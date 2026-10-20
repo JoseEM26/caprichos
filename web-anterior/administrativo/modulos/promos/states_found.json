@@ -1,0 +1,206 @@
+[
+  {
+    "name": "escritorio.listapromoyape",
+    "raw": "{url:\"/lista-promos-yape\",acl:\"escritorio\",views:{\"\":{templateUrl:\"scripts/restaurantpe/escritorio/resumen/yape/lista-descuentos-yape.view.html\",controller:\"ListaCrearPromoCtrl\",controllerAs:\"vm\"}},data:{pageTitle:\"Lista de promos Yape\"}}"
+  },
+  {
+    "name": "escritorio.valesproccesos",
+    "raw": "{url:\"/lista-cupones-procesos\",acl:\"escritorio\",views:{\"\":{templateUrl:\"scripts/restaurantpe/escritorio/resumen/yape/lista-cupones-proceso.view.html\",controller:\"ListaCuponesProcesoController\",controllerAs:\"vm\"}},data:{pageTitle:\"Lista de promos Yape\"}}"
+  },
+  {
+    "name": "ventas.hacerpedidos.salones",
+    "raw": "{url:\"/salones\",acl:\"ventas\",views:{\"\":{templateUrl:\"scripts/restaurantpe/ventas/salones/hacerpedidos-demanda-salones.html\",controller:\"salonesController\",controllerAs:\"vm\"},supply:{templateUrl:\"scripts/restaurantpe/ventas/salones/hacerpedidos-oferta-salones.html\"},\"breadcrumb@ventas\":{templateUrl:\"scripts/restaurantpe/ventas/salones/bc-index.html\"}},data:{pageTitle:\"Salones\"}}"
+  },
+  {
+    "name": "ventas.hacerpedidos.online",
+    "raw": "{url:\"/online\",abstract:!0,acl:\"ventas\",views:{\"\":{templateUrl:\"scripts/restaurantpe/ventas/online/hacerpedidos-demanda-online.html\",controller:\"PlaceOrdersOnlineCtrl\",controllerAs:\"vm\"},supply:{templateUrl:\"scripts/restaurantpe/ventas/online/hacerpedidos-oferta-online.html\"},\"breadcrumb@ventas\":{templateUrl:\"scripts/restaurantpe/ventas/online/bc-index.html\"}},data:{pageTitle:\"Pedidos Online\"}}"
+  },
+  {
+    "name": "ventas.hacerpedidos.online.telefonico.pedir",
+    "raw": "{url:\"/pedir/:clienteId\",acl:\"ventas\",views:{\"@ventas.hacerpedidos.online.telefonico.pedir\":{templateUrl:\"scripts/restaurantpe/ventas/ventarapida/hacerpedidos-oferta-ventarapida.html\"}},data:{pageTitle:\"Pedido Telefonico\"}}"
+  },
+  {
+    "name": "ventas.hacerpedidos.ventarapida",
+    "raw": "{url:\"/ventarapida\",acl:\"ventas.ventarapida\",views:{\"\":{templateUrl:\"scripts/restaurantpe/ventas/ventarapida/hacerpedidos-demanda-ventarapida.html\",controller:\"PlaceOrdersVentaRapidaCtrl\"},supply:{templateUrl:\"scripts/restaurantpe/ventas/ventarapida/hacerpedidos-oferta-ventarapida.html\"},\"breadcrumb@ventas\":{templateUrl:\"scripts/restaurantpe/ventas/ventarapida/bc-index.html\"}},data:{pageTitle:\"Venta Rápida\"}}"
+  },
+  {
+    "name": "ventas.hacerpedidos.comprobantemanual",
+    "raw": "{url:\"/comprobantemanual\",acl:\"ventas.comprobantemanual\",views:{\"\":{templateUrl:\"scripts/restaurantpe/ventas/comprobantemanual/hacerpedidos-demanda-comprobantemanual.html\"},supply:{templateUrl:\"scripts/restaurantpe/ventas/comprobantemanual/hacerpedidos-oferta-comprobantemanual.html\"},\"breadcrumb@ventas\":{templateUrl:\"scripts/restaurantpe/ventas/comprobantemanual/bc-index.html\"}},data:{pageTitle:\"Comprobante manual\"}}"
+  },
+  {
+    "name": "ventas.hacerpedidos.prepagos",
+    "raw": "{url:\"/prepagos\",acl:\"ventas\",views:{\"\":{templateUrl:\"scripts/restaurantpe/ventas/prepagos/hacerpedidos-demanda-prepagos.html\",controller:\"PlaceOrdersPrepagosCtrl\",controllerAs:\"vm\"},supply:{templateUrl:\"scripts/restaurantpe/ventas/prepagos/hacerpedidos-oferta-prepagos.html\"},\"breadcrumb@ventas\":{templateUrl:\"scripts/restaurantpe/ventas/prepagos/bc-index.html\"}},data:{pageTitle:\"Prepagos\"}}"
+  },
+  {
+    "name": "ventas.hacerpedidos.qr",
+    "raw": "{url:\"/qr\",acl:\"ventas\",views:{\"\":{templateUrl:\"scripts/restaurantpe/ventas/qr/hacerpedidos-qr.html\",controller:\"mesaPedidosQRCtrl as vm\"},supply:{templateUrl:\"scripts/restaurantpe/ventas/salones/hacerpedidos-oferta-salones.html\"},\"breadcrumb@ventas\":{templateUrl:\"scripts/restaurantpe/ventas/qr/bc-index.html\"}},data:{pageTitle:\"Pedidos con QR\"}}"
+  },
+  {
+    "name": "caja.cobrar.salones",
+    "raw": "{url:\"/salones\",acl:\"caja.cobrar\",views:{\"\":{templateUrl:\"scripts/restaurantpe/caja/cobrar/salones/cobrar-demanda-salones.html\",controller:\"salonesController\",controllerAs:\"vm\"},supply:{templateUrl:\"scripts/restaurantpe/caja/cobrar/salones/cobrar-oferta-salones.html\"},\"breadcrumb@caja\":{templateUrl:\"scripts/restaurantpe/caja/cobrar/salones/bc-index.html\"}},data:{pageTitle:\"Salones\"}}"
+  },
+  {
+    "name": "caja.cobrar.online",
+    "raw": "{url:\"/online\",acl:\"caja.cobrar\",views:{\"\":{templateUrl:\"scripts/restaurantpe/ventas/online/hacerpedidos-demanda-online.html\",controller:\"PlaceOrdersOnlineCtrl\",controllerAs:\"vm\"},supply:{templateUrl:\"scripts/restaurantpe/caja/cobrar/online/cobrar-oferta-online.html\"},\"breadcrumb@caja\":{templateUrl:\"scripts/restaurantpe/caja/cobrar/online/bc-index.html\"}},data:{pageTitle:\"Pedidos Online\"}}"
+  },
+  {
+    "name": "caja.cobrar.online.telefonico.pedir",
+    "raw": "{url:\"/pedir/:clienteId\",acl:\"caja.cobrar\",views:{\"@caja.cobrar.online.telefonico.pedir\":{templateUrl:\"scripts/restaurantpe/ventas/ventarapida/hacerpedidos-oferta-ventarapida.html\"}},data:{pageTitle:\"Pedido Telefonico Caja\"}}"
+  },
+  {
+    "name": "caja.cobrar.ventarapida",
+    "raw": "{url:\"/ventarapida\",acl:\"ventas.ventarapida\",views:{\"\":{templateUrl:\"scripts/restaurantpe/ventas/ventarapida/hacerpedidos-demanda-ventarapida.html\",controller:\"PlaceOrdersVentaRapidaCtrl\"},supply:{templateUrl:\"scripts/restaurantpe/ventas/ventarapida/hacerpedidos-oferta-ventarapida.html\"},\"breadcrumb@caja\":{templateUrl:\"scripts/restaurantpe/caja/cobrar/ventarapida/bc-index.html\"}},data:{pageTitle:\"Venta Rápida\"}}"
+  },
+  {
+    "name": "caja.cobrar.prepagos",
+    "raw": "{url:\"/prepagos\",acl:\"caja.cobrar\",views:{\"\":{templateUrl:\"scripts/restaurantpe/ventas/prepagos/hacerpedidos-demanda-prepagos.html\",controller:\"PlaceOrdersPrepagosCtrl\",controllerAs:\"vm\"},supply:{templateUrl:\"scripts/restaurantpe/caja/cobrar/prepagos/cobrar-oferta-prepagos.html\"},\"breadcrumb@caja\":{templateUrl:\"scripts/restaurantpe/caja/cobrar/prepagos/bc-index.html\"}},data:{pageTitle:\"Prepagos\"}}"
+  },
+  {
+    "name": "caja.cobrar.comprobantemanual",
+    "raw": "{url:\"/comprobantemanual\",acl:\"ventas.comprobantemanual\",views:{\"\":{templateUrl:\"scripts/restaurantpe/ventas/comprobantemanual/hacerpedidos-demanda-comprobantemanual.html\"},supply:{templateUrl:\"scripts/restaurantpe/ventas/comprobantemanual/hacerpedidos-oferta-comprobantemanual.html\"},\"breadcrumb@caja\":{templateUrl:\"scripts/restaurantpe/caja/cobrar/comprobantemanual/bc-index.html\"}},data:{pageTitle:\"Comprobante manual\"}}"
+  },
+  {
+    "name": "caja.cobrar.qr",
+    "raw": "{url:\"/qr\",acl:\"caja.cobrar\",views:{\"\":{templateUrl:\"scripts/restaurantpe/ventas/qr/hacerpedidos-qr.html\",controller:\"mesaPedidosQRCtrl as vm\"},supply:{templateUrl:\"scripts/restaurantpe/ventas/salones/hacerpedidos-oferta-salones.html\"},\"breadcrumb@caja\":{templateUrl:\"scripts/restaurantpe/ventas/qr/bc-index.html\"}},data:{pageTitle:\"Pedidos con QR\"}}"
+  },
+  {
+    "name": "productos.equivalencias-combo",
+    "raw": "{url:\"/combos/equivalencias/:idProductoGeneral?manejarporequivalencias\",acl:\"productos\",templateUrl:\"scripts/restaurantpe/productos/combos/equivalencias/combos.equivalencias.view.html\",controller:\"CombosEditarCtrl\",controllerAs:\"vm\"}"
+  },
+  {
+    "name": "ofertas",
+    "raw": "{abstract:!0,url:\"/ofertas\",views:{\"\":{templateUrl:\"scripts/common/content/content.html\"},\"breadcrumb@ofertas\":{templateUrl:\"scripts/restaurantpe/oferta/oferta-breadcrumb.html\"}}}"
+  },
+  {
+    "name": "ofertas.sucursales",
+    "raw": "{abstract:!0,url:\"/sucursales\",templateUrl:\"scripts/restaurantpe/oferta/oferta.view.html\",controller:\"ofertaCtrl as vm\"}"
+  },
+  {
+    "name": "ofertas.sucursales.tipo",
+    "raw": "{url:\"/:tipoOfertaTxt/:idTipooferta/categoria/:idCategoria\",acl:\"ofertas\",views:{oferta:{templateUrl:\"scripts/restaurantpe/oferta/asignar-precios-sucursales.view.html\",controller:\"asignarPrecioSucursalesCtrl as vm\"}},data:{pageTitle:\"Oferta 2 en 1\"}}"
+  },
+  {
+    "name": "ofertas.2en1",
+    "raw": "{abstract:!0,url:\"/2en1\",templateUrl:\"scripts/restaurantpe/oferta/oferta.view.html\",controller:\"ofertaCtrl as vm\"}"
+  },
+  {
+    "name": "ofertas.2en1.categoria",
+    "raw": "{url:\"/:idTipooferta/categoria/:idCategoria\",acl:\"ofertas\",views:{oferta:{templateUrl:\"scripts/restaurantpe/oferta/oferta2en1.lista.view.html\",controller:\"ofertaCtrl as vm\"}},data:{pageTitle:\"Oferta 2 en 1\"}}"
+  },
+  {
+    "name": "ofertas.2en1.registrar",
+    "raw": "{url:\"/registrar/:idTipooferta/categoria/:idCategoria\",acl:\"ofertas\",views:{oferta:{templateUrl:\"scripts/restaurantpe/oferta/oferta2en1.registrar.view.html\",controller:\"nuevaOfertaCtrl as vm\"},\"breadcrumb@ofertas\":{templateUrl:\"scripts/restaurantpe/oferta/nuevaoferta-breadcrumb.html\"}},data:{pageTitle:\"Registrar oferta 2 en 1\"}}"
+  },
+  {
+    "name": "ofertas.2x1",
+    "raw": "{abstract:!0,url:\"/2x1\",templateUrl:\"scripts/restaurantpe/oferta/oferta.view.html\",controller:\"ofertaCtrl as vm\"}"
+  },
+  {
+    "name": "ofertas.2x1.categoria",
+    "raw": "{url:\"/:idTipooferta/categoria/:idCategoria\",acl:\"ofertas\",views:{oferta:{templateUrl:\"scripts/restaurantpe/oferta/oferta2x1.lista.view.html\",controller:\"ofertaCtrl as vm\"}},data:{pageTitle:\"Oferta 2 x 1\"}}"
+  },
+  {
+    "name": "ofertas.2x1.registrar",
+    "raw": "{url:\"/registrar/:idTipooferta/categoria/:idCategoria\",acl:\"ofertas\",views:{oferta:{templateUrl:\"scripts/restaurantpe/oferta/oferta2x1.registrar.view.html\",controller:\"nuevaOfertaCtrl as vm\"},\"breadcrumb@ofertas\":{templateUrl:\"scripts/restaurantpe/oferta/nuevaoferta-breadcrumb.html\"}},data:{pageTitle:\"Registrar oferta 2 x 1\"}}"
+  },
+  {
+    "name": "ofertas.lowprice",
+    "raw": "{abstract:!0,url:\"/lowprice\",templateUrl:\"scripts/restaurantpe/oferta/oferta.view.html\",controller:\"ofertaCtrl as vm\"}"
+  },
+  {
+    "name": "ofertas.lowprice.categoria",
+    "raw": "{url:\"/:idTipooferta/categoria/:idCategoria\",acl:\"ofertas\",views:{oferta:{templateUrl:\"scripts/restaurantpe/oferta/ofertalowprice.lista.view.html\",controller:\"ofertaCtrl as vm\"}},data:{pageTitle:\"Oferta bajo precio\"}}"
+  },
+  {
+    "name": "ofertas.lowprice.registrar",
+    "raw": "{url:\"/registrar/:idTipooferta/categoria/:idCategoria\",acl:\"ofertas\",views:{oferta:{templateUrl:\"scripts/restaurantpe/oferta/lowprice.registrar.view.html\",controller:\"nuevaOfertaCtrl as vm\"},\"breadcrumb@ofertas\":{templateUrl:\"scripts/restaurantpe/oferta/nuevaoferta-breadcrumb.html\"}},data:{pageTitle:\"Registrar oferta bajo precio\"}}"
+  },
+  {
+    "name": "ofertas.porsalon",
+    "raw": "{abstract:!0,url:\"/porsalon\",templateUrl:\"scripts/restaurantpe/oferta/oferta.view.html\",controller:\"ofertaCtrl as vm\"}"
+  },
+  {
+    "name": "ofertas.porsalon.categoria",
+    "raw": "{url:\"/:idTipooferta/categoria/:idCategoria\",acl:\"ofertas\",views:{oferta:{templateUrl:\"scripts/restaurantpe/oferta/porsalon.lista.view.html\",controller:\"ofertaCtrl as vm\"}},data:{pageTitle:\"Oferta por salón\"}}"
+  },
+  {
+    "name": "ofertas.porsalon.registrar",
+    "raw": "{url:\"/registrar/:idTipooferta/categoria/:idCategoria\",acl:\"ofertas\",views:{oferta:{templateUrl:\"scripts/restaurantpe/oferta/porsalon.registrar.view.html\",controller:\"nuevaOfertaCtrl as vm\"},\"breadcrumb@ofertas\":{templateUrl:\"scripts/restaurantpe/oferta/nuevaoferta-breadcrumb.html\"}},data:{pageTitle:\"Registrar oferta por salón\"}}"
+  },
+  {
+    "name": "ofertas.asignarpreciosucursal",
+    "raw": "{abstract:!0,url:\"/asignar-precio\",templateUrl:\"scripts/restaurantpe/oferta/oferta.view.html\",controller:\"ofertaCtrl as vm\"}"
+  },
+  {
+    "name": "ofertas.asignarpreciosucursal.categoria",
+    "raw": "{url:\"/sucursal\",acl:\"ofertas\",views:{oferta:{templateUrl:\"scripts/restaurantpe/oferta/asignar-precios-sucursales.view.html\",controller:\"AsignarPrecioSucursalesCtrl as vm\"}},data:{pageTitle:\"Asignar precio\"}}"
+  },
+  {
+    "name": "descuentos",
+    "raw": "{url:\"/descuentos\",acl:\"descuentos\",views:{\"\":{templateUrl:\"scripts/common/content/content.html\"},\"@descuentos\":{templateUrl:\"scripts/restaurantpe/descuento/descuento.lista.view.html\",controller:\"descuentoCtrl as vm\"},\"breadcrumb@descuentos\":{templateUrl:\"scripts/restaurantpe/descuento/descuento-breadcrumb.html\"}}}"
+  },
+  {
+    "name": "descuentos.nuevo",
+    "raw": "{url:\"/nuevo\",acl:\"descuentos\",views:{form:{templateUrl:\"scripts/restaurantpe/descuento/descuento.editar.view.html\",controller:\"registrardescuentoCtrl as vm\"},\"breadcrumb@descuentos\":{templateUrl:\"scripts/restaurantpe/descuento/descuento-breadcrumb-form.html\"}}}"
+  },
+  {
+    "name": "descuentos.editar",
+    "raw": "{url:\"/:idDescuento/editar\",acl:\"descuentos\",views:{form:{templateUrl:\"scripts/restaurantpe/descuento/descuento.editar.view.html\",controller:\"modificardescuentoCtrl as vm\"},\"breadcrumb@descuentos\":{templateUrl:\"scripts/restaurantpe/descuento/descuento-breadcrumb-form.html\"}}}"
+  },
+  {
+    "name": "informes.ventas.descuentos",
+    "raw": "{url:\"/descuentos\",acl:\"informes.ventas\",views:{\"@informes\":{templateUrl:\"scripts/restaurantpe/informes/ventas/reportedescuentos/descuento.html\",controller:\"descuentoPorVentaCtrl as vm\"},\"breadcrumb@informes\":{templateUrl:\"scripts/restaurantpe/informes/ventas/reportedescuentos/bc-descuento.html\"}},data:{pageTitle:\"Descuentos por venta - Informes\"}}"
+  },
+  {
+    "name": "informes.ventas.descuentosyape",
+    "raw": "{url:\"/yape-cupones\",acl:\"informes.ventas\",views:{\"@informes\":{templateUrl:\"scripts/restaurantpe/informes/ventas/reportedescuentosyape/descuento-yape.html\",controller:\"descuentoYapePorVentaCtrl as vm\"},\"breadcrumb@informes\":{templateUrl:\"scripts/restaurantpe/informes/ventas/reportedescuentosyape/bc-descuento-yape.html\"}},data:{pageTitle:\"Descuentos por venta - Informes\"}}"
+  },
+  {
+    "name": "informes.ventas.poroferta",
+    "raw": "{url:\"/porofertas\",acl:\"informes.ventas\",views:{\"@informes\":{templateUrl:\"scripts/restaurantpe/informes/ventas/ventasporoferta/ventasporoferta.html\",controller:\"ventasPorOfertaCtrl as vm\"},\"breadcrumb@informes\":{templateUrl:\"scripts/restaurantpe/informes/ventas/ventasporoferta/bc-ventasporoferta.html\"}},data:{pageTitle:\"Ventas por oferta - Informes\"}}"
+  },
+  {
+    "name": "informes.fidelizacion.promociones",
+    "raw": "{url:\"/promociones\",acl:\"informes.generales\",views:{\"@informes\":{templateUrl:\"scripts/restaurantpe/informes/fidelizacion/promociones.html\",controller:\"FidelizacionCtrl\",controllerAs:\"vm\"},\"breadcrumb@informes\":{templateUrl:\"scripts/restaurantpe/informes/fidelizacion/bc-promociones.html\"}},data:{pageTitle:\"Promociones - Informes\"}}"
+  },
+  {
+    "name": "ajustes.cupondescuento",
+    "raw": "{url:\"/cupondescuento\",acl:\"ajustes\",views:{\"\":{templateUrl:\"scripts/restaurantpe/ajustes/cupondescuento/index.html\",controller:\"AjustesCuponesCtrl as vm\"},\"breadcrumb@ajustes\":{templateUrl:\"scripts/restaurantpe/ajustes/cupondescuento/bc-index.html\"}}}"
+  },
+  {
+    "name": "ajustes.cupondescuento.editar",
+    "raw": "{url:\"/:idCupondescuento/editar\",acl:\"ajustes\",views:{form:{templateUrl:\"scripts/restaurantpe/ajustes/cupondescuento/editar.html\",controller:\"nuevoCuponDescuentoCtrl as vm\"},\"breadcrumb@ajustes\":{templateUrl:\"scripts/restaurantpe/ajustes/cupondescuento/bc-form.html\"}}}"
+  },
+  {
+    "name": "ajustes.cupondescuento.nuevo",
+    "raw": "{url:\"/nuevo\",acl:\"ajustes\",views:{form:{templateUrl:\"scripts/restaurantpe/ajustes/cupondescuento/editar.html\",controller:\"nuevoCuponDescuentoCtrl as vm\"},\"breadcrumb@ajustes\":{templateUrl:\"scripts/restaurantpe/ajustes/cupondescuento/bc-form.html\"}}}"
+  },
+  {
+    "name": "ajustes.cupondescuento.importar",
+    "raw": "{url:\"/importar\",acl:\"ajustes\",views:{form:{templateUrl:\"scripts/restaurantpe/ajustes/cupondescuento/importar.html\",controller:\"AjustesCuponesCtrl as vm\"},\"breadcrumb@ajustes\":{templateUrl:\"scripts/restaurantpe/ajustes/cupondescuento/bc-form.html\"}}}"
+  },
+  {
+    "name": "ajustes.valedepago",
+    "raw": "{url:\"/valedepago\",acl:\"descuentos\",views:{\"\":{templateUrl:\"scripts/restaurantpe/ajustes/valedepago/index.html\",controller:\"AjustesValeDePagoCtrl as vm\",data:{pageTitle:\"Vales de pago\"}},\"breadcrumb@ajustes\":{templateUrl:\"scripts/restaurantpe/ajustes/valedepago/bc-index.html\"}}}"
+  },
+  {
+    "name": "ajustes.valedepago.editar",
+    "raw": "{url:\"/:idVale/editar\",acl:\"descuentos\",views:{form:{templateUrl:\"scripts/restaurantpe/ajustes/valedepago/editar.html\"},\"breadcrumb@ajustes\":{templateUrl:\"scripts/restaurantpe/ajustes/valedepago/bc-form.html\"}},data:{pageTitle:\"Editar vale de pago\"}}"
+  },
+  {
+    "name": "promocionsorteo",
+    "raw": "{url:\"/promocionsorteo\",acl:\"clientes\",views:{\"\":{templateUrl:\"scripts/common/content/content.html\"},\"@promocionsorteo\":{templateUrl:\"scripts/restaurantpe/promocionsorteo/index.html\",controller:\"promocionsorteoIndexCtrl as vm\"},\"breadcrumb@promocionsorteo\":{templateUrl:\"scripts/restaurantpe/promocionsorteo/bc-index.html\"}}}"
+  },
+  {
+    "name": "promocionsorteo.listar",
+    "raw": "{url:\"/listar\",acl:\"clientes\",views:{\"\":{templateUrl:\"scripts/restaurantpe/promocionsorteo/listar/promocionsorteo.listar.html\",controller:\"promocionSorteoListarCtrl as vm\"},\"breadcrumb@promocionsorteo\":{templateUrl:\"scripts/restaurantpe/promocionsorteo/listar/bc-promocionsorteo-lista.html\"}},data:{pageTitle:\"Promociones/Sorteos\"}}"
+  },
+  {
+    "name": "promocionsorteo.campania.detalle",
+    "raw": "{url:\"/detalle/:idPlanmensajeria\",acl:\"clientes\",views:{\"@promocionsorteo\":{templateUrl:\"scripts/restaurantpe/promocionsorteo/planmensajeria/planmensajeria_detalle.html\",controller:\"PlanMensajeriaDetalleCtrl as vm\"},\"breadcrumb@promocionsorteo\":{templateUrl:\"scripts/restaurantpe/promocionsorteo/planmensajeria/bc-planmensajeria-nuevo.html\"}},data:{pageTitle:\"Detalle campaña de mensajes\"}}"
+  },
+  {
+    "name": "promocionsorteo.registrar",
+    "raw": "{url:\"/registrar\",acl:\"clientes\",views:{\"@promocionsorteo\":{templateUrl:\"scripts/restaurantpe/promocionsorteo/registrar/promocionsorteo.nuevo.html\",controller:\"promocionsorteoNuevoCtrl as vm\"},\"breadcrumb@promocionsorteo\":{templateUrl:\"scripts/restaurantpe/promocionsorteo/registrar/bc-promocionsorteo-nuevo.html\"}},data:{pageTitle:\"Nueva promoción/sorteo\"}}"
+  }
+]

@@ -1,0 +1,175 @@
+{
+  "v": 3,
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-10-13T20:00:00Z"
+  },
+  "title": "Caprichos Plataforma Digital",
+  "launch": {
+    "view": "canvas"
+  },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1366,
+      "h": 900,
+      "title": "Carta virtual (web): carta, carrito y pedido",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Chatbot.dc.html": {
+      "x": 1446,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "title": "Chatbot de WhatsApp: pedido por conversación",
+      "is_interactive": true
+    },
+    "Admin.dc.html": {
+      "x": 1916,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "title": "Administrativo: pedidos y caja, cocina, repartos, productos y stock",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Pantalla.dc.html": {
+      "x": 3436,
+      "y": 0,
+      "w": 1280,
+      "h": 790,
+      "title": "Pantalla de cocina en TV: solo lectura",
+      "is_interactive": true
+    },
+    "Propuesta.dc.html": {
+      "x": 4796,
+      "y": 0,
+      "w": 1280,
+      "h": 790,
+      "title": "Propuesta comercial: alcance, partes y montos",
+      "is_interactive": true
+    },
+    "Tecnica.dc.html": {
+      "x": 6156,
+      "y": 0,
+      "w": 1280,
+      "h": 790,
+      "title": "Propuesta técnica: VPS o Vercel y Neon",
+      "is_interactive": true
+    }
+  },
+  "order": [
+    "Main.dc.html",
+    "Chatbot.dc.html",
+    "Admin.dc.html",
+    "Pantalla.dc.html",
+    "Propuesta.dc.html",
+    "Tecnica.dc.html"
+  ],
+  "notes": {
+    "titulo": {
+      "x": 0,
+      "y": -260,
+      "text": "Carta virtual (web) y chatbot de WhatsApp",
+      "kind": "title1",
+      "maxW": 1836
+    },
+    "titulo2": {
+      "x": 1916,
+      "y": -260,
+      "text": "Administrativo",
+      "kind": "title1",
+      "maxW": 1440
+    },
+    "n1": {
+      "x": 0,
+      "y": 980,
+      "w": 420,
+      "text": "Cómo se usa la carta: 1) Filtra por categoría o busca por nombre. 2) Toca un producto: se abre la ventana con tamaño, leche, endulzante, cremas o adicionales y una nota para cocina. 3) Agrega: aparece el aviso y el contador de Mi pedido sube.",
+      "fill": "orange",
+      "size": "s"
+    },
+    "n2": {
+      "x": 460,
+      "y": 980,
+      "w": 420,
+      "text": "Carrito y pago: Mi pedido abre el panel lateral con cantidades y subtotal. Ahí se elige Delivery, Para llevar o En el local; con Delivery aparece el envío (gratis desde s/ 70) y el aviso del mínimo (s/ 14.50). Continuar pide nombre, teléfono, dirección o mesa según la modalidad, y el medio de pago. Pedir envía el pedido a caja.",
+      "fill": "teal",
+      "size": "s"
+    },
+    "n3": {
+      "x": 920,
+      "y": 980,
+      "w": 420,
+      "text": "Después de pedir: el cliente ve el estado: recibido, caja lo verifica y lo acepta, en cocina, y en camino o listo. El botón 'Simular siguiente paso' solo sirve en este prototipo. Reglas y precios de envío por confirmar con el cliente.",
+      "fill": "blue",
+      "size": "s"
+    },
+    "n4": {
+      "x": 1916,
+      "y": 980,
+      "w": 420,
+      "text": "Cómo se usa el administrativo: 0) Entra con el inicio de sesión eligiendo un rol (Administrador, Cajero, Cocina y barra, Mozo, Call center, Almacén o Repartidor): el menú muestra solo sus módulos y oculta los grupos sin módulos. Arriba, 'Ver como' cambia de rol y 'Dispositivo' alterna PC y Celular. Los grupos del menú se contraen y abren. El perfil está al pie del menú. 1) En Pedidos y caja, 'Simular pedido nuevo' crea uno; verifícalo y pulsa Aceptar: al aceptar se imprime la comanda en la ticketera de cocina; el detalle del pedido muestra cómo sale el ticket impreso y permite reimprimirlo. 2) En Cocina aparece: Empezar a preparar y Marcar listo; el contador cambia de color cerca de los 13 minutos. 3) En Repartos, el repartidor toma un pedido disponible (el primero que lo toma se lo queda y a los demás les desaparece), abre la dirección en Google Maps o Waze y marca Entregado. En mesa o para llevar, caja entrega y cierra.",
+      "fill": "orange",
+      "size": "s"
+    },
+    "n5": {
+      "x": 2376,
+      "y": 980,
+      "w": 420,
+      "text": "Menú lateral por grupos: Operación (escritorio, pedidos y caja, cocina, repartos, reservas), Clientes y ventas (clientes, créditos, productos, ofertas y descuentos), Compras y stock (compras, almacén, stock y recetas), Análisis (informes, indicadores) y Configuración (mi restaurant, ajustes, usuarios, notificaciones). Las listas tienen búsqueda, filtros y paginación; Ajustes y Mi restaurant son tarjetas que muestran sus campos. En Productos, marca AGOTADO y deja de ofrecerse en la carta y el chatbot. Diseño de la carta (solo administrador): 'Abrir el diseñador en pantalla completa' muestra la carta igual que la ve el cliente; ahí mismo se elige entre tres organizaciones (secciones en cuadrícula, lista o tarjetas grandes), se arrastran productos y categorías, se cambian fotos, se editan nombre, descripción y precio, se esconden productos y se editan las dos promociones; al Publicar, la carta virtual lo usa. Pantallas (solo administrador, en Configuración): vincula una TV escribiendo el código que ella muestra, con confirmación; la lista permite desactivar una pantalla si se pierde. Paleta de colores (solo administrador): cada decoración festiva tiene su paleta; la carta la usa solo mientras esa decoración está activa y vuelve a los colores normales cuando se elige 'Sin decoración'. Todos los datos son de ejemplo. Plano del local (solo administrador): dibuja mesas, cocina, baños, paredes y entrada por piso; el segundo piso se activa solo si se necesita. Se puede eliminar lo que no tiene historial; una mesa con pedidos o reservas no se elimina, solo se desactiva. El mozo, en Pedidos y caja, usa 'Nuevo pedido de mesa': elige el piso (si hay más de uno), la mesa y los productos, con las mismas opciones que la carta (tamaño, leche, endulzante, cremas, adicionales y nota para cocina) y varios productos en el mismo pedido, como un carrito. En Productos, Ofertas y descuentos y Almacén, 'Gestionar listas' crea, edita y desactiva categorías, tipos y origen; los combos de la edición permiten crear al instante, y se pueden subir imágenes. Reservas, Clientes y Créditos están marcados 'Por conversar'.",
+      "fill": "teal",
+      "size": "s"
+    },
+    "titulo3": {
+      "x": 3436,
+      "y": -260,
+      "text": "Pantalla de cocina (TV)",
+      "kind": "title1",
+      "maxW": 1280
+    },
+    "n6": {
+      "x": 3436,
+      "y": 980,
+      "w": 420,
+      "text": "Pantalla de TV: es una URL aparte, sin usuario, que solo muestra los pedidos de cocina (sin teléfono ni dirección). La TV no tiene botones: los estados se cambian en la mini computadora de cocina desde Cocina. Colores por tiempo: azul a tiempo, naranja desde 10 min, rojo desde 13 min (meta). Los botones de arriba solo sirven en este prototipo para ver los otros estados: Vincular pantalla (código que el administrador escribe en el administrativo), Sin conexión y Desvinculada. Todos los datos son de ejemplo.",
+      "fill": "blue",
+      "size": "s"
+    },
+    "titulo4": {
+      "x": 4796,
+      "y": -260,
+      "text": "Propuestas para el cliente",
+      "kind": "title1",
+      "maxW": 2640
+    },
+    "n7": {
+      "x": 4796,
+      "y": 980,
+      "w": 420,
+      "text": "Propuesta comercial: 10 láminas con lo que se mostró, el problema que resuelve, los siete roles, la inversión de S/ 3,000 en cuatro partes (S/ 500, 700, 800 y 1,000), qué entrega cada parte, qué incluye y qué va aparte, cómo se trabaja y el siguiente paso. Usa Anterior y Siguiente o los números. Los plazos son estimados.",
+      "fill": "orange",
+      "size": "s"
+    },
+    "n8": {
+      "x": 6156,
+      "y": 980,
+      "w": 420,
+      "text": "Propuesta técnica: 7 láminas que comparan un VPS con Vercel y Neon en palabras de negocio. Advierte que el plan gratuito de Vercel no permite uso comercial y que el de Neon se duerme tras 5 minutos sin uso. Los costos en dólares son estimados y se deben verificar con cada proveedor.",
+      "fill": "teal",
+      "size": "s"
+    }
+  },
+  "designSystems": [
+    {
+      "title": "Caprichos Design System",
+      "namespace": "caprichos",
+      "artifact": "https://claude.ai/artifact/7GmJ8tWCzfidRpXfeEd4LR",
+      "version": "1791924851-7eab",
+      "copiedAt": "2026-10-13T20:00:00Z"
+    }
+  ]
+}

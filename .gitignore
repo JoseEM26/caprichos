@@ -1,0 +1,35 @@
+# --- Secretos (nunca al repositorio) ---
+.env
+.env.*
+*.key
+*.pem
+.vercel/
+
+# --- Datos personales de clientes (Ley 29733) ---
+capri-bot/CAPRIBOT RAIZ/CHATBOT/user_sessions.json
+capri-bot/CAPRIBOT RAIZ/CHATBOT/chat_history.json
+capri-bot/CAPRIBOT RAIZ/CHATBOT/chat_history_archive.json
+capri-bot/CAPRIBOT RAIZ/CHATBOT/clientes.json
+capri-bot/CAPRIBOT RAIZ/CHATBOT/special_notice_notified.json
+capri-bot/CAPRIBOT RAIZ/CHATBOT/uploads/
+
+# --- Capturas de la web anterior con tokens de sesión de restaurant.pe ---
+web-anterior/carta/enlaces/external_links_results.json
+web-anterior/administrativo/audit_output.json
+web-anterior/administrativo/modulos/escritorio/escritorio_analysis.json
+web-anterior/administrativo/modulos/escritorio/dashboard_details.json
+web-anterior/administrativo/modulos/delivery/admin_delivery_data.json
+web-anterior/administrativo/modulos/clientes/clientes_live_inspection.json
+web-anterior/administrativo/modulos/reservas/inspection_result.json
+web-anterior/administrativo/modulos/ventas/ventas_inspection_raw.json
+web-anterior/administrativo/modulos/ventas/summary.txt
+web-anterior/administrativo/modulos/productos/raw_inspection.json
+
+# --- Dependencias y generados ---
+.venv/
+node_modules/
+__pycache__/
+*.pyc
+
+# --- Ya vive en su propio repositorio: JoseEM26/caprichos-mockup ---
+mockup-web/

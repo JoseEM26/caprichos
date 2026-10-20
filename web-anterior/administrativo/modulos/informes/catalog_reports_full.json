@@ -1,0 +1,336 @@
+{
+  "ventas": [
+    {
+      "ruta": "informes.ventas.todas",
+      "valor": "Todas las ventas"
+    },
+    {
+      "ruta": "informes.ventas.anuladas",
+      "valor": "Ventas anuladas"
+    },
+    {
+      "ruta": "informes.ventas.porarea",
+      "valor": "Ventas por área"
+    },
+    {
+      "ruta": "informes.ventas.porproducto",
+      "valor": "Ventas por productos o categorias"
+    },
+    {
+      "ruta": "informes.ventas.ventasproductosrangodias",
+      "valor": "Ventas productos por mes"
+    },
+    {
+      "ruta": "informes.ventas.porcombo",
+      "valor": "Ventas por combo"
+    },
+    {
+      "ruta": "informes.ventas.kardexporproducto",
+      "valor": "Kardex de productos vendidos"
+    },
+    {
+      "ruta": "informes.ventas.pormozo",
+      "valor": "Ventas por +MOZO.toLowerCase()+ y cajero"
+    },
+    {
+      "ruta": "informes.ventas.reportemozos",
+      "valor": "Pedidos por +MOZO.toLowerCase()+ y cajero"
+    },
+    {
+      "ruta": "informes.ventas.comisionpormozo",
+      "valor": "Comisión por +MOZO.toLowerCase()+ y cajero"
+    },
+    {
+      "ruta": "informes.ventas.porcliente",
+      "valor": "Ventas por cliente"
+    },
+    {
+      "ruta": "informes.ventas.credito",
+      "valor": "Estado de créditos de cliente"
+    },
+    {
+      "ruta": "informes.ventas.registradaspendientes",
+      "valor": "Ventas registradas y pendientes"
+    },
+    {
+      "ruta": "informes.ventas.pedidosmodificados",
+      "valor": "Pedidos modificados"
+    },
+    {
+      "ruta": "informes.ventas.pedidosanulados",
+      "valor": "Pedidos anulados"
+    },
+    {
+      "ruta": "informes.ventas.porimpuestos",
+      "valor": "Ventas por impuesto"
+    },
+    {
+      "ruta": "informes.ventas.retencionportarjeta",
+      "valor": "Retenciones por tarjeta"
+    },
+    {
+      "ruta": "informes.ventas.descuentos",
+      "valor": "Descuentos"
+    },
+    {
+      "ruta": "informes.ventas.deducibles",
+      "valor": "Deducibles"
+    },
+    {
+      "ruta": "informes.ventas.porformadepago",
+      "valor": "Por forma de pago"
+    },
+    {
+      "ruta": "informes.ventas.pordiasmes",
+      "valor": "Por dias del mes"
+    },
+    {
+      "ruta": "informes.ventas.sucursalesporperiodo",
+      "valor": "Ventas en sucursales por periodo"
+    },
+    {
+      "ruta": "informes.ventas.porhoras",
+      "valor": "Por horas (Ventas detalladas)"
+    },
+    {
+      "ruta": "informes.ventas.propinapormozo",
+      "valor": "e+ por +MOZO.toLowerCase()+/+MOTORIZADO.toLowerCase()"
+    },
+    {
+      "ruta": "informes.ventas.resumenventascajero",
+      "valor": "Resumen de ventas por cajero"
+    },
+    {
+      "ruta": "informes.ventas.productosporhoras",
+      "valor": "Productos por horas y/o dias"
+    },
+    {
+      "ruta": "informes.ventas.reportemenuspordia",
+      "valor": "Menús por día"
+    },
+    {
+      "ruta": "informes.ventas.deliverysvendidos",
+      "valor": "DELIVERYS+ vendidos"
+    },
+    {
+      "ruta": "informes.ventas.afluenciapersonas",
+      "valor": "Afluencia de personas por mesa y salon"
+    },
+    {
+      "ruta": "informes.ventas.porreserva",
+      "valor": "Ventas por reservas"
+    },
+    {
+      "ruta": "informes.ventas.ventasporhoraconsolidado",
+      "valor": "Ventas por hora consolidado"
+    },
+    {
+      "ruta": "informes.ventas.pormodificador",
+      "valor": "Ventas por modificador"
+    },
+    {
+      "ruta": "informes.ventas.pormodificadoragrupadosporcantidad",
+      "valor": "Ventas por modificador agrupados por cantidad"
+    },
+    {
+      "ruta": "informes.ventas.pormodificadoragrupadosporproducto",
+      "valor": "Ventas por modificador agrupados por producto"
+    },
+    {
+      "ruta": "informes.ventas.pordiaenperiodos",
+      "valor": "Ventas por día y periodo del día"
+    },
+    {
+      "ruta": "informes.ventas.poroferta",
+      "valor": "Ventas por oferta"
+    },
+    {
+      "ruta": "informes.ventas.reportereimpresiones",
+      "valor": "Reimpresión de documentos"
+    },
+    {
+      "ruta": "informes.ventas.reservamesas",
+      "valor": "Reservacion de mesas"
+    },
+    {
+      "ruta": "informes.ventas.deliveryresumenpedidos",
+      "valor": "DELIVERYS+ por pedidos"
+    },
+    {
+      "ruta": "informes.ventas.deliveryresumenproductos",
+      "valor": "DELIVERY+ por productos"
+    },
+    {
+      "ruta": "informes.ventas.margengananciaproductos",
+      "valor": "Margen de ganancia por productos vendidos"
+    },
+    {
+      "ruta": "informes.ventas.operacionsospechosa",
+      "valor": "Operacion sospechosa por producto"
+    },
+    {
+      "ruta": "informes.ventas.autoservicio",
+      "valor": "Ventas por autoservicio"
+    },
+    {
+      "ruta": "informes.inventario.tiempodespacho",
+      "valor": "Tiempo de despacho"
+    },
+    {
+      "ruta": "informes.ventas.todas",
+      "valor": "Todas las ventas"
+    },
+    {
+      "ruta": "informes.ventas.anuladas",
+      "valor": "Ventas anuladas"
+    },
+    {
+      "ruta": "informes.ventas.porproducto",
+      "valor": "Ventas por productos o categorias"
+    },
+    {
+      "ruta": "informes.ventas.pedidosanulados",
+      "valor": "Pedidos anulados"
+    },
+    {
+      "ruta": "informes.ventas.descuentosyape",
+      "valor": "Yape Cupones"
+    },
+    {
+      "ruta": "informes.ventas.consumoclientes",
+      "valor": "Consumo clientes"
+    }
+  ],
+  "compras": [
+    {
+      "ruta": "informes.finanzas.informecomprascontable",
+      "valor": "Exportable de compras a sistemas contables"
+    }
+  ],
+  "finanzas": [
+    {
+      "ruta": "informes.finanzas.resumencomparativo",
+      "valor": "Resumen comparativo de cierres de caja"
+    },
+    {
+      "ruta": "informes.finanzas.resumen",
+      "valor": "Cierres de caja"
+    },
+    {
+      "ruta": "informes.finanzas.informeventascontable",
+      "valor": "Exportable de ventas a sistemas contables"
+    },
+    {
+      "ruta": "informes.finanzas.ingresos",
+      "valor": "Ingresos extras"
+    },
+    {
+      "ruta": "informes.finanzas.egresos",
+      "valor": "Egresos extras"
+    },
+    {
+      "ruta": "informes.finanzas.notacreditoventa",
+      "valor": "Notas de crédito por venta"
+    },
+    {
+      "ruta": "informes.finanzas.notadebitoventa",
+      "valor": "Notas de débito por venta"
+    },
+    {
+      "ruta": "informes.finanzas.reimpresiones",
+      "valor": "Historico de operaciones"
+    },
+    {
+      "ruta": "informes.finanzas.integracionwsahi",
+      "valor": "Documentos por integracion WSAHI"
+    },
+    {
+      "ruta": "informes.finanzas.complementoventa",
+      "valor": "Complementos Financieros de la Venta"
+    },
+    {
+      "ruta": "informes.finanzas.importadorventas",
+      "valor": "Importador de ventas"
+    },
+    {
+      "ruta": "informes.finanzas.informeventascontable",
+      "valor": "Exportable de ventas a sistemas contables"
+    },
+    {
+      "ruta": "informes.finanzas.sunat",
+      "valor": "Documentos +SUNAT"
+    },
+    {
+      "ruta": "informes.finanzas.cdrrestafact",
+      "valor": "Descargar CDR de documentos en Restafact"
+    },
+    {
+      "ruta": "informes.finanzas.restafact",
+      "valor": "Estado documentos pendientes en Restafact"
+    }
+  ],
+  "facturacion": [
+    {
+      "ruta": "informes.facturacion.documentos",
+      "valor": "Documentos +SUNAT"
+    },
+    {
+      "ruta": "informes.facturacion.reenviodocumentos",
+      "valor": "Panel de Reenvio de Documentos"
+    },
+    {
+      "ruta": "informes.facturacion.estadodocumento",
+      "valor": "Panel de estado de documento"
+    },
+    {
+      "ruta": "informes.facturacion.cdrrestafact",
+      "valor": "Descargar CDR de documentos en Restafact"
+    },
+    {
+      "ruta": "informes.facturacion.restafact",
+      "valor": "Estado documentos pendientes en Restafact"
+    }
+  ],
+  "inventario": [
+    {
+      "ruta": "almacen.kardex.individual",
+      "valor": "Kardex"
+    }
+  ],
+  "gerenciales": [
+    {
+      "ruta": "informes.gerenciales.ventas",
+      "valor": "Ventas totales"
+    }
+  ],
+  "otros": [
+    {
+      "ruta": "informes.otros.asistencia",
+      "valor": "Reporte de asistencia"
+    },
+    {
+      "ruta": "informes.otros.webhookintegracion",
+      "valor": "Reporte de webhook por integracion"
+    },
+    {
+      "ruta": "informes.otros.migracionerp",
+      "valor": "Reporte de migraciones ERP"
+    },
+    {
+      "ruta": "informes.otros.logerp",
+      "valor": "Reporte de Logs ERP"
+    }
+  ],
+  "mercado": [
+    {
+      "ruta": "informes.mercado.ventasmercado",
+      "valor": "Todas las ventas"
+    }
+  ],
+  "fidelizacion": [
+    {
+      "ruta": "informes.ventas.porcliente",
+      "valor": "Ventas por cliente"
+    }
+  ]
+}

@@ -1,0 +1,252 @@
+{
+  "data": {
+    "onsite": [
+      {
+        "id": "a7a980a0-68f4-11ec-870d-0f37fb22b0f8",
+        "payment_method_id": "a7a980a0-68f4-11ec-870d-0f37fb22b0f8",
+        "code": "credit_card",
+        "provider_id": null,
+        "provider_code": null,
+        "payment_code": null,
+        "description": null,
+        "payment_method_fee": null,
+        "logo_name": null,
+        "logo_url": null
+      },
+      {
+        "id": "c31f42e6-86e7-4dee-ae62-40fb523d99a9",
+        "payment_method_id": "c31f42e6-86e7-4dee-ae62-40fb523d99a9",
+        "code": "transfer",
+        "provider_id": null,
+        "provider_code": null,
+        "payment_code": null,
+        "description": "BCP Ahorro Soles 19197148281074 \nINTERBANK Ahorro soles 0913227414217\nAmbas a nombre de Maria Jose Morillo Ruiz",
+        "payment_method_fee": null,
+        "logo_name": null,
+        "logo_url": null
+      },
+      {
+        "id": "cda35c3c-d97d-4312-8f46-331525955ed6",
+        "payment_method_id": "cda35c3c-d97d-4312-8f46-331525955ed6",
+        "code": "yape",
+        "provider_id": null,
+        "provider_code": null,
+        "payment_code": null,
+        "description": "977503006 a nombre de: María José Morillo Ruiz",
+        "payment_method_fee": null,
+        "logo_name": null,
+        "logo_url": null
+      },
+      {
+        "id": "efb5df60-c79e-11eb-a39e-39b43976a67f",
+        "payment_method_id": "efb5df60-c79e-11eb-a39e-39b43976a67f",
+        "code": "plin",
+        "provider_id": null,
+        "provider_code": null,
+        "payment_code": null,
+        "description": "977503006 a nombre de: María José Morillo Ruiz",
+        "payment_method_fee": null,
+        "logo_name": null,
+        "logo_url": null
+      },
+      {
+        "id": "2a689983-36b6-436e-8abb-7b2f197fd0a3",
+        "payment_method_id": "2a689983-36b6-436e-8abb-7b2f197fd0a3",
+        "code": "cash",
+        "provider_id": null,
+        "provider_code": null,
+        "payment_code": null,
+        "description": "100% Contra-Entrega",
+        "payment_method_fee": null,
+        "logo_name": null,
+        "logo_url": null
+      }
+    ],
+    "delivery": [
+      {
+        "id": "a7a980a0-68f4-11ec-870d-0f37fb22b0f8",
+        "payment_method_id": "a7a980a0-68f4-11ec-870d-0f37fb22b0f8",
+        "code": "credit_card",
+        "provider_id": null,
+        "provider_code": null,
+        "payment_code": null,
+        "description": null,
+        "payment_method_fee": null,
+        "logo_name": null,
+        "logo_url": null
+      },
+      {
+        "id": "c31f42e6-86e7-4dee-ae62-40fb523d99a9",
+        "payment_method_id": "c31f42e6-86e7-4dee-ae62-40fb523d99a9",
+        "code": "transfer",
+        "provider_id": null,
+        "provider_code": null,
+        "payment_code": null,
+        "description": "BCP Ahorro Soles 19197148281074 \nINTERBANK Ahorro soles 0913227414217\nAmbas a nombre de Maria Jose Morillo Ruiz",
+        "payment_method_fee": null,
+        "logo_name": null,
+        "logo_url": null
+      },
+      {
+        "id": "cda35c3c-d97d-4312-8f46-331525955ed6",
+        "payment_method_id": "cda35c3c-d97d-4312-8f46-331525955ed6",
+        "code": "yape",
+        "provider_id": null,
+        "provider_code": null,
+        "payment_code": null,
+        "description": "977503006 a nombre de: María José Morillo Ruiz",
+        "payment_method_fee": null,
+        "logo_name": null,
+        "logo_url": null
+      },
+      {
+        "id": "efb5df60-c79e-11eb-a39e-39b43976a67f",
+        "payment_method_id": "efb5df60-c79e-11eb-a39e-39b43976a67f",
+        "code": "plin",
+        "provider_id": null,
+        "provider_code": null,
+        "payment_code": null,
+        "description": "977503006 a nombre de: María José Morillo Ruiz",
+        "payment_method_fee": null,
+        "logo_name": null,
+        "logo_url": null
+      },
+      {
+        "id": "2a689983-36b6-436e-8abb-7b2f197fd0a3",
+        "payment_method_id": "2a689983-36b6-436e-8abb-7b2f197fd0a3",
+        "code": "cash",
+        "provider_id": null,
+        "provider_code": null,
+        "payment_code": null,
+        "description": "100% Contra-Entrega",
+        "payment_method_fee": null,
+        "logo_name": null,
+        "logo_url": null
+      }
+    ],
+    "table": [
+      {
+        "id": "a7a980a0-68f4-11ec-870d-0f37fb22b0f8",
+        "payment_method_id": "a7a980a0-68f4-11ec-870d-0f37fb22b0f8",
+        "code": "credit_card",
+        "provider_id": null,
+        "provider_code": null,
+        "payment_code": null,
+        "description": null,
+        "payment_method_fee": null,
+        "logo_name": null,
+        "logo_url": null
+      },
+      {
+        "id": "c31f42e6-86e7-4dee-ae62-40fb523d99a9",
+        "payment_method_id": "c31f42e6-86e7-4dee-ae62-40fb523d99a9",
+        "code": "transfer",
+        "provider_id": null,
+        "provider_code": null,
+        "payment_code": null,
+        "description": "BCP Ahorro Soles 19197148281074 \nINTERBANK Ahorro soles 0913227414217\nAmbas a nombre de Maria Jose Morillo Ruiz",
+        "payment_method_fee": null,
+        "logo_name": null,
+        "logo_url": null
+      },
+      {
+        "id": "cda35c3c-d97d-4312-8f46-331525955ed6",
+        "payment_method_id": "cda35c3c-d97d-4312-8f46-331525955ed6",
+        "code": "yape",
+        "provider_id": null,
+        "provider_code": null,
+        "payment_code": null,
+        "description": "977503006 a nombre de: María José Morillo Ruiz",
+        "payment_method_fee": null,
+        "logo_name": null,
+        "logo_url": null
+      },
+      {
+        "id": "efb5df60-c79e-11eb-a39e-39b43976a67f",
+        "payment_method_id": "efb5df60-c79e-11eb-a39e-39b43976a67f",
+        "code": "plin",
+        "provider_id": null,
+        "provider_code": null,
+        "payment_code": null,
+        "description": "977503006 a nombre de: María José Morillo Ruiz",
+        "payment_method_fee": null,
+        "logo_name": null,
+        "logo_url": null
+      },
+      {
+        "id": "2a689983-36b6-436e-8abb-7b2f197fd0a3",
+        "payment_method_id": "2a689983-36b6-436e-8abb-7b2f197fd0a3",
+        "code": "cash",
+        "provider_id": null,
+        "provider_code": null,
+        "payment_code": null,
+        "description": "100% Contra-Entrega",
+        "payment_method_fee": null,
+        "logo_name": null,
+        "logo_url": null
+      }
+    ],
+    "takeaway": [
+      {
+        "id": "a7a980a0-68f4-11ec-870d-0f37fb22b0f8",
+        "payment_method_id": "a7a980a0-68f4-11ec-870d-0f37fb22b0f8",
+        "code": "credit_card",
+        "provider_id": null,
+        "provider_code": null,
+        "payment_code": null,
+        "description": null,
+        "payment_method_fee": null,
+        "logo_name": null,
+        "logo_url": null
+      },
+      {
+        "id": "c31f42e6-86e7-4dee-ae62-40fb523d99a9",
+        "payment_method_id": "c31f42e6-86e7-4dee-ae62-40fb523d99a9",
+        "code": "transfer",
+        "provider_id": null,
+        "provider_code": null,
+        "payment_code": null,
+        "description": "BCP Ahorro Soles 19197148281074 \nINTERBANK Ahorro soles 0913227414217\nAmbas a nombre de Maria Jose Morillo Ruiz",
+        "payment_method_fee": null,
+        "logo_name": null,
+        "logo_url": null
+      },
+      {
+        "id": "cda35c3c-d97d-4312-8f46-331525955ed6",
+        "payment_method_id": "cda35c3c-d97d-4312-8f46-331525955ed6",
+        "code": "yape",
+        "provider_id": null,
+        "provider_code": null,
+        "payment_code": null,
+        "description": "977503006 a nombre de: María José Morillo Ruiz",
+        "payment_method_fee": null,
+        "logo_name": null,
+        "logo_url": null
+      },
+      {
+        "id": "efb5df60-c79e-11eb-a39e-39b43976a67f",
+        "payment_method_id": "efb5df60-c79e-11eb-a39e-39b43976a67f",
+        "code": "plin",
+        "provider_id": null,
+        "provider_code": null,
+        "payment_code": null,
+        "description": "977503006 a nombre de: María José Morillo Ruiz",
+        "payment_method_fee": null,
+        "logo_name": null,
+        "logo_url": null
+      },
+      {
+        "id": "2a689983-36b6-436e-8abb-7b2f197fd0a3",
+        "payment_method_id": "2a689983-36b6-436e-8abb-7b2f197fd0a3",
+        "code": "cash",
+        "provider_id": null,
+        "provider_code": null,
+        "payment_code": null,
+        "description": "100% Contra-Entrega",
+        "payment_method_fee": null,
+        "logo_name": null,
+        "logo_url": null
+      }
+    ]
+  }
+}

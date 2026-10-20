@@ -1,0 +1,92 @@
+erDiagram
+  CONVERSACION {
+    bigint id PK
+    text telefono UK
+    bigint party_id FK
+    text duenio
+    bigint tomado_por
+    timestamptz tomado_en
+    boolean urgente
+    text estado
+    jsonb flujo
+    timestamptz ultima_actividad
+  }
+  MENSAJE_CHAT {
+    bigint id PK
+    bigint conversacion_id FK
+    text direccion
+    text autor
+    text tipo
+    jsonb contenido
+    text meta_id UK
+    timestamptz en
+  }
+  RESPUESTA_RAPIDA {
+    bigint id PK
+    text titulo UK
+    text texto
+    boolean activo
+  }
+  SOLICITUD_RESERVA {
+    bigint id PK
+    bigint conversacion_id FK
+    int personas
+    timestamptz hora
+    text estado
+    bigint reserva_id FK
+  }
+  SOLICITUD_CAMBIO {
+    bigint id PK
+    bigint pedido_id FK
+    text tipo
+    text detalle
+    text estado
+    bigint decidido_por
+    text motivo
+  }
+  ENCUESTA {
+    bigint id PK
+    bigint pedido_id FK,UK
+    smallint nota
+    text comentario
+    boolean derivada
+    timestamptz enviada_en
+    timestamptz respondida_en
+  }
+  USO_EXTERNO {
+    bigint id PK
+    text servicio
+    int unidades
+    numeric costo_usd
+    timestamptz en
+  }
+  NOTIFICACION {
+    bigint id PK
+    text tipo
+    text rol_destino FK
+    bigint party_destino FK
+    text titulo
+    text enlace
+    timestamptz leida_en
+    timestamptz en
+  }
+  PARTY {
+    bigint id PK "en otro dominio"
+  }
+  PEDIDO {
+    bigint id PK "en otro dominio"
+  }
+  RESERVA {
+    bigint id PK "en otro dominio"
+  }
+  ROL {
+    bigint id PK "en otro dominio"
+  }
+  CONVERSACION ||--o{ MENSAJE_CHAT : "conversacion_id"
+  CONVERSACION ||--o{ SOLICITUD_RESERVA : "conversacion_id"
+  PARTY ||--o{ CONVERSACION : "party_id"
+  PARTY ||--o{ NOTIFICACION : "party_destino"
+  PEDIDO ||--o{ ENCUESTA : "pedido_id"
+  PEDIDO ||--o{ SOLICITUD_CAMBIO : "pedido_id"
+  RESERVA ||--o{ SOLICITUD_RESERVA : "reserva_id"
+  ROL ||--o{ NOTIFICACION : "rol_destino"

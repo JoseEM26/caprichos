@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Propuesta comercial Caprichos</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+button{font-family:inherit;cursor:pointer}
+.deck{width:1280px;height:790px;background:#E3D6C6;font-family:Montserrat,system-ui,sans-serif;color:#0B2C3E;display:flex;flex-direction:column}
+.sl{width:1280px;height:720px;box-sizing:border-box;background:#FBF4EC;padding:48px 64px 40px 64px;display:flex;flex-direction:column;gap:20px;position:relative;overflow:hidden}
+.dark{background:#0B2C3E;color:#FBF4EC}
+.kick{font-size:14px;font-weight:700;letter-spacing:0.12em;color:#B2500F;text-transform:uppercase}
+.dark .kick{color:#F6A04D}
+.h1{font-weight:800;font-size:40px;line-height:46px;margin:0}
+.h2{font-weight:800;font-size:22px;line-height:28px;margin:0}
+.p{font-size:19px;line-height:28px;color:#2C4C5D;margin:0}
+.dark .p{color:#C9D6DD}
+.row{display:flex;gap:20px;align-items:stretch}
+.card{flex:1;min-width:0;background:#FFFFFF;border:1px solid #E3D6C6;border-radius:14px;padding:20px 22px;display:flex;flex-direction:column;gap:8px}
+.card ul{margin:0;padding-left:20px;font-size:17px;line-height:25px;color:#2C4C5D}
+.card li{margin-bottom:4px}
+.price{font-weight:800;font-size:30px;color:#B2500F}
+.pill{display:inline-block;font-size:14px;font-weight:700;border-radius:9999px;padding:4px 14px;background:#0B2C3E;color:#FBF4EC}
+.foot{position:absolute;left:64px;right:64px;bottom:16px;display:flex;justify-content:space-between;font-size:12px;color:#2C4C5D}
+.dark .foot{color:#C9D6DD}
+.tbl{width:100%;border-collapse:collapse;font-size:17px;line-height:24px}
+.tbl th{text-align:left;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;color:#2C4C5D;padding:8px 12px;border-bottom:2px solid #0B2C3E}
+.tbl td{padding:12px;border-bottom:1px solid #E3D6C6;vertical-align:top}
+.tbl td.k{font-weight:800;white-space:nowrap}
+.tbl tr.tot td{font-weight:800;border-bottom:0;background:#F3E8DA}
+</style>
+</helmet>
+<div class="deck">
+  <div style="height:70px;box-sizing:border-box;padding:0 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#FBF4EC;border-bottom:1px solid #D9CFC2">
+    <span style="font-size:12px;font-weight:700;letter-spacing:0.06em;color:#2C4C5D">PROPUESTA COMERCIAL</span>
+    <button onClick="{{prev}}" style="min-height:40px;padding:0 16px;border-radius:9999px;border:1.5px solid #0B2C3E;background:transparent;color:#0B2C3E;font-weight:700;opacity:{{prevOp}}">← Anterior</button>
+    <span style="font-weight:800;font-size:14px;min-width:64px;text-align:center">{{pos}}</span>
+    <button onClick="{{next}}" style="min-height:40px;padding:0 16px;border-radius:9999px;border:1.5px solid #0B2C3E;background:#0B2C3E;color:#FBF4EC;font-weight:700;opacity:{{nextOp}}">Siguiente →</button>
+    <sc-for list="{{dots}}" as="d" hint-placeholder-count="13"><button onClick="{{d.pick}}" aria-label="Ir a la lámina {{d.n}}" style="width:28px;height:28px;border-radius:14px;border:1.5px solid #0B2C3E;background:{{d.bg}};color:{{d.fg}};font-weight:700;font-size:12px;padding:0">{{d.n}}</button></sc-for>
+  </div>
+  <sc-if value="{{s1}}" hint-placeholder-val="{{ true }}">
+  <div class="sl dark">
+    <img src="/_blob/6d6aa5696913688bb2235a49f1133c2a" alt="Caprichos" style="width:84px;height:84px;border-radius:42px">
+    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:16px">
+      <div class="kick">Propuesta de desarrollo</div>
+      <h1 class="h1" style="font-size:56px;line-height:62px;max-width:900px">Plataforma digital de Caprichos</h1>
+      <p class="p" style="font-size:24px;line-height:34px;max-width:820px">Carta virtual, chatbot de WhatsApp y administrativo en un solo sistema, entregado en cuatro partes funcionales.</p>
+    </div>
+    <div style="display:flex;gap:48px;font-size:17px;color:#C9D6DD"><div>Para<br><b style="color:#FBF4EC">Kevin Rosales · Caprichos</b></div><div>Desarrollo<br><b style="color:#FBF4EC">José Ángel Espinoza</b></div><div>Fecha<br><b style="color:#FBF4EC">19 de octubre de 2026</b></div></div>
+    <div class="foot"><span>Caprichos · Plataforma digital</span><span>1</span></div>
+  </div>
+  </sc-if>
+  <sc-if value="{{s2}}" hint-placeholder-val="{{ false }}">
+  <div class="sl">
+    <div class="kick">Lo que ya te mostramos</div>
+    <h2 class="h1">Un prototipo navegable de todo el sistema</h2>
+    <div class="row" style="flex:1">
+      <div class="card"><div class="h2">Carta virtual (web)</div><ul><li>Categorías, búsqueda y filtros</li><li>Opciones de cada producto: tamaño, leche, cremas</li><li>Carrito, modalidad y pago</li><li>Seguimiento del pedido</li></ul></div>
+      <div class="card"><div class="h2">Chatbot de WhatsApp</div><ul><li>Pedido completo por conversación</li><li>Mismas opciones y precios que la carta</li><li>El pedido llega a caja</li></ul></div>
+    </div>
+    <div class="row" style="flex:1">
+      <div class="card"><div class="h2">Administrativo</div><ul><li>Ocho roles, cada uno ve solo lo suyo</li><li>Caja, cocina, repartos, reservas, stock</li><li>Diseño de la carta y decoraciones festivas</li></ul></div>
+      <div class="card"><div class="h2">Cocina y ticket</div><ul><li>Ticket impreso al aceptar un pedido</li><li>Pantalla de TV de solo lectura</li><li>Vincular pantallas desde el administrativo</li></ul></div>
+    </div>
+    <p class="p" style="font-size:16px">Todos los datos del prototipo son de ejemplo: así se verá y se usará el sistema.</p>
+    <div class="foot"><span>Caprichos · Plataforma digital</span><span>2</span></div>
+  </div>
+  </sc-if>
+  <sc-if value="{{s3}}" hint-placeholder-val="{{ false }}">
+  <div class="sl">
+    <div class="kick">Lo que se agregó al prototipo</div>
+    <h2 class="h1">Pedidos, caja y atención al cliente</h2>
+    <div class="row" style="flex:1">
+      <div class="card"><div class="h2">Carta virtual</div><ul><li>Delivery, para llevar y en el local; no recibe pedidos con el local cerrado</li><li>Ubicación actual opcional: calcula el envío por zona; si no puede, escribe su dirección y el equipo la ubica</li><li>Cuenta con DNI, cumpleaños en calendario y campanita con su cupón de cumpleaños</li><li>Libro de Reclamaciones y cupones</li></ul></div>
+      <div class="card"><div class="h2">Pedidos y caja</div><ul><li>Nuevo pedido para un cliente o para el personal, elegido por su usuario</li><li>El pago se confirma por WhatsApp: el mozo o caja sube la captura</li><li>Cobro con medio de pago, vuelto y pago mixto</li><li>Anulaciones con motivo y PIN, y cierre de caja por medio de pago</li></ul></div>
+      <div class="card"><div class="h2">Reservas de mesa</div><ul><li>Un solo formulario: nombre, personas, hora exacta y mesa</li><li>La reserva dura 15 minutos y se anula sola</li><li>La marca en el plano es solo visual: la mesa siempre se puede usar</li></ul></div>
+    </div>
+    <div class="foot"><span>Caprichos · Plataforma digital</span><span>3</span></div>
+  </div>
+  </sc-if>
+  <sc-if value="{{s4}}" hint-placeholder-val="{{ false }}">
+  <div class="sl">
+    <div class="kick">Lo que se agregó al prototipo</div>
+    <h2 class="h1">Mensajes, reparto y control del local</h2>
+    <div class="row" style="flex:1">
+      <div class="card"><div class="h2">Mensajes de WhatsApp</div><ul><li>Bandeja con el aspecto de WhatsApp: buscador, filtros y chats por atender</li><li>Pausar el bot, validar pagos y respuestas rápidas</li><li>Botón Pulir: mejora el tono y corrige la ortografía antes de enviar</li><li>Pantalla completa y zoom</li></ul></div>
+      <div class="card"><div class="h2">Delivery</div><ul><li>Zonas de reparto en el mapa, editables por el administrador</li><li>Envío gratis desde o por más de un monto que tú eliges</li><li>Tarifa especial por cliente: monto fijo o descuento</li><li>Mapa de entregas y repartidor con Maps y Waze</li></ul></div>
+      <div class="card"><div class="h2">Control del local</div><ul><li>Configuración del local en un solo lugar: horario, pagos, textos y zonas</li><li>Usuarios y permisos por rol; el personal con crédito y descuento configurable</li><li>Áreas de cocina, recetas y stock</li><li>Informes e indicadores</li></ul></div>
+    </div>
+    <div class="foot"><span>Caprichos · Plataforma digital</span><span>4</span></div>
+  </div>
+  </sc-if>
+  <sc-if value="{{s5}}" hint-placeholder-val="{{ false }}">
+  <div class="sl">
+    <div class="kick">Lo que se agregó al prototipo</div>
+    <h2 class="h1">Cocina, almacén y acceso del personal</h2>
+    <div class="row" style="flex:1">
+      <div class="card"><div class="h2">Cocina</div><ul><li>Registrar merma solo de productos de cocina (donas, galletas, pan, gelatina)</li><li>Merma de varios productos a la vez, cada uno con su destino: donación, personal o desecho</li><li>Cierre del día con conteo: se cuenta, se bota lo que sobra y la diferencia queda registrada</li><li>Alta demanda: la carta y el chatbot avisan que tarda más (minutos configurables) y se pueden pausar los pedidos</li></ul></div>
+      <div class="card"><div class="h2">Almacén y stock</div><ul><li>Entradas, salidas, mermas y devoluciones solo de los insumos con los que se prepara</li><li>Cada insumo con una barra de qué tan lleno está: agotado, por acabarse, poco, bien o lleno</li><li>La producción nunca deja el stock en negativo: avisa qué falta y cuántas tandas alcanzan</li><li>Historial con filtros por tipo y por fecha</li></ul></div>
+      <div class="card"><div class="h2">Acceso del personal</div><ul><li>Primer ingreso: el usuario crea su contraseña nueva (obligatoria, escrita dos veces y con botón para verla)</li><li>Foto de perfil opcional</li><li>Usuarios que se desactivan, no se eliminan, y permisos por rol</li></ul></div>
+    </div>
+    <div class="foot"><span>Caprichos · Plataforma digital</span><span>5</span></div>
+  </div>
+  </sc-if>
+  <sc-if value="{{s6}}" hint-placeholder-val="{{ false }}">
+  <div class="sl">
+    <div class="kick">Para qué sirve</div>
+    <h2 class="h1">De herramientas separadas a un solo sistema</h2>
+    <div class="row" style="flex:1">
+      <div class="card"><div class="h2">Hoy</div><ul>
+        <li>Carta digital, POS y chatbot sin conexión entre sí.</li><li>El pedido de WhatsApp no pasa por caja ni llega a cocina.</li><li>Procesos empíricos y sin manual.</li><li>Entrega de 20 a 25 minutos.</li></ul></div>
+      <div class="card" style="border:2px solid #E67929"><div class="h2">Con la plataforma</div><ul>
+        <li>Un pedido, venga de donde venga, pasa por caja antes de cocina.</li><li>Se imprime la comanda y se ve en la pantalla de cocina.</li><li>Cada persona ve solo lo que le corresponde.</li><li>Meta de entrega: 13 minutos o menos.</li></ul></div>
+    </div>
+    <div class="foot"><span>Caprichos · Plataforma digital</span><span>6</span></div>
+  </div>
+  </sc-if>
+  <sc-if value="{{s7}}" hint-placeholder-val="{{ false }}">
+  <div class="sl">
+    <div class="kick">Quién usa el sistema</div>
+    <h2 class="h1">Ocho roles, cada uno con su propio escritorio</h2>
+    <div style="display:flex;flex-wrap:wrap;gap:10px"><span class="pill">Administrador</span><span class="pill">Cajero</span><span class="pill">Cocina y barra</span><span class="pill">Mozo</span><span class="pill">Call center</span><span class="pill">Almacén</span><span class="pill">Producción</span><span class="pill">Repartidor</span></div>
+    <div class="row" style="flex:1">
+      <div class="card"><div class="h2">Lo que cambia por rol</div><ul><li>El menú muestra solo sus módulos</li><li>El escritorio muestra solo lo importante para su función</li><li>El repartidor ve únicamente sus entregas, con Google Maps y Waze</li></ul></div>
+      <div class="card"><div class="h2">Seguridad</div><ul><li>Solo el administrador ve ventas e indicadores</li><li>Nada se elimina: se desactiva y se puede reactivar</li><li>Cada acción importante pide confirmar Sí o No</li></ul></div>
+    </div>
+    <div class="foot"><span>Caprichos · Plataforma digital</span><span>7</span></div>
+  </div>
+  </sc-if>
+  <sc-if value="{{s8}}" hint-placeholder-val="{{ false }}">
+  <div class="sl">
+    <div class="kick">Inversión</div>
+    <h2 class="h1">S/ 3,500 en cuatro partes, de menor a mayor</h2>
+    <table class="tbl">
+      <tr><th>Parte</th><th>Lo que recibes funcionando</th><th>Plazo estimado</th><th>Monto</th><th>Acumulado</th></tr>
+      <tr><td class="k">1</td><td>Carta virtual con cuenta del cliente y notificaciones, y administración de productos y usuarios</td><td>2 semanas</td><td class="k">S/ 600</td><td>S/ 600</td></tr>
+      <tr><td class="k">2</td><td>Pedidos y caja, reservas, cocina y escritorio por rol</td><td>3 semanas</td><td class="k">S/ 800</td><td>S/ 1,400</td></tr>
+      <tr><td class="k">3</td><td>Impresión de tickets, TV de cocina, delivery por zonas y diseño de la carta</td><td>3 semanas</td><td class="k">S/ 1,000</td><td>S/ 2,400</td></tr>
+      <tr><td class="k">4</td><td>Chatbot y bandeja de mensajes de WhatsApp, stock y recetas, informes, capacitación</td><td>4 semanas</td><td class="k">S/ 1,100</td><td>S/ 3,500</td></tr>
+      <tr class="tot"><td colspan="3">Total del proyecto</td><td class="k">S/ 3,500</td><td></td></tr>
+    </table>
+    <p class="p" style="font-size:16px">Los plazos son estimados y se acuerdan al aprobar el diseño. La primera parte es la más baja para empezar con poco riesgo.</p>
+    <div class="foot"><span>Caprichos · Plataforma digital</span><span>8</span></div>
+  </div>
+  </sc-if>
+  <sc-if value="{{s9}}" hint-placeholder-val="{{ false }}">
+  <div class="sl">
+    <div class="kick">Qué entrega cada parte</div>
+    <h2 class="h1">Partes 1 y 2</h2>
+    <div class="row" style="flex:1">
+      <div class="card"><div class="h2">Parte 1 · S/ 600</div><div class="price" style="font-size:16px;color:#2C4C5D">Resultado: la carta ya se ve en línea</div><ul><li>Diseño UI/UX aprobado y ajustado</li><li>Carta virtual en celular y PC, con los productos y precios vigentes</li><li>El administrador cambia precios, fotos y marca productos agotados</li><li>Usuarios y ocho roles con inicio de sesión</li><li>Cuenta del cliente: cumpleaños en calendario y campanita con su cupón</li></ul></div>
+      <div class="card"><div class="h2">Parte 2 · S/ 800</div><div class="price" style="font-size:16px;color:#2C4C5D">Resultado: se puede operar un pedido completo</div><ul><li>Carrito, modalidad (delivery, para llevar, en el local) y pago</li><li>El pedido llega a caja; caja lo acepta y registra el cobro</li><li>Cocina ve los pedidos y marca preparando y listo</li><li>Pedido del personal por usuario; el pago se confirma por WhatsApp</li><li>Reservas de mesa con hora exacta y sin bloquear la mesa</li></ul></div>
+    </div>
+    <div class="foot"><span>Caprichos · Plataforma digital</span><span>9</span></div>
+  </div>
+  </sc-if>
+  <sc-if value="{{s10}}" hint-placeholder-val="{{ false }}">
+  <div class="sl">
+    <div class="kick">Qué entrega cada parte</div>
+    <h2 class="h1">Partes 3 y 4</h2>
+    <div class="row" style="flex:1">
+      <div class="card"><div class="h2">Parte 3 · S/ 1,000</div><div class="price" style="font-size:16px;color:#2C4C5D">Resultado: cocina y reparto funcionan solos</div><ul><li>Comanda impresa sola al aceptar el pedido, en la ticketera</li><li>Pantalla de TV de solo lectura, vinculada con código</li><li>Delivery por zonas: el cliente comparte su ubicación o el equipo la marca en el mapa</li><li>Diseño de la carta: orden, promociones y decoraciones festivas</li></ul></div>
+      <div class="card"><div class="h2">Parte 4 · S/ 1,100</div><div class="price" style="font-size:16px;color:#2C4C5D">Resultado: sistema completo y equipo capacitado</div><ul><li>Chatbot y bandeja de mensajes de WhatsApp, con botón para pulir los mensajes</li><li>Stock de insumos con barras de nivel, recetas y producción validada; mermas y cierre del día</li><li>Productos agotados que dejan de ofrecerse solos</li><li>Informes, indicadores y capacitación al personal</li></ul></div>
+    </div>
+    <div class="foot"><span>Caprichos · Plataforma digital</span><span>10</span></div>
+  </div>
+  </sc-if>
+  <sc-if value="{{s11}}" hint-placeholder-val="{{ false }}">
+  <div class="sl">
+    <div class="kick">Alcance</div>
+    <h2 class="h1">Qué incluye y qué va aparte</h2>
+    <div class="row" style="flex:1">
+      <div class="card"><div class="h2">Incluido en los S/ 3,500</div><ul><li>Las cuatro entregas funcionales, con todo lo que muestra el prototipo</li><li>Una sesión de capacitación para caja, cocina y administrador</li><li>Un mes de garantía de errores tras la entrega final</li><li>Ajustes menores de diseño dentro de cada parte</li></ul></div>
+      <div class="card"><div class="h2">Aparte</div><ul><li>Hosting y dominio (ver la propuesta técnica)</li><li>API de WhatsApp: costo mensual del proveedor</li><li>IA para pulir mensajes: opcional, se paga por uso</li><li>Facturación electrónica: se mantiene con el sistema actual</li><li>Cambios de alcance y app móvil propia: se cotizan</li></ul></div>
+    </div>
+    <div class="foot"><span>Caprichos · Plataforma digital</span><span>11</span></div>
+  </div>
+  </sc-if>
+  <sc-if value="{{s12}}" hint-placeholder-val="{{ false }}">
+  <div class="sl">
+    <div class="kick">Cómo trabajamos</div>
+    <h2 class="h1">Una parte a la vez, aprobada antes de seguir</h2>
+    <div class="row" style="flex:1;align-items:flex-start">
+      <div class="card"><div class="price">1</div><div class="h2">Aprobar el diseño</div><p class="p" style="font-size:16px;line-height:23px">Revisamos el prototipo y se ajusta lo que haga falta.</p></div>
+      <div class="card"><div class="price">2</div><div class="h2">Desarrollar la parte</div><p class="p" style="font-size:16px;line-height:23px">Se construye lo acordado y se prueba con datos reales.</p></div>
+      <div class="card"><div class="price">3</div><div class="h2">Demostrar y aprobar</div><p class="p" style="font-size:16px;line-height:23px">Se muestra funcionando y el cliente aprueba la entrega.</p></div>
+      <div class="card"><div class="price">4</div><div class="h2">Pagar y continuar</div><p class="p" style="font-size:16px;line-height:23px">Se paga la parte recibida conforme y empieza la siguiente.</p></div>
+    </div>
+    <div class="foot"><span>Caprichos · Plataforma digital</span><span>12</span></div>
+  </div>
+  </sc-if>
+  <sc-if value="{{s13}}" hint-placeholder-val="{{ false }}">
+  <div class="sl">
+    <div class="kick">Siguiente paso</div>
+    <h2 class="h1">Para empezar la Parte 1</h2>
+    <div class="row" style="flex:1">
+      <div class="card"><div class="h2">Necesitamos de Caprichos</div><ul>
+        <li>Aprobar el diseño UI/UX del prototipo.</li><li>Confirmar los datos pendientes: ticketera y TV de cocina, API de WhatsApp, reglas de delivery.</li><li>Elegir dónde se aloja el sistema (propuesta técnica).</li><li>Fijar la fecha de inicio.</li></ul></div>
+      <div class="card"><div class="h2">Aprobación</div><p class="p" style="font-size:16px">Esta propuesta no se acepta hasta que la firme una persona de Caprichos.</p>
+        <div style="margin-top:auto;border-top:1.5px solid #0B2C3E;padding-top:8px;font-size:15px">Kevin Rosales · Fecha: ____ / ____ / ________</div></div>
+    </div>
+    <div class="foot"><span>Caprichos · Plataforma digital</span><span>13</span></div>
+  </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":790}}'>
+const N = 13;
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { i: 0 }; }
+  go(i) { this.setState({ i: Math.max(0, Math.min(N - 1, i)) }); }
+  renderVals() {
+    const i = this.state.i;
+    const v = { prev: () => this.go(i - 1), next: () => this.go(i + 1), prevOp: i === 0 ? 0.4 : 1, nextOp: i === N - 1 ? 0.4 : 1, pos: (i + 1) + ' / ' + N,
+      dots: Array.from({ length: N }, (_, k) => ({ n: k + 1, pick: () => this.go(k), bg: k === i ? '#0B2C3E' : 'transparent', fg: k === i ? '#FBF4EC' : '#0B2C3E' })) };
+    for (let k = 1; k <= N; k++) { v['s' + k] = i === k - 1; }
+    return v;
+  }
+}
+</script>
+</body>
+</html>

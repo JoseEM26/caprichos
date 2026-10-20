@@ -1,0 +1,91 @@
+User-agent: OAI-SearchBot
+Allow: /
+Disallow: /cart
+Disallow: /checkout
+Disallow: /tracking
+Disallow: /health
+
+User-agent: ChatGPT-User
+Allow: /
+Disallow: /cart
+Disallow: /checkout
+Disallow: /tracking
+Disallow: /health
+
+User-agent: Claude-SearchBot
+Allow: /
+Disallow: /cart
+Disallow: /checkout
+Disallow: /tracking
+Disallow: /health
+
+User-agent: Claude-User
+Allow: /
+Disallow: /cart
+Disallow: /checkout
+Disallow: /tracking
+Disallow: /health
+
+User-agent: PerplexityBot
+Allow: /
+Disallow: /cart
+Disallow: /checkout
+Disallow: /tracking
+Disallow: /health
+
+User-agent: Perplexity-User
+Allow: /
+Disallow: /cart
+Disallow: /checkout
+Disallow: /tracking
+Disallow: /health
+
+User-agent: GPTBot
+Allow: /
+Disallow: /cart
+Disallow: /checkout
+Disallow: /tracking
+Disallow: /health
+
+User-agent: ClaudeBot
+Allow: /
+Disallow: /cart
+Disallow: /checkout
+Disallow: /tracking
+Disallow: /health
+
+User-agent: Google-Extended
+Allow: /
+Disallow: /cart
+Disallow: /checkout
+Disallow: /tracking
+Disallow: /health
+
+User-agent: facebookexternalhit
+Allow: /
+Disallow: /cart
+Disallow: /checkout
+Disallow: /tracking
+Disallow: /health
+
+User-agent: Twitterbot
+Allow: /
+Disallow: /cart
+Disallow: /checkout
+Disallow: /tracking
+Disallow: /health
+
+User-agent: LinkedInBot
+Allow: /
+Disallow: /cart
+Disallow: /checkout
+Disallow: /tracking
+Disallow: /health
+
+User-agent: *
+Disallow: /cart
+Disallow: /checkout
+Disallow: /tracking
+Disallow: /health
+
+Sitemap: https://caprichos-per.ola.click/sitemap.xml

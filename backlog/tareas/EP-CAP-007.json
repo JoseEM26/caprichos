@@ -1,0 +1,760 @@
+{
+  "epica": "EP-CAP-007",
+  "generado_por_ia": true,
+  "revisado_por": null,
+  "historias": [
+    {
+      "hu": "HU-CAP-058",
+      "tareas": [
+        {
+          "id": "HU-CAP-058-T01",
+          "titulo": "Revisar criterios de HU-CAP-058 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-058-T02",
+          "titulo": "Migración Prisma de las tablas de FT-SAL-01 (piso, elemento_plano, pedido, pedido_mesa, reserva)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-058-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-058-T03",
+          "titulo": "Reglas de dominio de HU-CAP-058 (RQ-SAL-01-01, RQ-SAL-01-02, RQ-SAL-01-03, RQ-SAL-01-08)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-058-T01",
+            "HU-CAP-058-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-058-T04",
+          "titulo": "Casos de uso: Dibujar el plano del local por piso",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-058-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-058-T05",
+          "titulo": "Endpoints y eventos de FT-SAL-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-058-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-058-T06",
+          "titulo": "Pantalla React: Dibujar el plano del local por piso",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-058-T05"
+          ]
+        },
+        {
+          "id": "HU-CAP-058-T07",
+          "titulo": "Pruebas TC-CAP-058-01..04 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-058-T06"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-059",
+      "tareas": [
+        {
+          "id": "HU-CAP-059-T01",
+          "titulo": "Revisar criterios de HU-CAP-059 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-059-T02",
+          "titulo": "Reglas de dominio de HU-CAP-059 (RQ-SAL-01-04, RQ-SAL-01-05, RQ-SAL-01-06, RQ-SAL-01-07)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-059-T01",
+            "HU-CAP-058-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-059-T03",
+          "titulo": "Casos de uso: Activar pisos y eliminar o desactivar elementos",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-059-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-059-T04",
+          "titulo": "Endpoints y eventos de FT-SAL-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-059-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-059-T05",
+          "titulo": "Pantalla React: Activar pisos y eliminar o desactivar elementos",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-059-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-059-T06",
+          "titulo": "Pruebas TC-CAP-059-01..05 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-059-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-060",
+      "tareas": [
+        {
+          "id": "HU-CAP-060-T01",
+          "titulo": "Revisar criterios de HU-CAP-060 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-060-T02",
+          "titulo": "Reglas de dominio de HU-CAP-060 (RQ-SAL-01-09, RQ-SAL-01-10)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-060-T01",
+            "HU-CAP-058-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-060-T03",
+          "titulo": "Casos de uso: Copiar, pegar y restaurar el plano por defecto",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-060-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-060-T04",
+          "titulo": "Endpoints y eventos de FT-SAL-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-060-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-060-T05",
+          "titulo": "Pantalla React: Copiar, pegar y restaurar el plano por defecto",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-060-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-060-T06",
+          "titulo": "Pruebas TC-CAP-060-01..02 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-060-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-061",
+      "tareas": [
+        {
+          "id": "HU-CAP-061-T01",
+          "titulo": "Revisar criterios de HU-CAP-061 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-061-T02",
+          "titulo": "Migración Prisma de las tablas de FT-SAL-02 (piso, elemento_plano, pedido, pedido_mesa, reserva)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-061-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-061-T03",
+          "titulo": "Reglas de dominio de HU-CAP-061 (RQ-SAL-02-01, RQ-SAL-02-02, RQ-SAL-02-06, RQ-SAL-02-07)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-061-T01",
+            "HU-CAP-061-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-061-T04",
+          "titulo": "Casos de uso: Elegir la mesa y armar el pedido de mesa",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-061-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-061-T05",
+          "titulo": "Endpoints y eventos de FT-SAL-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-061-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-061-T06",
+          "titulo": "Pantalla React: Elegir la mesa y armar el pedido de mesa",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-061-T05"
+          ]
+        },
+        {
+          "id": "HU-CAP-061-T07",
+          "titulo": "Pruebas TC-CAP-061-01..04 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-061-T06"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-062",
+      "tareas": [
+        {
+          "id": "HU-CAP-062-T01",
+          "titulo": "Revisar criterios de HU-CAP-062 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-062-T02",
+          "titulo": "Reglas de dominio de HU-CAP-062 (RQ-SAL-02-03, RQ-SAL-02-04)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-062-T01",
+            "HU-CAP-061-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-062-T03",
+          "titulo": "Casos de uso: Enviar el pedido de mesa directo a cocina",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-062-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-062-T04",
+          "titulo": "Endpoints y eventos de FT-SAL-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-062-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-062-T05",
+          "titulo": "Pantalla React: Enviar el pedido de mesa directo a cocina",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-062-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-062-T06",
+          "titulo": "Pruebas TC-CAP-062-01..03 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-062-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-063",
+      "tareas": [
+        {
+          "id": "HU-CAP-063-T01",
+          "titulo": "Revisar criterios de HU-CAP-063 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-063-T02",
+          "titulo": "Reglas de dominio de HU-CAP-063 (RQ-SAL-02-05, RQ-SAL-02-08)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-063-T01",
+            "HU-CAP-061-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-063-T03",
+          "titulo": "Casos de uso: Agregar consumos a una mesa ocupada e imprimir la precuenta",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-063-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-063-T04",
+          "titulo": "Endpoints y eventos de FT-SAL-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-063-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-063-T05",
+          "titulo": "Pantalla React: Agregar consumos a una mesa ocupada e imprimir la precuenta",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-063-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-063-T06",
+          "titulo": "Pruebas TC-CAP-063-01..02 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-063-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-064",
+      "tareas": [
+        {
+          "id": "HU-CAP-064-T01",
+          "titulo": "Revisar criterios de HU-CAP-064 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-064-T02",
+          "titulo": "Reglas de dominio de HU-CAP-064 (RQ-SAL-02-09, RQ-SAL-02-10)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-064-T01",
+            "HU-CAP-061-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-064-T03",
+          "titulo": "Casos de uso: Recibir aviso de listo, entregar en mesa y liberar",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-064-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-064-T04",
+          "titulo": "Endpoints y eventos de FT-SAL-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-064-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-064-T05",
+          "titulo": "Pantalla React: Recibir aviso de listo, entregar en mesa y liberar",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-064-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-064-T06",
+          "titulo": "Pruebas TC-CAP-064-01..03 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-064-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-065",
+      "tareas": [
+        {
+          "id": "HU-CAP-065-T01",
+          "titulo": "Revisar criterios de HU-CAP-065 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-065-T02",
+          "titulo": "Migración Prisma de las tablas de FT-SAL-03 (piso, elemento_plano, pedido, pedido_mesa, reserva)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-065-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-065-T03",
+          "titulo": "Reglas de dominio de HU-CAP-065 (RQ-SAL-03-01, RQ-SAL-03-02, RQ-SAL-03-03)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-065-T01",
+            "HU-CAP-065-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-065-T04",
+          "titulo": "Casos de uso: Registrar una reserva con una o varias mesas",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-065-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-065-T05",
+          "titulo": "Endpoints y eventos de FT-SAL-03 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-065-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-065-T06",
+          "titulo": "Pantalla React: Registrar una reserva con una o varias mesas",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-065-T05"
+          ]
+        },
+        {
+          "id": "HU-CAP-065-T07",
+          "titulo": "Pruebas TC-CAP-065-01..03 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-065-T06"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-066",
+      "tareas": [
+        {
+          "id": "HU-CAP-066-T01",
+          "titulo": "Revisar criterios de HU-CAP-066 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-066-T02",
+          "titulo": "Reglas de dominio de HU-CAP-066 (RQ-SAL-03-04, RQ-SAL-03-05, RQ-SAL-03-06)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-066-T01",
+            "HU-CAP-065-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-066-T03",
+          "titulo": "Casos de uso: Ver la reserva en el plano, sentarla o dejar que venza",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-066-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-066-T04",
+          "titulo": "Endpoints y eventos de FT-SAL-03 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-066-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-066-T05",
+          "titulo": "Pantalla React: Ver la reserva en el plano, sentarla o dejar que venza",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-066-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-066-T06",
+          "titulo": "Pruebas TC-CAP-066-01..03 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-066-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-067",
+      "tareas": [
+        {
+          "id": "HU-CAP-067-T01",
+          "titulo": "Revisar criterios de HU-CAP-067 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-067-T02",
+          "titulo": "Reglas de dominio de HU-CAP-067 (RQ-SAL-03-07, RQ-SAL-03-08)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-067-T01",
+            "HU-CAP-065-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-067-T03",
+          "titulo": "Casos de uso: Ver las reservas en el calendario del mes",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-067-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-067-T04",
+          "titulo": "Endpoints y eventos de FT-SAL-03 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-067-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-067-T05",
+          "titulo": "Pantalla React: Ver las reservas en el calendario del mes",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-067-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-067-T06",
+          "titulo": "Pruebas TC-CAP-067-01..03 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-067-T05"
+          ]
+        }
+      ]
+    }
+  ]
+}

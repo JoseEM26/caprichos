@@ -1,0 +1,14 @@
+{
+  "data": {
+    "loyalty_program": {
+      "active": false,
+      "rules_credit": [
+        {
+          "threshold_purchase": 10,
+          "earned_points_per_purchase": 1
+        }
+      ],
+      "rewards": []
+    }
+  }
+}

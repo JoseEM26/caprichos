@@ -1,0 +1,442 @@
+{
+  "scripts/common/content/content.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_common_content_content.html"
+  },
+  "scripts/restaurantpe/almacen/almacen-breadcrumb.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_almacen-breadcrumb.html"
+  },
+  "scripts/restaurantpe/almacen/almacen.view.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_almacen.view.html"
+  },
+  "scripts/restaurantpe/almacen/arqueoinventario/arqueoinventario.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_arqueoinventario_arqueoinventario.html"
+  },
+  "scripts/restaurantpe/almacen/arqueoinventario/breadcrumb-arqueoinventario.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_arqueoinventario_breadcrumb-arqueoinventario.html"
+  },
+  "scripts/restaurantpe/almacen/guiaremision/breadcrumb-guia-lista.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_guiaremision_breadcrumb-guia-lista.html"
+  },
+  "scripts/restaurantpe/almacen/guiaremision/breadcrumb-guia-n2.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_guiaremision_breadcrumb-guia-n2.html"
+  },
+  "scripts/restaurantpe/almacen/guiaremision/guia-editar.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_guiaremision_guia-editar.html"
+  },
+  "scripts/restaurantpe/almacen/guiaremision/guia-lista.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_guiaremision_guia-lista.html"
+  },
+  "scripts/restaurantpe/almacen/guiaremision/guia-nuevo.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_guiaremision_guia-nuevo.html"
+  },
+  "scripts/restaurantpe/almacen/index.html": {
+    "status": "ok",
+    "size": 6617,
+    "file": "scripts_restaurantpe_almacen_index.html"
+  },
+  "scripts/restaurantpe/almacen/kardex/avanzado.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_kardex_avanzado.html"
+  },
+  "scripts/restaurantpe/almacen/kardex/breadcrumb-kardex-avanzado.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_kardex_breadcrumb-kardex-avanzado.html"
+  },
+  "scripts/restaurantpe/almacen/kardex/breadcrumb-kardex-general.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_kardex_breadcrumb-kardex-general.html"
+  },
+  "scripts/restaurantpe/almacen/kardex/breadcrumb-kardex-individual.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_kardex_breadcrumb-kardex-individual.html"
+  },
+  "scripts/restaurantpe/almacen/kardex/general.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_kardex_general.html"
+  },
+  "scripts/restaurantpe/almacen/kardex/individual.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_kardex_individual.html"
+  },
+  "scripts/restaurantpe/almacen/kardex/kardex.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_kardex_kardex.html"
+  },
+  "scripts/restaurantpe/almacen/lista-procesos/lista-de-procesos.view.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_lista-procesos_lista-de-procesos.view.html"
+  },
+  "scripts/restaurantpe/almacen/lista-procesos/movimiento-detalle.view.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_lista-procesos_movimiento-detalle.view.html"
+  },
+  "scripts/restaurantpe/almacen/lista-procesos/proceso-detalle.view.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_lista-procesos_proceso-detalle.view.html"
+  },
+  "scripts/restaurantpe/almacen/lista-procesos/recepcion-detalle.view.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_lista-procesos_recepcion-detalle.view.html"
+  },
+  "scripts/restaurantpe/almacen/merma/breadcrumb-merma-nuevo.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_merma_breadcrumb-merma-nuevo.html"
+  },
+  "scripts/restaurantpe/almacen/merma/breadcrumb-merma.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_merma_breadcrumb-merma.html"
+  },
+  "scripts/restaurantpe/almacen/merma/merma-nuevo.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_merma_merma-nuevo.html"
+  },
+  "scripts/restaurantpe/almacen/merma/merma.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_merma_merma.html"
+  },
+  "scripts/restaurantpe/almacen/movimientoalmacen/breadcrumb-movimientoalmacen-nuevo.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_movimientoalmacen_breadcrumb-movimientoalmacen-nuevo.html"
+  },
+  "scripts/restaurantpe/almacen/movimientoalmacen/breadcrumb-movimientoalmacen.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_movimientoalmacen_breadcrumb-movimientoalmacen.html"
+  },
+  "scripts/restaurantpe/almacen/movimientoalmacen/movimientoalmacen-nuevo.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_movimientoalmacen_movimientoalmacen-nuevo.html"
+  },
+  "scripts/restaurantpe/almacen/movimientoalmacen/movimientoalmacen.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_movimientoalmacen_movimientoalmacen.html"
+  },
+  "scripts/restaurantpe/almacen/movimientointerno/modal-agregar-insumo.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_movimientointerno_modal-agregar-insumo.html"
+  },
+  "scripts/restaurantpe/almacen/movimientointerno/modal-ver-detalle.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_movimientointerno_modal-ver-detalle.html"
+  },
+  "scripts/restaurantpe/almacen/movimientointerno/movimientointerno.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_movimientointerno_movimientointerno.html"
+  },
+  "scripts/restaurantpe/almacen/ordenguiaremision/breadcrumb-guia-lista.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_ordenguiaremision_breadcrumb-guia-lista.html"
+  },
+  "scripts/restaurantpe/almacen/ordenguiaremision/breadcrumb-guia-n2.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_ordenguiaremision_breadcrumb-guia-n2.html"
+  },
+  "scripts/restaurantpe/almacen/ordenguiaremision/guia-editar.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_ordenguiaremision_guia-editar.html"
+  },
+  "scripts/restaurantpe/almacen/ordenguiaremision/guia-lista.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_ordenguiaremision_guia-lista.html"
+  },
+  "scripts/restaurantpe/almacen/ordenguiaremision/guia-nuevo.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_ordenguiaremision_guia-nuevo.html"
+  },
+  "scripts/restaurantpe/almacen/ordenproduccion/breadcrumb-ordenproduccion.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_ordenproduccion_breadcrumb-ordenproduccion.html"
+  },
+  "scripts/restaurantpe/almacen/ordenproduccion/ordenproduccion.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_ordenproduccion_ordenproduccion.html"
+  },
+  "scripts/restaurantpe/almacen/ordenproduccion/prepararorden/breadcrumb-ordenproduccion-preparar.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_ordenproduccion_prepararorden_breadcrumb-ordenproduccion-preparar.html"
+  },
+  "scripts/restaurantpe/almacen/ordenproduccion/prepararorden/ordenproduccion-preparar.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_ordenproduccion_prepararorden_ordenproduccion-preparar.html"
+  },
+  "scripts/restaurantpe/almacen/ordenproduccion/registrar/breadcrumb-ordenproduccion-nueva.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_ordenproduccion_registrar_breadcrumb-ordenproduccion-nueva.html"
+  },
+  "scripts/restaurantpe/almacen/ordenproduccion/registrar/ordenproduccion-nueva.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_ordenproduccion_registrar_ordenproduccion-nueva.html"
+  },
+  "scripts/restaurantpe/almacen/porcionamientoinsumo/historial/porcionamiento.historial.view.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_porcionamientoinsumo_historial_porcionamiento.historial.view.html"
+  },
+  "scripts/restaurantpe/almacen/porcionamientoinsumo/lista/breadcrumb-porcionamientoinsumo.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_porcionamientoinsumo_lista_breadcrumb-porcionamientoinsumo.html"
+  },
+  "scripts/restaurantpe/almacen/porcionamientoinsumo/lista/lista.view.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_porcionamientoinsumo_lista_lista.view.html"
+  },
+  "scripts/restaurantpe/almacen/porcionamientoinsumo/registrar/porcionamiento-detalle.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_porcionamientoinsumo_registrar_porcionamiento-detalle.html"
+  },
+  "scripts/restaurantpe/almacen/preparacionreceta/historial/breadcrumb-historial.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_preparacionreceta_historial_breadcrumb-historial.html"
+  },
+  "scripts/restaurantpe/almacen/preparacionreceta/historial/receta.historial.view.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_preparacionreceta_historial_receta.historial.view.html"
+  },
+  "scripts/restaurantpe/almacen/preparacionreceta/lista/breadcrumb-preparacionreceta.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_preparacionreceta_lista_breadcrumb-preparacionreceta.html"
+  },
+  "scripts/restaurantpe/almacen/preparacionreceta/lista/receta.lista.view.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_preparacionreceta_lista_receta.lista.view.html"
+  },
+  "scripts/restaurantpe/almacen/preparacionreceta/registrar/breadcrumb-registrar.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_preparacionreceta_registrar_breadcrumb-registrar.html"
+  },
+  "scripts/restaurantpe/almacen/preparacionreceta/registrar/recetas-detalle.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_preparacionreceta_registrar_recetas-detalle.html"
+  },
+  "scripts/restaurantpe/almacen/procesarstock/breadcrumb-lista.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_procesarstock_breadcrumb-lista.html"
+  },
+  "scripts/restaurantpe/almacen/procesarstock/breadcrumb-procesarstock.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_procesarstock_breadcrumb-procesarstock.html"
+  },
+  "scripts/restaurantpe/almacen/procesarstock/lista.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_procesarstock_lista.html"
+  },
+  "scripts/restaurantpe/almacen/procesarstock/procesarstock.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_procesarstock_procesarstock.html"
+  },
+  "scripts/restaurantpe/almacen/recepcion/modal-agregar-insumo.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_recepcion_modal-agregar-insumo.html"
+  },
+  "scripts/restaurantpe/almacen/recepcion/recepcion.view.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_recepcion_recepcion.view.html"
+  },
+  "scripts/restaurantpe/almacen/regularstock/breadcrumb-listastock.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_regularstock_breadcrumb-listastock.html"
+  },
+  "scripts/restaurantpe/almacen/regularstock/breadcrumb-stock.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_regularstock_breadcrumb-stock.html"
+  },
+  "scripts/restaurantpe/almacen/regularstock/regularstock.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_regularstock_regularstock.html"
+  },
+  "scripts/restaurantpe/almacen/requerimientomovimiento/breadcrumb-generar-movimiento.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_requerimientomovimiento_breadcrumb-generar-movimiento.html"
+  },
+  "scripts/restaurantpe/almacen/requerimientomovimiento/breadcrumb-requerimientomovimiento-nuevo.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_requerimientomovimiento_breadcrumb-requerimientomovimiento-nuevo.html"
+  },
+  "scripts/restaurantpe/almacen/requerimientomovimiento/breadcrumb-requerimientomovimiento.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_requerimientomovimiento_breadcrumb-requerimientomovimiento.html"
+  },
+  "scripts/restaurantpe/almacen/requerimientomovimiento/generarmovimiento.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_requerimientomovimiento_generarmovimiento.html"
+  },
+  "scripts/restaurantpe/almacen/requerimientomovimiento/procesar/breadcrumb-procesar-requerimiento.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_requerimientomovimiento_procesar_breadcrumb-procesar-requerimiento.html"
+  },
+  "scripts/restaurantpe/almacen/requerimientomovimiento/procesar/breadcrumb-procesarlist-requerimiento.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_requerimientomovimiento_procesar_breadcrumb-procesarlist-requerimiento.html"
+  },
+  "scripts/restaurantpe/almacen/requerimientomovimiento/procesar/requerimientomovimiento-procesar.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_requerimientomovimiento_procesar_requerimientomovimiento-procesar.html"
+  },
+  "scripts/restaurantpe/almacen/requerimientomovimiento/procesar/requerimientomovimiento-procesarlist.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_requerimientomovimiento_procesar_requerimientomovimiento-procesarlist.html"
+  },
+  "scripts/restaurantpe/almacen/requerimientomovimiento/requerimientomovimiento-nuevo.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_requerimientomovimiento_requerimientomovimiento-nuevo.html"
+  },
+  "scripts/restaurantpe/almacen/requerimientomovimiento/requerimientomovimiento.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_requerimientomovimiento_requerimientomovimiento.html"
+  },
+  "scripts/restaurantpe/almacen/requerimientomovimiento/revision/breadcrumb-revision-requerimiento.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_requerimientomovimiento_revision_breadcrumb-revision-requerimiento.html"
+  },
+  "scripts/restaurantpe/almacen/requerimientomovimiento/revision/requerimientomovimiento-revision.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_requerimientomovimiento_revision_requerimientomovimiento-revision.html"
+  },
+  "scripts/restaurantpe/almacen/requerimientomovimiento/seleccion/breadcrumb-seleccion-requerimiento.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_requerimientomovimiento_seleccion_breadcrumb-seleccion-requerimiento.html"
+  },
+  "scripts/restaurantpe/almacen/requerimientomovimiento/seleccion/requerimientomovimiento-seleccion.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_requerimientomovimiento_seleccion_requerimientomovimiento-seleccion.html"
+  },
+  "scripts/restaurantpe/almacen/requerimientov2/modal-agregar-insumo.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_requerimientov2_modal-agregar-insumo.html"
+  },
+  "scripts/restaurantpe/almacen/requerimientov2/requerimientos.view.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_requerimientov2_requerimientos.view.html"
+  },
+  "scripts/restaurantpe/almacen/stock/breadcrumb-stock.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_stock_breadcrumb-stock.html"
+  },
+  "scripts/restaurantpe/almacen/stock/stock-tabla.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_stock_stock-tabla.html"
+  },
+  "scripts/restaurantpe/almacen/stock/stock.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_stock_stock.html"
+  },
+  "scripts/restaurantpe/almacen/stock/stock.view.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_almacen_stock_stock.view.html"
+  },
+  "scripts/restaurantpe/informes/compras/modal-detalle.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_informes_compras_modal-detalle.html"
+  },
+  "scripts/restaurantpe/informes/inventario/cuadrestockmanual.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_informes_inventario_cuadrestockmanual.html"
+  },
+  "scripts/restaurantpe/informes/inventario/informearqueoinventario/arqueoinventario.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_informes_inventario_informearqueoinventario_arqueoinventario.html"
+  },
+  "scripts/restaurantpe/informes/inventario/informearqueoinventario/bc-arqueoinventario.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_informes_inventario_informearqueoinventario_bc-arqueoinventario.html"
+  },
+  "scripts/restaurantpe/informes/ventas/modals/modal-detalle.html": {
+    "status": "ok",
+    "size": 29808,
+    "file": "scripts_restaurantpe_informes_ventas_modals_modal-detalle.html"
+  }
+}

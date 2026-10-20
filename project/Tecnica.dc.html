@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Propuesta técnica Caprichos</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+button{font-family:inherit;cursor:pointer}
+.deck{width:1280px;height:790px;background:#E3D6C6;font-family:Montserrat,system-ui,sans-serif;color:#0B2C3E;display:flex;flex-direction:column}
+.sl{width:1280px;height:720px;box-sizing:border-box;background:#FBF4EC;padding:48px 64px 40px 64px;display:flex;flex-direction:column;gap:20px;position:relative;overflow:hidden}
+.dark{background:#0B2C3E;color:#FBF4EC}
+.kick{font-size:14px;font-weight:700;letter-spacing:0.12em;color:#B2500F;text-transform:uppercase}
+.dark .kick{color:#F6A04D}
+.h1{font-weight:800;font-size:40px;line-height:46px;margin:0}
+.h2{font-weight:800;font-size:22px;line-height:28px;margin:0}
+.p{font-size:19px;line-height:28px;color:#2C4C5D;margin:0}
+.dark .p{color:#C9D6DD}
+.row{display:flex;gap:20px;align-items:stretch}
+.card{flex:1;min-width:0;background:#FFFFFF;border:1px solid #E3D6C6;border-radius:14px;padding:20px 22px;display:flex;flex-direction:column;gap:8px}
+.card ul{margin:0;padding-left:20px;font-size:17px;line-height:25px;color:#2C4C5D}
+.card li{margin-bottom:4px}
+.price{font-weight:800;font-size:30px;color:#B2500F}
+.pill{display:inline-block;font-size:14px;font-weight:700;border-radius:9999px;padding:4px 14px;background:#0B2C3E;color:#FBF4EC}
+.foot{position:absolute;left:64px;right:64px;bottom:16px;display:flex;justify-content:space-between;font-size:12px;color:#2C4C5D}
+.dark .foot{color:#C9D6DD}
+.tbl{width:100%;border-collapse:collapse;font-size:17px;line-height:24px}
+.tbl th{text-align:left;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;color:#2C4C5D;padding:8px 12px;border-bottom:2px solid #0B2C3E}
+.tbl td{padding:12px;border-bottom:1px solid #E3D6C6;vertical-align:top}
+.tbl td.k{font-weight:800;white-space:nowrap}
+.tbl tr.tot td{font-weight:800;border-bottom:0;background:#F3E8DA}
+</style>
+</helmet>
+<div class="deck">
+  <div style="height:70px;box-sizing:border-box;padding:0 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#FBF4EC;border-bottom:1px solid #D9CFC2">
+    <span style="font-size:12px;font-weight:700;letter-spacing:0.06em;color:#2C4C5D">PROPUESTA TÉCNICA</span>
+    <button onClick="{{prev}}" style="min-height:40px;padding:0 16px;border-radius:9999px;border:1.5px solid #0B2C3E;background:transparent;color:#0B2C3E;font-weight:700;opacity:{{prevOp}}">← Anterior</button>
+    <span style="font-weight:800;font-size:14px;min-width:64px;text-align:center">{{pos}}</span>
+    <button onClick="{{next}}" style="min-height:40px;padding:0 16px;border-radius:9999px;border:1.5px solid #0B2C3E;background:#0B2C3E;color:#FBF4EC;font-weight:700;opacity:{{nextOp}}">Siguiente →</button>
+    <sc-for list="{{dots}}" as="d" hint-placeholder-count="10"><button onClick="{{d.pick}}" aria-label="Ir a la lámina {{d.n}}" style="width:28px;height:28px;border-radius:14px;border:1.5px solid #0B2C3E;background:{{d.bg}};color:{{d.fg}};font-weight:700;font-size:12px;padding:0">{{d.n}}</button></sc-for>
+  </div>
+  <sc-if value="{{s1}}" hint-placeholder-val="{{ true }}">
+  <div class="sl dark">
+    <img src="/_blob/6d6aa5696913688bb2235a49f1133c2a" alt="Caprichos" style="width:84px;height:84px;border-radius:42px">
+    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:16px">
+      <div class="kick">Propuesta técnica</div>
+      <h1 class="h1" style="font-size:56px;line-height:62px;max-width:960px">¿Dónde vivirá el sistema de Caprichos?</h1>
+      <p class="p" style="font-size:24px;line-height:34px;max-width:860px">Un servidor propio (VPS) frente a Vercel y Neon: costo, riesgo y trabajo de cada camino.</p>
+    </div>
+    <div style="font-size:17px;color:#C9D6DD">Para <b style="color:#FBF4EC">Kevin Rosales</b> · Desarrollo <b style="color:#FBF4EC">José Ángel Espinoza</b> · 13 de octubre de 2026</div>
+    <div class="foot"><span>Caprichos · Propuesta técnica</span><span>1</span></div>
+  </div>
+  </sc-if>
+  <sc-if value="{{s2}}" hint-placeholder-val="{{ false }}">
+  <div class="sl">
+    <div class="kick">Lo que necesita el sistema</div>
+    <h2 class="h1">Cinco cosas que no pueden fallar</h2>
+    <div class="row" style="flex:1">
+      <div class="card"><div class="h2">Siempre disponible</div><ul><li>Caja, cocina y TV lo usan durante todo el horario</li><li>No puede "dormirse" a media atención</li></ul></div>
+      <div class="card"><div class="h2">Pedidos al instante</div><ul><li>El pedido aceptado aparece en cocina sin recargar</li><li>La TV se actualiza sola</li></ul></div>
+      <div class="card"><div class="h2">Información segura</div><ul><li>Pedidos, clientes y precios con respaldo diario</li><li>Cada rol ve solo lo suyo</li></ul></div>
+    </div>
+    <div class="row" style="flex:1">
+      <div class="card"><div class="h2">Imprimir en el local</div><ul><li>La comanda sale en la ticketera de caja</li><li>Hace falta un programa pequeño en esa computadora, en cualquiera de las dos opciones</li></ul></div>
+      <div class="card"><div class="h2">Costo claro</div><ul><li>Saber cuánto se paga cada mes</li><li>Que no suba sin avisar cuando crezca el negocio</li></ul></div>
+    </div>
+    <div class="foot"><span>Caprichos · Propuesta técnica</span><span>2</span></div>
+  </div>
+  </sc-if>
+  <sc-if value="{{s3}}" hint-placeholder-val="{{ false }}">
+  <div class="sl">
+    <div class="kick">Opción A</div>
+    <h2 class="h1">VPS: un servidor propio, alquilado</h2>
+    <p class="p">Es una computadora en internet, siempre encendida, que solo usa Caprichos. Ahí vive la carta, la base de datos y el administrativo.</p>
+    <div class="row" style="flex:1">
+      <div class="card"><div class="h2">Ventajas</div><ul><li>Costo fijo y predecible, sin sorpresas</li><li>Todo en un solo lugar, incluido el tiempo real de cocina y TV</li><li>Sin pausas ni límites por cantidad de pedidos</li><li>Total control: respaldos, ajustes y datos son tuyos</li></ul></div>
+      <div class="card"><div class="h2">Desventajas</div><ul><li>Alguien debe mantenerlo: actualizaciones, seguridad y respaldos</li><li>Si el servidor falla, queda caído hasta repararlo</li><li>Crecer exige ampliar el servidor a mano</li><li>Instalación inicial más larga</li></ul></div>
+    </div>
+    <div style="font-size:17px"><b>Propuesta: Contabo Cloud VPS 4 con respaldo automático.</b> US$ 7.28 al mes (aprox. S/ 27) en promoción durante 24 meses; precio normal US$ 8.60. Trae 4 núcleos, 8 GB de RAM y 100 GB SSD. El dominio va aparte.</div>
+    <div class="foot"><span>Caprichos · Propuesta técnica</span><span>3</span></div>
+  </div>
+  </sc-if>
+  <sc-if value="{{s4}}" hint-placeholder-val="{{ false }}">
+  <div class="sl">
+    <div class="kick">Opción B</div>
+    <h2 class="h1">Vercel y Neon: servicios en la nube</h2>
+    <p class="p">Vercel publica la carta y el administrativo; Neon guarda la base de datos. No hay servidor que mantener.</p>
+    <div class="row" style="flex:1">
+      <div class="card"><div class="h2">Ventajas</div><ul><li>Sin servidor que cuidar: se publica con un clic</li><li>Certificados, respaldos básicos y disponibilidad los maneja el proveedor</li><li>Rápido de arrancar y de mostrar avances</li><li>Crece solo si aumentan las visitas</li></ul></div>
+      <div class="card"><div class="h2">Desventajas</div><ul><li>Gratis solo para probar: el plan gratuito de Vercel no permite uso comercial</li><li>El plan gratuito de Neon se duerme tras 5 minutos sin uso y tiene 0.5 GB</li><li>Los avisos en tiempo real a cocina necesitan un servicio adicional</li><li>Costo variable y dependes de dos empresas</li></ul></div>
+    </div>
+    <div style="font-size:17px"><b>Costo estimado en producción:</b> Vercel Pro US$ 20 al mes (aprox. S/ 75) más Neon de pago según uso, de US$ 5 a 20 (estimado).</div>
+    <div class="foot"><span>Caprichos · Propuesta técnica</span><span>4</span></div>
+  </div>
+  </sc-if>
+  <sc-if value="{{s5}}" hint-placeholder-val="{{ false }}">
+  <div class="sl">
+    <div class="kick">Comparación</div>
+    <h2 class="h1">Lado a lado</h2>
+    <table class="tbl">
+      <tr><th></th><th>VPS</th><th>Vercel y Neon</th></tr>
+      <tr><td class="k">Costo al mes</td><td>US$ 7.28 fijo (promoción Contabo, 24 meses)</td><td>Gratis para probar; en producción US$ 25 a 40 (estimado)</td></tr>
+      <tr><td class="k">Mantenimiento</td><td>Lo hace el desarrollador</td><td>Casi nada</td></tr>
+      <tr><td class="k">Pedidos en tiempo real</td><td>Incluido</td><td>Servicio adicional o consulta cada pocos segundos</td></tr>
+      <tr><td class="k">Si algo falla</td><td>Se repara el servidor</td><td>El proveedor lo atiende; la base puede tardar al despertar</td></tr>
+      <tr><td class="k">Crecer</td><td>Ampliar el servidor</td><td>Automático, con costo variable</td></tr>
+      <tr><td class="k">Impresión y TV</td><td>Igual en ambas</td><td>Igual en ambas</td></tr>
+    </table>
+    <div class="foot"><span>Caprichos · Propuesta técnica</span><span>5</span></div>
+  </div>
+  </sc-if>
+  <sc-if value="{{s6}}" hint-placeholder-val="{{ false }}">
+  <div class="sl">
+    <div class="kick">Recomendación</div>
+    <h2 class="h1">VPS para operar; Vercel y Neon solo para mostrar avances</h2>
+    <div class="row" style="flex:1">
+      <div class="card" style="border:2px solid #E67929"><div class="h2">Por qué un VPS</div><ul>
+        <li>Contabo Cloud VPS 4: 8 GB de RAM por US$ 7.28 al mes, con respaldo automático.</li><li>Los pedidos llegan a cocina y a la TV al instante, sin servicios extra.</li><li>No se duerme ni tiene límites por pedido.</li><li>Encaja con un sistema que se usa todo el día.</li></ul></div>
+      <div class="card"><div class="h2">Qué se necesita</div><ul>
+        <li>Respaldo automático del servidor y una copia de la base de datos fuera de él.</li><li>Confirmar al comprar: contrato de 24 meses, región del servidor y tarifa de instalación.</li><li>Aviso automático si el servidor deja de responder.</li><li>Quién lo mantiene después de la entrega, con soporte de un mes incluido.</li><li>Si Caprichos prefiere no tener servidor, se usa Vercel Pro y Neon de pago, no el plan gratuito.</li></ul></div>
+    </div>
+    <div class="foot"><span>Caprichos · Propuesta técnica</span><span>6</span></div>
+  </div>
+  </sc-if>
+  <sc-if value="{{s7}}" hint-placeholder-val="{{ false }}">
+  <div class="sl">
+    <div class="kick">Decisión y datos a verificar</div>
+    <h2 class="h1">Qué necesitamos decidir</h2>
+    <div class="row" style="flex:1">
+      <div class="card"><div class="h2">Decisiones de Caprichos</div><ul>
+        <li>Elegir VPS o Vercel con Neon de pago.</li><li>Quién paga y quién administra la cuenta del servicio.</li><li>Dominio de la carta (por ejemplo, el de Caprichos).</li><li>Modelo de la ticketera y computadora de caja.</li></ul></div>
+      <div class="card"><div class="h2">Condiciones de los proveedores</div>
+        <p class="p" style="font-size:15px;line-height:22px">Los precios y límites cambian. Verificar antes de contratar:</p>
+        <ul style="font-size:15px;line-height:22px">
+          <li><a href="https://vercel.com/docs/limits/fair-use-guidelines" target="_blank" rel="noopener">Vercel: uso comercial y plan Hobby</a></li>
+          <li><a href="https://neon.com/pricing" target="_blank" rel="noopener">Neon: planes y límites</a></li>
+          <li>Contabo: confirmar precio, plazo y región en su página de Cloud VPS.</li></ul></div>
+    </div>
+    <div class="foot"><span>Caprichos · Propuesta técnica</span><span>7</span></div>
+  </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":790}}'>
+const N = 7;
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { i: 0 }; }
+  go(i) { this.setState({ i: Math.max(0, Math.min(N - 1, i)) }); }
+  renderVals() {
+    const i = this.state.i;
+    const v = { prev: () => this.go(i - 1), next: () => this.go(i + 1), prevOp: i === 0 ? 0.4 : 1, nextOp: i === N - 1 ? 0.4 : 1, pos: (i + 1) + ' / ' + N,
+      dots: Array.from({ length: N }, (_, k) => ({ n: k + 1, pick: () => this.go(k), bg: k === i ? '#0B2C3E' : 'transparent', fg: k === i ? '#FBF4EC' : '#0B2C3E' })) };
+    for (let k = 1; k <= N; k++) { v['s' + k] = i === k - 1; }
+    return v;
+  }
+}
+</script>
+</body>
+</html>

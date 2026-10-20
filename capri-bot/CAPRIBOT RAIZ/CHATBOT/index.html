@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Caprichos | Carta Digital & Pedidos por WhatsApp</title>
+  <meta name="description" content="Haz tu pedido online en Caprichos Cafetería & Pastelería. Frappés, waffles, sándwiches artesanales y postres. Delivery y recojo con confirmación directa por WhatsApp." />
+  <meta name="theme-color" content="#120b08" />
+
+  <!-- Favicon Emoji -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>☕</text></svg>" />
+
+  <!-- Hoja de estilos de Leaflet (Mapas Interactivos) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+  <!-- Estilos propios de Caprichos -->
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+  <!-- Brillo ambiental de fondo -->
+  <div class="bg-glow-top"></div>
+
+  <!-- ========================================================================
+       HEADER / BARRA SUPERIOR
+       ======================================================================== -->
+  <header class="site-header">
+    <div class="header-container">
+      <a href="#" class="brand-wrapper" aria-label="Caprichos Inicio">
+        <div class="brand-logo-badge">☕</div>
+        <div class="brand-text-col">
+          <span class="brand-name">Caprichos</span>
+          <span class="brand-tagline">Cafetería & Pastelería</span>
+        </div>
+      </a>
+
+      <div class="header-actions">
+        <!-- Botón para probar número de WhatsApp (Tester) -->
+        <button type="button" class="btn-tester-trigger" id="btn-open-wa-tester" title="Configurar número para pruebas">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+
+        <!-- Botón del Carrito -->
+        <button type="button" class="btn-open-cart" aria-label="Abrir Carrito de compras">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3">
+            <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-2z"></path>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <path d="M16 10a4 4 0 0 1-8 0"></path>
+          </svg>
+          <span>Carrito</span>
+          <span class="cart-count-badge" style="display: none;">0</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ========================================================================
+       HERO BANNER
+       ======================================================================== -->
+  <section class="hero-section">
+    <div class="hero-banner-card">
+      <div class="hero-top-badges">
+        <span class="badge-pill schedule">
+          <span class="pin-pulse" style="background: #34d399;"></span>
+          Tienda: 2:00 pm - 10:00 pm
+        </span>
+        <span class="badge-pill delivery">🛵 Delivery Activo</span>
+        <span class="badge-pill payment">💳 Yape • Plin • BCP</span>
+      </div>
+
+      <h1 class="hero-headline">
+        El antojo perfecto, <span>directo a tu mesa</span> y a un clic de WhatsApp
+      </h1>
+
+      <p class="hero-subtitle">
+        Selecciona tus frappés, waffles y postres favoritos, añade tu ubicación en el mapa y envíanos tu orden para coordinar el pago al instante.
+      </p>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       BARRA FIJA: BUSCADOR & CATEGORÍAS
+       ======================================================================== -->
+  <nav class="controls-sticky-wrapper" aria-label="Filtros de carta">
+    <div class="controls-container">
+      <!-- Buscador -->
+      <div class="search-bar-row">
+        <div class="search-input-wrapper">
+          <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="search-input" class="search-input" placeholder="Buscar frappé, waffle, club sándwich, dona..." autocomplete="off" />
+          <button type="button" id="clear-search-btn" class="btn-clear-search" title="Limpiar búsqueda">✕</button>
+        </div>
+      </div>
+
+      <!-- Barra horizontal de categorías -->
+      <div class="categories-scroll-row" id="categories-bar">
+        <!-- Renderizado dinámicamente por app.js -->
+      </div>
+    </div>
+  </nav>
+
+  <!-- ========================================================================
+       CONTENIDO PRINCIPAL: CATÁLOGO DE PRODUCTOS
+       ======================================================================== -->
+  <main class="main-content">
+    <div class="products-grid" id="products-grid">
+      <!-- Renderizado dinámicamente por app.js -->
+    </div>
+  </main>
+
+  <!-- ========================================================================
+       BARRA FLOTANTE INFERIOR EN MÓVILES
+       ======================================================================== -->
+  <div class="mobile-cart-bar" id="mobile-cart-bar">
+    <div class="mobile-cart-info">
+      <span class="mobile-cart-count">0 productos</span>
+      <span class="mobile-cart-total">S/ 0.00</span>
+    </div>
+    <button type="button" class="btn-mobile-open-cart btn-open-cart">
+      <span>Ver Carrito</span>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <polyline points="9 18 15 12 9 6"></polyline>
+      </svg>
+    </button>
+  </div>
+
+  <!-- ========================================================================
+       MODAL DE DETALLE Y PERSONALIZACIÓN DE PRODUCTO
+       ======================================================================== -->
+  <div class="modal-backdrop" id="product-modal">
+    <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="modal-product-title">
+      <div class="modal-header-bar">
+        <button type="button" class="btn-close-modal" onclick="closeProductModal()" aria-label="Cerrar ventana">✕</button>
+      </div>
+
+      <div class="modal-scrollable-body" id="product-modal-body">
+        <!-- Contenido dinámico inyectado por app.js -->
+      </div>
+
+      <div class="modal-footer-bar">
+        <div class="modal-qty-control">
+          <button type="button" class="btn-modal-qty" onclick="changeModalQty(-1)" aria-label="Restar">-</button>
+          <span class="modal-qty-num" id="modal-qty-display">1</span>
+          <button type="button" class="btn-modal-qty" onclick="changeModalQty(1)" aria-label="Sumar">+</button>
+        </div>
+
+        <button type="button" class="btn-add-modal-cart" onclick="addCurrentProductToCart()">
+          <span>Agregar al Carrito</span>
+          <span id="modal-btn-total">S/ 0.00</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       DRAWER LATERAL: CARRITO & CHECKOUT
+       ======================================================================== -->
+  <div class="cart-backdrop" id="cart-backdrop"></div>
+
+  <aside class="cart-drawer" id="cart-drawer" aria-label="Carrito de pedidos">
+    <!-- Header del Drawer -->
+    <div class="drawer-header">
+      <div class="drawer-title-group">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-2z"></path>
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <path d="M16 10a4 4 0 0 1-8 0"></path>
+        </svg>
+        <h2 class="drawer-title">Tu Pedido</h2>
+      </div>
+      <button type="button" class="btn-close-modal" id="btn-close-cart" aria-label="Cerrar carrito">✕</button>
+    </div>
+
+    <!-- Pestañas de Navegación del Drawer -->
+    <div class="drawer-tabs-nav">
+      <button type="button" class="drawer-tab-btn active" id="tab-btn-cart">1. Productos en Carrito</button>
+      <button type="button" class="drawer-tab-btn" id="tab-btn-checkout">2. Datos & Entrega</button>
+    </div>
+
+    <!-- CUERPO 1: VISTA DE ITEMS DEL CARRITO -->
+    <div class="drawer-body-scroll" id="cart-items-view">
+      <div class="cart-empty-state" id="cart-empty-message">
+        <div class="cart-empty-icon">🛒</div>
+        <h3>Tu carrito está esperando por ti</h3>
+        <p>Explora la carta y añade tus antojos para continuar.</p>
+        <button type="button" class="btn-secondary" onclick="closeCart()">Volver a la Carta</button>
+      </div>
+
+      <div class="cart-items-list" id="cart-items-list">
+        <!-- Inyectado dinámicamente -->
+      </div>
+    </div>
+
+    <!-- CUERPO 2: VISTA DE CHECKOUT (DATOS, MAPA, PAGO) -->
+    <div class="drawer-body-scroll" id="cart-checkout-view" style="display: none;">
+      <div class="checkout-form-container">
+
+        <!-- Selector de Modalidad -->
+        <div class="form-group-block">
+          <label class="form-label">Modalidad de Pedido:</label>
+          <div class="delivery-mode-toggle">
+            <label class="mode-radio-label selected" id="lbl-mode-delivery">
+              <input type="radio" name="delivery_mode" id="mode-delivery" value="delivery" checked />
+              <span>🛵 Delivery</span>
+            </label>
+            <label class="mode-radio-label" id="lbl-mode-recojo">
+              <input type="radio" name="delivery_mode" id="mode-recojo" value="recojo" />
+              <span>🛍️ Recojo en Tienda</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Formulario de Registro / Datos del Cliente -->
+        <div class="form-group-block">
+          <label class="form-label" for="client-name">👤 Nombres y Apellidos: *</label>
+          <input type="text" id="client-name" class="form-input" placeholder="Ej: Roberto Ramos" required />
+        </div>
+
+        <div class="form-group-block">
+          <label class="form-label" for="client-phone">📱 Celular / WhatsApp: *</label>
+          <input type="tel" id="client-phone" class="form-input" placeholder="Ej: 977 503 006" maxlength="12" required />
+          <label class="checkbox-row">
+            <input type="checkbox" id="client-save-data" checked />
+            <span>Guardar mis datos en este dispositivo para futuros pedidos</span>
+          </label>
+        </div>
+
+        <!-- Bloque exclusivo de Delivery: Ubicación y Mapa -->
+        <div id="delivery-location-section">
+          <div class="form-group-block">
+            <label class="form-label">📍 Ubicación en el Mapa (Google Maps / GPS):</label>
+            
+            <div class="map-interactive-wrapper">
+              <div id="delivery-map"></div>
+            </div>
+
+            <div class="map-floating-actions">
+              <button type="button" class="btn-gps-action" id="btn-use-gps">
+                <span>📍 Usar mi ubicación actual GPS</span>
+              </button>
+              <a href="#" class="link-gmaps-verify" id="gmaps-external-link" target="_blank">
+                <span>🗺️ Ver en Google Maps</span>
+              </a>
+            </div>
+
+            <!-- Card de estado de zona y costo calculado -->
+            <div id="zone-status-card" class="status-card inside-zone">
+              <div class="status-icon">🛵</div>
+              <div class="status-content">
+                <span class="status-badge" style="background: #10b981; color: white;">Zona 2 • S/ 2.00</span>
+                <p class="status-text">Cálculo de delivery activo en tiempo real.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group-block" style="margin-top: 0.75rem;">
+            <label class="form-label" for="client-address">🏠 Dirección exacta: *</label>
+            <input type="text" id="client-address" class="form-input" placeholder="Ej: Av. Las Flores de Primavera 540" oninput="this.dataset.manual='true'" required />
+          </div>
+
+          <div class="form-group-block">
+            <label class="form-label" for="client-reference">🚪 Referencia de entrega:</label>
+            <input type="text" id="client-reference" class="form-input" placeholder="Ej: Mz F Lote 12, frente al parque, timbre 2" />
+          </div>
+        </div>
+
+        <!-- Bloque informativo de Recojo en Tienda -->
+        <div id="recojo-info-section" style="display: none;">
+          <div class="recojo-info-box">
+            <div class="recojo-icon">🛍️</div>
+            <div class="recojo-text">
+              <h4>Recojo en Tienda Caprichos</h4>
+              <p>Puedes pasar a recoger tu pedido directamente en nuestro local de <strong>2:00 pm a 10:00 pm</strong>.</p>
+              <p style="margin-top: 4px; color: #10b981; font-weight: 700;">¡Costo de envío: S/ 0.00!</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Método de Pago -->
+        <div class="form-group-block">
+          <label class="form-label">💳 ¿Con qué método pagarás por WhatsApp?</label>
+          <div class="payment-methods-grid">
+            <div class="payment-option-card selected" data-payment="Yape">
+              <span class="payment-icon">🟣</span>
+              <div class="payment-text">
+                <strong>Yape</strong>
+                <small>Pago rápido</small>
+              </div>
+            </div>
+
+            <div class="payment-option-card" data-payment="Plin">
+              <span class="payment-icon">🔵</span>
+              <div class="payment-text">
+                <strong>Plin</strong>
+                <small>Interbancario</small>
+              </div>
+            </div>
+
+            <div class="payment-option-card" data-payment="Transferencia">
+              <span class="payment-icon">🏦</span>
+              <div class="payment-text">
+                <strong>Transferencia</strong>
+                <small>BCP / BBVA</small>
+              </div>
+            </div>
+
+            <div class="payment-option-card" data-payment="Efectivo">
+              <span class="payment-icon">💵</span>
+              <div class="payment-text">
+                <strong>Efectivo</strong>
+                <small>Contra entrega</small>
+              </div>
+            </div>
+          </div>
+
+          <div id="cash-amount-container" style="display: none; margin-top: 0.5rem;">
+            <input type="number" id="cash-amount-input" class="form-input" placeholder="¿Con cuánto pagarás para tu vuelto? Ej: 50" />
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- FOOTER DEL DRAWER: RESUMEN Y BOTONES DE ACCIÓN -->
+    <div class="drawer-footer" id="cart-summary-box" style="display: none;">
+      <div class="summary-rows">
+        <div class="summary-row">
+          <span>Subtotal:</span>
+          <strong id="summary-subtotal">S/ 0.00</strong>
+        </div>
+        <div class="summary-row">
+          <span>Delivery:</span>
+          <strong id="summary-delivery">S/ 3.00</strong>
+        </div>
+        <div class="summary-row total-row">
+          <span>Total a Pagar:</span>
+          <strong id="summary-total">S/ 0.00</strong>
+        </div>
+      </div>
+
+      <div class="free-delivery-notice" id="free-delivery-notice" style="display: none;">
+        🛵 ¡Agrega más productos para tener <strong>Delivery GRATIS</strong>!
+      </div>
+
+      <!-- Botón cuando está en vista de productos -->
+      <button type="button" class="btn-checkout-primary" id="btn-go-to-checkout">
+        <span>Completar Datos & Ubicación</span>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+          <polyline points="12 5 19 12 12 19"></polyline>
+        </svg>
+      </button>
+
+      <!-- Botón cuando está en vista de checkout -->
+      <button type="button" class="btn-whatsapp-send" id="btn-send-whatsapp" style="display: none;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
+        </svg>
+        <span>Enviar Pedido a WhatsApp</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ========================================================================
+       MODAL TESTER: CAMBIAR NÚMERO DE WHATSAPP PARA PRUEBAS
+       ======================================================================== -->
+  <div class="modal-backdrop" id="tester-modal">
+    <div class="modal-sheet" style="max-width: 440px;">
+      <div class="modal-header-bar">
+        <h3 style="font-size: 1.1rem; color: var(--accent-cream); margin-right: auto;">⚙️ Probar Número de WhatsApp</h3>
+        <button type="button" class="btn-close-modal" id="btn-close-tester">✕</button>
+      </div>
+      <div style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
+        <p style="font-size: 0.88rem; color: var(--text-secondary);">
+          Por defecto, los pedidos se envían al WhatsApp oficial de Caprichos (<strong>51977503006</strong>). Si deseas probarlo enviándote el pedido a tu propio número o al de tu jefe, cámbialo aquí:
+        </p>
+        <div class="form-group-block">
+          <label class="form-label" for="tester-phone-input">Número con código de país (ej. 519XXXXXXXX):</label>
+          <input type="text" id="tester-phone-input" class="form-input" value="51977503006" />
+        </div>
+        <button type="button" class="btn-checkout-primary" id="btn-save-tester">
+          Guardar y Usar este Número
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       SCRIPTS DE LA APLICACIÓN
+       ======================================================================== -->
+  <!-- 1. Leaflet (Mapas Interactivos) -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <!-- 2. Módulos de datos y lógica -->
+  <script src="js/zones.js"></script>
+  <script src="js/menu-data.js"></script>
+  <script src="js/cart.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/checkout.js"></script>
+  <script src="js/app.js"></script>
+
+  <script>
+    // Conectar botón de pasar a checkout en el drawer
+    document.getElementById("btn-go-to-checkout").addEventListener("click", () => {
+      document.getElementById("btn-go-to-checkout").style.display = "none";
+      document.getElementById("btn-send-whatsapp").style.display = "flex";
+    });
+
+    document.getElementById("tab-btn-cart").addEventListener("click", () => {
+      document.getElementById("btn-go-to-checkout").style.display = "flex";
+      document.getElementById("btn-send-whatsapp").style.display = "none";
+    });
+
+    document.getElementById("tab-btn-checkout").addEventListener("click", () => {
+      document.getElementById("btn-go-to-checkout").style.display = "none";
+      document.getElementById("btn-send-whatsapp").style.display = "flex";
+    });
+  </script>
+</body>
+</html>

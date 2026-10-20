@@ -1,0 +1,1022 @@
+{
+  "routes": {
+    "routeProvider": {},
+    "stateProvider": {}
+  },
+  "screens": {
+    "Proveedores": {
+      "title": "Descargar \n  Nuevo proveedor",
+      "buttons": [
+        {
+          "text": "Descargar",
+          "tag": "A",
+          "classes": "btn btn-default dropdown-toggle",
+          "type": "",
+          "id": "",
+          "ngClick": "",
+          "disabled": false
+        },
+        {
+          "text": "Nuevo proveedor",
+          "tag": "A",
+          "classes": "btn btn-primary",
+          "type": "",
+          "id": "",
+          "ngClick": "vm.fnNuevaProveedor()",
+          "disabled": false
+        },
+        {
+          "text": "Por: 10 registros",
+          "tag": "SPAN",
+          "classes": "btn btn-default form-control ui-select-toggle",
+          "type": "",
+          "id": "",
+          "ngClick": "$select.activate()",
+          "disabled": false
+        }
+      ],
+      "tables": [
+        {
+          "headers": [],
+          "rowCount": 1
+        },
+        {
+          "headers": [],
+          "rowCount": 1
+        }
+      ],
+      "inputs": [
+        {
+          "tag": "input",
+          "type": "text",
+          "name": "",
+          "id": "",
+          "placeholder": "Buscar...",
+          "label": "",
+          "ngModel": "vm.valBusqueda",
+          "disabled": false,
+          "options": []
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "name": "",
+          "id": "",
+          "placeholder": "Paginación",
+          "label": "",
+          "ngModel": "$select.search",
+          "disabled": false,
+          "options": []
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "name": "",
+          "id": "focusser-0",
+          "placeholder": "",
+          "label": "",
+          "ngModel": "",
+          "disabled": false,
+          "options": []
+        }
+      ],
+      "modals": [],
+      "tabs": []
+    },
+    "Lotizar Compras": {
+      "title": "",
+      "buttons": [
+        {
+          "text": "Generar informe",
+          "tag": "BUTTON",
+          "classes": "btn btn-success ladda-button",
+          "type": "",
+          "id": "",
+          "ngClick": "vm.fnGenerarInforme()",
+          "disabled": false
+        },
+        {
+          "text": "Registrar lote",
+          "tag": "A",
+          "classes": "btn btn-primary",
+          "type": "",
+          "id": "",
+          "ngClick": "",
+          "disabled": false
+        },
+        {
+          "text": "Por: 10 registros",
+          "tag": "SPAN",
+          "classes": "btn btn-default form-control ui-select-toggle",
+          "type": "",
+          "id": "",
+          "ngClick": "$select.activate()",
+          "disabled": false
+        },
+        {
+          "text": "Del 01 Octubre, 2026 hasta 13 Octubre, 2026",
+          "tag": "BUTTON",
+          "classes": "btn btn-default pull-right ng-pristine ng-untouched ng-valid ng-isolate-scope ng-not-empty",
+          "type": "",
+          "id": "",
+          "ngClick": "",
+          "disabled": false
+        },
+        {
+          "text": "Aplicar",
+          "tag": "BUTTON",
+          "classes": "applyBtn btn btn-sm btn-success",
+          "type": "button",
+          "id": "",
+          "ngClick": "",
+          "disabled": true
+        },
+        {
+          "text": "Cancelar",
+          "tag": "BUTTON",
+          "classes": "cancelBtn btn btn-sm btn-default",
+          "type": "button",
+          "id": "",
+          "ngClick": "",
+          "disabled": false
+        }
+      ],
+      "tables": [
+        {
+          "headers": [
+            "Fech. de registro",
+            "Fech. de programación",
+            "Fech. de pago",
+            "Día de pago",
+            "Lote",
+            "Cta. Bancaria",
+            "Estado",
+            "Total",
+            "Opciones"
+          ],
+          "rowCount": 1
+        },
+        {
+          "headers": [],
+          "rowCount": 1
+        }
+      ],
+      "inputs": [
+        {
+          "tag": "input",
+          "type": "text",
+          "name": "",
+          "id": "",
+          "placeholder": "Buscar...",
+          "label": "",
+          "ngModel": "vm.valBusqueda",
+          "disabled": false,
+          "options": []
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "name": "",
+          "id": "",
+          "placeholder": "Paginación",
+          "label": "",
+          "ngModel": "$select.search",
+          "disabled": false,
+          "options": []
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "name": "",
+          "id": "focusser-0",
+          "placeholder": "",
+          "label": "",
+          "ngModel": "",
+          "disabled": false,
+          "options": []
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "name": "daterangepicker_start",
+          "id": "",
+          "placeholder": "",
+          "label": "",
+          "ngModel": "",
+          "disabled": false,
+          "options": []
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "name": "daterangepicker_end",
+          "id": "",
+          "placeholder": "",
+          "label": "",
+          "ngModel": "",
+          "disabled": false,
+          "options": []
+        }
+      ],
+      "modals": [],
+      "tabs": []
+    },
+    "Ajustes Compras": {
+      "title": "",
+      "buttons": [
+        {
+          "text": "Por: 10 registros",
+          "tag": "SPAN",
+          "classes": "btn btn-default form-control ui-select-toggle",
+          "type": "",
+          "id": "",
+          "ngClick": "$select.activate()",
+          "disabled": false
+        },
+        {
+          "text": "Nuevo banco",
+          "tag": "BUTTON",
+          "classes": "btn btn-primary btn-block",
+          "type": "",
+          "id": "",
+          "ngClick": "vm.banco.resetearBancoObjeto();$state.go('modulocompras.ajustes.banco.nuevo')",
+          "disabled": false
+        }
+      ],
+      "tables": [
+        {
+          "headers": [
+            "Nombre",
+            "Dirección",
+            "Observaciones",
+            "Estado",
+            "Acciones"
+          ],
+          "rowCount": 1
+        },
+        {
+          "headers": [],
+          "rowCount": 1
+        }
+      ],
+      "inputs": [
+        {
+          "tag": "input",
+          "type": "text",
+          "name": "",
+          "id": "",
+          "placeholder": "Buscar...",
+          "label": "",
+          "ngModel": "vm.valBusqueda",
+          "disabled": false,
+          "options": []
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "name": "",
+          "id": "",
+          "placeholder": "Paginación",
+          "label": "",
+          "ngModel": "$select.search",
+          "disabled": false,
+          "options": []
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "name": "",
+          "id": "focusser-0",
+          "placeholder": "",
+          "label": "",
+          "ngModel": "",
+          "disabled": false,
+          "options": []
+        }
+      ],
+      "modals": [],
+      "tabs": [
+        "Bancos",
+        "Cuentas bancarias",
+        "Comprobantes de compra",
+        "Percepciones",
+        "Transportistas",
+        "Categorias de servicios",
+        "Servicios"
+      ]
+    }
+  },
+  "templates": {},
+  "api_endpoints": [
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/local/getLocalList",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/local/getVariablesLog",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/local/esUnPlanLite",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/caja/getCajaListByLocal/1",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/api/rest/campaniaaddons/getByIdUsuario",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/turno/getTurnoListByLocal/1",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/configuracion/getAllByLocalId/1/0/0",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/configuracion/getAllByLocalId/null/0/0",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/usuario/login",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/configuracionlocalpos/obtenerTodasLasConfiguracionesPOSPorLocalLogeado/1",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/getWebinars/caprichos.restaurant.pe",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/getInformacionKamAndSupport/caprichos.restaurant.pe",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerPermisosPorUsuarioValidado/1",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/getLocalesPermitidos/0",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/getLocalesPermitidos/0",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/caja/validarCajaActualAbierta",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerLocalesPermitidosParaUsuarioID/1",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerDocElectronicosPendientes",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/getLive/caprichos.restaurant.pe",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/obtenerAddons",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/getTokenApp",
+      "query_keys": [
+        "token"
+      ],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerAddonsPorToken",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/caja/allcajasbylocal/1/1/0/0",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/estadoTodosLosReportes",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://billing.restaurant.pe/billing/m/rest/suscripcion/getEstadoSuscripcionLocalV2/caprichos/1",
+      "query_keys": [
+        "token"
+      ],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://billing.restaurant.pe/billing/m/rest/suscripcion/obtenerPermisosPorPlan/caprichos/1",
+      "query_keys": [
+        "token"
+      ],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://billing.quipupos.com/billing/public/rest/aplicacion/obtenerWebinarVigenteV2",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/readonly/rest/dashboard/obtenerPortadaV2",
+      "query_keys": [
+        "readonly"
+      ],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/integracion/integracion/34",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/obtenerFechaRenovacionCertificadoValidar/20611290064",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://billing.restaurant.pe/billing/m/rest/suscripcion/obtenerPermisosPorPlan/caprichos/1",
+      "query_keys": [
+        "token"
+      ],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/obtenerAddons",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://billing.quipupos.com/billing/public/rest/aplicacion/obtenerWebinarVigenteV2",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://billing.restaurant.pe/billing/m/rest/suscripcion/getEstadoSuscripcionLocalV2/caprichos/1",
+      "query_keys": [
+        "token"
+      ],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/getLive/caprichos.restaurant.pe",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/encuestabi/verificarMostrar",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/sorteos/obtenerSorteoDisponible",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/configuracion/get/31",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerAddonsPorToken",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/validarUsoPlataforma",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/validarConfiguracioCartaJson",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerPermisosPorUsuarioValidado/1",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerLocalYape",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/api/rest/campaniaaddons/getByIdUsuario",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/configuracion/getAllByLocalId/1/0/0",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/configuracionregional/getAllByLocalId/1/0/0",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/getLocalesPermitidos/0",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/proveedor/getAll/-1/1/10",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerDocElectronicosPendientes",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/local/getVariablesLog",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/integracion/integracion/34",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://incidencias.restaurant.pe/billing/m/rest/local/obtenerIncidenciaPorusuarioSinCalificacion/restaurant.pe/caprichos/1",
+      "query_keys": [
+        "token"
+      ],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/obtenerFechaRenovacionCertificadoValidar/20611290064",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://billing.restaurant.pe/billing/m/rest/suscripcion/obtenerPermisosPorPlan/caprichos/1",
+      "query_keys": [
+        "token"
+      ],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://billing.restaurant.pe/billing/m/rest/suscripcion/getEstadoSuscripcionLocalV2/caprichos/1",
+      "query_keys": [
+        "token"
+      ],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://billing.quipupos.com/billing/public/rest/aplicacion/obtenerWebinarVigenteV2",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/sorteos/obtenerSorteoDisponible",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/encuestabi/verificarMostrar",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/validarConfiguracioCartaJson",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerLocalYape",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/configuracion/get/31",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/getLive/caprichos.restaurant.pe",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/api/rest/campaniaaddons/getByIdUsuario",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerAddonsPorToken",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/validarUsoPlataforma",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerPermisosPorUsuarioValidado/1",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/configuracion/getAllByLocalId/1/0/0",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/lotecompra/obtenerLotecomprasListByRangoFechasAndEstadoAndBusqueda/2026-10-01%2000:00:00/2026-10-13%2023:45:00/-1/1/10/-1",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerDocElectronicosPendientes",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/getLocalesPermitidos/0",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/local/getVariablesLog",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/integracion/integracion/34",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://incidencias.restaurant.pe/billing/m/rest/local/obtenerIncidenciaPorusuarioSinCalificacion/restaurant.pe/caprichos/1",
+      "query_keys": [
+        "token"
+      ],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/obtenerAddons",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/obtenerFechaRenovacionCertificadoValidar/20611290064",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://billing.restaurant.pe/billing/m/rest/suscripcion/obtenerPermisosPorPlan/caprichos/1",
+      "query_keys": [
+        "token"
+      ],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/obtenerAddons",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://billing.restaurant.pe/billing/m/rest/suscripcion/getEstadoSuscripcionLocalV2/caprichos/1",
+      "query_keys": [
+        "token"
+      ],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://billing.quipupos.com/billing/public/rest/aplicacion/obtenerWebinarVigenteV2",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/sorteos/obtenerSorteoDisponible",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/encuestabi/verificarMostrar",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/validarUsoPlataforma",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerAddonsPorToken",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/configuracion/get/31",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/getLive/caprichos.restaurant.pe",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerPermisosPorUsuarioValidado/1",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/api/rest/campaniaaddons/getByIdUsuario",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerLocalYape",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/validarConfiguracioCartaJson",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/getLocalesPermitidos/0",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/banco/obtenerTodoslosBancosPorBusquedaPaginado/-1/-1/1/10",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerDocElectronicosPendientes",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/integracion/integracion/34",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/local/getVariablesLog",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://incidencias.restaurant.pe/billing/m/rest/local/obtenerIncidenciaPorusuarioSinCalificacion/restaurant.pe/caprichos/1",
+      "query_keys": [
+        "token"
+      ],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/configuracion/getAllByLocalId/1/0/0",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/obtenerFechaRenovacionCertificadoValidar/20611290064",
+      "query_keys": [],
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/configuracion/getAllByLocalId/1/0/0",
+      "query_keys": [],
+      "status": 200
+    }
+  ]
+}

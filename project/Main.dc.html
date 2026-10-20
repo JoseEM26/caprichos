@@ -1,0 +1,835 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Carta virtual de Caprichos (web)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Open+Sans:wght@400;600;700&display=swap">
+<style>
+body{margin:0;background:var(--bg)}
+button{font-family:inherit;cursor:pointer}
+input,textarea{font-family:inherit}
+@keyframes fx-fall { 0% { transform: translate3d(0,-10vh,0) rotate(0deg); } 50% { transform: translate3d(22px,50vh,0) rotate(180deg); } 100% { transform: translate3d(-12px,110vh,0) rotate(360deg); } }
+@keyframes fx-rise { 0% { transform: translate3d(0,110vh,0); } 100% { transform: translate3d(28px,-15vh,0); } }
+@keyframes fx-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) { .fx { display: none; } }
+.noscroll{scrollbar-width:none;-ms-overflow-style:none}
+.noscroll::-webkit-scrollbar{display:none}
+.card{transition:box-shadow .15s ease,transform .15s ease}
+.card:hover{box-shadow:0 10px 24px color-mix(in srgb, var(--ink) 18%, transparent);transform:translateY(-2px)}
+.add:hover{background:var(--ink) !important;color:var(--bg) !important}
+</style>
+</helmet>
+<div style="{{palVars}};min-height:100vh;background:color-mix(in srgb, var(--bg) 90%, var(--ink))">
+<div style="background:var(--card);border-bottom:1.5px dashed var(--soft);padding:10px 16px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 24px">
+  <span style="font-size:12px;font-weight:700;letter-spacing:0.06em;color:var(--soft)">CONTROLES DE LA MAQUETA</span>
+  <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center"><span style="font-size:12px;font-weight:700">Dispositivo</span>
+    <sc-for list="{{deviceChips}}" as="r" hint-placeholder-count="2"><button onClick="{{r.pick}}" style="min-height:36px;padding:0 12px;border-radius:9999px;border:1.5px solid var(--ink);background:{{r.bg}};color:{{r.fg}};font-weight:700;font-size:12px">{{r.n}}</button></sc-for></div>
+</div>
+<div style="position:relative;margin:0 auto;width:{{devW}};max-width:100%;height:{{devH}};overflow:{{devOv}};transform:{{devTransform}};box-shadow:{{devShadow}}">
+<div style="height:{{scrollH}};overflow-y:{{scrollOv}};min-height:{{scrollMin}};background:var(--bg);color:var(--ink);font-family:'Open Sans',system-ui,sans-serif;font-size:15px;line-height:22px">
+
+<!-- ===== CABECERA FIJA ===== -->
+<div style="position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--line)">
+  <div style="max-width:1200px;margin:0 auto;padding:12px 24px;display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <img src="/_blob/6d6aa5696913688bb2235a49f1133c2a" alt="Caprichos" style="width:48px;height:48px;border-radius:24px">
+      <div>
+        <div style="font-family:Montserrat,sans-serif;font-weight:800;font-size:20px;line-height:24px;letter-spacing:0.02em">CAPRICHOS</div>
+        <div style="font-size:12px;line-height:16px;color:var(--soft)">Cafetería artesanal · Campoy · Abierto hasta las 10:00 pm</div>
+      </div>
+    </div>
+    <div style="flex:1 1 220px;min-width:200px">
+      <label for="buscar" style="position:absolute;left:-9999px">Buscar en la carta</label>
+      <input id="buscar" type="search" value="{{query}}" onChange="{{setQuery}}" placeholder="Buscar en la carta" style="width:100%;box-sizing:border-box;min-height:44px;border-radius:9999px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);padding:0 16px;font-size:14px">
+    </div>
+    <button onClick="{{openCart}}" style="min-height:44px;padding:0 18px;border:0;border-radius:12px;background:var(--accent);color:var(--on);font-family:Montserrat,sans-serif;font-weight:800;font-size:14px">Mi pedido · {{cartCount}} · {{cartSubText}}</button>
+  </div>
+  <div style="max-width:1200px;margin:0 auto;padding:0 24px 12px;display:flex;align-items:center;gap:6px">
+    <sc-if value="{{showArrows}}" hint-placeholder-val="{{ false }}">
+      <button onClick="{{stripLeft}}" aria-label="Ver categorías anteriores" style="flex:none;width:36px;height:36px;border:1.5px solid var(--ink);border-radius:18px;background:transparent;color:var(--ink);font-weight:800;font-size:18px;line-height:18px">‹</button>
+    </sc-if>
+    <div class="noscroll" data-strip="1" onMouseDown="{{stripDown}}" onMouseMove="{{stripMove}}" onMouseUp="{{stripUp}}" onMouseLeave="{{stripUp}}" style="flex:1;min-width:0;display:flex;gap:8px;overflow-x:auto;cursor:grab">
+      <sc-for list="{{cats}}" as="c" hint-placeholder-count="8">
+        <button onClick="{{c.pick}}" style="flex:none;min-height:40px;padding:0 16px;border-radius:9999px;border:1.5px solid var(--ink);background:{{c.bg}};color:{{c.fg}};font-weight:700;font-size:12px;letter-spacing:0.05em">{{c.n}}</button>
+      </sc-for>
+    </div>
+    <sc-if value="{{showArrows}}" hint-placeholder-val="{{ false }}">
+      <button onClick="{{stripRight}}" aria-label="Ver más categorías" style="flex:none;width:36px;height:36px;border:1.5px solid var(--ink);border-radius:18px;background:transparent;color:var(--ink);font-weight:800;font-size:18px;line-height:18px">›</button>
+    </sc-if>
+  </div>
+</div>
+
+<!-- ===== DECORACIÓN FESTIVA ===== -->
+<sc-if value="{{themeOn}}" hint-placeholder-val="{{ false }}">
+  <div class="fx" aria-hidden="true" style="position:fixed;left:0;top:0;right:0;bottom:0;pointer-events:none;overflow:hidden;z-index:25">
+    <sc-for list="{{fx}}" as="f" hint-placeholder-count="14"><span style="position:absolute;left:{{f.left}};top:0;font-size:{{f.size}};line-height:1;animation:{{f.anim}}">{{f.g}}</span></sc-for>
+    <sc-if value="{{hasBulbs}}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:0;right:0;top:0;height:14px">
+        <sc-for list="{{bulbs}}" as="bb" hint-placeholder-count="30"><span style="position:absolute;top:2px;left:{{bb.left}};width:10px;height:10px;margin-left:-5px;border-radius:50%;background:{{bb.color}};box-shadow:0 0 8px {{bb.color}};animation:{{bb.anim}}"></span></sc-for>
+      </div>
+    </sc-if>
+  </div>
+</sc-if>
+
+<!-- ===== PROMOCIONES ===== -->
+<sc-if value="{{showPromos}}" hint-placeholder-val="{{ true }}">
+<div style="max-width:1200px;margin:0 auto;padding:24px 24px 0;display:flex;flex-wrap:wrap;gap:16px">
+  <sc-for list="{{promos}}" as="b" hint-placeholder-count="2">
+    <button onClick="{{b.open}}" class="card" style="flex:1 1 440px;min-width:0;border:0;padding:0;border-radius:20px;background:{{b.bg}};color:{{b.fg}};text-align:left;overflow:hidden;display:flex;align-items:stretch">
+      <span style="flex:1;padding:24px;display:flex;flex-direction:column;gap:8px;justify-content:center;min-width:0">
+        <span style="font-family:Montserrat,sans-serif;font-weight:800;font-size:12px;letter-spacing:0.1em;color:{{b.acc}}">{{b.tag}}</span>
+        <span style="font-family:Montserrat,sans-serif;font-weight:800;font-size:26px;line-height:30px;overflow-wrap:anywhere">{{b.title}}</span>
+        <span style="font-size:14px">{{b.sub}}</span>
+        <span style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+          <span style="font-family:Montserrat,sans-serif;font-weight:800;font-size:32px;color:{{b.acc}}">{{b.price}}</span>
+          <sc-if value="{{b.hasOld}}" hint-placeholder-val="{{ false }}"><span style="font-size:16px;text-decoration:line-through;color:{{b.oldC}}">{{b.old}}</span></sc-if>
+          <sc-if value="{{b.hasBadge}}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;font-weight:700;background:{{b.acc}};color:{{b.bg}};border-radius:9999px;padding:2px 10px">{{b.badge}}</span></sc-if>
+        </span>
+      </span>
+      <img src="{{b.img}}" alt="{{b.title}}" style="width:200px;object-fit:cover;flex:none">
+    </button>
+  </sc-for>
+</div>
+</sc-if>
+
+<!-- ===== CARTA ===== -->
+<div style="max-width:1200px;margin:0 auto;padding:24px 24px 64px">
+  <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;flex-wrap:wrap;gap:10px 28px">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <span style="font-weight:700;font-size:13px">Ordenar</span>
+        <sc-for list="{{sorts}}" as="o" hint-placeholder-count="4">
+          <button onClick="{{o.pick}}" style="min-height:40px;padding:0 14px;border-radius:9999px;border:1.5px solid var(--ink);background:{{o.bg}};color:{{o.fg}};font-weight:700;font-size:12px">{{o.n}}</button>
+        </sc-for>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <span style="font-weight:700;font-size:13px">Precio</span>
+        <sc-for list="{{prices}}" as="o" hint-placeholder-count="4">
+          <button onClick="{{o.pick}}" style="min-height:40px;padding:0 14px;border-radius:9999px;border:1.5px solid var(--ink);background:{{o.bg}};color:{{o.fg}};font-weight:700;font-size:12px">{{o.n}}</button>
+        </sc-for>
+      </div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <span style="font-weight:700;font-size:13px">Mostrar solo</span>
+        <sc-for list="{{toggles}}" as="o" hint-placeholder-count="3">
+          <button onClick="{{o.pick}}" style="min-height:40px;padding:0 14px;border-radius:9999px;border:1.5px solid var(--ink);background:{{o.bg}};color:{{o.fg}};font-weight:700;font-size:12px">{{o.mark}}{{o.n}}</button>
+        </sc-for>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="font-size:13px;color:var(--soft);font-weight:600">{{resultText}}</span>
+        <sc-if value="{{anyFilter}}" hint-placeholder-val="{{ false }}">
+          <button onClick="{{clearFilters}}" style="min-height:40px;padding:0 8px;border:0;background:transparent;color:var(--price);font-weight:700;text-decoration:underline">Limpiar filtros</button>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+  <sc-if value="{{noResults}}" hint-placeholder-val="{{ false }}">
+    <div style="padding:48px 0;text-align:center">
+      <div style="font-family:Montserrat,sans-serif;font-weight:800;font-size:20px">No encontramos "{{query}}"</div>
+      <div style="margin-top:4px;color:var(--soft)">Prueba con otra palabra o elige una categoría.</div>
+      <button onClick="{{clearQuery}}" style="margin-top:16px;min-height:44px;padding:0 20px;border:0;border-radius:12px;background:var(--accent);color:var(--on);font-weight:800">Ver toda la carta</button>
+    </div>
+  </sc-if>
+  <sc-for list="{{sections}}" as="sec" hint-placeholder-count="2">
+    <div style="margin-top:32px">
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
+        <span style="flex:1;height:3px;background:var(--accent);border-radius:2px"></span>
+        <h2 style="margin:0;font-family:Montserrat,sans-serif;font-weight:800;font-size:28px;line-height:34px;letter-spacing:0.03em">{{sec.title}}</h2>
+        <span style="flex:1;height:3px;background:var(--accent);border-radius:2px"></span>
+      </div>
+      <div style="text-align:center;font-size:13px;color:var(--soft);margin:-8px 0 16px">{{sec.note}}</div>
+      <div style="display:grid;grid-template-columns:{{gridCols}};gap:16px">
+        <sc-for list="{{sec.items}}" as="p" hint-placeholder-count="4">
+          <div class="card" style="background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 6px 18px color-mix(in srgb, var(--ink) 12%, transparent);overflow:hidden;display:flex;flex-direction:{{cardDir}}">
+            <button onClick="{{p.open}}" aria-label="Ver {{p.name}}" style="border:0;padding:0;background:transparent;display:block;width:{{imgW}};flex:none">
+              <sc-if value="{{p.hasImg}}" hint-placeholder-val="{{ true }}">
+                <img src="{{p.img}}" alt="{{p.name}}" style="width:100%;aspect-ratio:{{imgRatio}};object-fit:cover;display:block">
+              </sc-if>
+              <sc-if value="{{p.noImg}}" hint-placeholder-val="{{ false }}">
+                <span style="width:100%;aspect-ratio:{{imgRatio}};background:var(--sec);display:flex;align-items:center;justify-content:center;font-family:Montserrat,sans-serif;font-weight:800;font-size:44px;color:var(--ink)">{{p.initials}}</span>
+              </sc-if>
+            </button>
+            <div style="padding:12px;display:flex;flex-direction:column;gap:6px;flex:1">
+              <div style="font-family:Montserrat,sans-serif;font-weight:700;font-size:15px;line-height:20px">{{p.name}}</div>
+              <div style="font-size:12px;line-height:17px;color:var(--soft);flex:1">{{p.desc}}</div>
+              <sc-if value="{{p.tag}}" hint-placeholder-val="{{ false }}">
+                <div><span style="font-size:11px;font-weight:700;background:var(--ink);color:var(--bg);border-radius:9999px;padding:2px 10px">{{p.tagText}}</span></div>
+              </sc-if>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px">
+                <span style="display:flex;flex-direction:column">
+                  <span style="font-family:Montserrat,sans-serif;font-weight:800;font-size:18px;color:var(--price)">{{p.priceText}}</span>
+                  <sc-if value="{{p.hasOld}}" hint-placeholder-val="{{ false }}">
+                    <span style="font-size:12px;text-decoration:line-through;color:var(--soft)">{{p.oldText}}</span>
+                  </sc-if>
+                </span>
+                <button onClick="{{p.open}}" class="add" style="min-height:44px;padding:0 16px;border:0;border-radius:12px;background:var(--accent);color:var(--on);font-weight:800;font-size:13px">{{p.cta}}</button>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-for>
+  <sc-if value="{{hasPages}}" hint-placeholder-val="{{ false }}">
+    <div style="margin-top:32px;display:flex;flex-direction:column;align-items:center;gap:10px">
+      <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px">
+        <button onClick="{{prevPage}}" style="min-height:44px;padding:0 16px;border-radius:12px;border:1.5px solid var(--ink);background:transparent;color:var(--ink);font-weight:700;opacity:{{prevOp}}">← Anterior</button>
+        <sc-for list="{{pageButtons}}" as="b" hint-placeholder-count="5">
+          <button onClick="{{b.pick}}" aria-label="Página {{b.n}}" style="min-width:44px;min-height:44px;border-radius:12px;border:1.5px solid var(--ink);background:{{b.bg}};color:{{b.fg}};font-weight:800">{{b.n}}</button>
+        </sc-for>
+        <button onClick="{{nextPage}}" style="min-height:44px;padding:0 16px;border-radius:12px;border:1.5px solid var(--ink);background:transparent;color:var(--ink);font-weight:700;opacity:{{nextOp}}">Siguiente →</button>
+      </div>
+      <div style="font-size:13px;color:var(--soft)">{{rangeText}}</div>
+    </div>
+  </sc-if>
+  <div style="margin-top:48px;padding-top:16px;border-top:1px solid var(--line);font-size:13px;color:var(--soft);text-align:center">Horario: todos los días de 2:00 pm a 10:00 pm · Delivery gratis desde s/ 70 · Pedido mínimo de delivery s/ 14.50</div>
+</div>
+
+<!-- ===== AVISO DE AGREGADO ===== -->
+<sc-if value="{{hasToast}}" hint-placeholder-val="{{ false }}">
+  <div style="position:fixed;left:0;right:0;bottom:24px;z-index:60;display:flex;justify-content:center;pointer-events:none">
+    <div style="background:var(--ink);color:var(--bg);border-radius:9999px;padding:12px 20px;font-weight:700;box-shadow:0 10px 24px color-mix(in srgb, var(--ink) 30%, transparent)">{{toast}}</div>
+  </div>
+</sc-if>
+
+<!-- ===== FONDO DE VENTANAS ===== -->
+<sc-if value="{{hasOverlay}}" hint-placeholder-val="{{ false }}">
+  <div onClick="{{closeAll}}" style="position:fixed;left:0;top:0;right:0;bottom:0;z-index:30;background:color-mix(in srgb, var(--ink) 55%, transparent)"></div>
+</sc-if>
+
+<!-- ===== VENTANA DE PRODUCTO ===== -->
+<sc-if value="{{isProduct}}" hint-placeholder-val="{{ false }}">
+<div style="position:fixed;z-index:40;left:50%;top:50%;transform:translate(-50%,-50%);width:min(900px,calc(100% - 24px));max-height:calc(100% - 24px);overflow-y:auto;background:var(--bg);border-radius:20px;box-shadow:0 20px 50px color-mix(in srgb, var(--ink) 40%, transparent)">
+  <div style="display:flex;flex-wrap:wrap">
+    <div style="flex:1 1 320px;min-width:0;background:var(--card);display:flex;align-items:center;justify-content:center">
+      <sc-if value="{{cur.hasImg}}" hint-placeholder-val="{{ true }}">
+        <img src="{{cur.img}}" alt="{{cur.name}}" style="width:100%;aspect-ratio:1/1;object-fit:cover;display:block">
+      </sc-if>
+      <sc-if value="{{cur.noImg}}" hint-placeholder-val="{{ false }}">
+        <span style="width:100%;aspect-ratio:1/1;background:var(--sec);display:flex;align-items:center;justify-content:center;font-family:Montserrat,sans-serif;font-weight:800;font-size:72px;color:var(--ink)">{{cur.initials}}</span>
+      </sc-if>
+    </div>
+    <div style="flex:1 1 380px;min-width:0;padding:24px;display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
+        <div>
+          <div style="font-family:Montserrat,sans-serif;font-weight:800;font-size:24px;line-height:30px">{{cur.name}}</div>
+          <div style="font-size:13px;color:var(--soft);margin-top:4px">{{cur.desc}}</div>
+        </div>
+        <button onClick="{{closeAll}}" aria-label="Cerrar" style="flex:none;width:44px;height:44px;border-radius:22px;border:1.5px solid var(--ink);background:transparent;color:var(--ink);font-size:20px;font-weight:800">×</button>
+      </div>
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <span style="font-family:Montserrat,sans-serif;font-weight:800;font-size:26px;color:var(--price)">{{unitText}}</span>
+        <sc-if value="{{curHasOld}}" hint-placeholder-val="{{ false }}">
+          <span style="font-size:14px;text-decoration:line-through;color:var(--soft)">{{curOldText}}</span>
+          <span style="font-size:12px;font-weight:700;background:var(--accent);color:var(--on);border-radius:9999px;padding:2px 10px">-13%</span>
+        </sc-if>
+      </div>
+
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-family:Montserrat,sans-serif;font-weight:700;font-size:15px">{{cur.variantTitle}}</span>
+          <span style="font-size:11px;font-weight:700;background:var(--ink);color:var(--bg);border-radius:9999px;padding:2px 10px">OBLIGATORIO</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <sc-for list="{{variants}}" as="v" hint-placeholder-count="3">
+            <button onClick="{{v.pick}}" style="min-height:48px;border-radius:12px;border:1.5px solid {{v.bd}};background:var(--card);color:var(--ink);padding:0 12px;display:flex;align-items:center;gap:12px;text-align:left">
+              <span style="width:20px;height:20px;border-radius:10px;border:2px solid var(--ink);background:{{v.dot}};flex:none"></span>
+              <span style="flex:1;font-weight:600">{{v.n}}</span>
+              <span style="font-weight:700">{{v.priceText}}</span>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+
+      <sc-for list="{{groups}}" as="g" hint-placeholder-count="2">
+        <div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <span style="font-family:Montserrat,sans-serif;font-weight:700;font-size:15px">{{g.name}}</span>
+            <span style="font-size:11px;font-weight:700;background:{{g.tagBg}};color:{{g.tagFg}};border-radius:9999px;padding:2px 10px;border:1px solid {{g.tagBd}}">{{g.tag}}</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <sc-for list="{{g.opts}}" as="o" hint-placeholder-count="3">
+              <button onClick="{{o.pick}}" style="min-height:48px;border-radius:12px;border:1.5px solid {{o.bd}};background:var(--card);color:var(--ink);padding:0 12px;display:flex;align-items:center;gap:12px;text-align:left">
+                <span style="width:20px;height:20px;border-radius:{{o.radius}};border:2px solid var(--ink);background:{{o.dot}};flex:none"></span>
+                <span style="flex:1;font-weight:600">{{o.n}}</span>
+                <span style="font-weight:700;color:var(--price)">{{o.priceText}}</span>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+      </sc-for>
+
+      <div>
+        <label for="nota" style="font-family:Montserrat,sans-serif;font-weight:700;font-size:15px;display:block;margin-bottom:8px">Nota para cocina (opcional)</label>
+        <input id="nota" type="text" value="{{note}}" onChange="{{setNote}}" placeholder="Ej.: sin hielo, bien caliente" style="width:100%;box-sizing:border-box;min-height:48px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);padding:0 12px;font-size:14px">
+      </div>
+
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;border:1.5px solid var(--ink);border-radius:12px">
+          <button onClick="{{qtyDec}}" aria-label="Menos" style="width:44px;height:48px;border:0;background:transparent;color:var(--ink);font-size:22px;font-weight:800">−</button>
+          <span style="min-width:28px;text-align:center;font-weight:700">{{qty}}</span>
+          <button onClick="{{qtyInc}}" aria-label="Más" style="width:44px;height:48px;border:0;background:transparent;color:var(--ink);font-size:22px;font-weight:800">+</button>
+        </div>
+        <button onClick="{{addToCart}}" style="flex:1 1 200px;min-height:52px;border:0;border-radius:12px;background:{{addBg}};color:var(--on);font-family:Montserrat,sans-serif;font-weight:800;font-size:14px;display:flex;justify-content:space-between;align-items:center;padding:0 16px">
+          <span>{{addLabel}}</span>
+          <span>{{lineTotalText}}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<!-- ===== CARRITO (PANEL LATERAL) ===== -->
+<sc-if value="{{isCart}}" hint-placeholder-val="{{ false }}">
+<div style="position:fixed;z-index:40;right:0;top:0;bottom:0;width:min(440px,100%);background:var(--bg);box-shadow:-10px 0 30px color-mix(in srgb, var(--ink) 25%, transparent);display:flex;flex-direction:column">
+  <div style="padding:16px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)">
+    <div style="font-family:Montserrat,sans-serif;font-weight:800;font-size:22px">Mi pedido</div>
+    <button onClick="{{closeAll}}" aria-label="Cerrar" style="width:44px;height:44px;border-radius:22px;border:1.5px solid var(--ink);background:transparent;color:var(--ink);font-size:20px;font-weight:800">×</button>
+  </div>
+  <div style="flex:1;min-height:0;overflow-y:auto;padding:16px 20px">
+    <sc-if value="{{cartEmpty}}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top:48px;text-align:center;color:var(--soft)">
+        <div style="font-family:Montserrat,sans-serif;font-weight:700;font-size:18px;color:var(--ink)">Tu pedido está vacío</div>
+        <div style="margin-top:4px">Elige algo de la carta para empezar.</div>
+        <button onClick="{{closeAll}}" style="margin-top:16px;min-height:48px;padding:0 20px;border:0;border-radius:12px;background:var(--accent);color:var(--on);font-weight:800">Ir a la carta</button>
+      </div>
+    </sc-if>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <sc-for list="{{cartLines}}" as="l" hint-placeholder-count="2">
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;gap:12px;align-items:center">
+          <sc-if value="{{l.hasImg}}" hint-placeholder-val="{{ true }}">
+            <img src="{{l.img}}" alt="{{l.name}}" style="width:64px;height:64px;border-radius:10px;object-fit:cover;flex:none">
+          </sc-if>
+          <sc-if value="{{l.noImg}}" hint-placeholder-val="{{ false }}">
+            <span style="width:64px;height:64px;border-radius:10px;background:var(--sec);flex:none;display:flex;align-items:center;justify-content:center;font-family:Montserrat,sans-serif;font-weight:800;color:var(--ink)">{{l.initials}}</span>
+          </sc-if>
+          <div style="flex:1;min-width:0">
+            <div style="font-family:Montserrat,sans-serif;font-weight:700;font-size:14px;line-height:18px">{{l.name}}</div>
+            <div style="font-size:12px;line-height:16px;color:var(--soft)">{{l.detail}}</div>
+            <div style="font-weight:800;color:var(--price);margin-top:2px">{{l.totalText}}</div>
+          </div>
+          <div style="display:flex;align-items:center;border:1.5px solid var(--ink);border-radius:12px;flex:none">
+            <button onClick="{{l.dec}}" aria-label="Menos" style="width:36px;height:40px;border:0;background:transparent;color:var(--ink);font-size:20px;font-weight:800">−</button>
+            <span style="min-width:20px;text-align:center;font-weight:700">{{l.qty}}</span>
+            <button onClick="{{l.inc}}" aria-label="Más" style="width:36px;height:40px;border:0;background:transparent;color:var(--ink);font-size:20px;font-weight:800">+</button>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+    <sc-if value="{{hasCart}}" hint-placeholder-val="{{ true }}">
+      <div style="margin-top:20px">
+        <div style="font-family:Montserrat,sans-serif;font-weight:700;font-size:15px;margin-bottom:8px">¿Cómo quieres recibir tu pedido?</div>
+        <div style="display:flex;gap:8px">
+          <sc-for list="{{modals}}" as="m" hint-placeholder-count="3">
+            <button onClick="{{m.pick}}" style="flex:1;min-height:48px;padding:0 6px;border-radius:12px;border:1.5px solid var(--ink);background:{{m.bg}};color:{{m.fg}};font-weight:700;font-size:13px">{{m.n}}</button>
+          </sc-for>
+        </div>
+        <sc-if value="{{needModal}}" hint-placeholder-val="{{ false }}">
+          <div style="margin-top:8px;font-size:13px;line-height:18px;color:var(--price);font-weight:600">Elige una opción para continuar.</div>
+        </sc-if>
+      </div>
+      <div style="margin-top:20px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;justify-content:space-between"><span>Subtotal</span><span style="font-weight:700">{{subtotalText}}</span></div>
+        <sc-if value="{{isDelivery}}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;justify-content:space-between"><span>Envío</span><span style="font-weight:700">{{feeText}}</span></div>
+          <div style="font-size:12px;line-height:16px;color:var(--soft)">{{feeNote}}</div>
+        </sc-if>
+        <div style="border-top:1px solid var(--line);padding-top:8px;display:flex;justify-content:space-between;font-family:Montserrat,sans-serif;font-weight:800;font-size:18px"><span>Total</span><span>{{totalText}}</span></div>
+      </div>
+      <sc-if value="{{belowMin}}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:12px;border:1.5px solid var(--price);border-radius:12px;padding:12px;font-size:13px;line-height:18px;color:var(--price);font-weight:600">{{minText}}</div>
+      </sc-if>
+    </sc-if>
+  </div>
+  <sc-if value="{{hasCart}}" hint-placeholder-val="{{ true }}">
+    <div style="padding:12px 20px 20px;border-top:1px solid var(--line)">
+      <button onClick="{{goCheckout}}" style="width:100%;min-height:52px;border:0;border-radius:12px;background:{{contBg}};color:var(--on);font-family:Montserrat,sans-serif;font-weight:800;font-size:15px">Continuar · {{totalText}}</button>
+    </div>
+  </sc-if>
+</div>
+</sc-if>
+
+<!-- ===== DATOS Y PAGO ===== -->
+<sc-if value="{{isCheckout}}" hint-placeholder-val="{{ false }}">
+<div style="position:fixed;z-index:40;left:50%;top:50%;transform:translate(-50%,-50%);width:min(960px,calc(100% - 24px));max-height:calc(100% - 24px);overflow-y:auto;background:var(--bg);border-radius:20px;box-shadow:0 20px 50px color-mix(in srgb, var(--ink) 40%, transparent)">
+  <div style="padding:20px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)">
+    <div style="font-family:Montserrat,sans-serif;font-weight:800;font-size:22px">Tus datos y el pago</div>
+    <button onClick="{{closeAll}}" aria-label="Cerrar" style="width:44px;height:44px;border-radius:22px;border:1.5px solid var(--ink);background:transparent;color:var(--ink);font-size:20px;font-weight:800">×</button>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:24px;padding:24px">
+    <div style="flex:1 1 380px;min-width:0">
+      <div style="font-size:13px;color:var(--soft);margin-bottom:12px">{{modalLabel}}</div>
+      <label for="f-nombre" style="font-weight:700;display:block;margin-bottom:4px">Nombre</label>
+      <input id="f-nombre" type="text" value="{{name}}" onChange="{{setName}}" placeholder="Tu nombre" style="width:100%;box-sizing:border-box;min-height:48px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);padding:0 12px;font-size:14px;margin-bottom:12px">
+      <label for="f-tel" style="font-weight:700;display:block;margin-bottom:4px">Teléfono (+51)</label>
+      <input id="f-tel" type="tel" value="{{phone}}" onChange="{{setPhone}}" placeholder="9 dígitos" style="width:100%;box-sizing:border-box;min-height:48px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);padding:0 12px;font-size:14px;margin-bottom:12px">
+      <sc-if value="{{isDelivery}}" hint-placeholder-val="{{ false }}">
+        <label for="f-dir" style="font-weight:700;display:block;margin-bottom:4px">Calle o avenida</label>
+        <input id="f-dir" type="text" value="{{addr}}" onChange="{{setAddr}}" placeholder="Escribe aquí" style="width:100%;box-sizing:border-box;min-height:48px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);padding:0 12px;font-size:14px;margin-bottom:12px">
+        <label for="f-ref" style="font-weight:700;display:block;margin-bottom:4px">Referencia (opcional)</label>
+        <input id="f-ref" type="text" value="{{ref}}" onChange="{{setRef}}" placeholder="Cerca de..." style="width:100%;box-sizing:border-box;min-height:48px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);padding:0 12px;font-size:14px;margin-bottom:12px">
+        <div style="background:var(--card);border:1.5px dashed var(--soft);border-radius:12px;padding:12px;font-size:13px;line-height:18px;color:var(--soft)">El repartidor recibirá esta dirección y podrá abrirla en Waze o Google Maps.</div>
+      </sc-if>
+      <sc-if value="{{isMesa}}" hint-placeholder-val="{{ false }}">
+        <label for="f-mesa" style="font-weight:700;display:block;margin-bottom:4px">Número de mesa</label>
+        <input id="f-mesa" type="text" value="{{mesa}}" onChange="{{setMesa}}" placeholder="Ej.: M12" style="width:100%;box-sizing:border-box;min-height:48px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);padding:0 12px;font-size:14px;margin-bottom:12px">
+      </sc-if>
+    </div>
+    <div style="flex:1 1 320px;min-width:0">
+      <div style="font-family:Montserrat,sans-serif;font-weight:700;font-size:15px;margin-bottom:8px">Medio de pago</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
+        <sc-for list="{{pays}}" as="y" hint-placeholder-count="5">
+          <button onClick="{{y.pick}}" style="min-height:48px;border-radius:12px;border:1.5px solid {{y.bd}};background:var(--card);color:var(--ink);padding:0 12px;display:flex;align-items:center;gap:12px;text-align:left">
+            <span style="width:20px;height:20px;border-radius:10px;border:2px solid var(--ink);background:{{y.dot}};flex:none"></span>
+            <span style="flex:1;font-weight:600">{{y.n}}</span>
+          </button>
+        </sc-for>
+      </div>
+      <sc-if value="{{isCash}}" hint-placeholder-val="{{ false }}">
+        <label for="f-efe" style="font-weight:700;display:block;margin-bottom:4px">¿Con cuánto pagas? (para el vuelto)</label>
+        <input id="f-efe" type="text" value="{{cash}}" onChange="{{setCash}}" placeholder="s/" style="width:100%;box-sizing:border-box;min-height:48px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);padding:0 12px;font-size:14px;margin-bottom:12px">
+      </sc-if>
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;justify-content:space-between"><span>Subtotal</span><span style="font-weight:700">{{subtotalText}}</span></div>
+        <sc-if value="{{isDelivery}}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;justify-content:space-between"><span>Envío</span><span style="font-weight:700">{{feeText}}</span></div>
+        </sc-if>
+        <div style="border-top:1px solid var(--line);padding-top:8px;display:flex;justify-content:space-between;font-family:Montserrat,sans-serif;font-weight:800;font-size:18px"><span>Total</span><span>{{totalText}}</span></div>
+      </div>
+      <div style="font-size:12px;line-height:16px;color:var(--soft);margin:12px 0">El comprobante electrónico no se emite desde esta carta. Pide boleta o factura por WhatsApp.</div>
+      <button onClick="{{placeOrder}}" style="width:100%;min-height:52px;border:0;border-radius:12px;background:var(--accent);color:var(--on);font-family:Montserrat,sans-serif;font-weight:800;font-size:15px">Pedir · {{totalText}}</button>
+      <button onClick="{{openCart}}" style="width:100%;min-height:44px;margin-top:8px;border:0;background:transparent;color:var(--soft);font-weight:700;text-decoration:underline">Volver a mi pedido</button>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<!-- ===== CONFIRMACIÓN Y SEGUIMIENTO ===== -->
+<sc-if value="{{isDone}}" hint-placeholder-val="{{ false }}">
+<div style="position:fixed;z-index:40;left:50%;top:50%;transform:translate(-50%,-50%);width:min(560px,calc(100% - 24px));max-height:calc(100% - 24px);overflow-y:auto;background:var(--bg);border-radius:20px;box-shadow:0 20px 50px color-mix(in srgb, var(--ink) 40%, transparent);padding:32px 24px;display:flex;flex-direction:column;gap:16px">
+  <div style="text-align:center">
+    <div style="font-family:Montserrat,sans-serif;font-weight:800;font-size:26px;line-height:32px">¡Gracias, {{name}}!</div>
+    <div style="margin-top:4px;color:var(--soft)">Tu pedido {{orderCode}} fue enviado.</div>
+  </div>
+  <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px">
+    <sc-for list="{{steps}}" as="st" hint-placeholder-count="4">
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="width:24px;height:24px;border-radius:12px;background:{{st.dot}};border:2px solid var(--ink);flex:none"></span>
+        <span style="flex:1;font-weight:{{st.weight}}">{{st.n}}</span>
+      </div>
+    </sc-for>
+  </div>
+  <div style="font-size:13px;line-height:18px;color:var(--soft)">{{stageNote}}</div>
+  <button onClick="{{advance}}" style="min-height:48px;border:1.5px dashed var(--soft);border-radius:12px;background:transparent;color:var(--soft);font-weight:700">Simular siguiente paso (solo prototipo)</button>
+  <button onClick="{{resetAll}}" style="min-height:52px;border:0;border-radius:12px;background:var(--accent);color:var(--on);font-family:Montserrat,sans-serif;font-weight:800;font-size:15px">Volver a la carta</button>
+</div>
+</sc-if>
+
+<!-- ===== CONFIRMACIÓN (SÍ / NO) ===== -->
+<sc-if value="{{isConfirm}}" hint-placeholder-val="{{ false }}">
+  <div onClick="{{confirmNo}}" style="position:fixed;left:0;top:0;right:0;bottom:0;z-index:70;background:color-mix(in srgb, var(--ink) 60%, transparent)"></div>
+  <div role="alertdialog" aria-label="Confirmar acción" style="position:fixed;z-index:80;left:50%;top:50%;transform:translate(-50%,-50%);width:min(420px,calc(100% - 24px));background:var(--bg);border-radius:20px;box-shadow:0 20px 50px color-mix(in srgb, var(--ink) 45%, transparent);padding:24px;display:flex;flex-direction:column;gap:12px">
+    <div style="font-family:Montserrat,sans-serif;font-weight:800;font-size:20px;line-height:26px">{{confirmTitle}}</div>
+    <div style="font-size:14px;line-height:20px;color:var(--soft)">{{confirmMsg}}</div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button onClick="{{confirmYes}}" style="flex:1;min-height:52px;border:0;border-radius:12px;background:var(--accent);color:var(--on);font-family:Montserrat,sans-serif;font-weight:800;font-size:16px">Sí</button>
+      <button onClick="{{confirmNo}}" style="flex:1;min-height:52px;border:1.5px solid var(--ink);border-radius:12px;background:transparent;color:var(--ink);font-weight:800;font-size:16px">No</button>
+    </div>
+  </div>
+</sc-if>
+
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1366,"height":900}}'>
+const ID = {
+  algarro: 'f9cb12ce42a4c0d9f72e94a07b7d7b2c', americano: '9f377899695f9deec091767e602e1112', banana: '31e87426466f4c3872e9acca2d690bc8', berries: '29da9f5cbeb0f9ffafa693b4f527b296',
+  cafe: 'f1092310334bf61cc1d9ea23691a5517', capri: 'b59de72d153bb8dbab1994ec85e85a75', capu: '49f667e5cae3f1eb45409f53886d67c0', carachoc: 'b38e4e89ff25f2b263647afaeb064d41',
+  caraclas: 'e39ebe84e2294a9eb599afc4277bb963', carrot: '279ba7cc46883a20ade1648b4d250143', chocoberry: '2728bbd06db01031691d4c87919713a9', chocolate: '58637d724dc0e404cfc62a39af120aa4',
+  chocolucuma: 'c9d683b02b56bec9f285d2c877c319d5', clasico: '0e79e86314ebeeb53bc6d8ac21c20b67', club: 'e76ca16064c24aa12da7fe618e1100c1', docena: 'a813960683bea3ecf29c35db275ca60c',
+  dona: 'fce184d64c939c4dba744353129b8a7b', duocomp: '9c38ba30369e586bbec3f4c8cf48f581', duoirr: '7b83d7075e0141642c6bbc3d1eede929', empanada: 'c4df146f6980b149309b194ec3571ae9',
+  especial: 'adf52d154032e0f2ca3af30d11447aa9', fresasplit: 'e9c7ea8934b908d69a16c38d4e7f28ee', frutos: 'ad8c64b8af0f214ec59c211ef69240c6', galleta: '25757c608a115410cceebb7525b69505',
+  iceberry: 'cd40b816660662e809ffb5f7e7f4173d', icedcafe: '2867d29ee76fe5db14eed3d4f6a45548', icedchoc: 'bc7e1adb0a9fe5bd66973f7326be6642', latte: '12dcba2780f9099d3448237a255fb1e9',
+  latvainilla: '37dd67b7d66ef6023f428ec95db180c5', macchiato: 'e3789baf876ac4ab0db35bff0fbce410', manjar: 'bf4eef4f50f9b58600eee8eb34e16d24', maracuya: '97056bd8f961da5e1fe9d962b7fa882c',
+  marmol: '35131e10a846331e59b97d2410259c96', mocaccino: 'df17aa405d737c2cc8d73cb28495900a', moca: '16ba01a532d8b26c8995a3dff8f61a48', nute: 'da06271ba5c5472cfe78e492bf6916ff',
+  oreo: 'fb0501a95cb504528a1503ab71a888ad', oreolatte: '00ebb770ea5db09ca825fb0ddbf174e2', parrillero: '648412923aed727dd48f2b4c7a9dbc32', petit: '11fdbe103fcae48c19dcbb0fb713b013',
+  strawberry: 'f45a65a9016d2a8024f173c327303dab', suprema: 'fbaa8a0afdf00e761c6c59bf52bbe4d8', tropical: '92835b6760cc06347479d57f79be27cb', waforeo: '527c455e0dda432c883dd1d0a68f0e02'
+};
+const img = (k) => (k && ID[k] ? '/_blob/' + ID[k] : '');
+const LECHE = { id: 'leche', name: 'Tipo de leche', type: 'one', min: 1, max: 1, opts: [ { id: 'ent', n: 'Leche entera', p: 0 }, { id: 'sin', n: 'Leche sin lactosa', p: 0 }, { id: 'alm', n: 'Bebida de almendra', p: 2.5 } ] };
+const DULZOR = { id: 'dulzor', name: 'Endúlzalo con', type: 'one', min: 1, max: 1, opts: [ { id: 'azu', n: 'Azúcar', p: 0 }, { id: 'ste', n: 'Stevia', p: 0 } ] };
+const WAF_ADIC = { id: 'adic', name: 'Adicionales', type: 'many', min: 0, max: 3, opts: [ { id: 'cha', n: 'Chantilly 4 oz', p: 2 }, { id: 'hel', n: 'Una bola de helado', p: 2 }, { id: 'cac', n: 'Syrop de cacao', p: 2 } ] };
+const CREMAS = { id: 'cremas', name: 'Elige tus cremas', type: 'many', min: 0, max: 2, opts: [ { id: 'tar', n: 'Tártara', p: 0 }, { id: 'hon', n: 'Honey', p: 0 }, { id: 'aji', n: 'Crema de ají amarillo', p: 0 }, { id: 'chi', n: 'Chimichurri', p: 0 } ] };
+const PAPAS = { id: 'papas', name: 'Acompañamiento', type: 'many', min: 0, max: 1, opts: [ { id: 'pap', n: 'Papas nativas 350 g', p: 6 } ] };
+const SABOR = { id: 'sabor', name: 'Sabor', type: 'one', min: 1, max: 1, opts: [ { id: 'cre', n: 'Crema pastelera', p: 0 }, { id: 'cho', n: 'Chocolate', p: 0 }, { id: 'bla', n: 'Blanco', p: 0 }, { id: 'ore', n: 'Oreo', p: 0 }, { id: 'fre', n: 'Fresa', p: 0 }, { id: 'man', n: 'Manjar', p: 0 } ] };
+const FRAP_IDS = [ 'Oreo', 'Choco Lúcuma', 'Café', 'Strawberry', 'Berries', 'Caramel Chocolate', 'Choco Berry', 'Maracuyá', 'Caramel Clásico', 'Fit', 'Algarro Lúcuma', 'Moca' ];
+const DUO_FRAPPES = { id: 'frap2', name: 'Elige tus 2 frappes', type: 'many', min: 2, max: 2, opts: FRAP_IDS.map((n, i) => ({ id: 'f' + i, n: n, p: 0 })) };
+const DUO_BEB = { id: 'beb2', name: 'Elige tus 2 bebidas', type: 'many', min: 2, max: 2, opts: [ { id: 'am', n: 'Café Americano', p: 0 }, { id: 'cap', n: 'Capuccino', p: 0 }, { id: 'cho', n: 'Chocolate', p: 0 } ] };
+const T3 = (a, b, c) => [ { n: 'Regular 12 oz', p: a }, { n: 'Grande 16 oz', p: b }, { n: 'Extra 21 oz', p: c } ];
+const W2 = (a, b) => [ { n: '1/2 waffle', p: a }, { n: 'Waffle completo', p: b } ];
+const mk = (cat, name, desc, im, variants, groups, vt, tag) => ({ id: name, cat: cat, name: name, desc: desc, im: im, variants: variants, groups: groups, variantTitle: vt || 'Tamaño', tag: tag || '' });
+const FD = 'Disponible en 12, 16 y 21 oz';
+const WD = 'Waffle artesanal · completo o 1/2';
+
+const P = [
+  mk('combos', 'DÚO PARA COMPARTIR', '2 frappes + 2 donas del día', 'duocomp', [ { n: 'Regular 12 oz', p: 33, old: 38 }, { n: 'Grande 16 oz', p: 35 }, { n: 'Extra 21 oz', p: 38 } ], [ DUO_FRAPPES ], 'Tamaño de los frappes'),
+  mk('combos', 'DÚO IRRESISTIBLE', '2 bebidas a elección (frías o calientes) + 1 Club Sándwich con papas', 'duoirr', [ { n: 'Regular 12 oz', p: 37 }, { n: 'Grande 16 oz', p: 40 }, { n: 'Extra 21 oz', p: 42 } ], [ DUO_BEB ], 'Tamaño de las bebidas'),
+  mk('frappes', 'FRAPPE OREO', FD, 'oreo', T3(14.5, 16.5, 17.5), [ LECHE, DULZOR ]),
+  mk('frappes', 'FRAPPE CHOCO LÚCUMA', FD, 'chocolucuma', T3(14.5, 16.5, 17.5), [ LECHE, DULZOR ]),
+  mk('frappes', 'FRAPPE CAFÉ', FD, 'cafe', T3(14.5, 16.5, 17.5), [ LECHE, DULZOR ]),
+  mk('frappes', 'FRAPPE STRAWBERRY', FD, 'strawberry', T3(14.5, 16.5, 17.5), [ LECHE, DULZOR ]),
+  mk('frappes', 'FRAPPE BERRIES', FD, 'berries', T3(14.5, 16.5, 17.5), [ LECHE, DULZOR ]),
+  mk('frappes', 'FRAPPE CARAMEL CHOCOLATE', FD, 'carachoc', T3(14.5, 16.5, 17.5), [ LECHE, DULZOR ]),
+  mk('frappes', 'FRAPPE CHOCO BERRY', FD, 'chocoberry', T3(14.5, 16.5, 17.5), [ LECHE, DULZOR ]),
+  mk('frappes', 'FRAPPE MARACUYÁ', FD, 'maracuya', T3(14.5, 16.5, 17.5), [ LECHE, DULZOR ]),
+  mk('frappes', 'FRAPPE CARAMEL CLÁSICO', FD, 'caraclas', T3(14.5, 16.5, 17.5), [ LECHE, DULZOR ]),
+  mk('frappes', 'FRAPPE FIT', FD, '', T3(14.5, 16.5, 17.5), [ LECHE, DULZOR ]),
+  mk('frappes', 'FRAPPE ALGARRO LÚCUMA', FD, 'algarro', T3(14.5, 16.5, 17.5), [ LECHE, DULZOR ]),
+  mk('frappes', 'FRAPPE MOCA', FD, 'moca', T3(14.5, 16.5, 17.5), [ LECHE, DULZOR ], 'Tamaño', '100% CACAO'),
+  mk('iced', 'LATTE COFFE', 'Café frío con leche · ' + FD, 'latte', T3(12, 13, 14), [ LECHE, DULZOR ]),
+  mk('iced', 'ICED CHOCOLATE', 'Chocolate frío · ' + FD, 'icedchoc', T3(12, 13, 14), [ LECHE, DULZOR ], 'Tamaño', '100% CACAO'),
+  mk('iced', 'ICE BERRY', FD, 'iceberry', T3(12, 13, 14), [ LECHE, DULZOR ]),
+  mk('iced', 'ICED COFFE', 'Café frío · ' + FD, 'icedcafe', T3(9.5, 11, 12), [ DULZOR ]),
+  mk('calientes', 'MOCACCINO', FD, 'mocaccino', T3(12, 13.5, 14.5), [ LECHE, DULZOR ]),
+  mk('calientes', 'CARAMEL MACCHIATO', FD, 'macchiato', T3(12, 13.5, 14.5), [ LECHE, DULZOR ]),
+  mk('calientes', 'OREO LATTE', FD, 'oreolatte', T3(12, 13.5, 14.5), [ LECHE, DULZOR ]),
+  mk('calientes', 'LATTE VAINILLA', FD, 'latvainilla', T3(12, 13.5, 14.5), [ LECHE, DULZOR ]),
+  mk('calientes', 'CAPRIBERRY VAINILLA', FD, '', T3(12, 13.5, 14.5), [ LECHE, DULZOR ]),
+  mk('calientes', 'CANELATTE CARAMEL', FD, '', T3(12, 13.5, 14.5), [ LECHE, DULZOR ]),
+  mk('calientes', 'SALTAMEL BROWNIE', FD, '', T3(12, 13.5, 14.5), [ LECHE, DULZOR ]),
+  mk('calientes', 'CHOCONUBE', FD, '', T3(12, 13.5, 14.5), [ LECHE, DULZOR ]),
+  mk('calientes', 'CAPUCCINO', FD, 'capu', T3(9.5, 11, 12), [ LECHE, DULZOR ]),
+  mk('calientes', 'CHOCOLATE CALIENTE', FD, 'chocolate', T3(9.5, 11, 12), [ LECHE, DULZOR ], 'Tamaño', '100% CACAO'),
+  mk('calientes', 'CAFÉ AMERICANO', FD, 'americano', T3(9.5, 11, 12), [ DULZOR ]),
+  mk('waffles', 'WAFFLE FRUTOS DEL BOSQUE', WD, 'frutos', W2(15, 21), [ WAF_ADIC ], 'Porción'),
+  mk('waffles', 'WAFFLE TROPICAL', WD, 'tropical', W2(15, 21), [ WAF_ADIC ], 'Porción'),
+  mk('waffles', 'NUTEWAFFLE', WD, 'nute', W2(15, 21), [ WAF_ADIC ], 'Porción'),
+  mk('waffles', 'WAFFLE BANANA SPLIT', WD, 'banana', W2(15, 21), [ WAF_ADIC ], 'Porción'),
+  mk('waffles', 'WAFFLE MANJAR', WD, 'manjar', W2(15, 21), [ WAF_ADIC ], 'Porción'),
+  mk('waffles', 'WAFFLE KIWIBERRY', WD, '', W2(15, 21), [ WAF_ADIC ], 'Porción'),
+  mk('waffles', 'WAFFLE BROWNIE', WD, '', W2(15, 21), [ WAF_ADIC ], 'Porción'),
+  mk('waffles', 'WAFFLE POP', WD, '', W2(14, 19.5), [ WAF_ADIC ], 'Porción'),
+  mk('waffles', 'WAFFLE FRESA SPLIT', WD, 'fresasplit', W2(14, 19.5), [ WAF_ADIC ], 'Porción'),
+  mk('waffles', 'WAFFLE OREO', WD, 'waforeo', W2(14, 19.5), [ WAF_ADIC ], 'Porción'),
+  mk('salados', 'CAPRISABROSO', 'Carne artesanal, pollo a la plancha, chuleta ahumada, huevo, doble tocino culinario, doble jamón y queso', 'capri', [ { n: 'Unidad', p: 33 } ], [ CREMAS, PAPAS ], 'Presentación'),
+  mk('salados', 'PARRILLERO', '180 g de carne artesanal, huevo, doble queso, doble jamón y doble tocino culinario', 'parrillero', [ { n: 'Unidad', p: 21 } ], [ CREMAS, PAPAS ], 'Presentación'),
+  mk('salados', 'SUPREMA', 'Pollo a la plancha, huevo, doble tocino, doble jamón y queso', 'suprema', [ { n: 'Unidad', p: 18.5 } ], [ CREMAS, PAPAS ], 'Presentación'),
+  mk('salados', 'CLUB SANDWICH', 'Pollo a la plancha, doble tocino culinario, doble jamón y queso', 'club', [ { n: '4 cuartos', p: 27 } ], [ CREMAS, PAPAS ], 'Presentación'),
+  mk('salados', 'SÁNDWICH ESPECIAL', 'Pollo deshilachado en salsa, doble queso, doble jamón, tocino culinario, huevo, lechuga y tomate', 'especial', [ { n: 'Unidad', p: 16.5 } ], [ CREMAS ], 'Presentación'),
+  mk('salados', 'SÁNDWICH CLÁSICO', 'Pollo deshilachado en salsa, jamón y queso', 'clasico', [ { n: 'Unidad', p: 9.9 } ], [ CREMAS ], 'Presentación'),
+  mk('salados', 'PAPAS NATIVAS', 'Porción de 450 g', '', [ { n: 'Porción 450 g', p: 6 } ], [], 'Presentación'),
+  mk('complementos', 'DONAS ARTESANALES', 'Crema pastelera, chocolate, blanco, Oreo, fresa o manjar', 'dona', [ { n: 'Unidad', p: 4 }, { n: '1/2 docena', p: 21 } ], [ SABOR ], 'Presentación'),
+  mk('complementos', 'GALLETA CHOCO CHIPS', 'Galleta artesanal', 'galleta', [ { n: 'Unidad', p: 4 }, { n: '1/2 docena', p: 21 } ], [], 'Presentación'),
+  mk('complementos', 'CARROT CAKE', 'Torta artesanal', 'carrot', [ { n: 'Tajada', p: 8 }, { n: 'Entero', p: 59 }, { n: 'Cumpleañero 26 cm', p: 69 } ], [], 'Presentación'),
+  mk('complementos', 'MARMOLEADO CHIPS', 'Torta artesanal', 'marmol', [ { n: 'Tajada', p: 8 }, { n: 'Entero', p: 59 }, { n: 'Cumpleañero 26 cm', p: 69 } ], [], 'Presentación'),
+  mk('complementos', 'PETIT PAN RELLENO DE POLLO', '4 unidades', 'petit', [ { n: '4 unidades', p: 5.5 } ], [], 'Presentación'),
+  mk('complementos', 'EMPANADA DE JAMÓN Y QUESO CON BECHAMEL', 'Empanada artesanal', 'empanada', [ { n: 'Unidad', p: 7.5 } ], [], 'Presentación'),
+  mk('complementos', 'EMPANADA DE POLLO CASERO', 'Empanada artesanal', 'empanada', [ { n: 'Unidad', p: 7.5 } ], [], 'Presentación'),
+  mk('complementos', 'GELATINA MOSAICO', 'Vaso individual', '', [ { n: 'Vaso', p: 5.5 } ], [], 'Presentación'),
+  mk('complementos', 'CREMA VOLTEADA', 'Porción individual', '', [ { n: 'Porción', p: 9.5 } ], [], 'Presentación'),
+  mk('complementos', 'TORTA DE CHOCOLATE', 'Tajada individual', '', [ { n: 'Tajada', p: 9.5 } ], [], 'Presentación'),
+  mk('complementos', 'TARTALETA FRUTOS ROJOS', 'Unidad individual', '', [ { n: 'Unidad', p: 7.5 } ], [], 'Presentación'),
+  mk('complementos', 'PIE DE LIMÓN', 'Unidad individual', '', [ { n: 'Unidad', p: 7.5 } ], [], 'Presentación')
+];
+const CATS = [
+  { id: 'all', n: 'TODA LA CARTA', t: '' }, { id: 'combos', n: 'COMBOS', t: 'Combos Dúo', note: 'Precio por tamaño de bebida' },
+  { id: 'frappes', n: 'FRAPPES', t: 'Frappes', note: 'Todos al mismo precio: 12 oz s/ 14.50 · 16 oz s/ 16.50 · 21 oz s/ 17.50' },
+  { id: 'iced', n: 'ICED', t: 'Iced', note: 'Bebidas frías con hielo' }, { id: 'calientes', n: 'CALIENTES', t: 'Calientes', note: 'Servidas en taza de vidrio' },
+  { id: 'waffles', n: 'WAFFLES', t: 'Waffles', note: 'Completo o 1/2' }, { id: 'salados', n: 'SALADOS', t: 'Salados', note: 'Hamburguesas, sándwiches y papas' },
+  { id: 'complementos', n: 'COMPLEMENTOS', t: 'Complementos', note: 'Donas, tortas, bocaditos y postres' }
+];
+const MODALS = [ { id: 'delivery', n: 'Delivery' }, { id: 'llevar', n: 'Para llevar' }, { id: 'local', n: 'En el local' } ];
+const PAYS = [ { id: 'yape', n: 'Yape' }, { id: 'plin', n: 'Plin' }, { id: 'transf', n: 'Transferencia' }, { id: 'efe', n: 'Efectivo' }, { id: 'tarj', n: 'Tarjeta' } ];
+const MIN_DELIVERY = 14.5;
+const FREE_FROM = 70;
+const FEE = 3;
+const fmt = (n) => 's/ ' + (Number.isInteger(n) ? n : n.toFixed(2));
+const initials = (name) => name.split(' ').filter((w) => w.length > 2).slice(0, 2).map((w) => w[0]).join('');
+
+const FX = {
+  ninguno: { n: 'Sin decoración', glyphs: [], msg: '', bg: 'var(--line)', fg: 'var(--ink)' },
+  halloween: { n: 'Halloween', glyphs: ['🎃', '🦇', '👻', '✨'], msg: '¡Feliz Halloween! Dulces y travesuras en Caprichos', bg: '#2B1B3F', fg: '#F6A04D' },
+  navidad: { n: 'Navidad', glyphs: ['❄️', '🎄', '🎁', '⭐'], msg: '¡Feliz Navidad! Endulza la Nochebuena con Caprichos', bg: '#1F6B3A', fg: '#FFFFFF', lights: true },
+  anonuevo: { n: 'Año Nuevo', glyphs: ['🎉', '✨', '🎈', '🥂'], msg: '¡Feliz Año Nuevo! Brindemos con algo dulce', bg: '#1A1A2E', fg: '#F5C84B' },
+  sanvalentin: { n: 'San Valentín', glyphs: ['❤️', '💕', '🌹', '✨'], msg: 'Feliz Día de San Valentín. Comparte un capricho', bg: '#B83A5B', fg: '#FFFFFF' },
+  madre: { n: 'Día de la Madre', glyphs: ['🌸', '💐', '🌷', '✨'], msg: 'Feliz Día de la Madre. Un capricho para mamá', bg: '#D77FA1', fg: '#FFFFFF' },
+  padre: { n: 'Día del Padre', glyphs: ['⭐', '🏆', '☕', '✨'], msg: 'Feliz Día del Padre. Un capricho para papá', bg: 'var(--soft)', fg: 'var(--bg)' },
+  patrias: { n: 'Fiestas Patrias', glyphs: ['🎉', '🎈', '✨', '🇵🇪'], msg: '¡Felices Fiestas Patrias! Celebra con sabor peruano', bg: '#C8102E', fg: '#FFFFFF' },
+  ninos: { n: 'Día del Niño', glyphs: ['🎈', '⭐', '🍭', '🎉'], msg: 'Feliz Día del Niño. Donas y frappes para los más chiquitos', bg: 'var(--sec)', fg: 'var(--ink)' },
+  aniversario: { n: 'Aniversario', glyphs: ['🎈', '🎉', '🎂', '✨'], msg: '¡Caprichos está de aniversario! Celebra con nosotros', bg: 'var(--accent)', fg: 'var(--ink)' }
+};
+const FX_IDS = ['ninguno', 'halloween', 'navidad', 'anonuevo', 'sanvalentin', 'madre', 'padre', 'patrias', 'ninos', 'aniversario'];
+const fxParticles = (id, count) => {
+  const T = FX[id]; if (!T || !T.glyphs.length) { return []; }
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    const g = T.glyphs[i % T.glyphs.length]; const rise = g === '🎈';
+    out.push({ g: g, left: (((i * 53) % 94) + 2) + '%', size: (16 + ((i * 7) % 14)) + 'px', anim: (rise ? 'fx-rise ' : 'fx-fall ') + (9 + ((i * 3) % 8)) + 's linear ' + (-((i * 17) % 10)) + 's infinite' });
+  }
+  return out;
+};
+const fxBulbs = (id) => {
+  if (!FX[id] || !FX[id].lights) { return []; }
+  const cols = ['#E63946', '#F5C84B', '#2FA84F', '#4DA3FF'];
+  const out = [];
+  for (let i = 0; i < 30; i++) { out.push({ left: ((i * 100) / 29) + '%', color: cols[i % cols.length], anim: 'fx-blink 1.6s ease-in-out ' + (-((i % 4) * 0.4)) + 's infinite' }); }
+  return out;
+};
+const PAL_ROLES = [ { k: 'accent', n: 'Botones y detalles' }, { k: 'on', n: 'Texto sobre los botones' }, { k: 'ink', n: 'Texto y fondos oscuros' }, { k: 'bg', n: 'Fondo de la carta' }, { k: 'card', n: 'Tarjetas y cajas' }, { k: 'price', n: 'Precios' }, { k: 'sec', n: 'Detalle secundario' }, { k: 'soft', n: 'Texto suave' }, { k: 'line', n: 'Líneas y bordes' } ];
+const PAL_DEFAULT = {
+  ninguno: { accent: '#E67929', on: '#0B2C3E', ink: '#0B2C3E', bg: '#FBF4EC', card: '#FFFFFF', price: '#B2500F', sec: '#D99E39', soft: '#2C4C5D', line: '#E3D6C6' },
+  halloween: { accent: '#F2812A', on: '#2B1B3F', ink: '#2B1B3F', bg: '#F4ECF6', card: '#FCF8FD', price: '#A8460B', sec: '#9B6BD6', soft: '#4A3A66', line: '#DCCBE3' },
+  navidad: { accent: '#C0392B', on: '#FFFFFF', ink: '#0F3D2B', bg: '#EEF6EE', card: '#FAFEF9', price: '#B22222', sec: '#2F7D4F', soft: '#2F5D45', line: '#C9DFCD' },
+  anonuevo: { accent: '#F5C84B', on: '#14142B', ink: '#14142B', bg: '#FBF8EE', card: '#FFFEFA', price: '#8A5A00', sec: '#B58A1E', soft: '#4B4B6B', line: '#E8E1C8' },
+  sanvalentin: { accent: '#D6336C', on: '#FFFFFF', ink: '#4A1020', bg: '#FFF0F3', card: '#FFFAFB', price: '#B3123F', sec: '#F2A1B5', soft: '#6B3A48', line: '#F0D0D8' },
+  madre: { accent: '#C2417A', on: '#FFFFFF', ink: '#3B2A4A', bg: '#FFF2F7', card: '#FFFAFC', price: '#A93469', sec: '#C9A0DC', soft: '#5E4A70', line: '#EBD3E0' },
+  padre: { accent: '#1F6FB5', on: '#FFFFFF', ink: '#0F2A44', bg: '#EEF4FA', card: '#FAFCFF', price: '#1C5FA3', sec: '#7FB3D5', soft: '#3A5570', line: '#D0DFEC' },
+  patrias: { accent: '#C8102E', on: '#FFFFFF', ink: '#3A0A12', bg: '#FFF4F4', card: '#FFFFFF', price: '#B0122A', sec: '#E8A2AB', soft: '#6B3A41', line: '#F0D0D4' },
+  ninos: { accent: '#FFC93C', on: '#1B3A5F', ink: '#1B3A5F', bg: '#FFF8E4', card: '#FFFDF5', price: '#B84F00', sec: '#7ED6A5', soft: '#3F5E80', line: '#F1E2B5' },
+  aniversario: { accent: '#8E44AD', on: '#FFFFFF', ink: '#2E1A47', bg: '#F8F1FD', card: '#FEFBFF', price: '#7B2FA0', sec: '#D4A93C', soft: '#5B4678', line: '#E2D1EF' }
+};
+const palFor = (id, cfg) => Object.assign({}, PAL_DEFAULT[id] || PAL_DEFAULT.ninguno, (cfg && cfg.palettes && cfg.palettes[id]) || {});
+const palVars = (p) => '--accent:' + p.accent + ';--on:' + p.on + ';--ink:' + p.ink + ';--bg:' + p.bg + ';--card:' + p.card + ';--price:' + p.price + ';--sec:' + p.sec + ';--soft:' + p.soft + ';--line:' + p.line;
+const CFG_KEY = 'caprichos_carta_cfg_v1';
+const PROMOS_DEF = [
+  { tag: 'PROMOCIÓN', title: 'DÚO PARA COMPARTIR', sub: '2 frappes + 2 donas del día', price: 's/ 33', old: 's/ 38', badge: '-13%', theme: 'oscuro', imgKey: 'duocomp', photo: '', target: 'DÚO PARA COMPARTIR' },
+  { tag: 'COMBO', title: 'DÚO IRRESISTIBLE', sub: '2 bebidas a elección + 1 Club Sándwich', price: 's/ 37', old: '', badge: '', theme: 'naranja', imgKey: 'duoirr', photo: '', target: 'DÚO IRRESISTIBLE' }
+];
+const THEMES = { oscuro: { bg: 'var(--ink)', fg: 'var(--bg)', acc: 'var(--accent)', old: 'var(--line)' }, naranja: { bg: 'var(--accent)', fg: 'var(--on)', acc: 'var(--on)', old: 'var(--on)' } };
+const LAYOUT_STYLES = { secciones: { gridCols: 'repeat(auto-fill,minmax(230px,1fr))', cardDir: 'column', imgW: '100%', imgRatio: '1/1' },
+  lista: { gridCols: 'repeat(auto-fill,minmax(420px,1fr))', cardDir: 'row', imgW: '120px', imgRatio: '1/1' },
+  grande: { gridCols: 'repeat(auto-fill,minmax(340px,1fr))', cardDir: 'column', imgW: '100%', imgRatio: '4/3' } };
+const applyTexts = (p, cfg) => {
+  const t = cfg && cfg.texts && cfg.texts[p.id];
+  if (!t) { return p; }
+  const out = Object.assign({}, p);
+  if (t.name) { out.name = t.name; }
+  if (t.desc !== undefined && t.desc !== null) { out.desc = t.desc; }
+  if (t.price > 0) {
+    const min = Math.min.apply(null, p.variants.map((v) => v.p)); const f = t.price / min; const r2 = (n) => Math.round(n * 100) / 100;
+    out.variants = p.variants.map((v) => Object.assign({}, v, { p: r2(v.p * f), old: v.old ? r2(v.old * f) : v.old }));
+  }
+  return out;
+};
+const loadCfg = () => { try { const raw = window.localStorage.getItem(CFG_KEY); return raw ? JSON.parse(raw) : null; } catch (err) { return null; } };
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    if (typeof window !== 'undefined' && window.addEventListener) { window.addEventListener('storage', () => this.setState({ cfgTick: Date.now() })); }
+    this.state = { device: 'pc', confirm: null, sort: 'rec', price: 'all', fPromo: false, fCacao: false, fDirect: false, page: 1, overlay: 'none', cat: 'all', query: '', pid: null, vi: 0, sel: {}, qty: 1, note: '', cart: [], modal: 'delivery',
+      name: 'Ana Pérez', phone: '999888777', addr: 'Av. Los Jazmines 123', ref: '', mesa: '', pay: 'yape', cash: '', stage: 0, orderCode: 'CP-0001', toast: '' };
+    this.state.modal = '';
+  }
+
+  curProduct() {
+    const p = P.find((x) => x.id === this.state.pid) || P[0];
+    const cfg = loadCfg();
+    return Object.assign({}, applyTexts(p, cfg), { photo: cfg && cfg.photos ? cfg.photos[p.id] : '' });
+  }
+  minOf(g) { return g.min; }
+
+  openProduct(id) {
+    const p = P.find((x) => x.id === id);
+    const sel = {};
+    p.groups.forEach((g) => { sel[g.id] = (g.type === 'one' && g.min >= 1) ? [g.opts[0].id] : []; });
+    this.setState({ overlay: 'product', pid: id, vi: 0, sel: sel, qty: 1, note: '' });
+  }
+
+  unitPrice() {
+    const s = this.state; const p = this.curProduct();
+    let u = p.variants[s.vi].p;
+    p.groups.forEach((g) => { (s.sel[g.id] || []).forEach((oid) => { const o = g.opts.find((x) => x.id === oid); if (o) { u += o.p; } }); });
+    return u;
+  }
+
+  isValid() {
+    const s = this.state; const p = this.curProduct();
+    return p.groups.every((g) => (s.sel[g.id] || []).length >= g.min);
+  }
+
+  toggleOpt(g, oid) {
+    const sel = Object.assign({}, this.state.sel);
+    let cur = (sel[g.id] || []).slice();
+    if (g.type === 'one') { cur = [oid]; }
+    else if (cur.indexOf(oid) >= 0) { cur = cur.filter((x) => x !== oid); }
+    else if (cur.length < g.max) { cur.push(oid); }
+    sel[g.id] = cur;
+    this.setState({ sel: sel });
+  }
+
+  addToCart() {
+    if (!this.isValid()) { return; }
+    const s = this.state; const p = this.curProduct();
+    const detail = [p.variants[s.vi].n].concat(
+      p.groups.map((g) => (s.sel[g.id] || []).map((oid) => g.opts.find((x) => x.id === oid).n).join(', ')).filter((t) => t)
+    ).join(' · ');
+    const key = p.id + '|' + s.vi + '|' + JSON.stringify(s.sel) + '|' + s.note;
+    const cart = s.cart.slice();
+    const found = cart.find((l) => l.key === key);
+    if (found) { found.qty += s.qty; }
+    else { cart.push({ key: key, pid: p.id, name: p.name, im: p.im, detail: detail + (s.note ? ' · Nota: ' + s.note : ''), unit: this.unitPrice(), qty: s.qty }); }
+    this.setState({ cart: cart, overlay: 'none', toast: 'Agregado: ' + p.name });
+    setTimeout(() => this.setState({ toast: '' }), 2200);
+  }
+
+  cartChange(key, d) {
+    const cart = this.state.cart.map((l) => (l.key === key ? Object.assign({}, l, { qty: l.qty + d }) : l)).filter((l) => l.qty > 0);
+    this.setState({ cart: cart });
+  }
+
+  totals() {
+    const s = this.state;
+    const sub = s.cart.reduce((a, l) => a + l.unit * l.qty, 0);
+    const fee = s.modal === 'delivery' && sub > 0 && sub < FREE_FROM ? FEE : 0;
+    return { sub: sub, fee: fee, total: sub + fee };
+  }
+
+  card(p) {
+    const min = Math.min.apply(null, p.variants.map((v) => v.p));
+    const onlyOne = p.variants.length === 1 && p.groups.length === 0;
+    return { name: p.name, desc: p.desc, variantTitle: p.variantTitle, img: p.photo || img(p.im), hasImg: !!(p.photo || p.im), noImg: !(p.photo || p.im), initials: initials(p.name), tag: !!p.tag, tagText: p.tag,
+      hasOld: !!p.variants[0].old, oldText: p.variants[0].old ? fmt(p.variants[0].old) : '',
+      priceText: (p.variants.length > 1 && !p.variants[0].old ? 'Desde ' : '') + fmt(min), cta: onlyOne ? 'Agregar' : 'Personalizar', open: () => this.openProduct(p.id) };
+  }
+
+  renderVals() {
+    const s = this.state;
+    const t = this.totals();
+    const cur = this.curProduct();
+    const cartCount = s.cart.reduce((a, l) => a + l.qty, 0);
+    const isDelivery = s.modal === 'delivery';
+    const belowMin = isDelivery && t.sub > 0 && t.sub < MIN_DELIVERY;
+    const valid = this.isValid();
+    const isMob = s.device === 'mobile';
+    const ask = (title, msg, fn) => () => this.setState({ confirm: { title: title, msg: msg, fn: fn } });
+    const q = s.query.trim().toLowerCase();
+    const minP = (p) => Math.min.apply(null, p.variants.map((v) => v.p));
+    const PRICE = { all: () => true, low: (p) => minP(p) <= 10, mid: (p) => minP(p) > 10 && minP(p) <= 20, high: (p) => minP(p) > 20 };
+    const cfg = loadCfg();
+    const baseCats = CATS.filter((c) => c.id !== 'all');
+    const catIds = cfg && Array.isArray(cfg.catOrder) ? cfg.catOrder.filter((id) => baseCats.some((c) => c.id === id)).concat(baseCats.map((c) => c.id).filter((id) => cfg.catOrder.indexOf(id) < 0)) : baseCats.map((c) => c.id);
+    const themeId = cfg && cfg.theme && FX[cfg.theme] ? cfg.theme : 'ninguno';
+    const layoutSt = LAYOUT_STYLES[cfg && cfg.layout] || LAYOUT_STYLES.secciones;
+    const catsOrdered = [ CATS[0] ].concat(catIds.map((id) => CATS.find((c) => c.id === id)));
+    const eff = [];
+    catIds.forEach((cid) => {
+      const o = (cfg && cfg.order && cfg.order[cid]) || [];
+      const rank = (p) => { const i = o.indexOf(p.id); return i < 0 ? 999 : i; };
+      P.filter((p) => p.cat === cid && !(cfg && cfg.hidden && cfg.hidden[p.id])).sort((a, b) => rank(a) - rank(b))
+        .forEach((p) => eff.push(Object.assign({}, applyTexts(p, cfg), { photo: cfg && cfg.photos ? cfg.photos[p.id] : '' })));
+    });
+    let filtered = eff.filter((p) => (s.cat === 'all' || p.cat === s.cat) && (!q || p.name.toLowerCase().indexOf(q) >= 0 || p.desc.toLowerCase().indexOf(q) >= 0)
+      && PRICE[s.price](p) && (!s.fPromo || !!p.variants[0].old) && (!s.fCacao || p.tag === '100% CACAO') && (!s.fDirect || (p.variants.length === 1 && p.groups.length === 0)));
+    if (s.sort === 'asc') { filtered = filtered.slice().sort((a, b) => minP(a) - minP(b)); }
+    else if (s.sort === 'desc') { filtered = filtered.slice().sort((a, b) => minP(b) - minP(a)); }
+    else if (s.sort === 'az') { filtered = filtered.slice().sort((a, b) => a.name.localeCompare(b.name)); }
+    const PAGE = 12;
+    const total = filtered.length;
+    const pages = Math.max(1, Math.ceil(total / PAGE));
+    const page = Math.min(s.page, pages);
+    const slice = filtered.slice((page - 1) * PAGE, page * PAGE);
+    const sections = s.sort === 'rec'
+      ? catsOrdered.filter((c) => c.id !== 'all').map((c) => ({ title: c.t, note: c.note, items: slice.filter((p) => p.cat === c.id).map((p) => this.card(p)) })).filter((x) => x.items.length > 0)
+      : (slice.length ? [ { title: 'Resultados', note: 'Ordenados según tu elección', items: slice.map((p) => this.card(p)) } ] : []);
+    const anyFilter = s.sort !== 'rec' || s.price !== 'all' || s.fPromo || s.fCacao || s.fDirect || s.cat !== 'all' || !!q;
+    const chip = (on) => ({ bg: on ? 'var(--ink)' : 'transparent', fg: on ? 'var(--bg)' : 'var(--ink)' });
+    const pageButtons = [];
+    for (let i = 1; i <= pages; i++) { pageButtons.push(Object.assign({ n: i, pick: () => this.setState({ page: i }) }, chip(i === page))); }
+    const modalLabels = { '': '', delivery: 'Delivery a domicilio', llevar: 'Para llevar: lo recoges en el local', local: 'En el local: te lo llevamos a la mesa' };
+    const modalNames = { delivery: 'Delivery', llevar: 'Para llevar', local: 'En el local' };
+    const stageNotes = [
+      'Esperando que caja verifique y acepte tu pedido.',
+      'Caja aceptó tu pedido. Ya aparece en las pantallas de cocina.',
+      'Tu pedido está en preparación.',
+      isDelivery ? 'Tu pedido va en camino con el repartidor.' : 'Tu pedido está listo.'
+    ];
+    const stepNames = ['Pedido recibido', 'Caja lo verifica y lo acepta', 'En cocina', isDelivery ? 'En camino' : 'Listo para recoger'];
+    return {
+      query: s.query, setQuery: (e) => this.setState({ query: e.target.value, page: 1 }), clearQuery: () => this.setState({ query: '', cat: 'all', page: 1 }),
+      sorts: [ { id: 'rec', n: 'Recomendado' }, { id: 'asc', n: 'Precio: menor a mayor' }, { id: 'desc', n: 'Precio: mayor a menor' }, { id: 'az', n: 'Nombre A-Z' } ].map((o) => Object.assign({ n: o.n, pick: () => this.setState({ sort: o.id, page: 1 }) }, chip(s.sort === o.id))),
+      prices: [ { id: 'all', n: 'Todos' }, { id: 'low', n: 'Hasta s/ 10' }, { id: 'mid', n: 's/ 10 a 20' }, { id: 'high', n: 'Más de s/ 20' } ].map((o) => Object.assign({ n: o.n, pick: () => this.setState({ price: o.id, page: 1 }) }, chip(s.price === o.id))),
+      toggles: [ { k: 'fPromo', n: 'Con promoción' }, { k: 'fCacao', n: '100% cacao' }, { k: 'fDirect', n: 'Agregar directo' } ].map((o) => Object.assign({ n: o.n, mark: s[o.k] ? '✓ ' : '', pick: () => this.setState({ [o.k]: !s[o.k], page: 1 }) }, chip(s[o.k]))),
+      resultText: total + (total === 1 ? ' producto' : ' productos'), anyFilter: anyFilter,
+      clearFilters: () => this.setState({ sort: 'rec', price: 'all', fPromo: false, fCacao: false, fDirect: false, cat: 'all', query: '', page: 1 }),
+      hasPages: pages > 1, pageButtons: pageButtons, canPrev: page > 1, canNext: page < pages,
+      prevPage: () => this.setState({ page: Math.max(1, page - 1) }), nextPage: () => this.setState({ page: Math.min(pages, page + 1) }),
+      prevOp: page > 1 ? 1 : 0.4, nextOp: page < pages ? 1 : 0.4,
+      rangeText: total ? 'Mostrando ' + ((page - 1) * PAGE + 1) + '–' + Math.min(page * PAGE, total) + ' de ' + total : '',
+      modals: MODALS.map((m) => ({ n: m.n, bg: s.modal === m.id ? 'var(--ink)' : 'transparent', fg: s.modal === m.id ? 'var(--bg)' : 'var(--ink)', pick: () => this.setState({ modal: m.id }) })),
+      promos: (cfg && Array.isArray(cfg.promos) && cfg.promos.length === 2 ? cfg.promos : PROMOS_DEF).map((b) => { const th = THEMES[b.theme] || THEMES.oscuro;
+        return { tag: b.tag, title: b.title, sub: b.sub, price: b.price, old: b.old, hasOld: !!b.old, badge: b.badge, hasBadge: !!b.badge, bg: th.bg, fg: th.fg, acc: th.acc, oldC: th.old,
+          img: b.photo || img(b.imgKey), open: () => this.openProduct(b.target) }; }),
+      gridCols: layoutSt.gridCols, cardDir: layoutSt.cardDir, imgW: layoutSt.imgW, imgRatio: layoutSt.imgRatio,
+      themeOn: (cfg && cfg.theme && FX[cfg.theme] ? FX[cfg.theme].glyphs.length > 0 : false), themeMsg: FX[themeId].msg, themeBg: FX[themeId].bg, themeFg: FX[themeId].fg, themeGl: FX[themeId].glyphs[0] || '', themeGr: FX[themeId].glyphs[1] || '',
+      fx: fxParticles(themeId, isMob ? 10 : 18), bulbs: fxBulbs(themeId), hasBulbs: !!FX[themeId].lights,
+      palVars: palVars(palFor(themeId, cfg)),
+      showArrows: isMob,
+      stripLeft: (e) => { const st = e.currentTarget.parentElement.querySelector('[data-strip]'); if (st) { st.scrollBy({ left: -220, behavior: 'smooth' }); } },
+      stripRight: (e) => { const st = e.currentTarget.parentElement.querySelector('[data-strip]'); if (st) { st.scrollBy({ left: 220, behavior: 'smooth' }); } },
+      stripDown: (e) => { this.dragStrip = { x: e.clientX, l: e.currentTarget.scrollLeft }; },
+      stripMove: (e) => { if (this.dragStrip) { e.currentTarget.scrollLeft = this.dragStrip.l - (e.clientX - this.dragStrip.x); } },
+      stripUp: () => { this.dragStrip = null; },
+      cats: catsOrdered.map((c) => ({ n: c.n, bg: s.cat === c.id ? 'var(--ink)' : 'transparent', fg: s.cat === c.id ? 'var(--bg)' : 'var(--ink)', pick: () => this.setState({ cat: c.id, page: 1 }) })),
+      showPromos: s.cat === 'all' && !q,
+      openDuoComp: () => this.openProduct('DÚO PARA COMPARTIR'), openDuoIrr: () => this.openProduct('DÚO IRRESISTIBLE'),
+      sections: sections, noResults: sections.length === 0,
+      cartCount: cartCount === 1 ? '1 producto' : cartCount + ' productos', cartSubText: fmt(t.sub), hasCart: s.cart.length > 0, cartEmpty: s.cart.length === 0,
+      hasToast: !!s.toast, toast: s.toast,
+      hasOverlay: s.overlay !== 'none', closeAll: () => this.setState({ overlay: 'none' }),
+      isProduct: s.overlay === 'product', isCart: s.overlay === 'cart', isCheckout: s.overlay === 'checkout', isDone: s.overlay === 'done',
+      openCart: () => this.setState({ overlay: 'cart' }),
+      cur: this.card(cur), curHasOld: !!cur.variants[s.vi].old, curOldText: cur.variants[s.vi].old ? fmt(cur.variants[s.vi].old) : '',
+      unitText: fmt(this.unitPrice()),
+      variants: cur.variants.map((v, i) => ({ n: v.n, priceText: fmt(v.p), bd: s.vi === i ? 'var(--accent)' : 'var(--line)', dot: s.vi === i ? 'var(--accent)' : 'transparent', pick: () => this.setState({ vi: i }) })),
+      groups: cur.groups.map((g) => ({
+        name: g.name,
+        tag: g.min >= 1 ? (g.type === 'many' ? 'OBLIGATORIO · ELIGE ' + g.min : 'OBLIGATORIO') : (g.max > 1 ? 'OPCIONAL · HASTA ' + g.max : 'OPCIONAL'),
+        tagBg: g.min >= 1 ? 'var(--ink)' : 'transparent', tagFg: g.min >= 1 ? 'var(--bg)' : 'var(--soft)', tagBd: g.min >= 1 ? 'var(--ink)' : 'var(--soft)',
+        opts: g.opts.map((o) => { const on = (s.sel[g.id] || []).indexOf(o.id) >= 0;
+          return { n: o.n, priceText: o.p ? '+' + fmt(o.p) : '', radius: g.type === 'one' ? '10px' : '6px', bd: on ? 'var(--accent)' : 'var(--line)', dot: on ? 'var(--accent)' : 'transparent', pick: () => this.toggleOpt(g, o.id) }; })
+      })),
+      note: s.note, setNote: (e) => this.setState({ note: e.target.value }),
+      qty: s.qty, qtyInc: () => this.setState({ qty: s.qty + 1 }), qtyDec: () => this.setState({ qty: Math.max(1, s.qty - 1) }),
+      addToCart: () => this.addToCart(), addBg: valid ? 'var(--accent)' : 'var(--line)', addLabel: valid ? 'Agregar al pedido' : 'Elige las opciones obligatorias',
+      lineTotalText: fmt(this.unitPrice() * s.qty),
+      cartLines: s.cart.map((l) => ({ name: l.name, img: img(l.im), hasImg: !!l.im, noImg: !l.im, initials: initials(l.name), detail: l.detail, qty: l.qty, totalText: fmt(l.unit * l.qty), inc: () => this.cartChange(l.key, 1), dec: () => this.cartChange(l.key, -1) })),
+      modalName: modalNames[s.modal], isDelivery: isDelivery, subtotalText: fmt(t.sub), totalText: fmt(t.total),
+      feeText: t.fee === 0 ? 'Gratis' : fmt(t.fee),
+      feeNote: t.fee === 0 ? 'Envío gratis desde ' + fmt(FREE_FROM) + '.' : 'Envío gratis desde ' + fmt(FREE_FROM) + '. Costo según tu zona (ejemplo).',
+      belowMin: belowMin, minText: 'Faltan ' + fmt(MIN_DELIVERY - t.sub) + ' para el pedido mínimo de delivery (' + fmt(MIN_DELIVERY) + ').',
+      needModal: s.cart.length > 0 && !s.modal,
+      contBg: (belowMin || !s.modal) ? 'var(--line)' : 'var(--accent)',
+      goCheckout: () => { if (!belowMin && s.modal) { this.setState({ overlay: 'checkout' }); } },
+      modalLabel: modalLabels[s.modal], isMesa: s.modal === 'local', isCash: s.pay === 'efe',
+      name: s.name, phone: s.phone, addr: s.addr, ref: s.ref, mesa: s.mesa, cash: s.cash,
+      setName: (e) => this.setState({ name: e.target.value }), setPhone: (e) => this.setState({ phone: e.target.value }),
+      setAddr: (e) => this.setState({ addr: e.target.value }), setRef: (e) => this.setState({ ref: e.target.value }),
+      setMesa: (e) => this.setState({ mesa: e.target.value }), setCash: (e) => this.setState({ cash: e.target.value }),
+      pays: PAYS.map((y) => ({ n: y.n, bd: s.pay === y.id ? 'var(--accent)' : 'var(--line)', dot: s.pay === y.id ? 'var(--accent)' : 'transparent', pick: () => this.setState({ pay: y.id }) })),
+      placeOrder: ask('¿Enviar tu pedido?', 'Total ' + fmt(t.total) + '. Se enviará a caja para que lo verifique y lo acepte.', () => this.setState({ overlay: 'done', stage: 0 })),
+      isConfirm: !!s.confirm, confirmTitle: s.confirm ? s.confirm.title : '', confirmMsg: s.confirm ? s.confirm.msg : '',
+      confirmYes: () => { const c = s.confirm; this.setState({ confirm: null }); if (c) { c.fn(); } }, confirmNo: () => this.setState({ confirm: null }),
+      deviceChips: [ [ 'pc', 'PC' ], [ 'mobile', 'Celular' ] ].map((d) => Object.assign({ n: d[1], pick: () => this.setState({ device: d[0], overlay: 'none' }) }, chip(s.device === d[0]))),
+      devW: isMob ? '390px' : '100%', devH: isMob ? 'calc(100vh - 80px)' : 'auto', devOv: isMob ? 'hidden' : 'visible', devTransform: isMob ? 'translateZ(0)' : 'none',
+      devShadow: isMob ? '0 10px 40px color-mix(in srgb, var(--ink) 30%, transparent)' : 'none', scrollH: isMob ? '100%' : 'auto', scrollOv: isMob ? 'auto' : 'visible', scrollMin: isMob ? '0' : 'calc(100vh - 58px)',
+      orderCode: s.orderCode,
+      steps: stepNames.map((n, i) => ({ n: n, dot: i <= s.stage ? 'var(--accent)' : 'transparent', weight: i === s.stage ? 800 : 400 })),
+      stageNote: stageNotes[s.stage],
+      advance: () => this.setState({ stage: Math.min(3, s.stage + 1) }),
+      resetAll: ask('¿Volver a la carta?', 'Se vaciará tu pedido y empezarás de nuevo.', () => this.setState({ overlay: 'none', cart: [], stage: 0, cat: 'all', query: '' }))
+    };
+  }
+}
+</script>
+</body>
+</html>

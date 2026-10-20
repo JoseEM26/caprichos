@@ -1,0 +1,92 @@
+erDiagram
+  CAJA {
+    bigint id PK
+    date fecha UK
+    numeric apertura
+    text estado
+    bigint abierta_por
+    bigint cerrada_por
+    timestamptz cerrada_en
+  }
+  COBRO {
+    bigint id PK
+    bigint pedido_id FK,UK
+    bigint caja_id FK
+    numeric total
+    boolean credito_personal
+    bigint cobrado_por
+    timestamptz en
+    timestamptz anulado_en
+    bigint anulado_por
+    text motivo_anulacion
+  }
+  COBRO_PAGO {
+    bigint id PK
+    bigint cobro_id FK
+    text medio
+    numeric monto
+    numeric recibido
+    numeric vuelto
+  }
+  MOVIMIENTO_CAJA {
+    bigint id PK
+    bigint caja_id FK
+    text tipo
+    numeric monto
+    text motivo
+    timestamptz anulado_en
+    text motivo_anulacion
+  }
+  LIQUIDACION {
+    bigint id PK
+    bigint caja_id FK
+    bigint repartidor_party_id FK
+    numeric esperado
+    numeric entregado
+    timestamptz en
+  }
+  CIERRE_CAJA {
+    bigint caja_id PK,FK
+    jsonb conteo
+    text nota
+  }
+  CIERRE_MEDIO {
+    bigint caja_id PK,FK
+    text medio PK
+    numeric sistema
+    numeric visto
+    numeric diferencia
+  }
+  CONSUMO_PERSONAL {
+    bigint id PK
+    bigint party_id FK
+    char anio_mes
+    bigint pedido_id FK,UK
+    numeric monto
+  }
+  MOVIMIENTO_PUNTOS {
+    bigint id PK
+    bigint party_id FK
+    bigint pedido_id FK
+    int puntos
+    text tipo
+    timestamptz en
+  }
+  PARTY {
+    bigint id PK "en otro dominio"
+  }
+  PEDIDO {
+    bigint id PK "en otro dominio"
+  }
+  CAJA ||--o{ COBRO : "caja_id"
+  CAJA ||--o{ LIQUIDACION : "caja_id"
+  CAJA ||--o{ MOVIMIENTO_CAJA : "caja_id"
+  CAJA ||--o| CIERRE_CAJA : "caja_id"
+  CIERRE_CAJA ||--o{ CIERRE_MEDIO : "caja_id"
+  COBRO ||--o{ COBRO_PAGO : "cobro_id"
+  PARTY ||--o{ CONSUMO_PERSONAL : "party_id"
+  PARTY ||--o{ LIQUIDACION : "repartidor_party_id"
+  PARTY ||--o{ MOVIMIENTO_PUNTOS : "party_id"
+  PEDIDO ||--o{ COBRO : "pedido_id"
+  PEDIDO ||--o{ CONSUMO_PERSONAL : "pedido_id"
+  PEDIDO ||--o{ MOVIMIENTO_PUNTOS : "pedido_id"

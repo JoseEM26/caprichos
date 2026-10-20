@@ -1,0 +1,30 @@
+<div class="flex flex-col gap-16 overflow-y-auto h-full" ng-class="{'confselect': vm.ocultarPanelLateral }"> <div rest-loader-model="vm.cargandoLocales" ng-class="{'is-loading': vm.cargandoLocales}"></div> <div class="p-l-none p-r-none mb-md"> <div class="mb-4"> <h5> <i class="fa fa-print"></i> Test de Impresión</h5> </div> <ui-select ng-model="vm.localSeleccionado" ng-change="vm.fnCargarDatosDelLocalSeleccionado()" theme="bootstrap" search-enabled="false"> <ui-select-match> <span> Local: {{$select.selected.local_descripcion}} </span> </ui-select-match> <ui-select-choices repeat="item in vm.locallist | filter: $select.search"> <div ng-bind-html="item.local_descripcion + ' registros' | highlight: $select.search"></div> </ui-select-choices> </ui-select> </div> <div class="text-10 p-8" style="background-color:#dfeffd;color:#135d9a"> <span class="font-medium">Selecciona un salón o “Ver general” para ver todas las rutas de impresión del local.</span> </div> <div class="flex flex-col gap-8 p-8 border border-gray-10"> <ul class="list-simple-menu" style="margin:0!important"> <li class="list-item" style="border:1px solid #c7c7c7;border-radius:4px" ng-class="{'active border-none': vm.salonSeleccionadoId === null}"> <span class="title-wrapper"> <a class="title" style="border-radius:4px;padding:8px!important" ng-click="vm.fnClickSalonGeneral()"> <i class="fa fa-eye"></i> <span style="margin:2px">Ver general</span> </a> </span> </li> </ul> <div class="flex flex-col gap-8" ng-show="vm.tabSeleccionado.value === 'salon'"> <div rest-loader-model="vm.cargandoSalones" ng-class="{'is-loading': vm.cargandoSalones}"></div> <span class="text-bold text-16" style="color:#676a6c">Salones</span> <ul class="list-simple-menu"> <li class="list-item" ng-repeat="sal in vm.salonList" ng-class="{'active': vm.salonSeleccionadoId === sal.salon_id}"> <span class="title-wrapper"> <a class="title" style="padding-left:8px!important" ng-click="vm.fnClickSalon(sal)"> <span class="text-12">{{ sal.salon_descripcion }}</span> </a> </span> </li> </ul> </div> </div> <div class="text-10 p-8 font-medium" style="background-color:#dfeffd;color:#135d9a"> <span>También puedes elegir un producto para saber dónde se imprimirá.</span> </div> <div class="flex flex-col gap-8"> <span class="text-bold text-16" style="color:#676a6c">Categorías de productos</span> <div rest-loader-model="vm.cargandoCategorias" ng-class="{'is-loading': vm.cargandoCategorias}"></div> <input type="text" class="form-control" placeholder="Buscar categoría" ng-model="vm.filtroCategorias"> <div class="restloader-remote-el" ng-class="{'is-loading': vm.isLoading}"> <div class="module-body"> <ul class="list-simple-menu"> <li ng-include="'recursiva.html'" ng-repeat="cat in vm.fnGetCategoriasFiltradasSimple()"></li> </ul> </div> </div> </div> <script type="text/ng-template" id="recursiva.html"> <div rest-loader-model="cat.cargando" ng-class="{'is-loading': cat.cargando}"></div>
+        <ul class="list-simple-menu">
+            <li class="list-item has-children parent" ng-class="{'': (cat.hijos && cat.hijos.length > 0)}">
+                <span ng-if="true" class="arrow" ng-click="cat.abierta = !cat.abierta"></span>
+                <span class="title-wrapper">
+                    <a class="title not-underline" ng-click="vm.fnClickCategoria(cat)">
+                        <span class="text-12" style="color: #676A6C">{{cat.categoria_descripcion}}</span>
+                    </a>
+                </span>
+
+                \x3c!-- MOSTRAR MÁS CATEGORIAS --\x3e
+                <ul class="children collapsed list-simple-menu" ng-if="cat.hijos && cat.hijos.length > 0" ng-show="cat.abierta">
+                    <li class="list-item has-children parent" ng-include="'recursiva.html'" ng-repeat="cat in cat.hijos"></li>
+                </ul>
+
+                \x3c!-- MOSTRAR PRODUCTOS --\x3e
+                <ul class="children collapsed list-simple-menu" ng-if="cat.productoslist" ng-show="cat.abierta">
+                    <li class="list-item has-children parent" ng-class="{'active': vm.productoSeleccionado && vm.productoSeleccionado.productogeneral_id == prod.productogeneral_id}" ng-repeat="prod in cat.productoslist">
+                        <span class="title-wrapper">
+                            <a class="title not-underline" ng-click="vm.fnClickProducto(prod)">
+                                <span class="text-12" style="color: #676A6C">{{prod.productogeneral_descripcion}}</span>
+                            </a>
+                        </span>
+                    </li>
+                    <li ng-if="cat.productoslist && cat.productoslist.length === 0">
+                        <span class="text-12" style="color: #676A6C; padding-left: 2rem;">Sin productos</span>
+                    </li>
+                </ul>
+            </li>
+        </ul> <\/script> </div> <div style="display:flex;justify-content:space-between;gap:1rem"> <button class="btn btn-default" style="flex-grow:1" ng-disabled="!vm.productoSeleccionado || vm.cargandoSimulacion || (vm.simulacion && vm.simulacion.productos && !vm.simulacion.productos.length)" ng-click="vm.fnClickResetView()">Cancelar</button> <button class="btn btn-primary" style="flex-grow:1" ng-disabled="!vm.productoSeleccionado || vm.cargandoSimulacion" ng-click="vm.fnCargarSimulacionDeImpresion()"><i class="fa fa-print"></i> Ver ruta</button> </div> <div class="w-full h-full absolute z-10 flex flex-col justify-center gap-16 p-x-24" style="background-color:#fbfbfbb3;top:0;left:0" ng-if="vm.ocultarPanelLateral"> <button class="btn btn-success" ng-click="vm.ocultarPanelLateral = false;"><i class="fa fa-print"></i> Simular recorrido de impresión</button> <div class="flex flex-col gap-8"> <span class="text-center text-12 font-bold">Muestra el recorrido de impresión según tu selección.</span> <span class="text-center text-12">Verifica que todo esté asignado correctamente.</span> </div> </div>

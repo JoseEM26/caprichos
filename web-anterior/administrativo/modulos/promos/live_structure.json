@@ -1,0 +1,254 @@
+{
+  "login_status": "EXITOSO",
+  "screens": {
+    "Ofertas": {
+      "pageTitle": "Oferta 2 en 1",
+      "breadcrumbs": [],
+      "tabs": [],
+      "tables": [
+        {
+          "tableIndex": 0,
+          "headers": [
+            "Producto",
+            "¿Marcar fila?",
+            "Sucursal CAPRICHOS"
+          ],
+          "rowCount": 0
+        },
+        {
+          "tableIndex": 1,
+          "headers": [],
+          "rowCount": 1
+        }
+      ],
+      "formControls": [],
+      "filters": [],
+      "buttons": [
+        {
+          "text": "2 en 1",
+          "class": "btn dim m-n display-flex display-flex-v btn-primary active btn-default"
+        },
+        {
+          "text": "2 x 1",
+          "class": "btn dim m-n display-flex display-flex-v btn-default"
+        },
+        {
+          "text": "Precio bajo",
+          "class": "btn dim m-n display-flex display-flex-v btn-default"
+        },
+        {
+          "text": "Por salón",
+          "class": "btn dim m-n display-flex display-flex-v btn-default"
+        },
+        {
+          "text": "Ver detalles de ofertas",
+          "class": "btn btn-primary ng-scope ladda-button"
+        },
+        {
+          "text": "Guardar cambios",
+          "class": "btn btn-success ng-scope ladda-button"
+        }
+      ]
+    },
+    "Descuentos": {
+      "pageTitle": "Restaurant.pe",
+      "breadcrumbs": [],
+      "tabs": [],
+      "tables": [
+        {
+          "tableIndex": 0,
+          "headers": [
+            "Descripción",
+            "Estado"
+          ],
+          "rowCount": 2
+        },
+        {
+          "tableIndex": 1,
+          "headers": [],
+          "rowCount": 1
+        }
+      ],
+      "formControls": [],
+      "filters": [],
+      "buttons": [
+        {
+          "text": "Registrar descuento",
+          "class": "btn btn-link"
+        },
+        {
+          "text": "Editar",
+          "class": "btn btn-success btn-xs"
+        },
+        {
+          "text": "Registrar descuento",
+          "class": "btn btn-block btn-primary"
+        }
+      ]
+    },
+    "Cupon descuento": {
+      "pageTitle": "Restaurant.pe",
+      "breadcrumbs": [],
+      "tabs": [],
+      "tables": [
+        {
+          "tableIndex": 0,
+          "headers": [
+            "Fecha expiración",
+            "Categoría / Código",
+            "Monto",
+            "Monto disponible",
+            "Monto usado",
+            "Estado",
+            "Acciones"
+          ],
+          "rowCount": 6
+        },
+        {
+          "tableIndex": 1,
+          "headers": [],
+          "rowCount": 1
+        }
+      ],
+      "formControls": [],
+      "filters": [
+        {
+          "identifier": "vm.categoriacupodescuento",
+          "tag": "div",
+          "options": []
+        },
+        {
+          "identifier": "Categoría",
+          "tag": "input",
+          "options": []
+        },
+        {
+          "identifier": "vm.paginacionSeleccionada",
+          "tag": "div",
+          "options": []
+        },
+        {
+          "identifier": "Paginación",
+          "tag": "input",
+          "options": []
+        }
+      ],
+      "buttons": [
+        {
+          "text": "Nuevo cupón",
+          "class": "btn btn-link"
+        },
+        {
+          "text": "Editar",
+          "class": "btn btn-success btn-xs"
+        },
+        {
+          "text": "Editar",
+          "class": "btn btn-success btn-xs"
+        },
+        {
+          "text": "Editar",
+          "class": "btn btn-success btn-xs"
+        },
+        {
+          "text": "Editar",
+          "class": "btn btn-success btn-xs"
+        },
+        {
+          "text": "Editar",
+          "class": "btn btn-success btn-xs"
+        },
+        {
+          "text": "Nuevo cupón",
+          "class": "btn btn-primary btn-block"
+        },
+        {
+          "text": "Importar Cupones",
+          "class": "btn btn-primary btn-block"
+        }
+      ]
+    },
+    "Promociones y sorteos": {
+      "pageTitle": "Restaurant.pe",
+      "breadcrumbs": [],
+      "tabs": [],
+      "tables": [
+        {
+          "tableIndex": 0,
+          "headers": [],
+          "rowCount": 1
+        }
+      ],
+      "formControls": [],
+      "filters": [],
+      "buttons": []
+    },
+    "Vales de Pago": {
+      "pageTitle": "Restaurant.pe",
+      "breadcrumbs": [],
+      "tabs": [],
+      "tables": [
+        {
+          "tableIndex": 0,
+          "headers": [
+            "Nombre",
+            "Tipo",
+            "Categoria",
+            "Local actual",
+            "Global",
+            "Configurar"
+          ],
+          "rowCount": 1
+        },
+        {
+          "tableIndex": 1,
+          "headers": [],
+          "rowCount": 1
+        }
+      ],
+      "formControls": [],
+      "filters": [
+        {
+          "identifier": "vm.paginacionSeleccionada",
+          "tag": "div",
+          "options": []
+        },
+        {
+          "identifier": "Paginación",
+          "tag": "input",
+          "options": []
+        }
+      ],
+      "buttons": []
+    }
+  },
+  "observed_get_endpoints": [
+    "http://gestioninterna.restaurant.pe/restaurant/m/rest/encuesta/mostarModalAddonsEncuesta/restaurant.pe/caprichos/null//Web",
+    "http://caprichos.restaurant.pe/restaurant/m/rest/configuracion/getAllByLocalId/null/0/0",
+    "http://caprichos.restaurant.pe/restaurant/m/rest/local/getVariablesLog",
+    "http://caprichos.restaurant.pe/restaurant/m/rest/local/esUnPlanLite",
+    "http://caprichos.restaurant.pe/restaurant/m/rest/configuracion/getAllByLocalId/1/0/0",
+    "http://caprichos.restaurant.pe/restaurant/api/rest/configuracionlocalpos/obtenerTodasLasConfiguracionesPOSPorLocalLogeado/1",
+    "http://caprichos.restaurant.pe/restaurant/m/rest/caja/validarCajaActualAbierta",
+    "http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerLocalesPermitidosParaUsuarioID/1",
+    "http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerPermisosPorUsuarioValidado/1",
+    "http://billing.restaurant.pe/billing/m/rest/suscripcion/getEstadoSuscripcionLocalV2/caprichos/1",
+    "http://manual.restaurant.pe/manual/m/rest/module/module/getModuleAndSubmoduleList",
+    "http://billing.restaurant.pe/billing/m/rest/suscripcion/obtenerPermisosPorPlan/caprichos/1",
+    "http://caprichos.restaurant.pe/restaurant/api/rest/integracion/integracion/34",
+    "http://caprichos.restaurant.pe/restaurant/api/rest/caja/allcajasbylocal/1/1/0/0",
+    "http://caprichos.restaurant.pe/restaurant/api/rest/local/estadoTodosLosReportes",
+    "http://gestioninterna.restaurant.pe/restaurant/m/rest/encuesta/mostarModalAddonsEncuesta/restaurant.pe/caprichos/1/1/Web",
+    "http://caprichos.restaurant.pe/restaurant/api/rest/configuracion/get/31",
+    "http://caprichos.restaurant.pe/restaurant/api/rest/local/validarConfiguracioCartaJson",
+    "http://caprichos.restaurant.pe/restaurant/api/rest/local/validarUsoPlataforma",
+    "http://incidencias.restaurant.pe/billing/m/rest/local/obtenerIncidenciaPorusuarioSinCalificacion/restaurant.pe/caprichos/1",
+    "http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerLocalYape",
+    "http://caprichos.restaurant.pe/restaurant/api/rest/oferta/getAllByTipoAndCategoria/1/-1/1/1/10/-1",
+    "http://caprichos.restaurant.pe/restaurant/api/rest/oferta/getAllByTipoAndCategoria/1/-1/1/1/10/-1/1",
+    "http://caprichos.restaurant.pe/restaurant/api/rest/categoriadescuento/getAll/-1/1/10",
+    "http://caprichos.restaurant.pe/restaurant/api/rest/categoriacupodescuento/getAllActivos",
+    "http://caprichos.restaurant.pe/restaurant/api/rest/cupondescuento/listarPorPaginacion/-1/-1/1/10/-1",
+    "http://caprichos.restaurant.pe/restaurant/api/rest/producto/getAllByLocalId/1/1/0/0/-1"
+  ]
+}

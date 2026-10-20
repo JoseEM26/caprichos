@@ -1,0 +1,1227 @@
+{
+  "movimiento_interno": {
+    "file": "scripts__restaurantpe__almacen__movimientointerno__movimientointerno.html",
+    "inputs": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Buscar plantillas registradas",
+        "model": "vm.busquedaPlantilla",
+        "required": false
+      }
+    ],
+    "buttons": [
+      {
+        "tag": "button",
+        "ng_click": "vm.fnModalenviarrequerimiento()",
+        "class": "btn btn-primary w-300 h-55 border-none text-white text-18"
+      }
+    ],
+    "clean_texts": [
+      "Nuevo movimiento interno",
+      "Registra una plantilla de requerimiento, luego añade los ítems que deseas solicitar.",
+      "Plantillas de mov. internos",
+      "Editar",
+      "Resumen de movimiento:",
+      "“{{vm.movimientoSeleccionado.movimiento_nombre}}”",
+      "Productos",
+      "Ítems",
+      "Categoría",
+      "Cantidad a mover",
+      "Presentación",
+      "Insumos",
+      "Ítems",
+      "Categoría",
+      "Cantidad a mover",
+      "Presentación",
+      "Recetas",
+      "Ítems",
+      "Categoría",
+      "Cantidad a mover",
+      "Presentación",
+      "Selecciona una plantilla de mov. interno",
+      "Haz clic en una plantilla para empezar",
+      "a agregar tus ítems.",
+      "Usar esta plantilla"
+    ],
+    "raw_len": 6558
+  },
+  "modal_plantilla_movimiento": {
+    "file": "scripts__restaurantpe__almacen__movimientointerno__modal-plantilla-movimiento.view.html",
+    "inputs": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Ejem:",
+        "model": "vm.movimientoalmacen.movimiento_nombre",
+        "required": false
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Jean Pierre Santillán García",
+        "model": "vm.movimientoalmacen.movimiento_encargado",
+        "required": false
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Alessandra Ontaneda Herrada",
+        "model": "vm.movimientoalmacen.movimiento_receptor",
+        "required": false
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Ingresa un monto",
+        "model": "detallemovimientoalmacen.detallemovimiento_cantidad",
+        "required": true
+      }
+    ],
+    "buttons": [
+      {
+        "tag": "button",
+        "ng_click": "vm.cerrarModal()",
+        "class": ""
+      },
+      {
+        "tag": "button",
+        "ng_click": "vm.cerrarModal()",
+        "class": "gap-5 btn btn-danger"
+      },
+      {
+        "tag": "button",
+        "ng_click": "vm.agregandoDetalles = true",
+        "class": "botonguardar gap-5 btn btn-primary"
+      },
+      {
+        "tag": "button",
+        "ng_click": "vm.cerrarModal()",
+        "class": "gap-5 btn btn-danger"
+      },
+      {
+        "tag": "button",
+        "ng_click": "vm.fnGuardarAvanceMovimiento()",
+        "class": "botonguardar gap-5 btn btn-primary"
+      },
+      {
+        "tag": "button",
+        "ng_click": "vm.fnGuardarAvanceMovimiento()",
+        "class": "botonguardar gap-5 btn btn-primary"
+      }
+    ],
+    "clean_texts": [
+      "Registrar plantilla de movimiento interno",
+      "Nombre de plantilla",
+      "Encargado del envío",
+      "Desde",
+      "- {{$select.selected.local.local_descripcion}}",
+      "Hacia",
+      "- {{$select.selected.local.local_descripcion}}",
+      "Receptor del envío",
+      "Cancelar",
+      "Agregar ítems",
+      "Movimiento interno: “{{vm.movimientoalmacen.movimiento_nombre}}”",
+      "Registrar plantilla de movimiento interno",
+      "Insumo",
+      "Producto",
+      "Ítems",
+      "Categorías",
+      "Cantidad",
+      "Presentaciones",
+      "Cancelar",
+      "Registrar plantilla",
+      "Editar plantilla"
+    ],
+    "raw_len": 6825
+  },
+  "modal_canje_movimiento": {
+    "file": "scripts__restaurantpe__almacen__movimientointerno__modal-canje-movimiento-interno.view.html",
+    "inputs": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "",
+        "model": "vm.movimientoalmacen.movimiento_encargado",
+        "required": false
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "",
+        "model": "vm.movimientoalmacen.movimiento_receptor",
+        "required": false
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Ingresa un monto",
+        "model": "detallemovimientoalmacen.detallemovimiento_cantidad",
+        "required": true
+      }
+    ],
+    "buttons": [
+      {
+        "tag": "button",
+        "ng_click": "vm.cerrarModal()",
+        "class": ""
+      },
+      {
+        "tag": "button",
+        "ng_click": "vm.cerrarModal()",
+        "class": "gap-5 btn btn-danger"
+      },
+      {
+        "tag": "button",
+        "ng_click": "vm.fnAgregarMovimientoEntreAlmacenes()",
+        "class": "botonguardar gap-5 btn btn-primary"
+      }
+    ],
+    "clean_texts": [
+      "Movimiento interno: \"{{vm.movimientoalmacen.movimiento_nombre}}”",
+      "1. Datos del movimiento entre almacenes",
+      "Desde",
+      "- {{$select.selected.local.local_descripcion}}",
+      "Hacia",
+      "- {{$select.selected.local.local_descripcion}}",
+      "Encargado del envío",
+      "Receptor del envío",
+      "2. Agrega ítems a tu movimiento",
+      "Insumo",
+      "Producto",
+      "Ítems",
+      "Categorías",
+      "Cantidad",
+      "Presentaciones",
+      "Cancelar",
+      "Guardar movimiento"
+    ],
+    "raw_len": 5583
+  },
+  "requerimiento_v2": {
+    "file": "scripts__restaurantpe__almacen__requerimientov2__requerimientos.view.html",
+    "inputs": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Buscar plantillas registradas",
+        "model": "vm.busquedaPlantilla",
+        "required": false
+      }
+    ],
+    "buttons": [
+      {
+        "tag": "button",
+        "ng_click": "vm.fnmodalregistroplantilla()",
+        "class": "btn btn-primary flex-none w-200 h-55 border-none text-white text-14 flex justify-center items-center gap-8"
+      },
+      {
+        "tag": "button",
+        "ng_click": "vm.fnModalCanjearRequerimiento(vm.plantillaSeleccionada.plantillarequerimiento_id)",
+        "class": "btn btn-primary w-300 h-55 border-none text-white text-18"
+      }
+    ],
+    "clean_texts": [
+      "Nuevo requerimiento",
+      "Registra una plantilla de requerimiento, luego añade los ítems que deseas solicitar.",
+      "Plantillas de requerimientos",
+      "Editar",
+      "No se encuentran plantillas registradas",
+      "Para realizar un requerimientoprimero debes registrar una plantilla.",
+      "Registrar plantilla",
+      "Resumen de requerimiento:",
+      "“{{vm.plantillaSeleccionada.plantillarequerimiento_nombre}}”",
+      "Productos",
+      "Ítems",
+      "Cant. requerida",
+      "Presentación",
+      "Insumos",
+      "Ítems",
+      "Cant. requerida",
+      "Presentación",
+      "Recetas",
+      "Ítems",
+      "Cant. requerida",
+      "Presentación",
+      "Selecciona una plantilla de requerimiento",
+      "Haz clic en una plantilla para empezar",
+      "a agregar tus ítems.",
+      "Usar esta plantilla"
+    ],
+    "raw_len": 6682
+  },
+  "modal_plantilla_requerimiento": {
+    "file": "scripts__restaurantpe__almacen__requerimientov2__modal-registrar-plantilla.view.html",
+    "inputs": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Ejem: Plantilla de lunes",
+        "model": "vm.requerimientomovimiento.requerimientomovimiento_nombreplantilla",
+        "required": false
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Jean Pierre Santillán García",
+        "model": "vm.requerimientomovimiento.requerimientomovimiento_encargado",
+        "required": false
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Alessandra Ontaneda Herrada",
+        "model": "vm.requerimientomovimiento.requerimientomovimiento_receptor",
+        "required": false
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Ingresa una cantidad",
+        "model": "item.item_cantidad",
+        "required": true
+      }
+    ],
+    "buttons": [
+      {
+        "tag": "button",
+        "ng_click": "vm.cerrarModal()",
+        "class": ""
+      },
+      {
+        "tag": "button",
+        "ng_click": "vm.cerrarModal()",
+        "class": "gap-5 btn btn-danger"
+      },
+      {
+        "tag": "button",
+        "ng_click": "vm.agregandoDetalles = true",
+        "class": "btn btn-primary gap-5"
+      },
+      {
+        "tag": "button",
+        "ng_click": "vm.fnActualizarPlantilla()",
+        "class": "btn btn-primary gap-5"
+      },
+      {
+        "tag": "button",
+        "ng_click": "vm.cerrarModal()",
+        "class": ""
+      },
+      {
+        "tag": "button",
+        "ng_click": "vm.cerrarModal()",
+        "class": "gap-5 btn btn-danger"
+      },
+      {
+        "tag": "button",
+        "ng_click": "vm.fnGuardarRequerimientoSoloComoPlantilla()",
+        "class": "btn btn-primary gap-5"
+      }
+    ],
+    "clean_texts": [
+      "Registrar plantilla de requerimiento",
+      "Nombre de plantilla",
+      "¿A qué sucursal se le solicita el requerimiento?",
+      "Encargado del requerimiento",
+      "Receptor del requerimiento",
+      "Cancelar",
+      "Agregar ítems",
+      "Actualizar plantilla",
+      "Registrar plantilla de requerimiento",
+      "Registrar plantilla de requerimiento",
+      "Ítems",
+      "Categorías",
+      "Cantidad",
+      "Presentaciones",
+      "Cancelar",
+      "Registrar plantilla"
+    ],
+    "raw_len": 5485
+  },
+  "modal_canje_requerimiento": {
+    "file": "scripts__restaurantpe__almacen__requerimientov2__modal-canjear-requerimiento.view.html",
+    "inputs": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Jean Pierre Santillán García",
+        "model": "vm.requerimientomovimiento.requerimientomovimiento_encargado",
+        "required": false
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Alessandra Ontaneda Herrada",
+        "model": "vm.requerimientomovimiento.requerimientomovimiento_receptor",
+        "required": false
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Ingresa una cantidad",
+        "model": "item.item_cantidad",
+        "required": true
+      }
+    ],
+    "buttons": [
+      {
+        "tag": "button",
+        "ng_click": "vm.cerrarModal()",
+        "class": ""
+      },
+      {
+        "tag": "button",
+        "ng_click": "",
+        "class": "btn btn-default"
+      },
+      {
+        "tag": "button",
+        "ng_click": "vm.cerrarModal()",
+        "class": "gap-5 btn btn-danger"
+      },
+      {
+        "tag": "button",
+        "ng_click": "vm.fnCanjearRequerimiento()",
+        "class": "botonguardar gap-5 btn btn-primary"
+      }
+    ],
+    "clean_texts": [
+      "Requerimiento: “{{vm.requerimientomovimiento.plantillarequerimiento_nombre}}”",
+      "Datos del requerimiento:",
+      "Fecha de abastecimiento",
+      "¿A qué sucursal se le solicita el requerimiento?",
+      "Encargado del requerimiento",
+      "Receptor del requerimiento",
+      "Ítems agregados al requerimiento",
+      "Ítems",
+      "Categorías",
+      "Cantidad",
+      "Presentaciones",
+      "Cancelar",
+      "Enviar requerimiento"
+    ],
+    "raw_len": 4640
+  },
+  "recepcion_v2": {
+    "file": "scripts__restaurantpe__almacen__recepcion__recepcion.view.html",
+    "inputs": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Buscar guías pendientes",
+        "model": "vm.busquedaRequerimiento",
+        "required": false
+      }
+    ],
+    "buttons": [
+      {
+        "tag": "button",
+        "ng_click": "vm.fnModalCanjearGuia()",
+        "class": "btn btn-primary w-300 h-55 border-none text-white text-18"
+      }
+    ],
+    "clean_texts": [
+      "Nuevo registro de recepción",
+      "Selecciona un requerimiento, y corrobora los ítems entregados en tu registro de recepción.",
+      "Lista de guías",
+      "Guía interna {{guiaremision.guiaremision_serie}} - {{guiaremision.guiaremision_correlativo}}",
+      "No se encuentran requerimientos pendientes",
+      "Verifica que el estado de tus",
+      "requerimientos estén “En camino”",
+      "Resumen de la guía:",
+      "“Guía {{vm.guiaSeleccionado.guiaremision_id}}”",
+      "Productos",
+      "Ítems",
+      "Cantidad a mover",
+      "Cant. recibida",
+      "Presentación",
+      "Insumos",
+      "Ítems",
+      "Cantidad a mover",
+      "Cant. recibida",
+      "Presentación",
+      "Recetas",
+      "Ítems",
+      "Cantidad a mover",
+      "Cant. recibida",
+      "Presentación",
+      "Derivados",
+      "Ítems",
+      "Cantidad a mover",
+      "Cant. recibida",
+      "Presentación",
+      "Selecciona una guía",
+      "Haz clic en una guía para poder",
+      "realizar un registro de recepción.",
+      "Realizar registro"
+    ],
+    "raw_len": 7456
+  },
+  "modal_canje_guia_recepcion": {
+    "file": "scripts__restaurantpe__almacen__recepcion__modal-canje-guia-remision-mov.view.html",
+    "inputs": [
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "placeholder": "",
+        "model": "",
+        "required": false
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Ingresa una cantidad",
+        "model": "item.item_cantidad",
+        "required": true
+      }
+    ],
+    "buttons": [
+      {
+        "tag": "button",
+        "ng_click": "vm.cerrarModal()",
+        "class": ""
+      },
+      {
+        "tag": "button",
+        "ng_click": "",
+        "class": "btn btn-default"
+      },
+      {
+        "tag": "button",
+        "ng_click": "vm.cerrarModal()",
+        "class": "gap-5 btn btn-danger"
+      },
+      {
+        "tag": "button",
+        "ng_click": "vm.fnGuardarMovimiento()",
+        "class": "btn btn-primary gap-5"
+      }
+    ],
+    "clean_texts": [
+      "Registro de recepción para: Guía \"{{vm.guiaSeleccionada.guiaremision_serie}}-{{vm.guiaSeleccionada.guiaremision_correlativo}}”",
+      "1. Confirma la fecha de abastecimiento",
+      "Fecha de abastecimiento",
+      "Almacén de recepción",
+      "- {{$select.selected.local.local_descripcion}}",
+      "2. Confirma la cantidad de ítems recibidos",
+      "Haz clic en las casillas en caso de que la cantidad recibida sea igual a la solicitada.",
+      "Ítems",
+      "Categorías",
+      "Cant. enviada",
+      "Cant. recibida",
+      "Presentación",
+      "Cancelar",
+      "Finalizar registro"
+    ],
+    "raw_len": 3995
+  },
+  "lista_procesos": {
+    "file": "scripts__restaurantpe__almacen__lista-procesos__lista-de-procesos.view.html",
+    "inputs": [],
+    "buttons": [],
+    "clean_texts": [
+      "Lista de procesos",
+      "Requerimientos",
+      "Registros de recepción",
+      "Movimientos internos"
+    ],
+    "raw_len": 1445
+  },
+  "tab_requerimiento": {
+    "file": "scripts__restaurantpe__almacen__lista-procesos__tap-requerimiento.view.html",
+    "inputs": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Busca ítems para agregarlos a tu lista",
+        "model": "vm.busqueda",
+        "required": false
+      }
+    ],
+    "buttons": [
+      {
+        "tag": "button",
+        "ng_click": "",
+        "class": "btn btn-primary w-200 flex-none border-none text-white text-14"
+      },
+      {
+        "tag": "button",
+        "ng_click": "vm.fnAbrirModalFiltros()",
+        "class": "text-14 recudinputright text-white btn btn-success flex-none w-200 flex-none"
+      }
+    ],
+    "clean_texts": [
+      "Nuevo requerimiento",
+      "Filtro de búsqueda",
+      "Fecha: {{vm.filter.rangoDeFechas.fechas.startDate._d | amDateFormat:'DD/MM/YYYY'}} - {{vm.filter.rangoDeFechas.fechas.endDate._d | amDateFormat:'DD/MM/YYYY'}}",
+      "Local: {{vm.filter.localSeleccionadoDescrip}}",
+      "Estado: {{vm.filter.estadoSeleccionadoDecrip}}",
+      "Requerimiento",
+      "Solicitado a",
+      "Fecha de registro",
+      "Cant. de ítems",
+      "Estado",
+      "Acciones",
+      "Requerimiento #{{requerimiento.requerimientomovimiento_id}}",
+      "Ver detalle"
+    ],
+    "raw_len": 5682
+  },
+  "tab_recepcion": {
+    "file": "scripts__restaurantpe__almacen__lista-procesos__tab-recepcion.view.html",
+    "inputs": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Buscar registros de recepción",
+        "model": "",
+        "required": false
+      }
+    ],
+    "buttons": [
+      {
+        "tag": "button",
+        "ng_click": "",
+        "class": "btn btn-primary w-200 flex-none border-none text-white text-14"
+      },
+      {
+        "tag": "button",
+        "ng_click": "vm.fnmodalfiltro()",
+        "class": "btn btn-success text-14 recudinputright text-white flex-none w-200 flex-none"
+      }
+    ],
+    "clean_texts": [
+      "Nuevo registro",
+      "Filtro de búsqueda",
+      "Fecha: {{vm.objFiltroMov.rangoDeFechas.fechas.startDate._d | amDateFormat:'DD/MM/YYYY'}} - {{vm.objFiltroMov.rangoDeFechas.fechas.endDate._d | amDateFormat:'DD/MM/YYYY'}}",
+      "Local: {{vm.objFiltroMov.localSeleccionadoDescrip}}",
+      "Desde: {{vm.objFiltroMov.almacenOrigenDescrip}}",
+      "Hacia: {{vm.objFiltroMov.almacenDestinoDescrip}}",
+      "Registros de recepción",
+      "Enviado por",
+      "Fecha de recepción",
+      "Ítems solicitados",
+      "Ítems entregados",
+      "Acciones",
+      "Registro de recepción # {{movimiento.movimiento_id}}"
+    ],
+    "raw_len": 4102
+  },
+  "tab_movimiento": {
+    "file": "scripts__restaurantpe__almacen__lista-procesos__tab-movimiento.view.html",
+    "inputs": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Buscar registros de recepción",
+        "model": "vm.busqueda",
+        "required": false
+      }
+    ],
+    "buttons": [
+      {
+        "tag": "button",
+        "ng_click": "",
+        "class": "btn btn-primary w-200 flex-none border-none text-white text-14"
+      },
+      {
+        "tag": "button",
+        "ng_click": "vm.fnmodalfiltro()",
+        "class": "btn btn-success text-14 recudinputright text-white flex-none w-200 flex-none"
+      }
+    ],
+    "clean_texts": [
+      "Nuevo movimiento",
+      "Filtro de búsqueda",
+      "Fecha: {{vm.objFiltroMov.rangoDeFechas.fechas.startDate._d | amDateFormat:'DD/MM/YYYY'}} - {{vm.objFiltroMov.rangoDeFechas.fechas.endDate._d | amDateFormat:'DD/MM/YYYY'}}",
+      "Local: {{vm.objFiltroMov.localSeleccionadoDescrip}}",
+      "Desde: {{vm.objFiltroMov.almacenOrigenDescrip}}",
+      "Hacia: {{vm.objFiltroMov.almacenDestinoDescrip}}",
+      "Movimiento",
+      "Desde",
+      "Hacia",
+      "Fecha del mov.",
+      "Ítems transferidos",
+      "Acciones",
+      "Movimiento interno # {{movimiento.movimiento_id}}"
+    ],
+    "raw_len": 4077
+  },
+  "proceso_detalle": {
+    "file": "scripts__restaurantpe__almacen__lista-procesos__proceso-detalle.view.html",
+    "inputs": [],
+    "buttons": [
+      {
+        "tag": "button",
+        "ng_click": "$state.go('almacen.requerimientomovimiento.listprocesos')",
+        "class": "gap-5 btn btn-warning"
+      }
+    ],
+    "clean_texts": [
+      "Requerimiento #{{vm.requerimientoSeleccionado.requerimientomovimiento_id}}",
+      "Pendiente",
+      "Tu requerimiento se encuentra pendiente. Te notificaremos cuando esté sea aprobado.",
+      "Cancelado",
+      "Tu requerimiento fue cancelado o rechazado. Te recomendamos hablar con un supervisor.",
+      "Aprobado",
+      "Tu requerimiento fue aprobado. Te notificaremos cuando esté en camino.",
+      "Despachado",
+      "Tu requerimiento está en camino. Una vez haya llegado, verifica los ítems que solicitaste y añádelos a un registro de entrega.",
+      "Recepcionado",
+      "Tu requerimiento fue recepcionado. A continuación se mostrará el registro de entrega realizado para tu requerimiento.",
+      "Datos de Requerimiento:",
+      "#{{vm.requerimientoSeleccionado.requerimientomovimiento_id}}",
+      "Solicitado a:",
+      "Fecha de abastecimiento",
+      "Encargado del requerimiento:",
+      "Receptor del requerimiento:",
+      "Ítems solicitados:",
+      "Productos",
+      "Ítems",
+      "Cantidad de ingreso",
+      "Presentación",
+      "Insumos",
+      "Ítems",
+      "Cantidad de ingreso",
+      "Presentación",
+      "Recetas",
+      "Ítems",
+      "Cantidad de ingreso",
+      "Presentación",
+      "Derivados",
+      "Ítems",
+      "Cantidad de ingreso",
+      "Presentación",
+      "Atras"
+    ],
+    "raw_len": 13661
+  },
+  "recepcion_detalle": {
+    "file": "scripts__restaurantpe__almacen__lista-procesos__recepcion-detalle.view.html",
+    "inputs": [],
+    "buttons": [
+      {
+        "tag": "button",
+        "ng_click": "$state.go('almacen.requerimientomovimiento.listprocesos')",
+        "class": "gap-5 btn btn-warning"
+      }
+    ],
+    "clean_texts": [
+      "Registro de entrega #{{vm.idMovimientoInterno}}",
+      "Datos del registro de entrega para:",
+      "Registro de entrega #{{vm.idMovimientoInterno}}",
+      "Enviado por:",
+      "Fecha de recepción:",
+      "Encargado del requerimiento:",
+      "Receptor del requerimiento:",
+      "Ítems recibidos:",
+      "Productos",
+      "Ítems",
+      "Categoría",
+      "Cantidad movida",
+      "Presentación",
+      "Insumos",
+      "Ítems",
+      "Categoría",
+      "Cantidad movida",
+      "Presentación",
+      "Recetas",
+      "Ítems",
+      "Categoría",
+      "Cantidad movida",
+      "Presentación",
+      "Derivados",
+      "Ítems",
+      "Categoría",
+      "Cantidad movida",
+      "Presentación",
+      "Atras"
+    ],
+    "raw_len": 6257
+  },
+  "movimiento_detalle": {
+    "file": "scripts__restaurantpe__almacen__lista-procesos__movimiento-detalle.view.html",
+    "inputs": [],
+    "buttons": [
+      {
+        "tag": "button",
+        "ng_click": "$state.go('almacen.requerimientomovimiento.listprocesos')",
+        "class": "gap-5 btn btn-warning"
+      }
+    ],
+    "clean_texts": [
+      "Movimiento interno #{{vm.idMovimientoInterno}}",
+      "Datos del movimiento:",
+      "#{{vm.idMovimientoInterno}}",
+      "Desde:",
+      "Hacia:",
+      "Fecha de recepción:",
+      "Encargado del requerimiento:",
+      "Receptor del requerimiento:",
+      "Ítems transferidos:",
+      "Productos",
+      "Ítems",
+      "Categoría",
+      "Cantidad movida",
+      "Presentación",
+      "Insumos",
+      "Ítems",
+      "Categoría",
+      "Cantidad movida",
+      "Presentación",
+      "Recetas",
+      "Ítems",
+      "Categoría",
+      "Cantidad movida",
+      "Presentación",
+      "Derivados",
+      "Ítems",
+      "Categoría",
+      "Cantidad movida",
+      "Presentación",
+      "Atras"
+    ],
+    "raw_len": 6452
+  },
+  "filtro_requerimiento": {
+    "file": "scripts__restaurantpe__almacen__lista-procesos__modal-filtro-requerimiento.view.html",
+    "inputs": [],
+    "buttons": [
+      {
+        "tag": "button",
+        "ng_click": "",
+        "class": "btn btn-default pull-right"
+      },
+      {
+        "tag": "button",
+        "ng_click": "vm.cerrarModal()",
+        "class": "gap-5 btn btn-danger"
+      },
+      {
+        "tag": "button",
+        "ng_click": "vm.fnAplicarFiltros()",
+        "class": "btn btn-primary gap-5"
+      }
+    ],
+    "clean_texts": [
+      "Filtros de búsqueda",
+      "Fecha de registro:",
+      "Del",
+      "hasta",
+      "Solicitado a:",
+      "Estado del requerimiento:",
+      "Pendiente",
+      "Cancelado",
+      "Aprobado",
+      "Despachado",
+      "Recepcionado",
+      "Todos",
+      "Cancelar",
+      "Aplicar filtros"
+    ],
+    "raw_len": 3993
+  },
+  "filtro_recepcion": {
+    "file": "scripts__restaurantpe__almacen__lista-procesos__modal-filtro-recepcion.view.html",
+    "inputs": [],
+    "buttons": [
+      {
+        "tag": "button",
+        "ng_click": "",
+        "class": "btn btn-default pull-right"
+      },
+      {
+        "tag": "button",
+        "ng_click": "vm.cerrarModal()",
+        "class": "btn btn-danger"
+      },
+      {
+        "tag": "button",
+        "ng_click": "vm.fnAplicarFiltros()",
+        "class": "btn btn-primary"
+      }
+    ],
+    "clean_texts": [
+      "Filtros de búsqueda",
+      "Fecha de los movimientos",
+      "Del",
+      "hasta",
+      "Local origen:",
+      "Desde:",
+      "- {{$select.selected.local.local_descripcion}}",
+      "Hacia:",
+      "- {{$select.selected.local.local_descripcion}}",
+      "Cancelar",
+      "Aplicar filtros"
+    ],
+    "raw_len": 3100
+  },
+  "filtro_movimiento": {
+    "file": "scripts__restaurantpe__almacen__lista-procesos__modal-filtro-movimiento.view.html",
+    "inputs": [],
+    "buttons": [
+      {
+        "tag": "button",
+        "ng_click": "",
+        "class": "btn btn-default pull-right"
+      },
+      {
+        "tag": "button",
+        "ng_click": "vm.cerrarModal()",
+        "class": "btn btn-danger"
+      },
+      {
+        "tag": "button",
+        "ng_click": "vm.fnAplicarFiltros()",
+        "class": "btn btn-primary"
+      }
+    ],
+    "clean_texts": [
+      "Filtros de búsqueda",
+      "Fecha de los movimientos",
+      "Del",
+      "hasta",
+      "Local origen:",
+      "Desde:",
+      "- {{$select.selected.local.local_descripcion}}",
+      "Hacia:",
+      "- {{$select.selected.local.local_descripcion}}",
+      "Cancelar",
+      "Aplicar filtros"
+    ],
+    "raw_len": 3100
+  },
+  "stock_principal": {
+    "file": "scripts__restaurantpe__almacen__stock__stock.html",
+    "inputs": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Filtrar o buscar un insumo o producto",
+        "model": "vm.productoFiltro",
+        "required": false
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "placeholder": "",
+        "model": "vm.debajoStock",
+        "required": false
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "placeholder": "",
+        "model": "vm.arribaStock",
+        "required": false
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "placeholder": "",
+        "model": "vm.porpresentacioncompra",
+        "required": false
+      }
+    ],
+    "buttons": [
+      {
+        "tag": "button",
+        "ng_click": "vm.fnGenerarInformeStock()",
+        "class": "btn btn-success"
+      },
+      {
+        "tag": "button",
+        "ng_click": "",
+        "class": "btn btn-default"
+      },
+      {
+        "tag": "a",
+        "ng_click": "vm.fnAbrirModalGenerarOCPorStock(0)",
+        "class": ""
+      },
+      {
+        "tag": "a",
+        "ng_click": "vm.fnAbrirModalGenerarOCPorStock(1)",
+        "class": ""
+      },
+      {
+        "tag": "button",
+        "ng_click": "",
+        "class": "btn btn-default"
+      },
+      {
+        "tag": "a",
+        "ng_click": "vm.fnGenerarInformeStock('excel')",
+        "class": ""
+      },
+      {
+        "tag": "a",
+        "ng_click": "$state.go('almacen.procesarstock.procesar')",
+        "class": "alert-link"
+      },
+      {
+        "tag": "button",
+        "ng_click": "vm.productoFiltro = ''",
+        "class": "btn btn-default"
+      },
+      {
+        "tag": "button",
+        "ng_click": "vm.fnGenerarInformeStock();",
+        "class": "btn btn-info"
+      }
+    ],
+    "clean_texts": [
+      "Generar informe",
+      "Generar orden compra",
+      "Por stock mínimo",
+      "Por stock máximo",
+      "Descargar",
+      "Formato",
+      "Excel",
+      "Informe de stock",
+      "Actualmente cuenta con",
+      "({{vm.ventasPorProcesar}}) Ventas",
+      "entre el {{vm.f1 | amDateFormat:'DD/MM/YYYY h:mm A'}} y el {{vm.f2 | amDateFormat:'DD/MM/YYYY h:mm A'}} pendientes de procesar stock. puede hacerlo",
+      "haciendo clic aqui",
+      "Almacén:",
+      "Tipo:",
+      "Categoria:",
+      "Categoria:",
+      "Buscar ( ENTER )",
+      "Ver solo por debajo del stock mínimo",
+      "Ver sobre stock máximo",
+      "Mostrar por presentación de compra",
+      "Producto / Insumo",
+      "Tipo",
+      "Categoría",
+      "Almacenes",
+      "Stock total",
+      "Stock",
+      "Mínimo req.",
+      "Máximo req.",
+      "Faltante",
+      "Insumo",
+      "Receta",
+      "Porcionable",
+      "Descartable",
+      "Producto"
+    ],
+    "raw_len": 9618
+  },
+  "receta_lista": {
+    "file": "scripts__restaurantpe__almacen__preparacionreceta__lista__receta.lista.view.html",
+    "inputs": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Buscar una receta",
+        "model": "vm.filtroBusquedaReceta",
+        "required": false
+      }
+    ],
+    "buttons": [
+      {
+        "tag": "button",
+        "ng_click": "vm.fnBuscarRecetaPorFiltro()",
+        "class": "btn btn-success"
+      },
+      {
+        "tag": "button",
+        "ng_click": "$event.stopPropagation();$state.go('almacen.preparacionreceta', {idInsumo: receta.insumo_id})",
+        "class": "btn btn-sm btn-primary"
+      }
+    ],
+    "clean_texts": [
+      "Opciones de pantalla",
+      "Ayuda",
+      "Actualizar Lista",
+      "Preparación de recetas base",
+      "A continuación se muestran las recetas base que tienen el tipo de descuento en",
+      "Por stock en almacén",
+      "Nombre",
+      "Descuenta de stock",
+      "Medida",
+      "¿Activo?",
+      "Acciones",
+      "No",
+      "Sí",
+      "No",
+      "Sí",
+      "Preparar",
+      "No existen recetas base registradas."
+    ],
+    "raw_len": 3315
+  },
+  "receta_detalle": {
+    "file": "scripts__restaurantpe__almacen__preparacionreceta__registrar__recetas-detalle.html",
+    "inputs": [],
+    "buttons": [],
+    "clean_texts": [
+      "Preparando una receta base",
+      "Estas apunto de preparar la receta base:",
+      ", por favor selecciona el",
+      "almacén de movimiento",
+      "para aumentar su stock y la",
+      "cantidad a generar"
+    ],
+    "raw_len": 969
+  },
+  "porcionamiento_detalle": {
+    "file": "scripts__restaurantpe__almacen__porcionamientoinsumo__registrar__porcionamiento-detalle.html",
+    "inputs": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "",
+        "model": "vm.cantidadGeneradaDeReceta",
+        "required": false
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "",
+        "model": "vm.insumo.stockActual",
+        "required": false
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "",
+        "model": "vm.insumo.resultado",
+        "required": false
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "",
+        "model": "vm.insumo.porPorcionar",
+        "required": false
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "",
+        "model": "vm.insumo.merma",
+        "required": false
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "placeholder": "",
+        "model": "vm.insumo.generarMerma",
+        "required": false
+      },
+      {
+        "tag": "textarea",
+        "type": "text",
+        "placeholder": "",
+        "model": "vm.preparacionreceta_observacion",
+        "required": false
+      }
+    ],
+    "buttons": [
+      {
+        "tag": "a",
+        "ng_click": "",
+        "class": "btn btn-default m-t-n-xs"
+      },
+      {
+        "tag": "button",
+        "ng_click": "vm.guardarPorcionamiento()",
+        "class": "btn btn-primary m-t-n-xs ladda-button"
+      },
+      {
+        "tag": "a",
+        "ng_click": "vm.activarInsumo()",
+        "class": "alert-link"
+      },
+      {
+        "tag": "button",
+        "ng_click": "",
+        "class": "btn btn-warning btn-circle btn-lg"
+      },
+      {
+        "tag": "button",
+        "ng_click": "",
+        "class": "btn btn-warning btn-circle btn-lg"
+      },
+      {
+        "tag": "button",
+        "ng_click": "",
+        "class": "btn btn-warning btn-circle btn-lg"
+      },
+      {
+        "tag": "button",
+        "ng_click": "vm.guardarPorcionamiento()",
+        "class": "btn btn-primary btn-lg btn-block ladda-button"
+      }
+    ],
+    "clean_texts": [
+      "Porcionar un insumo",
+      "Estas apunto de porcionar el insumo:",
+      ", por favor selecciona el",
+      "almacén de movimiento",
+      "para aumentar su stock y la",
+      "cantidad a generar",
+      "Cancelar",
+      "Guardar y porcionar insumo",
+      "Porcionar insumo: {{vm.insumo.insumo_nombre}}",
+      "Sigue los pasos del 01 al 03",
+      "Este insumo se encuentra anulado, por lo que no se mostrará en otras ventanas.",
+      "Volver a activar este insumo",
+      "01",
+      "Seleccione el almacén de movimiento",
+      "Almacén:",
+      "Stock actual",
+      "02",
+      "Cantidad resultante",
+      "Medida resutante",
+      "No hay insumos agregados a este porcionable",
+      "03",
+      "Resumen del porcionamiento de: {{vm.insumo.insumo_nombre}}",
+      "Cantidad a porcionar",
+      "Stock actual",
+      "Resultado",
+      "Restante a porcionar",
+      "Merma",
+      "Usar diferencia como merma",
+      "Ingrese alguna observación para este porcionamiento",
+      "Guardar y porcionar insumo"
+    ],
+    "raw_len": 8259
+  },
+  "ajustes_almacen_modal": {
+    "file": "scripts__restaurantpe__ajustes__produccion__modals__almacen-modal.html",
+    "inputs": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "",
+        "model": "vm.almacen.almacen_descripcion",
+        "required": true
+      }
+    ],
+    "buttons": [
+      {
+        "tag": "button",
+        "ng_click": "vm.cerrarModal()",
+        "class": "btn btn-default"
+      },
+      {
+        "tag": "button",
+        "ng_click": "vm.fnAgregar()",
+        "class": "btn btn-primary"
+      }
+    ],
+    "clean_texts": [
+      "Nuevo almacén",
+      "Nombre",
+      "Campo requerido",
+      "Nombre muy corto (minimo 3 letras)",
+      "Cancelar",
+      "Guardar"
+    ],
+    "raw_len": 1126
+  }
+}

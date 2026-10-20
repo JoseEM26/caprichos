@@ -1,0 +1,208 @@
+{
+  "login": {
+    "status": "SUCCESS",
+    "second": 1,
+    "url": "http://caprichos.restaurant.pe/restaurant/#!/"
+  },
+  "screens": {
+    "ventacreditos": {
+      "id": "ventacreditos",
+      "name": "Cobro de ventas (Ventas al Crédito)",
+      "url": "https://caprichos.restaurant.pe/restaurant/#!/creditos/ventacreditos",
+      "dom_structure": {
+        "title": "Deuda: S/ 70.79",
+        "breadcrumbs": [],
+        "tabs": [],
+        "buttons": [
+          "Generar informe",
+          "Descargar",
+          "Detalles",
+          "Pagar"
+        ],
+        "tableHeaders": [
+          {
+            "tableIndex": 0,
+            "headers": [
+              "Fecha pago",
+              "Fecha venta",
+              "Cliente",
+              "Comprobante",
+              "N° comprobante",
+              "Total venta",
+              "Monto deuda",
+              "Interés",
+              "Amortizado",
+              "Pendiente"
+            ]
+          }
+        ],
+        "fields": [
+          {
+            "label": "Input",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "label": "Input",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "label": "Input",
+            "type": "checkbox",
+            "placeholder": ""
+          }
+        ],
+        "summaries": [
+          "Todas las ventas al crédito",
+          "S/ 11.92",
+          "S/ 29.25",
+          "S/ 7.12",
+          "S/ 22.50"
+        ]
+      },
+      "endpoints_called": [
+        "GET https://caprichos.restaurant.pe/restaurant/",
+        "GET http://caprichos.restaurant.pe/restaurant/",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/pace.d2426819.js",
+        "GET https://fonts.googleapis.com/css",
+        "GET https://fonts.googleapis.com/css2",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/vendor.9707f748.css",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/style.a3719272.css",
+        "GET http://caprichos.restaurant.pe/restaurant/img/logo-restaurantpe.55ba42bd.png",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/vendor.6dad86f4.js",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/dx.all.d41d8cd9.js",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/scripts.9fdb592e.js",
+        "GET https://maps.googleapis.com/maps/api/js",
+        "GET http://caprichos.restaurant.pe/restaurant/fonts/fontawesome-webfont.woff2",
+        "GET https://maps.googleapis.com/maps/api/mapsjs/gen_204",
+        "POST https://api.deliverygo.app/v2/public/rest/establishment/getZonesLocal",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/api/rest/campaniaaddons/getByIdUsuario",
+        "GET http://gestioninterna.restaurant.pe/restaurant/m/rest/encuesta/mostarModalAddonsEncuesta/restaurant.pe/caprichos/1/1/Web",
+        "GET http://billing.restaurant.pe/billing/m/rest/suscripcion/obtenerPermisosPorPlan/caprichos/1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/configuracion/get/31",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerPermisosPorUsuarioValidado/1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/validarConfiguracioCartaJson",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/validarUsoPlataforma",
+        "GET http://incidencias.restaurant.pe/billing/m/rest/local/obtenerIncidenciaPorusuarioSinCalificacion/restaurant.pe/caprichos/1",
+        "POST http://billing.quipupos.com/billing/public/rest/aplicacion/obtenerWebinarVigenteV2",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/obtenerAddons",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerAddonsPorToken",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerLocalYape",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/sorteos/obtenerSorteoDisponible",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/encuestabi/verificarMostrar",
+        "GET http://caprichos.restaurant.pe/restaurant/m/rest/configuracion/getAllByLocalId/1/0/0",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/obtenerFechaRenovacionCertificadoValidar/20611290064",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerLocalesPermitidosParaUsuarioID/1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/comprobante/getComprobanteListByCaja/1/1/0/0",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/tarjeta/getAllTarjetasByLocalId/1/0/0",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/moneda/allmonedasbylocal/1/0/0",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/caja/allcajasbylocal/1/1/0/0",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/turno/getAllByLocalId/1/-1/0/0",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/local/getLocalesPermitidos/0",
+        "GET http://billing.restaurant.pe/billing/m/rest/suscripcion/getEstadoSuscripcionLocalV2/caprichos/1",
+        "GET http://manual.restaurant.pe/manual/m/rest/module/module/getModuleAndSubmoduleList",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/getLive/caprichos.restaurant.pe",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerDocElectronicosPendientes",
+        "GET http://caprichos.restaurant.pe/restaurant/img/restaurantloader-pot-top_inv.cb19fa90.png",
+        "GET http://caprichos.restaurant.pe/restaurant/img/restaurantloader-pot-bottom_inv.9a417680.png",
+        "GET http://caprichos.restaurant.pe/restaurant/media/pedido_deliverygo.mp3",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/green.f2e0aef8.png",
+        "GET http://caprichos.restaurant.pe/restaurant/m/rest/local/getVariablesLog",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/integracion/integracion/34",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/patterns/header-profile.993cf68a.png",
+        "POST http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/caja/allcajasbylocal/1/-1/0/0",
+        "GET http://caprichos.restaurant.pe/restaurant/readonly/rest/ventacredito/getInformeDeudasPorLocal/-1/1/1/1/75/-1/-1/1/0/-1/0/-1/-1/-1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/ventacredito/getTotalInformeDeudasPorLocal/-1/1/1/-1/-1/1/-1/0/-1/-1/-1"
+      ]
+    },
+    "compracreditos": {
+      "id": "compracreditos",
+      "name": "Pago de compras (Compras al Crédito)",
+      "url": "https://caprichos.restaurant.pe/restaurant/#!/creditos/compracreditos",
+      "dom_structure": {
+        "title": "Deuda: S/ 0.00",
+        "breadcrumbs": [],
+        "tabs": [],
+        "buttons": [
+          "Generar informe",
+          "Descargar"
+        ],
+        "tableHeaders": [
+          {
+            "tableIndex": 0,
+            "headers": [
+              "Fecha pago",
+              "Proveedor",
+              "Comprobante",
+              "N° comprobante",
+              "Monto deuda",
+              "Interés",
+              "Amortizado",
+              "Pendiente"
+            ]
+          }
+        ],
+        "fields": [
+          {
+            "label": "Input",
+            "type": "checkbox",
+            "placeholder": ""
+          }
+        ],
+        "summaries": [
+          "Todas las compras al crédito"
+        ]
+      },
+      "endpoints_called": [
+        "GET https://caprichos.restaurant.pe/restaurant/",
+        "GET http://caprichos.restaurant.pe/restaurant/",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/pace.d2426819.js",
+        "GET https://fonts.googleapis.com/css",
+        "GET https://fonts.googleapis.com/css2",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/vendor.9707f748.css",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/style.a3719272.css",
+        "GET http://caprichos.restaurant.pe/restaurant/img/logo-restaurantpe.55ba42bd.png",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/vendor.6dad86f4.js",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/dx.all.d41d8cd9.js",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/scripts.9fdb592e.js",
+        "GET https://maps.googleapis.com/maps/api/js",
+        "GET http://caprichos.restaurant.pe/restaurant/fonts/fontawesome-webfont.woff2",
+        "GET https://maps.googleapis.com/maps/api/mapsjs/gen_204",
+        "POST https://api.deliverygo.app/v2/public/rest/establishment/getZonesLocal",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/api/rest/campaniaaddons/getByIdUsuario",
+        "GET http://gestioninterna.restaurant.pe/restaurant/m/rest/encuesta/mostarModalAddonsEncuesta/restaurant.pe/caprichos/1/1/Web",
+        "GET http://billing.restaurant.pe/billing/m/rest/suscripcion/obtenerPermisosPorPlan/caprichos/1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/configuracion/get/31",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerPermisosPorUsuarioValidado/1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/validarConfiguracioCartaJson",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/validarUsoPlataforma",
+        "GET http://incidencias.restaurant.pe/billing/m/rest/local/obtenerIncidenciaPorusuarioSinCalificacion/restaurant.pe/caprichos/1",
+        "POST http://billing.quipupos.com/billing/public/rest/aplicacion/obtenerWebinarVigenteV2",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/obtenerAddons",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerAddonsPorToken",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerLocalYape",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/sorteos/obtenerSorteoDisponible",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/encuestabi/verificarMostrar",
+        "GET http://caprichos.restaurant.pe/restaurant/m/rest/configuracion/getAllByLocalId/1/0/0",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/obtenerFechaRenovacionCertificadoValidar/20611290064",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerLocalesPermitidosParaUsuarioID/1",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/local/getLocalesPermitidos/0",
+        "GET http://billing.restaurant.pe/billing/m/rest/suscripcion/getEstadoSuscripcionLocalV2/caprichos/1",
+        "GET http://manual.restaurant.pe/manual/m/rest/module/module/getModuleAndSubmoduleList",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/getLive/caprichos.restaurant.pe",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerDocElectronicosPendientes",
+        "GET http://caprichos.restaurant.pe/restaurant/img/restaurantloader-pot-top_inv.cb19fa90.png",
+        "GET http://caprichos.restaurant.pe/restaurant/img/restaurantloader-pot-bottom_inv.9a417680.png",
+        "GET http://caprichos.restaurant.pe/restaurant/media/pedido_deliverygo.mp3",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/green.f2e0aef8.png",
+        "GET http://caprichos.restaurant.pe/restaurant/m/rest/local/getVariablesLog",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/patterns/header-profile.993cf68a.png",
+        "POST http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/integracion/integracion/34",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/compra/getInformeDeudasPorLocalProveedorTipoPaginado/1/-1/1/1/10/-1/-1/-1/-1"
+      ]
+    }
+  }
+}

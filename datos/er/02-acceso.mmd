@@ -1,0 +1,57 @@
+erDiagram
+  ROL {
+    text codigo PK
+    text nombre
+  }
+  PERMISO {
+    bigint id PK
+    text modulo
+    text accion
+  }
+  ROL_PERMISO {
+    text rol PK,FK
+    bigint permiso_id PK,FK
+  }
+  USER_ACCOUNT {
+    bigint id PK
+    bigint party_id FK,UK
+    text rol FK
+    text hash
+    boolean debe_cambiar
+    timestamptz clave_inicial_vence
+    text pin_hash
+    boolean activo
+    date alta_en
+  }
+  CUSTOMER_ACCOUNT {
+    bigint id PK
+    bigint party_id FK,UK
+    text hash
+    boolean activo
+  }
+  SESION {
+    bigint id PK
+    text audiencia
+    bigint party_id FK
+    text refresh_hash UK
+    text dispositivo
+    timestamptz expira_en
+    timestamptz revocada_en
+  }
+  DEVICE_KEY {
+    bigint id PK
+    text tipo
+    text nombre
+    text llave_hash UK
+    bigint area_id
+    boolean activo
+  }
+  PARTY {
+    bigint id PK "en otro dominio"
+  }
+  PARTY ||--o{ CUSTOMER_ACCOUNT : "party_id"
+  PARTY ||--o{ SESION : "party_id"
+  PARTY ||--o{ USER_ACCOUNT : "party_id"
+  PERMISO ||--o{ ROL_PERMISO : "permiso_id"
+  ROL ||--o{ ROL_PERMISO : "rol"
+  ROL ||--o{ USER_ACCOUNT : "rol"

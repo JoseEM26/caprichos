@@ -1,0 +1,38 @@
+{
+  "opcionesSistemaCtrl": {
+    "found": false
+  },
+  "configuracionposCtrl": {
+    "found": false
+  },
+  "configuracionRegionalCtrl": {
+    "found": false
+  },
+  "AjustesSucursalesCtrl": {
+    "found": false
+  },
+  "AjustesProduccionCtrl": {
+    "found": false
+  },
+  "AjustesSalonesCtrl": {
+    "found": false
+  },
+  "AjustesCajasCtrl": {
+    "found": false
+  },
+  "AjustesImpresorasCtrl": {
+    "found": false
+  },
+  "ConfigurarImpresorasCtrl": {
+    "found": false
+  },
+  "AjustesTurnosCtrl": {
+    "found": false
+  },
+  "MarcaCtrl": {
+    "found": false
+  },
+  "ImagenSelfServiceCtrl": {
+    "found": false
+  }
+}

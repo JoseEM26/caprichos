@@ -1,0 +1,306 @@
+<div class="page-heading row text-right p-t-none">
+    <div class="wrapper page-heading-inner p-t-sm p-b-sm">
+        <button ladda="vm.btnCargandoGuardar" class="btn btn-primary" ng-click="vm.fnAgregar()">
+            <i class="fa fa-save"></i> Registrar cambios
+        </button>
+        \x3c!--
+        <button type="button"  class="btn btn-default" ng-click="vm.getLogPorLogTablaConfigLocal()">
+            <i class="fa fa-book"></i> Ver ultimas actualizaciones
+        </button>
+        --\x3e
+        \x3c!--a href=""><i class="fa fa-gear"></i> Opciones de pantalla</a--\x3e
+        \x3c!--a href=""><i class="fa fa-life-saver"></i> Ayuda</a--\x3e
+    </div>
+</div>
+
+<div class="wrapper wrapper-content">
+    <div class="ibox-content m-b-sm border-bottom">
+        <div class="p-xs">
+            <div class="pull-left m-r-md">
+                <i class="fa fa-gear mid-icon"></i>
+            </div>
+            <h2 class="m-t-none">Opciones de sistema</h2>
+            <span>Lista de opciones de configuración para el sistema para QuipuPOS y QuipuNET.</span>
+        </div>
+    </div>
+    <div rest-loader-model="vm.cargando" ng-class="{'is-loading': vm.cargando}"></div>
+    <div class="ibox-content forum-container restloader-remote-el" ng-class="{'is-loading': vm.cargando}">
+        <div class="forum-item active" ng-repeat="configuracion in vm.configuracionList" ng-if="configuracion.configuracion.configuracionpos_debemostrarse == '1'">
+            <div class="row">
+                <div class="col-xs-6 col-md-6 col-sm-6 col-lg-7">
+                    <div class="forum-icon">
+                        <i  class="fa fa-mobile"></i>
+                    </div>
+                    <h1 class="forum-icon text-primary" style="margin-top:6px;width: 60px;">
+                        #{{configuracion.configuracionpos_id}}
+                    </h1>
+                    <a class="forum-item-title">{{configuracion.configuracion.configuracionpos_descripcion}}</a>
+                    <div class="forum-sub-title text-pre text-word-pre-wrap"> {{configuracion.configuracion.configuracionpos_descripcionlarga}}</div>
+                </div>
+
+                <div class="col-xs-5 col-md-5 col-sm-5 col-lg-4">
+
+                    <div class="w-full" ng-if="configuracion.configuracionlocalpos_valor=='1' && configuracion.configuracionpos_id == CONFIGURACIONPOS.CONFIGURACIONPOS_MARCAR_DEBITO_TIPO_DAYPASS">
+                        <div>
+                            <label class="control-label">Cantidad de horas de duración:</label>
+                            <input class="form-control" type="text" name="horas_debito_daypass" id="horas_debito_daypass"
+                                placeholder="Ingrese horas de duración"
+                                ng-model="configuracion.configuracionlocalpos_valoraux1" solo-numeros
+                                style="max-width: 300px;"
+                            />
+                        </div>
+                    </div>
+
+                    <div class="input" ng-if="configuracion.configuracionlocalpos_valor=='1' && configuracion.configuracionpos_id==CONFIGURACIONPOS.CONFIGURACIONPOS_USO_TOTEM_CASHDRO">
+                        <label class="w-full">
+                            <label class="control-label">User cashdro:</label>
+                            <input type="text" class="form-control"
+                                   ng-model="configuracion.configuracionCashdro.user" placeholder="User cashdro">
+                        </label>
+                        <label class="w-full">
+                            <label class="control-label">Password cashdro:</label>
+                            <input type="text" class="form-control"
+                                   ng-model="configuracion.configuracionCashdro.password" placeholder="Password cashdro">
+                        </label>
+                        <label class="w-full">
+                            <label class="control-label">IP cashdro:</label>
+                            <input type="text" class="form-control"
+                                   ng-model="configuracion.configuracionCashdro.ip" placeholder="IP cashdro">
+                        </label>
+                    </div>
+
+                    <div class="input"  ng-if="configuracion.configuracionlocalpos_valor=='1' && configuracion.configuracionpos_id==CONFIGURACIONPOS.CONFIGURACIONPOS_MOSTRAR_EQUIVALENTE_DOLARES">
+                        <label>Seleccionar moneda
+
+                            <ui-select multiple ng-model="configuracion.monedaSelectedList"
+                                       theme="bootstrap">
+                                <ui-select-match placeholder="Selecciona una moneda">
+                                    {{$item.moneda_descripcion}}</strong>
+                                </ui-select-match>
+                                <ui-select-choices repeat="item in vm.monedaList | filter: $select.search">
+                                    <div ng-bind-html="item.moneda_descripcion | highlight: $select.search"></div>
+                                </ui-select-choices>
+                            </ui-select>
+
+                        </label>
+                    </div>
+                    <div class="input" ng-if="configuracion.configuracionlocalpos_valor=='1' && configuracion.configuracionpos_id=='6'">
+                        <label>
+                            <select class="form-control" ng-model="configuracion.configuracionlocalpos_valoraux1">
+                                <option value="Factura">Factura</option>
+                                <option value="Boleta">Boleta</option>
+                                <option value="Nota de Venta">Nota de Venta</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="input" ng-if="configuracion.configuracionpos_id=='8'">
+                        <label>                            
+                            <select class="form-control" ng-model="configuracion.configuracionlocalpos_valor">
+                                <option value="1">Formato 1</option>
+                                <option value="2">Formato 2</option>
+                                <option value="3">Formato reducido</option>
+                            </select>
+                        </label>
+                    </div>
+
+                    <div class="input" ng-if="configuracion.configuracionpos_id=='10'">
+                        <label>
+                            <select class="form-control" ng-model="configuracion.configuracionlocalpos_valor">
+                                <option value="1">Formato 1</option>
+                                <option value="2">Formato 2</option>                            
+                            </select>
+                        </label>
+                    </div>
+
+                    <div class="input" ng-if="configuracion.configuracionpos_id=='11'">
+                        <label>
+                            <select class="form-control" ng-model="configuracion.configuracionlocalpos_valoraux1">
+                                <option value="1">Modificadores verticales</option>
+                                <option value="2">Modificadores horizontales </option>                                
+                            </select>
+                        </label>
+                    </div>
+
+                    <div class="input"
+                         ng-if="configuracion.configuracionpos_id=='15' && configuracion.configuracionlocalpos_valor=='1'">
+                        <label>
+                            <select class="form-control" ng-model="configuracion.configuracionlocalpos_valoraux1">
+                                <option value="1">{{ 'DELIVERYS' | translate }} por integración</option>
+                                <option value="2">{{ 'DELIVERYS' | translate }} telefonicos</option>
+                                <option value="3">Todos los {{ 'DELIVERYS' | translate | lowercase }}</option>
+                            </select>
+                        </label>
+                    </div>
+
+                    <div class="input" ng-if="configuracion.configuracionlocalpos_valor=='1' && configuracion.configuracionpos_id=='12'">
+                        <div class="checkbox is-icheck">
+                            <label>
+                                <input type="checkbox" id="validar_duplicidad_voucher" icheck
+                                       ng-model="configuracion.configuracionlocalpos_valoraux1" ng-true-value="'1'"
+                                       ng-false-value="'0'"/>
+                                <span>Validar duplicidad de código de operación</span>
+                            </label>
+                        </div>
+                        <div class="checkbox is-icheck">
+                            <label>
+                                <input type="checkbox" id="validar_duplicidad_codigo_ap" icheck
+                                       ng-model="configuracion.configuracionlocalpos_valoraux2" ng-true-value="'1'"
+                                       ng-false-value="'0'"/>
+                                <span>Validar duplicidad de código AP</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="input" ng-if="configuracion.configuracionlocalpos_valor=='1' && configuracion.configuracionpos_id=='14'">
+                        <label>
+                            <input type="time" class="form-control" ng-model="configuracion.configuracionlocalpos_valoraux1">
+                        </label>
+                    </div>
+                    <div class="input" ng-if="configuracion.configuracionlocalpos_valor=='1' && configuracion.configuracionpos_id=='17'">
+                        <div class="checkbox is-icheck">
+                            <label>
+                                <input type="checkbox" id="efectivo" icheck
+                                       ng-model="configuracion.configuracionlocalpos_valoraux2Obj.efectivo" ng-true-value="'1'"
+                                       ng-false-value="'0'"/>
+                                <span>Efectivo</span>
+                            </label>
+                        </div>
+                        <div class="checkbox is-icheck">
+                            <label>
+                                <input type="checkbox" id="credito" icheck
+                                       ng-model="configuracion.configuracionlocalpos_valoraux2Obj.credito" ng-true-value="'1'"
+                                       ng-false-value="'0'"/>
+                                <span>Credito</span>
+                            </label>
+                        </div>
+                        <div class="checkbox is-icheck">
+                            <label>
+                                <input type="checkbox" id="tarjeta" icheck
+                                       ng-model="configuracion.configuracionlocalpos_valoraux2Obj.tarjeta" ng-true-value="'1'"
+                                       ng-false-value="'0'"/>
+                                <span>Tarjeta</span>
+                            </label>
+                        </div>
+                        <div class="checkbox is-icheck">
+                            <label>
+                                <input type="checkbox" id="transferencia" icheck
+                                       ng-model="configuracion.configuracionlocalpos_valoraux2Obj.transferencia" ng-true-value="'1'"
+                                       ng-false-value="'0'"/>
+                                <span>Transferencia</span>
+                            </label>
+                        </div>
+                        <div class="checkbox is-icheck">
+                            <label>
+                                <input type="checkbox" id="delivery" icheck
+                                       ng-model="configuracion.configuracionlocalpos_valoraux2Obj.delivery" ng-true-value="'1'"
+                                       ng-false-value="'0'"/>
+                                <span>Delivery</span>
+                            </label>
+                        </div>
+                        <div class="checkbox is-icheck">
+                            <label>
+                                <input type="checkbox" id="ventarapida" icheck
+                                       ng-model="configuracion.configuracionlocalpos_valoraux2Obj.ventarapida" ng-true-value="'1'"
+                                       ng-false-value="'0'"/>
+                                <span>Venta Rápida</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+
+                    <div class="col-xs-5 col-md-5 col-sm-5 col-lg-2"  ng-if="configuracion.configuracionlocalpos_valor=='1' && configuracion.configuracionpos_id == CONFIGURACIONPOS.CONFIGURACIONPOS_SELFSERVICE_V6">
+                        <div class="w-full">
+                            <label class="control-label">Tiempo Mínimo (minutos):</label>
+                            <input class="form-control" type="text" name="tiempo_min" id="tiempo_min
+                                placeholder="Ingrese el tiempo min para el pedido de self service ()"
+                                ng-model="configuracion.configuracionlocalpos_valoraux1" solo-numeros
+                                style="max-width: 300px;"
+                            />
+                        </div>
+                    </div>
+
+                    <div class="col-xs-5 col-md-5 col-sm-5 col-lg-2" ng-if="configuracion.configuracionlocalpos_valor=='1' && configuracion.configuracionpos_id == CONFIGURACIONPOS.CONFIGURACIONPOS_SELFSERVICE_V6">
+                        <div class="w-full">
+                            <label class="control-label">Tiempo máximo (minutos):</label>
+                            <input class="form-control" type="text" name="tiempo_max" id="tiempo_min
+                                placeholder="Ingrese el tiempo max para el pedido de self service"
+                                ng-model="configuracion.configuracionlocalpos_valoraux2" solo-numeros
+                                style="max-width: 300px;"
+                            />
+                        </div>
+                    </div>
+
+                <div  class="col-xs-5 col-md-5 col-sm-5 col-lg-4"
+                      ng-if="configuracion.configuracionpos_id==CONFIGURACIONPOS.CONFIGURACIONPOS_IMPRIMIR_DATOS_ADICIONALES_EN_COMPROBANTE && configuracion.configuracionlocalpos_valor=='1'">
+                    <div class="input">
+                        <ui-select multiple class="select-required" tagging="vm.fnAgregarCampoImpresion" tagging-label="(Agregar)"
+                                   tagging-tokens=",|/" ng-model="configuracion.camposImpresionSeleccionados" theme="bootstrap"
+                                   title="Escribe los campos">
+                            <ui-select-match placeholder="Escribe los campos del cliente que se mostrarán en el ticket">{{$item.descripcion}}
+                            </ui-select-match>
+                            <ui-select-choices
+                                    repeat="item in vm.camposOpcionImpresionTag | propsFilter: {descripcion: $select.search}">
+                                <div ng-if="!item.id"
+                                     ng-bind-html="item.descripcion + ' ' + $select.taggingLabel | highlight: $select.search"></div>
+                                <div ng-if="item.id"
+                                     ng-bind-html="item.descripcion| highlight: $select.search"></div>
+                            </ui-select-choices>
+                        </ui-select>
+                    </div>
+                </div>
+
+                <div class="col-xs-1 col-md-1 col-sm-2 col-lg-1">
+
+                    <div class="row">
+                        <div class="col-xs-12">
+                            <div class="checkbox is-icheck">
+                                <label ng-hide="configuracion.configuracionpos_id=='8' || configuracion.configuracionpos_id=='10'" >
+                                    <input type="checkbox" id="configuracionlocalpos_valor" icheck
+                                           ng-model="configuracion.configuracionlocalpos_valor" ng-true-value="'1'"
+                                           ng-false-value="'0'"/>
+                                </label>
+
+
+                                \x3c!--
+                                <button type="button"  class="btn btn-default btn-xs"  ng-if="vm.ver"  ng-click="vm.fnObtenerLogtablaPorId(configuracion.configuracion_id,configuracion.configuracion.configuracion_descripcion,'Opción Sistema')">
+                                    <i class="fa fa-book"></i> Ver log
+                                </button>
+                                --\x3e
+
+
+                            </div>
+                        </div>
+
+                     </div>
+                 </div>
+
+                <div class="col-xs-5 col-md-5 col-sm-5 col-lg-4"
+                    ng-if="configuracion.configuracionpos_id==CONFIGURACIONPOS.CONFIGURACIONPOS_IMPRIMIR_COMANDAS_AGRUPADAS_POR_ETIQUETAS && configuracion.configuracionlocalpos_valor=='1'">
+                    <div class="input">
+                        <label>Etiquetas de agrupación (máx. 2)</label>
+                        <ui-select multiple theme="bootstrap" tagging="vm.fnTagEtiquetaComanda" tagging-label="(Agregar)"
+                            tagging-tokens=",|/" ng-model="configuracion.etiquetasAgrupacionSeleccionadas"
+                            title="Escribe una etiqueta (máx. 12 caracteres)"
+                            search-enabled="{{ (configuracion.etiquetasAgrupacionSeleccionadas || []).length < 2 }}"
+                            on-select="vm.onSelectEtiqueta(configuracion, $item, $model, $select)">
+                            <ui-select-match placeholder="Ej.: Entrada, Plato Fuerte">{{$item}}</ui-select-match>
+                            <ui-select-choices
+                                repeat="item in vm.etiquetasAgrupacionOpciones">
+                                <div ng-bind-html="item | highlight: $select.search"></div>
+                            </ui-select-choices>
+                        </ui-select>
+                
+                        <small class="text-muted">
+                            Por defecto: <b>Entrada</b> y <b>Plato Fuerte</b>. Máx. 2 etiquetas y 12 caracteres por etiqueta.
+                        </small>
+                    </div>
+                </div>
+
+
+
+
+            </div>
+        </div>
+    </div>
+</div>

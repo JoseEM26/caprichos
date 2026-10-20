@@ -1,0 +1,351 @@
+{
+ "floors": [
+  {
+   "id": "p1",
+   "n": "Piso 1",
+   "on": true
+  },
+  {
+   "id": "p2",
+   "n": "Piso 2",
+   "on": false
+  }
+ ],
+ "dims": {},
+ "plan": {
+  "p1": [
+   {
+    "id": "e1",
+    "t": "pared",
+    "x": 0,
+    "y": 0,
+    "w": 20,
+    "h": 1,
+    "label": "Pared",
+    "seats": 4,
+    "on": true
+   },
+   {
+    "id": "e2",
+    "t": "pared",
+    "x": 0,
+    "y": 1,
+    "w": 1,
+    "h": 10,
+    "label": "Pared",
+    "seats": 4,
+    "on": true
+   },
+   {
+    "id": "e3",
+    "t": "pared",
+    "x": 19,
+    "y": 1,
+    "w": 1,
+    "h": 10,
+    "label": "Pared",
+    "seats": 4,
+    "on": true
+   },
+   {
+    "id": "e4",
+    "t": "pared",
+    "x": 0,
+    "y": 11,
+    "w": 8,
+    "h": 1,
+    "label": "Pared",
+    "seats": 4,
+    "on": true
+   },
+   {
+    "id": "e5",
+    "t": "pared",
+    "x": 12,
+    "y": 11,
+    "w": 8,
+    "h": 1,
+    "label": "Pared",
+    "seats": 4,
+    "on": true
+   },
+   {
+    "id": "e6",
+    "t": "entrada",
+    "x": 8,
+    "y": 11,
+    "w": 4,
+    "h": 1,
+    "label": "Entrada",
+    "seats": 4,
+    "on": true
+   },
+   {
+    "id": "e7",
+    "t": "cocina",
+    "x": 1,
+    "y": 1,
+    "w": 5,
+    "h": 3,
+    "label": "Cocina",
+    "seats": 4,
+    "on": true
+   },
+   {
+    "id": "e8",
+    "t": "barra",
+    "x": 8,
+    "y": 1,
+    "w": 6,
+    "h": 2,
+    "label": "Barra",
+    "seats": 4,
+    "on": true
+   },
+   {
+    "id": "e9",
+    "t": "caja",
+    "x": 15,
+    "y": 1,
+    "w": 3,
+    "h": 2,
+    "label": "Caja",
+    "seats": 4,
+    "on": true
+   },
+   {
+    "id": "e10",
+    "t": "bano",
+    "x": 16,
+    "y": 8,
+    "w": 3,
+    "h": 3,
+    "label": "Baños",
+    "seats": 4,
+    "on": true
+   },
+   {
+    "id": "m1",
+    "t": "mesa",
+    "x": 2,
+    "y": 5,
+    "w": 2,
+    "h": 2,
+    "label": "Mesa 1",
+    "seats": 2,
+    "on": true
+   },
+   {
+    "id": "m2",
+    "t": "mesa",
+    "x": 5,
+    "y": 5,
+    "w": 2,
+    "h": 2,
+    "label": "Mesa 2",
+    "seats": 2,
+    "on": true
+   },
+   {
+    "id": "m3",
+    "t": "mesa",
+    "x": 8,
+    "y": 5,
+    "w": 2,
+    "h": 2,
+    "label": "Mesa 3",
+    "seats": 4,
+    "on": true
+   },
+   {
+    "id": "m4",
+    "t": "mesa",
+    "x": 11,
+    "y": 5,
+    "w": 2,
+    "h": 2,
+    "label": "Mesa 4",
+    "seats": 4,
+    "on": true
+   },
+   {
+    "id": "m5",
+    "t": "mesa",
+    "x": 14,
+    "y": 5,
+    "w": 2,
+    "h": 2,
+    "label": "Mesa 5",
+    "seats": 4,
+    "on": true
+   },
+   {
+    "id": "m6",
+    "t": "mesa",
+    "x": 2,
+    "y": 8,
+    "w": 2,
+    "h": 2,
+    "label": "Mesa 6",
+    "seats": 4,
+    "on": true
+   },
+   {
+    "id": "m7",
+    "t": "mesa",
+    "x": 5,
+    "y": 8,
+    "w": 2,
+    "h": 2,
+    "label": "Mesa 7",
+    "seats": 4,
+    "on": true
+   },
+   {
+    "id": "m8",
+    "t": "mesa",
+    "x": 8,
+    "y": 8,
+    "w": 2,
+    "h": 2,
+    "label": "Mesa 8",
+    "seats": 6,
+    "on": true
+   },
+   {
+    "id": "m9",
+    "t": "mesa",
+    "x": 11,
+    "y": 8,
+    "w": 2,
+    "h": 2,
+    "label": "Mesa 9",
+    "seats": 6,
+    "on": true
+   },
+   {
+    "id": "m10",
+    "t": "mesa",
+    "x": 14,
+    "y": 8,
+    "w": 2,
+    "h": 2,
+    "label": "Mesa 10",
+    "seats": 2,
+    "on": true
+   }
+  ],
+  "p2": [
+   {
+    "id": "f1",
+    "t": "pared",
+    "x": 0,
+    "y": 0,
+    "w": 20,
+    "h": 1,
+    "label": "Pared",
+    "seats": 4,
+    "on": true
+   },
+   {
+    "id": "f2",
+    "t": "pared",
+    "x": 0,
+    "y": 1,
+    "w": 1,
+    "h": 11,
+    "label": "Pared",
+    "seats": 4,
+    "on": true
+   },
+   {
+    "id": "f3",
+    "t": "pared",
+    "x": 19,
+    "y": 1,
+    "w": 1,
+    "h": 11,
+    "label": "Pared",
+    "seats": 4,
+    "on": true
+   },
+   {
+    "id": "f4",
+    "t": "pared",
+    "x": 1,
+    "y": 11,
+    "w": 18,
+    "h": 1,
+    "label": "Pared",
+    "seats": 4,
+    "on": true
+   },
+   {
+    "id": "f5",
+    "t": "escalera",
+    "x": 1,
+    "y": 1,
+    "w": 2,
+    "h": 3,
+    "label": "Escalera",
+    "seats": 4,
+    "on": true
+   },
+   {
+    "id": "f6",
+    "t": "bano",
+    "x": 16,
+    "y": 1,
+    "w": 3,
+    "h": 3,
+    "label": "Baños",
+    "seats": 4,
+    "on": true
+   },
+   {
+    "id": "m11",
+    "t": "mesa",
+    "x": 5,
+    "y": 4,
+    "w": 2,
+    "h": 2,
+    "label": "Mesa 11",
+    "seats": 4,
+    "on": true
+   },
+   {
+    "id": "m12",
+    "t": "mesa",
+    "x": 9,
+    "y": 4,
+    "w": 2,
+    "h": 2,
+    "label": "Mesa 12",
+    "seats": 4,
+    "on": true
+   },
+   {
+    "id": "m13",
+    "t": "mesa",
+    "x": 5,
+    "y": 8,
+    "w": 2,
+    "h": 2,
+    "label": "Mesa 13",
+    "seats": 6,
+    "on": true
+   },
+   {
+    "id": "m14",
+    "t": "mesa",
+    "x": 9,
+    "y": 8,
+    "w": 2,
+    "h": 2,
+    "label": "Mesa 14",
+    "seats": 6,
+    "on": true
+   }
+  ]
+ }
+}

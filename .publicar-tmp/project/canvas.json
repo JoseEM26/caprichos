@@ -1,0 +1,252 @@
+{
+  "v": 3,
+  "attachments": {},
+  "boards": {
+    "Admin.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "is_interactive": true,
+      "title": "Administrativo: pedidos y caja, cocina, repartos, productos y stock",
+      "w": 1440,
+      "x": 1916,
+      "y": 0
+    },
+    "Chatbot.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Chatbot de WhatsApp: pedido por conversación",
+      "w": 390,
+      "x": 1446,
+      "y": 0
+    },
+    "Inicio.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "title": "Pantalla principal (portada con las tres entradas)",
+      "w": 1280,
+      "x": -1446,
+      "y": 0
+    },
+    "Main.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "is_interactive": true,
+      "title": "Carta virtual (web): carta, carrito y pedido",
+      "w": 1366,
+      "x": 0,
+      "y": 0
+    },
+    "Offline.dc.html": {
+      "h": 790,
+      "is_interactive": true,
+      "title": "Propuesta: modo sin internet con base de datos local",
+      "w": 1280,
+      "x": 7516,
+      "y": 0
+    },
+    "Pantalla.dc.html": {
+      "h": 790,
+      "is_interactive": true,
+      "title": "Pantalla de cocina en TV: solo lectura",
+      "w": 1280,
+      "x": 3436,
+      "y": 0
+    },
+    "Propuesta.dc.html": {
+      "h": 790,
+      "is_interactive": true,
+      "title": "Propuesta comercial: alcance, partes y montos",
+      "w": 1280,
+      "x": 4796,
+      "y": 0
+    },
+    "Tecnica.dc.html": {
+      "h": 790,
+      "is_interactive": true,
+      "title": "Propuesta técnica: VPS o Vercel y Neon",
+      "w": 1280,
+      "x": 6156,
+      "y": 0
+    },
+    "Wifi.dc.html": {
+      "h": 790,
+      "is_interactive": true,
+      "title": "Propuesta: Wi-Fi del local con red del personal y red de clientes",
+      "w": 1280,
+      "x": 8796,
+      "y": 0
+    },
+    "Workflow.dc.html": {
+      "x": 10156,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "title": "Workflows: pedidos, delivery, WhatsApp, cocina, almacén y acceso, por categorías",
+      "expand": "fill",
+      "is_interactive": true
+    }
+  },
+  "createdOnFiles": {
+    "at": "2026-10-13T20:00:00Z",
+    "v": 1
+  },
+  "designSystems": [
+    {
+      "artifact": "https://claude.ai/artifact/7GmJ8tWCzfidRpXfeEd4LR",
+      "copiedAt": "2026-10-13T20:00:00Z",
+      "namespace": "caprichos",
+      "title": "Caprichos Design System",
+      "version": "1791924851-7eab"
+    }
+  ],
+  "launch": {
+    "view": "canvas"
+  },
+  "notes": {
+    "n1": {
+      "fill": "orange",
+      "text": "Cómo se usa la carta: 1) Elige una categoría arriba (no hay filtros ni páginas: solo categorías y el buscador). Cada categoría tiene su más comprado del mes, marcado con una estrella. 2) Toca un producto: se abre la ventana con la foto grande arriba (tócala para ampliarla), y abajo tamaño, leche, endulzante, toppings opcionales, cremas o adicionales y una nota para cocina. 3) Agrega: aparece el aviso y el carrito (ícono arriba) muestra cuántos productos llevas. Arriba hay un banner administrable (Caprichos del mes). 'Conócenos' es una página aparte con ubicación, horario, teléfono y redes. En celular las tarjetas son más pequeñas. En Conócenos hay una galería 'Nuestro lugar' con espacios reservados para las fotos del local; se suben desde el administrativo (Configuración del local > Fotos del local). Al final de la carta hay un formulario '¿Cómo te fue en Caprichos?' (comentario, sugerencia, felicitación o queja; teléfono o correo opcional) y un pie de página con ubicación, horario, contacto, redes y enlaces; los mensajes llegan al administrativo en Clientes > Comentarios de los clientes. Inicio de la carta (pensado para celular): portada con el Capricho del mes y los botones 'Pedir ahora' y 'Ver la carta', franja de datos útiles (abierto o cerrado, delivery gratis, tiempo de entrega y pagos), 'Explora la carta' con categorías en círculos con foto, y promociones para compartir en un carrusel que se desliza. Novedades: una página aparte (Carta | Novedades | Conócenos) con promociones, imágenes, videos de TikTok o Instagram y avisos; en el inicio hay un carrusel con las primeras. Los círculos 'Momentos Caprichos' son destacadas: al tocarlos se abre un visor de fotos como las historias de Instagram (toca a la derecha o a la izquierda, barras de progreso). Solo muestran fotos de clientes, del local o del equipo; no llevan a ninguna parte. Ya no están las dos tarjetas de promociones dúo. Novedades ahora tiene portada deslizable con banners, filtros, tarjetas con galería de fotos, 'Antes de venir' y redes. En Novedades también hay fotos de clientes o de eventos y eventos con fecha y lugar (por ejemplo la chocolatada de Navidad), con etiqueta de tema.",
+      "w": 420,
+      "x": 0,
+      "y": 980
+    },
+    "n10": {
+      "fill": "orange",
+      "text": "Propuesta del modo sin internet: 9 láminas con el problema, cómo funcionaría (la caja guarda en una base local y sincroniza al volver), qué sigue funcionando y qué no, reglas para evitar choques, opciones de base de datos (se recomienda SQLite), lo que necesita el local, etapas y decisiones. La inversión se cotiza aparte. Los tiempos son estimados.",
+      "w": 420,
+      "x": 7516,
+      "y": 980
+    },
+    "n11": {
+      "text": "Propuesta Wi-Fi: dos redes separadas (personal y clientes), límites por dispositivo, clave semanal o código por pedido, qué router se necesita, qué datos del local faltan y quién configura qué. Los precios y modelos están por verificar.",
+      "w": 420,
+      "x": 8796,
+      "y": 980
+    },
+    "n2": {
+      "fill": "teal",
+      "text": "Carrito y pago: Mi pedido abre el panel lateral con cantidades y subtotal. Ahí se elige Delivery o Para recoger en el local (el cliente no pide 'en el local': en el salón pide el mozo). Con Delivery se pide la ubicación: dirección guardada por teléfono (prueba con el 999 888 777), ubicación actual (con mapa) o dirección y referencia; el envío se calcula por rangos de distancia (ejemplo) y es gratis desde s/ 70. Continuar pide solo nombre y teléfono (más dirección o mesa): sin fecha. Se pide como invitado (sin puntos) o con cuenta (correo, cumpleaños y un check para guardar los datos: suma 1 punto por cada s/ 1); nunca se obliga. Hay un campo de cupón (prueba BIENVENIDA, FRAPPE5 o CUMPLE25). Pagos: efectivo con vuelto, Yape, Plin, tarjeta y transferencia; Yape y Plin muestran el número para copiar y el pago se confirma por WhatsApp. Pedir envía el pedido a caja. Arriba, junto al carrito, el botón 'Ingresar' abre la cuenta del cliente: ingresar, crear cuenta (con casilla para guardar sus datos) o seguir como invitado, sin obligar a nada. Con cuenta se ve el saldo de puntos en la cabecera y suma 1 punto por cada s/ 1 al pedir; el inicio de sesión es solo visual (cualquier correo y contraseña de 4 caracteres sirve). En el delivery, 'Usar mi ubicación actual' pide el permiso del navegador: si se consigue dice 'Tu ubicación fue localizada correctamente', pone la dirección y muestra el mapa con un enlace a Google Maps; si no, dice 'No fue posible conseguir la ubicación' con la causa (sin permiso, tardó demasiado o no disponible) y se puede escribir la dirección.",
+      "w": 420,
+      "x": 460,
+      "y": 980
+    },
+    "n3": {
+      "fill": "blue",
+      "text": "Después de pedir: el cliente ve el estado: recibido, caja lo verifica y lo acepta, en cocina, y en camino o listo. El botón 'Simular siguiente paso' solo sirve en este prototipo. Reglas y precios de envío por confirmar con el cliente.",
+      "w": 420,
+      "x": 920,
+      "y": 980
+    },
+    "n4": {
+      "fill": "orange",
+      "text": "Cómo se usa el administrativo: 0) Entra eligiendo un rol (Administrador, Cajero, Cocina y barra, Mozo, Call center, Almacén, Producción o Repartidor): el menú muestra solo sus módulos. Arriba, 'Ver como' cambia de rol, 'Conexión' simula quedarse sin internet (la caja sigue trabajando y los pedidos quedan por sincronizar) y 'Dispositivo' alterna PC y Celular. 1) En Pedidos y caja, 'Nuevo pedido' sirve para mesa (elige piso y mesa en el plano), para llevar, delivery o reservar mesa; los pedidos manuales piden nombre y teléfono. 'Simular pedido nuevo' crea uno web; verifícalo y pulsa Aceptar: se imprime la comanda y las etiquetas de los vasos, se descuentan los insumos por receta, y el comprobante por defecto es nota de venta. En una mesa, el mozo saca la precuenta y el cajero cobra. 2) En Cocina hay un filtro por área (Bebidas, Postres, Salados) y los combos se reparten entre áreas. 3) En Repartos el repartidor toma un pedido disponible (el primero que lo toma se lo queda). 4) Reservas: las solicitudes del chatbot llegan como pendientes; un mozo o caja las aprueba y asigna la mesa (no se reservan solas). Si un cliente pide hablar con una persona llega una notificación con su nombre y teléfono. Arriba a la derecha, visible en cualquier módulo, están la conexión (en línea o sin internet), la hora y la campanita: reúne todas las notificaciones por prioridad y por tiempo de espera (lo que lleva más tiempo sube) y se filtra según tu rol. Usa 'Desde el chatbot' para simular reservas y clientes que esperan, y 'Reloj > Pasan 10 minutos' para ver cómo suben. En 'Nuevo pedido' de delivery también está 'Usar mi ubicación actual' con los mismos mensajes.",
+      "w": 420,
+      "x": 1916,
+      "y": 980
+    },
+    "n5": {
+      "fill": "teal",
+      "text": "Menú lateral por grupos: Operación (escritorio, pedidos y caja, cocina, repartos, reservas), Clientes y ventas (clientes, créditos, productos, ofertas y descuentos), Compras y stock (compras, almacén, stock y recetas), Análisis (informes, indicadores) y Configuración (configuración del local, usuarios, notificaciones). Las listas tienen búsqueda, filtros y paginación. Configuración del local (solo administrador) se edita por categorías: Datos del local, Ubicación, Contacto, Horario, Redes sociales, Pagos, Entrega y Empresa; al guardar, la carta usa esos datos (cabecera, página Conócenos, números de pago, envío gratis y pedido mínimo). En Productos, marca AGOTADO y deja de ofrecerse en la carta y el chatbot. Diseño de la carta (solo administrador): 'Abrir el diseñador en pantalla completa' muestra la carta igual que la ve el cliente; ahí mismo se elige entre tres organizaciones (secciones en cuadrícula, lista o tarjetas grandes), se arrastran productos y categorías, se cambian fotos, se editan nombre, descripción y precio, se esconden productos y se editan las dos promociones; al Publicar, la carta virtual lo usa. Pantallas (solo administrador, en Configuración): vincula una TV escribiendo el código que ella muestra, con confirmación; la lista permite desactivar una pantalla si se pierde. Paleta de colores (solo administrador): cada decoración festiva tiene su paleta; la carta la usa solo mientras esa decoración está activa y vuelve a los colores normales cuando se elige 'Sin decoración'. Todos los datos son de ejemplo. Plano del local (solo administrador): dibuja mesas, cocina, baños, paredes y entrada por piso; el segundo piso se activa solo si se necesita. Se puede eliminar cualquier elemento, incluso una mesa que ya se usó (los pedidos y reservas cerrados conservan el nombre de la mesa); solo no se elimina una mesa con un pedido abierto o una reserva activa hoy, que se puede desactivar. Arriba están todos los controles (piso, agregar, nombre, tamaño, personas, desactivar y eliminar, y cuántas columnas y filas tiene la cuadrícula) y el plano ocupa casi toda la pantalla. El mozo, al pedir en una mesa, ve las mesas libres como botones rápidos y un cartel con la mesa y 'Cambiar mesa'. El mozo, en Pedidos y caja, usa 'Nuevo pedido de mesa': elige el piso (si hay más de uno), la mesa y los productos, con las mismas opciones que la carta (tamaño, leche, endulzante, cremas, adicionales y nota para cocina) y varios productos en el mismo pedido, como un carrito. En Productos, Ofertas y descuentos y Almacén, 'Gestionar listas' crea, edita y desactiva categorías, tipos y origen; los combos de la edición permiten crear al instante, y se pueden subir imágenes. Stock y recetas: semáforo verde, naranja y rojo con mínimo, medio y máximo, proveedores A, B y C, y orden de compra por WhatsApp con un clic. Almacén: entrada, salida, merma y devolución. Clientes con puntos y cumpleaños; Créditos para el personal con 25 % de descuento. Diseño de la carta: banner de publicidad que se activa o desactiva. Indicadores: el más comprado de cada categoría con historial mensual (se reinicia solo cada mes), lo vendido hoy por promoción y por producto, y un botón para mostrar u ocultar las estrellas en la carta. Ofertas y descuentos: 'Armar promoción' crea combos y 2x1 con sus componentes; al venderse se registra la promoción y se descuenta cada producto por separado (el Dúo para compartir descuenta 2 frappes y 2 donas; un 2x1 descuenta sus dos productos aunque sean de sabores distintos). Almacén: 'Registrar movimiento' (entrada, salida, merma, devolución), 'Registrar la producción del día' y 'Cerrar el día', que pasa lo que sobra de las donas a merma (donación, personal o desecho). Roles nuevos: Producción. Ofertas y descuentos también tiene los Cupones del comprobante: al imprimir el comprobante del cliente salen abajo los primeros cupones activos marcados para imprimir (por ejemplo '20 % de descuento en el Dúo para compartir en tu siguiente compra'), 2 por comprobante (se puede cambiar a 1 o 3). Cada cupón tiene código, descuento (% o monto), a qué aplica (toda la carta, una categoría o un producto), vigencia, días de validez impresos, canal y si exige cuenta; se crean, editan, desactivan y ordenan, y hay historial de cambios y de impresiones. El cliente escribe el código impreso (por ejemplo DUO20-0102) en la carta. Cocina: 'Pantalla completa, sin desplazar' muestra cada área en grande, con '+N más'. Una mesa se libera al cobrar o a mano (mozo o caja). Configuración del local > Horario y fechas: horario de cada día (abierto o cerrado, hora de apertura y de cierre) y fechas especiales (feriados cerrados o con otro horario); al guardar, la carta (cabecera con 'Abierto hasta…' o 'Cerrado hoy', Conócenos, pie), el chatbot y las horas para reservar usan ese horario. Configuración > Novedades y publicidad: se arma la página Novedades de la carta viéndola como la ve el cliente; se toca una tarjeta para editarla (tipo, título, texto, foto o ",
+      "w": 420,
+      "x": 2376,
+      "y": 980
+    },
+    "n6": {
+      "fill": "blue",
+      "text": "Pantalla de TV por área: elige Bebidas, Postres o Salados (cada pantalla muestra solo lo suyo y los combos se reparten). Es una URL aparte, sin usuario, que solo muestra los pedidos de cocina (sin teléfono ni dirección). La TV no tiene botones: los estados se cambian en la mini computadora de cocina desde Cocina. Colores por tiempo: azul a tiempo, naranja desde 10 min, rojo desde 13 min (meta). Los botones de arriba solo sirven en este prototipo para ver los otros estados: Vincular pantalla (código que el administrador escribe en el administrativo), Sin conexión y Desvinculada. Todos los datos son de ejemplo.",
+      "w": 420,
+      "x": 3436,
+      "y": 980
+    },
+    "n7": {
+      "fill": "orange",
+      "text": "Propuesta comercial: 13 láminas con lo que se mostró, lo que se agregó al prototipo (carta y atención, mensajes y reparto, cocina y almacén), el problema que resuelve, los ocho roles, la inversión de S/ 3,500 en cuatro partes (S/ 600, 800, 1,000 y 1,100), qué entrega cada parte, qué incluye y qué va aparte, cómo se trabaja y el siguiente paso. Usa Anterior y Siguiente o los números. Los plazos son estimados.",
+      "w": 420,
+      "x": 4796,
+      "y": 980
+    },
+    "n8": {
+      "fill": "teal",
+      "text": "Propuesta técnica: 7 láminas que comparan un VPS con Vercel y Neon en palabras de negocio. Advierte que el plan gratuito de Vercel no permite uso comercial y que el de Neon se duerme tras 5 minutos sin uso. Los costos en dólares son estimados y se deben verificar con cada proveedor.",
+      "w": 420,
+      "x": 6156,
+      "y": 980
+    },
+    "n9": {
+      "fill": "blue",
+      "text": "Chatbot Capri: el menú ofrece Hacer un pedido, Reservar mesa, Ver la carta, Preguntar algo y Hablar con una persona. Preguntar algo lo responde Capri, el bot, conectado a la base de datos: se presenta, dice qué hay disponible ahora y recomienda (ejemplos fijos). El pedido va por botones, con varios productos, pago y aviso de alta demanda. Reservar mesa envía una solicitud (personas y hora): no se confirma sola, un mozo o caja la aprueba en el administrativo. Hablar con una persona avisa al administrativo con el nombre y el teléfono. La franja Controles de la maqueta simula: entra un pedido web, pasaron 2 horas (encuesta y Google Maps) y alta demanda. FRAPPE STRAWBERRY aparece agotado. Si el cliente elige Delivery, Capri le pide compartir su ubicación actual (o escribirla) con los mismos mensajes de éxito o de error.",
+      "w": 420,
+      "x": 1446,
+      "y": 980
+    },
+    "nI": {
+      "fill": "orange",
+      "text": "Pantalla principal para cuando todo se suba a Vercel: tres tarjetas, Carta virtual, Administrativo y WhatsApp (Capri). Cada tarjeta es un enlace; las rutas (./carta.html, ./admin.html, ./chatbot.html) están al inicio del archivo y se cambian al subir los HTML. Aquí en el lienzo los enlaces no abren nada porque esos archivos todavía no existen. No modifica los otros tableros. Todos los datos son de ejemplo.",
+      "w": 420,
+      "x": -1446,
+      "y": 980
+    },
+    "titulo": {
+      "kind": "title1",
+      "maxW": 1836,
+      "text": "Carta virtual (web) y chatbot de WhatsApp",
+      "w": 240,
+      "x": 0,
+      "y": -260
+    },
+    "titulo2": {
+      "kind": "title1",
+      "maxW": 1440,
+      "text": "Administrativo",
+      "w": 240,
+      "x": 1916,
+      "y": -260
+    },
+    "titulo3": {
+      "kind": "title1",
+      "maxW": 1280,
+      "text": "Pantalla de cocina (TV)",
+      "w": 240,
+      "x": 3436,
+      "y": -260
+    },
+    "titulo4": {
+      "kind": "title1",
+      "maxW": 2640,
+      "text": "Propuestas para el cliente",
+      "w": 240,
+      "x": 4796,
+      "y": -260
+    },
+    "tituloI": {
+      "kind": "title1",
+      "maxW": 1280,
+      "text": "Pantalla principal",
+      "w": 240,
+      "x": -1446,
+      "y": -260
+    },
+    "nWF": {
+      "x": 10156,
+      "y": 980,
+      "w": 460,
+      "text": "Workflows en una sola pantalla: categorías a la izquierda (Pedidos y pago, Delivery y entregas, Atención por WhatsApp, Local y mesas, Cocina, Almacén y stock, Personal y acceso) y, para cada proceso, un diagrama por carriles con quién hace qué en cada paso, las reglas clave y lo pendiente. Coincide con el mockup.",
+      "fill": "orange",
+      "size": "s"
+    }
+  },
+  "order": [
+    "Inicio.dc.html",
+    "Main.dc.html",
+    "Chatbot.dc.html",
+    "Admin.dc.html",
+    "Pantalla.dc.html",
+    "Propuesta.dc.html",
+    "Tecnica.dc.html",
+    "Offline.dc.html",
+    "Wifi.dc.html",
+    "Workflow.dc.html"
+  ],
+  "pages": [],
+  "title": "Caprichos Plataforma Digital"
+}

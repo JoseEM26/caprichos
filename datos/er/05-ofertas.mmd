@@ -1,0 +1,91 @@
+erDiagram
+  OFERTA {
+    bigint id PK
+    text tipo
+    text nombre UK
+    int lleva
+    int paga
+    bigint alcance_categoria_id FK
+    bigint alcance_producto_id FK
+    text descuento_tipo
+    numeric descuento_valor
+    numeric compra_minima
+    smallint_arr dias
+    time hora_desde
+    time hora_hasta
+    date fecha_desde
+    date fecha_hasta
+    text_arr canales
+    int limite_usos
+    int orden
+    boolean activo
+  }
+  COMBO_PRECIO {
+    bigint oferta_id PK,FK
+    bigint tamano_valor_id PK,FK
+    numeric precio
+  }
+  COMBO_PARTE {
+    bigint id PK
+    bigint oferta_id FK
+    text tipo
+    int cantidad
+    bigint_arr categorias
+    bigint_arr productos
+  }
+  REGLA_ACUMULACION {
+    smallint id PK
+    boolean cupon_con_descuento
+    boolean promo_con_descuento
+    int cupones_por_comprobante
+    text texto_pie
+  }
+  CUPON {
+    bigint id PK
+    text modo
+    text codigo_base UK
+    text descuento_tipo
+    numeric descuento_valor
+    numeric compra_minima
+    bigint categoria_id
+    bigint producto_id
+    text_arr canales
+    boolean requiere_cuenta
+    int dias_validez
+    int tope_usos
+    int max_por_cliente
+    int orden
+    boolean activo
+  }
+  CUPON_EMITIDO {
+    bigint id PK
+    bigint cupon_id FK
+    text codigo UK
+    bigint pedido_origen_id
+    timestamptz vence_en
+    text estado
+    timestamptz canjeado_en
+    bigint pedido_canje_id
+  }
+  CUPON_CANJE_COMPARTIDO {
+    bigint cupon_id PK,FK
+    bigint pedido_id PK
+    bigint party_id
+    timestamptz en
+  }
+  CATEGORIA {
+    bigint id PK "en otro dominio"
+  }
+  LISTA_VALOR {
+    bigint id PK "en otro dominio"
+  }
+  PRODUCTO {
+    bigint id PK "en otro dominio"
+  }
+  CATEGORIA ||--o{ OFERTA : "alcance_categoria_id"
+  CUPON ||--o{ CUPON_CANJE_COMPARTIDO : "cupon_id"
+  CUPON ||--o{ CUPON_EMITIDO : "cupon_id"
+  LISTA_VALOR ||--o{ COMBO_PRECIO : "tamano_valor_id"
+  OFERTA ||--o{ COMBO_PARTE : "oferta_id"
+  OFERTA ||--o{ COMBO_PRECIO : "oferta_id"
+  PRODUCTO ||--o{ OFERTA : "alcance_producto_id"

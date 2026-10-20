@@ -1,0 +1,915 @@
+{
+  "epica": "EP-CAP-013",
+  "generado_por_ia": true,
+  "revisado_por": null,
+  "historias": [
+    {
+      "hu": "HU-CAP-116",
+      "tareas": [
+        {
+          "id": "HU-CAP-116-T01",
+          "titulo": "Revisar criterios de HU-CAP-116 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-116-T02",
+          "titulo": "Migración Prisma de las tablas de FT-USR-01 (auditoria, party, person, user_account, rol)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-116-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-116-T03",
+          "titulo": "Reglas de dominio de HU-CAP-116 (RQ-USR-01-01, RQ-USR-01-02, RQ-USR-01-03, RQ-USR-01-11)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-116-T01",
+            "HU-CAP-116-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-116-T04",
+          "titulo": "Casos de uso: Dar de alta y desactivar a un usuario",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-116-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-116-T05",
+          "titulo": "Endpoints y eventos de FT-USR-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-116-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-116-T06",
+          "titulo": "Pantalla React: Dar de alta y desactivar a un usuario",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-116-T05"
+          ]
+        },
+        {
+          "id": "HU-CAP-116-T07",
+          "titulo": "Pruebas TC-CAP-116-01..06 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-116-T06"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-117",
+      "tareas": [
+        {
+          "id": "HU-CAP-117-T01",
+          "titulo": "Revisar criterios de HU-CAP-117 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-117-T02",
+          "titulo": "Reglas de dominio de HU-CAP-117 (RQ-USR-01-04, RQ-USR-01-05, RQ-USR-01-06, RQ-USR-01-07, RQ-USR-01-10)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-117-T01",
+            "HU-CAP-116-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-117-T03",
+          "titulo": "Casos de uso: Crear mi contraseña en el primer ingreso",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-117-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-117-T04",
+          "titulo": "Endpoints y eventos de FT-USR-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-117-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-117-T05",
+          "titulo": "Pantalla React: Crear mi contraseña en el primer ingreso",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-117-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-117-T06",
+          "titulo": "Pruebas TC-CAP-117-01..06 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-117-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-118",
+      "tareas": [
+        {
+          "id": "HU-CAP-118-T01",
+          "titulo": "Revisar criterios de HU-CAP-118 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-118-T02",
+          "titulo": "Reglas de dominio de HU-CAP-118 (RQ-USR-01-08, RQ-USR-01-09)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-118-T01",
+            "HU-CAP-116-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-118-T03",
+          "titulo": "Casos de uso: Cambiar mi foto y restablecer contraseñas",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-118-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-118-T04",
+          "titulo": "Endpoints y eventos de FT-USR-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-118-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-118-T05",
+          "titulo": "Pantalla React: Cambiar mi foto y restablecer contraseñas",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-118-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-118-T06",
+          "titulo": "Pruebas TC-CAP-118-01..04 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-118-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-119",
+      "tareas": [
+        {
+          "id": "HU-CAP-119-T01",
+          "titulo": "Guard de permisos por módulo y acción con la matriz rol_permiso (ADR-008)",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-119-T02",
+          "titulo": "Revisar criterios de HU-CAP-119 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-119-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-119-T03",
+          "titulo": "Migración Prisma de las tablas de FT-USR-02 (auditoria, party, person, user_account, rol)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-119-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-119-T04",
+          "titulo": "Reglas de dominio de HU-CAP-119 (RQ-USR-02-01, RQ-USR-02-02, RQ-USR-02-03)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-119-T02",
+            "HU-CAP-119-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-119-T05",
+          "titulo": "Casos de uso: Asignar un rol y ver solo mis módulos",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-119-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-119-T06",
+          "titulo": "Endpoints y eventos de FT-USR-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-119-T05"
+          ]
+        },
+        {
+          "id": "HU-CAP-119-T07",
+          "titulo": "Pantalla React: Asignar un rol y ver solo mis módulos",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-119-T06"
+          ]
+        },
+        {
+          "id": "HU-CAP-119-T08",
+          "titulo": "Pruebas TC-CAP-119-01..04 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-119-T07"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-120",
+      "tareas": [
+        {
+          "id": "HU-CAP-120-T01",
+          "titulo": "Revisar criterios de HU-CAP-120 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-120-T02",
+          "titulo": "Reglas de dominio de HU-CAP-120 (RQ-USR-02-04)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-120-T01",
+            "HU-CAP-119-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-120-T03",
+          "titulo": "Casos de uso: Ver mi escritorio según mi rol",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-120-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-120-T04",
+          "titulo": "Endpoints y eventos de FT-USR-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-120-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-120-T05",
+          "titulo": "Pantalla React: Ver mi escritorio según mi rol",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-120-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-120-T06",
+          "titulo": "Pruebas TC-CAP-120-01..02 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-120-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-121",
+      "tareas": [
+        {
+          "id": "HU-CAP-121-T01",
+          "titulo": "Revisar criterios de HU-CAP-121 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-121-T02",
+          "titulo": "Reglas de dominio de HU-CAP-121 (RQ-USR-02-05, RQ-USR-02-06, RQ-USR-02-09)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-121-T01",
+            "HU-CAP-119-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-121-T03",
+          "titulo": "Casos de uso: Editar la matriz de permisos por rol",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-121-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-121-T04",
+          "titulo": "Endpoints y eventos de FT-USR-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-121-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-121-T05",
+          "titulo": "Pantalla React: Editar la matriz de permisos por rol",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-121-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-121-T06",
+          "titulo": "Pruebas TC-CAP-121-01..05 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-121-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-122",
+      "tareas": [
+        {
+          "id": "HU-CAP-122-T01",
+          "titulo": "Revisar criterios de HU-CAP-122 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-122-T02",
+          "titulo": "Reglas de dominio de HU-CAP-122 (RQ-USR-02-07, RQ-USR-02-08)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-122-T01",
+            "HU-CAP-119-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-122-T03",
+          "titulo": "Casos de uso: Autorizar una acción sensible con el PIN del administrador",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-122-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-122-T04",
+          "titulo": "Endpoints y eventos de FT-USR-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-122-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-122-T05",
+          "titulo": "Pantalla React: Autorizar una acción sensible con el PIN del administrador",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-122-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-122-T06",
+          "titulo": "Pruebas TC-CAP-122-01..03 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-122-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-123",
+      "tareas": [
+        {
+          "id": "HU-CAP-123-T01",
+          "titulo": "Revisar criterios de HU-CAP-123 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-123-T02",
+          "titulo": "Migración Prisma de las tablas de FT-USR-03 (auditoria, party, person, user_account, rol)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-123-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-123-T03",
+          "titulo": "Reglas de dominio de HU-CAP-123 (RQ-USR-03-01, RQ-USR-03-02, RQ-USR-03-06)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-123-T01",
+            "HU-CAP-123-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-123-T04",
+          "titulo": "Casos de uso: Registrar el consumo del personal a crédito",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-123-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-123-T05",
+          "titulo": "Endpoints y eventos de FT-USR-03 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-123-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-123-T06",
+          "titulo": "Pantalla React: Registrar el consumo del personal a crédito",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-123-T05"
+          ]
+        },
+        {
+          "id": "HU-CAP-123-T07",
+          "titulo": "Pruebas TC-CAP-123-01..04 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-123-T06"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-124",
+      "tareas": [
+        {
+          "id": "HU-CAP-124-T01",
+          "titulo": "Revisar criterios de HU-CAP-124 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-124-T02",
+          "titulo": "Reglas de dominio de HU-CAP-124 (RQ-USR-03-03, RQ-USR-03-04, RQ-USR-03-05, RQ-USR-03-08)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-124-T01",
+            "HU-CAP-123-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-124-T03",
+          "titulo": "Casos de uso: Revisar el crédito del personal por mes",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-124-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-124-T04",
+          "titulo": "Endpoints y eventos de FT-USR-03 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-124-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-124-T05",
+          "titulo": "Pantalla React: Revisar el crédito del personal por mes",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-124-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-124-T06",
+          "titulo": "Pruebas TC-CAP-124-01..05 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-124-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-125",
+      "tareas": [
+        {
+          "id": "HU-CAP-125-T01",
+          "titulo": "Revisar criterios de HU-CAP-125 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-125-T02",
+          "titulo": "Reglas de dominio de HU-CAP-125 (RQ-USR-03-07, RQ-USR-03-09)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-125-T01",
+            "HU-CAP-123-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-125-T03",
+          "titulo": "Casos de uso: Configurar el descuento del personal y exportar el mes",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-125-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-125-T04",
+          "titulo": "Endpoints y eventos de FT-USR-03 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-125-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-125-T05",
+          "titulo": "Pantalla React: Configurar el descuento del personal y exportar el mes",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-125-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-125-T06",
+          "titulo": "Pruebas TC-CAP-125-01..04 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-125-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-176",
+      "tareas": [
+        {
+          "id": "HU-CAP-176-T01",
+          "titulo": "Revisar criterios de HU-CAP-176 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-176-T02",
+          "titulo": "Migración Prisma de las tablas de FT-USR-04 (auditoria, party, person, user_account, rol)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-176-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-176-T03",
+          "titulo": "Reglas de dominio de HU-CAP-176 (RQ-USR-04-01, RQ-USR-04-02, RQ-USR-04-03, RQ-USR-04-04, RQ-USR-04-05, RQ-USR-04-10, RQ-USR-04-11, RQ-USR-04-12)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-176-T01",
+            "HU-CAP-176-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-176-T04",
+          "titulo": "Casos de uso: Registrar automáticamente cambios, accesos y lecturas sensibles",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-176-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-176-T05",
+          "titulo": "Endpoints y eventos de FT-USR-04 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-176-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-176-T06",
+          "titulo": "Pruebas TC-CAP-176-01..08 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-176-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-177",
+      "tareas": [
+        {
+          "id": "HU-CAP-177-T01",
+          "titulo": "Revisar criterios de HU-CAP-177 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-177-T02",
+          "titulo": "Reglas de dominio de HU-CAP-177 (RQ-USR-04-06, RQ-USR-04-07, RQ-USR-04-08, RQ-USR-04-09)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-177-T01",
+            "HU-CAP-176-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-177-T03",
+          "titulo": "Casos de uso: Consultar el Historial de acciones y el historial de cada ficha",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-177-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-177-T04",
+          "titulo": "Endpoints y eventos de FT-USR-04 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-177-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-177-T05",
+          "titulo": "Pantalla React: Consultar el Historial de acciones y el historial de cada ficha",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-177-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-177-T06",
+          "titulo": "Pruebas TC-CAP-177-01..05 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-177-T05"
+          ]
+        }
+      ]
+    }
+  ]
+}

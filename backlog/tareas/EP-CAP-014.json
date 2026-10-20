@@ -1,0 +1,760 @@
+{
+  "epica": "EP-CAP-014",
+  "generado_por_ia": true,
+  "revisado_por": null,
+  "historias": [
+    {
+      "hu": "HU-CAP-126",
+      "tareas": [
+        {
+          "id": "HU-CAP-126-T01",
+          "titulo": "Revisar criterios de HU-CAP-126 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-126-T02",
+          "titulo": "Migración Prisma de las tablas de FT-BOT-01 (conversacion, mensaje_chat, pedido, comprobante_pago, solicitud_reserva)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-126-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-126-T03",
+          "titulo": "Reglas de dominio de HU-CAP-126 (RQ-BOT-01-01, RQ-BOT-01-02)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-126-T01",
+            "HU-CAP-126-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-126-T04",
+          "titulo": "Casos de uso: Elegir productos y opciones con botones en WhatsApp",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-126-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-126-T05",
+          "titulo": "Endpoints y eventos de FT-BOT-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-126-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-126-T06",
+          "titulo": "Pantalla React: Elegir productos y opciones con botones en WhatsApp",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-126-T05"
+          ]
+        },
+        {
+          "id": "HU-CAP-126-T07",
+          "titulo": "Pruebas TC-CAP-126-01..02 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-126-T06"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-127",
+      "tareas": [
+        {
+          "id": "HU-CAP-127-T01",
+          "titulo": "Revisar criterios de HU-CAP-127 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-127-T02",
+          "titulo": "Reglas de dominio de HU-CAP-127 (RQ-BOT-01-03, RQ-BOT-01-04)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-127-T01",
+            "HU-CAP-126-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-127-T03",
+          "titulo": "Casos de uso: Armar el carrito y dar la entrega en WhatsApp",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-127-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-127-T04",
+          "titulo": "Endpoints y eventos de FT-BOT-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-127-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-127-T05",
+          "titulo": "Pantalla React: Armar el carrito y dar la entrega en WhatsApp",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-127-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-127-T06",
+          "titulo": "Pruebas TC-CAP-127-01..02 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-127-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-128",
+      "tareas": [
+        {
+          "id": "HU-CAP-128-T01",
+          "titulo": "Revisar criterios de HU-CAP-128 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-128-T02",
+          "titulo": "Reglas de dominio de HU-CAP-128 (RQ-BOT-01-05, RQ-BOT-01-06, RQ-BOT-01-07)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-128-T01",
+            "HU-CAP-126-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-128-T03",
+          "titulo": "Casos de uso: Enviar el pedido del bot a caja",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-128-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-128-T04",
+          "titulo": "Endpoints y eventos de FT-BOT-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-128-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-128-T05",
+          "titulo": "Pantalla React: Enviar el pedido del bot a caja",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-128-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-128-T06",
+          "titulo": "Pruebas TC-CAP-128-01..03 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-128-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-129",
+      "tareas": [
+        {
+          "id": "HU-CAP-129-T01",
+          "titulo": "Revisar criterios de HU-CAP-129 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-129-T02",
+          "titulo": "Reglas de dominio de HU-CAP-129 (RQ-BOT-01-08)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-129-T01",
+            "HU-CAP-126-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-129-T03",
+          "titulo": "Casos de uso: Pasar a una persona cuando el bot no entiende",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-129-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-129-T04",
+          "titulo": "Endpoints y eventos de FT-BOT-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-129-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-129-T05",
+          "titulo": "Pantalla React: Pasar a una persona cuando el bot no entiende",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-129-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-129-T06",
+          "titulo": "Pruebas TC-CAP-129-01..01 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-129-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-130",
+      "tareas": [
+        {
+          "id": "HU-CAP-130-T01",
+          "titulo": "Revisar criterios de HU-CAP-130 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-130-T02",
+          "titulo": "Migración Prisma de las tablas de FT-BOT-02 (conversacion, mensaje_chat, pedido, comprobante_pago, solicitud_reserva)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-130-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-130-T03",
+          "titulo": "Reglas de dominio de HU-CAP-130 (RQ-BOT-02-01, RQ-BOT-02-02)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-130-T01",
+            "HU-CAP-130-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-130-T04",
+          "titulo": "Casos de uso: Recibir el mensaje del bot con mi pedido y los datos de pago",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-130-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-130-T05",
+          "titulo": "Endpoints y eventos de FT-BOT-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-130-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-130-T06",
+          "titulo": "Pantalla React: Recibir el mensaje del bot con mi pedido y los datos de pago",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-130-T05"
+          ]
+        },
+        {
+          "id": "HU-CAP-130-T07",
+          "titulo": "Pruebas TC-CAP-130-01..02 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-130-T06"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-131",
+      "tareas": [
+        {
+          "id": "HU-CAP-131-T01",
+          "titulo": "Revisar criterios de HU-CAP-131 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-131-T02",
+          "titulo": "Reglas de dominio de HU-CAP-131 (RQ-BOT-02-03, RQ-BOT-02-04, RQ-BOT-02-05)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-131-T01",
+            "HU-CAP-130-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-131-T03",
+          "titulo": "Casos de uso: Enviar mi captura y esperar la aprobación",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-131-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-131-T04",
+          "titulo": "Endpoints y eventos de FT-BOT-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-131-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-131-T05",
+          "titulo": "Pantalla React: Enviar mi captura y esperar la aprobación",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-131-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-131-T06",
+          "titulo": "Pruebas TC-CAP-131-01..04 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-131-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-132",
+      "tareas": [
+        {
+          "id": "HU-CAP-132-T01",
+          "titulo": "Revisar criterios de HU-CAP-132 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-132-T02",
+          "titulo": "Reglas de dominio de HU-CAP-132 (RQ-BOT-02-06, RQ-BOT-02-07, RQ-BOT-02-08)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-132-T01",
+            "HU-CAP-130-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-132-T03",
+          "titulo": "Casos de uso: Aprobar o rechazar un pago desde la consola",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-132-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-132-T04",
+          "titulo": "Endpoints y eventos de FT-BOT-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-132-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-132-T05",
+          "titulo": "Pantalla React: Aprobar o rechazar un pago desde la consola",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-132-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-132-T06",
+          "titulo": "Pruebas TC-CAP-132-01..03 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-132-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-133",
+      "tareas": [
+        {
+          "id": "HU-CAP-133-T01",
+          "titulo": "Revisar criterios de HU-CAP-133 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-133-T02",
+          "titulo": "Migración Prisma de las tablas de FT-BOT-03 (conversacion, mensaje_chat, pedido, comprobante_pago, solicitud_reserva)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-133-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-133-T03",
+          "titulo": "Reglas de dominio de HU-CAP-133 (RQ-BOT-03-01, RQ-BOT-03-02, RQ-BOT-03-03, RQ-BOT-03-04)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-133-T01",
+            "HU-CAP-133-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-133-T04",
+          "titulo": "Casos de uso: Preguntar una duda al bot",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-133-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-133-T05",
+          "titulo": "Endpoints y eventos de FT-BOT-03 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-133-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-133-T06",
+          "titulo": "Pantalla React: Preguntar una duda al bot",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-133-T05"
+          ]
+        },
+        {
+          "id": "HU-CAP-133-T07",
+          "titulo": "Pruebas TC-CAP-133-01..04 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-133-T06"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-134",
+      "tareas": [
+        {
+          "id": "HU-CAP-134-T01",
+          "titulo": "Revisar criterios de HU-CAP-134 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-134-T02",
+          "titulo": "Reglas de dominio de HU-CAP-134 (RQ-BOT-03-05)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-134-T01",
+            "HU-CAP-133-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-134-T03",
+          "titulo": "Casos de uso: Pedir una reserva por WhatsApp",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-134-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-134-T04",
+          "titulo": "Endpoints y eventos de FT-BOT-03 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-134-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-134-T05",
+          "titulo": "Pantalla React: Pedir una reserva por WhatsApp",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-134-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-134-T06",
+          "titulo": "Pruebas TC-CAP-134-01..01 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-134-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-135",
+      "tareas": [
+        {
+          "id": "HU-CAP-135-T01",
+          "titulo": "Revisar criterios de HU-CAP-135 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-135-T02",
+          "titulo": "Reglas de dominio de HU-CAP-135 (RQ-BOT-03-06, RQ-BOT-03-07)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-135-T01",
+            "HU-CAP-133-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-135-T03",
+          "titulo": "Casos de uso: Pedir hablar con una persona",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-135-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-135-T04",
+          "titulo": "Endpoints y eventos de FT-BOT-03 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-135-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-135-T05",
+          "titulo": "Pantalla React: Pedir hablar con una persona",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-135-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-135-T06",
+          "titulo": "Pruebas TC-CAP-135-01..02 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-135-T05"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,79 @@
+{
+  "AlmacenResource": {
+    "module": "resource.almacen",
+    "methods": [],
+    "urls": [
+      "restaurantpe.almacen"
+    ]
+  },
+  "AreaproduccionResource": {
+    "module": "resource.areaproduccion",
+    "methods": [],
+    "urls": [
+      "restaurantpe.almacen"
+    ]
+  },
+  "MermaResource": {
+    "module": "resource.merma",
+    "methods": [],
+    "urls": [
+      "restaurantpe.almacen"
+    ]
+  },
+  "MovimientoalmaceninsumoResource": {
+    "module": "resource.movimientoalmaceninsumo",
+    "methods": [],
+    "urls": [
+      "restaurantpe.almacen"
+    ]
+  },
+  "DetallemermaResource": {
+    "module": "resource.detallemerma",
+    "methods": [],
+    "urls": [
+      "restaurantpe.almacen"
+    ]
+  },
+  "MovimientoResource": {
+    "module": "resource.movimiento",
+    "methods": [],
+    "urls": [
+      "restaurantpe.almacen"
+    ]
+  },
+  "DetallemovimientoResource": {
+    "module": "resource.detallemovimiento",
+    "methods": [],
+    "urls": [
+      "restaurantpe.almacen"
+    ]
+  },
+  "OrdenproduccionResource": {
+    "module": "resource.ordenproduccion",
+    "methods": [],
+    "urls": [
+      "restaurantpe.almacen"
+    ]
+  },
+  "DetalleordenproduccionResource": {
+    "module": "resource.detalleordenproduccion",
+    "methods": [],
+    "urls": [
+      "restaurantpe.almacen"
+    ]
+  },
+  "RequerimientomovimientoResource": {
+    "module": "resource.requerimientomovimiento",
+    "methods": [],
+    "urls": [
+      "restaurantpe.almacen"
+    ]
+  },
+  "DetallerequerimientoResource": {
+    "module": "resource.detallerequerimiento",
+    "methods": [],
+    "urls": [
+      "restaurantpe.almacen"
+    ]
+  }
+}

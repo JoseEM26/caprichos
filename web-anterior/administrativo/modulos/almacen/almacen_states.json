@@ -1,0 +1,499 @@
+{
+  "almacen": {
+    "url": "/almacen",
+    "controller": null,
+    "acl": "ajustes.produccionyalmacenes",
+    "templates": [
+      "scripts/common/content/content.html",
+      "scripts/restaurantpe/almacen/index.html",
+      "scripts/restaurantpe/almacen/almacen-breadcrumb.html"
+    ],
+    "raw": "{url:\"/almacen\",acl:\"ajustes.produccionyalmacenes\",views:{\"\":{templateUrl:\"scripts/common/content/content.html\"},\"@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/index.html\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/almacen-breadcrumb.html\"}}}"
+  },
+  "almacen.kardex": {
+    "url": "/kardex",
+    "controller": null,
+    "acl": "almacen.kardex",
+    "templates": [],
+    "raw": "{url:\"/kardex\",acl:\"almacen.kardex\",redirectTo:\"almacen.kardex.individual\"}"
+  },
+  "almacen.kardex.individual": {
+    "url": "/individual",
+    "controller": "KardexCtrl as vm",
+    "acl": "almacen.kardex",
+    "templates": [
+      "scripts/restaurantpe/almacen/kardex/individual.html",
+      "scripts/restaurantpe/almacen/kardex/breadcrumb-kardex-individual.html"
+    ],
+    "raw": "{url:\"/individual\",acl:\"almacen.kardex\",views:{\"@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/kardex/individual.html\",controller:\"KardexCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/kardex/breadcrumb-kardex-individual.html\"}},data:{pageTitle:\"Kardex individual\"}}"
+  },
+  "almacen.kardex.general": {
+    "url": "/general",
+    "controller": "KardexCtrl as vm",
+    "acl": "almacen.kardex",
+    "templates": [
+      "scripts/restaurantpe/almacen/kardex/general.html",
+      "scripts/restaurantpe/almacen/kardex/breadcrumb-kardex-general.html"
+    ],
+    "raw": "{url:\"/general\",acl:\"almacen.kardex\",views:{\"@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/kardex/general.html\",controller:\"KardexCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/kardex/breadcrumb-kardex-general.html\"}},data:{pageTitle:\"Kardex general\"}}"
+  },
+  "almacen.kardex.avanzado": {
+    "url": "/avanzado",
+    "controller": "KardexCtrl as vm",
+    "acl": "almacen.kardex",
+    "templates": [
+      "scripts/restaurantpe/almacen/kardex/avanzado.html",
+      "scripts/restaurantpe/almacen/kardex/breadcrumb-kardex-avanzado.html"
+    ],
+    "raw": "{url:\"/avanzado\",acl:\"almacen.kardex\",views:{\"@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/kardex/avanzado.html\",controller:\"KardexCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/kardex/breadcrumb-kardex-avanzado.html\"}},data:{pageTitle:\"Kardex general\"}}"
+  },
+  "almacen.stock": {
+    "url": "/stock",
+    "controller": "StockCtrl as vm",
+    "acl": "almacen.stock",
+    "templates": [
+      "scripts/restaurantpe/almacen/stock/stock.html",
+      "scripts/restaurantpe/almacen/stock/breadcrumb-stock.html"
+    ],
+    "raw": "{url:\"/stock\",acl:\"almacen.stock\",views:{\"\":{templateUrl:\"scripts/restaurantpe/almacen/stock/stock.html\",controller:\"StockCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/stock/breadcrumb-stock.html\"}}}"
+  },
+  "almacen.stockCheckActivo": {
+    "url": "/stock/:activarCheckStockBajo",
+    "controller": "StockCtrl as vm",
+    "acl": "almacen.stock",
+    "templates": [
+      "scripts/restaurantpe/almacen/stock/stock.html",
+      "scripts/restaurantpe/almacen/stock/breadcrumb-stock.html"
+    ],
+    "raw": "{url:\"/stock/:activarCheckStockBajo\",acl:\"almacen.stock\",views:{\"\":{templateUrl:\"scripts/restaurantpe/almacen/stock/stock.html\",controller:\"StockCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/stock/breadcrumb-stock.html\"}}}"
+  },
+  "almacen.listaregularstock": {
+    "url": "/ultimos-cuadres",
+    "controller": "InformeCuadreStockCtrl as vm",
+    "acl": "almacen.stock",
+    "templates": [
+      "scripts/restaurantpe/informes/inventario/cuadrestockmanual.html",
+      "scripts/restaurantpe/almacen/regularstock/breadcrumb-listastock.html"
+    ],
+    "raw": "{url:\"/ultimos-cuadres\",acl:\"almacen.stock\",views:{\"\":{templateUrl:\"scripts/restaurantpe/informes/inventario/cuadrestockmanual.html\",controller:\"InformeCuadreStockCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/regularstock/breadcrumb-listastock.html\"}}}"
+  },
+  "almacen.regularstock": {
+    "url": "/regular-stock",
+    "controller": "RegularStockCtrl as vm",
+    "acl": "almacen.stock",
+    "templates": [
+      "scripts/restaurantpe/almacen/regularstock/regularstock.html",
+      "scripts/restaurantpe/almacen/regularstock/breadcrumb-stock.html"
+    ],
+    "raw": "{url:\"/regular-stock\",acl:\"almacen.stock\",views:{\"\":{templateUrl:\"scripts/restaurantpe/almacen/regularstock/regularstock.html\",controller:\"RegularStockCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/regularstock/breadcrumb-stock.html\"}}}"
+  },
+  "almacen.merma": {
+    "url": "/merma",
+    "controller": "MermaCtrl as vm",
+    "acl": "almacen.merma",
+    "templates": [
+      "scripts/restaurantpe/almacen/merma/merma.html",
+      "scripts/restaurantpe/almacen/merma/breadcrumb-merma.html"
+    ],
+    "raw": "{url:\"/merma\",acl:\"almacen.merma\",views:{\"\":{templateUrl:\"scripts/restaurantpe/almacen/merma/merma.html\",controller:\"MermaCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/merma/breadcrumb-merma.html\"}}}"
+  },
+  "almacen.merma.nuevo": {
+    "url": "/nuevo",
+    "controller": "MermaNuevoCtrl as vm",
+    "acl": "almacen.merma",
+    "templates": [
+      "scripts/restaurantpe/almacen/merma/merma-nuevo.html",
+      "scripts/restaurantpe/almacen/merma/breadcrumb-merma-nuevo.html"
+    ],
+    "raw": "{url:\"/nuevo\",acl:\"almacen.merma\",views:{\"@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/merma/merma-nuevo.html\",controller:\"MermaNuevoCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/merma/breadcrumb-merma-nuevo.html\"}}}"
+  },
+  "almacen.guia": {
+    "url": "/guiaremision",
+    "controller": "GuiasRemisionCtrl as vm",
+    "acl": "almacen.guiaremision.venta",
+    "templates": [
+      "scripts/restaurantpe/almacen/guiaremision/guia-lista.html",
+      "scripts/restaurantpe/almacen/guiaremision/breadcrumb-guia-lista.html"
+    ],
+    "raw": "{url:\"/guiaremision\",acl:\"almacen.guiaremision.venta\",views:{\"\":{templateUrl:\"scripts/restaurantpe/almacen/guiaremision/guia-lista.html\",controller:\"GuiasRemisionCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/guiaremision/breadcrumb-guia-lista.html\"}}}"
+  },
+  "almacen.guia.nuevo": {
+    "url": "/nuevo",
+    "controller": "GuiasRemisionNuevoCtrl as vm",
+    "acl": "almacen.guiaremision.venta",
+    "templates": [
+      "scripts/restaurantpe/almacen/guiaremision/guia-nuevo.html",
+      "scripts/restaurantpe/almacen/guiaremision/breadcrumb-guia-n2.html"
+    ],
+    "raw": "{url:\"/nuevo\",acl:\"almacen.guiaremision.venta\",views:{\"@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/guiaremision/guia-nuevo.html\",controller:\"GuiasRemisionNuevoCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/guiaremision/breadcrumb-guia-n2.html\"}}}"
+  },
+  "almacen.guia.editar": {
+    "url": "/editar/:idGuiaremision",
+    "controller": "GuiasRemisionNuevoCtrl as vm",
+    "acl": "almacen.guiaremision.venta",
+    "templates": [
+      "scripts/restaurantpe/almacen/guiaremision/guia-editar.html",
+      "scripts/restaurantpe/almacen/guiaremision/breadcrumb-guia-n2.html"
+    ],
+    "raw": "{url:\"/editar/:idGuiaremision\",acl:\"almacen.guiaremision.venta\",views:{\"@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/guiaremision/guia-editar.html\",controller:\"GuiasRemisionNuevoCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/guiaremision/breadcrumb-guia-n2.html\"}}}"
+  },
+  "almacen.ordenguiaremision": {
+    "url": "/ordenguiaremision",
+    "controller": "OrdenGuiasRemisionCtrl as vm",
+    "acl": "almacen.guiaremision.venta",
+    "templates": [
+      "scripts/restaurantpe/almacen/ordenguiaremision/guia-lista.html",
+      "scripts/restaurantpe/almacen/ordenguiaremision/breadcrumb-guia-lista.html"
+    ],
+    "raw": "{url:\"/ordenguiaremision\",acl:\"almacen.guiaremision.venta\",views:{\"\":{templateUrl:\"scripts/restaurantpe/almacen/ordenguiaremision/guia-lista.html\",controller:\"OrdenGuiasRemisionCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/ordenguiaremision/breadcrumb-guia-lista.html\"}}}"
+  },
+  "almacen.ordenguiaremision.nuevo": {
+    "url": "/nuevo",
+    "controller": "OrdenGuiasRemisionNuevoCtrl as vm",
+    "acl": "almacen.guiaremision.venta",
+    "templates": [
+      "scripts/restaurantpe/almacen/ordenguiaremision/guia-nuevo.html",
+      "scripts/restaurantpe/almacen/ordenguiaremision/breadcrumb-guia-n2.html"
+    ],
+    "raw": "{url:\"/nuevo\",acl:\"almacen.guiaremision.venta\",views:{\"@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/ordenguiaremision/guia-nuevo.html\",controller:\"OrdenGuiasRemisionNuevoCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/ordenguiaremision/breadcrumb-guia-n2.html\"}}}"
+  },
+  "almacen.ordenguiaremision.editar": {
+    "url": "/editar/:idOrdenguiaremision",
+    "controller": "OrdenGuiasRemisionNuevoCtrl as vm",
+    "acl": "almacen.guiaremision.venta",
+    "templates": [
+      "scripts/restaurantpe/almacen/ordenguiaremision/guia-editar.html",
+      "scripts/restaurantpe/almacen/ordenguiaremision/breadcrumb-guia-n2.html"
+    ],
+    "raw": "{url:\"/editar/:idOrdenguiaremision\",acl:\"almacen.guiaremision.venta\",views:{\"@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/ordenguiaremision/guia-editar.html\",controller:\"OrdenGuiasRemisionNuevoCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/ordenguiaremision/breadcrumb-guia-n2.html\"}}}"
+  },
+  "almacen.procesarstock": {
+    "url": "/ultimos-procesos",
+    "controller": "ProcesarStockCtrl as vm",
+    "acl": "almacen.stock",
+    "templates": [
+      "scripts/restaurantpe/almacen/procesarstock/lista.html",
+      "scripts/restaurantpe/almacen/procesarstock/breadcrumb-lista.html"
+    ],
+    "raw": "{url:\"/ultimos-procesos\",acl:\"almacen.stock\",views:{\"\":{templateUrl:\"scripts/restaurantpe/almacen/procesarstock/lista.html\",controller:\"ProcesarStockCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/procesarstock/breadcrumb-lista.html\"}}}"
+  },
+  "almacen.procesarstock.procesar": {
+    "url": "/procesar",
+    "controller": "ProcesarStockCtrl as vm",
+    "acl": "almacen.stock",
+    "templates": [
+      "scripts/restaurantpe/almacen/procesarstock/procesarstock.html",
+      "scripts/restaurantpe/almacen/procesarstock/breadcrumb-procesarstock.html"
+    ],
+    "raw": "{url:\"/procesar\",acl:\"almacen.stock\",views:{\"@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/procesarstock/procesarstock.html\",controller:\"ProcesarStockCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/procesarstock/breadcrumb-procesarstock.html\"}}}"
+  },
+  "almacen.movimientoalmacen": {
+    "url": "/movimientoalmacen",
+    "controller": "MovimientoalmacenCtrl as vm",
+    "acl": "almacen.movimientoalmacen",
+    "templates": [
+      "scripts/restaurantpe/almacen/movimientoalmacen/movimientoalmacen.html",
+      "scripts/restaurantpe/almacen/movimientoalmacen/breadcrumb-movimientoalmacen.html"
+    ],
+    "raw": "{url:\"/movimientoalmacen\",acl:\"almacen.movimientoalmacen\",views:{\"@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/movimientoalmacen/movimientoalmacen.html\",controller:\"MovimientoalmacenCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/movimientoalmacen/breadcrumb-movimientoalmacen.html\"}}}"
+  },
+  "almacen.movimientoalmacen.nuevo": {
+    "url": "/nuevo/:avancemovimiento_id",
+    "controller": "MovimientoalmacenNuevoCtrl as vm",
+    "acl": "almacen.movimientoalmacen",
+    "templates": [
+      "scripts/restaurantpe/almacen/movimientoalmacen/movimientoalmacen-nuevo.html",
+      "scripts/restaurantpe/almacen/movimientoalmacen/breadcrumb-movimientoalmacen-nuevo.html"
+    ],
+    "raw": "{url:\"/nuevo/:avancemovimiento_id\",acl:\"almacen.movimientoalmacen\",views:{\"@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/movimientoalmacen/movimientoalmacen-nuevo.html\",controller:\"MovimientoalmacenNuevoCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/movimientoalmacen/breadcrumb-movimientoalmacen-nuevo.html\"}}}"
+  },
+  "almacen.movimientoalmacen.editar": {
+    "url": "/editar/:idMovimiento",
+    "controller": "MovimientoalmacenEditarCtrl as vm",
+    "acl": "almacen.movimientoalmacen",
+    "templates": [
+      "scripts/restaurantpe/almacen/movimientoalmacen/movimientoalmacen-nuevo.html",
+      "scripts/restaurantpe/almacen/movimientoalmacen/breadcrumb-movimientoalmacen-nuevo.html"
+    ],
+    "raw": "{url:\"/editar/:idMovimiento\",acl:\"almacen.movimientoalmacen\",views:{\"@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/movimientoalmacen/movimientoalmacen-nuevo.html\",controller:\"MovimientoalmacenEditarCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/movimientoalmacen/breadcrumb-movimientoalmacen-nuevo.html\"}}}"
+  },
+  "almacen.listarecetas": {
+    "url": "/listarecetas",
+    "controller": "PreparacionRecetaListaCtrl as vm",
+    "acl": "almacen.movimientoalmacen",
+    "templates": [
+      "scripts/restaurantpe/almacen/preparacionreceta/lista/receta.lista.view.html",
+      "scripts/restaurantpe/almacen/preparacionreceta/lista/breadcrumb-preparacionreceta.html"
+    ],
+    "raw": "{url:\"/listarecetas\",acl:\"almacen.movimientoalmacen\",views:{\"@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/preparacionreceta/lista/receta.lista.view.html\",controller:\"PreparacionRecetaListaCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/preparacionreceta/lista/breadcrumb-preparacionreceta.html\"}}}"
+  },
+  "almacen.preparacionreceta": {
+    "url": "/historial-preparacion/:idInsumo",
+    "controller": "PreparacionRecetaHistorialCtrl as vm",
+    "acl": "almacen.movimientoalmacen",
+    "templates": [
+      "scripts/restaurantpe/almacen/preparacionreceta/historial/receta.historial.view.html",
+      "scripts/restaurantpe/almacen/preparacionreceta/historial/breadcrumb-historial.html"
+    ],
+    "raw": "{url:\"/historial-preparacion/:idInsumo\",acl:\"almacen.movimientoalmacen\",views:{\"@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/preparacionreceta/historial/receta.historial.view.html\",controller:\"PreparacionRecetaHistorialCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/preparacionreceta/historial/breadcrumb-historial.html\"}}}"
+  },
+  "almacen.registrarpreparacion": {
+    "url": "/registrar-preparacion/:idInsumo",
+    "controller": "PreparacionRecetaCtrl as vm",
+    "acl": "almacen.movimientoalmacen",
+    "templates": [
+      "scripts/restaurantpe/almacen/preparacionreceta/registrar/recetas-detalle.html",
+      "scripts/restaurantpe/almacen/preparacionreceta/registrar/breadcrumb-registrar.html"
+    ],
+    "raw": "{url:\"/registrar-preparacion/:idInsumo\",acl:\"almacen.movimientoalmacen\",views:{\"@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/preparacionreceta/registrar/recetas-detalle.html\",controller:\"PreparacionRecetaCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/preparacionreceta/registrar/breadcrumb-registrar.html\"}}}"
+  },
+  "almacen.registrarpreparacionporordendeproduccion": {
+    "url": "/registrar-preparacion-por-orden-produccion/:idInsumo/:idOrdenproduccion/:idDetalleordenproduccion",
+    "controller": "PreparacionRecetaCtrl as vm",
+    "acl": "almacen.movimientoalmacen",
+    "templates": [
+      "scripts/restaurantpe/almacen/preparacionreceta/registrar/recetas-detalle.html",
+      "scripts/restaurantpe/almacen/preparacionreceta/registrar/breadcrumb-registrar.html"
+    ],
+    "raw": "{url:\"/registrar-preparacion-por-orden-produccion/:idInsumo/:idOrdenproduccion/:idDetalleordenproduccion\",acl:\"almacen.movimientoalmacen\",views:{\"@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/preparacionreceta/registrar/recetas-detalle.html\",controller:\"PreparacionRecetaCtrl as vm\",params:{idInsumo:null,idOrdenproduccion:null}},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/preparacionreceta/registrar/breadcrumb-registrar.html\"}}}"
+  },
+  "almacen.listaporcionamientos": {
+    "url": "/lista",
+    "controller": "PorcionamientoInsumoListaCtrl as vm",
+    "acl": "almacen.porcionamiento.insumos",
+    "templates": [
+      "scripts/restaurantpe/almacen/porcionamientoinsumo/lista/lista.view.html",
+      "scripts/restaurantpe/almacen/porcionamientoinsumo/lista/breadcrumb-porcionamientoinsumo.html"
+    ],
+    "raw": "{url:\"/lista\",acl:\"almacen.porcionamiento.insumos\",views:{\"@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/porcionamientoinsumo/lista/lista.view.html\",controller:\"PorcionamientoInsumoListaCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/porcionamientoinsumo/lista/breadcrumb-porcionamientoinsumo.html\"}}}"
+  },
+  "almacen.porcionamientoinsumo": {
+    "url": "/historial-porcionamiento/:idInsumo",
+    "controller": "PorcionamientoHistorialCtrl as vm",
+    "acl": "almacen.porcionamiento.insumos",
+    "templates": [
+      "scripts/restaurantpe/almacen/porcionamientoinsumo/historial/porcionamiento.historial.view.html"
+    ],
+    "raw": "{url:\"/historial-porcionamiento/:idInsumo\",acl:\"almacen.porcionamiento.insumos\",templateUrl:\"scripts/restaurantpe/almacen/porcionamientoinsumo/historial/porcionamiento.historial.view.html\",controller:\"PorcionamientoHistorialCtrl as vm\"}"
+  },
+  "almacen.registrarporcionamiento": {
+    "url": "/nuevo/:idInsumo",
+    "controller": "PorcionamientoInsumoRegistroCtrl as vm",
+    "acl": "almacen.movimientoalmacen",
+    "templates": [
+      "scripts/restaurantpe/almacen/porcionamientoinsumo/registrar/porcionamiento-detalle.html"
+    ],
+    "raw": "{url:\"/nuevo/:idInsumo\",acl:\"almacen.movimientoalmacen\",templateUrl:\"scripts/restaurantpe/almacen/porcionamientoinsumo/registrar/porcionamiento-detalle.html\",controller:\"PorcionamientoInsumoRegistroCtrl as vm\"}"
+  },
+  "almacen.ordenproduccion": {
+    "url": "/ordenproduccion",
+    "controller": "OrdenProduccionCtrl as vm",
+    "acl": "almacen.movimientoalmacen",
+    "templates": [
+      "scripts/restaurantpe/almacen/ordenproduccion/ordenproduccion.html",
+      "scripts/restaurantpe/almacen/ordenproduccion/breadcrumb-ordenproduccion.html"
+    ],
+    "raw": "{url:\"/ordenproduccion\",acl:\"almacen.movimientoalmacen\",views:{\"@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/ordenproduccion/ordenproduccion.html\",controller:\"OrdenProduccionCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/ordenproduccion/breadcrumb-ordenproduccion.html\"}}}"
+  },
+  "almacen.ordenproduccion.registrar": {
+    "url": "/registrar",
+    "controller": "OrdenProduccionRegistrarCtrl as vm",
+    "acl": "almacen.movimientoalmacen",
+    "templates": [
+      "scripts/restaurantpe/almacen/ordenproduccion/registrar/ordenproduccion-nueva.html",
+      "scripts/restaurantpe/almacen/ordenproduccion/registrar/breadcrumb-ordenproduccion-nueva.html"
+    ],
+    "raw": "{url:\"/registrar\",acl:\"almacen.movimientoalmacen\",views:{\"@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/ordenproduccion/registrar/ordenproduccion-nueva.html\",controller:\"OrdenProduccionRegistrarCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/ordenproduccion/registrar/breadcrumb-ordenproduccion-nueva.html\"}}}"
+  },
+  "almacen.ordenproduccion.preparar": {
+    "url": "/preparar",
+    "controller": "OrdenProduccionPrepararCtrl as vm",
+    "acl": "almacen.movimientoalmacen",
+    "templates": [
+      "scripts/restaurantpe/almacen/ordenproduccion/prepararorden/ordenproduccion-preparar.html",
+      "scripts/restaurantpe/almacen/ordenproduccion/prepararorden/breadcrumb-ordenproduccion-preparar.html"
+    ],
+    "raw": "{url:\"/preparar\",acl:\"almacen.movimientoalmacen\",views:{\"@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/ordenproduccion/prepararorden/ordenproduccion-preparar.html\",controller:\"OrdenProduccionPrepararCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/ordenproduccion/prepararorden/breadcrumb-ordenproduccion-preparar.html\"}}}"
+  },
+  "almacen.listaarqueoinventario": {
+    "url": "/ultimos-arqueos",
+    "controller": "InformeArqueoInventarioCtrl as vm",
+    "acl": "almacen.stock",
+    "templates": [
+      "scripts/restaurantpe/informes/inventario/informearqueoinventario/arqueoinventario.html",
+      "scripts/restaurantpe/informes/inventario/informearqueoinventario/bc-arqueoinventario.html"
+    ],
+    "raw": "{url:\"/ultimos-arqueos\",acl:\"almacen.stock\",views:{\"\":{templateUrl:\"scripts/restaurantpe/informes/inventario/informearqueoinventario/arqueoinventario.html\",controller:\"InformeArqueoInventarioCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/informes/inventario/informearqueoinventario/bc-arqueoinventario.html\"}}}"
+  },
+  "almacen.arqueoinventario": {
+    "url": "/registrar-arqueoinventario/:plantillaarqueoinventario_id",
+    "controller": "ArqueoInventarioCtrl as vm",
+    "acl": "almacen.stock",
+    "templates": [
+      "scripts/restaurantpe/almacen/arqueoinventario/arqueoinventario.html",
+      "scripts/restaurantpe/almacen/arqueoinventario/breadcrumb-arqueoinventario.html"
+    ],
+    "raw": "{url:\"/registrar-arqueoinventario/:plantillaarqueoinventario_id\",acl:\"almacen.stock\",views:{\"\":{templateUrl:\"scripts/restaurantpe/almacen/arqueoinventario/arqueoinventario.html\",controller:\"ArqueoInventarioCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/arqueoinventario/breadcrumb-arqueoinventario.html\"}}}"
+  },
+  "almacen.requerimientomovimiento": {
+    "url": "/requerimientomovimiento",
+    "controller": null,
+    "acl": "almacen.requerimientomovimiento",
+    "templates": [],
+    "raw": "{url:\"/requerimientomovimiento\",acl:\"almacen.requerimientomovimiento\",redirectTo:\"almacen.requerimientomovimiento.solicitud\"}"
+  },
+  "almacen.requerimientomovimiento.solicitud": {
+    "url": "/requerimientomovimiento",
+    "controller": "RequerimientomovimientoCtrl as vm",
+    "acl": "almacen.requerimientomovimiento",
+    "templates": [
+      "scripts/restaurantpe/almacen/requerimientomovimiento/requerimientomovimiento.html",
+      "scripts/restaurantpe/almacen/requerimientomovimiento/breadcrumb-requerimientomovimiento.html"
+    ],
+    "raw": "{url:\"/requerimientomovimiento\",acl:\"almacen.requerimientomovimiento\",views:{\"@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/requerimientomovimiento/requerimientomovimiento.html\",controller:\"RequerimientomovimientoCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/requerimientomovimiento/breadcrumb-requerimientomovimiento.html\"}}}"
+  },
+  "almacen.requerimientomovimiento.nuevo": {
+    "url": "/nuevo/:plantillaRequerimientoId",
+    "controller": "RequerimientomovimientoNuevoCtrl as vm",
+    "acl": "almacen.requerimientomovimiento",
+    "templates": [
+      "scripts/restaurantpe/almacen/requerimientomovimiento/requerimientomovimiento-nuevo.html",
+      "scripts/restaurantpe/almacen/requerimientomovimiento/breadcrumb-requerimientomovimiento-nuevo.html"
+    ],
+    "raw": "{url:\"/nuevo/:plantillaRequerimientoId\",acl:\"almacen.requerimientomovimiento\",views:{\"@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/requerimientomovimiento/requerimientomovimiento-nuevo.html\",controller:\"RequerimientomovimientoNuevoCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/requerimientomovimiento/breadcrumb-requerimientomovimiento-nuevo.html\"}}}"
+  },
+  "almacen.requerimientomovimiento.editar": {
+    "url": "/editar/:idRequerimiento",
+    "controller": "RequerimientomovimientoEditarCtrl as vm",
+    "acl": "almacen.requerimientomovimiento",
+    "templates": [
+      "scripts/restaurantpe/almacen/requerimientomovimiento/requerimientomovimiento-nuevo.html",
+      "scripts/restaurantpe/almacen/requerimientomovimiento/breadcrumb-requerimientomovimiento-nuevo.html"
+    ],
+    "raw": "{url:\"/editar/:idRequerimiento\",acl:\"almacen.requerimientomovimiento\",views:{\"@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/requerimientomovimiento/requerimientomovimiento-nuevo.html\",controller:\"RequerimientomovimientoEditarCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/requerimientomovimiento/breadcrumb-requerimientomovimiento-nuevo.html\"}}}"
+  },
+  "almacen.requerimientomovimiento.generarmovimiento": {
+    "url": "/generarmovimiento/:idRequerimiento",
+    "controller": "GenerarRequerimientomovimientoCtrl as vm",
+    "acl": "almacen.aprobarrequerimiento",
+    "templates": [
+      "scripts/restaurantpe/almacen/requerimientomovimiento/generarmovimiento.html",
+      "scripts/restaurantpe/almacen/requerimientomovimiento/breadcrumb-generar-movimiento.html"
+    ],
+    "raw": "{url:\"/generarmovimiento/:idRequerimiento\",acl:\"almacen.aprobarrequerimiento\",views:{\"@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/requerimientomovimiento/generarmovimiento.html\",controller:\"GenerarRequerimientomovimientoCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/requerimientomovimiento/breadcrumb-generar-movimiento.html\"}}}"
+  },
+  "almacen.requerimientomovimiento.seleccion": {
+    "url": "/seleccion",
+    "controller": "RequerimientomovimientoSeleccionCtrl as vm",
+    "acl": "almacen.aprobarrequerimiento",
+    "templates": [
+      "scripts/restaurantpe/almacen/requerimientomovimiento/seleccion/requerimientomovimiento-seleccion.html",
+      "scripts/restaurantpe/almacen/requerimientomovimiento/seleccion/breadcrumb-seleccion-requerimiento.html"
+    ],
+    "raw": "{url:\"/seleccion\",acl:\"almacen.aprobarrequerimiento\",views:{\"@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/requerimientomovimiento/seleccion/requerimientomovimiento-seleccion.html\",controller:\"RequerimientomovimientoSeleccionCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/requerimientomovimiento/seleccion/breadcrumb-seleccion-requerimiento.html\"}}}"
+  },
+  "almacen.requerimientomovimiento.revision": {
+    "url": "/revision",
+    "controller": "RequerimientomovimientoRevisionCtrl as vm",
+    "acl": "almacen.aprobarrequerimiento",
+    "templates": [
+      "scripts/restaurantpe/almacen/requerimientomovimiento/revision/requerimientomovimiento-revision.html",
+      "scripts/restaurantpe/almacen/requerimientomovimiento/revision/breadcrumb-revision-requerimiento.html"
+    ],
+    "raw": "{url:\"/revision\",acl:\"almacen.aprobarrequerimiento\",views:{\"@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/requerimientomovimiento/revision/requerimientomovimiento-revision.html\",controller:\"RequerimientomovimientoRevisionCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/requerimientomovimiento/revision/breadcrumb-revision-requerimiento.html\"}}}"
+  },
+  "almacen.requerimientomovimiento.listaprocesos": {
+    "url": "/listaprocesos",
+    "controller": "RequerimientomovimientoProcesoListCtrl as vm",
+    "acl": "almacen.aprobarrequerimiento",
+    "templates": [
+      "scripts/restaurantpe/almacen/requerimientomovimiento/procesar/requerimientomovimiento-procesarlist.html",
+      "scripts/restaurantpe/almacen/requerimientomovimiento/procesar/breadcrumb-procesarlist-requerimiento.html"
+    ],
+    "raw": "{url:\"/listaprocesos\",acl:\"almacen.aprobarrequerimiento\",views:{\"@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/requerimientomovimiento/procesar/requerimientomovimiento-procesarlist.html\",controller:\"RequerimientomovimientoProcesoListCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/requerimientomovimiento/procesar/breadcrumb-procesarlist-requerimiento.html\"}}}"
+  },
+  "almacen.requerimientomovimiento.proceso": {
+    "url": "/proceso/:idLoteRequerimiento/:estadoLoteRequerimiento",
+    "controller": "RequerimientomovimientoProcesoCtrl as vm",
+    "acl": "almacen.aprobarrequerimiento",
+    "templates": [
+      "scripts/restaurantpe/almacen/requerimientomovimiento/procesar/requerimientomovimiento-procesar.html",
+      "scripts/restaurantpe/almacen/requerimientomovimiento/procesar/breadcrumb-procesar-requerimiento.html"
+    ],
+    "raw": "{url:\"/proceso/:idLoteRequerimiento/:estadoLoteRequerimiento\",acl:\"almacen.aprobarrequerimiento\",views:{\"@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/requerimientomovimiento/procesar/requerimientomovimiento-procesar.html\",controller:\"RequerimientomovimientoProcesoCtrl as vm\"},\"breadcrumb@almacen\":{templateUrl:\"scripts/restaurantpe/almacen/requerimientomovimiento/procesar/breadcrumb-procesar-requerimiento.html\"}}}"
+  },
+  "almacen.requerimientomovimiento.movimiento": {
+    "url": "/requerimientos/movimiento",
+    "controller": "movimientoCrtl as vm",
+    "acl": "almacen.requerimientomovimiento",
+    "templates": [
+      "scripts/restaurantpe/almacen/movimientointerno/movimientointerno.html"
+    ],
+    "raw": "{url:\"/requerimientos/movimiento\",acl:\"almacen.requerimientomovimiento\",views:{\"\":{templateUrl:\"scripts/restaurantpe/almacen/movimientointerno/movimientointerno.html\",controller:\"movimientoCrtl as vm\"}},data:{pageTitle:\"\"}}"
+  },
+  "almacen.requerimientomovimiento.requerimieentos": {
+    "url": "/requerimientos/nuevo-requerimiento",
+    "controller": "requeriemintoCrtl as vm",
+    "acl": "almacen.requerimientomovimiento",
+    "templates": [
+      "scripts/restaurantpe/almacen/requerimientov2/requerimientos.view.html"
+    ],
+    "raw": "{url:\"/requerimientos/nuevo-requerimiento\",acl:\"almacen.requerimientomovimiento\",views:{\"\":{templateUrl:\"scripts/restaurantpe/almacen/requerimientov2/requerimientos.view.html\",controller:\"requeriemintoCrtl as vm\"}},data:{pageTitle:\"\"}}"
+  },
+  "almacen.requerimientomovimiento.recepcion": {
+    "url": "/requerimientos/nuevo-recepcion",
+    "controller": "RecepcionCtrl as vm",
+    "acl": "almacen.requerimientomovimiento",
+    "templates": [
+      "scripts/restaurantpe/almacen/recepcion/recepcion.view.html"
+    ],
+    "raw": "{url:\"/requerimientos/nuevo-recepcion\",acl:\"almacen.requerimientomovimiento\",views:{\"\":{templateUrl:\"scripts/restaurantpe/almacen/recepcion/recepcion.view.html\",controller:\"RecepcionCtrl as vm\"}},data:{pageTitle:\"\"}}"
+  },
+  "almacen.requerimientomovimiento.listado": {
+    "url": "/requerimientos/listados-requerimientos",
+    "controller": "requeriemintoCrtl as vm",
+    "acl": "almacen.requerimientomovimiento",
+    "templates": [
+      "scripts/restaurantpe/almacen/requerimientov2/requerimientos.view.html"
+    ],
+    "raw": "{url:\"/requerimientos/listados-requerimientos\",acl:\"almacen.requerimientomovimiento\",views:{\"\":{templateUrl:\"scripts/restaurantpe/almacen/requerimientov2/requerimientos.view.html\",controller:\"requeriemintoCrtl as vm\"}},data:{pageTitle:\"\"}}"
+  },
+  "almacen.requerimientomovimiento.listprocesos": {
+    "url": "/requerimientos/lista-de-proceso",
+    "controller": "listaprocesooCrtl as vm",
+    "acl": "almacen.requerimientomovimiento",
+    "templates": [
+      "scripts/restaurantpe/almacen/lista-procesos/lista-de-procesos.view.html"
+    ],
+    "raw": "{url:\"/requerimientos/lista-de-proceso\",acl:\"almacen.requerimientomovimiento\",views:{\"\":{templateUrl:\"scripts/restaurantpe/almacen/lista-procesos/lista-de-procesos.view.html\",controller:\"listaprocesooCrtl as vm\"}},data:{pageTitle:\"\"}}"
+  },
+  "almacen.requerimientomovimiento.procesosdetalle": {
+    "url": "/requerimientos/detalle-de-proceso/:idRequerimiento",
+    "controller": "ProcesoRequerimientoDetalleCtrl as vm",
+    "acl": "almacen.requerimientomovimiento",
+    "templates": [
+      "scripts/restaurantpe/almacen/lista-procesos/proceso-detalle.view.html"
+    ],
+    "raw": "{url:\"/requerimientos/detalle-de-proceso/:idRequerimiento\",acl:\"almacen.requerimientomovimiento\",views:{\"\":{templateUrl:\"scripts/restaurantpe/almacen/lista-procesos/proceso-detalle.view.html\",controller:\"ProcesoRequerimientoDetalleCtrl as vm\"}},data:{pageTitle:\"\"}}"
+  },
+  "almacen.requerimientomovimiento.recepciondetalle": {
+    "url": "/requerimientos/detalle-de-recepcion/:idMovimientoInterno",
+    "controller": "RecepcionDetalleCtrl as vm",
+    "acl": "almacen.requerimientomovimiento",
+    "templates": [
+      "scripts/restaurantpe/almacen/lista-procesos/recepcion-detalle.view.html"
+    ],
+    "raw": "{url:\"/requerimientos/detalle-de-recepcion/:idMovimientoInterno\",acl:\"almacen.requerimientomovimiento\",views:{\"\":{templateUrl:\"scripts/restaurantpe/almacen/lista-procesos/recepcion-detalle.view.html\",controller:\"RecepcionDetalleCtrl as vm\"}},data:{pageTitle:\"\"}}"
+  },
+  "almacen.requerimientomovimiento.movimientodetalle": {
+    "url": "/requerimientos/detalle-de-movimiento/:idMovimientoInterno",
+    "controller": "MovimientoInternoDetalleCtrl as vm",
+    "acl": "almacen.requerimientomovimiento",
+    "templates": [
+      "scripts/restaurantpe/almacen/lista-procesos/movimiento-detalle.view.html",
+      "scripts/restaurantpe/informes/ventas/modals/modal-detalle.html",
+      "scripts/restaurantpe/informes/compras/modal-detalle.html"
+    ],
+    "raw": "{url:\"/requerimientos/detalle-de-movimiento/:idMovimientoInterno\",acl:\"almacen.requerimientomovimiento\",views:{\"\":{templateUrl:\"scripts/restaurantpe/almacen/lista-procesos/movimiento-detalle.view.html\",controller:\"MovimientoInternoDetalleCtrl as vm\"}},data:{pageTitle:\"\"}})}e.$inject=[\"$stateProvider\"],angular.module(\"restaurantpe.almacen\").config(e)})(),(()=>{function e(e){e.translations(\"es\",{CLIENTES:\"Almacen\"}).translations(\"en\",{CLIENTES:\"Warehouse\"})}e.$inject=[\"$translateProvider\"],angular"
+  }
+}

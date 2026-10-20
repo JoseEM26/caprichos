@@ -1,0 +1,67 @@
+---
+id: HU-CAP-148
+tipo: hu
+titulo: "Editar la carta en la vista del cliente"
+estado: draft
+producto: caprichos
+version: "1.0"
+owner: "José Ángel Espinoza"
+aprobadores: []
+fecha: 2026-10-20
+relacionados: [EP-CAP-016, FT-CON-02, RQ-CON-02-01, RQ-CON-02-02, RQ-CON-02-03, HU-CAP-149, HU-CAP-150, ADR-001, ADR-011, ADR-014, ADR-003, ADR-012, DEP-02, DEP-06, R-01]
+tags: [hu, contenidos, capa-a, ft-con-02, media, ui]
+---
+
+# FORMATO DE HISTORIA DE USUARIO
+
+| ID / Código | HU-CAP-148 | Título | Editar la carta en la vista del cliente |
+|---|---|---|---|
+| **Épica / Módulo** | EP-CAP-016 · FT-CON-02 | **Sprint / Release** | H1 · piloto en el local · 28/12/2026 (supuesto, D-19) |
+
+| Prioridad | Estado | Responsable | Estimación |
+|---|---|---|---|
+| Media | Draft | José Ángel Espinoza (asignación propuesta, DT-07) | por estimar (Bloque 5) |
+
+## 01 | NECESIDAD DEL USUARIO
+
+| COMO | QUIERO | PARA |
+|---|---|---|
+| **ACT-CAP-001** Kevin Rosales, dueño y administrador | editar la carta en la vista del cliente | cambiar la carta viendo exactamente lo que verá el cliente |
+
+## 02 | CONTEXTO Y ALCANCE
+
+| CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
+|---|---|
+| **Contexto.** Historia de FT-CON-02 «Diseñador de la carta y decoración» (Debería tener, épica EP-CAP-016). Cubre los requerimientos: **RQ-CON-02-01** El administrador edita la carta en una vista igual a la del cliente. **RQ-CON-02-02** Cambia el orden de productos y categorías arrastrando. **RQ-CON-02-03** Cambia fotos, textos y precios y oculta productos desde la vista. | **Alcance.**<br>• El administrador edita la carta en una vista igual a la del cliente.<br>• Cambia el orden de productos y categorías arrastrando.<br>• Cambia fotos, textos y precios y oculta productos desde la vista. |
+| **Problema.** Cambiar la carta sin formularios técnicos y sin errores visibles para el cliente hasta publicar. | **Fuera de alcance.**<br>• HU-CAP-149: Elegir organización y decoración festiva.<br>• HU-CAP-150: Publicar o descartar los cambios.<br>• Crear productos y opciones: FT-CON-01.<br>• Novedades y destacadas: FT-CON-03. |
+
+## 03 | CRITERIOS DE ACEPTACIÓN
+
+| N.° | DADO | CUANDO | ENTONCES |
+|---|---|---|---|
+| CA-1 | el diseñador | lo abre | ve la carta con su cabecera, categorías y productos como el cliente, con controles de edición (RQ-CON-02-01) |
+| CA-2 | Postres después de Frappés | arrastra Postres antes | la vista previa cambia al momento (RQ-CON-02-02) |
+| CA-3 | un producto | cambia su foto y su precio | la vista previa lo muestra y queda pendiente de publicar (RQ-CON-02-03) |
+
+Origen: criterios de verificación de FT-CON-02 (RQ-CON-02-01, RQ-CON-02-02, RQ-CON-02-03); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
+
+## 04 | REGLAS, DEPENDENCIAS Y EVIDENCIAS
+
+| REGLAS DE NEGOCIO | DATOS Y VALIDACIONES |
+|---|---|
+| **RB-01** (RN-CAP-018) Los cambios de la carta se publican con una acción explícita.<br>**RNF aplicables:** RNF-CAP-012, RNF-CAP-009, RNF-CAP-001. | `Producto` · `Categoria` (lleva opciones o fija, oculta) · `Lista`/`ElementoLista` (por categoría, sin repetir) · `GrupoOpciones` (alcance por producto o categoría) · `VersionCarta` (borrador, publicada, organización, decoración) · `Novedad` (tipo, tema, fotos, vigencia, orden) · `Destacada` (fotos, portada, archivada).<br>*(Entidades propuestas; detalle y tablas en `datos/DAT-CAP-001-modelo-de-datos.md`, se aprueba en G3.)*<br>**Validaciones:** cada cambio guarda autor y fecha. |
+| **DEPENDENCIAS / RIESGOS** | **DISEÑO / ADJUNTOS** |
+| • FT-CON-01.<br>• **DEP-02** plataforma y hosting: propuestos en ADR-001 y ADR-011, pendientes de aprobación en G3.<br>• **DEP-06** mockup en Figma o aceptación del mockup navegable como diseño (G2).<br>• Riesgos: R-01 (roadmap PLT-01). | • Mockup en Figma: (pendiente UX — G2, DEP-06).<br>• Referencia mientras tanto: mockup navegable (DT-04), Administrativo ▸ Diseño de la carta (vista del cliente, decoración, publicar) (`Admin.dc.html`).<br>• Contrato de API: `arquitectura/ARQ-CAP-002-catalogo-de-api-y-eventos.md`, módulo de FT-CON-02 (borrador, se aprueba en G3).<br>• ADR (propuestos): ADR-001, ADR-011, ADR-014, ADR-003, ADR-012.<br>• Modelo de datos: `datos/DAT-CAP-001-modelo-de-datos.md`. |
+
+## 05 | CHECKLIST DE CALIDAD
+
+| DEFINITION OF READY (DoR) | DEFINITION OF DONE (DoD) |
+|---|---|
+| ☑ Valor y usuario claros | ☐ Código revisado y pruebas aprobadas — no hay código: no se construye antes de G3 y G4 |
+| ☐ Criterios verificables — redactados en Dado/Cuando/Entonces; códigos de error por fijar con el contrato (G3) | ☐ Sin defectos críticos — nada construido que evaluar |
+| ☐ Diseño/reglas disponibles — las reglas sí; falta el mockup (DEP-06, G2) y aprobar ADR y contrato (G3) | ☐ Criterios cumplidos — sin ejecución |
+| ☑ Dependencias identificadas | ☐ Evidencia y documentación actualizadas — sin evidencia de pruebas ni enlaces de G2/G3 |
+
+**DoR: NO READY** hasta cerrar G2 y G3 (y con G0 y G1 aún sin aprobar).
+
+Generado por IA: historia derivada de FT-CON-02 (requerimientos RQ-CON-02-01, RQ-CON-02-02, RQ-CON-02-03, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)

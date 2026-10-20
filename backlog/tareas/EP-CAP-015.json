@@ -1,0 +1,616 @@
+{
+  "epica": "EP-CAP-015",
+  "generado_por_ia": true,
+  "revisado_por": null,
+  "historias": [
+    {
+      "hu": "HU-CAP-136",
+      "tareas": [
+        {
+          "id": "HU-CAP-136-T01",
+          "titulo": "Revisar criterios de HU-CAP-136 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-136-T02",
+          "titulo": "Migración Prisma de las tablas de FT-ATN-01 (conversacion, mensaje_chat, respuesta_rapida, solicitud_cambio, pedido)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-136-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-136-T03",
+          "titulo": "Reglas de dominio de HU-CAP-136 (RQ-ATN-01-01)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-136-T01",
+            "HU-CAP-136-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-136-T04",
+          "titulo": "Casos de uso: Ver y filtrar los chats en la consola",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-136-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-136-T05",
+          "titulo": "Endpoints y eventos de FT-ATN-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-136-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-136-T06",
+          "titulo": "Pantalla React: Ver y filtrar los chats en la consola",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-136-T05"
+          ]
+        },
+        {
+          "id": "HU-CAP-136-T07",
+          "titulo": "Pruebas TC-CAP-136-01..01 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-136-T06"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-137",
+      "tareas": [
+        {
+          "id": "HU-CAP-137-T01",
+          "titulo": "Revisar criterios de HU-CAP-137 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-137-T02",
+          "titulo": "Reglas de dominio de HU-CAP-137 (RQ-ATN-01-02, RQ-ATN-01-03, RQ-ATN-01-04, RQ-ATN-01-09)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-137-T01",
+            "HU-CAP-136-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-137-T03",
+          "titulo": "Casos de uso: Tomar, soltar y marcar atendido un chat",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-137-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-137-T04",
+          "titulo": "Endpoints y eventos de FT-ATN-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-137-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-137-T05",
+          "titulo": "Pantalla React: Tomar, soltar y marcar atendido un chat",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-137-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-137-T06",
+          "titulo": "Pruebas TC-CAP-137-01..04 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-137-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-138",
+      "tareas": [
+        {
+          "id": "HU-CAP-138-T01",
+          "titulo": "Revisar criterios de HU-CAP-138 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-138-T02",
+          "titulo": "Reglas de dominio de HU-CAP-138 (RQ-ATN-01-05, RQ-ATN-01-06, RQ-ATN-01-07, RQ-ATN-01-08)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-138-T01",
+            "HU-CAP-136-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-138-T03",
+          "titulo": "Casos de uso: Responder con respuestas rápidas y pulir el mensaje",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-138-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-138-T04",
+          "titulo": "Endpoints y eventos de FT-ATN-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-138-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-138-T05",
+          "titulo": "Pantalla React: Responder con respuestas rápidas y pulir el mensaje",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-138-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-138-T06",
+          "titulo": "Pruebas TC-CAP-138-01..04 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-138-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-139",
+      "tareas": [
+        {
+          "id": "HU-CAP-139-T01",
+          "titulo": "Revisar criterios de HU-CAP-139 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-139-T02",
+          "titulo": "Migración Prisma de las tablas de FT-ATN-02 (conversacion, mensaje_chat, respuesta_rapida, solicitud_cambio, pedido)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-139-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-139-T03",
+          "titulo": "Reglas de dominio de HU-CAP-139 (RQ-ATN-02-01)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-139-T01",
+            "HU-CAP-139-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-139-T04",
+          "titulo": "Casos de uso: Preguntar por el estado de mi pedido",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-139-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-139-T05",
+          "titulo": "Endpoints y eventos de FT-ATN-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-139-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-139-T06",
+          "titulo": "Pantalla React: Preguntar por el estado de mi pedido",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-139-T05"
+          ]
+        },
+        {
+          "id": "HU-CAP-139-T07",
+          "titulo": "Pruebas TC-CAP-139-01..01 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-139-T06"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-140",
+      "tareas": [
+        {
+          "id": "HU-CAP-140-T01",
+          "titulo": "Revisar criterios de HU-CAP-140 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-140-T02",
+          "titulo": "Reglas de dominio de HU-CAP-140 (RQ-ATN-02-02, RQ-ATN-02-03, RQ-ATN-02-04, RQ-ATN-02-05)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-140-T01",
+            "HU-CAP-139-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-140-T03",
+          "titulo": "Casos de uso: Pedir un cambio y que lo decida un asesor",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-140-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-140-T04",
+          "titulo": "Endpoints y eventos de FT-ATN-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-140-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-140-T05",
+          "titulo": "Pantalla React: Pedir un cambio y que lo decida un asesor",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-140-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-140-T06",
+          "titulo": "Pruebas TC-CAP-140-01..04 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-140-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-141",
+      "tareas": [
+        {
+          "id": "HU-CAP-141-T01",
+          "titulo": "Revisar criterios de HU-CAP-141 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-141-T02",
+          "titulo": "Reglas de dominio de HU-CAP-141 (RQ-ATN-02-06)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-141-T01",
+            "HU-CAP-139-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-141-T03",
+          "titulo": "Casos de uso: Derivar a una persona un mensaje no entendido",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-141-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-141-T04",
+          "titulo": "Endpoints y eventos de FT-ATN-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-141-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-141-T05",
+          "titulo": "Pantalla React: Derivar a una persona un mensaje no entendido",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-141-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-141-T06",
+          "titulo": "Pruebas TC-CAP-141-01..01 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-141-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-142",
+      "tareas": [
+        {
+          "id": "HU-CAP-142-T01",
+          "titulo": "Revisar criterios de HU-CAP-142 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-142-T02",
+          "titulo": "Migración Prisma de las tablas de FT-ATN-03 (conversacion, mensaje_chat, respuesta_rapida, solicitud_cambio, pedido)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-142-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-142-T03",
+          "titulo": "Reglas de dominio de HU-CAP-142 (RQ-ATN-03-01, RQ-ATN-03-02, RQ-ATN-03-05)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-142-T01",
+            "HU-CAP-142-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-142-T04",
+          "titulo": "Casos de uso: Responder la encuesta posventa",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-142-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-142-T05",
+          "titulo": "Endpoints y eventos de FT-ATN-03 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-142-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-142-T06",
+          "titulo": "Pantalla React: Responder la encuesta posventa",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-142-T05"
+          ]
+        },
+        {
+          "id": "HU-CAP-142-T07",
+          "titulo": "Pruebas TC-CAP-142-01..03 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-142-T06"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-143",
+      "tareas": [
+        {
+          "id": "HU-CAP-143-T01",
+          "titulo": "Revisar criterios de HU-CAP-143 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-143-T02",
+          "titulo": "Reglas de dominio de HU-CAP-143 (RQ-ATN-03-03, RQ-ATN-03-04)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-143-T01",
+            "HU-CAP-142-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-143-T03",
+          "titulo": "Casos de uso: Atender una opinión negativa",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-143-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-143-T04",
+          "titulo": "Endpoints y eventos de FT-ATN-03 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-143-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-143-T05",
+          "titulo": "Pantalla React: Atender una opinión negativa",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-143-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-143-T06",
+          "titulo": "Pruebas TC-CAP-143-01..02 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-143-T05"
+          ]
+        }
+      ]
+    }
+  ]
+}

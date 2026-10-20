@@ -1,0 +1,16 @@
+erDiagram
+  LISTA {
+    bigint id PK
+    text codigo UK
+    text nombre
+  }
+  LISTA_VALOR {
+    bigint id PK
+    bigint lista_id FK
+    text nombre
+    int orden
+    boolean activo
+  }
+  AUDITORIA {
+  }
+  LISTA ||--o{ LISTA_VALOR : "lista_id"

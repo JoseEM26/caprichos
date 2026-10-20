@@ -1,0 +1,124 @@
+pagina_origen,texto,href,destino_final,tipo,estado_http
+http://caprichos-per.ola.click,Redirección HTTP a HTTPS,http://caprichos-per.ola.click,https://caprichos-per.ola.click/,Redirección Protocolo,301 -> 200
+https://caprichos-per.ola.click/checkout,Redirección Checkout vacío,https://caprichos-per.ola.click/checkout,https://caprichos-per.ola.click/cart,Redirección Flujo Carrito,302 -> 200
+https://caprichos-per.ola.click/,Crear mi menú digital (Banner superior),https://panel.olaclick.app/register,https://panel.olaclick.app/register,Plataforma OlaClick - Registro,200
+https://caprichos-per.ola.click/,Empieza ahora (Banner promocional chatbot),https://olaclick.com/es/chatbot-whatsapp-restaurantes-bares/,https://olaclick.com/es/chatbot-whatsapp/,Plataforma OlaClick - Banner Promocional,301 -> 200
+https://caprichos-per.ola.click/,Pedir,/products,https://caprichos-per.ola.click/products,Navegación Interna,200
+https://caprichos-per.ola.click/,"C. 11, Lima 15457, Perú","https://www.google.com/maps/search/?api=1&query=-12.0196436,-76.963255","https://www.google.com/maps/search/?api=1&query=-12.0196436,-76.963255",Google Maps - Ubicación,200
+https://caprichos-per.ola.click/,Carta,/products,https://caprichos-per.ola.click/products,Navegación Interna,200
+https://caprichos-per.ola.click/,Whatsapp (Botón de Landing),https://api.whatsapp.com/send?phone=51977503006&text=%F0%9F%91%8B+Hola%2C+vengo+de+http%3A%2F%2Fcaprichos-per.ola.click%0ADeseo+realizar+el+siguiente+pedido%3A%0A,https://api.whatsapp.com/send?phone=51977503006&text=%F0%9F%91%8B+Hola%2C+vengo+de+http%3A%2F%2Fcaprichos-per.ola.click%0ADeseo+realizar+el+siguiente+pedido%3A%0A,WhatsApp - Botón Landing,200
+https://caprichos-per.ola.click/,Restaurantguru.com (Botón de Landing),https://es.restaurantguru.com/Caprichos-Campoy-San-Juan-de-Lurigancho,https://es.restaurantguru.com/Caprichos-Campoy-San-Juan-de-Lurigancho,Reseñas Restaurant Guru,405/503 (Cloudflare) / 200 (Browser)
+https://caprichos-per.ola.click/,Ir al enlace (Icono WhatsApp cabecera),https://api.whatsapp.com/send?phone=51977503006&text=%F0%9F%91%8B+Hola%2C+vengo+de+http%3A%2F%2Fcaprichos-per.ola.click%0ADeseo+realizar+el+siguiente+pedido%3A%0A,https://api.whatsapp.com/send?phone=51977503006&text=%F0%9F%91%8B+Hola%2C+vengo+de+http%3A%2F%2Fcaprichos-per.ola.click%0ADeseo+realizar+el+siguiente+pedido%3A%0A,WhatsApp - Red Social,200
+https://caprichos-per.ola.click/,Ir al enlace (Icono Instagram cabecera),https://www.instagram.com/caprichoscampoy,https://www.instagram.com/caprichoscampoy,Red Social - Instagram,200
+https://caprichos-per.ola.click/,Ir al enlace (Icono Facebook cabecera),https://www.facebook.com/caprichosC,https://www.facebook.com/caprichosC,Red Social - Facebook,400 (WAF CLI) / 200 (Browser)
+https://caprichos-per.ola.click/,Ir al enlace (Icono TikTok cabecera),https://www.tiktok.com/@caprichoscampoy,https://www.tiktok.com/@caprichoscampoy,Red Social - TikTok,200
+https://caprichos-per.ola.click/,Menú Digital de Caprichos,/products,https://caprichos-per.ola.click/products,Navegación Interna,200
+https://caprichos-per.ola.click/,Horarios (Tipos de servicio y horarios),/info,https://caprichos-per.ola.click/info,Navegación Interna,200
+https://caprichos-per.ola.click/,Crea tu menú digital con (OlaClick),https://olaclick.com/es/punto-de-venta,https://olaclick.com/es/punto-de-venta/,Plataforma OlaClick - Footer,301 -> 200
+https://caprichos-per.ola.click/info,VER MENU,/products,https://caprichos-per.ola.click/products,Navegación Interna,200
+https://caprichos-per.ola.click/info,Ir al enlace (WhatsApp),https://api.whatsapp.com/send?phone=51977503006&text=%F0%9F%91%8B+Hola%2C+vengo+de+http%3A%2F%2Fcaprichos-per.ola.click%0ADeseo+realizar+el+siguiente+pedido%3A%0A,https://api.whatsapp.com/send?phone=51977503006&text=%F0%9F%91%8B+Hola%2C+vengo+de+http%3A%2F%2Fcaprichos-per.ola.click%0ADeseo+realizar+el+siguiente+pedido%3A%0A,WhatsApp - Red Social,200
+https://caprichos-per.ola.click/info,Ir al enlace (Instagram),https://www.instagram.com/caprichoscampoy,https://www.instagram.com/caprichoscampoy,Red Social - Instagram,200
+https://caprichos-per.ola.click/info,Ir al enlace (Facebook),https://www.facebook.com/caprichosC,https://www.facebook.com/caprichosC,Red Social - Facebook,400 (WAF CLI) / 200 (Browser)
+https://caprichos-per.ola.click/info,Ir al enlace (TikTok),https://www.tiktok.com/@caprichoscampoy,https://www.tiktok.com/@caprichoscampoy,Red Social - TikTok,200
+https://caprichos-per.ola.click/info,"C. 11, Lima 15457, Perú (Dirección)","https://www.google.com/maps/search/?api=1&query=-12.0196436,-76.963255","https://www.google.com/maps/search/?api=1&query=-12.0196436,-76.963255",Google Maps - Ubicación,200
+https://caprichos-per.ola.click/info,OlaClick version 4.00.f684a4e-v2,https://olaclick.com/es/punto-de-venta,https://olaclick.com/es/punto-de-venta/,Plataforma OlaClick - Footer,301 -> 200
+https://caprichos-per.ola.click/products,Crear mi menú digital (Banner superior),https://panel.olaclick.app/register,https://panel.olaclick.app/register,Plataforma OlaClick - Registro,200
+https://caprichos-per.ola.click/products,Empieza ahora (Banner promocional chatbot),https://olaclick.com/es/chatbot-whatsapp-restaurantes-bares/,https://olaclick.com/es/chatbot-whatsapp/,Plataforma OlaClick - Banner Promocional,301 -> 200
+https://caprichos-per.ola.click/products,Logo Caprichos (Inicio),/,https://caprichos-per.ola.click/,Navegación Interna,200
+https://caprichos-per.ola.click/products,Ir al enlace (WhatsApp cabecera),https://api.whatsapp.com/send?phone=51977503006&text=%F0%9F%91%8B+Hola%2C+vengo+de+http%3A%2F%2Fcaprichos-per.ola.click%0ADeseo+realizar+el+siguiente+pedido%3A%0A,https://api.whatsapp.com/send?phone=51977503006&text=%F0%9F%91%8B+Hola%2C+vengo+de+http%3A%2F%2Fcaprichos-per.ola.click%0ADeseo+realizar+el+siguiente+pedido%3A%0A,WhatsApp - Red Social,200
+https://caprichos-per.ola.click/products,Ir al enlace (Instagram cabecera),https://www.instagram.com/caprichoscampoy,https://www.instagram.com/caprichoscampoy,Red Social - Instagram,200
+https://caprichos-per.ola.click/products,Ir al enlace (Facebook cabecera),https://www.facebook.com/caprichosC,https://www.facebook.com/caprichosC,Red Social - Facebook,400 (WAF CLI) / 200 (Browser)
+https://caprichos-per.ola.click/products,Ir al enlace (TikTok cabecera),https://www.tiktok.com/@caprichoscampoy,https://www.tiktok.com/@caprichoscampoy,Red Social - TikTok,200
+https://caprichos-per.ola.click/products,Caprichos (Enlace footer),/,https://caprichos-per.ola.click/,Navegación Interna,200
+https://caprichos-per.ola.click/products,Crea tu menú digital con (OlaClick footer),https://olaclick.com/es/punto-de-venta,https://olaclick.com/es/punto-de-venta/,Plataforma OlaClick - Footer,301 -> 200
+https://caprichos-per.ola.click/products,Categoría Combos,/combos,https://caprichos-per.ola.click/combos,Navegación Interna - Categoría,200
+https://caprichos-per.ola.click/products,Categoría Frío🥤,/frio,https://caprichos-per.ola.click/frio,Navegación Interna - Categoría,200
+https://caprichos-per.ola.click/products,Categoría Caliente☕️,/caliente,https://caprichos-per.ola.click/caliente,Navegación Interna - Categoría,200
+https://caprichos-per.ola.click/products,Categoría Salado🍗,/salado,https://caprichos-per.ola.click/salado,Navegación Interna - Categoría,200
+https://caprichos-per.ola.click/products,Categoría Postres🍰,/postres,https://caprichos-per.ola.click/postres,Navegación Interna - Categoría,200
+https://caprichos-per.ola.click/products,Categoría Destacados,/favoritos,https://caprichos-per.ola.click/favoritos,Navegación Interna - Categoría,200
+https://caprichos-per.ola.click/products,Dúo Irresistible,/salado/duo-irresistible-i0ld,https://caprichos-per.ola.click/salado/duo-irresistible-i0ld,Producto - Salado,200
+https://caprichos-per.ola.click/products,Dúo Compartir (2 Frappés + 2 Donuts),/frio/duo-compartir-2-frappes-2-donuts,https://caprichos-per.ola.click/frio/duo-compartir-2-frappes-2-donuts,Producto - Frío,200
+https://caprichos-per.ola.click/products,Sándwich Suprema,/salado/sandwich-suprema,https://caprichos-per.ola.click/salado/sandwich-suprema,Producto - Salado,200
+https://caprichos-per.ola.click/products,Club Sandwich,/salado/club-sandwich,https://caprichos-per.ola.click/salado/club-sandwich,Producto - Salado,200
+https://caprichos-per.ola.click/products,Frappé Caramel Clásico,/frio/frappe-caramel-clasico,https://caprichos-per.ola.click/frio/frappe-caramel-clasico,Producto - Frío,200
+https://caprichos-per.ola.click/products,Caramel Macchiato,/caliente/caramel-macchiato,https://caprichos-per.ola.click/caliente/caramel-macchiato,Producto - Caliente,200
+https://caprichos-per.ola.click/products,Americano,/caliente/americano,https://caprichos-per.ola.click/caliente/americano,Producto - Caliente,200
+https://caprichos-per.ola.click/products,Dona Artesanal,/postres/dona-artesanal,https://caprichos-per.ola.click/postres/dona-artesanal,Producto - Postres,200
+https://caprichos-per.ola.click/products,Waffle Nutella,/postres/waffle-nutella,https://caprichos-per.ola.click/postres/waffle-nutella,Producto - Postres,200
+https://caprichos-per.ola.click/products,Dúo Compartir (2 Frappés + 2 Donuts),/combos/duo-compartir-2-frappes-2-donuts-3rl0,https://caprichos-per.ola.click/combos/duo-compartir-2-frappes-2-donuts-3rl0,Producto - Combos,200
+https://caprichos-per.ola.click/combos,Crear mi menú digital (Banner superior),https://panel.olaclick.app/register,https://panel.olaclick.app/register,Plataforma OlaClick - Registro,200
+https://caprichos-per.ola.click/combos,Empieza ahora (Banner promocional chatbot),https://olaclick.com/es/chatbot-whatsapp-restaurantes-bares/,https://olaclick.com/es/chatbot-whatsapp/,Plataforma OlaClick - Banner Promocional,301 -> 200
+https://caprichos-per.ola.click/combos,Logo Caprichos (Inicio),/,https://caprichos-per.ola.click/,Navegación Interna,200
+https://caprichos-per.ola.click/combos,Ir al enlace (WhatsApp cabecera),https://api.whatsapp.com/send?phone=51977503006&text=%F0%9F%91%8B+Hola%2C+vengo+de+http%3A%2F%2Fcaprichos-per.ola.click%0ADeseo+realizar+el+siguiente+pedido%3A%0A,https://api.whatsapp.com/send?phone=51977503006&text=%F0%9F%91%8B+Hola%2C+vengo+de+http%3A%2F%2Fcaprichos-per.ola.click%0ADeseo+realizar+el+siguiente+pedido%3A%0A,WhatsApp - Red Social,200
+https://caprichos-per.ola.click/combos,Ir al enlace (Instagram cabecera),https://www.instagram.com/caprichoscampoy,https://www.instagram.com/caprichoscampoy,Red Social - Instagram,200
+https://caprichos-per.ola.click/combos,Ir al enlace (Facebook cabecera),https://www.facebook.com/caprichosC,https://www.facebook.com/caprichosC,Red Social - Facebook,400 (WAF CLI) / 200 (Browser)
+https://caprichos-per.ola.click/combos,Ir al enlace (TikTok cabecera),https://www.tiktok.com/@caprichoscampoy,https://www.tiktok.com/@caprichoscampoy,Red Social - TikTok,200
+https://caprichos-per.ola.click/combos,Dúo Compartir (2 Frappés + 2 Donuts),/combos/duo-compartir-2-frappes-2-donuts-3rl0,https://caprichos-per.ola.click/combos/duo-compartir-2-frappes-2-donuts-3rl0,Producto - Combos,200
+https://caprichos-per.ola.click/combos,¡Nuevo! Combo CapriKids,/combos/nuevo-combo-caprikids,https://caprichos-per.ola.click/combos/nuevo-combo-caprikids,Producto - Combos,200
+https://caprichos-per.ola.click/combos,3x2 en Bebidas Frías,/combos/3x2-en-bebidas-frias,https://caprichos-per.ola.click/combos/3x2-en-bebidas-frias,Producto - Combos,200
+https://caprichos-per.ola.click/combos,Crea tu menú digital con (OlaClick footer),https://olaclick.com/es/punto-de-venta,https://olaclick.com/es/punto-de-venta/,Plataforma OlaClick - Footer,301 -> 200
+https://caprichos-per.ola.click/frio,Crear mi menú digital (Banner superior),https://panel.olaclick.app/register,https://panel.olaclick.app/register,Plataforma OlaClick - Registro,200
+https://caprichos-per.ola.click/frio,Empieza ahora (Banner promocional chatbot),https://olaclick.com/es/chatbot-whatsapp-restaurantes-bares/,https://olaclick.com/es/chatbot-whatsapp/,Plataforma OlaClick - Banner Promocional,301 -> 200
+https://caprichos-per.ola.click/frio,Logo Caprichos (Inicio),/,https://caprichos-per.ola.click/,Navegación Interna,200
+https://caprichos-per.ola.click/frio,Ir al enlace (WhatsApp cabecera),https://api.whatsapp.com/send?phone=51977503006&text=%F0%9F%91%8B+Hola%2C+vengo+de+http%3A%2F%2Fcaprichos-per.ola.click%0ADeseo+realizar+el+siguiente+pedido%3A%0A,https://api.whatsapp.com/send?phone=51977503006&text=%F0%9F%91%8B+Hola%2C+vengo+de+http%3A%2F%2Fcaprichos-per.ola.click%0ADeseo+realizar+el+siguiente+pedido%3A%0A,WhatsApp - Red Social,200
+https://caprichos-per.ola.click/frio,Ir al enlace (Instagram cabecera),https://www.instagram.com/caprichoscampoy,https://www.instagram.com/caprichoscampoy,Red Social - Instagram,200
+https://caprichos-per.ola.click/frio,Ir al enlace (Facebook cabecera),https://www.facebook.com/caprichosC,https://www.facebook.com/caprichosC,Red Social - Facebook,400 (WAF CLI) / 200 (Browser)
+https://caprichos-per.ola.click/frio,Ir al enlace (TikTok cabecera),https://www.tiktok.com/@caprichoscampoy,https://www.tiktok.com/@caprichoscampoy,Red Social - TikTok,200
+https://caprichos-per.ola.click/frio,Dúo Compartir (2 Frappés + 2 Donuts),/frio/duo-compartir-2-frappes-2-donuts,https://caprichos-per.ola.click/frio/duo-compartir-2-frappes-2-donuts,Producto - Frío🥤,200
+https://caprichos-per.ola.click/frio,Frappé Caramel Clásico,/frio/frappe-caramel-clasico,https://caprichos-per.ola.click/frio/frappe-caramel-clasico,Producto - Frío🥤,200
+https://caprichos-per.ola.click/frio,Frappuccino Oreo,/frio/frappuccino-oreo,https://caprichos-per.ola.click/frio/frappuccino-oreo,Producto - Frío🥤,200
+https://caprichos-per.ola.click/frio,Crea tu menú digital con (OlaClick footer),https://olaclick.com/es/punto-de-venta,https://olaclick.com/es/punto-de-venta/,Plataforma OlaClick - Footer,301 -> 200
+https://caprichos-per.ola.click/caliente,Crear mi menú digital (Banner superior),https://panel.olaclick.app/register,https://panel.olaclick.app/register,Plataforma OlaClick - Registro,200
+https://caprichos-per.ola.click/caliente,Empieza ahora (Banner promocional chatbot),https://olaclick.com/es/chatbot-whatsapp-restaurantes-bares/,https://olaclick.com/es/chatbot-whatsapp/,Plataforma OlaClick - Banner Promocional,301 -> 200
+https://caprichos-per.ola.click/caliente,Logo Caprichos (Inicio),/,https://caprichos-per.ola.click/,Navegación Interna,200
+https://caprichos-per.ola.click/caliente,Ir al enlace (WhatsApp cabecera),https://api.whatsapp.com/send?phone=51977503006&text=%F0%9F%91%8B+Hola%2C+vengo+de+http%3A%2F%2Fcaprichos-per.ola.click%0ADeseo+realizar+el+siguiente+pedido%3A%0A,https://api.whatsapp.com/send?phone=51977503006&text=%F0%9F%91%8B+Hola%2C+vengo+de+http%3A%2F%2Fcaprichos-per.ola.click%0ADeseo+realizar+el+siguiente+pedido%3A%0A,WhatsApp - Red Social,200
+https://caprichos-per.ola.click/caliente,Ir al enlace (Instagram cabecera),https://www.instagram.com/caprichoscampoy,https://www.instagram.com/caprichoscampoy,Red Social - Instagram,200
+https://caprichos-per.ola.click/caliente,Ir al enlace (Facebook cabecera),https://www.facebook.com/caprichosC,https://www.facebook.com/caprichosC,Red Social - Facebook,400 (WAF CLI) / 200 (Browser)
+https://caprichos-per.ola.click/caliente,Ir al enlace (TikTok cabecera),https://www.tiktok.com/@caprichoscampoy,https://www.tiktok.com/@caprichoscampoy,Red Social - TikTok,200
+https://caprichos-per.ola.click/caliente,Americano,/caliente/americano,https://caprichos-per.ola.click/caliente/americano,Producto - Caliente☕️,200
+https://caprichos-per.ola.click/caliente,Cappuccino,/caliente/cappuccino,https://caprichos-per.ola.click/caliente/cappuccino,Producto - Caliente☕️,200
+https://caprichos-per.ola.click/caliente,Caramel Macchiato,/caliente/caramel-macchiato,https://caprichos-per.ola.click/caliente/caramel-macchiato,Producto - Caliente☕️,200
+https://caprichos-per.ola.click/caliente,Crea tu menú digital con (OlaClick footer),https://olaclick.com/es/punto-de-venta,https://olaclick.com/es/punto-de-venta/,Plataforma OlaClick - Footer,301 -> 200
+https://caprichos-per.ola.click/salado,Crear mi menú digital (Banner superior),https://panel.olaclick.app/register,https://panel.olaclick.app/register,Plataforma OlaClick - Registro,200
+https://caprichos-per.ola.click/salado,Empieza ahora (Banner promocional chatbot),https://olaclick.com/es/chatbot-whatsapp-restaurantes-bares/,https://olaclick.com/es/chatbot-whatsapp/,Plataforma OlaClick - Banner Promocional,301 -> 200
+https://caprichos-per.ola.click/salado,Logo Caprichos (Inicio),/,https://caprichos-per.ola.click/,Navegación Interna,200
+https://caprichos-per.ola.click/salado,Ir al enlace (WhatsApp cabecera),https://api.whatsapp.com/send?phone=51977503006&text=%F0%9F%91%8B+Hola%2C+vengo+de+http%3A%2F%2Fcaprichos-per.ola.click%0ADeseo+realizar+el+siguiente+pedido%3A%0A,https://api.whatsapp.com/send?phone=51977503006&text=%F0%9F%91%8B+Hola%2C+vengo+de+http%3A%2F%2Fcaprichos-per.ola.click%0ADeseo+realizar+el+siguiente+pedido%3A%0A,WhatsApp - Red Social,200
+https://caprichos-per.ola.click/salado,Ir al enlace (Instagram cabecera),https://www.instagram.com/caprichoscampoy,https://www.instagram.com/caprichoscampoy,Red Social - Instagram,200
+https://caprichos-per.ola.click/salado,Ir al enlace (Facebook cabecera),https://www.facebook.com/caprichosC,https://www.facebook.com/caprichosC,Red Social - Facebook,400 (WAF CLI) / 200 (Browser)
+https://caprichos-per.ola.click/salado,Ir al enlace (TikTok cabecera),https://www.tiktok.com/@caprichoscampoy,https://www.tiktok.com/@caprichoscampoy,Red Social - TikTok,200
+https://caprichos-per.ola.click/salado,Club Sandwich,/salado/club-sandwich,https://caprichos-per.ola.click/salado/club-sandwich,Producto - Salado🍗,200
+https://caprichos-per.ola.click/salado,Empanada Clásica,/salado/empanada-clasica,https://caprichos-per.ola.click/salado/empanada-clasica,Producto - Salado🍗,200
+https://caprichos-per.ola.click/salado,Sándwich Suprema,/salado/sandwich-suprema,https://caprichos-per.ola.click/salado/sandwich-suprema,Producto - Salado🍗,200
+https://caprichos-per.ola.click/salado,Crea tu menú digital con (OlaClick footer),https://olaclick.com/es/punto-de-venta,https://olaclick.com/es/punto-de-venta/,Plataforma OlaClick - Footer,301 -> 200
+https://caprichos-per.ola.click/postres,Crear mi menú digital (Banner superior),https://panel.olaclick.app/register,https://panel.olaclick.app/register,Plataforma OlaClick - Registro,200
+https://caprichos-per.ola.click/postres,Empieza ahora (Banner promocional chatbot),https://olaclick.com/es/chatbot-whatsapp-restaurantes-bares/,https://olaclick.com/es/chatbot-whatsapp/,Plataforma OlaClick - Banner Promocional,301 -> 200
+https://caprichos-per.ola.click/postres,Logo Caprichos (Inicio),/,https://caprichos-per.ola.click/,Navegación Interna,200
+https://caprichos-per.ola.click/postres,Ir al enlace (WhatsApp cabecera),https://api.whatsapp.com/send?phone=51977503006&text=%F0%9F%91%8B+Hola%2C+vengo+de+http%3A%2F%2Fcaprichos-per.ola.click%0ADeseo+realizar+el+siguiente+pedido%3A%0A,https://api.whatsapp.com/send?phone=51977503006&text=%F0%9F%91%8B+Hola%2C+vengo+de+http%3A%2F%2Fcaprichos-per.ola.click%0ADeseo+realizar+el+siguiente+pedido%3A%0A,WhatsApp - Red Social,200
+https://caprichos-per.ola.click/postres,Ir al enlace (Instagram cabecera),https://www.instagram.com/caprichoscampoy,https://www.instagram.com/caprichoscampoy,Red Social - Instagram,200
+https://caprichos-per.ola.click/postres,Ir al enlace (Facebook cabecera),https://www.facebook.com/caprichosC,https://www.facebook.com/caprichosC,Red Social - Facebook,400 (WAF CLI) / 200 (Browser)
+https://caprichos-per.ola.click/postres,Ir al enlace (TikTok cabecera),https://www.tiktok.com/@caprichoscampoy,https://www.tiktok.com/@caprichoscampoy,Red Social - TikTok,200
+https://caprichos-per.ola.click/postres,Dona Artesanal,/postres/dona-artesanal,https://caprichos-per.ola.click/postres/dona-artesanal,Producto - Postres🍰,200
+https://caprichos-per.ola.click/postres,Waffle Nutella,/postres/waffle-nutella,https://caprichos-per.ola.click/postres/waffle-nutella,Producto - Postres🍰,200
+https://caprichos-per.ola.click/postres,¡Nuevo! Brownie Artesanal 100% Cacao,/postres/nuevo-brownie-artesanal-100-cacao,https://caprichos-per.ola.click/postres/nuevo-brownie-artesanal-100-cacao,Producto - Postres🍰,200
+https://caprichos-per.ola.click/postres,Crea tu menú digital con (OlaClick footer),https://olaclick.com/es/punto-de-venta,https://olaclick.com/es/punto-de-venta/,Plataforma OlaClick - Footer,301 -> 200
+https://caprichos-per.ola.click/favoritos,Crear mi menú digital (Banner superior),https://panel.olaclick.app/register,https://panel.olaclick.app/register,Plataforma OlaClick - Registro,200
+https://caprichos-per.ola.click/favoritos,Empieza ahora (Banner promocional chatbot),https://olaclick.com/es/chatbot-whatsapp-restaurantes-bares/,https://olaclick.com/es/chatbot-whatsapp/,Plataforma OlaClick - Banner Promocional,301 -> 200
+https://caprichos-per.ola.click/favoritos,Logo Caprichos (Inicio),/,https://caprichos-per.ola.click/,Navegación Interna,200
+https://caprichos-per.ola.click/favoritos,Ir al enlace (WhatsApp cabecera),https://api.whatsapp.com/send?phone=51977503006&text=%F0%9F%91%8B+Hola%2C+vengo+de+http%3A%2F%2Fcaprichos-per.ola.click%0ADeseo+realizar+el+siguiente+pedido%3A%0A,https://api.whatsapp.com/send?phone=51977503006&text=%F0%9F%91%8B+Hola%2C+vengo+de+http%3A%2F%2Fcaprichos-per.ola.click%0ADeseo+realizar+el+siguiente+pedido%3A%0A,WhatsApp - Red Social,200
+https://caprichos-per.ola.click/favoritos,Ir al enlace (Instagram cabecera),https://www.instagram.com/caprichoscampoy,https://www.instagram.com/caprichoscampoy,Red Social - Instagram,200
+https://caprichos-per.ola.click/favoritos,Ir al enlace (Facebook cabecera),https://www.facebook.com/caprichosC,https://www.facebook.com/caprichosC,Red Social - Facebook,400 (WAF CLI) / 200 (Browser)
+https://caprichos-per.ola.click/favoritos,Ir al enlace (TikTok cabecera),https://www.tiktok.com/@caprichoscampoy,https://www.tiktok.com/@caprichoscampoy,Red Social - TikTok,200
+https://caprichos-per.ola.click/favoritos,Dúo Irresistible,/salado/duo-irresistible-i0ld,https://caprichos-per.ola.click/salado/duo-irresistible-i0ld,Producto - Destacados / Favoritos,200
+https://caprichos-per.ola.click/favoritos,Dúo Compartir (2 Frappés + 2 Donuts),/frio/duo-compartir-2-frappes-2-donuts,https://caprichos-per.ola.click/frio/duo-compartir-2-frappes-2-donuts,Producto - Destacados / Favoritos,200
+https://caprichos-per.ola.click/favoritos,Sándwich Suprema,/salado/sandwich-suprema,https://caprichos-per.ola.click/salado/sandwich-suprema,Producto - Destacados / Favoritos,200
+https://caprichos-per.ola.click/favoritos,Crea tu menú digital con (OlaClick footer),https://olaclick.com/es/punto-de-venta,https://olaclick.com/es/punto-de-venta/,Plataforma OlaClick - Footer,301 -> 200
+https://caprichos-per.ola.click/cart,WhatsApp Negocio (Cabecera soporte/contacto),https://api.whatsapp.com/send?phone=51977503006,https://api.whatsapp.com/send?phone=51977503006,WhatsApp - Contacto Directo,200
+https://caprichos-per.ola.click/cart,OpenStreetMap (Atribución mapa entrega),https://www.openstreetmap.org/copyright,https://www.openstreetmap.org/copyright,Atribución Mapa,200
+https://caprichos-per.ola.click/checkout,Términos de uso (CheckoutTermsAndConditions),https://olaclick.com/es/terms-and-condition/,https://olaclick.com/es/terminos-y-condiciones/,Plataforma OlaClick - Términos,301 -> 200
+https://caprichos-per.ola.click/checkout,Política de privacidad (CheckoutTermsAndConditions),https://olaclick.com/es/politica-de-privacidad-de-la-plataforma/,https://olaclick.com/es/politica-de-privacidad/,Plataforma OlaClick - Privacidad,301 -> 200
+https://caprichos-per.ola.click/checkout,WhatsApp Enviar Pedido (OrderSendWhatsappButton),https://api.whatsapp.com/send?phone=51977503006&text=[RESUMEN_PEDIDO_ORDEN],https://api.whatsapp.com/send?phone=51977503006&text=...,WhatsApp - Envío de Pedido,200 (Generado por JS tTe)
+https://caprichos-per.ola.click/tracking,WhatsApp Consulta Estado Pedido (Tracking),https://api.whatsapp.com/send?phone=51977503006&text=👋+Quisiera+saber+el+avance+de+mi+pedido...,https://api.whatsapp.com/send?phone=51977503006&text=...,WhatsApp - Seguimiento Pedido,200 (Generado por JS Tracking)
+https://caprichos-per.ola.click/info,Teléfono fijo (tel:),NO OBSERVADO,NO OBSERVADO,Teléfono - No implementado,N/A
+https://caprichos-per.ola.click/info,Correo electrónico (mailto:),NO OBSERVADO,NO OBSERVADO,Correo - No implementado,N/A
+https://caprichos-per.ola.click/,Libro de Reclamaciones,NO OBSERVADO,NO OBSERVADO,Legal - No implementado,N/A

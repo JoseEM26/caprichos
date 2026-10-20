@@ -1,0 +1,461 @@
+{
+  "epica": "EP-CAP-020",
+  "generado_por_ia": true,
+  "revisado_por": null,
+  "historias": [
+    {
+      "hu": "HU-CAP-170",
+      "tareas": [
+        {
+          "id": "HU-CAP-170-T01",
+          "titulo": "Revisar criterios de HU-CAP-170 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-170-T02",
+          "titulo": "Migración Prisma de las tablas de FT-LEG-01 (pedido, reclamo, party, consent, data_request)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-170-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-170-T03",
+          "titulo": "Reglas de dominio de HU-CAP-170 (RQ-LEG-01-01, RQ-LEG-01-02, RQ-LEG-01-05)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-170-T01",
+            "HU-CAP-170-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-170-T04",
+          "titulo": "Casos de uso: Elegir el comprobante y sus datos",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-170-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-170-T05",
+          "titulo": "Endpoints y eventos de FT-LEG-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-170-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-170-T06",
+          "titulo": "Pantalla React: Elegir el comprobante y sus datos",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-170-T05"
+          ]
+        },
+        {
+          "id": "HU-CAP-170-T07",
+          "titulo": "Pruebas TC-CAP-170-01..03 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-170-T06"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-171",
+      "tareas": [
+        {
+          "id": "HU-CAP-171-T01",
+          "titulo": "Revisar criterios de HU-CAP-171 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-171-T02",
+          "titulo": "Reglas de dominio de HU-CAP-171 (RQ-LEG-01-03)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-171-T01",
+            "HU-CAP-170-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-171-T03",
+          "titulo": "Casos de uso: Imprimir y reimprimir la nota de venta",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-171-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-171-T04",
+          "titulo": "Endpoints y eventos de FT-LEG-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-171-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-171-T05",
+          "titulo": "Pantalla React: Imprimir y reimprimir la nota de venta",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-171-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-171-T06",
+          "titulo": "Pruebas TC-CAP-171-01..01 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-171-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-172",
+      "tareas": [
+        {
+          "id": "HU-CAP-172-T01",
+          "titulo": "Revisar criterios de HU-CAP-172 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-172-T02",
+          "titulo": "Reglas de dominio de HU-CAP-172 (RQ-LEG-01-04)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-172-T01",
+            "HU-CAP-170-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-172-T03",
+          "titulo": "Casos de uso: Ver los comprobantes por emitir en el facturador",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-172-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-172-T04",
+          "titulo": "Endpoints y eventos de FT-LEG-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-172-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-172-T05",
+          "titulo": "Pantalla React: Ver los comprobantes por emitir en el facturador",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-172-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-172-T06",
+          "titulo": "Pruebas TC-CAP-172-01..01 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-172-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-173",
+      "tareas": [
+        {
+          "id": "HU-CAP-173-T01",
+          "titulo": "Revisar criterios de HU-CAP-173 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-173-T02",
+          "titulo": "Migración Prisma de las tablas de FT-LEG-02 (pedido, reclamo, party, consent, data_request)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-173-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-173-T03",
+          "titulo": "Reglas de dominio de HU-CAP-173 (RQ-LEG-02-01, RQ-LEG-02-02)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-173-T01",
+            "HU-CAP-173-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-173-T04",
+          "titulo": "Casos de uso: Registrar un reclamo en el Libro de Reclamaciones",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-173-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-173-T05",
+          "titulo": "Endpoints y eventos de FT-LEG-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-173-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-173-T06",
+          "titulo": "Pantalla React: Registrar un reclamo en el Libro de Reclamaciones",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-173-T05"
+          ]
+        },
+        {
+          "id": "HU-CAP-173-T07",
+          "titulo": "Pruebas TC-CAP-173-01..02 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-173-T06"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-174",
+      "tareas": [
+        {
+          "id": "HU-CAP-174-T01",
+          "titulo": "Revisar criterios de HU-CAP-174 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-174-T02",
+          "titulo": "Reglas de dominio de HU-CAP-174 (RQ-LEG-02-03, RQ-LEG-02-04)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-174-T01",
+            "HU-CAP-173-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-174-T03",
+          "titulo": "Casos de uso: Responder reclamos en el administrativo",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-174-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-174-T04",
+          "titulo": "Endpoints y eventos de FT-LEG-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-174-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-174-T05",
+          "titulo": "Pantalla React: Responder reclamos en el administrativo",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-174-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-174-T06",
+          "titulo": "Pruebas TC-CAP-174-01..02 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-174-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-175",
+      "tareas": [
+        {
+          "id": "HU-CAP-175-T01",
+          "titulo": "Revisar criterios de HU-CAP-175 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-175-T02",
+          "titulo": "Reglas de dominio de HU-CAP-175 (RQ-LEG-02-05, RQ-LEG-02-06)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-175-T01",
+            "HU-CAP-173-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-175-T03",
+          "titulo": "Casos de uso: Aceptar el aviso de privacidad",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-175-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-175-T04",
+          "titulo": "Endpoints y eventos de FT-LEG-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-175-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-175-T05",
+          "titulo": "Pantalla React: Aceptar el aviso de privacidad",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-175-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-175-T06",
+          "titulo": "Pruebas TC-CAP-175-01..02 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-175-T05"
+          ]
+        }
+      ]
+    }
+  ]
+}

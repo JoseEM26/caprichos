@@ -1,0 +1,78 @@
+erDiagram
+  PARTY {
+    bigint id PK
+    text tipo
+    text estado
+    timestamptz creado_en
+  }
+  PERSON {
+    bigint party_id PK,FK
+    text nombres
+    text apellidos
+    smallint cumple_dia
+    smallint cumple_mes
+    bigint foto_archivo_id
+  }
+  ORGANIZATION {
+    bigint party_id PK,FK
+    text razon_social
+    text nombre_comercial
+  }
+  PARTY_IDENTIFIER {
+    bigint id PK
+    bigint party_id FK
+    text tipo
+    text numero
+  }
+  CONTACT_MECHANISM {
+    bigint id PK
+    bigint party_id FK
+    text tipo
+    text valor
+    numeric lat
+    numeric lng
+    text referencia
+    bigint zona_id
+    boolean principal
+    boolean activo
+  }
+  CONSENT {
+    bigint id PK
+    bigint party_id FK
+    text version_texto
+    text canal
+    timestamptz aceptado_en
+    timestamptz revocado_en
+  }
+  PARTY_ROLE {
+    bigint id PK
+    bigint party_id FK
+    text rol
+    date desde
+    date hasta
+  }
+  CUSTOMER_DETAIL {
+    bigint party_role_id PK,FK
+    int puntos
+    text envio_tipo
+    numeric envio_valor
+  }
+  EMPLOYEE_DETAIL {
+    bigint party_role_id PK,FK
+    numeric descuento_pct
+  }
+  SUPPLIER_DETAIL {
+    bigint party_role_id PK,FK
+    int dias_credito
+    text cuenta_pago
+    boolean activo
+  }
+  PARTY ||--o{ CONSENT : "party_id"
+  PARTY ||--o{ CONTACT_MECHANISM : "party_id"
+  PARTY ||--o{ PARTY_IDENTIFIER : "party_id"
+  PARTY ||--o{ PARTY_ROLE : "party_id"
+  PARTY ||--o| ORGANIZATION : "party_id"
+  PARTY ||--o| PERSON : "party_id"
+  PARTY_ROLE ||--o| CUSTOMER_DETAIL : "party_role_id"
+  PARTY_ROLE ||--o| EMPLOYEE_DETAIL : "party_role_id"
+  PARTY_ROLE ||--o| SUPPLIER_DETAIL : "party_role_id"

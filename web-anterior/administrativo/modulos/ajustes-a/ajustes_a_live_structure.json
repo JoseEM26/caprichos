@@ -1,0 +1,1694 @@
+{
+  "login": {
+    "status": "SUCCESS",
+    "second": 1,
+    "url": "http://caprichos.restaurant.pe/restaurant/#!/"
+  },
+  "screens": {
+    "opcionessistema": {
+      "id": "opcionessistema",
+      "name": "Opciones sistema",
+      "url": "https://caprichos.restaurant.pe/restaurant/#!/ajustes/opcionessistema",
+      "dom_structure": {
+        "title": "Opciones de sistema",
+        "breadcrumbs": [],
+        "tabs": [
+          "Configuraciones generales",
+          "Configuraciones por local"
+        ],
+        "panels": [],
+        "buttons": [
+          "Registrar cambios",
+          "Ver ultimas actualizaciones"
+        ],
+        "tableHeaders": [],
+        "formControls": [
+          {
+            "label": "Activa Plaza Puntos",
+            "control": "checkbox",
+            "model": "configuracion.configuracion_valor",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "Activa Plaza Puntos",
+            "control": "checkbox",
+            "model": "configuracion.configuracion_valor",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "Ahora puedes buscar o filtrar una opción",
+            "control": "text",
+            "model": "vm.valBusqueda",
+            "placeholder": "Busca una opción...",
+            "checked": false
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "Contraseña",
+            "control": "text",
+            "model": "configuracion.configuracionlocal_valoraux1",
+            "placeholder": "Contraseña",
+            "checked": false
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "Para llevar por defecto:",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valoraux1",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "Promedio ponderado Útimo costo Lote",
+            "control": "select",
+            "model": "configuracion.configuracionlocal_valor",
+            "options_sample": [
+              "Promedio ponderado",
+              "Útimo costo",
+              "Lote"
+            ]
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "Promedio ponderado Útimo costo Lote",
+            "control": "select",
+            "model": "configuracion.configuracionlocal_valor",
+            "options_sample": [
+              "Promedio ponderado",
+              "Útimo costo",
+              "Lote"
+            ]
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "Delivery",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valoraux1",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "Mesa",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valoraux2",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocal_valor",
+            "placeholder": "",
+            "checked": false
+          }
+        ],
+        "alerts": [
+          "Configuración Restringida Configuración restringida, para poder activar esta configuración favor registrar una incidencia para que un soporte pueda ayudarlo"
+        ]
+      },
+      "endpoints_called": [
+        "GET https://caprichos.restaurant.pe/restaurant/",
+        "GET http://caprichos.restaurant.pe/restaurant/",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/pace.d2426819.js",
+        "GET https://fonts.googleapis.com/css",
+        "GET https://fonts.googleapis.com/css2",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/vendor.9707f748.css",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/style.a3719272.css",
+        "GET http://caprichos.restaurant.pe/restaurant/img/logo-restaurantpe.55ba42bd.png",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/vendor.6dad86f4.js",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/dx.all.d41d8cd9.js",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/scripts.9fdb592e.js",
+        "GET https://maps.googleapis.com/maps/api/js",
+        "GET http://caprichos.restaurant.pe/restaurant/fonts/fontawesome-webfont.woff2",
+        "GET https://maps.googleapis.com/maps/api/mapsjs/gen_204",
+        "POST https://api.deliverygo.app/v2/public/rest/establishment/getZonesLocal",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/api/rest/campaniaaddons/getByIdUsuario",
+        "GET http://gestioninterna.restaurant.pe/restaurant/m/rest/encuesta/mostarModalAddonsEncuesta/restaurant.pe/caprichos/1/1/Web",
+        "GET http://billing.restaurant.pe/billing/m/rest/suscripcion/obtenerPermisosPorPlan/caprichos/1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/configuracion/get/31",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerPermisosPorUsuarioValidado/1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/validarConfiguracioCartaJson",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/validarUsoPlataforma",
+        "GET http://incidencias.restaurant.pe/billing/m/rest/local/obtenerIncidenciaPorusuarioSinCalificacion/restaurant.pe/caprichos/1",
+        "POST http://billing.quipupos.com/billing/public/rest/aplicacion/obtenerWebinarVigenteV2",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/obtenerAddons",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerAddonsPorToken",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerLocalYape",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/sorteos/obtenerSorteoDisponible",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/encuestabi/verificarMostrar",
+        "GET http://caprichos.restaurant.pe/restaurant/m/rest/configuracion/getAllByLocalId/1/0/0",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/obtenerFechaRenovacionCertificadoValidar/20611290064",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/canaldelivery/obtenerTodoslosCanaldeliverysPorBusquedaPaginado/-1/1/-1/-1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/precuenta/getAllByLocalId/1/1/0/0",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerTodosLousuariosLt",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/tokenusuario/obtenerDistintosDispositivosLogueados/1",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/local/getLocalesPermitidos/0",
+        "GET http://billing.restaurant.pe/billing/m/rest/suscripcion/getEstadoSuscripcionLocalV2/caprichos/1",
+        "GET http://manual.restaurant.pe/manual/m/rest/module/module/getModuleAndSubmoduleList",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/getLive/caprichos.restaurant.pe",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerDocElectronicosPendientes",
+        "GET http://caprichos.restaurant.pe/restaurant/img/restaurantloader-pot-top_inv.cb19fa90.png",
+        "GET http://caprichos.restaurant.pe/restaurant/img/restaurantloader-pot-bottom_inv.9a417680.png",
+        "GET http://caprichos.restaurant.pe/restaurant/%7B%7B$select.selected.url%7D%7D",
+        "GET http://caprichos.restaurant.pe/restaurant/%7B%7Bitem.url%7D%7D",
+        "GET http://caprichos.restaurant.pe/restaurant/media/pedido_deliverygo.mp3",
+        "GET http://caprichos.restaurant.pe/restaurant/m/rest/local/getVariablesLog",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/integracion/integracion/34",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/patterns/header-profile.993cf68a.png",
+        "POST http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/configuracion/obtenerTodasLasConfiguracionesPorLocalLogeadoNew/1",
+        "GET https://res.cloudinary.com/restaurant-pe/image/upload/v1709676874/backgrounds/20240305/cloud-e3afe2d1ee4f4cc98d040a330d287eac-normal.jpg",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/green.f2e0aef8.png"
+      ]
+    },
+    "configuracionpos": {
+      "id": "configuracionpos",
+      "name": "Opciones de APP Quipu",
+      "url": "https://caprichos.restaurant.pe/restaurant/#!/ajustes/configuracionpos",
+      "dom_structure": {
+        "title": "Opciones de sistema",
+        "breadcrumbs": [],
+        "tabs": [],
+        "panels": [],
+        "buttons": [
+          "Registrar cambios"
+        ],
+        "tableHeaders": [],
+        "formControls": [
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "Factura Boleta Nota de Venta",
+            "control": "select",
+            "model": "configuracion.configuracionlocalpos_valoraux1",
+            "options_sample": [
+              "Factura",
+              "Boleta",
+              "Nota de Venta"
+            ]
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "Formato 1 Formato 2 Formato reducido",
+            "control": "select",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "options_sample": [
+              "Formato 1",
+              "Formato 2",
+              "Formato reducido"
+            ]
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "Formato 1 Formato 2",
+            "control": "select",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "options_sample": [
+              "Formato 1",
+              "Formato 2"
+            ]
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "Modificadores verticales Modificadores horizontales",
+            "control": "select",
+            "model": "configuracion.configuracionlocalpos_valoraux1",
+            "options_sample": [
+              "Modificadores verticales",
+              "Modificadores horizontales"
+            ]
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "Deliverys por integración Deliverys telefonicos Todos los deliverys",
+            "control": "select",
+            "model": "configuracion.configuracionlocalpos_valoraux1",
+            "options_sample": [
+              "Deliverys por integración",
+              "Deliverys telefonicos",
+              "Todos los deliverys"
+            ]
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "Efectivo",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valoraux2Obj.efectivo",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "Efectivo",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valoraux2Obj.efectivo",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "Credito",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valoraux2Obj.credito",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "Credito",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valoraux2Obj.credito",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "Tarjeta",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valoraux2Obj.tarjeta",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "Tarjeta",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valoraux2Obj.tarjeta",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "Transferencia",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valoraux2Obj.transferencia",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "Transferencia",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valoraux2Obj.transferencia",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "Delivery",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valoraux2Obj.delivery",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "Delivery",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valoraux2Obj.delivery",
+            "placeholder": "",
+            "checked": true
+          },
+          {
+            "label": "Venta Rápida",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valoraux2Obj.ventarapida",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "Venta Rápida",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valoraux2Obj.ventarapida",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "",
+            "control": "checkbox",
+            "model": "configuracion.configuracionlocalpos_valor",
+            "placeholder": "",
+            "checked": true
+          }
+        ],
+        "alerts": []
+      },
+      "endpoints_called": [
+        "GET https://caprichos.restaurant.pe/restaurant/",
+        "GET http://caprichos.restaurant.pe/restaurant/",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/pace.d2426819.js",
+        "GET https://fonts.googleapis.com/css",
+        "GET https://fonts.googleapis.com/css2",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/vendor.9707f748.css",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/style.a3719272.css",
+        "GET http://caprichos.restaurant.pe/restaurant/img/logo-restaurantpe.55ba42bd.png",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/vendor.6dad86f4.js",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/dx.all.d41d8cd9.js",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/scripts.9fdb592e.js",
+        "GET https://maps.googleapis.com/maps/api/js",
+        "GET http://caprichos.restaurant.pe/restaurant/fonts/fontawesome-webfont.woff2",
+        "GET https://maps.googleapis.com/maps/api/mapsjs/gen_204",
+        "POST https://api.deliverygo.app/v2/public/rest/establishment/getZonesLocal",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/api/rest/campaniaaddons/getByIdUsuario",
+        "GET http://gestioninterna.restaurant.pe/restaurant/m/rest/encuesta/mostarModalAddonsEncuesta/restaurant.pe/caprichos/1/1/Web",
+        "GET http://billing.restaurant.pe/billing/m/rest/suscripcion/obtenerPermisosPorPlan/caprichos/1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/configuracion/get/31",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerPermisosPorUsuarioValidado/1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/validarConfiguracioCartaJson",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/validarUsoPlataforma",
+        "GET http://incidencias.restaurant.pe/billing/m/rest/local/obtenerIncidenciaPorusuarioSinCalificacion/restaurant.pe/caprichos/1",
+        "POST http://billing.quipupos.com/billing/public/rest/aplicacion/obtenerWebinarVigenteV2",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/obtenerAddons",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerAddonsPorToken",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerLocalYape",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/sorteos/obtenerSorteoDisponible",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/encuestabi/verificarMostrar",
+        "GET http://caprichos.restaurant.pe/restaurant/m/rest/configuracion/getAllByLocalId/1/0/0",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/obtenerFechaRenovacionCertificadoValidar/20611290064",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/configuracionlocalpos/obtenerTodasLasConfiguracionesPOSPorLocalLogeado/1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/moneda/allmonedasbylocal/1/0/0",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/local/getLocalesPermitidos/0",
+        "GET http://billing.restaurant.pe/billing/m/rest/suscripcion/getEstadoSuscripcionLocalV2/caprichos/1",
+        "GET http://manual.restaurant.pe/manual/m/rest/module/module/getModuleAndSubmoduleList",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/getLive/caprichos.restaurant.pe",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerDocElectronicosPendientes",
+        "GET http://caprichos.restaurant.pe/restaurant/img/restaurantloader-pot-top_inv.cb19fa90.png",
+        "GET http://caprichos.restaurant.pe/restaurant/img/restaurantloader-pot-bottom_inv.9a417680.png",
+        "GET http://caprichos.restaurant.pe/restaurant/media/pedido_deliverygo.mp3",
+        "GET http://caprichos.restaurant.pe/restaurant/m/rest/local/getVariablesLog",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/patterns/header-profile.993cf68a.png",
+        "POST http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/integracion/integracion/34",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/green.f2e0aef8.png"
+      ]
+    },
+    "configuracionregional": {
+      "id": "configuracionregional",
+      "name": "Configuracion regional",
+      "url": "https://caprichos.restaurant.pe/restaurant/#!/ajustes/configuracionregional",
+      "dom_structure": {
+        "title": "Configuración regional",
+        "breadcrumbs": [],
+        "tabs": [],
+        "panels": [],
+        "buttons": [
+          "Registrar cambios",
+          "Ver ultimas actualizaciones"
+        ],
+        "tableHeaders": [],
+        "formControls": [
+          {
+            "label": "Cantidad de caracteres:",
+            "control": "text",
+            "model": "configuracionregional.configuracionregionallocal_valoraux1",
+            "placeholder": "Valor numerico",
+            "checked": false
+          },
+          {
+            "label": "Tipo de valor:",
+            "control": "select",
+            "model": "configuracionregional.configuracionregionallocal_valoraux2",
+            "options_sample": [
+              "Númerico",
+              "Alfanumerico"
+            ]
+          },
+          {
+            "label": "¿Obligatorio?",
+            "control": "checkbox",
+            "model": "configuracionregional.configuracionregionallocal_valoraux3",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "¿Obligatorio?",
+            "control": "checkbox",
+            "model": "configuracionregional.configuracionregionallocal_valoraux3",
+            "placeholder": "",
+            "checked": false
+          },
+          {
+            "label": "Cantidad de caracteres:",
+            "control": "text",
+            "model": "configuracionregional.configuracionregionallocal_valoraux1",
+            "placeholder": "Valor numerico",
+            "checked": false
+          },
+          {
+            "label": "Tipo de valor:",
+            "control": "select",
+            "model": "configuracionregional.configuracionregionallocal_valoraux2",
+            "options_sample": [
+              "Númerico",
+              "Alfanumerico"
+            ]
+          },
+          {
+            "label": "Tipo de redondeo en venta:",
+            "control": "select",
+            "model": "configuracionregional.configuracionregionallocal_valor",
+            "options_sample": [
+              "Según ley del pais",
+              "Sin redondeo"
+            ]
+          }
+        ],
+        "alerts": []
+      },
+      "endpoints_called": [
+        "GET https://caprichos.restaurant.pe/restaurant/",
+        "GET http://caprichos.restaurant.pe/restaurant/",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/pace.d2426819.js",
+        "GET https://fonts.googleapis.com/css",
+        "GET https://fonts.googleapis.com/css2",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/vendor.9707f748.css",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/style.a3719272.css",
+        "GET http://caprichos.restaurant.pe/restaurant/img/logo-restaurantpe.55ba42bd.png",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/vendor.6dad86f4.js",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/dx.all.d41d8cd9.js",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/scripts.9fdb592e.js",
+        "GET https://maps.googleapis.com/maps/api/js",
+        "GET http://caprichos.restaurant.pe/restaurant/fonts/fontawesome-webfont.woff2",
+        "GET https://maps.googleapis.com/maps/api/mapsjs/gen_204",
+        "POST https://api.deliverygo.app/v2/public/rest/establishment/getZonesLocal",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/api/rest/campaniaaddons/getByIdUsuario",
+        "GET http://gestioninterna.restaurant.pe/restaurant/m/rest/encuesta/mostarModalAddonsEncuesta/restaurant.pe/caprichos/1/1/Web",
+        "GET http://billing.restaurant.pe/billing/m/rest/suscripcion/obtenerPermisosPorPlan/caprichos/1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/configuracion/get/31",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerPermisosPorUsuarioValidado/1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/validarConfiguracioCartaJson",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/validarUsoPlataforma",
+        "GET http://incidencias.restaurant.pe/billing/m/rest/local/obtenerIncidenciaPorusuarioSinCalificacion/restaurant.pe/caprichos/1",
+        "POST http://billing.quipupos.com/billing/public/rest/aplicacion/obtenerWebinarVigenteV2",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/obtenerAddons",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerAddonsPorToken",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerLocalYape",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/sorteos/obtenerSorteoDisponible",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/encuestabi/verificarMostrar",
+        "GET http://caprichos.restaurant.pe/restaurant/m/rest/configuracion/getAllByLocalId/1/0/0",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/obtenerFechaRenovacionCertificadoValidar/20611290064",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/configuracionregional/obtenerTodasLasConfiguracionesregionalesPorLocalLogeado/1",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/local/getLocalesPermitidos/0",
+        "GET http://billing.restaurant.pe/billing/m/rest/suscripcion/getEstadoSuscripcionLocalV2/caprichos/1",
+        "GET http://manual.restaurant.pe/manual/m/rest/module/module/getModuleAndSubmoduleList",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/getLive/caprichos.restaurant.pe",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerDocElectronicosPendientes",
+        "GET http://caprichos.restaurant.pe/restaurant/img/restaurantloader-pot-top_inv.cb19fa90.png",
+        "GET http://caprichos.restaurant.pe/restaurant/img/restaurantloader-pot-bottom_inv.9a417680.png",
+        "GET http://caprichos.restaurant.pe/restaurant/media/pedido_deliverygo.mp3",
+        "GET http://caprichos.restaurant.pe/restaurant/m/rest/local/getVariablesLog",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/patterns/header-profile.993cf68a.png",
+        "POST http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/integracion/integracion/34",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/green.f2e0aef8.png"
+      ]
+    },
+    "locales": {
+      "id": "locales",
+      "name": "Locales",
+      "url": "https://caprichos.restaurant.pe/restaurant/#!/ajustes/locales",
+      "dom_structure": {
+        "title": "",
+        "breadcrumbs": [],
+        "tabs": [],
+        "panels": [
+          "Todos los locales"
+        ],
+        "buttons": [
+          "Editar",
+          "Conctatos"
+        ],
+        "tableHeaders": [],
+        "formControls": [],
+        "alerts": [
+          "Todos los locales"
+        ]
+      },
+      "endpoints_called": [
+        "GET https://caprichos.restaurant.pe/restaurant/",
+        "GET http://caprichos.restaurant.pe/restaurant/",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/pace.d2426819.js",
+        "GET https://fonts.googleapis.com/css",
+        "GET https://fonts.googleapis.com/css2",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/vendor.9707f748.css",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/style.a3719272.css",
+        "GET http://caprichos.restaurant.pe/restaurant/img/logo-restaurantpe.55ba42bd.png",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/vendor.6dad86f4.js",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/dx.all.d41d8cd9.js",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/scripts.9fdb592e.js",
+        "GET https://maps.googleapis.com/maps/api/js",
+        "GET http://caprichos.restaurant.pe/restaurant/fonts/fontawesome-webfont.woff2",
+        "GET https://maps.googleapis.com/maps/api/mapsjs/gen_204",
+        "POST https://api.deliverygo.app/v2/public/rest/establishment/getZonesLocal",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/api/rest/campaniaaddons/getByIdUsuario",
+        "GET http://gestioninterna.restaurant.pe/restaurant/m/rest/encuesta/mostarModalAddonsEncuesta/restaurant.pe/caprichos/1/1/Web",
+        "GET http://billing.restaurant.pe/billing/m/rest/suscripcion/obtenerPermisosPorPlan/caprichos/1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/configuracion/get/31",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerPermisosPorUsuarioValidado/1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/validarConfiguracioCartaJson",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/validarUsoPlataforma",
+        "GET http://incidencias.restaurant.pe/billing/m/rest/local/obtenerIncidenciaPorusuarioSinCalificacion/restaurant.pe/caprichos/1",
+        "POST http://billing.quipupos.com/billing/public/rest/aplicacion/obtenerWebinarVigenteV2",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/obtenerAddons",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerAddonsPorToken",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerLocalYape",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/sorteos/obtenerSorteoDisponible",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/encuestabi/verificarMostrar",
+        "GET http://caprichos.restaurant.pe/restaurant/m/rest/configuracion/getAllByLocalId/1/0/0",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/obtenerFechaRenovacionCertificadoValidar/20611290064",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/local/getLocalList",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/local/getLocalesPermitidos/0",
+        "GET http://billing.restaurant.pe/billing/m/rest/suscripcion/getEstadoSuscripcionLocalV2/caprichos/1",
+        "GET http://manual.restaurant.pe/manual/m/rest/module/module/getModuleAndSubmoduleList",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/getLive/caprichos.restaurant.pe",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerDocElectronicosPendientes",
+        "GET http://caprichos.restaurant.pe/restaurant/img/restaurantloader-pot-top_inv.cb19fa90.png",
+        "GET http://caprichos.restaurant.pe/restaurant/img/restaurantloader-pot-bottom_inv.9a417680.png",
+        "GET http://caprichos.restaurant.pe/restaurant/media/pedido_deliverygo.mp3",
+        "GET http://caprichos.restaurant.pe/restaurant/m/rest/local/getVariablesLog",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/patterns/header-profile.993cf68a.png",
+        "POST http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/integracion/integracion/34",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/moneda/get/1",
+        "GET https://maps.googleapis.com/maps/api/staticmap"
+      ]
+    },
+    "produccion": {
+      "id": "produccion",
+      "name": "Almacenes y Produccion",
+      "url": "https://caprichos.restaurant.pe/restaurant/#!/ajustes/produccion",
+      "dom_structure": {
+        "title": "",
+        "breadcrumbs": [],
+        "tabs": [],
+        "panels": [
+          "Áreas de producción",
+          "Almacenes"
+        ],
+        "buttons": [
+          "Nuevo almacén",
+          "Nueva área de producción",
+          "Editar",
+          "Nueva Área de producción",
+          "Nuevo Almacén"
+        ],
+        "tableHeaders": [
+          {
+            "tableIndex": 0,
+            "headers": [
+              "Nombre",
+              "Almacén",
+              "Impresora",
+              "¿Imprime comandas?",
+              "Estado",
+              "Acciones"
+            ],
+            "visibleRows": 5
+          },
+          {
+            "tableIndex": 1,
+            "headers": [
+              "Nombre",
+              "Estado",
+              "Acciones"
+            ],
+            "visibleRows": 2
+          }
+        ],
+        "formControls": [],
+        "alerts": [
+          "Áreas de producción",
+          "Almacenes"
+        ]
+      },
+      "endpoints_called": [
+        "GET https://caprichos.restaurant.pe/restaurant/",
+        "GET http://caprichos.restaurant.pe/restaurant/",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/pace.d2426819.js",
+        "GET https://fonts.googleapis.com/css",
+        "GET https://fonts.googleapis.com/css2",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/vendor.9707f748.css",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/style.a3719272.css",
+        "GET http://caprichos.restaurant.pe/restaurant/img/logo-restaurantpe.55ba42bd.png",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/vendor.6dad86f4.js",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/dx.all.d41d8cd9.js",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/scripts.9fdb592e.js",
+        "GET https://maps.googleapis.com/maps/api/js",
+        "GET http://caprichos.restaurant.pe/restaurant/fonts/fontawesome-webfont.woff2",
+        "GET https://maps.googleapis.com/maps/api/mapsjs/gen_204",
+        "POST https://api.deliverygo.app/v2/public/rest/establishment/getZonesLocal",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/api/rest/campaniaaddons/getByIdUsuario",
+        "GET http://gestioninterna.restaurant.pe/restaurant/m/rest/encuesta/mostarModalAddonsEncuesta/restaurant.pe/caprichos/1/1/Web",
+        "GET http://billing.restaurant.pe/billing/m/rest/suscripcion/obtenerPermisosPorPlan/caprichos/1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/configuracion/get/31",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerPermisosPorUsuarioValidado/1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/validarConfiguracioCartaJson",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/validarUsoPlataforma",
+        "GET http://incidencias.restaurant.pe/billing/m/rest/local/obtenerIncidenciaPorusuarioSinCalificacion/restaurant.pe/caprichos/1",
+        "POST http://billing.quipupos.com/billing/public/rest/aplicacion/obtenerWebinarVigenteV2",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/obtenerAddons",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerAddonsPorToken",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerLocalYape",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/sorteos/obtenerSorteoDisponible",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/encuestabi/verificarMostrar",
+        "GET http://caprichos.restaurant.pe/restaurant/m/rest/configuracion/getAllByLocalId/1/0/0",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/obtenerFechaRenovacionCertificadoValidar/20611290064",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/areaproduccion/getAllByLocalId/1/-1/1/10",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/almacen/getAllByLocalYEstadoPaginado/1/-1/1/10",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/almacen/getAllByLocalId/1/-1/0/0",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/impresora/getAllByLocalId/1/-1/0/0",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/configuracion/obtenerTodasLasConfiguracionesPorLocalLogeado/1",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/local/getLocalesPermitidos/0",
+        "GET http://billing.restaurant.pe/billing/m/rest/suscripcion/getEstadoSuscripcionLocalV2/caprichos/1",
+        "GET http://manual.restaurant.pe/manual/m/rest/module/module/getModuleAndSubmoduleList",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/getLive/caprichos.restaurant.pe",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerDocElectronicosPendientes",
+        "GET http://caprichos.restaurant.pe/restaurant/img/restaurantloader-pot-top_inv.cb19fa90.png",
+        "GET http://caprichos.restaurant.pe/restaurant/img/restaurantloader-pot-bottom_inv.9a417680.png",
+        "GET http://caprichos.restaurant.pe/restaurant/media/pedido_deliverygo.mp3",
+        "GET http://caprichos.restaurant.pe/restaurant/m/rest/local/getVariablesLog",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/integracion/integracion/34",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/patterns/header-profile.993cf68a.png",
+        "POST http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/almacen/obtenerPorId/1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/impresora/impresora/3"
+      ]
+    },
+    "salones": {
+      "id": "salones",
+      "name": "Salones y Mesas",
+      "url": "https://caprichos.restaurant.pe/restaurant/#!/ajustes/salones",
+      "dom_structure": {
+        "title": "Selecciona un salón",
+        "breadcrumbs": [],
+        "tabs": [],
+        "panels": [
+          "Salones"
+        ],
+        "buttons": [
+          "Nuevo salón",
+          "Nuevo Salón",
+          "Ver",
+          "Editar"
+        ],
+        "tableHeaders": [
+          {
+            "tableIndex": 0,
+            "headers": [
+              "Nombre",
+              "Mesas",
+              "Estado",
+              "Acciones"
+            ],
+            "visibleRows": 2
+          }
+        ],
+        "formControls": [],
+        "alerts": [
+          "Salones"
+        ]
+      },
+      "endpoints_called": [
+        "GET https://caprichos.restaurant.pe/restaurant/",
+        "GET http://caprichos.restaurant.pe/restaurant/",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/pace.d2426819.js",
+        "GET https://fonts.googleapis.com/css",
+        "GET https://fonts.googleapis.com/css2",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/vendor.9707f748.css",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/style.a3719272.css",
+        "GET http://caprichos.restaurant.pe/restaurant/img/logo-restaurantpe.55ba42bd.png",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/vendor.6dad86f4.js",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/dx.all.d41d8cd9.js",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/scripts.9fdb592e.js",
+        "GET https://maps.googleapis.com/maps/api/js",
+        "GET http://caprichos.restaurant.pe/restaurant/fonts/fontawesome-webfont.woff2",
+        "GET https://maps.googleapis.com/maps/api/mapsjs/gen_204",
+        "POST https://api.deliverygo.app/v2/public/rest/establishment/getZonesLocal",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/api/rest/campaniaaddons/getByIdUsuario",
+        "GET http://gestioninterna.restaurant.pe/restaurant/m/rest/encuesta/mostarModalAddonsEncuesta/restaurant.pe/caprichos/1/1/Web",
+        "GET http://billing.restaurant.pe/billing/m/rest/suscripcion/obtenerPermisosPorPlan/caprichos/1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/configuracion/get/31",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerPermisosPorUsuarioValidado/1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/validarConfiguracioCartaJson",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/validarUsoPlataforma",
+        "GET http://incidencias.restaurant.pe/billing/m/rest/local/obtenerIncidenciaPorusuarioSinCalificacion/restaurant.pe/caprichos/1",
+        "POST http://billing.quipupos.com/billing/public/rest/aplicacion/obtenerWebinarVigenteV2",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/obtenerAddons",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerAddonsPorToken",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerLocalYape",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/sorteos/obtenerSorteoDisponible",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/encuestabi/verificarMostrar",
+        "GET http://caprichos.restaurant.pe/restaurant/m/rest/configuracion/getAllByLocalId/1/0/0",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/obtenerFechaRenovacionCertificadoValidar/20611290064",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/configuracionlocalpos/obtenerTodasLasConfiguracionesPOSPorLocalLogeado/1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/salon/getAllByLocalId/1/-1/1/10",
+        "GET https://api.deliverygo.app/v2/public/rest/establishment/getDatosEstablecimiento/6986/1/restaurant.pe",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/local/getLocalesPermitidos/0",
+        "GET http://billing.restaurant.pe/billing/m/rest/suscripcion/getEstadoSuscripcionLocalV2/caprichos/1",
+        "GET http://manual.restaurant.pe/manual/m/rest/module/module/getModuleAndSubmoduleList",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/getLive/caprichos.restaurant.pe",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerDocElectronicosPendientes",
+        "GET http://caprichos.restaurant.pe/restaurant/img/restaurantloader-pot-top_inv.cb19fa90.png",
+        "GET http://caprichos.restaurant.pe/restaurant/img/restaurantloader-pot-bottom_inv.9a417680.png",
+        "GET http://caprichos.restaurant.pe/restaurant/media/pedido_deliverygo.mp3",
+        "GET http://caprichos.restaurant.pe/restaurant/m/rest/local/getVariablesLog",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/patterns/header-profile.993cf68a.png",
+        "POST http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/integracion/integracion/34"
+      ]
+    },
+    "cajas": {
+      "id": "cajas",
+      "name": "Cajas",
+      "url": "https://caprichos.restaurant.pe/restaurant/#!/ajustes/cajas",
+      "dom_structure": {
+        "title": "",
+        "breadcrumbs": [],
+        "tabs": [],
+        "panels": [
+          "Cajas registradas"
+        ],
+        "buttons": [
+          "Editar",
+          "Nueva caja"
+        ],
+        "tableHeaders": [
+          {
+            "tableIndex": 0,
+            "headers": [
+              "Nombre",
+              "Almacen",
+              "Factura e imprime?",
+              "Self Service?",
+              "Estado",
+              "Acciones"
+            ],
+            "visibleRows": 3
+          }
+        ],
+        "formControls": [],
+        "alerts": [
+          "Cajas registradas"
+        ]
+      },
+      "endpoints_called": [
+        "GET https://caprichos.restaurant.pe/restaurant/",
+        "GET http://caprichos.restaurant.pe/restaurant/",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/pace.d2426819.js",
+        "GET https://fonts.googleapis.com/css",
+        "GET https://fonts.googleapis.com/css2",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/vendor.9707f748.css",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/style.a3719272.css",
+        "GET http://caprichos.restaurant.pe/restaurant/img/logo-restaurantpe.55ba42bd.png",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/vendor.6dad86f4.js",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/dx.all.d41d8cd9.js",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/scripts.9fdb592e.js",
+        "GET https://maps.googleapis.com/maps/api/js",
+        "GET http://caprichos.restaurant.pe/restaurant/fonts/fontawesome-webfont.woff2",
+        "GET https://maps.googleapis.com/maps/api/mapsjs/gen_204",
+        "POST https://api.deliverygo.app/v2/public/rest/establishment/getZonesLocal",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/api/rest/campaniaaddons/getByIdUsuario",
+        "GET http://gestioninterna.restaurant.pe/restaurant/m/rest/encuesta/mostarModalAddonsEncuesta/restaurant.pe/caprichos/1/1/Web",
+        "GET http://billing.restaurant.pe/billing/m/rest/suscripcion/obtenerPermisosPorPlan/caprichos/1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/configuracion/get/31",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerPermisosPorUsuarioValidado/1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/validarConfiguracioCartaJson",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/validarUsoPlataforma",
+        "GET http://incidencias.restaurant.pe/billing/m/rest/local/obtenerIncidenciaPorusuarioSinCalificacion/restaurant.pe/caprichos/1",
+        "POST http://billing.quipupos.com/billing/public/rest/aplicacion/obtenerWebinarVigenteV2",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/obtenerAddons",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerAddonsPorToken",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerLocalYape",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/sorteos/obtenerSorteoDisponible",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/encuestabi/verificarMostrar",
+        "GET http://caprichos.restaurant.pe/restaurant/m/rest/configuracion/getAllByLocalId/1/0/0",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/obtenerFechaRenovacionCertificadoValidar/20611290064",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/marca/getBusquedaPaginadaByEstado/-1/1/-1/-1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/caja/allcajasbylocal/1/-1/1/10",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/caja/allcajasbylocal/-1/1/-1/-1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/almacen/getPorLocal",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/comprobantecaja/getComprobantecajaList/1/10",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/impresora/getAllByLocalId/1/-1/0/0",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/local/getLocalesPermitidos/0",
+        "GET http://billing.restaurant.pe/billing/m/rest/suscripcion/getEstadoSuscripcionLocalV2/caprichos/1",
+        "GET http://manual.restaurant.pe/manual/m/rest/module/module/getModuleAndSubmoduleList",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/getLive/caprichos.restaurant.pe",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerDocElectronicosPendientes",
+        "GET http://caprichos.restaurant.pe/restaurant/img/restaurantloader-pot-top_inv.cb19fa90.png",
+        "GET http://caprichos.restaurant.pe/restaurant/img/restaurantloader-pot-bottom_inv.9a417680.png",
+        "GET http://caprichos.restaurant.pe/restaurant/media/pedido_deliverygo.mp3",
+        "GET http://caprichos.restaurant.pe/restaurant/m/rest/local/getVariablesLog",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/patterns/header-profile.993cf68a.png",
+        "POST http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/integracion/integracion/34"
+      ]
+    },
+    "impresoras": {
+      "id": "impresoras",
+      "name": "Impresoras",
+      "url": "https://caprichos.restaurant.pe/restaurant/#!/ajustes/impresoras",
+      "dom_structure": {
+        "title": "",
+        "breadcrumbs": [],
+        "tabs": [
+          "Áreas de producción",
+          "Cajas y comprobantes",
+          "Estaciones de pre-cuentas"
+        ],
+        "panels": [
+          "Vincular impresoras",
+          "Todas las impresoras"
+        ],
+        "buttons": [
+          "Simular Rutas de impresión",
+          "Registrar impresora",
+          "Ver ultimas actualizaciones",
+          "Editar",
+          "Probar",
+          "Registrar nueva impresora",
+          "Conectar con servicio"
+        ],
+        "tableHeaders": [
+          {
+            "tableIndex": 0,
+            "headers": [
+              "Nombre",
+              "Impresora",
+              "Imprimir comandas",
+              "Acciones"
+            ],
+            "visibleRows": 4
+          },
+          {
+            "tableIndex": 1,
+            "headers": [
+              "Caja",
+              "Comprobante",
+              "Impresora",
+              "Imprime logo",
+              "Acciones"
+            ],
+            "visibleRows": 17
+          },
+          {
+            "tableIndex": 2,
+            "headers": [
+              "Estación",
+              "Impresora",
+              "Imprime logo",
+              "Estado",
+              "Acciones"
+            ],
+            "visibleRows": 3
+          },
+          {
+            "tableIndex": 3,
+            "headers": [
+              "Nombre",
+              "Tipo",
+              "Estado",
+              "Acciones"
+            ],
+            "visibleRows": 6
+          }
+        ],
+        "formControls": [
+          {
+            "label": "Ver impresoras activas",
+            "control": "checkbox",
+            "model": "vm.verSoloActivos",
+            "placeholder": "",
+            "checked": false
+          }
+        ],
+        "alerts": [
+          "Vincular impresoras",
+          "Todas las impresoras"
+        ]
+      },
+      "endpoints_called": [
+        "GET https://caprichos.restaurant.pe/restaurant/",
+        "GET http://caprichos.restaurant.pe/restaurant/",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/pace.d2426819.js",
+        "GET https://fonts.googleapis.com/css",
+        "GET https://fonts.googleapis.com/css2",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/vendor.9707f748.css",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/style.a3719272.css",
+        "GET http://caprichos.restaurant.pe/restaurant/img/logo-restaurantpe.55ba42bd.png",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/vendor.6dad86f4.js",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/dx.all.d41d8cd9.js",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/scripts.9fdb592e.js",
+        "GET https://maps.googleapis.com/maps/api/js",
+        "GET http://caprichos.restaurant.pe/restaurant/fonts/fontawesome-webfont.woff2",
+        "GET https://maps.googleapis.com/maps/api/mapsjs/gen_204",
+        "POST https://api.deliverygo.app/v2/public/rest/establishment/getZonesLocal",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/api/rest/campaniaaddons/getByIdUsuario",
+        "GET http://gestioninterna.restaurant.pe/restaurant/m/rest/encuesta/mostarModalAddonsEncuesta/restaurant.pe/caprichos/1/1/Web",
+        "GET http://billing.restaurant.pe/billing/m/rest/suscripcion/obtenerPermisosPorPlan/caprichos/1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/configuracion/get/31",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerPermisosPorUsuarioValidado/1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/validarConfiguracioCartaJson",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/validarUsoPlataforma",
+        "GET http://incidencias.restaurant.pe/billing/m/rest/local/obtenerIncidenciaPorusuarioSinCalificacion/restaurant.pe/caprichos/1",
+        "POST http://billing.quipupos.com/billing/public/rest/aplicacion/obtenerWebinarVigenteV2",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/obtenerAddons",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerAddonsPorToken",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerLocalYape",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/sorteos/obtenerSorteoDisponible",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/encuestabi/verificarMostrar",
+        "GET http://caprichos.restaurant.pe/restaurant/m/rest/configuracion/getAllByLocalId/1/0/0",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/obtenerFechaRenovacionCertificadoValidar/20611290064",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/impresora/getAllByLocalId/1/-1/1/10",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/areaproduccion/getAllByLocalId/1/1/0/0",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/comprobante/getComprobanteList/0/0",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/precuenta/getAllByLocalId/1/-1/0/0",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/impresora/cargarModelos",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/impresora/getAllByLocalId/1/1/0/0",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/local/getLocalesPermitidos/0",
+        "GET http://billing.restaurant.pe/billing/m/rest/suscripcion/getEstadoSuscripcionLocalV2/caprichos/1",
+        "GET http://manual.restaurant.pe/manual/m/rest/module/module/getModuleAndSubmoduleList",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/getLive/caprichos.restaurant.pe",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerDocElectronicosPendientes",
+        "GET http://caprichos.restaurant.pe/restaurant/img/restaurantloader-pot-top_inv.cb19fa90.png",
+        "GET http://caprichos.restaurant.pe/restaurant/img/restaurantloader-pot-bottom_inv.9a417680.png",
+        "GET http://caprichos.restaurant.pe/restaurant/media/pedido_deliverygo.mp3",
+        "GET http://caprichos.restaurant.pe/restaurant/m/rest/local/getVariablesLog",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/green.f2e0aef8.png",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/patterns/header-profile.993cf68a.png",
+        "POST http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/integracion/integracion/34"
+      ]
+    },
+    "turnos": {
+      "id": "turnos",
+      "name": "Turnos",
+      "url": "https://caprichos.restaurant.pe/restaurant/#!/ajustes/turnos",
+      "dom_structure": {
+        "title": "",
+        "breadcrumbs": [],
+        "tabs": [],
+        "panels": [
+          "Todos los turnos"
+        ],
+        "buttons": [
+          "Editar",
+          "Nuevo turno"
+        ],
+        "tableHeaders": [
+          {
+            "tableIndex": 0,
+            "headers": [
+              "Turno",
+              "Inicia",
+              "Termina",
+              "Estado",
+              "Acciones"
+            ],
+            "visibleRows": 2
+          }
+        ],
+        "formControls": [],
+        "alerts": [
+          "Todos los turnos"
+        ]
+      },
+      "endpoints_called": [
+        "GET https://caprichos.restaurant.pe/restaurant/",
+        "GET http://caprichos.restaurant.pe/restaurant/",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/pace.d2426819.js",
+        "GET https://fonts.googleapis.com/css",
+        "GET https://fonts.googleapis.com/css2",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/vendor.9707f748.css",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/style.a3719272.css",
+        "GET http://caprichos.restaurant.pe/restaurant/img/logo-restaurantpe.55ba42bd.png",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/vendor.6dad86f4.js",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/dx.all.d41d8cd9.js",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/scripts.9fdb592e.js",
+        "GET https://maps.googleapis.com/maps/api/js",
+        "GET http://caprichos.restaurant.pe/restaurant/fonts/fontawesome-webfont.woff2",
+        "GET https://maps.googleapis.com/maps/api/mapsjs/gen_204",
+        "POST https://api.deliverygo.app/v2/public/rest/establishment/getZonesLocal",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/api/rest/campaniaaddons/getByIdUsuario",
+        "GET http://gestioninterna.restaurant.pe/restaurant/m/rest/encuesta/mostarModalAddonsEncuesta/restaurant.pe/caprichos/1/1/Web",
+        "GET http://billing.restaurant.pe/billing/m/rest/suscripcion/obtenerPermisosPorPlan/caprichos/1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/configuracion/get/31",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerPermisosPorUsuarioValidado/1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/validarConfiguracioCartaJson",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/validarUsoPlataforma",
+        "GET http://incidencias.restaurant.pe/billing/m/rest/local/obtenerIncidenciaPorusuarioSinCalificacion/restaurant.pe/caprichos/1",
+        "POST http://billing.quipupos.com/billing/public/rest/aplicacion/obtenerWebinarVigenteV2",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/obtenerAddons",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerAddonsPorToken",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerLocalYape",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/sorteos/obtenerSorteoDisponible",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/encuestabi/verificarMostrar",
+        "GET http://caprichos.restaurant.pe/restaurant/m/rest/configuracion/getAllByLocalId/1/0/0",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/obtenerFechaRenovacionCertificadoValidar/20611290064",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/turno/getAllByLocalId/1/-1/1/10",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/local/getLocalesPermitidos/0",
+        "GET http://billing.restaurant.pe/billing/m/rest/suscripcion/getEstadoSuscripcionLocalV2/caprichos/1",
+        "GET http://manual.restaurant.pe/manual/m/rest/module/module/getModuleAndSubmoduleList",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/getLive/caprichos.restaurant.pe",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerDocElectronicosPendientes",
+        "GET http://caprichos.restaurant.pe/restaurant/img/restaurantloader-pot-top_inv.cb19fa90.png",
+        "GET http://caprichos.restaurant.pe/restaurant/img/restaurantloader-pot-bottom_inv.9a417680.png",
+        "GET http://caprichos.restaurant.pe/restaurant/media/pedido_deliverygo.mp3",
+        "GET http://caprichos.restaurant.pe/restaurant/m/rest/local/getVariablesLog",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/patterns/header-profile.993cf68a.png",
+        "POST http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/integracion/integracion/34"
+      ]
+    },
+    "marca": {
+      "id": "marca",
+      "name": "Gestion de marcas",
+      "url": "https://caprichos.restaurant.pe/restaurant/#!/ajustes/marca",
+      "dom_structure": {
+        "title": "",
+        "breadcrumbs": [],
+        "tabs": [],
+        "panels": [
+          "Todas las marcas"
+        ],
+        "buttons": [
+          "Editar",
+          "Nueva marca"
+        ],
+        "tableHeaders": [
+          {
+            "tableIndex": 0,
+            "headers": [
+              "Nombre",
+              "RUC",
+              "Estado",
+              "Acciones"
+            ],
+            "visibleRows": 2
+          }
+        ],
+        "formControls": [],
+        "alerts": [
+          "Todas las marcas"
+        ]
+      },
+      "endpoints_called": [
+        "GET https://caprichos.restaurant.pe/restaurant/",
+        "GET http://caprichos.restaurant.pe/restaurant/",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/pace.d2426819.js",
+        "GET https://fonts.googleapis.com/css",
+        "GET https://fonts.googleapis.com/css2",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/vendor.9707f748.css",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/style.a3719272.css",
+        "GET http://caprichos.restaurant.pe/restaurant/img/logo-restaurantpe.55ba42bd.png",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/vendor.6dad86f4.js",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/dx.all.d41d8cd9.js",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/scripts.9fdb592e.js",
+        "GET https://maps.googleapis.com/maps/api/js",
+        "GET http://caprichos.restaurant.pe/restaurant/fonts/fontawesome-webfont.woff2",
+        "GET https://maps.googleapis.com/maps/api/mapsjs/gen_204",
+        "POST https://api.deliverygo.app/v2/public/rest/establishment/getZonesLocal",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/api/rest/campaniaaddons/getByIdUsuario",
+        "GET http://gestioninterna.restaurant.pe/restaurant/m/rest/encuesta/mostarModalAddonsEncuesta/restaurant.pe/caprichos/1/1/Web",
+        "GET http://billing.restaurant.pe/billing/m/rest/suscripcion/obtenerPermisosPorPlan/caprichos/1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/configuracion/get/31",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerPermisosPorUsuarioValidado/1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/validarConfiguracioCartaJson",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/validarUsoPlataforma",
+        "GET http://incidencias.restaurant.pe/billing/m/rest/local/obtenerIncidenciaPorusuarioSinCalificacion/restaurant.pe/caprichos/1",
+        "POST http://billing.quipupos.com/billing/public/rest/aplicacion/obtenerWebinarVigenteV2",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/obtenerAddons",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerAddonsPorToken",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerLocalYape",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/sorteos/obtenerSorteoDisponible",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/encuestabi/verificarMostrar",
+        "GET http://caprichos.restaurant.pe/restaurant/m/rest/configuracion/getAllByLocalId/1/0/0",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/obtenerFechaRenovacionCertificadoValidar/20611290064",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/marca/getBusquedaPaginadaByEstado/-1/-1/1/10",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerLocalesPermitidosParaUsuarioID/1",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/local/getLocalesPermitidos/0",
+        "GET http://billing.restaurant.pe/billing/m/rest/suscripcion/getEstadoSuscripcionLocalV2/caprichos/1",
+        "GET http://manual.restaurant.pe/manual/m/rest/module/module/getModuleAndSubmoduleList",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/getLive/caprichos.restaurant.pe",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerDocElectronicosPendientes",
+        "GET http://caprichos.restaurant.pe/restaurant/img/restaurantloader-pot-top_inv.cb19fa90.png",
+        "GET http://caprichos.restaurant.pe/restaurant/img/restaurantloader-pot-bottom_inv.9a417680.png",
+        "GET http://caprichos.restaurant.pe/restaurant/media/pedido_deliverygo.mp3",
+        "GET http://caprichos.restaurant.pe/restaurant/m/rest/local/getVariablesLog",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/patterns/header-profile.993cf68a.png",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/integracion/integracion/34",
+        "POST http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas"
+      ]
+    },
+    "imagen_self_service": {
+      "id": "imagen_self_service",
+      "name": "Imagenes self service",
+      "url": "https://caprichos.restaurant.pe/restaurant/#!/ajustes/imagen-self-service",
+      "dom_structure": {
+        "title": "",
+        "breadcrumbs": [],
+        "tabs": [],
+        "panels": [],
+        "buttons": [
+          "Elegir una imagen"
+        ],
+        "tableHeaders": [],
+        "formControls": [],
+        "alerts": []
+      },
+      "endpoints_called": [
+        "GET https://caprichos.restaurant.pe/restaurant/",
+        "GET http://caprichos.restaurant.pe/restaurant/",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/pace.d2426819.js",
+        "GET https://fonts.googleapis.com/css",
+        "GET https://fonts.googleapis.com/css2",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/vendor.9707f748.css",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/style.a3719272.css",
+        "GET http://caprichos.restaurant.pe/restaurant/img/logo-restaurantpe.55ba42bd.png",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/vendor.6dad86f4.js",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/dx.all.d41d8cd9.js",
+        "GET http://caprichos.restaurant.pe/restaurant/scripts/scripts.9fdb592e.js",
+        "GET https://maps.googleapis.com/maps/api/js",
+        "GET http://caprichos.restaurant.pe/restaurant/fonts/fontawesome-webfont.woff2",
+        "GET https://maps.googleapis.com/maps/api/mapsjs/gen_204",
+        "POST https://api.deliverygo.app/v2/public/rest/establishment/getZonesLocal",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/api/rest/campaniaaddons/getByIdUsuario",
+        "GET http://gestioninterna.restaurant.pe/restaurant/m/rest/encuesta/mostarModalAddonsEncuesta/restaurant.pe/caprichos/1/1/Web",
+        "GET http://billing.restaurant.pe/billing/m/rest/suscripcion/obtenerPermisosPorPlan/caprichos/1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/configuracion/get/31",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerPermisosPorUsuarioValidado/1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/validarConfiguracioCartaJson",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/validarUsoPlataforma",
+        "GET http://incidencias.restaurant.pe/billing/m/rest/local/obtenerIncidenciaPorusuarioSinCalificacion/restaurant.pe/caprichos/1",
+        "POST http://billing.quipupos.com/billing/public/rest/aplicacion/obtenerWebinarVigenteV2",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/obtenerAddons",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerAddonsPorToken",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerLocalYape",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/sorteos/obtenerSorteoDisponible",
+        "POST http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/encuestabi/verificarMostrar",
+        "GET http://caprichos.restaurant.pe/restaurant/m/rest/configuracion/getAllByLocalId/1/0/0",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/obtenerFechaRenovacionCertificadoValidar/20611290064",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerLocalesPermitidosParaUsuarioID/1",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/marca/getAll/1/0/0",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/local/getLocalesPermitidos/0",
+        "GET http://billing.restaurant.pe/billing/m/rest/suscripcion/getEstadoSuscripcionLocalV2/caprichos/1",
+        "GET http://manual.restaurant.pe/manual/m/rest/module/module/getModuleAndSubmoduleList",
+        "GET http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/getLive/caprichos.restaurant.pe",
+        "POST http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerDocElectronicosPendientes",
+        "GET http://caprichos.restaurant.pe/restaurant/img/restaurantloader-pot-top_inv.cb19fa90.png",
+        "GET http://caprichos.restaurant.pe/restaurant/img/restaurantloader-pot-bottom_inv.9a417680.png",
+        "GET http://caprichos.restaurant.pe/restaurant/media/pedido_deliverygo.mp3",
+        "GET http://caprichos.restaurant.pe/restaurant/m/rest/local/getVariablesLog",
+        "GET http://caprichos.restaurant.pe/restaurant/styles/patterns/header-profile.993cf68a.png",
+        "POST http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/integracion/integracion/34",
+        "GET http://caprichos.restaurant.pe/restaurant/api/rest/imagenlocalmarca/getAllSync/1/-1/1/0/0"
+      ]
+    }
+  }
+}

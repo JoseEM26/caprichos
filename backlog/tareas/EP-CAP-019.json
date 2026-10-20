@@ -1,0 +1,151 @@
+{
+  "epica": "EP-CAP-019",
+  "generado_por_ia": true,
+  "revisado_por": null,
+  "historias": [
+    {
+      "hu": "HU-CAP-168",
+      "tareas": [
+        {
+          "id": "HU-CAP-168-T01",
+          "titulo": "Revisar criterios de HU-CAP-168 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-168-T02",
+          "titulo": "Migración Prisma de las tablas de FT-OFF-01 (pedido, cobro, comanda_area, pedido_mesa)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-168-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-168-T03",
+          "titulo": "Reglas de dominio de HU-CAP-168 (RQ-OFF-01-01, RQ-OFF-01-02, RQ-OFF-01-05)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-168-T01",
+            "HU-CAP-168-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-168-T04",
+          "titulo": "Casos de uso: Seguir operando sin internet",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-168-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-168-T05",
+          "titulo": "Endpoints y eventos de FT-OFF-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-168-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-168-T06",
+          "titulo": "Pantalla React: Seguir operando sin internet",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-168-T05"
+          ]
+        },
+        {
+          "id": "HU-CAP-168-T07",
+          "titulo": "Pruebas TC-CAP-168-01..03 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-168-T06"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-169",
+      "tareas": [
+        {
+          "id": "HU-CAP-169-T01",
+          "titulo": "Revisar criterios de HU-CAP-169 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-169-T02",
+          "titulo": "Reglas de dominio de HU-CAP-169 (RQ-OFF-01-03, RQ-OFF-01-04)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-169-T01",
+            "HU-CAP-168-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-169-T03",
+          "titulo": "Casos de uso: Sincronizar al volver la conexión",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-169-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-169-T04",
+          "titulo": "Endpoints y eventos de FT-OFF-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-169-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-169-T05",
+          "titulo": "Pruebas TC-CAP-169-01..02 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-169-T04"
+          ]
+        }
+      ]
+    }
+  ]
+}

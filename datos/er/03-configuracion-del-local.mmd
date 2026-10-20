@@ -1,0 +1,31 @@
+erDiagram
+  PARAMETRO {
+    text clave PK
+    jsonb valor
+  }
+  HORARIO_DIA {
+    smallint dia_semana PK
+    time abre
+    time cierra
+    boolean cerrado
+  }
+  FECHA_ESPECIAL {
+    date fecha PK
+    boolean cerrado
+    time abre
+    time cierra
+    text motivo
+  }
+  ARCHIVO {
+    bigint id PK
+    text ruta UK
+    text tipo_mime
+    int bytes
+    boolean privado
+  }
+  FOTO_LOCAL {
+    bigint archivo_id PK,FK
+    int orden
+    boolean activo
+  }
+  ARCHIVO ||--o| FOTO_LOCAL : "archivo_id"

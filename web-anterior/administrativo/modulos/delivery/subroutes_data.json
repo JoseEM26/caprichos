@@ -1,0 +1,232 @@
+{
+  "Canales de delivery": {
+    "title": " Todos los motorizados",
+    "tables": [
+      [
+        "Nombres",
+        "Dirección",
+        "Licencia",
+        "Teléfono",
+        "Estado",
+        "Acciones"
+      ]
+    ],
+    "buttons": [
+      "Editar",
+      "Editar",
+      "Editar",
+      "Editar",
+      "Nuevo motorizado"
+    ],
+    "inputs": [
+      {
+        "placeholder": "Buscar...",
+        "type": "text",
+        "name": ""
+      },
+      {
+        "placeholder": "Paginación",
+        "type": "text",
+        "name": ""
+      },
+      {
+        "placeholder": "",
+        "type": "text",
+        "name": ""
+      },
+      {
+        "placeholder": "Selecciona un local",
+        "type": "text",
+        "name": ""
+      },
+      {
+        "placeholder": "",
+        "type": "text",
+        "name": ""
+      }
+    ],
+    "snippet": " Motorizados\n Canales de delivery\n Movilidad\n Tipo de reclamo\n Motivos cancelación\n Todos los motorizados\n\t\nPor: 10 registros\nLocal: Todos los locales\nNombres\tDirección\tLicencia\tTeléfono\tEstado\tAcciones\n\n\n Delivery Caprichos\n\nDNI: 76038665\n\n\tcampoy\t\t51914699356\tACTIVO\t Editar\n\n\n MARVIL YOEL CORNETERO\n\nDNI: 71736646\n\n\tCAMPOY\t\t51935634985\tINACTIVO\t Editar\n\n\n Marvil Yoel Cornetero Espinoza\n\nDNI: 0000000\n\n\tnn\t\t935634985\tINACTIVO\t Editar\n\n\n YEFRI SANCHEZ GONZALES\n\nDNI: 76038665\n\n\tnn\t\t914699356\tINACTIVO\t Editar\nAnterior\n1\nSiguiente\n Nuevo motorizado"
+  },
+  "Movilidad": {
+    "title": " Todos los motorizados",
+    "tables": [
+      [
+        "Nombres",
+        "Dirección",
+        "Licencia",
+        "Teléfono",
+        "Estado",
+        "Acciones"
+      ]
+    ],
+    "buttons": [
+      "Editar",
+      "Editar",
+      "Editar",
+      "Editar",
+      "Nuevo motorizado"
+    ],
+    "inputs": [
+      {
+        "placeholder": "Buscar...",
+        "type": "text",
+        "name": ""
+      },
+      {
+        "placeholder": "Paginación",
+        "type": "text",
+        "name": ""
+      },
+      {
+        "placeholder": "",
+        "type": "text",
+        "name": ""
+      },
+      {
+        "placeholder": "Selecciona un local",
+        "type": "text",
+        "name": ""
+      },
+      {
+        "placeholder": "",
+        "type": "text",
+        "name": ""
+      }
+    ],
+    "snippet": " Motorizados\n Canales de delivery\n Movilidad\n Tipo de reclamo\n Motivos cancelación\n Todos los motorizados\n\t\nPor: 10 registros\nLocal: Todos los locales\nNombres\tDirección\tLicencia\tTeléfono\tEstado\tAcciones\n\n\n Delivery Caprichos\n\nDNI: 76038665\n\n\tcampoy\t\t51914699356\tACTIVO\t Editar\n\n\n MARVIL YOEL CORNETERO\n\nDNI: 71736646\n\n\tCAMPOY\t\t51935634985\tINACTIVO\t Editar\n\n\n Marvil Yoel Cornetero Espinoza\n\nDNI: 0000000\n\n\tnn\t\t935634985\tINACTIVO\t Editar\n\n\n YEFRI SANCHEZ GONZALES\n\nDNI: 76038665\n\n\tnn\t\t914699356\tINACTIVO\t Editar\nAnterior\n1\nSiguiente\n Nuevo motorizado"
+  },
+  "Tipo de reclamo": {
+    "title": " Todos los motorizados",
+    "tables": [
+      [
+        "Nombres",
+        "Dirección",
+        "Licencia",
+        "Teléfono",
+        "Estado",
+        "Acciones"
+      ]
+    ],
+    "buttons": [
+      "Editar",
+      "Editar",
+      "Editar",
+      "Editar",
+      "Nuevo motorizado"
+    ],
+    "inputs": [
+      {
+        "placeholder": "Buscar...",
+        "type": "text",
+        "name": ""
+      },
+      {
+        "placeholder": "Paginación",
+        "type": "text",
+        "name": ""
+      },
+      {
+        "placeholder": "",
+        "type": "text",
+        "name": ""
+      },
+      {
+        "placeholder": "Selecciona un local",
+        "type": "text",
+        "name": ""
+      },
+      {
+        "placeholder": "",
+        "type": "text",
+        "name": ""
+      }
+    ],
+    "snippet": " Motorizados\n Canales de delivery\n Movilidad\n Tipo de reclamo\n Motivos cancelación\n Todos los motorizados\n\t\nPor: 10 registros\nLocal: Todos los locales\nNombres\tDirección\tLicencia\tTeléfono\tEstado\tAcciones\n\n\n Delivery Caprichos\n\nDNI: 76038665\n\n\tcampoy\t\t51914699356\tACTIVO\t Editar\n\n\n MARVIL YOEL CORNETERO\n\nDNI: 71736646\n\n\tCAMPOY\t\t51935634985\tINACTIVO\t Editar\n\n\n Marvil Yoel Cornetero Espinoza\n\nDNI: 0000000\n\n\tnn\t\t935634985\tINACTIVO\t Editar\n\n\n YEFRI SANCHEZ GONZALES\n\nDNI: 76038665\n\n\tnn\t\t914699356\tINACTIVO\t Editar\nAnterior\n1\nSiguiente\n Nuevo motorizado"
+  },
+  "Motivos cancelacion": {
+    "title": " Todos los motorizados",
+    "tables": [
+      [
+        "Nombres",
+        "Dirección",
+        "Licencia",
+        "Teléfono",
+        "Estado",
+        "Acciones"
+      ]
+    ],
+    "buttons": [
+      "Editar",
+      "Editar",
+      "Editar",
+      "Editar",
+      "Nuevo motorizado"
+    ],
+    "inputs": [
+      {
+        "placeholder": "Buscar...",
+        "type": "text",
+        "name": ""
+      },
+      {
+        "placeholder": "Paginación",
+        "type": "text",
+        "name": ""
+      },
+      {
+        "placeholder": "",
+        "type": "text",
+        "name": ""
+      },
+      {
+        "placeholder": "Selecciona un local",
+        "type": "text",
+        "name": ""
+      },
+      {
+        "placeholder": "",
+        "type": "text",
+        "name": ""
+      }
+    ],
+    "snippet": " Motorizados\n Canales de delivery\n Movilidad\n Tipo de reclamo\n Motivos cancelación\n Todos los motorizados\n\t\nPor: 10 registros\nLocal: Todos los locales\nNombres\tDirección\tLicencia\tTeléfono\tEstado\tAcciones\n\n\n Delivery Caprichos\n\nDNI: 76038665\n\n\tcampoy\t\t51914699356\tACTIVO\t Editar\n\n\n MARVIL YOEL CORNETERO\n\nDNI: 71736646\n\n\tCAMPOY\t\t51935634985\tINACTIVO\t Editar\n\n\n Marvil Yoel Cornetero Espinoza\n\nDNI: 0000000\n\n\tnn\t\t935634985\tINACTIVO\t Editar\n\n\n YEFRI SANCHEZ GONZALES\n\nDNI: 76038665\n\n\tnn\t\t914699356\tINACTIVO\t Editar\nAnterior\n1\nSiguiente\n Nuevo motorizado"
+  },
+  "Zona sucursal": {
+    "title": "Zonas de reparto",
+    "tables": [],
+    "buttons": [
+      "Regresar a todas las sucursales",
+      "Nueva zona de reparto",
+      "Opciones",
+      "Importar zonas de reparto"
+    ],
+    "inputs": [
+      {
+        "placeholder": "",
+        "type": "search",
+        "name": ""
+      },
+      {
+        "placeholder": "Ingresa la dirección o una referencia",
+        "type": "search",
+        "name": ""
+      },
+      {
+        "placeholder": "Selecciona un estado",
+        "type": "text",
+        "name": ""
+      },
+      {
+        "placeholder": "",
+        "type": "text",
+        "name": ""
+      },
+      {
+        "placeholder": "",
+        "type": "file",
+        "name": ""
+      }
+    ],
+    "snippet": "    \nMapLibre | © MapTiler © OpenStreetMap contributors\n\t\nSucursal: CAPRICHOS\n\nEsta sucursal está habilitada para recibir pedidos.\n\n Opciones\nEstado: Activo\nImportador\n\n Descargar plantilla\n Importar zonas de reparto\n\nZonas de reparto\nACTIVA\nS/ 2.00\n Z1-2\nACTIVA\nS/ 3.00\n Z3\nACTIVA\nS/ 4.00\n Z4\nACTIVA\nS/ 5.00\n Z5"
+  }
+}

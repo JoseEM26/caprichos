@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Workflows de Caprichos</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+:root{--navy:#0B2C3E;--cream:#FBF4EC;--sand:#E3D6C6;--orange:#E67929;--rust:#B2500F;--soft:#2C4C5D;--line:#D9CFC2;--white:#FFFFFF;--green:#2E7D32}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--navy:#FBF4EC;--cream:#0B2C3E;--sand:#143C52;--soft:#C9D6DD;--line:#2C4C5D;--white:#0F3347}}
+:root[data-theme="dark"]{--navy:#FBF4EC;--cream:#0B2C3E;--sand:#143C52;--soft:#C9D6DD;--line:#2C4C5D;--white:#0F3347}
+body{margin:0;background:var(--cream)}
+button{font-family:inherit;cursor:pointer}
+.wf{display:flex;flex-direction:column;height:100vh;min-height:640px;background:var(--cream);color:var(--navy);font-family:Montserrat,system-ui,sans-serif}
+.wf-top{padding:14px 16px 10px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:2px}
+.wf-top h1{margin:0;font-weight:800;font-size:22px;line-height:28px}
+.wf-top p{margin:0;font-size:13px;line-height:18px;color:var(--soft)}
+.wf-body{flex:1;min-height:0;display:flex}
+.wf-grp{margin:8px 2px 0;font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--soft)}
+.wf-nav{flex:none;width:270px;border-right:1px solid var(--line);padding:12px;display:flex;flex-direction:column;gap:6px;overflow-y:auto;background:var(--white)}
+.wf-cat{min-height:44px;text-align:left;border:1.5px solid var(--line);border-radius:12px;background:transparent;color:var(--navy);padding:6px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:700;font-size:14px}
+.wf-cat .n{font-size:12px;font-weight:800;border-radius:9999px;padding:1px 9px;background:var(--sand);color:var(--navy)}
+.wf-main{flex:1;min-width:0;overflow-y:auto;padding:14px 16px 28px;display:flex;flex-direction:column;gap:14px}
+.wf-chips{display:flex;gap:6px;flex-wrap:wrap}
+.wf-chip{min-height:44px;padding:0 14px;border-radius:9999px;border:1.5px solid var(--navy);font-weight:700;font-size:13px}
+.wf-head{display:flex;flex-direction:column;gap:6px}
+.wf-title{font-weight:800;font-size:20px;line-height:26px;margin:0}
+.wf-meta{display:flex;gap:8px 16px;flex-wrap:wrap;font-size:13px;color:var(--soft)}
+.pill{display:inline-block;font-size:12px;font-weight:800;border-radius:9999px;padding:2px 12px}
+.lanes{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--white)}
+.grid{display:grid;gap:8px 10px;padding:12px;min-width:640px}
+.lh{font-weight:800;font-size:12px;letter-spacing:0.06em;text-transform:uppercase;padding:6px 10px;border-radius:8px;color:#fff;text-align:center}
+.st{border:1.5px solid var(--line);border-left-width:6px;border-radius:10px;padding:8px 10px;background:var(--white);font-size:13px;line-height:18px;position:relative}
+.st .num{display:inline-block;min-width:22px;height:22px;line-height:22px;border-radius:11px;text-align:center;font-weight:800;font-size:12px;color:#fff;margin-right:6px}
+.st .nt{display:block;margin-top:4px;font-size:12px;color:var(--soft);font-weight:600}
+.arrow{position:absolute;top:-12px;left:14px;font-size:11px;color:var(--soft);line-height:12px}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.box{background:var(--white);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.box h3{margin:0;font-weight:800;font-size:15px}
+.box ul{margin:0;padding-left:18px;font-size:13px;line-height:19px}
+.box li{margin-bottom:3px}
+@media (max-width:760px){.wf-grp{display:none}.wf-body{flex-direction:column}.wf-nav{width:auto;flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line)}.wf-cat{flex:none}}
+</style>
+</helmet>
+<div class="wf">
+  <div class="wf-top"><h1>Workflows de Caprichos</h1><p>Cómo funciona la carta virtual, cada módulo del administrativo y los procesos de punta a punta: quién hace qué y en qué orden. Elige una categoría y un workflow. Todo coincide con el mockup; lo marcado como «Propuesta» todavía no está construido.</p></div>
+  <div class="wf-body">
+    <nav class="wf-nav" aria-label="Categorías">
+      <sc-for list="{{cats}}" as="c" hint-placeholder-count="10"><sc-if value="{{c.isHead}}" hint-placeholder-val="{{ false }}"><div class="wf-grp">{{c.n}}</div></sc-if><sc-if value="{{c.isCat}}" hint-placeholder-val="{{ true }}"><button class="wf-cat" onClick="{{c.pick}}" aria-pressed="{{c.on}}" style="background:{{c.bg}};color:{{c.fg}};border-color:{{c.bd}}"><span>{{c.n}}</span><span class="n">{{c.count}}</span></button></sc-if></sc-for>
+    </nav>
+    <main class="wf-main">
+      <div class="wf-chips" role="tablist" aria-label="Workflows de la categoría"><sc-for list="{{wfs}}" as="w" hint-placeholder-count="4"><button class="wf-chip" role="tab" onClick="{{w.pick}}" aria-selected="{{w.on}}" style="background:{{w.bg}};color:{{w.fg}}">{{w.n}}</button></sc-for></div>
+      <div class="wf-head">
+        <h2 class="wf-title">{{title}}</h2>
+        <div class="wf-meta"><span class="pill" style="background:{{stBg}};color:{{stFg}}">{{stLabel}}</span><span><b>Quién:</b> {{who}}</span><span><b>Cuándo empieza:</b> {{trigger}}</span></div>
+      </div>
+      <div class="lanes"><div class="grid" style="{{gridCss}}">
+        <sc-for list="{{laneHeads}}" as="l" hint-placeholder-count="3"><div class="lh" style="{{l.css}}">{{l.n}}</div></sc-for>
+        <sc-for list="{{steps}}" as="s" hint-placeholder-count="6"><div class="st" style="{{s.css}}"><sc-if value="{{s.hasArrow}}" hint-placeholder-val="{{ false }}"><span class="arrow" aria-hidden="true">&#9660;</span></sc-if><span class="num" style="background:{{s.col}}">{{s.n}}</span>{{s.t}}<sc-if value="{{s.hasNote}}" hint-placeholder-val="{{ false }}"><span class="nt">{{s.note}}</span></sc-if></div></sc-for>
+      </div></div>
+      <div class="two">
+        <div class="box"><h3>Reglas clave</h3><ul><sc-for list="{{rules}}" as="r" hint-placeholder-count="3"><li>{{r.t}}</li></sc-for></ul></div>
+        <div class="box"><h3>Por decidir o pendiente</h3><ul><sc-for list="{{todo}}" as="r" hint-placeholder-count="2"><li>{{r.t}}</li></sc-for></ul></div>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+const LANES = { cliente: ['Cliente', '#E67929'], bot: ['Bot', '#1F7A8C'], persona: ['Persona del equipo', '#0B2C3E'], sistema: ['Sistema', '#6B4E9B'], repartidor: ['Repartidor', '#2E7D32'], almacen: ['Almacén', '#B5651D'], cocina: ['Cocina y barra', '#AD4A4A'], caja: ['Caja', '#37698F'], mozo: ['Mozo', '#2F7A6B'], admin: ['Administrador', '#7A4B8C'] };
+const GRP_CARTA = 'Carta virtual';
+const GRP_PROC = 'Procesos de punta a punta';
+const GRP_MOD = 'Módulos del administrativo';
+const CARTA = { id: 'carta', grp: GRP_CARTA, n: 'Carta virtual (cliente)', wfs: [
+  { n: 'Flujo general: del ingreso al pedido', st: 'Construido', who: 'Cliente (celular o computadora)', trig: 'El cliente abre la carta', lanes: ['cliente', 'sistema', 'bot'], steps: [
+    ['cliente', 'Entra a la carta. Ve si el local está abierto, el tiempo de entrega y el envío gratis.', 'Fuera de horario o con pedidos en pausa puede mirar la carta pero no pedir.'],
+    ['cliente', 'Busca o filtra por categoría y abre un producto.'],
+    ['cliente', 'Elige tamaño, tipo de leche, endulzante, extras y toppings (lo obligatorio no deja avanzar) y lo agrega al carrito.', 'Un producto agotado no se ofrece.'],
+    ['cliente', 'Abre el carrito: elige delivery o para recoger, aplica un cupón si tiene (opcional) y ve los descuentos automáticos.'],
+    ['cliente', 'Deja su nombre y celular. En delivery: comparte su ubicación actual (opcional) o escribe su dirección.', 'Sin ubicación, la dirección es obligatoria y el envío se confirma contigo.'],
+    ['cliente', 'Elige cómo prefiere pagar (no paga ni envía capturas) y, si quiere, pide boleta o factura (RUC).'],
+    ['sistema', 'Valida horario, mínimo de delivery y datos; confirma con Sí. Registra el pedido «Por confirmar» y avisa al equipo.'],
+    ['bot', 'Le escribe por WhatsApp con el resumen y el pago; si falta la ubicación, un asesor se pone en contacto.', 'Ver «Pedido de la carta y pago por WhatsApp».'],
+    ['cliente', 'Recibe la confirmación y el aviso cuando sale su pedido.']
+  ], rules: ['El cliente nunca paga ni sube capturas desde la carta.', 'La ubicación no es obligatoria; nunca ve «zonas».', 'Cada pedido valida otra vez el horario al confirmar.'], todo: ['Seguimiento en vivo del pedido en la carta (hoy se sigue por WhatsApp).'] },
+  { n: 'Cuenta, puntos y campanita', st: 'Construido', who: 'Cliente', trig: 'El cliente toca Ingresar', lanes: ['cliente', 'sistema'], steps: [
+    ['cliente', 'Crea su cuenta con su DNI, contraseña, nombre y cumpleaños elegido en un calendario (obligatorio). El correo personal es opcional.'],
+    ['sistema', 'Guarda solo día y mes del cumpleaños, pide aceptar que se guarden sus datos y no pide la contraseña en el local.'],
+    ['cliente', 'Con la sesión iniciada ve sus puntos en la cabecera y la campanita junto al carrito.'],
+    ['sistema', 'En el mes de su cumpleaños, la campanita avisa «¡Feliz cumpleaños!» con el cupón vigente y un botón para usarlo.', 'Si no tiene cumpleaños guardado, ofrece un calendario para agregarlo.'],
+    ['cliente', 'Cada compra con cuenta suma puntos; puede pedir como invitado sin cuenta.']
+  ], rules: ['La contraseña del cliente se guarda solo como huella.', 'Los puntos por cada s/ 1 se configuran en Configuración del local.'], todo: ['Cupón de cumpleaños por cliente (hoy es uno solo para todos).'] },
+  { n: 'Libro de reclamaciones y encuesta', st: 'Construido', who: 'Cliente', trig: 'Un reclamo o la encuesta de posventa', lanes: ['cliente', 'sistema', 'persona'], steps: [
+    ['cliente', 'Abre «Libro de Reclamaciones» al final de la carta y llena su DNI, domicilio, monto y detalle.'],
+    ['sistema', 'Guarda el reclamo y avisa al dueño (correo configurado).'],
+    ['persona', 'Responde dentro del plazo legal (15 días hábiles, por revisar con legal).'],
+    ['cliente', 'Tras el pedido recibe la encuesta «¿Cómo te fue en Caprichos?».'],
+    ['sistema', 'Una queja se avisa al correo del dueño; una buena opinión invita a dejar reseña con un descuento.']
+  ], rules: ['El texto y el plazo del libro los define Kevin con revisión legal.'], todo: ['Texto y plazo definitivos.'] }
+] };
+const M = (n, who, trig, lanes, steps, rules, todo) => ({ n: n, st: 'Construido', who: who, trig: trig, lanes: lanes, steps: steps, rules: rules || [], todo: todo || [] });
+const MODS = [
+  { id: 'mod-op', grp: GRP_MOD, n: 'Operación', wfs: [
+    M('Escritorio', 'Todos los roles', 'Al iniciar sesión', ['persona', 'sistema'], [
+      ['persona', 'Inicia sesión.'], ['sistema', 'Muestra su escritorio: cifras y pendientes de SU rol (el administrador ve ventas; la caja, lo cobrado en su caja; cocina, lo que está en cocina; el repartidor, sus entregas).'],
+      ['persona', 'Toca un pendiente (con su contador).'], ['sistema', 'Lo lleva al módulo donde se resuelve.']], ['Cada rol ve solo lo suyo.', 'Solo el administrador ve ventas e indicadores.']),
+    M('Pedidos y caja', 'Cajero, mozo, call center, administrador', 'Llega o se toma un pedido', ['persona', 'sistema', 'cocina'], [
+      ['persona', 'Ve la lista de pedidos con pestañas (por confirmar, en cocina, listos…) y filtros por canal, modalidad y cobro.'],
+      ['persona', 'Abre un pedido: ve productos, cliente, ubicación y cobro. Un solo botón «Nuevo pedido» crea pedidos de cliente o del personal.'],
+      ['persona', 'Pedidos de fuera del local: confirma el pago hablando con el cliente por WhatsApp (o lo aprueba el bot). Ubica el delivery en el mapa si falta.'],
+      ['sistema', 'El pedido pasa a las pantallas de cocina, descuenta los insumos por receta e imprime la comanda.'],
+      ['persona', 'Cobra: medio de pago, vuelto, pago mixto o crédito del personal. Puede anular con motivo y PIN, repetir un pedido o imprimir la precuenta.'],
+      ['cocina', 'Prepara y marca listo; el mozo lo lleva o sale con el repartidor.']], ['Un pedido en el local va directo a cocina; fuera del local una persona (o el bot) debe confirmarlo.', 'Anular un pedido cobrado exige motivo y PIN del administrador.']),
+    M('Mensajes de WhatsApp', 'Caja, mozo, call center', 'Un cliente escribe', ['persona', 'bot'], [
+      ['bot', 'Atiende los chats: abre el pedido, pide el pago y la captura.'], ['persona', 'Filtra por Todos, Por atender, Con el bot o Atendidos y abre un chat.'],
+      ['persona', 'Aprueba o rechaza un comprobante, contesta con respuestas rápidas o escribe (botón Pulir opcional).'], ['persona', 'Toma o suelta el chat; Marcar atendido lo devuelve al bot.']], ['Un solo dueño por chat: Bot o Persona.']),
+    M('Caja y cierres', 'Cajero, administrador', 'Inicio y fin del turno', ['caja', 'sistema'], [
+      ['caja', 'Abre la caja (en cero; el monto de apertura se puede cambiar).'], ['sistema', 'Durante el turno suma lo cobrado por medio de pago (efectivo, Yape, Plin, transferencia, tarjeta, otros).'],
+      ['caja', 'Registra ingresos y egresos extras.'], ['caja', 'Cierra la caja contando: ve el efectivo esperado (apertura + ventas en efectivo + ingresos − egresos).'],
+      ['sistema', 'Guarda la diferencia (cuadrado, sobrante o faltante) en el historial; el cierre no se edita ni se elimina.']], ['No se cierra con pedidos sin cobrar ni con efectivo de repartidores sin liquidar.', 'El sistema no asigna culpables.']),
+    M('Cocina', 'Cocina, barra, administrador', 'Entra un pedido aceptado', ['cocina', 'sistema'], [
+      ['sistema', 'El pedido aparece con sonido en la pantalla de su área (frappés, calientes, waffles, salados o las áreas propias).'], ['cocina', 'Lo marca preparando y luego listo.'],
+      ['cocina', 'Pide insumos al almacén y confirma «Recibí» cuando llegan.'], ['cocina', 'Registra mermas y cierra el día con conteo.'],
+      ['cocina', 'Activa la alta demanda o pausa los pedidos si hace falta.']], ['Un combo aparece en cada pantalla solo con su parte.']),
+    M('Repartos', 'Repartidor, caja, call center', 'Un pedido de delivery está listo', ['repartidor', 'sistema'], [
+      ['repartidor', 'Ve los pedidos disponibles y toma uno («Tomar este pedido»).'], ['repartidor', 'Sale con él: abre la ubicación en Google Maps o Waze y llama o escribe al cliente.'],
+      ['repartidor', 'Cobra contra entrega si falta y marca entregado.'], ['repartidor', 'Si falla, reporta «cliente no contesta» o «no encuentro la dirección».'], ['sistema', 'Llegada de efectivo: se liquida con caja al cerrar.']], ['Ver «Entrega fallida del repartidor».']),
+    M('Reservas', 'Mozo, cajero, call center', 'Un cliente quiere reservar', ['persona', 'sistema'], [
+      ['persona', 'Abre el calendario del mes (con el número de reservas de cada día, confirmadas y pendientes) y toca un día para ver su agenda; hoy muestra «llega en X min».'], ['persona', 'Revisa las solicitudes que llegaron por WhatsApp y las aprueba eligiendo la mesa en el plano del local, o crea una reserva nueva (nombre, personas, hora exacta, mesas en el plano).'],
+      ['sistema', 'Marca la mesa con R, solo como aviso visual, y la reserva se anula sola a los 15 minutos de su hora.']], ['La reserva nunca bloquea una mesa.'])
+  ] },
+  { id: 'mod-cv', grp: GRP_MOD, n: 'Clientes y ventas', wfs: [
+    M('Clientes', 'Cajero, call center, administrador', 'Registrar o buscar un cliente', ['persona', 'sistema'], [
+      ['persona', 'Busca por DNI completo o nombre; el DNI se ve enmascarado.'], ['persona', 'Crea un cliente (DNI o RUC, nombre, teléfono; cumpleaños obligatorio para personas, correo opcional) con aceptación de datos.'],
+      ['persona', 'Edita sin cambiar el documento y ve el historial de pedidos.'], ['sistema', 'El administrador puede fijar una tarifa de envío especial (monto fijo o descuento) por cliente.']], ['La contraseña la crea el cliente en la carta; en el local no se pide.']),
+    M('Créditos del personal', 'Cajero, administrador', 'Un trabajador consume a crédito', ['persona', 'caja', 'sistema'], [
+      ['caja', 'En Pedidos y caja elige «Cobrar a crédito del personal» y al trabajador.'], ['sistema', 'Aplica el descuento (sin combos ni promociones) y suma lo que paga al consumo del mes del trabajador, con lo que se llevó (productos, combos, promociones).'],
+      ['persona', 'A fin de mes, el administrador abre Créditos del personal, elige el mes y ve cuánto consumió cada trabajador y qué; quienes no consumieron salen al final.'], ['persona', 'El descuento del pago se hace fuera del sistema, en la planilla.']], ['No hay plazo ni abonos.', 'Por la carta virtual no se consume crédito.', 'Solo el administrador cambia el porcentaje (Configuración del local > Operación).']),
+    M('Productos', 'Administrador', 'Cambiar el catálogo', ['persona', 'sistema'], [
+      ['persona', 'Edita precios, descripción y fotos; marca un producto agotado o lo desactiva (no se elimina).'], ['persona', 'Arma opciones y tamaños (leche, endulzante, toppings) en un solo lugar: los nombres se ELIGEN de una lista. Si falta uno (un cuarto tipo de leche), lo crea ahí mismo con «+ Crear» y lo corrige con el lápiz, sin salir del combo. Solo escribe el precio.'],
+      ['persona', 'Crea un producto nuevo.'], ['sistema', 'Los cambios se ven en la carta, en el chatbot y en Nuevo pedido; un agotado deja de ofrecerse.']], ['Nada se elimina: se desactiva.']),
+    M('Listas y categorías', 'Administrador', 'Mantener las listas de la carta', ['persona', 'sistema'], [
+      ['persona', 'Abre Listas y categorías y elige una lista: Categorías de la carta, Dónde se pregunta cada grupo, Tamaños de bebida, Presentaciones y porciones, Tipos de leche, Endulzantes, Cremas, etc.'], ['persona', 'Agrega, edita o oculta elementos. Crea una categoría nueva (por ejemplo Pizzas) y dice si sus productos llevan tamaños y opciones o se venden fijos; también se puede crear al agregar un producto.'],
+      ['sistema', 'En Opciones y tamaños cada combo muestra solo la lista que le toca (tamaño de bebida para una bebida, presentación para lo demás) y deja crear uno nuevo al momento. Un producto de categoría con opciones abre Opciones y tamaños al crearlo.'], ['persona', 'En «Dónde se pregunta cada grupo» marca en qué categorías enteras se pregunta cada grupo de opciones.']], ['Nada se elimina: se oculta.', 'Un cambio de categorías de un grupo vale para todos sus productos.']),
+    M('Ofertas y descuentos', 'Administrador, cajero (consulta)', 'Crear una promoción, un descuento o un cupón', ['persona', 'sistema', 'caja'], [
+      ['persona', 'Crea una promoción «lleva N, paga M» (2x1, 3x2, 5x4…): el contenido debe sumar lo que lleva y el precio se sugiere solo.'], ['persona', 'Crea un descuento automático (por categoría o producto, con días, horas, fechas, canal y compra mínima; por ejemplo Domingos de waffles o Happy hour).'],
+      ['persona', 'Crea un cupón: de código único (en el comprobante, distinto en cada uno, de un solo uso) o de código compartido con tope (afiches y redes, no se imprime).'], ['sistema', 'En la carta, en Nuevo pedido y en el chatbot: los descuentos valen solo en su día y hora; si el pedido califica para una promoción, avisa y, con un toque, la aplica como descuento (los adicionales se cobran aparte).'],
+      ['caja', 'Al imprimir el comprobante se sortean al azar los cupones de código único y se les pone su código; al canjearlos se marcan como usados.']], ['Solo el administrador edita ofertas y cupones.', 'Si no se pueden juntar, entre promoción, descuento y cupón se aplica el mayor.'])
+  ] },
+  { id: 'mod-cs', grp: GRP_MOD, n: 'Compras y stock', wfs: [
+    M('Compras', 'Almacén, administrador', 'Falta mercadería o llega un pedido', ['almacen', 'sistema'], [
+      ['almacen', 'Desde Almacén o Stock toca «Stock bajo» y se abre Compras ▸ Pedir a proveedores; «Traer lo que falta» llena la lista con cantidades en cajas o sacos enteros.'], ['almacen', 'Elige un proveedor en la fila de proveedores, ajusta cantidades, quita o agrega insumos (cada insumo va a un solo proveedor por pedido) y envía su mensaje por WhatsApp.'],
+      ['sistema', 'Crea el pedido «Por recibir». Cuando llega, «Recibir» abre el registro con todo prellenado.'], ['almacen', 'Registra costos, lote, vencimiento y comprobante.'], ['sistema', 'Convierte a la unidad del almacén, suma el stock y deja la Entrada. Si fue a crédito, queda «por pagar» hasta marcarla pagada.']], ['Un insumo no se pide a dos proveedores a la vez: otro proveedor, en otro pedido.', 'Los insumos perecibles exigen fecha de vencimiento.', 'Una compra registrada no se edita; un pedido por recibir se puede anular.']),
+    M('Almacén', 'Almacén, administrador', 'Mover o perder insumos', ['almacen', 'sistema'], [
+      ['almacen', 'Registra entradas, salidas, mermas y devoluciones solo de insumos con stock.'], ['almacen', 'Entrega los pedidos de cocina y barra («por recibir» hasta que confirmen).'],
+      ['almacen', 'Consulta el historial con filtros plegables (tipo, fecha, origen, insumo).']], ['Ver «Compra, entrega a cocina y venta (leche)».']),
+    M('Stock y recetas', 'Almacén, cocina, producción, administrador', 'Mirar o mantener el stock', ['almacen', 'sistema'], [
+      ['almacen', 'Ve cada insumo con su barra (agotado, por acabarse, poco, bien, lleno), lo que hay en almacén y en Barra o Cocina.'], ['almacen', 'Manda lo que está bajo a Compras ▸ Pedir a proveedores y edita el consumo de cada producto.'],
+      ['sistema', 'Descuenta por receta con cada venta y muestra el costo y el margen de cada plato.'], ['almacen', 'Registra la producción del día (sin dejar el stock en negativo) y cierra el día.']], ['Los productos de un día pasan a merma al cerrar.'])
+  ] },
+  { id: 'mod-an', grp: GRP_MOD, n: 'Análisis', wfs: [
+    M('Informes', 'Administrador, almacén', 'Necesita un reporte', ['persona', 'sistema'], [
+      ['persona', 'Mira «Hoy en un vistazo» (pedidos, ventas, ticket, por cobrar, rechazados).'], ['persona', 'Busca un informe o filtra por categoría: Ventas, Caja, Inventario, Compras, Clientes o Delivery.'],
+      ['sistema', 'Cada tarjeta muestra qué contiene, sus filtros, cómo se exporta y una cifra clave.'], ['persona', 'Abre el informe.'], ['sistema', 'Muestra las cifras principales y la tabla armada con los datos del sistema.'], ['persona', 'Descarga el archivo para Excel (.csv).']],
+      ['Son 22 informes: ventas (resumen, producto, categoría, canal, modalidad, método de pago, rechazados), caja (cierres, medios de pago, arqueo, pendiente de cobro), inventario (stock bajo, kardex, mermas, producción), compras, clientes y delivery.', 'El monto por producto y por categoría es una estimación: se reparte el total del pedido entre sus productos.'], ['Filtro de fechas y exportación a PDF: hoy los informes usan los pedidos del día y el historial de cierres de caja.']),
+    M('Mapa de entregas', 'Administrador, call center', 'Quiere ver dónde se reparte', ['persona', 'sistema'], [
+      ['persona', 'Elige el periodo y el canal.'], ['sistema', 'Muestra un mapa de calor con las zonas, los puntos de entrega y los intentos fuera de cobertura.'],
+      ['persona', 'Decide dónde ajustar las zonas o repartir volantes.']], ['Los pedidos nuevos con ubicación se suman solos.']),
+    M('Indicadores', 'Administrador', 'Revisar el negocio', ['persona', 'sistema'], [
+      ['sistema', 'Calcula ventas, tiempos de entrega y más con los pedidos del sistema.'], ['persona', 'Mira el resumen y los comparativos.']], ['Solo el administrador los ve.'])
+  ] },
+  { id: 'mod-co', grp: GRP_MOD, n: 'Configuración', wfs: [
+    M('Configuración del local', 'Administrador', 'Cambiar un dato del negocio', ['persona', 'sistema'], [
+      ['persona', 'Elige la sección: datos, ubicación, contacto, horario y fechas especiales, redes, pagos, logo, operación, zonas de reparto, entregas fallidas, áreas de cocina, textos y mensajes, entrega, avisos o empresa.'],
+      ['persona', 'Edita y guarda con confirmación.'], ['sistema', 'La carta y el chatbot usan el dato nuevo al instante (horario, pagos, tiempo prometido, envío gratis, zonas…).'],
+      ['persona', 'En Ubicación, si la tienda se muda o está en el local, toca «Usar mi ubicación actual» (el navegador pide permiso), «Buscar la dirección escrita» o «Tomar del enlace de Google Maps»; también puede escribir latitud y longitud.'], ['sistema', 'Muestra las coordenadas en uso, avisa si los números no son válidos o si faltan por guardar, y ofrece «Ver en el mapa».'], ['persona', 'Revisa que sea la tienda y guarda.'], ['sistema', 'El mapa de entregas y los radios de 0,5, 1 y 2 km se centran en la nueva ubicación, y el mapa de «Nuevo pedido» arranca ahí.']], ['El dueño cambia esto solo, sin programador.', 'Una ubicación con números inválidos no se usa: se mantiene la última válida.'], ['Las zonas de reparto y los puntos de ejemplo del mapa de calor no se mueven con la tienda: se editan aparte en «Zonas de reparto».']),
+    M('Diseño de la carta', 'Administrador', 'Cambiar cómo se ve la carta', ['persona', 'sistema'], [
+      ['persona', 'Abre el diseñador y ordena las categorías y los productos (flechas o arrastrando); elige fotos, textos, promociones y decoración festiva.'], ['sistema', 'Muestra la carta como la ve el cliente, con un aviso de «Borrador sin publicar».'], ['persona', 'Publica o descarta.'], ['sistema', 'La carta virtual usa el orden publicado; lo ocultado no se ve, pero no se elimina.']],
+      ['Un producto, una categoría o un combo que se crea en Productos, Listas y categorías u Ofertas aparece al instante en el diseñador, al final de su categoría.', 'Un producto nuevo se agrega al final; hay que moverlo si se quiere antes.']),
+    M('Destacadas de la carta', 'Administrador', 'Renovar los círculos «Momentos Caprichos»', ['persona', 'sistema'], [
+      ['persona', 'Crea un círculo, le pone nombre y portada, y sube varias imágenes de una vez (cada una con su texto).'], ['persona', 'Por imagen: cambia la foto, la usa de portada, la sube, la baja o la quita. Puede quitarlas todas.'], ['persona', 'Cambia el lugar de los círculos arrastrándolos o con las flechas.'], ['sistema', 'Avisa cuáles están ocultos o sin fotos (un círculo sin fotos no se ve en la carta).'],
+      ['persona', 'Desactiva, duplica, archiva o elimina un círculo.'], ['sistema', 'Un círculo archivado sale de la lista y de la carta y queda en «Archivadas», donde se restaura o se elimina para siempre.'], ['persona', 'Toca «Ver como cliente» o «▶ Ver» para probar el visor tipo historia, y publica.'], ['sistema', 'La carta muestra solo los círculos activos, no archivados y con imágenes.']],
+      ['Desactivar es temporal; archivar los guarda fuera de la vista; eliminar es definitivo y pide confirmación.'], ['«Cargar fotos de ejemplo» es solo para probar el visor.']),
+    M('Novedades y publicidad', 'Administrador', 'Renovar promociones, banners y avisos', ['persona', 'sistema'], [
+      ['persona', 'Abre el diseñador de Novedades en pantalla completa: ve la página igual que la ve el cliente.'], ['persona', 'Agrega una novedad (promoción, banner, foto, evento, video de TikTok o Instagram, aviso).'], ['persona', 'Ordena arrastrando o con las flechas; activa, destaca o duplica desde la tarjeta; filtra por Activas, Programadas, Vencidas o Desactivadas.'],
+      ['persona', 'Toca «Editar» para cambiar tipo, textos, fotos, enlace y fechas (con atajos: solo hoy, esta semana, este mes).'], ['sistema', 'Cada tarjeta dice si está activa, programada o vencida, y cuándo empieza o termina.'], ['persona', 'Publica o descarta.'], ['sistema', 'La carta muestra lo activo y vigente; las destacadas y los banners van en la portada.']],
+      ['Una novedad duplicada queda desactivada para editarla antes de mostrarla.', 'Nada se elimina: se desactiva.']),
+    M('Paleta de colores', 'Administrador', 'Cambiar los colores de la carta', ['persona', 'sistema'], [
+      ['persona', 'Elige la decoración y ajusta sus colores.'], ['sistema', 'Avisa si algún color se lee con poco contraste.'], ['persona', 'Publica.'], ['sistema', 'La carta usa la paleta publicada.']]),
+    M('Usuarios', 'Administrador', 'Alta o baja de una persona', ['admin', 'sistema'], [
+      ['admin', 'Abre Usuarios: tres pestañas, Personal, Clientes y Qué ve cada rol.'], ['admin', 'En Personal mira el resumen (activos, inactivos, entraron hoy, nuevos, nunca ingresaron) y filtra por cargo, estado, fecha de creación (o entre dos fechas) y último acceso.'],
+      ['admin', 'Crea un usuario (nombre, usuario, cargo) o desactiva a quien se va; se desactiva, no se elimina.'], ['sistema', 'Cada tarjeta dice cuándo se creó la cuenta y cuándo entró por última vez, y marca a quien nunca ingresó o lleva más de 30 días sin entrar.'],
+      ['admin', 'En Clientes ve quién tiene cuenta y quién compra como invitado, desde cuándo es cliente, cuándo pidió por última vez y sus puntos; filtra por tipo, cuenta, fecha de alta y último pedido, y abre el cliente en el módulo Clientes.'], ['admin', 'En Qué ve cada rol edita la matriz de permisos.'], ['sistema', 'El usuario nuevo entra con la contraseña inicial y debe crear una nueva.']],
+      ['Nada se elimina.', 'Los clientes se editan en el módulo Clientes; aquí solo se consultan.'], ['Las fechas de creación, último acceso, alta de clientes y último pedido son de ejemplo; en el sistema real se guardan solas.']),
+    M('Pantallas y plano del local', 'Administrador', 'Armar el salón y la TV', ['admin', 'sistema'], [
+      ['admin', 'Abre el Plano del local: arriba ve cuántas mesas hay, la capacidad en personas, las del piso actual y los pisos activos.'], ['admin', 'Elige el piso y, a la derecha, el elemento a agregar (para sentarse, estructura o servicios); toca el plano para colocarlo.'], ['admin', 'Toca un elemento para cambiar su nombre, personas, ancho y alto, o desactivarlo; arrástralo para moverlo.'], ['admin', 'Ajusta el tamaño del plano (columnas y filas).'],
+      ['admin', 'Vincula una TV de cocina con un código; solo lectura.'], ['sistema', 'El plano se usa para tomar pedidos, reservar y juntar mesas.']], ['Se puede eliminar cualquier elemento salvo una mesa con pedido abierto o reserva activa hoy; mientras tanto se desactiva.']),
+    M('Notificaciones', 'Todos los roles', 'Un hecho importante', ['sistema', 'persona'], [
+      ['sistema', 'Avisa según el rol: pedido por confirmar, comprobante, entrega con problema, pedido devuelto, entregas por recibir, productos por vencer, alerta de la impresora…'], ['persona', 'Abre la campanita, lee y va al módulo con un toque.'],
+      ['persona', 'O abre la página Notificaciones: arriba ve lo que pide atención ahora (con su botón para resolverlo) y un resumen; abajo, el historial de avisos agrupado por día.'], ['persona', 'Filtra el historial por tipo, estado (nuevas o leídas) y fecha (hoy, ayer, 7 días o entre dos fechas), o busca por palabra.'], ['persona', 'Marca un aviso como leído o nuevo, o todos los que se ven; con un toque va al módulo donde se resuelve.']],
+      ['Los avisos de «Pendientes ahora» se van solos cuando se resuelve lo que los causó.'], ['Marcar como leído hoy solo cambia lo que ve esta pantalla.'])
+  ] }
+];
+const CATS0 = [
+  { id: 'pedidos', n: 'Pedidos y pago', wfs: [
+    { n: 'Pedido de la carta y pago por WhatsApp', st: 'Construido', who: 'Cliente, bot, caja, mozo o call center', trig: 'El cliente envía su pedido desde la carta', lanes: ['cliente', 'sistema', 'bot', 'persona', 'cocina'], steps: [
+      ['cliente', 'Arma su pedido en la carta (delivery o para llevar) y lo envía. No paga ni sube capturas.'],
+      ['sistema', 'El pedido llega a Pedidos y caja como «Por confirmar» y avisa al equipo.', 'Si el local está cerrado o en pausa, la carta no recibe el pedido.'],
+      ['bot', 'Escribe al cliente con el resumen del pedido y pregunta cómo prefiere pagar.', 'Sin ubicación: «un asesor se pondrá en contacto para validar tu comprobante y la ubicación de entrega».'],
+      ['bot', 'Según el medio: manda los datos de Yape, Plin o transferencia con el monto exacto; en efectivo pregunta con cuánto paga.'],
+      ['cliente', 'Envía la captura del pago.'],
+      ['bot', 'Responde «Recibido, una persona verifica tu pago» y calla. El chat queda «Validar pago».'],
+      ['persona', 'Mira la tarjeta «Comprobante por revisar» y toca Aprobar o Rechazar.', 'Pueden decidir: administrador, cajero, mozo y call center.'],
+      ['sistema', 'Aprobar: registra el cobro (quién y a qué hora) y el pedido pasa a las pantallas de cocina; el bot avisa el tiempo.', 'Rechazar: el bot pide otra captura.'],
+      ['cocina', 'Prepara el pedido y lo marca listo.']
+    ], rules: ['El bot no verifica que el comprobante sea verdadero ni manda nada a cocina por sí solo.', 'Un delivery sin ubicación no se puede aprobar.', 'El primer mensaje del bot es de plantilla de WhatsApp y se cobra (tarifa para Perú por confirmar).'], todo: ['Plazo de espera de un pedido por confirmar antes de avisar al administrador.', 'Conexión real con WhatsApp.'] },
+    { n: 'Pedido de personal y crédito', st: 'Construido', who: 'Mozo, cajero, administrador', trig: 'Nuevo pedido > Pedido del personal', lanes: ['persona', 'sistema', 'caja'], steps: [
+      ['persona', 'Toca Nuevo pedido y elige «Pedido del personal».'],
+      ['persona', 'Elige al usuario activo (busca por usuario, nombre o cargo) y dónde lo consume: en el local o para llevar.'],
+      ['sistema', 'Pasa directo a los productos. El resumen dice «Pide: Personal · nombre».'],
+      ['caja', 'Al cobrar puede cobrar normal o a crédito del personal.'],
+      ['sistema', 'Crédito: descuenta el porcentaje configurado (25 % de ejemplo, sin combos, promociones ni docenas) y lo suma al consumo del mes del trabajador (sin plazo ni abonos; se descuenta fuera del sistema a fin de mes).']
+    ], rules: ['Solo en el local o para llevar; solo usuarios activos.', 'El porcentaje se cambia en Configuración del local > Operación; lo consumido se revisa por mes en Créditos del personal.'], todo: ['Los puntos y el crédito siguen ligados a la lista de clientes de tipo Personal.'] }
+  ] },
+  { id: 'delivery', n: 'Delivery y entregas', wfs: [
+    { n: 'Ubicación del cliente', st: 'Construido', who: 'Cliente, mozo, caja, call center', trig: 'Un pedido de delivery', lanes: ['cliente', 'sistema', 'persona'], steps: [
+      ['cliente', 'Comparte su ubicación actual (opcional) o escribe su dirección.', 'Si el navegador la bloquea: «No hay problema: escribe tu dirección y un asesor te ayudará».'],
+      ['sistema', 'Con ubicación: la zona y el envío salen solos. El cliente solo ve el costo, nunca la palabra «zona».', 'Fuera de cobertura: avisa y ofrece recoger en la tienda.'],
+      ['sistema', 'Sin ubicación: la dirección escrita es obligatoria y el envío dice «lo confirmamos contigo».'],
+      ['persona', 'Abre el pedido, toca «Ubicar en el mapa»: sugerencia si el cliente ya pidió antes, marca el punto y la zona sale sola.'],
+      ['sistema', 'Recalcula zona, envío y total. Con el punto fuera de cobertura no se guarda.']
+    ], rules: ['La ubicación nunca bloquea al cliente.', 'Un delivery sin ubicación no se confirma.', 'Envío gratis solo si los productos pasan de s/ 70 (configurable). Tarifa especial por cliente: fija o en porcentaje.'], todo: ['Permiso de ubicación del navegador: depende del cliente y de usar https.'] },
+    { n: 'Entrega fallida del repartidor', st: 'Construido', who: 'Repartidor, caja, call center, administrador', trig: 'El repartidor no encuentra la dirección o el cliente no contesta', lanes: ['repartidor', 'sistema', 'persona', 'cliente'], steps: [
+      ['repartidor', 'Toca «Cliente no contesta» o «No encuentro la dirección». Espera en el lugar (10 min, configurable).', 'Cuenta el intento: «Intento 1 de 2».'],
+      ['sistema', 'Avisa a caja, call center y administrador con un botón para escribirle al cliente.'],
+      ['persona', 'Habla con el cliente por WhatsApp. Puede escribir la dirección corregida (o la escribe el repartidor).'],
+      ['repartidor', 'Si se resuelve: «Ya se resolvió, sigo con la entrega».'],
+      ['repartidor', 'Si no: «Devolver a la tienda». El pedido queda en coordinación y nadie más lo puede tomar.'],
+      ['persona', 'Habla con el cliente y elige el cierre. Antes decide qué se hace con lo preparado (desecho, personal o donación).'],
+      ['sistema', 'Reprogramar: vuelve a repartos (con recargo opcional). Devolver el dinero: anula con motivo «Cliente no recibió». Cobrar igual: cierra cobrado sin entrega.', 'Lo preparado queda como merma informativa sin tocar el stock.']
+    ], rules: ['Espera, intentos, plazo de coordinación y recargo son configurables.', 'Se recomienda devolver el dinero por defecto; la decisión final es de la persona.'], todo: ['El mockup no cuenta el tiempo de espera ni el plazo (no hay reloj).', 'Qué medio se usa para devolver el dinero (se coordina por WhatsApp).'] }
+  ] },
+  { id: 'whatsapp', n: 'Atención por WhatsApp', wfs: [
+    { n: 'Bot y persona sin cruzarse', st: 'Construido', who: 'Bot, caja, mozo, call center', trig: 'Un chat de WhatsApp', lanes: ['cliente', 'bot', 'persona'], steps: [
+      ['bot', 'Atiende solo mientras no haya captura, urgencia ni pedido de un asesor.'],
+      ['cliente', 'Envía la captura, pide un asesor o escribe «urgente».'],
+      ['bot', 'Cede el chat. Si es urgente, el chat se marca URGENTE. El bot calla.'],
+      ['persona', 'Toca «Tomar el chat» (o aprueba, rechaza o escribe: se vuelve su dueña automáticamente).'],
+      ['cliente', 'Escribe mientras lo atienden: el mensaje llega, el bot no responde.'],
+      ['persona', 'Otra persona no puede escribir sin tomar el chat (con confirmación).'],
+      ['persona', 'Termina: «Soltar el chat» o «Marcar atendido». El chat vuelve al bot.']
+    ], rules: ['Cada chat tiene un solo dueño: Bot o Persona.', 'Botón Pulir: mejora tono y ortografía; la persona decide, nunca se envía solo.'], todo: ['Liberación automática por inactividad (propuesta 15 min).'] },
+    { n: 'El cliente escribe después de pedir', st: 'Construido (simulado)', who: 'Cliente, bot, asesor', trig: 'Mensaje del cliente con un pedido ya hecho', lanes: ['cliente', 'bot', 'persona'], steps: [
+      ['cliente', 'Escribe: cambiar la dirección, cambiar o cancelar, «¿cuánto falta?» o algo suelto.'],
+      ['bot', 'Mira el estado del pedido (por confirmar, en preparación, en camino, entregado).'],
+      ['bot', 'Por confirmar: avisa a un asesor, se puede cambiar. En preparación: el asesor revisa. En camino: no cambia nada, aviso urgente.'],
+      ['bot', '«¿Cuánto falta?»: responde con el estado y el tiempo prometido; si ya pasó, se disculpa y avisa al equipo.'],
+      ['bot', 'Si no entiende: repregunta una vez; a la segunda pasa a una persona.'],
+      ['persona', 'Ve el chat «Requiere atención» con una tarjeta del pedido y decide.']
+    ], rules: ['El bot nunca cambia un pedido: solo avisa.', 'El simulador entiende palabras clave; el bot real con IA lo haría mejor.'], todo: ['Conectar el estado real del pedido al bot.'] }
+  ] },
+  { id: 'local', n: 'Local y mesas', wfs: [
+    { n: 'Pedido en el local y juntar mesas', st: 'Construido', who: 'Mozo, cajero, call center', trig: 'Nuevo pedido > En el local', lanes: ['mozo', 'sistema', 'cocina', 'caja'], steps: [
+      ['mozo', 'Elige En el local, el piso y la mesa. Si juntan mesas: modo «Juntar varias mesas» y toca todas.'],
+      ['mozo', 'Arma el pedido y confirma con Sí.'],
+      ['sistema', 'Va directo a las pantallas de cocina (no pasa por caja) y ocupa todas las mesas.'],
+      ['cocina', 'Prepara y marca listo; el mozo lo lleva.'],
+      ['caja', 'Cobra al final. Las mesas se liberan juntas.']
+    ], rules: ['Un pedido puede ocupar varias mesas: se ve «Mesa 1 + Mesa 2».'], todo: [] },
+    { n: 'Reservar mesa', st: 'Construido', who: 'Mozo, cajero, call center', trig: 'Nuevo pedido > Reservar mesa', lanes: ['persona', 'sistema'], steps: [
+      ['persona', 'Escribe nombre (y celular opcional), personas (− / +), hora exacta y toca las mesas en el plano del local (siempre se elige en el dibujo, nunca en una lista).'],
+      ['sistema', 'Suma los asientos de las mesas contra las personas. No guarda si faltan, si la hora ya pasó o si cae fuera del horario.'],
+      ['persona', 'Revisa el resumen y guarda con confirmación.'],
+      ['sistema', 'La reserva dura 15 minutos desde su hora y se anula sola. La marca R es solo visual: la mesa siempre se puede usar.']
+    ], rules: ['La reserva nunca bloquea una mesa.'], todo: ['Las solicitudes por WhatsApp se aprueban con una sola mesa.'] }
+  ] },
+  { id: 'cocina', n: 'Cocina', wfs: [
+    { n: 'Merma y merma de varios productos', st: 'Construido', who: 'Cocina (cualquier rol que entre a Cocina)', trig: 'Cocina > Registrar merma', lanes: ['cocina', 'sistema'], steps: [
+      ['cocina', 'Elige solo productos de cocina que existen y tienen stock (donas, galletas, pan pullman, gelatina).'],
+      ['cocina', 'Pone la cantidad (solo números) y el origen: Cocina, Barra o Producción.'],
+      ['cocina', 'Elige qué se hace: donación, personal, desecho, caída, error de comanda o calibración.'],
+      ['sistema', 'Valida que no pase del stock, descuenta y deja el movimiento.'],
+      ['cocina', 'Varios a la vez: «Merma de varios productos» con cantidad, origen y destino por línea, y un destino para todos.']
+    ], rules: ['En Cocina solo se registra merma, y solo de productos de cocina.'], todo: ['La merma de barra (calibrar café) espera el área por insumo.'] },
+    { n: 'Cierre del día con conteo', st: 'Construido', who: 'Cocina, producción', trig: 'Al terminar el día', lanes: ['cocina', 'sistema'], steps: [
+      ['cocina', 'Abre «Cerrar el día»: salen los productos del día con stock (donas primero).'],
+      ['cocina', 'En cada uno pone lo contado, cuánto se bota (o «Todo») y el destino (donación, personal, desecho).'],
+      ['sistema', 'Muestra el resultado de cada línea: «se bota 10, queda 10, diferencia 4».'],
+      ['sistema', 'Al confirmar: lo botado queda como merma, la diferencia contada de menos como «Diferencia de conteo» y lo demás sigue en el stock.']
+    ], rules: ['Las donas arrancan en «botar todo»; los demás productos en 0.', 'No se puede contar más que el sistema.'], todo: [] },
+    { n: 'Alta demanda', st: 'Construido', who: 'Cocina, administrador', trig: 'Hay muchísimos pedidos o una emergencia', lanes: ['cocina', 'sistema', 'cliente'], steps: [
+      ['cocina', 'Activa «Alta demanda» y elige los minutos extra (atajos de 5 a 60 o «Otro», hasta 180).'],
+      ['sistema', 'La carta y el chatbot avisan que la entrega tarda más (tiempo normal + extra).'],
+      ['cocina', 'Si hace falta, elige «Pausar pedidos».'],
+      ['sistema', 'La carta deja de recibir pedidos y el chatbot pasa a un asesor.'],
+      ['cocina', 'Al apagarla, todo vuelve a la normalidad.']
+    ], rules: ['La pausa solo vale mientras la alta demanda está activada.'], todo: [] }
+  ] },
+  { id: 'almacen', n: 'Almacén y stock', wfs: [
+    { n: 'Compra, entrega a cocina y venta (leche)', st: 'Construido', who: 'Proveedor, almacenero, cocina y barra, sistema', trig: 'Llega mercadería o cocina pide insumos', lanes: ['almacen', 'cocina', 'sistema'], steps: [
+      ['almacen', 'El proveedor entrega 40 L de leche en el almacén. El almacenero lo registra como Entrada.', 'Almacén 40 L · Barra 0 L · Total de la tienda: 40 L.'],
+      ['cocina', 'La Barra necesita leche y pide 10 L al almacén («Pedir al almacén»).', 'No cambia nada: es solo un pedido.'],
+      ['almacen', 'Un almacenero lleva físicamente los 10 L a la Barra y lo registra: «Entregar desde el almacén» (es una Salida a la Barra).', 'Almacén 30 L · «por recibir 10 L». NO se consume nada: la leche solo cambia de lugar. Total de la tienda: sigue en 40 L.'],
+      ['cocina', 'La Barra recibe la leche y confirma «Recibí» con lo que llegó de verdad.', 'Almacén 30 L · Barra 10 L · Total 40 L. Si llegaron 9, anota 9 y la diferencia (1 L) queda registrada para revisar.'],
+      ['sistema', 'Se vende un frappé: el sistema descuenta solo 0.25 L de la Barra, según la receta.', 'Aquí recién baja el total: Barra 9.75 L · Total 39.75 L, porque ya se consumió.'],
+      ['cocina', 'Si se malogra o sobra, se registra como Merma en la Barra (donación, personal o desecho).', 'También baja el total, porque se pierde. Si el sobrante vuelve al almacén es una Devolución: no baja el total.']
+    ], rules: ['Entregar desde el almacén es un movimiento físico entre dos lugares de la misma tienda; por eso se registra en los dos lados («por recibir» en la Barra hasta que confirme).', 'El total de un insumo solo baja cuando se vende (receta), se pierde (merma) o se corrige un conteo. Las entradas, las entregas y las devoluciones lo mueven, no lo consumen.', 'El almacén central y cada área tienen su propio stock, así la leche no se descuenta dos veces.', 'Un combo se descompone en sus productos y cada uno baja su receta del área que lo prepara.'], todo: ['Asignar el área (Cocina o Barra) a cada insumo desde el administrativo.', 'En el mockup, las ventas toman del área primero y del almacén si falta.'] },
+    { n: 'Producción del día', st: 'Construido', who: 'Producción, almacén', trig: 'Se hace una tanda (donas, galletas, pan, gelatina)', lanes: ['cocina', 'sistema'], steps: [
+      ['cocina', 'Elige qué hizo y cuántas tandas.'],
+      ['sistema', 'Calcula la materia prima y cuántas unidades entran al stock. Si no alcanza, marca en rojo lo que falta.'],
+      ['sistema', 'Avisa cuántas tandas sí alcanzan y ofrece «Usar N tandas». No deja registrar con faltante.'],
+      ['cocina', 'Corrige el total que salió si hace falta y registra.'],
+      ['sistema', 'La materia prima sale primero de Cocina o Barra y, si ahí no alcanza, del almacén central (el «no alcanza» cuenta ambos); entra el producto terminado (donas, galletas, gelatina o pan de molde).'],
+      ['sistema', 'Cuando se vende, ese producto baja del mismo stock: una dona o galleta resta 1, media docena resta 6, una gelatina resta 1.']
+    ], rules: ['El stock nunca queda en negativo.', 'La producción descuenta la materia prima; la venta descuenta el producto terminado. Nunca se descuenta lo mismo en los dos momentos.', 'El pan pullman es el pan de molde: la tanda suma «Pan de molde» y los sándwiches restan de ahí.', 'Si lo de Cocina o Barra no alcanza y hay que tomar del almacén central, la lista lo marca («X saldrán del almacén central») y al registrar pregunta «¿Seguro?»: con Sí continúa; con No no se registra nada.', 'Si al agregar un producto en Nuevo pedido ya no alcanza el stock, avisa «quedan N (registra la producción)» pero deja vender.'], todo: ['Recetas y vida útil de ejemplo: las ajusta la encargada.'] },
+    { n: 'Movimientos y devoluciones de Almacén', st: 'Construido', who: 'Almacén, administrador', trig: 'Almacén > Registrar movimiento', lanes: ['almacen', 'sistema'], steps: [
+      ['almacen', 'Elige el tipo: Entrada, Salida, Merma o Devolución.'],
+      ['almacen', 'Elige el insumo (solo los que tienen stock; en una Entrada, todos) y la cantidad (solo números).'],
+      ['sistema', 'Origen según el tipo. Una Salida a Cocina o Barra queda «por recibir». Una Merma o Devolución desde Barra o Cocina baja el stock de esa área.'],
+      ['almacen', 'Consulta el historial con filtros plegables: tipo, fecha (hoy, ayer, 7 días, desde y hasta), origen e insumo.']
+    ], rules: ['Almacén ve solo insumos; los productos de cocina se manejan en Cocina.'], todo: ['Control de sobrantes de insumos entregados a cocina (el caso de los huevos).'] }
+  ] },
+  { id: 'personal', n: 'Personal y acceso', wfs: [
+    { n: 'Primer ingreso de un usuario nuevo', st: 'Construido', who: 'Todo el personal', trig: 'Un usuario nuevo inicia sesión por primera vez', lanes: ['admin', 'persona', 'sistema'], steps: [
+      ['admin', 'Crea el usuario: el sistema le pone la contraseña inicial común y lo marca como nuevo.'],
+      ['persona', 'Entra con su usuario y la contraseña inicial.'],
+      ['sistema', 'No lo deja entrar: abre «Bienvenido» para crear su contraseña nueva.'],
+      ['persona', 'Escribe la contraseña dos veces (puede verla u ocultarla) y, si quiere, sube su foto.'],
+      ['sistema', 'Valida: 6 caracteres como mínimo, distinta de la inicial e iguales. Al guardar entra al escritorio y ya no es nuevo.']
+    ], rules: ['La foto es opcional; la contraseña nueva, obligatoria.', 'Nunca se guarda una contraseña en texto.'], todo: ['Caducidad de la inicial, límite de intentos y restablecer: ver recomendaciones de seguridad.'] }
+  ] }
+];
+const CATS = [ CARTA ].concat(CATS0.map((c) => Object.assign({ grp: GRP_PROC }, c)), MODS);
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { cat: 0, wf: 0 }; }
+  renderVals() {
+    const s = this.state; const cat = CATS[s.cat]; const wf = cat.wfs[Math.min(s.wf, cat.wfs.length - 1)];
+    const ln = wf.lanes; const idx = {}; ln.forEach((k, i) => { idx[k] = i; });
+    const stDone = /^Construido/.test(wf.st);
+    return {
+      cats: (() => { const out = []; let g = ''; CATS.forEach((c, i) => { if (c.grp !== g) { g = c.grp; out.push({ isHead: true, isCat: false, n: g }); } out.push({ isHead: false, isCat: true, n: c.n, count: c.wfs.length, on: i === s.cat, bg: i === s.cat ? 'var(--navy)' : 'transparent', fg: i === s.cat ? 'var(--cream)' : 'var(--navy)', bd: i === s.cat ? 'var(--navy)' : 'var(--line)', pick: () => this.setState({ cat: i, wf: 0 }) }); }); return out; })(),
+      wfs: cat.wfs.map((w, i) => ({ n: w.n, on: i === s.wf, bg: i === s.wf ? 'var(--navy)' : 'transparent', fg: i === s.wf ? 'var(--cream)' : 'var(--navy)', pick: () => this.setState({ wf: i }) })),
+      title: wf.n, stLabel: wf.st, stBg: stDone ? '#DDF1E3' : '#FFF1C9', stFg: stDone ? '#14502B' : '#7A5C00', who: wf.who, trigger: wf.trig,
+      gridCss: 'grid-template-columns:repeat(' + ln.length + ',minmax(190px,1fr))',
+      laneHeads: ln.map((k) => ({ n: LANES[k][0], css: 'background:' + LANES[k][1] })),
+      steps: wf.steps.map((st, i) => ({ n: i + 1, t: st[1], note: st[2] || '', hasNote: !!st[2], hasArrow: i > 0, col: LANES[st[0]][1], css: 'grid-column:' + (idx[st[0]] + 1) + ';grid-row:' + (i + 2) + ';border-left-color:' + LANES[st[0]][1] })),
+      rules: wf.rules.map((t) => ({ t: t })), todo: (wf.todo.length ? wf.todo : [ 'Nada pendiente por ahora.' ]).map((t) => ({ t: t }))
+    };
+  }
+}
+</script>
+</body>
+</html>

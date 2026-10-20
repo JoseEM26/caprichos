@@ -1,0 +1,135 @@
+{
+  "modalReproductorVideoTutorialCtrl": [],
+  "ModalMenuInstanceCtrl": [],
+  "ModalModificadorProducogeneralInstanceCtrl": [],
+  "comboEquivalenciasController": [],
+  "ModalEditarComboInstanceCtrl": [],
+  "impresionProductosCtrl": [],
+  "modalCategoriaEgreso": [],
+  "modalCategoriaIngreso": [],
+  "ModalCategoriadescuentoCtrl": [
+    "scripts/restaurantpe/productos/platos/ver/platos.ver.html",
+    "scripts/restaurantpe/productos/platos/breadcrumb-productos.html",
+    "scripts/restaurantpe/productos/platos/editar/platos.editar.rapido.html",
+    "scripts/restaurantpe/productos/platos/editar/platos.editar.full.html",
+    "/productos/productosugerido/por-producto",
+    "/productos/productosugerido",
+    "scripts/restaurantpe/productos/platos/lista/platos.lista.view.html",
+    "scripts/restaurantpe/productos/productos.view.html",
+    "/productos/productosugerido/por-producto/all",
+    "scripts/restaurantpe/productos/platos/presentacion/presentacion.lista.view.html",
+    "/productos/productosugerido/detalle/all"
+  ],
+  "DescartableCtrl": [],
+  "PlatosCtrl": [],
+  "ModalActualizarPropiedadesProductoCtrl": [],
+  "ModalActualizarProductogeneralcategoriaCtrl": [],
+  "ModalActualizarPrecioIntegracionModificadorSeleccionCtrl": [],
+  "ProductosLlevarCtrl": [],
+  "combosListaCtrl": [],
+  "CombosNuevoCtrl": [],
+  "PlatosVerCtrl": [],
+  "PlatosEditarCtrl": [
+    "scripts/restaurantpe/productos/platos/modals/vinculacionmodificadorseleccion.view.html"
+  ],
+  "NuevoModificadorProductogeneralCtrl": [
+    "scripts/restaurantpe/productos/platos/modals/vinculacionmodificadorseleccion.view.html",
+    "scripts/restaurantpe/productos/platos/presentacion/modals/modal-actualizarprecio-integracion-modificadorseleccion.html"
+  ],
+  "registroModificadorController": [],
+  "modalAgregarModificadoresAProductogeneralController": [],
+  "vinculacionmodificadorseleccionController": [],
+  "PlabesCategoriasCtrl": [
+    "scripts/restaurantpe/productos/categorias/modals/modal-asignarimpuestos.html"
+  ],
+  "CategoriasCtrl": [
+    "scripts/restaurantpe/productos/categorias/modals/modal-asignarimpuestos.html"
+  ],
+  "CategoriasInsumosCtrl": [],
+  "asignarImpuestosPorProductoInsumoCtrl": [
+    "scripts/restaurantpe/productos/modals/modalFormatoCartaImagen.html",
+    "scripts/restaurantpe/productos/modals/modalFormatoActualizarPrecios.html",
+    "scripts/restaurantpe/productos/modals/modalImportarProductosBDMaster.html"
+  ],
+  "modaNewCategoriaParaDelivery": [
+    "scripts/restaurantpe/productos/modals/modalFormatoCartaImagen.html",
+    "scripts/restaurantpe/productos/modals/modalFormatoActualizarPrecios.html",
+    "scripts/restaurantpe/productos/modals/modalImportarProductosBDMaster.html"
+  ],
+  "ProductoTopBarCtrl": [
+    "scripts/restaurantpe/productos/platos/presentacion/modals/modal-actualizapreciosucursales.html"
+  ],
+  "ComboDetalleCtrl": [
+    "scripts/restaurantpe/productos/platos/presentacion/modals/modal-actualizapreciosucursales.html"
+  ],
+  "CombosEditarCtrl": [],
+  "InsumosCtrl": [],
+  "InsumosListaCtrl": [],
+  "InsumosNormalCtrl": [],
+  "InsumosRecetaCtrl": [
+    "scripts/restaurantpe/productos/insumos/porcionable/modals/modal-registrarinsumo.html"
+  ],
+  "InsumoPorcionableCtrl": [
+    "scripts/restaurantpe/productos/menus/modals/categoriamenu/modal-categoria.html",
+    "scripts/restaurantpe/productos/menus/modals/fase/modal-fase.html"
+  ],
+  "ModalRegistrarInsumoCtrl": [
+    "scripts/restaurantpe/productos/menus/modals/categoriamenu/modal-categoria.html",
+    "scripts/restaurantpe/productos/menus/modals/fase/modal-fase.html",
+    "scripts/restaurantpe/productos/menus/modals/actualizar-preciofase/modal-actualizar-preciofase.html"
+  ],
+  "MenusCtrl": [
+    "scripts/restaurantpe/productos/menus/modals/programacion/modal-configuracionproducto.html"
+  ],
+  "ModalCategoriaInstanceCtrl": [
+    "scripts/restaurantpe/productos/menus/modals/programacion/modal-configuracionproducto.html"
+  ],
+  "MenusProgramacionCtrl": [
+    "scripts/restaurantpe/productos/menus/modals/programacion/modal-configuracionproducto.html"
+  ],
+  "MenusProgramacionDiaCtrl": [],
+  "ModalConfiguracionProductoCtrl": [],
+  "ModificadoresListaCtrl": [],
+  "modificadorNuevoCtrl": [],
+  "insumosModificadorCtrl": [],
+  "ProductoSugeridoCtrl": [],
+  "PSporCategoriaCtrl": [],
+  "PSporProductoCtrl": [],
+  "ProductoListadoCtrl": [],
+  "ModalImportarProductosBDMaster": [],
+  "modalSelectorModoAgotarProductoCtrl": [],
+  "matrizproductosCtrl": [],
+  "detallepreciosproductosCtrl": [
+    "scripts/restaurantpe/productos/matrizv2/modals/modalImprExcelM.view.html"
+  ],
+  "CategoriaserviciocompraCtrl": [],
+  "modalCategoriasalida": [],
+  "PreparacionRecetaCtrl": [],
+  "PreparacionRecetaListaCtrl": [],
+  "PreparacionRecetaHistorialCtrl": [],
+  "PorcionamientoInsumoListaCtrl": [],
+  "PorcionamientoInsumoRegistroCtrl": [],
+  "ModalVerDetallePreparacionReceta": [],
+  "ventasPorProductoCtrl": [],
+  "ventasProductosRangodiasCtrl": [],
+  "ventasPorComboCtrl": [],
+  "kardexProductosVendidosCtrl": [],
+  "ventasPorCategoriaDeProductoCtrl": [],
+  "ProductosPorHoraCtrl": [],
+  "menusPorDiaCtrl": [],
+  "ventasPorModificadorCtrl": [],
+  "ventasPorModificadorAgrupadosPorCantidadCtrl": [],
+  "ventasPorModificadorAgrupadosPorProductoCtrl": [],
+  "consolidadoVentasPorModificadorCtrl": [],
+  "margenGananciaProductosCtrl": [],
+  "operacionSospechosaPorProductoCtrl": [],
+  "consolidadocomprasinsumosproductoCtrl": [],
+  "StockMenuDelDiaCtrl": [],
+  "HistorialPreparacionRecetasCtrl": [],
+  "consolidadoSalidasProductoInsumoCtrl": [],
+  "ventasPorCategoriaGerenciaCtrl": [],
+  "consolidadoVentasPorProductoCtrl": [],
+  "ModalAgregarImagenMenuOnline": [],
+  "CategoriaAnularVentaControllerCtrl": [],
+  "modalCategoriaCupoDescuento": []
+}

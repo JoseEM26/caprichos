@@ -1,0 +1,345 @@
+[
+  {
+    "name": "escritorio.delivery",
+    "url": "/resumen/delivery",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "ventas.reclamo",
+    "url": "/callcenter/reclamo",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "ventas.callcenter",
+    "url": "/callcenter",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "ventas.callcenter.cliente",
+    "url": "/nuevo-pedido/:clienteId",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "ventas.callcenter.revision",
+    "url": "/revisar/:idPedido",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "ventas.callcenter.resumen",
+    "url": "/resumen/:deliveryId",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "ventas.callcenter.nuevocliente",
+    "url": "/nuevo-cliente/:textoBusqueda",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "ajustes.motorizados",
+    "url": "/motorizados",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "ajustes.motorizados.editar",
+    "url": "/:idMotorizado/editar",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "ajustes.motorizados.nuevo",
+    "url": "/nuevo",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "ajustes.callcenter",
+    "url": "/zonareparto",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "ajustes.callcenter.nuevazona",
+    "url": "/nuevazona/:idSucursal",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "ajustes.callcenter.sucursal",
+    "url": "/sucursal/:idSucursal",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "informes.ventas.delivery",
+    "url": "/delivery",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "informes.ventas.deliverysvendidos",
+    "url": "/deliverys-vendidos",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "informes.ventas.coberturadelivery",
+    "url": "/deliverys-cobertura",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "informes.ventas.coberturadelivery-mapa",
+    "url": "/deliverys-cobertura/mapa",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "informes.ventas.frecuenciadelivery",
+    "url": "/deliverys-frecuencia",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "informes.ventas.deliveryresumenproductos",
+    "url": "/resumen-por-productos",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "informes.ventas.deliveryresumenpedidos",
+    "url": "/resumen-por-pedidos",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "delivery",
+    "url": "/delivery",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "delivery.ajustes",
+    "url": "/ajustes",
+    "templateUrl": "scripts/restaurantpe/delivery/ajustes/ajustesdelivery.html",
+    "controller": "AjustesDeliveryCtrl as vm",
+    "templateContent": "<div class=\"page-heading row text-right p-t-none\"> <div class=\"wrapper page-heading-inner p-t-sm p-b-sm\"> </div> </div> <div class=\"wrapper wrapper-content animated fadeIn\"> <div class=\"row\"> <div class=\"col-sm-12\"> <div class=\"ibox\"> <div class=\"ibox-content\"> <div class=\"table-responsive\"> <div class=\"tabs-container m-t\"> <uib-tabset active=\"activeTab\"> <uib-tab ui-sref=\"delivery.ajustes.motorizado\" ng-if=\"$state.includes('delivery.ajustes')\"> <uib-tab-heading> <i class=\"fa fa fa-motorcycle\"></i> <span>Motorizados</span> </uib-tab-heading> <div class=\"panel-body\" ui-view=\"viewMotorizados\"></div> </uib-tab> <uib-tab ui-sref=\"delivery.ajustes.canaldelivery\" ng-if=\"$state.includes('delivery.ajustes')\"> <uib-tab-heading> <i class=\"fa fa-cc\"></i> <span>Canales de delivery</span> </uib-tab-heading> <div class=\"panel-body\" ui-view=\"viewCanalDelivery\"></div> </uib-tab> <uib-tab ui-sref=\"delivery.ajustes.movilidad\" ng-if=\"$state.includes('delivery.ajustes')\"> <uib-tab-heading> <i class=\"fa fa-cc\"></i> <span>Movilidad</span> </uib-tab-heading> <div class=\"panel-body\" ui-view=\"viewMovilidad\"></div> </uib-tab> <uib-tab ui-sref=\"delivery.ajustesrestaurantgo.motorizado\" ng-if=\"$state.includes('delivery.ajustesrestaurantgo')\"> <uib-tab-heading> <i class=\"fa fa fa-motorcycle\"></i> <span>Motorizados</span> </uib-tab-heading> <div class=\"panel-body\" ui-view=\"viewMotorizados\"></div> </uib-tab> <uib-tab ui-sref=\"delivery.ajustesrestaurantgo.movilidad\" ng-if=\"$state.includes('delivery.ajustesrestaurantgo')\"> <uib-tab-heading> <i class=\"fa fa-cc\"></i> <span>Movilidad</span> </uib-tab-heading> <div class=\"panel-body\" ui-view=\"viewMovilidad\"></div> </uib-tab> <uib-tab ui-sref=\"delivery.ajustes.tiporeclamo\" ng-if=\"$state.includes('delivery.ajustes')\"> <uib-tab-heading> <i class=\"fa fa-list\"></i> <span>Tipo de reclamo</span> </uib-tab-heading> <div class=\"panel-body\" ui-view=\"viewTiporeclamo\"></div> </uib-tab> <uib-tab ui-sref=\"delivery.ajustes.tipoproblemadelivery\" ng-if=\"$state.includes('delivery.ajustes')\"> <uib-tab-heading> <i class=\"fa fa-list\"></i> <span>Motivos cancelación</span> </uib-tab-heading> <div class=\"panel-body\" ui-view=\"viewTipoproblemadelivery\"></div> </uib-tab> </uib-tabset> </div> </div> </div> </div> </div> </div> </div> "
+  },
+  {
+    "name": "delivery.ajustes.movilidad",
+    "url": "/movilidad",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "delivery.ajustes.movilidad.editar",
+    "url": "/:idMotorizado/editar",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "delivery.ajustes.movilidad.nuevo",
+    "url": "/nuevo",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "delivery.ajustes.motorizado",
+    "url": "/motorizado",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "delivery.ajustes.motorizado.nuevo",
+    "url": "/nuevo",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "delivery.ajustes.motorizado.editar",
+    "url": "/:idMotorizado/editar",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "delivery.ajustes.canaldelivery",
+    "url": "/canaldelivery",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "delivery.ajustes.canaldelivery.nuevo",
+    "url": "/nuevo",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "delivery.canalenvio",
+    "url": "/canalenvio",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "delivery.canalenvio.editar",
+    "url": "/:idCanalenvio/editar",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "delivery.ajustes.canaldelivery.editar",
+    "url": "/:idCanaldelivery/editar",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "delivery.ajustes.tiporeclamo",
+    "url": "/tiporeclamo",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "delivery.ajustes.tiporeclamo.nuevo",
+    "url": "/nuevo",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "delivery.ajustes.tiporeclamo.editar",
+    "url": "/:idTiporeclamo/editar",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "delivery.ajustes.tipoproblemadelivery",
+    "url": "/tipoproblemadelivery",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "delivery.ajustes.tipoproblemadelivery.nuevo",
+    "url": "/nuevo",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "delivery.ajustes.tipoproblemadelivery.editar",
+    "url": "/:idTipoproblemadelivery/editar",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "delivery.ajustesrestaurantgo",
+    "url": "/ajustes-delivery",
+    "templateUrl": "scripts/restaurantpe/delivery/ajustes/ajustesdelivery.html",
+    "controller": "AjustesDeliveryCtrl as vm",
+    "templateContent": "<div class=\"page-heading row text-right p-t-none\"> <div class=\"wrapper page-heading-inner p-t-sm p-b-sm\"> </div> </div> <div class=\"wrapper wrapper-content animated fadeIn\"> <div class=\"row\"> <div class=\"col-sm-12\"> <div class=\"ibox\"> <div class=\"ibox-content\"> <div class=\"table-responsive\"> <div class=\"tabs-container m-t\"> <uib-tabset active=\"activeTab\"> <uib-tab ui-sref=\"delivery.ajustes.motorizado\" ng-if=\"$state.includes('delivery.ajustes')\"> <uib-tab-heading> <i class=\"fa fa fa-motorcycle\"></i> <span>Motorizados</span> </uib-tab-heading> <div class=\"panel-body\" ui-view=\"viewMotorizados\"></div> </uib-tab> <uib-tab ui-sref=\"delivery.ajustes.canaldelivery\" ng-if=\"$state.includes('delivery.ajustes')\"> <uib-tab-heading> <i class=\"fa fa-cc\"></i> <span>Canales de delivery</span> </uib-tab-heading> <div class=\"panel-body\" ui-view=\"viewCanalDelivery\"></div> </uib-tab> <uib-tab ui-sref=\"delivery.ajustes.movilidad\" ng-if=\"$state.includes('delivery.ajustes')\"> <uib-tab-heading> <i class=\"fa fa-cc\"></i> <span>Movilidad</span> </uib-tab-heading> <div class=\"panel-body\" ui-view=\"viewMovilidad\"></div> </uib-tab> <uib-tab ui-sref=\"delivery.ajustesrestaurantgo.motorizado\" ng-if=\"$state.includes('delivery.ajustesrestaurantgo')\"> <uib-tab-heading> <i class=\"fa fa fa-motorcycle\"></i> <span>Motorizados</span> </uib-tab-heading> <div class=\"panel-body\" ui-view=\"viewMotorizados\"></div> </uib-tab> <uib-tab ui-sref=\"delivery.ajustesrestaurantgo.movilidad\" ng-if=\"$state.includes('delivery.ajustesrestaurantgo')\"> <uib-tab-heading> <i class=\"fa fa-cc\"></i> <span>Movilidad</span> </uib-tab-heading> <div class=\"panel-body\" ui-view=\"viewMovilidad\"></div> </uib-tab> <uib-tab ui-sref=\"delivery.ajustes.tiporeclamo\" ng-if=\"$state.includes('delivery.ajustes')\"> <uib-tab-heading> <i class=\"fa fa-list\"></i> <span>Tipo de reclamo</span> </uib-tab-heading> <div class=\"panel-body\" ui-view=\"viewTiporeclamo\"></div> </uib-tab> <uib-tab ui-sref=\"delivery.ajustes.tipoproblemadelivery\" ng-if=\"$state.includes('delivery.ajustes')\"> <uib-tab-heading> <i class=\"fa fa-list\"></i> <span>Motivos cancelación</span> </uib-tab-heading> <div class=\"panel-body\" ui-view=\"viewTipoproblemadelivery\"></div> </uib-tab> </uib-tabset> </div> </div> </div> </div> </div> </div> </div> "
+  },
+  {
+    "name": "delivery.ajustesrestaurantgo.movilidad",
+    "url": "/movilidad",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "delivery.ajustesrestaurantgo.movilidad.editar",
+    "url": "/:idMotorizado/editar",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "delivery.ajustesrestaurantgo.movilidad.nuevo",
+    "url": "/nuevo",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "delivery.ajustesrestaurantgo.motorizado",
+    "url": "/motorizado",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "delivery.ajustesrestaurantgo.motorizado.nuevo",
+    "url": "/nuevo",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "delivery.ajustesrestaurantgo.motorizado.editar",
+    "url": "/:idMotorizado/editar",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "deliverygo",
+    "url": "/deliverygo",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "deliverygo.resumenpedidos",
+    "url": "/resumen-por-pedidos",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  },
+  {
+    "name": "deliverygo.resumenproductos",
+    "url": "/resumen-por-productos",
+    "templateUrl": null,
+    "controller": null,
+    "templateContent": ""
+  }
+]

@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Chatbot de Caprichos en WhatsApp</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+button{font-family:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="position:relative;width:390px;height:844px;overflow:hidden;background:#EFEAE2;color:#111B21;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:20px;display:flex;flex-direction:column">
+
+  <!-- Cabecera de WhatsApp -->
+  <div style="background:#008069;color:#FFFFFF;padding:10px 12px;display:flex;align-items:center;gap:10px">
+    <span aria-hidden="true" style="font-size:22px;line-height:22px">←</span>
+    <img src="{{logoSrc}}" alt="{{botName}}" style="width:40px;height:40px;border-radius:20px;object-fit:cover">
+    <div style="flex:1;min-width:0">
+      <div style="font-weight:600;font-size:16px;line-height:20px">{{botName}}</div>
+      <div style="font-size:12px;line-height:16px;color:#D9F2EC">Cuenta de empresa · en línea</div>
+    </div>
+    <span aria-hidden="true" style="font-size:20px;letter-spacing:6px">⋮</span>
+  </div>
+
+  <!-- Controles de la maqueta (acta 02): no es parte de WhatsApp -->
+  <sc-if value="{{hideCtl}}" hint-placeholder-val="{{ false }}"><button onClick="{{toggleCtl}}" style="margin:6px 8px 0;min-height:44px;padding:0 10px;border:1px dashed #667781;border-radius:8px;background:#F7F5F0;color:#54656F;font-weight:700;font-size:12px">Mostrar controles</button></sc-if>
+  <sc-if value="{{showCtl}}" hint-placeholder-val="{{ true }}"><div style="margin:6px 8px 0;padding:4px 6px 6px;border:1px dashed #667781;border-radius:8px;background:#F7F5F0">
+    <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;line-height:14px;letter-spacing:0.6px;font-weight:700;color:#54656F">CONTROLES DE LA MAQUETA</span><button onClick="{{toggleCtl}}" style="min-height:28px;padding:0 8px;border:1px solid #667781;border-radius:8px;background:transparent;color:#54656F;font-weight:700;font-size:12px">Ocultar</button></div>
+    <div style="display:flex;gap:6px;margin-top:2px;flex-wrap:wrap">
+      <sc-for list="{{controls}}" as="c" hint-placeholder-count="3">
+        <button onClick="{{c.pick}}" style="flex:1 1 30%;min-height:44px;padding:2px 4px;border:1px solid #667781;border-radius:8px;background:{{c.bg}};color:{{c.fg}};font-size:12px;line-height:14px;font-weight:600">{{c.n}}</button>
+      </sc-for>
+    </div>
+  </div></sc-if>
+
+  <!-- Conversación -->
+  <div role="log" aria-live="polite" aria-label="Conversación con el asistente" style="flex:1;min-height:0;overflow-y:auto;padding:12px;display:flex;flex-direction:column-reverse;gap:6px">
+    <sc-for list="{{msgs}}" as="m" hint-placeholder-count="3">
+      <div style="display:flex;flex-direction:column;align-items:{{m.align}};gap:4px">
+        <sc-if value="{{m.isSys}}" hint-placeholder-val="{{ false }}">
+          <!-- Etiqueta de sistema, estilo pildora (acta 02) -->
+          <div style="align-self:center;background:#FFF3C4;color:#54656F;font-size:12px;line-height:16px;font-weight:700;padding:4px 12px;border-radius:12px;box-shadow:0 1px 0.5px rgba(11,20,26,0.13)">{{m.text}}</div>
+        </sc-if>
+        <sc-if value="{{m.isMsg}}" hint-placeholder-val="{{ true }}">
+        <div style="max-width:80%;padding:6px 8px 4px 9px;border-radius:8px;background:{{m.bg}};box-shadow:0 1px 0.5px rgba(11,20,26,0.13)">
+          <div style="white-space:pre-line">{{m.text}}</div>
+          <div style="text-align:right;font-size:12px;line-height:14px;color:#667781">{{m.time}}<span style="color:{{m.tickColor}}">{{m.ticks}}</span></div>
+        </div>
+        </sc-if>
+        <sc-if value="{{m.hasButtons}}" hint-placeholder-val="{{ false }}">
+          <div style="width:80%;display:flex;flex-direction:column;gap:4px">
+            <sc-for list="{{m.buttons}}" as="b" hint-placeholder-count="2">
+              <button onClick="{{b.pick}}" style="width:100%;min-height:44px;border:0;border-radius:8px;background:#FFFFFF;color:#0B6FB3;font-weight:600;font-size:15px;box-shadow:0 1px 0.5px rgba(11,20,26,0.13)">{{b.n}}</button>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{m.hasList}}" hint-placeholder-val="{{ false }}">
+          <div style="width:80%">
+            <button onClick="{{openSheet}}" style="width:100%;min-height:44px;border:0;border-radius:8px;background:#FFFFFF;color:#0B6FB3;font-weight:600;font-size:15px;box-shadow:0 1px 0.5px rgba(11,20,26,0.13)">☰  Ver opciones</button>
+          </div>
+        </sc-if>
+      </div>
+    </sc-for>
+    <div style="align-self:center;background:#FFFFFF;color:#54656F;font-size:12px;line-height:16px;font-weight:600;padding:4px 10px;border-radius:8px;box-shadow:0 1px 0.5px rgba(11,20,26,0.13)">HOY</div>
+  </div>
+
+  <!-- Barra de escritura: el cliente puede escribir libre; el bot entiende lo básico y si no, pasa a una persona -->
+  <div style="padding:8px;display:flex;align-items:center;gap:8px;background:#EFEAE2">
+    <input type="text" value="{{txt}}" onChange="{{setTxt}}" placeholder="Mensaje" aria-label="Escribe tu mensaje" style="flex:1;min-width:0;box-sizing:border-box;min-height:44px;border-radius:22px;border:0;background:#FFFFFF;padding:0 14px;font-size:15px;color:#111B21">
+    <button onClick="{{sendTxt}}" aria-label="Enviar mensaje" style="width:44px;height:44px;border:0;border-radius:22px;background:#008069;color:#FFFFFF;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 20l18-8L3 4v6l11 2-11 2z" fill="#fff"></path></svg></button>
+  </div>
+
+  <!-- Hoja de opciones (mensaje de lista) -->
+  <sc-if value="{{sheetOpen}}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{closeSheet}}" style="position:absolute;left:0;right:0;top:0;bottom:0;background:rgba(11,20,26,0.5)"></div>
+    <div style="position:absolute;left:0;right:0;bottom:0;max-height:70%;background:#FFFFFF;border-radius:16px 16px 0 0;display:flex;flex-direction:column">
+      <div style="padding:16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #E9EDEF">
+        <div style="font-weight:600;font-size:16px">{{sheetTitle}}</div>
+        <button onClick="{{closeSheet}}" aria-label="Cerrar" style="width:44px;height:44px;border:0;background:transparent;color:#54656F;font-size:22px">×</button>
+      </div>
+      <div style="flex:1;min-height:0;overflow-y:auto">
+        <sc-for list="{{sheetRows}}" as="r" hint-placeholder-count="4">
+          <button onClick="{{r.pick}}" style="width:100%;min-height:52px;border:0;border-bottom:1px solid #F0F2F5;background:#FFFFFF;color:#111B21;padding:0 16px;display:flex;align-items:center;gap:12px;text-align:left;font-size:15px">
+            <span style="flex:1">{{r.n}}</span>
+            <span style="width:20px;height:20px;border-radius:10px;border:2px solid #667781;background:{{r.dot}};flex:none"></span>
+          </button>
+        </sc-for>
+      </div>
+      <div style="padding:12px 16px 16px">
+        <button onClick="{{sendSheet}}" style="width:100%;min-height:48px;border:0;border-radius:24px;background:{{sendBg}};color:#FFFFFF;font-weight:600;font-size:15px">Enviar</button>
+      </div>
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+const fmt = (n) => 's/ ' + (Number.isInteger(n) ? n : n.toFixed(2));
+const LECHE = { name: 'Tipo de leche', req: true, opts: [ { n: 'Leche entera', p: 0 }, { n: 'Leche sin lactosa', p: 0 }, { n: 'Bebida de almendra', p: 2.5 } ] };
+const DULZOR = { name: 'Endulzante', req: true, opts: [ { n: 'Azúcar', p: 0 }, { n: 'Stevia', p: 0 } ] };
+const TOPS = { name: 'Extras', req: false, opts: [ { n: 'Chantilly', p: 2 }, { n: 'Syrop de 100% cacao', p: 2.5 }, { n: 'Syrop de maracuyá', p: 2.5 }, { n: 'Syrop de fresa', p: 2 }, { n: 'Bola de helado', p: 2.5 } ] };
+const ADIC = { name: 'Adicionales', req: false, opts: [ { n: 'Chantilly', p: 2 }, { n: 'Bola de helado', p: 2.5 }, { n: 'Syrop de 100% cacao', p: 2.5 } ] };
+const CREMAS = { name: 'Cremas', req: false, opts: [ { n: 'Tártara', p: 0 }, { n: 'Honey', p: 0 }, { n: 'Crema de ají amarillo', p: 0 }, { n: 'Chimichurri', p: 0 } ] };
+const BEB = [ { n: 'Regular 12 oz', p: 14.5 }, { n: 'Grande 16 oz', p: 16.5 }, { n: 'Extra 21 oz', p: 17.5 } ];
+const CAL = [ { n: 'Regular 12 oz', p: 12 }, { n: 'Grande 16 oz', p: 13.5 }, { n: 'Extra 21 oz', p: 14.5 } ];
+const WAF = [ { n: '1/2 waffle', p: 15 }, { n: 'Waffle completo', p: 21 } ];
+const CATS = [
+  { n: 'Frappes', prods: [
+    { n: 'FRAPPE OREO', variants: BEB, groups: [ LECHE, DULZOR, TOPS ] },
+    { n: 'FRAPPE MARACUYÁ', variants: BEB, groups: [ LECHE, DULZOR, TOPS ] },
+    { n: 'FRAPPE STRAWBERRY', variants: BEB, groups: [ LECHE, DULZOR, TOPS ] } ] },
+  { n: 'Calientes', prods: [
+    { n: 'MOCACCINO', variants: CAL, groups: [ LECHE, DULZOR, TOPS ] },
+    { n: 'CAPUCCINO', variants: [ { n: 'Regular 12 oz', p: 9.5 }, { n: 'Grande 16 oz', p: 11 }, { n: 'Extra 21 oz', p: 12 } ], groups: [ LECHE, DULZOR, TOPS ] } ] },
+  { n: 'Waffles', prods: [
+    { n: 'WAFFLE FRUTOS DEL BOSQUE', variants: WAF, groups: [ ADIC ] },
+    { n: 'NUTEWAFFLE', variants: WAF, groups: [ ADIC ] } ] },
+  { n: 'Salados', prods: [
+    { n: 'CAPRISABROSO', variants: [ { n: 'Unidad', p: 33 } ], groups: [ CREMAS ] },
+    { n: 'CLUB SANDWICH', variants: [ { n: '4 cuartos', p: 27 } ], groups: [ CREMAS ] } ] }
+];
+
+// ---- ubicación actual del cliente (GPS del navegador) con mensajes claros
+const GEO_ERR = { 1: 'No fue posible conseguir la ubicación: no diste permiso. Activa la ubicación en tu navegador y vuelve a intentarlo, o escribe tu dirección.', 2: 'No fue posible conseguir la ubicación: el dispositivo no la encuentra ahora. Inténtalo otra vez o escribe tu dirección.', 3: 'No fue posible conseguir la ubicación: tardó demasiado. Inténtalo de nuevo o escribe tu dirección.' };
+const getPos = (ok, fail) => { const g = typeof navigator !== 'undefined' && navigator.geolocation;
+  if (!g) { fail('No fue posible conseguir la ubicación: este navegador no permite ubicarte. Escribe tu dirección.'); return; }
+  try { g.getCurrentPosition((p) => ok({ lat: p.coords.latitude.toFixed(5), lng: p.coords.longitude.toFixed(5), acc: Math.round(p.coords.accuracy) }), (e) => fail(GEO_ERR[e && e.code] || 'No fue posible conseguir la ubicación. Escribe tu dirección.'), { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }); }
+  catch (err) { fail('No fue posible conseguir la ubicación. Escribe tu dirección.'); } };
+const mapsOf = (g) => 'https://www.google.com/maps/search/?api=1&query=' + g.lat + ',' + g.lng;
+const geoOkText = (g) => 'Tu ubicación fue localizada correctamente (precisión de unos ' + g.acc + ' m).';
+const MODALS = [ { id: 'delivery', n: 'Delivery' }, { id: 'llevar', n: 'Para recoger' } ];
+// (acta 02) Productos sin stock: variable de datos
+const AGOTADOS = [];
+const ALT = [ 'FRAPPE MARACUYÁ', 'FRAPPE OREO' ];
+const HELLO = 'CAPRICHOS DEL MES · Frappe Maracuyá Tropical 🍓\n\n¡Hola! ☕ Soy Capri, la asistente de Caprichos. ¿En qué te puedo ayudar hoy? 🧁';
+const SYS = 'SE REQUIERE ATENCIÓN · pasó a una persona';
+const HUMAN = 'Te paso con alguien del equipo. Ya les avisé con tu nombre y tu número; en unos minutos te escriben.';
+const hdCfg = () => { try { const raw = window.localStorage.getItem('caprichos_carta_cfg_v1'); const c = raw ? JSON.parse(raw) : null; return (c && c.altaDem && c.altaDem.on) ? c.altaDem : null; } catch (err) { return null; } };
+const INIT = () => { const h = hdCfg(); return [ { from: 'user', text: 'Hola' }, { from: 'bot', text: HELLO + (h ? '\n\nHoy tenemos muchos pedidos: la entrega está tardando unos ' + (tBaseOf() + (Number(h.extra) || 10)) + ' minutos.' + (h.pause ? ' Por ahora un asesor te atiende por WhatsApp.' : '') : '') } ]; };
+// (acta 02) Preguntar algo: respuestas fijas de ejemplo (la IA solo responde dudas, nunca toma el pedido)
+// ---- horario por día y fechas especiales (se editan en Configuración del local > Horario)
+const DIAS = [ [ 'lun', 'Lunes', 'Lun' ], [ 'mar', 'Martes', 'Mar' ], [ 'mie', 'Miércoles', 'Mié' ], [ 'jue', 'Jueves', 'Jue' ], [ 'vie', 'Viernes', 'Vie' ], [ 'sab', 'Sábado', 'Sáb' ], [ 'dom', 'Domingo', 'Dom' ] ];
+const HDEF = () => { const d = {}; DIAS.forEach((x) => { d[x[0]] = { on: true, abre: '14:00', cierra: '22:00' }; }); return { dias: d, especiales: [] }; };
+const horarioOf = (info) => { const h = info && info.horario && info.horario.dias ? info.horario : null; return { dias: Object.assign({}, HDEF().dias, h ? h.dias : {}), especiales: h && Array.isArray(h.especiales) ? h.especiales : [] }; };
+const h12 = (h) => { const m = String(h).match(/^(\d{1,2}):(\d{2})$/); if (!m) { return h; } const n = parseInt(m[1], 10); return ((n + 11) % 12 + 1) + ':' + m[2] + (n >= 12 ? ' pm' : ' am'); };
+const hMin = (h) => { const m = String(h).match(/^(\d{1,2}):(\d{2})$/); return m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : 0; };
+const schedText = (h) => { const keyOf = (x) => (x.on ? x.abre + '-' + x.cierra : 'x'); const groups = [];
+  DIAS.forEach((d) => { const x = h.dias[d[0]]; const last = groups[groups.length - 1]; if (last && last.k === keyOf(x)) { last.to = d; } else { groups.push({ k: keyOf(x), x: x, from: d, to: d }); } });
+  const open = groups.filter((g) => g.x.on); const closed = DIAS.filter((d) => !h.dias[d[0]].on).map((d) => d[1].toLowerCase());
+  if (!open.length) { return 'Cerrado por el momento'; }
+  if (open.length === 1 && !closed.length) { return 'Todos los días, de ' + h12(open[0].x.abre) + ' a ' + h12(open[0].x.cierra); }
+  return open.map((g) => (g.from === g.to ? g.from[2] : g.from[2] + ' a ' + g.to[2]) + ': ' + h12(g.x.abre) + ' a ' + h12(g.x.cierra)).join(' · ') + (closed.length ? ' · Cerrado: ' + closed.join(', ') : ''); };
+const isoOf = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+const entryOn = (h, d) => { const sp = h.especiales.find((e) => e.fecha === isoOf(d)); if (sp) { return { sp: sp, e: sp.cerrado ? null : { abre: sp.abre, cierra: sp.cierra } }; } const x = h.dias[DIAS[(d.getDay() + 6) % 7][0]]; return { sp: null, e: x.on ? x : null }; };
+const statusNow = (h, now) => { const r = entryOn(h, now); if (!r.e) { return { open: false, text: 'Cerrado hoy' + (r.sp && r.sp.nota ? ' · ' + r.sp.nota : '') }; }
+  const a = hMin(r.e.abre); let c = hMin(r.e.cierra); if (c <= a) { c += 1440; } const t = now.getHours() * 60 + now.getMinutes();
+  if (t >= a && t < c) { return { open: true, text: 'Abierto hasta las ' + h12(r.e.cierra) }; } if (t < a) { return { open: false, text: 'Cerrado · abre hoy a las ' + h12(r.e.abre) }; } return { open: false, text: 'Cerrado por hoy' }; };
+const infoCfg = () => { try { const raw = window.localStorage.getItem('caprichos_carta_cfg_v1'); const c = raw ? JSON.parse(raw) : null; return (c && c.info) || {}; } catch (err) { return {}; } };
+const CINFO = Object.assign({ nombre: 'Caprichos', yape: '9XX XXX XXX (ejemplo)', plin: '9XX XXX XXX (ejemplo)', telefono: '9XX XXX XXX', direccion: 'Campoy, San Juan de Lurigancho, Lima', referencia: '', mapa: '' }, infoCfg());
+const HORARIO = horarioOf(CINFO);
+const ZONAS_GEO = [{"z":"Z2","p":[[-12.01935,-76.97091],[-12.02095,-76.97006],[-12.02326,-76.96959],[-12.02466,-76.96876],[-12.02416,-76.96705],[-12.02529,-76.96659],[-12.02146,-76.95588],[-12.01909,-76.95609],[-12.01765,-76.95641],[-12.01775,-76.95681],[-12.01841,-76.95702],[-12.0185,-76.95721],[-12.01854,-76.95741],[-12.01854,-76.95761],[-12.01791,-76.95834],[-12.01789,-76.95881],[-12.01347,-76.96005],[-12.01156,-76.96449],[-12.01257,-76.9655],[-12.01324,-76.96597],[-12.01352,-76.9662],[-12.01365,-76.9664],[-12.01461,-76.96748],[-12.01564,-76.96854],[-12.01686,-76.96954],[-12.01858,-76.9691],[-12.01935,-76.97091]]},{"z":"Z3","p":[[-12.02529,-76.96659],[-12.02417,-76.96705],[-12.02466,-76.96876],[-12.02326,-76.96959],[-12.02095,-76.97006],[-12.01935,-76.97091],[-12.01858,-76.9691],[-12.01686,-76.96954],[-12.01564,-76.96854],[-12.01462,-76.96749],[-12.01455,-76.96741],[-12.01449,-76.96735],[-12.01445,-76.96731],[-12.01422,-76.96704],[-12.01365,-76.9664],[-12.01351,-76.96619],[-12.01324,-76.96597],[-12.01256,-76.9655],[-12.01155,-76.96448],[-12.01347,-76.96005],[-12.01789,-76.95881],[-12.01791,-76.95833],[-12.01854,-76.95761],[-12.01854,-76.95741],[-12.01852,-76.95735],[-12.0182,-76.95748],[-12.01743,-76.95761],[-12.01656,-76.95744],[-12.01046,-76.95607],[-12.00776,-76.96073],[-12.00835,-76.96462],[-12.00898,-76.96509],[-12.00906,-76.96567],[-12.00863,-76.96672],[-12.00887,-76.96724],[-12.00937,-76.96751],[-12.01055,-76.96636],[-12.0114,-76.96688],[-12.01058,-76.96879],[-12.01268,-76.9696],[-12.0166,-76.97184],[-12.01642,-76.97228],[-12.01626,-76.97311],[-12.01679,-76.97344],[-12.01741,-76.97335],[-12.01769,-76.97492],[-12.01845,-76.97636],[-12.02034,-76.97688],[-12.02124,-76.97599],[-12.02538,-76.97658],[-12.02638,-76.96943],[-12.02529,-76.96659]]},{"z":"Z3","p":[[-12.01765,-76.95641],[-12.01909,-76.95609],[-12.02146,-76.95588],[-12.02033,-76.95231],[-12.01863,-76.95186],[-12.01768,-76.95163],[-12.01769,-76.95281],[-12.01814,-76.95363],[-12.01806,-76.95379],[-12.01822,-76.95393],[-12.01765,-76.95641]]},{"z":"Z4","p":[[-12.021,-76.98622],[-12.02626,-76.98628],[-12.0253,-76.98126],[-12.02638,-76.96943],[-12.02538,-76.97658],[-12.02124,-76.97599],[-12.02034,-76.97688],[-12.01845,-76.97636],[-12.01769,-76.97492],[-12.01741,-76.97335],[-12.01679,-76.97344],[-12.01626,-76.97311],[-12.01642,-76.97228],[-12.0166,-76.97184],[-12.01268,-76.9696],[-12.01058,-76.96879],[-12.0114,-76.96688],[-12.01055,-76.96636],[-12.00937,-76.96751],[-12.00887,-76.96724],[-12.00863,-76.96672],[-12.00906,-76.96567],[-12.00898,-76.96509],[-12.00835,-76.96462],[-12.00776,-76.96073],[-12.01046,-76.95607],[-12.01661,-76.95745],[-12.01743,-76.95761],[-12.0182,-76.95748],[-12.01852,-76.95735],[-12.0185,-76.95721],[-12.01841,-76.95702],[-12.01775,-76.95681],[-12.01765,-76.95641],[-12.01821,-76.95393],[-12.01806,-76.95379],[-12.01814,-76.95363],[-12.01769,-76.95281],[-12.01768,-76.95163],[-12.01616,-76.95078],[-12.01184,-76.95005],[-12.00965,-76.94993],[-12.00757,-76.94918],[-12.00797,-76.95079],[-12.00878,-76.95098],[-12.00915,-76.95147],[-12.01032,-76.95218],[-12.01106,-76.95163],[-12.0149,-76.95302],[-12.00996,-76.95627],[-12.00712,-76.96084],[-12.00795,-76.96699],[-12.00873,-76.96812],[-12.00963,-76.96885],[-12.01952,-76.97799],[-12.02224,-76.98301],[-12.0217,-76.98463],[-12.021,-76.98622]]},{"z":"Z5","p":[[-12.00712,-76.96084],[-12.00996,-76.95627],[-12.0149,-76.95302],[-12.01106,-76.95163],[-12.01032,-76.95218],[-12.00915,-76.95148],[-12.00878,-76.95098],[-12.00797,-76.95079],[-12.00757,-76.94918],[-12.00965,-76.94992],[-12.01184,-76.95004],[-12.01356,-76.95033],[-12.01616,-76.95078],[-12.01768,-76.95163],[-12.0184,-76.95179],[-12.01903,-76.95195],[-12.02033,-76.95231],[-12.01991,-76.94824],[-12.02014,-76.94354],[-12.02186,-76.9296],[-12.0186,-76.92987],[-12.01181,-76.93425],[-12.00951,-76.93066],[-11.99751,-76.93727],[-11.99915,-76.95799],[-12.0053,-76.97107],[-12.00987,-76.97401],[-12.01687,-76.97939],[-12.01252,-76.98842],[-12.01601,-76.99144],[-12.01755,-76.99174],[-12.01681,-76.99808],[-12.01725,-76.99962],[-12.02391,-76.99714],[-12.02491,-77.00247],[-12.02843,-77.00125],[-12.02814,-76.99992],[-12.02949,-76.99958],[-12.02869,-76.99707],[-12.03073,-76.99301],[-12.03192,-76.99084],[-12.03162,-76.98779],[-12.02908,-76.97951],[-12.02545,-76.97976],[-12.02531,-76.98126],[-12.02626,-76.98628],[-12.02332,-76.98626],[-12.021,-76.98623],[-12.02169,-76.98464],[-12.02224,-76.98301],[-12.01952,-76.97799],[-12.00995,-76.96916],[-12.00962,-76.96885],[-12.00874,-76.96813],[-12.00795,-76.96699],[-12.00712,-76.96084]]},{"z":"Z7","p":[[-12.01251,-76.98843],[-12.01687,-76.97939],[-12.00983,-76.974],[-12.00663,-76.97197],[-12.0057,-76.97418],[-12.00755,-76.9798],[-12.00788,-76.98186],[-12.00756,-76.9839],[-12.00967,-76.98682],[-12.01251,-76.98843]]}];
+const ZONA_COLOR = { Z2: '#2F9E57', Z3: '#7DBB3A', Z4: '#D99E39', Z5: '#E67929', Z7: '#B2500F' };
+const ZONA_IDS = [ 'Z2', 'Z3', 'Z4', 'Z5', 'Z7' ];
+const zonaInRing = (lat, lng, ring) => { let ins = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const yi = ring[i][0], xi = ring[i][1], yj = ring[j][0], xj = ring[j][1]; if (((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) { ins = !ins; } } return ins; };
+const polyParse = (t) => { if (typeof t !== 'string' || !t.trim()) { return null; } const pts = []; const ls = t.trim().split(/\n+/); for (let i = 0; i < ls.length; i++) { const m = ls[i].trim().match(/^(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)$/); if (!m) { return null; } const la = Number(m[1]); const lo = Number(m[2]); if (Math.abs(la) > 90 || Math.abs(lo) > 180) { return null; } pts.push([ la, lo ]); } return pts.length >= 3 ? pts : null; };
+const zonasEff = (info) => ZONAS_GEO.map((z) => ({ z: z.z, p: polyParse((info || {})['zpoly_' + z.z]) || z.p }));
+const zonaOf = (lat, lng) => { const a = Number(lat); const b = Number(lng); if (!isFinite(a) || !isFinite(b)) { return null; } const h = zonasEff(cfgAll().info).find((z) => zonaInRing(a, b, z.p)); if (h && String((cfgAll().info || {})['zon_' + h.z]) === '0') { return null; } return h ? h.z : null; };
+const cfgAll = () => { try { const raw = window.localStorage.getItem('caprichos_carta_cfg_v1'); return raw ? JSON.parse(raw) : {}; } catch (err) { return {}; } };
+// ---- descuentos automáticos (Ofertas y descuentos): se aplican solos según día, hora, fechas, canal (WhatsApp) y compra mínima; entre varios, el mejor
+const DESC_DEFAULT = [ { id: 'D-1', nombre: 'Domingos de waffles', tipo: 'pct', valor: '10', aplica: 'cat', cat: 'waffles', prod: '', min: '0', dias: [ 'dom' ], hd: '', hh: '', vd: '2026-10-01', vh: '2026-12-31', canal: 'todos', on: true }, { id: 'D-2', nombre: 'Happy hour de la tarde', tipo: 'pct', valor: '15', aplica: 'toda', cat: '', prod: '', min: '0', dias: [ 'lun', 'mar', 'mie', 'jue', 'vie' ], hd: '15:00', hh: '17:00', vd: '2026-10-01', vh: '2026-12-31', canal: 'todos', on: true } ];
+const descsCfg = () => { const c = cfgAll(); return c && Array.isArray(c.descuentos) ? c.descuentos : DESC_DEFAULT; };
+const autoDesc = (items) => { let best = { name: '', disc: 0 }; const sub = items.reduce((a, x) => a + x.price, 0); const now = new Date();
+  descsCfg().forEach((d) => { if (!d.on || !xyVig(d, now) || (d.canal !== 'todos' && d.canal && d.canal !== 'whatsapp') || sub < Number(d.min || 0)) { return; }
+    const base = d.aplica === 'prod' ? items.filter((x) => x.name === d.prod).reduce((a, x) => a + x.price, 0) : (d.aplica === 'cat' ? items.filter((x) => x.cat === d.cat).reduce((a, x) => a + x.price, 0) : sub);
+    if (base <= 0) { return; } const disc = d.tipo === 'pct' ? Math.round(base * Number(d.valor)) / 100 : Math.min(Number(d.valor), base); if (disc > best.disc) { best = { name: d.nombre, disc: disc }; } });
+  return best; };
+// ---- promociones «lleva N, paga M» (las mismas de Nuevo pedido y la carta): se ofrecen al cliente y se aplican como descuento sobre los precios base
+const XY_DEF = [ { id: 'p3', n: '2x1 LATTE COFFE', tipo: '2x1', precio: '11.5', on: true, comps: [ { kind: 'prod', prod: 'LATTE COFFE', q: 2 } ], sched: { dias: [ 'mar' ], hd: '', hh: '', vd: '', vh: '', canal: 'todos', limite: '2' } }, { id: 'p4', n: '2x1 ICED COFFE', tipo: '2x1', precio: '9', on: true, comps: [ { kind: 'prod', prod: 'ICED COFFE', q: 2 } ] } ];
+const xyLoad = () => { const c = cfgAll(); const l = c && Array.isArray(c.promosAll) ? c.promosAll : XY_DEF; return l.filter((p) => !p.slots && p.on !== false && /^\d+x\d+$/.test(String(p.tipo)) && p.comps && p.comps.length); };
+const xyVig = (sc, now) => { const iso = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0'); if (sc.vd && iso < sc.vd) { return false; } if (sc.vh && iso > sc.vh) { return false; }
+  if (sc.dias && sc.dias.length && sc.dias.indexOf(DIAS[(now.getDay() + 6) % 7][0]) < 0) { return false; }
+  const hm = (h) => { const m = String(h).match(/^(\d{1,2}):(\d{2})$/); return m ? Number(m[1]) * 60 + Number(m[2]) : 0; }; if (sc.hd && sc.hh) { const tm = now.getHours() * 60 + now.getMinutes(); if (tm < hm(sc.hd) || tm >= hm(sc.hh)) { return false; } } return true; };
+// busca la mejor promoción para los productos del pedido: devuelve las que ya califican (ok) y las que faltan poco
+const xyOffers = (items, pd, declined) => { const out = []; if (!items.length) { return out; } const now = new Date(); const drink = [ 'frappes', 'iced', 'frozen', 'calientes' ]; const tipos = cfgAll().tipos || [];
+  xyLoad().forEach((pr) => { const sc = pr.sched || {}; if ((declined || []).indexOf(pr.id) >= 0 || !xyVig(sc, now) || (sc.canal && sc.canal !== 'todos' && sc.canal !== 'whatsapp')) { return; }
+    const need = Number(/^(\d+)x/.exec(String(pr.tipo))[1]); const lim = Number(sc.limite) || 0; if (lim && (pd || []).filter((e) => e.id === pr.id).length >= lim) { return; }
+    const avail = items.map(() => 1); (pd || []).forEach((e) => { e.idx.forEach((i) => { avail[i] = 0; }); });
+    const slots = []; pr.comps.forEach((c) => { for (let i = 0; i < c.q; i++) { slots.push(c); } }); slots.sort((a, b) => (a.kind === 'cat' ? 1 : 0) - (b.kind === 'cat' ? 1 : 0));
+    const taken = []; const miss = []; slots.forEach((c) => { const k = items.findIndex((l, i) => avail[i] && (c.kind === 'prod' ? l.name === c.prod : c.kind === 'tipo' ? l.name === (tipos.find((x) => x.id === c.tipo) || {}).prod : (c.cat === 'bebidas' ? drink.indexOf(l.cat) >= 0 : l.cat === c.cat))); if (k >= 0) { avail[k] = 0; taken.push(k); } else { miss.push(c.kind === 'prod' ? c.prod : (c.kind === 'tipo' ? ((tipos.find((x) => x.id === c.tipo) || {}).n || c.tipo) : (c.cat === 'complementos' ? 'Postres' : (c.cat === 'bebidas' ? 'bebidas' : c.cat.charAt(0).toUpperCase() + c.cat.slice(1))))); } });
+    if (!taken.length) { return; } const price = parseFloat(pr.precio);
+    if (taken.length === need) { const sav = Math.round((taken.reduce((a, k) => a + (items[k].base !== undefined ? items[k].base : items[k].price), 0) - price) * 100) / 100; if (sav > 0) { out.push({ ok: true, id: pr.id, n: pr.n, v: sav, idx: taken }); } }
+    else { out.push({ ok: false, id: pr.id, n: pr.n, miss: miss, price: price }); } });
+  return out.sort((a, b) => (a.ok ? 0 : 1) - (b.ok ? 0 : 1)); };
+const tarOf = (z) => { const i = (cfgAll().info) || {}; return Number(i['tar' + z]) || Number(String(z).slice(1)); };
+const isAgot = (name) => { const c = cfgAll(); const a = (c.agot || {}); const h = (c.agotHoy || {}); const d = new Date(); const iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); return AGOTADOS.indexOf(name) >= 0 || a[name] !== undefined || h[name] === iso; };
+const minOf = () => Number((cfgAll().info || {}).pedidoMin) || 14.5;
+const freeOf = () => Number((cfgAll().info || {}).envioGratis) || 70;
+const freeMas = () => String((cfgAll().info || {}).envioGratisMas) !== '0';
+const payOn = () => { const i = cfgAll().info || {}; const on = (k) => String(i[k]) !== '0'; return { efectivo: on('pg_efe'), yape: on('pg_yape'), plin: on('pg_plin'), tarjeta: on('pg_tarj'), transf: on('pg_transf') }; };
+const tBaseOf = () => Number((cfgAll().info || {}).tiempoBase) || 13;
+const tolOf = () => Number((cfgAll().info || {}).resTol) || 15;
+const tx = (k, d) => String((cfgAll().info || {})[k] || d);
+const isPaused = () => { const h = cfgAll().altaDem; return !!(h && h.on && h.pause); };
+(() => { const po = (cfgAll().pover) || {}; CATS.forEach((c) => c.prods.forEach((p) => { const nm = p.n; const o = po[nm]; if (o && isFinite(Number(o.p)) && Number(o.p) > 0) { const mn = Math.min.apply(null, p.variants.map((v) => v.p)); const dl = Number(o.p) - mn; if (Math.abs(dl) > 0.001) { p.variants = p.variants.map((v) => ({ n: v.n, p: Math.max(0, Math.round((v.p + dl) * 100) / 100) })); } } })); })();
+const DUDAS = [
+  { id: 'd1', n: 'Soy intolerante a la lactosa', a: 'Revisé lo que hay ahora: tenemos leche sin lactosa y bebida de almendra (+ s/ 2.50). Te recomiendo el Capuccino o el Mocaccino con leche sin lactosa. El pedido lo hacemos por botones.' },
+  { id: 'd2', n: '¿Qué bebidas calientes tienen?', a: 'Disponibles ahora: Mocaccino, Capuccino y Café americano. ¿Te gustan más dulces o más fuertes? Con eso te recomiendo una. El pedido lo hacemos por botones.' },
+  { id: 'd4', n: '¿Qué postres hay hoy?', a: 'Hoy hay Carrot Cake, galleta choco chips y waffles. Las donas de manjar se acabaron; te sugiero la dona de Oreo. El pedido lo hacemos por botones.' },
+  { id: 'd5', n: '¿Dónde están ubicados?', a: 'Estamos en ' + CINFO.direccion + '.' + (CINFO.referencia ? ' ' + CINFO.referencia : '') + (CINFO.mapa ? ' Cómo llegar: ' + CINFO.mapa : '') + ' Si prefieres llamar: ' + CINFO.telefono + '.' },
+  { id: 'd3', n: '¿Hasta qué hora atienden?', a: 'Nuestro horario: ' + schedText(HORARIO) + '. Hoy: ' + statusNow(HORARIO, new Date()).text.toLowerCase() + '. El pedido lo hacemos por botones.' }
+];
+const PERSONAS = [ '1 a 2', '3 a 4', '5 a 6', '7 o más' ];
+// horas para reservar: según el horario de hoy (una hora después de abrir hasta una hora antes de cerrar)
+const HORAS = (() => { const e = entryOn(HORARIO, new Date()).e; let a = 15 * 60; let c = 22 * 60; if (e) { a = hMin(e.abre) + 60; c = hMin(e.cierra); if (c <= hMin(e.abre)) { c += 1440; } c -= 60; } const r = []; for (let t = a; t <= c; t += 30) { r.push((Math.floor(t / 60) % 24) + ':' + (t % 60 ? '30' : '00')); } return r.length ? r : [ '15:00' ]; })();
+const timeOf = (i) => { const t = 21 * 60 + 29 + i; const h = Math.floor(t / 60) % 24; const m = t % 60; return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m; };
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { zona: '', ctlHide: false, demand: false, people: '', msgs: INIT(), step: 'start', modal: 'delivery', cat: 0, prod: 0, vi: 0, gi: 0, picks: [], price: 0, items: [], pd: [], declined: [], code: 'CP-0002', sheet: false, sel: -1, txt: '', hasOrder: false, ordSt: 'nuevo', ordMin: 8, ordCode: '', unk: 0 };
+  }
+
+  say(list, who, text) { return list.concat([ { from: who, text: text } ]); }
+  currentProd() { const s = this.state; return CATS[s.cat].prods[s.prod]; }
+
+  restart() {
+    this.setState({ zona: '', people: '', msgs: INIT(), step: 'start', modal: 'delivery', cat: 0, prod: 0, vi: 0, gi: 0, picks: [], price: 0, items: [], pd: [], declined: [], sheet: false, sel: -1 });
+  }
+
+  askGroup(msgs, prod, gi, price, picks, vi) {
+    if (gi < prod.groups.length) {
+      const g = prod.groups[gi];
+      return { msgs: this.say(msgs, 'bot', g.req ? '¿' + g.name + '? Es obligatorio.' : '¿Quieres ' + g.name.toLowerCase() + '? Es opcional.'), step: 'group', gi: gi, price: price, picks: picks, vi: vi };
+    }
+    const items = this.state.items.concat([ { name: prod.n, detail: picks.join(' · '), price: price, base: prod.variants[vi].p, cat: CATS[this.state.cat].n.toLowerCase() } ]);
+    const near = xyOffers(items, this.state.pd, this.state.declined).find((o) => !o.ok); const hint = near ? '\n\n🏷 Con ' + near.miss.length + ' más (' + near.miss.join(' + ') + ') se aplica «' + near.n + '»: pagas ' + fmt(near.price) + ' por los productos.' : '';
+    return { msgs: this.say(msgs, 'bot', 'Agregué ' + prod.n + ' (' + fmt(price) + ') a tu pedido. ¿Quieres algo más?' + hint), step: 'more', items: items, price: 0, picks: [] };
+  }
+
+  // (acta 02) Escenarios de la maqueta: reinician el hilo con el mensaje del escenario
+  scenario(step, text) {
+    this.setState({ msgs: [ { from: 'bot', text: text } ], step: step, items: [], pd: [], declined: [], picks: [], price: 0, sheet: false, sel: -1 });
+  }
+
+  doneOrder(msgs) {
+    this.setState({ hasOrder: true, ordCode: this.state.code, ordSt: 'nuevo', ordMin: 0, unk: 0, sheet: false, sel: -1, step: 'done', msgs: this.say(msgs, 'bot', 'Listo. Recibimos tu pedido ' + this.state.code + '. Una persona del equipo te escribe por este mismo chat para confirmarlo y ver el pago contigo. Recién entonces pasa a cocina. ' + tx('msgPago', 'Si pagas por Yape, Plin o transferencia, envíanos aquí la captura de tu comprobante.')) });
+  }
+
+  // ---- después de pedir: el bot entiende lo básico y decide según el estado real del pedido; los cambios los hace una persona
+  handoff(msgs, tipo, detalle, texto, raw) {
+    const s = this.state; const d = new Date(); const hh = (d.getHours() < 10 ? '0' : '') + d.getHours() + ':' + (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
+    try { const cur = cfgAll(); const list = Array.isArray(cur.botReqs) ? cur.botReqs : []; list.push({ id: 'RQ' + (101 + list.length), nombre: 'Ana Pérez', tel: '999 888 777', orden: s.ordCode || '', tipo: tipo, detalle: detalle, estado: s.ordSt, hora: hh, texto: raw || '' }); cur.botReqs = list; window.localStorage.setItem('caprichos_carta_cfg_v1', JSON.stringify(cur)); } catch (err) { /* sin almacenamiento */ }
+    this.setState({ msgs: this.say(this.say(msgs, 'bot', texto), 'sys', SYS), step: 'human', txt: '', unk: 0, sheet: false, sel: -1 });
+  }
+
+  orderReply(kind, msgs, raw) {
+    const s = this.state; const st = s.ordSt; const base = tBaseOf(); const late = s.ordMin > base;
+    const ST = { nuevo: 'por confirmar', prep: 'en preparación', ruta: 'en camino con el repartidor', entregado: 'entregado' };
+    const code = s.ordCode || 'tu pedido';
+    if (st === 'entregado') { this.handoff(msgs, 'Consulta tras la entrega', 'El pedido ' + code + ' figura como entregado.', 'Tu pedido ' + code + ' figura como entregado. Si hubo algún problema, ya avisé a una persona del equipo para que te escriba.', raw); return; }
+    if (kind === 'dir') {
+      if (st === 'nuevo') { this.handoff(msgs, 'Cambio de dirección', 'El cliente quiere cambiar la dirección o ubicación del pedido ' + code + '. Aún no pasa a cocina.', 'Sin problema, tu pedido ' + code + ' todavía está por confirmar y se puede cambiar. Ya avisé a un asesor: te escribe en unos minutos para ubicar la nueva dirección en el mapa y confirmarte el envío.', raw); }
+      else if (st === 'prep') { this.handoff(msgs, 'Cambio de dirección', 'El pedido ' + code + ' ya está en preparación. Si cambia de zona, cambia el envío.', 'Tu pedido ya está en preparación. Ya avisé a un asesor para ver si se puede cambiar la dirección; si la nueva zona cuesta distinto, te confirma el nuevo envío.', raw); }
+      else { this.handoff(msgs, 'Cambio de dirección URGENTE', 'El pedido ' + code + ' ya salió con el repartidor. Hablar con el repartidor y el cliente ahora.', 'Tu pedido ya salió con el repartidor y por seguridad no lo puedo cambiar desde aquí. Ya avisé a un asesor para que hable contigo y con el repartidor ahora mismo.', raw); }
+      return; }
+    if (kind === 'ped') {
+      if (st === 'nuevo') { this.handoff(msgs, 'Cambio o cancelación del pedido', 'El cliente quiere cambiar o cancelar ' + code + '. Aún no pasa a cocina.', 'Claro, tu pedido todavía está por confirmar. Ya avisé a un asesor para ajustarlo contigo por este chat.', raw); }
+      else if (st === 'prep') { this.handoff(msgs, 'Cambio o cancelación del pedido', 'El pedido ' + code + ' ya está en cocina. Ver si se puede ajustar.', 'Tu pedido ya está en cocina y quitar productos no siempre se puede. Ya avisé a un asesor para revisarlo contigo ahora.', raw); }
+      else { this.handoff(msgs, 'Cambio o cancelación del pedido', 'El pedido ' + code + ' ya va en camino; no se puede modificar.', 'Tu pedido ya va en camino y no se puede modificar. Ya avisé a un asesor por si necesitas algo más.', raw); }
+      return; }
+    // kind === 'eta'
+    if (st === 'nuevo') { this.setState({ msgs: this.say(msgs, 'bot', 'Tu pedido ' + code + ' está por confirmar: una persona del equipo lo revisa contigo por este chat. Apenas se confirme, tarda unos ' + base + ' minutos.'), step: 'start', txt: '', unk: 0 }); return; }
+    if (late) { this.handoff(msgs, 'Demora en la entrega', 'El pedido ' + code + ' (' + ST[st] + ') lleva ' + s.ordMin + ' min y el tiempo prometido es ' + base + ' min.', 'Tu pedido está ' + ST[st] + ' y ya pasamos el tiempo prometido de ' + base + ' minutos. Disculpa la demora: ya avisé al equipo para apurarlo y una persona te escribe.', raw); return; }
+    this.setState({ msgs: this.say(msgs, 'bot', 'Tu pedido ' + code + ' está ' + ST[st] + '. Lo recibimos hace ' + s.ordMin + ' minutos y el tiempo prometido es de unos ' + base + ' minutos, así que debería llegar pronto.'), step: 'start', txt: '', unk: 0 });
+  }
+
+  sendTxt() {
+    const s = this.state; const raw = String(s.txt || '').trim(); if (!raw) { return; }
+    const n = raw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const kind = /(cancel|anul|ya no quiero|quitar|quita |agreg|anadir|cambiar? (el |mi )?(pedido|producto|orden)|cambio de (pedido|producto))/.test(n) ? 'ped'
+      : /((cambi|otra|nueva|mal).*(direcci|ubicaci|lugar)|(direcci|ubicaci).*(cambi|mal|equivo[cq]|error)|(equivo[cq]|error|incorrect).*(direcci|ubicaci|lugar)|me mude|llevalo a|en otro lado)/.test(n) ? 'dir'
+      : /(cuanto (falta|demora|tarda|tiempo)|ya sale|donde esta|demora|tarda|tiempo (de entrega|estimado)|a que hora (llega|sale))/.test(n) ? 'eta'
+      : /(asesor|persona|humano|alguien|reclamo|queja|ayuda)/.test(n) ? 'persona'
+      : /(quiero|quisiera|pedir|pedido|ordenar|me das|me regalas|antoj|tienen|carta|menu)/.test(n) ? 'pedir'
+      : /^(hola|holi|buenas|buen dia|buenos dias|buenas tardes|buenas noches|hey)\b/.test(n) ? 'saludo' : 'otro';
+    const msgs = this.say(s.msgs, 'user', raw);
+    if (kind === 'dir' || kind === 'ped' || kind === 'eta') {
+      if (!s.hasOrder) { this.setState({ msgs: this.say(msgs, 'bot', 'No encuentro un pedido activo con tu número. ¿Quieres hacer uno ahora?'), step: 'start', txt: '', unk: 0 }); return; }
+      this.orderReply(kind, msgs, raw); return; }
+    if (kind === 'persona') { this.handoff(msgs, 'Pidió hablar con una persona', raw, HUMAN, raw); return; }
+    if (kind === 'pedir') { this.setState({ txt: '' }); this.choose({ id: 'pedir', say: raw }); return; }
+    if (kind === 'saludo') { this.setState({ msgs: this.say(msgs, 'bot', HELLO), step: 'start', txt: '', unk: 0 }); return; }
+    if ((s.unk || 0) >= 1) { this.handoff(msgs, 'Mensaje que el bot no entendió', raw, 'No logro entender bien tu mensaje, mejor te paso con una persona del equipo para ayudarte.', raw); return; }
+    this.setState({ msgs: this.say(msgs, 'bot', 'No estoy seguro de haber entendido. ¿Qué necesitas? Puedes elegir una opción o escribirme de otra forma.'), step: 'start', txt: '', unk: 1 });
+  }
+
+  // resumen del pedido; antes ofrece una promoción si el pedido califica (o le falta poco). Nada cambia sin que el cliente acepte
+  toSummary(msgs0, patch0) {
+    const s = Object.assign({}, this.state, patch0 || {}); let msgs = msgs0; const bot = (tt) => { msgs = this.say(msgs, 'bot', tt); return msgs; };
+    const offs = xyOffers(s.items, s.pd, s.declined); const okO = offs.find((o) => o.ok); const nearO = offs.find((o) => !o.ok);
+    if (okO) { this.setState(Object.assign({ sheet: false, sel: -1 }, patch0 || {}, { msgs: bot('🏷 Tu pedido califica para «' + okO.n + '»: te ahorras ' + fmt(okO.v) + ' (los adicionales se cobran aparte). ¿La aplico?'), step: 'promo' })); return; }
+    if (nearO) { this.setState(Object.assign({ sheet: false, sel: -1 }, patch0 || {}, { msgs: bot('🏷 Con ' + nearO.miss.length + ' más (' + nearO.miss.join(' + ') + ') se aplica «' + nearO.n + '»: pagas ' + fmt(nearO.price) + ' por los productos. ¿Quieres agregarlo?'), step: 'promoMiss' })); return; }
+    const sub = s.items.reduce((a, x) => a + x.price, 0);
+    if (s.modal === 'delivery' && sub < minOf()) { this.setState(Object.assign({ sheet: false, sel: -1 }, patch0 || {}, { msgs: bot('El pedido mínimo para delivery es ' + fmt(minOf()) + ' en productos. Te faltan ' + fmt(minOf() - sub) + '; agrega algo más.'), step: 'cat' })); return; }
+    const pdS0 = s.pd.reduce((a, e) => a + e.v, 0); const au0 = autoDesc(s.items); const acu = !!(cfgAll().reglas || {}).acumula;
+    // si no se pueden juntar, entre la promoción y el descuento automático se aplica solo el mayor
+    const au = { name: au0.name, disc: !acu && pdS0 > 0 && au0.disc <= pdS0 ? 0 : au0.disc }; const pdS = !acu && au0.disc > pdS0 ? 0 : pdS0;
+    const feePend = s.modal === 'delivery' && !s.zona; const fee = s.modal === 'delivery' && s.zona && (freeMas() ? sub <= freeOf() : sub < freeOf()) ? tarOf(s.zona) : 0;
+    const lines = s.items.map((x) => x.name + ' · ' + x.detail + ' — ' + fmt(x.price)).join('\n') + (pdS > 0 ? s.pd.map((e) => '\nPromoción ' + e.n + ' — −' + fmt(e.v)).join('') : '') + (au.disc > 0 ? '\nDescuento ' + au.name + ' — −' + fmt(au.disc) : '');
+    const feeLine = s.modal === 'delivery' ? '\nEnvío: ' + (feePend ? 'lo confirma un asesor al ubicarte' : (fee ? fmt(fee) : 'gratis')) : '';
+    this.setState(Object.assign({ sheet: false, sel: -1 }, patch0 || {}, { msgs: bot('Este es tu resumen:\n' + lines + feeLine + '\nTotal: ' + fmt(sub - pdS - au.disc + fee) + '\n\n¿Confirmo tu pedido?'), step: 'summary' }));
+  }
+
+  choose(opt) {
+    const s = this.state;
+    let msgs = this.say(s.msgs, 'user', opt.say || opt.n);
+    const bot = (t) => { msgs = this.say(msgs, 'bot', t); return msgs; };
+    const done = (patch) => this.setState(Object.assign({ sheet: false, sel: -1 }, patch));
+    if (opt.id === 'nuevo') { this.restart(); return; }
+    if (opt.id === 'menu') { done({ msgs: bot('Claro. ¿En qué te ayudo? 🧁'), step: 'start' }); return; }
+    if (opt.id === 'pedir') {
+      const st = statusNow(HORARIO, new Date());
+      if (isPaused()) { done({ msgs: this.say(bot('Por ahora pausamos los pedidos por alta demanda. Un asesor te atiende por este chat.'), 'sys', SYS), step: 'human' }); return; }
+      if (!st.open) { done({ msgs: bot('Ahora estamos cerrados. Nuestro horario: ' + schedText(HORARIO) + '. No tomamos pedidos fuera de horario; escríbenos cuando abramos.'), step: 'end' }); return; }
+      done({ msgs: bot('Perfecto. ¿Cómo lo quieres?'), step: 'modal' }); return; }
+    if (opt.id === 'mipedido') { done({ msgs: bot('Claro. ¿Qué necesitas de tu pedido ' + s.ordCode + '? También puedes escribírmelo.'), step: 'mine' }); return; }
+    if (s.step === 'mine') {
+      if (opt.id === 'persona') { this.handoff(msgs, 'Pidió hablar con una persona', 'Sobre el pedido ' + s.ordCode, HUMAN, ''); return; }
+      this.orderReply(opt.id === 'c_dir' ? 'dir' : (opt.id === 'c_ped' ? 'ped' : 'eta'), msgs, ''); return; }
+    if (s.step === 'start') {
+      if (opt.id === 'carta') { done({ msgs: bot('Aquí tienes la carta digital: [enlace a la carta virtual]. También puedo tomar tu pedido por aquí. ¿Lo hacemos?') }); }
+      else if (opt.id === 'preguntar') { done({ msgs: bot('Hola, soy Capri. Dime tu consulta y te ayudo.'), step: 'ask' }); }
+      else if (opt.id === 'reservar') { done({ msgs: bot('¿Para cuántas personas es la reserva?'), step: 'resPeople' }); }
+      else if (opt.id === 'persona') { done({ msgs: this.say(bot(HUMAN), 'sys', SYS), step: 'human' }); }
+      else { done({ msgs: bot('¿En qué te ayudo?') }); }
+    } else if (s.step === 'ask') {
+      done({ msgs: bot(opt.ans), step: 'askAns' });
+    } else if (s.step === 'resPeople') {
+      done({ people: opt.n, msgs: bot('¿A qué hora quieres venir? Atendemos reservas desde las 15:00.'), step: 'resTime' });
+    } else if (s.step === 'resTime') {
+      done({ msgs: bot('Recibí tu solicitud de reserva para ' + s.people + ' personas a las ' + opt.n + '. Todavía no está confirmada: una persona del equipo la revisa y te responde por aquí. Si se confirma, guardamos la mesa ' + tolOf() + ' minutos de tolerancia.'), step: 'resDone' });
+    } else if (s.step === 'web') {
+      done({ msgs: bot('Perfecto, quedamos así. Con tu confirmación el equipo registra el pago y el pedido pasa a cocina. Te aviso cuando salga.'), step: 'end' });
+    } else if (s.step === 'post') {
+      if (opt.id === 'buena') { done({ msgs: bot('¡Qué alegría! ¿Nos dejas tu opinión en Google Maps? Copia y pega lo que nos escribiste en este enlace y obtén ' + tx('encDesc', '25') + ' % de descuento en tu próximo pedido: ' + tx('encLink', '[enlace a Google Maps]')), step: 'end' }); }
+      else { done({ msgs: this.say(bot('Lamentamos eso. Te paso con alguien del equipo para ayudarte'), 'sys', SYS), step: 'human' }); }
+    } else if (s.step === 'modal') {
+      if (opt.id === 'delivery') { done({ modal: opt.id, msgs: bot('Anotado: Delivery. ¿Dónde te lo llevamos? Comparte tu ubicación actual para que el repartidor te encuentre.'), step: 'loc' }); }
+      else { done({ modal: opt.id, msgs: bot('Anotado: ' + opt.n + '. Elige una categoría.'), step: 'cat' }); }
+    } else if (s.step === 'loc') {
+      if (opt.id === 'type') { done({ zona: '', msgs: bot('Sin problema, escríbeme tu dirección cuando termines tu pedido (distrito, calle, manzana y lote). Un asesor te escribe, te ubica en el mapa y te confirma el costo del envío. Elige una categoría.'), step: 'cat' }); }
+      else if (opt.id === 'sim1' || opt.id === 'sim2') { const g = opt.id === 'sim1' ? { lat: -12.0147, lng: -76.966 } : { lat: -12.1219, lng: -77.0297 }; const z = zonaOf(g.lat, g.lng);
+        if (!z) { done({ msgs: bot('Tu ubicación está fuera de nuestra zona de reparto. Puedes pedir para recoger en el local.'), step: 'loc' }); }
+        else { done({ zona: z, msgs: bot('Ubicación recibida (ejemplo). El envío a tu ubicación cuesta ' + fmt(tarOf(z)) + '. Elige una categoría.'), step: 'cat' }); } }
+      else { done({ msgs: bot('Buscando tu ubicación… permite el acceso cuando tu teléfono lo pida.'), step: 'locWait' });
+        getPos((g) => { const z = zonaOf(g.lat, g.lng); if (!z) { this.setState({ msgs: this.say(this.state.msgs, 'bot', geoOkText(g) + ' Pero está fuera de nuestra zona de reparto. Puedes pedir para recoger en el local.'), step: 'loc' }); } else { this.setState({ zona: z, msgs: this.say(this.state.msgs, 'bot', geoOkText(g) + ' ' + mapsOf(g) + '\nZona ' + z.slice(1) + ': envío ' + fmt(tarOf(z)) + '. Elige una categoría.'), step: 'cat' }); } }, (m) => this.setState({ msgs: this.say(this.state.msgs, 'bot', m), step: 'loc' })); }
+    } else if (s.step === 'cat') {
+      done({ cat: opt.i, msgs: bot('Estos son nuestros ' + CATS[opt.i].n.toLowerCase() + '. ¿Cuál te provoca?'), step: 'prod' });
+    } else if (s.step === 'prod' || s.step === 'alt') {
+      const pr = CATS[s.cat].prods[opt.i];
+      if (isAgot(pr.n)) {
+        // (acta 02) Sin stock: no sigue el flujo del agotado
+        done({ msgs: bot('Por ahora no hay stock de ' + pr.n + '. Te sugiero ' + ALT.join(' o ')), step: 'alt' });
+      } else { done({ prod: opt.i, msgs: bot(pr.n + '. ¿Qué presentación prefieres?'), step: 'variant' }); }
+    } else if (s.step === 'variant') {
+      const prod = this.currentProd();
+      done(this.askGroup(msgs, prod, 0, prod.variants[opt.i].p, [ prod.variants[opt.i].n ], opt.i));
+    } else if (s.step === 'group') {
+      const prod = this.currentProd();
+      const g = prod.groups[s.gi];
+      const extra = opt.i >= 0 ? g.opts[opt.i].p : 0;
+      const picks = opt.i >= 0 ? s.picks.concat([ g.opts[opt.i].n ]) : s.picks;
+      done(this.askGroup(msgs, prod, s.gi + 1, s.price + extra, picks, s.vi));
+    } else if (s.step === 'more') {
+      if (opt.id === 'otro') { done({ msgs: bot('Claro. Elige una categoría.'), step: 'cat' }); }
+      else { this.toSummary(msgs); }
+    } else if (s.step === 'promo') {
+      const of = xyOffers(s.items, s.pd, s.declined).find((o) => o.ok);
+      if (opt.id === 'si' && of) { this.toSummary(this.say(msgs, 'bot', 'Listo, apliqué «' + of.n + '»: ahorras ' + fmt(of.v) + ' (los adicionales se cobran aparte).'), { pd: s.pd.concat([ { id: of.id, n: of.n, v: of.v, idx: of.idx } ]) }); }
+      else { this.toSummary(msgs, { declined: s.declined.concat(of ? [ of.id ] : []) }); }
+    } else if (s.step === 'promoMiss') {
+      if (opt.id === 'otro') { done({ msgs: bot('Claro. Elige una categoría.'), step: 'cat' }); }
+      else { const near = xyOffers(s.items, s.pd, s.declined).find((o) => !o.ok); this.toSummary(msgs, { declined: s.declined.concat(near ? [ near.id ] : []) }); }
+    } else if (s.step === 'summary') {
+      // (acta 02) Pago dentro del flujo; aviso de alta demanda si el chip está encendido
+      if (s.demand) { bot('Hoy tenemos alta demanda: la entrega puede tardar unos ' + (tBaseOf() + (Number((hdCfg() || {}).extra) || 10)) + ' minutos'); }
+      done({ msgs: bot('¿Cómo pagarás?'), step: 'pay' });
+    } else if (s.step === 'pay') {
+      if (opt.id === 'efectivo') { done({ msgs: bot('¿Con cuánto pagas? Te preparamos el vuelto'), step: 'cash' }); }
+      else { this.setState({ pays: opt.n }); this.doneOrder(this.say(msgs, 'bot', 'Anotado: ' + opt.n + '. Todavía no pagues: una persona del equipo te dirá por aquí cómo hacerlo y lo confirma contigo.')); }
+    } else if (s.step === 'cash') {
+      this.doneOrder(msgs);
+    } else {
+      this.restart();
+    }
+  }
+
+  optionsNow() {
+    const s = this.state;
+    let options = []; let title = 'Opciones';
+    if (s.step === 'start') { options = [ s.hasOrder && { n: '📦 Mi pedido ' + s.ordCode, id: 'mipedido' }, { n: '☕ Hacer un pedido', id: 'pedir' }, { n: '📅 Reservar mesa', id: 'reservar' }, { n: '🧁 Ver la carta', id: 'carta' }, { n: '💬 Preguntar algo', id: 'preguntar' }, { n: '🙋 Hablar con una persona', id: 'persona' } ].filter(Boolean); title = 'Menú'; }
+    else if (s.step === 'mine') { options = [ { n: 'Cambiar mi dirección', id: 'c_dir' }, { n: 'Cambiar o cancelar mi pedido', id: 'c_ped' }, { n: '¿Cuánto falta?', id: 'c_eta' }, { n: 'Hablar con una persona', id: 'persona' } ]; title = 'Mi pedido'; }
+    else if (s.step === 'ask') { options = DUDAS.map((d) => ({ n: d.n, id: d.id, ans: d.a })); }
+    else if (s.step === 'askAns') { options = [ { n: 'Pedir ahora', id: 'pedir' }, { n: 'Menú', id: 'menu' } ]; }
+    else if (s.step === 'resPeople') { options = PERSONAS.map((p) => ({ n: p, id: 'p' })); title = 'Personas'; }
+    else if (s.step === 'resTime') { options = HORAS.map((h) => ({ n: h, id: 'h' })); title = 'Hora'; }
+    else if (s.step === 'web') { options = [ { n: 'Confirmo mi pedido', say: 'Sí, confirmo mi pedido', id: 'confirmo' } ]; }
+    else if (s.step === 'post') { options = [ { n: 'Excelente', id: 'buena' }, { n: 'Regular', id: 'regular' }, { n: 'Mal', id: 'mal' } ]; }
+    else if (s.step === 'human' || s.step === 'resDone' || s.step === 'end') { options = [ { n: 'Volver al menú', id: 'menu' } ]; }
+    else if (s.step === 'alt') { options = ALT.map((n) => ({ n: n, i: CATS[s.cat].prods.findIndex((p) => p.n === n) })); title = 'Alternativas'; }
+    else if (s.step === 'pay') { const po = payOn(); options = [ po.efectivo && { n: 'Efectivo', id: 'efectivo' }, po.yape && { n: 'Yape', id: 'yape' }, po.plin && { n: 'Plin', id: 'plin' }, po.tarjeta && { n: 'Tarjeta (POS al entregar)', id: 'tarjeta' }, po.transf && { n: 'Transferencia bancaria', id: 'transf' } ].filter(Boolean); }
+    else if (s.step === 'cash') { options = [ { n: 's/ 50' }, { n: 's/ 100' }, { n: 'Exacto' } ]; }
+    else if (s.step === 'modal') { options = MODALS.map((m) => ({ n: m.n, id: m.id })); }
+    else if (s.step === 'loc') { options = [ { n: 'Compartir mi ubicación', say: 'Comparto mi ubicación actual', id: 'share' }, { n: 'Escribir mi dirección', say: 'Prefiero escribir mi dirección', id: 'type' }, { n: 'Simular: zona de reparto', say: 'Comparto mi ubicación (ejemplo)', id: 'sim1' }, { n: 'Simular: fuera de cobertura', say: 'Comparto mi ubicación (ejemplo)', id: 'sim2' } ]; title = 'Tu ubicación'; }
+    else if (s.step === 'cat') { options = CATS.map((c, i) => ({ n: c.n, i: i })); title = 'Categorías'; }
+    else if (s.step === 'prod') { options = CATS[s.cat].prods.map((p, i) => ({ n: isAgot(p.n) ? p.n + ' · agotado' : p.n, say: p.n, i: i })); title = CATS[s.cat].n; }
+    else if (s.step === 'variant') { options = this.currentProd().variants.map((v, i) => ({ n: v.n + ' · ' + fmt(v.p), i: i })); title = 'Presentación'; }
+    else if (s.step === 'group') {
+      const g = this.currentProd().groups[s.gi];
+      options = g.opts.map((o, i) => ({ n: o.n + (o.p ? ' +' + fmt(o.p) : ''), i: i }));
+      if (!g.req) { options = options.concat([ { n: 'Ninguno', i: -1 } ]); }
+      title = g.name;
+    }
+    else if (s.step === 'more') { options = [ { n: 'Agregar otro producto', id: 'otro' }, { n: 'Ver resumen', id: 'resumen' } ]; }
+    else if (s.step === 'promo') { options = [ { n: 'Sí, aplicar la promoción', say: 'Sí, aplícala', id: 'si' }, { n: 'No, gracias', id: 'no' } ]; }
+    else if (s.step === 'promoMiss') { options = [ { n: 'Agregar otro producto', id: 'otro' }, { n: 'Seguir sin la promoción', id: 'seguir' } ]; }
+    else if (s.step === 'summary') { options = [ { n: 'Confirmar pedido', id: 'ok' }, { n: 'Empezar de nuevo', id: 'nuevo' } ]; }
+    else { options = [ { n: 'Hacer otro pedido', id: 'nuevo' } ]; }
+    return { options: options, title: title };
+  }
+
+  renderVals() {
+    const s = this.state;
+    const cur = this.optionsNow();
+    const asList = cur.options.length > 3;
+    const lastIdx = s.msgs.length - 1;
+    const msgs = s.msgs.map((m, i) => {
+      const isLastBot = i === lastIdx && m.from !== 'user';
+      return { text: m.text, isSys: m.from === 'sys', isMsg: m.from !== 'sys', align: m.from === 'user' ? 'flex-end' : 'flex-start', bg: m.from === 'bot' ? '#FFFFFF' : '#D9FDD3',
+        time: timeOf(i), ticks: m.from === 'user' ? ' ✓✓' : '', tickColor: '#53BDEB',
+        hasButtons: isLastBot && !asList, hasList: isLastBot && asList,
+        buttons: isLastBot && !asList ? cur.options.map((o) => ({ n: o.n, pick: () => this.choose(o) })) : [] };
+    }).reverse();
+    const chip = (on) => ({ bg: on ? '#008069' : '#FFFFFF', fg: on ? '#FFFFFF' : '#111B21' });
+    // (acta 02) Chips de la maqueta que disparan escenarios simulados
+    const controls = [
+      Object.assign({ n: 'Entra un pedido web', pick: () => this.scenario('web', '¡Hola, Ana! Soy del equipo de Caprichos. Recibimos tu pedido CP-0110 por la carta web. Total: s/ 52.50 · Pago preferido: Yape. Te confirmo por aquí los datos y el pago. ¿Está todo bien con tu pedido?') }, chip(s.step === 'web')),
+      Object.assign({ n: 'Pasaron ' + (Number(tx('encMin', '120')) >= 60 ? (Math.round(Number(tx('encMin', '120')) / 6) / 10) + ' h' : tx('encMin', '120') + ' min'), pick: () => this.scenario('post', tx('encPregunta', 'Hola, ¿tu pedido llegó bien y en orden? Cuéntanos cómo te fue')) }, chip(s.step === 'post')),
+      Object.assign({ n: 'Cliente escribe tras pedir', pick: () => this.setState({ hasOrder: true, ordCode: 'CP-0110', ordSt: s.ordSt, step: 'start', unk: 0, txt: '', msgs: [ { from: 'sys', text: 'Hace ' + s.ordMin + ' min Ana Pérez hizo el pedido CP-0110 (delivery, s/ 52.50). Ahora escribe:' }, { from: 'user', text: 'Hola' }, { from: 'bot', text: HELLO } ] }) }, chip(s.hasOrder)),
+      Object.assign({ n: 'Estado del pedido: ' + ({ nuevo: 'por confirmar', prep: 'en preparación', ruta: 'en camino', entregado: 'entregado' })[s.ordSt], pick: () => this.setState({ ordSt: ({ nuevo: 'prep', prep: 'ruta', ruta: 'entregado', entregado: 'nuevo' })[s.ordSt] }) }, chip(false)),
+      Object.assign({ n: 'Pasaron ' + s.ordMin + ' min', pick: () => this.setState({ ordMin: ({ 0: 8, 8: 15, 15: 25, 25: 8 })[s.ordMin] || 8 }) }, chip(false)),
+      Object.assign({ n: 'Alta demanda: ' + (s.demand ? 'Encendida' : 'Apagada'), pick: () => this.setState({ demand: !s.demand }) }, chip(s.demand))
+    ];
+    return {
+      botName: CINFO.nombre, logoSrc: (cfgAll().info || {}).logo || '/_blob/6d6aa5696913688bb2235a49f1133c2a', showCtl: !s.ctlHide, hideCtl: !!s.ctlHide, toggleCtl: () => this.setState({ ctlHide: !this.state.ctlHide }), controls: controls,
+      msgs: msgs, txt: s.txt, setTxt: (e) => this.setState({ txt: e.target.value }), sendTxt: () => this.sendTxt(),
+      openSheet: () => this.setState({ sheet: true, sel: -1 }), closeSheet: () => this.setState({ sheet: false }),
+      sheetOpen: s.sheet, sheetTitle: cur.title,
+      sheetRows: cur.options.map((o, i) => ({ n: o.n, dot: s.sel === i ? '#008069' : 'transparent', pick: () => this.setState({ sel: i }) })),
+      sendBg: s.sel >= 0 ? '#008069' : '#B7C0C4',
+      sendSheet: () => { if (s.sel >= 0) { this.choose(cur.options[s.sel]); } }
+    };
+  }
+}
+</script>
+</body>
+</html>

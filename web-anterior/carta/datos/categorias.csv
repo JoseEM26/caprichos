@@ -1,0 +1,6 @@
+id,nombre,slug,posicion,visible,total_productos,url
+1e0a4f3f-4390-45da-a4b2-1d4452056a92,Destacados,favoritos,-10,SI,8,https://caprichos-per.ola.click/favoritos
+8bb2c080-2af9-11eb-bb4e-c35f6f469c03,Frío🥤,frio,1,SI,19,https://caprichos-per.ola.click/frio
+27d948b0-2c82-11eb-923b-cbbd4aea16e8,Caliente☕️,caliente,2,SI,7,https://caprichos-per.ola.click/caliente
+ac38e8a0-0e95-11ed-876a-6f6df5178b43,Salado🍗,salado,3,SI,9,https://caprichos-per.ola.click/salado
+49677360-6b8c-11eb-bd39-43082e3c756f,Postres🍰,postres,4,SI,14,https://caprichos-per.ola.click/postres

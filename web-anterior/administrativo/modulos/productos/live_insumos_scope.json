@@ -1,0 +1,45 @@
+{
+  "title": "Restaurant.pe",
+  "columns": [
+    "Nombre",
+    "Medida",
+    "¿Activo?",
+    "Acciones"
+  ],
+  "buttons": [
+    "",
+    "Añadir nueva categoría",
+    "Configuración avanzada",
+    "Platos/bebidas",
+    "",
+    "Combos",
+    "",
+    "Modificadores",
+    "",
+    "Menús",
+    "",
+    "Nuevo insumo porcionable"
+  ],
+  "inputs": [
+    {
+      "placeholder": "Filtrar mis categorias",
+      "ngModel": "vm.filtroCategorias",
+      "type": "text"
+    },
+    {
+      "placeholder": "",
+      "ngModel": "vm.verAnulados",
+      "type": "checkbox"
+    },
+    {
+      "placeholder": "Buscar un porcionable",
+      "ngModel": "vm.filtroBusquedaPorcionable",
+      "type": "text"
+    },
+    {
+      "placeholder": "",
+      "ngModel": "vm.verAnulados",
+      "type": "checkbox"
+    }
+  ]
+}

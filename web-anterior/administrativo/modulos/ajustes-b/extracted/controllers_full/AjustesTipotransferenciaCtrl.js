@@ -1,0 +1,1 @@
+(()=>{function e(e,a){var o=this;o.tags=[],o._fnObtenerLogs=function(){a.obtenerActualizacionesSistema().then(function(e){o.tags=e.data,console.log("tags"),console.log(o.tags)})},o._fnObtenerLogs()}e.$inject=["$scope","Logtabla"],angular.module("restaurantpe.changelog.history").controller("ChangelogCtrl",e)})(),angular.module("restaurantpe.ajustes.comprobantes

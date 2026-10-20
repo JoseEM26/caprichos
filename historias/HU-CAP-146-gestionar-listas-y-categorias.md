@@ -1,0 +1,66 @@
+---
+id: HU-CAP-146
+tipo: hu
+titulo: "Gestionar listas y categorías"
+estado: draft
+producto: caprichos
+version: "1.0"
+owner: "José Ángel Espinoza"
+aprobadores: []
+fecha: 2026-10-20
+relacionados: [EP-CAP-016, FT-CON-01, RQ-CON-01-05, RQ-CON-01-06, HU-CAP-144, HU-CAP-145, HU-CAP-147, ADR-001, ADR-011, ADR-014, ADR-003, ADR-012, DEP-02, DEP-06, R-01]
+tags: [hu, contenidos, capa-a, ft-con-01, media, ui]
+---
+
+# FORMATO DE HISTORIA DE USUARIO
+
+| ID / Código | HU-CAP-146 | Título | Gestionar listas y categorías |
+|---|---|---|---|
+| **Épica / Módulo** | EP-CAP-016 · FT-CON-01 | **Sprint / Release** | H2 · 01/03/2027 (supuesto, D-19) |
+
+| Prioridad | Estado | Responsable | Estimación |
+|---|---|---|---|
+| Media | Draft | José Ángel Espinoza (asignación propuesta, DT-07) | por estimar (Bloque 5) |
+
+## 01 | NECESIDAD DEL USUARIO
+
+| COMO | QUIERO | PARA |
+|---|---|---|
+| **ACT-CAP-001** Kevin Rosales, dueño y administrador | gestionar listas y categorías | mantener ordenadas las listas sin nombres repetidos ni errores de escritura |
+
+## 02 | CONTEXTO Y ALCANCE
+
+| CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
+|---|---|
+| **Contexto.** Historia de FT-CON-01 «Productos, listas y categorías» (Debería tener, épica EP-CAP-016). Cubre los requerimientos: **RQ-CON-01-05** Los nombres se eligen de listas por categoría y se crean o corrigen ahí mismo sin repetirse. **RQ-CON-01-06** Un módulo de Listas y categorías crea categorías de lista y agrega, edita y oculta elementos. | **Alcance.**<br>• Los nombres se eligen de listas por categoría y se crean o corrigen ahí mismo sin repetirse.<br>• Un módulo de Listas y categorías crea categorías de lista y agrega, edita y oculta elementos. |
+| **Problema.** Que el dueño mantenga la carta sin depender de un programador (NEC-CAP-082). | **Fuera de alcance.**<br>• HU-CAP-144: Crear un producto en una categoría fija o con opciones.<br>• HU-CAP-145: Gestionar opciones y tamaños en un solo lugar.<br>• HU-CAP-147: Gestionar tipos con sabores.<br>• Orden, fotos y publicación de la carta: FT-CON-02.<br>• Recetas del producto: FT-STK-02.<br>• Combos: FT-OFE-01. |
+
+## 03 | CRITERIOS DE ACEPTACIÓN
+
+| N.° | DADO | CUANDO | ENTONCES |
+|---|---|---|---|
+| CA-1 | el combo de tamaños | el administrador escribe «Mediano» que no existe | puede crearlo ahí mismo; «Grande» repetido no se acepta (RQ-CON-01-05) |
+| CA-2 | la lista «Endulzantes» | el administrador oculta «Stevia» | deja de ofrecerse y los pedidos pasados la conservan (RQ-CON-01-06) |
+
+Origen: criterios de verificación de FT-CON-01 (RQ-CON-01-05, RQ-CON-01-06); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
+
+## 04 | REGLAS, DEPENDENCIAS Y EVIDENCIAS
+
+| REGLAS DE NEGOCIO | DATOS Y VALIDACIONES |
+|---|---|
+| **RB-01** (RN-CAP-128) Tamaños y opciones se eligen de listas; se crean o corrigen ahí mismo; no se repiten.<br>**RB-02** (RN-CAP-129) Listas por categoría específica; módulo de Listas y categorías.<br>**RNF aplicables:** RNF-CAP-014, RNF-CAP-009, RNF-CAP-012. | `Producto` · `Categoria` (lleva opciones o fija, oculta) · `Lista`/`ElementoLista` (por categoría, sin repetir) · `GrupoOpciones` (alcance por producto o categoría) · `VersionCarta` (borrador, publicada, organización, decoración) · `Novedad` (tipo, tema, fotos, vigencia, orden) · `Destacada` (fotos, portada, archivada).<br>*(Entidades propuestas; detalle y tablas en `datos/DAT-CAP-001-modelo-de-datos.md`, se aprueba en G3.)*<br>**Validaciones:** sin borrado físico: se desactiva o anula (RN-CAP-014); cada cambio guarda autor y fecha. |
+| **DEPENDENCIAS / RIESGOS** | **DISEÑO / ADJUNTOS** |
+| • **HU-CAP-145** (Gestionar opciones y tamaños en un solo lugar) va antes, dentro de la misma feature.<br>• **DEP-02** plataforma y hosting: propuestos en ADR-001 y ADR-011, pendientes de aprobación en G3.<br>• **DEP-06** mockup en Figma o aceptación del mockup navegable como diseño (G2).<br>• Riesgos: R-01 (roadmap PLT-01). | • Mockup en Figma: (pendiente UX — G2, DEP-06).<br>• Referencia mientras tanto: mockup navegable (DT-04), Administrativo ▸ Productos, Opciones y tamaños, Listas y categorías (`Admin.dc.html`); `analisis/combos-y-opciones.md`.<br>• Contrato de API: `arquitectura/ARQ-CAP-002-catalogo-de-api-y-eventos.md`, módulo de FT-CON-01 (borrador, se aprueba en G3).<br>• ADR (propuestos): ADR-001, ADR-011, ADR-014, ADR-003, ADR-012.<br>• Modelo de datos: `datos/DAT-CAP-001-modelo-de-datos.md`. |
+
+## 05 | CHECKLIST DE CALIDAD
+
+| DEFINITION OF READY (DoR) | DEFINITION OF DONE (DoD) |
+|---|---|
+| ☑ Valor y usuario claros | ☐ Código revisado y pruebas aprobadas — no hay código: no se construye antes de G3 y G4 |
+| ☐ Criterios verificables — redactados en Dado/Cuando/Entonces; códigos de error por fijar con el contrato (G3) | ☐ Sin defectos críticos — nada construido que evaluar |
+| ☐ Diseño/reglas disponibles — las reglas sí; falta el mockup (DEP-06, G2) y aprobar ADR y contrato (G3) | ☐ Criterios cumplidos — sin ejecución |
+| ☑ Dependencias identificadas | ☐ Evidencia y documentación actualizadas — sin evidencia de pruebas ni enlaces de G2/G3 |
+
+**DoR: NO READY** hasta cerrar G2 y G3 (y con G0 y G1 aún sin aprobar).
+
+Generado por IA: historia derivada de FT-CON-01 (requerimientos RQ-CON-01-05, RQ-CON-01-06, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)

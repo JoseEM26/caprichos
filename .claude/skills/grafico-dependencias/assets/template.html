@@ -1,0 +1,692 @@
+<title>Gráfico de dependencias</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Source+Sans+3:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600;700&display=swap">
+<style>
+/* Layout: grafo de red a todo el ancho, ajustado a la pantalla; panel de detalle flotante solo al seleccionar. Paleta AybarCorp, solo tema claro. */
+:root{
+  --blue:#02424e; --blue-2:#02323b;
+  --orange:#ffa726; --orange-2:#ff8c26; --orange-soft:#ffeed7;
+  --card:#ffffff; --card-a:#fafafb; --card-b:#f0f0f0; --bg:#fafafb;
+  --ink:#122a30; --muted:#5b6c71; --line:#e0e5e6; --grey:#9aa5a8;
+  --display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --body:"Source Sans 3","Segoe UI",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:400 15px/1.45 var(--body)}
+h1,h2,h3{font-family:var(--display);margin:0;line-height:1.15;text-wrap:balance}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--orange);outline-offset:2px}
+.wrap{padding-inline:clamp(16px,2.4vw,32px)}
+.key{font:600 .76rem var(--mono);color:var(--muted)}
+
+header.top{background:linear-gradient(135deg,var(--blue),var(--blue-2));color:#fff;padding-block:16px}
+.hrow{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 28px;justify-content:space-between}
+.eyebrow{font:600 .68rem/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--orange)}
+header.top h1{font-size:clamp(1.4rem,2.8vw,2rem);font-weight:800;margin-top:6px}
+header.top p{opacity:.88;margin:4px 0 0;font-size:.95rem}
+.stats{display:flex;flex-wrap:wrap;gap:6px 20px;font-variant-numeric:tabular-nums}
+.stats div{display:flex;align-items:baseline;gap:6px}
+.stats b{font:800 1.3rem var(--display)}
+.stats span{font-size:.82rem;opacity:.85}
+
+.bar{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;padding-block:12px 6px}
+.lbl{font:600 .7rem var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card)}
+.seg button{cursor:pointer;border:0;background:transparent;padding:7px 14px;font-weight:700;color:var(--blue)}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:linear-gradient(135deg,var(--orange),var(--orange-2));color:var(--blue-2)}
+.route{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.route input{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:7px 10px;width:min(330px,100%)}
+.btn{cursor:pointer;border:1px solid var(--orange-2);background:linear-gradient(135deg,var(--orange),var(--orange-2));color:var(--blue-2);border-radius:8px;padding:6px 12px;font-weight:700;white-space:nowrap}
+.btn.ghost{background:var(--card);border-color:var(--line);color:var(--blue)}
+.tools{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{cursor:pointer;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:3px 10px;font-size:.82rem;font-weight:600;display:flex;gap:6px;align-items:center}
+.chip[aria-pressed="false"]{opacity:.4}
+.sw{width:18px;height:11px;border-radius:6px;display:inline-block;background:var(--card);border:2px solid var(--blue);flex:none}
+.sw.DEBERIA{border-width:1px}
+.sw.PODRIA{border-style:dashed;border-width:1.5px}
+.sw.NO{border:1.5px dashed var(--grey);background:var(--card-b)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.82rem;color:var(--muted);align-items:center}
+.legend span{display:flex;gap:6px;align-items:center}
+.lg{width:16px;height:11px;border-radius:6px;display:inline-block}
+.lg.me{background:linear-gradient(135deg,var(--orange),var(--orange-2))}
+.lg.up{background:var(--blue)}
+.lg.dn{background:var(--orange-soft);border:2px solid var(--orange)}
+
+.stage{position:relative}
+.stage.side{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:12px;align-items:start}
+.stage.side .drawer{position:static;width:auto;max-height:none;box-shadow:none}
+.drawer.left{right:auto;left:10px}
+.banner{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;background:var(--orange-soft);border:1px solid var(--orange);border-radius:10px;padding:7px 12px;margin-bottom:8px;font-size:.92rem}
+.banner b{color:var(--blue)}
+.canvas{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:auto;touch-action:none;display:flex}
+.canvas svg{margin:auto;display:block;font-family:var(--body);user-select:none;-webkit-user-select:none;flex:none}
+.band{fill:var(--card-a)}
+.bandl{font:700 12px var(--mono);fill:var(--muted);letter-spacing:.08em}
+.bandl.start{fill:var(--orange-2)}
+.edge{fill:none;stroke:var(--blue);stroke-width:1.6;opacity:.6}
+.node{cursor:pointer}
+.node rect{fill:var(--card);stroke:var(--blue);stroke-width:1.4}
+.node.pr-DEBE rect{stroke-width:2.6}
+.node.pr-PODRIA rect{stroke-dasharray:5 3}
+.node.pr-NO rect{stroke:var(--grey);stroke-dasharray:5 3;fill:var(--card-b)}
+.node .id{font:700 14px var(--mono);fill:var(--blue)}
+.node .sub{font:600 10.5px var(--mono);fill:var(--muted)}
+.node .tt{font-size:13px;fill:var(--ink)}
+.node.pr-NO .id{fill:var(--muted)}
+.node:hover rect{fill:var(--orange-soft)}
+.node.dragging{cursor:grabbing}
+.sel .node{opacity:.25}
+.sel .edge{opacity:.1}
+.sel .node.on{opacity:1}
+.sel .node.me rect{fill:url(#gOrange);stroke:var(--orange-2);stroke-width:3;stroke-dasharray:none}
+.sel .node.me .id,.sel .node.me .sub,.sel .node.me .tt{fill:var(--blue-2)}
+.sel .node.up rect{fill:var(--blue);stroke:var(--blue-2);stroke-dasharray:none}
+.sel .node.up .id,.sel .node.up .tt{fill:#fff}
+.sel .node.up .sub{fill:#cfe3e6}
+.sel .node.dn rect{fill:var(--orange-soft);stroke:var(--orange);stroke-width:2.6;stroke-dasharray:none}
+.node.ctx rect{fill:var(--card-b);stroke:var(--grey);stroke-dasharray:4 3;stroke-width:1.2}
+.node.ctx .id,.node.ctx .tt{fill:var(--muted)}
+.drawer h3{font:700 .92rem var(--display);color:var(--blue);margin:14px 0 4px;padding-top:10px;border-top:1px solid var(--line)}
+.grp{margin-top:4px;font-size:.84rem}
+.grp .key{margin-right:4px}
+.dor{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:8px;font-size:.84rem}
+.dor ul{margin:6px 0 0;padding-left:16px}
+.dor li{margin-bottom:3px}
+.dor summary{cursor:pointer;font-weight:600}
+.pill.R{background:var(--orange-soft);border-color:var(--orange);color:var(--blue-2)}
+.pill.N{background:#fbe6e2;border-color:#b7412f;color:#b7412f}
+.crumbs{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.crumbs button{cursor:pointer;border:0;background:transparent;font:700 .9rem var(--body);color:var(--blue);text-decoration:underline;padding:0}
+.logro{font-size:.9rem;background:var(--orange-soft);border-radius:8px;padding:8px 10px;margin:6px 0}
+.orig{font-size:.8rem;color:var(--muted);margin:4px 0}
+.orig summary{cursor:pointer}
+.src{font:400 .7rem var(--mono);color:var(--grey);margin-top:3px;word-break:break-word}
+.code{font:700 .72rem var(--mono);color:var(--blue);background:var(--card-b);border-radius:4px;padding:1px 5px;margin-right:2px}
+.states{display:grid;gap:4px;margin:6px 0;font-size:.84rem}
+.grp2{border-top:1px solid var(--line);padding:6px 0;font-size:.86rem}
+.grp2>summary{cursor:pointer;font-weight:700;color:var(--blue)}
+.it{margin:6px 0 0 4px;font-size:.84rem}
+.it>summary{cursor:pointer}
+.itb{margin:4px 0 0 14px;color:var(--ink)}
+.otros{font-size:.84rem;margin:6px 0 0;padding-left:18px}
+.glos{display:grid;grid-template-columns:1fr;gap:2px;font-size:.85rem;margin:0}
+.glos dt{font-weight:700;color:var(--blue);margin-top:6px}
+.glos dd{margin:0}
+.navbtns{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.mini{cursor:pointer;border:1px solid var(--orange-2);background:linear-gradient(135deg,var(--orange),var(--orange-2));color:var(--blue-2);border-radius:6px;padding:2px 8px;font:700 .74rem var(--body);white-space:nowrap;margin-left:4px}
+.drow{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:baseline}
+.drow .grow{flex:1;min-width:0}
+.sel .edge.up{opacity:1;stroke-width:2.8}
+.sel .edge.dn{opacity:1;stroke-width:2.8;stroke:var(--orange-2)}
+.hint{font-size:.82rem;color:var(--muted);margin-top:6px}
+
+.drawer{position:absolute;top:10px;right:10px;width:min(340px,calc(100% - 20px));max-height:calc(100% - 20px);overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;box-shadow:0 10px 30px rgba(2,50,59,.18)}
+.drawer h2{font-size:1.05rem;margin:6px 0 8px;color:var(--blue)}
+.drawer .x{position:absolute;top:8px;right:8px;cursor:pointer;border:0;background:transparent;font-size:1.2rem;color:var(--muted);line-height:1;padding:4px 8px}
+.kv{display:grid;grid-template-columns:96px minmax(0,1fr);gap:7px 10px;font-size:.88rem;margin-top:8px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;min-width:0}
+.links{display:flex;flex-wrap:wrap;gap:5px}
+.links button{cursor:pointer;border:1px solid var(--line);background:linear-gradient(180deg,var(--card-a),var(--card-b));border-radius:5px;padding:2px 6px;font:600 .74rem var(--mono);color:var(--blue)}
+.links button.up{background:var(--blue);color:#fff;border-color:var(--blue)}
+.links button.dn{background:var(--orange-soft);border-color:var(--orange)}
+.pill{display:inline-block;font:600 .68rem/1 var(--mono);padding:4px 7px;border-radius:5px;white-space:nowrap;border:1px solid var(--blue);color:var(--blue);background:var(--card)}
+.pill.DEBE{background:var(--blue);color:#fff}
+.pill.PODRIA{border-style:dashed}
+.pill.NO{border:1px dashed var(--grey);color:var(--muted);background:var(--card-b)}
+.note{font-size:.84rem;border-radius:8px;padding:8px 10px;margin-top:10px;background:var(--orange-soft)}
+.empty{color:var(--muted);font-size:.88rem}
+.steps{display:grid;gap:8px;margin-top:8px}
+.step{border-left:3px solid var(--orange);padding:2px 0 2px 10px}
+.step b{font:700 .76rem var(--mono);color:var(--blue);letter-spacing:.05em}
+.step div{font-size:.84rem}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.copied{font-size:.8rem;color:var(--muted);min-height:1.2em;margin-top:6px}
+textarea.fallback{width:100%;height:150px;margin-top:6px;font:12px var(--mono);border:1px solid var(--line);border-radius:8px;padding:8px}
+
+.method{font-size:.88rem;color:var(--muted);max-width:92ch;padding-block:18px 40px}
+.method h3{font:700 .95rem var(--display);color:var(--blue);margin-bottom:6px}
+.method ul{margin:6px 0 0;padding-left:18px}
+.prio-list{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:8px}
+.prio-list span{display:flex;gap:6px;align-items:center}
+</style>
+
+<header class="top">
+  <div class="wrap hrow">
+    <div>
+      <div class="eyebrow" id="eyebrow"></div>
+      <h1>Gráfico de dependencias</h1>
+      <p>Qué se construye antes de qué. Cada flecha va de lo que se necesita a lo que lo necesita.</p>
+    </div>
+    <div class="stats" id="stats"></div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="bar">
+    <span class="lbl">Ver por</span>
+    <div class="seg" id="lvlSeg">
+      <button data-l="ep" aria-pressed="false">Épica</button>
+      <button data-l="ft" aria-pressed="false">Feature</button>
+      <button data-l="hu" aria-pressed="true">HU</button>
+    </div>
+    <div class="route">
+      <label class="lbl" for="routeIn">Ruta hasta</label>
+      <input id="routeIn" list="routeList" placeholder="Elige una épica, feature o HU" autocomplete="off">
+      <datalist id="routeList"></datalist>
+    </div>
+    <div class="tools">
+      <button class="btn" id="glosBtn">¿Qué significa?</button>
+      <button class="btn ghost" id="zoomOut" aria-label="Alejar">−</button>
+      <button class="btn ghost" id="zoomFit">Ajustar a pantalla</button>
+      <button class="btn ghost" id="zoomIn" aria-label="Acercar">+</button>
+      <button class="btn ghost" id="relayout" hidden>Volver a ordenar</button>
+    </div>
+  </div>
+  <div class="bar" style="padding-top:0">
+    <span class="lbl">Prioridad</span><div class="chips" id="prioChips"></div>
+    <div class="legend" style="margin-left:auto"><span><i class="lg me"></i>Seleccionada</span><span><i class="lg up"></i>Necesita antes</span><span><i class="lg dn"></i>Desbloquea a</span></div>
+  </div>
+  <div id="banner"></div>
+  <div class="stage">
+    <div class="canvas" id="canvas"></div>
+    <aside class="drawer" id="drawer" hidden></aside>
+  </div>
+  <p class="hint" id="hint"></p>
+  <div class="method">
+    <h3>Cómo leer el gráfico</h3>
+    <ul>
+      <li><b>Se empieza por el paso 1</b> y se avanza en el sentido de las flechas. Lo que está en el mismo paso puede avanzar en paralelo.</li>
+      <li><b>Haz clic en una caja</b> para ver qué necesita antes (azul) y qué desbloquea (naranja). <b>Ruta hasta</b> deja solo lo que hay que construir para llegar a una épica, feature o HU.</li>
+      <li><b>Bajar y subir de nivel:</b> en el panel, junto a «Sus features» y «Sus HU», el botón «Ver todas →» las muestra en el gráfico; cada código lleva a esa pieza, y «Ver →» junto a la épica o la feature sube de nivel. Se muestran sus piezas y, en gris, las de otras épicas o features con las que se conectan. La barra naranja de arriba permite volver.</li>
+      <li><b>Qué te detiene:</b> el panel indica lo que tiene que estar terminado para empezar y para terminar, y lo pendiente según el Definition of Ready de cada feature (bloqueos externos, aprobaciones, decisiones y preguntas abiertas).</li>
+      <li><b>Solo se dibujan las flechas directas:</b> si A va antes de B y B antes de C, no se dibuja A → C porque ya se ve en la cadena.</li>
+      <li><b>Paso:</b> cada caja va en el paso siguiente al más tardío de lo que necesita. No hace falta terminar todo un paso para empezar el siguiente, y los pasos no son semanas ni sprints.</li>
+      <li><b>Épicas y features:</b> sus flechas salen de las dependencias entre sus HU. A veces dos se esperan en partes distintas (una HU de cada lado); se dibuja la que arranca primero y el panel indica la otra espera.</li>
+      <li><b>Dependencias:</b> salen del backlog de tareas y del texto de cada HU. El gráfico muestra el orden, no tiempos ni esfuerzo.</li>
+      <li id="docDiffs" hidden></li>
+    </ul>
+    <div class="prio-list" id="prioList"></div>
+  </div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
+<script>
+/*CORE*/
+
+const CFG = /*CFG*/null;
+const M = /*DATA*/null;
+const ORDERS = /*ORDERS*/null;
+const core = makeCore(M, dagre), HU = core.HU;
+const DEPS = CFG.externals;
+const PRIO = {DEBE:"Debe tener",DEBERIA:"Debería",PODRIA:"Podría",NO:"No esta vez"};
+const PRIO_TXT = {DEBE:"obligatoria: sin esto no sale el producto",DEBERIA:"importante, pero se puede salir sin esto",PODRIA:"opcional: entra solo si sobra capacidad",NO:CFG.outOfScope};
+const PORDER = ["DEBE","DEBERIA","PODRIA","NO"];
+const DOR = CFG.readiness;
+const GATES = {G0:"Aprobación de inicio (G0)",G1:"Aprobación del análisis (G1)",G2:"Diseño de pantallas aprobado (G2)",G3:"Arquitectura aprobada (G3)",G4:"Definition of Ready aprobada (G4)"};
+const DORV = {READY_COND:["R","Ready con condiciones"],NO:["N","No Ready"],READY:["R","Ready"]};
+const DIFF = CFG.notes;
+const LNAME = {hu:"HU", ft:"feature", ep:"épica"};
+const epIds = Object.keys(M.eps).sort();
+const LEVELS = {hu:core.level("hu"), ft:core.level("ft"), ep:core.level("ep")};
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const short = id => CFG.idPrefix ? id.replace(CFG.idPrefix,"-") : id;
+const titleOf = id => id.startsWith("HU-") ? HU[id].t : id.startsWith("FT-") ? M.fts[id].t : M.eps[id].t;
+const levelOf = id => id.startsWith("HU-") ? "hu" : id.startsWith("FT-") ? "ft" : "ep";
+function wrap(s, n, lines){
+  const out = []; let cur = "";
+  for(const x of s.split(/\s+/)){ const c = cur ? cur+" "+x : x; if(c.length <= n || !cur) cur = c; else { out.push(cur); cur = x; } }
+  if(cur) out.push(cur);
+  if(out.length > lines){ const keep = out.slice(0, lines), last = keep[lines-1]; keep[lines-1] = (last.length > n-1 ? last.slice(0, n-1) : last) + "…"; return keep; }
+  return out.map(l => l.length > n ? l.slice(0, n-1)+"…" : l);
+}
+
+let st = {lvl:"hu", prio:new Set(["DEBE","DEBERIA","PODRIA"]), sel:null, route:null, focus:null, zoom:1, pos:{}};
+try{ const s = JSON.parse(localStorage.getItem("gd6")||"{}"); if(s.lvl) st.lvl = s.lvl; }catch(e){}
+const remember = () => { try{ localStorage.setItem("gd6", JSON.stringify({lvl:st.lvl})); }catch(e){} };
+const prioKey = () => [...st.prio].sort().join(",");
+const viewKey = () => `${st.lvl}|${prioKey()}|${st.route?st.route.id:""}|${st.focus?st.focus.from+":"+st.focus.id:""}`;
+
+function huAncestors(id){
+  const s = new Set(), q = [...HU[id].deps];
+  while(q.length){ const x = q.pop(); if(!s.has(x)){ s.add(x); q.push(...HU[x].deps); } }
+  s.delete(id); return s;
+}
+function routeHUs(id){
+  const G = LEVELS[levelOf(id)], s = new Set(G.hus[id].map(h=>h.id));
+  for(const t of [...s]) for(const a of huAncestors(t)) s.add(a);
+  return s;
+}
+const huVisible = h => st.prio.has(h.p) && (!st.route || st.route.hus.has(h.id));
+
+/* ---------- Disposición (con caché) ---------- */
+const CACHE = {};
+function getLayout(){
+  const k = viewKey(); if(CACHE[k]) return CACHE[k];
+  const G = LEVELS[st.lvl], ctx = new Set();
+  let vis = i => G.hus[i].some(huVisible);
+  if(st.focus){
+    const f = st.focus, own = i => G.hus[i].some(h => h[f.from]===f.id);
+    const mine = G.items.filter(i => own(i) && vis(i));
+    for(const i of mine) for(const o of [...G.deps[i], ...G.rev[i]]) if(!own(o) && vis(o)) ctx.add(o);
+    const base = vis; vis = i => base(i) && (own(i) || ctx.has(i));
+  }
+  const vw = core.view(G, vis);
+  const res = {G, vw, ctx};
+  for(const dir of ["LR","TB"]){
+    const pre = !st.route && !st.focus && ORDERS[`${st.lvl}|${prioKey()}|${dir}`];
+    let g;
+    if(pre && pre.length===vw.V.length) g = core.layout(st.lvl, vw, dir, pre);
+    else g = core.bestOrder(st.lvl, vw, dir, vw.V.length > 40 ? 12 : 30, 7).g;
+    res[dir] = g;
+  }
+  return CACHE[k] = res;
+}
+
+/* ---------- Dibujo ---------- */
+let CUR = null;  // {G, vw, g, dir, ox, oy, W, H, pos}
+function basis(pts){
+  if(pts.length < 3) return `M${pts[0].x},${pts[0].y} L${pts[pts.length-1].x},${pts[pts.length-1].y}`;
+  let d = `M${pts[0].x},${pts[0].y}`;
+  const p = [pts[0], ...pts, pts[pts.length-1]];
+  for(let i=1;i<p.length-2;i++){
+    const p0=p[i-1], p1=p[i], p2=p[i+1];
+    const c1 = {x:(2*p1.x+p2.x)/3, y:(2*p1.y+p2.y)/3}, c2 = {x:(p1.x+2*p2.x)/3, y:(p1.y+2*p2.y)/3};
+    const e = {x:(p1.x+4*p2.x+p[i+2].x)/6, y:(p1.y+4*p2.y+p[i+2].y)/6};
+    if(i===1) d += ` L${(p0.x+4*p1.x+p2.x)/6},${(p0.y+4*p1.y+p2.y)/6}`;
+    d += ` C${c1.x},${c1.y} ${c2.x},${c2.y} ${e.x},${e.y}`;
+  }
+  return d + ` L${pts[pts.length-1].x},${pts[pts.length-1].y}`;
+}
+function edgePath(a, b){
+  const moved = st.pos[viewKey()] || {};
+  const S = core.SIZE[st.lvl], pa = CUR.pos[a], pb = CUR.pos[b];
+  if(!moved[a] && !moved[b]){
+    const pts = CUR.g.edge(b, a).points.slice().reverse().map(p=>({x:p.x+CUR.ox, y:p.y+CUR.oy}));
+    return basis(pts);
+  }
+  if(CUR.dir==="LR"){ const x1=pa.x+S.width/2, y1=pa.y, x2=pb.x-S.width/2-2, y2=pb.y, c=Math.max(30,(x2-x1)/2); return `M${x1},${y1} C${x1+c},${y1} ${x2-c},${y2} ${x2},${y2}`; }
+  const x1=pa.x, y1=pa.y+S.height/2, x2=pb.x, y2=pb.y-S.height/2-2, c=Math.max(24,(y2-y1)/2); return `M${x1},${y1} C${x1},${y1+c} ${x2},${y2-c} ${x2},${y2}`;
+}
+function relOf(id){
+  const G = CUR.G, up = new Set([...G.deps[id]]), dn = new Set([...G.rev[id]]);
+  return {up, dn};
+}
+
+function render(){
+  document.querySelectorAll("#lvlSeg button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.l===st.lvl));
+  const Lay = getLayout(), cv = $("#canvas");
+  const side = !!st.route;
+  $(".stage").classList.toggle("side", side);
+  const availW = $(".stage").clientWidth - (side ? 352 : 0) - 8;
+  const availH = Math.max(380, window.innerHeight - 40 - (st.route ? 50 : 0) - Math.min(260, cv.getBoundingClientRect().top + window.scrollY));
+  const fitH = availH - 8;
+  let best = null;
+  for(const dir of (st.lvl==="ep" ? ["LR"] : ["LR","TB"])){
+    const gg = Lay[dir].graph(), W = gg.width + (dir==="TB" ? 96 : 0), H = gg.height + (dir==="LR" ? 34 : 0);
+    const fit = Math.min(availW / W, fitH / H, 1.25);
+    if(!best || fit > best.fit + 0.02) best = {dir, fit, W, H};
+  }
+  const g = Lay[best.dir], ox = best.dir==="TB" ? 96 : 0, oy = best.dir==="LR" ? 34 : 0;
+  const pos = {};
+  for(const v of Lay.vw.V){ const n = g.node(v); pos[v] = {x:n.x+ox, y:n.y+oy}; }
+  const moved = st.pos[viewKey()] || {};
+  for(const v in moved) if(pos[v]) pos[v] = {...moved[v]};
+  CUR = {G:Lay.G, vw:Lay.vw, ctx:Lay.ctx, g, dir:best.dir, ox, oy, W:best.W, H:best.H, pos, fit:best.fit};
+  if(st.sel && !Lay.vw.V.includes(st.sel)) st.sel = null;
+  cv.style.height = availH + "px";
+  drawSvg();
+  renderDrawer(); renderBanner(); stats();
+  $("#relayout").hidden = !Object.keys(moved).length;
+  $("#hint").textContent = st.focus ? `En gris: piezas de otras ${st.focus.from==="ep"?"épicas":"features"} que se necesitan antes o que esperan a estas. ` + "Puedes arrastrar una caja si necesitas separarla." : `${Lay.vw.V.length} ${st.lvl==="hu"?"HU":LNAME[st.lvl]+"s"} en ${Lay.vw.steps} pasos.` + (st.prio.has("NO") ? "" : ` Las HU «No esta vez» están ocultas; actívalas en Prioridad.`) + " Puedes arrastrar una caja si necesitas separarla.";
+}
+
+function drawSvg(){
+  const {G, vw, dir, W, H, pos} = CUR, S = core.SIZE[st.lvl], z = CUR.fit * st.zoom;
+  const rel = st.sel ? relOf(st.sel) : null;
+  const out = [];
+  out.push(`<svg id="svg" width="${Math.round(W*z)}" height="${Math.round(H*z)}" viewBox="0 0 ${W} ${H}" class="${st.sel?"sel":""}" role="img" aria-label="Gráfico de dependencias por ${LNAME[st.lvl]}">
+    <defs><linearGradient id="gOrange" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffa726"/><stop offset="1" stop-color="#ff8c26"/></linearGradient>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#02424e"/></marker>
+    <marker id="arO" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#ff8c26"/></marker></defs>
+    <rect id="bg" width="${W}" height="${H}" fill="#ffffff"/>`);
+  // Bandas de paso (según la posición real de cada paso)
+  const coord = v => dir==="LR" ? Math.round(CUR.g.node(v).x) : Math.round(CUR.g.node(v).y);
+  const ranks = [...new Set(vw.V.map(coord))].sort((a,b)=>a-b);
+  const span = dir==="LR" ? S.width + 20 : S.height + 18;
+  ranks.forEach((r,i) => {
+    const label = i===0 ? "PASO 1 · INICIO" : "PASO " + (i+1);
+    if(dir==="LR"){ const x = r + CUR.ox;
+      if(i%2===0) out.push(`<rect class="band" x="${x-span/2}" y="0" width="${span}" height="${H}"/>`);
+      out.push(`<text class="bandl${i===0?" start":""}" x="${x}" y="22" text-anchor="middle">${label}</text>`);
+    } else { const y = r + CUR.oy;
+      if(i%2===0) out.push(`<rect class="band" x="0" y="${y-span/2}" width="${W}" height="${span}"/>`);
+      out.push(`<text class="bandl${i===0?" start":""}" x="12" y="${y+4}">${i===0?"PASO 1":"PASO "+(i+1)}</text>`);
+      if(i===0) out.push(`<text class="bandl start" x="12" y="${y+20}">INICIO</text>`);
+    }
+  });
+  out.push(`<g id="edges">`);
+  for(const [a,b] of vw.edges){
+    const cls = st.sel ? (b===st.sel ? "up" : a===st.sel ? "dn" : "") : "";
+    out.push(`<path class="edge ${cls}" data-a="${a}" data-b="${b}" d="${edgePath(a,b)}" marker-end="url(#${cls==="dn"?"arO":"ar"})"/>`);
+  }
+  out.push(`</g><g id="nodes">`);
+  for(const id of vw.V){
+    const p = pos[id], hs = G.hus[id].filter(huVisible), pr = PORDER.find(k=>hs.some(h=>h.p===k));
+    const role = !st.sel ? "" : id===st.sel ? "on me" : rel.up.has(id) ? "on up" : rel.dn.has(id) ? "on dn" : "";
+    const x = p.x - S.width/2, y = p.y - S.height/2;
+    out.push(`<g class="node pr-${pr} ${CUR.ctx.has(id)?"ctx":""} ${role}" data-id="${id}" transform="translate(${x},${y})" tabindex="0" role="button" aria-label="${esc(id+" "+titleOf(id))}"><title>${esc(id+" · "+titleOf(id))}</title>`);
+    if(st.lvl==="hu"){
+      out.push(`<rect width="${S.width}" height="${S.height}" rx="${S.height/2}"/>`);
+      out.push(`<text class="id" x="${S.width/2}" y="19" text-anchor="middle">${short(id)}</text>`);
+      out.push(`<text class="sub" x="${S.width/2}" y="33" text-anchor="middle">${short(HU[id].ep)}</text>`);
+    } else {
+      const total = G.hus[id].length, part = hs.length;
+      out.push(`<rect width="${S.width}" height="${S.height}" rx="10"/>`);
+      out.push(`<text class="id" x="10" y="19" style="font-size:12.5px">${short(id)}</text>`);
+      out.push(`<text class="sub" x="${S.width-10}" y="19" text-anchor="end">${st.route && part<total ? `${part} de ${total} HU` : `${total} HU`}</text>`);
+      wrap(titleOf(id), 30, 2).forEach((l,i)=>out.push(`<text class="tt" x="10" y="${36+i*15}">${esc(l)}</text>`));
+    }
+    out.push(`</g>`);
+  }
+  out.push(`</g></svg>`);
+  const cv = $("#canvas"), sx = cv.scrollLeft, sy = cv.scrollTop;
+  cv.innerHTML = out.join("");
+  cv.scrollLeft = sx; cv.scrollTop = sy;
+}
+
+/* ---------- Panel ---------- */
+function btns(ids, cls, star){
+  ids = [...ids].sort(); star = star || new Set();
+  if(!ids.length) return `<span class="empty">nada</span>`;
+  return `<div class="links">${ids.map(i=>`<button data-sel="${i}" class="${cls}">${short(i)}${star.has(i)?" *":""}</button>`).join("")}</div>`;
+}
+function routeSteps(){
+  const G = LEVELS.hu, vw = core.view(G, i => G.hus[i].some(huVisible)), steps = {};
+  for(const id of vw.V) (steps[vw.step[id]] ||= []).push(id);
+  return steps;
+}
+function renderDrawer(){
+  const d = $("#drawer"), G = CUR.G;
+  if(st.sel){
+    const id = st.sel, rel = relOf(id), back = [...G.back[id]], inV = x => CUR.vw.V.includes(x);
+    const ahead = [...G.dag[id]].filter(inV), unl = [...rel.dn].filter(inV);
+    let html = `<button class="x" id="closeDrawer" aria-label="Cerrar">×</button>`;
+    if(st.lvl==="hu"){
+      const h = HU[id];
+      html += `<span class="key">${h.id}</span> <span class="pill ${h.p}">${PRIO[h.p]}</span><h2>${esc(h.t)}</h2>${logroHtml(id)}
+        <dl class="kv"><dt>Épica</dt><dd><div class="drow"><span class="grow"><span class="key">${h.ep}</span> ${esc(M.eps[h.ep].t)}</span><button class="mini" data-nav="goto|ep|${h.ep}">Ver →</button></div></dd>
+        <dt>Feature</dt><dd><div class="drow"><span class="grow"><span class="key">${h.ft}</span> ${esc(M.fts[h.ft].t)}</span><button class="mini" data-nav="goto|ft|${h.ft}">Ver →</button></div></dd>
+        <dt>Paso</dt><dd>${CUR.vw.step[id]}</dd>`;
+    } else {
+      const hs = G.hus[id];
+      html += `<span class="key">${id}</span><h2>${esc(titleOf(id))}</h2>${logroHtml(id)}<dl class="kv">
+        ${st.lvl==="ft"?`<dt>Su épica</dt><dd><div class="drow"><span class="grow"><span class="key">${M.fts[id].ep}</span> ${esc(M.eps[M.fts[id].ep].t)}</span><button class="mini" data-nav="goto|ep|${M.fts[id].ep}">Ver →</button></div></dd>`:""}
+        <dt>Paso</dt><dd>${CUR.vw.step[id]}</dd>
+        <dt>Prioridad</dt><dd>${PORDER.filter(k=>hs.some(h=>h.p===k)).map(k=>`<span class="pill ${k}">${hs.filter(h=>h.p===k).length} ${PRIO[k]}</span>`).join(" ")}</dd>
+        ${st.lvl==="ep"?`<dt>Sus features</dt><dd><button class="mini" style="margin:0 0 6px" data-nav="focus|ep|${id}|ft">Ver todas →</button><div class="links">${[...new Set(hs.map(h=>h.ft))].sort().map(f=>`<button data-nav="goto|ft|${f}" title="${esc(M.fts[f].t)}">${short(f)}</button>`).join("")}</div></dd>`:""}
+        <dt>Sus HU</dt><dd><button class="mini" style="margin:0 0 6px" data-nav="focus|${st.lvl}|${id}|hu">Ver todas →</button>${btnsHU(hs.map(h=>h.id))}</dd>`;
+    }
+    const starIn = new Set(st.lvl==="hu" ? HU[id].txt.filter(x=>ahead.includes(x)) : []), starOut = new Set(st.lvl==="hu" ? unl.filter(x=>HU[x].txt.includes(id)) : []);
+    html += `<dt>Necesita antes</dt><dd>${btns(ahead,"up",starIn)}</dd><dt>Desbloquea a</dt><dd>${btns(unl,"dn",starOut)}</dd>`;
+    if(st.lvl==="hu" && HU[id].ext.length) html += `<dt>Depende de afuera</dt><dd>${HU[id].ext.map(x=>`<div><span class="code" title="${esc((CODES[x]||{}).simple||"")}">${x}</span> ${esc(DEPS[x]||(CODES[x]||{}).nombre||"")}${(CODES[x]||{}).responsable?` <span class="empty">· a cargo de ${esc(CODES[x].responsable)}</span>`:""}</div>`).join("")}</dd>`;
+    html += `</dl>`;
+    if(st.lvl==="hu" && DIFF[id]) html += `<div class="note"><b>No coincidía en la documentación.</b> ${DIFF[id]}</div>`;
+    if(starIn.size || starOut.size) html += `<p class="empty" style="margin-top:6px">* Según el texto de la HU; el backlog de tareas no la incluye.</p>`;
+    const backV = back.filter(inV);
+    if(backV.length) html += `<div class="note"><b>También espera a ${backV.map(short).join(", ")}</b> en una parte: ${whyBack(id, backV)} Por eso avanzan intercaladas.</div>`;
+    html += blockersHtml(id);
+    html += `<div class="actions"><button class="btn" data-route="${id}">Ver ruta hasta aquí</button></div>`;
+    d.innerHTML = html; d.hidden = false;
+    if(!st.route){ const cv = $("#canvas"), nx = CUR.pos[id].x * CUR.fit * st.zoom - cv.scrollLeft; d.classList.toggle("left", nx > cv.clientWidth / 2); } else d.classList.remove("left");
+    return;
+  }
+  if(st.route){
+    const steps = routeSteps();
+    d.innerHTML = `<button class="x" id="clearRoute3" aria-label="Cerrar">×</button><span class="key">Ruta</span><h2>Para llegar a ${short(st.route.id)}</h2>
+      <p class="empty">${esc(titleOf(st.route.id))}</p>
+      <p style="font-size:.88rem;margin-top:6px">Estas HU, en este orden. Las de un mismo paso pueden ir en paralelo.</p>
+      <div class="steps">${Object.keys(steps).sort((a,b)=>a-b).map(k=>`<div class="step"><b>PASO ${k}</b>${steps[k].sort().map(id=>`<div><span class="key">${short(id)}</span> ${esc(HU[id].t)}</div>`).join("")}</div>`).join("")}</div>
+      <div class="actions"><button class="btn" id="copyRoute">Copiar lista</button><button class="btn ghost" id="clearRoute2">Ver todo</button></div>
+      <div class="copied" id="copied"></div>`;
+    d.hidden = false; return;
+  }
+  d.hidden = true; d.innerHTML = "";
+}
+function navButtons(id){
+  const b = (nav, label) => `<button class="btn ghost" data-nav="${nav}">${label}</button>`;
+  if(st.lvl==="ep") return b(`focus|ep|${id}|ft`,"Ver sus features") + b(`focus|ep|${id}|hu`,"Ver sus HU");
+  if(st.lvl==="ft") return b(`focus|ft|${id}|hu`,"Ver sus HU") + b(`goto|ep|${M.fts[id].ep}`,"Ver su épica");
+  return b(`goto|ft|${HU[id].ft}`,"Ver su feature") + b(`goto|ep|${HU[id].ep}`,"Ver su épica");
+}
+function groupHU(set){
+  const by = {}; [...set].sort().forEach(h => (by[HU[h].ep] ||= []).push(h));
+  return Object.keys(by).sort().map(e => `<div class="grp"><span class="key">${short(e)}</span>${btnsHU(by[e])}</div>`).join("");
+}
+function blockersHtml(id){
+  const G = LEVELS[st.lvl];
+  let S = G.hus[id].filter(h => st.prio.has(h.p)).map(h => h.id); if(!S.length) S = G.hus[id].map(h => h.id);
+  const Ss = new Set(S), all = new Set(), first = new Set();
+  for(const h of S) for(const a of huAncestors(h)) if(!Ss.has(a)) all.add(a);
+  // Para empezar se usa el orden dibujado (las esperas mutuas no frenan el inicio)
+  const H = LEVELS.hu, dagAnc = h => H.anc[h] || new Set();
+  const starts = S.filter(h => ![...H.dag[h]].some(d => Ss.has(d)));
+  for(const h of starts) for(const a of dagAnc(h)) if(!Ss.has(a)) first.add(a);
+  let html = `<h3>Qué te detiene</h3><p class="empty" style="margin:2px 0 4px"><b>1. Otras piezas que deben terminar antes</b></p><dl class="kv">`;
+  if(st.lvl==="hu"){
+    html += `<dt>HU previas</dt><dd>${all.size ? `${all.size} HU${groupHU(all)}` : `Ninguna. No depende de otra HU.`}</dd>`;
+  } else {
+    const otras = st.lvl==="ep" ? "otras épicas" : "otras features";
+    html += `<dt>Para empezar</dt><dd>${first.size ? `${first.size} HU de ${otras}${groupHU(first)}` : `Ninguna HU de ${otras}.`}<div class="empty" style="margin-top:4px">Sus primeras HU: ${starts.sort().map(short).join(", ")}</div></dd>
+      <dt>Para terminarla completa</dt><dd>${all.size ? `<details><summary>${all.size} HU de ${otras}</summary>${groupHU(all)}</details>` : `Ninguna HU de ${otras}.`}</dd>`;
+  }
+  html += `</dl>`;
+  // Lo que falta resolver: se juntan los Definition of Ready de sus features y se agrupa por quién lo resuelve
+  const fts = st.lvl==="hu" ? [HU[id].ft] : st.lvl==="ft" ? [id] : [...new Set(G.hus[id].map(h => h.ft))].sort();
+  const conDor = fts.filter(f => DOR[f]);
+  if(!conDor.length && !S.some(h => HU[h].ext.length)) return html;
+  html += `<p class="empty" style="margin-top:10px"><b>2. Lo que falta resolver antes de desarrollar</b><br>Según el Definition of Ready de ${fts.length>1?"cada feature":"su feature"}. Es una propuesta: falta la firma del PO.</p>`;
+  html += `<div class="states">${conDor.map(f => { const [cls, txt] = DORV[DOR[f].status] || DORV.NO;
+    return `<div><span class="key">${short(f)}</span> <span class="pill ${cls}">${txt}</span> <span class="empty">${DOR[f].status==="NO" ? "todavía no puede entrar a desarrollo" : DOR[f].status==="READY" ? "lista para desarrollo" : "puede entrar cuando se resuelva lo de abajo"}</span>${src("DOR:"+f)}</div>`; }).join("")}</div>`;
+  const uni = k => [...new Set(conDor.flatMap(f => DOR[f][k] || []))].sort((a,b) => a.localeCompare(b, "es", {numeric:true}));
+  const deps = [...new Set([...uni("externals"), ...S.flatMap(h => HU[h].ext)])].sort();
+  const grupo = (titulo, items) => items.length ? `<details class="grp2"${items.length<=3?" open":""}><summary>${titulo} <span class="key">(${items.length})</span></summary>${items.join("")}</details>` : "";
+  // Decisiones del TL
+  html += grupo("El TL debe decidir", uni("decisions").map(c => item(c, (CODES[c]||{}).pregunta || (CODES[c]||{}).texto, (CODES[c]||{}).propuesta ? `<b>Propuesta:</b> ${esc(CODES[c].propuesta)}` : "")));
+  // Aprobaciones
+  html += grupo("Aprobaciones pendientes", uni("approvals").map(g => item(g, gateName(g), [(CODES[g]||{}).simple || (CODES[g]||{}).texto, (CODES[g]||{}).responsable ? `<b>Aprueba:</b> ${esc(CODES[g].responsable)}` : ""].filter(Boolean).map(esc2).join("<br>"))));
+  // Bloqueos externos, por responsable
+  const porResp = {};
+  for(const x of deps) (porResp[(CODES[x]||{}).responsable || "Sin responsable indicado"] ||= []).push(x);
+  html += Object.keys(porResp).sort().map(r => grupo(`A cargo de ${r}`, porResp[r].map(x => item(x, DEPS[x] || (CODES[x]||{}).nombre || x,
+    [(CODES[x]||{}).simple, (CODES[x]||{}).fecha ? `<b>Fecha requerida:</b> ${esc(CODES[x].fecha)}` : ""].filter(Boolean).map(esc2).join("<br>"))))).join("");
+  // Preguntas abiertas y otros
+  html += grupo("Preguntas por resolver", uni("questions").map(c => item(c, (CODES[c]||{}).simple || (CODES[c]||{}).texto, "")));
+  const otros = [...new Set(conDor.flatMap(f => DOR[f].other || []))];
+  if(conDor.some(f => DOR[f].estimation)) otros.push("Falta la estimación del equipo");
+  if(otros.length) html += `<ul class="otros">${otros.map(o => `<li>${esc(o)}</li>`).join("")}</ul>`;
+  return html;
+}
+const CODES = CFG.codigos || {}, LOGROS = CFG.logros || {}, FUENTES = CFG.fuentes || {};
+const GATE_DEF = {G0:"Aprobación de inicio",G1:"Aprobación del análisis",G2:"Diseño de pantallas aprobado",G3:"Arquitectura aprobada",G4:"Definition of Ready aprobada",G5:"Construcción terminada",G6:"Pruebas aprobadas",G7:"Revisión de seguridad",G8:"Aprobación para producción"};
+const gateName = g => (CODES[g]||{}).nombre || GATE_DEF[g] || g;
+const esc2 = s => s.startsWith("<b>") ? s : esc(s);
+const src = k => FUENTES[k] ? `<div class="src">${esc(FUENTES[k])}</div>` : "";
+function item(code, titulo, detalle){
+  const c = CODES[code] || {};
+  const body = [detalle, c.fuente ? `<div class="src">${esc(c.fuente)}</div>` : ""].filter(Boolean).join("");
+  return body ? `<details class="it"><summary><span class="code">${esc(short(code))}</span> ${esc(titulo || "")}</summary><div class="itb">${body}</div></details>`
+              : `<div class="it"><span class="code">${esc(short(code))}</span> ${esc(titulo || "")}</div>`;
+}
+function logroHtml(id){
+  const h = HU[id], txt = LOGROS[id];
+  let html = "";
+  if(txt) html += `<p class="logro"><b>Qué se logra:</b> ${esc(txt)}</p>`;
+  if(h && h.historia){
+    const hs = h.historia;
+    html += `<details class="orig"><summary>Historia original</summary><p><b>Como</b> ${esc(hs.como)} · <b>quiero</b> ${esc(hs.quiero)} · <b>para</b> ${esc(hs.para)}</p></details>`;
+  }
+  return html + src(id);
+}
+const GLOS = [
+  ["Épica","Un objetivo grande del proyecto. Se divide en features."],
+  ["Feature","Una parte de una épica que entrega algo usable. Se divide en HU."],
+  ["HU (historia de usuario)","La pieza más pequeña de trabajo: quién necesita qué y para qué."],
+  ["Paso","Columna del gráfico. El paso 1 es lo que no necesita nada antes. Lo del mismo paso puede ir en paralelo. No son semanas ni sprints."],
+  ["Necesita antes / Desbloquea a","Lo que tiene que terminar antes de empezar esta pieza, y lo que puede empezar cuando esta termine."],
+  ["Debe tener · Debería · Podría · No esta vez","Prioridad: obligatoria, importante, opcional o fuera de alcance por ahora."],
+  ["Definition of Ready","Lista de lo que debe estar resuelto para que una feature entre a desarrollo sin bloqueos."],
+  ["Ready con condiciones / No Ready","Puede entrar a desarrollo cuando se resuelva lo pendiente / todavía no puede entrar."],
+  ["D-## (decisión)","Una pregunta que el TL debe decidir, con una propuesta."],
+  ["O## (pregunta abierta)","Algo que falta definir o aclarar en el análisis."],
+  ["G0 a G8 (puerta)","Aprobaciones del proceso de Aybar: inicio, análisis, diseño de pantallas, arquitectura, Definition of Ready, construcción, pruebas, seguridad y producción."],
+  ["DEP-xx (bloqueo externo)","Algo que depende de otro equipo o proveedor: mockups, ambientes, registros, aprobaciones."],
+  ["TL · PO · UX","Líder técnico · Product Owner · equipo de diseño de experiencia."]
+];
+function glosarioHtml(q){
+  q = (q||"").trim().toLowerCase();
+  const gen = GLOS.filter(([a,b]) => !q || (a+" "+b).toLowerCase().includes(q));
+  const cods = Object.entries(CODES).filter(([k,c]) => !q || (k+" "+(c.pregunta||"")+" "+(c.simple||"")+" "+(c.nombre||"")+" "+(c.texto||"")).toLowerCase().includes(q))
+    .sort((a,b) => a[0].localeCompare(b[0], "es", {numeric:true}));
+  return `${gen.length ? `<dl class="glos">${gen.map(([a,b]) => `<dt>${esc(a)}</dt><dd>${esc(b)}</dd>`).join("")}</dl>` : ""}
+    <h3>Códigos del proyecto <span class="key">(${cods.length})</span></h3>
+    ${cods.slice(0, 200).map(([k,c]) => item(k, c.pregunta || c.nombre || c.simple || c.texto,
+       [c.propuesta ? `<b>Propuesta:</b> ${esc(c.propuesta)}` : "", c.nombre && c.simple ? esc(c.simple) : "", c.responsable ? `<b>Responsable:</b> ${esc(c.responsable)}` : ""].filter(Boolean).join("<br>"))).join("")}`;
+}
+function renderGlosario(){
+  const d = $("#drawer");
+  d.innerHTML = `<button class="x" id="closeGlos" aria-label="Cerrar">×</button><h2>¿Qué significa?</h2>
+    <input id="glosQ" type="search" placeholder="Buscar un término o código (ej. D-22, G2, DEP-06)" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:6px 10px;margin:4px 0 8px">
+    <div id="glosBody">${glosarioHtml("")}</div>`;
+  d.hidden = false; d.classList.remove("left");
+  $("#glosQ").addEventListener("input", e => { $("#glosBody").innerHTML = glosarioHtml(e.target.value); });
+}
+function btnsHU(ids){ return `<div class="links">${ids.sort().map(i=>`<button data-gohu="${i}">${short(i)}</button>`).join("")}</div>`; }
+function whyBack(id, others){
+  // Explica con HU concretas por qué esta pieza también espera a la otra
+  const G = CUR.G, mine = new Set(G.hus[id].map(h=>h.id)), parts = [];
+  for(const o of others){
+    const theirs = new Set(G.hus[o].map(h=>h.id));
+    for(const h of mine){ const d = HU[h].deps.find(x=>theirs.has(x)); if(d){ parts.push(`${short(h)} necesita a ${short(d)}${HU[h].txt.includes(d)?" (según el texto de la HU)":""}`); break; } }
+  }
+  return parts.length ? parts.join("; ") + "." : "";
+}
+
+function renderBanner(){
+  if(st.focus){
+    const f = st.focus, ep = f.from==="ep" ? f.id : M.fts[f.id].ep;
+    const crumbs = [`<button data-nav="goto|ep|${ep}">${short(ep)} · ${esc(wrap(M.eps[ep].t,40,1)[0])}</button>`];
+    if(f.from==="ft") crumbs.push(`<button data-nav="focus|ep|${ep}|ft">Features</button>`, `<button data-nav="goto|ft|${f.id}">${short(f.id)} · ${esc(wrap(M.fts[f.id].t,40,1)[0])}</button>`);
+    crumbs.push(`<b>${st.lvl==="ft" ? "Sus features" : "Sus HU"}</b>`);
+    $("#banner").innerHTML = `<div class="banner"><span class="crumbs">${crumbs.join(" <span>›</span> ")}</span><button class="btn ghost" id="clearFocus">Ver todo</button></div>`;
+    return;
+  }
+  if(!st.route){ $("#banner").innerHTML = ""; return; }
+  const r = st.route, hs = [...r.hus].filter(h=>st.prio.has(HU[h].p));
+  $("#banner").innerHTML = `<div class="banner"><span>Ruta hasta <b>${short(r.id)}</b> · ${esc(titleOf(r.id))}</span><span class="key">${new Set(hs.map(h=>HU[h].ep)).size} épicas · ${new Set(hs.map(h=>HU[h].ft)).size} features · ${hs.length} HU</span><button class="btn ghost" id="clearRoute">Ver todo</button></div>`;
+}
+function stats(){
+  const G = LEVELS.hu, vw = core.view(G, i => G.hus[i].some(h=>st.prio.has(h.p)));
+  const hs = M.hus.filter(h=>st.prio.has(h.p));
+  $("#stats").innerHTML = [[new Set(hs.map(h=>h.ep)).size,"épicas"],[new Set(hs.map(h=>h.ft)).size,"features"],[hs.length,"HU"],[vw.steps,"pasos"]].map(([b,s])=>`<div><b>${b}</b><span>${s}</span></div>`).join("");
+}
+
+/* ---------- Ruta ---------- */
+function navTo(nav){
+  const [kind, a, id, lvl] = nav.split("|");
+  st.route = null; $("#routeIn").value = ""; st.zoom = 1;
+  if(kind==="focus"){ st.focus = {from:a, id}; st.lvl = lvl; st.sel = null; }
+  else if(a==="ep"){ st.focus = null; st.lvl = "ep"; st.sel = id; }
+  else { st.focus = {from:"ep", id:M.fts[id].ep}; st.lvl = "ft"; st.sel = id; }
+  remember(); render();
+}
+function setRoute(id){
+  st.focus = null;
+  st.route = id ? {id, hus: routeHUs(id)} : null;
+  st.sel = null; st.zoom = 1;
+  $("#routeIn").value = st.route ? `${id} · ${titleOf(id)}` : ""; render();
+}
+function routeText(){
+  const steps = routeSteps();
+  return `Ruta hasta ${st.route.id} · ${titleOf(st.route.id)}\n` + Object.keys(steps).sort((a,b)=>a-b).map(k=>`\nPaso ${k}\n` + steps[k].sort().map(id=>`- ${id} · ${HU[id].t} (${HU[id].ep})`).join("\n")).join("\n");
+}
+
+/* ---------- Arrastre ---------- */
+let drag = null;
+function svgPoint(e){ const svg = $("#svg"), pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; return pt.matrixTransform(svg.getScreenCTM().inverse()); }
+$("#canvas").addEventListener("pointerdown", e => {
+  const g = e.target.closest(".node");
+  if(!g){ drag = {bg:true, sx:e.clientX, sy:e.clientY}; return; }
+  const p = svgPoint(e), id = g.dataset.id;
+  drag = {id, g, dx:p.x-CUR.pos[id].x, dy:p.y-CUR.pos[id].y, sx:e.clientX, sy:e.clientY, moved:false};
+  g.setPointerCapture(e.pointerId);
+});
+$("#canvas").addEventListener("pointermove", e => {
+  if(!drag || drag.bg) return;
+  if(!drag.moved && Math.hypot(e.clientX-drag.sx, e.clientY-drag.sy) < 5) return;
+  drag.moved = true; drag.g.classList.add("dragging");
+  const p = svgPoint(e), S = core.SIZE[st.lvl];
+  const x = p.x - drag.dx, y = p.y - drag.dy;
+  CUR.pos[drag.id] = {x, y};
+  (st.pos[viewKey()] ||= {})[drag.id] = {x, y};
+  drag.g.setAttribute("transform", `translate(${x-S.width/2},${y-S.height/2})`);
+  document.querySelectorAll(".edge").forEach(el => { if(el.dataset.a===drag.id || el.dataset.b===drag.id) el.setAttribute("d", edgePath(el.dataset.a, el.dataset.b)); });
+});
+$("#canvas").addEventListener("pointerup", e => {
+  if(!drag) return; const d = drag; drag = null;
+  if(d.bg){ if(Math.hypot(e.clientX-d.sx, e.clientY-d.sy) < 5 && st.sel){ st.sel = null; render(); } return; }
+  d.g.classList.remove("dragging");
+  if(d.moved){ $("#relayout").hidden = false; return; }
+  st.sel = st.sel===d.id ? null : d.id; render();
+});
+
+/* ---------- Eventos ---------- */
+document.addEventListener("click", e => {
+  const t = e.target;
+  const lv = t.closest("#lvlSeg button"); if(lv){ st.lvl = lv.dataset.l; st.sel = null; st.focus = null; st.zoom = 1; remember(); render(); return; }
+  const nv = t.closest("[data-nav]"); if(nv){ navTo(nv.dataset.nav); return; }
+  if(t.closest("#clearFocus")){ st.focus = null; st.sel = null; st.zoom = 1; render(); return; }
+  const chip = t.closest("#prioChips .chip"); if(chip){ const k = chip.dataset.p; if(st.prio.has(k) && st.prio.size>1) st.prio.delete(k); else st.prio.add(k); st.zoom = 1; prioChips(); if(st.route) st.route.hus = routeHUs(st.route.id); render(); return; }
+  const s = t.closest("[data-sel]"); if(s){ st.sel = s.dataset.sel; render(); return; }
+  const gh = t.closest("[data-gohu]"); if(gh){ st.lvl = "hu"; st.sel = gh.dataset.gohu; if(!st.prio.has(HU[st.sel].p)){ st.prio.add(HU[st.sel].p); prioChips(); } remember(); render(); return; }
+  const r = t.closest("[data-route]"); if(r){ setRoute(r.dataset.route); return; }
+  if(t.closest("#closeDrawer")){ st.sel = null; render(); return; }
+  if(t.closest("#glosBtn")){ st.sel = null; render(); renderGlosario(); return; }
+  if(t.closest("#closeGlos")){ $("#drawer").hidden = true; return; }
+  if(t.closest("#clearRoute") || t.closest("#clearRoute2") || t.closest("#clearRoute3")){ setRoute(null); return; }
+  if(t.closest("#zoomIn")){ st.zoom = Math.min(3, +(st.zoom*1.25).toFixed(3)); drawSvg(); return; }
+  if(t.closest("#zoomOut")){ st.zoom = Math.max(0.4, +(st.zoom/1.25).toFixed(3)); drawSvg(); return; }
+  if(t.closest("#zoomFit")){ st.zoom = 1; drawSvg(); return; }
+  if(t.closest("#relayout")){ delete st.pos[viewKey()]; render(); return; }
+  if(t.closest("#copyRoute")){
+    const txt = routeText(), out = $("#copied");
+    const fallback = () => { out.innerHTML = `Selecciona el texto y cópialo:<textarea class="fallback" readonly>${esc(txt)}</textarea>`; out.querySelector("textarea").select(); };
+    try{ navigator.clipboard.writeText(txt).then(()=>{ out.textContent = "Lista copiada."; }, fallback); }catch(_){ fallback(); }
+  }
+});
+document.addEventListener("keydown", e => {
+  if((e.key==="Enter"||e.key===" ") && e.target.matches?.(".node")){ e.preventDefault(); const id = e.target.dataset.id; st.sel = st.sel===id ? null : id; render(); }
+  if(e.key==="Escape" && st.sel){ st.sel = null; render(); }
+});
+$("#routeIn").addEventListener("change", e => {
+  const v = e.target.value.trim(); if(!v){ setRoute(null); return; }
+  const id = v.split(" · ")[0].trim().toUpperCase();
+  if(HU[id] || M.fts[id] || M.eps[id]){ st.lvl = st.lvl; setRoute(id); }
+});
+let rz; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(render, 150); });
+
+function prioChips(){
+  $("#prioChips").innerHTML = PORDER.map(k=>`<button class="chip" data-p="${k}" aria-pressed="${st.prio.has(k)}" title="${PRIO_TXT[k]}"><i class="sw ${k}"></i>${PRIO[k]} <span class="key">${M.hus.filter(h=>h.p===k).length}</span></button>`).join("");
+}
+$("#eyebrow").textContent = CFG.eyebrow || "";
+if(CFG.docNotesHtml){ const li = $("#docDiffs"); li.innerHTML = CFG.docNotesHtml; li.hidden = false; }
+$("#routeList").innerHTML = [...epIds.map(e=>[e,M.eps[e].t]), ...Object.keys(M.fts).sort().map(f=>[f,M.fts[f].t]), ...M.hus.map(h=>[h.id,h.t])].map(([id,t])=>`<option value="${esc(id+" · "+t)}"></option>`).join("");
+$("#prioList").innerHTML = PORDER.map(k=>`<span><i class="sw ${k}"></i><b>${PRIO[k]}</b>: ${PRIO_TXT[k]}</span>`).join("");
+prioChips(); render();
+</script>

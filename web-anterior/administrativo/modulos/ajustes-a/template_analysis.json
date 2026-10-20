@@ -1,0 +1,5827 @@
+{
+  "scripts__restaurantpe__ajustes__salones__salones-editar.html": {
+    "file": "scripts__restaurantpe__ajustes__salones__salones-editar.html",
+    "size": 2198,
+    "ng_models": [
+      "vm.salon.salon_costoporreserva",
+      "vm.salon.salon_descripcion",
+      "vm.salon.salon_estado"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.fnActualizarSalon()",
+      "vm.fnAgregarSalon()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar",
+      "Modificar"
+    ],
+    "table_headers": [],
+    "input_count": 3,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__categoriaanularventa__bc-form.html": {
+    "file": "scripts__restaurantpe__ajustes__categoriaanularventa__bc-form.html",
+    "size": 412,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__monedas__bc-form.html": {
+    "file": "scripts__restaurantpe__ajustes__monedas__bc-form.html",
+    "size": 326,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__proveedorfe__modals__modal-actualizacomprobante.html": {
+    "file": "scripts__restaurantpe__ajustes__proveedorfe__modals__modal-actualizacomprobante.html",
+    "size": 2374,
+    "ng_models": [
+      "vm.comprobante.comprobante_estado",
+      "vm.comprobante.comprobante_numero",
+      "vm.comprobante.comprobante_predeterminado",
+      "vm.comprobante.comprobante_serie"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnCancel()",
+      "vm.fnGuardar()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar"
+    ],
+    "table_headers": [],
+    "input_count": 4,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__callcenter__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__callcenter__bc-index.html",
+    "size": 122,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__salones__breadcrumb-mesa.html": {
+    "file": "scripts__restaurantpe__ajustes__salones__breadcrumb-mesa.html",
+    "size": 564,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__capacitacion__bc-form.html": {
+    "file": "scripts__restaurantpe__ajustes__capacitacion__bc-form.html",
+    "size": 356,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__zonalocal__editar.html": {
+    "file": "scripts__restaurantpe__ajustes__zonalocal__editar.html",
+    "size": 2467,
+    "ng_models": [
+      "vm.zonalocal.zonalocal_costodelivery",
+      "vm.zonalocal.zonalocal_descripcion",
+      "vm.zonalocal.zonalocal_estado"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.fnActualizar()",
+      "vm.fnAgregar()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar",
+      "Modificar"
+    ],
+    "table_headers": [],
+    "input_count": 3,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__integracion__erpcanal-conexion.html": {
+    "file": "scripts__restaurantpe__ajustes__integracion__erpcanal-conexion.html",
+    "size": 11706,
+    "ng_models": [
+      "loc.seleccionado",
+      "tab12.modoEmision",
+      "tab12.todosSel",
+      "vm.erpContableConexion.clave",
+      "vm.erpContableConexion.empresaSel",
+      "vm.erpContableConexion.url",
+      "vm.erpContableConexion.usuario",
+      "vm.erpContableEmision.cajaId",
+      "vm.erpContableEmision.habilitado",
+      "vm.erpContableEmision.localId"
+    ],
+    "ng_clicks_sample": [
+      "vm.buscarEmpresasErpContableRuc()",
+      "vm.conectarEmpresaErpContableRuc()",
+      "vm.guardarEmisionErpContable()"
+    ],
+    "buttons": [
+      "Buscar empresa en el ERP",
+      "Guardar el punto de emisión"
+    ],
+    "table_headers": [],
+    "input_count": 9,
+    "select_count": 1,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__comprobantes__verlog.html": {
+    "file": "scripts__restaurantpe__ajustes__comprobantes__verlog.html",
+    "size": 2137,
+    "ng_models": [
+      "vm.comprobante.comprobante_numero",
+      "vm.comprobante.comprobante_serie"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.abrirNuevaImpresora()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Ver detalle log"
+    ],
+    "table_headers": [
+      "Fecha cambio",
+      "Usuario",
+      "Comentario",
+      "Opcion"
+    ],
+    "input_count": 2,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__integracion__erp-selector-demo.html": {
+    "file": "scripts__restaurantpe__ajustes__integracion__erp-selector-demo.html",
+    "size": 10069,
+    "ng_models": [
+      "vm.almacenSel",
+      "vm.cajaSel",
+      "vm.cuentaSel",
+      "vm.sucursalSel",
+      "vm.sucursalSel2",
+      "vm.sucursalSel3"
+    ],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__sucursales__modals__modalVerUbicacion.view.html": {
+    "file": "scripts__restaurantpe__ajustes__sucursales__modals__modalVerUbicacion.view.html",
+    "size": 1387,
+    "ng_models": [],
+    "ng_clicks_sample": [
+      "vm.fnCancelar()"
+    ],
+    "buttons": [
+      "&times;",
+      "Cerrar"
+    ],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__capacitacion__index.html": {
+    "file": "scripts__restaurantpe__ajustes__capacitacion__index.html",
+    "size": 11210,
+    "ng_models": [
+      "vm.filtros.administrativaObj",
+      "vm.filtros.estadoObj",
+      "vm.filtros.implementoinsumoObj",
+      "vm.filtros.implementorecetaObj",
+      "vm.filtros.logisticaObj",
+      "vm.filtros.modalidadObj",
+      "vm.filtros.modoCapacitacionObj",
+      "vm.filtros.operativaObj",
+      "vm.filtros.plataformaObj",
+      "vm.filtros.productoObj",
+      "vm.filtros.tipoCapacitacionObj",
+      "vm.paginaActual",
+      "vm.paginacionSeleccionada",
+      "vm.valBusqueda"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnCargarCapacitaciones()",
+      "vm.fnObtenerPorId(capacitacion.capacitacionbi_id);$state.go(",
+      "vm.resetearCapacitacionObjeto();$state.go("
+    ],
+    "buttons": [
+      "Editar",
+      "Nueva Capacitacion"
+    ],
+    "table_headers": [
+      "Id",
+      "link Dominio",
+      "Plataforma",
+      "Producto",
+      "Capacitador",
+      "Gastos",
+      "Modo Capacitacion",
+      "Tipo Capacitacion",
+      "Duracion",
+      "Link Acta",
+      "Link Evaluacion",
+      "Link Drive Capacitacion",
+      "Motivo Capacitacion",
+      "Modalidad",
+      "Fecha Capacitacion",
+      "Fecha Reprograma",
+      "Estado",
+      "Operativa",
+      "Administrativa",
+      "Imp Insumo",
+      "Imp Receta",
+      "Logistica",
+      "LocalBI",
+      "Acciones"
+    ],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__opcionessistema__modal__opsistverdetallelog-modal.html": {
+    "file": "scripts__restaurantpe__ajustes__opcionessistema__modal__opsistverdetallelog-modal.html",
+    "size": 1571,
+    "ng_models": [],
+    "ng_clicks_sample": [
+      "vm.emitEvent();vm.fnCancelar()",
+      "vm.getLogPorLogTablaIdConfigLocal(logtabla.usuario.usuario_id,logtabla.logtabla_fecharegistro)"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Ver"
+    ],
+    "table_headers": [
+      "Fecha",
+      "Usuario",
+      "Opcion Sistema",
+      "Campo modificado",
+      "Valor anterior",
+      "Valor nuevo"
+    ],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 2
+  },
+  "scripts__restaurantpe__ajustes__sucursales__map__control.view.html": {
+    "file": "scripts__restaurantpe__ajustes__sucursales__map__control.view.html",
+    "size": 94,
+    "ng_models": [],
+    "ng_clicks_sample": [
+      "vm.controlClick()"
+    ],
+    "buttons": [
+      "Obtener ubicacion"
+    ],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__impresoras__cajas-tabla.html": {
+    "file": "scripts__restaurantpe__ajustes__impresoras__cajas-tabla.html",
+    "size": 2755,
+    "ng_models": [
+      "comprobante.comprobante_imprimelogo",
+      "comprobante.impresora"
+    ],
+    "ng_clicks_sample": [
+      "comprobante.editando = !comprobante.editando",
+      "comprobante.editando = !comprobante.editando;vm.fnVincularCajaImpresora(comprobante)",
+      "vm.fnTestImpresora(comprobante.impresora)"
+    ],
+    "buttons": [
+      "Editar",
+      "Guardar",
+      "Probar"
+    ],
+    "table_headers": [
+      "Caja",
+      "Comprobante",
+      "Impresora",
+      "Imprime logo",
+      "Acciones"
+    ],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__sucursales__modals__modalVerZonaReparto.view.html": {
+    "file": "scripts__restaurantpe__ajustes__sucursales__modals__modalVerZonaReparto.view.html",
+    "size": 1072,
+    "ng_models": [],
+    "ng_clicks_sample": [
+      "vm.fnCancelarModal()"
+    ],
+    "buttons": [
+      "&times;",
+      "Cancelar"
+    ],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__movilidad__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__movilidad__bc-index.html",
+    "size": 128,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__comprobantes__modals__impresora-modal.html": {
+    "file": "scripts__restaurantpe__ajustes__comprobantes__modals__impresora-modal.html",
+    "size": 2949,
+    "ng_models": [
+      "vm.impresora.impresora_ip",
+      "vm.impresora.impresora_nombre",
+      "vm.impresora.impresora_serie",
+      "vm.tipoImpresoraSeleccionada"
+    ],
+    "ng_clicks_sample": [
+      "vm.emitEvent();vm.cerrarModal()",
+      "vm.fnAgregar()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar"
+    ],
+    "table_headers": [],
+    "input_count": 3,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__reuniones__editar.html": {
+    "file": "scripts__restaurantpe__ajustes__reuniones__editar.html",
+    "size": 8083,
+    "ng_models": [
+      "vm.devObj",
+      "vm.localSeleccionado",
+      "vm.pickerFechasolicitud.fechas.startDate",
+      "vm.reunion.reunion_acta",
+      "vm.reunion.reunion_asunto",
+      "vm.reunion.reunion_clientes",
+      "vm.reunion.reunion_descripcion",
+      "vm.reunion.reunion_duracion",
+      "vm.reunion.reunion_horainicio",
+      "vm.reunion.reunion_observaciones",
+      "vm.reunion.reunion_sucursal",
+      "vm.reunion.reunion_teamrestaurant"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.fnActualizar()",
+      "vm.fnAgregar()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar",
+      "Modificar"
+    ],
+    "table_headers": [],
+    "input_count": 8,
+    "select_count": 0,
+    "textarea_count": 2,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__integracion__modals__modalIntegracionCulqui.html": {
+    "file": "scripts__restaurantpe__ajustes__integracion__modals__modalIntegracionCulqui.html",
+    "size": 2455,
+    "ng_models": [
+      "vm.integracion.integracion_clavepublica",
+      "vm.integracion.integracion_clavesecreta",
+      "vm.integracion.integracion_valoraux1"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnCancelar()",
+      "vm.fnIntegrarLocal()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Integrar"
+    ],
+    "table_headers": [],
+    "input_count": 3,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__cajas__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__cajas__bc-index.html",
+    "size": 107,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__pos__index.html": {
+    "file": "scripts__restaurantpe__ajustes__pos__index.html",
+    "size": 3733,
+    "ng_models": [
+      "vm.paginaActual",
+      "vm.paginacionSeleccionada",
+      "vm.valBusqueda"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnCargarPosList()",
+      "vm.fnObtenerPorId(pos.pos_id);$state.go(",
+      "vm.pos.resetearPosObjeto();$state.go("
+    ],
+    "buttons": [
+      "Editar",
+      "Nueva Integración POS"
+    ],
+    "table_headers": [
+      "Nombre",
+      "Tipo",
+      "Serie",
+      "Proveedor",
+      "Acciones"
+    ],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__zonalocal__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__zonalocal__bc-index.html",
+    "size": 124,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__reuniones__bc-form.html": {
+    "file": "scripts__restaurantpe__ajustes__reuniones__bc-form.html",
+    "size": 338,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__motivosoperacion__editar.html": {
+    "file": "scripts__restaurantpe__ajustes__motivosoperacion__editar.html",
+    "size": 2670,
+    "ng_models": [
+      "vm.motivoOperacion.categoriamotivooperacion_descripcion",
+      "vm.motivoOperacion.categoriamotivooperacion_estado",
+      "vm.motivoOperacion.categoriamotivooperacion_tipo"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.fnActualizar()",
+      "vm.fnAgregar()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar",
+      "Modificar"
+    ],
+    "table_headers": [],
+    "input_count": 2,
+    "select_count": 1,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__produccion__index.html": {
+    "file": "scripts__restaurantpe__ajustes__produccion__index.html",
+    "size": 9637,
+    "ng_models": [
+      "vm.cantidadesPorPaginaAlmacenes",
+      "vm.cantidadesPorPaginaAreaproduccion",
+      "vm.paginaActualAlmacen",
+      "vm.paginaActualArea",
+      "vm.valBusquedaAlmacen",
+      "vm.valBusquedaAreas"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnCargarAlmacenes()",
+      "vm.fnCargarProduccions()",
+      "vm.fnNuevaProduccion();",
+      "vm.fnNuevaProduccion();$state.go(",
+      "vm.fnNuevoAlmacen();",
+      "vm.fnNuevoAlmacen();$state.go(",
+      "vm.fnObtenerAlmacenPorId(almacen.almacen_id);$state.go(",
+      "vm.fnObtenerLogtablaAlmacenPorId(vm.almacen.almacen_id,vm.almacen.almacen_descripcion,",
+      "vm.fnObtenerLogtablaPorId(vm.produccion.areaproduccion_id,vm.produccion.areaproduccion_descripcion,",
+      "vm.fnObtenerPorId(area.areaproduccion_id);$state.go("
+    ],
+    "buttons": [
+      "Editar",
+      "Nueva Área de producción",
+      "Nueva área de producción",
+      "Nuevo Almacén",
+      "Nuevo almacén",
+      "Ver ultimas actualizaciones"
+    ],
+    "table_headers": [
+      "Nombre",
+      "Almacén",
+      "Impresora",
+      "¿Imprime comandas?",
+      "Estado",
+      "Acciones",
+      "Nombre",
+      "Estado",
+      "Acciones"
+    ],
+    "input_count": 2,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 2
+  },
+  "scripts__restaurantpe__ajustes__filtros.html": {
+    "file": "scripts__restaurantpe__ajustes__filtros.html",
+    "size": 647,
+    "ng_models": [
+      "$parent.cantidadPorPagina",
+      "$parent.valBusqueda"
+    ],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 1,
+    "select_count": 1,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__categoriaanularventa__index.html": {
+    "file": "scripts__restaurantpe__ajustes__categoriaanularventa__index.html",
+    "size": 4118,
+    "ng_models": [
+      "vm.paginaActual",
+      "vm.paginacionSeleccionada",
+      "vm.valBusqueda"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.fnCargarCategoriaAnularVenta()",
+      "vm.setCategoriaanularventa(categoriaanularventa);$state.go("
+    ],
+    "buttons": [
+      "Editar",
+      "Nueva categoria"
+    ],
+    "table_headers": [
+      "Descripción",
+      "Estado",
+      "Acciones"
+    ],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__imagen-self-service__bc-form.html": {
+    "file": "scripts__restaurantpe__ajustes__imagen-self-service__bc-form.html",
+    "size": 120,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__sucursales__editar.html": {
+    "file": "scripts__restaurantpe__ajustes__sucursales__editar.html",
+    "size": 41548,
+    "ng_models": [
+      "vm.fondoSeleccionado",
+      "vm.local_apptelefonocontacto",
+      "vm.paisSeleccionado",
+      "vm.sucursal.estadoOnOff",
+      "vm.sucursal.local_aceptaefectivopordelivery",
+      "vm.sucursal.local_aceptamposvisa",
+      "vm.sucursal.local_aceptatarjetapordelivery",
+      "vm.sucursal.local_calle",
+      "vm.sucursal.local_cartagenerica",
+      "vm.sucursal.local_categorianegocio",
+      "vm.sucursal.local_coddistritoubigeo",
+      "vm.sucursal.local_codigocomercio",
+      "vm.sucursal.local_codpais",
+      "vm.sucursal.local_condicionesmenuonline",
+      "vm.sucursal.local_correodeliverypersonalizado",
+      "vm.sucursal.local_costodelivery",
+      "vm.sucursal.local_deliverymenuonline",
+      "vm.sucursal.local_deliveryprogramadomenuonline",
+      "vm.sucursal.local_departamento",
+      "vm.sucursal.local_descripcion",
+      "vm.sucursal.local_direccion",
+      "vm.sucursal.local_direccionfiscal",
+      "vm.sucursal.local_distrito",
+      "vm.sucursal.local_email",
+      "vm.sucursal.local_encargado",
+      "vm.sucursal.local_fechautorizacionsalvador",
+      "vm.sucursal.local_mensajeprecuenta",
+      "vm.sucursal.local_montominimo",
+      "vm.sucursal.local_nombrecomercial",
+      "vm.sucursal.local_nrc",
+      "vm.sucursal.local_numeroautorizacion",
+      "vm.sucursal.local_pagoenlineamenuonline",
+      "vm.sucursal.local_pagotransferenciamenuonline",
+      "vm.sucursal.local_permitecomprobantemenuonline",
+      "vm.sucursal.local_pieticket",
+      "vm.sucursal.local_porcentajepropina",
+      "vm.sucursal.local_propinasautomaticas",
+      "vm.sucursal.local_provincia",
+      "vm.sucursal.local_razonsocial",
+      "vm.sucursal.local_recojomenuonline",
+      "vm.sucursal.local_resolucionsalvador",
+      "vm.sucursal.local_ruc",
+      "vm.sucursal.local_serie",
+      "vm.sucursal.local_solopagoenlinea",
+      "vm.sucursal.local_telefono",
+      "vm.sucursal.local_tiempomaximodelivery",
+      "vm.sucursal.local_tiempominimodelivery",
+      "vm.sucursal.local_urbanizacion",
+      "vm.sucursal.local_urlcatalogo",
+      "vm.sucursal.local_urlfacebook",
+      "vm.sucursal.local_urlinstagram",
+      "vm.sucursal.local_urlterminosycondiciones",
+      "vm.sucursal.local_zonahoraria",
+      "vm.sucursal.zonalocal_id",
+      "vm.tipoPropinaSeleccionada"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "Utility.fnVerImagenGenerico(",
+      "imagenlocal.enEdicion = false; vm.ActualizarImagenLocal(imagenlocal)",
+      "imagenlocal.enEdicion = true",
+      "vm.AbrirModalPdfQRPersonalizado()",
+      "vm.abrirEnlaceMenuEnlinea()",
+      "vm.abrirModalImagenLocal()",
+      "vm.fnActualizar()",
+      "vm.fnEliminarImagenLocal(imagenlocal.imagenlocal_id, $index);",
+      "vm.fnObtenerLogtablaPorId(vm.sucursal.local_id,vm.sucursal.local_descripcion,",
+      "vm.fnOpenModalHorarioAtencion(2)",
+      "vm.fnOpenModalHorarioAtencion(3)",
+      "vm.fnOpenModalHorarioAtencion(4)",
+      "vm.fnOpenModalHorarioAtencion(5)",
+      "vm.fnOpenModalPixel()"
+    ],
+    "buttons": [
+      "ADM Cloud",
+      "Agregar una imágen",
+      "CONCAR CB",
+      "CONCAR V.2",
+      "CONCAT - WSAHI",
+      "Cambiar imagen",
+      "Cancelar",
+      "DEFONTANA",
+      "ECB CONT",
+      "Editar",
+      "Editar datos fiscales",
+      "Elegir una Imágen",
+      "Elige tu logo",
+      "Eliminar",
+      "FE - Altheanet",
+      "Guardar",
+      "Imprimir QR personalizado",
+      "Modificar",
+      "Orden Compra SAP | SAP BUSINESS ONE",
+      "Parametros para Exportables",
+      "Parametros para Integraciones",
+      "SAP",
+      "SAP B1",
+      "SISCON",
+      "SISCON TXT",
+      "STARSOFT",
+      "Subir mi carta en PDF",
+      "Ver imagen",
+      "Ver ultimas actualizaciones"
+    ],
+    "table_headers": [
+      "Tipo",
+      "Nombre",
+      "Descripción",
+      "Orden",
+      "Acciones"
+    ],
+    "input_count": 49,
+    "select_count": 2,
+    "textarea_count": 3,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__impuestos__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__impuestos__bc-index.html",
+    "size": 128,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__motivosoperacion__index.html": {
+    "file": "scripts__restaurantpe__ajustes__motivosoperacion__index.html",
+    "size": 4617,
+    "ng_models": [
+      "vm.paginaActual",
+      "vm.paginacionSeleccionada",
+      "vm.valBusqueda"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnCargarMotivosOperacionList()",
+      "vm.fnObtenerPorId(motivosOperacion.categoriamotivooperacion_id);$state.go(",
+      "vm.motivoOperacion.resetearMotivoOperacionObjeto();$state.go("
+    ],
+    "buttons": [
+      "Editar",
+      "Nuevo motivo de operación"
+    ],
+    "table_headers": [
+      "Descripción",
+      "Estado",
+      "Tipo",
+      "Acciones"
+    ],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__integracion__bc-configuracioncartarappi.html": {
+    "file": "scripts__restaurantpe__ajustes__integracion__bc-configuracioncartarappi.html",
+    "size": 186,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__gestiondocumentosrecibidosfe__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__gestiondocumentosrecibidosfe__bc-index.html",
+    "size": 164,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__categoriaanularventa__editar.html": {
+    "file": "scripts__restaurantpe__ajustes__categoriaanularventa__editar.html",
+    "size": 2150,
+    "ng_models": [
+      "vm.categoriaAnularVenta.categoriaanularventa_descripcion",
+      "vm.categoriaAnularVenta.categoriaanularventa_estado"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.actualizar()",
+      "vm.agregar()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar",
+      "Modificar"
+    ],
+    "table_headers": [],
+    "input_count": 2,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__callcenter__bc-nuevacoberturalocal.html": {
+    "file": "scripts__restaurantpe__ajustes__callcenter__bc-nuevacoberturalocal.html",
+    "size": 185,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__tarjetas__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__tarjetas__bc-index.html",
+    "size": 126,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__sucursales__modals__parametrocontable.view.html": {
+    "file": "scripts__restaurantpe__ajustes__sucursales__modals__parametrocontable.view.html",
+    "size": 49605,
+    "ng_models": [
+      "categoriaegreso.nro_cuenta",
+      "categoriasalida.nro_cuenta",
+      "fe_fechalimite.fechas.startDate",
+      "fe_vigencia.fechas.startDate",
+      "formapago.formapago_caja",
+      "formapago.formapago_cta",
+      "producto.codArt",
+      "producto.codLinea",
+      "producto.descripcion",
+      "tarjeta.nro_cuenta",
+      "vm.parametros.admcloud_cajadefault",
+      "vm.parametros.admcloud_consumidorfinalid",
+      "vm.parametros.admcloud_descripcionarticulo",
+      "vm.parametros.admcloud_ubicacion",
+      "vm.parametros.altheanet_claveunidad",
+      "vm.parametros.altheanet_codigoservicio",
+      "vm.parametros.codigo_centro_de_costo_defontana",
+      "vm.parametros.codigo_centro_de_costo_sap",
+      "vm.parametros.concar_701111",
+      "vm.parametros.concar_anexo_121201",
+      "vm.parametros.concar_anexo_701111",
+      "vm.parametros.concat_centrocosto",
+      "vm.parametros.concat_cuentacobrarboleta",
+      "vm.parametros.concat_cuentacobrarfactura",
+      "vm.parametros.concat_cuentaingresos",
+      "vm.parametros.concat_cuentapagarfactura_dolares",
+      "vm.parametros.concat_cuentapagarfactura_soles",
+      "vm.parametros.concat_idalmacenflete",
+      "vm.parametros.concat_ides3",
+      "vm.parametros.concat_idmarcaflete",
+      "vm.parametros.concat_idmarcamaster",
+      "vm.parametros.concat_idpais",
+      "vm.parametros.concat_idzona",
+      "vm.parametros.concat_origencorrelativo",
+      "vm.parametros.concat_subcanalglovo",
+      "vm.parametros.concat_ubigeo",
+      "vm.parametros.concat_urldominio",
+      "vm.parametros.concat_user",
+      "vm.parametros.cuenta_caja_chica",
+      "vm.parametros.cuenta_de_caja_efectivo",
+      "vm.parametros.cuenta_fondos_de_monedas",
+      "vm.parametros.cuentasAsientoCostoBase[key]",
+      "vm.parametros.cuentasAsientoDiferencia[key]",
+      "vm.parametros.cuentasAsientoTransferencia[key]",
+      "vm.parametros.cuentasAsientoVentas[key]",
+      "vm.parametros.ecbcont_centrocosto",
+      "vm.parametros.ecbcont_codentidad",
+      "vm.parametros.ecbcont_cuentadebecont",
+      "vm.parametros.ecbcont_cuentadebecred",
+      "vm.parametros.ecbcont_cuentahaber",
+      "vm.parametros.ecbcont_cuentaicbper",
+      "vm.parametros.ecbcont_cuentaigv",
+      "vm.parametros.ecbcont_cuentaisc",
+      "vm.parametros.ecbcont_cuentaoth",
+      "vm.parametros.sap_accountcode",
+      "vm.parametros.sap_cardcode",
+      "vm.parametros.sap_costingcode",
+      "vm.parametros.sap_costingcode2",
+      "vm.parametros.sap_costingcode3",
+      "vm.parametros.sap_costingcode4",
+      "vm.parametros.sap_proyectcode",
+      "vm.parametros.sap_serieboleta",
+      "vm.parametros.sap_seriefactura",
+      "vm.parametros.sap_whscode",
+      "vm.parametros.sapb1_codcliente",
+      "vm.parametros.sapb1_codtienda",
+      "vm.parametros.sapb1_descripcioncliente",
+      "vm.parametros.siscon_ctacobrar",
+      "vm.parametros.siscon_ctacosto",
+      "vm.parametros.siscon_ctadebe",
+      "vm.parametros.siscon_ctahaber",
+      "vm.parametros.siscon_ctahaberdefault",
+      "vm.parametros.siscon_ctaigv",
+      "vm.parametros.siscon_ctaingreso",
+      "vm.parametros.siscon_ctaotros",
+      "vm.parametros.siscon_glosadebe",
+      "vm.parametros.siscon_glosahaber",
+      "vm.parametros.siscon_glosatienda",
+      "vm.parametros.siscon_pagoglosa",
+      "vm.parametros.siscon_pctacobrar",
+      "vm.parametros.siscon_porigen",
+      "vm.parametros.siscon_presupuesto",
+      "vm.parametros.siscon_tablaorigen",
+      "vm.parametros.siscon_tipocambiodolares",
+      "vm.parametros.siscon_tipocambiosoles",
+      "vm.parametros.siscon_vouorigen",
+      "vm.parametros.starsoft_anexoBV",
+      "vm.parametros.starsoft_anexoFT",
+      "vm.parametros.starsoft_anexoNBV",
+      "vm.parametros.starsoft_anexoNFT",
+      "vm.parametros.starsoft_cuenta12",
+      "vm.parametros.starsoft_cuenta40",
+      "vm.parametros.starsoft_cuenta70",
+      "vm.parametros.starsoft_mostrarsigla",
+      "vm.parametros.starsoft_subdiarioBV",
+      "vm.parametros.starsoft_subdiarioFT",
+      "vm.productobusqueda.codArt",
+      "vm.productobusqueda.codLinea",
+      "vm.productobusqueda.descripcion"
+    ],
+    "ng_clicks_sample": [
+      "vm.agregarItemArtSAPB1()",
+      "vm.eliminarItemArtSAPB1($index);",
+      "vm.fnCancelar()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar"
+    ],
+    "table_headers": [
+      "Cod. Articulo",
+      "Descripción",
+      "Cod. Linea",
+      "Acción",
+      "Cod. Articulo",
+      "Descripción",
+      "Cod. Linea",
+      "Acción",
+      "Tarjeta (Estado)",
+      "Cuenta Contable",
+      "Descripcion (Estado)",
+      "Cuenta Contable",
+      "Tarjeta (Estado)",
+      "Cuenta Contable",
+      "Descripcion (Estado)",
+      "Cuenta Contable",
+      "Descripcion (Estado)",
+      "Cuenta Contable"
+    ],
+    "input_count": 102,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 7
+  },
+  "scripts__restaurantpe__ajustes__zonalocal__bc-form.html": {
+    "file": "scripts__restaurantpe__ajustes__zonalocal__bc-form.html",
+    "size": 323,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__contrato__index.html": {
+    "file": "scripts__restaurantpe__ajustes__contrato__index.html",
+    "size": 2056,
+    "ng_models": [],
+    "ng_clicks_sample": [
+      "vm.fnDescargarPDF()"
+    ],
+    "buttons": [
+      "&nbsp; Descargar PDF"
+    ],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__integracion__modals__modal-mapeos-erpcontable.html": {
+    "file": "scripts__restaurantpe__ajustes__integracion__modals__modal-mapeos-erpcontable.html",
+    "size": 22806,
+    "ng_models": [
+      "row.almacenErp",
+      "row.centroCostoErp",
+      "row.docTipoErp",
+      "row.formaPagoErp",
+      "row.formaPagoPos",
+      "row.motivoErp",
+      "row.pagoTipo",
+      "row.porcentaje",
+      "row.recaudador",
+      "row.tarjeta",
+      "row.tiposImpuestoErp",
+      "row.tributoSel",
+      "vm.centroCostoDefault",
+      "vm.unidadDefault"
+    ],
+    "ng_clicks_sample": [
+      "row.almacenErp = null",
+      "row.centroCostoErp = null",
+      "row.docTipoErp = null",
+      "row.formaPagoErp = null",
+      "row.formaPagoPos = null",
+      "row.motivoErp = null",
+      "row.pagoTipo = null; vm.onPagoTipoCambio(row)",
+      "row.recaudador = null",
+      "row.tarjeta = null",
+      "row.tiposImpuestoErp = null",
+      "row.tributoSel = null",
+      "vm.agregarFilaFormaPago()",
+      "vm.agregarFilaImpuestoCompra()",
+      "vm.cancelar()",
+      "vm.centroCostoDefault = null"
+    ],
+    "buttons": [
+      "&times;",
+      "Agregar forma de pago",
+      "Agregar tasa",
+      "Cancelar",
+      "Guardar mapeos"
+    ],
+    "table_headers": [],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 8
+  },
+  "scripts__restaurantpe__ajustes__gestiondocumentosrecibidosfe__index.html": {
+    "file": "scripts__restaurantpe__ajustes__gestiondocumentosrecibidosfe__index.html",
+    "size": 3956,
+    "ng_models": [
+      "vm.rucSeleccionado",
+      "vm.valBusqueda"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnCargarDocumentosRecibidosList()",
+      "vm.seleccionarAccion(seriemanualfe,accion)"
+    ],
+    "buttons": [
+      "Acciones",
+      "Actualizar"
+    ],
+    "table_headers": [
+      "RUT Emisor",
+      "RUT Receptor",
+      "Fecha de Emisión",
+      "Fecha de Registro",
+      "Tipo Documento",
+      "Folio",
+      "Total",
+      "Código Recepción",
+      "Descripción de Código",
+      "Acciones"
+    ],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__llamada__index.html": {
+    "file": "scripts__restaurantpe__ajustes__llamada__index.html",
+    "size": 8309,
+    "ng_models": [
+      "vm.filtros.asesorObj",
+      "vm.filtros.categoriaClienteObj",
+      "vm.filtros.esCapacitacionObj",
+      "vm.filtros.esProblemaObj",
+      "vm.filtros.estadoObj",
+      "vm.filtros.plataformaObj",
+      "vm.filtros.tipoProblemaObj",
+      "vm.paginaActual",
+      "vm.paginacionSeleccionada",
+      "vm.valBusqueda"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnCargarLlamadas()",
+      "vm.fnObtenerPorId(llamada.llamadabi_id);$state.go(",
+      "vm.resetearLlamadaObjeto();$state.go("
+    ],
+    "buttons": [
+      "Editar",
+      "Nueva Llamada"
+    ],
+    "table_headers": [
+      "Id",
+      "Link Dominio",
+      "Asesor",
+      "Estado",
+      "NPS Producto",
+      "NPS Servicio",
+      "Plataforma",
+      "Es Problema",
+      "Tipo Problema",
+      "Capacitacion",
+      "Detalle",
+      "# Incidencias",
+      "Promedio de Incidencias",
+      "Categoria Cliente",
+      "Proxima Llamada",
+      "NPS",
+      "Estado Cliente",
+      "Usa AppManager",
+      "Acciones"
+    ],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__llamada__editar.html": {
+    "file": "scripts__restaurantpe__ajustes__llamada__editar.html",
+    "size": 12748,
+    "ng_models": [
+      "vm.asesorObj",
+      "vm.capacitacionObj",
+      "vm.categoriaclienteObj",
+      "vm.esproblemaObj",
+      "vm.estadoObj",
+      "vm.llamada.llamadabi_detalle",
+      "vm.llamada.llamadabi_npmsservicio",
+      "vm.llamada.llamadabi_npsproducto",
+      "vm.localSeleccionado",
+      "vm.motivoInactividadObj",
+      "vm.nosRecomendariaObj",
+      "vm.pickerFechaBi.fechas.startDate",
+      "vm.plataformaObj",
+      "vm.tipoproblemaObj",
+      "vm.usaAppManagerObj"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.fnActualizar()",
+      "vm.fnAgregar()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar",
+      "Modificar"
+    ],
+    "table_headers": [],
+    "input_count": 4,
+    "select_count": 0,
+    "textarea_count": 1,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__impresoras__areas-tabla.html": {
+    "file": "scripts__restaurantpe__ajustes__impresoras__areas-tabla.html",
+    "size": 3112,
+    "ng_models": [
+      "areaproduccion.areaproduccion_imprimir",
+      "areaproduccion.impresora"
+    ],
+    "ng_clicks_sample": [
+      "areaproduccion.editando = !areaproduccion.editando",
+      "areaproduccion.editando = !areaproduccion.editando; vm.fnVincularAreaImpresora(areaproduccion)",
+      "vm.fnObtenerLogtablaPorIdV2(areaproduccion.areaproduccion_id,areaproduccion.areaproduccion_descripcion,",
+      "vm.fnTestImpresora(areaproduccion.impresora)"
+    ],
+    "buttons": [
+      "Editar",
+      "Guardar",
+      "Probar",
+      "Ver log"
+    ],
+    "table_headers": [
+      "Nombre",
+      "Impresora",
+      "Imprimir comandas",
+      "Acciones"
+    ],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__monedafacturacion__index.html": {
+    "file": "scripts__restaurantpe__ajustes__monedafacturacion__index.html",
+    "size": 4412,
+    "ng_models": [
+      "vm.paginaActual",
+      "vm.paginacionSeleccionada",
+      "vm.valBusqueda"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnCargarMonedafacturacionList()",
+      "vm.fnObtenerLogtablaPorId(vm.monedafacturacion.monedafacturacion_id,vm.monedafacturacion.monedafacturacion_descripcion,",
+      "vm.fnObtenerPorId(monedafacturacion.monedafacturacion_id);$state.go(",
+      "vm.monedafacturacion.resetearMonedafacturacionObjeto();$state.go("
+    ],
+    "buttons": [
+      "Editar",
+      "Nueva moneda de facturación",
+      "Ver ultimas actualizaciones"
+    ],
+    "table_headers": [
+      "Nombre",
+      "Símbolo",
+      "Isocode",
+      "Acciones"
+    ],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__ticket__index.html": {
+    "file": "scripts__restaurantpe__ajustes__ticket__index.html",
+    "size": 6901,
+    "ng_models": [
+      "vm.filtros.asesorObj",
+      "vm.filtros.canalReporteObj",
+      "vm.filtros.categoriaObj",
+      "vm.filtros.complejidadObj",
+      "vm.filtros.estadoObj",
+      "vm.paginaActual",
+      "vm.paginacionSeleccionada",
+      "vm.valBusqueda"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnCargarTickets()",
+      "vm.fnObtenerPorId(ticket.ticketbi_id);$state.go(",
+      "vm.resetearTicketObjeto();$state.go("
+    ],
+    "buttons": [
+      "Editar",
+      "Nueva Ticket"
+    ],
+    "table_headers": [
+      "Id",
+      "Link Dominio",
+      "Fecha",
+      "Canal de Reporte",
+      "Ticket",
+      "Resumen",
+      "F. Tentativa Solucion",
+      "F. Solucion",
+      "Complejidad",
+      "Categoria",
+      "Sub Categoria",
+      "Asesor",
+      "Notifica Area",
+      "Estado",
+      "Acciones"
+    ],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__salones__mesas-lista.html": {
+    "file": "scripts__restaurantpe__ajustes__salones__mesas-lista.html",
+    "size": 5436,
+    "ng_models": [
+      "vm.paginaMesa",
+      "vm.paginacionSeleccionadaMesa",
+      "vm.tipoQRMesaSelecionado",
+      "vm.valBusquedaMesas"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnAbrirModalPdfQr()",
+      "vm.fnCargarMesas()",
+      "vm.fnDesactiVarMesa(false,mesa)",
+      "vm.fnDesactiVarMesa(true,mesa)",
+      "vm.fnNuevaMesa();$state.go(",
+      "vm.fnObtenerMesaPorId(mesa.mesa_id);$state.go("
+    ],
+    "buttons": [
+      "Añadir Mesa(s)",
+      "Desactivar",
+      "Editar",
+      "Habilitar",
+      "Mesas con QR"
+    ],
+    "table_headers": [
+      "Nombre",
+      "QR",
+      "Sku",
+      "Estado",
+      "Acciones"
+    ],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__impresoras__index.html": {
+    "file": "scripts__restaurantpe__ajustes__impresoras__index.html",
+    "size": 829,
+    "ng_models": [],
+    "ng_clicks_sample": [
+      "vm.fnNuevaImpresora()",
+      "vm.getLogPorLogTablaConfigLocal()"
+    ],
+    "buttons": [
+      "Registrar impresora",
+      "Simular Rutas de impresión",
+      "Ver ultimas actualizaciones"
+    ],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__proveedorfe__index.html": {
+    "file": "scripts__restaurantpe__ajustes__proveedorfe__index.html",
+    "size": 15235,
+    "ng_models": [
+      "sucursal.configuracion.accesos.proveedorfe_opcionesavanzadas",
+      "sucursal.configuracion.configuracionlocal_valoraux1",
+      "vm.clienteSeleccionado",
+      "vm.configuracion.configuracionlocal_valor",
+      "vm.configuracion.configuracionlocal_valoraux1",
+      "vm.rucSeleccionado",
+      "vm.statusValidacionRestafact.nrus"
+    ],
+    "ng_clicks_sample": [
+      "vm.clientes = vm.clientesEmpty;vm.clienteSeleccionado = vm.clientes[0];vm.statusValidacionRestafact.clienteSeleccionado = false",
+      "vm.fnAbrirValidacionPin()",
+      "vm.fnActualizarApiKeyBySucursal(sucursal);",
+      "vm.fnActualizarComprobante(comprobante);",
+      "vm.fnConsolidarDocumentosByNotas()",
+      "vm.fnCrearDocumentosIndependientesByNotas()",
+      "vm.fnGenerarVentaParaValidacion()",
+      "vm.fnPreActivacionFacturacion(",
+      "vm.fnValidarVentaGenerada()"
+    ],
+    "buttons": [
+      "Desactivar Facturación electrónica",
+      "Generar Venta",
+      "Notas Agrupadas",
+      "Notas Independientes",
+      "Validar Venta",
+      "Ver"
+    ],
+    "table_headers": [
+      "Local",
+      "Proveedor",
+      "Avanzado",
+      "Activo",
+      "Opciones",
+      "Acción",
+      "Estado"
+    ],
+    "input_count": 3,
+    "select_count": 2,
+    "textarea_count": 0,
+    "table_count": 2
+  },
+  "scripts__restaurantpe__ajustes__motivosoperacion__bc-form.html": {
+    "file": "scripts__restaurantpe__ajustes__motivosoperacion__bc-form.html",
+    "size": 389,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__produccion__modals__impresora-modal.html": {
+    "file": "scripts__restaurantpe__ajustes__produccion__modals__impresora-modal.html",
+    "size": 2932,
+    "ng_models": [
+      "vm.impresora.impresora_ip",
+      "vm.impresora.impresora_nombre",
+      "vm.impresora.impresora_serie",
+      "vm.tipoImpresoraSeleccionada"
+    ],
+    "ng_clicks_sample": [
+      "vm.emitEvent();vm.cerrarModal()",
+      "vm.fnAgregar()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar"
+    ],
+    "table_headers": [],
+    "input_count": 3,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__impuestos__bc-form.html": {
+    "file": "scripts__restaurantpe__ajustes__impuestos__bc-form.html",
+    "size": 338,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__folios__index.html": {
+    "file": "scripts__restaurantpe__ajustes__folios__index.html",
+    "size": 4853,
+    "ng_models": [
+      "vm.paginaActual",
+      "vm.paginacionSeleccionada",
+      "vm.valBusqueda"
+    ],
+    "ng_clicks_sample": [
+      "vm.comprobantefolio.resetearComprobantefolioObjeto();$state.go(",
+      "vm.fnCargarComprobantefolioList()",
+      "vm.fnObtenerPorId(comprobantefolio.comprobantefolio_id);$state.go("
+    ],
+    "buttons": [
+      "Editar",
+      "Nuevo folio"
+    ],
+    "table_headers": [
+      "RUT",
+      "Rango",
+      "Correlativo",
+      "Tipo de Documento",
+      "Fecha de Registro",
+      "Estado",
+      "Acciones"
+    ],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__vista-conf-impresora__tabla-visualizacion-configuracion.view.html": {
+    "file": "scripts__restaurantpe__ajustes__vista-conf-impresora__tabla-visualizacion-configuracion.view.html",
+    "size": 24550,
+    "ng_models": [],
+    "ng_clicks_sample": [
+      "vm.fnClickCategoriaEnTabla(salon, categoria)"
+    ],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__produccion__bc-editar.html": {
+    "file": "scripts__restaurantpe__ajustes__produccion__bc-editar.html",
+    "size": 479,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__comprobantes__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__comprobantes__bc-index.html",
+    "size": 134,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__integracion__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__integracion__bc-index.html",
+    "size": 118,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__proveedorfe__modals__modal-actualizakeyapi.html": {
+    "file": "scripts__restaurantpe__ajustes__proveedorfe__modals__modal-actualizakeyapi.html",
+    "size": 86627,
+    "ng_models": [
+      "caja.caja_codigo",
+      "caja.caja_tipo",
+      "caja.caja_ubicacion",
+      "caja.comprobanteBV_estabPuntoVenta",
+      "caja.comprobanteBV_numcontrol",
+      "caja.comprobanteBV_puntoVenta",
+      "caja.comprobanteFV_estabPuntoVenta",
+      "caja.comprobanteFV_numcontrol",
+      "caja.comprobanteFV_puntoVenta",
+      "caja.comprobanteNC_estabPuntoVenta",
+      "caja.comprobanteNC_numcontrol",
+      "caja.comprobanteNC_puntoVenta",
+      "caja.comprobanteND_estabPuntoVenta",
+      "caja.comprobanteND_numcontrol",
+      "caja.comprobanteND_puntoVenta",
+      "caja.numeracion_manual",
+      "caja.resolucion_independiente",
+      "caja.siigo_docfvSiigo",
+      "caja.siigo_docfvSiigo.automatic_number",
+      "caja.siigo_docfvSiigo.code",
+      "caja.siigo_docfvprefijo",
+      "caja.siigo_docncSiigo",
+      "caja.siigo_docncSiigo.automatic_number",
+      "caja.siigo_docncSiigo.code",
+      "caja.siigo_docncprefijo",
+      "caja.siigo_docposSiigo",
+      "caja.siigo_docposSiigo.automatic_number",
+      "caja.siigo_docposSiigo.code",
+      "caja.siigo_docposprefijo",
+      "caja.siigo_eposdesde",
+      "caja.siigo_poselectronico",
+      "caja.taxxa_eposdesde",
+      "caja.taxxa_poselectronico",
+      "caja.taxxa_prefijo",
+      "caja.taxxa_prefijods",
+      "caja.taxxa_prefijoepos",
+      "caja.taxxa_prefijonc",
+      "caja.taxxa_prefijond",
+      "caja.taxxa_prefijonds",
+      "caja.taxxa_tributo",
+      "objFPSiigo.objSiigo",
+      "objFPSiigo.paymate_tipo",
+      "objFPSiigo.tarjeta",
+      "objFrases.Escenario",
+      "objFrases.FechaResolucion",
+      "objFrases.NumeroResolucion",
+      "objFrases.TipoFrase",
+      "objImpSiigo.objSiigo",
+      "rangoDeFechasInicio.fechas.startDate",
+      "rangoDeFechasResolucion.fechas.startDate",
+      "vm.accesos.datosAuxAltheanet.altheanet_lugarexpedicion",
+      "vm.accesos.datosAuxAltheanet.altheanet_regimenfiscal",
+      "vm.accesos.datosAuxAltheanet.altheanet_sucursal",
+      "vm.accesos.datosAuxDigifactGT.digifactgt_afiliacioniva",
+      "vm.accesos.datosAuxDigifactGT.digifactgt_bienoservicio",
+      "vm.accesos.datosAuxDigifactGT.digifactgt_codestablecimiento",
+      "vm.accesos.datosAuxDigifactGT.digifactgt_correoemisor",
+      "vm.accesos.datosAuxDigifactGT.digifactgt_enviarpropina",
+      "vm.accesos.datosAuxDigifactGT.digifactgt_itemdelivery",
+      "vm.accesos.datosAuxDigifactGT.digifactgt_itempropina",
+      "vm.accesos.datosAuxDigifactGT.digifactgt_nittercero",
+      "vm.accesos.datosAuxDigifactGT.digifactgt_propinabienoservicio",
+      "vm.accesos.datosAuxDigifactGT.digifactgt_propinatipoitem",
+      "vm.accesos.datosAuxDigifactGT.digifactgt_resolucionfecha",
+      "vm.accesos.datosAuxDigifactGT.digifactgt_resolucionnumero",
+      "vm.accesos.datosAuxDigifactGT.digifactgt_sandbox",
+      "vm.accesos.datosAuxDigifactGT.digifactgt_webhook",
+      "vm.accesos.datosAuxDigifactSV.codigoActividadEconomica",
+      "vm.accesos.datosAuxDigifactSV.departamento",
+      "vm.accesos.datosAuxDigifactSV.digifactsv_establecimiento",
+      "vm.accesos.datosAuxDigifactSV.digifactsv_itempropina",
+      "vm.accesos.datosAuxDigifactSV.digifactsv_rncemisor",
+      "vm.accesos.datosAuxDigifactSV.digifactsv_tipoEstablecimiento",
+      "vm.accesos.datosAuxDigifactSV.digifactsv_tipoItem",
+      "vm.accesos.datosAuxDigifactSV.digifactsv_unidadmedida",
+      "vm.accesos.datosAuxDigifactSV.municipio",
+      "vm.accesos.datosAuxDigifactSV.responsableDui",
+      "vm.accesos.datosAuxDigifactSV.responsableNombres",
+      "vm.accesos.datosAuxInfile.codigoActividadEconomica",
+      "vm.accesos.datosAuxInfile.infile_establecimiento",
+      "vm.accesos.datosAuxInfile.infile_tipoitem",
+      "vm.accesos.datosAuxInfile.infilesv_itempropina",
+      "vm.accesos.datosAuxInfile.infilesv_propinabienoservicio",
+      "vm.accesos.datosAuxInfile.infilesv_propinatipoitem",
+      "vm.accesos.datosAuxInfile.infilesv_webhook",
+      "vm.accesos.datosAuxInfile.responsableDui",
+      "vm.accesos.datosAuxInfile.responsableNombres",
+      "vm.accesos.datosAuxSRI.sri_ambiente",
+      "vm.accesos.datosAuxSRI.sri_contribuyenteEspecial",
+      "vm.accesos.datosAuxSRI.sri_estab",
+      "vm.accesos.datosAuxSRI.sri_llevaContabilidad",
+      "vm.accesos.datosAuxSRI.sri_textoauxiliarpdf",
+      "vm.accesos.datosAuxSRI.sri_textocontribuyente",
+      "vm.accesos.datosAuxSiigo.siigo_citycode",
+      "vm.accesos.datosAuxSiigo.siigo_codedomicilio",
+      "vm.accesos.datosAuxSiigo.siigo_codeitem",
+      "vm.accesos.datosAuxSiigo.siigo_descripciondomicilio",
+      "vm.accesos.datosAuxSiigo.siigo_docfvcod",
+      "vm.accesos.datosAuxSiigo.siigo_docfvnumber",
+      "vm.accesos.datosAuxSiigo.siigo_docfvprefijo",
+      "vm.accesos.datosAuxSiigo.siigo_docnccod",
+      "vm.accesos.datosAuxSiigo.siigo_docncnumber",
+      "vm.accesos.datosAuxSiigo.siigo_docncprefijo",
+      "vm.accesos.datosAuxSiigo.siigo_docndcod",
+      "vm.accesos.datosAuxSiigo.siigo_docndnumber",
+      "vm.accesos.datosAuxSiigo.siigo_docndprefijo",
+      "vm.accesos.datosAuxSiigo.siigo_docposcod",
+      "vm.accesos.datosAuxSiigo.siigo_docposnumber",
+      "vm.accesos.datosAuxSiigo.siigo_docposprefijo",
+      "vm.accesos.datosAuxSiigo.siigo_sellerid",
+      "vm.accesos.datosAuxSiigo.siigo_statecode",
+      "vm.accesos.datosAuxSiigo.siigo_webhook",
+      "vm.accesos.datosAuxTaxxa.taxxa_ambiente",
+      "vm.accesos.datosAuxTaxxa.taxxa_coddepartamento",
+      "vm.accesos.datosAuxTaxxa.taxxa_codprovincia",
+      "vm.accesos.datosAuxTaxxa.taxxa_configuracionbycaja",
+      "vm.accesos.datosAuxTaxxa.taxxa_correodefault",
+      "vm.accesos.datosAuxTaxxa.taxxa_namedepartamento",
+      "vm.accesos.datosAuxTaxxa.taxxa_nameprovincia",
+      "vm.accesos.datosAuxTaxxa.taxxa_organizacion",
+      "vm.accesos.datosAuxTaxxa.taxxa_prefijo",
+      "vm.accesos.datosAuxTaxxa.taxxa_prefijonc",
+      "vm.accesos.datosAuxTaxxa.taxxa_regimen",
+      "vm.accesos.datosAuxTaxxa.taxxa_responsabilidad",
+      "vm.accesos.datosAuxTaxxa.taxxa_tributo",
+      "vm.accesos.datosAuxTaxxa.taxxa_webhook",
+      "vm.accesos.datosDgiiRD.dgiirepdom_acteconomica",
+      "vm.accesos.datosDgiiRD.dgiirepdom_bienoservicio",
+      "vm.accesos.datosDgiiRD.dgiirepdom_codmunicipio",
+      "vm.accesos.datosDgiiRD.dgiirepdom_codprovincia",
+      "vm.accesos.datosDgiiRD.dgiirepdom_correo",
+      "vm.accesos.datosDgiiRD.dgiirepdom_itemdelivery",
+      "vm.accesos.datosDgiiRD.dgiirepdom_rutaventa",
+      "vm.accesos.datosDgiiRD.dgiirepdom_telefonosTag",
+      "vm.accesos.datosDgiiRD.dgiirepdom_urlweb",
+      "vm.accesos.datosDgiiRD.dgiirepdom_zonaventa",
+      "vm.accesos.datosDgiiRD.restperd_dgii_fechavencimiento[comprobanteRD.serie]",
+      "vm.accesos.datosDgiiRD.restperd_dgii_webhook",
+      "vm.accesos.lucidafe_webhook",
+      "vm.accesos.proveedorfe_clave",
+      "vm.accesos.proveedorfe_clienteid",
+      "vm.accesos.proveedorfe_codactividad",
+      "vm.accesos.proveedorfe_codencargado",
+      "vm.accesos.proveedorfe_enviarcorrelativo",
+      "vm.accesos.proveedorfe_esproduccion",
+      "vm.accesos.proveedorfe_estest",
+      "vm.accesos.proveedorfe_idra",
+      "vm.accesos.proveedorfe_marcaranuladoventaconnotacred",
+      "vm.accesos.proveedorfe_numcuenta",
+      "vm.accesos.proveedorfe_numresolucion",
+      "vm.accesos.proveedorfe_pequenocontribuyente",
+      "vm.accesos.proveedorfe_regimensimplificado",
+      "vm.accesos.proveedorfe_representaciongrafica",
+      "vm.accesos.proveedorfe_sininternet",
+      "vm.accesos.proveedorfe_sucursal",
+      "vm.accesos.proveedorfe_urlbase",
+      "vm.accesos.proveedorfe_urlconsulta",
+      "vm.altheanet_regimenfiscalSeleccionados",
+      "vm.objFormPagoSiigo.objSiigo",
+      "vm.objFormPagoSiigo.paymate_descripcion",
+      "vm.objFormPagoSiigo.paymate_tipo",
+      "vm.objImpSiigo.impuesto_descripcion",
+      "vm.objImpSiigo.impuesto_porcentaje",
+      "vm.objImpSiigo.impuesto_tipo",
+      "vm.objImpSiigo.objSiigo"
+    ],
+    "ng_clicks_sample": [
+      "vm.agregarFormaPagoSiigo();",
+      "vm.agregarFrasesDigifact();",
+      "vm.agregarImpuestoSiigo();",
+      "vm.eliminarFormaPagoSiigo($index)",
+      "vm.eliminarFrasesDigifact($index)",
+      "vm.eliminarImpuestoSiigo($index)",
+      "vm.fnCancel()",
+      "vm.fnGuardar()",
+      "vm.fnGuardarAndActivar()",
+      "vm.obtenerCajasByLocal()",
+      "vm.obtenerFormasDePagoSiigo();",
+      "vm.obtenerImpuestosSiigo();"
+    ],
+    "buttons": [
+      "Activar Facturacion",
+      "Cancelar",
+      "Guardar"
+    ],
+    "table_headers": [
+      "Frase",
+      "Escenario",
+      "Resolucion",
+      "Fecha",
+      "Type Impuesto",
+      "Nombre Siigo",
+      "Porcentaje",
+      "Siigo",
+      "Forma de Pago",
+      "Nombre Siigo",
+      "Serie EPOS",
+      "Placa Caja",
+      "Tipo Caja",
+      "Ubicación",
+      "Comprobante",
+      "Fecha de vencimiento"
+    ],
+    "input_count": 137,
+    "select_count": 1,
+    "textarea_count": 0,
+    "table_count": 15
+  },
+  "scripts__restaurantpe__ajustes__tipotransferencia__modals__modalTipoTransferenciaview.html": {
+    "file": "scripts__restaurantpe__ajustes__tipotransferencia__modals__modalTipoTransferenciaview.html",
+    "size": 393,
+    "ng_models": [],
+    "ng_clicks_sample": [
+      "vm.cerrarModal()"
+    ],
+    "buttons": [
+      "&times;"
+    ],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__cajas__bc-form.html": {
+    "file": "scripts__restaurantpe__ajustes__cajas__bc-form.html",
+    "size": 314,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__salones__breadcrumb-salon-forms.html": {
+    "file": "scripts__restaurantpe__ajustes__salones__breadcrumb-salon-forms.html",
+    "size": 389,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__integracion__erpcanal-local.html": {
+    "file": "scripts__restaurantpe__ajustes__integracion__erpcanal-local.html",
+    "size": 28785,
+    "ng_models": [
+      "erpcLocal.cajas.cuentaNueva",
+      "erpcLocal.cc.sel",
+      "fila.almacenErp",
+      "fila.erpSel",
+      "vm.erpUi.localSel.sucursalSel"
+    ],
+    "ng_clicks_sample": [
+      "erpcLocal.almCrear(vm.erpUi.localSel, fila)",
+      "erpcLocal.cajaCrear(vm.erpUi.localSel, fila)",
+      "erpcLocal.cajasCargar(vm.erpUi.localSel)",
+      "erpcLocal.cc.sel = null",
+      "erpcLocal.ccCargar(vm.erpUi.localSel)",
+      "erpcLocal.ccCrear(vm.erpUi.localSel)",
+      "erpcLocal.ccGuardar(vm.erpUi.localSel)",
+      "erpcLocal.cerrarRes(",
+      "erpcLocal.crearSucursal(vm.erpUi.localSel)",
+      "erpcLocal.enviar(vm.erpUi.localSel, ",
+      "erpcLocal.guardarLocal(vm.erpUi.localSel)",
+      "fila.almacenErp = null",
+      "fila.erpSel = fila.sugerido",
+      "fila.erpSel = null",
+      "vm.activarLocalErpContableRuc(vm.erpUi.localSel, false)"
+    ],
+    "buttons": [
+      "&times;",
+      "Activar",
+      "Crear",
+      "Desconectar",
+      "Desvincular",
+      "Editar los canales en la empresa",
+      "Elegir como emisor",
+      "Guardar {{vm.erpUi.localSel.local_descripcion}}",
+      "Pausar",
+      "usar"
+    ],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__callcenter__index.html": {
+    "file": "scripts__restaurantpe__ajustes__callcenter__index.html",
+    "size": 694,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [
+      "Nueva zona de reparto",
+      "Regresar a todas las sucursales"
+    ],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__index.html": {
+    "file": "scripts__restaurantpe__ajustes__index.html",
+    "size": 6379,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__vista-conf-impresora__vista-conf-impresora.view.html": {
+    "file": "scripts__restaurantpe__ajustes__vista-conf-impresora__vista-conf-impresora.view.html",
+    "size": 16219,
+    "ng_models": [],
+    "ng_clicks_sample": [
+      "vm.fnClickTab(tab)",
+      "vm.modalVisible = true; $event.stopPropagation()"
+    ],
+    "buttons": [
+      "Ayuda"
+    ],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__tipotransferencia__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__tipotransferencia__bc-index.html",
+    "size": 153,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__movilidad__editar.html": {
+    "file": "scripts__restaurantpe__ajustes__movilidad__editar.html",
+    "size": 2627,
+    "ng_models": [
+      "vm.movilidad.movilidad_categoria",
+      "vm.movilidad.movilidad_estado",
+      "vm.movilidad.movilidad_marca",
+      "vm.movilidad.movilidad_placa",
+      "vm.movilidad.movilidad_seriechasis"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.fnActualizar()",
+      "vm.fnAgregar()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar",
+      "Modificar"
+    ],
+    "table_headers": [],
+    "input_count": 5,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__tarjetas__index.html": {
+    "file": "scripts__restaurantpe__ajustes__tarjetas__index.html",
+    "size": 5586,
+    "ng_models": [
+      "vm.paginaActual",
+      "vm.paginacionSeleccionada",
+      "vm.valBusqueda"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnCargarTarjetas()",
+      "vm.fnObtenerLogtablaPorId(vm.tarjeta.tarjeta_id,vm.tarjeta.tarjeta_descripcion,",
+      "vm.fnObtenerPorId(tarjeta.tarjeta_id);$state.go(",
+      "vm.tarjeta.resetearTarjetaObjeto();(vm.tarjetaglobalList.length > 0 ? vm.tarjeta.tarjetaglobal = vm.tarjetaglobalList[0]: vm.tarjeta.tarjetaglobal = null);$state.go("
+    ],
+    "buttons": [
+      "Editar",
+      "Ver ultimas actualizaciones"
+    ],
+    "table_headers": [
+      "Nombre",
+      "Tipo tarjeta",
+      "{{ 'DELIVERYS' | translate }}",
+      "Retención",
+      "Mostrar",
+      "Estado",
+      "Acciones"
+    ],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__turnos__editar.html": {
+    "file": "scripts__restaurantpe__ajustes__turnos__editar.html",
+    "size": 3138,
+    "ng_models": [
+      "vm.turno.turno_descripcion",
+      "vm.turno.turno_estado",
+      "vm.turno_hora_fin",
+      "vm.turno_hora_inicio"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.fnActualizar()",
+      "vm.fnAgregar()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar",
+      "Modificar"
+    ],
+    "table_headers": [],
+    "input_count": 4,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__monedas__modals__modalActualizarTipoCambio.view.html": {
+    "file": "scripts__restaurantpe__ajustes__monedas__modals__modalActualizarTipoCambio.view.html",
+    "size": 3134,
+    "ng_models": [
+      "pl.moneda_tipocambio",
+      "pl.moneda_tipocambio_compra",
+      "vm.monedafacturacionObj",
+      "vm.tipocambioCompra",
+      "vm.tipocambioVenta"
+    ],
+    "ng_clicks_sample": [
+      "vm.actualizarTipoCambioCompra()",
+      "vm.actualizarTipoCambioVenta()",
+      "vm.fnActualizarTipoCambio()",
+      "vm.fnCancel()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar"
+    ],
+    "table_headers": [
+      "Sucursal",
+      "Tipo de cambio",
+      "Tipo de cambio compra"
+    ],
+    "input_count": 4,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__capacitacion__editar.html": {
+    "file": "scripts__restaurantpe__ajustes__capacitacion__editar.html",
+    "size": 16757,
+    "ng_models": [
+      "vm.administrativaObj",
+      "vm.capacitacion.duracion",
+      "vm.capacitacion.gastos",
+      "vm.capacitacion.link_acta",
+      "vm.capacitacion.link_drive_capacitacion",
+      "vm.capacitacion.link_evaluacion",
+      "vm.capacitacion.motivo_capacitacion",
+      "vm.capacitadorObj",
+      "vm.estadoObj",
+      "vm.hora_fin",
+      "vm.hora_inicio",
+      "vm.implementoinsumoObj",
+      "vm.implementorecetaObj",
+      "vm.localSeleccionado",
+      "vm.logisticaObj",
+      "vm.modalidadObj",
+      "vm.modoCapacitacionObj",
+      "vm.operativaObj",
+      "vm.pickerHoraCapacitacion.fechas.startDate",
+      "vm.pickerReprogramada.fechas.startDate",
+      "vm.plataformaObj",
+      "vm.productoObj",
+      "vm.tipoCapacitacionObj"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.fnActualizar()",
+      "vm.fnAgregar()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar",
+      "Modificar"
+    ],
+    "table_headers": [],
+    "input_count": 7,
+    "select_count": 0,
+    "textarea_count": 1,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__zonalocal__index.html": {
+    "file": "scripts__restaurantpe__ajustes__zonalocal__index.html",
+    "size": 3829,
+    "ng_models": [
+      "vm.paginaActual",
+      "vm.paginacionSeleccionada",
+      "vm.valBusqueda"
+    ],
+    "ng_clicks_sample": [
+      "vm.Zonalocal.resetearObjeto();$state.go(",
+      "vm.fnCargarZonas()",
+      "vm.fnObtenerPorId(zonalocal.zonalocal_id);$state.go("
+    ],
+    "buttons": [
+      "Editar",
+      "Nueva Zona"
+    ],
+    "table_headers": [
+      "Zona",
+      "Estado",
+      "Acciones"
+    ],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__cupondescuento__bc-form.html": {
+    "file": "scripts__restaurantpe__ajustes__cupondescuento__bc-form.html",
+    "size": 361,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__integracion__erp.html": {
+    "file": "scripts__restaurantpe__ajustes__integracion__erp.html",
+    "size": 4706,
+    "ng_models": [
+      "almacen.erp.restauranterp_iderp",
+      "categoriasalida.erp.restauranterp_iderp",
+      "local.erp.restauranterp_iderp",
+      "moneda.erp.restauranterp_iderp",
+      "producto.erp.restauranterp_iderp",
+      "proveedor.erp.restauranterp_iderp",
+      "tarjeta.erp.restauranterp_iderp",
+      "vm.entidadSeleccionada",
+      "vm.localSeleccionado",
+      "vm.paginaActual"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnGuardar()"
+    ],
+    "buttons": [
+      "Guardar"
+    ],
+    "table_headers": [
+      "LOCAL",
+      "ENTIDAD",
+      "RESTAUTANT.PE ID",
+      "ERP ID"
+    ],
+    "input_count": 7,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__ticket__editar.html": {
+    "file": "scripts__restaurantpe__ajustes__ticket__editar.html",
+    "size": 9737,
+    "ng_models": [
+      "vm.asesorObj",
+      "vm.canalReporteObj",
+      "vm.categoriaObj",
+      "vm.complejidadObj",
+      "vm.estadoObj",
+      "vm.localSeleccionado",
+      "vm.notificaAreaObj",
+      "vm.pickerFechaBi.fechas.startDate",
+      "vm.pickerFechaSoulcionBi.fechas.startDate",
+      "vm.pickerFechaTentativaSoulcionBi.fechas.startDate",
+      "vm.subCategoriaObj",
+      "vm.ticket.tickectbi_resumen",
+      "vm.ticket.ticketbi_ticket"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.fnActualizar()",
+      "vm.fnAgregar()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar",
+      "Modificar"
+    ],
+    "table_headers": [],
+    "input_count": 4,
+    "select_count": 0,
+    "textarea_count": 1,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__capacitacion__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__capacitacion__bc-index.html",
+    "size": 134,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__produccion__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__produccion__bc-index.html",
+    "size": 130,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__cajas__comprobantecaja-editar.html": {
+    "file": "scripts__restaurantpe__ajustes__cajas__comprobantecaja-editar.html",
+    "size": 4584,
+    "ng_models": [
+      "marca.comprobantecajamarca_estado",
+      "vm.cajaSeleccionada",
+      "vm.comprobante.comprobantecaja_estado",
+      "vm.comprobante.comprobantecaja_numero",
+      "vm.comprobante.comprobantecaja_serie",
+      "vm.impresoraSeleccionada",
+      "vm.tipoSeleccionado"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.abrirNuevaImpresora()",
+      "vm.fnActualizarComprobante()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar",
+      "Registrar nueva impresora"
+    ],
+    "table_headers": [
+      "Marcas disponibles"
+    ],
+    "input_count": 4,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__motorizados__modals__modal.seleccionarvehiculo.html": {
+    "file": "scripts__restaurantpe__ajustes__motorizados__modals__modal.seleccionarvehiculo.html",
+    "size": 1926,
+    "ng_models": [
+      "movilidad.movilidad_asignar",
+      "vm.filtroMovilidad"
+    ],
+    "ng_clicks_sample": [
+      "vm.cerrarModal()",
+      "vm.filtroMovilidad = ",
+      "vm.fnAsignarAMorotizado()"
+    ],
+    "buttons": [
+      "Asignar al motorizado",
+      "Cancelar"
+    ],
+    "table_headers": [
+      "Marca",
+      "Placa",
+      "Serie chasis",
+      "Asignar"
+    ],
+    "input_count": 2,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__marca__editar.html": {
+    "file": "scripts__restaurantpe__ajustes__marca__editar.html",
+    "size": 5206,
+    "ng_models": [
+      "vm.marca.marca_direccioncomercial",
+      "vm.marca.marca_direccionfiscal",
+      "vm.marca.marca_estado",
+      "vm.marca.marca_nombre",
+      "vm.marca.marca_nombrecomercial",
+      "vm.marca.marca_razonsocial",
+      "vm.marca.marca_ruc"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.fnActualizar()",
+      "vm.fnAgregar()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Elige tu logo",
+      "Guardar",
+      "Modificar"
+    ],
+    "table_headers": [],
+    "input_count": 7,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__integracion__bc-integrar.html": {
+    "file": "scripts__restaurantpe__ajustes__integracion__bc-integrar.html",
+    "size": 171,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__vista-conf-impresora__side-vista-conf-impresora.view.html": {
+    "file": "scripts__restaurantpe__ajustes__vista-conf-impresora__side-vista-conf-impresora.view.html",
+    "size": 5919,
+    "ng_models": [
+      "vm.filtroCategorias",
+      "vm.localSeleccionado"
+    ],
+    "ng_clicks_sample": [
+      "cat.abierta = !cat.abierta",
+      "vm.fnCargarSimulacionDeImpresion()",
+      "vm.fnClickCategoria(cat)",
+      "vm.fnClickProducto(prod)",
+      "vm.fnClickResetView()",
+      "vm.fnClickSalon(sal)",
+      "vm.fnClickSalonGeneral()",
+      "vm.ocultarPanelLateral = false;"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Simular recorrido de impresión",
+      "Ver ruta"
+    ],
+    "table_headers": [],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__configuracionpos__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__configuracionpos__bc-index.html",
+    "size": 156,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__produccion__bc-nuevo.html": {
+    "file": "scripts__restaurantpe__ajustes__produccion__bc-nuevo.html",
+    "size": 403,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__integracion__bc-configuracioncartauber.html": {
+    "file": "scripts__restaurantpe__ajustes__integracion__bc-configuracioncartauber.html",
+    "size": 185,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__integracion__modals__modal-centrocosto-erpcontable.html": {
+    "file": "scripts__restaurantpe__ajustes__integracion__modals__modal-centrocosto-erpcontable.html",
+    "size": 2078,
+    "ng_models": [
+      "vm.centro.cencos",
+      "vm.centro.clasificacion",
+      "vm.centro.descCencos",
+      "vm.centro.factor"
+    ],
+    "ng_clicks_sample": [
+      "vm.cancelar()",
+      "vm.guardar(formCentroCosto)"
+    ],
+    "buttons": [
+      "&times;",
+      "Cancelar",
+      "Crear"
+    ],
+    "table_headers": [],
+    "input_count": 4,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__cupondescuento__editar.html": {
+    "file": "scripts__restaurantpe__ajustes__cupondescuento__editar.html",
+    "size": 12440,
+    "ng_models": [
+      "pl.localvalidovale",
+      "vm.cupondescuento.categoriacupodescuento",
+      "vm.cupondescuento.cupondescuento_codigo",
+      "vm.cupondescuento.cupondescuento_esporporcentaje",
+      "vm.cupondescuento.cupondescuento_esporproducto",
+      "vm.cupondescuento.cupondescuento_estado",
+      "vm.cupondescuento.cupondescuento_fechaexpiracion",
+      "vm.cupondescuento.cupondescuento_monto",
+      "vm.cupondescuento.cupondescuento_montodisponible",
+      "vm.cupondescuento.cupondescuento_montomaximodescuentoporporcentaje",
+      "vm.cupondescuento.cupondescuento_montousado",
+      "vm.cupondescuento.cupondescuento_numerofinserie",
+      "vm.cupondescuento.cupondescuento_numeroinicioserie",
+      "vm.cupondescuento.cupondescuento_porlocal",
+      "vm.cupondescuento.cupondescuento_sigla",
+      "vm.cupondescuento.cupondescuento_unusoporcliente",
+      "vm.cupondescuento.producto",
+      "vm.registrarPorRango"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.cliente = undefined",
+      "vm.fnAbrirModalCategorias()",
+      "vm.fnActualizar()",
+      "vm.fnAgregar()",
+      "vm.fnObtenerLogtablaPorId(vm.cupondescuento.cupondescuento_id,vm.cupondescuento.cupondescuento_codigo,"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar",
+      "Modificar",
+      "Registrar nueva categoria",
+      "Ver actualizaciones"
+    ],
+    "table_headers": [
+      "Sucursal",
+      "El cupon se puede usar en"
+    ],
+    "input_count": 16,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__callcenter__mapabasico.html": {
+    "file": "scripts__restaurantpe__ajustes__callcenter__mapabasico.html",
+    "size": 1864,
+    "ng_models": [
+      "vm.referenciaMapa"
+    ],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 2,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__paginacion.html": {
+    "file": "scripts__restaurantpe__ajustes__paginacion.html",
+    "size": 276,
+    "ng_models": [
+      "paginaActual"
+    ],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__integracion__bc-configuracioncartapedidosya.html": {
+    "file": "scripts__restaurantpe__ajustes__integracion__bc-configuracioncartapedidosya.html",
+    "size": 186,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__integracion__integracion.html": {
+    "file": "scripts__restaurantpe__ajustes__integracion__integracion.html",
+    "size": 291378,
+    "ng_models": [
+      "almacen.almacenPerseo",
+      "caja._tempPV",
+      "caja._tempPV.tarjeta",
+      "caja.caja",
+      "caja.secuenciaFV",
+      "caja.secuenciaNC",
+      "caja.secuenciaND",
+      "caja.secuenciaTK",
+      "caja.vendedor",
+      "fp.accountADM",
+      "fp.itemADM",
+      "fpRestpe.fpPerseo",
+      "intMiPos.external_store_id",
+      "item.UUID",
+      "item.canaldeliverySelected",
+      "item.datosextra.enviarModificadoresCombo",
+      "item.datosextra.enviarProductocomboConfigurados",
+      "item.integracion_clavepublica",
+      "item.integracion_clavesecreta",
+      "item.integracion_confirmacionautomatica",
+      "item.integracion_valoraux1",
+      "item.integracion_valoraux2",
+      "item.integracion_valoraux3",
+      "item.integracion_valoraux6",
+      "item.integracion_valoraux7",
+      "item.integracion_valoraux8",
+      "item.integracionlocal_nombre",
+      "item.marcaSelected",
+      "item.pedidosYaEnvSelected",
+      "item.versionRappiSelected",
+      "loc.sedeSel",
+      "loc.seleccionado",
+      "loc.sucursalSel",
+      "localintegracion.loadingActualizarCartaLocal",
+      "p.tiposImpuestoErpSel",
+      "row.almacenErp",
+      "row.centroCostoErp",
+      "row.docTipoErp",
+      "row.formaPagoErp",
+      "row.motivoErp",
+      "row.pagoTipo",
+      "row.porcentaje",
+      "row.recaudador",
+      "row.tarjeta",
+      "row.tiposImpuestoErp",
+      "row.tributoSel",
+      "tarjeta.objCuenta",
+      "tarjeta.tjPerseo",
+      "transferencia.bancoPerseo",
+      "vm.canaldeliverySelected",
+      "vm.empresaErpContableSeleccionada",
+      "vm.erpContableConexion.clave",
+      "vm.erpContableConexion.empresaSel",
+      "vm.erpContableConexion.url",
+      "vm.erpContableConexion.usuario",
+      "vm.erpContableCtaCajasSel",
+      "vm.erpContableEmision.cajaId",
+      "vm.erpContableEmision.habilitado",
+      "vm.erpContableEmision.localId",
+      "vm.erpContableMapeo.centroCostoDefault",
+      "vm.erpContableMapeo.unidadDefault",
+      "vm.erpContableReplicarOrigen",
+      "vm.erpContableRucSel",
+      "vm.erpContableTodosSel",
+      "vm.integracion.adquiriente_code",
+      "vm.integracion.autentificacion_clave",
+      "vm.integracion.autentificacion_usuario",
+      "vm.integracion.centrodecosto",
+      "vm.integracion.centrodecosto_codigo",
+      "vm.integracion.centrodecosto_nombre",
+      "vm.integracion.city",
+      "vm.integracion.courrency_code",
+      "vm.integracion.cuentaProducto_compra",
+      "vm.integracion.cuentaProducto_costo",
+      "vm.integracion.cuentaProducto_venta",
+      "vm.integracion.datosAuxiliares.almacenCompra",
+      "vm.integracion.datosAuxiliares.almacenVenta",
+      "vm.integracion.datosAuxiliares.cajaCompra",
+      "vm.integracion.datosAuxiliares.centroDeCosto",
+      "vm.integracion.datosAuxiliares.compracontado",
+      "vm.integracion.datosAuxiliares.compracredito",
+      "vm.integracion.datosAuxiliares.cuentacontable_compra.descartable",
+      "vm.integracion.datosAuxiliares.cuentacontable_compra.insumo",
+      "vm.integracion.datosAuxiliares.cuentacontable_compra.producto",
+      "vm.integracion.datosAuxiliares.facturacompra",
+      "vm.integracion.datosAuxiliares.facturaventa",
+      "vm.integracion.datosAuxiliares.local",
+      "vm.integracion.datosAuxiliares.notadeventa",
+      "vm.integracion.datosAuxiliares.producto_esbien",
+      "vm.integracion.datosAuxiliares.producto_esservicio",
+      "vm.integracion.datosAuxiliares.puntoEmision",
+      "vm.integracion.datosAuxiliares.tarifa",
+      "vm.integracion.datosAuxiliares.tipoGasto",
+      "vm.integracion.datosAuxiliares.ubicacionCompra",
+      "vm.integracion.datosAuxiliares.ubicacionVenta",
+      "vm.integracion.datosAuxiliares.vendedor",
+      "vm.integracion.datosAuxiliares.ventacontado",
+      "vm.integracion.datosAuxiliares.ventacredito",
+      "vm.integracion.datosextra.enviarModificadoresCombo",
+      "vm.integracion.datosextra.enviarProductocomboConfigurados",
+      "vm.integracion.integracion_clave",
+      "vm.integracion.integracion_clavepublica",
+      "vm.integracion.integracion_clavesecreta",
+      "vm.integracion.integracion_confirmacionautomatica",
+      "vm.integracion.integracion_encendido",
+      "vm.integracion.integracion_localid",
+      "vm.integracion.integracion_marcaid",
+      "vm.integracion.integracion_minutosconfirmacion",
+      "vm.integracion.integracion_urlwebhook",
+      "vm.integracion.integracion_usuario",
+      "vm.integracion.integracion_valoraux1",
+      "vm.integracion.integracion_valoraux2",
+      "vm.integracion.integracion_valoraux3",
+      "vm.integracion.integracion_valoraux4",
+      "vm.integracion.integracion_valoraux5",
+      "vm.integracion.integracion_valoraux6",
+      "vm.integracion.integracion_valoraux7",
+      "vm.integracion.integracion_valoraux8",
+      "vm.integracion.integracionlocal_nombre",
+      "vm.integracion.integracionlocal_valoraux2",
+      "vm.integracion.language",
+      "vm.integracion.libroVentaBruta_mntbruto",
+      "vm.integracion.libroVentaBruta_mntiva",
+      "vm.integracion.libroVentaBruta_mntneto",
+      "vm.integracion.libroVentaBruta_mntrc",
+      "vm.integracion.libroVentaInventario_mntdebe",
+      "vm.integracion.libroVentaInventario_mntdefaulthaber",
+      "vm.integracion.libroVentaNeto_aplicapropina",
+      "vm.integracion.libroVentaNeto_canjepuntos",
+      "vm.integracion.libroVentaNeto_debito",
+      "vm.integracion.libroVentaNeto_deposito",
+      "vm.integracion.libroVentaNeto_efectivo",
+      "vm.integracion.libroVentaNeto_enlinea",
+      "vm.integracion.libroVentaNeto_fpay",
+      "vm.integracion.libroVentaNeto_giftcard",
+      "vm.integracion.libroVentaNeto_mercpago",
+      "vm.integracion.libroVentaNeto_mntneto",
+      "vm.integracion.libroVentaNeto_mntpropina",
+      "vm.integracion.libroVentaNeto_niubiz",
+      "vm.integracion.libroVentaNeto_plin",
+      "vm.integracion.libroVentaNeto_tarjeta",
+      "vm.integracion.libroVentaNeto_yape",
+      "vm.integracion.merchant_type",
+      "vm.integracion.mipos_email",
+      "vm.integracion.mipos_fechatoken",
+      "vm.integracion.mipos_name",
+      "vm.integracion.mipos_password",
+      "vm.integracion.mipos_token",
+      "vm.integracion.state",
+      "vm.integracion.terminal_owner_name",
+      "vm.integracion.url_actualizaciondelivery",
+      "vm.local_id",
+      "vm.marcaSelected",
+      "vm.pedidosYaEnvSelected",
+      "vm.sucursalErpContableSeleccionada",
+      "vm.talentoConexion.clave",
+      "vm.talentoConexion.url",
+      "vm.talentoConexion.usuario",
+      "vm.talentoRucSel",
+      "vm.talentoTodosSel",
+      "vm.versionRappiSelected"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "almacen.almacenPerseo = undefined;",
+      "row.almacenErp = null",
+      "row.centroCostoErp = null",
+      "row.motivoErp = null",
+      "tarjeta.objCuenta = null",
+      "vm.abrirEditorMapeosErpContable(loc)",
+      "vm.abrirVincularCajasCanalesErpContable(loc)",
+      "vm.accionesIntegracionesMiPos(PARAM.TODOS, intMiPos.id, 1)",
+      "vm.accionesIntegracionesMiPos(PARAM.TODOS, intMiPos.id, 2)",
+      "vm.accionesIntegracionesMiPos(PARAM.TODOS, intMiPos.id, 3)",
+      "vm.accionesIntegracionesMiPos(localintegracion.local_id, intMiPos.id, 1)",
+      "vm.accionesIntegracionesMiPos(localintegracion.local_id, intMiPos.id, 2)",
+      "vm.accionesIntegracionesMiPos(localintegracion.local_id, intMiPos.id, 3)",
+      "vm.activarLocalErpContableRuc(loc, false)"
+    ],
+    "buttons": [
+      "0)\">",
+      "1) Crear sucursales",
+      "2) Completar aprovisionamiento",
+      "3) Vincular defaults",
+      "Activar",
+      "Actualizar",
+      "Actualizar carta",
+      "Agotados",
+      "Agregar forma de pago",
+      "Agregar impuesto de compra",
+      "Buscar empresas",
+      "Cancelar",
+      "Cargar Centros de Costo",
+      "Cargar Cuentas contables",
+      "Cargar Data Requerida",
+      "Cargar cuentas",
+      "Cargar empresas",
+      "Configurar carta",
+      "Confirmacion",
+      "Desactivar Google Maps",
+      "Descargar carta en Excel",
+      "Eliminar",
+      "Enviar carta",
+      "Generar Token",
+      "Guardar configuración",
+      "Guardar match de {{det.local_descripcion}}",
+      "Guardar punto de emisión",
+      "Guardar sucursales",
+      "Habilitar accesos",
+      "Inactivar",
+      "Integrar",
+      "Integrar y crear webhook",
+      "Ir al panel nuevo",
+      "Nuevo",
+      "Obtener Integraciones MiPos",
+      "Opciones",
+      "Pausar",
+      "Probar credenciales",
+      "Recargar",
+      "Registrar",
+      "Registrar Usuario",
+      "Replicar a los locales marcados",
+      "Sincronizar",
+      "Sincronizar carta",
+      "Vincular",
+      "Vincular / crear cajas en el ERP",
+      "Vincular Store Mercado pago"
+    ],
+    "table_headers": [
+      "Sucursal",
+      "Acción",
+      "Sucursal",
+      "Acción",
+      "Integraciones de MiPos",
+      "Identificador Externo de integracion",
+      "Acción",
+      "Sucursal",
+      "Acción",
+      "Integraciones de MiPos",
+      "Identificador Externo de integracion",
+      "Acción",
+      "Caja",
+      "POS Id",
+      "Acciones",
+      "Local",
+      "Estado",
+      "Sede en Gestión de Talento",
+      "Opciones",
+      "Local / Empresa ERP",
+      "Sucursal ERP",
+      "Map",
+      "Acción"
+    ],
+    "input_count": 224,
+    "select_count": 4,
+    "textarea_count": 0,
+    "table_count": 23
+  },
+  "scripts__restaurantpe__ajustes__salones__breadcrumb-salon-ver.html": {
+    "file": "scripts__restaurantpe__ajustes__salones__breadcrumb-salon-ver.html",
+    "size": 256,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__llamada__bc-form.html": {
+    "file": "scripts__restaurantpe__ajustes__llamada__bc-form.html",
+    "size": 327,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__comprobantes__editar.html": {
+    "file": "scripts__restaurantpe__ajustes__comprobantes__editar.html",
+    "size": 7047,
+    "ng_models": [
+      "vm.comprobante.comprobante_estado",
+      "vm.comprobante.comprobante_maxproductos",
+      "vm.comprobante.comprobante_numero",
+      "vm.comprobante.comprobante_predeterminado",
+      "vm.comprobante.comprobante_rangodasignado",
+      "vm.comprobante.comprobante_rangohasignado",
+      "vm.comprobante.comprobante_rangosalvador",
+      "vm.comprobante.comprobante_rangoultimousado",
+      "vm.comprobante.comprobante_ruta",
+      "vm.comprobante.comprobante_serie",
+      "vm.impresoraSeleccionada"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.abrirNuevaImpresora()",
+      "vm.fnActualizar()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar",
+      "Registrar nueva impresora"
+    ],
+    "table_headers": [],
+    "input_count": 12,
+    "select_count": 0,
+    "textarea_count": 1,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__tipotransferencia__index.html": {
+    "file": "scripts__restaurantpe__ajustes__tipotransferencia__index.html",
+    "size": 4247,
+    "ng_models": [
+      "vm.paginaActual",
+      "vm.paginacionSeleccionada"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnCargarTipotransferencias()",
+      "vm.fnObtenerPorId(tipotransferencia.tipotransferencia_id);vm.editando = true; vm.registrando = false;",
+      "vm.tipotransferencia.resetearTipotransferenciaObjeto();vm.registrando=!vm.registrando;vm.editando=false;vm.tipotransferencia.tipotransferencia_urlimagen=null;"
+    ],
+    "buttons": [
+      "Editar",
+      "Nueva cuenta"
+    ],
+    "table_headers": [
+      "Nombre de cuenta",
+      "Número asociado",
+      "Titular",
+      "Tipo",
+      "Local",
+      "Estado",
+      "Acciones"
+    ],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__salones__salones-lista.html": {
+    "file": "scripts__restaurantpe__ajustes__salones__salones-lista.html",
+    "size": 3450,
+    "ng_models": [
+      "vm.paginaActual",
+      "vm.paginacionSeleccionada",
+      "vm.valBusqueda"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnCargarSalons()",
+      "vm.fnNuevaSalon();$state.go(",
+      "vm.fnObtenerPorId(salon.salon_id);$state.go(",
+      "vm.fnVer(salon.salon_id)"
+    ],
+    "buttons": [
+      "Editar",
+      "Nuevo Salón",
+      "Ver"
+    ],
+    "table_headers": [
+      "Nombre",
+      "Mesas",
+      "Estado",
+      "Acciones"
+    ],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__seriemanualfe__bc-form.html": {
+    "file": "scripts__restaurantpe__ajustes__seriemanualfe__bc-form.html",
+    "size": 372,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__ticket__bc-form.html": {
+    "file": "scripts__restaurantpe__ajustes__ticket__bc-form.html",
+    "size": 320,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__sucursales__index-breadcrumb.html": {
+    "file": "scripts__restaurantpe__ajustes__sucursales__index-breadcrumb.html",
+    "size": 114,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__integracion__configuracioncartaintegracion.html": {
+    "file": "scripts__restaurantpe__ajustes__integracion__configuracioncartaintegracion.html",
+    "size": 18537,
+    "ng_models": [
+      "integracionLocal.marcarTodos",
+      "preciolocalproducto.preciolocalproducto_debemostrarse",
+      "preciolocalproducto.preciolocalproducto_precio",
+      "producto.producto_codigo",
+      "vm.categoriaSeleccionada",
+      "vm.filtrarSinSKU",
+      "vm.filtrarSoloActivos",
+      "vm.paginaActual",
+      "vm.porMarca",
+      "vm.productoFiltroAux",
+      "vm.proveedorIntegracionSeleccionado",
+      "vm.tipoSeleccionado"
+    ],
+    "ng_clicks_sample": [
+      "vm.abrirModalRegistroProducto(producto.productogeneral_id)",
+      "vm.cancelar()",
+      "vm.clonarPreciosIntegracionA(item)",
+      "vm.fnAbrirModalEditarProducto(producto, ",
+      "vm.fnAgotarProductoDelivery(producto.producto_id,",
+      "vm.fnAnularPresentacionProducto(producto.producto_id)",
+      "vm.fnCargarCartaProductosIntegracion()",
+      "vm.fnGuardarConfiguracionDePreciosPorIntegracion()",
+      "vm.fnQuitarProductoDelivery(producto.producto_id)",
+      "vm.modalNuevoProducto()",
+      "vm.nuevaCategoriaDelivery()",
+      "vm.productoFiltro = ",
+      "vm.updateCategoriaDelivery(producto.categoria_id)"
+    ],
+    "buttons": [
+      "Atras",
+      "Cerrar",
+      "Clonar precios a",
+      "Guardar cambios",
+      "Operaciones"
+    ],
+    "table_headers": [
+      "Nombre producto agrupador",
+      "SKU",
+      "Categoría",
+      "Imagen",
+      "Ver",
+      "{{local.local_descripcion}}",
+      "Todos"
+    ],
+    "input_count": 14,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 3
+  },
+  "scripts__restaurantpe__ajustes__impuestos__index.html": {
+    "file": "scripts__restaurantpe__ajustes__impuestos__index.html",
+    "size": 6313,
+    "ng_models": [
+      "vm.paginaActual",
+      "vm.paginacionSeleccionada",
+      "vm.valBusqueda"
+    ],
+    "ng_clicks_sample": [
+      "vm.eleminardetalleprogramdo()",
+      "vm.fnCargarImpuestos()",
+      "vm.fnObtenerLogtablaPorId(vm.impuesto.igv_id,vm.impuesto.igv_nombre,",
+      "vm.fnObtenerPorId(impuesto.igv_id);$state.go(",
+      "vm.impuesto.resetearImpuestoObjeto();vm.fnLimpiarCatalogo();$state.go("
+    ],
+    "buttons": [
+      "Anular programación",
+      "Crear programación",
+      "Editar",
+      "Nuevo impuesto",
+      "Ver ultimas actualizaciones"
+    ],
+    "table_headers": [
+      "Nombre",
+      "Porcentaje",
+      "Modalidad",
+      "Estado",
+      "Fiscalizado",
+      "Acciones"
+    ],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__implementacion__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__implementacion__bc-index.html",
+    "size": 142,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__sucursales__modals__modalConfigRestaurantGo.view.html": {
+    "file": "scripts__restaurantpe__ajustes__sucursales__modals__modalConfigRestaurantGo.view.html",
+    "size": 7929,
+    "ng_models": [
+      "rb.establecimientotiponegocio_estado",
+      "vm.sucursal.local_aceptadelivery",
+      "vm.sucursal.local_aceptaefectivopordelivery",
+      "vm.sucursal.local_aceptaentregaprogramada",
+      "vm.sucursal.local_aceptapagoenlinea",
+      "vm.sucursal.local_aceptarecojo",
+      "vm.sucursal.local_aceptatarjetapordelivery",
+      "vm.sucursal.local_aceptatransferenciasdelivery",
+      "vm.sucursal.local_appcontacto",
+      "vm.sucursal.local_appemailcontacto",
+      "vm.sucursal.local_apptelefonocontacto",
+      "vm.sucursal.local_capacidadpedidospordia",
+      "vm.sucursal.local_email",
+      "vm.sucursal.local_montominimo",
+      "vm.sucursal.local_tiempominimodelivery"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnActualizar()",
+      "vm.fnCancelar()"
+    ],
+    "buttons": [
+      "&times;",
+      "Cerrar",
+      "Modificar"
+    ],
+    "table_headers": [],
+    "input_count": 15,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__movilidad__index.html": {
+    "file": "scripts__restaurantpe__ajustes__movilidad__index.html",
+    "size": 4121,
+    "ng_models": [
+      "vm.paginaActual",
+      "vm.paginacionSeleccionada",
+      "vm.valBusqueda"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnCargarMovilidades()",
+      "vm.fnObtenerPorId(movilidad.movilidad_id);$state.go(",
+      "vm.movilidad.resetearMovilidadObjeto()",
+      "vm.movilidad.resetearMovilidadObjeto();$state.go("
+    ],
+    "buttons": [
+      "Editar",
+      "Nuevo movilidad"
+    ],
+    "table_headers": [
+      "Placa",
+      "Seríe chasis",
+      "Marca",
+      "categoría",
+      "Estado",
+      "Acciones"
+    ],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__implementacion__bc-form.html": {
+    "file": "scripts__restaurantpe__ajustes__implementacion__bc-form.html",
+    "size": 380,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__monedafacturacion__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__monedafacturacion__bc-index.html",
+    "size": 148,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__turnos__index.html": {
+    "file": "scripts__restaurantpe__ajustes__turnos__index.html",
+    "size": 4342,
+    "ng_models": [
+      "vm.paginaActual",
+      "vm.paginacionSeleccionada",
+      "vm.valBusqueda"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnCargarTurnos()",
+      "vm.fnLimpiarClock();vm.turno.resetearTurnoObjeto();$state.go(",
+      "vm.fnObtenerLogtablaPorId(vm.turno.turno_id,vm.turno.turno_descripcion,",
+      "vm.fnObtenerPorId(turno.turno_id);$state.go("
+    ],
+    "buttons": [
+      "Editar",
+      "Nuevo turno",
+      "Ver ultimas actualizaciones"
+    ],
+    "table_headers": [
+      "Turno",
+      "Inicia",
+      "Termina",
+      "Estado",
+      "Acciones"
+    ],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__transportistas__editar.html": {
+    "file": "scripts__restaurantpe__ajustes__transportistas__editar.html",
+    "size": 4658,
+    "ng_models": [
+      "vm.transportista.transportista_certificado",
+      "vm.transportista.transportista_direccion",
+      "vm.transportista.transportista_estadol",
+      "vm.transportista.transportista_licencia",
+      "vm.transportista.transportista_marca",
+      "vm.transportista.transportista_placa",
+      "vm.transportista.transportista_razonsocial",
+      "vm.transportista.transportista_ruc",
+      "vm.transportista.transportista_telefono"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.fnActualizar()",
+      "vm.fnAgregar()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar",
+      "Modificar"
+    ],
+    "table_headers": [],
+    "input_count": 9,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__marca__bc-form.html": {
+    "file": "scripts__restaurantpe__ajustes__marca__bc-form.html",
+    "size": 327,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__gestiondocumentosrecibidosfe__bc-form.html": {
+    "file": "scripts__restaurantpe__ajustes__gestiondocumentosrecibidosfe__bc-form.html",
+    "size": 136,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__impresoras__precuentas-tabla.html": {
+    "file": "scripts__restaurantpe__ajustes__impresoras__precuentas-tabla.html",
+    "size": 3857,
+    "ng_models": [
+      "precuenta.impresora",
+      "precuenta.precuenta_estado",
+      "precuenta.precuenta_imprimelogo",
+      "precuenta.precuenta_nombre"
+    ],
+    "ng_clicks_sample": [
+      "precuenta.editando = !precuenta.editando",
+      "precuenta.editando = !precuenta.editando;vm.fnVincularGuardarPrecuentaImpresora(precuenta)",
+      "vm.fnEliminarImpresoraPrecuenta(precuenta)",
+      "vm.fnTestImpresora(precuenta.impresora)",
+      "vm.nuevaPrecuenta()"
+    ],
+    "buttons": [
+      "Editar",
+      "Eliminiar",
+      "Guardar",
+      "Nueva estación",
+      "Probar"
+    ],
+    "table_headers": [
+      "Estación",
+      "Impresora",
+      "Imprime logo",
+      "Estado",
+      "Acciones"
+    ],
+    "input_count": 3,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__impresoras__impresoras-vinculos.html": {
+    "file": "scripts__restaurantpe__ajustes__impresoras__impresoras-vinculos.html",
+    "size": 684,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__cupondescuento__index.html": {
+    "file": "scripts__restaurantpe__ajustes__cupondescuento__index.html",
+    "size": 5711,
+    "ng_models": [
+      "vm.categoriacupodescuento",
+      "vm.paginaActual",
+      "vm.paginacionSeleccionada",
+      "vm.valBusqueda"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.cupondescuento.resetearObjeto();$state.go(",
+      "vm.fnCargarCupondescuentos()",
+      "vm.fnObtenerPorId(cupondescuento.cupondescuento_id);"
+    ],
+    "buttons": [
+      "Editar",
+      "Importar Cupones",
+      "Nuevo cupón"
+    ],
+    "table_headers": [
+      "Fecha expiración",
+      "Categoría / Código",
+      "Monto",
+      "Monto disponible",
+      "Monto usado",
+      "Estado",
+      "Acciones"
+    ],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__integracion__bc-configuracioncartaintegracion.html": {
+    "file": "scripts__restaurantpe__ajustes__integracion__bc-configuracioncartaintegracion.html",
+    "size": 166,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__tarea__editar.html": {
+    "file": "scripts__restaurantpe__ajustes__tarea__editar.html",
+    "size": 11886,
+    "ng_models": [
+      "vm.devDesarroldoObj",
+      "vm.devObj",
+      "vm.estadoObj",
+      "vm.localSeleccionado",
+      "vm.origenObj",
+      "vm.pickerFechaentrega.fechas.startDate",
+      "vm.pickerFechasolicitud.fechas.startDate",
+      "vm.porrevisarObj",
+      "vm.prioridadObj",
+      "vm.proyectoObj",
+      "vm.tarea.tarea_comentario",
+      "vm.tarea.tarea_descripcion",
+      "vm.tarea.tarea_peso",
+      "vm.tarea.tarea_referencia",
+      "vm.tarea.tarea_sprint",
+      "vm.tipoObj"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.fnActualizar()",
+      "vm.fnAgregar()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar",
+      "Modificar"
+    ],
+    "table_headers": [],
+    "input_count": 5,
+    "select_count": 0,
+    "textarea_count": 2,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__salones__salones-nuevo.html": {
+    "file": "scripts__restaurantpe__ajustes__salones__salones-nuevo.html",
+    "size": 4013,
+    "ng_models": [
+      "vm.salon.salon_costoporreserva",
+      "vm.salon.salon_descripcion",
+      "vm.salon.salon_estado",
+      "vm.salon.salon_nmesas",
+      "vm.salon.salon_prefijomesas"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.fnAgregarSalon()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar"
+    ],
+    "table_headers": [],
+    "input_count": 5,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__callcenter__bc-sucursal.html": {
+    "file": "scripts__restaurantpe__ajustes__callcenter__bc-sucursal.html",
+    "size": 187,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__proveedorfe__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__proveedorfe__bc-index.html",
+    "size": 155,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__sucursales__modals__modalAgregarImagenMenuEnLinea.view.html": {
+    "file": "scripts__restaurantpe__ajustes__sucursales__modals__modalAgregarImagenMenuEnLinea.view.html",
+    "size": 5299,
+    "ng_models": [
+      "vm.categoriaSeleccionada",
+      "vm.imagenLocal.imagenlocal_descripcion",
+      "vm.imagenLocal.imagenlocal_nombre",
+      "vm.imagenLocal.imagenlocal_tipo",
+      "vm.imagenLocal.imagenlocal_vinculodirecto",
+      "vm.productoSeleccionado"
+    ],
+    "ng_clicks_sample": [
+      "vm.agregarImagenLocal()",
+      "vm.fnCancelar()",
+      "vm.mas()",
+      "vm.menos()",
+      "vm.productoSeleccionado = undefined"
+    ],
+    "buttons": [
+      "&times;",
+      "Cambiar imagen",
+      "Cerrar",
+      "Elegir una Imágen",
+      "Guardar imágen"
+    ],
+    "table_headers": [],
+    "input_count": 3,
+    "select_count": 1,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__monedas__index.html": {
+    "file": "scripts__restaurantpe__ajustes__monedas__index.html",
+    "size": 4791,
+    "ng_models": [
+      "vm.paginaActual",
+      "vm.paginacionSeleccionada",
+      "vm.valBusqueda"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnCargarMonedas()",
+      "vm.fnObtenerLogtablaPorId(vm.moneda.moneda_id,vm.moneda.moneda_descripcion,",
+      "vm.fnObtenerPorId(moneda.moneda_id);$state.go(",
+      "vm.moneda.resetearMonedaObjeto();$state.go("
+    ],
+    "buttons": [
+      "Editar",
+      "Nueva moneda",
+      "Ver ultimas actualizaciones"
+    ],
+    "table_headers": [
+      "Nombre",
+      "Símbolo",
+      "Tipo de cambio",
+      "Predeterminada",
+      "Última modificación",
+      "Estado",
+      "Acciones"
+    ],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__transportistas__bc-form.html": {
+    "file": "scripts__restaurantpe__ajustes__transportistas__bc-form.html",
+    "size": 502,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__addons__bc-form.html": {
+    "file": "scripts__restaurantpe__ajustes__addons__bc-form.html",
+    "size": 43,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__formasdepago__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__formasdepago__bc-index.html",
+    "size": 130,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__formasdepago__editar.html": {
+    "file": "scripts__restaurantpe__ajustes__formasdepago__editar.html",
+    "size": 1859,
+    "ng_models": [
+      "vm.formaPago.formadepago_descripcion",
+      "vm.formaPago.formadepago_estado"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.fnActualizar()",
+      "vm.fnAgregar()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar",
+      "Modificar"
+    ],
+    "table_headers": [],
+    "input_count": 2,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__pos__editar.html": {
+    "file": "scripts__restaurantpe__ajustes__pos__editar.html",
+    "size": 6278,
+    "ng_models": [
+      "caja.agregar",
+      "vm.pos.pos_claveapp",
+      "vm.pos.pos_clavews",
+      "vm.pos.pos_estado",
+      "vm.pos.pos_nombre",
+      "vm.pos.pos_proveedor",
+      "vm.pos.pos_serie",
+      "vm.pos.pos_usuarioapp",
+      "vm.pos.pos_usuariows",
+      "vm.tipoPosSeleccionado",
+      "vm.valBusquedaLocal"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.fnActualizar()",
+      "vm.fnAgregar()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar",
+      "Modificar"
+    ],
+    "table_headers": [
+      "Cajas"
+    ],
+    "input_count": 10,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__addons__addon.view.html": {
+    "file": "scripts__restaurantpe__ajustes__addons__addon.view.html",
+    "size": 1081,
+    "ng_models": [],
+    "ng_clicks_sample": [
+      "vm.redirectShowWppMessage();"
+    ],
+    "buttons": [
+      "Solicita una demo"
+    ],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__cajas__editar.html": {
+    "file": "scripts__restaurantpe__ajustes__cajas__editar.html",
+    "size": 9921,
+    "ng_models": [
+      "marca.asignada",
+      "vm.almacenSeleccionado",
+      "vm.asignar_caja",
+      "vm.caja.caja_aceptadelivery",
+      "vm.caja.caja_darkkitchen",
+      "vm.caja.caja_descripcion",
+      "vm.caja.caja_deviceid",
+      "vm.caja.caja_disparaimpresion",
+      "vm.caja.caja_esselfservice",
+      "vm.caja.caja_estado",
+      "vm.caja.caja_tipoimpresion",
+      "vm.caja.impresora_id",
+      "vm.caja.impresora_tiempoespera",
+      "vm.plataformaObj",
+      "vm.proveedorSeleccionado"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.fnActualizar()",
+      "vm.fnAgregar()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar",
+      "Modificar"
+    ],
+    "table_headers": [
+      "Marcas disponibles"
+    ],
+    "input_count": 11,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__folios__bc-form.html": {
+    "file": "scripts__restaurantpe__ajustes__folios__bc-form.html",
+    "size": 332,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__impresoras__impresoras-lista.html": {
+    "file": "scripts__restaurantpe__ajustes__impresoras__impresoras-lista.html",
+    "size": 4873,
+    "ng_models": [
+      "vm.paginaActual",
+      "vm.paginacionSeleccionada",
+      "vm.valBusqueda",
+      "vm.verSoloActivos"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnActualizarInformacionServicio()",
+      "vm.fnCargarImpresoras()",
+      "vm.fnNuevaImpresora()",
+      "vm.fnObtenerPorId(impresora.impresora_id);vm.fnGetIDImpresoraByNombre(impresora.impresora_nombre);$state.go(",
+      "vm.fnTestImpresora(impresora)"
+    ],
+    "buttons": [
+      "Conectar con servicio",
+      "Editar",
+      "Probar",
+      "Registrar nueva impresora"
+    ],
+    "table_headers": [
+      "Nombre",
+      "Tipo",
+      "Estado",
+      "Acciones"
+    ],
+    "input_count": 2,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__turnos__bc-form.html": {
+    "file": "scripts__restaurantpe__ajustes__turnos__bc-form.html",
+    "size": 320,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__folios__editar.html": {
+    "file": "scripts__restaurantpe__ajustes__folios__editar.html",
+    "size": 4508,
+    "ng_models": [
+      "vm.comprobantefolio.comprobantefolio_estado",
+      "vm.comprobantefolio.comprobantefolio_fin",
+      "vm.comprobantefolio.comprobantefolio_inicio",
+      "vm.objTipoComprobante",
+      "vm.rucSeleccionado"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.fnActualizar()",
+      "vm.fnAgregar()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar",
+      "Modificar"
+    ],
+    "table_headers": [],
+    "input_count": 3,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__produccion__almacen-editar.html": {
+    "file": "scripts__restaurantpe__ajustes__produccion__almacen-editar.html",
+    "size": 2795,
+    "ng_models": [
+      "vm.almacen.almacen_aplicafoodcost",
+      "vm.almacen.almacen_controlstock",
+      "vm.almacen.almacen_descripcion",
+      "vm.almacen.almacen_eslineaproduccion",
+      "vm.almacen.almacen_estado"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.fnActualizarAlmacen()",
+      "vm.fnAgregarAlmacen()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar",
+      "Modificar"
+    ],
+    "table_headers": [],
+    "input_count": 5,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__tarjetas__editar.html": {
+    "file": "scripts__restaurantpe__ajustes__tarjetas__editar.html",
+    "size": 7330,
+    "ng_models": [
+      "vm.tarjeta.tarjeta_codigointerno",
+      "vm.tarjeta.tarjeta_codigopos",
+      "vm.tarjeta.tarjeta_comision",
+      "vm.tarjeta.tarjeta_comisionpropina",
+      "vm.tarjeta.tarjeta_delivery",
+      "vm.tarjeta.tarjeta_descripcion",
+      "vm.tarjeta.tarjeta_estado",
+      "vm.tarjeta.tarjeta_mostrarcaja",
+      "vm.tarjeta.tarjeta_referencia",
+      "vm.tarjeta.tarjeta_retencion",
+      "vm.tarjeta.tarjeta_retencioncondicion",
+      "vm.tarjeta.tarjeta_retienecliente",
+      "vm.tarjeta.tarjeta_tieneretencion",
+      "vm.tarjeta.tarjetaglobal"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.fnActualizar()",
+      "vm.fnAgregar()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar",
+      "Modificar"
+    ],
+    "table_headers": [],
+    "input_count": 12,
+    "select_count": 1,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__salones__mesas-editar.html": {
+    "file": "scripts__restaurantpe__ajustes__salones__mesas-editar.html",
+    "size": 3772,
+    "ng_models": [
+      "vm.formaSeleccionado",
+      "vm.mesa.mesa_descripcion",
+      "vm.mesa.mesa_estado",
+      "vm.mesa.mesa_numeroasientos",
+      "vm.salonSeleccionado"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.fnActualizarMesa()",
+      "vm.fnAgregarMesa()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar",
+      "Modificar"
+    ],
+    "table_headers": [],
+    "input_count": 4,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__comprobantes__bc-form.html": {
+    "file": "scripts__restaurantpe__ajustes__comprobantes__bc-form.html",
+    "size": 232,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__integracion__erpcanal.html": {
+    "file": "scripts__restaurantpe__ajustes__integracion__erpcanal.html",
+    "size": 17181,
+    "ng_models": [
+      "vm.erpContableRucSel",
+      "vm.erpUi.nivel"
+    ],
+    "ng_clicks_sample": [
+      "vm.cargarLocalesPorRucErpContable()",
+      "vm.erpIrANivel(loc)",
+      "vm.erpIrANivel(null)",
+      "vm.erpIrATab(",
+      "vm.erpVolverAlPanelActual()"
+    ],
+    "buttons": [
+      "Panel actual",
+      "Recargar"
+    ],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 1,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__callcenter__modals__modal-configuracionlocalcallcenter.html": {
+    "file": "scripts__restaurantpe__ajustes__callcenter__modals__modal-configuracionlocalcallcenter.html",
+    "size": 3054,
+    "ng_models": [
+      "vm.configuracionLocal.localconfig_metaventadelivery",
+      "vm.configuracionLocal.localconfig_tiempoentrega",
+      "vm.estadoDeliverySeleccionado",
+      "vm.local.local_aceptadelivery"
+    ],
+    "ng_clicks_sample": [
+      "vm.cancelar()",
+      "vm.cancelar();",
+      "vm.guardarConfiguracion()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar configuración"
+    ],
+    "table_headers": [],
+    "input_count": 3,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__callcenter__sucursales.html": {
+    "file": "scripts__restaurantpe__ajustes__callcenter__sucursales.html",
+    "size": 1139,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__monedas__editar.html": {
+    "file": "scripts__restaurantpe__ajustes__monedas__editar.html",
+    "size": 10571,
+    "ng_models": [
+      "denominacion.denominacionmoneda_valor",
+      "denominacion.tipomoneda",
+      "vm.moneda.moneda_culqicodigocomercio",
+      "vm.moneda.moneda_culqillavesecreta",
+      "vm.moneda.moneda_descripcion",
+      "vm.moneda.moneda_estado",
+      "vm.moneda.moneda_simbolo",
+      "vm.moneda.moneda_tipocambio",
+      "vm.moneda.moneda_tipocambio_compra",
+      "vm.moneda.moneda_visallavesecreta",
+      "vm.monedafacturacionObj"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "denominacion.editando = !denominacion.editando",
+      "denominacion.editando = !denominacion.editando;denominacion.denominacionmoneda_estado=0;vm.fnGuardarDenominacionMoneda(denominacion)",
+      "denominacion.editando = !denominacion.editando;denominacion.denominacionmoneda_estado=1;vm.fnGuardarDenominacionMoneda(denominacion)",
+      "denominacion.editando = !denominacion.editando;vm.fnGuardarDenominacionMoneda(denominacion)",
+      "vm.abrirModalActualizacionTipoCambio()",
+      "vm.fnActualizar()",
+      "vm.fnAgregar()",
+      "vm.nuevaDenominacionMoneda()"
+    ],
+    "buttons": [
+      "Activar",
+      "Cancelar",
+      "Editar",
+      "Eliminar",
+      "Guardar",
+      "Modificar",
+      "Nueva denominación"
+    ],
+    "table_headers": [
+      "Valor",
+      "Tipo",
+      "Estado",
+      "Acciones"
+    ],
+    "input_count": 9,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__callcenter__nuevacoberturalocal.html": {
+    "file": "scripts__restaurantpe__ajustes__callcenter__nuevacoberturalocal.html",
+    "size": 10698,
+    "ng_models": [
+      "vm.coberturaSelecionada",
+      "vm.localSeleccionado",
+      "vm.nuevaRuta.coberturalocal_color",
+      "vm.nuevaRuta.coberturalocal_costoenvio",
+      "vm.nuevaRuta.coberturalocal_estado",
+      "vm.nuevaRuta.coberturalocal_horafin",
+      "vm.nuevaRuta.coberturalocal_horainicio",
+      "vm.nuevaRuta.coberturalocal_minimoparaenviogratis",
+      "vm.nuevaRuta.coberturalocal_nombre",
+      "vm.nuevaRuta.coberturalocal_pedidominimo",
+      "vm.nuevaRuta.coberturalocal_radiokmcobertura_manual",
+      "vm.nuevaRuta.coberturalocal_tipocobertura",
+      "vm.referenciaMapa"
+    ],
+    "ng_clicks_sample": [
+      "vm.guardarNuevazona();",
+      "vm.limpiarMapa();",
+      "vm.limpiarUltimoTrazo();",
+      "vm.nuevaRuta.coberturalocal_permiteenviogratis = ",
+      "vm.nuevaRuta.coberturalocal_tipocobertura_aux = "
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar zona",
+      "Limpiar el mapa",
+      "Limpiar ultimo trazo",
+      "Regresar a todas las sucursales"
+    ],
+    "table_headers": [],
+    "input_count": 11,
+    "select_count": 1,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__pos__bc-form.html": {
+    "file": "scripts__restaurantpe__ajustes__pos__bc-form.html",
+    "size": 315,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__cajas__index.html": {
+    "file": "scripts__restaurantpe__ajustes__cajas__index.html",
+    "size": 8647,
+    "ng_models": [
+      "vm.paginaActual",
+      "vm.paginaActualComprobante",
+      "vm.paginacionSeleccionada",
+      "vm.paginacionSeleccionadaComprobante",
+      "vm.valBusqueda",
+      "vm.valBusquedaComprobante"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnAbrirModalRestriccionCrearCaja()",
+      "vm.fnCargarCajas()",
+      "vm.fnCargarComprobantes()",
+      "vm.fnEditarComprobante(comprobante)",
+      "vm.fnNuevoComprobante()",
+      "vm.fnObtenerLogtablaPorId(vm.caja.caja_id,vm.caja.caja_descripcion,",
+      "vm.fnObtenerPorId(caja.caja_id);$state.go("
+    ],
+    "buttons": [
+      "Editar",
+      "Nueva caja",
+      "Nuevo comprobante",
+      "Ver ultimas actualizaciones"
+    ],
+    "table_headers": [
+      "Nombre",
+      "Almacen",
+      "Factura e imprime?",
+      "Self Service?",
+      "Estado",
+      "Acciones",
+      "Caja",
+      "Comprobante",
+      "RUC",
+      "Numeración",
+      "Impresora",
+      "Estado",
+      "Acciones"
+    ],
+    "input_count": 2,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 2
+  },
+  "scripts__restaurantpe__ajustes__reuniones__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__reuniones__bc-index.html",
+    "size": 128,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__integracion__configuracioncartarappi.html": {
+    "file": "scripts__restaurantpe__ajustes__integracion__configuracioncartarappi.html",
+    "size": 4341,
+    "ng_models": [
+      "producto.itemObj",
+      "producto.tipoitemObj",
+      "subitem.itemObj",
+      "vm.paginaActual",
+      "vm.textSearch"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnGuardarConfiguracion()"
+    ],
+    "buttons": [
+      "Atras",
+      "Guardar cambios"
+    ],
+    "table_headers": [
+      "Item en Rappi",
+      "Tipo de item",
+      "Item en Restaurant.pe",
+      "Item en Rappi",
+      "Item en Restaurant.pe"
+    ],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__valedepago__bc-form.html": {
+    "file": "scripts__restaurantpe__ajustes__valedepago__bc-form.html",
+    "size": 230,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__imagen-self-service__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__imagen-self-service__bc-index.html",
+    "size": 150,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__tarea__index.html": {
+    "file": "scripts__restaurantpe__ajustes__tarea__index.html",
+    "size": 8106,
+    "ng_models": [
+      "vm.filtros.devObj",
+      "vm.filtros.estadoObj",
+      "vm.filtros.origenObj",
+      "vm.filtros.prioridadObj",
+      "vm.filtros.proyectoObj",
+      "vm.filtros.tarea_sprint",
+      "vm.filtros.tipoObj",
+      "vm.paginaActual",
+      "vm.paginacionSeleccionada",
+      "vm.valBusqueda"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnCargarTareas()",
+      "vm.fnDuplicarTareaEdit(tarea)",
+      "vm.fnObtenerPorId(tarea.tarea_id);$state.go(",
+      "vm.resetearTareaObjeto();$state.go("
+    ],
+    "buttons": [
+      "Duplicar",
+      "Editar",
+      "Nueva tarea"
+    ],
+    "table_headers": [
+      "Id",
+      "Sprint",
+      "Proyecto",
+      "Prioridad",
+      "Origen",
+      "Tipo",
+      "F. Solicitud",
+      "F. Entrega",
+      "Descripcion",
+      "Referencia",
+      "Dev",
+      "Dessarrollado",
+      "Comentario",
+      "Por Revisar",
+      "Peso",
+      "Estado",
+      "Acciones"
+    ],
+    "input_count": 2,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__valedepago__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__valedepago__bc-index.html",
+    "size": 133,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__imagen-self-service__index.html": {
+    "file": "scripts__restaurantpe__ajustes__imagen-self-service__index.html",
+    "size": 12121,
+    "ng_models": [],
+    "ng_clicks_sample": [
+      "vm.eliminarImagenMarca(image)",
+      "vm.openFileDialog(",
+      "vm.scrollCarousel(",
+      "vm.selectLocal(item)",
+      "vm.selectMarca(item)",
+      "vm.selectTipo(item)",
+      "vm.toggleLocalDropdown()",
+      "vm.toggleMarcaDropdown()",
+      "vm.toggleTipoDropdown()"
+    ],
+    "buttons": [
+      "Elegir una imagen Subiendo..."
+    ],
+    "table_headers": [],
+    "input_count": 4,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__callcenter__sucursal.html": {
+    "file": "scripts__restaurantpe__ajustes__callcenter__sucursal.html",
+    "size": 10999,
+    "ng_models": [
+      "vm.cambiandoZonaLocal",
+      "vm.coberturaSelecionada",
+      "vm.estadoSeleccionado",
+      "vm.localCambioRuta",
+      "vm.zonaSeleccionada.coberturalocal_color",
+      "vm.zonaSeleccionada.coberturalocal_costoenvio",
+      "vm.zonaSeleccionada.coberturalocal_estado",
+      "vm.zonaSeleccionada.coberturalocal_horafin",
+      "vm.zonaSeleccionada.coberturalocal_horainicio",
+      "vm.zonaSeleccionada.coberturalocal_minimoparaenviogratis",
+      "vm.zonaSeleccionada.coberturalocal_nombre",
+      "vm.zonaSeleccionada.coberturalocal_pedidominimo",
+      "vm.zonaSeleccionada.coberturalocal_radiokmcobertura",
+      "vm.zonaSeleccionada.coberturalocal_tipocobertura"
+    ],
+    "ng_clicks_sample": [
+      "vm.cancelar();",
+      "vm.descargarPlantillaZonasDeReparto();",
+      "vm.fnAbrirModalConfiguracionSucursal();",
+      "vm.guardarCambiosRuta();",
+      "vm.seleccionarZona(zona)",
+      "vm.zonaSeleccionada.coberturalocal_estado = ",
+      "vm.zonaSeleccionada.coberturalocal_permiteenviogratis = ",
+      "vm.zonaSeleccionada.coberturalocal_tipocobertura_aux = "
+    ],
+    "buttons": [
+      "Cancelar",
+      "Eliminar",
+      "Guardar",
+      "Importar zonas de reparto",
+      "Opciones"
+    ],
+    "table_headers": [],
+    "input_count": 10,
+    "select_count": 1,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__ajustes-breadcrumb.html": {
+    "file": "scripts__restaurantpe__ajustes__ajustes-breadcrumb.html",
+    "size": 74,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__sucursales__index.html": {
+    "file": "scripts__restaurantpe__ajustes__sucursales__index.html",
+    "size": 2882,
+    "ng_models": [],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.abrirmodalconctatos(sucursal.local_id)"
+    ],
+    "buttons": [
+      "Conctatos",
+      "Editar"
+    ],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__vista-conf-impresora__guia-conf-impresion.view.html": {
+    "file": "scripts__restaurantpe__ajustes__vista-conf-impresora__guia-conf-impresion.view.html",
+    "size": 4350,
+    "ng_models": [],
+    "ng_clicks_sample": [
+      "vm.modalVisible = false",
+      "vm.tabSeleccionadaDelModalDeAyuda = tab;"
+    ],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__salones__breadcrumb-index.html": {
+    "file": "scripts__restaurantpe__ajustes__salones__breadcrumb-index.html",
+    "size": 132,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__monedafacturacion__editar.html": {
+    "file": "scripts__restaurantpe__ajustes__monedafacturacion__editar.html",
+    "size": 3516,
+    "ng_models": [
+      "vm.monedafacturacion.monedafacturacion_descripcion",
+      "vm.monedafacturacion.monedafacturacion_simbolo",
+      "vm.objIsoCode"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.fnActualizar()",
+      "vm.fnAgregar()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar",
+      "Modificar"
+    ],
+    "table_headers": [],
+    "input_count": 2,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__pos__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__pos__bc-index.html",
+    "size": 128,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__tarea__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__tarea__bc-index.html",
+    "size": 124,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__proveedorfe__modals__modal-actualizaareaproduccionsucursales.html": {
+    "file": "scripts__restaurantpe__ajustes__proveedorfe__modals__modal-actualizaareaproduccionsucursales.html",
+    "size": 1775,
+    "ng_models": [
+      "localareaproduccionprincipal.areaproduccionprincipalObj"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnCancel()",
+      "vm.fnGuardar()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar"
+    ],
+    "table_headers": [
+      "Sucursal",
+      "Area producción principal"
+    ],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__impresoras__breadcrumb-impresoras-form.html": {
+    "file": "scripts__restaurantpe__ajustes__impresoras__breadcrumb-impresoras-form.html",
+    "size": 381,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__folios__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__folios__bc-index.html",
+    "size": 122,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__implementacion__editar.html": {
+    "file": "scripts__restaurantpe__ajustes__implementacion__editar.html",
+    "size": 11808,
+    "ng_models": [
+      "vm.asesoresTecnicoObj",
+      "vm.categoriaImplementacionObj",
+      "vm.esNuevoClienteObj",
+      "vm.implementacion.gastos",
+      "vm.implementacion.link_drive",
+      "vm.implementacion.motivo_implementacion",
+      "vm.implementacion.observacion",
+      "vm.implementacion.trazabilidad_acuerdo",
+      "vm.implementacion.trazabilidad_cliente",
+      "vm.implementacion.trazabilidad_fechacierre",
+      "vm.implementacion.trazabilidad_local",
+      "vm.localSeleccionado",
+      "vm.pickerFechaalta.fechas.startDate",
+      "vm.pickerFechaimplementacion.fechas.startDate",
+      "vm.plataformaObj",
+      "vm.productoObj",
+      "vm.seImplementoObj",
+      "vm.tipoImplementacionObj"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.fnActualizar()",
+      "vm.fnAgregar()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar",
+      "Modificar"
+    ],
+    "table_headers": [],
+    "input_count": 8,
+    "select_count": 0,
+    "textarea_count": 2,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__contrato__modal__modal-contrato.html": {
+    "file": "scripts__restaurantpe__ajustes__contrato__modal__modal-contrato.html",
+    "size": 1200,
+    "ng_models": [],
+    "ng_clicks_sample": [
+      "vm.fnCancelar()"
+    ],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__impuestos__editar.html": {
+    "file": "scripts__restaurantpe__ajustes__impuestos__editar.html",
+    "size": 7966,
+    "ng_models": [
+      "vm.entradaCatalogo",
+      "vm.impuesto.igv_estado",
+      "vm.impuesto.igv_fiscalizado",
+      "vm.impuesto.igv_moddelivery",
+      "vm.impuesto.igv_modrapida",
+      "vm.impuesto.igv_modreserva",
+      "vm.impuesto.igv_modsalon",
+      "vm.impuesto.igv_nombre",
+      "vm.impuesto.igv_porcentajeigv",
+      "vm.impuestomultipaisObj",
+      "vm.tasaCatalogo"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.fnActualizar()",
+      "vm.fnAgregar()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar",
+      "Modificar"
+    ],
+    "table_headers": [
+      "Modalidad",
+      "Estado"
+    ],
+    "input_count": 12,
+    "select_count": 2,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__salones__index.html": {
+    "file": "scripts__restaurantpe__ajustes__salones__index.html",
+    "size": 1643,
+    "ng_models": [],
+    "ng_clicks_sample": [
+      "vm.fnObtenerLogtablaMesaPorId(vm.mesa.mesa_id,vm.mesa.mesa_descripcion,",
+      "vm.fnObtenerLogtablaPorId(vm.salon.salon_id,vm.salon.salon_descripcion,"
+    ],
+    "buttons": [
+      "Configurar salones de impresión",
+      "Nuevo salón",
+      "Ver ultimas actualizaciones"
+    ],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__implementacion__index.html": {
+    "file": "scripts__restaurantpe__ajustes__implementacion__index.html",
+    "size": 7807,
+    "ng_models": [
+      "vm.filtros.categoriaImplementacionObj",
+      "vm.filtros.esNuevoClienteObj",
+      "vm.filtros.plataformaObj",
+      "vm.filtros.productoObj",
+      "vm.filtros.seImplementoObj",
+      "vm.filtros.tipoImplementacionObj",
+      "vm.paginaActual",
+      "vm.paginacionSeleccionada",
+      "vm.valBusqueda"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnCargarImplementaciones()",
+      "vm.fnObtenerPorId(implementacion.implementacion_id);$state.go(",
+      "vm.resetearImplementacionObjeto();$state.go("
+    ],
+    "buttons": [
+      "Editar",
+      "Nueva Implementacion"
+    ],
+    "table_headers": [
+      "link Dominio",
+      "Producto",
+      "Asesor Implem",
+      "Fecha Alta",
+      "Se Implemento",
+      "Tipo",
+      "Observacion",
+      "Fecha Implementacion",
+      "[Traza] Cliente",
+      "[Traza] Local",
+      "[Traza] Cierre",
+      "[Traza] Asesor",
+      "Acciones"
+    ],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__opcionessistema__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__opcionessistema__bc-index.html",
+    "size": 131,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__tarjetas__bc-form.html": {
+    "file": "scripts__restaurantpe__ajustes__tarjetas__bc-form.html",
+    "size": 332,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__sucursales__editar-breadcrumb.html": {
+    "file": "scripts__restaurantpe__ajustes__sucursales__editar-breadcrumb.html",
+    "size": 215,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__integracion__configuracioncartapedidosya.html": {
+    "file": "scripts__restaurantpe__ajustes__integracion__configuracioncartapedidosya.html",
+    "size": 2372,
+    "ng_models": [
+      "producto.itemObj",
+      "producto.itemintegracion_idintegracion "
+    ],
+    "ng_clicks_sample": [
+      "vm.fnAddItem()",
+      "vm.fnGuardarConfiguracion()"
+    ],
+    "buttons": [
+      "Agregar Item",
+      "Atras",
+      "Guardar cambios"
+    ],
+    "table_headers": [
+      "Item en PedidosYa",
+      "Item en Restaurant.pe"
+    ],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__callcenter__mapaconzonas.html": {
+    "file": "scripts__restaurantpe__ajustes__callcenter__mapaconzonas.html",
+    "size": 2599,
+    "ng_models": [
+      "vm.referenciaMapa"
+    ],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 2,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__comprobantes__index.html": {
+    "file": "scripts__restaurantpe__ajustes__comprobantes__index.html",
+    "size": 6042,
+    "ng_models": [
+      "vm.paginaActual",
+      "vm.paginacionSeleccionada",
+      "vm.valBusqueda"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnAbrirModalRestriccionComprobantes(comprobante)",
+      "vm.fnCargarComprobantes()",
+      "vm.fnObtenerLogtablaPorId(vm.comprobante.comprobante_id,vm.comprobante.comprobante_tipo,"
+    ],
+    "buttons": [
+      "Editar",
+      "Ver ultimas actualizaciones"
+    ],
+    "table_headers": [
+      "Caja",
+      "Comprobante",
+      "Numeración",
+      "Impresora",
+      "Estado",
+      "Predeterminado",
+      "Acciones"
+    ],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__contrato__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__contrato__bc-index.html",
+    "size": 126,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__seriemanualfe__index.html": {
+    "file": "scripts__restaurantpe__ajustes__seriemanualfe__index.html",
+    "size": 4383,
+    "ng_models": [
+      "vm.paginaActual",
+      "vm.paginacionSeleccionada",
+      "vm.valBusqueda"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.fnCargarSeriemanualfeList()",
+      "vm.fnObtenerPorId(seriemanualfe.seriemanualfe_id);$state.go("
+    ],
+    "buttons": [
+      "Editar",
+      "Nueva serie de contingencia"
+    ],
+    "table_headers": [
+      "RUC",
+      "Comprobante",
+      "Serie",
+      "Fecha de alta",
+      "Fecha de registro",
+      "Estado",
+      "Acciones"
+    ],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__valedepago__modals__valepagorestaurant.modal.html": {
+    "file": "scripts__restaurantpe__ajustes__valedepago__modals__valepagorestaurant.modal.html",
+    "size": 7526,
+    "ng_models": [
+      "productovale.valepagoproducto_estado",
+      "valepagorestaurant.codigo",
+      "valepagorestaurant.fechacaducidad",
+      "valepagorestaurant.monto",
+      "valepagorestaurant.seleccionada",
+      "valepagorestaurant.valepagorestaurant_categoria",
+      "vm.busqueda",
+      "vm.paginaActual",
+      "vm.valBusquedaProducto"
+    ],
+    "ng_clicks_sample": [
+      "vm.activarEditar(valepagorestaurant)",
+      "vm.busqueda = ",
+      "vm.cerrarModal()",
+      "vm.desactivarEditar(valepagorestaurant)",
+      "vm.deshabilitarVale(valepagorestaurant.valepagorestaurant_id)",
+      "vm.fnDescargarExcel()",
+      "vm.fnDesmarcarTodos()",
+      "vm.fnInactivarVales()",
+      "vm.fnMarcarTodos()",
+      "vm.guardarCambios(valepagorestaurant)",
+      "vm.valBusquedaProducto="
+    ],
+    "buttons": [
+      "Cancelar",
+      "Cerrar",
+      "Descargar",
+      "Guardar"
+    ],
+    "table_headers": [
+      "Categoria",
+      "Codigo",
+      "Monto",
+      "Fecha Caducidad",
+      "Reutilizable",
+      "Estado",
+      "Opciones"
+    ],
+    "input_count": 8,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__integracion__configuracioncartauber.html": {
+    "file": "scripts__restaurantpe__ajustes__integracion__configuracioncartauber.html",
+    "size": 3510,
+    "ng_models": [
+      "producto.external_data_tipo",
+      "producto.external_obj",
+      "vm.paginaActual",
+      "vm.textSearch"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnGuardarConfiguracion()"
+    ],
+    "buttons": [
+      "Atras",
+      "Guardar cambios"
+    ],
+    "table_headers": [
+      "Item en Ubereats",
+      "Tipo de item",
+      "Item en Restaurant.pe"
+    ],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__integracion__erpcanal-locales.html": {
+    "file": "scripts__restaurantpe__ajustes__integracion__erpcanal-locales.html",
+    "size": 23588,
+    "ng_models": [
+      "loc.seleccionado",
+      "loc.sucursalSel",
+      "p.tiposImpuestoErpSel",
+      "tab12.todosSel",
+      "vm.erpContableCtaCajasSel",
+      "vm.erpContableReplicarOrigen"
+    ],
+    "ng_clicks_sample": [
+      "tab12.replicarDesde(o)",
+      "tab12.unificarEmpresa()",
+      "tab12.validarEmpresa()",
+      "tab12.verQueSeCopia()",
+      "vm.activarLocalErpContableRuc(loc, false)",
+      "vm.activarLocalErpContableRuc(loc, true)",
+      "vm.activarLocalesErpContableRuc(false)",
+      "vm.activarLocalesErpContableRuc(true)",
+      "vm.cargarPlanCuentasErpContableRuc()",
+      "vm.completarAprovisionamientoErpContableRuc()",
+      "vm.conectarEmpresaErpContableRuc()",
+      "vm.copiarMapeosErpContableRuc()",
+      "vm.crearSucursalesErpContableRuc()",
+      "vm.desconectarLocalErpContableRuc(loc)",
+      "vm.erpIrANivel(loc)"
+    ],
+    "buttons": [
+      "Abrir local",
+      "Activar",
+      "Cargar",
+      "Comparar los locales",
+      "Desconectar",
+      "Guardar el match de {{r.local_descripcion}}",
+      "Guardar las sucursales elegidas",
+      "Pausar",
+      "Replicar a los marcados",
+      "Replicar desde…"
+    ],
+    "table_headers": [
+      "Local",
+      "Empresa ERP",
+      "Sucursal ERP",
+      "Sync",
+      "C. costo",
+      "Cajas",
+      "Almacenes",
+      "Emisor",
+      "Acciones",
+      "EquivalenciaSin alinearSe tomaría de"
+    ],
+    "input_count": 2,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 2
+  },
+  "scripts__restaurantpe__ajustes__tipotransferencia__bc-form.html": {
+    "file": "scripts__restaurantpe__ajustes__tipotransferencia__bc-form.html",
+    "size": 386,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__cupondescuento__importar.html": {
+    "file": "scripts__restaurantpe__ajustes__cupondescuento__importar.html",
+    "size": 1952,
+    "ng_models": [
+      "vm.formatoSeparadorDecimalSeleccionado"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.descargarPlantilla()"
+    ],
+    "buttons": [
+      "Atras",
+      "Descargar plantilla",
+      "Importar Cupones"
+    ],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__configurarimpresoras__breadcrumb-index.html": {
+    "file": "scripts__restaurantpe__ajustes__configurarimpresoras__breadcrumb-index.html",
+    "size": 151,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__configuracionpos__index.html": {
+    "file": "scripts__restaurantpe__ajustes__configuracionpos__index.html",
+    "size": 18729,
+    "ng_models": [
+      "configuracion.camposImpresionSeleccionados",
+      "configuracion.configuracionCashdro.ip",
+      "configuracion.configuracionCashdro.password",
+      "configuracion.configuracionCashdro.user",
+      "configuracion.configuracionlocalpos_valor",
+      "configuracion.configuracionlocalpos_valoraux1",
+      "configuracion.configuracionlocalpos_valoraux2",
+      "configuracion.configuracionlocalpos_valoraux2Obj.credito",
+      "configuracion.configuracionlocalpos_valoraux2Obj.delivery",
+      "configuracion.configuracionlocalpos_valoraux2Obj.efectivo",
+      "configuracion.configuracionlocalpos_valoraux2Obj.tarjeta",
+      "configuracion.configuracionlocalpos_valoraux2Obj.transferencia",
+      "configuracion.configuracionlocalpos_valoraux2Obj.ventarapida",
+      "configuracion.etiquetasAgrupacionSeleccionadas",
+      "configuracion.monedaSelectedList"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnAgregar()",
+      "vm.fnObtenerLogtablaPorId(configuracion.configuracion_id,configuracion.configuracion.configuracion_descripcion,",
+      "vm.getLogPorLogTablaConfigLocal()"
+    ],
+    "buttons": [
+      "Registrar cambios",
+      "Ver log",
+      "Ver ultimas actualizaciones"
+    ],
+    "table_headers": [],
+    "input_count": 16,
+    "select_count": 5,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__salones__mesas-nuevo.html": {
+    "file": "scripts__restaurantpe__ajustes__salones__mesas-nuevo.html",
+    "size": 4822,
+    "ng_models": [
+      "vm.formMesaSeleccionado",
+      "vm.mesa.mesa_descripcion",
+      "vm.mesa.mesa_estado",
+      "vm.mesa.salon_nmesas",
+      "vm.mesa.salon_prefijomesas"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.fnActualizarMesa()",
+      "vm.fnAgregarMesa()",
+      "vm.fnEliminarMesa()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Eliminar",
+      "Guardar",
+      "Modificar"
+    ],
+    "table_headers": [],
+    "input_count": 5,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__seriemanualfe__editar.html": {
+    "file": "scripts__restaurantpe__ajustes__seriemanualfe__editar.html",
+    "size": 3611,
+    "ng_models": [
+      "vm.seriemanualfe.seriemanualfe_estado",
+      "vm.seriemanualfe.seriemanualfe_fechadealta",
+      "vm.seriemanualfe.seriemanualfe_serie",
+      "vm.tipoSeriemanualfeSeleccionado"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "abrirDatepicker(true)",
+      "vm.fnActualizar()",
+      "vm.fnAgregar()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar",
+      "Modificar"
+    ],
+    "table_headers": [],
+    "input_count": 3,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__cupondescuento__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__cupondescuento__bc-index.html",
+    "size": 131,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__tarea__bc-form.html": {
+    "file": "scripts__restaurantpe__ajustes__tarea__bc-form.html",
+    "size": 326,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__transportistas__index.html": {
+    "file": "scripts__restaurantpe__ajustes__transportistas__index.html",
+    "size": 4531,
+    "ng_models": [
+      "vm.paginaActual",
+      "vm.paginacionSeleccionada",
+      "vm.valBusqueda"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnCargarTransportistas()",
+      "vm.fnObtenerPorId(transportista.transportista_id);$state.go(",
+      "vm.transportista.resetearTransportistaObjeto();$state.go("
+    ],
+    "buttons": [
+      "Editar",
+      "Nuevo transportista"
+    ],
+    "table_headers": [
+      "Razón social",
+      "Dirección",
+      "Vehiculo",
+      "Certificado",
+      "Licencia",
+      "Teléfono",
+      "Estado",
+      "Acciones"
+    ],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__transportistas__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__transportistas__bc-index.html",
+    "size": 203,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__tipotransferencia__editar.html": {
+    "file": "scripts__restaurantpe__ajustes__tipotransferencia__editar.html",
+    "size": 5662,
+    "ng_models": [
+      "vm.localSeleccionado",
+      "vm.tipoCuentaTransferenciaSeleccionada",
+      "vm.tipotransferencia.tipotransferencia_codigointerbancario",
+      "vm.tipotransferencia.tipotransferencia_estado",
+      "vm.tipotransferencia.tipotransferencia_nombreentidad",
+      "vm.tipotransferencia.tipotransferencia_numerocuenta",
+      "vm.tipotransferencia.tipotransferencia_titular"
+    ],
+    "ng_clicks_sample": [
+      "vm.editando = false; vm.registrando = false;",
+      "vm.fnActualizar()",
+      "vm.fnAgregar()"
+    ],
+    "buttons": [
+      "&nbsp;&nbsp;Elegir una Imagen",
+      "Cancelar",
+      "Guardar",
+      "Modificar"
+    ],
+    "table_headers": [],
+    "input_count": 5,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__monedafacturacion__bc-form.html": {
+    "file": "scripts__restaurantpe__ajustes__monedafacturacion__bc-form.html",
+    "size": 390,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__valedepago__index.html": {
+    "file": "scripts__restaurantpe__ajustes__valedepago__index.html",
+    "size": 4638,
+    "ng_models": [
+      "vm.paginaActual",
+      "vm.paginacionSeleccionada",
+      "vm.valBusqueda"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnAbrirModalConfiguracionPorLocal(vale.formapago_id);",
+      "vm.fnCargarVales()",
+      "vm.fnObtenerLogtablaPorId(vm.valepagorestaurant.valepagorestaurant_codigo,vm.valepagorestaurant.valepagorestaurant_sigla,",
+      "vm.fnObtenerPorId(vale.formapago_id);$state.go("
+    ],
+    "buttons": [
+      "En este local",
+      "Global",
+      "Ver ultimas actualizaciones"
+    ],
+    "table_headers": [
+      "Nombre",
+      "Tipo",
+      "Categoria",
+      "Local actual",
+      "Global",
+      "Configurar"
+    ],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__impresoras__breadcrumb-index.html": {
+    "file": "scripts__restaurantpe__ajustes__impresoras__breadcrumb-index.html",
+    "size": 115,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__configurarimpresoras__index.html": {
+    "file": "scripts__restaurantpe__ajustes__configurarimpresoras__index.html",
+    "size": 11231,
+    "ng_models": [
+      "cat.categoria_afectaconfiguracion",
+      "cat.replicar",
+      "configuracion.impresoraAux",
+      "subhijo.categoria_afectaconfiguracion",
+      "subhijo.replicar",
+      "subhijo2.categoria_afectaconfiguracion",
+      "subhijo2.replicar",
+      "subhijo3.categoria_afectaconfiguracion",
+      "subhijo3.replicar",
+      "vm.localSeleccionado"
+    ],
+    "ng_clicks_sample": [
+      "vm.agregarImpresoraCat(cat)",
+      "vm.agregarImpresoraCat(subhijo)",
+      "vm.agregarImpresoraCat(subhijo2)",
+      "vm.agregarImpresoraCat(subhijo3)",
+      "vm.eliminarImpresoraCat(cat, configuracion)",
+      "vm.eliminarImpresoraCat(subhijo, configuracion)",
+      "vm.eliminarImpresoraCat(subhijo2, configuracion)",
+      "vm.eliminarImpresoraCat(subhijo3, configuracion)",
+      "vm.fnClickCategoria(cat)",
+      "vm.fnClickCategoria(subhijo)",
+      "vm.fnClickCategoria(subhijo2)",
+      "vm.fnClickCategoria(subhijo3)",
+      "vm.fnGuardar();",
+      "vm.seleccionarSalon(item)"
+    ],
+    "buttons": [
+      "+",
+      "Guardar"
+    ],
+    "table_headers": [
+      "Nombre categoría",
+      "Aplicar",
+      "Replicar",
+      "Impresora",
+      "Aplicar",
+      "Replicar",
+      "Impresora",
+      "Aplicar",
+      "Replicar",
+      "Impresora",
+      "Aplicar",
+      "Replicar",
+      "Impresora"
+    ],
+    "input_count": 8,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 4
+  },
+  "scripts__restaurantpe__ajustes__categoriaanularventa__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__categoriaanularventa__bc-index.html",
+    "size": 152,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__formasdepago__bc-form.html": {
+    "file": "scripts__restaurantpe__ajustes__formasdepago__bc-form.html",
+    "size": 352,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__integracion__bc-erpcanal.html": {
+    "file": "scripts__restaurantpe__ajustes__integracion__bc-erpcanal.html",
+    "size": 205,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__motivosoperacion__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__motivosoperacion__bc-index.html",
+    "size": 140,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__produccion__modals__almacen-modal.html": {
+    "file": "scripts__restaurantpe__ajustes__produccion__modals__almacen-modal.html",
+    "size": 1126,
+    "ng_models": [
+      "vm.almacen.almacen_descripcion"
+    ],
+    "ng_clicks_sample": [
+      "vm.cerrarModal()",
+      "vm.fnAgregar()"
+    ],
+    "buttons": [
+      "Cancelar",
+      "Guardar"
+    ],
+    "table_headers": [],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__marca__index.html": {
+    "file": "scripts__restaurantpe__ajustes__marca__index.html",
+    "size": 3934,
+    "ng_models": [
+      "vm.paginaActual",
+      "vm.paginacionSeleccionada",
+      "vm.valBusqueda"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnCargarMarcaList()",
+      "vm.fnObtenerPorId(marca.marca_id);$state.go(",
+      "vm.marca.resetearMarcaObjeto();$state.go("
+    ],
+    "buttons": [
+      "Editar",
+      "Nueva marca"
+    ],
+    "table_headers": [
+      "Nombre",
+      "RUC",
+      "Estado",
+      "Acciones"
+    ],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__cupondescuento__modals__categoriacupondescuento.modal.html": {
+    "file": "scripts__restaurantpe__ajustes__cupondescuento__modals__categoriacupondescuento.modal.html",
+    "size": 5539,
+    "ng_models": [
+      "vm.categoriacupodescuento.categoriacupodescuento_descripcion",
+      "vm.categoriacupodescuento.categoriacupodescuento_estado",
+      "vm.categoriacupodescuento.categoriacupodescuento_fechaexpiracionpordefecto",
+      "vm.categoriacupodescuento.categoriacupodescuento_montopordefecto",
+      "vm.nPagina",
+      "vm.tipoCuponSeleccionado"
+    ],
+    "ng_clicks_sample": [
+      "vm.categoriacupodescuento=d;vm.seleccionarTipo(d);",
+      "vm.fnActualizarCategoria()",
+      "vm.fnAgregarCategoria()",
+      "vm.fnCancel()"
+    ],
+    "buttons": [
+      "Actualizar",
+      "Cerrar",
+      "Editar",
+      "Guardar"
+    ],
+    "table_headers": [
+      "Descripción",
+      "Tipo",
+      "Estado"
+    ],
+    "input_count": 4,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__impresoras__impresoras-editar.html": {
+    "file": "scripts__restaurantpe__ajustes__impresoras__impresoras-editar.html",
+    "size": 19888,
+    "ng_models": [
+      "vm.checkInhabilitarObservaciones",
+      "vm.impresora.impresora_abregaveta",
+      "vm.impresora.impresora_esparafacturacion ",
+      "vm.impresora.impresora_estado",
+      "vm.impresora.impresora_impresiondirecta",
+      "vm.impresora.impresora_imprimedocumento",
+      "vm.impresora.impresora_ip",
+      "vm.impresora.impresora_ipdeimpresora",
+      "vm.impresora.impresora_ipfabrica",
+      "vm.impresora.impresora_macdeimpresora",
+      "vm.impresora.impresora_nombre",
+      "vm.impresora.impresora_nroautorizacion",
+      "vm.impresora.impresora_numerocaracteres",
+      "vm.impresora.impresora_numerocaracteres2",
+      "vm.impresora.impresora_numerocorrelativo",
+      "vm.impresora.impresora_numeroserie",
+      "vm.impresora.impresora_observacion",
+      "vm.impresora.impresora_saltoslineaqr",
+      "vm.impresora.impresora_serie",
+      "vm.impresora.impresora_ubicacionfisica",
+      "vm.impresoraSeleccionada",
+      "vm.modeloSeleccionado",
+      "vm.modoImpresionSeleccionada",
+      "vm.tamanioFuenteSeleccionado",
+      "vm.tamanioQRSeleccionado",
+      "vm.tipoDeConectorSeleccionado",
+      "vm.tipoImpresoraSeleccionada",
+      "vm.tipogeneracionSeleccionada"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.fnActualizar()",
+      "vm.fnAgregar()",
+      "vm.fnComprobarServicio()",
+      "vm.fnGetMacPorIP(vm.impresora.impresora_ipdeimpresora)",
+      "vm.fnObtenerLogtablaPorId(vm.impresora.impresora_id,vm.impresora.impresora_nombre,",
+      "vm.fnSetearValoresDefault()"
+    ],
+    "buttons": [
+      "Cancelar y volver",
+      "Comprobar servicio",
+      "Guardar nueva impresora",
+      "Modificar impresora",
+      "Obtener información de esta computadora",
+      "Ver ultimas actualizaciones",
+      "capturar MAC"
+    ],
+    "table_headers": [],
+    "input_count": 19,
+    "select_count": 0,
+    "textarea_count": 1,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__produccion__area-editar.html": {
+    "file": "scripts__restaurantpe__ajustes__produccion__area-editar.html",
+    "size": 9813,
+    "ng_models": [
+      "salon.areaproduccionsalon.areaproduccionsalon_estado",
+      "vm.almacenSeleccionado",
+      "vm.impresoraSeleccionado",
+      "vm.produccion.areaproduccion_descripcion",
+      "vm.produccion.areaproduccion_estado",
+      "vm.produccion.areaproduccion_imprimir",
+      "vm.produccion.areaproduccion_noafectaconfiguracionsalon",
+      "vm.produccion.areaproduccion_numerocopias",
+      "vm.produccion.areaproduccion_omitiralmacencaja",
+      "vm.produccion.areaproduccion_tiempodespachocrititco",
+      "vm.produccion.areaproduccion_tiempodespachomalo",
+      "vm.produccion.areaproduccion_visiblecentrologistico",
+      "vm.produccion.salon"
+    ],
+    "ng_clicks_sample": [
+      "$state.go(",
+      "vm.abrirNuevaImpresora()",
+      "vm.abrirNuevoAlmacen()",
+      "vm.fnAbrirModalAreasalonimpresora(salon)",
+      "vm.fnActualizarArea()",
+      "vm.fnAgregarArea()"
+    ],
+    "buttons": [
+      "0)\"> Asignar",
+      "Cancelar",
+      "Crear nuevo almacén",
+      "Guardar",
+      "Modificar",
+      "Registrar nueva impresora"
+    ],
+    "table_headers": [
+      "Salon",
+      "Imp. asig.",
+      "Estado",
+      "Impresora"
+    ],
+    "input_count": 10,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__monedas__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__monedas__bc-index.html",
+    "size": 124,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__turnos__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__turnos__bc-index.html",
+    "size": 121,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__movilidad__bc-form.html": {
+    "file": "scripts__restaurantpe__ajustes__movilidad__bc-form.html",
+    "size": 340,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__integracion__index.html": {
+    "file": "scripts__restaurantpe__ajustes__integracion__index.html",
+    "size": 4383,
+    "ng_models": [],
+    "ng_clicks_sample": [
+      "vm.fnActualizarApiKeyBySucursal(proveedorIntegracion);",
+      "vm.fnObtenerLogtablaPorId($state.params.integracion_id)",
+      "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go("
+    ],
+    "buttons": [
+      "Integrar",
+      "Ver ultimas actualizaciones"
+    ],
+    "table_headers": [
+      "Proveedor",
+      "Rubro",
+      "Estado",
+      "Opciones"
+    ],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__valedepago__modals__configurarporlocal.modal.html": {
+    "file": "scripts__restaurantpe__ajustes__valedepago__modals__configurarporlocal.modal.html",
+    "size": 1793,
+    "ng_models": [
+      "vm.formapago.formapago_activo"
+    ],
+    "ng_clicks_sample": [
+      "vm.cerrarModal()",
+      "vm.fnActualizarFormaDePagoLocal()"
+    ],
+    "buttons": [
+      "Cerrar",
+      "Guardar"
+    ],
+    "table_headers": [],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__marca__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__marca__bc-index.html",
+    "size": 121,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__valedepago__editar.html": {
+    "file": "scripts__restaurantpe__ajustes__valedepago__editar.html",
+    "size": 18456,
+    "ng_models": [
+      "pl.localvalidovale",
+      "producto.formapagoproducto_puntos",
+      "producto.formapagoproducto_usapuntos",
+      "productovale.valepagoproducto_estado",
+      "vm.formapago.formapago_activo",
+      "vm.formapago.formapago_equivalenciapuntos",
+      "vm.formapago.formapago_equivalenciasoles",
+      "vm.formapago.formapago_todosproductos",
+      "vm.productoBuscado",
+      "vm.valepagorestaurant.mostrarOpcionActualizar",
+      "vm.valepagorestaurant.mostrarSucursales",
+      "vm.valepagorestaurant.registrarPorRango",
+      "vm.valepagorestaurant.valepagorestaurant_categoria",
+      "vm.valepagorestaurant.valepagorestaurant_codigo",
+      "vm.valepagorestaurant.valepagorestaurant_estado",
+      "vm.valepagorestaurant.valepagorestaurant_fechacaducidad",
+      "vm.valepagorestaurant.valepagorestaurant_monto",
+      "vm.valepagorestaurant.valepagorestaurant_numerofinserie",
+      "vm.valepagorestaurant.valepagorestaurant_numeroinicioserie",
+      "vm.valepagorestaurant.valepagorestaurant_reutilizable",
+      "vm.valepagorestaurant.valepagorestaurant_sigla",
+      "vm.valepagorestaurant_esporproducto"
+    ],
+    "ng_clicks_sample": [
+      "vm.descargarPlantilla()",
+      "vm.fnAbrirModalVale(vm.formapago.formapago_id);",
+      "vm.fnActualizar()",
+      "vm.fnAgregarProducto()",
+      "vm.fnEliminarProducto($index);",
+      "vm.productoBuscado=",
+      "vm.valepagorestaurant.mostrarImportador = !vm.valepagorestaurant.mostrarImportador; vm.valepagorestaurant.registrarNuevoVale = false;",
+      "vm.valepagorestaurant.registrarNuevoVale = !vm.valepagorestaurant.registrarNuevoVale; vm.valepagorestaurant.mostrarImportador = false;",
+      "vm.valepagorestaurant.registrarNuevoVale = false; $state.go("
+    ],
+    "buttons": [
+      "Agregar",
+      "Cancelar",
+      "Descargar plantilla",
+      "Guardar",
+      "Importar Vales",
+      "Importar vales",
+      "Nuevo vale",
+      "Ver vales registrados"
+    ],
+    "table_headers": [
+      "Producto",
+      "¿Personalizar?",
+      "Puntos",
+      "Acciones",
+      "Sucursal",
+      "El vale se puede usar en",
+      "Sucursal",
+      "El vale se puede usar en"
+    ],
+    "input_count": 25,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 3
+  },
+  "scripts__restaurantpe__ajustes__ticket__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__ticket__bc-index.html",
+    "size": 122,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__sucursales__modals__pixel.view.html": {
+    "file": "scripts__restaurantpe__ajustes__sucursales__modals__pixel.view.html",
+    "size": 2121,
+    "ng_models": [
+      "vm.pixelObj.script",
+      "vm.pixelObj.url"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnAplicar()",
+      "vm.fnCancelar()",
+      "vm.fnEditarPixel($index);",
+      "vm.fnEliminarPixel($index);",
+      "vm.fnGuardarPixel();",
+      "vm.fnNuevoPixel();"
+    ],
+    "buttons": [
+      "&times;",
+      "Aplicar",
+      "Cancelar",
+      "Editar",
+      "Eliminar",
+      "Guardar",
+      "Nuevo"
+    ],
+    "table_headers": [
+      "URL",
+      "Script",
+      "Acciones"
+    ],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 1,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__salones__salones-placeholder.html": {
+    "file": "scripts__restaurantpe__ajustes__salones__salones-placeholder.html",
+    "size": 304,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__configuracionregional__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__configuracionregional__bc-index.html",
+    "size": 147,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__integracion__modals__modal-cajascanales-erpcontable.html": {
+    "file": "scripts__restaurantpe__ajustes__integracion__modals__modal-cajascanales-erpcontable.html",
+    "size": 11133,
+    "ng_models": [
+      "c.erpSel",
+      "c.provSel",
+      "vm.cuentaCajaNueva"
+    ],
+    "ng_clicks_sample": [
+      "c.erpSel = null",
+      "c.erpSel = null; vm.recalcularAvisos()",
+      "c.provSel = null; vm.recalcularAvisos()",
+      "vm.cancelar()",
+      "vm.crearCaja(c)",
+      "vm.crearCanal(c)",
+      "vm.cuentaCajaNueva = null",
+      "vm.guardar()",
+      "vm.recargar()"
+    ],
+    "buttons": [
+      "&times;",
+      "Cerrar",
+      "Crear",
+      "Guardar vínculos"
+    ],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 3
+  },
+  "scripts__restaurantpe__ajustes__opcionessistema__index.html": {
+    "file": "scripts__restaurantpe__ajustes__opcionessistema__index.html",
+    "size": 49063,
+    "ng_models": [
+      "configuracion.camposImpresionSeleccionados",
+      "configuracion.camposPreCuentaseleccionados",
+      "configuracion.camposRestriccionAppManagerSeleccionados",
+      "configuracion.configuracion.configuracion_valoraux1",
+      "configuracion.configuracion_valor",
+      "configuracion.configuracionlocal_valor",
+      "configuracion.configuracionlocal_valoraux1",
+      "configuracion.configuracionlocal_valoraux2",
+      "configuracion.configuracionlocal_valoraux2.fecha_inicio",
+      "configuracion.configuracionlocal_valoraux2.frecuencia_envio",
+      "configuracion.configuracionlocal_valoraux2.hora_corte_1",
+      "configuracion.configuracionlocal_valoraux2.hora_corte_2",
+      "configuracion.configuracionlocal_valoraux2.hora_envio",
+      "configuracion.configuracionlocal_valoraux2.hora_fin",
+      "configuracion.configuracionlocal_valoraux2.hora_inicio",
+      "configuracion.configuracionlocal_valoraux2.tipoNotificacion",
+      "configuracion.configuracionlocal_valoraux2.usuariosSeleccionados",
+      "configuracion.configuracionlocal_valoraux3",
+      "configuracion.correosSeleccionados",
+      "vm.afectacionImpuestosDinamicosSeleccionado",
+      "vm.canaldeliverySeleccionado",
+      "vm.correousiario",
+      "vm.formatoPaloteoSeleccionada",
+      "vm.formatoPrecuentaSeleccionada",
+      "vm.paisSeleccionado",
+      "vm.precuentaSeleccionada",
+      "vm.registrarReservaSeleccionada",
+      "vm.telefonos_encuesta",
+      "vm.tipoProductosExentosSeleccionado",
+      "vm.valBusqueda"
+    ],
+    "ng_clicks_sample": [
+      "agregarcorreo(configuracion.configuracionlocal_valoraux2.listacorreos)",
+      "agregarnumero(configuracion.configuracionlocal_valoraux2.listNumeros)",
+      "eliminarCorreo(configuracion.configuracionlocal_valoraux2.listacorreos,$index)",
+      "eliminarNumero(configuracion.configuracionlocal_valoraux2.listNumeros,$index)",
+      "vm.fnAgregar()",
+      "vm.fnObtenerLogtablaPorId(configuracion.configuracion_id,configuracion.configuracion.configuracion_descripcion,",
+      "vm.getLogPorLogTablaConfigLocal()",
+      "vm.habilitarEdiccionConfiguracionesCriticas()"
+    ],
+    "buttons": [
+      "Registrar cambios",
+      "Ver log",
+      "Ver ultimas actualizaciones"
+    ],
+    "table_headers": [],
+    "input_count": 56,
+    "select_count": 14,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__llamada__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__llamada__bc-index.html",
+    "size": 125,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__opcionessistema__modal__impuestos-dinamicos-modal.html": {
+    "file": "scripts__restaurantpe__ajustes__opcionessistema__modal__impuestos-dinamicos-modal.html",
+    "size": 1880,
+    "ng_models": [
+      "impuesto.tributoSeleccionado"
+    ],
+    "ng_clicks_sample": [
+      "vm.cancelar()",
+      "vm.guardar()"
+    ],
+    "buttons": [
+      "&times;",
+      "Cancelar",
+      "Guardar"
+    ],
+    "table_headers": [
+      "Impuesto",
+      "Porcentaje",
+      "Estado",
+      "Tributo"
+    ],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__configuracionregional__index.html": {
+    "file": "scripts__restaurantpe__ajustes__configuracionregional__index.html",
+    "size": 4727,
+    "ng_models": [
+      "configuracionregional.configuracionregionallocal_valor",
+      "configuracionregional.configuracionregionallocal_valoraux1",
+      "configuracionregional.configuracionregionallocal_valoraux2",
+      "configuracionregional.configuracionregionallocal_valoraux3"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnAgregar()",
+      "vm.fnObtenerLogtablaPorId(configuracionregional.configuracionregional_id,configuracionregional.configuracionregional.configuracionregional_descripcion,",
+      "vm.getLogPorLogTablaConfigLocal()"
+    ],
+    "buttons": [
+      "Registrar cambios",
+      "Ver log",
+      "Ver ultimas actualizaciones"
+    ],
+    "table_headers": [],
+    "input_count": 3,
+    "select_count": 2,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__sucursales__modals__horarioatencion.view.html": {
+    "file": "scripts__restaurantpe__ajustes__sucursales__modals__horarioatencion.view.html",
+    "size": 3833,
+    "ng_models": [
+      "horarioatencion.horarioatencion_fin",
+      "horarioatencion.horarioatencion_inicio",
+      "horarioatencion.horarioatenciondia_horasanticipacion",
+      "horarioatenciondia.horarioatenciondia_estado"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnAnadirHorario(horarioatenciondia)",
+      "vm.fnAplicar()",
+      "vm.fnCancelar()",
+      "vm.fnEliminarHorarioatencion($index, horarioatenciondia.horarioatencionList)"
+    ],
+    "buttons": [
+      "&times;",
+      "Aplicar",
+      "Cancelar"
+    ],
+    "table_headers": [],
+    "input_count": 2,
+    "select_count": 1,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__integracion__erpcanal-equivalencias.html": {
+    "file": "scripts__restaurantpe__ajustes__integracion__erpcanal-equivalencias.html",
+    "size": 30141,
+    "ng_models": [
+      "eq.soloPend",
+      "row.bancoCntaSel",
+      "row.formaPagoErp",
+      "row.formaPagoPos",
+      "row.pagoTipo",
+      "row.porcentaje",
+      "row.provSel",
+      "row.tarjeta",
+      "row.tributoSel",
+      "row[eq.fam().def.campo]"
+    ],
+    "ng_clicks_sample": [
+      "eq.abrir(fa)",
+      "eq.agregarRegla(eq.fam())",
+      "eq.borrarRegla(eq.fam(), row)",
+      "eq.canalesGuardar()",
+      "eq.desvincular(eq.fam(), row)",
+      "eq.famSel = ",
+      "eq.famSel = eq.fam().motivo.ir",
+      "eq.guardarEmpresa()",
+      "eq.guardarSoloEn(loc)",
+      "eq.recargarCatalogo()",
+      "eq.usarSugerido(eq.fam(), row)"
+    ],
+    "buttons": [
+      "Borrar regla",
+      "Desvincular",
+      "Guardar en los {{eq.nLocales()}} locales",
+      "Guardar los canales",
+      "Guardar solo en un local",
+      "Ir a la familia donde se resuelve hoy",
+      "Recargar catálogo",
+      "{{fa.nombre}} {{fa.hechos}}/{{fa.total}}"
+    ],
+    "table_headers": [],
+    "input_count": 2,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__reuniones__index.html": {
+    "file": "scripts__restaurantpe__ajustes__reuniones__index.html",
+    "size": 5445,
+    "ng_models": [
+      "vm.filtros.cat",
+      "vm.localbusqueda",
+      "vm.paginaActual",
+      "vm.paginacionSeleccionada",
+      "vm.valBusqueda"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnCargarTareas()",
+      "vm.fnDuplicarTareaEdit(reunion)",
+      "vm.fnObtenerPorId(reunion.reunion_id);$state.go(",
+      "vm.resetearTareaObjeto();$state.go("
+    ],
+    "buttons": [
+      "Duplicar",
+      "Editar",
+      "Nueva Reunion"
+    ],
+    "table_headers": [
+      "Id",
+      "Local",
+      "Fecha",
+      "Hora Inicio",
+      "Clientes",
+      "Team Restaurant",
+      "Asunto",
+      "Descripcion",
+      "Acta",
+      "Duracion",
+      "Observaciones",
+      "Link Dominio",
+      "Sucursal",
+      "Categoria",
+      "Acciones"
+    ],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__integracion__modals__modalIntegracionesPago.html": {
+    "file": "scripts__restaurantpe__ajustes__integracion__modals__modalIntegracionesPago.html",
+    "size": 4708,
+    "ng_models": [
+      "vm.integracion.integracion_clavepublica",
+      "vm.integracion.integracion_clavesecreta",
+      "vm.integracion.integracion_valoraux1"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnActualizarApiKeyBySucursal(proveedorIntegracion);",
+      "vm.fnCancelar()",
+      "vm.fnIntegrarLocal()",
+      "vm.fnObtenerPorId(proveedorIntegracion.integracion_id);"
+    ],
+    "buttons": [
+      "&times;",
+      "Cancelar",
+      "Integrar"
+    ],
+    "table_headers": [
+      "Proveedor",
+      "Rubro",
+      "Estado",
+      "Opciones"
+    ],
+    "input_count": 3,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  },
+  "scripts__restaurantpe__ajustes__seriemanualfe__bc-index.html": {
+    "file": "scripts__restaurantpe__ajustes__seriemanualfe__bc-index.html",
+    "size": 145,
+    "ng_models": [],
+    "ng_clicks_sample": [],
+    "buttons": [],
+    "table_headers": [],
+    "input_count": 0,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 0
+  },
+  "scripts__restaurantpe__ajustes__formasdepago__index.html": {
+    "file": "scripts__restaurantpe__ajustes__formasdepago__index.html",
+    "size": 4012,
+    "ng_models": [
+      "vm.paginaActual",
+      "vm.paginacionSeleccionada",
+      "vm.valBusqueda"
+    ],
+    "ng_clicks_sample": [
+      "vm.fnCargarFormaPagoList()",
+      "vm.fnObtenerPorId(formaPago.formadepago_id);$state.go(",
+      "vm.formaPago.resetearFormaPagoObjeto();$state.go("
+    ],
+    "buttons": [
+      "Editar",
+      "Nueva forma de pago"
+    ],
+    "table_headers": [
+      "Descripción",
+      "Estado",
+      "Acciones"
+    ],
+    "input_count": 1,
+    "select_count": 0,
+    "textarea_count": 0,
+    "table_count": 1
+  }
+}

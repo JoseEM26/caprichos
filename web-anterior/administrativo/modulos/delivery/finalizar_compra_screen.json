@@ -1,0 +1,74 @@
+{
+  "url": "https://caprichos.restaurant.pe/carta-digital/#/tienda/1/finalizarcompra",
+  "bodyText": "Finalizar compra\nRegresar\nDirección de entrega:\nTiempo de entrega:\nTus datos:\n¿Desea comprobante?\nMis métodos de Pago:\nEfectivo\nResumen:\nCosto de productos:\nTotal:\nRealizar pedido\nBienvenido\nPrimero selecciona una modalidad para ayudarte a realizar tu pedido.\nRecojo en tienda\nDelivery",
+  "sections": [
+    {
+      "className": "direccion flex justify-between w-full py-6 border-b",
+      "text": "Dirección de entrega:"
+    },
+    {
+      "className": "tiempoentrega flex justify-between py-6 border-b",
+      "text": "Tiempo de entrega:"
+    },
+    {
+      "className": "datos flex justify-between py-6 border-b",
+      "text": "Tus datos:"
+    },
+    {
+      "className": "comprobante flex flex-col justify-between py-6 border-b",
+      "text": "¿Desea comprobante?"
+    },
+    {
+      "className": "metodopago flex flex-col justify-between pt-6",
+      "text": "Mis métodos de Pago:\nEfectivo"
+    },
+    {
+      "className": "productaccordion ion-color ion-color-light item md item-fill-none ion-focusable hydrated item-lines-full ion-activatable",
+      "text": ""
+    }
+  ],
+  "inputs": [
+    {
+      "tag": "INPUT",
+      "type": "hidden",
+      "placeholder": "",
+      "name": "ion-cb-0",
+      "id": "",
+      "label": "¿Desea comprobante?"
+    },
+    {
+      "tag": "INPUT",
+      "type": "hidden",
+      "placeholder": "",
+      "name": "ion-rg-0",
+      "id": "",
+      "label": "Mis métodos de Pago:"
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "placeholder": "",
+      "name": "",
+      "id": "idInpTrabsaccionId",
+      "label": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "placeholder": "",
+      "name": "",
+      "id": "inInpAutorizacionCode",
+      "label": ""
+    }
+  ],
+  "paymentMethods": [
+    "Mis métodos de Pago:\nEfectivo",
+    "Mis métodos de Pago:",
+    "Efectivo"
+  ],
+  "buttons": [
+    "Realizar pedido",
+    "En Proceso",
+    "Realizar pedido"
+  ]
+}

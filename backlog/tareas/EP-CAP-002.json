@@ -1,0 +1,760 @@
+{
+  "epica": "EP-CAP-002",
+  "generado_por_ia": true,
+  "revisado_por": null,
+  "historias": [
+    {
+      "hu": "HU-CAP-012",
+      "tareas": [
+        {
+          "id": "HU-CAP-012-T01",
+          "titulo": "Revisar criterios de HU-CAP-012 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-012-T02",
+          "titulo": "Migración Prisma de las tablas de FT-PED-01 (pedido, pedido_linea, party, contact_mechanism, consent)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-012-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-012-T03",
+          "titulo": "Reglas de dominio de HU-CAP-012 (RQ-PED-01-01, RQ-PED-01-02, RQ-PED-01-03)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-012-T01",
+            "HU-CAP-012-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-012-T04",
+          "titulo": "Casos de uso: Agregar y editar productos en el carrito",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-012-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-012-T05",
+          "titulo": "Endpoints y eventos de FT-PED-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-012-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-012-T06",
+          "titulo": "Pantalla React: Agregar y editar productos en el carrito",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-012-T05"
+          ]
+        },
+        {
+          "id": "HU-CAP-012-T07",
+          "titulo": "Pruebas TC-CAP-012-01..05 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-012-T06"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-013",
+      "tareas": [
+        {
+          "id": "HU-CAP-013-T01",
+          "titulo": "Revisar criterios de HU-CAP-013 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-013-T02",
+          "titulo": "Reglas de dominio de HU-CAP-013 (RQ-PED-01-04, RQ-PED-01-05)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-013-T01",
+            "HU-CAP-012-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-013-T03",
+          "titulo": "Casos de uso: Dar mis datos mínimos al final",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-013-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-013-T04",
+          "titulo": "Endpoints y eventos de FT-PED-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-013-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-013-T05",
+          "titulo": "Pantalla React: Dar mis datos mínimos al final",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-013-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-013-T06",
+          "titulo": "Pruebas TC-CAP-013-01..03 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-013-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-014",
+      "tareas": [
+        {
+          "id": "HU-CAP-014-T01",
+          "titulo": "Revisar criterios de HU-CAP-014 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-014-T02",
+          "titulo": "Reglas de dominio de HU-CAP-014 (RQ-PED-01-06, RQ-PED-01-07, RQ-PED-01-08)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-014-T01",
+            "HU-CAP-012-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-014-T03",
+          "titulo": "Casos de uso: Elegir cómo pagar sin pagar en la web",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-014-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-014-T04",
+          "titulo": "Endpoints y eventos de FT-PED-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-014-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-014-T05",
+          "titulo": "Pantalla React: Elegir cómo pagar sin pagar en la web",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-014-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-014-T06",
+          "titulo": "Pruebas TC-CAP-014-01..04 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-014-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-015",
+      "tareas": [
+        {
+          "id": "HU-CAP-015-T01",
+          "titulo": "Revisar criterios de HU-CAP-015 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-015-T02",
+          "titulo": "Reglas de dominio de HU-CAP-015 (RQ-PED-01-09, RQ-PED-01-10, RQ-PED-01-11)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-015-T01",
+            "HU-CAP-012-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-015-T03",
+          "titulo": "Casos de uso: Ver el resumen con descuentos, cupón y comprobante",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-015-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-015-T04",
+          "titulo": "Endpoints y eventos de FT-PED-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-015-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-015-T05",
+          "titulo": "Pantalla React: Ver el resumen con descuentos, cupón y comprobante",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-015-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-015-T06",
+          "titulo": "Pruebas TC-CAP-015-01..04 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-015-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-016",
+      "tareas": [
+        {
+          "id": "HU-CAP-016-T01",
+          "titulo": "Revisar criterios de HU-CAP-016 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-016-T02",
+          "titulo": "Migración Prisma de las tablas de FT-PED-02 (pedido, pedido_linea, party, contact_mechanism, consent)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-016-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-016-T03",
+          "titulo": "Reglas de dominio de HU-CAP-016 (RQ-PED-02-01, RQ-PED-02-02, RQ-PED-02-03, RQ-PED-02-04, RQ-PED-02-05)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-016-T01",
+            "HU-CAP-016-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-016-T04",
+          "titulo": "Casos de uso: Compartir mi ubicación o escribir mi dirección",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-016-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-016-T05",
+          "titulo": "Endpoints y eventos de FT-PED-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-016-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-016-T06",
+          "titulo": "Pantalla React: Compartir mi ubicación o escribir mi dirección",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-016-T05"
+          ]
+        },
+        {
+          "id": "HU-CAP-016-T07",
+          "titulo": "Pruebas TC-CAP-016-01..06 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-016-T06"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-017",
+      "tareas": [
+        {
+          "id": "HU-CAP-017-T01",
+          "titulo": "Revisar criterios de HU-CAP-017 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-017-T02",
+          "titulo": "Reglas de dominio de HU-CAP-017 (RQ-PED-02-06, RQ-PED-02-07, RQ-PED-02-08)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-017-T01",
+            "HU-CAP-016-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-017-T03",
+          "titulo": "Casos de uso: Ver el costo de envío o el aviso de fuera de cobertura",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-017-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-017-T04",
+          "titulo": "Endpoints y eventos de FT-PED-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-017-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-017-T05",
+          "titulo": "Pantalla React: Ver el costo de envío o el aviso de fuera de cobertura",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-017-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-017-T06",
+          "titulo": "Pruebas TC-CAP-017-01..04 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-017-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-018",
+      "tareas": [
+        {
+          "id": "HU-CAP-018-T01",
+          "titulo": "Revisar criterios de HU-CAP-018 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-018-T02",
+          "titulo": "Reglas de dominio de HU-CAP-018 (RQ-PED-02-09, RQ-PED-02-10)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-018-T01",
+            "HU-CAP-016-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-018-T03",
+          "titulo": "Casos de uso: Ver envío gratis y pedido mínimo",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-018-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-018-T04",
+          "titulo": "Endpoints y eventos de FT-PED-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-018-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-018-T05",
+          "titulo": "Pantalla React: Ver envío gratis y pedido mínimo",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-018-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-018-T06",
+          "titulo": "Pruebas TC-CAP-018-01..03 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-018-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-019",
+      "tareas": [
+        {
+          "id": "HU-CAP-019-T01",
+          "titulo": "Revisar criterios de HU-CAP-019 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-019-T02",
+          "titulo": "Migración Prisma de las tablas de FT-PED-03 (pedido, pedido_linea, party, contact_mechanism, consent)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-019-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-019-T03",
+          "titulo": "Reglas de dominio de HU-CAP-019 (RQ-PED-03-01, RQ-PED-03-02, RQ-PED-03-08, RQ-PED-03-09)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-019-T01",
+            "HU-CAP-019-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-019-T04",
+          "titulo": "Casos de uso: Enviar mi pedido y ver la confirmación",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-019-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-019-T05",
+          "titulo": "Endpoints y eventos de FT-PED-03 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-019-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-019-T06",
+          "titulo": "Pantalla React: Enviar mi pedido y ver la confirmación",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-019-T05"
+          ]
+        },
+        {
+          "id": "HU-CAP-019-T07",
+          "titulo": "Pruebas TC-CAP-019-01..04 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-019-T06"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-020",
+      "tareas": [
+        {
+          "id": "HU-CAP-020-T01",
+          "titulo": "Revisar criterios de HU-CAP-020 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-020-T02",
+          "titulo": "Reglas de dominio de HU-CAP-020 (RQ-PED-03-03, RQ-PED-03-04)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-020-T01",
+            "HU-CAP-019-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-020-T03",
+          "titulo": "Casos de uso: Escribir al local por WhatsApp con mi pedido",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-020-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-020-T04",
+          "titulo": "Endpoints y eventos de FT-PED-03 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-020-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-020-T05",
+          "titulo": "Pantalla React: Escribir al local por WhatsApp con mi pedido",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-020-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-020-T06",
+          "titulo": "Pruebas TC-CAP-020-01..02 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-020-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-021",
+      "tareas": [
+        {
+          "id": "HU-CAP-021-T01",
+          "titulo": "Revisar criterios de HU-CAP-021 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-021-T02",
+          "titulo": "Reglas de dominio de HU-CAP-021 (RQ-PED-03-05, RQ-PED-03-06, RQ-PED-03-07)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-021-T01",
+            "HU-CAP-019-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-021-T03",
+          "titulo": "Casos de uso: Recibir el aviso de un pedido nuevo en caja",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-021-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-021-T04",
+          "titulo": "Endpoints y eventos de FT-PED-03 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-021-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-021-T05",
+          "titulo": "Pantalla React: Recibir el aviso de un pedido nuevo en caja",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-021-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-021-T06",
+          "titulo": "Pruebas TC-CAP-021-01..03 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-021-T05"
+          ]
+        }
+      ]
+    }
+  ]
+}

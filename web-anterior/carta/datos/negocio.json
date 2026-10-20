@@ -1,0 +1,284 @@
+{
+  "nombre": "Caprichos",
+  "direccion": "C. 11, Lima 15457, Perú",
+  "coordenadas": {
+    "latitud": -12.0196436,
+    "longitud": -76.963255
+  },
+  "telefono": null,
+  "whatsapp": "51977503006",
+  "redes_sociales": {
+    "tiktok": "https://www.tiktok.com/@caprichoscampoy",
+    "facebook": "https://www.facebook.com/caprichosC",
+    "instagram": "https://www.instagram.com/caprichoscampoy",
+    "restaurantguru": "https://es.restaurantguru.com/Caprichos-Campoy-San-Juan-de-Lurigancho"
+  },
+  "wifi": {
+    "red": "CAPRICHOS 5G GRATIS",
+    "clave": "CAPRICHOS*24"
+  },
+  "reputacion_google": {
+    "score": 4.8,
+    "total_opiniones": 775
+  },
+  "horarios_atencion": [
+    {
+      "dia": "Lunes",
+      "dia_en": "monday",
+      "abierto": true,
+      "horas": [
+        "14:00 - 22:00"
+      ]
+    },
+    {
+      "dia": "Martes",
+      "dia_en": "tuesday",
+      "abierto": true,
+      "horas": [
+        "14:00 - 22:00"
+      ]
+    },
+    {
+      "dia": "Miércoles",
+      "dia_en": "wednesday",
+      "abierto": true,
+      "horas": [
+        "14:00 - 22:00"
+      ]
+    },
+    {
+      "dia": "Jueves",
+      "dia_en": "thursday",
+      "abierto": true,
+      "horas": [
+        "14:00 - 22:00"
+      ]
+    },
+    {
+      "dia": "Viernes",
+      "dia_en": "friday",
+      "abierto": true,
+      "horas": [
+        "14:00 - 22:00"
+      ]
+    },
+    {
+      "dia": "Sábado",
+      "dia_en": "saturday",
+      "abierto": true,
+      "horas": [
+        "14:00 - 22:00"
+      ]
+    },
+    {
+      "dia": "Domingo",
+      "dia_en": "sunday",
+      "abierto": true,
+      "horas": [
+        "14:00 - 22:00"
+      ]
+    }
+  ],
+  "delivery": {
+    "activo": true,
+    "tiempo_promedio": "20 - 45min.",
+    "monto_minimo_para_pedir": 14.5,
+    "monto_minimo_delivery_gratis": 70,
+    "tipo_tarifa_configurada": "FIXED",
+    "tarifa_fija_soles": 0,
+    "rangos_por_distancia": [
+      {
+        "id": "6169c710-e13e-45c9-8880-8361f3546877",
+        "distancia_min_metros": 0,
+        "distancia_max_metros": 2020,
+        "precio_soles": 0,
+        "activo": true
+      },
+      {
+        "id": "7ce14dfe-3027-4971-8d9f-141569695aad",
+        "distancia_min_metros": 2021,
+        "distancia_max_metros": 3605,
+        "precio_soles": 3,
+        "activo": true
+      }
+    ],
+    "zonas_poligonales_definidas": [
+      {
+        "id": "2c774d40-4093-11ef-ad2b-63a8be056dd6",
+        "nombre": "",
+        "precio": 7,
+        "activo": false,
+        "num_puntos_poligono": 9
+      },
+      {
+        "id": "2c79bd40-4093-11ef-a518-f39933862986",
+        "nombre": "",
+        "precio": 7,
+        "activo": false,
+        "num_puntos_poligono": 20
+      },
+      {
+        "id": "2c8c39f0-4093-11ef-846c-0de7171c1f69",
+        "nombre": "",
+        "precio": 9,
+        "activo": false,
+        "num_puntos_poligono": 12
+      },
+      {
+        "id": "2c7e8ea0-4093-11ef-a85e-55be394540cf",
+        "nombre": "",
+        "precio": 2,
+        "activo": false,
+        "num_puntos_poligono": 29
+      },
+      {
+        "id": "2c89a290-4093-11ef-872a-1fc650690d16",
+        "nombre": "",
+        "precio": 5,
+        "activo": false,
+        "num_puntos_poligono": 56
+      },
+      {
+        "id": "2c80fa20-4093-11ef-8a04-2f4985152bfe",
+        "nombre": "",
+        "precio": 2,
+        "activo": false,
+        "num_puntos_poligono": 72
+      },
+      {
+        "id": "2c7c4650-4093-11ef-9cd0-2dc4fba31d8c",
+        "nombre": "",
+        "precio": 8,
+        "activo": false,
+        "num_puntos_poligono": 21
+      },
+      {
+        "id": "2c83f0c0-4093-11ef-a5fe-bbf4f13adbc9",
+        "nombre": "",
+        "precio": 3,
+        "activo": false,
+        "num_puntos_poligono": 79
+      },
+      {
+        "id": "2c86de00-4093-11ef-89a9-17a89c8ce181",
+        "nombre": "",
+        "precio": 4,
+        "activo": false,
+        "num_puntos_poligono": 71
+      }
+    ],
+    "propinas": {
+      "type": "AMOUNT",
+      "active": true,
+      "comment": "Para colaboradores de Caprichos",
+      "options": [
+        {
+          "value": 0,
+          "is_default": false
+        },
+        {
+          "value": 0.5,
+          "is_default": false
+        },
+        {
+          "value": 2,
+          "is_default": false
+        }
+      ]
+    }
+  },
+  "recojo_en_tienda": {
+    "activo": true,
+    "propinas": {
+      "type": "AMOUNT",
+      "active": true,
+      "comment": "Para colaboradores de Caprichos",
+      "options": [
+        {
+          "value": 0,
+          "is_default": false
+        },
+        {
+          "value": 0.5,
+          "is_default": false
+        },
+        {
+          "value": 2,
+          "is_default": false
+        }
+      ]
+    }
+  },
+  "metodos_pago": [
+    {
+      "id": "a7a980a0-68f4-11ec-870d-0f37fb22b0f8",
+      "codigo": "credit_card",
+      "nombre": "Tarjeta de Crédito / Débito",
+      "descripcion": null,
+      "activo_delivery": true,
+      "activo_recojo": true,
+      "activo_en_mesa": true
+    },
+    {
+      "id": "c31f42e6-86e7-4dee-ae62-40fb523d99a9",
+      "codigo": "transfer",
+      "nombre": "Transferencia Bancaria",
+      "descripcion": "BCP Ahorro Soles 19197148281074 \nINTERBANK Ahorro soles 0913227414217\nAmbas a nombre de Maria Jose Morillo Ruiz",
+      "activo_delivery": true,
+      "activo_recojo": true,
+      "activo_en_mesa": true
+    },
+    {
+      "id": "cda35c3c-d97d-4312-8f46-331525955ed6",
+      "codigo": "yape",
+      "nombre": "Yape",
+      "descripcion": "977503006 a nombre de: María José Morillo Ruiz",
+      "activo_delivery": true,
+      "activo_recojo": true,
+      "activo_en_mesa": true
+    },
+    {
+      "id": "efb5df60-c79e-11eb-a39e-39b43976a67f",
+      "codigo": "plin",
+      "nombre": "Plin",
+      "descripcion": "977503006 a nombre de: María José Morillo Ruiz",
+      "activo_delivery": true,
+      "activo_recojo": true,
+      "activo_en_mesa": true
+    },
+    {
+      "id": "2a689983-36b6-436e-8abb-7b2f197fd0a3",
+      "codigo": "cash",
+      "nombre": "Efectivo (Contra-Entrega)",
+      "descripcion": "100% Contra-Entrega",
+      "activo_delivery": true,
+      "activo_recojo": true,
+      "activo_en_mesa": true
+    }
+  ],
+  "textos_legales": {
+    "terminos_y_condiciones": "No configurados explicitamente en la plataforma OlaClick para este comercio.",
+    "libro_de_reclamaciones": "No visible en el frontend ni configurado en el e-commerce de OlaClick.",
+    "politicas_privacidad": "Utiliza politicas estandar de plataforma OlaClick (no personalizadas por el negocio)."
+  },
+  "seo": {
+    "title": "Caprichos - Pide en línea. Menú, Precios y Teléfonos.",
+    "description": "¡Consulta y Pide directo con nosotros!",
+    "keywords": "carta digital, carta de productos, mejores promociones, olaclick, olaClick, Olaclick, OlaClick",
+    "open_graph": {
+      "og:title": "Caprichos - Menú digital",
+      "og:description": "Disfruta del sabor único de Caprichos. Explora nuestro menú digital y haz tu pedido online.",
+      "og:image": "https://assets.olaclick.app/companies/logos/6fd43b85-d6b2-42a0-a358-4aa351f47bef.png",
+      "og:url": "https://caprichos-per.ola.click/products",
+      "og:type": "website",
+      "og:site_name": "Caprichos"
+    }
+  },
+  "plataforma": {
+    "tipo": "OlaClick (Nuxt 3 con SSR)",
+    "app_version": "4.00.f684a4e",
+    "cdn_assets": "https://assets.olaclick.app",
+    "logo_url": "https://assets.olaclick.app/companies/logos/6fd43b85-d6b2-42a0-a358-4aa351f47bef.png",
+    "banner_url": "https://assets.olaclick.app/companies/backgrounds/99a80199-f8a6-4623-93c4-88ab22d8816f.png"
+  }
+}

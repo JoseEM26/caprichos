@@ -1,0 +1,533 @@
+{
+  "epica": "EP-CAP-003",
+  "generado_por_ia": true,
+  "revisado_por": null,
+  "historias": [
+    {
+      "hu": "HU-CAP-022",
+      "tareas": [
+        {
+          "id": "HU-CAP-022-T01",
+          "titulo": "Revisar criterios de HU-CAP-022 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-022-T02",
+          "titulo": "Migración Prisma de las tablas de FT-CLI-01 (party, person, party_identifier, party_role, customer_detail)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-022-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-022-T03",
+          "titulo": "Reglas de dominio de HU-CAP-022 (RQ-CLI-01-01, RQ-CLI-01-02, RQ-CLI-01-03)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-022-T01",
+            "HU-CAP-022-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-022-T04",
+          "titulo": "Casos de uso: Crear mi cuenta o seguir como invitado",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-022-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-022-T05",
+          "titulo": "Endpoints y eventos de FT-CLI-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-022-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-022-T06",
+          "titulo": "Pantalla React: Crear mi cuenta o seguir como invitado",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-022-T05"
+          ]
+        },
+        {
+          "id": "HU-CAP-022-T07",
+          "titulo": "Pruebas TC-CAP-022-01..03 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-022-T06"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-023",
+      "tareas": [
+        {
+          "id": "HU-CAP-023-T01",
+          "titulo": "Revisar criterios de HU-CAP-023 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-023-T02",
+          "titulo": "Reglas de dominio de HU-CAP-023 (RQ-CLI-01-04, RQ-CLI-01-05, RQ-CLI-01-11)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-023-T01",
+            "HU-CAP-022-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-023-T03",
+          "titulo": "Casos de uso: Ingresar a mi cuenta con DNI y contraseña",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-023-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-023-T04",
+          "titulo": "Endpoints y eventos de FT-CLI-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-023-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-023-T05",
+          "titulo": "Pantalla React: Ingresar a mi cuenta con DNI y contraseña",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-023-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-023-T06",
+          "titulo": "Pruebas TC-CAP-023-01..03 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-023-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-024",
+      "tareas": [
+        {
+          "id": "HU-CAP-024-T01",
+          "titulo": "Revisar criterios de HU-CAP-024 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-024-T02",
+          "titulo": "Reglas de dominio de HU-CAP-024 (RQ-CLI-01-06, RQ-CLI-01-07)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-024-T01",
+            "HU-CAP-022-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-024-T03",
+          "titulo": "Casos de uso: Registrar a un cliente en el local y que cree su contraseña",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-024-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-024-T04",
+          "titulo": "Endpoints y eventos de FT-CLI-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-024-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-024-T05",
+          "titulo": "Pantalla React: Registrar a un cliente en el local y que cree su contraseña",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-024-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-024-T06",
+          "titulo": "Pruebas TC-CAP-024-01..03 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-024-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-025",
+      "tareas": [
+        {
+          "id": "HU-CAP-025-T01",
+          "titulo": "Revisar criterios de HU-CAP-025 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-025-T02",
+          "titulo": "Reglas de dominio de HU-CAP-025 (RQ-CLI-01-08, RQ-CLI-01-09, RQ-CLI-01-10)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-025-T01",
+            "HU-CAP-022-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-025-T03",
+          "titulo": "Casos de uso: Buscar y editar clientes en caja",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-025-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-025-T04",
+          "titulo": "Endpoints y eventos de FT-CLI-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-025-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-025-T05",
+          "titulo": "Pantalla React: Buscar y editar clientes en caja",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-025-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-025-T06",
+          "titulo": "Pruebas TC-CAP-025-01..04 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-025-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-026",
+      "tareas": [
+        {
+          "id": "HU-CAP-026-T01",
+          "titulo": "Revisar criterios de HU-CAP-026 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-026-T02",
+          "titulo": "Migración Prisma de las tablas de FT-CLI-02 (party, person, party_identifier, party_role, customer_detail)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-026-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-026-T03",
+          "titulo": "Reglas de dominio de HU-CAP-026 (RQ-CLI-02-01, RQ-CLI-02-02, RQ-CLI-02-03, RQ-CLI-02-04, RQ-CLI-02-07)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-026-T01",
+            "HU-CAP-026-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-026-T04",
+          "titulo": "Casos de uso: Sumar puntos al cobrar un pedido con cuenta",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-026-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-026-T05",
+          "titulo": "Endpoints y eventos de FT-CLI-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-026-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-026-T06",
+          "titulo": "Pantalla React: Sumar puntos al cobrar un pedido con cuenta",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-026-T05"
+          ]
+        },
+        {
+          "id": "HU-CAP-026-T07",
+          "titulo": "Pruebas TC-CAP-026-01..06 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-026-T06"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-027",
+      "tareas": [
+        {
+          "id": "HU-CAP-027-T01",
+          "titulo": "Revisar criterios de HU-CAP-027 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-027-T02",
+          "titulo": "Reglas de dominio de HU-CAP-027 (RQ-CLI-02-05, RQ-CLI-02-08)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-027-T01",
+            "HU-CAP-026-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-027-T03",
+          "titulo": "Casos de uso: Ver mi saldo e historial de puntos",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-027-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-027-T04",
+          "titulo": "Endpoints y eventos de FT-CLI-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-027-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-027-T05",
+          "titulo": "Pantalla React: Ver mi saldo e historial de puntos",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-027-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-027-T06",
+          "titulo": "Pruebas TC-CAP-027-01..02 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-027-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-028",
+      "tareas": [
+        {
+          "id": "HU-CAP-028-T01",
+          "titulo": "Revisar criterios de HU-CAP-028 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-028-T02",
+          "titulo": "Reglas de dominio de HU-CAP-028 (RQ-CLI-02-06)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-028-T01",
+            "HU-CAP-026-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-028-T03",
+          "titulo": "Casos de uso: Recibir mi cupón de cumpleaños",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-028-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-028-T04",
+          "titulo": "Endpoints y eventos de FT-CLI-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-028-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-028-T05",
+          "titulo": "Pantalla React: Recibir mi cupón de cumpleaños",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-028-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-028-T06",
+          "titulo": "Pruebas TC-CAP-028-01..01 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-028-T05"
+          ]
+        }
+      ]
+    }
+  ]
+}

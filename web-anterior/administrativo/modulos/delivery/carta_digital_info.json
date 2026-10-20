@@ -1,0 +1,148 @@
+{
+  "urls": {
+    "inicio": "https://caprichos.restaurant.pe/carta-digital/#/inicio"
+  },
+  "network_requests": [
+    {
+      "url": "https://caprichos.restaurant.pe/carta-digital/",
+      "method": "GET",
+      "status": 200,
+      "summary": "<!DOCTYPE html><html lang=\"es\"><head>\n  <meta charset=\"utf-8\">\n  <meta name=\"google\" content=\"notranslate\">\n  <title>Carta Digital-Restaurant.pe</title>\n  <base href=\"/carta-digital/\">\n  <meta name=\"v"
+    },
+    {
+      "url": "https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap",
+      "method": "GET",
+      "status": 200,
+      "summary": "/* cyrillic-ext */\n@font-face {\n  font-family: 'Roboto';\n  font-style: normal;\n  font-weight: 400;\n  font-stretch: 100%;\n  font-display: swap;\n  src: url(https://fonts.gstatic.com/s/roboto/v51/KFO7Cnq"
+    },
+    {
+      "url": "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap",
+      "method": "GET",
+      "status": 200,
+      "summary": "/* cyrillic-ext */\n@font-face {\n  font-family: 'Inter';\n  font-style: italic;\n  font-weight: 100 900;\n  font-display: swap;\n  src: url(https://fonts.gstatic.com/s/inter/v20/UcCm3FwrK3iLTcvnUwkT9nA2.wo"
+    },
+    {
+      "url": "https://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/credentialsFirebase",
+      "method": "POST",
+      "status": 200,
+      "summary": {
+        "type": "dict",
+        "keys": [
+          "tipo",
+          "data",
+          "mensajes",
+          "inicio",
+          "fin",
+          "node",
+          "diff"
+        ]
+      }
+    },
+    {
+      "url": "blob:https://caprichos.restaurant.pe/117a363f-e6ab-4b9d-a085-cdc03a6f1e45",
+      "method": "GET",
+      "status": 200,
+      "summary": "var sharedModule = {}; (function(R){function f(t,e,i,n){return new(i||(i=Promise))(function(a,s){function l(g){try{m(n.next(g))}catch(v){s(v)}}function h(g){try{m(n.throw(g))}catch(v){s(v)}}function m"
+    },
+    {
+      "url": "https://caprichos.restaurant.pe/restaurant/facebook/rest/delivery/cargarLocalesMenuEnLinea?page_id=0",
+      "method": "GET",
+      "status": 200,
+      "summary": {
+        "type": "dict",
+        "keys": [
+          "mensajes",
+          "tipo",
+          "locales",
+          "usoBaseDatosClientes",
+          "tarjetasGlobales",
+          "monedafacturacion",
+          "urlnode",
+          "proveedorMapa",
+          "inicio",
+          "fin",
+          "diff",
+          "array_query",
+          "array_queryParam",
+          "array_logsTem",
+          "server"
+        ]
+      }
+    },
+    {
+      "url": "https://caprichos.restaurant.pe/carta-digital/assets/loading2.json",
+      "method": "GET",
+      "status": 200,
+      "summary": {
+        "type": "dict",
+        "keys": [
+          "v",
+          "meta",
+          "fr",
+          "ip",
+          "op",
+          "w",
+          "h",
+          "nm",
+          "ddd",
+          "assets",
+          "layers",
+          "markers"
+        ]
+      }
+    },
+    {
+      "url": "https://mapas.restaurant.pe/get-geolocalizacion",
+      "method": "POST",
+      "status": 200,
+      "summary": {
+        "type": "dict",
+        "keys": [
+          "url",
+          "apiKey",
+          "predictions",
+          "results",
+          "status",
+          "error_message",
+          "request_status",
+          "keyFromClient"
+        ]
+      }
+    },
+    {
+      "url": "https://api.mercadopago.com/v1/devices/widgets?referer=https%3A//caprichos.restaurant.pe",
+      "method": "POST",
+      "status": 200,
+      "summary": {
+        "type": "dict",
+        "keys": [
+          "widget",
+          "session_id"
+        ]
+      }
+    }
+  ],
+  "categories": [],
+  "sample_product": {},
+  "modalities": [],
+  "checkout_fields": [],
+  "payment_methods": [],
+  "order_destination": null,
+  "scripts_and_frameworks": {
+    "angular": "no",
+    "vue": "no",
+    "react": "no",
+    "title": "Carta Digital-Restaurant.pe",
+    "body_classes": "backdrop-no-scroll"
+  },
+  "initial_modals": [],
+  "page_info": {
+    "buttons": [],
+    "headers": [
+      "CAPRICHOS",
+      "Bienvenido"
+    ],
+    "categories": []
+  },
+  "angular_states": null
+}

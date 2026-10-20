@@ -1,0 +1,45 @@
+erDiagram
+  ZONA_REPARTO {
+    bigint id PK
+    text codigo UK
+    jsonb poligono
+    numeric tarifa
+    boolean activa
+  }
+  PISO {
+    bigint id PK
+    text nombre
+    boolean activo
+    int cuadricula_ancho
+    int cuadricula_alto
+  }
+  ELEMENTO_PLANO {
+    bigint id PK
+    bigint piso_id FK
+    text tipo
+    int x
+    int y
+    int ancho
+    int alto
+    int numero
+    int asientos
+    boolean activo
+  }
+  RESERVA {
+    bigint id PK
+    text nombre
+    text telefono
+    int personas
+    timestamptz hora
+    int tolerancia_min
+    text estado
+    text motivo_cancelacion
+    bigint pedido_id
+  }
+  RESERVA_MESA {
+    bigint reserva_id PK,FK
+    bigint mesa_id PK,FK
+  }
+  ELEMENTO_PLANO ||--o{ RESERVA_MESA : "mesa_id"
+  PISO ||--o{ ELEMENTO_PLANO : "piso_id"
+  RESERVA ||--o{ RESERVA_MESA : "reserva_id"

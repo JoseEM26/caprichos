@@ -1,0 +1,22 @@
+{
+  "custom_tags": [
+    "app-root",
+    "ion-app",
+    "ion-router-outlet",
+    "app-content-layout",
+    "app-home",
+    "ion-header",
+    "app-header",
+    "app-h-ubicacion",
+    "fa-icon",
+    "ion-content",
+    "ion-button",
+    "ion-footer",
+    "app-footer",
+    "ion-modal",
+    "app-select-modalidad-modal"
+  ],
+  "all_text": "Ingresar mi ubicación\nCambiar modalidad\nCAPRICHOS\n¡PEDIR AHORA!\nRestaurant.pe ©. Todos los derechos reservados - 09/05/2026 - v1.0.8\nBienvenido\nPrimero selecciona una modalidad para ayudarte a realizar tu pedido.\nRecojo en tienda\nDelivery",
+  "inputs": [],
+  "clickable": []
+}

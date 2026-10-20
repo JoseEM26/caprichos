@@ -1,0 +1,489 @@
+{
+  "_metadata": {
+    "extract_source": "products.html & info.html (__NUXT_DATA__ Pinia Stores)",
+    "company_token": "caprichos-per",
+    "platform": "OlaClick / Nuxt 3",
+    "security": "Claves, tokens, cuentas bancarias y telefonos enmascarados dejando solo los ultimos 3 digitos"
+  },
+  "empresa": {
+    "id": "5816bd90-2af9-11eb-83a6-91c28df3eedf",
+    "token": "caprichos-per",
+    "nombre": "Caprichos",
+    "industria": "Coffee",
+    "direccion": "C. 11, Lima 15457, Perú",
+    "direccion_habilitada": true,
+    "coordenadas": {
+      "latitud": -12.0196436,
+      "longitud": -76.963255
+    },
+    "ciudad": "Lima",
+    "pais": {
+      "name": "Peru",
+      "country_code": "PE",
+      "country_calling_code": "51",
+      "time_format": "12h"
+    },
+    "zona_horaria": "America/Lima",
+    "moneda": {
+      "code": "PEN",
+      "decimal_separator": ",",
+      "decimals": 2,
+      "position": "left",
+      "show_decimals": true,
+      "symbol": "S/.",
+      "tax": "impuestos",
+      "thousands_separator": "."
+    },
+    "whatsapp_masked": "***006",
+    "url_publica": "https://caprichos-per.ola.click",
+    "logo_url": "https://assets.olaclick.app/companies/logos/6fd43b85-d6b2-42a0-a358-4aa351f47bef.png",
+    "logo_thumbnail_url": "https://assets.olaclick.app/companies/logos/thumbnails/6fd43b85-d6b2-42a0-a358-4aa351f47bef.png",
+    "plan_suscripcion": {
+      "highest_plan": "P2",
+      "highest_value": "SQL-H-500",
+      "current_subscriptions": [],
+      "active_subscriptions": [],
+      "order_limit_usage_count": 0
+    },
+    "wifi": {
+      "ssid": "CAPRICHOS 5G GRATIS",
+      "password_masked": "****24"
+    }
+  },
+  "ecommerce_settings": {
+    "checkout_type": "WHATSAPP",
+    "default_inbound_order_status": "PREPARING",
+    "enable_repeat_last_order": true,
+    "enable_suggested_products": true,
+    "order_here_enabled": true,
+    "account_setup_steps": {
+      "add_your_team": true,
+      "create_your_account": true,
+      "set_up_your_address": true,
+      "enable_stock_control": true,
+      "create_a_cash_register": true,
+      "enable_loyalty_program": true,
+      "link_google_my_business": true,
+      "mark_a_dish_as_prepared": true,
+      "share_your_digital_menu": true,
+      "create_a_discount_coupon": true,
+      "configure_your_service_types": true,
+      "activate_your_whatsapp_chatbot": true,
+      "configure_your_payment_methods": true,
+      "place_a_test_order_with_the_pdv": true,
+      "create_or_edit_your_first_product": true,
+      "configure_hours_and_general_information": true,
+      "place_a_test_order_with_your_digital_menu": true
+    }
+  },
+  "tipos_de_pedido": {
+    "delivery": {
+      "active": true,
+      "tiempo_promedio": "20 - 45min.",
+      "monto_minimo_para_permitir": 14.5,
+      "monto_minimo_para_gratis": 70,
+      "pedidos_programados_habilitados": true,
+      "recolectar_info_cliente": true,
+      "validacion_google_maps": false,
+      "permitir_fuera_de_cobertura": true,
+      "tarifas_envio": {
+        "tipo": "FIXED",
+        "precio_fijo": {
+          "price": 0
+        },
+        "reglas_por_distancia": {
+          "price_per_km": 0.83,
+          "starting_price": 0,
+          "max_distance_km": 3.61
+        },
+        "rangos_distancia_metros": [
+          {
+            "id": "6169c710-e13e-45c9-8880-8361f3546877",
+            "enabled": true,
+            "max": 2020,
+            "min": 0,
+            "price": 0
+          },
+          {
+            "id": "7ce14dfe-3027-4971-8d9f-141569695aad",
+            "enabled": true,
+            "max": 3605,
+            "min": 2021,
+            "price": 3
+          }
+        ],
+        "poligonos": []
+      },
+      "disabled_until": "2024-12-14T20:04:18.098Z"
+    },
+    "takeaway": {
+      "active": true,
+      "pedidos_programados_habilitados": true,
+      "recolectar_info_cliente": true,
+      "propina": {
+        "type": "AMOUNT",
+        "active": true,
+        "comment": "Para colaboradores de Caprichos",
+        "options": [
+          {
+            "value": 0,
+            "is_default": false
+          },
+          {
+            "value": 0.5,
+            "is_default": false
+          },
+          {
+            "value": 2,
+            "is_default": false
+          }
+        ]
+      },
+      "additional_input": null,
+      "disabled_until": "2024-12-14T20:04:30.842Z"
+    },
+    "onsite": {
+      "active": true,
+      "pedidos_programados_habilitados": true,
+      "recolectar_info_cliente": true,
+      "onsite_qr_ordering": false,
+      "propina": {
+        "type": "AMOUNT",
+        "active": true,
+        "comment": "Para colaboradores de Caprichos",
+        "options": [
+          {
+            "value": 0,
+            "is_default": false
+          },
+          {
+            "value": 0.5,
+            "is_default": false
+          },
+          {
+            "value": 2,
+            "is_default": false
+          }
+        ]
+      },
+      "additional_input": null,
+      "disabled_until": "2024-12-14T20:04:25.201Z"
+    },
+    "table": {
+      "active": true,
+      "propina": {
+        "type": "AMOUNT",
+        "active": false,
+        "comment": "Para colaboradores de Caprichos",
+        "options": [
+          {
+            "value": 0,
+            "is_default": true
+          },
+          {
+            "value": 0.5,
+            "is_default": false
+          },
+          {
+            "value": 1,
+            "is_default": false
+          },
+          {
+            "value": 2,
+            "is_default": false
+          }
+        ]
+      }
+    }
+  },
+  "metodos_de_pago": [
+    {
+      "id": "a7a980a0-68f4-11ec-870d-0f37fb22b0f8",
+      "code": "credit_card",
+      "delivery": true,
+      "onsite": true,
+      "takeaway": true,
+      "payment_method_fee": null,
+      "description_masked": null
+    },
+    {
+      "id": "c31f42e6-86e7-4dee-ae62-40fb523d99a9",
+      "code": "transfer",
+      "delivery": true,
+      "onsite": true,
+      "takeaway": true,
+      "payment_method_fee": null,
+      "description_masked": "BCP Ahorro Soles ***...074 \nINTERBANK Ahorro soles ***...217\nAmbas a nombre de Maria Jose Morillo Ruiz"
+    },
+    {
+      "id": "cda35c3c-d97d-4312-8f46-331525955ed6",
+      "code": "yape",
+      "delivery": true,
+      "onsite": true,
+      "takeaway": true,
+      "payment_method_fee": null,
+      "description_masked": "***...006 a nombre de: María José Morillo Ruiz"
+    },
+    {
+      "id": "efb5df60-c79e-11eb-a39e-39b43976a67f",
+      "code": "plin",
+      "delivery": true,
+      "onsite": true,
+      "takeaway": true,
+      "payment_method_fee": null,
+      "description_masked": "***...006 a nombre de: María José Morillo Ruiz"
+    },
+    {
+      "id": "2a689983-36b6-436e-8abb-7b2f197fd0a3",
+      "code": "cash",
+      "delivery": true,
+      "onsite": true,
+      "takeaway": true,
+      "payment_method_fee": null,
+      "description_masked": "100% Contra-Entrega"
+    }
+  ],
+  "horarios_de_atencion": {
+    "fecha_servidor": "2026-10-13T14:16:21.217Z",
+    "dias": {
+      "sunday": {
+        "hours": [
+          {
+            "open": "14:00",
+            "close": "22:00"
+          }
+        ],
+        "is_active": true
+      },
+      "monday": {
+        "hours": [
+          {
+            "open": "14:00",
+            "close": "22:00"
+          }
+        ],
+        "is_active": true
+      },
+      "tuesday": {
+        "hours": [
+          {
+            "open": "14:00",
+            "close": "22:00"
+          }
+        ],
+        "is_active": true
+      },
+      "wednesday": {
+        "hours": [
+          {
+            "open": "14:00",
+            "close": "22:00"
+          }
+        ],
+        "is_active": true
+      },
+      "thursday": {
+        "hours": [
+          {
+            "open": "14:00",
+            "close": "22:00"
+          }
+        ],
+        "is_active": true
+      },
+      "friday": {
+        "hours": [
+          {
+            "open": "14:00",
+            "close": "22:00"
+          }
+        ],
+        "is_active": true
+      },
+      "saturday": {
+        "hours": [
+          {
+            "open": "14:00",
+            "close": "22:00"
+          }
+        ],
+        "is_active": true
+      }
+    }
+  },
+  "fidelizacion_loyalty": {
+    "loyalty_program": {
+      "active": false,
+      "rules_credit": [
+        {
+          "threshold_purchase": 10,
+          "earned_points_per_purchase": 1
+        }
+      ],
+      "rewards": []
+    }
+  },
+  "redes_sociales": {
+    "tiktok": {
+      "url": "https://www.tiktok.com/@caprichoscampoy"
+    },
+    "facebook": {
+      "url": "https://www.facebook.com/caprichosC"
+    },
+    "instagram": {
+      "url": "https://www.instagram.com/caprichoscampoy"
+    },
+    "tripadvisor": {
+      "url": null
+    }
+  },
+  "tema_y_diseno_visual": {
+    "company": {
+      "banner": {
+        "url": "https://assets.olaclick.app/companies/backgrounds/99a80199-f8a6-4623-93c4-88ab22d8816f.png",
+        "path": "companies/backgrounds/99a80199-f8a6-4623-93c4-88ab22d8816f.png"
+      }
+    },
+    "landing": {
+      "body": {
+        "degraded_color": {
+          "degraded_1": "#FFF6ED",
+          "degraded_2": "#FFFFFF"
+        },
+        "background_type": "flat_color",
+        "background_color": "#FFFFFF",
+        "background_image": {
+          "desktop_url": null,
+          "mobile_url": null,
+          "thumbnail_desktop_url": "",
+          "thumbnail_mobile_url": ""
+        }
+      },
+      "title": {
+        "name": "👌¡A disfrutar!🍩",
+        "font": "poppins",
+        "text_color": "#000000",
+        "summary": "Un buen café, un buen momento para compartir"
+      },
+      "footer": {
+        "app_download_color": "#FF0808",
+        "background_color": "#7c4a33",
+        "download_app_enabled": false,
+        "olaclick_promotion_enabled": true,
+        "text_color": "#fdf3e7"
+      },
+      "header": {
+        "color": "#FCFCFD"
+      },
+      "content": {
+        "font": "poppins",
+        "text_color": "#000000"
+      },
+      "buttons_icons": {
+        "button_color": "#FF0808",
+        "text_color": "#FFFFFF",
+        "form": "filled_semi_rounded",
+        "form_color": null
+      }
+    },
+    "product": {
+      "body": {
+        "background_color": "#fdf3e7"
+      },
+      "content": {
+        "font": "poppins",
+        "text_color": "#0b2c3e",
+        "discounts_color": "#f39c12"
+      },
+      "buttons_icons": {
+        "background_color": "#f39c12",
+        "text_color": "#7c4a33"
+      }
+    }
+  },
+  "menu_pdf_settings": {
+    "colors": {
+      "background": "#F1F2F4",
+      "font": "#121417",
+      "main": "#BA35E8"
+    },
+    "page_format": {
+      "type": "A4"
+    },
+    "header": {
+      "business_address": true,
+      "business_name": true,
+      "business_qr": true,
+      "cover_page": true,
+      "logo": true,
+      "welcome_page_link": true
+    },
+    "products": {
+      "description": true,
+      "image": true,
+      "show_invisibles": false,
+      "variants": true
+    }
+  },
+  "reportes_programados": {
+    "habilitado": false,
+    "tipo_reporte": [
+      "DAILY"
+    ],
+    "telefonos_notificacion_masked": [
+      "***934"
+    ],
+    "dias_envio_local": [
+      "WEDNESDAY",
+      "THURSDAY",
+      "FRIDAY",
+      "SATURDAY",
+      "SUNDAY",
+      "MONDAY",
+      "TUESDAY"
+    ],
+    "hora_envio_local": "23:00"
+  },
+  "google_settings": {
+    "place_id": null,
+    "ratings_count": 775,
+    "ratings_score": 4.8,
+    "display_ratings": false,
+    "address_validation": false,
+    "google_feed_enabled": false,
+    "google_feed_location": {
+      "address": {
+        "region": "Lima",
+        "country": "PE",
+        "locality": "Santa María de Huachipa",
+        "postal_code": "15457",
+        "street_address": "Los Pinos, Campoy, San Juan de Lurigancho, Santa María de Huachipa, Lima, Lima Metropolitana, Lima, 15457, Perú"
+      },
+      "latitude": -12.01949887,
+      "longitude": -76.96281426
+    },
+    "google_for_restaurant": {
+      "location": null,
+      "ai_enabled": false,
+      "module_status": "DISCONNECTED",
+      "export_menu_daily": false,
+      "order_now_enabled": false,
+      "show_score_in_menu": false,
+      "google_feed_location": null,
+      "show_reviews_in_menu": false
+    }
+  },
+  "analytics_y_terceros_enmascarados": {
+    "facebook_pixel_masked": "***347",
+    "google_analytics_masked": "***DL8",
+    "google_tag_manager_masked": "***PTB",
+    "facebook_domain_verification_token_masked": "***xvv"
+  },
+  "runtime_config_public": {
+    "appEnv": "prod",
+    "appVersion": "4.00.f684a4e",
+    "apiBaseUrl": "https://api.olaclick.app",
+    "awsS3BaseUrl": "https://assets.olaclick.app",
+    "websocketHost": "wss://knr0gr5370.execute-api.us-east-1.amazonaws.com/default"
+  }
+}

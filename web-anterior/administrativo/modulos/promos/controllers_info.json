@@ -1,0 +1,44 @@
+{
+  "ofertaCtrl": {
+    "found": false
+  },
+  "nuevaOfertaCtrl": {
+    "found": false
+  },
+  "asignarPrecioSucursalesCtrl": {
+    "found": false
+  },
+  "AsignarPrecioSucursalesCtrl": {
+    "found": false
+  },
+  "descuentoCtrl": {
+    "found": false
+  },
+  "registrardescuentoCtrl": {
+    "found": false
+  },
+  "modificardescuentoCtrl": {
+    "found": false
+  },
+  "AjustesCuponesCtrl": {
+    "found": false
+  },
+  "nuevoCuponDescuentoCtrl": {
+    "found": false
+  },
+  "promocionsorteoIndexCtrl": {
+    "found": false
+  },
+  "promocionSorteoListarCtrl": {
+    "found": false
+  },
+  "promocionsorteoNuevoCtrl": {
+    "found": false
+  },
+  "PlanMensajeriaDetalleCtrl": {
+    "found": false
+  },
+  "AjustesValeDePagoCtrl": {
+    "found": false
+  }
+}

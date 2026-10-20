@@ -1,0 +1,118 @@
+{
+  "buttons": [
+    {
+      "text": "Importadores",
+      "title": "",
+      "ngClick": ""
+    },
+    {
+      "text": "Descargar",
+      "title": "",
+      "ngClick": ""
+    },
+    {
+      "text": "Nuevo producto",
+      "title": "",
+      "ngClick": ""
+    },
+    {
+      "text": "Recorrido guiado",
+      "title": "",
+      "ngClick": "vm.fnShowJoyrideNuevoProducto()"
+    },
+    {
+      "text": "Añadir nueva categoría",
+      "title": "",
+      "ngClick": "vm.fnNuevaCategoria()"
+    },
+    {
+      "text": "Configuración avanzada",
+      "title": "",
+      "ngClick": ""
+    },
+    {
+      "text": "Platos/bebidas",
+      "title": "",
+      "ngClick": ""
+    },
+    {
+      "text": "Combos",
+      "title": "",
+      "ngClick": ""
+    },
+    {
+      "text": "Modificadores",
+      "title": "",
+      "ngClick": ""
+    },
+    {
+      "text": "Menús",
+      "title": "",
+      "ngClick": ""
+    },
+    {
+      "text": "Nuevo producto",
+      "title": "",
+      "ngClick": "joyride.next()"
+    }
+  ],
+  "columns": [
+    "Producto",
+    "Cód.",
+    "¿Transformable?",
+    "¿Activo?"
+  ],
+  "filters": [
+    {
+      "tag": "input",
+      "type": "text",
+      "name": "",
+      "placeholder": "Selecciona un local",
+      "ngModel": "$select.search",
+      "id": ""
+    },
+    {
+      "tag": "input",
+      "type": "text",
+      "name": "",
+      "placeholder": "",
+      "ngModel": "",
+      "id": "focusser-0"
+    },
+    {
+      "tag": "input",
+      "type": "text",
+      "name": "",
+      "placeholder": "Filtrar mis categorias",
+      "ngModel": "vm.filtroCategorias",
+      "id": ""
+    },
+    {
+      "tag": "input",
+      "type": "checkbox",
+      "name": "",
+      "placeholder": "",
+      "ngModel": "vm.verAnulados",
+      "id": ""
+    },
+    {
+      "tag": "input",
+      "type": "text",
+      "name": "",
+      "placeholder": "Filtrar producto",
+      "ngModel": "vm.filtroBusqueda",
+      "id": ""
+    },
+    {
+      "tag": "input",
+      "type": "checkbox",
+      "name": "",
+      "placeholder": "",
+      "ngModel": "vm.verAnulados",
+      "id": ""
+    }
+  ],
+  "tabs": [],
+  "selects": [],
+  "modals": []
+}

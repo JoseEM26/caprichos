@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Pantalla de cocina en TV</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+button{font-family:inherit;cursor:pointer}
+@keyframes tv-pulse{0%,100%{opacity:1}50%{opacity:0.35}}
+</style>
+</helmet>
+<div style="width:1280px;height:790px;background:#E3D6C6;font-family:Montserrat,system-ui,sans-serif;color:#0B2C3E;display:flex;flex-direction:column">
+
+  <!-- CONTROLES DE LA MAQUETA (no son parte de la pantalla) -->
+  <div style="height:70px;box-sizing:border-box;padding:0 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#FBF4EC;border-bottom:1px solid #D9CFC2">
+    <span style="font-size:12px;font-weight:700;letter-spacing:0.06em;color:#2C4C5D">CONTROLES DE LA MAQUETA</span>
+    <span style="font-size:13px;color:#2C4C5D">La TV no tiene botones ni menús. Aquí eliges qué estado mostrar:</span>
+    <sc-for list="{{modes}}" as="m" hint-placeholder-count="3">
+      <button onClick="{{m.pick}}" style="min-height:40px;padding:0 14px;border-radius:9999px;border:1.5px solid #0B2C3E;background:{{m.bg}};color:{{m.fg}};font-weight:700;font-size:13px">{{m.n}}</button>
+    </sc-for>
+  </div>
+
+  <!-- PANTALLA DE LA TV (16:9) -->
+  <div style="width:1280px;height:720px;background:#0B2C3E;color:#FBF4EC;position:relative;overflow:hidden;display:flex;flex-direction:column">
+
+    <sc-if value="{{isOrders}}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;align-items:center;gap:20px;padding:14px 28px;border-bottom:2px solid #2C4C5D">
+        <img src="/_blob/6d6aa5696913688bb2235a49f1133c2a" alt="Caprichos" style="width:52px;height:52px;border-radius:26px">
+        <div style="flex:1">
+          <div style="font-weight:800;font-size:28px;line-height:32px">COCINA Y BARRA</div>
+          <div style="font-size:15px;color:#C9D6DD">Estación: todas · Meta de entrega: 13 min</div>
+        </div>
+        <div style="display:flex;gap:10px">
+          <sc-for list="{{totals}}" as="t" hint-placeholder-count="3">
+            <div style="min-width:120px;text-align:center;padding:6px 14px;border-radius:12px;background:#123F56"><div style="font-size:30px;font-weight:800;line-height:34px;color:{{t.c}}">{{t.v}}</div><div style="font-size:13px;color:#C9D6DD">{{t.n}}</div></div>
+          </sc-for>
+        </div>
+        <div style="text-align:right">
+          <div style="font-weight:800;font-size:40px;line-height:42px">21:34</div>
+          <div style="font-size:13px;color:#C9D6DD;display:flex;align-items:center;justify-content:flex-end;gap:6px"><span style="width:10px;height:10px;border-radius:5px;background:#5DD38A;animation:tv-pulse 2s ease-in-out infinite"></span>En línea</div>
+        </div>
+      </div>
+
+      <div style="flex:1;min-height:0;display:flex;gap:16px;padding:16px 28px 12px 28px">
+        <sc-for list="{{cols}}" as="c" hint-placeholder-count="3">
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-radius:12px;background:{{c.bg}};color:{{c.fg}}">
+              <span style="font-weight:800;font-size:20px">{{c.title}}</span><span style="font-weight:800;font-size:22px">{{c.count}}</span>
+            </div>
+            <sc-for list="{{c.cards}}" as="k" hint-placeholder-count="2">
+              <div style="background:#FBF4EC;color:#0B2C3E;border-radius:14px;border-left:10px solid {{k.tc}};padding:10px 14px;display:flex;flex-direction:column;gap:4px">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <span style="font-weight:800;font-size:22px">{{k.code}} <span style="font-size:13px;font-weight:700;border-radius:9999px;padding:2px 10px;background:#0B2C3E;color:#FBF4EC;vertical-align:middle">{{k.modal}}</span></span>
+                  <span style="font-weight:800;font-size:26px;color:{{k.tc}}">{{k.mins}} min</span>
+                </div>
+                <sc-for list="{{k.items}}" as="it" hint-placeholder-count="2">
+                  <div style="font-size:17px;line-height:21px"><b>{{it.q}} x {{it.n}}</b> <span style="color:#2C4C5D">{{it.d}}</span></div>
+                </sc-for>
+                <sc-if value="{{k.hasNote}}" hint-placeholder-val="{{ false }}"><div style="font-size:16px;font-weight:800;color:#B2500F">NOTA: {{k.note}}</div></sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="padding:8px 28px;display:flex;justify-content:space-between;font-size:13px;color:#C9D6DD;border-top:1px solid #2C4C5D">
+        <span>Azul: a tiempo · Naranja: desde 10 min · Rojo: desde 13 min</span><span>Pantalla de solo lectura · se actualiza sola</span>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isPair}}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center">
+        <img src="/_blob/6d6aa5696913688bb2235a49f1133c2a" alt="Caprichos" style="width:96px;height:96px;border-radius:48px">
+        <div style="font-weight:800;font-size:34px">Vincula esta pantalla</div>
+        <div style="font-size:20px;color:#C9D6DD;max-width:760px;line-height:28px">En el administrativo entra a Pantallas, pulsa Vincular pantalla y escribe este código:</div>
+        <div style="font-weight:800;font-size:96px;letter-spacing:0.18em;padding:12px 40px;border-radius:20px;background:#FBF4EC;color:#0B2C3E">K7M-4QX</div>
+        <div style="font-size:18px;color:#C9D6DD">El código vence en 10 minutos. Esta pantalla solo mostrará pedidos de cocina.</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isOff}}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center">
+        <div style="width:28px;height:28px;border-radius:14px;background:#E5533D;animation:tv-pulse 1.4s ease-in-out infinite"></div>
+        <div style="font-weight:800;font-size:44px">Sin conexión</div>
+        <div style="font-size:22px;color:#C9D6DD;max-width:780px;line-height:30px">No se pueden mostrar pedidos nuevos. Estamos reintentando solos. Mientras tanto, avisa a caja y revisa los tickets impresos.</div>
+        <div style="font-size:16px;color:#C9D6DD">Última actualización: 21:33</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isOut}}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center">
+        <div style="font-weight:800;font-size:44px">Pantalla desvinculada</div>
+        <div style="font-size:22px;color:#C9D6DD;max-width:780px;line-height:30px">El administrador desactivó esta pantalla. Pide que la vuelva a vincular.</div>
+      </div>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":790}}'>
+const TIMEC = (m) => (m >= 13 ? '#C73E2A' : m >= 10 ? '#C98A1B' : '#2C7FA3');
+const ORD = [
+  { st: 0, code: 'CP-0102', modal: 'LLEVAR', mins: 1, items: [ { q: 1, n: 'DÚO PARA COMPARTIR', d: 'Regular 12 oz · 2 frappes a elección' } ], note: '' },
+  { st: 0, code: 'CP-0106', modal: 'DELIVERY', mins: 0, items: [ { q: 2, n: 'FRAPPE MARACUYÁ', d: 'Grande 16 oz · Leche entera · Azúcar' } ], note: 'Sin hielo en uno' },
+  { st: 1, code: 'CP-0103', modal: 'MESA 7', mins: 6, items: [ { q: 1, n: 'CLUB SANDWICH', d: '4 cuartos · Honey' }, { q: 1, n: 'CAPUCCINO', d: 'Regular 12 oz · Sin lactosa · Stevia' } ], note: '' },
+  { st: 1, code: 'CP-0105', modal: 'LLEVAR', mins: 11, items: [ { q: 1, n: 'MOCACCINO', d: 'Grande 16 oz · Leche entera · Azúcar' } ], note: 'Bien caliente' },
+  { st: 1, code: 'CP-0101', modal: 'DELIVERY', mins: 14, items: [ { q: 1, n: 'FRAPPE OREO', d: 'Grande 16 oz · Leche entera · Azúcar' }, { q: 1, n: 'CAPRISABROSO', d: 'Unidad · Honey' } ], note: 'Sin hielo en el frappe' },
+  { st: 2, code: 'CP-0104', modal: 'DELIVERY', mins: 11, items: [ { q: 1, n: 'NUTEWAFFLE', d: 'Waffle completo · Chantilly 4 oz' } ], note: '' }
+];
+const COLS = [ { t: 'POR PREPARAR', bg: '#E67929', fg: '#0B2C3E' }, { t: 'EN PREPARACIÓN', bg: '#D99E39', fg: '#0B2C3E' }, { t: 'LISTOS', bg: '#5DD38A', fg: '#0B2C3E' } ];
+const MODES = [ { id: 'orders', n: 'Mostrando pedidos' }, { id: 'pair', n: 'Vincular pantalla' }, { id: 'off', n: 'Sin conexión' }, { id: 'out', n: 'Desvinculada' } ];
+
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { mode: 'orders' }; }
+  renderVals() {
+    const s = this.state;
+    const cols = COLS.map((c, i) => {
+      const cards = ORD.filter((o) => o.st === i).map((o) => ({ code: o.code, modal: o.modal, mins: o.mins, tc: TIMEC(o.mins), items: o.items, hasNote: !!o.note, note: o.note }));
+      return { title: c.t, count: cards.length, bg: c.bg, fg: c.fg, cards: cards };
+    });
+    return {
+      modes: MODES.map((m) => ({ n: m.n, pick: () => this.setState({ mode: m.id }), bg: s.mode === m.id ? '#0B2C3E' : 'transparent', fg: s.mode === m.id ? '#FBF4EC' : '#0B2C3E' })),
+      isOrders: s.mode === 'orders', isPair: s.mode === 'pair', isOff: s.mode === 'off', isOut: s.mode === 'out',
+      cols: cols,
+      totals: [ { n: 'Por preparar', v: String(cols[0].count), c: '#E67929' }, { n: 'En preparación', v: String(cols[1].count), c: '#D99E39' }, { n: 'Atrasados', v: String(ORD.filter((o) => o.mins >= 13 && o.st < 2).length), c: '#FF7A66' } ]
+    };
+  }
+}
+</script>
+</body>
+</html>

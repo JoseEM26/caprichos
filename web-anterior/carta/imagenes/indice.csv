@@ -1,0 +1,53 @@
+archivo,producto,categoria,url origen,ancho x alto,bytes
+negocio/logo.png,[Marca] logo,negocio,https://assets.olaclick.app/companies/logos/6fd43b85-d6b2-42a0-a358-4aa351f47bef.png,475x475,25835
+negocio/logo-miniatura.png,[Marca] logo-miniatura,negocio,https://assets.olaclick.app/companies/logos/thumbnails/6fd43b85-d6b2-42a0-a358-4aa351f47bef.png,50x50,995
+negocio/banner-portada.png,[Marca] banner-portada,negocio,https://assets.olaclick.app/companies/backgrounds/99a80199-f8a6-4623-93c4-88ab22d8816f.png,1440x360,394507
+negocio/favicon.ico,[Marca] favicon,negocio,https://caprichos-per.ola.click/favicon.ico,32x32,4286
+frio/duo-compartir-2-frappes-2-donuts.png,Dúo Compartir (2 Frappés + 2 Donuts),Frío🥤,https://assets.olaclick.app/companies/products/images/800/bfbf712a-99c1-44e5-abda-c3f2db3fe0e9.png,800x800,1171263
+frio/frozen-maracuya-21oz.png,Frozen Maracuyá 21oz,Frío🥤,https://assets.olaclick.app/companies/products/images/800/1f575ebd-f957-43a7-9254-cedabcd3a370.png,800x800,1124864
+frio/frozen-limonada-21oz.png,Frozen Limonada 21oz,Frío🥤,https://assets.olaclick.app/companies/products/images/800/ba3bda3d-3b28-4693-8e33-0ead7824e725.png,800x800,1095588
+frio/frozen-strawberry-21oz.png,Frozen Strawberry 21oz,Frío🥤,https://assets.olaclick.app/companies/products/images/800/5c395371-c9fe-44a9-a6cd-9bc0427ab91f.png,800x800,1145384
+frio/frappe-caramel-clasico.png,Frappé Caramel Clásico,Frío🥤,https://assets.olaclick.app/companies/products/images/800/854b3c6e-d2a2-4b6e-86cf-4ad800e6a133.png,800x800,1171403
+frio/frappe-caramel-chocolate.png,Frappé Caramel Chocolate,Frío🥤,https://assets.olaclick.app/companies/products/images/800/8d5d1fe9-9d7f-4075-aa31-a6d245c6dff6.png,800x800,1119491
+frio/frappe-algarrolucuma.png,Frappé Algarrolúcuma,Frío🥤,https://assets.olaclick.app/companies/products/images/800/0fcb9b4b-53f5-490c-9f42-3b4f0169c514.png,800x800,1108612
+frio/frappuccino-oreo.png,Frappuccino Oreo,Frío🥤,https://assets.olaclick.app/companies/products/images/800/ad27e72a-0d29-4f55-8d89-92fdf1f036fa.png,800x800,892647
+frio/frappe-maracuya.png,Frappé Maracuyá,Frío🥤,https://assets.olaclick.app/companies/products/images/800/f0ce087e-bd9c-41b6-9044-05e023f27d85.png,800x800,793053
+frio/frappuccino-moca.png,Frappuccino Moca,Frío🥤,https://assets.olaclick.app/companies/products/images/800/d009451c-749b-4bd4-a776-cd29af836171.png,800x800,900459
+frio/frappe-chocolucuma.png,Frappé Chocolúcuma,Frío🥤,https://assets.olaclick.app/companies/products/images/800/1c0fa0d2-a8cc-4131-8737-024b38e9cfd5.png,800x800,893090
+frio/frappe-berries.png,Frappé Berries,Frío🥤,https://assets.olaclick.app/companies/products/images/800/8983d5ca-e1f6-4d44-9c9d-54fcde3429f3.png,800x800,891183
+frio/frappe-strawberry.png,Frappé Strawberry,Frío🥤,https://assets.olaclick.app/companies/products/images/800/10889921-fd0e-4de6-9f27-315f89d35676.png,800x800,885529
+frio/frappe-chocoberry.png,Frappé Chocoberry,Frío🥤,https://assets.olaclick.app/companies/products/images/800/df3dfd85-c368-4417-b4fa-7bc388200697.png,800x800,886337
+frio/frappe-cafe.png,Frappé Café,Frío🥤,https://assets.olaclick.app/companies/products/images/800/fedf6d19-a008-4aa8-89af-399dfc6f86ad.png,800x800,895894
+frio/iced-berry.png,Iced Berry,Frío🥤,https://assets.olaclick.app/companies/products/images/800/91aeff44-bda2-4c37-a2d9-f97547c87942.png,800x800,1158756
+frio/iced-coffee-americano-helado.png,Iced Coffee (Americano Helado),Frío🥤,https://assets.olaclick.app/companies/products/images/800/c0b029e0-8506-4308-a1ce-fb522592fe76.png,800x800,882558
+frio/iced-latte-coffee.png,Iced Latte Coffee,Frío🥤,https://assets.olaclick.app/companies/products/images/800/25052501-cac5-4652-a225-a28b80a15276.png,800x800,858059
+frio/nuevo-iced-chocolate.png,¡Nuevo! Iced Chocolate,Frío🥤,https://assets.olaclick.app/companies/products/images/800/8b5d65ea-015c-4f2b-ac0b-e31939e955aa.png,800x800,1110178
+caliente/caramel-macchiato.png,Caramel Macchiato,Caliente☕️,https://assets.olaclick.app/companies/products/images/800/a6f1bb58-e0ae-46a4-81a8-b09651733d41.png,800x800,1103435
+caliente/oreo-latte.png,Oreo Latte,Caliente☕️,https://assets.olaclick.app/companies/products/images/800/9987d000-a70f-4ed5-a758-02cd7e54508d.png,800x800,1122969
+caliente/latte-vainilla.png,Latte Vainilla,Caliente☕️,https://assets.olaclick.app/companies/products/images/800/54abbc3d-db2a-412a-b630-2921677038bf.png,800x800,1135088
+caliente/mocaccino.png,Mocaccino,Caliente☕️,https://assets.olaclick.app/companies/products/images/800/7eff1971-fb79-4ef6-8da3-3a9d946404e1.png,800x800,1195062
+caliente/cappuccino.png,Cappuccino,Caliente☕️,https://assets.olaclick.app/companies/products/images/800/e95056bb-1daf-47f9-82bd-5584e18769c0.png,800x800,1134174
+caliente/chocolate.png,Chocolate,Caliente☕️,https://assets.olaclick.app/companies/products/images/800/4c06c3c1-5ce2-4fee-a76c-53bf634cc31f.png,800x800,1147358
+caliente/americano.png,Americano,Caliente☕️,https://assets.olaclick.app/companies/products/images/800/d07ac83f-8fd6-4b32-acaf-e368ed87b268.png,800x800,1071238
+salado/duo-irresistible.jpg,Dúo Irresistible,Salado🍗,https://assets.olaclick.app/companies/products/images/800/4753a256-f935-4568-9f95-366f76cc21d8.jpg,800x800,107298
+salado/empanada-clasica.png,Empanada Clásica,Salado🍗,https://assets.olaclick.app/companies/products/images/800/eb894258-5027-4465-bef3-c2d1f3df7bf1.png,800x800,1066015
+salado/sandwich-caprisabroso.jpeg,Sándwich Caprisabroso,Salado🍗,https://assets.olaclick.app/companies/products/images/800/90cfdb73-649e-4285-bc8b-5fafbc12c8cb.jpeg,800x800,107896
+salado/sandwich-parrillero.png,Sándwich Parrillero,Salado🍗,https://assets.olaclick.app/companies/products/images/800/fa7744c0-f987-43bf-a4b7-96ba08de3a72.png,800x800,1099659
+salado/sandwich-suprema.png,Sándwich Suprema,Salado🍗,https://assets.olaclick.app/companies/products/images/800/bc7f36b2-2170-4e50-bab7-640d535a38d1.png,800x800,1087372
+salado/club-sandwich.jpg,Club Sandwich,Salado🍗,https://assets.olaclick.app/companies/products/images/800/8c1fdd33-8847-4c88-b004-e296a1bbfb70.jpg,800x800,110097
+salado/sandwich-especial.png,Sándwich Especial,Salado🍗,https://assets.olaclick.app/companies/products/images/800/b4e43690-7bf9-4e91-9192-f3cf7d921200.png,800x800,1083289
+salado/sandwich-clasico.png,Sándwich Clásico,Salado🍗,https://assets.olaclick.app/companies/products/images/800/c1e36621-b381-4345-8951-62e146e87d28.png,800x800,1012524
+salado/petit-pan-clasico-x-4-und.png,Petit Pan Clásico x 4 UND,Salado🍗,https://assets.olaclick.app/companies/products/images/800/f5a92bed-1310-40c4-a8fc-81176efb30ed.png,800x800,998808
+postres/dona-artesanal.png,Dona Artesanal,Postres🍰,https://assets.olaclick.app/companies/products/images/800/030dcb1b-fd99-43e2-9d08-a958c9cbf30f.png,800x800,1021277
+postres/nuevo-keke-marmoleado-chips.png,¡NUEVO! Keke Marmoleado Chips,Postres🍰,https://assets.olaclick.app/companies/products/images/800/92998e81-2e5e-4345-98ee-cba6d016e9e5.png,800x800,1126751
+postres/12-docena-donuts.png,1/2 Docena Donuts,Postres🍰,https://assets.olaclick.app/companies/products/images/800/a0367bf5-0cf8-4f03-a7ff-17cb49ab629a.png,800x800,829310
+postres/12-docena-de-galletas.jpeg,1/2 Docena de Galletas,Postres🍰,https://assets.olaclick.app/companies/products/images/800/5f0ccca2-3a81-41c4-82f4-082edb431fea.jpeg,290x290,17190
+postres/carrot-cake-artesanal.png,Carrot cake Artesanal,Postres🍰,https://assets.olaclick.app/companies/products/images/800/637eb639-389d-4424-9d05-2e71a133ae2a.png,800x800,1197597
+postres/galleta-choco-chips-90-gr.png,Galleta Choco Chips (90 Gr.),Postres🍰,https://assets.olaclick.app/companies/products/images/800/8668b84e-7302-4ef5-b62b-dba6fd40dee5.png,800x800,893236
+postres/waffle-frutos-del-bosque.png,Waffle Frutos del Bosque,Postres🍰,https://assets.olaclick.app/companies/products/images/800/fb5fdb6e-d20d-498d-9842-03f33afcbf75.png,800x800,1102404
+postres/waffle-tropical.jpg,Waffle Tropical,Postres🍰,https://assets.olaclick.app/companies/products/images/800/9145eb92-898b-4a8c-8fd1-92f8c9de2f8a.jpg,800x800,96647
+postres/waffle-fresa-split.jpg,Waffle Fresa Split,Postres🍰,https://assets.olaclick.app/companies/products/images/800/ecd79094-0a78-4003-b2fe-1acb700a07e5.jpg,800x800,119126
+postres/waffle-oreo.jpg,Waffle Oreo,Postres🍰,https://assets.olaclick.app/companies/products/images/800/e916c337-cd44-4e7e-8e01-9a57674df7f2.jpg,800x800,111434
+postres/nuevo-waffle-manjar.jpg,¡NUEVO! Waffle Manjar,Postres🍰,https://assets.olaclick.app/companies/products/images/800/15277639-7605-4021-ad15-8bf392a09d8c.jpg,800x800,105864
+postres/waffle-nutella.jpg,Waffle Nutella*,Postres🍰,https://assets.olaclick.app/companies/products/images/800/5a0cf771-492a-4d94-9db3-19d2b78f79de.jpg,800x800,106569
+postres/waffle-banana-split.png,Waffle Banana Split,Postres🍰,https://assets.olaclick.app/companies/products/images/800/eeb08796-1959-4b72-80d1-a7f31e569d42.png,800x800,1134306

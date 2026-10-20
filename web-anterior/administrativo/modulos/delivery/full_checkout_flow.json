@@ -1,0 +1,97 @@
+{
+  "modalities": [
+    "Recojo en tienda",
+    "Delivery"
+  ],
+  "recojo_step": {
+    "local_name": "CAPRICHOS",
+    "address": "Calle 11, Mz D LT 27 Urb. Los girasoles de Campoy, SJL, Lima",
+    "schedule": "De 14:00 pm a 22:00 pm",
+    "hours": [
+      "2 pm",
+      "3 pm",
+      "4 pm",
+      "5 pm",
+      "6 pm",
+      "7 pm",
+      "8 pm",
+      "9 pm",
+      "10 pm"
+    ]
+  },
+  "catalog": {
+    "url": "https://caprichos.restaurant.pe/carta-digital/#/inicio",
+    "info": {
+      "title": "Carta Digital-Restaurant.pe",
+      "bodySnippet": "Ingresar mi ubicación\nCambiar modalidad\nCAPRICHOS\n¡PEDIR AHORA!\nRestaurant.pe ©. Todos los derechos reservados - 09/05/2026 - v1.0.8\nSelecciona un local\nCAPRICHOS\nLima, Lima\n\nCalle 11, Mz D LT 27 Urb. Los girasoles de Campoy, SJL, Lima\n\nSelecciona el día\nMartes\n13\noct.\nMiércoles\n14\noct.\nJueves\n15\noct.\nViernes\n16\noct.\nSábado\n17\noct.\nDomingo\n18\noct.\nLunes\n19\noct.\nSelecciona un horario de atención\nDe 14:00 pm a 22:00 pm\nHora:\n2 pm\n3 pm\n4 pm\n5 pm\n6 pm\n7 pm\n8 pm\n9 pm\n10 pm\nMinutos:\n3:00\n3:15\n3:30\n3:45\n Regresar\n Aceptar\nTe falta escoger la hora de tu pedido",
+      "categories": [],
+      "productsCount": 0,
+      "productsSample": []
+    }
+  },
+  "product_modal": {},
+  "cart": {},
+  "checkout_form": {},
+  "apis": [
+    {
+      "url": "https://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/credentialsFirebase",
+      "method": "POST",
+      "status": 200,
+      "keys": [
+        "tipo",
+        "data",
+        "mensajes",
+        "inicio",
+        "fin",
+        "node",
+        "diff"
+      ]
+    },
+    {
+      "url": "https://caprichos.restaurant.pe/restaurant/facebook/rest/delivery/cargarLocalesMenuEnLinea?page_id=0",
+      "method": "GET",
+      "status": 200,
+      "keys": [
+        "mensajes",
+        "tipo",
+        "locales",
+        "usoBaseDatosClientes",
+        "tarjetasGlobales",
+        "monedafacturacion",
+        "urlnode",
+        "proveedorMapa",
+        "inicio",
+        "fin",
+        "diff",
+        "array_query",
+        "array_queryParam",
+        "array_logsTem",
+        "server"
+      ]
+    },
+    {
+      "url": "https://mapas.restaurant.pe/get-geolocalizacion",
+      "method": "POST",
+      "status": 200,
+      "keys": [
+        "url",
+        "apiKey",
+        "predictions",
+        "results",
+        "status",
+        "error_message",
+        "request_status",
+        "keyFromClient"
+      ]
+    },
+    {
+      "url": "https://api.mercadopago.com/v1/devices/widgets?referer=https%3A//caprichos.restaurant.pe",
+      "method": "POST",
+      "status": 200,
+      "keys": [
+        "widget",
+        "session_id"
+      ]
+    }
+  ]
+}

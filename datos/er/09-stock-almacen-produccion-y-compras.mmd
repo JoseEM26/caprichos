@@ -1,0 +1,190 @@
+erDiagram
+  LUGAR_STOCK {
+    bigint id PK
+    text nombre UK
+    text tipo
+    bigint area_id FK
+  }
+  INSUMO {
+    bigint id PK
+    text nombre UK
+    text unidad_compra
+    text unidad_almacen
+    text unidad_receta
+    numeric factor_compra
+    numeric factor_receta
+    numeric minimo
+    numeric intermedio
+    numeric maximo
+    boolean perecible
+    bigint lugar_consumo_id FK
+    numeric costo_unit
+    bigint proveedor_a
+    bigint proveedor_b
+    bigint proveedor_c
+    boolean activo
+  }
+  STOCK {
+    bigint insumo_id FK
+    bigint producto_id FK
+    bigint lugar_id FK
+    numeric cantidad
+  }
+  MOVIMIENTO_STOCK {
+    bigint id PK
+    text tipo
+    bigint insumo_id FK
+    bigint producto_id FK
+    bigint lugar_id FK
+    numeric cantidad
+    bigint origen_valor_id FK
+    bigint destino_valor_id FK
+    bigint pedido_id
+    bigint produccion_id
+    bigint traslado_id
+    bigint compra_id
+    text nota
+    bigint movimiento_anulado_id FK
+    bigint por
+    timestamptz en
+  }
+  RECETA {
+    bigint id PK
+    bigint producto_id FK
+    bigint tamano_valor_id FK
+    boolean es_produccion
+    numeric rinde
+  }
+  RECETA_LINEA {
+    bigint receta_id PK,FK
+    bigint insumo_id PK,FK
+    numeric cantidad
+  }
+  AJUSTE_OPCION {
+    bigint opcion_id PK,FK
+    bigint insumo_id PK,FK
+    text efecto
+    bigint reemplaza_insumo_id FK
+    numeric cantidad
+  }
+  TRASLADO {
+    bigint id PK
+    bigint insumo_id FK
+    bigint destino_lugar_id FK
+    numeric enviado
+    numeric recibido
+    text estado
+    bigint pedido_interno_id
+    bigint recibido_por
+    timestamptz recibido_en
+  }
+  PEDIDO_INTERNO {
+    bigint id PK
+    bigint area_id FK
+    jsonb detalle
+    text estado
+    bigint por
+    timestamptz en
+  }
+  PRODUCCION {
+    bigint id PK
+    bigint receta_id FK
+    numeric tandas
+    numeric unidades
+    timestamptz producido_en
+    bigint por
+    timestamptz anulado_en
+    text motivo_anulacion
+  }
+  CIERRE_DIA {
+    bigint id PK
+    date fecha
+    bigint lugar_id FK
+    jsonb detalle
+    bigint por
+    timestamptz en
+  }
+  PEDIDO_PROVEEDOR {
+    bigint id PK
+    bigint proveedor_party_id FK
+    text estado
+    timestamptz enviado_en
+    text motivo_anulacion
+  }
+  PEDIDO_PROVEEDOR_LINEA {
+    bigint pedido_proveedor_id PK,FK
+    bigint insumo_id PK,FK
+    numeric cantidad_compra
+    numeric recibido
+  }
+  COMPRA {
+    bigint id PK
+    bigint proveedor_party_id FK
+    bigint pedido_proveedor_id FK
+    text comprobante_tipo
+    text comprobante_numero
+    bigint archivo_id FK
+    text condicion
+    numeric total
+    timestamptz pagada_en
+    timestamptz anulada_en
+    text motivo_anulacion
+  }
+  COMPRA_LINEA {
+    bigint id PK
+    bigint compra_id FK
+    bigint insumo_id FK
+    numeric cantidad_compra
+    numeric costo_unit
+    text lote
+    date vence
+  }
+  ARCHIVO {
+    bigint id PK "en otro dominio"
+  }
+  AREA_COCINA {
+    bigint id PK "en otro dominio"
+  }
+  LISTA_VALOR {
+    bigint id PK "en otro dominio"
+  }
+  OPCION {
+    bigint id PK "en otro dominio"
+  }
+  PARTY {
+    bigint id PK "en otro dominio"
+  }
+  PRODUCTO {
+    bigint id PK "en otro dominio"
+  }
+  ARCHIVO ||--o{ COMPRA : "archivo_id"
+  AREA_COCINA ||--o{ LUGAR_STOCK : "area_id"
+  AREA_COCINA ||--o{ PEDIDO_INTERNO : "area_id"
+  COMPRA ||--o{ COMPRA_LINEA : "compra_id"
+  INSUMO ||--o{ AJUSTE_OPCION : "insumo_id"
+  INSUMO ||--o{ AJUSTE_OPCION : "reemplaza_insumo_id"
+  INSUMO ||--o{ COMPRA_LINEA : "insumo_id"
+  INSUMO ||--o{ MOVIMIENTO_STOCK : "insumo_id"
+  INSUMO ||--o{ PEDIDO_PROVEEDOR_LINEA : "insumo_id"
+  INSUMO ||--o{ RECETA_LINEA : "insumo_id"
+  INSUMO ||--o{ STOCK : "insumo_id"
+  INSUMO ||--o{ TRASLADO : "insumo_id"
+  LISTA_VALOR ||--o{ MOVIMIENTO_STOCK : "destino_valor_id"
+  LISTA_VALOR ||--o{ MOVIMIENTO_STOCK : "origen_valor_id"
+  LISTA_VALOR ||--o{ RECETA : "tamano_valor_id"
+  LUGAR_STOCK ||--o{ CIERRE_DIA : "lugar_id"
+  LUGAR_STOCK ||--o{ INSUMO : "lugar_consumo_id"
+  LUGAR_STOCK ||--o{ MOVIMIENTO_STOCK : "lugar_id"
+  LUGAR_STOCK ||--o{ STOCK : "lugar_id"
+  LUGAR_STOCK ||--o{ TRASLADO : "destino_lugar_id"
+  MOVIMIENTO_STOCK ||--o{ MOVIMIENTO_STOCK : "movimiento_anulado_id"
+  OPCION ||--o{ AJUSTE_OPCION : "opcion_id"
+  PARTY ||--o{ COMPRA : "proveedor_party_id"
+  PARTY ||--o{ PEDIDO_PROVEEDOR : "proveedor_party_id"
+  PEDIDO_PROVEEDOR ||--o{ COMPRA : "pedido_proveedor_id"
+  PEDIDO_PROVEEDOR ||--o{ PEDIDO_PROVEEDOR_LINEA : "pedido_proveedor_id"
+  PRODUCTO ||--o{ MOVIMIENTO_STOCK : "producto_id"
+  PRODUCTO ||--o{ RECETA : "producto_id"
+  PRODUCTO ||--o{ STOCK : "producto_id"
+  RECETA ||--o{ PRODUCCION : "receta_id"
+  RECETA ||--o{ RECETA_LINEA : "receta_id"

@@ -1,0 +1,93 @@
+{
+  "modalities": {},
+  "pickup_flow": {
+    "url_after_click": "https://caprichos.restaurant.pe/carta-digital/#/inicio",
+    "visible_text": "Ingresar mi ubicación\nCambiar modalidad\nCAPRICHOS\n¡PEDIR AHORA!\nRestaurant.pe ©. Todos los derechos reservados - 09/05/2026 - v1.0.8\nSelecciona un local\nCAPRICHOS\nLima, Lima\n\nCalle 11, Mz D LT 27 Urb. Los girasoles de Campoy, SJL, Lima\n\n Regresar\n Aceptar",
+    "catalog": {
+      "cats": [],
+      "prods": []
+    }
+  },
+  "delivery_flow": {},
+  "captured_apis": [
+    {
+      "url": "https://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/credentialsFirebase",
+      "method": "POST",
+      "status": 200,
+      "response_keys": [
+        "tipo",
+        "data",
+        "mensajes",
+        "inicio",
+        "fin",
+        "node",
+        "diff"
+      ]
+    },
+    {
+      "url": "https://caprichos.restaurant.pe/carta-digital/assets/loading2.json",
+      "method": "GET",
+      "status": 200,
+      "response_keys": [
+        "v",
+        "meta",
+        "fr",
+        "ip",
+        "op",
+        "w",
+        "h",
+        "nm",
+        "ddd",
+        "assets",
+        "layers",
+        "markers"
+      ]
+    },
+    {
+      "url": "https://caprichos.restaurant.pe/restaurant/facebook/rest/delivery/cargarLocalesMenuEnLinea?page_id=0",
+      "method": "GET",
+      "status": 200,
+      "response_keys": [
+        "mensajes",
+        "tipo",
+        "locales",
+        "usoBaseDatosClientes",
+        "tarjetasGlobales",
+        "monedafacturacion",
+        "urlnode",
+        "proveedorMapa",
+        "inicio",
+        "fin",
+        "diff",
+        "array_query",
+        "array_queryParam",
+        "array_logsTem",
+        "server"
+      ]
+    },
+    {
+      "url": "https://mapas.restaurant.pe/get-geolocalizacion",
+      "method": "POST",
+      "status": 200,
+      "response_keys": [
+        "url",
+        "apiKey",
+        "predictions",
+        "results",
+        "status",
+        "error_message",
+        "request_status",
+        "keyFromClient"
+      ]
+    },
+    {
+      "url": "https://api.mercadopago.com/v1/devices/widgets?referer=https%3A//caprichos.restaurant.pe",
+      "method": "POST",
+      "status": 200,
+      "response_keys": [
+        "widget",
+        "session_id"
+      ]
+    }
+  ]
+}

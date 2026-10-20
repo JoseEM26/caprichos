@@ -1,0 +1,738 @@
+{
+  "epica": "EP-CAP-009",
+  "generado_por_ia": true,
+  "revisado_por": null,
+  "historias": [
+    {
+      "hu": "HU-CAP-078",
+      "tareas": [
+        {
+          "id": "HU-CAP-078-T01",
+          "titulo": "Revisar criterios de HU-CAP-078 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-078-T02",
+          "titulo": "Migración Prisma de las tablas de FT-STK-01 (insumo, lugar_stock, stock, receta, receta_linea)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-078-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-078-T03",
+          "titulo": "Reglas de dominio de HU-CAP-078 (RQ-STK-01-01, RQ-STK-01-02, RQ-STK-01-03, RQ-STK-01-08)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-078-T01",
+            "HU-CAP-078-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-078-T04",
+          "titulo": "Casos de uso: Crear la ficha de un insumo con unidades y equivalencias",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-078-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-078-T05",
+          "titulo": "Endpoints y eventos de FT-STK-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-078-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-078-T06",
+          "titulo": "Pantalla React: Crear la ficha de un insumo con unidades y equivalencias",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-078-T05"
+          ]
+        },
+        {
+          "id": "HU-CAP-078-T07",
+          "titulo": "Pruebas TC-CAP-078-01..05 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-078-T06"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-079",
+      "tareas": [
+        {
+          "id": "HU-CAP-079-T01",
+          "titulo": "Revisar criterios de HU-CAP-079 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-079-T02",
+          "titulo": "Reglas de dominio de HU-CAP-079 (RQ-STK-01-04, RQ-STK-01-05, RQ-STK-01-09)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-079-T01",
+            "HU-CAP-078-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-079-T03",
+          "titulo": "Casos de uso: Asignar proveedores y área a un insumo",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-079-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-079-T04",
+          "titulo": "Endpoints y eventos de FT-STK-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-079-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-079-T05",
+          "titulo": "Pantalla React: Asignar proveedores y área a un insumo",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-079-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-079-T06",
+          "titulo": "Pruebas TC-CAP-079-01..03 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-079-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-080",
+      "tareas": [
+        {
+          "id": "HU-CAP-080-T01",
+          "titulo": "Revisar criterios de HU-CAP-080 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-080-T02",
+          "titulo": "Reglas de dominio de HU-CAP-080 (RQ-STK-01-06, RQ-STK-01-07)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-080-T01",
+            "HU-CAP-078-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-080-T03",
+          "titulo": "Casos de uso: Ver el stock por lugar con semáforo y barra",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-080-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-080-T04",
+          "titulo": "Endpoints y eventos de FT-STK-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-080-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-080-T05",
+          "titulo": "Pantalla React: Ver el stock por lugar con semáforo y barra",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-080-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-080-T06",
+          "titulo": "Pruebas TC-CAP-080-01..02 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-080-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-081",
+      "tareas": [
+        {
+          "id": "HU-CAP-081-T01",
+          "titulo": "Revisar criterios de HU-CAP-081 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-081-T02",
+          "titulo": "Migración Prisma de las tablas de FT-STK-02 (insumo, lugar_stock, stock, receta, receta_linea)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-081-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-081-T03",
+          "titulo": "Reglas de dominio de HU-CAP-081 (RQ-STK-02-01, RQ-STK-02-02, RQ-STK-02-08)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-081-T01",
+            "HU-CAP-081-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-081-T04",
+          "titulo": "Casos de uso: Definir la receta de un producto por tamaño",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-081-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-081-T05",
+          "titulo": "Endpoints y eventos de FT-STK-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-081-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-081-T06",
+          "titulo": "Pantalla React: Definir la receta de un producto por tamaño",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-081-T05"
+          ]
+        },
+        {
+          "id": "HU-CAP-081-T07",
+          "titulo": "Pruebas TC-CAP-081-01..05 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-081-T06"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-082",
+      "tareas": [
+        {
+          "id": "HU-CAP-082-T01",
+          "titulo": "Revisar criterios de HU-CAP-082 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-082-T02",
+          "titulo": "Reglas de dominio de HU-CAP-082 (RQ-STK-02-03)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-082-T01",
+            "HU-CAP-081-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-082-T03",
+          "titulo": "Casos de uso: Definir cómo las opciones cambian la receta",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-082-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-082-T04",
+          "titulo": "Endpoints y eventos de FT-STK-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-082-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-082-T05",
+          "titulo": "Pantalla React: Definir cómo las opciones cambian la receta",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-082-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-082-T06",
+          "titulo": "Pruebas TC-CAP-082-01..02 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-082-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-083",
+      "tareas": [
+        {
+          "id": "HU-CAP-083-T01",
+          "titulo": "Revisar criterios de HU-CAP-083 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-083-T02",
+          "titulo": "Reglas de dominio de HU-CAP-083 (RQ-STK-02-04, RQ-STK-02-05, RQ-STK-02-06)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-083-T01",
+            "HU-CAP-081-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-083-T03",
+          "titulo": "Casos de uso: Ver el costo y el margen de cada plato",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-083-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-083-T04",
+          "titulo": "Endpoints y eventos de FT-STK-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-083-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-083-T05",
+          "titulo": "Pantalla React: Ver el costo y el margen de cada plato",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-083-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-083-T06",
+          "titulo": "Pruebas TC-CAP-083-01..04 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-083-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-084",
+      "tareas": [
+        {
+          "id": "HU-CAP-084-T01",
+          "titulo": "Revisar criterios de HU-CAP-084 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-084-T02",
+          "titulo": "Reglas de dominio de HU-CAP-084 (RQ-STK-02-07)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-084-T01",
+            "HU-CAP-081-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-084-T03",
+          "titulo": "Casos de uso: Definir la receta de producción por tanda",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-084-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-084-T04",
+          "titulo": "Endpoints y eventos de FT-STK-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-084-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-084-T05",
+          "titulo": "Pantalla React: Definir la receta de producción por tanda",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-084-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-084-T06",
+          "titulo": "Pruebas TC-CAP-084-01..02 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-084-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-085",
+      "tareas": [
+        {
+          "id": "HU-CAP-085-T01",
+          "titulo": "Revisar criterios de HU-CAP-085 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-085-T02",
+          "titulo": "Migración Prisma de las tablas de FT-STK-03 (insumo, lugar_stock, stock, receta, receta_linea)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-085-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-085-T03",
+          "titulo": "Reglas de dominio de HU-CAP-085 (RQ-STK-03-01, RQ-STK-03-02, RQ-STK-03-03)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-085-T01",
+            "HU-CAP-085-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-085-T04",
+          "titulo": "Casos de uso: Descontar insumos al pasar un pedido a cocina",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-085-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-085-T05",
+          "titulo": "Endpoints y eventos de FT-STK-03 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-085-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-085-T06",
+          "titulo": "Pruebas TC-CAP-085-01..03 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-085-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-086",
+      "tareas": [
+        {
+          "id": "HU-CAP-086-T01",
+          "titulo": "Revisar criterios de HU-CAP-086 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-086-T02",
+          "titulo": "Reglas de dominio de HU-CAP-086 (RQ-STK-03-04, RQ-STK-03-05, RQ-STK-03-08)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-086-T01",
+            "HU-CAP-085-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-086-T03",
+          "titulo": "Casos de uso: Devolver insumos al anular un pedido",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-086-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-086-T04",
+          "titulo": "Endpoints y eventos de FT-STK-03 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-086-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-086-T05",
+          "titulo": "Pruebas TC-CAP-086-01..03 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-086-T04"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-087",
+      "tareas": [
+        {
+          "id": "HU-CAP-087-T01",
+          "titulo": "Revisar criterios de HU-CAP-087 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-087-T02",
+          "titulo": "Reglas de dominio de HU-CAP-087 (RQ-STK-03-06, RQ-STK-03-07)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-087-T01",
+            "HU-CAP-085-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-087-T03",
+          "titulo": "Casos de uso: Avisar stock negativo o bajo y apagar productos sin insumos",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-087-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-087-T04",
+          "titulo": "Endpoints y eventos de FT-STK-03 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-087-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-087-T05",
+          "titulo": "Pantalla React: Avisar stock negativo o bajo y apagar productos sin insumos",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-087-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-087-T06",
+          "titulo": "Pruebas TC-CAP-087-01..02 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-087-T05"
+          ]
+        }
+      ]
+    }
+  ]
+}

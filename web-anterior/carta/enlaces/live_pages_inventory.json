@@ -1,0 +1,812 @@
+[
+  {
+    "name": "Inicio / Landing",
+    "url": "https://caprichos-per.ola.click/",
+    "final_url": "https://caprichos-per.ola.click/",
+    "status": 200,
+    "links_count": 12,
+    "links": [
+      {
+        "href": "https://panel.olaclick.app/register",
+        "text": ""
+      },
+      {
+        "href": "https://olaclick.com/es/chatbot-whatsapp-restaurantes-bares/",
+        "text": "Empieza ahora"
+      },
+      {
+        "href": "/products",
+        "text": "Pedir"
+      },
+      {
+        "href": "https://www.google.com/maps/search/?api=1&query=-12.0196436,-76.963255",
+        "text": "C. 11, Lima 15457, Perú"
+      },
+      {
+        "href": "/products",
+        "text": "Carta"
+      },
+      {
+        "href": "https://api.whatsapp.com/send?phone=51977503006&text=%F0%9F%91%8B+Hola%2C+vengo+de+http%3A%2F%2Fcaprichos-per.ola.click%0ADeseo+realizar+el+siguiente+pedido%3A%0A",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "https://www.instagram.com/caprichoscampoy",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "https://www.facebook.com/caprichosC",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "https://www.tiktok.com/@caprichoscampoy",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "/products",
+        "text": "Menú Digital de Caprichos"
+      },
+      {
+        "href": "/info",
+        "text": "Tipos de servicio y horariosHorarios"
+      },
+      {
+        "href": "https://olaclick.com/es/punto-de-venta",
+        "text": "Crea tu menú digital con"
+      }
+    ],
+    "store_status": [
+      "Detectado mensaje de Cerrado",
+      "Detectado Pedir para luego"
+    ]
+  },
+  {
+    "name": "Catálogo General",
+    "url": "https://caprichos-per.ola.click/products",
+    "final_url": "https://caprichos-per.ola.click/products",
+    "status": 200,
+    "links_count": 34,
+    "links": [
+      {
+        "href": "https://panel.olaclick.app/register",
+        "text": ""
+      },
+      {
+        "href": "https://olaclick.com/es/chatbot-whatsapp-restaurantes-bares/",
+        "text": "Empieza ahora"
+      },
+      {
+        "href": "/",
+        "text": ""
+      },
+      {
+        "href": "https://api.whatsapp.com/send?phone=51977503006&text=%F0%9F%91%8B+Hola%2C+vengo+de+http%3A%2F%2Fcaprichos-per.ola.click%0ADeseo+realizar+el+siguiente+pedido%3A%0A",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "https://www.instagram.com/caprichoscampoy",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "https://www.facebook.com/caprichosC",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "https://www.tiktok.com/@caprichoscampoy",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "/frio/duo-compartir-2-frappes-2-donuts",
+        "text": "Dúo Compartir (2 Frappés + 2 Donuts)2 Bebidas (cualquier Sabor) + Complemento a elegir entre:\n2 Donas \nó 2 Galletas Choco Chips \nó 1 Carrot cake \nó 1 Bandeja de 4 Petit Pan\n\n*Todas las bebidas incluyen 1 shot de espresso-13%S/. 33,00-13%S/. 38,00"
+      },
+      {
+        "href": "/frio/frozen-maracuya-21oz",
+        "text": "Frozen Maracuyá 21ozFrozen de maracuyá intenso: pulpa natural, limón recién exprimido y hielo perfecto. Dulce, ácido y refrescante. Un sorbo y tu verano cambia para siempre. 🍹-24%S/. 14,50-24%S/. 19,00"
+      },
+      {
+        "href": "/frio/frozen-limonada-21oz",
+        "text": "Frozen Limonada 21ozUna limonada frozen intensa y refrescante, preparada con limón natural, hielo y un delicado aroma de hierbabuena. Equilibrio perfecto entre dulzor y acidez.-24%S/. 14,50-24%S/. 19,00"
+      },
+      {
+        "href": "/frio/frozen-strawberry-21oz",
+        "text": "Frozen Strawberry 21ozDelicioso frozen de fresas naturales con limón fresco, hielo y un sutil aroma de hierbabuena. Dulce, vibrante y muy refrescante.-24%S/. 14,50-24%S/. 19,00"
+      },
+      {
+        "href": "/frio/frappe-caramel-clasico",
+        "text": "Frappé Caramel ClásicoSabor sublime de café espresso, caramelo artesanal, leche y vainilla natural 100% orgánica. Endulzado artesanalmente con siropes naturales y bajos en azúcar.S/. 14,50"
+      },
+      {
+        "href": "/frio/frappe-caramel-chocolate",
+        "text": "Frappé Caramel ChocolateCafé espresso con toque de caramelo artesanal, chocolate 100% cacao y vainilla natural. Delicia preparada al instante.S/. 14,50"
+      },
+      {
+        "href": "/frio/frappe-algarrolucuma",
+        "text": "Frappé Algarrolúcuma¡Exquisito y único! Prueba el Frappé AlgarroLúcuma con café, leche y helado de vainilla. Una delicia refrescante y auténtica. ¡Caprichos en cada sorbo!S/. 14,50"
+      },
+      {
+        "href": "/frio/frappuccino-oreo",
+        "text": "Frappuccino OreoDulce y cremosa combinación de chocolate negro fuerte, vainilla y trocitos de Oreo, harán que disfrutes tu día. Ámalo hasta el finalS/. 14,50"
+      },
+      {
+        "href": "/frio/frappe-maracuya",
+        "text": "Frappé MaracuyáSaludablemente placentero, apasionada fusión tropical de pulpa de maracuya, café espresso con granos frescos recién molidos decorado con chantilly y sirope de maracuya.S/. 14,50"
+      },
+      {
+        "href": "/frio/frappuccino-moca",
+        "text": "Frappuccino MocaVas a querer probar muchas veces esta maravillosa fusión de café y chocolate con crema chantillyS/. 14,50"
+      },
+      {
+        "href": "/frio/frappe-chocolucuma",
+        "text": "Frappé ChocolúcumaCremosa y perfecta combinación de chocolate (100% cacao), lúcuma, leche y helado de vainilla con chispas de chocolate.S/. 14,50"
+      },
+      {
+        "href": "/frio/frappe-berries",
+        "text": "Frappé BerriesUna Mezcla Apasionada de Frutos Rojos con Arándano, Fresa, Helado de vainilla y café espresso que te seducirán a volver a probarlo.S/. 14,50"
+      },
+      {
+        "href": "/frio/frappe-strawberry",
+        "text": "Frappé StrawberryDeliciosa mezcla de fresa con helado de vainilla y un intenso café espresso destacará las notas ácidas y dulces en tu paladar. DisfrútaloS/. 14,50"
+      },
+      {
+        "href": "/frio/frappe-chocoberry",
+        "text": "Frappé ChocoberryUna mezcla apasionada de fresa, Oreo, leche y un intenso café espresso se unen para explotar cientos de sensaciones en tu boca.S/. 14,50"
+      },
+      {
+        "href": "/frio/frappe-cafe",
+        "text": "Frappé CaféAgregamos hielo y leche a nuestro café espresso con granos tostados del día y lo convertimos en una dulce tentación para tus sentidos. ¡Pruébalo!S/. 14,50"
+      },
+      {
+        "href": "/frio/iced-berry",
+        "text": "Iced BerryIcedBerry Refrescante: Hielo en leche suave, frambuesas y moras trituradas, complementado con una mermelada artesanal de fresa delicadamente dulce. Endulzado artesanalmente con siropes naturales y bajos en azúcar.S/. 11,50"
+      },
+      {
+        "href": "/frio/iced-coffee-americano-helado",
+        "text": "Iced Coffee (Americano Helado)Hielo en Cubos sumergido en café de especialidad recién molido con un tueste medio-claro y fresco.S/. 9,00"
+      },
+      {
+        "href": "/frio/iced-latte-coffee",
+        "text": "Iced Latte CoffeeHielo en cubos sumergido en leche con café de especialidad recién molido con un tueste medio-claro y con una capa de espuma de leche.S/. 11,50"
+      },
+      {
+        "href": "/frio/nuevo-iced-chocolate",
+        "text": "¡Nuevo! Iced ChocolateCubos de hielo en leche cremosa, cacao 100%, syrop de almendra hecho artesanalmente y crema de avellana (Nutella).S/. 11,50"
+      },
+      {
+        "href": "/caliente/caramel-macchiato",
+        "text": "Caramel MacchiatoUna deliciosa mezcla de café con un toque de caramelo artesanal y vainilla natural con una capa aterciopelada de espuma cremosa. Endulzado artesanalmente con siropes naturales y bajos en azúcar.S/. 12,00"
+      },
+      {
+        "href": "/caliente/oreo-latte",
+        "text": "Oreo LatteDulce y cremosa combinación de chocolate negro fuerte, vainilla y trocitos de OREO harán que disfrutes tu día como no te lo imaginas. ¡Pruébalo! 🤤 al estilo de CAPRICHOS CAMPOY🔥👩‍🍳S/. 12,00"
+      },
+      {
+        "href": "/caliente/latte-vainilla",
+        "text": "Latte VainillaSencilla pero exquisita combinación de café espresso, vainilla natural y leche con ese toque cremoso perfecto, se unen para saborear y hacer cada momento el más especial. Endulzado artesanalmente con siropes naturales y bajos en azúcar.S/. 12,00"
+      },
+      {
+        "href": "/caliente/mocaccino",
+        "text": "MocaccinoUn sabor irresistible y la combinación perfecta de chocolate, leche vaporizada y un intenso café espresso con granos recién tostados. Irresistible para los días fríosS/. 12,00"
+      },
+      {
+        "href": "/caliente/cappuccino",
+        "text": "CappuccinoEl balance perfecto. Café espresso de cuerpo completo mezclado con leche vaporizada harán que sientas las inmejorables notas de aroma y sabor en tu paladar.S/. 9,50"
+      },
+      {
+        "href": "/caliente/chocolate",
+        "text": "ChocolateElaborado con 100% cacao artesanal y leche vaporizada. Endulzado artesanalmente con siropes naturales y bajos en azúcar.S/. 9,50"
+      },
+      {
+        "href": "/caliente/americano",
+        "text": "AmericanoDesde la cosecha, hasta tu taza.\n\nDisfruta de un sencillo y delicioso Americano, hecho con agua caliente sobre café espresso a base de granos de especialidad recién tostados que te harán deleitar cada momento de tu día.S/. 6,00"
+      },
+      {
+        "href": "https://olaclick.com/es/punto-de-venta",
+        "text": "Crea tu menú digital con"
+      }
+    ],
+    "store_status": []
+  },
+  {
+    "name": "Información del Negocio",
+    "url": "https://caprichos-per.ola.click/info",
+    "final_url": "https://caprichos-per.ola.click/info",
+    "status": 200,
+    "links_count": 7,
+    "links": [
+      {
+        "href": "/products",
+        "text": "Ver menu"
+      },
+      {
+        "href": "https://api.whatsapp.com/send?phone=51977503006&text=%F0%9F%91%8B+Hola%2C+vengo+de+http%3A%2F%2Fcaprichos-per.ola.click%0ADeseo+realizar+el+siguiente+pedido%3A%0A",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "https://www.instagram.com/caprichoscampoy",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "https://www.facebook.com/caprichosC",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "https://www.tiktok.com/@caprichoscampoy",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "https://www.google.com/maps/search/?api=1&query=-12.0196436,-76.963255",
+        "text": "C. 11, Lima 15457, Perú"
+      },
+      {
+        "href": "https://olaclick.com/es/punto-de-venta",
+        "text": "OlaClick version 4.00.f684a4e-v2"
+      }
+    ],
+    "store_status": [
+      "Detectado mensaje de Cerrado"
+    ]
+  },
+  {
+    "name": "Categoría Combos",
+    "url": "https://caprichos-per.ola.click/combos",
+    "final_url": "https://caprichos-per.ola.click/combos",
+    "status": 200,
+    "links_count": 8,
+    "links": [
+      {
+        "href": "https://panel.olaclick.app/register",
+        "text": ""
+      },
+      {
+        "href": "https://olaclick.com/es/chatbot-whatsapp-restaurantes-bares/",
+        "text": "Empieza ahora"
+      },
+      {
+        "href": "/",
+        "text": ""
+      },
+      {
+        "href": "https://api.whatsapp.com/send?phone=51977503006&text=%F0%9F%91%8B+Hola%2C+vengo+de+http%3A%2F%2Fcaprichos-per.ola.click%0ADeseo+realizar+el+siguiente+pedido%3A%0A",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "https://www.instagram.com/caprichoscampoy",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "https://www.facebook.com/caprichosC",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "https://www.tiktok.com/@caprichoscampoy",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "https://olaclick.com/es/punto-de-venta",
+        "text": "Crea tu menú digital con"
+      }
+    ],
+    "store_status": []
+  },
+  {
+    "name": "Categoría Frío",
+    "url": "https://caprichos-per.ola.click/frio",
+    "final_url": "https://caprichos-per.ola.click/frio",
+    "status": 200,
+    "links_count": 28,
+    "links": [
+      {
+        "href": "https://panel.olaclick.app/register",
+        "text": ""
+      },
+      {
+        "href": "https://olaclick.com/es/chatbot-whatsapp-restaurantes-bares/",
+        "text": "Empieza ahora"
+      },
+      {
+        "href": "/",
+        "text": ""
+      },
+      {
+        "href": "https://api.whatsapp.com/send?phone=51977503006&text=%F0%9F%91%8B+Hola%2C+vengo+de+http%3A%2F%2Fcaprichos-per.ola.click%0ADeseo+realizar+el+siguiente+pedido%3A%0A",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "https://www.instagram.com/caprichoscampoy",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "https://www.facebook.com/caprichosC",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "https://www.tiktok.com/@caprichoscampoy",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "/products",
+        "text": "Menú"
+      },
+      {
+        "href": "/frio/duo-compartir-2-frappes-2-donuts",
+        "text": "Dúo Compartir (2 Frappés + 2 Donuts)2 Bebidas (cualquier Sabor) + Complemento a elegir entre:\n2 Donas \nó 2 Galletas Choco Chips \nó 1 Carrot cake \nó 1 Bandeja de 4 Petit Pan\n\n*Todas las bebidas incluyen 1 shot de espresso-13%S/. 33,00-13%S/. 38,00"
+      },
+      {
+        "href": "/frio/frozen-maracuya-21oz",
+        "text": "Frozen Maracuyá 21ozFrozen de maracuyá intenso: pulpa natural, limón recién exprimido y hielo perfecto. Dulce, ácido y refrescante. Un sorbo y tu verano cambia para siempre. 🍹-24%S/. 14,50-24%S/. 19,00"
+      },
+      {
+        "href": "/frio/frozen-limonada-21oz",
+        "text": "Frozen Limonada 21ozUna limonada frozen intensa y refrescante, preparada con limón natural, hielo y un delicado aroma de hierbabuena. Equilibrio perfecto entre dulzor y acidez.-24%S/. 14,50-24%S/. 19,00"
+      },
+      {
+        "href": "/frio/frozen-strawberry-21oz",
+        "text": "Frozen Strawberry 21ozDelicioso frozen de fresas naturales con limón fresco, hielo y un sutil aroma de hierbabuena. Dulce, vibrante y muy refrescante.-24%S/. 14,50-24%S/. 19,00"
+      },
+      {
+        "href": "/frio/frappe-caramel-clasico",
+        "text": "Frappé Caramel ClásicoSabor sublime de café espresso, caramelo artesanal, leche y vainilla natural 100% orgánica. Endulzado artesanalmente con siropes naturales y bajos en azúcar.S/. 14,50"
+      },
+      {
+        "href": "/frio/frappe-caramel-chocolate",
+        "text": "Frappé Caramel ChocolateCafé espresso con toque de caramelo artesanal, chocolate 100% cacao y vainilla natural. Delicia preparada al instante.S/. 14,50"
+      },
+      {
+        "href": "/frio/frappe-algarrolucuma",
+        "text": "Frappé Algarrolúcuma¡Exquisito y único! Prueba el Frappé AlgarroLúcuma con café, leche y helado de vainilla. Una delicia refrescante y auténtica. ¡Caprichos en cada sorbo!S/. 14,50"
+      },
+      {
+        "href": "/frio/frappuccino-oreo",
+        "text": "Frappuccino OreoDulce y cremosa combinación de chocolate negro fuerte, vainilla y trocitos de Oreo, harán que disfrutes tu día. Ámalo hasta el finalS/. 14,50"
+      },
+      {
+        "href": "/frio/frappe-maracuya",
+        "text": "Frappé MaracuyáSaludablemente placentero, apasionada fusión tropical de pulpa de maracuya, café espresso con granos frescos recién molidos decorado con chantilly y sirope de maracuya.S/. 14,50"
+      },
+      {
+        "href": "/frio/frappuccino-moca",
+        "text": "Frappuccino MocaVas a querer probar muchas veces esta maravillosa fusión de café y chocolate con crema chantillyS/. 14,50"
+      },
+      {
+        "href": "/frio/frappe-chocolucuma",
+        "text": "Frappé ChocolúcumaCremosa y perfecta combinación de chocolate (100% cacao), lúcuma, leche y helado de vainilla con chispas de chocolate.S/. 14,50"
+      },
+      {
+        "href": "/frio/frappe-berries",
+        "text": "Frappé BerriesUna Mezcla Apasionada de Frutos Rojos con Arándano, Fresa, Helado de vainilla y café espresso que te seducirán a volver a probarlo.S/. 14,50"
+      },
+      {
+        "href": "/frio/frappe-strawberry",
+        "text": "Frappé StrawberryDeliciosa mezcla de fresa con helado de vainilla y un intenso café espresso destacará las notas ácidas y dulces en tu paladar. DisfrútaloS/. 14,50"
+      },
+      {
+        "href": "/frio/frappe-chocoberry",
+        "text": "Frappé ChocoberryUna mezcla apasionada de fresa, Oreo, leche y un intenso café espresso se unen para explotar cientos de sensaciones en tu boca.S/. 14,50"
+      },
+      {
+        "href": "/frio/frappe-cafe",
+        "text": "Frappé CaféAgregamos hielo y leche a nuestro café espresso con granos tostados del día y lo convertimos en una dulce tentación para tus sentidos. ¡Pruébalo!S/. 14,50"
+      },
+      {
+        "href": "/frio/iced-berry",
+        "text": "Iced BerryIcedBerry Refrescante: Hielo en leche suave, frambuesas y moras trituradas, complementado con una mermelada artesanal de fresa delicadamente dulce. Endulzado artesanalmente con siropes naturales y bajos en azúcar.S/. 11,50"
+      },
+      {
+        "href": "/frio/iced-coffee-americano-helado",
+        "text": "Iced Coffee (Americano Helado)Hielo en Cubos sumergido en café de especialidad recién molido con un tueste medio-claro y fresco.S/. 9,00"
+      },
+      {
+        "href": "/frio/iced-latte-coffee",
+        "text": "Iced Latte CoffeeHielo en cubos sumergido en leche con café de especialidad recién molido con un tueste medio-claro y con una capa de espuma de leche.S/. 11,50"
+      },
+      {
+        "href": "/frio/nuevo-iced-chocolate",
+        "text": "¡Nuevo! Iced ChocolateCubos de hielo en leche cremosa, cacao 100%, syrop de almendra hecho artesanalmente y crema de avellana (Nutella).S/. 11,50"
+      },
+      {
+        "href": "https://olaclick.com/es/punto-de-venta",
+        "text": "Crea tu menú digital con"
+      }
+    ],
+    "store_status": []
+  },
+  {
+    "name": "Categoría Caliente",
+    "url": "https://caprichos-per.ola.click/caliente",
+    "final_url": "https://caprichos-per.ola.click/caliente",
+    "status": 200,
+    "links_count": 16,
+    "links": [
+      {
+        "href": "https://panel.olaclick.app/register",
+        "text": ""
+      },
+      {
+        "href": "https://olaclick.com/es/chatbot-whatsapp-restaurantes-bares/",
+        "text": "Empieza ahora"
+      },
+      {
+        "href": "/",
+        "text": ""
+      },
+      {
+        "href": "https://api.whatsapp.com/send?phone=51977503006&text=%F0%9F%91%8B+Hola%2C+vengo+de+http%3A%2F%2Fcaprichos-per.ola.click%0ADeseo+realizar+el+siguiente+pedido%3A%0A",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "https://www.instagram.com/caprichoscampoy",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "https://www.facebook.com/caprichosC",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "https://www.tiktok.com/@caprichoscampoy",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "/products",
+        "text": "Menú"
+      },
+      {
+        "href": "/caliente/caramel-macchiato",
+        "text": "Caramel MacchiatoUna deliciosa mezcla de café con un toque de caramelo artesanal y vainilla natural con una capa aterciopelada de espuma cremosa. Endulzado artesanalmente con siropes naturales y bajos en azúcar.S/. 12,00"
+      },
+      {
+        "href": "/caliente/oreo-latte",
+        "text": "Oreo LatteDulce y cremosa combinación de chocolate negro fuerte, vainilla y trocitos de OREO harán que disfrutes tu día como no te lo imaginas. ¡Pruébalo! 🤤 al estilo de CAPRICHOS CAMPOY🔥👩‍🍳S/. 12,00"
+      },
+      {
+        "href": "/caliente/latte-vainilla",
+        "text": "Latte VainillaSencilla pero exquisita combinación de café espresso, vainilla natural y leche con ese toque cremoso perfecto, se unen para saborear y hacer cada momento el más especial. Endulzado artesanalmente con siropes naturales y bajos en azúcar.S/. 12,00"
+      },
+      {
+        "href": "/caliente/mocaccino",
+        "text": "MocaccinoUn sabor irresistible y la combinación perfecta de chocolate, leche vaporizada y un intenso café espresso con granos recién tostados. Irresistible para los días fríosS/. 12,00"
+      },
+      {
+        "href": "/caliente/cappuccino",
+        "text": "CappuccinoEl balance perfecto. Café espresso de cuerpo completo mezclado con leche vaporizada harán que sientas las inmejorables notas de aroma y sabor en tu paladar.S/. 9,50"
+      },
+      {
+        "href": "/caliente/chocolate",
+        "text": "ChocolateElaborado con 100% cacao artesanal y leche vaporizada. Endulzado artesanalmente con siropes naturales y bajos en azúcar.S/. 9,50"
+      },
+      {
+        "href": "/caliente/americano",
+        "text": "AmericanoDesde la cosecha, hasta tu taza.\n\nDisfruta de un sencillo y delicioso Americano, hecho con agua caliente sobre café espresso a base de granos de especialidad recién tostados que te harán deleitar cada momento de tu día.S/. 6,00"
+      },
+      {
+        "href": "https://olaclick.com/es/punto-de-venta",
+        "text": "Crea tu menú digital con"
+      }
+    ],
+    "store_status": []
+  },
+  {
+    "name": "Categoría Salado",
+    "url": "https://caprichos-per.ola.click/salado",
+    "final_url": "https://caprichos-per.ola.click/salado",
+    "status": 200,
+    "links_count": 18,
+    "links": [
+      {
+        "href": "https://panel.olaclick.app/register",
+        "text": ""
+      },
+      {
+        "href": "https://olaclick.com/es/chatbot-whatsapp-restaurantes-bares/",
+        "text": "Empieza ahora"
+      },
+      {
+        "href": "/",
+        "text": ""
+      },
+      {
+        "href": "https://api.whatsapp.com/send?phone=51977503006&text=%F0%9F%91%8B+Hola%2C+vengo+de+http%3A%2F%2Fcaprichos-per.ola.click%0ADeseo+realizar+el+siguiente+pedido%3A%0A",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "https://www.instagram.com/caprichoscampoy",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "https://www.facebook.com/caprichosC",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "https://www.tiktok.com/@caprichoscampoy",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "/products",
+        "text": "Menú"
+      },
+      {
+        "href": "/salado/duo-irresistible-i0ld",
+        "text": "Dúo Irresistible¡Un dúo irresistible! Disfruta de nuestro Club Sandwich y refresca tu paladar con nuestros Iced Latte Coffee.\n\n*¿No tomas café? reemplaza el Iced latte Coffee por Iced Chocolate-26%S/. 37,00-26%S/. 50,00"
+      },
+      {
+        "href": "/salado/empanada-clasica",
+        "text": "Empanada ClásicaDorado y suculento: trío de empanadas artesanales recién horneadas, calientes y doraditas—jamón y queso con bechamel cremosa; carne y pollo con una base tierna sabrosa y tradicional.S/. 7,50"
+      },
+      {
+        "href": "/salado/sandwich-caprisabroso",
+        "text": "Sándwich Caprisabroso200 gr. de carne artesanal, chorizo parrillero, huevo, doble tocino culinario, doble jamón y doble queso.S/. 33,00"
+      },
+      {
+        "href": "/salado/sandwich-parrillero",
+        "text": "Sándwich Parrillero200g de carne artesanal, huevo, doble tocino culinario, jamón inglés, queso Edam, y 350g de papas nativas doradas.S/. 21,00"
+      },
+      {
+        "href": "/salado/sandwich-suprema",
+        "text": "Sándwich SupremaFilete de pollo, huevo, doble tocino culinario, jamón inglés, queso Edam, y papas nativas crujientes.S/. 18,50"
+      },
+      {
+        "href": "/salado/club-sandwich",
+        "text": "Club Sandwich¡Irresistible! sándwich de 4 pisos cortado en cuatro relleno con jamón ingles, queso, pechuga de pollo, lechuga, tomate y tocino en perfecta combinación con papas nativas frescas del día.-18%S/. 27,00-18%S/. 33,00"
+      },
+      {
+        "href": "/salado/sandwich-especial",
+        "text": "Sándwich Especial🍔🥑 Prepárate para un Sándwich épico: 4 pisos de pan, pollo en salsa deshilachado, huevo sancochado y la frescura de la palta. ¡Sabor inigualable!S/. 14,50"
+      },
+      {
+        "href": "/salado/sandwich-clasico",
+        "text": "Sándwich Clásico🌭🧀 El auténtico Sándwich Clásico: 4 pisos de pan, pollo en salsa deshilachado, jamón y queso. ¡Un clásico que nunca pasa de moda!S/. 9,90"
+      },
+      {
+        "href": "/salado/petit-pan-clasico-x-4-und",
+        "text": "Petit Pan Clásico x 4 UNDPetit Pan clásico con relleno de pollo deshilachado y salsa de la casa. Ideal para satisfacer esos pequeños Caprichos.S/. 5,50"
+      },
+      {
+        "href": "https://olaclick.com/es/punto-de-venta",
+        "text": "Crea tu menú digital con"
+      }
+    ],
+    "store_status": []
+  },
+  {
+    "name": "Categoría Postres",
+    "url": "https://caprichos-per.ola.click/postres",
+    "final_url": "https://caprichos-per.ola.click/postres",
+    "status": 200,
+    "links_count": 23,
+    "links": [
+      {
+        "href": "https://panel.olaclick.app/register",
+        "text": ""
+      },
+      {
+        "href": "https://olaclick.com/es/chatbot-whatsapp-restaurantes-bares/",
+        "text": "Empieza ahora"
+      },
+      {
+        "href": "/",
+        "text": ""
+      },
+      {
+        "href": "https://api.whatsapp.com/send?phone=51977503006&text=%F0%9F%91%8B+Hola%2C+vengo+de+http%3A%2F%2Fcaprichos-per.ola.click%0ADeseo+realizar+el+siguiente+pedido%3A%0A",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "https://www.instagram.com/caprichoscampoy",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "https://www.facebook.com/caprichosC",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "https://www.tiktok.com/@caprichoscampoy",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "/products",
+        "text": "Menú"
+      },
+      {
+        "href": "/postres/dona-artesanal",
+        "text": "Dona Artesanal🥰 ¡Escoge tu sabor favorito! 🍩\n\nElaboramos Donas Diariamente a mano con ingredientes de alta calidad que te harán disfrutar de una masa fresca, muy suave y esponjosas por dentro con glaseados de chocolate negro y blanco.-20%S/. 4,00-20%S/. 5,00"
+      },
+      {
+        "href": "/postres/nuevo-keke-marmoleado-chips",
+        "text": "¡NUEVO! Keke Marmoleado ChipsDisfruta de nuestro keke marmoleado artesanal con 🍫 chispas de chocolate, frosting de cacao y frutos del bosque, ¡una tentación irresistible! 😋S/. 8,00"
+      },
+      {
+        "href": "/postres/12-docena-donuts",
+        "text": "1/2 Docena DonutsProducto elaborado del día, muy fresco. ¡Escoge tus sabores Favoritos!-30%S/. 21,00-30%S/. 30,00"
+      },
+      {
+        "href": "/postres/12-docena-de-galletas",
+        "text": "1/2 Docena de GalletasMedia Docena de crocante galleta Artesanal a lo Ruthy Bances.-13%S/. 21,00-13%S/. 24,00"
+      },
+      {
+        "href": "/postres/carrot-cake-artesanal",
+        "text": "Carrot cake ArtesanalAmable y gentil tajada de keke de zanahoria artesanal a lo Ruthy Bances.S/. 8,00"
+      },
+      {
+        "href": "/postres/galleta-choco-chips-90-gr",
+        "text": "Galleta Choco Chips (90 Gr.)Crocante Galleta Artesanal a lo Ruthy Bances.S/. 4,00"
+      },
+      {
+        "href": "/postres/waffle-frutos-del-bosque",
+        "text": "Waffle Frutos del BosqueEmpieza tu día con energía: waffle de frutos del bosque (abuntande arándano y fresa, gentíl dosis de frambuesa y mora), helado o chantilly, y crema suave con mermelada de fresa.S/. 15,00"
+      },
+      {
+        "href": "/postres/waffle-tropical",
+        "text": "Waffle TropicalWaffle base de Vainilla, avena y crema de leche con mango, fresa, piña y arándano, acompañado de Helado y un sirope natural de Maracuyá te harán ver de una forma distinta los Waffles que ya conocías.S/. 14,00"
+      },
+      {
+        "href": "/postres/waffle-fresa-split",
+        "text": "Waffle Fresa SplitWaffle base de Vainilla, avena y crema de leche con Fresa, Plátano, Helado, Chantilly, Granola y un sirope natural de cacao.S/. 12,50"
+      },
+      {
+        "href": "/postres/waffle-oreo",
+        "text": "Waffle OreoWaffle base de Vainilla, avena y crema de leche con Oreo, Chispas de chocolate, Obsesión + Chantilly + Helado + Syrop natural de cacao.S/. 12,00"
+      },
+      {
+        "href": "/postres/nuevo-waffle-manjar",
+        "text": "¡NUEVO! Waffle ManjarWaffle base de Vainilla, avena y crema de leche con Plátano, Chispas de chocolate + Chantilly + Manjar blancoS/. 11,00"
+      },
+      {
+        "href": "/postres/waffle-nutella",
+        "text": "Waffle Nutella*Waffle base de Vainilla, avena y crema de leche con Nutella: Pasta de cacao*, Fresa, Chispas de chocolate, Obsesión + Helado + Syrop natural de cacao.S/. 15,00"
+      },
+      {
+        "href": "/postres/waffle-banana-split",
+        "text": "Waffle Banana Split🍌🍫 ¡Nuevo Waffle Banana Split! Incluye TRIPLE bola de helado, arándano, plátano, chantilly, syrop artesanal de cacao y granola. ¡Uff más delicioso imposible!S/. 15,00"
+      },
+      {
+        "href": "/postres/nota",
+        "text": "Nota"
+      },
+      {
+        "href": "https://olaclick.com/es/punto-de-venta",
+        "text": "Crea tu menú digital con"
+      }
+    ],
+    "store_status": []
+  },
+  {
+    "name": "Categoría Favoritos / Destacados",
+    "url": "https://caprichos-per.ola.click/favoritos",
+    "final_url": "https://caprichos-per.ola.click/favoritos",
+    "status": 200,
+    "links_count": 17,
+    "links": [
+      {
+        "href": "https://panel.olaclick.app/register",
+        "text": ""
+      },
+      {
+        "href": "https://olaclick.com/es/chatbot-whatsapp-restaurantes-bares/",
+        "text": "Empieza ahora"
+      },
+      {
+        "href": "/",
+        "text": ""
+      },
+      {
+        "href": "https://api.whatsapp.com/send?phone=51977503006&text=%F0%9F%91%8B+Hola%2C+vengo+de+http%3A%2F%2Fcaprichos-per.ola.click%0ADeseo+realizar+el+siguiente+pedido%3A%0A",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "https://www.instagram.com/caprichoscampoy",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "https://www.facebook.com/caprichosC",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "https://www.tiktok.com/@caprichoscampoy",
+        "text": "Ir al enlace"
+      },
+      {
+        "href": "/products",
+        "text": "Menú"
+      },
+      {
+        "href": "/salado/duo-irresistible-i0ld",
+        "text": "Dúo Irresistible¡Un dúo irresistible! Disfruta de nuestro Club Sandwich y refresca tu paladar con nuestros Iced Latte Coffee.\n\n*¿No tomas café? reemplaza el Iced latte Coffee por Iced Chocolate-26%S/. 37,00-26%S/. 50,00"
+      },
+      {
+        "href": "/frio/duo-compartir-2-frappes-2-donuts",
+        "text": "Dúo Compartir (2 Frappés + 2 Donuts)2 Bebidas (cualquier Sabor) + Complemento a elegir entre:\n2 Donas \nó 2 Galletas Choco Chips \nó 1 Carrot cake \nó 1 Bandeja de 4 Petit Pan\n\n*Todas las bebidas incluyen 1 shot de espresso-13%S/. 33,00-13%S/. 38,00"
+      },
+      {
+        "href": "/salado/sandwich-suprema",
+        "text": "Sándwich SupremaFilete de pollo, huevo, doble tocino culinario, jamón inglés, queso Edam, y papas nativas crujientes.S/. 18,50"
+      },
+      {
+        "href": "/salado/petit-pan-clasico-x-4-und",
+        "text": "Petit Pan Clásico x 4 UNDPetit Pan clásico con relleno de pollo deshilachado y salsa de la casa. Ideal para satisfacer esos pequeños Caprichos.S/. 5,50"
+      },
+      {
+        "href": "/frio/frappuccino-oreo",
+        "text": "Frappuccino OreoDulce y cremosa combinación de chocolate negro fuerte, vainilla y trocitos de Oreo, harán que disfrutes tu día. Ámalo hasta el finalS/. 14,50"
+      },
+      {
+        "href": "/postres/waffle-fresa-split",
+        "text": "Waffle Fresa SplitWaffle base de Vainilla, avena y crema de leche con Fresa, Plátano, Helado, Chantilly, Granola y un sirope natural de cacao.S/. 12,50"
+      },
+      {
+        "href": "/postres/waffle-nutella",
+        "text": "Waffle Nutella*Waffle base de Vainilla, avena y crema de leche con Nutella: Pasta de cacao*, Fresa, Chispas de chocolate, Obsesión + Helado + Syrop natural de cacao.S/. 15,00"
+      },
+      {
+        "href": "/postres/waffle-frutos-del-bosque",
+        "text": "Waffle Frutos del BosqueEmpieza tu día con energía: waffle de frutos del bosque (abuntande arándano y fresa, gentíl dosis de frambuesa y mora), helado o chantilly, y crema suave con mermelada de fresa.S/. 15,00"
+      },
+      {
+        "href": "https://olaclick.com/es/punto-de-venta",
+        "text": "Crea tu menú digital con"
+      }
+    ],
+    "store_status": []
+  },
+  {
+    "name": "Carrito",
+    "url": "https://caprichos-per.ola.click/cart",
+    "final_url": "https://caprichos-per.ola.click/cart",
+    "status": 200,
+    "links_count": 0,
+    "links": [],
+    "store_status": []
+  },
+  {
+    "name": "Checkout",
+    "url": "https://caprichos-per.ola.click/checkout",
+    "final_url": "https://caprichos-per.ola.click/cart",
+    "status": 200,
+    "links_count": 0,
+    "links": [],
+    "store_status": []
+  },
+  {
+    "name": "Producto Combo Muestra",
+    "url": "https://caprichos-per.ola.click/combos/duo-compartir-2-frappes-2-donuts-3rl0",
+    "final_url": "https://caprichos-per.ola.click/combos/duo-compartir-2-frappes-2-donuts-3rl0",
+    "status": 200,
+    "links_count": 0,
+    "links": [],
+    "store_status": []
+  },
+  {
+    "name": "Producto Frío Muestra",
+    "url": "https://caprichos-per.ola.click/frio/frappe-caramel-clasico",
+    "final_url": "https://caprichos-per.ola.click/frio/frappe-caramel-clasico",
+    "status": 200,
+    "links_count": 0,
+    "links": [],
+    "store_status": []
+  },
+  {
+    "name": "Producto Caliente Muestra",
+    "url": "https://caprichos-per.ola.click/caliente/americano",
+    "final_url": "https://caprichos-per.ola.click/caliente/americano",
+    "status": 200,
+    "links_count": 0,
+    "links": [],
+    "store_status": []
+  },
+  {
+    "name": "Producto Salado Muestra",
+    "url": "https://caprichos-per.ola.click/salado/club-sandwich",
+    "final_url": "https://caprichos-per.ola.click/salado/club-sandwich",
+    "status": 200,
+    "links_count": 0,
+    "links": [],
+    "store_status": []
+  },
+  {
+    "name": "Producto Postres Muestra",
+    "url": "https://caprichos-per.ola.click/postres/dona-artesanal",
+    "final_url": "https://caprichos-per.ola.click/postres/dona-artesanal",
+    "status": 200,
+    "links_count": 0,
+    "links": [],
+    "store_status": []
+  }
+]

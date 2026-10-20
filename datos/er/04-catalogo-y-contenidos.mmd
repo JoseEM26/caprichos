@@ -1,0 +1,149 @@
+erDiagram
+  AREA_COCINA {
+    bigint id PK
+    text nombre UK
+    boolean propia
+    text impresora
+    text etiquetera
+    boolean activo
+  }
+  CATEGORIA {
+    bigint id PK
+    text nombre UK
+    boolean lleva_opciones
+    bigint area_id FK
+    int orden
+    boolean oculta
+  }
+  PRODUCTO {
+    bigint id PK
+    bigint categoria_id FK
+    text nombre UK
+    text descripcion
+    bigint foto_archivo_id FK
+    numeric precio
+    boolean por_lote
+    int vida_util_horas
+    int orden
+    boolean oculto
+    timestamptz agotado_hasta
+  }
+  PRODUCTO_TAMANO {
+    bigint id PK
+    bigint producto_id FK
+    bigint tamano_valor_id FK
+    numeric precio
+    boolean activo
+  }
+  GRUPO_OPCIONES {
+    bigint id PK
+    text nombre UK
+    bigint lista_id FK
+    boolean obligatorio
+    int minimo
+    int maximo
+    boolean activo
+  }
+  OPCION {
+    bigint id PK
+    bigint grupo_id FK
+    bigint valor_id FK
+    numeric precio_extra
+    boolean activo
+    timestamptz agotado_hasta
+  }
+  GRUPO_ALCANCE {
+    bigint grupo_id FK
+    bigint producto_id FK
+    bigint categoria_id FK
+    int orden
+  }
+  SABOR {
+    bigint id PK
+    bigint producto_id FK
+    text nombre
+    boolean activo
+    timestamptz agotado_hasta
+  }
+  VERSION_CARTA {
+    bigint id PK
+    text estado
+    text organizacion
+    text decoracion
+    jsonb contenido
+    timestamptz publicada_en
+    bigint publicada_por
+  }
+  NOVEDAD {
+    bigint id PK
+    text tipo
+    text titulo
+    text texto
+    text tema
+    text video_url
+    timestamptz evento_fecha
+    text evento_lugar
+    date desde
+    date hasta
+    int orden
+    boolean activo
+  }
+  NOVEDAD_FOTO {
+    bigint novedad_id PK,FK
+    bigint archivo_id PK,FK
+    int orden
+  }
+  DESTACADA {
+    bigint id PK
+    text titulo
+    bigint portada_archivo_id FK
+    int orden
+    boolean archivada
+  }
+  DESTACADA_FOTO {
+    bigint destacada_id PK,FK
+    bigint archivo_id PK,FK
+    int orden
+  }
+  RANKING_MES {
+    char anio_mes PK
+    bigint producto_id PK,FK
+    int unidades
+    smallint puesto
+  }
+  MENSAJE_CARTA {
+    bigint id PK
+    text tipo
+    text texto
+    text nombre
+    text contacto
+    timestamptz atendido_en
+    bigint atendido_por
+  }
+  ARCHIVO {
+    bigint id PK "en otro dominio"
+  }
+  LISTA {
+    bigint id PK "en otro dominio"
+  }
+  LISTA_VALOR {
+    bigint id PK "en otro dominio"
+  }
+  ARCHIVO ||--o{ DESTACADA : "portada_archivo_id"
+  ARCHIVO ||--o{ DESTACADA_FOTO : "archivo_id"
+  ARCHIVO ||--o{ NOVEDAD_FOTO : "archivo_id"
+  ARCHIVO ||--o{ PRODUCTO : "foto_archivo_id"
+  AREA_COCINA ||--o{ CATEGORIA : "area_id"
+  CATEGORIA ||--o{ GRUPO_ALCANCE : "categoria_id"
+  CATEGORIA ||--o{ PRODUCTO : "categoria_id"
+  DESTACADA ||--o{ DESTACADA_FOTO : "destacada_id"
+  GRUPO_OPCIONES ||--o{ GRUPO_ALCANCE : "grupo_id"
+  GRUPO_OPCIONES ||--o{ OPCION : "grupo_id"
+  LISTA ||--o{ GRUPO_OPCIONES : "lista_id"
+  LISTA_VALOR ||--o{ OPCION : "valor_id"
+  LISTA_VALOR ||--o{ PRODUCTO_TAMANO : "tamano_valor_id"
+  NOVEDAD ||--o{ NOVEDAD_FOTO : "novedad_id"
+  PRODUCTO ||--o{ GRUPO_ALCANCE : "producto_id"
+  PRODUCTO ||--o{ PRODUCTO_TAMANO : "producto_id"
+  PRODUCTO ||--o{ RANKING_MES : "producto_id"
+  PRODUCTO ||--o{ SABOR : "producto_id"

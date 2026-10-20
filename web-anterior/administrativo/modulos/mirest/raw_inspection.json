@@ -1,0 +1,1815 @@
+{
+  "routes": {},
+  "screens_dom": {
+    "Mi empresa": {
+      "title": "Información de mi negocio",
+      "breadcrumbs": [],
+      "buttons": [
+        {
+          "text": "Modificar",
+          "class": "btn btn-success ladda-button",
+          "type": "",
+          "ngClick": "vm.fnActualizarDatosEmpresa()",
+          "href": ""
+        },
+        {
+          "text": "Atras",
+          "class": "btn btn-default",
+          "type": "",
+          "ngClick": "",
+          "href": "#!/mirestaurante"
+        },
+        {
+          "text": "Elegir una imágen para mi empresa",
+          "class": "btn btn-success btnSubirVoucher ladda-label ladda-button",
+          "type": "",
+          "ngClick": "",
+          "href": ""
+        }
+      ],
+      "tables": [
+        {
+          "headers": [],
+          "rowCount": 1
+        }
+      ],
+      "inputs": [
+        {
+          "name": "razonsocial_nombrecomercial",
+          "type": "text",
+          "placeholder": "",
+          "label": "Razón social (No usado para impresion)",
+          "ngModel": "vm.miempresa.razonsocial_nombrecomercial",
+          "required": true,
+          "disabled": false,
+          "options": []
+        },
+        {
+          "name": "razonsocial_nomrazonsocial",
+          "type": "text",
+          "placeholder": "",
+          "label": "Nombre comercial (No usado para impresion)",
+          "ngModel": "vm.miempresa.razonsocial_nomrazonsocial",
+          "required": true,
+          "disabled": false,
+          "options": []
+        },
+        {
+          "name": "razonsocial_ruc",
+          "type": "text",
+          "placeholder": "___________",
+          "label": "RUC (No usado para impresion)(11 Digitos)",
+          "ngModel": "vm.miempresa.razonsocial_ruc",
+          "required": true,
+          "disabled": false,
+          "options": []
+        },
+        {
+          "name": "razonsocial_direccion",
+          "type": "text",
+          "placeholder": "",
+          "label": "Dirección (No usado para impresion)",
+          "ngModel": "vm.miempresa.razonsocial_direccion",
+          "required": true,
+          "disabled": false,
+          "options": []
+        },
+        {
+          "name": "razonsocial_telefono",
+          "type": "tel",
+          "placeholder": "",
+          "label": "Teléfono",
+          "ngModel": "vm.miempresa.razonsocial_telefono",
+          "required": true,
+          "disabled": false,
+          "options": []
+        },
+        {
+          "name": "razonsocial_email",
+          "type": "text",
+          "placeholder": "",
+          "label": "Email",
+          "ngModel": "vm.miempresa.razonsocial_email",
+          "required": false,
+          "disabled": false,
+          "options": []
+        },
+        {
+          "name": "",
+          "type": "file",
+          "placeholder": "",
+          "label": "",
+          "ngModel": "",
+          "required": false,
+          "disabled": false,
+          "options": []
+        }
+      ],
+      "tabs": [],
+      "alerts": [
+        "Campo requerido"
+      ],
+      "htmlSnippet": " <div class=\"row\"> <div class=\"col-sm-12\"> <div class=\"ibox\"> <div class=\"ibox-title\"> <h5>Información de mi negocio</h5> </div> <div class=\"ibox-content\"> <div class=\"row\"> <div class=\"col-sm-6\"> <ng-form name=\"form\" class=\"ng-pristine ng-invalid ng-invalid-required ng-valid-mask\" style=\"\"> <div class=\"panel panel-default panel-shadow\"> <div class=\"panel-body\"> <div class=\"form-group\" ng-class=\"{'has-error': form.razonsocial_nombrecomercial.$invalid &amp;&amp; form.$dirty}\"> <label for=\"razonsocial_nombrecomercial\" class=\"control-label\">Razón social (No usado para impresion)</label> <input type=\"text\" class=\"form-control ng-pristine ng-untouched ng-not-empty ng-valid ng-valid-required\" id=\"razonsocial_nombrecomercial\" name=\"razonsocial_nombrecomercial\" ng-model=\"vm.miempresa.razonsocial_nombrecomercial\" required=\"\" style=\"\"> <div ng-messages=\"form.razonsocial_nombrecomercial.$error\" class=\"ng-inactive\" style=\"\"> <!-- ngMessage: required --> </div> </div> <div class=\"row\"> <div class=\"col-sm-6\"> <div class=\"form-group\" ng-class=\"{'has-error': form.razonsocial_nomrazonsocial.$invalid &amp;&amp; form.$dirty}\"> <label for=\"razonsocial_nomrazonsocial\" class=\"control-label\">Nombre comercial (No usado para impresion)</label> <input type=\"text\" class=\"form-control ng-pristine ng-untouched ng-not-empty ng-valid ng-valid-required\" id=\"razonsocial_nomrazonsocial\" name=\"razonsocial_nomrazonsocial\" ng-model=\"vm.miempresa.razonsocial_nomrazonsocial\" required=\"\" style=\"\"> <div ng-messages=\"form.razonsocial_nomrazonsocial.$error\" class=\"ng-inactive\" style=\"\"> <!-- ngMessage: required --> </div> </div> </div> <div class=\"col-sm-6\"> <div class=\"form-group\" ng-class=\"{'has-error': (form.razonsocial_ruc.$invalid &amp;&amp; form.$dirty) || (vm.miempresa.razonsocial_ruc.length!= vm.cantidadMaximaCaracteres &amp;&amp; (vm.miempresa.mascara.length &lt; 1 || vm.miempresa.mascara == null))}\" style=\"\"> <label class=\"control-label ng-binding\">RUC (No usado para impresion)<!-- ngIf: vm.miempresa.razonsocial_ruc.length>0 --><label ng-if=\"vm.miempresa.razonsocial_ruc.length&gt;0\" class=\"ng-binding ng-scope\" style=\"\">(11 Digitos)</label><!-- end ngIf: vm.miempresa.razonsocial_ruc.length>0 --></label> <!-- ngIf: vm.miempresa.mascara.length < 1 || vm.miempresa.mascara == null --> <!-- ngIf: vm.miempresa.mascara.length > 0 --><div ng-if=\"vm.miempresa.mascara.length &gt; 0\" class=\"ng-scope\" style=\"\"> <input type=\"text\" class=\"form-control ng-pristine ng-untouched ng-valid ng-not-empty ng-valid-required ng-valid-mask\" name=\"razonsocial_ruc\" ng-model=\"vm.miempresa.razonsocial_ruc\" ui-mask=\"99999999999\" autocomplete=\"off\" required=\"\" placeholder=\"___________\"> <!-- ngIf: form.razonsocial_ruc.$invalid && form.$dirty --> </div><!-- end ngIf: vm.miempresa.mascara.length > 0 --> </div> </div> </div> <div class=\"form-group\" ng-class=\"{'has-error': form.razonsocial_direccion.$invalid &amp;&amp; form.$dirty}\"> <label for=\"razonsocial_direccion\" class=\"control-label\">Dirección (No usado para impresion)</label> <input type=\"text\" class=\"form-control ng-pristine ng-untouched ng-not-empty ng-valid ng-valid-required\" id=\"razonsocial_direccion\" name=\"razonsocial_direccion\" ng-model=\"vm.miempresa.razonsocial_direccion\" required=\"\" style=\"\"> <div ng-messages=\"form.razonsocial_direccion.$error\" class=\"ng-inactive\" style=\"\"> <!-- ngMessage: required --> </div> </div> <div class=\"row\"> <div class=\"col-sm-6\"> <div class=\"form-group\" ng-class=\"{'has-error': form.razonsocial_telefono.$invalid &amp;&amp; form.$dirty}\"> <label for=\"razonsocial_telefono\" class=\"control-label\">Teléfono</label> <input type=\"tel\" class=\"form-control ng-pristine ng-untouched ng-empty ng-invalid ng-invalid-required\" id=\"razonsocial_telefono\" name=\"razonsocial_telefono\" ng-model=\"vm.miempresa.razonsocial_telefono\" required=\"\"> <div ng-messages=\"form.razonsocial_telefono.$error\" class=\"ng-active\"> <!-- ngMessage: required --><div class=\"help-block ng-scope\" ng-message=\"required\">Campo requerido</div> </div> </div> </div> <div class=\"col-sm-6\"> <div class=\"form-group\"> <label for=\"razonsocial_email\" class=\"control-label\">Email</label> <input type=\"type\" class=\"form-control ng-pristine ng-untouched ng-valid ng-not-empty\" id=\"razonsocial_email\" name=\"razonsocial_email\" ng-model=\"vm.miempresa.razonsocial_email\" style=\"\"> </div> </div> </div> <div class=\"float-e-margins\"> <button ladda=\"btnCargando\" ng-disabled=\"form.$invalid\" class=\"btn btn-success ladda-button\" ng-click=\"vm.fnActualizarDatosEmpresa()\" data-style=\"zoom-in\" disabled=\"disabled\"><span class=\"ladda-label\"><i class=\"fa fa-save\"></i> Modificar</span><span class=\"ladda-spinner\"></span></button> <a class=\"btn btn-default\" ui-sref=\"mirestaurante\" href=\"#!/mirestaurante\"><i class=\"fa fa-arrow-left\"></i> Atras</a> </div> </div> </div> </ng-form> </div> <div class=\"col-sm-6\"> <div class=\"panel panel-default panel-shadow\"> <div class=\"panel-body\"> <form name=\"formImg\" class=\"ng-pristine ng-valid\"> <p></p> <p class=\"text-center text-muted m-b"
+    },
+    "Facturacion Electronica": {
+      "title": "",
+      "breadcrumbs": [],
+      "buttons": [
+        {
+          "text": "OK",
+          "class": "ladda-button btn btn-primary keypad-top-control",
+          "type": "button",
+          "ngClick": "vm.ok()",
+          "href": ""
+        },
+        {
+          "text": "7",
+          "class": "bc-keypad__button ng-binding ng-scope",
+          "type": "",
+          "ngClick": "",
+          "href": ""
+        },
+        {
+          "text": "8",
+          "class": "bc-keypad__button ng-binding ng-scope",
+          "type": "",
+          "ngClick": "",
+          "href": ""
+        },
+        {
+          "text": "9",
+          "class": "bc-keypad__button ng-binding ng-scope",
+          "type": "",
+          "ngClick": "",
+          "href": ""
+        },
+        {
+          "text": "4",
+          "class": "bc-keypad__button ng-binding ng-scope",
+          "type": "",
+          "ngClick": "",
+          "href": ""
+        },
+        {
+          "text": "5",
+          "class": "bc-keypad__button ng-binding ng-scope",
+          "type": "",
+          "ngClick": "",
+          "href": ""
+        },
+        {
+          "text": "6",
+          "class": "bc-keypad__button ng-binding ng-scope",
+          "type": "",
+          "ngClick": "",
+          "href": ""
+        },
+        {
+          "text": "1",
+          "class": "bc-keypad__button ng-binding ng-scope",
+          "type": "",
+          "ngClick": "",
+          "href": ""
+        },
+        {
+          "text": "2",
+          "class": "bc-keypad__button ng-binding ng-scope",
+          "type": "",
+          "ngClick": "",
+          "href": ""
+        },
+        {
+          "text": "3",
+          "class": "bc-keypad__button ng-binding ng-scope",
+          "type": "",
+          "ngClick": "",
+          "href": ""
+        },
+        {
+          "text": "0",
+          "class": "bc-keypad__button ng-binding ng-scope",
+          "type": "",
+          "ngClick": "",
+          "href": ""
+        },
+        {
+          "text": ".",
+          "class": "bc-keypad__button ng-binding ng-scope",
+          "type": "",
+          "ngClick": "",
+          "href": ""
+        }
+      ],
+      "tables": [
+        {
+          "headers": [],
+          "rowCount": 1
+        }
+      ],
+      "inputs": [
+        {
+          "name": "",
+          "type": "password",
+          "placeholder": "",
+          "label": "",
+          "ngModel": "vm.numbers",
+          "required": false,
+          "disabled": false,
+          "options": []
+        }
+      ],
+      "tabs": [],
+      "alerts": [],
+      "htmlSnippet": " <!-- ngIf: vm.mostrarPanelProveedorFE=='1' && vm.validarSuport==true --> <div rest-loader-model=\"cargandoConfiguracionFe\" ng-class=\"{'is-loading': cargandoConfiguracionFe}\"></div> <!-- ngIf: vm.mostrarPanelProveedorFE=='0' && vm.validarSuport==true --> <!-- ngIf: vm.validarSuport==false --><div class=\"row ng-scope\" ng-if=\"vm.validarSuport==false\"> <div class=\"col-sm-8 col-sm-offset-2\"> <div class=\"ibox color-black\"> <div class=\"ibox-content\"> <img src=\"img/logo-restaurantpe-black.9968267a.png\" class=\"logo\" alt=\"Restaurant.pe\" style=\"height:50px;max-width:100%;width:250px\" height=\"50\" width=\"250\"> <h1>Oops, ocurrió un problema.</h1> <p><a ng-click=\"vm.fnAbrirValidacionPin()\"> click Aquí para volver a intentar <i class=\"fa fa-hand-o-left fa-fw\"></i></a></p> <p>Usted no cuenta con Permiso para acceder a este modulo. Asegúrate de haber ingresado la dirección URL correcta o vuelva a la <a href=\"./\">página principal</a>.</p> </div> </div> </div> </div><!-- end ngIf: vm.validarSuport==false --> "
+    },
+    "Series de contingencia": {
+      "title": "Todas las Series de contingencia",
+      "breadcrumbs": [],
+      "buttons": [
+        {
+          "text": "Nueva serie de contingencia",
+          "class": "btn btn-primary btn-block",
+          "type": "",
+          "ngClick": "$state.go('ajustes.seriemanualfe.nuevo');vm.resetearPosObjeto();",
+          "href": ""
+        }
+      ],
+      "tables": [
+        {
+          "headers": [
+            "RUC",
+            "Comprobante",
+            "Serie",
+            "Fecha de alta",
+            "Fecha de registro",
+            "Estado",
+            "Acciones"
+          ],
+          "rowCount": 1
+        },
+        {
+          "headers": [],
+          "rowCount": 1
+        }
+      ],
+      "inputs": [
+        {
+          "name": "",
+          "type": "text",
+          "placeholder": "Buscar...",
+          "label": "",
+          "ngModel": "vm.valBusqueda",
+          "required": false,
+          "disabled": false,
+          "options": []
+        },
+        {
+          "name": "",
+          "type": "text",
+          "placeholder": "Paginación",
+          "label": "",
+          "ngModel": "$select.search",
+          "required": false,
+          "disabled": false,
+          "options": []
+        },
+        {
+          "name": "focusser-0",
+          "type": "text",
+          "placeholder": "",
+          "label": "",
+          "ngModel": "",
+          "required": false,
+          "disabled": true,
+          "options": []
+        }
+      ],
+      "tabs": [],
+      "alerts": [],
+      "htmlSnippet": " <div class=\"row\"> <div class=\"col-sm-9\" equalizer=\"'theColumns'\" style=\"min-height: 264.547px; height: auto;\"> <div class=\"ibox\"> <div class=\"ibox-title\"> <h5><i class=\"fa fa-money\"></i> Todas las Series de contingencia</h5> </div> <div class=\"ibox-content\" style=\"position: relative; min-height: 30px;\"> <div class=\"row\"> <div class=\"col-sm-7\"> <div class=\"input-group m-b\" ng-class=\"{'has-warning': vm.valBusqueda}\"> <div class=\"input-group-addon\"> <i class=\"fa fa-search\"></i> </div> <input type=\"text\" autocomplete=\"off\" class=\"form-control ng-pristine ng-untouched ng-valid ng-empty\" placeholder=\"Buscar...\" ng-model=\"vm.valBusqueda\"> </div> </div> <div class=\"col-sm-3\"> <div class=\"ui-select-container ui-select-bootstrap dropdown ng-not-empty ng-valid\" ng-class=\"{open: $select.open}\" ng-model=\"vm.paginacionSeleccionada\" ng-change=\"vm.fnCargarSeriemanualfeList()\" theme=\"bootstrap\" search-enabled=\"false\"><div class=\"ui-select-loading-indicator ng-hide\" ng-show=\"$select.showLoader\"><span></span></div><div class=\"ui-select-match ng-scope\" ng-hide=\"$select.open\" ng-disabled=\"$select.disabled\" ng-class=\"{'btn-default-focus':$select.focus, 'has-action-buttons': $select.actionButtons.isActivated}\" placeholder=\"Paginación\"><span tabindex=\"-1\" class=\"btn btn-default form-control ui-select-toggle\" aria-label=\"Select box activate\" ng-disabled=\"$select.disabled\" ng-click=\"$select.activate()\" style=\"outline: 0;\"><span ng-show=\"$select.isEmpty()\" class=\"ui-select-placeholder text-muted ng-binding ng-hide\">Paginación</span> <span ng-hide=\"$select.isEmpty()\" class=\"ui-select-match-text pull-left\" ng-class=\"{'ui-select-allow-clear': $select.allowClear &amp;&amp; !$select.isEmpty()}\" ng-transclude=\"\"> <!-- ngIf: $select.selected.paginacion_valor != 'Todos' --><span ng-if=\"$select.selected.paginacion_valor != 'Todos'\" class=\"ng-scope\"> Por: <strong class=\"ng-binding\">10</strong> registros </span><!-- end ngIf: $select.selected.paginacion_valor != 'Todos' --> <!-- ngIf: $select.selected.paginacion_valor == 'Todos' --> </span> <i class=\"caret pull-right\" ng-click=\"$select.toggle($event)\" ng-hide=\"!$select.items.length\"></i> <a ng-show=\"$select.allowClear &amp;&amp; !$select.isEmpty()\" aria-label=\"Select box clear\" style=\"margin-right: 10px\" ng-click=\"$select.clear($event)\" class=\"btn btn-xs btn-link pull-right ng-hide\"><i class=\"glyphicon glyphicon-remove\" aria-hidden=\"true\"></i></a></span> <!-- ngIf: $select.actionButtons.isActivated --></div><input type=\"text\" autocomplete=\"off\" tabindex=\"-1\" aria-expanded=\"true\" aria-label=\"Select box\" aria-owns=\"ui-select-choices-0\" aria-activedescendant=\"ui-select-choices-row-0-0\" class=\"form-control ui-select-search ng-pristine ng-untouched ng-valid ng-empty ng-hide\" placeholder=\"Paginación\" ng-model=\"$select.search\" ng-show=\"$select.searchEnabled &amp;&amp; $select.open\"><ul class=\"ui-select-choices ui-select-choices-content dropdown-menu ng-scope\" role=\"listbox\" ng-show=\"$select.items.length &gt; 0\" repeat=\"item in vm.cantidadesPorPagina | filter: $select.search\"><li class=\"ui-select-choices-group\" id=\"ui-select-choices-0\"><div class=\"divider ng-hide\" ng-show=\"$select.isGrouped &amp;&amp; $index &gt; 0\"></div><div ng-show=\"$select.isGrouped\" class=\"ui-select-choices-group-label dropdown-header ng-binding ng-hide\" ng-bind=\"$group.name\"></div><!-- ngRepeat: item in $select.items --><!-- ngIf: $select.open --><!-- end ngRepeat: item in $select.items --><!-- ngIf: $select.open --><!-- end ngRepeat: item in $select.items --><!-- ngIf: $select.open --><!-- end ngRepeat: item in $select.items --><!-- ngIf: $select.open --><!-- end ngRepeat: item in $select.items --></li></ul><ui-select-single></ui-select-single><input ng-disabled=\"$select.disabled\" class=\"ui-select-focusser ui-select-offscreen ng-scope\" type=\"text\" id=\"focusser-0\" aria-label=\"Select box focus\" aria-haspopup=\"true\" role=\"button\"></div> </div> <div class=\"col-sm-2\" uib-tooltip=\"Volver a cargar los datos\"> <button ng-click=\"vm.fnCargarSeriemanualfeList()\" class=\"btn btn-default btn-icon btn-block\"><i class=\"fa fa-refresh\"></i></button> </div> </div> <div rest-loader-model=\"cargando\" ng-class=\"{'is-loading': cargando}\" class=\"restloader\" style=\"height: 59.5625px; top: 59px; width: 978px; background: rgba(255, 255, 255, 0.8); z-index: 991;\"><div class=\"restloader-mini\"><div class=\"sk-rect1\"></div> <div class=\"sk-rect2\"></div> <div class=\"sk-rect3\"></div> <div class=\"sk-rect4\"></div> <div class=\"sk-rect5\"></div> </div></div> <div class=\"table-responsive restloader-remote-el\" ng-class=\"{'is-loading': cargando}\" style=\"\"> <table class=\"table table-condensed table-text-13 table-middle table-hover m-b-none\"> <thead> <tr> <th>RUC</th> <th>Comprobante</th> <th>Serie</th> <th>Fecha de alta</th> <th>Fecha de registro</th> <th>Estado</th> <th class=\"text-right\">Acciones</th> </tr> </thead> <tbody> <!-- ngRepeat: seriemanualfe in vm.seriemanualfeList | filter: vm.valBusqueda --> <tr ng-hide=\"(vm.seriemanualfeList|filter:vm.valBusqueda).length !"
+    },
+    "Integraciones": {
+      "title": "Selecciona un proveedor para integrarte",
+      "breadcrumbs": [],
+      "buttons": [
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        },
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        },
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        },
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        },
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        },
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        },
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        },
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        },
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        },
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        },
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        },
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        },
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        },
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        },
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        },
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        },
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        },
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        },
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        },
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        },
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        },
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        },
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        },
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        },
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        },
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        },
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        },
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        },
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        },
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        },
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        },
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        },
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        },
+        {
+          "text": "Integrar",
+          "class": "btn btn-primary btn-xs",
+          "type": "",
+          "ngClick": "vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})",
+          "href": ""
+        }
+      ],
+      "tables": [
+        {
+          "headers": [
+            "Proveedor",
+            "Rubro",
+            "Estado",
+            "Opciones"
+          ],
+          "rowCount": 35
+        },
+        {
+          "headers": [],
+          "rowCount": 1
+        }
+      ],
+      "inputs": [],
+      "tabs": [],
+      "alerts": [],
+      "htmlSnippet": " <div class=\"row\"> <div class=\"col-sm-12\" equalizer=\"'theColumns'\" style=\"min-height: 506.375px; height: auto;\"> <div class=\"ibox border-all-color-black\"> <div class=\"ibox-content\"> <div class=\"row\"> <div class=\"col-sm-9\"> <h1 class=\"text-black\">Integraciones</h1> </div> </div> <div class=\"row m-t-lg\"> <div class=\"col-sm-6\" equalizer=\"'theColumns'\" style=\"min-height: 506.375px; height: auto;\"> <div class=\"panel panel-default panel-shadow\"> <div class=\"panel-body\" equalizer=\"'col'\" style=\"min-height: 224.188px; height: auto;\"> <h3 class=\"text-black\">Empresas que trabajan con restaurant.pe</h3> <div class=\"row\"> <div class=\"col-sm-12\"> <div class=\"panel panel-default panel-shadow\"> <div class=\"panel-body\" equalizer=\"'col'\" style=\"min-height: 224.188px; height: auto;\"> <table class=\"table table-hover margin bottom\"> <thead> <tr> <th>Proveedor</th> <th>Rubro</th> <th>Estado</th> <th class=\"text-right\">Opciones</th> </tr> </thead> <tbody> <!-- ngRepeat: proveedorIntegracion in vm.proveedorIntegracionList --><tr ng-repeat=\"proveedorIntegracion in vm.proveedorIntegracionList\" class=\"ng-scope\" style=\"\"> <td style=\"vertical-align:middle\"> <a class=\"alert-link\" ng-click=\"vm.fnActualizarApiKeyBySucursal(proveedorIntegracion);\"> <h4 style=\"margin-bottom:0\" class=\"ng-binding\">Uber eats</h4> </a> </td> <td style=\"vertical-align:middle\"> <!-- ngIf: proveedorIntegracion.integracion_tipo =='1' --> <!-- ngIf: proveedorIntegracion.integracion_tipo =='2' --><span ng-if=\"proveedorIntegracion.integracion_tipo =='2'\" class=\"ng-scope\">Delivery</span><!-- end ngIf: proveedorIntegracion.integracion_tipo =='2' --> <!-- ngIf: proveedorIntegracion.integracion_tipo =='3' --> <!-- ngIf: proveedorIntegracion.integracion_tipo =='4' --> <!-- ngIf: proveedorIntegracion.integracion_tipo =='5' --> <!-- ngIf: proveedorIntegracion.integracion_tipo =='6' --> <!-- ngIf: proveedorIntegracion.integracion_tipo =='7' --> <!-- ngIf: proveedorIntegracion.integracion_tipo =='8' --> <!-- ngIf: proveedorIntegracion.integracion_tipo =='9' --> <!-- ngIf: proveedorIntegracion.integracion_tipo =='10' --> <!-- ngIf: proveedorIntegracion.integracion_tipo =='11' --> <!-- ngIf: proveedorIntegracion.integracion_tipo =='12' --> <!-- ngIf: proveedorIntegracion.integracion_tipo =='13' --> </td> <td style=\"vertical-align:middle\"> <!-- ngIf: proveedorIntegracion.integracion_id == '34' && proveedorIntegracion.googleActivoEnRedis === true --> <!-- ngIf: proveedorIntegracion.integracion_id == '34' && proveedorIntegracion.googleActivoEnRedis === false --> <!-- ngIf: proveedorIntegracion.integracion_id != '34' && proveedorIntegracion.integracion_estaintegrada == '1' --> <!-- ngIf: proveedorIntegracion.integracion_id != '34' && proveedorIntegracion.integracion_estaintegrada == '0' --><span ng-if=\"proveedorIntegracion.integracion_id != '34' &amp;&amp; proveedorIntegracion.integracion_estaintegrada == '0'\" class=\"label label-danger ng-scope\"><b>Inactiva</b></span><!-- end ngIf: proveedorIntegracion.integracion_id != '34' && proveedorIntegracion.integracion_estaintegrada == '0' --> </td> <td class=\"text-right\" style=\"vertical-align:middle\"> <button class=\"btn btn-primary btn-xs\" ng-click=\"vm.fnObtenerPorId(proveedorIntegracion.integracion_id); $state.go('ajustes.integraciones.integrar', {integracion_id: proveedorIntegracion.integracion_id})\"> <i class=\"fa fa-external-link\"></i> Integrar </button> </td> </tr><!-- end ngRepeat: proveedorIntegracion in vm.proveedorIntegracionList --><tr ng-repeat=\"proveedorIntegracion in vm.proveedorIntegracionList\" class=\"ng-scope\"> <td style=\"vertical-align:middle\"> <a class=\"alert-link\" ng-click=\"vm.fnActualizarApiKeyBySucursal(proveedorIntegracion);\"> <h4 style=\"margin-bottom:0\" class=\"ng-binding\">Glovo</h4> </a> </td> <td style=\"vertical-align:middle\"> <!-- ngIf: proveedorIntegracion.integracion_tipo =='1' --> <!-- ngIf: proveedorIntegracion.integracion_tipo =='2' --><span ng-if=\"proveedorIntegracion.integracion_tipo =='2'\" class=\"ng-scope\">Delivery</span><!-- end ngIf: proveedorIntegracion.integracion_tipo =='2' --> <!-- ngIf: proveedorIntegracion.integracion_tipo =='3' --> <!-- ngIf: proveedorIntegracion.integracion_tipo =='4' --> <!-- ngIf: proveedorIntegracion.integracion_tipo =='5' --> <!-- ngIf: proveedorIntegracion.integracion_tipo =='6' --> <!-- ngIf: proveedorIntegracion.integracion_tipo =='7' --> <!-- ngIf: proveedorIntegracion.integracion_tipo =='8' --> <!-- ngIf: proveedorIntegracion.integracion_tipo =='9' --> <!-- ngIf: proveedorIntegracion.integracion_tipo =='10' --> <!-- ngIf: proveedorIntegracion.integracion_tipo =='11' --> <!-- ngIf: proveedorIntegracion.integracion_tipo =='12' --> <!-- ngIf: proveedorIntegracion.integracion_tipo =='13' --> </td> <td style=\"vertical-align:middle\"> <!-- ngIf: proveedorIntegracion.integracion_id == '34' && proveedorIntegracion.googleActivoEnRedis === true --> <!-- ngIf: proveedorIntegracion.integracion_id == '34' && proveedorIntegracion.googleActivoEnRedis === false --> <!-- ngIf: proveedorInteg"
+    },
+    "Integracion POS": {
+      "title": "Todas los POS",
+      "breadcrumbs": [],
+      "buttons": [
+        {
+          "text": "Nueva Integración POS",
+          "class": "btn btn-primary btn-block",
+          "type": "",
+          "ngClick": "vm.pos.resetearPosObjeto();$state.go('ajustes.pos.nuevo');vm.objIsoCode.value='';",
+          "href": ""
+        }
+      ],
+      "tables": [
+        {
+          "headers": [
+            "Nombre",
+            "Tipo",
+            "Serie",
+            "Proveedor",
+            "Acciones"
+          ],
+          "rowCount": 1
+        },
+        {
+          "headers": [],
+          "rowCount": 1
+        }
+      ],
+      "inputs": [
+        {
+          "name": "",
+          "type": "text",
+          "placeholder": "Buscar...",
+          "label": "",
+          "ngModel": "vm.valBusqueda",
+          "required": false,
+          "disabled": false,
+          "options": []
+        },
+        {
+          "name": "",
+          "type": "text",
+          "placeholder": "Paginación",
+          "label": "",
+          "ngModel": "$select.search",
+          "required": false,
+          "disabled": false,
+          "options": []
+        },
+        {
+          "name": "focusser-0",
+          "type": "text",
+          "placeholder": "",
+          "label": "",
+          "ngModel": "",
+          "required": false,
+          "disabled": true,
+          "options": []
+        }
+      ],
+      "tabs": [],
+      "alerts": [],
+      "htmlSnippet": " <div class=\"row\"> <div class=\"col-sm-7\" equalizer=\"'theColumns'\" style=\"min-height: 264.547px; height: auto;\"> <div class=\"ibox\"> <div class=\"ibox-title\"> <h5><i class=\"fa fa-money\"></i> Todas los POS</h5> </div> <div class=\"ibox-content\" style=\"position: relative; min-height: 30px;\"> <div class=\"row\"> <div class=\"col-sm-7\"> <div class=\"input-group m-b\" ng-class=\"{'has-warning': vm.valBusqueda}\"> <div class=\"input-group-addon\"> <i class=\"fa fa-search\"></i> </div> <input type=\"text\" autocomplete=\"off\" class=\"form-control ng-pristine ng-untouched ng-valid ng-empty\" placeholder=\"Buscar...\" ng-model=\"vm.valBusqueda\"> </div> </div> <div class=\"col-sm-3\"> <div class=\"ui-select-container ui-select-bootstrap dropdown ng-not-empty ng-valid\" ng-class=\"{open: $select.open}\" ng-model=\"vm.paginacionSeleccionada\" ng-change=\"vm.fnCargarPosList()\" theme=\"bootstrap\" search-enabled=\"false\"><div class=\"ui-select-loading-indicator ng-hide\" ng-show=\"$select.showLoader\"><span></span></div><div class=\"ui-select-match ng-scope\" ng-hide=\"$select.open\" ng-disabled=\"$select.disabled\" ng-class=\"{'btn-default-focus':$select.focus, 'has-action-buttons': $select.actionButtons.isActivated}\" placeholder=\"Paginación\"><span tabindex=\"-1\" class=\"btn btn-default form-control ui-select-toggle\" aria-label=\"Select box activate\" ng-disabled=\"$select.disabled\" ng-click=\"$select.activate()\" style=\"outline: 0;\"><span ng-show=\"$select.isEmpty()\" class=\"ui-select-placeholder text-muted ng-binding ng-hide\">Paginación</span> <span ng-hide=\"$select.isEmpty()\" class=\"ui-select-match-text pull-left\" ng-class=\"{'ui-select-allow-clear': $select.allowClear &amp;&amp; !$select.isEmpty()}\" ng-transclude=\"\"> <!-- ngIf: $select.selected.paginacion_valor != 'Todos' --><span ng-if=\"$select.selected.paginacion_valor != 'Todos'\" class=\"ng-scope\"> Por: <strong class=\"ng-binding\">10</strong> registros </span><!-- end ngIf: $select.selected.paginacion_valor != 'Todos' --> <!-- ngIf: $select.selected.paginacion_valor == 'Todos' --> </span> <i class=\"caret pull-right\" ng-click=\"$select.toggle($event)\" ng-hide=\"!$select.items.length\"></i> <a ng-show=\"$select.allowClear &amp;&amp; !$select.isEmpty()\" aria-label=\"Select box clear\" style=\"margin-right: 10px\" ng-click=\"$select.clear($event)\" class=\"btn btn-xs btn-link pull-right ng-hide\"><i class=\"glyphicon glyphicon-remove\" aria-hidden=\"true\"></i></a></span> <!-- ngIf: $select.actionButtons.isActivated --></div><input type=\"text\" autocomplete=\"off\" tabindex=\"-1\" aria-expanded=\"true\" aria-label=\"Select box\" aria-owns=\"ui-select-choices-0\" aria-activedescendant=\"ui-select-choices-row-0-0\" class=\"form-control ui-select-search ng-pristine ng-untouched ng-valid ng-empty ng-hide\" placeholder=\"Paginación\" ng-model=\"$select.search\" ng-show=\"$select.searchEnabled &amp;&amp; $select.open\"><ul class=\"ui-select-choices ui-select-choices-content dropdown-menu ng-scope\" role=\"listbox\" ng-show=\"$select.items.length &gt; 0\" repeat=\"item in vm.cantidadesPorPagina | filter: $select.search\"><li class=\"ui-select-choices-group\" id=\"ui-select-choices-0\"><div class=\"divider ng-hide\" ng-show=\"$select.isGrouped &amp;&amp; $index &gt; 0\"></div><div ng-show=\"$select.isGrouped\" class=\"ui-select-choices-group-label dropdown-header ng-binding ng-hide\" ng-bind=\"$group.name\"></div><!-- ngRepeat: item in $select.items --><!-- ngIf: $select.open --><!-- end ngRepeat: item in $select.items --><!-- ngIf: $select.open --><!-- end ngRepeat: item in $select.items --><!-- ngIf: $select.open --><!-- end ngRepeat: item in $select.items --><!-- ngIf: $select.open --><!-- end ngRepeat: item in $select.items --></li></ul><ui-select-single></ui-select-single><input ng-disabled=\"$select.disabled\" class=\"ui-select-focusser ui-select-offscreen ng-scope\" type=\"text\" id=\"focusser-0\" aria-label=\"Select box focus\" aria-haspopup=\"true\" role=\"button\"></div> </div> <div class=\"col-sm-2\" uib-tooltip=\"Volver a cargar los datos\"> <button ng-click=\"vm.fnCargarPosList()\" class=\"btn btn-default btn-icon btn-block\"><i class=\"fa fa-refresh\"></i></button> </div> </div> <div rest-loader-model=\"cargando\" ng-class=\"{'is-loading': cargando}\" class=\"restloader\" style=\"height: 59.5625px; top: 59px; width: 744.656px; background: rgba(255, 255, 255, 0.8); z-index: 991;\"><div class=\"restloader-mini\"><div class=\"sk-rect1\"></div> <div class=\"sk-rect2\"></div> <div class=\"sk-rect3\"></div> <div class=\"sk-rect4\"></div> <div class=\"sk-rect5\"></div> </div></div> <div class=\"table-responsive restloader-remote-el\" ng-class=\"{'is-loading': cargando}\" style=\"\"> <table class=\"table table-condensed table-text-13 table-middle table-hover m-b-none\"> <thead> <tr> <th>Nombre</th> <th>Tipo</th> <th>Serie</th> <th>Proveedor</th> <th class=\"text-right\">Acciones</th> </tr> </thead> <tbody> <!-- ngRepeat: pos in vm.posList | filter: vm.valBusqueda --> <tr ng-hide=\"(vm.posList|filter:vm.valBusqueda).length != 0\"> <td colspan=\"7\"> <em> <span>No hay resultados</span> <!-- ngIf: vm.valBusqueda --> </em> </td> </tr> </tbody> "
+    }
+  },
+  "templates": {},
+  "endpoints": [
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/local/getLocalList",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/local/getVariablesLog",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/local/esUnPlanLite",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/api/rest/campaniaaddons/getByIdUsuario",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/caja/getCajaListByLocal/1",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/turno/getTurnoListByLocal/1",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/configuracion/getAllByLocalId/1/0/0",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/configuracion/getAllByLocalId/null/0/0",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/usuario/login",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/configuracionlocalpos/obtenerTodasLasConfiguracionesPOSPorLocalLogeado/1",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/obtenerAddons",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/getInformacionKamAndSupport/caprichos.restaurant.pe",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/getWebinars/caprichos.restaurant.pe",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/getLive/caprichos.restaurant.pe",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerPermisosPorUsuarioValidado/1",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/getLocalesPermitidos/0",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/obtenerFechaRenovacionCertificadoValidar/20611290064",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerDocElectronicosPendientes",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/caja/validarCajaActualAbierta",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerLocalesPermitidosParaUsuarioID/1",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/getTokenApp",
+      "status": 200,
+      "query": "token=[REDACTED]"
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/caja/allcajasbylocal/1/1/0/0",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://billing.restaurant.pe/billing/m/rest/suscripcion/obtenerPermisosPorPlan/caprichos/1",
+      "status": 200,
+      "query": "token=[REDACTED]"
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/obtenerAddons",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://billing.quipupos.com/billing/public/rest/aplicacion/obtenerWebinarVigenteV2",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/configuracion/get/31",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/validarUsoPlataforma",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://billing.restaurant.pe/billing/m/rest/suscripcion/getEstadoSuscripcionLocalV2/caprichos/1",
+      "status": 200,
+      "query": "token=[REDACTED]"
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/validarConfiguracioCartaJson",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/getLive/caprichos.restaurant.pe",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/encuestabi/verificarMostrar",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/sorteos/obtenerSorteoDisponible",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/api/rest/campaniaaddons/getByIdUsuario",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerAddonsPorToken",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerLocalYape",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerPermisosPorUsuarioValidado/1",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/configuracion/getAllByLocalId/1/0/0",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/razonsocial/get/1",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/configuracionregional/getAllByLocalId/1/0/0",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/getLocalesPermitidos/0",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerDocElectronicosPendientes",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/local/getVariablesLog",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/integracion/integracion/34",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://incidencias.restaurant.pe/billing/m/rest/local/obtenerIncidenciaPorusuarioSinCalificacion/restaurant.pe/caprichos/1",
+      "status": 200,
+      "query": "token=[REDACTED]"
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/obtenerFechaRenovacionCertificadoValidar/20611290064",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://billing.restaurant.pe/billing/m/rest/suscripcion/getEstadoSuscripcionLocalV2/caprichos/1",
+      "status": 200,
+      "query": "token=[REDACTED]"
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/obtenerAddons",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://billing.quipupos.com/billing/public/rest/aplicacion/obtenerWebinarVigenteV2",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/sorteos/obtenerSorteoDisponible",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/encuestabi/verificarMostrar",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/getLive/caprichos.restaurant.pe",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerAddonsPorToken",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerLocalYape",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/configuracion/get/31",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/validarUsoPlataforma",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerPermisosPorUsuarioValidado/1",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/validarConfiguracioCartaJson",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerDocElectronicosPendientes",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/configuracion/getAllByLocalId/1/0/0",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/api/rest/campaniaaddons/getByIdUsuario",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/getLocalesPermitidos/0",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/local/getVariablesLog",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/integracion/integracion/34",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://incidencias.restaurant.pe/billing/m/rest/local/obtenerIncidenciaPorusuarioSinCalificacion/restaurant.pe/caprichos/1",
+      "status": 200,
+      "query": "token=[REDACTED]"
+    },
+    {
+      "method": "GET",
+      "url": "http://billing.restaurant.pe/billing/m/rest/suscripcion/obtenerPermisosPorPlan/caprichos/1",
+      "status": 200,
+      "query": "token=[REDACTED]"
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/obtenerFechaRenovacionCertificadoValidar/20611290064",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://billing.restaurant.pe/billing/m/rest/suscripcion/obtenerPermisosPorPlan/caprichos/1",
+      "status": 200,
+      "query": "token=[REDACTED]"
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/obtenerAddons",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://billing.quipupos.com/billing/public/rest/aplicacion/obtenerWebinarVigenteV2",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/sorteos/obtenerSorteoDisponible",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/encuestabi/verificarMostrar",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerLocalYape",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://billing.restaurant.pe/billing/m/rest/suscripcion/getEstadoSuscripcionLocalV2/caprichos/1",
+      "status": 200,
+      "query": "token=[REDACTED]"
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/validarUsoPlataforma",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/getLive/caprichos.restaurant.pe",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/validarConfiguracioCartaJson",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerPermisosPorUsuarioValidado/1",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerAddonsPorToken",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/configuracion/get/31",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/api/rest/campaniaaddons/getByIdUsuario",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerSeriemanualfeByLocal/1/-1/1/10",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/getLocalesPermitidos/0",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/local/getVariablesLog",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerDocElectronicosPendientes",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/integracion/integracion/34",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://incidencias.restaurant.pe/billing/m/rest/local/obtenerIncidenciaPorusuarioSinCalificacion/restaurant.pe/caprichos/1",
+      "status": 200,
+      "query": "token=[REDACTED]"
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/configuracion/getAllByLocalId/1/0/0",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/obtenerFechaRenovacionCertificadoValidar/20611290064",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://billing.restaurant.pe/billing/m/rest/suscripcion/obtenerPermisosPorPlan/caprichos/1",
+      "status": 200,
+      "query": "token=[REDACTED]"
+    },
+    {
+      "method": "POST",
+      "url": "http://billing.quipupos.com/billing/public/rest/aplicacion/obtenerWebinarVigenteV2",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/sorteos/obtenerSorteoDisponible",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/encuestabi/verificarMostrar",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://billing.restaurant.pe/billing/m/rest/suscripcion/getEstadoSuscripcionLocalV2/caprichos/1",
+      "status": 200,
+      "query": "token=[REDACTED]"
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/configuracion/get/31",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerLocalYape",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/getLive/caprichos.restaurant.pe",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerPermisosPorUsuarioValidado/1",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/validarUsoPlataforma",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/api/rest/campaniaaddons/getByIdUsuario",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/validarConfiguracioCartaJson",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerAddonsPorToken",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/configuracion/getAllByLocalId/1/0/0",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/integracion/obtenerTodoslosProveedoresParaIntegracion/-1/1/0/0",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/getLocalList",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/configuracion/obtenerTodasLasConfiguracionesPorLocalLogeado/1",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/canaldelivery/obtenerTodoslosCanaldeliverysPorBusquedaPaginado/-1/1/-1/-1",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/getLocalesPermitidos/0",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://incidencias.restaurant.pe/billing/m/rest/local/obtenerIncidenciaPorusuarioSinCalificacion/restaurant.pe/caprichos/1",
+      "status": 200,
+      "query": "token=[REDACTED]"
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerDocElectronicosPendientes",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/local/getVariablesLog",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/integracion/integracion/34",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/marca/getAll/1/-1/-1",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/obtenerAddons",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/obtenerFechaRenovacionCertificadoValidar/20611290064",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://billing.restaurant.pe/billing/m/rest/suscripcion/obtenerPermisosPorPlan/caprichos/1",
+      "status": 200,
+      "query": "token=[REDACTED]"
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/obtenerAddons",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://billing.quipupos.com/billing/public/rest/aplicacion/obtenerWebinarVigenteV2",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/encuestabi/verificarMostrar",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerLocalYape",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://billing.restaurant.pe/billing/m/rest/suscripcion/getEstadoSuscripcionLocalV2/caprichos/1",
+      "status": 200,
+      "query": "token=[REDACTED]"
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/getLive/caprichos.restaurant.pe",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerAddonsPorToken",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/validarUsoPlataforma",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/configuracion/get/31",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/validarConfiguracioCartaJson",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerPermisosPorUsuarioValidado/1",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/api/rest/campaniaaddons/getByIdUsuario",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/configuracion/getAllByLocalId/1/0/0",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerPOSPorByLocal/1/-1/1/10",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/getLocalesPermitidos/0",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/local/obtenerDocElectronicosPendientes",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/local/getVariablesLog",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://caprichos.restaurant.pe/restaurant/api/rest/integracion/integracion/34",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://restaurantlog.portafolioitdast.com/restaurant/api/rest/logrespuestas/logrespuestas",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "url": "http://caprichos.restaurant.pe/restaurant/m/rest/caja/getCajaListByLocal/1",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://incidencias.restaurant.pe/billing/m/rest/local/obtenerIncidenciaPorusuarioSinCalificacion/restaurant.pe/caprichos/1",
+      "status": 200,
+      "query": "token=[REDACTED]"
+    },
+    {
+      "method": "POST",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/common/sorteos/obtenerSorteoDisponible",
+      "status": 200,
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "url": "http://microservices.restaurant.pe/backendrestaurantpe/public/rest/localbi/obtenerFechaRenovacionCertificadoValidar/20611290064",
+      "status": 200,
+      "query": ""
+    }
+  ],
+  "states_meta": [
+    {
+      "name": "ajustes.configuracionpos",
+      "url": "/configuracionpos",
+      "templateUrl": null,
+      "controller": null,
+      "abstract": null
+    },
+    {
+      "name": "ajustes.pos",
+      "url": "/pos",
+      "templateUrl": null,
+      "controller": null,
+      "abstract": null
+    },
+    {
+      "name": "ajustes.pos.editar",
+      "url": "/:idPos/editar",
+      "templateUrl": null,
+      "controller": null,
+      "abstract": null
+    },
+    {
+      "name": "ajustes.pos.nuevo",
+      "url": "/nuevo",
+      "templateUrl": null,
+      "controller": null,
+      "abstract": null
+    },
+    {
+      "name": "ajustes.usuarios.editarpermisopos",
+      "url": "/:idUsuario/editar-permisopos",
+      "templateUrl": null,
+      "controller": null,
+      "abstract": null
+    },
+    {
+      "name": "ajustes.facturacionelectronica",
+      "url": "/facturacionelectronica",
+      "templateUrl": null,
+      "controller": null,
+      "abstract": null
+    },
+    {
+      "name": "ajustes.monedafacturacion",
+      "url": "/monedafacturacion",
+      "templateUrl": null,
+      "controller": null,
+      "abstract": null
+    },
+    {
+      "name": "ajustes.monedafacturacion.editar",
+      "url": "/:idMonedafacturacion/editar",
+      "templateUrl": null,
+      "controller": null,
+      "abstract": null
+    },
+    {
+      "name": "ajustes.monedafacturacion.nuevo",
+      "url": "/nuevo",
+      "templateUrl": null,
+      "controller": null,
+      "abstract": null
+    },
+    {
+      "name": "ajustes.integraciones",
+      "url": "/integraciones",
+      "templateUrl": null,
+      "controller": null,
+      "abstract": null
+    },
+    {
+      "name": "ajustes.integracionerp",
+      "url": "/integracionerp",
+      "templateUrl": null,
+      "controller": null,
+      "abstract": null
+    },
+    {
+      "name": "ajustes.integracionerpcanal",
+      "url": "/integracionerpcanal/:integracion_id",
+      "templateUrl": null,
+      "controller": null,
+      "abstract": null
+    },
+    {
+      "name": "ajustes.integraciones.integrar",
+      "url": "/:integracion_id",
+      "templateUrl": null,
+      "controller": null,
+      "abstract": null
+    },
+    {
+      "name": "ajustes.cartaporintegracion",
+      "url": "/configurarcarta/:desdeRestaurantGo",
+      "templateUrl": null,
+      "controller": null,
+      "abstract": null
+    },
+    {
+      "name": "ajustes.seriemanualfe",
+      "url": "/serie-contingencia",
+      "templateUrl": null,
+      "controller": null,
+      "abstract": null
+    },
+    {
+      "name": "informes.finanzas.integracionwsahi",
+      "url": "/wsahi",
+      "templateUrl": null,
+      "controller": null,
+      "abstract": null
+    },
+    {
+      "name": "informes.facturacion",
+      "url": "/facturacion-electronica",
+      "templateUrl": null,
+      "controller": null,
+      "abstract": null
+    },
+    {
+      "name": "informes.facturacion.documentos",
+      "url": "/documentos",
+      "templateUrl": null,
+      "controller": null,
+      "abstract": null
+    },
+    {
+      "name": "informes.facturacion.restafact",
+      "url": "/documentos-pendientes-restafact",
+      "templateUrl": null,
+      "controller": null,
+      "abstract": null
+    },
+    {
+      "name": "informes.facturacion.cdrrestafact",
+      "url": "/descargar-cdr-restafact",
+      "templateUrl": null,
+      "controller": null,
+      "abstract": null
+    },
+    {
+      "name": "informes.facturacion.reenviodocumentos",
+      "url": "/panelDeReenvios",
+      "templateUrl": null,
+      "controller": null,
+      "abstract": null
+    },
+    {
+      "name": "informes.facturacion.estadodocumento",
+      "url": "/estadodocumento",
+      "templateUrl": null,
+      "controller": null,
+      "abstract": null
+    },
+    {
+      "name": "informes.facturacion.descargamasiva",
+      "url": "/descargamasiva",
+      "templateUrl": null,
+      "controller": null,
+      "abstract": null
+    },
+    {
+      "name": "informes.otros.webhookintegracion",
+      "url": "/webhook-por-integracion",
+      "templateUrl": null,
+      "controller": null,
+      "abstract": null
+    },
+    {
+      "name": "mirestaurante",
+      "url": "/mirestaurante",
+      "templateUrl": null,
+      "controller": null,
+      "abstract": null
+    },
+    {
+      "name": "mirestaurante.miempresa",
+      "url": "/miempresa",
+      "templateUrl": null,
+      "controller": null,
+      "abstract": null
+    },
+    {
+      "name": "mirestaurante.facturas",
+      "url": "/facturas",
+      "templateUrl": null,
+      "controller": null,
+      "abstract": null
+    },
+    {
+      "name": "mirestaurante.facturas.ver",
+      "url": "/:idFactura",
+      "templateUrl": null,
+      "controller": null,
+      "abstract": null
+    },
+    {
+      "name": "mirestaurante.facturasotro",
+      "url": "/facturasotros",
+      "templateUrl": null,
+      "controller": null,
+      "abstract": null
+    },
+    {
+      "name": "mirestaurante.facturasotro.ver",
+      "url": "/:idFactura",
+      "templateUrl": null,
+      "controller": null,
+      "abstract": null
+    },
+    {
+      "name": "mirestaurante.suscripcion",
+      "url": "/suscripcion",
+      "templateUrl": null,
+      "controller": null,
+      "abstract": null
+    },
+    {
+      "name": "mirestaurante.facturacionelectronica",
+      "url": "/facturacion-electronica",
+      "templateUrl": null,
+      "controller": null,
+      "abstract": null
+    },
+    {
+      "name": "mirestaurante.configurarfacturacionelectronica",
+      "url": "/configurar-facturacion-electronica",
+      "templateUrl": null,
+      "controller": null,
+      "abstract": null
+    }
+  ]
+}

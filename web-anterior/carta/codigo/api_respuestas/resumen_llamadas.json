@@ -1,0 +1,85 @@
+{
+  "hosts": {
+    "url": "https://api.olaclick.app/ms-companies/public/hosts/caprichos-per.ola.click",
+    "status": 200,
+    "file": "api_respuestas/hosts.json",
+    "keys": [
+      "data"
+    ]
+  },
+  "company": {
+    "url": "https://api.olaclick.app/ms-companies/public/companies/5816bd90-2af9-11eb-83a6-91c28df3eedf",
+    "status": 200,
+    "file": "api_respuestas/company.json",
+    "keys": [
+      "data"
+    ]
+  },
+  "ecommerce_settings": {
+    "url": "https://api.olaclick.app/ms-companies/public/companies/5816bd90-2af9-11eb-83a6-91c28df3eedf/ecommerce-settings",
+    "status": 200,
+    "file": "api_respuestas/ecommerce_settings.json",
+    "keys": [
+      "data"
+    ]
+  },
+  "payment_methods": {
+    "url": "https://api.olaclick.app/ms-orders/public/companies/5816bd90-2af9-11eb-83a6-91c28df3eedf/payment-methods",
+    "status": 200,
+    "file": "api_respuestas/payment_methods.json",
+    "keys": [
+      "data"
+    ]
+  },
+  "order_settings": {
+    "url": "https://api.olaclick.app/ms-orders/public/companies/5816bd90-2af9-11eb-83a6-91c28df3eedf/order-settings",
+    "status": 200,
+    "file": "api_respuestas/order_settings.json",
+    "keys": [
+      "data"
+    ]
+  },
+  "coupons": {
+    "url": "https://api.olaclick.app/ms-orders/public/companies/5816bd90-2af9-11eb-83a6-91c28df3eedf/coupons",
+    "status": 200,
+    "file": "api_respuestas/coupons.json",
+    "keys": [
+      "data"
+    ]
+  },
+  "loyalty_settings": {
+    "url": "https://api.olaclick.app/ms-clients/public/companies/5816bd90-2af9-11eb-83a6-91c28df3eedf/loyalty-settings",
+    "status": 200,
+    "file": "api_respuestas/loyalty_settings.json",
+    "keys": [
+      "data"
+    ]
+  },
+  "categories": {
+    "url": "https://api.olaclick.app/ms-products/public/companies/5816bd90-2af9-11eb-83a6-91c28df3eedf/categories",
+    "status": 200,
+    "file": "api_respuestas/categories.json",
+    "keys": [
+      "data"
+    ]
+  },
+  "gallery_images": {
+    "url": "https://api.olaclick.app/ms-companies/public/companies/5816bd90-2af9-11eb-83a6-91c28df3eedf/gallery-images",
+    "status": 200,
+    "file": "api_respuestas/gallery_images.json",
+    "keys": [
+      "data"
+    ]
+  },
+  "chat_orchestrator_health": {
+    "url": "https://api.olaclick.app/ms-chat-orchestrator/public/health",
+    "status": 200,
+    "file": "api_respuestas/chat_orchestrator_health.json",
+    "keys": [
+      "status",
+      "service",
+      "timestamp",
+      "uptime"
+    ]
+  }
+}

@@ -1,0 +1,461 @@
+{
+  "epica": "EP-CAP-005",
+  "generado_por_ia": true,
+  "revisado_por": null,
+  "historias": [
+    {
+      "hu": "HU-CAP-041",
+      "tareas": [
+        {
+          "id": "HU-CAP-041-T01",
+          "titulo": "Revisar criterios de HU-CAP-041 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-041-T02",
+          "titulo": "Migración Prisma de las tablas de FT-CIE-01 (caja, cobro, cobro_pago, movimiento_caja, liquidacion)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-041-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-041-T03",
+          "titulo": "Reglas de dominio de HU-CAP-041 (RQ-CIE-01-01, RQ-CIE-01-02)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-041-T01",
+            "HU-CAP-041-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-041-T04",
+          "titulo": "Casos de uso: Abrir la caja del día",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-041-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-041-T05",
+          "titulo": "Endpoints y eventos de FT-CIE-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-041-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-041-T06",
+          "titulo": "Pantalla React: Abrir la caja del día",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-041-T05"
+          ]
+        },
+        {
+          "id": "HU-CAP-041-T07",
+          "titulo": "Pruebas TC-CAP-041-01..02 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-041-T06"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-042",
+      "tareas": [
+        {
+          "id": "HU-CAP-042-T01",
+          "titulo": "Revisar criterios de HU-CAP-042 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-042-T02",
+          "titulo": "Reglas de dominio de HU-CAP-042 (RQ-CIE-01-03, RQ-CIE-01-04, RQ-CIE-01-05, RQ-CIE-01-06)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-042-T01",
+            "HU-CAP-041-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-042-T03",
+          "titulo": "Casos de uso: Ver ventas por medio y registrar ingresos y egresos",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-042-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-042-T04",
+          "titulo": "Endpoints y eventos de FT-CIE-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-042-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-042-T05",
+          "titulo": "Pantalla React: Ver ventas por medio y registrar ingresos y egresos",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-042-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-042-T06",
+          "titulo": "Pruebas TC-CAP-042-01..05 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-042-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-043",
+      "tareas": [
+        {
+          "id": "HU-CAP-043-T01",
+          "titulo": "Revisar criterios de HU-CAP-043 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-043-T02",
+          "titulo": "Reglas de dominio de HU-CAP-043 (RQ-CIE-01-07, RQ-CIE-01-08)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-043-T01",
+            "HU-CAP-041-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-043-T03",
+          "titulo": "Casos de uso: Liquidar el efectivo de un repartidor",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-043-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-043-T04",
+          "titulo": "Endpoints y eventos de FT-CIE-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-043-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-043-T05",
+          "titulo": "Pantalla React: Liquidar el efectivo de un repartidor",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-043-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-043-T06",
+          "titulo": "Pruebas TC-CAP-043-01..02 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-043-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-044",
+      "tareas": [
+        {
+          "id": "HU-CAP-044-T01",
+          "titulo": "Revisar criterios de HU-CAP-044 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-044-T02",
+          "titulo": "Migración Prisma de las tablas de FT-CIE-02 (caja, cobro, cobro_pago, movimiento_caja, liquidacion)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-044-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-044-T03",
+          "titulo": "Reglas de dominio de HU-CAP-044 (RQ-CIE-02-01, RQ-CIE-02-02, RQ-CIE-02-03, RQ-CIE-02-04)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-044-T01",
+            "HU-CAP-044-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-044-T04",
+          "titulo": "Casos de uso: Contar el efectivo y comparar cada medio de pago",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-044-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-044-T05",
+          "titulo": "Endpoints y eventos de FT-CIE-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-044-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-044-T06",
+          "titulo": "Pantalla React: Contar el efectivo y comparar cada medio de pago",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-044-T05"
+          ]
+        },
+        {
+          "id": "HU-CAP-044-T07",
+          "titulo": "Pruebas TC-CAP-044-01..04 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-044-T06"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-045",
+      "tareas": [
+        {
+          "id": "HU-CAP-045-T01",
+          "titulo": "Revisar criterios de HU-CAP-045 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-045-T02",
+          "titulo": "Reglas de dominio de HU-CAP-045 (RQ-CIE-02-05, RQ-CIE-02-06)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-045-T01",
+            "HU-CAP-044-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-045-T03",
+          "titulo": "Casos de uso: Cerrar la caja con sus validaciones",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-045-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-045-T04",
+          "titulo": "Endpoints y eventos de FT-CIE-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-045-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-045-T05",
+          "titulo": "Pantalla React: Cerrar la caja con sus validaciones",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-045-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-045-T06",
+          "titulo": "Pruebas TC-CAP-045-01..02 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-045-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-046",
+      "tareas": [
+        {
+          "id": "HU-CAP-046-T01",
+          "titulo": "Revisar criterios de HU-CAP-046 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-046-T02",
+          "titulo": "Reglas de dominio de HU-CAP-046 (RQ-CIE-02-07, RQ-CIE-02-08, RQ-CIE-02-09)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-046-T01",
+            "HU-CAP-044-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-046-T03",
+          "titulo": "Casos de uso: Consultar e imprimir el historial de cierres",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-046-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-046-T04",
+          "titulo": "Endpoints y eventos de FT-CIE-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-046-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-046-T05",
+          "titulo": "Pantalla React: Consultar e imprimir el historial de cierres",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-046-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-046-T06",
+          "titulo": "Pruebas TC-CAP-046-01..04 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-046-T05"
+          ]
+        }
+      ]
+    }
+  ]
+}

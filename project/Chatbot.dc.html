@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Chatbot de Caprichos en WhatsApp</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+button{font-family:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="position:relative;width:390px;height:844px;overflow:hidden;background:#EFEAE2;color:#111B21;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:20px;display:flex;flex-direction:column">
+
+  <!-- Cabecera de WhatsApp -->
+  <div style="background:#008069;color:#FFFFFF;padding:10px 12px;display:flex;align-items:center;gap:10px">
+    <span aria-hidden="true" style="font-size:22px;line-height:22px">←</span>
+    <img src="/_blob/6d6aa5696913688bb2235a49f1133c2a" alt="Caprichos" style="width:40px;height:40px;border-radius:20px">
+    <div style="flex:1;min-width:0">
+      <div style="font-weight:600;font-size:16px;line-height:20px">Caprichos</div>
+      <div style="font-size:12px;line-height:16px;color:#D9F2EC">Cuenta de empresa · en línea</div>
+    </div>
+    <span aria-hidden="true" style="font-size:20px;letter-spacing:6px">⋮</span>
+  </div>
+
+  <!-- Conversación -->
+  <div style="flex:1;min-height:0;overflow-y:auto;padding:12px;display:flex;flex-direction:column-reverse;gap:6px">
+    <sc-for list="{{msgs}}" as="m" hint-placeholder-count="3">
+      <div style="display:flex;flex-direction:column;align-items:{{m.align}};gap:4px">
+        <div style="max-width:80%;padding:6px 8px 4px 9px;border-radius:8px;background:{{m.bg}};box-shadow:0 1px 0.5px rgba(11,20,26,0.13)">
+          <div style="white-space:pre-line">{{m.text}}</div>
+          <div style="text-align:right;font-size:11px;line-height:14px;color:#667781">{{m.time}}<span style="color:{{m.tickColor}}">{{m.ticks}}</span></div>
+        </div>
+        <sc-if value="{{m.hasButtons}}" hint-placeholder-val="{{ false }}">
+          <div style="width:80%;display:flex;flex-direction:column;gap:4px">
+            <sc-for list="{{m.buttons}}" as="b" hint-placeholder-count="2">
+              <button onClick="{{b.pick}}" style="width:100%;min-height:44px;border:0;border-radius:8px;background:#FFFFFF;color:#0B6FB3;font-weight:600;font-size:15px;box-shadow:0 1px 0.5px rgba(11,20,26,0.13)">{{b.n}}</button>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{m.hasList}}" hint-placeholder-val="{{ false }}">
+          <div style="width:80%">
+            <button onClick="{{openSheet}}" style="width:100%;min-height:44px;border:0;border-radius:8px;background:#FFFFFF;color:#0B6FB3;font-weight:600;font-size:15px;box-shadow:0 1px 0.5px rgba(11,20,26,0.13)">☰  Ver opciones</button>
+          </div>
+        </sc-if>
+      </div>
+    </sc-for>
+    <div style="align-self:center;background:#FFFFFF;color:#54656F;font-size:12px;line-height:16px;font-weight:600;padding:4px 10px;border-radius:8px;box-shadow:0 1px 0.5px rgba(11,20,26,0.13)">HOY</div>
+  </div>
+
+  <!-- Barra de escritura (solo ilustrativa) -->
+  <div style="padding:8px;display:flex;align-items:center;gap:8px;background:#EFEAE2">
+    <div style="flex:1;min-height:44px;border-radius:22px;background:#FFFFFF;display:flex;align-items:center;padding:0 14px;color:#667781">Mensaje</div>
+    <div aria-hidden="true" style="width:44px;height:44px;border-radius:22px;background:#008069;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:18px">🎤</div>
+  </div>
+
+  <!-- Hoja de opciones (mensaje de lista) -->
+  <sc-if value="{{sheetOpen}}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{closeSheet}}" style="position:absolute;left:0;right:0;top:0;bottom:0;background:rgba(11,20,26,0.5)"></div>
+    <div style="position:absolute;left:0;right:0;bottom:0;max-height:70%;background:#FFFFFF;border-radius:16px 16px 0 0;display:flex;flex-direction:column">
+      <div style="padding:16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #E9EDEF">
+        <div style="font-weight:600;font-size:16px">{{sheetTitle}}</div>
+        <button onClick="{{closeSheet}}" aria-label="Cerrar" style="width:44px;height:44px;border:0;background:transparent;color:#54656F;font-size:22px">×</button>
+      </div>
+      <div style="flex:1;min-height:0;overflow-y:auto">
+        <sc-for list="{{sheetRows}}" as="r" hint-placeholder-count="4">
+          <button onClick="{{r.pick}}" style="width:100%;min-height:52px;border:0;border-bottom:1px solid #F0F2F5;background:#FFFFFF;color:#111B21;padding:0 16px;display:flex;align-items:center;gap:12px;text-align:left;font-size:15px">
+            <span style="flex:1">{{r.n}}</span>
+            <span style="width:20px;height:20px;border-radius:10px;border:2px solid #667781;background:{{r.dot}};flex:none"></span>
+          </button>
+        </sc-for>
+      </div>
+      <div style="padding:12px 16px 16px">
+        <button onClick="{{sendSheet}}" style="width:100%;min-height:48px;border:0;border-radius:24px;background:{{sendBg}};color:#FFFFFF;font-weight:600;font-size:15px">Enviar</button>
+      </div>
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+const fmt = (n) => 's/ ' + (Number.isInteger(n) ? n : n.toFixed(2));
+const LECHE = { name: 'Tipo de leche', req: true, opts: [ { n: 'Leche entera', p: 0 }, { n: 'Leche sin lactosa', p: 0 }, { n: 'Bebida de almendra', p: 2.5 } ] };
+const DULZOR = { name: 'Endulzante', req: true, opts: [ { n: 'Azúcar', p: 0 }, { n: 'Stevia', p: 0 } ] };
+const ADIC = { name: 'Adicionales', req: false, opts: [ { n: 'Chantilly 4 oz', p: 2 }, { n: 'Una bola de helado', p: 2 }, { n: 'Syrop de cacao', p: 2 } ] };
+const CREMAS = { name: 'Cremas', req: false, opts: [ { n: 'Tártara', p: 0 }, { n: 'Honey', p: 0 }, { n: 'Crema de ají amarillo', p: 0 }, { n: 'Chimichurri', p: 0 } ] };
+const BEB = [ { n: 'Regular 12 oz', p: 14.5 }, { n: 'Grande 16 oz', p: 16.5 }, { n: 'Extra 21 oz', p: 17.5 } ];
+const CAL = [ { n: 'Regular 12 oz', p: 12 }, { n: 'Grande 16 oz', p: 13.5 }, { n: 'Extra 21 oz', p: 14.5 } ];
+const WAF = [ { n: '1/2 waffle', p: 15 }, { n: 'Waffle completo', p: 21 } ];
+const CATS = [
+  { n: 'Frappes', prods: [
+    { n: 'FRAPPE OREO', variants: BEB, groups: [ LECHE, DULZOR ] },
+    { n: 'FRAPPE MARACUYÁ', variants: BEB, groups: [ LECHE, DULZOR ] },
+    { n: 'FRAPPE STRAWBERRY', variants: BEB, groups: [ LECHE, DULZOR ] } ] },
+  { n: 'Calientes', prods: [
+    { n: 'MOCACCINO', variants: CAL, groups: [ LECHE, DULZOR ] },
+    { n: 'CAPUCCINO', variants: [ { n: 'Regular 12 oz', p: 9.5 }, { n: 'Grande 16 oz', p: 11 }, { n: 'Extra 21 oz', p: 12 } ], groups: [ LECHE, DULZOR ] } ] },
+  { n: 'Waffles', prods: [
+    { n: 'WAFFLE FRUTOS DEL BOSQUE', variants: WAF, groups: [ ADIC ] },
+    { n: 'NUTEWAFFLE', variants: WAF, groups: [ ADIC ] } ] },
+  { n: 'Salados', prods: [
+    { n: 'CAPRISABROSO', variants: [ { n: 'Unidad', p: 33 } ], groups: [ CREMAS ] },
+    { n: 'CLUB SANDWICH', variants: [ { n: '4 cuartos', p: 27 } ], groups: [ CREMAS ] } ] }
+];
+const MODALS = [ { id: 'delivery', n: 'Delivery' }, { id: 'llevar', n: 'Para llevar' }, { id: 'local', n: 'En el local' } ];
+const HELLO = '¡Hola! Soy Capri, la asistente de Caprichos. ¿En qué te puedo ayudar hoy?';
+const timeOf = (i) => { const t = 21 * 60 + 29 + i; const h = Math.floor(t / 60) % 24; const m = t % 60; return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m; };
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { msgs: [ { from: 'user', text: 'Hola' }, { from: 'bot', text: HELLO } ], step: 'start', modal: 'delivery', cat: 0, prod: 0, vi: 0, gi: 0, picks: [], price: 0, items: [], code: 'CP-0002', sheet: false, sel: -1 };
+  }
+
+  say(list, who, text) { return list.concat([ { from: who, text: text } ]); }
+  currentProd() { const s = this.state; return CATS[s.cat].prods[s.prod]; }
+
+  restart() {
+    this.setState({ msgs: [ { from: 'user', text: 'Hola' }, { from: 'bot', text: HELLO } ], step: 'start', modal: 'delivery', cat: 0, prod: 0, vi: 0, gi: 0, picks: [], price: 0, items: [], sheet: false, sel: -1 });
+  }
+
+  askGroup(msgs, prod, gi, price, picks, vi) {
+    if (gi < prod.groups.length) {
+      const g = prod.groups[gi];
+      return { msgs: this.say(msgs, 'bot', g.req ? '¿' + g.name + '? Es obligatorio.' : '¿Quieres ' + g.name.toLowerCase() + '? Es opcional.'), step: 'group', gi: gi, price: price, picks: picks, vi: vi };
+    }
+    const items = this.state.items.concat([ { name: prod.n, detail: picks.join(' · '), price: price } ]);
+    return { msgs: this.say(msgs, 'bot', 'Agregué ' + prod.n + ' (' + fmt(price) + ') a tu pedido. ¿Quieres algo más?'), step: 'more', items: items, price: 0, picks: [] };
+  }
+
+  choose(opt) {
+    const s = this.state;
+    let msgs = this.say(s.msgs, 'user', opt.n);
+    const done = (patch) => this.setState(Object.assign({ sheet: false, sel: -1 }, patch));
+    if (s.step === 'start') {
+      if (opt.id === 'carta') { done({ msgs: this.say(msgs, 'bot', 'Aquí tienes la carta digital: [enlace a la carta virtual]. También puedo tomar tu pedido por aquí. ¿Lo hacemos?') }); return; }
+      done({ msgs: this.say(msgs, 'bot', 'Perfecto. ¿Cómo lo quieres?'), step: 'modal' });
+    } else if (s.step === 'modal') {
+      done({ modal: opt.id, msgs: this.say(msgs, 'bot', 'Anotado: ' + opt.n + '. Elige una categoría.'), step: 'cat' });
+    } else if (s.step === 'cat') {
+      done({ cat: opt.i, msgs: this.say(msgs, 'bot', 'Estos son nuestros ' + CATS[opt.i].n.toLowerCase() + '. ¿Cuál te provoca?'), step: 'prod' });
+    } else if (s.step === 'prod') {
+      done({ prod: opt.i, msgs: this.say(msgs, 'bot', opt.n + '. ¿Qué presentación prefieres?'), step: 'variant' });
+    } else if (s.step === 'variant') {
+      const prod = this.currentProd();
+      done(this.askGroup(msgs, prod, 0, prod.variants[opt.i].p, [ prod.variants[opt.i].n ], opt.i));
+    } else if (s.step === 'group') {
+      const prod = this.currentProd();
+      const g = prod.groups[s.gi];
+      const extra = opt.i >= 0 ? g.opts[opt.i].p : 0;
+      const picks = opt.i >= 0 ? s.picks.concat([ g.opts[opt.i].n ]) : s.picks;
+      done(this.askGroup(msgs, prod, s.gi + 1, s.price + extra, picks, s.vi));
+    } else if (s.step === 'more') {
+      if (opt.id === 'otro') { done({ msgs: this.say(msgs, 'bot', 'Claro. Elige una categoría.'), step: 'cat' }); }
+      else {
+        const sub = s.items.reduce((a, x) => a + x.price, 0);
+        const fee = s.modal === 'delivery' && sub < 70 ? 3 : 0;
+        const lines = s.items.map((x) => x.name + ' · ' + x.detail + ' — ' + fmt(x.price)).join('\n');
+        const feeLine = s.modal === 'delivery' ? '\nEnvío: ' + (fee ? fmt(fee) : 'gratis') : '';
+        done({ msgs: this.say(msgs, 'bot', 'Este es tu resumen:\n' + lines + feeLine + '\nTotal: ' + fmt(sub + fee) + '\n\n¿Confirmo tu pedido?'), step: 'summary' });
+      }
+    } else if (s.step === 'summary') {
+      if (opt.id === 'nuevo') { this.restart(); return; }
+      done({ msgs: this.say(msgs, 'bot', 'Listo. Tu pedido ' + s.code + ' fue enviado a caja. Un cajero lo verifica y lo acepta; recién entonces pasa a cocina. Te aviso por aquí cuando lo acepten.'), step: 'done' });
+    } else {
+      this.restart();
+    }
+  }
+
+  optionsNow() {
+    const s = this.state;
+    let options = []; let title = 'Opciones';
+    if (s.step === 'start') { options = [ { n: 'Hacer un pedido', id: 'pedir' }, { n: 'Ver la carta', id: 'carta' } ]; }
+    else if (s.step === 'modal') { options = MODALS.map((m) => ({ n: m.n, id: m.id })); }
+    else if (s.step === 'cat') { options = CATS.map((c, i) => ({ n: c.n, i: i })); title = 'Categorías'; }
+    else if (s.step === 'prod') { options = CATS[s.cat].prods.map((p, i) => ({ n: p.n, i: i })); title = CATS[s.cat].n; }
+    else if (s.step === 'variant') { options = this.currentProd().variants.map((v, i) => ({ n: v.n + ' · ' + fmt(v.p), i: i })); title = 'Presentación'; }
+    else if (s.step === 'group') {
+      const g = this.currentProd().groups[s.gi];
+      options = g.opts.map((o, i) => ({ n: o.n + (o.p ? ' +' + fmt(o.p) : ''), i: i }));
+      if (!g.req) { options = options.concat([ { n: 'Ninguno', i: -1 } ]); }
+      title = g.name;
+    }
+    else if (s.step === 'more') { options = [ { n: 'Agregar otro producto', id: 'otro' }, { n: 'Ver resumen', id: 'resumen' } ]; }
+    else if (s.step === 'summary') { options = [ { n: 'Confirmar pedido', id: 'ok' }, { n: 'Empezar de nuevo', id: 'nuevo' } ]; }
+    else { options = [ { n: 'Hacer otro pedido', id: 'nuevo' } ]; }
+    return { options: options, title: title };
+  }
+
+  renderVals() {
+    const s = this.state;
+    const cur = this.optionsNow();
+    const asList = cur.options.length > 3;
+    const lastIdx = s.msgs.length - 1;
+    const msgs = s.msgs.map((m, i) => {
+      const isLastBot = i === lastIdx && m.from === 'bot';
+      return { text: m.text, align: m.from === 'bot' ? 'flex-start' : 'flex-end', bg: m.from === 'bot' ? '#FFFFFF' : '#D9FDD3',
+        time: timeOf(i), ticks: m.from === 'user' ? ' ✓✓' : '', tickColor: '#53BDEB',
+        hasButtons: isLastBot && !asList, hasList: isLastBot && asList,
+        buttons: isLastBot && !asList ? cur.options.map((o) => ({ n: o.n, pick: () => this.choose(o) })) : [] };
+    }).reverse();
+    return {
+      msgs: msgs,
+      openSheet: () => this.setState({ sheet: true, sel: -1 }), closeSheet: () => this.setState({ sheet: false }),
+      sheetOpen: s.sheet, sheetTitle: cur.title,
+      sheetRows: cur.options.map((o, i) => ({ n: o.n, dot: s.sel === i ? '#008069' : 'transparent', pick: () => this.setState({ sel: i }) })),
+      sendBg: s.sel >= 0 ? '#008069' : '#B7C0C4',
+      sendSheet: () => { if (s.sel >= 0) { this.choose(cur.options[s.sel]); } }
+    };
+  }
+}
+</script>
+</body>
+</html>

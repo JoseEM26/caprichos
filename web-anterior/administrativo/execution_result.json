@@ -1,0 +1,503 @@
+{
+  "login_status": "EXITOSO",
+  "error_message": null,
+  "lockout_or_counter": null,
+  "preloaded_fields": [
+    {
+      "name": "local_id",
+      "tag": "select",
+      "type": "select-one",
+      "placeholder": "",
+      "label_or_text": "CAPRICHOS",
+      "raw_value": "string:1"
+    },
+    {
+      "name": "caja_id",
+      "tag": "select",
+      "type": "select-one",
+      "placeholder": "",
+      "label_or_text": "Caja Principal",
+      "raw_value": "string:1"
+    },
+    {
+      "name": "turno_id",
+      "tag": "select",
+      "type": "select-one",
+      "placeholder": "",
+      "label_or_text": "Turno Dia",
+      "raw_value": "string:1"
+    },
+    {
+      "name": "usuario_nick",
+      "tag": "input",
+      "type": "text",
+      "placeholder": "Usuario",
+      "label_or_text": "",
+      "raw_value": ""
+    },
+    {
+      "name": "usuario_clave",
+      "tag": "input",
+      "type": "password",
+      "placeholder": "Contraseña",
+      "label_or_text": "[VACIO]",
+      "raw_value": "[REDACTED]"
+    },
+    {
+      "name": "usuario_clavecaja",
+      "tag": "input",
+      "type": "password",
+      "placeholder": "Clave de caja",
+      "label_or_text": "[VACIO]",
+      "raw_value": "[REDACTED]"
+    }
+  ],
+  "post_login_url": "http://caprichos.restaurant.pe/restaurant/#!/",
+  "menu_tree": [
+    {
+      "title": "Usuario: krosales CAPRICHOS",
+      "href": "",
+      "submodules": []
+    },
+    {
+      "title": "Academia",
+      "href": "",
+      "submodules": []
+    },
+    {
+      "title": "Escritorio",
+      "href": "index.html",
+      "submodules": [
+        {
+          "title": "Resumen",
+          "href": "#!/"
+        },
+        {
+          "title": "Novedades",
+          "href": "#!/novedades"
+        }
+      ]
+    },
+    {
+      "title": "Add onsNuevo",
+      "href": "",
+      "submodules": [
+        {
+          "title": "Plaza puntosActivalo",
+          "href": "#!/ajustes/addon-nuevos/Plaza_puntos"
+        },
+        {
+          "title": "EncuestasActivalo",
+          "href": "#!/ajustes/addon-nuevos/Encuestas"
+        },
+        {
+          "title": "Self serviceActivalo",
+          "href": "#!/ajustes/addon-nuevos/Self_service"
+        },
+        {
+          "title": "Workplace LogisticaActivalo",
+          "href": "#!/ajustes/addon-nuevos/Workplace_Logistica"
+        },
+        {
+          "title": "AsistenciasActivalo",
+          "href": "#!/ajustes/addon-nuevos/Asistencias"
+        }
+      ]
+    },
+    {
+      "title": "Ventas",
+      "href": "#!/ventas/hacer-pedidos/salones",
+      "submodules": [
+        {
+          "title": "Pedidos en caja",
+          "href": "#!/ventas/hacer-pedidos/salones"
+        },
+        {
+          "title": "Pedidos Multimozo",
+          "href": "#!/ventas/multimozo"
+        },
+        {
+          "title": "Pantalla de cocina",
+          "href": "#!/ventas/ver-pedidos/estado"
+        }
+      ]
+    },
+    {
+      "title": "Caja",
+      "href": "#!/caja/cobrar",
+      "submodules": [
+        {
+          "title": "Cobrar",
+          "href": "#!/caja/cobrar/salones"
+        },
+        {
+          "title": "Apertura y cierre",
+          "href": "#!/caja/apertura-cierre"
+        },
+        {
+          "title": "Cierre caja Z",
+          "href": "#!/caja/cierre-caja-z"
+        },
+        {
+          "title": "Cierres de caja",
+          "href": "#!/caja/movimientos"
+        },
+        {
+          "title": "Ingresos",
+          "href": "#!/caja/ingresos"
+        },
+        {
+          "title": "Egresos",
+          "href": "#!/caja/egresos"
+        },
+        {
+          "title": "Notas de credito",
+          "href": "#!/caja/Notas-Credito"
+        },
+        {
+          "title": "Notas de debito",
+          "href": "#!/caja/Notas-Debito"
+        },
+        {
+          "title": "Monitor de ventas",
+          "href": "#!/caja/monitorcaja"
+        },
+        {
+          "title": "Consulta de precios",
+          "href": "#!/informes/inventario/productos-con-precio"
+        }
+      ]
+    },
+    {
+      "title": "Reservas",
+      "href": "#!/reservas/principal",
+      "submodules": []
+    },
+    {
+      "title": "Créditos",
+      "href": "",
+      "submodules": [
+        {
+          "title": "Cobro de ventas",
+          "href": "#!/creditos/ventacreditos"
+        },
+        {
+          "title": "Pago de compras",
+          "href": "#!/creditos/compracreditos"
+        }
+      ]
+    },
+    {
+      "title": "Clientes",
+      "href": "#!/descuentos",
+      "submodules": [
+        {
+          "title": "Clientes",
+          "href": "#!/clientes"
+        },
+        {
+          "title": "Debito",
+          "href": "#!/clientes/debito"
+        }
+      ]
+    },
+    {
+      "title": "Productos",
+      "href": "#!/productos/platos/categoria/All",
+      "submodules": []
+    },
+    {
+      "title": "Ofertas",
+      "href": "#!/ofertas/sucursales/2en1/1/categoria/All",
+      "submodules": []
+    },
+    {
+      "title": "Descuentos",
+      "href": "#!/descuentos",
+      "submodules": [
+        {
+          "title": "Descuentos",
+          "href": "#!/descuentos"
+        },
+        {
+          "title": "Cupón descuento",
+          "href": "#!/ajustes/cupondescuento"
+        },
+        {
+          "title": "Promociones y sorteos",
+          "href": "#!/promocionsorteo"
+        },
+        {
+          "title": "Vales de Pago",
+          "href": "#!/ajustes/valedepago"
+        }
+      ]
+    },
+    {
+      "title": "Compras",
+      "href": "",
+      "submodules": [
+        {
+          "title": "Proveedores",
+          "href": "#!/compras/proveedores"
+        },
+        {
+          "title": "Lotizar compras",
+          "href": "#!/compras/lotes"
+        },
+        {
+          "title": "Ajustes",
+          "href": "#!/compras/ajustes/banco"
+        },
+        {
+          "title": "Ir a módulo logística Nuevo",
+          "href": ""
+        }
+      ]
+    },
+    {
+      "title": "Almacén",
+      "href": "",
+      "submodules": [
+        {
+          "title": "Movimiento interno",
+          "href": "#!/almacen/requerimientomovimiento/requerimientos/movimiento"
+        },
+        {
+          "title": "Requerimiento",
+          "href": "#!/almacen/requerimientomovimiento/requerimientos/nuevo-requerimiento"
+        },
+        {
+          "title": "Recepción",
+          "href": "#!/almacen/requerimientomovimiento/requerimientos/nuevo-recepcion"
+        },
+        {
+          "title": "Lista de procesos",
+          "href": "#!/almacen/requerimientomovimiento/requerimientos/lista-de-proceso"
+        },
+        {
+          "title": "Ir modulo gastos",
+          "href": ""
+        },
+        {
+          "title": "Ir a módulo logística Nuevo",
+          "href": ""
+        }
+      ]
+    },
+    {
+      "title": "Delivery",
+      "href": "",
+      "submodules": [
+        {
+          "title": "Menú online Nuevo",
+          "href": "https://caprichos.restaurant.pe/carta-digital/#/inicio"
+        },
+        {
+          "title": "Pedidos QR Nuevo",
+          "href": "https://caprichos.restaurant.pe/carta-digital/#/inicio?pickupAtStore=1&storeId=null"
+        },
+        {
+          "title": "Call center",
+          "href": "#!/ventas/callcenter"
+        },
+        {
+          "title": "Tu restaurant en facebook",
+          "href": "#!/delivery"
+        },
+        {
+          "title": "Zona de reparto",
+          "href": "#!/ajustes/zonareparto"
+        },
+        {
+          "title": "Ajustes",
+          "href": "#!/delivery/ajustes/motorizado"
+        },
+        {
+          "title": "Informes",
+          "href": ""
+        },
+        {
+          "title": "Resumen",
+          "href": "#!/resumen/delivery"
+        },
+        {
+          "title": "Zona de reparto",
+          "href": "#!/informes/ventas/deliverys-cobertura"
+        },
+        {
+          "title": "Zona de reparto (Mapa de calor)",
+          "href": "#!/informes/ventas/deliverys-cobertura/mapa"
+        },
+        {
+          "title": "Reclamos",
+          "href": "#!/ventas/callcenter/reclamo"
+        },
+        {
+          "title": "Frecuencia",
+          "href": "#!/informes/ventas/deliverys-frecuencia"
+        }
+      ]
+    },
+    {
+      "title": "Informes",
+      "href": "#!/informes",
+      "submodules": []
+    },
+    {
+      "title": "Indicadores",
+      "href": "#!/indicadores",
+      "submodules": []
+    },
+    {
+      "title": "Mis Addons",
+      "href": "",
+      "submodules": [
+        {
+          "title": "Encuestas",
+          "href": ""
+        },
+        {
+          "title": "Delivery Pro",
+          "href": ""
+        },
+        {
+          "title": "Club de Beneficios",
+          "href": ""
+        }
+      ]
+    },
+    {
+      "title": "Mi restaurant",
+      "href": "",
+      "submodules": [
+        {
+          "title": "Mi empresa",
+          "href": "#!/mirestaurante/miempresa"
+        },
+        {
+          "title": "Pagos del sistema",
+          "href": ""
+        },
+        {
+          "title": "Facturación Electrónica",
+          "href": "#!/ajustes/facturacionelectronica"
+        },
+        {
+          "title": "Series de contingencia",
+          "href": "#!/ajustes/serie-contingencia"
+        },
+        {
+          "title": "Integraciones",
+          "href": "#!/ajustes/integraciones"
+        },
+        {
+          "title": "Integración POS",
+          "href": "#!/ajustes/pos"
+        },
+        {
+          "title": "Contrato",
+          "href": "#!/ajustes/contrato"
+        }
+      ]
+    },
+    {
+      "title": "Ajustes",
+      "href": "#!/ajustes",
+      "submodules": [
+        {
+          "title": "Opciones sistema",
+          "href": "#!/ajustes/opcionessistema"
+        },
+        {
+          "title": "Opciones de APP Quipu",
+          "href": "#!/ajustes/configuracionpos"
+        },
+        {
+          "title": "Configuración regional",
+          "href": "#!/ajustes/configuracionregional"
+        },
+        {
+          "title": "Locales",
+          "href": "#!/ajustes/locales"
+        },
+        {
+          "title": "Usuarios",
+          "href": "#!/ajustes/usuarios"
+        },
+        {
+          "title": "Almacenes y Producción",
+          "href": "#!/ajustes/produccion"
+        },
+        {
+          "title": "Salones y Mesas",
+          "href": "#!/ajustes/salones"
+        },
+        {
+          "title": "Cajas",
+          "href": "#!/ajustes/cajas"
+        },
+        {
+          "title": "Comprobantes",
+          "href": "#!/ajustes/comprobantes"
+        },
+        {
+          "title": "Impresoras",
+          "href": "#!/ajustes/impresoras"
+        },
+        {
+          "title": "Impuestos",
+          "href": "#!/ajustes/impuestos"
+        },
+        {
+          "title": "Tarjetas",
+          "href": "#!/ajustes/tarjetas"
+        },
+        {
+          "title": "Turnos",
+          "href": "#!/ajustes/turnos"
+        },
+        {
+          "title": "Monedas",
+          "href": "#!/ajustes/monedas"
+        },
+        {
+          "title": "Moneda de facturacion",
+          "href": "#!/ajustes/monedafacturacion"
+        },
+        {
+          "title": "Cuentas de transferencia",
+          "href": "#!/ajustes/tipotransferencia"
+        },
+        {
+          "title": "Gestión de marcas",
+          "href": "#!/ajustes/marca"
+        },
+        {
+          "title": "Imágenes self service",
+          "href": "#!/ajustes/imagen-self-service"
+        },
+        {
+          "title": "Categoría Anular Venta",
+          "href": "#!/ajustes/categoriaanularventa"
+        },
+        {
+          "title": "Formas de pago",
+          "href": "#!/ajustes/formas-de-pago"
+        }
+      ]
+    }
+  ],
+  "locked_or_absent_modules": [],
+  "tech_stack": {
+    "angular": "1.6.10",
+    "jquery": "3.2.1",
+    "bootstrap": "Bootstrap 3"
+  },
+  "api_base_url": "https://maps.googleapis.com/maps/api",
+  "network_login_response": {
+    "url": "http://caprichos.restaurant.pe/restaurant/api/rest/usuario/obtenerAddonsPorToken",
+    "status": 200,
+    "body": "{\"data\":{\"tieneAddonAsistencia\":\"0\",\"tieneAddonDelivery\":\"1\",\"deboMostrarProgramaFidelizacion\":\"0\",\"deboMostrarEncuestas\":\"1\",\"deboMostrarCrmPlazaPuntos\":\"1\",\"deboMostrarReservas\":\"0\",\"deboMostrarAsistenciasFaceID\":\"0\",\"deboMostrarLogisticaIA\":\"0\"},\"mensajes\":[\"Addons obtenidos correctamente\"],\"tipo\":\"1\",\"inicio\":\"2026-10-13 10:39:52.496892\",\"fin\":\"2026-10-13 10:39:52.628663\",\"diff\":0.13177099999999997,\"array_query\":[],\"array_queryParam\":[],\"array_logsTem\":[\"Inicio operacion: 2026-10-13 10:39:52.547860\",\"Redis ok, nodo: node1web.p4.d2.restaurant.pe\",\"Config: iniciando DB::getInstance - 2026-10-13 10:39:52.563359\",\"Config: fin DB::getInstance - 2026-10-13 10:39:52.569017\"],\"server\":\"node1web.p4.d2.restaurant.pe\"}"
+  }
+}

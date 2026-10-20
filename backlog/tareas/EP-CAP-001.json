@@ -1,0 +1,874 @@
+{
+  "epica": "EP-CAP-001",
+  "generado_por_ia": true,
+  "revisado_por": null,
+  "historias": [
+    {
+      "hu": "HU-CAP-001",
+      "tareas": [
+        {
+          "id": "HU-CAP-001-T01",
+          "titulo": "Monorepo pnpm (apps/api, apps/web, apps/agente-local, packages/compartido) y CI de PR",
+          "capa": "infrastructure",
+          "actividad": "DESPLIEGUE",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": []
+        },
+        {
+          "id": "HU-CAP-001-T02",
+          "titulo": "Playbook de Ansible del VPS y Dokploy con ambientes de pruebas y producción (ADR-011)",
+          "capa": "infrastructure",
+          "actividad": "DESPLIEGUE",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-001-T03",
+          "titulo": "Cloudflare (DNS de caprichos.pe y proxy) y despliegue desde GHCR",
+          "capa": "infrastructure",
+          "actividad": "DESPLIEGUE",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-001-T04",
+          "titulo": "Base NestJS: configuración, Prisma, Redis, Socket.IO, registros JSON y GlitchTip",
+          "capa": "boot",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-001-T05",
+          "titulo": "Revisar criterios de HU-CAP-001 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-001-T06",
+          "titulo": "Migración Prisma de las tablas de FT-CAR-01 (categoria, producto, producto_tamano, grupo_opciones, opcion)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T05"
+          ]
+        },
+        {
+          "id": "HU-CAP-001-T07",
+          "titulo": "Reglas de dominio de HU-CAP-001 (RQ-CAR-01-01, RQ-CAR-01-02, RQ-CAR-01-03, RQ-CAR-01-04)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T05",
+            "HU-CAP-001-T06"
+          ]
+        },
+        {
+          "id": "HU-CAP-001-T08",
+          "titulo": "Casos de uso: Navegar la carta por categorías y buscador",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T07"
+          ]
+        },
+        {
+          "id": "HU-CAP-001-T09",
+          "titulo": "Endpoints y eventos de FT-CAR-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T08"
+          ]
+        },
+        {
+          "id": "HU-CAP-001-T10",
+          "titulo": "Pantalla React: Navegar la carta por categorías y buscador",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T09"
+          ]
+        },
+        {
+          "id": "HU-CAP-001-T11",
+          "titulo": "Pruebas TC-CAP-001-01..05 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T10"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-002",
+      "tareas": [
+        {
+          "id": "HU-CAP-002-T01",
+          "titulo": "Revisar criterios de HU-CAP-002 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-002-T02",
+          "titulo": "Reglas de dominio de HU-CAP-002 (RQ-CAR-01-05, RQ-CAR-01-06, RQ-CAR-01-07, RQ-CAR-01-08)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-002-T01",
+            "HU-CAP-001-T06"
+          ]
+        },
+        {
+          "id": "HU-CAP-002-T03",
+          "titulo": "Casos de uso: Armar un producto con tamaño y opciones",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-002-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-002-T04",
+          "titulo": "Endpoints y eventos de FT-CAR-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-002-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-002-T05",
+          "titulo": "Pantalla React: Armar un producto con tamaño y opciones",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-002-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-002-T06",
+          "titulo": "Pruebas TC-CAP-002-01..05 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-002-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-003",
+      "tareas": [
+        {
+          "id": "HU-CAP-003-T01",
+          "titulo": "Revisar criterios de HU-CAP-003 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-003-T02",
+          "titulo": "Reglas de dominio de HU-CAP-003 (RQ-CAR-01-09, RQ-CAR-01-10)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-003-T01",
+            "HU-CAP-001-T06"
+          ]
+        },
+        {
+          "id": "HU-CAP-003-T03",
+          "titulo": "Casos de uso: Elegir sabores y armar un combo por unidad",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-003-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-003-T04",
+          "titulo": "Endpoints y eventos de FT-CAR-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-003-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-003-T05",
+          "titulo": "Pantalla React: Elegir sabores y armar un combo por unidad",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-003-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-003-T06",
+          "titulo": "Pruebas TC-CAP-003-01..03 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-003-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-004",
+      "tareas": [
+        {
+          "id": "HU-CAP-004-T01",
+          "titulo": "Revisar criterios de HU-CAP-004 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-004-T02",
+          "titulo": "Reglas de dominio de HU-CAP-004 (RQ-CAR-01-11, RQ-CAR-01-12)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-004-T01",
+            "HU-CAP-001-T06"
+          ]
+        },
+        {
+          "id": "HU-CAP-004-T03",
+          "titulo": "Casos de uso: Ver promociones y combos con su precio",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-004-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-004-T04",
+          "titulo": "Endpoints y eventos de FT-CAR-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-004-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-004-T05",
+          "titulo": "Pantalla React: Ver promociones y combos con su precio",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-004-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-004-T06",
+          "titulo": "Pruebas TC-CAP-004-01..03 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-004-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-005",
+      "tareas": [
+        {
+          "id": "HU-CAP-005-T01",
+          "titulo": "Revisar criterios de HU-CAP-005 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-005-T02",
+          "titulo": "Migración Prisma de las tablas de FT-CAR-02 (categoria, producto, producto_tamano, grupo_opciones, opcion)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-005-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-005-T03",
+          "titulo": "Reglas de dominio de HU-CAP-005 (RQ-CAR-02-01, RQ-CAR-02-02, RQ-CAR-02-03)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-005-T01",
+            "HU-CAP-005-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-005-T04",
+          "titulo": "Casos de uso: Ver si el local está abierto o cerrado",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-005-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-005-T05",
+          "titulo": "Endpoints y eventos de FT-CAR-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-005-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-005-T06",
+          "titulo": "Pantalla React: Ver si el local está abierto o cerrado",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-005-T05"
+          ]
+        },
+        {
+          "id": "HU-CAP-005-T07",
+          "titulo": "Pruebas TC-CAP-005-01..03 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-005-T06"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-006",
+      "tareas": [
+        {
+          "id": "HU-CAP-006-T01",
+          "titulo": "Revisar criterios de HU-CAP-006 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-006-T02",
+          "titulo": "Reglas de dominio de HU-CAP-006 (RQ-CAR-02-04, RQ-CAR-02-05, RQ-CAR-02-09)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-006-T01",
+            "HU-CAP-005-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-006-T03",
+          "titulo": "Casos de uso: Ver productos y opciones agotados",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-006-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-006-T04",
+          "titulo": "Endpoints y eventos de FT-CAR-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-006-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-006-T05",
+          "titulo": "Pantalla React: Ver productos y opciones agotados",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-006-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-006-T06",
+          "titulo": "Pruebas TC-CAP-006-01..03 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-006-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-007",
+      "tareas": [
+        {
+          "id": "HU-CAP-007-T01",
+          "titulo": "Revisar criterios de HU-CAP-007 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-007-T02",
+          "titulo": "Reglas de dominio de HU-CAP-007 (RQ-CAR-02-06, RQ-CAR-02-07)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-007-T01",
+            "HU-CAP-005-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-007-T03",
+          "titulo": "Casos de uso: Ver la pausa y el tiempo de Alta demanda",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-007-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-007-T04",
+          "titulo": "Endpoints y eventos de FT-CAR-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-007-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-007-T05",
+          "titulo": "Pantalla React: Ver la pausa y el tiempo de Alta demanda",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-007-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-007-T06",
+          "titulo": "Pruebas TC-CAP-007-01..02 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-007-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-008",
+      "tareas": [
+        {
+          "id": "HU-CAP-008-T01",
+          "titulo": "Revisar criterios de HU-CAP-008 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-008-T02",
+          "titulo": "Reglas de dominio de HU-CAP-008 (RQ-CAR-02-08)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-008-T01",
+            "HU-CAP-005-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-008-T03",
+          "titulo": "Casos de uso: Comprobar la disponibilidad al enviar el pedido",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-008-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-008-T04",
+          "titulo": "Endpoints y eventos de FT-CAR-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-008-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-008-T05",
+          "titulo": "Pantalla React: Comprobar la disponibilidad al enviar el pedido",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-008-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-008-T06",
+          "titulo": "Pruebas TC-CAP-008-01..01 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-008-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-009",
+      "tareas": [
+        {
+          "id": "HU-CAP-009-T01",
+          "titulo": "Revisar criterios de HU-CAP-009 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-009-T02",
+          "titulo": "Migración Prisma de las tablas de FT-CAR-03 (categoria, producto, producto_tamano, grupo_opciones, opcion)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-009-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-009-T03",
+          "titulo": "Reglas de dominio de HU-CAP-009 (RQ-CAR-03-01, RQ-CAR-03-02, RQ-CAR-03-03)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-009-T01",
+            "HU-CAP-009-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-009-T04",
+          "titulo": "Casos de uso: Ver los más vendidos del mes con estrellas",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-009-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-009-T05",
+          "titulo": "Endpoints y eventos de FT-CAR-03 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-009-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-009-T06",
+          "titulo": "Pantalla React: Ver los más vendidos del mes con estrellas",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-009-T05"
+          ]
+        },
+        {
+          "id": "HU-CAP-009-T07",
+          "titulo": "Pruebas TC-CAP-009-01..04 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-009-T06"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-010",
+      "tareas": [
+        {
+          "id": "HU-CAP-010-T01",
+          "titulo": "Revisar criterios de HU-CAP-010 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-010-T02",
+          "titulo": "Reglas de dominio de HU-CAP-010 (RQ-CAR-03-04, RQ-CAR-03-05, RQ-CAR-03-09)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-010-T01",
+            "HU-CAP-009-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-010-T03",
+          "titulo": "Casos de uso: Ver la página Conócenos y el pie de la carta",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-010-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-010-T04",
+          "titulo": "Endpoints y eventos de FT-CAR-03 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-010-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-010-T05",
+          "titulo": "Pantalla React: Ver la página Conócenos y el pie de la carta",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-010-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-010-T06",
+          "titulo": "Pruebas TC-CAP-010-01..03 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-010-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-011",
+      "tareas": [
+        {
+          "id": "HU-CAP-011-T01",
+          "titulo": "Revisar criterios de HU-CAP-011 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-011-T02",
+          "titulo": "Reglas de dominio de HU-CAP-011 (RQ-CAR-03-06, RQ-CAR-03-07, RQ-CAR-03-08)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-011-T01",
+            "HU-CAP-009-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-011-T03",
+          "titulo": "Casos de uso: Enviar mi opinión y atenderla en el administrativo",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-011-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-011-T04",
+          "titulo": "Endpoints y eventos de FT-CAR-03 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-011-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-011-T05",
+          "titulo": "Pantalla React: Enviar mi opinión y atenderla en el administrativo",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-011-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-011-T06",
+          "titulo": "Pruebas TC-CAP-011-01..04 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-011-T05"
+          ]
+        }
+      ]
+    }
+  ]
+}

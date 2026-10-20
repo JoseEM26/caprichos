@@ -1,0 +1,65 @@
+{
+  "data": {
+    "default_inbound_order_status": "PREPARING",
+    "delivery": {
+      "rider": {
+        "owner": {
+          "riders_selected": [
+            {
+              "id": "cae7a950-fc85-11f0-8d8d-b9083c6847f9",
+              "name": "Yefri Smith Sanchez",
+              "phone_number": "51914699356"
+            },
+            {
+              "id": "bd1694b0-5b70-11f0-8498-89b7e9915232",
+              "name": "marvil",
+              "phone_number": "51935634985"
+            }
+          ]
+        },
+        "request": "AUTOMATICALLY",
+        "external": {
+          "providers_selected": []
+        },
+        "rider_type": "OWNER"
+      },
+      "service_fee": {
+        "type": "AMOUNT",
+        "value": 0,
+        "optional": false
+      },
+      "packaging_price": false
+    },
+    "id": "e2667e89-488d-460b-8fe2-f794804c897a",
+    "onsite": {
+      "service_fee": {
+        "type": "AMOUNT",
+        "value": 0,
+        "optional": false
+      },
+      "packaging_price": false
+    },
+    "product_tax": {
+      "type": "INC",
+      "value": 0
+    },
+    "table": {
+      "service_fee": {
+        "type": "AMOUNT",
+        "value": 0,
+        "optional": false
+      },
+      "packaging_price": false
+    },
+    "takeaway": {
+      "service_fee": {
+        "type": "AMOUNT",
+        "value": 0,
+        "optional": false
+      },
+      "packaging_price": false
+    },
+    "share_rider_location": false,
+    "request_number_of_consumers": true
+  }
+}

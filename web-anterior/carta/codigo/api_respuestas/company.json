@@ -1,0 +1,162 @@
+{
+  "data": {
+    "account_setup_steps": {
+      "add_your_team": true,
+      "create_your_account": true,
+      "set_up_your_address": true,
+      "enable_stock_control": true,
+      "create_a_cash_register": true,
+      "enable_loyalty_program": true,
+      "link_google_my_business": true,
+      "mark_a_dish_as_prepared": true,
+      "share_your_digital_menu": true,
+      "create_a_discount_coupon": true,
+      "configure_your_service_types": true,
+      "activate_your_whatsapp_chatbot": true,
+      "configure_your_payment_methods": true,
+      "place_a_test_order_with_the_pdv": true,
+      "create_or_edit_your_first_product": true,
+      "configure_hours_and_general_information": true,
+      "place_a_test_order_with_your_digital_menu": true
+    },
+    "active_subscriptions": [],
+    "address_enabled": true,
+    "address": "C. 11, Lima 15457, Perú",
+    "business_hours_settings": {
+      "sunday": {
+        "hours": [
+          {
+            "open": "14:00",
+            "close": "22:00"
+          }
+        ],
+        "is_active": true
+      },
+      "monday": {
+        "hours": [
+          {
+            "open": "14:00",
+            "close": "22:00"
+          }
+        ],
+        "is_active": true
+      },
+      "tuesday": {
+        "hours": [
+          {
+            "open": "14:00",
+            "close": "22:00"
+          }
+        ],
+        "is_active": true
+      },
+      "wednesday": {
+        "hours": [
+          {
+            "open": "14:00",
+            "close": "22:00"
+          }
+        ],
+        "is_active": true
+      },
+      "thursday": {
+        "hours": [
+          {
+            "open": "14:00",
+            "close": "22:00"
+          }
+        ],
+        "is_active": true
+      },
+      "friday": {
+        "hours": [
+          {
+            "open": "14:00",
+            "close": "22:00"
+          }
+        ],
+        "is_active": true
+      },
+      "saturday": {
+        "hours": [
+          {
+            "open": "14:00",
+            "close": "22:00"
+          }
+        ],
+        "is_active": true
+      }
+    },
+    "city": "Lima",
+    "country": {
+      "name": "Peru",
+      "country_code": "PE",
+      "country_calling_code": "51",
+      "time_format": "12h"
+    },
+    "created_at": "2020-11-20T06:26:38+00:00",
+    "currency": {
+      "code": "PEN",
+      "decimal_separator": ",",
+      "decimals": 2,
+      "position": "left",
+      "show_decimals": true,
+      "symbol": "S/.",
+      "tax": "impuestos",
+      "thousands_separator": "."
+    },
+    "current_subscriptions": [],
+    "current_value": "DEAD",
+    "domain_settings": null,
+    "highest_plan": "P2",
+    "highest_value": "SQL-H-500",
+    "id": "5816bd90-2af9-11eb-83a6-91c28df3eedf",
+    "industry": "Coffee",
+    "landing_contents": [
+      {
+        "id": "db153ee0-ca2d-11eb-bf1e-ab2807b215c5",
+        "name": "Carta",
+        "order": 0,
+        "status": true,
+        "type": "menu_webapp_url",
+        "value": "https://caprichos-per.ola.click/products"
+      },
+      {
+        "id": "e76422d0-ca2d-11eb-8db1-ad6557d63bec",
+        "name": "Whatsapp",
+        "order": 1,
+        "status": true,
+        "type": "whatsapp_number",
+        "value": "51977503006"
+      },
+      {
+        "id": "fbbf54c0-ca2d-11eb-81de-b7226c5d6714",
+        "name": "Clave WiFi",
+        "order": 2,
+        "status": true,
+        "type": "wifi_network",
+        "value": "CAPRICHOS 5G GRATIS>>>===OLACLICK_WIFI_VALUES_SEPARATOR===<<<CAPRICHOS*24"
+      },
+      {
+        "id": "c721cf30-e35a-11f0-a570-137f97bd60d5",
+        "name": "Restaurantguru.com",
+        "order": 3,
+        "status": true,
+        "type": "external_link",
+        "value": "https://es.restaurantguru.com/Caprichos-Campoy-San-Juan-de-Lurigancho"
+      }
+    ],
+    "language": "es",
+    "latitude": -12.0196436,
+    "logo_thumbnail_url": "https://assets.olaclick.app/companies/logos/thumbnails/6fd43b85-d6b2-42a0-a358-4aa351f47bef.png",
+    "logo_url": "https://assets.olaclick.app/companies/logos/6fd43b85-d6b2-42a0-a358-4aa351f47bef.png",
+    "longitude": -76.963255,
+    "name": "Caprichos",
+    "order_limit_usage_count": 0,
+    "public_url": "https://caprichos-per.ola.click",
+    "reseller_id": null,
+    "timezone": "America/Lima",
+    "token": "caprichos-per",
+    "whatsapp": "51977503006"
+  }
+}

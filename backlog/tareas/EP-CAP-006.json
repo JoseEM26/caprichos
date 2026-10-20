@@ -1,0 +1,832 @@
+{
+  "epica": "EP-CAP-006",
+  "generado_por_ia": true,
+  "revisado_por": null,
+  "historias": [
+    {
+      "hu": "HU-CAP-047",
+      "tareas": [
+        {
+          "id": "HU-CAP-047-T01",
+          "titulo": "Revisar criterios de HU-CAP-047 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-047-T02",
+          "titulo": "Migración Prisma de las tablas de FT-COC-01 (area_cocina, categoria, pedido, comanda_area, print_job)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-047-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-047-T03",
+          "titulo": "Reglas de dominio de HU-CAP-047 (RQ-COC-01-01, RQ-COC-01-02, RQ-COC-01-03, RQ-COC-01-04, RQ-COC-01-08)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-047-T01",
+            "HU-CAP-047-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-047-T04",
+          "titulo": "Casos de uso: Ver en mi pantalla solo las comandas de mi área",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-047-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-047-T05",
+          "titulo": "Endpoints y eventos de FT-COC-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-047-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-047-T06",
+          "titulo": "Pantalla React: Ver en mi pantalla solo las comandas de mi área",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-047-T05"
+          ]
+        },
+        {
+          "id": "HU-CAP-047-T07",
+          "titulo": "Pruebas TC-CAP-047-01..06 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-047-T06"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-048",
+      "tareas": [
+        {
+          "id": "HU-CAP-048-T01",
+          "titulo": "Revisar criterios de HU-CAP-048 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-048-T02",
+          "titulo": "Reglas de dominio de HU-CAP-048 (RQ-COC-01-05, RQ-COC-01-06, RQ-COC-01-07)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-048-T01",
+            "HU-CAP-047-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-048-T03",
+          "titulo": "Casos de uso: Avanzar y deshacer el estado de mi parte",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-048-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-048-T04",
+          "titulo": "Endpoints y eventos de FT-COC-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-048-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-048-T05",
+          "titulo": "Pantalla React: Avanzar y deshacer el estado de mi parte",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-048-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-048-T06",
+          "titulo": "Pruebas TC-CAP-048-01..04 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-048-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-049",
+      "tareas": [
+        {
+          "id": "HU-CAP-049-T01",
+          "titulo": "Revisar criterios de HU-CAP-049 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-049-T02",
+          "titulo": "Reglas de dominio de HU-CAP-049 (RQ-COC-01-09)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-049-T01",
+            "HU-CAP-047-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-049-T03",
+          "titulo": "Casos de uso: Ver la TV de cocina de solo lectura",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-049-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-049-T04",
+          "titulo": "Endpoints y eventos de FT-COC-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-049-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-049-T05",
+          "titulo": "Pantalla React: Ver la TV de cocina de solo lectura",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-049-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-049-T06",
+          "titulo": "Pruebas TC-CAP-049-01..02 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-049-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-050",
+      "tareas": [
+        {
+          "id": "HU-CAP-050-T01",
+          "titulo": "Revisar criterios de HU-CAP-050 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-050-T02",
+          "titulo": "Reglas de dominio de HU-CAP-050 (RQ-COC-01-10, RQ-COC-01-11)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-050-T01",
+            "HU-CAP-047-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-050-T03",
+          "titulo": "Casos de uso: Crear áreas de cocina y asignarles categorías",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-050-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-050-T04",
+          "titulo": "Endpoints y eventos de FT-COC-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-050-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-050-T05",
+          "titulo": "Pantalla React: Crear áreas de cocina y asignarles categorías",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-050-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-050-T06",
+          "titulo": "Pruebas TC-CAP-050-01..04 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-050-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-051",
+      "tareas": [
+        {
+          "id": "HU-CAP-051-T01",
+          "titulo": "Revisar criterios de HU-CAP-051 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-051-T02",
+          "titulo": "Migración Prisma de las tablas de FT-COC-02 (area_cocina, categoria, pedido, comanda_area, print_job)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-051-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-051-T03",
+          "titulo": "Reglas de dominio de HU-CAP-051 (RQ-COC-02-01, RQ-COC-02-02, RQ-COC-02-10)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-051-T01",
+            "HU-CAP-051-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-051-T04",
+          "titulo": "Casos de uso: Imprimir la comanda por área al pasar a cocina",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-051-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-051-T05",
+          "titulo": "Endpoints y eventos de FT-COC-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-051-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-051-T06",
+          "titulo": "Pantalla React: Imprimir la comanda por área al pasar a cocina",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-051-T05"
+          ]
+        },
+        {
+          "id": "HU-CAP-051-T07",
+          "titulo": "Pruebas TC-CAP-051-01..03 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-051-T06"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-052",
+      "tareas": [
+        {
+          "id": "HU-CAP-052-T01",
+          "titulo": "Revisar criterios de HU-CAP-052 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-052-T02",
+          "titulo": "Reglas de dominio de HU-CAP-052 (RQ-COC-02-03, RQ-COC-02-04, RQ-COC-02-05)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-052-T01",
+            "HU-CAP-051-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-052-T03",
+          "titulo": "Casos de uso: Imprimir las etiquetas general, por área y por bebida",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-052-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-052-T04",
+          "titulo": "Endpoints y eventos de FT-COC-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-052-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-052-T05",
+          "titulo": "Pantalla React: Imprimir las etiquetas general, por área y por bebida",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-052-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-052-T06",
+          "titulo": "Pruebas TC-CAP-052-01..03 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-052-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-053",
+      "tareas": [
+        {
+          "id": "HU-CAP-053-T01",
+          "titulo": "Revisar criterios de HU-CAP-053 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-053-T02",
+          "titulo": "Reglas de dominio de HU-CAP-053 (RQ-COC-02-06)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-053-T01",
+            "HU-CAP-051-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-053-T03",
+          "titulo": "Casos de uso: Activar o desactivar tipos de etiqueta",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-053-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-053-T04",
+          "titulo": "Endpoints y eventos de FT-COC-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-053-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-053-T05",
+          "titulo": "Pantalla React: Activar o desactivar tipos de etiqueta",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-053-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-053-T06",
+          "titulo": "Pruebas TC-CAP-053-01..01 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-053-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-054",
+      "tareas": [
+        {
+          "id": "HU-CAP-054-T01",
+          "titulo": "Revisar criterios de HU-CAP-054 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-054-T02",
+          "titulo": "Reglas de dominio de HU-CAP-054 (RQ-COC-02-07, RQ-COC-02-08, RQ-COC-02-09)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-054-T01",
+            "HU-CAP-051-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-054-T03",
+          "titulo": "Casos de uso: Recibir la alerta de fallo y reimprimir",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-054-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-054-T04",
+          "titulo": "Endpoints y eventos de FT-COC-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-054-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-054-T05",
+          "titulo": "Pantalla React: Recibir la alerta de fallo y reimprimir",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-054-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-054-T06",
+          "titulo": "Pruebas TC-CAP-054-01..03 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-054-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-055",
+      "tareas": [
+        {
+          "id": "HU-CAP-055-T01",
+          "titulo": "Revisar criterios de HU-CAP-055 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-055-T02",
+          "titulo": "Migración Prisma de las tablas de FT-COC-03 (area_cocina, categoria, pedido, comanda_area, print_job)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-055-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-055-T03",
+          "titulo": "Reglas de dominio de HU-CAP-055 (RQ-COC-03-01, RQ-COC-03-02, RQ-COC-03-03, RQ-COC-03-04)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-055-T01",
+            "HU-CAP-055-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-055-T04",
+          "titulo": "Casos de uso: Marcar y reactivar un agotado por hoy",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-055-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-055-T05",
+          "titulo": "Endpoints y eventos de FT-COC-03 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-055-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-055-T06",
+          "titulo": "Pantalla React: Marcar y reactivar un agotado por hoy",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-055-T05"
+          ]
+        },
+        {
+          "id": "HU-CAP-055-T07",
+          "titulo": "Pruebas TC-CAP-055-01..05 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-055-T06"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-056",
+      "tareas": [
+        {
+          "id": "HU-CAP-056-T01",
+          "titulo": "Revisar criterios de HU-CAP-056 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-056-T02",
+          "titulo": "Reglas de dominio de HU-CAP-056 (RQ-COC-03-05)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-056-T01",
+            "HU-CAP-055-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-056-T03",
+          "titulo": "Casos de uso: Agotar un producto desde Productos",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-056-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-056-T04",
+          "titulo": "Endpoints y eventos de FT-COC-03 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-056-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-056-T05",
+          "titulo": "Pantalla React: Agotar un producto desde Productos",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-056-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-056-T06",
+          "titulo": "Pruebas TC-CAP-056-01..01 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-056-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-057",
+      "tareas": [
+        {
+          "id": "HU-CAP-057-T01",
+          "titulo": "Revisar criterios de HU-CAP-057 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-001-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-057-T02",
+          "titulo": "Reglas de dominio de HU-CAP-057 (RQ-COC-03-06, RQ-COC-03-07, RQ-COC-03-08, RQ-COC-03-09, RQ-COC-03-10)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-057-T01",
+            "HU-CAP-055-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-057-T03",
+          "titulo": "Casos de uso: Activar Alta demanda y pausar pedidos",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-057-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-057-T04",
+          "titulo": "Endpoints y eventos de FT-COC-03 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-057-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-057-T05",
+          "titulo": "Pantalla React: Activar Alta demanda y pausar pedidos",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-057-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-057-T06",
+          "titulo": "Pruebas TC-CAP-057-01..06 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-057-T05"
+          ]
+        }
+      ]
+    }
+  ]
+}

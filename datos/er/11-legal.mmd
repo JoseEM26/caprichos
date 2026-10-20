@@ -1,0 +1,31 @@
+erDiagram
+  RECLAMO {
+    bigint id PK
+    text numero UK
+    text tipo
+    text nombre
+    text documento
+    text domicilio
+    text contacto
+    text detalle
+    bigint pedido_id FK
+    date vence_respuesta
+    text respuesta
+    timestamptz respondido_en
+    bigint respondido_por
+  }
+  DATA_REQUEST {
+    bigint id PK
+    bigint party_id FK
+    text tipo
+    text estado
+    timestamptz en
+  }
+  PARTY {
+    bigint id PK "en otro dominio"
+  }
+  PEDIDO {
+    bigint id PK "en otro dominio"
+  }
+  PARTY ||--o{ DATA_REQUEST : "party_id"
+  PEDIDO ||--o{ RECLAMO : "pedido_id"
