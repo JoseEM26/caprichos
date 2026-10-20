@@ -1,6 +1,6 @@
 ---
 name: aybar-plan-pruebas
-description: Use cuando hay que crear o actualizar el Plan de Pruebas (T-TEST-PLAN) de un servicio en el marco Aybar (gate G4), asegurando la cobertura exhaustiva de criterios de HU (TC-IDN-<HU>-<NN>), complementos, adversariales, performance, regresión y el anexo de trazabilidad.
+description: Use cuando hay que crear o actualizar el Plan de Pruebas (T-TEST-PLAN) de un servicio en el marco Aybar (gate G4), asegurando la cobertura exhaustiva de criterios de HU (TC-IDN-<HU>-<NN>), complementos, adversariales, performance, regresión y el anexo de trazabilidad (incluye pruebas de plataforma, restauración y seguridad de salida).
 ---
 
 # Aybar · Plan de Pruebas (T-TEST-PLAN)
@@ -87,3 +87,10 @@ Antes de concluir el Plan de Pruebas:
   ```bash
   python3 -I '/home/jose/Aybar-Corp/equipo-innovacion/NEXORA/.claude/skills/aybar-siguiente-paso/scripts/estado.py' '<ruta-del-paquete>'
   ```
+
+## DevOps, plataforma e infraestructura (DT-51)
+
+- Los casos de seguridad (`SEC-##`) se enlazan con los controles de la **revisión de seguridad** `operacion/SEC-<DOM>-###` (G7): cada control crítico debe tener al menos un caso.
+- Los casos de rendimiento y disponibilidad (`PERF-##`) incluyen **restaurar una copia en el tiempo meta** y la RAM del servidor en hora punta.
+- Las historias de plataforma tienen sus `TC-` 1 a 1 como cualquier HU, ejecutados en el ambiente de pruebas.
+- El **plan de release** (`operacion/REL-`) usa los E2E de este plan como prueba de humo del día de salida.

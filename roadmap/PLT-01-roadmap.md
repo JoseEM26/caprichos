@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-19
-relacionados: [CAP-PENDIENTE, INT-CAP-001, BRD-CAP-001, EP-CAP-001, EP-CAP-002, EP-CAP-003, EP-CAP-004, EP-CAP-005, EP-CAP-006, EP-CAP-007, EP-CAP-008, EP-CAP-009, EP-CAP-010, EP-CAP-011, EP-CAP-012, EP-CAP-013, EP-CAP-014, EP-CAP-015, EP-CAP-016, EP-CAP-017, EP-CAP-018, EP-CAP-019, EP-CAP-020]
+relacionados: [CAP-PENDIENTE, INT-CAP-001, BRD-CAP-001, EP-CAP-001, EP-CAP-002, EP-CAP-003, EP-CAP-004, EP-CAP-005, EP-CAP-006, EP-CAP-007, EP-CAP-008, EP-CAP-009, EP-CAP-010, EP-CAP-011, EP-CAP-012, EP-CAP-013, EP-CAP-014, EP-CAP-015, EP-CAP-016, EP-CAP-017, EP-CAP-018, EP-CAP-019, EP-CAP-020, EP-CAP-021]
 tags: [roadmap, plataforma-digital, plt-01, g1]
 ---
 
@@ -31,6 +31,7 @@ tags: [roadmap, plataforma-digital, plt-01, g1]
 
 | Fase | Épica | Prioridad | Inicio (supuesto) | Fin (supuesto) |
 | --- | --- | --- | --- | --- |
+| Ahora | EP-CAP-021 Plataforma, despliegue y operación (habilitadora, DT-51) | Debe | 26/10/2026 | 06/11/2026 |
 | Ahora | EP-CAP-013 Personal, usuarios y roles | Debe | 02/11/2026 | 13/11/2026 |
 | Ahora | EP-CAP-017 Configuración del local | Debe | 02/11/2026 | 13/11/2026 |
 | Ahora | EP-CAP-001 Carta virtual y catálogo | Debe | 09/11/2026 | 27/11/2026 |
@@ -58,6 +59,7 @@ gantt
     dateFormat YYYY-MM-DD
     axisFormat %d/%m
     section Ahora
+    EP-CAP-021 Plataforma y operación      :a0, 2026-10-26, 12d
     EP-CAP-013 Personal y roles            :a1, 2026-11-02, 12d
     EP-CAP-017 Configuración del local     :a2, 2026-11-02, 12d
     EP-CAP-001 Carta y catálogo            :a3, 2026-11-09, 19d
@@ -92,7 +94,7 @@ gantt
 
 **Agrupación por horizonte**
 
-- **Ahora:** EP-CAP-013, EP-CAP-017, EP-CAP-001, EP-CAP-002, EP-CAP-004, EP-CAP-006, EP-CAP-007, EP-CAP-008, EP-CAP-005, EP-CAP-020.
+- **Ahora:** EP-CAP-021 (primero: habilitadora), EP-CAP-013, EP-CAP-017, EP-CAP-001, EP-CAP-002, EP-CAP-004, EP-CAP-006, EP-CAP-007, EP-CAP-008, EP-CAP-005, EP-CAP-020.
 - **Siguiente:** EP-CAP-009, EP-CAP-010, EP-CAP-011, EP-CAP-012, EP-CAP-003, EP-CAP-014, EP-CAP-015, EP-CAP-016.
 - **Después:** EP-CAP-018; EP-CAP-019 como fase aparte con su propia cotización (DT-12).
 
@@ -149,7 +151,8 @@ gantt
 
 | Versión | Fecha | Autor | Cambio | Aprobado por |
 | --- | --- | --- | --- | --- |
-| 1.0 | 19/10/2026 | IA (Claude) con José Ángel Espinoza | Primera versión: 20 épicas en tres fases, 14 dependencias y 11 riesgos. | José Ángel Espinoza (DT-48) |
+| 1.0 | 19/10/2026 | IA (Claude) con José Ángel Espinoza | Primera versión: 20 épicas en tres fases, 14 dependencias y 11 riesgos. | *(pendiente de firma, G1)* |
+| 1.1 | 20/10/2026 | IA (Claude) con José Ángel Espinoza | Se agrega EP-CAP-021 Plataforma, despliegue y operación como primera épica de la fase Ahora (DT-51). | *(pendiente de firma, G1)* |
 
 ---
 Generado por IA: a partir de `analisis/BRD.md` (§4 Alcance, §7 Riesgos), `analisis/decisiones.md` y `analisis/informacion-a-pedir-al-cliente.md` — Revisado por: (pendiente)

@@ -1,6 +1,6 @@
 ---
 name: aybar-feature
-description: Use cuando hay que redactar o corregir una Feature (PLT-03 / spec) para los gates G1 o G4 en el paquete de análisis y diseño Aybar.
+description: Use cuando hay que redactar o corregir una Feature (PLT-03 / spec) para los gates G1 o G4 en el paquete de análisis y diseño Aybar (incluidas las features de plataforma `FT-PLA-##`).
 ---
 
 # Aybar · Feature (PLT-03)
@@ -104,3 +104,11 @@ Tomadas estrictamente de `features/FT-CAT-01-*.md` y `features/FT-IDN-005-*.md`:
 ## 6. Documento modelo a copiar
 
 Copiar la estructura y convenciones de `features/FT-CAT-01-registro-de-roles-y-permisos-por-microservicios.md` o `features/FT-IDN-005-roles-y-caducidad.md`.
+
+## DevOps, plataforma e infraestructura (DT-51)
+
+- Las features de plataforma usan el área `PLA` (`FT-PLA-##`) y cuelgan de la épica habilitadora.
+- Sus requerimientos se verifican con comandos y resultados observables (por ejemplo: «cuando se corre `ansible-playbook` dos veces, la segunda no cambia nada»; «`/salud` responde 503 si Redis cae»), no con pantallas.
+- Si un requerimiento exige un procedimiento manual (restaurar, volver atrás, rotar claves), su dependencia es el **runbook** en `operacion/RB-<DOM>-###` (créalo con `aybar-devops-operacion`).
+- RNF típicos: disponibilidad, datos personales en copias y registros, secretos fuera del repositorio.
+- «Pantallas de referencia»: «no tiene pantallas de negocio; se opera desde GitHub, el panel de despliegue y la vigilancia».

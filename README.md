@@ -12,11 +12,12 @@ Paquete de análisis y diseño del marco Aybar (todo en `draft` hasta que se fir
 |---|---|
 | `analisis/` | Intake, BRD, registro de decisiones (`decisiones.md`), plano del local, informes de apoyo |
 | `roadmap/` | Roadmap, dependencias y riesgos |
-| `epicas/` · `features/` · `historias/` | 20 épicas, 55 features y 177 historias de usuario |
+| `epicas/` · `features/` · `historias/` | 21 épicas (incluida la de plataforma, EP-CAP-021), 60 features y 189 historias de usuario |
 | `adr/` | 14 decisiones técnicas (ADR-001 a ADR-014) |
 | `arquitectura/` · `datos/` | Vista de arquitectura, catálogo de API, modelo de datos y diagramas ER |
 | `dor/` · `backlog/tareas/` · `pruebas/` | Definition of Ready, tareas por épica y plan de pruebas |
 | `gates/CAP-PENDIENTE/` | Envío de G0 a G4 |
+| `operacion/` | Documentos de DevOps: runbooks, plan de release, revisión de seguridad e inventario de infraestructura |
 | `scripts/aprobar.py` | Firma de cada gate (la corre la persona que firma) |
 | `.publicar-tmp/` | Fuente del mockup navegable publicado en Claude |
 | `capri-bot/` · `web-anterior/` · `recursos/` | Bot actual, extracción de la web anterior y recursos del cliente |

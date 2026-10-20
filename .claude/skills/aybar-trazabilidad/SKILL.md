@@ -63,3 +63,8 @@ Solo lee; no escribe nada. Código de salida: `0` sin incumplimientos, `1` con i
 - [ ] Cada incumplimiento A–F tiene documento a tocar y arreglo propuesto
 - [ ] Nada editado sin pedido del usuario
 - [ ] Conclusión dicha con sus límites (sección 6)
+
+## DevOps, plataforma e infraestructura (DT-51)
+
+- Los documentos de `operacion/` deben citar en `relacionados` la feature, la historia o el ADR que los origina; y las historias de plataforma deben nombrar el documento de operación que crean.
+- Un control crítico de la revisión de seguridad sin caso `SEC-##` en el plan de pruebas es un hueco de trazabilidad.

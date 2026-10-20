@@ -90,3 +90,7 @@ Pie de trazabilidad: `Generado por IA: <qué> — Revisado por: (pendiente)`
 
 - Para Ficha de Intake: copiar estructura de `analisis/ficha-intake.md`.
 - Para BRD: copiar estructura de `analisis/BRD.md`.
+
+## DevOps, plataforma e infraestructura (DT-51)
+
+- Si el cambio exige servidores, despliegue o datos personales, anota en el intake y en el BRD (supuestos y riesgos) que habrá una **épica habilitadora** de plataforma y documentos de operación (runbooks, plan de release, revisión de seguridad), aunque se detallen después.

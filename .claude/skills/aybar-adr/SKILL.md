@@ -1,6 +1,6 @@
 ---
 name: aybar-adr
-description: Use cuando hay que redactar o actualizar un Registro de Decisión Arquitectónica (ADR / T-ADR) para el gate G3 de Arquitectura en el paquete Aybar.
+description: Use cuando hay que redactar o actualizar un Registro de Decisión Arquitectónica (ADR / T-ADR) para el gate G3 de Arquitectura en el paquete Aybar (incluidos los de infraestructura y DevOps).
 ---
 
 # Aybar · Generar ADR (T-ADR)
@@ -92,3 +92,9 @@ Tomadas estrictamente de `adr/ADR-021-*.md` y `adr/ADR-020-*.md`:
 ## 6. Documento modelo a copiar
 
 Copiar estructura y convenciones de `adr/ADR-021-registro-de-roles-y-permisos-por-microservicios.md` o `adr/ADR-020-starters-del-sdk-del-servicio.md`.
+
+## DevOps, plataforma e infraestructura (DT-51)
+
+- Un ADR de infraestructura (servidor, despliegue, red, copias, vigilancia, secretos) debe nombrar en «Consecuencias → Obliga a» los **runbooks** que exige (`operacion/RB-<DOM>-###`) y la actualización del **inventario** (`operacion/INV-<DOM>-###`).
+- Costo: si no se usa la nube del marco, escribe el costo real del proveedor elegido.
+- Ningún valor de secreto en el ADR: solo dónde vive (skill `aybar-secretos`).

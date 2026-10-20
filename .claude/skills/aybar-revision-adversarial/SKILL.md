@@ -97,3 +97,11 @@ Si no hay nada que reportar, **decirlo y decir qué se miró**. No rellenar para
 - [ ] Cada hallazgo verificado contra la fuente; descartados los dudosos
 - [ ] Informe presentado; nada editado ni aprobado
 - [ ] «Lo que no se pudo revisar» incluido
+
+## DevOps, plataforma e infraestructura (DT-51)
+
+Para documentos de plataforma o de `operacion/`, pregunta además:
+- ¿El runbook lo puede seguir otra persona sin preguntar nada? ¿Tiene comandos exactos, comprobación y vuelta atrás?
+- ¿Aparece algún valor de secreto, IP privada o token?
+- ¿El plan de release tiene criterios de go/no-go medibles y una contingencia si todo falla?
+- ¿La revisión de seguridad calcula sus conteos desde las tablas y cada control crítico tiene evidencia?

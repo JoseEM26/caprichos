@@ -486,6 +486,42 @@ tags: [arquitectura, api, websocket, g3]
 | GET | `/admin/auditoria.csv` | ADMIN | Exportar (queda auditado) |
 | GET | `/admin/auditoria/verificacion` | ADMIN | Estado de la última verificación de la cadena |
 
+### FT-PLA-01 — Monorepo y publicación automática (EP-CAP-021)
+
+| Método | Ruta | Quién | Qué hace |
+| --- | --- | --- | --- |
+| GET | `/salud` | Público (Uptime Kuma) | Estado de la API, la base y Redis; 503 si algo falla |
+| GET | `/version` | Público | Versión y commit desplegados |
+| (CI) | `.github/workflows/ci.yml · deploy-staging.yml · deploy-prod.yml` | GitHub Actions | Lint, pruebas, dependencias, build, Trivy; publicación a pruebas y a producción con tag |
+
+### FT-PLA-02 — Servidor, red, ambientes y secretos (EP-CAP-021)
+
+| Método | Ruta | Quién | Qué hace |
+| --- | --- | --- | --- |
+| (infra) | `infra/ansible/site.yml` | SSH con llave | Prepara el VPS: usuario, firewall, fail2ban, parches, Docker y Dokploy |
+| (infra) | `Cloudflare: caprichos.pe, admin., api., staging., panel.` | Cloudflare | DNS, proxy, HTTPS y Access para el panel |
+
+### FT-PLA-03 — Copias y recuperación (EP-CAP-021)
+
+| Método | Ruta | Quién | Qué hace |
+| --- | --- | --- | --- |
+| (tarea) | `copia-diaria (restic) 03:00 Lima` | VPS | pg_dump por ambiente + carpetas de fotos y comprobantes, cifrado, fuera del VPS |
+| (tarea) | `prueba-de-restauracion trimestral` | Persona responsable | Restaurar en pruebas siguiendo RB-CAP-002 y anotar el tiempo |
+
+### FT-PLA-04 — Vigilancia y alertas (EP-CAP-021)
+
+| Método | Ruta | Quién | Qué hace |
+| --- | --- | --- | --- |
+| (monitor) | `Uptime Kuma: carta, /salud, WebSocket, webhook de WhatsApp, agente, copia` | Uptime Kuma | Revisa cada minuto y avisa al celular |
+| (monitor) | `GlitchTip: api, web, bot` | GlitchTip | Errores sin datos personales |
+
+### FT-PLA-05 — Seguridad y mantenimiento (EP-CAP-021)
+
+| Método | Ruta | Quién | Qué hace |
+| --- | --- | --- | --- |
+| (CI) | `Renovate y Trivy` | GitHub | PRs de actualización y bloqueo de imágenes con vulnerabilidades críticas |
+| (infra) | `unattended-upgrades` | VPS | Parches de seguridad automáticos |
+
 ## 3. Eventos en tiempo real (Socket.IO, ADR-006)
 
 Namespaces: `/admin` (personal), `/carta` (público, sin datos personales), `/dispositivo` (agente y TV). Los eventos se publican **después del commit**; al reconectar, la pantalla pide el estado por REST.
@@ -533,4 +569,4 @@ Namespaces: `/admin` (personal), `/carta` (público, sin datos personales), `/di
 
 ---
 
-Generado por IA: 179 endpoints derivados de los requerimientos de las 55 features y de los ADR-001, 006, 007, 008, 009 y 014 — Revisado por: (pendiente)
+Generado por IA: 178 endpoints derivados de los requerimientos de las 60 features y de los ADR-001, 006, 007, 008, 009 y 014 — Revisado por: (pendiente)

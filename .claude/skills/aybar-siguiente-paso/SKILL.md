@@ -1,6 +1,6 @@
 ---
 name: aybar-siguiente-paso
-description: Use cuando el usuario trabaja en un paquete de análisis y diseño Aybar (carpetas adr/, historias/, features/, epicas/, dor/, gates/, backlog/) y pregunta qué sigue, en qué estado está, qué falta para cerrar un gate (G0-G4), o antes de dar por "listo" cualquier documento. Corre un script de solo lectura que cuenta documentos, valida frontmatter y trazabilidad, y dice el siguiente paso.
+description: Use cuando el usuario trabaja en un paquete de análisis y diseño Aybar (carpetas adr/, historias/, features/, epicas/, dor/, gates/, backlog/) y pregunta qué sigue, en qué estado está, qué falta para cerrar un gate (G0-G4), o antes de dar por "listo" cualquier documento. Corre un script de solo lectura que cuenta documentos, valida frontmatter y trazabilidad, y dice el siguiente paso (incluye la carpeta operacion/ de DevOps).
 ---
 
 # Aybar · qué paso sigue
@@ -54,3 +54,8 @@ Cambio T3 (crítico): aprueban PO + Stakeholder + TL. El acto formal de cada gat
 - Cada documento dice qué generó la IA y quién lo revisó (`Generado por IA: … — Revisado por: (pendiente)`).
 - La IA no firma, no marca `approved` y no cierra gates.
 - Las copias publicadas del paquete no se editan: se edita en `access-control-service/docs/` (o el repo origen) y se vuelve a copiar.
+
+## DevOps, plataforma e infraestructura (DT-51)
+
+- `estado.py` también revisa el frontmatter de `operacion/` (runbooks, plan de release, revisión de seguridad e inventario).
+- Si el paquete no tiene épica habilitadora de plataforma o le faltan los runbooks mínimos (publicar y volver atrás, restaurar una copia, servicio caído, servidor nuevo, rotar claves), dilo como siguiente paso: sin ellos no se puede preparar G7 ni G8 (skill `aybar-devops-operacion`).

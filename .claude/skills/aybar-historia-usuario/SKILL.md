@@ -1,6 +1,6 @@
 ---
 name: aybar-historia-usuario
-description: Use cuando hay que crear o corregir una Historia de Usuario (HU) en el formato estándar Aybar (gate G4), asegurando trazabilidad con épica, feature, criterios de aceptación DADO/CUANDO/ENTONCES, checklist DoR/DoD y datos sintéticos.
+description: Use cuando hay que crear o corregir una Historia de Usuario (HU) en el formato estándar Aybar (gate G4), asegurando trazabilidad con épica, feature, criterios de aceptación DADO/CUANDO/ENTONCES, checklist DoR/DoD y datos sintéticos (también historias de plataforma o DevOps).
 ---
 
 # Aybar · Historia de Usuario (HU)
@@ -95,3 +95,10 @@ Antes de concluir la creación o modificación de una HU:
   ```bash
   python3 -I '/home/jose/Aybar-Corp/equipo-innovacion/NEXORA/.claude/skills/aybar-siguiente-paso/scripts/estado.py' '<ruta-del-paquete>'
   ```
+
+## DevOps, plataforma e infraestructura (DT-51)
+
+- Historias de plataforma: **COMO** el equipo de desarrollo y operación (`DEV`) · **QUIERO** la capacidad técnica · **PARA** el beneficio operativo (publicar sin miedo, recuperar en menos de una hora, enterarse de una caída).
+- No tienen pantalla de negocio: en DISEÑO / ADJUNTOS pon «Mockup: no aplica (operación de plataforma)» y enlaza el **runbook**, el **inventario** o el **plan de release** de `operacion/` que la historia crea o actualiza.
+- Los criterios se prueban en el ambiente de pruebas con comandos y resultados observables; nunca contra producción con datos reales.
+- Ninguna historia de negocio lleva tareas de plataforma: van en la épica habilitadora (skill `aybar-devops-operacion`).

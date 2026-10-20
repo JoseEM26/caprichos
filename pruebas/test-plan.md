@@ -8,14 +8,14 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [CAP-PENDIENTE, EP-CAP-001, EP-CAP-002, EP-CAP-003, EP-CAP-004, EP-CAP-005, EP-CAP-006, EP-CAP-007, EP-CAP-008, EP-CAP-009, EP-CAP-010, EP-CAP-011, EP-CAP-012, EP-CAP-013, EP-CAP-014, EP-CAP-015, EP-CAP-016, EP-CAP-017, EP-CAP-018, EP-CAP-019, EP-CAP-020, FT-CAR-01, FT-CAR-02, FT-CAR-03, FT-PED-01, FT-PED-02, FT-PED-03, FT-CLI-01, FT-CLI-02, FT-CAJ-01, FT-CAJ-02, FT-CAJ-03, FT-CIE-01, FT-CIE-02, FT-COC-01, FT-COC-02, FT-COC-03, FT-SAL-01, FT-SAL-02, FT-SAL-03, FT-DEL-01, FT-DEL-02, FT-DEL-03, FT-STK-01, FT-STK-02, FT-STK-03, FT-ALM-01, FT-ALM-02, FT-ALM-03, FT-COM-01, FT-COM-02, FT-COM-03, FT-OFE-01, FT-OFE-02, FT-OFE-03, FT-USR-01, FT-USR-02, FT-USR-03, FT-BOT-01, FT-BOT-02, FT-BOT-03, FT-ATN-01, FT-ATN-02, FT-ATN-03, FT-CON-01, FT-CON-02, FT-CON-03, FT-CFG-01, FT-CFG-02, FT-INF-01, FT-INF-02, FT-INF-03, FT-OFF-01, FT-LEG-01, FT-LEG-02, FT-USR-04]
+relacionados: [CAP-PENDIENTE, EP-CAP-001, EP-CAP-002, EP-CAP-003, EP-CAP-004, EP-CAP-005, EP-CAP-006, EP-CAP-007, EP-CAP-008, EP-CAP-009, EP-CAP-010, EP-CAP-011, EP-CAP-012, EP-CAP-013, EP-CAP-014, EP-CAP-015, EP-CAP-016, EP-CAP-017, EP-CAP-018, EP-CAP-019, EP-CAP-020, EP-CAP-021, FT-CAR-01, FT-CAR-02, FT-CAR-03, FT-PED-01, FT-PED-02, FT-PED-03, FT-CLI-01, FT-CLI-02, FT-CAJ-01, FT-CAJ-02, FT-CAJ-03, FT-CIE-01, FT-CIE-02, FT-COC-01, FT-COC-02, FT-COC-03, FT-SAL-01, FT-SAL-02, FT-SAL-03, FT-DEL-01, FT-DEL-02, FT-DEL-03, FT-STK-01, FT-STK-02, FT-STK-03, FT-ALM-01, FT-ALM-02, FT-ALM-03, FT-COM-01, FT-COM-02, FT-COM-03, FT-OFE-01, FT-OFE-02, FT-OFE-03, FT-USR-01, FT-USR-02, FT-USR-03, FT-BOT-01, FT-BOT-02, FT-BOT-03, FT-ATN-01, FT-ATN-02, FT-ATN-03, FT-CON-01, FT-CON-02, FT-CON-03, FT-CFG-01, FT-CFG-02, FT-INF-01, FT-INF-02, FT-INF-03, FT-OFF-01, FT-LEG-01, FT-LEG-02, FT-USR-04, FT-PLA-01, FT-PLA-02, FT-PLA-03, FT-PLA-04, FT-PLA-05]
 tags: [test-plan, caprichos, qa, g4, g6, t3]
 ---
 
 # Test Plan (T-TEST-PLAN) - G6 · Caprichos (carta, administrativo y chatbot)
 
 - Ticket: *(pendiente — R13, D-14)*
-- HU referenciadas: 177 (HU-CAP-001 a HU-CAP-175). Todas son de capa A salvo HU-CAP-168 y HU-CAP-169 (modo sin internet, fase aparte), que llevan casos pero se ejecutan solo si se aprueba la fase.
+- HU referenciadas: 189 (HU-CAP-001 a HU-CAP-189). Todas son de capa A salvo HU-CAP-168 y HU-CAP-169 (modo sin internet, fase aparte), que llevan casos pero se ejecutan solo si se aprueba la fase.
 - Tipo: T3 (BRD §Ticket).
 - Flujos críticos E2E propuestos para que el PO los confirme: sección «Flujos críticos E2E».
 - Fuente de verdad: `analisis/decisiones.md`.
@@ -708,6 +708,49 @@ Convención: un caso `TC-CAP-<HU>-<NN>` por cada criterio `CA-NN` de la historia
 | TC-CAP-175-01 | HU-CAP-175 · CA-1: dado el pie de la carta, cuando el cliente toca «Privacidad» → ve el texto vigente (RQ-LEG-02-05) | func |  |  |
 | TC-CAP-175-02 | HU-CAP-175 · CA-2: dado un pedido que guarda teléfono y dirección para la próxima vez, cuando el cliente no acepta el aviso → se usan solo para ese pedido (RQ-LEG-02-06) | func |  |  |
 
+### EP-CAP-021 Plataforma, despliegue y operación
+
+| ID | Caso | Tipo (func/E2E/API/integ/regres/advers) | Resultado | Evidencia (commit) |
+| --- | --- | --- | --- | --- |
+| TC-CAP-178-01 | HU-CAP-178 · CA-1: dado un equipo nuevo con Node y Docker, cuando se clona el repositorio y se corre `pnpm install` y `docker compose up` → la API, la web, PostgreSQL y Redis quedan corriendo en local siguiendo solo el README (RQ-PLA-01-01) | func |  |  |
+| TC-CAP-178-02 | HU-CAP-178 · CA-2: dado la API en local, cuando arranca → escribe un registro JSON de inicio con la versión y el ambiente, se conecta a la base y a Redis, y un error de prueba aparece en GlitchTip sin DNI ni teléfonos (RQ-PLA-01-02) | func |  |  |
+| TC-CAP-178-03 | HU-CAP-178 · CA-3: dado la API en pruebas, cuando se apaga Redis → `/salud` responde 503 indicando qué falló; `/version` devuelve la versión y el commit desplegados (RQ-PLA-01-03) | func |  |  |
+| TC-CAP-179-01 | HU-CAP-179 · CA-1: dado un PR que importa una tabla de otro módulo, cuando corre el CI → la regla de dependencias falla y GitHub no permite unirlo a `main` (RQ-PLA-01-04) | func |  |  |
+| TC-CAP-179-02 | HU-CAP-179 · CA-2: dado un PR con una prueba rota, cuando termina el CI → el PR muestra en rojo el paso «pruebas» con el nombre de la prueba, y el CI completo tardó menos de 10 minutos (RQ-PLA-01-09) | func |  |  |
+| TC-CAP-179-03 | HU-CAP-179 · CA-3: dado un PR del autor, cuando intenta unirlo sin revisión → la protección de la rama `main` lo impide hasta que quede una revisión aprobada (RQ-PLA-01-10) | func |  |  |
+| TC-CAP-180-01 | HU-CAP-180 · CA-1: dado un PR aprobado y unido a `main`, cuando termina el flujo → `staging.caprichos.pe/version` muestra el commit nuevo sin pasos manuales (RQ-PLA-01-05) | func |  |  |
+| TC-CAP-180-02 | HU-CAP-180 · CA-2: dado un tag `v0.3.0`, cuando se publica → producción muestra `v0.3.0` en `/version` y el historial de Dokploy registra la publicación; un push a `main` sin tag no toca producción (RQ-PLA-01-06) | func |  |  |
+| TC-CAP-180-03 | HU-CAP-180 · CA-3: dado `v0.3.0` con un error grave, cuando se sigue RB-CAP-001 → producción vuelve a `v0.2.x` en menos de 10 minutos y las migraciones aplicadas siguen siendo compatibles (expandir antes de contraer) (RQ-PLA-01-07) | func |  |  |
+| TC-CAP-180-04 | HU-CAP-180 · CA-4: dado una columna que se renombra, cuando se publica → primero se agrega la nueva y se copian los datos, y la vieja se quita en una versión posterior (RQ-PLA-01-08) | func |  |  |
+| TC-CAP-181-01 | HU-CAP-181 · CA-1: dado un VPS recién creado, cuando se corre `ansible-playbook site.yml` dos veces seguidas → la segunda corrida no cambia nada y el servidor no acepta SSH con contraseña ni como root (RQ-PLA-02-01) | advers |  |  |
+| TC-CAP-181-02 | HU-CAP-181 · CA-2: dado un servicio nuevo en Dokploy, cuando se publica → aparece en INV-CAP-001 con su ambiente, puerto interno y responsable (RQ-PLA-02-07) | func |  |  |
+| TC-CAP-181-03 | HU-CAP-181 · CA-3: dado RB-CAP-004, cuando lo sigue otra persona en un VPS nuevo → deja el servidor listo sin preguntar nada fuera del documento (RQ-PLA-02-08) | advers |  |  |
+| TC-CAP-182-01 | HU-CAP-182 · CA-1: dado el VPS, cuando alguien abre `http://IP-del-VPS` directo → no responde; por `https://caprichos.pe` sí (RQ-PLA-02-02) | func |  |  |
+| TC-CAP-182-02 | HU-CAP-182 · CA-2: dado los servidores de nombres cambiados en punto.pe, cuando se abren `caprichos.pe`, `admin.`, `api.` y `staging.` → responden con HTTPS válido y la IP del VPS no aparece en el DNS público (RQ-PLA-02-03) | advers |  |  |
+| TC-CAP-182-03 | HU-CAP-182 · CA-3: dado `panel.caprichos.pe`, cuando lo abre alguien sin acceso → Cloudflare Access lo bloquea antes de llegar al VPS (RQ-PLA-02-04) | func |  |  |
+| TC-CAP-183-01 | HU-CAP-183 · CA-1: dado un pedido de prueba en `staging.`, cuando pasa a cocina → no aparece en producción, el mensaje sale por el número de prueba de Meta y la comanda se genera como PDF (RQ-PLA-02-05) | func |  |  |
+| TC-CAP-183-02 | HU-CAP-183 · CA-2: dado un commit que incluye una clave de OpenAI, cuando se intenta → el hook lo rechaza; y `git grep` en el repositorio no encuentra claves reales (RQ-PLA-02-06) | func |  |  |
+| TC-CAP-183-03 | HU-CAP-183 · CA-3: dado pruebas encendido, cuando se apaga desde Dokploy a las 23:00 → producción sigue respondiendo y la RAM libre del VPS sube cerca de 1 GB (RQ-PLA-02-09) | func |  |  |
+| TC-CAP-184-01 | HU-CAP-184 · CA-1: dado el día 21, cuando son las 03:10 → el repositorio de restic tiene una copia nueva con la base de producción, la de pruebas y las dos carpetas, y su contenido no se puede leer sin la clave (RQ-PLA-03-01) | func |  |  |
+| TC-CAP-184-02 | HU-CAP-184 · CA-2: dado 40 copias diarias, cuando corre la limpieza → quedan las 30 últimas diarias y una por mes de los últimos 6 meses (RQ-PLA-03-02) | func |  |  |
+| TC-CAP-184-03 | HU-CAP-184 · CA-3: dado un día en que el almacenamiento externo no responde, cuando la copia falla → Uptime Kuma marca el monitor de la copia en rojo y envía el aviso antes de las 04:00 (RQ-PLA-03-03) | func |  |  |
+| TC-CAP-184-04 | HU-CAP-184 · CA-4: dado el VPS perdido por completo, cuando hay que restaurar → la clave y el acceso están en el gestor de contraseñas del responsable y no solo en el servidor (RQ-PLA-03-04) | advers |  |  |
+| TC-CAP-185-01 | HU-CAP-185 · CA-1: dado RB-CAP-002, cuando lo sigue alguien distinto de quien lo escribió → logra restaurar en pruebas sin pedir ayuda (RQ-PLA-03-05) | func |  |  |
+| TC-CAP-185-02 | HU-CAP-185 · CA-2: dado el primer lunes del trimestre, cuando se restaura la copia del día en pruebas → los pedidos y cobros del día anterior aparecen completos y el tiempo total queda anotado (meta: menos de 1 hora) (RQ-PLA-03-06) | func |  |  |
+| TC-CAP-185-03 | HU-CAP-185 · CA-3: dado un producto borrado por error ayer, cuando se restaura la copia en una base aparte → se copia solo ese registro a producción y el resto no cambia (RQ-PLA-03-07) | func |  |  |
+| TC-CAP-186-01 | HU-CAP-186 · CA-1: dado los 6 monitores, cuando se apaga la API en pruebas → su monitor pasa a rojo en el minuto siguiente (RQ-PLA-04-01) | func |  |  |
+| TC-CAP-186-02 | HU-CAP-186 · CA-2: dado la API caída, cuando pasan 2 minutos → llega el aviso al celular configurado; al volver, llega «recuperado» con la duración (RQ-PLA-04-02) | func |  |  |
+| TC-CAP-186-03 | HU-CAP-186 · CA-3: dado el fin de mes, cuando se revisa el reporte → se ve el porcentaje de disponibilidad de la carta y de la API (RQ-PLA-04-03) | func |  |  |
+| TC-CAP-187-01 | HU-CAP-187 · CA-1: dado un error al cobrar con el DNI 00000012 en la solicitud, cuando se revisa en GlitchTip → el DNI aparece enmascarado y no hay tokens (RQ-PLA-04-04) | func |  |  |
+| TC-CAP-187-02 | HU-CAP-187 · CA-2: dado un día de hora punta, cuando se revisa el disco → los registros de Docker no superan el tamaño configurado y se puede buscar por número de pedido (RQ-PLA-04-05) | func |  |  |
+| TC-CAP-187-03 | HU-CAP-187 · CA-3: dado la API caída, cuando se sigue RB-CAP-003 → se identifica la causa con los registros y se vuelve a levantar o se vuelve a la versión anterior (RQ-PLA-04-06) | func |  |  |
+| TC-CAP-188-01 | HU-CAP-188 · CA-1: dado un parche de seguridad publicado, cuando pasa un día → está instalado y queda en el registro de unattended-upgrades (RQ-PLA-05-01) | func |  |  |
+| TC-CAP-188-02 | HU-CAP-188 · CA-2: dado una versión nueva de NestJS, cuando Renovate la detecta → abre un PR que corre todas las pruebas antes de unirse (RQ-PLA-05-02) | func |  |  |
+| TC-CAP-188-03 | HU-CAP-188 · CA-3: dado una imagen con una vulnerabilidad crítica conocida, cuando corre el CI → falla y la imagen no se sube a GHCR (RQ-PLA-05-03) | func |  |  |
+| TC-CAP-189-01 | HU-CAP-189 · CA-1: dado el piloto H1, cuando se prepara la salida → SEC-CAP-001 tiene cada punto revisado con evidencia o con su pendiente aceptado (RQ-PLA-05-04) | func |  |  |
+| TC-CAP-189-02 | HU-CAP-189 · CA-2: dado la clave de OpenAI expuesta, cuando se sigue RB-CAP-005 → se genera una nueva, se cambia en Dokploy, se reinicia el servicio y la vieja se revoca en menos de 30 minutos (RQ-PLA-05-05) | func |  |  |
+| TC-CAP-189-03 | HU-CAP-189 · CA-3: dado una sospecha de acceso indebido, cuando se sigue el procedimiento → se revocan sesiones y claves, se revisa el Historial de acciones y se evalúa si hay que avisar a los afectados (Ley 29733) (RQ-PLA-05-06) | func |  |  |
+
 ### Flujos críticos E2E
 
 | ID | Caso | Tipo (func/E2E/API/integ/regres/advers) | Resultado | Evidencia (commit) |
@@ -980,5 +1023,17 @@ Ejecutado por IA: (nada ejecutado; plan generado por IA) - Consolidado y aprobad
 | HU-CAP-173 | H1 | 2 | TC-CAP-173-01 a 02 | 0 |
 | HU-CAP-174 | H1 | 2 | TC-CAP-174-01 a 02 | 0 |
 | HU-CAP-175 | H1 | 2 | TC-CAP-175-01 a 02 | 0 |
+| HU-CAP-178 | H1 | 3 | TC-CAP-178-01 a 03 | 0 |
+| HU-CAP-179 | H1 | 3 | TC-CAP-179-01 a 03 | 0 |
+| HU-CAP-180 | H1 | 4 | TC-CAP-180-01 a 04 | 0 |
+| HU-CAP-181 | H1 | 3 | TC-CAP-181-01 a 03 | 0 |
+| HU-CAP-182 | H1 | 3 | TC-CAP-182-01 a 03 | 0 |
+| HU-CAP-183 | H1 | 3 | TC-CAP-183-01 a 03 | 0 |
+| HU-CAP-184 | H1 | 4 | TC-CAP-184-01 a 04 | 0 |
+| HU-CAP-185 | H1 | 3 | TC-CAP-185-01 a 03 | 0 |
+| HU-CAP-186 | H1 | 3 | TC-CAP-186-01 a 03 | 0 |
+| HU-CAP-187 | H1 | 3 | TC-CAP-187-01 a 03 | 0 |
+| HU-CAP-188 | H1 | 3 | TC-CAP-188-01 a 03 | 0 |
+| HU-CAP-189 | H1 | 3 | TC-CAP-189-01 a 03 | 0 |
 
-**Totales:** 572 criterios en 177 historias = 572 casos TC (0 complementos) + 10 E2E + 12 SEC + 7 PERF + 5 REG = **606 casos**.
+**Totales:** 610 criterios en 189 historias = 610 casos TC (0 complementos) + 10 E2E + 12 SEC + 7 PERF + 5 REG = **644 casos**.

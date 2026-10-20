@@ -1,6 +1,6 @@
 ---
 name: aybar-generar-documento
-description: Use cuando hay que crear o corregir un documento del paquete de análisis y diseño Aybar - ADR, Historia de Usuario (formato HU Aybar), Feature PLT-03, Épica PLT-02, DoR PLT-05, ficha de intake, BRD, roadmap, plan de pruebas, JSON de tareas o paquete de envío de gate. Fija el frontmatter, las secciones obligatorias en su orden y las reglas de trazabilidad. Para saber QUÉ documento toca después, usar primero aybar-siguiente-paso.
+description: Use cuando hay que crear o corregir un documento del paquete de análisis y diseño Aybar - ADR, Historia de Usuario (formato HU Aybar), Feature PLT-03, Épica PLT-02, DoR PLT-05, ficha de intake, BRD, roadmap, plan de pruebas, JSON de tareas o paquete de envío de gate. Fija el frontmatter, las secciones obligatorias en su orden y las reglas de trazabilidad. Para saber QUÉ documento toca después, usar primero aybar-siguiente-paso. Para runbooks, planes de release, revisiones de seguridad e inventario de infraestructura usar `aybar-devops-operacion`.
 ---
 
 # Aybar · generar un documento del paquete
@@ -86,3 +86,14 @@ Las skills `aybar-starter-*` son copias selladas del SDK y asumen un servicio co
 
 1. Corre `estado.py` y corrige incumplimientos.
 2. Entrega al usuario: archivo creado, qué quedó como pendiente de decisión y quién debe firmar. No afirmes "listo" sin la salida del script.
+
+## DevOps, plataforma e infraestructura (DT-51)
+
+| Documento | Carpeta | Prefijo | Gate | Skill |
+|---|---|---|---|---|
+| Runbook | `operacion/` | `RB-<DOM>-###` | G8, G9 | `aybar-devops-operacion` |
+| Plan de release | `operacion/` | `REL-<DOM>-###` | G8 | `aybar-devops-operacion` |
+| Revisión de seguridad | `operacion/` | `SEC-<DOM>-###` | G7 | `aybar-devops-operacion` |
+| Inventario de infraestructura | `operacion/` | `INV-<DOM>-###` | G3, G8 | `aybar-devops-operacion` |
+
+Si el pedido es de plataforma o DevOps, además de estos documentos se trabaja la **épica habilitadora** con features `FT-PLA-##` e historias con actor `DEV` (DT-51).

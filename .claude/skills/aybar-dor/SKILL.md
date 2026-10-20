@@ -1,6 +1,6 @@
 ---
 name: aybar-dor
-description: Use cuando hay que crear o auditar un documento Definition of Ready (PLT-05) por feature para el Gate G4 en el paquete de analisis y diseno Aybar.
+description: Use cuando hay que crear o auditar un documento Definition of Ready (PLT-05) por feature para el Gate G4 en el paquete de analisis y diseno Aybar (también para features de plataforma o DevOps).
 ---
 
 # Aybar · Definition of Ready (PLT-05)
@@ -105,3 +105,10 @@ Tomadas directamente de los modelos reales `dor/DOR-FT-CAT-01-registro-por-micro
 ```bash
 python3 -I '/home/jose/Aybar-Corp/equipo-innovacion/NEXORA/.claude/skills/aybar-siguiente-paso/scripts/estado.py' '<ruta-del-paquete>'
 ```
+
+## DevOps, plataforma e infraestructura (DT-51)
+
+- En features de plataforma, «3 MODELADO» dice «No aplica un modelo de datos» y apunta al inventario (`operacion/INV-`); se mantiene el diagrama de estados si hay ciclo (por ejemplo, PR → main → pruebas → producción → volver atrás).
+- En el checklist TÉCNICO agrega: **runbook escrito y probado** por alguien distinto de quien lo escribió, **inventario actualizado**, **secretos fuera del repositorio**.
+- En CALIDAD: la prueba se hace en el ambiente de pruebas; para copias, la restauración se mide en tiempo.
+- En RIESGOS cita los del roadmap de disponibilidad y caída (por ejemplo, R-06) y la falta de runbook como riesgo propio `R-<FT-id>-##`.

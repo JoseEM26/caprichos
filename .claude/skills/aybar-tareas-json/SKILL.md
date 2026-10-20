@@ -1,6 +1,6 @@
 ---
 name: aybar-tareas-json
-description: Use cuando hay que crear, actualizar o validar el desglose de tareas tecnicas en JSON por epica para el Gate G4 en el paquete de analisis y diseno Aybar.
+description: Use cuando hay que crear, actualizar o validar el desglose de tareas tecnicas en JSON por epica para el Gate G4 en el paquete de analisis y diseno Aybar (incluidas las tareas de plataforma y DevOps).
 ---
 
 # Aybar · Desglose de Tareas en JSON (`backlog/tareas/EP-XXX-###.json`)
@@ -114,3 +114,10 @@ python3 -c "import json, glob, sys; files=glob.glob('backlog/tareas/*.json'); al
 ```bash
 python3 -I '/home/jose/Aybar-Corp/equipo-innovacion/NEXORA/.claude/skills/aybar-siguiente-paso/scripts/estado.py' '<ruta-del-paquete>'
 ```
+
+## DevOps, plataforma e infraestructura (DT-51)
+
+- Las tareas de plataforma viven en el JSON de la **épica habilitadora**, nunca en el de una épica de negocio.
+- Capas y actividades para DevOps: `infrastructure` + `DESPLIEGUE` (Ansible, Dokploy, Cloudflare, CI/CD, copias, vigilancia), `boot` + `DESARROLLO` (base de la API: configuración, salud, versión), `docs` + `DOCUMENTACION` (runbook, inventario, plan de release o revisión de seguridad en `operacion/`) y `infrastructure` + `PRUEBAS` (en el ambiente de pruebas).
+- Toda historia de plataforma lleva al menos una tarea `DOCUMENTACION` que nombra el documento de `operacion/` que crea o actualiza.
+- La primera tarea de las historias de negocio depende de la **tarea base** de la épica habilitadora (la que deja lista la API), no de una historia de negocio.

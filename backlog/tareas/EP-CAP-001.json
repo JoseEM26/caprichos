@@ -8,18 +8,20 @@
       "tareas": [
         {
           "id": "HU-CAP-001-T01",
-          "titulo": "Monorepo pnpm (apps/api, apps/web, apps/agente-local, packages/compartido) y CI de PR",
-          "capa": "infrastructure",
-          "actividad": "DESPLIEGUE",
+          "titulo": "Revisar criterios de HU-CAP-001 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
           "responsable": "José Ángel Espinoza",
           "estimacion_horas": null,
-          "depende_de": []
+          "depende_de": [
+            "HU-CAP-178-T03"
+          ]
         },
         {
           "id": "HU-CAP-001-T02",
-          "titulo": "Playbook de Ansible del VPS y Dokploy con ambientes de pruebas y producción (ADR-011)",
-          "capa": "infrastructure",
-          "actividad": "DESPLIEGUE",
+          "titulo": "Migración Prisma de las tablas de FT-CAR-01 (categoria, producto, producto_tamano, grupo_opciones, opcion)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
           "estimacion_horas": null,
           "depende_de": [
@@ -28,19 +30,20 @@
         },
         {
           "id": "HU-CAP-001-T03",
-          "titulo": "Cloudflare (DNS de caprichos.pe y proxy) y despliegue desde GHCR",
-          "capa": "infrastructure",
-          "actividad": "DESPLIEGUE",
+          "titulo": "Reglas de dominio de HU-CAP-001 (RQ-CAR-01-01, RQ-CAR-01-02, RQ-CAR-01-03, RQ-CAR-01-04)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
           "estimacion_horas": null,
           "depende_de": [
+            "HU-CAP-001-T01",
             "HU-CAP-001-T02"
           ]
         },
         {
           "id": "HU-CAP-001-T04",
-          "titulo": "Base NestJS: configuración, Prisma, Redis, Socket.IO, registros JSON y GlitchTip",
-          "capa": "boot",
+          "titulo": "Casos de uso: Navegar la carta por categorías y buscador",
+          "capa": "application",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
           "estimacion_horas": null,
@@ -50,9 +53,9 @@
         },
         {
           "id": "HU-CAP-001-T05",
-          "titulo": "Revisar criterios de HU-CAP-001 contra el contrato de ARQ-CAP-002 y el mockup",
-          "capa": "docs",
-          "actividad": "ANALISIS",
+          "titulo": "Endpoints y eventos de FT-CAR-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
           "estimacion_horas": null,
           "depende_de": [
@@ -61,8 +64,8 @@
         },
         {
           "id": "HU-CAP-001-T06",
-          "titulo": "Migración Prisma de las tablas de FT-CAR-01 (categoria, producto, producto_tamano, grupo_opciones, opcion)",
-          "capa": "modelo",
+          "titulo": "Pantalla React: Navegar la carta por categorías y buscador",
+          "capa": "ux",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
           "estimacion_horas": null,
@@ -72,58 +75,13 @@
         },
         {
           "id": "HU-CAP-001-T07",
-          "titulo": "Reglas de dominio de HU-CAP-001 (RQ-CAR-01-01, RQ-CAR-01-02, RQ-CAR-01-03, RQ-CAR-01-04)",
-          "capa": "domain",
-          "actividad": "DESARROLLO",
-          "responsable": "José Ángel Espinoza",
-          "estimacion_horas": null,
-          "depende_de": [
-            "HU-CAP-001-T05",
-            "HU-CAP-001-T06"
-          ]
-        },
-        {
-          "id": "HU-CAP-001-T08",
-          "titulo": "Casos de uso: Navegar la carta por categorías y buscador",
-          "capa": "application",
-          "actividad": "DESARROLLO",
-          "responsable": "José Ángel Espinoza",
-          "estimacion_horas": null,
-          "depende_de": [
-            "HU-CAP-001-T07"
-          ]
-        },
-        {
-          "id": "HU-CAP-001-T09",
-          "titulo": "Endpoints y eventos de FT-CAR-01 según ARQ-CAP-002",
-          "capa": "adapters",
-          "actividad": "DESARROLLO",
-          "responsable": "José Ángel Espinoza",
-          "estimacion_horas": null,
-          "depende_de": [
-            "HU-CAP-001-T08"
-          ]
-        },
-        {
-          "id": "HU-CAP-001-T10",
-          "titulo": "Pantalla React: Navegar la carta por categorías y buscador",
-          "capa": "ux",
-          "actividad": "DESARROLLO",
-          "responsable": "José Ángel Espinoza",
-          "estimacion_horas": null,
-          "depende_de": [
-            "HU-CAP-001-T09"
-          ]
-        },
-        {
-          "id": "HU-CAP-001-T11",
           "titulo": "Pruebas TC-CAP-001-01..05 (unitarias de dominio e integración de API)",
           "capa": "application",
           "actividad": "PRUEBAS",
           "responsable": "José Ángel Espinoza",
           "estimacion_horas": null,
           "depende_de": [
-            "HU-CAP-001-T10"
+            "HU-CAP-001-T06"
           ]
         }
       ]
@@ -139,7 +97,7 @@
           "responsable": "José Ángel Espinoza",
           "estimacion_horas": null,
           "depende_de": [
-            "HU-CAP-001-T04"
+            "HU-CAP-178-T03"
           ]
         },
         {
@@ -151,7 +109,7 @@
           "estimacion_horas": null,
           "depende_de": [
             "HU-CAP-002-T01",
-            "HU-CAP-001-T06"
+            "HU-CAP-001-T02"
           ]
         },
         {
@@ -211,7 +169,7 @@
           "responsable": "José Ángel Espinoza",
           "estimacion_horas": null,
           "depende_de": [
-            "HU-CAP-001-T04"
+            "HU-CAP-178-T03"
           ]
         },
         {
@@ -223,7 +181,7 @@
           "estimacion_horas": null,
           "depende_de": [
             "HU-CAP-003-T01",
-            "HU-CAP-001-T06"
+            "HU-CAP-001-T02"
           ]
         },
         {
@@ -283,7 +241,7 @@
           "responsable": "José Ángel Espinoza",
           "estimacion_horas": null,
           "depende_de": [
-            "HU-CAP-001-T04"
+            "HU-CAP-178-T03"
           ]
         },
         {
@@ -295,7 +253,7 @@
           "estimacion_horas": null,
           "depende_de": [
             "HU-CAP-004-T01",
-            "HU-CAP-001-T06"
+            "HU-CAP-001-T02"
           ]
         },
         {
@@ -355,7 +313,7 @@
           "responsable": "José Ángel Espinoza",
           "estimacion_horas": null,
           "depende_de": [
-            "HU-CAP-001-T04"
+            "HU-CAP-178-T03"
           ]
         },
         {
@@ -438,7 +396,7 @@
           "responsable": "José Ángel Espinoza",
           "estimacion_horas": null,
           "depende_de": [
-            "HU-CAP-001-T04"
+            "HU-CAP-178-T03"
           ]
         },
         {
@@ -510,7 +468,7 @@
           "responsable": "José Ángel Espinoza",
           "estimacion_horas": null,
           "depende_de": [
-            "HU-CAP-001-T04"
+            "HU-CAP-178-T03"
           ]
         },
         {
@@ -582,7 +540,7 @@
           "responsable": "José Ángel Espinoza",
           "estimacion_horas": null,
           "depende_de": [
-            "HU-CAP-001-T04"
+            "HU-CAP-178-T03"
           ]
         },
         {
@@ -654,7 +612,7 @@
           "responsable": "José Ángel Espinoza",
           "estimacion_horas": null,
           "depende_de": [
-            "HU-CAP-001-T04"
+            "HU-CAP-178-T03"
           ]
         },
         {
@@ -737,7 +695,7 @@
           "responsable": "José Ángel Espinoza",
           "estimacion_horas": null,
           "depende_de": [
-            "HU-CAP-001-T04"
+            "HU-CAP-178-T03"
           ]
         },
         {
@@ -809,7 +767,7 @@
           "responsable": "José Ángel Espinoza",
           "estimacion_horas": null,
           "depende_de": [
-            "HU-CAP-001-T04"
+            "HU-CAP-178-T03"
           ]
         },
         {

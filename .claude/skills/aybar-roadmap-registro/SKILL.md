@@ -1,6 +1,6 @@
 ---
 name: aybar-roadmap-registro
-description: Use cuando hay que crear o actualizar el Roadmap de producto PLT-01 en roadmap/ o consultar y registrar decisiones, pendientes, aclaraciones y riesgos en analisis/decisiones.md.
+description: Use cuando hay que crear o actualizar el Roadmap de producto PLT-01 en roadmap/ o consultar y registrar decisiones, pendientes, aclaraciones y riesgos en analisis/decisiones.md (incluida la épica habilitadora de plataforma).
 ---
 
 # Aybar · Roadmap PLT-01 y Registro de Decisiones
@@ -93,3 +93,9 @@ Secciones estructuradas:
 
 - Para Roadmap: copiar estructura de `roadmap/PLT-01-roadmap.md`.
 - Para Registro de Decisiones: seguir estructura y tablas de `analisis/decisiones.md`.
+
+## DevOps, plataforma e infraestructura (DT-51)
+
+- La épica habilitadora de plataforma va **primera** en la fase «Ahora»: el resto de épicas se construyen sobre ella.
+- Los riesgos de disponibilidad, caída y pérdida de datos se mitigan con runbooks concretos de `operacion/`; nómbralos en la columna de mitigación.
+- Las decisiones de infraestructura se registran como `DT-##` en `analisis/decisiones.md` y se formalizan en ADR.

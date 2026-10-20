@@ -31,7 +31,7 @@ def frontmatter(texto):
 
 
 docs, problemas = {}, []
-for carpeta in list(CARPETAS) + ["analisis", "roadmap", "arquitectura", "datos", "pruebas", "gates"]:
+for carpeta in list(CARPETAS) + ["analisis", "roadmap", "arquitectura", "datos", "pruebas", "gates", "operacion"]:
     for f in sorted((ROOT / carpeta).rglob("*.md")):
         t = f.read_text(encoding="utf-8")
         fm = frontmatter(t)

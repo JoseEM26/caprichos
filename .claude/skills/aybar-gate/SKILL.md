@@ -1,6 +1,6 @@
 ---
 name: aybar-gate
-description: Use cuando hay que redactar o auditar un paquete de envío de gate (G0 a G4) para formalizar el paso entre etapas en el paquete Aybar.
+description: Use cuando hay que redactar o auditar un paquete de envío de gate (G0 a G4) para formalizar el paso entre etapas en el paquete Aybar (y cómo se relacionan con los documentos de G7, G8 y G9).
 ---
 
 # Aybar · Generar paquete de envío de Gate (G0 a G4)
@@ -95,3 +95,9 @@ Tomadas estrictamente de `gates/AYB-1042/G0.md` a `G4.md`:
 ## 6. Documento modelo a copiar
 
 Copiar estructura de `gates/AYB-1042/G3.md` (o `G0.md`, `G1.md`, `G2.md`, `G4.md` según corresponda al gate a enviar).
+
+## DevOps, plataforma e infraestructura (DT-51)
+
+- G3: la evidencia de infraestructura incluye los ADR de plataforma y el **inventario** `operacion/INV-<DOM>-###`.
+- G4: la épica habilitadora (plataforma) debe tener sus historias, DoR y tareas como cualquier otra.
+- Los gates de salida usan documentos de `operacion/`: **G7** la revisión de seguridad (`SEC-`), **G8** el plan de release (`REL-`) y los runbooks (`RB-`), **G9** el cierre del acompañamiento. Para redactarlos, skill `aybar-devops-operacion` (criterios: `aybar-release`, `aybar-seguridad`).

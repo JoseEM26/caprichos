@@ -1,0 +1,604 @@
+{
+  "epica": "EP-CAP-021",
+  "generado_por_ia": true,
+  "revisado_por": null,
+  "historias": [
+    {
+      "hu": "HU-CAP-178",
+      "tareas": [
+        {
+          "id": "HU-CAP-178-T01",
+          "titulo": "Revisar criterios de HU-CAP-178 contra ADR-001, ADR-011 y DT-36",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": []
+        },
+        {
+          "id": "HU-CAP-178-T02",
+          "titulo": "Monorepo pnpm (apps/api, apps/web, apps/agente-local, packages/compartido, infra/) y docker compose local",
+          "capa": "infrastructure",
+          "actividad": "DESPLIEGUE",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-178-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-178-T03",
+          "titulo": "Base NestJS: configuración por ambiente, Prisma, Redis, Socket.IO, registros JSON, GlitchTip, /salud y /version",
+          "capa": "boot",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-178-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-178-T04",
+          "titulo": "Escribir o actualizar el documento de operación: README del monorepo e INV-CAP-001 (servicios)",
+          "capa": "docs",
+          "actividad": "DOCUMENTACION",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-178-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-178-T05",
+          "titulo": "Pruebas TC-CAP-178-01..03 en el ambiente de pruebas",
+          "capa": "infrastructure",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-178-T04"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-179",
+      "tareas": [
+        {
+          "id": "HU-CAP-179-T01",
+          "titulo": "Revisar criterios de HU-CAP-179 contra ADR-011, ADR-012 y las decisiones DT",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-178-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-179-T02",
+          "titulo": "Implementar: Validar cada pull request en el CI",
+          "capa": "infrastructure",
+          "actividad": "DESPLIEGUE",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-179-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-179-T03",
+          "titulo": "Escribir o actualizar el documento de operación: RB-CAP-001 (sección CI)",
+          "capa": "docs",
+          "actividad": "DOCUMENTACION",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-179-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-179-T04",
+          "titulo": "Pruebas TC-CAP-179-01..03 en el ambiente de pruebas",
+          "capa": "infrastructure",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-179-T03"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-180",
+      "tareas": [
+        {
+          "id": "HU-CAP-180-T01",
+          "titulo": "Revisar criterios de HU-CAP-180 contra ADR-011, ADR-012 y las decisiones DT",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-178-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-180-T02",
+          "titulo": "Implementar: Publicar en pruebas y en producción y volver atrás",
+          "capa": "infrastructure",
+          "actividad": "DESPLIEGUE",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-180-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-180-T03",
+          "titulo": "Escribir o actualizar el documento de operación: RB-CAP-001 Publicar y volver atrás, y REL-CAP-001",
+          "capa": "docs",
+          "actividad": "DOCUMENTACION",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-180-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-180-T04",
+          "titulo": "Pruebas TC-CAP-180-01..04 en el ambiente de pruebas",
+          "capa": "infrastructure",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-180-T03"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-181",
+      "tareas": [
+        {
+          "id": "HU-CAP-181-T01",
+          "titulo": "Revisar criterios de HU-CAP-181 contra ADR-011, ADR-012 y las decisiones DT",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-178-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-181-T02",
+          "titulo": "Implementar: Preparar el VPS desde cero con Ansible",
+          "capa": "infrastructure",
+          "actividad": "DESPLIEGUE",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-181-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-181-T03",
+          "titulo": "Escribir o actualizar el documento de operación: RB-CAP-004 Preparar un servidor nuevo",
+          "capa": "docs",
+          "actividad": "DOCUMENTACION",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-181-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-181-T04",
+          "titulo": "Pruebas TC-CAP-181-01..03 en el ambiente de pruebas",
+          "capa": "infrastructure",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-181-T03"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-182",
+      "tareas": [
+        {
+          "id": "HU-CAP-182-T01",
+          "titulo": "Revisar criterios de HU-CAP-182 contra ADR-011, ADR-012 y las decisiones DT",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-178-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-182-T02",
+          "titulo": "Implementar: Poner el dominio detrás de Cloudflare con HTTPS y firewall",
+          "capa": "infrastructure",
+          "actividad": "DESPLIEGUE",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-182-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-182-T03",
+          "titulo": "Escribir o actualizar el documento de operación: INV-CAP-001 (dominios, red y firewall)",
+          "capa": "docs",
+          "actividad": "DOCUMENTACION",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-182-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-182-T04",
+          "titulo": "Pruebas TC-CAP-182-01..03 en el ambiente de pruebas",
+          "capa": "infrastructure",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-182-T03"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-183",
+      "tareas": [
+        {
+          "id": "HU-CAP-183-T01",
+          "titulo": "Revisar criterios de HU-CAP-183 contra ADR-011, ADR-012 y las decisiones DT",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-178-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-183-T02",
+          "titulo": "Implementar: Separar pruebas y producción y manejar los secretos",
+          "capa": "infrastructure",
+          "actividad": "DESPLIEGUE",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-183-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-183-T03",
+          "titulo": "Escribir o actualizar el documento de operación: INV-CAP-001 (ambientes y secretos)",
+          "capa": "docs",
+          "actividad": "DOCUMENTACION",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-183-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-183-T04",
+          "titulo": "Pruebas TC-CAP-183-01..03 en el ambiente de pruebas",
+          "capa": "infrastructure",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-183-T03"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-184",
+      "tareas": [
+        {
+          "id": "HU-CAP-184-T01",
+          "titulo": "Revisar criterios de HU-CAP-184 contra ADR-011, ADR-012 y las decisiones DT",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-178-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-184-T02",
+          "titulo": "Implementar: Hacer la copia diaria cifrada fuera del VPS",
+          "capa": "infrastructure",
+          "actividad": "DESPLIEGUE",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-184-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-184-T03",
+          "titulo": "Escribir o actualizar el documento de operación: INV-CAP-001 (copias)",
+          "capa": "docs",
+          "actividad": "DOCUMENTACION",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-184-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-184-T04",
+          "titulo": "Pruebas TC-CAP-184-01..04 en el ambiente de pruebas",
+          "capa": "infrastructure",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-184-T03"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-185",
+      "tareas": [
+        {
+          "id": "HU-CAP-185-T01",
+          "titulo": "Revisar criterios de HU-CAP-185 contra ADR-011, ADR-012 y las decisiones DT",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-178-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-185-T02",
+          "titulo": "Implementar: Restaurar una copia y probarlo cada 3 meses",
+          "capa": "infrastructure",
+          "actividad": "DESPLIEGUE",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-185-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-185-T03",
+          "titulo": "Escribir o actualizar el documento de operación: RB-CAP-002 Restaurar una copia",
+          "capa": "docs",
+          "actividad": "DOCUMENTACION",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-185-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-185-T04",
+          "titulo": "Pruebas TC-CAP-185-01..03 en el ambiente de pruebas",
+          "capa": "infrastructure",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-185-T03"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-186",
+      "tareas": [
+        {
+          "id": "HU-CAP-186-T01",
+          "titulo": "Revisar criterios de HU-CAP-186 contra ADR-011, ADR-012 y las decisiones DT",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-178-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-186-T02",
+          "titulo": "Implementar: Recibir un aviso en el celular si algo se cae",
+          "capa": "infrastructure",
+          "actividad": "DESPLIEGUE",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-186-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-186-T03",
+          "titulo": "Escribir o actualizar el documento de operación: RB-CAP-003 Un servicio se cayó",
+          "capa": "docs",
+          "actividad": "DOCUMENTACION",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-186-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-186-T04",
+          "titulo": "Pruebas TC-CAP-186-01..03 en el ambiente de pruebas",
+          "capa": "infrastructure",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-186-T03"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-187",
+      "tareas": [
+        {
+          "id": "HU-CAP-187-T01",
+          "titulo": "Revisar criterios de HU-CAP-187 contra ADR-011, ADR-012 y las decisiones DT",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-178-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-187-T02",
+          "titulo": "Implementar: Capturar errores y revisar registros",
+          "capa": "infrastructure",
+          "actividad": "DESPLIEGUE",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-187-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-187-T03",
+          "titulo": "Escribir o actualizar el documento de operación: RB-CAP-003 (diagnóstico con registros)",
+          "capa": "docs",
+          "actividad": "DOCUMENTACION",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-187-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-187-T04",
+          "titulo": "Pruebas TC-CAP-187-01..03 en el ambiente de pruebas",
+          "capa": "infrastructure",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-187-T03"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-188",
+      "tareas": [
+        {
+          "id": "HU-CAP-188-T01",
+          "titulo": "Revisar criterios de HU-CAP-188 contra ADR-011, ADR-012 y las decisiones DT",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-178-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-188-T02",
+          "titulo": "Implementar: Mantener el sistema parchado y las dependencias al día",
+          "capa": "infrastructure",
+          "actividad": "DESPLIEGUE",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-188-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-188-T03",
+          "titulo": "Escribir o actualizar el documento de operación: SEC-CAP-001 (mantenimiento)",
+          "capa": "docs",
+          "actividad": "DOCUMENTACION",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-188-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-188-T04",
+          "titulo": "Pruebas TC-CAP-188-01..03 en el ambiente de pruebas",
+          "capa": "infrastructure",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-188-T03"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-189",
+      "tareas": [
+        {
+          "id": "HU-CAP-189-T01",
+          "titulo": "Revisar criterios de HU-CAP-189 contra ADR-011, ADR-012 y las decisiones DT",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-178-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-189-T02",
+          "titulo": "Implementar: Revisar la seguridad antes de salir y responder a una filtración",
+          "capa": "infrastructure",
+          "actividad": "DESPLIEGUE",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-189-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-189-T03",
+          "titulo": "Escribir o actualizar el documento de operación: SEC-CAP-001 y RB-CAP-005 Rotar claves y responder a una filtración",
+          "capa": "docs",
+          "actividad": "DOCUMENTACION",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-189-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-189-T04",
+          "titulo": "Pruebas TC-CAP-189-01..03 en el ambiente de pruebas",
+          "capa": "infrastructure",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-189-T03"
+          ]
+        }
+      ]
+    }
+  ]
+}

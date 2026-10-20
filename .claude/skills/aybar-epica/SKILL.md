@@ -1,6 +1,6 @@
 ---
 name: aybar-epica
-description: Use cuando hay que redactar o actualizar una Épica (PLT-02 / spec) para el gate G1 en el paquete de análisis y diseño Aybar.
+description: Use cuando hay que redactar o actualizar una Épica (PLT-02 / spec) para el gate G1 en el paquete de análisis y diseño Aybar (incluidas las épicas habilitadoras de plataforma, DevOps o infraestructura).
 ---
 
 # Aybar · Épica (PLT-02)
@@ -100,3 +100,10 @@ Tomadas estrictamente de `epicas/EP-IDN-005-*.md` y `epicas/EP-IDN-001-*.md`:
 ## 6. Documento modelo a copiar
 
 Copiar la estructura y tablas de `epicas/EP-IDN-005-roles-permisos-y-sod.md` o `epicas/EP-IDN-001-cuentas-e-identidades-federadas.md`.
+
+## DevOps, plataforma e infraestructura (DT-51)
+
+- El trabajo de plataforma (monorepo, CI/CD, servidor, ambientes, secretos, copias, vigilancia, parches, seguridad de salida) va en una **épica habilitadora** propia (en Caprichos, `EP-CAP-021`), en la fase más temprana del roadmap: es la primera ola de construcción.
+- Usuario de la épica: el **equipo de desarrollo y operación** (`DEV`) y el dueño como beneficiario de la disponibilidad.
+- KPI típicos: disponibilidad en horario de atención, tiempo de restauración desde una copia, días con copia verificada, publicaciones con vuelta atrás exitosa.
+- En el alcance, nombra los **documentos de operación** que la épica produce en `operacion/` (runbooks `RB-`, plan de release `REL-`, revisión de seguridad `SEC-`, inventario `INV-`). Plantillas y reglas: skill `aybar-devops-operacion`.
