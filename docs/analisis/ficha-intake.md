@@ -2,11 +2,11 @@
 id: INT-CAP-001
 tipo: spec
 titulo: Ficha de intake — plataforma digital de Caprichos (carta virtual, módulo administrativo y chatbot)
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.1"
 owner: "Kevin Rosales (negocio)"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)"]
 fecha: 2026-10-13
 relacionados: [BRD-CAP-001, INI-CAP-002]
 tags: [intake, g0, t3]

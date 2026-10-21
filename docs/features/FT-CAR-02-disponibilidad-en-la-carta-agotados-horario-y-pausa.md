@@ -2,11 +2,11 @@
 id: FT-CAR-02
 tipo: spec
 titulo: "Disponibilidad en la carta: agotados, horario y pausa"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-001, FT-CAR-01, FT-COC-03, FT-CFG-01, FT-STK-03, ADR-001, ADR-011, ADR-014, ADR-003, ADR-006, NEC-CAP-085, RN-CAP-017, RN-CAP-060, RN-CAP-113]
 tags: [carta, plt-03, ep-cap-001, ft-car-02, debe-tener]

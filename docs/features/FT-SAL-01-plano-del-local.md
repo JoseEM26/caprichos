@@ -2,11 +2,11 @@
 id: FT-SAL-01
 tipo: spec
 titulo: "Plano del local"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-007, FT-SAL-02, FT-SAL-03, ADR-001, ADR-011, ADR-014, ADR-006, ADR-007, NEC-CAP-014, NEC-CAP-052, RN-CAP-014, RN-CAP-068]
 tags: [salon, plt-03, ep-cap-007, ft-sal-01, debe-tener]

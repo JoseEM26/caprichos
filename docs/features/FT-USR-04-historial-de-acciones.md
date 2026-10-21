@@ -2,11 +2,11 @@
 id: FT-USR-04
 tipo: spec
 titulo: "Historial de acciones (auditoría)"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-013, FT-USR-01, FT-USR-02, FT-CAJ-02, FT-CFG-02, FT-LEG-02, ADR-001, ADR-011, ADR-014, ADR-004, ADR-008, RNF-CAP-009, RN-CAP-094, DT-49]
 tags: [usuarios, plt-03, ep-cap-013, ft-usr-04, debe-tener]

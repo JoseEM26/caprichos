@@ -2,11 +2,11 @@
 id: FT-ATN-01
 tipo: spec
 titulo: "Consola de chats con dueño único"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-015, FT-ATN-02, FT-BOT-02, FT-BOT-03, ADR-001, ADR-011, ADR-014, ADR-006, ADR-007, ADR-009, NEC-CAP-083, NEC-CAP-091, NEC-CAP-098, RN-CAP-102, RN-CAP-111]
 tags: [atencion, plt-03, ep-cap-015, ft-atn-01, deberia-tener]

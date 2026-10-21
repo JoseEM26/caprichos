@@ -2,11 +2,11 @@
 id: EP-CAP-022
 tipo: spec
 titulo: "EP-CAP-022 Iniciativas del equipo"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-19
 relacionados: [CAP-PENDIENTE, BRD-CAP-001, RMP-CAP-001, DT-53, DT-49, ADR-014, RNF-CAP-009, FT-USR-04]
 tags: [epica, plt-02, g1, iniciativas, deberia-tener]

@@ -2,11 +2,11 @@
 id: FT-CAJ-01
 tipo: spec
 titulo: "Cola de pedidos por confirmar"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-004, FT-PED-03, FT-CAJ-02, FT-COC-01, FT-DEL-01, FT-BOT-02, ADR-001, ADR-011, ADR-014, ADR-003, ADR-006, ADR-007, ADR-008, ADR-010, ADR-012, NEC-CAP-061, NEC-CAP-059, RN-CAP-074, RN-CAP-075, RN-CAP-101, RN-CAP-104]
 tags: [caja, plt-03, ep-cap-004, ft-caj-01, debe-tener]

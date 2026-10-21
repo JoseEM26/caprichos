@@ -2,11 +2,11 @@
 id: FT-ALM-03
 tipo: spec
 titulo: "Pedidos internos, mermas y cierre del día"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-010, FT-ALM-01, FT-ALM-02, FT-DEL-03, ADR-001, ADR-011, ADR-014, ADR-003, NEC-CAP-075, NEC-CAP-102, RN-CAP-116, RN-CAP-121, RN-CAP-124]
 tags: [almacen, plt-03, ep-cap-010, ft-alm-03, deberia-tener]

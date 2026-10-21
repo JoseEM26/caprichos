@@ -2,11 +2,11 @@
 id: FT-INF-01
 tipo: spec
 titulo: "Informes con período y filtros"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-018, FT-INF-02, FT-CIE-02, FT-STK-02, ADR-001, ADR-011, ADR-014, ADR-006, ADR-012, NEC-CAP-041, NEC-CAP-050, OBJ-CAP-001, OBJ-CAP-003]
 tags: [informes, plt-03, ep-cap-018, ft-inf-01, podria-tener]

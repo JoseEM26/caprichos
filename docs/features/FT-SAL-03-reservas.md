@@ -2,11 +2,11 @@
 id: FT-SAL-03
 tipo: spec
 titulo: "Reservas"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-007, FT-SAL-01, FT-SAL-02, FT-BOT-03, FT-CFG-01, ADR-001, ADR-011, ADR-014, ADR-006, ADR-007, NEC-CAP-095, NEC-CAP-107, RN-CAP-047, RN-CAP-107]
 tags: [salon, plt-03, ep-cap-007, ft-sal-03, debe-tener]

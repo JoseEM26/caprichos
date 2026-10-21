@@ -2,11 +2,11 @@
 id: FT-COC-03
 tipo: spec
 titulo: "Agotado por hoy y alta demanda"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-006, FT-CAR-02, FT-COC-01, FT-BOT-01, ADR-001, ADR-011, ADR-014, ADR-002, ADR-006, ADR-007, NEC-CAP-073, NEC-CAP-074, NEC-CAP-103, RN-CAP-085, RN-CAP-113]
 tags: [cocina, plt-03, ep-cap-006, ft-coc-03, debe-tener]

@@ -2,11 +2,11 @@
 id: EP-CAP-021
 tipo: spec
 titulo: "EP-CAP-021 Plataforma, despliegue y operación"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [CAP-PENDIENTE, FT-PLA-01, FT-PLA-02, FT-PLA-03, FT-PLA-04, FT-PLA-05, BRD-CAP-001, RMP-CAP-001, DT-51, ADR-011, ADR-012, ADR-001, RNF-CAP-003, DEP-02, R-06]
 tags: [epica, plt-02, g1, plataforma, debe-tener]

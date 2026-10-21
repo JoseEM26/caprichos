@@ -2,11 +2,11 @@
 id: EP-CAP-010
 tipo: spec
 titulo: "EP-CAP-010 Almacén y producción"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-19
 relacionados: [CAP-PENDIENTE, BRD-CAP-001, RMP-CAP-001, NEC-CAP-026, NEC-CAP-075, NEC-CAP-081, NEC-CAP-102, RN-CAP-091, RN-CAP-117]
 tags: [epica, plt-02, g1, almacen, deberia-tener]

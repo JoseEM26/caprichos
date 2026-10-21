@@ -2,11 +2,11 @@
 id: FT-PED-03
 tipo: spec
 titulo: "Envío del pedido a comandas y aviso al cliente"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-002, FT-PED-01, FT-CAJ-01, FT-BOT-02, FT-INF-03, ADR-001, ADR-011, ADR-014, ADR-003, ADR-005, ADR-009, ADR-010, NEC-CAP-001, NEC-CAP-086, NEC-CAP-090, RN-CAP-043, RN-CAP-074, DT-57]
 tags: [pedido, plt-03, ep-cap-002, ft-ped-03, debe-tener]

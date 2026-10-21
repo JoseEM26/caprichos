@@ -2,11 +2,11 @@
 id: FT-BOT-01
 tipo: spec
 titulo: "Pedido por botones"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-014, FT-BOT-02, FT-BOT-03, FT-CAR-01, FT-CAR-02, FT-OFE-02, ADR-001, ADR-011, ADR-014, ADR-007, ADR-009, NEC-CAP-004, NEC-CAP-028, RN-CAP-005, RN-CAP-049]
 tags: [chatbot, plt-03, ep-cap-014, ft-bot-01, deberia-tener]

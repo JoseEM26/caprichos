@@ -2,11 +2,11 @@
 id: FT-OFE-03
 tipo: spec
 titulo: "Cupones"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-012, FT-OFE-02, FT-PED-01, FT-CAJ-03, FT-LEG-01, FT-CLI-02, ADR-001, ADR-011, ADR-014, ADR-003, ADR-007, NEC-CAP-035, NEC-CAP-054, NEC-CAP-111, RN-CAP-069, RN-CAP-133, RN-CAP-134, RN-CAP-135]
 tags: [ofertas, plt-03, ep-cap-012, ft-ofe-03, deberia-tener]

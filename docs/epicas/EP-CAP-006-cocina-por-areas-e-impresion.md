@@ -2,11 +2,11 @@
 id: EP-CAP-006
 tipo: spec
 titulo: "EP-CAP-006 Cocina por áreas e impresión"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-19
 relacionados: [CAP-PENDIENTE, BRD-CAP-001, RMP-CAP-001, NEC-CAP-013, NEC-CAP-020, NEC-CAP-021, NEC-CAP-037, NEC-CAP-060, NEC-CAP-072, NEC-CAP-073, NEC-CAP-074, NEC-CAP-101]
 tags: [epica, plt-02, g1, cocina, debe-tener]

@@ -2,11 +2,11 @@
 id: EP-CAP-013
 tipo: spec
 titulo: "EP-CAP-013 Personal, usuarios y roles"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-19
 relacionados: [FT-USR-04, CAP-PENDIENTE, BRD-CAP-001, RMP-CAP-001, NEC-CAP-008, NEC-CAP-010, NEC-CAP-025, NEC-CAP-088, NEC-CAP-094, NEC-CAP-099, NEC-CAP-108]
 tags: [epica, plt-02, g1, usuarios, debe-tener]

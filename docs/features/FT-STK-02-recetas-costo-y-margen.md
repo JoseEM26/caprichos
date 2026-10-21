@@ -2,11 +2,11 @@
 id: FT-STK-02
 tipo: spec
 titulo: "Recetas, costo y margen"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-009, FT-STK-01, FT-STK-03, FT-ALM-02, FT-INF-01, ADR-001, ADR-011, ADR-014, ADR-003, ADR-007, NEC-CAP-003, NEC-CAP-088, RN-CAP-039]
 tags: [stock, plt-03, ep-cap-009, ft-stk-02, deberia-tener]

@@ -2,11 +2,11 @@
 id: FT-CFG-01
 tipo: spec
 titulo: "Datos del local, horario y fechas especiales"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-017, FT-CFG-02, FT-CAR-02, FT-CAR-03, FT-SAL-03, ADR-001, ADR-011, ADR-014, ADR-010, ADR-012, NEC-CAP-038, NEC-CAP-042, RN-CAP-059, RN-CAP-060]
 tags: [configuracion, plt-03, ep-cap-017, ft-cfg-01, debe-tener]

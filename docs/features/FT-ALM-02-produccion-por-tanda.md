@@ -2,11 +2,11 @@
 id: FT-ALM-02
 tipo: spec
 titulo: "Producción por tanda"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-010, FT-STK-02, FT-ALM-01, FT-ALM-03, ADR-001, ADR-011, ADR-014, ADR-003, NEC-CAP-081, RN-CAP-091, RN-CAP-092, RN-CAP-117]
 tags: [almacen, plt-03, ep-cap-010, ft-alm-02, deberia-tener]

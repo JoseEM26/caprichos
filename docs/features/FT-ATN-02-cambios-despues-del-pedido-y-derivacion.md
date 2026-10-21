@@ -2,11 +2,11 @@
 id: FT-ATN-02
 tipo: spec
 titulo: "Cambios después del pedido y derivación"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-015, FT-ATN-01, FT-CAJ-01, FT-DEL-02, ADR-001, ADR-011, ADR-014, ADR-006, ADR-007, ADR-009, NEC-CAP-093, RN-CAP-105]
 tags: [atencion, plt-03, ep-cap-015, ft-atn-02, deberia-tener]

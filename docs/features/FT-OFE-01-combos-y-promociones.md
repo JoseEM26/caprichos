@@ -2,11 +2,11 @@
 id: FT-OFE-01
 tipo: spec
 titulo: "Combos y promociones"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-012, FT-OFE-02, FT-OFE-03, FT-CAR-01, FT-COC-01, FT-STK-03, ADR-001, ADR-011, ADR-014, ADR-003, ADR-007, NEC-CAP-034, NEC-CAP-056, NEC-CAP-066, NEC-CAP-068, NEC-CAP-109, RN-CAP-034]
 tags: [ofertas, plt-03, ep-cap-012, ft-ofe-01, deberia-tener]

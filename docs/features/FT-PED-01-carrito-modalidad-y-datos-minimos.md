@@ -2,11 +2,11 @@
 id: FT-PED-01
 tipo: spec
 titulo: "Carrito, modalidad y datos mínimos"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-002, FT-CAR-01, FT-PED-02, FT-PED-03, FT-OFE-02, FT-OFE-03, FT-LEG-01, ADR-001, ADR-011, ADR-014, ADR-003, ADR-005, ADR-009, ADR-010, NEC-CAP-017, NEC-CAP-018, RN-CAP-016, RN-CAP-028]
 tags: [pedido, plt-03, ep-cap-002, ft-ped-01, debe-tener]

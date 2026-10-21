@@ -2,11 +2,11 @@
 id: EP-CAP-016
 tipo: spec
 titulo: "EP-CAP-016 Administración de la carta y contenidos"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-19
 relacionados: [CAP-PENDIENTE, BRD-CAP-001, RMP-CAP-001, NEC-CAP-011, NEC-CAP-012, NEC-CAP-016, NEC-CAP-030, NEC-CAP-042, NEC-CAP-044, NEC-CAP-045, NEC-CAP-058, NEC-CAP-067, NEC-CAP-082, NEC-CAP-106]
 tags: [epica, plt-02, g1, contenidos, deberia-tener]

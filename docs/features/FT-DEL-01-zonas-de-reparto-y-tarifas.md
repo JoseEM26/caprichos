@@ -2,11 +2,11 @@
 id: FT-DEL-01
 tipo: spec
 titulo: "Zonas de reparto y tarifas"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-008, FT-PED-02, FT-CAJ-01, FT-CAJ-03, FT-INF-02, ADR-001, ADR-011, ADR-014, ADR-006, ADR-007, ADR-010, NEC-CAP-076, NEC-CAP-096, NEC-CAP-100, RN-CAP-103, RN-CAP-109, RN-CAP-122]
 tags: [delivery, plt-03, ep-cap-008, ft-del-01, debe-tener]

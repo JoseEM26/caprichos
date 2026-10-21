@@ -2,11 +2,11 @@
 id: EP-CAP-011
 tipo: spec
 titulo: "EP-CAP-011 Compras y proveedores"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-19
 relacionados: [CAP-PENDIENTE, BRD-CAP-001, RMP-CAP-001, NEC-CAP-027, NEC-CAP-069, NEC-CAP-070, NEC-CAP-112, RN-CAP-136, RN-CAP-137]
 tags: [epica, plt-02, g1, compras, deberia-tener]

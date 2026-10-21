@@ -2,11 +2,11 @@
 id: EP-CAP-003
 tipo: spec
 titulo: "EP-CAP-003 Cuenta del cliente y puntos"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-19
 relacionados: [CAP-PENDIENTE, BRD-CAP-001, RMP-CAP-001, NEC-CAP-024, NEC-CAP-036, NEC-CAP-048, NEC-CAP-057, NEC-CAP-064, NEC-CAP-097]
 tags: [epica, plt-02, g1, clientes, deberia-tener]

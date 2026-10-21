@@ -2,11 +2,11 @@
 id: EP-CAP-008
 tipo: spec
 titulo: "EP-CAP-008 Delivery y entregas"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-19
 relacionados: [CAP-PENDIENTE, BRD-CAP-001, RMP-CAP-001, NEC-CAP-009, NEC-CAP-015, NEC-CAP-059, NEC-CAP-076, NEC-CAP-079, NEC-CAP-096, NEC-CAP-100, NEC-CAP-104]
 tags: [epica, plt-02, g1, delivery, debe-tener]

@@ -2,11 +2,11 @@
 id: FT-PLA-02
 tipo: spec
 titulo: "Servidor, red, ambientes y secretos"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-021, FT-PLA-01, FT-PLA-03, FT-PLA-05, ADR-001, ADR-011, ADR-014, ADR-003, ADR-012, DT-30, DT-39, DT-40, DT-42, DT-43, DEP-02, RNF-CAP-003]
 tags: [plataforma, plt-03, ep-cap-021, ft-pla-02, debe-tener]

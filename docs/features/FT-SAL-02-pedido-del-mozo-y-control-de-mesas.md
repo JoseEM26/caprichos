@@ -2,11 +2,11 @@
 id: FT-SAL-02
 tipo: spec
 titulo: "Pedido del mozo y control de mesas"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-007, FT-SAL-01, FT-SAL-03, FT-COC-01, FT-CAJ-02, ADR-001, ADR-011, ADR-014, ADR-006, ADR-007, NEC-CAP-023, NEC-CAP-043, NEC-CAP-053, NEC-CAP-078, RN-CAP-073, RN-CAP-090]
 tags: [salon, plt-03, ep-cap-007, ft-sal-02, debe-tener]

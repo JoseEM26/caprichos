@@ -2,11 +2,11 @@
 id: FT-CIE-01
 tipo: spec
 titulo: "Apertura, movimientos y liquidación de repartidores"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-005, FT-CIE-02, FT-CAJ-02, FT-DEL-02, ADR-001, ADR-011, ADR-014, ADR-003, ADR-008, NEC-CAP-062, RN-CAP-077, RN-CAP-088, RN-CAP-097]
 tags: [cierre-caja, plt-03, ep-cap-005, ft-cie-01, debe-tener]

@@ -2,11 +2,11 @@
 id: EP-CAP-020
 tipo: spec
 titulo: "EP-CAP-020 Comprobantes y obligaciones legales"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-19
 relacionados: [CAP-PENDIENTE, BRD-CAP-001, RMP-CAP-001, NEC-CAP-031, NEC-CAP-089, RN-CAP-037, RN-CAP-071, RN-CAP-099]
 tags: [epica, plt-02, g1, legal, debe-tener]

@@ -2,11 +2,11 @@
 id: FT-DEL-02
 tipo: spec
 titulo: "Reparto: tomar, navegar y entregar"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-008, FT-DEL-01, FT-DEL-03, FT-CIE-01, FT-USR-02, ADR-001, ADR-011, ADR-014, ADR-006, ADR-007, ADR-010, NEC-CAP-009, NEC-CAP-015, NEC-CAP-079, RN-CAP-012, RN-CAP-024, RN-CAP-088]
 tags: [delivery, plt-03, ep-cap-008, ft-del-02, debe-tener]

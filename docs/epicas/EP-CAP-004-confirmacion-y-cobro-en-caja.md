@@ -2,11 +2,11 @@
 id: EP-CAP-004
 tipo: spec
 titulo: "EP-CAP-004 Confirmación y cobro en caja"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-19
 relacionados: [CAP-PENDIENTE, BRD-CAP-001, RMP-CAP-001, NEC-CAP-061, NEC-CAP-063, NEC-CAP-064, NEC-CAP-065, NEC-CAP-080, RN-CAP-074]
 tags: [epica, plt-02, g1, caja, debe-tener]

@@ -2,11 +2,11 @@
 id: RMP-CAP-001
 tipo: spec
 titulo: "PLT-01 Roadmap de producto — Plataforma digital de Caprichos"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-19
 relacionados: [CAP-PENDIENTE, INT-CAP-001, BRD-CAP-001, EP-CAP-001, EP-CAP-002, EP-CAP-003, EP-CAP-004, EP-CAP-005, EP-CAP-006, EP-CAP-007, EP-CAP-008, EP-CAP-009, EP-CAP-010, EP-CAP-011, EP-CAP-012, EP-CAP-013, EP-CAP-014, EP-CAP-015, EP-CAP-016, EP-CAP-017, EP-CAP-018, EP-CAP-019, EP-CAP-020, EP-CAP-021]
 tags: [roadmap, plataforma-digital, plt-01, g1]

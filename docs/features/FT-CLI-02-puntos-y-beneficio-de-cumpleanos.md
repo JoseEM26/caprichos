@@ -2,11 +2,11 @@
 id: FT-CLI-02
 tipo: spec
 titulo: "Puntos y beneficio de cumpleaños"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-003, FT-CLI-01, FT-CAJ-02, FT-OFE-03, FT-CFG-02, ADR-001, ADR-011, ADR-014, ADR-004, ADR-005, ADR-008, NEC-CAP-036, NEC-CAP-097, RN-CAP-072]
 tags: [clientes, plt-03, ep-cap-003, ft-cli-02, deberia-tener]

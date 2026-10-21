@@ -2,11 +2,11 @@
 id: FT-PED-02
 tipo: spec
 titulo: "Ubicación y costo de envío en la carta"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-002, FT-PED-01, FT-DEL-01, FT-CAJ-01, ADR-001, ADR-011, ADR-014, ADR-003, ADR-005, ADR-009, ADR-010, NEC-CAP-019, NEC-CAP-049, NEC-CAP-076, NEC-CAP-092, RN-CAP-065, RN-CAP-103]
 tags: [pedido, plt-03, ep-cap-002, ft-ped-02, debe-tener]

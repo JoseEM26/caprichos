@@ -2,11 +2,11 @@
 id: FT-BOT-03
 tipo: spec
 titulo: "IA para dudas y recomendaciones"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-014, FT-BOT-01, FT-ATN-01, FT-SAL-03, ADR-001, ADR-011, ADR-014, ADR-007, ADR-009, NEC-CAP-007, NEC-CAP-028, RN-CAP-047, RN-CAP-049]
 tags: [chatbot, plt-03, ep-cap-014, ft-bot-03, deberia-tener]

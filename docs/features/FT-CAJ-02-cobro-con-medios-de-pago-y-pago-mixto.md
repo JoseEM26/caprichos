@@ -2,11 +2,11 @@
 id: FT-CAJ-02
 tipo: spec
 titulo: "Cobro con medios de pago y pago mixto"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-004, FT-CAJ-01, FT-CIE-01, FT-CIE-02, FT-LEG-01, FT-CLI-02, FT-USR-03, ADR-001, ADR-011, ADR-014, ADR-003, ADR-006, ADR-007, ADR-008, ADR-010, ADR-012, NEC-CAP-063, RN-CAP-011, RN-CAP-030, RN-CAP-096]
 tags: [caja, plt-03, ep-cap-004, ft-caj-02, debe-tener]

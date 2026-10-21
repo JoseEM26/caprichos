@@ -2,11 +2,11 @@
 id: EP-CAP-018
 tipo: spec
 titulo: "EP-CAP-018 Informes, indicadores y notificaciones"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-19
 relacionados: [CAP-PENDIENTE, BRD-CAP-001, RMP-CAP-001, NEC-CAP-041, NEC-CAP-077, NEC-CAP-047, NEC-CAP-050]
 tags: [epica, plt-02, g1, informes, podria-tener]

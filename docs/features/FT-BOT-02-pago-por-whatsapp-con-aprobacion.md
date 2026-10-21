@@ -2,11 +2,11 @@
 id: FT-BOT-02
 tipo: spec
 titulo: "Pago por WhatsApp con aprobación"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-014, FT-BOT-01, FT-PED-03, FT-CAJ-01, FT-ATN-01, ADR-001, ADR-011, ADR-014, ADR-007, ADR-009, NEC-CAP-090, RN-CAP-043, RN-CAP-100, RN-CAP-101]
 tags: [chatbot, plt-03, ep-cap-014, ft-bot-02, deberia-tener]

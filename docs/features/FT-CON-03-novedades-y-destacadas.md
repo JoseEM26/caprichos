@@ -2,11 +2,11 @@
 id: FT-CON-03
 tipo: spec
 titulo: "Novedades y destacadas"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-016, FT-CON-02, FT-CAR-03, ADR-001, ADR-011, ADR-014, ADR-003, ADR-012, NEC-CAP-030, NEC-CAP-044, NEC-CAP-045, NEC-CAP-046, NEC-CAP-051, RN-CAP-063, RN-CAP-064]
 tags: [contenidos, plt-03, ep-cap-016, ft-con-03, deberia-tener]

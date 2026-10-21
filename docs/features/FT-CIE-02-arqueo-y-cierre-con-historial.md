@@ -2,11 +2,11 @@
 id: FT-CIE-02
 tipo: spec
 titulo: "Arqueo ciego y cierre con historial"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-005, FT-CIE-01, FT-CAJ-02, FT-INF-01, ADR-001, ADR-011, ADR-014, ADR-003, ADR-008, NEC-CAP-062, RN-CAP-078, RN-CAP-079, RN-CAP-080, RN-CAP-097]
 tags: [cierre-caja, plt-03, ep-cap-005, ft-cie-02, debe-tener]

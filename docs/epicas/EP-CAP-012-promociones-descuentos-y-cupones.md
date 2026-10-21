@@ -2,11 +2,11 @@
 id: EP-CAP-012
 tipo: spec
 titulo: "EP-CAP-012 Promociones, descuentos y cupones"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-19
 relacionados: [CAP-PENDIENTE, BRD-CAP-001, RMP-CAP-001, NEC-CAP-034, NEC-CAP-035, NEC-CAP-054, NEC-CAP-056, NEC-CAP-066, NEC-CAP-109, NEC-CAP-110, NEC-CAP-111]
 tags: [epica, plt-02, g1, ofertas, deberia-tener]

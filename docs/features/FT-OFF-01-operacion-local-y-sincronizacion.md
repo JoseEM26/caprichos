@@ -2,11 +2,11 @@
 id: FT-OFF-01
 tipo: spec
 titulo: "Operación local y sincronización"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-019, FT-CAJ-02, FT-COC-01, FT-COC-02, FT-SAL-02, ADR-001, ADR-011, ADR-014, ADR-002, ADR-013, NEC-CAP-022, RN-CAP-050, DT-52, DT-29, R-06]
 tags: [offline, plt-03, ep-cap-019, ft-off-01, debe-tener]

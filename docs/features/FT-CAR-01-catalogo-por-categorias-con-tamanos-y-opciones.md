@@ -2,11 +2,11 @@
 id: FT-CAR-01
 tipo: spec
 titulo: "Catálogo por categorías con tamaños y opciones"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-001, FT-CAR-02, FT-PED-01, FT-CON-01, ADR-001, ADR-011, ADR-014, ADR-003, ADR-006, NEC-CAP-006, NEC-CAP-084, RN-CAP-004, RN-CAP-051]
 tags: [carta, plt-03, ep-cap-001, ft-car-01, debe-tener]

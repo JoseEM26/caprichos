@@ -2,11 +2,11 @@
 id: FT-CON-01
 tipo: spec
 titulo: "Productos, listas y categorías"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-016, FT-CAR-01, FT-CON-02, FT-STK-02, ADR-001, ADR-011, ADR-014, ADR-003, ADR-012, NEC-CAP-016, NEC-CAP-058, NEC-CAP-067, NEC-CAP-082, NEC-CAP-106, RN-CAP-128, RN-CAP-129, RN-CAP-130]
 tags: [contenidos, plt-03, ep-cap-016, ft-con-01, deberia-tener]

@@ -2,11 +2,11 @@
 id: FT-USR-03
 tipo: spec
 titulo: "Crédito del personal"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-013, FT-USR-01, FT-CAJ-02, FT-CAJ-03, FT-CFG-02, ADR-001, ADR-011, ADR-014, ADR-004, ADR-008, NEC-CAP-025, NEC-CAP-094, NEC-CAP-108, RN-CAP-036, RN-CAP-106, RN-CAP-131]
 tags: [usuarios, plt-03, ep-cap-013, ft-usr-03, deberia-tener]

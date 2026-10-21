@@ -2,11 +2,11 @@
 id: BRD-CAP-001
 tipo: brd
 titulo: BRD — plataforma digital de Caprichos (carta virtual, módulo administrativo y chatbot)
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.51"
 owner: "Kevin Rosales (negocio)"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-19
 relacionados: [INT-CAP-001, INI-CAP-002]
 tags: [brd, plataforma-digital, g1]

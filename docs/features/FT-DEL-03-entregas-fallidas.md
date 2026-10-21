@@ -2,11 +2,11 @@
 id: FT-DEL-03
 tipo: spec
 titulo: "Entregas fallidas"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-008, FT-DEL-02, FT-CAJ-01, FT-CAJ-02, FT-ALM-03, FT-INF-03, ADR-001, ADR-011, ADR-014, ADR-006, ADR-007, ADR-010, NEC-CAP-104, RN-CAP-089, RN-CAP-125, RN-CAP-126]
 tags: [delivery, plt-03, ep-cap-008, ft-del-03, debe-tener]

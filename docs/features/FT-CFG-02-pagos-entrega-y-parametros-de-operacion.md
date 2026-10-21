@@ -2,11 +2,11 @@
 id: FT-CFG-02
 tipo: spec
 titulo: "Pagos, entrega y parámetros de operación"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-017, FT-CFG-01, FT-DEL-01, FT-COC-02, FT-USR-03, FT-CLI-02, ADR-001, ADR-011, ADR-014, ADR-010, ADR-012, NEC-CAP-087, NEC-CAP-094]
 tags: [configuracion, plt-03, ep-cap-017, ft-cfg-02, debe-tener]

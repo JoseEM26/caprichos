@@ -2,11 +2,11 @@
 id: EP-CAP-015
 tipo: spec
 titulo: "EP-CAP-015 Atención por WhatsApp y posventa"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-19
 relacionados: [CAP-PENDIENTE, BRD-CAP-001, RMP-CAP-001, NEC-CAP-029, NEC-CAP-083, NEC-CAP-091, NEC-CAP-093, NEC-CAP-098, RN-CAP-102]
 tags: [epica, plt-02, g1, atencion, deberia-tener]

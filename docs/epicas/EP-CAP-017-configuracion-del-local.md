@@ -2,11 +2,11 @@
 id: EP-CAP-017
 tipo: spec
 titulo: "EP-CAP-017 Configuración del local"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-19
 relacionados: [CAP-PENDIENTE, BRD-CAP-001, RMP-CAP-001, NEC-CAP-038, NEC-CAP-087, RN-CAP-059, RN-CAP-060]
 tags: [epica, plt-02, g1, configuracion, debe-tener]

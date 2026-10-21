@@ -2,11 +2,11 @@
 id: FT-PLA-03
 tipo: spec
 titulo: "Copias y recuperación"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-021, FT-PLA-02, FT-PLA-04, ADR-001, ADR-011, ADR-014, ADR-003, ADR-012, DT-31, DT-35, DT-47, RNF-CAP-003, RNF-CAP-008]
 tags: [plataforma, plt-03, ep-cap-021, ft-pla-03, debe-tener]

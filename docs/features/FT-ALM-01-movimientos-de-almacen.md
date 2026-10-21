@@ -2,11 +2,11 @@
 id: FT-ALM-01
 tipo: spec
 titulo: "Movimientos de almacén"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-010, FT-STK-01, FT-ALM-03, FT-COM-03, ADR-001, ADR-011, ADR-014, ADR-003, NEC-CAP-026, NEC-CAP-102, RN-CAP-046, RN-CAP-114, RN-CAP-115, RN-CAP-127]
 tags: [almacen, plt-03, ep-cap-010, ft-alm-01, deberia-tener]

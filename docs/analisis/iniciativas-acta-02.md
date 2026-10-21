@@ -2,11 +2,11 @@
 id: INI-CAP-002
 tipo: analisis
 titulo: Iniciativas, sugerencias y pendientes de la reunión del 14 de octubre de 2026 (acta 02)
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.1"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)"]
 fecha: 2026-10-15
 fuente: actas/acta-02-descubrimiento.md
 relacionados: [INT-CAP-001, BRD-CAP-001]

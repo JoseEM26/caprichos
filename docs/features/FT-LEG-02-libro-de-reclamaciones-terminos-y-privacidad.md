@@ -2,11 +2,11 @@
 id: FT-LEG-02
 tipo: spec
 titulo: "Libro de Reclamaciones, términos y privacidad"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-020, FT-PED-01, FT-CLI-01, FT-CFG-01, ADR-001, ADR-011, ADR-014, ADR-004, ADR-005, NEC-CAP-089, RN-CAP-045, RN-CAP-071, RN-CAP-099]
 tags: [legal, plt-03, ep-cap-020, ft-leg-02, debe-tener]

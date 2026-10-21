@@ -9,6 +9,7 @@ Este registro es la **fuente de verdad** del paquete. Si un documento (BRD, road
 
 Generado por IA: a partir de `analisis/BRD.md` (v1.51), `analisis/ficha-intake.md`, las actas 01, 02 y 03, `analisis/registro-mockup.md` y `analisis/informacion-a-pedir-al-cliente.md` — Revisado por: *(pendiente)*
 
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 ---
 
 ## 1. Forma de trabajo

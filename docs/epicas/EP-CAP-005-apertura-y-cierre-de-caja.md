@@ -2,11 +2,11 @@
 id: EP-CAP-005
 tipo: spec
 titulo: "EP-CAP-005 Apertura y cierre de caja"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-19
 relacionados: [CAP-PENDIENTE, BRD-CAP-001, RMP-CAP-001, NEC-CAP-062, RN-CAP-077, RN-CAP-079, RN-CAP-080, RN-CAP-088, RN-CAP-097]
 tags: [epica, plt-02, g1, caja, debe-tener]

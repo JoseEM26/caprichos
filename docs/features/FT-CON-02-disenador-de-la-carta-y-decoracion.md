@@ -2,11 +2,11 @@
 id: FT-CON-02
 tipo: spec
 titulo: "Diseñador de la carta y decoración"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-016, FT-CON-01, FT-CON-03, FT-CAR-01, ADR-001, ADR-011, ADR-014, ADR-003, ADR-012, NEC-CAP-011, NEC-CAP-012, RN-CAP-018]
 tags: [contenidos, plt-03, ep-cap-016, ft-con-02, deberia-tener]

@@ -2,11 +2,11 @@
 id: FT-COM-02
 tipo: spec
 titulo: "Pedir a proveedores por WhatsApp"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-011, FT-COM-01, FT-COM-03, FT-STK-01, ADR-001, ADR-011, ADR-014, ADR-003, ADR-004, NEC-CAP-027, NEC-CAP-112, RN-CAP-136, RN-CAP-137]
 tags: [compras, plt-03, ep-cap-011, ft-com-02, deberia-tener]

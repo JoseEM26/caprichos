@@ -2,11 +2,11 @@
 id: EP-CAP-007
 tipo: spec
 titulo: "EP-CAP-007 Salón: plano, mesas, pedido del mozo y reservas"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-19
 relacionados: [CAP-PENDIENTE, BRD-CAP-001, RMP-CAP-001, NEC-CAP-014, NEC-CAP-023, NEC-CAP-043, NEC-CAP-052, NEC-CAP-053, NEC-CAP-078, NEC-CAP-095, NEC-CAP-107]
 tags: [epica, plt-02, g1, salon, debe-tener]

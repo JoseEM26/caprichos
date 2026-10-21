@@ -2,11 +2,11 @@
 id: FT-OFE-02
 tipo: spec
 titulo: "Descuentos automáticos y acumulación"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-012, FT-OFE-01, FT-OFE-03, FT-PED-01, FT-CAJ-03, FT-BOT-01, ADR-001, ADR-011, ADR-014, ADR-003, ADR-007, NEC-CAP-056, NEC-CAP-110, RN-CAP-070, RN-CAP-132]
 tags: [ofertas, plt-03, ep-cap-012, ft-ofe-02, deberia-tener]

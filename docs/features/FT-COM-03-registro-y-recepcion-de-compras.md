@@ -2,11 +2,11 @@
 id: FT-COM-03
 tipo: spec
 titulo: "Registro y recepción de compras"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-011, FT-COM-01, FT-COM-02, FT-ALM-01, FT-STK-02, ADR-001, ADR-011, ADR-014, ADR-003, ADR-004, NEC-CAP-069, RN-CAP-081, RN-CAP-136]
 tags: [compras, plt-03, ep-cap-011, ft-com-03, deberia-tener]

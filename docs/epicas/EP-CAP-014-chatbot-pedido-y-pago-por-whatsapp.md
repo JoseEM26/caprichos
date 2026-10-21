@@ -2,11 +2,11 @@
 id: EP-CAP-014
 tipo: spec
 titulo: "EP-CAP-014 Chatbot: pedido y pago por WhatsApp"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-19
 relacionados: [CAP-PENDIENTE, BRD-CAP-001, RMP-CAP-001, NEC-CAP-004, NEC-CAP-007, NEC-CAP-028, NEC-CAP-090, RN-CAP-005, RN-CAP-049, RN-CAP-101]
 tags: [epica, plt-02, g1, chatbot, deberia-tener]

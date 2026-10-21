@@ -2,11 +2,11 @@
 id: FT-INF-03
 tipo: spec
 titulo: "Notificaciones"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-018, FT-PED-03, FT-COC-01, FT-STK-03, FT-DEL-03, FT-ATN-01, ADR-001, ADR-011, ADR-014, ADR-006, ADR-012, NEC-CAP-028, NEC-CAP-086]
 tags: [informes, plt-03, ep-cap-018, ft-inf-03, deberia-tener]

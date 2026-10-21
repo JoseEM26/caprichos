@@ -2,11 +2,11 @@
 id: FT-USR-01
 tipo: spec
 titulo: "Usuarios y primer ingreso"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-013, FT-USR-02, FT-USR-03, FT-CLI-01, ADR-001, ADR-011, ADR-014, ADR-004, ADR-008, NEC-CAP-088, NEC-CAP-099, RN-CAP-098, RN-CAP-119, RN-CAP-120]
 tags: [usuarios, plt-03, ep-cap-013, ft-usr-01, debe-tener]

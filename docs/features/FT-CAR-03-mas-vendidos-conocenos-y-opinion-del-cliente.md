@@ -2,11 +2,11 @@
 id: FT-CAR-03
 tipo: spec
 titulo: "Más vendidos, Conócenos y opinión del cliente"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-001, FT-CAR-01, FT-CFG-01, FT-INF-03, ADR-001, ADR-011, ADR-014, ADR-003, ADR-006, NEC-CAP-032, NEC-CAP-033, NEC-CAP-039, RN-CAP-052, RN-CAP-061]
 tags: [carta, plt-03, ep-cap-001, ft-car-03, deberia-tener]

@@ -2,11 +2,11 @@
 id: FT-INI-01
 tipo: spec
 titulo: "Iniciativas del equipo"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-022, FT-USR-04, FT-USR-01, ADR-001, ADR-011, ADR-014, ADR-003, ADR-008, ADR-012, DT-53, DT-49, RNF-CAP-009, RNF-CAP-014]
 tags: [iniciativas, plt-03, ep-cap-022, ft-ini-01, deberia-tener]

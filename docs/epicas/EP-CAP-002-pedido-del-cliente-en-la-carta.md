@@ -2,11 +2,11 @@
 id: EP-CAP-002
 tipo: spec
 titulo: "EP-CAP-002 Pedido del cliente en la carta"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-19
 relacionados: [CAP-PENDIENTE, BRD-CAP-001, RMP-CAP-001, NEC-CAP-001, NEC-CAP-017, NEC-CAP-018, NEC-CAP-019, NEC-CAP-049, NEC-CAP-086, NEC-CAP-092]
 tags: [epica, plt-02, g1, pedido, debe-tener]

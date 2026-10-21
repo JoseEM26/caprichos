@@ -2,11 +2,11 @@
 id: FT-LEG-01
 tipo: spec
 titulo: "Comprobantes: nota de venta y datos de boleta o factura"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-020, FT-CAJ-02, FT-PED-01, FT-OFE-03, ADR-001, ADR-011, ADR-014, ADR-004, ADR-005, NEC-CAP-031, NEC-CAP-089, RN-CAP-037, RN-CAP-099]
 tags: [legal, plt-03, ep-cap-020, ft-leg-01, debe-tener]

@@ -2,11 +2,11 @@
 id: FT-COC-01
 tipo: spec
 titulo: "Pantallas de cocina por área"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-006, FT-COC-02, FT-COC-03, FT-CAJ-01, FT-SAL-02, FT-CFG-01, ADR-001, ADR-011, ADR-014, ADR-002, ADR-006, ADR-007, NEC-CAP-020, NEC-CAP-037, NEC-CAP-072, NEC-CAP-101, RN-CAP-022, RN-CAP-035, RN-CAP-084]
 tags: [cocina, plt-03, ep-cap-006, ft-coc-01, debe-tener]

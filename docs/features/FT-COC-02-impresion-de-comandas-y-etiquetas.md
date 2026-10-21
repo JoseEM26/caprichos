@@ -2,11 +2,11 @@
 id: FT-COC-02
 tipo: spec
 titulo: "Impresión de comandas y etiquetas"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-006, FT-COC-01, FT-CAJ-01, FT-CFG-02, FT-OFE-03, ADR-001, ADR-011, ADR-014, ADR-002, ADR-006, ADR-007, NEC-CAP-013, NEC-CAP-021, NEC-CAP-060, RN-CAP-019, RN-CAP-020, RN-CAP-021]
 tags: [cocina, plt-03, ep-cap-006, ft-coc-02, debe-tener]

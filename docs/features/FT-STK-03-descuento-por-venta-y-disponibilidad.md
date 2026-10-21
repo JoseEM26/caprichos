@@ -2,11 +2,11 @@
 id: FT-STK-03
 tipo: spec
 titulo: "Descuento por venta y disponibilidad"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-009, FT-STK-01, FT-STK-02, FT-CAR-02, FT-ALM-01, FT-INF-03, ADR-001, ADR-011, ADR-014, ADR-003, ADR-007, NEC-CAP-002, NEC-CAP-026, RN-CAP-003, RN-CAP-039, RN-CAP-127]
 tags: [stock, plt-03, ep-cap-009, ft-stk-03, deberia-tener]

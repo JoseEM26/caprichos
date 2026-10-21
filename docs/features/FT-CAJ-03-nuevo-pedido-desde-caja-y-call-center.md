@@ -2,11 +2,11 @@
 id: FT-CAJ-03
 tipo: spec
 titulo: "Nuevo pedido desde caja y call center"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-004, FT-CAJ-01, FT-SAL-02, FT-OFE-01, FT-OFE-02, FT-OFE-03, FT-CLI-01, FT-DEL-01, FT-USR-03, ADR-001, ADR-011, ADR-014, ADR-003, ADR-006, ADR-007, ADR-008, ADR-010, ADR-012, NEC-CAP-065, NEC-CAP-080, NEC-CAP-094, RN-CAP-033, RN-CAP-109]
 tags: [caja, plt-03, ep-cap-004, ft-caj-03, debe-tener]

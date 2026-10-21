@@ -2,11 +2,11 @@
 id: FT-INF-02
 tipo: spec
 titulo: "Indicadores y mapa de entregas"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-018, FT-INF-01, FT-DEL-01, FT-USR-02, ADR-001, ADR-011, ADR-014, ADR-006, ADR-012, NEC-CAP-041, NEC-CAP-077]
 tags: [informes, plt-03, ep-cap-018, ft-inf-02, podria-tener]

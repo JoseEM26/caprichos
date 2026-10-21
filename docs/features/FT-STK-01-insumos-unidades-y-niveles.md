@@ -2,11 +2,11 @@
 id: FT-STK-01
 tipo: spec
 titulo: "Insumos, unidades y niveles"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "Kevin Rosales (Stakeholder)", "José Ángel Espinoza (Technical Lead)"]
 fecha: 2026-10-20
 relacionados: [EP-CAP-009, FT-STK-02, FT-STK-03, FT-ALM-01, FT-COM-01, ADR-001, ADR-011, ADR-014, ADR-003, ADR-007, NEC-CAP-026, NEC-CAP-071, RN-CAP-041, RN-CAP-118, RN-CAP-127]
 tags: [stock, plt-03, ep-cap-009, ft-stk-01, deberia-tener]
