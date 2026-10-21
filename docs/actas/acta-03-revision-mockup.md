@@ -28,7 +28,7 @@ José recorrió el mockup (carta, pedidos y caja, cocina, reparto, almacén, adm
 
 ## 2. Puntos
 
-- **1 punto = S/ 1** para canjear en lo que el cliente quiera de Caprichos. No es dinero que se pueda retirar.
+- Los puntos sirven para canjear en lo que el cliente quiera de Caprichos. No es dinero que se pueda retirar.
 - **Se gana un porcentaje del total de la compra: 5 % por defecto**, editable por el administrador (antes usaron 7 % y 3 %). Ejemplo de Kevin: compra de S/ 70 → 3,5 puntos.
 - **El porcentaje es general para toda la carta,** no por producto como en restaurant.pe, para que el cliente entienda fácil cuánto acumula.
 - **Excepciones:** productos o promociones que no suman (por ejemplo, un 2×1 de campaña muy ajustado). Se marcan en el producto: «No suma puntos ni aplica cupones».

@@ -28,7 +28,7 @@ tags: [brd, plataforma-digital, g1]
 >
 > | Del BRD | Ahora | Decisión |
 > |---|---|---|
-> | NEC-CAP-036 y V8: 1 punto por cada S/ 1 | Se gana el 5 % del total (configurable); 1 punto = S/ 1 para canjear | DT-55 |
+> | NEC-CAP-036 y V8: 1 punto por cada S/ 1 | Se gana el 5 % del total (configurable); se eliminó la regla de 1 punto por sol | DT-55 |
 > | RN-CAP-001 y RN-CAP-074: todo pedido de fuera espera «por confirmar» | El pedido de la carta va directo a las comandas; caja coordina el pago después | DT-57 |
 > | RN-CAP-084: área avanza en preparación → listo | Un solo botón «Despejar», historial y vista de despacho | DT-58 |
 > | RN-CAP-078: el cajero ve lo esperado mientras cuenta | Cierre ciego: el cajero solo ve «Cuadra» o «No cuadra» | DT-61 |
@@ -80,7 +80,7 @@ Caprichos es una cafetería artesanal cuyo foco es la hospitalidad. Hoy sus herr
 | NEC-CAP-033 | Una página "Conócenos" aparte con ubicación, horario, teléfono y redes sociales. | Cliente, dueño | Acta 02 (15/10) |
 | NEC-CAP-034 | Promociones y combos armados con sus productos: al venderse se registra la promoción y se descuenta cada producto por separado; si un componente no hay, se elige otro de la misma categoría. | Cliente, dueño | Acta 02 (14/10) |
 | NEC-CAP-035 | Cupones de descuento completos (código, % o monto, mínimo, vigencia, usos máximos y por cliente, categoría o producto, canal, requiere cuenta). | Cliente | Acta 02 (14/10) y pedido del 17/10 |
-| NEC-CAP-036 | Pedir como invitado (sin puntos) o con cuenta (1 punto por cada s/ 1, con visto bueno para guardar datos); nunca se obliga a crear cuenta. | Cliente | Acta 02 (14/10) |
+| NEC-CAP-036 | Pedir como invitado (sin puntos) o con cuenta (5 % del total en puntos, con visto bueno para guardar datos); nunca se obliga a crear cuenta. | Cliente | Acta 02 (14/10) |
 | NEC-CAP-037 | Pantalla de cocina por área (bebidas, postres, salados), sin desplazamiento y con vista general opcional. | Cliente | Acta 02 (14/10) |
 | NEC-CAP-038 | Toda la información del local (nombre, ubicación, teléfono, WhatsApp, horario por día, fechas especiales, redes, pagos, entrega y fotos) se administra en un solo módulo, Configuración del local, y se refleja en la carta, el chatbot y el administrativo. | Cliente, dueño | Decisión del 17/10 (ver CFG-CAP-001) |
 | NEC-CAP-039 | Formulario "¿Cómo te fue?" al final de la carta (comentario, sugerencia, felicitación o queja) y pie de página con ubicación, horario, contacto y redes; los mensajes se ven en el administrativo. | Cliente | Decisión del 17/10 |
@@ -92,7 +92,7 @@ Caprichos es una cafetería artesanal cuyo foco es la hospitalidad. Hoy sus herr
 | NEC-CAP-045 | Los círculos "Momentos Caprichos" de la carta son destacadas editables: al tocarlos abren un visor de fotos (como las historias de Instagram) de clientes, del local o del equipo, que sube el administrador. Solo muestran fotos y no redirigen a ninguna parte. | Cliente, dueño | Pedido del 17/10 |
 | NEC-CAP-046 | Página Novedades más completa: portada con banners, filtros por tipo, galería de fotos por novedad, datos útiles y redes. | Cliente, dueño | Pedido del 17/10 |
 | NEC-CAP-047 | Filtros del administrativo en una barra compacta (buscador y botón "Filtros" que abre un panel con limpiar y resumen), pensada para celular. | Todos los roles | Pedido del 17/10 |
-| NEC-CAP-048 | Entrada visible a la cuenta del cliente en la carta (botón "Ingresar"): ingresar, crear cuenta o seguir como invitado; con cuenta se ve el saldo de puntos y suma 1 punto por cada s/ 1. Nunca se obliga. | Cliente | Pedido del 17/10 (complementa NEC-CAP-036) |
+| NEC-CAP-048 | Entrada visible a la cuenta del cliente en la carta (botón "Ingresar"): ingresar, crear cuenta o seguir como invitado; con cuenta se ve el saldo de puntos y suma el 5 % del total en puntos. Nunca se obliga. | Cliente | Pedido del 17/10 (complementa NEC-CAP-036) |
 | NEC-CAP-049 | "Usar mi ubicación actual" en todo pedido de delivery (carta, administrativo y chatbot), con mensaje de éxito o de error, mapa y enlace a Google Maps; la dirección y la referencia siguen editables. | Cliente, cajero, mozo | Pedido del 17/10 |
 | NEC-CAP-050 | Filtros del administrativo como combos (listas desplegables) con buscador cuando pasan de 10 opciones, y fechas con selector de calendario. | Todos los roles | Pedido del 17/10 |
 | NEC-CAP-051 | El panel de novedades y publicidad es general, no solo de comida: promociones, banners, videos (TikTok, Instagram o YouTube), fotos de clientes o de un evento, eventos con fecha y lugar y avisos; con etiqueta o tema (por ejemplo Navidad) y varias fotos por publicación. | Cliente, dueño | Pedido del 17/10 |
@@ -130,7 +130,7 @@ Caprichos es una cafetería artesanal cuyo foco es la hospitalidad. Hoy sus herr
 | NEC-CAP-084 | Toppings secos a 1 sol (Oreo triturado, chispas, chin chin, almendra) y aviso de hielo en los frappés. | Cliente | Reglas del bot |
 | NEC-CAP-085 | La carta y el chatbot no reciben pedidos fuera de horario, en feriado cerrado ni con la pausa por alta demanda; se comprueba otra vez al confirmar. | Cliente / Dueño | Revisión cruzada |
 | NEC-CAP-086 | Los pedidos de la carta web llegan a la cola del Admin como "por confirmar". | Operación | Revisión cruzada |
-| NEC-CAP-087 | El dueño cambia solo: medios de pago aceptados, logo, tiempo de entrega prometido, tolerancia de reservas, puntos por sol, Wi-Fi, coordenadas, términos, privacidad, mensajes de WhatsApp, encuesta posventa, zonas atendidas y área de cocina de cada categoría. | Dueño | Revisión cruzada |
+| NEC-CAP-087 | El dueño cambia solo: medios de pago aceptados, logo, tiempo de entrega prometido, tolerancia de reservas, porcentaje de puntos, Wi-Fi, coordenadas, términos, privacidad, mensajes de WhatsApp, encuesta posventa, zonas atendidas y área de cocina de cada categoría. | Dueño | Revisión cruzada |
 | NEC-CAP-088 | Altas y desactivación de usuarios, permisos editables por rol y consumo de insumos editable por producto. | Dueño | Revisión cruzada |
 | NEC-CAP-089 | Libro de Reclamaciones en la carta (con DNI, domicilio y respuesta en 15 días hábiles) y datos de boleta/factura (RUC) en el pedido. | Legal / Cliente | Revisión cruzada |
 | NEC-CAP-090 | Pago por WhatsApp automatizado: al llegar un pedido de la carta, el bot escribe al cliente con el resumen del pedido, le pregunta cómo paga, le envía los datos de pago y el monto, y espera la captura; una persona (administrador, cajero, mozo o call center) solo aprueba o rechaza el comprobante. Al aprobar, el pedido pasa a cocina. | Caja, mozo, dueño | Reunión del 19/10 |

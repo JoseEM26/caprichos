@@ -26,7 +26,7 @@ tags: [clientes, plt-03, ep-cap-003, ft-cli-02, deberia-tener]
 
 ## 1. Descripción y valor
 
-**Descripción.** Los puntos son un **saldo para canjear**: **1 punto = S/ 1** en cualquier producto de Caprichos; no se retira (DT-55, acta 03). Con cuenta, cada pedido suma **el 5 % del total** pagado (V8; el administrador cambia el porcentaje en Configuración del local), con dos decimales, una sola vez, cuando el pedido se cobra (RN-CAP-072): una compra de S/ 70 suma 3,50 puntos. El porcentaje es **general**, no por producto, para que el cliente entienda fácil cuánto acumula. No suman los productos o promociones marcados «No suma puntos ni aplica cupones» (DT-65) ni un pedido con cupón (DT-56). Un pedido como invitado no suma; por eso, **al terminar el pedido**, al invitado se le recuerda que puede ingresar para acumular, y al que ingresó se le muestra el resumen: puntos de esta compra y total. **Canje en el pedido:** «¿Cuántos puntos deseas usar?», con los puntos disponibles debajo, lo que queda mientras escribe y un botón **Aplicar**. Quien atiende suma puntos con solo el DNI; **ver o canjear** requiere la contraseña (RN-CAP-071). Al acercarse su cumpleaños, el cliente recibe en la campanita de la carta un cupón de cumpleaños (NEC-CAP-097).
+**Descripción.** Los puntos son un **saldo para canjear**: en cualquier producto de Caprichos; no se retira (DT-55, acta 03). Con cuenta, cada pedido suma **el 5 % del total** pagado (V8; el administrador cambia el porcentaje en Configuración del local), con dos decimales, una sola vez, cuando el pedido se cobra (RN-CAP-072): una compra de S/ 70 suma 3,50 puntos. El porcentaje es **general**, no por producto, para que el cliente entienda fácil cuánto acumula. No suman los productos o promociones marcados «No suma puntos ni aplica cupones» (DT-65) ni un pedido con cupón (DT-56). Un pedido como invitado no suma; por eso, **al terminar el pedido**, al invitado se le recuerda que puede ingresar para acumular, y al que ingresó se le muestra el resumen: puntos de esta compra y total. **Canje en el pedido:** «¿Cuántos puntos deseas usar?», con los puntos disponibles debajo, lo que queda mientras escribe y un botón **Aplicar**. Quien atiende suma puntos con solo el DNI; **ver o canjear** requiere la contraseña (RN-CAP-071). Al acercarse su cumpleaños, el cliente recibe en la campanita de la carta un cupón de cumpleaños (NEC-CAP-097).
 
 **Beneficio esperado.** Fidelizar a los clientes frecuentes con un programa simple que se entiende en soles, sin obligar a nadie a registrarse. Kevin lo considera «generoso» y «vale la pena para mantener la fidelidad» (acta 03). Hipótesis medible: **100 % de los pedidos cobrados con cuenta suman sus puntos una sola vez**; **0 puntos sumados a pedidos anulados**; **0 canjes mayores al saldo**.
 
@@ -70,7 +70,7 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | --- | --- | --- |
 | RN-CAP-071 | Sumar puntos requiere solo el DNI; ver o canjear requiere la contraseña. | BRD §5 |
 | RN-CAP-072 | Los puntos se suman al cobrarse el pedido, una sola vez; el personal también suma. | Personal, caja |
-| V8 | Se gana el 5 % del total con cuenta (configurable); 1 punto = S/ 1. | Acta 03 · decisiones.md |
+| V8 | Se gana el 5 % del total con cuenta (configurable); ya no existe «1 punto por sol». | Acta 03 · decisiones.md |
 | DT-55 | Puntos como saldo, porcentaje general, excepciones marcadas, resumen al terminar y canje en el pedido. | Acta 03 · decisiones.md |
 
 ## 5. Trazabilidad y planificación

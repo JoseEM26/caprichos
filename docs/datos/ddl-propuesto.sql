@@ -197,7 +197,7 @@ create table device_key (                     -- agente de impresión y TV (ADR-
 -- ---------- 3. Configuración del local (FT-CFG-01/02) ------------------
 create table parametro (                      -- clave/valor con historial en auditoria (DT-20)
   clave text primary key,                      -- tiempo_prometido_min, envio_gratis_monto, envio_gratis_modo,
-  valor jsonb not null                         -- pedido_minimo, tolerancia_reserva_min, puntos_por_sol, descuento_personal_pct…
+  valor jsonb not null                         -- pedido_minimo, tolerancia_reserva_min, puntos_porcentaje, descuento_personal_pct…
 );
 create table horario_dia (
   dia_semana smallint primary key check (dia_semana between 1 and 7),
@@ -541,7 +541,7 @@ create table consumo_personal (                 -- crédito del personal; se ve 
 create table movimiento_puntos (
   id bigint generated always as identity primary key,
   party_id bigint not null references party(id), pedido_id bigint references pedido(id),
-  puntos numeric(12,2) not null,                 -- 5 % del total, 1 punto = S/ 1 (DT-55)
+  puntos numeric(12,2) not null,                 -- 5 % del total (DT-55)
   tipo text not null check (tipo in ('SUMA','REVERSA','CANJE','DEVOLUCION_CANJE')),
   en timestamptz not null default now(),
   unique (pedido_id, tipo)                       -- suma una sola vez (RN-CAP-072)

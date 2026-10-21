@@ -26,7 +26,7 @@ tags: [legal, plt-03, ep-cap-020, ft-leg-01, debe-tener]
 
 ## 1. Descripción y valor
 
-**Descripción.** El comprobante por defecto es **nota de venta**; boleta o factura solo cuando el cliente la pide (NEC-CAP-031, RN-CAP-037). El sistema **recoge los datos** (DNI para boleta, RUC y razón social para factura) en la carta, en Nuevo pedido y en el cobro, pero **no emite** el comprobante electrónico ante SUNAT: se mantiene con el facturador actual (DT-11, D-07). La nota de venta se imprime con los datos del local, el detalle, el medio de pago y, abajo, los cupones sorteados (FT-OFE-03). Se puede reimprimir.
+**Descripción.** El comprobante por defecto es **nota de venta**; en la carta el cliente elige solo **Boleta o Factura** (sin la opción «Sin comprobante», DT-77); la nota de venta es lo que imprime el local (NEC-CAP-031, RN-CAP-037). El sistema **recoge los datos** (DNI para boleta, RUC y razón social para factura) en la carta, en Nuevo pedido y en el cobro, pero **no emite** el comprobante electrónico ante SUNAT: se mantiene con el facturador actual (DT-11, D-07). La nota de venta se imprime con los datos del local, el detalle, el medio de pago y, abajo, los cupones sorteados (FT-OFE-03). Se puede reimprimir.
 
 **Beneficio esperado.** Cumplir con lo que el cliente pide sin integrar todavía la facturación electrónica. Hipótesis medible: **100 % de pedidos con boleta o factura con sus datos completos para el facturador**.
 
