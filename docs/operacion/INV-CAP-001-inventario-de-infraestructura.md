@@ -55,6 +55,21 @@ tags: [inventario, infraestructura, devops]
 
 Firewall (UFW): 22 (SSH con llave) y 80/443 solo desde los rangos de Cloudflare.
 
+**Dominio `caprichos.pe` (21/10/2026):**
+
+| Dato | Valor |
+|---|---|
+| Titular | Kevin Jordan Rosales Ocampo (contacto administrativo, técnico y de cobranza); facturación a nombre de la empresa |
+| Registrador | punto.pe |
+| Registrado | 18/10/2026 |
+| **Vence** | **17/10/2028** (renovar antes; poner recordatorio 60 días antes) |
+| Servidores de nombres | Antes `ns.rcp.net.pe` y `ns2.rcp.net.pe`; desde el 21/10/2026 los de Cloudflare (`aliza.ns.cloudflare.com`, `george.ns.cloudflare.com`) |
+| Cuenta de Cloudflare | Plan Free. Recomendado: cuenta de Kevin con José como administrador |
+
+Los datos de contacto del titular (dirección, teléfono, correos) **no se guardan en este repositorio** (Ley 29733).
+
+**Decisión del 21/10/2026 sobre el panel de Dokploy:** por ahora **no lleva dominio**; se entra por túnel SSH (`ssh -L 3000:localhost:3000 deploy@IP`). `panel.caprichos.pe` con Cloudflare Access queda para después del piloto.
+
 ## 4. Cuentas externas
 
 | Servicio | Para qué | Cuenta a nombre de | Administra | Costo |
