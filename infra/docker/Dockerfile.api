@@ -41,7 +41,21 @@ RUN pnpm --filter @caprichos/compartido build || true
 RUN pnpm --filter @caprichos/api build || pnpm run build
 
 # ==============================================================================
-# Etapa 4: Runner - Imagen final de producción de mínimo privilegio
+# Etapa 4: Producción - solo las dependencias que la API usa al ejecutarse
+# ==============================================================================
+# «pnpm deploy» arma una carpeta autónoma con la API compilada y SUS dependencias de
+# producción (sin jest, esbuild, vite ni typescript) y con el paquete compartido ya
+# copiado dentro. Así la imagen final es pequeña y no arrastra herramientas de desarrollo
+# (que Trivy reporta con vulnerabilidades críticas) ni enlaces rotos de pnpm.
+FROM builder AS prod
+RUN pnpm --filter @caprichos/api deploy --prod --legacy /out
+# «deploy» reinstala las dependencias y pierde el cliente de Prisma generado en el builder:
+# se vuelve a generar aquí, con la misma versión que declara la API.
+RUN cd /out && PRISMA_V=$(node -p "require('@prisma/client/package.json').version") \
+    && pnpm dlx prisma@${PRISMA_V} generate --schema prisma/schema.prisma
+
+# ==============================================================================
+# Etapa 5: Runner - Imagen final de producción de mínimo privilegio
 # ==============================================================================
 FROM node:24-alpine AS runner
 WORKDIR /app
@@ -53,15 +67,7 @@ RUN apk add --no-cache openssl dumb-init curl \
     && addgroup -g 1001 -S nodejs \
     && adduser -S nestjs -u 1001
 
-# Copiar artefactos compilados, dependencias y esquemas
-COPY --from=builder --chown=nestjs:nodejs /app/apps/api/dist ./apps/api/dist
-COPY --from=builder --chown=nestjs:nodejs /app/apps/api/package.json ./apps/api/package.json
-COPY --from=builder --chown=nestjs:nodejs /app/packages/compartido ./packages/compartido
-COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=nestjs:nodejs /app/package.json ./package.json
-
-# Si existen archivos de Prisma (schema y migraciones)
-COPY --from=builder --chown=nestjs:nodejs /app/apps/api/prisma* ./apps/api/prisma
+COPY --from=prod --chown=nestjs:nodejs /out/ ./
 
 USER nestjs
 
@@ -72,4 +78,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD curl -f http://localhost:3000/salud || curl -f http://localhost:3000/api/v1/salud || exit 1
 
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["node", "apps/api/dist/main.js"]
+CMD ["node", "dist/main.js"]

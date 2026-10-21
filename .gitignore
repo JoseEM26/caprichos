@@ -41,3 +41,10 @@ coverage/
 
 # Inventario real del VPS (IP del servidor): solo local
 infra/ansible/inventory.ini
+
+# Salida compilada: nunca dentro de src
+packages/*/src/**/*.js
+packages/*/src/**/*.d.ts
+packages/*/src/**/*.map
+apps/*/src/**/*.js
+apps/*/src/**/*.map
