@@ -8,14 +8,14 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [CAP-PENDIENTE, EP-CAP-001, EP-CAP-002, EP-CAP-003, EP-CAP-004, EP-CAP-005, EP-CAP-006, EP-CAP-007, EP-CAP-008, EP-CAP-009, EP-CAP-010, EP-CAP-011, EP-CAP-012, EP-CAP-013, EP-CAP-014, EP-CAP-015, EP-CAP-016, EP-CAP-017, EP-CAP-018, EP-CAP-019, EP-CAP-020, EP-CAP-021, FT-CAR-01, FT-CAR-02, FT-CAR-03, FT-PED-01, FT-PED-02, FT-PED-03, FT-CLI-01, FT-CLI-02, FT-CAJ-01, FT-CAJ-02, FT-CAJ-03, FT-CIE-01, FT-CIE-02, FT-COC-01, FT-COC-02, FT-COC-03, FT-SAL-01, FT-SAL-02, FT-SAL-03, FT-DEL-01, FT-DEL-02, FT-DEL-03, FT-STK-01, FT-STK-02, FT-STK-03, FT-ALM-01, FT-ALM-02, FT-ALM-03, FT-COM-01, FT-COM-02, FT-COM-03, FT-OFE-01, FT-OFE-02, FT-OFE-03, FT-USR-01, FT-USR-02, FT-USR-03, FT-BOT-01, FT-BOT-02, FT-BOT-03, FT-ATN-01, FT-ATN-02, FT-ATN-03, FT-CON-01, FT-CON-02, FT-CON-03, FT-CFG-01, FT-CFG-02, FT-INF-01, FT-INF-02, FT-INF-03, FT-OFF-01, FT-LEG-01, FT-LEG-02, FT-USR-04, FT-PLA-01, FT-PLA-02, FT-PLA-03, FT-PLA-04, FT-PLA-05]
+relacionados: [CAP-PENDIENTE, EP-CAP-001, EP-CAP-002, EP-CAP-003, EP-CAP-004, EP-CAP-005, EP-CAP-006, EP-CAP-007, EP-CAP-008, EP-CAP-009, EP-CAP-010, EP-CAP-011, EP-CAP-012, EP-CAP-013, EP-CAP-014, EP-CAP-015, EP-CAP-016, EP-CAP-017, EP-CAP-018, EP-CAP-019, EP-CAP-020, EP-CAP-021, EP-CAP-022, FT-CAR-01, FT-CAR-02, FT-CAR-03, FT-PED-01, FT-PED-02, FT-PED-03, FT-CLI-01, FT-CLI-02, FT-CAJ-01, FT-CAJ-02, FT-CAJ-03, FT-CIE-01, FT-CIE-02, FT-COC-01, FT-COC-02, FT-COC-03, FT-SAL-01, FT-SAL-02, FT-SAL-03, FT-DEL-01, FT-DEL-02, FT-DEL-03, FT-STK-01, FT-STK-02, FT-STK-03, FT-ALM-01, FT-ALM-02, FT-ALM-03, FT-COM-01, FT-COM-02, FT-COM-03, FT-OFE-01, FT-OFE-02, FT-OFE-03, FT-USR-01, FT-USR-02, FT-USR-03, FT-BOT-01, FT-BOT-02, FT-BOT-03, FT-ATN-01, FT-ATN-02, FT-ATN-03, FT-CON-01, FT-CON-02, FT-CON-03, FT-CFG-01, FT-CFG-02, FT-INF-01, FT-INF-02, FT-INF-03, FT-OFF-01, FT-LEG-01, FT-LEG-02, FT-USR-04, FT-PLA-01, FT-PLA-02, FT-PLA-03, FT-PLA-04, FT-PLA-05, FT-INI-01]
 tags: [test-plan, caprichos, qa, g4, g6, t3]
 ---
 
 # Test Plan (T-TEST-PLAN) - G6 · Caprichos (carta, administrativo y chatbot)
 
 - Ticket: *(pendiente — R13, D-14)*
-- HU referenciadas: 189 (HU-CAP-001 a HU-CAP-189). Todas son de capa A salvo HU-CAP-168 y HU-CAP-169 (modo sin internet, fase aparte), que llevan casos pero se ejecutan solo si se aprueba la fase.
+- HU referenciadas: 194 (HU-CAP-001 a HU-CAP-194). Todas son de capa A. HU-CAP-168 y HU-CAP-169 (modo sin internet, mini servidor en la caja) llevan casos que se ejecutan en la segunda meta (DT-52).
 - Tipo: T3 (BRD §Ticket).
 - Flujos críticos E2E propuestos para que el PO los confirme: sección «Flujos críticos E2E».
 - Fuente de verdad: `analisis/decisiones.md`.
@@ -34,7 +34,7 @@ Criterios de salida: Ciclo 0 sin fallos de seguridad críticos y PERF dentro de 
 
 ## Casos
 
-Convención: un caso `TC-CAP-<HU>-<NN>` por cada criterio `CA-NN` de la historia (1 a 1). Tipos: func, E2E, API, integ, regres, advers. Entregas: H1 (piloto), H2, H3 y fase aparte. Datos **sintéticos**: clientes «Cliente 9001», teléfonos +51 900 000 0xx, correos `@ejemplo.test`, DNI 00000001 a 00000099, RUC 20000000001.
+Convención: un caso `TC-CAP-<HU>-<NN>` por cada criterio `CA-NN` de la historia (1 a 1). Tipos: func, E2E, API, integ, regres, advers. Entregas: H1 (piloto), H2 y H3; el modo sin internet va en la segunda meta (DT-52). Datos **sintéticos**: clientes «Cliente 9001», teléfonos +51 900 000 0xx, correos `@ejemplo.test`, DNI 00000001 a 00000099, RUC 20000000001.
 
 ### EP-CAP-001 Carta virtual y catálogo
 
@@ -686,11 +686,13 @@ Convención: un caso `TC-CAP-<HU>-<NN>` por cada criterio `CA-NN` de la historia
 
 | ID | Caso | Tipo (func/E2E/API/integ/regres/advers) | Resultado | Evidencia (commit) |
 | --- | --- | --- | --- | --- |
-| TC-CAP-168-01 | HU-CAP-168 · CA-1: dado internet cortado, cuando el mozo envía un pedido → llega a la pantalla de cocina por la red local y se imprime (RQ-OFF-01-01) | func |  |  |
-| TC-CAP-168-02 | HU-CAP-168 · CA-2: dado un cobro sin internet, cuando se registra → queda en la base local con su hora (RQ-OFF-01-02) | func |  |  |
-| TC-CAP-168-03 | HU-CAP-168 · CA-3: dado internet cortado, cuando cualquier usuario mira la cabecera → ve «Sin internet · los pedidos web no llegan» (RQ-OFF-01-05) | func |  |  |
-| TC-CAP-169-01 | HU-CAP-169 · CA-1: dado 20 pedidos sin internet, cuando vuelve la conexión → los 20 llegan al sistema en línea en orden, sin duplicados (RQ-OFF-01-03) | func |  |  |
-| TC-CAP-169-02 | HU-CAP-169 · CA-2: dado la mesa 3 abierta en dos equipos sin conexión entre ellos, cuando se sincroniza → se juntan en un pedido y se avisa a caja (RQ-OFF-01-04) | func |  |  |
+| TC-CAP-168-01 | HU-CAP-168 · CA-1: dado internet cortado, cuando el mozo envía un pedido desde su tablet → llega a la pantalla de cocina por la red local y la caja lo ve (RQ-OFF-01-01) | func |  |  |
+| TC-CAP-168-02 | HU-CAP-168 · CA-2: dado un cobro sin internet, cuando se registra → queda en la base local con su hora y su número de orden (RQ-OFF-01-02) | func |  |  |
+| TC-CAP-168-03 | HU-CAP-168 · CA-3: dado la PC de caja recién encendida y el router sin internet, cuando la tablet abre el administrativo → carga desde el mini servidor sin pedir internet (RQ-OFF-01-03) | advers |  |  |
+| TC-CAP-168-04 | HU-CAP-168 · CA-4: dado internet cortado, cuando cualquier usuario mira la cabecera → ve «Sin internet · los pedidos web no llegan», y la carta muestra que no recibe pedidos (RQ-OFF-01-06) | func |  |  |
+| TC-CAP-168-05 | HU-CAP-168 · CA-5: dado internet cortado, cuando el administrador intenta cambiar un precio → ve «Esto se puede hacer cuando vuelva el internet» (RQ-OFF-01-07) | func |  |  |
+| TC-CAP-169-01 | HU-CAP-169 · CA-1: dado 20 pedidos sin internet, cuando vuelve la conexión → los 20 llegan al sistema en línea en orden, sin duplicados (RQ-OFF-01-04) | func |  |  |
+| TC-CAP-169-02 | HU-CAP-169 · CA-2: dado la mesa 3 pedida desde la tablet y desde caja sin conexión al sistema en línea, cuando se sincroniza → queda un solo pedido y se avisa a caja (RQ-OFF-01-05) | func |  |  |
 
 ### EP-CAP-020 Comprobantes y obligaciones legales
 
@@ -751,6 +753,24 @@ Convención: un caso `TC-CAP-<HU>-<NN>` por cada criterio `CA-NN` de la historia
 | TC-CAP-189-02 | HU-CAP-189 · CA-2: dado la clave de OpenAI expuesta, cuando se sigue RB-CAP-005 → se genera una nueva, se cambia en Dokploy, se reinicia el servicio y la vieja se revoca en menos de 30 minutos (RQ-PLA-05-05) | func |  |  |
 | TC-CAP-189-03 | HU-CAP-189 · CA-3: dado una sospecha de acceso indebido, cuando se sigue el procedimiento → se revocan sesiones y claves, se revisa el Historial de acciones y se evalúa si hay que avisar a los afectados (Ley 29733) (RQ-PLA-05-06) | func |  |  |
 
+### EP-CAP-022 Iniciativas del equipo
+
+| ID | Caso | Tipo (func/E2E/API/integ/regres/advers) | Resultado | Evidencia (commit) |
+| --- | --- | --- | --- | --- |
+| TC-CAP-190-01 | HU-CAP-190 · CA-1: dado una cajera con sesión, cuando completa el tipo, el área, el título y el comentario y responde «Sí» en la confirmación → la iniciativa queda con código `IN-NNNN`, estado *Nueva*, su nombre, su rol y la fecha; si responde «No», no se guarda nada (RQ-INI-01-01) | func |  |  |
+| TC-CAP-190-02 | HU-CAP-190 · CA-2: dado una captura de 8 MB, cuando se intenta subir → se rechaza con un aviso de tamaño; dada una de 2 MB, se guarda y su dirección directa sin sesión responde 403 (RQ-INI-01-02) | func |  |  |
+| TC-CAP-190-03 | HU-CAP-190 · CA-3: dado el cuadro sin título, cuando se pulsa «Subir iniciativa» → aparece «Escribe un título corto» y no se pide confirmación (RQ-INI-01-03) | func |  |  |
+| TC-CAP-190-04 | HU-CAP-190 · CA-4: dado la confirmación Sí/No de la acción, cuando quien la hace responde «No» → no cambia nada y la pantalla queda como estaba (RN-CAP-015, RNF-CAP-012) | func |  |  |
+| TC-CAP-191-01 | HU-CAP-191 · CA-1: dado un mozo con sesión, cuando abre Iniciativas → ve las de todos, cada una con «Subida por <nombre> (<rol>)» y su estado, y ninguna pantalla de otro módulo queda abierta por esto (RQ-INI-01-04) | func |  |  |
+| TC-CAP-191-02 | HU-CAP-191 · CA-2: dado 30 iniciativas, cuando se filtra «Queja» y «En revisión» → solo aparecen las quejas en revisión y el contador dice cuántas son; con «Solo las mías» solo aparecen las del usuario (RQ-INI-01-05) | func |  |  |
+| TC-CAP-191-03 | HU-CAP-191 · CA-3: dado una iniciativa con captura, cuando se pulsa «Ver y comentar» → la captura se muestra ampliada dentro del ancho de un celular de 360 px sin desplazamiento horizontal (RQ-INI-01-06) | func |  |  |
+| TC-CAP-192-01 | HU-CAP-192 · CA-1: dado una iniciativa abierta, cuando el cocinero escribe un comentario y pulsa «Comentar» → aparece al final con su nombre y su rol; un comentario vacío muestra «Escribe tu comentario» (RQ-INI-01-07) | func |  |  |
+| TC-CAP-193-01 | HU-CAP-193 · CA-1: dado un cajero, cuando intenta cambiar el estado por la API → recibe 403 y el estado no cambia; dado el administrador, cuando responde «Sí» a pasar a *En revisión*, entonces el estado cambia y queda su nombre y la hora (RQ-INI-01-08) | func |  |  |
+| TC-CAP-193-02 | HU-CAP-193 · CA-2: dado 3 iniciativas nuevas, cuando el administrador abre el sistema → el menú Iniciativas muestra el número 3; al pasar una a *En revisión*, muestra 2 (RQ-INI-01-09) | func |  |  |
+| TC-CAP-193-03 | HU-CAP-193 · CA-3: dado la confirmación Sí/No de la acción, cuando quien la hace responde «No» → no cambia nada y la pantalla queda como estaba (RN-CAP-015, RNF-CAP-012) | func |  |  |
+| TC-CAP-194-01 | HU-CAP-194 · CA-1: dado una iniciativa subida desde la tablet del mozo, cuando el administrador abre el Historial de acciones y filtra el módulo «iniciativas» → ve «Subió la iniciativa IN-NNNN» con el nombre del mozo y su IP (RQ-INI-01-10) | func |  |  |
+| TC-CAP-194-02 | HU-CAP-194 · CA-2: dado una falla al escribir en el historial, cuando se sube una iniciativa → no se crea la iniciativa y se muestra un aviso para reintentar (RQ-INI-01-11) | func |  |  |
+
 ### Flujos críticos E2E
 
 | ID | Caso | Tipo (func/E2E/API/integ/regres/advers) | Resultado | Evidencia (commit) |
@@ -807,7 +827,7 @@ Convención: un caso `TC-CAP-<HU>-<NN>` por cada criterio `CA-NN` de la historia
 
 ### Capa B — Después (sin casos detallados)
 
-No hay HU de capa B en Caprichos. Lo equivalente es el modo sin internet (HU-CAP-168, HU-CAP-169, FT-OFF-01): tiene sus casos arriba, pero se ejecuta solo si se aprueba la fase aparte (DT-12, D-11).
+No hay HU de capa B en Caprichos. Lo equivalente es el modo sin internet (HU-CAP-168, HU-CAP-169, FT-OFF-01): tiene sus casos arriba y se ejecuta en la segunda meta, con el mini servidor en la caja (DT-52).
 
 ## Defectos
 
@@ -1015,8 +1035,8 @@ Ejecutado por IA: (nada ejecutado; plan generado por IA) - Consolidado y aprobad
 | HU-CAP-165 | H3 | 4 | TC-CAP-165-01 a 04 | 0 |
 | HU-CAP-166 | H1 | 4 | TC-CAP-166-01 a 04 | 0 |
 | HU-CAP-167 | H1 | 3 | TC-CAP-167-01 a 03 | 0 |
-| HU-CAP-168 | Fase aparte | 3 | TC-CAP-168-01 a 03 | 0 |
-| HU-CAP-169 | Fase aparte | 2 | TC-CAP-169-01 a 02 | 0 |
+| HU-CAP-168 | H2 | 5 | TC-CAP-168-01 a 05 | 0 |
+| HU-CAP-169 | H2 | 2 | TC-CAP-169-01 a 02 | 0 |
 | HU-CAP-170 | H1 | 3 | TC-CAP-170-01 a 03 | 0 |
 | HU-CAP-171 | H1 | 1 | TC-CAP-171-01 a 01 | 0 |
 | HU-CAP-172 | H1 | 1 | TC-CAP-172-01 a 01 | 0 |
@@ -1035,5 +1055,10 @@ Ejecutado por IA: (nada ejecutado; plan generado por IA) - Consolidado y aprobad
 | HU-CAP-187 | H1 | 3 | TC-CAP-187-01 a 03 | 0 |
 | HU-CAP-188 | H1 | 3 | TC-CAP-188-01 a 03 | 0 |
 | HU-CAP-189 | H1 | 3 | TC-CAP-189-01 a 03 | 0 |
+| HU-CAP-190 | H2 | 4 | TC-CAP-190-01 a 04 | 0 |
+| HU-CAP-191 | H2 | 3 | TC-CAP-191-01 a 03 | 0 |
+| HU-CAP-192 | H2 | 1 | TC-CAP-192-01 a 01 | 0 |
+| HU-CAP-193 | H2 | 3 | TC-CAP-193-01 a 03 | 0 |
+| HU-CAP-194 | H2 | 2 | TC-CAP-194-01 a 02 | 0 |
 
-**Totales:** 610 criterios en 189 historias = 610 casos TC (0 complementos) + 10 E2E + 12 SEC + 7 PERF + 5 REG = **644 casos**.
+**Totales:** 625 criterios en 194 historias = 625 casos TC (0 complementos) + 10 E2E + 12 SEC + 7 PERF + 5 REG = **659 casos**.

@@ -50,8 +50,9 @@ tags: [roadmap, plataforma-digital, plt-01, g1]
 | Siguiente | EP-CAP-014 Chatbot: pedido y pago por WhatsApp | Debería | 25/01/2027 | 19/02/2027 |
 | Siguiente | EP-CAP-015 Atención por WhatsApp y posventa | Debería | 08/02/2027 | 26/02/2027 |
 | Siguiente | EP-CAP-016 Administración de la carta y contenidos | Debería | 08/02/2027 | 26/02/2027 |
+| Siguiente | EP-CAP-022 Iniciativas del equipo (DT-53) | Debería | 22/02/2027 | 26/02/2027 |
 | Después | EP-CAP-018 Informes, indicadores y notificaciones | Podría | 01/03/2027 | 19/03/2027 |
-| Después (fase aparte) | EP-CAP-019 Modo sin internet | No esta vez | *(por cotizar — D-11)* | *(por cotizar — D-11)* |
+| Segunda meta (después del piloto) | EP-CAP-019 Modo sin internet (mini servidor en la caja, DT-52) | Debe | *(por cotizar — D-11)* | *(por cotizar — D-11)* |
 
 ```mermaid
 gantt
@@ -80,6 +81,7 @@ gantt
     EP-CAP-014 Chatbot: pedido y pago      :b6, 2027-01-25, 26d
     EP-CAP-015 Atención y posventa         :b7, 2027-02-08, 19d
     EP-CAP-016 Carta y contenidos          :b8, 2027-02-08, 19d
+    EP-CAP-022 Iniciativas del equipo      :b9, 2027-02-22, 5d
     Stock real y chatbot en uso (H2)       :milestone, h2, 2027-03-01, 0d
     section Después
     EP-CAP-018 Informes y notificaciones   :c1, 2027-03-01, 19d
@@ -96,7 +98,17 @@ gantt
 
 - **Ahora:** EP-CAP-021 (primero: habilitadora), EP-CAP-013, EP-CAP-017, EP-CAP-001, EP-CAP-002, EP-CAP-004, EP-CAP-006, EP-CAP-007, EP-CAP-008, EP-CAP-005, EP-CAP-020.
 - **Siguiente:** EP-CAP-009, EP-CAP-010, EP-CAP-011, EP-CAP-012, EP-CAP-003, EP-CAP-014, EP-CAP-015, EP-CAP-016.
-- **Después:** EP-CAP-018; EP-CAP-019 como fase aparte con su propia cotización (DT-12).
+- **Después:** EP-CAP-018.
+- **Segunda meta:** EP-CAP-019, el modo sin internet con un mini servidor en la caja (DT-52); su cotización queda aparte (DT-12).
+
+**Metas de construcción (DT-52)**
+
+| Meta | Qué se construye | Qué queda para después |
+|---|---|---|
+| **Primera meta** | La **carta y el administrativo en línea**, sin el agente local: EP-CAP-021, EP-CAP-013, EP-CAP-017, EP-CAP-001, EP-CAP-002, EP-CAP-004, EP-CAP-007, EP-CAP-008, EP-CAP-005, EP-CAP-020 y las pantallas de cocina (FT-COC-01 y FT-COC-03) | La impresión automática (FT-COC-02) |
+| **Segunda meta** | El **agente local en la PC de caja**: impresión automática de comandas y etiquetas (FT-COC-02, ADR-002) y el **modo sin internet** con mini servidor (EP-CAP-019, ADR-013) | — |
+
+En la primera meta, cocina trabaja con las pantallas y caja puede reimprimir desde el navegador; la impresión automática llega con el agente. Las épicas de la fase «Siguiente» siguen su orden.
 
 ## 2 DEPENDENCIAS
 
@@ -126,7 +138,7 @@ gantt
 | R-03 | Reglas y precios de la web anterior desactualizados. | Media | Medio | MEDIO | Validar la carta y las tarifas antes del piloto (DEP-05, DEP-07). | Kevin |
 | R-04 | Errores del canal de WhatsApp que generan quejas (pasó el 11/10/2026). | Media | Alto | ALTO | Pedido por botones, IA solo para dudas y una persona confirma el pago (DT-17, DT-18). | Desarrollo |
 | R-05 | Convivencia con restaurant.pe y el bot actual. | Media | Medio | MEDIO | Definir qué se mantiene durante un mes de transición (D-20). | Kevin y desarrollo |
-| R-06 | Caída de internet en hora punta. | Media | Alto | ALTO | Modo sin internet como fase aparte (D-11); mientras tanto, procedimiento manual de contingencia. | Kevin |
+| R-06 | Caída de internet en hora punta. | Media | Alto | ALTO | Modo sin internet con un mini servidor en la caja (DT-52), después de la primera meta; mientras tanto, modo manual (PCN-CAP-001). **Riesgo aceptado:** sin internet no llegan pedidos de la carta ni de WhatsApp. | Kevin |
 | R-07 | Costo y errores de la IA del bot (casi US$ 10 en 3 días con el bot actual). | Media | Medio | MEDIO | IA acotada a dudas, con límite de uso y registro de costo. | Desarrollo |
 | R-08 | Ticketeras incompatibles con la impresión automática. | Media | Alto | ALTO | Relevar modelos antes (DEP-03); ADR-002 con opción de respaldo. | Desarrollo |
 | R-09 | Pedidos duplicados en una mesa al usarla dos personas a la vez. | Media | Medio | MEDIO | Bloqueo de la mesa en tiempo real (RN-CAP-025). | Desarrollo |

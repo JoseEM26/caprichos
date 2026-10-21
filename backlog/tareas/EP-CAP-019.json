@@ -30,7 +30,7 @@
         },
         {
           "id": "HU-CAP-168-T03",
-          "titulo": "Reglas de dominio de HU-CAP-168 (RQ-OFF-01-01, RQ-OFF-01-02, RQ-OFF-01-05)",
+          "titulo": "Reglas de dominio de HU-CAP-168 (RQ-OFF-01-01, RQ-OFF-01-02, RQ-OFF-01-03, RQ-OFF-01-06, RQ-OFF-01-07)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -75,7 +75,7 @@
         },
         {
           "id": "HU-CAP-168-T07",
-          "titulo": "Pruebas TC-CAP-168-01..03 (unitarias de dominio e integración de API)",
+          "titulo": "Pruebas TC-CAP-168-01..05 (unitarias de dominio e integración de API)",
           "capa": "application",
           "actividad": "PRUEBAS",
           "responsable": "José Ángel Espinoza",
@@ -102,7 +102,7 @@
         },
         {
           "id": "HU-CAP-169-T02",
-          "titulo": "Reglas de dominio de HU-CAP-169 (RQ-OFF-01-03, RQ-OFF-01-04)",
+          "titulo": "Reglas de dominio de HU-CAP-169 (RQ-OFF-01-04, RQ-OFF-01-05)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",

@@ -37,7 +37,7 @@ Generado por IA: a partir de `analisis/BRD.md` (v1.51), `analisis/ficha-intake.m
 | DT-09 | Tres líneas de producto en una sola plataforma web: carta virtual, módulo administrativo (con pantallas de cocina y rol repartidor) y chatbot de WhatsApp. | BRD §4 |
 | DT-10 | No hay aplicación móvil propia: el repartidor usa la misma web. | BRD §4 Fuera de alcance |
 | DT-11 | La facturación electrónica ante SUNAT y el pago en línea con pasarela quedan fuera: el sistema registra la venta y el medio de pago. El comprobante por defecto es nota de venta. | BRD §4; RN-CAP-037 |
-| DT-12 | El modo sin internet es una fase aparte, con su propia cotización. | BRD §4 «Propuesto como fase aparte» |
+| DT-12 | El modo sin internet es una fase aparte, con su propia cotización. *(Confirmada y concretada por DT-52 el 20/10/2026: se hará, con un mini servidor en la caja; queda pendiente solo su cotización.)* | BRD §4 «Propuesto como fase aparte» |
 | DT-13 | Descartado por Kevin: tótems de autoservicio, reservas desde la web, filtros por rango de precio, reseñas públicas en la carta y órdenes de compra por correo. | Acta 02 |
 | DT-14 | Un insumo se pide a un solo proveedor por pedido (no se reparte mitad y mitad). | RN-CAP-137 |
 | DT-15 | El crédito es solo para el personal: se acumula por mes, sin plazo ni abonos; el descuento del pago se hace fuera del sistema. | RN-CAP-131 |
@@ -96,6 +96,8 @@ Generado por IA: a partir de `analisis/BRD.md` (v1.51), `analisis/ficha-intake.m
 | DT-49 | **Auditoría de acciones** (ADR-014): se registran los cambios sensibles (precios, ofertas, cupones, parámetros, permisos, usuarios, anulaciones, uso del PIN), los accesos (ingresos e intentos fallidos de contraseña y PIN) y las lecturas de datos sensibles (DNI completo, comprobantes de pago, exportaciones). Se consulta en una pantalla **Historial de acciones** solo para el administrador, con «Ver historial» en cada ficha (FT-USR-04). La tabla solo admite inserciones, con **huella encadenada** verificada a diario. Se guarda **2 años en línea** y luego pasa a un archivo cifrado (plazo por confirmar en la revisión legal). | Cambios sensibles sin accesos; todo cada acción. Solo «Ver historial»; sin pantalla. Solo insertar sin huella. 1 año; para siempre | RNF-CAP-009, ADR-005 |
 | DT-50 | **Descartada (20/10/2026):** registrar equipos del local, guardar la IP del local y clasificar cada acción por origen (dentro o fuera del local). Se descartó por simpleza: la IP del local puede cambiar y la llave guardada en cada navegador es frágil. **Queda la auditoría de DT-49**, que guarda y muestra la IP de cada acción tal cual, sin clasificarla. | Registrar equipos + IP del local con aviso; bloqueo desde fuera | DT-49 |
 | DT-51 | **El trabajo de plataforma y DevOps es una épica habilitadora** (EP-CAP-021 «Plataforma, despliegue y operación», fase Ahora, primera ola): monorepo y CI/CD, servidor y ambientes, copias y recuperación, vigilancia, y seguridad y mantenimiento (FT-PLA-01 a FT-PLA-05), con historias cuyo usuario es el equipo de desarrollo y operación. Sus tareas salen de HU-CAP-001. Los **documentos de operación** viven en `operacion/`: runbooks (`RB-CAP-###`), plan de release (`REL-CAP-###`, para G8), revisión de seguridad (`SEC-CAP-###`, para G7) e inventario de infraestructura (`INV-CAP-###`). Las skills del paquete los tienen en cuenta (skill `aybar-devops-operacion`). | Tareas de plataforma colgadas de una historia de negocio; documentos de operación sueltos | ADR-011, ADR-012, RNF-CAP-003 |
+| DT-52 | **El modo sin internet se hace, con un mini servidor en la PC de caja** (ADR-013, EP-CAP-019). No es una aplicación de escritorio aparte: es el agente local de DT-29. Sin internet, caja, mozo y cocina siguen trabajando por la red del local; los pedidos y cobros se guardan en la caja y **se envían todos cuando vuelve la conexión**. **No se compra router con respaldo 4G.** **Riesgo aceptado:** mientras no hay internet no llegan los pedidos de la carta ni de WhatsApp y no se manda información al delivery; lo que importa es el local (R-06). Hoy hay **una sola tablet** (la del mozo). **Orden de construcción:** la **primera meta** es la carta y el administrativo en línea, **sin el agente local todavía**; después se construye el agente (impresión automática y mini servidor). Hasta entonces, la contingencia es el modo manual (PCN-CAP-001). | Router con respaldo 4G; dejarlo solo con datos del celular y papel; construirlo dentro del piloto | R-06, DT-12, DT-29, D-11 |
+| DT-53 | **Módulo «Iniciativas»** (EP-CAP-022, FT-INI-01): cualquier persona del equipo sube una **queja, mejora o idea** con área, título, comentario y una captura opcional. **Todo el personal ve todas y ve quién la subió**; todos pueden comentar; **solo el administrador cambia el estado** (nueva, en revisión, hecha, no por ahora). No se borra ni se edita. Cada acción (subir, comentar, cambiar el estado) queda en el **Historial de acciones** con su IP (DT-49). Sin anónimas, votos ni avisos por WhatsApp. Prioridad propuesta *Debería tener*, H2 (por confirmar con Kevin). Ya está en el mockup. | Solo el administrador las ve; anónimas; votos y puntos | DT-49, ADR-014, ADR-012 |
 
 **RAM estimada con todo lo elegido**, de los 8 GB del VPS:
 
@@ -136,7 +138,7 @@ Queda margen. Si se ajusta, lo primero es apagar el ambiente de pruebas fuera de
 | Debería tener | EP-CAP-016 Administración de la carta y contenidos | El dueño cambia la carta sin programador (NEC-CAP-011, NEC-CAP-044). |
 | Debería tener | EP-CAP-003 Cuenta del cliente y puntos | Fidelización sin obligar a crear cuenta (NEC-CAP-024, NEC-CAP-036). |
 | Podría tener | EP-CAP-018 Informes, indicadores y notificaciones | Decisiones con datos (NEC-CAP-041). |
-| No esta vez (fase aparte) | EP-CAP-019 Modo sin internet | Requiere base local y sincronización; se cotiza aparte (DT-12). |
+| Debe tener (segunda meta) | EP-CAP-019 Modo sin internet | Mini servidor en la caja; se construye después de la primera meta (DT-52). Su cotización queda aparte (DT-12). |
 
 ## 7. Valores
 
@@ -175,7 +177,7 @@ Queda margen. Si se ajusta, lo primero es apagar el ambiente de pruebas fuera de
 | D-08 | Costo de las plantillas de WhatsApp y acceso a la cuenta de Meta. | Que Kevin dé acceso a la cuenta y asuma el costo de las plantillas; medir cuántas se envían al mes. |
 | D-09 | Si un trabajador, desde la carta con su usuario, puede cargar el pedido a su consumo del mes. | No en la primera versión: el crédito del personal se usa solo en el pedido del personal en el local. |
 | D-10 | Si una promoción se acumula con descuentos y cupones. | «No acumula» por defecto: se aplica solo el beneficio mayor. |
-| D-11 | Modo sin internet. | Cotizarlo aparte cuando el sistema en línea esté estable. |
+| D-11 | Modo sin internet. | **Resuelta por DT-52: se hará con un mini servidor en la caja, después de la primera meta.** Queda pendiente solo su cotización con Kevin. |
 | D-12 | Plataforma, lenguaje y hosting. | Decidir en ADR-001 con costo mensual estimado. |
 | D-13 | Cómo se conecta la ticketera (red, USB o Bluetooth) y modelo. | Relevar las ticketeras del local y decidir en ADR-002. |
 | D-14 | Ticket del tablero (R13) y nombres de PO, TL, QA y UX (R16). | **Nombres resueltos por DT-48.** Queda solo el ticket: mientras no exista, se usa `CAP-PENDIENTE`. |
@@ -187,7 +189,7 @@ Queda margen. Si se ajusta, lo primero es apagar el ambiente de pruebas fuera de
 | D-20 | Qué se mantiene de restaurant.pe y del bot actual durante la transición. | Convivir un mes: el sistema nuevo para pedidos y cocina; el actual solo para facturar. |
 | D-21 | Cuánto trabajo se puede perder si el servidor se pierde: hasta 24 horas (copia diaria) o minutos (copia continua de la base). | Empezar con 24 horas y el modo manual (PCN-CAP-001); evaluar la copia continua si Kevin no tolera perder un día de pedidos. |
 | D-22 | Segundo responsable técnico y acceso de emergencia (gestor de contraseñas y clave de restic). | Una persona de confianza con acceso de emergencia y Kevin con la clave de restic impresa y guardada. |
-| D-23 | Equipos de respaldo del local: UPS, datos móviles de respaldo y un segundo proveedor de VPS identificado. | UPS y datos móviles antes del piloto; el segundo proveedor identificado, sin contratarlo. |
+| D-23 | Equipos de respaldo del local: UPS y un segundo proveedor de VPS identificado. *(El router con respaldo 4G se descartó en DT-52.)* | UPS antes del piloto; el segundo proveedor identificado, sin contratarlo. |
 
 ## 9. Aclaraciones de alcance
 

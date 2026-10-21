@@ -14,7 +14,7 @@ tags: [datos, modelo, party, postgresql, g3]
 
 # DAT-CAP-001 — Modelo de datos de Caprichos
 
-> Modelo lógico y físico de referencia para G3. El script `datos/ddl-propuesto.sql` es la fuente: se probó en PostgreSQL 16 el 20/10/2026. Crea **96 tablas y 3 vistas** sin errores, y las restricciones clave rechazan los casos inválidos: rol vigente duplicado, DNI mal formado, dos pedidos abiertos en una mesa y delivery sin ubicación. Las migraciones reales las genera Prisma (ADR-003).
+> Modelo lógico y físico de referencia para G3. El script `datos/ddl-propuesto.sql` es la fuente: se probó en PostgreSQL 16 el 20/10/2026. Crea **98 tablas y 3 vistas** sin errores, y las restricciones clave rechazan los casos inválidos: rol vigente duplicado, DNI mal formado, dos pedidos abiertos en una mesa y delivery sin ubicación. Las migraciones reales las genera Prisma (ADR-003).
 
 ## 1. Convenciones
 
@@ -187,6 +187,23 @@ erDiagram
 | Capturas de pago | `comprobante_pago` → `archivo.privado` | Sensible | Carpeta privada, por API con permiso; 12 meses (propuesta) |
 | Contraseñas y PIN | `user_account.hash`, `pin_hash`, `customer_account.hash`, `sesion.refresh_hash` | Secreto | argon2id o huella; nunca en registros ni GlitchTip |
 | Mensajes de WhatsApp | `mensaje_chat` | Personal | No se envían a la IA con datos personales |
+
+## 7a. Iniciativas del equipo (FT-INI-01, DT-53)
+
+```mermaid
+erDiagram
+  USER_ACCOUNT ||--o{ INICIATIVA : "sube"
+  USER_ACCOUNT ||--o{ INICIATIVA_COMENTARIO : "comenta"
+  INICIATIVA ||--o{ INICIATIVA_COMENTARIO : "tiene"
+  ARCHIVO |o--o| INICIATIVA : "captura privada"
+```
+
+| Tabla | Para qué sirve |
+|---|---|
+| `iniciativa` | Queja, mejora o idea: código `IN-NNNN`, tipo, área, título (80), detalle (600), captura opcional, estado (`NUEVA`, `EN_REVISION`, `HECHA`, `NO_POR_AHORA`), autor y fecha; quién y cuándo cambió el estado |
+| `iniciativa_comentario` | Comentarios (400) con autor y fecha; no se editan ni se borran |
+
+Todo el personal lee las dos tablas; solo `ADMIN` cambia el estado. Cada acción lleva `@Auditar('iniciativas', ...)` y queda en `auditoria`. Probado en PostgreSQL 16 el 20/10/2026 (98 tablas).
 
 ## 7b. Auditoría (ADR-014)
 

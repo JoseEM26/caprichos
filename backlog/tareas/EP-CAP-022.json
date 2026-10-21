@@ -1,0 +1,367 @@
+{
+  "epica": "EP-CAP-022",
+  "generado_por_ia": true,
+  "revisado_por": null,
+  "historias": [
+    {
+      "hu": "HU-CAP-190",
+      "tareas": [
+        {
+          "id": "HU-CAP-190-T01",
+          "titulo": "Revisar criterios de HU-CAP-190 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-178-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-190-T02",
+          "titulo": "Migración Prisma de las tablas de FT-INI-01 (iniciativa, iniciativa_comentario, archivo, user_account, auditoria)",
+          "capa": "modelo",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-190-T01"
+          ]
+        },
+        {
+          "id": "HU-CAP-190-T03",
+          "titulo": "Reglas de dominio de HU-CAP-190 (RQ-INI-01-01, RQ-INI-01-02, RQ-INI-01-03)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-190-T01",
+            "HU-CAP-190-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-190-T04",
+          "titulo": "Casos de uso: Subir una iniciativa con captura",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-190-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-190-T05",
+          "titulo": "Endpoints y eventos de FT-INI-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-190-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-190-T06",
+          "titulo": "Pantalla React: Subir una iniciativa con captura",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-190-T05"
+          ]
+        },
+        {
+          "id": "HU-CAP-190-T07",
+          "titulo": "Pruebas TC-CAP-190-01..04 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-190-T06"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-191",
+      "tareas": [
+        {
+          "id": "HU-CAP-191-T01",
+          "titulo": "Revisar criterios de HU-CAP-191 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-178-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-191-T02",
+          "titulo": "Reglas de dominio de HU-CAP-191 (RQ-INI-01-04, RQ-INI-01-05, RQ-INI-01-06)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-191-T01",
+            "HU-CAP-190-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-191-T03",
+          "titulo": "Casos de uso: Ver, buscar y filtrar las iniciativas del equipo",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-191-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-191-T04",
+          "titulo": "Endpoints y eventos de FT-INI-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-191-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-191-T05",
+          "titulo": "Pantalla React: Ver, buscar y filtrar las iniciativas del equipo",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-191-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-191-T06",
+          "titulo": "Pruebas TC-CAP-191-01..03 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-191-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-192",
+      "tareas": [
+        {
+          "id": "HU-CAP-192-T01",
+          "titulo": "Revisar criterios de HU-CAP-192 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-178-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-192-T02",
+          "titulo": "Reglas de dominio de HU-CAP-192 (RQ-INI-01-07)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-192-T01",
+            "HU-CAP-190-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-192-T03",
+          "titulo": "Casos de uso: Comentar una iniciativa",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-192-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-192-T04",
+          "titulo": "Endpoints y eventos de FT-INI-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-192-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-192-T05",
+          "titulo": "Pantalla React: Comentar una iniciativa",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-192-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-192-T06",
+          "titulo": "Pruebas TC-CAP-192-01..01 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-192-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-193",
+      "tareas": [
+        {
+          "id": "HU-CAP-193-T01",
+          "titulo": "Revisar criterios de HU-CAP-193 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-178-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-193-T02",
+          "titulo": "Reglas de dominio de HU-CAP-193 (RQ-INI-01-08, RQ-INI-01-09)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-193-T01",
+            "HU-CAP-190-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-193-T03",
+          "titulo": "Casos de uso: Cambiar el estado de una iniciativa",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-193-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-193-T04",
+          "titulo": "Endpoints y eventos de FT-INI-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-193-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-193-T05",
+          "titulo": "Pantalla React: Cambiar el estado de una iniciativa",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-193-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-193-T06",
+          "titulo": "Pruebas TC-CAP-193-01..03 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-193-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-194",
+      "tareas": [
+        {
+          "id": "HU-CAP-194-T01",
+          "titulo": "Revisar criterios de HU-CAP-194 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-178-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-194-T02",
+          "titulo": "Reglas de dominio de HU-CAP-194 (RQ-INI-01-10, RQ-INI-01-11)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-194-T01",
+            "HU-CAP-190-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-194-T03",
+          "titulo": "Casos de uso: Dejar cada acción en el Historial de acciones",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-194-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-194-T04",
+          "titulo": "Endpoints y eventos de FT-INI-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-194-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-194-T05",
+          "titulo": "Pruebas TC-CAP-194-01..02 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-194-T04"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -90,9 +90,7 @@ flowchart LR
 erDiagram
   PEDIDO ||--o{ RECLAMO : ""
   PARTY ||--o{ CONSENT : ""
-  DATA_REQUEST {
-    bigint id PK
-  }
+  PARTY ||--o{ DATA_REQUEST : ""
 ```
 
 Tablas de `datos/ddl-propuesto.sql` que usa la feature: `pedido`, `reclamo`, `party`, `consent`, `data_request`. Las relaciones son las claves foráneas físicas del script (ADR-003); el detalle de columnas y restricciones está en DAT-CAP-001.

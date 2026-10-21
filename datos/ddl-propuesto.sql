@@ -627,6 +627,33 @@ create table reclamo (
 );
 create table data_request (id bigint generated always as identity primary key, party_id bigint not null references party(id), tipo text not null check (tipo in ('EXPORTAR','ANONIMIZAR')), estado text not null default 'PENDIENTE', en timestamptz default now());
 
+-- ---------- 10b. Iniciativas del equipo (FT-INI-01, DT-53) --------------
+-- Todo el personal ve y comenta; solo ADMIN cambia el estado. Nada se borra.
+-- Cada acción se registra en auditoria con @Auditar('iniciativas', ...) (ADR-014).
+create table iniciativa (
+  id bigint generated always as identity primary key,
+  codigo text not null unique,                  -- IN-0001
+  tipo text not null check (tipo in ('QUEJA','MEJORA','IDEA')),
+  area text not null check (area in ('CARTA_WEB','PEDIDOS_CAJA','COCINA','REPARTO','ALMACEN_COMPRAS','OTRO')),
+  titulo text not null check (char_length(titulo) between 1 and 80),
+  detalle text not null check (char_length(detalle) between 1 and 600),
+  archivo_id bigint references archivo(id),     -- la captura (archivo privado, ADR-012)
+  estado text not null default 'NUEVA' check (estado in ('NUEVA','EN_REVISION','HECHA','NO_POR_AHORA')),
+  creado_en timestamptz not null default now(),
+  creado_por bigint not null references user_account(id),
+  estado_cambiado_en timestamptz,
+  estado_cambiado_por bigint references user_account(id)
+);
+create index iniciativa_estado_idx on iniciativa(estado, creado_en desc);
+create table iniciativa_comentario (
+  id bigint generated always as identity primary key,
+  iniciativa_id bigint not null references iniciativa(id),
+  texto text not null check (char_length(texto) between 1 and 400),
+  creado_en timestamptz not null default now(),
+  creado_por bigint not null references user_account(id)
+);
+create index iniciativa_comentario_idx on iniciativa_comentario(iniciativa_id, creado_en);
+
 -- ---------- 11. Vistas de lectura (ADR-004) ------------------------------
 create view vw_clientes as
   select p.id party_id, coalesce(pe.nombres || ' ' || coalesce(pe.apellidos,''), o.razon_social) nombre,

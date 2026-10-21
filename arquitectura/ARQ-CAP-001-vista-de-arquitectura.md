@@ -113,6 +113,7 @@ flowchart LR
 | `atencion` | EP-CAP-015 | `respuesta_rapida`, `solicitud_cambio`, `encuesta` | `chat.tomado` | bot, pedidos |
 | `informes` | EP-CAP-018 (FT-INF-01, 02) | vistas de lectura | — | todos (solo lectura) |
 | `notificaciones` | EP-CAP-018 (FT-INF-03) | `notificacion` | `notificacion.nueva` | escucha eventos de todos |
+| `iniciativas` | EP-CAP-022 | `iniciativa`, `iniciativa_comentario` (captura en `archivo` privado) | — | usuarios y auditoría (`@Auditar`) |
 | `legal` | EP-CAP-020 | `reclamo`, `data_request`, comprobante en `pedido` | — | personas, pedidos |
 
 **Regla de dependencias** (ADR-001): un módulo solo llama a otro por su servicio de aplicación exportado o reacciona a sus eventos; nunca lee sus tablas. `informes` es la única excepción y solo lee vistas. Se verifica en el CI con dependency-cruiser.
@@ -214,7 +215,7 @@ flowchart LR
 | RNF-CAP-013 impresión | Trabajos por cola, confirmación del agente, alerta a los 10 s | ADR-002 |
 | RNF-CAP-014 sin borrado | `activo`/`anulado_en` | ADR-003 |
 | RNF-CAP-015 costo externo | `uso_externo` y topes (OpenAI, plantillas, Google) | ADR-009, ADR-010 |
-| RNF-CAP-018 sin internet | Fase aparte | ADR-013 |
+| RNF-CAP-018 sin internet | Mini servidor en la PC de caja (segunda meta, DT-52) | ADR-013 |
 | RNF-CAP-019 hora de Lima | Tareas programadas y reglas de día en `America/Lima` | ADR-003, ADR-007 |
 | RNF-CAP-020 trazabilidad de stock | `movimiento_stock` para todo cambio | ADR-003 |
 
@@ -225,7 +226,7 @@ caprichos/
 ├─ apps/
 │  ├─ api/                 NestJS · src/modulos/<modulo>/{dominio,aplicacion,infraestructura}
 │  ├─ web/                 React + Vite · src/{carta,admin,cocina}
-│  └─ agente-local/        Node · impresión ESC/POS (+ modo sin internet, fase aparte)
+│  └─ agente-local/        Node · impresión ESC/POS y mini servidor del modo sin internet (segunda meta, DT-52)
 ├─ packages/
 │  └─ compartido/          precio con opciones, descuentos, cupones, zonas (punto en polígono), tipos
 ├─ infra/

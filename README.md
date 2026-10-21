@@ -12,7 +12,7 @@ Paquete de análisis y diseño del marco Aybar (todo en `draft` hasta que se fir
 |---|---|
 | `analisis/` | Intake, BRD, registro de decisiones (`decisiones.md`), plano del local, informes de apoyo |
 | `roadmap/` | Roadmap, dependencias y riesgos |
-| `epicas/` · `features/` · `historias/` | 21 épicas (incluida la de plataforma, EP-CAP-021), 60 features y 189 historias de usuario |
+| `epicas/` · `features/` · `historias/` | 22 épicas (incluidas la de plataforma, EP-CAP-021, y la de iniciativas, EP-CAP-022), 61 features y 194 historias de usuario |
 | `adr/` | 14 decisiones técnicas (ADR-001 a ADR-014) |
 | `arquitectura/` · `datos/` | Vista de arquitectura, catálogo de API, modelo de datos y diagramas ER |
 | `dor/` · `backlog/tareas/` · `pruebas/` | Definition of Ready, tareas por épica y plan de pruebas |

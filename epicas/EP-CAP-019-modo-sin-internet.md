@@ -21,8 +21,8 @@ tags: [epica, plt-02, g1, offline, no-esta-vez]
 | PRODUCTO | Plataforma digital de Caprichos |
 | PRODUCT OWNER | José Ángel Espinoza (DT-48) |
 | SPONSOR | Kevin Rosales (dueño, ACT-CAP-001) |
-| PRIORIDAD | No esta vez (fase aparte) |
-| HORIZONTE | Fase aparte (por cotizar) |
+| PRIORIDAD | Debe tener (segunda meta, DT-52) |
+| HORIZONTE | Segunda meta: después de la carta y el administrativo en línea (cotización por definir) |
 | ESTADO | Borrador (`draft`) |
 | FECHA / VERSIÓN | 19/10/2026 · 1.0 |
 
@@ -75,25 +75,29 @@ Las metas marcadas «(propuesta)» son de la IA y las fija el dueño; las línea
 
 **Fuera de alcance (OUT)**
 
-- Pedidos de la carta y de WhatsApp durante la caída: no llegan sin internet.
+- Pedidos de la carta y de WhatsApp durante la caída: no llegan sin internet. **Riesgo aceptado por el dueño** (DT-52).
+- Información al delivery durante la caída: no se envía. También aceptado.
+- Router con respaldo 4G: descartado (DT-52).
 
 **Features que componen la épica**
 
 | ID Feature | Nombre | Prioridad | Estado |
 | --- | --- | --- | --- |
-| FT-OFF-01 | Operación local y sincronización | No esta vez | Redactada en draft: [`FT-OFF-01-operacion-local-y-sincronizacion.md`](../features/FT-OFF-01-operacion-local-y-sincronizacion.md) |
+| FT-OFF-01 | Operación local y sincronización | Debe tener | Redactada en draft: [`FT-OFF-01-operacion-local-y-sincronizacion.md`](../features/FT-OFF-01-operacion-local-y-sincronizacion.md) |
 
 **Supuestos**
 
-- Hay red local estable entre caja, mozos y cocina.
+- Hay red local estable entre caja, mozos y cocina, que sigue funcionando sin internet.
+- Hoy hay **una sola tablet** (la del mozo).
+- La PC de caja está encendida en horario de atención.
 
 **Restricciones**
 
-- Se cotiza aparte (DT-12, D-11).
+- Se construye **después de la primera meta** (carta y administrativo en línea, sin el agente local) y se cotiza aparte (DT-12, DT-52).
 
 **Dependencias y riesgos**
 
-- D-11 Modo sin internet.
+- DT-52 Decisión: mini servidor en la caja, sin router 4G, riesgo aceptado. D-11 resuelta; falta su cotización.
 - ADR del modo sin internet (bloque 4).
 
 **Criterios de éxito / salida**

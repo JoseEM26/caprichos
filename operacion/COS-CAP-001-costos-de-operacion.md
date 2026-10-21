@@ -22,14 +22,14 @@ tags: [costos, operacion, devops]
 |---|---|---|---|
 | Pedidos de la carta o del bot al día | 10 | 30 | 80 |
 | Dudas al bot de IA al día | 30 | 100 | 300 |
-| **Costo fijo mensual** | US$ 10.77 | US$ 10.77 | US$ 10.77 |
+| **Costo fijo mensual** (VPS y copias; el dominio ya está pagado) | US$ 7.77 | US$ 7.77 | US$ 7.77 |
 | Costo variable mensual (WhatsApp + IA) | US$ 6.90 | US$ 21.00 | US$ 57.00 |
-| **Total mensual** | **US$ 17.67** | **US$ 31.77** | **US$ 67.77** |
-| En soles (S/ 3.70 por US$) | S/ 65 | S/ 118 | S/ 251 |
-| **Total anual** | US$ 212.04 | US$ 381.24 | US$ 813.24 |
-| Costo por pedido de la carta o del bot | S/ 0.22 | S/ 0.13 | S/ 0.10 |
+| **Total mensual** | **US$ 14.67** | **US$ 28.77** | **US$ 64.77** |
+| En soles (S/ 3.70 por US$) | S/ 54 | S/ 106 | S/ 240 |
+| **Total anual** | US$ 176.04 | US$ 345.24 | US$ 777.24 |
+| Costo por pedido de la carta o del bot | S/ 0.18 | S/ 0.12 | S/ 0.10 |
 
-**Lectura:** lo más probable para el piloto es el escenario **Bajo a Medio**: entre **S/ 65 y S/ 118 al mes**. El costo fijo no cambia aunque haya más pedidos; lo que sube es WhatsApp.
+**Lectura:** lo más probable para el piloto es el escenario **Bajo a Medio**: entre **S/ 54 y S/ 106 al mes**. El costo fijo no cambia aunque haya más pedidos; lo que sube es WhatsApp.
 
 ## 2. Supuestos
 
@@ -39,7 +39,7 @@ tags: [costos, operacion, devops]
 | Plantilla de WhatsApp iniciada por el negocio | ~US$ 0.02 cada una (por confirmar con la calculadora de Meta, D-08) | D-08 |
 | Mensajes por pedido de la carta | 1 plantilla: el primer mensaje del bot (RN-CAP-100). Lo demás ocurre dentro de las 24 h de respuesta del cliente y es gratis | RN-CAP-100 |
 | Costo de IA por consulta | ~US$ 0.001 (modelo pequeño; por confirmar con el modelo elegido) | ADR-009 |
-| Dominio `caprichos.pe` | ~US$ 36 al año (~US$ 3.00 al mes; confirmar en punto.pe) | INV-CAP-001 |
+| Dominio `caprichos.pe` | **Ya pagado por 2 años.** Renovación después: ~US$ 36 al año (supuesto; confirmar en punto.pe) | INV-CAP-001 |
 | Copias fuera del VPS | ~US$ 0.50 al mes pasados los 10 GB gratis (confirmar con B2 o R2) | ADR-012 |
 
 ## 3. Costos fijos mensuales
@@ -47,9 +47,11 @@ tags: [costos, operacion, devops]
 | Servicio | Para qué | Cómo cobra | Mensual |
 |---|---|---|---|
 | **VPS** de 8 vCPU, 8 GB y 100 GB, con Auto Backup y 1 snapshot | Todo el sistema | Fijo | US$ 7.27 |
-| **Dominio** `caprichos.pe` (punto.pe) | Dirección de la carta y del administrativo | Anual | ~US$ 3.00 |
+| **Dominio** `caprichos.pe` (punto.pe) | Dirección de la carta y del administrativo | **Pagado por 2 años** | US$ 0.00 (ya pagado) |
 | **Copias** fuera del VPS (Cloudflare R2 o Backblaze B2) | Copia diaria de la base y las carpetas | Por GB al mes | ~US$ 0.50 |
-| **Total fijo** | | | **US$ 10.77** (S/ 40) |
+| **Total fijo** | | | **US$ 7.77** (S/ 29) |
+
+Cuando se cumplan los 2 años, el dominio vuelve a costar alrededor de **US$ 36 al año** (US$ 3 al mes si se reparte). Conviene guardar esa cifra para el presupuesto de 2028 y poner un recordatorio de renovación 90 días antes del vencimiento (PCN-CAP-001, escenario E16).
 
 ## 4. Costos variables
 
@@ -103,7 +105,7 @@ Equipos que no son parte del sistema pero hacen falta para el piloto. **No hay p
 | Tablets de mozo | Pedidos en mesa | Por confirmar | *(por cotizar)* |
 | Pantallas o TV de cocina | Mostrar las comandas | 3 Smart TV (acta 02) | — |
 | UPS (respaldo de energía) para router y PC de caja | Seguir trabajando en un corte corto | Por confirmar | *(por cotizar)* |
-| Datos móviles de respaldo (chip o celular con datos) | Internet si cae la conexión del local | Por confirmar | *(por cotizar, mensual)* |
+| Mini servidor del modo sin internet | Operar sin internet (DT-52) | Usa la PC de caja que ya existe; **sin hardware nuevo** | — |
 
 ## 8. Lo que Kevin ya paga hoy y podría reemplazarse
 
@@ -125,6 +127,7 @@ Equipos que no son parte del sistema pero hacen falta para el piloto. **No hay p
 
 ## 10. Pendientes
 
+- **Dominio ya pagado por 2 años:** anotar en INV-CAP-001 la fecha de vencimiento, a nombre de quién está y cuánto se pagó, para el recordatorio y para este documento.
 - **Cuentas a nombre de quién:** Meta, Google Cloud, OpenAI y punto.pe piden tarjeta. Propuesta: a nombre del negocio, con José como administrador (D-08).
 - **Precios exactos:** confirmar plantilla de WhatsApp en Perú, dominio `.pe`, plan del VPS y almacenamiento de copias antes de firmar este documento.
 - **Cotizar** los equipos de la sección 7.

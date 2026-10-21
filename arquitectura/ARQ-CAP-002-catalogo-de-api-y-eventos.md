@@ -456,7 +456,7 @@ tags: [arquitectura, api, websocket, g3]
 
 | Método | Ruta | Quién | Qué hace |
 | --- | --- | --- | --- |
-| (agente) | `http://caja.local/api/v1/*` | Local | Subconjunto de pedidos, cobros, comandas y mesas sin internet (fase aparte) |
+| (agente) | `http://caja.local/api/v1/*` | Local | Subconjunto de pedidos, cobros, comandas y mesas sin internet, en el mini servidor de la caja (segunda meta, DT-52) |
 | POST | `/sincronizacion` | Llave AGENTE | Envío ordenado e idempotente al volver |
 
 ### FT-LEG-01 — Comprobantes: nota de venta y datos de boleta o factura (EP-CAP-020)
@@ -522,6 +522,16 @@ tags: [arquitectura, api, websocket, g3]
 | (CI) | `Renovate y Trivy` | GitHub | PRs de actualización y bloqueo de imágenes con vulnerabilidades críticas |
 | (infra) | `unattended-upgrades` | VPS | Parches de seguridad automáticos |
 
+### FT-INI-01 — Iniciativas del equipo (EP-CAP-022)
+
+| Método | Ruta | Quién | Qué hace |
+| --- | --- | --- | --- |
+| GET | `/admin/iniciativas?q=&tipo=&estado=&mias=` | Personal | Lista para todo el personal, con autor, rol, fecha y contadores |
+| POST | `/admin/iniciativas` | Personal | Subir (tipo, área, título, detalle, captura); queda en el historial |
+| POST | `/admin/iniciativas/capturas` | Personal | Subir la captura (imagen hasta 5 MB, carpeta privada) |
+| POST | `/admin/iniciativas/{id}/comentarios` | Personal | Comentar; queda en el historial |
+| PATCH | `/admin/iniciativas/{id}/estado` | ADMIN | Nueva, en revisión, hecha o no por ahora; queda en el historial |
+
 ## 3. Eventos en tiempo real (Socket.IO, ADR-006)
 
 Namespaces: `/admin` (personal), `/carta` (público, sin datos personales), `/dispositivo` (agente y TV). Los eventos se publican **después del commit**; al reconectar, la pantalla pide el estado por REST.
@@ -569,4 +579,4 @@ Namespaces: `/admin` (personal), `/carta` (público, sin datos personales), `/di
 
 ---
 
-Generado por IA: 178 endpoints derivados de los requerimientos de las 60 features y de los ADR-001, 006, 007, 008, 009 y 014 — Revisado por: (pendiente)
+Generado por IA: 183 endpoints derivados de los requerimientos de las 61 features y de los ADR-001, 006, 007, 008, 009 y 014 — Revisado por: (pendiente)

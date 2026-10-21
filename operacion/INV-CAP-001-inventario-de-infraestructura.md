@@ -60,7 +60,7 @@ Firewall (UFW): 22 (SSH con llave) y 80/443 solo desde los rangos de Cloudflare.
 | Servicio | Para qué | Cuenta a nombre de | Administra | Costo |
 |---|---|---|---|---|
 | Proveedor del VPS | Servidor | *(por definir)* | José | US$ 7,27/mes (detalle de todos los costos en COS-CAP-001) |
-| punto.pe | Registro de `caprichos.pe` | *(por confirmar con Kevin)* | Kevin | Renovación anual |
+| punto.pe | Registro de `caprichos.pe` | *(por confirmar con Kevin)* | Kevin | **Pagado por 2 años** (vence: *por completar*; renovación ~US$ 36 al año, por confirmar) |
 | Cloudflare | DNS, proxy, HTTPS, Access | *(por definir)* | José | Gratis |
 | GitHub (JoseEM26) | Código, CI, GHCR | José | José | Gratis (cuota de Actions) |
 | Meta (WhatsApp Cloud API) | Bot y mensajes | Negocio de Kevin (DEP-12) | Kevin y José | Por conversación (D-08) |

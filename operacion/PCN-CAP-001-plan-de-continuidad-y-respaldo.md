@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-021, FT-PLA-03, FT-PLA-04, FT-PLA-05, EP-CAP-019, ADR-011, ADR-012, RB-CAP-001, RB-CAP-002, RB-CAP-003, RB-CAP-004, RB-CAP-005, INV-CAP-001, COS-CAP-001, REL-CAP-001, R-06, D-11, D-20]
+relacionados: [DT-52, EP-CAP-021, FT-PLA-03, FT-PLA-04, FT-PLA-05, EP-CAP-019, ADR-011, ADR-012, RB-CAP-001, RB-CAP-002, RB-CAP-003, RB-CAP-004, RB-CAP-005, INV-CAP-001, COS-CAP-001, REL-CAP-001, R-06, D-11, D-20]
 tags: [continuidad, respaldo, contingencia, devops]
 ---
 
@@ -53,7 +53,7 @@ Cada fila dice **qué se nota**, **qué hace el local** y **qué hace el técnic
 
 | # | Escenario | Qué se nota | Qué hace el local | Qué hace el técnico | RTO | Se puede perder |
 |---|---|---|---|---|---|---|
-| **E1** | **Se cae el internet del local** | Las pantallas no cargan; el bot y la carta siguen funcionando (están en el VPS) | **Primero**: conectar las PC y tablets a los **datos del celular** (compartir internet): el sistema vuelve a funcionar. Si no, modo manual | Llamar al proveedor de internet. Nada que restaurar | Minutos | Nada |
+| **E1** | **Se cae el internet del local** | Las pantallas no cargan; el bot y la carta siguen funcionando (están en el VPS) pero el local no los ve | **Hoy (primera meta): modo manual** con el kit en papel; se puede probar compartir los datos del celular como ayuda ocasional. **Cuando exista el mini servidor en la caja (segunda meta, DT-52):** caja, mozo y cocina siguen por la red del local y **todo se envía al volver el internet** | Llamar al proveedor de internet. Con el mini servidor: revisar que sincronizó todo al volver | Inmediato (modo manual) | Nada |
 | **E2** | **Se cae la API o la carta** (error o publicación mala) | Uptime Kuma avisa; el local ve errores | Modo manual. Poner la carta en pausa si se demora (FT-COC-03) | RB-CAP-003 y, si fue una publicación, **volver atrás** con RB-CAP-001 | < 10 min si es rollback | Nada |
 | **E3** | **Se cae todo el VPS** | Carta, administrativo y bot sin respuesta | Modo manual; avisar a Kevin | Revisar el panel del proveedor; **restaurar el snapshot**; si no, servidor nuevo con **RB-CAP-004** y datos con **RB-CAP-002** | < 30 min (snapshot) a < 1 h | Hasta 24 h (RPO) |
 | **E4** | **El proveedor del VPS falla o cierra la cuenta** | No se puede entrar ni al panel | Modo manual | Contratar **otro proveedor** (candidato por elegir, D-23), **RB-CAP-004** y **RB-CAP-002**. Cambiar los registros en Cloudflare | 2 a 4 h | Hasta 24 h |
@@ -68,8 +68,19 @@ Cada fila dice **qué se nota**, **qué hace el local** y **qué hace el técnic
 | **E13** | **Falla la copia diaria** | Uptime Kuma avisa a la mañana | Nada | Correr la copia a mano (RB-CAP-003 E). Si pasan 2 días sin copia, se vuelve prioridad | Mismo día | — |
 | **E14** | **Se filtra una clave o hay acceso indebido** | Aviso, actividad rara en el Historial de acciones | Cambiar contraseñas si se pide | **RB-CAP-005 C**: contener, rotar, revisar el historial y evaluar el aviso legal (Ley 29733) | 1 a 3 h | Depende |
 | **E15** | **Virus o secuestro de datos en una PC del local** | Equipo bloqueado o con comportamiento raro | Desconectar el equipo de la red; usar otro | Reinstalar el equipo; **revocar sesiones**; cambiar contraseñas. Los datos están en el VPS y en las copias | Horas | Nada en el VPS |
-| **E16** | **Vence o se pierde el dominio `caprichos.pe`** | La carta y el administrativo dejan de abrir | Modo manual | Renovar en punto.pe; **renovación automática** y a nombre del negocio; aviso 60 días antes | Horas | Nada |
+| **E16** | **Vence o se pierde el dominio `caprichos.pe`** | La carta y el administrativo dejan de abrir | Modo manual | El dominio está **pagado por 2 años**: anotar la fecha de vencimiento, poner un recordatorio **90 días antes** y renovar en punto.pe; cuenta a nombre del negocio | Horas | Nada |
 | **E17** | **El responsable técnico no está disponible** (enfermedad, viaje, deja el proyecto) | Nadie puede arreglar | Modo manual; avisar a Kevin | Un **segundo responsable** con acceso de emergencia, runbooks y gestor de contraseñas (D-22) | Según disponibilidad | Nada |
+
+### 4.0 Modo sin internet con mini servidor en la caja (decidido, DT-52)
+
+Es la solución definitiva para una caída de internet y **está decidida**, aunque se construye en la **segunda meta**, después de la carta y el administrativo en línea (sin el agente local todavía). Es el agente local de la PC de caja (DT-29, ADR-013), no una aplicación de escritorio aparte:
+
+- Sin internet, **caja, mozo y cocina siguen trabajando por la red del local** (que sigue funcionando); los pedidos y cobros se guardan en la caja.
+- **Al volver la conexión, se envía todo** al sistema en línea, en orden y sin duplicar.
+- Hoy hay **una sola tablet**, lo que simplifica los conflictos de mesa.
+- **Riesgo aceptado por el dueño:** mientras no hay internet **no llegan los pedidos de la carta ni de WhatsApp** y no se manda información al delivery. Lo que importa es el local.
+- **No se compra router con respaldo 4G.**
+- Hasta que el mini servidor exista, el respaldo es el **modo manual** de la sección siguiente.
 
 ### 4.1 Modo manual (el local no se detiene)
 
@@ -136,8 +147,8 @@ Cada fila dice **qué se nota**, **qué hace el local** y **qué hace el técnic
 | **Copia continua de la base (WAL)** en lugar de diaria | Bajar la pérdida máxima de 24 h a minutos | Un poco más de almacenamiento de copias (centavos) y más trabajo de configuración | **D-21** |
 | **Segundo VPS en espera** | Volver en minutos si el principal cae | Unos US$ 7 al mes más | D-23 |
 | **UPS** para router y PC de caja | Cortes de luz cortos | Pago único *(por cotizar)* | D-23 |
-| **Datos móviles de respaldo** (chip o celular) | Internet del local caído | Mensual *(por cotizar)* | D-23 |
-| **Modo sin internet** (EP-CAP-019) | Operar sin conexión y sincronizar después | Fase aparte con su cotización | D-11 |
+| ~~Router con respaldo 4G~~ | *(Descartado por el equipo, DT-52)* | — | — |
+| **Modo sin internet con mini servidor en la caja** (EP-CAP-019) | Operar sin conexión y sincronizar después | **Decidido (DT-52)**: segunda meta; cotización aparte | D-11 (resuelta) |
 | **Segundo responsable técnico** | Que el sistema no dependa de una sola persona | Según el acuerdo | **D-22** |
 
 Los costos de operación habituales están en COS-CAP-001.
@@ -148,7 +159,7 @@ Los costos de operación habituales están en COS-CAP-001.
 |---|---|---|---|
 | **Restaurar una copia** (E3, E5) | Cada 3 meses | Restaurar la copia del día en pruebas con RB-CAP-002 | Tiempo total y que esté completa |
 | **Volver atrás una publicación** (E2) | Antes del piloto y cada 6 meses | Publicar y revertir en pruebas con RB-CAP-001 | Minutos |
-| **Corte de internet** (E1) | Antes del piloto | Pasar el local a datos del celular y a modo manual, con el personal | Minutos hasta volver a vender |
+| **Corte de internet** (E1) | Antes del piloto, y con el mini servidor cuando exista | Pasar el local a modo manual con el personal; después, cortar internet con el mini servidor y comprobar que sincroniza | Minutos hasta volver a vender; 0 registros perdidos |
 | **Servidor nuevo** (E3, E4) | Una vez antes del piloto | Preparar un VPS de prueba con RB-CAP-004 | Tiempo hasta responder |
 | **Modo manual** (todos) | Antes del piloto y cada 6 meses | Una hora de servicio con el kit, sin sistema | Pedidos tomados y cuadre del cierre |
 | **Rotar una clave** (E14) | Antes del piloto | RB-CAP-005 B en pruebas | Minutos |
@@ -163,7 +174,7 @@ Los costos de operación habituales están en COS-CAP-001.
 |---|---|---|
 | D-21 | Cuánto trabajo se puede perder si el servidor se pierde: hasta 24 h (copia diaria) o minutos (copia continua) | Empezar con 24 h y el modo manual; evaluar la copia continua si Kevin no tolera perder un día de pedidos |
 | D-22 | Segundo responsable técnico y acceso de emergencia (gestor de contraseñas y clave de restic) | Una persona de confianza con acceso de emergencia, más Kevin con la clave de restic impresa guardada |
-| D-23 | Equipos de respaldo del local: UPS, datos móviles de respaldo, segundo proveedor de VPS candidato | UPS y datos móviles antes del piloto; un segundo proveedor identificado, sin contratarlo |
+| D-23 | Equipos de respaldo del local: UPS y segundo proveedor de VPS candidato (el router 4G se descartó, DT-52) | UPS antes del piloto; un segundo proveedor identificado, sin contratarlo |
 
 ---
 
