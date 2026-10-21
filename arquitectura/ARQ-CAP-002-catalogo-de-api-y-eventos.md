@@ -318,9 +318,9 @@ tags: [arquitectura, api, websocket, g3]
 | Método | Ruta | Quién | Qué hace |
 | --- | --- | --- | --- |
 | CRUD | `/admin/usuarios` | ADMIN | Alta, edición, desactivar (no borrar) |
-| POST | `/auth/ingresar` | Público | Ingreso del personal |
-| POST | `/auth/cambiar-contrasena` | Personal | Primer ingreso y cambio |
-| POST | `/admin/usuarios/{id}/restablecer` | ADMIN | Volver a la inicial |
+| POST | `/auth/ingresar` | Público | Ingreso del personal; 403 USUARIO_DESACTIVADO si la cuenta está inactiva |
+| POST | `/auth/cambiar-contrasena` | Personal | Primer ingreso y cambio; en el cambio pide la contraseña actual (reautenticación) y queda en el historial |
+| POST | `/admin/usuarios/{id}/restablecer` | ADMIN | Solo el administrador: vuelve a la inicial y obliga a cambiarla; queda en el historial |
 | PUT | `/perfil/foto` | Personal | Foto de perfil |
 | POST | `/auth/renovar` | Personal y cliente | Token de renovación rotativo |
 

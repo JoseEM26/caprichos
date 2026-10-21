@@ -49,6 +49,9 @@ tags: [usuarios, plt-03, ep-cap-013, ft-usr-01, debe-tener]
 | RQ-USR-01-09 | El administrador restablece la contraseña de un usuario a la inicial. | Debería tener | RN-CAP-120 · D-17 | Dado un usuario que olvidó su contraseña, cuando el administrador la restablece con Sí/No, entonces vuelve a la inicial y se le pide crear una nueva al entrar. | Propuesto |
 | RQ-USR-01-10 | Tras 5 intentos fallidos el ingreso se bloquea unos minutos. | Debería tener | RN-CAP-120 · D-17 | Dados 5 intentos errados, cuando se intenta un sexto, entonces se rechaza y se avisa cuánto falta. | Propuesto |
 | RQ-USR-01-11 | La lista de usuarios se filtra por rol, estado y fechas de alta. | Debería tener | NEC-CAP-047 · NEC-CAP-050 | Dados 12 usuarios, cuando el administrador filtra «Cajero» activos dados de alta en octubre, entonces solo ve esos. | Propuesto |
+| RQ-USR-01-12 | Solo el administrador restablece la contraseña de un usuario a la inicial, con confirmación Sí/No; ningún otro rol ve el botón ni puede llamar a la acción, y queda en el Historial de acciones. | Debe tener | Pedido del dueño 20/10/2026 · RN-CAP-120 | Dada una cajera que olvidó su contraseña, cuando el administrador pulsa «Restablecer contraseña» en su ficha y responde «Sí», entonces su contraseña vuelve a la inicial, al entrar el sistema le exige crear una nueva y el historial registra quién la restableció; dado un mozo que intenta la misma acción por la API, entonces recibe 403 y nada cambia. | Propuesto |
+| RQ-USR-01-13 | Un usuario desactivado no puede iniciar sesión en el administrativo: ve un aviso claro, sus sesiones abiertas se cierran y su historial se conserva. | Debe tener | Pedido del dueño 20/10/2026 · RN-CAP-098 | Dado un cajero desactivado por el administrador, cuando escribe su usuario y su contraseña correcta, entonces no entra y ve «Tu usuario está desactivado»; si tenía una sesión abierta, la siguiente acción le pide ingresar y no puede; al reactivarlo vuelve a entrar con su misma contraseña. | Propuesto |
+| RQ-USR-01-14 | Para cambiar su propia contraseña, el usuario confirma que es él: escribe primero su contraseña actual; sin eso no se cambia, y el cambio queda en el Historial de acciones. | Debe tener | Pedido del dueño 20/10/2026 · RNF-CAP-007 | Dado un mozo en Mi perfil, cuando pulsa «Cambiar mi contraseña» y deja vacía la actual o escribe una equivocada, entonces no se cambia y ve un aviso; con la actual correcta y una nueva válida (6 o más caracteres, distinta de la inicial y de la actual, escrita dos veces igual), entonces se cambia y queda registrado. | Propuesto |
 
 Prioridad por NEC-CAP-088 y NEC-CAP-099 (E1). RQ-USR-01-09 y 10 dependen de la política de contraseñas (D-17). Todos nacen *Propuesto* hasta que el PO los apruebe (DT-48).
 
@@ -87,12 +90,15 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RQ-USR-01-09 | HU-CAP-118 | D-17 | R-01 |
 | RQ-USR-01-10 | HU-CAP-117 | D-17 | R-11 |
 | RQ-USR-01-11 | HU-CAP-116 | — | R-01 |
+| RQ-USR-01-12 | HU-CAP-118 | — | R-11 |
+| RQ-USR-01-13 | HU-CAP-116 | — | R-11 |
+| RQ-USR-01-14 | HU-CAP-118 | — | R-11 |
 
 Historias de usuario de esta feature (en `historias/`, en draft):
 
 - HU-CAP-116 Dar de alta y desactivar a un usuario
 - HU-CAP-117 Crear mi contraseña en el primer ingreso
-- HU-CAP-118 Cambiar mi foto y restablecer contraseñas
+- HU-CAP-118 Cambiar mi foto, cambiar mi contraseña y restablecer la de otros
 
 Decisiones técnicas que la rigen (ADR propuestos, G3): ADR-001, ADR-011, ADR-014, ADR-004, ADR-008.
 

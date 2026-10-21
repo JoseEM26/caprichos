@@ -47,6 +47,7 @@ tags: [usuarios, plt-03, ep-cap-013, ft-usr-03, deberia-tener]
 | RQ-USR-03-07 | El porcentaje de descuento del personal se cambia en Configuración del local. | Debería tener | NEC-CAP-094 · RN-CAP-058 | Dado 25 %, cuando el administrador lo cambia a 20 % con Sí/No, entonces los pedidos nuevos usan 20 %. | Propuesto |
 | RQ-USR-03-08 | El crédito no se da a clientes. | Debe tener | RN-CAP-058 | Dado un pedido de un cliente, cuando el cajero cobra, entonces no aparece la opción de crédito. | Propuesto |
 | RQ-USR-03-09 | El mes de consumos se exporta para el pago fuera del sistema. | Podría tener | RN-CAP-131 | Dado octubre, cuando el administrador toca «Exportar», entonces descarga un CSV con trabajador, total y detalle. | Propuesto |
+| RQ-USR-03-10 | El descuento del personal solo se da a trabajadores activos en cualquier canal, caja o carta virtual; al desactivar a un trabajador deja de recibirlo y al reactivarlo lo recupera. | Debe tener | Pedido del dueño 20/10/2026 · RN-CAP-106 | Dado un trabajador desactivado, cuando intenta aplicar su descuento de personal en la carta virtual o el cajero lo busca, entonces no se le aplica descuento ni aparece como trabajador activo; dado el mismo trabajador reactivado, cuando pide de nuevo, entonces vuelve a recibir su descuento. | Propuesto |
 
 Prioridad *Debería tener* por la épica (fase Siguiente). RQ-USR-03-06 y 08 son *Debe tener* porque fijan límites del crédito. Todos nacen *Propuesto* hasta que el PO los apruebe (DT-48).
 
@@ -83,6 +84,7 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RQ-USR-03-07 | HU-CAP-125 | FT-CFG-02 | R-01 |
 | RQ-USR-03-08 | HU-CAP-124 | — | R-01 |
 | RQ-USR-03-09 | HU-CAP-125 | — | R-01 |
+| RQ-USR-03-10 | HU-CAP-123 | FT-USR-01 · D-24 | R-11 |
 
 Historias de usuario de esta feature (en `historias/`, en draft):
 
@@ -101,7 +103,8 @@ Decisiones técnicas que la rigen (ADR propuestos, G3): ADR-001, ADR-011, ADR-01
 **Preguntas abiertas**
 
 1. **D-09** — si un trabajador puede cargar a su crédito desde la carta. Recomendación: no en la primera versión.
-2. **O3** — renumerar o retirar la RN-CAP-084 de abonos.
+2. **D-24** — cómo se identifica un trabajador en la carta virtual para recibir su descuento (propuesta: iniciando sesión con su usuario del administrativo; solo para trabajadores activos).
+3. **O3** — renumerar o retirar la RN-CAP-084 de abonos.
 
 ---
 

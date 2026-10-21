@@ -480,8 +480,9 @@ Convención: un caso `TC-CAP-<HU>-<NN>` por cada criterio `CA-NN` de la historia
 | TC-CAP-116-02 | HU-CAP-116 · CA-2: dado un DNI ya usado, cuando se crea otro usuario con él → no se acepta (RQ-USR-01-02) | func |  |  |
 | TC-CAP-116-03 | HU-CAP-116 · CA-3: dado Ana activa, cuando el administrador la desactiva con Sí/No → no puede entrar y su historial se conserva; al reactivarla vuelve a entrar (RQ-USR-01-03) | func |  |  |
 | TC-CAP-116-04 | HU-CAP-116 · CA-4: dado 12 usuarios, cuando el administrador filtra «Cajero» activos dados de alta en octubre → solo ve esos (RQ-USR-01-11) | func |  |  |
-| TC-CAP-116-05 | HU-CAP-116 · CA-5: dado un usuario con un rol sin permiso para esta acción (ACT-CAP-004 mozo), cuando intenta hacerla desde el menú o escribiendo la dirección de la pantalla → se rechaza en el servidor, no se guarda nada y no se entregan datos (RN-CAP-013, RNF-CAP-006) | advers |  |  |
-| TC-CAP-116-06 | HU-CAP-116 · CA-6: dado la confirmación Sí/No de la acción, cuando quien la hace responde «No» → no cambia nada y la pantalla queda como estaba (RN-CAP-015, RNF-CAP-012) | func |  |  |
+| TC-CAP-116-05 | HU-CAP-116 · CA-5: dado un cajero desactivado por el administrador, cuando escribe su usuario y su contraseña correcta → no entra y ve «Tu usuario está desactivado»; si tenía una sesión abierta, la siguiente acción le pide ingresar y no puede; al reactivarlo vuelve a entrar con su misma contraseña (RQ-USR-01-13) | func |  |  |
+| TC-CAP-116-06 | HU-CAP-116 · CA-6: dado un usuario con un rol sin permiso para esta acción (ACT-CAP-004 mozo), cuando intenta hacerla desde el menú o escribiendo la dirección de la pantalla → se rechaza en el servidor, no se guarda nada y no se entregan datos (RN-CAP-013, RNF-CAP-006) | advers |  |  |
+| TC-CAP-116-07 | HU-CAP-116 · CA-7: dado la confirmación Sí/No de la acción, cuando quien la hace responde «No» → no cambia nada y la pantalla queda como estaba (RN-CAP-015, RNF-CAP-012) | func |  |  |
 | TC-CAP-117-01 | HU-CAP-117 · CA-1: dado un usuario nuevo, cuando entra con 123456 → ve «Crea tu contraseña» y no puede ir a otra pantalla (RQ-USR-01-04) | func |  |  |
 | TC-CAP-117-02 | HU-CAP-117 · CA-2: dado la pantalla de primer ingreso, cuando el usuario escribe «123456» o dos contraseñas distintas → no se acepta; con «café2026» dos veces, sí (RQ-USR-01-05) | func |  |  |
 | TC-CAP-117-03 | HU-CAP-117 · CA-3: dado el campo de contraseña, cuando el usuario toca el ojo → ve el texto; otro toque lo oculta (RQ-USR-01-06) | func |  |  |
@@ -490,8 +491,10 @@ Convención: un caso `TC-CAP-<HU>-<NN>` por cada criterio `CA-NN` de la historia
 | TC-CAP-117-06 | HU-CAP-117 · CA-6: dado un usuario con un rol sin permiso para esta acción (ACT-CAP-004 mozo), cuando intenta hacerla desde el menú o escribiendo la dirección de la pantalla → se rechaza en el servidor, no se guarda nada y no se entregan datos (RN-CAP-013, RNF-CAP-006) | advers |  |  |
 | TC-CAP-118-01 | HU-CAP-118 · CA-1: dado un mozo en Mi perfil, cuando lo abre → puede cambiar su foto y su contraseña, y su nombre, DNI y rol aparecen bloqueados (RQ-USR-01-08) | func |  |  |
 | TC-CAP-118-02 | HU-CAP-118 · CA-2: dado un usuario que olvidó su contraseña, cuando el administrador la restablece con Sí/No → vuelve a la inicial y se le pide crear una nueva al entrar (RQ-USR-01-09) | func |  |  |
-| TC-CAP-118-03 | HU-CAP-118 · CA-3: dado un usuario con un rol sin permiso para esta acción (ACT-CAP-004 mozo), cuando intenta hacerla desde el menú o escribiendo la dirección de la pantalla → se rechaza en el servidor, no se guarda nada y no se entregan datos (RN-CAP-013, RNF-CAP-006) | advers |  |  |
-| TC-CAP-118-04 | HU-CAP-118 · CA-4: dado la confirmación Sí/No de la acción, cuando quien la hace responde «No» → no cambia nada y la pantalla queda como estaba (RN-CAP-015, RNF-CAP-012) | func |  |  |
+| TC-CAP-118-03 | HU-CAP-118 · CA-3: dado una cajera que olvidó su contraseña, cuando el administrador pulsa «Restablecer contraseña» en su ficha y responde «Sí» → su contraseña vuelve a la inicial, al entrar el sistema le exige crear una nueva y el historial registra quién la restableció; dado un mozo que intenta la misma acción por la API, entonces recibe 403 y nada cambia (RQ-USR-01-12) | func |  |  |
+| TC-CAP-118-04 | HU-CAP-118 · CA-4: dado un mozo en Mi perfil, cuando pulsa «Cambiar mi contraseña» y deja vacía la actual o escribe una equivocada → no se cambia y ve un aviso; con la actual correcta y una nueva válida (6 o más caracteres, distinta de la inicial y de la actual, escrita dos veces igual), entonces se cambia y queda registrado (RQ-USR-01-14) | func |  |  |
+| TC-CAP-118-05 | HU-CAP-118 · CA-5: dado un usuario con un rol sin permiso para esta acción (ACT-CAP-004 mozo), cuando intenta hacerla desde el menú o escribiendo la dirección de la pantalla → se rechaza en el servidor, no se guarda nada y no se entregan datos (RN-CAP-013, RNF-CAP-006) | advers |  |  |
+| TC-CAP-118-06 | HU-CAP-118 · CA-6: dado la confirmación Sí/No de la acción, cuando quien la hace responde «No» → no cambia nada y la pantalla queda como estaba (RN-CAP-015, RNF-CAP-012) | func |  |  |
 | TC-CAP-119-01 | HU-CAP-119 · CA-1: dado la lista de roles, cuando el administrador asigna un rol → elige entre administrador, cajero, cocina y barra, mozo, call center, almacén y repartidor (RQ-USR-02-01) | func |  |  |
 | TC-CAP-119-02 | HU-CAP-119 · CA-2: dado un usuario de cocina, cuando entra → su menú muestra Cocina y Producción y no Pedidos y caja, Informes ni Usuarios (RQ-USR-02-02) | func |  |  |
 | TC-CAP-119-03 | HU-CAP-119 · CA-3: dado un mozo, cuando abre la dirección de Informes → ve «No tienes acceso» y el servidor no entrega datos (RQ-USR-02-03) | advers |  |  |
@@ -509,7 +512,8 @@ Convención: un caso `TC-CAP-<HU>-<NN>` por cada criterio `CA-NN` de la historia
 | TC-CAP-123-01 | HU-CAP-123 · CA-1: dado un trabajador desactivado, cuando el cajero busca → no aparece; para un activo, no se ofrece delivery ni reserva (RQ-USR-03-01) | func |  |  |
 | TC-CAP-123-02 | HU-CAP-123 · CA-2: dado un pedido con un café de S/ 8 y un combo de S/ 22, cuando se aplica el 25 % → el café queda en S/ 6 y el combo en S/ 22 (RQ-USR-03-02) | func |  |  |
 | TC-CAP-123-03 | HU-CAP-123 · CA-3: dado un trabajador que pide en la carta con su cuenta, cuando elige el pago → no aparece «Crédito del personal» (RQ-USR-03-06) | func |  |  |
-| TC-CAP-123-04 | HU-CAP-123 · CA-4: dado un usuario con un rol sin permiso para esta acción (ACT-CAP-009 repartidor), cuando intenta hacerla desde el menú o escribiendo la dirección de la pantalla → se rechaza en el servidor, no se guarda nada y no se entregan datos (RN-CAP-013, RNF-CAP-006) | advers |  |  |
+| TC-CAP-123-04 | HU-CAP-123 · CA-4: dado un trabajador desactivado, cuando intenta aplicar su descuento de personal en la carta virtual o el cajero lo busca → no se le aplica descuento ni aparece como trabajador activo; dado el mismo trabajador reactivado, cuando pide de nuevo, entonces vuelve a recibir su descuento (RQ-USR-03-10) | func |  |  |
+| TC-CAP-123-05 | HU-CAP-123 · CA-5: dado un usuario con un rol sin permiso para esta acción (ACT-CAP-009 repartidor), cuando intenta hacerla desde el menú o escribiendo la dirección de la pantalla → se rechaza en el servidor, no se guarda nada y no se entregan datos (RN-CAP-013, RNF-CAP-006) | advers |  |  |
 | TC-CAP-124-01 | HU-CAP-124 · CA-1: dado un consumo de S/ 28 el 15/10, cuando se cobra a crédito → el mes de octubre del trabajador suma S/ 28 con el pedido y sus productos (RQ-USR-03-03) | func |  |  |
 | TC-CAP-124-02 | HU-CAP-124 · CA-2: dado Créditos del personal, cuando el administrador lo revisa → no hay botón de abono ni fechas de vencimiento (RQ-USR-03-04) | func |  |  |
 | TC-CAP-124-03 | HU-CAP-124 · CA-3: dado octubre, cuando el administrador abre Créditos del personal → ve cada trabajador con su total y, al abrirlo, sus consumos (RQ-USR-03-05) | func |  |  |
@@ -981,14 +985,14 @@ Ejecutado por IA: (nada ejecutado; plan generado por IA) - Consolidado y aprobad
 | HU-CAP-113 | H2 | 3 | TC-CAP-113-01 a 03 | 0 |
 | HU-CAP-114 | H2 | 3 | TC-CAP-114-01 a 03 | 0 |
 | HU-CAP-115 | H2 | 4 | TC-CAP-115-01 a 04 | 0 |
-| HU-CAP-116 | H1 | 6 | TC-CAP-116-01 a 06 | 0 |
+| HU-CAP-116 | H1 | 7 | TC-CAP-116-01 a 07 | 0 |
 | HU-CAP-117 | H1 | 6 | TC-CAP-117-01 a 06 | 0 |
-| HU-CAP-118 | H1 | 4 | TC-CAP-118-01 a 04 | 0 |
+| HU-CAP-118 | H1 | 6 | TC-CAP-118-01 a 06 | 0 |
 | HU-CAP-119 | H1 | 4 | TC-CAP-119-01 a 04 | 0 |
 | HU-CAP-120 | H1 | 2 | TC-CAP-120-01 a 02 | 0 |
 | HU-CAP-121 | H1 | 5 | TC-CAP-121-01 a 05 | 0 |
 | HU-CAP-122 | H1 | 3 | TC-CAP-122-01 a 03 | 0 |
-| HU-CAP-123 | H2 | 4 | TC-CAP-123-01 a 04 | 0 |
+| HU-CAP-123 | H2 | 5 | TC-CAP-123-01 a 05 | 0 |
 | HU-CAP-124 | H2 | 5 | TC-CAP-124-01 a 05 | 0 |
 | HU-CAP-125 | H2 | 4 | TC-CAP-125-01 a 04 | 0 |
 | HU-CAP-176 | H1 | 8 | TC-CAP-176-01 a 08 | 0 |
@@ -1061,4 +1065,4 @@ Ejecutado por IA: (nada ejecutado; plan generado por IA) - Consolidado y aprobad
 | HU-CAP-193 | H2 | 3 | TC-CAP-193-01 a 03 | 0 |
 | HU-CAP-194 | H2 | 2 | TC-CAP-194-01 a 02 | 0 |
 
-**Totales:** 625 criterios en 194 historias = 625 casos TC (0 complementos) + 10 E2E + 12 SEC + 7 PERF + 5 REG = **659 casos**.
+**Totales:** 629 criterios en 194 historias = 629 casos TC (0 complementos) + 10 E2E + 12 SEC + 7 PERF + 5 REG = **663 casos**.

@@ -30,7 +30,7 @@
         },
         {
           "id": "HU-CAP-116-T03",
-          "titulo": "Reglas de dominio de HU-CAP-116 (RQ-USR-01-01, RQ-USR-01-02, RQ-USR-01-03, RQ-USR-01-11)",
+          "titulo": "Reglas de dominio de HU-CAP-116 (RQ-USR-01-01, RQ-USR-01-02, RQ-USR-01-03, RQ-USR-01-11, RQ-USR-01-13)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -75,7 +75,7 @@
         },
         {
           "id": "HU-CAP-116-T07",
-          "titulo": "Pruebas TC-CAP-116-01..06 (unitarias de dominio e integración de API)",
+          "titulo": "Pruebas TC-CAP-116-01..07 (unitarias de dominio e integración de API)",
           "capa": "application",
           "actividad": "PRUEBAS",
           "responsable": "José Ángel Espinoza",
@@ -174,7 +174,7 @@
         },
         {
           "id": "HU-CAP-118-T02",
-          "titulo": "Reglas de dominio de HU-CAP-118 (RQ-USR-01-08, RQ-USR-01-09)",
+          "titulo": "Reglas de dominio de HU-CAP-118 (RQ-USR-01-08, RQ-USR-01-09, RQ-USR-01-12, RQ-USR-01-14)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -186,7 +186,7 @@
         },
         {
           "id": "HU-CAP-118-T03",
-          "titulo": "Casos de uso: Cambiar mi foto y restablecer contraseñas",
+          "titulo": "Casos de uso: Cambiar mi foto, cambiar mi contraseña y restablecer la de otros",
           "capa": "application",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -208,7 +208,7 @@
         },
         {
           "id": "HU-CAP-118-T05",
-          "titulo": "Pantalla React: Cambiar mi foto y restablecer contraseñas",
+          "titulo": "Pantalla React: Cambiar mi foto, cambiar mi contraseña y restablecer la de otros",
           "capa": "ux",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -219,7 +219,7 @@
         },
         {
           "id": "HU-CAP-118-T06",
-          "titulo": "Pruebas TC-CAP-118-01..04 (unitarias de dominio e integración de API)",
+          "titulo": "Pruebas TC-CAP-118-01..06 (unitarias de dominio e integración de API)",
           "capa": "application",
           "actividad": "PRUEBAS",
           "responsable": "José Ángel Espinoza",
@@ -567,7 +567,7 @@
         },
         {
           "id": "HU-CAP-123-T03",
-          "titulo": "Reglas de dominio de HU-CAP-123 (RQ-USR-03-01, RQ-USR-03-02, RQ-USR-03-06)",
+          "titulo": "Reglas de dominio de HU-CAP-123 (RQ-USR-03-01, RQ-USR-03-02, RQ-USR-03-06, RQ-USR-03-10)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -612,7 +612,7 @@
         },
         {
           "id": "HU-CAP-123-T07",
-          "titulo": "Pruebas TC-CAP-123-01..04 (unitarias de dominio e integración de API)",
+          "titulo": "Pruebas TC-CAP-123-01..05 (unitarias de dominio e integración de API)",
           "capa": "application",
           "actividad": "PRUEBAS",
           "responsable": "José Ángel Espinoza",
