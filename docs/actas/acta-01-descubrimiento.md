@@ -74,7 +74,7 @@ Referencias mostradas por José: un mockup de otro proyecto, la plataforma **Nex
 
 - `recursos/`: logos, plantillas de vasos y las dos cartas vigentes (PDF).
 - `recursos/README.md`: misión, visión, valores, público objetivo, paleta y contexto (incluye el reto de reducir el tiempo de entrega de 20-25 min a un máximo de 13 min).
-- `web-anterior/carta/`: análisis de la web anterior de pedidos en OlaClick (catálogo, imágenes, flujo de pedido y funcionalidades). Esa web es **histórica**; la carta vigente es la de los PDFs.
+- `legacy/web-anterior/carta/`: análisis de la web anterior de pedidos en OlaClick (catálogo, imágenes, flujo de pedido y funcionalidades). Esa web es **histórica**; la carta vigente es la de los PDFs.
 - Design system de Caprichos (artefacto): https://claude.ai/artifact/7GmJ8tWCzfidRpXfeEd4LR
 
 ## 7. Próximos pasos

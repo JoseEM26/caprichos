@@ -20,7 +20,7 @@ tags: [analisis, apoyo, analisis]
 Cuando caja **acepta** un pedido (carta web, chatbot, mesa o teléfono), se imprime sola la comanda en la ticketera de cocina, sin que nadie pulse "imprimir". Si hay delivery pagado, puede imprimirse además una copia para despacho. Si la impresión falla, caja debe enterarse y poder **reimprimir**.
 
 ## 2. Cómo lo hace hoy restaurant.pe (observado, solo lectura)
-Del análisis de Ajustes > Impresoras (`web-anterior/administrativo/modulos/ajustes-a.md`):
+Del análisis de Ajustes > Impresoras (`legacy/web-anterior/administrativo/modulos/ajustes-a.md`):
 - Un **servicio instalado en una PC Windows** del local (`PrinterRestaurant.PE`, `ServicioV5.msi`) recibe las órdenes del sistema y las manda a la impresora.
 - La ticketera se registra con **nombre, IP fija, MAC, tipo de conexión** (red con socket directo **TCP puerto 9100**, USB/driver de Windows, serial) y **ancho de papel** (58 mm = 42 columnas; 80 mm = 48 columnas). Envía comandos **ESC/POS** sin pasar por el spooler de Windows. Algunas disparan la gaveta de dinero.
 - Se enrutan por **área de producción** (cocina, barra), por **caja y tipo de comprobante** y por **estación de precuenta**. Hay botón **Probar** (ticket de calibración) y alerta "Error de impresora".

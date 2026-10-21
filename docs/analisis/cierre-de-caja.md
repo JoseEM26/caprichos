@@ -46,4 +46,4 @@ Según el informe: correlativos de boletas y facturas por turno, moneda extranje
 5. ¿Se imprime el ticket de cierre o se revisa en digital?
 
 ## 5. Sobre el informe de restaurant.pe
-El informe se generó con un agente de Antigravity. Contrasté tres puntos con las plantillas ya extraídas de restaurant.pe en `web-anterior/administrativo/modulos/caja/` (verificar movimientos antes de cerrar, conteo por billetes y monedas, caja a ciegas) y coinciden. No pude confirmar que el agente haya visto la aplicación en vivo, y varias partes del informe (tolerancia de descuadre, PDF del servidor, cajón monedero) figuran como no verificadas.
+El informe se generó con un agente de Antigravity. Contrasté tres puntos con las plantillas ya extraídas de restaurant.pe en `legacy/web-anterior/administrativo/modulos/caja/` (verificar movimientos antes de cerrar, conteo por billetes y monedas, caja a ciegas) y coinciden. No pude confirmar que el agente haya visto la aplicación en vivo, y varias partes del informe (tolerancia de descuadre, PDF del servidor, cajón monedero) figuran como no verificadas.

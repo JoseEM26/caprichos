@@ -32,7 +32,7 @@ tags: [chatbot, plt-03, ep-cap-014, ft-bot-01, deberia-tener]
 
 **Usuarios / roles.** ACT-CAP-006 Clientes (piden por WhatsApp) · Chatbot de WhatsApp, sistema (guía con botones) · ACT-CAP-002 Cajero/a (recibe el pedido).
 
-**Pantallas de referencia.** Chatbot ▸ simulador de WhatsApp (`Chatbot.dc.html` o tablero del bot del mockup); `capri-bot/` (bot actual) (mockup navegable, DT-04; no reemplaza al G2, DEP-06).
+**Pantallas de referencia.** Chatbot ▸ simulador de WhatsApp (`Chatbot.dc.html` o tablero del bot del mockup); `legacy/capri-bot/` (bot actual) (mockup navegable, DT-04; no reemplaza al G2, DEP-06).
 
 ## 2. Catálogo de requerimientos funcionales
 

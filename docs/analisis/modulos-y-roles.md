@@ -15,7 +15,7 @@ tags: [analisis, apoyo, analisis]
 # Módulos y roles del administrativo de Caprichos
 
 > Borrador para revisión. Describe los módulos y roles **del prototipo** de UX (artifact "Caprichos Plataforma Digital", tablero Administrativo). La matriz de qué ve cada rol sale del prototipo y está **por confirmar con Kevin** (RN-CAP-013 del BRD). Todos los datos del prototipo son de ejemplo.
-> Origen de los módulos: análisis del sistema actual restaurant.pe (`web-anterior/administrativo/`), reducido a lo que Caprichos usa.
+> Origen de los módulos: análisis del sistema actual restaurant.pe (`legacy/web-anterior/administrativo/`), reducido a lo que Caprichos usa.
 
 ## 1. Reglas generales
 

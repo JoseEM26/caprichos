@@ -17,7 +17,7 @@ tags: [analisis, apoyo, analisis]
 > Borrador para revisión, por confirmar con Kevin. La decisión se formaliza después en un ADR.
 
 ## 1. Cómo funciona hoy en restaurant.pe (observado, solo lectura)
-Fuente: `web-anterior/administrativo/modulos/ventas.md`, sección "Pantalla de Cocina / KDS".
+Fuente: `legacy/web-anterior/administrativo/modulos/ventas.md`, sección "Pantalla de Cocina / KDS".
 - La pantalla de cocina es **una página web más** (`#!/ventas/ver-pedidos/estado`). No hay señal de video que se envíe: el dispositivo de cocina **abre la página en un navegador**.
 - Las comandas llegan **en tiempo real** (WebSockets / Firebase) y suena un timbre; además la página se vuelve a consultar cada 60 segundos como respaldo.
 - Muestra tarjetas por estado (pendiente, en preparación), con colores por tiempo (azul, naranja desde 15 min, rojo desde 20 min), filtros por estación (cocina, barra, repostería) y opción de **ocultar la barra lateral** para verla a pantalla completa.

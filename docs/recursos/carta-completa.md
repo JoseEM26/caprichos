@@ -101,6 +101,6 @@ Variedades (12): Oreo, Choco Lúcuma, Café, Strawberry, Berries, Caramel Chocol
 
 - Si las papas van incluidas en los salados con foto.
 - Descripción de cada frappe, caliente y waffle: la carta solo da nombre y precio. Los extractores de IA dedujeron ingredientes y toppings desde las fotos; no se incluyen aquí por no estar impresos.
-- Cremas y adicionales con precio: la carta no los muestra. La web anterior sí los tenía (ver `../web-anterior/carta/datos/RESUMEN.md`), pero es histórica y sus precios difieren.
+- Cremas y adicionales con precio: la carta no los muestra. La web anterior sí los tenía (ver `../legacy/web-anterior/carta/datos/RESUMEN.md`), pero es histórica y sus precios difieren.
 - Alérgenos, horarios, canales de pedido y delivery.
 - Sabores de donas del día en el Dúo Para Compartir.

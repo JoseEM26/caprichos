@@ -42,7 +42,7 @@ El bot actual («Capri») solo entrega el enlace de la carta y no toma el pedido
 - NEC-CAP-004, NEC-CAP-007 y NEC-CAP-028.
 - NEC-CAP-090: pago por WhatsApp automatizado.
 - RN-CAP-005, RN-CAP-049 y RN-CAP-101.
-- Acta 02 y `capri-bot/`.
+- Acta 02 y `legacy/capri-bot/`.
 
 **Alineamiento estratégico**
 
