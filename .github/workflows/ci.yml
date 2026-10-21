@@ -39,11 +39,12 @@ jobs:
       - name: Regla de dependencias entre módulos
         run: pnpm run check:deps
 
-      - name: Pruebas unitarias
-        run: pnpm run test
-
+      # El paquete compartido se compila primero: la API y sus pruebas lo importan desde dist/
       - name: Compilar aplicaciones (build)
         run: pnpm run build
+
+      - name: Pruebas unitarias
+        run: pnpm run test
 
   docker-trivy:
     name: Construcción y escaneo de imágenes (Trivy)
@@ -68,7 +69,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Escanear imagen API con Trivy (falla con vulnerabilidades críticas)
-        uses: aquasecurity/trivy-action@0.29.0
+        uses: aquasecurity/trivy-action@v0.33.1
         with:
           image-ref: caprichos-api:test
           format: table
@@ -89,7 +90,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Escanear imagen Web con Trivy (falla con vulnerabilidades críticas)
-        uses: aquasecurity/trivy-action@0.29.0
+        uses: aquasecurity/trivy-action@v0.33.1
         with:
           image-ref: caprichos-web:test
           format: table
