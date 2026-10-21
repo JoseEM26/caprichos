@@ -538,12 +538,11 @@ input,textarea{font-family:inherit}
           <span style="font-family:Montserrat,sans-serif;font-weight:700;font-size:15px">{{cur.variantTitle}}</span>
           <span style="font-size:11px;font-weight:700;background:var(--ink);color:var(--bg);border-radius:9999px;padding:2px 10px">OBLIGATORIO</span>
         </div>
-        <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:8px">
           <sc-for list="{{variants}}" as="v" hint-placeholder-count="3">
-            <button onClick="{{v.pick}}" style="min-height:48px;border-radius:12px;border:1.5px solid {{v.bd}};background:var(--card);color:var(--ink);padding:0 12px;display:flex;align-items:center;gap:12px;text-align:left">
-              <span style="width:20px;height:20px;border-radius:10px;border:2px solid var(--ink);background:{{v.dot}};flex:none"></span>
-              <span style="flex:1;font-weight:600">{{v.n}}</span>
-              <span style="font-weight:700">{{v.priceText}}</span>
+            <button onClick="{{v.pick}}" style="min-height:64px;border-radius:14px;border:2px solid {{v.bd}};background:var(--card);color:var(--ink);padding:8px 10px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;text-align:left">
+              <span style="display:flex;align-items:center;gap:8px;width:100%"><span style="width:16px;height:16px;border-radius:8px;border:2px solid var(--ink);background:{{v.dot}};flex:none"></span><span style="flex:1;font-weight:700;font-size:13px;line-height:17px">{{v.n}}</span></span>
+              <span style="font-family:Montserrat,sans-serif;font-weight:800;font-size:15px;color:var(--price);padding-left:24px">{{v.priceText}}</span>
             </button>
           </sc-for>
         </div>
@@ -581,15 +580,15 @@ input,textarea{font-family:inherit}
       <sc-for list="{{groups}}" as="g" hint-placeholder-count="2">
         <div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-            <span style="font-family:Montserrat,sans-serif;font-weight:700;font-size:15px">{{g.name}}</span>
+            <span style="font-family:Montserrat,sans-serif;font-weight:800;font-size:14px;letter-spacing:0.01em">{{g.name}}</span>
             <span style="font-size:11px;font-weight:700;background:{{g.tagBg}};color:{{g.tagFg}};border-radius:9999px;padding:2px 10px;border:1px solid {{g.tagBd}}">{{g.tag}}</span>
           </div>
           <sc-if value="{{g.hasSearch}}" hint-placeholder-val="{{ false }}"><input type="search" value="{{g.q}}" onChange="{{g.setQ}}" placeholder="{{g.qLabel}}" aria-label="{{g.qLabel}}" style="width:100%;box-sizing:border-box;min-height:44px;border-radius:9999px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink);padding:0 16px;font-size:14px;margin-bottom:8px"></sc-if>
-          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;{{g.listStyle}}">
+          <div style="display:flex;flex-wrap:wrap;gap:8px;{{g.listStyle}}">
             <sc-for list="{{g.opts}}" as="o" hint-placeholder-count="3">
-              <button onClick="{{o.pick}}" style="min-height:48px;border-radius:12px;border:1.5px solid {{o.bd}};background:var(--card);color:var(--ink);padding:0 12px;display:flex;align-items:center;gap:12px;text-align:left">
-                <span style="width:20px;height:20px;border-radius:{{o.radius}};border:2px solid var(--ink);background:{{o.dot}};flex:none"></span>
-                <span style="flex:1;font-weight:600">{{o.n}}</span>
+              <button onClick="{{o.pick}}" style="min-height:44px;border-radius:9999px;border:2px solid {{o.bd}};background:var(--card);color:var(--ink);padding:0 14px 0 10px;display:flex;align-items:center;gap:8px;text-align:left;font-size:13px">
+                <span style="width:16px;height:16px;border-radius:{{o.radius}};border:2px solid var(--ink);background:{{o.dot}};flex:none"></span>
+                <span style="font-weight:600">{{o.n}}</span>
                 <span style="font-weight:700;color:var(--price)">{{o.priceText}}</span>
               </button>
             </sc-for>
@@ -598,13 +597,26 @@ input,textarea{font-family:inherit}
       </sc-for>
       </sc-if>
 
+      <!-- acta 03 (DT-57): nombre de quien toma cada bebida, para su etiqueta -->
+      <sc-if value="{{askNames}}" hint-placeholder-val="{{ false }}">
+        <div style="border:1.5px solid var(--line);border-radius:14px;padding:12px;background:var(--card);display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
+          <div aria-hidden="true" style="flex:none;width:88px;border:1.5px dashed var(--soft);border-radius:8px;padding:6px;text-align:center;background:var(--bg)"><div style="font-family:Montserrat,sans-serif;font-weight:800;font-size:14px">LUCÍA</div><div style="font-size:10px;color:var(--soft)">{{curShort}}</div></div>
+          <div style="flex:1 1 200px;min-width:0;display:flex;flex-direction:column;gap:8px">
+            <div><div style="font-family:Montserrat,sans-serif;font-weight:700;font-size:15px">¿Para quién es?</div><div style="font-size:12px;line-height:16px;color:var(--soft)">Sale en la etiqueta del vaso. Si lo dejas vacío, ponemos tu nombre.</div></div>
+            <sc-for list="{{nameInputs}}" as="ni" hint-placeholder-count="1">
+              <label style="font-size:12px;font-weight:700;display:block">{{ni.label}}<input type="text" value="{{ni.val}}" onChange="{{ni.set}}" placeholder="Ej.: Lucía" style="display:block;width:100%;box-sizing:border-box;min-height:44px;margin-top:4px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink);padding:0 12px;font-size:14px"></label>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
       <div>
         <label for="nota" style="font-family:Montserrat,sans-serif;font-weight:700;font-size:15px;display:block;margin-bottom:8px">Nota para cocina (opcional)</label>
         <input id="nota" type="text" value="{{note}}" onChange="{{setNote}}" placeholder="Ej.: sin hielo, bien caliente" style="width:100%;box-sizing:border-box;min-height:48px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);padding:0 12px;font-size:14px">
         <sc-if value="{{hasIceAdvice}}" hint-placeholder-val="{{ false }}"><div role="status" style="margin-top:6px;font-size:12px;line-height:17px;font-weight:600;color:var(--price)">{{iceAdvice}}</div></sc-if>
       </div>
 
-      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <div style="position:sticky;bottom:0;z-index:1;margin:0 -24px -24px;padding:12px 24px 16px;background:var(--bg);border-top:1px solid var(--line);display:flex;gap:12px;align-items:center;flex-wrap:wrap">
         <div style="display:flex;align-items:center;border:1.5px solid var(--ink);border-radius:12px">
           <button onClick="{{qtyDec}}" aria-label="Menos" style="width:44px;height:48px;border:0;background:transparent;color:var(--ink);font-size:22px;font-weight:800">−</button>
           <span style="min-width:28px;text-align:center;font-weight:700">{{qty}}</span>
@@ -615,18 +627,6 @@ input,textarea{font-family:inherit}
           <span>{{lineTotalText}}</span>
         </button>
       </div>
-      <!-- acta 03 (DT-57): nombre de quien toma cada bebida, para su etiqueta -->
-      <sc-if value="{{askNames}}" hint-placeholder-val="{{ false }}">
-        <div style="margin-top:12px;border:1.5px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px">
-          <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-            <div aria-hidden="true" style="flex:none;width:92px;border:1.5px dashed var(--soft);border-radius:8px;padding:6px;text-align:center;background:var(--card)"><div style="font-family:Montserrat,sans-serif;font-weight:800;font-size:15px">LUCÍA</div><div style="font-size:10px;color:var(--soft)">{{curShort}}</div></div>
-            <div style="flex:1 1 180px;min-width:0;font-size:13px;line-height:18px">Así sale en la etiqueta del vaso. Si lo dejas vacío, ponemos tu nombre.</div>
-          </div>
-          <sc-for list="{{nameInputs}}" as="ni" hint-placeholder-count="1">
-            <label style="font-size:13px;font-weight:700;display:block">{{ni.label}}<input type="text" value="{{ni.val}}" onChange="{{ni.set}}" placeholder="Ej.: Lucía" style="display:block;width:100%;box-sizing:border-box;min-height:44px;margin-top:4px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);padding:0 12px;font-size:14px"></label>
-          </sc-for>
-        </div>
-      </sc-if>
     </div>
   </div>
 </div>
