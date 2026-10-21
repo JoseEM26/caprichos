@@ -46,6 +46,8 @@ tags: [chatbot, plt-03, ep-cap-014, ft-bot-01, deberia-tener]
 | RQ-BOT-01-06 | El bot aplica los descuentos automáticos vigentes y avisa promociones aplicables. | Debería tener | NEC-CAP-110 · NEC-CAP-109 | Dado un descuento de 20 % en frappés, cuando el cliente agrega uno, entonces el resumen muestra el descuento. | Propuesto |
 | RQ-BOT-01-07 | Al terminar, el pedido pasa directo a cocina con canal «Chatbot» y el pago por coordinar; el bot confirma con el rango de entrega. | Debería tener | DT-71 · DT-57 · V1 | Dado un carrito terminado sin alta demanda, cuando el cliente confirma, entonces cada parte aparece en la pantalla de su área, el pedido figura en caja con el pago por coordinar y el bot responde «Tu pedido ya está en cocina: te llega de 25 a 35 minutos». | Propuesto |
 | RQ-BOT-01-08 | Un mensaje que el bot no entiende se repregunta una vez y luego pasa a una persona. | Debería tener | NEC-CAP-093 | Dado un texto libre fuera del flujo, cuando el bot no lo entiende dos veces, entonces avisa «Te comunico con un asesor» y deja el chat en la consola. | Propuesto |
+| RQ-BOT-01-09 | Si el cliente manda un enlace de Google Maps, el bot lee las coordenadas (también de un enlace corto, abriéndolo desde el servidor) y guarda el punto, la zona y el envío. | Debería tener | DT-79 · NEC-CAP-092 | Dado un enlace de Google Maps con coordenadas, cuando el cliente lo manda por WhatsApp, entonces el pedido guarda el punto y el bot responde con el costo de envío. | Propuesto |
+| RQ-BOT-01-10 | Si el bot no puede sacar un punto del mensaje (enlace de un lugar sin coordenadas o solo texto), pide la ubicación con el clip «Ubicación» de WhatsApp; si no la manda, el asesor ubica el pedido. Cada punto guarda de dónde vino (carta, GPS, WhatsApp, enlace, asesor). | Debería tener | DT-79 | Dado un enlace sin coordenadas, cuando el cliente lo manda, entonces el bot le pide la ubicación con el clip y no calcula el envío hasta recibirla. | Propuesto |
 
 Prioridad *Debería tener* por la épica (fase Siguiente); depende del acceso a WhatsApp (DEP-12). Todos nacen *Propuesto* hasta que el PO los apruebe (DT-48).
 
@@ -81,6 +83,8 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RQ-BOT-01-06 | HU-CAP-128 | FT-OFE-02 | R-01 |
 | RQ-BOT-01-07 | HU-CAP-128 | FT-CAJ-01 | R-01 |
 | RQ-BOT-01-08 | HU-CAP-129 | FT-ATN-01 | R-01 |
+| RQ-BOT-01-09 | HU-CAP-127 | FT-DEL-01 | R-07 |
+| RQ-BOT-01-10 | HU-CAP-127 | FT-DEL-01 | R-07 |
 
 Historias de usuario de esta feature (en `historias/`, en draft):
 

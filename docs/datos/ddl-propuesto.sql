@@ -398,6 +398,7 @@ create table pedido (
   -- copia de datos del momento (ADR-004)
   cliente_nombre text, cliente_telefono text,
   entrega_direccion text, entrega_referencia text, entrega_lat numeric(9,6), entrega_lng numeric(9,6),
+  entrega_origen text check (entrega_origen in ('GPS','ESCRITA','MAPA','WHATSAPP','ENLACE','ASESOR')),   -- de dónde vino el punto (DT-79)
   zona_id bigint references zona_reparto(id),
   pago_preferido text, paga_con numeric(12,2),
   subtotal numeric(12,2) not null, descuento numeric(12,2) not null default 0,

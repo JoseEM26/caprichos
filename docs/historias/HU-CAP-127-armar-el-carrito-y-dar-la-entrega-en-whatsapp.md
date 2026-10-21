@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-014, FT-BOT-01, RQ-BOT-01-03, RQ-BOT-01-04, HU-CAP-126, HU-CAP-128, HU-CAP-129, ADR-001, ADR-011, ADR-014, ADR-007, ADR-009, DEP-02, DEP-06, R-01, R-07]
+relacionados: [EP-CAP-014, FT-BOT-01, RQ-BOT-01-03, RQ-BOT-01-04, RQ-BOT-01-09, RQ-BOT-01-10, HU-CAP-126, HU-CAP-128, HU-CAP-129, ADR-001, ADR-011, ADR-014, ADR-007, ADR-009, DEP-02, DEP-06, R-01, R-07]
 tags: [hu, chatbot, capa-a, ft-bot-01, media, ui]
 ---
 
@@ -41,8 +41,10 @@ tags: [hu, chatbot, capa-a, ft-bot-01, media, ui]
 |---|---|---|---|
 | CA-1 | dos productos agregados | el cliente pide «Ver carrito» | ve los dos con su total y botones «Agregar más», «Quitar» y «Terminar» (RQ-BOT-01-03) |
 | CA-2 | un delivery | el cliente comparte su ubicación de WhatsApp | el bot calcula el envío; si escribe solo la dirección, el envío queda por calcular para el asesor (RQ-BOT-01-04) |
+| CA-3 | un enlace de Google Maps con coordenadas | el cliente lo manda por WhatsApp | el pedido guarda el punto y la zona, y el bot responde con el costo de envío (RQ-BOT-01-09) |
+| CA-4 | un enlace sin coordenadas o solo texto | el cliente lo manda | el bot pide la ubicación con el clip de WhatsApp y no calcula el envío; si no la manda, el asesor ubica el pedido (RQ-BOT-01-10) |
 
-Origen: criterios de verificación de FT-BOT-01 (RQ-BOT-01-03, RQ-BOT-01-04); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
+Origen: criterios de verificación de FT-BOT-01 (RQ-BOT-01-03, RQ-BOT-01-04, RQ-BOT-01-09, RQ-BOT-01-10); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
 
 ## 04 | REGLAS, DEPENDENCIAS Y EVIDENCIAS
 
