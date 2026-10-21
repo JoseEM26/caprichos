@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-013, FT-USR-03, HU-CAP-123, HU-CAP-124, HU-CAP-125, ADR-001, ADR-011, ADR-014, ADR-004, ADR-008, FT-CAJ-02, FT-CAJ-03, FT-CFG-02, FT-USR-01]
+relacionados: [EP-CAP-013, FT-USR-03, HU-CAP-123, HU-CAP-124, HU-CAP-125, ADR-001, ADR-011, ADR-014, ADR-004, ADR-008, FT-CAJ-02, FT-CAJ-03, FT-CFG-02, FT-USR-01, FT-USR-04]
 tags: [dor, plt-05, usuarios, ft-usr-03, g4]
 ---
 
@@ -61,6 +61,7 @@ flowchart LR
   FT_CAJ_03["FT-CAJ-03"]:::interna --> FT_USR_03
   FT_CFG_02["FT-CFG-02"]:::interna --> FT_USR_03
   FT_USR_01["FT-USR-01"]:::interna --> FT_USR_03
+  FT_USR_04["FT-USR-04"]:::interna --> FT_USR_03
   ADR_001["ADR-001"]:::interna -.-> FT_USR_03
   ADR_011["ADR-011"]:::interna -.-> FT_USR_03
   ADR_014["ADR-014"]:::interna -.-> FT_USR_03
@@ -71,7 +72,7 @@ flowchart LR
 ```
 
 - **Ítems evaluados:** FT-USR-03 y sus historias HU-CAP-123, HU-CAP-124, HU-CAP-125.
-- **Dependencias técnicas:** FT-CAJ-02, FT-CAJ-03, FT-CFG-02, FT-USR-01; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-004, ADR-008.
+- **Dependencias técnicas:** FT-CAJ-02, FT-CAJ-03, FT-CFG-02, FT-USR-01, FT-USR-04; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-004, ADR-008.
 - **Dependencias externas:** DEP-02, DEP-06.
 - **Decisiones abiertas:** D-09, D-24.
 
@@ -98,21 +99,24 @@ erDiagram
   PARTY_ROLE ||--o{ EMPLOYEE_DETAIL : ""
   PARTY ||--o{ PARTY_ROLE : ""
   PARTY ||--o{ CONSUMO_PERSONAL : ""
+  PARTY ||--o{ HORARIO_TRABAJO : ""
+  PARTY ||--o{ COBERTURA_TURNO : ""
+  ROL ||--o{ COBERTURA_TURNO : ""
   AUDITORIA {
     bigint id PK
   }
 ```
 
-Tablas de `datos/ddl-propuesto.sql` que usa la feature: `auditoria`, `party`, `person`, `user_account`, `rol`, `permiso`, `rol_permiso`, `sesion`, `employee_detail`, `party_role`, `consumo_personal`. Las relaciones son las claves foráneas físicas del script (ADR-003); el detalle de columnas y restricciones está en DAT-CAP-001.
+Tablas de `datos/ddl-propuesto.sql` que usa la feature: `auditoria`, `party`, `person`, `user_account`, `rol`, `permiso`, `rol_permiso`, `sesion`, `employee_detail`, `party_role`, `consumo_personal`, `horario_trabajo`, `cobertura_turno`. Las relaciones son las claves foráneas físicas del script (ADR-003); el detalle de columnas y restricciones está en DAT-CAP-001.
 
 Proceso (orden de las historias):
 
 ```mermaid
 flowchart TB
   P0["HU-CAP-123<br>Registrar el consumo del personal a crédito"]
-  P1["HU-CAP-124<br>Revisar el crédito del personal por mes"]
+  P1["HU-CAP-124<br>Revisar el crédito del personal por semana o por rango de fechas"]
   P0 --> P1
-  P2["HU-CAP-125<br>Configurar el descuento del personal y exportar el mes"]
+  P2["HU-CAP-125<br>Configurar el descuento del personal y exportar la semana"]
   P1 --> P2
 ```
 
@@ -164,9 +168,10 @@ flowchart TB
 | --- | --- | --- | --- | --- | --- | --- |
 | R-01 | Riesgo de roadmap (ver PLT-01) | — | — | Según roadmap | Ver PLT-01 | Abierto |
 | R-11 | Riesgo de roadmap (ver PLT-01) | — | — | Según roadmap | Ver PLT-01 | Abierto |
-| R-FT-USR-03-01 | Si no se resuelve «D-09», hay que rehacer criterios o pantallas | Media | Medio | Resolver con Kevin antes de G4 con la propuesta escrita en la feature | Kevin | Abierto |
-| R-FT-USR-03-02 | Si no se resuelve «D-24», hay que rehacer criterios o pantallas | Media | Medio | Resolver con Kevin antes de G4 con la propuesta escrita en la feature | Kevin | Abierto |
-| R-FT-USR-03-03 | Si no se resuelve «O3», hay que rehacer criterios o pantallas | Media | Medio | Resolver con Kevin antes de G4 con la propuesta escrita en la feature | Kevin | Abierto |
+| R-FT-USR-03-01 | Si no se resuelve «¿En qué día empieza la semana de pago? Propuesta: de lunes a domingo, configurable en Configuración del local», hay que rehacer criterios o pantallas | Media | Medio | Resolver con Kevin antes de G4 con la propuesta escrita en la feature | Kevin | Abierto |
+| R-FT-USR-03-02 | Si no se resuelve «D-09», hay que rehacer criterios o pantallas | Media | Medio | Resolver con Kevin antes de G4 con la propuesta escrita en la feature | Kevin | Abierto |
+| R-FT-USR-03-03 | Si no se resuelve «D-24», hay que rehacer criterios o pantallas | Media | Medio | Resolver con Kevin antes de G4 con la propuesta escrita en la feature | Kevin | Abierto |
+| R-FT-USR-03-04 | Si no se resuelve «O3», hay que rehacer criterios o pantallas | Media | Medio | Resolver con Kevin antes de G4 con la propuesta escrita en la feature | Kevin | Abierto |
 
 ## 6 DECISIÓN Y APROBACIÓN
 

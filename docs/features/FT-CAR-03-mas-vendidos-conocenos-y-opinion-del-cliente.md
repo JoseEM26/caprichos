@@ -47,6 +47,7 @@ tags: [carta, plt-03, ep-cap-001, ft-car-03, deberia-tener]
 | RQ-CAR-03-07 | Una queja avisa al correo del dueño. | Debería tener | RN-CAP-061 · RN-CAP-057 | Dada una queja recibida, cuando se guarda, entonces se envía un aviso al correo del dueño guardado en Configuración y una notificación en el administrativo (FT-INF-03). | Propuesto |
 | RQ-CAR-03-08 | Los mensajes no se eliminan: se marcan como atendidos. | Debe tener | RN-CAP-061 · RN-CAP-014 | Dado un mensaje nuevo, cuando el administrador lo marca atendido con Sí/No, entonces cambia de estado, guarda quién y cuándo, y no hay opción de borrarlo. | Propuesto |
 | RQ-CAR-03-09 | El pie de la carta muestra ubicación, horario, contacto y redes. | Debería tener | NEC-CAP-039 | Dada la carta, cuando el cliente llega al final, entonces ve el pie con los datos de Configuración del local y enlaces a WhatsApp y redes. | Propuesto |
+| RQ-CAR-03-10 | Conócenos ofrece solo un enlace «Ver nuestras reseñas en Google» a la ficha del local; la carta no copia reseñas, nombres ni fotos de quienes las escribieron. | Podría tener | DT-66 · Acta 03 | Dado el enlace de Google Maps cargado en Configuración del local, cuando el cliente toca «Ver nuestras reseñas en Google», entonces se abre la ficha del local en Google Maps; en la carta no aparece ninguna reseña, nombre ni foto de terceros. | Propuesto |
 
 Prioridad *Debería tener* por la épica (acta 02 y decisión del 17/10); RQ-CAR-03-05 y 08 son *Debe tener* porque aplican reglas generales (RN-CAP-059 y RN-CAP-014). Todos nacen *Propuesto* hasta que el PO los apruebe (DT-48).
 
@@ -69,6 +70,7 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RN-CAP-059 | Un dato del local tiene una sola fuente: Configuración del local. | Decisión del 17/10 |
 | RN-CAP-061 | Las quejas del formulario se avisan al correo del dueño; los mensajes no se eliminan, se marcan atendidos. | Decisión del 17/10 |
 | RN-CAP-062 | Solo el administrador sube o quita fotos del local, con confirmación. | Decisión del 17/10 |
+| DT-66 | No se muestran reseñas de Google con nombre o foto (Ley 29733 y términos de Google); solo un enlace a la ficha, hasta una revisión legal. | decisiones.md |
 
 ## 5. Trazabilidad y planificación
 
@@ -83,6 +85,7 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RQ-CAR-03-07 | HU-CAP-011 | Correo del dueño (DEP-04) | R-01 |
 | RQ-CAR-03-08 | HU-CAP-011 | — | R-01 |
 | RQ-CAR-03-09 | HU-CAP-010 | FT-CFG-01 | R-01 |
+| RQ-CAR-03-10 | HU-CAP-010 | FT-CFG-01 | R-01 |
 
 Historias de usuario de esta feature (en `historias/`, en draft):
 
@@ -94,7 +97,7 @@ Decisiones técnicas que la rigen (ADR propuestos, G3): ADR-001, ADR-011, ADR-01
 
 **Fuera de alcance**
 
-- Reseñas públicas en la carta (descartadas, DT-13).
+- Reseñas públicas en la carta (descartadas, DT-13) y reseñas de Google Maps con nombre o foto (descartadas por datos personales, DT-66).
 - Encuesta posventa por WhatsApp y opiniones en Google Maps: FT-ATN-03.
 - Cómo se cargan los datos y las fotos del local: FT-CFG-01.
 

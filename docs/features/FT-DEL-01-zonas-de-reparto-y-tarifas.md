@@ -42,10 +42,11 @@ tags: [delivery, plt-03, ep-cap-008, ft-del-01, debe-tener]
 | RQ-DEL-01-02 | El administrador edita los puntos de una zona con validación; si no son válidos, se mantiene la zona original. | Debe tener | NEC-CAP-100 · RN-CAP-122 | Dada la zona Z3, cuando el administrador pega puntos con una latitud mal escrita, entonces ve el error y la zona sigue con sus puntos anteriores. | Propuesto |
 | RQ-DEL-01-03 | El administrador cambia la tarifa de una zona. | Debe tener | NEC-CAP-100 | Dada Z5 en S/ 6, cuando el administrador la cambia a S/ 6,50 con Sí/No, entonces los pedidos nuevos en Z5 cobran S/ 6,50 y los anteriores no cambian. | Propuesto |
 | RQ-DEL-01-04 | Una zona apagada no se ofrece ni se detecta. | Debe tener | RN-CAP-122 | Dada Z7 apagada, cuando un punto cae en Z7, entonces se trata como fuera de cobertura. | Propuesto |
-| RQ-DEL-01-05 | No se crean zonas nuevas desde el administrativo. | Debe tener | NEC-CAP-100 · RN-CAP-122 | Dada la pantalla de zonas, cuando el administrador la revisa, entonces no hay botón para crear zonas. | Propuesto |
-| RQ-DEL-01-06 | El envío es gratis cuando los productos pasan del monto configurado. | Debe tener | RN-CAP-095 · NEC-CAP-096 | Dado «más de S/ 70», cuando los productos suman S/ 70,10, entonces el envío es S/ 0; el administrador puede cambiar a «desde S/ 70». | Propuesto |
-| RQ-DEL-01-07 | El administrador asigna a un cliente una tarifa especial de monto fijo o porcentaje. | Debería tener | RN-CAP-109 · NEC-CAP-096 | Dado un cliente con envío fijo de S/ 2 y otro con 50 %, cuando cada uno pide a Z5 (S/ 6), entonces pagan S/ 2 y S/ 3; si sus productos pasan de S/ 70, ambos pagan S/ 0. | Propuesto |
-| RQ-DEL-01-08 | Fuera de cobertura no se registra delivery y se ofrece recojo. | Debe tener | RN-CAP-087 · RN-CAP-103 | Dado un punto fuera de todas las zonas activas, cuando se intenta guardar el delivery, entonces se avisa y se ofrece «Para recoger»; el intento se registra para el mapa de entregas. | Propuesto |
+| RQ-DEL-01-05 | Las zonas no dejan huecos entre sí: al guardar una zona se avisa si queda un espacio entre ella y una vecina. | Debería tener | Acta 03 §17 | Dadas Z3 y Z4 vecinas, cuando el administrador mueve un punto de Z3 y deja una franja sin zona entre ambas, entonces ve «Queda un espacio sin zona entre Z3 y Z4» antes de guardar; un pedido en esa franja no queda sin cobrar envío. | Propuesto |
+| RQ-DEL-01-06 | No se crean zonas nuevas desde el administrativo. | Debe tener | NEC-CAP-100 · RN-CAP-122 | Dada la pantalla de zonas, cuando el administrador la revisa, entonces no hay botón para crear zonas. | Propuesto |
+| RQ-DEL-01-07 | El envío es gratis cuando los productos pasan del monto configurado. | Debe tener | RN-CAP-095 · NEC-CAP-096 | Dado «más de S/ 70», cuando los productos suman S/ 70,10, entonces el envío es S/ 0; el administrador puede cambiar a «desde S/ 70». | Propuesto |
+| RQ-DEL-01-08 | El administrador asigna a un cliente una tarifa especial de monto fijo o porcentaje. | Debería tener | RN-CAP-109 · NEC-CAP-096 | Dado un cliente con envío fijo de S/ 2 y otro con 50 %, cuando cada uno pide a Z5 (S/ 6), entonces pagan S/ 2 y S/ 3; si sus productos pasan de S/ 70, ambos pagan S/ 0. | Propuesto |
+| RQ-DEL-01-09 | Fuera de cobertura no se registra delivery y se ofrece recojo. | Debe tener | RN-CAP-087 · RN-CAP-103 | Dado un punto fuera de todas las zonas activas, cuando se intenta guardar el delivery, entonces se avisa y se ofrece «Para recoger»; el intento se registra para el mapa de entregas. | Propuesto |
 
 Prioridad por NEC-CAP-076 y NEC-CAP-100 (E1). RQ-DEL-01-07 es *Debería tener*. Todos nacen *Propuesto* hasta que el PO los apruebe (DT-48).
 
@@ -78,9 +79,10 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RQ-DEL-01-03 | HU-CAP-069 | — | R-01 |
 | RQ-DEL-01-04 | HU-CAP-069 | — | R-01 |
 | RQ-DEL-01-05 | HU-CAP-069 | — | R-01 |
-| RQ-DEL-01-06 | HU-CAP-070 | D-02 | R-01 |
-| RQ-DEL-01-07 | HU-CAP-070 | — | R-01 |
-| RQ-DEL-01-08 | HU-CAP-068 | FT-INF-02 | R-01 |
+| RQ-DEL-01-06 | HU-CAP-069 | — | R-01 |
+| RQ-DEL-01-07 | HU-CAP-070 | D-02 | R-01 |
+| RQ-DEL-01-08 | HU-CAP-070 | — | R-01 |
+| RQ-DEL-01-09 | HU-CAP-068 | FT-INF-02 | R-01 |
 
 Historias de usuario de esta feature (en `historias/`, en draft):
 

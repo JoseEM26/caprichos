@@ -1,31 +1,31 @@
 ---
 id: DOR-FT-CIE-02
 tipo: spec
-titulo: "Definition of Ready — FT-CIE-02 Arqueo y cierre con historial"
+titulo: "Definition of Ready — FT-CIE-02 Arqueo ciego y cierre con historial"
 estado: draft
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-005, FT-CIE-02, HU-CAP-044, HU-CAP-045, HU-CAP-046, ADR-001, ADR-011, ADR-014, ADR-003, ADR-008, FT-CAJ-01, FT-CIE-01, FT-INF-01]
+relacionados: [EP-CAP-005, FT-CIE-02, HU-CAP-044, HU-CAP-045, HU-CAP-046, HU-CAP-199, ADR-001, ADR-011, ADR-014, ADR-003, ADR-008, FT-CAJ-01, FT-CIE-01, FT-INF-01, FT-USR-02, FT-USR-04]
 tags: [dor, plt-05, cierre-caja, ft-cie-02, g4]
 ---
 
-# PLT-05 · DEFINITION OF READY — FT-CIE-02 Arqueo y cierre con historial
+# PLT-05 · DEFINITION OF READY — FT-CIE-02 Arqueo ciego y cierre con historial
 
 **Frente CAJA · módulo `caja` · Caprichos · ticket *(pendiente — R13, D-14)***
 
 | Campo | Valor |
 | --- | --- |
-| ÍTEM EVALUADO | EP-CAP-005 Apertura y cierre de caja · FT-CIE-02 Arqueo y cierre con historial |
+| ÍTEM EVALUADO | EP-CAP-005 Apertura y cierre de caja · FT-CIE-02 Arqueo ciego y cierre con historial |
 | PRODUCT OWNER | José Ángel Espinoza (DT-48) |
 | LÍDER TÉCNICO | José Ángel Espinoza (DT-48) |
 | FECHA DE REVISIÓN | 2026-10-20 |
 | SPRINT / RELEASE DESTINO | H1 · piloto en el local · 28/12/2026 (supuesto, D-19) |
 | RESULTADO | (lo decide el PO — propuesta IA: **NO READY**) |
 
-> Insumos: `analisis/decisiones.md` (fuente de verdad), la feature `FT-CIE-02`, sus 3 historias (HU-CAP-044, HU-CAP-045, HU-CAP-046), la épica EP-CAP-005, los ADR ADR-001, ADR-011, ADR-014, ADR-003, ADR-008, `arquitectura/ARQ-CAP-001` y `ARQ-CAP-002`, y `datos/DAT-CAP-001`.
+> Insumos: `analisis/decisiones.md` (fuente de verdad), la feature `FT-CIE-02`, sus 4 historias (HU-CAP-044, HU-CAP-045, HU-CAP-046, HU-CAP-199), la épica EP-CAP-005, los ADR ADR-001, ADR-011, ADR-014, ADR-003, ADR-008, `arquitectura/ARQ-CAP-001` y `ARQ-CAP-002`, y `datos/DAT-CAP-001`.
 
 ## 1 CHECKLIST DE PREPARACIÓN
 
@@ -34,7 +34,7 @@ tags: [dor, plt-05, cierre-caja, ft-cie-02, g4]
 | NEGOCIO | ☑ | Objetivo y valor con KPI | Épica EP-CAP-005 §2 y feature §1 (hipótesis medible) |
 | NEGOCIO | ☐ | Alcance dentro y fuera acordado | Redactado en la feature; falta la firma del PO (DT-48) |
 | NEGOCIO | ☐ | Prioridad y release confirmados | Debe tener · H1 · piloto en el local · 28/12/2026 (supuesto, D-19); fechas supuestas hasta D-19 |
-| FUNCIONAL | ☑ | Historias con criterios verificables | 3 historias, 10 criterios Dado/Cuando/Entonces |
+| FUNCIONAL | ☑ | Historias con criterios verificables | 4 historias, 16 criterios Dado/Cuando/Entonces |
 | FUNCIONAL | ☑ | Reglas de negocio documentadas y validadas | Documentadas en la feature §4; sin decisiones abiertas propias |
 | FUNCIONAL | ☐ | Estimación por el equipo | Tareas en `backlog/tareas/EP-CAP-005.json` con `estimacion_horas: null` |
 | DISEÑO / UX | ☐ | Prototipos aprobados (DEP-06) | Mockup navegable como referencia (DT-04); Figma o aceptación del mockup pendiente (G2) |
@@ -42,8 +42,8 @@ tags: [dor, plt-05, cierre-caja, ft-cie-02, g4]
 | TÉCNICO | ☑ | Dependencias, modelado y arquitectura | Secciones 2 a 4 de este DoR; ARQ-CAP-001 |
 | TÉCNICO | ☐ | Contrato de API | Borrador en ARQ-CAP-002 §FT-CIE-02; se aprueba en G3 |
 | TÉCNICO | ☐ | Modelo de datos / DDL | DAT-CAP-001 y `datos/ddl-propuesto.sql` (probado en PostgreSQL 16); sin aprobar (G3) |
-| TÉCNICO | ☐ | RNF y seguridad | RNF-CAP-011, RNF-CAP-014, RNF-CAP-009, RNF-CAP-012; umbrales propuestos (feature §3) |
-| CALIDAD | ☑ | Estrategia y datos de prueba | `pruebas/test-plan.md`: 10 casos TC para estas historias, datos sintéticos |
+| TÉCNICO | ☐ | RNF y seguridad | RNF-CAP-011, RNF-CAP-014, RNF-CAP-009, RNF-CAP-012, RNF-CAP-006; umbrales propuestos (feature §3) |
+| CALIDAD | ☑ | Estrategia y datos de prueba | `pruebas/test-plan.md`: 16 casos TC para estas historias, datos sintéticos |
 | CALIDAD | ☑ | Riesgos con mitigación y dueño | Sección 5 |
 
 ## 2 DIAGRAMA DE DEPENDENCIAS
@@ -53,13 +53,16 @@ flowchart LR
   classDef evaluado fill:#fde68a,stroke:#b45309
   classDef interna fill:#dbeafe,stroke:#1d4ed8
   classDef externa fill:#fee2e2,stroke:#b91c1c
-  FT_CIE_02["FT-CIE-02<br>Arqueo y cierre con historial"]:::evaluado
+  FT_CIE_02["FT-CIE-02<br>Arqueo ciego y cierre con historial"]:::evaluado
   HU_CAP_044["HU-CAP-044"]:::evaluado --> FT_CIE_02
   HU_CAP_045["HU-CAP-045"]:::evaluado --> FT_CIE_02
   HU_CAP_046["HU-CAP-046"]:::evaluado --> FT_CIE_02
+  HU_CAP_199["HU-CAP-199"]:::evaluado --> FT_CIE_02
   FT_CAJ_01["FT-CAJ-01"]:::interna --> FT_CIE_02
   FT_CIE_01["FT-CIE-01"]:::interna --> FT_CIE_02
   FT_INF_01["FT-INF-01"]:::interna --> FT_CIE_02
+  FT_USR_02["FT-USR-02"]:::interna --> FT_CIE_02
+  FT_USR_04["FT-USR-04"]:::interna --> FT_CIE_02
   ADR_001["ADR-001"]:::interna -.-> FT_CIE_02
   ADR_011["ADR-011"]:::interna -.-> FT_CIE_02
   ADR_014["ADR-014"]:::interna -.-> FT_CIE_02
@@ -69,8 +72,8 @@ flowchart LR
   DEP_06["DEP-06"]:::externa ==> FT_CIE_02
 ```
 
-- **Ítems evaluados:** FT-CIE-02 y sus historias HU-CAP-044, HU-CAP-045, HU-CAP-046.
-- **Dependencias técnicas:** FT-CAJ-01, FT-CIE-01, FT-INF-01; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-003, ADR-008.
+- **Ítems evaluados:** FT-CIE-02 y sus historias HU-CAP-044, HU-CAP-045, HU-CAP-046, HU-CAP-199.
+- **Dependencias técnicas:** FT-CAJ-01, FT-CIE-01, FT-INF-01, FT-USR-02, FT-USR-04; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-003, ADR-008.
 - **Dependencias externas:** DEP-02, DEP-06.
 - **Decisiones abiertas:** ninguna propia.
 
@@ -92,19 +95,22 @@ erDiagram
   CAJA ||--o{ LIQUIDACION : ""
   CAJA ||--o{ CIERRE_CAJA : ""
   CIERRE_CAJA ||--o{ CIERRE_MEDIO : ""
+  CAJA ||--o{ CONTEO_CIERRE : ""
 ```
 
-Tablas de `datos/ddl-propuesto.sql` que usa la feature: `caja`, `cobro`, `cobro_pago`, `movimiento_caja`, `liquidacion`, `cierre_caja`, `cierre_medio`. Las relaciones son las claves foráneas físicas del script (ADR-003); el detalle de columnas y restricciones está en DAT-CAP-001.
+Tablas de `datos/ddl-propuesto.sql` que usa la feature: `caja`, `cobro`, `cobro_pago`, `movimiento_caja`, `liquidacion`, `cierre_caja`, `cierre_medio`, `conteo_cierre`. Las relaciones son las claves foráneas físicas del script (ADR-003); el detalle de columnas y restricciones está en DAT-CAP-001.
 
 Proceso (orden de las historias):
 
 ```mermaid
 flowchart TB
-  P0["HU-CAP-044<br>Contar el efectivo y comparar cada medio de pago"]
+  P0["HU-CAP-044<br>Contar a ciegas el efectivo y las billeteras"]
   P1["HU-CAP-045<br>Cerrar la caja con sus validaciones"]
   P0 --> P1
   P2["HU-CAP-046<br>Consultar e imprimir el historial de cierres"]
   P1 --> P2
+  P3["HU-CAP-199<br>Revisar con mi PIN el detalle de un cierre que no cuadra"]
+  P2 --> P3
 ```
 
 Ciclo de vida de **caja**:
@@ -153,8 +159,9 @@ flowchart TB
 | ID | Riesgo | Prob. | Impacto | Mitigación | Dueño | Estado |
 | --- | --- | --- | --- | --- | --- | --- |
 | R-01 | Riesgo de roadmap (ver PLT-01) | — | — | Según roadmap | Ver PLT-01 | Abierto |
-| R-FT-CIE-02-01 | Si no se resuelve «¿Qué hacer con un pedido por confirmar al cierre? Propuesta: rechazarlo con motivo o pasarlo al día siguiente; pendiente de Kevin», hay que rehacer criterios o pantallas | Media | Medio | Resolver con Kevin antes de G4 con la propuesta escrita en la feature | Kevin | Abierto |
-| R-FT-CIE-02-02 | Si no se resuelve «¿Se puede reabrir un cierre por error? Propuesta: no; se corrige con un movimiento en la caja del día siguiente», hay que rehacer criterios o pantallas | Media | Medio | Resolver con Kevin antes de G4 con la propuesta escrita en la feature | Kevin | Abierto |
+| R-FT-CIE-02-01 | Si no se resuelve «¿Se acepta una diferencia mínima como «Cuadra»? Propuesta: S/ 0,00 por defecto, configurable (por ejemplo, S/ 0,50 por monedas)», hay que rehacer criterios o pantallas | Media | Medio | Resolver con Kevin antes de G4 con la propuesta escrita en la feature | Kevin | Abierto |
+| R-FT-CIE-02-02 | Si no se resuelve «¿Qué hacer con un pedido por confirmar o con pago por coordinar al cierre? Propuesta: anularlo con motivo y PIN o pasarlo al día siguiente; pendiente de Kevin», hay que rehacer criterios o pantallas | Media | Medio | Resolver con Kevin antes de G4 con la propuesta escrita en la feature | Kevin | Abierto |
+| R-FT-CIE-02-03 | Si no se resuelve «¿Se puede reabrir un cierre por error? Propuesta: no; se corrige con un movimiento en la caja del día siguiente», hay que rehacer criterios o pantallas | Media | Medio | Resolver con Kevin antes de G4 con la propuesta escrita en la feature | Kevin | Abierto |
 
 ## 6 DECISIÓN Y APROBACIÓN
 

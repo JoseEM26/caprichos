@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-013, FT-USR-01, RQ-USR-01-01, RQ-USR-01-02, RQ-USR-01-03, RQ-USR-01-11, RQ-USR-01-13, HU-CAP-117, HU-CAP-118, ADR-001, ADR-011, ADR-014, ADR-004, ADR-008, DEP-02, DEP-06, R-01, R-11]
+relacionados: [EP-CAP-013, FT-USR-01, RQ-USR-01-01, RQ-USR-01-02, RQ-USR-01-03, RQ-USR-01-11, RQ-USR-01-13, HU-CAP-117, HU-CAP-118, HU-CAP-201, ADR-001, ADR-011, ADR-014, ADR-004, ADR-008, DEP-02, DEP-06, R-01, R-11]
 tags: [hu, usuarios, capa-a, ft-usr-01, alta, ui]
 ---
 
@@ -33,7 +33,7 @@ tags: [hu, usuarios, capa-a, ft-usr-01, alta, ui]
 | CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
 |---|---|
 | **Contexto.** Historia de FT-USR-01 «Usuarios y primer ingreso» (Debe tener, épica EP-CAP-013). Cubre los requerimientos: **RQ-USR-01-01** El administrador da de alta a un usuario con nombre, DNI, teléfono, rol y fecha de alta. **RQ-USR-01-02** Un DNI no se repite entre usuarios. **RQ-USR-01-03** Un usuario se desactiva y se reactiva; no se elimina. **RQ-USR-01-11** La lista de usuarios se filtra por rol, estado y fechas de alta. **RQ-USR-01-13** Un usuario desactivado no puede iniciar sesión en el administrativo: ve un aviso claro, sus sesiones abiertas se cierran y su historial se conserva. | **Alcance.**<br>• El administrador da de alta a un usuario con nombre, DNI, teléfono, rol y fecha de alta.<br>• Un DNI no se repite entre usuarios.<br>• Un usuario se desactiva y se reactiva; no se elimina.<br>• La lista de usuarios se filtra por rol, estado y fechas de alta.<br>• Un usuario desactivado no puede iniciar sesión en el administrativo: ve un aviso claro, sus sesiones abiertas se cierran y su historial se conserva. |
-| **Problema.** Cada persona entra con su propio usuario, sin compartir claves, y el dueño sabe quién hizo qué. | **Fuera de alcance.**<br>• HU-CAP-117: Crear mi contraseña en el primer ingreso.<br>• HU-CAP-118: Cambiar mi foto, cambiar mi contraseña y restablecer la de otros.<br>• Roles, permisos y escritorio: FT-USR-02.<br>• Crédito del personal: FT-USR-03.<br>• Registro de asistencia (horizonte futuro).<br>• Ingreso con Google o con código por SMS (no pedido). |
+| **Problema.** Cada persona entra con su propio usuario, sin compartir claves, y el dueño sabe quién hizo qué. | **Fuera de alcance.**<br>• HU-CAP-117: Crear mi contraseña en el primer ingreso.<br>• HU-CAP-118: Cambiar mi foto, cambiar mi contraseña y restablecer la de otros.<br>• HU-CAP-201: Definir los días y horas de trabajo de cada persona y quién cubre un descanso.<br>• Roles, permisos y escritorio: FT-USR-02.<br>• Crédito del personal: FT-USR-03.<br>• Registro de asistencia (horizonte futuro).<br>• Ingreso con Google o con código por SMS (no pedido). |
 
 ## 03 | CRITERIOS DE ACEPTACIÓN
 

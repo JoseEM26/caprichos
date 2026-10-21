@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-017, FT-CFG-02, HU-CAP-158, HU-CAP-159, HU-CAP-160, ADR-001, ADR-011, ADR-014, ADR-010, ADR-012, FT-ATN-03, FT-BOT-02, FT-CLI-02, FT-COC-02, FT-DEL-03, FT-SAL-03, FT-USR-03]
+relacionados: [EP-CAP-017, FT-CFG-02, HU-CAP-158, HU-CAP-159, HU-CAP-160, ADR-001, ADR-011, ADR-014, ADR-010, ADR-012, FT-ATN-03, FT-BOT-02, FT-CLI-02, FT-COC-02, FT-COC-03, FT-DEL-02, FT-DEL-03, FT-SAL-03, FT-USR-03]
 tags: [dor, plt-05, configuracion, ft-cfg-02, g4]
 ---
 
@@ -34,7 +34,7 @@ tags: [dor, plt-05, configuracion, ft-cfg-02, g4]
 | NEGOCIO | ☑ | Objetivo y valor con KPI | Épica EP-CAP-017 §2 y feature §1 (hipótesis medible) |
 | NEGOCIO | ☐ | Alcance dentro y fuera acordado | Redactado en la feature; falta la firma del PO (DT-48) |
 | NEGOCIO | ☐ | Prioridad y release confirmados | Debe tener · H1 · piloto en el local · 28/12/2026 (supuesto, D-19); fechas supuestas hasta D-19 |
-| FUNCIONAL | ☑ | Historias con criterios verificables | 3 historias, 12 criterios Dado/Cuando/Entonces |
+| FUNCIONAL | ☑ | Historias con criterios verificables | 3 historias, 14 criterios Dado/Cuando/Entonces |
 | FUNCIONAL | ☐ | Reglas de negocio documentadas y validadas | Documentadas; abiertas: D-01, D-02, D-03 |
 | FUNCIONAL | ☐ | Estimación por el equipo | Tareas en `backlog/tareas/EP-CAP-017.json` con `estimacion_horas: null` |
 | DISEÑO / UX | ☐ | Prototipos aprobados (DEP-06) | Mockup navegable como referencia (DT-04); Figma o aceptación del mockup pendiente (G2) |
@@ -43,7 +43,7 @@ tags: [dor, plt-05, configuracion, ft-cfg-02, g4]
 | TÉCNICO | ☐ | Contrato de API | Borrador en ARQ-CAP-002 §FT-CFG-02; se aprueba en G3 |
 | TÉCNICO | ☐ | Modelo de datos / DDL | DAT-CAP-001 y `datos/ddl-propuesto.sql` (probado en PostgreSQL 16); sin aprobar (G3) |
 | TÉCNICO | ☐ | RNF y seguridad | RNF-CAP-006, RNF-CAP-009, RNF-CAP-012; umbrales propuestos (feature §3) |
-| CALIDAD | ☑ | Estrategia y datos de prueba | `pruebas/test-plan.md`: 12 casos TC para estas historias, datos sintéticos |
+| CALIDAD | ☑ | Estrategia y datos de prueba | `pruebas/test-plan.md`: 14 casos TC para estas historias, datos sintéticos |
 | CALIDAD | ☑ | Riesgos con mitigación y dueño | Sección 5 |
 
 ## 2 DIAGRAMA DE DEPENDENCIAS
@@ -61,6 +61,8 @@ flowchart LR
   FT_BOT_02["FT-BOT-02"]:::interna --> FT_CFG_02
   FT_CLI_02["FT-CLI-02"]:::interna --> FT_CFG_02
   FT_COC_02["FT-COC-02"]:::interna --> FT_CFG_02
+  FT_COC_03["FT-COC-03"]:::interna --> FT_CFG_02
+  FT_DEL_02["FT-DEL-02"]:::interna --> FT_CFG_02
   FT_DEL_03["FT-DEL-03"]:::interna --> FT_CFG_02
   FT_SAL_03["FT-SAL-03"]:::interna --> FT_CFG_02
   FT_USR_03["FT-USR-03"]:::interna --> FT_CFG_02
@@ -74,7 +76,7 @@ flowchart LR
 ```
 
 - **Ítems evaluados:** FT-CFG-02 y sus historias HU-CAP-158, HU-CAP-159, HU-CAP-160.
-- **Dependencias técnicas:** FT-ATN-03, FT-BOT-02, FT-CLI-02, FT-COC-02, FT-DEL-03, FT-SAL-03, FT-USR-03; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-010, ADR-012.
+- **Dependencias técnicas:** FT-ATN-03, FT-BOT-02, FT-CLI-02, FT-COC-02, FT-COC-03, FT-DEL-02, FT-DEL-03, FT-SAL-03, FT-USR-03; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-010, ADR-012.
 - **Dependencias externas:** DEP-02, DEP-06.
 - **Decisiones abiertas:** D-01, D-02, D-03.
 
@@ -115,7 +117,7 @@ Proceso (orden de las historias):
 ```mermaid
 flowchart TB
   P0["HU-CAP-158<br>Configurar medios de pago y entrega"]
-  P1["HU-CAP-159<br>Configurar tiempos, tolerancias, puntos y descuento del personal"]
+  P1["HU-CAP-159<br>Configurar tiempos, tolerancias, porcentaje de puntos y descuento del personal"]
   P0 --> P1
   P2["HU-CAP-160<br>Configurar mensajes, entregas fallidas y etiquetas"]
   P1 --> P2
@@ -160,6 +162,7 @@ flowchart TB
 | --- | --- | --- | --- | --- | --- | --- |
 | R-01 | Riesgo de roadmap (ver PLT-01) | — | — | Según roadmap | Ver PLT-01 | Abierto |
 | R-FT-CFG-02-01 | Si no se resuelve «Valores iniciales», hay que rehacer criterios o pantallas | Media | Medio | Resolver con Kevin antes de G4 con la propuesta escrita en la feature | Kevin | Abierto |
+| R-FT-CFG-02-02 | Si no se resuelve «Lista de medios de pago», hay que rehacer criterios o pantallas | Media | Medio | Resolver con Kevin antes de G4 con la propuesta escrita en la feature | Kevin | Abierto |
 
 ## 6 DECISIÓN Y APROBACIÓN
 

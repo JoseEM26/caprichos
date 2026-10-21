@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-004, FT-CAJ-02, HU-CAP-033, HU-CAP-034, HU-CAP-035, HU-CAP-036, ADR-001, ADR-011, ADR-014, ADR-003, ADR-006, ADR-007, ADR-008, ADR-010, ADR-012, FT-CFG-02, FT-CIE-01, FT-CIE-02, FT-LEG-01, FT-SAL-02, FT-USR-03]
+relacionados: [EP-CAP-004, FT-CAJ-02, HU-CAP-033, HU-CAP-034, HU-CAP-035, HU-CAP-036, ADR-001, ADR-011, ADR-014, ADR-003, ADR-006, ADR-007, ADR-008, ADR-010, ADR-012, FT-CFG-02, FT-CIE-01, FT-CIE-02, FT-LEG-01, FT-SAL-02, FT-USR-03, FT-USR-04]
 tags: [dor, plt-05, caja, ft-caj-02, g4]
 ---
 
@@ -34,7 +34,7 @@ tags: [dor, plt-05, caja, ft-caj-02, g4]
 | NEGOCIO | ☑ | Objetivo y valor con KPI | Épica EP-CAP-004 §2 y feature §1 (hipótesis medible) |
 | NEGOCIO | ☐ | Alcance dentro y fuera acordado | Redactado en la feature; falta la firma del PO (DT-48) |
 | NEGOCIO | ☐ | Prioridad y release confirmados | Debe tener · H1 · piloto en el local · 28/12/2026 (supuesto, D-19); fechas supuestas hasta D-19 |
-| FUNCIONAL | ☑ | Historias con criterios verificables | 4 historias, 11 criterios Dado/Cuando/Entonces |
+| FUNCIONAL | ☑ | Historias con criterios verificables | 4 historias, 12 criterios Dado/Cuando/Entonces |
 | FUNCIONAL | ☑ | Reglas de negocio documentadas y validadas | Documentadas en la feature §4; sin decisiones abiertas propias |
 | FUNCIONAL | ☐ | Estimación por el equipo | Tareas en `backlog/tareas/EP-CAP-004.json` con `estimacion_horas: null` |
 | DISEÑO / UX | ☐ | Prototipos aprobados (DEP-06) | Mockup navegable como referencia (DT-04); Figma o aceptación del mockup pendiente (G2) |
@@ -43,7 +43,7 @@ tags: [dor, plt-05, caja, ft-caj-02, g4]
 | TÉCNICO | ☐ | Contrato de API | Borrador en ARQ-CAP-002 §FT-CAJ-02; se aprueba en G3 |
 | TÉCNICO | ☐ | Modelo de datos / DDL | DAT-CAP-001 y `datos/ddl-propuesto.sql` (probado en PostgreSQL 16); sin aprobar (G3) |
 | TÉCNICO | ☐ | RNF y seguridad | RNF-CAP-011, RNF-CAP-009, RNF-CAP-007, RNF-CAP-012, RNF-CAP-014; umbrales propuestos (feature §3) |
-| CALIDAD | ☑ | Estrategia y datos de prueba | `pruebas/test-plan.md`: 11 casos TC para estas historias, datos sintéticos |
+| CALIDAD | ☑ | Estrategia y datos de prueba | `pruebas/test-plan.md`: 12 casos TC para estas historias, datos sintéticos |
 | CALIDAD | ☑ | Riesgos con mitigación y dueño | Sección 5 |
 
 ## 2 DIAGRAMA DE DEPENDENCIAS
@@ -64,6 +64,7 @@ flowchart LR
   FT_LEG_01["FT-LEG-01"]:::interna --> FT_CAJ_02
   FT_SAL_02["FT-SAL-02"]:::interna --> FT_CAJ_02
   FT_USR_03["FT-USR-03"]:::interna --> FT_CAJ_02
+  FT_USR_04["FT-USR-04"]:::interna --> FT_CAJ_02
   ADR_001["ADR-001"]:::interna -.-> FT_CAJ_02
   ADR_011["ADR-011"]:::interna -.-> FT_CAJ_02
   ADR_014["ADR-014"]:::interna -.-> FT_CAJ_02
@@ -78,7 +79,7 @@ flowchart LR
 ```
 
 - **Ítems evaluados:** FT-CAJ-02 y sus historias HU-CAP-033, HU-CAP-034, HU-CAP-035, HU-CAP-036.
-- **Dependencias técnicas:** FT-CFG-02, FT-CIE-01, FT-CIE-02, FT-LEG-01, FT-SAL-02, FT-USR-03; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-003, ADR-006, ADR-007, ADR-008, ADR-010, ADR-012.
+- **Dependencias técnicas:** FT-CFG-02, FT-CIE-01, FT-CIE-02, FT-LEG-01, FT-SAL-02, FT-USR-03, FT-USR-04; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-003, ADR-006, ADR-007, ADR-008, ADR-010, ADR-012.
 - **Dependencias externas:** DEP-02, DEP-06.
 - **Decisiones abiertas:** ninguna propia.
 
@@ -117,7 +118,7 @@ flowchart TB
   P0 --> P1
   P2["HU-CAP-035<br>Elegir comprobante y cobrar a crédito del personal"]
   P1 --> P2
-  P3["HU-CAP-036<br>Anular un pedido con motivo y PIN"]
+  P3["HU-CAP-036<br>Anular un pedido con motivo y el PIN de la supervisora"]
   P2 --> P3
 ```
 
@@ -173,6 +174,7 @@ flowchart TB
 | ID | Riesgo | Prob. | Impacto | Mitigación | Dueño | Estado |
 | --- | --- | --- | --- | --- | --- | --- |
 | R-01 | Riesgo de roadmap (ver PLT-01) | — | — | Según roadmap | Ver PLT-01 | Abierto |
+| R-11 | Riesgo de roadmap (ver PLT-01) | — | — | Según roadmap | Ver PLT-01 | Abierto |
 | R-FT-CAJ-02-01 | Si no se resuelve «Devolución de un cobro de una caja ya cerrada», hay que rehacer criterios o pantallas | Media | Medio | Resolver con Kevin antes de G4 con la propuesta escrita en la feature | Kevin | Abierto |
 | R-FT-CAJ-02-02 | Si no se resuelve «¿La tarjeta lleva número de operación del terminal? Propuesta: opcional», hay que rehacer criterios o pantallas | Media | Medio | Resolver con Kevin antes de G4 con la propuesta escrita en la feature | Kevin | Abierto |
 

@@ -27,7 +27,7 @@ create table lista_valor (
   unique (lista_id, nombre)                   -- sin nombres repetidos (RN-CAP-128)
 );
 
-create table auditoria (                      -- historial de acciones (ADR-014, DT-49); solo se inserta
+create table auditoria (                      -- historial de acciones (ADR-014, DT-49), solo se inserta
   id bigint generated always as identity primary key,
   categoria text not null check (categoria in ('CAMBIO','ACCESO','LECTURA_SENSIBLE')),
   modulo text not null,                        -- pedidos, caja, ofertas, usuarios, configuracion…
@@ -160,7 +160,7 @@ create table user_account (
   hash text not null,                          -- argon2id (RNF-CAP-007)
   debe_cambiar boolean not null default true,  -- primer ingreso (RN-CAP-119)
   clave_inicial_vence timestamptz,             -- propuesta D-17
-  pin_hash text,                               -- solo ADMIN (RN-CAP-094)
+  pin_hash text,                               -- PIN de 6 dígitos de la supervisora, solo ADMIN (RN-CAP-094, DT-61)
   activo boolean not null default true,
   alta_en date not null default current_date
 );
@@ -169,6 +169,16 @@ create table customer_account (
   party_id bigint not null unique references party(id),
   hash text,                                   -- nulo: registrado en el local sin contraseña (NEC-CAP-057)
   activo boolean not null default true
+);
+create table horario_trabajo (                  -- días y horas de cada persona (DT-64)
+  party_id bigint references party(id), dia smallint check (dia between 1 and 7),   -- 1 = lunes
+  desde time not null, hasta time not null, primary key (party_id, dia)
+);
+create table cobertura_turno (                  -- quién cubre un descanso un día puntual (DT-64)
+  id bigint generated always as identity primary key,
+  fecha date not null, rol text not null references rol(codigo),
+  cubre_party_id bigint not null references party(id), reemplaza_party_id bigint references party(id),
+  desde time not null, hasta time not null, por bigint not null
 );
 create table sesion (
   id bigint generated always as identity primary key,
@@ -226,7 +236,8 @@ create table producto (
   por_lote boolean not null default false,                  -- donas, galletas, pan (RN-CAP-039)
   vida_util_horas int,                                       -- RN-CAP-040
   orden int not null default 0, oculto boolean not null default false,
-  agotado_hasta timestamptz                                  -- null = disponible; 'infinity' = desde Productos (RN-CAP-085)
+  agotado_hasta timestamptz,                                 -- null = disponible; 'infinity' = desde Productos (RN-CAP-085)
+  no_suma_beneficios boolean not null default false          -- «No suma puntos ni aplica cupones» (DT-65)
 );
 create table producto_tamano (
   id bigint generated always as identity primary key,
@@ -309,7 +320,8 @@ create table oferta (
   descuento_tipo text check (descuento_tipo in ('PORCENTAJE','MONTO')), descuento_valor numeric(12,2),
   compra_minima numeric(12,2),
   dias smallint[], hora_desde time, hora_hasta time, fecha_desde date, fecha_hasta date,  -- RN-CAP-132
-  canales text[] not null default '{CARTA,ADMIN,BOT}', limite_usos int,
+  canales text[] not null default '{CARTA,ADMIN,BOT}', limite_usos int,   -- al llegar al límite se desactiva sola (FT-OFE-01)
+  no_suma_beneficios boolean not null default false,                     -- DT-65
   orden int not null default 0, activo boolean not null default false
 );
 create table combo_precio (oferta_id bigint references oferta(id), tamano_valor_id bigint references lista_valor(id), precio numeric(12,2) not null, primary key (oferta_id, tamano_valor_id));
@@ -379,7 +391,7 @@ create table pedido (
   codigo text not null unique,                   -- corto, para el cliente
   canal text not null check (canal in ('CARTA','BOT','TELEFONO','MOSTRADOR','MOZO')),
   modalidad text not null check (modalidad in ('DELIVERY','RECOGER','MESA','LLEVAR')),
-  estado text not null check (estado in ('POR_CONFIRMAR','EN_COCINA','EN_PREPARACION','LISTO','EN_CAMINO',
+  estado text not null check (estado in ('POR_CONFIRMAR','EN_COCINA','LISTO','EN_CAMINO',      -- sin EN_PREPARACION: solo «Despejar» (DT-58)
                                          'ENTREGADO','EN_COORDINACION','COBRADO','RECHAZADO','ANULADO')),
   party_id bigint references party(id),          -- cliente si se identificó
   es_personal boolean not null default false,    -- pedido del personal (RN-CAP-106)
@@ -392,11 +404,15 @@ create table pedido (
   envio numeric(12,2), total numeric(12,2) not null,
   comprobante_tipo text not null default 'NOTA_VENTA' check (comprobante_tipo in ('NOTA_VENTA','BOLETA','FACTURA')),
   comprobante_doc text, comprobante_razon text, nota text,
-  oferta_ids bigint[], cupon_emitido_id bigint,
+  oferta_ids bigint[], cupon_emitido_id bigint, puntos_canjeados numeric(12,2) not null default 0,   -- DT-55
+  pago_coordinado_en timestamptz, pago_coordinado_por bigint,   -- pedido de la carta: pago por coordinar (DT-57)
+  despachado_en timestamptz, despachado_por bigint,             -- despacho (DT-58)
   confirmado_en timestamptz, confirmado_por bigint, pasa_cocina_en timestamptz, listo_en timestamptz,
   entregado_en timestamptz, anulado_en timestamptz, anulado_por bigint, motivo_anulacion text,
+  anulacion_aprobada_por bigint,                 -- supervisora que puso su PIN (DT-61)
   creado_en timestamptz not null default now(),
-  check (modalidad <> 'DELIVERY' or estado in ('POR_CONFIRMAR','RECHAZADO','ANULADO') or (entrega_lat is not null and zona_id is not null))  -- RN-CAP-104
+  check (modalidad <> 'DELIVERY' or estado not in ('EN_CAMINO','ENTREGADO') or (entrega_lat is not null and zona_id is not null)),  -- RN-CAP-104; la carta va a cocina sin ubicación (DT-57)
+  check (anulado_en is null or (motivo_anulacion is not null and anulacion_aprobada_por is not null))   -- DT-61
 );
 create table pedido_mesa (                      -- un pedido, varias mesas (RN-CAP-108)
   pedido_id bigint references pedido(id), mesa_id bigint references elemento_plano(id),
@@ -409,12 +425,16 @@ create table pedido_linea (
   producto_id bigint references producto(id), oferta_id bigint references oferta(id), linea_combo_id bigint references pedido_linea(id),
   nombre text not null, tamano text, opciones jsonb not null default '[]', sabor text, nota text,
   cantidad int not null check (cantidad > 0), precio_unit numeric(12,2) not null,
-  area_id bigint references area_cocina(id), adicional boolean not null default false   -- comanda adicional (RN-CAP-090)
+  area_id bigint references area_cocina(id), adicional boolean not null default false,  -- comanda adicional (RN-CAP-090)
+  nombres_persona text[],                        -- quién toma cada bebida, para la etiqueta (DT-57)
+  check (nombres_persona is null or cardinality(nombres_persona) <= cantidad)
 );
 create table comanda_area (                     -- estado por área (RN-CAP-084)
   pedido_id bigint references pedido(id), area_id bigint references area_cocina(id),
-  estado text not null default 'NUEVO' check (estado in ('NUEVO','EN_PREPARACION','LISTO')),
-  despejado boolean not null default false, cambiado_en timestamptz, primary key (pedido_id, area_id)
+  estado text not null default 'EN_COCINA' check (estado in ('EN_COCINA','DESPEJADA')),   -- un solo botón «Despejar» (DT-58)
+  llego_en timestamptz not null default now(), despejada_en timestamptz, despejada_por bigint,
+  devuelta_en timestamptz, devuelta_por bigint,  -- devuelta desde el Historial
+  primary key (pedido_id, area_id)
 );
 create table comprobante_pago (                 -- capturas, carpeta privada (ADR-005, ADR-012)
   id bigint generated always as identity primary key,
@@ -453,10 +473,19 @@ create table liquidacion (                      -- efectivo del repartidor (RN-C
   caja_id bigint not null references caja(id), repartidor_party_id bigint not null references party(id),
   esperado numeric(12,2) not null, entregado numeric(12,2) not null, en timestamptz not null default now()
 );
-create table cierre_caja (                      -- no se edita ni borra (RN-CAP-080)
+create table cierre_caja (                      -- no se edita ni borra (RN-CAP-080), ciego (DT-61)
   caja_id bigint primary key references caja(id),
   conteo jsonb not null,                         -- {"200":3,"100":0,…,"0.10":4}
-  nota text
+  resultado text not null check (resultado in ('CUADRA','NO_CUADRA')),
+  aprobado_por bigint,                           -- supervisora con PIN; obligatorio si no cuadra
+  nota text,
+  check (resultado = 'CUADRA' or aprobado_por is not null)
+);
+create table conteo_cierre (                    -- cada intento del arqueo ciego (DT-61)
+  caja_id bigint references caja(id), intento smallint not null,
+  conteo jsonb not null, medios jsonb not null,  -- lo que anotó el cajero; no ve lo esperado
+  resultado text not null check (resultado in ('CUADRA','NO_CUADRA')),
+  por bigint not null, en timestamptz not null default now(), primary key (caja_id, intento)
 );
 create table cierre_medio (
   caja_id bigint references cierre_caja(caja_id), medio text not null,
@@ -473,7 +502,8 @@ create table agotado (                          -- historial de agotados (FT-COC
 create table alta_demanda (
   id bigint generated always as identity primary key,
   minutos int not null check (minutos between 5 and 180), pausa boolean not null default false,   -- RN-CAP-113
-  desde timestamptz not null default now(), hasta timestamptz, por bigint not null
+  desde timestamptz not null default now(), hasta timestamptz, por bigint not null,   -- por: quién la activó, visible en todas las áreas (DT-58)
+  area_id bigint references area_cocina(id)
 );
 create table print_job (                        -- ADR-002
   id bigint generated always as identity primary key,
@@ -485,7 +515,7 @@ create table print_job (                        -- ADR-002
 create table asignacion_reparto (               -- uno solo lo toma (RN-CAP-024)
   pedido_id bigint primary key references pedido(id),
   repartidor_party_id bigint not null references party(id),
-  tomado_en timestamptz not null default now(), salida_en timestamptz, entregado_en timestamptz,
+  tomado_en timestamptz not null default now(), salida_en timestamptz, llegado_en timestamptz, entregado_en timestamptz,   -- Tomar → En camino → He llegado → Entregado (DT-59)
   cobrado_efectivo numeric(12,2)
 );
 create table incidente_entrega (
@@ -495,15 +525,22 @@ create table incidente_entrega (
   en timestamptz not null default now(),
   cierre text check (cierre in ('REPROGRAMADO','DEVUELTO','COBRADO_IGUAL')), recargo numeric(12,2), cerrado_por bigint
 );
-create table consumo_personal (                 -- crédito del personal por mes (RN-CAP-131)
+create table mensaje_reparto (                  -- avisos al cliente al salir y al llegar (DT-60)
+  pedido_id bigint references pedido(id), numero smallint check (numero between 1 and 3),
+  enviado_en timestamptz not null default now(), respondido_en timestamptz,
+  estado text not null default 'ENVIADO' check (estado in ('ENVIADO','RESPONDIDO','FALLIDO')),
+  primary key (pedido_id, numero)
+);
+create table consumo_personal (                 -- crédito del personal; se ve por semana o rango (RN-CAP-131, DT-63)
   id bigint generated always as identity primary key,
-  party_id bigint not null references party(id), anio_mes char(7) not null,
+  party_id bigint not null references party(id), fecha date not null,
   pedido_id bigint not null unique references pedido(id), monto numeric(12,2) not null
 );
 create table movimiento_puntos (
   id bigint generated always as identity primary key,
   party_id bigint not null references party(id), pedido_id bigint references pedido(id),
-  puntos int not null, tipo text not null check (tipo in ('SUMA','REVERSA','CANJE')),
+  puntos numeric(12,2) not null,                 -- 5 % del total, 1 punto = S/ 1 (DT-55)
+  tipo text not null check (tipo in ('SUMA','REVERSA','CANJE','DEVOLUCION_CANJE')),
   en timestamptz not null default now(),
   unique (pedido_id, tipo)                       -- suma una sola vez (RN-CAP-072)
 );
@@ -517,7 +554,7 @@ create table insumo (
   factor_compra numeric(14,3) not null,          -- 1 unidad de compra = N de almacén
   factor_receta numeric(14,6) not null,          -- 1 de almacén = N de receta
   minimo numeric(14,3) not null, intermedio numeric(14,3), maximo numeric(14,3) not null,
-  perecible boolean not null default false, lugar_consumo_id bigint references lugar_stock(id),
+  lugar_consumo_id bigint references lugar_stock(id),
   costo_unit numeric(12,4), proveedor_a bigint, proveedor_b bigint, proveedor_c bigint,
   check (proveedor_a is distinct from proveedor_b and proveedor_a is distinct from proveedor_c
          and (proveedor_b is null or proveedor_b is distinct from proveedor_c)),         -- RN-CAP-082 (2.ª)
@@ -560,7 +597,8 @@ create table traslado (
   estado text not null default 'POR_RECIBIR' check (estado in ('POR_RECIBIR','RECIBIDO')),
   pedido_interno_id bigint, recibido_por bigint, recibido_en timestamptz
 );
-create table pedido_interno (id bigint generated always as identity primary key, area_id bigint not null references area_cocina(id), detalle jsonb not null, estado text not null default 'PENDIENTE' check (estado in ('PENDIENTE','ENTREGADO')), por bigint not null, en timestamptz default now());
+create table pedido_interno (id bigint generated always as identity primary key, area_id bigint not null references area_cocina(id), detalle jsonb not null, estado text not null default 'PENDIENTE' check (estado in ('PENDIENTE','RECIBIDO','ENTREGADO')), por bigint not null, en timestamptz default now(),
+  avisado_party_id bigint references party(id), recibido_por bigint, recibido_en timestamptz);   -- suena hasta «Recibido»; WhatsApp a quien está de turno (DT-64)
 create table produccion (
   id bigint generated always as identity primary key,
   receta_id bigint not null references receta(id), tandas numeric(8,2) not null check (tandas > 0),
@@ -587,7 +625,7 @@ create table compra (
 create table compra_linea (
   id bigint generated always as identity primary key,
   compra_id bigint not null references compra(id), insumo_id bigint not null references insumo(id),
-  cantidad_compra numeric(14,3) not null, costo_unit numeric(12,4) not null, lote text, vence date
+  cantidad_compra numeric(14,3) not null, costo_unit numeric(12,4) not null   -- sin lote ni vencimiento (DT-64)
 );
 
 -- ---------- 9. Bot, atención y notificaciones -------------------------

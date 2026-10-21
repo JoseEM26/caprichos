@@ -78,7 +78,7 @@ Las metas marcadas «(propuesta)» son de la IA y las fija el dueño; las línea
 - Cobro con efectivo (y vuelto), Yape, Plin, transferencia, tarjeta y pago mixto (RN-CAP-082).
 - Nuevo pedido desde caja y call center: cliente, dirección recordada, promociones vigentes y cupón (NEC-CAP-065, NEC-CAP-080).
 - Crear y buscar clientes por DNI completo (NEC-CAP-064).
-- Anular con motivo; si ya se cobró, con PIN del administrador (RN-CAP-089, RN-CAP-096).
+- El cajero anula con motivo y el PIN de 6 dígitos de la supervisora, escrito en persona en la caja (RN-CAP-089, RN-CAP-096, DT-61).
 
 **Fuera de alcance (OUT)**
 
@@ -102,7 +102,7 @@ Las metas marcadas «(propuesta)» son de la IA y las fija el dueño; las línea
 **Restricciones**
 
 - El sistema no verifica que un comprobante sea verdadero: lo decide una persona (RN-CAP-101).
-- Solo se anulan pedidos sin cobrar, salvo con PIN (RN-CAP-096).
+- Toda anulación lleva motivo y el PIN de la supervisora; un cobrado, solo con el cobro en la caja abierta (RN-CAP-096, DT-61).
 
 **Dependencias y riesgos**
 

@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-013, FT-USR-01, RQ-USR-01-04, RQ-USR-01-05, RQ-USR-01-06, RQ-USR-01-07, RQ-USR-01-10, HU-CAP-116, HU-CAP-118, ADR-001, ADR-011, ADR-014, ADR-004, ADR-008, D-17, DEP-02, DEP-06, R-01, R-11]
+relacionados: [EP-CAP-013, FT-USR-01, RQ-USR-01-04, RQ-USR-01-05, RQ-USR-01-06, RQ-USR-01-07, RQ-USR-01-10, HU-CAP-116, HU-CAP-118, HU-CAP-201, ADR-001, ADR-011, ADR-014, ADR-004, ADR-008, D-17, DEP-02, DEP-06, R-01, R-11]
 tags: [hu, usuarios, capa-a, ft-usr-01, alta, ui]
 ---
 
@@ -33,7 +33,7 @@ tags: [hu, usuarios, capa-a, ft-usr-01, alta, ui]
 | CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
 |---|---|
 | **Contexto.** Historia de FT-USR-01 «Usuarios y primer ingreso» (Debe tener, épica EP-CAP-013). Cubre los requerimientos: **RQ-USR-01-04** En el primer ingreso con la contraseña inicial no se entra al escritorio sin crear una nueva. **RQ-USR-01-05** La nueva contraseña tiene al menos 6 caracteres, es distinta de la inicial y se escribe dos veces igual. **RQ-USR-01-06** Hay botón para ver u ocultar la contraseña. **RQ-USR-01-07** Tras crear la contraseña se ofrece, sin obligar, una foto de perfil. **RQ-USR-01-10** Tras 5 intentos fallidos el ingreso se bloquea unos minutos. | **Alcance.**<br>• En el primer ingreso con la contraseña inicial no se entra al escritorio sin crear una nueva.<br>• La nueva contraseña tiene al menos 6 caracteres, es distinta de la inicial y se escribe dos veces igual.<br>• Hay botón para ver u ocultar la contraseña.<br>• Tras crear la contraseña se ofrece, sin obligar, una foto de perfil.<br>• Tras 5 intentos fallidos el ingreso se bloquea unos minutos. |
-| **Problema.** Cada persona entra con su propio usuario, sin compartir claves, y el dueño sabe quién hizo qué. | **Fuera de alcance.**<br>• HU-CAP-116: Dar de alta y desactivar a un usuario.<br>• HU-CAP-118: Cambiar mi foto, cambiar mi contraseña y restablecer la de otros.<br>• Roles, permisos y escritorio: FT-USR-02.<br>• Crédito del personal: FT-USR-03.<br>• Registro de asistencia (horizonte futuro).<br>• Ingreso con Google o con código por SMS (no pedido). |
+| **Problema.** Cada persona entra con su propio usuario, sin compartir claves, y el dueño sabe quién hizo qué. | **Fuera de alcance.**<br>• HU-CAP-116: Dar de alta y desactivar a un usuario.<br>• HU-CAP-118: Cambiar mi foto, cambiar mi contraseña y restablecer la de otros.<br>• HU-CAP-201: Definir los días y horas de trabajo de cada persona y quién cubre un descanso.<br>• Roles, permisos y escritorio: FT-USR-02.<br>• Crédito del personal: FT-USR-03.<br>• Registro de asistencia (horizonte futuro).<br>• Ingreso con Google o con código por SMS (no pedido). |
 
 ## 03 | CRITERIOS DE ACEPTACIÓN
 

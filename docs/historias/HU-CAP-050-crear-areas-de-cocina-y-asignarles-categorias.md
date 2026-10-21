@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-006, FT-COC-01, RQ-COC-01-10, RQ-COC-01-11, HU-CAP-047, HU-CAP-048, HU-CAP-049, ADR-001, ADR-011, ADR-014, ADR-002, ADR-006, ADR-007, DEP-02, DEP-06, R-01]
+relacionados: [EP-CAP-006, FT-COC-01, RQ-COC-01-13, RQ-COC-01-14, HU-CAP-047, HU-CAP-048, HU-CAP-049, HU-CAP-198, ADR-001, ADR-011, ADR-014, ADR-002, ADR-006, ADR-007, DEP-02, DEP-06, R-01]
 tags: [hu, cocina, capa-a, ft-coc-01, alta, ui]
 ---
 
@@ -32,19 +32,19 @@ tags: [hu, cocina, capa-a, ft-coc-01, alta, ui]
 
 | CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
 |---|---|
-| **Contexto.** Historia de FT-COC-01 «Pantallas de cocina por área» (Debe tener, épica EP-CAP-006). Cubre los requerimientos: **RQ-COC-01-10** El administrador crea hasta cuatro áreas propias, les asigna categorías y aparecen como pantalla. **RQ-COC-01-11** Cada categoría de la carta tiene su área de cocina, editable por el administrador. | **Alcance.**<br>• El administrador crea hasta cuatro áreas propias, les asigna categorías y aparecen como pantalla.<br>• Cada categoría de la carta tiene su área de cocina, editable por el administrador. |
-| **Problema.** Cada área sabe qué preparar sin gritos ni papeles, y el tiempo de cada pedido se ve y se mide. Contribuye a OBJ-CAP-001. | **Fuera de alcance.**<br>• HU-CAP-047: Ver en mi pantalla solo las comandas de mi área.<br>• HU-CAP-048: Avanzar y deshacer el estado de mi parte.<br>• HU-CAP-049: Ver la TV de cocina de solo lectura.<br>• Impresión de comandas y etiquetas: FT-COC-02.<br>• Agotado por hoy y Alta demanda: FT-COC-03.<br>• Mermas y cierre del día de cocina: FT-ALM-03. |
+| **Contexto.** Historia de FT-COC-01 «Pantallas de cocina por área» (Debe tener, épica EP-CAP-006). Cubre los requerimientos: **RQ-COC-01-13** El administrador crea hasta cuatro áreas propias, les asigna categorías y aparecen como pantalla. **RQ-COC-01-14** Cada categoría de la carta tiene su área de cocina, editable por el administrador. | **Alcance.**<br>• El administrador crea hasta cuatro áreas propias, les asigna categorías y aparecen como pantalla.<br>• Cada categoría de la carta tiene su área de cocina, editable por el administrador. |
+| **Problema.** Cada área sabe qué preparar sin gritos ni papeles, y el tiempo de cada pedido se ve y se mide. Contribuye a OBJ-CAP-001. | **Fuera de alcance.**<br>• HU-CAP-047: Ver en mi pantalla solo las comandas de mi área.<br>• HU-CAP-048: Despejar mi parte y devolverla desde el historial.<br>• HU-CAP-049: Ver la TV de cocina de solo lectura.<br>• HU-CAP-198: Ver en despacho el pedido completo de todas las áreas.<br>• Impresión de comandas y etiquetas: FT-COC-02.<br>• Agotado por hoy y Alta demanda: FT-COC-03.<br>• Mermas y cierre del día de cocina: FT-ALM-03. |
 
 ## 03 | CRITERIOS DE ACEPTACIÓN
 
 | N.° | DADO | CUANDO | ENTONCES |
 |---|---|---|---|
-| CA-1 | un área nueva «Parrilla» con la categoría Hamburguesas | entra un pedido con una hamburguesa | aparece en la pantalla Parrilla; una quinta área no se puede crear (RQ-COC-01-10) |
-| CA-2 | la categoría Postres en el área Postres | el administrador la cambia a Bebidas con Sí/No | los pedidos nuevos de esa categoría van a Bebidas (RQ-COC-01-11) |
+| CA-1 | un área nueva «Parrilla» con la categoría Hamburguesas | entra un pedido con una hamburguesa | aparece en la pantalla Parrilla; una quinta área no se puede crear (RQ-COC-01-13) |
+| CA-2 | la categoría Postres en el área Postres | el administrador la cambia a Bebidas con Sí/No | los pedidos nuevos de esa categoría van a Bebidas (RQ-COC-01-14) |
 | CA-3 | un usuario con un rol sin permiso para esta acción (ACT-CAP-009 repartidor) | intenta hacerla desde el menú o escribiendo la dirección de la pantalla | se rechaza en el servidor, no se guarda nada y no se entregan datos (RN-CAP-013, RNF-CAP-006) |
 | CA-4 | la confirmación Sí/No de la acción | quien la hace responde «No» | no cambia nada y la pantalla queda como estaba (RN-CAP-015, RNF-CAP-012) |
 
-Origen: criterios de verificación de FT-COC-01 (RQ-COC-01-10, RQ-COC-01-11); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
+Origen: criterios de verificación de FT-COC-01 (RQ-COC-01-13, RQ-COC-01-14); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
 
 ## 04 | REGLAS, DEPENDENCIAS Y EVIDENCIAS
 
@@ -52,7 +52,7 @@ Origen: criterios de verificación de FT-COC-01 (RQ-COC-01-10, RQ-COC-01-11); lo
 |---|---|
 | **RB-01** (RN-CAP-123) Hasta cuatro áreas propias; se desactivan, no se eliminan; sin etiqueta propia.<br>**RNF aplicables:** RNF-CAP-002, RNF-CAP-004, RNF-CAP-006, RNF-CAP-003. | `AreaCocina` (nombre, activa, propia, máximo 4 propias) · `Categoria.area` · `ComandaArea` (pedido, área, estado, horas) · `Agotado` (producto, sabor u opción, alcance hoy o indefinido, autor) · `AltaDemanda` (minutos, pausa) · `Impresion` (tipo, área, estado, intentos) · `LlaveTV`.<br>*(Entidades propuestas; detalle y tablas en `datos/DAT-CAP-001-modelo-de-datos.md`, se aprueba en G3.)* |
 | **DEPENDENCIAS / RIESGOS** | **DISEÑO / ADJUNTOS** |
-| • **HU-CAP-049** (Ver la TV de cocina de solo lectura) va antes, dentro de la misma feature.<br>• FT-CFG-01.<br>• **DEP-02** plataforma y hosting: propuestos en ADR-001 y ADR-011, pendientes de aprobación en G3.<br>• **DEP-06** mockup en Figma o aceptación del mockup navegable como diseño (G2).<br>• Riesgos: R-01 (roadmap PLT-01). | • Mockup en Figma: (pendiente UX — G2, DEP-06).<br>• Referencia mientras tanto: mockup navegable (DT-04), Administrativo ▸ Cocina por área, vista general, TV de cocina (`Admin.dc.html`); `analisis/pantalla-cocina.md`.<br>• Contrato de API: `arquitectura/ARQ-CAP-002-catalogo-de-api-y-eventos.md`, módulo de FT-COC-01 (borrador, se aprueba en G3).<br>• ADR (propuestos): ADR-001, ADR-011, ADR-014, ADR-002, ADR-006, ADR-007.<br>• Modelo de datos: `datos/DAT-CAP-001-modelo-de-datos.md`. |
+| • **HU-CAP-049** (Ver la TV de cocina de solo lectura) va antes, dentro de la misma feature.<br>• FT-CFG-01.<br>• **DEP-02** plataforma y hosting: propuestos en ADR-001 y ADR-011, pendientes de aprobación en G3.<br>• **DEP-06** mockup en Figma o aceptación del mockup navegable como diseño (G2).<br>• Riesgos: R-01 (roadmap PLT-01). | • Mockup en Figma: (pendiente UX — G2, DEP-06).<br>• Referencia mientras tanto: mockup navegable (DT-04), Administrativo ▸ Cocina por área (Despejar, Historial), Despacho, vista general, TV de cocina (`Admin.dc.html`); `analisis/pantalla-cocina.md`.<br>• Contrato de API: `arquitectura/ARQ-CAP-002-catalogo-de-api-y-eventos.md`, módulo de FT-COC-01 (borrador, se aprueba en G3).<br>• ADR (propuestos): ADR-001, ADR-011, ADR-014, ADR-002, ADR-006, ADR-007.<br>• Modelo de datos: `datos/DAT-CAP-001-modelo-de-datos.md`. |
 
 ## 05 | CHECKLIST DE CALIDAD
 
@@ -65,4 +65,4 @@ Origen: criterios de verificación de FT-COC-01 (RQ-COC-01-10, RQ-COC-01-11); lo
 
 **DoR: NO READY** hasta cerrar G2 y G3 (y con G0 y G1 aún sin aprobar).
 
-Generado por IA: historia derivada de FT-COC-01 (requerimientos RQ-COC-01-10, RQ-COC-01-11, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)
+Generado por IA: historia derivada de FT-COC-01 (requerimientos RQ-COC-01-13, RQ-COC-01-14, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)

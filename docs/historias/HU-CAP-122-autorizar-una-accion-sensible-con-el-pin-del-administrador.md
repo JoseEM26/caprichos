@@ -32,15 +32,15 @@ tags: [hu, usuarios, capa-a, ft-usr-02, alta, ui]
 
 | CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
 |---|---|
-| **Contexto.** Historia de FT-USR-02 «Roles, permisos y escritorio por rol» (Debe tener, épica EP-CAP-013). Cubre los requerimientos: **RQ-USR-02-07** Las acciones sensibles hechas por otro rol exigen el PIN del administrador. **RQ-USR-02-08** El administrador cambia su PIN, que se guarda como huella. | **Alcance.**<br>• Las acciones sensibles hechas por otro rol exigen el PIN del administrador.<br>• El administrador cambia su PIN, que se guarda como huella. |
+| **Contexto.** Historia de FT-USR-02 «Roles, permisos y escritorio por rol» (Debe tener, épica EP-CAP-013). Cubre los requerimientos: **RQ-USR-02-07** Las acciones sensibles hechas por otro rol exigen el PIN de 6 dígitos de la supervisora (rol administrador), escrito en la misma pantalla; no hay aprobación a distancia. **RQ-USR-02-08** El administrador cambia su PIN de 6 dígitos, que se guarda como huella y no se comparte. | **Alcance.**<br>• Las acciones sensibles hechas por otro rol exigen el PIN de 6 dígitos de la supervisora (rol administrador), escrito en la misma pantalla; no hay aprobación a distancia.<br>• El administrador cambia su PIN de 6 dígitos, que se guarda como huella y no se comparte. |
 | **Problema.** Que cada persona vea solo lo que necesita (NEC-CAP-010) y que los procesos y roles queden documentados (NEC-CAP-008). | **Fuera de alcance.**<br>• HU-CAP-119: Asignar un rol y ver solo mis módulos.<br>• HU-CAP-120: Ver mi escritorio según mi rol.<br>• HU-CAP-121: Editar la matriz de permisos por rol.<br>• Altas y primer ingreso: FT-USR-01.<br>• Permisos por usuario distintos a su rol (no pedido). |
 
 ## 03 | CRITERIOS DE ACEPTACIÓN
 
 | N.° | DADO | CUANDO | ENTONCES |
 |---|---|---|---|
-| CA-1 | un cajero que anula un pedido | confirma | se pide el PIN del administrador y sin él no se anula (RQ-USR-02-07) |
-| CA-2 | el perfil del administrador | cambia su PIN de 4 a 6 dígitos | el nuevo vale y el anterior no (RQ-USR-02-08) |
+| CA-1 | un cajero que anula un pedido | confirma | la pantalla de caja pide el PIN de la supervisora y sin él no se anula; no se envía ninguna notificación para aprobar desde otro lugar (RQ-USR-02-07) |
+| CA-2 | el perfil del administrador | cambia su PIN por otro de 6 dígitos | el nuevo vale y el anterior no; un PIN de 4 dígitos o como 123456 no se acepta (RQ-USR-02-08) |
 | CA-3 | un usuario con un rol sin permiso para esta acción (ACT-CAP-004 mozo) | intenta hacerla desde el menú o escribiendo la dirección de la pantalla | se rechaza en el servidor, no se guarda nada y no se entregan datos (RN-CAP-013, RNF-CAP-006) |
 
 Origen: criterios de verificación de FT-USR-02 (RQ-USR-02-07, RQ-USR-02-08); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.

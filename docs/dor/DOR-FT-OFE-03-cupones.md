@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-012, FT-OFE-03, HU-CAP-112, HU-CAP-113, HU-CAP-114, HU-CAP-115, ADR-001, ADR-011, ADR-014, ADR-003, ADR-007, FT-CLI-01, FT-LEG-01, FT-PED-01]
+relacionados: [EP-CAP-012, FT-OFE-03, HU-CAP-112, HU-CAP-113, HU-CAP-114, HU-CAP-115, ADR-001, ADR-011, ADR-014, ADR-003, ADR-007, FT-CLI-01, FT-LEG-01, FT-OFE-02, FT-PED-01]
 tags: [dor, plt-05, ofertas, ft-ofe-03, g4]
 ---
 
@@ -34,7 +34,7 @@ tags: [dor, plt-05, ofertas, ft-ofe-03, g4]
 | NEGOCIO | ☑ | Objetivo y valor con KPI | Épica EP-CAP-012 §2 y feature §1 (hipótesis medible) |
 | NEGOCIO | ☐ | Alcance dentro y fuera acordado | Redactado en la feature; falta la firma del PO (DT-48) |
 | NEGOCIO | ☐ | Prioridad y release confirmados | Debería tener · H2 · 01/03/2027 (supuesto, D-19); fechas supuestas hasta D-19 |
-| FUNCIONAL | ☑ | Historias con criterios verificables | 4 historias, 12 criterios Dado/Cuando/Entonces |
+| FUNCIONAL | ☑ | Historias con criterios verificables | 4 historias, 13 criterios Dado/Cuando/Entonces |
 | FUNCIONAL | ☑ | Reglas de negocio documentadas y validadas | Documentadas en la feature §4; sin decisiones abiertas propias |
 | FUNCIONAL | ☐ | Estimación por el equipo | Tareas en `backlog/tareas/EP-CAP-012.json` con `estimacion_horas: null` |
 | DISEÑO / UX | ☐ | Prototipos aprobados (DEP-06) | Mockup navegable como referencia (DT-04); Figma o aceptación del mockup pendiente (G2) |
@@ -43,7 +43,7 @@ tags: [dor, plt-05, ofertas, ft-ofe-03, g4]
 | TÉCNICO | ☐ | Contrato de API | Borrador en ARQ-CAP-002 §FT-OFE-03; se aprueba en G3 |
 | TÉCNICO | ☐ | Modelo de datos / DDL | DAT-CAP-001 y `datos/ddl-propuesto.sql` (probado en PostgreSQL 16); sin aprobar (G3) |
 | TÉCNICO | ☐ | RNF y seguridad | RNF-CAP-010, RNF-CAP-009, RNF-CAP-014, RNF-CAP-019; umbrales propuestos (feature §3) |
-| CALIDAD | ☑ | Estrategia y datos de prueba | `pruebas/test-plan.md`: 12 casos TC para estas historias, datos sintéticos |
+| CALIDAD | ☑ | Estrategia y datos de prueba | `pruebas/test-plan.md`: 13 casos TC para estas historias, datos sintéticos |
 | CALIDAD | ☑ | Riesgos con mitigación y dueño | Sección 5 |
 
 ## 2 DIAGRAMA DE DEPENDENCIAS
@@ -60,6 +60,7 @@ flowchart LR
   HU_CAP_115["HU-CAP-115"]:::evaluado --> FT_OFE_03
   FT_CLI_01["FT-CLI-01"]:::interna --> FT_OFE_03
   FT_LEG_01["FT-LEG-01"]:::interna --> FT_OFE_03
+  FT_OFE_02["FT-OFE-02"]:::interna --> FT_OFE_03
   FT_PED_01["FT-PED-01"]:::interna --> FT_OFE_03
   ADR_001["ADR-001"]:::interna -.-> FT_OFE_03
   ADR_011["ADR-011"]:::interna -.-> FT_OFE_03
@@ -71,7 +72,7 @@ flowchart LR
 ```
 
 - **Ítems evaluados:** FT-OFE-03 y sus historias HU-CAP-112, HU-CAP-113, HU-CAP-114, HU-CAP-115.
-- **Dependencias técnicas:** FT-CLI-01, FT-LEG-01, FT-PED-01; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-003, ADR-007.
+- **Dependencias técnicas:** FT-CLI-01, FT-LEG-01, FT-OFE-02, FT-PED-01; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-003, ADR-007.
 - **Dependencias externas:** DEP-02, DEP-06.
 - **Decisiones abiertas:** ninguna propia.
 
@@ -164,7 +165,7 @@ flowchart TB
 | --- | --- | --- | --- | --- | --- | --- |
 | R-01 | Riesgo de roadmap (ver PLT-01) | — | — | Según roadmap | Ver PLT-01 | Abierto |
 | R-11 | Riesgo de roadmap (ver PLT-01) | — | — | Según roadmap | Ver PLT-01 | Abierto |
-| R-FT-OFE-03-01 | Si no se resuelve «¿Cuántos días vale un cupón impreso por defecto? Propuesta: 30 días», hay que rehacer criterios o pantallas | Media | Medio | Resolver con Kevin antes de G4 con la propuesta escrita en la feature | Kevin | Abierto |
+| R-FT-OFE-03-01 | Si no se resuelve «Días de vigencia por defecto», hay que rehacer criterios o pantallas | Media | Medio | Resolver con Kevin antes de G4 con la propuesta escrita en la feature | Kevin | Abierto |
 
 ## 6 DECISIÓN Y APROBACIÓN
 

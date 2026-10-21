@@ -257,7 +257,7 @@
         },
         {
           "id": "HU-CAP-158-T03",
-          "titulo": "Reglas de dominio de HU-CAP-158 (RQ-CFG-02-01, RQ-CFG-02-02, RQ-CFG-02-03, RQ-CFG-02-08)",
+          "titulo": "Reglas de dominio de HU-CAP-158 (RQ-CFG-02-01, RQ-CFG-02-02, RQ-CFG-02-03, RQ-CFG-02-09)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -341,7 +341,7 @@
         },
         {
           "id": "HU-CAP-159-T03",
-          "titulo": "Casos de uso: Configurar tiempos, tolerancias, puntos y descuento del personal",
+          "titulo": "Casos de uso: Configurar tiempos, tolerancias, porcentaje de puntos y descuento del personal",
           "capa": "application",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -363,7 +363,7 @@
         },
         {
           "id": "HU-CAP-159-T05",
-          "titulo": "Pantalla React: Configurar tiempos, tolerancias, puntos y descuento del personal",
+          "titulo": "Pantalla React: Configurar tiempos, tolerancias, porcentaje de puntos y descuento del personal",
           "capa": "ux",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -401,7 +401,7 @@
         },
         {
           "id": "HU-CAP-160-T02",
-          "titulo": "Reglas de dominio de HU-CAP-160 (RQ-CFG-02-06, RQ-CFG-02-07)",
+          "titulo": "Reglas de dominio de HU-CAP-160 (RQ-CFG-02-06, RQ-CFG-02-07, RQ-CFG-02-08)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -446,7 +446,7 @@
         },
         {
           "id": "HU-CAP-160-T06",
-          "titulo": "Pruebas TC-CAP-160-01..03 (unitarias de dominio e integración de API)",
+          "titulo": "Pruebas TC-CAP-160-01..05 (unitarias de dominio e integración de API)",
           "capa": "application",
           "actividad": "PRUEBAS",
           "responsable": "José Ángel Espinoza",

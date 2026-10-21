@@ -63,7 +63,7 @@ tags: [arquitectura, api, websocket, g3]
 | Método | Ruta | Quién | Qué hace |
 | --- | --- | --- | --- |
 | POST | `/carta/cupones/validar` | Público | Valida un código (límite de intentos) |
-| POST | `/pedidos` | Público (canal CARTA) | Crea el pedido «por confirmar»; idempotente con `Idempotency-Key` |
+| POST | `/pedidos` | Público (canal CARTA) | Crea el pedido directo en cocina con el pago por coordinar (DT-57); método de pago obligatorio; idempotente con `Idempotency-Key` |
 
 ### FT-PED-02 — Ubicación y costo de envío en la carta (EP-CAP-002)
 
@@ -72,7 +72,7 @@ tags: [arquitectura, api, websocket, g3]
 | POST | `/zonas/detectar` | Público | Zona y costo de envío para un punto; fuera de cobertura → 422 |
 | GET | `/carta/recordar?telefono=` | Público (con consentimiento previo) | Nombre y última dirección para el siguiente pedido |
 
-### FT-PED-03 — Envío del pedido a caja y aviso al cliente (EP-CAP-002)
+### FT-PED-03 — Envío del pedido a comandas y aviso al cliente (EP-CAP-002)
 
 | Método | Ruta | Quién | Qué hace |
 | --- | --- | --- | --- |
@@ -86,23 +86,30 @@ tags: [arquitectura, api, websocket, g3]
 | POST | `/cuenta/registro` | Público | Crear cuenta con DNI, contraseña, cumpleaños y aceptación |
 | POST | `/cuenta/ingresar` | Público | Ingreso por DNI y contraseña (5 intentos) |
 | POST | `/cuenta/crear-contrasena` | Público | Cliente registrado en el local crea su contraseña |
-| GET | `/admin/clientes?doc=` | CAJERO, ADMIN | Búsqueda por DNI o RUC completo; DNI enmascarado salvo ADMIN |
+| GET | `/admin/clientes?doc=` | CAJERO, ADMIN | Búsqueda por DNI o RUC completo; DNI y RUC enmascarados salvo ADMIN |
 | POST | `/admin/clientes` | CAJERO, ADMIN | Registrar cliente en el local |
 | PATCH | `/admin/clientes/{id}` | CAJERO, ADMIN | Editar sin cambiar el documento |
 | GET | `/admin/clientes/{id}/pedidos` | CAJERO, ADMIN | Historial de pedidos |
+| GET | `/admin/clientes/{id}/documento` | ADMIN | DNI o RUC completo; queda en el historial (DT-67) |
+| GET | `/admin/clientes.xlsx` | ADMIN | Exportar nombre y teléfono a Excel; queda en el historial |
 
 ### FT-CLI-02 — Puntos y beneficio de cumpleaños (EP-CAP-003)
 
 | Método | Ruta | Quién | Qué hace |
 | --- | --- | --- | --- |
 | GET | `/cuenta/puntos` | Cliente | Saldo e historial |
+| POST | `/carta/puntos/simular` | Público | Puntos que gana un carrito (5 % configurable, sin productos marcados, DT-55) |
+| POST | `/cuenta/puntos/canjear` | Cliente | Aplica N puntos al pedido; 422 si supera el saldo o el total |
+| POST | `/admin/pedidos/{id}/puntos/canjear` | CAJERO, ADMIN | Canje en caja con DNI y contraseña del cliente |
 | GET | `/cuenta/notificaciones` | Cliente | Campanita: cupón de cumpleaños |
 
 ### FT-CAJ-01 — Cola de pedidos por confirmar (EP-CAP-004)
 
 | Método | Ruta | Quién | Qué hace |
 | --- | --- | --- | --- |
-| GET | `/admin/pedidos?estado=POR_CONFIRMAR` | CAJERO, MOZO, CALLCENTER, ADMIN | Cola por confirmar |
+| GET | `/admin/pedidos?estado=POR_CONFIRMAR` | CAJERO, MOZO, CALLCENTER, ADMIN | Cola por confirmar (chatbot y teléfono) |
+| GET | `/admin/pedidos?pago=POR_COORDINAR` | CAJERO, CALLCENTER, ADMIN | Pedidos de la carta con el pago por coordinar (DT-57) |
+| POST | `/admin/pedidos/{id}/pago-coordinado` | CAJERO, CALLCENTER, ADMIN | Registra el pago y la captura sin reenviar a cocina |
 | POST | `/admin/pedidos/{id}/comprobante-pago` | CAJERO, MOZO, CALLCENTER, ADMIN | Subir captura (carpeta privada) |
 | POST | `/admin/pedidos/{id}/confirmar` | CAJERO, MOZO, CALLCENTER, ADMIN | Confirmar: pasa a cocina, imprime, descuenta stock; 409 si otro ya confirmó |
 | PUT | `/admin/pedidos/{id}/ubicacion` | CAJERO, MOZO, CALLCENTER, ADMIN | Ubicar en el mapa; recalcula zona, envío y total |
@@ -134,11 +141,13 @@ tags: [arquitectura, api, websocket, g3]
 | POST | `/admin/caja/movimientos/{id}/anular` | CAJERO, ADMIN | Anular movimiento |
 | POST | `/admin/caja/liquidaciones` | CAJERO, ADMIN | Liquidar efectivo de un repartidor |
 
-### FT-CIE-02 — Arqueo y cierre con historial (EP-CAP-005)
+### FT-CIE-02 — Arqueo ciego y cierre con historial (EP-CAP-005)
 
 | Método | Ruta | Quién | Qué hace |
 | --- | --- | --- | --- |
-| POST | `/admin/caja/cerrar` | CAJERO, ADMIN | Arqueo por denominación y medios vistos; valida pendientes |
+| POST | `/admin/caja/conteos` | CAJERO, ADMIN | Arqueo ciego: guarda el intento y responde solo CUADRA o NO_CUADRA (DT-61) |
+| GET | `/admin/caja/conteos/detalle` | ADMIN (+PIN) | Detalle por medio y ventas del día de un cierre que no cuadra |
+| POST | `/admin/caja/cerrar` | CAJERO, ADMIN | Cierra; con NO_CUADRA exige el PIN de la supervisora; valida pendientes |
 | GET | `/admin/caja/cierres` | ADMIN | Historial con filtros |
 | GET | `/admin/caja/cierres/{fecha}.csv` | ADMIN | Exportar |
 
@@ -147,9 +156,11 @@ tags: [arquitectura, api, websocket, g3]
 | Método | Ruta | Quién | Qué hace |
 | --- | --- | --- | --- |
 | GET | `/cocina/comandas?area=` | COCINA, ADMIN | Comandas activas del área |
-| POST | `/cocina/comandas/{pedido}/{area}/avanzar` | COCINA | NUEVO → EN_PREPARACION → LISTO |
-| POST | `/cocina/comandas/{pedido}/{area}/deshacer` | COCINA | Volver un paso |
-| POST | `/cocina/comandas/{pedido}/{area}/despejar` | COCINA | Quitar de pantalla |
+| POST | `/cocina/comandas/{pedido}/{area}/despejar` | COCINA | Único botón: despeja la parte del área (DT-58) |
+| GET | `/cocina/historial?area=&fecha=` | COCINA, ADMIN | Despejadas del día con hora de llegada y despeje |
+| POST | `/cocina/comandas/{pedido}/{area}/devolver` | COCINA | Devuelve a la pantalla una despejada por error |
+| GET | `/despacho/pedidos` | DESPACHO, CAJERO, ADMIN | Pedido completo de todas las áreas y qué falta |
+| POST | `/despacho/pedidos/{id}/entregar` | DESPACHO, CAJERO, ADMIN | Entregado al mozo, al cliente o al repartidor |
 | GET | `/tv/comandas` | Llave TV | Solo lectura, sin datos personales |
 | CRUD | `/admin/areas-cocina` | ADMIN | Áreas propias (máx. 4) y categoría → área |
 
@@ -165,7 +176,7 @@ tags: [arquitectura, api, websocket, g3]
 
 | Método | Ruta | Quién | Qué hace |
 | --- | --- | --- | --- |
-| POST | `/cocina/agotados` | COCINA, ADMIN | Agotar por hoy producto, sabor u opción |
+| POST | `/cocina/agotados` | COCINA, CAJERO, ADMIN | Agotar por hoy producto, sabor u opción |
 | DELETE | `/cocina/agotados/{id}` | COCINA, ADMIN | Reactivar (cierra la vigencia, no borra) |
 | PUT | `/cocina/alta-demanda` | COCINA, ADMIN | Minutos (5–180) y pausa |
 
@@ -211,7 +222,9 @@ tags: [arquitectura, api, websocket, g3]
 | GET | `/reparto/disponibles` | REPARTIDOR | Delivery listos |
 | POST | `/reparto/{pedido}/tomar` | REPARTIDOR | Tomar (409 si otro ganó) |
 | GET | `/reparto/mis-entregas` | REPARTIDOR | Solo sus pedidos |
-| POST | `/reparto/{pedido}/en-camino` | REPARTIDOR | Salida |
+| GET | `/reparto/mapa` | REPARTIDOR | Puntos con nombre, código, minutos de espera, zona y orden sugerido (DT-59) |
+| POST | `/reparto/{pedido}/en-camino` | REPARTIDOR | Salida; envía el mensaje 1 al cliente (DT-60) |
+| POST | `/reparto/{pedido}/he-llegado` | REPARTIDOR | Llegada; envía el mensaje 2 y programa el 3 |
 | POST | `/reparto/{pedido}/entregado` | REPARTIDOR | Entrega y efectivo cobrado |
 
 ### FT-DEL-03 — Entregas fallidas (EP-CAP-008)
@@ -265,6 +278,7 @@ tags: [arquitectura, api, websocket, g3]
 | Método | Ruta | Quién | Qué hace |
 | --- | --- | --- | --- |
 | POST | `/admin/pedidos-internos` | COCINA | Pedir insumos |
+| POST | `/admin/pedidos-internos/{id}/recibido` | ALMACEN, PRODUCCION, ADMIN | Calla el sonido; queda quién recibió (DT-64) |
 | POST | `/admin/pedidos-internos/{id}/entregar` | ALMACEN | Entregar (crea traslados) |
 | POST | `/admin/cocina/mermas` | COCINA, ADMIN | Merma de productos de cocina |
 | POST | `/admin/cierre-dia` | COCINA, ALMACEN, ADMIN | Conteo y destino |
@@ -322,6 +336,9 @@ tags: [arquitectura, api, websocket, g3]
 | POST | `/auth/cambiar-contrasena` | Personal | Primer ingreso y cambio; en el cambio pide la contraseña actual (reautenticación) y queda en el historial |
 | POST | `/admin/usuarios/{id}/restablecer` | ADMIN | Solo el administrador: vuelve a la inicial y obliga a cambiarla; queda en el historial |
 | PUT | `/perfil/foto` | Personal | Foto de perfil |
+| PUT | `/admin/usuarios/{id}/horario` | ADMIN | Días y horas de trabajo (DT-64) |
+| CRUD | `/admin/coberturas` | ADMIN | Quién cubre un descanso un día puntual |
+| GET | `/admin/turno?rol=&momento=` | ADMIN, sistema | Quién está de turno |
 | POST | `/auth/renovar` | Personal y cliente | Token de renovación rotativo |
 
 ### FT-USR-02 — Roles, permisos y escritorio por rol (EP-CAP-013)
@@ -331,14 +348,15 @@ tags: [arquitectura, api, websocket, g3]
 | GET | `/auth/yo` | Personal | Rol, permisos y menú |
 | GET | `/admin/escritorio` | Personal | Escritorio según rol |
 | PUT | `/admin/roles/{rol}/permisos` | ADMIN | Matriz editable |
-| PUT | `/admin/pin` | ADMIN | Cambiar PIN |
+| PUT | `/admin/pin` | ADMIN | Cambiar PIN de 6 dígitos (DT-61) |
+| POST | `/admin/pin/verificar` | Personal (con el PIN de la supervisora) | Aprobación en la misma pantalla; 3 errores bloquean 5 minutos |
 
 ### FT-USR-03 — Crédito del personal (EP-CAP-013)
 
 | Método | Ruta | Quién | Qué hace |
 | --- | --- | --- | --- |
-| GET | `/admin/creditos-personal?mes=` | ADMIN | Consumo por trabajador |
-| GET | `/admin/creditos-personal/{mes}.csv` | ADMIN | Exportar |
+| GET | `/admin/creditos-personal?desde=&hasta=` | ADMIN | Consumo por trabajador; por defecto la semana actual (DT-63) |
+| GET | `/admin/creditos-personal.xlsx?desde=&hasta=` | ADMIN | Exportar a Excel (queda en el historial) |
 
 ### FT-BOT-01 — Pedido por botones (EP-CAP-014)
 
@@ -435,7 +453,7 @@ tags: [arquitectura, api, websocket, g3]
 | Método | Ruta | Quién | Qué hace |
 | --- | --- | --- | --- |
 | GET | `/admin/informes/{tipo}?desde=&hasta=&canal=&pago=&modalidad=` | ADMIN | Ventas, tiempos, rentabilidad, ofertas |
-| GET | `/admin/informes/{tipo}.csv` | ADMIN | Exportar |
+| GET | `/admin/informes/{tipo}.xlsx` | ADMIN | Exportar a Excel (queda en el historial, DT-67) |
 
 ### FT-INF-02 — Indicadores y mapa de entregas (EP-CAP-018)
 
@@ -538,9 +556,11 @@ Namespaces: `/admin` (personal), `/carta` (público, sin datos personales), `/di
 
 | Evento | Sala / destino | Significado | Feature |
 | --- | --- | --- | --- |
-| `pedido.creado` | `/admin, rol:CAJERO/MOZO/CALLCENTER/ADMIN` | Pedido nuevo por confirmar o de mesa | FT-PED-03 |
+| `pedido.creado` | `/admin, rol:CAJERO/MOZO/CALLCENTER/ADMIN, area:*` | Pedido nuevo: por confirmar, de mesa o de la carta (este va directo a cocina) | FT-PED-03 |
 | `pedido.confirmado` | `area:*` | Comanda nueva en cocina | FT-CAJ-01, FT-COC-01 |
-| `comanda.estado` | `area:*, pedido:{id}` | Avance o deshacer de un área | FT-COC-01 |
+| `comanda.estado` | `area:*, pedido:{id}, rol:DESPACHO` | Despejada o devuelta por un área | FT-COC-01 |
+| `reparto.mensaje` | `rol:REPARTIDOR` | El cliente respondió o falló un aviso | FT-DEL-02 |
+| `almacen.pedido` | `rol:ALMACEN, usuario:{de turno}` | Pedido interno: suena hasta «Recibido» | FT-ALM-03 |
 | `pedido.listo` | `usuario:{mozo}, rol:CAJERO, rol:REPARTIDOR` | Todas las áreas terminaron | FT-COC-01, FT-SAL-02, FT-DEL-02 |
 | `pedido.estado` | `pedido:{id}` | Cualquier cambio de estado | FT-CAJ-01 |
 | `mesa.estado` | `rol:MOZO, rol:CAJERO` | Ocupada, libre, reservada | FT-SAL-02, FT-SAL-03 |
@@ -553,7 +573,7 @@ Namespaces: `/admin` (personal), `/carta` (público, sin datos personales), `/di
 | `stock.bajo` | `rol:ALMACEN, rol:ADMIN` | Bajo mínimo o negativo | FT-STK-03 |
 | `chat.mensaje` | `rol:CAJERO/MOZO/CALLCENTER` | Mensaje nuevo, urgente o validar pago | FT-ATN-01, FT-BOT-02 |
 | `chat.tomado` | `rol:CAJERO/MOZO/CALLCENTER` | Cambio de dueño del chat | FT-ATN-01 |
-| `caja.cobro` | `rol:CAJERO, rol:ADMIN` | Totales por medio en vivo | FT-CIE-01 |
+| `caja.cobro` | `rol:ADMIN` | Totales por medio en vivo (el cajero no los recibe, DT-61) | FT-CIE-01 |
 | `carta.publicada` | `/carta` | Recargar la carta | FT-CON-02 |
 | `notificacion.nueva` | `rol:*, usuario:*` | Campanita | FT-INF-03 |
 
@@ -579,4 +599,4 @@ Namespaces: `/admin` (personal), `/carta` (público, sin datos personales), `/di
 
 ---
 
-Generado por IA: 183 endpoints derivados de los requerimientos de las 61 features y de los ADR-001, 006, 007, 008, 009 y 014 — Revisado por: (pendiente)
+Generado por IA: 201 endpoints derivados de los requerimientos de las 61 features y de los ADR-001, 006, 007, 008, 009 y 014 — Revisado por: (pendiente)

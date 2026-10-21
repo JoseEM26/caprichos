@@ -32,14 +32,14 @@ tags: [hu, cierre-caja, capa-a, ft-cie-01, alta, ui]
 
 | CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
 |---|---|
-| **Contexto.** Historia de FT-CIE-01 «Apertura, movimientos y liquidación de repartidores» (Debe tener, épica EP-CAP-005). Cubre los requerimientos: **RQ-CIE-01-03** Durante el turno se ven en vivo las ventas por medio de pago. **RQ-CIE-01-04** El cajero registra ingresos y egresos de caja con monto, motivo y autor. **RQ-CIE-01-05** Un movimiento de caja no se edita ni se borra: se anula con motivo. **RQ-CIE-01-06** El efectivo esperado se calcula como apertura + ventas en efectivo + ingresos − egresos. | **Alcance.**<br>• Durante el turno se ven en vivo las ventas por medio de pago.<br>• El cajero registra ingresos y egresos de caja con monto, motivo y autor.<br>• Un movimiento de caja no se edita ni se borra: se anula con motivo.<br>• El efectivo esperado se calcula como apertura + ventas en efectivo + ingresos − egresos. |
+| **Contexto.** Historia de FT-CIE-01 «Apertura, movimientos y liquidación de repartidores» (Debe tener, épica EP-CAP-005). Cubre los requerimientos: **RQ-CIE-01-03** Durante el turno, solo el administrador ve en vivo las ventas por medio de pago; el cajero ve sus cobros uno por uno, sin totales. **RQ-CIE-01-04** El cajero registra ingresos y egresos de caja con monto, motivo y autor. **RQ-CIE-01-05** Un movimiento de caja no se edita ni se borra: se anula con motivo. **RQ-CIE-01-06** El efectivo esperado se calcula como apertura + ventas en efectivo + ingresos − egresos, y solo lo ve el administrador. | **Alcance.**<br>• Durante el turno, solo el administrador ve en vivo las ventas por medio de pago; el cajero ve sus cobros uno por uno, sin totales.<br>• El cajero registra ingresos y egresos de caja con monto, motivo y autor.<br>• Un movimiento de caja no se edita ni se borra: se anula con motivo.<br>• El efectivo esperado se calcula como apertura + ventas en efectivo + ingresos − egresos, y solo lo ve el administrador. |
 | **Problema.** Saber en cualquier momento cuánto efectivo debería haber, y que el efectivo de los repartidores no se pierda entre turnos. | **Fuera de alcance.**<br>• HU-CAP-041: Abrir la caja del día.<br>• HU-CAP-043: Liquidar el efectivo de un repartidor.<br>• Arqueo, cierre e historial: FT-CIE-02.<br>• Varias cajas o varios turnos al día (un solo local, una caja). |
 
 ## 03 | CRITERIOS DE ACEPTACIÓN
 
 | N.° | DADO | CUANDO | ENTONCES |
 |---|---|---|---|
-| CA-1 | cobros con efectivo, Yape y tarjeta | el cajero abre el resumen | ve el total de cada medio y el total del día, actualizados con cada cobro (RQ-CIE-01-03) |
+| CA-1 | cobros con efectivo, Yape y tarjeta | el administrador abre el resumen | ve el total de cada medio y del día; cuando lo abre el cajero, ve la lista de cobros sin sumas por medio ni efectivo esperado, y el servidor no le entrega esos totales (RQ-CIE-01-03) |
 | CA-2 | un egreso de S/ 15 por «compra de hielo» | el cajero lo registra con Sí/No | baja el efectivo esperado en S/ 15 y queda en la lista con su autor y hora (RQ-CIE-01-04) |
 | CA-3 | un ingreso mal registrado | el cajero lo anula con motivo | deja de sumar y sigue visible tachado con su motivo (RQ-CIE-01-05) |
 | CA-4 | apertura S/ 50, ventas en efectivo S/ 300, ingresos S/ 20 y egresos S/ 15 | se consulta | el efectivo esperado es S/ 355,00 (RQ-CIE-01-06) |

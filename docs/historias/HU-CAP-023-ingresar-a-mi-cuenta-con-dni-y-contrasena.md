@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-003, FT-CLI-01, RQ-CLI-01-04, RQ-CLI-01-05, RQ-CLI-01-11, HU-CAP-022, HU-CAP-024, HU-CAP-025, ADR-001, ADR-011, ADR-014, ADR-004, ADR-005, ADR-008, D-17, DEP-02, DEP-06, R-01]
+relacionados: [EP-CAP-003, FT-CLI-01, RQ-CLI-01-04, RQ-CLI-01-05, RQ-CLI-01-12, HU-CAP-022, HU-CAP-024, HU-CAP-025, ADR-001, ADR-011, ADR-014, ADR-004, ADR-005, ADR-008, D-17, DEP-02, DEP-06, R-01]
 tags: [hu, clientes, capa-a, ft-cli-01, media, ui]
 ---
 
@@ -32,8 +32,8 @@ tags: [hu, clientes, capa-a, ft-cli-01, media, ui]
 
 | CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
 |---|---|
-| **Contexto.** Historia de FT-CLI-01 «Cuenta del cliente» (Debería tener, épica EP-CAP-003). Cubre los requerimientos: **RQ-CLI-01-04** El cliente ingresa con DNI y contraseña y ve su nombre y sus puntos. **RQ-CLI-01-05** Tras 5 intentos fallidos de contraseña, el ingreso se bloquea unos minutos. **RQ-CLI-01-11** El personal usa la misma cuenta del administrativo para pedir y suma puntos. | **Alcance.**<br>• El cliente ingresa con DNI y contraseña y ve su nombre y sus puntos.<br>• Tras 5 intentos fallidos de contraseña, el ingreso se bloquea unos minutos.<br>• El personal usa la misma cuenta del administrativo para pedir y suma puntos. |
-| **Problema.** Conocer a los clientes frecuentes y habilitar el programa de puntos sin frenar la compra como invitado (NEC-CAP-024, NEC-CAP-036). | **Fuera de alcance.**<br>• HU-CAP-022: Crear mi cuenta o seguir como invitado.<br>• HU-CAP-024: Registrar a un cliente en el local y que cree su contraseña.<br>• HU-CAP-025: Buscar y editar clientes en caja.<br>• Puntos, canje y cupón de cumpleaños: FT-CLI-02.<br>• Niveles del programa (Platino, Súper Capricho): horizonte futuro (BRD §4).<br>• Recuperar la contraseña por correo o SMS: pendiente (D-17). |
+| **Contexto.** Historia de FT-CLI-01 «Cuenta del cliente» (Debería tener, épica EP-CAP-003). Cubre los requerimientos: **RQ-CLI-01-04** El cliente ingresa con DNI y contraseña y ve su nombre y sus puntos. **RQ-CLI-01-05** Tras 5 intentos fallidos de contraseña, el ingreso se bloquea unos minutos. **RQ-CLI-01-12** El personal usa la misma cuenta del administrativo para pedir y suma puntos. | **Alcance.**<br>• El cliente ingresa con DNI y contraseña y ve su nombre y sus puntos.<br>• Tras 5 intentos fallidos de contraseña, el ingreso se bloquea unos minutos.<br>• El personal usa la misma cuenta del administrativo para pedir y suma puntos. |
+| **Problema.** Conocer a los clientes frecuentes y habilitar el programa de puntos sin frenar la compra como invitado (NEC-CAP-024, NEC-CAP-036). | **Fuera de alcance.**<br>• HU-CAP-022: Crear mi cuenta o seguir como invitado.<br>• HU-CAP-024: Registrar a un cliente en el local y que cree su contraseña.<br>• HU-CAP-025: Buscar y editar clientes en caja.<br>• Listas de difusión y envíos masivos por WhatsApp (descartados por costo y riesgo de bloqueo del número, DT-67).<br>• Agregar automáticamente al cliente a los contactos del WhatsApp del local (en investigación, D-28).<br>• Puntos, canje y cupón de cumpleaños: FT-CLI-02.<br>• Niveles del programa (Platino, Súper Capricho): horizonte futuro (BRD §4).<br>• Recuperar la contraseña por correo o SMS: pendiente (D-17). |
 
 ## 03 | CRITERIOS DE ACEPTACIÓN
 
@@ -41,9 +41,9 @@ tags: [hu, clientes, capa-a, ft-cli-01, media, ui]
 |---|---|---|---|
 | CA-1 | un cliente con cuenta | ingresa con su DNI y contraseña | la cabecera muestra su nombre y su saldo de puntos (RQ-CLI-01-04) |
 | CA-2 | un DNI con 5 contraseñas erradas seguidas | se intenta una sexta | se rechaza y se avisa cuánto falta para reintentar (RQ-CLI-01-05) |
-| CA-3 | un trabajador con usuario | pide para sí mismo | el pedido se asocia a su cuenta y suma puntos al cobrarse (FT-CLI-02) (RQ-CLI-01-11) |
+| CA-3 | un trabajador con usuario | pide para sí mismo | el pedido se asocia a su cuenta y suma puntos al cobrarse (FT-CLI-02) (RQ-CLI-01-12) |
 
-Origen: criterios de verificación de FT-CLI-01 (RQ-CLI-01-04, RQ-CLI-01-05, RQ-CLI-01-11); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
+Origen: criterios de verificación de FT-CLI-01 (RQ-CLI-01-04, RQ-CLI-01-05, RQ-CLI-01-12); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
 
 ## 04 | REGLAS, DEPENDENCIAS Y EVIDENCIAS
 
@@ -64,4 +64,4 @@ Origen: criterios de verificación de FT-CLI-01 (RQ-CLI-01-04, RQ-CLI-01-05, RQ-
 
 **DoR: NO READY** hasta cerrar G2 y G3 (y con G0 y G1 aún sin aprobar).
 
-Generado por IA: historia derivada de FT-CLI-01 (requerimientos RQ-CLI-01-04, RQ-CLI-01-05, RQ-CLI-01-11, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)
+Generado por IA: historia derivada de FT-CLI-01 (requerimientos RQ-CLI-01-04, RQ-CLI-01-05, RQ-CLI-01-12, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)

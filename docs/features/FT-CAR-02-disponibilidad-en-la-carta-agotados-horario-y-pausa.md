@@ -46,7 +46,7 @@ tags: [carta, plt-03, ep-cap-001, ft-car-02, debe-tener]
 | RQ-CAR-02-04 | Un producto agotado se ve apagado con «Agotado» y no se puede agregar. | Debe tener | RN-CAP-017 · OBJ-CAP-002 | Dado un producto marcado agotado, cuando aparece en la carta, entonces se ve en gris con «Agotado» y su botón de agregar no responde. | Propuesto |
 | RQ-CAR-02-05 | Un sabor o una opción agotada no se ofrece dentro de la ficha. | Debe tener | RN-CAP-017 · NEC-CAP-058 | Dado el sabor «Manjar» agotado, cuando el cliente elige donas, entonces el sabor aparece apagado y no se puede marcar. | Propuesto |
 | RQ-CAR-02-06 | Con la pausa de pedidos activa, la carta muestra un aviso y no recibe pedidos. | Debe tener | RN-CAP-113 | Dada la Alta demanda con pausa activa, cuando el cliente abre la carta, entonces ve «Por ahora no estamos recibiendo pedidos» y no puede enviar; al apagar la pausa vuelve a recibir. | Propuesto |
-| RQ-CAR-02-07 | Con Alta demanda activa, la carta muestra el tiempo de entrega aumentado. | Debe tener | RN-CAP-113 · NEC-CAP-103 | Dado un tiempo prometido de 13 minutos y Alta demanda de +15, cuando el cliente ve el tiempo estimado, entonces lee 28 minutos. | Propuesto |
+| RQ-CAR-02-07 | Con Alta demanda activa, la carta muestra el tiempo de entrega aumentado. | Debe tener | RN-CAP-113 · NEC-CAP-103 | Dado el rango de entrega de 25 a 35 minutos y Alta demanda de +30, cuando el cliente ve el tiempo estimado, entonces lee «de 55 a 65 minutos». | Propuesto |
 | RQ-CAR-02-08 | Al enviar el pedido se vuelve a comprobar horario, pausa y disponibilidad de cada producto. | Debe tener | NEC-CAP-085 | Dado un carrito con un producto que se agotó mientras el cliente lo armaba, cuando envía, entonces el pedido no se envía, ve qué producto ya no está y puede quitarlo y continuar. | Propuesto |
 | RQ-CAR-02-09 | Cuando hay stock y recetas, un producto se apaga solo si falta un insumo de su receta. | Debería tener | RN-CAP-003 · OBJ-CAP-002 | Dado un producto cuya receta usa un insumo con stock cero en su área, cuando el cliente abre la carta, entonces el producto aparece agotado sin que nadie lo marque. | Propuesto |
 
@@ -83,7 +83,7 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RQ-CAR-02-04 | HU-CAP-006 | FT-COC-03 | R-01 |
 | RQ-CAR-02-05 | HU-CAP-006 | FT-COC-03 | R-01 |
 | RQ-CAR-02-06 | HU-CAP-007 | FT-COC-03 | R-01 |
-| RQ-CAR-02-07 | HU-CAP-007 | FT-COC-03 · D-01 | R-01 |
+| RQ-CAR-02-07 | HU-CAP-007 | FT-COC-03 · V1 | R-01 |
 | RQ-CAR-02-08 | HU-CAP-008 | — | R-01 |
 | RQ-CAR-02-09 | HU-CAP-006 | FT-STK-03 (fase Siguiente) | R-02 |
 

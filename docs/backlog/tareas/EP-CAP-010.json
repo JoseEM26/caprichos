@@ -484,7 +484,7 @@
         },
         {
           "id": "HU-CAP-094-T03",
-          "titulo": "Reglas de dominio de HU-CAP-094 (RQ-ALM-03-01, RQ-ALM-03-02)",
+          "titulo": "Reglas de dominio de HU-CAP-094 (RQ-ALM-03-01, RQ-ALM-03-04, RQ-ALM-03-05)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -529,7 +529,7 @@
         },
         {
           "id": "HU-CAP-094-T07",
-          "titulo": "Pruebas TC-CAP-094-01..02 (unitarias de dominio e integración de API)",
+          "titulo": "Pruebas TC-CAP-094-01..03 (unitarias de dominio e integración de API)",
           "capa": "application",
           "actividad": "PRUEBAS",
           "responsable": "José Ángel Espinoza",
@@ -556,7 +556,7 @@
         },
         {
           "id": "HU-CAP-095-T02",
-          "titulo": "Reglas de dominio de HU-CAP-095 (RQ-ALM-03-03, RQ-ALM-03-04, RQ-ALM-03-08)",
+          "titulo": "Reglas de dominio de HU-CAP-095 (RQ-ALM-03-06, RQ-ALM-03-07, RQ-ALM-03-11)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -628,7 +628,7 @@
         },
         {
           "id": "HU-CAP-096-T02",
-          "titulo": "Reglas de dominio de HU-CAP-096 (RQ-ALM-03-05, RQ-ALM-03-06, RQ-ALM-03-07, RQ-ALM-03-09)",
+          "titulo": "Reglas de dominio de HU-CAP-096 (RQ-ALM-03-08, RQ-ALM-03-09, RQ-ALM-03-10, RQ-ALM-03-12)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -680,6 +680,78 @@
           "estimacion_horas": null,
           "depende_de": [
             "HU-CAP-096-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-200",
+      "tareas": [
+        {
+          "id": "HU-CAP-200-T01",
+          "titulo": "Revisar criterios de HU-CAP-200 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-178-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-200-T02",
+          "titulo": "Reglas de dominio de HU-CAP-200 (RQ-ALM-03-02, RQ-ALM-03-03)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-200-T01",
+            "HU-CAP-094-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-200-T03",
+          "titulo": "Casos de uso: Recibir el aviso de un pedido al almacén con sonido y por WhatsApp según el turno",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-200-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-200-T04",
+          "titulo": "Endpoints y eventos de FT-ALM-03 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-200-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-200-T05",
+          "titulo": "Pantalla React: Recibir el aviso de un pedido al almacén con sonido y por WhatsApp según el turno",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-200-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-200-T06",
+          "titulo": "Pruebas TC-CAP-200-01..02 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-200-T05"
           ]
         }
       ]

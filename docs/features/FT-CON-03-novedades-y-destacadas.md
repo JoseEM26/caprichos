@@ -47,7 +47,8 @@ tags: [contenidos, plt-03, ep-cap-016, ft-con-03, deberia-tener]
 | RQ-CON-03-07 | Una destacada tiene varias fotos y abre un visor tipo historias sin enlaces. | Debería tener | NEC-CAP-045 · RN-CAP-064 | Dado el círculo «Equipo» con 4 fotos, cuando el cliente lo toca, entonces ve las 4 fotos en secuencia, puede avanzar o cerrar, y no hay enlaces. | Propuesto |
 | RQ-CON-03-08 | Un círculo sin fotos no se ve en la carta. | Debería tener | RN-CAP-064 | Dado un círculo sin fotos, cuando se publica, entonces no aparece en la carta. | Propuesto |
 | RQ-CON-03-09 | Las destacadas se editan, ordenan, archivan y eliminan, con portada elegida y confirmación. | Debería tener | NEC-CAP-045 · DT-06 | Dado un círculo, cuando el administrador lo archiva, entonces sale de la carta y queda en «Archivadas»; al eliminarlo con Sí/No, desaparece. | Propuesto |
-| RQ-CON-03-10 | El espacio de publicidad «Caprichos del mes» se activa y desactiva. | Podría tener | NEC-CAP-030 | Dado el espacio activo, cuando el administrador lo desactiva y publica, entonces deja de verse en la carta. | Propuesto |
+| RQ-CON-03-10 | El título y el subtítulo de la sección Novedades de la carta son textos que el administrador edita. | Debería tener | Acta 03 | Dado el subtítulo «Lo nuevo en Caprichos», cuando el administrador lo cambia a «¡Feliz Navidad para todos!» y publica, entonces la carta muestra el texto nuevo; no es una imagen. | Propuesto |
+| RQ-CON-03-11 | El espacio de publicidad «Caprichos del mes» se activa y desactiva. | Podría tener | NEC-CAP-030 | Dado el espacio activo, cuando el administrador lo desactiva y publica, entonces deja de verse en la carta. | Propuesto |
 
 Prioridad *Debería tener* por la épica. Todos nacen *Propuesto* hasta que el PO los apruebe (DT-48).
 
@@ -83,6 +84,7 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RQ-CON-03-08 | HU-CAP-154 | — | R-01 |
 | RQ-CON-03-09 | HU-CAP-154 | — | R-01 |
 | RQ-CON-03-10 | HU-CAP-151 | — | R-01 |
+| RQ-CON-03-11 | HU-CAP-151 | — | R-01 |
 
 Historias de usuario de esta feature (en `historias/`, en draft):
 

@@ -1,7 +1,7 @@
 ---
 id: HU-CAP-159
 tipo: hu
-titulo: "Configurar tiempos, tolerancias, puntos y descuento del personal"
+titulo: "Configurar tiempos, tolerancias, porcentaje de puntos y descuento del personal"
 estado: draft
 producto: caprichos
 version: "1.0"
@@ -14,7 +14,7 @@ tags: [hu, configuracion, capa-a, ft-cfg-02, alta, ui]
 
 # FORMATO DE HISTORIA DE USUARIO
 
-| ID / Código | HU-CAP-159 | Título | Configurar tiempos, tolerancias, puntos y descuento del personal |
+| ID / Código | HU-CAP-159 | Título | Configurar tiempos, tolerancias, porcentaje de puntos y descuento del personal |
 |---|---|---|---|
 | **Épica / Módulo** | EP-CAP-017 · FT-CFG-02 | **Sprint / Release** | H1 · piloto en el local · 28/12/2026 (supuesto, D-19) |
 
@@ -26,13 +26,13 @@ tags: [hu, configuracion, capa-a, ft-cfg-02, alta, ui]
 
 | COMO | QUIERO | PARA |
 |---|---|---|
-| **ACT-CAP-001** Kevin Rosales, dueño y administrador | configurar tiempos, tolerancias, puntos y descuento del personal | ajustar la operación según lo que el local puede cumplir |
+| **ACT-CAP-001** Kevin Rosales, dueño y administrador | configurar tiempos, tolerancias, porcentaje de puntos y descuento del personal | ajustar la operación según lo que el local puede cumplir |
 
 ## 02 | CONTEXTO Y ALCANCE
 
 | CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
 |---|---|
-| **Contexto.** Historia de FT-CFG-02 «Pagos, entrega y parámetros de operación» (Debe tener, épica EP-CAP-017). Cubre los requerimientos: **RQ-CFG-02-04** El dueño fija la tolerancia de reservas, los puntos por sol y el descuento del personal. **RQ-CFG-02-05** El dueño edita los mensajes de WhatsApp y la encuesta posventa. | **Alcance.**<br>• El dueño fija la tolerancia de reservas, los puntos por sol y el descuento del personal.<br>• El dueño edita los mensajes de WhatsApp y la encuesta posventa. |
+| **Contexto.** Historia de FT-CFG-02 «Pagos, entrega y parámetros de operación» (Debe tener, épica EP-CAP-017). Cubre los requerimientos: **RQ-CFG-02-04** El dueño fija la tolerancia de reservas, el porcentaje de puntos y el descuento del personal. **RQ-CFG-02-05** El dueño edita los mensajes de WhatsApp y la encuesta posventa. | **Alcance.**<br>• El dueño fija la tolerancia de reservas, el porcentaje de puntos y el descuento del personal.<br>• El dueño edita los mensajes de WhatsApp y la encuesta posventa. |
 | **Problema.** Ajustar la operación sin programador y con historial de quién cambió qué. | **Fuera de alcance.**<br>• HU-CAP-158: Configurar medios de pago y entrega.<br>• HU-CAP-160: Configurar mensajes, entregas fallidas y etiquetas.<br>• Datos, horario y fotos del local: FT-CFG-01.<br>• Zonas de reparto: FT-DEL-01. |
 
 ## 03 | CRITERIOS DE ACEPTACIÓN

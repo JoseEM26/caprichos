@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-012, FT-OFE-03, RQ-OFE-03-09, RQ-OFE-03-10, RQ-OFE-03-11, HU-CAP-112, HU-CAP-113, HU-CAP-114, ADR-001, ADR-011, ADR-014, ADR-003, ADR-007, DEP-02, DEP-06, R-01]
+relacionados: [EP-CAP-012, FT-OFE-03, RQ-OFE-03-10, RQ-OFE-03-11, RQ-OFE-03-12, HU-CAP-112, HU-CAP-113, HU-CAP-114, ADR-001, ADR-011, ADR-014, ADR-003, ADR-007, DEP-02, DEP-06, R-01]
 tags: [hu, ofertas, capa-a, ft-ofe-03, media, ui]
 ---
 
@@ -32,19 +32,19 @@ tags: [hu, ofertas, capa-a, ft-ofe-03, media, ui]
 
 | CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
 |---|---|
-| **Contexto.** Historia de FT-OFE-03 «Cupones» (Debería tener, épica EP-CAP-012). Cubre los requerimientos: **RQ-OFE-03-09** Se registra cada emisión y canje con su estado: vigente, canjeado, vencido o anulado. **RQ-OFE-03-10** El administrador anula un cupón emitido. **RQ-OFE-03-11** Los cupones se crean, editan, desactivan y ordenan, con historial de cambios e impresiones. | **Alcance.**<br>• Se registra cada emisión y canje con su estado: vigente, canjeado, vencido o anulado.<br>• El administrador anula un cupón emitido.<br>• Los cupones se crean, editan, desactivan y ordenan, con historial de cambios e impresiones. |
+| **Contexto.** Historia de FT-OFE-03 «Cupones» (Debería tener, épica EP-CAP-012). Cubre los requerimientos: **RQ-OFE-03-10** Se registra cada emisión y canje con su estado: vigente, canjeado, vencido o anulado. **RQ-OFE-03-11** El administrador anula un cupón emitido. **RQ-OFE-03-12** Los cupones se crean, editan, desactivan y ordenan, con historial de cambios e impresiones. | **Alcance.**<br>• Se registra cada emisión y canje con su estado: vigente, canjeado, vencido o anulado.<br>• El administrador anula un cupón emitido.<br>• Los cupones se crean, editan, desactivan y ordenan, con historial de cambios e impresiones. |
 | **Problema.** Que el cliente vuelva (cupón en su comprobante) y que las campañas en redes tengan un tope de costo. | **Fuera de alcance.**<br>• HU-CAP-112: Crear y gestionar cupones de los dos modos.<br>• HU-CAP-113: Imprimir cupones sorteados en el comprobante.<br>• HU-CAP-114: Canjear un cupón en la carta o en caja.<br>• Descuentos automáticos y acumulación: FT-OFE-02.<br>• Cupón de cumpleaños: FT-CLI-02 (usa esta feature). |
 
 ## 03 | CRITERIOS DE ACEPTACIÓN
 
 | N.° | DADO | CUANDO | ENTONCES |
 |---|---|---|---|
-| CA-1 | un cupón emitido hace 8 días con validez de 7 | el administrador abre Cupones emitidos | aparece «Vencido» (RQ-OFE-03-09) |
-| CA-2 | un cupón vigente | el administrador lo anula con motivo y Sí/No | queda «Anulado» y no se puede canjear (RQ-OFE-03-10) |
-| CA-3 | un cupón | el administrador cambia su porcentaje | el historial muestra el cambio con autor y fecha; no hay opción de eliminar (RQ-OFE-03-11) |
+| CA-1 | un cupón emitido hace 8 días con validez de 7 | el administrador abre Cupones emitidos | aparece «Vencido» (RQ-OFE-03-10) |
+| CA-2 | un cupón vigente | el administrador lo anula con motivo y Sí/No | queda «Anulado» y no se puede canjear (RQ-OFE-03-11) |
+| CA-3 | un cupón | el administrador cambia su porcentaje | el historial muestra el cambio con autor y fecha; no hay opción de eliminar (RQ-OFE-03-12) |
 | CA-4 | la confirmación Sí/No de la acción | quien la hace responde «No» | no cambia nada y la pantalla queda como estaba (RN-CAP-015, RNF-CAP-012) |
 
-Origen: criterios de verificación de FT-OFE-03 (RQ-OFE-03-09, RQ-OFE-03-10, RQ-OFE-03-11); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
+Origen: criterios de verificación de FT-OFE-03 (RQ-OFE-03-10, RQ-OFE-03-11, RQ-OFE-03-12); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
 
 ## 04 | REGLAS, DEPENDENCIAS Y EVIDENCIAS
 
@@ -65,4 +65,4 @@ Origen: criterios de verificación de FT-OFE-03 (RQ-OFE-03-09, RQ-OFE-03-10, RQ-
 
 **DoR: NO READY** hasta cerrar G2 y G3 (y con G0 y G1 aún sin aprobar).
 
-Generado por IA: historia derivada de FT-OFE-03 (requerimientos RQ-OFE-03-09, RQ-OFE-03-10, RQ-OFE-03-11, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)
+Generado por IA: historia derivada de FT-OFE-03 (requerimientos RQ-OFE-03-10, RQ-OFE-03-11, RQ-OFE-03-12, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)

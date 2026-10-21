@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-002, FT-PED-02, RQ-PED-02-09, RQ-PED-02-10, HU-CAP-016, HU-CAP-017, ADR-001, ADR-011, ADR-014, ADR-003, ADR-005, ADR-009, ADR-010, D-02, D-03, DEP-02, DEP-06, R-01]
+relacionados: [EP-CAP-002, FT-PED-02, RQ-PED-02-10, RQ-PED-02-11, HU-CAP-016, HU-CAP-017, ADR-001, ADR-011, ADR-014, ADR-003, ADR-005, ADR-009, ADR-010, D-02, D-03, DEP-02, DEP-06, R-01]
 tags: [hu, pedido, capa-a, ft-ped-02, alta, ui]
 ---
 
@@ -32,18 +32,18 @@ tags: [hu, pedido, capa-a, ft-ped-02, alta, ui]
 
 | CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
 |---|---|
-| **Contexto.** Historia de FT-PED-02 «Ubicación y costo de envío en la carta» (Debe tener, épica EP-CAP-002). Cubre los requerimientos: **RQ-PED-02-09** El envío es gratis cuando los productos pasan del monto de envío gratis. **RQ-PED-02-10** No se puede enviar un delivery por debajo del pedido mínimo. | **Alcance.**<br>• El envío es gratis cuando los productos pasan del monto de envío gratis.<br>• No se puede enviar un delivery por debajo del pedido mínimo. |
+| **Contexto.** Historia de FT-PED-02 «Ubicación y costo de envío en la carta» (Debe tener, épica EP-CAP-002). Cubre los requerimientos: **RQ-PED-02-10** El envío es gratis cuando los productos pasan del monto de envío gratis. **RQ-PED-02-11** No se puede enviar un delivery por debajo del pedido mínimo. | **Alcance.**<br>• El envío es gratis cuando los productos pasan del monto de envío gratis.<br>• No se puede enviar un delivery por debajo del pedido mínimo. |
 | **Problema.** Pedidos de delivery con un punto exacto que el repartidor abre en su app de mapas, y un costo de envío correcto sin preguntar zonas al cliente. Contribuye a OBJ-CAP-001. | **Fuera de alcance.**<br>• HU-CAP-016: Compartir mi ubicación o escribir mi dirección.<br>• HU-CAP-017: Ver el costo de envío o el aviso de fuera de cobertura.<br>• Cómo se editan zonas y tarifas: FT-DEL-01.<br>• Cómo el asesor ubica un pedido sin punto: FT-CAJ-01.<br>• Seguimiento del repartidor en un mapa en tiempo real (fuera de alcance, BRD §4). |
 
 ## 03 | CRITERIOS DE ACEPTACIÓN
 
 | N.° | DADO | CUANDO | ENTONCES |
 |---|---|---|---|
-| CA-1 | envío gratis con «más de S/ 70» | los productos suman S/ 70,00 | se cobra envío; con S/ 70,10, el envío es S/ 0 (RQ-PED-02-09) |
-| CA-2 | un pedido mínimo de S/ 14,50 | los productos suman S/ 12 | se ve cuánto falta y no se puede enviar como delivery (RQ-PED-02-10) |
+| CA-1 | envío gratis con «más de S/ 70» | los productos suman S/ 70,00 | se cobra envío; con S/ 70,10, el envío es S/ 0 (RQ-PED-02-10) |
+| CA-2 | un pedido mínimo de S/ 14,50 | los productos suman S/ 12 | se ve cuánto falta y no se puede enviar como delivery (RQ-PED-02-11) |
 | CA-3 | un celular de 360 px de ancho | el cliente abre la pantalla de esta historia | todo se lee y se toca sin desplazamiento horizontal (RNF-CAP-004) |
 
-Origen: criterios de verificación de FT-PED-02 (RQ-PED-02-09, RQ-PED-02-10); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
+Origen: criterios de verificación de FT-PED-02 (RQ-PED-02-10, RQ-PED-02-11); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
 
 ## 04 | REGLAS, DEPENDENCIAS Y EVIDENCIAS
 
@@ -64,4 +64,4 @@ Origen: criterios de verificación de FT-PED-02 (RQ-PED-02-09, RQ-PED-02-10); lo
 
 **DoR: NO READY** hasta cerrar G2 y G3 (y con G0 y G1 aún sin aprobar).
 
-Generado por IA: historia derivada de FT-PED-02 (requerimientos RQ-PED-02-09, RQ-PED-02-10, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)
+Generado por IA: historia derivada de FT-PED-02 (requerimientos RQ-PED-02-10, RQ-PED-02-11, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)

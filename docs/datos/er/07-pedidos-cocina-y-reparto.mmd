@@ -26,6 +26,11 @@ erDiagram
     text nota
     bigint_arr oferta_ids
     bigint cupon_emitido_id
+    numeric puntos_canjeados
+    timestamptz pago_coordinado_en
+    bigint pago_coordinado_por
+    timestamptz despachado_en
+    bigint despachado_por
     timestamptz confirmado_en
     bigint confirmado_por
     timestamptz pasa_cocina_en
@@ -34,6 +39,7 @@ erDiagram
     timestamptz anulado_en
     bigint anulado_por
     text motivo_anulacion
+    bigint anulacion_aprobada_por
     timestamptz creado_en
   }
   PEDIDO_MESA {
@@ -56,13 +62,17 @@ erDiagram
     numeric precio_unit
     bigint area_id FK
     boolean adicional
+    text_arr nombres_persona
   }
   COMANDA_AREA {
     bigint pedido_id PK,FK
     bigint area_id PK,FK
     text estado
-    boolean despejado
-    timestamptz cambiado_en
+    timestamptz llego_en
+    timestamptz despejada_en
+    bigint despejada_por
+    timestamptz devuelta_en
+    bigint devuelta_por
   }
   COMPROBANTE_PAGO {
     bigint id PK
@@ -91,6 +101,7 @@ erDiagram
     timestamptz desde
     timestamptz hasta
     bigint por
+    bigint area_id FK
   }
   PRINT_JOB {
     bigint id PK
@@ -108,6 +119,7 @@ erDiagram
     bigint repartidor_party_id FK
     timestamptz tomado_en
     timestamptz salida_en
+    timestamptz llegado_en
     timestamptz entregado_en
     numeric cobrado_efectivo
   }
@@ -120,6 +132,13 @@ erDiagram
     text cierre
     numeric recargo
     bigint cerrado_por
+  }
+  MENSAJE_REPARTO {
+    bigint pedido_id PK,FK
+    smallint numero PK
+    timestamptz enviado_en
+    timestamptz respondido_en
+    text estado
   }
   ARCHIVO {
     bigint id PK "en otro dominio"
@@ -143,6 +162,7 @@ erDiagram
     bigint id PK "en otro dominio"
   }
   ARCHIVO ||--o{ COMPROBANTE_PAGO : "archivo_id"
+  AREA_COCINA ||--o{ ALTA_DEMANDA : "area_id"
   AREA_COCINA ||--o{ COMANDA_AREA : "area_id"
   AREA_COCINA ||--o{ PEDIDO_LINEA : "area_id"
   AREA_COCINA ||--o{ PRINT_JOB : "area_id"
@@ -153,6 +173,7 @@ erDiagram
   PEDIDO ||--o{ COMANDA_AREA : "pedido_id"
   PEDIDO ||--o{ COMPROBANTE_PAGO : "pedido_id"
   PEDIDO ||--o{ INCIDENTE_ENTREGA : "pedido_id"
+  PEDIDO ||--o{ MENSAJE_REPARTO : "pedido_id"
   PEDIDO ||--o{ PEDIDO_LINEA : "pedido_id"
   PEDIDO ||--o{ PEDIDO_MESA : "pedido_id"
   PEDIDO ||--o{ PRINT_JOB : "pedido_id"

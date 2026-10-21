@@ -44,10 +44,11 @@ tags: [salon, plt-03, ep-cap-007, ft-sal-02, debe-tener]
 | RQ-SAL-02-04 | El pedido del mozo va directo a cocina y se imprimen su comanda y etiquetas. | Debe tener | RN-CAP-073 | Dado un pedido de mesa, cuando el mozo lo envía con Sí/No, entonces aparece en las pantallas de sus áreas y no en «Por confirmar». | Propuesto |
 | RQ-SAL-02-05 | A una mesa ocupada se le agregan consumos como comanda adicional. | Debe tener | RN-CAP-090 · NEC-CAP-078 | Dada la mesa 3 ocupada, cuando el mozo agrega dos cafés, entonces cocina recibe una comanda adicional marcada «Adicional · Mesa 3» y la cuenta suma los cafés. | Propuesto |
 | RQ-SAL-02-06 | Un pedido puede ocupar varias mesas juntas, que se muestran y liberan juntas. | Debe tener | RN-CAP-108 | Dado un grupo de 8, cuando el mozo elige las mesas 4 y 5, entonces ambas quedan ocupadas por el mismo pedido y se liberan juntas al cobrar. | Propuesto |
-| RQ-SAL-02-07 | «Para llevar» no usa mesa. | Debe tener | Acta 02 · BRD §4 «Mesas» | Dado un pedido para llevar del mozo, cuando lo arma, entonces no se le pide mesa. | Propuesto |
-| RQ-SAL-02-08 | El mozo imprime la precuenta de una mesa. | Debe tener | RN-CAP-030 · NEC-CAP-078 | Dada la mesa 3 con consumos, cuando el mozo toca «Precuenta», entonces se imprime el detalle y el total, sin ser comprobante. | Propuesto |
-| RQ-SAL-02-09 | El mozo recibe aviso cuando su pedido está listo y marca que lo llevó a la mesa. | Debe tener | NEC-CAP-078 | Dado un pedido listo de la mesa 3, cuando todas las áreas terminan, entonces el mozo que lo tomó recibe un aviso; al marcar «Entregado en mesa», el pedido lo registra con la hora. | Propuesto |
-| RQ-SAL-02-10 | La mesa se libera al cobrar y también a mano por mozo o caja, con Sí/No. | Debe tener | RN-CAP-054 · RN-CAP-031 | Dada una mesa cobrada, cuando termina el cobro, entonces queda libre; una mesa con pedido cancelado se libera a mano con confirmación. | Propuesto |
+| RQ-SAL-02-07 | El mozo tiene las mismas ayudas de Nuevo pedido: opción por unidad al pedir varias y sugerencia de la promoción aplicable. | Debe tener | DT-62 · Acta 03 | Dados 2 Ice Coffee con leches distintas, cuando el mozo pone cantidad 2, entonces elige la leche de cada uno y ve la sugerencia «2×1 Ice Coffee · Aplicar» para ofrecérsela al cliente. | Propuesto |
+| RQ-SAL-02-08 | «Para llevar» no usa mesa. | Debe tener | Acta 02 · BRD §4 «Mesas» | Dado un pedido para llevar del mozo, cuando lo arma, entonces no se le pide mesa. | Propuesto |
+| RQ-SAL-02-09 | El mozo imprime la precuenta de una mesa. | Debe tener | RN-CAP-030 · NEC-CAP-078 | Dada la mesa 3 con consumos, cuando el mozo toca «Precuenta», entonces se imprime el detalle y el total, sin ser comprobante. | Propuesto |
+| RQ-SAL-02-10 | El mozo recibe aviso cuando su pedido está listo y marca que lo llevó a la mesa. | Debe tener | NEC-CAP-078 | Dado un pedido listo de la mesa 3, cuando todas las áreas terminan, entonces el mozo que lo tomó recibe un aviso; al marcar «Entregado en mesa», el pedido lo registra con la hora. | Propuesto |
+| RQ-SAL-02-11 | La mesa se libera al cobrar y también a mano por mozo o caja, con Sí/No. | Debe tener | RN-CAP-054 · RN-CAP-031 | Dada una mesa cobrada, cuando termina el cobro, entonces queda libre; una mesa con pedido cancelado se libera a mano con confirmación. | Propuesto |
 
 Prioridad por NEC-CAP-023, 053 y 078 (E1). Todos nacen *Propuesto* hasta que el PO los apruebe (DT-48).
 
@@ -85,10 +86,11 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RQ-SAL-02-04 | HU-CAP-062 | FT-COC-01 · FT-COC-02 | R-01 |
 | RQ-SAL-02-05 | HU-CAP-063 | — | R-01 |
 | RQ-SAL-02-06 | HU-CAP-061 | — | R-01 |
-| RQ-SAL-02-07 | HU-CAP-061 | — | R-01 |
-| RQ-SAL-02-08 | HU-CAP-063 | FT-COC-02 | R-01 |
-| RQ-SAL-02-09 | HU-CAP-064 | FT-COC-01 · FT-INF-03 | R-01 |
-| RQ-SAL-02-10 | HU-CAP-064 | FT-CAJ-02 | R-01 |
+| RQ-SAL-02-07 | HU-CAP-062 | FT-CAJ-03 | R-01 |
+| RQ-SAL-02-08 | HU-CAP-061 | — | R-01 |
+| RQ-SAL-02-09 | HU-CAP-063 | FT-COC-02 | R-01 |
+| RQ-SAL-02-10 | HU-CAP-064 | FT-COC-01 · FT-INF-03 | R-01 |
+| RQ-SAL-02-11 | HU-CAP-064 | FT-CAJ-02 | R-01 |
 
 Historias de usuario de esta feature (en `historias/`, en draft):
 

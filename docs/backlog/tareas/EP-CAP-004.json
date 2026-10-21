@@ -30,7 +30,7 @@
         },
         {
           "id": "HU-CAP-029-T03",
-          "titulo": "Reglas de dominio de HU-CAP-029 (RQ-CAJ-01-01, RQ-CAJ-01-02, RQ-CAJ-01-11)",
+          "titulo": "Reglas de dominio de HU-CAP-029 (RQ-CAJ-01-01, RQ-CAJ-01-04, RQ-CAJ-01-13)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -102,7 +102,7 @@
         },
         {
           "id": "HU-CAP-030-T02",
-          "titulo": "Reglas de dominio de HU-CAP-030 (RQ-CAJ-01-03, RQ-CAJ-01-04, RQ-CAJ-01-05, RQ-CAJ-01-10)",
+          "titulo": "Reglas de dominio de HU-CAP-030 (RQ-CAJ-01-02, RQ-CAJ-01-05, RQ-CAJ-01-06, RQ-CAJ-01-07, RQ-CAJ-01-12)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -147,7 +147,7 @@
         },
         {
           "id": "HU-CAP-030-T06",
-          "titulo": "Pruebas TC-CAP-030-01..06 (unitarias de dominio e integración de API)",
+          "titulo": "Pruebas TC-CAP-030-01..07 (unitarias de dominio e integración de API)",
           "capa": "application",
           "actividad": "PRUEBAS",
           "responsable": "José Ángel Espinoza",
@@ -174,7 +174,7 @@
         },
         {
           "id": "HU-CAP-031-T02",
-          "titulo": "Reglas de dominio de HU-CAP-031 (RQ-CAJ-01-06, RQ-CAJ-01-07, RQ-CAJ-01-08)",
+          "titulo": "Reglas de dominio de HU-CAP-031 (RQ-CAJ-01-03, RQ-CAJ-01-08, RQ-CAJ-01-09, RQ-CAJ-01-10)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -219,7 +219,7 @@
         },
         {
           "id": "HU-CAP-031-T06",
-          "titulo": "Pruebas TC-CAP-031-01..04 (unitarias de dominio e integración de API)",
+          "titulo": "Pruebas TC-CAP-031-01..05 (unitarias de dominio e integración de API)",
           "capa": "application",
           "actividad": "PRUEBAS",
           "responsable": "José Ángel Espinoza",
@@ -246,7 +246,7 @@
         },
         {
           "id": "HU-CAP-032-T02",
-          "titulo": "Reglas de dominio de HU-CAP-032 (RQ-CAJ-01-09)",
+          "titulo": "Reglas de dominio de HU-CAP-032 (RQ-CAJ-01-11)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -545,7 +545,7 @@
         },
         {
           "id": "HU-CAP-036-T02",
-          "titulo": "Reglas de dominio de HU-CAP-036 (RQ-CAJ-02-09, RQ-CAJ-02-10)",
+          "titulo": "Reglas de dominio de HU-CAP-036 (RQ-CAJ-02-09, RQ-CAJ-02-10, RQ-CAJ-02-12)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -557,7 +557,7 @@
         },
         {
           "id": "HU-CAP-036-T03",
-          "titulo": "Casos de uso: Anular un pedido con motivo y PIN",
+          "titulo": "Casos de uso: Anular un pedido con motivo y el PIN de la supervisora",
           "capa": "application",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -579,7 +579,7 @@
         },
         {
           "id": "HU-CAP-036-T05",
-          "titulo": "Pantalla React: Anular un pedido con motivo y PIN",
+          "titulo": "Pantalla React: Anular un pedido con motivo y el PIN de la supervisora",
           "capa": "ux",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -590,7 +590,7 @@
         },
         {
           "id": "HU-CAP-036-T06",
-          "titulo": "Pruebas TC-CAP-036-01..02 (unitarias de dominio e integración de API)",
+          "titulo": "Pruebas TC-CAP-036-01..03 (unitarias de dominio e integración de API)",
           "capa": "application",
           "actividad": "PRUEBAS",
           "responsable": "José Ángel Espinoza",
@@ -628,7 +628,7 @@
         },
         {
           "id": "HU-CAP-037-T03",
-          "titulo": "Reglas de dominio de HU-CAP-037 (RQ-CAJ-03-01, RQ-CAJ-03-07, RQ-CAJ-03-09)",
+          "titulo": "Reglas de dominio de HU-CAP-037 (RQ-CAJ-03-01, RQ-CAJ-03-02, RQ-CAJ-03-09, RQ-CAJ-03-11)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -673,7 +673,7 @@
         },
         {
           "id": "HU-CAP-037-T07",
-          "titulo": "Pruebas TC-CAP-037-01..04 (unitarias de dominio e integración de API)",
+          "titulo": "Pruebas TC-CAP-037-01..05 (unitarias de dominio e integración de API)",
           "capa": "application",
           "actividad": "PRUEBAS",
           "responsable": "José Ángel Espinoza",
@@ -700,7 +700,7 @@
         },
         {
           "id": "HU-CAP-038-T02",
-          "titulo": "Reglas de dominio de HU-CAP-038 (RQ-CAJ-03-02, RQ-CAJ-03-03, RQ-CAJ-03-04, RQ-CAJ-03-05, RQ-CAJ-03-10)",
+          "titulo": "Reglas de dominio de HU-CAP-038 (RQ-CAJ-03-03, RQ-CAJ-03-04, RQ-CAJ-03-05, RQ-CAJ-03-06, RQ-CAJ-03-12)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -772,7 +772,7 @@
         },
         {
           "id": "HU-CAP-039-T02",
-          "titulo": "Reglas de dominio de HU-CAP-039 (RQ-CAJ-03-06)",
+          "titulo": "Reglas de dominio de HU-CAP-039 (RQ-CAJ-03-07, RQ-CAJ-03-08)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -817,7 +817,7 @@
         },
         {
           "id": "HU-CAP-039-T06",
-          "titulo": "Pruebas TC-CAP-039-01..02 (unitarias de dominio e integración de API)",
+          "titulo": "Pruebas TC-CAP-039-01..03 (unitarias de dominio e integración de API)",
           "capa": "application",
           "actividad": "PRUEBAS",
           "responsable": "José Ángel Espinoza",
@@ -844,7 +844,7 @@
         },
         {
           "id": "HU-CAP-040-T02",
-          "titulo": "Reglas de dominio de HU-CAP-040 (RQ-CAJ-03-08)",
+          "titulo": "Reglas de dominio de HU-CAP-040 (RQ-CAJ-03-10)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",

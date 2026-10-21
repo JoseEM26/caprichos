@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-008, FT-DEL-01, RQ-DEL-01-02, RQ-DEL-01-03, RQ-DEL-01-04, RQ-DEL-01-05, HU-CAP-068, HU-CAP-070, ADR-001, ADR-011, ADR-014, ADR-006, ADR-007, ADR-010, DEP-02, DEP-06, R-01]
+relacionados: [EP-CAP-008, FT-DEL-01, RQ-DEL-01-02, RQ-DEL-01-03, RQ-DEL-01-04, RQ-DEL-01-05, RQ-DEL-01-06, HU-CAP-068, HU-CAP-070, ADR-001, ADR-011, ADR-014, ADR-006, ADR-007, ADR-010, DEP-02, DEP-06, R-01]
 tags: [hu, delivery, capa-a, ft-del-01, alta, ui]
 ---
 
@@ -32,7 +32,7 @@ tags: [hu, delivery, capa-a, ft-del-01, alta, ui]
 
 | CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
 |---|---|
-| **Contexto.** Historia de FT-DEL-01 «Zonas de reparto y tarifas» (Debe tener, épica EP-CAP-008). Cubre los requerimientos: **RQ-DEL-01-02** El administrador edita los puntos de una zona con validación; si no son válidos, se mantiene la zona original. **RQ-DEL-01-03** El administrador cambia la tarifa de una zona. **RQ-DEL-01-04** Una zona apagada no se ofrece ni se detecta. **RQ-DEL-01-05** No se crean zonas nuevas desde el administrativo. | **Alcance.**<br>• El administrador edita los puntos de una zona con validación; si no son válidos, se mantiene la zona original.<br>• El administrador cambia la tarifa de una zona.<br>• Una zona apagada no se ofrece ni se detecta.<br>• No se crean zonas nuevas desde el administrativo. |
+| **Contexto.** Historia de FT-DEL-01 «Zonas de reparto y tarifas» (Debe tener, épica EP-CAP-008). Cubre los requerimientos: **RQ-DEL-01-02** El administrador edita los puntos de una zona con validación; si no son válidos, se mantiene la zona original. **RQ-DEL-01-03** El administrador cambia la tarifa de una zona. **RQ-DEL-01-04** Una zona apagada no se ofrece ni se detecta. **RQ-DEL-01-05** Las zonas no dejan huecos entre sí: al guardar una zona se avisa si queda un espacio entre ella y una vecina. **RQ-DEL-01-06** No se crean zonas nuevas desde el administrativo. | **Alcance.**<br>• El administrador edita los puntos de una zona con validación; si no son válidos, se mantiene la zona original.<br>• El administrador cambia la tarifa de una zona.<br>• Una zona apagada no se ofrece ni se detecta.<br>• Las zonas no dejan huecos entre sí: al guardar una zona se avisa si queda un espacio entre ella y una vecina.<br>• No se crean zonas nuevas desde el administrativo. |
 | **Problema.** Un envío cobrado igual en todos los canales, calculado solo con el punto, sin que el cliente tenga que conocer las zonas. | **Fuera de alcance.**<br>• HU-CAP-068: Calcular el envío por la zona del punto.<br>• HU-CAP-070: Asignar una tarifa especial de envío a un cliente.<br>• Cómo el cliente da su ubicación: FT-PED-02.<br>• Mapa de calor de entregas: FT-INF-02.<br>• Crear zonas nuevas (excluido por NEC-CAP-100). |
 
 ## 03 | CRITERIOS DE ACEPTACIÓN
@@ -42,11 +42,12 @@ tags: [hu, delivery, capa-a, ft-del-01, alta, ui]
 | CA-1 | la zona Z3 | el administrador pega puntos con una latitud mal escrita | ve el error y la zona sigue con sus puntos anteriores (RQ-DEL-01-02) |
 | CA-2 | Z5 en S/ 6 | el administrador la cambia a S/ 6,50 con Sí/No | los pedidos nuevos en Z5 cobran S/ 6,50 y los anteriores no cambian (RQ-DEL-01-03) |
 | CA-3 | Z7 apagada | un punto cae en Z7 | se trata como fuera de cobertura (RQ-DEL-01-04) |
-| CA-4 | la pantalla de zonas | el administrador la revisa | no hay botón para crear zonas (RQ-DEL-01-05) |
-| CA-5 | un usuario con un rol sin permiso para esta acción (ACT-CAP-009 repartidor) | intenta hacerla desde el menú o escribiendo la dirección de la pantalla | se rechaza en el servidor, no se guarda nada y no se entregan datos (RN-CAP-013, RNF-CAP-006) |
-| CA-6 | la confirmación Sí/No de la acción | quien la hace responde «No» | no cambia nada y la pantalla queda como estaba (RN-CAP-015, RNF-CAP-012) |
+| CA-4 | Z3 y Z4 vecinas | el administrador mueve un punto de Z3 y deja una franja sin zona entre ambas | ve «Queda un espacio sin zona entre Z3 y Z4» antes de guardar; un pedido en esa franja no queda sin cobrar envío (RQ-DEL-01-05) |
+| CA-5 | la pantalla de zonas | el administrador la revisa | no hay botón para crear zonas (RQ-DEL-01-06) |
+| CA-6 | un usuario con un rol sin permiso para esta acción (ACT-CAP-009 repartidor) | intenta hacerla desde el menú o escribiendo la dirección de la pantalla | se rechaza en el servidor, no se guarda nada y no se entregan datos (RN-CAP-013, RNF-CAP-006) |
+| CA-7 | la confirmación Sí/No de la acción | quien la hace responde «No» | no cambia nada y la pantalla queda como estaba (RN-CAP-015, RNF-CAP-012) |
 
-Origen: criterios de verificación de FT-DEL-01 (RQ-DEL-01-02, RQ-DEL-01-03, RQ-DEL-01-04, RQ-DEL-01-05); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
+Origen: criterios de verificación de FT-DEL-01 (RQ-DEL-01-02, RQ-DEL-01-03, RQ-DEL-01-04, RQ-DEL-01-05, RQ-DEL-01-06); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
 
 ## 04 | REGLAS, DEPENDENCIAS Y EVIDENCIAS
 
@@ -67,4 +68,4 @@ Origen: criterios de verificación de FT-DEL-01 (RQ-DEL-01-02, RQ-DEL-01-03, RQ-
 
 **DoR: NO READY** hasta cerrar G2 y G3 (y con G0 y G1 aún sin aprobar).
 
-Generado por IA: historia derivada de FT-DEL-01 (requerimientos RQ-DEL-01-02, RQ-DEL-01-03, RQ-DEL-01-04, RQ-DEL-01-05, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)
+Generado por IA: historia derivada de FT-DEL-01 (requerimientos RQ-DEL-01-02, RQ-DEL-01-03, RQ-DEL-01-04, RQ-DEL-01-05, RQ-DEL-01-06, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)

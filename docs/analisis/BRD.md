@@ -24,6 +24,21 @@ tags: [brd, plataforma-digital, g1]
 | Aprueba | Stakeholder firma el BRD; PO cierra G1; en T3 aprueban PO + Stakeholder + TL |
 | Origen | `analisis/ficha-intake.md` (INT-CAP-001) y actas de las reuniones (`actas/acta-01-descubrimiento.md` y `actas/acta-02-descubrimiento.md`) y las iniciativas de la segunda reunión (`analisis/iniciativas-acta-02.md`, INI-CAP-002) |
 
+> **Cambios del acta 03 (revisión del mockup, 20/10/2026).** Estas reglas del BRD quedaron reemplazadas o ajustadas por `analisis/decisiones.md` §11, que manda sobre este documento:
+>
+> | Del BRD | Ahora | Decisión |
+> |---|---|---|
+> | NEC-CAP-036 y V8: 1 punto por cada S/ 1 | Se gana el 5 % del total (configurable); 1 punto = S/ 1 para canjear | DT-55 |
+> | RN-CAP-001 y RN-CAP-074: todo pedido de fuera espera «por confirmar» | El pedido de la carta va directo a las comandas; caja coordina el pago después | DT-57 |
+> | RN-CAP-084: área avanza en preparación → listo | Un solo botón «Despejar», historial y vista de despacho | DT-58 |
+> | RN-CAP-078: el cajero ve lo esperado mientras cuenta | Cierre ciego: el cajero solo ve «Cuadra» o «No cuadra» | DT-61 |
+> | RN-CAP-094: anular por otro rol con el PIN del administrador | El cajero anula con motivo y el PIN de 6 dígitos de la supervisora, en persona | DT-61 |
+> | NEC-CAP-025, NEC-CAP-108 y RN-CAP-131: crédito por mes | Crédito revisado por semana y por rango de fechas | DT-63 |
+> | RN-CAP-081 (2.ª): los perecibles exigen vencimiento | Compras sin lote ni fecha de vencimiento | DT-64 |
+> | OBJ-CAP-001 y D-01: 13 minutos prometidos | Al cliente se le dice de 25 a 35 minutos | V1 |
+>
+> Además se agregaron el mapa del repartidor (DT-59), los mensajes de reparto (DT-60), las opciones por unidad (DT-62), la marca «no suma puntos» (DT-65), el horario del personal (DT-64), los datos de clientes (DT-67) y se descartaron las reseñas de Google (DT-66).
+
 ## 1. Problema
 
 Caprichos es una cafetería artesanal cuyo foco es la hospitalidad. Hoy sus herramientas de venta están separadas: una carta digital anterior (con el plan vencido y sin vínculo con el stock), un sistema de caja y administración, y un chatbot de WhatsApp que solo entrega el enlace de la carta. Un pedido que nace en WhatsApp o en la web no pasa de forma ordenada por caja ni llega a cocina, y el negocio no ve en tiempo real qué hay en stock ni cuánto gana por plato. Los procesos son empíricos y no están documentados. El tiempo de entrega actual es de 20 a 25 minutos.

@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-004, FT-CAJ-03, HU-CAP-037, HU-CAP-038, HU-CAP-039, HU-CAP-040, ADR-001, ADR-011, ADR-014, ADR-003, ADR-006, ADR-007, ADR-008, ADR-010, ADR-012, FT-CAJ-01, FT-CAR-01, FT-DEL-01, FT-DEL-02, FT-OFE-01, FT-OFE-02, FT-OFE-03, FT-USR-03]
+relacionados: [EP-CAP-004, FT-CAJ-03, HU-CAP-037, HU-CAP-038, HU-CAP-039, HU-CAP-040, ADR-001, ADR-011, ADR-014, ADR-003, ADR-006, ADR-007, ADR-008, ADR-010, ADR-012, FT-CAJ-01, FT-CAR-01, FT-COC-01, FT-DEL-01, FT-DEL-02, FT-OFE-01, FT-OFE-02, FT-OFE-03, FT-USR-03]
 tags: [dor, plt-05, caja, ft-caj-03, g4]
 ---
 
@@ -34,7 +34,7 @@ tags: [dor, plt-05, caja, ft-caj-03, g4]
 | NEGOCIO | ☑ | Objetivo y valor con KPI | Épica EP-CAP-004 §2 y feature §1 (hipótesis medible) |
 | NEGOCIO | ☐ | Alcance dentro y fuera acordado | Redactado en la feature; falta la firma del PO (DT-48) |
 | NEGOCIO | ☐ | Prioridad y release confirmados | Debe tener · H1 · piloto en el local · 28/12/2026 (supuesto, D-19); fechas supuestas hasta D-19 |
-| FUNCIONAL | ☑ | Historias con criterios verificables | 4 historias, 14 criterios Dado/Cuando/Entonces |
+| FUNCIONAL | ☑ | Historias con criterios verificables | 4 historias, 16 criterios Dado/Cuando/Entonces |
 | FUNCIONAL | ☑ | Reglas de negocio documentadas y validadas | Documentadas en la feature §4; sin decisiones abiertas propias |
 | FUNCIONAL | ☐ | Estimación por el equipo | Tareas en `backlog/tareas/EP-CAP-004.json` con `estimacion_horas: null` |
 | DISEÑO / UX | ☐ | Prototipos aprobados (DEP-06) | Mockup navegable como referencia (DT-04); Figma o aceptación del mockup pendiente (G2) |
@@ -43,7 +43,7 @@ tags: [dor, plt-05, caja, ft-caj-03, g4]
 | TÉCNICO | ☐ | Contrato de API | Borrador en ARQ-CAP-002 §FT-CAJ-03; se aprueba en G3 |
 | TÉCNICO | ☐ | Modelo de datos / DDL | DAT-CAP-001 y `datos/ddl-propuesto.sql` (probado en PostgreSQL 16); sin aprobar (G3) |
 | TÉCNICO | ☐ | RNF y seguridad | RNF-CAP-004, RNF-CAP-008, RNF-CAP-011, RNF-CAP-006; umbrales propuestos (feature §3) |
-| CALIDAD | ☑ | Estrategia y datos de prueba | `pruebas/test-plan.md`: 14 casos TC para estas historias, datos sintéticos |
+| CALIDAD | ☑ | Estrategia y datos de prueba | `pruebas/test-plan.md`: 16 casos TC para estas historias, datos sintéticos |
 | CALIDAD | ☑ | Riesgos con mitigación y dueño | Sección 5 |
 
 ## 2 DIAGRAMA DE DEPENDENCIAS
@@ -60,6 +60,7 @@ flowchart LR
   HU_CAP_040["HU-CAP-040"]:::evaluado --> FT_CAJ_03
   FT_CAJ_01["FT-CAJ-01"]:::interna --> FT_CAJ_03
   FT_CAR_01["FT-CAR-01"]:::interna --> FT_CAJ_03
+  FT_COC_01["FT-COC-01"]:::interna --> FT_CAJ_03
   FT_DEL_01["FT-DEL-01"]:::interna --> FT_CAJ_03
   FT_DEL_02["FT-DEL-02"]:::interna --> FT_CAJ_03
   FT_OFE_01["FT-OFE-01"]:::interna --> FT_CAJ_03
@@ -80,7 +81,7 @@ flowchart LR
 ```
 
 - **Ítems evaluados:** FT-CAJ-03 y sus historias HU-CAP-037, HU-CAP-038, HU-CAP-039, HU-CAP-040.
-- **Dependencias técnicas:** FT-CAJ-01, FT-CAR-01, FT-DEL-01, FT-DEL-02, FT-OFE-01, FT-OFE-02, FT-OFE-03, FT-USR-03; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-003, ADR-006, ADR-007, ADR-008, ADR-010, ADR-012.
+- **Dependencias técnicas:** FT-CAJ-01, FT-CAR-01, FT-COC-01, FT-DEL-01, FT-DEL-02, FT-OFE-01, FT-OFE-02, FT-OFE-03, FT-USR-03; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-003, ADR-006, ADR-007, ADR-008, ADR-010, ADR-012.
 - **Dependencias externas:** DEP-02, DEP-06.
 - **Decisiones abiertas:** ninguna propia.
 

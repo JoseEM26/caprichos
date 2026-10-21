@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-008, FT-DEL-01, RQ-DEL-01-01, RQ-DEL-01-08, HU-CAP-069, HU-CAP-070, ADR-001, ADR-011, ADR-014, ADR-006, ADR-007, ADR-010, D-03, DEP-02, DEP-07, R-01, R-03]
+relacionados: [EP-CAP-008, FT-DEL-01, RQ-DEL-01-01, RQ-DEL-01-09, HU-CAP-069, HU-CAP-070, ADR-001, ADR-011, ADR-014, ADR-006, ADR-007, ADR-010, D-03, DEP-02, DEP-07, R-01, R-03]
 tags: [hu, delivery, capa-a, ft-del-01, alta]
 ---
 
@@ -32,7 +32,7 @@ tags: [hu, delivery, capa-a, ft-del-01, alta]
 
 | CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
 |---|---|
-| **Contexto.** Historia de FT-DEL-01 «Zonas de reparto y tarifas» (Debe tener, épica EP-CAP-008). Cubre los requerimientos: **RQ-DEL-01-01** El sistema detecta la zona por el punto de entrega y aplica su tarifa. **RQ-DEL-01-08** Fuera de cobertura no se registra delivery y se ofrece recojo. | **Alcance.**<br>• El sistema detecta la zona por el punto de entrega y aplica su tarifa.<br>• Fuera de cobertura no se registra delivery y se ofrece recojo. |
+| **Contexto.** Historia de FT-DEL-01 «Zonas de reparto y tarifas» (Debe tener, épica EP-CAP-008). Cubre los requerimientos: **RQ-DEL-01-01** El sistema detecta la zona por el punto de entrega y aplica su tarifa. **RQ-DEL-01-09** Fuera de cobertura no se registra delivery y se ofrece recojo. | **Alcance.**<br>• El sistema detecta la zona por el punto de entrega y aplica su tarifa.<br>• Fuera de cobertura no se registra delivery y se ofrece recojo. |
 | **Problema.** Un envío cobrado igual en todos los canales, calculado solo con el punto, sin que el cliente tenga que conocer las zonas. | **Fuera de alcance.**<br>• HU-CAP-069: Editar, apagar y tarifar las zonas.<br>• HU-CAP-070: Asignar una tarifa especial de envío a un cliente.<br>• Cómo el cliente da su ubicación: FT-PED-02.<br>• Mapa de calor de entregas: FT-INF-02.<br>• Crear zonas nuevas (excluido por NEC-CAP-100). |
 
 ## 03 | CRITERIOS DE ACEPTACIÓN
@@ -40,9 +40,9 @@ tags: [hu, delivery, capa-a, ft-del-01, alta]
 | N.° | DADO | CUANDO | ENTONCES |
 |---|---|---|---|
 | CA-1 | un punto dentro de Z4 (S/ 5) | se calcula el envío desde cualquier canal | es S/ 5,00 (RQ-DEL-01-01) |
-| CA-2 | un punto fuera de todas las zonas activas | se intenta guardar el delivery | se avisa y se ofrece «Para recoger»; el intento se registra para el mapa de entregas (RQ-DEL-01-08) |
+| CA-2 | un punto fuera de todas las zonas activas | se intenta guardar el delivery | se avisa y se ofrece «Para recoger»; el intento se registra para el mapa de entregas (RQ-DEL-01-09) |
 
-Origen: criterios de verificación de FT-DEL-01 (RQ-DEL-01-01, RQ-DEL-01-08); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
+Origen: criterios de verificación de FT-DEL-01 (RQ-DEL-01-01, RQ-DEL-01-09); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
 
 ## 04 | REGLAS, DEPENDENCIAS Y EVIDENCIAS
 
@@ -63,4 +63,4 @@ Origen: criterios de verificación de FT-DEL-01 (RQ-DEL-01-01, RQ-DEL-01-08); lo
 
 **DoR: NO READY** hasta cerrar G2 y G3 (y con G0 y G1 aún sin aprobar).
 
-Generado por IA: historia derivada de FT-DEL-01 (requerimientos RQ-DEL-01-01, RQ-DEL-01-08, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)
+Generado por IA: historia derivada de FT-DEL-01 (requerimientos RQ-DEL-01-01, RQ-DEL-01-09, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)

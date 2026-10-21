@@ -26,28 +26,33 @@ tags: [clientes, plt-03, ep-cap-003, ft-cli-02, deberia-tener]
 
 ## 1. Descripción y valor
 
-**Descripción.** Con cuenta, cada pedido suma **1 punto por cada S/ 1** pagado (V8, configurable en Configuración del local), una sola vez, cuando el pedido se cobra (RN-CAP-072). Un pedido como invitado no suma. El cliente ve su saldo en la cabecera de la carta y su historial de puntos en Mi cuenta. Quien atiende suma puntos con solo el DNI; **ver o canjear** puntos requiere la contraseña (RN-CAP-071). Al acercarse su cumpleaños, el cliente recibe en la campanita de la carta un cupón de cumpleaños (NEC-CAP-097). El canje de puntos (qué se obtiene con cuántos puntos) no está definido por el cliente y queda como pregunta abierta.
+**Descripción.** Los puntos son un **saldo para canjear**: **1 punto = S/ 1** en cualquier producto de Caprichos; no se retira (DT-55, acta 03). Con cuenta, cada pedido suma **el 5 % del total** pagado (V8; el administrador cambia el porcentaje en Configuración del local), con dos decimales, una sola vez, cuando el pedido se cobra (RN-CAP-072): una compra de S/ 70 suma 3,50 puntos. El porcentaje es **general**, no por producto, para que el cliente entienda fácil cuánto acumula. No suman los productos o promociones marcados «No suma puntos ni aplica cupones» (DT-65) ni un pedido con cupón (DT-56). Un pedido como invitado no suma; por eso, **al terminar el pedido**, al invitado se le recuerda que puede ingresar para acumular, y al que ingresó se le muestra el resumen: puntos de esta compra y total. **Canje en el pedido:** «¿Cuántos puntos deseas usar?», con los puntos disponibles debajo, lo que queda mientras escribe y un botón **Aplicar**. Quien atiende suma puntos con solo el DNI; **ver o canjear** requiere la contraseña (RN-CAP-071). Al acercarse su cumpleaños, el cliente recibe en la campanita de la carta un cupón de cumpleaños (NEC-CAP-097).
 
-**Beneficio esperado.** Fidelizar a los clientes frecuentes con un programa simple, sin obligar a nadie a registrarse. Hipótesis medible: **100 % de los pedidos cobrados con cuenta suman sus puntos una sola vez**; **0 puntos sumados a pedidos anulados**.
+**Beneficio esperado.** Fidelizar a los clientes frecuentes con un programa simple que se entiende en soles, sin obligar a nadie a registrarse. Kevin lo considera «generoso» y «vale la pena para mantener la fidelidad» (acta 03). Hipótesis medible: **100 % de los pedidos cobrados con cuenta suman sus puntos una sola vez**; **0 puntos sumados a pedidos anulados**; **0 canjes mayores al saldo**.
 
-**Usuarios / roles.** ACT-CAP-006 Clientes (acumulan y ven sus puntos) · ACT-CAP-002 Cajero/a (suma puntos al cobrar) · ACT-CAP-001 Kevin Rosales, dueño y administrador (define puntos por sol).
+**Usuarios / roles.** ACT-CAP-006 Clientes (acumulan, ven y canjean sus puntos) · ACT-CAP-002 Cajero/a (suma y canjea puntos al cobrar) · ACT-CAP-001 Kevin Rosales, dueño y administrador (define el porcentaje de puntos).
 
-**Pantallas de referencia.** Carta ▸ saldo en la cabecera, Mi cuenta, campanita; administrativo ▸ Clientes ▸ puntos (`Main.dc.html`, `Admin.dc.html`) (mockup navegable, DT-04; no reemplaza al G2, DEP-06).
+**Pantallas de referencia.** Carta ▸ saldo en la cabecera, resumen al terminar el pedido, «Usar mis puntos», Mi cuenta, campanita; administrativo ▸ Clientes ▸ puntos, cobro (`Main.dc.html`, `Admin.dc.html`) (mockup navegable, DT-04; no reemplaza al G2, DEP-06).
 
 ## 2. Catálogo de requerimientos funcionales
 
 | ID | Requerimiento | Prioridad | Origen | Criterio de verificación | Estado |
 | --- | --- | --- | --- | --- | --- |
-| RQ-CLI-02-01 | Al cobrarse un pedido con cuenta se suman los puntos una sola vez, según los puntos por sol configurados. | Debería tener | NEC-CAP-036 · RN-CAP-072 · V8 | Dado un pedido de S/ 37,80 de un cliente con cuenta y 1 punto por sol, cuando se cobra, entonces suma 37 puntos; si se reimprime o se vuelve a abrir, no suma otra vez. | Propuesto |
-| RQ-CLI-02-02 | Un pedido como invitado no suma puntos. | Debería tener | RN-CAP-066 | Dado un pedido sin cuenta, cuando se cobra, entonces no se suman puntos a nadie. | Propuesto |
-| RQ-CLI-02-03 | Anular un pedido cobrado resta los puntos que había sumado. | Debería tener | Propuesta (derivada de RN-CAP-072) | Dado un pedido que sumó 37 puntos, cuando se anula con su motivo, entonces el saldo baja 37 y el historial muestra la reversa. | Propuesto |
-| RQ-CLI-02-04 | Quien atiende suma puntos con solo el DNI del cliente. | Debería tener | RN-CAP-071 | Dado un cliente con cuenta que paga en el local, cuando el cajero escribe su DNI en el pedido, entonces el pedido se asocia y suma al cobrarse, sin pedir contraseña. | Propuesto |
-| RQ-CLI-02-05 | El cliente ve su saldo en la cabecera y su historial de puntos en Mi cuenta, con contraseña. | Debería tener | NEC-CAP-048 · RN-CAP-071 | Dado un cliente que ingresó, cuando abre Mi cuenta, entonces ve su saldo y cada movimiento con fecha, pedido y puntos. | Propuesto |
-| RQ-CLI-02-06 | El cliente recibe en la campanita un cupón de cumpleaños. | Debería tener | NEC-CAP-097 | Dado un cliente con cumpleaños el 20/11, cuando ingresa a la carta en la semana de su cumpleaños, entonces la campanita muestra su cupón con código y vigencia. | Propuesto |
-| RQ-CLI-02-07 | Los puntos por sol se cambian en Configuración del local y valen desde ese momento. | Podría tener | NEC-CAP-087 | Dado 1 punto por sol, cuando el administrador lo cambia a 2 con Sí/No, entonces los pedidos cobrados desde entonces suman el doble y los anteriores no cambian. | Propuesto |
-| RQ-CLI-02-08 | El cajero no edita puntos. | Debe tener | RN-CAP-083 (1.ª) | Dada la ficha de un cliente abierta por el cajero, cuando busca cómo editar puntos, entonces no hay opción. | Propuesto |
+| RQ-CLI-02-01 | Al cobrarse un pedido con cuenta se suma una sola vez el porcentaje configurado del total, con dos decimales. | Debería tener | NEC-CAP-036 · RN-CAP-072 · V8 · DT-55 | Dado un pedido de S/ 70,00 de un cliente con cuenta y 5 %, cuando se cobra, entonces suma 3,50 puntos; si se reimprime o se vuelve a abrir, no suma otra vez. | Propuesto |
+| RQ-CLI-02-02 | Los productos marcados «No suma puntos ni aplica cupones» y los pedidos con cupón no suman puntos. | Debería tener | DT-55 · DT-56 · DT-65 | Dado un pedido con un 2×1 de frappé marcado «No suma puntos» (S/ 15) y un sándwich de S/ 20, con 5 %, cuando se cobra, entonces suma 1,00 punto (solo por el sándwich); un pedido pagado con cupón no suma. | Propuesto |
+| RQ-CLI-02-03 | Un pedido como invitado no suma puntos. | Debería tener | RN-CAP-066 | Dado un pedido sin cuenta, cuando se cobra, entonces no se suman puntos a nadie. | Propuesto |
+| RQ-CLI-02-04 | Anular un pedido cobrado resta los puntos que había sumado. | Debería tener | Propuesta (derivada de RN-CAP-072) | Dado un pedido que sumó 37 puntos, cuando se anula con su motivo, entonces el saldo baja 37 y el historial muestra la reversa. | Propuesto |
+| RQ-CLI-02-05 | Quien atiende suma puntos con solo el DNI del cliente. | Debería tener | RN-CAP-071 | Dado un cliente con cuenta que paga en el local, cuando el cajero escribe su DNI en el pedido, entonces el pedido se asocia y suma al cobrarse, sin pedir contraseña. | Propuesto |
+| RQ-CLI-02-06 | El cliente ve su saldo en la cabecera y su historial de puntos en Mi cuenta, con contraseña. | Debería tener | NEC-CAP-048 · RN-CAP-071 | Dado un cliente que ingresó, cuando abre Mi cuenta, entonces ve su saldo y cada movimiento con fecha, pedido y puntos. | Propuesto |
+| RQ-CLI-02-07 | El cliente recibe en la campanita un cupón de cumpleaños. | Debería tener | NEC-CAP-097 | Dado un cliente con cumpleaños el 20/11, cuando ingresa a la carta en la semana de su cumpleaños, entonces la campanita muestra su cupón con código y vigencia. | Propuesto |
+| RQ-CLI-02-08 | El porcentaje de puntos se cambia en Configuración del local y vale desde ese momento. | Debería tener | NEC-CAP-087 · DT-55 | Dado 5 %, cuando el administrador lo cambia a 3 % con Sí/No, entonces los pedidos cobrados desde entonces suman el 3 % y los anteriores no cambian; el cambio queda en el Historial de acciones. | Propuesto |
+| RQ-CLI-02-09 | El cajero no edita puntos. | Debe tener | RN-CAP-083 (1.ª) | Dada la ficha de un cliente abierta por el cajero, cuando busca cómo editar puntos, entonces no hay opción. | Propuesto |
+| RQ-CLI-02-10 | Al terminar el pedido, el cliente con cuenta ve los puntos de esta compra y su total; el invitado ve cuánto ganaría y la opción de ingresar, sin que lo bloquee. | Debería tener | DT-55 · RN-CAP-066 · Acta 03 | Dado un cliente con 1,50 puntos que pide S/ 70, cuando termina, entonces ve «Por esta compra acumulas 3,50 puntos · Tendrás 5,00»; un invitado ve «Ingresa y gana 3,50 puntos con este pedido» y puede seguir sin ingresar. | Propuesto |
+| RQ-CLI-02-11 | En el pedido, el cliente con cuenta escribe cuántos puntos usar, ve sus disponibles y lo que queda, y toca «Aplicar». | Debería tener | DT-55 · RN-CAP-071 | Dado un cliente con 3,50 puntos y un pedido de S/ 20, cuando escribe 2 en «¿Cuántos puntos deseas usar?», entonces ve «Te quedan 1,50» y al tocar «Aplicar» el total baja a S/ 18,00. | Propuesto |
+| RQ-CLI-02-12 | No se canjean más puntos que el saldo ni más que el total del pedido; anular un pedido devuelve los puntos canjeados. | Debe tener | DT-55 · RNF-CAP-011 | Dado un saldo de 3,50, cuando el cliente escribe 5, entonces ve «Solo tienes 3,50 puntos» y no se aplica; si el pedido con 2 puntos canjeados se anula, el saldo vuelve a subir 2 y el historial muestra la devolución. | Propuesto |
+| RQ-CLI-02-13 | En caja, el canje se hace con el DNI del cliente y su contraseña, que escribe el propio cliente. | Debería tener | RN-CAP-071 · DT-55 | Dado un cliente con cuenta en el local, cuando el cajero toca «Usar puntos» en el cobro, entonces el cliente escribe su contraseña en la pantalla de caja y el cajero indica cuántos puntos usar; sin contraseña solo se suman puntos. | Propuesto |
 
-Prioridad *Debería tener* por la épica. RQ-CLI-02-03 es derivado: si un cobro se anula, sus puntos no pueden quedar. El canje no tiene requerimiento hasta que Kevin lo defina. Todos nacen *Propuesto* hasta que el PO los apruebe (DT-48).
+Prioridad *Debería tener* por la épica. RQ-CLI-02-04 es derivado: si un cobro se anula, sus puntos no pueden quedar. El canje lo definió Kevin en el acta 03 (DT-55); RQ-CLI-02-12 es *Debe tener* porque protege el saldo. Todos nacen *Propuesto* hasta que el PO los apruebe (DT-48).
 
 ## 3. Requerimientos no funcionales
 
@@ -65,26 +70,33 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | --- | --- | --- |
 | RN-CAP-071 | Sumar puntos requiere solo el DNI; ver o canjear requiere la contraseña. | BRD §5 |
 | RN-CAP-072 | Los puntos se suman al cobrarse el pedido, una sola vez; el personal también suma. | Personal, caja |
-| V8 | 1 punto por cada S/ 1 con cuenta. | NEC-CAP-036 · decisiones.md |
+| V8 | Se gana el 5 % del total con cuenta (configurable); 1 punto = S/ 1. | Acta 03 · decisiones.md |
+| DT-55 | Puntos como saldo, porcentaje general, excepciones marcadas, resumen al terminar y canje en el pedido. | Acta 03 · decisiones.md |
 
 ## 5. Trazabilidad y planificación
 
 | Requerimiento | Historias de usuario | Dependencia | Riesgo |
 | --- | --- | --- | --- |
-| RQ-CLI-02-01 | HU-CAP-026 | FT-CAJ-02 | R-01 |
-| RQ-CLI-02-02 | HU-CAP-026 | — | R-01 |
-| RQ-CLI-02-03 | HU-CAP-026 | FT-CAJ-02 | R-01 |
-| RQ-CLI-02-04 | HU-CAP-026 | — | R-01 |
-| RQ-CLI-02-05 | HU-CAP-027 | — | R-01 |
-| RQ-CLI-02-06 | HU-CAP-028 | FT-OFE-03 | R-01 |
-| RQ-CLI-02-07 | HU-CAP-026 | FT-CFG-02 | R-01 |
-| RQ-CLI-02-08 | HU-CAP-027 | — | R-01 |
+| RQ-CLI-02-01 | HU-CAP-026 | FT-CAJ-02 · D-25 | R-01 |
+| RQ-CLI-02-02 | HU-CAP-026 | FT-CON-01 · FT-OFE-01 | R-01 |
+| RQ-CLI-02-03 | HU-CAP-026 | — | R-01 |
+| RQ-CLI-02-04 | HU-CAP-026 | FT-CAJ-02 | R-01 |
+| RQ-CLI-02-05 | HU-CAP-026 | — | R-01 |
+| RQ-CLI-02-06 | HU-CAP-027 | — | R-01 |
+| RQ-CLI-02-07 | HU-CAP-028 | FT-OFE-03 | R-01 |
+| RQ-CLI-02-08 | HU-CAP-026 | FT-CFG-02 | R-01 |
+| RQ-CLI-02-09 | HU-CAP-027 | — | R-01 |
+| RQ-CLI-02-10 | HU-CAP-195 | — | R-01 |
+| RQ-CLI-02-11 | HU-CAP-195 | — | R-01 |
+| RQ-CLI-02-12 | HU-CAP-195 | FT-CAJ-02 | R-01 |
+| RQ-CLI-02-13 | HU-CAP-195 | FT-CAJ-02 | R-01 |
 
 Historias de usuario de esta feature (en `historias/`, en draft):
 
 - HU-CAP-026 Sumar puntos al cobrar un pedido con cuenta
 - HU-CAP-027 Ver mi saldo e historial de puntos
 - HU-CAP-028 Recibir mi cupón de cumpleaños
+- HU-CAP-195 Ver cuántos puntos gano y canjearlos en mi pedido
 
 Decisiones técnicas que la rigen (ADR propuestos, G3): ADR-001, ADR-011, ADR-014, ADR-004, ADR-005, ADR-008.
 
@@ -96,10 +108,10 @@ Decisiones técnicas que la rigen (ADR propuestos, G3): ADR-001, ADR-011, ADR-01
 
 **Preguntas abiertas**
 
-1. **¿Cómo se canjean los puntos?** No está en el BRD. Propuesta: canje por productos de la carta con un valor en puntos fijado por el administrador, solo en caja (pendiente de Kevin).
+1. **¿Sobre qué se calcula el 5 %?** — D-25. Propuesta: solo productos, sin envío, y solo sobre lo pagado con dinero.
 2. **¿Los puntos vencen?** Propuesta: no vencen en la primera versión.
 3. **Beneficio de cumpleaños** — qué descuento y cuántos días vale (pendiente de Kevin).
 
 ---
 
-Generado por IA: BRD (NEC-CAP-036, 048, 087, 097; RN-CAP-066, 071, 072, 083), V8 de decisiones.md y el mockup — Revisado por: *(pendiente)*
+Generado por IA: BRD (NEC-CAP-036, 048, 087, 097; RN-CAP-066, 071, 072, 083), DT-55, DT-56, DT-65, V8 y D-25 de decisiones.md, acta 03 y el mockup — Revisado por: *(pendiente)*

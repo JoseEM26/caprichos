@@ -76,7 +76,7 @@ Las metas marcadas «(propuesta)» son de la IA y las fija el dueño; las línea
 - Ingresos y egresos durante el turno, con motivo.
 - Ventas del turno por medio de pago.
 - Liquidación del efectivo de cada repartidor (RN-CAP-088).
-- Arqueo con billetes y monedas, efectivo esperado y diferencia (RN-CAP-079, RN-CAP-080).
+- Arqueo **ciego** con billetes y monedas: el cajero solo ve «Cuadra» o «No cuadra»; el efectivo esperado y la diferencia los ve la supervisora con su PIN (RN-CAP-079, RN-CAP-080, DT-61).
 - Historial de cierres que no se borra.
 
 **Fuera de alcance (OUT)**
@@ -90,7 +90,7 @@ Las metas marcadas «(propuesta)» son de la IA y las fija el dueño; las línea
 | ID Feature | Nombre | Prioridad | Estado |
 | --- | --- | --- | --- |
 | FT-CIE-01 | Apertura, movimientos y liquidación de repartidores | Debe tener | Redactada en draft: [`FT-CIE-01-apertura-movimientos-y-liquidacion-de-repartidores.md`](../features/FT-CIE-01-apertura-movimientos-y-liquidacion-de-repartidores.md) |
-| FT-CIE-02 | Arqueo y cierre con historial | Debe tener | Redactada en draft: [`FT-CIE-02-arqueo-y-cierre-con-historial.md`](../features/FT-CIE-02-arqueo-y-cierre-con-historial.md) |
+| FT-CIE-02 | Arqueo ciego y cierre con historial | Debe tener | Redactada en draft: [`FT-CIE-02-arqueo-y-cierre-con-historial.md`](../features/FT-CIE-02-arqueo-y-cierre-con-historial.md) |
 
 **Supuestos**
 

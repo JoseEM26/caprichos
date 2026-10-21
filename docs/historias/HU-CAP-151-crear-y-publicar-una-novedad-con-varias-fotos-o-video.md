@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-016, FT-CON-03, RQ-CON-03-01, RQ-CON-03-02, RQ-CON-03-10, HU-CAP-152, HU-CAP-153, HU-CAP-154, ADR-001, ADR-011, ADR-014, ADR-003, ADR-012, DEP-02, DEP-06, R-01]
+relacionados: [EP-CAP-016, FT-CON-03, RQ-CON-03-01, RQ-CON-03-02, RQ-CON-03-10, RQ-CON-03-11, HU-CAP-152, HU-CAP-153, HU-CAP-154, ADR-001, ADR-011, ADR-014, ADR-003, ADR-012, DEP-02, DEP-06, R-01]
 tags: [hu, contenidos, capa-a, ft-con-03, media, ui]
 ---
 
@@ -32,7 +32,7 @@ tags: [hu, contenidos, capa-a, ft-con-03, media, ui]
 
 | CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
 |---|---|
-| **Contexto.** Historia de FT-CON-03 «Novedades y destacadas» (Debería tener, épica EP-CAP-016). Cubre los requerimientos: **RQ-CON-03-01** El administrador crea una novedad de tipo promoción, banner, video, fotos, evento o aviso, con tema y varias fotos. **RQ-CON-03-02** Un video se agrega con el enlace de TikTok, Instagram o YouTube. **RQ-CON-03-10** El espacio de publicidad «Caprichos del mes» se activa y desactiva. | **Alcance.**<br>• El administrador crea una novedad de tipo promoción, banner, video, fotos, evento o aviso, con tema y varias fotos.<br>• Un video se agrega con el enlace de TikTok, Instagram o YouTube.<br>• El espacio de publicidad «Caprichos del mes» se activa y desactiva. |
+| **Contexto.** Historia de FT-CON-03 «Novedades y destacadas» (Debería tener, épica EP-CAP-016). Cubre los requerimientos: **RQ-CON-03-01** El administrador crea una novedad de tipo promoción, banner, video, fotos, evento o aviso, con tema y varias fotos. **RQ-CON-03-02** Un video se agrega con el enlace de TikTok, Instagram o YouTube. **RQ-CON-03-10** El título y el subtítulo de la sección Novedades de la carta son textos que el administrador edita. **RQ-CON-03-11** El espacio de publicidad «Caprichos del mes» se activa y desactiva. | **Alcance.**<br>• El administrador crea una novedad de tipo promoción, banner, video, fotos, evento o aviso, con tema y varias fotos.<br>• Un video se agrega con el enlace de TikTok, Instagram o YouTube.<br>• El título y el subtítulo de la sección Novedades de la carta son textos que el administrador edita.<br>• El espacio de publicidad «Caprichos del mes» se activa y desactiva. |
 | **Problema.** Mostrar la vida del local y sus campañas en la carta, sin programador. | **Fuera de alcance.**<br>• HU-CAP-152: Ver la página Novedades con filtros y galería.<br>• HU-CAP-153: Gestionar destacadas con varias fotos y archivarlas.<br>• HU-CAP-154: Ver las destacadas como historias en la carta.<br>• Diseño general de la carta: FT-CON-02.<br>• Subir videos al servidor (solo enlaces). |
 
 ## 03 | CRITERIOS DE ACEPTACIÓN
@@ -41,9 +41,10 @@ tags: [hu, contenidos, capa-a, ft-con-03, media, ui]
 |---|---|---|---|
 | CA-1 | el tipo «Evento» | crea «Noche de jazz» con fecha, lugar, 3 fotos y tema «Aniversario» | queda como borrador (RQ-CON-03-01) |
 | CA-2 | un enlace de TikTok válido | se pega | la vista previa lo muestra; un enlace de otro sitio no se acepta (RQ-CON-03-02) |
-| CA-3 | el espacio activo | el administrador lo desactiva y publica | deja de verse en la carta (RQ-CON-03-10) |
+| CA-3 | el subtítulo «Lo nuevo en Caprichos» | el administrador lo cambia a «¡Feliz Navidad para todos!» y publica | la carta muestra el texto nuevo; no es una imagen (RQ-CON-03-10) |
+| CA-4 | el espacio activo | el administrador lo desactiva y publica | deja de verse en la carta (RQ-CON-03-11) |
 
-Origen: criterios de verificación de FT-CON-03 (RQ-CON-03-01, RQ-CON-03-02, RQ-CON-03-10); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
+Origen: criterios de verificación de FT-CON-03 (RQ-CON-03-01, RQ-CON-03-02, RQ-CON-03-10, RQ-CON-03-11); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
 
 ## 04 | REGLAS, DEPENDENCIAS Y EVIDENCIAS
 
@@ -64,4 +65,4 @@ Origen: criterios de verificación de FT-CON-03 (RQ-CON-03-01, RQ-CON-03-02, RQ-
 
 **DoR: NO READY** hasta cerrar G2 y G3 (y con G0 y G1 aún sin aprobar).
 
-Generado por IA: historia derivada de FT-CON-03 (requerimientos RQ-CON-03-01, RQ-CON-03-02, RQ-CON-03-10, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)
+Generado por IA: historia derivada de FT-CON-03 (requerimientos RQ-CON-03-01, RQ-CON-03-02, RQ-CON-03-10, RQ-CON-03-11, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)

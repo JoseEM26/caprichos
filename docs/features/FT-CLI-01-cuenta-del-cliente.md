@@ -49,8 +49,9 @@ tags: [clientes, plt-03, ep-cap-003, ft-cli-01, deberia-tener]
 | RQ-CLI-01-07 | Un cliente registrado en el local crea su contraseña en la carta. | Debería tener | NEC-CAP-057 | Dado un cliente sin contraseña, cuando entra a «Ingresar», escribe su DNI y confirma un dato (cumpleaños), entonces crea su contraseña y entra. | Propuesto |
 | RQ-CLI-01-08 | El cajero busca un cliente por DNI completo o RUC y ve su historial de pedidos. | Debe tener | NEC-CAP-064 | Dado un cliente con 3 pedidos, cuando el cajero escribe su DNI completo, entonces lo encuentra y ve sus pedidos con fecha y total; con un DNI parcial no se muestra nada. | Propuesto |
 | RQ-CLI-01-09 | El documento de un cliente no se cambia al editar; el cajero no edita puntos ni pedidos. | Debe tener | RN-CAP-083 (1.ª) | Dado un cliente, cuando el cajero lo edita, entonces el DNI o RUC aparece bloqueado y no hay campos de puntos ni pedidos. | Propuesto |
-| RQ-CLI-01-10 | El DNI se muestra enmascarado en las listas y completo solo al administrador. | Debe tener | RN-CAP-071 · D-18 | Dada la lista de clientes, cuando la abre el cajero, entonces ve «4567****»; el administrador ve el DNI completo en la ficha. | Propuesto |
-| RQ-CLI-01-11 | El personal usa la misma cuenta del administrativo para pedir y suma puntos. | Podría tener | NEC-CAP-057 · RN-CAP-072 | Dado un trabajador con usuario, cuando pide para sí mismo, entonces el pedido se asocia a su cuenta y suma puntos al cobrarse (FT-CLI-02). | Propuesto |
+| RQ-CLI-01-10 | El DNI y el RUC se muestran enmascarados a todos y completos solo al administrador, y cada vez que los ve queda registrado. | Debe tener | RN-CAP-071 · D-18 · DT-67 | Dada la lista de clientes, cuando la abre el cajero, entonces ve «4567****» y «2060******5»; el administrador toca «Ver completo» en la ficha y el Historial de acciones registra quién lo vio. | Propuesto |
+| RQ-CLI-01-11 | El administrador exporta a Excel la lista de clientes con nombre y teléfono, y la exportación queda registrada. | Debería tener | DT-67 · Acta 03 | Dados 300 clientes con cuenta, cuando el administrador toca «Exportar a Excel», entonces descarga nombre, teléfono, cumpleaños y fecha del último pedido (sin DNI completo) para importarlos a Google Contactos, y el historial registra la exportación. | Propuesto |
+| RQ-CLI-01-12 | El personal usa la misma cuenta del administrativo para pedir y suma puntos. | Podría tener | NEC-CAP-057 · RN-CAP-072 | Dado un trabajador con usuario, cuando pide para sí mismo, entonces el pedido se asocia a su cuenta y suma puntos al cobrarse (FT-CLI-02). | Propuesto |
 
 Prioridad *Debería tener* por la épica (fase Siguiente). RQ-CLI-01-03, 08, 09 y 10 son *Debe tener* porque protegen datos personales o los usa caja desde la fase Ahora. Todos nacen *Propuesto* hasta que el PO los apruebe (DT-48).
 
@@ -88,8 +89,9 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RQ-CLI-01-07 | HU-CAP-024 | D-17 | R-01 |
 | RQ-CLI-01-08 | HU-CAP-025 | — | R-01 |
 | RQ-CLI-01-09 | HU-CAP-025 | — | R-01 |
-| RQ-CLI-01-10 | HU-CAP-025 | D-18 | R-11 |
-| RQ-CLI-01-11 | HU-CAP-023 | FT-USR-01 | R-01 |
+| RQ-CLI-01-10 | HU-CAP-025 | D-18 · FT-USR-04 | R-11 |
+| RQ-CLI-01-11 | HU-CAP-025 | FT-USR-04 · D-18 · D-28 | R-11 |
+| RQ-CLI-01-12 | HU-CAP-023 | FT-USR-01 | R-01 |
 
 Historias de usuario de esta feature (en `historias/`, en draft):
 
@@ -102,6 +104,8 @@ Decisiones técnicas que la rigen (ADR propuestos, G3): ADR-001, ADR-011, ADR-01
 
 **Fuera de alcance**
 
+- Listas de difusión y envíos masivos por WhatsApp (descartados por costo y riesgo de bloqueo del número, DT-67).
+- Agregar automáticamente al cliente a los contactos del WhatsApp del local (en investigación, D-28).
 - Puntos, canje y cupón de cumpleaños: FT-CLI-02.
 - Niveles del programa (Platino, Súper Capricho): horizonte futuro (BRD §4).
 - Recuperar la contraseña por correo o SMS: pendiente (D-17).

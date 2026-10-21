@@ -26,7 +26,7 @@ tags: [informes, plt-03, ep-cap-018, ft-inf-01, podria-tener]
 
 ## 1. Descripción y valor
 
-**Descripción.** Informes con **gráficos y filtros** de período (hoy, semana, mes, año o fechas «de… a…»), canal, medio de pago y modalidad (NEC-CAP-041, NEC-CAP-050). Incluye ventas por día y hora, por categoría y producto, por canal y por medio de pago; ticket promedio; combos vendidos; tiempos de entrega frente a la meta (OBJ-CAP-001); márgenes por plato (OBJ-CAP-003); mermas por destino; descuentos y cupones canjeados; clientes nuevos y próximos cumpleaños. Cada informe se exporta a CSV. Solo el administrador los ve (RN-CAP-013).
+**Descripción.** Informes con **gráficos y filtros** de período (hoy, semana, mes, año o fechas «de… a…»), canal, medio de pago y modalidad (NEC-CAP-041, NEC-CAP-050). Incluye ventas por día y hora, por categoría y producto, por canal y por medio de pago; ticket promedio; combos vendidos; tiempos de entrega frente a la meta (OBJ-CAP-001); márgenes por plato (OBJ-CAP-003); mermas por destino; descuentos y cupones canjeados; clientes nuevos y próximos cumpleaños. Cada informe se exporta a Excel y la exportación queda en el Historial de acciones (DT-67); Kevin la usa para indicadores propios que no están en los resúmenes (acta 03). Solo el administrador los ve (RN-CAP-013).
 
 **Beneficio esperado.** Decidir con datos: qué se vende, cuándo, cuánto se gana y dónde se pierde. Hipótesis medible: **Los totales de ventas de un período coinciden al 100 % con los cierres de caja del mismo período**.
 
@@ -44,7 +44,7 @@ tags: [informes, plt-03, ep-cap-018, ft-inf-01, podria-tener]
 | RQ-INF-01-04 | Hay tiempos de entrega frente a la meta. | Podría tener | OBJ-CAP-001 | Dado octubre, cuando abre «Tiempos», entonces ve el tiempo medio y el % de pedidos dentro de la meta por día. | Propuesto |
 | RQ-INF-01-05 | Hay margen por plato y mermas por destino. | Podría tener | OBJ-CAP-003 · RN-CAP-124 | Dado octubre, cuando abre «Rentabilidad», entonces ve el margen de cada plato con receta y la merma por destino. | Propuesto |
 | RQ-INF-01-06 | Hay combos, descuentos y cupones canjeados. | Podría tener | NEC-CAP-066 | Dado octubre, cuando abre «Ofertas», entonces ve cuántos combos se vendieron y cuánto se descontó por cupón. | Propuesto |
-| RQ-INF-01-07 | Cada informe se exporta a CSV. | Podría tener | Mockup | Dado un informe filtrado, cuando toca «Exportar», entonces descarga un CSV con las filas del filtro. | Propuesto |
+| RQ-INF-01-07 | Cada informe se exporta a Excel y la exportación queda registrada. | Debería tener | Mockup · DT-67 · Acta 03 | Dado un informe filtrado, cuando toca «Exportar a Excel», entonces descarga un archivo con las filas del filtro y el Historial de acciones registra quién lo exportó y con qué filtro. | Propuesto |
 | RQ-INF-01-08 | Los totales de ventas coinciden con los cierres de caja del período. | Debe tener | RNF-CAP-011 | Dados los cierres de octubre, cuando se compara con el informe de octubre, entonces la venta por medio de pago es igual. | Propuesto |
 
 Prioridad *Podría tener* por la épica (fase Después). RQ-INF-01-08 es *Debe tener* porque un informe que no cuadra con caja no sirve. Todos nacen *Propuesto* hasta que el PO los apruebe (DT-48).
@@ -75,7 +75,7 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RQ-INF-01-04 | HU-CAP-162 | FT-DEL-02 · FT-COC-01 | R-01 |
 | RQ-INF-01-05 | HU-CAP-163 | FT-STK-02 · FT-ALM-03 | R-01 |
 | RQ-INF-01-06 | HU-CAP-163 | FT-OFE-01 · FT-OFE-03 | R-01 |
-| RQ-INF-01-07 | HU-CAP-161 | — | R-01 |
+| RQ-INF-01-07 | HU-CAP-161 | FT-USR-04 | R-01 |
 | RQ-INF-01-08 | HU-CAP-162 | FT-CIE-02 | R-01 |
 
 Historias de usuario de esta feature (en `historias/`, en draft):

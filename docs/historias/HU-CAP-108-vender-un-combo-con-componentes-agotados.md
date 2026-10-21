@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-012, FT-OFE-01, RQ-OFE-01-08, RQ-OFE-01-09, RQ-OFE-01-10, HU-CAP-105, HU-CAP-106, HU-CAP-107, ADR-001, ADR-011, ADR-014, ADR-003, ADR-007, DEP-02, DEP-06, R-01]
+relacionados: [EP-CAP-012, FT-OFE-01, RQ-OFE-01-10, RQ-OFE-01-11, RQ-OFE-01-12, HU-CAP-105, HU-CAP-106, HU-CAP-107, ADR-001, ADR-011, ADR-014, ADR-003, ADR-007, DEP-02, DEP-06, R-01]
 tags: [hu, ofertas, capa-a, ft-ofe-01, media, ui]
 ---
 
@@ -32,19 +32,19 @@ tags: [hu, ofertas, capa-a, ft-ofe-01, media, ui]
 
 | CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
 |---|---|
-| **Contexto.** Historia de FT-OFE-01 «Combos y promociones» (Debería tener, épica EP-CAP-012). Cubre los requerimientos: **RQ-OFE-01-08** Al venderse, se registra el combo y cada parte se descuenta y va a su área. **RQ-OFE-01-09** Las ofertas se desactivan, se ordenan y no se eliminan. **RQ-OFE-01-10** El administrador ve una vista previa de cómo se verá la oferta en la carta. | **Alcance.**<br>• Al venderse, se registra el combo y cada parte se descuenta y va a su área.<br>• Las ofertas se desactivan, se ordenan y no se eliminan.<br>• El administrador ve una vista previa de cómo se verá la oferta en la carta. |
+| **Contexto.** Historia de FT-OFE-01 «Combos y promociones» (Debería tener, épica EP-CAP-012). Cubre los requerimientos: **RQ-OFE-01-10** Al venderse, se registra el combo y cada parte se descuenta y va a su área. **RQ-OFE-01-11** Las ofertas se desactivan, se ordenan y no se eliminan. **RQ-OFE-01-12** El administrador ve una vista previa de cómo se verá la oferta en la carta. | **Alcance.**<br>• Al venderse, se registra el combo y cada parte se descuenta y va a su área.<br>• Las ofertas se desactivan, se ordenan y no se eliminan.<br>• El administrador ve una vista previa de cómo se verá la oferta en la carta. |
 | **Problema.** Promociones que el dueño crea solo, y que cocina, stock e informes cuentan por producto y por combo. | **Fuera de alcance.**<br>• HU-CAP-105: Crear un combo con sus partes y precio por tamaño.<br>• HU-CAP-106: Crear una promoción «lleva N, paga M».<br>• HU-CAP-107: Definir la vigencia de una oferta.<br>• Descuentos automáticos: FT-OFE-02.<br>• Cupones: FT-OFE-03.<br>• Cómo la carta muestra el precio tachado: FT-CAR-01. |
 
 ## 03 | CRITERIOS DE ACEPTACIÓN
 
 | N.° | DADO | CUANDO | ENTONCES |
 |---|---|---|---|
-| CA-1 | un combo vendido | pasa a cocina | cada parte va a su área y se descuenta por separado (FT-STK-03), y el informe cuenta el combo (RQ-OFE-01-08) |
-| CA-2 | una oferta | el administrador la desactiva con Sí/No | deja de mostrarse y conserva sus ventas (RQ-OFE-01-09) |
-| CA-3 | un combo nuevo | toca «Vista previa» | lo ve como tarjeta y ficha de la carta antes de publicarlo (RQ-OFE-01-10) |
+| CA-1 | un combo vendido | pasa a cocina | cada parte va a su área y se descuenta por separado (FT-STK-03), y el informe cuenta el combo (RQ-OFE-01-10) |
+| CA-2 | una oferta | el administrador la desactiva con Sí/No | deja de mostrarse y conserva sus ventas (RQ-OFE-01-11) |
+| CA-3 | un combo nuevo | toca «Vista previa» | lo ve como tarjeta y ficha de la carta antes de publicarlo (RQ-OFE-01-12) |
 | CA-4 | la confirmación Sí/No de la acción | quien la hace responde «No» | no cambia nada y la pantalla queda como estaba (RN-CAP-015, RNF-CAP-012) |
 
-Origen: criterios de verificación de FT-OFE-01 (RQ-OFE-01-08, RQ-OFE-01-09, RQ-OFE-01-10); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
+Origen: criterios de verificación de FT-OFE-01 (RQ-OFE-01-10, RQ-OFE-01-11, RQ-OFE-01-12); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
 
 ## 04 | REGLAS, DEPENDENCIAS Y EVIDENCIAS
 
@@ -65,4 +65,4 @@ Origen: criterios de verificación de FT-OFE-01 (RQ-OFE-01-08, RQ-OFE-01-09, RQ-
 
 **DoR: NO READY** hasta cerrar G2 y G3 (y con G0 y G1 aún sin aprobar).
 
-Generado por IA: historia derivada de FT-OFE-01 (requerimientos RQ-OFE-01-08, RQ-OFE-01-09, RQ-OFE-01-10, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)
+Generado por IA: historia derivada de FT-OFE-01 (requerimientos RQ-OFE-01-10, RQ-OFE-01-11, RQ-OFE-01-12, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)

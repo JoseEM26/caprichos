@@ -19,7 +19,7 @@
         },
         {
           "id": "HU-CAP-068-T02",
-          "titulo": "Migración Prisma de las tablas de FT-DEL-01 (zona_reparto, pedido, asignacion_reparto, incidente_entrega, party)",
+          "titulo": "Migración Prisma de las tablas de FT-DEL-01 (zona_reparto, pedido, asignacion_reparto, incidente_entrega, mensaje_reparto)",
           "capa": "modelo",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -30,7 +30,7 @@
         },
         {
           "id": "HU-CAP-068-T03",
-          "titulo": "Reglas de dominio de HU-CAP-068 (RQ-DEL-01-01, RQ-DEL-01-08)",
+          "titulo": "Reglas de dominio de HU-CAP-068 (RQ-DEL-01-01, RQ-DEL-01-09)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -91,7 +91,7 @@
         },
         {
           "id": "HU-CAP-069-T02",
-          "titulo": "Reglas de dominio de HU-CAP-069 (RQ-DEL-01-02, RQ-DEL-01-03, RQ-DEL-01-04, RQ-DEL-01-05)",
+          "titulo": "Reglas de dominio de HU-CAP-069 (RQ-DEL-01-02, RQ-DEL-01-03, RQ-DEL-01-04, RQ-DEL-01-05, RQ-DEL-01-06)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -136,7 +136,7 @@
         },
         {
           "id": "HU-CAP-069-T06",
-          "titulo": "Pruebas TC-CAP-069-01..06 (unitarias de dominio e integración de API)",
+          "titulo": "Pruebas TC-CAP-069-01..07 (unitarias de dominio e integración de API)",
           "capa": "application",
           "actividad": "PRUEBAS",
           "responsable": "José Ángel Espinoza",
@@ -163,7 +163,7 @@
         },
         {
           "id": "HU-CAP-070-T02",
-          "titulo": "Reglas de dominio de HU-CAP-070 (RQ-DEL-01-06, RQ-DEL-01-07)",
+          "titulo": "Reglas de dominio de HU-CAP-070 (RQ-DEL-01-07, RQ-DEL-01-08)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -235,7 +235,7 @@
         },
         {
           "id": "HU-CAP-071-T02",
-          "titulo": "Migración Prisma de las tablas de FT-DEL-02 (zona_reparto, pedido, asignacion_reparto, incidente_entrega, party)",
+          "titulo": "Migración Prisma de las tablas de FT-DEL-02 (zona_reparto, pedido, asignacion_reparto, incidente_entrega, mensaje_reparto)",
           "capa": "modelo",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -402,7 +402,7 @@
         },
         {
           "id": "HU-CAP-073-T03",
-          "titulo": "Casos de uso: Marcar en camino y entregado con el cobro",
+          "titulo": "Casos de uso: Marcar en camino, he llegado y entregado con el cobro",
           "capa": "application",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -424,7 +424,7 @@
         },
         {
           "id": "HU-CAP-073-T05",
-          "titulo": "Pantalla React: Marcar en camino y entregado con el cobro",
+          "titulo": "Pantalla React: Marcar en camino, he llegado y entregado con el cobro",
           "capa": "ux",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -447,6 +447,139 @@
       ]
     },
     {
+      "hu": "HU-CAP-196",
+      "tareas": [
+        {
+          "id": "HU-CAP-196-T01",
+          "titulo": "Revisar criterios de HU-CAP-196 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-178-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-196-T02",
+          "titulo": "Reglas de dominio de HU-CAP-196 (RQ-DEL-02-10, RQ-DEL-02-11, RQ-DEL-02-12, RQ-DEL-02-13, RQ-DEL-02-14, RQ-DEL-02-15)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-196-T01",
+            "HU-CAP-071-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-196-T03",
+          "titulo": "Casos de uso: Ver los pedidos en el mapa con nombre, color de espera y orden sugerido",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-196-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-196-T04",
+          "titulo": "Endpoints y eventos de FT-DEL-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-196-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-196-T05",
+          "titulo": "Pantalla React: Ver los pedidos en el mapa con nombre, color de espera y orden sugerido",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-196-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-196-T06",
+          "titulo": "Pruebas TC-CAP-196-01..07 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-196-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-197",
+      "tareas": [
+        {
+          "id": "HU-CAP-197-T01",
+          "titulo": "Revisar criterios de HU-CAP-197 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-178-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-197-T02",
+          "titulo": "Reglas de dominio de HU-CAP-197 (RQ-DEL-02-16, RQ-DEL-02-17, RQ-DEL-02-18, RQ-DEL-02-19)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-197-T01",
+            "HU-CAP-071-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-197-T03",
+          "titulo": "Casos de uso: Recibir por WhatsApp el aviso de que mi pedido sale y de que el repartidor llegó",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-197-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-197-T04",
+          "titulo": "Endpoints y eventos de FT-DEL-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-197-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-197-T05",
+          "titulo": "Pruebas TC-CAP-197-01..05 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-197-T04"
+          ]
+        }
+      ]
+    },
+    {
       "hu": "HU-CAP-074",
       "tareas": [
         {
@@ -462,7 +595,7 @@
         },
         {
           "id": "HU-CAP-074-T02",
-          "titulo": "Migración Prisma de las tablas de FT-DEL-03 (zona_reparto, pedido, asignacion_reparto, incidente_entrega, party)",
+          "titulo": "Migración Prisma de las tablas de FT-DEL-03 (zona_reparto, pedido, asignacion_reparto, incidente_entrega, mensaje_reparto)",
           "capa": "modelo",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",

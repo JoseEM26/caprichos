@@ -45,8 +45,9 @@ tags: [contenidos, plt-03, ep-cap-016, ft-con-01, deberia-tener]
 | RQ-CON-01-05 | Los nombres se eligen de listas por categoría y se crean o corrigen ahí mismo sin repetirse. | Debería tener | RN-CAP-128 · RN-CAP-129 | Dado el combo de tamaños, cuando el administrador escribe «Mediano» que no existe, entonces puede crearlo ahí mismo; «Grande» repetido no se acepta. | Propuesto |
 | RQ-CON-01-06 | Un módulo de Listas y categorías crea categorías de lista y agrega, edita y oculta elementos. | Debería tener | NEC-CAP-106 · RN-CAP-129 | Dada la lista «Endulzantes», cuando el administrador oculta «Stevia», entonces deja de ofrecerse y los pedidos pasados la conservan. | Propuesto |
 | RQ-CON-01-07 | Los productos con variantes son tipos con sabores que se crean, editan y desactivan. | Debería tener | NEC-CAP-058 | Dado el tipo «Donas», cuando se agrega el sabor «Pistacho», entonces aparece en la carta y en las promociones que piden donas. | Propuesto |
-| RQ-CON-01-08 | Productos, opciones y categorías no se eliminan: se ocultan o desactivan. | Debe tener | RN-CAP-014 · RN-CAP-086 (2.ª) | Dado un producto, cuando el administrador busca «Eliminar», entonces solo hay «Ocultar»; sus ventas pasadas se conservan. | Propuesto |
-| RQ-CON-01-09 | Los cambios de precio se conservan y quedan en el historial. | Debería tener | NEC-CAP-082 · RNF-CAP-009 | Dado un cambio de precio, cuando se publica, entonces el historial muestra precio anterior, nuevo, autor y fecha, y los pedidos pasados mantienen su precio. | Propuesto |
+| RQ-CON-01-08 | Un producto tiene la marca «No suma puntos ni aplica cupones». | Debería tener | DT-65 · Acta 03 | Dado el producto «Frappé 2×1 de campaña», cuando el administrador activa la marca con Sí/No, entonces ese producto deja de sumar puntos y de aceptar cupones (FT-CLI-02, FT-OFE-03), y el cambio queda en el historial. | Propuesto |
+| RQ-CON-01-09 | Productos, opciones y categorías no se eliminan: se ocultan o desactivan. | Debe tener | RN-CAP-014 · RN-CAP-086 (2.ª) | Dado un producto, cuando el administrador busca «Eliminar», entonces solo hay «Ocultar»; sus ventas pasadas se conservan. | Propuesto |
+| RQ-CON-01-10 | Los cambios de precio se conservan y quedan en el historial. | Debería tener | NEC-CAP-082 · RNF-CAP-009 | Dado un cambio de precio, cuando se publica, entonces el historial muestra precio anterior, nuevo, autor y fecha, y los pedidos pasados mantienen su precio. | Propuesto |
 
 Prioridad *Debería tener* por la épica (fase Siguiente). En el piloto la carta se carga con la carta oficial (DEP-05). Todos nacen *Propuesto* hasta que el PO los apruebe (DT-48).
 
@@ -69,6 +70,7 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RN-CAP-128 | Tamaños y opciones se eligen de listas; se crean o corrigen ahí mismo; no se repiten. | Productos, Ofertas |
 | RN-CAP-129 | Listas por categoría específica; módulo de Listas y categorías. | Productos |
 | RN-CAP-130 | Categorías gestionables con o sin tamaños y opciones; se ocultan, no se eliminan. | Productos, Carta |
+| DT-65 | Un producto puede marcarse «No suma puntos ni aplica cupones». | Acta 03 · decisiones.md |
 
 ## 5. Trazabilidad y planificación
 
@@ -81,8 +83,9 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RQ-CON-01-05 | HU-CAP-146 | — | R-01 |
 | RQ-CON-01-06 | HU-CAP-146 | — | R-01 |
 | RQ-CON-01-07 | HU-CAP-147 | — | R-01 |
-| RQ-CON-01-08 | HU-CAP-144 | — | R-01 |
+| RQ-CON-01-08 | HU-CAP-144 | FT-CLI-02 | R-01 |
 | RQ-CON-01-09 | HU-CAP-144 | — | R-01 |
+| RQ-CON-01-10 | HU-CAP-144 | — | R-01 |
 
 Historias de usuario de esta feature (en `historias/`, en draft):
 

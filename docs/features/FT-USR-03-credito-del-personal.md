@@ -26,13 +26,13 @@ tags: [usuarios, plt-03, ep-cap-013, ft-usr-03, deberia-tener]
 
 ## 1. Descripción y valor
 
-**Descripción.** El personal puede consumir **a crédito con descuento** (25 % de inicio, configurable; V5), salvo combos, promociones, docenas y lo que ya tiene descuento (RN-CAP-036, RN-CAP-106). El crédito se usa **solo en Pedidos y caja**: el administrativo elige al trabajador activo en el pedido del personal, en el local o para llevar; por la carta virtual no se consume crédito (RN-CAP-131, D-09). Cada consumo se **suma al mes del trabajador** con el detalle de lo que se llevó; **no hay plazo ni abonos** (DT-15). A fin de mes el administrador revisa en **Créditos del personal** cuánto consumió cada uno; el descuento del pago se hace **fuera del sistema**. El crédito es solo para el personal: no se da crédito a clientes (RN-CAP-058).
+**Descripción.** El personal puede consumir **a crédito con descuento** (25 % de inicio, configurable; V5), salvo combos, promociones, docenas y lo que ya tiene descuento (RN-CAP-036, RN-CAP-106). El crédito se usa **solo en Pedidos y caja**: el administrativo elige al trabajador activo en el pedido del personal, en el local o para llevar; por la carta virtual no se consume crédito (RN-CAP-131, D-09). Cada consumo se **suma a la semana del trabajador** con el detalle de lo que se llevó, porque el pago es semanal (DT-63, acta 03); **no hay plazo ni abonos** (DT-15). El administrador revisa en **Créditos del personal** cuánto consumió cada uno **por semana** (por defecto), por mes o por cualquier **rango de fechas**; el descuento del pago se hace **fuera del sistema**. El crédito es solo para el personal: no se da crédito a clientes (RN-CAP-058).
 
 **Beneficio esperado.** Control claro de lo que consume el personal cada mes, sin cuadernos. Hipótesis medible: **100 % de consumos del personal registrados con su detalle**; **0 créditos a clientes**.
 
 **Usuarios / roles.** ACT-CAP-002 Cajero/a (registra el consumo) · ACT-CAP-001 Kevin Rosales, dueño y administrador (revisa el mes y fija el descuento).
 
-**Pantallas de referencia.** Administrativo ▸ Nuevo pedido ▸ Pedido del personal; Créditos del personal por mes (`Admin.dc.html`) (mockup navegable, DT-04; no reemplaza al G2, DEP-06).
+**Pantallas de referencia.** Administrativo ▸ Nuevo pedido ▸ Pedido del personal; Créditos del personal por semana, mes o rango (`Admin.dc.html`) (mockup navegable, DT-04; no reemplaza al G2, DEP-06).
 
 ## 2. Catálogo de requerimientos funcionales
 
@@ -40,13 +40,13 @@ tags: [usuarios, plt-03, ep-cap-013, ft-usr-03, deberia-tener]
 | --- | --- | --- | --- | --- | --- |
 | RQ-USR-03-01 | El pedido del personal elige a un trabajador activo, solo en el local o para llevar. | Debería tener | NEC-CAP-094 · RN-CAP-106 | Dado un trabajador desactivado, cuando el cajero busca, entonces no aparece; para un activo, no se ofrece delivery ni reserva. | Propuesto |
 | RQ-USR-03-02 | Se aplica el descuento del personal salvo a combos, promociones, docenas y lo que ya tiene descuento. | Debería tener | RN-CAP-036 · RN-CAP-106 · V5 | Dado un pedido con un café de S/ 8 y un combo de S/ 22, cuando se aplica el 25 %, entonces el café queda en S/ 6 y el combo en S/ 22. | Propuesto |
-| RQ-USR-03-03 | El consumo cargado a crédito se suma al mes del trabajador con su detalle. | Debería tener | RN-CAP-131 · NEC-CAP-108 | Dado un consumo de S/ 28 el 15/10, cuando se cobra a crédito, entonces el mes de octubre del trabajador suma S/ 28 con el pedido y sus productos. | Propuesto |
+| RQ-USR-03-03 | El consumo cargado a crédito se suma a la semana del trabajador con su detalle. | Debería tener | RN-CAP-131 · NEC-CAP-108 · DT-63 | Dado un consumo de S/ 28 el jueves 15/10, cuando se cobra a crédito, entonces la semana del lunes 12 al domingo 18/10 del trabajador suma S/ 28 con el pedido y sus productos. | Propuesto |
 | RQ-USR-03-04 | No hay plazos ni abonos en el crédito. | Debería tener | RN-CAP-131 · DT-15 · O3 | Dado Créditos del personal, cuando el administrador lo revisa, entonces no hay botón de abono ni fechas de vencimiento. | Propuesto |
-| RQ-USR-03-05 | El administrador ve por mes cuánto consumió cada trabajador y el detalle. | Debería tener | RN-CAP-131 | Dado octubre, cuando el administrador abre Créditos del personal, entonces ve cada trabajador con su total y, al abrirlo, sus consumos. | Propuesto |
+| RQ-USR-03-05 | El administrador ve por semana (por defecto), por mes o por rango de fechas cuánto consumió cada trabajador y el detalle. | Debería tener | RN-CAP-131 · DT-63 | Dada la semana actual, cuando el administrador abre Créditos del personal, entonces ve cada trabajador con su total de la semana; al elegir «del 1 al 20/10», ve el total de ese rango y, al abrir a uno, sus consumos. | Propuesto |
 | RQ-USR-03-06 | Por la carta virtual no se consume crédito. | Debe tener | RN-CAP-131 · D-09 | Dado un trabajador que pide en la carta con su cuenta, cuando elige el pago, entonces no aparece «Crédito del personal». | Propuesto |
 | RQ-USR-03-07 | El porcentaje de descuento del personal se cambia en Configuración del local. | Debería tener | NEC-CAP-094 · RN-CAP-058 | Dado 25 %, cuando el administrador lo cambia a 20 % con Sí/No, entonces los pedidos nuevos usan 20 %. | Propuesto |
 | RQ-USR-03-08 | El crédito no se da a clientes. | Debe tener | RN-CAP-058 | Dado un pedido de un cliente, cuando el cajero cobra, entonces no aparece la opción de crédito. | Propuesto |
-| RQ-USR-03-09 | El mes de consumos se exporta para el pago fuera del sistema. | Podría tener | RN-CAP-131 | Dado octubre, cuando el administrador toca «Exportar», entonces descarga un CSV con trabajador, total y detalle. | Propuesto |
+| RQ-USR-03-09 | La semana o el rango de consumos se exporta para el pago fuera del sistema. | Debería tener | RN-CAP-131 · DT-63 | Dada la semana del 12 al 18/10, cuando el administrador toca «Exportar», entonces descarga un archivo de Excel con trabajador, total y detalle, y la exportación queda en el Historial de acciones. | Propuesto |
 | RQ-USR-03-10 | El descuento del personal solo se da a trabajadores activos en cualquier canal, caja o carta virtual; al desactivar a un trabajador deja de recibirlo y al reactivarlo lo recupera. | Debe tener | Pedido del dueño 20/10/2026 · RN-CAP-106 | Dado un trabajador desactivado, cuando intenta aplicar su descuento de personal en la carta virtual o el cajero lo busca, entonces no se le aplica descuento ni aparece como trabajador activo; dado el mismo trabajador reactivado, cuando pide de nuevo, entonces vuelve a recibir su descuento. | Propuesto |
 
 Prioridad *Debería tener* por la épica (fase Siguiente). RQ-USR-03-06 y 08 son *Debe tener* porque fijan límites del crédito. Todos nacen *Propuesto* hasta que el PO los apruebe (DT-48).
@@ -68,7 +68,8 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RN-CAP-036 | El personal consume a crédito con 25 % de descuento salvo combos y promociones; sin plazo. | Acta 02 |
 | RN-CAP-058 | El crédito es solo para el personal; el porcentaje se configura. | Acta 02 y 16/10 |
 | RN-CAP-106 | Pedido del personal solo en el local o para llevar, solo usuarios activos; sin descuento en combos, promociones ni docenas. | Personal |
-| RN-CAP-131 | Sin plazo ni abonos; se suma al mes; solo en Pedidos y caja; no por la carta. | Instrucción del dueño 19/10/2026 |
+| RN-CAP-131 | Sin plazo ni abonos; solo en Pedidos y caja; no por la carta. «Se suma al mes» queda reemplazado por la semana (DT-63). | Instrucción del dueño 19/10/2026 |
+| DT-63 | El crédito se revisa por semana (el pago es semanal) y por rango de fechas. | Acta 03 · decisiones.md |
 | RN-CAP-084 (2.ª) | Abonos del crédito: **obsoleta** por RN-CAP-131 (O3). | Revisión del rol cajero |
 
 ## 5. Trazabilidad y planificación
@@ -83,14 +84,14 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RQ-USR-03-06 | HU-CAP-123 | D-09 | R-01 |
 | RQ-USR-03-07 | HU-CAP-125 | FT-CFG-02 | R-01 |
 | RQ-USR-03-08 | HU-CAP-124 | — | R-01 |
-| RQ-USR-03-09 | HU-CAP-125 | — | R-01 |
+| RQ-USR-03-09 | HU-CAP-125 | FT-USR-04 | R-01 |
 | RQ-USR-03-10 | HU-CAP-123 | FT-USR-01 · D-24 | R-11 |
 
 Historias de usuario de esta feature (en `historias/`, en draft):
 
 - HU-CAP-123 Registrar el consumo del personal a crédito
-- HU-CAP-124 Revisar el crédito del personal por mes
-- HU-CAP-125 Configurar el descuento del personal y exportar el mes
+- HU-CAP-124 Revisar el crédito del personal por semana o por rango de fechas
+- HU-CAP-125 Configurar el descuento del personal y exportar la semana
 
 Decisiones técnicas que la rigen (ADR propuestos, G3): ADR-001, ADR-011, ADR-014, ADR-004, ADR-008.
 
@@ -102,9 +103,10 @@ Decisiones técnicas que la rigen (ADR propuestos, G3): ADR-001, ADR-011, ADR-01
 
 **Preguntas abiertas**
 
-1. **D-09** — si un trabajador puede cargar a su crédito desde la carta. Recomendación: no en la primera versión.
-2. **D-24** — cómo se identifica un trabajador en la carta virtual para recibir su descuento (propuesta: iniciando sesión con su usuario del administrativo; solo para trabajadores activos).
-3. **O3** — renumerar o retirar la RN-CAP-084 de abonos.
+1. **¿En qué día empieza la semana de pago?** Propuesta: de lunes a domingo, configurable en Configuración del local.
+2. **D-09** — si un trabajador puede cargar a su crédito desde la carta. Recomendación: no en la primera versión.
+3. **D-24** — cómo se identifica un trabajador en la carta virtual para recibir su descuento (propuesta: iniciando sesión con su usuario del administrativo; solo para trabajadores activos).
+4. **O3** — renumerar o retirar la RN-CAP-084 de abonos.
 
 ---
 

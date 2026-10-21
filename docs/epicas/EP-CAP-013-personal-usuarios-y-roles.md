@@ -41,7 +41,7 @@ Los roles y funciones del personal están desactualizados desde 2024 y todos ven
 
 - NEC-CAP-008 y NEC-CAP-010: roles documentados y escritorio por rol.
 - NEC-CAP-088 y NEC-CAP-099: usuarios, permisos y primer ingreso.
-- NEC-CAP-025, NEC-CAP-094 y NEC-CAP-108: crédito del personal por mes.
+- NEC-CAP-025, NEC-CAP-094 y NEC-CAP-108: crédito del personal, revisado por semana y por rango de fechas (DT-63).
 - `analisis/modulos-y-roles.md` y `analisis/primer-ingreso-y-contrasenas.md`.
 
 **Alineamiento estratégico**

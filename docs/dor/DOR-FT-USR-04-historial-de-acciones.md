@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-013, FT-USR-04, HU-CAP-176, HU-CAP-177, ADR-001, ADR-011, ADR-014, ADR-004, ADR-008, FT-CAJ-02, FT-CLI-01, FT-LEG-02, FT-USR-01]
+relacionados: [EP-CAP-013, FT-USR-04, HU-CAP-176, HU-CAP-177, ADR-001, ADR-011, ADR-014, ADR-004, ADR-008, FT-CAJ-02, FT-CIE-02, FT-CLI-01, FT-COC-03, FT-LEG-02, FT-USR-01]
 tags: [dor, plt-05, usuarios, ft-usr-04, g4]
 ---
 
@@ -34,7 +34,7 @@ tags: [dor, plt-05, usuarios, ft-usr-04, g4]
 | NEGOCIO | ☑ | Objetivo y valor con KPI | Épica EP-CAP-013 §2 y feature §1 (hipótesis medible) |
 | NEGOCIO | ☐ | Alcance dentro y fuera acordado | Redactado en la feature; falta la firma del PO (DT-48) |
 | NEGOCIO | ☐ | Prioridad y release confirmados | Debe tener · H1 · piloto en el local · 28/12/2026 (supuesto, D-19); fechas supuestas hasta D-19 |
-| FUNCIONAL | ☑ | Historias con criterios verificables | 2 historias, 13 criterios Dado/Cuando/Entonces |
+| FUNCIONAL | ☑ | Historias con criterios verificables | 2 historias, 15 criterios Dado/Cuando/Entonces |
 | FUNCIONAL | ☐ | Reglas de negocio documentadas y validadas | Documentadas; abiertas: D-18 |
 | FUNCIONAL | ☐ | Estimación por el equipo | Tareas en `backlog/tareas/EP-CAP-013.json` con `estimacion_horas: null` |
 | DISEÑO / UX | ☐ | Prototipos aprobados (DEP-06) | Mockup navegable como referencia (DT-04); Figma o aceptación del mockup pendiente (G2) |
@@ -43,7 +43,7 @@ tags: [dor, plt-05, usuarios, ft-usr-04, g4]
 | TÉCNICO | ☐ | Contrato de API | Borrador en ARQ-CAP-002 §FT-USR-04; se aprueba en G3 |
 | TÉCNICO | ☐ | Modelo de datos / DDL | DAT-CAP-001 y `datos/ddl-propuesto.sql` (probado en PostgreSQL 16); sin aprobar (G3) |
 | TÉCNICO | ☐ | RNF y seguridad | RNF-CAP-009, RNF-CAP-006, RNF-CAP-008, RNF-CAP-014, RNF-CAP-017; umbrales propuestos (feature §3) |
-| CALIDAD | ☑ | Estrategia y datos de prueba | `pruebas/test-plan.md`: 13 casos TC para estas historias, datos sintéticos |
+| CALIDAD | ☑ | Estrategia y datos de prueba | `pruebas/test-plan.md`: 15 casos TC para estas historias, datos sintéticos |
 | CALIDAD | ☑ | Riesgos con mitigación y dueño | Sección 5 |
 
 ## 2 DIAGRAMA DE DEPENDENCIAS
@@ -57,7 +57,9 @@ flowchart LR
   HU_CAP_176["HU-CAP-176"]:::evaluado --> FT_USR_04
   HU_CAP_177["HU-CAP-177"]:::evaluado --> FT_USR_04
   FT_CAJ_02["FT-CAJ-02"]:::interna --> FT_USR_04
+  FT_CIE_02["FT-CIE-02"]:::interna --> FT_USR_04
   FT_CLI_01["FT-CLI-01"]:::interna --> FT_USR_04
+  FT_COC_03["FT-COC-03"]:::interna --> FT_USR_04
   FT_LEG_02["FT-LEG-02"]:::interna --> FT_USR_04
   FT_USR_01["FT-USR-01"]:::interna --> FT_USR_04
   ADR_001["ADR-001"]:::interna -.-> FT_USR_04
@@ -71,7 +73,7 @@ flowchart LR
 ```
 
 - **Ítems evaluados:** FT-USR-04 y sus historias HU-CAP-176, HU-CAP-177.
-- **Dependencias técnicas:** FT-CAJ-02, FT-CLI-01, FT-LEG-02, FT-USR-01; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-004, ADR-008.
+- **Dependencias técnicas:** FT-CAJ-02, FT-CIE-02, FT-CLI-01, FT-COC-03, FT-LEG-02, FT-USR-01; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-004, ADR-008.
 - **Dependencias externas:** DEP-02, DEP-06, DEP-09.
 - **Decisiones abiertas:** D-18.
 
@@ -98,12 +100,15 @@ erDiagram
   PARTY_ROLE ||--o{ EMPLOYEE_DETAIL : ""
   PARTY ||--o{ PARTY_ROLE : ""
   PARTY ||--o{ CONSUMO_PERSONAL : ""
+  PARTY ||--o{ HORARIO_TRABAJO : ""
+  PARTY ||--o{ COBERTURA_TURNO : ""
+  ROL ||--o{ COBERTURA_TURNO : ""
   AUDITORIA {
     bigint id PK
   }
 ```
 
-Tablas de `datos/ddl-propuesto.sql` que usa la feature: `auditoria`, `party`, `person`, `user_account`, `rol`, `permiso`, `rol_permiso`, `sesion`, `employee_detail`, `party_role`, `consumo_personal`. Las relaciones son las claves foráneas físicas del script (ADR-003); el detalle de columnas y restricciones está en DAT-CAP-001.
+Tablas de `datos/ddl-propuesto.sql` que usa la feature: `auditoria`, `party`, `person`, `user_account`, `rol`, `permiso`, `rol_permiso`, `sesion`, `employee_detail`, `party_role`, `consumo_personal`, `horario_trabajo`, `cobertura_turno`. Las relaciones son las claves foráneas físicas del script (ADR-003); el detalle de columnas y restricciones está en DAT-CAP-001.
 
 Proceso (orden de las historias):
 

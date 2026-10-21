@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-012, FT-OFE-01, RQ-OFE-01-04, RQ-OFE-01-07, HU-CAP-105, HU-CAP-107, HU-CAP-108, ADR-001, ADR-011, ADR-014, ADR-003, ADR-007, DEP-02, DEP-06, R-01]
+relacionados: [EP-CAP-012, FT-OFE-01, RQ-OFE-01-04, RQ-OFE-01-09, HU-CAP-105, HU-CAP-107, HU-CAP-108, ADR-001, ADR-011, ADR-014, ADR-003, ADR-007, DEP-02, DEP-06, R-01]
 tags: [hu, ofertas, capa-a, ft-ofe-01, media, ui]
 ---
 
@@ -32,7 +32,7 @@ tags: [hu, ofertas, capa-a, ft-ofe-01, media, ui]
 
 | CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
 |---|---|
-| **Contexto.** Historia de FT-OFE-01 «Combos y promociones» (Debería tener, épica EP-CAP-012). Cubre los requerimientos: **RQ-OFE-01-04** Se crea una promoción «lleva N, paga M» con su contenido limitado. **RQ-OFE-01-07** Un combo sigue a la venta si falta un componente: se elige otro de la misma categoría. | **Alcance.**<br>• Se crea una promoción «lleva N, paga M» con su contenido limitado.<br>• Un combo sigue a la venta si falta un componente: se elige otro de la misma categoría. |
+| **Contexto.** Historia de FT-OFE-01 «Combos y promociones» (Debería tener, épica EP-CAP-012). Cubre los requerimientos: **RQ-OFE-01-04** Se crea una promoción «lleva N, paga M» de un producto, con el precio que fija el administrador. **RQ-OFE-01-09** Un combo sigue a la venta si falta un componente: se elige otro de la misma categoría. | **Alcance.**<br>• Se crea una promoción «lleva N, paga M» de un producto, con el precio que fija el administrador.<br>• Un combo sigue a la venta si falta un componente: se elige otro de la misma categoría. |
 | **Problema.** Promociones que el dueño crea solo, y que cocina, stock e informes cuentan por producto y por combo. | **Fuera de alcance.**<br>• HU-CAP-105: Crear un combo con sus partes y precio por tamaño.<br>• HU-CAP-107: Definir la vigencia de una oferta.<br>• HU-CAP-108: Vender un combo con componentes agotados.<br>• Descuentos automáticos: FT-OFE-02.<br>• Cupones: FT-OFE-03.<br>• Cómo la carta muestra el precio tachado: FT-CAR-01. |
 
 ## 03 | CRITERIOS DE ACEPTACIÓN
@@ -40,9 +40,9 @@ tags: [hu, ofertas, capa-a, ft-ofe-01, media, ui]
 | N.° | DADO | CUANDO | ENTONCES |
 |---|---|---|---|
 | CA-1 | una 3x2 en donas | el cliente lleva 3 donas | se descuenta la más barata; con 2 donas no aplica y se avisa «Lleva 1 más y paga 2» (RQ-OFE-01-04) |
-| CA-2 | un combo con el postre «Brownie» agotado | el cliente lo arma | el brownie aparece apagado y puede elegir otro postre de la categoría (RQ-OFE-01-07) |
+| CA-2 | un combo con el postre «Brownie» agotado | el cliente lo arma | el brownie aparece apagado y puede elegir otro postre de la categoría (RQ-OFE-01-09) |
 
-Origen: criterios de verificación de FT-OFE-01 (RQ-OFE-01-04, RQ-OFE-01-07); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
+Origen: criterios de verificación de FT-OFE-01 (RQ-OFE-01-04, RQ-OFE-01-09); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
 
 ## 04 | REGLAS, DEPENDENCIAS Y EVIDENCIAS
 
@@ -63,4 +63,4 @@ Origen: criterios de verificación de FT-OFE-01 (RQ-OFE-01-04, RQ-OFE-01-07); lo
 
 **DoR: NO READY** hasta cerrar G2 y G3 (y con G0 y G1 aún sin aprobar).
 
-Generado por IA: historia derivada de FT-OFE-01 (requerimientos RQ-OFE-01-04, RQ-OFE-01-07, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)
+Generado por IA: historia derivada de FT-OFE-01 (requerimientos RQ-OFE-01-04, RQ-OFE-01-09, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)

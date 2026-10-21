@@ -33,7 +33,7 @@ tags: [hu, delivery, capa-a, ft-del-03, media, ui]
 | CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
 |---|---|
 | **Contexto.** Historia de FT-DEL-03 «Entregas fallidas» (Debe tener, épica EP-CAP-008). Cubre los requerimientos: **RQ-DEL-03-08** Lo preparado y no entregado se registra como merma informativa de origen Reparto, sin descontar stock otra vez. **RQ-DEL-03-09** Tiempos, intentos, recargo y recomendación se configuran. | **Alcance.**<br>• Lo preparado y no entregado se registra como merma informativa de origen Reparto, sin descontar stock otra vez.<br>• Tiempos, intentos, recargo y recomendación se configuran. |
-| **Problema.** Que una entrega fallida no se quede en el aire: alguien la atiende, se decide qué hacer y queda registrada. | **Fuera de alcance.**<br>• HU-CAP-074: Reportar que el cliente no contesta o no encuentro la dirección.<br>• HU-CAP-075: Corregir la dirección y seguir los intentos.<br>• HU-CAP-076: Cerrar la coordinación de un pedido devuelto.<br>• Mensajes automáticos del bot para la coordinación (se hace a mano por WhatsApp en la primera versión).<br>• Merma de reparto en el stock: FT-ALM-03. |
+| **Problema.** Que una entrega fallida no se quede en el aire: alguien la atiende, se decide qué hacer y queda registrada. | **Fuera de alcance.**<br>• HU-CAP-074: Reportar que el cliente no contesta o no encuentro la dirección.<br>• HU-CAP-075: Corregir la dirección y seguir los intentos.<br>• HU-CAP-076: Cerrar la coordinación de un pedido devuelto.<br>• Avisos automáticos al salir y al llegar: FT-DEL-02 (DT-60). La coordinación después de una entrega fallida se hace a mano por WhatsApp en la primera versión.<br>• Merma de reparto en el stock: FT-ALM-03. |
 
 ## 03 | CRITERIOS DE ACEPTACIÓN
 

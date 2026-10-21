@@ -47,7 +47,7 @@ Cocina y barra reciben los pedidos de forma desordenada y un combo no se reparte
 
 **Alineamiento estratégico**
 
-- OBJ-CAP-001 Entregar más rápido (13 minutos como meta, D-01).
+- OBJ-CAP-001 Entregar más rápido (al cliente se le dice de 25 a 35 minutos, V1; acta 03).
 - NEC-CAP-001 El pedido llega a cocina sin reescribirse.
 
 ## 2 OBJETIVOS
@@ -62,7 +62,7 @@ Que el cocinero vea en su pantalla qué preparar, con opciones y notas, y lo ava
 
 | Métrica (KPI) | Línea base | Meta | Fuente de datos | Frecuencia |
 | --- | --- | --- | --- | --- |
-| Minutos desde que el pedido entra a cocina hasta que está listo | 20-25 min declarado (por medir) | 13 minutos como máximo (OBJ-CAP-001, D-01) | Registro de tiempos del sistema | Diaria |
+| Minutos desde que el pedido entra a cocina hasta que está listo | 20-25 min declarado (por medir) | la que permita entregar dentro de 25 a 35 minutos (OBJ-CAP-001, V1; se fija con la primera medición) | Registro de tiempos del sistema | Diaria |
 | Comandas que no se imprimieron y no se reimprimieron | Por medir | Cero (propuesta) | Registro de impresión | Diaria |
 | Pedidos con producto agotado que llegaron a cocina | Por medir | Cero (OBJ-CAP-002) | Registro de pedidos | Diaria |
 

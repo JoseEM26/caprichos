@@ -73,7 +73,7 @@ Las metas marcadas «(propuesta)» son de la IA y las fija el dueño; las línea
 
 - Compra como invitado sin puntos o con cuenta, con visto bueno para guardar datos (RN-CAP-066).
 - Cuenta con DNI y contraseña; correo opcional; cumpleaños obligatorio para personas (RN-CAP-110).
-- 1 punto por cada S/ 1 al cobrarse el pedido.
+- El 5 % del total en puntos al cobrarse el pedido (1 punto = S/ 1), con canje en el pedido (DT-55).
 - Campanita con el cupón de cumpleaños (NEC-CAP-097).
 - Crear, buscar y editar clientes en caja sin cambiar el documento (RN-CAP-083).
 

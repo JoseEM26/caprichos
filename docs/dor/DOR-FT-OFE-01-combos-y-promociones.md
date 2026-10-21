@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-012, FT-OFE-01, HU-CAP-105, HU-CAP-106, HU-CAP-107, HU-CAP-108, ADR-001, ADR-011, ADR-014, ADR-003, ADR-007, FT-COC-01, FT-COC-03, FT-CON-02, FT-STK-03]
+relacionados: [EP-CAP-012, FT-OFE-01, HU-CAP-105, HU-CAP-106, HU-CAP-107, HU-CAP-108, ADR-001, ADR-011, ADR-014, ADR-003, ADR-007, FT-CLI-02, FT-COC-01, FT-COC-03, FT-CON-02, FT-STK-03]
 tags: [dor, plt-05, ofertas, ft-ofe-01, g4]
 ---
 
@@ -34,7 +34,7 @@ tags: [dor, plt-05, ofertas, ft-ofe-01, g4]
 | NEGOCIO | ☑ | Objetivo y valor con KPI | Épica EP-CAP-012 §2 y feature §1 (hipótesis medible) |
 | NEGOCIO | ☐ | Alcance dentro y fuera acordado | Redactado en la feature; falta la firma del PO (DT-48) |
 | NEGOCIO | ☐ | Prioridad y release confirmados | Debería tener · H2 · 01/03/2027 (supuesto, D-19); fechas supuestas hasta D-19 |
-| FUNCIONAL | ☑ | Historias con criterios verificables | 4 historias, 11 criterios Dado/Cuando/Entonces |
+| FUNCIONAL | ☑ | Historias con criterios verificables | 4 historias, 13 criterios Dado/Cuando/Entonces |
 | FUNCIONAL | ☐ | Reglas de negocio documentadas y validadas | Documentadas; abiertas: D-10 |
 | FUNCIONAL | ☐ | Estimación por el equipo | Tareas en `backlog/tareas/EP-CAP-012.json` con `estimacion_horas: null` |
 | DISEÑO / UX | ☐ | Prototipos aprobados (DEP-06) | Mockup navegable como referencia (DT-04); Figma o aceptación del mockup pendiente (G2) |
@@ -43,7 +43,7 @@ tags: [dor, plt-05, ofertas, ft-ofe-01, g4]
 | TÉCNICO | ☐ | Contrato de API | Borrador en ARQ-CAP-002 §FT-OFE-01; se aprueba en G3 |
 | TÉCNICO | ☐ | Modelo de datos / DDL | DAT-CAP-001 y `datos/ddl-propuesto.sql` (probado en PostgreSQL 16); sin aprobar (G3) |
 | TÉCNICO | ☐ | RNF y seguridad | RNF-CAP-011, RNF-CAP-019, RNF-CAP-014; umbrales propuestos (feature §3) |
-| CALIDAD | ☑ | Estrategia y datos de prueba | `pruebas/test-plan.md`: 11 casos TC para estas historias, datos sintéticos |
+| CALIDAD | ☑ | Estrategia y datos de prueba | `pruebas/test-plan.md`: 13 casos TC para estas historias, datos sintéticos |
 | CALIDAD | ☑ | Riesgos con mitigación y dueño | Sección 5 |
 
 ## 2 DIAGRAMA DE DEPENDENCIAS
@@ -58,6 +58,7 @@ flowchart LR
   HU_CAP_106["HU-CAP-106"]:::evaluado --> FT_OFE_01
   HU_CAP_107["HU-CAP-107"]:::evaluado --> FT_OFE_01
   HU_CAP_108["HU-CAP-108"]:::evaluado --> FT_OFE_01
+  FT_CLI_02["FT-CLI-02"]:::interna --> FT_OFE_01
   FT_COC_01["FT-COC-01"]:::interna --> FT_OFE_01
   FT_COC_03["FT-COC-03"]:::interna --> FT_OFE_01
   FT_CON_02["FT-CON-02"]:::interna --> FT_OFE_01
@@ -72,7 +73,7 @@ flowchart LR
 ```
 
 - **Ítems evaluados:** FT-OFE-01 y sus historias HU-CAP-105, HU-CAP-106, HU-CAP-107, HU-CAP-108.
-- **Dependencias técnicas:** FT-COC-01, FT-COC-03, FT-CON-02, FT-STK-03; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-003, ADR-007.
+- **Dependencias técnicas:** FT-CLI-02, FT-COC-01, FT-COC-03, FT-CON-02, FT-STK-03; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-003, ADR-007.
 - **Dependencias externas:** DEP-02, DEP-06.
 - **Decisiones abiertas:** D-10.
 

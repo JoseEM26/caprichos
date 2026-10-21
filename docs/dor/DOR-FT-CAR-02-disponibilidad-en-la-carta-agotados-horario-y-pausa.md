@@ -35,7 +35,7 @@ tags: [dor, plt-05, carta, ft-car-02, g4]
 | NEGOCIO | ☐ | Alcance dentro y fuera acordado | Redactado en la feature; falta la firma del PO (DT-48) |
 | NEGOCIO | ☐ | Prioridad y release confirmados | Debe tener · H1 · piloto en el local · 28/12/2026 (supuesto, D-19); fechas supuestas hasta D-19 |
 | FUNCIONAL | ☑ | Historias con criterios verificables | 4 historias, 9 criterios Dado/Cuando/Entonces |
-| FUNCIONAL | ☐ | Reglas de negocio documentadas y validadas | Documentadas; abiertas: D-01, D-04 |
+| FUNCIONAL | ☐ | Reglas de negocio documentadas y validadas | Documentadas; abiertas: D-04 |
 | FUNCIONAL | ☐ | Estimación por el equipo | Tareas en `backlog/tareas/EP-CAP-001.json` con `estimacion_horas: null` |
 | DISEÑO / UX | ☐ | Prototipos aprobados (DEP-06) | Mockup navegable como referencia (DT-04); Figma o aceptación del mockup pendiente (G2) |
 | DISEÑO / UX | ☐ | Textos y mensajes definidos | Los del mockup; por revisar con Kevin |
@@ -74,7 +74,7 @@ flowchart LR
 - **Ítems evaluados:** FT-CAR-02 y sus historias HU-CAP-005, HU-CAP-006, HU-CAP-007, HU-CAP-008.
 - **Dependencias técnicas:** FT-CFG-01, FT-COC-03, FT-STK-03; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-003, ADR-006.
 - **Dependencias externas:** DEP-02, DEP-04, DEP-06.
-- **Decisiones abiertas:** D-01, D-04.
+- **Decisiones abiertas:** D-04.
 
 **Bloqueantes**
 
@@ -84,7 +84,6 @@ flowchart LR
 | G3 | Aprobación de ADR-001, ADR-011, ADR-014, ADR-003, ADR-006 | Arquitectura | José Ángel Espinoza (TL, DT-48) | Antes de G4 | Abierto |
 | DEP-02 | Plataforma y hosting (ADR-001, ADR-011) | Técnica | Desarrollo | Antes de G3 | Abierto |
 | DEP-04 | Ver roadmap PLT-01 | Externa | Kevin | Según roadmap | Abierto |
-| D-01 | Decisión pendiente (ver `analisis/decisiones.md`) | Decisión | Kevin | Antes de G4 | Abierto |
 | D-04 | Decisión pendiente (ver `analisis/decisiones.md`) | Decisión | Kevin | Antes de G4 | Abierto |
 
 ## 3 MODELADO (DATOS Y PROCESO)
@@ -164,7 +163,7 @@ flowchart TB
 
 ☐ READY · Puede ingresar a desarrollo  ☐ READY CON CONDICIONES · ver acuerdos  ☐ NO READY · devolver a refinamiento
 
-**Propuesta IA: NO READY.** Motivos: G0 a G3 sin aprobar (DT-48); ADR ADR-001, ADR-011, ADR-014, ADR-003, ADR-006 propuestos, no aprobados (G3); tareas sin estimar; mockup sin aprobar (G2, DEP-06); decisiones abiertas D-01, D-04. Lo que sí está listo: historias con criterios verificables, casos de prueba 1 a 1, modelo de datos probado y dependencias identificadas. Con las firmas de G2 y G3 y la estimación, pasaría a **READY CON CONDICIONES**. La decisión es del PO.
+**Propuesta IA: NO READY.** Motivos: G0 a G3 sin aprobar (DT-48); ADR ADR-001, ADR-011, ADR-014, ADR-003, ADR-006 propuestos, no aprobados (G3); tareas sin estimar; mockup sin aprobar (G2, DEP-06); decisiones abiertas D-04. Lo que sí está listo: historias con criterios verificables, casos de prueba 1 a 1, modelo de datos probado y dependencias identificadas. Con las firmas de G2 y G3 y la estimación, pasaría a **READY CON CONDICIONES**. La decisión es del PO.
 
 | Rol | Nombre | Fecha | Firma |
 | --- | --- | --- | --- |

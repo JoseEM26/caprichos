@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-013, FT-USR-04, RQ-USR-04-06, RQ-USR-04-07, RQ-USR-04-08, RQ-USR-04-09, HU-CAP-176, ADR-001, ADR-011, ADR-014, ADR-004, ADR-008, DEP-02, DEP-06, R-01]
+relacionados: [EP-CAP-013, FT-USR-04, RQ-USR-04-08, RQ-USR-04-09, RQ-USR-04-10, RQ-USR-04-11, HU-CAP-176, ADR-001, ADR-011, ADR-014, ADR-004, ADR-008, DEP-02, DEP-06, R-01]
 tags: [hu, usuarios, capa-a, ft-usr-04, alta, ui]
 ---
 
@@ -32,20 +32,20 @@ tags: [hu, usuarios, capa-a, ft-usr-04, alta, ui]
 
 | CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
 |---|---|
-| **Contexto.** Historia de FT-USR-04 «Historial de acciones (auditoría)» (Debe tener, épica EP-CAP-013). Cubre los requerimientos: **RQ-USR-04-06** Solo el administrador ve la pantalla Historial de acciones. **RQ-USR-04-07** El historial se filtra por persona, módulo, acción, resultado y fechas, y se exporta a CSV. **RQ-USR-04-08** El antes y el después se muestran lado a lado, resaltando lo que cambió. **RQ-USR-04-09** Cada ficha tiene «Ver historial» con solo sus registros. | **Alcance.**<br>• Solo el administrador ve la pantalla Historial de acciones.<br>• El historial se filtra por persona, módulo, acción, resultado y fechas, y se exporta a CSV.<br>• El antes y el después se muestran lado a lado, resaltando lo que cambió.<br>• Cada ficha tiene «Ver historial» con solo sus registros. |
+| **Contexto.** Historia de FT-USR-04 «Historial de acciones (auditoría)» (Debe tener, épica EP-CAP-013). Cubre los requerimientos: **RQ-USR-04-08** Solo el administrador ve la pantalla Historial de acciones. **RQ-USR-04-09** El historial se filtra por persona, módulo, acción, resultado y fechas, y se exporta a CSV. **RQ-USR-04-10** El antes y el después se muestran lado a lado, resaltando lo que cambió. **RQ-USR-04-11** Cada ficha tiene «Ver historial» con solo sus registros. | **Alcance.**<br>• Solo el administrador ve la pantalla Historial de acciones.<br>• El historial se filtra por persona, módulo, acción, resultado y fechas, y se exporta a CSV.<br>• El antes y el después se muestran lado a lado, resaltando lo que cambió.<br>• Cada ficha tiene «Ver historial» con solo sus registros. |
 | **Problema.** Que el dueño pueda revisar cambios de precios, anulaciones, permisos y accesos sin depender de nadie, y responder ante un reclamo o una pérdida. | **Fuera de alcance.**<br>• HU-CAP-176: Registrar automáticamente cambios, accesos y lecturas sensibles.<br>• Registros técnicos y errores del sistema: ADR-012 (GlitchTip y registros JSON).<br>• El historial propio de dinero y stock (cobros, cierres, movimientos), que ya está en sus módulos.<br>• Auditoría de cada acción menor (estados de cocina, mensajes de chat). |
 
 ## 03 | CRITERIOS DE ACEPTACIÓN
 
 | N.° | DADO | CUANDO | ENTONCES |
 |---|---|---|---|
-| CA-1 | un cajero | abre la dirección del historial | ve «No tienes acceso» y el servidor no entrega datos (RQ-USR-04-06) |
-| CA-2 | registros de un mes | el administrador filtra «Ana · caja · ANULAR» del 1 al 15 | ve solo esos y puede exportarlos; la exportación también queda registrada (RQ-USR-04-07) |
-| CA-3 | un cambio de parámetros | el administrador abre el registro | ve los dos valores lado a lado y el campo cambiado resaltado (RQ-USR-04-08) |
-| CA-4 | el producto capuchino | el administrador toca «Ver historial» | ve sus cambios de precio, foto y estado en orden (RQ-USR-04-09) |
+| CA-1 | un cajero | abre la dirección del historial | ve «No tienes acceso» y el servidor no entrega datos (RQ-USR-04-08) |
+| CA-2 | registros de un mes | el administrador filtra «Ana · caja · ANULAR» del 1 al 15 | ve solo esos y puede exportarlos; la exportación también queda registrada (RQ-USR-04-09) |
+| CA-3 | un cambio de parámetros | el administrador abre el registro | ve los dos valores lado a lado y el campo cambiado resaltado (RQ-USR-04-10) |
+| CA-4 | el producto capuchino | el administrador toca «Ver historial» | ve sus cambios de precio, foto y estado en orden (RQ-USR-04-11) |
 | CA-5 | un usuario con un rol sin permiso para esta acción (ACT-CAP-009 repartidor) | intenta hacerla desde el menú o escribiendo la dirección de la pantalla | se rechaza en el servidor, no se guarda nada y no se entregan datos (RN-CAP-013, RNF-CAP-006) |
 
-Origen: criterios de verificación de FT-USR-04 (RQ-USR-04-06, RQ-USR-04-07, RQ-USR-04-08, RQ-USR-04-09); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
+Origen: criterios de verificación de FT-USR-04 (RQ-USR-04-08, RQ-USR-04-09, RQ-USR-04-10, RQ-USR-04-11); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
 
 ## 04 | REGLAS, DEPENDENCIAS Y EVIDENCIAS
 
@@ -66,4 +66,4 @@ Origen: criterios de verificación de FT-USR-04 (RQ-USR-04-06, RQ-USR-04-07, RQ-
 
 **DoR: NO READY** hasta cerrar G2 y G3 (y con G0 y G1 aún sin aprobar).
 
-Generado por IA: historia derivada de FT-USR-04 (requerimientos RQ-USR-04-06, RQ-USR-04-07, RQ-USR-04-08, RQ-USR-04-09, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)
+Generado por IA: historia derivada de FT-USR-04 (requerimientos RQ-USR-04-08, RQ-USR-04-09, RQ-USR-04-10, RQ-USR-04-11, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)

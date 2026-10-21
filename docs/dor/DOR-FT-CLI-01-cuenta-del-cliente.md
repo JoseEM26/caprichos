@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-003, FT-CLI-01, HU-CAP-022, HU-CAP-023, HU-CAP-024, HU-CAP-025, ADR-001, ADR-011, ADR-014, ADR-004, ADR-005, ADR-008, FT-CAJ-03, FT-CLI-02, FT-LEG-02, FT-USR-01]
+relacionados: [EP-CAP-003, FT-CLI-01, HU-CAP-022, HU-CAP-023, HU-CAP-024, HU-CAP-025, ADR-001, ADR-011, ADR-014, ADR-004, ADR-005, ADR-008, FT-CAJ-03, FT-CLI-02, FT-LEG-02, FT-USR-01, FT-USR-04]
 tags: [dor, plt-05, clientes, ft-cli-01, g4]
 ---
 
@@ -34,8 +34,8 @@ tags: [dor, plt-05, clientes, ft-cli-01, g4]
 | NEGOCIO | ☑ | Objetivo y valor con KPI | Épica EP-CAP-003 §2 y feature §1 (hipótesis medible) |
 | NEGOCIO | ☐ | Alcance dentro y fuera acordado | Redactado en la feature; falta la firma del PO (DT-48) |
 | NEGOCIO | ☐ | Prioridad y release confirmados | Debería tener · H2 · 01/03/2027 (supuesto, D-19); fechas supuestas hasta D-19 |
-| FUNCIONAL | ☑ | Historias con criterios verificables | 4 historias, 13 criterios Dado/Cuando/Entonces |
-| FUNCIONAL | ☐ | Reglas de negocio documentadas y validadas | Documentadas; abiertas: D-17, D-18 |
+| FUNCIONAL | ☑ | Historias con criterios verificables | 4 historias, 14 criterios Dado/Cuando/Entonces |
+| FUNCIONAL | ☐ | Reglas de negocio documentadas y validadas | Documentadas; abiertas: D-17, D-18, D-28 |
 | FUNCIONAL | ☐ | Estimación por el equipo | Tareas en `backlog/tareas/EP-CAP-003.json` con `estimacion_horas: null` |
 | DISEÑO / UX | ☐ | Prototipos aprobados (DEP-06) | Mockup navegable como referencia (DT-04); Figma o aceptación del mockup pendiente (G2) |
 | DISEÑO / UX | ☐ | Textos y mensajes definidos | Los del mockup; por revisar con Kevin |
@@ -43,7 +43,7 @@ tags: [dor, plt-05, clientes, ft-cli-01, g4]
 | TÉCNICO | ☐ | Contrato de API | Borrador en ARQ-CAP-002 §FT-CLI-01; se aprueba en G3 |
 | TÉCNICO | ☐ | Modelo de datos / DDL | DAT-CAP-001 y `datos/ddl-propuesto.sql` (probado en PostgreSQL 16); sin aprobar (G3) |
 | TÉCNICO | ☐ | RNF y seguridad | RNF-CAP-007, RNF-CAP-008, RNF-CAP-006, RNF-CAP-009; umbrales propuestos (feature §3) |
-| CALIDAD | ☑ | Estrategia y datos de prueba | `pruebas/test-plan.md`: 13 casos TC para estas historias, datos sintéticos |
+| CALIDAD | ☑ | Estrategia y datos de prueba | `pruebas/test-plan.md`: 14 casos TC para estas historias, datos sintéticos |
 | CALIDAD | ☑ | Riesgos con mitigación y dueño | Sección 5 |
 
 ## 2 DIAGRAMA DE DEPENDENCIAS
@@ -62,6 +62,7 @@ flowchart LR
   FT_CLI_02["FT-CLI-02"]:::interna --> FT_CLI_01
   FT_LEG_02["FT-LEG-02"]:::interna --> FT_CLI_01
   FT_USR_01["FT-USR-01"]:::interna --> FT_CLI_01
+  FT_USR_04["FT-USR-04"]:::interna --> FT_CLI_01
   ADR_001["ADR-001"]:::interna -.-> FT_CLI_01
   ADR_011["ADR-011"]:::interna -.-> FT_CLI_01
   ADR_014["ADR-014"]:::interna -.-> FT_CLI_01
@@ -73,9 +74,9 @@ flowchart LR
 ```
 
 - **Ítems evaluados:** FT-CLI-01 y sus historias HU-CAP-022, HU-CAP-023, HU-CAP-024, HU-CAP-025.
-- **Dependencias técnicas:** FT-CAJ-03, FT-CLI-02, FT-LEG-02, FT-USR-01; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-004, ADR-005, ADR-008.
+- **Dependencias técnicas:** FT-CAJ-03, FT-CLI-02, FT-LEG-02, FT-USR-01, FT-USR-04; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-004, ADR-005, ADR-008.
 - **Dependencias externas:** DEP-02, DEP-06.
-- **Decisiones abiertas:** D-17, D-18.
+- **Decisiones abiertas:** D-17, D-18, D-28.
 
 **Bloqueantes**
 
@@ -86,6 +87,7 @@ flowchart LR
 | DEP-02 | Plataforma y hosting (ADR-001, ADR-011) | Técnica | Desarrollo | Antes de G3 | Abierto |
 | D-17 | Decisión pendiente (ver `analisis/decisiones.md`) | Decisión | Kevin | Antes de G4 | Abierto |
 | D-18 | Decisión pendiente (ver `analisis/decisiones.md`) | Decisión | Kevin | Antes de G4 | Abierto |
+| D-28 | Decisión pendiente (ver `analisis/decisiones.md`) | Decisión | Kevin | Antes de G4 | Abierto |
 
 ## 3 MODELADO (DATOS Y PROCESO)
 
@@ -161,7 +163,7 @@ flowchart TB
 
 ☐ READY · Puede ingresar a desarrollo  ☐ READY CON CONDICIONES · ver acuerdos  ☐ NO READY · devolver a refinamiento
 
-**Propuesta IA: NO READY.** Motivos: G0 a G3 sin aprobar (DT-48); ADR ADR-001, ADR-011, ADR-014, ADR-004, ADR-005, ADR-008 propuestos, no aprobados (G3); tareas sin estimar; mockup sin aprobar (G2, DEP-06); decisiones abiertas D-17, D-18. Lo que sí está listo: historias con criterios verificables, casos de prueba 1 a 1, modelo de datos probado y dependencias identificadas. Con las firmas de G2 y G3 y la estimación, pasaría a **READY CON CONDICIONES**. La decisión es del PO.
+**Propuesta IA: NO READY.** Motivos: G0 a G3 sin aprobar (DT-48); ADR ADR-001, ADR-011, ADR-014, ADR-004, ADR-005, ADR-008 propuestos, no aprobados (G3); tareas sin estimar; mockup sin aprobar (G2, DEP-06); decisiones abiertas D-17, D-18, D-28. Lo que sí está listo: historias con criterios verificables, casos de prueba 1 a 1, modelo de datos probado y dependencias identificadas. Con las firmas de G2 y G3 y la estimación, pasaría a **READY CON CONDICIONES**. La decisión es del PO.
 
 | Rol | Nombre | Fecha | Firma |
 | --- | --- | --- | --- |

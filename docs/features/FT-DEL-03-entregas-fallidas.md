@@ -93,12 +93,12 @@ Decisiones técnicas que la rigen (ADR propuestos, G3): ADR-001, ADR-011, ADR-01
 
 **Fuera de alcance**
 
-- Mensajes automáticos del bot para la coordinación (se hace a mano por WhatsApp en la primera versión).
+- Avisos automáticos al salir y al llegar: FT-DEL-02 (DT-60). La coordinación después de una entrega fallida se hace a mano por WhatsApp en la primera versión.
 - Merma de reparto en el stock: FT-ALM-03.
 
 **Preguntas abiertas**
 
-1. **Tiempos e intentos por defecto** — propuesta: 2 intentos o 10 minutos (por confirmar con Kevin).
+1. **Tiempos e intentos por defecto** — el acta 03 fija una espera máxima de 10 minutos desde «He llegado» (DT-60); propuesta: 2 intentos.
 2. **¿Quién paga el recargo de reprogramación?** Pendiente de Kevin.
 
 ---

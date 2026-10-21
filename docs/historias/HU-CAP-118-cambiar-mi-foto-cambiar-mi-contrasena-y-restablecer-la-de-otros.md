@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-013, FT-USR-01, RQ-USR-01-08, RQ-USR-01-09, RQ-USR-01-12, RQ-USR-01-14, HU-CAP-116, HU-CAP-117, ADR-001, ADR-011, ADR-014, ADR-004, ADR-008, D-17, DEP-02, DEP-06, R-01, R-11]
+relacionados: [EP-CAP-013, FT-USR-01, RQ-USR-01-08, RQ-USR-01-09, RQ-USR-01-12, RQ-USR-01-17, HU-CAP-116, HU-CAP-117, HU-CAP-201, ADR-001, ADR-011, ADR-014, ADR-004, ADR-008, D-17, DEP-02, DEP-06, R-01, R-11]
 tags: [hu, usuarios, capa-a, ft-usr-01, alta, ui]
 ---
 
@@ -32,8 +32,8 @@ tags: [hu, usuarios, capa-a, ft-usr-01, alta, ui]
 
 | CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
 |---|---|
-| **Contexto.** Historia de FT-USR-01 «Usuarios y primer ingreso» (Debe tener, épica EP-CAP-013). Cubre los requerimientos: **RQ-USR-01-08** Todos cambian su foto; solo el administrador edita datos personales y rol. **RQ-USR-01-09** El administrador restablece la contraseña de un usuario a la inicial. **RQ-USR-01-12** Solo el administrador restablece la contraseña de un usuario a la inicial, con confirmación Sí/No; ningún otro rol ve el botón ni puede llamar a la acción, y queda en el Historial de acciones. **RQ-USR-01-14** Para cambiar su propia contraseña, el usuario confirma que es él: escribe primero su contraseña actual; sin eso no se cambia, y el cambio queda en el Historial de acciones. | **Alcance.**<br>• Todos cambian su foto; solo el administrador edita datos personales y rol.<br>• El administrador restablece la contraseña de un usuario a la inicial.<br>• Solo el administrador restablece la contraseña de un usuario a la inicial, con confirmación Sí/No; ningún otro rol ve el botón ni puede llamar a la acción, y queda en el Historial de acciones.<br>• Para cambiar su propia contraseña, el usuario confirma que es él: escribe primero su contraseña actual; sin eso no se cambia, y el cambio queda en el Historial de acciones. |
-| **Problema.** Cada persona entra con su propio usuario, sin compartir claves, y el dueño sabe quién hizo qué. | **Fuera de alcance.**<br>• HU-CAP-116: Dar de alta y desactivar a un usuario.<br>• HU-CAP-117: Crear mi contraseña en el primer ingreso.<br>• Roles, permisos y escritorio: FT-USR-02.<br>• Crédito del personal: FT-USR-03.<br>• Registro de asistencia (horizonte futuro).<br>• Ingreso con Google o con código por SMS (no pedido). |
+| **Contexto.** Historia de FT-USR-01 «Usuarios y primer ingreso» (Debe tener, épica EP-CAP-013). Cubre los requerimientos: **RQ-USR-01-08** Todos cambian su foto; solo el administrador edita datos personales y rol. **RQ-USR-01-09** El administrador restablece la contraseña de un usuario a la inicial. **RQ-USR-01-12** Solo el administrador restablece la contraseña de un usuario a la inicial, con confirmación Sí/No; ningún otro rol ve el botón ni puede llamar a la acción, y queda en el Historial de acciones. **RQ-USR-01-17** Para cambiar su propia contraseña, el usuario confirma que es él: escribe primero su contraseña actual; sin eso no se cambia, y el cambio queda en el Historial de acciones. | **Alcance.**<br>• Todos cambian su foto; solo el administrador edita datos personales y rol.<br>• El administrador restablece la contraseña de un usuario a la inicial.<br>• Solo el administrador restablece la contraseña de un usuario a la inicial, con confirmación Sí/No; ningún otro rol ve el botón ni puede llamar a la acción, y queda en el Historial de acciones.<br>• Para cambiar su propia contraseña, el usuario confirma que es él: escribe primero su contraseña actual; sin eso no se cambia, y el cambio queda en el Historial de acciones. |
+| **Problema.** Cada persona entra con su propio usuario, sin compartir claves, y el dueño sabe quién hizo qué. | **Fuera de alcance.**<br>• HU-CAP-116: Dar de alta y desactivar a un usuario.<br>• HU-CAP-117: Crear mi contraseña en el primer ingreso.<br>• HU-CAP-201: Definir los días y horas de trabajo de cada persona y quién cubre un descanso.<br>• Roles, permisos y escritorio: FT-USR-02.<br>• Crédito del personal: FT-USR-03.<br>• Registro de asistencia (horizonte futuro).<br>• Ingreso con Google o con código por SMS (no pedido). |
 
 ## 03 | CRITERIOS DE ACEPTACIÓN
 
@@ -42,11 +42,11 @@ tags: [hu, usuarios, capa-a, ft-usr-01, alta, ui]
 | CA-1 | un mozo en Mi perfil | lo abre | puede cambiar su foto y su contraseña, y su nombre, DNI y rol aparecen bloqueados (RQ-USR-01-08) |
 | CA-2 | un usuario que olvidó su contraseña | el administrador la restablece con Sí/No | vuelve a la inicial y se le pide crear una nueva al entrar (RQ-USR-01-09) |
 | CA-3 | una cajera que olvidó su contraseña | el administrador pulsa «Restablecer contraseña» en su ficha y responde «Sí» | su contraseña vuelve a la inicial, al entrar el sistema le exige crear una nueva y el historial registra quién la restableció; dado un mozo que intenta la misma acción por la API, entonces recibe 403 y nada cambia (RQ-USR-01-12) |
-| CA-4 | un mozo en Mi perfil | pulsa «Cambiar mi contraseña» y deja vacía la actual o escribe una equivocada | no se cambia y ve un aviso; con la actual correcta y una nueva válida (6 o más caracteres, distinta de la inicial y de la actual, escrita dos veces igual), entonces se cambia y queda registrado (RQ-USR-01-14) |
+| CA-4 | un mozo en Mi perfil | pulsa «Cambiar mi contraseña» y deja vacía la actual o escribe una equivocada | no se cambia y ve un aviso; con la actual correcta y una nueva válida (6 o más caracteres, distinta de la inicial y de la actual, escrita dos veces igual), entonces se cambia y queda registrado (RQ-USR-01-17) |
 | CA-5 | un usuario con un rol sin permiso para esta acción (ACT-CAP-004 mozo) | intenta hacerla desde el menú o escribiendo la dirección de la pantalla | se rechaza en el servidor, no se guarda nada y no se entregan datos (RN-CAP-013, RNF-CAP-006) |
 | CA-6 | la confirmación Sí/No de la acción | quien la hace responde «No» | no cambia nada y la pantalla queda como estaba (RN-CAP-015, RNF-CAP-012) |
 
-Origen: criterios de verificación de FT-USR-01 (RQ-USR-01-08, RQ-USR-01-09, RQ-USR-01-12, RQ-USR-01-14); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
+Origen: criterios de verificación de FT-USR-01 (RQ-USR-01-08, RQ-USR-01-09, RQ-USR-01-12, RQ-USR-01-17); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
 
 ## 04 | REGLAS, DEPENDENCIAS Y EVIDENCIAS
 
@@ -67,4 +67,4 @@ Origen: criterios de verificación de FT-USR-01 (RQ-USR-01-08, RQ-USR-01-09, RQ-
 
 **DoR: NO READY** hasta cerrar G2 y G3 (y con G0 y G1 aún sin aprobar).
 
-Generado por IA: historia derivada de FT-USR-01 (requerimientos RQ-USR-01-08, RQ-USR-01-09, RQ-USR-01-12, RQ-USR-01-14, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)
+Generado por IA: historia derivada de FT-USR-01 (requerimientos RQ-USR-01-08, RQ-USR-01-09, RQ-USR-01-12, RQ-USR-01-17, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)

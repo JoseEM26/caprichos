@@ -41,13 +41,15 @@ tags: [ofertas, plt-03, ep-cap-012, ft-ofe-01, deberia-tener]
 | RQ-OFE-01-01 | El administrador crea un combo con nombre, precio por tamaño y partes. | Debería tener | NEC-CAP-066 | Dado el formulario, cuando crea «Dúo Frappé» con 2 frappés a elección y precio regular S/ 22 y grande S/ 26, entonces el combo queda guardado inactivo hasta publicarlo. | Propuesto |
 | RQ-OFE-01-02 | Una parte puede ser productos a elección de categorías, una opción entre varias o un producto fijo. | Debería tener | NEC-CAP-066 | Dado un combo, cuando una parte es «1 postre de la categoría Postres» y otra «Americano fijo», entonces la carta pide elegir el postre y el Americano viene incluido. | Propuesto |
 | RQ-OFE-01-03 | El nombre de un combo no puede repetir el de un producto. | Debería tener | RN-CAP-085 (2.ª) | Dado el producto «Frappé Oreo», cuando se intenta crear un combo con ese nombre, entonces no se acepta. | Propuesto |
-| RQ-OFE-01-04 | Se crea una promoción «lleva N, paga M» con su contenido limitado. | Debería tener | NEC-CAP-109 | Dada una 3x2 en donas, cuando el cliente lleva 3 donas, entonces se descuenta la más barata; con 2 donas no aplica y se avisa «Lleva 1 más y paga 2». | Propuesto |
+| RQ-OFE-01-04 | Se crea una promoción «lleva N, paga M» de un producto, con el precio que fija el administrador. | Debería tener | NEC-CAP-109 · Acta 03 | Dada una 3x2 en donas, cuando el cliente lleva 3 donas, entonces se descuenta la más barata; con 2 donas no aplica y se avisa «Lleva 1 más y paga 2». | Propuesto |
 | RQ-OFE-01-05 | Las ofertas comparten una vigencia opcional: días, horas, fechas, canal y límite. | Debería tener | NEC-CAP-068 · RN-CAP-070 | Dado un combo vigente de lunes a viernes de 15:00 a 18:00 solo en la carta, cuando un cliente lo busca un sábado o en el chatbot, entonces no aparece. | Propuesto |
-| RQ-OFE-01-06 | Un combo fuera de su vigencia no se ofrece en la carta ni en Nuevo pedido. | Debería tener | NEC-CAP-068 | Dado un combo cuya fecha terminó ayer, cuando el cajero abre Nuevo pedido, entonces no aparece. | Propuesto |
-| RQ-OFE-01-07 | Un combo sigue a la venta si falta un componente: se elige otro de la misma categoría. | Debería tener | RN-CAP-034 · RN-CAP-055 | Dado un combo con el postre «Brownie» agotado, cuando el cliente lo arma, entonces el brownie aparece apagado y puede elegir otro postre de la categoría. | Propuesto |
-| RQ-OFE-01-08 | Al venderse, se registra el combo y cada parte se descuenta y va a su área. | Debería tener | RN-CAP-085 (2.ª) · RN-CAP-035 | Dado un combo vendido, cuando pasa a cocina, entonces cada parte va a su área y se descuenta por separado (FT-STK-03), y el informe cuenta el combo. | Propuesto |
-| RQ-OFE-01-09 | Las ofertas se desactivan, se ordenan y no se eliminan. | Debería tener | RN-CAP-014 | Dada una oferta, cuando el administrador la desactiva con Sí/No, entonces deja de mostrarse y conserva sus ventas. | Propuesto |
-| RQ-OFE-01-10 | El administrador ve una vista previa de cómo se verá la oferta en la carta. | Podría tener | NEC-CAP-011 | Dado un combo nuevo, cuando toca «Vista previa», entonces lo ve como tarjeta y ficha de la carta antes de publicarlo. | Propuesto |
+| RQ-OFE-01-06 | Una oferta con límite de usos se desactiva sola al llegar al límite. | Debería tener | NEC-CAP-068 · Acta 03 | Dada una 2×1 limitada a los 10 primeros pedidos, cuando se vende la décima, entonces deja de ofrecerse en todos los canales y queda «Agotada por límite». | Propuesto |
+| RQ-OFE-01-07 | Una oferta se puede marcar «No suma puntos ni aplica cupones». | Debería tener | DT-65 · Acta 03 | Dada una 2×1 de frappé marcada «No suma puntos ni aplica cupones», cuando un cliente con cuenta la compra, entonces esa línea no suma puntos y no se le puede aplicar un cupón (FT-CLI-02, FT-OFE-03). | Propuesto |
+| RQ-OFE-01-08 | Un combo fuera de su vigencia no se ofrece en la carta ni en Nuevo pedido. | Debería tener | NEC-CAP-068 | Dado un combo cuya fecha terminó ayer, cuando el cajero abre Nuevo pedido, entonces no aparece. | Propuesto |
+| RQ-OFE-01-09 | Un combo sigue a la venta si falta un componente: se elige otro de la misma categoría. | Debería tener | RN-CAP-034 · RN-CAP-055 | Dado un combo con el postre «Brownie» agotado, cuando el cliente lo arma, entonces el brownie aparece apagado y puede elegir otro postre de la categoría. | Propuesto |
+| RQ-OFE-01-10 | Al venderse, se registra el combo y cada parte se descuenta y va a su área. | Debería tener | RN-CAP-085 (2.ª) · RN-CAP-035 | Dado un combo vendido, cuando pasa a cocina, entonces cada parte va a su área y se descuenta por separado (FT-STK-03), y el informe cuenta el combo. | Propuesto |
+| RQ-OFE-01-11 | Las ofertas se desactivan, se ordenan y no se eliminan. | Debería tener | RN-CAP-014 | Dada una oferta, cuando el administrador la desactiva con Sí/No, entonces deja de mostrarse y conserva sus ventas. | Propuesto |
+| RQ-OFE-01-12 | El administrador ve una vista previa de cómo se verá la oferta en la carta. | Podría tener | NEC-CAP-011 | Dado un combo nuevo, cuando toca «Vista previa», entonces lo ve como tarjeta y ficha de la carta antes de publicarlo. | Propuesto |
 
 Prioridad *Debería tener* por la épica; los combos básicos de la carta oficial (Dúo) ya se muestran en la fase Ahora con FT-CAR-01. Todos nacen *Propuesto* hasta que el PO los apruebe (DT-48).
 
@@ -71,6 +73,7 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RN-CAP-070 | Una promoción vale solo en sus días, horas, fechas y canales. | Pedido del 17/10 |
 | RN-CAP-085 (2.ª) | Se descuenta cada producto del combo y se registra el combo; el nombre no repite un producto (id repetido, O1). | Reunión del 18/10 |
 | RN-CAP-128 | En las promociones el nombre se sugiere a partir de sus componentes. | Productos, Ofertas |
+| DT-65 | Un producto o una promoción puede marcarse «No suma puntos ni aplica cupones». | Acta 03 · decisiones.md |
 
 ## 5. Trazabilidad y planificación
 
@@ -82,10 +85,12 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RQ-OFE-01-04 | HU-CAP-106 | — | R-01 |
 | RQ-OFE-01-05 | HU-CAP-107 | — | R-01 |
 | RQ-OFE-01-06 | HU-CAP-107 | — | R-01 |
-| RQ-OFE-01-07 | HU-CAP-106 | FT-COC-03 | R-01 |
-| RQ-OFE-01-08 | HU-CAP-108 | FT-COC-01 · FT-STK-03 | R-01 |
-| RQ-OFE-01-09 | HU-CAP-108 | — | R-01 |
-| RQ-OFE-01-10 | HU-CAP-108 | FT-CON-02 | R-01 |
+| RQ-OFE-01-07 | HU-CAP-107 | FT-CLI-02 | R-01 |
+| RQ-OFE-01-08 | HU-CAP-107 | — | R-01 |
+| RQ-OFE-01-09 | HU-CAP-106 | FT-COC-03 | R-01 |
+| RQ-OFE-01-10 | HU-CAP-108 | FT-COC-01 · FT-STK-03 | R-01 |
+| RQ-OFE-01-11 | HU-CAP-108 | — | R-01 |
+| RQ-OFE-01-12 | HU-CAP-108 | FT-CON-02 | R-01 |
 
 Historias de usuario de esta feature (en `historias/`, en draft):
 

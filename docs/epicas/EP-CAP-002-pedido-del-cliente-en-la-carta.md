@@ -35,7 +35,7 @@ Hoy un pedido hecho en la web o en WhatsApp no pasa de forma ordenada por caja n
 **Usuarios / segmentos**
 
 - ACT-CAP-006: clientes que piden delivery o para recoger
-- ACT-CAP-002: cajero/a, que recibe el pedido como «por confirmar»
+- ACT-CAP-002: cajero/a, que ve el pedido con el pago por coordinar y lo cobra o anula (DT-57)
 
 **Evidencia**
 
@@ -77,7 +77,7 @@ Las metas marcadas «(propuesta)» son de la IA y las fija el dueño; las línea
 - Ubicación actual con mapa y enlace, o dirección escrita si el cliente no la da (NEC-CAP-049, NEC-CAP-092).
 - Costo de envío por zona calculado solo, envío gratis y pedido mínimo (RN-CAP-103).
 - Medios de pago visibles: Yape, Plin, efectivo con vuelto, tarjeta y transferencia, sin cobrar en la web (DT-17).
-- El pedido llega a caja como «por confirmar» y el chatbot escribe al cliente (NEC-CAP-086, RN-CAP-043).
+- El pedido pasa directo a las comandas, aparece en caja con el pago por coordinar y al cliente le llega un mensaje automático por WhatsApp (NEC-CAP-086, RN-CAP-043, DT-57).
 
 **Fuera de alcance (OUT)**
 
@@ -92,7 +92,7 @@ Las metas marcadas «(propuesta)» son de la IA y las fija el dueño; las línea
 | --- | --- | --- | --- |
 | FT-PED-01 | Carrito, modalidad y datos mínimos | Debe tener | Redactada en draft: [`FT-PED-01-carrito-modalidad-y-datos-minimos.md`](../features/FT-PED-01-carrito-modalidad-y-datos-minimos.md) |
 | FT-PED-02 | Ubicación y costo de envío en la carta | Debe tener | Redactada en draft: [`FT-PED-02-ubicacion-y-costo-de-envio-en-la-carta.md`](../features/FT-PED-02-ubicacion-y-costo-de-envio-en-la-carta.md) |
-| FT-PED-03 | Envío del pedido a caja y aviso al cliente | Debe tener | Redactada en draft: [`FT-PED-03-envio-del-pedido-a-caja-y-aviso-al-cliente.md`](../features/FT-PED-03-envio-del-pedido-a-caja-y-aviso-al-cliente.md) |
+| FT-PED-03 | Envío del pedido a comandas y aviso al cliente | Debe tener | Redactada en draft: [`FT-PED-03-envio-del-pedido-a-caja-y-aviso-al-cliente.md`](../features/FT-PED-03-envio-del-pedido-a-caja-y-aviso-al-cliente.md) |
 
 **Supuestos**
 
@@ -112,7 +112,7 @@ Las metas marcadas «(propuesta)» son de la IA y las fija el dueño; las línea
 
 **Criterios de éxito / salida**
 
-- Un pedido de prueba hecho en la carta llega a la cola de caja como «por confirmar» con todos sus datos.
+- Un pedido de prueba hecho en la carta aparece en las pantallas de cocina y en caja con todos sus datos, sin pasar por «por confirmar» (DT-57).
 - Un cliente que niega el permiso de ubicación termina su pedido escribiendo la dirección.
 - El envío se calcula solo según la zona y respeta el envío gratis.
 

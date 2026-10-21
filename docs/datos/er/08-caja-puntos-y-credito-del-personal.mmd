@@ -48,7 +48,18 @@ erDiagram
   CIERRE_CAJA {
     bigint caja_id PK,FK
     jsonb conteo
+    text resultado
+    bigint aprobado_por
     text nota
+  }
+  CONTEO_CIERRE {
+    bigint caja_id PK,FK
+    smallint intento PK
+    jsonb conteo
+    jsonb medios
+    text resultado
+    bigint por
+    timestamptz en
   }
   CIERRE_MEDIO {
     bigint caja_id PK,FK
@@ -60,7 +71,7 @@ erDiagram
   CONSUMO_PERSONAL {
     bigint id PK
     bigint party_id FK
-    char anio_mes
+    date fecha
     bigint pedido_id FK,UK
     numeric monto
   }
@@ -68,7 +79,7 @@ erDiagram
     bigint id PK
     bigint party_id FK
     bigint pedido_id FK
-    int puntos
+    numeric puntos
     text tipo
     timestamptz en
   }
@@ -79,6 +90,7 @@ erDiagram
     bigint id PK "en otro dominio"
   }
   CAJA ||--o{ COBRO : "caja_id"
+  CAJA ||--o{ CONTEO_CIERRE : "caja_id"
   CAJA ||--o{ LIQUIDACION : "caja_id"
   CAJA ||--o{ MOVIMIENTO_CAJA : "caja_id"
   CAJA ||--o| CIERRE_CAJA : "caja_id"

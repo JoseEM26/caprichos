@@ -1,24 +1,24 @@
 ---
 id: FT-PED-03
 tipo: spec
-titulo: "Envío del pedido a caja y aviso al cliente"
+titulo: "Envío del pedido a comandas y aviso al cliente"
 estado: draft
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-002, FT-PED-01, FT-CAJ-01, FT-BOT-02, FT-INF-03, ADR-001, ADR-011, ADR-014, ADR-003, ADR-005, ADR-009, ADR-010, NEC-CAP-001, NEC-CAP-086, NEC-CAP-090, RN-CAP-043, RN-CAP-074]
+relacionados: [EP-CAP-002, FT-PED-01, FT-CAJ-01, FT-BOT-02, FT-INF-03, ADR-001, ADR-011, ADR-014, ADR-003, ADR-005, ADR-009, ADR-010, NEC-CAP-001, NEC-CAP-086, NEC-CAP-090, RN-CAP-043, RN-CAP-074, DT-57]
 tags: [pedido, plt-03, ep-cap-002, ft-ped-03, debe-tener]
 ---
 
-# FT-PED-03 — Envío del pedido a caja y aviso al cliente
+# FT-PED-03 — Envío del pedido a comandas y aviso al cliente
 
 **PLT-03 · Feature · Catálogo de requerimientos** · Frente PEDIDO · Caprichos · ticket *(pendiente — R13, D-14)*
 
 | ID FEATURE | NOMBRE | ÉPICA PADRE |
 |---|---|---|
-| FT-PED-03 | Envío del pedido a caja y aviso al cliente | EP-CAP-002 Pedido del cliente en la carta |
+| FT-PED-03 | Envío del pedido a comandas y aviso al cliente | EP-CAP-002 Pedido del cliente en la carta |
 | **PRODUCT OWNER** | **PRIORIDAD** | **ESTADO** |
 | José Ángel Espinoza (DT-48) | **Debe tener** (NEC-CAP-001 · NEC-CAP-086) | Refinamiento |
 | **RELEASE OBJETIVO** | **ESTIMACIÓN (T-SHIRT)** | **FECHA / VERSIÓN** |
@@ -26,9 +26,9 @@ tags: [pedido, plt-03, ep-cap-002, ft-ped-03, debe-tener]
 
 ## 1. Descripción y valor
 
-**Descripción.** Al enviar, el pedido de la carta llega a la cola de Pedidos y caja con estado **«por confirmar»** y un código corto; no pasa a cocina (RN-CAP-074). El cliente ve una pantalla de confirmación con el código, el resumen y el mensaje de que un asesor le escribirá por WhatsApp; también un botón para escribir él mismo al WhatsApp del local con el resumen ya armado. En el administrativo suena un aviso y aparece una notificación. Cuando el chatbot esté activo (FT-BOT-02), el bot escribe primero al teléfono del cliente con el resumen del pedido (RN-CAP-043, RN-CAP-081). Si el pedido no se atiende en un tiempo configurable, caja recibe un recordatorio; nunca se anula solo (D-05).
+**Descripción.** Al enviar, el pedido de la carta **pasa directo a las comandas** (DT-57, acta 03): cada parte aparece en la pantalla de su área y se imprime su comanda, sin esperar la confirmación de caja ni la captura de pago. Esto **reemplaza para la carta** la regla de «por confirmar» (RN-CAP-074). El pedido aparece también en Pedidos y caja, con un código corto, para que el asesor coordine el pago por WhatsApp y caja lo cobre. Al cliente le llega un **mensaje automático al WhatsApp** con el resumen y el método de pago elegido (RN-CAP-043, RN-CAP-081), y ve una pantalla de confirmación con el código, el resumen y un botón para escribir él mismo al WhatsApp del local. En el administrativo suena un aviso y aparece una notificación. Si el cliente nunca paga, caja anula el pedido con motivo y el PIN de la supervisora (DT-61); nunca se anula solo.
 
-**Beneficio esperado.** Ningún pedido de la carta se reescribe a mano y todos pasan por una persona antes de cocinar. Contribuye a NEC-CAP-001 y OBJ-CAP-001. Hipótesis medible: **0 pedidos de la carta reescritos a mano** y **95 % de los pedidos por confirmar atendidos en 5 minutos** (propuesta, D-05).
+**Beneficio esperado.** Ningún pedido de la carta se reescribe a mano y cocina empieza apenas el cliente envía, sin que el personal tenga que pasar cada pedido. Contribuye a NEC-CAP-001 y OBJ-CAP-001. Hipótesis medible: **0 pedidos de la carta reescritos a mano** y **100 % de los pedidos de la carta en las pantallas de cocina en menos de 5 segundos** (propuesta); se mide además cuántos se anulan por falta de pago (riesgo de D-26).
 
 **Usuarios / roles.** ACT-CAP-006 Clientes (reciben la confirmación) · ACT-CAP-002 Cajero/a (recibe el pedido en la cola) · Chatbot de WhatsApp, sistema (escribe al cliente cuando está activo).
 
@@ -38,17 +38,17 @@ tags: [pedido, plt-03, ep-cap-002, ft-ped-03, debe-tener]
 
 | ID | Requerimiento | Prioridad | Origen | Criterio de verificación | Estado |
 | --- | --- | --- | --- | --- | --- |
-| RQ-PED-03-01 | Al enviar, el pedido queda «por confirmar» en la cola de caja, con código, canal «Carta» y todos sus datos. | Debe tener | NEC-CAP-086 · RN-CAP-074 | Dado un carrito válido, cuando el cliente envía, entonces aparece en Pedidos y caja como «por confirmar», con código, productos, opciones, notas, modalidad, ubicación, pago preferido y total. | Propuesto |
-| RQ-PED-03-02 | Un pedido «por confirmar» no aparece en cocina ni se imprime. | Debe tener | RN-CAP-001 · RN-CAP-019 | Dado un pedido recién enviado desde la carta, cuando se revisan las pantallas de cocina y las ticketeras, entonces no hay rastro del pedido. | Propuesto |
+| RQ-PED-03-01 | Al enviar, el pedido pasa directo a las comandas con código, canal «Carta» y todos sus datos, sin esperar a caja. | Debe tener | NEC-CAP-086 · DT-57 | Dado un carrito válido, cuando el cliente envía, entonces cada parte aparece en la pantalla de su área y se imprime su comanda, y el pedido figura en Pedidos y caja como «en cocina, pago por coordinar» con código, productos, opciones, notas, modalidad, ubicación, método de pago y total. | Propuesto |
+| RQ-PED-03-02 | Caja ve los pedidos de la carta con el pago por coordinar y los cobra o anula; un pedido de la carta no se anula solo. | Debe tener | DT-57 · DT-61 | Dado un pedido de la carta sin pagar, cuando el asesor confirma el pago por WhatsApp, entonces caja lo marca cobrado; si el cliente no paga, caja lo anula con motivo y PIN de la supervisora y cocina lo ve anulado. | Propuesto |
 | RQ-PED-03-03 | El cliente ve la confirmación con su código, el resumen y que un asesor le escribirá. | Debe tener | RN-CAP-076 | Dado el pedido enviado, cuando termina el envío, entonces el cliente ve «Pedido N.º ABC123 recibido», el resumen y el mensaje del asesor por WhatsApp. | Propuesto |
 | RQ-PED-03-04 | El cliente puede abrir WhatsApp del local con el resumen del pedido ya escrito. | Debería tener | RN-CAP-081 | Dada la confirmación, cuando el cliente toca «Escribir por WhatsApp», entonces se abre un chat con el número del local y un mensaje con código, productos, opciones, nota, entrega, total y pago preferido. | Propuesto |
 | RQ-PED-03-05 | El administrativo avisa con sonido y notificación al llegar un pedido de la carta. | Debe tener | NEC-CAP-086 · NEC-CAP-028 | Dado un usuario de caja con la sesión abierta, cuando entra un pedido de la carta, entonces suena un aviso y la campanita suma una notificación que abre el pedido. | Propuesto |
-| RQ-PED-03-06 | Con el chatbot activo, el bot escribe al cliente con el resumen del pedido. | Debería tener | RN-CAP-043 · NEC-CAP-090 | Dado el chatbot activo, cuando entra un pedido de la carta, entonces el bot envía al teléfono del cliente la plantilla con el resumen y le pregunta cómo pagará (FT-BOT-02). | Propuesto |
-| RQ-PED-03-07 | Un pedido sin atender recibe un recordatorio a caja a los N minutos y nunca se anula solo. | Debe tener | D-05 · RN-CAP-112 | Dado un plazo de 5 minutos, cuando un pedido sigue «por confirmar» a los 5 minutos, entonces caja recibe un recordatorio; a los 30 minutos sigue en la cola sin anularse. | Propuesto |
+| RQ-PED-03-06 | Al enviar, llega un mensaje automático al WhatsApp del cliente con el resumen y el método de pago elegido. | Debería tener | RN-CAP-043 · NEC-CAP-090 · DT-57 | Dado el acceso a WhatsApp configurado, cuando entra un pedido de la carta, entonces el número del local envía al teléfono del cliente «Recibimos tu pedido» con el código, los productos, el total y el método de pago; el asesor sigue la conversación para pedir la captura. | Propuesto |
+| RQ-PED-03-07 | Un pedido de la carta sin pago coordinado recibe un recordatorio a caja a los N minutos. | Debe tener | D-05 · RN-CAP-112 · DT-57 | Dado un plazo de 5 minutos, cuando un pedido de la carta sigue con el pago por coordinar a los 5 minutos, entonces caja recibe un recordatorio; a los 30 minutos sigue sin anularse. | Propuesto |
 | RQ-PED-03-08 | El envío vuelve a comprobar horario, pausa y disponibilidad antes de registrar el pedido. | Debe tener | NEC-CAP-085 | Dada la pausa activada mientras el cliente confirmaba, cuando envía, entonces el pedido no se registra y el cliente ve el motivo (FT-CAR-02). | Propuesto |
 | RQ-PED-03-09 | Un pedido no se registra dos veces si el cliente toca enviar dos veces o se corta la conexión. | Debe tener | Propuesta (calidad) | Dado un doble toque en «Enviar», cuando llegan las dos solicitudes, entonces queda un solo pedido con un solo código. | Propuesto |
 
-Prioridad por NEC-CAP-001 y NEC-CAP-086. RQ-PED-03-06 depende del acceso a WhatsApp (DEP-12), por eso es *Debería tener* en la fase Ahora y se completa con FT-BOT-02. RQ-PED-03-09 es derivado (calidad) y se propone. Todos nacen *Propuesto* hasta que el PO los apruebe (DT-48).
+Prioridad por NEC-CAP-001 y NEC-CAP-086. RQ-PED-03-01 y 02 aplican DT-57 (acta 03), que reemplaza para la carta el paso «por confirmar»; si D-26 extiende la regla al chatbot, se ajusta FT-BOT-02. RQ-PED-03-06 depende del acceso a WhatsApp (DEP-12), por eso es *Debería tener* en la fase Ahora. RQ-PED-03-09 es derivado (calidad) y se propone. Todos nacen *Propuesto* hasta que el PO los apruebe (DT-48).
 
 ## 3. Requerimientos no funcionales
 
@@ -65,9 +65,10 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 
 | ID | Regla | Fuente |
 | --- | --- | --- |
-| RN-CAP-001 | Un pedido fuera del local no pasa a cocina hasta que una persona lo confirma. | Acta 01 y 18/10 |
+| DT-57 | El pedido de la carta pasa directo a las comandas; la captura la pide el asesor por WhatsApp; reemplaza RN-CAP-001 y RN-CAP-074 para la carta. | Acta 03 · decisiones.md |
+| RN-CAP-001 | Un pedido fuera del local no pasa a cocina hasta que una persona lo confirma (para la carta, reemplazada por DT-57). | Acta 01 y 18/10 |
 | RN-CAP-043 | Al entrar un pedido por la web, el chatbot escribe al teléfono del cliente. | Acta 02 |
-| RN-CAP-074 | Un pedido fuera del local llega «por confirmar» y no aparece en cocina hasta confirmarse. | Reunión del 18/10 |
+| RN-CAP-074 | Un pedido fuera del local llega «por confirmar» y no aparece en cocina hasta confirmarse (para la carta, reemplazada por DT-57). | Reunión del 18/10 |
 | RN-CAP-081 (1.ª) | El mensaje al cliente incluye el resumen completo, no solo código y total (id repetido, O1). | Reunión del 18/10 |
 | RN-CAP-100 | El primer mensaje del bot es plantilla y se cobra; las respuestas en 24 horas son gratis. | Costos |
 | RN-CAP-112 | Pendiente de Kevin el plazo de espera de un pedido por confirmar. | Decisiones |
@@ -76,8 +77,8 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 
 | Requerimiento | Historias de usuario | Dependencia | Riesgo |
 | --- | --- | --- | --- |
-| RQ-PED-03-01 | HU-CAP-019 | FT-CAJ-01 | R-01 |
-| RQ-PED-03-02 | HU-CAP-019 | — | R-01 |
+| RQ-PED-03-01 | HU-CAP-019 | FT-COC-01 · FT-CAJ-01 · D-26 | R-01 |
+| RQ-PED-03-02 | HU-CAP-019 | FT-CAJ-02 · D-26 | R-01 |
 | RQ-PED-03-03 | HU-CAP-020 | — | R-01 |
 | RQ-PED-03-04 | HU-CAP-020 | FT-CFG-01 (número de WhatsApp) | R-01 |
 | RQ-PED-03-05 | HU-CAP-021 | FT-INF-03 | R-01 |
@@ -102,9 +103,10 @@ Decisiones técnicas que la rigen (ADR propuestos, G3): ADR-001, ADR-011, ADR-01
 
 **Preguntas abiertas**
 
-1. **Plazo para el recordatorio** — D-05. Propuesta: 5 minutos, configurable; nunca anular solo.
-2. **Costo de la plantilla de WhatsApp** — D-08 y DEP-12.
+1. **¿Vale también para el chatbot y qué pasa si el cliente no paga?** — D-26. Propuesta: igual en la carta y en el bot; si no paga, caja anula con motivo y PIN.
+2. **Plazo para el recordatorio** — D-05. Propuesta: 5 minutos, configurable; nunca anular solo.
+3. **Costo de la plantilla de WhatsApp** — D-08 y DEP-12.
 
 ---
 
-Generado por IA: BRD (NEC-CAP-001, 028, 085, 086, 090; RN-CAP-001, 019, 043, 074, 076, 081, 100, 112), decisiones D-05 y D-08 y el mockup — Revisado por: *(pendiente)*
+Generado por IA: BRD (NEC-CAP-001, 028, 085, 086, 090; RN-CAP-001, 019, 043, 074, 076, 081, 100, 112), decisiones DT-57, DT-61, D-05, D-08 y D-26, acta 03 y el mockup — Revisado por: *(pendiente)*

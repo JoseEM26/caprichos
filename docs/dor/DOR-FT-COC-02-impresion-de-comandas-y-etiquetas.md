@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-006, FT-COC-02, HU-CAP-051, HU-CAP-052, HU-CAP-053, HU-CAP-054, ADR-001, ADR-011, ADR-014, ADR-002, ADR-006, ADR-007, FT-CFG-02, FT-COC-01]
+relacionados: [EP-CAP-006, FT-COC-02, HU-CAP-051, HU-CAP-052, HU-CAP-053, HU-CAP-054, ADR-001, ADR-011, ADR-014, ADR-002, ADR-006, ADR-007, FT-CAR-01, FT-CFG-02, FT-COC-01, FT-PED-03]
 tags: [dor, plt-05, cocina, ft-coc-02, g4]
 ---
 
@@ -58,8 +58,10 @@ flowchart LR
   HU_CAP_052["HU-CAP-052"]:::evaluado --> FT_COC_02
   HU_CAP_053["HU-CAP-053"]:::evaluado --> FT_COC_02
   HU_CAP_054["HU-CAP-054"]:::evaluado --> FT_COC_02
+  FT_CAR_01["FT-CAR-01"]:::interna --> FT_COC_02
   FT_CFG_02["FT-CFG-02"]:::interna --> FT_COC_02
   FT_COC_01["FT-COC-01"]:::interna --> FT_COC_02
+  FT_PED_03["FT-PED-03"]:::interna --> FT_COC_02
   ADR_001["ADR-001"]:::interna -.-> FT_COC_02
   ADR_011["ADR-011"]:::interna -.-> FT_COC_02
   ADR_014["ADR-014"]:::interna -.-> FT_COC_02
@@ -72,7 +74,7 @@ flowchart LR
 ```
 
 - **Ítems evaluados:** FT-COC-02 y sus historias HU-CAP-051, HU-CAP-052, HU-CAP-053, HU-CAP-054.
-- **Dependencias técnicas:** FT-CFG-02, FT-COC-01; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-002, ADR-006, ADR-007.
+- **Dependencias técnicas:** FT-CAR-01, FT-CFG-02, FT-COC-01, FT-PED-03; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-002, ADR-006, ADR-007.
 - **Dependencias externas:** DEP-02, DEP-03, DEP-06.
 - **Decisiones abiertas:** D-13.
 
@@ -95,10 +97,8 @@ erDiagram
   PEDIDO ||--o{ COMANDA_AREA : ""
   AREA_COCINA ||--o{ PRINT_JOB : ""
   PEDIDO ||--o{ PRINT_JOB : ""
+  AREA_COCINA ||--o{ ALTA_DEMANDA : ""
   AGOTADO {
-    bigint id PK
-  }
-  ALTA_DEMANDA {
     bigint id PK
   }
   DEVICE_KEY {

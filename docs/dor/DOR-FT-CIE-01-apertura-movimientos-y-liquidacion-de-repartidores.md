@@ -91,9 +91,10 @@ erDiagram
   CAJA ||--o{ LIQUIDACION : ""
   CAJA ||--o{ CIERRE_CAJA : ""
   CIERRE_CAJA ||--o{ CIERRE_MEDIO : ""
+  CAJA ||--o{ CONTEO_CIERRE : ""
 ```
 
-Tablas de `datos/ddl-propuesto.sql` que usa la feature: `caja`, `cobro`, `cobro_pago`, `movimiento_caja`, `liquidacion`, `cierre_caja`, `cierre_medio`. Las relaciones son las claves foráneas físicas del script (ADR-003); el detalle de columnas y restricciones está en DAT-CAP-001.
+Tablas de `datos/ddl-propuesto.sql` que usa la feature: `caja`, `cobro`, `cobro_pago`, `movimiento_caja`, `liquidacion`, `cierre_caja`, `cierre_medio`, `conteo_cierre`. Las relaciones son las claves foráneas físicas del script (ADR-003); el detalle de columnas y restricciones está en DAT-CAP-001.
 
 Proceso (orden de las historias):
 

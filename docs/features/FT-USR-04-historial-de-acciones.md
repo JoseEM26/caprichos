@@ -41,17 +41,19 @@ tags: [usuarios, plt-03, ep-cap-013, ft-usr-04, debe-tener]
 | ID | Requerimiento | Prioridad | Origen | Criterio de verificación | Estado |
 | --- | --- | --- | --- | --- | --- |
 | RQ-USR-04-01 | Cada cambio sensible queda registrado con quién, cuándo, módulo, acción, antes, después y motivo. | Debe tener | DT-49 · RNF-CAP-009 | Dado un administrador que cambia el precio del capuchino de S/ 9 a S/ 10, cuando guarda, entonces el historial muestra «carta · PRECIO · capuchino», S/ 9 → S/ 10, su nombre, la hora y el dispositivo. | Propuesto |
-| RQ-USR-04-02 | Una anulación y cada uso del PIN del administrador quedan registrados. | Debe tener | RN-CAP-094 · DT-49 | Dado un cajero que anula un cobro con el PIN, cuando se confirma, entonces el historial registra la anulación con el motivo, el cajero y «con PIN del administrador». | Propuesto |
-| RQ-USR-04-03 | Los ingresos y los intentos fallidos de contraseña y de PIN quedan registrados. | Debe tener | DT-49 | Dados 3 intentos fallidos con el DNI 00000012, cuando el administrador filtra «Accesos», entonces ve los 3 intentos con resultado «Rechazado», la hora y la IP. | Propuesto |
-| RQ-USR-04-04 | Ver el DNI completo, abrir un comprobante de pago o exportar datos de una persona queda registrado. | Debe tener | DT-49 · ADR-005 | Dado un administrador que abre el DNI completo de un cliente, cuando lo ve, entonces el historial registra «LECTURA_SENSIBLE · VER_DNI» con el cliente y quién lo vio. | Propuesto |
-| RQ-USR-04-05 | En el historial los DNI y teléfonos aparecen enmascarados y nunca se guardan contraseñas, PIN ni tokens. | Debe tener | ADR-005 · ADR-014 | Dado un cambio en los datos de un cliente, cuando se revisa su registro, entonces el DNI se ve como «4567****» y no hay ninguna contraseña ni PIN. | Propuesto |
-| RQ-USR-04-06 | Solo el administrador ve la pantalla Historial de acciones. | Debe tener | RN-CAP-013 · RNF-CAP-006 | Dado un cajero, cuando abre la dirección del historial, entonces ve «No tienes acceso» y el servidor no entrega datos. | Propuesto |
-| RQ-USR-04-07 | El historial se filtra por persona, módulo, acción, resultado y fechas, y se exporta a CSV. | Debe tener | NEC-CAP-047 · NEC-CAP-050 | Dados registros de un mes, cuando el administrador filtra «Ana · caja · ANULAR» del 1 al 15, entonces ve solo esos y puede exportarlos; la exportación también queda registrada. | Propuesto |
-| RQ-USR-04-08 | El antes y el después se muestran lado a lado, resaltando lo que cambió. | Debería tener | DT-49 | Dado un cambio de parámetros, cuando el administrador abre el registro, entonces ve los dos valores lado a lado y el campo cambiado resaltado. | Propuesto |
-| RQ-USR-04-09 | Cada ficha tiene «Ver historial» con solo sus registros. | Debería tener | DT-49 | Dado el producto capuchino, cuando el administrador toca «Ver historial», entonces ve sus cambios de precio, foto y estado en orden. | Propuesto |
-| RQ-USR-04-10 | El historial no se puede editar ni borrar, ni desde la aplicación ni desde la base con el usuario de la API. | Debe tener | ADR-014 | Dado un registro, cuando alguien intenta editarlo o borrarlo, entonces la base lo rechaza con «La auditoría no se edita ni se borra». | Propuesto |
-| RQ-USR-04-11 | Una verificación diaria comprueba la huella encadenada y avisa si se rompió. | Debe tener | ADR-014 | Dada una fila alterada por fuera, cuando corre la verificación de las 03:30, entonces el administrador recibe «Historial alterado desde el registro N» y Uptime Kuma marca la alerta. | Propuesto |
-| RQ-USR-04-12 | Los registros de más de 2 años pasan a un archivo cifrado y salen de la base, conservando la cadena. | Debería tener | DT-49 · D-18 | Dado un registro de hace 25 meses, cuando corre el archivado mensual, entonces queda en el archivo cifrado de copias y ya no aparece en la pantalla; la cadena sigue verificando. | Propuesto |
+| RQ-USR-04-02 | Una anulación y cada uso del PIN de la supervisora quedan registrados con quién pidió, quién aprobó y el motivo. | Debe tener | RN-CAP-094 · DT-49 · DT-61 | Dado un cajero que anula un cobro con el PIN de la supervisora, cuando se confirma, entonces el historial registra la anulación con el motivo, el cajero que la pidió y la supervisora que la aprobó. | Propuesto |
+| RQ-USR-04-03 | Marcar un producto como agotado, ocultarlo o desactivarlo queda registrado con quién lo hizo y cuándo. | Debe tener | DT-49 · Acta 03 | Dado un cajero que marca el club sándwich como agotado, cuando el administrador filtra «AGOTAR», entonces ve el producto, quién lo marcó, la hora y cuándo volvió a ofrecerse. | Propuesto |
+| RQ-USR-04-04 | Cada conteo de un cierre ciego y cada vez que la supervisora abre su detalle quedan registrados. | Debe tener | DT-61 · DT-49 | Dado un cierre que no cuadró al primer conteo, cuando se revisa el historial, entonces aparecen los dos conteos del cajero y la apertura del detalle por la supervisora con su hora. | Propuesto |
+| RQ-USR-04-05 | Los ingresos y los intentos fallidos de contraseña y de PIN quedan registrados. | Debe tener | DT-49 | Dados 3 intentos fallidos con el DNI 00000012, cuando el administrador filtra «Accesos», entonces ve los 3 intentos con resultado «Rechazado», la hora y la IP. | Propuesto |
+| RQ-USR-04-06 | Ver el DNI completo, abrir un comprobante de pago o exportar datos de una persona queda registrado. | Debe tener | DT-49 · ADR-005 | Dado un administrador que abre el DNI completo de un cliente, cuando lo ve, entonces el historial registra «LECTURA_SENSIBLE · VER_DNI» con el cliente y quién lo vio. | Propuesto |
+| RQ-USR-04-07 | En el historial los DNI y teléfonos aparecen enmascarados y nunca se guardan contraseñas, PIN ni tokens. | Debe tener | ADR-005 · ADR-014 | Dado un cambio en los datos de un cliente, cuando se revisa su registro, entonces el DNI se ve como «4567****» y no hay ninguna contraseña ni PIN. | Propuesto |
+| RQ-USR-04-08 | Solo el administrador ve la pantalla Historial de acciones. | Debe tener | RN-CAP-013 · RNF-CAP-006 | Dado un cajero, cuando abre la dirección del historial, entonces ve «No tienes acceso» y el servidor no entrega datos. | Propuesto |
+| RQ-USR-04-09 | El historial se filtra por persona, módulo, acción, resultado y fechas, y se exporta a CSV. | Debe tener | NEC-CAP-047 · NEC-CAP-050 | Dados registros de un mes, cuando el administrador filtra «Ana · caja · ANULAR» del 1 al 15, entonces ve solo esos y puede exportarlos; la exportación también queda registrada. | Propuesto |
+| RQ-USR-04-10 | El antes y el después se muestran lado a lado, resaltando lo que cambió. | Debería tener | DT-49 | Dado un cambio de parámetros, cuando el administrador abre el registro, entonces ve los dos valores lado a lado y el campo cambiado resaltado. | Propuesto |
+| RQ-USR-04-11 | Cada ficha tiene «Ver historial» con solo sus registros. | Debería tener | DT-49 | Dado el producto capuchino, cuando el administrador toca «Ver historial», entonces ve sus cambios de precio, foto y estado en orden. | Propuesto |
+| RQ-USR-04-12 | El historial no se puede editar ni borrar, ni desde la aplicación ni desde la base con el usuario de la API. | Debe tener | ADR-014 | Dado un registro, cuando alguien intenta editarlo o borrarlo, entonces la base lo rechaza con «La auditoría no se edita ni se borra». | Propuesto |
+| RQ-USR-04-13 | Una verificación diaria comprueba la huella encadenada y avisa si se rompió. | Debe tener | ADR-014 | Dada una fila alterada por fuera, cuando corre la verificación de las 03:30, entonces el administrador recibe «Historial alterado desde el registro N» y Uptime Kuma marca la alerta. | Propuesto |
+| RQ-USR-04-14 | Los registros de más de 2 años pasan a un archivo cifrado y salen de la base, conservando la cadena. | Debería tener | DT-49 · D-18 | Dado un registro de hace 25 meses, cuando corre el archivado mensual, entonces queda en el archivo cifrado de copias y ya no aparece en la pantalla; la cadena sigue verificando. | Propuesto |
 
 Prioridad *Debe tener*: sin historial, las anulaciones con PIN y los cambios de precio no se pueden revisar (RNF-CAP-009). Entra en el piloto (H1). Todos nacen *Propuesto* hasta que el PO los apruebe (DT-48).
 
@@ -75,6 +77,7 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RN-CAP-013 | Solo el administrador ve los datos del negocio. | Prototipo |
 | DT-49 | Alcance, pantalla, inmutabilidad con huella y conservación de 2 años. | decisiones.md |
 | RN-CAP-014 | Los registros no se eliminan. | Diseño |
+| DT-61 | Anulación con PIN de la supervisora y cierre ciego: queda quién pidió, quién aprobó y cada conteo. | Acta 03 · decisiones.md |
 
 ## 5. Trazabilidad y planificación
 
@@ -82,16 +85,18 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | --- | --- | --- | --- |
 | RQ-USR-04-01 | HU-CAP-176 | — | R-01 |
 | RQ-USR-04-02 | HU-CAP-176 | FT-CAJ-02 | R-01 |
-| RQ-USR-04-03 | HU-CAP-176 | FT-USR-01 | R-01 |
-| RQ-USR-04-04 | HU-CAP-176 | FT-CLI-01 · FT-LEG-02 | R-11 |
-| RQ-USR-04-05 | HU-CAP-176 | — | R-01 |
-| RQ-USR-04-06 | HU-CAP-177 | — | R-01 |
-| RQ-USR-04-07 | HU-CAP-177 | — | R-01 |
+| RQ-USR-04-03 | HU-CAP-176 | FT-COC-03 | R-01 |
+| RQ-USR-04-04 | HU-CAP-176 | FT-CIE-02 | R-01 |
+| RQ-USR-04-05 | HU-CAP-176 | FT-USR-01 | R-01 |
+| RQ-USR-04-06 | HU-CAP-176 | FT-CLI-01 · FT-LEG-02 | R-11 |
+| RQ-USR-04-07 | HU-CAP-176 | — | R-01 |
 | RQ-USR-04-08 | HU-CAP-177 | — | R-01 |
 | RQ-USR-04-09 | HU-CAP-177 | — | R-01 |
-| RQ-USR-04-10 | HU-CAP-176 | — | R-01 |
-| RQ-USR-04-11 | HU-CAP-176 | ADR-012 | R-01 |
-| RQ-USR-04-12 | HU-CAP-176 | DEP-09 | R-01 |
+| RQ-USR-04-10 | HU-CAP-177 | — | R-01 |
+| RQ-USR-04-11 | HU-CAP-177 | — | R-01 |
+| RQ-USR-04-12 | HU-CAP-176 | — | R-01 |
+| RQ-USR-04-13 | HU-CAP-176 | ADR-012 | R-01 |
+| RQ-USR-04-14 | HU-CAP-176 | DEP-09 | R-01 |
 
 Historias de usuario de esta feature (en `historias/`, en draft):
 

@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-012, FT-OFE-01, RQ-OFE-01-05, RQ-OFE-01-06, HU-CAP-105, HU-CAP-106, HU-CAP-108, ADR-001, ADR-011, ADR-014, ADR-003, ADR-007, DEP-02, DEP-06, R-01]
+relacionados: [EP-CAP-012, FT-OFE-01, RQ-OFE-01-05, RQ-OFE-01-06, RQ-OFE-01-07, RQ-OFE-01-08, HU-CAP-105, HU-CAP-106, HU-CAP-108, ADR-001, ADR-011, ADR-014, ADR-003, ADR-007, DEP-02, DEP-06, R-01]
 tags: [hu, ofertas, capa-a, ft-ofe-01, media, ui]
 ---
 
@@ -32,7 +32,7 @@ tags: [hu, ofertas, capa-a, ft-ofe-01, media, ui]
 
 | CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
 |---|---|
-| **Contexto.** Historia de FT-OFE-01 «Combos y promociones» (Debería tener, épica EP-CAP-012). Cubre los requerimientos: **RQ-OFE-01-05** Las ofertas comparten una vigencia opcional: días, horas, fechas, canal y límite. **RQ-OFE-01-06** Un combo fuera de su vigencia no se ofrece en la carta ni en Nuevo pedido. | **Alcance.**<br>• Las ofertas comparten una vigencia opcional: días, horas, fechas, canal y límite.<br>• Un combo fuera de su vigencia no se ofrece en la carta ni en Nuevo pedido. |
+| **Contexto.** Historia de FT-OFE-01 «Combos y promociones» (Debería tener, épica EP-CAP-012). Cubre los requerimientos: **RQ-OFE-01-05** Las ofertas comparten una vigencia opcional: días, horas, fechas, canal y límite. **RQ-OFE-01-06** Una oferta con límite de usos se desactiva sola al llegar al límite. **RQ-OFE-01-07** Una oferta se puede marcar «No suma puntos ni aplica cupones». **RQ-OFE-01-08** Un combo fuera de su vigencia no se ofrece en la carta ni en Nuevo pedido. | **Alcance.**<br>• Las ofertas comparten una vigencia opcional: días, horas, fechas, canal y límite.<br>• Una oferta con límite de usos se desactiva sola al llegar al límite.<br>• Una oferta se puede marcar «No suma puntos ni aplica cupones».<br>• Un combo fuera de su vigencia no se ofrece en la carta ni en Nuevo pedido. |
 | **Problema.** Promociones que el dueño crea solo, y que cocina, stock e informes cuentan por producto y por combo. | **Fuera de alcance.**<br>• HU-CAP-105: Crear un combo con sus partes y precio por tamaño.<br>• HU-CAP-106: Crear una promoción «lleva N, paga M».<br>• HU-CAP-108: Vender un combo con componentes agotados.<br>• Descuentos automáticos: FT-OFE-02.<br>• Cupones: FT-OFE-03.<br>• Cómo la carta muestra el precio tachado: FT-CAR-01. |
 
 ## 03 | CRITERIOS DE ACEPTACIÓN
@@ -40,17 +40,19 @@ tags: [hu, ofertas, capa-a, ft-ofe-01, media, ui]
 | N.° | DADO | CUANDO | ENTONCES |
 |---|---|---|---|
 | CA-1 | un combo vigente de lunes a viernes de 15:00 a 18:00 solo en la carta | un cliente lo busca un sábado o en el chatbot | no aparece (RQ-OFE-01-05) |
-| CA-2 | un combo cuya fecha terminó ayer | el cajero abre Nuevo pedido | no aparece (RQ-OFE-01-06) |
+| CA-2 | una 2×1 limitada a los 10 primeros pedidos | se vende la décima | deja de ofrecerse en todos los canales y queda «Agotada por límite» (RQ-OFE-01-06) |
+| CA-3 | una 2×1 de frappé marcada «No suma puntos ni aplica cupones» | un cliente con cuenta la compra | esa línea no suma puntos y no se le puede aplicar un cupón (FT-CLI-02, FT-OFE-03) (RQ-OFE-01-07) |
+| CA-4 | un combo cuya fecha terminó ayer | el cajero abre Nuevo pedido | no aparece (RQ-OFE-01-08) |
 
-Origen: criterios de verificación de FT-OFE-01 (RQ-OFE-01-05, RQ-OFE-01-06); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
+Origen: criterios de verificación de FT-OFE-01 (RQ-OFE-01-05, RQ-OFE-01-06, RQ-OFE-01-07, RQ-OFE-01-08); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
 
 ## 04 | REGLAS, DEPENDENCIAS Y EVIDENCIAS
 
 | REGLAS DE NEGOCIO | DATOS Y VALIDACIONES |
 |---|---|
-| **RB-01** (RN-CAP-070) Una promoción vale solo en sus días, horas, fechas y canales.<br>**RNF aplicables:** RNF-CAP-011, RNF-CAP-019, RNF-CAP-014. | `Oferta` (tipo combo, lleva N paga M, descuento; vigencia: días, horas, fechas, canal, límite) · `DescuentoAutomatico` (alcance, porcentaje o monto, mínimo) · `ReglaAcumulacion` · `Cupon` (modo único o compartido, tope, por cliente) · `CuponEmitido` (código al azar, pedido, estado, vencimiento) · `IntentoCupon`.<br>*(Entidades propuestas; detalle y tablas en `datos/DAT-CAP-001-modelo-de-datos.md`, se aprueba en G3.)*<br>**Validaciones:** sin borrado físico: se desactiva o anula (RN-CAP-014); montos en soles con dos decimales. |
+| **RB-01** (RN-CAP-070) Una promoción vale solo en sus días, horas, fechas y canales.<br>**RB-02** (DT-65) Un producto o una promoción puede marcarse «No suma puntos ni aplica cupones».<br>**RNF aplicables:** RNF-CAP-011, RNF-CAP-019, RNF-CAP-014. | `Oferta` (tipo combo, lleva N paga M, descuento; vigencia: días, horas, fechas, canal, límite) · `DescuentoAutomatico` (alcance, porcentaje o monto, mínimo) · `ReglaAcumulacion` · `Cupon` (modo único o compartido, tope, por cliente) · `CuponEmitido` (código al azar, pedido, estado, vencimiento) · `IntentoCupon`.<br>*(Entidades propuestas; detalle y tablas en `datos/DAT-CAP-001-modelo-de-datos.md`, se aprueba en G3.)*<br>**Validaciones:** sin borrado físico: se desactiva o anula (RN-CAP-014); montos en soles con dos decimales. |
 | **DEPENDENCIAS / RIESGOS** | **DISEÑO / ADJUNTOS** |
-| • **HU-CAP-106** (Crear una promoción «lleva N, paga M») va antes, dentro de la misma feature.<br>• **DEP-02** plataforma y hosting: propuestos en ADR-001 y ADR-011, pendientes de aprobación en G3.<br>• **DEP-06** mockup en Figma o aceptación del mockup navegable como diseño (G2).<br>• Riesgos: R-01 (roadmap PLT-01). | • Mockup en Figma: (pendiente UX — G2, DEP-06).<br>• Referencia mientras tanto: mockup navegable (DT-04), Administrativo ▸ Ofertas y descuentos ▸ Nueva oferta (combo, lleva N paga M), vigencia (`Admin.dc.html`); `analisis/combos-y-opciones.md`.<br>• Contrato de API: `arquitectura/ARQ-CAP-002-catalogo-de-api-y-eventos.md`, módulo de FT-OFE-01 (borrador, se aprueba en G3).<br>• ADR (propuestos): ADR-001, ADR-011, ADR-014, ADR-003, ADR-007.<br>• Modelo de datos: `datos/DAT-CAP-001-modelo-de-datos.md`. |
+| • **HU-CAP-106** (Crear una promoción «lleva N, paga M») va antes, dentro de la misma feature.<br>• FT-CLI-02.<br>• **DEP-02** plataforma y hosting: propuestos en ADR-001 y ADR-011, pendientes de aprobación en G3.<br>• **DEP-06** mockup en Figma o aceptación del mockup navegable como diseño (G2).<br>• Riesgos: R-01 (roadmap PLT-01). | • Mockup en Figma: (pendiente UX — G2, DEP-06).<br>• Referencia mientras tanto: mockup navegable (DT-04), Administrativo ▸ Ofertas y descuentos ▸ Nueva oferta (combo, lleva N paga M), vigencia (`Admin.dc.html`); `analisis/combos-y-opciones.md`.<br>• Contrato de API: `arquitectura/ARQ-CAP-002-catalogo-de-api-y-eventos.md`, módulo de FT-OFE-01 (borrador, se aprueba en G3).<br>• ADR (propuestos): ADR-001, ADR-011, ADR-014, ADR-003, ADR-007.<br>• Modelo de datos: `datos/DAT-CAP-001-modelo-de-datos.md`. |
 
 ## 05 | CHECKLIST DE CALIDAD
 
@@ -63,4 +65,4 @@ Origen: criterios de verificación de FT-OFE-01 (RQ-OFE-01-05, RQ-OFE-01-06); lo
 
 **DoR: NO READY** hasta cerrar G2 y G3 (y con G0 y G1 aún sin aprobar).
 
-Generado por IA: historia derivada de FT-OFE-01 (requerimientos RQ-OFE-01-05, RQ-OFE-01-06, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)
+Generado por IA: historia derivada de FT-OFE-01 (requerimientos RQ-OFE-01-05, RQ-OFE-01-06, RQ-OFE-01-07, RQ-OFE-01-08, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)

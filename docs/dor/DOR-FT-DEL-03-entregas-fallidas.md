@@ -94,12 +94,13 @@ erDiagram
   PARTY ||--o{ ASIGNACION_REPARTO : ""
   PEDIDO ||--o{ ASIGNACION_REPARTO : ""
   PEDIDO ||--o{ INCIDENTE_ENTREGA : ""
+  PEDIDO ||--o{ MENSAJE_REPARTO : ""
   ZONA_REPARTO {
     bigint id PK
   }
 ```
 
-Tablas de `datos/ddl-propuesto.sql` que usa la feature: `zona_reparto`, `pedido`, `asignacion_reparto`, `incidente_entrega`, `party`. Las relaciones son las claves foráneas físicas del script (ADR-003); el detalle de columnas y restricciones está en DAT-CAP-001.
+Tablas de `datos/ddl-propuesto.sql` que usa la feature: `zona_reparto`, `pedido`, `asignacion_reparto`, `incidente_entrega`, `mensaje_reparto`, `party`. Las relaciones son las claves foráneas físicas del script (ADR-003); el detalle de columnas y restricciones está en DAT-CAP-001.
 
 Proceso (orden de las historias):
 

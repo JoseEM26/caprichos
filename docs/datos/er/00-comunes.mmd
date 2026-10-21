@@ -12,5 +12,23 @@ erDiagram
     boolean activo
   }
   AUDITORIA {
+    bigint id PK
+    text categoria
+    text modulo
+    text accion
+    text resultado
+    text entidad
+    bigint entidad_id
+    jsonb antes
+    jsonb despues
+    text motivo
+    bigint party_id
+    boolean con_pin_admin
+    inet ip
+    text dispositivo
+    text request_id
+    timestamptz en
+    bytea hash_anterior
+    bytea hash
   }
   LISTA ||--o{ LISTA_VALOR : "lista_id"

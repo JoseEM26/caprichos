@@ -16,7 +16,6 @@ erDiagram
     numeric minimo
     numeric intermedio
     numeric maximo
-    boolean perecible
     bigint lugar_consumo_id FK
     numeric costo_unit
     bigint proveedor_a
@@ -85,6 +84,9 @@ erDiagram
     text estado
     bigint por
     timestamptz en
+    bigint avisado_party_id FK
+    bigint recibido_por
+    timestamptz recibido_en
   }
   PRODUCCION {
     bigint id PK
@@ -136,8 +138,6 @@ erDiagram
     bigint insumo_id FK
     numeric cantidad_compra
     numeric costo_unit
-    text lote
-    date vence
   }
   ARCHIVO {
     bigint id PK "en otro dominio"
@@ -180,6 +180,7 @@ erDiagram
   MOVIMIENTO_STOCK ||--o{ MOVIMIENTO_STOCK : "movimiento_anulado_id"
   OPCION ||--o{ AJUSTE_OPCION : "opcion_id"
   PARTY ||--o{ COMPRA : "proveedor_party_id"
+  PARTY ||--o{ PEDIDO_INTERNO : "avisado_party_id"
   PARTY ||--o{ PEDIDO_PROVEEDOR : "proveedor_party_id"
   PEDIDO_PROVEEDOR ||--o{ COMPRA : "pedido_proveedor_id"
   PEDIDO_PROVEEDOR ||--o{ PEDIDO_PROVEEDOR_LINEA : "pedido_proveedor_id"

@@ -29,6 +29,22 @@ erDiagram
     text hash
     boolean activo
   }
+  HORARIO_TRABAJO {
+    bigint party_id PK,FK
+    smallint dia PK
+    time desde
+    time hasta
+  }
+  COBERTURA_TURNO {
+    bigint id PK
+    date fecha
+    text rol FK
+    bigint cubre_party_id FK
+    bigint reemplaza_party_id FK
+    time desde
+    time hasta
+    bigint por
+  }
   SESION {
     bigint id PK
     text audiencia
@@ -49,9 +65,13 @@ erDiagram
   PARTY {
     bigint id PK "en otro dominio"
   }
+  PARTY ||--o{ COBERTURA_TURNO : "cubre_party_id"
+  PARTY ||--o{ COBERTURA_TURNO : "reemplaza_party_id"
   PARTY ||--o{ CUSTOMER_ACCOUNT : "party_id"
+  PARTY ||--o{ HORARIO_TRABAJO : "party_id"
   PARTY ||--o{ SESION : "party_id"
   PARTY ||--o{ USER_ACCOUNT : "party_id"
   PERMISO ||--o{ ROL_PERMISO : "permiso_id"
+  ROL ||--o{ COBERTURA_TURNO : "rol"
   ROL ||--o{ ROL_PERMISO : "rol"
   ROL ||--o{ USER_ACCOUNT : "rol"

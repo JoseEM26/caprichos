@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-008, FT-DEL-02, HU-CAP-071, HU-CAP-072, HU-CAP-073, ADR-001, ADR-011, ADR-014, ADR-006, ADR-007, ADR-010, FT-CIE-01, FT-INF-01, FT-USR-02]
+relacionados: [EP-CAP-008, FT-DEL-02, HU-CAP-071, HU-CAP-072, HU-CAP-073, HU-CAP-196, HU-CAP-197, ADR-001, ADR-011, ADR-014, ADR-006, ADR-007, ADR-010, FT-CFG-02, FT-CIE-01, FT-DEL-01, FT-DEL-03, FT-INF-01, FT-USR-02]
 tags: [dor, plt-05, delivery, ft-del-02, g4]
 ---
 
@@ -25,7 +25,7 @@ tags: [dor, plt-05, delivery, ft-del-02, g4]
 | SPRINT / RELEASE DESTINO | H1 · piloto en el local · 28/12/2026 (supuesto, D-19) |
 | RESULTADO | (lo decide el PO — propuesta IA: **NO READY**) |
 
-> Insumos: `analisis/decisiones.md` (fuente de verdad), la feature `FT-DEL-02`, sus 3 historias (HU-CAP-071, HU-CAP-072, HU-CAP-073), la épica EP-CAP-008, los ADR ADR-001, ADR-011, ADR-014, ADR-006, ADR-007, ADR-010, `arquitectura/ARQ-CAP-001` y `ARQ-CAP-002`, y `datos/DAT-CAP-001`.
+> Insumos: `analisis/decisiones.md` (fuente de verdad), la feature `FT-DEL-02`, sus 5 historias (HU-CAP-071, HU-CAP-072, HU-CAP-073, HU-CAP-196, HU-CAP-197), la épica EP-CAP-008, los ADR ADR-001, ADR-011, ADR-014, ADR-006, ADR-007, ADR-010, `arquitectura/ARQ-CAP-001` y `ARQ-CAP-002`, y `datos/DAT-CAP-001`.
 
 ## 1 CHECKLIST DE PREPARACIÓN
 
@@ -34,16 +34,16 @@ tags: [dor, plt-05, delivery, ft-del-02, g4]
 | NEGOCIO | ☑ | Objetivo y valor con KPI | Épica EP-CAP-008 §2 y feature §1 (hipótesis medible) |
 | NEGOCIO | ☐ | Alcance dentro y fuera acordado | Redactado en la feature; falta la firma del PO (DT-48) |
 | NEGOCIO | ☐ | Prioridad y release confirmados | Debe tener · H1 · piloto en el local · 28/12/2026 (supuesto, D-19); fechas supuestas hasta D-19 |
-| FUNCIONAL | ☑ | Historias con criterios verificables | 3 historias, 13 criterios Dado/Cuando/Entonces |
-| FUNCIONAL | ☑ | Reglas de negocio documentadas y validadas | Documentadas en la feature §4; sin decisiones abiertas propias |
+| FUNCIONAL | ☑ | Historias con criterios verificables | 5 historias, 25 criterios Dado/Cuando/Entonces |
+| FUNCIONAL | ☐ | Reglas de negocio documentadas y validadas | Documentadas; abiertas: D-08, D-27, D-29 |
 | FUNCIONAL | ☐ | Estimación por el equipo | Tareas en `backlog/tareas/EP-CAP-008.json` con `estimacion_horas: null` |
 | DISEÑO / UX | ☐ | Prototipos aprobados (DEP-06) | Mockup navegable como referencia (DT-04); Figma o aceptación del mockup pendiente (G2) |
 | DISEÑO / UX | ☐ | Textos y mensajes definidos | Los del mockup; por revisar con Kevin |
 | TÉCNICO | ☑ | Dependencias, modelado y arquitectura | Secciones 2 a 4 de este DoR; ARQ-CAP-001 |
 | TÉCNICO | ☐ | Contrato de API | Borrador en ARQ-CAP-002 §FT-DEL-02; se aprueba en G3 |
 | TÉCNICO | ☐ | Modelo de datos / DDL | DAT-CAP-001 y `datos/ddl-propuesto.sql` (probado en PostgreSQL 16); sin aprobar (G3) |
-| TÉCNICO | ☐ | RNF y seguridad | RNF-CAP-010, RNF-CAP-004, RNF-CAP-006, RNF-CAP-008; umbrales propuestos (feature §3) |
-| CALIDAD | ☑ | Estrategia y datos de prueba | `pruebas/test-plan.md`: 13 casos TC para estas historias, datos sintéticos |
+| TÉCNICO | ☐ | RNF y seguridad | RNF-CAP-010, RNF-CAP-004, RNF-CAP-006, RNF-CAP-008, RNF-CAP-002; umbrales propuestos (feature §3) |
+| CALIDAD | ☑ | Estrategia y datos de prueba | `pruebas/test-plan.md`: 25 casos TC para estas historias, datos sintéticos |
 | CALIDAD | ☑ | Riesgos con mitigación y dueño | Sección 5 |
 
 ## 2 DIAGRAMA DE DEPENDENCIAS
@@ -57,7 +57,12 @@ flowchart LR
   HU_CAP_071["HU-CAP-071"]:::evaluado --> FT_DEL_02
   HU_CAP_072["HU-CAP-072"]:::evaluado --> FT_DEL_02
   HU_CAP_073["HU-CAP-073"]:::evaluado --> FT_DEL_02
+  HU_CAP_196["HU-CAP-196"]:::evaluado --> FT_DEL_02
+  HU_CAP_197["HU-CAP-197"]:::evaluado --> FT_DEL_02
+  FT_CFG_02["FT-CFG-02"]:::interna --> FT_DEL_02
   FT_CIE_01["FT-CIE-01"]:::interna --> FT_DEL_02
+  FT_DEL_01["FT-DEL-01"]:::interna --> FT_DEL_02
+  FT_DEL_03["FT-DEL-03"]:::interna --> FT_DEL_02
   FT_INF_01["FT-INF-01"]:::interna --> FT_DEL_02
   FT_USR_02["FT-USR-02"]:::interna --> FT_DEL_02
   ADR_001["ADR-001"]:::interna -.-> FT_DEL_02
@@ -68,12 +73,13 @@ flowchart LR
   ADR_010["ADR-010"]:::interna -.-> FT_DEL_02
   DEP_02["DEP-02"]:::externa ==> FT_DEL_02
   DEP_06["DEP-06"]:::externa ==> FT_DEL_02
+  DEP_12["DEP-12"]:::externa ==> FT_DEL_02
 ```
 
-- **Ítems evaluados:** FT-DEL-02 y sus historias HU-CAP-071, HU-CAP-072, HU-CAP-073.
-- **Dependencias técnicas:** FT-CIE-01, FT-INF-01, FT-USR-02; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-006, ADR-007, ADR-010.
-- **Dependencias externas:** DEP-02, DEP-06.
-- **Decisiones abiertas:** ninguna propia.
+- **Ítems evaluados:** FT-DEL-02 y sus historias HU-CAP-071, HU-CAP-072, HU-CAP-073, HU-CAP-196, HU-CAP-197.
+- **Dependencias técnicas:** FT-CFG-02, FT-CIE-01, FT-DEL-01, FT-DEL-03, FT-INF-01, FT-USR-02; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-006, ADR-007, ADR-010.
+- **Dependencias externas:** DEP-02, DEP-06, DEP-12.
+- **Decisiones abiertas:** D-08, D-27, D-29.
 
 **Bloqueantes**
 
@@ -82,6 +88,10 @@ flowchart LR
 | G2 | Mockup aprobado o aceptación del mockup navegable (DEP-06) | Diseño | José Ángel Espinoza (UX, DT-48) | Antes de G4 | Abierto |
 | G3 | Aprobación de ADR-001, ADR-011, ADR-014, ADR-006, ADR-007, ADR-010 | Arquitectura | José Ángel Espinoza (TL, DT-48) | Antes de G4 | Abierto |
 | DEP-02 | Plataforma y hosting (ADR-001, ADR-011) | Técnica | Desarrollo | Antes de G3 | Abierto |
+| DEP-12 | Ver roadmap PLT-01 | Externa | Kevin | Según roadmap | Abierto |
+| D-08 | Decisión pendiente (ver `analisis/decisiones.md`) | Decisión | Kevin | Antes de G4 | Abierto |
+| D-27 | Decisión pendiente (ver `analisis/decisiones.md`) | Decisión | Kevin | Antes de G4 | Abierto |
+| D-29 | Decisión pendiente (ver `analisis/decisiones.md`) | Decisión | Kevin | Antes de G4 | Abierto |
 
 ## 3 MODELADO (DATOS Y PROCESO)
 
@@ -90,12 +100,13 @@ erDiagram
   PARTY ||--o{ ASIGNACION_REPARTO : ""
   PEDIDO ||--o{ ASIGNACION_REPARTO : ""
   PEDIDO ||--o{ INCIDENTE_ENTREGA : ""
+  PEDIDO ||--o{ MENSAJE_REPARTO : ""
   ZONA_REPARTO {
     bigint id PK
   }
 ```
 
-Tablas de `datos/ddl-propuesto.sql` que usa la feature: `zona_reparto`, `pedido`, `asignacion_reparto`, `incidente_entrega`, `party`. Las relaciones son las claves foráneas físicas del script (ADR-003); el detalle de columnas y restricciones está en DAT-CAP-001.
+Tablas de `datos/ddl-propuesto.sql` que usa la feature: `zona_reparto`, `pedido`, `asignacion_reparto`, `incidente_entrega`, `mensaje_reparto`, `party`. Las relaciones son las claves foráneas físicas del script (ADR-003); el detalle de columnas y restricciones está en DAT-CAP-001.
 
 Proceso (orden de las historias):
 
@@ -104,8 +115,12 @@ flowchart TB
   P0["HU-CAP-071<br>Ver y tomar un delivery listo"]
   P1["HU-CAP-072<br>Navegar y contactar al cliente"]
   P0 --> P1
-  P2["HU-CAP-073<br>Marcar en camino y entregado con el cobro"]
+  P2["HU-CAP-073<br>Marcar en camino, he llegado y entregado con el cobro"]
   P1 --> P2
+  P3["HU-CAP-196<br>Ver los pedidos en el mapa con nombre, color de espera y orden sugerido"]
+  P2 --> P3
+  P4["HU-CAP-197<br>Recibir por WhatsApp el aviso de que mi pedido sale y de que el repartidor llegó"]
+  P3 --> P4
 ```
 
 Ciclo de vida de **pedido de delivery**:
@@ -161,14 +176,17 @@ flowchart TB
 | --- | --- | --- | --- | --- | --- | --- |
 | R-01 | Riesgo de roadmap (ver PLT-01) | — | — | Según roadmap | Ver PLT-01 | Abierto |
 | R-09 | Riesgo de roadmap (ver PLT-01) | — | — | Según roadmap | Ver PLT-01 | Abierto |
-| R-FT-DEL-02-01 | Si no se resuelve «¿Un repartidor puede tomar varios pedidos a la vez? Propuesta: sí, hasta 3, configurable», hay que rehacer criterios o pantallas | Media | Medio | Resolver con Kevin antes de G4 con la propuesta escrita en la feature | Kevin | Abierto |
-| R-FT-DEL-02-02 | Si no se resuelve «¿Caja puede asignar un pedido a un repartidor? Propuesta: sí, como respaldo, con aviso al repartidor», hay que rehacer criterios o pantallas | Media | Medio | Resolver con Kevin antes de G4 con la propuesta escrita en la feature | Kevin | Abierto |
+| R-04 | Riesgo de roadmap (ver PLT-01) | — | — | Según roadmap | Ver PLT-01 | Abierto |
+| R-FT-DEL-02-01 | Si no se resuelve «Colores del mapa», hay que rehacer criterios o pantallas | Media | Medio | Resolver con Kevin antes de G4 con la propuesta escrita en la feature | Kevin | Abierto |
+| R-FT-DEL-02-02 | Si no se resuelve «Momento de los mensajes 2 y 3 y sus textos», hay que rehacer criterios o pantallas | Media | Medio | Resolver con Kevin antes de G4 con la propuesta escrita en la feature | Kevin | Abierto |
+| R-FT-DEL-02-03 | Si no se resuelve «¿Un repartidor puede tomar varios pedidos a la vez? Propuesta: sí, hasta 3, configurable», hay que rehacer criterios o pantallas | Media | Medio | Resolver con Kevin antes de G4 con la propuesta escrita en la feature | Kevin | Abierto |
+| R-FT-DEL-02-04 | Si no se resuelve «¿Caja puede asignar un pedido a un repartidor? Propuesta: sí, como respaldo, con aviso al repartidor», hay que rehacer criterios o pantallas | Media | Medio | Resolver con Kevin antes de G4 con la propuesta escrita en la feature | Kevin | Abierto |
 
 ## 6 DECISIÓN Y APROBACIÓN
 
 ☐ READY · Puede ingresar a desarrollo  ☐ READY CON CONDICIONES · ver acuerdos  ☐ NO READY · devolver a refinamiento
 
-**Propuesta IA: NO READY.** Motivos: G0 a G3 sin aprobar (DT-48); ADR ADR-001, ADR-011, ADR-014, ADR-006, ADR-007, ADR-010 propuestos, no aprobados (G3); tareas sin estimar; mockup sin aprobar (G2, DEP-06). Lo que sí está listo: historias con criterios verificables, casos de prueba 1 a 1, modelo de datos probado y dependencias identificadas. Con las firmas de G2 y G3 y la estimación, pasaría a **READY CON CONDICIONES**. La decisión es del PO.
+**Propuesta IA: NO READY.** Motivos: G0 a G3 sin aprobar (DT-48); ADR ADR-001, ADR-011, ADR-014, ADR-006, ADR-007, ADR-010 propuestos, no aprobados (G3); tareas sin estimar; mockup sin aprobar (G2, DEP-06); decisiones abiertas D-08, D-27, D-29. Lo que sí está listo: historias con criterios verificables, casos de prueba 1 a 1, modelo de datos probado y dependencias identificadas. Con las firmas de G2 y G3 y la estimación, pasaría a **READY CON CONDICIONES**. La decisión es del PO.
 
 | Rol | Nombre | Fecha | Firma |
 | --- | --- | --- | --- |

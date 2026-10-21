@@ -46,14 +46,15 @@ tags: [carta, plt-03, ep-cap-001, ft-car-01, debe-tener]
 | RQ-CAR-01-02 | La barra de categorías queda fija arriba y lleva a cada categoría con un toque. | Debe tener | RN-CAP-051 · mockup | Dado que el cliente se desplazó por la carta, cuando toca una categoría en la barra, entonces la carta salta a esa categoría y la barra marca la categoría visible. | Propuesto |
 | RQ-CAR-01-03 | El buscador encuentra productos por nombre o descripción, sin tildes ni mayúsculas. | Debe tener | RN-CAP-051 | Dado el producto «Frappé de Café», cuando el cliente escribe «frappe cafe», entonces aparece en los resultados; si no hay coincidencias, ve «No encontramos ese producto». | Propuesto |
 | RQ-CAR-01-04 | La carta no tiene filtros por precio ni paginación. | Debe tener | RN-CAP-051 · DT-13 | Dada la carta abierta, cuando se revisa la pantalla, entonces no hay filtros por rango de precio ni páginas: todo el catálogo se recorre por categorías y buscador. | Propuesto |
-| RQ-CAR-01-05 | La ficha del producto muestra foto cuadrada ampliable, descripción, tamaños y grupos de opciones. | Debe tener | NEC-CAP-017 · BRD §4 | Dado un producto con foto, cuando el cliente lo abre, entonces ve la foto cuadrada, puede ampliarla con un toque y ve sus tamaños y grupos de opciones. | Propuesto |
+| RQ-CAR-01-05 | La ficha del producto muestra foto cuadrada ampliable, descripción, tamaños y grupos de opciones. | Debe tener | NEC-CAP-017 · BRD §4 · Acta 03 | Dado un producto con foto, cuando el cliente lo abre, entonces ve la foto cuadrada, puede ampliarla con un toque y la foto ampliada se adapta sin recortarse a productos anchos o altos y al tamaño de la pantalla; ve sus tamaños y grupos de opciones. | Propuesto |
 | RQ-CAR-01-06 | Cada grupo de opciones aplica su obligatoriedad, mínimo y máximo. | Debe tener | RN-CAP-004 | Dado un grupo obligatorio con mínimo 1 y máximo 2, cuando el cliente intenta agregar sin elegir, entonces el botón queda desactivado con el aviso del grupo; al marcar una tercera opción, la más antigua no se agrega y se avisa del máximo. | Propuesto |
 | RQ-CAR-01-07 | El precio de la ficha se recalcula en vivo con tamaño, opciones con precio extra y cantidad. | Debe tener | RN-CAP-004 · RN-CAP-007 | Dado un frappé de S/ 12 en tamaño grande (+S/ 2) con leche de almendras (+S/ 1,50) y cantidad 2, cuando el cliente lo arma, entonces el precio mostrado es S/ 31,00. | Propuesto |
 | RQ-CAR-01-08 | Los toppings secos cuestan S/ 1 y los frappés muestran el aviso de hielo. | Debería tener | NEC-CAP-084 · RN-CAP-053 | Dado un frappé, cuando el cliente abre su ficha, entonces ve el aviso de hielo y los toppings secos (Oreo triturado, chispas, chin chin, almendra) a S/ 1 cada uno. | Propuesto |
-| RQ-CAR-01-09 | Los productos con variantes se eligen por sabor y solo muestran los sabores activos. | Debe tener | NEC-CAP-058 | Dado el tipo «Donas» con 5 sabores, 1 desactivado, cuando el cliente elige donas, entonces ve 4 sabores y no puede pedir el desactivado. | Propuesto |
-| RQ-CAR-01-10 | Un combo se arma por unidad, en pasos plegables, y un paso con más de 10 opciones lleva buscador. | Debe tener | NEC-CAP-040 · RN-CAP-067 | Dado un combo de 2 frappés, cuando el cliente lo arma, entonces elige sabor, leche, dulzor y toppings de cada frappé en un paso plegable propio; si un paso tiene 11 opciones, aparece un buscador dentro. | Propuesto |
-| RQ-CAR-01-11 | Una promoción muestra el precio anterior tachado y el porcentaje de descuento. | Debe tener | RN-CAP-007 · NEC-CAP-006 | Dado un producto de S/ 20 con promoción a S/ 15, cuando aparece en la carta, entonces se ve «S/ 20» tachado, «S/ 15» y «-25 %». | Propuesto |
-| RQ-CAR-01-12 | Los combos Dúo muestran su precio por tamaño. | Debe tener | RN-CAP-007 | Dado el combo Dúo con precio para tamaño regular y grande, cuando el cliente lo abre, entonces ve los dos precios y el total cambia al elegir el tamaño. | Propuesto |
+| RQ-CAR-01-09 | En las bebidas se pide «Ingresa el nombre de la persona que tomará esta bebida», uno por cada unidad, con una imagen de referencia. | Debería tener | DT-57 · Acta 03 | Dados 3 capuchinos, cuando el cliente los agrega, entonces ve tres campos «Ingresa el nombre de la persona que tomará esta bebida» con la imagen de una etiqueta de ejemplo; si deja uno vacío se usa el nombre del cliente, y cada nombre sale en la etiqueta de su bebida (FT-COC-02). | Propuesto |
+| RQ-CAR-01-10 | Los productos con variantes se eligen por sabor y solo muestran los sabores activos. | Debe tener | NEC-CAP-058 | Dado el tipo «Donas» con 5 sabores, 1 desactivado, cuando el cliente elige donas, entonces ve 4 sabores y no puede pedir el desactivado. | Propuesto |
+| RQ-CAR-01-11 | Un combo se arma por unidad, en pasos plegables, y un paso con más de 10 opciones lleva buscador. | Debe tener | NEC-CAP-040 · RN-CAP-067 | Dado un combo de 2 frappés, cuando el cliente lo arma, entonces elige sabor, leche, dulzor y toppings de cada frappé en un paso plegable propio; si un paso tiene 11 opciones, aparece un buscador dentro. | Propuesto |
+| RQ-CAR-01-12 | Una promoción muestra el precio anterior tachado y el porcentaje de descuento. | Debe tener | RN-CAP-007 · NEC-CAP-006 | Dado un producto de S/ 20 con promoción a S/ 15, cuando aparece en la carta, entonces se ve «S/ 20» tachado, «S/ 15» y «-25 %». | Propuesto |
+| RQ-CAR-01-13 | Los combos Dúo muestran su precio por tamaño. | Debe tener | RN-CAP-007 | Dado el combo Dúo con precio para tamaño regular y grande, cuando el cliente lo abre, entonces ve los dos precios y el total cambia al elegir el tamaño. | Propuesto |
 
 Prioridad por BRD §4 (E1). RQ-CAR-01-08 queda en *Debería tener* porque la lista de toppings la confirma Kevin (RN-CAP-053). Todos nacen *Propuesto* hasta que el PO los apruebe (DT-48).
 
@@ -81,6 +82,7 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RN-CAP-053 | Las bebidas pueden llevar toppings opcionales con precio extra; la lista se confirma con el cliente. | Acta 02 |
 | RN-CAP-067 | Un combo con más de 10 opciones lleva buscador dentro de la lista. | Pedido del 17/10 |
 | RN-CAP-038 | Moneda: soles. Un solo local. | Acta 02 |
+| DT-57 | En las bebidas se pide el nombre de quien la tomará, uno por unidad; sale como protagonista en su etiqueta. | Acta 03 · decisiones.md |
 
 ## 5. Trazabilidad y planificación
 
@@ -94,10 +96,11 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RQ-CAR-01-06 | HU-CAP-002 | — | R-01 |
 | RQ-CAR-01-07 | HU-CAP-002 | — | R-03 |
 | RQ-CAR-01-08 | HU-CAP-002 | DEP-05 lista de toppings | R-03 |
-| RQ-CAR-01-09 | HU-CAP-003 | — | R-01 |
-| RQ-CAR-01-10 | HU-CAP-003 | FT-OFE-01 combos | R-01 |
-| RQ-CAR-01-11 | HU-CAP-004 | FT-OFE-01 | R-01 |
+| RQ-CAR-01-09 | HU-CAP-002 | FT-COC-02 | R-01 |
+| RQ-CAR-01-10 | HU-CAP-003 | — | R-01 |
+| RQ-CAR-01-11 | HU-CAP-003 | FT-OFE-01 combos | R-01 |
 | RQ-CAR-01-12 | HU-CAP-004 | FT-OFE-01 | R-01 |
+| RQ-CAR-01-13 | HU-CAP-004 | FT-OFE-01 | R-01 |
 
 Historias de usuario de esta feature (en `historias/`, en draft):
 

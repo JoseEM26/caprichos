@@ -26,7 +26,7 @@ tags: [compras, plt-03, ep-cap-011, ft-com-03, deberia-tener]
 
 ## 1. Descripción y valor
 
-**Descripción.** Cada compra a un proveedor se registra con su **comprobante** (tipo, número y foto), condición **contado o crédito** y el **detalle**: insumo, cantidad en unidad de compra, costo, lote y vencimiento (NEC-CAP-069). La cantidad se **convierte** a la unidad del almacén con la equivalencia del insumo; los perecibles exigen vencimiento (RN-CAP-081 2.ª). Al registrarla, **suma al stock** del almacén y deja la entrada en Almacén. Un pedido «Por recibir» (FT-COM-02) se recibe completando costos, vencimientos y comprobante; recién ahí sube el stock (RN-CAP-136). Una compra registrada no se borra: se anula o se marca pagada. El costo de la compra actualiza el costo del insumo para las recetas.
+**Descripción.** Cada compra a un proveedor se registra con su **comprobante** (tipo, número y foto), condición **contado o crédito** y el **detalle**: insumo, cantidad en unidad de compra y costo (NEC-CAP-069); la serie del comprobante es opcional. **No se pide lote ni fecha de vencimiento** (DT-64, acta 03): el almacén es chico, no usa código de barras y las compras de un mes se mezclan con las del siguiente, así que esos datos no servirían. La cantidad se **convierte** a la unidad del almacén con la equivalencia del insumo (RN-CAP-081 2.ª). Al registrarla, **suma al stock** del almacén y deja la entrada en Almacén. Un pedido «Por recibir» (FT-COM-02) se recibe completando costos y comprobante; recién ahí sube el stock (RN-CAP-136). Una compra registrada no se borra: se anula o se marca pagada. El costo de la compra actualiza el costo del insumo para las recetas.
 
 **Beneficio esperado.** Stock y costos actualizados con cada compra; base del margen por plato (OBJ-CAP-003). Hipótesis medible: **100 % de compras con comprobante y costo**; **costo de insumos actualizado en el 100 % de las recetas**.
 
@@ -40,9 +40,9 @@ tags: [compras, plt-03, ep-cap-011, ft-com-03, deberia-tener]
 | --- | --- | --- | --- | --- | --- |
 | RQ-COM-03-01 | Se registra una compra con proveedor, comprobante, condición y detalle. | Debería tener | NEC-CAP-069 | Dada una factura de 2 cajas de leche a S/ 60 cada una, cuando almacén la registra con su foto, entonces queda con total S/ 120 y condición «crédito 15 días». | Propuesto |
 | RQ-COM-03-02 | La cantidad se convierte a la unidad del almacén con la equivalencia del insumo. | Debería tener | RN-CAP-081 (2.ª) | Dadas 2 cajas de 12 L, cuando se registra la compra, entonces el almacén sube 24 L. | Propuesto |
-| RQ-COM-03-03 | Los insumos perecibles exigen lote y vencimiento. | Debería tener | RN-CAP-081 (2.ª) | Dado el pollo perecible, cuando se registra sin vencimiento, entonces no se acepta. | Propuesto |
+| RQ-COM-03-03 | La compra no pide lote ni fecha de vencimiento. | Debería tener | DT-64 · Acta 03 | Dada una compra de 15 filetes de pollo, cuando almacén la registra, entonces el formulario no tiene campos de lote ni de vencimiento y la compra se guarda con insumo, cantidad y costo. | Propuesto |
 | RQ-COM-03-04 | Registrar la compra suma al stock y deja la entrada en Almacén. | Debería tener | NEC-CAP-069 | Dada la compra guardada, cuando almacén abre el historial, entonces ve la entrada «Compra · proveedor · comprobante». | Propuesto |
-| RQ-COM-03-05 | Un pedido «Por recibir» se recibe con costos, vencimientos y comprobante, y recién ahí sube el stock. | Debería tener | RN-CAP-136 | Dado un pedido por recibir de 3 cajas, cuando llegan 2, entonces almacén recibe 2 con su costo y el pedido queda parcial con 1 pendiente. | Propuesto |
+| RQ-COM-03-05 | Un pedido «Por recibir» se recibe con costos y comprobante, y recién ahí sube el stock. | Debería tener | RN-CAP-136 | Dado un pedido por recibir de 3 cajas, cuando llegan 2, entonces almacén recibe 2 con su costo y el pedido queda parcial con 1 pendiente. | Propuesto |
 | RQ-COM-03-06 | El costo de la compra actualiza el costo del insumo para las recetas. | Debería tener | OBJ-CAP-003 | Dada la leche a S/ 5 por litro en la nueva compra, cuando se registra, entonces el costo de la leche pasa a S/ 5 y los márgenes se recalculan. | Propuesto |
 | RQ-COM-03-07 | Una compra no se borra: se anula con motivo o se marca pagada. | Debería tener | RN-CAP-081 (2.ª) · RN-CAP-014 | Dada una compra a crédito, cuando el administrador la marca pagada, entonces queda con fecha de pago; al anularla, se revierte su entrada al stock. | Propuesto |
 | RQ-COM-03-08 | Las compras se filtran por proveedor, fechas, condición y estado de pago. | Podría tener | NEC-CAP-050 | Dadas compras de un mes, cuando se filtra «crédito sin pagar», entonces solo aparecen esas, con su vencimiento de pago. | Propuesto |
@@ -64,8 +64,9 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 
 | ID | Regla | Fuente |
 | --- | --- | --- |
-| RN-CAP-081 (2.ª) | La cantidad se convierte a la unidad del almacén; los perecibles exigen vencimiento; una compra no se borra (id repetido, O1). | Compras |
-| RN-CAP-136 | Al llegar se recibe y se registran costos, vencimientos y comprobante; recién ahí sube el stock. | Revisión de Compras 19/10 |
+| RN-CAP-081 (2.ª) | La cantidad se convierte a la unidad del almacén; una compra no se borra (id repetido, O1). Lo de exigir vencimiento a los perecibles queda **reemplazado por DT-64**. | Compras |
+| RN-CAP-136 | Al llegar se recibe y se registran costos y comprobante; recién ahí sube el stock (sin vencimientos, DT-64). | Revisión de Compras 19/10 |
+| DT-64 | Las compras no llevan lote ni fecha de vencimiento. | Acta 03 · decisiones.md |
 
 ## 5. Trazabilidad y planificación
 

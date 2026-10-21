@@ -33,7 +33,7 @@ tags: [hu, caja, capa-a, ft-caj-02, alta, ui]
 | CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
 |---|---|
 | **Contexto.** Historia de FT-CAJ-02 «Cobro con medios de pago y pago mixto» (Debe tener, épica EP-CAP-004). Cubre los requerimientos: **RQ-CAJ-02-07** Al cobrar se elige el comprobante, nota de venta por defecto. **RQ-CAJ-02-08** El cajero puede cobrar a crédito del personal un pedido del personal. | **Alcance.**<br>• Al cobrar se elige el comprobante, nota de venta por defecto.<br>• El cajero puede cobrar a crédito del personal un pedido del personal. |
-| **Problema.** Cobros exactos por medio de pago que cuadran con el cierre del día, sin cuentas hechas a mano. | **Fuera de alcance.**<br>• HU-CAP-033: Cobrar un pedido con un medio de pago y vuelto.<br>• HU-CAP-034: Cobrar con pago mixto.<br>• HU-CAP-036: Anular un pedido con motivo y PIN.<br>• Apertura y cierre de caja: FT-CIE-01 y FT-CIE-02.<br>• Emisión electrónica de boleta y factura (DT-11, D-07).<br>• Pago en línea con pasarela (DT-11).<br>• Devolución de un cobro ya cerrado (pendiente de Kevin, RN-CAP-096). |
+| **Problema.** Cobros exactos por medio de pago que cuadran con el cierre del día, sin cuentas hechas a mano. | **Fuera de alcance.**<br>• HU-CAP-033: Cobrar un pedido con un medio de pago y vuelto.<br>• HU-CAP-034: Cobrar con pago mixto.<br>• HU-CAP-036: Anular un pedido con motivo y el PIN de la supervisora.<br>• Apertura y cierre de caja: FT-CIE-01 y FT-CIE-02.<br>• Emisión electrónica de boleta y factura (DT-11, D-07).<br>• Pago en línea con pasarela (DT-11).<br>• Devolución de un cobro ya cerrado (pendiente de Kevin, RN-CAP-096). |
 
 ## 03 | CRITERIOS DE ACEPTACIÓN
 

@@ -14,7 +14,7 @@ tags: [datos, modelo, party, postgresql, g3]
 
 # DAT-CAP-001 — Modelo de datos de Caprichos
 
-> Modelo lógico y físico de referencia para G3. El script `datos/ddl-propuesto.sql` es la fuente: se probó en PostgreSQL 16 el 20/10/2026. Crea **98 tablas y 3 vistas** sin errores, y las restricciones clave rechazan los casos inválidos: rol vigente duplicado, DNI mal formado, dos pedidos abiertos en una mesa y delivery sin ubicación. Las migraciones reales las genera Prisma (ADR-003).
+> Modelo lógico y físico de referencia para G3. El script `datos/ddl-propuesto.sql` es la fuente: se probó en PostgreSQL 16 el 21/10/2026. Crea **102 tablas y 3 vistas** sin errores, y las restricciones clave rechazan los casos inválidos: rol vigente duplicado, DNI mal formado, dos pedidos abiertos en una mesa y delivery sin ubicación. Las migraciones reales las genera Prisma (ADR-003).
 
 ## 1. Convenciones
 
@@ -40,6 +40,7 @@ flowchart LR
   end
   subgraph ACC[Acceso]
     user_account & customer_account & sesion & rol_permiso & device_key
+    horario_trabajo & cobertura_turno
   end
   subgraph CAT[Catálogo y contenidos]
     categoria --- producto --- producto_tamano & sabor
@@ -55,12 +56,13 @@ flowchart LR
     pedido --- pedido_linea & pedido_mesa & comanda_area & comprobante_pago & cobro
     cobro --- cobro_pago
     caja --- movimiento_caja & liquidacion & cierre_caja --- cierre_medio
+    caja --- conteo_cierre
     print_job & agotado & alta_demanda
   end
   subgraph SAL[Salón y reparto]
     piso --- elemento_plano
     reserva --- reserva_mesa
-    zona_reparto & asignacion_reparto & incidente_entrega
+    zona_reparto & asignacion_reparto & incidente_entrega & mensaje_reparto
   end
   subgraph STK[Stock, almacén y compras]
     insumo --- stock & receta_linea
@@ -167,8 +169,12 @@ erDiagram
 
 | Entidad | Estados y transiciones | Fuente |
 |---|---|---|
-| `pedido` | Fuera del local: `POR_CONFIRMAR` → `EN_COCINA` (confirmar) o `RECHAZADO`. Mozo: nace en `EN_COCINA`. Luego `EN_PREPARACION` (alguna área empieza) → `LISTO` (todas terminan) → `EN_CAMINO` → `ENTREGADO` o `EN_COORDINACION` (entrega fallida) → `COBRADO`. `ANULADO` desde cualquiera sin cobrar, o cobrado con PIN y caja abierta | RN-CAP-074, RN-CAP-084, RN-CAP-096, RN-CAP-125 |
-| `comanda_area` | `NUEVO` → `EN_PREPARACION` → `LISTO` (con deshacer); `despejado` no cambia el estado | NEC-CAP-072 |
+| `pedido` | Chatbot y teléfono: `POR_CONFIRMAR` → `EN_COCINA` (confirmar) o `RECHAZADO`. Carta y mozo: nacen en `EN_COCINA` (la carta con el pago por coordinar, `pago_coordinado_en` vacío, DT-57). Luego `LISTO` (todas las áreas despejaron) → `EN_CAMINO` → `ENTREGADO` o `EN_COORDINACION` (entrega fallida) → `COBRADO`. `ANULADO` con motivo y el PIN de la supervisora (`anulacion_aprobada_por`); un cobrado, solo con caja abierta. Ya no existe `EN_PREPARACION` (DT-58) | RN-CAP-074, RN-CAP-084, RN-CAP-096, RN-CAP-125, DT-57, DT-58, DT-61 |
+| `comanda_area` | `EN_COCINA` → `DESPEJADA` (un solo botón); desde el Historial vuelve a `EN_COCINA` (`devuelta_en`) | NEC-CAP-072, DT-58 |
+| `asignacion_reparto` | tomado (`tomado_en`) → en camino (`salida_en`) → he llegado (`llegado_en`) → entregado (`entregado_en`) | DT-59 |
+| `mensaje_reparto` | 1 al salir; 2 y 3 desde «He llegado» si no responde: `ENVIADO` → `RESPONDIDO` o `FALLIDO` | DT-60 |
+| `cierre_caja` | cada intento en `conteo_cierre` (`CUADRA` / `NO_CUADRA`); se cierra con `CUADRA`, o con `NO_CUADRA` y el PIN de la supervisora (`aprobado_por`) | DT-61 |
+| `pedido_interno` | `PENDIENTE` (suena y avisa a quien está de turno) → `RECIBIDO` → `ENTREGADO` | DT-64 |
 | `reserva` | `ACTIVA` → `SENTADA`, `NO_ASISTIO` (vence la tolerancia) o `CANCELADA` | RN-CAP-107 |
 | `cupon_emitido` | `VIGENTE` → `CANJEADO`, `VENCIDO` o `ANULADO` | RN-CAP-133 |
 | `conversacion` | dueño `BOT` ↔ `PERSONA`; estado `ABIERTA`, `VALIDAR_PAGO` o `ATENDIDA` | RN-CAP-102 |
@@ -203,7 +209,25 @@ erDiagram
 | `iniciativa` | Queja, mejora o idea: código `IN-NNNN`, tipo, área, título (80), detalle (600), captura opcional, estado (`NUEVA`, `EN_REVISION`, `HECHA`, `NO_POR_AHORA`), autor y fecha; quién y cuándo cambió el estado |
 | `iniciativa_comentario` | Comentarios (400) con autor y fecha; no se editan ni se borran |
 
-Todo el personal lee las dos tablas; solo `ADMIN` cambia el estado. Cada acción lleva `@Auditar('iniciativas', ...)` y queda en `auditoria`. Probado en PostgreSQL 16 el 20/10/2026 (98 tablas).
+Todo el personal lee las dos tablas; solo `ADMIN` cambia el estado. Cada acción lleva `@Auditar('iniciativas', ...)` y queda en `auditoria`. Probado en PostgreSQL 16 el 21/10/2026 (102 tablas con los cambios del acta 03).
+
+## 7c. Cambios del acta 03 (revisión del mockup, 20/10/2026)
+
+| Cambio | Dónde | Decisión |
+|---|---|---|
+| Puntos con decimales (5 % del total) y canje en el pedido | `movimiento_puntos.puntos numeric(12,2)`, tipo `DEVOLUCION_CANJE`; `pedido.puntos_canjeados` | DT-55 |
+| Marca «No suma puntos ni aplica cupones» | `producto.no_suma_beneficios`, `oferta.no_suma_beneficios` | DT-65 |
+| Pedido de la carta directo a cocina, pago por coordinar | `pedido.pago_coordinado_en/por`; el `check` de ubicación solo exige punto para salir a reparto | DT-57 |
+| Nombre de quien toma cada bebida | `pedido_linea.nombres_persona text[]` (no más que la cantidad) | DT-57 |
+| Un solo botón «Despejar», historial y despacho | `comanda_area` con `EN_COCINA`/`DESPEJADA`, `despejada_en`, `devuelta_en`; `pedido.despachado_en/por` | DT-58 |
+| Alta demanda visible para todas las áreas | `alta_demanda.area_id` (quién la activó) | DT-58 |
+| Estados del reparto y mensajes al cliente | `asignacion_reparto.llegado_en`; tabla `mensaje_reparto` | DT-59, DT-60 |
+| Cierre ciego y anulación con PIN de la supervisora | `cierre_caja.resultado`, `aprobado_por`; tabla `conteo_cierre`; `pedido.anulacion_aprobada_por` con `check` | DT-61 |
+| Crédito del personal por semana o rango | `consumo_personal.fecha` (antes `anio_mes`) | DT-63 |
+| Horario de trabajo, coberturas y aviso del almacén | tablas `horario_trabajo`, `cobertura_turno`; `pedido_interno.avisado_party_id`, `recibido_por/en`, estado `RECIBIDO` | DT-64 |
+| Compras sin lote ni vencimiento | se quitan `compra_linea.lote`, `compra_linea.vence` e `insumo.perecible` | DT-64 |
+
+Todo lo anterior se probó en PostgreSQL 16 (`postgres:16-alpine`) el 21/10/2026: 102 tablas y 3 vistas, sin errores.
 
 ## 7b. Auditoría (ADR-014)
 

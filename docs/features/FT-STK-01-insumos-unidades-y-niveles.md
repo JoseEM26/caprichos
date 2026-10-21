@@ -26,7 +26,7 @@ tags: [stock, plt-03, ep-cap-009, ft-stk-01, deberia-tener]
 
 ## 1. Descripción y valor
 
-**Descripción.** Cada insumo (leche, azúcar, harina, huevos, pollo, café…) tiene una **ficha** con unidad de compra, de almacén y de receta y sus equivalencias (por ejemplo, caja de 12 litros → litro → mililitro), niveles de stock editables (mínimo, intermedio y máximo), si vence y sus **proveedores A, B y C** elegidos del directorio (NEC-CAP-071). El stock se lleva **por lugar**: el almacén central y cada área (cocina, barra) tienen su propio stock (RN-CAP-127). Cada insumo muestra un **semáforo** y una barra de qué tan lleno está frente a su máximo, con marcas de mínimo y medio y un estado en palabras: agotado, por acabarse, poco, bien, lleno (RN-CAP-041, RN-CAP-118). Los insumos no se eliminan: se desactivan.
+**Descripción.** Cada insumo (leche, azúcar, harina, huevos, pollo, café…) tiene una **ficha** con unidad de compra, de almacén y de receta y sus equivalencias (por ejemplo, caja de 12 litros → litro → mililitro), niveles de stock editables (mínimo, intermedio y máximo), sus **proveedores A, B y C** elegidos del directorio (NEC-CAP-071). El stock se lleva **por lugar**: el almacén central y cada área (cocina, barra) tienen su propio stock (RN-CAP-127). Cada insumo muestra un **semáforo** y una barra de qué tan lleno está frente a su máximo, con marcas de mínimo y medio y un estado en palabras: agotado, por acabarse, poco, bien, lleno (RN-CAP-041, RN-CAP-118). Los insumos no se eliminan: se desactivan.
 
 **Beneficio esperado.** Saber qué hay, dónde está y qué falta, con un vistazo. Base para OBJ-CAP-002 y OBJ-CAP-003. Hipótesis medible: **100 % de los insumos de las recetas con ficha completa** y **semáforo correcto en el 100 % de los casos de prueba**.
 
@@ -40,7 +40,7 @@ tags: [stock, plt-03, ep-cap-009, ft-stk-01, deberia-tener]
 | --- | --- | --- | --- | --- | --- |
 | RQ-STK-01-01 | Un insumo tiene ficha con nombre, unidad de compra, de almacén y de receta con sus equivalencias. | Debería tener | NEC-CAP-071 | Dada la leche con «caja de 12 L = 12 L» y «1 L = 1000 ml», cuando se registran 2 cajas, entonces el almacén suma 24 L y una receta de 250 ml descuenta 0,25 L. | Propuesto |
 | RQ-STK-01-02 | Los niveles mínimo, intermedio y máximo se editan por insumo. | Debería tener | RN-CAP-041 · NEC-CAP-071 | Dada la leche con mínimo 10 L, cuando el administrador lo cambia a 12 L con Sí/No, entonces el semáforo se recalcula con el nuevo mínimo. | Propuesto |
-| RQ-STK-01-03 | Cada insumo indica si vence; los perecibles exigen vencimiento al entrar. | Debería tener | NEC-CAP-071 · RN-CAP-081 (2.ª) | Dado el pollo marcado perecible, cuando se registra una entrada sin fecha de vencimiento, entonces no se acepta. | Propuesto |
+| RQ-STK-01-03 | Las entradas de insumos no piden lote ni fecha de vencimiento. | Debería tener | DT-64 · Acta 03 | Dado el pollo, cuando se registra una entrada, entonces no hay campos de lote ni de vencimiento; la frescura de lo producido se controla con la vida útil de los productos (V7). | Propuesto |
 | RQ-STK-01-04 | Un insumo tiene proveedores A, B y C elegidos del directorio, sin repetir. | Debería tener | NEC-CAP-071 · RN-CAP-082 (2.ª) | Dado un insumo, cuando el administrador elige el mismo proveedor como A y B, entonces no se acepta. | Propuesto |
 | RQ-STK-01-05 | El stock se lleva por lugar: almacén central y cada área. | Debería tener | RN-CAP-127 | Dada la leche con 20 L en almacén y 3 L en barra, cuando se abre la ficha, entonces se ven las dos cantidades por separado y el total. | Propuesto |
 | RQ-STK-01-06 | Cada insumo muestra semáforo, barra frente al máximo y estado en palabras. | Debería tener | RN-CAP-041 · RN-CAP-118 | Dado un máximo de 40 y un mínimo de 10, cuando hay 8, entonces se ve rojo y «Poco»; con 0, «Agotado»; con 38, «Lleno». | Propuesto |
@@ -66,7 +66,7 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | ID | Regla | Fuente |
 | --- | --- | --- |
 | RN-CAP-041 | Semáforo verde, naranja y rojo con mínimo, intermedio y máximo. | Acta 02 |
-| RN-CAP-081 (2.ª) | Al registrar una compra se convierte a la unidad del almacén; los perecibles exigen vencimiento (id repetido, O1). | Compras |
+| RN-CAP-081 (2.ª) | Al registrar una compra se convierte a la unidad del almacén (id repetido, O1); sin lote ni vencimiento (DT-64). | Compras |
 | RN-CAP-082 (2.ª) | Proveedor desactivado no se elige; A, B y C no se repiten (id repetido, O1). | Proveedores |
 | RN-CAP-118 | Barra de llenado con marcas y estado en palabras. | Stock |
 | RN-CAP-127 | Stock por área: almacén central y cocina o barra, cada uno con su stock. | Stock |

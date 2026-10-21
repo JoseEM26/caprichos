@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-008, FT-DEL-01, RQ-DEL-01-06, RQ-DEL-01-07, HU-CAP-068, HU-CAP-069, ADR-001, ADR-011, ADR-014, ADR-006, ADR-007, ADR-010, D-02, DEP-02, DEP-06, R-01]
+relacionados: [EP-CAP-008, FT-DEL-01, RQ-DEL-01-07, RQ-DEL-01-08, HU-CAP-068, HU-CAP-069, ADR-001, ADR-011, ADR-014, ADR-006, ADR-007, ADR-010, D-02, DEP-02, DEP-06, R-01]
 tags: [hu, delivery, capa-a, ft-del-01, alta, ui]
 ---
 
@@ -32,18 +32,18 @@ tags: [hu, delivery, capa-a, ft-del-01, alta, ui]
 
 | CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
 |---|---|
-| **Contexto.** Historia de FT-DEL-01 «Zonas de reparto y tarifas» (Debe tener, épica EP-CAP-008). Cubre los requerimientos: **RQ-DEL-01-06** El envío es gratis cuando los productos pasan del monto configurado. **RQ-DEL-01-07** El administrador asigna a un cliente una tarifa especial de monto fijo o porcentaje. | **Alcance.**<br>• El envío es gratis cuando los productos pasan del monto configurado.<br>• El administrador asigna a un cliente una tarifa especial de monto fijo o porcentaje. |
+| **Contexto.** Historia de FT-DEL-01 «Zonas de reparto y tarifas» (Debe tener, épica EP-CAP-008). Cubre los requerimientos: **RQ-DEL-01-07** El envío es gratis cuando los productos pasan del monto configurado. **RQ-DEL-01-08** El administrador asigna a un cliente una tarifa especial de monto fijo o porcentaje. | **Alcance.**<br>• El envío es gratis cuando los productos pasan del monto configurado.<br>• El administrador asigna a un cliente una tarifa especial de monto fijo o porcentaje. |
 | **Problema.** Un envío cobrado igual en todos los canales, calculado solo con el punto, sin que el cliente tenga que conocer las zonas. | **Fuera de alcance.**<br>• HU-CAP-068: Calcular el envío por la zona del punto.<br>• HU-CAP-069: Editar, apagar y tarifar las zonas.<br>• Cómo el cliente da su ubicación: FT-PED-02.<br>• Mapa de calor de entregas: FT-INF-02.<br>• Crear zonas nuevas (excluido por NEC-CAP-100). |
 
 ## 03 | CRITERIOS DE ACEPTACIÓN
 
 | N.° | DADO | CUANDO | ENTONCES |
 |---|---|---|---|
-| CA-1 | «más de S/ 70» | los productos suman S/ 70,10 | el envío es S/ 0; el administrador puede cambiar a «desde S/ 70» (RQ-DEL-01-06) |
-| CA-2 | un cliente con envío fijo de S/ 2 y otro con 50 % | cada uno pide a Z5 (S/ 6) | pagan S/ 2 y S/ 3; si sus productos pasan de S/ 70, ambos pagan S/ 0 (RQ-DEL-01-07) |
+| CA-1 | «más de S/ 70» | los productos suman S/ 70,10 | el envío es S/ 0; el administrador puede cambiar a «desde S/ 70» (RQ-DEL-01-07) |
+| CA-2 | un cliente con envío fijo de S/ 2 y otro con 50 % | cada uno pide a Z5 (S/ 6) | pagan S/ 2 y S/ 3; si sus productos pasan de S/ 70, ambos pagan S/ 0 (RQ-DEL-01-08) |
 | CA-3 | un usuario con un rol sin permiso para esta acción (ACT-CAP-009 repartidor) | intenta hacerla desde el menú o escribiendo la dirección de la pantalla | se rechaza en el servidor, no se guarda nada y no se entregan datos (RN-CAP-013, RNF-CAP-006) |
 
-Origen: criterios de verificación de FT-DEL-01 (RQ-DEL-01-06, RQ-DEL-01-07); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
+Origen: criterios de verificación de FT-DEL-01 (RQ-DEL-01-07, RQ-DEL-01-08); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
 
 ## 04 | REGLAS, DEPENDENCIAS Y EVIDENCIAS
 
@@ -64,4 +64,4 @@ Origen: criterios de verificación de FT-DEL-01 (RQ-DEL-01-06, RQ-DEL-01-07); lo
 
 **DoR: NO READY** hasta cerrar G2 y G3 (y con G0 y G1 aún sin aprobar).
 
-Generado por IA: historia derivada de FT-DEL-01 (requerimientos RQ-DEL-01-06, RQ-DEL-01-07, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)
+Generado por IA: historia derivada de FT-DEL-01 (requerimientos RQ-DEL-01-07, RQ-DEL-01-08, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)

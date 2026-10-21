@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-018, FT-INF-01, HU-CAP-161, HU-CAP-162, HU-CAP-163, ADR-001, ADR-011, ADR-014, ADR-006, ADR-012, FT-ALM-03, FT-CIE-02, FT-COC-01, FT-DEL-02, FT-OFE-01, FT-OFE-03, FT-STK-02]
+relacionados: [EP-CAP-018, FT-INF-01, HU-CAP-161, HU-CAP-162, HU-CAP-163, ADR-001, ADR-011, ADR-014, ADR-006, ADR-012, FT-ALM-03, FT-CIE-02, FT-COC-01, FT-DEL-02, FT-OFE-01, FT-OFE-03, FT-STK-02, FT-USR-04]
 tags: [dor, plt-05, informes, ft-inf-01, g4]
 ---
 
@@ -64,6 +64,7 @@ flowchart LR
   FT_OFE_01["FT-OFE-01"]:::interna --> FT_INF_01
   FT_OFE_03["FT-OFE-03"]:::interna --> FT_INF_01
   FT_STK_02["FT-STK-02"]:::interna --> FT_INF_01
+  FT_USR_04["FT-USR-04"]:::interna --> FT_INF_01
   ADR_001["ADR-001"]:::interna -.-> FT_INF_01
   ADR_011["ADR-011"]:::interna -.-> FT_INF_01
   ADR_014["ADR-014"]:::interna -.-> FT_INF_01
@@ -74,7 +75,7 @@ flowchart LR
 ```
 
 - **Ítems evaluados:** FT-INF-01 y sus historias HU-CAP-161, HU-CAP-162, HU-CAP-163.
-- **Dependencias técnicas:** FT-ALM-03, FT-CIE-02, FT-COC-01, FT-DEL-02, FT-OFE-01, FT-OFE-03, FT-STK-02; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-006, ADR-012.
+- **Dependencias técnicas:** FT-ALM-03, FT-CIE-02, FT-COC-01, FT-DEL-02, FT-OFE-01, FT-OFE-03, FT-STK-02, FT-USR-04; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-006, ADR-012.
 - **Dependencias externas:** DEP-02, DEP-06.
 - **Decisiones abiertas:** ninguna propia.
 

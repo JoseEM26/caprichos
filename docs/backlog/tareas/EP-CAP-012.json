@@ -102,7 +102,7 @@
         },
         {
           "id": "HU-CAP-106-T02",
-          "titulo": "Reglas de dominio de HU-CAP-106 (RQ-OFE-01-04, RQ-OFE-01-07)",
+          "titulo": "Reglas de dominio de HU-CAP-106 (RQ-OFE-01-04, RQ-OFE-01-09)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -174,7 +174,7 @@
         },
         {
           "id": "HU-CAP-107-T02",
-          "titulo": "Reglas de dominio de HU-CAP-107 (RQ-OFE-01-05, RQ-OFE-01-06)",
+          "titulo": "Reglas de dominio de HU-CAP-107 (RQ-OFE-01-05, RQ-OFE-01-06, RQ-OFE-01-07, RQ-OFE-01-08)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -219,7 +219,7 @@
         },
         {
           "id": "HU-CAP-107-T06",
-          "titulo": "Pruebas TC-CAP-107-01..02 (unitarias de dominio e integración de API)",
+          "titulo": "Pruebas TC-CAP-107-01..04 (unitarias de dominio e integración de API)",
           "capa": "application",
           "actividad": "PRUEBAS",
           "responsable": "José Ángel Espinoza",
@@ -246,7 +246,7 @@
         },
         {
           "id": "HU-CAP-108-T02",
-          "titulo": "Reglas de dominio de HU-CAP-108 (RQ-OFE-01-08, RQ-OFE-01-09, RQ-OFE-01-10)",
+          "titulo": "Reglas de dominio de HU-CAP-108 (RQ-OFE-01-10, RQ-OFE-01-11, RQ-OFE-01-12)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -700,7 +700,7 @@
         },
         {
           "id": "HU-CAP-114-T02",
-          "titulo": "Reglas de dominio de HU-CAP-114 (RQ-OFE-03-06, RQ-OFE-03-07, RQ-OFE-03-08)",
+          "titulo": "Reglas de dominio de HU-CAP-114 (RQ-OFE-03-06, RQ-OFE-03-07, RQ-OFE-03-08, RQ-OFE-03-09)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -745,7 +745,7 @@
         },
         {
           "id": "HU-CAP-114-T06",
-          "titulo": "Pruebas TC-CAP-114-01..03 (unitarias de dominio e integración de API)",
+          "titulo": "Pruebas TC-CAP-114-01..04 (unitarias de dominio e integración de API)",
           "capa": "application",
           "actividad": "PRUEBAS",
           "responsable": "José Ángel Espinoza",
@@ -772,7 +772,7 @@
         },
         {
           "id": "HU-CAP-115-T02",
-          "titulo": "Reglas de dominio de HU-CAP-115 (RQ-OFE-03-09, RQ-OFE-03-10, RQ-OFE-03-11)",
+          "titulo": "Reglas de dominio de HU-CAP-115 (RQ-OFE-03-10, RQ-OFE-03-11, RQ-OFE-03-12)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",

@@ -39,17 +39,19 @@ tags: [caja, plt-03, ep-cap-004, ft-caj-03, debe-tener]
 | ID | Requerimiento | Prioridad | Origen | Criterio de verificación | Estado |
 | --- | --- | --- | --- | --- | --- |
 | RQ-CAJ-03-01 | Nuevo pedido usa el mismo catálogo y reglas de opciones que la carta, con o sin imágenes. | Debe tener | RN-CAP-027 · NEC-CAP-043 | Dado un producto con grupo obligatorio, cuando el cajero lo agrega sin elegir, entonces no puede; puede alternar la vista con o sin imágenes. | Propuesto |
-| RQ-CAJ-03-02 | El cliente se busca por teléfono o DNI y su dirección se recuerda. | Debe tener | NEC-CAP-080 | Dado un cliente que pidió antes, cuando el call center escribe su teléfono, entonces aparecen su nombre y su última dirección con el punto en el mapa, editables. | Propuesto |
-| RQ-CAJ-03-03 | Se puede repetir un pedido anterior del cliente. | Debería tener | NEC-CAP-080 | Dado un cliente con pedidos anteriores, cuando el call center toca «Repetir» en uno, entonces el carrito se llena con esos productos y opciones a los precios de hoy. | Propuesto |
-| RQ-CAJ-03-04 | Para delivery se marca el lugar en el mapa buscando la dirección o tocando el punto. | Debe tener | NEC-CAP-059 · NEC-CAP-049 | Dado un pedido por teléfono, cuando el call center busca la dirección que dictó el cliente y ajusta el pin, entonces el pedido guarda el punto, el enlace, la zona y su envío. | Propuesto |
-| RQ-CAJ-03-05 | Se aplica la tarifa especial de envío del cliente si la tiene. | Debería tener | RN-CAP-109 · NEC-CAP-096 | Dado un cliente con envío fijo de S/ 2, cuando se toma su delivery a la zona de S/ 5, entonces el envío es S/ 2. | Propuesto |
-| RQ-CAJ-03-06 | Se pueden elegir promociones vigentes y aplicar un cupón; los descuentos automáticos se aplican solos. | Debe tener | NEC-CAP-065 · RN-CAP-070 | Dado un descuento automático vigente para la categoría Frappés, cuando el cajero agrega un frappé, entonces el descuento aparece solo; al escribir un cupón, se aplica según la regla de acumulación. | Propuesto |
-| RQ-CAJ-03-07 | Un pedido por teléfono para delivery o recojo entra «por confirmar». | Debe tener | RN-CAP-074 | Dado un pedido tomado por teléfono, cuando el call center lo guarda, entonces entra a la cola «por confirmar» con canal «Teléfono». | Propuesto |
-| RQ-CAJ-03-08 | El pedido del personal elige a un trabajador activo, en el local o para llevar, con su descuento. | Debería tener | NEC-CAP-094 · RN-CAP-106 | Dado el pedido del personal, cuando el cajero elige a un trabajador activo, entonces solo se ofrecen «En el local» y «Para llevar» y se aplica el 25 % salvo a combos, promociones y docenas. | Propuesto |
-| RQ-CAJ-03-09 | Anular un pedido exige motivo y queda en el historial. | Debe tener | RN-CAP-089 · NEC-CAP-080 | Dado un pedido guardado sin cobrar, cuando el call center lo anula con motivo, entonces queda anulado con su autor y motivo. | Propuesto |
-| RQ-CAJ-03-10 | Se registra con cuánto paga el cliente en efectivo para que el repartidor lleve el vuelto. | Debe tener | NEC-CAP-080 · NEC-CAP-079 | Dado un delivery en efectivo de S/ 37, cuando el call center anota «paga con S/ 50», entonces el pedido muestra vuelto S/ 13 para el repartidor. | Propuesto |
+| RQ-CAJ-03-02 | Al pedir más de una unidad de un producto con opciones, se elige la opción de cada unidad, con un mismo tamaño. | Debe tener | DT-62 · Acta 03 | Dados 3 frappés de fresa tamaño regular, cuando el cajero pone cantidad 3, entonces se le piden 3 leches y elige «entera, entera, almendra»; la cuenta y la comanda muestran «2 × entera · 1 × almendra». | Propuesto |
+| RQ-CAJ-03-03 | El cliente se busca por teléfono o DNI y su dirección se recuerda. | Debe tener | NEC-CAP-080 | Dado un cliente que pidió antes, cuando el call center escribe su teléfono, entonces aparecen su nombre y su última dirección con el punto en el mapa, editables. | Propuesto |
+| RQ-CAJ-03-04 | Se puede repetir un pedido anterior del cliente. | Debería tener | NEC-CAP-080 | Dado un cliente con pedidos anteriores, cuando el call center toca «Repetir» en uno, entonces el carrito se llena con esos productos y opciones a los precios de hoy. | Propuesto |
+| RQ-CAJ-03-05 | Para delivery se marca el lugar en el mapa buscando la dirección o tocando el punto. | Debe tener | NEC-CAP-059 · NEC-CAP-049 | Dado un pedido por teléfono, cuando el call center busca la dirección que dictó el cliente y ajusta el pin, entonces el pedido guarda el punto, el enlace, la zona y su envío. | Propuesto |
+| RQ-CAJ-03-06 | Se aplica la tarifa especial de envío del cliente si la tiene. | Debería tener | RN-CAP-109 · NEC-CAP-096 | Dado un cliente con envío fijo de S/ 2, cuando se toma su delivery a la zona de S/ 5, entonces el envío es S/ 2. | Propuesto |
+| RQ-CAJ-03-07 | Se pueden elegir promociones vigentes y aplicar un cupón; los descuentos automáticos se aplican solos. | Debe tener | NEC-CAP-065 · RN-CAP-070 | Dado un descuento automático vigente para la categoría Frappés, cuando el cajero agrega un frappé, entonces el descuento aparece solo; al escribir un cupón, se aplica según la regla de acumulación. | Propuesto |
+| RQ-CAJ-03-08 | El sistema sugiere la promoción para la que califica el pedido y quien atiende la aplica si el cliente acepta. | Debería tener | DT-62 · Acta 03 | Dado un pedido con dos Ice Coffee de S/ 9, cuando el cajero los agrega, entonces ve «El pedido califica para 2×1 Ice Coffee · ahorra S/ 9 · Aplicar»; si el cliente no la quiere, el aviso se cierra y no vuelve a salir en ese pedido. | Propuesto |
+| RQ-CAJ-03-09 | Un pedido por teléfono para delivery o recojo entra «por confirmar». | Debe tener | RN-CAP-074 | Dado un pedido tomado por teléfono, cuando el call center lo guarda, entonces entra a la cola «por confirmar» con canal «Teléfono». | Propuesto |
+| RQ-CAJ-03-10 | El pedido del personal elige a un trabajador activo, en el local o para llevar, con su descuento. | Debería tener | NEC-CAP-094 · RN-CAP-106 | Dado el pedido del personal, cuando el cajero elige a un trabajador activo, entonces solo se ofrecen «En el local» y «Para llevar» y se aplica el 25 % salvo a combos, promociones y docenas. | Propuesto |
+| RQ-CAJ-03-11 | Anular un pedido exige motivo y queda en el historial. | Debe tener | RN-CAP-089 · NEC-CAP-080 | Dado un pedido guardado sin cobrar, cuando el call center lo anula con motivo, entonces queda anulado con su autor y motivo. | Propuesto |
+| RQ-CAJ-03-12 | Se registra con cuánto paga el cliente en efectivo para que el repartidor lleve el vuelto. | Debe tener | NEC-CAP-080 · NEC-CAP-079 | Dado un delivery en efectivo de S/ 37, cuando el call center anota «paga con S/ 50», entonces el pedido muestra vuelto S/ 13 para el repartidor. | Propuesto |
 
-Prioridad por NEC-CAP-080 (E1). RQ-CAJ-03-03, 05 y 08 quedan en *Debería tener* por depender de historial, tarifas especiales y crédito del personal. Todos nacen *Propuesto* hasta que el PO los apruebe (DT-48).
+Prioridad por NEC-CAP-080 (E1). RQ-CAJ-03-04, 06 y 10 quedan en *Debería tener* por depender de historial, tarifas especiales y crédito del personal; RQ-CAJ-03-08 porque depende de las promociones (fase Siguiente). Todos nacen *Propuesto* hasta que el PO los apruebe (DT-48).
 
 ## 3. Requerimientos no funcionales
 
@@ -71,21 +73,24 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RN-CAP-070 | Promociones y descuentos valen en sus días, horas y canales; por defecto un cupón no se junta con un descuento automático. | Pedido del 17/10 |
 | RN-CAP-106 | El pedido del personal es solo en el local o para llevar; el descuento no aplica a combos, promociones ni docenas. | Personal |
 | RN-CAP-109 | Tarifa especial por cliente: el monto fijo prevalece sobre el porcentaje y el envío gratis sobre ambos. | Delivery |
+| DT-62 | Opciones por unidad al pedir varias, con un mismo tamaño; sugerencia de la promoción aplicable. | Acta 03 · decisiones.md |
 
 ## 5. Trazabilidad y planificación
 
 | Requerimiento | Historias de usuario | Dependencia | Riesgo |
 | --- | --- | --- | --- |
 | RQ-CAJ-03-01 | HU-CAP-037 | FT-CAR-01 | R-01 |
-| RQ-CAJ-03-02 | HU-CAP-038 | — | R-01 |
+| RQ-CAJ-03-02 | HU-CAP-037 | FT-COC-01 | R-01 |
 | RQ-CAJ-03-03 | HU-CAP-038 | — | R-01 |
-| RQ-CAJ-03-04 | HU-CAP-038 | FT-DEL-01 | R-01 |
+| RQ-CAJ-03-04 | HU-CAP-038 | — | R-01 |
 | RQ-CAJ-03-05 | HU-CAP-038 | FT-DEL-01 | R-01 |
-| RQ-CAJ-03-06 | HU-CAP-039 | FT-OFE-01 · FT-OFE-02 · FT-OFE-03 | R-01 |
-| RQ-CAJ-03-07 | HU-CAP-037 | FT-CAJ-01 | R-01 |
-| RQ-CAJ-03-08 | HU-CAP-040 | FT-USR-03 | R-01 |
-| RQ-CAJ-03-09 | HU-CAP-037 | — | R-01 |
-| RQ-CAJ-03-10 | HU-CAP-038 | FT-DEL-02 | R-01 |
+| RQ-CAJ-03-06 | HU-CAP-038 | FT-DEL-01 | R-01 |
+| RQ-CAJ-03-07 | HU-CAP-039 | FT-OFE-01 · FT-OFE-02 · FT-OFE-03 | R-01 |
+| RQ-CAJ-03-08 | HU-CAP-039 | FT-OFE-01 | R-01 |
+| RQ-CAJ-03-09 | HU-CAP-037 | FT-CAJ-01 | R-01 |
+| RQ-CAJ-03-10 | HU-CAP-040 | FT-USR-03 | R-01 |
+| RQ-CAJ-03-11 | HU-CAP-037 | — | R-01 |
+| RQ-CAJ-03-12 | HU-CAP-038 | FT-DEL-02 | R-01 |
 
 Historias de usuario de esta feature (en `historias/`, en draft):
 

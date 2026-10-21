@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-007, FT-SAL-02, RQ-SAL-02-01, RQ-SAL-02-02, RQ-SAL-02-06, RQ-SAL-02-07, HU-CAP-062, HU-CAP-063, HU-CAP-064, ADR-001, ADR-011, ADR-014, ADR-006, ADR-007, DEP-02, DEP-06, R-01, R-09]
+relacionados: [EP-CAP-007, FT-SAL-02, RQ-SAL-02-01, RQ-SAL-02-02, RQ-SAL-02-06, RQ-SAL-02-08, HU-CAP-062, HU-CAP-063, HU-CAP-064, ADR-001, ADR-011, ADR-014, ADR-006, ADR-007, DEP-02, DEP-06, R-01, R-09]
 tags: [hu, salon, capa-a, ft-sal-02, alta, ui]
 ---
 
@@ -32,7 +32,7 @@ tags: [hu, salon, capa-a, ft-sal-02, alta, ui]
 
 | CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
 |---|---|
-| **Contexto.** Historia de FT-SAL-02 «Pedido del mozo y control de mesas» (Debe tener, épica EP-CAP-007). Cubre los requerimientos: **RQ-SAL-02-01** El mozo elige la mesa con botones de mesas libres o en el plano, y la mesa queda visible con opción de cambiarla. **RQ-SAL-02-02** Una mesa ocupada no se puede abrir otra vez, aunque dos personas lo intenten a la vez. **RQ-SAL-02-06** Un pedido puede ocupar varias mesas juntas, que se muestran y liberan juntas. **RQ-SAL-02-07** «Para llevar» no usa mesa. | **Alcance.**<br>• El mozo elige la mesa con botones de mesas libres o en el plano, y la mesa queda visible con opción de cambiarla.<br>• Una mesa ocupada no se puede abrir otra vez, aunque dos personas lo intenten a la vez.<br>• Un pedido puede ocupar varias mesas juntas, que se muestran y liberan juntas.<br>• «Para llevar» no usa mesa. |
+| **Contexto.** Historia de FT-SAL-02 «Pedido del mozo y control de mesas» (Debe tener, épica EP-CAP-007). Cubre los requerimientos: **RQ-SAL-02-01** El mozo elige la mesa con botones de mesas libres o en el plano, y la mesa queda visible con opción de cambiarla. **RQ-SAL-02-02** Una mesa ocupada no se puede abrir otra vez, aunque dos personas lo intenten a la vez. **RQ-SAL-02-06** Un pedido puede ocupar varias mesas juntas, que se muestran y liberan juntas. **RQ-SAL-02-08** «Para llevar» no usa mesa. | **Alcance.**<br>• El mozo elige la mesa con botones de mesas libres o en el plano, y la mesa queda visible con opción de cambiarla.<br>• Una mesa ocupada no se puede abrir otra vez, aunque dos personas lo intenten a la vez.<br>• Un pedido puede ocupar varias mesas juntas, que se muestran y liberan juntas.<br>• «Para llevar» no usa mesa. |
 | **Problema.** Pedidos de salón que llegan a cocina al instante y sin mezclar mesas. Contribuye a OBJ-CAP-001. | **Fuera de alcance.**<br>• HU-CAP-062: Enviar el pedido de mesa directo a cocina.<br>• HU-CAP-063: Agregar consumos a una mesa ocupada e imprimir la precuenta.<br>• HU-CAP-064: Recibir aviso de listo, entregar en mesa y liberar.<br>• Dibujar el plano: FT-SAL-01.<br>• Reservas: FT-SAL-03.<br>• El cobro: FT-CAJ-02.<br>• Dividir la cuenta de una mesa entre varias personas (no pedido en el BRD). |
 
 ## 03 | CRITERIOS DE ACEPTACIÓN
@@ -42,9 +42,9 @@ tags: [hu, salon, capa-a, ft-sal-02, alta, ui]
 | CA-1 | el pedido de mesa | el mozo abre Nuevo pedido | se le pregunta la mesa con las libres como botones y un acceso al plano; la mesa elegida se ve arriba con «Cambiar» (RQ-SAL-02-01) |
 | CA-2 | dos mozos que eligen la mesa 3 al mismo tiempo | envían | solo uno abre el pedido y el otro ve «La mesa 3 ya está ocupada» (RQ-SAL-02-02) |
 | CA-3 | un grupo de 8 | el mozo elige las mesas 4 y 5 | ambas quedan ocupadas por el mismo pedido y se liberan juntas al cobrar (RQ-SAL-02-06) |
-| CA-4 | un pedido para llevar del mozo | lo arma | no se le pide mesa (RQ-SAL-02-07) |
+| CA-4 | un pedido para llevar del mozo | lo arma | no se le pide mesa (RQ-SAL-02-08) |
 
-Origen: criterios de verificación de FT-SAL-02 (RQ-SAL-02-01, RQ-SAL-02-02, RQ-SAL-02-06, RQ-SAL-02-07); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
+Origen: criterios de verificación de FT-SAL-02 (RQ-SAL-02-01, RQ-SAL-02-02, RQ-SAL-02-06, RQ-SAL-02-08); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
 
 ## 04 | REGLAS, DEPENDENCIAS Y EVIDENCIAS
 
@@ -65,4 +65,4 @@ Origen: criterios de verificación de FT-SAL-02 (RQ-SAL-02-01, RQ-SAL-02-02, RQ-
 
 **DoR: NO READY** hasta cerrar G2 y G3 (y con G0 y G1 aún sin aprobar).
 
-Generado por IA: historia derivada de FT-SAL-02 (requerimientos RQ-SAL-02-01, RQ-SAL-02-02, RQ-SAL-02-06, RQ-SAL-02-07, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)
+Generado por IA: historia derivada de FT-SAL-02 (requerimientos RQ-SAL-02-01, RQ-SAL-02-02, RQ-SAL-02-06, RQ-SAL-02-08, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)

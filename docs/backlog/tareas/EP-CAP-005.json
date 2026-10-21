@@ -257,7 +257,7 @@
         },
         {
           "id": "HU-CAP-044-T03",
-          "titulo": "Reglas de dominio de HU-CAP-044 (RQ-CIE-02-01, RQ-CIE-02-02, RQ-CIE-02-03, RQ-CIE-02-04)",
+          "titulo": "Reglas de dominio de HU-CAP-044 (RQ-CIE-02-01, RQ-CIE-02-02, RQ-CIE-02-03, RQ-CIE-02-04, RQ-CIE-02-06)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -269,7 +269,7 @@
         },
         {
           "id": "HU-CAP-044-T04",
-          "titulo": "Casos de uso: Contar el efectivo y comparar cada medio de pago",
+          "titulo": "Casos de uso: Contar a ciegas el efectivo y las billeteras",
           "capa": "application",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -291,7 +291,7 @@
         },
         {
           "id": "HU-CAP-044-T06",
-          "titulo": "Pantalla React: Contar el efectivo y comparar cada medio de pago",
+          "titulo": "Pantalla React: Contar a ciegas el efectivo y las billeteras",
           "capa": "ux",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -302,7 +302,7 @@
         },
         {
           "id": "HU-CAP-044-T07",
-          "titulo": "Pruebas TC-CAP-044-01..04 (unitarias de dominio e integración de API)",
+          "titulo": "Pruebas TC-CAP-044-01..06 (unitarias de dominio e integración de API)",
           "capa": "application",
           "actividad": "PRUEBAS",
           "responsable": "José Ángel Espinoza",
@@ -329,7 +329,7 @@
         },
         {
           "id": "HU-CAP-045-T02",
-          "titulo": "Reglas de dominio de HU-CAP-045 (RQ-CIE-02-05, RQ-CIE-02-06)",
+          "titulo": "Reglas de dominio de HU-CAP-045 (RQ-CIE-02-07, RQ-CIE-02-08)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -374,7 +374,7 @@
         },
         {
           "id": "HU-CAP-045-T06",
-          "titulo": "Pruebas TC-CAP-045-01..02 (unitarias de dominio e integración de API)",
+          "titulo": "Pruebas TC-CAP-045-01..03 (unitarias de dominio e integración de API)",
           "capa": "application",
           "actividad": "PRUEBAS",
           "responsable": "José Ángel Espinoza",
@@ -401,7 +401,7 @@
         },
         {
           "id": "HU-CAP-046-T02",
-          "titulo": "Reglas de dominio de HU-CAP-046 (RQ-CIE-02-07, RQ-CIE-02-08, RQ-CIE-02-09)",
+          "titulo": "Reglas de dominio de HU-CAP-046 (RQ-CIE-02-09, RQ-CIE-02-10, RQ-CIE-02-11)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -446,13 +446,85 @@
         },
         {
           "id": "HU-CAP-046-T06",
-          "titulo": "Pruebas TC-CAP-046-01..04 (unitarias de dominio e integración de API)",
+          "titulo": "Pruebas TC-CAP-046-01..05 (unitarias de dominio e integración de API)",
           "capa": "application",
           "actividad": "PRUEBAS",
           "responsable": "José Ángel Espinoza",
           "estimacion_horas": null,
           "depende_de": [
             "HU-CAP-046-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-199",
+      "tareas": [
+        {
+          "id": "HU-CAP-199-T01",
+          "titulo": "Revisar criterios de HU-CAP-199 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-178-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-199-T02",
+          "titulo": "Reglas de dominio de HU-CAP-199 (RQ-CIE-02-05)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-199-T01",
+            "HU-CAP-044-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-199-T03",
+          "titulo": "Casos de uso: Revisar con mi PIN el detalle de un cierre que no cuadra",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-199-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-199-T04",
+          "titulo": "Endpoints y eventos de FT-CIE-02 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-199-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-199-T05",
+          "titulo": "Pantalla React: Revisar con mi PIN el detalle de un cierre que no cuadra",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-199-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-199-T06",
+          "titulo": "Pruebas TC-CAP-199-01..02 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-199-T05"
           ]
         }
       ]

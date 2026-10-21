@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-004, FT-CAJ-01, RQ-CAJ-01-01, RQ-CAJ-01-02, RQ-CAJ-01-11, HU-CAP-030, HU-CAP-031, HU-CAP-032, ADR-001, ADR-011, ADR-014, ADR-003, ADR-006, ADR-007, ADR-008, ADR-010, ADR-012, DEP-02, DEP-06, R-01]
+relacionados: [EP-CAP-004, FT-CAJ-01, RQ-CAJ-01-01, RQ-CAJ-01-04, RQ-CAJ-01-13, HU-CAP-030, HU-CAP-031, HU-CAP-032, ADR-001, ADR-011, ADR-014, ADR-003, ADR-006, ADR-007, ADR-008, ADR-010, ADR-012, DEP-02, DEP-06, R-01]
 tags: [hu, caja, capa-a, ft-caj-01, alta, ui]
 ---
 
@@ -32,27 +32,27 @@ tags: [hu, caja, capa-a, ft-caj-01, alta, ui]
 
 | CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
 |---|---|
-| **Contexto.** Historia de FT-CAJ-01 «Cola de pedidos por confirmar» (Debe tener, épica EP-CAP-004). Cubre los requerimientos: **RQ-CAJ-01-01** La cola muestra los pedidos «por confirmar» con canal, código, cliente, modalidad, total y minutos de espera. **RQ-CAJ-01-02** Abrir un pedido muestra todos sus datos y un botón de WhatsApp con el resumen del pedido. **RQ-CAJ-01-11** Los pedidos tomados por el mozo en el local no aparecen en la cola: van directo a cocina. | **Alcance.**<br>• La cola muestra los pedidos «por confirmar» con canal, código, cliente, modalidad, total y minutos de espera.<br>• Abrir un pedido muestra todos sus datos y un botón de WhatsApp con el resumen del pedido.<br>• Los pedidos tomados por el mozo en el local no aparecen en la cola: van directo a cocina. |
-| **Problema.** Que ningún pedido de fuera se cocine sin pago verificado y que ninguno se pierda entre canales. Contribuye a OBJ-CAP-001 y NEC-CAP-001. | **Fuera de alcance.**<br>• HU-CAP-030: Confirmar el pago de un pedido y enviarlo a cocina.<br>• HU-CAP-031: Ubicar en el mapa un delivery sin ubicación.<br>• HU-CAP-032: Rechazar un pedido con motivo.<br>• El cobro con medios de pago y el pago mixto: FT-CAJ-02.<br>• La aprobación del comprobante desde la consola de WhatsApp: FT-BOT-02 y FT-ATN-01.<br>• Pedidos que toma caja o el call center: FT-CAJ-03. |
+| **Contexto.** Historia de FT-CAJ-01 «Cola de pedidos por confirmar» (Debe tener, épica EP-CAP-004). Cubre los requerimientos: **RQ-CAJ-01-01** La cola muestra los pedidos «por confirmar» del chatbot y del teléfono con canal, código, cliente, modalidad, total y minutos de espera. **RQ-CAJ-01-04** Abrir un pedido muestra todos sus datos y un botón de WhatsApp con el resumen del pedido. **RQ-CAJ-01-13** Los pedidos tomados por el mozo en el local no aparecen en la cola: van directo a cocina. | **Alcance.**<br>• La cola muestra los pedidos «por confirmar» del chatbot y del teléfono con canal, código, cliente, modalidad, total y minutos de espera.<br>• Abrir un pedido muestra todos sus datos y un botón de WhatsApp con el resumen del pedido.<br>• Los pedidos tomados por el mozo en el local no aparecen en la cola: van directo a cocina. |
+| **Problema.** Que ningún pedido del chatbot o del teléfono se cocine sin confirmación, que los de la carta tengan su pago coordinado antes del cierre y que ninguno se pierda entre canales. Contribuye a OBJ-CAP-001 y NEC-CAP-001. | **Fuera de alcance.**<br>• HU-CAP-030: Confirmar el pago de un pedido y enviarlo a cocina.<br>• HU-CAP-031: Ubicar en el mapa un delivery sin ubicación.<br>• HU-CAP-032: Rechazar un pedido con motivo.<br>• El cobro con medios de pago y el pago mixto: FT-CAJ-02.<br>• La aprobación del comprobante desde la consola de WhatsApp: FT-BOT-02 y FT-ATN-01.<br>• Pedidos que toma caja o el call center: FT-CAJ-03. |
 
 ## 03 | CRITERIOS DE ACEPTACIÓN
 
 | N.° | DADO | CUANDO | ENTONCES |
 |---|---|---|---|
-| CA-1 | 3 pedidos por confirmar de carta, chatbot y teléfono | el cajero abre la cola | los ve ordenados por llegada, con su canal y el tiempo que llevan esperando (RQ-CAJ-01-01) |
-| CA-2 | un pedido por confirmar | el cajero toca «Escribir al cliente» | se abre WhatsApp con el número del cliente y el resumen (productos, opciones, nota, entrega, total y pago preferido) (RQ-CAJ-01-02) |
-| CA-3 | un pedido de mesa del mozo | se envía | no aparece en «Por confirmar» y sí en cocina (RQ-CAJ-01-11) |
+| CA-1 | 2 pedidos por confirmar de chatbot y teléfono y 1 de la carta | el cajero abre la cola | ve los 2 primeros ordenados por llegada con su canal y tiempo de espera, y el de la carta en «Pago por coordinar» (RQ-CAJ-01-01) |
+| CA-2 | un pedido por confirmar | el cajero toca «Escribir al cliente» | se abre WhatsApp con el número del cliente y el resumen (productos, opciones, nota, entrega, total y pago preferido) (RQ-CAJ-01-04) |
+| CA-3 | un pedido de mesa del mozo | se envía | no aparece en «Por confirmar» y sí en cocina (RQ-CAJ-01-13) |
 | CA-4 | un usuario con un rol sin permiso para esta acción (ACT-CAP-009 repartidor) | intenta hacerla desde el menú o escribiendo la dirección de la pantalla | se rechaza en el servidor, no se guarda nada y no se entregan datos (RN-CAP-013, RNF-CAP-006) |
 
-Origen: criterios de verificación de FT-CAJ-01 (RQ-CAJ-01-01, RQ-CAJ-01-02, RQ-CAJ-01-11); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
+Origen: criterios de verificación de FT-CAJ-01 (RQ-CAJ-01-01, RQ-CAJ-01-04, RQ-CAJ-01-13); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
 
 ## 04 | REGLAS, DEPENDENCIAS Y EVIDENCIAS
 
 | REGLAS DE NEGOCIO | DATOS Y VALIDACIONES |
 |---|---|
-| **RB-01** (RN-CAP-073) El pedido del mozo en el local va directo a cocina.<br>**RNF aplicables:** RNF-CAP-002, RNF-CAP-006, RNF-CAP-009, RNF-CAP-010, RNF-CAP-012. | `Pedido` (estado: por confirmar, confirmado, en cocina, listo, entregado, cobrado, rechazado, anulado) · `Confirmacion` (autor, hora, medio, comprobante de pago, código de operación) · `Cobro` y `PagoCobro` (medio, monto, recibido, vuelto) · `Anulacion` (motivo, autor, PIN validado).<br>*(Entidades propuestas; detalle y tablas en `datos/DAT-CAP-001-modelo-de-datos.md`, se aprueba en G3.)*<br>**Validaciones:** cada cambio guarda autor y fecha; bloqueo en el servidor ante dos acciones simultáneas sobre el mismo registro. |
+| **RB-01** (DT-57) El pedido de la carta va directo a las comandas; caja coordina el pago después.<br>**RB-02** (RN-CAP-073) El pedido del mozo en el local va directo a cocina.<br>**RNF aplicables:** RNF-CAP-002, RNF-CAP-006, RNF-CAP-009, RNF-CAP-010, RNF-CAP-012. | `Pedido` (estado: por confirmar, confirmado, en cocina, listo, entregado, cobrado, rechazado, anulado) · `Confirmacion` (autor, hora, medio, comprobante de pago, código de operación) · `Cobro` y `PagoCobro` (medio, monto, recibido, vuelto) · `Anulacion` (motivo, autor, PIN validado).<br>*(Entidades propuestas; detalle y tablas en `datos/DAT-CAP-001-modelo-de-datos.md`, se aprueba en G3.)*<br>**Validaciones:** cada cambio guarda autor y fecha; bloqueo en el servidor ante dos acciones simultáneas sobre el mismo registro. |
 | **DEPENDENCIAS / RIESGOS** | **DISEÑO / ADJUNTOS** |
-| • FT-SAL-02.<br>• **DEP-02** plataforma y hosting: propuestos en ADR-001 y ADR-011, pendientes de aprobación en G3.<br>• **DEP-06** mockup en Figma o aceptación del mockup navegable como diseño (G2).<br>• Riesgos: R-01 (roadmap PLT-01). | • Mockup en Figma: (pendiente UX — G2, DEP-06).<br>• Referencia mientras tanto: mockup navegable (DT-04), Administrativo ▸ Pedidos y caja ▸ «Por confirmar», detalle del pedido, ubicar en el mapa, subir comprobante (`Admin.dc.html`).<br>• Contrato de API: `arquitectura/ARQ-CAP-002-catalogo-de-api-y-eventos.md`, módulo de FT-CAJ-01 (borrador, se aprueba en G3).<br>• ADR (propuestos): ADR-001, ADR-011, ADR-014, ADR-003, ADR-006, ADR-007, ADR-008, ADR-010, ADR-012.<br>• Modelo de datos: `datos/DAT-CAP-001-modelo-de-datos.md`. |
+| • FT-SAL-02.<br>• **DEP-02** plataforma y hosting: propuestos en ADR-001 y ADR-011, pendientes de aprobación en G3.<br>• **DEP-06** mockup en Figma o aceptación del mockup navegable como diseño (G2).<br>• Riesgos: R-01 (roadmap PLT-01). | • Mockup en Figma: (pendiente UX — G2, DEP-06).<br>• Referencia mientras tanto: mockup navegable (DT-04), Administrativo ▸ Pedidos y caja ▸ «Por confirmar» y «Pago por coordinar», detalle del pedido, ubicar en el mapa, subir comprobante (`Admin.dc.html`).<br>• Contrato de API: `arquitectura/ARQ-CAP-002-catalogo-de-api-y-eventos.md`, módulo de FT-CAJ-01 (borrador, se aprueba en G3).<br>• ADR (propuestos): ADR-001, ADR-011, ADR-014, ADR-003, ADR-006, ADR-007, ADR-008, ADR-010, ADR-012.<br>• Modelo de datos: `datos/DAT-CAP-001-modelo-de-datos.md`. |
 
 ## 05 | CHECKLIST DE CALIDAD
 
@@ -65,4 +65,4 @@ Origen: criterios de verificación de FT-CAJ-01 (RQ-CAJ-01-01, RQ-CAJ-01-02, RQ-
 
 **DoR: NO READY** hasta cerrar G2 y G3 (y con G0 y G1 aún sin aprobar).
 
-Generado por IA: historia derivada de FT-CAJ-01 (requerimientos RQ-CAJ-01-01, RQ-CAJ-01-02, RQ-CAJ-01-11, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)
+Generado por IA: historia derivada de FT-CAJ-01 (requerimientos RQ-CAJ-01-01, RQ-CAJ-01-04, RQ-CAJ-01-13, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)

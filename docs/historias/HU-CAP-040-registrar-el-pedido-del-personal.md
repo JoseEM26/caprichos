@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-004, FT-CAJ-03, RQ-CAJ-03-08, HU-CAP-037, HU-CAP-038, HU-CAP-039, ADR-001, ADR-011, ADR-014, ADR-003, ADR-006, ADR-007, ADR-008, ADR-010, ADR-012, DEP-02, DEP-06, R-01]
+relacionados: [EP-CAP-004, FT-CAJ-03, RQ-CAJ-03-10, HU-CAP-037, HU-CAP-038, HU-CAP-039, ADR-001, ADR-011, ADR-014, ADR-003, ADR-006, ADR-007, ADR-008, ADR-010, ADR-012, DEP-02, DEP-06, R-01]
 tags: [hu, caja, capa-a, ft-caj-03, media, ui]
 ---
 
@@ -32,17 +32,17 @@ tags: [hu, caja, capa-a, ft-caj-03, media, ui]
 
 | CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
 |---|---|
-| **Contexto.** Historia de FT-CAJ-03 «Nuevo pedido desde caja y call center» (Debe tener, épica EP-CAP-004). Cubre el requerimiento: **RQ-CAJ-03-08** El pedido del personal elige a un trabajador activo, en el local o para llevar, con su descuento. | **Alcance.**<br>• El pedido del personal elige a un trabajador activo, en el local o para llevar, con su descuento. |
+| **Contexto.** Historia de FT-CAJ-03 «Nuevo pedido desde caja y call center» (Debe tener, épica EP-CAP-004). Cubre el requerimiento: **RQ-CAJ-03-10** El pedido del personal elige a un trabajador activo, en el local o para llevar, con su descuento. | **Alcance.**<br>• El pedido del personal elige a un trabajador activo, en el local o para llevar, con su descuento. |
 | **Problema.** Que los pedidos por teléfono y WhatsApp se registren rápido y con los mismos datos que los de la carta. | **Fuera de alcance.**<br>• HU-CAP-037: Armar un pedido para un cliente en Nuevo pedido.<br>• HU-CAP-038: Recordar, ubicar y repetir el pedido de un cliente por teléfono.<br>• HU-CAP-039: Aplicar promociones, descuentos y cupón en Nuevo pedido.<br>• El pedido del mozo en mesa: FT-SAL-02.<br>• Confirmar y cobrar: FT-CAJ-01 y FT-CAJ-02.<br>• Creación de ofertas y cupones: FT-OFE-01 a FT-OFE-03. |
 
 ## 03 | CRITERIOS DE ACEPTACIÓN
 
 | N.° | DADO | CUANDO | ENTONCES |
 |---|---|---|---|
-| CA-1 | el pedido del personal | el cajero elige a un trabajador activo | solo se ofrecen «En el local» y «Para llevar» y se aplica el 25 % salvo a combos, promociones y docenas (RQ-CAJ-03-08) |
+| CA-1 | el pedido del personal | el cajero elige a un trabajador activo | solo se ofrecen «En el local» y «Para llevar» y se aplica el 25 % salvo a combos, promociones y docenas (RQ-CAJ-03-10) |
 | CA-2 | un usuario con un rol sin permiso para esta acción (ACT-CAP-009 repartidor) | intenta hacerla desde el menú o escribiendo la dirección de la pantalla | se rechaza en el servidor, no se guarda nada y no se entregan datos (RN-CAP-013, RNF-CAP-006) |
 
-Origen: criterios de verificación de FT-CAJ-03 (RQ-CAJ-03-08); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
+Origen: criterios de verificación de FT-CAJ-03 (RQ-CAJ-03-10); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
 
 ## 04 | REGLAS, DEPENDENCIAS Y EVIDENCIAS
 
@@ -63,4 +63,4 @@ Origen: criterios de verificación de FT-CAJ-03 (RQ-CAJ-03-08); los criterios si
 
 **DoR: NO READY** hasta cerrar G2 y G3 (y con G0 y G1 aún sin aprobar).
 
-Generado por IA: historia derivada de FT-CAJ-03 (requerimientos RQ-CAJ-03-08, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)
+Generado por IA: historia derivada de FT-CAJ-03 (requerimientos RQ-CAJ-03-10, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)

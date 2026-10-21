@@ -329,7 +329,7 @@
         },
         {
           "id": "HU-CAP-016-T03",
-          "titulo": "Reglas de dominio de HU-CAP-016 (RQ-PED-02-01, RQ-PED-02-02, RQ-PED-02-03, RQ-PED-02-04, RQ-PED-02-05)",
+          "titulo": "Reglas de dominio de HU-CAP-016 (RQ-PED-02-01, RQ-PED-02-02, RQ-PED-02-03, RQ-PED-02-04, RQ-PED-02-05, RQ-PED-02-06)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -374,7 +374,7 @@
         },
         {
           "id": "HU-CAP-016-T07",
-          "titulo": "Pruebas TC-CAP-016-01..06 (unitarias de dominio e integración de API)",
+          "titulo": "Pruebas TC-CAP-016-01..07 (unitarias de dominio e integración de API)",
           "capa": "application",
           "actividad": "PRUEBAS",
           "responsable": "José Ángel Espinoza",
@@ -401,7 +401,7 @@
         },
         {
           "id": "HU-CAP-017-T02",
-          "titulo": "Reglas de dominio de HU-CAP-017 (RQ-PED-02-06, RQ-PED-02-07, RQ-PED-02-08)",
+          "titulo": "Reglas de dominio de HU-CAP-017 (RQ-PED-02-07, RQ-PED-02-08, RQ-PED-02-09)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -473,7 +473,7 @@
         },
         {
           "id": "HU-CAP-018-T02",
-          "titulo": "Reglas de dominio de HU-CAP-018 (RQ-PED-02-09, RQ-PED-02-10)",
+          "titulo": "Reglas de dominio de HU-CAP-018 (RQ-PED-02-10, RQ-PED-02-11)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",

@@ -174,7 +174,7 @@
         },
         {
           "id": "HU-CAP-118-T02",
-          "titulo": "Reglas de dominio de HU-CAP-118 (RQ-USR-01-08, RQ-USR-01-09, RQ-USR-01-12, RQ-USR-01-14)",
+          "titulo": "Reglas de dominio de HU-CAP-118 (RQ-USR-01-08, RQ-USR-01-09, RQ-USR-01-12, RQ-USR-01-17)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -226,6 +226,78 @@
           "estimacion_horas": null,
           "depende_de": [
             "HU-CAP-118-T05"
+          ]
+        }
+      ]
+    },
+    {
+      "hu": "HU-CAP-201",
+      "tareas": [
+        {
+          "id": "HU-CAP-201-T01",
+          "titulo": "Revisar criterios de HU-CAP-201 contra el contrato de ARQ-CAP-002 y el mockup",
+          "capa": "docs",
+          "actividad": "ANALISIS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-178-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-201-T02",
+          "titulo": "Reglas de dominio de HU-CAP-201 (RQ-USR-01-14, RQ-USR-01-15, RQ-USR-01-16)",
+          "capa": "domain",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-201-T01",
+            "HU-CAP-116-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-201-T03",
+          "titulo": "Casos de uso: Definir los días y horas de trabajo de cada persona y quién cubre un descanso",
+          "capa": "application",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-201-T02"
+          ]
+        },
+        {
+          "id": "HU-CAP-201-T04",
+          "titulo": "Endpoints y eventos de FT-USR-01 según ARQ-CAP-002",
+          "capa": "adapters",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-201-T03"
+          ]
+        },
+        {
+          "id": "HU-CAP-201-T05",
+          "titulo": "Pantalla React: Definir los días y horas de trabajo de cada persona y quién cubre un descanso",
+          "capa": "ux",
+          "actividad": "DESARROLLO",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-201-T04"
+          ]
+        },
+        {
+          "id": "HU-CAP-201-T06",
+          "titulo": "Pruebas TC-CAP-201-01..05 (unitarias de dominio e integración de API)",
+          "capa": "application",
+          "actividad": "PRUEBAS",
+          "responsable": "José Ángel Espinoza",
+          "estimacion_horas": null,
+          "depende_de": [
+            "HU-CAP-201-T05"
           ]
         }
       ]
@@ -651,7 +723,7 @@
         },
         {
           "id": "HU-CAP-124-T03",
-          "titulo": "Casos de uso: Revisar el crédito del personal por mes",
+          "titulo": "Casos de uso: Revisar el crédito del personal por semana o por rango de fechas",
           "capa": "application",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -673,7 +745,7 @@
         },
         {
           "id": "HU-CAP-124-T05",
-          "titulo": "Pantalla React: Revisar el crédito del personal por mes",
+          "titulo": "Pantalla React: Revisar el crédito del personal por semana o por rango de fechas",
           "capa": "ux",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -723,7 +795,7 @@
         },
         {
           "id": "HU-CAP-125-T03",
-          "titulo": "Casos de uso: Configurar el descuento del personal y exportar el mes",
+          "titulo": "Casos de uso: Configurar el descuento del personal y exportar la semana",
           "capa": "application",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -745,7 +817,7 @@
         },
         {
           "id": "HU-CAP-125-T05",
-          "titulo": "Pantalla React: Configurar el descuento del personal y exportar el mes",
+          "titulo": "Pantalla React: Configurar el descuento del personal y exportar la semana",
           "capa": "ux",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -794,7 +866,7 @@
         },
         {
           "id": "HU-CAP-176-T03",
-          "titulo": "Reglas de dominio de HU-CAP-176 (RQ-USR-04-01, RQ-USR-04-02, RQ-USR-04-03, RQ-USR-04-04, RQ-USR-04-05, RQ-USR-04-10, RQ-USR-04-11, RQ-USR-04-12)",
+          "titulo": "Reglas de dominio de HU-CAP-176 (RQ-USR-04-01, RQ-USR-04-02, RQ-USR-04-03, RQ-USR-04-04, RQ-USR-04-05, RQ-USR-04-06, RQ-USR-04-07, RQ-USR-04-12, RQ-USR-04-13, RQ-USR-04-14)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -828,7 +900,7 @@
         },
         {
           "id": "HU-CAP-176-T06",
-          "titulo": "Pruebas TC-CAP-176-01..08 (unitarias de dominio e integración de API)",
+          "titulo": "Pruebas TC-CAP-176-01..10 (unitarias de dominio e integración de API)",
           "capa": "application",
           "actividad": "PRUEBAS",
           "responsable": "José Ángel Espinoza",
@@ -855,7 +927,7 @@
         },
         {
           "id": "HU-CAP-177-T02",
-          "titulo": "Reglas de dominio de HU-CAP-177 (RQ-USR-04-06, RQ-USR-04-07, RQ-USR-04-08, RQ-USR-04-09)",
+          "titulo": "Reglas de dominio de HU-CAP-177 (RQ-USR-04-08, RQ-USR-04-09, RQ-USR-04-10, RQ-USR-04-11)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",

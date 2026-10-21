@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-007, FT-SAL-02, RQ-SAL-02-09, RQ-SAL-02-10, HU-CAP-061, HU-CAP-062, HU-CAP-063, ADR-001, ADR-011, ADR-014, ADR-006, ADR-007, DEP-02, DEP-06, R-01]
+relacionados: [EP-CAP-007, FT-SAL-02, RQ-SAL-02-10, RQ-SAL-02-11, HU-CAP-061, HU-CAP-062, HU-CAP-063, ADR-001, ADR-011, ADR-014, ADR-006, ADR-007, DEP-02, DEP-06, R-01]
 tags: [hu, salon, capa-a, ft-sal-02, alta, ui]
 ---
 
@@ -32,18 +32,18 @@ tags: [hu, salon, capa-a, ft-sal-02, alta, ui]
 
 | CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
 |---|---|
-| **Contexto.** Historia de FT-SAL-02 «Pedido del mozo y control de mesas» (Debe tener, épica EP-CAP-007). Cubre los requerimientos: **RQ-SAL-02-09** El mozo recibe aviso cuando su pedido está listo y marca que lo llevó a la mesa. **RQ-SAL-02-10** La mesa se libera al cobrar y también a mano por mozo o caja, con Sí/No. | **Alcance.**<br>• El mozo recibe aviso cuando su pedido está listo y marca que lo llevó a la mesa.<br>• La mesa se libera al cobrar y también a mano por mozo o caja, con Sí/No. |
+| **Contexto.** Historia de FT-SAL-02 «Pedido del mozo y control de mesas» (Debe tener, épica EP-CAP-007). Cubre los requerimientos: **RQ-SAL-02-10** El mozo recibe aviso cuando su pedido está listo y marca que lo llevó a la mesa. **RQ-SAL-02-11** La mesa se libera al cobrar y también a mano por mozo o caja, con Sí/No. | **Alcance.**<br>• El mozo recibe aviso cuando su pedido está listo y marca que lo llevó a la mesa.<br>• La mesa se libera al cobrar y también a mano por mozo o caja, con Sí/No. |
 | **Problema.** Pedidos de salón que llegan a cocina al instante y sin mezclar mesas. Contribuye a OBJ-CAP-001. | **Fuera de alcance.**<br>• HU-CAP-061: Elegir la mesa y armar el pedido de mesa.<br>• HU-CAP-062: Enviar el pedido de mesa directo a cocina.<br>• HU-CAP-063: Agregar consumos a una mesa ocupada e imprimir la precuenta.<br>• Dibujar el plano: FT-SAL-01.<br>• Reservas: FT-SAL-03.<br>• El cobro: FT-CAJ-02.<br>• Dividir la cuenta de una mesa entre varias personas (no pedido en el BRD). |
 
 ## 03 | CRITERIOS DE ACEPTACIÓN
 
 | N.° | DADO | CUANDO | ENTONCES |
 |---|---|---|---|
-| CA-1 | un pedido listo de la mesa 3 | todas las áreas terminan | el mozo que lo tomó recibe un aviso; al marcar «Entregado en mesa», el pedido lo registra con la hora (RQ-SAL-02-09) |
-| CA-2 | una mesa cobrada | termina el cobro | queda libre; una mesa con pedido cancelado se libera a mano con confirmación (RQ-SAL-02-10) |
+| CA-1 | un pedido listo de la mesa 3 | todas las áreas terminan | el mozo que lo tomó recibe un aviso; al marcar «Entregado en mesa», el pedido lo registra con la hora (RQ-SAL-02-10) |
+| CA-2 | una mesa cobrada | termina el cobro | queda libre; una mesa con pedido cancelado se libera a mano con confirmación (RQ-SAL-02-11) |
 | CA-3 | la confirmación Sí/No de la acción | quien la hace responde «No» | no cambia nada y la pantalla queda como estaba (RN-CAP-015, RNF-CAP-012) |
 
-Origen: criterios de verificación de FT-SAL-02 (RQ-SAL-02-09, RQ-SAL-02-10); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
+Origen: criterios de verificación de FT-SAL-02 (RQ-SAL-02-10, RQ-SAL-02-11); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
 
 ## 04 | REGLAS, DEPENDENCIAS Y EVIDENCIAS
 
@@ -64,4 +64,4 @@ Origen: criterios de verificación de FT-SAL-02 (RQ-SAL-02-09, RQ-SAL-02-10); lo
 
 **DoR: NO READY** hasta cerrar G2 y G3 (y con G0 y G1 aún sin aprobar).
 
-Generado por IA: historia derivada de FT-SAL-02 (requerimientos RQ-SAL-02-09, RQ-SAL-02-10, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)
+Generado por IA: historia derivada de FT-SAL-02 (requerimientos RQ-SAL-02-10, RQ-SAL-02-11, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)

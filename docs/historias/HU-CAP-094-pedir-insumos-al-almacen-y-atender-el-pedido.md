@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-010, FT-ALM-03, RQ-ALM-03-01, RQ-ALM-03-02, HU-CAP-095, HU-CAP-096, ADR-001, ADR-011, ADR-014, ADR-003, DEP-02, DEP-06, R-01]
+relacionados: [EP-CAP-010, FT-ALM-03, RQ-ALM-03-01, RQ-ALM-03-04, RQ-ALM-03-05, HU-CAP-095, HU-CAP-096, HU-CAP-200, ADR-001, ADR-011, ADR-014, ADR-003, DEP-02, DEP-06, R-01]
 tags: [hu, almacen, capa-a, ft-alm-03, media, ui]
 ---
 
@@ -32,25 +32,26 @@ tags: [hu, almacen, capa-a, ft-alm-03, media, ui]
 
 | CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
 |---|---|
-| **Contexto.** Historia de FT-ALM-03 «Pedidos internos, mermas y cierre del día» (Debería tener, épica EP-CAP-010). Cubre los requerimientos: **RQ-ALM-03-01** Cocina o barra piden insumos al almacén con cantidades. **RQ-ALM-03-02** Almacén marca un pedido interno como entregado y se crea el traslado por recibir. | **Alcance.**<br>• Cocina o barra piden insumos al almacén con cantidades.<br>• Almacén marca un pedido interno como entregado y se crea el traslado por recibir. |
-| **Problema.** Saber cuánto se pierde cada día y por qué, y que cocina tenga lo que necesita sin pedir de palabra. | **Fuera de alcance.**<br>• HU-CAP-095: Registrar la merma de productos de cocina.<br>• HU-CAP-096: Hacer el cierre del día con conteo y destino.<br>• Movimientos de insumos del almacén: FT-ALM-01.<br>• Producción: FT-ALM-02. |
+| **Contexto.** Historia de FT-ALM-03 «Pedidos internos, mermas y cierre del día» (Debería tener, épica EP-CAP-010). Cubre los requerimientos: **RQ-ALM-03-01** Cocina o barra piden insumos al almacén con cantidades. **RQ-ALM-03-04** Quien saca insumos sin almacenero registra la salida con su propio usuario. **RQ-ALM-03-05** Almacén marca un pedido interno como entregado y se crea el traslado por recibir. | **Alcance.**<br>• Cocina o barra piden insumos al almacén con cantidades.<br>• Quien saca insumos sin almacenero registra la salida con su propio usuario.<br>• Almacén marca un pedido interno como entregado y se crea el traslado por recibir. |
+| **Problema.** Saber cuánto se pierde cada día y por qué, y que cocina tenga lo que necesita sin pedir de palabra. | **Fuera de alcance.**<br>• HU-CAP-095: Registrar la merma de productos de cocina.<br>• HU-CAP-096: Hacer el cierre del día con conteo y destino.<br>• HU-CAP-200: Recibir el aviso de un pedido al almacén con sonido y por WhatsApp según el turno.<br>• Movimientos de insumos del almacén: FT-ALM-01.<br>• Producción: FT-ALM-02. |
 
 ## 03 | CRITERIOS DE ACEPTACIÓN
 
 | N.° | DADO | CUANDO | ENTONCES |
 |---|---|---|---|
 | CA-1 | la barra | pide 6 L de leche y 1 kg de café | almacén ve el pedido interno con el área, autor y hora (RQ-ALM-03-01) |
-| CA-2 | un pedido interno | almacén lo marca entregado | baja el stock central y el área ve el traslado por recibir (FT-ALM-01) (RQ-ALM-03-02) |
+| CA-2 | la repostera con su usuario en la mañana | saca 2 kg de harina | registra la salida a su nombre y el historial del almacén muestra «Salida · harina 2 kg · Rosa (producción)» (RQ-ALM-03-04) |
+| CA-3 | un pedido interno | almacén lo marca entregado | baja el stock central y el área ve el traslado por recibir (FT-ALM-01) (RQ-ALM-03-05) |
 
-Origen: criterios de verificación de FT-ALM-03 (RQ-ALM-03-01, RQ-ALM-03-02); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
+Origen: criterios de verificación de FT-ALM-03 (RQ-ALM-03-01, RQ-ALM-03-04, RQ-ALM-03-05); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
 
 ## 04 | REGLAS, DEPENDENCIAS Y EVIDENCIAS
 
 | REGLAS DE NEGOCIO | DATOS Y VALIDACIONES |
 |---|---|
-| **RB-01** (RN-CAP-056) Las mermas las registran almacén, producción o el administrador.<br>**RB-02** (RN-CAP-115) En Cocina solo se registra merma de productos de cocina con stock.<br>**RB-03** (RN-CAP-116) Merma de varios productos a la vez, con origen y destino.<br>**RNF aplicables:** RNF-CAP-020, RNF-CAP-019, RNF-CAP-009. | `MovimientoStock` (entrada, salida, merma, devolución, producción, traslado) · `Traslado` (por recibir, recibido, diferencia) · `Produccion` (receta, tandas, hora, anulada) · `PedidoInterno` · `Merma` (producto, cantidad, origen, destino) · `CierreDia` (contado, botado, diferencia).<br>*(Entidades propuestas; detalle y tablas en `datos/DAT-CAP-001-modelo-de-datos.md`, se aprueba en G3.)*<br>**Validaciones:** cada cambio guarda autor y fecha. |
+| **RB-01** (DT-64) Aviso del almacén con sonido hasta «Recibido» y por WhatsApp a quien está de turno; salidas con usuario propio.<br>**RNF aplicables:** RNF-CAP-020, RNF-CAP-019, RNF-CAP-009. | `MovimientoStock` (entrada, salida, merma, devolución, producción, traslado) · `Traslado` (por recibir, recibido, diferencia) · `Produccion` (receta, tandas, hora, anulada) · `PedidoInterno` · `Merma` (producto, cantidad, origen, destino) · `CierreDia` (contado, botado, diferencia).<br>*(Entidades propuestas; detalle y tablas en `datos/DAT-CAP-001-modelo-de-datos.md`, se aprueba en G3.)*<br>**Validaciones:** cada cambio guarda autor y fecha. |
 | **DEPENDENCIAS / RIESGOS** | **DISEÑO / ADJUNTOS** |
-| • FT-ALM-01.<br>• **DEP-02** plataforma y hosting: propuestos en ADR-001 y ADR-011, pendientes de aprobación en G3.<br>• **DEP-06** mockup en Figma o aceptación del mockup navegable como diseño (G2).<br>• Riesgos: R-01 (roadmap PLT-01). | • Mockup en Figma: (pendiente UX — G2, DEP-06).<br>• Referencia mientras tanto: mockup navegable (DT-04), Administrativo ▸ Cocina ▸ Pedir insumos, Merma, Cierre del día; Almacén ▸ Pedidos internos (`Admin.dc.html`).<br>• Contrato de API: `arquitectura/ARQ-CAP-002-catalogo-de-api-y-eventos.md`, módulo de FT-ALM-03 (borrador, se aprueba en G3).<br>• ADR (propuestos): ADR-001, ADR-011, ADR-014, ADR-003.<br>• Modelo de datos: `datos/DAT-CAP-001-modelo-de-datos.md`. |
+| • FT-ALM-01.<br>• **DEP-02** plataforma y hosting: propuestos en ADR-001 y ADR-011, pendientes de aprobación en G3.<br>• **DEP-06** mockup en Figma o aceptación del mockup navegable como diseño (G2).<br>• Riesgos: R-01 (roadmap PLT-01). | • Mockup en Figma: (pendiente UX — G2, DEP-06).<br>• Referencia mientras tanto: mockup navegable (DT-04), Administrativo ▸ Cocina ▸ Pedir insumos, Merma, Cierre del día; Almacén ▸ Pedidos internos con aviso sonoro (`Admin.dc.html`).<br>• Contrato de API: `arquitectura/ARQ-CAP-002-catalogo-de-api-y-eventos.md`, módulo de FT-ALM-03 (borrador, se aprueba en G3).<br>• ADR (propuestos): ADR-001, ADR-011, ADR-014, ADR-003.<br>• Modelo de datos: `datos/DAT-CAP-001-modelo-de-datos.md`. |
 
 ## 05 | CHECKLIST DE CALIDAD
 
@@ -63,4 +64,4 @@ Origen: criterios de verificación de FT-ALM-03 (RQ-ALM-03-01, RQ-ALM-03-02); lo
 
 **DoR: NO READY** hasta cerrar G2 y G3 (y con G0 y G1 aún sin aprobar).
 
-Generado por IA: historia derivada de FT-ALM-03 (requerimientos RQ-ALM-03-01, RQ-ALM-03-02, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)
+Generado por IA: historia derivada de FT-ALM-03 (requerimientos RQ-ALM-03-01, RQ-ALM-03-04, RQ-ALM-03-05, reglas y RNF de la feature) y del mockup navegable — Revisado por: (pendiente)

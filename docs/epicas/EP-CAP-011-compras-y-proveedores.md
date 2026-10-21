@@ -72,7 +72,7 @@ Las metas marcadas «(propuesta)» son de la IA y las fija el dueño; las línea
 - Directorio de proveedores con RUC, WhatsApp, días de crédito y cuenta; se desactivan (NEC-CAP-070).
 - Pedir a proveedores: lista de lo que falta, agrupada por proveedor, un mensaje de WhatsApp por proveedor (NEC-CAP-112).
 - Un insumo a un solo proveedor por pedido; aviso si ya hay uno por recibir (RN-CAP-137).
-- Pedido «por recibir» y recepción con costos, lote y vencimiento, que suma al stock (NEC-CAP-069).
+- Pedido «por recibir» y recepción con costos y comprobante, sin lote ni vencimiento (DT-64), que suma al stock (NEC-CAP-069).
 - Historial de compras y de precios por proveedor.
 
 **Fuera de alcance (OUT)**

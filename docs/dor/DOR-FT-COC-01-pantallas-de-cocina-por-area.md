@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-006, FT-COC-01, HU-CAP-047, HU-CAP-048, HU-CAP-049, HU-CAP-050, ADR-001, ADR-011, ADR-014, ADR-002, ADR-006, ADR-007, FT-CFG-01, FT-OFE-01]
+relacionados: [EP-CAP-006, FT-COC-01, HU-CAP-047, HU-CAP-048, HU-CAP-049, HU-CAP-050, HU-CAP-198, ADR-001, ADR-011, ADR-014, ADR-002, ADR-006, ADR-007, FT-CFG-01, FT-COC-02, FT-DEL-02, FT-OFE-01]
 tags: [dor, plt-05, cocina, ft-coc-01, g4]
 ---
 
@@ -25,7 +25,7 @@ tags: [dor, plt-05, cocina, ft-coc-01, g4]
 | SPRINT / RELEASE DESTINO | H1 · piloto en el local · 28/12/2026 (supuesto, D-19) |
 | RESULTADO | (lo decide el PO — propuesta IA: **NO READY**) |
 
-> Insumos: `analisis/decisiones.md` (fuente de verdad), la feature `FT-COC-01`, sus 4 historias (HU-CAP-047, HU-CAP-048, HU-CAP-049, HU-CAP-050), la épica EP-CAP-006, los ADR ADR-001, ADR-011, ADR-014, ADR-002, ADR-006, ADR-007, `arquitectura/ARQ-CAP-001` y `ARQ-CAP-002`, y `datos/DAT-CAP-001`.
+> Insumos: `analisis/decisiones.md` (fuente de verdad), la feature `FT-COC-01`, sus 5 historias (HU-CAP-047, HU-CAP-048, HU-CAP-049, HU-CAP-050, HU-CAP-198), la épica EP-CAP-006, los ADR ADR-001, ADR-011, ADR-014, ADR-002, ADR-006, ADR-007, `arquitectura/ARQ-CAP-001` y `ARQ-CAP-002`, y `datos/DAT-CAP-001`.
 
 ## 1 CHECKLIST DE PREPARACIÓN
 
@@ -34,8 +34,8 @@ tags: [dor, plt-05, cocina, ft-coc-01, g4]
 | NEGOCIO | ☑ | Objetivo y valor con KPI | Épica EP-CAP-006 §2 y feature §1 (hipótesis medible) |
 | NEGOCIO | ☐ | Alcance dentro y fuera acordado | Redactado en la feature; falta la firma del PO (DT-48) |
 | NEGOCIO | ☐ | Prioridad y release confirmados | Debe tener · H1 · piloto en el local · 28/12/2026 (supuesto, D-19); fechas supuestas hasta D-19 |
-| FUNCIONAL | ☑ | Historias con criterios verificables | 4 historias, 16 criterios Dado/Cuando/Entonces |
-| FUNCIONAL | ☐ | Reglas de negocio documentadas y validadas | Documentadas; abiertas: D-01 |
+| FUNCIONAL | ☑ | Historias con criterios verificables | 5 historias, 21 criterios Dado/Cuando/Entonces |
+| FUNCIONAL | ☑ | Reglas de negocio documentadas y validadas | Documentadas en la feature §4; sin decisiones abiertas propias |
 | FUNCIONAL | ☐ | Estimación por el equipo | Tareas en `backlog/tareas/EP-CAP-006.json` con `estimacion_horas: null` |
 | DISEÑO / UX | ☐ | Prototipos aprobados (DEP-06) | Mockup navegable como referencia (DT-04); Figma o aceptación del mockup pendiente (G2) |
 | DISEÑO / UX | ☐ | Textos y mensajes definidos | Los del mockup; por revisar con Kevin |
@@ -43,7 +43,7 @@ tags: [dor, plt-05, cocina, ft-coc-01, g4]
 | TÉCNICO | ☐ | Contrato de API | Borrador en ARQ-CAP-002 §FT-COC-01; se aprueba en G3 |
 | TÉCNICO | ☐ | Modelo de datos / DDL | DAT-CAP-001 y `datos/ddl-propuesto.sql` (probado en PostgreSQL 16); sin aprobar (G3) |
 | TÉCNICO | ☐ | RNF y seguridad | RNF-CAP-002, RNF-CAP-004, RNF-CAP-006, RNF-CAP-003; umbrales propuestos (feature §3) |
-| CALIDAD | ☑ | Estrategia y datos de prueba | `pruebas/test-plan.md`: 16 casos TC para estas historias, datos sintéticos |
+| CALIDAD | ☑ | Estrategia y datos de prueba | `pruebas/test-plan.md`: 21 casos TC para estas historias, datos sintéticos |
 | CALIDAD | ☑ | Riesgos con mitigación y dueño | Sección 5 |
 
 ## 2 DIAGRAMA DE DEPENDENCIAS
@@ -58,7 +58,10 @@ flowchart LR
   HU_CAP_048["HU-CAP-048"]:::evaluado --> FT_COC_01
   HU_CAP_049["HU-CAP-049"]:::evaluado --> FT_COC_01
   HU_CAP_050["HU-CAP-050"]:::evaluado --> FT_COC_01
+  HU_CAP_198["HU-CAP-198"]:::evaluado --> FT_COC_01
   FT_CFG_01["FT-CFG-01"]:::interna --> FT_COC_01
+  FT_COC_02["FT-COC-02"]:::interna --> FT_COC_01
+  FT_DEL_02["FT-DEL-02"]:::interna --> FT_COC_01
   FT_OFE_01["FT-OFE-01"]:::interna --> FT_COC_01
   ADR_001["ADR-001"]:::interna -.-> FT_COC_01
   ADR_011["ADR-011"]:::interna -.-> FT_COC_01
@@ -71,10 +74,10 @@ flowchart LR
   DEP_06["DEP-06"]:::externa ==> FT_COC_01
 ```
 
-- **Ítems evaluados:** FT-COC-01 y sus historias HU-CAP-047, HU-CAP-048, HU-CAP-049, HU-CAP-050.
-- **Dependencias técnicas:** FT-CFG-01, FT-OFE-01; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-002, ADR-006, ADR-007.
+- **Ítems evaluados:** FT-COC-01 y sus historias HU-CAP-047, HU-CAP-048, HU-CAP-049, HU-CAP-050, HU-CAP-198.
+- **Dependencias técnicas:** FT-CFG-01, FT-COC-02, FT-DEL-02, FT-OFE-01; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-002, ADR-006, ADR-007.
 - **Dependencias externas:** DEP-02, DEP-03, DEP-06.
-- **Decisiones abiertas:** D-01.
+- **Decisiones abiertas:** ninguna propia.
 
 **Bloqueantes**
 
@@ -84,7 +87,6 @@ flowchart LR
 | G3 | Aprobación de ADR-001, ADR-011, ADR-014, ADR-002, ADR-006, ADR-007 | Arquitectura | José Ángel Espinoza (TL, DT-48) | Antes de G4 | Abierto |
 | DEP-02 | Plataforma y hosting (ADR-001, ADR-011) | Técnica | Desarrollo | Antes de G3 | Abierto |
 | DEP-03 | Ver roadmap PLT-01 | Externa | Kevin | Según roadmap | Abierto |
-| D-01 | Decisión pendiente (ver `analisis/decisiones.md`) | Decisión | Kevin | Antes de G4 | Abierto |
 
 ## 3 MODELADO (DATOS Y PROCESO)
 
@@ -95,10 +97,8 @@ erDiagram
   PEDIDO ||--o{ COMANDA_AREA : ""
   AREA_COCINA ||--o{ PRINT_JOB : ""
   PEDIDO ||--o{ PRINT_JOB : ""
+  AREA_COCINA ||--o{ ALTA_DEMANDA : ""
   AGOTADO {
-    bigint id PK
-  }
-  ALTA_DEMANDA {
     bigint id PK
   }
   DEVICE_KEY {
@@ -113,12 +113,14 @@ Proceso (orden de las historias):
 ```mermaid
 flowchart TB
   P0["HU-CAP-047<br>Ver en mi pantalla solo las comandas de mi área"]
-  P1["HU-CAP-048<br>Avanzar y deshacer el estado de mi parte"]
+  P1["HU-CAP-048<br>Despejar mi parte y devolverla desde el historial"]
   P0 --> P1
   P2["HU-CAP-049<br>Ver la TV de cocina de solo lectura"]
   P1 --> P2
   P3["HU-CAP-050<br>Crear áreas de cocina y asignarles categorías"]
   P2 --> P3
+  P4["HU-CAP-198<br>Ver en despacho el pedido completo de todas las áreas"]
+  P3 --> P4
 ```
 
 Ciclo de vida de **comanda por área**:
@@ -181,7 +183,7 @@ flowchart TB
 
 ☐ READY · Puede ingresar a desarrollo  ☐ READY CON CONDICIONES · ver acuerdos  ☐ NO READY · devolver a refinamiento
 
-**Propuesta IA: NO READY.** Motivos: G0 a G3 sin aprobar (DT-48); ADR ADR-001, ADR-011, ADR-014, ADR-002, ADR-006, ADR-007 propuestos, no aprobados (G3); tareas sin estimar; mockup sin aprobar (G2, DEP-06); decisiones abiertas D-01. Lo que sí está listo: historias con criterios verificables, casos de prueba 1 a 1, modelo de datos probado y dependencias identificadas. Con las firmas de G2 y G3 y la estimación, pasaría a **READY CON CONDICIONES**. La decisión es del PO.
+**Propuesta IA: NO READY.** Motivos: G0 a G3 sin aprobar (DT-48); ADR ADR-001, ADR-011, ADR-014, ADR-002, ADR-006, ADR-007 propuestos, no aprobados (G3); tareas sin estimar; mockup sin aprobar (G2, DEP-06). Lo que sí está listo: historias con criterios verificables, casos de prueba 1 a 1, modelo de datos probado y dependencias identificadas. Con las firmas de G2 y G3 y la estimación, pasaría a **READY CON CONDICIONES**. La decisión es del PO.
 
 | Rol | Nombre | Fecha | Firma |
 | --- | --- | --- | --- |

@@ -96,12 +96,15 @@ erDiagram
   PARTY_ROLE ||--o{ EMPLOYEE_DETAIL : ""
   PARTY ||--o{ PARTY_ROLE : ""
   PARTY ||--o{ CONSUMO_PERSONAL : ""
+  PARTY ||--o{ HORARIO_TRABAJO : ""
+  PARTY ||--o{ COBERTURA_TURNO : ""
+  ROL ||--o{ COBERTURA_TURNO : ""
   AUDITORIA {
     bigint id PK
   }
 ```
 
-Tablas de `datos/ddl-propuesto.sql` que usa la feature: `auditoria`, `party`, `person`, `user_account`, `rol`, `permiso`, `rol_permiso`, `sesion`, `employee_detail`, `party_role`, `consumo_personal`. Las relaciones son las claves foráneas físicas del script (ADR-003); el detalle de columnas y restricciones está en DAT-CAP-001.
+Tablas de `datos/ddl-propuesto.sql` que usa la feature: `auditoria`, `party`, `person`, `user_account`, `rol`, `permiso`, `rol_permiso`, `sesion`, `employee_detail`, `party_role`, `consumo_personal`, `horario_trabajo`, `cobertura_turno`. Las relaciones son las claves foráneas físicas del script (ADR-003); el detalle de columnas y restricciones está en DAT-CAP-001.
 
 Proceso (orden de las historias):
 

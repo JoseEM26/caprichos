@@ -26,7 +26,7 @@ tags: [pedido, plt-03, ep-cap-002, ft-ped-02, debe-tener]
 
 ## 1. Descripción y valor
 
-**Descripción.** En delivery, la carta pide la ubicación con el botón «Usar mi ubicación actual»: el celular da el punto, se muestra en un mapa con su enlace a Google Maps, y el cliente puede mover el pin, escribir o corregir la dirección y dejar una referencia (NEC-CAP-049). La ubicación **nunca es obligatoria ni bloquea** (NEC-CAP-092): si el cliente no la comparte (sin permiso, tardó demasiado o el equipo no la soporta), ve «No fue posible conseguir la ubicación» y escribe la dirección, que entonces es obligatoria; un asesor la ubica después (FT-CAJ-01). No se pide código Plus (RN-CAP-065). Con el punto, el sistema calcula solo la zona de reparto y su costo; el cliente nunca elige ni ve una «zona», solo el costo o el aviso de fuera de cobertura, con la opción de recoger (RN-CAP-103). Aplica envío gratis (más de S/ 70, V2) y pedido mínimo (V3).
+**Descripción.** En delivery, la carta pide la ubicación con el botón «Usar mi ubicación actual»: el celular da el punto, se muestra en un mapa con su enlace a Google Maps, y el cliente puede mover el pin (por ejemplo, a la puerta de atrás o a la otra calle), escribir o corregir la dirección y dejar una referencia (NEC-CAP-049). Debajo del mapa el cliente **confirma** «Mi pedido llega aquí» antes de seguir, porque con la prisa el GPS queda impreciso y hay calles con el mismo nombre en distritos distintos (DT-57, acta 03). El mapa **no dibuja los límites de las zonas** de reparto. La ubicación **nunca es obligatoria ni bloquea** (NEC-CAP-092): si el cliente no la comparte (sin permiso, tardó demasiado o el equipo no la soporta), ve «No fue posible conseguir la ubicación» y escribe la dirección, que entonces es obligatoria; un asesor la ubica después (FT-CAJ-01). No se pide código Plus (RN-CAP-065). Con el punto, el sistema calcula solo la zona de reparto y su costo; el cliente nunca elige ni ve una «zona», solo el costo o el aviso de fuera de cobertura, con la opción de recoger (RN-CAP-103). Aplica envío gratis (más de S/ 70, V2) y pedido mínimo (V3).
 
 **Beneficio esperado.** Pedidos de delivery con un punto exacto que el repartidor abre en su app de mapas, y un costo de envío correcto sin preguntar zonas al cliente. Contribuye a OBJ-CAP-001. Hipótesis medible: **80 % de los delivery llegan con ubicación del cliente** (propuesta) y **0 envíos cobrados con una zona distinta a la del punto**.
 
@@ -41,13 +41,14 @@ tags: [pedido, plt-03, ep-cap-002, ft-ped-02, debe-tener]
 | RQ-PED-02-01 | En delivery, la carta ofrece «Usar mi ubicación actual» y muestra el punto en un mapa con enlace a Google Maps. | Debe tener | NEC-CAP-049 | Dado un cliente que acepta el permiso, cuando toca el botón, entonces ve «Ubicación encontrada», el pin en el mapa y el enlace que abre ese punto. | Propuesto |
 | RQ-PED-02-02 | Si la ubicación falla, se avisa y se pide escribir la dirección, sin bloquear el pedido. | Debe tener | RN-CAP-065 · NEC-CAP-092 | Dado un cliente que niega el permiso, cuando toca el botón, entonces ve «No fue posible conseguir la ubicación» y puede terminar el pedido escribiendo la dirección. | Propuesto |
 | RQ-PED-02-03 | Con ubicación compartida, la dirección escrita es opcional; sin ubicación, es obligatoria. | Debe tener | NEC-CAP-092 | Dado un pedido con punto, cuando el cliente deja la dirección vacía, entonces puede enviar; sin punto y con la dirección vacía, no puede. | Propuesto |
-| RQ-PED-02-04 | El cliente puede mover el pin y dejar una referencia. | Debe tener | NEC-CAP-019 · NEC-CAP-049 | Dado el pin en el mapa, cuando el cliente lo arrastra a su puerta y escribe «casa verde, 2.º piso», entonces el pedido guarda el punto nuevo y la referencia. | Propuesto |
-| RQ-PED-02-05 | La carta no pide código Plus de Google Maps. | Debe tener | RN-CAP-065 · NEC-CAP-019 | Dado el paso de entrega, cuando se revisa el formulario, entonces no hay campo de código Plus. | Propuesto |
-| RQ-PED-02-06 | La zona y el costo de envío salen solos del punto; el cliente solo ve el costo. | Debe tener | RN-CAP-103 · NEC-CAP-076 | Dado un punto dentro de la zona Z3 con tarifa S/ 4, cuando el cliente confirma la ubicación, entonces ve «Envío S/ 4,00», sin el nombre de la zona. | Propuesto |
-| RQ-PED-02-07 | Un punto fuera de cobertura avisa y ofrece cambiar a recoger; no se guarda como delivery. | Debe tener | RN-CAP-103 · RN-CAP-087 | Dado un punto fuera de todas las zonas activas, cuando el cliente lo confirma, entonces ve «Aún no llegamos a esa dirección» con el botón «Recoger en tienda», y no puede enviar como delivery. | Propuesto |
-| RQ-PED-02-08 | Sin punto, el envío queda «por calcular» y lo fija el asesor al ubicar el pedido. | Debe tener | RN-CAP-104 · NEC-CAP-092 | Dado un pedido enviado solo con dirección escrita, cuando llega a caja, entonces el envío figura «por calcular» y el pedido no se puede confirmar hasta ubicarlo (FT-CAJ-01). | Propuesto |
-| RQ-PED-02-09 | El envío es gratis cuando los productos pasan del monto de envío gratis. | Debe tener | RN-CAP-095 · NEC-CAP-096 · V2 | Dado envío gratis con «más de S/ 70», cuando los productos suman S/ 70,00, entonces se cobra envío; con S/ 70,10, el envío es S/ 0. | Propuesto |
-| RQ-PED-02-10 | No se puede enviar un delivery por debajo del pedido mínimo. | Debe tener | RN-CAP-008 · V3 | Dado un pedido mínimo de S/ 14,50, cuando los productos suman S/ 12, entonces se ve cuánto falta y no se puede enviar como delivery. | Propuesto |
+| RQ-PED-02-04 | Debajo del mapa el cliente confirma la ubicación con «Mi pedido llega aquí» antes de seguir. | Debe tener | DT-57 · Acta 03 | Dado el pin puesto por el GPS, cuando el cliente intenta seguir sin confirmar, entonces ve «Revisa que el punto rojo sea donde recibirás tu pedido» y el botón «Mi pedido llega aquí»; al confirmar, se calcula el envío con ese punto. | Propuesto |
+| RQ-PED-02-05 | El cliente puede mover el pin y dejar una referencia. | Debe tener | NEC-CAP-019 · NEC-CAP-049 | Dado el pin en el mapa, cuando el cliente lo arrastra a su puerta y escribe «casa verde, 2.º piso», entonces el pedido guarda el punto nuevo y la referencia. | Propuesto |
+| RQ-PED-02-06 | La carta no pide código Plus de Google Maps. | Debe tener | RN-CAP-065 · NEC-CAP-019 | Dado el paso de entrega, cuando se revisa el formulario, entonces no hay campo de código Plus. | Propuesto |
+| RQ-PED-02-07 | La zona y el costo de envío salen solos del punto; el cliente solo ve el costo y el mapa no dibuja los límites de las zonas. | Debe tener | RN-CAP-103 · NEC-CAP-076 · DT-57 | Dado un punto dentro de la zona Z3 con tarifa S/ 4, cuando el cliente confirma la ubicación, entonces ve «Envío S/ 4,00», sin el nombre de la zona y sin líneas de zonas en el mapa. | Propuesto |
+| RQ-PED-02-08 | Un punto fuera de cobertura avisa y ofrece cambiar a recoger; no se guarda como delivery. | Debe tener | RN-CAP-103 · RN-CAP-087 | Dado un punto fuera de todas las zonas activas, cuando el cliente lo confirma, entonces ve «Aún no llegamos a esa dirección» con el botón «Recoger en tienda», y no puede enviar como delivery. | Propuesto |
+| RQ-PED-02-09 | Sin punto, el envío queda «por calcular» y lo fija el asesor al ubicar el pedido. | Debe tener | RN-CAP-104 · NEC-CAP-092 | Dado un pedido enviado solo con dirección escrita, cuando llega a caja, entonces el envío figura «por calcular» y el pedido no se puede confirmar hasta ubicarlo (FT-CAJ-01). | Propuesto |
+| RQ-PED-02-10 | El envío es gratis cuando los productos pasan del monto de envío gratis. | Debe tener | RN-CAP-095 · NEC-CAP-096 · V2 | Dado envío gratis con «más de S/ 70», cuando los productos suman S/ 70,00, entonces se cobra envío; con S/ 70,10, el envío es S/ 0. | Propuesto |
+| RQ-PED-02-11 | No se puede enviar un delivery por debajo del pedido mínimo. | Debe tener | RN-CAP-008 · V3 | Dado un pedido mínimo de S/ 14,50, cuando los productos suman S/ 12, entonces se ve cuánto falta y no se puede enviar como delivery. | Propuesto |
 
 Prioridad por NEC-CAP-049 y NEC-CAP-092 (E1). Los valores de envío gratis y pedido mínimo son los del mockup (V2, V3), por confirmar (D-02, D-03). Todos nacen *Propuesto* hasta que el PO los apruebe (DT-48).
 
@@ -72,6 +73,7 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RN-CAP-095 | Envío gratis «más de 70» por defecto, configurable a «desde 70». | Delivery |
 | RN-CAP-103 | La zona y su costo salen solos del punto; el cliente nunca ve la zona. | Delivery |
 | RN-CAP-104 | Un delivery sin ubicación ni zona no se confirma. | Delivery |
+| DT-57 | La ubicación se confirma bajo el mapa, no es obligatoria y los límites de las zonas no se muestran al cliente. | Acta 03 · decisiones.md |
 
 ## 5. Trazabilidad y planificación
 
@@ -82,11 +84,12 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RQ-PED-02-03 | HU-CAP-016 | — | R-01 |
 | RQ-PED-02-04 | HU-CAP-016 | — | R-01 |
 | RQ-PED-02-05 | HU-CAP-016 | — | R-01 |
-| RQ-PED-02-06 | HU-CAP-017 | FT-DEL-01 · DEP-07 (D-03) | R-03 |
-| RQ-PED-02-07 | HU-CAP-017 | FT-DEL-01 | R-01 |
-| RQ-PED-02-08 | HU-CAP-017 | FT-CAJ-01 | R-01 |
-| RQ-PED-02-09 | HU-CAP-018 | D-02 | R-01 |
-| RQ-PED-02-10 | HU-CAP-018 | D-03 | R-01 |
+| RQ-PED-02-06 | HU-CAP-016 | — | R-01 |
+| RQ-PED-02-07 | HU-CAP-017 | FT-DEL-01 · DEP-07 (D-03) | R-03 |
+| RQ-PED-02-08 | HU-CAP-017 | FT-DEL-01 | R-01 |
+| RQ-PED-02-09 | HU-CAP-017 | FT-CAJ-01 | R-01 |
+| RQ-PED-02-10 | HU-CAP-018 | D-02 | R-01 |
+| RQ-PED-02-11 | HU-CAP-018 | D-03 | R-01 |
 
 Historias de usuario de esta feature (en `historias/`, en draft):
 

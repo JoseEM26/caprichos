@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-016, FT-CON-01, HU-CAP-144, HU-CAP-145, HU-CAP-146, HU-CAP-147, ADR-001, ADR-011, ADR-014, ADR-003, ADR-012, FT-CAR-01]
+relacionados: [EP-CAP-016, FT-CON-01, HU-CAP-144, HU-CAP-145, HU-CAP-146, HU-CAP-147, ADR-001, ADR-011, ADR-014, ADR-003, ADR-012, FT-CAR-01, FT-CLI-02]
 tags: [dor, plt-05, contenidos, ft-con-01, g4]
 ---
 
@@ -34,7 +34,7 @@ tags: [dor, plt-05, contenidos, ft-con-01, g4]
 | NEGOCIO | ☑ | Objetivo y valor con KPI | Épica EP-CAP-016 §2 y feature §1 (hipótesis medible) |
 | NEGOCIO | ☐ | Alcance dentro y fuera acordado | Redactado en la feature; falta la firma del PO (DT-48) |
 | NEGOCIO | ☐ | Prioridad y release confirmados | Debería tener · H2 · 01/03/2027 (supuesto, D-19); fechas supuestas hasta D-19 |
-| FUNCIONAL | ☑ | Historias con criterios verificables | 4 historias, 9 criterios Dado/Cuando/Entonces |
+| FUNCIONAL | ☑ | Historias con criterios verificables | 4 historias, 11 criterios Dado/Cuando/Entonces |
 | FUNCIONAL | ☐ | Reglas de negocio documentadas y validadas | Documentadas; abiertas: D-15 |
 | FUNCIONAL | ☐ | Estimación por el equipo | Tareas en `backlog/tareas/EP-CAP-016.json` con `estimacion_horas: null` |
 | DISEÑO / UX | ☐ | Prototipos aprobados (DEP-06) | Mockup navegable como referencia (DT-04); Figma o aceptación del mockup pendiente (G2) |
@@ -43,7 +43,7 @@ tags: [dor, plt-05, contenidos, ft-con-01, g4]
 | TÉCNICO | ☐ | Contrato de API | Borrador en ARQ-CAP-002 §FT-CON-01; se aprueba en G3 |
 | TÉCNICO | ☐ | Modelo de datos / DDL | DAT-CAP-001 y `datos/ddl-propuesto.sql` (probado en PostgreSQL 16); sin aprobar (G3) |
 | TÉCNICO | ☐ | RNF y seguridad | RNF-CAP-014, RNF-CAP-009, RNF-CAP-012; umbrales propuestos (feature §3) |
-| CALIDAD | ☑ | Estrategia y datos de prueba | `pruebas/test-plan.md`: 9 casos TC para estas historias, datos sintéticos |
+| CALIDAD | ☑ | Estrategia y datos de prueba | `pruebas/test-plan.md`: 11 casos TC para estas historias, datos sintéticos |
 | CALIDAD | ☑ | Riesgos con mitigación y dueño | Sección 5 |
 
 ## 2 DIAGRAMA DE DEPENDENCIAS
@@ -59,6 +59,7 @@ flowchart LR
   HU_CAP_146["HU-CAP-146"]:::evaluado --> FT_CON_01
   HU_CAP_147["HU-CAP-147"]:::evaluado --> FT_CON_01
   FT_CAR_01["FT-CAR-01"]:::interna --> FT_CON_01
+  FT_CLI_02["FT-CLI-02"]:::interna --> FT_CON_01
   ADR_001["ADR-001"]:::interna -.-> FT_CON_01
   ADR_011["ADR-011"]:::interna -.-> FT_CON_01
   ADR_014["ADR-014"]:::interna -.-> FT_CON_01
@@ -69,7 +70,7 @@ flowchart LR
 ```
 
 - **Ítems evaluados:** FT-CON-01 y sus historias HU-CAP-144, HU-CAP-145, HU-CAP-146, HU-CAP-147.
-- **Dependencias técnicas:** FT-CAR-01; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-003, ADR-012.
+- **Dependencias técnicas:** FT-CAR-01, FT-CLI-02; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-003, ADR-012.
 - **Dependencias externas:** DEP-02, DEP-06.
 - **Decisiones abiertas:** D-15.
 

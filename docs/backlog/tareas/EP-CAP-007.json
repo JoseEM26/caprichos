@@ -257,7 +257,7 @@
         },
         {
           "id": "HU-CAP-061-T03",
-          "titulo": "Reglas de dominio de HU-CAP-061 (RQ-SAL-02-01, RQ-SAL-02-02, RQ-SAL-02-06, RQ-SAL-02-07)",
+          "titulo": "Reglas de dominio de HU-CAP-061 (RQ-SAL-02-01, RQ-SAL-02-02, RQ-SAL-02-06, RQ-SAL-02-08)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -329,7 +329,7 @@
         },
         {
           "id": "HU-CAP-062-T02",
-          "titulo": "Reglas de dominio de HU-CAP-062 (RQ-SAL-02-03, RQ-SAL-02-04)",
+          "titulo": "Reglas de dominio de HU-CAP-062 (RQ-SAL-02-03, RQ-SAL-02-04, RQ-SAL-02-07)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -374,7 +374,7 @@
         },
         {
           "id": "HU-CAP-062-T06",
-          "titulo": "Pruebas TC-CAP-062-01..03 (unitarias de dominio e integración de API)",
+          "titulo": "Pruebas TC-CAP-062-01..04 (unitarias de dominio e integración de API)",
           "capa": "application",
           "actividad": "PRUEBAS",
           "responsable": "José Ángel Espinoza",
@@ -401,7 +401,7 @@
         },
         {
           "id": "HU-CAP-063-T02",
-          "titulo": "Reglas de dominio de HU-CAP-063 (RQ-SAL-02-05, RQ-SAL-02-08)",
+          "titulo": "Reglas de dominio de HU-CAP-063 (RQ-SAL-02-05, RQ-SAL-02-09)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",
@@ -473,7 +473,7 @@
         },
         {
           "id": "HU-CAP-064-T02",
-          "titulo": "Reglas de dominio de HU-CAP-064 (RQ-SAL-02-09, RQ-SAL-02-10)",
+          "titulo": "Reglas de dominio de HU-CAP-064 (RQ-SAL-02-10, RQ-SAL-02-11)",
           "capa": "domain",
           "actividad": "DESARROLLO",
           "responsable": "José Ángel Espinoza",

@@ -34,8 +34,8 @@ tags: [dor, plt-05, cocina, ft-coc-03, g4]
 | NEGOCIO | ☑ | Objetivo y valor con KPI | Épica EP-CAP-006 §2 y feature §1 (hipótesis medible) |
 | NEGOCIO | ☐ | Alcance dentro y fuera acordado | Redactado en la feature; falta la firma del PO (DT-48) |
 | NEGOCIO | ☐ | Prioridad y release confirmados | Debe tener · H1 · piloto en el local · 28/12/2026 (supuesto, D-19); fechas supuestas hasta D-19 |
-| FUNCIONAL | ☑ | Historias con criterios verificables | 3 historias, 12 criterios Dado/Cuando/Entonces |
-| FUNCIONAL | ☐ | Reglas de negocio documentadas y validadas | Documentadas; abiertas: D-01 |
+| FUNCIONAL | ☑ | Historias con criterios verificables | 3 historias, 13 criterios Dado/Cuando/Entonces |
+| FUNCIONAL | ☑ | Reglas de negocio documentadas y validadas | Documentadas en la feature §4; sin decisiones abiertas propias |
 | FUNCIONAL | ☐ | Estimación por el equipo | Tareas en `backlog/tareas/EP-CAP-006.json` con `estimacion_horas: null` |
 | DISEÑO / UX | ☐ | Prototipos aprobados (DEP-06) | Mockup navegable como referencia (DT-04); Figma o aceptación del mockup pendiente (G2) |
 | DISEÑO / UX | ☐ | Textos y mensajes definidos | Los del mockup; por revisar con Kevin |
@@ -43,7 +43,7 @@ tags: [dor, plt-05, cocina, ft-coc-03, g4]
 | TÉCNICO | ☐ | Contrato de API | Borrador en ARQ-CAP-002 §FT-COC-03; se aprueba en G3 |
 | TÉCNICO | ☐ | Modelo de datos / DDL | DAT-CAP-001 y `datos/ddl-propuesto.sql` (probado en PostgreSQL 16); sin aprobar (G3) |
 | TÉCNICO | ☐ | RNF y seguridad | RNF-CAP-002, RNF-CAP-019, RNF-CAP-009, RNF-CAP-012; umbrales propuestos (feature §3) |
-| CALIDAD | ☑ | Estrategia y datos de prueba | `pruebas/test-plan.md`: 12 casos TC para estas historias, datos sintéticos |
+| CALIDAD | ☑ | Estrategia y datos de prueba | `pruebas/test-plan.md`: 13 casos TC para estas historias, datos sintéticos |
 | CALIDAD | ☑ | Riesgos con mitigación y dueño | Sección 5 |
 
 ## 2 DIAGRAMA DE DEPENDENCIAS
@@ -73,7 +73,7 @@ flowchart LR
 - **Ítems evaluados:** FT-COC-03 y sus historias HU-CAP-055, HU-CAP-056, HU-CAP-057.
 - **Dependencias técnicas:** FT-BOT-01, FT-CAR-02, FT-CON-01; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-002, ADR-006, ADR-007.
 - **Dependencias externas:** DEP-02, DEP-06.
-- **Decisiones abiertas:** D-01.
+- **Decisiones abiertas:** ninguna propia.
 
 **Bloqueantes**
 
@@ -82,7 +82,6 @@ flowchart LR
 | G2 | Mockup aprobado o aceptación del mockup navegable (DEP-06) | Diseño | José Ángel Espinoza (UX, DT-48) | Antes de G4 | Abierto |
 | G3 | Aprobación de ADR-001, ADR-011, ADR-014, ADR-002, ADR-006, ADR-007 | Arquitectura | José Ángel Espinoza (TL, DT-48) | Antes de G4 | Abierto |
 | DEP-02 | Plataforma y hosting (ADR-001, ADR-011) | Técnica | Desarrollo | Antes de G3 | Abierto |
-| D-01 | Decisión pendiente (ver `analisis/decisiones.md`) | Decisión | Kevin | Antes de G4 | Abierto |
 
 ## 3 MODELADO (DATOS Y PROCESO)
 
@@ -93,10 +92,8 @@ erDiagram
   PEDIDO ||--o{ COMANDA_AREA : ""
   AREA_COCINA ||--o{ PRINT_JOB : ""
   PEDIDO ||--o{ PRINT_JOB : ""
+  AREA_COCINA ||--o{ ALTA_DEMANDA : ""
   AGOTADO {
-    bigint id PK
-  }
-  ALTA_DEMANDA {
     bigint id PK
   }
   DEVICE_KEY {
@@ -177,7 +174,7 @@ flowchart TB
 
 ☐ READY · Puede ingresar a desarrollo  ☐ READY CON CONDICIONES · ver acuerdos  ☐ NO READY · devolver a refinamiento
 
-**Propuesta IA: NO READY.** Motivos: G0 a G3 sin aprobar (DT-48); ADR ADR-001, ADR-011, ADR-014, ADR-002, ADR-006, ADR-007 propuestos, no aprobados (G3); tareas sin estimar; mockup sin aprobar (G2, DEP-06); decisiones abiertas D-01. Lo que sí está listo: historias con criterios verificables, casos de prueba 1 a 1, modelo de datos probado y dependencias identificadas. Con las firmas de G2 y G3 y la estimación, pasaría a **READY CON CONDICIONES**. La decisión es del PO.
+**Propuesta IA: NO READY.** Motivos: G0 a G3 sin aprobar (DT-48); ADR ADR-001, ADR-011, ADR-014, ADR-002, ADR-006, ADR-007 propuestos, no aprobados (G3); tareas sin estimar; mockup sin aprobar (G2, DEP-06). Lo que sí está listo: historias con criterios verificables, casos de prueba 1 a 1, modelo de datos probado y dependencias identificadas. Con las firmas de G2 y G3 y la estimación, pasaría a **READY CON CONDICIONES**. La decisión es del PO.
 
 | Rol | Nombre | Fecha | Firma |
 | --- | --- | --- | --- |

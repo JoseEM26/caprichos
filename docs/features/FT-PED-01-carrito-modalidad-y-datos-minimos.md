@@ -26,7 +26,7 @@ tags: [pedido, plt-03, ep-cap-002, ft-ped-01, debe-tener]
 
 ## 1. Descripción y valor
 
-**Descripción.** El cliente arma su pedido con el menor esfuerzo: primero elige productos y al final da sus datos (NEC-CAP-017). El carrito lista cada producto con sus opciones, su nota para cocina, cantidad editable y subtotal; permite quitar y editar. En el carrito se elige la modalidad: **delivery** o **para recoger** (RN-CAP-016); no hay «en el local», porque en el salón pide el mozo (A2). Al final se piden solo nombre y teléfono; el correo es opcional y no se pide fecha (todo es para el mismo día, RN-CAP-028) ni crear cuenta. El cliente elige cómo prefiere pagar: Yape, Plin, efectivo (con cuánto paga, para el vuelto), tarjeta o transferencia. La carta **no cobra** (DT-17): informa que un asesor le escribirá por WhatsApp. El resumen muestra subtotal, descuentos, cupón, envío y total.
+**Descripción.** El cliente arma su pedido con el menor esfuerzo: primero elige productos y al final da sus datos (NEC-CAP-017). El carrito lista cada producto con sus opciones, su nota para cocina, cantidad editable y subtotal; permite quitar y editar. En el carrito se elige la modalidad: **delivery** o **para recoger** (RN-CAP-016); no hay «en el local», porque en el salón pide el mozo (A2). Al final se piden solo nombre y teléfono; el correo es opcional y no se pide fecha (todo es para el mismo día, RN-CAP-028) ni crear cuenta. El cliente **debe elegir** cómo pagará: Yape, Plin, efectivo (con cuánto paga, para el vuelto), tarjeta o transferencia (DT-57), para no recargar al personal preguntándolo por WhatsApp. La carta **no cobra ni pide la captura** (DT-17, DT-57): el asesor la pide por WhatsApp. Si el cliente no entró a su cuenta, al final se le recuerda que puede acumular puntos (FT-CLI-02). El resumen muestra subtotal, descuentos, cupón, envío y total.
 
 **Datos que se recuerdan.** Con aviso de privacidad, el nombre, el teléfono y la última dirección se guardan en el dispositivo y, por teléfono, en el sistema para el siguiente pedido (RN-CAP-045).
 
@@ -45,9 +45,9 @@ tags: [pedido, plt-03, ep-cap-002, ft-ped-01, debe-tener]
 | RQ-PED-01-03 | La modalidad (delivery o para recoger) se elige en el carrito, no en la cabecera. | Debe tener | RN-CAP-016 · A2 | Dado el carrito, cuando el cliente va a confirmar, entonces elige entre «Delivery» y «Para recoger»; no aparece «En el local». | Propuesto |
 | RQ-PED-01-04 | Al final se piden solo nombre y teléfono; el correo es opcional y no se pide fecha ni cuenta. | Debe tener | NEC-CAP-017 · RN-CAP-028 · RN-CAP-066 | Dado el paso de datos, cuando el cliente deja vacío el correo y no tiene cuenta, entonces puede enviar el pedido; sin nombre o con un teléfono de menos de 9 dígitos no puede. | Propuesto |
 | RQ-PED-01-05 | Los datos del cliente se recuerdan para el siguiente pedido, con aviso de privacidad. | Debería tener | RN-CAP-045 · NEC-CAP-019 | Dado un cliente que ya pidió y aceptó el aviso, cuando vuelve a pedir desde el mismo celular o escribe el mismo teléfono, entonces su nombre y última dirección aparecen llenos y editables. | Propuesto |
-| RQ-PED-01-06 | El cliente elige su medio de pago preferido entre Yape, Plin, efectivo, tarjeta y transferencia. | Debe tener | RN-CAP-011 · NEC-CAP-018 | Dados los medios activos en Configuración del local, cuando el cliente elige el pago, entonces solo ve esos medios, con Yape y Plin como opciones propias y visibles. | Propuesto |
+| RQ-PED-01-06 | El cliente elige obligatoriamente su medio de pago entre Yape, Plin, efectivo, tarjeta y transferencia. | Debe tener | RN-CAP-011 · NEC-CAP-018 · DT-57 | Dados los medios activos en Configuración del local, cuando el cliente llega al pago, entonces solo ve esos medios, con Yape y Plin como opciones propias y visibles, y sin elegir uno no puede enviar el pedido. | Propuesto |
 | RQ-PED-01-07 | Con efectivo, el cliente indica con cuánto paga y ve el vuelto. | Debe tener | RN-CAP-011 | Dado un total de S/ 37,50, cuando el cliente elige efectivo y escribe S/ 50, entonces ve vuelto S/ 12,50; un monto menor al total no se acepta. | Propuesto |
-| RQ-PED-01-08 | La carta no cobra ni pide capturas: informa que un asesor escribirá por WhatsApp. | Debe tener | RN-CAP-076 · DT-17 | Dado cualquier medio de pago, cuando el cliente envía, entonces ve «Un asesor te escribirá por WhatsApp para confirmar tu pedido y el pago», sin campo para subir comprobante. | Propuesto |
+| RQ-PED-01-08 | La carta no cobra ni pide capturas: informa que un asesor escribirá por WhatsApp. | Debe tener | RN-CAP-076 · DT-17 | Dado cualquier medio de pago, cuando el cliente envía, entonces ve «Un asesor te escribirá por WhatsApp para coordinar el pago», sin campo para subir la captura. | Propuesto |
 | RQ-PED-01-09 | El resumen muestra subtotal, descuento automático, cupón, envío y total. | Debe tener | RN-CAP-070 · NEC-CAP-065 | Dado un carrito con un descuento automático vigente y envío de S/ 4, cuando el cliente ve el resumen, entonces cada línea aparece por separado y el total es la suma correcta. | Propuesto |
 | RQ-PED-01-10 | El cliente puede escribir un código de cupón en el resumen. | Debería tener | RN-CAP-069 · RN-CAP-133 | Dado un cupón vigente, cuando el cliente lo escribe, entonces ve el descuento aplicado o el motivo por el que no aplica. | Propuesto |
 | RQ-PED-01-11 | El cliente puede pedir boleta o factura dejando DNI o RUC; por defecto es nota de venta. | Debe tener | RN-CAP-037 · NEC-CAP-089 | Dado el resumen, cuando el cliente marca «Quiero factura», entonces se le pide RUC de 11 dígitos y razón social; si no marca nada, el comprobante es nota de venta. | Propuesto |
@@ -76,6 +76,7 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RN-CAP-066 | La cuenta es opcional: sin cuenta se compra igual, sin puntos. | Acta 02 y 17/10 |
 | RN-CAP-076 | La carta y el chatbot no piden pagar ni enviar capturas. | Reunión del 18/10 |
 | RN-CAP-037 | Comprobante por defecto: nota de venta; boleta o factura a pedido. | Acta 02 |
+| DT-57 | El método de pago se elige en la carta (obligatorio); la captura la pide el asesor por WhatsApp. | Acta 03 · decisiones.md |
 
 ## 5. Trazabilidad y planificación
 
@@ -86,7 +87,7 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RQ-PED-01-03 | HU-CAP-012 | — | R-01 |
 | RQ-PED-01-04 | HU-CAP-013 | — | R-01 |
 | RQ-PED-01-05 | HU-CAP-013 | FT-LEG-02 (privacidad) · D-18 | R-11 |
-| RQ-PED-01-06 | HU-CAP-014 | FT-CFG-02 | R-01 |
+| RQ-PED-01-06 | HU-CAP-014 | FT-CFG-02 · lista de medios de Kevin (acta 03) | R-01 |
 | RQ-PED-01-07 | HU-CAP-014 | — | R-01 |
 | RQ-PED-01-08 | HU-CAP-014 | — | R-01 |
 | RQ-PED-01-09 | HU-CAP-015 | FT-OFE-02 · FT-OFE-03 · FT-PED-02 | R-01 |

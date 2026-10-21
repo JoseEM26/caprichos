@@ -26,7 +26,7 @@ tags: [cocina, plt-03, ep-cap-006, ft-coc-03, debe-tener]
 
 ## 1. Descripción y valor
 
-**Descripción.** Cocina y barra marcan un producto, un sabor o una opción como **agotado por hoy**: se apaga al momento en la carta, en Nuevo pedido y en el chatbot, y vuelve solo al día siguiente (NEC-CAP-073). El administrador también puede agotarlo desde Productos hasta que lo vuelva a ofrecer (RN-CAP-085). **Alta demanda** es un interruptor que suma minutos (de 5 a 180, con atajos de 5 a 60) al tiempo de entrega prometido en la carta, el chatbot y las respuestas del bot; mientras está activa, se puede además **pausar pedidos**: la carta y el chatbot dejan de recibir pedidos nuevos y el bot pasa a un asesor. Apagarla vuelve todo a la normalidad (RN-CAP-113). Toda activación pide confirmación Sí/No.
+**Descripción.** Cocina y barra marcan un producto, un sabor o una opción como **agotado por hoy**: se apaga al momento en la carta, en Nuevo pedido y en el chatbot, y vuelve solo al día siguiente (NEC-CAP-073). El administrador también puede agotarlo desde Productos hasta que lo vuelva a ofrecer (RN-CAP-085). **Alta demanda** es un interruptor que suma minutos (de 5 a 180, con atajos de 5 a 60) al **rango de entrega** que se le dice al cliente (de 25 a 35 minutos sin congestión, V1) en la carta, el chatbot y las respuestas del bot; cualquier área puede activarla y el cambio se ve **en tiempo real en todas las áreas** (DT-58, acta 03); mientras está activa, se puede además **pausar pedidos**: la carta y el chatbot dejan de recibir pedidos nuevos y el bot pasa a un asesor. Apagarla vuelve todo a la normalidad (RN-CAP-113). Toda activación pide confirmación Sí/No y queda en el Historial de acciones con quién la hizo: en el acta 03 Kevin contó que un producto quedó agotado dos días porque nadie lo reactivó, por eso el agotado por hoy vuelve solo al día siguiente.
 
 **Beneficio esperado.** Evita prometer lo que no hay y tiempos que no se cumplen en hora punta. Hipótesis medible: **0 pedidos con productos agotados por hoy**; **el tiempo mostrado en la carta coincide al 100 % con el de Alta demanda**.
 
@@ -43,11 +43,12 @@ tags: [cocina, plt-03, ep-cap-006, ft-coc-03, debe-tener]
 | RQ-COC-03-03 | El agotado por hoy vuelve solo al cambiar el día en Lima. | Debe tener | RN-CAP-085 (1.ª) | Dado un producto agotado por hoy, cuando pasan las 00:00 de Lima, entonces vuelve a ofrecerse sin que nadie lo active. | Propuesto |
 | RQ-COC-03-04 | Cocina puede volver a ofrecer un agotado antes del día siguiente. | Debe tener | RN-CAP-085 (1.ª) | Dado un producto agotado por hoy, cuando Bebidas lo reactiva con Sí/No, entonces vuelve a la carta al momento. | Propuesto |
 | RQ-COC-03-05 | El administrador agota un producto desde Productos hasta que lo vuelva a ofrecer. | Debe tener | RN-CAP-085 (1.ª) | Dado un producto agotado desde Productos, cuando cambia el día, entonces sigue agotado hasta que el administrador lo active. | Propuesto |
-| RQ-COC-03-06 | Alta demanda suma los minutos elegidos al tiempo prometido en la carta y el chatbot. | Debe tener | RN-CAP-113 · NEC-CAP-103 | Dado un tiempo prometido de 13 minutos, cuando cocina activa Alta demanda con +20, entonces la carta y el bot dicen 33 minutos. | Propuesto |
-| RQ-COC-03-07 | Los minutos extra van de 5 a 180, con atajos de 5 a 60. | Debe tener | RN-CAP-113 · V10 | Dado el control de Alta demanda, cuando cocina escribe 200, entonces no se acepta; con el atajo «30» se aplica 30. | Propuesto |
-| RQ-COC-03-08 | La pausa de pedidos solo se puede activar con Alta demanda activa. | Debe tener | RN-CAP-113 | Dada Alta demanda apagada, cuando cocina busca la pausa, entonces está desactivada; con Alta demanda activa se puede pausar. | Propuesto |
-| RQ-COC-03-09 | Con la pausa, la carta y el chatbot no reciben pedidos nuevos y el bot pasa los chats a un asesor. | Debe tener | RN-CAP-113 · RN-CAP-044 | Dada la pausa activa, cuando un cliente intenta pedir por la carta o el bot, entonces ve el aviso de pausa y el bot ofrece hablar con una persona. | Propuesto |
-| RQ-COC-03-10 | Apagar Alta demanda quita los minutos extra y la pausa. | Debe tener | RN-CAP-113 | Dada Alta demanda con pausa, cuando cocina la apaga con Sí/No, entonces el tiempo vuelve a 13 minutos y la carta recibe pedidos. | Propuesto |
+| RQ-COC-03-06 | Alta demanda suma los minutos elegidos al tiempo prometido en la carta y el chatbot. | Debe tener | RN-CAP-113 · NEC-CAP-103 | Dado el rango de 25 a 35 minutos, cuando cocina activa Alta demanda con +30, entonces la carta y el bot dicen «de 55 a 65 minutos». | Propuesto |
+| RQ-COC-03-07 | Alta demanda se ve en tiempo real en todas las áreas; cualquiera puede cambiarla y queda quién lo hizo. | Debe tener | DT-58 · DT-49 | Dadas tres pantallas de cocina abiertas, cuando Bebidas activa +30, entonces Postres y Salados ven «Alta demanda +30 · activó Bebidas» sin recargar, y el Historial de acciones registra el cambio. | Propuesto |
+| RQ-COC-03-08 | Los minutos extra van de 5 a 180, con atajos de 5 a 60. | Debe tener | RN-CAP-113 · V10 | Dado el control de Alta demanda, cuando cocina escribe 200, entonces no se acepta; con el atajo «30» se aplica 30. | Propuesto |
+| RQ-COC-03-09 | La pausa de pedidos solo se puede activar con Alta demanda activa. | Debe tener | RN-CAP-113 | Dada Alta demanda apagada, cuando cocina busca la pausa, entonces está desactivada; con Alta demanda activa se puede pausar. | Propuesto |
+| RQ-COC-03-10 | Con la pausa, la carta y el chatbot no reciben pedidos nuevos y el bot pasa los chats a un asesor. | Debe tener | RN-CAP-113 · RN-CAP-044 | Dada la pausa activa, cuando un cliente intenta pedir por la carta o el bot, entonces ve el aviso de pausa y el bot ofrece hablar con una persona. | Propuesto |
+| RQ-COC-03-11 | Apagar Alta demanda quita los minutos extra y la pausa. | Debe tener | RN-CAP-113 | Dada Alta demanda con pausa, cuando cocina la apaga con Sí/No, entonces el rango vuelve a «de 25 a 35 minutos» y la carta recibe pedidos. | Propuesto |
 
 Prioridad por NEC-CAP-073, 074 y 103 (E1). Todos nacen *Propuesto* hasta que el PO los apruebe (DT-48).
 
@@ -69,7 +70,8 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RN-CAP-017 | Un producto agotado deja de ofrecerse en la carta y el chatbot. | Diseño |
 | RN-CAP-044 | En alta demanda se puede pausar el bot o subir los tiempos. | Acta 02 |
 | RN-CAP-085 (1.ª) | Agotado por hoy vence al cambiar la fecha; agotado desde Productos dura hasta reactivarlo (id repetido, O1). | Cocina |
-| RN-CAP-086 (1.ª) | Con Alta demanda el tiempo mostrado es 13 + lo elegido (id repetido, O1; ampliado por RN-CAP-113). | Cocina |
+| RN-CAP-086 (1.ª) | Con Alta demanda el tiempo mostrado es el rango normal + lo elegido (id repetido, O1; ampliado por RN-CAP-113 y V1). | Cocina |
+| DT-58 | Alta demanda suma minutos al rango de 25 a 35 y se ve en tiempo real en todas las áreas, la carta y el bot. | Acta 03 · decisiones.md |
 | RN-CAP-113 | Alta demanda suma de 5 a 180 minutos; la pausa solo vale con Alta demanda activa. | Operación |
 
 ## 5. Trazabilidad y planificación
@@ -81,11 +83,12 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RQ-COC-03-03 | HU-CAP-055 | — | R-01 |
 | RQ-COC-03-04 | HU-CAP-055 | — | R-01 |
 | RQ-COC-03-05 | HU-CAP-056 | FT-CON-01 | R-01 |
-| RQ-COC-03-06 | HU-CAP-057 | D-01 | R-01 |
+| RQ-COC-03-06 | HU-CAP-057 | — | R-01 |
 | RQ-COC-03-07 | HU-CAP-057 | — | R-01 |
 | RQ-COC-03-08 | HU-CAP-057 | — | R-01 |
-| RQ-COC-03-09 | HU-CAP-057 | FT-CAR-02 · FT-BOT-01 | R-01 |
-| RQ-COC-03-10 | HU-CAP-057 | — | R-01 |
+| RQ-COC-03-09 | HU-CAP-057 | — | R-01 |
+| RQ-COC-03-10 | HU-CAP-057 | FT-CAR-02 · FT-BOT-01 | R-01 |
+| RQ-COC-03-11 | HU-CAP-057 | — | R-01 |
 
 Historias de usuario de esta feature (en `historias/`, en draft):
 
@@ -102,7 +105,7 @@ Decisiones técnicas que la rigen (ADR propuestos, G3): ADR-001, ADR-011, ADR-01
 
 **Preguntas abiertas**
 
-1. **Tiempo prometido base** — D-01 (13 minutos o 30 a 45).
+1. **Tiempo prometido base** — resuelto en el acta 03: de 25 a 35 minutos (V1).
 2. **¿Alta demanda se apaga sola al cierre?** Propuesta: sí, a la hora de cierre del día.
 
 ---

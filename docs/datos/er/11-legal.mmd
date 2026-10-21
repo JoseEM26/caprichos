@@ -21,11 +21,43 @@ erDiagram
     text estado
     timestamptz en
   }
+  INICIATIVA {
+    bigint id PK
+    text codigo UK
+    text tipo
+    text area
+    text titulo
+    text detalle
+    bigint archivo_id FK
+    text estado
+    timestamptz creado_en
+    bigint creado_por FK
+    timestamptz estado_cambiado_en
+    bigint estado_cambiado_por FK
+  }
+  INICIATIVA_COMENTARIO {
+    bigint id PK
+    bigint iniciativa_id FK
+    text texto
+    timestamptz creado_en
+    bigint creado_por FK
+  }
+  ARCHIVO {
+    bigint id PK "en otro dominio"
+  }
   PARTY {
     bigint id PK "en otro dominio"
   }
   PEDIDO {
     bigint id PK "en otro dominio"
   }
+  USER_ACCOUNT {
+    bigint id PK "en otro dominio"
+  }
+  ARCHIVO ||--o{ INICIATIVA : "archivo_id"
+  INICIATIVA ||--o{ INICIATIVA_COMENTARIO : "iniciativa_id"
   PARTY ||--o{ DATA_REQUEST : "party_id"
   PEDIDO ||--o{ RECLAMO : "pedido_id"
+  USER_ACCOUNT ||--o{ INICIATIVA : "creado_por"
+  USER_ACCOUNT ||--o{ INICIATIVA : "estado_cambiado_por"
+  USER_ACCOUNT ||--o{ INICIATIVA_COMENTARIO : "creado_por"

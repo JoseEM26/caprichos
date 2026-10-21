@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-003, FT-CLI-02, HU-CAP-026, HU-CAP-027, HU-CAP-028, ADR-001, ADR-011, ADR-014, ADR-004, ADR-005, ADR-008, FT-CAJ-02, FT-CFG-02, FT-OFE-03]
+relacionados: [EP-CAP-003, FT-CLI-02, HU-CAP-026, HU-CAP-027, HU-CAP-028, HU-CAP-195, ADR-001, ADR-011, ADR-014, ADR-004, ADR-005, ADR-008, FT-CAJ-02, FT-CFG-02, FT-CON-01, FT-OFE-01, FT-OFE-03]
 tags: [dor, plt-05, clientes, ft-cli-02, g4]
 ---
 
@@ -25,7 +25,7 @@ tags: [dor, plt-05, clientes, ft-cli-02, g4]
 | SPRINT / RELEASE DESTINO | H2 · 01/03/2027 (supuesto, D-19) |
 | RESULTADO | (lo decide el PO — propuesta IA: **NO READY**) |
 
-> Insumos: `analisis/decisiones.md` (fuente de verdad), la feature `FT-CLI-02`, sus 3 historias (HU-CAP-026, HU-CAP-027, HU-CAP-028), la épica EP-CAP-003, los ADR ADR-001, ADR-011, ADR-014, ADR-004, ADR-005, ADR-008, `arquitectura/ARQ-CAP-001` y `ARQ-CAP-002`, y `datos/DAT-CAP-001`.
+> Insumos: `analisis/decisiones.md` (fuente de verdad), la feature `FT-CLI-02`, sus 4 historias (HU-CAP-026, HU-CAP-027, HU-CAP-028, HU-CAP-195), la épica EP-CAP-003, los ADR ADR-001, ADR-011, ADR-014, ADR-004, ADR-005, ADR-008, `arquitectura/ARQ-CAP-001` y `ARQ-CAP-002`, y `datos/DAT-CAP-001`.
 
 ## 1 CHECKLIST DE PREPARACIÓN
 
@@ -34,8 +34,8 @@ tags: [dor, plt-05, clientes, ft-cli-02, g4]
 | NEGOCIO | ☑ | Objetivo y valor con KPI | Épica EP-CAP-003 §2 y feature §1 (hipótesis medible) |
 | NEGOCIO | ☐ | Alcance dentro y fuera acordado | Redactado en la feature; falta la firma del PO (DT-48) |
 | NEGOCIO | ☐ | Prioridad y release confirmados | Debería tener · H2 · 01/03/2027 (supuesto, D-19); fechas supuestas hasta D-19 |
-| FUNCIONAL | ☑ | Historias con criterios verificables | 3 historias, 9 criterios Dado/Cuando/Entonces |
-| FUNCIONAL | ☑ | Reglas de negocio documentadas y validadas | Documentadas en la feature §4; sin decisiones abiertas propias |
+| FUNCIONAL | ☑ | Historias con criterios verificables | 4 historias, 14 criterios Dado/Cuando/Entonces |
+| FUNCIONAL | ☐ | Reglas de negocio documentadas y validadas | Documentadas; abiertas: D-25 |
 | FUNCIONAL | ☐ | Estimación por el equipo | Tareas en `backlog/tareas/EP-CAP-003.json` con `estimacion_horas: null` |
 | DISEÑO / UX | ☐ | Prototipos aprobados (DEP-06) | Mockup navegable como referencia (DT-04); Figma o aceptación del mockup pendiente (G2) |
 | DISEÑO / UX | ☐ | Textos y mensajes definidos | Los del mockup; por revisar con Kevin |
@@ -43,7 +43,7 @@ tags: [dor, plt-05, clientes, ft-cli-02, g4]
 | TÉCNICO | ☐ | Contrato de API | Borrador en ARQ-CAP-002 §FT-CLI-02; se aprueba en G3 |
 | TÉCNICO | ☐ | Modelo de datos / DDL | DAT-CAP-001 y `datos/ddl-propuesto.sql` (probado en PostgreSQL 16); sin aprobar (G3) |
 | TÉCNICO | ☐ | RNF y seguridad | RNF-CAP-009, RNF-CAP-011, RNF-CAP-019; umbrales propuestos (feature §3) |
-| CALIDAD | ☑ | Estrategia y datos de prueba | `pruebas/test-plan.md`: 9 casos TC para estas historias, datos sintéticos |
+| CALIDAD | ☑ | Estrategia y datos de prueba | `pruebas/test-plan.md`: 14 casos TC para estas historias, datos sintéticos |
 | CALIDAD | ☑ | Riesgos con mitigación y dueño | Sección 5 |
 
 ## 2 DIAGRAMA DE DEPENDENCIAS
@@ -57,8 +57,11 @@ flowchart LR
   HU_CAP_026["HU-CAP-026"]:::evaluado --> FT_CLI_02
   HU_CAP_027["HU-CAP-027"]:::evaluado --> FT_CLI_02
   HU_CAP_028["HU-CAP-028"]:::evaluado --> FT_CLI_02
+  HU_CAP_195["HU-CAP-195"]:::evaluado --> FT_CLI_02
   FT_CAJ_02["FT-CAJ-02"]:::interna --> FT_CLI_02
   FT_CFG_02["FT-CFG-02"]:::interna --> FT_CLI_02
+  FT_CON_01["FT-CON-01"]:::interna --> FT_CLI_02
+  FT_OFE_01["FT-OFE-01"]:::interna --> FT_CLI_02
   FT_OFE_03["FT-OFE-03"]:::interna --> FT_CLI_02
   ADR_001["ADR-001"]:::interna -.-> FT_CLI_02
   ADR_011["ADR-011"]:::interna -.-> FT_CLI_02
@@ -70,10 +73,10 @@ flowchart LR
   DEP_06["DEP-06"]:::externa ==> FT_CLI_02
 ```
 
-- **Ítems evaluados:** FT-CLI-02 y sus historias HU-CAP-026, HU-CAP-027, HU-CAP-028.
-- **Dependencias técnicas:** FT-CAJ-02, FT-CFG-02, FT-OFE-03; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-004, ADR-005, ADR-008.
+- **Ítems evaluados:** FT-CLI-02 y sus historias HU-CAP-026, HU-CAP-027, HU-CAP-028, HU-CAP-195.
+- **Dependencias técnicas:** FT-CAJ-02, FT-CFG-02, FT-CON-01, FT-OFE-01, FT-OFE-03; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-004, ADR-005, ADR-008.
 - **Dependencias externas:** DEP-02, DEP-06.
-- **Decisiones abiertas:** ninguna propia.
+- **Decisiones abiertas:** D-25.
 
 **Bloqueantes**
 
@@ -82,6 +85,7 @@ flowchart LR
 | G2 | Mockup aprobado o aceptación del mockup navegable (DEP-06) | Diseño | José Ángel Espinoza (UX, DT-48) | Antes de G4 | Abierto |
 | G3 | Aprobación de ADR-001, ADR-011, ADR-014, ADR-004, ADR-005, ADR-008 | Arquitectura | José Ángel Espinoza (TL, DT-48) | Antes de G4 | Abierto |
 | DEP-02 | Plataforma y hosting (ADR-001, ADR-011) | Técnica | Desarrollo | Antes de G3 | Abierto |
+| D-25 | Decisión pendiente (ver `analisis/decisiones.md`) | Decisión | Kevin | Antes de G4 | Abierto |
 
 ## 3 MODELADO (DATOS Y PROCESO)
 
@@ -107,6 +111,8 @@ flowchart TB
   P0 --> P1
   P2["HU-CAP-028<br>Recibir mi cupón de cumpleaños"]
   P1 --> P2
+  P3["HU-CAP-195<br>Ver cuántos puntos gano y canjearlos en mi pedido"]
+  P2 --> P3
 ```
 
 ## 4 DIAGRAMA DE ARQUITECTURA
@@ -147,7 +153,7 @@ flowchart TB
 | ID | Riesgo | Prob. | Impacto | Mitigación | Dueño | Estado |
 | --- | --- | --- | --- | --- | --- | --- |
 | R-01 | Riesgo de roadmap (ver PLT-01) | — | — | Según roadmap | Ver PLT-01 | Abierto |
-| R-FT-CLI-02-01 | Si no se resuelve «¿Cómo se canjean los puntos? No está en el BRD. Propuesta: canje por productos de la carta con un valor en puntos fijado por el administrador, solo en caja (pendiente de Kevin)», hay que rehacer criterios o pantallas | Media | Medio | Resolver con Kevin antes de G4 con la propuesta escrita en la feature | Kevin | Abierto |
+| R-FT-CLI-02-01 | Si no se resuelve «¿Sobre qué se calcula el 5 %?», hay que rehacer criterios o pantallas | Media | Medio | Resolver con Kevin antes de G4 con la propuesta escrita en la feature | Kevin | Abierto |
 | R-FT-CLI-02-02 | Si no se resuelve «¿Los puntos vencen? Propuesta: no vencen en la primera versión», hay que rehacer criterios o pantallas | Media | Medio | Resolver con Kevin antes de G4 con la propuesta escrita en la feature | Kevin | Abierto |
 | R-FT-CLI-02-03 | Si no se resuelve «Beneficio de cumpleaños», hay que rehacer criterios o pantallas | Media | Medio | Resolver con Kevin antes de G4 con la propuesta escrita en la feature | Kevin | Abierto |
 
@@ -155,7 +161,7 @@ flowchart TB
 
 ☐ READY · Puede ingresar a desarrollo  ☐ READY CON CONDICIONES · ver acuerdos  ☐ NO READY · devolver a refinamiento
 
-**Propuesta IA: NO READY.** Motivos: G0 a G3 sin aprobar (DT-48); ADR ADR-001, ADR-011, ADR-014, ADR-004, ADR-005, ADR-008 propuestos, no aprobados (G3); tareas sin estimar; mockup sin aprobar (G2, DEP-06). Lo que sí está listo: historias con criterios verificables, casos de prueba 1 a 1, modelo de datos probado y dependencias identificadas. Con las firmas de G2 y G3 y la estimación, pasaría a **READY CON CONDICIONES**. La decisión es del PO.
+**Propuesta IA: NO READY.** Motivos: G0 a G3 sin aprobar (DT-48); ADR ADR-001, ADR-011, ADR-014, ADR-004, ADR-005, ADR-008 propuestos, no aprobados (G3); tareas sin estimar; mockup sin aprobar (G2, DEP-06); decisiones abiertas D-25. Lo que sí está listo: historias con criterios verificables, casos de prueba 1 a 1, modelo de datos probado y dependencias identificadas. Con las firmas de G2 y G3 y la estimación, pasaría a **READY CON CONDICIONES**. La decisión es del PO.
 
 | Rol | Nombre | Fecha | Firma |
 | --- | --- | --- | --- |

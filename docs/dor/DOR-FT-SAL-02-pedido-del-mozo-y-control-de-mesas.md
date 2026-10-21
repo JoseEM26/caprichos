@@ -8,7 +8,7 @@ version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-007, FT-SAL-02, HU-CAP-061, HU-CAP-062, HU-CAP-063, HU-CAP-064, ADR-001, ADR-011, ADR-014, ADR-006, ADR-007, FT-CAJ-02, FT-CAR-01, FT-COC-01, FT-COC-02, FT-INF-03, FT-SAL-01]
+relacionados: [EP-CAP-007, FT-SAL-02, HU-CAP-061, HU-CAP-062, HU-CAP-063, HU-CAP-064, ADR-001, ADR-011, ADR-014, ADR-006, ADR-007, FT-CAJ-02, FT-CAJ-03, FT-CAR-01, FT-COC-01, FT-COC-02, FT-INF-03, FT-SAL-01]
 tags: [dor, plt-05, salon, ft-sal-02, g4]
 ---
 
@@ -34,7 +34,7 @@ tags: [dor, plt-05, salon, ft-sal-02, g4]
 | NEGOCIO | ☑ | Objetivo y valor con KPI | Épica EP-CAP-007 §2 y feature §1 (hipótesis medible) |
 | NEGOCIO | ☐ | Alcance dentro y fuera acordado | Redactado en la feature; falta la firma del PO (DT-48) |
 | NEGOCIO | ☐ | Prioridad y release confirmados | Debe tener · H1 · piloto en el local · 28/12/2026 (supuesto, D-19); fechas supuestas hasta D-19 |
-| FUNCIONAL | ☑ | Historias con criterios verificables | 4 historias, 12 criterios Dado/Cuando/Entonces |
+| FUNCIONAL | ☑ | Historias con criterios verificables | 4 historias, 13 criterios Dado/Cuando/Entonces |
 | FUNCIONAL | ☑ | Reglas de negocio documentadas y validadas | Documentadas en la feature §4; sin decisiones abiertas propias |
 | FUNCIONAL | ☐ | Estimación por el equipo | Tareas en `backlog/tareas/EP-CAP-007.json` con `estimacion_horas: null` |
 | DISEÑO / UX | ☐ | Prototipos aprobados (DEP-06) | Mockup navegable como referencia (DT-04); Figma o aceptación del mockup pendiente (G2) |
@@ -43,7 +43,7 @@ tags: [dor, plt-05, salon, ft-sal-02, g4]
 | TÉCNICO | ☐ | Contrato de API | Borrador en ARQ-CAP-002 §FT-SAL-02; se aprueba en G3 |
 | TÉCNICO | ☐ | Modelo de datos / DDL | DAT-CAP-001 y `datos/ddl-propuesto.sql` (probado en PostgreSQL 16); sin aprobar (G3) |
 | TÉCNICO | ☐ | RNF y seguridad | RNF-CAP-010, RNF-CAP-002, RNF-CAP-004, RNF-CAP-005; umbrales propuestos (feature §3) |
-| CALIDAD | ☑ | Estrategia y datos de prueba | `pruebas/test-plan.md`: 12 casos TC para estas historias, datos sintéticos |
+| CALIDAD | ☑ | Estrategia y datos de prueba | `pruebas/test-plan.md`: 13 casos TC para estas historias, datos sintéticos |
 | CALIDAD | ☑ | Riesgos con mitigación y dueño | Sección 5 |
 
 ## 2 DIAGRAMA DE DEPENDENCIAS
@@ -59,6 +59,7 @@ flowchart LR
   HU_CAP_063["HU-CAP-063"]:::evaluado --> FT_SAL_02
   HU_CAP_064["HU-CAP-064"]:::evaluado --> FT_SAL_02
   FT_CAJ_02["FT-CAJ-02"]:::interna --> FT_SAL_02
+  FT_CAJ_03["FT-CAJ-03"]:::interna --> FT_SAL_02
   FT_CAR_01["FT-CAR-01"]:::interna --> FT_SAL_02
   FT_COC_01["FT-COC-01"]:::interna --> FT_SAL_02
   FT_COC_02["FT-COC-02"]:::interna --> FT_SAL_02
@@ -74,7 +75,7 @@ flowchart LR
 ```
 
 - **Ítems evaluados:** FT-SAL-02 y sus historias HU-CAP-061, HU-CAP-062, HU-CAP-063, HU-CAP-064.
-- **Dependencias técnicas:** FT-CAJ-02, FT-CAR-01, FT-COC-01, FT-COC-02, FT-INF-03, FT-SAL-01; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-006, ADR-007.
+- **Dependencias técnicas:** FT-CAJ-02, FT-CAJ-03, FT-CAR-01, FT-COC-01, FT-COC-02, FT-INF-03, FT-SAL-01; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-006, ADR-007.
 - **Dependencias externas:** DEP-02, DEP-06.
 - **Decisiones abiertas:** ninguna propia.
 

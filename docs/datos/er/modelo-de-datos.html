@@ -61,10 +61,10 @@ html{scroll-behavior:smooth}
     <p class="eyebrow">Caprichos · DAT-CAP-001 · PostgreSQL 16</p>
     <h1>Modelo de datos</h1>
     <p class="lead">Así queda la base de datos de la carta, el administrativo y el chatbot. Cada diagrama sale del script <code>datos/ddl-propuesto.sql</code>, que ya se probó en PostgreSQL 16: las tablas, columnas y relaciones son exactamente las que se van a crear.</p>
-    <ul class="stats"><li><b>96</b> tablas</li><li><b>3</b> vistas</li><li><b>116</b> relaciones</li><li><b>12</b> dominios</li></ul>
+    <ul class="stats"><li><b>102</b> tablas</li><li><b>3</b> vistas</li><li><b>129</b> relaciones</li><li><b>12</b> dominios</li></ul>
     <div class="legend"><span><span class="k">PK</span> clave primaria</span><span><span class="f">FK</span> clave foránea</span><span>UK valor único</span><span>||--o{ uno a muchos · ||--o| uno a uno</span></div>
   </header>
-  <nav aria-label="Dominios"><a href="#comunes"><span>Comunes</span><b>3</b></a><a href="#personas-patron-party-simple"><span>Personas: patrón Party simple</span><b>10</b></a><a href="#acceso"><span>Acceso</span><b>7</b></a><a href="#configuracion-del-local"><span>Configuración del local</span><b>5</b></a><a href="#catalogo-y-contenidos"><span>Catálogo y contenidos</span><b>15</b></a><a href="#ofertas"><span>Ofertas</span><b>7</b></a><a href="#reparto-y-salon"><span>Reparto y salón</span><b>5</b></a><a href="#pedidos-cocina-y-reparto"><span>Pedidos, cocina y reparto</span><b>10</b></a><a href="#caja-puntos-y-credito-del-personal"><span>Caja, puntos y crédito del personal</span><b>9</b></a><a href="#stock-almacen-produccion-y-compras"><span>Stock, almacén, producción y compras</span><b>15</b></a><a href="#bot-atencion-y-notificaciones"><span>Bot, atención y notificaciones</span><b>8</b></a><a href="#legal"><span>Legal</span><b>2</b></a></nav>
+  <nav aria-label="Dominios"><a href="#comunes"><span>Comunes</span><b>3</b></a><a href="#personas-patron-party-simple"><span>Personas: patrón Party simple</span><b>10</b></a><a href="#acceso"><span>Acceso</span><b>9</b></a><a href="#configuracion-del-local"><span>Configuración del local</span><b>5</b></a><a href="#catalogo-y-contenidos"><span>Catálogo y contenidos</span><b>15</b></a><a href="#ofertas"><span>Ofertas</span><b>7</b></a><a href="#reparto-y-salon"><span>Reparto y salón</span><b>5</b></a><a href="#pedidos-cocina-y-reparto"><span>Pedidos, cocina y reparto</span><b>11</b></a><a href="#caja-puntos-y-credito-del-personal"><span>Caja, puntos y crédito del personal</span><b>10</b></a><a href="#stock-almacen-produccion-y-compras"><span>Stock, almacén, producción y compras</span><b>15</b></a><a href="#bot-atencion-y-notificaciones"><span>Bot, atención y notificaciones</span><b>8</b></a><a href="#legal"><span>Legal</span><b>4</b></a></nav>
   <section id="mapa"><header class="sec-head"><p class="eyebrow">Mapa</p><h2>Cómo se conectan los dominios</h2>
     <p>Las personas (patrón Party) y el catálogo alimentan los pedidos; el pedido mueve la caja, la cocina y el stock.</p></header>
     <div class="overview"><pre class="mermaid">flowchart LR
@@ -97,9 +97,27 @@ html{scroll-behavior:smooth}
     boolean activo
   }
   AUDITORIA {
+    bigint id PK
+    text categoria
+    text modulo
+    text accion
+    text resultado
+    text entidad
+    bigint entidad_id
+    jsonb antes
+    jsonb despues
+    text motivo
+    bigint party_id
+    boolean con_pin_admin
+    inet ip
+    text dispositivo
+    text request_id
+    timestamptz en
+    bytea hash_anterior
+    bytea hash
   }
   LISTA ||--o{ LISTA_VALOR : &quot;lista_id&quot;</pre></div>
-  <details><summary>Columnas de cada tabla</summary><div class="tw"><table><thead><tr><th>Tabla</th><th>Columnas (<span class="k">clave</span>, <span class="f">foránea</span>)</th></tr></thead><tbody><tr><td><code>lista</code></td><td><span class="k">id</span>, <span class="">codigo</span>, <span class="">nombre</span></td></tr><tr><td><code>lista_valor</code></td><td><span class="k">id</span>, <span class="f">lista_id</span>, <span class="">nombre</span>, <span class="">orden</span>, <span class="">activo</span></td></tr><tr><td><code>auditoria</code></td><td></td></tr></tbody></table></div></details>
+  <details><summary>Columnas de cada tabla</summary><div class="tw"><table><thead><tr><th>Tabla</th><th>Columnas (<span class="k">clave</span>, <span class="f">foránea</span>)</th></tr></thead><tbody><tr><td><code>lista</code></td><td><span class="k">id</span>, <span class="">codigo</span>, <span class="">nombre</span></td></tr><tr><td><code>lista_valor</code></td><td><span class="k">id</span>, <span class="f">lista_id</span>, <span class="">nombre</span>, <span class="">orden</span>, <span class="">activo</span></td></tr><tr><td><code>auditoria</code></td><td><span class="k">id</span>, <span class="">categoria</span>, <span class="">modulo</span>, <span class="">accion</span>, <span class="">resultado</span>, <span class="">entidad</span>, <span class="">entidad_id</span>, <span class="">antes</span>, <span class="">despues</span>, <span class="">motivo</span>, <span class="">party_id</span>, <span class="">con_pin_admin</span>, <span class="">ip</span>, <span class="">dispositivo</span>, <span class="">request_id</span>, <span class="">en</span>, <span class="">hash_anterior</span>, <span class="">hash</span></td></tr></tbody></table></div></details>
 </section>
 <section id="personas-patron-party-simple">
   <header class="sec-head"><p class="eyebrow">Dominio 2 de 12 · 10 tablas</p><h2>Personas: patrón Party simple</h2><p>Una persona o empresa existe una sola vez y cumple roles: cliente, trabajador o proveedor. El documento es opcional y nunca es la clave (ADR-004).</p></header>
@@ -184,7 +202,7 @@ html{scroll-behavior:smooth}
   <details><summary>Columnas de cada tabla</summary><div class="tw"><table><thead><tr><th>Tabla</th><th>Columnas (<span class="k">clave</span>, <span class="f">foránea</span>)</th></tr></thead><tbody><tr><td><code>party</code></td><td><span class="k">id</span>, <span class="">tipo</span>, <span class="">estado</span>, <span class="">creado_en</span></td></tr><tr><td><code>person</code></td><td><span class="k">party_id</span>, <span class="">nombres</span>, <span class="">apellidos</span>, <span class="">cumple_dia</span>, <span class="">cumple_mes</span>, <span class="">foto_archivo_id</span></td></tr><tr><td><code>organization</code></td><td><span class="k">party_id</span>, <span class="">razon_social</span>, <span class="">nombre_comercial</span></td></tr><tr><td><code>party_identifier</code></td><td><span class="k">id</span>, <span class="f">party_id</span>, <span class="">tipo</span>, <span class="">numero</span></td></tr><tr><td><code>contact_mechanism</code></td><td><span class="k">id</span>, <span class="f">party_id</span>, <span class="">tipo</span>, <span class="">valor</span>, <span class="">lat</span>, <span class="">lng</span>, <span class="">referencia</span>, <span class="">zona_id</span>, <span class="">principal</span>, <span class="">activo</span></td></tr><tr><td><code>consent</code></td><td><span class="k">id</span>, <span class="f">party_id</span>, <span class="">version_texto</span>, <span class="">canal</span>, <span class="">aceptado_en</span>, <span class="">revocado_en</span></td></tr><tr><td><code>party_role</code></td><td><span class="k">id</span>, <span class="f">party_id</span>, <span class="">rol</span>, <span class="">desde</span>, <span class="">hasta</span></td></tr><tr><td><code>customer_detail</code></td><td><span class="k">party_role_id</span>, <span class="">puntos</span>, <span class="">envio_tipo</span>, <span class="">envio_valor</span></td></tr><tr><td><code>employee_detail</code></td><td><span class="k">party_role_id</span>, <span class="">descuento_pct</span></td></tr><tr><td><code>supplier_detail</code></td><td><span class="k">party_role_id</span>, <span class="">dias_credito</span>, <span class="">cuenta_pago</span>, <span class="">activo</span></td></tr></tbody></table></div></details>
 </section>
 <section id="acceso">
-  <header class="sec-head"><p class="eyebrow">Dominio 3 de 12 · 7 tablas</p><h2>Acceso</h2><p>Cuentas del personal con su rol del sistema, cuenta opcional del cliente, sesiones, permisos y llaves de la TV y del agente de impresión (ADR-008).</p><p class="ext">Viene de otros dominios: <code>party</code></p></header>
+  <header class="sec-head"><p class="eyebrow">Dominio 3 de 12 · 9 tablas</p><h2>Acceso</h2><p>Cuentas del personal con su rol del sistema, cuenta opcional del cliente, sesiones, permisos y llaves de la TV y del agente de impresión (ADR-008).</p><p class="ext">Viene de otros dominios: <code>party</code></p></header>
   <div class="diagram"><pre class="mermaid">erDiagram
   ROL {
     text codigo PK
@@ -216,6 +234,22 @@ html{scroll-behavior:smooth}
     text hash
     boolean activo
   }
+  HORARIO_TRABAJO {
+    bigint party_id PK,FK
+    smallint dia PK
+    time desde
+    time hasta
+  }
+  COBERTURA_TURNO {
+    bigint id PK
+    date fecha
+    text rol FK
+    bigint cubre_party_id FK
+    bigint reemplaza_party_id FK
+    time desde
+    time hasta
+    bigint por
+  }
   SESION {
     bigint id PK
     text audiencia
@@ -236,13 +270,17 @@ html{scroll-behavior:smooth}
   PARTY {
     bigint id PK &quot;en otro dominio&quot;
   }
+  PARTY ||--o{ COBERTURA_TURNO : &quot;cubre_party_id&quot;
+  PARTY ||--o{ COBERTURA_TURNO : &quot;reemplaza_party_id&quot;
   PARTY ||--o{ CUSTOMER_ACCOUNT : &quot;party_id&quot;
+  PARTY ||--o{ HORARIO_TRABAJO : &quot;party_id&quot;
   PARTY ||--o{ SESION : &quot;party_id&quot;
   PARTY ||--o{ USER_ACCOUNT : &quot;party_id&quot;
   PERMISO ||--o{ ROL_PERMISO : &quot;permiso_id&quot;
+  ROL ||--o{ COBERTURA_TURNO : &quot;rol&quot;
   ROL ||--o{ ROL_PERMISO : &quot;rol&quot;
   ROL ||--o{ USER_ACCOUNT : &quot;rol&quot;</pre></div>
-  <details><summary>Columnas de cada tabla</summary><div class="tw"><table><thead><tr><th>Tabla</th><th>Columnas (<span class="k">clave</span>, <span class="f">foránea</span>)</th></tr></thead><tbody><tr><td><code>rol</code></td><td><span class="k">codigo</span>, <span class="">nombre</span></td></tr><tr><td><code>permiso</code></td><td><span class="k">id</span>, <span class="">modulo</span>, <span class="">accion</span></td></tr><tr><td><code>rol_permiso</code></td><td><span class="k">rol</span>, <span class="k">permiso_id</span></td></tr><tr><td><code>user_account</code></td><td><span class="k">id</span>, <span class="f">party_id</span>, <span class="f">rol</span>, <span class="">hash</span>, <span class="">debe_cambiar</span>, <span class="">clave_inicial_vence</span>, <span class="">pin_hash</span>, <span class="">activo</span>, <span class="">alta_en</span></td></tr><tr><td><code>customer_account</code></td><td><span class="k">id</span>, <span class="f">party_id</span>, <span class="">hash</span>, <span class="">activo</span></td></tr><tr><td><code>sesion</code></td><td><span class="k">id</span>, <span class="">audiencia</span>, <span class="f">party_id</span>, <span class="">refresh_hash</span>, <span class="">dispositivo</span>, <span class="">expira_en</span>, <span class="">revocada_en</span></td></tr><tr><td><code>device_key</code></td><td><span class="k">id</span>, <span class="">tipo</span>, <span class="">nombre</span>, <span class="">llave_hash</span>, <span class="">area_id</span>, <span class="">activo</span></td></tr></tbody></table></div></details>
+  <details><summary>Columnas de cada tabla</summary><div class="tw"><table><thead><tr><th>Tabla</th><th>Columnas (<span class="k">clave</span>, <span class="f">foránea</span>)</th></tr></thead><tbody><tr><td><code>rol</code></td><td><span class="k">codigo</span>, <span class="">nombre</span></td></tr><tr><td><code>permiso</code></td><td><span class="k">id</span>, <span class="">modulo</span>, <span class="">accion</span></td></tr><tr><td><code>rol_permiso</code></td><td><span class="k">rol</span>, <span class="k">permiso_id</span></td></tr><tr><td><code>user_account</code></td><td><span class="k">id</span>, <span class="f">party_id</span>, <span class="f">rol</span>, <span class="">hash</span>, <span class="">debe_cambiar</span>, <span class="">clave_inicial_vence</span>, <span class="">pin_hash</span>, <span class="">activo</span>, <span class="">alta_en</span></td></tr><tr><td><code>customer_account</code></td><td><span class="k">id</span>, <span class="f">party_id</span>, <span class="">hash</span>, <span class="">activo</span></td></tr><tr><td><code>horario_trabajo</code></td><td><span class="k">party_id</span>, <span class="k">dia</span>, <span class="">desde</span>, <span class="">hasta</span></td></tr><tr><td><code>cobertura_turno</code></td><td><span class="k">id</span>, <span class="">fecha</span>, <span class="f">rol</span>, <span class="f">cubre_party_id</span>, <span class="f">reemplaza_party_id</span>, <span class="">desde</span>, <span class="">hasta</span>, <span class="">por</span></td></tr><tr><td><code>sesion</code></td><td><span class="k">id</span>, <span class="">audiencia</span>, <span class="f">party_id</span>, <span class="">refresh_hash</span>, <span class="">dispositivo</span>, <span class="">expira_en</span>, <span class="">revocada_en</span></td></tr><tr><td><code>device_key</code></td><td><span class="k">id</span>, <span class="">tipo</span>, <span class="">nombre</span>, <span class="">llave_hash</span>, <span class="">area_id</span>, <span class="">activo</span></td></tr></tbody></table></div></details>
 </section>
 <section id="configuracion-del-local">
   <header class="sec-head"><p class="eyebrow">Dominio 4 de 12 · 5 tablas</p><h2>Configuración del local</h2><p>Parámetros con historial, horario por día, fechas especiales y archivos (fotos y comprobantes).</p></header>
@@ -310,6 +348,7 @@ html{scroll-behavior:smooth}
     int orden
     boolean oculto
     timestamptz agotado_hasta
+    boolean no_suma_beneficios
   }
   PRODUCTO_TAMANO {
     bigint id PK
@@ -430,7 +469,7 @@ html{scroll-behavior:smooth}
   PRODUCTO ||--o{ PRODUCTO_TAMANO : &quot;producto_id&quot;
   PRODUCTO ||--o{ RANKING_MES : &quot;producto_id&quot;
   PRODUCTO ||--o{ SABOR : &quot;producto_id&quot;</pre></div>
-  <details><summary>Columnas de cada tabla</summary><div class="tw"><table><thead><tr><th>Tabla</th><th>Columnas (<span class="k">clave</span>, <span class="f">foránea</span>)</th></tr></thead><tbody><tr><td><code>area_cocina</code></td><td><span class="k">id</span>, <span class="">nombre</span>, <span class="">propia</span>, <span class="">impresora</span>, <span class="">etiquetera</span>, <span class="">activo</span></td></tr><tr><td><code>categoria</code></td><td><span class="k">id</span>, <span class="">nombre</span>, <span class="">lleva_opciones</span>, <span class="f">area_id</span>, <span class="">orden</span>, <span class="">oculta</span></td></tr><tr><td><code>producto</code></td><td><span class="k">id</span>, <span class="f">categoria_id</span>, <span class="">nombre</span>, <span class="">descripcion</span>, <span class="f">foto_archivo_id</span>, <span class="">precio</span>, <span class="">por_lote</span>, <span class="">vida_util_horas</span>, <span class="">orden</span>, <span class="">oculto</span>, <span class="">agotado_hasta</span></td></tr><tr><td><code>producto_tamano</code></td><td><span class="k">id</span>, <span class="f">producto_id</span>, <span class="f">tamano_valor_id</span>, <span class="">precio</span>, <span class="">activo</span></td></tr><tr><td><code>grupo_opciones</code></td><td><span class="k">id</span>, <span class="">nombre</span>, <span class="f">lista_id</span>, <span class="">obligatorio</span>, <span class="">minimo</span>, <span class="">maximo</span>, <span class="">activo</span></td></tr><tr><td><code>opcion</code></td><td><span class="k">id</span>, <span class="f">grupo_id</span>, <span class="f">valor_id</span>, <span class="">precio_extra</span>, <span class="">activo</span>, <span class="">agotado_hasta</span></td></tr><tr><td><code>grupo_alcance</code></td><td><span class="f">grupo_id</span>, <span class="f">producto_id</span>, <span class="f">categoria_id</span>, <span class="">orden</span></td></tr><tr><td><code>sabor</code></td><td><span class="k">id</span>, <span class="f">producto_id</span>, <span class="">nombre</span>, <span class="">activo</span>, <span class="">agotado_hasta</span></td></tr><tr><td><code>version_carta</code></td><td><span class="k">id</span>, <span class="">estado</span>, <span class="">organizacion</span>, <span class="">decoracion</span>, <span class="">contenido</span>, <span class="">publicada_en</span>, <span class="">publicada_por</span></td></tr><tr><td><code>novedad</code></td><td><span class="k">id</span>, <span class="">tipo</span>, <span class="">titulo</span>, <span class="">texto</span>, <span class="">tema</span>, <span class="">video_url</span>, <span class="">evento_fecha</span>, <span class="">evento_lugar</span>, <span class="">desde</span>, <span class="">hasta</span>, <span class="">orden</span>, <span class="">activo</span></td></tr><tr><td><code>novedad_foto</code></td><td><span class="k">novedad_id</span>, <span class="k">archivo_id</span>, <span class="">orden</span></td></tr><tr><td><code>destacada</code></td><td><span class="k">id</span>, <span class="">titulo</span>, <span class="f">portada_archivo_id</span>, <span class="">orden</span>, <span class="">archivada</span></td></tr><tr><td><code>destacada_foto</code></td><td><span class="k">destacada_id</span>, <span class="k">archivo_id</span>, <span class="">orden</span></td></tr><tr><td><code>ranking_mes</code></td><td><span class="k">anio_mes</span>, <span class="k">producto_id</span>, <span class="">unidades</span>, <span class="">puesto</span></td></tr><tr><td><code>mensaje_carta</code></td><td><span class="k">id</span>, <span class="">tipo</span>, <span class="">texto</span>, <span class="">nombre</span>, <span class="">contacto</span>, <span class="">atendido_en</span>, <span class="">atendido_por</span></td></tr></tbody></table></div></details>
+  <details><summary>Columnas de cada tabla</summary><div class="tw"><table><thead><tr><th>Tabla</th><th>Columnas (<span class="k">clave</span>, <span class="f">foránea</span>)</th></tr></thead><tbody><tr><td><code>area_cocina</code></td><td><span class="k">id</span>, <span class="">nombre</span>, <span class="">propia</span>, <span class="">impresora</span>, <span class="">etiquetera</span>, <span class="">activo</span></td></tr><tr><td><code>categoria</code></td><td><span class="k">id</span>, <span class="">nombre</span>, <span class="">lleva_opciones</span>, <span class="f">area_id</span>, <span class="">orden</span>, <span class="">oculta</span></td></tr><tr><td><code>producto</code></td><td><span class="k">id</span>, <span class="f">categoria_id</span>, <span class="">nombre</span>, <span class="">descripcion</span>, <span class="f">foto_archivo_id</span>, <span class="">precio</span>, <span class="">por_lote</span>, <span class="">vida_util_horas</span>, <span class="">orden</span>, <span class="">oculto</span>, <span class="">agotado_hasta</span>, <span class="">no_suma_beneficios</span></td></tr><tr><td><code>producto_tamano</code></td><td><span class="k">id</span>, <span class="f">producto_id</span>, <span class="f">tamano_valor_id</span>, <span class="">precio</span>, <span class="">activo</span></td></tr><tr><td><code>grupo_opciones</code></td><td><span class="k">id</span>, <span class="">nombre</span>, <span class="f">lista_id</span>, <span class="">obligatorio</span>, <span class="">minimo</span>, <span class="">maximo</span>, <span class="">activo</span></td></tr><tr><td><code>opcion</code></td><td><span class="k">id</span>, <span class="f">grupo_id</span>, <span class="f">valor_id</span>, <span class="">precio_extra</span>, <span class="">activo</span>, <span class="">agotado_hasta</span></td></tr><tr><td><code>grupo_alcance</code></td><td><span class="f">grupo_id</span>, <span class="f">producto_id</span>, <span class="f">categoria_id</span>, <span class="">orden</span></td></tr><tr><td><code>sabor</code></td><td><span class="k">id</span>, <span class="f">producto_id</span>, <span class="">nombre</span>, <span class="">activo</span>, <span class="">agotado_hasta</span></td></tr><tr><td><code>version_carta</code></td><td><span class="k">id</span>, <span class="">estado</span>, <span class="">organizacion</span>, <span class="">decoracion</span>, <span class="">contenido</span>, <span class="">publicada_en</span>, <span class="">publicada_por</span></td></tr><tr><td><code>novedad</code></td><td><span class="k">id</span>, <span class="">tipo</span>, <span class="">titulo</span>, <span class="">texto</span>, <span class="">tema</span>, <span class="">video_url</span>, <span class="">evento_fecha</span>, <span class="">evento_lugar</span>, <span class="">desde</span>, <span class="">hasta</span>, <span class="">orden</span>, <span class="">activo</span></td></tr><tr><td><code>novedad_foto</code></td><td><span class="k">novedad_id</span>, <span class="k">archivo_id</span>, <span class="">orden</span></td></tr><tr><td><code>destacada</code></td><td><span class="k">id</span>, <span class="">titulo</span>, <span class="f">portada_archivo_id</span>, <span class="">orden</span>, <span class="">archivada</span></td></tr><tr><td><code>destacada_foto</code></td><td><span class="k">destacada_id</span>, <span class="k">archivo_id</span>, <span class="">orden</span></td></tr><tr><td><code>ranking_mes</code></td><td><span class="k">anio_mes</span>, <span class="k">producto_id</span>, <span class="">unidades</span>, <span class="">puesto</span></td></tr><tr><td><code>mensaje_carta</code></td><td><span class="k">id</span>, <span class="">tipo</span>, <span class="">texto</span>, <span class="">nombre</span>, <span class="">contacto</span>, <span class="">atendido_en</span>, <span class="">atendido_por</span></td></tr></tbody></table></div></details>
 </section>
 <section id="ofertas">
   <header class="sec-head"><p class="eyebrow">Dominio 6 de 12 · 7 tablas</p><h2>Ofertas</h2><p>Combos, «lleva N paga M» y descuentos con vigencia; cupones de código único o compartido y sus emisiones.</p><p class="ext">Viene de otros dominios: <code>categoria</code>, <code>lista_valor</code>, <code>producto</code></p></header>
@@ -453,6 +492,7 @@ html{scroll-behavior:smooth}
     date fecha_hasta
     text_arr canales
     int limite_usos
+    boolean no_suma_beneficios
     int orden
     boolean activo
   }
@@ -525,7 +565,7 @@ html{scroll-behavior:smooth}
   OFERTA ||--o{ COMBO_PARTE : &quot;oferta_id&quot;
   OFERTA ||--o{ COMBO_PRECIO : &quot;oferta_id&quot;
   PRODUCTO ||--o{ OFERTA : &quot;alcance_producto_id&quot;</pre></div>
-  <details><summary>Columnas de cada tabla</summary><div class="tw"><table><thead><tr><th>Tabla</th><th>Columnas (<span class="k">clave</span>, <span class="f">foránea</span>)</th></tr></thead><tbody><tr><td><code>oferta</code></td><td><span class="k">id</span>, <span class="">tipo</span>, <span class="">nombre</span>, <span class="">lleva</span>, <span class="">paga</span>, <span class="f">alcance_categoria_id</span>, <span class="f">alcance_producto_id</span>, <span class="">descuento_tipo</span>, <span class="">descuento_valor</span>, <span class="">compra_minima</span>, <span class="">dias</span>, <span class="">hora_desde</span>, <span class="">hora_hasta</span>, <span class="">fecha_desde</span>, <span class="">fecha_hasta</span>, <span class="">canales</span>, <span class="">limite_usos</span>, <span class="">orden</span>, <span class="">activo</span></td></tr><tr><td><code>combo_precio</code></td><td><span class="k">oferta_id</span>, <span class="k">tamano_valor_id</span>, <span class="">precio</span></td></tr><tr><td><code>combo_parte</code></td><td><span class="k">id</span>, <span class="f">oferta_id</span>, <span class="">tipo</span>, <span class="">cantidad</span>, <span class="">categorias</span>, <span class="">productos</span></td></tr><tr><td><code>regla_acumulacion</code></td><td><span class="k">id</span>, <span class="">cupon_con_descuento</span>, <span class="">promo_con_descuento</span>, <span class="">cupones_por_comprobante</span>, <span class="">texto_pie</span></td></tr><tr><td><code>cupon</code></td><td><span class="k">id</span>, <span class="">modo</span>, <span class="">codigo_base</span>, <span class="">descuento_tipo</span>, <span class="">descuento_valor</span>, <span class="">compra_minima</span>, <span class="">categoria_id</span>, <span class="">producto_id</span>, <span class="">canales</span>, <span class="">requiere_cuenta</span>, <span class="">dias_validez</span>, <span class="">tope_usos</span>, <span class="">max_por_cliente</span>, <span class="">orden</span>, <span class="">activo</span></td></tr><tr><td><code>cupon_emitido</code></td><td><span class="k">id</span>, <span class="f">cupon_id</span>, <span class="">codigo</span>, <span class="">pedido_origen_id</span>, <span class="">vence_en</span>, <span class="">estado</span>, <span class="">canjeado_en</span>, <span class="">pedido_canje_id</span></td></tr><tr><td><code>cupon_canje_compartido</code></td><td><span class="k">cupon_id</span>, <span class="k">pedido_id</span>, <span class="">party_id</span>, <span class="">en</span></td></tr></tbody></table></div></details>
+  <details><summary>Columnas de cada tabla</summary><div class="tw"><table><thead><tr><th>Tabla</th><th>Columnas (<span class="k">clave</span>, <span class="f">foránea</span>)</th></tr></thead><tbody><tr><td><code>oferta</code></td><td><span class="k">id</span>, <span class="">tipo</span>, <span class="">nombre</span>, <span class="">lleva</span>, <span class="">paga</span>, <span class="f">alcance_categoria_id</span>, <span class="f">alcance_producto_id</span>, <span class="">descuento_tipo</span>, <span class="">descuento_valor</span>, <span class="">compra_minima</span>, <span class="">dias</span>, <span class="">hora_desde</span>, <span class="">hora_hasta</span>, <span class="">fecha_desde</span>, <span class="">fecha_hasta</span>, <span class="">canales</span>, <span class="">limite_usos</span>, <span class="">no_suma_beneficios</span>, <span class="">orden</span>, <span class="">activo</span></td></tr><tr><td><code>combo_precio</code></td><td><span class="k">oferta_id</span>, <span class="k">tamano_valor_id</span>, <span class="">precio</span></td></tr><tr><td><code>combo_parte</code></td><td><span class="k">id</span>, <span class="f">oferta_id</span>, <span class="">tipo</span>, <span class="">cantidad</span>, <span class="">categorias</span>, <span class="">productos</span></td></tr><tr><td><code>regla_acumulacion</code></td><td><span class="k">id</span>, <span class="">cupon_con_descuento</span>, <span class="">promo_con_descuento</span>, <span class="">cupones_por_comprobante</span>, <span class="">texto_pie</span></td></tr><tr><td><code>cupon</code></td><td><span class="k">id</span>, <span class="">modo</span>, <span class="">codigo_base</span>, <span class="">descuento_tipo</span>, <span class="">descuento_valor</span>, <span class="">compra_minima</span>, <span class="">categoria_id</span>, <span class="">producto_id</span>, <span class="">canales</span>, <span class="">requiere_cuenta</span>, <span class="">dias_validez</span>, <span class="">tope_usos</span>, <span class="">max_por_cliente</span>, <span class="">orden</span>, <span class="">activo</span></td></tr><tr><td><code>cupon_emitido</code></td><td><span class="k">id</span>, <span class="f">cupon_id</span>, <span class="">codigo</span>, <span class="">pedido_origen_id</span>, <span class="">vence_en</span>, <span class="">estado</span>, <span class="">canjeado_en</span>, <span class="">pedido_canje_id</span></td></tr><tr><td><code>cupon_canje_compartido</code></td><td><span class="k">cupon_id</span>, <span class="k">pedido_id</span>, <span class="">party_id</span>, <span class="">en</span></td></tr></tbody></table></div></details>
 </section>
 <section id="reparto-y-salon">
   <header class="sec-head"><p class="eyebrow">Dominio 7 de 12 · 5 tablas</p><h2>Reparto y salón</h2><p>Zonas de reparto con su polígono, plano por piso con mesas, y reservas de una o varias mesas.</p></header>
@@ -577,7 +617,7 @@ html{scroll-behavior:smooth}
   <details><summary>Columnas de cada tabla</summary><div class="tw"><table><thead><tr><th>Tabla</th><th>Columnas (<span class="k">clave</span>, <span class="f">foránea</span>)</th></tr></thead><tbody><tr><td><code>zona_reparto</code></td><td><span class="k">id</span>, <span class="">codigo</span>, <span class="">poligono</span>, <span class="">tarifa</span>, <span class="">activa</span></td></tr><tr><td><code>piso</code></td><td><span class="k">id</span>, <span class="">nombre</span>, <span class="">activo</span>, <span class="">cuadricula_ancho</span>, <span class="">cuadricula_alto</span></td></tr><tr><td><code>elemento_plano</code></td><td><span class="k">id</span>, <span class="f">piso_id</span>, <span class="">tipo</span>, <span class="">x</span>, <span class="">y</span>, <span class="">ancho</span>, <span class="">alto</span>, <span class="">numero</span>, <span class="">asientos</span>, <span class="">activo</span></td></tr><tr><td><code>reserva</code></td><td><span class="k">id</span>, <span class="">nombre</span>, <span class="">telefono</span>, <span class="">personas</span>, <span class="">hora</span>, <span class="">tolerancia_min</span>, <span class="">estado</span>, <span class="">motivo_cancelacion</span>, <span class="">pedido_id</span></td></tr><tr><td><code>reserva_mesa</code></td><td><span class="k">reserva_id</span>, <span class="k">mesa_id</span></td></tr></tbody></table></div></details>
 </section>
 <section id="pedidos-cocina-y-reparto">
-  <header class="sec-head"><p class="eyebrow">Dominio 8 de 12 · 10 tablas</p><h2>Pedidos, cocina y reparto</h2><p>El pedido con sus líneas y mesas, el estado por área de cocina, las capturas de pago, la impresión, los agotados y el reparto.</p><p class="ext">Viene de otros dominios: <code>archivo</code>, <code>area_cocina</code>, <code>elemento_plano</code>, <code>oferta</code>, <code>party</code>, <code>producto</code>, <code>zona_reparto</code></p></header>
+  <header class="sec-head"><p class="eyebrow">Dominio 8 de 12 · 11 tablas</p><h2>Pedidos, cocina y reparto</h2><p>El pedido con sus líneas y mesas, el estado por área de cocina, las capturas de pago, la impresión, los agotados y el reparto.</p><p class="ext">Viene de otros dominios: <code>archivo</code>, <code>area_cocina</code>, <code>elemento_plano</code>, <code>oferta</code>, <code>party</code>, <code>producto</code>, <code>zona_reparto</code></p></header>
   <div class="diagram"><pre class="mermaid">erDiagram
   PEDIDO {
     bigint id PK
@@ -606,6 +646,11 @@ html{scroll-behavior:smooth}
     text nota
     bigint_arr oferta_ids
     bigint cupon_emitido_id
+    numeric puntos_canjeados
+    timestamptz pago_coordinado_en
+    bigint pago_coordinado_por
+    timestamptz despachado_en
+    bigint despachado_por
     timestamptz confirmado_en
     bigint confirmado_por
     timestamptz pasa_cocina_en
@@ -614,6 +659,7 @@ html{scroll-behavior:smooth}
     timestamptz anulado_en
     bigint anulado_por
     text motivo_anulacion
+    bigint anulacion_aprobada_por
     timestamptz creado_en
   }
   PEDIDO_MESA {
@@ -636,13 +682,17 @@ html{scroll-behavior:smooth}
     numeric precio_unit
     bigint area_id FK
     boolean adicional
+    text_arr nombres_persona
   }
   COMANDA_AREA {
     bigint pedido_id PK,FK
     bigint area_id PK,FK
     text estado
-    boolean despejado
-    timestamptz cambiado_en
+    timestamptz llego_en
+    timestamptz despejada_en
+    bigint despejada_por
+    timestamptz devuelta_en
+    bigint devuelta_por
   }
   COMPROBANTE_PAGO {
     bigint id PK
@@ -671,6 +721,7 @@ html{scroll-behavior:smooth}
     timestamptz desde
     timestamptz hasta
     bigint por
+    bigint area_id FK
   }
   PRINT_JOB {
     bigint id PK
@@ -688,6 +739,7 @@ html{scroll-behavior:smooth}
     bigint repartidor_party_id FK
     timestamptz tomado_en
     timestamptz salida_en
+    timestamptz llegado_en
     timestamptz entregado_en
     numeric cobrado_efectivo
   }
@@ -700,6 +752,13 @@ html{scroll-behavior:smooth}
     text cierre
     numeric recargo
     bigint cerrado_por
+  }
+  MENSAJE_REPARTO {
+    bigint pedido_id PK,FK
+    smallint numero PK
+    timestamptz enviado_en
+    timestamptz respondido_en
+    text estado
   }
   ARCHIVO {
     bigint id PK &quot;en otro dominio&quot;
@@ -723,6 +782,7 @@ html{scroll-behavior:smooth}
     bigint id PK &quot;en otro dominio&quot;
   }
   ARCHIVO ||--o{ COMPROBANTE_PAGO : &quot;archivo_id&quot;
+  AREA_COCINA ||--o{ ALTA_DEMANDA : &quot;area_id&quot;
   AREA_COCINA ||--o{ COMANDA_AREA : &quot;area_id&quot;
   AREA_COCINA ||--o{ PEDIDO_LINEA : &quot;area_id&quot;
   AREA_COCINA ||--o{ PRINT_JOB : &quot;area_id&quot;
@@ -733,6 +793,7 @@ html{scroll-behavior:smooth}
   PEDIDO ||--o{ COMANDA_AREA : &quot;pedido_id&quot;
   PEDIDO ||--o{ COMPROBANTE_PAGO : &quot;pedido_id&quot;
   PEDIDO ||--o{ INCIDENTE_ENTREGA : &quot;pedido_id&quot;
+  PEDIDO ||--o{ MENSAJE_REPARTO : &quot;pedido_id&quot;
   PEDIDO ||--o{ PEDIDO_LINEA : &quot;pedido_id&quot;
   PEDIDO ||--o{ PEDIDO_MESA : &quot;pedido_id&quot;
   PEDIDO ||--o{ PRINT_JOB : &quot;pedido_id&quot;
@@ -740,10 +801,10 @@ html{scroll-behavior:smooth}
   PEDIDO_LINEA ||--o{ PEDIDO_LINEA : &quot;linea_combo_id&quot;
   PRODUCTO ||--o{ PEDIDO_LINEA : &quot;producto_id&quot;
   ZONA_REPARTO ||--o{ PEDIDO : &quot;zona_id&quot;</pre></div>
-  <details><summary>Columnas de cada tabla</summary><div class="tw"><table><thead><tr><th>Tabla</th><th>Columnas (<span class="k">clave</span>, <span class="f">foránea</span>)</th></tr></thead><tbody><tr><td><code>pedido</code></td><td><span class="k">id</span>, <span class="">codigo</span>, <span class="">canal</span>, <span class="">modalidad</span>, <span class="">estado</span>, <span class="f">party_id</span>, <span class="">es_personal</span>, <span class="">cliente_nombre</span>, <span class="">cliente_telefono</span>, <span class="">entrega_direccion</span>, <span class="">entrega_referencia</span>, <span class="">entrega_lat</span>, <span class="">entrega_lng</span>, <span class="f">zona_id</span>, <span class="">pago_preferido</span>, <span class="">paga_con</span>, <span class="">subtotal</span>, <span class="">descuento</span>, <span class="">envio</span>, <span class="">total</span>, <span class="">comprobante_tipo</span>, <span class="">comprobante_doc</span>, <span class="">comprobante_razon</span>, <span class="">nota</span>, <span class="">oferta_ids</span>, <span class="">cupon_emitido_id</span>, <span class="">confirmado_en</span>, <span class="">confirmado_por</span>, <span class="">pasa_cocina_en</span>, <span class="">listo_en</span>, <span class="">entregado_en</span>, <span class="">anulado_en</span>, <span class="">anulado_por</span>, <span class="">motivo_anulacion</span>, <span class="">creado_en</span></td></tr><tr><td><code>pedido_mesa</code></td><td><span class="k">pedido_id</span>, <span class="k">mesa_id</span>, <span class="">abierta</span></td></tr><tr><td><code>pedido_linea</code></td><td><span class="k">id</span>, <span class="f">pedido_id</span>, <span class="f">producto_id</span>, <span class="f">oferta_id</span>, <span class="f">linea_combo_id</span>, <span class="">nombre</span>, <span class="">tamano</span>, <span class="">opciones</span>, <span class="">sabor</span>, <span class="">nota</span>, <span class="">cantidad</span>, <span class="">precio_unit</span>, <span class="f">area_id</span>, <span class="">adicional</span></td></tr><tr><td><code>comanda_area</code></td><td><span class="k">pedido_id</span>, <span class="k">area_id</span>, <span class="">estado</span>, <span class="">despejado</span>, <span class="">cambiado_en</span></td></tr><tr><td><code>comprobante_pago</code></td><td><span class="k">id</span>, <span class="f">pedido_id</span>, <span class="f">archivo_id</span>, <span class="">codigo_operacion</span>, <span class="">estado</span>, <span class="">decidido_por</span>, <span class="">decidido_en</span>, <span class="">motivo</span></td></tr><tr><td><code>agotado</code></td><td><span class="k">id</span>, <span class="">producto_id</span>, <span class="">opcion_id</span>, <span class="">sabor_id</span>, <span class="">alcance</span>, <span class="">desde</span>, <span class="">hasta</span>, <span class="">por</span></td></tr><tr><td><code>alta_demanda</code></td><td><span class="k">id</span>, <span class="">minutos</span>, <span class="">pausa</span>, <span class="">desde</span>, <span class="">hasta</span>, <span class="">por</span></td></tr><tr><td><code>print_job</code></td><td><span class="k">id</span>, <span class="f">pedido_id</span>, <span class="f">area_id</span>, <span class="">tipo</span>, <span class="">copia</span>, <span class="">estado</span>, <span class="">intentos</span>, <span class="">error</span>, <span class="">en</span></td></tr><tr><td><code>asignacion_reparto</code></td><td><span class="k">pedido_id</span>, <span class="f">repartidor_party_id</span>, <span class="">tomado_en</span>, <span class="">salida_en</span>, <span class="">entregado_en</span>, <span class="">cobrado_efectivo</span></td></tr><tr><td><code>incidente_entrega</code></td><td><span class="k">id</span>, <span class="f">pedido_id</span>, <span class="">motivo</span>, <span class="">intento</span>, <span class="">en</span>, <span class="">cierre</span>, <span class="">recargo</span>, <span class="">cerrado_por</span></td></tr></tbody></table></div></details>
+  <details><summary>Columnas de cada tabla</summary><div class="tw"><table><thead><tr><th>Tabla</th><th>Columnas (<span class="k">clave</span>, <span class="f">foránea</span>)</th></tr></thead><tbody><tr><td><code>pedido</code></td><td><span class="k">id</span>, <span class="">codigo</span>, <span class="">canal</span>, <span class="">modalidad</span>, <span class="">estado</span>, <span class="f">party_id</span>, <span class="">es_personal</span>, <span class="">cliente_nombre</span>, <span class="">cliente_telefono</span>, <span class="">entrega_direccion</span>, <span class="">entrega_referencia</span>, <span class="">entrega_lat</span>, <span class="">entrega_lng</span>, <span class="f">zona_id</span>, <span class="">pago_preferido</span>, <span class="">paga_con</span>, <span class="">subtotal</span>, <span class="">descuento</span>, <span class="">envio</span>, <span class="">total</span>, <span class="">comprobante_tipo</span>, <span class="">comprobante_doc</span>, <span class="">comprobante_razon</span>, <span class="">nota</span>, <span class="">oferta_ids</span>, <span class="">cupon_emitido_id</span>, <span class="">puntos_canjeados</span>, <span class="">pago_coordinado_en</span>, <span class="">pago_coordinado_por</span>, <span class="">despachado_en</span>, <span class="">despachado_por</span>, <span class="">confirmado_en</span>, <span class="">confirmado_por</span>, <span class="">pasa_cocina_en</span>, <span class="">listo_en</span>, <span class="">entregado_en</span>, <span class="">anulado_en</span>, <span class="">anulado_por</span>, <span class="">motivo_anulacion</span>, <span class="">anulacion_aprobada_por</span>, <span class="">creado_en</span></td></tr><tr><td><code>pedido_mesa</code></td><td><span class="k">pedido_id</span>, <span class="k">mesa_id</span>, <span class="">abierta</span></td></tr><tr><td><code>pedido_linea</code></td><td><span class="k">id</span>, <span class="f">pedido_id</span>, <span class="f">producto_id</span>, <span class="f">oferta_id</span>, <span class="f">linea_combo_id</span>, <span class="">nombre</span>, <span class="">tamano</span>, <span class="">opciones</span>, <span class="">sabor</span>, <span class="">nota</span>, <span class="">cantidad</span>, <span class="">precio_unit</span>, <span class="f">area_id</span>, <span class="">adicional</span>, <span class="">nombres_persona</span></td></tr><tr><td><code>comanda_area</code></td><td><span class="k">pedido_id</span>, <span class="k">area_id</span>, <span class="">estado</span>, <span class="">llego_en</span>, <span class="">despejada_en</span>, <span class="">despejada_por</span>, <span class="">devuelta_en</span>, <span class="">devuelta_por</span></td></tr><tr><td><code>comprobante_pago</code></td><td><span class="k">id</span>, <span class="f">pedido_id</span>, <span class="f">archivo_id</span>, <span class="">codigo_operacion</span>, <span class="">estado</span>, <span class="">decidido_por</span>, <span class="">decidido_en</span>, <span class="">motivo</span></td></tr><tr><td><code>agotado</code></td><td><span class="k">id</span>, <span class="">producto_id</span>, <span class="">opcion_id</span>, <span class="">sabor_id</span>, <span class="">alcance</span>, <span class="">desde</span>, <span class="">hasta</span>, <span class="">por</span></td></tr><tr><td><code>alta_demanda</code></td><td><span class="k">id</span>, <span class="">minutos</span>, <span class="">pausa</span>, <span class="">desde</span>, <span class="">hasta</span>, <span class="">por</span>, <span class="f">area_id</span></td></tr><tr><td><code>print_job</code></td><td><span class="k">id</span>, <span class="f">pedido_id</span>, <span class="f">area_id</span>, <span class="">tipo</span>, <span class="">copia</span>, <span class="">estado</span>, <span class="">intentos</span>, <span class="">error</span>, <span class="">en</span></td></tr><tr><td><code>asignacion_reparto</code></td><td><span class="k">pedido_id</span>, <span class="f">repartidor_party_id</span>, <span class="">tomado_en</span>, <span class="">salida_en</span>, <span class="">llegado_en</span>, <span class="">entregado_en</span>, <span class="">cobrado_efectivo</span></td></tr><tr><td><code>incidente_entrega</code></td><td><span class="k">id</span>, <span class="f">pedido_id</span>, <span class="">motivo</span>, <span class="">intento</span>, <span class="">en</span>, <span class="">cierre</span>, <span class="">recargo</span>, <span class="">cerrado_por</span></td></tr><tr><td><code>mensaje_reparto</code></td><td><span class="k">pedido_id</span>, <span class="k">numero</span>, <span class="">enviado_en</span>, <span class="">respondido_en</span>, <span class="">estado</span></td></tr></tbody></table></div></details>
 </section>
 <section id="caja-puntos-y-credito-del-personal">
-  <header class="sec-head"><p class="eyebrow">Dominio 9 de 12 · 9 tablas</p><h2>Caja, puntos y crédito del personal</h2><p>Caja del día, cobros con pago mixto, ingresos y egresos, liquidación de repartidores, arqueo, puntos y consumo del personal.</p><p class="ext">Viene de otros dominios: <code>party</code>, <code>pedido</code></p></header>
+  <header class="sec-head"><p class="eyebrow">Dominio 9 de 12 · 10 tablas</p><h2>Caja, puntos y crédito del personal</h2><p>Caja del día, cobros con pago mixto, ingresos y egresos, liquidación de repartidores, arqueo, puntos y consumo del personal.</p><p class="ext">Viene de otros dominios: <code>party</code>, <code>pedido</code></p></header>
   <div class="diagram"><pre class="mermaid">erDiagram
   CAJA {
     bigint id PK
@@ -794,7 +855,18 @@ html{scroll-behavior:smooth}
   CIERRE_CAJA {
     bigint caja_id PK,FK
     jsonb conteo
+    text resultado
+    bigint aprobado_por
     text nota
+  }
+  CONTEO_CIERRE {
+    bigint caja_id PK,FK
+    smallint intento PK
+    jsonb conteo
+    jsonb medios
+    text resultado
+    bigint por
+    timestamptz en
   }
   CIERRE_MEDIO {
     bigint caja_id PK,FK
@@ -806,7 +878,7 @@ html{scroll-behavior:smooth}
   CONSUMO_PERSONAL {
     bigint id PK
     bigint party_id FK
-    char anio_mes
+    date fecha
     bigint pedido_id FK,UK
     numeric monto
   }
@@ -814,7 +886,7 @@ html{scroll-behavior:smooth}
     bigint id PK
     bigint party_id FK
     bigint pedido_id FK
-    int puntos
+    numeric puntos
     text tipo
     timestamptz en
   }
@@ -825,6 +897,7 @@ html{scroll-behavior:smooth}
     bigint id PK &quot;en otro dominio&quot;
   }
   CAJA ||--o{ COBRO : &quot;caja_id&quot;
+  CAJA ||--o{ CONTEO_CIERRE : &quot;caja_id&quot;
   CAJA ||--o{ LIQUIDACION : &quot;caja_id&quot;
   CAJA ||--o{ MOVIMIENTO_CAJA : &quot;caja_id&quot;
   CAJA ||--o| CIERRE_CAJA : &quot;caja_id&quot;
@@ -836,7 +909,7 @@ html{scroll-behavior:smooth}
   PEDIDO ||--o{ COBRO : &quot;pedido_id&quot;
   PEDIDO ||--o{ CONSUMO_PERSONAL : &quot;pedido_id&quot;
   PEDIDO ||--o{ MOVIMIENTO_PUNTOS : &quot;pedido_id&quot;</pre></div>
-  <details><summary>Columnas de cada tabla</summary><div class="tw"><table><thead><tr><th>Tabla</th><th>Columnas (<span class="k">clave</span>, <span class="f">foránea</span>)</th></tr></thead><tbody><tr><td><code>caja</code></td><td><span class="k">id</span>, <span class="">fecha</span>, <span class="">apertura</span>, <span class="">estado</span>, <span class="">abierta_por</span>, <span class="">cerrada_por</span>, <span class="">cerrada_en</span></td></tr><tr><td><code>cobro</code></td><td><span class="k">id</span>, <span class="f">pedido_id</span>, <span class="f">caja_id</span>, <span class="">total</span>, <span class="">credito_personal</span>, <span class="">cobrado_por</span>, <span class="">en</span>, <span class="">anulado_en</span>, <span class="">anulado_por</span>, <span class="">motivo_anulacion</span></td></tr><tr><td><code>cobro_pago</code></td><td><span class="k">id</span>, <span class="f">cobro_id</span>, <span class="">medio</span>, <span class="">monto</span>, <span class="">recibido</span>, <span class="">vuelto</span></td></tr><tr><td><code>movimiento_caja</code></td><td><span class="k">id</span>, <span class="f">caja_id</span>, <span class="">tipo</span>, <span class="">monto</span>, <span class="">motivo</span>, <span class="">anulado_en</span>, <span class="">motivo_anulacion</span></td></tr><tr><td><code>liquidacion</code></td><td><span class="k">id</span>, <span class="f">caja_id</span>, <span class="f">repartidor_party_id</span>, <span class="">esperado</span>, <span class="">entregado</span>, <span class="">en</span></td></tr><tr><td><code>cierre_caja</code></td><td><span class="k">caja_id</span>, <span class="">conteo</span>, <span class="">nota</span></td></tr><tr><td><code>cierre_medio</code></td><td><span class="k">caja_id</span>, <span class="k">medio</span>, <span class="">sistema</span>, <span class="">visto</span>, <span class="">diferencia</span></td></tr><tr><td><code>consumo_personal</code></td><td><span class="k">id</span>, <span class="f">party_id</span>, <span class="">anio_mes</span>, <span class="f">pedido_id</span>, <span class="">monto</span></td></tr><tr><td><code>movimiento_puntos</code></td><td><span class="k">id</span>, <span class="f">party_id</span>, <span class="f">pedido_id</span>, <span class="">puntos</span>, <span class="">tipo</span>, <span class="">en</span></td></tr></tbody></table></div></details>
+  <details><summary>Columnas de cada tabla</summary><div class="tw"><table><thead><tr><th>Tabla</th><th>Columnas (<span class="k">clave</span>, <span class="f">foránea</span>)</th></tr></thead><tbody><tr><td><code>caja</code></td><td><span class="k">id</span>, <span class="">fecha</span>, <span class="">apertura</span>, <span class="">estado</span>, <span class="">abierta_por</span>, <span class="">cerrada_por</span>, <span class="">cerrada_en</span></td></tr><tr><td><code>cobro</code></td><td><span class="k">id</span>, <span class="f">pedido_id</span>, <span class="f">caja_id</span>, <span class="">total</span>, <span class="">credito_personal</span>, <span class="">cobrado_por</span>, <span class="">en</span>, <span class="">anulado_en</span>, <span class="">anulado_por</span>, <span class="">motivo_anulacion</span></td></tr><tr><td><code>cobro_pago</code></td><td><span class="k">id</span>, <span class="f">cobro_id</span>, <span class="">medio</span>, <span class="">monto</span>, <span class="">recibido</span>, <span class="">vuelto</span></td></tr><tr><td><code>movimiento_caja</code></td><td><span class="k">id</span>, <span class="f">caja_id</span>, <span class="">tipo</span>, <span class="">monto</span>, <span class="">motivo</span>, <span class="">anulado_en</span>, <span class="">motivo_anulacion</span></td></tr><tr><td><code>liquidacion</code></td><td><span class="k">id</span>, <span class="f">caja_id</span>, <span class="f">repartidor_party_id</span>, <span class="">esperado</span>, <span class="">entregado</span>, <span class="">en</span></td></tr><tr><td><code>cierre_caja</code></td><td><span class="k">caja_id</span>, <span class="">conteo</span>, <span class="">resultado</span>, <span class="">aprobado_por</span>, <span class="">nota</span></td></tr><tr><td><code>conteo_cierre</code></td><td><span class="k">caja_id</span>, <span class="k">intento</span>, <span class="">conteo</span>, <span class="">medios</span>, <span class="">resultado</span>, <span class="">por</span>, <span class="">en</span></td></tr><tr><td><code>cierre_medio</code></td><td><span class="k">caja_id</span>, <span class="k">medio</span>, <span class="">sistema</span>, <span class="">visto</span>, <span class="">diferencia</span></td></tr><tr><td><code>consumo_personal</code></td><td><span class="k">id</span>, <span class="f">party_id</span>, <span class="">fecha</span>, <span class="f">pedido_id</span>, <span class="">monto</span></td></tr><tr><td><code>movimiento_puntos</code></td><td><span class="k">id</span>, <span class="f">party_id</span>, <span class="f">pedido_id</span>, <span class="">puntos</span>, <span class="">tipo</span>, <span class="">en</span></td></tr></tbody></table></div></details>
 </section>
 <section id="stock-almacen-produccion-y-compras">
   <header class="sec-head"><p class="eyebrow">Dominio 10 de 12 · 15 tablas</p><h2>Stock, almacén, producción y compras</h2><p>Insumos y stock por lugar, recetas, movimientos, traslados, producción, cierre del día, pedidos a proveedores y compras.</p><p class="ext">Viene de otros dominios: <code>archivo</code>, <code>area_cocina</code>, <code>lista_valor</code>, <code>opcion</code>, <code>party</code>, <code>producto</code></p></header>
@@ -858,7 +931,6 @@ html{scroll-behavior:smooth}
     numeric minimo
     numeric intermedio
     numeric maximo
-    boolean perecible
     bigint lugar_consumo_id FK
     numeric costo_unit
     bigint proveedor_a
@@ -927,6 +999,9 @@ html{scroll-behavior:smooth}
     text estado
     bigint por
     timestamptz en
+    bigint avisado_party_id FK
+    bigint recibido_por
+    timestamptz recibido_en
   }
   PRODUCCION {
     bigint id PK
@@ -978,8 +1053,6 @@ html{scroll-behavior:smooth}
     bigint insumo_id FK
     numeric cantidad_compra
     numeric costo_unit
-    text lote
-    date vence
   }
   ARCHIVO {
     bigint id PK &quot;en otro dominio&quot;
@@ -1022,6 +1095,7 @@ html{scroll-behavior:smooth}
   MOVIMIENTO_STOCK ||--o{ MOVIMIENTO_STOCK : &quot;movimiento_anulado_id&quot;
   OPCION ||--o{ AJUSTE_OPCION : &quot;opcion_id&quot;
   PARTY ||--o{ COMPRA : &quot;proveedor_party_id&quot;
+  PARTY ||--o{ PEDIDO_INTERNO : &quot;avisado_party_id&quot;
   PARTY ||--o{ PEDIDO_PROVEEDOR : &quot;proveedor_party_id&quot;
   PEDIDO_PROVEEDOR ||--o{ COMPRA : &quot;pedido_proveedor_id&quot;
   PEDIDO_PROVEEDOR ||--o{ PEDIDO_PROVEEDOR_LINEA : &quot;pedido_proveedor_id&quot;
@@ -1030,7 +1104,7 @@ html{scroll-behavior:smooth}
   PRODUCTO ||--o{ STOCK : &quot;producto_id&quot;
   RECETA ||--o{ PRODUCCION : &quot;receta_id&quot;
   RECETA ||--o{ RECETA_LINEA : &quot;receta_id&quot;</pre></div>
-  <details><summary>Columnas de cada tabla</summary><div class="tw"><table><thead><tr><th>Tabla</th><th>Columnas (<span class="k">clave</span>, <span class="f">foránea</span>)</th></tr></thead><tbody><tr><td><code>lugar_stock</code></td><td><span class="k">id</span>, <span class="">nombre</span>, <span class="">tipo</span>, <span class="f">area_id</span></td></tr><tr><td><code>insumo</code></td><td><span class="k">id</span>, <span class="">nombre</span>, <span class="">unidad_compra</span>, <span class="">unidad_almacen</span>, <span class="">unidad_receta</span>, <span class="">factor_compra</span>, <span class="">factor_receta</span>, <span class="">minimo</span>, <span class="">intermedio</span>, <span class="">maximo</span>, <span class="">perecible</span>, <span class="f">lugar_consumo_id</span>, <span class="">costo_unit</span>, <span class="">proveedor_a</span>, <span class="">proveedor_b</span>, <span class="">proveedor_c</span>, <span class="">activo</span></td></tr><tr><td><code>stock</code></td><td><span class="f">insumo_id</span>, <span class="f">producto_id</span>, <span class="f">lugar_id</span>, <span class="">cantidad</span></td></tr><tr><td><code>movimiento_stock</code></td><td><span class="k">id</span>, <span class="">tipo</span>, <span class="f">insumo_id</span>, <span class="f">producto_id</span>, <span class="f">lugar_id</span>, <span class="">cantidad</span>, <span class="f">origen_valor_id</span>, <span class="f">destino_valor_id</span>, <span class="">pedido_id</span>, <span class="">produccion_id</span>, <span class="">traslado_id</span>, <span class="">compra_id</span>, <span class="">nota</span>, <span class="f">movimiento_anulado_id</span>, <span class="">por</span>, <span class="">en</span></td></tr><tr><td><code>receta</code></td><td><span class="k">id</span>, <span class="f">producto_id</span>, <span class="f">tamano_valor_id</span>, <span class="">es_produccion</span>, <span class="">rinde</span></td></tr><tr><td><code>receta_linea</code></td><td><span class="k">receta_id</span>, <span class="k">insumo_id</span>, <span class="">cantidad</span></td></tr><tr><td><code>ajuste_opcion</code></td><td><span class="k">opcion_id</span>, <span class="k">insumo_id</span>, <span class="">efecto</span>, <span class="f">reemplaza_insumo_id</span>, <span class="">cantidad</span></td></tr><tr><td><code>traslado</code></td><td><span class="k">id</span>, <span class="f">insumo_id</span>, <span class="f">destino_lugar_id</span>, <span class="">enviado</span>, <span class="">recibido</span>, <span class="">estado</span>, <span class="">pedido_interno_id</span>, <span class="">recibido_por</span>, <span class="">recibido_en</span></td></tr><tr><td><code>pedido_interno</code></td><td><span class="k">id</span>, <span class="f">area_id</span>, <span class="">detalle</span>, <span class="">estado</span>, <span class="">por</span>, <span class="">en</span></td></tr><tr><td><code>produccion</code></td><td><span class="k">id</span>, <span class="f">receta_id</span>, <span class="">tandas</span>, <span class="">unidades</span>, <span class="">producido_en</span>, <span class="">por</span>, <span class="">anulado_en</span>, <span class="">motivo_anulacion</span></td></tr><tr><td><code>cierre_dia</code></td><td><span class="k">id</span>, <span class="">fecha</span>, <span class="f">lugar_id</span>, <span class="">detalle</span>, <span class="">por</span>, <span class="">en</span></td></tr><tr><td><code>pedido_proveedor</code></td><td><span class="k">id</span>, <span class="f">proveedor_party_id</span>, <span class="">estado</span>, <span class="">enviado_en</span>, <span class="">motivo_anulacion</span></td></tr><tr><td><code>pedido_proveedor_linea</code></td><td><span class="k">pedido_proveedor_id</span>, <span class="k">insumo_id</span>, <span class="">cantidad_compra</span>, <span class="">recibido</span></td></tr><tr><td><code>compra</code></td><td><span class="k">id</span>, <span class="f">proveedor_party_id</span>, <span class="f">pedido_proveedor_id</span>, <span class="">comprobante_tipo</span>, <span class="">comprobante_numero</span>, <span class="f">archivo_id</span>, <span class="">condicion</span>, <span class="">total</span>, <span class="">pagada_en</span>, <span class="">anulada_en</span>, <span class="">motivo_anulacion</span></td></tr><tr><td><code>compra_linea</code></td><td><span class="k">id</span>, <span class="f">compra_id</span>, <span class="f">insumo_id</span>, <span class="">cantidad_compra</span>, <span class="">costo_unit</span>, <span class="">lote</span>, <span class="">vence</span></td></tr></tbody></table></div></details>
+  <details><summary>Columnas de cada tabla</summary><div class="tw"><table><thead><tr><th>Tabla</th><th>Columnas (<span class="k">clave</span>, <span class="f">foránea</span>)</th></tr></thead><tbody><tr><td><code>lugar_stock</code></td><td><span class="k">id</span>, <span class="">nombre</span>, <span class="">tipo</span>, <span class="f">area_id</span></td></tr><tr><td><code>insumo</code></td><td><span class="k">id</span>, <span class="">nombre</span>, <span class="">unidad_compra</span>, <span class="">unidad_almacen</span>, <span class="">unidad_receta</span>, <span class="">factor_compra</span>, <span class="">factor_receta</span>, <span class="">minimo</span>, <span class="">intermedio</span>, <span class="">maximo</span>, <span class="f">lugar_consumo_id</span>, <span class="">costo_unit</span>, <span class="">proveedor_a</span>, <span class="">proveedor_b</span>, <span class="">proveedor_c</span>, <span class="">activo</span></td></tr><tr><td><code>stock</code></td><td><span class="f">insumo_id</span>, <span class="f">producto_id</span>, <span class="f">lugar_id</span>, <span class="">cantidad</span></td></tr><tr><td><code>movimiento_stock</code></td><td><span class="k">id</span>, <span class="">tipo</span>, <span class="f">insumo_id</span>, <span class="f">producto_id</span>, <span class="f">lugar_id</span>, <span class="">cantidad</span>, <span class="f">origen_valor_id</span>, <span class="f">destino_valor_id</span>, <span class="">pedido_id</span>, <span class="">produccion_id</span>, <span class="">traslado_id</span>, <span class="">compra_id</span>, <span class="">nota</span>, <span class="f">movimiento_anulado_id</span>, <span class="">por</span>, <span class="">en</span></td></tr><tr><td><code>receta</code></td><td><span class="k">id</span>, <span class="f">producto_id</span>, <span class="f">tamano_valor_id</span>, <span class="">es_produccion</span>, <span class="">rinde</span></td></tr><tr><td><code>receta_linea</code></td><td><span class="k">receta_id</span>, <span class="k">insumo_id</span>, <span class="">cantidad</span></td></tr><tr><td><code>ajuste_opcion</code></td><td><span class="k">opcion_id</span>, <span class="k">insumo_id</span>, <span class="">efecto</span>, <span class="f">reemplaza_insumo_id</span>, <span class="">cantidad</span></td></tr><tr><td><code>traslado</code></td><td><span class="k">id</span>, <span class="f">insumo_id</span>, <span class="f">destino_lugar_id</span>, <span class="">enviado</span>, <span class="">recibido</span>, <span class="">estado</span>, <span class="">pedido_interno_id</span>, <span class="">recibido_por</span>, <span class="">recibido_en</span></td></tr><tr><td><code>pedido_interno</code></td><td><span class="k">id</span>, <span class="f">area_id</span>, <span class="">detalle</span>, <span class="">estado</span>, <span class="">por</span>, <span class="">en</span>, <span class="f">avisado_party_id</span>, <span class="">recibido_por</span>, <span class="">recibido_en</span></td></tr><tr><td><code>produccion</code></td><td><span class="k">id</span>, <span class="f">receta_id</span>, <span class="">tandas</span>, <span class="">unidades</span>, <span class="">producido_en</span>, <span class="">por</span>, <span class="">anulado_en</span>, <span class="">motivo_anulacion</span></td></tr><tr><td><code>cierre_dia</code></td><td><span class="k">id</span>, <span class="">fecha</span>, <span class="f">lugar_id</span>, <span class="">detalle</span>, <span class="">por</span>, <span class="">en</span></td></tr><tr><td><code>pedido_proveedor</code></td><td><span class="k">id</span>, <span class="f">proveedor_party_id</span>, <span class="">estado</span>, <span class="">enviado_en</span>, <span class="">motivo_anulacion</span></td></tr><tr><td><code>pedido_proveedor_linea</code></td><td><span class="k">pedido_proveedor_id</span>, <span class="k">insumo_id</span>, <span class="">cantidad_compra</span>, <span class="">recibido</span></td></tr><tr><td><code>compra</code></td><td><span class="k">id</span>, <span class="f">proveedor_party_id</span>, <span class="f">pedido_proveedor_id</span>, <span class="">comprobante_tipo</span>, <span class="">comprobante_numero</span>, <span class="f">archivo_id</span>, <span class="">condicion</span>, <span class="">total</span>, <span class="">pagada_en</span>, <span class="">anulada_en</span>, <span class="">motivo_anulacion</span></td></tr><tr><td><code>compra_linea</code></td><td><span class="k">id</span>, <span class="f">compra_id</span>, <span class="f">insumo_id</span>, <span class="">cantidad_compra</span>, <span class="">costo_unit</span></td></tr></tbody></table></div></details>
 </section>
 <section id="bot-atencion-y-notificaciones">
   <header class="sec-head"><p class="eyebrow">Dominio 11 de 12 · 8 tablas</p><h2>Bot, atención y notificaciones</h2><p>Conversaciones de WhatsApp con su dueño, mensajes, solicitudes, encuestas, costo de servicios externos y notificaciones.</p><p class="ext">Viene de otros dominios: <code>party</code>, <code>pedido</code>, <code>reserva</code>, <code>rol</code></p></header>
@@ -1129,7 +1203,7 @@ html{scroll-behavior:smooth}
   <details><summary>Columnas de cada tabla</summary><div class="tw"><table><thead><tr><th>Tabla</th><th>Columnas (<span class="k">clave</span>, <span class="f">foránea</span>)</th></tr></thead><tbody><tr><td><code>conversacion</code></td><td><span class="k">id</span>, <span class="">telefono</span>, <span class="f">party_id</span>, <span class="">duenio</span>, <span class="">tomado_por</span>, <span class="">tomado_en</span>, <span class="">urgente</span>, <span class="">estado</span>, <span class="">flujo</span>, <span class="">ultima_actividad</span></td></tr><tr><td><code>mensaje_chat</code></td><td><span class="k">id</span>, <span class="f">conversacion_id</span>, <span class="">direccion</span>, <span class="">autor</span>, <span class="">tipo</span>, <span class="">contenido</span>, <span class="">meta_id</span>, <span class="">en</span></td></tr><tr><td><code>respuesta_rapida</code></td><td><span class="k">id</span>, <span class="">titulo</span>, <span class="">texto</span>, <span class="">activo</span></td></tr><tr><td><code>solicitud_reserva</code></td><td><span class="k">id</span>, <span class="f">conversacion_id</span>, <span class="">personas</span>, <span class="">hora</span>, <span class="">estado</span>, <span class="f">reserva_id</span></td></tr><tr><td><code>solicitud_cambio</code></td><td><span class="k">id</span>, <span class="f">pedido_id</span>, <span class="">tipo</span>, <span class="">detalle</span>, <span class="">estado</span>, <span class="">decidido_por</span>, <span class="">motivo</span></td></tr><tr><td><code>encuesta</code></td><td><span class="k">id</span>, <span class="f">pedido_id</span>, <span class="">nota</span>, <span class="">comentario</span>, <span class="">derivada</span>, <span class="">enviada_en</span>, <span class="">respondida_en</span></td></tr><tr><td><code>uso_externo</code></td><td><span class="k">id</span>, <span class="">servicio</span>, <span class="">unidades</span>, <span class="">costo_usd</span>, <span class="">en</span></td></tr><tr><td><code>notificacion</code></td><td><span class="k">id</span>, <span class="">tipo</span>, <span class="f">rol_destino</span>, <span class="f">party_destino</span>, <span class="">titulo</span>, <span class="">enlace</span>, <span class="">leida_en</span>, <span class="">en</span></td></tr></tbody></table></div></details>
 </section>
 <section id="legal">
-  <header class="sec-head"><p class="eyebrow">Dominio 12 de 12 · 2 tablas</p><h2>Legal</h2><p>Libro de Reclamaciones y pedidos de derechos sobre datos personales (Ley 29733).</p><p class="ext">Viene de otros dominios: <code>party</code>, <code>pedido</code></p></header>
+  <header class="sec-head"><p class="eyebrow">Dominio 12 de 12 · 4 tablas</p><h2>Legal</h2><p>Libro de Reclamaciones y pedidos de derechos sobre datos personales (Ley 29733).</p><p class="ext">Viene de otros dominios: <code>archivo</code>, <code>party</code>, <code>pedido</code>, <code>user_account</code></p></header>
   <div class="diagram"><pre class="mermaid">erDiagram
   RECLAMO {
     bigint id PK
@@ -1153,15 +1227,47 @@ html{scroll-behavior:smooth}
     text estado
     timestamptz en
   }
+  INICIATIVA {
+    bigint id PK
+    text codigo UK
+    text tipo
+    text area
+    text titulo
+    text detalle
+    bigint archivo_id FK
+    text estado
+    timestamptz creado_en
+    bigint creado_por FK
+    timestamptz estado_cambiado_en
+    bigint estado_cambiado_por FK
+  }
+  INICIATIVA_COMENTARIO {
+    bigint id PK
+    bigint iniciativa_id FK
+    text texto
+    timestamptz creado_en
+    bigint creado_por FK
+  }
+  ARCHIVO {
+    bigint id PK &quot;en otro dominio&quot;
+  }
   PARTY {
     bigint id PK &quot;en otro dominio&quot;
   }
   PEDIDO {
     bigint id PK &quot;en otro dominio&quot;
   }
+  USER_ACCOUNT {
+    bigint id PK &quot;en otro dominio&quot;
+  }
+  ARCHIVO ||--o{ INICIATIVA : &quot;archivo_id&quot;
+  INICIATIVA ||--o{ INICIATIVA_COMENTARIO : &quot;iniciativa_id&quot;
   PARTY ||--o{ DATA_REQUEST : &quot;party_id&quot;
-  PEDIDO ||--o{ RECLAMO : &quot;pedido_id&quot;</pre></div>
-  <details><summary>Columnas de cada tabla</summary><div class="tw"><table><thead><tr><th>Tabla</th><th>Columnas (<span class="k">clave</span>, <span class="f">foránea</span>)</th></tr></thead><tbody><tr><td><code>reclamo</code></td><td><span class="k">id</span>, <span class="">numero</span>, <span class="">tipo</span>, <span class="">nombre</span>, <span class="">documento</span>, <span class="">domicilio</span>, <span class="">contacto</span>, <span class="">detalle</span>, <span class="f">pedido_id</span>, <span class="">vence_respuesta</span>, <span class="">respuesta</span>, <span class="">respondido_en</span>, <span class="">respondido_por</span></td></tr><tr><td><code>data_request</code></td><td><span class="k">id</span>, <span class="f">party_id</span>, <span class="">tipo</span>, <span class="">estado</span>, <span class="">en</span></td></tr></tbody></table></div></details>
+  PEDIDO ||--o{ RECLAMO : &quot;pedido_id&quot;
+  USER_ACCOUNT ||--o{ INICIATIVA : &quot;creado_por&quot;
+  USER_ACCOUNT ||--o{ INICIATIVA : &quot;estado_cambiado_por&quot;
+  USER_ACCOUNT ||--o{ INICIATIVA_COMENTARIO : &quot;creado_por&quot;</pre></div>
+  <details><summary>Columnas de cada tabla</summary><div class="tw"><table><thead><tr><th>Tabla</th><th>Columnas (<span class="k">clave</span>, <span class="f">foránea</span>)</th></tr></thead><tbody><tr><td><code>reclamo</code></td><td><span class="k">id</span>, <span class="">numero</span>, <span class="">tipo</span>, <span class="">nombre</span>, <span class="">documento</span>, <span class="">domicilio</span>, <span class="">contacto</span>, <span class="">detalle</span>, <span class="f">pedido_id</span>, <span class="">vence_respuesta</span>, <span class="">respuesta</span>, <span class="">respondido_en</span>, <span class="">respondido_por</span></td></tr><tr><td><code>data_request</code></td><td><span class="k">id</span>, <span class="f">party_id</span>, <span class="">tipo</span>, <span class="">estado</span>, <span class="">en</span></td></tr><tr><td><code>iniciativa</code></td><td><span class="k">id</span>, <span class="">codigo</span>, <span class="">tipo</span>, <span class="">area</span>, <span class="">titulo</span>, <span class="">detalle</span>, <span class="f">archivo_id</span>, <span class="">estado</span>, <span class="">creado_en</span>, <span class="f">creado_por</span>, <span class="">estado_cambiado_en</span>, <span class="f">estado_cambiado_por</span></td></tr><tr><td><code>iniciativa_comentario</code></td><td><span class="k">id</span>, <span class="f">iniciativa_id</span>, <span class="">texto</span>, <span class="">creado_en</span>, <span class="f">creado_por</span></td></tr></tbody></table></div></details>
 </section>
   <footer>Generado desde el DDL propuesto (borrador para G3, ADR-003 y ADR-004). Las migraciones reales las crea Prisma al construir.</footer>
 </div>

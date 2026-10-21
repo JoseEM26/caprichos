@@ -1,24 +1,24 @@
 ---
 id: DOR-FT-PED-03
 tipo: spec
-titulo: "Definition of Ready — FT-PED-03 Envío del pedido a caja y aviso al cliente"
+titulo: "Definition of Ready — FT-PED-03 Envío del pedido a comandas y aviso al cliente"
 estado: draft
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [EP-CAP-002, FT-PED-03, HU-CAP-019, HU-CAP-020, HU-CAP-021, ADR-001, ADR-011, ADR-014, ADR-003, ADR-005, ADR-009, ADR-010, FT-BOT-02, FT-CAJ-01, FT-CAR-02, FT-CFG-01, FT-INF-03]
+relacionados: [EP-CAP-002, FT-PED-03, HU-CAP-019, HU-CAP-020, HU-CAP-021, ADR-001, ADR-011, ADR-014, ADR-003, ADR-005, ADR-009, ADR-010, FT-BOT-02, FT-CAJ-01, FT-CAJ-02, FT-CAR-02, FT-CFG-01, FT-COC-01, FT-INF-03]
 tags: [dor, plt-05, pedido, ft-ped-03, g4]
 ---
 
-# PLT-05 · DEFINITION OF READY — FT-PED-03 Envío del pedido a caja y aviso al cliente
+# PLT-05 · DEFINITION OF READY — FT-PED-03 Envío del pedido a comandas y aviso al cliente
 
 **Frente PEDIDO · módulo `pedidos` · Caprichos · ticket *(pendiente — R13, D-14)***
 
 | Campo | Valor |
 | --- | --- |
-| ÍTEM EVALUADO | EP-CAP-002 Pedido del cliente en la carta · FT-PED-03 Envío del pedido a caja y aviso al cliente |
+| ÍTEM EVALUADO | EP-CAP-002 Pedido del cliente en la carta · FT-PED-03 Envío del pedido a comandas y aviso al cliente |
 | PRODUCT OWNER | José Ángel Espinoza (DT-48) |
 | LÍDER TÉCNICO | José Ángel Espinoza (DT-48) |
 | FECHA DE REVISIÓN | 2026-10-20 |
@@ -35,7 +35,7 @@ tags: [dor, plt-05, pedido, ft-ped-03, g4]
 | NEGOCIO | ☐ | Alcance dentro y fuera acordado | Redactado en la feature; falta la firma del PO (DT-48) |
 | NEGOCIO | ☐ | Prioridad y release confirmados | Debe tener · H1 · piloto en el local · 28/12/2026 (supuesto, D-19); fechas supuestas hasta D-19 |
 | FUNCIONAL | ☑ | Historias con criterios verificables | 3 historias, 9 criterios Dado/Cuando/Entonces |
-| FUNCIONAL | ☐ | Reglas de negocio documentadas y validadas | Documentadas; abiertas: D-05, D-08 |
+| FUNCIONAL | ☐ | Reglas de negocio documentadas y validadas | Documentadas; abiertas: D-05, D-08, D-26 |
 | FUNCIONAL | ☐ | Estimación por el equipo | Tareas en `backlog/tareas/EP-CAP-002.json` con `estimacion_horas: null` |
 | DISEÑO / UX | ☐ | Prototipos aprobados (DEP-06) | Mockup navegable como referencia (DT-04); Figma o aceptación del mockup pendiente (G2) |
 | DISEÑO / UX | ☐ | Textos y mensajes definidos | Los del mockup; por revisar con Kevin |
@@ -53,14 +53,16 @@ flowchart LR
   classDef evaluado fill:#fde68a,stroke:#b45309
   classDef interna fill:#dbeafe,stroke:#1d4ed8
   classDef externa fill:#fee2e2,stroke:#b91c1c
-  FT_PED_03["FT-PED-03<br>Envío del pedido a caja y aviso al cliente"]:::evaluado
+  FT_PED_03["FT-PED-03<br>Envío del pedido a comandas y aviso al cliente"]:::evaluado
   HU_CAP_019["HU-CAP-019"]:::evaluado --> FT_PED_03
   HU_CAP_020["HU-CAP-020"]:::evaluado --> FT_PED_03
   HU_CAP_021["HU-CAP-021"]:::evaluado --> FT_PED_03
   FT_BOT_02["FT-BOT-02"]:::interna --> FT_PED_03
   FT_CAJ_01["FT-CAJ-01"]:::interna --> FT_PED_03
+  FT_CAJ_02["FT-CAJ-02"]:::interna --> FT_PED_03
   FT_CAR_02["FT-CAR-02"]:::interna --> FT_PED_03
   FT_CFG_01["FT-CFG-01"]:::interna --> FT_PED_03
+  FT_COC_01["FT-COC-01"]:::interna --> FT_PED_03
   FT_INF_03["FT-INF-03"]:::interna --> FT_PED_03
   ADR_001["ADR-001"]:::interna -.-> FT_PED_03
   ADR_011["ADR-011"]:::interna -.-> FT_PED_03
@@ -75,9 +77,9 @@ flowchart LR
 ```
 
 - **Ítems evaluados:** FT-PED-03 y sus historias HU-CAP-019, HU-CAP-020, HU-CAP-021.
-- **Dependencias técnicas:** FT-BOT-02, FT-CAJ-01, FT-CAR-02, FT-CFG-01, FT-INF-03; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-003, ADR-005, ADR-009, ADR-010.
+- **Dependencias técnicas:** FT-BOT-02, FT-CAJ-01, FT-CAJ-02, FT-CAR-02, FT-CFG-01, FT-COC-01, FT-INF-03; decisiones técnicas ADR-001, ADR-011, ADR-014, ADR-003, ADR-005, ADR-009, ADR-010.
 - **Dependencias externas:** DEP-02, DEP-06, DEP-12.
-- **Decisiones abiertas:** D-05, D-08.
+- **Decisiones abiertas:** D-05, D-08, D-26.
 
 **Bloqueantes**
 
@@ -89,6 +91,7 @@ flowchart LR
 | DEP-12 | Ver roadmap PLT-01 | Externa | Kevin | Según roadmap | Abierto |
 | D-05 | Decisión pendiente (ver `analisis/decisiones.md`) | Decisión | Kevin | Antes de G4 | Abierto |
 | D-08 | Decisión pendiente (ver `analisis/decisiones.md`) | Decisión | Kevin | Antes de G4 | Abierto |
+| D-26 | Decisión pendiente (ver `analisis/decisiones.md`) | Decisión | Kevin | Antes de G4 | Abierto |
 
 ## 3 MODELADO (DATOS Y PROCESO)
 
@@ -171,14 +174,15 @@ flowchart TB
 | --- | --- | --- | --- | --- | --- | --- |
 | R-01 | Riesgo de roadmap (ver PLT-01) | — | — | Según roadmap | Ver PLT-01 | Abierto |
 | R-04 | Riesgo de roadmap (ver PLT-01) | — | — | Según roadmap | Ver PLT-01 | Abierto |
-| R-FT-PED-03-01 | Si no se resuelve «Plazo para el recordatorio», hay que rehacer criterios o pantallas | Media | Medio | Resolver con Kevin antes de G4 con la propuesta escrita en la feature | Kevin | Abierto |
-| R-FT-PED-03-02 | Si no se resuelve «Costo de la plantilla de WhatsApp», hay que rehacer criterios o pantallas | Media | Medio | Resolver con Kevin antes de G4 con la propuesta escrita en la feature | Kevin | Abierto |
+| R-FT-PED-03-01 | Si no se resuelve «¿Vale también para el chatbot y qué pasa si el cliente no paga?», hay que rehacer criterios o pantallas | Media | Medio | Resolver con Kevin antes de G4 con la propuesta escrita en la feature | Kevin | Abierto |
+| R-FT-PED-03-02 | Si no se resuelve «Plazo para el recordatorio», hay que rehacer criterios o pantallas | Media | Medio | Resolver con Kevin antes de G4 con la propuesta escrita en la feature | Kevin | Abierto |
+| R-FT-PED-03-03 | Si no se resuelve «Costo de la plantilla de WhatsApp», hay que rehacer criterios o pantallas | Media | Medio | Resolver con Kevin antes de G4 con la propuesta escrita en la feature | Kevin | Abierto |
 
 ## 6 DECISIÓN Y APROBACIÓN
 
 ☐ READY · Puede ingresar a desarrollo  ☐ READY CON CONDICIONES · ver acuerdos  ☐ NO READY · devolver a refinamiento
 
-**Propuesta IA: NO READY.** Motivos: G0 a G3 sin aprobar (DT-48); ADR ADR-001, ADR-011, ADR-014, ADR-003, ADR-005, ADR-009, ADR-010 propuestos, no aprobados (G3); tareas sin estimar; mockup sin aprobar (G2, DEP-06); decisiones abiertas D-05, D-08. Lo que sí está listo: historias con criterios verificables, casos de prueba 1 a 1, modelo de datos probado y dependencias identificadas. Con las firmas de G2 y G3 y la estimación, pasaría a **READY CON CONDICIONES**. La decisión es del PO.
+**Propuesta IA: NO READY.** Motivos: G0 a G3 sin aprobar (DT-48); ADR ADR-001, ADR-011, ADR-014, ADR-003, ADR-005, ADR-009, ADR-010 propuestos, no aprobados (G3); tareas sin estimar; mockup sin aprobar (G2, DEP-06); decisiones abiertas D-05, D-08, D-26. Lo que sí está listo: historias con criterios verificables, casos de prueba 1 a 1, modelo de datos probado y dependencias identificadas. Con las firmas de G2 y G3 y la estimación, pasaría a **READY CON CONDICIONES**. La decisión es del PO.
 
 | Rol | Nombre | Fecha | Firma |
 | --- | --- | --- | --- |

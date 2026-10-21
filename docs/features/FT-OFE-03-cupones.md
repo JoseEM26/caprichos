@@ -26,7 +26,7 @@ tags: [ofertas, plt-03, ep-cap-012, ft-ofe-03, deberia-tener]
 
 ## 1. Descripción y valor
 
-**Descripción.** Cupones de descuento completos: código, porcentaje o monto, compra mínima, vigencia, usos máximos y por cliente, categoría o producto, canal y si requiere cuenta (NEC-CAP-035). Hay dos modos (RN-CAP-134): **código único en el comprobante** (distinto por comprobante, al azar, no correlativo y de un solo uso, que vence a los N días de la compra) y **código compartido con tope** (el mismo para todos, para afiches y redes, con tope de usos obligatorio y máximo por cliente cuando pide con cuenta). Los cupones no se asignan a mano: al imprimir el comprobante salen abajo hasta N cupones (2 por defecto), **sorteados al azar** entre los de código único activos; el sorteo se guarda y reimprimir da los mismos (RN-CAP-135). Se registra cada **emisión y canje** (vigente, canjeado, vencido, anulado), el administrador puede **anular** uno, y la carta **bloquea el campo 5 minutos tras 5 intentos fallidos** (RN-CAP-133, V11). CRUD completo (crear, editar, desactivar, ordenar) con historial de cambios e impresiones (NEC-CAP-054). Detalle en `analisis/cupones.md`.
+**Descripción.** Cupones de descuento completos: código, porcentaje o monto, compra mínima, vigencia, usos máximos y por cliente, categoría o producto, canal y si requiere cuenta (NEC-CAP-035). Hay dos modos (RN-CAP-134, DT-56): **código único en el comprobante** (distinto por comprobante, al azar, no correlativo y de un solo uso, que vence a los N días de emitido, 15 por defecto; lo usa **quien traiga el código**, en el local o en la carta) y **código de campaña con tope** (el mismo para todos, para volantes, transmisiones en vivo y redes, con tope de usos obligatorio —por ejemplo, los primeros 50— y máximo por cliente cuando pide con cuenta). **Un cupón por compra**; no se junta con otras promociones y el pedido con cupón no suma puntos (DT-56). Los cupones no se asignan a mano: al imprimir el comprobante salen abajo hasta N cupones (de 1 a 3, 2 por defecto), **sorteados al azar** entre los de código único activos; el sorteo se guarda y reimprimir da los mismos (RN-CAP-135). Se registra cada **emisión y canje** (vigente, canjeado, vencido, anulado), el administrador puede **anular** uno, y la carta **bloquea el campo 5 minutos tras 5 intentos fallidos** (RN-CAP-133, V11). CRUD completo (crear, editar, desactivar, ordenar) con historial de cambios e impresiones (NEC-CAP-054). Detalle en `analisis/cupones.md`.
 
 **Seguridad.** Un código único no se puede adivinar ni reusar; el bloqueo por intentos evita probar códigos al azar.
 
@@ -45,12 +45,13 @@ tags: [ofertas, plt-03, ep-cap-012, ft-ofe-03, deberia-tener]
 | RQ-OFE-03-03 | Al imprimir el comprobante salen hasta N cupones sorteados al azar entre los de código único activos. | Debería tener | RN-CAP-135 · NEC-CAP-054 | Dados 4 cupones de código único activos y N = 2, cuando se imprime un comprobante, entonces salen 2 elegidos al azar; reimprimirlo da los mismos 2. | Propuesto |
 | RQ-OFE-03-04 | Cada cupón impreso lleva un código único, al azar y no correlativo, que vence a los N días de la compra. | Debería tener | RN-CAP-133 · RN-CAP-069 | Dados dos comprobantes seguidos, cuando se imprimen, entonces sus códigos no son consecutivos ni predecibles y cada uno vence a los días definidos. | Propuesto |
 | RQ-OFE-03-05 | Los cupones compartidos no se imprimen. | Debería tener | RN-CAP-135 | Dado un cupón compartido activo, cuando se imprime un comprobante, entonces no aparece. | Propuesto |
-| RQ-OFE-03-06 | El cliente canjea el cupón escribiendo el código completo; el de código único vale una sola vez. | Debería tener | RN-CAP-133 | Dado un código ya canjeado, cuando otro cliente lo escribe, entonces ve «Este cupón ya se usó». | Propuesto |
-| RQ-OFE-03-07 | El cupón compartido respeta su tope de usos y el máximo por cliente con cuenta. | Debería tener | RN-CAP-134 | Dado un tope de 100 usos con 100 canjes, cuando alguien lo escribe, entonces ve «Se agotaron los usos». | Propuesto |
-| RQ-OFE-03-08 | Tras 5 intentos fallidos, el campo de cupón se bloquea 5 minutos. | Debería tener | RN-CAP-133 · V11 | Dados 5 códigos inválidos seguidos, cuando el cliente intenta un sexto, entonces el campo queda bloqueado 5 minutos. | Propuesto |
-| RQ-OFE-03-09 | Se registra cada emisión y canje con su estado: vigente, canjeado, vencido o anulado. | Debería tener | RN-CAP-133 | Dado un cupón emitido hace 8 días con validez de 7, cuando el administrador abre Cupones emitidos, entonces aparece «Vencido». | Propuesto |
-| RQ-OFE-03-10 | El administrador anula un cupón emitido. | Debería tener | RN-CAP-133 | Dado un cupón vigente, cuando el administrador lo anula con motivo y Sí/No, entonces queda «Anulado» y no se puede canjear. | Propuesto |
-| RQ-OFE-03-11 | Los cupones se crean, editan, desactivan y ordenan, con historial de cambios e impresiones. | Debería tener | NEC-CAP-054 · RN-CAP-069 | Dado un cupón, cuando el administrador cambia su porcentaje, entonces el historial muestra el cambio con autor y fecha; no hay opción de eliminar. | Propuesto |
+| RQ-OFE-03-06 | Un pedido acepta un solo cupón, que no se junta con promociones ni con productos marcados «No suma puntos ni aplica cupones». | Debería tener | DT-56 · DT-65 | Dado un pedido con un cupón aplicado, cuando el cliente escribe otro, entonces ve «Solo se puede usar un cupón por compra»; en una línea con promoción o marcada, el cupón no descuenta. | Propuesto |
+| RQ-OFE-03-07 | El cliente canjea el cupón escribiendo el código completo; el de código único vale una sola vez. | Debería tener | RN-CAP-133 | Dado un código ya canjeado, cuando otro cliente lo escribe, entonces ve «Este cupón ya se usó». | Propuesto |
+| RQ-OFE-03-08 | El cupón compartido respeta su tope de usos y el máximo por cliente con cuenta. | Debería tener | RN-CAP-134 | Dado un tope de 100 usos con 100 canjes, cuando alguien lo escribe, entonces ve «Se agotaron los usos». | Propuesto |
+| RQ-OFE-03-09 | Tras 5 intentos fallidos, el campo de cupón se bloquea 5 minutos. | Debería tener | RN-CAP-133 · V11 | Dados 5 códigos inválidos seguidos, cuando el cliente intenta un sexto, entonces el campo queda bloqueado 5 minutos. | Propuesto |
+| RQ-OFE-03-10 | Se registra cada emisión y canje con su estado: vigente, canjeado, vencido o anulado. | Debería tener | RN-CAP-133 | Dado un cupón emitido hace 8 días con validez de 7, cuando el administrador abre Cupones emitidos, entonces aparece «Vencido». | Propuesto |
+| RQ-OFE-03-11 | El administrador anula un cupón emitido. | Debería tener | RN-CAP-133 | Dado un cupón vigente, cuando el administrador lo anula con motivo y Sí/No, entonces queda «Anulado» y no se puede canjear. | Propuesto |
+| RQ-OFE-03-12 | Los cupones se crean, editan, desactivan y ordenan, con historial de cambios e impresiones. | Debería tener | NEC-CAP-054 · RN-CAP-069 | Dado un cupón, cuando el administrador cambia su porcentaje, entonces el historial muestra el cambio con autor y fecha; no hay opción de eliminar. | Propuesto |
 
 Prioridad *Debería tener* por la épica. Todos nacen *Propuesto* hasta que el PO los apruebe (DT-48).
 
@@ -74,6 +75,7 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RN-CAP-134 | Dos modos: código único en el comprobante o código compartido con tope. | Decisión del dueño 19/10 |
 | RN-CAP-135 | Hasta N cupones al azar por comprobante; el sorteo se guarda; los compartidos no se imprimen. | Decisión del dueño 19/10 |
 | V11 | Bloqueo de 5 intentos fallidos durante 5 minutos. | decisiones.md |
+| DT-56 | Cupón impreso de 1 a 3 por ticket, 15 días, un uso, para quien traiga el código; cupón de campaña con tope; uno por compra, sin puntos ni promociones. | Acta 03 · decisiones.md |
 
 ## 5. Trazabilidad y planificación
 
@@ -84,12 +86,13 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RQ-OFE-03-03 | HU-CAP-113 | FT-LEG-01 | R-01 |
 | RQ-OFE-03-04 | HU-CAP-113 | — | R-01 |
 | RQ-OFE-03-05 | HU-CAP-113 | — | R-01 |
-| RQ-OFE-03-06 | HU-CAP-114 | FT-PED-01 | R-01 |
-| RQ-OFE-03-07 | HU-CAP-114 | FT-CLI-01 | R-01 |
-| RQ-OFE-03-08 | HU-CAP-114 | — | R-11 |
-| RQ-OFE-03-09 | HU-CAP-115 | — | R-01 |
+| RQ-OFE-03-06 | HU-CAP-114 | FT-OFE-02 | R-01 |
+| RQ-OFE-03-07 | HU-CAP-114 | FT-PED-01 | R-01 |
+| RQ-OFE-03-08 | HU-CAP-114 | FT-CLI-01 | R-01 |
+| RQ-OFE-03-09 | HU-CAP-114 | — | R-11 |
 | RQ-OFE-03-10 | HU-CAP-115 | — | R-01 |
 | RQ-OFE-03-11 | HU-CAP-115 | — | R-01 |
+| RQ-OFE-03-12 | HU-CAP-115 | — | R-01 |
 
 Historias de usuario de esta feature (en `historias/`, en draft):
 
@@ -107,8 +110,8 @@ Decisiones técnicas que la rigen (ADR propuestos, G3): ADR-001, ADR-011, ADR-01
 
 **Preguntas abiertas**
 
-1. **¿Cuántos días vale un cupón impreso por defecto?** Propuesta: 30 días.
+1. **Días de vigencia por defecto** — resuelto en el acta 03: 15 días desde que se emite (DT-56), configurable.
 
 ---
 
-Generado por IA: BRD (NEC-CAP-035, 054, 111; RN-CAP-069, 133 a 135), V11 y `analisis/cupones.md` — Revisado por: *(pendiente)*
+Generado por IA: BRD (NEC-CAP-035, 054, 111; RN-CAP-069, 133 a 135), V11, DT-56, acta 03 y `analisis/cupones.md` — Revisado por: *(pendiente)*
