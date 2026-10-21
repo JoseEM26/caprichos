@@ -1,0 +1,75 @@
+# syntax=docker/dockerfile:1
+
+# ==============================================================================
+# Etapa 1: Base - Node.js 24 Alpine con soporte para Prisma y pnpm 12
+# ==============================================================================
+FROM node:24-alpine AS base
+RUN apk add --no-cache libc6-compat openssl dumb-init curl
+WORKDIR /app
+RUN corepack enable && corepack prepare pnpm@12 --activate
+
+# ==============================================================================
+# Etapa 2: Dependencias - Instalación optimizada para monorepo pnpm
+# ==============================================================================
+FROM base AS deps
+WORKDIR /app
+
+# Copiar manifiestos de paquetes y configuración de workspace
+COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* ./
+COPY apps/api/package.json ./apps/api/
+COPY apps/web/package.json ./apps/web/
+COPY packages/compartido/package.json ./packages/compartido/
+
+# Instalar dependencias completas para construcción
+RUN pnpm install --frozen-lockfile
+
+# ==============================================================================
+# Etapa 3: Builder - Generación de Prisma y compilación NestJS + TypeScript
+# ==============================================================================
+FROM deps AS builder
+WORKDIR /app
+
+COPY . .
+
+# Generar cliente Prisma si existe el esquema
+RUN if [ -f apps/api/prisma/schema.prisma ]; then \
+      pnpm --filter @caprichos/api exec prisma generate || true; \
+    fi
+
+# Compilar paquete compartido y la aplicación API
+RUN pnpm --filter @caprichos/compartido build || true
+RUN pnpm --filter @caprichos/api build || pnpm run build
+
+# ==============================================================================
+# Etapa 4: Runner - Imagen final de producción de mínimo privilegio
+# ==============================================================================
+FROM node:24-alpine AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production \
+    PORT=3000
+
+RUN apk add --no-cache openssl dumb-init curl \
+    && addgroup -g 1001 -S nodejs \
+    && adduser -S nestjs -u 1001
+
+# Copiar artefactos compilados, dependencias y esquemas
+COPY --from=builder --chown=nestjs:nodejs /app/apps/api/dist ./apps/api/dist
+COPY --from=builder --chown=nestjs:nodejs /app/apps/api/package.json ./apps/api/package.json
+COPY --from=builder --chown=nestjs:nodejs /app/packages/compartido ./packages/compartido
+COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nestjs:nodejs /app/package.json ./package.json
+
+# Si existen archivos de Prisma (schema y migraciones)
+COPY --from=builder --chown=nestjs:nodejs /app/apps/api/prisma* ./apps/api/prisma
+
+USER nestjs
+
+EXPOSE 3000
+
+# Verificación de salud interna (RQ-PLA-01-03)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:3000/salud || curl -f http://localhost:3000/api/v1/salud || exit 1
+
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["node", "apps/api/dist/main.js"]

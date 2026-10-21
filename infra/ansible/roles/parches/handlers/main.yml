@@ -1,0 +1,9 @@
+---
+# ==============================================================================
+# Handlers para el rol parches
+# ==============================================================================
+
+- name: Reiniciar servicio unattended-upgrades
+  ansible.builtin.service:
+    name: unattended-upgrades
+    state: restarted

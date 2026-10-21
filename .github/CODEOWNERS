@@ -1,0 +1,27 @@
+# ==============================================================================
+# GitHub CODEOWNERS - Caprichos
+# Regla: Ningún PR se une a main sin revisión registrada (RQ-PLA-01-10)
+# Technical Lead y Product Owner: José Ángel Espinoza (@JoseEM26 - DT-07 / DT-48)
+# ==============================================================================
+
+# Propietario por defecto de todo el monorepo
+* @JoseEM26
+
+# Infraestructura, Docker y CI/CD
+/.github/ @JoseEM26
+/infra/ @JoseEM26
+/.githooks/ @JoseEM26
+/.gitleaks.toml @JoseEM26
+/renovate.json @JoseEM26
+/.dockerignore @JoseEM26
+/.env.example @JoseEM26
+
+# Aplicaciones y paquetes del monorepo
+/apps/ @JoseEM26
+/packages/ @JoseEM26
+
+# Documentación de arquitectura, decisiones y operación
+/analisis/ @JoseEM26
+/adr/ @JoseEM26
+/operacion/ @JoseEM26
+/historias/ @JoseEM26

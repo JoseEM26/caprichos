@@ -1,0 +1,54 @@
+# Dependencias y artefactos locales
+node_modules
+.pnpm-store
+dist
+build
+coverage
+*.tsbuildinfo
+
+# Secretos y variables de entorno (NUNCA en imágenes)
+.env
+.env.*
+*.key
+*.pem
+
+# Control de versiones y CI/CD
+.git
+.github
+.githooks
+.claude
+.publicar-tmp
+
+# Documentación de análisis y diseño (no requerida en producción)
+analisis
+adr
+epicas
+features
+historias
+dor
+gates
+backlog
+pruebas
+operacion
+datos
+arquitectura
+roadmap
+actas
+project
+recursos
+scripts
+scratchpad
+*.md
+LICENSE
+
+# Código heredado y pruebas manuales
+capri-bot
+web-anterior
+imagenes-carta-web
+
+# Logs y volcados
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*

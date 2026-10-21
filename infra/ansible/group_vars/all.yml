@@ -1,0 +1,90 @@
+---
+# ==============================================================================
+# Variables globales para el aprovisionamiento del VPS de Caprichos
+# ==============================================================================
+# Ref: FT-PLA-02 (HU-CAP-181, HU-CAP-182), ADR-011, DT-30, DT-40, DT-42, RB-CAP-004
+# ==============================================================================
+
+# Configuración de zona horaria (DT-40: America/Lima)
+timezone: "America/Lima"
+
+# Usuario administrativo sin root para despliegues (RB-CAP-004)
+deploy_user: "deploy"
+deploy_user_shell: "/bin/bash"
+deploy_user_groups:
+  - "sudo"
+# Llave SSH pública de ejemplo para el usuario deploy (reemplazar con la llave pública real de José/operador)
+deploy_user_ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLEKEYFORCAPRICHOSDEPLOYUSER0000000000000000000000 jose@caprichos.pe"
+
+# Configuración del servicio SSH
+ssh_port: 22
+
+# Paquetes base esenciales para el sistema
+base_packages:
+  - "apt-transport-https"
+  - "ca-certificates"
+  - "curl"
+  - "wget"
+  - "gnupg"
+  - "lsb-release"
+  - "software-properties-common"
+  - "htop"
+  - "git"
+  - "jq"
+  - "unzip"
+  - "tar"
+  - "rsync"
+  - "ufw"
+  - "fail2ban"
+  - "unattended-upgrades"
+
+# ==============================================================================
+# Rangos de IP oficiales de Cloudflare para UFW
+# ==============================================================================
+# FUENTE OFICIAL:
+# - IPv4: https://www.cloudflare.com/ips-v4
+# - IPv6: https://www.cloudflare.com/ips-v6
+# - Documentación: https://www.cloudflare.com/ips/
+# Política de seguridad (RQ-PLA-02-02, ADR-011, DT-42):
+# Solo los proxies de Cloudflare pueden conectarse a los puertos HTTP (80) y HTTPS (443).
+# Cualquier conexión directa a la IP del VPS en estos puertos es rechazada por UFW.
+# ==============================================================================
+cloudflare_ipv4_ranges:
+  - "173.245.48.0/20"
+  - "103.21.244.0/22"
+  - "103.22.200.0/22"
+  - "103.31.4.0/22"
+  - "141.101.64.0/18"
+  - "108.162.192.0/18"
+  - "190.93.240.0/20"
+  - "188.114.96.0/20"
+  - "197.234.240.0/22"
+  - "198.41.128.0/17"
+  - "162.158.0.0/15"
+  - "104.16.0.0/13"
+  - "104.24.0.0/14"
+  - "172.64.0.0/13"
+  - "131.0.72.0/22"
+
+cloudflare_ipv6_ranges:
+  - "2400:cb00::/32"
+  - "2606:4700::/32"
+  - "2803:f800::/32"
+  - "2405:b500::/32"
+  - "2405:8100::/32"
+  - "2a06:98c0::/29"
+  - "2c0f:f248::/32"
+
+# Configuración de Fail2ban
+fail2ban_bantime: "1h"
+fail2ban_findtime: "10m"
+fail2ban_maxretry: 3
+
+# Configuración de parches automáticos (unattended-upgrades)
+unattended_automatic_reboot: false
+unattended_reboot_time: "03:00"
+
+# Versión y configuración de Dokploy (DT-30, DT-40)
+# Versión estable fijada explícitamente para garantizar reproducibilidad
+dokploy_version: "v0.30.8"
+dokploy_install_script_url: "https://dokploy.com/install.sh"

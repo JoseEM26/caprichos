@@ -1,0 +1,39 @@
+---
+# ==============================================================================
+# Rol: fail2ban
+# Propósito: Instalar y configurar Fail2ban integrado con UFW para bloquear ataques
+# ==============================================================================
+
+- name: Asegurar que el paquete fail2ban esté instalado
+  ansible.builtin.apt:
+    name: fail2ban
+    state: present
+
+- name: Configurar /etc/fail2ban/jail.local con acción UFW y protección SSH
+  ansible.builtin.copy:
+    dest: /etc/fail2ban/jail.local
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Configuración de Fail2ban para Caprichos (ADR-011, DT-40)
+      [DEFAULT]
+      bantime = {{ fail2ban_bantime }}
+      findtime = {{ fail2ban_findtime }}
+      maxretry = {{ fail2ban_maxretry }}
+      banaction = ufw
+      banaction_allports = ufw
+      backend = systemd
+
+      [sshd]
+      enabled = true
+      port = {{ ssh_port }}
+      mode = aggressive
+      maxretry = {{ fail2ban_maxretry }}
+  notify: Reiniciar servicio Fail2ban
+
+- name: Habilitar y arrancar el servicio Fail2ban
+  ansible.builtin.service:
+    name: fail2ban
+    state: started
+    enabled: true

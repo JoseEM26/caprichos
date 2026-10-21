@@ -1,0 +1,53 @@
+title = "Gitleaks config para Caprichos (HU-CAP-183 / DT-43)"
+
+[allowlist]
+description = "Archivos y valores permitidos para plantillas de ejemplo y documentación"
+paths = [
+  '''^\.env\.example$''',
+  '''^\.gitleaks\.toml$''',
+  '''^\.githooks/pre-commit$''',
+  '''^.*\.md$''',
+  '''^analisis/.*$''',
+  '''^adr/.*$''',
+  '''^historias/.*$''',
+  '''^operacion/.*$''',
+  '''^features/.*$'''
+]
+regexes = [
+  '''sk-[xX]{20,}''',
+  '''sk-ejemplo-[a-zA-Z0-9_-]+''',
+  '''AKIAIOSFODNN7EXAMPLE''', # ejemplo de la documentación de AWS (placeholder)
+  '''ghp_000000000000000000000000000000000000''', # ejemplo (placeholder)
+  '''EAAB00000000000000000000000000000000000''',
+  '''EAA_ejemplo_[a-zA-Z0-9_-]+'''
+]
+
+[[rules]]
+id = "openai-api-key"
+description = "OpenAI API Key (sk-... / sk-proj-...)"
+regex = '''sk-[a-zA-Z0-9_-]{20,}'''
+keywords = ["sk-"]
+
+[[rules]]
+id = "aws-access-key-id"
+description = "AWS Access Key ID (AKIA...)"
+regex = '''\b(AKIA[0-9A-Z]{16})\b'''
+keywords = ["AKIA"]
+
+[[rules]]
+id = "github-pat"
+description = "GitHub Personal Access Token (ghp_...)"
+regex = '''ghp_[a-zA-Z0-9]{36}'''
+keywords = ["ghp_"]
+
+[[rules]]
+id = "private-key"
+description = "Llave privada en texto plano (BEGIN ... PRIVATE KEY)"
+regex = '''-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----'''
+keywords = ["BEGIN", "PRIVATE KEY"]
+
+[[rules]]
+id = "meta-whatsapp-token"
+description = "Meta / WhatsApp Graph API Token (EAA...)"
+regex = '''EAA[a-zA-Z0-9_-]{20,}'''
+keywords = ["EAA"]

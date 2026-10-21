@@ -33,3 +33,9 @@ __pycache__/
 
 # --- Ya vive en su propio repositorio: JoseEM26/caprichos-mockup ---
 mockup-web/
+
+# --- Compilados y cobertura ---
+dist/
+coverage/
+.pnpm-store/
+

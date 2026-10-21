@@ -1,0 +1,69 @@
+---
+# ==============================================================================
+# Rol: firewall
+# Propósito: Configurar UFW con política restrictiva por defecto, puerto SSH, y
+#            restringir 80/443 exclusivamente a los rangos de Cloudflare.
+# Ref: RQ-PLA-02-02, ADR-011, DT-42
+# ==============================================================================
+
+- name: Asegurar que el paquete UFW esté instalado
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+
+- name: Establecer política por defecto de UFW - Denegar tráfico entrante
+  community.general.ufw:
+    direction: incoming
+    default: deny
+
+- name: Establecer política por defecto de UFW - Permitir tráfico saliente
+  community.general.ufw:
+    direction: outgoing
+    default: allow
+
+- name: Permitir conexiones SSH con limitación de intentos (puerto {{ ssh_port }})
+  community.general.ufw:
+    rule: limit
+    port: "{{ ssh_port }}"
+    proto: tcp
+    comment: "Acceso SSH seguro para administradores"
+
+- name: Permitir tráfico HTTP (80) exclusivamente desde rangos IPv4 de Cloudflare
+  community.general.ufw:
+    rule: allow
+    src: "{{ item }}"
+    port: "80"
+    proto: tcp
+    comment: "Cloudflare proxy HTTP IPv4"
+  loop: "{{ cloudflare_ipv4_ranges }}"
+
+- name: Permitir tráfico HTTPS (443) exclusivamente desde rangos IPv4 de Cloudflare
+  community.general.ufw:
+    rule: allow
+    src: "{{ item }}"
+    port: "443"
+    proto: tcp
+    comment: "Cloudflare proxy HTTPS IPv4"
+  loop: "{{ cloudflare_ipv4_ranges }}"
+
+- name: Permitir tráfico HTTP (80) exclusivamente desde rangos IPv6 de Cloudflare
+  community.general.ufw:
+    rule: allow
+    src: "{{ item }}"
+    port: "80"
+    proto: tcp
+    comment: "Cloudflare proxy HTTP IPv6"
+  loop: "{{ cloudflare_ipv6_ranges }}"
+
+- name: Permitir tráfico HTTPS (443) exclusivamente desde rangos IPv6 de Cloudflare
+  community.general.ufw:
+    rule: allow
+    src: "{{ item }}"
+    port: "443"
+    proto: tcp
+    comment: "Cloudflare proxy HTTPS IPv6"
+  loop: "{{ cloudflare_ipv6_ranges }}"
+
+- name: Habilitar y activar el firewall UFW
+  community.general.ufw:
+    state: enabled

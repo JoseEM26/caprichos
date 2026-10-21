@@ -1,0 +1,101 @@
+# syntax=docker/dockerfile:1
+
+# ==============================================================================
+# Etapa 1: Base - Node.js 24 Alpine con pnpm 12
+# ==============================================================================
+FROM node:24-alpine AS base
+WORKDIR /app
+RUN corepack enable && corepack prepare pnpm@12 --activate
+
+# ==============================================================================
+# Etapa 2: Dependencias - Instalación de dependencias del monorepo
+# ==============================================================================
+FROM base AS deps
+WORKDIR /app
+
+# Copiar manifiestos y configuración del workspace
+COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* ./
+COPY apps/api/package.json ./apps/api/
+COPY apps/web/package.json ./apps/web/
+COPY packages/compartido/package.json ./packages/compartido/
+
+RUN pnpm install --frozen-lockfile
+
+# ==============================================================================
+# Etapa 3: Builder - Compilación de React + Vite (PWA y SPA)
+# ==============================================================================
+FROM deps AS builder
+WORKDIR /app
+
+COPY . .
+
+# Compilar tipos/lógica compartida y la web
+RUN pnpm --filter @caprichos/compartido build || true
+RUN pnpm --filter @caprichos/web build || pnpm run build
+
+# ==============================================================================
+# Etapa 4: Runner - Servidor Nginx ultra-ligero (~30 MB de RAM - INV-CAP-001)
+# ==============================================================================
+FROM nginx:alpine AS runner
+WORKDIR /usr/share/nginx/html
+
+# Limpiar configuración por defecto
+RUN rm -rf /etc/nginx/conf.d/* /usr/share/nginx/html/*
+
+# Configuración optimizada de Nginx para SPA (React Router, compresión y caché)
+RUN cat << 'EOF' > /etc/nginx/conf.d/caprichos.conf
+server {
+    listen 80;
+    server_name localhost;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Compresión gzip para alto rendimiento
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_types
+        text/plain
+        text/css
+        text/xml
+        application/json
+        application/javascript
+        application/rss+xml
+        application/atom+xml
+        image/svg+xml;
+
+    # Cabeceras de seguridad HTTP
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # Enrutamiento de Single Page Application (SPA / React)
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Caché inmutable para activos estáticos con hash de Vite
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+
+    # Endpoint de verificación de salud para Dokploy y Uptime Kuma
+    location /salud {
+        access_log off;
+        default_type application/json;
+        return 200 '{"status":"ok","app":"caprichos-web"}';
+    }
+}
+EOF
+
+# Copiar el paquete estático generado por Vite
+COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
+
+EXPOSE 80
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost/salud || exit 1
+
+CMD ["nginx", "-g", "daemon off;"]

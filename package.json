@@ -1,0 +1,25 @@
+{
+  "name": "caprichos-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Monorepo modular de la plataforma Caprichos (café artesanal en Lima)",
+  "scripts": {
+    "lint": "eslint .",
+    "test": "pnpm --filter @caprichos/api test",
+    "build": "pnpm --filter @caprichos/compartido build && pnpm --filter @caprichos/agente-local build && pnpm --filter @caprichos/api build && pnpm --filter @caprichos/web build",
+    "check:deps": "depcruise --config .dependency-cruiser.js apps/api/src",
+    "dev:api": "pnpm --filter @caprichos/api start:dev",
+    "dev:web": "pnpm --filter @caprichos/web dev"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.19.0",
+    "dependency-cruiser": "^16.9.0",
+    "eslint": "^9.19.0",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.21.0"
+  },
+  "engines": {
+    "node": ">=24.0.0",
+    "pnpm": ">=12.0.0"
+  }
+}

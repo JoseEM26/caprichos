@@ -1,0 +1,97 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Configuración de Renovate para Caprichos (HU-CAP-188 / DT-47)",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommits"
+  ],
+  "timezone": "America/Lima",
+  "schedule": [
+    "before 6am on monday"
+  ],
+  "labels": [
+    "dependencias",
+    "renovate"
+  ],
+  "packageRules": [
+    {
+      "description": "Automerge únicamente para actualizaciones de tipo parche en dependencias de desarrollo",
+      "matchDepTypes": [
+        "devDependencies"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "groupName": "devDependencies (parches automerge)",
+      "automerge": true,
+      "automergeType": "branch"
+    },
+    {
+      "description": "Agrupar actualizaciones menores de dependencias de desarrollo sin automerge",
+      "matchDepTypes": [
+        "devDependencies"
+      ],
+      "matchUpdateTypes": [
+        "minor"
+      ],
+      "groupName": "devDependencies (menores)",
+      "automerge": false
+    },
+    {
+      "description": "Agrupar dependencias de producción (parche y menor) para revisión manual obligatoria",
+      "matchDepTypes": [
+        "dependencies"
+      ],
+      "matchUpdateTypes": [
+        "patch",
+        "minor"
+      ],
+      "groupName": "dependencias de producción (no mayores)",
+      "automerge": false
+    },
+    {
+      "description": "Agrupar ecosistema NestJS",
+      "matchPackagePatterns": [
+        "^@nestjs/"
+      ],
+      "groupName": "ecosistema NestJS",
+      "automerge": false
+    },
+    {
+      "description": "Agrupar ecosistema React",
+      "matchPackagePatterns": [
+        "^react",
+        "^@types/react"
+      ],
+      "groupName": "ecosistema React",
+      "automerge": false
+    },
+    {
+      "description": "Agrupar Prisma ORM",
+      "matchPackagePatterns": [
+        "^@prisma/",
+        "^prisma$"
+      ],
+      "groupName": "Prisma ORM",
+      "automerge": false
+    },
+    {
+      "description": "Agrupar imágenes Docker en Dockerfiles",
+      "matchDatasources": [
+        "docker"
+      ],
+      "groupName": "imágenes Docker",
+      "automerge": false
+    },
+    {
+      "description": "Bloquear automerge en cualquier actualización mayor para evitar incompatibilidades",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "automerge": false
+    }
+  ],
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2
+}
