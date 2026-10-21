@@ -3,10 +3,10 @@
 Este directorio contiene la automatización de aprovisionamiento del servidor VPS para la plataforma digital de **Caprichos** (Lima, Perú), así como la guía completa para la exposición segura mediante Cloudflare y la operación del entorno.
 
 > **Referencias obligatorias:**
-> - [operacion/RB-CAP-004: Runbook: preparar un servidor nuevo](../operacion/RB-CAP-004-preparar-un-servidor-nuevo.md)
-> - [operacion/INV-CAP-001: Inventario de infraestructura](../operacion/INV-CAP-001-inventario-de-infraestructura.md)
-> - [adr/ADR-011: VPS con Dokploy, Ansible, Cloudflare y CI/CD](../adr/ADR-011-infraestructura-vps-dokploy-cloudflare-y-ci-cd.md)
-> - [features/FT-PLA-02: Servidor, red, ambientes y secretos](../features/FT-PLA-02-servidor-red-ambientes-y-secretos.md) (HU-CAP-181, HU-CAP-182)
+> - [operacion/RB-CAP-004: Runbook: preparar un servidor nuevo](../docs/operacion/RB-CAP-004-preparar-un-servidor-nuevo.md)
+> - [operacion/INV-CAP-001: Inventario de infraestructura](../docs/operacion/INV-CAP-001-inventario-de-infraestructura.md)
+> - [adr/ADR-011: VPS con Dokploy, Ansible, Cloudflare y CI/CD](../docs/adr/ADR-011-infraestructura-vps-dokploy-cloudflare-y-ci-cd.md)
+> - [features/FT-PLA-02: Servidor, red, ambientes y secretos](../docs/features/FT-PLA-02-servidor-red-ambientes-y-secretos.md) (HU-CAP-181, HU-CAP-182)
 
 ---
 
@@ -139,7 +139,7 @@ Dado que UFW bloquea el puerto 3000 desde el exterior y los puertos 80/443 solo 
 
 ## 5. Pasos Manuales Fuera del Alcance de Ansible
 
-Por políticas de seguridad, delegación externa o requerimiento de interacción humana, los siguientes pasos **no se pueden automatizar en el playbook** y deben ejecutarse manualmente siguiendo [operacion/RB-CAP-004](../operacion/RB-CAP-004-preparar-un-servidor-nuevo.md):
+Por políticas de seguridad, delegación externa o requerimiento de interacción humana, los siguientes pasos **no se pueden automatizar en el playbook** y deben ejecutarse manualmente siguiendo [operacion/RB-CAP-004](../docs/operacion/RB-CAP-004-preparar-un-servidor-nuevo.md):
 
 1. **Gestión en punto.pe:** Modificación manual de los Name Servers del dominio `caprichos.pe` hacia Cloudflare (portal externo peruano).
 2. **Dashboard de Cloudflare:** Creación de la zona, registros DNS `A` para subdominios (`admin`, `api`, `staging`, `panel`), configuración de cifrado Full Strict y emisión del Certificado de Origen.
