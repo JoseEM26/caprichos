@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validar código (lint, dependencias, pruebas, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar pnpm 12
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      - name: Configurar Node.js 24 con caché de pnpm
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint de código
+        run: pnpm run lint
+
+      - name: Regla de dependencias entre módulos
+        run: pnpm run check:deps
+
+      # El paquete compartido se compila primero: la API y sus pruebas lo importan desde dist/
+      - name: Compilar aplicaciones (build)
+        run: pnpm run build
+
+      - name: Pruebas unitarias
+        run: pnpm run test
+
+  docker-trivy:
+    name: Construcción y escaneo de imágenes (Trivy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Construir imagen API para escaneo
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/Dockerfile.api
+          push: false
+          load: true
+          tags: caprichos-api:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Escanear imagen API con Trivy (falla con vulnerabilidades críticas)
+        uses: aquasecurity/trivy-action@v0.33.1
+        with:
+          version: 'v0.75.0'  # versión del programa Trivy fijada: la de la acción por defecto (v0.65.0) ya no existe
+          image-ref: caprichos-api:test
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: CRITICAL
+
+      - name: Construir imagen Web para escaneo
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/Dockerfile.web
+          push: false
+          load: true
+          tags: caprichos-web:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Escanear imagen Web con Trivy (falla con vulnerabilidades críticas)
+        uses: aquasecurity/trivy-action@v0.33.1
+        with:
+          version: 'v0.75.0'  # versión del programa Trivy fijada: la de la acción por defecto (v0.65.0) ya no existe
+          image-ref: caprichos-web:test
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: CRITICAL

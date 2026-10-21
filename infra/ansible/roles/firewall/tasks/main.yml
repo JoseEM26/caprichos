@@ -1,0 +1,116 @@
+---
+# ==============================================================================
+# Rol: firewall
+# Propósito: Configurar UFW con política restrictiva por defecto, puerto SSH, y
+#            restringir 80/443 exclusivamente a los rangos de Cloudflare.
+# Ref: RQ-PLA-02-02, ADR-011, DT-42
+# ==============================================================================
+
+- name: Asegurar que el paquete UFW esté instalado
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+
+- name: Establecer política por defecto de UFW - Denegar tráfico entrante
+  community.general.ufw:
+    direction: incoming
+    default: deny
+
+- name: Establecer política por defecto de UFW - Permitir tráfico saliente
+  community.general.ufw:
+    direction: outgoing
+    default: allow
+
+- name: Permitir conexiones SSH con limitación de intentos (puerto {{ ssh_port }})
+  community.general.ufw:
+    rule: limit
+    port: "{{ ssh_port }}"
+    proto: tcp
+    comment: "Acceso SSH seguro para administradores"
+
+- name: Permitir tráfico HTTP (80) exclusivamente desde rangos IPv4 de Cloudflare
+  community.general.ufw:
+    rule: allow
+    src: "{{ item }}"
+    port: "80"
+    proto: tcp
+    comment: "Cloudflare proxy HTTP IPv4"
+  loop: "{{ cloudflare_ipv4_ranges }}"
+
+- name: Permitir tráfico HTTPS (443) exclusivamente desde rangos IPv4 de Cloudflare
+  community.general.ufw:
+    rule: allow
+    src: "{{ item }}"
+    port: "443"
+    proto: tcp
+    comment: "Cloudflare proxy HTTPS IPv4"
+  loop: "{{ cloudflare_ipv4_ranges }}"
+
+- name: Permitir tráfico HTTP (80) exclusivamente desde rangos IPv6 de Cloudflare
+  community.general.ufw:
+    rule: allow
+    src: "{{ item }}"
+    port: "80"
+    proto: tcp
+    comment: "Cloudflare proxy HTTP IPv6"
+  loop: "{{ cloudflare_ipv6_ranges }}"
+
+- name: Permitir tráfico HTTPS (443) exclusivamente desde rangos IPv6 de Cloudflare
+  community.general.ufw:
+    rule: allow
+    src: "{{ item }}"
+    port: "443"
+    proto: tcp
+    comment: "Cloudflare proxy HTTPS IPv6"
+  loop: "{{ cloudflare_ipv6_ranges }}"
+
+- name: Habilitar y activar el firewall UFW
+  community.general.ufw:
+    state: enabled
+
+# ------------------------------------------------------------------------------
+# Docker se salta UFW: los puertos que publica un contenedor no pasan por las
+# reglas de entrada de UFW. Se filtra el tráfico hacia los contenedores en la
+# cadena DOCKER-USER (mismo enfoque que ufw-docker): todo lo que viene de
+# internet hacia un contenedor se bloquea salvo las reglas «ufw route allow».
+# Así 80/443 solo aceptan a Cloudflare y el panel de Dokploy (3000) queda
+# cerrado hacia afuera; se entra por túnel SSH (RB-CAP-004).
+# ------------------------------------------------------------------------------
+- name: Filtrar en DOCKER-USER el tráfico de internet hacia contenedores
+  ansible.builtin.blockinfile:
+    path: /etc/ufw/after.rules
+    marker: "# {mark} UFW Y DOCKER (Caprichos)"
+    block: |
+      *filter
+      :ufw-user-forward - [0:0]
+      :ufw-docker-logging-deny - [0:0]
+      :DOCKER-USER - [0:0]
+      -A DOCKER-USER -j ufw-user-forward
+      -A DOCKER-USER -j RETURN -s 10.0.0.0/8
+      -A DOCKER-USER -j RETURN -s 172.16.0.0/12
+      -A DOCKER-USER -j RETURN -s 192.168.0.0/16
+      -A DOCKER-USER -p udp -m udp --sport 53 --dport 1024:65535 -j RETURN
+      -A DOCKER-USER -j ufw-docker-logging-deny -p tcp -m tcp --tcp-flags FIN,SYN,RST,ACK SYN -d 192.168.0.0/16
+      -A DOCKER-USER -j ufw-docker-logging-deny -p tcp -m tcp --tcp-flags FIN,SYN,RST,ACK SYN -d 10.0.0.0/8
+      -A DOCKER-USER -j ufw-docker-logging-deny -p tcp -m tcp --tcp-flags FIN,SYN,RST,ACK SYN -d 172.16.0.0/12
+      -A DOCKER-USER -j ufw-docker-logging-deny -p udp -m udp --dport 0:32767 -d 192.168.0.0/16
+      -A DOCKER-USER -j ufw-docker-logging-deny -p udp -m udp --dport 0:32767 -d 10.0.0.0/8
+      -A DOCKER-USER -j ufw-docker-logging-deny -p udp -m udp --dport 0:32767 -d 172.16.0.0/12
+      -A DOCKER-USER -j RETURN
+      -A ufw-docker-logging-deny -m limit --limit 3/min --limit-burst 10 -j LOG --log-prefix "[UFW DOCKER BLOCK] "
+      -A ufw-docker-logging-deny -j DROP
+      COMMIT
+  register: ufw_docker_rules
+
+- name: Permitir hacia los contenedores 80 y 443 solo desde Cloudflare (IPv4)
+  ansible.builtin.command:
+    cmd: "ufw route allow proto tcp from {{ item.0 }} to any port {{ item.1 }} comment 'Cloudflare a contenedor {{ item.1 }}'"
+  loop: "{{ cloudflare_ipv4_ranges | product(['80', '443']) | list }}"
+  register: ufw_route_v4
+  changed_when: "'Skipping' not in ufw_route_v4.stdout"
+
+- name: Recargar UFW si cambiaron las reglas de Docker
+  ansible.builtin.command:
+    cmd: ufw reload
+  when: ufw_docker_rules.changed
+  changed_when: true

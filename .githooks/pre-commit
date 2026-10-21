@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# Pre-commit hook: Detección y bloqueo de secretos (HU-CAP-183 / DT-43)
+# Caprichos - Monorepo
+# ==============================================================================
+
+set -o pipefail
+
+# Determinar lista de archivos a verificar
+FILES_TO_CHECK=()
+
+if [ -n "$1" ]; then
+  # Modo prueba directa con un archivo proporcionado como argumento
+  if [ -f "$1" ]; then
+    FILES_TO_CHECK+=("$1")
+  else
+    echo "⚠️ Archivo no encontrado: $1"
+    exit 1
+  fi
+else
+  # Modo pre-commit normal de git: inspeccionar archivos staged
+  while IFS= read -r file; do
+    [ -n "$file" ] && FILES_TO_CHECK+=("$file")
+  done < <(git diff --cached --name-only --diff-filter=ACM 2>/dev/null)
+fi
+
+# Si no hay archivos para escanear, continuar
+if [ ${#FILES_TO_CHECK[@]} -eq 0 ]; then
+  exit 0
+fi
+
+# Función para identificar archivos explícitamente permitidos (ejemplos y docs)
+is_allowlisted() {
+  local target="$1"
+  case "$target" in
+    *.env.example|.env.example|.gitleaks.toml|.githooks/*|*.md|analisis/*|adr/*|historias/*|operacion/*|features/*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+SECRETS_FOUND=0
+
+# Opción 1: Si gitleaks está instalado en el sistema, usarlo
+if command -v gitleaks &> /dev/null; then
+  echo "🔍 [pre-commit] Analizando con Gitleaks..."
+  if [ -n "$1" ]; then
+    if ! is_allowlisted "$1"; then
+      if ! gitleaks detect --source="$1" --config=.gitleaks.toml --no-git --verbose; then
+        SECRETS_FOUND=1
+      fi
+    fi
+  else
+    if ! gitleaks protect --staged --config=.gitleaks.toml --verbose; then
+      SECRETS_FOUND=1
+    fi
+  fi
+else
+  # Opción 2: Escaneo con grep de patrones sensibles de alta severidad
+  echo "🔍 [pre-commit] Gitleaks nativo no encontrado en PATH. Ejecutando escaneo con patrones de seguridad..."
+
+  # Patrones obligatorios:
+  # - sk- : OpenAI API keys
+  # - AKIA : AWS Access Key ID
+  # - ghp_ : GitHub Personal Access Tokens
+  # - BEGIN PRIVATE KEY : Llaves privadas (RSA, SSH, EC)
+  # - EAA : Meta / WhatsApp Graph API tokens
+  REGEX_PATTERNS="(sk-[a-zA-Z0-9_-]{20,}|AKIA[0-9A-Z]{16}|ghp_[a-zA-Z0-9]{36}|BEGIN[[:space:]]+.*PRIVATE[[:space:]]+KEY|EAA[a-zA-Z0-9_-]{20,})"
+
+  for file in "${FILES_TO_CHECK[@]}"; do
+    if [ -f "$file" ] && ! is_allowlisted "$file"; then
+      # Buscar coincidencias en el archivo
+      MATCHES=$(grep -En "$REGEX_PATTERNS" "$file" 2>/dev/null || true)
+      if [ -n "$MATCHES" ]; then
+        echo ""
+        echo "❌ [SEGURIDAD] Se detectó un secreto sensible en: $file"
+        echo "--------------------------------------------------------------------------------"
+        echo "$MATCHES"
+        echo "--------------------------------------------------------------------------------"
+        SECRETS_FOUND=1
+      fi
+    fi
+  done
+fi
+
+if [ $SECRETS_FOUND -ne 0 ]; then
+  echo ""
+  echo "🚫 COMMIT BLOQUEADO: Se detectaron posibles secretos o credenciales en el commit."
+  echo "   Regla del proyecto: Los secretos NUNCA van en el repositorio (DT-43 / HU-CAP-183)."
+  echo "   - Para desarrollo local, utiliza archivos .env locales (ignorados por git)."
+  echo "   - Para documentación de variables, actualiza .env.example con valores ficticios."
+  echo "   - Para ambientes (pruebas y producción), configura las variables en Dokploy."
+  echo ""
+  exit 1
+fi
+
+echo "✅ [pre-commit] Verificación de secretos superada exitosamente."
+exit 0

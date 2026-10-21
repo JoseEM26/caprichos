@@ -1,0 +1,59 @@
+---
+# ==============================================================================
+# Playbook principal de aprovisionamiento del VPS - Caprichos
+# ==============================================================================
+# Automatiza la preparación completa de un VPS virgen (Ubuntu LTS) para albergar
+# la plataforma digital Caprichos bajo Docker y Dokploy, protegido por Cloudflare.
+#
+# Referencias:
+# - FT-PLA-02: Servidor, red, ambientes y secretos (HU-CAP-181, HU-CAP-182)
+# - ADR-011: Infraestructura: VPS con Dokploy, Ansible, Cloudflare y CI/CD
+# - DT-30, DT-40, DT-42: Decisiones técnicas de infraestructura
+# - operacion/RB-CAP-004: Runbook de preparación de servidor nuevo
+#
+# Idempotencia: Este playbook puede ejecutarse múltiples veces consecutivas
+#               sin alterar el estado ni generar cambios redundantes (changed=0).
+# ==============================================================================
+
+- name: Aprovisionar y bastionear servidor VPS para la plataforma Caprichos
+  hosts: vps
+  become: true
+  gather_facts: true
+
+  roles:
+    - role: base
+      tags:
+        - base
+        - system
+
+    - role: ssh
+      tags:
+        - ssh
+        - security
+
+    - role: firewall
+      tags:
+        - firewall
+        - ufw
+        - security
+
+    - role: fail2ban
+      tags:
+        - fail2ban
+        - security
+
+    - role: parches
+      tags:
+        - parches
+        - updates
+        - security
+
+    - role: docker
+      tags:
+        - docker
+        - containers
+
+    - role: dokploy
+      tags:
+        - dokploy
+        - platform

@@ -1,0 +1,38 @@
+---
+# ==============================================================================
+# Rol: dokploy
+# Propósito: Instalar Dokploy mediante su instalador oficial, fijando versión
+#            e implementando verificación para asegurar idempotencia total.
+# Ref: ADR-011, DT-30, DT-40, RB-CAP-004
+# ==============================================================================
+
+- name: Verificar si el servicio Dokploy ya se encuentra instalado en Docker
+  ansible.builtin.command:
+    cmd: docker service inspect dokploy --format "{{ '{{' }}.Spec.TaskTemplate.ContainerSpec.Image{{ '}}' }}"
+  register: dokploy_service_check
+  failed_when: false
+  changed_when: false
+
+- name: Instalar Dokploy mediante script oficial con versión fijada ({{ dokploy_version }})
+  ansible.builtin.shell:
+    cmd: "set -o pipefail && curl -sSL {{ dokploy_install_script_url }} | DOKPLOY_VERSION={{ dokploy_version }} bash"
+    executable: /bin/bash
+  environment:
+    DOKPLOY_VERSION: "{{ dokploy_version }}"
+  when: dokploy_service_check.rc != 0
+  changed_when: true
+
+- name: Actualizar Dokploy si la versión instalada difiere de {{ dokploy_version }}
+  ansible.builtin.command:
+    cmd: "docker service update --image dokploy/dokploy:{{ dokploy_version }} dokploy"
+  when:
+    - dokploy_service_check.rc == 0
+    - dokploy_version not in dokploy_service_check.stdout
+  changed_when: true
+
+- name: Verificar que el servicio Dokploy esté activo
+  ansible.builtin.command:
+    cmd: docker service ls --filter name=dokploy --format "{{ '{{' }}.Replicas{{ '}}' }}"
+  register: dokploy_replicas
+  failed_when: false
+  changed_when: false

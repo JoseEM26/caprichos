@@ -1,0 +1,70 @@
+---
+# ==============================================================================
+# Rol: ssh
+# Propósito: Bastionado SSH: solo autenticación por llave, sin root, sin contraseñas
+# ==============================================================================
+
+- name: Asegurar existencia del directorio /etc/ssh/sshd_config.d
+  ansible.builtin.file:
+    path: /etc/ssh/sshd_config.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Asegurar que sshd_config incluye el directorio sshd_config.d
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    line: "Include /etc/ssh/sshd_config.d/*.conf"
+    insertafter: BOF
+    state: present
+  notify: Reiniciar servicio SSH
+
+- name: Deshabilitar PasswordAuthentication en sshd_config principal si está presente
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PasswordAuthentication\s+'
+    line: 'PasswordAuthentication no'
+    state: present
+  notify: Reiniciar servicio SSH
+
+- name: Deshabilitar PermitRootLogin en sshd_config principal si está presente
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PermitRootLogin\s+'
+    line: 'PermitRootLogin no'
+    state: present
+  notify: Reiniciar servicio SSH
+
+- name: Aplicar configuración de endurecimiento SSH en sshd_config.d/01-caprichos-security.conf
+  ansible.builtin.copy:
+    dest: /etc/ssh/sshd_config.d/01-caprichos-security.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Configuración de endurecimiento SSH - Proyecto Caprichos (ADR-011, RB-CAP-004)
+      Port {{ ssh_port }}
+      PermitRootLogin no
+      PasswordAuthentication no
+      PubkeyAuthentication yes
+      KbdInteractiveAuthentication no
+      ChallengeResponseAuthentication no
+      X11Forwarding no
+      MaxAuthTries 3
+      ClientAliveInterval 300
+      ClientAliveCountMax 2
+  notify: Reiniciar servicio SSH
+
+# En OpenSSH gana el PRIMER valor leído: el archivo 50-cloud-init.conf de Contabo trae
+# «PasswordAuthentication yes», por eso nuestro archivo lleva el prefijo 01 para leerse antes.
+- name: Retirar el archivo anterior 60-caprichos-security.conf (se leía después del de cloud-init)
+  ansible.builtin.file:
+    path: /etc/ssh/sshd_config.d/60-caprichos-security.conf
+    state: absent
+  notify: Reiniciar servicio SSH
+
+- name: Validar configuración de SSH antes de continuar
+  ansible.builtin.command:
+    cmd: /usr/sbin/sshd -t
+  changed_when: false

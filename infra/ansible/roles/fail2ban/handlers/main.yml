@@ -1,0 +1,9 @@
+---
+# ==============================================================================
+# Handlers para el rol fail2ban
+# ==============================================================================
+
+- name: Reiniciar servicio Fail2ban
+  ansible.builtin.service:
+    name: fail2ban
+    state: restarted

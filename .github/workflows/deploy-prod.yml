@@ -1,0 +1,119 @@
+name: Deploy Producción
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag de versión a desplegar (ej. v0.3.0 o versión para rollback)'
+        required: true
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy-production:
+    name: Publicar en Producción (vX.Y.Z)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determinar metadatos de versión y auditoría (Quién y Qué)
+        id: meta
+        run: |
+          TARGET_TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          {
+            echo "tag=$TARGET_TAG"
+            echo "owner=${GITHUB_REPOSITORY_OWNER,,}"
+            echo "actor=${{ github.triggering_actor || github.actor }}"
+            echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Iniciar sesión en GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Construir y publicar imagen API en GHCR (Producción)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/Dockerfile.api
+          push: true
+          tags: |
+            ghcr.io/${{ steps.meta.outputs.owner }}/caprichos-api:${{ steps.meta.outputs.tag }}
+            ghcr.io/${{ steps.meta.outputs.owner }}/caprichos-api:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Construir y publicar imagen Web en GHCR (Producción)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/Dockerfile.web
+          push: true
+          tags: |
+            ghcr.io/${{ steps.meta.outputs.owner }}/caprichos-web:${{ steps.meta.outputs.tag }}
+            ghcr.io/${{ steps.meta.outputs.owner }}/caprichos-web:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Disparar publicación en Dokploy (Webhook Producción)
+        run: |
+          if [ -z "${{ secrets.DOKPLOY_PROD_WEBHOOK_URL }}" ]; then
+            echo "::error::El secreto DOKPLOY_PROD_WEBHOOK_URL no está configurado en GitHub Secrets."
+            exit 1
+          fi
+
+          echo "Disparando despliegue de Producción en Dokploy para versión ${{ steps.meta.outputs.tag }}..."
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${{ secrets.DOKPLOY_PROD_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"tag\": \"${{ steps.meta.outputs.tag }}\", \"commit\": \"${{ github.sha }}\", \"actor\": \"${{ steps.meta.outputs.actor }}\", \"deployed_at\": \"${{ steps.meta.outputs.timestamp }}\"}")
+
+          echo "Respuesta del webhook de Dokploy: HTTP $HTTP_STATUS"
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
+            echo "Publicación en producción disparada exitosamente en Dokploy."
+          else
+            echo "::error::Fallo al disparar webhook en Dokploy. Código de respuesta: HTTP $HTTP_STATUS"
+            exit 1
+          fi
+
+      - name: Registrar auditoría de publicación en producción (Quién y Qué - RNF-CAP-009)
+        run: |
+          cat << 'EOF' >> "$GITHUB_STEP_SUMMARY"
+          ## ☕ Registro de Despliegue en Producción (RQ-PLA-01-06 / RNF-CAP-009)
+
+          | Parámetro | Detalle |
+          |---|---|
+          | **Versión (Qué)** | `${{ steps.meta.outputs.tag }}` |
+          | **Commit (Qué)** | `${{ github.sha }}` |
+          | **Responsable (Quién)** | `@${{ steps.meta.outputs.actor }}` |
+          | **Fecha y hora (UTC)** | `${{ steps.meta.outputs.timestamp }}` |
+          | **Ambiente** | Producción (`caprichos.pe`, `admin.caprichos.pe`, `api.caprichos.pe`) |
+
+          ### 📦 Imágenes publicadas en GHCR
+          - `ghcr.io/${{ steps.meta.outputs.owner }}/caprichos-api:${{ steps.meta.outputs.tag }}`
+          - `ghcr.io/${{ steps.meta.outputs.owner }}/caprichos-web:${{ steps.meta.outputs.tag }}`
+
+          ### 🔍 Verificaciones post-despliegue recomendadas (RB-CAP-001)
+          - Salud de API: `curl -s https://api.caprichos.pe/salud` (esperado: 200)
+          - Versión activa: `curl -s https://api.caprichos.pe/version` (esperado: `${{ steps.meta.outputs.tag }}`)
+          - Monitoreo: Uptime Kuma y GlitchTip en `panel.caprichos.pe`
+          EOF

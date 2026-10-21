@@ -1,0 +1,9 @@
+---
+# ==============================================================================
+# Handlers para el rol ssh
+# ==============================================================================
+
+- name: Reiniciar servicio SSH
+  ansible.builtin.service:
+    name: ssh
+    state: restarted

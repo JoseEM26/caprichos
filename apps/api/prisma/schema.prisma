@@ -1,0 +1,18 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Schema mínimo para inicializar el cliente de Prisma sin tablas de negocio (HU-CAP-178)
+model ControlSistema {
+  id             String   @id @default(uuid())
+  clave          String   @unique
+  valor          String
+  actualizado_en DateTime @updatedAt
+
+  @@map("sys_control")
+}

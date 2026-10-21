@@ -1,0 +1,81 @@
+# syntax=docker/dockerfile:1
+
+# ==============================================================================
+# Etapa 1: Base - Node.js 24 Alpine con soporte para Prisma y pnpm 12
+# ==============================================================================
+FROM node:24-alpine AS base
+RUN apk add --no-cache libc6-compat openssl dumb-init curl
+WORKDIR /app
+RUN corepack enable && corepack prepare pnpm@12 --activate
+
+# ==============================================================================
+# Etapa 2: Dependencias - Instalación optimizada para monorepo pnpm
+# ==============================================================================
+FROM base AS deps
+WORKDIR /app
+
+# Copiar manifiestos de paquetes y configuración de workspace
+COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* ./
+COPY apps/api/package.json ./apps/api/
+COPY apps/web/package.json ./apps/web/
+COPY packages/compartido/package.json ./packages/compartido/
+
+# Instalar dependencias completas para construcción
+RUN pnpm install --frozen-lockfile
+
+# ==============================================================================
+# Etapa 3: Builder - Generación de Prisma y compilación NestJS + TypeScript
+# ==============================================================================
+FROM deps AS builder
+WORKDIR /app
+
+COPY . .
+
+# Generar cliente Prisma si existe el esquema
+RUN if [ -f apps/api/prisma/schema.prisma ]; then \
+      pnpm --filter @caprichos/api exec prisma generate || true; \
+    fi
+
+# Compilar paquete compartido y la aplicación API
+RUN pnpm --filter @caprichos/compartido build || true
+RUN pnpm --filter @caprichos/api build || pnpm run build
+
+# ==============================================================================
+# Etapa 4: Producción - solo las dependencias que la API usa al ejecutarse
+# ==============================================================================
+# «pnpm deploy» arma una carpeta autónoma con la API compilada y SUS dependencias de
+# producción (sin jest, esbuild, vite ni typescript) y con el paquete compartido ya
+# copiado dentro. Así la imagen final es pequeña y no arrastra herramientas de desarrollo
+# (que Trivy reporta con vulnerabilidades críticas) ni enlaces rotos de pnpm.
+FROM builder AS prod
+RUN pnpm --filter @caprichos/api deploy --prod --legacy /out
+# «deploy» reinstala las dependencias y pierde el cliente de Prisma generado en el builder:
+# se vuelve a generar aquí, con la misma versión que declara la API.
+RUN cd /out && PRISMA_V=$(node -p "require('@prisma/client/package.json').version") \
+    && pnpm dlx prisma@${PRISMA_V} generate --schema prisma/schema.prisma
+
+# ==============================================================================
+# Etapa 5: Runner - Imagen final de producción de mínimo privilegio
+# ==============================================================================
+FROM node:24-alpine AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production \
+    PORT=3000
+
+RUN apk add --no-cache openssl dumb-init curl \
+    && addgroup -g 1001 -S nodejs \
+    && adduser -S nestjs -u 1001
+
+COPY --from=prod --chown=nestjs:nodejs /out/ ./
+
+USER nestjs
+
+EXPOSE 3000
+
+# Verificación de salud interna (RQ-PLA-01-03)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:3000/salud || curl -f http://localhost:3000/api/v1/salud || exit 1
+
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["node", "dist/main.js"]

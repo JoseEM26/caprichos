@@ -1,0 +1,48 @@
+---
+# ==============================================================================
+# Rol: base
+# Propósito: Configurar usuario sin root con sudo, zona horaria Lima y paquetes base
+# ==============================================================================
+
+- name: Actualizar caché de repositorios apt
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Instalar paquetes esenciales del sistema
+  ansible.builtin.apt:
+    name: "{{ base_packages }}"
+    state: present
+
+- name: Configurar zona horaria del servidor a {{ timezone }}
+  community.general.timezone:
+    name: "{{ timezone }}"
+
+- name: Asegurar grupo sudo
+  ansible.builtin.group:
+    name: sudo
+    state: present
+
+- name: Crear usuario administrativo sin privilegios root ({{ deploy_user }})
+  ansible.builtin.user:
+    name: "{{ deploy_user }}"
+    comment: "Caprichos Deploy Administrator"
+    shell: "{{ deploy_user_shell }}"
+    groups: "{{ deploy_user_groups }}"
+    append: true
+    state: present
+    create_home: true
+
+- name: Configurar sudo sin contraseña para usuario {{ deploy_user }}
+  ansible.builtin.copy:
+    content: "{{ deploy_user }} ALL=(ALL) NOPASSWD:ALL\n"
+    dest: "/etc/sudoers.d/90-{{ deploy_user }}"
+    mode: "0440"
+    validate: "/usr/sbin/visudo -cf %s"
+
+- name: Instalar llave SSH pública autorizada para {{ deploy_user }}
+  ansible.posix.authorized_key:
+    user: "{{ deploy_user }}"
+    state: present
+    key: "{{ deploy_user_ssh_public_key }}"
+  when: deploy_user_ssh_public_key is defined and deploy_user_ssh_public_key | length > 0
