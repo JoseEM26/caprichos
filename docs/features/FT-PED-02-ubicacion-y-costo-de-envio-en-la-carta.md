@@ -89,6 +89,7 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RQ-PED-02-08 | HU-CAP-017 | FT-DEL-01 | R-01 |
 | RQ-PED-02-09 | HU-CAP-017 | FT-CAJ-01 | R-01 |
 | RQ-PED-02-10 | HU-CAP-018 | D-02 | R-01 |
+| RQ-PED-02-11 | En delivery el cliente elige una de tres formas de dar su ubicación, en una sola fila: «Mi ubicación» (GPS), «Escribir dirección» (sin mapa, no se le impide pedir) o «Marcar en el mapa» (mueve el punto hasta su puerta). Si no dio punto, el chatbot coordina con él la ubicación y el pago. | Debe tener | DT-78 | Dado un cliente cuyo GPS falla, cuando elige «Escribir dirección» y escribe su calle, entonces puede enviar el pedido sin mapa y el asesor lo ubica por WhatsApp. | Propuesto |
 | RQ-PED-02-11 | HU-CAP-018 | D-03 | R-01 |
 
 Historias de usuario de esta feature (en `historias/`, en draft):

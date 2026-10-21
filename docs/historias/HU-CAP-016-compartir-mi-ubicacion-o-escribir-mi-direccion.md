@@ -45,6 +45,7 @@ tags: [hu, pedido, capa-a, ft-ped-02, alta, ui]
 | CA-4 | el pin puesto por el GPS | el cliente intenta seguir sin confirmar | ve «Revisa que el punto rojo sea donde recibirás tu pedido» y el botón «Mi pedido llega aquí»; al confirmar, se calcula el envío con ese punto (RQ-PED-02-04) |
 | CA-5 | el pin en el mapa | el cliente lo arrastra a su puerta y escribe «casa verde, 2.º piso» | el pedido guarda el punto nuevo y la referencia (RQ-PED-02-05) |
 | CA-6 | el paso de entrega | se revisa el formulario | no hay campo de código Plus (RQ-PED-02-06) |
+| CA-7a | un cliente en delivery | elige «Escribir dirección» o «Marcar en el mapa» | puede pedir sin usar el GPS: escribe su calle (sin mapa) o mueve el punto hasta su puerta y lo confirma (RQ-PED-02-11) |
 | CA-7 | un celular de 360 px de ancho | el cliente abre la pantalla de esta historia | todo se lee y se toca sin desplazamiento horizontal (RNF-CAP-004) |
 
 Origen: criterios de verificación de FT-PED-02 (RQ-PED-02-01, RQ-PED-02-02, RQ-PED-02-03, RQ-PED-02-04, RQ-PED-02-05, RQ-PED-02-06); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
