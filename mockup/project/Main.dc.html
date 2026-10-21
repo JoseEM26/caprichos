@@ -244,6 +244,8 @@ input,textarea{font-family:inherit}
       <div style="font-size:{{abTxt}}px;line-height:{{abLh}}px">{{aboutAddr}}<br><span style="color:var(--soft)">{{aboutRef}}</span></div>
       <div style="flex:1;min-height:{{abMap}}px;border-radius:12px;background:var(--sec);display:flex;align-items:center;justify-content:center;text-align:center;padding:12px;font-weight:700;color:var(--ink)">Mapa de ubicación (ejemplo)</div>
       <a href="{{aboutMap}}" target="_blank" rel="noopener" style="min-height:{{abBtn}}px;box-sizing:border-box;border-radius:12px;border:1.5px solid var(--ink);color:var(--ink);font-weight:800;display:flex;align-items:center;justify-content:center;text-decoration:none">Cómo llegar en Google Maps</a>
+      <!-- acta 03 (DT-66): solo un enlace; la carta no copia reseñas, nombres ni fotos de terceros -->
+      <a href="{{aboutMap}}" target="_blank" rel="noopener" style="min-height:{{abBtn}}px;box-sizing:border-box;border-radius:12px;border:1.5px dashed var(--ink);color:var(--ink);font-weight:700;display:flex;align-items:center;justify-content:center;text-decoration:none">Ver nuestras reseñas en Google</a>
     </div>
     <div style="flex:1 1 340px;min-width:0;display:flex;flex-direction:column;gap:{{abGap}}px">
       <div style="background:var(--card);border:1px solid var(--line);border-radius:{{abRad}}px;padding:{{abCardPad}};display:flex;flex-direction:column;gap:6px">
@@ -283,8 +285,8 @@ input,textarea{font-family:inherit}
   <div style="position:relative;overflow:hidden;background:linear-gradient(155deg, var(--ink) 55%, color-mix(in srgb, var(--ink) 65%, var(--accent)));color:var(--bg);border-radius:{{abRad}}px;padding:{{abHeroPad}};display:flex;flex-direction:column;gap:6px">
     <span aria-hidden="true" style="position:absolute;right:-50px;top:-50px;width:180px;height:180px;border-radius:50%;background:var(--accent);opacity:0.16"></span>
     <span style="position:relative;font-family:Montserrat,sans-serif;font-weight:800;font-size:12px;letter-spacing:0.12em;color:var(--accent)">NOVEDADES</span>
-    <span style="position:relative;font-family:Montserrat,sans-serif;font-weight:800;font-size:{{abTitleFs}}px;line-height:{{abTitleLh}}px">Lo nuevo en Caprichos</span>
-    <span style="position:relative;font-size:{{abTxt}}px;line-height:{{abLh}}px;max-width:720px">Promociones, lanzamientos, datos útiles y lo que pasa en nuestras redes.</span>
+    <span style="position:relative;font-family:Montserrat,sans-serif;font-weight:800;font-size:{{abTitleFs}}px;line-height:{{abTitleLh}}px">{{novTit}}</span>
+    <span style="position:relative;font-size:{{abTxt}}px;line-height:{{abLh}}px;max-width:720px">{{novSub}}</span>
   </div>
   <sc-if value="{{hasHero}}" hint-placeholder-val="{{ false }}">
   <div class="noscroll" aria-label="Destacados" style="display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory">
@@ -447,7 +449,7 @@ input,textarea{font-family:inherit}
 <div role="dialog" aria-modal="true" aria-label="Tu cuenta" style="position:fixed;z-index:105;left:50%;top:50%;transform:translate(-50%,-50%);width:min(440px,calc(100% - 24px));max-height:calc(100% - 24px);overflow-y:auto;background:var(--bg);color:var(--ink);border-radius:20px;box-shadow:0 20px 50px color-mix(in srgb, var(--ink) 40%, transparent);padding:20px;display:flex;flex-direction:column;gap:12px">
   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><div style="font-family:Montserrat,sans-serif;font-weight:800;font-size:20px;line-height:26px">{{accTitle}}</div><button onClick="{{closeAcc}}" aria-label="Cerrar" style="flex:none;width:44px;height:44px;border-radius:22px;border:1.5px solid var(--ink);background:transparent;color:var(--ink);font-size:20px;font-weight:800">×</button></div>
   <sc-if value="{{noUser}}" hint-placeholder-val="{{ true }}">
-    <div style="font-size:14px;line-height:20px;color:var(--soft)">Con tu cuenta sumas <b>1 punto por cada s/ 1</b> de tus pedidos. Es opcional: también puedes pedir como invitado, sin cuenta.</div>
+    <div style="font-size:14px;line-height:20px;color:var(--soft)">Con tu cuenta acumulas <b>el 5 % de lo que pagas en puntos</b> (1 punto = s/ 1) y los usas en tus siguientes pedidos. Es opcional: también puedes pedir como invitado, sin cuenta.</div>
     <div role="tablist" style="display:flex;gap:6px"><sc-for list="{{accTabs}}" as="t" hint-placeholder-count="2"><button onClick="{{t.pick}}" role="tab" aria-selected="{{t.on}}" style="flex:1;min-height:44px;border-radius:12px;border:1.5px solid var(--ink);background:{{t.bg}};color:{{t.fg}};font-weight:800;font-size:14px">{{t.n}}</button></sc-for></div>
     <sc-if value="{{isAccNew}}" hint-placeholder-val="{{ false }}"><div><label for="ac-n" style="font-weight:700;display:block;margin-bottom:4px">Nombre</label><input id="ac-n" type="text" value="{{accName}}" onChange="{{setAccName}}" style="width:100%;box-sizing:border-box;min-height:48px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink);padding:0 12px;font-size:14px"></div></sc-if>
     <div><label for="ac-d" style="font-weight:700;display:block;margin-bottom:4px">DNI</label><input id="ac-d" type="text" inputmode="numeric" maxlength="8" value="{{accDni}}" onChange="{{setAccDni}}" placeholder="8 dígitos" style="width:100%;box-sizing:border-box;min-height:48px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink);padding:0 12px;font-size:14px"></div>
@@ -613,6 +615,18 @@ input,textarea{font-family:inherit}
           <span>{{lineTotalText}}</span>
         </button>
       </div>
+      <!-- acta 03 (DT-57): nombre de quien toma cada bebida, para su etiqueta -->
+      <sc-if value="{{askNames}}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:12px;border:1.5px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+            <div aria-hidden="true" style="flex:none;width:92px;border:1.5px dashed var(--soft);border-radius:8px;padding:6px;text-align:center;background:var(--card)"><div style="font-family:Montserrat,sans-serif;font-weight:800;font-size:15px">LUCÍA</div><div style="font-size:10px;color:var(--soft)">{{curShort}}</div></div>
+            <div style="flex:1 1 180px;min-width:0;font-size:13px;line-height:18px">Así sale en la etiqueta del vaso. Si lo dejas vacío, ponemos tu nombre.</div>
+          </div>
+          <sc-for list="{{nameInputs}}" as="ni" hint-placeholder-count="1">
+            <label style="font-size:13px;font-weight:700;display:block">{{ni.label}}<input type="text" value="{{ni.val}}" onChange="{{ni.set}}" placeholder="Ej.: Lucía" style="display:block;width:100%;box-sizing:border-box;min-height:44px;margin-top:4px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);padding:0 12px;font-size:14px"></label>
+          </sc-for>
+        </div>
+      </sc-if>
     </div>
   </div>
 </div>
@@ -725,12 +739,18 @@ input,textarea{font-family:inherit}
       <div role="group" aria-label="Cómo quieres pedir" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">
         <sc-for list="{{acctChips}}" as="c" hint-placeholder-count="2"><button onClick="{{c.pick}}" style="flex:1 1 150px;min-height:48px;padding:0 12px;border-radius:12px;border:1.5px solid var(--ink);background:{{c.bg}};color:{{c.fg}};font-weight:700;font-size:13px">{{c.n}}</button></sc-for>
       </div>
-      <sc-if value="{{isGuest}}" hint-placeholder-val="{{ true }}"><div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:13px;line-height:18px;font-weight:600;margin-bottom:12px">Pides sin cuenta ni correo. Este pedido no suma puntos.</div></sc-if>
+      <sc-if value="{{isGuest}}" hint-placeholder-val="{{ true }}"><div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:13px;line-height:18px;font-weight:600;margin-bottom:12px">Pides sin cuenta ni correo. {{guestPtsText}}</div></sc-if>
       <sc-if value="{{showAccInvite}}" hint-placeholder-val="{{ false }}"><button onClick="{{openAcc}}" style="width:100%;min-height:44px;margin-bottom:12px;border:1.5px dashed var(--ink);border-radius:12px;background:transparent;color:var(--ink);font-weight:700;font-size:13px">Ingresar o crear cuenta para sumar puntos</button></sc-if>
       <sc-if value="{{isAcct}}" hint-placeholder-val="{{ false }}">
         <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px;display:flex;flex-direction:column;gap:8px">
           <div style="font-size:13px;line-height:18px;font-weight:600">{{pointsText}}</div>
-          <sc-if value="{{hasUser}}" hint-placeholder-val="{{ false }}"><div style="font-size:13px;line-height:18px">Pides con la cuenta de <b>{{userName}}</b> · DNI {{userDniMask}}</div></sc-if>
+          <sc-if value="{{hasUser}}" hint-placeholder-val="{{ false }}"><div style="font-size:13px;line-height:18px">Pides con la cuenta de <b>{{userName}}</b> · DNI {{userDniMask}}</div>
+            <div style="border-top:1px solid var(--line);padding-top:8px;display:flex;flex-direction:column;gap:6px">
+              <label for="f-canje" style="font-weight:700;font-size:13px">¿Cuántos puntos deseas usar?</label>
+              <div style="display:flex;gap:8px"><input id="f-canje" type="text" inputmode="decimal" value="{{canjeIn}}" onChange="{{setCanje}}" placeholder="0" style="flex:1;min-width:0;box-sizing:border-box;min-height:44px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink);padding:0 12px;font-size:14px"><button onClick="{{applyCanje}}" style="min-height:44px;padding:0 16px;border:0;border-radius:12px;background:var(--accent);color:var(--on);font-weight:800">Aplicar</button></div>
+              <div style="font-size:12px;line-height:16px;color:var(--soft)">{{canjeHint}}</div>
+              <sc-if value="{{hasCanjeMsg}}" hint-placeholder-val="{{ false }}"><div role="status" style="font-size:13px;font-weight:700;color:{{canjeFg}}">{{canjeMsg}}</div></sc-if>
+            </div></sc-if>
           <sc-if value="{{noUser}}" hint-placeholder-val="{{ true }}"><button onClick="{{openAcc}}" style="min-height:48px;border:1.5px solid var(--ink);border-radius:12px;background:transparent;color:var(--ink);font-weight:800;font-size:14px">Ingresar con mi DNI</button></sc-if>
           <sc-if value="{{hasAcctMsg}}" hint-placeholder-val="{{ false }}"><div style="font-size:13px;font-weight:700;color:var(--price)">{{acctMsg}}</div></sc-if>
         </div>
@@ -755,7 +775,13 @@ input,textarea{font-family:inherit}
         </sc-if>
         <button onClick="{{useGps}}" style="width:100%;min-height:48px;border:1.5px solid var(--ink);border-radius:12px;background:transparent;color:var(--ink);font-weight:800;margin-bottom:12px">{{gpsBtnText}}</button>
         <sc-if value="{{hasGpsMsg}}" hint-placeholder-val="{{ false }}"><div role="status" aria-live="polite" style="background:{{gpsBg}};color:{{gpsFg}};border:1.5px solid {{gpsFg}};border-radius:12px;padding:10px 12px;font-size:13px;line-height:18px;font-weight:600;margin:-4px 0 12px">{{gpsMsg}}<sc-if value="{{hasGpsLink}}" hint-placeholder-val="{{ false }}"> <a href="{{gpsLink}}" target="_blank" rel="noopener" style="color:inherit;font-weight:800">Ver en Google Maps</a></sc-if></div></sc-if>
-        <sc-if value="{{hasGpsMap}}" hint-placeholder-val="{{ false }}"><iframe title="Mapa de tu ubicación actual" src="{{gpsMap}}" loading="lazy" referrerpolicy="no-referrer-when-downgrade" style="display:block;width:100%;height:190px;border:0;border-radius:12px;margin:-4px 0 12px"></iframe></sc-if>
+        <sc-if value="{{hasGpsMap}}" hint-placeholder-val="{{ false }}"><iframe title="Mapa de tu ubicación actual" src="{{gpsMap}}" loading="lazy" referrerpolicy="no-referrer-when-downgrade" style="display:block;width:100%;height:190px;border:0;border-radius:12px;margin:-4px 0 8px"></iframe>
+          <!-- acta 03 (DT-57): el cliente revisa el punto rojo, lo mueve si hace falta y confirma -->
+          <div style="border:1.5px solid {{locBd}};border-radius:12px;padding:10px 12px;margin-bottom:12px;display:flex;flex-direction:column;gap:8px">
+            <div style="font-size:13px;line-height:18px;font-weight:600">{{locText}}</div>
+            <div role="group" aria-label="Mover el punto" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span style="font-size:12px;color:var(--soft)">Mover el punto:</span><sc-for list="{{locMoves}}" as="mv" hint-placeholder-count="4"><button onClick="{{mv.pick}}" aria-label="{{mv.aria}}" style="width:44px;height:44px;border-radius:10px;border:1.5px solid var(--ink);background:transparent;color:var(--ink);font-weight:800">{{mv.n}}</button></sc-for></div>
+            <button onClick="{{locConfirm}}" style="min-height:48px;border:0;border-radius:12px;background:{{locBtnBg}};color:var(--on);font-weight:800">{{locBtnText}}</button>
+          </div></sc-if>
         <label for="f-dir" style="font-weight:700;display:block;margin-bottom:4px">{{addrLabel}}</label>
         <input id="f-dir" type="text" value="{{addr}}" onChange="{{setAddr}}" placeholder="{{addrPh}}" style="width:100%;box-sizing:border-box;min-height:48px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);padding:0 12px;font-size:14px;margin-bottom:6px">
         <sc-if value="{{hasAddrHint}}" hint-placeholder-val="{{ false }}"><div style="font-size:12px;line-height:16px;color:var(--soft);margin-bottom:12px">{{addrHint}}</div></sc-if>
@@ -771,8 +797,9 @@ input,textarea{font-family:inherit}
       </sc-if>
     </div>
     <div style="flex:1 1 320px;min-width:0">
-      <div style="font-family:Montserrat,sans-serif;font-weight:700;font-size:15px;margin-bottom:8px">Cómo prefieres pagar</div>
-      <div style="font-size:13px;line-height:18px;color:var(--soft);margin-bottom:8px">Solo nos dices tu preferencia. Todavía no pagas nada.</div>
+      <div style="font-family:Montserrat,sans-serif;font-weight:700;font-size:15px;margin-bottom:8px">¿Cómo vas a pagar? <span style="font-size:12px;color:var(--price)">(obligatorio)</span></div>
+      <div style="font-size:13px;line-height:18px;color:var(--soft);margin-bottom:8px">Elige el medio. Todavía no pagas nada aquí.</div>
+      <sc-if value="{{hasPayMsg}}" hint-placeholder-val="{{ false }}"><div role="alert" style="font-size:13px;font-weight:700;color:var(--price);margin-bottom:8px">{{payMsg}}</div></sc-if>
       <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
         <sc-for list="{{pays}}" as="y" hint-placeholder-count="5">
           <button onClick="{{y.pick}}" style="min-height:48px;border-radius:12px;border:1.5px solid {{y.bd}};background:var(--card);color:var(--ink);padding:0 12px;display:flex;align-items:center;gap:12px;text-align:left">
@@ -788,7 +815,7 @@ input,textarea{font-family:inherit}
       <!-- reunión 18/10: el cliente no paga ni envía capturas desde la carta; un asesor lo contacta por WhatsApp y confirma el pago -->
       <div style="background:var(--card);border:1.5px solid var(--accent);border-radius:12px;padding:12px;margin-bottom:12px;display:flex;flex-direction:column;gap:6px">
         <div style="font-weight:800">Un asesor te escribirá por WhatsApp</div>
-        <div style="font-size:13px;line-height:18px">Confirmará tu pedido contigo y te dirá cómo hacer el pago. Tu pedido pasa a cocina cuando se confirme. No envíes capturas de pago por tu cuenta.</div>
+        <div style="font-size:13px;line-height:18px">Tu pedido pasa a cocina apenas lo envías y te llega el resumen a tu WhatsApp. Un asesor te escribirá para coordinar el pago y pedirte la captura si pagas con Yape, Plin o transferencia.</div>
       </div>
       <sc-if value="{{isCard}}" hint-placeholder-val="{{ false }}">
         <div style="font-size:13px;line-height:18px;color:var(--soft);margin-bottom:12px">Pagas con tarjeta cuando recibes o recoges tu pedido.</div>
@@ -801,6 +828,7 @@ input,textarea{font-family:inherit}
         <sc-if value="{{isDelivery}}" hint-placeholder-val="{{ false }}">
           <div style="display:flex;justify-content:space-between"><span>Envío</span><span style="font-weight:700">{{feeText}}</span></div>
         </sc-if>
+        <sc-if value="{{hasCanje}}" hint-placeholder-val="{{ false }}"><div style="display:flex;justify-content:space-between"><span>Puntos usados</span><span style="font-weight:700;color:var(--price)">{{canjeText}}</span></div></sc-if>
         <div style="border-top:1px solid var(--line);padding-top:8px;display:flex;justify-content:space-between;font-family:Montserrat,sans-serif;font-weight:800;font-size:18px"><span>Total</span><span>{{totalText}}</span></div>
       </div>
       <sc-if value="{{hasLegal}}" hint-placeholder-val="{{ false }}"><div style="font-size:12px;line-height:17px;color:var(--soft);margin:0 0 12px">
@@ -838,7 +866,7 @@ input,textarea{font-family:inherit}
   <div style="font-size:13px;line-height:18px;color:var(--soft)">{{stageNote}}</div>
   <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;font-size:14px;line-height:20px;font-weight:600">{{earnText}}</div>
   <sc-if value="{{waitPay}}" hint-placeholder-val="{{ false }}">
-    <div style="background:var(--card);border:1.5px solid var(--accent);border-radius:12px;padding:12px;font-size:14px;line-height:20px;font-weight:600">Un asesor te escribirá por WhatsApp al número que dejaste para confirmar tu pedido y el pago. No envíes capturas por tu cuenta.</div>
+    <div style="background:var(--card);border:1.5px solid var(--accent);border-radius:12px;padding:12px;font-size:14px;line-height:20px;font-weight:600">Te enviamos el resumen al WhatsApp que dejaste (simulado). Un asesor te escribirá ahí para coordinar el pago y pedirte la captura.</div>
   </sc-if>
   <button onClick="{{advance}}" style="min-height:48px;border:1.5px dashed var(--soft);border-radius:12px;background:transparent;color:var(--soft);font-weight:700">Simular siguiente paso (solo prototipo)</button>
   <button onClick="{{resetAll}}" style="min-height:52px;border:0;border-radius:12px;background:var(--accent);color:var(--on);font-family:Montserrat,sans-serif;font-weight:800;font-size:15px">Volver a la carta</button>
@@ -1105,7 +1133,7 @@ const INFO_DEFAULT = { nombre: 'Caprichos', lema: 'Cafetería artesanal', zona: 
   direccion: 'Campoy, San Juan de Lurigancho, Lima', referencia: 'Dirección exacta y referencia: por confirmar (ejemplo).', mapa: 'https://www.google.com/maps/search/?api=1&query=Caprichos%20Campoy%20Lima',
   telefono: '9XX XXX XXX', whatsapp: '51900000000', abre: '14:00', cierra: '22:00', horarioTexto: 'Todos los días, de 2:00 pm a 10:00 pm',
   instagram: 'https://www.instagram.com/', instagramNombre: '@caprichos (ejemplo)', facebook: 'https://www.facebook.com/', tiktok: 'https://www.tiktok.com/',
-  yape: '9XX XXX XXX (ejemplo)', plin: '9XX XXX XXX (ejemplo)', cuenta: 'XXX-XXXXXXXXXX-X-XX (ejemplo)', envioGratis: '70', envioGratisMas: '1', pedidoMin: '14.50', tiempoBase: '13', ptsPorSol: '1', logo: '', pg_efe: '1', pg_yape: '1', pg_plin: '1', pg_tarj: '1', pg_transf: '1', terminos: '', privacidad: '', tarZ2: '2', tarZ3: '3', tarZ4: '4', tarZ5: '5', tarZ7: '7',
+  yape: '9XX XXX XXX (ejemplo)', plin: '9XX XXX XXX (ejemplo)', cuenta: 'XXX-XXXXXXXXXX-X-XX (ejemplo)', envioGratis: '70', envioGratisMas: '1', pedidoMin: '14.50', tiempoBase: '13', ptsPorSol: '1', ptsPct: '5', novTit: 'Lo nuevo en Caprichos', novSub: 'Promociones, lanzamientos, datos útiles y lo que pasa en nuestras redes.', logo: '', pg_efe: '1', pg_yape: '1', pg_plin: '1', pg_tarj: '1', pg_transf: '1', terminos: '', privacidad: '', tarZ2: '2', tarZ3: '3', tarZ4: '4', tarZ5: '5', tarZ7: '7',
   razonSocial: '', ruc: '', direccionFiscal: '' };
 let INFO = INFO_DEFAULT;
 // (acta 02) cupones: se crean en el administrativo (cfg.coupons); estos son los de ejemplo
@@ -1164,6 +1192,8 @@ const getPos = (ok, fail) => { const g = typeof navigator !== 'undefined' && nav
   try { g.getCurrentPosition((p) => ok({ lat: p.coords.latitude.toFixed(5), lng: p.coords.longitude.toFixed(5), acc: Math.round(p.coords.accuracy) }), (e) => fail(GEO_ERR[e && e.code] || 'No pudimos usar tu ubicación. Escribe tu dirección y un asesor te ayudará a ubicarla.'), { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }); }
   catch (err) { fail('No pudimos usar tu ubicación. Escribe tu dirección y un asesor te ayudará a ubicarla.'); } };
 const mapsOf = (g) => 'https://www.google.com/maps/search/?api=1&query=' + g.lat + ',' + g.lng;
+const isDrink = (p) => [ 'frappes', 'iced', 'frozen', 'calientes' ].indexOf(p.cat) >= 0;
+const pts2 = (n) => (Math.round(n * 100) / 100).toFixed(2).replace(/\.00$/, '');
 const mapEmbed = (g) => 'https://www.google.com/maps?q=' + g.lat + ',' + g.lng + '&z=17&output=embed';
 const geoOkText = (g) => 'Tu ubicación fue localizada correctamente (precisión de unos ' + g.acc + ' m).';
 
@@ -1319,7 +1349,7 @@ class Component extends DCLogic {
     super(props);
     if (typeof window !== 'undefined' && window.addEventListener) { window.addEventListener('storage', () => this.setState({ cfgTick: Date.now() })); }
     this.state = { cfails: 0, cblock: 0, fbDni: '', fbDom: '', fbMonto: '', compTipo: 'ninguno', compRuc: '', compRs: '', gpsMsg: '', gpsOk: null, gpsBusy: false, gpsLink: '', gpsMap: '', user: userLoad(), accOpen: false, accTab: 'in', accName: '', accDni: '', accEmail: '', accPass: '', accBday: '', notifOpen: false, notifFresh: [], notifBday: '', accConsent: false, accMsg: '', vw: null, nf: 'todo', fbType: 'Comentario', fbName: '', fbContact: '', fbMsg: '', fbErr: '', fbSent: false, openSec: '', ctlHide: (typeof window !== 'undefined' && window.innerWidth < 700), acct: 'guest', email: '', bday: '', consent: false, acctMsg: '', cin: '', coupon: '', cmsg: '', pg: 'carta', device: (typeof window !== 'undefined' && window.innerWidth < 700) ? 'mobile' : 'pc', confirm: null, fBest: false, ship: 'r1', shipMan: false, zoom: false, addrMem: 'ask', copied: false, copyFail: false, plus: '', fPromo: false, fCacao: false, fDirect: false, page: 1, overlay: 'none', cat: 'all', query: '', pid: null, vi: 0, sel: {}, qty: 1, note: '', cart: [], pd: [], modal: 'delivery',
-      name: 'Ana Pérez', phone: '999888777', addr: '', ref: '', mesa: '', pay: 'yape', cash: '', stage: 0, orderCode: 'CP-0001', toast: null };
+      name: 'Ana Pérez', phone: '999888777', addr: '', ref: '', mesa: '', pay: '', payMsg: '', canjeIn: '', canje: 0, canjeMsg: '', canjeOk: false, locOk: false, gpsG: null, pnames: [], cash: '', stage: 0, orderCode: 'CP-0001', toast: null };
     this.state.modal = '';
     this.state.loading = true;
     setTimeout(() => this.setState({ loading: false }), 1100);
@@ -1333,7 +1363,7 @@ class Component extends DCLogic {
   minOf(g) { return g.min; }
 
   openProduct(id) {
-    this.setState({ openSec: '' });
+    this.setState({ openSec: '', pnames: [] });
     const p = P.find((x) => x.id === id);
     const sel = {};
     p.groups.forEach((g) => { sel[g.id] = (g.type === 'one' && g.min >= 1) ? [g.opts[0].id] : []; });
@@ -1368,11 +1398,12 @@ class Component extends DCLogic {
     const detail = [p.variants[s.vi].n].concat(
       p.groups.map((g) => { const t = (s.sel[g.id] || []).map((oid) => g.opts.find((x) => x.id === oid).n).join(', '); return t && g.lbl ? g.lbl + ': ' + t : t; }).filter((t) => t)
     ).join(' · ');
-    const key = p.id + '|' + s.vi + '|' + JSON.stringify(s.sel) + '|' + s.note;
+    const names = isDrink(p) ? Array.from({ length: s.qty }, (x, i) => String((s.pnames || [])[i] || '').trim()) : [];
+    const key = p.id + '|' + s.vi + '|' + JSON.stringify(s.sel) + '|' + s.note + '|' + names.join(',');
     const cart = s.cart.slice();
     const found = cart.find((l) => l.key === key);
     if (found) { found.qty += s.qty; }
-    else { cart.push({ key: key, pid: p.id, name: p.name, im: p.im, detail: detail + (s.note ? ' · Nota: ' + s.note : ''), unit: this.unitPrice(), base: p.variants[s.vi].p, qty: s.qty }); }
+    else { cart.push({ key: key, pid: p.id, name: p.name, im: p.im, detail: detail + (s.note ? ' · Nota: ' + s.note : '') + (names.some((x) => x) ? ' · Para: ' + names.map((x) => x || 'tu nombre').join(', ') : ''), names: names, noSuma: !!p.noSuma || !!(((loadCfg() || {}).noSuma || {})[p.name] || ((loadCfg() || {}).noSuma || {})[p.id]), unit: this.unitPrice(), base: p.variants[s.vi].p, qty: s.qty }); }
     const nUnits = cart.reduce((a, l) => a + l.qty, 0); const nSub = cart.reduce((a, l) => a + l.unit * l.qty, 0);
     this.setState({ cart: cart, overlay: 'none', toast: { name: (s.qty > 1 ? s.qty + ' × ' : '') + p.name, img: img(p.im), initials: initials(p.name), line: (nUnits === 1 ? '1 producto' : nUnits + ' productos') + ' · ' + fmt(nSub) + ' en total' } });
     clearTimeout(this.toastT); this.toastT = setTimeout(() => this.setState({ toast: null }), 3200);
@@ -1439,7 +1470,12 @@ class Component extends DCLogic {
     // si no se pueden juntar, entre promoción y descuento automático se aplica solo el mayor
     const au = { name: au0.name, disc: !acu && pdS > 0 && au0.disc <= pdS ? 0 : au0.disc }; const pdE = !acu && au0.disc > pdS ? 0 : pdS; const disc = (cp && cp.ok ? cp.disc : 0) + au.disc + pdE;
     const fee = s.modal === 'delivery' && s.ship !== 'FUERA' && sub - disc > 0 && (s.shipAuto || s.shipMan) && !(INFO.envioGratisMas === '1' ? sub > Number(INFO.envioGratis) : sub >= Number(INFO.envioGratis)) ? (() => { const cl0 = s.user ? (cliLoad().find((x) => x.dni === s.user.dni) || null) : null; if (cl0 && cl0.envio !== undefined && cl0.envio !== '') { return Number(cl0.envio); } if (cl0 && Number(cl0.envioDesc) > 0) { return Math.round(sh.fee * (1 - Number(cl0.envioDesc) / 100) * 100) / 100; } return sh.fee; })() : 0;
-    return { sub: sub, disc: disc, auto: au.disc, promo: pdE, promoList: pdv, autoName: au.name, fee: fee, pend: s.modal === 'delivery' && !(s.shipAuto || s.shipMan), total: sub - disc + fee };
+    // acta 03 (DT-55): 1 punto = s/ 1; el canje no pasa del total
+    const cj = Math.max(0, Math.min(Number(s.canje) || 0, sub - disc + fee));
+    const noSumaSub = s.cart.filter((l) => l.noSuma).reduce((a, l) => a + l.unit * l.qty, 0);
+    const pct = Number(INFO.ptsPct) || 5;
+    const earn = (cp && cp.ok) ? 0 : Math.round(Math.max(0, sub - disc - noSumaSub - cj) * pct) / 100;
+    return { sub: sub, disc: disc, auto: au.disc, promo: pdE, promoList: pdv, autoName: au.name, fee: fee, pend: s.modal === 'delivery' && !(s.shipAuto || s.shipMan), canje: cj, earn: earn, pct: pct, total: sub - disc + fee - cj };
   }
 
 
@@ -1549,12 +1585,12 @@ class Component extends DCLogic {
     const modalLabels = { '': '', delivery: 'Delivery a domicilio', llevar: 'Para recoger: pasas por el local a retirar tu pedido', local: '' };
     const modalNames = { delivery: 'Delivery', llevar: 'Para recoger', local: '' };
     const stageNotes = [
-      'Un asesor te escribirá por WhatsApp para confirmar tu pedido y el pago.',
-      'Pedido y pago confirmados. Ya aparece en las pantallas de cocina.',
-      'Tu pedido está en preparación.',
+      'Tu pedido ya está en cocina. Te enviamos el resumen a tu WhatsApp.',
+      'Un asesor te escribe por WhatsApp para coordinar el pago.',
+      'Tu pedido está listo.',
       isDelivery ? 'Tu pedido va en camino con el repartidor.' : 'Tu pedido está listo.'
     ];
-    const stepNames = ['Pedido recibido', 'Un asesor te contacta y confirma el pago', 'En cocina', isDelivery ? 'En camino' : 'Listo para recoger'];
+    const stepNames = ['Pedido recibido y en cocina', 'Pago coordinado por WhatsApp', 'Listo', isDelivery ? 'En camino' : 'Listo para recoger'];
     return {
       placeStrip: PLACE.slice(0, 3).map((x) => placeTile(x, isMob ? '16/10' : '3/2')), gallery: PLACE.map((x) => placeTile(x, isMob ? '4/3' : '3/2')), stripFlex: isMob ? '0 0 72%' : '1 1 0', placeFs: isMob ? 16 : 20, galCols: isMob ? 'repeat(2,1fr)' : 'repeat(3,1fr)',
       hoursRows: DIAS.map((d, i) => { const x = horarioOf(INFO).dias[d[0]]; const today = (new Date().getDay() + 6) % 7 === i; return { d: d[1], h: x.on ? h12(x.abre) + ' a ' + h12(x.cierra) : 'Cerrado', w: today ? '800' : '500', mark: today ? ' (hoy)' : '' }; }),
@@ -1673,6 +1709,8 @@ class Component extends DCLogic {
       })),
       note: s.note, setNote: (e) => this.setState({ note: e.target.value }), iceAdvice: /poco hielo|menos hielo/i.test(s.note || '') ? 'Con poco hielo el vaso queda con menos volumen de bebida.' : (/no tan helado|menos helado|sin tanto hielo/i.test(s.note || '') ? 'Si lo pides menos helado, la bebida quedará más aguada.' : ''), hasIceAdvice: /poco hielo|menos hielo|no tan helado|menos helado|sin tanto hielo/i.test(s.note || ''),
       qty: s.qty, qtyInc: () => this.setState({ qty: s.qty + 1 }), qtyDec: () => this.setState({ qty: Math.max(1, s.qty - 1) }),
+      askNames: isDrink(cur) && !comboMode, curShort: cur.name.length > 16 ? cur.name.slice(0, 16) + '…' : cur.name,
+      nameInputs: (isDrink(cur) && !comboMode) ? Array.from({ length: s.qty }, (x, i) => ({ label: 'Ingresa el nombre de la persona que tomará esta bebida' + (s.qty > 1 ? ' (' + (i + 1) + ' de ' + s.qty + ')' : ''), val: (s.pnames || [])[i] || '', set: (e) => { const a = (this.state.pnames || []).slice(); a[i] = e.target.value; this.setState({ pnames: a }); } })) : [],
       addToCart: () => this.addToCart(), addBg: valid ? 'var(--accent)' : 'var(--line)', addLabel: valid ? 'Agregar al pedido' : 'Elige las opciones obligatorias',
       lineTotalText: fmt(this.unitPrice() * s.qty),
       cartLines: s.cart.map((l) => ({ name: l.name, img: img(l.im), hasImg: !!l.im, noImg: !l.im, initials: initials(l.name), detail: l.detail, qty: l.qty, totalText: fmt(l.unit * l.qty), inc: () => this.cartChange(l.key, 1), dec: () => this.cartChange(l.key, -1) })),
@@ -1692,7 +1730,7 @@ class Component extends DCLogic {
       memNo: ask('¿Escribir otra dirección?', 'Dejaremos de usar la dirección guardada.', () => this.setState({ addr: '', addrMem: 'no' })),
       addrLabel: s.shipAuto ? 'Dirección (opcional, ya tenemos tu ubicación)' : 'Tu dirección (obligatoria si no compartes tu ubicación)', addrPh: s.shipAuto ? 'Opcional: calle, número o referencia' : 'Ej.: Lima, San Juan de Lurigancho, Mz. B Lote 5', addrHint: s.shipAuto ? '' : 'Un asesor te escribirá por WhatsApp para ubicarte en el mapa y confirmarte el costo del envío.', hasAddrHint: !s.shipAuto,
       useGps: () => { if (s.gpsBusy) { return; } this.setState({ gpsBusy: true, gpsOk: null, gpsMsg: 'Buscando tu ubicación… permite el acceso cuando el navegador lo pida.', gpsLink: '', gpsMap: '' });
-        getPos((g) => this.setState({ gpsBusy: false, gpsOk: true, gpsMsg: geoOkText(g) + ' La pusimos en tu dirección; agrégale una referencia si quieres.', gpsLink: mapsOf(g), gpsMap: mapEmbed(g), addr: 'Mi ubicación actual (' + g.lat + ', ' + g.lng + ')', addrMem: 'no', ship: zonaOf(g.lat, g.lng) || 'FUERA', shipAuto: true, shipMan: false }), (m) => this.setState({ gpsBusy: false, gpsOk: false, gpsMsg: m, gpsLink: '', gpsMap: '' })); },
+        getPos((g) => this.setState({ gpsBusy: false, gpsOk: true, gpsG: g, locOk: false, gpsMsg: geoOkText(g) + ' Revisa el punto en el mapa y confírmalo abajo.', gpsLink: mapsOf(g), gpsMap: mapEmbed(g), addr: 'Mi ubicación actual (' + g.lat + ', ' + g.lng + ')', addrMem: 'no', ship: zonaOf(g.lat, g.lng) || 'FUERA', shipAuto: true, shipMan: false }), (m) => this.setState({ gpsBusy: false, gpsOk: false, gpsMsg: m, gpsLink: '', gpsMap: '' })); },
       gpsBtnText: s.gpsBusy ? 'Buscando tu ubicación…' : 'Usar mi ubicación actual', hasGpsMsg: !!s.gpsMsg, gpsMsg: s.gpsMsg, hasGpsLink: !!s.gpsLink, gpsLink: s.gpsLink, hasGpsMap: !!s.gpsMap, gpsMap: s.gpsMap, gpsBg: s.gpsOk === true ? 'color-mix(in srgb, #2F9E57 16%, var(--card))' : (s.gpsOk === false ? 'color-mix(in srgb, #B2500F 14%, var(--card))' : 'var(--card)'), gpsFg: s.gpsOk === false ? '#B2500F' : (s.gpsOk === true ? '#2F7A45' : 'var(--ink)'), plus: s.plus, setPlus: (e) => this.setState({ plus: e.target.value }),
       isDigital: !!payInfo()[s.pay], isCard: s.pay === 'tarj', payLabel: payInfo()[s.pay] ? payInfo()[s.pay].l : '', payNumber: payInfo()[s.pay] ? payInfo()[s.pay].v : '',
       copyLabel: s.copied ? 'Copiado' : 'Copiar número', copyFail: s.copyFail, waitPay: true,
@@ -1707,15 +1745,27 @@ class Component extends DCLogic {
       removeCoupon: () => this.setState({ coupon: '', cin: '', cmsg: '' }),
       isGuest: s.acct === 'guest', isAcct: s.acct === 'cuenta', acctChips: [ [ 'guest', 'Pedir como invitado' ], [ 'cuenta', 'Pedir con mi cuenta' ] ].map((c) => ({ n: c[1], bg: s.acct === c[0] ? 'var(--ink)' : 'transparent', fg: s.acct === c[0] ? 'var(--bg)' : 'var(--ink)', pick: () => this.setState({ acct: c[0], acctMsg: '' }) })),
       email: s.email, setEmail: (e) => this.setState({ email: e.target.value, acctMsg: '' }), bday: s.bday, setBday: (e) => this.setState({ bday: e.target.value }), consent: s.consent, consentMark: s.consent ? '✓' : '', toggleConsent: () => this.setState({ consent: !s.consent, acctMsg: '' }), acctMsg: s.acctMsg, hasAcctMsg: !!s.acctMsg,
-      pointsText: 'Este pedido suma ' + Math.floor(t.total * (Number(INFO.ptsPorSol) || 1)) + ' puntos (' + (Number(INFO.ptsPorSol) || 1) + ' punto(s) por cada s/ 1).', earnText: s.acct === 'cuenta' ? 'Sumaste ' + Math.floor(t.total) + ' puntos con tu cuenta.' + (s.user ? ' Ahora tienes ' + s.user.points + ' puntos.' : '') : 'Como pediste de invitado, este pedido no suma puntos.',
+      pointsText: s.coupon ? 'Este pedido usa un cupón, así que no suma puntos.' : 'Por esta compra acumulas ' + pts2(t.earn) + ' puntos (el ' + t.pct + ' % de lo que pagas; 1 punto = s/ 1).',
+      guestPtsText: s.coupon ? 'Este pedido usa un cupón y no suma puntos.' : 'Si ingresas con tu cuenta, este pedido te da ' + pts2(t.earn) + ' puntos.',
+      earnText: s.acct === 'cuenta' ? (s.lastEarn > 0 ? 'Por esta compra acumulas ' + pts2(s.lastEarn) + ' puntos.' : 'Este pedido no sumó puntos.') + (s.user ? ' Ahora tienes ' + pts2(Number(upts) || 0) + ' puntos.' : '') : '¿Quieres acumular puntos? Con tu cuenta, este pedido te habría dado ' + pts2(s.lastEarn || 0) + ' puntos. Crea tu cuenta para el próximo.',
+      canjeIn: s.canjeIn, setCanje: (e) => this.setState({ canjeIn: e.target.value, canjeMsg: '' }),
+      canjeHint: 'Tus puntos disponibles: ' + pts2(Number(upts) || 0) + ' · Te quedan ' + pts2(Math.max(0, (Number(upts) || 0) - (Number(String(s.canjeIn).replace(',', '.')) || 0))) + ' · 1 punto = s/ 1',
+      applyCanje: () => { const n = Number(String(s.canjeIn).replace(',', '.')) || 0; const tope = t.total + t.canje; if (n < 0) { return; } if (n > (Number(upts) || 0)) { this.setState({ canjeMsg: 'Solo tienes ' + pts2(Number(upts) || 0) + ' puntos.', canjeOk: false }); return; } if (n > tope) { this.setState({ canjeMsg: 'No puedes usar más puntos que el total del pedido (' + fmt(tope) + ').', canjeOk: false }); return; } this.setState({ canje: n, canjeOk: true, canjeMsg: n > 0 ? 'Usas ' + pts2(n) + ' puntos: −' + fmt(n) + ' en tu total.' : 'No usas puntos en este pedido.' }); },
+      hasCanjeMsg: !!s.canjeMsg, canjeMsg: s.canjeMsg, canjeFg: s.canjeOk ? '#2F7A45' : 'var(--price)', hasCanje: t.canje > 0, canjeText: '−' + fmt(t.canje),
+      hasPayMsg: !!s.payMsg, payMsg: s.payMsg,
+      locText: s.locOk ? 'Listo: tu pedido llegará a este punto.' : 'Revisa el punto rojo: ¿es donde recibirás tu pedido? Si tu puerta está en otra calle o atrás, muévelo.',
+      locBd: s.locOk ? '#2F9E57' : 'var(--accent)', locBtnBg: s.locOk ? '#2F9E57' : 'var(--accent)', locBtnText: s.locOk ? '✓ Ubicación confirmada' : 'Mi pedido llega aquí',
+      locConfirm: () => this.setState({ locOk: true, gpsOk: true }),
+      locMoves: [ [ '↑', 'Mover al norte', 1, 0 ], [ '↓', 'Mover al sur', -1, 0 ], [ '←', 'Mover al oeste', 0, -1 ], [ '→', 'Mover al este', 0, 1 ] ].map((m) => ({ n: m[0], aria: m[1], pick: () => { const g0 = this.state.gpsG; if (!g0) { return; } const g = Object.assign({}, g0, { lat: (Number(g0.lat) + m[2] * 0.00015).toFixed(5), lng: (Number(g0.lng) + m[3] * 0.00015).toFixed(5) }); this.setState({ gpsG: g, locOk: false, gpsLink: mapsOf(g), gpsMap: mapEmbed(g), addr: 'Mi ubicación (' + g.lat + ', ' + g.lng + ')', ship: zonaOf(g.lat, g.lng) || 'FUERA' }); } })),
+      novTit: INFO.novTit || 'Lo nuevo en Caprichos', novSub: INFO.novSub || '',
       setName: (e) => this.setState({ name: e.target.value }), setPhone: (e) => this.setState({ phone: e.target.value }),
       setAddr: (e) => this.setState({ addr: e.target.value }), setRef: (e) => this.setState({ ref: e.target.value }),
       setMesa: (e) => this.setState({ mesa: e.target.value }), setCash: (e) => this.setState({ cash: e.target.value }),
-      pays: PAYS.filter((y) => String(INFO['pg_' + y.id]) !== '0').map((y) => ({ n: y.n, bd: s.pay === y.id ? 'var(--accent)' : 'var(--line)', dot: s.pay === y.id ? 'var(--accent)' : 'transparent', pick: () => this.setState({ pay: y.id, copied: false, copyFail: false }) })),
-      placeOrder: blocked ? () => this.setState({ overlay: 'cart' }) : (isDelivery && !s.shipAuto && String(s.addr || '').trim().length < 5) ? () => this.setState({ gpsOk: false, gpsMsg: 'Escribe tu dirección (o comparte tu ubicación actual) para poder llevarte el pedido.' }) : (s.compTipo === 'factura' && (!/^\d{11}$/.test(String(s.compRuc).trim()) || String(s.compRs).trim().length < 3)) ? () => this.setState({ compErr: 'Para factura escribe el RUC de 11 dígitos y la razón social.' }) : (s.acct === 'cuenta' && !s.user) ? () => this.setState({ acctMsg: 'Ingresa con tu DNI para sumar puntos, o elige pedir como invitado.', accOpen: true }) : ask('¿Enviar tu pedido?', 'Total ' + fmt(t.total) + '. Un asesor te escribirá por WhatsApp para confirmarlo y ver el pago. Pasa a cocina cuando se confirme.', () => { const st2 = statusNow(horarioOf(INFO), new Date()); const hd2 = (loadCfg() && loadCfg().altaDem) || {}; if (!st2.open || hd2.pause) { this.setState({ overlay: 'cart' }); return; } const gained = Math.floor(t.total * (Number(INFO.ptsPorSol) || 1)); const cfg0 = loadCfg() || {}; const seq = (Number(cfg0.webSeq) || 0) + 1; const code = 'CP-W' + String(seq).padStart(3, '0'); const gm = String(s.gpsLink || '').match(/query=(-?[\d.]+),(-?[\d.]+)/); const payN = { efe: 'Efectivo', yape: 'Yape', plin: 'Plin', tarj: 'Tarjeta', transf: 'Transferencia' }[s.pay] || 'Efectivo';
+      pays: PAYS.filter((y) => String(INFO['pg_' + y.id]) !== '0').map((y) => ({ n: y.n, bd: s.pay === y.id ? 'var(--accent)' : 'var(--line)', dot: s.pay === y.id ? 'var(--accent)' : 'transparent', pick: () => this.setState({ pay: y.id, payMsg: '', copied: false, copyFail: false }) })),
+      placeOrder: blocked ? () => this.setState({ overlay: 'cart' }) : !s.pay ? () => this.setState({ payMsg: 'Elige cómo vas a pagar para enviar tu pedido.' }) : (isDelivery && s.shipAuto && !s.locOk) ? () => this.setState({ gpsOk: false, gpsMsg: 'Confirma en el mapa que ahí recibirás tu pedido («Mi pedido llega aquí»).' }) : (isDelivery && !s.shipAuto && String(s.addr || '').trim().length < 5) ? () => this.setState({ gpsOk: false, gpsMsg: 'Escribe tu dirección (o comparte tu ubicación actual) para poder llevarte el pedido.' }) : (s.compTipo === 'factura' && (!/^\d{11}$/.test(String(s.compRuc).trim()) || String(s.compRs).trim().length < 3)) ? () => this.setState({ compErr: 'Para factura escribe el RUC de 11 dígitos y la razón social.' }) : (s.acct === 'cuenta' && !s.user) ? () => this.setState({ acctMsg: 'Ingresa con tu DNI para sumar puntos, o elige pedir como invitado.', accOpen: true }) : ask('¿Enviar tu pedido?', 'Total ' + fmt(t.total) + '. Pasa directo a cocina y te llega el resumen por WhatsApp; un asesor coordina contigo el pago.', () => { const st2 = statusNow(horarioOf(INFO), new Date()); const hd2 = (loadCfg() && loadCfg().altaDem) || {}; if (!st2.open || hd2.pause) { this.setState({ overlay: 'cart' }); return; } const gained = s.acct === 'cuenta' && s.user ? t.earn : 0; const cfg0 = loadCfg() || {}; const seq = (Number(cfg0.webSeq) || 0) + 1; const code = 'CP-W' + String(seq).padStart(3, '0'); const gm = String(s.gpsLink || '').match(/query=(-?[\d.]+),(-?[\d.]+)/); const payN = { efe: 'Efectivo', yape: 'Yape', plin: 'Plin', tarj: 'Tarjeta', transf: 'Transferencia' }[s.pay] || 'Efectivo';
         const cpR = s.coupon ? this.couponCheck(s.coupon) : null; if (cpR && cpR.ok) { if (cpR.ent) { cfgPatch({ couponIssued: cpiLoad().map((e) => (e.code === cpR.ent.code ? Object.assign({}, e, { usadoEn: todayIso(), usadoOrden: code }) : e)) }); } else { cfgPatch({ coupons: couponsLoad().map((q) => (q.code === cpR.c.code ? Object.assign({}, q, { usos: (q.usos || 0) + 1 }) : q)), couponUses: (((loadCfg() || {}).couponUses) || []).concat([ { code: cpR.c.code, who: s.acct === 'cuenta' && s.user ? s.user.dni : '', orden: code, fecha: todayIso() } ]) }); } }
-        const wo = { id: code, web: true, ubicPend: s.modal === 'delivery' && !s.shipAuto, canal: 'Web', modal: s.modal === 'delivery' ? 'delivery' : (s.modal === 'local' ? 'local' : 'llevar'), cliente: s.name || 'Cliente web', phone: s.phone || '', addr: s.modal === 'delivery' ? s.addr : '', ref: s.modal === 'delivery' ? s.ref : '', mesa: s.modal === 'local' ? s.mesa : '', mapLink: s.gpsLink || '', lat: gm ? Number(gm[1]) : undefined, lng: gm ? Number(gm[2]) : undefined, zona: s.modal === 'delivery' && s.ship !== 'FUERA' ? s.ship : '', fee: t.fee || 0, items: s.cart.map((l) => ({ q: l.qty, n: l.name, d: l.detail, unit: l.unit })), descPromo: t.promo > 0 ? t.promoList.map((e) => ({ n: e.n, v: e.v })) : [], total: Math.round(t.total * 100) / 100, pay: payN, paid: false, note: (s.cash ? 'Paga con ' + s.cash : '') + (s.compTipo === 'boleta' ? (s.cash ? ' · ' : '') + 'Pide BOLETA' : '') + (s.compTipo === 'factura' ? (s.cash ? ' · ' : '') + 'Pide FACTURA · RUC ' + String(s.compRuc).trim() + ' · ' + String(s.compRs).trim() : ''), status: 'nuevo', mins: 0, rider: '', acct: s.acct === 'cuenta' && s.user ? { dni: s.user.dni, name: s.user.name } : null, ts: Date.now() };
-        try { const raw = window.localStorage.getItem(CFG_KEY); const cur = raw ? JSON.parse(raw) : {}; cur.webSeq = seq; cur.webOrders = (cur.webOrders || []).concat([ wo ]).slice(-60); window.localStorage.setItem(CFG_KEY, JSON.stringify(cur)); } catch (err) { /* sin almacenamiento */ } let nu = s.user; if (nu && s.acct === 'cuenta') { const cl = cliLoad(); const c = cl.find((x) => x.dni === nu.dni); if (c) { c.points += gained; c.pedidos += 1; cliSave(cl); nu = Object.assign({}, nu, { points: c.points }); } userSave(nu); } this.setState({ overlay: 'done', stage: 0, user: nu, orderCode: code }); }),
+        const wo = { id: code, web: true, ubicPend: s.modal === 'delivery' && !s.shipAuto, canal: 'Web', modal: s.modal === 'delivery' ? 'delivery' : (s.modal === 'local' ? 'local' : 'llevar'), cliente: s.name || 'Cliente web', phone: s.phone || '', addr: s.modal === 'delivery' ? s.addr : '', ref: s.modal === 'delivery' ? s.ref : '', mesa: s.modal === 'local' ? s.mesa : '', mapLink: s.gpsLink || '', lat: gm ? Number(gm[1]) : undefined, lng: gm ? Number(gm[2]) : undefined, zona: s.modal === 'delivery' && s.ship !== 'FUERA' ? s.ship : '', fee: t.fee || 0, items: s.cart.map((l) => ({ q: l.qty, n: l.name, d: l.detail, unit: l.unit, names: l.names || [] })), canje: t.canje, directo: true, pagoCoord: false, descPromo: t.promo > 0 ? t.promoList.map((e) => ({ n: e.n, v: e.v })) : [], total: Math.round(t.total * 100) / 100, pay: payN, paid: false, note: (s.cash ? 'Paga con ' + s.cash : '') + (s.compTipo === 'boleta' ? (s.cash ? ' · ' : '') + 'Pide BOLETA' : '') + (s.compTipo === 'factura' ? (s.cash ? ' · ' : '') + 'Pide FACTURA · RUC ' + String(s.compRuc).trim() + ' · ' + String(s.compRs).trim() : ''), status: 'cola', mins: 0, rider: '', acct: s.acct === 'cuenta' && s.user ? { dni: s.user.dni, name: s.user.name } : null, ts: Date.now() };
+        try { const raw = window.localStorage.getItem(CFG_KEY); const cur = raw ? JSON.parse(raw) : {}; cur.webSeq = seq; cur.webOrders = (cur.webOrders || []).concat([ wo ]).slice(-60); window.localStorage.setItem(CFG_KEY, JSON.stringify(cur)); } catch (err) { /* sin almacenamiento */ } let nu = s.user; if (nu && s.acct === 'cuenta') { const cl = cliLoad(); const c = cl.find((x) => x.dni === nu.dni); if (c) { c.points = Math.round((c.points - t.canje + gained) * 100) / 100; c.pedidos += 1; cliSave(cl); nu = Object.assign({}, nu, { points: c.points }); } userSave(nu); } this.setState({ overlay: 'done', stage: 0, user: nu, orderCode: code, lastEarn: s.acct === 'cuenta' && s.user ? gained : t.earn, canje: 0, canjeIn: '', canjeMsg: '' }); }),
       isConfirm: !!s.confirm, confirmTitle: s.confirm ? s.confirm.title : '', confirmMsg: s.confirm ? s.confirm.msg : '',
       confirmYes: () => { const c = s.confirm; this.setState({ confirm: null }); if (c) { c.fn(); } }, confirmNo: () => this.setState({ confirm: null }),
       deviceChips: [ [ 'pc', 'PC' ], [ 'mobile', 'Celular' ] ].map((d) => Object.assign({ n: d[1], pick: () => this.setState({ device: d[0], overlay: 'none', zoom: false }) }, chip(s.device === d[0]))),

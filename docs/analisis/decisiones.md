@@ -198,6 +198,11 @@ Queda margen. Si se ajusta, lo primero es apagar el ambiente de pruebas fuera de
 | D-28 | Si se puede agregar al cliente a los contactos del WhatsApp del local de forma automática. | José lo investiga; mientras tanto, exportar a Excel e importar a Google Contactos a mano (DT-67). |
 | D-29 | Umbrales de color del mapa de reparto. | Verde hasta 35 minutos, naranja de 35 a 50, rojo desde 50 (DT-59), configurables. Confirmar con Kevin. |
 | D-30 | A quién le llega el aviso del almacén si en ese momento nadie del almacén está de turno. | Al administrador. Confirmar con Kevin. |
+| D-31 | Plan B de los avisos de reparto mientras no esté la API de WhatsApp de Meta. | Que «En camino» y «He llegado» abran WhatsApp con el mensaje ya escrito y el repartidor solo toque «Enviar»: sin costo y sin depender de Meta (`analisis/analisis-delivery.md` P3). |
+| D-32 | Cuántos pedidos puede llevar a la vez un repartidor. | Hasta 3, configurable. |
+| D-33 | Meta de tiempo de cocina para delivery, coherente con la entrega de 25 a 35 minutos. | 15 minutos, ajustable con la medición del piloto. |
+| D-34 | Evidencia de una entrega fallida (Kevin: «va a tomar foto y va a tener registro de las llamadas»). | Guardar cada intento de llamada y mensaje con su hora, y una foto opcional de la puerta en la carpeta privada, que se borra a los 30 días (Ley 29733). |
+| D-35 | Ubicación del repartidor en tiempo real. | Mantenerla fuera de la primera versión. El costo real es casi cero (GPS del celular y OpenStreetMap); los motivos son la privacidad del repartidor, la batería y la complejidad. Volver a evaluar después del piloto. |
 
 ## 9. Aclaraciones de alcance
 
