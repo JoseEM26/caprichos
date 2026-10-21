@@ -1,9 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
-import { PrismaService } from '../../comun/prisma/prisma.service';
-import { RedisService } from '../../comun/redis/redis.service';
-import { AuditoriaService } from '../auditoria/auditoria.service';
 import { AccesoGuard } from './acceso.guard';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
@@ -32,9 +29,6 @@ import { AuthService } from './auth.service';
   providers: [
     AccesoGuard,
     AuthService,
-    PrismaService,
-    RedisService,
-    AuditoriaService,
   ],
   exports: [AccesoGuard, JwtModule, AuthService],
 })

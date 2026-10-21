@@ -28,6 +28,7 @@ model Party {
   documentos PartyIdentifier[]
   usuario    UserAccount?
   sesiones   Sesion[]
+  pedidos    Pedido[]
 
   @@map("party")
 }
@@ -214,8 +215,9 @@ model AreaCocina {
   propia     Boolean     @default(false)
   impresora  String?
   etiquetera String?
-  activo     Boolean     @default(true)
-  categorias Categoria[]
+  activo       Boolean       @default(true)
+  categorias   Categoria[]
+  pedidoLineas PedidoLinea[]
 
   @@map("area_cocina")
 }
@@ -251,6 +253,7 @@ model Producto {
   tamanos            ProductoTamano[]
   grupos             ProductoGrupo[]
   sabores            Sabor[]
+  pedidoLineas       PedidoLinea[]
 
   @@map("producto")
 }
@@ -288,10 +291,11 @@ model Opcion {
   grupo_id      BigInt
   valor_id      BigInt
   precio_extra  Decimal       @default(0) @db.Decimal(12, 2)
-  activo        Boolean       @default(true)
-  agotado_hasta DateTime?     @db.Timestamptz
-  grupo         GrupoOpciones @relation(fields: [grupo_id], references: [id])
-  valor         ListaValor    @relation(fields: [valor_id], references: [id])
+  activo              Boolean              @default(true)
+  agotado_hasta       DateTime?            @db.Timestamptz
+  grupo               GrupoOpciones        @relation(fields: [grupo_id], references: [id])
+  valor               ListaValor           @relation(fields: [valor_id], references: [id])
+  pedidoLineaOpciones PedidoLineaOpcion[]
 
   @@unique([grupo_id, valor_id])
   @@map("opcion")
@@ -320,4 +324,127 @@ model Sabor {
   @@unique([producto_id, nombre])
   @@map("sabor")
 }
+
+// ---------- Ola 3: zonas de reparto y pedidos de la carta (FT-DEL-01, FT-PED-01..03, DT-57) ----------
+
+model ZonaReparto {
+  id       BigInt   @id @default(autoincrement())
+  codigo   String   @unique
+  poligono Json
+  tarifa   Decimal  @db.Decimal(12, 2)
+  activa   Boolean  @default(true)
+  pedidos  Pedido[]
+
+  @@map("zona_reparto")
+}
+
+model Pedido {
+  id                     BigInt                  @id @default(autoincrement())
+  codigo                 String                  @unique
+  canal                  String                  @default("CARTA")
+  modalidad              String
+  estado                 String                  @default("COLA")
+  party_id               BigInt?
+  es_personal            Boolean                 @default(false)
+  cliente_nombre         String?
+  cliente_telefono       String?
+  entrega_direccion      String?
+  entrega_referencia     String?
+  entrega_lat            Decimal?                @db.Decimal(9, 6)
+  entrega_lng            Decimal?                @db.Decimal(9, 6)
+  entrega_origen         String?
+  zona_id                BigInt?
+  pago_metodo            String?
+  pago_estado            String?                 @default("PENDIENTE")
+  pago_preferido         String?
+  paga_con               Decimal?                @db.Decimal(12, 2)
+  subtotal               Decimal                 @db.Decimal(12, 2)
+  descuento              Decimal                 @default(0) @db.Decimal(12, 2)
+  envio                  Decimal?                @db.Decimal(12, 2)
+  total                  Decimal                 @db.Decimal(12, 2)
+  comprobante_tipo       String                  @default("BOLETA")
+  comprobante_doc        String?
+  comprobante_razon      String?
+  nota                   String?
+  clave_idempotencia     String?                 @unique
+  pago_coordinado_en     DateTime?               @db.Timestamptz
+  pago_coordinado_por    BigInt?
+  despachado_en          DateTime?               @db.Timestamptz
+  despachado_por         BigInt?
+  confirmado_en          DateTime?               @db.Timestamptz
+  confirmado_por         BigInt?
+  pasa_cocina_en         DateTime?               @db.Timestamptz
+  listo_en               DateTime?               @db.Timestamptz
+  entregado_en           DateTime?               @db.Timestamptz
+  anulado_en             DateTime?               @db.Timestamptz
+  anulado_por            BigInt?
+  motivo_anulacion       String?
+  anulacion_aprobada_por BigInt?
+  creado_en              DateTime                @default(now()) @db.Timestamptz
+  party                  Party?                  @relation(fields: [party_id], references: [id])
+  zona                   ZonaReparto?            @relation(fields: [zona_id], references: [id])
+  lineas                 PedidoLinea[]
+  historial              PedidoEstadoHistorial[]
+
+  @@map("pedido")
+}
+
+model PedidoLinea {
+  id               BigInt              @id @default(autoincrement())
+  pedido_id        BigInt
+  producto_id      BigInt?
+  nombre           String
+  tamano           String?
+  opciones         Json                @default("[]")
+  sabor            String?
+  nota             String?
+  cantidad         Int
+  precio_unit      Decimal             @db.Decimal(12, 2)
+  subtotal         Decimal?            @db.Decimal(12, 2)
+  area_id          BigInt?
+  adicional        Boolean             @default(false)
+  nombres_persona  String[]
+  pedido           Pedido              @relation(fields: [pedido_id], references: [id])
+  producto         Producto?           @relation(fields: [producto_id], references: [id])
+  area             AreaCocina?         @relation(fields: [area_id], references: [id])
+  opcionesElegidas PedidoLineaOpcion[]
+
+  @@map("pedido_linea")
+}
+
+model PedidoLineaOpcion {
+  id              BigInt      @id @default(autoincrement())
+  pedido_linea_id BigInt
+  opcion_id       BigInt?
+  grupo_nombre    String
+  opcion_nombre   String
+  precio_unit     Decimal     @default(0) @db.Decimal(12, 2)
+  precio_extra    Decimal     @default(0) @db.Decimal(12, 2)
+  nombre_persona  String?
+  pedido_linea    PedidoLinea @relation(fields: [pedido_linea_id], references: [id])
+  opcion          Opcion?     @relation(fields: [opcion_id], references: [id])
+
+  @@map("pedido_linea_opcion")
+}
+
+model PedidoEstadoHistorial {
+  id              BigInt   @id @default(autoincrement())
+  pedido_id       BigInt
+  estado_anterior String?
+  estado_nuevo    String
+  motivo          String?
+  por_party_id    BigInt?
+  en              DateTime @default(now()) @db.Timestamptz
+  pedido          Pedido   @relation(fields: [pedido_id], references: [id])
+
+  @@map("pedido_estado_historial")
+}
+
+model SecuenciaPedido {
+  nombre String @id
+  ultimo Int    @default(0)
+
+  @@map("secuencia_pedido")
+}
+
 

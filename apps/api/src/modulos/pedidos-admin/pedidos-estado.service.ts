@@ -1,0 +1,706 @@
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common';
+import * as argon2 from 'argon2';
+import { PrismaService } from '../../comun/prisma/prisma.service';
+import { RedisService } from '../../comun/redis/redis.service';
+import { AuditoriaService } from '../auditoria/auditoria.service';
+import { EventosGateway } from '../../comun/socket/eventos.gateway';
+import { UsuarioAutenticado } from '../acceso/acceso.tipos';
+import { enmascararDni } from '../usuarios/usuarios.util';
+import { FiltrarPedidosDto } from './dto/filtrar-pedidos.dto';
+import { CambiarEstadoDto } from './dto/cambiar-estado.dto';
+import { RegistrarPagoDto } from './dto/registrar-pago.dto';
+
+export type ColorEspera = 'verde' | 'naranja' | 'rojo';
+
+export const METODOS_PAGO_PERMITIDOS = [
+  'EFECTIVO',
+  'YAPE',
+  'PLIN',
+  'TARJETA',
+  'TRANSFERENCIA',
+] as const;
+
+@Injectable()
+export class PedidosEstadoService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly redisService: RedisService,
+    private readonly auditoria: AuditoriaService,
+    @Optional() private readonly eventosGateway?: EventosGateway,
+  ) {}
+
+  private parsearId(id: bigint | string | number): bigint {
+    try {
+      return BigInt(id);
+    } catch {
+      throw new BadRequestException({
+        codigo: 'ID_INVALIDO',
+        mensaje: 'El identificador del pedido no es válido',
+      });
+    }
+  }
+
+  /**
+   * Obtiene los umbrales configurados para alertas de espera en cocina y reparto (DT-69).
+   */
+  async obtenerUmbrales(): Promise<{ naranjaMin: number; rojoMin: number }> {
+    let naranjaMin = 35;
+    let rojoMin = 50;
+
+    try {
+      const params = await this.prisma.parametro.findMany({
+        where: {
+          clave: { in: ['rep_naranja_min', 'rep_rojo_min'] },
+        },
+      });
+
+      for (const p of params) {
+        if (p.clave === 'rep_naranja_min' && p.valor !== null && p.valor !== undefined) {
+          const val = typeof p.valor === 'number' ? p.valor : Number(p.valor);
+          if (!isNaN(val) && val >= 0) naranjaMin = val;
+        }
+        if (p.clave === 'rep_rojo_min' && p.valor !== null && p.valor !== undefined) {
+          const val = typeof p.valor === 'number' ? p.valor : Number(p.valor);
+          if (!isNaN(val) && val >= 0) rojoMin = val;
+        }
+      }
+    } catch {
+      // Usar valores por defecto (35 y 50) si falla la consulta
+    }
+
+    return { naranjaMin, rojoMin };
+  }
+
+  /**
+   * Calcula los minutos transcurridos y el color de espera según umbrales de Kevin (DT-69).
+   */
+  calcularMinutosYColor(
+    creadoEn: Date,
+    ahora: Date = new Date(),
+    naranjaMin = 35,
+    rojoMin = 50,
+  ): { minutosEspera: number; color: ColorEspera; colorEspera: ColorEspera } {
+    const diffMs = ahora.getTime() - new Date(creadoEn).getTime();
+    const minutosEspera = Math.max(0, Math.floor(diffMs / 60000));
+
+    let color: ColorEspera = 'verde';
+    if (minutosEspera >= rojoMin) {
+      color = 'rojo';
+    } else if (minutosEspera >= naranjaMin) {
+      color = 'naranja';
+    }
+
+    return { minutosEspera, color, colorEspera: color };
+  }
+
+  /**
+   * Verifica el PIN de 6 dígitos contra algún usuario ADMIN activo en la base de datos (DT-61).
+   * 3 intentos fallidos consecutivos bloquean 10 minutos en Redis.
+   */
+  async verificarPinSupervisor(
+    pinSupervisor?: string,
+    partyIdOperador?: bigint,
+    ip?: string,
+    pedidoId?: bigint,
+  ): Promise<{ party_id: bigint; id: bigint }> {
+    const claveIntentos = `pin:supervisor:intentos:${partyIdOperador ?? 'general'}`;
+    const redis = this.redisService.obtenerCliente();
+
+    // 1. Verificar si está bloqueado por demasiados intentos fallidos (DT-61)
+    if (redis) {
+      const intentosActuales = await redis.get(claveIntentos);
+      if (intentosActuales && parseInt(intentosActuales, 10) >= 3) {
+        throw new HttpException(
+          {
+            codigo: 'PIN_BLOQUEADO',
+            mensaje: 'Demasiados intentos fallidos de PIN de supervisor. Bloqueado temporalmente por 10 minutos.',
+          },
+          HttpStatus.FORBIDDEN,
+        );
+      }
+    }
+
+    // 2. Validar formato del PIN (exactamente 6 dígitos numéricos)
+    const pinLimpio = typeof pinSupervisor === 'string' ? pinSupervisor.trim() : '';
+    const formatoValido = /^\d{6}$/.test(pinLimpio);
+
+    let supervisorValido: { party_id: bigint; id: bigint } | null = null;
+
+    if (formatoValido) {
+      // 3. Buscar supervisores activos con rol ADMIN y PIN configurado
+      const admins = await this.prisma.userAccount.findMany({
+        where: {
+          rol: 'ADMIN',
+          activo: true,
+          pin_hash: { not: null },
+        },
+      });
+
+      for (const admin of admins) {
+        if (admin.pin_hash) {
+          try {
+            const coincide = await argon2.verify(admin.pin_hash, pinLimpio);
+            if (coincide) {
+              supervisorValido = { party_id: admin.party_id, id: admin.id };
+              break;
+            }
+          } catch {
+            // Continuar evaluando otros administradores
+          }
+        }
+      }
+    }
+
+    // 4. Si el PIN es incorrecto o no se proveyó
+    if (!supervisorValido) {
+      if (redis) {
+        const fallos = await redis.incr(claveIntentos);
+        if (fallos === 1) {
+          await redis.expire(claveIntentos, 10 * 60); // 10 minutos
+        }
+      }
+
+      await this.auditoria.registrar({
+        categoria: 'ACCESO',
+        modulo: 'pedidos',
+        accion: 'PIN_FALLIDO',
+        resultado: 'RECHAZADO',
+        entidad: 'pedido',
+        entidadId: pedidoId,
+        motivo: 'Intento de anulación con PIN de supervisor inválido o no proporcionado',
+        partyId: partyIdOperador,
+        ip,
+      });
+
+      throw new HttpException(
+        {
+          codigo: 'PIN_INVALIDO',
+          mensaje: 'PIN de supervisor inválido o no proporcionado',
+        },
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    // 5. PIN válido: reiniciar contador de fallos
+    if (redis) {
+      await redis.del(claveIntentos);
+    }
+
+    return supervisorValido;
+  }
+
+  /**
+   * Lista los pedidos con filtros, paginación, cálculo de espera y enmascaramiento de comprobante (DT-69, DT-75).
+   */
+  async listar(filtros: FiltrarPedidosDto, usuarioActual?: UsuarioAutenticado) {
+    const where: any = {};
+
+    if (filtros.estado) {
+      where.estado = filtros.estado;
+    }
+    if (filtros.canal) {
+      where.canal = filtros.canal;
+    }
+    if (filtros.modalidad) {
+      where.modalidad = filtros.modalidad;
+    }
+    if (filtros.desde || filtros.hasta) {
+      where.creado_en = {};
+      if (filtros.desde) {
+        where.creado_en.gte = new Date(filtros.desde);
+      }
+      if (filtros.hasta) {
+        where.creado_en.lte = new Date(filtros.hasta);
+      }
+    }
+    if (filtros.buscar) {
+      const q = filtros.buscar.trim();
+      where.OR = [
+        { codigo: { contains: q, mode: 'insensitive' } },
+        { cliente_nombre: { contains: q, mode: 'insensitive' } },
+      ];
+    }
+
+    const pagina = Math.max(1, Number(filtros.pagina) || 1);
+    const limite = Math.min(100, Math.max(1, Number(filtros.limite) || 20));
+    const skip = (pagina - 1) * limite;
+
+    const [total, pedidos, umbrales] = await Promise.all([
+      this.prisma.pedido.count({ where }),
+      this.prisma.pedido.findMany({
+        where,
+        skip,
+        take: limite,
+        orderBy: { creado_en: 'desc' },
+        include: {
+          lineas: {
+            include: {
+              opcionesElegidas: true,
+              area: true,
+            },
+          },
+          zona: true,
+        },
+      }),
+      this.obtenerUmbrales(),
+    ]);
+
+    const ahora = new Date();
+    const esAdmin = usuarioActual?.rol === 'ADMIN';
+
+    const items = pedidos.map((p) => {
+      const { minutosEspera, color, colorEspera } = this.calcularMinutosYColor(
+        p.creado_en,
+        ahora,
+        umbrales.naranjaMin,
+        umbrales.rojoMin,
+      );
+
+      return {
+        ...p,
+        comprobante_doc: esAdmin ? p.comprobante_doc : enmascararDni(p.comprobante_doc || ''),
+        minutosEspera,
+        color,
+        colorEspera,
+      };
+    });
+
+    return {
+      total,
+      pagina,
+      limite,
+      items,
+    };
+  }
+
+  /**
+   * Vista de cocina: solo COLA y PREPARANDO, más viejos primero (DT-58).
+   * Si historial=true, muestra los pedidos preparados hoy.
+   */
+  async listarCocina(historial?: string | boolean, usuarioActual?: UsuarioAutenticado) {
+    const umbrales = await this.obtenerUmbrales();
+    const ahora = new Date();
+    const esHistorial = historial === true || historial === 'true' || historial === '1';
+
+    let pedidos: any[];
+
+    if (esHistorial) {
+      const inicioDia = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 0, 0, 0, 0);
+      pedidos = await this.prisma.pedido.findMany({
+        where: {
+          listo_en: { gte: inicioDia },
+          estado: { in: ['LISTO', 'EN_CAMINO', 'ENTREGADO'] },
+        },
+        orderBy: { listo_en: 'desc' },
+        include: {
+          lineas: {
+            include: {
+              opcionesElegidas: true,
+              area: true,
+            },
+          },
+          zona: true,
+        },
+      });
+    } else {
+      pedidos = await this.prisma.pedido.findMany({
+        where: {
+          estado: { in: ['COLA', 'PREPARANDO'] },
+        },
+        orderBy: { creado_en: 'asc' }, // Más viejos primero
+        include: {
+          lineas: {
+            include: {
+              opcionesElegidas: true,
+              area: true,
+            },
+          },
+          zona: true,
+        },
+      });
+    }
+
+    // Cocina solo ve qué preparar y para quién: sin teléfono, dirección, pago ni comprobante (Ley 29733)
+    return pedidos.map((p) => {
+      const { minutosEspera, color, colorEspera } = this.calcularMinutosYColor(
+        p.creado_en,
+        ahora,
+        umbrales.naranjaMin,
+        umbrales.rojoMin,
+      );
+
+      return {
+        id: p.id,
+        codigo: p.codigo,
+        canal: p.canal,
+        modalidad: p.modalidad,
+        estado: p.estado,
+        cliente_nombre: p.cliente_nombre,
+        nota: p.nota,
+        creado_en: p.creado_en,
+        listo_en: p.listo_en,
+        lineas: p.lineas,
+        minutosEspera,
+        color,
+        colorEspera,
+      };
+    });
+  }
+
+  /**
+   * Obtiene el detalle completo de un pedido con enmascaramiento de DNI/RUC según rol (DT-75).
+   */
+  async obtenerPorId(
+    id: bigint | string | number,
+    usuarioActual?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const pedidoId = this.parsearId(id);
+    const pedido = await this.prisma.pedido.findUnique({
+      where: { id: pedidoId },
+      include: {
+        lineas: {
+          include: {
+            opcionesElegidas: true,
+            area: true,
+          },
+        },
+        historial: {
+          orderBy: { en: 'asc' },
+        },
+        zona: true,
+      },
+    });
+
+    if (!pedido) {
+      throw new NotFoundException({
+        codigo: 'PEDIDO_NO_ENCONTRADO',
+        mensaje: 'Pedido no encontrado',
+      });
+    }
+
+    const umbrales = await this.obtenerUmbrales();
+    const { minutosEspera, color, colorEspera } = this.calcularMinutosYColor(
+      pedido.creado_en,
+      new Date(),
+      umbrales.naranjaMin,
+      umbrales.rojoMin,
+    );
+
+    const esAdmin = usuarioActual?.rol === 'ADMIN';
+
+    if (esAdmin && pedido.comprobante_doc) {
+      await this.auditoria.registrar({
+        categoria: 'LECTURA_SENSIBLE',
+        modulo: 'pedidos',
+        accion: 'VER_COMPROBANTE',
+        resultado: 'OK',
+        entidad: 'pedido',
+        entidadId: pedido.id,
+        partyId: usuarioActual?.partyId,
+        ip,
+      });
+    }
+
+    return {
+      ...pedido,
+      comprobante_doc: esAdmin
+        ? pedido.comprobante_doc
+        : enmascararDni(pedido.comprobante_doc || ''),
+      minutosEspera,
+      color,
+      colorEspera,
+    };
+  }
+
+  /**
+   * Cambia el estado de un pedido validando transiciones, permisos y PIN de supervisor para anulación (DT-58, DT-61).
+   */
+  async cambiarEstado(
+    id: bigint | string | number,
+    dto: CambiarEstadoDto,
+    usuarioActual: UsuarioAutenticado,
+    pinSupervisor?: string,
+    ip?: string,
+  ) {
+    const pedidoId = this.parsearId(id);
+    const pedido = await this.prisma.pedido.findUnique({
+      where: { id: pedidoId },
+    });
+
+    if (!pedido) {
+      throw new NotFoundException({
+        codigo: 'PEDIDO_NO_ENCONTRADO',
+        mensaje: 'Pedido no encontrado',
+      });
+    }
+
+    const estadoAnterior = pedido.estado;
+    const nuevoEstado = dto.estado.toUpperCase().trim();
+    const ahora = new Date();
+
+    // 1. Manejo de Anulación (DT-61)
+    if (nuevoEstado === 'ANULADO') {
+      // Estados desde los que se permite anular: COLA, PREPARANDO, LISTO
+      if (!['COLA', 'PREPARANDO', 'LISTO'].includes(estadoAnterior)) {
+        throw new ConflictException({
+          codigo: 'TRANSICION_INVALIDA',
+          mensaje: `No se puede anular un pedido en estado ${estadoAnterior}`,
+        });
+      }
+
+      // Validar permiso de anular
+      if (usuarioActual.rol !== 'ADMIN') {
+        const tienePermiso = await this.prisma.rolPermiso.findFirst({
+          where: {
+            rol: usuarioActual.rol,
+            permiso: {
+              modulo: 'pedidos',
+              accion: 'anular',
+            },
+          },
+        });
+
+        if (!tienePermiso) {
+          throw new ForbiddenException({
+            codigo: 'SIN_PERMISO',
+            mensaje: 'No tiene permiso para anular pedidos',
+          });
+        }
+      }
+
+      // Motivo obligatorio de al menos 5 caracteres
+      const motivo = dto.motivo?.trim() || '';
+      if (motivo.length < 5) {
+        throw new BadRequestException({
+          codigo: 'MOTIVO_REQUERIDO',
+          mensaje: 'El motivo de anulación es obligatorio y debe tener al menos 5 caracteres',
+        });
+      }
+
+      // Verificación de PIN de supervisor (6 dígitos, ADMIN activo)
+      const supervisor = await this.verificarPinSupervisor(
+        pinSupervisor,
+        usuarioActual.partyId,
+        ip,
+        pedido.id,
+      );
+
+      // Actualizar pedido a ANULADO
+      const pedidoActualizado = await this.prisma.pedido.update({
+        where: { id: pedido.id },
+        data: {
+          estado: 'ANULADO',
+          anulado_en: ahora,
+          anulado_por: usuarioActual.partyId,
+          motivo_anulacion: motivo,
+          anulacion_aprobada_por: supervisor.party_id,
+        },
+      });
+
+      // Insertar en historial
+      await this.prisma.pedidoEstadoHistorial.create({
+        data: {
+          pedido_id: pedido.id,
+          estado_anterior: estadoAnterior,
+          estado_nuevo: 'ANULADO',
+          motivo,
+          por_party_id: usuarioActual.partyId,
+          en: ahora,
+        },
+      });
+
+      // Registrar auditoría
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'pedidos',
+        accion: 'ANULAR',
+        resultado: 'OK',
+        entidad: 'pedido',
+        entidadId: pedido.id,
+        antes: { estado: estadoAnterior },
+        despues: { estado: 'ANULADO', motivo },
+        motivo,
+        partyId: usuarioActual.partyId,
+        conPinAdmin: true,
+        ip,
+      });
+
+      // Emitir evento por WebSocket
+      this.eventosGateway?.emitirAdmin('pedido:estado', {
+        id: Number(pedido.id),
+        codigo: pedido.codigo,
+        estado: 'ANULADO',
+      });
+
+      return pedidoActualizado;
+    }
+
+    // 2. Transiciones válidas normales: COLA -> PREPARANDO -> LISTO -> EN_CAMINO -> ENTREGADO
+    let esTransicionValida = false;
+
+    if (estadoAnterior === 'COLA') {
+      // Cocina puede empezar a preparar o despejar directo a LISTO (DT-58)
+      if (nuevoEstado === 'PREPARANDO' || nuevoEstado === 'LISTO') {
+        esTransicionValida = true;
+      }
+    } else if (estadoAnterior === 'PREPARANDO') {
+      if (nuevoEstado === 'LISTO') {
+        esTransicionValida = true;
+      }
+    } else if (estadoAnterior === 'LISTO') {
+      if (pedido.modalidad === 'DELIVERY') {
+        if (nuevoEstado === 'EN_CAMINO') {
+          esTransicionValida = true;
+        }
+      } else if (pedido.modalidad !== 'DELIVERY') {
+        // RECOGER, MESA y LLEVAR saltan EN_CAMINO (LISTO -> ENTREGADO)
+        if (nuevoEstado === 'ENTREGADO') {
+          esTransicionValida = true;
+        }
+      }
+    } else if (estadoAnterior === 'EN_CAMINO') {
+      if (nuevoEstado === 'ENTREGADO') {
+        esTransicionValida = true;
+      }
+    }
+
+    if (!esTransicionValida) {
+      throw new ConflictException({
+        codigo: 'TRANSICION_INVALIDA',
+        mensaje: `No se puede cambiar el pedido del estado ${estadoAnterior} a ${nuevoEstado} para modalidad ${pedido.modalidad}`,
+      });
+    }
+
+    // Construir campos de actualización según el estado al que avanza
+    const datosActualizacion: any = {
+      estado: nuevoEstado,
+    };
+
+    if (nuevoEstado === 'PREPARANDO' && !pedido.pasa_cocina_en) {
+      datosActualizacion.pasa_cocina_en = ahora;
+    } else if (nuevoEstado === 'LISTO') {
+      datosActualizacion.listo_en = ahora;
+      if (!pedido.pasa_cocina_en) {
+        datosActualizacion.pasa_cocina_en = ahora;
+      }
+    } else if (nuevoEstado === 'EN_CAMINO') {
+      datosActualizacion.despachado_en = ahora;
+      datosActualizacion.despachado_por = usuarioActual.partyId;
+    } else if (nuevoEstado === 'ENTREGADO') {
+      datosActualizacion.entregado_en = ahora;
+    }
+
+    const pedidoActualizado = await this.prisma.pedido.update({
+      where: { id: pedido.id },
+      data: datosActualizacion,
+    });
+
+    // Registrar en historial de estados
+    await this.prisma.pedidoEstadoHistorial.create({
+      data: {
+        pedido_id: pedido.id,
+        estado_anterior: estadoAnterior,
+        estado_nuevo: nuevoEstado,
+        motivo: dto.motivo?.trim() || null,
+        por_party_id: usuarioActual.partyId,
+        en: ahora,
+      },
+    });
+
+    // Auditoría
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'pedidos',
+      accion: 'CAMBIAR_ESTADO',
+      resultado: 'OK',
+      entidad: 'pedido',
+      entidadId: pedido.id,
+      antes: { estado: estadoAnterior },
+      despues: { estado: nuevoEstado, motivo: dto.motivo },
+      motivo: dto.motivo,
+      partyId: usuarioActual.partyId,
+      ip,
+    });
+
+    // Emitir evento por WebSocket
+    this.eventosGateway?.emitirAdmin('pedido:estado', {
+      id: Number(pedido.id),
+      codigo: pedido.codigo,
+      estado: nuevoEstado,
+    });
+
+    return pedidoActualizado;
+  }
+
+  /**
+   * Registra o actualiza el pago del pedido en caja (DT-57, sin pago mixto en esta ola).
+   */
+  async registrarPago(
+    id: bigint | string | number,
+    dto: RegistrarPagoDto,
+    usuarioActual: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const pedidoId = this.parsearId(id);
+    const pedido = await this.prisma.pedido.findUnique({
+      where: { id: pedidoId },
+    });
+
+    if (!pedido) {
+      throw new NotFoundException({
+        codigo: 'PEDIDO_NO_ENCONTRADO',
+        mensaje: 'Pedido no encontrado',
+      });
+    }
+
+    const metodoUpper = dto.metodo.toUpperCase().trim();
+    if (!METODOS_PAGO_PERMITIDOS.includes(metodoUpper as any)) {
+      throw new BadRequestException({
+        codigo: 'METODO_INVALIDO',
+        mensaje: `El método de pago '${dto.metodo}' no es válido`,
+      });
+    }
+
+    const ahora = new Date();
+    const pedidoActualizado = await this.prisma.pedido.update({
+      where: { id: pedido.id },
+      data: {
+        pago_metodo: metodoUpper,
+        pago_estado: dto.estado,
+        pago_coordinado_en: ahora,
+        pago_coordinado_por: usuarioActual.partyId,
+      },
+    });
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'pedidos',
+      accion: 'REGISTRAR_PAGO',
+      resultado: 'OK',
+      entidad: 'pedido',
+      entidadId: pedido.id,
+      antes: { pago_metodo: pedido.pago_metodo, pago_estado: pedido.pago_estado },
+      despues: { pago_metodo: metodoUpper, pago_estado: dto.estado },
+      partyId: usuarioActual.partyId,
+      ip,
+    });
+
+    this.eventosGateway?.emitirAdmin('pedido:estado', {
+      id: Number(pedido.id),
+      codigo: pedido.codigo,
+      estado: pedido.estado,
+    });
+
+    return pedidoActualizado;
+  }
+}

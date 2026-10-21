@@ -37,12 +37,18 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'local', accion: 'editar' },
   { modulo: 'archivos', accion: 'subir' },
   { modulo: 'archivos', accion: 'ver' },
+  // Zonas y Pedidos (Ola 3)
+  { modulo: 'pedidos', accion: 'ver' },
+  { modulo: 'pedidos', accion: 'cambiar_estado' },
+  { modulo: 'pedidos', accion: 'anular' },
+  { modulo: 'zonas', accion: 'ver' },
+  { modulo: 'zonas', accion: 'editar' },
 ] as const;
 
 export const MATRIZ: Record<string, string[]> = {
   ADMIN: PERMISOS.map((p) => `${p.modulo}/${p.accion}`),
-  CAJERO: [],
-  COCINA: [],
+  CAJERO: ['pedidos/ver', 'pedidos/cambiar_estado', 'pedidos/anular'],
+  COCINA: ['pedidos/ver', 'pedidos/cambiar_estado'],
   MOZO: [],
   CALLCENTER: [],
   ALMACEN: [],

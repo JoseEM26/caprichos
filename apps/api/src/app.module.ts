@@ -3,7 +3,6 @@ import { ConfigModule } from '@nestjs/config';
 import { validarEntorno } from './config/entorno.validacion';
 import { PinoLoggerService } from './comun/logger/pino-logger.service';
 import { ComunModule } from './comun/comun.module';
-import { EventosGateway } from './comun/socket/eventos.gateway';
 import { SaludModule } from './salud/salud.module';
 import { VersionModule } from './version/version.module';
 import { AccesoModule } from './modulos/acceso/acceso.module';
@@ -13,6 +12,9 @@ import { ConfiguracionModule } from './modulos/configuracion/configuracion.modul
 import { CatalogoModule } from './modulos/catalogo/catalogo.module';
 import { LocalModule } from './modulos/local/local.module';
 import { ArchivosModule } from './modulos/archivos/archivos.module';
+import { ZonasModule } from './modulos/zonas/zonas.module';
+import { PedidosModule } from './modulos/pedidos/pedidos.module';
+import { PedidosAdminModule } from './modulos/pedidos-admin/pedidos-admin.module';
 
 @Module({
   imports: [
@@ -30,14 +32,15 @@ import { ArchivosModule } from './modulos/archivos/archivos.module';
     ArchivosModule,
     CatalogoModule,
     LocalModule,
+    ZonasModule,
+    PedidosModule,
+    PedidosAdminModule,
   ],
   providers: [
     PinoLoggerService,
-    EventosGateway,
   ],
   exports: [
     PinoLoggerService,
-    EventosGateway,
   ],
 })
 export class AppModule {}
