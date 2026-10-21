@@ -39,6 +39,18 @@ export class VariablesEntorno {
 
   @IsString()
   @IsOptional()
+  JWT_SECRET: string = 'solo-desarrollo-cambiar-en-produccion'; // en producción viene del entorno (ver validarEntorno)
+
+  @IsNumber()
+  @IsOptional()
+  JWT_EXPIRA_MIN: number = 15;
+
+  @IsNumber()
+  @IsOptional()
+  REFRESH_DIAS: number = 7;
+
+  @IsString()
+  @IsOptional()
   GIT_COMMIT: string = 'dev-local';
 }
 
@@ -51,6 +63,10 @@ export function validarEntorno(config: Record<string, unknown>) {
 
   if (errors.length > 0) {
     throw new Error(`Error en validación de variables de entorno: ${errors.toString()}`);
+  }
+
+  if (validatedConfig.NODE_ENV !== Entorno.Development && validatedConfig.NODE_ENV !== Entorno.Test && (!config.JWT_SECRET || String(config.JWT_SECRET).length < 32)) {
+    throw new Error('JWT_SECRET es obligatorio (mínimo 32 caracteres) fuera de desarrollo');
   }
 
   return validatedConfig;

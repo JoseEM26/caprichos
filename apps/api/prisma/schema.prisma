@@ -16,3 +16,128 @@ model ControlSistema {
 
   @@map("sys_control")
 }
+
+// ---------- Ola 1: personas, acceso, auditoría y configuración (ADR-004, ADR-008, ADR-014) ----------
+
+model Party {
+  id         BigInt            @id @default(autoincrement())
+  tipo       String // PERSONA | ORGANIZACION
+  estado     String            @default("ACTIVO")
+  creado_en  DateTime          @default(now()) @db.Timestamptz
+  persona    Person?
+  documentos PartyIdentifier[]
+  usuario    UserAccount?
+  sesiones   Sesion[]
+
+  @@map("party")
+}
+
+model Person {
+  party_id  BigInt  @id
+  nombres   String
+  apellidos String?
+  party     Party   @relation(fields: [party_id], references: [id])
+
+  @@map("person")
+}
+
+model PartyIdentifier {
+  id       BigInt @id @default(autoincrement())
+  party_id BigInt
+  tipo     String // DNI | RUC | CE
+  numero   String
+  party    Party  @relation(fields: [party_id], references: [id])
+
+  @@unique([tipo, numero])
+  @@map("party_identifier")
+}
+
+model Rol {
+  codigo   String        @id
+  nombre   String
+  permisos RolPermiso[]
+  usuarios UserAccount[]
+
+  @@map("rol")
+}
+
+model Permiso {
+  id     BigInt       @id @default(autoincrement())
+  modulo String
+  accion String
+  roles  RolPermiso[]
+
+  @@unique([modulo, accion])
+  @@map("permiso")
+}
+
+model RolPermiso {
+  rol        String
+  permiso_id BigInt
+  r          Rol     @relation(fields: [rol], references: [codigo])
+  permiso    Permiso @relation(fields: [permiso_id], references: [id])
+
+  @@id([rol, permiso_id])
+  @@map("rol_permiso")
+}
+
+model UserAccount {
+  id           BigInt   @id @default(autoincrement())
+  party_id     BigInt   @unique
+  rol          String
+  hash         String
+  debe_cambiar Boolean  @default(true)
+  pin_hash     String?
+  activo       Boolean  @default(true)
+  alta_en      DateTime @default(now()) @db.Date
+  party        Party    @relation(fields: [party_id], references: [id])
+  r            Rol      @relation(fields: [rol], references: [codigo])
+
+  @@map("user_account")
+}
+
+model Sesion {
+  id           BigInt    @id @default(autoincrement())
+  audiencia    String // ADMIN | CARTA
+  party_id     BigInt
+  refresh_hash String    @unique
+  dispositivo  String?
+  expira_en    DateTime  @db.Timestamptz
+  revocada_en  DateTime? @db.Timestamptz
+  party        Party     @relation(fields: [party_id], references: [id])
+
+  @@map("sesion")
+}
+
+model Parametro {
+  clave String @id
+  valor Json
+
+  @@map("parametro")
+}
+
+// Solo se inserta: los triggers de la migración encadenan el hash y bloquean update y delete.
+model Auditoria {
+  id            BigInt   @id @default(autoincrement())
+  categoria     String // CAMBIO | ACCESO | LECTURA_SENSIBLE
+  modulo        String
+  accion        String
+  resultado     String   @default("OK")
+  entidad       String?
+  entidad_id    BigInt?
+  antes         Json?
+  despues       Json?
+  motivo        String?
+  party_id      BigInt?
+  con_pin_admin Boolean  @default(false)
+  ip            String?  @db.Inet
+  dispositivo   String?
+  request_id    String?
+  en            DateTime @default(now()) @db.Timestamptz
+  hash_anterior Bytes?
+  hash          Bytes    @default(dbgenerated("'\\x'::bytea"))
+
+  @@index([en(sort: Desc), modulo, party_id], map: "ix_auditoria_busqueda")
+  @@index([entidad, entidad_id], map: "ix_auditoria_entidad")
+  @@map("auditoria")
+}

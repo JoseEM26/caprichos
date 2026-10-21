@@ -597,15 +597,22 @@ input,textarea{font-family:inherit}
       </sc-for>
       </sc-if>
 
-      <!-- acta 03 (DT-57): nombre de quien toma cada bebida, para su etiqueta -->
+      <!-- acta 03 (DT-57): nombre de quien toma cada bebida; la vista previa copia el sticker del mozo -->
       <sc-if value="{{askNames}}" hint-placeholder-val="{{ false }}">
-        <div style="border:1.5px solid var(--line);border-radius:14px;padding:12px;background:var(--card);display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
-          <div aria-hidden="true" style="flex:none;width:88px;border:1.5px dashed var(--soft);border-radius:8px;padding:6px;text-align:center;background:var(--bg)"><div style="font-family:Montserrat,sans-serif;font-weight:800;font-size:14px">LUCÍA</div><div style="font-size:10px;color:var(--soft)">{{curShort}}</div></div>
-          <div style="flex:1 1 200px;min-width:0;display:flex;flex-direction:column;gap:8px">
-            <div><div style="font-family:Montserrat,sans-serif;font-weight:700;font-size:15px">¿Para quién es?</div><div style="font-size:12px;line-height:16px;color:var(--soft)">Sale en la etiqueta del vaso. Si lo dejas vacío, ponemos tu nombre.</div></div>
+        <div style="border:1.5px solid var(--line);border-radius:14px;padding:10px 12px;background:var(--card);display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <div style="flex:1 1 150px;min-width:0;display:flex;flex-direction:column;gap:4px">
+            <div style="font-family:Montserrat,sans-serif;font-weight:800;font-size:14px">¿Para quién es?</div>
             <sc-for list="{{nameInputs}}" as="ni" hint-placeholder-count="1">
-              <label style="font-size:12px;font-weight:700;display:block">{{ni.label}}<input type="text" value="{{ni.val}}" onChange="{{ni.set}}" placeholder="Ej.: Lucía" style="display:block;width:100%;box-sizing:border-box;min-height:44px;margin-top:4px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink);padding:0 12px;font-size:14px"></label>
+              <label style="font-size:11px;font-weight:700;display:block;color:var(--soft)">{{ni.label}}<input type="text" value="{{ni.val}}" onChange="{{ni.set}}" placeholder="Ej.: Lucía" maxlength="30" style="display:block;width:100%;box-sizing:border-box;min-height:40px;margin-top:2px;border-radius:10px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink);padding:0 10px;font-size:14px"></label>
             </sc-for>
+            <div style="font-size:11px;line-height:14px;color:var(--soft)">Vacío = ponemos tu nombre.</div>
+          </div>
+          <div aria-label="Así se verá la etiqueta del vaso" style="flex:none;width:158px;font-family:'Courier New',monospace;font-size:10px;line-height:13px;color:#111;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 2px 8px color-mix(in srgb, var(--ink) 14%, transparent);overflow:hidden">
+            <div style="background:var(--ink);color:var(--bg);padding:2px 8px;display:flex;justify-content:space-between;font-weight:700"><span>BEBIDA 1</span><span>ETIQUETA</span></div>
+            <div style="padding:5px 8px">
+              <div style="font-family:Montserrat,sans-serif;font-weight:800;font-size:17px;line-height:20px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{stkPerson}}</div>
+              <div style="font-family:Montserrat,sans-serif;font-weight:700;font-size:11px;line-height:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{stkProd}}</div>
+            </div>
           </div>
         </div>
       </sc-if>
@@ -1711,6 +1718,7 @@ class Component extends DCLogic {
       })),
       note: s.note, setNote: (e) => this.setState({ note: e.target.value }), iceAdvice: /poco hielo|menos hielo/i.test(s.note || '') ? 'Con poco hielo el vaso queda con menos volumen de bebida.' : (/no tan helado|menos helado|sin tanto hielo/i.test(s.note || '') ? 'Si lo pides menos helado, la bebida quedará más aguada.' : ''), hasIceAdvice: /poco hielo|menos hielo|no tan helado|menos helado|sin tanto hielo/i.test(s.note || ''),
       qty: s.qty, qtyInc: () => this.setState({ qty: s.qty + 1 }), qtyDec: () => this.setState({ qty: Math.max(1, s.qty - 1) }),
+      stkPerson: (String((s.pnames || [])[0] || '').trim() || String(s.name || '').trim() || 'TU NOMBRE').slice(0, 14) + ((String((s.pnames || [])[0] || '').trim() || String(s.name || '').trim()).length > 14 ? '…' : ''), stkProd: cur.name.length > 18 ? cur.name.slice(0, 17) + '…' : cur.name,
       askNames: isDrink(cur) && !comboMode, curShort: cur.name.length > 16 ? cur.name.slice(0, 16) + '…' : cur.name,
       nameInputs: (isDrink(cur) && !comboMode) ? Array.from({ length: s.qty }, (x, i) => ({ label: 'Ingresa el nombre de la persona que tomará esta bebida' + (s.qty > 1 ? ' (' + (i + 1) + ' de ' + s.qty + ')' : ''), val: (s.pnames || [])[i] || '', set: (e) => { const a = (this.state.pnames || []).slice(); a[i] = e.target.value; this.setState({ pnames: a }); } })) : [],
       addToCart: () => this.addToCart(), addBg: valid ? 'var(--accent)' : 'var(--line)', addLabel: valid ? 'Agregar al pedido' : 'Elige las opciones obligatorias',

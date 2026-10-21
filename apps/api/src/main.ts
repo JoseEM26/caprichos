@@ -1,7 +1,12 @@
 import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
+import cookieParser from 'cookie-parser';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import { PinoLoggerService } from './comun/logger/pino-logger.service';
+
+// Los ids de la base son BigInt: salen como texto en el JSON
+(BigInt.prototype as unknown as { toJSON: () => string }).toJSON = function () { return this.toString(); };
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -10,7 +15,9 @@ async function bootstrap() {
 
   const pinoLogger = app.get(PinoLoggerService);
   app.useLogger(pinoLogger);
-  app.enableCors();
+  app.use(cookieParser());
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  app.enableCors({ origin: true, credentials: true });
 
   const configService = app.get(ConfigService);
   const puerto = configService.get<number>('PORT', 3000);
