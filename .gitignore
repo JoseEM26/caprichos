@@ -39,3 +39,5 @@ dist/
 coverage/
 .pnpm-store/
 
+# Inventario real del VPS (IP del servidor): solo local
+infra/ansible/inventory.ini

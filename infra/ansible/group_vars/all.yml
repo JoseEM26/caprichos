@@ -13,8 +13,8 @@ deploy_user: "deploy"
 deploy_user_shell: "/bin/bash"
 deploy_user_groups:
   - "sudo"
-# Llave SSH pública de ejemplo para el usuario deploy (reemplazar con la llave pública real de José/operador)
-deploy_user_ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLEKEYFORCAPRICHOSDEPLOYUSER0000000000000000000000 jose@caprichos.pe"
+# Llave SSH PÚBLICA de José para el usuario deploy (la privada nunca sale de su PC)
+deploy_user_ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBPY78g36QgX+dMBZ++j7n6fE8hTCDL4/bqc5/bweSKo jose@caprichos.pe"
 
 # Configuración del servicio SSH
 ssh_port: 22
