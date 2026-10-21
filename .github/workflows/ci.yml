@@ -71,6 +71,7 @@ jobs:
       - name: Escanear imagen API con Trivy (falla con vulnerabilidades críticas)
         uses: aquasecurity/trivy-action@v0.33.1
         with:
+          version: 'v0.75.0'  # versión del programa Trivy fijada: la de la acción por defecto (v0.65.0) ya no existe
           image-ref: caprichos-api:test
           format: table
           exit-code: '1'
@@ -92,6 +93,7 @@ jobs:
       - name: Escanear imagen Web con Trivy (falla con vulnerabilidades críticas)
         uses: aquasecurity/trivy-action@v0.33.1
         with:
+          version: 'v0.75.0'  # versión del programa Trivy fijada: la de la acción por defecto (v0.65.0) ya no existe
           image-ref: caprichos-web:test
           format: table
           exit-code: '1'
