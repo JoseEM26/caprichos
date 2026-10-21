@@ -245,7 +245,7 @@ Convención: un caso `TC-CAP-<HU>-<NN>` por cada criterio `CA-NN` de la historia
 | TC-CAP-047-01 | HU-CAP-047 · CA-1: dado un pedido con un frappé y un sándwich, cuando pasa a cocina → Bebidas ve el frappé, Salados ve el sándwich y Postres no ve nada (RQ-COC-01-01) | func |  |  |
 | TC-CAP-047-02 | HU-CAP-047 · CA-2: dado un combo de bebida y postre, cuando pasa a cocina → la bebida va a Bebidas y el postre a Postres, cada uno con el nombre del combo (RQ-COC-01-02) | func |  |  |
 | TC-CAP-047-03 | HU-CAP-047 · CA-3: dado un pedido con 6 productos, cuando aparece en Bebidas → todo cabe en su tarjeta sin scroll, con las opciones y la nota resaltada (RQ-COC-01-03) | func |  |  |
-| TC-CAP-047-04 | HU-CAP-047 · CA-4: dado una meta de 25 minutos (V1), cuando una comanda pasa los 19 y los 25 minutos → cambia a ámbar y a rojo (RQ-COC-01-04) | func |  |  |
+| TC-CAP-047-04 | HU-CAP-047 · CA-4: contando desde que el cliente terminó su pedido, cuando una comanda pasa los 35 y los 50 minutos → cambia a naranja y a rojo (RQ-COC-01-04) | func |  |  |
 | TC-CAP-047-05 | HU-CAP-047 · CA-5: dado 3 comandas en Bebidas, cuando se ven en una pantalla de 1366 px → se reparten en todo el ancho, sin espacios en blanco por estado (RQ-COC-01-08) | func |  |  |
 | TC-CAP-047-06 | HU-CAP-047 · CA-6: dado un usuario de cocina, cuando elige «Vista general» → ve todas las comandas con el estado de cada área (RQ-COC-01-09) | func |  |  |
 | TC-CAP-047-07 | HU-CAP-047 · CA-7: dado un usuario con un rol sin permiso para esta acción (ACT-CAP-009 repartidor), cuando intenta hacerla desde el menú o escribiendo la dirección de la pantalla → se rechaza en el servidor, no se guarda nada y no se entregan datos (RN-CAP-013, RNF-CAP-006) | advers |  |  |
@@ -361,6 +361,7 @@ Convención: un caso `TC-CAP-<HU>-<NN>` por cada criterio `CA-NN` de la historia
 | TC-CAP-196-05 | HU-CAP-196 · CA-5: dado un repartidor con 3 pedidos tomados, cuando abre el mapa → ve los números 1, 2 y 3 sobre sus puntos según la distancia desde el local y el tiempo de espera, sin ninguna pregunta; puede entregarlos en otro orden (RQ-DEL-02-14) | func |  |  |
 | TC-CAP-196-06 | HU-CAP-196 · CA-6: dado el mapa, cuando el repartidor toca «Rosa Díaz» → ve abajo el código, el total, el vuelto, los botones Llamar, WhatsApp y Navegar, y el botón grande «Tomar pedido» (RQ-DEL-02-15) | integ |  |  |
 | TC-CAP-196-07 | HU-CAP-196 · CA-7: dado un usuario con un rol sin permiso para esta acción (ACT-CAP-004 mozo), cuando intenta hacerla desde el menú o escribiendo la dirección de la pantalla → se rechaza en el servidor, no se guarda nada y no se entregan datos (RN-CAP-013, RNF-CAP-006) | advers |  |  |
+| TC-CAP-196-08 | HU-CAP-196 · CA-8: dado un repartidor con 3 pedidos tomados, cuando intenta tomar un cuarto → no se le asigna y ve el aviso del límite (RQ-DEL-02-20) | func |  |  |
 | TC-CAP-197-01 | HU-CAP-197 · CA-1: dado un pedido tomado, cuando el repartidor pulsa «En camino» → el cliente recibe el mensaje 1 («Tu pedido está en camino, por favor atento a tu celular para recibir la llamada») en menos de un minuto (RQ-DEL-02-16) | func |  |  |
 | TC-CAP-197-02 | HU-CAP-197 · CA-2: dado un repartidor que pulsa «He llegado», cuando el cliente no responde en 2 minutos → recibe el mensaje 3 («Recuerda que el tiempo máximo de espera es de 10 minutos…; si no estás, el repartidor regresará al local con tu pedido») (RQ-DEL-02-17) | func |  |  |
 | TC-CAP-197-03 | HU-CAP-197 · CA-3: dado el mensaje 2 enviado, cuando el cliente toca «Ya salgo» → no se envía el mensaje 3 y el repartidor ve «El cliente respondió» (RQ-DEL-02-18) | func |  |  |
@@ -368,6 +369,7 @@ Convención: un caso `TC-CAP-<HU>-<NN>` por cada criterio `CA-NN` de la historia
 | TC-CAP-197-05 | HU-CAP-197 · CA-5: dado la confirmación Sí/No de la acción, cuando quien la hace responde «No» → no cambia nada y la pantalla queda como estaba (RN-CAP-015, RNF-CAP-012) | func |  |  |
 | TC-CAP-074-01 | HU-CAP-074 · CA-1: dado un pedido en camino, cuando el repartidor toca «No contesta» → el pedido queda con el incidente, la hora y el intento 1 (RQ-DEL-03-01) | func |  |  |
 | TC-CAP-074-02 | HU-CAP-074 · CA-2: dado un reporte, cuando se registra → caja y call center reciben una notificación con el pedido, el motivo y un botón para escribir al cliente (RQ-DEL-03-02) | func |  |  |
+| TC-CAP-074-03 | HU-CAP-074 · CA-3: dado un repartidor que llamó dos veces y escribió una, cuando reporta «No contesta» → se guardan los tres intentos con su hora y la foto opcional en la carpeta privada (RQ-DEL-03-10) | func |  |  |
 | TC-CAP-075-01 | HU-CAP-075 · CA-1: dado un «No encuentro la dirección», cuando caja corrige el punto → el repartidor ve la nueva ubicación y un aviso «Dirección corregida» (RQ-DEL-03-03) | func |  |  |
 | TC-CAP-075-02 | HU-CAP-075 · CA-2: dado 2 intentos y 10 minutos configurados, cuando se llega al segundo intento o a los 10 minutos → el repartidor ve «Volver a la tienda» como recomendación (RQ-DEL-03-04) | func |  |  |
 | TC-CAP-076-01 | HU-CAP-076 · CA-1: dado un pedido devuelto a la tienda, cuando un repartidor revisa los disponibles → no lo ve; en caja figura «En coordinación» (RQ-DEL-03-05) | func |  |  |
@@ -1004,9 +1006,9 @@ Ejecutado por IA: (nada ejecutado; plan generado por IA) - Consolidado y aprobad
 | HU-CAP-071 | H1 | 5 | TC-CAP-071-01 a 05 | 0 |
 | HU-CAP-072 | H1 | 4 | TC-CAP-072-01 a 04 | 0 |
 | HU-CAP-073 | H1 | 4 | TC-CAP-073-01 a 04 | 0 |
-| HU-CAP-196 | H1 | 7 | TC-CAP-196-01 a 07 | 0 |
+| HU-CAP-196 | H1 | 8 | TC-CAP-196-01 a 08 | 0 |
 | HU-CAP-197 | H1 | 5 | TC-CAP-197-01 a 05 | 0 |
-| HU-CAP-074 | H1 | 2 | TC-CAP-074-01 a 02 | 0 |
+| HU-CAP-074 | H1 | 3 | TC-CAP-074-01 a 03 | 0 |
 | HU-CAP-075 | H1 | 2 | TC-CAP-075-01 a 02 | 0 |
 | HU-CAP-076 | H1 | 3 | TC-CAP-076-01 a 03 | 0 |
 | HU-CAP-077 | H1 | 3 | TC-CAP-077-01 a 03 | 0 |
@@ -1130,4 +1132,4 @@ Ejecutado por IA: (nada ejecutado; plan generado por IA) - Consolidado y aprobad
 | HU-CAP-193 | H2 | 3 | TC-CAP-193-01 a 03 | 0 |
 | HU-CAP-194 | H2 | 2 | TC-CAP-194-01 a 02 | 0 |
 
-**Totales:** 687 criterios en 201 historias = 687 casos TC (0 complementos) + 10 E2E + 12 SEC + 7 PERF + 5 REG = **721 casos**.
+**Totales:** 689 criterios en 201 historias = 689 casos TC (0 complementos) + 10 E2E + 12 SEC + 7 PERF + 5 REG = **723 casos**.

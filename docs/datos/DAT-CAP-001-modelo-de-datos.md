@@ -225,6 +225,7 @@ Todo el personal lee las dos tablas; solo `ADMIN` cambia el estado. Cada acción
 | Cierre ciego y anulación con PIN de la supervisora | `cierre_caja.resultado`, `aprobado_por`; tabla `conteo_cierre`; `pedido.anulacion_aprobada_por` con `check` | DT-61 |
 | Crédito del personal por semana o rango | `consumo_personal.fecha` (antes `anio_mes`) | DT-63 |
 | Horario de trabajo, coberturas y aviso del almacén | tablas `horario_trabajo`, `cobertura_turno`; `pedido_interno.avisado_party_id`, `recibido_por/en`, estado `RECIBIDO` | DT-64 |
+| Evidencia de la entrega fallida | `incidente_entrega.contactos jsonb` y `foto_archivo_id` | DT-70 |
 | Compras sin lote ni vencimiento | se quitan `compra_linea.lote`, `compra_linea.vence` e `insumo.perecible` | DT-64 |
 
 Todo lo anterior se probó en PostgreSQL 16 (`postgres:16-alpine`) el 21/10/2026: 102 tablas y 3 vistas, sin errores.

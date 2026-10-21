@@ -41,7 +41,7 @@ tags: [cocina, plt-03, ep-cap-006, ft-coc-01, debe-tener]
 | RQ-COC-01-01 | Un pedido que pasa a cocina aparece en la pantalla de cada área con solo sus productos. | Debe tener | NEC-CAP-020 · RN-CAP-002 | Dado un pedido con un frappé y un sándwich, cuando pasa a cocina, entonces Bebidas ve el frappé, Salados ve el sándwich y Postres no ve nada. | Propuesto |
 | RQ-COC-01-02 | Las partes de un combo van cada una a su área. | Debe tener | RN-CAP-035 | Dado un combo de bebida y postre, cuando pasa a cocina, entonces la bebida va a Bebidas y el postre a Postres, cada uno con el nombre del combo. | Propuesto |
 | RQ-COC-01-03 | La comanda muestra ticket, mozo o canal, modalidad, cronómetro, productos con opciones y notas sin desplazar. | Debe tener | NEC-CAP-020 · NEC-CAP-037 | Dado un pedido con 6 productos, cuando aparece en Bebidas, entonces todo cabe en su tarjeta sin scroll, con las opciones y la nota resaltada. | Propuesto |
-| RQ-COC-01-04 | Al llegar un pedido suena un aviso y el color cambia según el tiempo frente a la meta. | Debe tener | RN-CAP-022 | Dada una meta de 25 minutos (V1), cuando una comanda pasa los 19 y los 25 minutos, entonces cambia a ámbar y a rojo. | Propuesto |
+| RQ-COC-01-04 | Al llegar un pedido suena un aviso y el color cambia según el tiempo frente a la meta. | Debe tener | RN-CAP-022 | Contando desde que el cliente terminó su pedido, cuando una comanda pasa los 35 minutos (retraso) y los 50 (crítico), entonces cambia a naranja y a rojo: son los tiempos que dio Kevin (25 ideal, 35 retraso, 50 crítico) y los mismos del mapa de reparto, configurables. | Propuesto |
 | RQ-COC-01-05 | Cada comanda tiene un solo botón, «Despejar», que el área toca cuando terminó su parte; no hay «empezar a preparar». | Debe tener | NEC-CAP-072 · DT-58 | Dado un pedido que llega a Bebidas, cuando el barista lo termina y toca «Despejar», entonces la comanda sale de la pantalla con un toque y queda en el Historial con la hora; no hay otro botón de estado. | Propuesto |
 | RQ-COC-01-06 | El pedido queda listo cuando todas sus áreas despejaron su parte. | Debe tener | RN-CAP-084 (1.ª) · DT-58 | Dado un pedido de dos áreas, cuando solo Bebidas despeja, entonces el pedido sigue «En cocina» y despacho ve que falta Salados; cuando Salados despeja, pasa a «Listo» y se avisa a despacho, caja o al mozo. | Propuesto |
 | RQ-COC-01-07 | El Historial del día muestra lo despejado con su hora de llegada y de despeje, y devuelve a la pantalla una comanda despejada por error. | Debe tener | DT-58 · Acta 03 | Dada una comanda despejada por error, cuando el área abre «Historial» y toca «Devolver» con Sí/No, entonces vuelve a su pantalla, el pedido regresa a «En cocina» si estaba listo y el cambio queda en el Historial de acciones. | Propuesto |
@@ -116,7 +116,7 @@ Decisiones técnicas que la rigen (ADR propuestos, G3): ADR-001, ADR-011, ADR-01
 **Preguntas abiertas**
 
 1. **Equipos del local** — computadoras de cada área y TV (DEP-03). El BRD dice 3 áreas con computadora propia; despacho necesita una pantalla o usa la copia impresa (FT-COC-02).
-2. **Umbrales de color** — propuesta: ámbar al 75 % de la meta y rojo al pasarla.
+2. **Umbrales de color** — D-33 resuelta (21/10/2026): Kevin no dio un tiempo propio para cocina; se usan sus tiempos contados desde que el cliente terminó el pedido (25 ideal, naranja desde 35, rojo desde 50).
 
 ---
 

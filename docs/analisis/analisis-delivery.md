@@ -84,8 +84,8 @@ tags: [analisis, apoyo, delivery]
   - Cada repartidor tiene su usuario.
   - «Tomar pedido» lo asigna, y si dos lo intentan a la vez solo uno lo recibe; el bloqueo es en el servidor (RNF-CAP-010).
   - Caja puede reasignar.
+- **Resuelto (DT-68, 21/10/2026):** hasta 3 pedidos a la vez, configurable.
 - **Falta:**
-  - El límite de pedidos simultáneos (D-32).
   - Qué pasa con los pedidos de un repartidor que termina su turno. Con el horario de trabajo (DT-64), el sistema puede avisar a caja.
 
 ## P5. Tiempos
@@ -94,7 +94,8 @@ tags: [analisis, apoyo, delivery]
   - Se le dice al cliente de 25 a 35 minutos (V1), y la alta demanda le suma minutos.
   - El mapa se pone naranja desde los 35 minutos y rojo desde los 50 (D-29).
   - La pantalla de cocina se pone ámbar a los 19 minutos y roja a los 25.
-- **Falta:**
+- **Resuelto (DT-69, 21/10/2026):** revisado el audio, Kevin no dio un tiempo para cocina; dio 25 ideal, 35 retraso y 50 crítico contados desde que el cliente terminó el pedido. Cocina y reparto usan esos mismos tiempos.
+- **Antes se proponía:**
   - **Una meta de cocina coherente con la de entrega (D-33).** Si el cliente espera como mucho 35 minutos y el viaje toma de 10 a 15, cocina debería tener lista la comanda en unos 15 a 20 minutos. Propuesta: meta de cocina de 15 minutos para delivery, que se ajusta con la medición.
   - **Línea base:** hoy no se mide. El sistema registra las horas de toma, salida, llegada y entrega desde el primer día (FT-DEL-02, RQ de estados).
 
@@ -110,7 +111,8 @@ tags: [analisis, apoyo, delivery]
   - Al reportar «No contesta», el sistema guarda cada intento de llamada y de mensaje con su hora (sale de los botones Llamar y WhatsApp).
   - Permite una foto opcional de la puerta.
   - Esto sirve como prueba si el cliente reclama.
-  - Riesgo: la foto puede mostrar personas o casas, que son datos personales. Se guarda en la carpeta privada (ADR-005) y se borra a los 30 días.
+  - Riesgo: la foto puede mostrar personas o casas, que son datos personales. Se guarda en la carpeta privada (ADR-005).
+- **Resuelto (DT-70, 21/10/2026):** se adopta la propuesta, pero la foto **no se borra a los 30 días**: se conserva como el Historial de acciones (2 años y luego archivo cifrado). La ley pide un plazo definido, que se fija en la política de privacidad (D-18).
 
 ## P8. Pedido que se cocina sin pago
 
@@ -119,7 +121,7 @@ tags: [analisis, apoyo, delivery]
   - «Pago por coordinar» en caja.
   - La anulación con motivo y el PIN de la supervisora.
   - Un recordatorio a los 5 minutos.
-- **Falta (D-26):** decidir si el chatbot sigue la misma regla y si hace falta un freno. Propuesta: el primer pedido de un teléfono nuevo por encima de cierto monto (por ejemplo S/ 80) espera la confirmación del asesor. Es simple y cubre el caso de riesgo sin frenar a los clientes conocidos.
+- **Resuelto (DT-71, 21/10/2026):** todo directo, también el chatbot, **sin freno**. Riesgo aceptado; se mide cuántos pedidos se anulan por falta de pago.
 
 ## P9. Zonas y tarifas
 
@@ -146,10 +148,10 @@ tags: [analisis, apoyo, delivery]
 
 ## Preguntas abiertas para Kevin
 
-1. ¿Cuántos pedidos puede llevar a la vez un repartidor (D-32)? Propuesta: hasta 3.
-2. ¿Qué meta de tiempo quiere para cocina en delivery (D-33)? Propuesta: 15 minutos.
-3. ¿Quiere foto y registro de llamadas en las entregas fallidas (D-34)? ¿Cuántos días se guarda la foto?
-4. ¿El primer pedido de un cliente nuevo por encima de S/ 80 debe esperar confirmación (D-26)?
+1. ~~¿Cuántos pedidos lleva un repartidor (D-32)?~~ Resuelto: hasta 3 (DT-68).
+2. ~~¿Meta de cocina (D-33)?~~ Resuelto: los tiempos de Kevin, 25/35/50 (DT-69).
+3. ~~¿Evidencia en entregas fallidas (D-34)?~~ Resuelto: llamadas y foto opcional, sin borrado a los 30 días (DT-70).
+4. ~~¿Freno a clientes nuevos (D-26)?~~ Resuelto: sin freno (DT-71).
 5. ¿Las tarifas y zonas vigentes (D-03)?
 6. ¿La plantilla de los tres mensajes (D-27) y quién asume el costo de Meta (D-08)?
 7. Los colores del mapa: ¿verde hasta 35 y rojo desde 50 (D-29)?

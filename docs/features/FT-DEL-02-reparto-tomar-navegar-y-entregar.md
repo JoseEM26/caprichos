@@ -57,6 +57,7 @@ tags: [delivery, plt-03, ep-cap-008, ft-del-02, debe-tener]
 | RQ-DEL-02-17 | Al pulsar «He llegado» se envía el mensaje 2 y, si el cliente no responde en el tiempo configurado, el mensaje 3 con la espera máxima de 10 minutos. | Debería tener | DT-60 · D-27 | Dado un repartidor que pulsa «He llegado», cuando el cliente no responde en 2 minutos, entonces recibe el mensaje 3 («Recuerda que el tiempo máximo de espera es de 10 minutos…; si no estás, el repartidor regresará al local con tu pedido»). | Propuesto |
 | RQ-DEL-02-18 | Si el cliente responde por WhatsApp (con un botón o un texto), no se envían los mensajes siguientes. | Debería tener | DT-60 | Dado el mensaje 2 enviado, cuando el cliente toca «Ya salgo», entonces no se envía el mensaje 3 y el repartidor ve «El cliente respondió». | Propuesto |
 | RQ-DEL-02-19 | Los textos de los mensajes de reparto y los minutos entre ellos los edita el administrador. | Debería tener | DT-60 · Acta 03 | Dado el mensaje 1, cuando el administrador cambia el texto en Configuración ▸ Mensajes con Sí/No, entonces los siguientes envíos usan el nuevo texto. | Propuesto |
+| RQ-DEL-02-20 | Un repartidor puede tener hasta 3 pedidos tomados a la vez (configurable). | Debe tener | D-32 · DT-59 | Dado un repartidor con 3 pedidos tomados, cuando intenta tomar un cuarto, entonces ve «Ya llevas 3 pedidos: entrega uno antes de tomar otro»; el administrador cambia el límite en Configuración. | Propuesto |
 
 Prioridad por NEC-CAP-009, 015 y 079 (E1) y por el acta 03 (DT-59). Los mensajes al cliente (RQ-DEL-02-16 a 19) son *Debería tener* porque dependen del acceso a WhatsApp de Meta y del costo de sus plantillas (DEP-12, D-08, R-04). Todos nacen *Propuesto* hasta que el PO los apruebe (DT-48).
 
@@ -107,6 +108,7 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RQ-DEL-02-17 | HU-CAP-197 | D-27 · FT-DEL-03 | R-04 |
 | RQ-DEL-02-18 | HU-CAP-197 | DEP-12 | R-01 |
 | RQ-DEL-02-19 | HU-CAP-197 | FT-CFG-02 · plantilla de Kevin (acta 03) | R-01 |
+| RQ-DEL-02-20 | HU-CAP-196 | FT-CFG-02 | R-01 |
 
 Historias de usuario de esta feature (en `historias/`, en draft):
 
@@ -130,7 +132,7 @@ Decisiones técnicas que la rigen (ADR propuestos, G3): ADR-001, ADR-011, ADR-01
 
 1. **Colores del mapa** — D-29. Propuesta: verde hasta 35 minutos, naranja de 35 a 50, rojo desde 50.
 2. **Momento de los mensajes 2 y 3 y sus textos** — D-27. Propuesta: desde «He llegado», cada 2 minutos; Kevin envía su plantilla.
-3. **¿Un repartidor puede tomar varios pedidos a la vez?** Propuesta: sí, hasta 3, configurable.
+3. **¿Un repartidor puede tomar varios pedidos a la vez?** — D-32 resuelta por José (21/10/2026): hasta 3, configurable (RQ-DEL-02-20).
 4. **¿Caja puede asignar un pedido a un repartidor?** Propuesta: sí, como respaldo, con aviso al repartidor.
 
 ---

@@ -42,7 +42,7 @@ tags: [hu, cocina, capa-a, ft-coc-01, alta, ui]
 | CA-1 | un pedido con un frappé y un sándwich | pasa a cocina | Bebidas ve el frappé, Salados ve el sándwich y Postres no ve nada (RQ-COC-01-01) |
 | CA-2 | un combo de bebida y postre | pasa a cocina | la bebida va a Bebidas y el postre a Postres, cada uno con el nombre del combo (RQ-COC-01-02) |
 | CA-3 | un pedido con 6 productos | aparece en Bebidas | todo cabe en su tarjeta sin scroll, con las opciones y la nota resaltada (RQ-COC-01-03) |
-| CA-4 | una meta de 25 minutos (V1) | una comanda pasa los 19 y los 25 minutos | cambia a ámbar y a rojo (RQ-COC-01-04) |
+| CA-4 | el tiempo desde que el cliente terminó su pedido | una comanda pasa los 35 y los 50 minutos | cambia a naranja y a rojo (RQ-COC-01-04) |
 | CA-5 | 3 comandas en Bebidas | se ven en una pantalla de 1366 px | se reparten en todo el ancho, sin espacios en blanco por estado (RQ-COC-01-08) |
 | CA-6 | un usuario de cocina | elige «Vista general» | ve todas las comandas con el estado de cada área (RQ-COC-01-09) |
 | CA-7 | un usuario con un rol sin permiso para esta acción (ACT-CAP-009 repartidor) | intenta hacerla desde el menú o escribiendo la dirección de la pantalla | se rechaza en el servidor, no se guarda nada y no se entregan datos (RN-CAP-013, RNF-CAP-006) |

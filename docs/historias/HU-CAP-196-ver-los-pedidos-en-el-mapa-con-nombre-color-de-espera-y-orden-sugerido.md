@@ -46,6 +46,7 @@ tags: [hu, delivery, capa-a, ft-del-02, alta, ui]
 | CA-5 | un repartidor con 3 pedidos tomados | abre el mapa | ve los números 1, 2 y 3 sobre sus puntos según la distancia desde el local y el tiempo de espera, sin ninguna pregunta; puede entregarlos en otro orden (RQ-DEL-02-14) |
 | CA-6 | el mapa | el repartidor toca «Rosa Díaz» | ve abajo el código, el total, el vuelto, los botones Llamar, WhatsApp y Navegar, y el botón grande «Tomar pedido» (RQ-DEL-02-15) |
 | CA-7 | un usuario con un rol sin permiso para esta acción (ACT-CAP-004 mozo) | intenta hacerla desde el menú o escribiendo la dirección de la pantalla | se rechaza en el servidor, no se guarda nada y no se entregan datos (RN-CAP-013, RNF-CAP-006) |
+| CA-8 | un repartidor con 3 pedidos tomados | intenta tomar un cuarto | ve «Ya llevas 3 pedidos: entrega uno antes de tomar otro» y no se le asigna; el límite se cambia en Configuración (RQ-DEL-02-20) |
 
 Origen: criterios de verificación de FT-DEL-02 (RQ-DEL-02-10, RQ-DEL-02-11, RQ-DEL-02-12, RQ-DEL-02-13, RQ-DEL-02-14, RQ-DEL-02-15); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
 

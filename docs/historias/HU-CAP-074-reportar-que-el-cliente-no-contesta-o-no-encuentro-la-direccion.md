@@ -41,6 +41,7 @@ tags: [hu, delivery, capa-a, ft-del-03, alta, ui]
 |---|---|---|---|
 | CA-1 | un pedido en camino | el repartidor toca «No contesta» | el pedido queda con el incidente, la hora y el intento 1 (RQ-DEL-03-01) |
 | CA-2 | un reporte | se registra | caja y call center reciben una notificación con el pedido, el motivo y un botón para escribir al cliente (RQ-DEL-03-02) |
+| CA-3 | un repartidor que tocó «Llamar» dos veces y «WhatsApp» una vez | reporta «No contesta» | el pedido guarda los tres intentos con su hora y, si toma una foto de la puerta, queda en la carpeta privada; caja la ve si el cliente reclama (RQ-DEL-03-10) |
 
 Origen: criterios de verificación de FT-DEL-03 (RQ-DEL-03-01, RQ-DEL-03-02); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
 

@@ -47,6 +47,7 @@ tags: [delivery, plt-03, ep-cap-008, ft-del-03, debe-tener]
 | RQ-DEL-03-07 | Reprogramar puede sumar un recargo configurable. | Podría tener | NEC-CAP-104 | Dado un recargo de S/ 3, cuando caja reprograma con recargo, entonces el total sube S/ 3 y el cliente lo ve en el mensaje. | Propuesto |
 | RQ-DEL-03-08 | Lo preparado y no entregado se registra como merma informativa de origen Reparto, sin descontar stock otra vez. | Debería tener | RN-CAP-126 | Dado un pedido devuelto con un frappé, cuando caja registra su destino «desecho», entonces queda una merma informativa sin movimiento de stock. | Propuesto |
 | RQ-DEL-03-09 | Tiempos, intentos, recargo y recomendación se configuran. | Debería tener | NEC-CAP-104 | Dada la configuración, cuando el administrador cambia los intentos de 2 a 3 con Sí/No, entonces la recomendación de volver sale al tercer intento. | Propuesto |
+| RQ-DEL-03-10 | Al reportar un problema, cada llamada y mensaje de WhatsApp al cliente queda con su hora, y el repartidor puede agregar una foto de la puerta. | Debe tener | D-34 · Acta 03 | Dado un repartidor que tocó «Llamar» dos veces y «WhatsApp» una vez, cuando reporta «No contesta», entonces el pedido guarda los tres intentos con su hora y, si toma una foto, queda en la carpeta privada; caja la ve si el cliente reclama. | Propuesto |
 
 Prioridad por NEC-CAP-104 (E1). Todos nacen *Propuesto* hasta que el PO los apruebe (DT-48).
 
@@ -81,6 +82,7 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RQ-DEL-03-07 | HU-CAP-076 | — | R-01 |
 | RQ-DEL-03-08 | HU-CAP-077 | FT-ALM-03 | R-01 |
 | RQ-DEL-03-09 | HU-CAP-077 | FT-CFG-02 | R-01 |
+| RQ-DEL-03-10 | HU-CAP-074 | ADR-005 | R-11 |
 
 Historias de usuario de esta feature (en `historias/`, en draft):
 
@@ -100,6 +102,7 @@ Decisiones técnicas que la rigen (ADR propuestos, G3): ADR-001, ADR-011, ADR-01
 
 1. **Tiempos e intentos por defecto** — el acta 03 fija una espera máxima de 10 minutos desde «He llegado» (DT-60); propuesta: 2 intentos.
 2. **¿Quién paga el recargo de reprogramación?** Pendiente de Kevin.
+3. **Evidencia de la entrega fallida** — D-34 resuelta por José (21/10/2026): registro de llamadas y WhatsApp con su hora y foto opcional de la puerta, que **no se borra a los 30 días**; se conserva como el Historial de acciones (2 años en línea y luego archivo cifrado, DT-49). La Ley 29733 pide un plazo definido: confirmarlo en la política de privacidad (D-18).
 
 ---
 

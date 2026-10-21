@@ -523,7 +523,9 @@ create table incidente_entrega (
   pedido_id bigint not null references pedido(id),
   motivo text not null check (motivo in ('NO_CONTESTA','DIRECCION_NO_ENCONTRADA')), intento int not null,
   en timestamptz not null default now(),
-  cierre text check (cierre in ('REPROGRAMADO','DEVUELTO','COBRADO_IGUAL')), recargo numeric(12,2), cerrado_por bigint
+  cierre text check (cierre in ('REPROGRAMADO','DEVUELTO','COBRADO_IGUAL')), recargo numeric(12,2), cerrado_por bigint,
+  contactos jsonb not null default '[]',         -- cada llamada o WhatsApp con su hora (DT-70)
+  foto_archivo_id bigint references archivo(id)  -- foto opcional de la puerta, carpeta privada; se conserva como la auditoría (DT-70)
 );
 create table mensaje_reparto (                  -- avisos al cliente al salir y al llegar (DT-60)
   pedido_id bigint references pedido(id), numero smallint check (numero between 1 and 3),
