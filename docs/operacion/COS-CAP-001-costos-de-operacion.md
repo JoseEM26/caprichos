@@ -22,14 +22,14 @@ tags: [costos, operacion, devops]
 |---|---|---|---|
 | Pedidos de la carta o del bot al día | 10 | 30 | 80 |
 | Dudas al bot de IA al día | 30 | 100 | 300 |
-| **Costo fijo mensual** (VPS y copias; el dominio ya está pagado) | US$ 7.77 | US$ 7.77 | US$ 7.77 |
+| **Costo fijo mensual** (VPS y copias; el dominio ya está pagado) | US$ 9.70 | US$ 9.70 | US$ 9.70 |
 | Costo variable mensual (WhatsApp + IA) | US$ 6.90 | US$ 21.00 | US$ 57.00 |
-| **Total mensual** | **US$ 14.67** | **US$ 28.77** | **US$ 64.77** |
-| En soles (S/ 3.70 por US$) | S/ 54 | S/ 106 | S/ 240 |
+| **Total mensual** | **US$ 16.60** | **US$ 30.70** | **US$ 66.70** |
+| En soles (S/ 3.70 por US$) | S/ 61 | S/ 114 | S/ 247 |
 | **Total anual** | US$ 176.04 | US$ 345.24 | US$ 777.24 |
 | Costo por pedido de la carta o del bot | S/ 0.18 | S/ 0.12 | S/ 0.10 |
 
-**Lectura:** lo más probable para el piloto es el escenario **Bajo a Medio**: entre **S/ 54 y S/ 106 al mes**. El costo fijo no cambia aunque haya más pedidos; lo que sube es WhatsApp.
+**Lectura:** lo más probable para el piloto es el escenario **Bajo a Medio**: entre **S/ 61 y S/ 114 al mes**. El costo fijo no cambia aunque haya más pedidos; lo que sube es WhatsApp.
 
 ## 2. Supuestos
 
@@ -46,10 +46,10 @@ tags: [costos, operacion, devops]
 
 | Servicio | Para qué | Cómo cobra | Mensual |
 |---|---|---|---|
-| **VPS** de 8 vCPU, 8 GB y 100 GB, con Auto Backup y 1 snapshot | Todo el sistema | Fijo | US$ 7.27 |
+| **VPS** Contabo Cloud VPS 6 (6 vCPU, 12 GB, 200 GB SSD, 2 snapshots), región EE. UU. Central, sin Auto Backup; contratado por 1 mes de prueba | Todo el sistema | Fijo | US$ 9.20 |
 | **Dominio** `caprichos.pe` (punto.pe) | Dirección de la carta y del administrativo | **Pagado por 2 años** | US$ 0.00 (ya pagado) |
 | **Copias** fuera del VPS (Cloudflare R2 o Backblaze B2) | Copia diaria de la base y las carpetas | Por GB al mes | ~US$ 0.50 |
-| **Total fijo** | | | **US$ 7.77** (S/ 29) |
+| **Total fijo** | | | **US$ 9.70** (S/ 36) |
 
 Cuando se cumplan los 2 años, el dominio vuelve a costar alrededor de **US$ 36 al año** (US$ 3 al mes si se reparte). Conviene guardar esa cifra para el presupuesto de 2028 y poner un recordatorio de renovación 90 días antes del vencimiento (PCN-CAP-001, escenario E16).
 

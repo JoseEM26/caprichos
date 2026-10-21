@@ -20,7 +20,7 @@ tags: [adr, infraestructura, devops, dokploy, cloudflare, g3]
 
 ## Contexto
 
-Hay un VPS contratado: 8 vCPU, 8 GB de RAM, 100 GB SSD, Auto Backup, 1 snapshot, 200 Mbit/s y tráfico ilimitado por US$ 7,27 al mes (DT-30). El dominio `caprichos.pe` está registrado en punto.pe. José eligió Dokploy, Ansible, Cloudflare, GitHub Actions con GHCR, secretos en Dokploy y GitHub, y tres ambientes (DT-39 a DT-43).
+Hay un VPS contratado (actualizado el 20/10/2026): Contabo Cloud VPS 6 con 6 vCPU, 12 GB de RAM, 200 GB SSD, 2 snapshots, 300 Mbit/s y tráfico ilimitado, sin Auto Backup, por 1 mes de prueba a US$ 9,20 (DT-30). El dominio `caprichos.pe` está registrado en punto.pe. José eligió Dokploy, Ansible, Cloudflare, GitHub Actions con GHCR, secretos en Dokploy y GitHub, y tres ambientes (DT-39 a DT-43).
 
 ## Opciones evaluadas
 

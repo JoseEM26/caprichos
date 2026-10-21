@@ -29,7 +29,7 @@ tags: [continuidad, respaldo, contingencia, devops]
 |---|---|---|---|---|---|---|
 | **Base de datos** (pedidos, cobros, clientes, stock, auditoría) | VPS | Copia cifrada (restic) en R2 o B2, fuera del VPS | Diaria, 03:00 | 30 diarias y 6 mensuales | Técnico | RB-CAP-002 |
 | **Fotos y comprobantes de pago** | VPS (`/data/uploads`) | Misma copia cifrada | Diaria, 03:00 | Igual | Técnico | RB-CAP-002 |
-| **Todo el servidor** (sistema, Docker, Dokploy) | VPS | Auto Backup y 1 snapshot del proveedor | Según el proveedor | Según el plan | Técnico | RB-CAP-004 |
+| **Todo el servidor** (sistema, Docker, Dokploy) | VPS | 2 snapshots del proveedor (Auto Backup opcional, por ahora sin contratar) | Según el proveedor | Según el plan | Técnico | RB-CAP-004 |
 | **Código** | GitHub | Cada equipo que lo clona; las imágenes se reconstruyen | En cada cambio | Historial completo | Técnico | RB-CAP-001 |
 | **Configuración del servidor** | `infra/ansible` en GitHub | El mismo repositorio | En cada cambio | Historial completo | Técnico | RB-CAP-004 |
 | **Secretos y claves** | Dokploy y GitHub Secrets | **Gestor de contraseñas** (con acceso de emergencia a Kevin) | Al crear o rotar | — | Responsable técnico | RB-CAP-005 |

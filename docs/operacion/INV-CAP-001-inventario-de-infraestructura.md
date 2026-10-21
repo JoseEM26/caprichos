@@ -20,8 +20,8 @@ tags: [inventario, infraestructura, devops]
 
 | Campo | Valor |
 |---|---|
-| Proveedor | *(por definir: el VPS de US$ 7,27/mes de DT-30)* |
-| Recursos | 8 vCPU, 8 GB RAM, 100 GB SSD, 200 Mbit/s, tráfico ilimitado, Auto Backup y 1 snapshot |
+| Proveedor | Contabo, Cloud VPS 6, región EE. UU. Central, contratado el 20/10/2026 por 1 mes de prueba (US$ 9,20). La IP no se guarda en el repositorio. |
+| Recursos | 6 vCPU, 12 GB RAM, 200 GB SSD (193 GB útiles), Ubuntu 24.04 LTS, 2 snapshots, tráfico ilimitado, sin Auto Backup |
 | Sistema | Ubuntu LTS |
 | IP pública | *(al crear el VPS)* — no se publica en el DNS: solo Cloudflare la conoce |
 | Acceso | SSH con llave, usuario `deploy` (RB-CAP-004) |
@@ -59,7 +59,7 @@ Firewall (UFW): 22 (SSH con llave) y 80/443 solo desde los rangos de Cloudflare.
 
 | Servicio | Para qué | Cuenta a nombre de | Administra | Costo |
 |---|---|---|---|---|
-| Proveedor del VPS | Servidor | *(por definir)* | José | US$ 7,27/mes (detalle de todos los costos en COS-CAP-001) |
+| Proveedor del VPS | Servidor | Contabo | José | US$ 9,20/mes el primer mes de prueba; luego se decide 12 o 24 meses (detalle en COS-CAP-001) |
 | punto.pe | Registro de `caprichos.pe` | *(por confirmar con Kevin)* | Kevin | **Pagado por 2 años** (vence: *por completar*; renovación ~US$ 36 al año, por confirmar) |
 | Cloudflare | DNS, proxy, HTTPS, Access | *(por definir)* | José | Gratis |
 | GitHub (JoseEM26) | Código, CI, GHCR | José | José | Gratis (cuota de Actions) |
