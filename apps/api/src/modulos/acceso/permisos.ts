@@ -28,6 +28,15 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'configuracion', accion: 'ver' },
   { modulo: 'configuracion', accion: 'editar' },
   { modulo: 'auditoria', accion: 'ver' },
+  { modulo: 'catalogo', accion: 'ver' },
+  { modulo: 'catalogo', accion: 'crear' },
+  { modulo: 'catalogo', accion: 'editar' },
+  { modulo: 'catalogo', accion: 'agotar' },
+  { modulo: 'catalogo', accion: 'ocultar' },
+  { modulo: 'local', accion: 'ver' },
+  { modulo: 'local', accion: 'editar' },
+  { modulo: 'archivos', accion: 'subir' },
+  { modulo: 'archivos', accion: 'ver' },
 ] as const;
 
 export const MATRIZ: Record<string, string[]> = {

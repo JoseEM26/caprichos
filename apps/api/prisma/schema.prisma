@@ -141,3 +141,183 @@ model Auditoria {
   @@index([entidad, entidad_id], map: "ix_auditoria_entidad")
   @@map("auditoria")
 }
+
+// ---------- Ola 2: catálogo, local y archivos (FT-CAR-01, FT-CFG-01/02, ADR-012) ----------
+
+model Lista {
+  id      BigInt          @id @default(autoincrement())
+  codigo  String          @unique
+  nombre  String
+  valores ListaValor[]
+  grupos  GrupoOpciones[]
+
+  @@map("lista")
+}
+
+model ListaValor {
+  id              BigInt           @id @default(autoincrement())
+  lista_id        BigInt
+  nombre          String
+  orden           Int              @default(0)
+  activo          Boolean          @default(true)
+  lista           Lista            @relation(fields: [lista_id], references: [id])
+  productoTamanos ProductoTamano[]
+  opciones        Opcion[]
+
+  @@unique([lista_id, nombre])
+  @@map("lista_valor")
+}
+
+model HorarioDia {
+  dia_semana Int       @id @db.SmallInt
+  abre       DateTime? @db.Time
+  cierra     DateTime? @db.Time
+  cerrado    Boolean   @default(false)
+
+  @@map("horario_dia")
+}
+
+model FechaEspecial {
+  fecha   DateTime  @id @db.Date
+  cerrado Boolean
+  abre    DateTime? @db.Time
+  cierra  DateTime? @db.Time
+  motivo  String?
+
+  @@map("fecha_especial")
+}
+
+model Archivo {
+  id         BigInt     @id @default(autoincrement())
+  ruta       String     @unique
+  tipo_mime  String
+  bytes      Int
+  privado    Boolean    @default(false)
+  foto_local FotoLocal?
+  productos  Producto[]
+
+  @@map("archivo")
+}
+
+model FotoLocal {
+  archivo_id BigInt  @id
+  orden      Int     @default(0)
+  activo     Boolean @default(true)
+  archivo    Archivo @relation(fields: [archivo_id], references: [id])
+
+  @@map("foto_local")
+}
+
+model AreaCocina {
+  id         BigInt      @id @default(autoincrement())
+  nombre     String      @unique
+  propia     Boolean     @default(false)
+  impresora  String?
+  etiquetera String?
+  activo     Boolean     @default(true)
+  categorias Categoria[]
+
+  @@map("area_cocina")
+}
+
+model Categoria {
+  id             BigInt     @id @default(autoincrement())
+  nombre         String     @unique
+  lleva_opciones Boolean    @default(true)
+  area_id        BigInt
+  orden          Int        @default(0)
+  oculta         Boolean    @default(false)
+  area           AreaCocina @relation(fields: [area_id], references: [id])
+  productos      Producto[]
+
+  @@map("categoria")
+}
+
+model Producto {
+  id                 BigInt           @id @default(autoincrement())
+  categoria_id       BigInt
+  nombre             String           @unique
+  descripcion        String?
+  foto_archivo_id    BigInt?
+  precio             Decimal          @db.Decimal(12, 2)
+  por_lote           Boolean          @default(false)
+  vida_util_horas    Int?
+  orden              Int              @default(0)
+  oculto             Boolean          @default(false)
+  agotado_hasta      DateTime?        @db.Timestamptz
+  no_suma_beneficios Boolean          @default(false)
+  categoria          Categoria        @relation(fields: [categoria_id], references: [id])
+  foto_archivo       Archivo?         @relation(fields: [foto_archivo_id], references: [id])
+  tamanos            ProductoTamano[]
+  grupos             ProductoGrupo[]
+  sabores            Sabor[]
+
+  @@map("producto")
+}
+
+model ProductoTamano {
+  id              BigInt     @id @default(autoincrement())
+  producto_id     BigInt
+  tamano_valor_id BigInt
+  precio          Decimal    @db.Decimal(12, 2)
+  activo          Boolean    @default(true)
+  producto        Producto   @relation(fields: [producto_id], references: [id])
+  tamano_valor    ListaValor @relation(fields: [tamano_valor_id], references: [id])
+
+  @@unique([producto_id, tamano_valor_id])
+  @@map("producto_tamano")
+}
+
+model GrupoOpciones {
+  id          BigInt          @id @default(autoincrement())
+  nombre      String          @unique
+  lista_id    BigInt?
+  obligatorio Boolean         @default(false)
+  minimo      Int             @default(0)
+  maximo      Int             @default(1)
+  activo      Boolean         @default(true)
+  lista       Lista?          @relation(fields: [lista_id], references: [id])
+  opciones    Opcion[]
+  productos   ProductoGrupo[]
+
+  @@map("grupo_opciones")
+}
+
+model Opcion {
+  id            BigInt        @id @default(autoincrement())
+  grupo_id      BigInt
+  valor_id      BigInt
+  precio_extra  Decimal       @default(0) @db.Decimal(12, 2)
+  activo        Boolean       @default(true)
+  agotado_hasta DateTime?     @db.Timestamptz
+  grupo         GrupoOpciones @relation(fields: [grupo_id], references: [id])
+  valor         ListaValor    @relation(fields: [valor_id], references: [id])
+
+  @@unique([grupo_id, valor_id])
+  @@map("opcion")
+}
+
+model ProductoGrupo {
+  id          BigInt        @id @default(autoincrement())
+  producto_id BigInt
+  grupo_id    BigInt
+  orden       Int           @default(0)
+  producto    Producto      @relation(fields: [producto_id], references: [id])
+  grupo       GrupoOpciones @relation(fields: [grupo_id], references: [id])
+
+  @@unique([producto_id, grupo_id])
+  @@map("producto_grupo")
+}
+
+model Sabor {
+  id            BigInt    @id @default(autoincrement())
+  producto_id   BigInt
+  nombre        String
+  activo        Boolean   @default(true)
+  agotado_hasta DateTime? @db.Timestamptz
+  producto      Producto  @relation(fields: [producto_id], references: [id])
+
+  @@unique([producto_id, nombre])
+  @@map("sabor")
+}
+

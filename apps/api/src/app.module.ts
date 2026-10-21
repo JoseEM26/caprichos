@@ -10,6 +10,9 @@ import { AccesoModule } from './modulos/acceso/acceso.module';
 import { AuditoriaModule } from './modulos/auditoria/auditoria.module';
 import { UsuariosModule } from './modulos/usuarios/usuarios.module';
 import { ConfiguracionModule } from './modulos/configuracion/configuracion.module';
+import { CatalogoModule } from './modulos/catalogo/catalogo.module';
+import { LocalModule } from './modulos/local/local.module';
+import { ArchivosModule } from './modulos/archivos/archivos.module';
 
 @Module({
   imports: [
@@ -24,6 +27,9 @@ import { ConfiguracionModule } from './modulos/configuracion/configuracion.modul
     AccesoModule,
     UsuariosModule,
     ConfiguracionModule,
+    ArchivosModule,
+    CatalogoModule,
+    LocalModule,
   ],
   providers: [
     PinoLoggerService,

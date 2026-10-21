@@ -112,7 +112,7 @@ describe('ConfiguracionService', () => {
       }
     });
 
-    it('valor no numérico o negativo → rechaza con 400 VALOR_INVALIDO', async () => {
+    it('valor no numérico o negativo para clave numérica → rechaza con 400 VALOR_INVALIDO', async () => {
       await expect(
         service.actualizar('pedido_minimo', -10, adminAuth),
       ).rejects.toThrow(BadRequestException);
@@ -132,23 +132,79 @@ describe('ConfiguracionService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
+    it('valor no texto para clave de texto → rechaza con 400 VALOR_INVALIDO', async () => {
+      await expect(
+        service.actualizar('envio_gratis_modo', 123, adminAuth),
+      ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        service.actualizar('envio_gratis_modo', '   ', adminAuth),
+      ).rejects.toThrow(BadRequestException);
+    });
+
     it('permite todas las claves válidas especificadas', async () => {
-      const clavesValidas = [
+      const clavesNumericas = [
         'tiempo_prometido_min',
+        'tiempo_max_min',
         'envio_gratis_monto',
         'pedido_minimo',
         'tolerancia_reserva_min',
         'puntos_porcentaje',
         'descuento_personal_pct',
+        'rep_naranja_min',
+        'rep_rojo_min',
+        'rep_max_pedidos',
       ];
 
-      for (const clave of clavesValidas) {
+      for (const clave of clavesNumericas) {
         prismaMock.parametro.findUnique.mockResolvedValue(null);
         prismaMock.parametro.upsert.mockResolvedValue({ clave, valor: 5 });
 
         const res = await service.actualizar(clave, 5, adminAuth);
         expect(res.clave).toBe(clave);
       }
+
+      prismaMock.parametro.findUnique.mockResolvedValue(null);
+      prismaMock.parametro.upsert.mockResolvedValue({
+        clave: 'envio_gratis_modo',
+        valor: 'MONTO',
+      });
+      const resModo = await service.actualizar('envio_gratis_modo', 'MONTO', adminAuth);
+      expect(resModo.valor).toBe('MONTO');
+    });
+  });
+
+  describe('actualizarPausaAltaDemanda', () => {
+    it('activa la pausa por alta demanda y audita', async () => {
+      prismaMock.parametro.findUnique.mockResolvedValue({
+        clave: 'pausa_alta_demanda',
+        valor: { activa: false, motivo: null },
+      });
+
+      prismaMock.parametro.upsert.mockResolvedValue({
+        clave: 'pausa_alta_demanda',
+        valor: { activa: true, motivo: 'Demasiados pedidos en cola' },
+      });
+
+      const res = await service.actualizarPausaAltaDemanda(
+        { activa: true, motivo: 'Demasiados pedidos en cola' },
+        adminAuth,
+        '127.0.0.1',
+      );
+
+      expect(res.clave).toBe('pausa_alta_demanda');
+      expect((res.valor as any)?.activa).toBe(true);
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          categoria: 'CAMBIO',
+          modulo: 'configuracion',
+          accion: 'PAUSA_ALTA_DEMANDA',
+          despues: {
+            clave: 'pausa_alta_demanda',
+            valor: { activa: true, motivo: 'Demasiados pedidos en cola' },
+          },
+        }),
+      );
     });
   });
 });
