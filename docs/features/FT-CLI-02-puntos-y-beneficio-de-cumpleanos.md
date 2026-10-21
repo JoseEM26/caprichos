@@ -108,7 +108,7 @@ Decisiones técnicas que la rigen (ADR propuestos, G3): ADR-001, ADR-011, ADR-01
 
 **Preguntas abiertas**
 
-1. **¿Sobre qué se calcula el 5 %?** — D-25. Propuesta: solo productos, sin envío, y solo sobre lo pagado con dinero.
+1. **¿Sobre qué se calcula el 5 %?** — D-25 resuelta (DT-73, 21/10/2026): solo productos, sin envío ni lo pagado con puntos.
 2. **¿Los puntos vencen?** Propuesta: no vencen en la primera versión.
 3. **Beneficio de cumpleaños** — qué descuento y cuántos días vale (pendiente de Kevin).
 

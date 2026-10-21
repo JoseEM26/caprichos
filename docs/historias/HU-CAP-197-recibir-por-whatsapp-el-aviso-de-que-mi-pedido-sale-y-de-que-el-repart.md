@@ -40,7 +40,7 @@ tags: [hu, delivery, capa-a, ft-del-02, media]
 | N.° | DADO | CUANDO | ENTONCES |
 |---|---|---|---|
 | CA-1 | un pedido tomado | el repartidor pulsa «En camino» | el cliente recibe el mensaje 1 («Tu pedido está en camino, por favor atento a tu celular para recibir la llamada») en menos de un minuto (RQ-DEL-02-16) |
-| CA-2 | un repartidor que pulsa «He llegado» | el cliente no responde en 2 minutos | recibe el mensaje 3 («Recuerda que el tiempo máximo de espera es de 10 minutos…; si no estás, el repartidor regresará al local con tu pedido») (RQ-DEL-02-17) |
+| CA-2 | un repartidor que pulsa «He llegado» | el cliente no responde en minuto y medio | recibe el mensaje 3 («Recuerda que el tiempo máximo de espera es de 10 minutos…; si no estás, el repartidor regresará al local con tu pedido») (RQ-DEL-02-17) |
 | CA-3 | el mensaje 2 enviado | el cliente toca «Ya salgo» | no se envía el mensaje 3 y el repartidor ve «El cliente respondió» (RQ-DEL-02-18) |
 | CA-4 | el mensaje 1 | el administrador cambia el texto en Configuración ▸ Mensajes con Sí/No | los siguientes envíos usan el nuevo texto (RQ-DEL-02-19) |
 | CA-5 | la confirmación Sí/No de la acción | quien la hace responde «No» | no cambia nada y la pantalla queda como estaba (RN-CAP-015, RNF-CAP-012) |

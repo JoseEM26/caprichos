@@ -68,7 +68,7 @@ tags: [analisis, apoyo, delivery]
 - **Ya existe (DT-60):**
   - Mensaje 1 al pulsar «En camino».
   - Mensaje 2 al pulsar «He llegado».
-  - Mensaje 3 a los 2 minutos sin respuesta, con la espera máxima de 10 minutos.
+  - Mensaje 3 si no responde en minuto y medio (lo dijo Kevin; DT-74), con la espera máxima de 10 minutos.
   - Si el cliente responde, no se envían más. Los textos son editables.
 - **Falta, y es lo más importante de este informe:**
   - **Costo de Meta.** Un mensaje que inicia el negocio es una plantilla y se cobra. Las respuestas dentro de las 24 horas desde el último mensaje del cliente son gratis.
@@ -76,7 +76,7 @@ tags: [analisis, apoyo, delivery]
     - Un pedido podría generar hasta cuatro plantillas: el resumen y tres avisos.
     - Hay que verificar el precio vigente para Perú (D-08) y medir cuántas se envían al mes.
     - Mitigación: los botones de respuesta («Ya salgo») hacen que el cliente responda, se abre la ventana gratuita y no se envían los siguientes avisos.
-  - **Dependencia del bot.** Los avisos automáticos necesitan la API de WhatsApp de Meta, y el bot actual funciona aparte. **Plan B propuesto (D-31):** mientras no esté la API, los botones «En camino» y «He llegado» abren WhatsApp con el mensaje ya escrito y el repartidor solo toca «Enviar». No cuesta nada y no depende de Meta.
+  - **Dependencia del bot — resuelta (DT-72, 21/10/2026):** José ya tiene la API de WhatsApp de Meta, así que los avisos salen automáticos. Plan B que se había propuesto (D-31), ya no necesario: mientras no esté la API, los botones «En camino» y «He llegado» abren WhatsApp con el mensaje ya escrito y el repartidor solo toca «Enviar». No cuesta nada y no depende de Meta.
 
 ## P4. Asignación entre repartidores
 
