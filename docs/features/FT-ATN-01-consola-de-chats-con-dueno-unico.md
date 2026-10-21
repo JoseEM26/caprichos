@@ -26,7 +26,7 @@ tags: [atencion, plt-03, ep-cap-015, ft-atn-01, deberia-tener]
 
 ## 1. Descripción y valor
 
-**Descripción.** Una **consola de mensajes de WhatsApp** dentro del administrativo, con aspecto de WhatsApp: lista de chats con buscador y filtros (pendientes, validar pago, urgentes, atendidos), zoom y pantalla completa (NEC-CAP-083, NEC-CAP-098). **Cada chat tiene un solo dueño**: el bot o una persona (NEC-CAP-091). Se puede **tomar** y **soltar** un chat; mientras lo atiende una persona, **el bot calla** y otra persona no puede escribir sin tomarlo, con confirmación (RN-CAP-102). Se libera con «Soltar el chat» o «Marcar atendido». Un aviso **urgente** pasa el chat a una persona al instante. Hay **respuestas rápidas**, botones para copiar productos y el celular, y para aprobar o rechazar el pago. Un botón opcional **«Pulir mensaje»** mejora tono y ortografía con vista previa y nunca envía solo (RN-CAP-111).
+**Descripción.** Una **consola de mensajes de WhatsApp** dentro del administrativo, con aspecto de WhatsApp: lista de chats con buscador y filtros (pendientes, validar pago, urgentes, atendidos), zoom y pantalla completa (NEC-CAP-083, NEC-CAP-098). **Cada chat tiene un solo dueño**: el bot o una persona (NEC-CAP-091). Se puede **tomar** y **soltar** un chat; mientras lo atiende una persona, **el bot calla** y otra persona no puede escribir sin tomarlo, con confirmación (RN-CAP-102). Se libera con «Soltar el chat» o «Marcar atendido». Un aviso **urgente** pasa el chat a una persona al instante. Hay **respuestas rápidas**, botones para copiar productos y el celular, para registrar o rechazar el pago coordinado (el pedido ya está en cocina, DT-57) y, en el chat de cada cliente, los **avisos de reparto** enviados y su respuesta (DT-60, DT-74). Un botón opcional **«Pulir mensaje»** mejora tono y ortografía con vista previa y nunca envía solo (RN-CAP-111).
 
 **Beneficio esperado.** Que el bot y las personas no se pisen y que ningún cliente quede sin respuesta. Hipótesis medible: **0 chats con respuestas del bot mientras los atiende una persona**; **tiempo de primera respuesta humana medido**.
 
@@ -45,8 +45,9 @@ tags: [atencion, plt-03, ep-cap-015, ft-atn-01, deberia-tener]
 | RQ-ATN-01-05 | Un aviso urgente pasa el chat a una persona al instante. | Debería tener | NEC-CAP-091 | Dado un cliente que escribe «urgente», cuando llega el mensaje, entonces el chat pasa a «Urgente», el bot calla y suena un aviso en el administrativo. | Propuesto |
 | RQ-ATN-01-06 | Hay respuestas rápidas y botones para copiar productos y el celular. | Debería tener | NEC-CAP-083 | Dado un chat, cuando el cajero elige la respuesta rápida «Datos de Yape», entonces se escribe en el cuadro para revisarla y enviarla. | Propuesto |
 | RQ-ATN-01-07 | «Pulir mensaje» mejora tono y ortografía con vista previa y nunca envía solo. | Podría tener | NEC-CAP-098 · RN-CAP-111 | Dado un texto con faltas, cuando el cajero toca «Pulir», entonces ve la versión mejorada y decide si usarla; no se envía hasta que toque «Enviar». | Propuesto |
-| RQ-ATN-01-08 | Desde la consola se aprueba o rechaza el pago de un pedido. | Debería tener | NEC-CAP-083 · NEC-CAP-090 | Dado un chat en «Validar pago», cuando el cajero aprueba, entonces el pedido pasa a cocina (FT-BOT-02). | Propuesto |
+| RQ-ATN-01-08 | Desde la consola se registra o rechaza el pago coordinado de un pedido que ya está en cocina. | Debería tener | NEC-CAP-083 · NEC-CAP-090 · DT-57 | Dado un chat en «Validar pago», cuando el cajero registra el pago, entonces el pedido queda pagado y no se reenvía a cocina (FT-BOT-02). | Propuesto |
 | RQ-ATN-01-09 | Un chat tomado sin actividad se libera solo tras un tiempo configurable. | Podría tener | RN-CAP-102 (pendiente) | Dado un chat tomado sin mensajes en 15 minutos, cuando pasa el tiempo, entonces vuelve al bot y se avisa a quien lo tenía. | Propuesto |
+| RQ-ATN-01-10 | El chat del cliente muestra los avisos de reparto enviados y su respuesta. | Debería tener | DT-60 · DT-74 | Dado un pedido en camino, cuando se envía el mensaje 2 al pulsar «He llegado», entonces el chat del cliente en la consola muestra «Aviso de reparto 2» con la hora y, si el cliente toca «Ya salgo», su respuesta con la marca «Respondió». | Propuesto |
 
 Prioridad *Debería tener* por la épica. RQ-ATN-01-09 aplica la propuesta de 15 minutos de RN-CAP-102, pendiente. Todos nacen *Propuesto* hasta que el PO los apruebe (DT-48).
 
@@ -82,6 +83,7 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RQ-ATN-01-07 | HU-CAP-138 | — | R-07 |
 | RQ-ATN-01-08 | HU-CAP-138 | FT-BOT-02 | R-01 |
 | RQ-ATN-01-09 | HU-CAP-137 | — | R-01 |
+| RQ-ATN-01-10 | HU-CAP-136 | FT-DEL-02 | R-01 |
 
 Historias de usuario de esta feature (en `historias/`, en draft):
 

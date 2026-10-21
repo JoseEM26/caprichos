@@ -32,7 +32,7 @@ tags: [hu, atencion, capa-a, ft-atn-01, media, ui]
 
 | CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
 |---|---|
-| **Contexto.** Historia de FT-ATN-01 «Consola de chats con dueño único» (Debería tener, épica EP-CAP-015). Cubre los requerimientos: **RQ-ATN-01-05** Un aviso urgente pasa el chat a una persona al instante. **RQ-ATN-01-06** Hay respuestas rápidas y botones para copiar productos y el celular. **RQ-ATN-01-07** «Pulir mensaje» mejora tono y ortografía con vista previa y nunca envía solo. **RQ-ATN-01-08** Desde la consola se aprueba o rechaza el pago de un pedido. | **Alcance.**<br>• Un aviso urgente pasa el chat a una persona al instante.<br>• Hay respuestas rápidas y botones para copiar productos y el celular.<br>• «Pulir mensaje» mejora tono y ortografía con vista previa y nunca envía solo.<br>• Desde la consola se aprueba o rechaza el pago de un pedido. |
+| **Contexto.** Historia de FT-ATN-01 «Consola de chats con dueño único» (Debería tener, épica EP-CAP-015). Cubre los requerimientos: **RQ-ATN-01-05** Un aviso urgente pasa el chat a una persona al instante. **RQ-ATN-01-06** Hay respuestas rápidas y botones para copiar productos y el celular. **RQ-ATN-01-07** «Pulir mensaje» mejora tono y ortografía con vista previa y nunca envía solo. **RQ-ATN-01-08** Desde la consola se registra o rechaza el pago coordinado de un pedido que ya está en cocina. | **Alcance.**<br>• Un aviso urgente pasa el chat a una persona al instante.<br>• Hay respuestas rápidas y botones para copiar productos y el celular.<br>• «Pulir mensaje» mejora tono y ortografía con vista previa y nunca envía solo.<br>• Desde la consola se registra o rechaza el pago coordinado de un pedido que ya está en cocina. |
 | **Problema.** Que el bot y las personas no se pisen y que ningún cliente quede sin respuesta. | **Fuera de alcance.**<br>• HU-CAP-136: Ver y filtrar los chats en la consola.<br>• HU-CAP-137: Tomar, soltar y marcar atendido un chat.<br>• Cambios después del pedido: FT-ATN-02.<br>• Encuesta posventa: FT-ATN-03.<br>• Varias cuentas de WhatsApp (un solo número). |
 
 ## 03 | CRITERIOS DE ACEPTACIÓN
@@ -42,7 +42,7 @@ tags: [hu, atencion, capa-a, ft-atn-01, media, ui]
 | CA-1 | un cliente que escribe «urgente» | llega el mensaje | el chat pasa a «Urgente», el bot calla y suena un aviso en el administrativo (RQ-ATN-01-05) |
 | CA-2 | un chat | el cajero elige la respuesta rápida «Datos de Yape» | se escribe en el cuadro para revisarla y enviarla (RQ-ATN-01-06) |
 | CA-3 | un texto con faltas | el cajero toca «Pulir» | ve la versión mejorada y decide si usarla; no se envía hasta que toque «Enviar» (RQ-ATN-01-07) |
-| CA-4 | un chat en «Validar pago» | el cajero aprueba | el pedido pasa a cocina (FT-BOT-02) (RQ-ATN-01-08) |
+| CA-4 | un chat en «Validar pago» | el cajero registra el pago | el pedido queda pagado y no se reenvía a cocina (FT-BOT-02) (RQ-ATN-01-08) |
 
 Origen: criterios de verificación de FT-ATN-01 (RQ-ATN-01-05, RQ-ATN-01-06, RQ-ATN-01-07, RQ-ATN-01-08); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
 

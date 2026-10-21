@@ -32,7 +32,7 @@ tags: [hu, usuarios, capa-a, ft-usr-03, media, ui]
 
 | CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
 |---|---|
-| **Contexto.** Historia de FT-USR-03 «Crédito del personal» (Debería tener, épica EP-CAP-013). Cubre los requerimientos: **RQ-USR-03-07** El porcentaje de descuento del personal se cambia en Configuración del local. **RQ-USR-03-09** La semana o el rango de consumos se exporta para el pago fuera del sistema. | **Alcance.**<br>• El porcentaje de descuento del personal se cambia en Configuración del local.<br>• La semana o el rango de consumos se exporta para el pago fuera del sistema. |
+| **Contexto.** Historia de FT-USR-03 «Crédito del personal» (Debería tener, épica EP-CAP-013). Cubre los requerimientos: **RQ-USR-03-07** El porcentaje de descuento del personal se cambia en Configuración del local. **RQ-USR-03-09** La semana o el rango de consumos se exporta para el pago fuera del sistema; solo el administrador (DT-75). | **Alcance.**<br>• El porcentaje de descuento del personal se cambia en Configuración del local.<br>• La semana o el rango de consumos se exporta para el pago fuera del sistema; solo el administrador (DT-75). |
 | **Problema.** Control claro de lo que consume el personal cada mes, sin cuadernos. | **Fuera de alcance.**<br>• HU-CAP-123: Registrar el consumo del personal a crédito.<br>• HU-CAP-124: Revisar el crédito del personal por semana o por rango de fechas.<br>• Descuento del pago al trabajador (fuera del sistema).<br>• Crédito a clientes (excluido, RN-CAP-058).<br>• Consumo a crédito desde la carta (D-09). |
 
 ## 03 | CRITERIOS DE ACEPTACIÓN

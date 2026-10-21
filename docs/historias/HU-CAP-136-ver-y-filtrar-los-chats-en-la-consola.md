@@ -40,6 +40,7 @@ tags: [hu, atencion, capa-a, ft-atn-01, media, ui]
 | N.° | DADO | CUANDO | ENTONCES |
 |---|---|---|---|
 | CA-1 | 10 chats | el cajero filtra «Validar pago» | ve solo esos, con el último mensaje y la hora (RQ-ATN-01-01) |
+| CA-2 | un pedido en camino | se envía el mensaje 2 al pulsar «He llegado» | el chat del cliente en la consola muestra «Aviso de reparto 2» con la hora y, si el cliente toca «Ya salgo», su respuesta con la marca «Respondió» (RQ-ATN-01-10) |
 
 Origen: criterios de verificación de FT-ATN-01 (RQ-ATN-01-01); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
 

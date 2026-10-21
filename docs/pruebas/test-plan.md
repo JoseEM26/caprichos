@@ -196,6 +196,7 @@ Convención: un caso `TC-CAP-<HU>-<NN>` por cada criterio `CA-NN` de la historia
 | TC-CAP-037-03 | HU-CAP-037 · CA-3: dado un pedido tomado por teléfono, cuando el call center lo guarda → entra a la cola «por confirmar» con canal «Teléfono» (RQ-CAJ-03-09) | func |  |  |
 | TC-CAP-037-04 | HU-CAP-037 · CA-4: dado un pedido guardado sin cobrar, cuando el call center lo anula con motivo → queda anulado con su autor y motivo (RQ-CAJ-03-11) | func |  |  |
 | TC-CAP-037-05 | HU-CAP-037 · CA-5: dado un usuario con un rol sin permiso para esta acción (ACT-CAP-009 repartidor), cuando intenta hacerla desde el menú o escribiendo la dirección de la pantalla → se rechaza en el servidor, no se guarda nada y no se entregan datos (RN-CAP-013, RNF-CAP-006) | advers |  |  |
+| TC-CAP-037-06 | HU-CAP-037 · CA-6: dado 5 frappés en Nuevo pedido, cuando el cajero o el mozo los agrega → ve 5 campos «Ingresa el nombre de la persona que tomará esta bebida (1 de 5 … 5 de 5)» y cada sticker del vaso sale con su nombre en grande; si uno queda vacío, va el nombre del cliente (RQ-CAJ-03-13) | func |  |  |
 | TC-CAP-038-01 | HU-CAP-038 · CA-1: dado un cliente que pidió antes, cuando el call center escribe su teléfono → aparecen su nombre y su última dirección con el punto en el mapa, editables (RQ-CAJ-03-03) | func |  |  |
 | TC-CAP-038-02 | HU-CAP-038 · CA-2: dado un cliente con pedidos anteriores, cuando el call center toca «Repetir» en uno → el carrito se llena con esos productos y opciones a los precios de hoy (RQ-CAJ-03-04) | func |  |  |
 | TC-CAP-038-03 | HU-CAP-038 · CA-3: dado un pedido por teléfono, cuando el call center busca la dirección que dictó el cliente y ajusta el pin → el pedido guarda el punto, el enlace, la zona y su envío (RQ-CAJ-03-05) | func |  |  |
@@ -602,17 +603,18 @@ Convención: un caso `TC-CAP-<HU>-<NN>` por cada criterio `CA-NN` de la historia
 | TC-CAP-127-02 | HU-CAP-127 · CA-2: dado un delivery, cuando el cliente comparte su ubicación de WhatsApp → el bot calcula el envío; si escribe solo la dirección, el envío queda por calcular para el asesor (RQ-BOT-01-04) | integ |  |  |
 | TC-CAP-128-01 | HU-CAP-128 · CA-1: dado un producto agotado, cuando el cliente abre su categoría → no aparece; con la pausa activa, el bot ofrece hablar con una persona (RQ-BOT-01-05) | func |  |  |
 | TC-CAP-128-02 | HU-CAP-128 · CA-2: dado un descuento de 20 % en frappés, cuando el cliente agrega uno → el resumen muestra el descuento (RQ-BOT-01-06) | func |  |  |
-| TC-CAP-128-03 | HU-CAP-128 · CA-3: dado un carrito terminado, cuando el cliente confirma → el pedido aparece en la cola de caja con todos sus datos (RQ-BOT-01-07) | func |  |  |
+| TC-CAP-128-03 | HU-CAP-128 · CA-3: dado un carrito terminado sin alta demanda, cuando el cliente confirma → cada parte aparece en la pantalla de su área, el pedido figura en caja con el pago por coordinar y el bot responde «Tu pedido ya está en cocina: te llega de 25 a 35 minutos» (RQ-BOT-01-07) | func |  |  |
 | TC-CAP-129-01 | HU-CAP-129 · CA-1: dado un texto libre fuera del flujo, cuando el bot no lo entiende dos veces → avisa «Te comunico con un asesor» y deja el chat en la consola (RQ-BOT-01-08) | func |  |  |
-| TC-CAP-130-01 | HU-CAP-130 · CA-1: dado un pedido de la carta, cuando entra → el cliente recibe la plantilla con productos, opciones, entrega y total, y botones de medios de pago (RQ-BOT-02-01) | func |  |  |
+| TC-CAP-130-01 | HU-CAP-130 · CA-1: dado un pedido de la carta con Yape, cuando entra → el cliente recibe la plantilla con productos, opciones, entrega, total, «Método de pago: Yape» y «Tu pedido ya está en cocina; un asesor te escribe para coordinar el pago» (RQ-BOT-02-01) | func |  |  |
 | TC-CAP-130-02 | HU-CAP-130 · CA-2: dado Yape elegido, cuando el cliente toca «Yape» → recibe el número, el nombre del titular y el monto a pagar, leídos de Configuración del local (RQ-BOT-02-02) | func |  |  |
+| TC-CAP-130-03 | HU-CAP-130 · CA-3: dado un repartidor que pulsa «En camino», cuando sale el mensaje 1 → el cliente lo recibe como plantilla con los botones «Estoy atento» y «No estoy»; si responde, no se envían los mensajes 2 y 3 y el repartidor ve la respuesta (RQ-BOT-02-09) | func |  |  |
 | TC-CAP-131-01 | HU-CAP-131 · CA-1: dado una imagen enviada por el cliente, cuando llega → se adjunta al pedido y el chat aparece en «Validar pago» con aviso a caja (RQ-BOT-02-03) | func |  |  |
-| TC-CAP-131-02 | HU-CAP-131 · CA-2: dado un chat en «Validar pago», cuando el cajero aprueba con Sí/No → el pedido pasa a cocina con el comprobante; al rechazar, el bot avisa al cliente el motivo (RQ-BOT-02-04) | func |  |  |
-| TC-CAP-131-03 | HU-CAP-131 · CA-3: dado un delivery solo con dirección escrita, cuando el cajero intenta aprobar → ve «Ubica el pedido primero» (RQ-BOT-02-05) | func |  |  |
+| TC-CAP-131-02 | HU-CAP-131 · CA-2: dado un chat en «Validar pago», cuando el cajero registra el pago con Sí/No → el pedido queda pagado sin volver a cocina; si lo rechaza, el bot avisa el motivo y caja decide si anula con motivo y el PIN de la supervisora (RQ-BOT-02-04) | func |  |  |
+| TC-CAP-131-03 | HU-CAP-131 · CA-3: dado un delivery solo con dirección escrita, cuando el repartidor intenta tomarlo → ve «Falta ubicar» y caja lo ubica en el mapa desde el chat (RQ-BOT-02-05) | func |  |  |
 | TC-CAP-131-04 | HU-CAP-131 · CA-4: dado la confirmación Sí/No de la acción, cuando quien la hace responde «No» → no cambia nada y la pantalla queda como estaba (RN-CAP-015, RNF-CAP-012) | func |  |  |
-| TC-CAP-132-01 | HU-CAP-132 · CA-1: dado efectivo elegido, cuando el cliente dice con cuánto paga → el chat queda «Por aprobar» y la persona lo confirma sin comprobante (RQ-BOT-02-06) | func |  |  |
+| TC-CAP-132-01 | HU-CAP-132 · CA-1: dado efectivo elegido, cuando el cliente dice con cuánto paga → se guarda para el vuelto del repartidor y el pedido sigue en cocina sin esperar a nadie (RQ-BOT-02-06) | func |  |  |
 | TC-CAP-132-02 | HU-CAP-132 · CA-2: dado un mes, cuando el administrador revisa el costo del bot → ve cuántas plantillas se enviaron y su costo estimado (RQ-BOT-02-07) | func |  |  |
-| TC-CAP-132-03 | HU-CAP-132 · CA-3: dado un pedido sin respuesta del cliente en 10 minutos, cuando pasa el tiempo → caja recibe un aviso y el pedido sigue en la cola (RQ-BOT-02-08) | func |  |  |
+| TC-CAP-132-03 | HU-CAP-132 · CA-3: dado un pedido con el pago por coordinar sin respuesta del cliente en 10 minutos, cuando pasa el tiempo → caja recibe un aviso y el pedido sigue en cocina (RQ-BOT-02-08) | func |  |  |
 | TC-CAP-133-01 | HU-CAP-133 · CA-1: dado «¿el frappé de Oreo lleva café?», cuando el cliente pregunta → la IA responde según la descripción del producto en la carta (RQ-BOT-03-01) | func |  |  |
 | TC-CAP-133-02 | HU-CAP-133 · CA-2: dado un producto agotado, cuando el cliente pide una recomendación → la IA no lo menciona (RQ-BOT-03-02) | func |  |  |
 | TC-CAP-133-03 | HU-CAP-133 · CA-3: dado «quiero 2 frappés», cuando lo escribe el cliente → la IA responde con el botón «Hacer pedido» y no arma el carrito (RQ-BOT-03-03) | func |  |  |
@@ -626,6 +628,7 @@ Convención: un caso `TC-CAP-<HU>-<NN>` por cada criterio `CA-NN` de la historia
 | ID | Caso | Tipo (func/E2E/API/integ/regres/advers) | Resultado | Evidencia (commit) |
 | --- | --- | --- | --- | --- |
 | TC-CAP-136-01 | HU-CAP-136 · CA-1: dado 10 chats, cuando el cajero filtra «Validar pago» → ve solo esos, con el último mensaje y la hora (RQ-ATN-01-01) | func |  |  |
+| TC-CAP-136-02 | HU-CAP-136 · CA-2: dado un pedido en camino, cuando se envía el mensaje 2 al pulsar «He llegado» → el chat del cliente en la consola muestra «Aviso de reparto 2» con la hora y, si el cliente toca «Ya salgo», su respuesta con la marca «Respondió» (RQ-ATN-01-10) | func |  |  |
 | TC-CAP-137-01 | HU-CAP-137 · CA-1: dado un chat del bot, cuando el cajero toca «Tomar» → el chat pasa a su nombre y el bot deja de responder (RQ-ATN-01-02) | func |  |  |
 | TC-CAP-137-02 | HU-CAP-137 · CA-2: dado un chat tomado por el cajero, cuando el mozo intenta escribir → ve «Lo atiende … ¿Tomarlo?» y solo con Sí pasa a su nombre (RQ-ATN-01-03) | func |  |  |
 | TC-CAP-137-03 | HU-CAP-137 · CA-3: dado un chat tomado, cuando el cajero toca «Soltar el chat» → vuelve al bot; con «Marcar atendido», queda cerrado hasta el próximo mensaje del cliente (RQ-ATN-01-04) | func |  |  |
@@ -633,9 +636,9 @@ Convención: un caso `TC-CAP-<HU>-<NN>` por cada criterio `CA-NN` de la historia
 | TC-CAP-138-01 | HU-CAP-138 · CA-1: dado un cliente que escribe «urgente», cuando llega el mensaje → el chat pasa a «Urgente», el bot calla y suena un aviso en el administrativo (RQ-ATN-01-05) | func |  |  |
 | TC-CAP-138-02 | HU-CAP-138 · CA-2: dado un chat, cuando el cajero elige la respuesta rápida «Datos de Yape» → se escribe en el cuadro para revisarla y enviarla (RQ-ATN-01-06) | func |  |  |
 | TC-CAP-138-03 | HU-CAP-138 · CA-3: dado un texto con faltas, cuando el cajero toca «Pulir» → ve la versión mejorada y decide si usarla; no se envía hasta que toque «Enviar» (RQ-ATN-01-07) | func |  |  |
-| TC-CAP-138-04 | HU-CAP-138 · CA-4: dado un chat en «Validar pago», cuando el cajero aprueba → el pedido pasa a cocina (FT-BOT-02) (RQ-ATN-01-08) | func |  |  |
-| TC-CAP-139-01 | HU-CAP-139 · CA-1: dado un pedido en cocina hace 8 minutos con tiempo prometido de 13, cuando el cliente pregunta → el bot dice «Está en preparación, unos 5 minutos» (RQ-ATN-02-01) | func |  |  |
-| TC-CAP-140-01 | HU-CAP-140 · CA-1: dado un pedido por confirmar, cuando el cliente pide cambiar la dirección → el bot dice que un asesor lo revisará y el pedido muestra «Solicitud de cambio» en caja (RQ-ATN-02-02) | func |  |  |
+| TC-CAP-138-04 | HU-CAP-138 · CA-4: dado un chat en «Validar pago», cuando el cajero registra el pago → el pedido queda pagado y no se reenvía a cocina (FT-BOT-02) (RQ-ATN-01-08) | func |  |  |
+| TC-CAP-139-01 | HU-CAP-139 · CA-1: dado un delivery en cocina desde hace 10 minutos, sin alta demanda, cuando el cliente pregunta «¿cuánto falta?» → el bot responde «Tu pedido está en cocina: te llega en unos 15 a 25 minutos»; si ya salió, «El repartidor ya está en camino»; si llegó, «El repartidor está en tu puerta» (RQ-ATN-02-01) | func |  |  |
+| TC-CAP-140-01 | HU-CAP-140 · CA-1: dado un pedido en cocina, cuando el cliente pide cambiar la dirección → el bot dice que un asesor lo revisará y el pedido muestra «Solicitud de cambio» en caja (RQ-ATN-02-02) | func |  |  |
 | TC-CAP-140-02 | HU-CAP-140 · CA-2: dado una solicitud de cambio, cuando el bot la recibe → el pedido no cambia hasta que un asesor lo edite (RQ-ATN-02-03) | func |  |  |
 | TC-CAP-140-03 | HU-CAP-140 · CA-3: dado un pedido en camino, cuando el cliente pide otra dirección → el bot dice que un asesor lo contactará y el chat pasa a «Urgente» (RQ-ATN-02-04) | func |  |  |
 | TC-CAP-140-04 | HU-CAP-140 · CA-4: dado una solicitud, cuando el asesor la acepta y edita el pedido → el bot avisa «Listo, cambiamos tu pedido»; si la rechaza, avisa el motivo (RQ-ATN-02-05) | func |  |  |
@@ -967,7 +970,7 @@ Ejecutado por IA: (nada ejecutado; plan generado por IA) - Consolidado y aprobad
 | HU-CAP-034 | H1 | 2 | TC-CAP-034-01 a 02 | 0 |
 | HU-CAP-035 | H1 | 2 | TC-CAP-035-01 a 02 | 0 |
 | HU-CAP-036 | H1 | 3 | TC-CAP-036-01 a 03 | 0 |
-| HU-CAP-037 | H1 | 5 | TC-CAP-037-01 a 05 | 0 |
+| HU-CAP-037 | H1 | 6 | TC-CAP-037-01 a 06 | 0 |
 | HU-CAP-038 | H1 | 6 | TC-CAP-038-01 a 06 | 0 |
 | HU-CAP-039 | H1 | 3 | TC-CAP-039-01 a 03 | 0 |
 | HU-CAP-040 | H1 | 2 | TC-CAP-040-01 a 02 | 0 |
@@ -1068,13 +1071,13 @@ Ejecutado por IA: (nada ejecutado; plan generado por IA) - Consolidado y aprobad
 | HU-CAP-127 | H2 | 2 | TC-CAP-127-01 a 02 | 0 |
 | HU-CAP-128 | H2 | 3 | TC-CAP-128-01 a 03 | 0 |
 | HU-CAP-129 | H2 | 1 | TC-CAP-129-01 a 01 | 0 |
-| HU-CAP-130 | H2 | 2 | TC-CAP-130-01 a 02 | 0 |
+| HU-CAP-130 | H2 | 3 | TC-CAP-130-01 a 03 | 0 |
 | HU-CAP-131 | H2 | 4 | TC-CAP-131-01 a 04 | 0 |
 | HU-CAP-132 | H2 | 3 | TC-CAP-132-01 a 03 | 0 |
 | HU-CAP-133 | H2 | 4 | TC-CAP-133-01 a 04 | 0 |
 | HU-CAP-134 | H2 | 1 | TC-CAP-134-01 a 01 | 0 |
 | HU-CAP-135 | H2 | 2 | TC-CAP-135-01 a 02 | 0 |
-| HU-CAP-136 | H2 | 1 | TC-CAP-136-01 a 01 | 0 |
+| HU-CAP-136 | H2 | 2 | TC-CAP-136-01 a 02 | 0 |
 | HU-CAP-137 | H2 | 4 | TC-CAP-137-01 a 04 | 0 |
 | HU-CAP-138 | H2 | 4 | TC-CAP-138-01 a 04 | 0 |
 | HU-CAP-139 | H2 | 1 | TC-CAP-139-01 a 01 | 0 |
@@ -1132,4 +1135,4 @@ Ejecutado por IA: (nada ejecutado; plan generado por IA) - Consolidado y aprobad
 | HU-CAP-193 | H2 | 3 | TC-CAP-193-01 a 03 | 0 |
 | HU-CAP-194 | H2 | 2 | TC-CAP-194-01 a 02 | 0 |
 
-**Totales:** 689 criterios en 201 historias = 689 casos TC (0 complementos) + 10 E2E + 12 SEC + 7 PERF + 5 REG = **723 casos**.
+**Totales:** 692 criterios en 201 historias = 692 casos TC (0 complementos) + 10 E2E + 12 SEC + 7 PERF + 5 REG = **726 casos**.

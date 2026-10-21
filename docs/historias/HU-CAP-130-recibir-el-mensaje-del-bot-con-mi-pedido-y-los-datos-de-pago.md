@@ -32,15 +32,16 @@ tags: [hu, chatbot, capa-a, ft-bot-02, media, ui]
 
 | CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
 |---|---|
-| **Contexto.** Historia de FT-BOT-02 «Pago por WhatsApp con aprobación» (Debería tener, épica EP-CAP-014). Cubre los requerimientos: **RQ-BOT-02-01** Al llegar un pedido de la carta, el bot escribe al cliente con el resumen y le pregunta cómo paga. **RQ-BOT-02-02** El bot envía los datos de pago del medio elegido y el monto. | **Alcance.**<br>• Al llegar un pedido de la carta, el bot escribe al cliente con el resumen y le pregunta cómo paga.<br>• El bot envía los datos de pago del medio elegido y el monto. |
+| **Contexto.** Historia de FT-BOT-02 «Pago por WhatsApp con aprobación» (Debería tener, épica EP-CAP-014). Cubre los requerimientos: **RQ-BOT-02-01** Al llegar un pedido de la carta, el bot escribe al cliente con el resumen, el método de pago que eligió y que ya está en cocina. **RQ-BOT-02-02** El bot envía los datos de pago del medio elegido y el monto. | **Alcance.**<br>• Al llegar un pedido de la carta, el bot escribe al cliente con el resumen, el método de pago que eligió y que ya está en cocina.<br>• El bot envía los datos de pago del medio elegido y el monto. |
 | **Problema.** Confirmar pagos sin que caja escriba cada mensaje a mano, y sin que el bot decida solo. | **Fuera de alcance.**<br>• HU-CAP-131: Enviar mi captura y esperar la aprobación.<br>• HU-CAP-132: Aprobar o rechazar un pago desde la consola.<br>• Verificación automática del pago con Yape o el banco (no hay integración, DT-11).<br>• Consola de chats: FT-ATN-01. |
 
 ## 03 | CRITERIOS DE ACEPTACIÓN
 
 | N.° | DADO | CUANDO | ENTONCES |
 |---|---|---|---|
-| CA-1 | un pedido de la carta | entra | el cliente recibe la plantilla con productos, opciones, entrega y total, y botones de medios de pago (RQ-BOT-02-01) |
+| CA-1 | un pedido de la carta con Yape | entra | el cliente recibe la plantilla con productos, opciones, entrega, total, «Método de pago: Yape» y «Tu pedido ya está en cocina; un asesor te escribe para coordinar el pago» (RQ-BOT-02-01) |
 | CA-2 | Yape elegido | el cliente toca «Yape» | recibe el número, el nombre del titular y el monto a pagar, leídos de Configuración del local (RQ-BOT-02-02) |
+| CA-3 | un repartidor que pulsa «En camino» | sale el mensaje 1 | el cliente lo recibe como plantilla con los botones «Estoy atento» y «No estoy»; si responde, no se envían los mensajes 2 y 3 y el repartidor ve la respuesta (RQ-BOT-02-09) |
 
 Origen: criterios de verificación de FT-BOT-02 (RQ-BOT-02-01, RQ-BOT-02-02); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
 

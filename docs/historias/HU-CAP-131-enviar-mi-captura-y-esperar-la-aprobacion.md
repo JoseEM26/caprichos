@@ -32,7 +32,7 @@ tags: [hu, chatbot, capa-a, ft-bot-02, alta, ui]
 
 | CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
 |---|---|
-| **Contexto.** Historia de FT-BOT-02 «Pago por WhatsApp con aprobación» (Debería tener, épica EP-CAP-014). Cubre los requerimientos: **RQ-BOT-02-03** El bot recibe la captura y deja el chat en «Validar pago». **RQ-BOT-02-04** Una persona aprueba o rechaza el comprobante; el bot nunca lo hace. **RQ-BOT-02-05** Un delivery sin ubicación no se puede aprobar. | **Alcance.**<br>• El bot recibe la captura y deja el chat en «Validar pago».<br>• Una persona aprueba o rechaza el comprobante; el bot nunca lo hace.<br>• Un delivery sin ubicación no se puede aprobar. |
+| **Contexto.** Historia de FT-BOT-02 «Pago por WhatsApp con aprobación» (Debería tener, épica EP-CAP-014). Cubre los requerimientos: **RQ-BOT-02-03** El bot recibe la captura y deja el chat en «Validar pago». **RQ-BOT-02-04** Una persona registra o rechaza el comprobante; el bot nunca lo hace y el pedido no vuelve a cocina. **RQ-BOT-02-05** Un delivery sin ubicación se cocina, pero no sale a reparto hasta que caja lo ubique. | **Alcance.**<br>• El bot recibe la captura y deja el chat en «Validar pago».<br>• Una persona registra o rechaza el comprobante; el bot nunca lo hace y el pedido no vuelve a cocina.<br>• Un delivery sin ubicación se cocina, pero no sale a reparto hasta que caja lo ubique. |
 | **Problema.** Confirmar pagos sin que caja escriba cada mensaje a mano, y sin que el bot decida solo. | **Fuera de alcance.**<br>• HU-CAP-130: Recibir el mensaje del bot con mi pedido y los datos de pago.<br>• HU-CAP-132: Aprobar o rechazar un pago desde la consola.<br>• Verificación automática del pago con Yape o el banco (no hay integración, DT-11).<br>• Consola de chats: FT-ATN-01. |
 
 ## 03 | CRITERIOS DE ACEPTACIÓN
@@ -40,8 +40,8 @@ tags: [hu, chatbot, capa-a, ft-bot-02, alta, ui]
 | N.° | DADO | CUANDO | ENTONCES |
 |---|---|---|---|
 | CA-1 | una imagen enviada por el cliente | llega | se adjunta al pedido y el chat aparece en «Validar pago» con aviso a caja (RQ-BOT-02-03) |
-| CA-2 | un chat en «Validar pago» | el cajero aprueba con Sí/No | el pedido pasa a cocina con el comprobante; al rechazar, el bot avisa al cliente el motivo (RQ-BOT-02-04) |
-| CA-3 | un delivery solo con dirección escrita | el cajero intenta aprobar | ve «Ubica el pedido primero» (RQ-BOT-02-05) |
+| CA-2 | un chat en «Validar pago» | el cajero registra el pago con Sí/No | el pedido queda pagado sin volver a cocina; si lo rechaza, el bot avisa el motivo y caja decide si anula con motivo y el PIN de la supervisora (RQ-BOT-02-04) |
+| CA-3 | un delivery solo con dirección escrita | el repartidor intenta tomarlo | ve «Falta ubicar» y caja lo ubica en el mapa desde el chat (RQ-BOT-02-05) |
 | CA-4 | la confirmación Sí/No de la acción | quien la hace responde «No» | no cambia nada y la pantalla queda como estaba (RN-CAP-015, RNF-CAP-012) |
 
 Origen: criterios de verificación de FT-BOT-02 (RQ-BOT-02-03, RQ-BOT-02-04, RQ-BOT-02-05); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.

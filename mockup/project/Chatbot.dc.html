@@ -201,7 +201,13 @@ const minOf = () => Number((cfgAll().info || {}).pedidoMin) || 14.5;
 const freeOf = () => Number((cfgAll().info || {}).envioGratis) || 70;
 const freeMas = () => String((cfgAll().info || {}).envioGratisMas) !== '0';
 const payOn = () => { const i = cfgAll().info || {}; const on = (k) => String(i[k]) !== '0'; return { efectivo: on('pg_efe'), yape: on('pg_yape'), plin: on('pg_plin'), tarjeta: on('pg_tarj'), transf: on('pg_transf') }; };
-const tBaseOf = () => Number((cfgAll().info || {}).tiempoBase) || 13;
+const tBaseOf = () => Number((cfgAll().info || {}).tiempoBase) || 25;
+// acta 03 (DT-69, V1): al cliente se le dice de 25 a 35 minutos desde que terminó su pedido; la alta demanda suma minutos
+const tMaxOf = () => Number((cfgAll().info || {}).tiempoMax) || 35;
+const extraOf = (on) => (on ? (Number((cfgAll().altaDem || {}).extra) || 30) : 0);
+// acta 03 (DT-60, DT-74): avisos de reparto; los textos los edita el administrador
+const REPM = { 1: 'Hola Ana, tu pedido CP-0110 está en camino 🛵. Por favor, atenta a tu celular para recibir la llamada del repartidor.', 2: 'Hola Ana, el repartidor ya llegó a tu ubicación. ¿Nos confirmas si estás ahí para entregarte tu pedido?', 3: 'Recuerda que el tiempo máximo de espera, desde que el repartidor llega, es de 10 minutos, para que tus productos lleguen en su mejor estado. Si no estás, el repartidor regresará al local con tu pedido y habrá que coordinar un nuevo envío.' };
+const repTxt = (n) => String((cfgAll().info || {})['repMsg' + n] || REPM[n]).replace('{nombre}', 'Ana').replace('{codigo}', 'CP-0110');
 const tolOf = () => Number((cfgAll().info || {}).resTol) || 15;
 const tx = (k, d) => String((cfgAll().info || {})[k] || d);
 const isPaused = () => { const h = cfgAll().altaDem; return !!(h && h.on && h.pause); };
@@ -247,7 +253,8 @@ class Component extends DCLogic {
   }
 
   doneOrder(msgs) {
-    this.setState({ hasOrder: true, ordCode: this.state.code, ordSt: 'nuevo', ordMin: 0, unk: 0, sheet: false, sel: -1, step: 'done', msgs: this.say(msgs, 'bot', 'Listo. Recibimos tu pedido ' + this.state.code + '. Una persona del equipo te escribe por este mismo chat para confirmarlo y ver el pago contigo. Recién entonces pasa a cocina. ' + tx('msgPago', 'Si pagas por Yape, Plin o transferencia, envíanos aquí la captura de tu comprobante.')) });
+    const ex = extraOf(this.state.demand);
+    this.setState({ hasOrder: true, ordCode: this.state.code, ordSt: 'prep', ordMin: 0, unk: 0, sheet: false, sel: -1, step: 'done', msgs: this.say(msgs, 'bot', 'Listo. Tu pedido ' + this.state.code + ' ya está en cocina 👩‍🍳. Te llega de ' + (tBaseOf() + ex) + ' a ' + (tMaxOf() + ex) + ' minutos. Una persona del equipo te escribe por este chat para coordinar el pago. ' + tx('msgPago', 'Si pagas por Yape, Plin o transferencia, envíanos aquí la captura de tu comprobante.')) });
   }
 
   // ---- después de pedir: el bot entiende lo básico y decide según el estado real del pedido; los cambios los hace una persona
@@ -258,24 +265,24 @@ class Component extends DCLogic {
   }
 
   orderReply(kind, msgs, raw) {
-    const s = this.state; const st = s.ordSt; const base = tBaseOf(); const late = s.ordMin > base;
-    const ST = { nuevo: 'por confirmar', prep: 'en preparación', ruta: 'en camino con el repartidor', entregado: 'entregado' };
+    const s = this.state; const st = s.ordSt === 'nuevo' ? 'prep' : s.ordSt; const ex = extraOf(s.demand); const base = tBaseOf() + ex; const tope = tMaxOf() + ex; const late = s.ordMin >= tope;
+    const ST = { prep: 'en cocina', listo: 'listo y esperando al repartidor', ruta: 'en camino con el repartidor', llego: 'con el repartidor en tu puerta', entregado: 'entregado' };
     const code = s.ordCode || 'tu pedido';
     if (st === 'entregado') { this.handoff(msgs, 'Consulta tras la entrega', 'El pedido ' + code + ' figura como entregado.', 'Tu pedido ' + code + ' figura como entregado. Si hubo algún problema, ya avisé a una persona del equipo para que te escriba.', raw); return; }
     if (kind === 'dir') {
-      if (st === 'nuevo') { this.handoff(msgs, 'Cambio de dirección', 'El cliente quiere cambiar la dirección o ubicación del pedido ' + code + '. Aún no pasa a cocina.', 'Sin problema, tu pedido ' + code + ' todavía está por confirmar y se puede cambiar. Ya avisé a un asesor: te escribe en unos minutos para ubicar la nueva dirección en el mapa y confirmarte el envío.', raw); }
-      else if (st === 'prep') { this.handoff(msgs, 'Cambio de dirección', 'El pedido ' + code + ' ya está en preparación. Si cambia de zona, cambia el envío.', 'Tu pedido ya está en preparación. Ya avisé a un asesor para ver si se puede cambiar la dirección; si la nueva zona cuesta distinto, te confirma el nuevo envío.', raw); }
+      if (st === 'prep' || st === 'listo') { this.handoff(msgs, 'Cambio de dirección', 'El pedido ' + code + ' ya está en preparación. Si cambia de zona, cambia el envío.', 'Tu pedido ya está en preparación. Ya avisé a un asesor para ver si se puede cambiar la dirección; si la nueva zona cuesta distinto, te confirma el nuevo envío.', raw); }
       else { this.handoff(msgs, 'Cambio de dirección URGENTE', 'El pedido ' + code + ' ya salió con el repartidor. Hablar con el repartidor y el cliente ahora.', 'Tu pedido ya salió con el repartidor y por seguridad no lo puedo cambiar desde aquí. Ya avisé a un asesor para que hable contigo y con el repartidor ahora mismo.', raw); }
       return; }
     if (kind === 'ped') {
-      if (st === 'nuevo') { this.handoff(msgs, 'Cambio o cancelación del pedido', 'El cliente quiere cambiar o cancelar ' + code + '. Aún no pasa a cocina.', 'Claro, tu pedido todavía está por confirmar. Ya avisé a un asesor para ajustarlo contigo por este chat.', raw); }
-      else if (st === 'prep') { this.handoff(msgs, 'Cambio o cancelación del pedido', 'El pedido ' + code + ' ya está en cocina. Ver si se puede ajustar.', 'Tu pedido ya está en cocina y quitar productos no siempre se puede. Ya avisé a un asesor para revisarlo contigo ahora.', raw); }
+      if (st === 'prep' || st === 'listo') { this.handoff(msgs, 'Cambio o cancelación del pedido', 'El pedido ' + code + ' ya está en cocina. Ver si se puede ajustar.', 'Tu pedido ya está en cocina y quitar productos no siempre se puede. Ya avisé a un asesor para revisarlo contigo ahora.', raw); }
       else { this.handoff(msgs, 'Cambio o cancelación del pedido', 'El pedido ' + code + ' ya va en camino; no se puede modificar.', 'Tu pedido ya va en camino y no se puede modificar. Ya avisé a un asesor por si necesitas algo más.', raw); }
       return; }
     // kind === 'eta'
-    if (st === 'nuevo') { this.setState({ msgs: this.say(msgs, 'bot', 'Tu pedido ' + code + ' está por confirmar: una persona del equipo lo revisa contigo por este chat. Apenas se confirme, tarda unos ' + base + ' minutos.'), step: 'start', txt: '', unk: 0 }); return; }
-    if (late) { this.handoff(msgs, 'Demora en la entrega', 'El pedido ' + code + ' (' + ST[st] + ') lleva ' + s.ordMin + ' min y el tiempo prometido es ' + base + ' min.', 'Tu pedido está ' + ST[st] + ' y ya pasamos el tiempo prometido de ' + base + ' minutos. Disculpa la demora: ya avisé al equipo para apurarlo y una persona te escribe.', raw); return; }
-    this.setState({ msgs: this.say(msgs, 'bot', 'Tu pedido ' + code + ' está ' + ST[st] + '. Lo recibimos hace ' + s.ordMin + ' minutos y el tiempo prometido es de unos ' + base + ' minutos, así que debería llegar pronto.'), step: 'start', txt: '', unk: 0 });
+    if (st === 'llego') { this.setState({ msgs: this.say(msgs, 'bot', 'El repartidor ya está en tu puerta con el pedido ' + code + '. Por favor sal a recibirlo: espera como máximo 10 minutos.'), step: 'start', txt: '', unk: 0 }); return; }
+    if (st === 'ruta') { this.setState({ msgs: this.say(msgs, 'bot', 'Tu pedido ' + code + ' ya está en camino con el repartidor 🛵. Atenta a tu celular: te llamará al llegar.'), step: 'start', txt: '', unk: 0 }); return; }
+    if (late) { this.handoff(msgs, 'Demora en la entrega', 'El pedido ' + code + ' (' + ST[st] + ') lleva ' + s.ordMin + ' min; se le dijo de ' + base + ' a ' + tope + ' min.', 'Tu pedido está ' + ST[st] + ' y ya pasamos el tiempo que te dijimos (' + base + ' a ' + tope + ' minutos). Disculpa la demora: ya avisé al equipo para apurarlo y una persona te escribe.', raw); return; }
+    const r1 = Math.max(0, base - s.ordMin); const r2 = Math.max(5, tope - s.ordMin);
+    this.setState({ msgs: this.say(msgs, 'bot', 'Tu pedido ' + code + ' está ' + ST[st] + '. Te llega en unos ' + (r1 > 0 ? r1 + ' a ' + r2 : 'pocos (máximo ' + r2 + ')') + ' minutos.' + (ex ? ' Hoy hay mucha demanda y tarda un poco más.' : '')), step: 'start', txt: '', unk: 0 });
   }
 
   sendTxt() {
@@ -344,7 +351,10 @@ class Component extends DCLogic {
     } else if (s.step === 'resTime') {
       done({ msgs: bot('Recibí tu solicitud de reserva para ' + s.people + ' personas a las ' + opt.n + '. Todavía no está confirmada: una persona del equipo la revisa y te responde por aquí. Si se confirma, guardamos la mesa ' + tolOf() + ' minutos de tolerancia.'), step: 'resDone' });
     } else if (s.step === 'web') {
-      done({ msgs: bot('Perfecto, quedamos así. Con tu confirmación el equipo registra el pago y el pedido pasa a cocina. Te aviso cuando salga.'), step: 'end' });
+      done({ msgs: bot('Perfecto. Tu pedido ya se está preparando. Si pagaste por Yape, Plin o transferencia, envíanos aquí la captura. Te aviso cuando salga.'), step: 'end' });
+    } else if (s.step === 'rep1' || s.step === 'rep2') {
+      // acta 03 (DT-74): si el cliente responde, no se envían los avisos siguientes
+      done({ msgs: this.say(bot(opt.id === 'no' ? 'Gracias por avisar. Le digo al repartidor y una persona del equipo te escribe para coordinar.' : '¡Gracias! Le avisamos al repartidor que estás atenta.'), 'sys', 'El cliente respondió: ya no se envían más avisos. El repartidor lo ve en su pantalla.'), step: 'end', repResp: true });
     } else if (s.step === 'post') {
       if (opt.id === 'buena') { done({ msgs: bot('¡Qué alegría! ¿Nos dejas tu opinión en Google Maps? Copia y pega lo que nos escribiste en este enlace y obtén ' + tx('encDesc', '25') + ' % de descuento en tu próximo pedido: ' + tx('encLink', '[enlace a Google Maps]')), step: 'end' }); }
       else { done({ msgs: this.say(bot('Lamentamos eso. Te paso con alguien del equipo para ayudarte'), 'sys', SYS), step: 'human' }); }
@@ -408,7 +418,9 @@ class Component extends DCLogic {
     else if (s.step === 'askAns') { options = [ { n: 'Pedir ahora', id: 'pedir' }, { n: 'Menú', id: 'menu' } ]; }
     else if (s.step === 'resPeople') { options = PERSONAS.map((p) => ({ n: p, id: 'p' })); title = 'Personas'; }
     else if (s.step === 'resTime') { options = HORAS.map((h) => ({ n: h, id: 'h' })); title = 'Hora'; }
-    else if (s.step === 'web') { options = [ { n: 'Confirmo mi pedido', say: 'Sí, confirmo mi pedido', id: 'confirmo' } ]; }
+    else if (s.step === 'web') { options = [ { n: 'Todo bien', say: 'Sí, todo bien', id: 'confirmo' } ]; }
+    else if (s.step === 'rep1') { options = [ { n: 'Estoy atenta', say: 'Estoy atenta', id: 'si' }, { n: 'No estoy', say: 'No estoy en casa', id: 'no' } ]; }
+    else if (s.step === 'rep2') { options = [ { n: 'Ya salgo', say: 'Ya salgo', id: 'si' }, { n: 'No estoy', say: 'No estoy', id: 'no' } ]; }
     else if (s.step === 'post') { options = [ { n: 'Excelente', id: 'buena' }, { n: 'Regular', id: 'regular' }, { n: 'Mal', id: 'mal' } ]; }
     else if (s.step === 'human' || s.step === 'resDone' || s.step === 'end') { options = [ { n: 'Volver al menú', id: 'menu' } ]; }
     else if (s.step === 'alt') { options = ALT.map((n) => ({ n: n, i: CATS[s.cat].prods.findIndex((p) => p.n === n) })); title = 'Alternativas'; }
@@ -448,11 +460,14 @@ class Component extends DCLogic {
     const chip = (on) => ({ bg: on ? '#008069' : '#FFFFFF', fg: on ? '#FFFFFF' : '#111B21' });
     // (acta 02) Chips de la maqueta que disparan escenarios simulados
     const controls = [
-      Object.assign({ n: 'Entra un pedido web', pick: () => this.scenario('web', '¡Hola, Ana! Soy del equipo de Caprichos. Recibimos tu pedido CP-0110 por la carta web. Total: s/ 52.50 · Pago preferido: Yape. Te confirmo por aquí los datos y el pago. ¿Está todo bien con tu pedido?') }, chip(s.step === 'web')),
+      Object.assign({ n: 'Entra un pedido web', pick: () => this.scenario('web', '¡Hola, Ana! Recibimos tu pedido CP-0110 por la carta web. Total: s/ 52.50 · Método de pago: Yape. Tu pedido ya está en cocina 👩‍🍳 y te llega de ' + (tBaseOf() + extraOf(s.demand)) + ' a ' + (tMaxOf() + extraOf(s.demand)) + ' minutos. Un asesor te escribe por aquí para coordinar el pago y pedirte la captura. ¿Todo bien con tu pedido?') }, chip(s.step === 'web')),
+      Object.assign({ n: 'Repartidor: «En camino»', pick: () => this.setState({ hasOrder: true, ordCode: 'CP-0110', ordSt: 'ruta', repResp: false, rep3: false, sheet: false, sel: -1, step: 'rep1', msgs: [ { from: 'sys', text: 'El repartidor pulsó «En camino». Mensaje 1 automático (plantilla de Meta):' }, { from: 'bot', text: repTxt(1) } ] }) }, chip(s.step === 'rep1' && s.ordSt === 'ruta')),
+      Object.assign({ n: 'Repartidor: «He llegado»', pick: () => this.setState({ hasOrder: true, ordCode: 'CP-0110', ordSt: 'llego', repResp: false, rep3: false, sheet: false, sel: -1, step: 'rep2', msgs: [ { from: 'sys', text: 'El repartidor pulsó «He llegado». Mensaje 2:' }, { from: 'bot', text: repTxt(2) } ] }) }, chip(s.step === 'rep2' && !s.rep3)),
+      Object.assign({ n: 'Minuto y medio sin respuesta', pick: () => { if (s.step !== 'rep2') { return; } this.setState({ rep3: true, msgs: this.say(this.say(s.msgs, 'sys', 'Pasó minuto y medio sin respuesta. Mensaje 3:'), 'bot', repTxt(3)) }); } }, chip(!!s.rep3 && s.step === 'rep2')),
       Object.assign({ n: 'Pasaron ' + (Number(tx('encMin', '120')) >= 60 ? (Math.round(Number(tx('encMin', '120')) / 6) / 10) + ' h' : tx('encMin', '120') + ' min'), pick: () => this.scenario('post', tx('encPregunta', 'Hola, ¿tu pedido llegó bien y en orden? Cuéntanos cómo te fue')) }, chip(s.step === 'post')),
       Object.assign({ n: 'Cliente escribe tras pedir', pick: () => this.setState({ hasOrder: true, ordCode: 'CP-0110', ordSt: s.ordSt, step: 'start', unk: 0, txt: '', msgs: [ { from: 'sys', text: 'Hace ' + s.ordMin + ' min Ana Pérez hizo el pedido CP-0110 (delivery, s/ 52.50). Ahora escribe:' }, { from: 'user', text: 'Hola' }, { from: 'bot', text: HELLO } ] }) }, chip(s.hasOrder)),
-      Object.assign({ n: 'Estado del pedido: ' + ({ nuevo: 'por confirmar', prep: 'en preparación', ruta: 'en camino', entregado: 'entregado' })[s.ordSt], pick: () => this.setState({ ordSt: ({ nuevo: 'prep', prep: 'ruta', ruta: 'entregado', entregado: 'nuevo' })[s.ordSt] }) }, chip(false)),
-      Object.assign({ n: 'Pasaron ' + s.ordMin + ' min', pick: () => this.setState({ ordMin: ({ 0: 8, 8: 15, 15: 25, 25: 8 })[s.ordMin] || 8 }) }, chip(false)),
+      Object.assign({ n: 'Estado del pedido: ' + ({ nuevo: 'en cocina', prep: 'en cocina', listo: 'listo', ruta: 'en camino', llego: 'el repartidor llegó', entregado: 'entregado' })[s.ordSt], pick: () => this.setState({ ordSt: ({ nuevo: 'listo', prep: 'listo', listo: 'ruta', ruta: 'llego', llego: 'entregado', entregado: 'prep' })[s.ordSt] }) }, chip(false)),
+      Object.assign({ n: 'Pasaron ' + s.ordMin + ' min', pick: () => this.setState({ ordMin: ({ 0: 10, 10: 20, 20: 36, 36: 10 })[s.ordMin] || 10 }) }, chip(false)),
       Object.assign({ n: 'Alta demanda: ' + (s.demand ? 'Encendida' : 'Apagada'), pick: () => this.setState({ demand: !s.demand }) }, chip(s.demand))
     ];
     return {

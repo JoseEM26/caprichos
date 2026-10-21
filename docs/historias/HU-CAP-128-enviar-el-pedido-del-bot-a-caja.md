@@ -32,7 +32,7 @@ tags: [hu, chatbot, capa-a, ft-bot-01, media, ui]
 
 | CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
 |---|---|
-| **Contexto.** Historia de FT-BOT-01 «Pedido por botones» (Debería tener, épica EP-CAP-014). Cubre los requerimientos: **RQ-BOT-01-05** El bot respeta horario, agotados, pausa y Alta demanda. **RQ-BOT-01-06** El bot aplica los descuentos automáticos vigentes y avisa promociones aplicables. **RQ-BOT-01-07** Al terminar, el pedido entra a caja «por confirmar» con canal «Chatbot». | **Alcance.**<br>• El bot respeta horario, agotados, pausa y Alta demanda.<br>• El bot aplica los descuentos automáticos vigentes y avisa promociones aplicables.<br>• Al terminar, el pedido entra a caja «por confirmar» con canal «Chatbot». |
+| **Contexto.** Historia de FT-BOT-01 «Pedido por botones» (Debería tener, épica EP-CAP-014). Cubre los requerimientos: **RQ-BOT-01-05** El bot respeta horario, agotados, pausa y Alta demanda. **RQ-BOT-01-06** El bot aplica los descuentos automáticos vigentes y avisa promociones aplicables. **RQ-BOT-01-07** Al terminar, el pedido pasa directo a cocina con canal «Chatbot» y el pago por coordinar; el bot confirma con el rango de entrega. | **Alcance.**<br>• El bot respeta horario, agotados, pausa y Alta demanda.<br>• El bot aplica los descuentos automáticos vigentes y avisa promociones aplicables.<br>• Al terminar, el pedido pasa directo a cocina con canal «Chatbot» y el pago por coordinar; el bot confirma con el rango de entrega. |
 | **Problema.** Atender por WhatsApp sin errores de precios ni cobros olvidados (el bot actual a veces omite el delivery, R-07). | **Fuera de alcance.**<br>• HU-CAP-126: Elegir productos y opciones con botones en WhatsApp.<br>• HU-CAP-127: Armar el carrito y dar la entrega en WhatsApp.<br>• HU-CAP-129: Pasar a una persona cuando el bot no entiende.<br>• Pago por WhatsApp: FT-BOT-02.<br>• IA para dudas: FT-BOT-03.<br>• Consola de chats: FT-ATN-01.<br>• Preferencias guardadas del cliente en el bot (horizonte futuro). |
 
 ## 03 | CRITERIOS DE ACEPTACIÓN
@@ -41,7 +41,7 @@ tags: [hu, chatbot, capa-a, ft-bot-01, media, ui]
 |---|---|---|---|
 | CA-1 | un producto agotado | el cliente abre su categoría | no aparece; con la pausa activa, el bot ofrece hablar con una persona (RQ-BOT-01-05) |
 | CA-2 | un descuento de 20 % en frappés | el cliente agrega uno | el resumen muestra el descuento (RQ-BOT-01-06) |
-| CA-3 | un carrito terminado | el cliente confirma | el pedido aparece en la cola de caja con todos sus datos (RQ-BOT-01-07) |
+| CA-3 | un carrito terminado sin alta demanda | el cliente confirma | cada parte aparece en la pantalla de su área, el pedido figura en caja con el pago por coordinar y el bot responde «Tu pedido ya está en cocina: te llega de 25 a 35 minutos» (RQ-BOT-01-07) |
 
 Origen: criterios de verificación de FT-BOT-01 (RQ-BOT-01-05, RQ-BOT-01-06, RQ-BOT-01-07); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
 

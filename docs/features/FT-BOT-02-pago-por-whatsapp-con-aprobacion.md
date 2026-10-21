@@ -26,7 +26,7 @@ tags: [chatbot, plt-03, ep-cap-014, ft-bot-02, deberia-tener]
 
 ## 1. Descripción y valor
 
-**Descripción.** Al llegar un pedido de la carta, el bot **escribe primero** al cliente con el **resumen del pedido**, le pregunta cómo paga, le envía los **datos de pago y el monto**, y espera la **captura** (NEC-CAP-090). Ese primer mensaje es una plantilla de WhatsApp y se cobra; las respuestas dentro de las 24 horas siguientes al mensaje del cliente son gratis (RN-CAP-100). El chat queda en **«Validar pago»** en la consola, y una persona (administrador, cajero, mozo o call center) **aprueba o rechaza** el comprobante; al aprobar, el pedido pasa a cocina (RN-CAP-101). El bot **no verifica** que un comprobante sea verdadero ni manda un pedido a cocina por sí solo. Un delivery sin ubicación no se puede aprobar. Con efectivo o tarjeta, el bot confirma el pedido para pagar al entregar o recoger, también con aprobación de una persona.
+**Descripción.** Al llegar un pedido de la carta, el bot **escribe primero** al cliente con el **resumen del pedido**, le pregunta cómo paga, le envía los **datos de pago y el monto**, y espera la **captura** (NEC-CAP-090). Ese primer mensaje es una plantilla de WhatsApp y se cobra; las respuestas dentro de las 24 horas siguientes al mensaje del cliente son gratis (RN-CAP-100). **Desde el acta 03 el pago ya no frena la cocina** (DT-57, DT-71): el pedido de la carta o del bot está en cocina desde que el cliente lo envía, y el pago **se coordina después**. El chat queda en **«Validar pago»** y una persona (administrador, cajero, mozo o call center) **registra o rechaza** el comprobante; el pedido no vuelve a cocina. El bot **no verifica** que un comprobante sea verdadero. Si el cliente no paga, caja anula con motivo y el PIN de la supervisora (DT-61). Un delivery sin ubicación se cocina igual, pero no sale a reparto hasta que caja lo ubique. Con efectivo o tarjeta se cobra al entregar o recoger, sin aprobación previa. El bot también envía los **avisos de reparto** (DT-60, DT-74) como plantillas de la API de Meta, que José ya tiene (DT-72).
 
 **Beneficio esperado.** Confirmar pagos sin que caja escriba cada mensaje a mano, y sin que el bot decida solo. Hipótesis medible: **0 pedidos pasados a cocina sin aprobación de una persona**; **tiempo de confirmación medio medido** (meta con D-05).
 
@@ -38,14 +38,15 @@ tags: [chatbot, plt-03, ep-cap-014, ft-bot-02, deberia-tener]
 
 | ID | Requerimiento | Prioridad | Origen | Criterio de verificación | Estado |
 | --- | --- | --- | --- | --- | --- |
-| RQ-BOT-02-01 | Al llegar un pedido de la carta, el bot escribe al cliente con el resumen y le pregunta cómo paga. | Debería tener | NEC-CAP-090 · RN-CAP-043 · RN-CAP-081 (1.ª) | Dado un pedido de la carta, cuando entra, entonces el cliente recibe la plantilla con productos, opciones, entrega y total, y botones de medios de pago. | Propuesto |
+| RQ-BOT-02-01 | Al llegar un pedido de la carta, el bot escribe al cliente con el resumen, el método de pago que eligió y que ya está en cocina. | Debería tener | NEC-CAP-090 · RN-CAP-043 · DT-57 | Dado un pedido de la carta con Yape, cuando entra, entonces el cliente recibe la plantilla con productos, opciones, entrega, total, «Método de pago: Yape» y «Tu pedido ya está en cocina; un asesor te escribe para coordinar el pago». | Propuesto |
 | RQ-BOT-02-02 | El bot envía los datos de pago del medio elegido y el monto. | Debería tener | NEC-CAP-090 | Dado Yape elegido, cuando el cliente toca «Yape», entonces recibe el número, el nombre del titular y el monto a pagar, leídos de Configuración del local. | Propuesto |
 | RQ-BOT-02-03 | El bot recibe la captura y deja el chat en «Validar pago». | Debería tener | NEC-CAP-090 | Dada una imagen enviada por el cliente, cuando llega, entonces se adjunta al pedido y el chat aparece en «Validar pago» con aviso a caja. | Propuesto |
-| RQ-BOT-02-04 | Una persona aprueba o rechaza el comprobante; el bot nunca lo hace. | Debería tener | RN-CAP-101 | Dado un chat en «Validar pago», cuando el cajero aprueba con Sí/No, entonces el pedido pasa a cocina con el comprobante; al rechazar, el bot avisa al cliente el motivo. | Propuesto |
-| RQ-BOT-02-05 | Un delivery sin ubicación no se puede aprobar. | Debe tener | RN-CAP-101 · RN-CAP-104 | Dado un delivery solo con dirección escrita, cuando el cajero intenta aprobar, entonces ve «Ubica el pedido primero». | Propuesto |
-| RQ-BOT-02-06 | Con efectivo o tarjeta, el bot confirma el pedido para pagar al entregar, con aprobación de una persona. | Debería tener | RN-CAP-075 | Dado efectivo elegido, cuando el cliente dice con cuánto paga, entonces el chat queda «Por aprobar» y la persona lo confirma sin comprobante. | Propuesto |
+| RQ-BOT-02-04 | Una persona registra o rechaza el comprobante; el bot nunca lo hace y el pedido no vuelve a cocina. | Debería tener | RN-CAP-101 · DT-57 | Dado un chat en «Validar pago», cuando el cajero registra el pago con Sí/No, entonces el pedido queda pagado sin volver a cocina; si lo rechaza, el bot avisa el motivo y caja decide si anula con motivo y el PIN de la supervisora. | Propuesto |
+| RQ-BOT-02-05 | Un delivery sin ubicación se cocina, pero no sale a reparto hasta que caja lo ubique. | Debe tener | RN-CAP-104 · DT-57 | Dado un delivery solo con dirección escrita, cuando el repartidor intenta tomarlo, entonces ve «Falta ubicar» y caja lo ubica en el mapa desde el chat. | Propuesto |
+| RQ-BOT-02-06 | Con efectivo o tarjeta se cobra al entregar o recoger, sin aprobación previa. | Debería tener | RN-CAP-075 · DT-57 | Dado efectivo elegido, cuando el cliente dice con cuánto paga, entonces se guarda para el vuelto del repartidor y el pedido sigue en cocina sin esperar a nadie. | Propuesto |
 | RQ-BOT-02-07 | Se registra el costo de cada plantilla enviada. | Debería tener | RN-CAP-100 · RNF-CAP-015 | Dado un mes, cuando el administrador revisa el costo del bot, entonces ve cuántas plantillas se enviaron y su costo estimado. | Propuesto |
-| RQ-BOT-02-08 | Si el cliente no responde en un tiempo, caja recibe un recordatorio; el pedido no se anula solo. | Debería tener | D-05 | Dado un pedido sin respuesta del cliente en 10 minutos, cuando pasa el tiempo, entonces caja recibe un aviso y el pedido sigue en la cola. | Propuesto |
+| RQ-BOT-02-08 | Si el pago no se coordina en un tiempo, caja recibe un recordatorio; el pedido no se anula solo. | Debería tener | D-05 · DT-57 | Dado un pedido con el pago por coordinar sin respuesta del cliente en 10 minutos, cuando pasa el tiempo, entonces caja recibe un aviso y el pedido sigue en cocina. | Propuesto |
+| RQ-BOT-02-09 | El bot envía los 3 avisos de reparto como plantillas de Meta con botones de respuesta, y la respuesta del cliente corta los siguientes. | Debería tener | DT-60 · DT-72 · DT-74 | Dado un repartidor que pulsa «En camino», cuando sale el mensaje 1, entonces el cliente lo recibe como plantilla con los botones «Estoy atento» y «No estoy»; si responde, no se envían los mensajes 2 y 3 y el repartidor ve la respuesta. | Propuesto |
 
 Prioridad *Debería tener* por la épica. RQ-BOT-02-05 es *Debe tener* (RN-CAP-104). Todos nacen *Propuesto* hasta que el PO los apruebe (DT-48).
 
@@ -67,7 +68,7 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RN-CAP-043 | Al entrar un pedido web, el chatbot escribe al teléfono del cliente. | Acta 02 |
 | RN-CAP-075 | Con Yape, Plin o transferencia se sube el comprobante; se guarda quién confirmó. | Reunión del 18/10 |
 | RN-CAP-100 | El primer mensaje es plantilla y se cobra; las respuestas en 24 horas son gratis. | Costos |
-| RN-CAP-101 | El bot no verifica comprobantes ni manda a cocina; un delivery sin ubicación no se aprueba. | Pagos |
+| RN-CAP-101 | El bot no verifica comprobantes. Que el pago se aprobaba antes de cocina queda **reemplazado por DT-57 y DT-71**: el pedido va directo a cocina. | Pagos |
 | DT-17 | La carta y el chatbot no cobran: informan y una persona confirma. | decisiones.md |
 
 ## 5. Trazabilidad y planificación
@@ -82,6 +83,7 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RQ-BOT-02-06 | HU-CAP-132 | — | R-01 |
 | RQ-BOT-02-07 | HU-CAP-132 | D-08 | R-01 |
 | RQ-BOT-02-08 | HU-CAP-132 | D-05 | R-01 |
+| RQ-BOT-02-09 | HU-CAP-130 | FT-DEL-02 · D-08 | R-04 |
 
 Historias de usuario de esta feature (en `historias/`, en draft):
 

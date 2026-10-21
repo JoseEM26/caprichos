@@ -44,6 +44,7 @@ tags: [hu, caja, capa-a, ft-caj-03, alta, ui]
 | CA-3 | un pedido tomado por teléfono | el call center lo guarda | entra a la cola «por confirmar» con canal «Teléfono» (RQ-CAJ-03-09) |
 | CA-4 | un pedido guardado sin cobrar | el call center lo anula con motivo | queda anulado con su autor y motivo (RQ-CAJ-03-11) |
 | CA-5 | un usuario con un rol sin permiso para esta acción (ACT-CAP-009 repartidor) | intenta hacerla desde el menú o escribiendo la dirección de la pantalla | se rechaza en el servidor, no se guarda nada y no se entregan datos (RN-CAP-013, RNF-CAP-006) |
+| CA-6 | 5 frappés en Nuevo pedido | el cajero o el mozo los agrega | ve 5 campos «Ingresa el nombre de la persona que tomará esta bebida (1 de 5 … 5 de 5)» y cada sticker del vaso sale con su nombre en grande; si uno queda vacío, va el nombre del cliente (RQ-CAJ-03-13) |
 
 Origen: criterios de verificación de FT-CAJ-03 (RQ-CAJ-03-01, RQ-CAJ-03-02, RQ-CAJ-03-09, RQ-CAJ-03-11); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
 

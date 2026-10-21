@@ -50,6 +50,7 @@ tags: [caja, plt-03, ep-cap-004, ft-caj-03, debe-tener]
 | RQ-CAJ-03-10 | El pedido del personal elige a un trabajador activo, en el local o para llevar, con su descuento. | Debería tener | NEC-CAP-094 · RN-CAP-106 | Dado el pedido del personal, cuando el cajero elige a un trabajador activo, entonces solo se ofrecen «En el local» y «Para llevar» y se aplica el 25 % salvo a combos, promociones y docenas. | Propuesto |
 | RQ-CAJ-03-11 | Anular un pedido exige motivo y queda en el historial. | Debe tener | RN-CAP-089 · NEC-CAP-080 | Dado un pedido guardado sin cobrar, cuando el call center lo anula con motivo, entonces queda anulado con su autor y motivo. | Propuesto |
 | RQ-CAJ-03-12 | Se registra con cuánto paga el cliente en efectivo para que el repartidor lleve el vuelto. | Debe tener | NEC-CAP-080 · NEC-CAP-079 | Dado un delivery en efectivo de S/ 37, cuando el call center anota «paga con S/ 50», entonces el pedido muestra vuelto S/ 13 para el repartidor. | Propuesto |
+| RQ-CAJ-03-13 | En las bebidas, Nuevo pedido pide el nombre de la persona que tomará cada una, uno por unidad, para su sticker. | Debe tener | DT-57 · DT-58 · Acta 03 | Dados 5 frappés en Nuevo pedido, cuando el cajero o el mozo los agrega, entonces ve 5 campos «Ingresa el nombre de la persona que tomará esta bebida (1 de 5 … 5 de 5)» y cada sticker del vaso sale con su nombre en grande; si uno queda vacío, va el nombre del cliente. | Propuesto |
 
 Prioridad por NEC-CAP-080 (E1). RQ-CAJ-03-04, 06 y 10 quedan en *Debería tener* por depender de historial, tarifas especiales y crédito del personal; RQ-CAJ-03-08 porque depende de las promociones (fase Siguiente). Todos nacen *Propuesto* hasta que el PO los apruebe (DT-48).
 
@@ -91,6 +92,7 @@ El BRD deja los RNF por definir (BRD §2); estos `RNF-CAP-###` son un catálogo 
 | RQ-CAJ-03-10 | HU-CAP-040 | FT-USR-03 | R-01 |
 | RQ-CAJ-03-11 | HU-CAP-037 | — | R-01 |
 | RQ-CAJ-03-12 | HU-CAP-038 | FT-DEL-02 | R-01 |
+| RQ-CAJ-03-13 | HU-CAP-037 | FT-COC-02 | R-01 |
 
 Historias de usuario de esta feature (en `historias/`, en draft):
 

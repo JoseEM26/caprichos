@@ -32,16 +32,16 @@ tags: [hu, chatbot, capa-a, ft-bot-02, media, ui]
 
 | CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
 |---|---|
-| **Contexto.** Historia de FT-BOT-02 «Pago por WhatsApp con aprobación» (Debería tener, épica EP-CAP-014). Cubre los requerimientos: **RQ-BOT-02-06** Con efectivo o tarjeta, el bot confirma el pedido para pagar al entregar, con aprobación de una persona. **RQ-BOT-02-07** Se registra el costo de cada plantilla enviada. **RQ-BOT-02-08** Si el cliente no responde en un tiempo, caja recibe un recordatorio; el pedido no se anula solo. | **Alcance.**<br>• Con efectivo o tarjeta, el bot confirma el pedido para pagar al entregar, con aprobación de una persona.<br>• Se registra el costo de cada plantilla enviada.<br>• Si el cliente no responde en un tiempo, caja recibe un recordatorio; el pedido no se anula solo. |
+| **Contexto.** Historia de FT-BOT-02 «Pago por WhatsApp con aprobación» (Debería tener, épica EP-CAP-014). Cubre los requerimientos: **RQ-BOT-02-06** Con efectivo o tarjeta se cobra al entregar o recoger, sin aprobación previa. **RQ-BOT-02-07** Se registra el costo de cada plantilla enviada. **RQ-BOT-02-08** Si el pago no se coordina en un tiempo, caja recibe un recordatorio; el pedido no se anula solo. | **Alcance.**<br>• Con efectivo o tarjeta se cobra al entregar o recoger, sin aprobación previa.<br>• Se registra el costo de cada plantilla enviada.<br>• Si el pago no se coordina en un tiempo, caja recibe un recordatorio; el pedido no se anula solo. |
 | **Problema.** Confirmar pagos sin que caja escriba cada mensaje a mano, y sin que el bot decida solo. | **Fuera de alcance.**<br>• HU-CAP-130: Recibir el mensaje del bot con mi pedido y los datos de pago.<br>• HU-CAP-131: Enviar mi captura y esperar la aprobación.<br>• Verificación automática del pago con Yape o el banco (no hay integración, DT-11).<br>• Consola de chats: FT-ATN-01. |
 
 ## 03 | CRITERIOS DE ACEPTACIÓN
 
 | N.° | DADO | CUANDO | ENTONCES |
 |---|---|---|---|
-| CA-1 | efectivo elegido | el cliente dice con cuánto paga | el chat queda «Por aprobar» y la persona lo confirma sin comprobante (RQ-BOT-02-06) |
+| CA-1 | efectivo elegido | el cliente dice con cuánto paga | se guarda para el vuelto del repartidor y el pedido sigue en cocina sin esperar a nadie (RQ-BOT-02-06) |
 | CA-2 | un mes | el administrador revisa el costo del bot | ve cuántas plantillas se enviaron y su costo estimado (RQ-BOT-02-07) |
-| CA-3 | un pedido sin respuesta del cliente en 10 minutos | pasa el tiempo | caja recibe un aviso y el pedido sigue en la cola (RQ-BOT-02-08) |
+| CA-3 | un pedido con el pago por coordinar sin respuesta del cliente en 10 minutos | pasa el tiempo | caja recibe un aviso y el pedido sigue en cocina (RQ-BOT-02-08) |
 
 Origen: criterios de verificación de FT-BOT-02 (RQ-BOT-02-06, RQ-BOT-02-07, RQ-BOT-02-08); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
 

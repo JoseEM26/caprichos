@@ -32,7 +32,7 @@ tags: [hu, informes, capa-a, ft-inf-01, media, ui]
 
 | CONTEXTO / PROBLEMA | ALCANCE / FUERA DE ALCANCE |
 |---|---|
-| **Contexto.** Historia de FT-INF-01 «Informes con período y filtros» (Podría tener, épica EP-CAP-018). Cubre los requerimientos: **RQ-INF-01-01** Los informes se filtran por período predefinido o fechas «de… a…» con calendario. **RQ-INF-01-02** Se filtran además por canal, medio de pago y modalidad. **RQ-INF-01-07** Cada informe se exporta a Excel y la exportación queda registrada. | **Alcance.**<br>• Los informes se filtran por período predefinido o fechas «de… a…» con calendario.<br>• Se filtran además por canal, medio de pago y modalidad.<br>• Cada informe se exporta a Excel y la exportación queda registrada. |
+| **Contexto.** Historia de FT-INF-01 «Informes con período y filtros» (Podría tener, épica EP-CAP-018). Cubre los requerimientos: **RQ-INF-01-01** Los informes se filtran por período predefinido o fechas «de… a…» con calendario. **RQ-INF-01-02** Se filtran además por canal, medio de pago y modalidad. **RQ-INF-01-07** Cada informe se exporta a Excel, solo el administrador, y la exportación queda registrada (DT-75). | **Alcance.**<br>• Los informes se filtran por período predefinido o fechas «de… a…» con calendario.<br>• Se filtran además por canal, medio de pago y modalidad.<br>• Cada informe se exporta a Excel, solo el administrador, y la exportación queda registrada (DT-75). |
 | **Problema.** Decidir con datos: qué se vende, cuándo, cuánto se gana y dónde se pierde. | **Fuera de alcance.**<br>• HU-CAP-162: Ver ventas, tiempos y márgenes.<br>• HU-CAP-163: Exportar un informe.<br>• Indicadores del escritorio y mapa de entregas: FT-INF-02.<br>• Herramientas externas de BI (no pedido). |
 
 ## 03 | CRITERIOS DE ACEPTACIÓN

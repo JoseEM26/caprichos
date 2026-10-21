@@ -39,7 +39,7 @@ tags: [hu, atencion, capa-a, ft-atn-02, media, ui]
 
 | N.° | DADO | CUANDO | ENTONCES |
 |---|---|---|---|
-| CA-1 | un pedido en cocina hace 8 minutos con tiempo prometido de 13 | el cliente pregunta | el bot dice «Está en preparación, unos 5 minutos» (RQ-ATN-02-01) |
+| CA-1 | un delivery en cocina desde hace 10 minutos, sin alta demanda | el cliente pregunta «¿cuánto falta?» | el bot responde «Tu pedido está en cocina: te llega en unos 15 a 25 minutos»; si ya salió, «El repartidor ya está en camino»; si llegó, «El repartidor está en tu puerta» (RQ-ATN-02-01) |
 
 Origen: criterios de verificación de FT-ATN-02 (RQ-ATN-02-01); los criterios sin RQ salen de los RNF y reglas generales de la feature. Datos sintéticos.
 

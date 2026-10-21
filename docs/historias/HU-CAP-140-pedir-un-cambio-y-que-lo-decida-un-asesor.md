@@ -39,7 +39,7 @@ tags: [hu, atencion, capa-a, ft-atn-02, media, ui]
 
 | N.° | DADO | CUANDO | ENTONCES |
 |---|---|---|---|
-| CA-1 | un pedido por confirmar | el cliente pide cambiar la dirección | el bot dice que un asesor lo revisará y el pedido muestra «Solicitud de cambio» en caja (RQ-ATN-02-02) |
+| CA-1 | un pedido en cocina | el cliente pide cambiar la dirección | el bot dice que un asesor lo revisará y el pedido muestra «Solicitud de cambio» en caja (RQ-ATN-02-02) |
 | CA-2 | una solicitud de cambio | el bot la recibe | el pedido no cambia hasta que un asesor lo edite (RQ-ATN-02-03) |
 | CA-3 | un pedido en camino | el cliente pide otra dirección | el bot dice que un asesor lo contactará y el chat pasa a «Urgente» (RQ-ATN-02-04) |
 | CA-4 | una solicitud | el asesor la acepta y edita el pedido | el bot avisa «Listo, cambiamos tu pedido»; si la rechaza, avisa el motivo (RQ-ATN-02-05) |
