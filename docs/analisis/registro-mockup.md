@@ -2,11 +2,11 @@
 id: REG-CAP-001
 tipo: analisis
 titulo: Registro del mockup de Caprichos (qué hace hoy cada pantalla)
-estado: draft
+estado: approved
 producto: caprichos
 version: "0.1"
 owner: "José Ángel Espinoza (desarrollo); validación pendiente de Kevin Rosales"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "José Ángel Espinoza (UX/UI Designer)", "Kevin Rosales (Stakeholder)"]
 fecha: 2026-10-17
 relacionados: [BRD-CAP-001, CFG-CAP-001]
 tags: [mockup, registro, etapa-siguiente]

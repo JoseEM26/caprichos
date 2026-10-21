@@ -2,11 +2,11 @@
 id: ANA-CAP-036
 tipo: analisis
 titulo: "Módulos y roles del administrativo de Caprichos"
-estado: draft
+estado: approved
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
-aprobadores: []
+aprobadores: ["José Ángel Espinoza (Product Owner)", "José Ángel Espinoza (UX/UI Designer)", "Kevin Rosales (Stakeholder)"]
 fecha: 2026-10-19
 relacionados: [BRD-CAP-001]
 tags: [analisis, apoyo, analisis]
