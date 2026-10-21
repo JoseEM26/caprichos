@@ -36,9 +36,9 @@
     state: present
   notify: Reiniciar servicio SSH
 
-- name: Aplicar configuración de endurecimiento SSH en sshd_config.d/60-caprichos-security.conf
+- name: Aplicar configuración de endurecimiento SSH en sshd_config.d/01-caprichos-security.conf
   ansible.builtin.copy:
-    dest: /etc/ssh/sshd_config.d/60-caprichos-security.conf
+    dest: /etc/ssh/sshd_config.d/01-caprichos-security.conf
     owner: root
     group: root
     mode: "0644"
@@ -54,6 +54,14 @@
       MaxAuthTries 3
       ClientAliveInterval 300
       ClientAliveCountMax 2
+  notify: Reiniciar servicio SSH
+
+# En OpenSSH gana el PRIMER valor leído: el archivo 50-cloud-init.conf de Contabo trae
+# «PasswordAuthentication yes», por eso nuestro archivo lleva el prefijo 01 para leerse antes.
+- name: Retirar el archivo anterior 60-caprichos-security.conf (se leía después del de cloud-init)
+  ansible.builtin.file:
+    path: /etc/ssh/sshd_config.d/60-caprichos-security.conf
+    state: absent
   notify: Reiniciar servicio SSH
 
 - name: Validar configuración de SSH antes de continuar
