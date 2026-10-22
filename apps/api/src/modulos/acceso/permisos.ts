@@ -74,6 +74,12 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'reservas', accion: 'ver' },
   { modulo: 'reservas', accion: 'crear' },
   { modulo: 'reservas', accion: 'editar' },
+  // Comprobantes y Reclamos (Ola 7)
+  { modulo: 'comprobantes', accion: 'ver' },
+  { modulo: 'comprobantes', accion: 'reimprimir' },
+  { modulo: 'comprobantes', accion: 'emitir' },
+  { modulo: 'reclamos', accion: 'ver' },
+  { modulo: 'reclamos', accion: 'responder' },
 ] as const;
 
 export const MATRIZ: Record<string, string[]> = {
@@ -97,6 +103,10 @@ export const MATRIZ: Record<string, string[]> = {
     'reservas/ver',
     'reservas/crear',
     'reservas/editar',
+    'comprobantes/ver',
+    'comprobantes/reimprimir',
+    'comprobantes/emitir',
+    'reclamos/ver',
   ],
   COCINA: [
     'pedidos/ver',

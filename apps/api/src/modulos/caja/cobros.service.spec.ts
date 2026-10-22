@@ -1,6 +1,7 @@
 // El gateway importa @nestjs/jwt (ESM): en las pruebas unitarias basta con un mock
 jest.mock('../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {} }));
 jest.mock('../salon/salon.service', () => ({ SalonService: class {} }));
+jest.mock('../comprobantes/comprobantes.service', () => ({ ComprobantesService: class {} }));
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpException, HttpStatus, BadRequestException } from '@nestjs/common';
@@ -8,6 +9,7 @@ import { Prisma } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { CobrosService } from './cobros.service';
 import { SalonService } from '../salon/salon.service';
+import { ComprobantesService } from '../comprobantes/comprobantes.service';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
@@ -21,6 +23,7 @@ describe('CobrosService', () => {
   let auditoriaMock: any;
   let eventosGatewayMock: any;
   let salonMock: any;
+  let comprobantesMock: any;
 
   const cajeroUsuario = {
     id: 2n,
@@ -53,6 +56,7 @@ describe('CobrosService', () => {
     };
 
     salonMock = { liberarMesasDePedido: jest.fn().mockResolvedValue(0) };
+    comprobantesMock = { emitirParaPedido: jest.fn().mockResolvedValue({ id: '1' }) };
     eventosGatewayMock = {
       emitirAdmin: jest.fn(),
     };
@@ -91,6 +95,7 @@ describe('CobrosService', () => {
         { provide: AuditoriaService, useValue: auditoriaMock },
         { provide: EventosGateway, useValue: eventosGatewayMock },
         { provide: SalonService, useValue: salonMock },
+        { provide: ComprobantesService, useValue: comprobantesMock },
       ],
     }).compile();
 
@@ -405,6 +410,28 @@ describe('CobrosService', () => {
           }),
         }),
       );
+    });
+
+    it('al cobrar genera la nota de venta y si eso falla el cobro igual queda registrado', async () => {
+      prismaMock.caja.findUnique.mockResolvedValue(cajaAbiertaMock);
+      prismaMock.pedido.findUnique.mockResolvedValue({ ...pedidoMock });
+      prismaMock.cobro.create.mockResolvedValue({
+        id: 32n,
+        pedido_id: 100n,
+        caja_id: 10n,
+        total: new Prisma.Decimal(50.0),
+        credito_personal: false,
+        cobrado_por: 2n,
+        en: new Date(),
+        pagos: [{ id: 41n, medio: 'YAPE', monto: new Prisma.Decimal(50.0), recibido: null, vuelto: null }],
+      });
+      prismaMock.pedido.update.mockResolvedValue({ ...pedidoMock, pago_estado: 'PAGADO', pago_metodo: 'YAPE' });
+      comprobantesMock.emitirParaPedido.mockRejectedValue(new Error('serie sin configurar'));
+
+      const res = await service.cobrar({ pedidoId: '100', pagos: [{ medio: 'YAPE', monto: 50 }] }, cajeroUsuario);
+
+      expect(res.id).toBe('32');
+      expect(comprobantesMock.emitirParaPedido).toHaveBeenCalledWith(100n, undefined, cajeroUsuario);
     });
 
     it('al cobrar libera las mesas del pedido y si falla el cobro igual queda registrado', async () => {

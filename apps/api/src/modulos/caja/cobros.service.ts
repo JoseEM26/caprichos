@@ -1,4 +1,5 @@
 import { SalonService } from '../salon/salon.service';
+import { ComprobantesService } from '../comprobantes/comprobantes.service';
 import {
   BadRequestException,
   HttpException,
@@ -25,6 +26,7 @@ export class CobrosService {
     private readonly auditoria: AuditoriaService,
     @Optional() private readonly eventosGateway?: EventosGateway,
     @Optional() private readonly salonService?: SalonService,
+    @Optional() private readonly comprobantesService?: ComprobantesService,
   ) {}
 
   private parsearId(id: bigint | string | number): bigint {
@@ -322,6 +324,14 @@ export class CobrosService {
 
       return { cobro: nuevoCobro, pedidoActualizado: pedAct };
     });
+
+    // el cobro genera la nota de venta con su correlativo (RQ-LEG-01-01); es idempotente y también se
+    // crea al consultarla, así que un fallo aquí no deshace el cobro
+    try {
+      await this.comprobantesService?.emitirParaPedido(pedido.id, undefined, usuario);
+    } catch {
+      // se genera al pedir el comprobante
+    }
 
     // la mesa se libera al cobrar (RN-CAP-054); si falla no se deshace el cobro: se libera a mano
     try {

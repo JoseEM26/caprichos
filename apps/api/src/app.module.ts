@@ -22,6 +22,8 @@ import { CocinaModule } from './modulos/cocina/cocina.module';
 import { PlanoModule } from './modulos/plano/plano.module';
 import { ReservasModule } from './modulos/reservas/reservas.module';
 import { SalonModule } from './modulos/salon/salon.module';
+import { ComprobantesModule } from './modulos/comprobantes/comprobantes.module';
+import { ReclamosModule } from './modulos/reclamos/reclamos.module';
 
 @Module({
   imports: [
@@ -49,6 +51,8 @@ import { SalonModule } from './modulos/salon/salon.module';
     PlanoModule,
     ReservasModule,
     SalonModule,
+    ComprobantesModule,
+    ReclamosModule,
   ],
   providers: [
     PinoLoggerService,

@@ -31,6 +31,8 @@ model Party {
   pedidos           Pedido[]          @relation("ClientePedido")
   pedidosRepartidos Pedido[]          @relation("RepartidorPedido")
   liquidaciones     Liquidacion[]     @relation("LiquidacionesRepartidor")
+  comprobantesEmitidos Comprobante[]     @relation("ComprobantesEmitidos")
+  reclamosRespondidos  Reclamo[]         @relation("ReclamosRespondidos")
 
   @@map("party")
 }
@@ -420,6 +422,8 @@ model Pedido {
   movimientosStock       MovimientoStock[]
   mesas                  PedidoMesa[]
   reservas               Reserva[]
+  comprobante            Comprobante?
+  reclamos               Reclamo[]
 
   @@map("pedido")
 }
@@ -888,6 +892,66 @@ model PedidoMesa {
 
   @@map("pedido_mesa")
 }
+
+// ---------- Ola 7: comprobantes y obligaciones legales (FT-LEG-01, FT-LEG-02) ----------
+
+model Comprobante {
+  id                 BigInt    @id @default(autoincrement())
+  pedido_id          BigInt    @unique
+  tipo               String    // NOTA_VENTA | BOLETA | FACTURA
+  serie              String
+  numero             Int
+  numero_texto       String    @unique
+  documento          String?
+  razon_social       String?
+  emision            String    @default("POR_EMITIR") // INTERNA | POR_EMITIR | EMITIDO
+  emitido_en         DateTime? @db.Timestamptz
+  emitido_por        BigInt?
+  referencia_externa String?
+  copias_impresas    Int       @default(0)
+  creado_en          DateTime  @default(now()) @db.Timestamptz
+
+  pedido             Pedido    @relation(fields: [pedido_id], references: [id])
+  emitidoPor         Party?    @relation("ComprobantesEmitidos", fields: [emitido_por], references: [id])
+
+  @@unique([serie, numero])
+  @@map("comprobante")
+}
+
+model SecuenciaComprobante {
+  serie         String @id
+  ultimo_numero Int    @default(0)
+
+  @@map("secuencia_comprobante")
+}
+
+model Reclamo {
+  id                    BigInt    @id @default(autoincrement())
+  numero                String    @unique
+  tipo                  String    // RECLAMO | QUEJA
+  nombre                String
+  documento             String
+  domicilio             String
+  telefono              String
+  correo                String?
+  pedido_id             BigInt?
+  detalle               String
+  monto_reclamado       Decimal?  @db.Decimal(12, 2)
+  estado                String    @default("RECIBIDO") // RECIBIDO | EN_REVISION | RESPONDIDO
+  respuesta             String?
+  respondido_por        BigInt?
+  respondido_en         DateTime? @db.Timestamptz
+  fecha_limite          DateTime  @db.Date
+  aceptacion_privacidad Boolean   @default(true)
+  aceptado_en           DateTime  @default(now()) @db.Timestamptz
+  creado_en             DateTime  @default(now()) @db.Timestamptz
+
+  pedido                Pedido?   @relation(fields: [pedido_id], references: [id])
+  respondidoPor         Party?    @relation("ReclamosRespondidos", fields: [respondido_por], references: [id])
+
+  @@map("reclamo")
+}
+
 
 
 
