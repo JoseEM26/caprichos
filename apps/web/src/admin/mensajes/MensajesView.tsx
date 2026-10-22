@@ -1,0 +1,826 @@
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Confirmar } from '../../comun/Confirmar';
+import { useEventos } from '../../comun/socket';
+import {
+  aprobarPagoChat,
+  enviarMensaje,
+  listarConversaciones,
+  listarRespuestasRapidas,
+  marcarAtendido,
+  obtenerDetalleConversacion,
+  pausarBot,
+  pulirMensaje,
+  rechazarPagoChat,
+  reanudarBot,
+  soltarChat,
+  tomarChat,
+} from './mensajesApi';
+import {
+  ChatResumen,
+  DetalleConversacion,
+  EstadoChat,
+  FiltroChat,
+  RespuestaRapida,
+} from './mensajesTipos';
+
+const ESTADOS_BG: Record<EstadoChat, string> = {
+  atencion: '#FBE9DF',
+  validar: '#FFF1C9',
+  bot: 'var(--cp-line)',
+  pausado: '#F0F2F5',
+  atendido: 'var(--cp-greenbg)',
+};
+
+const ESTADOS_LABEL: Record<EstadoChat, string> = {
+  atencion: 'Requiere atención',
+  validar: 'Validar pago',
+  bot: 'El bot atiende',
+  pausado: 'Pausado',
+  atendido: 'Atendido',
+};
+
+const BANNERS_TEXTO: Record<EstadoChat, [string, string]> = {
+  atencion: ['Este cliente pidió hablar con una persona. El bot ya no responde: contesta tú.', '#FFF1C9'],
+  validar: ['Revisa el comprobante y aprueba o rechaza el pago. El bot espera tu decisión.', '#FFF1C9'],
+  bot: ['El bot está atendiendo solo. Entra únicamente si hace falta.', '#E7F5EE'],
+  pausado: ['El bot está en pausa en este chat: solo respondes tú.', '#F0F2F5'],
+  atendido: ['Chat atendido. Si el cliente escribe de nuevo, vuelve a la lista de pendientes.', '#E7F5EE'],
+};
+
+const COLORES_AVATAR = ['#B5651D', '#6B4E9B', '#2E7D32', '#AD4A4A', '#1F7A8C', '#D97706'];
+
+const obtenerColorAvatar = (id: string) => {
+  let num = 0;
+  for (let i = 0; i < id.length; i++) num += id.charCodeAt(i);
+  return COLORES_AVATAR[num % COLORES_AVATAR.length];
+};
+
+const obtenerIniciales = (nombre: string) => {
+  const partes = (nombre || '').trim().split(/\s+/).filter(Boolean);
+  if (partes.length === 0) return 'WA';
+  if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
+  return (partes[0][0] + partes[1][0]).toUpperCase();
+};
+
+export function MensajesView() {
+  const [cargando, setCargando] = useState(true);
+  const [chats, setChats] = useState<ChatResumen[]>([]);
+  const [conteos, setConteos] = useState({ todos: 0, atender: 0, bot: 0, atendidos: 0 });
+  const [filtro, setFiltro] = useState<FiltroChat>('todos');
+  const [busqueda, setBusqueda] = useState('');
+  const [chatSeleccionadoId, setChatSeleccionadoId] = useState<string | null>(null);
+  const [detalle, setDetalle] = useState<DetalleConversacion | null>(null);
+  const [cargandoDetalle, setCargandoDetalle] = useState(false);
+  const [respuestasRapidas, setRespuestasRapidas] = useState<RespuestaRapida[]>([]);
+
+  // Vista móvil: chat abierto
+  const [chatAbiertoMovil, setChatAbiertoMovil] = useState(false);
+
+  // Pantalla completa y zoom
+  const [pantallaCompleta, setPantallaCompleta] = useState(false);
+  const [zoom, setZoom] = useState(85);
+
+  // Redacción de mensaje
+  const [textoMensaje, setTextoMensaje] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const [textoPulido, setTextoPulido] = useState<string | null>(null);
+  const [pulirError, setPulirError] = useState<string | null>(null);
+  const [mensajeCopiado, setMensajeCopiado] = useState<string | null>(null);
+
+  // Diálogos de confirmación
+  const [confirmarAccion, setConfirmarAccion] = useState<{
+    titulo: string;
+    mensaje: string;
+    textoSi?: string;
+    peligro?: boolean;
+    accion: () => Promise<void>;
+  } | null>(null);
+
+  // Cargar lista de conversaciones
+  const cargarLista = useCallback(async (mantenerSeleccion = true) => {
+    try {
+      const res = await listarConversaciones(filtro, busqueda);
+      setChats(res.chats);
+      setConteos(res.conteos);
+
+      if (res.chats.length > 0) {
+        setChatSeleccionadoId((prev) => {
+          if (mantenerSeleccion && prev && res.chats.some((c) => c.id === prev)) {
+            return prev;
+          }
+          return res.chats[0].id;
+        });
+      } else {
+        setChatSeleccionadoId(null);
+        setDetalle(null);
+      }
+    } catch {
+      // Ignorar error transitorio de red
+    } finally {
+      setCargando(false);
+    }
+  }, [filtro, busqueda]);
+
+  // Cargar respuestas rápidas una vez
+  useEffect(() => {
+    listarRespuestasRapidas()
+      .then((rr) => setRespuestasRapidas(rr))
+      .catch(() => {});
+  }, []);
+
+  // Cargar chats al cambiar filtro o búsqueda
+  useEffect(() => {
+    cargarLista(false);
+  }, [cargarLista]);
+
+  // Cargar detalle del chat seleccionado
+  const cargarDetalle = useCallback(async (id: string) => {
+    setCargandoDetalle(true);
+    setTextoPulido(null);
+    setPulirError(null);
+    setMensajeCopiado(null);
+    try {
+      const d = await obtenerDetalleConversacion(id);
+      setDetalle(d);
+    } catch {
+      setDetalle(null);
+    } finally {
+      setCargandoDetalle(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (chatSeleccionadoId) {
+      cargarDetalle(chatSeleccionadoId);
+    }
+  }, [chatSeleccionadoId, cargarDetalle]);
+
+  // Escuchar eventos en vivo
+  useEventos('mensajes:actualizado', () => {
+    cargarLista(true);
+    if (chatSeleccionadoId) {
+      cargarDetalle(chatSeleccionadoId);
+    }
+  });
+
+  // Acciones sobre el chat
+  const handleEnviarMensaje = async (textoAEnviar?: string) => {
+    const txt = (textoAEnviar !== undefined ? textoAEnviar : textoMensaje).trim();
+    if (!txt || !chatSeleccionadoId || enviando) return;
+    setEnviando(true);
+    try {
+      await enviarMensaje(chatSeleccionadoId, txt);
+      setTextoMensaje('');
+      setTextoPulido(null);
+      setPulirError(null);
+      await cargarDetalle(chatSeleccionadoId);
+      await cargarLista(true);
+    } catch (err: any) {
+      setPulirError(err?.message || 'Error al enviar mensaje');
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  const handlePulir = async () => {
+    const raw = textoMensaje.trim();
+    if (!raw) {
+      setPulirError('Escribe primero tu mensaje y luego toca Pulir.');
+      setTextoPulido(null);
+      return;
+    }
+    if (!chatSeleccionadoId) return;
+    try {
+      const res = await pulirMensaje(chatSeleccionadoId, raw);
+      setTextoPulido(res.texto);
+      setPulirError(null);
+    } catch (err: any) {
+      setPulirError(err?.message || 'No se pudo pulir el mensaje');
+    }
+  };
+
+  const handleTomarChat = async (forzar = false) => {
+    if (!chatSeleccionadoId) return;
+    try {
+      await tomarChat(chatSeleccionadoId, forzar);
+      await cargarDetalle(chatSeleccionadoId);
+      await cargarLista(true);
+    } catch (err: any) {
+      if (err?.codigo === 'CHAT_TOMADO') {
+        setConfirmarAccion({
+          titulo: '¿Tomar este chat?',
+          mensaje: err.message || 'Este chat lo atiende otra persona. ¿Deseas tomarlo tú?',
+          textoSi: 'Sí, tomarlo',
+          accion: async () => {
+            await tomarChat(chatSeleccionadoId, true);
+            await cargarDetalle(chatSeleccionadoId);
+            await cargarLista(true);
+          },
+        });
+      }
+    }
+  };
+
+  const handleSoltarChat = async () => {
+    if (!chatSeleccionadoId) return;
+    try {
+      await soltarChat(chatSeleccionadoId);
+      await cargarDetalle(chatSeleccionadoId);
+      await cargarLista(true);
+    } catch {}
+  };
+
+  const handleTogglePausaBot = () => {
+    if (!detalle || !chatSeleccionadoId) return;
+    const pausado = detalle.estado === 'pausado';
+    setConfirmarAccion({
+      titulo: pausado ? '¿Reanudar el bot en este chat?' : '¿Pausar el bot en este chat?',
+      mensaje: pausado
+        ? 'El bot vuelve a responder solo a este cliente.'
+        : `El bot deja de responder a ${detalle.nombre} hasta que lo reanudes.`,
+      textoSi: pausado ? 'Sí, reanudar bot' : 'Sí, pausar bot',
+      accion: async () => {
+        if (pausado) await reanudarBot(chatSeleccionadoId);
+        else await pausarBot(chatSeleccionadoId);
+        await cargarDetalle(chatSeleccionadoId);
+        await cargarLista(true);
+      },
+    });
+  };
+
+  const handleMarcarAtendido = () => {
+    if (!detalle || !chatSeleccionadoId) return;
+    setConfirmarAccion({
+      titulo: `¿Marcar el chat de ${detalle.nombre} como atendido?`,
+      mensaje: 'Sale de la lista de pendientes y el bot puede volver a responder.',
+      textoSi: 'Sí, marcar atendido',
+      accion: async () => {
+        await marcarAtendido(chatSeleccionadoId);
+        await cargarDetalle(chatSeleccionadoId);
+        await cargarLista(true);
+      },
+    });
+  };
+
+  const handleAprobarPago = () => {
+    if (!detalle || !chatSeleccionadoId) return;
+    const tiempoMin = detalle.tiempoPrometidoMin || 25;
+    setConfirmarAccion({
+      titulo: `¿Aprobar el pago de ${detalle.nombre}?`,
+      mensaje: `Se le avisa al cliente que el pago fue verificado y que su pedido demora unos ${tiempoMin} minutos.${detalle.altaDemanda ? ' (Alta demanda activa)' : ''}`,
+      textoSi: 'Sí, aprobar pago',
+      accion: async () => {
+        await aprobarPagoChat(chatSeleccionadoId);
+        await cargarDetalle(chatSeleccionadoId);
+        await cargarLista(true);
+      },
+    });
+  };
+
+  const handleRechazarPago = () => {
+    if (!detalle || !chatSeleccionadoId) return;
+    setConfirmarAccion({
+      titulo: `¿Rechazar el pago de ${detalle.nombre}?`,
+      mensaje: 'Se le pide al cliente que vuelva a enviar el comprobante.',
+      textoSi: 'Sí, rechazar',
+      peligro: true,
+      accion: async () => {
+        await rechazarPagoChat(chatSeleccionadoId);
+        await cargarDetalle(chatSeleccionadoId);
+        await cargarLista(true);
+      },
+    });
+  };
+
+  const handleCopiarProductos = () => {
+    if (!detalle?.pedido) {
+      setMensajeCopiado('Este chat no tiene un pedido armado.');
+      return;
+    }
+    const txt = detalle.pedido.lineas.join('\n');
+    try {
+      navigator.clipboard.writeText(txt);
+      setMensajeCopiado('Productos copiados:\n' + txt);
+    } catch {
+      setMensajeCopiado(txt);
+    }
+  };
+
+  const handleCopiarCelular = () => {
+    if (!detalle?.telefono) return;
+    const num = detalle.telefono.replace(/\D/g, '');
+    try {
+      navigator.clipboard.writeText(num);
+      setMensajeCopiado(`Celular copiado: ${num}`);
+    } catch {
+      setMensajeCopiado(`Celular: ${num}`);
+    }
+  };
+
+  const toggleFullscreen = () => {
+    setPantallaCompleta((prev) => !prev);
+  };
+
+  const bannerInfo = useMemo(() => {
+    if (!detalle) return null;
+    return BANNERS_TEXTO[detalle.estado] || BANNERS_TEXTO.bot;
+  }, [detalle]);
+
+  return (
+    <div className="cv-root" data-fs={pantallaCompleta ? '1' : '0'}>
+      <style>{`
+        .cv-wrap{display:grid;grid-template-columns:minmax(270px,350px) 1fr;height:calc((100vh - 200px) / var(--cvz,1));min-height:340px;border:1px solid #D1D7DB;border-radius:14px;overflow:hidden;background:#fff;color:#111B21}
+        .cv-list{display:flex;flex-direction:column;min-width:0;min-height:0;border-right:1px solid #E9EDEF;background:#fff}
+        .cv-lhead{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:8px 12px 2px;background:#fff}
+        .cv-root[data-fs="1"]{position:fixed;inset:0;z-index:100;background:var(--cp-cream);padding:8px;box-sizing:border-box;display:flex;flex-direction:column}
+        .cv-root[data-fs="1"] .cv-wrap{height:calc((100vh - 70px) / var(--cvz,1)) !important}
+        .cv-title{font-family:Montserrat,sans-serif;font-weight:800;font-size:17px}
+        .cv-sub{font-size:12px;color:#667781}
+        .cv-search{padding:6px 12px}
+        .cv-search input{width:100%;box-sizing:border-box;min-height:44px;border-radius:10px;border:0;background:#F0F2F5;padding:0 14px;font-size:14px;color:#111B21}
+        .cv-tabs{display:flex;gap:6px;padding:4px 12px 8px;overflow-x:auto}
+        .cv-tab{flex:none;min-height:44px;padding:0 12px;border:0;border-radius:9999px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+        .cv-rows{flex:1;min-height:0;overflow-y:auto}
+        .cv-row{display:flex;gap:10px;width:100%;text-align:left;border:0;border-bottom:1px solid #F0F2F5;padding:6px 12px;cursor:pointer;font-family:inherit;color:#111B21;min-height:56px}
+        .cv-av{flex:none;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:14px}
+        .cv-rb{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+        .cv-r1,.cv-r2{display:flex;justify-content:space-between;align-items:center;gap:8px}
+        .cv-rn{font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .cv-rt{flex:none;font-size:12px}
+        .cv-last{font-size:13px;color:#667781;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .cv-badge{flex:none;min-width:20px;height:20px;border-radius:10px;background:#25D366;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 6px;box-sizing:border-box}
+        .cv-pill{align-self:flex-start;padding:1px 10px;border-radius:9999px;font-size:12px;font-weight:700;color:#111B21;white-space:nowrap}
+        .cv-empty{padding:24px 16px;text-align:center;font-size:13px;color:#667781}
+        .cv-chat{display:flex;flex-direction:column;min-width:0;min-height:0;background:#EFEAE2}
+        .cv-chead{display:flex;align-items:center;gap:8px;padding:5px 12px;background:#F0F2F5;border-bottom:1px solid #D1D7DB}
+        .cv-hb{flex:1;min-width:0;display:flex;flex-direction:column}
+        .cv-hn{font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .cv-hs{font-size:12px;color:#667781}
+        .cv-back{display:none;flex:none;min-width:44px;min-height:44px;border:0;background:transparent;font-size:22px;color:#54656F;cursor:pointer;align-items:center;justify-content:center}
+        .cv-banner{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:4px 12px;font-size:12px;color:#111B21;border-bottom:1px solid #E9EDEF}
+        .cv-bbtn{min-height:44px;padding:0 14px;border:1.5px solid #00A884;border-radius:9999px;background:#fff;color:#008069;font-weight:700;font-size:13px;cursor:pointer}
+        .cv-owner{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:4px 12px;font-size:12px;font-weight:700;border-bottom:1px solid #E9EDEF}
+        .cv-owner button{min-height:44px;padding:0 14px;border:1.5px solid #54656F;border-radius:9999px;background:#fff;color:#111B21;font-weight:700;font-size:12px;cursor:pointer}
+        .cv-msgs{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column-reverse;gap:3px;padding:8px 4%}
+        .cv-bub{max-width:78%;border-radius:8px;padding:6px 9px 4px;box-shadow:0 1px 0.5px rgba(11,20,26,.13);font-size:14px;line-height:19px;color:#111B21}
+        .cv-who{font-size:12px;font-weight:700;margin-bottom:1px}
+        .cv-txt{white-space:pre-wrap;word-break:break-word}
+        .cv-meta{display:flex;justify-content:flex-end;align-items:center;gap:3px;font-size:11px;color:#667781;margin-top:1px}
+        .cv-ck{color:#53BDEB;font-size:12px;letter-spacing:-3px}
+        .cv-img{height:84px;border-radius:6px;background:#CFD8DC;display:flex;align-items:center;justify-content:center;color:#546E7A;font-size:13px;font-weight:700;margin-bottom:4px}
+        .cv-day{align-self:center;margin:6px 0}
+        .cv-day span{background:#fff;border-radius:8px;padding:3px 12px;font-size:12px;color:#54656F;box-shadow:0 1px 0.5px rgba(11,20,26,.13)}
+        .cv-order{margin:0 12px 6px;background:#fff;border-left:4px solid #25D366;border-radius:8px;padding:8px 12px;font-size:13px}
+        .cv-total{font-weight:800;margin-top:2px}
+        .cv-pay{margin:0 12px 6px;display:flex;flex-direction:column;gap:6px}
+        .cv-paynote{font-size:12px;font-weight:700;color:#54656F}
+        .cv-payb{display:flex;gap:8px;flex-wrap:wrap}
+        .cv-ok{flex:1 1 150px;min-height:48px;border:0;border-radius:24px;background:#00A884;color:#fff;font-weight:800;font-size:14px;cursor:pointer}
+        .cv-no{flex:1 1 150px;min-height:48px;border:1.5px solid #C0392B;border-radius:24px;background:#fff;color:#C0392B;font-weight:800;font-size:14px;cursor:pointer}
+        .cv-quick{display:flex;gap:6px;padding:4px 12px;overflow-x:auto}
+        .cv-qb{flex:none;min-height:44px;padding:0 14px;border:1px solid #D1D7DB;border-radius:9999px;background:#fff;color:#111B21;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+        .cv-comp{display:flex;gap:8px;align-items:center;padding:6px 12px 8px;background:#F0F2F5}
+        .cv-comp input{flex:1;min-width:0;box-sizing:border-box;min-height:46px;border-radius:24px;border:0;background:#fff;padding:0 16px;font-size:15px;color:#111B21}
+        .cv-polbtn{flex:none;min-height:46px;padding:0 14px;border:1.5px solid #00A884;border-radius:24px;background:#fff;color:#008069;font-weight:700;font-size:13px;cursor:pointer}
+        .cv-send{flex:none;width:46px;height:46px;border:0;border-radius:50%;background:#00A884;display:flex;align-items:center;justify-content:center;cursor:pointer}
+        .cv-more{background:#F0F2F5;border-top:1px solid #E9EDEF;font-size:13px}
+        .cv-more summary{min-height:44px;display:flex;align-items:center;padding:0 14px;cursor:pointer;color:#54656F;font-weight:600}
+        .cv-moreb{display:flex;gap:6px;flex-wrap:wrap;padding:0 12px 8px}
+        .cv-moreb button,.cv-moreb a{min-height:44px;padding:0 14px;border:1px solid #D1D7DB;border-radius:10px;background:#fff;color:#111B21;font-weight:600;font-size:13px;display:flex;align-items:center;text-decoration:none;cursor:pointer;box-sizing:border-box}
+        .cv-pol{margin:0 12px 6px;background:#fff;border-left:4px solid #00A884;border-radius:8px;padding:8px 12px;font-size:13px;display:flex;flex-direction:column;gap:6px}
+        .cv-pollbl{font-size:12px;font-weight:700;color:#54656F}
+        .cv-polx{white-space:pre-wrap;line-height:19px}
+        .cv-polb{display:flex;gap:8px;flex-wrap:wrap}
+        .cv-zb{min-width:44px;min-height:44px;border:1.5px solid var(--cp-navy);border-radius:10px;background:var(--cp-white);color:var(--cp-navy);font-weight:800;font-size:15px;cursor:pointer}
+        @media (max-width:760px){
+          .cv-wrap{grid-template-columns:1fr;height:calc((100vh - 230px) / var(--cvz,1))}
+          .cv-wrap[data-open="0"] .cv-chat{display:none}
+          .cv-wrap[data-open="1"] .cv-list{display:none}
+          .cv-back{display:flex}
+          .cv-msgs{padding:12px 3%}
+          .cv-bub{max-width:88%}
+        }
+      `}</style>
+
+      {/* Controles de Vista: Zoom y Pantalla completa */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          gap: '8px',
+          flexWrap: 'wrap',
+          marginBottom: '6px',
+        }}
+      >
+        <button
+          className="cv-zb"
+          aria-pressed={pantallaCompleta}
+          style={{ padding: '0 12px', fontSize: '13px' }}
+          onClick={toggleFullscreen}
+        >
+          {pantallaCompleta ? 'Salir de pantalla completa' : 'Pantalla completa'}
+        </button>
+        <div role="group" aria-label="Tamaño de la vista" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>Zoom</span>
+          <button className="cv-zb" aria-label="Alejar" onClick={() => setZoom((z) => Math.max(60, z - 10))}>
+            −
+          </button>
+          <button
+            className="cv-zb"
+            aria-label="Restablecer el tamaño"
+            style={{ minWidth: '60px' }}
+            onClick={() => setZoom(85)}
+          >
+            {zoom}%
+          </button>
+          <button className="cv-zb" aria-label="Acercar" onClick={() => setZoom((z) => Math.min(120, z + 10))}>
+            +
+          </button>
+        </div>
+      </div>
+
+      {/* Contenedor Principal */}
+      <div
+        className="cv-wrap"
+        data-open={chatAbiertoMovil ? '1' : '0'}
+        style={{ '--cvz': zoom / 100, zoom: zoom / 100 } as React.CSSProperties}
+      >
+        {/* Columna Izquierda: Lista de Chats */}
+        <div className="cv-list">
+          <div className="cv-lhead">
+            <span className="cv-title">Chats</span>
+            <span className="cv-sub">
+              {conteos.atender === 0 ? 'Todo al día' : `${conteos.atender} por atender`}
+            </span>
+          </div>
+
+          <div className="cv-search">
+            <input
+              type="text"
+              placeholder="Buscar un chat o un celular"
+              aria-label="Buscar un chat"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+            />
+          </div>
+
+          <div className="cv-tabs">
+            {[
+              { id: 'todos', label: 'Todos', count: conteos.todos },
+              { id: 'atender', label: 'Por atender', count: conteos.atender },
+              { id: 'bot', label: 'Con el bot', count: conteos.bot },
+              { id: 'atendidos', label: 'Atendidos', count: conteos.atendidos },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                className="cv-tab"
+                style={{
+                  background: filtro === tab.id ? '#D9FDD3' : '#F0F2F5',
+                  color: filtro === tab.id ? '#005C4B' : '#54656F',
+                }}
+                onClick={() => setFiltro(tab.id as FiltroChat)}
+              >
+                {tab.label} <b>{tab.count}</b>
+              </button>
+            ))}
+          </div>
+
+          <div className="cv-rows">
+            {cargando ? (
+              <div className="cv-empty">Cargando conversaciones...</div>
+            ) : chats.length === 0 ? (
+              <div className="cv-empty">No hay conversaciones en esta pestaña.</div>
+            ) : (
+              chats.map((c) => {
+                const seleccionado = c.id === chatSeleccionadoId;
+                const tieneSinLeer = c.sinLeer > 0;
+                return (
+                  <button
+                    key={c.id}
+                    className="cv-row"
+                    style={{
+                      background: seleccionado ? '#F0F2F5' : '#FFFFFF',
+                    }}
+                    onClick={() => {
+                      setChatSeleccionadoId(c.id);
+                      setChatAbiertoMovil(true);
+                    }}
+                  >
+                    <span className="cv-av" style={{ background: obtenerColorAvatar(c.id) }}>
+                      {obtenerIniciales(c.nombre)}
+                    </span>
+                    <span className="cv-rb">
+                      <span className="cv-r1">
+                        <b className="cv-rn">{c.nombre}</b>
+                        <span
+                          className="cv-rt"
+                          style={{ color: tieneSinLeer ? '#00A884' : '#667781' }}
+                        >
+                          {c.hora}
+                        </span>
+                      </span>
+                      <span className="cv-r2">
+                        <span className="cv-last">{c.ultimo}</span>
+                        {tieneSinLeer && <span className="cv-badge">{c.sinLeer}</span>}
+                      </span>
+                      <span
+                        className="cv-pill"
+                        style={{
+                          background: c.urgente ? '#F8C9C9' : ESTADOS_BG[c.estado] || '#F0F2F5',
+                        }}
+                      >
+                        {c.urgente ? `URGENTE · ${ESTADOS_LABEL[c.estado]}` : ESTADOS_LABEL[c.estado]}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Columna Derecha: Conversación */}
+        <div className="cv-chat">
+          {!chatSeleccionadoId || (!detalle && cargandoDetalle) ? (
+            <div className="cv-empty" style={{ margin: 'auto' }}>
+              {cargandoDetalle ? 'Cargando conversación...' : 'Selecciona un chat para ver la conversación'}
+            </div>
+          ) : !detalle ? (
+            <div className="cv-empty" style={{ margin: 'auto' }}>
+              No se pudo cargar la conversación.
+            </div>
+          ) : (
+            <>
+              {/* Cabecera del Chat */}
+              <div className="cv-chead">
+                <button
+                  className="cv-back"
+                  aria-label="Volver a la lista de chats"
+                  onClick={() => setChatAbiertoMovil(false)}
+                >
+                  ←
+                </button>
+                <span className="cv-av" style={{ background: obtenerColorAvatar(detalle.id) }}>
+                  {obtenerIniciales(detalle.nombre)}
+                </span>
+                <span className="cv-hb">
+                  <b className="cv-hn">{detalle.nombre}</b>
+                  <span className="cv-hs">
+                    {detalle.telefono}
+                    {detalle.modalidad ? ` · ${detalle.modalidad}` : ''}
+                  </span>
+                </span>
+                <span
+                  className="cv-pill"
+                  style={{
+                    background: detalle.urgente ? '#F8C9C9' : ESTADOS_BG[detalle.estado] || '#F0F2F5',
+                  }}
+                >
+                  {detalle.urgente ? `URGENTE · ${ESTADOS_LABEL[detalle.estado]}` : ESTADOS_LABEL[detalle.estado]}
+                </span>
+              </div>
+
+              {/* Banner Informativo */}
+              {bannerInfo && (
+                <div className="cv-banner" style={{ background: bannerInfo[1] }}>
+                  <span>{bannerInfo[0]}</span>
+                  <button className="cv-bbtn" onClick={handleTogglePausaBot}>
+                    {detalle.estado === 'pausado' ? 'Reanudar el bot' : 'Pausar el bot'}
+                  </button>
+                </div>
+              )}
+
+              {/* Control de Dueño / Tomar Chat */}
+              <div className="cv-owner">
+                <span>
+                  {detalle.dueno
+                    ? detalle.esMio
+                      ? 'Lo atiendes tú: el bot no responde en este chat.'
+                      : `Lo atiende ${detalle.dueno}: el bot no responde y tú no puedes escribir.`
+                    : 'Chat libre: el bot atiende automáticamente.'}
+                </span>
+                <button onClick={() => (detalle.esMio ? handleSoltarChat() : handleTomarChat(false))}>
+                  {detalle.esMio ? 'Soltar el chat' : 'Tomar el chat'}
+                </button>
+              </div>
+
+              {/* Mensajes del Chat */}
+              <div className="cv-msgs">
+                {detalle.mensajes
+                  .slice()
+                  .reverse()
+                  .map((m) => {
+                    const esCliente = m.autor === 'CLIENTE';
+                    const esBot = m.autor === 'BOT';
+                    const bg = esCliente ? '#FFFFFF' : esBot ? '#E1F3FB' : '#D9FDD3';
+                    const alineacion = esCliente ? 'flex-start' : 'flex-end';
+                    return (
+                      <div
+                        key={m.id}
+                        className="cv-bub"
+                        style={{ alignSelf: alineacion, background: bg }}
+                      >
+                        {!esCliente && (
+                          <div
+                            className="cv-who"
+                            style={{ color: esBot ? '#1F7A8C' : '#008069' }}
+                          >
+                            {esBot ? 'Capri (bot)' : 'Equipo'}
+                          </div>
+                        )}
+                        {m.imagen && (
+                          <div className="cv-img">
+                            <span>Foto</span>
+                          </div>
+                        )}
+                        <div className="cv-txt">{m.texto}</div>
+                        <div className="cv-meta">
+                          <span>{m.hora}</span>
+                          {!esCliente && <span className="cv-ck">✓✓</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                <div className="cv-day">
+                  <span>HOY</span>
+                </div>
+              </div>
+
+              {/* Solicitud de cambio si existe */}
+              {detalle.solicitud && (
+                <div className="cv-order" style={{ borderLeftColor: '#E67929' }}>
+                  <b>Solicitud del cliente: {detalle.solicitud.tipo}</b>
+                  <div>{detalle.solicitud.detalle}</div>
+                  <div style={{ color: '#54656F' }}>
+                    Pedido {detalle.solicitud.pedido} · estado: {detalle.solicitud.estadoPedido} · {detalle.solicitud.hora}
+                  </div>
+                </div>
+              )}
+
+              {/* Pedido armado si existe */}
+              {detalle.pedido && (
+                <div className="cv-order">
+                  <b>Pedido armado</b>
+                  {detalle.pedido.lineas.map((linea, idx) => (
+                    <div key={idx}>{linea}</div>
+                  ))}
+                  <div className="cv-total">Total s/ {detalle.pedido.total}</div>
+                </div>
+              )}
+
+              {/* Acciones de Validar Pago */}
+              {detalle.estado === 'validar' && detalle.pedido && (
+                <div className="cv-pay">
+                  <div className="cv-paynote">
+                    {detalle.altaDemanda
+                      ? `Alta demanda activa: el tiempo prometido es de ${detalle.tiempoPrometidoMin || 25} minutos.`
+                      : `Tiempo prometido: ${detalle.tiempoPrometidoMin || 25} minutos.`}
+                  </div>
+                  <div className="cv-payb">
+                    <button className="cv-ok" onClick={handleAprobarPago}>
+                      Aprobar el pago
+                    </button>
+                    <button className="cv-no" onClick={handleRechazarPago}>
+                      Rechazar
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Respuestas rápidas */}
+              <div className="cv-quick">
+                {respuestasRapidas.map((q) => (
+                  <button
+                    key={q.id}
+                    className="cv-qb"
+                    onClick={() => setTextoMensaje(q.texto)}
+                  >
+                    {q.titulo}
+                  </button>
+                ))}
+              </div>
+
+              {/* Vista previa de Pulir Mensaje */}
+              {textoPulido && (
+                <div className="cv-pol" role="status">
+                  <div className="cv-pollbl">Así quedaría tu mensaje, más amable y bien escrito:</div>
+                  <div className="cv-polx">{textoPulido}</div>
+                  <div className="cv-polb">
+                    <button
+                      className="cv-ok"
+                      style={{ minHeight: '44px' }}
+                      onClick={() => {
+                        setTextoMensaje(textoPulido);
+                        setTextoPulido(null);
+                        setPulirError(null);
+                      }}
+                    >
+                      Usar este texto
+                    </button>
+                    <button
+                      className="cv-no"
+                      style={{ minHeight: '44px', borderColor: '#54656F', color: '#54656F' }}
+                      onClick={() => setTextoPulido(null)}
+                    >
+                      Dejar el mío
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {pulirError && (
+                <div role="status" style={{ padding: '0 14px 4px', fontSize: '12px', fontWeight: 700, color: '#C0392B' }}>
+                  {pulirError}
+                </div>
+              )}
+
+              {/* Compositor de mensaje */}
+              <div className="cv-comp">
+                <input
+                  type="text"
+                  placeholder="Escribe un mensaje"
+                  aria-label="Escribe un mensaje"
+                  value={textoMensaje}
+                  disabled={detalle.ocupado}
+                  onChange={(e) => setTextoMensaje(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleEnviarMensaje();
+                  }}
+                />
+                <button
+                  className="cv-polbtn"
+                  aria-label="Pulir el mensaje para que sea más amable"
+                  disabled={detalle.ocupado}
+                  onClick={handlePulir}
+                >
+                  Pulir
+                </button>
+                <button
+                  className="cv-send"
+                  aria-label="Enviar mensaje"
+                  disabled={detalle.ocupado || enviando}
+                  onClick={() => handleEnviarMensaje()}
+                >
+                  <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+                    <path d="M3 20l18-8L3 4v6l11 2-11 2z" fill="#fff" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Menú Más Acciones */}
+              <details className="cv-more">
+                <summary>Más acciones</summary>
+                <div className="cv-moreb">
+                  {detalle.estado !== 'atendido' && (
+                    <button onClick={handleMarcarAtendido}>Marcar atendido</button>
+                  )}
+                  <button onClick={handleCopiarProductos}>Copiar solo productos</button>
+                  <button onClick={handleCopiarCelular}>Copiar celular</button>
+                  <a
+                    href={`https://wa.me/51${detalle.telefono.replace(/\D/g, '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Abrir en WhatsApp
+                  </a>
+                </div>
+                {mensajeCopiado && (
+                  <div
+                    role="status"
+                    style={{
+                      whiteSpace: 'pre-line',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      color: 'var(--cp-green)',
+                      padding: '0 10px 8px',
+                    }}
+                  >
+                    {mensajeCopiado}
+                  </div>
+                )}
+              </details>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Modal Confirmar Acción */}
+      {confirmarAccion && (
+        <Confirmar
+          abierto={true}
+          titulo={confirmarAccion.titulo}
+          mensaje={confirmarAccion.mensaje}
+          textoSi={confirmarAccion.textoSi}
+          peligro={confirmarAccion.peligro}
+          alConfirmar={async () => {
+            const acc = confirmarAccion.accion;
+            setConfirmarAccion(null);
+            await acc();
+          }}
+          alCancelar={() => setConfirmarAccion(null)}
+        />
+      )}
+    </div>
+  );
+}

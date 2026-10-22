@@ -3,7 +3,7 @@ export const TITULOS_VISTA: Record<string, { titulo: string; subtitulo: string }
   escritorio: { titulo: "Escritorio", subtitulo: "Resumen del día: ventas, pedidos y lo que está pendiente." },
   iniciativas: { titulo: "Iniciativas", subtitulo: "Quejas, mejoras e ideas del equipo, con su captura y su comentario. Las ve todo el personal y cada una dice quién la subió." },
   caja: { titulo: "Pedidos y caja", subtitulo: "El cajero verifica cada pedido y lo acepta antes de que pase a cocina." },
-  mensajes: { titulo: "Mensajes de WhatsApp", subtitulo: "Chats del bot: pausa, aprobación de pagos y respuestas rápidas (maqueta, sin conexión real a WhatsApp)." },
+  mensajes: { titulo: "Mensajes de WhatsApp", subtitulo: "Chats del bot: pausa, aprobación de pagos y respuestas rápidas." },
   cierre: { titulo: "Caja y cierres", subtitulo: "Abre en cero cada mañana, registra movimientos, cuadra el día contra lo que hay en caja y en las billeteras, y guarda todo en el historial." },
   cocina: { titulo: "Pantalla de cocina", subtitulo: "Pedidos aceptados por caja, con su tiempo." },
   repartos: { titulo: "Repartos", subtitulo: "Pedidos de delivery listos para salir." },

@@ -1,8 +1,12 @@
+jest.mock('../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {} }));
+
 import { NotificacionesService } from './notificaciones.service';
 
 describe('NotificacionesService', () => {
   const hace = (min: number) => new Date(Date.now() - min * 60000);
   let prisma: any;
+  let auditoria: any;
+  let eventos: any;
   let service: NotificacionesService;
 
   beforeEach(() => {
@@ -18,8 +22,36 @@ describe('NotificacionesService', () => {
       },
       comprobante: { count: jest.fn().mockResolvedValue(3) },
       reclamo: { findMany: jest.fn().mockResolvedValue([{ creado_en: hace(60) }]) },
+      notificacion: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 1n,
+            tipo: 'STOCK_BAJO',
+            titulo: 'Stock bajo',
+            mensaje: 'Crema chantilly bajo el mínimo',
+            enlace: null,
+            leida_en: null,
+            en: new Date('2026-10-15T20:55:00Z'),
+          },
+          {
+            id: 2n,
+            tipo: 'ERROR_IMPRESORA',
+            titulo: 'Error de impresora',
+            mensaje: 'La impresora de cocina no responde',
+            enlace: null,
+            leida_en: new Date('2026-10-15T21:00:00Z'),
+            en: new Date('2026-10-15T19:40:00Z'),
+          },
+        ]),
+        findUnique: jest.fn().mockResolvedValue({ id: 1n, leida_en: null }),
+        update: jest.fn().mockResolvedValue({ id: 1n }),
+        updateMany: jest.fn().mockResolvedValue({ count: 2 }),
+        create: jest.fn().mockResolvedValue({ id: 3n, titulo: 'Mensaje de prueba' }),
+      },
     };
-    service = new NotificacionesService(prisma);
+    auditoria = { registrar: jest.fn().mockResolvedValue(undefined) };
+    eventos = { emitirAdmin: jest.fn() };
+    service = new NotificacionesService(prisma, auditoria, eventos);
   });
 
   it('el administrador ve todo, con conteos y lo urgente primero', async () => {
@@ -44,5 +76,43 @@ describe('NotificacionesService', () => {
     prisma.pedido.findMany.mockReset().mockResolvedValue([]);
     const r = await service.resumen({ partyId: 3n, rol: 'CAJERO', debeCambiar: false });
     expect(Object.keys(r.conteos)).toEqual(['caja']);
+  });
+
+  it('lista el historial con métricas y conteos dinámicos', async () => {
+    // Setup for resumen inside historial
+    prisma.pedido.findMany.mockReset().mockResolvedValue([]);
+    prisma.comprobante.count.mockReset().mockResolvedValue(0);
+    prisma.reclamo.findMany.mockReset().mockResolvedValue([]);
+
+    const res = await service.historial({}, { partyId: 1n, rol: 'ADMIN', debeCambiar: false });
+    expect(res.metricas).toBeDefined();
+    expect(res.items.length).toBe(2);
+    expect(res.conteosPorTipo).toHaveProperty('Stock bajo');
+    expect(res.conteosPorEstado).toEqual({ todas: 2, nuevas: 1, leidas: 1 });
+  });
+
+  it('marca una notificación como leída o no leída', async () => {
+    const r = await service.marcarLeida('1', true, { partyId: 1n, rol: 'ADMIN', debeCambiar: false });
+    expect(r.ok).toBe(true);
+    expect(prisma.notificacion.update).toHaveBeenCalled();
+    expect(eventos.emitirAdmin).toHaveBeenCalledWith('notificaciones:actualizada', { id: '1' });
+  });
+
+  it('marca todas las notificaciones como leídas', async () => {
+    const r = await service.marcarTodasLeidas({ partyId: 1n, rol: 'ADMIN', debeCambiar: false });
+    expect(r.ok).toBe(true);
+    expect(prisma.notificacion.updateMany).toHaveBeenCalled();
+    expect(eventos.emitirAdmin).toHaveBeenCalledWith('notificaciones:actualizada', { todas: true });
+  });
+
+  it('crea un mensaje interno y lo audita', async () => {
+    const r = await service.crearMensajeInterno(
+      { titulo: 'Reunión de equipo', mensaje: 'Cierre a las 22:00' },
+      { partyId: 1n, rol: 'ADMIN', debeCambiar: false },
+    );
+    expect(r.ok).toBe(true);
+    expect(prisma.notificacion.create).toHaveBeenCalled();
+    expect(auditoria.registrar).toHaveBeenCalled();
+    expect(eventos.emitirAdmin).toHaveBeenCalledWith('notificaciones:nueva', expect.any(Object));
   });
 });
