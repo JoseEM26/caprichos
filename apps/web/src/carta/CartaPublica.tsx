@@ -24,6 +24,8 @@ import { FormularioCheckout } from './FormularioCheckout';
 import { PantallaConfirmacion } from './PantallaConfirmacion';
 import { NotificacionAgregado } from './NotificacionAgregado';
 
+const ZOOM_CELULAR = 0.82;
+
 // ponytail: notas fijas por categoría; el diseñador de la carta (FT-CON-02) las hará editables
 const NOTAS_CATEGORIA: Record<string, string> = {
   COMBOS: 'Precio por tamaño de bebida',
@@ -170,7 +172,9 @@ function ContenidoCartaPublica() {
   return (
     <div
       style={{
-        minHeight: '100vh',
+        // el mockup en celular maqueta a 476 px y reduce al 82 %: todo se ve más pequeño y cabe más
+        zoom: movil ? ZOOM_CELULAR : 1,
+        minHeight: movil ? `${100 / ZOOM_CELULAR}vh` : '100vh',
         backgroundColor: 'var(--cp-cream)',
         color: 'var(--cp-navy)',
         display: 'flex',

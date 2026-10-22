@@ -289,16 +289,19 @@ export function VentanaProducto({ producto, onCerrar }: VentanaProductoProps) {
           </button>
 
           {producto.fotoUrl ? (
-            <img
-              src={producto.fotoUrl}
-              alt={producto.nombre}
-              style={{
-                width: '100%',
-                maxHeight: '220px',
-                objectFit: 'cover',
-                display: 'block',
-              }}
-            />
+            <div style={{ position: 'relative', width: '100%', aspectRatio: '4/3', maxHeight: '280px', overflow: 'hidden', backgroundColor: 'var(--cp-sand)' }}>
+              <img
+                src={producto.fotoUrl}
+                alt=""
+                aria-hidden="true"
+                style={{ position: 'absolute', left: '-8%', top: '-8%', width: '116%', height: '116%', objectFit: 'cover', filter: 'blur(16px)', opacity: 0.5 }}
+              />
+              <img
+                src={producto.fotoUrl}
+                alt={producto.nombre}
+                style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'center' }}
+              />
+            </div>
           ) : (
             <div
               style={{
