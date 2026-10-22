@@ -152,6 +152,9 @@ export const salonApi = {
   // =========================================================================
   // CARTA (para armar pedido del mozo)
   // =========================================================================
-  obtenerCarta: () =>
-    api.get<{ categorias: CategoriaCarta[]; local?: any }>('/carta'),
+  /** GET /carta devuelve la lista de categorías; se acepta también { categorias } */
+  obtenerCarta: async (): Promise<{ categorias: CategoriaCarta[]; local?: any }> => {
+    const r = await api.get<CategoriaCarta[] | { categorias: CategoriaCarta[]; local?: any }>('/carta');
+    return Array.isArray(r) ? { categorias: r } : r;
+  },
 };
