@@ -2,12 +2,15 @@ import { Module } from '@nestjs/common';
 import { PedidosAdminController } from './pedidos-admin.controller';
 import { PedidosEstadoService } from './pedidos-estado.service';
 import { SalonModule } from '../salon/salon.module';
+import { ZonasModule } from '../zonas/zonas.module';
+import { UbicarPedidoService } from './ubicar-pedido.service';
 
 @Module({
-  imports: [SalonModule],
+  imports: [SalonModule, ZonasModule],
   controllers: [PedidosAdminController],
   providers: [
     PedidosEstadoService,
+    UbicarPedidoService,
   ],
   exports: [PedidosEstadoService],
 })

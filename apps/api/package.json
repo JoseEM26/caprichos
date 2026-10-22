@@ -15,7 +15,8 @@
     "prisma:generate": "prisma generate",
     "seed:carta": "ts-node prisma/seed-carta.ts",
     "seed:zonas": "ts-node prisma/seed-zonas.ts",
-    "seed:caja": "ts-node prisma/seed-caja.ts"
+    "seed:caja": "ts-node prisma/seed-caja.ts",
+    "seed:fotos": "ts-node prisma/seed-fotos.ts"
   },
   "dependencies": {
     "@caprichos/compartido": "workspace:*",

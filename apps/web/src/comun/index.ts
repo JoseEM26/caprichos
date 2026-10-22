@@ -13,3 +13,7 @@ export * from './Paginacion';
 export * from './Combo';
 export * from './Icono';
 export * from './socket';
+export * from './mapa/MapaUbicacion';
+export * from './mapa/MapaPedidos';
+export * from './mapa/BuscadorDireccion';
+export { enlaceGoogleMaps } from './mapa/leaflet';

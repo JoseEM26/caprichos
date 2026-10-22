@@ -205,6 +205,13 @@ export const pedidosApi = {
     );
   },
 
+  async ubicarPedido(
+    id: string | number,
+    dto: { lat: number; lng: number; direccion?: string; referencia?: string },
+  ): Promise<{ id: string; codigo: string; zona: string; envio: number; total: number; lat: number; lng: number }> {
+    return api.post(`/admin/pedidos/${id}/ubicacion`, dto);
+  },
+
   async marcarPagoCoordinado(id: string | number): Promise<{ id: string; pago_estado: string }> {
     return api.post<{ id: string; pago_estado: string }>(`/admin/caja/pedidos/${id}/coordinado`);
   },

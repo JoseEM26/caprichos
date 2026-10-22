@@ -428,6 +428,8 @@ export class RepartosService {
         estado: 'LISTO',
         repartidor_party_id: null,
         motivo_falla: null,
+        entrega_lat: { not: null },
+        entrega_lng: { not: null },
       },
       data: {
         repartidor_party_id: partyId,
@@ -465,6 +467,13 @@ export class RepartosService {
         throw new ConflictException({
           codigo: 'ESTADO_INVALIDO',
           mensaje: `El pedido no está listo para entrega (estado actual: ${pedidoExistente.estado})`,
+        });
+      }
+
+      if (pedidoExistente.entrega_lat == null || pedidoExistente.entrega_lng == null) {
+        throw new ConflictException({
+          codigo: 'FALTA_UBICAR',
+          mensaje: 'El pedido no tiene ubicación: caja debe ubicarlo antes de que se pueda tomar',
         });
       }
 

@@ -16,11 +16,16 @@ import { FiltrarPedidosDto } from './dto/filtrar-pedidos.dto';
 import { CambiarEstadoDto } from './dto/cambiar-estado.dto';
 import { RegistrarPagoDto } from './dto/registrar-pago.dto';
 import { CocinaQueryDto } from './dto/cocina-query.dto';
+import { UbicarPedidoDto } from './dto/ubicar-pedido.dto';
+import { UbicarPedidoService } from './ubicar-pedido.service';
 
 @Controller('admin/pedidos')
 @UseGuards(AccesoGuard)
 export class PedidosAdminController {
-  constructor(private readonly pedidosEstadoService: PedidosEstadoService) {}
+  constructor(
+    private readonly pedidosEstadoService: PedidosEstadoService,
+    private readonly ubicarPedidoService: UbicarPedidoService,
+  ) {}
 
   @Get()
   @Permiso('pedidos', 'ver')
@@ -68,5 +73,12 @@ export class PedidosAdminController {
   ) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.pedidosEstadoService.registrarPago(id, dto, req.usuario, ip);
+  }
+
+  @Post(':id/ubicacion')
+  @Permiso('pedidos', 'cambiar_estado')
+  async ubicar(@Param('id') id: string, @Body() dto: UbicarPedidoDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.ubicarPedidoService.ubicar(id, dto, req.usuario, ip);
   }
 }

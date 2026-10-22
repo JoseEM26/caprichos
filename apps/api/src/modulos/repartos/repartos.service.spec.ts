@@ -180,6 +180,29 @@ describe('RepartosService', () => {
     });
   });
 
+  describe('2b. Delivery sin ubicación (RQ-CAJ-01-03)', () => {
+    it('no se puede tomar hasta que caja lo ubique: 409 FALTA_UBICAR', async () => {
+      prismaMock.pedido.count.mockResolvedValue(0);
+      prismaMock.pedido.updateMany.mockResolvedValue({ count: 0 });
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 30n,
+        estado: 'LISTO',
+        repartidor_party_id: null,
+        motivo_falla: null,
+        entrega_lat: null,
+        entrega_lng: null,
+      });
+
+      await expect(service.tomarPedido('30', repartidor1)).rejects.toMatchObject({
+        response: { codigo: 'FALTA_UBICAR' },
+      });
+      expect(prismaMock.pedido.updateMany.mock.calls[0][0].where).toMatchObject({
+        entrega_lat: { not: null },
+        entrega_lng: { not: null },
+      });
+    });
+  });
+
   describe('3. Transiciones de estado (Tomar -> Salir -> Llegué -> Entregar)', () => {
     it('POST :id/salir cambia de LISTO a EN_CAMINO y registra aviso 1 pendiente', async () => {
       const pedidoMock = {

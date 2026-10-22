@@ -48,3 +48,6 @@ packages/*/src/**/*.d.ts
 packages/*/src/**/*.map
 apps/*/src/**/*.js
 apps/*/src/**/*.map
+
+# fotos subidas en desarrollo
+apps/api/data/uploads/

@@ -63,23 +63,13 @@ export function CabeceraCarta({
       >
         {/* Logo / Nombre */}
         <div style={{ flex: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div
-            style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '10px',
-              backgroundColor: 'var(--cp-navy)',
-              color: 'var(--cp-gold)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontFamily: 'var(--fuente-titulos)',
-              fontWeight: 800,
-              fontSize: '22px',
-            }}
-          >
-            C
-          </div>
+          <img
+            src="/logo.webp"
+            alt="Caprichos"
+            width={40}
+            height={40}
+            style={{ borderRadius: '50%', display: 'block' }}
+          />
           <div style={{ display: 'none', minWidth: 0, lineHeight: 1.1 }}>
             <span
               style={{

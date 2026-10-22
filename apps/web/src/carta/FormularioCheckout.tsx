@@ -2,6 +2,9 @@ import { useState, useRef } from 'react';
 import type { FormEvent } from 'react';
 import { calcularTotalPedido } from '@caprichos/compartido';
 import { api, ErrorApi } from '../comun/api';
+import { MapaUbicacion } from '../comun/mapa/MapaUbicacion';
+import { BuscadorDireccion } from '../comun/mapa/BuscadorDireccion';
+import { enlaceGoogleMaps } from '../comun/mapa/leaflet';
 import { useCarrito } from './CarritoContext';
 import {
   ConsultaEnvioRespuesta,
@@ -46,6 +49,9 @@ export function FormularioCheckout({
   const [costoEnvio, setCostoEnvio] = useState<number | null>(null);
   const [cargandoGps, setCargandoGps] = useState(false);
   const [mensajeGps, setMensajeGps] = useState<string | null>(null);
+  const [origenPunto, setOrigenPunto] = useState<'GPS' | 'MAPA'>('GPS');
+  const [mapaVisible, setMapaVisible] = useState(false);
+  const [ubicacionConfirmada, setUbicacionConfirmada] = useState(false);
 
   // Comprobante (Boleta o Factura)
   const [tipoComprobante, setTipoComprobante] = useState<TipoComprobante>('BOLETA');
@@ -94,6 +100,37 @@ export function FormularioCheckout({
     }
   };
 
+  // Fija el punto de entrega (GPS, búsqueda o toque en el mapa) y consulta la zona y el envío
+  const fijarPunto = async (lat: number, lng: number, origen: 'GPS' | 'MAPA') => {
+    setCoordenadas({ lat, lng });
+    setOrigenPunto(origen);
+    setMapaVisible(true);
+    setUbicacionConfirmada(false);
+
+    try {
+      const res = await api.get<ConsultaEnvioRespuesta>(`/carta/envio?lat=${lat}&lng=${lng}`);
+
+      if (!res.cubierto) {
+        setZonaEnvio(null);
+        setCostoEnvio(null);
+        setMensajeGps('FUERA_DE_COBERTURA: Tu ubicación está fuera de la zona de reparto');
+      } else {
+        setZonaEnvio(res.zona);
+        // Si el subtotal supera gratisDesde
+        const tarifaFinal = subtotal > res.gratisDesde ? 0 : res.tarifa;
+        setCostoEnvio(tarifaFinal);
+        setMensajeGps(
+          `Ubicación encontrada (Envío: ${
+            tarifaFinal === 0 ? 'GRATIS' : `S/ ${tarifaFinal?.toFixed(2)}`
+          })`,
+        );
+      }
+    } catch {
+      setMensajeGps('No se pudo verificar la zona de envío. Se coordinará por WhatsApp.');
+      setCostoEnvio(null);
+    }
+  };
+
   // Geolocalización
   const obtenerUbicacionGps = () => {
     if (!navigator.geolocation) {
@@ -106,41 +143,12 @@ export function FormularioCheckout({
 
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        setCoordenadas({ lat, lng });
-
-        try {
-          const res = await api.get<ConsultaEnvioRespuesta>(
-            `/carta/envio?lat=${lat}&lng=${lng}`,
-          );
-
-          if (!res.cubierto) {
-            setZonaEnvio(null);
-            setCostoEnvio(null);
-            setMensajeGps('FUERA_DE_COBERTURA: Tu ubicación está fuera de la zona de reparto');
-          } else {
-            setZonaEnvio(res.zona);
-            // Si el subtotal supera gratisDesde
-            const tarifaFinal =
-              subtotal > res.gratisDesde ? 0 : res.tarifa;
-            setCostoEnvio(tarifaFinal);
-            setMensajeGps(
-              `Ubicación confirmada · Zona ${res.zona} (Envío: ${
-                tarifaFinal === 0 ? 'GRATIS' : `S/ ${tarifaFinal?.toFixed(2)}`
-              })`,
-            );
-          }
-        } catch {
-          setMensajeGps('No se pudo verificar la zona de envío. Se coordinará por WhatsApp.');
-          setCostoEnvio(null);
-        } finally {
-          setCargandoGps(false);
-        }
+        await fijarPunto(pos.coords.latitude, pos.coords.longitude, 'GPS');
+        setCargandoGps(false);
       },
       () => {
         setCargandoGps(false);
-        setMensajeGps('No pudimos acceder a tu ubicación. Escribe tu dirección.');
+        setMensajeGps('No fue posible conseguir la ubicación. Escribe tu dirección o márcala en el mapa.');
       },
       { timeout: 10000, enableHighAccuracy: true },
     );
@@ -160,6 +168,9 @@ export function FormularioCheckout({
     if (modalidad === 'DELIVERY') {
       if (!coordenadas && direccion.trim().length < 5) {
         return 'Para delivery debes indicar una dirección de al menos 5 caracteres o usar tu ubicación';
+      }
+      if (coordenadas && !ubicacionConfirmada) {
+        return 'Confirma con «Mi pedido llega aquí» que el punto rojo es donde recibirás tu pedido';
       }
     }
 
@@ -254,7 +265,7 @@ export function FormularioCheckout({
               referencia: referencia.trim() || undefined,
               lat: coordenadas?.lat,
               lng: coordenadas?.lng,
-              origen: coordenadas ? ('GPS' as const) : ('ESCRITA' as const),
+              origen: coordenadas ? origenPunto : ('ESCRITA' as const),
             }
           : undefined,
       lineas: lineasDto,
@@ -645,34 +656,101 @@ export function FormularioCheckout({
                 />
               </div>
 
-              <div>
-                <button
-                  type="button"
-                  onClick={obtenerUbicacionGps}
-                  disabled={cargandoGps}
-                  style={{
-                    width: '100%',
-                    minHeight: '44px',
-                    borderRadius: '10px',
-                    border: '1.5px solid var(--cp-navy)',
-                    backgroundColor: 'var(--cp-sand)',
-                    color: 'var(--cp-navy)',
-                    fontWeight: 700,
-                    fontSize: '13px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px',
-                  }}
-                >
-                  {cargandoGps ? 'Obteniendo GPS...' : 'Usar mi ubicación actual (GPS)'}
-                </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={obtenerUbicacionGps}
+                    disabled={cargandoGps}
+                    style={{
+                      flex: '1 1 160px',
+                      minHeight: '44px',
+                      borderRadius: '10px',
+                      border: '1.5px solid var(--cp-navy)',
+                      backgroundColor: 'var(--cp-sand)',
+                      color: 'var(--cp-navy)',
+                      fontWeight: 700,
+                      fontSize: '13px',
+                    }}
+                  >
+                    {cargandoGps ? 'Obteniendo ubicación...' : 'Usar mi ubicación actual'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMapaVisible((v) => !v)}
+                    aria-expanded={mapaVisible}
+                    style={{
+                      flex: '1 1 160px',
+                      minHeight: '44px',
+                      borderRadius: '10px',
+                      border: '1.5px solid var(--cp-navy)',
+                      backgroundColor: 'var(--cp-white)',
+                      color: 'var(--cp-navy)',
+                      fontWeight: 700,
+                      fontSize: '13px',
+                    }}
+                  >
+                    {mapaVisible ? 'Ocultar el mapa' : 'Marcar en el mapa'}
+                  </button>
+                </div>
+
+                {mapaVisible && (
+                  <>
+                    <BuscadorDireccion
+                      onElegir={(p, texto) => {
+                        if (!direccion.trim()) setDireccion(texto.split(',').slice(0, 2).join(',').trim());
+                        void fijarPunto(p.lat, p.lng, 'MAPA');
+                      }}
+                    />
+                    <MapaUbicacion
+                      punto={coordenadas}
+                      onCambiar={(p) => void fijarPunto(p.lat, p.lng, 'MAPA')}
+                    />
+                    {!coordenadas && (
+                      <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
+                        Toca el mapa para poner el punto donde recibirás tu pedido; puedes arrastrarlo.
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {coordenadas && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
+                      Revisa que el punto rojo sea donde recibirás tu pedido.{' '}
+                      <a href={enlaceGoogleMaps(coordenadas.lat, coordenadas.lng)} target="_blank" rel="noreferrer">
+                        Ver en Google Maps
+                      </a>
+                    </div>
+                    {ubicacionConfirmada ? (
+                      <div role="status" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-green)' }}>
+                        Ubicación confirmada
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setUbicacionConfirmada(true)}
+                        disabled={costoEnvio === null && mensajeGps?.includes('FUERA_DE_COBERTURA')}
+                        style={{
+                          minHeight: '44px',
+                          borderRadius: '10px',
+                          border: 'none',
+                          backgroundColor: 'var(--cp-navy)',
+                          color: 'var(--cp-white)',
+                          fontWeight: 700,
+                          fontSize: '14px',
+                        }}
+                      >
+                        Mi pedido llega aquí
+                      </button>
+                    )}
+                  </div>
+                )}
 
                 {mensajeGps && (
                   <div
                     role="status"
                     style={{
-                      marginTop: '6px',
                       fontSize: '12px',
                       lineHeight: '16px',
                       fontWeight: 600,
@@ -688,13 +766,12 @@ export function FormularioCheckout({
                 {!coordenadas && (
                   <div
                     style={{
-                      marginTop: '6px',
                       fontSize: '11px',
                       color: 'var(--cp-soft)',
                       fontStyle: 'italic',
                     }}
                   >
-                    Si no usas GPS, el costo de envío se confirma por WhatsApp al procesar tu pedido.
+                    Si solo escribes la dirección, el costo de envío se confirma por WhatsApp al procesar tu pedido.
                   </div>
                 )}
               </div>

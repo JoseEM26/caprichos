@@ -29,6 +29,10 @@ export default defineConfig({
         target: 'http://localhost:3000',
         changeOrigin: true,
       },
+      '/archivos': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
       '/salud': {
         target: 'http://localhost:3000',
         changeOrigin: true,

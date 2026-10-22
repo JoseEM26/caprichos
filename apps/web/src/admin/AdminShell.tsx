@@ -366,23 +366,13 @@ export function AdminShell() {
               paddingLeft: '6px',
             }}
           >
-            <div
-              style={{
-                width: '42px',
-                height: '42px',
-                borderRadius: '21px',
-                background: 'var(--cp-orange)',
-                color: 'var(--cp-navy)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontFamily: 'var(--fuente-titulos)',
-                fontWeight: 800,
-                fontSize: '18px',
-              }}
-            >
-              C
-            </div>
+            <img
+              src="/logo.webp"
+              alt="Caprichos"
+              width={42}
+              height={42}
+              style={{ borderRadius: '50%', display: 'block' }}
+            />
             <div>
               <div
                 style={{

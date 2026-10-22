@@ -110,23 +110,13 @@ export function Ingresar() {
             textAlign: 'center',
           }}
         >
-          <div
-            style={{
-              width: '64px',
-              height: '64px',
-              borderRadius: '32px',
-              background: 'var(--cp-sand)',
-              color: 'var(--cp-orange)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontFamily: 'var(--fuente-titulos)',
-              fontWeight: 800,
-              fontSize: '28px',
-            }}
-          >
-            C
-          </div>
+          <img
+            src="/logo.webp"
+            alt="Caprichos"
+            width={64}
+            height={64}
+            style={{ borderRadius: '50%', display: 'block', margin: '0 auto' }}
+          />
           <h1
             style={{
               fontFamily: 'var(--fuente-titulos)',

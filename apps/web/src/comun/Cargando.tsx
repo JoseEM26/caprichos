@@ -34,27 +34,19 @@ export function Cargando({
             animation: 'cp-spin 0.9s linear infinite',
           }}
         />
-        <div
+        <img
+          src="/logo.webp"
+          alt=""
+          width={44}
+          height={44}
           style={{
             position: 'absolute',
             left: '12px',
             top: '12px',
-            width: '44px',
-            height: '44px',
-            borderRadius: '22px',
-            background: 'var(--cp-sand)',
-            color: 'var(--cp-navy)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontFamily: 'var(--fuente-titulos)',
-            fontWeight: 800,
-            fontSize: '18px',
+            borderRadius: '50%',
             animation: 'cp-pulse 1.4s ease-in-out infinite',
           }}
-        >
-          C
-        </div>
+        />
       </div>
       <div
         style={{

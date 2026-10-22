@@ -15,6 +15,7 @@ jest.mock('@nestjs/jwt', () => {
 import { Test, TestingModule } from '@nestjs/testing';
 import { PedidosAdminController } from './pedidos-admin.controller';
 import { PedidosEstadoService } from './pedidos-estado.service';
+import { UbicarPedidoService } from './ubicar-pedido.service';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
@@ -37,6 +38,7 @@ describe('PedidosAdminController', () => {
       controllers: [PedidosAdminController],
       providers: [
         { provide: PedidosEstadoService, useValue: service },
+        { provide: UbicarPedidoService, useValue: { ubicar: jest.fn() } },
         { provide: PrismaService, useValue: {} },
         { provide: AuditoriaService, useValue: {} },
         { provide: ConfigService, useValue: { get: () => 'secreto' } },

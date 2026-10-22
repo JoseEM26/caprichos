@@ -5,6 +5,7 @@ import { Insignia } from '../../comun/Insignia';
 import { Pedido, pedidosApi } from './pedidosApi';
 import { ModalCobrar } from './ModalCobrar';
 import { ModalAnular } from './ModalAnular';
+import { ModalUbicar } from './ModalUbicar';
 import { useSesion } from '../../comun/sesion';
 
 export interface PedidoDetalleProps {
@@ -21,6 +22,7 @@ export function PedidoDetalle({ pedido, alActualizar }: PedidoDetalleProps) {
   // Modales
   const [abrirCobro, setAbrirCobro] = useState<boolean>(false);
   const [abrirAnular, setAbrirAnular] = useState<boolean>(false);
+  const [abrirUbicar, setAbrirUbicar] = useState<boolean>(false);
   const [abrirAnularCobro, setAbrirAnularCobro] = useState<boolean>(false);
 
   // Confirmaciones directas
@@ -140,6 +142,15 @@ export function PedidoDetalle({ pedido, alActualizar }: PedidoDetalleProps) {
     ['COLA', 'PREPARANDO', 'LISTO'].includes(String(pedido.estado).toUpperCase()) &&
     String(pedido.estado).toUpperCase() !== 'ANULADO';
 
+  const faltaUbicar =
+    String(pedido.modalidad).toUpperCase() === 'DELIVERY' &&
+    pedido.entrega_lat == null &&
+    !['ENTREGADO', 'ANULADO'].includes(String(pedido.estado).toUpperCase());
+  const puedeUbicar =
+    String(pedido.modalidad).toUpperCase() === 'DELIVERY' &&
+    !['ENTREGADO', 'ANULADO'].includes(String(pedido.estado).toUpperCase()) &&
+    tiene('pedidos/cambiar_estado');
+
   const puedeCobrar =
     String(pedido.pago_estado).toUpperCase() !== 'PAGADO' &&
     String(pedido.estado).toUpperCase() !== 'ANULADO';
@@ -209,6 +220,9 @@ export function PedidoDetalle({ pedido, alActualizar }: PedidoDetalleProps) {
                 <span>
                   {pedido.entrega_direccion || 'Sin dirección escrita'}
                   {pedido.entrega_referencia && ` (${pedido.entrega_referencia})`}
+                  {faltaUbicar && (
+                    <b style={{ color: 'var(--cp-rust, #C4412B)' }}> · Falta ubicar en el mapa</b>
+                  )}
                 </span>
               ) : (
                 <span style={{ fontStyle: 'italic', opacity: 0.7 }}>[Dirección oculta]</span>
@@ -703,6 +717,16 @@ export function PedidoDetalle({ pedido, alActualizar }: PedidoDetalleProps) {
             </Boton>
           )}
 
+          {puedeUbicar && (
+            <Boton
+              variante="secundario"
+              onClick={() => setAbrirUbicar(true)}
+              style={{ flex: '1 1 130px', minHeight: 48, borderRadius: 12, fontWeight: 800, fontSize: 13 }}
+            >
+              {faltaUbicar ? 'Ubicar pedido' : 'Corregir ubicación'}
+            </Boton>
+          )}
+
           {/* Botón Anular Pedido */}
           {puedeAnularPedido && (
             <Boton
@@ -730,6 +754,25 @@ export function PedidoDetalle({ pedido, alActualizar }: PedidoDetalleProps) {
           alCobrarExitoso={() => {
             setAbrirCobro(false);
             setMensajeExito('Cobro registrado exitosamente');
+            alActualizar();
+          }}
+        />
+      )}
+
+      {abrirUbicar && (
+        <ModalUbicar
+          pedidoId={pedido.id}
+          codigoPedido={pedido.codigo}
+          direccionInicial={pedido.entrega_direccion}
+          puntoInicial={
+            pedido.entrega_lat != null && pedido.entrega_lng != null
+              ? { lat: Number(pedido.entrega_lat), lng: Number(pedido.entrega_lng) }
+              : null
+          }
+          alCerrar={() => setAbrirUbicar(false)}
+          alUbicar={(r) => {
+            setAbrirUbicar(false);
+            setMensajeExito(`Pedido ubicado en la zona ${r.zona}: envío S/ ${r.envio.toFixed(2)}, total S/ ${r.total.toFixed(2)}`);
             alActualizar();
           }}
         />
