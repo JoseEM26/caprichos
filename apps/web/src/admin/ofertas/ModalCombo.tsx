@@ -215,7 +215,7 @@ export function ModalCombo({
           precio: Number(t.precio),
         })),
         partes: partes.map((p, idx) => ({
-          nombre: p.nombre.trim(),
+          nombre: (p.nombre ?? "").trim(),
           tipo: (p.tipoParte === 'OPCIONES' || p.tipoParte === 'UNA_DE' ? 'A_ELECCION' : p.tipoParte || p.tipo || 'A_ELECCION') as any,
           tipoParte: p.tipoParte,
           cantidad: p.cantidad || 1,
@@ -224,7 +224,7 @@ export function ModalCombo({
           orden: idx + 1,
         })),
         combosPartes: partes.map((p, idx) => ({
-          nombre: p.nombre.trim(),
+          nombre: (p.nombre ?? "").trim(),
           tipo: (p.tipoParte === 'OPCIONES' || p.tipoParte === 'UNA_DE' ? 'A_ELECCION' : p.tipoParte || p.tipo || 'A_ELECCION') as any,
           tipoParte: p.tipoParte,
           cantidad: p.cantidad || 1,
@@ -252,9 +252,9 @@ export function ModalCombo({
     }
     if (sl.tipoParte === 'A_ELECCION') {
       const cats = (sl.categorias || []).join(', ');
-      return `${sl.cantidad} × ${sl.nombre.toLowerCase()} a elección (${cats || 'opciones'})`;
+      return `${sl.cantidad} × ${(sl.nombre ?? "").toLowerCase()} a elección (${cats || 'opciones'})`;
     }
-    return `1 × ${sl.nombre.toLowerCase()} a elegir entre ${(sl.opciones || []).length || 2} opciones`;
+    return `1 × ${(sl.nombre ?? "").toLowerCase()} a elegir entre ${(sl.opciones || []).length || 2} opciones`;
   });
 
   return (

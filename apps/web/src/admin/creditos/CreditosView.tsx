@@ -363,7 +363,7 @@ export function CreditosView() {
             Es lo que el trabajador consumió con su usuario en el período, ya con su descuento. Como el pago es semanal, por defecto se ve la semana (lunes a domingo); el descuento se hace fuera del sistema.
           </div>
 
-          {cargando && <Cargando texto="Cargando consumos del personal…" />}
+          {cargando && <Cargando mensaje="Cargando consumos del personal…" />}
 
           {error && (
             <div style={{ padding: '14px', background: '#FDECE8', color: 'var(--cp-rust)', borderRadius: '12px', fontSize: '13px', fontWeight: 700 }}>

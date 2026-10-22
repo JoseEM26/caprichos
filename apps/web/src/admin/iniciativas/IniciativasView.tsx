@@ -480,7 +480,7 @@ export function IniciativasView() {
         {iniciativas.length} {iniciativas.length === 1 ? 'iniciativa' : 'iniciativas'}
       </div>
 
-      {cargando && <Cargando texto="Cargando iniciativas…" />}
+      {cargando && <Cargando mensaje="Cargando iniciativas…" />}
 
       {error && (
         <div style={{ padding: '14px', background: '#FDECE8', color: 'var(--cp-rust)', borderRadius: '12px', fontSize: '13px', fontWeight: 700 }}>

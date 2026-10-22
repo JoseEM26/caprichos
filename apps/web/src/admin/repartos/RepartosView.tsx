@@ -897,7 +897,7 @@ export function RepartosView() {
                         esDisponible={
                           pedido.estado === 'LISTO' && !pedido.repartidor_party_id
                         }
-                        esMiPedido={
+                        esMio={
                           pedido.repartidor_party_id === usuario?.partyId ||
                           pedido.estado === 'EN_CAMINO'
                         }

@@ -27,10 +27,17 @@ import { ReclamosModule } from './modulos/reclamos/reclamos.module';
 import { NotificacionesModule } from './modulos/notificaciones/notificaciones.module';
 import { DireccionesModule } from './modulos/direcciones/direcciones.module';
 import { StockModule } from './modulos/stock/stock.module';
+import { ComprasModule } from './modulos/compras/compras.module';
+import { AlmacenModule } from './modulos/almacen/almacen.module';
 
 import { ClientesModule } from './modulos/clientes/clientes.module';
 import { OfertasModule } from './modulos/ofertas/ofertas.module';
 import { InformesModule } from './modulos/informes/informes.module';
+import { CreditosModule } from './modulos/creditos/creditos.module';
+import { IniciativasModule } from './modulos/iniciativas/iniciativas.module';
+import { MensajesModule } from './modulos/mensajes/mensajes.module';
+import { PantallasModule } from './modulos/pantallas/pantallas.module';
+import { ContenidoModule } from './modulos/contenido/contenido.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -65,6 +72,13 @@ import { InformesModule } from './modulos/informes/informes.module';
     OfertasModule,
     ClientesModule,
     StockModule,
+    MensajesModule,
+    PantallasModule,
+    IniciativasModule,
+    CreditosModule,
+    ComprasModule,
+    AlmacenModule,
+    ContenidoModule,
   ],
   providers: [
     PinoLoggerService,

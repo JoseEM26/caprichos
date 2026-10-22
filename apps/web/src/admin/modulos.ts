@@ -14,6 +14,19 @@ import { StockView } from './stock';
 import { ProductosView, ListasCategoriasView } from './catalogo';
 import { ClientesAdminView } from './clientes';
 import { OfertasAdminView } from './ofertas';
+import { IniciativasView } from './iniciativas';
+import { CreditosView } from './creditos';
+import { ComprasView } from './compras';
+import { AlmacenView } from './almacen';
+import { MensajesView } from './mensajes';
+import { NotificacionesView } from './notificaciones';
+import { PantallasView } from './pantallas';
+import {
+  DisenadorView,
+  DestacadasView,
+  NovedadesView,
+  PaletaView,
+} from './contenido';
 
 export type GrupoModulo =
   | 'Operación'
@@ -32,7 +45,7 @@ export interface DefinicionModulo {
   icono?: string;
 }
 
-function crearProximamente(nombre: string): React.ComponentType {
+export function crearProximamente(nombre: string): React.ComponentType {
   const ComponenteProximamente = () =>
     React.createElement(Proximamente, { nombre });
   ComponenteProximamente.displayName = `Proximamente_${nombre.replace(/\s+/g, '')}`;
@@ -62,8 +75,8 @@ export const MODULOS: DefinicionModulo[] = [
     nombre: 'Iniciativas',
     grupo: 'Operación',
     ruta: '/admin/iniciativas',
-    permisoMinimo: 'usuarios/ver',
-    componente: crearProximamente('Iniciativas'),
+    permisoMinimo: 'iniciativas/ver',
+    componente: IniciativasView,
     icono: 'iniciativas',
   },
   {
@@ -80,8 +93,8 @@ export const MODULOS: DefinicionModulo[] = [
     nombre: 'Mensajes de WhatsApp',
     grupo: 'Operación',
     ruta: '/admin/mensajes',
-    permisoMinimo: 'pedidos/ver',
-    componente: crearProximamente('Mensajes de WhatsApp'),
+    permisoMinimo: 'mensajes/ver',
+    componente: MensajesView,
     icono: 'mensajes',
   },
   {
@@ -154,8 +167,8 @@ export const MODULOS: DefinicionModulo[] = [
     nombre: 'Créditos del personal',
     grupo: 'Clientes y ventas',
     ruta: '/admin/creditos',
-    permisoMinimo: 'usuarios/ver',
-    componente: crearProximamente('Créditos del personal'),
+    permisoMinimo: 'creditos/ver',
+    componente: CreditosView,
     icono: 'creditos',
   },
   {
@@ -193,7 +206,7 @@ export const MODULOS: DefinicionModulo[] = [
     grupo: 'Compras y stock',
     ruta: '/admin/compras',
     permisoMinimo: 'stock/ver',
-    componente: crearProximamente('Compras'),
+    componente: ComprasView,
     icono: 'compras',
   },
   {
@@ -202,7 +215,7 @@ export const MODULOS: DefinicionModulo[] = [
     grupo: 'Compras y stock',
     ruta: '/admin/almacen',
     permisoMinimo: 'stock/ver',
-    componente: crearProximamente('Almacén'),
+    componente: AlmacenView,
     icono: 'almacen',
   },
   {
@@ -251,7 +264,7 @@ export const MODULOS: DefinicionModulo[] = [
     grupo: 'Configuración',
     ruta: '/admin/disenador',
     permisoMinimo: 'local/ver',
-    componente: crearProximamente('Diseño de la carta'),
+    componente: DisenadorView,
     icono: 'disenador',
   },
   {
@@ -260,7 +273,7 @@ export const MODULOS: DefinicionModulo[] = [
     grupo: 'Configuración',
     ruta: '/admin/novedades',
     permisoMinimo: 'catalogo/ver',
-    componente: crearProximamente('Novedades y publicidad'),
+    componente: NovedadesView,
     icono: 'novedades',
   },
   {
@@ -269,7 +282,7 @@ export const MODULOS: DefinicionModulo[] = [
     grupo: 'Configuración',
     ruta: '/admin/destacadas',
     permisoMinimo: 'catalogo/ver',
-    componente: crearProximamente('Destacadas de la carta'),
+    componente: DestacadasView,
     icono: 'destacadas',
   },
   {
@@ -278,7 +291,7 @@ export const MODULOS: DefinicionModulo[] = [
     grupo: 'Configuración',
     ruta: '/admin/paleta',
     permisoMinimo: 'local/ver',
-    componente: crearProximamente('Paleta de colores'),
+    componente: PaletaView,
     icono: 'paleta',
   },
   {
@@ -322,8 +335,8 @@ export const MODULOS: DefinicionModulo[] = [
     nombre: 'Pantallas',
     grupo: 'Configuración',
     ruta: '/admin/pantallas',
-    permisoMinimo: 'local/ver',
-    componente: crearProximamente('Pantallas'),
+    permisoMinimo: 'pantallas/ver',
+    componente: PantallasView,
     icono: 'pantallas',
   },
   {
@@ -340,8 +353,8 @@ export const MODULOS: DefinicionModulo[] = [
     nombre: 'Notificaciones',
     grupo: 'Configuración',
     ruta: '/admin/notificaciones',
-    permisoMinimo: 'local/ver',
-    componente: crearProximamente('Notificaciones'),
+    permisoMinimo: 'notificaciones/ver',
+    componente: NotificacionesView,
     icono: 'notificaciones',
   },
 ];

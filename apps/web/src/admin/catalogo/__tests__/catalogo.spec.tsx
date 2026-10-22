@@ -141,7 +141,12 @@ describe('Módulo Catálogo - ProductosView', () => {
       tiene: () => true,
       ingresar: vi.fn(),
       salir: vi.fn(),
-      refrescar: vi.fn(),
+      refrescarYo: vi.fn(),
+      renovar: vi.fn(),
+      marcarClaveCambiada: vi.fn(),
+      permisos: [],
+      debeCambiar: false,
+      autenticado: true,
       cargando: false,
     });
 
@@ -230,7 +235,12 @@ describe('Módulo Catálogo - ListasCategoriasView', () => {
       tiene: () => true,
       ingresar: vi.fn(),
       salir: vi.fn(),
-      refrescar: vi.fn(),
+      refrescarYo: vi.fn(),
+      renovar: vi.fn(),
+      marcarClaveCambiada: vi.fn(),
+      permisos: [],
+      debeCambiar: false,
+      autenticado: true,
       cargando: false,
     });
 
