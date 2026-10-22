@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { Escritorio } from '../admin/Escritorio';
+import { Escritorio } from '../admin/escritorio';
 import * as sesionModulo from '../comun/sesion';
 import { api } from '../comun/api';
 
@@ -10,8 +10,7 @@ describe('Escritorio (/admin)', () => {
     vi.restoreAllMocks();
   });
 
-  it('no muestra datos inventados («Turno Día» ni «Abierto») cuando la API falla y muestra «Sin dato»', async () => {
-    // Mock sesión activa de admin
+  it('inicia con el saludo del administrador y el recuadro del período sin inventar datos', async () => {
     vi.spyOn(sesionModulo, 'useSesion').mockReturnValue({
       usuario: { partyId: '1', nombres: 'Admin Test', rol: 'ADMIN' },
       permisos: ['caja/ver'],
@@ -26,7 +25,6 @@ describe('Escritorio (/admin)', () => {
       tiene: vi.fn().mockReturnValue(true),
     });
 
-    // Mock API que falla tanto para /carta/estado como para /admin/caja/actual
     vi.spyOn(api, 'get').mockRejectedValue(new Error('Conexión rehusada'));
 
     render(
@@ -35,22 +33,21 @@ describe('Escritorio (/admin)', () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => {
-      // Debe mostrar «Sin dato», no inventar «Abierto» ni «Turno Día»
-      const tarjetaLocal = screen.getByTestId('tarjeta-estado-local');
-      expect(tarjetaLocal).toHaveTextContent('Sin dato');
-      expect(tarjetaLocal).not.toHaveTextContent('Turno Día');
+    // Saludo idéntico al mockup
+    expect(
+      screen.getByText('Hola, Admin Test. Este es tu escritorio de Administrador.'),
+    ).toBeInTheDocument();
 
-      const tarjetaCaja = screen.getByTestId('tarjeta-caja-actual');
-      expect(tarjetaCaja).toHaveTextContent('Sin dato');
-      expect(tarjetaCaja).not.toHaveTextContent('Turno Día');
-    });
+    // Filtros de período (30 días por defecto)
+    expect(screen.getByText(/30 días/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /filtros/i })).toBeInTheDocument();
 
-    // Ninguna parte de la pantalla debe mostrar datos inventados
+    // No inventa datos ni tarjetas fuera de mockup («Turno Día»)
     expect(screen.queryByText(/Turno Día/i)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('tarjeta-estado-local')).not.toBeInTheDocument();
   });
 
-  it('obtiene el estado real del local desde /carta/estado cuando está abierto', async () => {
+  it('permite abrir el panel de Filtros y seleccionar otro período', async () => {
     vi.spyOn(sesionModulo, 'useSesion').mockReturnValue({
       usuario: { partyId: '1', nombres: 'Admin Test', rol: 'ADMIN' },
       permisos: [],
@@ -65,15 +62,11 @@ describe('Escritorio (/admin)', () => {
       tiene: vi.fn().mockReturnValue(false),
     });
 
-    vi.spyOn(api, 'get').mockImplementation((ruta: string) => {
-      if (ruta === '/carta/estado') {
-        return Promise.resolve({
-          abierta: true,
-          texto: 'Atendiendo pedidos en salón y delivery',
-          pausaAltaDemanda: false,
-        });
-      }
-      return Promise.reject(new Error(`Ruta inesperada: ${ruta}`));
+    vi.spyOn(api, 'get').mockResolvedValue({
+      kpisS: [
+        { n: 'VENTAS', v: 's/ 100.00', dTxt: 'Prueba', dCol: 'var(--cp-green)' },
+        { n: 'PEDIDOS', v: '5', dTxt: 'Prueba', dCol: 'var(--cp-green)' },
+      ],
     });
 
     render(
@@ -82,14 +75,16 @@ describe('Escritorio (/admin)', () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => {
-      const tarjetaLocal = screen.getByTestId('tarjeta-estado-local');
-      expect(tarjetaLocal).toHaveTextContent('Abierto');
-      expect(tarjetaLocal).toHaveTextContent('Atendiendo pedidos en salón y delivery');
-    });
+    const botonFiltros = screen.getByRole('button', { name: /filtros/i });
+    fireEvent.click(botonFiltros);
+
+    expect(screen.getByText('PERÍODO')).toBeInTheDocument();
+    expect(screen.getByText('AÑO')).toBeInTheDocument();
+    expect(screen.getByText('CANAL')).toBeInTheDocument();
+    expect(screen.getByText('RANGO DE FECHAS')).toBeInTheDocument();
   });
 
-  it('obtiene el estado real del local desde /carta/estado cuando está cerrado', async () => {
+  it('muestra la vista propia cuando el usuario entra con rol Cajero', async () => {
     vi.spyOn(sesionModulo, 'useSesion').mockReturnValue({
       usuario: { partyId: '2', nombres: 'Cajera Test', rol: 'CAJERO' },
       permisos: [],
@@ -104,27 +99,16 @@ describe('Escritorio (/admin)', () => {
       tiene: vi.fn().mockReturnValue(false),
     });
 
-    vi.spyOn(api, 'get').mockImplementation((ruta: string) => {
-      if (ruta === '/carta/estado') {
-        return Promise.resolve({
-          abierta: false,
-          texto: 'Abre hoy a las 16:00',
-          pausaAltaDemanda: false,
-        });
-      }
-      return Promise.reject(new Error(`Ruta inesperada: ${ruta}`));
-    });
-
     render(
       <MemoryRouter>
         <Escritorio />
       </MemoryRouter>,
     );
 
-    await waitFor(() => {
-      const tarjetaLocal = screen.getByTestId('tarjeta-estado-local');
-      expect(tarjetaLocal).toHaveTextContent('Cerrado');
-      expect(tarjetaLocal).toHaveTextContent('Abre hoy a las 16:00');
-    });
+    expect(
+      screen.getByText('Hola, Cajera Test. Este es tu escritorio de Cajero: solo muestra lo que corresponde a tu rol.'),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText('Pedidos por confirmar').length).toBeGreaterThan(0);
+    expect(screen.getByText('Para hacer ahora')).toBeInTheDocument();
   });
 });
