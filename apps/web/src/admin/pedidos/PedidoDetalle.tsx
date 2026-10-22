@@ -1,515 +1,332 @@
 import { useState } from 'react';
-import { Boton } from '../../comun/Boton';
-import { Confirmar } from '../../comun/Confirmar';
-import { Insignia } from '../../comun/Insignia';
 import { Pedido, pedidosApi } from './pedidosApi';
 import { ModalCobrar } from './ModalCobrar';
 import { ModalAnular } from './ModalAnular';
 import { ModalUbicar } from './ModalUbicar';
-import { useSesion } from '../../comun/sesion';
+import { ModalConfirmarPago } from './ModalConfirmarPago';
+import { canalLabel, modLabel, getBadge } from './PedidosAdminView';
 
 export interface PedidoDetalleProps {
   pedido: Pedido;
   alActualizar: () => void;
+  alRepetir?: (pedido: Pedido) => void;
 }
 
-export function PedidoDetalle({ pedido, alActualizar }: PedidoDetalleProps) {
-  const { usuario, tiene } = useSesion();
-  const [pestanaActiva, setPestanaActiva] = useState<
-    'pedido' | 'cobro' | 'ticket' | 'comprobante'
-  >('pedido');
+type TabDetalle = 'pedido' | 'cobro' | 'ticket' | 'etiquetas' | 'comprobante';
+
+export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalleProps) {
+  const [tab, setTab] = useState<TabDetalle>('pedido');
 
   // Modales
-  const [abrirCobro, setAbrirCobro] = useState<boolean>(false);
-  const [abrirAnular, setAbrirAnular] = useState<boolean>(false);
-  const [abrirUbicar, setAbrirUbicar] = useState<boolean>(false);
-  const [abrirAnularCobro, setAbrirAnularCobro] = useState<boolean>(false);
+  const [abrirCobrar, setAbrirCobrar] = useState(false);
+  const [abrirAnular, setAbrirAnular] = useState(false);
+  const [abrirUbicar, setAbrirUbicar] = useState(false);
+  const [abrirConfirmarPago, setAbrirConfirmarPago] = useState(false);
 
-  // Confirmaciones directas
-  const [transicionPendiente, setTransicionPendiente] = useState<{
-    nuevoEstado: string;
-    titulo: string;
-    mensaje: string;
-  } | null>(null);
+  // Estados locales para acciones
+  const [tipoComp, setTipoComp] = useState<string>(pedido.comprobante_tipo || 'Nota de venta');
+  const [msgTicket, setMsgTicket] = useState('');
+  const [msgEtiquetas, setMsgEtiquetas] = useState('');
+  const [msgComprobante, setMsgComprobante] = useState('');
+  const [procesando, setProcesando] = useState(false);
+  const [coordinandoDestino, setCoordinandoDestino] = useState('Merma');
 
-  const [confirmarCoordinado, setConfirmarCoordinado] = useState<boolean>(false);
-  const [procesandoAccion, setProcesandoAccion] = useState<boolean>(false);
-  const [errorAccion, setErrorAccion] = useState<string>('');
-  const [mensajeExito, setMensajeExito] = useState<string>('');
+  const est = String(pedido.estado || '').toUpperCase();
+  const pag = String(pedido.pago_estado || '').toUpperCase();
+  const mod = String(pedido.modalidad || '').toUpperCase();
+  const esDelivery = mod === 'DELIVERY';
+  const esMesa = mod === 'MESA';
+  const estaPagado = pag === 'PAGADO';
+  const esPorConfirmar = (est === 'COLA' || est === 'NUEVO') && !estaPagado && (pedido.canal === 'CARTA' || pedido.canal === 'BOT');
+  const esPagoPorCoordinar = (pedido.canal === 'CARTA' || pedido.canal === 'BOT') && !estaPagado && est !== 'ANULADO' && est !== 'ENTREGADO' && est !== 'COLA' && est !== 'NUEVO';
 
-  // Validación de permisos de contacto sensible (teléfono y dirección)
-  const puedeVerContacto =
-    usuario?.rol === 'ADMIN' ||
-    usuario?.rol === 'CAJERO' ||
-    usuario?.rol === 'CALLCENTER' ||
-    usuario?.rol === 'REPARTIDOR' ||
-    tiene('caja/ver') ||
-    tiene('pedidos/cambiar_estado') ||
-    tiene('repartos/ver');
+  // Configuración de estado visual (badge del mockup)
+  const stBadge = getBadge(pedido);
 
-  // Transición de estado permitida según el estado actual y modalidad
-  const obtenerAccionEstado = (): {
-    label: string;
-    nuevoEstado: string;
-    titulo: string;
-    mensaje: string;
-  } | null => {
-    const est = String(pedido.estado).toUpperCase();
-    const mod = String(pedido.modalidad).toUpperCase();
+  // Datos de contacto y mapa
+  const lat = pedido.entrega_lat;
+  const lng = pedido.entrega_lng;
+  const hasMapCoords = lat != null && lng != null && lat !== '' && lng !== '';
 
-    // DT-58 y DT-71: todo pedido llega directo a cocina y no hay «empezar a preparar»;
-    // pasa a LISTO cuando todas las áreas despejan su parte. Caja solo cobra o anula.
-    if (est === 'COLA') {
-      return null;
-    }
-    if (est === 'PREPARANDO') {
-      return {
-        label: 'Marcar como listo',
-        nuevoEstado: 'LISTO',
-        titulo: `¿Marcar el pedido ${pedido.codigo} como listo?`,
-        mensaje: 'El pedido pasará a estar listo para entrega o despacho.',
-      };
-    }
-    if (est === 'LISTO') {
-      if (mod === 'DELIVERY') {
-        return {
-          label: 'Despachar (En camino)',
-          nuevoEstado: 'EN_CAMINO',
-          titulo: `¿Despachar el pedido ${pedido.codigo}?`,
-          mensaje: 'El pedido saldrá con el repartidor hacia la dirección del cliente.',
-        };
-      } else {
-        return {
-          label: 'Entregar al cliente',
-          nuevoEstado: 'ENTREGADO',
-          titulo: `¿Entregar el pedido ${pedido.codigo}?`,
-          mensaje: 'El pedido quedará registrado como entregado al cliente.',
-        };
-      }
-    }
-    if (est === 'EN_CAMINO') {
-      return {
-        label: 'Marcar entregado',
-        nuevoEstado: 'ENTREGADO',
-        titulo: `¿Confirmar entrega del pedido ${pedido.codigo}?`,
-        mensaje: 'El repartidor finalizó la entrega con éxito.',
-      };
-    }
-    return null;
-  };
+  const phoneClean = (pedido.cliente_telefono || '').replace(/\D/g, '');
+  const waUrl = phoneClean
+    ? `https://wa.me/51${phoneClean}?text=${encodeURIComponent(`Hola ${pedido.cliente_nombre || ''}, te escribimos de Caprichos sobre tu pedido ${pedido.codigo}.`)}`
+    : '#';
 
-  const accionEstado = obtenerAccionEstado();
-
-  // Ejecutar cambio de estado confirmado
-  const ejecutarCambioEstado = async () => {
-    if (!transicionPendiente) return;
-    setProcesandoAccion(true);
-    setErrorAccion('');
-    setMensajeExito('');
+  // Transiciones de estado
+  const cambiarEstado = async (nuevoEstado: string, motivo?: string) => {
+    setProcesando(true);
     try {
-      await pedidosApi.cambiarEstado(
-        pedido.id,
-        transicionPendiente.nuevoEstado,
-      );
-      setTransicionPendiente(null);
-      setMensajeExito(`Pedido actualizado a ${transicionPendiente.nuevoEstado}`);
+      await pedidosApi.cambiarEstado(pedido.id, nuevoEstado, motivo);
       alActualizar();
     } catch (err: any) {
-      setErrorAccion(err?.message || 'Error al actualizar el estado del pedido');
+      alert(err?.message || 'Error al actualizar el estado del pedido');
     } finally {
-      setProcesandoAccion(false);
+      setProcesando(false);
     }
   };
 
-  // Ejecutar marcado de pago coordinado
-  const ejecutarMarcarCoordinado = async () => {
-    setConfirmarCoordinado(false);
-    setProcesandoAccion(true);
-    setErrorAccion('');
-    setMensajeExito('');
-    try {
-      await pedidosApi.marcarPagoCoordinado(pedido.id);
-      setMensajeExito('Pago coordinado registrado con éxito');
-      alActualizar();
-    } catch (err: any) {
-      setErrorAccion(err?.message || 'Error al registrar el pago coordinado');
-    } finally {
-      setProcesandoAccion(false);
-    }
-  };
+  const tabs: Array<{ id: TabDetalle; label: string }> = [
+    { id: 'pedido', label: 'Pedido' },
+    { id: 'cobro', label: 'Cobro' },
+    { id: 'ticket', label: 'Ticket de cocina' },
+    ...(est !== 'ANULADO' && est !== 'RECHAZADO' ? [{ id: 'etiquetas' as TabDetalle, label: 'Etiquetas' }] : []),
+    ...(!esPorConfirmar && est !== 'ANULADO' && est !== 'RECHAZADO' ? [{ id: 'comprobante' as TabDetalle, label: 'Comprobante' }] : []),
+  ];
 
-  const puedeAnularPedido =
-    ['COLA', 'PREPARANDO', 'LISTO'].includes(String(pedido.estado).toUpperCase()) &&
-    String(pedido.estado).toUpperCase() !== 'ANULADO';
-
-  const faltaUbicar =
-    String(pedido.modalidad).toUpperCase() === 'DELIVERY' &&
-    pedido.entrega_lat == null &&
-    !['ENTREGADO', 'ANULADO'].includes(String(pedido.estado).toUpperCase());
-  const puedeUbicar =
-    String(pedido.modalidad).toUpperCase() === 'DELIVERY' &&
-    !['ENTREGADO', 'ANULADO'].includes(String(pedido.estado).toUpperCase()) &&
-    tiene('pedidos/cambiar_estado');
-
-  const puedeCobrar =
-    String(pedido.pago_estado).toUpperCase() !== 'PAGADO' &&
-    String(pedido.estado).toUpperCase() !== 'ANULADO';
-
-  const puedeAnularCobro =
-    String(pedido.pago_estado).toUpperCase() === 'PAGADO' &&
-    String(pedido.estado).toUpperCase() !== 'ANULADO';
-
-  const formatearFecha = (iso: string) => {
-    try {
-      const d = new Date(iso);
-      return d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
-    } catch {
-      return iso;
-    }
-  };
+  const totalNum = Number(pedido.total || 0);
 
   return (
     <>
-      {/* Cabecera del Detalle */}
-      <div className="cj-head" style={{ gap: 8, padding: 14 }}>
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 8,
-          }}
-        >
-          <div
-            style={{
-              fontFamily: 'Montserrat, sans-serif',
-              fontWeight: 800,
-              fontSize: 22,
-              color: 'var(--cp-navy, #0B2C3E)',
-            }}
-          >
+      <div className="cj-head" style={{ gap: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+          <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 22, color: 'var(--cp-navy, #0B2C3E)' }}>
             {pedido.codigo}
           </div>
-          <Insignia
-            variante={
-              pedido.estado === 'ANULADO'
-                ? 'peligro'
-                : pedido.estado === 'ENTREGADO' || pedido.pago_estado === 'PAGADO'
-                  ? 'exito'
-                  : 'aviso'
-            }
+          <span
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              borderRadius: 9999,
+              padding: '3px 12px',
+              background: stBadge.bg,
+              color: stBadge.fg,
+            }}
           >
-            {pedido.estado}
-          </Insignia>
+            {stBadge.l}
+          </span>
         </div>
 
         <div style={{ fontSize: 13, lineHeight: '19px', color: 'var(--cp-soft, #2C4C5D)' }}>
-          <b>{pedido.canal}</b> · {pedido.modalidad} · {formatearFecha(pedido.creado_en)}
+          {canalLabel(pedido.canal)} · {modLabel(pedido.modalidad)}
           <br />
-          <b>{pedido.cliente_nombre || 'Cliente'}</b>
-          {' · '}
-          {puedeVerContacto ? (
-            <span>{pedido.cliente_telefono || 'Sin teléfono'}</span>
-          ) : (
-            <span style={{ fontStyle: 'italic', opacity: 0.7 }}>[Teléfono oculto]</span>
-          )}
-          {pedido.modalidad === 'DELIVERY' && (
+          {pedido.cliente_nombre || 'Cliente'} · {pedido.cliente_telefono || 'Sin teléfono'}
+          {esDelivery && (
             <>
               <br />
-              {puedeVerContacto ? (
-                <span>
-                  {pedido.entrega_direccion || 'Sin dirección escrita'}
-                  {pedido.entrega_referencia && ` (${pedido.entrega_referencia})`}
-                  {faltaUbicar && (
-                    <b style={{ color: 'var(--cp-rust, #C4412B)' }}> · Falta ubicar en el mapa</b>
-                  )}
-                </span>
-              ) : (
-                <span style={{ fontStyle: 'italic', opacity: 0.7 }}>[Dirección oculta]</span>
+              {pedido.entrega_direccion || 'Av. Los Jazmines 123, Campoy'}
+              {!hasMapCoords && (
+                <>
+                  <br />
+                  <button
+                    type="button"
+                    onClick={() => setAbrirUbicar(true)}
+                    style={{
+                      minHeight: 44,
+                      padding: '0 14px',
+                      marginTop: 4,
+                      border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                      borderRadius: 10,
+                      background: 'rgb(255, 241, 201)',
+                      color: 'var(--cp-navy, #0B2C3E)',
+                      fontWeight: 800,
+                      fontSize: 13,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Ubicar en el mapa (falta la ubicación)
+                  </button>
+                </>
               )}
             </>
           )}
-          {pedido.mesa_nombre && (
+          {esMesa && pedido.mesa_nombre && (
             <>
               <br />
-              <b>Ubicación:</b> {pedido.mesa_nombre}
+              Mesa {pedido.mesa_nombre}
             </>
           )}
         </div>
 
-        {/* Pestañas del Detalle */}
+        {/* 5 Tabs */}
         <div role="tablist" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {(
-            [
-              ['pedido', 'Pedido'],
-              ['cobro', 'Cobro'],
-              ['ticket', 'Ticket de cocina'],
-              ['comprobante', 'Comprobante'],
-            ] as const
-          ).map(([id, etiqueta]) => {
-            const activa = pestanaActiva === id;
+          {tabs.map((t) => {
+            const activo = tab === t.id;
             return (
               <button
-                key={id}
+                key={t.id}
                 role="tab"
-                aria-selected={activa}
-                onClick={() => setPestanaActiva(id)}
+                aria-selected={activo}
+                type="button"
+                onClick={() => setTab(t.id)}
                 style={{
                   minHeight: 38,
                   padding: '0 14px',
                   borderRadius: 9999,
                   border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                  background: activa ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
-                  color: activa ? 'var(--cp-cream, #FBF4EC)' : 'var(--cp-navy, #0B2C3E)',
+                  background: activo ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
+                  color: activo ? 'var(--cp-cream, #FBF4EC)' : 'var(--cp-navy, #0B2C3E)',
                   fontWeight: 700,
                   fontSize: 13,
+                  cursor: 'pointer',
                 }}
               >
-                {etiqueta}
+                {t.label}
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* Mensajes de aviso */}
-      {errorAccion && (
-        <div
-          role="alert"
-          style={{
-            margin: '8px 14px 0',
-            fontSize: 13,
-            fontWeight: 700,
-            color: 'var(--cp-rust, #B2500F)',
-            background: '#FFF0E6',
-            padding: '8px 12px',
-            borderRadius: 8,
-            border: '1px solid var(--cp-rust, #B2500F)',
-          }}
-        >
-          {errorAccion}
-        </div>
-      )}
-      {mensajeExito && (
-        <div
-          role="status"
-          style={{
-            margin: '8px 14px 0',
-            fontSize: 13,
-            fontWeight: 700,
-            color: 'var(--cp-green, #2F7A45)',
-            background: 'var(--cp-greenbg, #DFF3E3)',
-            padding: '8px 12px',
-            borderRadius: 8,
-          }}
-        >
-          {mensajeExito}
-        </div>
-      )}
-
-      {/* Contenido scrolleable de las pestañas */}
       <div className="cj-scroll" style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {/* PESTAÑA: PEDIDO */}
-        {pestanaActiva === 'pedido' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--cp-navy, #0B2C3E)' }}>
-              Productos solicitados
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {pedido.lineas && pedido.lineas.length > 0 ? (
-                pedido.lineas.map((linea, idx) => (
-                  <div
-                    key={linea.id || idx}
-                    style={{
-                      display: 'flex',
-                      gap: 10,
-                      borderBottom: '1px solid var(--cp-sand, #F3E9DB)',
-                      paddingBottom: 8,
-                    }}
-                  >
-                    <span style={{ fontWeight: 800, minWidth: 24 }}>{linea.cantidad}×</span>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontWeight: 700 }}>
-                          {linea.nombre} {linea.tamano ? `(${linea.tamano})` : ''}
+        {/* TAB: PEDIDO */}
+        {tab === 'pedido' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {pedido.lineas && pedido.lineas.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {pedido.lineas.map((it, idx) => (
+                  <div key={idx} style={{ display: 'flex', gap: 10 }}>
+                    <span style={{ fontWeight: 800 }}>{it.cantidad}×</span>
+                    <span style={{ flex: 1 }}>
+                      <span style={{ fontWeight: 700 }}>{it.nombre}</span>
+                      {it.nombres_persona && it.nombres_persona.length > 0 && (
+                        <span style={{ display: 'block', fontSize: 12, color: 'var(--cp-soft, #2C4C5D)' }}>
+                          Para: {it.nombres_persona.join(', ')}
                         </span>
-                        <span style={{ fontWeight: 700 }}>S/ {Number(linea.subtotal).toFixed(2)}</span>
-                      </div>
-
-                      {/* Personas / Nombres */}
-                      {linea.nombres_persona && linea.nombres_persona.length > 0 && (
-                        <div style={{ fontSize: 12, color: 'var(--cp-orange, #E67929)', fontWeight: 700, marginTop: 2 }}>
-                          Para: {linea.nombres_persona.join(', ')}
-                        </div>
                       )}
-
-                      {/* Opciones elegidas */}
-                      {(linea.opcionesElegidas || linea.opciones || []).map((opc, opcIdx) => (
-                        <div key={opcIdx} style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)' }}>
-                          {opc.grupo_nombre || opc.grupo}: {opc.opcion_nombre || opc.nombre}
-                          {Number(opc.precio_extra || 0) > 0 && ` (+S/ ${Number(opc.precio_extra).toFixed(2)})`}
-                        </div>
+                      {(it.opcionesElegidas || it.opciones || []).map((o, oi) => (
+                        <span key={oi} style={{ display: 'block', fontSize: 12, color: 'var(--cp-soft, #2C4C5D)' }}>
+                          + {o.opcion_nombre || o.nombre}
+                        </span>
                       ))}
-
-                      {/* Nota de la línea */}
-                      {linea.nota && (
-                        <div style={{ fontSize: 12, fontStyle: 'italic', color: 'var(--cp-rust, #B2500F)', marginTop: 2 }}>
-                          Nota: {linea.nota}
-                        </div>
+                      {it.nota && (
+                        <span style={{ display: 'block', fontSize: 12, color: 'var(--cp-rust, #B2500F)', fontWeight: 700 }}>
+                          * {it.nota} *
+                        </span>
                       )}
-                    </div>
+                    </span>
+                    <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
+                      S/ {Number(it.subtotal || 0).toFixed(2)}
+                    </span>
                   </div>
-                ))
-              ) : (
-                <div style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)' }}>Sin líneas de pedido.</div>
-              )}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ color: 'var(--cp-soft, #2C4C5D)', fontSize: 13 }}>Sin líneas detalladas.</div>
+            )}
 
-            {/* Nota global */}
             {pedido.nota && (
-              <div
-                style={{
-                  border: '1.5px dashed var(--cp-soft, #2C4C5D)',
-                  borderRadius: 12,
-                  padding: 10,
-                  fontSize: 13,
-                  background: '#FAF7F2',
-                }}
-              >
-                <b>Nota para cocina:</b> {pedido.nota}
+              <div style={{ border: '1.5px dashed var(--cp-soft, #2C4C5D)', borderRadius: 12, padding: 10, fontSize: 13 }}>
+                Nota para cocina: {pedido.nota}
               </div>
             )}
           </div>
         )}
 
-        {/* PESTAÑA: COBRO */}
-        {pestanaActiva === 'cobro' && (
+        {/* TAB: COBRO */}
+        {tab === 'cobro' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-              <span>Medio de pago preferido / registrado:</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Estado del pago</span>
+              <span
+                style={{
+                  fontSize: 12,
+                  fontWeight: 800,
+                  borderRadius: 9999,
+                  padding: '3px 12px',
+                  background: estaPagado ? 'var(--cp-greenbg, #DFF3E3)' : '#FFF0E6',
+                  color: estaPagado ? '#1F5C33' : 'var(--cp-rust, #B2500F)',
+                }}
+              >
+                {estaPagado ? 'PAGADO' : 'PENDIENTE'}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Medio de pago</span>
               <span style={{ fontWeight: 700 }}>{pedido.pago_metodo || pedido.pago_preferido || 'Efectivo'}</span>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-              <span>Estado del cobro:</span>
-              <Insignia variante={pedido.pago_estado === 'PAGADO' ? 'exito' : 'aviso'}>
-                {pedido.pago_estado || 'PENDIENTE'}
-              </Insignia>
+            {/* Selector de comprobante */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span>Comprobante</span>
+              <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {['Nota de venta', 'Boleta', 'Factura'].map((n) => {
+                  const sel = tipoComp === n;
+                  return (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setTipoComp(n)}
+                      style={{
+                        minHeight: 44,
+                        padding: '0 12px',
+                        borderRadius: 9999,
+                        border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                        background: sel ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
+                        color: sel ? 'var(--cp-cream, #FBF4EC)' : 'var(--cp-navy, #0B2C3E)',
+                        fontWeight: 700,
+                        fontSize: 12,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {n}
+                    </button>
+                  );
+                })}
+              </span>
             </div>
 
-            <div
-              style={{
-                background: 'var(--cp-sand, #F3E9DB)',
-                borderRadius: 12,
-                padding: '10px 14px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 6,
-                fontSize: 13,
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Subtotal</span>
-                <span>S/ {Number(pedido.subtotal || 0).toFixed(2)}</span>
-              </div>
-              {Number(pedido.descuento || 0) > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--cp-rust, #B2500F)' }}>
-                  <span>Descuento</span>
-                  <span>- S/ {Number(pedido.descuento).toFixed(2)}</span>
-                </div>
-              )}
-              {Number(pedido.envio || 0) > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Costo de envío</span>
-                  <span>S/ {Number(pedido.envio).toFixed(2)}</span>
-                </div>
-              )}
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  fontFamily: 'Montserrat, sans-serif',
-                  fontWeight: 800,
-                  fontSize: 16,
-                  borderTop: '1px solid var(--cp-line, #E3D6C6)',
-                  paddingTop: 6,
-                }}
-              >
-                <span>Total</span>
-                <span>S/ {Number(pedido.total).toFixed(2)}</span>
-              </div>
-
-              {pedido.paga_con && (
-                <div style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)', marginTop: 4 }}>
-                  Cliente paga con: S/ {Number(pedido.paga_con).toFixed(2)}
-                  {Number(pedido.paga_con) >= Number(pedido.total) && (
-                    <span> · Vuelto: S/ {(Number(pedido.paga_con) - Number(pedido.total)).toFixed(2)}</span>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Aviso y acción para pedidos de la carta con pago pendiente (DT-57) */}
-            {pedido.pago_estado !== 'PAGADO' && (pedido.canal === 'CARTA' || pedido.canal === 'BOT') && (
-              <div
-                style={{
-                  border: '1.5px solid var(--cp-gold, #D99E39)',
-                  background: '#FFF6E3',
-                  borderRadius: 10,
-                  padding: '10px 12px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 8,
-                }}
-              >
-                <div style={{ fontSize: 13, lineHeight: '18px', fontWeight: 700 }}>
-                  Pedido de la carta: ya está en cocina. Pago por coordinar por WhatsApp. Si el cliente no paga, anúlalo con motivo y el PIN de la supervisora.
+            {esMesa && (
+              <div>
+                <div style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)', marginBottom: 6 }}>
+                  La mesa se libera al cobrar. Un mozo o caja también puede liberarla a mano en Nuevo pedido, En el local.
                 </div>
                 <button
                   type="button"
-                  onClick={() => setConfirmarCoordinado(true)}
+                  onClick={() => alert(`Precuenta para Mesa ${pedido.mesa_nombre || ''} enviada a impresión.`)}
                   style={{
                     minHeight: 44,
-                    border: 0,
-                    borderRadius: 10,
-                    background: 'var(--cp-navy, #0B2C3E)',
-                    color: 'var(--cp-cream, #FBF4EC)',
-                    fontWeight: 800,
-                    fontSize: 13,
+                    border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                    borderRadius: 12,
+                    background: 'transparent',
+                    color: 'var(--cp-navy, #0B2C3E)',
+                    fontWeight: 700,
+                    width: '100%',
                     cursor: 'pointer',
                   }}
                 >
-                  Registrar pago coordinado
+                  Sacar precuenta (el cajero cobra)
                 </button>
               </div>
             )}
 
-            {/* Si es pedido de salón */}
-            {pedido.modalidad === 'MESA' && (
-              <div style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)', fontStyle: 'italic' }}>
-                La mesa se libera al cobrar. El mozo o caja también pueden liberarla a mano en el plano.
-              </div>
-            )}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                fontFamily: 'Montserrat, sans-serif',
+                fontWeight: 800,
+                fontSize: 18,
+                borderTop: '1px solid var(--cp-line, #E3D6C6)',
+                paddingTop: 8,
+              }}
+            >
+              <span>Total</span>
+              <span>S/ {totalNum.toFixed(2)}</span>
+            </div>
           </div>
         )}
 
-        {/* PESTAÑA: TICKET DE COCINA */}
-        {pestanaActiva === 'ticket' && (
+        {/* TAB: TICKET DE COCINA */}
+        {tab === 'ticket' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 14 }}>
               Ticket impreso (comanda de cocina, papel de 80 mm)
             </div>
+            <div style={{ fontSize: 12, lineHeight: '17px', color: 'var(--cp-soft, #2C4C5D)' }}>
+              Impreso en cocina y barra · 1 copia
+            </div>
             <div
               style={{
                 alignSelf: 'center',
-                width: 'min(100%, 320px)',
+                width: 'min(100%, 300px)',
                 boxSizing: 'border-box',
                 background: 'var(--cp-white, #FFFFFF)',
                 border: '1px solid var(--cp-line, #E3D6C6)',
-                boxShadow: '0 4px 12px rgba(11, 44, 62, 0.12)',
+                boxShadow: '0 4px 12px rgba(11, 44, 62, 0.15)',
                 padding: '16px 14px',
-                fontFamily: 'monospace',
+                fontFamily: "'Courier New', monospace",
                 fontSize: 12,
                 lineHeight: '16px',
                 color: '#111',
@@ -518,38 +335,29 @@ export function PedidoDetalle({ pedido, alActualizar }: PedidoDetalleProps) {
                 gap: 2,
               }}
             >
-              <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 15, letterSpacing: '0.08em' }}>
-                CAPRICHOS
-              </div>
+              <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 15, letterSpacing: '0.08em' }}>CAPRICHOS</div>
               <div style={{ textAlign: 'center' }}>Café artesanal · Lima</div>
               <div style={{ textAlign: 'center' }}>------------------------------</div>
-              <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 14 }}>
-                COMANDA {pedido.codigo}
-              </div>
-              <div style={{ textAlign: 'center', fontWeight: 700 }}>
-                {pedido.modalidad}
-              </div>
+              <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 14 }}>COMANDA {pedido.codigo}</div>
+              <div style={{ textAlign: 'center', fontWeight: 700 }}>{pedido.modalidad}</div>
               <div>Fecha: {new Date(pedido.creado_en).toLocaleString('es-PE')}</div>
               <div>Canal: {pedido.canal}</div>
               <div>Cliente: {pedido.cliente_nombre || 'Cliente'}</div>
-              {pedido.mesa_nombre && <div style={{ fontWeight: 700 }}>Mesa: {pedido.mesa_nombre}</div>}
-              {pedido.modalidad === 'DELIVERY' && puedeVerContacto && (
+              {esMesa && <div style={{ fontWeight: 700 }}>Mesa: {pedido.mesa_nombre || '1'}</div>}
+              {esDelivery && (
                 <>
                   <div>Dirección: {pedido.entrega_direccion || '—'}</div>
-                  <div>Teléfono: {pedido.cliente_telefono || '—'}</div>
+                  <div>Ref.: {pedido.entrega_referencia || '—'}</div>
+                  <div>Tel.: {pedido.cliente_telefono || '—'}</div>
                 </>
               )}
               <div style={{ textAlign: 'center' }}>------------------------------</div>
-              {pedido.lineas?.map((it, idx) => (
-                <div key={idx} style={{ marginBottom: 4 }}>
-                  <div style={{ fontWeight: 700 }}>{it.cantidad} × {it.nombre}</div>
-                  {it.nombres_persona && (
-                    <div style={{ paddingLeft: 12, fontStyle: 'italic' }}>Para: {it.nombres_persona.join(', ')}</div>
-                  )}
+              {(pedido.lineas || []).map((it, idx) => (
+                <div key={idx}>
+                  <span style={{ fontWeight: 700 }}>{it.cantidad} x {it.nombre}</span>
                   {(it.opcionesElegidas || it.opciones || []).map((o, oi) => (
-                    <div key={oi} style={{ paddingLeft: 12 }}>- {o.opcion_nombre || o.nombre}</div>
+                    <div key={oi} style={{ paddingLeft: 16 }}>- {o.opcion_nombre || o.nombre}</div>
                   ))}
-                  {it.nota && <div style={{ paddingLeft: 12, fontWeight: 700 }}>* {it.nota} *</div>}
                 </div>
               ))}
               {pedido.nota && (
@@ -565,51 +373,195 @@ export function PedidoDetalle({ pedido, alActualizar }: PedidoDetalleProps) {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 14 }}>
                 <span>TOTAL</span>
-                <span>S/ {Number(pedido.total).toFixed(2)}</span>
+                <span>S/ {totalNum.toFixed(2)}</span>
               </div>
               <div style={{ textAlign: 'center' }}>------------------------------</div>
-              <div style={{ textAlign: 'center', fontStyle: 'italic' }}>Gracias por tu capricho</div>
+              <div style={{ textAlign: 'center' }}>Wi-Fi: Caprichos-Clientes · clave 12345678</div>
+              <div style={{ textAlign: 'center' }}>Imprime: Cocina caliente</div>
+              <div style={{ textAlign: 'center' }}>Gracias por tu capricho</div>
+            </div>
+            <div style={{ fontSize: 12, lineHeight: '17px', color: 'var(--cp-soft, #2C4C5D)' }}>
+              Las etiquetas adhesivas (general, por área y por bebida) están en la pestaña Etiquetas.
+            </div>
+            <button
+              type="button"
+              onClick={() => setMsgTicket('Ticket enviado a la impresora.')}
+              style={{
+                minHeight: 44,
+                border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                borderRadius: 12,
+                background: 'transparent',
+                color: 'var(--cp-navy, #0B2C3E)',
+                fontWeight: 800,
+                cursor: 'pointer',
+              }}
+            >
+              Reimprimir ticket
+            </button>
+            {msgTicket && (
+              <div role="status" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-green, #2F7A45)' }}>
+                {msgTicket}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB: ETIQUETAS */}
+        {tab === 'etiquetas' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ fontSize: 12, lineHeight: '17px', color: 'var(--cp-soft, #2C4C5D)' }}>
+              Sale una general en caja, una por área en su etiquetera y una por vaso en barra.
+            </div>
+            <div style={{ fontWeight: 800, fontSize: 13 }}>
+              {pedido.lineas?.length || 1} producto(s) en este pedido
+            </div>
+
+            {msgEtiquetas && (
+              <div role="status" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-green, #2F7A45)' }}>
+                {msgEtiquetas}
+              </div>
+            )}
+
+            {/* 1. General */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 14 }}>
+                1. Etiqueta general del pedido
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)' }}>
+                Una por pedido, para la bolsa o la bandeja. Sale en la etiquetera de caja.
+              </div>
+              <div
+                style={{
+                  width: 230,
+                  fontFamily: "'Courier New', monospace",
+                  fontSize: 12,
+                  lineHeight: '15px',
+                  color: '#111',
+                  background: 'var(--cp-white, #FFFFFF)',
+                  border: '1px solid var(--cp-line, #E3D6C6)',
+                  borderRadius: 8,
+                  boxShadow: '0 3px 10px rgba(11, 44, 62, 0.15)',
+                  overflow: 'hidden',
+                }}
+              >
+                <div style={{ background: 'var(--cp-navy, #0B2C3E)', color: 'var(--cp-cream, #FBF4EC)', padding: '5px 10px', fontWeight: 700, letterSpacing: '0.08em' }}>
+                  CAPRICHOS · PEDIDO
+                </div>
+                <div style={{ padding: '8px 10px' }}>
+                  <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 22, lineHeight: '26px' }}>
+                    {pedido.codigo}
+                  </div>
+                  <div style={{ fontWeight: 700 }}>{pedido.modalidad} · {pedido.cliente_nombre || 'Cliente'}</div>
+                  <div>{pedido.canal} · {new Date(pedido.creado_en).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                  <div style={{ borderTop: '1px dashed #999', margin: '5px 0' }} />
+                  <div>{pedido.lineas?.reduce((acc, l) => acc + l.cantidad, 0) || 1} productos</div>
+                  <div>Total: S/ {totalNum.toFixed(2)}</div>
+                </div>
+                <div style={{ background: 'var(--cp-sand, #EDE1D1)', padding: '3px 10px', fontSize: 12 }}>
+                  Sale en: Etiquetera Caja
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMsgEtiquetas('Etiqueta general enviada a la etiquetera de caja.')}
+                style={{
+                  alignSelf: 'flex-start',
+                  minHeight: 44,
+                  padding: '0 14px',
+                  border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                  borderRadius: 10,
+                  background: 'transparent',
+                  color: 'var(--cp-navy, #0B2C3E)',
+                  fontWeight: 800,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                }}
+              >
+                Reimprimir la general
+              </button>
+            </div>
+
+            {/* 2. Por área */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 14 }}>
+                2. Etiquetas por área
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)' }}>
+                Una por cada área que tiene productos en el pedido.
+              </div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <div
+                  style={{
+                    width: 230,
+                    fontFamily: "'Courier New', monospace",
+                    fontSize: 12,
+                    lineHeight: '15px',
+                    color: '#111',
+                    background: 'var(--cp-white, #FFFFFF)',
+                    border: '1px solid var(--cp-line, #E3D6C6)',
+                    borderRadius: 8,
+                    boxShadow: '0 3px 10px rgba(11, 44, 62, 0.15)',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div style={{ background: '#7A3516', color: '#FFF', padding: '5px 10px', fontWeight: 700, letterSpacing: '0.08em' }}>
+                    ÁREA · COCINA
+                  </div>
+                  <div style={{ padding: '8px 10px' }}>
+                    <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 18 }}>
+                      {pedido.codigo} · {pedido.cliente_nombre || 'Cliente'}
+                    </div>
+                    <div>{pedido.modalidad}</div>
+                    <div style={{ borderTop: '1px dashed #999', margin: '5px 0' }} />
+                    {(pedido.lineas || []).slice(0, 3).map((l, i) => (
+                      <div key={i}>
+                        <b>{l.cantidad}× {l.nombre}</b>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ background: 'var(--cp-sand, #EDE1D1)', padding: '3px 10px', fontSize: 12 }}>
+                    Sale en: Etiquetera Cocina
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMsgEtiquetas('Etiquetas de área enviadas a las impresoras.')}
+                style={{
+                  alignSelf: 'flex-start',
+                  minHeight: 44,
+                  padding: '0 14px',
+                  border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                  borderRadius: 10,
+                  background: 'transparent',
+                  color: 'var(--cp-navy, #0B2C3E)',
+                  fontWeight: 800,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                }}
+              >
+                Reimprimir las de área
+              </button>
             </div>
           </div>
         )}
 
-        {/* PESTAÑA: COMPROBANTE */}
-        {pestanaActiva === 'comprobante' && (
+        {/* TAB: COMPROBANTE */}
+        {tab === 'comprobante' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 14 }}>
-              Comprobante del cliente ({pedido.comprobante_tipo || 'BOLETA'})
+              Comprobante del cliente ({tipoComp})
             </div>
-            {tiene('comprobantes/ver') && (
-              // la nota de venta numerada (NV01) se ve y se reimprime en el módulo Comprobantes
-              <a
-                href={`/admin/comprobantes?tab=nota&pedidoId=${encodeURIComponent(String(pedido.id))}`}
-                style={{
-                  alignSelf: 'flex-start',
-                  minHeight: 44,
-                  padding: '0 16px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                  borderRadius: 12,
-                  color: 'var(--cp-navy, #0B2C3E)',
-                  fontWeight: 800,
-                  fontSize: 13,
-                  textDecoration: 'none',
-                }}
-              >
-                Ver la nota de venta numerada
-              </a>
-            )}
             <div
               style={{
                 alignSelf: 'center',
-                width: 'min(100%, 320px)',
+                width: 'min(100%, 300px)',
                 boxSizing: 'border-box',
                 background: 'var(--cp-white, #FFFFFF)',
                 border: '1px solid var(--cp-line, #E3D6C6)',
-                boxShadow: '0 4px 12px rgba(11, 44, 62, 0.12)',
+                boxShadow: '0 4px 12px rgba(11, 44, 62, 0.15)',
                 padding: '16px 14px',
-                fontFamily: 'monospace',
+                fontFamily: "'Courier New', monospace",
                 fontSize: 12,
                 lineHeight: '16px',
                 color: 'var(--cp-navy, #0B2C3E)',
@@ -618,142 +570,354 @@ export function PedidoDetalle({ pedido, alActualizar }: PedidoDetalleProps) {
                 gap: 2,
               }}
             >
-              <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 15, letterSpacing: '0.08em' }}>
-                CAPRICHOS CAFÉ
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                {pedido.comprobante_tipo || 'BOLETA ELECTRÓNICA'}
-              </div>
-              <div style={{ textAlign: 'center' }}>{pedido.codigo}</div>
+              <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 15, letterSpacing: '0.08em' }}>CAPRICHOS</div>
+              <div style={{ textAlign: 'center' }}>{tipoComp} {pedido.codigo}</div>
               <div style={{ textAlign: 'center' }}>------------------------------</div>
-              <div>Cliente: {pedido.comprobante_razon || pedido.cliente_nombre || 'Cliente'}</div>
-              {pedido.comprobante_doc && <div>Doc.: {pedido.comprobante_doc}</div>}
-              <div>Fecha: {new Date(pedido.creado_en).toLocaleString('es-PE')}</div>
-              <div style={{ textAlign: 'center' }}>------------------------------</div>
-              {pedido.lineas?.map((it, idx) => (
+              {(pedido.lineas || []).map((it, idx) => (
                 <div key={idx} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>{it.cantidad} × {it.nombre}</span>
-                  <span>S/ {Number(it.subtotal).toFixed(2)}</span>
+                  <span>{it.cantidad} x {it.nombre}</span>
+                  <span>S/ {Number(it.subtotal || 0).toFixed(2)}</span>
                 </div>
               ))}
               <div style={{ textAlign: 'center' }}>------------------------------</div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 14 }}>
                 <span>TOTAL</span>
-                <span>S/ {Number(pedido.total).toFixed(2)}</span>
+                <span>S/ {totalNum.toFixed(2)}</span>
               </div>
-              <div style={{ textAlign: 'center', marginTop: 6 }}>Gracias por tu capricho</div>
+              <div style={{ textAlign: 'center' }}>Gracias por tu capricho</div>
+              <div style={{ textAlign: 'center', marginTop: 6 }}>- - - - - - cortar aquí - - - - - -</div>
+              <div
+                style={{
+                  border: '2px dashed var(--cp-navy, #0B2C3E)',
+                  borderRadius: 8,
+                  padding: '8px 10px',
+                  marginTop: 6,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 2,
+                }}
+              >
+                <span style={{ fontSize: 12, fontWeight: 700 }}>✂ 15 % de descuento</span>
+                <span style={{ fontSize: 14, fontWeight: 800, lineHeight: '18px' }}>En tu siguiente capricho</span>
+                <span style={{ fontSize: 12 }}>Válido 15 días desde la compra</span>
+                <span style={{ fontSize: 12, fontWeight: 700 }}>Código: FIDELIDAD-0102</span>
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={() => setMsgComprobante('Comprobante enviado a la impresora.')}
+              style={{
+                minHeight: 44,
+                border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                borderRadius: 12,
+                background: 'transparent',
+                color: 'var(--cp-navy, #0B2C3E)',
+                fontWeight: 800,
+                cursor: 'pointer',
+              }}
+            >
+              Imprimir comprobante con cupones
+            </button>
+            {msgComprobante && (
+              <div role="status" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-green, #2F7A45)' }}>
+                {msgComprobante}
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* Pie de acciones fijo (.cj-foot) */}
+      {/* FOOTER (.cj-foot) */}
       <div className="cj-foot" style={{ gap: 8, padding: '12px 16px' }}>
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            fontFamily: 'Montserrat, sans-serif',
-            fontWeight: 800,
-            fontSize: 16,
-          }}
-        >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 16 }}>
           <span>Total</span>
-          <span style={{ color: 'var(--cp-rust, #B2500F)' }}>S/ {Number(pedido.total).toFixed(2)}</span>
+          <span>S/ {totalNum.toFixed(2)}</span>
         </div>
 
-        {/* Acciones contextuales */}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {/* Botón de transición de estado */}
-          {accionEstado && pedido.estado !== 'ANULADO' && (
-            <Boton
-              variante="primario"
-              cargando={procesandoAccion}
-              onClick={() => setTransicionPendiente(accionEstado)}
+        {/* 1. Si es por confirmar */}
+        {esPorConfirmar && (
+          <>
+            <div style={{ fontSize: 13, lineHeight: '18px', color: 'var(--cp-soft, #2C4C5D)' }}>
+              Pedido fuera del local: aún no pasa a cocina. Habla con el cliente por WhatsApp, confirma el pago y sube el comprobante. Recién entonces va a las pantallas.
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => setAbrirConfirmarPago(true)}
+                style={{
+                  flex: '1 1 200px',
+                  minHeight: 52,
+                  border: 0,
+                  borderRadius: 12,
+                  background: 'var(--cp-orange, #E67929)',
+                  color: 'var(--cp-navy, #0B2C3E)',
+                  fontFamily: 'Montserrat, sans-serif',
+                  fontWeight: 800,
+                  fontSize: 15,
+                  cursor: 'pointer',
+                }}
+              >
+                Confirmar pedido y pago
+              </button>
+              <button
+                type="button"
+                onClick={() => setAbrirAnular(true)}
+                style={{
+                  flex: '1 1 120px',
+                  minHeight: 52,
+                  border: '1.5px solid var(--cp-rust, #B2500F)',
+                  borderRadius: 12,
+                  background: 'transparent',
+                  color: 'var(--cp-rust, #B2500F)',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                }}
+              >
+                Rechazar
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* 2. Si es pago por coordinar (entrega fallida u orden directa) */}
+        {!esPorConfirmar && esPagoPorCoordinar && (
+          <div style={{ border: '2px solid var(--cp-rust, #B2500F)', borderRadius: 12, padding: 12, display: 'flex', flexDirection: 'column', gap: 8, background: '#FBE9DF' }}>
+            <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 15 }}>
+              Entrega fallida: El cliente no contestó
+            </div>
+            <div style={{ fontSize: 13, lineHeight: '18px' }}>
+              El repartidor estuvo en la puerta y llamó 3 veces. Habla con el cliente antes de decidir.
+            </div>
+            <a
+              href={waUrl}
+              target="_blank"
+              rel="noopener noreferrer"
               style={{
-                flex: '1 1 180px',
                 minHeight: 48,
+                boxSizing: 'border-box',
+                border: 0,
                 borderRadius: 12,
+                background: 'var(--cp-green, #2F7A45)',
+                color: 'var(--cp-white, #FFFFFF)',
                 fontWeight: 800,
-                fontSize: 14,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textDecoration: 'none',
               }}
             >
-              {accionEstado.label}
-            </Boton>
-          )}
+              Hablar con el cliente por WhatsApp
+            </a>
+            <div style={{ fontSize: 13, fontWeight: 700 }}>¿Qué se hace con lo preparado?</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {['Merma', 'Personal', 'Donación'].map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setCoordinandoDestino(d)}
+                  style={{
+                    minHeight: 44,
+                    padding: '0 12px',
+                    borderRadius: 9999,
+                    border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                    fontWeight: 700,
+                    fontSize: 12,
+                    background: coordinandoDestino === d ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
+                    color: coordinandoDestino === d ? 'var(--cp-cream, #FBF4EC)' : 'var(--cp-navy, #0B2C3E)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 700 }}>Cuando termines de hablar con el cliente, elige cómo se cierra:</div>
+            <button
+              type="button"
+              onClick={() => cambiarEstado('EN_CAMINO', 'Reprogramada la entrega')}
+              style={{
+                minHeight: 48,
+                border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                borderRadius: 12,
+                background: 'var(--cp-white, #FFFFFF)',
+                color: 'var(--cp-navy, #0B2C3E)',
+                fontWeight: 800,
+                cursor: 'pointer',
+              }}
+            >
+              Reprogramar la entrega (+ s/ 5.00 de flete)
+            </button>
+            <button
+              type="button"
+              onClick={() => setAbrirAnular(true)}
+              style={{
+                minHeight: 48,
+                border: '1.5px solid var(--cp-rust, #B2500F)',
+                borderRadius: 12,
+                background: 'var(--cp-white, #FFFFFF)',
+                color: 'var(--cp-rust, #B2500F)',
+                fontWeight: 800,
+                cursor: 'pointer',
+              }}
+            >
+              Devolver el dinero (anular el pedido)
+            </button>
+            <button
+              type="button"
+              onClick={() => cambiarEstado('ENTREGADO', 'Cobrado igual sin entrega')}
+              style={{
+                minHeight: 48,
+                border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                borderRadius: 12,
+                background: 'var(--cp-white, #FFFFFF)',
+                color: 'var(--cp-navy, #0B2C3E)',
+                fontWeight: 800,
+                cursor: 'pointer',
+              }}
+            >
+              Cobrar igual (el cliente no recibió)
+            </button>
+          </div>
+        )}
 
-          {/* Botón Cobrar */}
-          {puedeCobrar && (
-            <Boton
-              variante="oscuro"
-              onClick={() => setAbrirCobro(true)}
+        {/* 3. Botones de cobro si no está pagado y no es por confirmar */}
+        {!esPorConfirmar && !estaPagado && est !== 'ANULADO' && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => setAbrirCobrar(true)}
               style={{
                 flex: '1 1 140px',
                 minHeight: 48,
+                border: '1.5px solid var(--cp-navy, #0B2C3E)',
                 borderRadius: 12,
+                background: 'transparent',
+                color: 'var(--cp-navy, #0B2C3E)',
                 fontWeight: 800,
-                fontSize: 14,
+                cursor: 'pointer',
               }}
             >
-              Cobrar pedido
-            </Boton>
-          )}
-
-          {/* Botón Anular cobro */}
-          {puedeAnularCobro && (
-            <Boton
-              variante="peligro"
-              onClick={() => setAbrirAnularCobro(true)}
+              Registrar cobro
+            </button>
+            <button
+              type="button"
+              onClick={() => alert('Cobro a crédito del personal registrado.')}
               style={{
-                flex: '1 1 130px',
+                flex: '1 1 180px',
                 minHeight: 48,
+                border: '1.5px solid var(--cp-orange, #E67929)',
                 borderRadius: 12,
+                background: 'transparent',
+                color: 'var(--cp-navy, #0B2C3E)',
                 fontWeight: 800,
-                fontSize: 13,
+                cursor: 'pointer',
               }}
             >
-              Anular cobro
-            </Boton>
-          )}
+              Cobrar a crédito del personal
+            </button>
+          </div>
+        )}
 
-          {puedeUbicar && (
-            <Boton
-              variante="secundario"
-              onClick={() => setAbrirUbicar(true)}
-              style={{ flex: '1 1 130px', minHeight: 48, borderRadius: 12, fontWeight: 800, fontSize: 13 }}
-            >
-              {faltaUbicar ? 'Ubicar pedido' : 'Corregir ubicación'}
-            </Boton>
-          )}
+        {/* 4. Si está listo y para entregar */}
+        {est === 'LISTO' && (
+          <button
+            type="button"
+            disabled={procesando}
+            onClick={() => cambiarEstado('ENTREGADO')}
+            style={{
+              minHeight: 52,
+              border: 0,
+              borderRadius: 12,
+              background: 'var(--cp-navy, #0B2C3E)',
+              color: 'var(--cp-cream, #FBF4EC)',
+              fontWeight: 800,
+              fontSize: 15,
+              cursor: 'pointer',
+            }}
+          >
+            Entregar al cliente y cerrar
+          </button>
+        )}
 
-          {/* Botón Anular Pedido */}
-          {puedeAnularPedido && (
-            <Boton
-              variante="peligro"
+        {/* 5. Si está en mesa y listo para servir */}
+        {esMesa && est === 'PREPARANDO' && (
+          <button
+            type="button"
+            disabled={procesando}
+            onClick={() => cambiarEstado('LISTO')}
+            style={{
+              minHeight: 52,
+              border: 0,
+              borderRadius: 12,
+              background: 'var(--cp-orange, #E67929)',
+              color: 'var(--cp-navy, #0B2C3E)',
+              fontWeight: 800,
+              cursor: 'pointer',
+            }}
+          >
+            Ya lo llevé a la mesa
+          </button>
+        )}
+
+        {/* 6. Repetir pedido y Anular pedido */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => alRepetir?.(pedido)}
+            style={{
+              flex: '1 1 140px',
+              minHeight: 44,
+              border: '1.5px solid var(--cp-navy, #0B2C3E)',
+              borderRadius: 12,
+              background: 'transparent',
+              color: 'var(--cp-navy, #0B2C3E)',
+              fontWeight: 800,
+              cursor: 'pointer',
+            }}
+          >
+            Repetir este pedido
+          </button>
+
+          {est !== 'ANULADO' && (
+            <button
+              type="button"
               onClick={() => setAbrirAnular(true)}
               style={{
                 flex: '1 1 120px',
-                minHeight: 48,
+                minHeight: 44,
+                border: '1.5px solid var(--cp-rust, #B2500F)',
                 borderRadius: 12,
+                background: 'transparent',
+                color: 'var(--cp-rust, #B2500F)',
                 fontWeight: 800,
-                fontSize: 13,
+                cursor: 'pointer',
               }}
             >
               Anular pedido
-            </Boton>
+            </button>
           )}
         </div>
       </div>
 
-      {/* Modal Cobrar */}
-      {abrirCobro && (
+      {/* Modales */}
+      {abrirCobrar && (
         <ModalCobrar
           pedido={pedido}
-          alCerrar={() => setAbrirCobro(false)}
+          alCerrar={() => setAbrirCobrar(false)}
           alCobrarExitoso={() => {
-            setAbrirCobro(false);
-            setMensajeExito('Cobro registrado exitosamente');
+            setAbrirCobrar(false);
+            alActualizar();
+          }}
+        />
+      )}
+
+      {abrirAnular && (
+        <ModalAnular
+          pedidoId={pedido.id}
+          codigoPedido={pedido.codigo}
+          alCerrar={() => setAbrirAnular(false)}
+          alAnularExitoso={() => {
+            setAbrirAnular(false);
             alActualizar();
           }}
         />
@@ -765,70 +929,24 @@ export function PedidoDetalle({ pedido, alActualizar }: PedidoDetalleProps) {
           codigoPedido={pedido.codigo}
           direccionInicial={pedido.entrega_direccion}
           puntoInicial={
-            pedido.entrega_lat != null && pedido.entrega_lng != null
-              ? { lat: Number(pedido.entrega_lat), lng: Number(pedido.entrega_lng) }
-              : null
+            hasMapCoords ? { lat: Number(pedido.entrega_lat), lng: Number(pedido.entrega_lng) } : null
           }
           alCerrar={() => setAbrirUbicar(false)}
-          alUbicar={(r) => {
+          alUbicar={() => {
             setAbrirUbicar(false);
-            setMensajeExito(`Pedido ubicado en la zona ${r.zona}: envío S/ ${r.envio.toFixed(2)}, total S/ ${r.total.toFixed(2)}`);
             alActualizar();
           }}
         />
       )}
 
-      {/* Modal Anular Pedido */}
-      {abrirAnular && (
-        <ModalAnular
-          pedidoId={pedido.id}
-          codigoPedido={pedido.codigo}
-          alCerrar={() => setAbrirAnular(false)}
-          alAnularExitoso={() => {
-            setAbrirAnular(false);
-            setMensajeExito('Pedido anulado con éxito');
+      {abrirConfirmarPago && (
+        <ModalConfirmarPago
+          pedido={pedido}
+          alCerrar={() => setAbrirConfirmarPago(false)}
+          alConfirmarExitoso={() => {
+            setAbrirConfirmarPago(false);
             alActualizar();
           }}
-        />
-      )}
-
-      {/* Modal Anular Cobro */}
-      {abrirAnularCobro && (
-        <ModalAnular
-          pedidoId={pedido.id}
-          codigoPedido={pedido.codigo}
-          esCobro={true}
-          cobroId={(pedido as any).cobro?.id || pedido.id}
-          alCerrar={() => setAbrirAnularCobro(false)}
-          alAnularExitoso={() => {
-            setAbrirAnularCobro(false);
-            setMensajeExito('Cobro anulado con éxito; el pedido vuelve a estado pendiente');
-            alActualizar();
-          }}
-        />
-      )}
-
-      {/* Confirmación de transición de estado */}
-      {transicionPendiente && (
-        <Confirmar
-          abierto={Boolean(transicionPendiente)}
-          titulo={transicionPendiente.titulo}
-          mensaje={transicionPendiente.mensaje}
-          textoSi="Confirmar"
-          alConfirmar={ejecutarCambioEstado}
-          alCancelar={() => setTransicionPendiente(null)}
-        />
-      )}
-
-      {/* Confirmación de marcar pago coordinado */}
-      {confirmarCoordinado && (
-        <Confirmar
-          abierto={confirmarCoordinado}
-          titulo={`¿Marcar pago coordinado para ${pedido.codigo}?`}
-          mensaje="Se registrará que el asesor coordinó el pago por WhatsApp. No se reenviará la comanda a cocina."
-          textoSi="Sí, coordinado"
-          alConfirmar={ejecutarMarcarCoordinado}
-          alCancelar={() => setConfirmarCoordinado(false)}
         />
       )}
     </>

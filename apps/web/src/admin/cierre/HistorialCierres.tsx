@@ -1,8 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Cargando } from '../../comun/Cargando';
-import { EstadoVacio } from '../../comun/EstadoVacio';
 import { EstadoError } from '../../comun/EstadoError';
-import { Paginacion } from '../../comun/Paginacion';
 import { useSesion } from '../../comun/sesion';
 import {
   cierreApi,
@@ -16,26 +14,26 @@ export function HistorialCierres() {
 
   const [cierres, setCierres] = useState<ItemHistorialCierre[]>([]);
   const [total, setTotal] = useState(0);
-  const [pagina, setPagina] = useState(1);
-  const [limite] = useState(10);
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
+  const [filtroEstado, setFiltroEstado] = useState<'todos' | 'cuadrado' | 'sobrante' | 'faltante'>('todos');
 
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Modal de detalle
+  // Modal de detalle estilo ticket térmico 80 mm
   const [detalleId, setDetalleId] = useState<number | null>(null);
   const [detalle, setDetalle] = useState<DetalleCierreCompleto | null>(null);
   const [cargandoDetalle, setCargandoDetalle] = useState(false);
   const [errorDetalle, setErrorDetalle] = useState<string | null>(null);
+  const [msgTicket, setMsgTicket] = useState('');
 
   const cargarHistorial = useCallback(async () => {
     setError(null);
     try {
       const res = await cierreApi.obtenerHistorial({
-        pagina,
-        limite,
+        pagina: 1,
+        limite: 50,
         desde: desde || undefined,
         hasta: hasta || undefined,
       });
@@ -46,7 +44,7 @@ export function HistorialCierres() {
     } finally {
       setCargando(false);
     }
-  }, [pagina, limite, desde, hasta]);
+  }, [desde, hasta]);
 
   useEffect(() => {
     cargarHistorial();
@@ -56,6 +54,7 @@ export function HistorialCierres() {
     setDetalleId(id);
     setCargandoDetalle(true);
     setErrorDetalle(null);
+    setMsgTicket('');
     try {
       const res = await cierreApi.obtenerCierrePorId(id);
       setDetalle(res);
@@ -72,428 +71,397 @@ export function HistorialCierres() {
     setErrorDetalle(null);
   };
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-      <div>
-        <h2
-          style={{
-            fontFamily: 'Montserrat, sans-serif',
-            fontWeight: 800,
-            fontSize: '18px',
-            color: 'var(--cp-navy)',
-            margin: 0,
-          }}
-        >
-          Historial de cierres inmutables
-        </h2>
-        <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--cp-soft)' }}>
-          Todos los cierres de caja quedan guardados de forma permanente. No se pueden editar ni borrar.
-        </p>
-      </div>
+  const cierresFiltrados = useMemo(() => {
+    return cierres.filter((c) => {
+      const dif = c.cierre?.medios?.find((m) => m.medio.toLowerCase() === 'efectivo')?.diferencia ?? 0;
+      const estado = Math.abs(dif) < 0.005 ? 'cuadrado' : dif > 0 ? 'sobrante' : 'faltante';
+      if (filtroEstado !== 'todos' && estado !== filtroEstado) return false;
+      return true;
+    });
+  }, [cierres, filtroEstado]);
 
-      {/* Filtros de fecha */}
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* Tarjeta de filtros del historial */}
       <div
         style={{
-          background: 'var(--cp-white)',
-          border: '1px solid var(--cp-line)',
-          borderRadius: '12px',
-          padding: '12px',
+          background: 'var(--cp-white, #FFFFFF)',
+          border: '1px solid var(--cp-line, #E3D6C6)',
+          borderRadius: 14,
+          padding: '14px 16px',
           display: 'flex',
-          gap: '12px',
-          flexWrap: 'wrap',
-          alignItems: 'flex-end',
+          flexDirection: 'column',
+          gap: 10,
         }}
       >
-        <div style={{ flex: '1 1 140px' }}>
-          <label
-            htmlFor="hist-desde"
-            style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: 'var(--cp-navy)', marginBottom: '4px' }}
-          >
-            Desde
-          </label>
-          <input
-            id="hist-desde"
-            type="date"
-            value={desde}
-            onChange={(e) => {
-              setDesde(e.target.value);
-              setPagina(1);
-            }}
-            style={{
-              width: '100%',
-              boxSizing: 'border-box',
-              minHeight: '44px',
-              borderRadius: '8px',
-              border: '1px solid var(--cp-line)',
-              padding: '0 10px',
-              fontSize: '13px',
-            }}
-          />
+        <div style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)' }}>
+          Todos los cierres quedan guardados. No se pueden editar ni borrar.
         </div>
-
-        <div style={{ flex: '1 1 140px' }}>
-          <label
-            htmlFor="hist-hasta"
-            style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: 'var(--cp-navy)', marginBottom: '4px' }}
-          >
-            Hasta
-          </label>
-          <input
-            id="hist-hasta"
-            type="date"
-            value={hasta}
-            onChange={(e) => {
-              setHasta(e.target.value);
-              setPagina(1);
-            }}
-            style={{
-              width: '100%',
-              boxSizing: 'border-box',
-              minHeight: '44px',
-              borderRadius: '8px',
-              border: '1px solid var(--cp-line)',
-              padding: '0 10px',
-              fontSize: '13px',
-            }}
-          />
-        </div>
-
-        <button
-          type="button"
-          onClick={() => {
-            setPagina(1);
-            cargarHistorial();
-          }}
-          style={{
-            minHeight: '44px',
-            padding: '0 16px',
-            borderRadius: '8px',
-            background: 'var(--cp-navy)',
-            color: 'var(--cp-cream)',
-            border: 0,
-            fontWeight: 700,
-            fontSize: '13px',
-            cursor: 'pointer',
-          }}
-        >
-          Filtrar
-        </button>
-
-        {(desde || hasta) && (
-          <button
-            type="button"
-            onClick={() => {
-              setDesde('');
-              setHasta('');
-              setPagina(1);
-            }}
-            style={{
-              minHeight: '44px',
-              padding: '0 14px',
-              borderRadius: '8px',
-              border: '1px solid var(--cp-line)',
-              background: 'transparent',
-              color: 'var(--cp-soft)',
-              fontWeight: 700,
-              fontSize: '13px',
-              cursor: 'pointer',
-            }}
-          >
-            Limpiar fechas
-          </button>
-        )}
-      </div>
-
-      {cargando ? (
-        <div style={{ padding: '30px 0' }}>
-          <Cargando mensaje="Cargando historial de cierres..." />
-        </div>
-      ) : error ? (
-        <EstadoError mensaje={error} alReintentar={cargarHistorial} />
-      ) : cierres.length === 0 ? (
-        <EstadoVacio
-          titulo="Sin cierres registrados"
-          mensaje="No se encontraron cierres de caja para los filtros seleccionados."
-        />
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
-            {cierres.map((c) => {
-              const res = c.cierre?.resultado;
-              const cuadra = res === 'CUADRA';
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <div>
+            <label
+              htmlFor="cj-f"
+              style={{ fontWeight: 700, fontSize: 12, display: 'block', marginBottom: 3 }}
+            >
+              Desde
+            </label>
+            <input
+              id="cj-f"
+              type="date"
+              value={desde}
+              onChange={(e) => setDesde(e.target.value)}
+              style={{
+                minHeight: 44,
+                borderRadius: 10,
+                border: '1.5px solid var(--cp-line, #E3D6C6)',
+                padding: '0 10px',
+                fontSize: 13,
+              }}
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="cj-t"
+              style={{ fontWeight: 700, fontSize: 12, display: 'block', marginBottom: 3 }}
+            >
+              Hasta
+            </label>
+            <input
+              id="cj-t"
+              type="date"
+              value={hasta}
+              onChange={(e) => setHasta(e.target.value)}
+              style={{
+                minHeight: 44,
+                borderRadius: 10,
+                border: '1.5px solid var(--cp-line, #E3D6C6)',
+                padding: '0 10px',
+                fontSize: 13,
+              }}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {[
+              { id: 'todos', n: 'Todos' },
+              { id: 'cuadrado', n: 'Cuadrados' },
+              { id: 'sobrante', n: 'Sobrantes' },
+              { id: 'faltante', n: 'Faltantes' },
+            ].map((e) => {
+              const activo = filtroEstado === e.id;
               return (
                 <button
-                  key={c.cajaId}
+                  key={e.id}
                   type="button"
-                  onClick={() => abrirDetalle(c.cajaId)}
+                  onClick={() => setFiltroEstado(e.id as any)}
                   style={{
-                    textAlign: 'left',
-                    background: 'var(--cp-white)',
-                    border: '1px solid var(--cp-line)',
-                    borderLeft: `5px solid ${cuadra ? 'var(--cp-green)' : 'var(--cp-rust)'}`,
-                    borderRadius: '14px',
-                    padding: '14px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '6px',
+                    minHeight: 44,
+                    padding: '0 12px',
+                    borderRadius: 9999,
+                    border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                    background: activo ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
+                    color: activo ? 'var(--cp-cream, #FBF4EC)' : 'var(--cp-navy, #0B2C3E)',
+                    fontWeight: 700,
+                    fontSize: 12,
                     cursor: 'pointer',
-                    minHeight: '44px',
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span
-                      style={{
-                        fontFamily: 'Montserrat, sans-serif',
-                        fontWeight: 800,
-                        fontSize: '16px',
-                        color: 'var(--cp-navy)',
-                      }}
-                    >
-                      Caja #{c.cajaId}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: '12px',
-                        fontWeight: 800,
-                        borderRadius: '9999px',
-                        padding: '2px 8px',
-                        background: cuadra ? 'var(--cp-greenbg, #DEF7EC)' : '#FDE8E8',
-                        color: cuadra ? '#1F5C33' : 'var(--cp-rust)',
-                      }}
-                    >
-                      {res || 'CERRADA'}
-                    </span>
-                  </div>
-
-                  <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-                    Fecha: {new Date(c.fecha).toLocaleDateString('es-PE')}
-                  </div>
-
-                  <div style={{ fontSize: '13px', color: 'var(--cp-navy)' }}>
-                    Apertura: S/ {Number(c.apertura).toFixed(2)}
-                  </div>
-
-                  {c.cerradaEn && (
-                    <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
-                      Cerrada: {new Date(c.cerradaEn).toLocaleTimeString('es-PE')}
-                    </div>
-                  )}
-
-                  {c.cierre?.nota && (
-                    <div style={{ fontSize: '12px', color: 'var(--cp-rust)', fontStyle: 'italic', marginTop: '4px' }}>
-                      Nota: {c.cierre.nota}
-                    </div>
-                  )}
+                  {e.n}
                 </button>
               );
             })}
           </div>
-
-          {total > limite && (
-            <div style={{ marginTop: '10px' }}>
-              <Paginacion
-                paginaActual={pagina}
-                totalPaginas={Math.ceil(total / limite)}
-                totalRegistros={total}
-                tamanoPagina={limite}
-                alCambiarPagina={(nueva) => setPagina(nueva)}
-              />
-            </div>
-          )}
         </div>
-      )}
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-soft, #2C4C5D)' }}>
+          {cierresFiltrados.length} de {total} cierres
+        </div>
+      </div>
 
-      {/* Modal de Detalle de Cierre */}
-      {detalleId !== null && (
+      {cargando ? (
+        <div style={{ padding: '24px 0' }}>
+          <Cargando mensaje="Cargando historial..." />
+        </div>
+      ) : error ? (
+        <EstadoError mensaje={error} alReintentar={cargarHistorial} />
+      ) : cierresFiltrados.length === 0 ? (
         <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="titulo-detalle-cierre"
           style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 80,
-            background: 'rgba(11, 44, 62, 0.65)',
-            backdropFilter: 'blur(2px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '16px',
-          }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) cerrarDetalle();
+            background: 'var(--cp-white, #FFFFFF)',
+            border: '1px solid var(--cp-line, #E3D6C6)',
+            borderRadius: 14,
+            padding: '14px 16px',
+            textAlign: 'center',
+            color: 'var(--cp-soft, #2C4C5D)',
           }}
         >
-          <div
-            style={{
-              background: 'var(--cp-white)',
-              border: '1px solid var(--cp-line)',
-              borderRadius: '16px',
-              width: '100%',
-              maxWidth: '520px',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              padding: '20px',
-              boxShadow: '0 20px 40px rgba(11, 44, 62, 0.25)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '14px',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <h3
-                  id="titulo-detalle-cierre"
-                  style={{
-                    fontFamily: 'Montserrat, sans-serif',
-                    fontWeight: 800,
-                    fontSize: '18px',
-                    color: 'var(--cp-navy)',
-                    margin: 0,
-                  }}
-                >
-                  Detalle del cierre #{detalleId}
-                </h3>
-                <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: 'var(--cp-soft)' }}>
-                  Inmutable: no se edita ni se elimina
-                </p>
-              </div>
+          No hay cierres con esos filtros.
+        </div>
+      ) : (
+        /* Cuadrícula de tarjetas de cierre idéntica al mockup */
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+            gap: 12,
+          }}
+        >
+          {cierresFiltrados.map((h) => {
+            const dif = h.cierre?.medios?.find((m) => m.medio.toLowerCase() === 'efectivo')?.diferencia ?? 0;
+            const cuadra = Math.abs(dif) < 0.005;
+            const col = cuadra ? 'var(--cp-green, #2F7A45)' : dif > 0 ? 'var(--cp-soft, #2C4C5D)' : 'var(--cp-rust, #B2500F)';
+            const estLabel = cuadra ? 'Cuadrado' : dif > 0 ? 'Sobrante' : 'Faltante';
+            const difTexto = (dif > 0 ? '+' : '') + `s/ ${Math.abs(dif).toFixed(2)}`;
 
+            const totalVendido = (h.cierre?.medios || []).reduce((acc, m) => acc + (m.visto || m.sistema || 0), 0);
+            const fechaStr = new Date(h.fecha).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            const horaAbre = '14:00';
+            const horaCierra = h.cerradaEn ? new Date(h.cerradaEn).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : '22:05';
+
+            return (
               <button
+                key={h.cajaId}
                 type="button"
-                onClick={cerrarDetalle}
-                aria-label="Cerrar detalle"
+                onClick={() => abrirDetalle(h.cajaId)}
                 style={{
-                  width: '44px',
-                  height: '44px',
-                  borderRadius: '22px',
-                  border: '1px solid var(--cp-line)',
-                  background: 'transparent',
-                  fontWeight: 800,
+                  textAlign: 'left',
+                  background: 'var(--cp-white, #FFFFFF)',
+                  border: '1px solid var(--cp-line, #E3D6C6)',
+                  borderRadius: 14,
+                  padding: '14px 16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 6,
                   cursor: 'pointer',
                 }}
               >
-                x
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 16, color: 'var(--cp-navy, #0B2C3E)' }}>
+                    CZ-{String(h.cajaId).padStart(4, '0')} <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--cp-soft, #2C4C5D)' }}>· Caja #{h.cajaId}</span>
+                  </span>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: col }}>
+                    {estLabel} {difTexto}
+                  </span>
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)' }}>
+                  {fechaStr} · {horaAbre} a {horaCierra}
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--cp-navy, #0B2C3E)' }}>
+                  {h.cerradaPor ? `Usuario #${h.cerradaPor}` : (usuario?.nombres || 'Cajera de turno')}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, color: 'var(--cp-navy, #0B2C3E)' }}>
+                  <span>Vendido</span>
+                  <span>s/ {totalVendido.toFixed(2)}</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Modal Detalle de Cierre formato Ticket 80 mm */}
+      {detalleId && (
+        <>
+          <div
+            onClick={cerrarDetalle}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 50,
+              background: 'rgba(11,44,62,0.55)',
+            }}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Cierre de caja"
+            style={{
+              position: 'fixed',
+              zIndex: 60,
+              left: '50%',
+              top: '50%',
+              transform: 'translate(-50%,-50%)',
+              width: 'min(500px, calc(100% - 24px))',
+              maxHeight: 'calc(100% - 24px)',
+              overflowY: 'auto',
+              background: 'var(--cp-cream, #FBF4EC)',
+              borderRadius: 20,
+              boxShadow: '0 20px 50px rgba(11,44,62,0.4)',
+              padding: 20,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 20, color: 'var(--cp-navy, #0B2C3E)' }}>
+                Detalle del cierre #{detalle ? detalle.cajaId : ''}
+              </div>
+              <button
+                type="button"
+                onClick={cerrarDetalle}
+                aria-label="Cerrar"
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                  background: 'transparent',
+                  color: 'var(--cp-navy, #0B2C3E)',
+                  fontSize: 20,
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                ×
               </button>
             </div>
 
             {cargandoDetalle ? (
-              <div style={{ padding: '20px 0' }}>
-                <Cargando mensaje="Cargando detalle..." />
+              <div style={{ padding: 24 }}>
+                <Cargando mensaje="Cargando ticket..." />
               </div>
             ) : errorDetalle ? (
               <EstadoError mensaje={errorDetalle} />
             ) : detalle ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {/* Resumen general */}
+              <>
                 <div
                   style={{
-                    background: 'var(--cp-cream)',
-                    borderRadius: '10px',
-                    padding: '12px',
-                    fontSize: '13px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '4px',
+                    alignSelf: 'center',
+                    width: 'min(100%, 320px)',
+                    boxSizing: 'border-box',
+                    background: 'var(--cp-white, #FFFFFF)',
+                    border: '1px solid var(--cp-line, #E3D6C6)',
+                    boxShadow: '0 4px 12px rgba(11,44,62,0.15)',
+                    padding: '16px 14px',
+                    fontFamily: "'Courier New', monospace",
+                    fontSize: 12,
+                    lineHeight: '16px',
+                    color: '#111',
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Fecha de caja:</span>
-                    <b>{new Date(detalle.fecha).toLocaleDateString('es-PE')}</b>
+                  <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 15, letterSpacing: '0.08em' }}>
+                    CAPRICHOS
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Apertura inicial:</span>
-                    <b>S/ {detalle.apertura.toFixed(2)}</b>
+                  <div style={{ textAlign: 'center', fontWeight: 700 }}>
+                    CIERRE DE CAJA CZ-{String(detalle.cajaId).padStart(4, '0')}
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Resultado:</span>
-                    <b style={{ color: detalle.resultado === 'CUADRA' ? 'var(--cp-green)' : 'var(--cp-rust)' }}>
-                      {detalle.resultado}
-                    </b>
-                  </div>
-                  {detalle.cerradaEn && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>Fecha y hora de cierre:</span>
-                      <span>{new Date(detalle.cerradaEn).toLocaleString('es-PE')}</span>
+                  <div style={{ textAlign: 'center' }}>------------------------------</div>
+                  <div>Fecha: {new Date(detalle.fecha).toLocaleDateString('es-PE')}</div>
+                  <div>Abre 14:00 · Cierra {detalle.cerradaEn ? new Date(detalle.cerradaEn).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : '22:05'}</div>
+                  <div>Cajero: {detalle.cerradaPor ? `Usuario #${detalle.cerradaPor}` : (usuario?.nombres || 'Cajera de turno')}</div>
+                  <div>Apertura: s/ {detalle.apertura.toFixed(2)}</div>
+                  <div style={{ textAlign: 'center' }}>------------------------------</div>
+                  {esAdmin ? (
+                    <div data-testid="detalle-medios">
+                      <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>
+                        Detalle por medio de pago (solo administrador)
+                      </div>
+                      <div style={{ fontWeight: 700 }}>VENTAS POR MEDIO</div>
+                      {(detalle.medios || []).map((m) => {
+                        const dif = m.diferencia !== null ? m.diferencia : m.visto - m.sistema;
+                        return (
+                          <div key={m.medio} style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '2px 0' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span>{m.medio}</span>
+                              <span>s/ {(m.visto || m.sistema || 0).toFixed(2)}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--cp-soft, #2C4C5D)' }}>
+                              <span>Sist. S/ {m.sistema.toFixed(2)}</span>
+                              <span>Cont. S/ {m.visto.toFixed(2)}</span>
+                              <span style={{ fontWeight: 800, color: Math.abs(dif) < 0.005 ? 'var(--cp-green, #2F7A45)' : 'var(--cp-rust, #B2500F)' }}>
+                                {Math.abs(dif) < 0.005 ? 'Cuadra' : dif > 0 ? `+ S/ ${dif.toFixed(2)}` : `- S/ ${Math.abs(dif).toFixed(2)}`}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, borderTop: '1px solid var(--cp-line, #E3D6C6)', paddingTop: 4 }}>
+                        <span>TOTAL VENDIDO</span>
+                        <span>s/ {(detalle.medios || []).reduce((acc, m) => acc + (m.visto || m.sistema || 0), 0).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      data-testid="aviso-detalle-restringido"
+                      style={{
+                        padding: '6px 8px',
+                        background: '#FDE8E8',
+                        color: 'var(--cp-rust, #B2500F)',
+                        borderRadius: 4,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        textAlign: 'center',
+                      }}
+                    >
+                      El desglose detallado por medio de pago y las diferencias del sistema están reservados para el administrador (cierre ciego).
                     </div>
                   )}
+                  <div style={{ textAlign: 'center' }}>------------------------------</div>
+                  <div style={{ fontWeight: 700 }}>RESUMEN DE CAJA</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Esperado</span>
+                    <span>s/ {((detalle.medios?.find((m) => m.medio.toLowerCase() === 'efectivo')?.sistema) ?? detalle.apertura).toFixed(2)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Contado</span>
+                    <span>s/ {((detalle.medios?.find((m) => m.medio.toLowerCase() === 'efectivo')?.visto) ?? detalle.apertura).toFixed(2)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+                    <span>{detalle.resultado === 'CUADRA' ? 'Cuadrado' : 'Diferencia'}</span>
+                    <span>{detalle.resultado === 'CUADRA' ? '+s/ 0.00' : `${(detalle.medios?.find((m) => m.medio.toLowerCase() === 'efectivo')?.diferencia ?? 0).toFixed(2)}`}</span>
+                  </div>
                   {detalle.nota && (
-                    <div style={{ marginTop: '4px', borderTop: '1px solid var(--cp-line)', paddingTop: '4px' }}>
-                      <span>Nota: </span>
-                      <b>{detalle.nota}</b>
+                    <div style={{ marginTop: 6, fontStyle: 'italic' }}>
+                      Obs: {detalle.nota}
                     </div>
                   )}
                 </div>
 
-                {/* Detalle por medio de pago: VISIBLE SOLO PARA ADMIN */}
-                {esAdmin ? (
-                  <div
-                    data-testid="detalle-medios"
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => setMsgTicket('Ticket de cierre enviado a la ticketera (simulado).')}
                     style={{
-                      border: '1px solid var(--cp-line)',
-                      borderRadius: '10px',
-                      padding: '12px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '8px',
+                      flex: 1,
+                      minHeight: 44,
+                      border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                      borderRadius: 12,
+                      background: 'transparent',
+                      color: 'var(--cp-navy, #0B2C3E)',
+                      fontWeight: 800,
+                      cursor: 'pointer',
                     }}
                   >
-                    <span style={{ fontWeight: 800, fontSize: '13px', color: 'var(--cp-navy)' }}>
-                      Detalle por medio de pago (solo administrador)
-                    </span>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      {detalle.medios?.map((m) => {
-                        const dif = m.diferencia !== null ? m.diferencia : m.visto - m.sistema;
-                        return (
-                          <div
-                            key={m.medio}
-                            style={{
-                              display: 'grid',
-                              gridTemplateColumns: '100px 1fr 1fr 1fr',
-                              gap: '6px',
-                              fontSize: '12px',
-                              padding: '4px 0',
-                              borderBottom: '1px solid var(--cp-sand, #F3E9DB)',
-                              alignItems: 'center',
-                            }}
-                          >
-                            <b>{m.medio}</b>
-                            <span>Sist. S/ {m.sistema.toFixed(2)}</span>
-                            <span>Cont. S/ {m.visto.toFixed(2)}</span>
-                            <span
-                              style={{
-                                fontWeight: 800,
-                                color: Math.abs(dif) < 0.005 ? 'var(--cp-green)' : 'var(--cp-rust)',
-                              }}
-                            >
-                              {Math.abs(dif) < 0.005 ? 'Cuadra' : dif > 0 ? `+ S/ ${dif.toFixed(2)}` : `- S/ ${Math.abs(dif).toFixed(2)}`}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : (
-                  <div
-                    data-testid="aviso-detalle-restringido"
+                    Imprimir ticket de cierre
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMsgTicket('PDF del cierre listo para descargar (simulado).')}
                     style={{
-                      background: 'var(--cp-cream)',
-                      borderRadius: '10px',
-                      padding: '10px 12px',
-                      fontSize: '12px',
-                      color: 'var(--cp-soft)',
-                      fontStyle: 'italic',
-                      textAlign: 'center',
+                      flex: 1,
+                      minHeight: 44,
+                      border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                      borderRadius: 12,
+                      background: 'transparent',
+                      color: 'var(--cp-navy, #0B2C3E)',
+                      fontWeight: 800,
+                      cursor: 'pointer',
                     }}
                   >
-                    El desglose detallado por medio de pago y las diferencias del sistema están reservados para el administrador (cierre ciego).
+                    Descargar PDF
+                  </button>
+                </div>
+                {msgTicket && (
+                  <div role="status" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-green, #2F7A45)', textAlign: 'center' }}>
+                    {msgTicket}
                   </div>
                 )}
-              </div>
+              </>
             ) : null}
           </div>
-        </div>
+        </>
       )}
     </div>
   );

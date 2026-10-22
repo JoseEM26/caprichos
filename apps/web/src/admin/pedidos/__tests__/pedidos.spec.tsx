@@ -172,27 +172,23 @@ describe('Ola F4: Pedidos y Caja', () => {
     render(<PedidosAdminView />);
 
     await waitFor(() => {
-      expect(screen.getByText(/Pedidos y caja/i)).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: /Por confirmar · 1/i })).toBeInTheDocument();
     });
 
-    // Verificar conteos en cada pestaña:
-    // Por cobrar: 1 (CP-001 con pago pendiente y no anulado)
-    expect(screen.getByRole('tab', { name: /Por cobrar · 1/i })).toBeInTheDocument();
-    // En cocina: 2 (CP-001 COLA + CP-002 PREPARANDO)
-    expect(screen.getByRole('tab', { name: /En cocina · 2/i })).toBeInTheDocument();
-    // Listos: 1 (CP-003)
-    expect(screen.getByRole('tab', { name: /Listos · 1/i })).toBeInTheDocument();
-    // En camino: 1 (CP-004)
-    expect(screen.getByRole('tab', { name: /En camino · 1/i })).toBeInTheDocument();
-    // Entregados: 1 (CP-005)
-    expect(screen.getByRole('tab', { name: /Entregados · 1/i })).toBeInTheDocument();
-    // Anulados: 1 (CP-006)
-    expect(screen.getByRole('tab', { name: /Anulados · 1/i })).toBeInTheDocument();
+    // Verificar conteos en cada pestaña del mockup:
+    // Por confirmar: 1 (CP-001)
+    expect(screen.getByRole('tab', { name: /Por confirmar · 1/i })).toBeInTheDocument();
+    // Pago por coordinar: 0
+    expect(screen.getByRole('tab', { name: /Pago por coordinar · 0/i })).toBeInTheDocument();
+    // En curso: 3 (CP-002 PREPARANDO + CP-003 LISTO + CP-004 EN_CAMINO)
+    expect(screen.getByRole('tab', { name: /En curso · 3/i })).toBeInTheDocument();
+    // Cerrados: 2 (CP-005 ENTREGADO + CP-006 ANULADO)
+    expect(screen.getByRole('tab', { name: /Cerrados · 2/i })).toBeInTheDocument();
 
-    // Cambiar a pestaña Listos y verificar que muestra solo CP-003
-    fireEvent.click(screen.getByRole('tab', { name: /Listos · 1/i }));
-    expect(screen.getByText('CP-003')).toBeInTheDocument();
-    expect(screen.queryByText('CP-002')).not.toBeInTheDocument();
+    // Cambiar a pestaña En curso y verificar que selecciona automáticamente CP-002 y ya no muestra CP-001
+    fireEvent.click(screen.getByRole('tab', { name: /En curso · 3/i }));
+    expect(screen.getAllByText('CP-002').length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText('CP-001')).not.toBeInTheDocument();
   });
 
   it('2. El pedido nuevo llegado por socket aparece sin recargar la página', async () => {

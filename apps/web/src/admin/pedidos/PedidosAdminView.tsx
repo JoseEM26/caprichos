@@ -1,174 +1,198 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useSesion } from '../../comun/sesion';
 import { Cargando } from '../../comun/Cargando';
-import { EstadoVacio } from '../../comun/EstadoVacio';
 import { EstadoError } from '../../comun/EstadoError';
-import { Insignia } from '../../comun/Insignia';
-import { Icono } from '../../comun/Icono';
-import { Paginacion } from '../../comun/Paginacion';
 import { useEventos } from '../../comun/socket';
-import {
-  pedidosApi,
-  Pedido,
-  CajaActualRespuesta,
-} from './pedidosApi';
+import { pedidosApi, Pedido } from './pedidosApi';
 import { PedidoDetalle } from './PedidoDetalle';
-import { ModalCaja } from './ModalCaja';
 import { reproducirCampana } from './audioAlerta';
 import './pedidos.css';
 
-export type ClavePestanaEstado =
-  | 'por_cobrar'
-  | 'en_cocina'
-  | 'listos'
-  | 'en_camino'
-  | 'entregados'
-  | 'anulados';
+export function canalLabel(c?: string | null) {
+  if (!c) return 'Web';
+  const cu = c.toUpperCase();
+  if (cu === 'CARTA') return 'Web';
+  if (cu === 'BOT') return 'WhatsApp';
+  if (cu === 'MOZO') return 'Mozo';
+  if (cu === 'CAJA') return 'Caja';
+  return c;
+}
 
-interface DefinicionPestana {
-  id: ClavePestanaEstado;
-  etiqueta: string;
+export function modLabel(m?: string | null) {
+  if (!m) return 'Local';
+  const mu = m.toUpperCase();
+  if (mu === 'DELIVERY') return 'Delivery';
+  if (mu === 'LLEVAR') return 'Para llevar';
+  if (mu === 'MESA') return 'En mesa';
+  return m;
+}
+
+export function getBadge(p: Pedido) {
+  const est = String(p.estado || '').toUpperCase();
+  const pag = String(p.pago_estado || '').toUpperCase();
+  const esPorConfirmar = (est === 'COLA' || est === 'NUEVO') && pag !== 'PAGADO' && (p.canal === 'CARTA' || p.canal === 'BOT');
+  if (esPorConfirmar) {
+    return { l: 'Por confirmar', bg: 'var(--cp-orange, #E67929)', fg: 'var(--cp-navy, #0B2C3E)' };
+  }
+  switch (est) {
+    case 'COLA':
+      return { l: 'En cocina · nuevo', bg: 'var(--cp-gold, #F5C84B)', fg: 'var(--cp-navy, #0B2C3E)' };
+    case 'PREPARANDO':
+      return { l: 'Preparando', bg: 'var(--cp-gold, #F5C84B)', fg: 'var(--cp-navy, #0B2C3E)' };
+    case 'LISTO':
+      return { l: 'Listo', bg: 'var(--cp-navy, #0B2C3E)', fg: 'var(--cp-cream, #FBF4EC)' };
+    case 'EN_CAMINO':
+    case 'RUTA':
+      return { l: 'En camino', bg: 'var(--cp-soft, #2C4C5D)', fg: 'var(--cp-cream, #FBF4EC)' };
+    case 'ENTREGADO':
+      return { l: 'Entregado', bg: 'var(--cp-line, #E3D6C6)', fg: 'var(--cp-navy, #0B2C3E)' };
+    case 'ANULADO':
+    case 'RECHAZADO':
+      return { l: 'Rechazado', bg: 'var(--cp-white, #FFFFFF)', fg: 'var(--cp-rust, #B2500F)' };
+    default:
+      return { l: p.estado, bg: 'var(--cp-sand, #EDE1D1)', fg: 'var(--cp-navy, #0B2C3E)' };
+  }
+}
+
+export type ClaveTabCaja = 'nuevo' | 'coord' | 'curso' | 'cerrado';
+
+interface TabDef {
+  id: ClaveTabCaja;
+  n: string;
   filtro: (p: Pedido) => boolean;
 }
 
-const PESTANAS: DefinicionPestana[] = [
+const TABS_CAJA: TabDef[] = [
   {
-    id: 'por_cobrar',
-    etiqueta: 'Por cobrar',
-    filtro: (p) =>
-      String(p.pago_estado).toUpperCase() !== 'PAGADO' &&
-      String(p.estado).toUpperCase() !== 'ANULADO',
-  },
-  {
-    id: 'en_cocina',
-    etiqueta: 'En cocina',
+    id: 'nuevo',
+    n: 'Por confirmar',
     filtro: (p) => {
-      const e = String(p.estado).toUpperCase();
-      return e === 'COLA' || e === 'PREPARANDO';
+      const e = String(p.estado || '').toUpperCase();
+      const pag = String(p.pago_estado || '').toUpperCase();
+      return (e === 'COLA' || e === 'NUEVO') && pag !== 'PAGADO' && (p.canal === 'CARTA' || p.canal === 'BOT');
     },
   },
   {
-    id: 'listos',
-    etiqueta: 'Listos',
-    filtro: (p) => String(p.estado).toUpperCase() === 'LISTO',
+    id: 'coord',
+    n: 'Pago por coordinar',
+    filtro: (p) => {
+      const e = String(p.estado || '').toUpperCase();
+      const pag = String(p.pago_estado || '').toUpperCase();
+      return (p.canal === 'CARTA' || p.canal === 'BOT') && pag !== 'PAGADO' && e !== 'ANULADO' && e !== 'ENTREGADO' && e !== 'COLA';
+    },
   },
   {
-    id: 'en_camino',
-    etiqueta: 'En camino',
-    filtro: (p) => String(p.estado).toUpperCase() === 'EN_CAMINO',
+    id: 'curso',
+    n: 'En curso',
+    filtro: (p) => {
+      const e = String(p.estado || '').toUpperCase();
+      return ['COLA', 'PREPARANDO', 'LISTO', 'EN_CAMINO', 'RUTA', 'PREP'].includes(e) &&
+        !((p.canal === 'CARTA' || p.canal === 'BOT') && String(p.pago_estado).toUpperCase() !== 'PAGADO' && e === 'COLA');
+    },
   },
   {
-    id: 'entregados',
-    etiqueta: 'Entregados',
-    filtro: (p) => String(p.estado).toUpperCase() === 'ENTREGADO',
-  },
-  {
-    id: 'anulados',
-    etiqueta: 'Anulados',
-    filtro: (p) => String(p.estado).toUpperCase() === 'ANULADO',
+    id: 'cerrado',
+    n: 'Cerrados',
+    filtro: (p) => {
+      const e = String(p.estado || '').toUpperCase();
+      return ['ENTREGADO', 'ANULADO', 'RECHAZADO'].includes(e);
+    },
   },
 ];
 
-const CANALES_OPCIONES = ['Todos', 'Carta', 'Bot', 'Mozo', 'Teléfono'];
-const MODALIDADES_OPCIONES = ['Todas', 'Delivery', 'Para llevar', 'En mesa'];
+const CANALES_OPCIONES = [
+  { id: 'all', n: 'Todos' },
+  { id: 'CARTA', n: 'Carta' },
+  { id: 'BOT', n: 'WhatsApp bot' },
+  { id: 'MOZO', n: 'Mozo' },
+  { id: 'TELEFONO', n: 'Teléfono' },
+];
+
+const MODALIDADES_OPCIONES = [
+  { id: 'all', n: 'Todas' },
+  { id: 'DELIVERY', n: 'Delivery' },
+  { id: 'LLEVAR', n: 'Para llevar' },
+  { id: 'MESA', n: 'En el local' },
+];
+
+const COBRO_OPCIONES = [
+  { id: 'all', n: 'Todos' },
+  { id: 'paid', n: 'Cobrados' },
+  { id: 'unpaid', n: 'Por cobrar' },
+];
 
 export function PedidosAdminView() {
-  const { tiene, usuario } = useSesion();
-
-  // Estados de carga y error
   const [cargando, setCargando] = useState<boolean>(true);
   const [errorCarga, setErrorCarga] = useState<string>('');
 
-  // Lista maestra de pedidos (cargados del día o activos)
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [pedidoSeleccionadoId, setPedidoSeleccionadoId] = useState<string | null>(null);
 
-  // Pestaña de estado activa
-  const [pestanaActiva, setPestanaActiva] = useState<ClavePestanaEstado>('por_cobrar');
+  // Pestaña activa del mockup: Por confirmar | Pago por coordinar | En curso | Cerrados
+  const [tabActiva, setTabActiva] = useState<ClaveTabCaja>('nuevo');
 
-  // Filtros y búsqueda
+  // Filtros
   const [busqueda, setBusqueda] = useState<string>('');
-  const [canalFiltro, setCanalFiltro] = useState<string>('Todos');
-  const [modalidadFiltro, setModalidadFiltro] = useState<string>('Todas');
-  const [mostrarFiltros, setMostrarFiltros] = useState<boolean>(false);
+  const [fcOpen, setFcOpen] = useState<boolean>(false);
+  const [canalFiltro, setCanalFiltro] = useState<string>('all');
+  const [modalidadFiltro, setModalidadFiltro] = useState<string>('all');
+  const [cobroFiltro, setCobroFiltro] = useState<string>('all');
 
-  // Paginación en cliente para la lista lateral
+  // Dropdown open states
+  const [openGroup, setOpenGroup] = useState<'canal' | 'modal' | 'cobro' | null>(null);
+
+  // Paginación
   const [paginaActual, setPaginaActual] = useState<number>(1);
-  const pedidosPorPagina = 8;
-
-  // Estado de caja
-  const [cajaInfo, setCajaInfo] = useState<CajaActualRespuesta | null>(null);
-  const [modalCajaAbierto, setModalCajaAbierto] = useState<boolean>(false);
+  const pedidosPorPagina = 4; // Mockup usa OPAGE = 4
 
   // Alerta sonora y visual
-  const [silenciado, setSilenciado] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('caprichos_pedidos_silenciado') === 'true';
-    } catch {
-      return false;
-    }
-  });
   const [pedidosResaltados, setPedidosResaltados] = useState<Set<string>>(new Set());
 
-  const alternarSilencio = () => {
-    setSilenciado((prev) => {
-      const nuevo = !prev;
-      try {
-        localStorage.setItem('caprichos_pedidos_silenciado', String(nuevo));
-      } catch {
-        // Ignorar
-      }
-      return nuevo;
-    });
-  };
-
-  // Carga inicial y refresco de pedidos
+  // Carga inicial y refresco
   const cargarDatos = useCallback(async () => {
     setErrorCarga('');
     try {
-      const [resPedidos, resCaja] = await Promise.all([
-        pedidosApi.listar({ limite: 100 }),
-        tiene('caja/ver') || usuario?.rol === 'ADMIN'
-          ? pedidosApi.obtenerCajaActual().catch(() => null)
-          : Promise.resolve(null),
-      ]);
-
+      const resPedidos = await pedidosApi.listar({ limite: 100 });
       setPedidos(resPedidos.items || []);
-      if (resCaja) {
-        setCajaInfo(resCaja);
-      }
     } catch (err: any) {
       setErrorCarga(err?.message || 'Error al cargar los pedidos');
     } finally {
       setCargando(false);
     }
-  }, [tiene, usuario?.rol]);
+  }, []);
 
   useEffect(() => {
     cargarDatos();
   }, [cargarDatos]);
 
-  // Selección por defecto del primer pedido disponible si ninguno está seleccionado
-  useEffect(() => {
-    if (pedidos.length > 0 && !pedidoSeleccionadoId) {
-      setPedidoSeleccionadoId(pedidos[0].id);
-    }
-  }, [pedidos, pedidoSeleccionadoId]);
+  const cambiarTab = (nuevaTab: ClaveTabCaja) => {
+    setTabActiva(nuevaTab);
+    setPaginaActual(1);
+    const tabDef = TABS_CAJA.find((t) => t.id === nuevaTab);
+    const filtro = tabDef ? tabDef.filtro : () => true;
+    const q = busqueda.trim().toLowerCase();
+    const nuevosFiltrados = pedidos.filter((p) => {
+      if (!filtro(p)) return false;
+      if (canalFiltro !== 'all' && String(p.canal).toUpperCase() !== canalFiltro) return false;
+      if (modalidadFiltro !== 'all' && String(p.modalidad).toUpperCase() !== modalidadFiltro) return false;
+      if (cobroFiltro !== 'all') {
+        const pag = String(p.pago_estado).toUpperCase() === 'PAGADO';
+        if (cobroFiltro === 'paid' && !pag) return false;
+        if (cobroFiltro === 'unpaid' && pag) return false;
+      }
+      if (q) {
+        const cod = String(p.codigo || '').toLowerCase();
+        const cli = String(p.cliente_nombre || '').toLowerCase();
+        if (!cod.includes(q) && !cli.includes(q)) return false;
+      }
+      return true;
+    });
+    setPedidoSeleccionadoId(nuevosFiltrados[0]?.id || null);
+  };
 
-  // ==========================================
-  // Socket.IO: Actualizaciones en tiempo real
-  // ==========================================
-
-  // 1. Evento: Pedido nuevo
+  // Socket events
   useEventos('pedido:nuevo', (datos: { id: string | number; codigo?: string }) => {
     const idStr = String(datos.id);
-
-    // Sonido si el navegador lo permite y no está silenciado
-    if (!silenciado) {
-      reproducirCampana();
-    }
-
-    // Resaltado visual por 6 segundos
+    reproducirCampana();
     setPedidosResaltados((prev) => new Set(prev).add(idStr));
     setTimeout(() => {
       setPedidosResaltados((prev) => {
@@ -178,7 +202,6 @@ export function PedidosAdminView() {
       });
     }, 6000);
 
-    // Actualizar datos
     pedidosApi.obtenerPorId(idStr).then((nuevoPedido) => {
       setPedidos((prev) => {
         if (prev.some((p) => String(p.id) === idStr)) {
@@ -186,159 +209,119 @@ export function PedidosAdminView() {
         }
         return [nuevoPedido, ...prev];
       });
-      // Si no había selección, seleccionar el nuevo
       setPedidoSeleccionadoId((prev) => prev || idStr);
     }).catch(() => {
       cargarDatos();
     });
   });
 
-  // 2. Evento: Cambio de estado de pedido
   useEventos('pedido:estado', (datos: { id: string | number; estado?: string }) => {
     const idStr = String(datos.id);
     setPedidos((prev) =>
-      prev.map((p) =>
-        String(p.id) === idStr && datos.estado
-          ? { ...p, estado: datos.estado }
-          : p,
-      ),
+      prev.map((p) => (String(p.id) === idStr && datos.estado ? { ...p, estado: datos.estado } : p)),
     );
-    // Recargar detalle en segundo plano para sincronizar cronómetro y subestados
     pedidosApi.obtenerPorId(idStr).then((pActualizado) => {
-      setPedidos((prev) =>
-        prev.map((p) => (String(p.id) === idStr ? pActualizado : p)),
-      );
+      setPedidos((prev) => prev.map((p) => (String(p.id) === idStr ? pActualizado : p)));
     }).catch(() => {});
   });
 
-  // 3. Evento: Pago de pedido registrado
   useEventos('pedido:pago', (datos: { id: string | number }) => {
     const idStr = String(datos.id);
     setPedidos((prev) =>
-      prev.map((p) =>
-        String(p.id) === idStr
-          ? { ...p, pago_estado: 'PAGADO' }
-          : p,
-      ),
+      prev.map((p) => (String(p.id) === idStr ? { ...p, pago_estado: 'PAGADO' } : p)),
     );
-    if (tiene('caja/ver') || usuario?.rol === 'ADMIN') {
-      pedidosApi.obtenerCajaActual().then(setCajaInfo).catch(() => {});
-    }
   });
 
-  // 4. Eventos de caja
-  useEventos('caja:cerrada', () => {
-    pedidosApi.obtenerCajaActual().then(setCajaInfo).catch(() => {});
-  });
-
-  // ==========================================
-  // Filtrado y conteos de pestañas
-  // ==========================================
-
-  // Conteos para cada pestaña (sobre la lista completa de pedidos)
-  const conteosPestanas = useMemo(() => {
-    const resultado: Record<ClavePestanaEstado, number> = {
-      por_cobrar: 0,
-      en_cocina: 0,
-      listos: 0,
-      en_camino: 0,
-      entregados: 0,
-      anulados: 0,
+  // Conteo de pestañas
+  const conteosTabs = useMemo(() => {
+    const res: Record<ClaveTabCaja, number> = {
+      nuevo: 0,
+      coord: 0,
+      curso: 0,
+      cerrado: 0,
     };
-    for (const def of PESTANAS) {
-      resultado[def.id] = pedidos.filter(def.filtro).length;
+    for (const t of TABS_CAJA) {
+      res[t.id] = pedidos.filter(t.filtro).length;
     }
-    return resultado;
+    return res;
   }, [pedidos]);
 
-  // Filtrado según pestaña, búsqueda y dropdowns
-  const pedidosFiltrados = useMemo(() => {
-    const defPestana = PESTANAS.find((p) => p.id === pestanaActiva);
-    const filtroPestana = defPestana ? defPestana.filtro : () => true;
+  // Filtros activos
+  const fcCount = (canalFiltro !== 'all' ? 1 : 0) + (modalidadFiltro !== 'all' ? 1 : 0) + (cobroFiltro !== 'all' ? 1 : 0);
+  const fcSummary = useMemo(() => {
+    const partes: string[] = [];
+    if (canalFiltro !== 'all') {
+      partes.push(`Canal: ${CANALES_OPCIONES.find((c) => c.id === canalFiltro)?.n}`);
+    }
+    if (modalidadFiltro !== 'all') {
+      partes.push(`Modalidad: ${MODALIDADES_OPCIONES.find((m) => m.id === modalidadFiltro)?.n}`);
+    }
+    if (cobroFiltro !== 'all') {
+      partes.push(`Cobro: ${COBRO_OPCIONES.find((c) => c.id === cobroFiltro)?.n}`);
+    }
+    return partes.join(' · ');
+  }, [canalFiltro, modalidadFiltro, cobroFiltro]);
 
+  // Lista filtrada
+  const pedidosFiltrados = useMemo(() => {
+    const tabDef = TABS_CAJA.find((t) => t.id === tabActiva);
+    const filtroTab = tabDef ? tabDef.filtro : () => true;
     const q = busqueda.trim().toLowerCase();
 
     return pedidos.filter((p) => {
-      // Filtro de pestaña
-      if (!filtroPestana(p)) return false;
+      if (!filtroTab(p)) return false;
 
-      // Filtro de búsqueda por código o cliente
+      if (canalFiltro !== 'all' && String(p.canal).toUpperCase() !== canalFiltro) return false;
+      if (modalidadFiltro !== 'all' && String(p.modalidad).toUpperCase() !== modalidadFiltro) return false;
+      if (cobroFiltro !== 'all') {
+        const pag = String(p.pago_estado).toUpperCase() === 'PAGADO';
+        if (cobroFiltro === 'paid' && !pag) return false;
+        if (cobroFiltro === 'unpaid' && pag) return false;
+      }
+
       if (q) {
-        const codigo = (p.codigo || '').toLowerCase();
-        const cliente = (p.cliente_nombre || '').toLowerCase();
-        if (!codigo.includes(q) && !cliente.includes(q)) return false;
-      }
-
-      // Filtro por canal
-      if (canalFiltro !== 'Todos') {
-        const canalNorm = (p.canal || '').toUpperCase();
-        if (canalFiltro === 'Carta' && canalNorm !== 'CARTA') return false;
-        if (canalFiltro === 'Bot' && !['BOT', 'CHATBOT'].includes(canalNorm)) return false;
-        if (canalFiltro === 'Mozo' && canalNorm !== 'MOZO') return false;
-        if (canalFiltro === 'Teléfono' && canalNorm !== 'TELEFONO') return false;
-      }
-
-      // Filtro por modalidad
-      if (modalidadFiltro !== 'Todas') {
-        const modNorm = (p.modalidad || '').toUpperCase();
-        if (modalidadFiltro === 'Delivery' && modNorm !== 'DELIVERY') return false;
-        if (modalidadFiltro === 'Para llevar' && !['RECOGER', 'LLEVAR'].includes(modNorm)) return false;
-        if (modalidadFiltro === 'En mesa' && modNorm !== 'MESA') return false;
+        const cod = String(p.codigo || '').toLowerCase();
+        const cli = String(p.cliente_nombre || '').toLowerCase();
+        if (!cod.includes(q) && !cli.includes(q)) return false;
       }
 
       return true;
     });
-  }, [pedidos, pestanaActiva, busqueda, canalFiltro, modalidadFiltro]);
+  }, [pedidos, tabActiva, canalFiltro, modalidadFiltro, cobroFiltro, busqueda]);
 
-  // Paginación sobre pedidos filtrados
-  const totalFiltrados = pedidosFiltrados.length;
-  const totalPaginas = Math.max(1, Math.ceil(totalFiltrados / pedidosPorPagina));
+  // Sincronización automática del pedido seleccionado con la lista visible:
+  // Al abrir, o cuando cambian los filtros/búsqueda, si el pedido seleccionado
+  // no está en la lista visible, se selecciona el primero (o null si la lista está vacía).
+  useEffect(() => {
+    if (pedidosFiltrados.length === 0) {
+      if (pedidoSeleccionadoId !== null) {
+        setPedidoSeleccionadoId(null);
+      }
+      return;
+    }
+
+    const estaEnListaVisible = pedidosFiltrados.some(
+      (p) => String(p.id) === String(pedidoSeleccionadoId),
+    );
+    if (!estaEnListaVisible) {
+      setPedidoSeleccionadoId(pedidosFiltrados[0].id);
+    }
+  }, [pedidosFiltrados, pedidoSeleccionadoId]);
+
+  // Paginación
+  const totalPaginas = Math.max(1, Math.ceil(pedidosFiltrados.length / pedidosPorPagina));
+  const paginaValida = Math.min(paginaActual, totalPaginas);
   const pedidosPaginados = useMemo(() => {
-    const inicio = (paginaActual - 1) * pedidosPorPagina;
+    const inicio = (paginaValida - 1) * pedidosPorPagina;
     return pedidosFiltrados.slice(inicio, inicio + pedidosPorPagina);
-  }, [pedidosFiltrados, paginaActual, pedidosPorPagina]);
+  }, [pedidosFiltrados, paginaValida, pedidosPorPagina]);
 
-  // Pedido seleccionado actualmente
   const pedidoSeleccionado = useMemo(() => {
-    return pedidos.find((p) => String(p.id) === String(pedidoSeleccionadoId)) || null;
+    return pedidos.find((p) => p.id === pedidoSeleccionadoId) || null;
   }, [pedidos, pedidoSeleccionadoId]);
 
-  // Color de indicador según tiempo de espera
-  const obtenerColorTiempo = (p: Pedido): { hex: string; bg: string } => {
-    const c = p.color || p.colorEspera || 'verde';
-    if (c === 'rojo') {
-      return { hex: 'var(--cp-rust, #B2500F)', bg: '#FFEBE0' };
-    }
-    if (c === 'naranja') {
-      return { hex: 'var(--cp-orange, #E67929)', bg: '#FFF3E8' };
-    }
-    return { hex: 'var(--cp-green, #2F7A45)', bg: 'var(--cp-greenbg, #DFF3E3)' };
-  };
-
-  // Color de borde de tarjeta según estado y selección
-  const obtenerBordeTarjeta = (p: Pedido, seleccionado: boolean) => {
-    if (seleccionado) return '2px solid var(--cp-navy, #0B2C3E)';
-    if (pedidosResaltados.has(String(p.id))) return '2px solid var(--cp-orange, #E67929)';
-    return '1px solid var(--cp-line, #E3D6C6)';
-  };
-
-  // Control de permiso de acceso mínimo al módulo
-  const tienePermisoModulo =
-    tiene('caja/ver') ||
-    tiene('pedidos/ver') ||
-    usuario?.rol === 'ADMIN' ||
-    usuario?.rol === 'CAJERO';
-
-  if (!tienePermisoModulo) {
-    return (
-      <div style={{ padding: 24, textAlign: 'center' }}>
-        <EstadoError mensaje="No tienes permiso para acceder al módulo de Pedidos y caja." />
-      </div>
-    );
-  }
-
   if (cargando) {
-    return <Cargando mensaje="Cargando pedidos y estado de caja..." />;
+    return <Cargando mensaje="Cargando pedidos..." />;
   }
 
   if (errorCarga) {
@@ -356,539 +339,572 @@ export function PedidosAdminView() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {/* Barra superior de título y control de caja/alerta */}
-      <div
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 12,
-        }}
-      >
-        <div>
-          <h1
-            style={{
-              fontFamily: 'Montserrat, sans-serif',
-              fontWeight: 800,
-              fontSize: 22,
-              color: 'var(--cp-navy, #0B2C3E)',
-              margin: 0,
-            }}
-          >
-            Pedidos y caja
-          </h1>
-          <div style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)' }}>
-            Verifica y gestiona pedidos, cobros y el flujo de caja en tiempo real.
-          </div>
-        </div>
-
-        {/* Botones de acción y estado de caja */}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* Botón de alerta sonora */}
-          <button
-            type="button"
-            onClick={alternarSilencio}
-            title={silenciado ? 'Activar sonido de pedidos nuevos' : 'Silenciar sonido'}
-            aria-label={silenciado ? 'Activar sonido de pedidos nuevos' : 'Silenciar sonido'}
-            style={{
-              minHeight: 44,
-              padding: '0 14px',
-              borderRadius: 12,
-              border: '1.5px solid var(--cp-navy, #0B2C3E)',
-              background: silenciado ? '#FAF2EB' : 'var(--cp-white, #FFFFFF)',
-              color: 'var(--cp-navy, #0B2C3E)',
-              fontWeight: 700,
-              fontSize: 13,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 8,
-              cursor: 'pointer',
-            }}
-          >
-            <Icono nombre={silenciado ? 'silencio' : 'sonido'} tamano={18} />
-            <span>{silenciado ? 'Sonido silenciado' : 'Sonido activo'}</span>
-          </button>
-
-          {/* Estado de Caja */}
-          {(tiene('caja/ver') || usuario?.rol === 'ADMIN') && (
+    <div className="cj-grid">
+      {/* PANEL IZQUIERDO */}
+      <div className="cj-left">
+        <div className="cj-head">
+          {/* Botón Nuevo pedido (solo si tiene permiso) */}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button
               type="button"
-              onClick={() => setModalCajaAbierto(true)}
+              onClick={() => alert('Abriendo nuevo pedido en salón / mostrador...')}
               style={{
-                minHeight: 44,
-                padding: '0 14px',
+                flex: '1 1 150px',
+                minHeight: 52,
+                border: 0,
                 borderRadius: 12,
-                border: cajaInfo?.abierta
-                  ? '1.5px solid var(--cp-green, #2F7A45)'
-                  : '1.5px solid var(--cp-rust, #B2500F)',
-                background: cajaInfo?.abierta
-                  ? 'var(--cp-greenbg, #DFF3E3)'
-                  : '#FFF0E6',
-                color: cajaInfo?.abierta
-                  ? '#1F5C33'
-                  : 'var(--cp-rust, #B2500F)',
+                background: 'var(--cp-orange, #E67929)',
+                color: 'var(--cp-navy, #0B2C3E)',
+                fontFamily: 'Montserrat, sans-serif',
                 fontWeight: 800,
-                fontSize: 13,
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 8,
+                fontSize: 15,
                 cursor: 'pointer',
               }}
             >
-              <Icono nombre="caja" tamano={18} />
-              <span>
-                {cajaInfo?.abierta
-                  ? `Caja abierta · S/ ${cajaInfo.efectivoEsperado.toFixed(2)}`
-                  : 'Caja cerrada · Abrir'}
-              </span>
+              Nuevo pedido
             </button>
-          )}
-        </div>
-      </div>
+          </div>
 
-      {/* Grid de 2 columnas (.cj-grid) */}
-      <div className="cj-grid">
-        {/* Columna Izquierda: Lista de Pedidos */}
-        <div className="cj-left">
-          {/* Cabecera de la columna izquierda */}
-          <div className="cj-head">
-            {/* Pestañas por estado con conteos */}
-            <div role="tablist" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {PESTANAS.map((pest) => {
-                const seleccionada = pestanaActiva === pest.id;
-                const cantidad = conteosPestanas[pest.id] || 0;
-
-                return (
-                  <button
-                    key={pest.id}
-                    role="tab"
-                    aria-selected={seleccionada}
-                    onClick={() => {
-                      setPestanaActiva(pest.id);
-                      setPaginaActual(1);
-                    }}
-                    style={{
-                      minHeight: 44,
-                      padding: '0 12px',
-                      borderRadius: 9999,
-                      border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                      background: seleccionada
-                        ? 'var(--cp-navy, #0B2C3E)'
-                        : 'transparent',
-                      color: seleccionada
-                        ? 'var(--cp-cream, #FBF4EC)'
-                        : 'var(--cp-navy, #0B2C3E)',
-                      fontWeight: 700,
-                      fontSize: 13,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {pest.etiqueta} · {cantidad}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Búsqueda y botón de filtros */}
-            <div
-              style={{
-                background: 'var(--cp-white, #FFFFFF)',
-                border: '1px solid var(--cp-line, #E3D6C6)',
-                borderRadius: 12,
-                padding: 8,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 6,
-              }}
-            >
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <label htmlFor="ord-buscar" style={{ position: 'absolute', left: -9999 }}>
-                  Buscar por código o cliente
-                </label>
-                <input
-                  id="ord-buscar"
-                  type="search"
-                  value={busqueda}
-                  onChange={(e) => {
-                    setBusqueda(e.target.value);
-                    setPaginaActual(1);
-                  }}
-                  placeholder="Buscar por código o cliente"
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    boxSizing: 'border-box',
-                    minHeight: 44,
-                    borderRadius: 9999,
-                    border: '1.5px solid var(--cp-line, #E3D6C6)',
-                    background: 'var(--cp-cream, #FBF4EC)',
-                    color: 'var(--cp-navy, #0B2C3E)',
-                    padding: '0 14px',
-                    fontSize: 14,
-                  }}
-                />
+          {/* 4 Pestañas principales */}
+          <div role="tablist" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {TABS_CAJA.map((t) => {
+              const activo = tabActiva === t.id;
+              return (
                 <button
+                  key={t.id}
+                  role="tab"
+                  aria-selected={activo}
                   type="button"
-                  onClick={() => setMostrarFiltros((prev) => !prev)}
-                  aria-expanded={mostrarFiltros}
+                  onClick={() => cambiarTab(t.id)}
                   style={{
-                    flex: 'none',
                     minHeight: 44,
-                    padding: '0 12px',
+                    padding: '0 14px',
                     borderRadius: 9999,
                     border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                    background: mostrarFiltros ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
-                    color: mostrarFiltros ? 'var(--cp-cream, #FBF4EC)' : 'var(--cp-navy, #0B2C3E)',
+                    background: activo ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
+                    color: activo ? 'var(--cp-cream, #FBF4EC)' : 'var(--cp-navy, #0B2C3E)',
                     fontWeight: 700,
                     fontSize: 13,
-                    display: 'inline-flex',
-                    gap: 6,
-                    alignItems: 'center',
                     cursor: 'pointer',
                   }}
                 >
-                  <Icono nombre="filtro" tamano={16} />
-                  <span>Filtros</span>
-                  {(canalFiltro !== 'Todos' || modalidadFiltro !== 'Todas') && (
-                    <span
-                      style={{
-                        minWidth: 20,
-                        height: 20,
-                        boxSizing: 'border-box',
-                        borderRadius: 10,
-                        background: 'var(--cp-orange, #E67929)',
-                        color: 'var(--cp-navy, #0B2C3E)',
-                        fontSize: 12,
-                        fontWeight: 800,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        padding: '0 5px',
-                      }}
-                    >
-                      !
-                    </span>
-                  )}
+                  {t.n} · {conteosTabs[t.id]}
                 </button>
-              </div>
+              );
+            })}
+          </div>
 
-              {/* Panel desplegable de filtros */}
-              {mostrarFiltros && (
-                <div
-                  style={{
-                    borderTop: '1px solid var(--cp-line, #E3D6C6)',
-                    paddingTop: 8,
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: '8px 16px',
-                  }}
+          {/* Buscador y Filtros */}
+          <div
+            style={{
+              background: 'var(--cp-white, #FFFFFF)',
+              border: '1px solid var(--cp-line, #E3D6C6)',
+              borderRadius: 12,
+              padding: 8,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 6,
+            }}
+          >
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <label htmlFor="ord-q" style={{ position: 'absolute', left: -9999 }}>
+                Buscar
+              </label>
+              <input
+                id="ord-q"
+                type="search"
+                value={busqueda}
+                onChange={(e) => {
+                  setBusqueda(e.target.value);
+                  setPaginaActual(1);
+                }}
+                placeholder="Buscar por código o cliente"
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  boxSizing: 'border-box',
+                  minHeight: 44,
+                  borderRadius: 9999,
+                  border: '1.5px solid var(--cp-line, #E3D6C6)',
+                  background: 'var(--cp-cream, #FBF4EC)',
+                  color: 'var(--cp-navy, #0B2C3E)',
+                  padding: '0 14px',
+                  fontSize: 14,
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setFcOpen(!fcOpen)}
+                aria-expanded={fcOpen}
+                style={{
+                  flex: 'none',
+                  minHeight: 44,
+                  padding: '0 12px',
+                  borderRadius: 9999,
+                  border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                  background: fcOpen ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
+                  color: fcOpen ? 'var(--cp-cream, #FBF4EC)' : 'var(--cp-navy, #0B2C3E)',
+                  fontWeight: 700,
+                  fontSize: 13,
+                  display: 'inline-flex',
+                  gap: 6,
+                  alignItems: 'center',
+                  cursor: 'pointer',
+                }}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  width="16"
+                  height="16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
                 >
-                  {/* Filtro Canal */}
-                  <div style={{ flex: '1 1 140px' }}>
+                  <path d="M3 5h18l-7 8v6l-4 2v-8z" />
+                </svg>
+                Filtros
+                {fcCount > 0 && (
+                  <span
+                    style={{
+                      minWidth: 20,
+                      height: 20,
+                      boxSizing: 'border-box',
+                      borderRadius: 10,
+                      background: 'var(--cp-orange, #E67929)',
+                      color: 'var(--cp-navy, #0B2C3E)',
+                      fontSize: 12,
+                      fontWeight: 800,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '0 5px',
+                    }}
+                  >
+                    {fcCount}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {fcSummary && (
+              <div style={{ fontSize: 12, lineHeight: '17px', color: 'var(--cp-soft, #2C4C5D)' }}>
+                <b>Filtrando:</b> {fcSummary}
+              </div>
+            )}
+
+            <div style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)', fontWeight: 600 }}>
+              {pedidosFiltrados.length} {pedidosFiltrados.length === 1 ? 'pedido' : 'pedidos'}
+            </div>
+
+            {/* Dropdown groups */}
+            {fcOpen && (
+              <div
+                style={{
+                  borderTop: '1px solid var(--cp-line, #E3D6C6)',
+                  paddingTop: 8,
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '8px 20px',
+                }}
+              >
+                {/* CANAL */}
+                <div style={{ flex: '1 1 200px', minWidth: 0, position: 'relative' }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', color: 'var(--cp-soft, #2C4C5D)', marginBottom: 3 }}>
+                    CANAL
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setOpenGroup(openGroup === 'canal' ? null : 'canal')}
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      minHeight: 44,
+                      padding: '0 12px',
+                      borderRadius: 10,
+                      border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                      background: canalFiltro !== 'all' ? 'var(--cp-cream, #FBF4EC)' : 'var(--cp-white, #FFFFFF)',
+                      color: 'var(--cp-navy, #0B2C3E)',
+                      fontWeight: 700,
+                      fontSize: 13,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <span>{CANALES_OPCIONES.find((c) => c.id === canalFiltro)?.n}</span>
+                    <span aria-hidden="true" style={{ flex: 'none', fontSize: 12 }}>
+                      {openGroup === 'canal' ? '▲' : '▼'}
+                    </span>
+                  </button>
+                  {openGroup === 'canal' && (
                     <div
+                      role="listbox"
                       style={{
-                        fontSize: 11,
-                        fontWeight: 800,
-                        letterSpacing: '0.06em',
-                        color: 'var(--cp-soft, #2C4C5D)',
-                        marginBottom: 4,
-                      }}
-                    >
-                      CANAL
-                    </div>
-                    <select
-                      value={canalFiltro}
-                      onChange={(e) => {
-                        setCanalFiltro(e.target.value);
-                        setPaginaActual(1);
-                      }}
-                      style={{
-                        width: '100%',
-                        minHeight: 44,
-                        padding: '0 10px',
-                        borderRadius: 8,
+                        position: 'absolute',
+                        zIndex: 20,
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        marginTop: 4,
                         border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                        borderRadius: 10,
                         background: 'var(--cp-white, #FFFFFF)',
-                        fontSize: 13,
-                        fontWeight: 700,
+                        overflow: 'hidden',
+                        boxShadow: '0 4px 12px rgba(11,44,62,0.15)',
                       }}
                     >
                       {CANALES_OPCIONES.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => {
+                            setCanalFiltro(c.id);
+                            setOpenGroup(null);
+                            setPaginaActual(1);
+                          }}
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            minHeight: 40,
+                            padding: '0 12px',
+                            border: 0,
+                            borderBottom: '1px solid var(--cp-line, #E3D6C6)',
+                            background: canalFiltro === c.id ? 'var(--cp-sand, #EDE1D1)' : 'transparent',
+                            color: 'var(--cp-navy, #0B2C3E)',
+                            fontWeight: canalFiltro === c.id ? 800 : 500,
+                            textAlign: 'left',
+                            fontSize: 13,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {c.n}
+                        </button>
                       ))}
-                    </select>
-                  </div>
-
-                  {/* Filtro Modalidad */}
-                  <div style={{ flex: '1 1 140px' }}>
-                    <div
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 800,
-                        letterSpacing: '0.06em',
-                        color: 'var(--cp-soft, #2C4C5D)',
-                        marginBottom: 4,
-                      }}
-                    >
-                      MODALIDAD
                     </div>
-                    <select
-                      value={modalidadFiltro}
-                      onChange={(e) => {
-                        setModalidadFiltro(e.target.value);
-                        setPaginaActual(1);
-                      }}
+                  )}
+                </div>
+
+                {/* MODALIDAD */}
+                <div style={{ flex: '1 1 200px', minWidth: 0, position: 'relative' }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', color: 'var(--cp-soft, #2C4C5D)', marginBottom: 3 }}>
+                    MODALIDAD
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setOpenGroup(openGroup === 'modal' ? null : 'modal')}
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      minHeight: 44,
+                      padding: '0 12px',
+                      borderRadius: 10,
+                      border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                      background: modalidadFiltro !== 'all' ? 'var(--cp-cream, #FBF4EC)' : 'var(--cp-white, #FFFFFF)',
+                      color: 'var(--cp-navy, #0B2C3E)',
+                      fontWeight: 700,
+                      fontSize: 13,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <span>{MODALIDADES_OPCIONES.find((m) => m.id === modalidadFiltro)?.n}</span>
+                    <span aria-hidden="true" style={{ flex: 'none', fontSize: 12 }}>
+                      {openGroup === 'modal' ? '▲' : '▼'}
+                    </span>
+                  </button>
+                  {openGroup === 'modal' && (
+                    <div
+                      role="listbox"
                       style={{
-                        width: '100%',
-                        minHeight: 44,
-                        padding: '0 10px',
-                        borderRadius: 8,
+                        position: 'absolute',
+                        zIndex: 20,
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        marginTop: 4,
                         border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                        borderRadius: 10,
                         background: 'var(--cp-white, #FFFFFF)',
-                        fontSize: 13,
-                        fontWeight: 700,
+                        overflow: 'hidden',
+                        boxShadow: '0 4px 12px rgba(11,44,62,0.15)',
                       }}
                     >
                       {MODALIDADES_OPCIONES.map((m) => (
-                        <option key={m} value={m}>
-                          {m}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Botón limpiar */}
-                  <div
-                    style={{
-                      flex: '1 1 100%',
-                      display: 'flex',
-                      justifyContent: 'flex-end',
-                      gap: 8,
-                    }}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCanalFiltro('Todos');
-                        setModalidadFiltro('Todas');
-                        setBusqueda('');
-                        setPaginaActual(1);
-                      }}
-                      style={{
-                        minHeight: 34,
-                        border: 0,
-                        background: 'transparent',
-                        color: 'var(--cp-rust, #B2500F)',
-                        fontWeight: 700,
-                        fontSize: 12,
-                        textDecoration: 'underline',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Limpiar filtros
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMostrarFiltros(false)}
-                      style={{
-                        minHeight: 34,
-                        padding: '0 14px',
-                        border: 0,
-                        borderRadius: 8,
-                        background: 'var(--cp-navy, #0B2C3E)',
-                        color: 'var(--cp-cream, #FBF4EC)',
-                        fontWeight: 700,
-                        fontSize: 12,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Listo
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Total filtrados */}
-              <div style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)', fontWeight: 600 }}>
-                {totalFiltrados} pedido(s) encontrado(s)
-              </div>
-            </div>
-          </div>
-
-          {/* Lista scrolleable de pedidos */}
-          <div className="cj-scroll" style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {pedidosFiltrados.length === 0 ? (
-              <EstadoVacio
-                titulo="No hay pedidos en esta lista"
-                descripcion="Prueba cambiando de pestaña o limpiando los filtros de búsqueda."
-              />
-            ) : (
-              pedidosPaginados.map((p) => {
-                const seleccionado = String(p.id) === String(pedidoSeleccionadoId);
-                const resaltado = pedidosResaltados.has(String(p.id));
-                const tiempoColor = obtenerColorTiempo(p);
-
-                // Resumen de productos
-                const resumenLineas = p.lineas
-                  ? p.lineas
-                      .map((l) => `${l.cantidad}x ${l.nombre}`)
-                      .slice(0, 2)
-                      .join(', ') + (p.lineas.length > 2 ? '...' : '')
-                  : '';
-
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => setPedidoSeleccionadoId(p.id)}
-                    className={`cj-pedido-card ${resaltado ? 'cj-resaltado' : ''}`}
-                    style={{
-                      border: obtenerBordeTarjeta(p, seleccionado),
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        gap: 8,
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontFamily: 'Montserrat, sans-serif',
-                          fontWeight: 800,
-                          fontSize: 16,
-                          color: 'var(--cp-navy, #0B2C3E)',
-                        }}
-                      >
-                        {p.codigo}
-                      </span>
-                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                        {/* Indicador de minutos y color de espera */}
-                        <span
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => {
+                            setModalidadFiltro(m.id);
+                            setOpenGroup(null);
+                            setPaginaActual(1);
+                          }}
                           style={{
-                            fontSize: 11,
-                            fontWeight: 800,
-                            borderRadius: 6,
-                            padding: '2px 6px',
-                            background: tiempoColor.bg,
-                            color: tiempoColor.hex,
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            minHeight: 40,
+                            padding: '0 12px',
+                            border: 0,
+                            borderBottom: '1px solid var(--cp-line, #E3D6C6)',
+                            background: modalidadFiltro === m.id ? 'var(--cp-sand, #EDE1D1)' : 'transparent',
+                            color: 'var(--cp-navy, #0B2C3E)',
+                            fontWeight: modalidadFiltro === m.id ? 800 : 500,
+                            textAlign: 'left',
+                            fontSize: 13,
+                            cursor: 'pointer',
                           }}
                         >
-                          {p.minutosEspera ?? 0}m
-                        </span>
-                        <Insignia
-                          variante={
-                            p.estado === 'ANULADO'
-                              ? 'peligro'
-                              : p.estado === 'ENTREGADO' || p.pago_estado === 'PAGADO'
-                                ? 'exito'
-                                : 'aviso'
-                          }
-                        >
-                          {p.estado}
-                        </Insignia>
-                      </div>
+                          {m.n}
+                        </button>
+                      ))}
                     </div>
+                  )}
+                </div>
 
-                    <div style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)' }}>
-                      {p.canal} · {p.modalidad} · {p.cliente_nombre || 'Cliente'}
-                    </div>
-
+                {/* COBRO */}
+                <div style={{ flex: '1 1 200px', minWidth: 0, position: 'relative' }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', color: 'var(--cp-soft, #2C4C5D)', marginBottom: 3 }}>
+                    COBRO
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setOpenGroup(openGroup === 'cobro' ? null : 'cobro')}
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      minHeight: 44,
+                      padding: '0 12px',
+                      borderRadius: 10,
+                      border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                      background: cobroFiltro !== 'all' ? 'var(--cp-cream, #FBF4EC)' : 'var(--cp-white, #FFFFFF)',
+                      color: 'var(--cp-navy, #0B2C3E)',
+                      fontWeight: 700,
+                      fontSize: 13,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <span>{COBRO_OPCIONES.find((c) => c.id === cobroFiltro)?.n}</span>
+                    <span aria-hidden="true" style={{ flex: 'none', fontSize: 12 }}>
+                      {openGroup === 'cobro' ? '▲' : '▼'}
+                    </span>
+                  </button>
+                  {openGroup === 'cobro' && (
                     <div
+                      role="listbox"
                       style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        fontSize: 13,
-                        marginTop: 2,
+                        position: 'absolute',
+                        zIndex: 20,
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        marginTop: 4,
+                        border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                        borderRadius: 10,
+                        background: 'var(--cp-white, #FFFFFF)',
+                        overflow: 'hidden',
+                        boxShadow: '0 4px 12px rgba(11,44,62,0.15)',
                       }}
                     >
-                      <span
-                        style={{
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          maxWidth: '70%',
-                        }}
-                      >
-                        {resumenLineas || `${p.modalidad}`}
-                      </span>
-                      <span
-                        style={{
-                          fontWeight: 800,
-                          color: 'var(--cp-rust, #B2500F)',
-                          fontSize: 14,
-                        }}
-                      >
-                        S/ {Number(p.total).toFixed(2)}
-                      </span>
+                      {COBRO_OPCIONES.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => {
+                            setCobroFiltro(c.id);
+                            setOpenGroup(null);
+                            setPaginaActual(1);
+                          }}
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            minHeight: 40,
+                            padding: '0 12px',
+                            border: 0,
+                            borderBottom: '1px solid var(--cp-line, #E3D6C6)',
+                            background: cobroFiltro === c.id ? 'var(--cp-sand, #EDE1D1)' : 'transparent',
+                            color: 'var(--cp-navy, #0B2C3E)',
+                            fontWeight: cobroFiltro === c.id ? 800 : 500,
+                            textAlign: 'left',
+                            fontSize: 13,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {c.n}
+                        </button>
+                      ))}
                     </div>
-                  </button>
-                );
-              })
+                  )}
+                </div>
+              </div>
             )}
           </div>
+        </div>
 
-          {/* Pie de lista con paginación */}
-          {totalPaginas > 1 && (
-            <div className="cj-foot">
-              <Paginacion
-                pagina={paginaActual}
-                totalPaginas={totalPaginas}
-                alCambiarPagina={setPaginaActual}
-              />
+        {/* LISTA DE PEDIDOS */}
+        <div className="cj-scroll" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {pedidosPaginados.length === 0 ? (
+            <div style={{ padding: 24, textAlign: 'center', color: 'var(--cp-soft, #2C4C5D)', fontSize: 13 }}>
+              No hay pedidos en esta pestaña.
             </div>
+          ) : (
+            pedidosPaginados.map((o) => {
+              const seleccionado = pedidoSeleccionadoId === o.id;
+              const resaltado = pedidosResaltados.has(String(o.id));
+              const itemsTexto = (o.lineas || []).map((l) => `${l.cantidad}× ${l.nombre}`).join(', ');
+              const badge = getBadge(o);
+
+              return (
+                <button
+                  key={o.id}
+                  type="button"
+                  onClick={() => setPedidoSeleccionadoId(o.id)}
+                  className={`cj-pedido-card ${resaltado ? 'cj-resaltado' : ''}`}
+                  style={{
+                    textAlign: 'left',
+                    background: 'var(--cp-white, #FFFFFF)',
+                    border: `1.5px solid ${seleccionado ? 'var(--cp-orange, #E67929)' : 'var(--cp-line, #E3D6C6)'}`,
+                    borderRadius: 12,
+                    padding: 12,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
+                    width: '100%',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 16 }}>
+                      {o.codigo}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        borderRadius: 9999,
+                        padding: '2px 10px',
+                        background: badge.bg,
+                        color: badge.fg,
+                      }}
+                    >
+                      {badge.l}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)' }}>
+                    {canalLabel(o.canal)} · {modLabel(o.modalidad)} · {o.cliente_nombre || 'Cliente'}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>
+                      {itemsTexto || '1 producto'}
+                    </span>
+                    <span style={{ fontWeight: 800, color: 'var(--cp-rust, #B2500F)', whiteSpace: 'nowrap' }}>
+                      s/ {Number(o.total || 0).toFixed(2)}
+                    </span>
+                  </div>
+                </button>
+              );
+            })
           )}
         </div>
 
-        {/* Columna Derecha: Detalle del Pedido */}
-        <div className="cj-right">
-          {pedidoSeleccionado ? (
-            <PedidoDetalle
-              pedido={pedidoSeleccionado}
-              alActualizar={cargarDatos}
-            />
-          ) : (
-            <div
-              style={{
-                flex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: 24,
-                textAlign: 'center',
-                color: 'var(--cp-soft, #2C4C5D)',
-                fontSize: 14,
-                lineHeight: '21px',
-              }}
-            >
-              Elige un pedido de la lista para ver su detalle, cobrarlo o imprimir sus comprobantes.
+        {/* PIE CON PAGINACIÓN */}
+        <div className="cj-foot">
+          {totalPaginas > 1 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 6 }}>
+              <button
+                type="button"
+                disabled={paginaValida <= 1}
+                onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
+                style={{
+                  minHeight: 44,
+                  padding: '0 12px',
+                  borderRadius: 12,
+                  border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                  background: 'transparent',
+                  color: 'var(--cp-navy, #0B2C3E)',
+                  fontWeight: 700,
+                  opacity: paginaValida <= 1 ? 0.4 : 1,
+                  cursor: paginaValida <= 1 ? 'not-allowed' : 'pointer',
+                }}
+              >
+                ← Anterior
+              </button>
+              {Array.from({ length: totalPaginas }, (_, i) => i + 1).map((num) => (
+                <button
+                  key={num}
+                  type="button"
+                  onClick={() => setPaginaActual(num)}
+                  aria-label={`Página ${num}`}
+                  style={{
+                    minWidth: 44,
+                    minHeight: 44,
+                    borderRadius: 12,
+                    border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                    background: paginaValida === num ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
+                    color: paginaValida === num ? 'var(--cp-cream, #FBF4EC)' : 'var(--cp-navy, #0B2C3E)',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {num}
+                </button>
+              ))}
+              <button
+                type="button"
+                disabled={paginaValida >= totalPaginas}
+                onClick={() => setPaginaActual((p) => Math.min(totalPaginas, p + 1))}
+                style={{
+                  minHeight: 44,
+                  padding: '0 12px',
+                  borderRadius: 12,
+                  border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                  background: 'transparent',
+                  color: 'var(--cp-navy, #0B2C3E)',
+                  fontWeight: 700,
+                  opacity: paginaValida >= totalPaginas ? 0.4 : 1,
+                  cursor: paginaValida >= totalPaginas ? 'not-allowed' : 'pointer',
+                }}
+              >
+                Siguiente →
+              </button>
             </div>
           )}
         </div>
       </div>
 
-      {/* Modal de gestión de caja */}
-      {modalCajaAbierto && (
-        <ModalCaja
-          cajaInfo={cajaInfo}
-          alCerrar={() => setModalCajaAbierto(false)}
-          alActualizarCaja={() => {
-            pedidosApi.obtenerCajaActual().then(setCajaInfo).catch(() => {});
-            cargarDatos();
-          }}
-          alSeleccionarPedidoPorCobrar={(pedidoId) => {
-            setPedidoSeleccionadoId(pedidoId);
-          }}
-        />
-      )}
+      {/* PANEL DERECHO */}
+      <div className="cj-right">
+        {!pedidoSeleccionado ? (
+          <div
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 24,
+              textAlign: 'center',
+              color: 'var(--cp-soft, #2C4C5D)',
+              fontSize: 14,
+              lineHeight: '21px',
+            }}
+          >
+            Elige un pedido de la lista para ver su detalle, cobrarlo o imprimir sus comprobantes.
+          </div>
+        ) : (
+          <PedidoDetalle
+            pedido={pedidoSeleccionado}
+            alActualizar={cargarDatos}
+            alRepetir={(p) => alert(`Repitiendo pedido ${p.codigo}...`)}
+          />
+        )}
+      </div>
     </div>
   );
 }
-export default PedidosAdminView;
