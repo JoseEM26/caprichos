@@ -61,6 +61,19 @@ export class CajaService {
       );
     }
 
+    // una caja de un día anterior sin cerrar bloquea la de hoy: se pide cerrarla primero (arqueo ciego)
+    const abiertaAnterior = await this.prisma.caja.findFirst({ where: { estado: 'ABIERTA' } });
+    if (abiertaAnterior) {
+      const dia = abiertaAnterior.fecha.toISOString().slice(0, 10).split('-').reverse().join('/');
+      throw new HttpException(
+        {
+          codigo: 'CAJA_ANTERIOR_SIN_CERRAR',
+          mensaje: `La caja del ${dia} sigue abierta: ciérrala en «Caja y cierres» antes de abrir la de hoy`,
+        },
+        HttpStatus.CONFLICT,
+      );
+    }
+
     const aperturaMonto =
       dto?.apertura !== undefined && dto?.apertura !== null
         ? Number(dto.apertura)

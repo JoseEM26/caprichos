@@ -21,6 +21,7 @@ describe('CajaService', () => {
     prismaMock = {
       caja: {
         findUnique: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn(),
       },
       movimientoCaja: {
@@ -47,6 +48,16 @@ describe('CajaService', () => {
   });
 
   describe('abrirCaja', () => {
+    it('no abre la de hoy si una caja de un día anterior sigue abierta', async () => {
+      prismaMock.caja.findUnique.mockResolvedValue(null);
+      prismaMock.caja.findFirst.mockResolvedValue({ id: 3n, fecha: new Date('2026-10-21T00:00:00.000Z'), estado: 'ABIERTA' });
+
+      await expect(service.abrirCaja({ apertura: 10 }, cajeroUsuario)).rejects.toMatchObject({
+        response: { codigo: 'CAJA_ANTERIOR_SIN_CERRAR' },
+      });
+      expect(prismaMock.caja.create).not.toHaveBeenCalled();
+    });
+
     it('debe abrir la caja con monto en soles y auditar', async () => {
       prismaMock.caja.findUnique.mockResolvedValue(null);
       prismaMock.caja.create.mockResolvedValue({

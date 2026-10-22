@@ -255,7 +255,7 @@ export function MapaEntregasView() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
       {/* Texto explicativo superior */}
       <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
-        Dónde se concentran los pedidos con delivery. Sirve para ajustar las zonas de reparto y para decidir dónde repartir volantes. Datos de ejemplo; los pedidos nuevos con ubicación se suman solos.
+        Dónde se concentran los pedidos con delivery. Sirve para ajustar las zonas de reparto y para decidir dónde repartir volantes. Los pedidos nuevos con ubicación se suman solos.
       </div>
 
       {/* Chips de Período */}
