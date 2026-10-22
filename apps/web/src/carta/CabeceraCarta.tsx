@@ -67,7 +67,7 @@ export function CabeceraCarta({
   const alto = movil ? 40 : 44;
 
   const mover = (px: number) => franja.current?.scrollBy({ left: px, behavior: 'smooth' });
-  const chips = [{ id: 'todo', nombre: 'TODO' }, ...categorias];
+  const chips = [{ id: 'todo', nombre: 'TODA LA CARTA' }, ...categorias];
 
   return (
     <>

@@ -142,7 +142,22 @@ export async function main() {
     }
   }
 
-  // 4. Versión de la Carta y Decoración festiva (FT-CON-02/03)
+  // 4. Versión de la Carta (FT-CON-02/03): arranca «Sin decoración», con el banner y las dos promociones del mockup
+  const contenidoInicial = {
+    secciones: ['Frappes', 'Bebidas Calientes', 'Bebidas Frías', 'Waffles', 'Postres'],
+    destacados: ['FRAPPE OREO', 'LATTE COFFE', 'DONAS ARTESANALES'],
+    banner: {
+      activo: true,
+      tag: 'CAPRICHOS DEL MES',
+      title: 'Frappe Maracuyá Tropical',
+      sub: 'Nuevo este mes: pruébalo antes de que se acabe',
+    },
+    promos: [
+      { tag: 'PROMOCIÓN', title: 'DÚO PARA COMPARTIR', sub: '2 bebidas + 1 complemento', price: 's/ 33', old: 's/ 38', badge: '-13 %', theme: 'oscuro', target: 'DÚO PARA COMPARTIR' },
+      { tag: 'COMBO', title: 'DÚO IRRESISTIBLE', sub: '2 bebidas a elección + 1 Club Sándwich', price: 's/ 37', old: '', badge: '', theme: 'naranja', target: 'DÚO IRRESISTIBLE' },
+    ],
+  };
+
   const versionPublicada = await prisma.versionCarta.findFirst({
     where: { estado: 'PUBLICADA' },
   });
@@ -152,33 +167,28 @@ export async function main() {
       data: {
         estado: 'PUBLICADA',
         organizacion: 'SECCIONES',
-        decoracion: 'HALLOWEEN',
-        contenido: {
-          secciones: ['Frappes', 'Bebidas Calientes', 'Bebidas Frías', 'Waffles', 'Postres'],
-          destacados: ['FRAPPE OREO', 'LATTE COFFE', 'DONAS ARTESANALES'],
-        },
+        decoracion: 'NINGUNO',
+        contenido: contenidoInicial,
         publicada_en: new Date(),
       },
     });
-    console.log('Versión de carta publicada con decoración HALLOWEEN.');
+    console.log('Versión de carta publicada sin decoración.');
+  } else if (versionPublicada.decoracion === 'HALLOWEEN') {
+    // corrige la semilla anterior que dejaba Halloween encendido
+    await prisma.versionCarta.update({
+      where: { id: versionPublicada.id },
+      data: { decoracion: 'NINGUNO', contenido: contenidoInicial },
+    });
+    console.log('Versión de carta corregida: sin decoración.');
   }
 
-  // Guardar paleta de colores personalizada en la tabla parametro
-  const paletaColores = {
-    tema: 'HALLOWEEN',
-    primario: '#ff7700',
-    secundario: '#1a1a24',
-    fondo: '#faf8f5',
-    texto: '#0b2c3e',
-    acento: '#7b2cbf',
-  };
-
+  // Sin colores personalizados: la paleta de cada decoración la guarda el administrador
   await prisma.parametro.upsert({
     where: { clave: 'carta_paleta_decoracion' },
-    update: { valor: paletaColores },
-    create: { clave: 'carta_paleta_decoracion', valor: paletaColores },
+    update: { valor: {} },
+    create: { clave: 'carta_paleta_decoracion', valor: {} },
   });
-  console.log('Parámetro carta_paleta_decoracion guardado.');
+  console.log('Parámetro carta_paleta_decoracion sin personalizar.');
 
   // 5. Ranking de más vendidos del mes (TOP_CAT del mockup)
   const mesActual = '2026-10';

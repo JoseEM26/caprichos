@@ -1,0 +1,338 @@
+jest.mock('../../../comun/socket/eventos.gateway', () => ({
+  EventosGateway: class {
+    emitirAdmin = jest.fn();
+    emitirPublico = jest.fn();
+  },
+}));
+
+import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { Test, TestingModule } from '@nestjs/testing';
+import { ContenidoService } from '../contenido.service';
+import { PrismaService } from '../../../comun/prisma/prisma.service';
+import { AuditoriaService } from '../../auditoria/auditoria.service';
+import { EventosGateway } from '../../../comun/socket/eventos.gateway';
+
+describe('ContenidoService', () => {
+  let service: ContenidoService;
+  let prisma: any;
+  let auditoria: any;
+  let eventosGateway: any;
+
+  const mockUsuario = {
+    partyId: BigInt(10),
+    rol: 'ADMIN',
+    debeCambiar: false,
+  };
+
+  beforeEach(async () => {
+    prisma = {
+      versionCarta: {
+        findFirst: jest.fn(),
+        findMany: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+        delete: jest.fn(),
+      },
+      novedad: {
+        findMany: jest.fn(),
+        findUnique: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+        aggregate: jest.fn(),
+      },
+      novedadFoto: {
+        deleteMany: jest.fn(),
+        upsert: jest.fn(),
+      },
+      destacada: {
+        findMany: jest.fn(),
+        findUnique: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+        delete: jest.fn(),
+        aggregate: jest.fn(),
+      },
+      destacadaFoto: {
+        deleteMany: jest.fn(),
+        create: jest.fn(),
+        upsert: jest.fn(),
+      },
+      rankingMes: {
+        findMany: jest.fn(),
+      },
+      mensajeCarta: {
+        create: jest.fn(),
+        findMany: jest.fn(),
+        findUnique: jest.fn(),
+        update: jest.fn(),
+      },
+      parametro: {
+        findUnique: jest.fn(),
+        upsert: jest.fn(),
+        delete: jest.fn(),
+      },
+      archivo: {
+        findFirst: jest.fn(),
+        create: jest.fn(),
+      },
+      categoria: {
+        findMany: jest.fn(),
+      },
+      producto: {
+        findMany: jest.fn(),
+        update: jest.fn(),
+      },
+      notificacion: {
+        create: jest.fn(),
+      },
+    };
+
+    auditoria = {
+      registrar: jest.fn().mockResolvedValue(undefined),
+    };
+
+    eventosGateway = {
+      emitirAdmin: jest.fn(),
+      emitirPublico: jest.fn(),
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        ContenidoService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: AuditoriaService, useValue: auditoria },
+        { provide: EventosGateway, useValue: eventosGateway },
+      ],
+    }).compile();
+
+    service = module.get<ContenidoService>(ContenidoService);
+  });
+
+  describe('CARTA PÚBLICA (obtenerContenidoPublicoCarta)', () => {
+    it('retorna la configuración de la carta con versión publicada, paleta y ranking', async () => {
+      prisma.versionCarta.findFirst.mockResolvedValue({
+        id: BigInt(1),
+        estado: 'PUBLICADA',
+        organizacion: 'SECCIONES',
+        decoracion: 'HALLOWEEN',
+        contenido: { banner: { activo: true, tag: 'FESTIVO', title: 'Halloween', sub: 'Dulces' } },
+        publicada_en: new Date('2026-10-20'),
+      });
+      prisma.parametro.findUnique.mockResolvedValue(null);
+      prisma.novedad.findMany.mockResolvedValue([]);
+      prisma.destacada.findMany.mockResolvedValue([]);
+      prisma.rankingMes.findMany.mockResolvedValue([
+        {
+          anio_mes: '2026-10',
+          producto_id: BigInt(5),
+          unidades: 40,
+          puesto: 1,
+          producto: { nombre: 'FRAPPE OREO' },
+        },
+        {
+          anio_mes: '2026-10',
+          producto_id: BigInt(6),
+          unidades: 35,
+          puesto: 2,
+          producto: { nombre: 'LATTE COFFE' },
+        },
+      ]);
+
+      const res = await service.obtenerContenidoPublicoCarta();
+
+      expect(res.decoracion).toBe('HALLOWEEN');
+      expect(res.organizacion).toBe('SECCIONES');
+      expect(res.paleta).toBeDefined();
+      expect(res.rankingMes).toHaveLength(2);
+      expect(res.rankingMes[0].estrellas).toBe(3);
+      expect(res.rankingMes[1].estrellas).toBe(1);
+    });
+
+    it('RN-CAP-064 / RQ-CON-03-08: excluye destacadas que no tengan fotos', async () => {
+      prisma.versionCarta.findFirst.mockResolvedValue(null);
+      prisma.parametro.findUnique.mockResolvedValue(null);
+      prisma.novedad.findMany.mockResolvedValue([]);
+      prisma.rankingMes.findMany.mockResolvedValue([]);
+      prisma.destacada.findMany.mockResolvedValue([
+        {
+          id: BigInt(1),
+          titulo: 'Con Fotos',
+          orden: 1,
+          archivada: false,
+          portada_archivo: null,
+          fotos: [{ archivo: { id: BigInt(10), ruta: 'publico/foto1.webp' } }],
+        },
+        {
+          id: BigInt(2),
+          titulo: 'Sin Fotos',
+          orden: 2,
+          archivada: false,
+          portada_archivo: null,
+          fotos: [], // vacío
+        },
+      ]);
+
+      const res = await service.obtenerContenidoPublicoCarta();
+
+      expect(res.destacadas).toHaveLength(1);
+      expect(res.destacadas[0].titulo).toBe('Con Fotos');
+    });
+
+    it('RN-CAP-063 / RQ-CON-03-03: excluye novedades fuera de vigencia', async () => {
+      prisma.versionCarta.findFirst.mockResolvedValue(null);
+      prisma.parametro.findUnique.mockResolvedValue(null);
+      prisma.destacada.findMany.mockResolvedValue([]);
+      prisma.rankingMes.findMany.mockResolvedValue([]);
+      prisma.novedad.findMany.mockResolvedValue([
+        {
+          id: BigInt(1),
+          tipo: 'AVISO',
+          titulo: 'Vigente',
+          orden: 1,
+          activo: true,
+          desde: new Date('2026-01-01'),
+          hasta: new Date('2026-12-31'),
+          fotos: [],
+        },
+        {
+          id: BigInt(2),
+          tipo: 'PROMOCION',
+          titulo: 'Vencida',
+          orden: 2,
+          activo: true,
+          desde: new Date('2026-01-01'),
+          hasta: new Date('2026-02-01'), // vencida
+          fotos: [],
+        },
+      ]);
+
+      const res = await service.obtenerContenidoPublicoCarta();
+
+      expect(res.novedades).toHaveLength(1);
+      expect(res.novedades[0].titulo).toBe('Vigente');
+    });
+  });
+
+  describe('COMENTARIOS Y BUZÓN (crearComentarioCarta)', () => {
+    it('guarda el comentario y si es QUEJA registra notificación para el dueño', async () => {
+      prisma.mensajeCarta.create.mockResolvedValue({
+        id: BigInt(100),
+        tipo: 'QUEJA',
+        texto: 'La atención tardó demasiado hoy',
+        nombre: 'Carlos',
+        contacto: '999888777',
+      });
+
+      const res = await service.crearComentarioCarta({
+        tipo: 'QUEJA',
+        texto: 'La atención tardó demasiado hoy',
+        nombre: 'Carlos',
+        contacto: '999888777',
+      });
+
+      expect(res.ok).toBe(true);
+      expect(prisma.mensajeCarta.create).toHaveBeenCalled();
+      expect(prisma.notificacion.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            tipo: 'RECLAMO_CARTA',
+          }),
+        }),
+      );
+    });
+  });
+
+  describe('ADMINISTRATIVO: DISEÑADOR', () => {
+    it('publica el borrador y archiva la versión anterior', async () => {
+      prisma.versionCarta.findFirst.mockResolvedValue({
+        id: BigInt(99),
+        estado: 'BORRADOR',
+        organizacion: 'TARJETAS',
+        decoracion: 'NAVIDAD',
+        contenido: { productosConfig: {} },
+      });
+      prisma.versionCarta.updateMany.mockResolvedValue({ count: 1 });
+      prisma.versionCarta.update.mockResolvedValue({
+        id: BigInt(99),
+        estado: 'PUBLICADA',
+        decoracion: 'NAVIDAD',
+      });
+
+      const res = await service.publicarDiseno(mockUsuario as any);
+
+      expect(res.ok).toBe(true);
+      expect(prisma.versionCarta.updateMany).toHaveBeenCalledWith({
+        where: { estado: 'PUBLICADA' },
+        data: { estado: 'ARCHIVADA' },
+      });
+      expect(prisma.versionCarta.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: BigInt(99) },
+          data: expect.objectContaining({ estado: 'PUBLICADA' }),
+        }),
+      );
+      expect(auditoria.registrar).toHaveBeenCalled();
+    });
+
+    it('falla al publicar si no hay borrador pendiente', async () => {
+      prisma.versionCarta.findFirst.mockResolvedValue(null);
+
+      await expect(service.publicarDiseno(mockUsuario as any)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('descarta el borrador pendiente', async () => {
+      prisma.versionCarta.findFirst.mockResolvedValue({
+        id: BigInt(99),
+        estado: 'BORRADOR',
+      });
+      prisma.versionCarta.delete.mockResolvedValue({ id: BigInt(99) });
+
+      const res = await service.descartarDiseno(mockUsuario as any);
+
+      expect(res.ok).toBe(true);
+      expect(prisma.versionCarta.delete).toHaveBeenCalledWith({
+        where: { id: BigInt(99) },
+      });
+    });
+  });
+
+  describe('ADMINISTRATIVO: DESTACADAS (DT-06 Excepción eliminar)', () => {
+    it('permite eliminar una destacada para siempre', async () => {
+      prisma.destacada.delete.mockResolvedValue({ id: BigInt(5) });
+
+      const res = await service.eliminarDestacada('5', mockUsuario as any);
+
+      expect(res.ok).toBe(true);
+      expect(prisma.destacada.delete).toHaveBeenCalledWith({
+        where: { id: BigInt(5) },
+      });
+      expect(auditoria.registrar).toHaveBeenCalled();
+    });
+  });
+
+  describe('ADMINISTRATIVO: PALETA DE COLORES', () => {
+    it('guarda borrador y publica los colores festivos', async () => {
+      prisma.parametro.upsert.mockResolvedValue({});
+      prisma.parametro.findUnique.mockResolvedValue({
+        clave: 'carta_paleta_decoracion_borrador',
+        valor: { halloween: { accent: '#ff6600' } },
+      });
+      prisma.parametro.delete.mockResolvedValue({});
+
+      await service.guardarBorradorPaleta(
+        { paletas: { halloween: { accent: '#ff6600' } } },
+        mockUsuario as any,
+      );
+
+      const pubRes = await service.publicarPaleta(mockUsuario as any);
+
+      expect(pubRes.ok).toBe(true);
+      expect(prisma.parametro.delete).toHaveBeenCalledWith({
+        where: { clave: 'carta_paleta_decoracion_borrador' },
+      });
+    });
+  });
+});

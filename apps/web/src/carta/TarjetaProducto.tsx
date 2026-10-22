@@ -2,11 +2,18 @@ import { ProductoCarta } from './tipos';
 import { useCarrito } from './CarritoContext';
 import { useEsMovil } from './useEsMovil';
 
-interface TarjetaProductoProps {
-  producto: ProductoCarta;
+export interface InfoRankingProducto {
+  puesto?: number;
+  estrellas?: number;
+  textoEstrellas?: string;
 }
 
-export function TarjetaProducto({ producto }: TarjetaProductoProps) {
+interface TarjetaProductoProps {
+  producto: ProductoCarta;
+  rankingInfo?: InfoRankingProducto | null;
+}
+
+export function TarjetaProducto({ producto, rankingInfo }: TarjetaProductoProps) {
   const { abrirModalProducto } = useCarrito();
   const movil = useEsMovil();
 
@@ -169,6 +176,24 @@ export function TarjetaProducto({ producto }: TarjetaProductoProps) {
           >
             {producto.descripcion}
           </p>
+        )}
+
+        {rankingInfo && (
+          <div>
+            <span
+              style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                background: 'var(--cp-orange)',
+                color: 'var(--cp-navy)',
+                borderRadius: '9999px',
+                padding: '2px 10px',
+                display: 'inline-block',
+              }}
+            >
+              {rankingInfo.textoEstrellas || (rankingInfo.estrellas === 3 ? '★★★ Más comprado del mes' : '★ Más comprado del mes')}
+            </span>
+          </div>
         )}
 
         <div

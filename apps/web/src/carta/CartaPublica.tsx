@@ -23,21 +23,33 @@ import { CajonCarrito } from './CajonCarrito';
 import { FormularioCheckout } from './FormularioCheckout';
 import { PantallaConfirmacion } from './PantallaConfirmacion';
 import { NotificacionAgregado } from './NotificacionAgregado';
+import { DecoracionAnimada } from './contenido/DecoracionAnimada';
+import { VisorHistoriasModal } from './contenido/VisorHistoriasModal';
+import type { HistoriaCírculo } from './contenido/VisorHistoriasModal';
+import { PromosCarta } from './contenido/PromosCarta';
+import type { PromoCarta } from './contenido/PromosCarta';
+import { FormularioComentarios } from './contenido/FormularioComentarios';
+import type { NovedadCarta } from './PaginaNovedades';
+import type { BannerCarta } from './PortadaCarta';
+
+interface ContenidoCarta {
+  decoracion: string;
+  organizacion: 'SECCIONES' | 'LISTA' | 'TARJETAS';
+  paleta: Record<string, string>;
+  novedades: NovedadCarta[];
+  destacadas: HistoriaCírculo[];
+  rankingMes: { productoId: string; puesto: number; estrellas: number; textoEstrellas: string }[];
+  banner: BannerCarta;
+  promos: PromoCarta[];
+}
+
+// El administrativo guarda la paleta por rol; la carta la lee con sus variables --cp-*
+const VAR_PALETA: Record<string, string> = {
+  accent: '--cp-orange', ink: '--cp-navy', bg: '--cp-cream', card: '--cp-white',
+  price: '--cp-rust', sec: '--cp-gold', soft: '--cp-soft', line: '--cp-line',
+};
 
 const ZOOM_CELULAR = 0.82;
-
-// ponytail: notas fijas por categoría; el diseñador de la carta (FT-CON-02) las hará editables
-const NOTAS_CATEGORIA: Record<string, string> = {
-  COMBOS: 'Precio por tamaño de bebida',
-  FRAPPES: 'Todos al mismo precio: 12 oz S/ 14.50 · 16 oz S/ 16.50 · 21 oz S/ 17.50',
-  ICED: 'Bebidas frías con hielo',
-  FROZEN: 'Solo tamaño extra de 21 oz',
-  CALIENTES: 'Servidas en taza de vidrio',
-  WAFFLES: 'Completo o 1/2',
-  SALADOS: 'Hamburguesas, sándwiches, papas, petit pan y empanadas',
-  CROISSANTS: 'Hojaldrados, hechos a mano',
-  POSTRES: 'Donas, galletas, tortas y postres individuales',
-};
 
 function normalizarTexto(txt: string): string {
   return txt
@@ -50,6 +62,8 @@ function ContenidoCartaPublica() {
   const [categorias, setCategorias] = useState<CategoriaCarta[]>([]);
   const [estadoLocal, setEstadoLocal] = useState<EstadoLocalCarta | null>(null);
   const [datosLocal, setDatosLocal] = useState<DatosLocalCarta | null>(null);
+  const [contenido, setContenido] = useState<ContenidoCarta | null>(null);
+  const [visor, setVisor] = useState<number | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,17 +72,19 @@ function ContenidoCartaPublica() {
   const [pagina, setPagina] = useState<PaginaCarta>('carta');
   const movil = useEsMovil();
 
-  const { productoEnModal, cerrarModalProducto } = useCarrito();
+  const { productoEnModal, cerrarModalProducto, abrirModalProducto } = useCarrito();
 
   const cargarDatos = async () => {
     setCargando(true);
     setError(null);
     try {
-      const [resCarta, resEstado, resLocal] = await Promise.all([
+      const [resCarta, resEstado, resLocal, resContenido] = await Promise.all([
         api.get<CategoriaCarta[]>('/carta'),
         api.get<EstadoLocalCarta>('/carta/estado').catch(() => null),
         api.get<DatosLocalCarta>('/carta/local').catch(() => null),
+        api.get<ContenidoCarta>('/carta/contenido').catch(() => null),
       ]);
+      if (resContenido) setContenido(resContenido);
 
       setCategorias(Array.isArray(resCarta) ? resCarta : []);
       if (resEstado) setEstadoLocal(resEstado);
@@ -121,6 +137,17 @@ function ContenidoCartaPublica() {
     const prod = categorias.flatMap((c) => c.productos).find((p) => p.nombre === 'FRAPPE MARACUYÁ' && p.fotoUrl);
     return prod?.fotoUrl ?? categorias.flatMap((c) => c.productos).find((p) => p.fotoUrl)?.fotoUrl ?? null;
   }, [categorias]);
+
+  const estilosPaleta = useMemo(() => {
+    const o: Record<string, string> = {};
+    (contenido && contenido.decoracion.toUpperCase() !== 'NINGUNO' ? Object.entries(contenido.paleta ?? {}) : []).forEach(([k, v]) => { if (VAR_PALETA[k] && v) o[VAR_PALETA[k]] = v; });
+    return o;
+  }, [contenido]);
+  const rankingPorProducto = useMemo(
+    () => new Map((contenido?.rankingMes ?? []).map((r) => [r.productoId, r])),
+    [contenido],
+  );
+  const organizacion = contenido?.organizacion ?? 'SECCIONES';
 
   const irACarta = () => {
     setPagina('carta');
@@ -179,8 +206,10 @@ function ContenidoCartaPublica() {
         color: 'var(--cp-navy)',
         display: 'flex',
         flexDirection: 'column',
+        ...(estilosPaleta as React.CSSProperties),
       }}
     >
+      <DecoracionAnimada tema={contenido?.decoracion ?? 'NINGUNO'} />
       {/* Cabecera pegajosa con las categorías dentro */}
       <CabeceraCarta
         busqueda={busqueda}
@@ -198,15 +227,69 @@ function ContenidoCartaPublica() {
       />
 
       {pagina === 'conocenos' && <PaginaConocenos datosLocal={datosLocal} estadoLocal={estadoLocal} />}
-      {pagina === 'novedades' && <PaginaNovedades onVerCarta={irACarta} />}
+      {pagina === 'novedades' && <PaginaNovedades novedades={contenido?.novedades ?? []} datosLocal={datosLocal} estadoLocal={estadoLocal} onVerCarta={irACarta} />}
 
       {pagina === 'carta' && !busqueda.trim() && categoriaActivaId === 'todo' && (
         <PortadaCarta
           datosLocal={datosLocal}
           estadoLocal={estadoLocal}
           fotoDestacada={fotoDestacada}
+          banner={contenido?.banner}
           onPedir={irACarta}
           onVerCarta={irACarta}
+        />
+      )}
+
+      {pagina === 'carta' && !busqueda.trim() && categoriaActivaId === 'todo' && (contenido?.destacadas.length ?? 0) > 0 && (
+        <div style={{ maxWidth: 1200, width: '100%', boxSizing: 'border-box', margin: '0 auto', padding: movil ? '20px 16px 0' : '32px 24px 0' }}>
+          <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: movil ? 17 : 22, marginBottom: 10 }}>Momentos Caprichos</div>
+          <div style={{ display: 'flex', gap: movil ? 10 : 18, overflowX: 'auto', paddingBottom: 4 }}>
+            {contenido!.destacadas.map((d, i) => (
+              <button key={d.id} aria-label={`Ver fotos: ${d.titulo}`} onClick={() => setVisor(i)}
+                style={{ flex: '0 0 auto', border: 0, background: 'transparent', padding: 0, width: movil ? 68 : 96, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, color: 'var(--cp-navy)' }}>
+                <span style={{ width: movil ? 60 : 84, height: movil ? 60 : 84, borderRadius: '50%', padding: 3, boxSizing: 'border-box', background: 'linear-gradient(135deg, var(--cp-orange), var(--cp-rust))', display: 'block' }}>
+                  <span style={{ width: '100%', height: '100%', borderRadius: '50%', border: '2px solid var(--cp-cream)', boxSizing: 'border-box', overflow: 'hidden', background: 'var(--cp-sand)', display: 'block' }}>
+                    {d.portada_url && <img src={d.portada_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                  </span>
+                </span>
+                <span style={{ fontSize: 11, fontWeight: 700, lineHeight: '14px', textAlign: 'center' }}>{d.titulo}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {pagina === 'carta' && !busqueda.trim() && categoriaActivaId === 'todo' && (contenido?.novedades.length ?? 0) > 0 && (
+        <div style={{ maxWidth: 1200, width: '100%', boxSizing: 'border-box', margin: '0 auto', padding: movil ? '20px 16px 0' : '32px 24px 0' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
+            <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: movil ? 17 : 22 }}>Novedades</span>
+            <button onClick={() => cambiarPagina('novedades')} style={{ minHeight: 36, padding: 0, border: 0, background: 'transparent', color: 'var(--cp-rust)', fontWeight: 800, fontSize: 13 }}>Ver todas</button>
+          </div>
+          <div style={{ display: 'flex', gap: movil ? 10 : 16, overflowX: 'auto', scrollSnapType: 'x mandatory' }}>
+            {contenido!.novedades.slice(0, 4).map((n) => (
+              <button key={n.id} onClick={() => cambiarPagina('novedades')}
+                style={{ flex: movil ? '0 0 66%' : '0 0 300px', scrollSnapAlign: 'start', border: '1px solid var(--cp-line)', padding: 0, borderRadius: movil ? 16 : 20, background: 'var(--cp-white)', color: 'var(--cp-navy)', textAlign: 'left', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                <span style={{ position: 'relative', display: 'block', width: '100%', aspectRatio: '16 / 9', background: 'var(--cp-gold)' }}>
+                  {n.fotos[0] && <img src={n.fotos[0].url} alt="" loading="lazy" style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+                  <span style={{ position: 'absolute', left: 8, top: 8, fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 10, letterSpacing: '0.08em', background: 'var(--cp-orange)', color: 'var(--cp-navy)', borderRadius: 9999, padding: '3px 9px' }}>
+                    {n.tipo === 'BANNER' ? 'EN PORTADA' : n.tipo === 'PROMOCION' ? 'PROMO' : n.tipo === 'IMAGEN' ? 'NOVEDAD' : n.tipo}
+                  </span>
+                </span>
+                <span style={{ padding: '10px 12px 12px', fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 14, lineHeight: '18px' }}>{n.titulo}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {pagina === 'carta' && !busqueda.trim() && categoriaActivaId === 'todo' && (
+        <PromosCarta
+          promos={contenido?.promos ?? []}
+          fotoDe={(nombre) => categorias.flatMap((c) => c.productos).find((p) => p.nombre === nombre)?.fotoUrl ?? null}
+          onAbrir={(nombre) => {
+            const prod = categorias.flatMap((c) => c.productos).find((p) => p.nombre === nombre);
+            if (prod) abrirModalProducto(prod);
+          }}
         />
       )}
 
@@ -312,28 +395,28 @@ function ContenidoCartaPublica() {
                 />
               </div>
 
-              {NOTAS_CATEGORIA[cat.nombre.toUpperCase()] && (
-                <div style={{ textAlign: 'center', fontSize: '13px', color: 'var(--cp-soft)', margin: '-8px 0 16px' }}>
-                  {NOTAS_CATEGORIA[cat.nombre.toUpperCase()]}
-                </div>
-              )}
-
               {/* Grid de productos responsiva */}
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))',
+                  gridTemplateColumns: organizacion === 'LISTA' ? '1fr' : organizacion === 'TARJETAS' ? 'repeat(auto-fill, minmax(320px, 1fr))' : 'repeat(auto-fill, minmax(230px, 1fr))',
                   gap: '16px',
                 }}
               >
                 {cat.productos.map((prod) => (
-                  <TarjetaProducto key={prod.id} producto={prod} />
+                  <TarjetaProducto key={prod.id} producto={prod} rankingInfo={rankingPorProducto.get(String(prod.id))} />
                 ))}
               </div>
             </section>
           ))
         )}
       </main>
+      )}
+
+      {pagina === 'carta' && <FormularioComentarios />}
+
+      {visor !== null && contenido && (
+        <VisorHistoriasModal historias={contenido.destacadas} destacadaIdxInicial={visor} onCerrar={() => setVisor(null)} />
       )}
 
       {/* Pie informativo */}
@@ -350,7 +433,7 @@ function ContenidoCartaPublica() {
         <div style={{ fontWeight: 700, color: 'var(--cp-navy)', marginBottom: '4px' }}>
           {datosLocal?.nombre || 'Caprichos'}
         </div>
-        <div>{datosLocal?.direccion || 'Av. Principal 123'} · Tel: {datosLocal?.telefono || '999888777'}</div>
+        <div>{datosLocal?.direccion} {datosLocal?.telefono ? `· Tel: ${datosLocal.telefono}` : ''}</div>
       </footer>
 
       {/* Ventana modal de detalle del producto */}

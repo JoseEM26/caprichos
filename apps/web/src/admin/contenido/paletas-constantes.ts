@@ -1,0 +1,123 @@
+export function normalizarUrlArchivo(u?: string | null): string | null {
+  if (!u) return null;
+  if (u.startsWith('/uploads/')) {
+    return `/archivos/${u.slice('/uploads/'.length)}`;
+  }
+  if (u.startsWith('/') || u.startsWith('http://') || u.startsWith('https://') || u.startsWith('data:')) {
+    return u;
+  }
+  return `/archivos/${u}`;
+}
+
+export const PAL_DEFAULT: Record<string, Record<string, string>> = {
+  ninguno: {
+    accent: '#E67929',
+    on: '#0B2C3E',
+    ink: '#0B2C3E',
+    bg: '#FBF4EC',
+    card: '#FFFFFF',
+    price: '#B2500F',
+    sec: '#D99E39',
+    soft: '#2C4C5D',
+    line: '#E3D6C6',
+  },
+  halloween: {
+    accent: '#F2812A',
+    on: '#2B1B3F',
+    ink: '#2B1B3F',
+    bg: '#F4ECF6',
+    card: '#FCF8FD',
+    price: '#A8460B',
+    sec: '#9B6BD6',
+    soft: '#4A3A66',
+    line: '#DCCBE3',
+  },
+  navidad: {
+    accent: '#C0392B',
+    on: '#FFFFFF',
+    ink: '#0F3D2B',
+    bg: '#EEF6EE',
+    card: '#FAFEF9',
+    price: '#B22222',
+    sec: '#2F7D4F',
+    soft: '#2F5D45',
+    line: '#C9DFCD',
+  },
+  anonuevo: {
+    accent: '#F5C84B',
+    on: '#14142B',
+    ink: '#14142B',
+    bg: '#FBF8EE',
+    card: '#FFFEFA',
+    price: '#8A5A00',
+    sec: '#B58A1E',
+    soft: '#4B4B6B',
+    line: '#E8E1C8',
+  },
+  sanvalentin: {
+    accent: '#D6336C',
+    on: '#FFFFFF',
+    ink: '#4A1020',
+    bg: '#FFF0F3',
+    card: '#FFFAFB',
+    price: '#B3123F',
+    sec: '#F2A1B5',
+    soft: '#6B3A48',
+    line: '#F0D0D8',
+  },
+  madre: {
+    accent: '#C2417A',
+    on: '#FFFFFF',
+    ink: '#3B2A4A',
+    bg: '#FFF2F7',
+    card: '#FFFAFC',
+    price: '#A93469',
+    sec: '#C9A0DC',
+    soft: '#5E4A70',
+    line: '#EBD3E0',
+  },
+  padre: {
+    accent: '#1F6FB5',
+    on: '#FFFFFF',
+    ink: '#0F2A44',
+    bg: '#EEF4FA',
+    card: '#FAFCFF',
+    price: '#1C5FA3',
+    sec: '#7FB3D5',
+    soft: '#3A5570',
+    line: '#D0DFEC',
+  },
+  patrias: {
+    accent: '#C8102E',
+    on: '#FFFFFF',
+    ink: '#3A0A12',
+    bg: '#FFF4F4',
+    card: '#FFFFFF',
+    price: '#B0122A',
+    sec: '#E8A2AB',
+    soft: '#6B3A41',
+    line: '#F0D0D4',
+  },
+  ninos: {
+    accent: '#FFC93C',
+    on: '#1B3A5F',
+    ink: '#1B3A5F',
+    bg: '#FFF8E4',
+    card: '#FFFDF5',
+    price: '#B84F00',
+    sec: '#7ED6A5',
+    soft: '#3F5E80',
+    line: '#F1E2B5',
+  },
+  aniversario: {
+    accent: '#8E44AD',
+    on: '#FFFFFF',
+    ink: '#2E1A47',
+    bg: '#F8F1FD',
+    card: '#FEFBFF',
+    price: '#7B2FA0',
+    sec: '#D4A93C',
+    soft: '#5B4678',
+    line: '#E2D1EF',
+  },
+};
