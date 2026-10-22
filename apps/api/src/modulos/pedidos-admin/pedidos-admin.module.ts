@@ -3,10 +3,12 @@ import { PedidosAdminController } from './pedidos-admin.controller';
 import { PedidosEstadoService } from './pedidos-estado.service';
 import { SalonModule } from '../salon/salon.module';
 import { ZonasModule } from '../zonas/zonas.module';
+import { ClientesModule } from '../clientes/clientes.module';
+import { StockModule } from '../stock/stock.module';
 import { UbicarPedidoService } from './ubicar-pedido.service';
 
 @Module({
-  imports: [SalonModule, ZonasModule],
+  imports: [SalonModule, ZonasModule, ClientesModule, StockModule],
   controllers: [PedidosAdminController],
   providers: [
     PedidosEstadoService,

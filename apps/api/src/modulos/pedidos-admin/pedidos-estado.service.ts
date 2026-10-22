@@ -1,3 +1,5 @@
+import { PuntosService } from '../clientes/puntos.service';
+import { StockService } from '../stock/stock.service';
 import { SalonService } from '../salon/salon.service';
 import {
   BadRequestException,
@@ -38,6 +40,8 @@ export class PedidosEstadoService {
     private readonly auditoria: AuditoriaService,
     @Optional() private readonly eventosGateway?: EventosGateway,
     @Optional() private readonly salonService?: SalonService,
+    @Optional() private readonly puntosService?: PuntosService,
+    @Optional() private readonly stockService?: StockService,
   ) {}
 
   private parsearId(id: bigint | string | number): bigint {
@@ -508,6 +512,18 @@ export class PedidosEstadoService {
           anulacion_aprobada_por: supervisor.party_id,
         },
       });
+
+      // un pedido anulado devuelve el stock y reversa los puntos si ya se había cobrado
+      for (const paso of [
+        () => this.puntosService?.reversarPorPedido(pedido.id),
+        () => this.stockService?.revertirPorPedido(pedido.id),
+      ]) {
+        try {
+          await paso();
+        } catch {
+          // idempotente
+        }
+      }
 
       // Insertar en historial
       await this.prisma.pedidoEstadoHistorial.create({

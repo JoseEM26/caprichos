@@ -18,6 +18,8 @@ import { CrearPedidoDto } from './dto/crear-pedido.dto';
 export interface OrigenPedido {
   canal?: 'CARTA' | 'MOZO';
   usuarioPartyId?: bigint | string | number;
+  /** Cliente con cuenta que hace el pedido en la carta (suma puntos) */
+  clientePartyId?: bigint | string | number;
   mesasIds?: (bigint | string | number)[];
   mesaNombre?: string;
   omitirChequeoCarta?: boolean;
@@ -503,7 +505,7 @@ export class PedidosService {
           canal: origen?.canal || 'CARTA',
           modalidad: dto.modalidad,
           estado: 'COLA',
-          party_id: mozoPartyId,
+          party_id: mozoPartyId ?? (origen?.clientePartyId ? BigInt(origen.clientePartyId) : null),
           cliente_nombre: clienteNombre,
           cliente_telefono: telefonoLimpio,
           mesa_nombre: mesaNombreFinal,

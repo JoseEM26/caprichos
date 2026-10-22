@@ -1,3 +1,6 @@
+import { PuntosService } from '../clientes/puntos.service';
+import { StockService } from '../stock/stock.service';
+import { OfertasService } from '../ofertas/ofertas.service';
 import { SalonService } from '../salon/salon.service';
 import { ComprobantesService } from '../comprobantes/comprobantes.service';
 import {
@@ -27,6 +30,9 @@ export class CobrosService {
     @Optional() private readonly eventosGateway?: EventosGateway,
     @Optional() private readonly salonService?: SalonService,
     @Optional() private readonly comprobantesService?: ComprobantesService,
+    @Optional() private readonly puntosService?: PuntosService,
+    @Optional() private readonly stockService?: StockService,
+    @Optional() private readonly ofertasService?: OfertasService,
   ) {}
 
   private parsearId(id: bigint | string | number): bigint {
@@ -340,6 +346,21 @@ export class CobrosService {
       // idempotente: el mozo o caja pueden liberarla a mano con Sí/No
     }
 
+    // lo que se enciende con el cobro; todo es idempotente y, si falla, no deshace el cobro
+    // (los servicios guardan su propio registro para reintentar):
+    //   puntos del cliente (5 %, DT-55), descuento de stock por receta (FT-STK-03) y cupones impresos (DT-56)
+    for (const paso of [
+      () => this.puntosService?.acumularPorPedido(pedido.id),
+      () => this.stockService?.descontarPorPedido(pedido.id),
+      () => this.ofertasService?.emitirCuponesParaPedido(pedido.id),
+    ]) {
+      try {
+        await paso();
+      } catch {
+        // se puede reintentar al volver a consultar el pedido
+      }
+    }
+
     // 8. Auditar
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
@@ -481,6 +502,18 @@ export class CobrosService {
         },
       });
     });
+
+    // el cobro anulado devuelve el stock y reversa los puntos que había sumado
+    for (const paso of [
+      () => this.puntosService?.reversarPorPedido(cobro.pedido_id),
+      () => this.stockService?.revertirPorPedido(cobro.pedido_id),
+    ]) {
+      try {
+        await paso();
+      } catch {
+        // idempotente: se reintenta desde el historial
+      }
+    }
 
     // 4. Auditar
     await this.auditoria.registrar({
