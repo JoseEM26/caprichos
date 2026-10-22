@@ -5,14 +5,14 @@ import { CambiarClave } from './admin/CambiarClave';
 import { AdminShell } from './admin/AdminShell';
 import { MODULOS } from './admin/modulos';
 import { Escritorio } from './admin/Escritorio';
-import { CartaPlaceholder } from './carta/CartaPlaceholder';
+import { CartaPublica } from './carta/CartaPublica';
 import { PantallaPlaceholder } from './pantalla/PantallaPlaceholder';
 
 export function RutasApp() {
   return (
     <Routes>
       {/* 1. Carta pública */}
-      <Route path="/" element={<CartaPlaceholder />} />
+      <Route path="/" element={<CartaPublica />} />
 
       {/* 2. Pantallas de cocina y TV */}
       <Route path="/pantalla/*" element={<PantallaPlaceholder />} />

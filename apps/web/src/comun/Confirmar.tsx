@@ -3,13 +3,15 @@ import { Boton } from './Boton';
 export interface ConfirmarProps {
   abierto: boolean;
   titulo?: string;
-  mensaje: string;
+  mensaje?: string;
   textoSi?: string;
+  textoConfirmar?: string;
   textoNo?: string;
   peligro?: boolean;
   cargando?: boolean;
   alConfirmar: () => void | Promise<void>;
   alCancelar: () => void;
+  children?: React.ReactNode;
 }
 
 export function Confirmar({
@@ -17,13 +19,17 @@ export function Confirmar({
   titulo = 'Confirmar acción',
   mensaje,
   textoSi = 'Sí, continuar',
+  textoConfirmar,
   textoNo = 'No, cancelar',
   peligro = false,
   cargando = false,
   alConfirmar,
   alCancelar,
+  children,
 }: ConfirmarProps) {
   if (!abierto) return null;
+
+  const textoBotonSi = textoConfirmar || textoSi;
 
   return (
     <div
@@ -43,6 +49,7 @@ export function Confirmar({
       <div
         role="dialog"
         aria-modal="true"
+        aria-label={titulo}
         aria-labelledby="confirmar-titulo"
         style={{
           width: '100%',
@@ -70,16 +77,19 @@ export function Confirmar({
           >
             {titulo}
           </h2>
-          <p
-            style={{
-              margin: 0,
-              fontSize: '14px',
-              lineHeight: '20px',
-              color: 'var(--cp-soft)',
-            }}
-          >
-            {mensaje}
-          </p>
+          {mensaje && (
+            <p
+              style={{
+                margin: 0,
+                fontSize: '14px',
+                lineHeight: '20px',
+                color: 'var(--cp-soft)',
+              }}
+            >
+              {mensaje}
+            </p>
+          )}
+          {children}
         </div>
 
         <div
@@ -104,7 +114,7 @@ export function Confirmar({
             cargando={cargando}
             onClick={alConfirmar}
           >
-            {textoSi}
+            {textoBotonSi}
           </Boton>
         </div>
       </div>

@@ -12,6 +12,7 @@ export interface BotonProps
   variante?: VarianteBoton;
   cargando?: boolean;
   tamano?: 'normal' | 'grande' | 'pequeno';
+  deshabilitado?: boolean;
 }
 
 export function Boton({
@@ -19,7 +20,8 @@ export function Boton({
   cargando = false,
   tamano = 'normal',
   children,
-  disabled,
+  deshabilitado,
+  disabled = deshabilitado,
   style,
   ...resto
 }: BotonProps) {

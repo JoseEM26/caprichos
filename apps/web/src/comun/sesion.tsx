@@ -40,6 +40,28 @@ export interface SesionProviderProps {
 
 let renovacionInicial: Promise<void> | null = null;
 
+// Marca (no secreta) de que este navegador ya inició sesión: sin ella no se intenta renovar al abrir
+// la página, para que la carta pública no haga una petición que siempre termina en 401.
+const CLAVE_INDICIO = 'caprichos_sesion';
+const hayIndicioDeSesion = (): boolean => {
+  try {
+    return window.localStorage.getItem(CLAVE_INDICIO) === '1';
+  } catch {
+    return true; // sin almacenamiento: se intenta igual
+  }
+};
+const marcarSesion = (activa: boolean): void => {
+  try {
+    if (activa) {
+      window.localStorage.setItem(CLAVE_INDICIO, '1');
+    } else {
+      window.localStorage.removeItem(CLAVE_INDICIO);
+    }
+  } catch {
+    // sin almacenamiento
+  }
+};
+
 export function SesionProvider({ children }: SesionProviderProps) {
   const [usuario, setUsuario] = useState<UsuarioSesion | null>(null);
   const [permisos, setPermisos] = useState<string[]>([]);
@@ -76,6 +98,7 @@ export function SesionProvider({ children }: SesionProviderProps) {
     }>('/auth/renovar');
 
     setTokenAcceso(res.accessToken);
+    marcarSesion(true);
     setDebeCambiar(Boolean(res.debeCambiar));
     setUsuario(res.usuario);
 
@@ -94,6 +117,7 @@ export function SesionProvider({ children }: SesionProviderProps) {
       }>('/auth/ingresar', { dni, contrasena });
 
       setTokenAcceso(res.accessToken);
+      marcarSesion(true);
       setDebeCambiar(Boolean(res.debeCambiar));
       setUsuario(res.usuario);
 
@@ -117,6 +141,7 @@ export function SesionProvider({ children }: SesionProviderProps) {
     } catch {
       // Ignorar error al salir del servidor
     } finally {
+      marcarSesion(false);
       setTokenAcceso(null);
       setUsuario(null);
       setPermisos([]);
@@ -151,6 +176,12 @@ export function SesionProvider({ children }: SesionProviderProps) {
   // Renovar al abrir la página (una sola vez: StrictMode monta dos veces y el token de renovación rota)
   useEffect(() => {
     let montado = true;
+    if (!hayIndicioDeSesion()) {
+      setCargando(false);
+      return () => {
+        montado = false;
+      };
+    }
     if (!renovacionInicial) {
       renovacionInicial = renovar();
     }
@@ -158,6 +189,7 @@ export function SesionProvider({ children }: SesionProviderProps) {
     esta
       .catch(() => {
         // Sin sesión previa válida
+        marcarSesion(false);
         if (montado) {
           setUsuario(null);
           setPermisos([]);

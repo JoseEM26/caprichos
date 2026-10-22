@@ -3,16 +3,19 @@ import type { ReactNode } from 'react';
 export interface EstadoVacioProps {
   titulo?: string;
   descripcion?: string;
+  mensaje?: string;
   accion?: ReactNode;
   icono?: ReactNode;
 }
 
 export function EstadoVacio({
   titulo = 'No hay elementos para mostrar',
-  descripcion = 'Aún no se han registrado datos en esta sección.',
+  descripcion,
+  mensaje,
   accion,
   icono,
 }: EstadoVacioProps) {
+  const textoDescripcion = descripcion || mensaje || 'Aún no se han registrado datos en esta sección.';
   return (
     <div
       style={{
@@ -43,7 +46,7 @@ export function EstadoVacio({
       >
         {titulo}
       </div>
-      {descripcion && (
+      {textoDescripcion && (
         <div
           style={{
             fontSize: '13px',
@@ -52,7 +55,7 @@ export function EstadoVacio({
             lineHeight: '18px',
           }}
         >
-          {descripcion}
+          {textoDescripcion}
         </div>
       )}
       {accion && <div style={{ marginTop: '12px' }}>{accion}</div>}

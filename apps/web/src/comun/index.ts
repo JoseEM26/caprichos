@@ -12,3 +12,4 @@ export * from './Confirmar';
 export * from './Paginacion';
 export * from './Combo';
 export * from './Icono';
+export * from './socket';

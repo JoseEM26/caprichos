@@ -3,6 +3,7 @@ import { Escritorio } from './Escritorio';
 import { Proximamente } from './Proximamente';
 import { UsuariosView, AuditoriaView } from './usuarios';
 import { ConfiguracionLocalView, ZonasRepartoView } from './configuracion';
+import { PedidosAdminView } from './pedidos';
 
 export type GrupoModulo =
   | 'Operación'
@@ -61,7 +62,7 @@ export const MODULOS: DefinicionModulo[] = [
     grupo: 'Operación',
     ruta: '/admin/caja',
     permisoMinimo: 'caja/ver',
-    componente: crearProximamente('Pedidos y caja'),
+    componente: PedidosAdminView,
     icono: 'caja',
   },
   {

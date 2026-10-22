@@ -6,9 +6,11 @@ import { SesionProvider } from '../comun/sesion';
 describe('SesionProvider: renovación al abrir la página', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    window.localStorage.clear();
   });
 
   it('con StrictMode renueva la sesión una sola vez (el token de renovación rota)', async () => {
+    window.localStorage.setItem('caprichos_sesion', '1');
     const llamadas: string[] = [];
     vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = String(input);
@@ -43,5 +45,24 @@ describe('SesionProvider: renovación al abrir la página', () => {
 
     await waitFor(() => expect(llamadas).toContain('/auth/yo'));
     expect(llamadas.filter((u) => u === '/auth/renovar')).toHaveLength(1);
+  });
+
+  it('sin indicio de sesión (carta pública) no intenta renovar', async () => {
+    const llamadas: string[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      llamadas.push(String(input));
+      return Promise.reject(new Error('no debería llamarse'));
+    });
+
+    render(
+      <StrictMode>
+        <SesionProvider>
+          <div>contenido</div>
+        </SesionProvider>
+      </StrictMode>,
+    );
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(llamadas).toHaveLength(0);
   });
 });

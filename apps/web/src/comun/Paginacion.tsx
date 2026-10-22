@@ -1,7 +1,8 @@
 import { Boton } from './Boton';
 
 export interface PaginacionProps {
-  pagina: number;
+  pagina?: number;
+  paginaActual?: number;
   totalPaginas: number;
   alCambiarPagina: (nuevaPagina: number) => void;
   totalRegistros?: number;
@@ -9,12 +10,14 @@ export interface PaginacionProps {
 }
 
 export function Paginacion({
-  pagina,
+  pagina: paginaProp,
+  paginaActual,
   totalPaginas,
   alCambiarPagina,
   totalRegistros,
   tamanoPagina,
 }: PaginacionProps) {
+  const pagina = paginaActual ?? paginaProp ?? 1;
   if (totalPaginas <= 1 && (!totalRegistros || totalRegistros <= 0)) {
     return null;
   }
