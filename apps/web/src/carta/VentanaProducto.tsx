@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useEsMovil } from './useEsMovil';
 import { calcularPrecioLinea } from '@caprichos/compartido';
 import {
   GrupoOpcionesCarta,
@@ -25,6 +26,8 @@ export function VentanaProducto({ producto, onCerrar }: VentanaProductoProps) {
 
   // Cantidad total (mínimo 1)
   const [cantidad, setCantidad] = useState(1);
+  const [fotoAmpliada, setFotoAmpliada] = useState(false);
+  const movil = useEsMovil();
 
   // Unidad activa para visualización si cantidad > 1 (0-indexed)
   const [unidadActivaIndex, setUnidadActivaIndex] = useState(0);
@@ -250,7 +253,7 @@ export function VentanaProducto({ producto, onCerrar }: VentanaProductoProps) {
     >
       <div
         style={{
-          width: 'min(600px, 100%)',
+          width: 'min(620px, 100%)',
           maxHeight: '92vh',
           backgroundColor: 'var(--cp-cream)',
           borderRadius: '20px',
@@ -289,19 +292,33 @@ export function VentanaProducto({ producto, onCerrar }: VentanaProductoProps) {
           </button>
 
           {producto.fotoUrl ? (
-            <div style={{ position: 'relative', width: '100%', aspectRatio: '4/3', maxHeight: '280px', overflow: 'hidden', backgroundColor: 'var(--cp-sand)' }}>
+            <button
+              type="button"
+              onClick={() => setFotoAmpliada(true)}
+              aria-label={`Ampliar la foto de ${producto.nombre}`}
+              style={{ position: 'relative', width: '100%', height: movil ? 210 : 280, border: 0, padding: 0, background: 'var(--cp-sand)', cursor: 'zoom-in', display: 'block', overflow: 'hidden' }}
+            >
               <img
                 src={producto.fotoUrl}
                 alt=""
                 aria-hidden="true"
-                style={{ position: 'absolute', left: '-8%', top: '-8%', width: '116%', height: '116%', objectFit: 'cover', filter: 'blur(16px)', opacity: 0.5 }}
+                style={{ position: 'absolute', left: '-10%', top: '-10%', width: '120%', height: '120%', objectFit: 'cover', filter: 'blur(22px)', opacity: 0.55 }}
               />
               <img
                 src={producto.fotoUrl}
                 alt={producto.nombre}
-                style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'center' }}
+                style={{ position: 'relative', height: '100%', maxWidth: '100%', objectFit: 'contain', objectPosition: 'center', display: 'block', margin: '0 auto' }}
               />
-            </div>
+              <span
+                aria-hidden="true"
+                style={{ position: 'absolute', right: 10, bottom: 10, width: 36, height: 36, borderRadius: 18, background: 'rgba(11,44,62,0.78)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="M21 21l-4.3-4.3 M11 8v6 M8 11h6" />
+                </svg>
+              </span>
+            </button>
           ) : (
             <div
               style={{
@@ -326,10 +343,10 @@ export function VentanaProducto({ producto, onCerrar }: VentanaProductoProps) {
           style={{
             flex: 1,
             overflowY: 'auto',
-            padding: '20px',
+            padding: '20px 24px 24px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '18px',
+            gap: '16px',
           }}
         >
           {/* Título, descripción y precio */}
@@ -338,8 +355,8 @@ export function VentanaProducto({ producto, onCerrar }: VentanaProductoProps) {
               style={{
                 fontFamily: 'var(--fuente-titulos)',
                 fontWeight: 800,
-                fontSize: '22px',
-                lineHeight: '26px',
+                fontSize: '24px',
+                lineHeight: '30px',
                 color: 'var(--cp-navy)',
               }}
             >
@@ -362,7 +379,7 @@ export function VentanaProducto({ producto, onCerrar }: VentanaProductoProps) {
                 marginTop: '10px',
                 fontFamily: 'var(--fuente-titulos)',
                 fontWeight: 800,
-                fontSize: '22px',
+                fontSize: '26px',
                 color: 'var(--cp-rust)',
               }}
             >
@@ -918,6 +935,21 @@ export function VentanaProducto({ producto, onCerrar }: VentanaProductoProps) {
           </button>
         </div>
       </div>
+      {fotoAmpliada && producto.fotoUrl && (
+        <div
+          onClick={() => setFotoAmpliada(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(11,44,62,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, boxSizing: 'border-box' }}
+        >
+          <img src={producto.fotoUrl} alt={producto.nombre} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 12 }} />
+          <button
+            onClick={() => setFotoAmpliada(false)}
+            aria-label="Cerrar vista ampliada"
+            style={{ position: 'absolute', top: 12, right: 12, width: 48, height: 48, borderRadius: 24, border: '1.5px solid var(--cp-cream)', background: 'transparent', color: 'var(--cp-cream)', fontSize: 22, fontWeight: 800 }}
+          >
+            ×
+          </button>
+        </div>
+      )}
     </div>
   );
 }
