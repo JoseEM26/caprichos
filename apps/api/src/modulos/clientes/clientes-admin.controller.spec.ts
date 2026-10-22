@@ -1,0 +1,76 @@
+jest.mock('@nestjs/jwt', () => ({
+  JwtService: class {
+    signAsync = jest.fn();
+    verifyAsync = jest.fn();
+  },
+  JwtModule: {
+    register: jest.fn().mockReturnValue({ module: class {} }),
+  },
+}));
+
+import { Test, TestingModule } from '@nestjs/testing';
+import { Reflector } from '@nestjs/core';
+import { ClientesAdminController } from './clientes-admin.controller';
+import { ClientesService } from './clientes.service';
+import { PuntosService } from './puntos.service';
+import { AccesoGuard } from '../acceso/acceso.guard';
+import { PrismaService } from '../../comun/prisma/prisma.service';
+
+describe('ClientesAdminController', () => {
+  let controller: ClientesAdminController;
+  let clientesServiceMock: any;
+  let puntosServiceMock: any;
+
+  beforeEach(async () => {
+    clientesServiceMock = {
+      listarAdmin: jest.fn().mockResolvedValue({ items: [], total: 0, pagina: 1, paginas: 1 }),
+      obtenerFichaAdmin: jest.fn().mockResolvedValue({ id: '100', nombre: 'Ana' }),
+      crearEnMostrador: jest.fn().mockResolvedValue({ id: '100', nombre: 'Ana' }),
+      editarCliente: jest.fn().mockResolvedValue({ ok: true }),
+      cambiarEstado: jest.fn().mockResolvedValue({ ok: true, activo: false }),
+    };
+
+    puntosServiceMock = {
+      ajustarManual: jest.fn().mockResolvedValue({ puntos: 10, nuevoSaldo: 20 }),
+      listarMovimientos: jest.fn().mockResolvedValue([]),
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      controllers: [ClientesAdminController],
+      providers: [
+        { provide: ClientesService, useValue: clientesServiceMock },
+        { provide: PuntosService, useValue: puntosServiceMock },
+        { provide: PrismaService, useValue: {} },
+        { provide: Reflector, useValue: {} },
+      ],
+    })
+      .overrideGuard(AccesoGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
+
+    controller = module.get<ClientesAdminController>(ClientesAdminController);
+  });
+
+  it('listar delega a clientesService.listarAdmin', async () => {
+    const req: any = { usuario: { rol: 'ADMIN' }, ip: '127.0.0.1' };
+    await controller.listar('ana', 'Persona', 'Activos', undefined, '1', '6', req);
+
+    expect(clientesServiceMock.listarAdmin).toHaveBeenCalledWith(
+      expect.objectContaining({ q: 'ana', tipo: 'Persona', estado: 'Activos' }),
+      req.usuario,
+      '127.0.0.1',
+    );
+  });
+
+  it('ajustarPuntos delega a puntosService.ajustarManual', async () => {
+    const req: any = { usuario: { partyId: 1n, rol: 'ADMIN' }, ip: '127.0.0.1' };
+    await controller.ajustarPuntos('100', { puntos: 10, motivo: 'Premio por fidelidad' }, req);
+
+    expect(puntosServiceMock.ajustarManual).toHaveBeenCalledWith(
+      '100',
+      { puntos: 10, motivo: 'Premio por fidelidad' },
+      1n,
+      '127.0.0.1',
+    );
+  });
+});
