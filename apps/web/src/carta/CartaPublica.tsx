@@ -1,3 +1,4 @@
+import { PieLegal } from './legal';
 import { useEffect, useState, useMemo } from 'react';
 import { api } from '../comun/api';
 import { Cargando } from '../comun/Cargando';
@@ -303,6 +304,9 @@ function ContenidoCartaPublica() {
           onCerrar={cerrarModalProducto}
         />
       )}
+
+      {/* Pie con términos, privacidad y libro de reclamaciones */}
+      <PieLegal />
 
       {/* Cajón lateral del carrito */}
       <CajonCarrito estadoLocal={estadoLocal} />

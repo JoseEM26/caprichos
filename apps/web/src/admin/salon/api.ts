@@ -1,0 +1,157 @@
+import { api } from '../../comun/api';
+import { CategoriaCarta } from '../../carta/tipos';
+import {
+  DiaCalendarioReserva,
+  DisenoCompletoJson,
+  PisoPlano,
+  PisoSalon,
+  Reserva,
+} from './tipos';
+
+export interface CrearElementoPayload {
+  pisoId: string;
+  tipo: string;
+  x: number;
+  y: number;
+  ancho: number;
+  alto: number;
+  nombre?: string;
+  asientos?: number;
+}
+
+export interface ActualizarElementoPayload {
+  x?: number;
+  y?: number;
+  ancho?: number;
+  alto?: number;
+  nombre?: string;
+  asientos?: number;
+  activo?: boolean;
+}
+
+export interface ActualizarPisoPayload {
+  nombre?: string;
+  activo?: boolean;
+  cuadriculaAncho?: number;
+  cuadriculaAlto?: number;
+}
+
+export interface AbrirPedidoMesaPayload {
+  mesas: string[];
+  lineas: Array<{
+    productoId: string | number;
+    tamanoId?: string | number;
+    cantidad: number;
+    opciones?: (string | number)[];
+    nota?: string;
+    personas?: string[];
+  }>;
+  nota?: string;
+  reservaId?: string;
+}
+
+export interface CrearReservaPayload {
+  nombre: string;
+  telefono: string;
+  personas: number;
+  hora: string;
+  mesas: (string | number)[];
+}
+
+export interface ActualizarReservaPayload {
+  nombre?: string;
+  telefono?: string;
+  personas?: number;
+  hora?: string;
+  mesas?: (string | number)[];
+}
+
+export const salonApi = {
+  // =========================================================================
+  // PLANO
+  // =========================================================================
+  obtenerPlano: () => api.get<PisoPlano[]>('/admin/plano'),
+
+  actualizarPiso: (id: string, payload: ActualizarPisoPayload) =>
+    api.patch<PisoPlano>(`/admin/plano/pisos/${id}`, payload),
+
+  crearElemento: (payload: CrearElementoPayload) =>
+    api.post('/admin/plano/elementos', payload),
+
+  actualizarElemento: (id: string, payload: ActualizarElementoPayload) =>
+    api.patch(`/admin/plano/elementos/${id}`, payload),
+
+  girarElemento: (id: string) =>
+    api.post(`/admin/plano/elementos/${id}/girar`),
+
+  eliminarElemento: (id: string) =>
+    api.delete<{ ok: boolean; eliminado: boolean; id: string }>(
+      `/admin/plano/elementos/${id}`,
+    ),
+
+  obtenerDiseno: () => api.get<DisenoCompletoJson>('/admin/plano/diseno'),
+
+  aplicarDiseno: (diseno: DisenoCompletoJson | string) =>
+    api.put<{ ok: boolean; mensaje: string }>('/admin/plano/diseno', diseno),
+
+  // =========================================================================
+  // SALÓN / MESAS
+  // =========================================================================
+  obtenerMesas: () => api.get<{ pisos: PisoSalon[] }>('/admin/salon/mesas'),
+
+  abrirPedidoMesa: (payload: AbrirPedidoMesaPayload, idempotencyKey: string) =>
+    api.post('/admin/salon/pedidos', payload, {
+      headers: {
+        'Idempotency-Key': idempotencyKey,
+      },
+    }),
+
+  liberarMesaManual: (mesaId: string, motivo: string) =>
+    api.post<{ ok: boolean; mensaje: string }>(
+      `/admin/salon/mesas/${mesaId}/liberar`,
+      { motivo },
+    ),
+
+  marcarEntregadoMesa: (pedidoId: string) =>
+    api.post<{ ok: boolean; id: string; codigo: string }>(
+      `/admin/salon/pedidos/${pedidoId}/entregado-mesa`,
+    ),
+
+  // =========================================================================
+  // RESERVAS
+  // =========================================================================
+  listarReservas: (filtros?: { desde?: string; hasta?: string; estado?: string }) => {
+    const params = new URLSearchParams();
+    if (filtros?.desde) params.append('desde', filtros.desde);
+    if (filtros?.hasta) params.append('hasta', filtros.hasta);
+    if (filtros?.estado) params.append('estado', filtros.estado);
+    const qs = params.toString();
+    return api.get<Reserva[]>(`/admin/reservas${qs ? `?${qs}` : ''}`);
+  },
+
+  calendario: (mes: string) =>
+    api.get<DiaCalendarioReserva[]>(`/admin/reservas/calendario?mes=${mes}`),
+
+  agenda: (fecha: string) =>
+    api.get<Reserva[]>(`/admin/reservas/agenda?fecha=${fecha}`),
+
+  crearReserva: (payload: CrearReservaPayload) =>
+    api.post<Reserva>('/admin/reservas', payload),
+
+  actualizarReserva: (id: string, payload: ActualizarReservaPayload) =>
+    api.patch<Reserva>(`/admin/reservas/${id}`, payload),
+
+  cancelarReserva: (id: string, motivo: string) =>
+    api.post<Reserva>(`/admin/reservas/${id}/cancelar`, { motivo }),
+
+  sentarReserva: (id: string) =>
+    api.post<{ mesas: string[]; personas: number; nombre: string }>(
+      `/admin/reservas/${id}/sentar`,
+    ),
+
+  // =========================================================================
+  // CARTA (para armar pedido del mozo)
+  // =========================================================================
+  obtenerCarta: () =>
+    api.get<{ categorias: CategoriaCarta[]; local?: any }>('/carta'),
+};

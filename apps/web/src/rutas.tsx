@@ -6,16 +6,27 @@ import { AdminShell } from './admin/AdminShell';
 import { MODULOS } from './admin/modulos';
 import { Escritorio } from './admin/Escritorio';
 import { CartaPublica } from './carta/CartaPublica';
-import { PantallaPlaceholder } from './pantalla/PantallaPlaceholder';
+import { TerminosPage, PrivacidadPage, ReclamosPublicoPage } from './carta/legal';
+import { PantallaCocinaView } from './pantalla/PantallaCocinaView';
 
 export function RutasApp() {
   return (
     <Routes>
       {/* 1. Carta pública */}
       <Route path="/" element={<CartaPublica />} />
+      <Route path="/legal/terminos" element={<TerminosPage />} />
+      <Route path="/legal/privacidad" element={<PrivacidadPage />} />
+      <Route path="/reclamos" element={<ReclamosPublicoPage />} />
 
       {/* 2. Pantallas de cocina y TV */}
-      <Route path="/pantalla/*" element={<PantallaPlaceholder />} />
+      <Route
+        path="/pantalla/*"
+        element={
+          <RutaProtegida permiso="cocina/ver">
+            <PantallaCocinaView />
+          </RutaProtegida>
+        }
+      />
 
       {/* 3. Autenticación administrativa */}
       <Route path="/admin/ingresar" element={<Ingresar />} />

@@ -565,6 +565,27 @@ export function PedidoDetalle({ pedido, alActualizar }: PedidoDetalleProps) {
             <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 14 }}>
               Comprobante del cliente ({pedido.comprobante_tipo || 'BOLETA'})
             </div>
+            {tiene('comprobantes/ver') && (
+              // la nota de venta numerada (NV01) se ve y se reimprime en el módulo Comprobantes
+              <a
+                href={`/admin/comprobantes?tab=nota&pedidoId=${encodeURIComponent(String(pedido.id))}`}
+                style={{
+                  alignSelf: 'flex-start',
+                  minHeight: 44,
+                  padding: '0 16px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                  borderRadius: 12,
+                  color: 'var(--cp-navy, #0B2C3E)',
+                  fontWeight: 800,
+                  fontSize: 13,
+                  textDecoration: 'none',
+                }}
+              >
+                Ver la nota de venta numerada
+              </a>
+            )}
             <div
               style={{
                 alignSelf: 'center',

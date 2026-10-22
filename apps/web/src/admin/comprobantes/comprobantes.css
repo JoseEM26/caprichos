@@ -1,0 +1,151 @@
+/* Estilos de comprobantes y nota de venta (80mm) */
+
+.comprobantes-contenedor {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+}
+
+.comprobantes-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 2px solid var(--cp-line);
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+}
+
+.comprobantes-tab-btn {
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  border: 1.5px solid var(--cp-navy);
+  transition: all 0.2s ease;
+}
+
+.comprobantes-tab-btn.activo {
+  background-color: var(--cp-navy);
+  color: var(--cp-cream);
+}
+
+.comprobantes-tab-btn:not(.activo) {
+  background-color: transparent;
+  color: var(--cp-navy);
+}
+
+/* Tabla táctil */
+.tabla-tactil-envoltura {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--cp-line);
+  border-radius: 12px;
+  background-color: var(--cp-white);
+}
+
+.tabla-tactil {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.tabla-tactil th {
+  background-color: var(--cp-sand);
+  color: var(--cp-navy);
+  font-weight: 800;
+  font-size: 13px;
+  padding: 12px 14px;
+  border-bottom: 1.5px solid var(--cp-line);
+}
+
+.tabla-tactil td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--cp-line);
+  font-size: 14px;
+  vertical-align: middle;
+}
+
+.tabla-tactil tr:hover {
+  background-color: rgba(230, 121, 41, 0.05);
+}
+
+/* Nota de venta ticket 80 mm */
+.ticket-vista {
+  width: min(100%, 340px);
+  margin: 0 auto;
+  background-color: var(--cp-white);
+  border: 1px solid var(--cp-line2);
+  box-shadow: 0 4px 14px rgba(11, 44, 62, 0.12);
+  padding: 20px 16px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--cp-navy);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-sizing: border-box;
+}
+
+.ticket-separador {
+  border-top: 1px dashed var(--cp-navy);
+  margin: 8px 0;
+}
+
+.ticket-separador-doble {
+  border-top: 2px dashed var(--cp-navy);
+  margin: 8px 0;
+}
+
+.ticket-copia-marca {
+  display: inline-block;
+  border: 2px solid var(--cp-rust);
+  color: var(--cp-rust);
+  font-weight: 800;
+  font-size: 15px;
+  padding: 4px 8px;
+  text-align: center;
+  margin: 6px 0;
+  letter-spacing: 0.1em;
+}
+
+.ticket-aviso-facturador {
+  border: 1.5px solid var(--cp-orange);
+  background-color: #FFF3EB;
+  color: var(--cp-rust);
+  font-weight: 700;
+  padding: 6px;
+  text-align: center;
+  font-size: 12px;
+  border-radius: 4px;
+  margin: 6px 0;
+}
+
+/* Impresión física de 80 mm */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #ticket-impresion, #ticket-impresion * {
+    visibility: visible;
+  }
+  #ticket-impresion {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm;
+    margin: 0;
+    padding: 2mm;
+    box-shadow: none;
+    border: none;
+    font-size: 12px;
+    line-height: 15px;
+    background: #FFFFFF !important;
+    color: #000000 !important;
+  }
+  .no-imprimir {
+    display: none !important;
+  }
+}

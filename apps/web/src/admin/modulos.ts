@@ -4,6 +4,11 @@ import { Proximamente } from './Proximamente';
 import { UsuariosView, AuditoriaView } from './usuarios';
 import { ConfiguracionLocalView, ZonasRepartoView } from './configuracion';
 import { PedidosAdminView } from './pedidos';
+import { CocinaAdminView } from './cocina';
+import { RepartosView } from './repartos';
+import { CierreView } from './cierre';
+import { ComprobantesView, ReclamosAdminView } from './comprobantes';
+import { PlanoView, ReservasView } from './salon';
 
 export type GrupoModulo =
   | 'Operación'
@@ -79,8 +84,8 @@ export const MODULOS: DefinicionModulo[] = [
     nombre: 'Caja y cierres',
     grupo: 'Operación',
     ruta: '/admin/cierre',
-    permisoMinimo: 'caja/cerrar',
-    componente: crearProximamente('Caja y cierres'),
+    permisoMinimo: 'caja/ver',
+    componente: CierreView,
     icono: 'cierre',
   },
   {
@@ -89,7 +94,7 @@ export const MODULOS: DefinicionModulo[] = [
     grupo: 'Operación',
     ruta: '/admin/cocina',
     permisoMinimo: 'cocina/ver',
-    componente: crearProximamente('Cocina'),
+    componente: CocinaAdminView,
     icono: 'cocina',
   },
   {
@@ -98,7 +103,7 @@ export const MODULOS: DefinicionModulo[] = [
     grupo: 'Operación',
     ruta: '/admin/repartos',
     permisoMinimo: 'repartos/ver',
-    componente: crearProximamente('Repartos'),
+    componente: RepartosView,
     icono: 'repartos',
   },
   {
@@ -106,12 +111,30 @@ export const MODULOS: DefinicionModulo[] = [
     nombre: 'Reservas',
     grupo: 'Operación',
     ruta: '/admin/reservas',
-    permisoMinimo: 'pedidos/ver',
-    componente: crearProximamente('Reservas'),
+    permisoMinimo: 'reservas/ver',
+    componente: ReservasView,
     icono: 'reservas',
   },
 
   // --- Clientes y ventas ---
+  {
+    clave: 'comprobantes',
+    nombre: 'Comprobantes',
+    grupo: 'Clientes y ventas',
+    ruta: '/admin/comprobantes',
+    permisoMinimo: 'comprobantes/ver',
+    componente: ComprobantesView,
+    icono: 'billete',
+  },
+  {
+    clave: 'reclamos',
+    nombre: 'Libro de reclamaciones',
+    grupo: 'Clientes y ventas',
+    ruta: '/admin/reclamos',
+    permisoMinimo: 'reclamos/ver',
+    componente: ReclamosAdminView,
+    icono: 'mensajes',
+  },
   {
     clave: 'clientes',
     nombre: 'Clientes',
@@ -303,8 +326,8 @@ export const MODULOS: DefinicionModulo[] = [
     nombre: 'Plano del local',
     grupo: 'Configuración',
     ruta: '/admin/plano',
-    permisoMinimo: 'local/ver',
-    componente: crearProximamente('Plano del local'),
+    permisoMinimo: 'plano/ver',
+    componente: PlanoView,
     icono: 'plano',
   },
   {
