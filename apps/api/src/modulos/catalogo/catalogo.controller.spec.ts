@@ -45,6 +45,17 @@ describe('CatalogoControllers', () => {
       actualizarCategoria: jest.fn(),
       ocultarCategoria: jest.fn(),
       mostrarCategoria: jest.fn(),
+      crearCategoria: jest.fn(),
+      listarListasAdmin: jest.fn(),
+      crearLista: jest.fn(),
+      actualizarLista: jest.fn(),
+      agregarValorLista: jest.fn(),
+      actualizarValorLista: jest.fn(),
+      alternarValorLista: jest.fn(),
+      listarGruposAdmin: jest.fn(),
+      crearGrupo: jest.fn(),
+      actualizarGrupo: jest.fn(),
+      asignarGrupoCategorias: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -158,6 +169,29 @@ describe('CatalogoControllers', () => {
         '127.0.0.1',
       );
       expect(res.nombre).toBe('Bebidas Especiales');
+    });
+
+    it('debe crear categoría vía POST /categorias', async () => {
+      service.crearCategoria.mockResolvedValue({ id: '5', nombre: 'PIZZAS' });
+      const reqMock: any = { usuario: { partyId: BigInt(1) }, ip: '127.0.0.1' };
+      const res = await catalogoController.crearCategoria(
+        { nombre: 'PIZZAS', areaId: '2' },
+        reqMock,
+      );
+      expect(service.crearCategoria).toHaveBeenCalled();
+      expect(res.nombre).toBe('PIZZAS');
+    });
+
+    it('debe listar listas y agregar valor vía controller', async () => {
+      service.listarListasAdmin.mockResolvedValue([{ id: '1', nombre: 'Tamaños' }]);
+      service.agregarValorLista.mockResolvedValue({ id: '10', nombre: '20 oz' });
+
+      const reqMock: any = { usuario: { partyId: BigInt(1) }, ip: '127.0.0.1' };
+      const listas = await catalogoController.listarListas();
+      expect(listas).toHaveLength(1);
+
+      const nuevoValor = await catalogoController.agregarValor('1', { nombre: '20 oz' }, reqMock);
+      expect(nuevoValor.nombre).toBe('20 oz');
     });
   });
 });

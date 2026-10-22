@@ -16,8 +16,16 @@ import { CatalogoService } from './catalogo.service';
 import { CrearProductoDto } from './dto/crear-producto.dto';
 import { EditarProductoDto } from './dto/editar-producto.dto';
 import { AgotarDto } from './dto/agotar.dto';
-import { ActualizarCategoriaDto } from './dto/categoria.dto';
+import { ActualizarCategoriaDto, CrearCategoriaDto } from './dto/categoria.dto';
 import { FiltrarProductosDto } from './dto/filtrar-productos.dto';
+import { ActualizarGrupoOpcionesDto, CrearGrupoOpcionesDto } from './dto/grupo-opciones.dto';
+import {
+  ActualizarListaDto,
+  ActualizarValorDto,
+  AgregarValorDto,
+  AsignarGrupoCategoriasDto,
+  CrearListaDto,
+} from './dto/lista.dto';
 
 // ===========================================================================
 // CARTA PÚBLICA (sin guard)
@@ -180,5 +188,104 @@ export class CatalogoController {
   async mostrarCategoria(@Param('id') id: string, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.catalogoService.mostrarCategoria(id, req.usuario, ip);
+  }
+
+  @Post('categorias')
+  @Permiso('catalogo', 'crear')
+  async crearCategoria(@Body() dto: CrearCategoriaDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.catalogoService.crearCategoria(dto, req.usuario, ip);
+  }
+
+  // --- Listas y valores ---
+
+  @Get('listas')
+  @Permiso('catalogo', 'ver')
+  async listarListas() {
+    return this.catalogoService.listarListasAdmin();
+  }
+
+  @Post('listas')
+  @Permiso('catalogo', 'crear')
+  async crearLista(@Body() dto: CrearListaDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.catalogoService.crearLista(dto, req.usuario, ip);
+  }
+
+  @Patch('listas/:id')
+  @Permiso('catalogo', 'editar')
+  async actualizarLista(
+    @Param('id') id: string,
+    @Body() dto: ActualizarListaDto,
+    @Req() req: any,
+  ) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.catalogoService.actualizarLista(id, dto, req.usuario, ip);
+  }
+
+  @Post('listas/:id/valores')
+  @Permiso('catalogo', 'crear')
+  async agregarValor(
+    @Param('id') id: string,
+    @Body() dto: AgregarValorDto,
+    @Req() req: any,
+  ) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.catalogoService.agregarValorLista(id, dto, req.usuario, ip);
+  }
+
+  @Patch('valores/:id')
+  @Permiso('catalogo', 'editar')
+  async actualizarValor(
+    @Param('id') id: string,
+    @Body() dto: ActualizarValorDto,
+    @Req() req: any,
+  ) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.catalogoService.actualizarValorLista(id, dto, req.usuario, ip);
+  }
+
+  @Post('valores/:id/alternar')
+  @Permiso('catalogo', 'ocultar')
+  async alternarValor(@Param('id') id: string, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.catalogoService.alternarValorLista(id, req.usuario, ip);
+  }
+
+  // --- Grupos de opciones ---
+
+  @Get('grupos')
+  @Permiso('catalogo', 'ver')
+  async listarGrupos() {
+    return this.catalogoService.listarGruposAdmin();
+  }
+
+  @Post('grupos')
+  @Permiso('catalogo', 'crear')
+  async crearGrupo(@Body() dto: CrearGrupoOpcionesDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.catalogoService.crearGrupo(dto, req.usuario, ip);
+  }
+
+  @Patch('grupos/:id')
+  @Permiso('catalogo', 'editar')
+  async actualizarGrupo(
+    @Param('id') id: string,
+    @Body() dto: ActualizarGrupoOpcionesDto,
+    @Req() req: any,
+  ) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.catalogoService.actualizarGrupo(id, dto, req.usuario, ip);
+  }
+
+  @Post('grupos/:id/categorias')
+  @Permiso('catalogo', 'editar')
+  async asignarGrupoCategorias(
+    @Param('id') id: string,
+    @Body() dto: AsignarGrupoCategoriasDto,
+    @Req() req: any,
+  ) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.catalogoService.asignarGrupoCategorias(id, dto.categoriaIds, req.usuario, ip);
   }
 }

@@ -3,9 +3,11 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
+import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import {
   CategoriaCarta,
@@ -14,8 +16,15 @@ import {
 import { CrearProductoDto } from './dto/crear-producto.dto';
 import { EditarProductoDto } from './dto/editar-producto.dto';
 import { AgotarDto } from './dto/agotar.dto';
-import { ActualizarCategoriaDto } from './dto/categoria.dto';
+import { ActualizarCategoriaDto, CrearCategoriaDto } from './dto/categoria.dto';
 import { FiltrarProductosDto } from './dto/filtrar-productos.dto';
+import { ActualizarGrupoOpcionesDto, CrearGrupoOpcionesDto } from './dto/grupo-opciones.dto';
+import {
+  ActualizarListaDto,
+  ActualizarValorDto,
+  AgregarValorDto,
+  CrearListaDto,
+} from './dto/lista.dto';
 
 export function normalizarTexto(texto: string): string {
   if (!texto) return '';
@@ -50,6 +59,7 @@ export class CatalogoService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditoriaService,
+    @Optional() private readonly eventosGateway?: EventosGateway,
   ) {}
 
   private parsearId(id: bigint | string | number): bigint {
@@ -1223,5 +1233,682 @@ export class CatalogoService {
     });
 
     return { ok: true, id: cId.toString(), oculta: false };
+  }
+
+  async crearCategoria(
+    dto: CrearCategoriaDto,
+    usuario?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const nombre = dto.nombre.trim();
+    const duplicado = await this.prisma.categoria.findFirst({
+      where: { nombre: { equals: nombre, mode: 'insensitive' } },
+    });
+    if (duplicado) {
+      throw new ConflictException({
+        codigo: 'NOMBRE_DUPLICADO',
+        mensaje: 'Ya existe una categoría con ese nombre',
+      });
+    }
+
+    let areaId: bigint;
+    if (dto.areaId) {
+      areaId = this.parsearId(dto.areaId);
+    } else {
+      const primeraArea = await this.prisma.areaCocina.findFirst({
+        where: { activo: true },
+        orderBy: { id: 'asc' },
+      });
+      areaId = primeraArea?.id || BigInt(1);
+    }
+
+    let orden = dto.orden;
+    if (orden === undefined) {
+      const maxOrden = await this.prisma.categoria.aggregate({ _max: { orden: true } });
+      orden = (maxOrden._max.orden || 0) + 1;
+    }
+
+    const nueva = await this.prisma.categoria.create({
+      data: {
+        nombre,
+        area_id: areaId,
+        orden,
+        lleva_opciones: dto.llevaOpciones ?? true,
+        oculta: dto.oculta ?? false,
+      },
+    });
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'catalogo',
+      accion: 'CREAR_CATEGORIA',
+      resultado: 'OK',
+      entidad: 'categoria',
+      entidadId: nueva.id,
+      despues: {
+        nombre: nueva.nombre,
+        orden: nueva.orden,
+        llevaOpciones: nueva.lleva_opciones,
+      },
+      partyId: usuario?.partyId,
+      ip,
+    });
+
+    this.eventosGateway?.emitirAdmin('catalogo:categoria_creada', {
+      id: nueva.id.toString(),
+      nombre: nueva.nombre,
+    });
+
+    return {
+      id: nueva.id.toString(),
+      nombre: nueva.nombre,
+      areaId: nueva.area_id.toString(),
+      orden: nueva.orden,
+      oculta: nueva.oculta,
+      llevaOpciones: nueva.lleva_opciones,
+    };
+  }
+
+  // =========================================================================
+  // 5. LISTAS Y VALORES (ADMIN)
+  // =========================================================================
+
+  async listarListasAdmin() {
+    const listas = await this.prisma.lista.findMany({
+      orderBy: { id: 'asc' },
+      include: {
+        valores: {
+          orderBy: { orden: 'asc' },
+          include: {
+            _count: {
+              select: {
+                productoTamanos: true,
+                opciones: true,
+              },
+            },
+          },
+        },
+        grupos: {
+          select: { id: true, nombre: true },
+        },
+      },
+    });
+
+    return listas.map((l) => ({
+      id: l.id.toString(),
+      codigo: l.codigo,
+      nombre: l.nombre,
+      grupos: l.grupos.map((g) => ({ id: g.id.toString(), nombre: g.nombre })),
+      valores: l.valores.map((v) => ({
+        id: v.id.toString(),
+        nombre: v.nombre,
+        orden: v.orden,
+        activo: v.activo,
+        usos: (v._count?.productoTamanos || 0) + (v._count?.opciones || 0),
+      })),
+    }));
+  }
+
+  async crearLista(
+    dto: CrearListaDto,
+    usuario?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const nombre = dto.nombre.trim();
+    if (nombre.length < 2) {
+      throw new BadRequestException({
+        codigo: 'NOMBRE_CORTO',
+        mensaje: 'El nombre debe tener al menos 2 letras',
+      });
+    }
+
+    const codigo = dto.codigo || `GRP_${nombre.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Z0-9]+/g, '_').slice(0, 35)}_${Date.now().toString(36).slice(-4).toUpperCase()}`;
+
+    const nueva = await this.prisma.lista.create({
+      data: {
+        nombre,
+        codigo,
+      },
+    });
+
+    await this.prisma.grupoOpciones.upsert({
+      where: { nombre },
+      update: { lista_id: nueva.id, activo: true },
+      create: {
+        nombre,
+        lista_id: nueva.id,
+        minimo: 0,
+        maximo: 1,
+        obligatorio: false,
+        activo: true,
+      },
+    });
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'catalogo',
+      accion: 'CREAR_LISTA',
+      resultado: 'OK',
+      entidad: 'lista',
+      entidadId: nueva.id,
+      despues: { nombre: nueva.nombre, codigo: nueva.codigo },
+      partyId: usuario?.partyId,
+      ip,
+    });
+
+    return {
+      id: nueva.id.toString(),
+      codigo: nueva.codigo,
+      nombre: nueva.nombre,
+      valores: [],
+    };
+  }
+
+  async actualizarLista(
+    id: bigint | string | number,
+    dto: ActualizarListaDto,
+    usuario?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const lId = this.parsearId(id);
+    const actual = await this.prisma.lista.findUnique({ where: { id: lId } });
+    if (!actual) {
+      throw new NotFoundException({
+        codigo: 'LISTA_NO_ENCONTRADA',
+        mensaje: 'La lista no existe',
+      });
+    }
+
+    const nuevoNombre = dto.nombre?.trim();
+    if (nuevoNombre && nuevoNombre.length < 2) {
+      throw new BadRequestException({
+        codigo: 'NOMBRE_CORTO',
+        mensaje: 'El nombre debe tener al menos 2 letras',
+      });
+    }
+
+    const updated = await this.prisma.lista.update({
+      where: { id: lId },
+      data: {
+        nombre: nuevoNombre || undefined,
+        codigo: dto.codigo || undefined,
+      },
+    });
+
+    if (nuevoNombre) {
+      await this.prisma.grupoOpciones.updateMany({
+        where: { lista_id: lId },
+        data: { nombre: nuevoNombre },
+      });
+    }
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'catalogo',
+      accion: 'EDITAR_LISTA',
+      resultado: 'OK',
+      entidad: 'lista',
+      entidadId: lId,
+      antes: { nombre: actual.nombre },
+      despues: { nombre: updated.nombre },
+      partyId: usuario?.partyId,
+      ip,
+    });
+
+    return {
+      id: updated.id.toString(),
+      codigo: updated.codigo,
+      nombre: updated.nombre,
+    };
+  }
+
+  async agregarValorLista(
+    listaId: bigint | string | number,
+    dto: AgregarValorDto,
+    usuario?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const lId = this.parsearId(listaId);
+    const lista = await this.prisma.lista.findUnique({ where: { id: lId } });
+    if (!lista) {
+      throw new NotFoundException({
+        codigo: 'LISTA_NO_ENCONTRADA',
+        mensaje: 'La lista no existe',
+      });
+    }
+
+    const nombre = dto.nombre.trim();
+    if (nombre.length < 1) {
+      throw new BadRequestException({
+        codigo: 'NOMBRE_VACIO',
+        mensaje: 'Escribe el nombre del elemento',
+      });
+    }
+
+    const existente = await this.prisma.listaValor.findFirst({
+      where: {
+        lista_id: lId,
+        nombre: { equals: nombre, mode: 'insensitive' },
+      },
+    });
+
+    let valor: any;
+    if (existente) {
+      if (existente.activo) {
+        throw new ConflictException({
+          codigo: 'VALOR_DUPLICADO',
+          mensaje: `«${nombre}» ya está en esta lista`,
+        });
+      }
+      valor = await this.prisma.listaValor.update({
+        where: { id: existente.id },
+        data: { activo: true, nombre },
+      });
+    } else {
+      let orden = dto.orden;
+      if (orden === undefined) {
+        const maxOrden = await this.prisma.listaValor.aggregate({
+          where: { lista_id: lId },
+          _max: { orden: true },
+        });
+        orden = (maxOrden._max.orden || 0) + 1;
+      }
+      valor = await this.prisma.listaValor.create({
+        data: {
+          lista_id: lId,
+          nombre,
+          orden,
+          activo: dto.activo ?? true,
+        },
+      });
+    }
+
+    const grupo = await this.prisma.grupoOpciones.findFirst({
+      where: { lista_id: lId },
+    });
+    if (grupo) {
+      await this.prisma.opcion.upsert({
+        where: {
+          grupo_id_valor_id: {
+            grupo_id: grupo.id,
+            valor_id: valor.id,
+          },
+        },
+        update: { activo: true },
+        create: {
+          grupo_id: grupo.id,
+          valor_id: valor.id,
+          precio_extra: 0,
+          activo: true,
+        },
+      });
+    }
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'catalogo',
+      accion: 'AGREGAR_VALOR_LISTA',
+      resultado: 'OK',
+      entidad: 'lista_valor',
+      entidadId: valor.id,
+      despues: { listaId: lId.toString(), nombre: valor.nombre },
+      partyId: usuario?.partyId,
+      ip,
+    });
+
+    return {
+      id: valor.id.toString(),
+      listaId: valor.lista_id.toString(),
+      nombre: valor.nombre,
+      orden: valor.orden,
+      activo: valor.activo,
+    };
+  }
+
+  async actualizarValorLista(
+    id: bigint | string | number,
+    dto: ActualizarValorDto,
+    usuario?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const vId = this.parsearId(id);
+    const actual = await this.prisma.listaValor.findUnique({ where: { id: vId } });
+    if (!actual) {
+      throw new NotFoundException({
+        codigo: 'VALOR_NO_ENCONTRADO',
+        mensaje: 'El elemento de la lista no existe',
+      });
+    }
+
+    const nuevoNombre = dto.nombre?.trim();
+    if (nuevoNombre && nuevoNombre !== actual.nombre) {
+      const dup = await this.prisma.listaValor.findFirst({
+        where: {
+          lista_id: actual.lista_id,
+          id: { not: vId },
+          nombre: { equals: nuevoNombre, mode: 'insensitive' },
+        },
+      });
+      if (dup) {
+        throw new ConflictException({
+          codigo: 'VALOR_DUPLICADO',
+          mensaje: `«${nuevoNombre}» ya existe en esta lista`,
+        });
+      }
+    }
+
+    const updated = await this.prisma.listaValor.update({
+      where: { id: vId },
+      data: {
+        nombre: nuevoNombre || undefined,
+        orden: dto.orden !== undefined ? dto.orden : undefined,
+        activo: dto.activo !== undefined ? dto.activo : undefined,
+      },
+    });
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'catalogo',
+      accion: 'EDITAR_VALOR_LISTA',
+      resultado: 'OK',
+      entidad: 'lista_valor',
+      entidadId: vId,
+      antes: { nombre: actual.nombre, activo: actual.activo },
+      despues: { nombre: updated.nombre, activo: updated.activo },
+      partyId: usuario?.partyId,
+      ip,
+    });
+
+    return {
+      id: updated.id.toString(),
+      listaId: updated.lista_id.toString(),
+      nombre: updated.nombre,
+      orden: updated.orden,
+      activo: updated.activo,
+    };
+  }
+
+  async alternarValorLista(
+    id: bigint | string | number,
+    usuario?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const vId = this.parsearId(id);
+    const actual = await this.prisma.listaValor.findUnique({ where: { id: vId } });
+    if (!actual) {
+      throw new NotFoundException({
+        codigo: 'VALOR_NO_ENCONTRADO',
+        mensaje: 'El elemento no existe',
+      });
+    }
+
+    const nuevoActivo = !actual.activo;
+    const updated = await this.prisma.listaValor.update({
+      where: { id: vId },
+      data: { activo: nuevoActivo },
+    });
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'catalogo',
+      accion: nuevoActivo ? 'ACTIVAR_VALOR_LISTA' : 'DESACTIVAR_VALOR_LISTA',
+      resultado: 'OK',
+      entidad: 'lista_valor',
+      entidadId: vId,
+      antes: { activo: actual.activo },
+      despues: { activo: nuevoActivo },
+      partyId: usuario?.partyId,
+      ip,
+    });
+
+    return { ok: true, id: vId.toString(), activo: nuevoActivo };
+  }
+
+  // =========================================================================
+  // 6. GRUPOS DE OPCIONES (ADMIN)
+  // =========================================================================
+
+  async listarGruposAdmin() {
+    const grupos = await this.prisma.grupoOpciones.findMany({
+      orderBy: { id: 'asc' },
+      include: {
+        lista: true,
+        opciones: {
+          include: { valor: true },
+          orderBy: { valor: { orden: 'asc' } },
+        },
+        productos: {
+          include: {
+            producto: {
+              select: { id: true, nombre: true, categoria_id: true },
+            },
+          },
+        },
+      },
+    });
+
+    return grupos.map((g) => {
+      const prodCats = Array.from(new Set(g.productos.map((p) => p.producto.categoria_id.toString())));
+      return {
+        id: g.id.toString(),
+        nombre: g.nombre,
+        listaId: g.lista_id ? g.lista_id.toString() : null,
+        listaNombre: g.lista?.nombre || null,
+        obligatorio: g.obligatorio,
+        minimo: g.minimo,
+        maximo: g.maximo,
+        activo: g.activo,
+        categoriaIds: prodCats,
+        productosCount: g.productos.length,
+        opciones: g.opciones.map((o) => ({
+          id: o.id.toString(),
+          valorId: o.valor_id.toString(),
+          nombre: o.valor?.nombre || '',
+          precioExtra: Number(Number(o.precio_extra).toFixed(2)),
+          activo: o.activo,
+          disponible: estaDisponible(o.agotado_hasta),
+        })),
+      };
+    });
+  }
+
+  async crearGrupo(
+    dto: CrearGrupoOpcionesDto,
+    usuario?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const nombre = dto.nombre.trim();
+    const dup = await this.prisma.grupoOpciones.findFirst({
+      where: { nombre: { equals: nombre, mode: 'insensitive' } },
+    });
+    if (dup) {
+      throw new ConflictException({
+        codigo: 'GRUPO_DUPLICADO',
+        mensaje: `Ya existe un grupo de opciones llamado «${nombre}»`,
+      });
+    }
+
+    let listaId: bigint | null = null;
+    if (dto.listaId) {
+      listaId = this.parsearId(dto.listaId);
+    } else {
+      const nuevaLista = await this.prisma.lista.create({
+        data: {
+          nombre,
+          codigo: `GRP_${nombre.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Z0-9]+/g, '_').slice(0, 35)}_${Date.now().toString(36).slice(-4).toUpperCase()}`,
+        },
+      });
+      listaId = nuevaLista.id;
+    }
+
+    const nuevo = await this.prisma.grupoOpciones.create({
+      data: {
+        nombre,
+        lista_id: listaId,
+        obligatorio: dto.obligatorio ?? false,
+        minimo: dto.minimo ?? 0,
+        maximo: dto.maximo ?? 1,
+        activo: dto.activo ?? true,
+      },
+    });
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'catalogo',
+      accion: 'CREAR_GRUPO_OPCIONES',
+      resultado: 'OK',
+      entidad: 'grupo_opciones',
+      entidadId: nuevo.id,
+      despues: { nombre: nuevo.nombre, listaId: listaId?.toString() },
+      partyId: usuario?.partyId,
+      ip,
+    });
+
+    return {
+      id: nuevo.id.toString(),
+      nombre: nuevo.nombre,
+      listaId: listaId ? listaId.toString() : null,
+      obligatorio: nuevo.obligatorio,
+      minimo: nuevo.minimo,
+      maximo: nuevo.maximo,
+      activo: nuevo.activo,
+      opciones: [],
+      categoriaIds: [],
+    };
+  }
+
+  async actualizarGrupo(
+    id: bigint | string | number,
+    dto: ActualizarGrupoOpcionesDto,
+    usuario?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const gId = this.parsearId(id);
+    const actual = await this.prisma.grupoOpciones.findUnique({ where: { id: gId } });
+    if (!actual) {
+      throw new NotFoundException({
+        codigo: 'GRUPO_NO_ENCONTRADO',
+        mensaje: 'El grupo de opciones no existe',
+      });
+    }
+
+    const nuevoNombre = dto.nombre?.trim();
+    if (nuevoNombre && nuevoNombre !== actual.nombre) {
+      const dup = await this.prisma.grupoOpciones.findFirst({
+        where: {
+          id: { not: gId },
+          nombre: { equals: nuevoNombre, mode: 'insensitive' },
+        },
+      });
+      if (dup) {
+        throw new ConflictException({
+          codigo: 'GRUPO_DUPLICADO',
+          mensaje: `Ya existe otro grupo de opciones llamado «${nuevoNombre}»`,
+        });
+      }
+    }
+
+    const updated = await this.prisma.grupoOpciones.update({
+      where: { id: gId },
+      data: {
+        nombre: nuevoNombre || undefined,
+        lista_id: dto.listaId ? this.parsearId(dto.listaId) : undefined,
+        obligatorio: dto.obligatorio !== undefined ? dto.obligatorio : undefined,
+        minimo: dto.minimo !== undefined ? dto.minimo : undefined,
+        maximo: dto.maximo !== undefined ? dto.maximo : undefined,
+        activo: dto.activo !== undefined ? dto.activo : undefined,
+      },
+    });
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'catalogo',
+      accion: 'EDITAR_GRUPO_OPCIONES',
+      resultado: 'OK',
+      entidad: 'grupo_opciones',
+      entidadId: gId,
+      antes: { nombre: actual.nombre, obligatorio: actual.obligatorio },
+      despues: { nombre: updated.nombre, obligatorio: updated.obligatorio },
+      partyId: usuario?.partyId,
+      ip,
+    });
+
+    return {
+      id: updated.id.toString(),
+      nombre: updated.nombre,
+      listaId: updated.lista_id ? updated.lista_id.toString() : null,
+      obligatorio: updated.obligatorio,
+      minimo: updated.minimo,
+      maximo: updated.maximo,
+      activo: updated.activo,
+    };
+  }
+
+  async asignarGrupoCategorias(
+    grupoId: bigint | string | number,
+    categoriaIds: (string | number)[],
+    usuario?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const gId = this.parsearId(grupoId);
+    const grupo = await this.prisma.grupoOpciones.findUnique({ where: { id: gId } });
+    if (!grupo) {
+      throw new NotFoundException({
+        codigo: 'GRUPO_NO_ENCONTRADO',
+        mensaje: 'El grupo de opciones no existe',
+      });
+    }
+
+    const cIds = categoriaIds.map((c) => this.parsearId(c));
+
+    const productosEnCats = await this.prisma.producto.findMany({
+      where: { categoria_id: { in: cIds } },
+      select: { id: true, categoria_id: true },
+    });
+
+    const actuales = await this.prisma.productoGrupo.findMany({
+      where: { grupo_id: gId },
+      include: { producto: { select: { id: true, categoria_id: true } } },
+    });
+
+    for (const pg of actuales) {
+      if (cIds.length === 0 || !cIds.some((cid) => cid === pg.producto.categoria_id)) {
+        await this.prisma.productoGrupo.delete({ where: { id: pg.id } });
+      }
+    }
+
+    for (const p of productosEnCats) {
+      await this.prisma.productoGrupo.upsert({
+        where: {
+          producto_id_grupo_id: {
+            producto_id: p.id,
+            grupo_id: gId,
+          },
+        },
+        update: {},
+        create: {
+          producto_id: p.id,
+          grupo_id: gId,
+        },
+      });
+    }
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'catalogo',
+      accion: 'ASIGNAR_GRUPO_CATEGORIAS',
+      resultado: 'OK',
+      entidad: 'grupo_opciones',
+      entidadId: gId,
+      despues: { categoriaIds: categoriaIds.map(String) },
+      partyId: usuario?.partyId,
+      ip,
+    });
+
+    return {
+      ok: true,
+      grupoId: gId.toString(),
+      categoriaIds: categoriaIds.map(String),
+    };
   }
 }

@@ -8,3 +8,4 @@ export * from './dto/agotar.dto';
 export * from './dto/categoria.dto';
 export * from './dto/grupo-opciones.dto';
 export * from './dto/filtrar-productos.dto';
+export * from './dto/lista.dto';

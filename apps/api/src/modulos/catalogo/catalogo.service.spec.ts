@@ -1,3 +1,5 @@
+jest.mock('../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {} }));
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { CatalogoService, normalizarTexto, estaDisponible } from './catalogo.service';
@@ -28,9 +30,40 @@ describe('CatalogoService', () => {
       },
       areaCocina: {
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
       },
       archivo: {
         findUnique: jest.fn(),
+      },
+      lista: {
+        findMany: jest.fn(),
+        findUnique: jest.fn(),
+        findFirst: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+      },
+      listaValor: {
+        findMany: jest.fn(),
+        findUnique: jest.fn(),
+        findFirst: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+        aggregate: jest.fn(),
+      },
+      grupoOpciones: {
+        findMany: jest.fn(),
+        findUnique: jest.fn(),
+        findFirst: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+        upsert: jest.fn(),
+      },
+      productoGrupo: {
+        findMany: jest.fn(),
+        create: jest.fn(),
+        delete: jest.fn(),
+        upsert: jest.fn(),
       },
       $transaction: jest.fn((cb) => cb(prisma)),
     };
@@ -461,6 +494,93 @@ describe('CatalogoService', () => {
           entidad: 'opcion',
           entidadId: BigInt(88),
         }),
+      );
+    });
+  });
+
+  describe('Listas y grupos de opciones', () => {
+    it('crea una categoría nueva correctamente', async () => {
+      prisma.categoria.findFirst = jest.fn().mockResolvedValue(null);
+      prisma.categoria.aggregate = jest.fn().mockResolvedValue({ _max: { orden: 5 } });
+      prisma.categoria.create = jest.fn().mockResolvedValue({
+        id: BigInt(10),
+        nombre: 'PIZZAS',
+        area_id: BigInt(2),
+        orden: 6,
+        lleva_opciones: true,
+        oculta: false,
+      });
+
+      const res = await service.crearCategoria({
+        nombre: 'PIZZAS',
+        areaId: '2',
+      });
+
+      expect(res.nombre).toBe('PIZZAS');
+      expect(res.orden).toBe(6);
+      expect(auditoria.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({ accion: 'CREAR_CATEGORIA' }),
+      );
+    });
+
+    it('lista las listas y valores con conteo de usos', async () => {
+      prisma.lista.findMany.mockResolvedValue([
+        {
+          id: BigInt(1),
+          codigo: 'TAMANO',
+          nombre: 'Tamaños',
+          grupos: [],
+          valores: [
+            {
+              id: BigInt(101),
+              nombre: '12 oz',
+              orden: 0,
+              activo: true,
+              _count: { productoTamanos: 5, opciones: 0 },
+            },
+          ],
+        },
+      ]);
+
+      const res = await service.listarListasAdmin();
+      expect(res).toHaveLength(1);
+      expect(res[0].valores[0].usos).toBe(5);
+    });
+
+    it('agrega un valor a una lista y lo audita', async () => {
+      prisma.lista.findUnique.mockResolvedValue({ id: BigInt(1), nombre: 'Tamaños' });
+      prisma.listaValor.findFirst.mockResolvedValue(null);
+      prisma.listaValor.aggregate.mockResolvedValue({ _max: { orden: 1 } });
+      prisma.listaValor.create.mockResolvedValue({
+        id: BigInt(202),
+        lista_id: BigInt(1),
+        nombre: '16 oz',
+        orden: 2,
+        activo: true,
+      });
+      prisma.grupoOpciones.findFirst.mockResolvedValue(null);
+
+      const res = await service.agregarValorLista(1, { nombre: '16 oz' });
+      expect(res.nombre).toBe('16 oz');
+      expect(auditoria.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({ accion: 'AGREGAR_VALOR_LISTA' }),
+      );
+    });
+
+    it('alterna el estado activo de un valor de lista', async () => {
+      prisma.listaValor.findUnique.mockResolvedValue({
+        id: BigInt(202),
+        activo: true,
+      });
+      prisma.listaValor.update.mockResolvedValue({
+        id: BigInt(202),
+        activo: false,
+      });
+
+      const res = await service.alternarValorLista(202);
+      expect(res.activo).toBe(false);
+      expect(auditoria.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({ accion: 'DESACTIVAR_VALOR_LISTA' }),
       );
     });
   });

@@ -1,0 +1,2443 @@
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useSesion } from '../../comun/sesion';
+import { Cargando } from '../../comun/Cargando';
+import { EstadoError } from '../../comun/EstadoError';
+import { Confirmar } from '../../comun/Confirmar';
+import {
+  catalogoApi,
+  ProductoAdmin,
+  CategoriaAdmin,
+  ListaAdmin,
+  GrupoOpcionItem,
+} from './catalogoApi';
+
+const PPAGE = 24;
+
+export function ProductosView() {
+  const navigate = useNavigate();
+  const { usuario, tiene } = useSesion();
+
+  // Roles y permisos
+  const esAdmin = usuario?.rol === 'ADMIN' || tiene('catalogo/crear');
+  const esCajero = usuario?.rol === 'CAJERO';
+  const esMozo = usuario?.rol === 'MOZO';
+  const puedeEditar = (esAdmin || esCajero) && !esMozo;
+  const puedeGestionarListas = esAdmin || tiene('catalogo/ver');
+
+  // Estados de datos
+  const [productos, setProductos] = useState<ProductoAdmin[]>([]);
+  const [categorias, setCategorias] = useState<CategoriaAdmin[]>([]);
+  const [listas, setListas] = useState<ListaAdmin[]>([]);
+  const [gruposGenerales, setGruposGenerales] = useState<GrupoOpcionItem[]>([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Filtros
+  const [catSeleccionada, setCatSeleccionada] = useState<string>('Todos');
+  const [busqueda, setBusqueda] = useState('');
+  const [filtrosAbiertos, setFiltrosAbiertos] = useState(false);
+  const [filtroDisponibilidad, setFiltroDisponibilidad] = useState<'all' | 'avail' | 'off'>('all');
+  const [filtroOrden, setFiltroOrden] = useState<'name-asc' | 'name-desc' | 'price-asc' | 'price-desc'>('name-asc');
+  const [filtroPromo, setFiltroPromo] = useState(false);
+  const [verTodosSinPagina, setVerTodosSinPagina] = useState(false);
+  const [pagina, setPagina] = useState(1);
+
+  // Dropdowns en filtros
+  const [ddDispAbierto, setDdDispAbierto] = useState(false);
+  const [ddOrdenAbierto, setDdOrdenAbierto] = useState(false);
+
+  // Modales
+  const [modalNuevoAbierto, setModalNuevoAbierto] = useState(false);
+  const [productoEnEdicion, setProductoEnEdicion] = useState<ProductoAdmin | null>(null);
+  const [productoEnOpciones, setProductoEnOpciones] = useState<ProductoAdmin | null>(null);
+
+  // Formulario Nuevo Producto
+  const [npNombre, setNpNombre] = useState('');
+  const [npCategoriaId, setNpCategoriaId] = useState<string>('');
+  const [npPrecio, setNpPrecio] = useState('');
+  const [npDesc, setNpDesc] = useState('');
+  const [npError, setNpError] = useState('');
+  const [npNuevaCatAbierta, setNpNuevaCatAbierta] = useState(false);
+  const [npNuevaCatNombre, setNpNuevaCatNombre] = useState('');
+  const [npNuevaCatConOpc, setNpNuevaCatConOpc] = useState(true);
+
+  // Formulario Editar Producto
+  const [edNombre, setEdNombre] = useState('');
+  const [edCategoriaId, setEdCategoriaId] = useState('');
+  const [edPrecio, setEdPrecio] = useState('');
+  const [edFotoUrl, setEdFotoUrl] = useState<string | null>(null);
+  const [edFotoArchivoId, setEdFotoArchivoId] = useState<string | null>(null);
+  const [edSabores, setEdSabores] = useState<Array<{ id?: string; nombre: string; activo?: boolean }>>([]);
+  const [edNuevoSabor, setEdNuevoSabor] = useState('');
+  const [edError, setEdError] = useState('');
+  const [guardandoEdicion, setGuardandoEdicion] = useState(false);
+
+  // Formulario Opciones y Tamaños
+  const [opdTamanos, setOpdTamanos] = useState<Array<{ id?: string; tamanoValorId: string; nombre: string; precio: number; activo: boolean }>>([]);
+  const [opdGrupos, setOpdGrupos] = useState<Array<{
+    id: string;
+    nombre: string;
+    activoEnProducto: boolean;
+    listaId?: string | null;
+    obligatorio: boolean;
+    minimo: number;
+    maximo: number;
+    opciones: Array<{ id: string; nombre: string; precioExtra: number; activo: boolean }>;
+  }>>([]);
+  const [opdGrupoAbierto, setOpdGrupoAbierto] = useState<string | null>(null);
+  const [opdError, setOpdError] = useState('');
+  const [guardandoOpciones, setGuardandoOpciones] = useState(false);
+
+  // Confirmación
+  const [confirmarProps, setConfirmarProps] = useState<{
+    abierto: boolean;
+    titulo: string;
+    mensaje: string;
+    accion: () => Promise<void> | void;
+  }>({
+    abierto: false,
+    titulo: '',
+    mensaje: '',
+    accion: () => {},
+  });
+
+  const refStrip = useRef<HTMLDivElement>(null);
+
+  // Cargar datos
+  const cargarDatos = async () => {
+    try {
+      setCargando(true);
+      setError(null);
+      const [prods, cats, lsts, grps] = await Promise.all([
+        catalogoApi.listarProductos({ incluyeOcultos: true }),
+        catalogoApi.listarCategorias(),
+        catalogoApi.listarListas(),
+        catalogoApi.listarGrupos(),
+      ]);
+      setProductos(prods);
+      setCategorias(cats);
+      setListas(lsts);
+      setGruposGenerales(grps);
+      if (cats.length > 0 && !npCategoriaId) {
+        setNpCategoriaId(cats[0].id);
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Error al cargar el catálogo');
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  useEffect(() => {
+    cargarDatos();
+  }, []);
+
+  // Lista de nombres de categorías para las pestañas
+  const categoriasPills = useMemo(() => {
+    const nombres = ['TODOS'];
+    categorias.forEach((c) => {
+      nombres.push(c.nombre.toUpperCase());
+    });
+    return nombres;
+  }, [categorias]);
+
+  // Filtrado y ordenamiento de productos
+  const productosFiltrados = useMemo(() => {
+    let res = [...productos];
+
+    // Por categoría
+    if (catSeleccionada.toUpperCase() !== 'TODOS') {
+      res = res.filter(
+        (p) => p.categoria?.nombre?.toUpperCase() === catSeleccionada.toUpperCase(),
+      );
+    }
+
+    // Por texto de búsqueda
+    if (busqueda.trim()) {
+      const q = busqueda.toLowerCase().trim();
+      res = res.filter(
+        (p) =>
+          p.nombre.toLowerCase().includes(q) ||
+          (p.descripcion && p.descripcion.toLowerCase().includes(q)),
+      );
+    }
+
+    // Por disponibilidad
+    if (filtroDisponibilidad === 'avail') {
+      res = res.filter((p) => p.disponible);
+    } else if (filtroDisponibilidad === 'off') {
+      res = res.filter((p) => !p.disponible);
+    }
+
+    // Por promoción (en mock: hasPromo)
+    if (filtroPromo) {
+      res = res.filter((p) => p.noSumaBeneficios);
+    }
+
+    // Ordenamiento
+    res.sort((a, b) => {
+      if (filtroOrden === 'name-asc') return a.nombre.localeCompare(b.nombre);
+      if (filtroOrden === 'name-desc') return b.nombre.localeCompare(a.nombre);
+      if (filtroOrden === 'price-asc') return a.precio - b.precio;
+      if (filtroOrden === 'price-desc') return b.precio - a.precio;
+      return 0;
+    });
+
+    return res;
+  }, [productos, catSeleccionada, busqueda, filtroDisponibilidad, filtroOrden, filtroPromo]);
+
+  // Paginación
+  const totalPaginas = Math.ceil(productosFiltrados.length / PPAGE) || 1;
+  const productosVisibles = useMemo(() => {
+    if (verTodosSinPagina) return productosFiltrados;
+    const inicio = (pagina - 1) * PPAGE;
+    return productosFiltrados.slice(inicio, inicio + PPAGE);
+  }, [productosFiltrados, verTodosSinPagina, pagina]);
+
+  // Scroll del strip de categorías
+  const scrollStrip = (direccion: 'izq' | 'der') => {
+    if (refStrip.current) {
+      refStrip.current.scrollBy({
+        left: direccion === 'izq' ? -220 : 220,
+        behavior: 'smooth',
+      });
+    }
+  };
+
+  // Conteo de filtros activos
+  const filtrosActivosCount = useMemo(() => {
+    let c = 0;
+    if (filtroDisponibilidad !== 'all') c++;
+    if (filtroOrden !== 'name-asc') c++;
+    if (filtroPromo) c++;
+    return c;
+  }, [filtroDisponibilidad, filtroOrden, filtroPromo]);
+
+  const textoResumenFiltros = useMemo(() => {
+    const partes: string[] = [];
+    if (filtroDisponibilidad === 'avail') partes.push('Disponibles');
+    if (filtroDisponibilidad === 'off') partes.push('Agotados');
+    if (filtroOrden === 'name-desc') partes.push('Nombre Z-A');
+    if (filtroOrden === 'price-asc') partes.push('Precio menor');
+    if (filtroOrden === 'price-desc') partes.push('Precio mayor');
+    if (filtroPromo) partes.push('Con promoción');
+    return partes.join(', ');
+  }, [filtroDisponibilidad, filtroOrden, filtroPromo]);
+
+  // Limpiar filtros
+  const limpiarFiltros = () => {
+    setFiltroDisponibilidad('all');
+    setFiltroOrden('name-asc');
+    setFiltroPromo(false);
+  };
+
+  // Acciones sobre productos
+  const toggleDisponibilidad = (p: ProductoAdmin) => {
+    const nuevoEstado = !p.disponible;
+    setConfirmarProps({
+      abierto: true,
+      titulo: nuevoEstado
+        ? `¿Marcar disponible "${p.nombre}"?`
+        : `¿Marcar agotado "${p.nombre}"?`,
+      mensaje: nuevoEstado
+        ? 'Volverá a ofrecerse en la carta y el chatbot.'
+        : 'Dejará de ofrecerse en la carta y el chatbot.',
+      accion: async () => {
+        try {
+          if (nuevoEstado) {
+            await catalogoApi.disponibilizarProducto(p.id);
+          } else {
+            await catalogoApi.agotarProducto(p.id, { alcance: 'INDEFINIDO' });
+          }
+          await cargarDatos();
+        } catch (err: any) {
+          alert(err?.message || 'Error al cambiar disponibilidad');
+        }
+      },
+    });
+  };
+
+  const toggleNoSuma = (p: ProductoAdmin) => {
+    const actual = p.noSumaBeneficios;
+    setConfirmarProps({
+      abierto: true,
+      titulo: actual
+        ? `¿Volver a sumar puntos con «${p.nombre}»?`
+        : `¿Marcar «${p.nombre}» como «no suma puntos ni aplica cupones»?`,
+      mensaje: actual
+        ? 'Vuelve a sumar puntos y a aceptar cupones.'
+        : 'Sirve para promociones muy ajustadas (por ejemplo, un 2×1 de campaña). Vale en la carta, la caja y el chatbot.',
+      accion: async () => {
+        try {
+          await catalogoApi.editarProducto(p.id, { noSumaBeneficios: !actual });
+          await cargarDatos();
+        } catch (err: any) {
+          alert(err?.message || 'Error al cambiar configuración');
+        }
+      },
+    });
+  };
+
+  // Abrir modal Editar
+  const abrirEditar = (p: ProductoAdmin) => {
+    setProductoEnEdicion(p);
+    setEdNombre(p.nombre);
+    setEdCategoriaId(p.categoriaId);
+    setEdPrecio(p.precio.toFixed(2));
+    setEdFotoUrl(p.fotoUrl || null);
+    setEdFotoArchivoId(null);
+    setEdSabores(p.sabores.map((s) => ({ ...s })));
+    setEdNuevoSabor('');
+    setEdError('');
+  };
+
+  // Guardar Edición
+  const guardarEdicion = async () => {
+    if (!productoEnEdicion) return;
+    const precioNum = parseFloat(edPrecio);
+    if (isNaN(precioNum) || precioNum < 0) {
+      setEdError('Ingresa un precio válido');
+      return;
+    }
+    setConfirmarProps({
+      abierto: true,
+      titulo: '¿Guardar los cambios?',
+      mensaje: `Se actualizará el producto "${productoEnEdicion.nombre}".`,
+      accion: async () => {
+        try {
+          setGuardandoEdicion(true);
+          await catalogoApi.editarProducto(productoEnEdicion.id, {
+            nombre: edNombre.trim(),
+            categoriaId: edCategoriaId,
+            precio: precioNum,
+            fotoArchivoId: edFotoArchivoId,
+            sabores: edSabores.map((s) => ({
+              id: s.id,
+              nombre: s.nombre,
+              activo: s.activo !== false,
+            })),
+          });
+          setProductoEnEdicion(null);
+          await cargarDatos();
+        } catch (err: any) {
+          setEdError(err?.message || 'Error al guardar');
+        } finally {
+          setGuardandoEdicion(false);
+        }
+      },
+    });
+  };
+
+  // Subir imagen en edición
+  const manejarSubidaFoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const res = await catalogoApi.subirFoto(file);
+      setEdFotoUrl(res.url);
+      setEdFotoArchivoId(res.id);
+    } catch (err: any) {
+      alert(err?.message || 'Error al subir la imagen');
+    }
+  };
+
+  const quitarFoto = () => {
+    setConfirmarProps({
+      abierto: true,
+      titulo: '¿Quitar la imagen?',
+      mensaje: 'Se quitará al guardar. Puedes subir otra.',
+      accion: () => {
+        setEdFotoUrl(null);
+        setEdFotoArchivoId(null);
+      },
+    });
+  };
+
+  // Abrir modal Opciones y Tamaños
+  const abrirOpciones = (p: ProductoAdmin) => {
+    setProductoEnOpciones(p);
+    setOpdError('');
+    // Tamaños
+    const listaTamano = listas.find((l) => l.codigo === 'TAMANO');
+    const valoresTamano = listaTamano ? listaTamano.valores : [];
+    const tamanosDelProducto = (p.tamanos || []).map((t) => ({
+      id: t.id,
+      tamanoValorId: t.tamanoValorId,
+      nombre: t.nombre,
+      precio: t.precio,
+      activo: t.activo !== false,
+    }));
+    // Si no tiene tamaños específicos, ponemos los valores de la lista
+    if (tamanosDelProducto.length === 0 && valoresTamano.length > 0) {
+      setOpdTamanos(
+        valoresTamano.map((v) => ({
+          tamanoValorId: v.id,
+          nombre: v.nombre,
+          precio: p.precio,
+          activo: true,
+        })),
+      );
+    } else {
+      setOpdTamanos(tamanosDelProducto);
+    }
+
+    // Grupos
+    const gruposAsociadosIds = new Set(p.grupos.map((g) => g.id));
+    const todosGrupos = gruposGenerales.map((g) => {
+      const enProd = gruposAsociadosIds.has(g.id);
+      const prodGrupo = p.grupos.find((pg) => pg.id === g.id);
+      return {
+        id: g.id,
+        nombre: g.nombre,
+        activoEnProducto: enProd,
+        listaId: g.listaId,
+        obligatorio: g.obligatorio ?? false,
+        minimo: g.minimo ?? 0,
+        maximo: g.maximo ?? 1,
+        opciones: (prodGrupo?.opciones || g.opciones || []).map((o) => ({
+          id: o.id,
+          nombre: o.nombre,
+          precioExtra: o.precioExtra || 0,
+          activo: o.activo !== false,
+        })),
+      };
+    });
+    setOpdGrupos(todosGrupos);
+    setOpdGrupoAbierto(todosGrupos[0]?.id || null);
+  };
+
+  // Guardar Opciones y Tamaños
+  const guardarOpciones = async () => {
+    if (!productoEnOpciones) return;
+    setConfirmarProps({
+      abierto: true,
+      titulo: '¿Guardar los cambios?',
+      mensaje: `Se actualizarán las opciones y tamaños de "${productoEnOpciones.nombre}".`,
+      accion: async () => {
+        try {
+          setGuardandoOpciones(true);
+          const gruposActivos = opdGrupos
+            .filter((g) => g.activoEnProducto)
+            .map((g, idx) => ({
+              grupoId: g.id,
+              orden: idx,
+            }));
+
+          await catalogoApi.editarProducto(productoEnOpciones.id, {
+            tamanos: opdTamanos.map((t) => ({
+              tamanoValorId: t.tamanoValorId,
+              precio: Number(t.precio) || 0,
+              activo: t.activo,
+            })),
+            grupos: gruposActivos,
+          });
+          setProductoEnOpciones(null);
+          await cargarDatos();
+        } catch (err: any) {
+          setOpdError(err?.message || 'Error al guardar opciones y tamaños');
+        } finally {
+          setGuardandoOpciones(false);
+        }
+      },
+    });
+  };
+
+  // Guardar Nuevo Producto
+  const guardarNuevoProducto = async () => {
+    if (!npNombre.trim()) {
+      setNpError('Escribe el nombre del producto');
+      return;
+    }
+    const precioNum = parseFloat(npPrecio);
+    if (isNaN(precioNum) || precioNum < 0) {
+      setNpError('Ingresa un precio válido');
+      return;
+    }
+    if (!npCategoriaId) {
+      setNpError('Elige una categoría');
+      return;
+    }
+
+    setConfirmarProps({
+      abierto: true,
+      titulo: `¿Agregar "${npNombre.trim().toUpperCase()}" a la carta?`,
+      mensaje:
+        'Aparece en la carta virtual, en Nuevo pedido y en Productos. Después le puedes poner imagen y opciones. No se elimina: se puede marcar agotado.',
+      accion: async () => {
+        try {
+          await catalogoApi.crearProducto({
+            nombre: npNombre.trim().toUpperCase(),
+            categoriaId: npCategoriaId,
+            precio: precioNum,
+            descripcion: npDesc.trim() || undefined,
+          });
+          setModalNuevoAbierto(false);
+          setNpNombre('');
+          setNpPrecio('');
+          setNpDesc('');
+          setNpError('');
+          await cargarDatos();
+        } catch (err: any) {
+          setNpError(err?.message || 'Error al crear el producto');
+        }
+      },
+    });
+  };
+
+  // Crear categoría nueva desde modal Nuevo Producto
+  const crearCategoriaRapida = async () => {
+    if (!npNuevaCatNombre.trim() || npNuevaCatNombre.trim().length < 2) {
+      setNpError('El nombre de la categoría debe tener al menos 2 letras');
+      return;
+    }
+    try {
+      const nueva = await catalogoApi.crearCategoria({
+        nombre: npNuevaCatNombre.trim().toUpperCase(),
+        llevaOpciones: npNuevaCatConOpc,
+      });
+      setCategorias((prev) => [...prev, nueva]);
+      setNpCategoriaId(nueva.id);
+      setNpNuevaCatAbierta(false);
+      setNpNuevaCatNombre('');
+    } catch (err: any) {
+      setNpError(err?.message || 'Error al crear categoría');
+    }
+  };
+
+  if (cargando && productos.length === 0) {
+    return (
+      <div style={{ padding: 24 }}>
+        <Cargando mensaje="Cargando catálogo de productos…" />
+      </div>
+    );
+  }
+
+  if (error && productos.length === 0) {
+    return (
+      <div style={{ padding: 24 }}>
+        <EstadoError mensaje={error} alReintentar={cargarDatos} />
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {/* 0. Recuadro de gestionar listas idéntico al mockup */}
+      {puedeGestionarListas && (
+        <div
+          style={{
+            background: 'var(--cp-white)',
+            border: '1px solid var(--cp-line)',
+            borderRadius: 12,
+            padding: '12px 16px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 8,
+            flexWrap: 'wrap',
+          }}
+        >
+          <span style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
+            Las listas que se eligen en este módulo (categorías, tipos u origen) se crean y se gestionan aquí mismo.
+          </span>
+          <button
+            onClick={() => navigate('/admin/listas')}
+            style={{
+              minHeight: 44,
+              padding: '0 16px',
+              border: '1.5px solid var(--cp-navy)',
+              borderRadius: 12,
+              background: 'transparent',
+              color: 'var(--cp-navy)',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            Gestionar listas
+          </button>
+        </div>
+      )}
+
+      {/* 1. Frase descriptiva idéntica al mockup */}
+      <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
+        Lo que se marca aquí se refleja de inmediato en la carta virtual y en el chatbot. Un producto agotado no se ofrece.
+      </div>
+
+      {/* 2. Botón + Nuevo producto (solo visible para admin) */}
+      {esAdmin && (
+        <button
+          onClick={() => {
+            setNpNombre('');
+            setNpPrecio('');
+            setNpDesc('');
+            setNpError('');
+            setNpNuevaCatAbierta(false);
+            setModalNuevoAbierto(true);
+          }}
+          style={{
+            alignSelf: 'flex-start',
+            minHeight: 44,
+            padding: '0 16px',
+            border: 0,
+            borderRadius: 12,
+            background: 'var(--cp-orange)',
+            color: 'var(--cp-navy)',
+            fontWeight: 800,
+            cursor: 'pointer',
+          }}
+        >
+          + Nuevo producto
+        </button>
+      )}
+
+      {/* 3. Strip horizontal de categorías con flechas */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <button
+          onClick={() => scrollStrip('izq')}
+          aria-label="Ver categorías anteriores"
+          style={{
+            flex: 'none',
+            width: 36,
+            height: 36,
+            border: '1.5px solid var(--cp-navy)',
+            borderRadius: 18,
+            background: 'transparent',
+            color: 'var(--cp-navy)',
+            fontWeight: 800,
+            fontSize: 18,
+            lineHeight: '18px',
+            cursor: 'pointer',
+          }}
+        >
+          ‹
+        </button>
+        <div
+          ref={refStrip}
+          className="noscroll"
+          style={{
+            flex: 1,
+            minWidth: 0,
+            display: 'flex',
+            gap: 8,
+            overflowX: 'auto',
+            cursor: 'grab',
+          }}
+        >
+          {categoriasPills.map((cNombre) => {
+            const activo =
+              (cNombre === 'TODOS' && catSeleccionada === 'Todos') ||
+              cNombre.toUpperCase() === catSeleccionada.toUpperCase();
+            return (
+              <button
+                key={cNombre}
+                onClick={() => {
+                  setCatSeleccionada(cNombre === 'TODOS' ? 'Todos' : cNombre);
+                  setPagina(1);
+                }}
+                style={{
+                  flex: 'none',
+                  minHeight: 44,
+                  padding: '0 14px',
+                  borderRadius: 9999,
+                  border: '1.5px solid var(--cp-navy)',
+                  background: activo ? 'var(--cp-navy)' : 'transparent',
+                  color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                  fontWeight: 700,
+                  fontSize: 12,
+                  letterSpacing: '0.04em',
+                  cursor: 'pointer',
+                }}
+              >
+                {cNombre}
+              </button>
+            );
+          })}
+        </div>
+        <button
+          onClick={() => scrollStrip('der')}
+          aria-label="Ver más categorías"
+          style={{
+            flex: 'none',
+            width: 36,
+            height: 36,
+            border: '1.5px solid var(--cp-navy)',
+            borderRadius: 18,
+            background: 'transparent',
+            color: 'var(--cp-navy)',
+            fontWeight: 800,
+            fontSize: 18,
+            lineHeight: '18px',
+            cursor: 'pointer',
+          }}
+        >
+          ›
+        </button>
+      </div>
+
+      {/* 4. Buscador y Filtros */}
+      <div
+        style={{
+          background: 'var(--cp-white)',
+          border: '1px solid var(--cp-line)',
+          borderRadius: 12,
+          padding: 8,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 6,
+        }}
+      >
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <label htmlFor="prod-q" style={{ position: 'absolute', left: -9999 }}>
+            Buscar
+          </label>
+          <input
+            id="prod-q"
+            type="search"
+            value={busqueda}
+            onChange={(e) => {
+              setBusqueda(e.target.value);
+              setPagina(1);
+            }}
+            placeholder="Buscar producto"
+            style={{
+              flex: 1,
+              minWidth: 0,
+              boxSizing: 'border-box',
+              minHeight: 44,
+              borderRadius: 9999,
+              border: '1.5px solid var(--cp-line)',
+              background: 'var(--cp-cream)',
+              color: 'var(--cp-navy)',
+              padding: '0 16px',
+              fontSize: 14,
+            }}
+          />
+          <button
+            onClick={() => setFiltrosAbiertos(!filtrosAbiertos)}
+            aria-expanded={filtrosAbiertos}
+            style={{
+              flex: 'none',
+              minHeight: 44,
+              padding: '0 12px',
+              borderRadius: 9999,
+              border: '1.5px solid var(--cp-navy)',
+              background: filtrosAbiertos ? 'var(--cp-navy)' : 'transparent',
+              color: filtrosAbiertos ? 'var(--cp-cream)' : 'var(--cp-navy)',
+              fontWeight: 700,
+              fontSize: 13,
+              display: 'inline-flex',
+              gap: 6,
+              alignItems: 'center',
+              cursor: 'pointer',
+            }}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M3 5h18l-7 8v6l-4 2v-8z" />
+            </svg>
+            Filtros
+            {filtrosActivosCount > 0 && (
+              <span
+                style={{
+                  minWidth: 20,
+                  height: 20,
+                  boxSizing: 'border-box',
+                  borderRadius: 10,
+                  background: 'var(--cp-orange)',
+                  color: 'var(--cp-navy)',
+                  fontSize: 12,
+                  fontWeight: 800,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '0 5px',
+                }}
+              >
+                {filtrosActivosCount}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* Resumen de filtros */}
+        {filtrosActivosCount > 0 && (
+          <div style={{ fontSize: 12, lineHeight: '17px', color: 'var(--cp-soft)' }}>
+            <b>Filtrando:</b> {textoResumenFiltros}
+          </div>
+        )}
+
+        {/* Panel de filtros expandible */}
+        {filtrosAbiertos && (
+          <div
+            style={{
+              borderTop: '1px solid var(--cp-line)',
+              paddingTop: 8,
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '8px 20px',
+            }}
+          >
+            {/* Disponibilidad */}
+            <div style={{ flex: '1 1 200px', minWidth: 0, position: 'relative' }}>
+              <div
+                style={{
+                  fontSize: 12,
+                  fontWeight: 800,
+                  letterSpacing: '0.06em',
+                  color: 'var(--cp-soft)',
+                  marginBottom: 3,
+                }}
+              >
+                DISPONIBILIDAD
+              </div>
+              <button
+                onClick={() => setDdDispAbierto(!ddDispAbierto)}
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  minHeight: 44,
+                  padding: '0 12px',
+                  borderRadius: 10,
+                  border: '1.5px solid var(--cp-navy)',
+                  background: 'var(--cp-white)',
+                  color: 'var(--cp-navy)',
+                  fontWeight: 700,
+                  fontSize: 13,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 8,
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                }}
+              >
+                <span>
+                  {filtroDisponibilidad === 'all'
+                    ? 'Todos'
+                    : filtroDisponibilidad === 'avail'
+                    ? 'Solo disponibles'
+                    : 'Solo agotados'}
+                </span>
+                <span>▾</span>
+              </button>
+              {ddDispAbierto && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    zIndex: 20,
+                    marginTop: 4,
+                    border: '1.5px solid var(--cp-navy)',
+                    borderRadius: 10,
+                    background: 'var(--cp-white)',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {[
+                    { id: 'all', n: 'Todos' },
+                    { id: 'avail', n: 'Solo disponibles' },
+                    { id: 'off', n: 'Solo agotados' },
+                  ].map((o) => (
+                    <button
+                      key={o.id}
+                      onClick={() => {
+                        setFiltroDisponibilidad(o.id as any);
+                        setDdDispAbierto(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        minHeight: 44,
+                        padding: '0 12px',
+                        border: 0,
+                        borderBottom: '1px solid var(--cp-sand)',
+                        background:
+                          filtroDisponibilidad === o.id ? 'var(--cp-cream)' : 'var(--cp-white)',
+                        color: 'var(--cp-navy)',
+                        fontWeight: filtroDisponibilidad === o.id ? 800 : 600,
+                        fontSize: 13,
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {o.n}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Ordenar */}
+            <div style={{ flex: '1 1 200px', minWidth: 0, position: 'relative' }}>
+              <div
+                style={{
+                  fontSize: 12,
+                  fontWeight: 800,
+                  letterSpacing: '0.06em',
+                  color: 'var(--cp-soft)',
+                  marginBottom: 3,
+                }}
+              >
+                ORDENAR
+              </div>
+              <button
+                onClick={() => setDdOrdenAbierto(!ddOrdenAbierto)}
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  minHeight: 44,
+                  padding: '0 12px',
+                  borderRadius: 10,
+                  border: '1.5px solid var(--cp-navy)',
+                  background: 'var(--cp-white)',
+                  color: 'var(--cp-navy)',
+                  fontWeight: 700,
+                  fontSize: 13,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 8,
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                }}
+              >
+                <span>
+                  {filtroOrden === 'name-asc'
+                    ? 'Nombre A-Z'
+                    : filtroOrden === 'name-desc'
+                    ? 'Nombre Z-A'
+                    : filtroOrden === 'price-asc'
+                    ? 'Precio menor'
+                    : 'Precio mayor'}
+                </span>
+                <span>▾</span>
+              </button>
+              {ddOrdenAbierto && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    zIndex: 20,
+                    marginTop: 4,
+                    border: '1.5px solid var(--cp-navy)',
+                    borderRadius: 10,
+                    background: 'var(--cp-white)',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {[
+                    { id: 'name-asc', n: 'Nombre A-Z' },
+                    { id: 'name-desc', n: 'Nombre Z-A' },
+                    { id: 'price-asc', n: 'Precio menor' },
+                    { id: 'price-desc', n: 'Precio mayor' },
+                  ].map((o) => (
+                    <button
+                      key={o.id}
+                      onClick={() => {
+                        setFiltroOrden(o.id as any);
+                        setDdOrdenAbierto(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        minHeight: 44,
+                        padding: '0 12px',
+                        border: 0,
+                        borderBottom: '1px solid var(--cp-sand)',
+                        background:
+                          filtroOrden === o.id ? 'var(--cp-cream)' : 'var(--cp-white)',
+                        color: 'var(--cp-navy)',
+                        fontWeight: filtroOrden === o.id ? 800 : 600,
+                        fontSize: 13,
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {o.n}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Promoción */}
+            <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+              <div
+                style={{
+                  fontSize: 12,
+                  fontWeight: 800,
+                  letterSpacing: '0.06em',
+                  color: 'var(--cp-soft)',
+                  marginBottom: 3,
+                }}
+              >
+                PROMOCIÓN
+              </div>
+              <button
+                onClick={() => setFiltroPromo(!filtroPromo)}
+                style={{
+                  minHeight: 44,
+                  padding: '0 12px',
+                  borderRadius: 10,
+                  border: '1.5px solid var(--cp-navy)',
+                  background: filtroPromo ? 'var(--cp-navy)' : 'transparent',
+                  color: filtroPromo ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                }}
+              >
+                Con promoción
+              </button>
+            </div>
+
+            {/* Botones inferiores del panel de filtros */}
+            <div
+              style={{
+                flex: '1 1 100%',
+                display: 'flex',
+                gap: 8,
+                justifyContent: 'flex-end',
+              }}
+            >
+              <button
+                onClick={limpiarFiltros}
+                style={{
+                  minHeight: 34,
+                  padding: '0 10px',
+                  border: 0,
+                  background: 'transparent',
+                  color: 'var(--cp-rust)',
+                  fontWeight: 700,
+                  fontSize: 13,
+                  textDecoration: 'underline',
+                  cursor: 'pointer',
+                }}
+              >
+                Limpiar filtros
+              </button>
+              <button
+                onClick={() => setFiltrosAbiertos(false)}
+                style={{
+                  minHeight: 34,
+                  padding: '0 16px',
+                  border: 0,
+                  borderRadius: 10,
+                  background: 'var(--cp-navy)',
+                  color: 'var(--cp-cream)',
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                }}
+              >
+                Listo
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Resumen inferior del box de búsqueda */}
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ fontSize: 13, color: 'var(--cp-soft)', fontWeight: 600 }}>
+            Mostrando {productosVisibles.length} de {productosFiltrados.length} productos
+          </div>
+          <button
+            onClick={() => setVerTodosSinPagina(!verTodosSinPagina)}
+            style={{
+              minHeight: 44,
+              padding: '0 14px',
+              border: '1.5px solid var(--cp-navy)',
+              borderRadius: 9999,
+              background: 'transparent',
+              color: 'var(--cp-navy)',
+              fontWeight: 700,
+              fontSize: 12,
+              cursor: 'pointer',
+            }}
+          >
+            {verTodosSinPagina
+              ? 'Ver por páginas (24 por página)'
+              : 'Ver todos en una sola lista'}
+          </button>
+        </div>
+      </div>
+
+      {/* 5. Grilla de tarjetas de productos */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))',
+          gap: 12,
+        }}
+      >
+        {productosVisibles.map((p) => {
+          const off = !p.disponible;
+          const tieneOpciones = p.tamanos.length > 0 || p.grupos.length > 0;
+          const minTamPrecio =
+            p.tamanos.length > 0
+              ? Math.min(...p.tamanos.map((t) => Number(t.precio) || 0))
+              : p.precio;
+          const precioTexto =
+            p.tamanos.length > 1
+              ? `Desde s/ ${minTamPrecio.toFixed(2)}`
+              : `s/ ${(Number(p.precio) || 0).toFixed(2)}`;
+
+          return (
+            <div
+              key={p.id}
+              style={{
+                background: 'var(--cp-white)',
+                border: '1px solid var(--cp-line)',
+                borderRadius: 12,
+                boxShadow: '0 6px 18px rgba(11,44,62,0.10)',
+                padding: 16,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 12,
+                opacity: off ? 0.65 : 1,
+              }}
+            >
+              {p.fotoUrl && (
+                <img
+                  src={p.fotoUrl}
+                  alt={p.nombre}
+                  style={{
+                    width: '100%',
+                    height: 140,
+                    objectFit: 'contain',
+                    background: 'var(--cp-sand)',
+                    borderRadius: 10,
+                  }}
+                />
+              )}
+
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  gap: 8,
+                }}
+              >
+                <div
+                  style={{
+                    fontFamily: 'Montserrat, sans-serif',
+                    fontWeight: 800,
+                    fontSize: 16,
+                    lineHeight: '21px',
+                    minWidth: 0,
+                    overflowWrap: 'anywhere',
+                  }}
+                >
+                  {p.nombre}
+                </div>
+                <span
+                  style={{
+                    flex: 'none',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    borderRadius: 9999,
+                    padding: '2px 10px',
+                    background: off ? 'var(--cp-rust)' : 'var(--cp-navy)',
+                    color: 'var(--cp-white)',
+                  }}
+                >
+                  {off ? 'AGOTADO' : 'DISPONIBLE'}
+                </span>
+              </div>
+
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                  gap: '8px 12px',
+                }}
+              >
+                <div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      letterSpacing: '0.05em',
+                      color: 'var(--cp-soft)',
+                    }}
+                  >
+                    CATEGORÍA
+                  </div>
+                  <div style={{ fontSize: 13 }}>{p.categoria?.nombre || 'General'}</div>
+                </div>
+                <div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      letterSpacing: '0.05em',
+                      color: 'var(--cp-soft)',
+                    }}
+                  >
+                    PRECIO
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-rust)' }}>
+                    {precioTexto}
+                  </div>
+                </div>
+              </div>
+
+              {/* Botón no suma puntos ni aplica cupones (solo Admin) */}
+              {esAdmin && (
+                <button
+                  onClick={() => toggleNoSuma(p)}
+                  style={{
+                    minHeight: 40,
+                    border: '1.5px solid var(--cp-navy)',
+                    borderRadius: 10,
+                    background: p.noSumaBeneficios ? 'var(--cp-rust)' : 'transparent',
+                    color: p.noSumaBeneficios ? 'var(--cp-white)' : 'var(--cp-navy)',
+                    fontWeight: 700,
+                    fontSize: 12,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {p.noSumaBeneficios
+                    ? 'No suma puntos ni aplica cupones'
+                    : 'Suma puntos y acepta cupones'}
+                </button>
+              )}
+
+              {/* Fila de acciones */}
+              <div style={{ display: 'flex', gap: 8, marginTop: 'auto' }}>
+                {tieneOpciones && (
+                  <button
+                    onClick={() => abrirOpciones(p)}
+                    style={{
+                      flex: 1.4,
+                      minHeight: 44,
+                      border: 0,
+                      borderRadius: 12,
+                      background: 'var(--cp-orange)',
+                      color: 'var(--cp-navy)',
+                      fontWeight: 800,
+                      fontSize: 13,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Opciones y tamaños
+                  </button>
+                )}
+                {puedeEditar && (
+                  <button
+                    onClick={() => abrirEditar(p)}
+                    style={{
+                      flex: 1,
+                      minHeight: 44,
+                      border: '1.5px solid var(--cp-navy)',
+                      borderRadius: 12,
+                      background: 'transparent',
+                      color: 'var(--cp-navy)',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Editar
+                  </button>
+                )}
+                <button
+                  onClick={() => toggleDisponibilidad(p)}
+                  aria-label={`Cambiar disponibilidad de ${p.nombre}`}
+                  style={{
+                    flex: 1,
+                    minHeight: 44,
+                    border: '1.5px solid var(--cp-navy)',
+                    borderRadius: 12,
+                    background: off ? 'var(--cp-orange)' : 'transparent',
+                    color: 'var(--cp-navy)',
+                    fontWeight: 700,
+                    fontSize: 13,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {off ? 'Marcar disponible' : 'Marcar agotado'}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Estado vacío si no hay coincidencias */}
+      {productosVisibles.length === 0 && (
+        <div
+          style={{
+            background: 'var(--cp-white)',
+            border: '1px solid var(--cp-line)',
+            borderRadius: 12,
+            padding: 24,
+            textAlign: 'center',
+            color: 'var(--cp-soft)',
+          }}
+        >
+          Ningún producto coincide con los filtros.
+        </div>
+      )}
+
+      {/* 6. Nota de pie */}
+      <div style={{ fontSize: 12, color: 'var(--cp-soft)', textAlign: 'center' }}>
+        Un producto agotado deja de ofrecerse en la carta y el chatbot; no se elimina.
+      </div>
+
+      {/* 7. Paginación */}
+      {!verTodosSinPagina && totalPaginas > 1 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 6 }}>
+          <button
+            onClick={() => setPagina((p) => Math.max(1, p - 1))}
+            disabled={pagina === 1}
+            style={{
+              minHeight: 44,
+              padding: '0 12px',
+              borderRadius: 12,
+              border: '1.5px solid var(--cp-navy)',
+              background: 'transparent',
+              color: 'var(--cp-navy)',
+              fontWeight: 700,
+              opacity: pagina === 1 ? 0.4 : 1,
+              cursor: pagina === 1 ? 'default' : 'pointer',
+            }}
+          >
+            ← Anterior
+          </button>
+          {Array.from({ length: totalPaginas }, (_, i) => i + 1).map((num) => {
+            const activo = num === pagina;
+            return (
+              <button
+                key={num}
+                onClick={() => setPagina(num)}
+                aria-label={`Página ${num}`}
+                style={{
+                  minWidth: 44,
+                  minHeight: 44,
+                  borderRadius: 12,
+                  border: '1.5px solid var(--cp-navy)',
+                  background: activo ? 'var(--cp-navy)' : 'transparent',
+                  color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                }}
+              >
+                {num}
+              </button>
+            );
+          })}
+          <button
+            onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+            disabled={pagina === totalPaginas}
+            style={{
+              minHeight: 44,
+              padding: '0 12px',
+              borderRadius: 12,
+              border: '1.5px solid var(--cp-navy)',
+              background: 'transparent',
+              color: 'var(--cp-navy)',
+              fontWeight: 700,
+              opacity: pagina === totalPaginas ? 0.4 : 1,
+              cursor: pagina === totalPaginas ? 'default' : 'pointer',
+            }}
+          >
+            Siguiente →
+          </button>
+        </div>
+      )}
+
+      {/* =================================================================== */}
+      {/* MODAL: + NUEVO PRODUCTO                                            */}
+      {/* =================================================================== */}
+      {modalNuevoAbierto && (
+        <>
+          <div
+            onClick={() => setModalNuevoAbierto(false)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 50,
+              background: 'rgba(11,44,62,0.55)',
+            }}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Nuevo producto"
+            style={{
+              position: 'fixed',
+              zIndex: 60,
+              left: '50%',
+              top: '50%',
+              transform: 'translate(-50%,-50%)',
+              width: 'min(810px, calc(100% - 24px))',
+              maxHeight: 'calc(100% - 24px)',
+              overflowY: 'auto',
+              background: 'var(--cp-cream)',
+              borderRadius: 20,
+              boxShadow: '0 20px 50px rgba(11,44,62,0.4)',
+              padding: 20,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                gap: 8,
+              }}
+            >
+              <div
+                style={{
+                  fontFamily: 'Montserrat, sans-serif',
+                  fontWeight: 800,
+                  fontSize: 22,
+                  lineHeight: '27px',
+                }}
+              >
+                Nuevo producto
+              </div>
+              <button
+                onClick={() => setModalNuevoAbierto(false)}
+                aria-label="Cerrar"
+                style={{
+                  flex: 'none',
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  border: '1.5px solid var(--cp-navy)',
+                  background: 'transparent',
+                  color: 'var(--cp-navy)',
+                  fontSize: 20,
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
+              Aparece de inmediato en la carta, en Nuevo pedido y en Productos. No se elimina: se desactiva.
+            </div>
+
+            {/* Nombre */}
+            <div>
+              <label style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>
+                Nombre
+              </label>
+              <input
+                type="text"
+                value={npNombre}
+                onChange={(e) => setNpNombre(e.target.value)}
+                placeholder="Ej.: BROWNIE CON HELADO"
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  minHeight: 42,
+                  borderRadius: 10,
+                  border: '1.5px solid var(--cp-line)',
+                  background: 'var(--cp-white)',
+                  padding: '0 10px',
+                  fontFamily: 'inherit',
+                  fontSize: 14,
+                  color: 'var(--cp-navy)',
+                }}
+              />
+            </div>
+
+            {/* Categoría */}
+            <div style={{ fontWeight: 700, fontSize: 13 }}>Categoría</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {categorias.map((cat) => {
+                const on = npCategoriaId === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => setNpCategoriaId(cat.id)}
+                    style={{
+                      minHeight: 44,
+                      padding: '0 12px',
+                      borderRadius: 9999,
+                      border: '1.5px solid var(--cp-navy)',
+                      fontWeight: 700,
+                      fontSize: 12,
+                      background: on ? 'var(--cp-navy)' : 'transparent',
+                      color: on ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {cat.nombre}
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => setNpNuevaCatAbierta(!npNuevaCatAbierta)}
+                style={{
+                  minHeight: 44,
+                  padding: '0 12px',
+                  borderRadius: 9999,
+                  border: '1.5px dashed var(--cp-navy)',
+                  fontWeight: 700,
+                  fontSize: 12,
+                  background: 'transparent',
+                  color: 'var(--cp-navy)',
+                  cursor: 'pointer',
+                }}
+              >
+                + Nueva categoría
+              </button>
+            </div>
+
+            {/* Formulario rápido para crear categoría */}
+            {npNuevaCatAbierta && (
+              <div
+                style={{
+                  background: 'var(--cp-white)',
+                  border: '1.5px solid var(--cp-navy)',
+                  borderRadius: 12,
+                  padding: 12,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                }}
+              >
+                <label style={{ fontWeight: 700, fontSize: 13 }}>
+                  Nombre de la categoría nueva
+                </label>
+                <input
+                  type="text"
+                  value={npNuevaCatNombre}
+                  onChange={(e) => setNpNuevaCatNombre(e.target.value)}
+                  placeholder="Ejemplo: Pizzas, Hamburguesas, Ensaladas"
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    minHeight: 44,
+                    borderRadius: 10,
+                    border: '1.5px solid var(--cp-line)',
+                    background: 'var(--cp-cream)',
+                    padding: '0 12px',
+                    fontSize: 14,
+                  }}
+                />
+                <div style={{ fontWeight: 700, fontSize: 13 }}>¿Cómo se venden sus productos?</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <button
+                    onClick={() => setNpNuevaCatConOpc(true)}
+                    style={{
+                      minHeight: 44,
+                      padding: '0 12px',
+                      borderRadius: 12,
+                      border: '1.5px solid var(--cp-navy)',
+                      textAlign: 'left',
+                      fontWeight: 700,
+                      fontSize: 12,
+                      background: npNuevaCatConOpc ? 'var(--cp-navy)' : 'transparent',
+                      color: npNuevaCatConOpc ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Con tamaños y opciones (como bebidas y waffles)
+                  </button>
+                  <button
+                    onClick={() => setNpNuevaCatConOpc(false)}
+                    style={{
+                      minHeight: 44,
+                      padding: '0 12px',
+                      borderRadius: 12,
+                      border: '1.5px solid var(--cp-navy)',
+                      textAlign: 'left',
+                      fontWeight: 700,
+                      fontSize: 12,
+                      background: !npNuevaCatConOpc ? 'var(--cp-navy)' : 'transparent',
+                      color: !npNuevaCatConOpc ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Se vende fijo (como postres sueltos)
+                  </button>
+                </div>
+                <button
+                  onClick={crearCategoriaRapida}
+                  style={{
+                    minHeight: 44,
+                    border: 0,
+                    borderRadius: 10,
+                    background: 'var(--cp-navy)',
+                    color: 'var(--cp-cream)',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Crear categoría
+                </button>
+              </div>
+            )}
+
+            {/* Precio y descripción */}
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <div style={{ flex: '1 1 140px', minWidth: 0 }}>
+                <label style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>
+                  Precio (s/)
+                </label>
+                <input
+                  type="number"
+                  step="0.50"
+                  value={npPrecio}
+                  onChange={(e) => setNpPrecio(e.target.value)}
+                  placeholder="0.00"
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    minHeight: 42,
+                    borderRadius: 10,
+                    border: '1.5px solid var(--cp-line)',
+                    background: 'var(--cp-white)',
+                    padding: '0 10px',
+                    fontFamily: 'inherit',
+                    fontSize: 14,
+                    color: 'var(--cp-navy)',
+                  }}
+                />
+              </div>
+              <div style={{ flex: '2 1 260px', minWidth: 0 }}>
+                <label style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>
+                  Descripción corta (opcional)
+                </label>
+                <input
+                  type="text"
+                  value={npDesc}
+                  onChange={(e) => setNpDesc(e.target.value)}
+                  placeholder=""
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    minHeight: 42,
+                    borderRadius: 10,
+                    border: '1.5px solid var(--cp-line)',
+                    background: 'var(--cp-white)',
+                    padding: '0 10px',
+                    fontFamily: 'inherit',
+                    fontSize: 14,
+                    color: 'var(--cp-navy)',
+                  }}
+                />
+              </div>
+            </div>
+
+            {npError && (
+              <div role="alert" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-rust)' }}>
+                {npError}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={guardarNuevoProducto}
+                style={{
+                  flex: 1,
+                  minHeight: 52,
+                  borderRadius: 12,
+                  fontFamily: 'Montserrat, sans-serif',
+                  fontWeight: 800,
+                  fontSize: 15,
+                  border: 0,
+                  background: 'var(--cp-orange)',
+                  color: 'var(--cp-navy)',
+                  cursor: 'pointer',
+                }}
+              >
+                Agregar a la carta
+              </button>
+              <button
+                onClick={() => setModalNuevoAbierto(false)}
+                style={{
+                  flex: 1,
+                  minHeight: 52,
+                  borderRadius: 12,
+                  fontFamily: 'Montserrat, sans-serif',
+                  fontWeight: 800,
+                  fontSize: 15,
+                  border: '1.5px solid var(--cp-navy)',
+                  background: 'transparent',
+                  color: 'var(--cp-navy)',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* =================================================================== */}
+      {/* MODAL: EDITAR PRODUCTO                                              */}
+      {/* =================================================================== */}
+      {productoEnEdicion && (
+        <>
+          <div
+            onClick={() => setProductoEnEdicion(null)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 50,
+              background: 'rgba(11,44,62,0.55)',
+            }}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Editar: ${productoEnEdicion.nombre}`}
+            style={{
+              position: 'fixed',
+              zIndex: 60,
+              left: '50%',
+              top: '50%',
+              transform: 'translate(-50%,-50%)',
+              width: 'min(620px, calc(100% - 24px))',
+              maxHeight: 'calc(100% - 24px)',
+              overflowY: 'auto',
+              background: 'var(--cp-cream)',
+              borderRadius: 20,
+              boxShadow: '0 20px 50px rgba(11,44,62,0.4)',
+              padding: 20,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              <div
+                style={{
+                  fontFamily: 'Montserrat, sans-serif',
+                  fontWeight: 800,
+                  fontSize: 20,
+                  lineHeight: '26px',
+                }}
+              >
+                Editar: {productoEnEdicion.nombre}
+              </div>
+              <button
+                onClick={() => setProductoEnEdicion(null)}
+                aria-label="Cerrar"
+                style={{
+                  flex: 'none',
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  border: '1.5px solid var(--cp-navy)',
+                  background: 'transparent',
+                  color: 'var(--cp-navy)',
+                  fontSize: 20,
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Nombre */}
+            <div>
+              <label style={{ fontWeight: 700, display: 'block', marginBottom: 4 }}>Nombre</label>
+              <input
+                type="text"
+                value={edNombre}
+                onChange={(e) => setEdNombre(e.target.value)}
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  minHeight: 48,
+                  borderRadius: 12,
+                  border: '1.5px solid var(--cp-line)',
+                  background: 'var(--cp-white)',
+                  color: 'var(--cp-navy)',
+                  padding: '0 12px',
+                  fontSize: 14,
+                }}
+              />
+            </div>
+
+            {/* Categoría */}
+            <div>
+              <label style={{ fontWeight: 700, display: 'block', marginBottom: 4 }}>
+                Categoría
+              </label>
+              <select
+                value={edCategoriaId}
+                onChange={(e) => setEdCategoriaId(e.target.value)}
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  minHeight: 48,
+                  borderRadius: 12,
+                  border: '1.5px solid var(--cp-navy)',
+                  background: 'var(--cp-white)',
+                  color: 'var(--cp-navy)',
+                  padding: '0 12px',
+                  fontSize: 14,
+                }}
+              >
+                {categorias.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Precio */}
+            <div>
+              <label style={{ fontWeight: 700, display: 'block', marginBottom: 4 }}>
+                Precio (s/)
+              </label>
+              <input
+                type="number"
+                step="0.50"
+                value={edPrecio}
+                onChange={(e) => setEdPrecio(e.target.value)}
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  minHeight: 48,
+                  borderRadius: 12,
+                  border: '1.5px solid var(--cp-line)',
+                  background: 'var(--cp-white)',
+                  color: 'var(--cp-navy)',
+                  padding: '0 12px',
+                  fontSize: 14,
+                }}
+              />
+            </div>
+
+            {/* Sabores gestionables (Donas, Galletas, Pizzas, etc.) */}
+            <div>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>Sabores o variantes</div>
+              <div
+                style={{
+                  background: 'var(--cp-white)',
+                  borderRadius: 12,
+                  padding: 10,
+                  border: '1px solid var(--cp-line)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                }}
+              >
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {edSabores.map((s, sIdx) => {
+                    const activo = s.activo !== false;
+                    return (
+                      <button
+                        key={sIdx}
+                        onClick={() => {
+                          const clon = [...edSabores];
+                          clon[sIdx].activo = !activo;
+                          setEdSabores(clon);
+                        }}
+                        style={{
+                          minHeight: 36,
+                          padding: '0 10px',
+                          borderRadius: 9999,
+                          border: '1.5px solid var(--cp-navy)',
+                          background: activo ? 'var(--cp-navy)' : 'transparent',
+                          color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                          fontSize: 12,
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {s.nombre} {activo ? '✓' : '(Agotado)'}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    type="text"
+                    value={edNuevoSabor}
+                    onChange={(e) => setEdNuevoSabor(e.target.value)}
+                    placeholder="Nuevo sabor (ej.: Pistacho, Nutella, Americana)"
+                    style={{
+                      flex: 1,
+                      minHeight: 38,
+                      borderRadius: 8,
+                      border: '1.5px solid var(--cp-line)',
+                      padding: '0 10px',
+                      fontSize: 13,
+                    }}
+                  />
+                  <button
+                    onClick={() => {
+                      if (!edNuevoSabor.trim()) return;
+                      setEdSabores([...edSabores, { nombre: edNuevoSabor.trim(), activo: true }]);
+                      setEdNuevoSabor('');
+                    }}
+                    style={{
+                      minHeight: 38,
+                      padding: '0 14px',
+                      borderRadius: 8,
+                      border: 0,
+                      background: 'var(--cp-navy)',
+                      color: 'var(--cp-cream)',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    + Agregar
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Imagen */}
+            <div>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>Imagen</div>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                <img
+                  src={edFotoUrl || '/logo.png'}
+                  alt="Imagen actual"
+                  style={{
+                    width: 96,
+                    height: 96,
+                    borderRadius: 12,
+                    objectFit: 'contain',
+                    background: 'var(--cp-sand)',
+                    border: '1.5px dashed var(--cp-soft)',
+                  }}
+                />
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <label
+                    style={{
+                      minHeight: 44,
+                      padding: '0 16px',
+                      border: '1.5px solid var(--cp-navy)',
+                      borderRadius: 12,
+                      display: 'flex',
+                      alignItems: 'center',
+                      color: 'var(--cp-navy)',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Subir imagen
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={manejarSubidaFoto}
+                      style={{ position: 'absolute', left: -9999 }}
+                    />
+                  </label>
+                  {edFotoUrl && (
+                    <button
+                      onClick={quitarFoto}
+                      style={{
+                        minHeight: 44,
+                        padding: '0 16px',
+                        border: '1.5px solid var(--cp-rust)',
+                        borderRadius: 12,
+                        background: 'transparent',
+                        color: 'var(--cp-rust)',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Quitar imagen
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {edError && (
+              <div role="alert" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-rust)' }}>
+                {edError}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <button
+                onClick={guardarEdicion}
+                disabled={guardandoEdicion}
+                style={{
+                  flex: 1,
+                  minHeight: 52,
+                  border: 0,
+                  borderRadius: 12,
+                  background: 'var(--cp-orange)',
+                  color: 'var(--cp-navy)',
+                  fontFamily: 'Montserrat, sans-serif',
+                  fontWeight: 800,
+                  fontSize: 15,
+                  cursor: 'pointer',
+                }}
+              >
+                Guardar
+              </button>
+              <button
+                onClick={() => setProductoEnEdicion(null)}
+                style={{
+                  flex: 1,
+                  minHeight: 52,
+                  border: '1.5px solid var(--cp-navy)',
+                  borderRadius: 12,
+                  background: 'transparent',
+                  color: 'var(--cp-navy)',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* =================================================================== */}
+      {/* MODAL: OPCIONES Y TAMAÑOS                                          */}
+      {/* =================================================================== */}
+      {productoEnOpciones && (
+        <>
+          <div
+            onClick={() => setProductoEnOpciones(null)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 50,
+              background: 'rgba(11,44,62,0.55)',
+            }}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Opciones y tamaños"
+            style={{
+              position: 'fixed',
+              zIndex: 60,
+              left: '50%',
+              top: '50%',
+              transform: 'translate(-50%,-50%)',
+              width: 'min(1120px, calc(100% - 24px))',
+              maxHeight: 'calc(100% - 24px)',
+              overflowY: 'auto',
+              background: 'var(--cp-cream)',
+              borderRadius: 20,
+              boxShadow: '0 20px 50px rgba(11,44,62,0.4)',
+              padding: 20,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14,
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                gap: 8,
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontFamily: 'Montserrat, sans-serif',
+                    fontWeight: 800,
+                    fontSize: 22,
+                    lineHeight: '27px',
+                  }}
+                >
+                  Opciones y tamaños: {productoEnOpciones.nombre}
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
+                  Los cambios en los grupos valen para todos los productos que los usan.
+                </div>
+              </div>
+              <button
+                onClick={() => setProductoEnOpciones(null)}
+                aria-label="Cerrar"
+                style={{
+                  flex: 'none',
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  border: '1.5px solid var(--cp-navy)',
+                  background: 'transparent',
+                  color: 'var(--cp-navy)',
+                  fontSize: 20,
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div
+              style={{
+                fontSize: 13,
+                lineHeight: '19px',
+                background: 'var(--cp-white)',
+                border: '1px dashed var(--cp-navy)',
+                borderRadius: 12,
+                padding: '10px 12px',
+              }}
+            >
+              Los tamaños, las opciones y los tipos de grupo se <b>eligen de una lista</b> para no
+              equivocarse al escribir. Si falta uno (por ejemplo, un cuarto tipo de leche), escríbelo en
+              el mismo buscador de la lista y toca <b>«+ Crear»</b>. Con el lápiz de cada nombre lo
+              corriges al instante.
+            </div>
+
+            {/* 1. Tamaños y precios */}
+            <div
+              style={{
+                background: 'var(--cp-white)',
+                border: '1px solid var(--cp-line)',
+                borderRadius: 14,
+                padding: 14,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+              }}
+            >
+              <div style={{ fontWeight: 800 }}>Tamaños y precios</div>
+              {opdTamanos.map((z, zIdx) => {
+                const activo = z.activo !== false;
+                return (
+                  <div
+                    key={zIdx}
+                    style={{
+                      display: 'flex',
+                      gap: 8,
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <div style={{ flex: '2 1 170px', minWidth: 0 }}>
+                      <input
+                        type="text"
+                        readOnly
+                        value={z.nombre}
+                        style={{
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          minHeight: 44,
+                          padding: '0 12px',
+                          borderRadius: 10,
+                          border: '1.5px solid var(--cp-navy)',
+                          background: 'var(--cp-white)',
+                          fontWeight: 700,
+                          fontSize: 13,
+                        }}
+                      />
+                    </div>
+                    <input
+                      type="number"
+                      step="0.50"
+                      value={z.precio}
+                      onChange={(e) => {
+                        const clon = [...opdTamanos];
+                        clon[zIdx].precio = parseFloat(e.target.value) || 0;
+                        setOpdTamanos(clon);
+                      }}
+                      placeholder="s/"
+                      aria-label="Precio"
+                      style={{
+                        flex: '1 1 90px',
+                        minWidth: 0,
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        minHeight: 42,
+                        borderRadius: 10,
+                        border: '1.5px solid var(--cp-line)',
+                        background: 'var(--cp-white)',
+                        padding: '0 12px',
+                        fontSize: 14,
+                      }}
+                    />
+                    <button
+                      onClick={() => {
+                        const clon = [...opdTamanos];
+                        clon[zIdx].activo = !activo;
+                        setOpdTamanos(clon);
+                      }}
+                      style={{
+                        minHeight: 44,
+                        padding: '0 12px',
+                        borderRadius: 9999,
+                        border: '1.5px solid var(--cp-navy)',
+                        fontWeight: 700,
+                        fontSize: 12,
+                        background: activo ? 'var(--cp-navy)' : 'transparent',
+                        color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {activo ? 'Activo' : 'Oculto'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* 2. Opciones que se le preguntan al cliente */}
+            <div
+              style={{
+                background: 'var(--cp-white)',
+                border: '1px solid var(--cp-line)',
+                borderRadius: 14,
+                padding: 14,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+              }}
+            >
+              <div style={{ fontWeight: 800 }}>Opciones que se le preguntan al cliente</div>
+              <div style={{ fontSize: 12, color: 'var(--cp-soft)' }}>
+                Cada grupo (tipo de leche, endulzante, shots, extras...) se crea y se edita aquí. Elige en cuáles productos se pregunta. Los cambios del grupo valen para todos los que lo usan.
+              </div>
+
+              {opdGrupos.map((g, gIdx) => {
+                const abierto = opdGrupoAbierto === g.id;
+                return (
+                  <div
+                    key={g.id}
+                    style={{
+                      border: '1.5px solid var(--cp-navy)',
+                      borderRadius: 12,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: '8px 10px',
+                        background: 'var(--cp-sand)',
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <button
+                        onClick={() => setOpdGrupoAbierto(abierto ? null : g.id)}
+                        style={{
+                          flex: '1 1 220px',
+                          minWidth: 0,
+                          textAlign: 'left',
+                          border: 0,
+                          background: 'transparent',
+                          color: 'var(--cp-navy)',
+                          padding: 0,
+                          fontFamily: 'inherit',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <div style={{ fontWeight: 800, fontSize: 14 }}>
+                          {g.nombre} {abierto ? '▴' : '▾'}
+                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--cp-soft)', lineHeight: '16px' }}>
+                          {g.obligatorio ? 'Obligatorio' : 'Opcional'} · {g.opciones.length} opciones
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => {
+                          const clon = [...opdGrupos];
+                          clon[gIdx].activoEnProducto = !g.activoEnProducto;
+                          setOpdGrupos(clon);
+                        }}
+                        style={{
+                          minHeight: 44,
+                          padding: '0 12px',
+                          borderRadius: 9999,
+                          border: '1.5px solid var(--cp-navy)',
+                          fontWeight: 700,
+                          fontSize: 12,
+                          background: g.activoEnProducto ? 'var(--cp-navy)' : 'transparent',
+                          color: g.activoEnProducto ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {g.activoEnProducto ? 'Se pregunta aquí' : 'No se pregunta aquí'}
+                      </button>
+                    </div>
+
+                    {abierto && (
+                      <div
+                        style={{
+                          padding: 12,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 10,
+                        }}
+                      >
+                        <div style={{ fontWeight: 700, fontSize: 13 }}>Opciones y su precio extra</div>
+                        {g.opciones.map((opt, oIdx) => (
+                          <div
+                            key={opt.id || oIdx}
+                            style={{
+                              display: 'flex',
+                              gap: 8,
+                              alignItems: 'center',
+                              flexWrap: 'wrap',
+                            }}
+                          >
+                            <input
+                              type="text"
+                              readOnly
+                              value={opt.nombre}
+                              style={{
+                                flex: '2 1 170px',
+                                minWidth: 0,
+                                minHeight: 44,
+                                padding: '0 12px',
+                                borderRadius: 10,
+                                border: '1.5px solid var(--cp-navy)',
+                                background: 'var(--cp-white)',
+                                fontWeight: 700,
+                                fontSize: 13,
+                              }}
+                            />
+                            <div
+                              style={{
+                                flex: '1 1 80px',
+                                minWidth: 0,
+                                minHeight: 42,
+                                display: 'flex',
+                                alignItems: 'center',
+                                padding: '0 12px',
+                                background: 'var(--cp-white)',
+                                borderRadius: 10,
+                                border: '1.5px solid var(--cp-line)',
+                                fontSize: 14,
+                              }}
+                            >
+                              + s/ {opt.precioExtra.toFixed(2)}
+                            </div>
+                            <span
+                              style={{
+                                minHeight: 44,
+                                padding: '0 12px',
+                                borderRadius: 9999,
+                                border: '1.5px solid var(--cp-navy)',
+                                fontWeight: 700,
+                                fontSize: 12,
+                                background: opt.activo !== false ? 'var(--cp-navy)' : 'transparent',
+                                color: opt.activo !== false ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                              }}
+                            >
+                              {opt.activo !== false ? 'Activo' : 'Oculto'}
+                            </span>
+                          </div>
+                        ))}
+                        <div
+                          style={{
+                            fontSize: 12,
+                            lineHeight: '17px',
+                            color: 'var(--cp-soft)',
+                            border: '1px dashed var(--cp-line)',
+                            borderRadius: 10,
+                            padding: '8px 10px',
+                          }}
+                        >
+                          Para cambiar en qué categorías enteras se pregunta, usa Listas y categorías ▸ Dónde se pregunta cada grupo.
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {opdError && (
+              <div role="alert" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-rust)' }}>
+                {opdError}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={guardarOpciones}
+                disabled={guardandoOpciones}
+                style={{
+                  flex: 1,
+                  minHeight: 52,
+                  border: 0,
+                  borderRadius: 12,
+                  background: 'var(--cp-orange)',
+                  color: 'var(--cp-navy)',
+                  fontFamily: 'Montserrat, sans-serif',
+                  fontWeight: 800,
+                  fontSize: 15,
+                  cursor: 'pointer',
+                }}
+              >
+                Guardar cambios
+              </button>
+              <button
+                onClick={() => setProductoEnOpciones(null)}
+                style={{
+                  flex: 1,
+                  minHeight: 52,
+                  border: '1.5px solid var(--cp-navy)',
+                  borderRadius: 12,
+                  background: 'transparent',
+                  color: 'var(--cp-navy)',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                }}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* =================================================================== */}
+      {/* DIÁLOGO GENERAL DE CONFIRMACIÓN (SÍ / NO)                          */}
+      {/* =================================================================== */}
+      <Confirmar
+        abierto={confirmarProps.abierto}
+        titulo={confirmarProps.titulo}
+        mensaje={confirmarProps.mensaje}
+        textoSi="Sí, continuar"
+        textoNo="No, cancelar"
+        alConfirmar={async () => {
+          setConfirmarProps((prev) => ({ ...prev, abierto: false }));
+          await confirmarProps.accion();
+        }}
+        alCancelar={() => setConfirmarProps((prev) => ({ ...prev, abierto: false }))}
+      />
+    </div>
+  );
+}
