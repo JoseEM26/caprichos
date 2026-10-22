@@ -264,7 +264,7 @@ export function ModalFormularioReserva({
                   setErrorValidacion(null);
                   alLimpiarError?.();
                 }}
-                placeholder="Ej. Juan Pérez"
+                placeholder="Nombre"
               />
               <Campo
                 etiqueta="Teléfono / Celular"
@@ -275,7 +275,7 @@ export function ModalFormularioReserva({
                   setErrorValidacion(null);
                   alLimpiarError?.();
                 }}
-                placeholder="Ej. 987654321"
+                placeholder="Celular (opcional)"
               />
             </div>
 

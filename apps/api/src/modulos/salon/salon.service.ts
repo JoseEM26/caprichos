@@ -56,6 +56,7 @@ export class SalonService {
                       where: { estado_anterior: null },
                       take: 1,
                     },
+                    lineas: true,
                   },
                 },
               },
@@ -81,6 +82,8 @@ export class SalonService {
               id: string;
               codigo: string;
               mozo: string | null;
+              total?: number;
+              lineas?: Array<{ cantidad: number; nombre: string; detalle: string }>;
             } | null = null;
             let pedidoCodigo: string | null = null;
             let mozoNombre: string | null = null;
@@ -106,6 +109,12 @@ export class SalonService {
                 id: ped.id.toString(),
                 codigo: ped.codigo,
                 mozo: mozoNombre || null,
+                total: ped.total ? Number(ped.total) : (ped.subtotal ? Number(ped.subtotal) : 0),
+                lineas: ((ped as any).lineas || []).map((l: any) => ({
+                  cantidad: l.cantidad,
+                  nombre: l.nombre,
+                  detalle: l.tamano ? `${l.tamano}${l.nota ? ` · ${l.nota}` : ''}` : (l.nota || ''),
+                })),
               };
             }
 

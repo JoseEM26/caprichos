@@ -1,15 +1,27 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import { useSesion } from '../../comun/sesion';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
-import { DisenoCompletoJson, PisoPlano, PisoSalon } from './tipos';
-import { BarraControlesPlano } from './componentes/BarraControlesPlano';
-import { CuadriculaPlano } from './componentes/CuadriculaPlano';
-import { ModalEditarElemento } from './componentes/ModalEditarElemento';
-import { ModalDisenoTexto } from './componentes/ModalDisenoTexto';
+import { Confirmar } from '../../comun/Confirmar';
+import { ElementoPlano, PisoPlano, PisoSalon, MesaSalon } from './tipos';
 import { ModalNuevoPedidoMesa } from './componentes/ModalNuevoPedidoMesa';
+import { ModalPrecuenta } from './componentes/ModalPrecuenta';
 import { useSalonSocket } from './useSalonSocket';
 import { salonApi } from './api';
+
+export const EL_CONFIG: Record<
+  string,
+  { n: string; bg: string; bd: string; fg: string; dw: number; dh: number }
+> = {
+  mesa: { n: 'Mesa', bg: 'var(--cp-white)', bd: 'var(--cp-navy)', fg: 'var(--cp-navy)', dw: 2, dh: 2 },
+  pared: { n: 'Pared', bg: 'var(--cp-navy)', bd: 'var(--cp-navy)', fg: 'var(--cp-cream)', dw: 4, dh: 1 },
+  cocina: { n: 'Cocina', bg: '#8FA9B8', bd: 'var(--cp-soft)', fg: 'var(--cp-navy)', dw: 5, dh: 3 },
+  barra: { n: 'Barra', bg: 'var(--cp-gold)', bd: 'var(--cp-rust)', fg: 'var(--cp-navy)', dw: 6, dh: 2 },
+  bano: { n: 'Baños', bg: 'var(--cp-line2)', bd: 'var(--cp-soft)', fg: 'var(--cp-navy)', dw: 3, dh: 3 },
+  entrada: { n: 'Entrada', bg: '#5DD38A', bd: 'var(--cp-ok)', fg: 'var(--cp-navy)', dw: 4, dh: 1 },
+  caja: { n: 'Caja', bg: 'var(--cp-line)', bd: 'var(--cp-soft)', fg: 'var(--cp-navy)', dw: 3, dh: 2 },
+  escalera: { n: 'Escalera', bg: '#F6E3C3', bd: 'var(--cp-rust)', fg: 'var(--cp-navy)', dw: 2, dh: 3 },
+};
 
 export function PlanoView() {
   const { tiene } = useSesion();
@@ -29,27 +41,36 @@ export function PlanoView() {
   // Elemento seleccionado para inspeccionar / editar
   const [elementoSeleccionadoId, setElementoSeleccionadoId] = useState<string | null>(null);
 
-  // Modales
-  const [modalDisenoAbierto, setModalDisenoAbierto] = useState(false);
+  // Sección "Guardar o cambiar el diseño"
+  const [pioAbierto, setPioAbierto] = useState(false);
+  const [pioTextoPegar, setPioTextoPegar] = useState('');
+  const [pioMensaje, setPioMensaje] = useState<string | null>(null);
+  const [confirmarAplicarDiseno, setConfirmarAplicarDiseno] = useState(false);
+
+  // Modales adicionales
   const [modalNuevoPedidoAbierto, setModalNuevoPedidoAbierto] = useState(false);
+  const [mesasParaPedido, setMesasParaPedido] = useState<string[]>([]);
+  const [modalPrecuentaAbierto, setModalPrecuentaAbierto] = useState(false);
+  const [mesaParaPrecuenta, setMesaParaPrecuenta] = useState<MesaSalon | null>(null);
+
+  // Confirmaciones obligatorias Sí/No
+  const [confirmarEliminar, setConfirmarEliminar] = useState<ElementoPlano | null>(null);
+  const [confirmarAlternarElemento, setConfirmarAlternarElemento] = useState<ElementoPlano | null>(
+    null,
+  );
+  const [confirmarAlternarPiso, setConfirmarAlternarPiso] = useState<PisoPlano | null>(null);
+
+  // Drag & drop en cuadrícula
+  const [dragOffset, setDragOffset] = useState<{ id: string; dc: number; dr: number } | null>(
+    null,
+  );
 
   // Estados de carga y error
   const [cargando, setCargando] = useState(true);
   const [errorGlobal, setErrorGlobal] = useState<string | null>(null);
-  const [errorOperacion, setErrorOperacion] = useState<string | null>(null);
-  const [errorCuadricula, setErrorCuadricula] = useState<string | null>(null);
-  const [elementosFuera, setElementosFuera] = useState<
-    Array<{ id: string; tipo: string; nombre?: string; numero?: number }>
-  >([]);
+  const [dimNote, setDimNote] = useState<string | null>(null);
 
-  // Detalles ante MESA_EN_USO
-  const [detallesMesaEnUso, setDetallesMesaEnUso] = useState<{
-    motivo: string;
-    mensaje: string;
-    sugerencia?: string;
-  } | null>(null);
-
-  // Cargar datos del plano y salón
+  // Cargar datos
   const cargarDatos = useCallback(async () => {
     try {
       setErrorGlobal(null);
@@ -61,7 +82,6 @@ export function PlanoView() {
       setPisos(datosPlano || []);
       setPisosSalon(datosSalon.pisos || []);
 
-      // Conservar piso seleccionado si existe, sino tomar el primero
       setPisoActivoId((prev) => {
         if (datosPlano && datosPlano.some((p) => p.id === prev)) {
           return prev;
@@ -69,9 +89,7 @@ export function PlanoView() {
         return datosPlano?.[0]?.id || '1';
       });
     } catch (err: any) {
-      setErrorGlobal(
-        err?.message || 'No fue posible cargar el plano del local.',
-      );
+      setErrorGlobal(err?.message || 'No fue posible cargar el plano del local.');
     } finally {
       setCargando(false);
     }
@@ -81,300 +99,256 @@ export function PlanoView() {
     cargarDatos();
   }, [cargarDatos]);
 
-  // Socket en tiempo real para avisos y estado de mesas
+  // Socket en tiempo real
   const { avisoListo, cerrarAvisoListo } = useSalonSocket({
     onMesaCambio: () => {
-      // Refrescar estado de mesas ante evento salon:mesa
-      salonApi.obtenerMesas().then((res) => {
-        if (res?.pisos) setPisosSalon(res.pisos);
-      }).catch(() => {});
+      salonApi
+        .obtenerMesas()
+        .then((res) => {
+          if (res?.pisos) setPisosSalon(res.pisos);
+        })
+        .catch(() => {});
     },
     onPlanoCambio: () => {
       cargarDatos();
     },
   });
 
-  // Piso actual en vista
+  // Piso actual
   const pisoActual = pisos.find((p) => p.id === pisoActivoId) || pisos[0];
-  const pisoSalonActual = pisosSalon.find((p) => p.id === pisoActivoId);
+  const elementosPiso = pisoActual?.elementos || [];
 
-  // Elemento actualmente seleccionado
-  const elementoSeleccionado =
-    pisoActual?.elementos?.find((e) => e.id === elementoSeleccionadoId) || null;
+  const ECOLS = pisoActual?.cuadriculaAncho || pisoActual?.cuadricula_ancho || 20;
+  const EROWS = pisoActual?.cuadriculaAlto || pisoActual?.cuadricula_alto || 12;
 
-  // 1. Colocar elemento tocando la cuadrícula
-  const handleColocarElemento = async (x: number, y: number) => {
-    if (!puedeEditar) {
-      setErrorOperacion('No tienes permiso para editar el plano.');
+  // Elemento seleccionado
+  const elementoSeleccionado = useMemo(() => {
+    return elementosPiso.find((e) => e.id === elementoSeleccionadoId) || null;
+  }, [elementosPiso, elementoSeleccionadoId]);
+
+  // Totales para los 5 KPIs de la cabecera
+  const todosLosElementos = useMemo(() => pisos.flatMap((p) => p.elementos || []), [pisos]);
+  const todasLasMesas = useMemo(
+    () => todosLosElementos.filter((e) => e.tipo.toLowerCase() === 'mesa'),
+    [todosLosElementos],
+  );
+  const mesasActivasTotal = useMemo(() => todasLasMesas.filter((m) => m.activo).length, [
+    todasLasMesas,
+  ]);
+  const capacidadTotal = useMemo(
+    () =>
+      todasLasMesas
+        .filter((m) => m.activo)
+        .reduce((acc, m) => acc + (Number(m.asientos) || 4), 0),
+    [todasLasMesas],
+  );
+
+  const mesasEnEstePiso = useMemo(
+    () => elementosPiso.filter((e) => e.tipo.toLowerCase() === 'mesa' && e.activo),
+    [elementosPiso],
+  );
+  const capacidadEnEstePiso = useMemo(
+    () => mesasEnEstePiso.reduce((acc, m) => acc + (Number(m.asientos) || 4), 0),
+    [mesasEnEstePiso],
+  );
+  const pisosActivosCount = useMemo(() => pisos.filter((p) => p.activo).length, [pisos]);
+
+  // JSON del diseño actual
+  const pioJson = useMemo(() => {
+    return JSON.stringify(
+      {
+        floors: pisos.map((p) => ({ id: p.id, n: p.nombre, on: p.activo })),
+        dims: pisos.reduce((acc, p) => {
+          acc[p.id] = {
+            c: p.cuadriculaAncho || p.cuadricula_ancho || 20,
+            r: p.cuadriculaAlto || p.cuadricula_alto || 12,
+          };
+          return acc;
+        }, {} as Record<string, { c?: number; r?: number }>),
+        plan: pisos.reduce((acc, p) => {
+          acc[p.id] = (p.elementos || []).map((e) => ({
+            id: e.id,
+            t: e.tipo.toLowerCase(),
+            x: e.x,
+            y: e.y,
+            w: e.ancho,
+            h: e.alto,
+            label: e.nombre || undefined,
+            seats: e.asientos || undefined,
+            on: e.activo,
+          }));
+          return acc;
+        }, {} as Record<string, any[]>),
+      },
+      null,
+      1,
+    );
+  }, [pisos]);
+
+  // Colocar elemento al hacer clic en cuadrícula si hay herramienta activa
+  const handleClicCuadricula = async (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!herramientaActiva) {
+      setElementoSeleccionadoId(null);
       return;
     }
-    if (!herramientaActiva || !pisoActual) return;
-
-    setErrorOperacion(null);
-    setDetallesMesaEnUso(null);
-
-    const esMesa = herramientaActiva === 'MESA';
-    let ancho = 2;
-    let alto = 2;
-
-    if (herramientaActiva === 'PARED') {
-      ancho = 4;
-      alto = 1;
-    } else if (herramientaActiva === 'COCINA') {
-      ancho = 5;
-      alto = 3;
-    } else if (herramientaActiva === 'BARRA') {
-      ancho = 6;
-      alto = 2;
-    } else if (herramientaActiva === 'BANO') {
-      ancho = 3;
-      alto = 3;
-    } else if (herramientaActiva === 'ENTRADA') {
-      ancho = 4;
-      alto = 1;
-    } else if (herramientaActiva === 'ESCALERA') {
-      ancho = 2;
-      alto = 3;
-    } else if (herramientaActiva === 'CAJA') {
-      ancho = 3;
-      alto = 2;
+    if (!puedeEditar) {
+      setDimNote('No tienes permiso para editar el plano.');
+      return;
     }
 
+    const t = EL_CONFIG[herramientaActiva.toLowerCase()] || EL_CONFIG.mesa;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = Math.floor(((e.clientX - rect.left) / rect.width) * ECOLS);
+    const clickY = Math.floor(((e.clientY - rect.top) / rect.height) * EROWS);
+
+    const x = Math.max(0, Math.min(ECOLS - t.dw, clickX));
+    const y = Math.max(0, Math.min(EROWS - t.dh, clickY));
+
+    const esMesa = herramientaActiva.toLowerCase() === 'mesa';
     try {
       const nuevo = await salonApi.crearElemento({
         pisoId: pisoActual.id,
-        tipo: herramientaActiva,
+        tipo: herramientaActiva.toUpperCase(),
         x,
         y,
-        ancho,
-        alto,
+        ancho: t.dw,
+        alto: t.dh,
         asientos: esMesa ? 4 : undefined,
       });
-
       await cargarDatos();
       if (nuevo?.id) {
         setElementoSeleccionadoId(String(nuevo.id));
       }
     } catch (err: any) {
-      if (err?.codigo === 'SUPERPUESTO') {
-        setErrorOperacion(
-          'No se puede colocar el elemento: se superpone con otro elemento activo en esa posición.',
-        );
-      } else if (err?.codigo === 'FUERA_DE_CUADRICULA') {
-        setErrorOperacion(
-          'El elemento no cabe en esa posición: queda fuera de los límites de la cuadrícula.',
-        );
-      } else {
-        setErrorOperacion(err?.message || 'Error al colocar elemento en el plano.');
-      }
+      setDimNote(err?.message || 'Error al colocar elemento.');
     }
   };
 
-  // 2. Mover elemento arrastrándolo
-  const handleMoverElemento = async (
-    id: string,
-    nuevoX: number,
-    nuevoY: number,
-  ) => {
-    if (!puedeEditar) {
-      setErrorOperacion('No tienes permiso para editar el plano.');
-      return;
-    }
-    setErrorOperacion(null);
-    setDetallesMesaEnUso(null);
-
+  // Girar elemento
+  const handleGirar = async () => {
+    if (!elementoSeleccionado || !puedeEditar) return;
     try {
-      await salonApi.actualizarElemento(id, { x: nuevoX, y: nuevoY });
+      setDimNote(null);
+      await salonApi.girarElemento(elementoSeleccionado.id);
       await cargarDatos();
     } catch (err: any) {
-      if (err?.codigo === 'SUPERPUESTO') {
-        setErrorOperacion(
-          'No se puede mover aquí: se superpone con otro elemento activo.',
-        );
-      } else if (err?.codigo === 'FUERA_DE_CUADRICULA') {
-        setErrorOperacion('El elemento quedaría fuera de la cuadrícula.');
-      } else {
-        setErrorOperacion(err?.message || 'Error al mover elemento.');
-      }
-      // Revertir recargando datos
-      await cargarDatos();
+      setDimNote(err?.message || 'No se puede girar el elemento en esa posición.');
     }
   };
 
-  // 3. Girar elemento
-  const handleGirarElemento = async (id: string) => {
-    if (!puedeEditar) {
-      setErrorOperacion('No tienes permiso para editar el plano.');
+  // Cambiar dimensiones stepper
+  const handleCambiarDimensiones = async (key: 'c' | 'r', delta: number) => {
+    if (!puedeEditar) return;
+    setDimNote(null);
+
+    const extC = Math.max(8, ...elementosPiso.map((e) => e.x + e.ancho));
+    const extR = Math.max(6, ...elementosPiso.map((e) => e.y + e.alto));
+
+    const nuevoAncho = key === 'c' ? ECOLS + delta : ECOLS;
+    const nuevoAlto = key === 'r' ? EROWS + delta : EROWS;
+
+    if (key === 'c' && nuevoAncho < extC) {
+      setDimNote(`No se puede achicar más: hay elementos hasta la columna ${extC}. Muévelos primero.`);
       return;
     }
-    setErrorOperacion(null);
-    setDetallesMesaEnUso(null);
-
-    try {
-      await salonApi.girarElemento(id);
-      await cargarDatos();
-    } catch (err: any) {
-      if (err?.codigo === 'NO_CABE' || err?.codigo === 'SUPERPUESTO') {
-        setErrorOperacion(
-          err.message ||
-            'El elemento no cabe en la cuadrícula al girar en su posición actual o se superpone con otro elemento.',
-        );
-      } else {
-        setErrorOperacion(err?.message || 'Error al girar elemento.');
-      }
-    }
-  };
-
-  // 4. Actualizar propiedades (nombre, asientos, ancho, alto)
-  const handleActualizarPropiedades = async (
-    id: string,
-    cambios: {
-      nombre?: string;
-      asientos?: number;
-      ancho?: number;
-      alto?: number;
-    },
-  ) => {
-    if (!puedeEditar) {
-      setErrorOperacion('No tienes permiso para editar el plano.');
+    if (key === 'r' && nuevoAlto < extR) {
+      setDimNote(`No se puede achicar más: hay elementos hasta la fila ${extR}. Muévelos primero.`);
       return;
     }
-    setErrorOperacion(null);
-    setDetallesMesaEnUso(null);
 
     try {
-      await salonApi.actualizarElemento(id, cambios);
-      await cargarDatos();
-    } catch (err: any) {
-      if (err?.codigo === 'SUPERPUESTO') {
-        setErrorOperacion(
-          'No se puede redimensionar: se superpondría con otro elemento activo.',
-        );
-      } else if (err?.codigo === 'FUERA_DE_CUADRICULA') {
-        setErrorOperacion('El nuevo tamaño sobrepasa los límites de la cuadrícula.');
-      } else {
-        setErrorOperacion(err?.message || 'Error al actualizar elemento.');
-      }
-    }
-  };
-
-  // 5. Alternar activo / desactivar elemento
-  const handleAlternarActivo = async (id: string, nuevoActivo: boolean) => {
-    if (!puedeEditar) {
-      setErrorOperacion('No tienes permiso para editar el plano.');
-      return;
-    }
-    setErrorOperacion(null);
-    setDetallesMesaEnUso(null);
-
-    try {
-      await salonApi.actualizarElemento(id, { activo: nuevoActivo });
-      await cargarDatos();
-    } catch (err: any) {
-      if (err?.codigo === 'SUPERPUESTO') {
-        setErrorOperacion(
-          'No se puede activar: su posición se superpone con otro elemento actualmente activo.',
-        );
-      } else {
-        setErrorOperacion(err?.message || 'Error al cambiar estado del elemento.');
-      }
-    }
-  };
-
-  // 6. Eliminar elemento (manejo de MESA_EN_USO)
-  const handleEliminarElemento = async (id: string) => {
-    if (!puedeEditar) {
-      setErrorOperacion('No tienes permiso para editar el plano.');
-      return;
-    }
-    setErrorOperacion(null);
-    setDetallesMesaEnUso(null);
-
-    try {
-      await salonApi.eliminarElemento(id);
-      setElementoSeleccionadoId(null);
-      await cargarDatos();
-    } catch (err: any) {
-      if (err?.codigo === 'MESA_EN_USO') {
-        setDetallesMesaEnUso({
-          motivo:
-            err.detalles?.motivo ||
-            err.motivo ||
-            'Tiene un pedido abierto o reserva activa hoy',
-          mensaje:
-            err.message ||
-            'Esta mesa tiene un pedido abierto o una reserva activa hoy y no se puede eliminar. Puedes desactivarla en su lugar.',
-          sugerencia: 'desactivar',
-        });
-      } else {
-        setErrorOperacion(err?.message || 'Error al eliminar elemento.');
-      }
-    }
-  };
-
-  // 7. Alternar activación de piso (piso 1 no desactivable: PISO_PRINCIPAL)
-  const handleAlternarPiso = async (id: string, nuevoActivo: boolean) => {
-    if (!puedeEditar) {
-      setErrorOperacion('No tienes permiso para editar pisos.');
-      return;
-    }
-    setErrorOperacion(null);
-
-    try {
-      await salonApi.actualizarPiso(id, { activo: nuevoActivo });
-      await cargarDatos();
-    } catch (err: any) {
-      if (err?.codigo === 'PISO_PRINCIPAL') {
-        setErrorOperacion('El piso 1 no se puede desactivar.');
-      } else {
-        setErrorOperacion(err?.message || 'Error al cambiar estado del piso.');
-      }
-    }
-  };
-
-  // 8. Cambiar tamaño de cuadrícula (ELEMENTOS_FUERA con lista)
-  const handleCambiarCuadricula = async (
-    pisoId: string,
-    nuevoAncho: number,
-    nuevoAlto: number,
-  ) => {
-    if (!puedeEditar) {
-      setErrorCuadricula('No tienes permiso para modificar la cuadrícula.');
-      return;
-    }
-    setErrorCuadricula(null);
-    setElementosFuera([]);
-
-    try {
-      await salonApi.actualizarPiso(pisoId, {
+      await salonApi.actualizarPiso(pisoActual.id, {
         cuadriculaAncho: nuevoAncho,
         cuadriculaAlto: nuevoAlto,
       });
       await cargarDatos();
     } catch (err: any) {
-      if (err?.codigo === 'ELEMENTOS_FUERA') {
-        setErrorCuadricula(
-          err.message ||
-            'Existen elementos que quedarían fuera del nuevo tamaño de cuadrícula.',
-        );
-        const elems = err.detalles?.elementos || err.elementos || [];
-        setElementosFuera(elems);
-      } else {
-        setErrorCuadricula(err?.message || 'Error al cambiar tamaño de cuadrícula.');
+      setDimNote(err?.message || 'Error al cambiar tamaño de la cuadrícula.');
+    }
+  };
+
+  // Drag & drop handlers
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, elem: ElementoPlano) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const dc = Math.floor(((e.clientX - rect.left) / rect.width) * elem.ancho);
+    const dr = Math.floor(((e.clientY - rect.top) / rect.height) * elem.alto);
+    setDragOffset({ id: elem.id, dc, dr });
+    setElementoSeleccionadoId(elem.id);
+    if (e.dataTransfer) {
+      e.dataTransfer.setData('text/plain', elem.id);
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (!dragOffset || !puedeEditar) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const elem = elementosPiso.find((x) => x.id === dragOffset.id);
+    if (!elem) return;
+
+    const cellW = rect.width / ECOLS;
+    const cellH = rect.height / EROWS;
+    const dropCol = Math.floor((e.clientX - rect.left) / cellW);
+    const dropRow = Math.floor((e.clientY - rect.top) / cellH);
+
+    const targetX = Math.max(0, Math.min(ECOLS - elem.ancho, dropCol - dragOffset.dc));
+    const targetY = Math.max(0, Math.min(EROWS - elem.alto, dropRow - dragOffset.dr));
+
+    setDragOffset(null);
+    try {
+      await salonApi.actualizarElemento(elem.id, { x: targetX, y: targetY });
+      await cargarDatos();
+    } catch (err: any) {
+      setDimNote(err?.message || 'Error al mover elemento.');
+    }
+  };
+
+  // Copiar diseño
+  const handleCopiarDiseno = () => {
+    let ok = false;
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        navigator.clipboard.writeText(pioJson);
+        ok = true;
       }
+    } catch {
+      ok = false;
+    }
+    setPioMensaje(
+      ok
+        ? 'Copiado. Pégalo donde lo necesites.'
+        : 'Selecciona el texto de abajo y cópialo (Ctrl+C).',
+    );
+  };
+
+  // Aplicar diseño pegado
+  const handleAplicarDisenoPegado = async () => {
+    let d: any = null;
+    try {
+      d = JSON.parse(pioTextoPegar);
+    } catch {
+      setPioMensaje('El texto no es un diseño válido.');
+      setConfirmarAplicarDiseno(false);
+      return;
+    }
+    if (!d || !d.plan || typeof d.plan !== 'object') {
+      setPioMensaje('El texto no contiene una estructura válida de diseño.');
+      setConfirmarAplicarDiseno(false);
+      return;
+    }
+
+    try {
+      await salonApi.aplicarDiseno(d);
+      setPioTextoPegar('');
+      setPioMensaje('Diseño aplicado correctamente.');
+      setConfirmarAplicarDiseno(false);
+      await cargarDatos();
+    } catch (err: any) {
+      setPioMensaje(err?.message || 'Error al aplicar el diseño.');
+      setConfirmarAplicarDiseno(false);
     }
   };
 
-  // 9. Aplicar diseño pegado en texto
-  const handleAplicarDiseno = async (diseno: DisenoCompletoJson) => {
-    if (!puedeEditar) {
-      throw new Error('No tienes permiso para editar el diseño del plano.');
-    }
-    await salonApi.aplicarDiseno(diseno);
-    await cargarDatos();
-  };
-
-  // Estado sin permiso
   if (!puedeVer) {
     return (
       <div
@@ -408,14 +382,7 @@ export function PlanoView() {
         >
           !
         </div>
-        <h2
-          style={{
-            fontFamily: 'var(--fuente-titulos)',
-            fontWeight: 800,
-            fontSize: '18px',
-            color: 'var(--cp-navy)',
-          }}
-        >
+        <h2 style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: '18px' }}>
           No tienes permiso
         </h2>
         <p style={{ fontSize: '14px', color: 'var(--cp-soft)', maxWidth: '380px' }}>
@@ -439,19 +406,15 @@ export function PlanoView() {
     );
   }
 
-  const columnas =
-    pisoActual?.cuadriculaAncho || pisoActual?.cuadricula_ancho || 20;
-  const filas =
-    pisoActual?.cuadriculaAlto || pisoActual?.cuadricula_alto || 12;
+  const isFloor1 = pisoActual?.id === '1' || pisoActual?.id === 'p1';
 
   return (
     <div
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: '16px',
+        gap: '14px',
         width: '100%',
-        minHeight: '85vh',
       }}
     >
       {/* Toast de aviso en vivo de Socket.IO (salon:listo) */}
@@ -511,38 +474,153 @@ export function PlanoView() {
               cursor: 'pointer',
             }}
           >
-            x
+            ×
           </button>
         </div>
       )}
 
-      {/* 1. BARRA DE CONTROLES ARRIBA */}
-      <BarraControlesPlano
-        pisos={pisos}
-        pisoActivoId={pisoActivoId}
-        onCambiarPiso={(id) => {
-          setPisoActivoId(id);
-          setElementoSeleccionadoId(null);
-          setHerramientaActiva(null);
-        }}
-        onAlternarPiso={handleAlternarPiso}
-        onCambiarCuadricula={handleCambiarCuadricula}
-        herramientaActiva={herramientaActiva}
-        onSeleccionarHerramienta={(t) => {
-          setHerramientaActiva(t);
-          if (t) setElementoSeleccionadoId(null);
-        }}
-        onAbrirDisenoTexto={() => setModalDisenoAbierto(true)}
-        onAbrirNuevoPedidoMesa={() => setModalNuevoPedidoAbierto(true)}
-        errorCuadricula={errorCuadricula}
-        elementosFuera={elementosFuera}
-        alLimpiarError={() => {
-          setErrorCuadricula(null);
-          setElementosFuera([]);
-        }}
-      />
+      {/* 1. TEXTO EXPLICATIVO SUPERIOR */}
+      <div style={{ fontSize: '13px', lineHeight: '19px', color: 'var(--cp-soft)' }}>
+        Dibuja el local: elige un elemento a la derecha y toca el plano para colocarlo; toca uno
+        para editarlo o arrástralo para moverlo. El mozo verá este plano al tomar un pedido de mesa.
+      </div>
 
-      {/* 2. ÁREA PRINCIPAL: PLANO A PANTALLA COMPLETA + INSPECTOR */}
+      {/* 2. 5 TARJETAS DE KPIS SUPERIORES */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+          gap: '10px',
+        }}
+      >
+        <div
+          style={{
+            background: 'var(--cp-white)',
+            border: '1px solid var(--cp-line)',
+            borderRadius: '14px',
+            padding: '10px 14px',
+          }}
+        >
+          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>
+            Mesas activas
+          </div>
+          <div
+            style={{
+              fontFamily: 'Montserrat, sans-serif',
+              fontWeight: 800,
+              fontSize: '22px',
+              color: 'var(--cp-navy)',
+            }}
+          >
+            {mesasActivasTotal}
+          </div>
+          <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
+            de {todasLasMesas.length} en total
+          </div>
+        </div>
+
+        <div
+          style={{
+            background: 'var(--cp-white)',
+            border: '1px solid var(--cp-line)',
+            borderRadius: '14px',
+            padding: '10px 14px',
+          }}
+        >
+          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>
+            Capacidad
+          </div>
+          <div
+            style={{
+              fontFamily: 'Montserrat, sans-serif',
+              fontWeight: 800,
+              fontSize: '22px',
+              color: 'var(--cp-navy)',
+            }}
+          >
+            {capacidadTotal} personas
+          </div>
+          <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
+            sentadas en las mesas activas
+          </div>
+        </div>
+
+        <div
+          style={{
+            background: 'var(--cp-white)',
+            border: '1px solid var(--cp-line)',
+            borderRadius: '14px',
+            padding: '10px 14px',
+          }}
+        >
+          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>
+            En este piso
+          </div>
+          <div
+            style={{
+              fontFamily: 'Montserrat, sans-serif',
+              fontWeight: 800,
+              fontSize: '22px',
+              color: 'var(--cp-navy)',
+            }}
+          >
+            {mesasEnEstePiso.length} mesas
+          </div>
+          <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
+            {capacidadEnEstePiso} personas
+          </div>
+        </div>
+
+        <div
+          style={{
+            background: 'var(--cp-white)',
+            border: '1px solid var(--cp-line)',
+            borderRadius: '14px',
+            padding: '10px 14px',
+          }}
+        >
+          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>
+            Pisos activos
+          </div>
+          <div
+            style={{
+              fontFamily: 'Montserrat, sans-serif',
+              fontWeight: 800,
+              fontSize: '22px',
+              color: 'var(--cp-navy)',
+            }}
+          >
+            {pisosActivosCount}
+          </div>
+          <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>de {pisos.length}</div>
+        </div>
+
+        <div
+          style={{
+            background: 'var(--cp-white)',
+            border: '1px solid var(--cp-line)',
+            borderRadius: '14px',
+            padding: '10px 14px',
+          }}
+        >
+          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>
+            Elementos
+          </div>
+          <div
+            style={{
+              fontFamily: 'Montserrat, sans-serif',
+              fontWeight: 800,
+              fontSize: '22px',
+              color: 'var(--cp-navy)',
+            }}
+          >
+            {elementosPiso.length}
+          </div>
+          <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>dibujados en este piso</div>
+        </div>
+      </div>
+
+      {/* 3. DOS COLUMNAS: PLANO (IZQ) Y CONTROLES (DER) */}
       <div
         style={{
           display: 'flex',
@@ -551,101 +629,1008 @@ export function PlanoView() {
           alignItems: 'flex-start',
         }}
       >
-        {/* Contenedor del plano casi a pantalla completa */}
+        {/* COLUMNA IZQUIERDA: PISOS + CUADRÍCULA + NOTA */}
         <div
           style={{
-            flex: '3 1 600px',
+            flex: '3 1 520px',
             minWidth: 0,
             display: 'flex',
             flexDirection: 'column',
             gap: '8px',
           }}
         >
-          <CuadriculaPlano
-            columnas={columnas}
-            filas={filas}
-            elementos={pisoActual?.elementos || []}
-            elementoSeleccionadoId={elementoSeleccionadoId}
-            onSeleccionarElemento={(elem) => {
-              setElementoSeleccionadoId(elem ? elem.id : null);
-              setErrorOperacion(null);
-              setDetallesMesaEnUso(null);
+          {/* Fila de controles de piso */}
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '8px',
+              alignItems: 'center',
+              justifyContent: 'space-between',
             }}
-            herramientaActiva={herramientaActiva}
-            onColocarElemento={handleColocarElemento}
-            onMoverElemento={handleMoverElemento}
-            mesasSalon={pisoSalonActual?.mesas || []}
-            modoSalon={false}
-          />
+          >
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <span
+                style={{
+                  fontSize: '12px',
+                  fontWeight: 800,
+                  letterSpacing: '0.06em',
+                  color: 'var(--cp-soft)',
+                }}
+              >
+                PISO
+              </span>
+              {pisos.map((f) => {
+                const activo = f.id === pisoActivoId;
+                return (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => {
+                      setPisoActivoId(f.id);
+                      setElementoSeleccionadoId(null);
+                    }}
+                    style={{
+                      minHeight: '34px',
+                      padding: '0 12px',
+                      borderRadius: '9999px',
+                      border: '1.5px solid var(--cp-navy)',
+                      fontWeight: 700,
+                      fontSize: '12px',
+                      background: activo ? 'var(--cp-navy)' : 'transparent',
+                      color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {f.nombre}
+                    {!f.activo ? ' (desactivado)' : ''}
+                  </button>
+                );
+              })}
 
-          <div style={{ fontSize: '12px', color: 'var(--cp-soft)', lineHeight: '18px' }}>
-            Arrastra los elementos con el dedo o ratón para moverlos dentro de los límites de la cuadrícula. Se puede eliminar cualquier elemento; una mesa con pedidos cerrados conserva su nombre histórico. Solo una mesa con pedido abierto o reserva activa hoy no se elimina: se desactiva.
+              <button
+                type="button"
+                onClick={() => {
+                  if (isFloor1) {
+                    setDimNote(
+                      'El Piso 1 siempre está activo. Para el segundo piso, elige "Piso 2" y actívalo.',
+                    );
+                  } else {
+                    setConfirmarAlternarPiso(pisoActual);
+                  }
+                }}
+                style={{
+                  minHeight: '34px',
+                  padding: '0 12px',
+                  borderRadius: '9999px',
+                  border: '1.5px dashed var(--cp-navy)',
+                  background: 'transparent',
+                  color: 'var(--cp-navy)',
+                  fontWeight: 700,
+                  fontSize: '12px',
+                  opacity: isFloor1 ? 0.5 : 1,
+                  cursor: isFloor1 ? 'default' : 'pointer',
+                }}
+              >
+                {isFloor1
+                  ? 'Siempre activo'
+                  : pisoActual?.activo
+                  ? 'Desactivar este piso'
+                  : 'Activar este piso'}
+              </button>
+            </div>
+
+            <div style={{ fontSize: '12px', color: 'var(--cp-soft)', fontWeight: 700 }}>
+              {herramientaActiva
+                ? `Toca el plano para colocar: ${
+                    EL_CONFIG[herramientaActiva.toLowerCase()]?.n || herramientaActiva
+                  }. Vuelve a tocar el botón para soltar la herramienta.`
+                : 'Toca un elemento para editarlo o arrástralo para moverlo.'}
+            </div>
+          </div>
+
+          {/* Aviso de error o dimensión */}
+          {dimNote && (
+            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-rust)' }}>
+              {dimNote}
+            </div>
+          )}
+
+          {/* Contenedor del plano con aspecto exacto del mockup */}
+          <div
+            style={{
+              background: 'var(--cp-cream)',
+              border: '1px solid var(--cp-line)',
+              borderRadius: '12px',
+              padding: '8px',
+              minHeight: '60vh',
+            }}
+          >
+            <div
+              onClick={handleClicCuadricula}
+              onDragOver={(ev) => ev.preventDefault()}
+              onDrop={handleDrop}
+              style={{
+                position: 'relative',
+                width: '100%',
+                aspectRatio: `${ECOLS} / ${EROWS}`,
+                boxSizing: 'border-box',
+                border: '2px solid var(--cp-navy)',
+                borderRadius: '8px',
+                backgroundColor: 'var(--cp-white)',
+                backgroundImage:
+                  'linear-gradient(#EFE6D9 1px, transparent 1px), linear-gradient(90deg, #EFE6D9 1px, transparent 1px)',
+                backgroundSize: `${100 / ECOLS}% ${100 / EROWS}%`,
+                overflow: 'hidden',
+                cursor: herramientaActiva ? 'crosshair' : 'default',
+              }}
+            >
+              {elementosPiso.map((e) => {
+                const t = EL_CONFIG[e.tipo.toLowerCase()] || EL_CONFIG.mesa;
+                const sel = e.id === elementoSeleccionadoId;
+                const esMesa = e.tipo.toLowerCase() === 'mesa';
+                const numMesa = parseInt(String(e.nombre || '').replace(/\D/g, ''), 10) || e.numero || 0;
+
+                return (
+                  <div
+                    key={e.id}
+                    draggable={puedeEditar}
+                    onDragStart={(ev) => handleDragStart(ev, e)}
+                    onClick={(ev) => {
+                      ev.stopPropagation();
+                      setElementoSeleccionadoId(e.id);
+                      setHerramientaActiva(null);
+                    }}
+                    style={{
+                      position: 'absolute',
+                      boxSizing: 'border-box',
+                      left: `${(e.x * 100) / ECOLS}%`,
+                      top: `${(e.y * 100) / EROWS}%`,
+                      width: `${(e.ancho * 100) / ECOLS}%`,
+                      height: `${(e.alto * 100) / EROWS}%`,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      textAlign: 'center',
+                      lineHeight: 1.15,
+                      overflow: 'hidden',
+                      fontWeight: 800,
+                      fontSize: 'clamp(8px, 1.1vw, 13px)',
+                      borderRadius: esMesa ? '10px' : '3px',
+                      background: t.bg,
+                      color: t.fg,
+                      border: sel
+                        ? '3px solid var(--cp-orange)'
+                        : e.activo
+                        ? `1.5px solid ${t.bd}`
+                        : `1.5px dashed ${t.bd}`,
+                      opacity: e.activo ? 1 : 0.35,
+                      cursor: 'grab',
+                      zIndex: sel ? 4 : e.tipo.toLowerCase() === 'pared' ? 1 : 2,
+                    }}
+                  >
+                    <span>{e.tipo.toLowerCase() === 'pared' ? '' : esMesa ? (numMesa ? String(numMesa) : e.nombre || 'M') : e.nombre || t.n}</span>
+                    {esMesa && ECOLS <= 30 && (
+                      <span style={{ fontSize: '9px', fontWeight: 600 }}>
+                        {e.asientos || 4} pers.
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
+            Se puede eliminar cualquier elemento, incluso una mesa que ya se usó: los pedidos y
+            reservas cerrados conservan el nombre de la mesa para consultas. Solo no se elimina una
+            mesa que tiene hoy un pedido abierto o una reserva activa; mientras tanto se puede
+            desactivar.
           </div>
         </div>
 
-        {/* Panel lateral de edición de elemento seleccionado */}
-        {elementoSeleccionado && (
-          <div style={{ flex: '1 1 300px', minWidth: '280px' }}>
-            <ModalEditarElemento
-              elemento={elementoSeleccionado}
-              alCerrar={() => setElementoSeleccionadoId(null)}
-              alActualizarPropiedades={handleActualizarPropiedades}
-              alGirar={handleGirarElemento}
-              alAlternarActivo={handleAlternarActivo}
-              alEliminar={handleEliminarElemento}
-              errorOperacion={errorOperacion}
-              alLimpiarError={() => {
-                setErrorOperacion(null);
-                setDetallesMesaEnUso(null);
-              }}
-              detallesMesaEnUso={detallesMesaEnUso}
-            />
+        {/* COLUMNA DERECHA: HERRAMIENTAS, INSPECTOR, DISEÑO Y TAMAÑO */}
+        <div
+          style={{
+            flex: '1 1 300px',
+            minWidth: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+          }}
+        >
+          {/* Card 1: AGREGAR AL PLANO */}
+          <div
+            style={{
+              background: 'var(--cp-white)',
+              border: '1px solid var(--cp-line)',
+              borderRadius: '14px',
+              padding: '14px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px',
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  fontFamily: 'Montserrat, sans-serif',
+                  fontWeight: 800,
+                  fontSize: '15px',
+                  color: 'var(--cp-navy)',
+                }}
+              >
+                Agregar al plano
+              </div>
+              <div style={{ fontSize: '12px', lineHeight: '17px', color: 'var(--cp-soft)' }}>
+                Elige uno y toca el plano para colocarlo. Vuelve a tocarlo para soltarlo.
+              </div>
+            </div>
+
+            {[
+              { n: 'PARA SENTARSE', tools: ['mesa', 'barra'] },
+              { n: 'ESTRUCTURA', tools: ['pared', 'entrada', 'escalera'] },
+              { n: 'SERVICIOS', tools: ['cocina', 'caja', 'bano'] },
+            ].map((g) => (
+              <div key={g.n} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <span
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: 800,
+                    letterSpacing: '0.06em',
+                    color: 'var(--cp-soft)',
+                  }}
+                >
+                  {g.n}
+                </span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {g.tools.map((k) => {
+                    const cfg = EL_CONFIG[k];
+                    const activo = herramientaActiva === k.toUpperCase();
+                    return (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => {
+                          setHerramientaActiva(activo ? null : k.toUpperCase());
+                          if (!activo) setElementoSeleccionadoId(null);
+                        }}
+                        style={{
+                          minHeight: '40px',
+                          padding: '0 14px',
+                          borderRadius: '9999px',
+                          border: '1.5px solid var(--cp-navy)',
+                          fontWeight: 700,
+                          fontSize: '13px',
+                          background: activo ? 'var(--cp-navy)' : 'transparent',
+                          color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {cfg.n}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
-        )}
+
+          {/* Card 2: INSPECTOR DE ELEMENTO SELECCIONADO */}
+          {elementoSeleccionado ? (
+            <div
+              style={{
+                background: 'var(--cp-white)',
+                border: '2px solid var(--cp-orange)',
+                borderRadius: '14px',
+                padding: '14px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
+              }}
+            >
+              <div
+                style={{
+                  fontFamily: 'Montserrat, sans-serif',
+                  fontWeight: 800,
+                  fontSize: '15px',
+                  color: 'var(--cp-rust)',
+                }}
+              >
+                {EL_CONFIG[elementoSeleccionado.tipo.toLowerCase()]?.n || elementoSeleccionado.tipo}
+              </div>
+
+              {elementoSeleccionado.tipo.toLowerCase() !== 'pared' && (
+                <input
+                  id="pl-name"
+                  type="text"
+                  value={elementoSeleccionado.nombre || ''}
+                  onChange={async (ev) => {
+                    const val = ev.target.value;
+                    try {
+                      await salonApi.actualizarElemento(elementoSeleccionado.id, { nombre: val });
+                      await cargarDatos();
+                    } catch {}
+                  }}
+                  aria-label="Nombre"
+                  style={{
+                    width: '130px',
+                    boxSizing: 'border-box',
+                    minHeight: '34px',
+                    borderRadius: '9999px',
+                    border: '1.5px solid var(--cp-line)',
+                    background: 'var(--cp-cream)',
+                    padding: '0 12px',
+                    fontSize: '13px',
+                  }}
+                />
+              )}
+
+              {elementoSeleccionado.tipo.toLowerCase() === 'mesa' && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 700 }}>Personas</span>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const cur = Number(elementoSeleccionado.asientos) || 4;
+                      if (cur > 1) {
+                        await salonApi.actualizarElemento(elementoSeleccionado.id, {
+                          asientos: cur - 1,
+                        });
+                        await cargarDatos();
+                      }
+                    }}
+                    aria-label="Menos personas"
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '16px',
+                      border: '1.5px solid var(--cp-navy)',
+                      background: 'transparent',
+                      color: 'var(--cp-navy)',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    −
+                  </button>
+                  <span style={{ minWidth: '22px', textAlign: 'center', fontWeight: 800, fontSize: '13px' }}>
+                    {elementoSeleccionado.asientos || 4}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const cur = Number(elementoSeleccionado.asientos) || 4;
+                      if (cur < 12) {
+                        await salonApi.actualizarElemento(elementoSeleccionado.id, {
+                          asientos: cur + 1,
+                        });
+                        await cargarDatos();
+                      }
+                    }}
+                    aria-label="Más personas"
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '16px',
+                      border: '1.5px solid var(--cp-navy)',
+                      background: 'transparent',
+                      color: 'var(--cp-navy)',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    +
+                  </button>
+                </span>
+              )}
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 700 }}>Ancho</span>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (elementoSeleccionado.ancho > 1) {
+                        await salonApi.actualizarElemento(elementoSeleccionado.id, {
+                          ancho: elementoSeleccionado.ancho - 1,
+                        });
+                        await cargarDatos();
+                      }
+                    }}
+                    aria-label="Menos ancho"
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '16px',
+                      border: '1.5px solid var(--cp-navy)',
+                      background: 'transparent',
+                      color: 'var(--cp-navy)',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    −
+                  </button>
+                  <span style={{ minWidth: '22px', textAlign: 'center', fontWeight: 800, fontSize: '13px' }}>
+                    {elementoSeleccionado.ancho}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (elementoSeleccionado.x + elementoSeleccionado.ancho < ECOLS) {
+                        await salonApi.actualizarElemento(elementoSeleccionado.id, {
+                          ancho: elementoSeleccionado.ancho + 1,
+                        });
+                        await cargarDatos();
+                      }
+                    }}
+                    aria-label="Más ancho"
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '16px',
+                      border: '1.5px solid var(--cp-navy)',
+                      background: 'transparent',
+                      color: 'var(--cp-navy)',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    +
+                  </button>
+                </span>
+
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 700 }}>Alto</span>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (elementoSeleccionado.alto > 1) {
+                        await salonApi.actualizarElemento(elementoSeleccionado.id, {
+                          alto: elementoSeleccionado.alto - 1,
+                        });
+                        await cargarDatos();
+                      }
+                    }}
+                    aria-label="Menos alto"
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '16px',
+                      border: '1.5px solid var(--cp-navy)',
+                      background: 'transparent',
+                      color: 'var(--cp-navy)',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    −
+                  </button>
+                  <span style={{ minWidth: '22px', textAlign: 'center', fontWeight: 800, fontSize: '13px' }}>
+                    {elementoSeleccionado.alto}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (elementoSeleccionado.y + elementoSeleccionado.alto < EROWS) {
+                        await salonApi.actualizarElemento(elementoSeleccionado.id, {
+                          alto: elementoSeleccionado.alto + 1,
+                        });
+                        await cargarDatos();
+                      }
+                    }}
+                    aria-label="Más alto"
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '16px',
+                      border: '1.5px solid var(--cp-navy)',
+                      background: 'transparent',
+                      color: 'var(--cp-navy)',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    +
+                  </button>
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={handleGirar}
+                  style={{
+                    minHeight: '34px',
+                    padding: '0 12px',
+                    borderRadius: '9999px',
+                    border: '1.5px solid var(--cp-navy)',
+                    fontWeight: 700,
+                    fontSize: '12px',
+                    background: 'transparent',
+                    color: 'var(--cp-navy)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  ↻ Girar (horizontal / vertical)
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setConfirmarAlternarElemento(elementoSeleccionado)}
+                  style={{
+                    minHeight: '34px',
+                    padding: '0 12px',
+                    borderRadius: '9999px',
+                    border: '1.5px solid var(--cp-navy)',
+                    fontWeight: 700,
+                    fontSize: '12px',
+                    background: 'transparent',
+                    color: 'var(--cp-navy)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {elementoSeleccionado.activo ? 'Desactivar' : 'Activar'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setConfirmarEliminar(elementoSeleccionado)}
+                  style={{
+                    minHeight: '34px',
+                    padding: '0 12px',
+                    borderRadius: '9999px',
+                    border: '1.5px solid var(--cp-rust)',
+                    background: 'transparent',
+                    color: 'var(--cp-rust)',
+                    fontWeight: 700,
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Eliminar
+                </button>
+              </div>
+
+              {!elementoSeleccionado.activo && (
+                <div style={{ fontSize: '12px', color: 'var(--cp-rust)', fontWeight: 700 }}>
+                  Desactivado: no se ve en el pedido del mozo.
+                </div>
+              )}
+
+              {/* Botón rápido para tomar pedido si es mesa */}
+              {elementoSeleccionado.tipo.toLowerCase() === 'mesa' && (
+                <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMesasParaPedido([elementoSeleccionado.id]);
+                      setModalNuevoPedidoAbierto(true);
+                    }}
+                    style={{
+                      flex: 1,
+                      minHeight: '40px',
+                      borderRadius: '10px',
+                      border: 0,
+                      background: 'var(--cp-orange)',
+                      color: 'var(--cp-navy)',
+                      fontWeight: 800,
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Tomar pedido en esta mesa
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div
+              style={{
+                background: 'var(--cp-white)',
+                border: '1px dashed var(--cp-soft)',
+                borderRadius: '14px',
+                padding: '14px',
+                fontSize: '13px',
+                color: 'var(--cp-soft)',
+              }}
+            >
+              Toca un elemento del plano para cambiar su nombre, tamaño, personas o desactivarlo.
+            </div>
+          )}
+
+          {/* Card 3: GUARDAR O CAMBIAR EL DISEÑO */}
+          <div
+            style={{
+              background: 'var(--cp-white)',
+              border: '1px solid var(--cp-line)',
+              borderRadius: '14px',
+              padding: '14px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px',
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  fontFamily: 'Montserrat, sans-serif',
+                  fontWeight: 800,
+                  fontSize: '15px',
+                  color: 'var(--cp-navy)',
+                }}
+              >
+                Guardar o cambiar el diseño
+              </div>
+              <div style={{ fontSize: '12px', lineHeight: '17px', color: 'var(--cp-soft)' }}>
+                Copia todo el plano como texto para guardarlo o mandarlo, o pega un diseño para
+                reemplazar el actual.
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setPioAbierto(!pioAbierto);
+                  setPioMensaje(null);
+                }}
+                style={{
+                  flex: '1 1 130px',
+                  minHeight: '44px',
+                  border: '1.5px solid var(--cp-navy)',
+                  borderRadius: '10px',
+                  background: 'transparent',
+                  color: 'var(--cp-navy)',
+                  fontWeight: 700,
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                }}
+              >
+                {pioAbierto ? 'Ocultar el diseño' : 'Ver / copiar el diseño'}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCopiarDiseno}
+                style={{
+                  flex: '1 1 110px',
+                  minHeight: '44px',
+                  border: 0,
+                  borderRadius: '10px',
+                  background: 'var(--cp-orange)',
+                  color: 'var(--cp-navy)',
+                  fontWeight: 800,
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                }}
+              >
+                Copiar
+              </button>
+            </div>
+
+            {pioMensaje && (
+              <div
+                role="status"
+                style={{
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  color: pioMensaje.includes('Error') || pioMensaje.includes('no')
+                    ? 'var(--cp-rust)'
+                    : 'var(--cp-green)',
+                }}
+              >
+                {pioMensaje}
+              </div>
+            )}
+
+            {pioAbierto && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label htmlFor="pio-t" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-navy)' }}>
+                  Diseño actual
+                </label>
+                <textarea
+                  id="pio-t"
+                  rows={6}
+                  readOnly
+                  value={pioJson}
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    borderRadius: '10px',
+                    border: '1.5px solid var(--cp-line)',
+                    background: 'var(--cp-cream)',
+                    color: 'var(--cp-navy)',
+                    padding: '8px',
+                    fontFamily: 'monospace',
+                    fontSize: '11px',
+                  }}
+                />
+
+                <label htmlFor="pio-p" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-navy)' }}>
+                  Pegar un diseño
+                </label>
+                <textarea
+                  id="pio-p"
+                  rows={4}
+                  value={pioTextoPegar}
+                  onChange={(e) => {
+                    setPioTextoPegar(e.target.value);
+                    setPioMensaje(null);
+                  }}
+                  placeholder="Pega aquí el texto del diseño"
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    borderRadius: '10px',
+                    border: '1.5px solid var(--cp-line)',
+                    background: 'var(--cp-white)',
+                    color: 'var(--cp-navy)',
+                    padding: '8px',
+                    fontFamily: 'monospace',
+                    fontSize: '11px',
+                  }}
+                />
+
+                <button
+                  type="button"
+                  disabled={!pioTextoPegar.trim()}
+                  onClick={() => setConfirmarAplicarDiseno(true)}
+                  style={{
+                    minHeight: '44px',
+                    border: '1.5px solid var(--cp-navy)',
+                    borderRadius: '10px',
+                    background: 'transparent',
+                    color: 'var(--cp-navy)',
+                    fontWeight: 700,
+                    fontSize: '13px',
+                    opacity: pioTextoPegar.trim() ? 1 : 0.5,
+                    cursor: pioTextoPegar.trim() ? 'pointer' : 'not-allowed',
+                  }}
+                >
+                  Aplicar el diseño pegado
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Card 4: TAMAÑO DEL PLANO */}
+          <div
+            style={{
+              background: 'var(--cp-white)',
+              border: '1px solid var(--cp-line)',
+              borderRadius: '14px',
+              padding: '14px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px',
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  fontFamily: 'Montserrat, sans-serif',
+                  fontWeight: 800,
+                  fontSize: '15px',
+                  color: 'var(--cp-navy)',
+                }}
+              >
+                Tamaño del plano
+              </div>
+              <div style={{ fontSize: '12px', lineHeight: '17px', color: 'var(--cp-soft)' }}>
+                Más columnas y filas dan más espacio para dibujar.
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 700 }}>Columnas</span>
+                <button
+                  type="button"
+                  onClick={() => handleCambiarDimensiones('c', -1)}
+                  aria-label="Menos columnas"
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '16px',
+                    border: '1.5px solid var(--cp-navy)',
+                    background: 'transparent',
+                    color: 'var(--cp-navy)',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                  }}
+                >
+                  −
+                </button>
+                <span style={{ minWidth: '22px', textAlign: 'center', fontWeight: 800, fontSize: '13px' }}>
+                  {ECOLS}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleCambiarDimensiones('c', 1)}
+                  aria-label="Más columnas"
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '16px',
+                    border: '1.5px solid var(--cp-navy)',
+                    background: 'transparent',
+                    color: 'var(--cp-navy)',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                  }}
+                >
+                  +
+                </button>
+              </span>
+
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 700 }}>Filas</span>
+                <button
+                  type="button"
+                  onClick={() => handleCambiarDimensiones('r', -1)}
+                  aria-label="Menos filas"
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '16px',
+                    border: '1.5px solid var(--cp-navy)',
+                    background: 'transparent',
+                    color: 'var(--cp-navy)',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                  }}
+                >
+                  −
+                </button>
+                <span style={{ minWidth: '22px', textAlign: 'center', fontWeight: 800, fontSize: '13px' }}>
+                  {EROWS}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleCambiarDimensiones('r', 1)}
+                  aria-label="Más filas"
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '16px',
+                    border: '1.5px solid var(--cp-navy)',
+                    background: 'transparent',
+                    color: 'var(--cp-navy)',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                  }}
+                >
+                  +
+                </button>
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Modal para ver, copiar y pegar diseño completo en texto */}
-      <ModalDisenoTexto
-        abierto={modalDisenoAbierto}
-        disenoActual={{
-          floors: pisos.map((p) => ({
-            id: p.id,
-            n: p.nombre,
-            on: p.activo,
-          })),
-          dims: pisos.reduce((acc, p) => {
-            acc[p.id] = {
-              c: p.cuadriculaAncho || p.cuadricula_ancho || 20,
-              r: p.cuadriculaAlto || p.cuadricula_alto || 12,
-            };
-            return acc;
-          }, {} as Record<string, { c?: number; r?: number }>),
-          plan: pisos.reduce((acc, p) => {
-            acc[p.id] = (p.elementos || []).map((e) => ({
-              id: e.id,
-              t: e.tipo.toLowerCase(),
-              x: e.x,
-              y: e.y,
-              w: e.ancho,
-              h: e.alto,
-              label: e.nombre || undefined,
-              seats: e.asientos || undefined,
-              on: e.activo,
-            }));
-            return acc;
-          }, {} as Record<string, any[]>),
-        }}
-        alCerrar={() => setModalDisenoAbierto(false)}
-        alAplicarDiseno={handleAplicarDiseno}
-      />
+      {/* DIÁLOGOS DE CONFIRMACIÓN OBLIGATORIA SÍ / NO */}
+      {confirmarEliminar && (
+        <Confirmar
+          abierto={true}
+          titulo={`¿Eliminar "${confirmarEliminar.nombre || confirmarEliminar.tipo}"?`}
+          mensaje="Se quita del plano. Los pedidos y reservas ya cerrados conservan el nombre de la mesa para consultas, así que no se pierde información."
+          textoConfirmar="Sí, eliminar"
+          textoNo="No, cancelar"
+          alConfirmar={async () => {
+            try {
+              await salonApi.eliminarElemento(confirmarEliminar.id);
+              setConfirmarEliminar(null);
+              setElementoSeleccionadoId(null);
+              await cargarDatos();
+            } catch (err: any) {
+              setConfirmarEliminar(null);
+              setDimNote(err?.message || 'Error al eliminar elemento.');
+            }
+          }}
+          alCancelar={() => setConfirmarEliminar(null)}
+        />
+      )}
 
-      {/* Modal de Nuevo Pedido de Mesa del mozo */}
-      <ModalNuevoPedidoMesa
-        abierto={modalNuevoPedidoAbierto}
-        alCerrar={() => setModalNuevoPedidoAbierto(false)}
-        pisos={pisosSalon}
-        alRefrescarMesas={cargarDatos}
-      />
+      {confirmarAlternarElemento && (
+        <Confirmar
+          abierto={true}
+          titulo={`¿${
+            confirmarAlternarElemento.activo ? 'Desactivar' : 'Activar'
+          } "${confirmarAlternarElemento.nombre || confirmarAlternarElemento.tipo}"?`}
+          mensaje={
+            confirmarAlternarElemento.activo
+              ? 'Dejará de verse para el mozo. No se elimina y se puede activar de nuevo.'
+              : 'Volverá a verse en el plano.'
+          }
+          textoConfirmar="Sí, continuar"
+          textoNo="No, cancelar"
+          alConfirmar={async () => {
+            try {
+              await salonApi.actualizarElemento(confirmarAlternarElemento.id, {
+                activo: !confirmarAlternarElemento.activo,
+              });
+              setConfirmarAlternarElemento(null);
+              await cargarDatos();
+            } catch (err: any) {
+              setConfirmarAlternarElemento(null);
+              setDimNote(err?.message || 'Error al cambiar estado del elemento.');
+            }
+          }}
+          alCancelar={() => setConfirmarAlternarElemento(null)}
+        />
+      )}
+
+      {confirmarAlternarPiso && (
+        <Confirmar
+          abierto={true}
+          titulo={`¿${confirmarAlternarPiso.activo ? 'Desactivar' : 'Activar'} ${
+            confirmarAlternarPiso.nombre
+          }?`}
+          mensaje={
+            confirmarAlternarPiso.activo
+              ? 'El mozo ya no verá este piso al tomar pedidos. El plano no se pierde.'
+              : 'El mozo elegirá primero el piso y luego la mesa.'
+          }
+          textoConfirmar="Sí, continuar"
+          textoNo="No, cancelar"
+          alConfirmar={async () => {
+            try {
+              await salonApi.actualizarPiso(confirmarAlternarPiso.id, {
+                activo: !confirmarAlternarPiso.activo,
+              });
+              setConfirmarAlternarPiso(null);
+              await cargarDatos();
+            } catch (err: any) {
+              setConfirmarAlternarPiso(null);
+              setDimNote(err?.message || 'Error al cambiar estado del piso.');
+            }
+          }}
+          alCancelar={() => setConfirmarAlternarPiso(null)}
+        />
+      )}
+
+      {confirmarAplicarDiseno && (
+        <Confirmar
+          abierto={true}
+          titulo="¿Reemplazar el plano por el diseño pegado?"
+          mensaje="Se cambian los pisos y todos los elementos del plano por los del texto. Si no estás seguro, primero copia el diseño actual."
+          textoConfirmar="Sí, aplicar diseño"
+          textoNo="No, cancelar"
+          alConfirmar={handleAplicarDisenoPegado}
+          alCancelar={() => setConfirmarAplicarDiseno(false)}
+        />
+      )}
+
+      {/* Modal Nuevo Pedido de Mesa */}
+      {modalNuevoPedidoAbierto && (
+        <ModalNuevoPedidoMesa
+          abierto={true}
+          alCerrar={() => {
+            setModalNuevoPedidoAbierto(false);
+            setMesasParaPedido([]);
+          }}
+          pisos={pisosSalon}
+          mesasPreseleccionadasIds={mesasParaPedido}
+          alRefrescarMesas={cargarDatos}
+        />
+      )}
+
+      {/* Modal Precuenta */}
+      {modalPrecuentaAbierto && mesaParaPrecuenta && (
+        <ModalPrecuenta
+          abierto={true}
+          alCerrar={() => {
+            setModalPrecuentaAbierto(false);
+            setMesaParaPrecuenta(null);
+          }}
+          mesa={mesaParaPrecuenta.nombre || `Mesa ${mesaParaPrecuenta.numero}`}
+          lineas={(mesaParaPrecuenta.pedido as any)?.lineas || []}
+          total={Number((mesaParaPrecuenta.pedido as any)?.total || 0)}
+        />
+      )}
     </div>
   );
 }
