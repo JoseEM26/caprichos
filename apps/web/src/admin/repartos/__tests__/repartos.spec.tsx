@@ -8,7 +8,25 @@ import * as sesionModulo from '../../../comun/sesion';
 import * as socketModulo from '../../../comun/socket';
 import { ErrorApi } from '../../../comun/api';
 
-describe('Ola F5: Repartos', () => {
+vi.mock('../../../comun/mapa/MapaPedidos', () => ({
+  MapaPedidos: ({ puntos, seleccionado, onSeleccionar }: any) => (
+    <div data-testid="mock-mapa-pedidos">
+      {puntos.map((p: any) => (
+        <button
+          key={p.id}
+          data-testid={`pin-${p.id}`}
+          data-selected={p.id === seleccionado ? 'true' : 'false'}
+          onClick={() => onSeleccionar && onSeleccionar(p.id)}
+        >
+          {p.orden ? `${p.orden}. ` : ''}
+          {p.etiqueta} - {p.detalle} ({p.color})
+        </button>
+      ))}
+    </div>
+  ),
+}));
+
+describe('Ola F5 y Siguiente: Repartos y Mapa', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
@@ -24,7 +42,9 @@ describe('Ola F5: Repartos', () => {
       refrescarYo: vi.fn(),
       marcarClaveCambiada: vi.fn(),
       tiene: vi.fn().mockImplementation((permiso: string) => {
-        return ['repartos/ver', 'repartos/tomar', 'repartos/entregar', 'repartos/reportar'].includes(permiso);
+        return ['repartos/ver', 'repartos/tomar', 'repartos/entregar', 'repartos/reportar'].includes(
+          permiso,
+        );
       }),
     });
 
@@ -204,11 +224,13 @@ describe('Ola F5: Repartos', () => {
     fireEvent.click(botonAvisos);
 
     await waitFor(() => {
-      expect(screen.getByText(/PENDIENTE DE ENVIAR \(no se envía nada real\)/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/PENDIENTE DE ENVIAR \(no se envía nada real\)/i),
+      ).toBeInTheDocument();
     });
   });
 
-  it('muestra la ruta sugerida de entrega como lista de paradas con distancia aproximada (sin mapa)', async () => {
+  it('muestra la ruta sugerida de entrega con mapa y lista de paradas con distancia aproximada', async () => {
     vi.spyOn(repartosApi, 'listarMios').mockResolvedValueOnce({
       pedidos: [
         {
@@ -243,9 +265,166 @@ describe('Ola F5: Repartos', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/ruta sugerida de entrega/i)).toBeInTheDocument();
-      expect(screen.getByText(/sin mapa en esta ola/i)).toBeInTheDocument();
+      // Puntos en el mapa con números de parada sugeridos (1. y 2.)
+      expect(screen.getByTestId('pin-101')).toHaveTextContent(/1\.\s*Maria Flores/);
+      expect(screen.getByTestId('pin-102')).toHaveTextContent(/2\.\s*Pedro Gomez/);
+      // Lista de paradas
       expect(screen.getAllByText(/CP-0101/).length).toBeGreaterThanOrEqual(1);
       expect(screen.getAllByText(/CP-0102/).length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  it('agrupación por zona en vista Lista («Z4 · 3 pedidos»)', async () => {
+    vi.spyOn(repartosApi, 'listarDisponibles').mockResolvedValueOnce([
+      { ...pedidoEjemplo, id: '201', codigo: 'CP-0201', zona: 'Z4' },
+      { ...pedidoEjemplo, id: '202', codigo: 'CP-0202', zona: 'Z4' },
+      { ...pedidoEjemplo, id: '203', codigo: 'CP-0203', zona: 'Z4' },
+      { ...pedidoEjemplo, id: '204', codigo: 'CP-0204', zona: 'Z7' },
+    ]);
+
+    render(<RepartosView />);
+
+    // Cambia a modo Lista
+    const botonLista = screen.getByRole('button', { name: /^lista$/i });
+    fireEvent.click(botonLista);
+
+    await waitFor(() => {
+      expect(screen.getByText('Z4 · 3 pedidos')).toBeInTheDocument();
+      expect(screen.getByText('Z7 · 1 pedido')).toBeInTheDocument();
+    });
+  });
+
+  it('filtro por zona filtra puntos en mapa y grupos en lista', async () => {
+    vi.spyOn(repartosApi, 'listarDisponibles').mockResolvedValue([
+      { ...pedidoEjemplo, id: '201', codigo: 'CP-0201', zona: 'Z4' },
+      { ...pedidoEjemplo, id: '202', codigo: 'CP-0202', zona: 'Z4' },
+      { ...pedidoEjemplo, id: '204', codigo: 'CP-0204', zona: 'Z7' },
+    ]);
+
+    render(<RepartosView />);
+
+    // Por defecto en Mapa, ambos deben estar presentes
+    await waitFor(() => {
+      expect(screen.getByTestId('pin-201')).toBeInTheDocument();
+      expect(screen.getByTestId('pin-204')).toBeInTheDocument();
+    });
+
+    // Filtra por Z4
+    const botonFiltroZ4 = screen.getByRole('button', { name: /^Z4$/ });
+    fireEvent.click(botonFiltroZ4);
+
+    expect(screen.getByTestId('pin-201')).toBeInTheDocument();
+    expect(screen.queryByTestId('pin-204')).not.toBeInTheDocument();
+  });
+
+  it('pedidos «Falta ubicar» (lat/lng nulos) no salen en el mapa y desactivan Tomar con aviso', async () => {
+    const pedidoSinUbicacion: PedidoReparto = {
+      ...pedidoEjemplo,
+      id: '301',
+      codigo: 'CP-0301',
+      cliente_nombre: 'Ana Rojas',
+      lat: null,
+      lng: null,
+      zona: 'Z2',
+    };
+
+    vi.spyOn(repartosApi, 'listarDisponibles').mockResolvedValueOnce([pedidoSinUbicacion]);
+
+    render(<RepartosView />);
+
+    // En el mapa NO debe aparecer pin
+    await waitFor(() => {
+      expect(screen.queryByTestId('pin-301')).not.toBeInTheDocument();
+      expect(
+        screen.getByText(/pedido\(s\) sin ubicación en esta vista/i),
+      ).toBeInTheDocument();
+    });
+
+    // Cambiar a Lista
+    const botonLista = screen.getByRole('button', { name: /^lista$/i });
+    fireEvent.click(botonLista);
+
+    await waitFor(() => {
+      // Debe tener la marca «Falta ubicar»
+      expect(screen.getAllByText('Falta ubicar').length).toBeGreaterThanOrEqual(1);
+      // Aviso para pedir a caja que lo ubique
+      expect(
+        screen.getByText(/pide a caja que ubique el pedido antes de tomarlo/i),
+      ).toBeInTheDocument();
+      // Botón "Falta ubicar" desactivado
+      const botonFaltaUbicar = screen.getByRole('button', { name: 'Falta ubicar' });
+      expect(botonFaltaUbicar).toBeDisabled();
+    });
+  });
+
+  it('al tocar un punto en el mapa aparece el resumen (RQ-DEL-02-15) con botones y botón de estado', async () => {
+    vi.spyOn(repartosApi, 'listarDisponibles').mockResolvedValueOnce([pedidoEjemplo]);
+
+    render(<RepartosView />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('pin-101')).toBeInTheDocument();
+    });
+
+    // Toca el pin del pedido 101
+    fireEvent.click(screen.getByTestId('pin-101'));
+
+    await waitFor(() => {
+      // Aparece la región de resumen
+      expect(screen.getByRole('region', { name: /resumen de pedido CP-0101/i })).toBeInTheDocument();
+      // Código, cliente, total
+      expect(screen.getByText('CP-0101')).toBeInTheDocument();
+      expect(screen.getByText('Maria Flores')).toBeInTheDocument();
+      expect(screen.getByText('S/ 45.00')).toBeInTheDocument();
+      // Vuelto que debe llevar
+      expect(
+        screen.getByText(/cobrar.*s\/ 45\.00.*llevar vuelto.*s\/ 5\.00/i),
+      ).toBeInTheDocument();
+      // Botones de acción rápida
+      const linkLlamar = screen.getByRole('link', { name: /llamar/i });
+      expect(linkLlamar).toHaveAttribute('href', 'tel:987654321');
+      const linkWa = screen.getByRole('link', { name: /whatsapp/i });
+      expect(linkWa).toHaveAttribute('href', 'https://wa.me/51987654321');
+      const linkNavegar = screen.getByRole('link', { name: /navegar/i });
+      expect(linkNavegar).toHaveAttribute(
+        'href',
+        'https://www.google.com/maps?q=-12.045,-77.03',
+      );
+      // Botón grande de Tomar pedido
+      expect(screen.getByRole('button', { name: /tomar pedido/i })).toBeInTheDocument();
+    });
+  });
+
+  it('exige confirmación Sí/No obligatoria antes de tomar pedido desde el resumen', async () => {
+    const tomarMock = vi.spyOn(repartosApi, 'tomarPedido').mockResolvedValueOnce({
+      ...pedidoEjemplo,
+      estado: 'LISTO',
+      repartidor_party_id: '10',
+    });
+
+    vi.spyOn(repartosApi, 'listarDisponibles').mockResolvedValueOnce([pedidoEjemplo]);
+
+    render(<RepartosView />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('pin-101')).toBeInTheDocument();
+    });
+
+    // Selecciona el pin
+    fireEvent.click(screen.getByTestId('pin-101'));
+
+    // Clic en Tomar pedido en el resumen
+    const botonTomar = screen.getByRole('button', { name: /tomar pedido/i });
+    fireEvent.click(botonTomar);
+
+    // Debe abrir el modal de confirmación Sí/No
+    expect(screen.getByText('¿Tomar este pedido?')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /no, cancelar/i })).toBeInTheDocument();
+    const botonConfirmar = screen.getByRole('button', { name: /sí, confirmar/i });
+    fireEvent.click(botonConfirmar);
+
+    await waitFor(() => {
+      expect(tomarMock).toHaveBeenCalledWith('101');
     });
   });
 });

@@ -1,11 +1,25 @@
-.cp-mapa { width: 100%; border-radius: 12px; border: 1.5px solid var(--cp-line, #E3D6C6); overflow: hidden; position: relative; z-index: 0; }
-.cp-pin { background: none; border: none; }
+.cp-mapa { width: 100%; border-radius: 16px; border: 1px solid var(--cp-line, #E3D6C6); overflow: hidden; position: relative; z-index: 0; }
+.cp-pin { background: none; border: none; position: relative; }
+.cp-local-marker { background: none !important; border: none !important; }
 .cp-pin span { display: block; width: 26px; height: 26px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: var(--cp-rust, #C4412B); border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.35); }
 .cp-pin.verde span { background: #2E8B57; }
 .cp-pin.naranja span { background: #E67929; }
 .cp-pin.rojo span { background: #C4412B; animation: cp-palpita 1s ease-in-out infinite alternate; }
 .cp-pin.local span { background: var(--cp-navy, #0B2C3E); }
 .cp-pin.elegido span { outline: 3px solid var(--cp-navy, #0B2C3E); }
+.cp-pin-num {
+  position: absolute;
+  top: 3px;
+  left: 0;
+  width: 26px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 800;
+  color: #fff;
+  pointer-events: none;
+  z-index: 2;
+  line-height: 14px;
+}
 @keyframes cp-palpita { from { transform: rotate(-45deg) scale(1); } to { transform: rotate(-45deg) scale(1.25); } }
 .cp-etiqueta { background: #fff; border: 1px solid var(--cp-line, #E3D6C6); border-radius: 8px; padding: 2px 6px; font-size: 11px; line-height: 13px; color: var(--cp-navy, #0B2C3E); box-shadow: 0 1px 3px rgba(0,0,0,.2); }
 .cp-etiqueta small { display: block; font-size: 10px; opacity: .7; }

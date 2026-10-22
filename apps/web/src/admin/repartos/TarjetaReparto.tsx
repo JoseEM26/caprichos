@@ -109,10 +109,11 @@ export function TarjetaReparto({
       ? `https://waze.com/ul?ll=${pedido.lat},${pedido.lng}&navigate=yes`
       : mapsUrl;
 
-  const telUrl = pedido.cliente_telefono ? `tel:${pedido.cliente_telefono}` : null;
-  const waUrl = pedido.cliente_telefono
-    ? `https://wa.me/51${pedido.cliente_telefono.replace(/\D/g, '')}`
+  const telDigitos = pedido.cliente_telefono
+    ? pedido.cliente_telefono.replace(/\D/g, '').slice(-9)
     : null;
+  const telUrl = telDigitos ? `tel:${telDigitos}` : null;
+  const waUrl = telDigitos ? `https://wa.me/51${telDigitos}` : null;
 
   // Acciones con confirmación
   const pedirConfirmacion = (
@@ -130,6 +131,11 @@ export function TarjetaReparto({
   };
 
   const handleTomar = () => {
+    if (pedido.lat == null || pedido.lng == null) {
+      setErrorAccion('El pedido no tiene ubicación: caja debe ubicarlo antes de que se pueda tomar');
+      return;
+    }
+
     pedirConfirmacion(
       '¿Tomar este pedido?',
       `El pedido ${pedido.codigo} se asignará a tu usuario y desaparecerá de disponibles para otros repartidores.`,
@@ -148,6 +154,10 @@ export function TarjetaReparto({
               );
             } else if (err.codigo === 'YA_TOMADO') {
               setErrorAccion(err.message || 'Otro repartidor ya tomó este pedido');
+            } else if (err.codigo === 'FALTA_UBICAR') {
+              setErrorAccion(
+                err.message || 'El pedido no tiene ubicación: caja debe ubicarlo antes de que se pueda tomar',
+              );
             } else {
               setErrorAccion(err.message || 'Error al tomar el pedido');
             }
@@ -287,6 +297,22 @@ export function TarjetaReparto({
                   }}
                 >
                   Zona {pedido.zona}
+                </span>
+              )}
+              {(pedido.lat == null || pedido.lng == null) && (
+                <span
+                  data-testid="badge-falta-ubicar"
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: 800,
+                    borderRadius: '9999px',
+                    padding: '2px 8px',
+                    background: '#FDE8E8',
+                    color: 'var(--cp-rust, #C4412B)',
+                    border: '1.5px solid var(--cp-rust, #C4412B)',
+                  }}
+                >
+                  Falta ubicar
                 </span>
               )}
             </div>
@@ -634,21 +660,54 @@ export function TarjetaReparto({
           </div>
         )}
 
-        {/* Botones de acción principales según pantalla */}
-        {esDisponible && (
-          <Boton
-            variante="primario"
-            onClick={handleTomar}
-            cargando={cargandoAccion}
+        {/* Aviso de falta ubicar */}
+        {pedido.lat == null || pedido.lng == null ? (
+          <div
+            role="status"
             style={{
-              minHeight: '52px',
-              fontSize: '16px',
-              fontWeight: 800,
-              width: '100%',
+              background: '#FFF1C9',
+              border: '1.5px solid var(--cp-gold)',
+              borderRadius: '10px',
+              padding: '8px 12px',
+              fontSize: '13px',
+              fontWeight: 700,
+              color: 'var(--cp-navy)',
             }}
           >
-            Tomar pedido
-          </Boton>
+            Pide a caja que ubique el pedido antes de tomarlo.
+          </div>
+        ) : null}
+
+        {/* Botones de acción principales según pantalla */}
+        {esDisponible && (
+          pedido.lat == null || pedido.lng == null ? (
+            <Boton
+              disabled
+              variante="secundario"
+              style={{
+                minHeight: '52px',
+                fontSize: '16px',
+                fontWeight: 800,
+                width: '100%',
+              }}
+            >
+              Falta ubicar
+            </Boton>
+          ) : (
+            <Boton
+              variante="primario"
+              onClick={handleTomar}
+              cargando={cargandoAccion}
+              style={{
+                minHeight: '52px',
+                fontSize: '16px',
+                fontWeight: 800,
+                width: '100%',
+              }}
+            >
+              Tomar pedido
+            </Boton>
+          )
         )}
 
         {esMio && (

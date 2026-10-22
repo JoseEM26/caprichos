@@ -32,7 +32,13 @@ export function MapaPedidos({ puntos, seleccionado, onSeleccionar, altura = 360 
     L.tileLayer(URL_TESELAS, { attribution: ATRIBUCION, maxZoom: 19 }).addTo(m);
     capa.current = L.layerGroup().addTo(m);
     mapa.current = m;
+
+    const timer = setTimeout(() => {
+      m.invalidateSize();
+    }, 100);
+
     return () => {
+      clearTimeout(timer);
       m.remove();
       mapa.current = null;
       capa.current = null;
@@ -49,7 +55,10 @@ export function MapaPedidos({ puntos, seleccionado, onSeleccionar, altura = 360 
       const pos: L.LatLngTuple = [p.lat, p.lng];
       coords.push(pos);
       const marcador = L.marker(pos, {
-        icon: iconoPin(`${p.color ?? ''} ${p.id === seleccionado ? 'elegido' : ''}`),
+        icon: iconoPin(
+          `${p.color ?? ''} ${p.id === seleccionado ? 'elegido' : ''}`,
+          p.orden ? String(p.orden) : '',
+        ),
         title: `${p.etiqueta}${p.detalle ? ` · ${p.detalle}` : ''}`,
       });
       const numero = p.orden ? `${p.orden}. ` : '';
@@ -64,8 +73,25 @@ export function MapaPedidos({ puntos, seleccionado, onSeleccionar, altura = 360 
       marcador.on('click', () => alSeleccionar.current?.(p.id));
       marcador.addTo(g);
     }
-    if (coords.length === 1) m.setView(coords[0], 16);
-    else if (coords.length > 1) m.fitBounds(L.latLngBounds(coords), { padding: [40, 40], maxZoom: 17 });
+    // Marcador del local «Caprichos» (acta 03, DT-59)
+    const marcadorTienda = L.marker(CENTRO_DEFECTO, {
+      icon: L.divIcon({
+        className: 'cp-local-marker',
+        html: '<div style="display:inline-flex;align-items:center;gap:6px;pointer-events:none;"><div style="width:16px;height:16px;background:#0B2C3E;border-radius:4px;border:2px solid #FFFFFF;box-shadow:0 2px 6px rgba(11,44,62,0.4)"></div><span style="font-family:Montserrat,sans-serif;font-weight:800;font-size:12px;color:#0B2C3E;background:rgba(255,255,255,0.92);padding:2px 6px;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,0.2);white-space:nowrap;">Caprichos</span></div>',
+        iconSize: [110, 24],
+        iconAnchor: [8, 12],
+      }),
+      title: 'Caprichos',
+      zIndexOffset: 1000,
+    });
+    marcadorTienda.addTo(g);
+
+    const todosCoords = [CENTRO_DEFECTO, ...coords];
+    if (coords.length === 0) {
+      m.setView(CENTRO_DEFECTO, 14);
+    } else {
+      m.fitBounds(L.latLngBounds(todosCoords), { padding: [50, 50], maxZoom: 17 });
+    }
   }, [puntos, seleccionado]);
 
   return <div ref={contenedor} className="cp-mapa" role="application" aria-label="Mapa de pedidos por entregar" style={{ height: altura }} />;
