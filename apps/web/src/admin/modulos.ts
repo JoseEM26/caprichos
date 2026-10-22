@@ -1,6 +1,8 @@
 import React from 'react';
 import { Escritorio } from './Escritorio';
 import { Proximamente } from './Proximamente';
+import { UsuariosView, AuditoriaView } from './usuarios';
+import { ConfiguracionLocalView, ZonasRepartoView } from './configuracion';
 
 export type GrupoModulo =
   | 'Operación'
@@ -256,8 +258,17 @@ export const MODULOS: DefinicionModulo[] = [
     grupo: 'Configuración',
     ruta: '/admin/mirest',
     permisoMinimo: 'local/ver',
-    componente: crearProximamente('Configuración del local'),
+    componente: ConfiguracionLocalView,
     icono: 'mirest',
+  },
+  {
+    clave: 'zonas',
+    nombre: 'Zonas de reparto',
+    grupo: 'Configuración',
+    ruta: '/admin/zonas',
+    permisoMinimo: 'zonas/ver',
+    componente: ZonasRepartoView,
+    icono: 'mapa',
   },
   {
     clave: 'usuarios',
@@ -265,7 +276,7 @@ export const MODULOS: DefinicionModulo[] = [
     grupo: 'Configuración',
     ruta: '/admin/usuarios',
     permisoMinimo: 'usuarios/ver',
-    componente: crearProximamente('Usuarios'),
+    componente: UsuariosView,
     icono: 'usuarios',
   },
   {
@@ -274,7 +285,7 @@ export const MODULOS: DefinicionModulo[] = [
     grupo: 'Configuración',
     ruta: '/admin/historial',
     permisoMinimo: 'auditoria/ver',
-    componente: crearProximamente('Historial de acciones'),
+    componente: AuditoriaView,
     icono: 'historial',
   },
   {
