@@ -12,6 +12,7 @@ import { PrismaService } from '../../comun/prisma/prisma.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { LocalService } from '../local/local.service';
 import { ZonasService } from '../zonas/zonas.service';
+import { OfertasService } from '../ofertas/ofertas.service';
 import { CrearPedidoDto } from './dto/crear-pedido.dto';
 
 describe('PedidosService', () => {
@@ -20,6 +21,7 @@ describe('PedidosService', () => {
   let localServiceMock: any;
   let zonasServiceMock: any;
   let eventosGatewayMock: any;
+  let ofertasServiceMock: any;
 
   const mockProductoCafe = {
     id: 1n,
@@ -158,6 +160,17 @@ describe('PedidosService', () => {
       emitirAdmin: jest.fn(),
     };
 
+    ofertasServiceMock = {
+      calcularDescuentosParaPedido: jest.fn().mockResolvedValue({
+        descuentoTotal: 0,
+        ofertaId: null,
+        cuponId: null,
+        cuponEmitidoId: null,
+        detalles: [],
+      }),
+      emitirCuponesParaPedido: jest.fn().mockResolvedValue([]),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PedidosService,
@@ -165,6 +178,7 @@ describe('PedidosService', () => {
         { provide: LocalService, useValue: localServiceMock },
         { provide: ZonasService, useValue: zonasServiceMock },
         { provide: EventosGateway, useValue: eventosGatewayMock },
+        { provide: OfertasService, useValue: ofertasServiceMock },
       ],
     }).compile();
 
@@ -408,6 +422,59 @@ describe('PedidosService', () => {
       // Servidor calcula 12 (tamaño) + 2 (leche) = 14 por 2 unidades = 28.0 (ignora 0.01)
       expect(res.subtotal).toBe(28.0);
       expect(res.total).toBe(33.0);
+    });
+
+    it('10. aplica descuento con cuponCodigo y calcula total = subtotal - descuento + envio en el servidor', async () => {
+      // Subtotal = 28, Envio = 5. Con cupón S/ 5 de descuento: Descuento = 5, Total = 28 - 5 + 5 = 28
+      ofertasServiceMock.calcularDescuentosParaPedido.mockResolvedValueOnce({
+        descuentoTotal: 5.0,
+        ofertaId: null,
+        cuponId: '10',
+        cuponEmitidoId: null,
+        detalles: [
+          {
+            tipo: 'CUPON',
+            nombre: 'Cupón BIENVENIDO5',
+            descuentoTipo: 'MONTO',
+            descuentoValor: 5.0,
+            montoDescontado: 5.0,
+          },
+        ],
+      });
+
+      let pedidoCreadoData: any = null;
+      prismaMock.pedido.create.mockImplementation(({ data }: any) => {
+        pedidoCreadoData = data;
+        return Promise.resolve({
+          id: 101n,
+          codigo: 'CP-W002',
+          estado: 'COLA',
+          subtotal: data.subtotal,
+          descuento: data.descuento,
+          envio: data.envio,
+          total: data.total,
+        });
+      });
+      prismaMock.cupon = { update: jest.fn().mockResolvedValue({}) };
+      prismaMock.cuponCanjeCompartido = { create: jest.fn().mockResolvedValue({}) };
+
+      const res = await service.crear(
+        { ...pedidoBaseDto, cuponCodigo: 'BIENVENIDO5' },
+        'idemp-cupon-valido',
+      );
+
+      expect(ofertasServiceMock.calcularDescuentosParaPedido).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subtotal: 28.0,
+          cuponCodigo: 'BIENVENIDO5',
+        }),
+      );
+      expect(pedidoCreadoData.descuento.toNumber()).toBe(5.0);
+      expect(pedidoCreadoData.total.toNumber()).toBe(28.0);
+      expect(pedidoCreadoData.cupon_id).toBe(10n);
+      expect(res.subtotal).toBe(28.0);
+      expect(res.descuento).toBe(5.0);
+      expect(res.total).toBe(28.0);
     });
 
     it('falta cabecera Idempotency-Key -> 400 CLAVE_REQUERIDA', async () => {

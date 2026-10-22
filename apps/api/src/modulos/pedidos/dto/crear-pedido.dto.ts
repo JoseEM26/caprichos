@@ -138,4 +138,8 @@ export class CrearPedidoDto {
   @IsOptional()
   @IsString()
   nota?: string;
+
+  @IsOptional()
+  @IsString()
+  cuponCodigo?: string;
 }

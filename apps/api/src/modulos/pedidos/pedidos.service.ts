@@ -11,6 +11,7 @@ import { PrismaService } from '../../comun/prisma/prisma.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { LocalService } from '../local/local.service';
 import { ZonasService } from '../zonas/zonas.service';
+import { OfertasService } from '../ofertas/ofertas.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { CrearPedidoDto } from './dto/crear-pedido.dto';
 
@@ -30,6 +31,7 @@ export class PedidosService {
     private readonly localService: LocalService,
     private readonly zonasService: ZonasService,
     private readonly eventosGateway: EventosGateway,
+    private readonly ofertasService: OfertasService,
   ) {}
 
   /**
@@ -60,6 +62,7 @@ export class PedidosService {
         codigo: pedidoExistente.codigo,
         estado: pedidoExistente.estado,
         subtotal: Number(pedidoExistente.subtotal),
+        descuento: Number(pedidoExistente.descuento || 0),
         envio: pedidoExistente.envio !== null ? Number(pedidoExistente.envio) : null,
         total: Number(pedidoExistente.total),
         mensaje:
@@ -336,6 +339,8 @@ export class PedidosService {
 
       lineasCalculadas.push({
         productoId: prodDb.id,
+        categoriaId: prodDb.categoria_id,
+        noSumaBeneficios: prodDb.no_suma_beneficios,
         nombre: prodDb.nombre,
         tamano: tamanoNombre,
         cantidad,
@@ -349,6 +354,25 @@ export class PedidosService {
     }
 
     subtotalCalculado = Number(subtotalCalculado.toFixed(2));
+
+    // 5.1. Calcular descuento (oferta/cupón según reglas de acumulación) en el servidor
+    const canalPedido = origen?.canal || 'CARTA';
+    const desgloseDescuento = await this.ofertasService.calcularDescuentosParaPedido({
+      subtotal: subtotalCalculado,
+      lineas: lineasCalculadas.map((lin) => ({
+        productoId: lin.productoId,
+        categoriaId: lin.categoriaId,
+        cantidad: lin.cantidad,
+        subtotal: lin.subtotal,
+        precioUnitario: lin.precioUnitario,
+        noSumaBeneficios: lin.noSumaBeneficios,
+      })),
+      canal: canalPedido,
+      cuponCodigo: dto.cuponCodigo,
+      clientePartyId: origen?.usuarioPartyId,
+    });
+
+    const descuentoAplicado = desgloseDescuento.descuentoTotal;
 
     // 6. Validar pedido mínimo si está configurado
     const paramPedidoMinimo = await this.prisma.parametro.findUnique({
@@ -431,7 +455,7 @@ export class PedidosService {
       entregaOrigen = null;
     }
 
-    const totalCalculado = Number((subtotalCalculado + (envio ?? 0)).toFixed(2));
+    const totalCalculado = Number(Math.max(0, subtotalCalculado - descuentoAplicado + (envio ?? 0)).toFixed(2));
 
     // 8. Validación de pago
     if (dto.pago.metodo === 'EFECTIVO' && dto.pago.pagaCon !== undefined) {
@@ -494,9 +518,13 @@ export class PedidosService {
           pago_preferido: dto.pago.metodo,
           paga_con: dto.pago.pagaCon != null ? new Prisma.Decimal(dto.pago.pagaCon) : null,
           subtotal: new Prisma.Decimal(subtotalCalculado),
-          descuento: new Prisma.Decimal(0),
+          descuento: new Prisma.Decimal(descuentoAplicado),
           envio: envio !== null ? new Prisma.Decimal(envio) : null,
           total: new Prisma.Decimal(totalCalculado),
+          oferta_id: desgloseDescuento.ofertaId ? BigInt(desgloseDescuento.ofertaId) : null,
+          cupon_id: desgloseDescuento.cuponId ? BigInt(desgloseDescuento.cuponId) : null,
+          cupon_emitido_id: desgloseDescuento.cuponEmitidoId ? BigInt(desgloseDescuento.cuponEmitidoId) : null,
+          descuento_detalle: desgloseDescuento.detalles.length > 0 ? (desgloseDescuento.detalles as any) : undefined,
           comprobante_tipo: comprobanteTipo,
           comprobante_doc: comprobanteDoc,
           comprobante_razon: comprobanteRazon,
@@ -574,6 +602,37 @@ export class PedidosService {
         await origen.enTransaccion(tx, pedido);
       }
 
+      // Actualizar canje o uso de cupones u ofertas si aplicó
+      if (desgloseDescuento.cuponEmitidoId) {
+        await tx.cuponEmitido.update({
+          where: { id: BigInt(desgloseDescuento.cuponEmitidoId) },
+          data: {
+            estado: 'CANJEADO',
+            canjeado_en: new Date(),
+            pedido_canje_id: pedido.id,
+          },
+        });
+      } else if (desgloseDescuento.cuponId) {
+        await tx.cupon.update({
+          where: { id: BigInt(desgloseDescuento.cuponId) },
+          data: { usos_actuales: { increment: 1 } },
+        });
+        await tx.cuponCanjeCompartido.create({
+          data: {
+            cupon_id: BigInt(desgloseDescuento.cuponId),
+            pedido_id: pedido.id,
+            party_id: pedido.party_id,
+          },
+        });
+      }
+
+      if (desgloseDescuento.ofertaId) {
+        await tx.oferta.update({
+          where: { id: BigInt(desgloseDescuento.ofertaId) },
+          data: { usos_actuales: { increment: 1 } },
+        });
+      }
+
       return pedido;
     });
 
@@ -594,6 +653,7 @@ export class PedidosService {
       codigo: pedidoCreado.codigo,
       estado: pedidoCreado.estado,
       subtotal: Number(pedidoCreado.subtotal),
+      descuento: Number(pedidoCreado.descuento || 0),
       envio: pedidoCreado.envio !== null ? Number(pedidoCreado.envio) : null,
       total: Number(pedidoCreado.total),
       mensaje:

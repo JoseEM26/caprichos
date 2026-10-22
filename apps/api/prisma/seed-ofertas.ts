@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -57,6 +58,32 @@ export async function main() {
   });
   const catIced = await prisma.categoria.findFirst({
     where: { nombre: { contains: 'ICED', mode: 'insensitive' } },
+  });
+  const catCalientes = await prisma.categoria.findFirst({
+    where: { nombre: { contains: 'CALIENTE', mode: 'insensitive' } },
+  });
+
+  const prodClubSandwich = await prisma.producto.findFirst({
+    where: { nombre: { contains: 'CLUB', mode: 'insensitive' } },
+  });
+  const prodLatte = await prisma.producto.findFirst({
+    where: { nombre: { contains: 'LATTE', mode: 'insensitive' } },
+  });
+  const prodIced = await prisma.producto.findFirst({
+    where: { nombre: { contains: 'ICED COFFE', mode: 'insensitive' } },
+  });
+
+  const complementosProds = await prisma.producto.findMany({
+    where: {
+      OR: [
+        { nombre: { contains: 'DONAS', mode: 'insensitive' } },
+        { nombre: { contains: 'GALLETA', mode: 'insensitive' } },
+        { nombre: { contains: 'EMPANADA', mode: 'insensitive' } },
+        { nombre: { contains: 'KEKE', mode: 'insensitive' } },
+        { nombre: { contains: 'CARROT', mode: 'insensitive' } },
+      ],
+    },
+    take: 8,
   });
 
   const tamanoRegular = await prisma.listaValor.findFirst({
@@ -124,17 +151,26 @@ export async function main() {
     });
   }
 
-  // Combo 1 partes: 2 bebidas a elección
-  const partesCombo1 = await prisma.comboParte.findMany({ where: { oferta_id: combo1.id } });
-  if (partesCombo1.length === 0) {
-    const catsCombo1 = [catFrappes?.id, catIced?.id].filter((id): id is bigint => id !== undefined && id !== null);
+  // Combo 1 partes: 2 bebidas a elección + 1 complemento
+  await prisma.comboParte.deleteMany({ where: { oferta_id: combo1.id } });
+  const catsCombo1 = [catFrappes?.id, catIced?.id, catCalientes?.id].filter((id): id is bigint => id !== undefined && id !== null);
+  await prisma.comboParte.create({
+    data: {
+      oferta_id: combo1.id,
+      tipo: 'A_ELECCION',
+      cantidad: 2,
+      categorias: catsCombo1,
+      productos: [],
+    },
+  });
+  if (complementosProds.length > 0) {
     await prisma.comboParte.create({
       data: {
         oferta_id: combo1.id,
-        tipo: 'A_ELECCION',
-        cantidad: 2,
-        categorias: catsCombo1,
-        productos: [],
+        tipo: 'UNA_DE',
+        cantidad: 1,
+        categorias: [],
+        productos: complementosProds.map((p) => p.id),
       },
     });
   }
@@ -196,20 +232,94 @@ export async function main() {
     });
   }
 
-  const partesCombo2 = await prisma.comboParte.findMany({ where: { oferta_id: combo2.id } });
-  if (partesCombo2.length === 0) {
-    const catsCombo2 = [catFrappes?.id, catWaffles?.id].filter((id): id is bigint => id !== undefined && id !== null);
+  await prisma.comboParte.deleteMany({ where: { oferta_id: combo2.id } });
+  const catsCombo2 = [catFrappes?.id].filter((id): id is bigint => id !== undefined && id !== null);
+  await prisma.comboParte.create({
+    data: {
+      oferta_id: combo2.id,
+      tipo: 'A_ELECCION',
+      cantidad: 2,
+      categorias: catsCombo2,
+      productos: [],
+    },
+  });
+  if (prodClubSandwich) {
     await prisma.comboParte.create({
       data: {
         oferta_id: combo2.id,
-        tipo: 'A_ELECCION',
-        cantidad: 2,
-        categorias: catsCombo2,
-        productos: [],
+        tipo: 'FIJO',
+        cantidad: 1,
+        categorias: [],
+        productos: [prodClubSandwich.id],
       },
     });
   }
   console.log(`Combo 2 "${combo2Nombre}" asegurado.`);
+
+  // Promos 2x1
+  if (prodLatte) {
+    await prisma.oferta.upsert({
+      where: { nombre: '2x1 LATTE COFFE' },
+      update: {
+        tipo: 'LLEVA_PAGA',
+        descripcion: '2x1 en Latte Coffe los martes',
+        alcance_producto_id: prodLatte.id,
+        lleva: 2,
+        paga: 1,
+        descuento_valor: prodLatte.precio,
+        dias: [2], // martes
+        canales: ['CARTA', 'ADMIN', 'BOT'],
+        activo: true,
+        orden: 3,
+      },
+      create: {
+        tipo: 'LLEVA_PAGA',
+        nombre: '2x1 LATTE COFFE',
+        descripcion: '2x1 en Latte Coffe los martes',
+        alcance_producto_id: prodLatte.id,
+        lleva: 2,
+        paga: 1,
+        descuento_valor: prodLatte.precio,
+        dias: [2],
+        canales: ['CARTA', 'ADMIN', 'BOT'],
+        activo: true,
+        orden: 3,
+      },
+    });
+    console.log('2x1 LATTE COFFE asegurado.');
+  }
+
+  if (prodIced) {
+    await prisma.oferta.upsert({
+      where: { nombre: '2x1 ICED COFFE' },
+      update: {
+        tipo: 'LLEVA_PAGA',
+        descripcion: '2x1 en Iced Coffe todos los días',
+        alcance_producto_id: prodIced.id,
+        lleva: 2,
+        paga: 1,
+        descuento_valor: prodIced.precio,
+        dias: [],
+        canales: ['CARTA', 'ADMIN', 'BOT'],
+        activo: true,
+        orden: 4,
+      },
+      create: {
+        tipo: 'LLEVA_PAGA',
+        nombre: '2x1 ICED COFFE',
+        descripcion: '2x1 en Iced Coffe todos los días',
+        alcance_producto_id: prodIced.id,
+        lleva: 2,
+        paga: 1,
+        descuento_valor: prodIced.precio,
+        dias: [],
+        canales: ['CARTA', 'ADMIN', 'BOT'],
+        activo: true,
+        orden: 4,
+      },
+    });
+    console.log('2x1 ICED COFFE asegurado.');
+  }
 
   // 5. Descuento automático: 10 % en waffles los martes (RN-CAP-132, día 2 = martes)
   const descMartesNombre = 'Martes de Waffles 10% OFF';
@@ -226,7 +336,7 @@ export async function main() {
       canales: ['CARTA', 'ADMIN', 'BOT'],
       no_suma_beneficios: false,
       activo: true,
-      orden: 3,
+      orden: 5,
     },
     create: {
       tipo: 'DESCUENTO',
@@ -240,10 +350,47 @@ export async function main() {
       canales: ['CARTA', 'ADMIN', 'BOT'],
       no_suma_beneficios: false,
       activo: true,
-      orden: 3,
+      orden: 5,
     },
   });
   console.log(`Descuento automático "${descMartesNombre}" asegurado.`);
+
+  const descHappyHour = 'Happy hour de la tarde';
+  await prisma.oferta.upsert({
+    where: { nombre: descHappyHour },
+    update: {
+      tipo: 'DESCUENTO',
+      descripcion: '15 % de descuento en toda la carta por la tarde',
+      alcance_categoria_id: null,
+      descuento_tipo: 'PORCENTAJE',
+      descuento_valor: 15.00,
+      compra_minima: 0,
+      dias: [1, 2, 3, 4, 5],
+      hora_desde: '15:00',
+      hora_hasta: '17:00',
+      canales: ['CARTA', 'ADMIN', 'BOT'],
+      no_suma_beneficios: false,
+      activo: true,
+      orden: 6,
+    },
+    create: {
+      tipo: 'DESCUENTO',
+      nombre: descHappyHour,
+      descripcion: '15 % de descuento en toda la carta por la tarde',
+      alcance_categoria_id: null,
+      descuento_tipo: 'PORCENTAJE',
+      descuento_valor: 15.00,
+      compra_minima: 0,
+      dias: [1, 2, 3, 4, 5],
+      hora_desde: '15:00',
+      hora_hasta: '17:00',
+      canales: ['CARTA', 'ADMIN', 'BOT'],
+      no_suma_beneficios: false,
+      activo: true,
+      orden: 6,
+    },
+  });
+  console.log(`Descuento automático "${descHappyHour}" asegurado.`);
 
   // 6. Cupones de ejemplo (2 cupones: uno de monto fijo, uno de porcentaje)
   // Cupón 1: Monto fijo (compartido con tope)
@@ -257,7 +404,7 @@ export async function main() {
       compra_minima: 25.00,
       tope_usos: 100,
       max_por_cliente: 1,
-      requiere_cuenta: true,
+      requiere_cuenta: false,
       canales: ['CARTA', 'CAJA', 'BOT'],
       activo: true,
       orden: 1,
@@ -271,7 +418,7 @@ export async function main() {
       compra_minima: 25.00,
       tope_usos: 100,
       max_por_cliente: 1,
-      requiere_cuenta: true,
+      requiere_cuenta: false,
       canales: ['CARTA', 'CAJA', 'BOT'],
       activo: true,
       orden: 1,

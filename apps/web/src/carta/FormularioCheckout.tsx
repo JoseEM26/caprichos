@@ -68,6 +68,18 @@ export function FormularioCheckout({
   const [enviando, setEnviando] = useState(false);
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
 
+  // Cupón
+  const [cuponCodigo, setCuponCodigo] = useState('');
+  const [cuponAplicado, setCuponAplicado] = useState<{
+    codigo: string;
+    descripcion: string;
+    descuentoCalculado: number;
+    tipo: string;
+    valor: number;
+  } | null>(null);
+  const [cargandoCupon, setCargandoCupon] = useState(false);
+  const [mensajeCupon, setMensajeCupon] = useState<string | null>(null);
+
   // Idempotency-Key único por intento
   const claveIdempotenciaRef = useRef<string>(
     typeof crypto !== 'undefined' && crypto.randomUUID
@@ -82,10 +94,52 @@ export function FormularioCheckout({
 
   // Cálculo del total
   const costoEnvioEfectivo = modalidad === 'DELIVERY' ? costoEnvio : 0;
-  const totalCalculado = calcularTotalPedido({
-    subtotal,
-    envio: costoEnvioEfectivo,
-  });
+  const descuentoCupon = cuponAplicado ? cuponAplicado.descuentoCalculado : 0;
+  const totalCalculado = Math.max(
+    0,
+    Number(
+      (
+        calcularTotalPedido({
+          subtotal,
+          envio: costoEnvioEfectivo,
+        }) - descuentoCupon
+      ).toFixed(2),
+    ),
+  );
+
+  const aplicarCupon = async () => {
+    if (!cuponCodigo.trim()) return;
+    setCargandoCupon(true);
+    setMensajeCupon(null);
+    try {
+      const res = await api.post<any>('/carta/cupon/validar', {
+        codigo: cuponCodigo.trim().toUpperCase(),
+        subtotal,
+        canal: 'CARTA',
+      });
+      if (res && res.cupon) {
+        setCuponAplicado({
+          codigo: res.cupon.codigoBase || cuponCodigo.trim().toUpperCase(),
+          descripcion: res.cupon.descripcion || 'Descuento aplicado',
+          descuentoCalculado: Number(res.cupon.descuentoCalculado || 0),
+          tipo: res.cupon.tipo,
+          valor: Number(res.cupon.valor),
+        });
+        setMensajeCupon(`Cupón aplicado: ${res.cupon.descripcion || ''}.`);
+      }
+    } catch (err: any) {
+      setCuponAplicado(null);
+      setMensajeCupon(err.response?.data?.mensaje || err.message || 'Código de cupón no válido');
+    } finally {
+      setCargandoCupon(false);
+    }
+  };
+
+  const removerCupon = () => {
+    setCuponAplicado(null);
+    setCuponCodigo('');
+    setMensajeCupon(null);
+  };
 
   // Copiar al portapapeles
   const copiarTexto = async (texto: string, clave: string) => {
@@ -280,6 +334,7 @@ export function FormularioCheckout({
         ruc: tipoComprobante === 'FACTURA' ? ruc.trim() : undefined,
         razonSocial: tipoComprobante === 'FACTURA' ? razonSocial.trim() : undefined,
       },
+      cuponCodigo: cuponAplicado ? cuponAplicado.codigo : undefined,
     };
 
     try {
@@ -1150,6 +1205,107 @@ export function FormularioCheckout({
             </div>
           </div>
 
+          {/* Campo de cupón */}
+          <div
+            style={{
+              border: '1px solid var(--cp-line)',
+              borderRadius: '12px',
+              padding: '12px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+              backgroundColor: 'var(--cp-white)',
+            }}
+          >
+            <label htmlFor="f-cup" style={{ fontWeight: 700, fontSize: '14px', color: 'var(--cp-navy)' }}>
+              ¿Tienes un cupón? <span style={{ fontWeight: 500, color: 'var(--cp-soft)' }}>(opcional)</span>
+            </label>
+            {!cuponAplicado ? (
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  id="f-cup"
+                  type="text"
+                  value={cuponCodigo}
+                  onChange={(e) => {
+                    setCuponCodigo(e.target.value);
+                    setMensajeCupon(null);
+                  }}
+                  placeholder="Código"
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    boxSizing: 'border-box',
+                    minHeight: '44px',
+                    borderRadius: '12px',
+                    border: '1.5px solid var(--cp-line)',
+                    backgroundColor: 'var(--cp-cream)',
+                    color: 'var(--cp-navy)',
+                    padding: '0 12px',
+                    textTransform: 'uppercase',
+                    fontSize: '14px',
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={aplicarCupon}
+                  disabled={cargandoCupon || !cuponCodigo.trim()}
+                  style={{
+                    minHeight: '44px',
+                    padding: '0 16px',
+                    border: '1.5px solid var(--cp-navy)',
+                    borderRadius: '12px',
+                    backgroundColor: 'transparent',
+                    color: 'var(--cp-navy)',
+                    fontWeight: 800,
+                    cursor: cargandoCupon || !cuponCodigo.trim() ? 'not-allowed' : 'pointer',
+                    opacity: cargandoCupon || !cuponCodigo.trim() ? 0.6 : 1,
+                  }}
+                >
+                  {cargandoCupon ? '...' : 'Aplicar'}
+                </button>
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <span style={{ fontWeight: 800, color: 'var(--cp-navy)' }}>{cuponAplicado.codigo}</span>
+                <button
+                  type="button"
+                  onClick={removerCupon}
+                  style={{
+                    minHeight: '40px',
+                    padding: '0 8px',
+                    border: 0,
+                    backgroundColor: 'transparent',
+                    color: 'var(--cp-rust)',
+                    fontWeight: 700,
+                    textDecoration: 'underline',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Quitar cupón
+                </button>
+              </div>
+            )}
+            {mensajeCupon && (
+              <div
+                style={{
+                  fontSize: '12px',
+                  lineHeight: '17px',
+                  fontWeight: 600,
+                  color: cuponAplicado ? '#2F7A45' : 'var(--cp-rust)',
+                }}
+              >
+                {mensajeCupon}
+              </div>
+            )}
+          </div>
+
           {/* Resumen de totales */}
           <div
             style={{
@@ -1166,6 +1322,13 @@ export function FormularioCheckout({
               <span>Subtotal productos</span>
               <span style={{ fontWeight: 700 }}>S/ {subtotal.toFixed(2)}</span>
             </div>
+
+            {cuponAplicado && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--cp-rust)' }}>
+                <span>Cupón {cuponAplicado.codigo}</span>
+                <span style={{ fontWeight: 700 }}>−S/ {cuponAplicado.descuentoCalculado.toFixed(2)}</span>
+              </div>
+            )}
 
             {modalidad === 'DELIVERY' && (
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>

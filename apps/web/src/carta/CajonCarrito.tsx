@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { useCarrito } from './CarritoContext';
 import { EstadoLocalCarta } from './tipos';
+import { api } from '../comun/api';
 
 interface CajonCarritoProps {
   estadoLocal: EstadoLocalCarta | null;
@@ -15,6 +17,47 @@ export function CajonCarrito({ estadoLocal }: CajonCarritoProps) {
     eliminarLinea,
     abrirCheckout,
   } = useCarrito();
+
+  const [cuponCodigo, setCuponCodigo] = useState('');
+  const [cuponAplicado, setCuponAplicado] = useState<{
+    codigo: string;
+    descripcion: string;
+    descuentoCalculado: number;
+  } | null>(null);
+  const [cargandoCupon, setCargandoCupon] = useState(false);
+  const [mensajeCupon, setMensajeCupon] = useState<string | null>(null);
+
+  const aplicarCupon = async () => {
+    if (!cuponCodigo.trim()) return;
+    setCargandoCupon(true);
+    setMensajeCupon(null);
+    try {
+      const res = await api.post<any>('/carta/cupon/validar', {
+        codigo: cuponCodigo.trim().toUpperCase(),
+        subtotal,
+        canal: 'CARTA',
+      });
+      if (res && res.cupon) {
+        setCuponAplicado({
+          codigo: res.cupon.codigoBase || cuponCodigo.trim().toUpperCase(),
+          descripcion: res.cupon.descripcion || 'Descuento aplicado',
+          descuentoCalculado: Number(res.cupon.descuentoCalculado || 0),
+        });
+        setMensajeCupon(`Cupón aplicado: ${res.cupon.descripcion || ''}.`);
+      }
+    } catch (err: any) {
+      setCuponAplicado(null);
+      setMensajeCupon(err.response?.data?.mensaje || err.message || 'Código no válido');
+    } finally {
+      setCargandoCupon(false);
+    }
+  };
+
+  const removerCupon = () => {
+    setCuponAplicado(null);
+    setCuponCodigo('');
+    setMensajeCupon(null);
+  };
 
   if (!cajonAbierto) return null;
 
@@ -360,18 +403,145 @@ export function CajonCarrito({ estadoLocal }: CajonCarritoProps) {
               gap: '12px',
             }}
           >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                fontFamily: 'var(--fuente-titulos)',
-                fontWeight: 800,
-                fontSize: '18px',
-                color: 'var(--cp-navy)',
-              }}
-            >
-              <span>Subtotal</span>
-              <span>S/ {subtotal.toFixed(2)}</span>
+            {/* Campo de cupón */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label htmlFor="c-cup" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-navy)' }}>
+                ¿Tienes un cupón? <span style={{ fontWeight: 500, color: 'var(--cp-soft)' }}>(opcional)</span>
+              </label>
+              {!cuponAplicado ? (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    id="c-cup"
+                    type="text"
+                    value={cuponCodigo}
+                    onChange={(e) => {
+                      setCuponCodigo(e.target.value);
+                      setMensajeCupon(null);
+                    }}
+                    placeholder="Código"
+                    autoCapitalize="characters"
+                    style={{
+                      flex: 1,
+                      minHeight: '40px',
+                      padding: '0 12px',
+                      borderRadius: '10px',
+                      border: '1.5px solid var(--cp-line)',
+                      fontSize: '13px',
+                      fontFamily: 'monospace',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={aplicarCupon}
+                    disabled={cargandoCupon || !cuponCodigo.trim()}
+                    style={{
+                      minHeight: '40px',
+                      padding: '0 14px',
+                      border: '1.5px solid var(--cp-navy)',
+                      borderRadius: '10px',
+                      backgroundColor: 'transparent',
+                      color: 'var(--cp-navy)',
+                      fontWeight: 800,
+                      fontSize: '13px',
+                      cursor: cargandoCupon || !cuponCodigo.trim() ? 'not-allowed' : 'pointer',
+                      opacity: cargandoCupon || !cuponCodigo.trim() ? 0.6 : 1,
+                    }}
+                  >
+                    {cargandoCupon ? '...' : 'Aplicar'}
+                  </button>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    backgroundColor: 'rgba(47, 122, 69, 0.08)',
+                    border: '1px solid #2F7A45',
+                    borderRadius: '10px',
+                    padding: '6px 12px',
+                  }}
+                >
+                  <span style={{ fontWeight: 800, fontSize: '13px', color: 'var(--cp-navy)' }}>{cuponAplicado.codigo}</span>
+                  <button
+                    type="button"
+                    onClick={removerCupon}
+                    style={{
+                      border: 0,
+                      backgroundColor: 'transparent',
+                      color: 'var(--cp-rust)',
+                      fontWeight: 700,
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Quitar
+                  </button>
+                </div>
+              )}
+              {mensajeCupon && (
+                <div
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    color: cuponAplicado ? '#2F7A45' : 'var(--cp-rust)',
+                  }}
+                >
+                  {mensajeCupon}
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontFamily: 'var(--fuente-titulos)',
+                  fontWeight: 800,
+                  fontSize: cuponAplicado ? '14px' : '18px',
+                  color: 'var(--cp-navy)',
+                }}
+              >
+                <span>Subtotal</span>
+                <span>S/ {subtotal.toFixed(2)}</span>
+              </div>
+
+              {cuponAplicado && (
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    fontSize: '14px',
+                    color: 'var(--cp-rust)',
+                    fontWeight: 700,
+                  }}
+                >
+                  <span>Descuento cupón</span>
+                  <span>−S/ {cuponAplicado.descuentoCalculado.toFixed(2)}</span>
+                </div>
+              )}
+
+              {cuponAplicado && (
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    fontFamily: 'var(--fuente-titulos)',
+                    fontWeight: 800,
+                    fontSize: '18px',
+                    color: 'var(--cp-navy)',
+                    borderTop: '1px dashed var(--cp-line)',
+                    paddingTop: '6px',
+                    marginTop: '4px',
+                  }}
+                >
+                  <span>Total estimado</span>
+                  <span>S/ {Math.max(0, subtotal - cuponAplicado.descuentoCalculado).toFixed(2)}</span>
+                </div>
+              )}
             </div>
 
             {localBloqueado && (
