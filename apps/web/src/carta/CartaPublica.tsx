@@ -18,7 +18,7 @@ import { CuentaProvider } from './cuenta/CuentaContext';
 import { PanelCuenta } from './cuenta/PanelCuenta';
 import { useEsMovil } from './useEsMovil';
 import { TarjetaProducto } from './TarjetaProducto';
-import { VentanaProducto } from './VentanaProducto';
+import { VentanaProductoCarta } from './VentanaProductoCarta';
 import { CajonCarrito } from './CajonCarrito';
 import { FormularioCheckout } from './FormularioCheckout';
 import { PantallaConfirmacion } from './PantallaConfirmacion';
@@ -355,8 +355,11 @@ function ContenidoCartaPublica() {
 
       {/* Ventana modal de detalle del producto */}
       {productoEnModal && (
-        <VentanaProducto
+        <VentanaProductoCarta
           producto={productoEnModal}
+          esBebida={['FRAPPES', 'ICED', 'FROZEN', 'CALIENTES'].includes(
+            (categorias.find((c) => c.productos.some((p) => p.id === productoEnModal.id))?.nombre ?? '').toUpperCase(),
+          )}
           onCerrar={cerrarModalProducto}
         />
       )}
