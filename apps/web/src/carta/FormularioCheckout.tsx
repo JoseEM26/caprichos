@@ -105,7 +105,7 @@ export function FormularioCheckout({
         lineas: lineas.map((l) => ({ productoId: l.productoId, cantidad: l.cantidad, subtotal: l.subtotal, precioUnitario: l.precioUnitario })),
         cuponCodigo: cuponAplicado?.codigo,
       })
-      .then((r) => vigente && setPromos({ total: r.descuentoTotal, detalles: r.detalles }))
+      .then((r) => vigente && setPromos({ total: Number(r?.descuentoTotal) || 0, detalles: Array.isArray(r?.detalles) ? r.detalles : [] }))
       .catch(() => vigente && setPromos({ total: 0, detalles: [] }));
     return () => {
       vigente = false;

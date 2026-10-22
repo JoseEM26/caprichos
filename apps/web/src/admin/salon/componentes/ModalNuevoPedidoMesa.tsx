@@ -2,7 +2,8 @@ import { useEffect, useState, useMemo } from 'react';
 import { Confirmar } from '../../../comun/Confirmar';
 import { Cargando } from '../../../comun/Cargando';
 import { CategoriaCarta, ProductoCarta, OpcionCarta as OpcionProducto } from '../../../carta/tipos';
-import { MesaSalon, PisoSalon } from '../tipos';
+import { ElementoPlano, MesaSalon, PisoPlano, PisoSalon } from '../tipos';
+import { CuadriculaPlano } from './CuadriculaPlano';
 import { VentanaOpcionesProducto, ProductoConfigurado } from './VentanaOpcionesProducto';
 import { ModalLiberarMesa } from './ModalLiberarMesa';
 import { salonApi } from '../api';
@@ -79,6 +80,18 @@ export function ModalNuevoPedidoMesa({
     pisosActivos[0]?.id || pisos[0]?.id || '1',
   );
 
+  // Dibujo del plano (paredes, cocina, barra…): viene de /admin/plano; las mesas y su estado, de /admin/salon/mesas
+  const [planoPisos, setPlanoPisos] = useState<PisoPlano[]>([]);
+  useEffect(() => {
+    let vigente = true;
+    Promise.resolve(salonApi.obtenerPlano?.())
+      .then((r) => vigente && setPlanoPisos(r || []))
+      .catch(() => vigente && setPlanoPisos([]));
+    return () => {
+      vigente = false;
+    };
+  }, []);
+
   // Datos cliente (para llevar o delivery)
   const [cliNombre, setCliNombre] = useState('');
   const [cliTelefono, setCliTelefono] = useState('');
@@ -143,6 +156,25 @@ export function ModalNuevoPedidoMesa({
   // Mesas del piso actual
   const pisoActual = pisos.find((p) => p.id === pisoActivoId) || pisos[0];
   const mesasPiso = pisoActual?.mesas || [];
+  const planoActual = planoPisos.find((p) => p.id === pisoActivoId) || planoPisos[0];
+  // sin dibujo del plano (o si falla), las mesas se dibujan con sus coordenadas
+  const elementosPlano: ElementoPlano[] = useMemo(() => {
+    const base = (planoActual?.elementos || []).filter((e) => e.activo !== false);
+    if (base.length > 0) return base;
+    return mesasPiso.map((m) => ({
+      id: m.id,
+      pisoId: m.pisoId,
+      tipo: 'MESA',
+      nombre: m.nombre,
+      x: m.x,
+      y: m.y,
+      ancho: m.ancho,
+      alto: m.alto,
+      numero: m.numero,
+      asientos: m.asientos,
+      activo: m.activo,
+    }));
+  }, [planoActual, mesasPiso]);
 
   // Todas las mesas
   const todasLasMesas = useMemo(() => pisos.flatMap((p) => p.mesas || []), [pisos]);
@@ -178,6 +210,7 @@ export function ModalNuevoPedidoMesa({
 
     if (modoPlano === 'one') {
       setMesasSeleccionadas([mesa.id]);
+      setPaso('items');
     } else {
       // Juntar varias mesas
       setMesasSeleccionadas((prev) => {
@@ -843,7 +876,7 @@ export function ModalNuevoPedidoMesa({
                       marginRight: '4px',
                     }}
                   />
-                  Ocupada ahora
+                  Ocupada
                 </span>
                 <span>
                   <b
@@ -860,108 +893,56 @@ export function ModalNuevoPedidoMesa({
                   />
                   Reservada (R)
                 </span>
-                <span>
-                  <b
-                    style={{
-                      display: 'inline-block',
-                      width: '14px',
-                      height: '14px',
-                      borderRadius: '4px',
-                      background: '#0B2C3E',
-                      verticalAlign: 'middle',
-                      marginRight: '4px',
-                    }}
-                  />
-                  Elegida
-                </span>
+                {modoPlano === 'one' && <span>Toca una mesa libre para continuar.</span>}
               </div>
 
-              {/* Cuadrícula interactiva de mesas */}
-              <div
-                style={{
-                  maxWidth: '100%',
-                  overflowX: 'auto',
-                  border: '1px solid var(--cp-line)',
-                  borderRadius: '12px',
-                  padding: '10px',
-                  background: 'var(--cp-white)',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))',
-                    gap: '10px',
-                  }}
-                >
-                  {mesasPiso.map((m) => {
-                    const elegida = mesasSeleccionadas.includes(m.id);
-                    const ocupada = m.estado === 'OCUPADA';
-                    const reservada = !!m.reserva;
-
-                    let bg = 'var(--cp-white)';
-                    let fg = 'var(--cp-navy)';
-                    let bd = 'var(--cp-ok)';
-
-                    if (elegida) {
-                      bg = 'var(--cp-navy)';
-                      fg = 'var(--cp-cream)';
-                      bd = 'var(--cp-navy)';
-                    } else if (ocupada) {
-                      bg = '#F6C9A5';
-                      bd = 'var(--cp-orange)';
-                    } else if (reservada) {
-                      bg = '#F9E0B5';
-                      bd = 'var(--cp-gold)';
-                    } else {
-                      bg = 'var(--cp-greenbg)';
-                      bd = 'var(--cp-ok)';
-                    }
-
-                    return (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => handleClicMesa(m)}
-                        style={{
-                          minHeight: '74px',
-                          borderRadius: '12px',
-                          border: `2px solid ${bd}`,
-                          background: bg,
-                          color: fg,
-                          padding: '8px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '2px',
-                          cursor: 'pointer',
-                          fontWeight: 800,
-                        }}
-                      >
-                        <span style={{ fontSize: '15px' }}>
+              {/* Mesas libres: atajo en chips, igual que el mockup */}
+              {modoPlano !== 'free' && (
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-navy)' }}>Mesas libres</span>
+                  {mesasPiso
+                    .filter((m) => m.estado !== 'OCUPADA')
+                    .map((m) => {
+                      const elegida = mesasSeleccionadas.includes(m.id);
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => handleClicMesa(m)}
+                          style={{
+                            minHeight: '44px',
+                            padding: '0 14px',
+                            borderRadius: '9999px',
+                            border: `1.5px solid ${elegida ? 'var(--cp-navy)' : 'var(--cp-ok)'}`,
+                            background: elegida ? 'var(--cp-navy)' : 'var(--cp-greenbg)',
+                            color: elegida ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                            fontWeight: 700,
+                            fontSize: '14px',
+                            cursor: 'pointer',
+                          }}
+                        >
                           {m.nombre || `Mesa ${m.numero}`}
-                        </span>
-                        <span style={{ fontSize: '11px', fontWeight: 600 }}>
-                          {m.asientos || 4} pers.
-                        </span>
-                        {reservada && !elegida && (
-                          <span style={{ fontSize: '11px', color: 'var(--cp-rust)' }}>
-                            (R: {m.reserva?.hora || 'Res.'})
-                          </span>
-                        )}
-                        {ocupada && !elegida && (
-                          <span style={{ fontSize: '10px', color: 'var(--cp-rust)' }}>
-                            Ocupada
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
+                        </button>
+                      );
+                    })}
                 </div>
+              )}
+
+              {/* El plano del local, con sus paredes, cocina, barra y mesas */}
+              <div style={{ maxWidth: '100%', overflowX: 'auto', display: 'flex', justifyContent: 'center' }}>
+                <CuadriculaPlano
+                  columnas={planoActual?.cuadriculaAncho ?? planoActual?.cuadricula_ancho ?? pisoActual?.cuadricula_ancho ?? 20}
+                  filas={planoActual?.cuadriculaAlto ?? planoActual?.cuadricula_alto ?? pisoActual?.cuadricula_alto ?? 12}
+                  elementos={elementosPlano}
+                  modoSalon
+                  mesasSalon={mesasPiso}
+                  mesasSeleccionadasIds={mesasSeleccionadas}
+                  onSeleccionarMesaSalon={handleClicMesa}
+                />
               </div>
 
-              {/* Barra inferior de confirmación de mesas */}
+              {/* Barra inferior de confirmación de mesas (solo al juntar varias) */}
+              {modoPlano === 'join' && (
               <div
                 style={{
                   display: 'flex',
@@ -976,7 +957,7 @@ export function ModalNuevoPedidoMesa({
                 <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--cp-navy)' }}>
                   {mesasSeleccionadas.length > 0
                     ? `Mesas elegidas: ${textoMesas} · ${asientosSeleccionados} asientos`
-                    : 'Toca una mesa para seleccionarla'}
+                    : 'Toca las mesas que vas a juntar'}
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px' }}>
@@ -1022,6 +1003,7 @@ export function ModalNuevoPedidoMesa({
                   </button>
                 </div>
               </div>
+              )}
             </div>
           )}
 

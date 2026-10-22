@@ -293,18 +293,11 @@ describe('Módulo Salón (Ola F5: Plano, Pedido del mozo y Reservas)', () => {
       />,
     );
 
-    // En el paso 1 sin mesa seleccionada, el botón "Continuar a la carta" está deshabilitado
-    const botonContinuar = screen.getByRole('button', {
-      name: 'Continuar a la carta',
-    });
-    expect(botonContinuar).toBeDisabled();
+    // Con «Tomar pedido» no hay botón de continuar: se elige una mesa libre y sigue la carta (como el mockup)
+    expect(screen.queryByRole('button', { name: 'Continuar a la carta' })).toBeNull();
 
-    // Seleccionar mesa 1
-    const botonMesa1 = screen.getByRole('button', { name: /Mesa 1/i });
-    fireEvent.click(botonMesa1);
-
-    expect(botonContinuar).not.toBeDisabled();
-    fireEvent.click(botonContinuar);
+    // Seleccionar mesa 1 (atajo de «Mesas libres»)
+    fireEvent.click(screen.getByRole('button', { name: /Mesa 1/i }));
 
     // En el paso 2 sin productos, el botón "Enviar directo a cocina" está deshabilitado
     const botonEnviar = screen.getByRole('button', {

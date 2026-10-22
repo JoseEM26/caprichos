@@ -400,8 +400,11 @@ export function CuadriculaPlano({
                   maxWidth: '100%',
                 }}
               >
-                {elem.nombre ||
-                  (elem.numero ? `Mesa ${elem.numero}` : config.nombre)}
+                {modoSalon && esMesa && elem.numero
+                  ? elem.numero
+                  : modoSalon && elem.tipo === 'PARED'
+                    ? ''
+                    : elem.nombre || (elem.numero ? `Mesa ${elem.numero}` : config.nombre)}
               </span>
 
               {/* Subtítulo: asientos o estado */}
@@ -414,14 +417,12 @@ export function CuadriculaPlano({
                     lineHeight: '11px',
                   }}
                 >
-                  {modoSalon && mesaSalon?.estado === 'OCUPADA'
-                    ? mesaSalon.pedidoCodigo || 'Ocupada'
-                    : `${elem.asientos} as.`}
+                  {modoSalon && mesaSalon?.estado === 'OCUPADA' ? 'ocupada' : `${elem.asientos} pers.`}
                 </span>
               )}
 
               {/* Mozo si está ocupada en salón */}
-              {modoSalon && mesaSalon?.estado === 'OCUPADA' && mesaSalon.mozo && (
+              {false && modoSalon && mesaSalon?.estado === 'OCUPADA' && mesaSalon?.mozo && (
                 <span
                   style={{
                     fontSize: '8px',
@@ -433,7 +434,7 @@ export function CuadriculaPlano({
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  {mesaSalon.mozo.split(' ')[0]}
+                  {mesaSalon?.mozo?.split(' ')[0]}
                 </span>
               )}
 
