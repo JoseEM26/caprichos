@@ -1,5 +1,6 @@
 import React from 'react';
-import { Escritorio } from './Escritorio';
+import { EscritorioView } from './escritorio';
+import { InformesView, IndicadoresView, MapaEntregasView } from './informes';
 import { Proximamente } from './Proximamente';
 import { UsuariosView, AuditoriaView } from './usuarios';
 import { ConfiguracionLocalView, ZonasRepartoView } from './configuracion';
@@ -9,6 +10,10 @@ import { RepartosView } from './repartos';
 import { CierreView } from './cierre';
 import { ComprobantesView, ReclamosAdminView } from './comprobantes';
 import { PlanoView, ReservasView } from './salon';
+import { StockView } from './stock';
+import { ProductosView, ListasCategoriasView } from './catalogo';
+import { ClientesAdminView } from './clientes';
+import { OfertasAdminView } from './ofertas';
 
 export type GrupoModulo =
   | 'Operación'
@@ -49,7 +54,7 @@ export const MODULOS: DefinicionModulo[] = [
     nombre: 'Escritorio',
     grupo: 'Operación',
     ruta: '/admin',
-    componente: Escritorio,
+    componente: EscritorioView,
     icono: 'escritorio',
   },
   {
@@ -140,8 +145,8 @@ export const MODULOS: DefinicionModulo[] = [
     nombre: 'Clientes',
     grupo: 'Clientes y ventas',
     ruta: '/admin/clientes',
-    permisoMinimo: 'catalogo/ver',
-    componente: crearProximamente('Clientes'),
+    permisoMinimo: 'clientes/ver',
+    componente: ClientesAdminView,
     icono: 'clientes',
   },
   {
@@ -159,7 +164,7 @@ export const MODULOS: DefinicionModulo[] = [
     grupo: 'Clientes y ventas',
     ruta: '/admin/productos',
     permisoMinimo: 'catalogo/ver',
-    componente: crearProximamente('Productos'),
+    componente: ProductosView,
     icono: 'productos',
   },
   {
@@ -168,7 +173,7 @@ export const MODULOS: DefinicionModulo[] = [
     grupo: 'Clientes y ventas',
     ruta: '/admin/listas',
     permisoMinimo: 'catalogo/ver',
-    componente: crearProximamente('Listas y categorías'),
+    componente: ListasCategoriasView,
     icono: 'listas',
   },
   {
@@ -176,8 +181,8 @@ export const MODULOS: DefinicionModulo[] = [
     nombre: 'Ofertas y descuentos',
     grupo: 'Clientes y ventas',
     ruta: '/admin/ofertas',
-    permisoMinimo: 'catalogo/ver',
-    componente: crearProximamente('Ofertas y descuentos'),
+    permisoMinimo: 'ofertas/ver',
+    componente: OfertasAdminView,
     icono: 'ofertas',
   },
 
@@ -206,7 +211,7 @@ export const MODULOS: DefinicionModulo[] = [
     grupo: 'Compras y stock',
     ruta: '/admin/stock',
     permisoMinimo: 'stock/ver',
-    componente: crearProximamente('Stock y recetas'),
+    componente: StockView,
     icono: 'stock',
   },
 
@@ -217,7 +222,7 @@ export const MODULOS: DefinicionModulo[] = [
     grupo: 'Análisis',
     ruta: '/admin/informes',
     permisoMinimo: 'auditoria/ver',
-    componente: crearProximamente('Informes'),
+    componente: InformesView,
     icono: 'informes',
   },
   {
@@ -226,7 +231,7 @@ export const MODULOS: DefinicionModulo[] = [
     grupo: 'Análisis',
     ruta: '/admin/mapa',
     permisoMinimo: 'zonas/ver',
-    componente: crearProximamente('Mapa de entregas'),
+    componente: MapaEntregasView,
     icono: 'mapa',
   },
   {
@@ -235,7 +240,7 @@ export const MODULOS: DefinicionModulo[] = [
     grupo: 'Análisis',
     ruta: '/admin/indicadores',
     permisoMinimo: 'auditoria/ver',
-    componente: crearProximamente('Indicadores'),
+    componente: IndicadoresView,
     icono: 'indicadores',
   },
 

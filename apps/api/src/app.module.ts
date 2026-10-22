@@ -26,7 +26,11 @@ import { ComprobantesModule } from './modulos/comprobantes/comprobantes.module';
 import { ReclamosModule } from './modulos/reclamos/reclamos.module';
 import { NotificacionesModule } from './modulos/notificaciones/notificaciones.module';
 import { DireccionesModule } from './modulos/direcciones/direcciones.module';
+import { StockModule } from './modulos/stock/stock.module';
 
+import { ClientesModule } from './modulos/clientes/clientes.module';
+import { OfertasModule } from './modulos/ofertas/ofertas.module';
+import { InformesModule } from './modulos/informes/informes.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -57,6 +61,10 @@ import { DireccionesModule } from './modulos/direcciones/direcciones.module';
     ReclamosModule,
     DireccionesModule,
     NotificacionesModule,
+    InformesModule,
+    OfertasModule,
+    ClientesModule,
+    StockModule,
   ],
   providers: [
     PinoLoggerService,

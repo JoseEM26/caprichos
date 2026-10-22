@@ -4,7 +4,7 @@ import { Ingresar } from './admin/Ingresar';
 import { CambiarClave } from './admin/CambiarClave';
 import { AdminShell } from './admin/AdminShell';
 import { MODULOS } from './admin/modulos';
-import { Escritorio } from './admin/Escritorio';
+import { Escritorio } from './admin/escritorio';
 import { Perfil } from './admin/Perfil';
 import { CartaPublica } from './carta/CartaPublica';
 import { TerminosPage, PrivacidadPage, ReclamosPublicoPage } from './carta/legal';
@@ -50,7 +50,7 @@ export function RutasApp() {
         }
       >
         <Route index element={<Escritorio />} />
-        <Route path="escritorio" element={<Escritorio />} />
+        <Route path="escritorio" element={<Navigate to="/admin" replace />} />
         <Route path="perfil" element={<Perfil />} />
 
         {MODULOS.filter((m) => m.ruta !== '/admin').map((m) => {
