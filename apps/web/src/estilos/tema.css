@@ -63,3 +63,6 @@ input, select, textarea {
   0%, 80%, 100% { transform: scale(0); opacity: 0.3; }
   40% { transform: scale(1); opacity: 1; }
 }
+
+.cp-tarjeta { transition: box-shadow 0.15s ease, transform 0.15s ease; }
+.cp-tarjeta:hover { box-shadow: 0 10px 24px rgba(11, 44, 62, 0.18); transform: translateY(-2px); }

@@ -1,5 +1,6 @@
 import { ProductoCarta } from './tipos';
 import { useCarrito } from './CarritoContext';
+import { useEsMovil } from './useEsMovil';
 
 interface TarjetaProductoProps {
   producto: ProductoCarta;
@@ -7,6 +8,7 @@ interface TarjetaProductoProps {
 
 export function TarjetaProducto({ producto }: TarjetaProductoProps) {
   const { abrirModalProducto } = useCarrito();
+  const movil = useEsMovil();
 
   const estaAgotado = (() => {
     if (!producto.disponible) return true;
@@ -43,42 +45,50 @@ export function TarjetaProducto({ producto }: TarjetaProductoProps) {
   return (
     <article
       data-testid={`producto-${producto.id}`}
+      className="cp-tarjeta"
       style={{
         backgroundColor: 'var(--cp-white)',
         border: '1px solid var(--cp-line)',
-        borderRadius: '16px',
-        boxShadow: '0 4px 14px rgba(11, 44, 62, 0.08)',
+        borderRadius: '12px',
+        boxShadow: '0 6px 18px rgba(11, 44, 62, 0.12)',
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
         opacity: estaAgotado ? 0.6 : 1,
-        transition: 'transform 0.15s ease, box-shadow 0.15s ease',
       }}
     >
-      {/* Zona de imagen / iniciales */}
+      {/* Zona de imagen / iniciales: la foto se ve completa (contain) sobre su propia versión difuminada, como en el mockup */}
+      <button
+        type="button"
+        onClick={() => !estaAgotado && abrirModalProducto(producto)}
+        aria-label={`Ver ${producto.nombre}`}
+        style={{ border: 0, padding: 0, background: 'transparent', display: 'block', width: '100%', minHeight: 0, cursor: estaAgotado ? 'default' : 'pointer' }}
+      >
       <div
         style={{
           position: 'relative',
           width: '100%',
-          // sin foto: franja compacta con las iniciales (en celular no ocupa media pantalla)
-          aspectRatio: producto.fotoUrl ? '16/10' : undefined,
-          height: producto.fotoUrl ? undefined : '56px',
+          aspectRatio: '4/3',
           backgroundColor: 'var(--cp-sand)',
           overflow: 'hidden',
         }}
       >
         {producto.fotoUrl ? (
-          <img
-            src={producto.fotoUrl}
-            alt={producto.nombre}
-            loading="lazy"
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              display: 'block',
-            }}
-          />
+          <>
+            <img
+              src={producto.fotoUrl}
+              alt=""
+              aria-hidden="true"
+              loading="lazy"
+              style={{ position: 'absolute', left: '-8%', top: '-8%', width: '116%', height: '116%', objectFit: 'cover', filter: 'blur(16px)', opacity: 0.5 }}
+            />
+            <img
+              src={producto.fotoUrl}
+              alt={producto.nombre}
+              loading="lazy"
+              style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'center' }}
+            />
+          </>
         ) : (
           <div
             style={{
@@ -89,8 +99,8 @@ export function TarjetaProducto({ producto }: TarjetaProductoProps) {
               justifyContent: 'center',
               fontFamily: 'var(--fuente-titulos)',
               fontWeight: 800,
-              fontSize: '24px',
-              color: 'var(--cp-soft)',
+              fontSize: '36px',
+              color: 'var(--cp-navy)',
               backgroundColor: 'var(--cp-sand)',
             }}
           >
@@ -119,11 +129,12 @@ export function TarjetaProducto({ producto }: TarjetaProductoProps) {
           </div>
         )}
       </div>
+      </button>
 
       {/* Cuerpo de la tarjeta */}
       <div
         style={{
-          padding: '14px 16px',
+          padding: movil ? '12px' : '16px',
           display: 'flex',
           flexDirection: 'column',
           flex: 1,
@@ -133,8 +144,8 @@ export function TarjetaProducto({ producto }: TarjetaProductoProps) {
         <h3
           style={{
             fontFamily: 'var(--fuente-titulos)',
-            fontWeight: 800,
-            fontSize: '15px',
+            fontWeight: 700,
+            fontSize: movil ? '13px' : '15px',
             lineHeight: '20px',
             color: 'var(--cp-navy)',
           }}
@@ -151,7 +162,7 @@ export function TarjetaProducto({ producto }: TarjetaProductoProps) {
               color: 'var(--cp-soft)',
               flex: 1,
               display: '-webkit-box',
-              WebkitLineClamp: 3,
+              WebkitLineClamp: movil ? 2 : 4,
               WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
             }}
@@ -174,7 +185,7 @@ export function TarjetaProducto({ producto }: TarjetaProductoProps) {
             style={{
               fontFamily: 'var(--fuente-titulos)',
               fontWeight: 800,
-              fontSize: '15px',
+              fontSize: movil ? '15px' : '18px',
               color: 'var(--cp-rust)',
             }}
           >

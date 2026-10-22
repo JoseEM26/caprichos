@@ -10,13 +10,32 @@ import {
 } from './tipos';
 import { CarritoProvider, useCarrito } from './CarritoContext';
 import { CabeceraCarta } from './CabeceraCarta';
-import { ChipsCategorias } from './ChipsCategorias';
+import type { PaginaCarta } from './CabeceraCarta';
+import { PortadaCarta } from './PortadaCarta';
+import { PaginaConocenos } from './PaginaConocenos';
+import { PaginaNovedades } from './PaginaNovedades';
+import { CuentaProvider } from './cuenta/CuentaContext';
+import { PanelCuenta } from './cuenta/PanelCuenta';
+import { useEsMovil } from './useEsMovil';
 import { TarjetaProducto } from './TarjetaProducto';
 import { VentanaProducto } from './VentanaProducto';
 import { CajonCarrito } from './CajonCarrito';
 import { FormularioCheckout } from './FormularioCheckout';
 import { PantallaConfirmacion } from './PantallaConfirmacion';
 import { NotificacionAgregado } from './NotificacionAgregado';
+
+// ponytail: notas fijas por categoría; el diseñador de la carta (FT-CON-02) las hará editables
+const NOTAS_CATEGORIA: Record<string, string> = {
+  COMBOS: 'Precio por tamaño de bebida',
+  FRAPPES: 'Todos al mismo precio: 12 oz S/ 14.50 · 16 oz S/ 16.50 · 21 oz S/ 17.50',
+  ICED: 'Bebidas frías con hielo',
+  FROZEN: 'Solo tamaño extra de 21 oz',
+  CALIENTES: 'Servidas en taza de vidrio',
+  WAFFLES: 'Completo o 1/2',
+  SALADOS: 'Hamburguesas, sándwiches, papas, petit pan y empanadas',
+  CROISSANTS: 'Hojaldrados, hechos a mano',
+  POSTRES: 'Donas, galletas, tortas y postres individuales',
+};
 
 function normalizarTexto(txt: string): string {
   return txt
@@ -33,7 +52,9 @@ function ContenidoCartaPublica() {
   const [error, setError] = useState<string | null>(null);
 
   const [busqueda, setBusqueda] = useState('');
-  const [categoriaActivaId, setCategoriaActivaId] = useState<string | null>(null);
+  const [categoriaActivaId, setCategoriaActivaId] = useState<string>('todo');
+  const [pagina, setPagina] = useState<PaginaCarta>('carta');
+  const movil = useEsMovil();
 
   const { productoEnModal, cerrarModalProducto } = useCarrito();
 
@@ -51,9 +72,6 @@ function ContenidoCartaPublica() {
       if (resEstado) setEstadoLocal(resEstado);
       if (resLocal) setDatosLocal(resLocal);
 
-      if (Array.isArray(resCarta) && resCarta.length > 0) {
-        setCategoriaActivaId(resCarta[0].id);
-      }
     } catch (err) {
       setError(
         err instanceof Error
@@ -91,14 +109,26 @@ function ContenidoCartaPublica() {
       .filter((cat) => cat.productos.length > 0);
   }, [categorias, busqueda]);
 
-  const seleccionarCategoria = (id: string) => {
-    setCategoriaActivaId(id);
-    const elem = document.getElementById(`categoria-${id}`);
-    if (elem) {
-      const yOffset = -140; // compensación por barra de cabecera y chips
-      const y = elem.getBoundingClientRect().top + window.pageYOffset + yOffset;
-      window.scrollTo({ top: y, behavior: 'smooth' });
-    }
+  // Con «TODO» se ve la portada y todas las secciones; con una categoría, solo esa (como el mockup)
+  const secciones = useMemo(() => {
+    if (busqueda.trim() || categoriaActivaId === 'todo') return categoriasFiltradas;
+    return categoriasFiltradas.filter((c) => c.id === categoriaActivaId);
+  }, [categoriasFiltradas, categoriaActivaId, busqueda]);
+
+  const fotoDestacada = useMemo(() => {
+    const prod = categorias.flatMap((c) => c.productos).find((p) => p.nombre === 'FRAPPE MARACUYÁ' && p.fotoUrl);
+    return prod?.fotoUrl ?? categorias.flatMap((c) => c.productos).find((p) => p.fotoUrl)?.fotoUrl ?? null;
+  }, [categorias]);
+
+  const irACarta = () => {
+    setPagina('carta');
+    setCategoriaActivaId('todo');
+    setTimeout(() => document.getElementById('carta-lista')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+  };
+
+  const cambiarPagina = (p: PaginaCarta) => {
+    setPagina(p);
+    window.scrollTo({ top: 0 });
   };
 
   if (cargando) {
@@ -147,31 +177,48 @@ function ContenidoCartaPublica() {
         flexDirection: 'column',
       }}
     >
-      {/* Cabecera pegajosa */}
+      {/* Cabecera pegajosa con las categorías dentro */}
       <CabeceraCarta
         busqueda={busqueda}
         onCambioBusqueda={setBusqueda}
         estadoLocal={estadoLocal}
+        datosLocal={datosLocal}
+        pagina={pagina}
+        onPagina={cambiarPagina}
+        categorias={categorias.map((c) => ({ id: c.id, nombre: c.nombre }))}
+        categoriaActivaId={categoriaActivaId}
+        onCategoria={(id) => {
+          setCategoriaActivaId(id);
+          setBusqueda('');
+        }}
       />
 
-      {/* Chips de categorías */}
-      <ChipsCategorias
-        categorias={categoriasFiltradas}
-        categoriaActivaId={categoriaActivaId}
-        onSeleccionarCategoria={seleccionarCategoria}
-      />
+      {pagina === 'conocenos' && <PaginaConocenos datosLocal={datosLocal} estadoLocal={estadoLocal} />}
+      {pagina === 'novedades' && <PaginaNovedades onVerCarta={irACarta} />}
+
+      {pagina === 'carta' && !busqueda.trim() && categoriaActivaId === 'todo' && (
+        <PortadaCarta
+          datosLocal={datosLocal}
+          estadoLocal={estadoLocal}
+          fotoDestacada={fotoDestacada}
+          onPedir={irACarta}
+          onVerCarta={irACarta}
+        />
+      )}
 
       {/* Lista de productos por categoría */}
+      {pagina === 'carta' && (
       <main
+        id="carta-lista"
         style={{
           maxWidth: '1200px',
           width: '100%',
           margin: '0 auto',
-          padding: '20px 16px 64px',
+          padding: movil ? '8px 16px 48px' : '24px 24px 64px',
           flex: 1,
         }}
       >
-        {categoriasFiltradas.length === 0 ? (
+        {secciones.length === 0 ? (
           <div
             style={{
               textAlign: 'center',
@@ -212,12 +259,12 @@ function ContenidoCartaPublica() {
             </button>
           </div>
         ) : (
-          categoriasFiltradas.map((cat) => (
+          secciones.map((cat) => (
             <section
               key={cat.id}
               id={`categoria-${cat.id}`}
               style={{
-                marginTop: '28px',
+                marginTop: movil ? '24px' : '32px',
                 scrollMarginTop: '140px',
               }}
             >
@@ -233,19 +280,18 @@ function ContenidoCartaPublica() {
                 <span
                   style={{
                     flex: 1,
-                    height: '2.5px',
+                    height: '3px',
                     backgroundColor: 'var(--cp-orange)',
                     borderRadius: '2px',
-                    opacity: 0.85,
                   }}
                 />
                 <h2
                   style={{
                     fontFamily: 'var(--fuente-titulos)',
                     fontWeight: 800,
-                    fontSize: '22px',
-                    lineHeight: '26px',
-                    letterSpacing: '0.04em',
+                    fontSize: movil ? '22px' : '28px',
+                    lineHeight: movil ? '28px' : '34px',
+                    letterSpacing: '0.03em',
                     color: 'var(--cp-navy)',
                     textAlign: 'center',
                   }}
@@ -255,19 +301,24 @@ function ContenidoCartaPublica() {
                 <span
                   style={{
                     flex: 1,
-                    height: '2.5px',
+                    height: '3px',
                     backgroundColor: 'var(--cp-orange)',
                     borderRadius: '2px',
-                    opacity: 0.85,
                   }}
                 />
               </div>
+
+              {NOTAS_CATEGORIA[cat.nombre.toUpperCase()] && (
+                <div style={{ textAlign: 'center', fontSize: '13px', color: 'var(--cp-soft)', margin: '-8px 0 16px' }}>
+                  {NOTAS_CATEGORIA[cat.nombre.toUpperCase()]}
+                </div>
+              )}
 
               {/* Grid de productos responsiva */}
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))',
                   gap: '16px',
                 }}
               >
@@ -279,6 +330,7 @@ function ContenidoCartaPublica() {
           ))
         )}
       </main>
+      )}
 
       {/* Pie informativo */}
       <footer
@@ -322,6 +374,9 @@ function ContenidoCartaPublica() {
 
       {/* Notificación Toast "Agregado a tu pedido" */}
       <NotificacionAgregado />
+
+      {/* Cuenta del cliente */}
+      <PanelCuenta />
     </div>
   );
 }
@@ -329,7 +384,9 @@ function ContenidoCartaPublica() {
 export function CartaPublica() {
   return (
     <CarritoProvider>
-      <ContenidoCartaPublica />
+      <CuentaProvider>
+        <ContenidoCartaPublica />
+      </CuentaProvider>
     </CarritoProvider>
   );
 }
