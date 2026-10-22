@@ -404,6 +404,9 @@ model Pedido {
   salio_en               DateTime?               @db.Timestamptz
   llego_en               DateTime?               @db.Timestamptz
   motivo_falla           String?
+  // Salón (Ola 6)
+  mesa_nombre            String?
+  entregado_mesa_en      DateTime?               @db.Timestamptz
 
   party                  Party?                  @relation("ClientePedido", fields: [party_id], references: [id])
   repartidor             Party?                  @relation("RepartidorPedido", fields: [repartidor_party_id], references: [id])
@@ -415,6 +418,8 @@ model Pedido {
   mensajesReparto        MensajeReparto[]
   comandas               ComandaArea[]
   movimientosStock       MovimientoStock[]
+  mesas                  PedidoMesa[]
+  reservas               Reserva[]
 
   @@map("pedido")
 }
@@ -809,6 +814,81 @@ model AjusteOpcion {
   @@id([opcion_id, insumo_id])
   @@map("ajuste_opcion")
 }
+
+// ---------- Ola 6: salón, plano, mesas y reservas (FT-SAL-01..03) ----------
+
+model Piso {
+  id               BigInt          @id @default(autoincrement())
+  nombre           String
+  activo           Boolean         @default(true)
+  cuadricula_ancho Int
+  cuadricula_alto  Int
+  elementos        ElementoPlano[]
+
+  @@map("piso")
+}
+
+model ElementoPlano {
+  id           BigInt        @id @default(autoincrement())
+  piso_id      BigInt
+  tipo         String
+  nombre       String?
+  x            Int
+  y            Int
+  ancho        Int
+  alto         Int
+  numero       Int?
+  asientos     Int?
+  activo       Boolean       @default(true)
+
+  piso         Piso          @relation(fields: [piso_id], references: [id])
+  pedidosMesa  PedidoMesa[]
+  reservasMesa ReservaMesa[]
+
+  @@map("elemento_plano")
+}
+
+model Reserva {
+  id                 BigInt        @id @default(autoincrement())
+  nombre             String
+  telefono           String
+  personas           Int
+  hora               DateTime      @db.Timestamptz
+  tolerancia_min     Int
+  estado             String        @default("ACTIVA")
+  motivo_cancelacion String?
+  pedido_id          BigInt?
+
+  pedido             Pedido?       @relation(fields: [pedido_id], references: [id])
+  mesas              ReservaMesa[]
+
+  @@map("reserva")
+}
+
+model ReservaMesa {
+  id         BigInt         @id @default(autoincrement())
+  reserva_id BigInt
+  mesa_id    BigInt?
+
+  reserva    Reserva        @relation(fields: [reserva_id], references: [id], onDelete: Cascade)
+  mesa       ElementoPlano? @relation(fields: [mesa_id], references: [id], onDelete: SetNull)
+
+  @@map("reserva_mesa")
+}
+
+model PedidoMesa {
+  id          BigInt         @id @default(autoincrement())
+  pedido_id   BigInt
+  mesa_id     BigInt?
+  mesa_nombre String?
+  abierta     Boolean        @default(true)
+
+  pedido      Pedido         @relation(fields: [pedido_id], references: [id], onDelete: Cascade)
+  mesa        ElementoPlano? @relation(fields: [mesa_id], references: [id], onDelete: SetNull)
+
+  @@map("pedido_mesa")
+}
+
 
 
 

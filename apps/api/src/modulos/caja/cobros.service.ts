@@ -1,3 +1,4 @@
+import { SalonService } from '../salon/salon.service';
 import {
   BadRequestException,
   HttpException,
@@ -23,6 +24,7 @@ export class CobrosService {
     private readonly redisService: RedisService,
     private readonly auditoria: AuditoriaService,
     @Optional() private readonly eventosGateway?: EventosGateway,
+    @Optional() private readonly salonService?: SalonService,
   ) {}
 
   private parsearId(id: bigint | string | number): bigint {
@@ -320,6 +322,13 @@ export class CobrosService {
 
       return { cobro: nuevoCobro, pedidoActualizado: pedAct };
     });
+
+    // la mesa se libera al cobrar (RN-CAP-054); si falla no se deshace el cobro: se libera a mano
+    try {
+      await this.salonService?.liberarMesasDePedido(pedido.id);
+    } catch {
+      // idempotente: el mozo o caja pueden liberarla a mano con Sí/No
+    }
 
     // 8. Auditar
     await this.auditoria.registrar({

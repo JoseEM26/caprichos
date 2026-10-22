@@ -65,6 +65,15 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'stock', accion: 'movimientos' },
   { modulo: 'recetas', accion: 'ver' },
   { modulo: 'recetas', accion: 'editar' },
+  // Salón, plano y reservas (Ola 6)
+  { modulo: 'plano', accion: 'ver' },
+  { modulo: 'plano', accion: 'editar' },
+  { modulo: 'mesas', accion: 'ver' },
+  { modulo: 'mesas', accion: 'abrir' },
+  { modulo: 'mesas', accion: 'liberar' },
+  { modulo: 'reservas', accion: 'ver' },
+  { modulo: 'reservas', accion: 'crear' },
+  { modulo: 'reservas', accion: 'editar' },
 ] as const;
 
 export const MATRIZ: Record<string, string[]> = {
@@ -82,6 +91,12 @@ export const MATRIZ: Record<string, string[]> = {
     'repartos/liquidar',
     'cocina/ver',
     'stock/ver',
+    'plano/ver',
+    'mesas/ver',
+    'mesas/liberar',
+    'reservas/ver',
+    'reservas/crear',
+    'reservas/editar',
   ],
   COCINA: [
     'pedidos/ver',
@@ -92,8 +107,21 @@ export const MATRIZ: Record<string, string[]> = {
     'cocina/agotar',
     'cocina/demanda',
   ],
-  MOZO: [],
-  CALLCENTER: [],
+  MOZO: [
+    'plano/ver',
+    'mesas/ver',
+    'mesas/abrir',
+    'mesas/liberar',
+    'reservas/ver',
+    'reservas/crear',
+    'reservas/editar',
+  ],
+  CALLCENTER: [
+    'reservas/ver',
+    'reservas/crear',
+    'reservas/editar',
+    'plano/ver',
+  ],
   ALMACEN: [
     'stock/ver',
     'stock/editar',

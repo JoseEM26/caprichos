@@ -1,5 +1,6 @@
 // El gateway importa @nestjs/jwt (ESM): en las pruebas basta con un doble
 jest.mock('../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {} }));
+jest.mock('../salon/salon.service', () => ({ SalonService: class {} }));
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   BadRequestException,
@@ -10,6 +11,7 @@ import {
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { PedidosEstadoService } from './pedidos-estado.service';
+import { SalonService } from '../salon/salon.service';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
@@ -23,6 +25,7 @@ describe('PedidosEstadoService', () => {
   let redisServiceMock: any;
   let auditoriaMock: any;
   let eventosGatewayMock: any;
+  let salonMock: any;
 
   const adminAuth: UsuarioAutenticado = {
     partyId: 1n,
@@ -80,6 +83,10 @@ describe('PedidosEstadoService', () => {
       registrar: jest.fn().mockResolvedValue(undefined),
     };
 
+    salonMock = {
+      liberarMesasDePedido: jest.fn().mockResolvedValue(0),
+      avisarListo: jest.fn().mockResolvedValue(undefined),
+    };
     eventosGatewayMock = {
       emitirAdmin: jest.fn(),
     };
@@ -91,6 +98,7 @@ describe('PedidosEstadoService', () => {
         { provide: RedisService, useValue: redisServiceMock },
         { provide: AuditoriaService, useValue: auditoriaMock },
         { provide: EventosGateway, useValue: eventosGatewayMock },
+        { provide: SalonService, useValue: salonMock },
       ],
     }).compile();
 
@@ -193,6 +201,21 @@ describe('PedidosEstadoService', () => {
         codigo: 'CP-W001',
         estado: 'PREPARANDO',
       });
+    });
+
+    it('un pedido de MESA que pasa a LISTO avisa al mozo; uno de DELIVERY no', async () => {
+      const mesa = { id: 10n, codigo: 'CP-M001', modalidad: 'MESA', estado: 'PREPARANDO', listo_en: null };
+      prismaMock.pedido.findUnique.mockResolvedValue(mesa);
+      prismaMock.pedido.update.mockResolvedValue({ ...mesa, estado: 'LISTO' });
+      await service.cambiarEstado(10n, { estado: 'LISTO' }, cocinaAuth);
+      expect(salonMock.avisarListo).toHaveBeenCalledWith(10n);
+
+      salonMock.avisarListo.mockClear();
+      const delivery = { ...mesa, id: 11n, codigo: 'CP-W011', modalidad: 'DELIVERY' };
+      prismaMock.pedido.findUnique.mockResolvedValue(delivery);
+      prismaMock.pedido.update.mockResolvedValue({ ...delivery, estado: 'LISTO' });
+      await service.cambiarEstado(11n, { estado: 'LISTO' }, cocinaAuth);
+      expect(salonMock.avisarListo).not.toHaveBeenCalled();
     });
 
     it('debe pasar de PREPARANDO a LISTO', async () => {
@@ -436,6 +459,27 @@ describe('PedidosEstadoService', () => {
           }),
         );
       }
+    });
+
+    it('anular un pedido libera sus mesas y un fallo al liberar no deshace la anulación', async () => {
+      const supervisorHash = await argon2.hash('654321');
+      const pedidoMock = { id: 10n, codigo: 'CP-M010', modalidad: 'MESA', estado: 'COLA' };
+      prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);
+      prismaMock.userAccount.findMany.mockResolvedValue([
+        { id: 99n, party_id: 99n, rol: 'ADMIN', activo: true, pin_hash: supervisorHash },
+      ]);
+      prismaMock.pedido.update.mockResolvedValue({ ...pedidoMock, estado: 'ANULADO' });
+      salonMock.liberarMesasDePedido.mockRejectedValue(new Error('falló al liberar'));
+
+      const res = await service.cambiarEstado(
+        10n,
+        { estado: 'ANULADO', motivo: 'Cliente desistió de compra' },
+        adminAuth,
+        '654321',
+      );
+
+      expect(res.estado).toBe('ANULADO');
+      expect(salonMock.liberarMesasDePedido).toHaveBeenCalledWith(10n);
     });
 
     it('anula exitosamente con PIN correcto de supervisor ADMIN', async () => {

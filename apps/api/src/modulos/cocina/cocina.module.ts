@@ -3,8 +3,10 @@ import { CocinaController } from './cocina.controller';
 import { ComandasService } from './comandas.service';
 import { AgotadosService } from './agotados.service';
 import { AltaDemandaService } from './alta-demanda.service';
+import { SalonModule } from '../salon/salon.module';
 
 @Module({
+  imports: [SalonModule],
   controllers: [CocinaController],
   providers: [ComandasService, AgotadosService, AltaDemandaService],
   exports: [ComandasService, AgotadosService, AltaDemandaService],

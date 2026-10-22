@@ -425,5 +425,56 @@ describe('PedidosService', () => {
         );
       }
     });
+
+    describe('origen MOZO', () => {
+      it('crea pedido con canal MOZO, omite chequeo de carta cerrada y no exige cliente ni teléfono', async () => {
+        // Carta cerrada
+        localServiceMock.obtenerEstadoCarta.mockResolvedValue({
+          abierta: false,
+          motivo: 'FUERA_HORARIO',
+          texto: 'Local cerrado',
+        });
+
+        const pedidoMozoDto: any = {
+          modalidad: 'MESA',
+          lineas: pedidoBaseDto.lineas,
+          pago: { metodo: 'EFECTIVO' },
+        };
+
+        let pedidoCreadoData: any = null;
+        prismaMock.pedido.create.mockImplementation(({ data }: any) => {
+          pedidoCreadoData = data;
+          return Promise.resolve({
+            id: 200n,
+            codigo: 'CP-W099',
+            estado: 'COLA',
+            subtotal: Number(data.subtotal),
+            envio: 0,
+            total: Number(data.total),
+          });
+        });
+
+        let callbackEjecutado = false;
+        const res = await service.crear(pedidoMozoDto, 'idemp-mozo-1', {
+          canal: 'MOZO',
+          usuarioPartyId: 55n,
+          mesasIds: [3n],
+          mesaNombre: 'Mesa 3',
+          enTransaccion: async () => {
+            callbackEjecutado = true;
+          },
+        });
+
+        expect(res.codigo).toBe('CP-W099');
+        expect(res.estado).toBe('COLA');
+        expect(res.mensaje).toBe('Pedido enviado a cocina');
+        expect(callbackEjecutado).toBe(true);
+        expect(pedidoCreadoData.canal).toBe('MOZO');
+        expect(pedidoCreadoData.party_id).toBe(55n);
+        expect(pedidoCreadoData.mesa_nombre).toBe('Mesa 3');
+        expect(pedidoCreadoData.cliente_nombre).toBe('Mesa 3');
+        expect(pedidoCreadoData.cliente_telefono).toBeNull();
+      });
+    });
   });
 });

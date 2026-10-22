@@ -1,3 +1,4 @@
+import { SalonService } from '../salon/salon.service';
 import {
   BadRequestException,
   ConflictException,
@@ -31,6 +32,7 @@ export class ComandasService {
     @Optional()
     @Inject('DESCUENTO_PEDIDO')
     private readonly descuentoService?: DescuentoPedidoHook,
+    @Optional() private readonly salonService?: SalonService,
   ) {}
 
   private parsearId(id: bigint | string | number, entidad = 'pedido'): bigint {
@@ -483,6 +485,15 @@ export class ComandasService {
         codigo: pedido.codigo,
         estado: 'LISTO',
       });
+
+      // el mozo que tomó el pedido de mesa recibe el aviso de que está listo (RQ-SAL-02-10)
+      if (pedido.modalidad === 'MESA') {
+        try {
+          await this.salonService?.avisarListo(pedido.id);
+        } catch {
+          // el aviso es informativo
+        }
+      }
     }
 
     // Auditoría de despeje de comanda

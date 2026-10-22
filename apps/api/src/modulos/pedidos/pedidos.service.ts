@@ -14,6 +14,15 @@ import { ZonasService } from '../zonas/zonas.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { CrearPedidoDto } from './dto/crear-pedido.dto';
 
+export interface OrigenPedido {
+  canal?: 'CARTA' | 'MOZO';
+  usuarioPartyId?: bigint | string | number;
+  mesasIds?: (bigint | string | number)[];
+  mesaNombre?: string;
+  omitirChequeoCarta?: boolean;
+  enTransaccion?: (tx: Prisma.TransactionClient, pedido: any) => Promise<void>;
+}
+
 @Injectable()
 export class PedidosService {
   constructor(
@@ -26,7 +35,11 @@ export class PedidosService {
   /**
    * Crea un nuevo pedido desde la carta virtual con validaciones completas y cálculo en el servidor.
    */
-  async crear(dto: CrearPedidoDto, idempotencyKey?: string) {
+  async crear(
+    dto: CrearPedidoDto,
+    idempotencyKey?: string,
+    origen?: OrigenPedido,
+  ) {
     if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.trim().length === 0) {
       throw new BadRequestException({
         codigo: 'CLAVE_REQUERIDA',
@@ -49,33 +62,58 @@ export class PedidosService {
         subtotal: Number(pedidoExistente.subtotal),
         envio: pedidoExistente.envio !== null ? Number(pedidoExistente.envio) : null,
         total: Number(pedidoExistente.total),
-        mensaje: 'Un asesor te escribirá para coordinar el pago',
+        mensaje:
+          origen?.canal === 'MOZO'
+            ? 'Pedido enviado a cocina'
+            : 'Un asesor te escribirá para coordinar el pago',
       };
     }
 
-    // 2. Comprobar que la carta esté abierta y sin pausa
-    const estadoCarta = await this.localService.obtenerEstadoCarta();
-    if (!estadoCarta.abierta) {
-      throw new HttpException(
-        { codigo: 'CARTA_CERRADA', mensaje: estadoCarta.texto },
-        HttpStatus.CONFLICT,
-      );
+    // 2. Comprobar que la carta esté abierta y sin pausa (omitido si es MOZO o se indica explícitamente)
+    const omitirCarta = origen?.canal === 'MOZO' || origen?.omitirChequeoCarta === true;
+    if (!omitirCarta) {
+      const estadoCarta = await this.localService.obtenerEstadoCarta();
+      if (!estadoCarta.abierta) {
+        throw new HttpException(
+          { codigo: 'CARTA_CERRADA', mensaje: estadoCarta.texto },
+          HttpStatus.CONFLICT,
+        );
+      }
     }
 
-    // 3. Validar datos de cliente
-    if (!dto.cliente?.nombre || dto.cliente.nombre.trim().length === 0) {
-      throw new BadRequestException({
-        codigo: 'CLIENTE_INVALIDO',
-        mensaje: 'El nombre del cliente es obligatorio',
-      });
-    }
+    // 3. Validar datos de cliente (opcional para pedidos de mozo en mesa)
+    const esMozo = origen?.canal === 'MOZO';
+    let clienteNombre: string | null = null;
+    let telefonoLimpio: string | null = null;
 
-    const telefonoLimpio = dto.cliente?.telefono?.trim();
-    if (!telefonoLimpio || !/^9\d{8}$/.test(telefonoLimpio)) {
-      throw new BadRequestException({
-        codigo: 'TELEFONO_INVALIDO',
-        mensaje: 'El teléfono debe tener 9 dígitos y empezar con 9',
-      });
+    if (esMozo) {
+      clienteNombre =
+        dto.cliente?.nombre?.trim() ||
+        origen?.mesaNombre ||
+        (dto.mesa ? `Mesa ${dto.mesa}` : 'Mesa');
+      telefonoLimpio = dto.cliente?.telefono?.trim() || null;
+      if (telefonoLimpio && !/^9\d{8}$/.test(telefonoLimpio)) {
+        throw new BadRequestException({
+          codigo: 'TELEFONO_INVALIDO',
+          mensaje: 'El teléfono debe tener 9 dígitos y empezar con 9',
+        });
+      }
+    } else {
+      if (!dto.cliente?.nombre || dto.cliente.nombre.trim().length === 0) {
+        throw new BadRequestException({
+          codigo: 'CLIENTE_INVALIDO',
+          mensaje: 'El nombre del cliente es obligatorio',
+        });
+      }
+
+      telefonoLimpio = dto.cliente?.telefono?.trim();
+      if (!telefonoLimpio || !/^9\d{8}$/.test(telefonoLimpio)) {
+        throw new BadRequestException({
+          codigo: 'TELEFONO_INVALIDO',
+          mensaje: 'El teléfono debe tener 9 dígitos y empezar con 9',
+        });
+      }
+      clienteNombre = dto.cliente.nombre.trim();
     }
 
     // 4. Validar comprobante
@@ -287,7 +325,7 @@ export class PedidosService {
           personasAsignadas.push(
             personaIngresada && personaIngresada.length > 0
               ? personaIngresada
-              : dto.cliente.nombre.trim(),
+              : (clienteNombre || 'Mesa'),
           );
         }
       } else {
@@ -432,14 +470,19 @@ export class PedidosService {
         codigo = `CP-W${String(sec.ultimo).padStart(3, '0')}`;
       }
 
+      const mozoPartyId = origen?.usuarioPartyId ? BigInt(origen.usuarioPartyId) : null;
+      const mesaNombreFinal = origen?.mesaNombre || dto.mesa || null;
+
       const pedido = await tx.pedido.create({
         data: {
           codigo,
-          canal: 'CARTA',
+          canal: origen?.canal || 'CARTA',
           modalidad: dto.modalidad,
           estado: 'COLA',
-          cliente_nombre: dto.cliente.nombre.trim(),
+          party_id: mozoPartyId,
+          cliente_nombre: clienteNombre,
           cliente_telefono: telefonoLimpio,
+          mesa_nombre: mesaNombreFinal,
           entrega_direccion: dto.entrega?.direccion?.trim() || null,
           entrega_referencia: dto.entrega?.referencia?.trim() || null,
           entrega_lat: dto.entrega?.lat != null ? new Prisma.Decimal(dto.entrega.lat) : null,
@@ -506,9 +549,30 @@ export class PedidosService {
           pedido_id: pedido.id,
           estado_anterior: null,
           estado_nuevo: 'COLA',
-          motivo: 'Pedido creado desde la carta virtual',
+          motivo:
+            origen?.canal === 'MOZO'
+              ? 'Pedido abierto por el mozo'
+              : 'Pedido creado desde la carta virtual',
+          por_party_id: mozoPartyId,
         },
       });
+
+      if (origen?.mesasIds && origen.mesasIds.length > 0 && !origen.enTransaccion) {
+        for (const mesaId of origen.mesasIds) {
+          await tx.pedidoMesa.create({
+            data: {
+              pedido_id: pedido.id,
+              mesa_id: BigInt(mesaId),
+              mesa_nombre: mesaNombreFinal,
+              abierta: true,
+            },
+          });
+        }
+      }
+
+      if (origen?.enTransaccion) {
+        await origen.enTransaccion(tx, pedido);
+      }
 
       return pedido;
     });
@@ -532,7 +596,10 @@ export class PedidosService {
       subtotal: Number(pedidoCreado.subtotal),
       envio: pedidoCreado.envio !== null ? Number(pedidoCreado.envio) : null,
       total: Number(pedidoCreado.total),
-      mensaje: 'Un asesor te escribirá para coordinar el pago',
+      mensaje:
+        origen?.canal === 'MOZO'
+          ? 'Pedido enviado a cocina'
+          : 'Un asesor te escribirá para coordinar el pago',
     };
   }
 

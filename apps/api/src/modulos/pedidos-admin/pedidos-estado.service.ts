@@ -1,3 +1,4 @@
+import { SalonService } from '../salon/salon.service';
 import {
   BadRequestException,
   ConflictException,
@@ -36,6 +37,7 @@ export class PedidosEstadoService {
     private readonly redisService: RedisService,
     private readonly auditoria: AuditoriaService,
     @Optional() private readonly eventosGateway?: EventosGateway,
+    @Optional() private readonly salonService?: SalonService,
   ) {}
 
   private parsearId(id: bigint | string | number): bigint {
@@ -542,6 +544,13 @@ export class PedidosEstadoService {
         estado: 'ANULADO',
       });
 
+      // un pedido anulado libera sus mesas
+      try {
+        await this.salonService?.liberarMesasDePedido(pedido.id);
+      } catch {
+        // idempotente: se puede liberar a mano
+      }
+
       return pedidoActualizado;
     }
 
@@ -638,6 +647,15 @@ export class PedidosEstadoService {
       codigo: pedido.codigo,
       estado: nuevoEstado,
     });
+
+    // un pedido de mesa que pasa a LISTO a mano también avisa al mozo (RQ-SAL-02-10)
+    if (nuevoEstado === 'LISTO' && pedido.modalidad === 'MESA') {
+      try {
+        await this.salonService?.avisarListo(pedido.id);
+      } catch {
+        // el aviso es informativo
+      }
+    }
 
     return pedidoActualizado;
   }

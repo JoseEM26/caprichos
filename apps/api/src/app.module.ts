@@ -19,6 +19,9 @@ import { CajaModule } from './modulos/caja/caja.module';
 import { CierreModule } from './modulos/cierre/cierre.module';
 import { RepartosModule } from './modulos/repartos/repartos.module';
 import { CocinaModule } from './modulos/cocina/cocina.module';
+import { PlanoModule } from './modulos/plano/plano.module';
+import { ReservasModule } from './modulos/reservas/reservas.module';
+import { SalonModule } from './modulos/salon/salon.module';
 
 @Module({
   imports: [
@@ -43,6 +46,9 @@ import { CocinaModule } from './modulos/cocina/cocina.module';
     CierreModule,
     RepartosModule,
     CocinaModule,
+    PlanoModule,
+    ReservasModule,
+    SalonModule,
   ],
   providers: [
     PinoLoggerService,

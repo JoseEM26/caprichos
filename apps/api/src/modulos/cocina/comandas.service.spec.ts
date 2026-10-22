@@ -1,12 +1,14 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ComandasService } from './comandas.service';
+import { SalonService } from '../salon/salon.service';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { calcularColor } from './cocina.util';
 
+jest.mock('../salon/salon.service', () => ({ SalonService: class {} }));
 jest.mock('../../comun/socket/eventos.gateway', () => ({
   EventosGateway: class {
     emitirAdmin = jest.fn();
@@ -19,6 +21,7 @@ describe('ComandasService', () => {
   let auditoria: any;
   let eventosGateway: any;
   let descuentoServiceMock: any;
+  let salonMock: any;
 
   const mockUsuario: UsuarioAutenticado = {
     partyId: 100n,
@@ -63,6 +66,7 @@ describe('ComandasService', () => {
       emitirAdmin: jest.fn(),
     };
 
+    salonMock = { avisarListo: jest.fn().mockResolvedValue(undefined) };
     descuentoServiceMock = {
       descontarPedido: jest.fn().mockResolvedValue({ ok: true }),
     };
@@ -74,6 +78,7 @@ describe('ComandasService', () => {
         { provide: AuditoriaService, useValue: auditoria },
         { provide: EventosGateway, useValue: eventosGateway },
         { provide: 'DESCUENTO_PEDIDO', useValue: descuentoServiceMock },
+        { provide: SalonService, useValue: salonMock },
       ],
     }).compile();
 
@@ -244,6 +249,22 @@ describe('ComandasService', () => {
   });
 
   describe('pedido de dos áreas: una despeja (sigue en COLA), la segunda lo deja LISTO', () => {
+    it('al completarse un pedido de MESA avisa al mozo; uno de DELIVERY no', async () => {
+      const probar = async (modalidad: string) => {
+        const pedido = { id: 8n, codigo: 'CP-0008', estado: 'COLA', modalidad, pasa_cocina_en: new Date() };
+        prisma.pedido.findUnique.mockResolvedValue(pedido);
+        prisma.comandaArea.findUnique.mockResolvedValue({ pedido_id: 8n, area_id: 1n, estado: 'EN_COCINA' });
+        prisma.comandaArea.findMany.mockResolvedValue([{ pedido_id: 8n, area_id: 1n, estado: 'DESPEJADA' }]);
+        prisma.pedido.update.mockResolvedValue({ ...pedido, estado: 'LISTO' });
+        await service.despejar(8n, 1n, mockUsuario);
+      };
+      await probar('MESA');
+      expect(salonMock.avisarListo).toHaveBeenCalledWith(8n);
+      salonMock.avisarListo.mockClear();
+      await probar('DELIVERY');
+      expect(salonMock.avisarListo).not.toHaveBeenCalled();
+    });
+
     it('al despejar la primera área sigue en COLA, al despejar la segunda pasa a LISTO', async () => {
       const pedidoMock = {
         id: 7n,
