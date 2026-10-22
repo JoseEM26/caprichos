@@ -16,7 +16,12 @@
     "seed:carta": "ts-node prisma/seed-carta.ts",
     "seed:zonas": "ts-node prisma/seed-zonas.ts",
     "seed:caja": "ts-node prisma/seed-caja.ts",
-    "seed:fotos": "ts-node prisma/seed-fotos.ts"
+    "seed:fotos": "ts-node prisma/seed-fotos.ts",
+    "seed:ofertas": "ts-node prisma/seed-ofertas.ts",
+    "seed:compras": "ts-node prisma/seed-compras.ts",
+    "seed:almacen": "ts-node prisma/seed-almacen-personal.ts",
+    "seed:mensajes": "ts-node prisma/seed-atencion-mensajes.ts",
+    "seed:contenido": "ts-node prisma/seed-contenido-notificaciones.ts"
   },
   "dependencies": {
     "@caprichos/compartido": "workspace:*",

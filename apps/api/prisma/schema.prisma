@@ -20,28 +20,49 @@ model ControlSistema {
 // ---------- Ola 1: personas, acceso, auditoría y configuración (ADR-004, ADR-008, ADR-014) ----------
 
 model Party {
-  id         BigInt            @id @default(autoincrement())
-  tipo       String // PERSONA | ORGANIZACION
-  estado     String            @default("ACTIVO")
-  creado_en  DateTime          @default(now()) @db.Timestamptz
-  persona    Person?
-  documentos PartyIdentifier[]
-  usuario    UserAccount?
-  sesiones          Sesion[]
-  pedidos           Pedido[]          @relation("ClientePedido")
-  pedidosRepartidos Pedido[]          @relation("RepartidorPedido")
-  liquidaciones     Liquidacion[]     @relation("LiquidacionesRepartidor")
-  comprobantesEmitidos Comprobante[]     @relation("ComprobantesEmitidos")
-  reclamosRespondidos  Reclamo[]         @relation("ReclamosRespondidos")
+  id                       BigInt                 @id @default(autoincrement())
+  tipo                     String // PERSONA | ORGANIZACION
+  estado                   String                 @default("ACTIVO")
+  creado_en                DateTime               @default(now()) @db.Timestamptz
+  persona                  Person?
+  documentos               PartyIdentifier[]
+  usuario                  UserAccount?
+  sesiones                 Sesion[]
+  pedidos                  Pedido[]               @relation("ClientePedido")
+  pedidosRepartidos        Pedido[]               @relation("RepartidorPedido")
+  liquidaciones            Liquidacion[]          @relation("LiquidacionesRepartidor")
+  comprobantesEmitidos     Comprobante[]          @relation("ComprobantesEmitidos")
+  reclamosRespondidos      Reclamo[]              @relation("ReclamosRespondidos")
+  cuentaCliente            CustomerAccount?
+  roles                    PartyRole[]
+  consentimientos          Consent[]
+  contactos                ContactMechanism[]
+  movimientosPuntos        MovimientoPuntos[]
+  canjesCuponesCompartidos CuponCanjeCompartido[]
+  organizacion             Organization?
+  horariosTrabajo          HorarioTrabajo[]
+  coberturasCubre          CoberturaTurno[]       @relation("CoberturasCubre")
+  coberturasReemplaza      CoberturaTurno[]       @relation("CoberturasReemplaza")
+  pedidosProveedor         PedidoProveedor[]
+  comprasProveedor         Compra[]
+  pedidosInternosAvisados  PedidoInterno[]
+  consumosPersonal         ConsumoPersonal[]
+  conversaciones           Conversacion[]
+  notificaciones           Notificacion[]
+  dataRequests             DataRequest[]
 
   @@map("party")
 }
 
 model Person {
-  party_id  BigInt  @id
-  nombres   String
-  apellidos String?
-  party     Party   @relation(fields: [party_id], references: [id])
+  party_id        BigInt    @id
+  nombres         String
+  apellidos       String?
+  cumple_dia      Int?      @db.SmallInt
+  cumple_mes      Int?      @db.SmallInt
+  correo          String?
+  foto_archivo_id BigInt?
+  party           Party     @relation(fields: [party_id], references: [id])
 
   @@map("person")
 }
@@ -58,10 +79,11 @@ model PartyIdentifier {
 }
 
 model Rol {
-  codigo   String        @id
-  nombre   String
-  permisos RolPermiso[]
-  usuarios UserAccount[]
+  codigo         String         @id
+  nombre         String
+  permisos       RolPermiso[]
+  usuarios       UserAccount[]
+  notificaciones Notificacion[]
 
   @@map("rol")
 }
@@ -87,16 +109,20 @@ model RolPermiso {
 }
 
 model UserAccount {
-  id           BigInt   @id @default(autoincrement())
-  party_id     BigInt   @unique
-  rol          String
-  hash         String
-  debe_cambiar Boolean  @default(true)
-  pin_hash     String?
-  activo       Boolean  @default(true)
-  alta_en      DateTime @default(now()) @db.Date
-  party        Party    @relation(fields: [party_id], references: [id])
-  r            Rol      @relation(fields: [rol], references: [codigo])
+  id                    BigInt                 @id @default(autoincrement())
+  party_id              BigInt                 @unique
+  rol                   String
+  hash                  String
+  debe_cambiar          Boolean                @default(true)
+  pin_hash              String?
+  activo                Boolean                @default(true)
+  alta_en               DateTime               @default(now()) @db.Date
+  party                 Party                  @relation(fields: [party_id], references: [id])
+  r                     Rol                    @relation(fields: [rol], references: [codigo])
+  iniciativasCreadas    Iniciativa[]           @relation("IniciativasCreadas")
+  iniciativasCambiadas  Iniciativa[]           @relation("IniciativasCambiadas")
+  iniciativaComentarios IniciativaComentario[]
+  conversacionesTomadas Conversacion[]
 
   @@map("user_account")
 }
@@ -171,6 +197,7 @@ model ListaValor {
   movimientosOrigen  MovimientoStock[] @relation("MovimientoStockOrigen")
   movimientosDestino MovimientoStock[] @relation("MovimientoStockDestino")
   recetas            Receta[]
+  combosPrecio       ComboPrecio[]
 
   @@unique([lista_id, nombre])
   @@map("lista_valor")
@@ -196,14 +223,19 @@ model FechaEspecial {
 }
 
 model Archivo {
-  id         BigInt     @id @default(autoincrement())
-  ruta       String     @unique
-  tipo_mime  String
-  bytes      Int
-  privado    Boolean            @default(false)
-  foto_local FotoLocal?
-  productos  Producto[]
-  incidentes IncidenteEntrega[]
+  id                 BigInt             @id @default(autoincrement())
+  ruta               String             @unique
+  tipo_mime          String
+  bytes              Int
+  privado            Boolean            @default(false)
+  foto_local         FotoLocal?
+  productos          Producto[]
+  incidentes         IncidenteEntrega[]
+  compras            Compra[]
+  iniciativas        Iniciativa[]
+  novedadesFotos     NovedadFoto[]
+  destacadasPortadas Destacada[]
+  destacadasFotos    DestacadaFoto[]
 
   @@map("archivo")
 }
@@ -218,17 +250,20 @@ model FotoLocal {
 }
 
 model AreaCocina {
-  id         BigInt      @id @default(autoincrement())
-  nombre     String      @unique
-  propia     Boolean     @default(false)
-  impresora  String?
-  etiquetera String?
-  activo       Boolean       @default(true)
-  categorias   Categoria[]
-  pedidoLineas PedidoLinea[]
-  comandas     ComandaArea[]
-  altasDemanda AltaDemanda[]
-  lugaresStock LugarStock[]
+  id              BigInt          @id @default(autoincrement())
+  nombre          String          @unique
+  propia          Boolean         @default(false)
+  impresora       String?
+  etiquetera      String?
+  activo          Boolean         @default(true)
+  categorias      Categoria[]
+  pedidoLineas    PedidoLinea[]
+  comandas        ComandaArea[]
+  altasDemanda    AltaDemanda[]
+  lugaresStock    LugarStock[]
+  pedidosInternos PedidoInterno[]
+  deviceKeys      DeviceKey[]
+  printJobs       PrintJob[]
 
   @@map("area_cocina")
 }
@@ -242,6 +277,8 @@ model Categoria {
   oculta         Boolean    @default(false)
   area           AreaCocina @relation(fields: [area_id], references: [id])
   productos      Producto[]
+  ofertasAlcance Oferta[]
+  cuponesAlcance Cupon[]
 
   @@map("categoria")
 }
@@ -269,6 +306,9 @@ model Producto {
   stocks             Stock[]
   movimientosStock   MovimientoStock[]
   recetas            Receta[]
+  ofertasAlcance     Oferta[]
+  cuponesAlcance     Cupon[]
+  rankingsMes        RankingMes[]
 
   @@map("producto")
 }
@@ -347,12 +387,13 @@ model Sabor {
 // ---------- Ola 3: zonas de reparto y pedidos de la carta (FT-DEL-01, FT-PED-01..03, DT-57) ----------
 
 model ZonaReparto {
-  id       BigInt   @id @default(autoincrement())
-  codigo   String   @unique
-  poligono Json
-  tarifa   Decimal  @db.Decimal(12, 2)
-  activa   Boolean  @default(true)
-  pedidos  Pedido[]
+  id        BigInt             @id @default(autoincrement())
+  codigo    String             @unique
+  poligono  Json
+  tarifa    Decimal            @db.Decimal(12, 2)
+  activa    Boolean            @default(true)
+  pedidos   Pedido[]
+  contactos ContactMechanism[]
 
   @@map("zona_reparto")
 }
@@ -386,6 +427,12 @@ model Pedido {
   comprobante_razon      String?
   nota                   String?
   clave_idempotencia     String?                 @unique
+  oferta_id              BigInt?
+  cupon_id               BigInt?
+  cupon_emitido_id       BigInt?
+  descuento_detalle      Json?
+  puntos_ganados         Decimal                 @default(0) @db.Decimal(12, 2)
+  puntos_canjeados       Decimal                 @default(0) @db.Decimal(12, 2)
   pago_coordinado_en     DateTime?               @db.Timestamptz
   pago_coordinado_por    BigInt?
   despachado_en          DateTime?               @db.Timestamptz
@@ -413,6 +460,9 @@ model Pedido {
   party                  Party?                  @relation("ClientePedido", fields: [party_id], references: [id])
   repartidor             Party?                  @relation("RepartidorPedido", fields: [repartidor_party_id], references: [id])
   zona                   ZonaReparto?            @relation(fields: [zona_id], references: [id])
+  oferta                 Oferta?                 @relation(fields: [oferta_id], references: [id])
+  cupon                  Cupon?                  @relation(fields: [cupon_id], references: [id])
+  cuponEmitido           CuponEmitido?           @relation("PedidoCuponEmitido", fields: [cupon_emitido_id], references: [id])
   lineas                 PedidoLinea[]
   historial              PedidoEstadoHistorial[]
   cobro                  Cobro?
@@ -424,6 +474,14 @@ model Pedido {
   reservas               Reserva[]
   comprobante            Comprobante?
   reclamos               Reclamo[]
+  cuponesEmitidosOrigen  CuponEmitido[]          @relation("CuponesEmitidosOrigen")
+  cuponesEmitidosCanje   CuponEmitido[]          @relation("CuponesEmitidosCanje")
+  cuponesCanjeCompartido CuponCanjeCompartido[]
+  movimientosPuntos      MovimientoPuntos[]
+  consumoPersonal        ConsumoPersonal?
+  solicitudesCambio      SolicitudCambio[]
+  encuesta               Encuesta?
+  printJobs              PrintJob[]
 
   @@map("pedido")
 }
@@ -432,6 +490,8 @@ model PedidoLinea {
   id               BigInt              @id @default(autoincrement())
   pedido_id        BigInt
   producto_id      BigInt?
+  oferta_id        BigInt?
+  linea_combo_id   BigInt?
   nombre           String
   tamano           String?
   opciones         Json                @default("[]")
@@ -445,7 +505,10 @@ model PedidoLinea {
   nombres_persona  String[]
   pedido           Pedido              @relation(fields: [pedido_id], references: [id])
   producto         Producto?           @relation(fields: [producto_id], references: [id])
+  oferta           Oferta?             @relation(fields: [oferta_id], references: [id])
   area             AreaCocina?         @relation(fields: [area_id], references: [id])
+  lineaComboPadre  PedidoLinea?        @relation("ComboPartes", fields: [linea_combo_id], references: [id])
+  lineasComboHijas PedidoLinea[]       @relation("ComboPartes")
   opcionesElegidas PedidoLineaOpcion[]
 
   @@map("pedido_linea")
@@ -691,42 +754,47 @@ model AltaDemanda {
 }
 
 model LugarStock {
-  id             BigInt            @id @default(autoincrement())
-  nombre         String            @unique
-  tipo           String            // ALMACEN | AREA
-  area_id        BigInt?
-  area           AreaCocina?       @relation(fields: [area_id], references: [id])
-  insumosConsumo Insumo[]          @relation("InsumoLugarConsumo")
-  stocks         Stock[]
-  movimientos    MovimientoStock[]
+  id               BigInt            @id @default(autoincrement())
+  nombre           String            @unique
+  tipo             String            // ALMACEN | AREA
+  area_id          BigInt?
+  area             AreaCocina?       @relation(fields: [area_id], references: [id])
+  insumosConsumo   Insumo[]          @relation("InsumoLugarConsumo")
+  stocks           Stock[]
+  movimientos      MovimientoStock[]
+  trasladosDestino Traslado[]
+  cierresDia       CierreDia[]
 
   @@map("lugar_stock")
 }
 
 model Insumo {
-  id               BigInt            @id @default(autoincrement())
-  nombre           String            @unique
-  unidad_compra    String
-  unidad_almacen   String
-  unidad_receta    String
-  factor_compra    Decimal           @db.Decimal(14, 3)
-  factor_receta    Decimal           @db.Decimal(14, 6)
-  minimo           Decimal           @db.Decimal(14, 3)
-  intermedio       Decimal?          @db.Decimal(14, 3)
-  maximo           Decimal           @db.Decimal(14, 3)
-  lugar_consumo_id BigInt?
-  costo_unit       Decimal?          @db.Decimal(12, 4)
-  proveedor_a      BigInt?
-  proveedor_b      BigInt?
-  proveedor_c      BigInt?
-  activo           Boolean           @default(true)
+  id                    BigInt                 @id @default(autoincrement())
+  nombre                String                 @unique
+  unidad_compra         String
+  unidad_almacen        String
+  unidad_receta         String
+  factor_compra         Decimal                @db.Decimal(14, 3)
+  factor_receta         Decimal                @db.Decimal(14, 6)
+  minimo                Decimal                @db.Decimal(14, 3)
+  intermedio            Decimal?               @db.Decimal(14, 3)
+  maximo                Decimal                @db.Decimal(14, 3)
+  lugar_consumo_id      BigInt?
+  costo_unit            Decimal?               @db.Decimal(12, 4)
+  proveedor_a           BigInt?
+  proveedor_b           BigInt?
+  proveedor_c           BigInt?
+  activo                Boolean                @default(true)
 
-  lugarConsumo     LugarStock?       @relation("InsumoLugarConsumo", fields: [lugar_consumo_id], references: [id])
-  stocks           Stock[]
-  movimientos      MovimientoStock[]
-  recetaLineas     RecetaLinea[]
-  ajustesOpcion    AjusteOpcion[]    @relation("AjusteInsumo")
-  ajustesReemplaza AjusteOpcion[]    @relation("AjusteReemplazaInsumo")
+  lugarConsumo          LugarStock?            @relation("InsumoLugarConsumo", fields: [lugar_consumo_id], references: [id])
+  stocks                Stock[]
+  movimientos           MovimientoStock[]
+  recetaLineas          RecetaLinea[]
+  ajustesOpcion         AjusteOpcion[]         @relation("AjusteInsumo")
+  ajustesReemplaza      AjusteOpcion[]         @relation("AjusteReemplazaInsumo")
+  pedidoProveedorLineas PedidoProveedorLinea[]
+  compraLineas          CompraLinea[]
+  traslados             Traslado[]
 
   @@map("insumo")
 }
@@ -785,6 +853,7 @@ model Receta {
   producto        Producto      @relation(fields: [producto_id], references: [id])
   tamano_valor    ListaValor?   @relation(fields: [tamano_valor_id], references: [id])
   lineas          RecetaLinea[]
+  producciones    Produccion[]
 
   @@unique([producto_id, tamano_valor_id, es_produccion])
   @@map("receta")
@@ -863,8 +932,9 @@ model Reserva {
   motivo_cancelacion String?
   pedido_id          BigInt?
 
-  pedido             Pedido?       @relation(fields: [pedido_id], references: [id])
+  pedido             Pedido?            @relation(fields: [pedido_id], references: [id])
   mesas              ReservaMesa[]
+  solicitudesReserva SolicitudReserva[]
 
   @@map("reserva")
 }
@@ -951,6 +1021,735 @@ model Reclamo {
 
   @@map("reclamo")
 }
+
+// ---------- Fase Siguiente - Ola S1: Promociones, ofertas, cupones y cuenta del cliente ----------
+
+model CustomerAccount {
+  id        BigInt   @id @default(autoincrement())
+  party_id  BigInt   @unique
+  hash      String?
+  activo    Boolean  @default(true)
+  creado_en DateTime @default(now()) @db.Timestamptz
+
+  party     Party    @relation(fields: [party_id], references: [id])
+
+  @@map("customer_account")
+}
+
+model PartyRole {
+  id              BigInt          @id @default(autoincrement())
+  party_id        BigInt
+  rol             String          // CLIENTE | TRABAJADOR | PROVEEDOR
+  desde           DateTime        @default(now()) @db.Date
+  hasta           DateTime?       @db.Date
+
+  party           Party           @relation(fields: [party_id], references: [id])
+  customer_detail CustomerDetail?
+  employee_detail EmployeeDetail?
+  supplier_detail SupplierDetail?
+
+  @@map("party_role")
+}
+
+model CustomerDetail {
+  party_role_id BigInt   @id
+  puntos        Decimal  @default(0) @db.Decimal(12, 2)
+  envio_tipo    String?  // FIJO | PORCENTAJE
+  envio_valor   Decimal? @db.Decimal(12, 2)
+
+  party_role    PartyRole @relation(fields: [party_role_id], references: [id])
+
+  @@map("customer_detail")
+}
+
+model Consent {
+  id            BigInt    @id @default(autoincrement())
+  party_id      BigInt
+  version_texto String
+  canal         String    // CARTA | CAJA | BOT | ADMIN
+  aceptado_en   DateTime  @default(now()) @db.Timestamptz
+  revocado_en   DateTime? @db.Timestamptz
+
+  party         Party     @relation(fields: [party_id], references: [id])
+
+  @@map("consent")
+}
+
+model ContactMechanism {
+  id         BigInt       @id @default(autoincrement())
+  party_id   BigInt
+  tipo       String       // TELEFONO | WHATSAPP | CORREO | DIRECCION
+  valor      String
+  lat        Decimal?     @db.Decimal(9, 6)
+  lng        Decimal?     @db.Decimal(9, 6)
+  referencia String?
+  zona_id    BigInt?
+  principal  Boolean      @default(false)
+  activo     Boolean      @default(true)
+
+  party      Party        @relation(fields: [party_id], references: [id])
+  zona       ZonaReparto? @relation(fields: [zona_id], references: [id])
+
+  @@index([tipo, valor], map: "ix_contacto_valor")
+  @@map("contact_mechanism")
+}
+
+model Oferta {
+  id                   BigInt         @id @default(autoincrement())
+  tipo                 String         // COMBO | LLEVA_PAGA | DESCUENTO
+  nombre               String         @unique
+  descripcion          String?
+  lleva                Int?
+  paga                 Int?
+  alcance_categoria_id BigInt?
+  alcance_producto_id  BigInt?
+  descuento_tipo       String?        // PORCENTAJE | MONTO
+  descuento_valor      Decimal?       @db.Decimal(12, 2)
+  compra_minima        Decimal?       @db.Decimal(12, 2)
+  dias                 Int[]
+  hora_desde           DateTime?      @db.Time
+  hora_hasta           DateTime?      @db.Time
+  fecha_desde          DateTime?      @db.Date
+  fecha_hasta          DateTime?      @db.Date
+  canales              String[]       @default(["CARTA", "ADMIN", "BOT"])
+  limite_usos          Int?
+  usos_actuales        Int            @default(0)
+  no_suma_beneficios   Boolean        @default(false)
+  orden                Int            @default(0)
+  activo               Boolean        @default(false)
+  creado_en            DateTime       @default(now()) @db.Timestamptz
+
+  categoria            Categoria?     @relation(fields: [alcance_categoria_id], references: [id])
+  producto             Producto?      @relation(fields: [alcance_producto_id], references: [id])
+  combosPrecio         ComboPrecio[]
+  combosParte          ComboParte[]
+  pedidos              Pedido[]
+  pedidoLineas         PedidoLinea[]
+
+  @@map("oferta")
+}
+
+model ComboPrecio {
+  oferta_id       BigInt
+  tamano_valor_id BigInt
+  precio          Decimal    @db.Decimal(12, 2)
+
+  oferta          Oferta     @relation(fields: [oferta_id], references: [id], onDelete: Cascade)
+  tamano_valor    ListaValor @relation(fields: [tamano_valor_id], references: [id])
+
+  @@id([oferta_id, tamano_valor_id])
+  @@map("combo_precio")
+}
+
+model ComboParte {
+  id         BigInt   @id @default(autoincrement())
+  oferta_id  BigInt
+  tipo       String   // A_ELECCION | UNA_DE | FIJO
+  cantidad   Int      @default(1)
+  categorias BigInt[]
+  productos  BigInt[]
+
+  oferta     Oferta   @relation(fields: [oferta_id], references: [id], onDelete: Cascade)
+
+  @@map("combo_parte")
+}
+
+model ReglaAcumulacion {
+  id                      Int     @id @default(1)
+  cupon_con_descuento     Boolean @default(false)
+  promo_con_descuento     Boolean @default(false)
+  cupones_por_comprobante Int     @default(2)
+  texto_pie               String?
+
+  @@map("regla_acumulacion")
+}
+
+model Cupon {
+  id                 BigInt                  @id @default(autoincrement())
+  modo               String                  // UNICO_COMPROBANTE | COMPARTIDO
+  codigo_base        String                  @unique
+  descripcion        String?
+  descuento_tipo     String                  // PORCENTAJE | MONTO
+  descuento_valor    Decimal                 @db.Decimal(12, 2)
+  compra_minima      Decimal?                @db.Decimal(12, 2)
+  categoria_id       BigInt?
+  producto_id        BigInt?
+  canales            String[]                @default(["CARTA", "CAJA", "BOT"])
+  requiere_cuenta    Boolean                 @default(false)
+  dias_validez       Int?                    @default(15)
+  tope_usos          Int?
+  usos_actuales      Int                     @default(0)
+  max_por_cliente    Int?
+  orden              Int                     @default(0)
+  activo             Boolean                 @default(true)
+  creado_en          DateTime                @default(now()) @db.Timestamptz
+
+  categoria          Categoria?              @relation(fields: [categoria_id], references: [id])
+  producto           Producto?               @relation(fields: [producto_id], references: [id])
+  cuponesEmitidos    CuponEmitido[]
+  canjesCompartidos  CuponCanjeCompartido[]
+  pedidos            Pedido[]
+
+  @@map("cupon")
+}
+
+model CuponEmitido {
+  id                 BigInt    @id @default(autoincrement())
+  cupon_id           BigInt
+  codigo             String    @unique
+  pedido_origen_id   BigInt?
+  vence_en           DateTime? @db.Timestamptz
+  estado             String    @default("VIGENTE") // VIGENTE | CANJEADO | VENCIDO | ANULADO
+  canjeado_en        DateTime? @db.Timestamptz
+  pedido_canje_id    BigInt?
+  motivo_anulacion   String?
+  anulado_en         DateTime? @db.Timestamptz
+  anulado_por        BigInt?
+  creado_en          DateTime  @default(now()) @db.Timestamptz
+
+  cupon              Cupon     @relation(fields: [cupon_id], references: [id])
+  pedidoOrigen       Pedido?   @relation("CuponesEmitidosOrigen", fields: [pedido_origen_id], references: [id])
+  pedidoCanje        Pedido?   @relation("CuponesEmitidosCanje", fields: [pedido_canje_id], references: [id])
+  pedidosQueUsaron   Pedido[]  @relation("PedidoCuponEmitido")
+
+  @@map("cupon_emitido")
+}
+
+model CuponCanjeCompartido {
+  cupon_id  BigInt
+  pedido_id BigInt
+  party_id  BigInt?
+  en        DateTime @default(now()) @db.Timestamptz
+
+  cupon     Cupon    @relation(fields: [cupon_id], references: [id])
+  pedido    Pedido   @relation(fields: [pedido_id], references: [id])
+  party     Party?   @relation(fields: [party_id], references: [id])
+
+  @@id([cupon_id, pedido_id])
+  @@map("cupon_canje_compartido")
+}
+
+model MovimientoPuntos {
+  id        BigInt   @id @default(autoincrement())
+  party_id  BigInt
+  pedido_id BigInt?
+  puntos    Decimal  @db.Decimal(12, 2)
+  tipo      String   // SUMA | REVERSA | CANJE | DEVOLUCION_CANJE
+  motivo    String?
+  en        DateTime @default(now()) @db.Timestamptz
+
+  party     Party    @relation(fields: [party_id], references: [id])
+  pedido    Pedido?  @relation(fields: [pedido_id], references: [id])
+
+  @@unique([pedido_id, tipo])
+  @@map("movimiento_puntos")
+}
+
+// ---------- Fase Siguiente - Ola S2: Proveedores, compras, almacén, créditos, iniciativas, bot, TV, contenidos ----------
+
+model Organization {
+  party_id         BigInt  @id
+  razon_social     String
+  nombre_comercial String?
+
+  party            Party   @relation(fields: [party_id], references: [id])
+
+  @@map("organization")
+}
+
+model SupplierDetail {
+  party_role_id BigInt    @id
+  dias_credito  Int       @default(0)
+  cuenta_pago   String?
+  activo        Boolean   @default(true)
+
+  party_role    PartyRole @relation(fields: [party_role_id], references: [id])
+
+  @@map("supplier_detail")
+}
+
+model EmployeeDetail {
+  party_role_id BigInt    @id
+  descuento_pct Decimal?  @db.Decimal(5, 2)
+
+  party_role    PartyRole @relation(fields: [party_role_id], references: [id])
+
+  @@map("employee_detail")
+}
+
+model HorarioTrabajo {
+  id         BigInt   @id @default(autoincrement())
+  party_id   BigInt
+  dia_semana Int      @db.SmallInt // 0 = Domingo, 1 = Lunes, etc.
+  entrada    DateTime @db.Time
+  salida     DateTime @db.Time
+  activo     Boolean  @default(true)
+
+  party      Party    @relation(fields: [party_id], references: [id])
+
+  @@map("horario_trabajo")
+}
+
+model CoberturaTurno {
+  id                 BigInt    @id @default(autoincrement())
+  fecha              DateTime  @db.Date
+  cubre_party_id     BigInt
+  reemplaza_party_id BigInt?
+  desde              DateTime  @db.Time
+  hasta              DateTime  @db.Time
+  por                BigInt
+
+  cubreParty         Party     @relation("CoberturasCubre", fields: [cubre_party_id], references: [id])
+  reemplazaParty     Party?    @relation("CoberturasReemplaza", fields: [reemplaza_party_id], references: [id])
+
+  @@map("cobertura_turno")
+}
+
+model PedidoProveedor {
+  id                 BigInt                  @id @default(autoincrement())
+  proveedor_party_id BigInt
+  estado             String                  @default("POR_RECIBIR") // POR_RECIBIR | PARCIAL | RECIBIDO | ANULADO
+  enviado_en         DateTime?               @default(now()) @db.Timestamptz
+  motivo_anulacion   String?
+
+  proveedor          Party                   @relation(fields: [proveedor_party_id], references: [id])
+  lineas             PedidoProveedorLinea[]
+  compras            Compra[]
+
+  @@map("pedido_proveedor")
+}
+
+model PedidoProveedorLinea {
+  pedido_proveedor_id BigInt
+  insumo_id           BigInt
+  cantidad_compra     Decimal         @db.Decimal(14, 3)
+  recibido            Decimal         @default(0) @db.Decimal(14, 3)
+
+  pedidoProveedor     PedidoProveedor @relation(fields: [pedido_proveedor_id], references: [id], onDelete: Cascade)
+  insumo              Insumo          @relation(fields: [insumo_id], references: [id])
+
+  @@id([pedido_proveedor_id, insumo_id])
+  @@map("pedido_proveedor_linea")
+}
+
+model Compra {
+  id                  BigInt           @id @default(autoincrement())
+  proveedor_party_id  BigInt
+  pedido_proveedor_id BigInt?
+  comprobante_tipo    String           // FACTURA | BOLETA | NOTA_VENTA | GUIA | OTRO
+  comprobante_numero  String
+  archivo_id          BigInt?
+  condicion           String           // CONTADO | CREDITO
+  total               Decimal          @db.Decimal(12, 2)
+  fecha_compra        DateTime         @default(now()) @db.Date
+  nota                String?
+  pagada_en           DateTime?        @db.Timestamptz
+  pagada_por          BigInt?
+  anulada_en          DateTime?        @db.Timestamptz
+  motivo_anulacion    String?
+  registrado_por      BigInt?
+  registrado_en       DateTime         @default(now()) @db.Timestamptz
+
+  proveedor           Party            @relation(fields: [proveedor_party_id], references: [id])
+  pedidoProveedor     PedidoProveedor? @relation(fields: [pedido_proveedor_id], references: [id])
+  archivo             Archivo?         @relation(fields: [archivo_id], references: [id])
+  lineas              CompraLinea[]
+
+  @@unique([proveedor_party_id, comprobante_tipo, comprobante_numero])
+  @@map("compra")
+}
+
+model CompraLinea {
+  id              BigInt   @id @default(autoincrement())
+  compra_id       BigInt
+  insumo_id       BigInt
+  cantidad_compra Decimal  @db.Decimal(14, 3)
+  costo_unit      Decimal  @db.Decimal(12, 4)
+
+  compra          Compra   @relation(fields: [compra_id], references: [id], onDelete: Cascade)
+  insumo          Insumo   @relation(fields: [insumo_id], references: [id])
+
+  @@map("compra_linea")
+}
+
+model Traslado {
+  id                BigInt         @id @default(autoincrement())
+  insumo_id         BigInt
+  destino_lugar_id  BigInt
+  enviado           Decimal        @db.Decimal(14, 3)
+  recibido          Decimal?       @db.Decimal(14, 3)
+  diferencia        Decimal?       @db.Decimal(14, 3)
+  estado            String         @default("POR_RECIBIR") // POR_RECIBIR | RECIBIDO
+  pedido_interno_id BigInt?
+  enviado_por       BigInt?
+  enviado_en        DateTime       @default(now()) @db.Timestamptz
+  recibido_por      BigInt?
+  recibido_en       DateTime?      @db.Timestamptz
+  nota              String?
+
+  insumo            Insumo         @relation(fields: [insumo_id], references: [id])
+  destinoLugar      LugarStock     @relation(fields: [destino_lugar_id], references: [id])
+  pedidoInterno     PedidoInterno? @relation(fields: [pedido_interno_id], references: [id])
+
+  @@map("traslado")
+}
+
+model PedidoInterno {
+  id               BigInt      @id @default(autoincrement())
+  area_id          BigInt
+  detalle          Json
+  estado           String      @default("PENDIENTE") // PENDIENTE | RECIBIDO | ENTREGADO | ANULADO
+  por              BigInt
+  en               DateTime    @default(now()) @db.Timestamptz
+  avisado_party_id BigInt?
+  recibido_por     BigInt?
+  recibido_en      DateTime?   @db.Timestamptz
+  entregado_por    BigInt?
+  entregado_en     DateTime?   @db.Timestamptz
+
+  area             AreaCocina  @relation(fields: [area_id], references: [id])
+  avisadoParty     Party?      @relation(fields: [avisado_party_id], references: [id])
+  traslados        Traslado[]
+
+  @@map("pedido_interno")
+}
+
+model Produccion {
+  id               BigInt    @id @default(autoincrement())
+  receta_id        BigInt
+  tandas           Decimal   @db.Decimal(8, 2)
+  unidades         Decimal   @db.Decimal(14, 3)
+  producido_en     DateTime  @default(now()) @db.Timestamptz
+  por              BigInt
+  anulado_en       DateTime? @db.Timestamptz
+  motivo_anulacion String?
+
+  receta           Receta    @relation(fields: [receta_id], references: [id])
+
+  @@map("produccion")
+}
+
+model CierreDia {
+  id       BigInt     @id @default(autoincrement())
+  fecha    DateTime   @db.Date
+  lugar_id BigInt
+  detalle  Json
+  por      BigInt
+  en       DateTime   @default(now()) @db.Timestamptz
+
+  lugar    LugarStock @relation(fields: [lugar_id], references: [id])
+
+  @@unique([fecha, lugar_id])
+  @@map("cierre_dia")
+}
+
+model ConsumoPersonal {
+  id        BigInt   @id @default(autoincrement())
+  party_id  BigInt
+  fecha     DateTime @db.Date
+  pedido_id BigInt   @unique
+  monto     Decimal  @db.Decimal(12, 2)
+  creado_en DateTime @default(now()) @db.Timestamptz
+
+  party     Party    @relation(fields: [party_id], references: [id])
+  pedido    Pedido   @relation(fields: [pedido_id], references: [id])
+
+  @@map("consumo_personal")
+}
+
+model Iniciativa {
+  id                  BigInt                 @id @default(autoincrement())
+  codigo              String                 @unique // IN-0001
+  tipo                String                 // QUEJA | MEJORA | IDEA
+  area                String                 // CARTA_WEB | PEDIDOS_CAJA | COCINA | REPARTO | ALMACEN_COMPRAS | OTRO
+  titulo              String                 // char_length <= 80
+  detalle             String                 // char_length <= 600
+  archivo_id          BigInt?
+  estado              String                 @default("NUEVA") // NUEVA | EN_REVISION | HECHA | NO_POR_AHORA
+  creado_en           DateTime               @default(now()) @db.Timestamptz
+  creado_por          BigInt
+  estado_cambiado_en  DateTime?              @db.Timestamptz
+  estado_cambiado_por BigInt?
+
+  archivo             Archivo?               @relation(fields: [archivo_id], references: [id])
+  autor               UserAccount            @relation("IniciativasCreadas", fields: [creado_por], references: [id])
+  revisor             UserAccount?           @relation("IniciativasCambiadas", fields: [estado_cambiado_por], references: [id])
+  comentarios         IniciativaComentario[]
+
+  @@index([estado, creado_en(sort: Desc)])
+  @@map("iniciativa")
+}
+
+model IniciativaComentario {
+  id            BigInt      @id @default(autoincrement())
+  iniciativa_id BigInt
+  texto         String      // char_length <= 400
+  creado_en     DateTime    @default(now()) @db.Timestamptz
+  creado_por    BigInt
+
+  iniciativa    Iniciativa  @relation(fields: [iniciativa_id], references: [id], onDelete: Cascade)
+  autor         UserAccount @relation(fields: [creado_por], references: [id])
+
+  @@index([iniciativa_id, creado_en])
+  @@map("iniciativa_comentario")
+}
+
+model Conversacion {
+  id                 BigInt             @id @default(autoincrement())
+  telefono           String             @unique
+  party_id           BigInt?
+  duenio             String             @default("BOT") // BOT | PERSONA
+  tomado_por         BigInt?
+  tomado_en          DateTime?          @db.Timestamptz
+  urgente            Boolean            @default(false)
+  estado             String             @default("ABIERTA") // ABIERTA | VALIDAR_PAGO | ATENDIDA
+  flujo              Json?
+  ultima_actividad   DateTime           @default(now()) @db.Timestamptz
+
+  party              Party?             @relation(fields: [party_id], references: [id])
+  tomadoPorUsuario   UserAccount?       @relation(fields: [tomado_por], references: [id])
+  mensajes           MensajeChat[]
+  solicitudesReserva SolicitudReserva[]
+
+  @@map("conversacion")
+}
+
+model MensajeChat {
+  id              BigInt       @id @default(autoincrement())
+  conversacion_id BigInt
+  direccion       String       // ENTRA | SALE
+  autor           String       // CLIENTE | BOT | PERSONA
+  tipo            String       // TEXTO | IMAGEN | AUDIO | BOTON | PLANTILLA | SISTEMA
+  contenido       Json
+  meta_id         String?      @unique
+  en              DateTime     @default(now()) @db.Timestamptz
+
+  conversacion    Conversacion @relation(fields: [conversacion_id], references: [id], onDelete: Cascade)
+
+  @@map("mensaje_chat")
+}
+
+model RespuestaRapida {
+  id     BigInt  @id @default(autoincrement())
+  titulo String  @unique
+  texto  String
+  activo Boolean @default(true)
+
+  @@map("respuesta_rapida")
+}
+
+model SolicitudReserva {
+  id              BigInt        @id @default(autoincrement())
+  conversacion_id BigInt?
+  personas        Int?
+  hora            DateTime?     @db.Timestamptz
+  estado          String        @default("PENDIENTE") // PENDIENTE | APROBADA | RECHAZADA
+  reserva_id      BigInt?
+
+  conversacion    Conversacion? @relation(fields: [conversacion_id], references: [id])
+  reserva         Reserva?      @relation(fields: [reserva_id], references: [id])
+
+  @@map("solicitud_reserva")
+}
+
+model SolicitudCambio {
+  id           BigInt    @id @default(autoincrement())
+  pedido_id    BigInt
+  tipo         String    // DIRECCION | PEDIDO | CANCELAR
+  detalle      String?
+  estado       String    @default("PENDIENTE") // PENDIENTE | ACEPTADA | RECHAZADA
+  decidido_por BigInt?
+  motivo       String?
+  creado_en    DateTime  @default(now()) @db.Timestamptz
+
+  pedido       Pedido    @relation(fields: [pedido_id], references: [id])
+
+  @@map("solicitud_cambio")
+}
+
+model Encuesta {
+  id            BigInt    @id @default(autoincrement())
+  pedido_id     BigInt    @unique
+  nota          Int?      @db.SmallInt
+  comentario    String?
+  derivada      Boolean   @default(false)
+  enviada_en    DateTime? @db.Timestamptz
+  respondida_en DateTime? @db.Timestamptz
+
+  pedido        Pedido    @relation(fields: [pedido_id], references: [id])
+
+  @@map("encuesta")
+}
+
+model Notificacion {
+  id            BigInt    @id @default(autoincrement())
+  tipo          String
+  rol_destino   String?
+  party_destino BigInt?
+  titulo        String
+  mensaje       String?
+  enlace        String?
+  leida_en      DateTime? @db.Timestamptz
+  en            DateTime  @default(now()) @db.Timestamptz
+
+  rol           Rol?      @relation(fields: [rol_destino], references: [codigo])
+  party         Party?    @relation(fields: [party_destino], references: [id])
+
+  @@map("notificacion")
+}
+
+model VersionCarta {
+  id            BigInt    @id @default(autoincrement())
+  estado        String    // BORRADOR | PUBLICADA | ARCHIVADA
+  organizacion  String    @default("SECCIONES") // SECCIONES | LISTA | TARJETAS
+  decoracion    String?   // NINGUNO | HALLOWEEN | NAVIDAD | ANONUEVO | SANVALENTIN | MADRE | PADRE | PATRIAS | NINOS
+  contenido     Json      // orden, destacados superiores, ocultos
+  publicada_en  DateTime? @db.Timestamptz
+  publicada_por BigInt?
+
+  @@map("version_carta")
+}
+
+model Novedad {
+  id           BigInt        @id @default(autoincrement())
+  tipo         String        // PROMOCION | BANNER | VIDEO | FOTOS | EVENTO | AVISO
+  titulo       String
+  texto        String?
+  tema         String?
+  video_url    String?
+  evento_fecha DateTime?     @db.Timestamptz
+  evento_lugar String?
+  desde        DateTime?     @db.Date
+  hasta        DateTime?     @db.Date
+  orden        Int           @default(0)
+  activo       Boolean       @default(false)
+  creado_en    DateTime      @default(now()) @db.Timestamptz
+
+  fotos        NovedadFoto[]
+
+  @@map("novedad")
+}
+
+model NovedadFoto {
+  novedad_id BigInt
+  archivo_id BigInt
+  orden      Int?    @default(0)
+
+  novedad    Novedad @relation(fields: [novedad_id], references: [id], onDelete: Cascade)
+  archivo    Archivo @relation(fields: [archivo_id], references: [id])
+
+  @@id([novedad_id, archivo_id])
+  @@map("novedad_foto")
+}
+
+model Destacada {
+  id                 BigInt          @id @default(autoincrement())
+  titulo             String
+  portada_archivo_id BigInt?
+  orden              Int             @default(0)
+  archivada          Boolean         @default(false)
+  creado_en          DateTime        @default(now()) @db.Timestamptz
+
+  portada_archivo    Archivo?        @relation(fields: [portada_archivo_id], references: [id])
+  fotos              DestacadaFoto[]
+
+  @@map("destacada")
+}
+
+model DestacadaFoto {
+  destacada_id BigInt
+  archivo_id   BigInt
+  orden        Int?      @default(0)
+
+  destacada    Destacada @relation(fields: [destacada_id], references: [id], onDelete: Cascade)
+  archivo      Archivo   @relation(fields: [archivo_id], references: [id])
+
+  @@id([destacada_id, archivo_id])
+  @@map("destacada_foto")
+}
+
+model RankingMes {
+  anio_mes    String   @db.Char(7)
+  producto_id BigInt
+  unidades    Int
+  puesto      Int?     @db.SmallInt
+
+  producto    Producto @relation(fields: [producto_id], references: [id])
+
+  @@id([anio_mes, producto_id])
+  @@map("ranking_mes")
+}
+
+model MensajeCarta {
+  id           BigInt    @id @default(autoincrement())
+  tipo         String    // COMENTARIO | SUGERENCIA | FELICITACION | QUEJA
+  texto        String
+  nombre       String?
+  contacto     String?
+  atendido_en  DateTime? @db.Timestamptz
+  atendido_por BigInt?
+  creado_en    DateTime  @default(now()) @db.Timestamptz
+
+  @@map("mensaje_carta")
+}
+
+model DeviceKey {
+  id               BigInt      @id @default(autoincrement())
+  tipo             String      // AGENTE | TV
+  nombre           String
+  llave_hash       String      @unique
+  area_id          BigInt?
+  codigo_vinculo   String?     @unique
+  codigo_expira_en DateTime?   @db.Timestamptz
+  ultima_conexion  DateTime?   @db.Timestamptz
+  activo           Boolean     @default(true)
+  creado_en        DateTime    @default(now()) @db.Timestamptz
+
+  area             AreaCocina? @relation(fields: [area_id], references: [id])
+
+  @@map("device_key")
+}
+
+model PrintJob {
+  id         BigInt      @id @default(autoincrement())
+  pedido_id  BigInt
+  area_id    BigInt?
+  tipo       String      // COMANDA | ETIQUETA_GENERAL | ETIQUETA_BEBIDA | COPIA_DESPACHO
+  estado     String      @default("PENDIENTE") // PENDIENTE | IMPRESO | ERROR
+  intentos   Int         @default(0)
+  impresora  String?
+  error      String?
+  creado_en  DateTime    @default(now()) @db.Timestamptz
+  impreso_en DateTime?   @db.Timestamptz
+
+  pedido     Pedido      @relation(fields: [pedido_id], references: [id])
+  area       AreaCocina? @relation(fields: [area_id], references: [id])
+
+  @@map("print_job")
+}
+
+model DataRequest {
+  id       BigInt   @id @default(autoincrement())
+  party_id BigInt
+  tipo     String   // EXPORTAR | ANONIMIZAR
+  estado   String   @default("PENDIENTE")
+  en       DateTime @default(now()) @db.Timestamptz
+
+  party    Party    @relation(fields: [party_id], references: [id])
+
+  @@map("data_request")
+}
+
+model UsoExterno {
+  id        BigInt   @id @default(autoincrement())
+  servicio  String   // OPENAI | WHATSAPP_PLANTILLA | GOOGLE_PLACES
+  unidades  Int
+  costo_usd Decimal? @db.Decimal(10, 4)
+  en        DateTime @default(now()) @db.Timestamptz
+
+  @@map("uso_externo")
+}
+
 
 
 
