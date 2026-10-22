@@ -250,7 +250,7 @@ export function InformesView() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
       {/* Texto explicativo superior */}
       <div style={{ fontSize: '13px', lineHeight: '19px', color: 'var(--cp-soft)' }}>
-        Cada informe se arma con lo que hay en el sistema: pedidos, caja, almacén, compras y clientes. Datos de ejemplo: los pedidos de hoy y el historial de los últimos días. Elige el período y los filtros, y abre un informe para ver sus cifras y descargarlo.
+        Cada informe se arma con lo que hay en el sistema: pedidos, caja, almacén, compras y clientes. Elige el período y los filtros, y abre un informe para ver sus cifras y descargarlo.
       </div>
 
       {/* Caja PERÍODO Y FILTROS */}

@@ -160,7 +160,7 @@ export function IndicadoresView() {
           )}
 
           <div style={{ fontSize: '12px', lineHeight: '17px', color: 'var(--cp-soft)' }}>
-            Cada categoría (frappes, iced, calientes, waffles, salados, complementos y combos) tiene su propio más comprado, con una estrella en la carta. Se calcula con las ventas del mes; el 1 de cada mes se reinicia solo y el mes que termina pasa al historial (datos de ejemplo).
+            Cada categoría (frappes, iced, calientes, waffles, salados, complementos y combos) tiene su propio más comprado, con una estrella en la carta. Se calcula con las ventas del mes; el 1 de cada mes se reinicia solo y el mes que termina pasa al historial.
           </div>
         </div>
 
@@ -217,7 +217,7 @@ export function IndicadoresView() {
             Lo vendido hoy: promociones y productos
           </div>
           <div style={{ fontSize: '12px', lineHeight: '17px', color: 'var(--cp-soft)' }}>
-            Cada promoción vendida se cuenta como promoción y, dentro de ella, se descuentan sus productos por separado (acta 02). Acepta un pedido en Pedidos y caja para ver cómo suma. Datos de ejemplo.
+            Cada promoción vendida se cuenta como promoción y, dentro de ella, se descuentan sus productos por separado (acta 02). Acepta un pedido en Pedidos y caja para ver cómo suma.
           </div>
 
           {promocionesVendidas.length === 0 ? (

@@ -1058,7 +1058,7 @@ export function UsuariosView() {
           </div>
 
           <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-            Fechas de creación y de último acceso: datos de ejemplo. En el sistema real se guardan solas cada vez que alguien entra.
+            Las fechas de creación y de último acceso se guardan solas cada vez que alguien entra.
           </div>
 
           {/* Paginación */}

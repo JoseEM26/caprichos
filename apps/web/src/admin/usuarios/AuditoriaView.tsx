@@ -188,7 +188,7 @@ export function AuditoriaView() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
       {/* Subtítulo descriptivo sin repetir título del módulo */}
       <div style={{ fontSize: '13px', lineHeight: '19px', color: 'var(--cp-soft)' }}>
-        Cada cambio sensible, cada ingreso y cada vez que alguien ve un dato sensible queda aquí con quién, cuándo y desde qué equipo. Nadie lo puede editar ni borrar; cada registro guarda la huella del anterior y el sistema verifica la cadena cada noche. Datos de ejemplo.
+        Cada cambio sensible, cada ingreso y cada vez que alguien ve un dato sensible queda aquí con quién, cuándo y desde qué equipo. Nadie lo puede editar ni borrar; cada registro guarda la huella del anterior y el sistema verifica la cadena cada noche.
       </div>
 
       {/* 4 Tarjetas KPI */}
