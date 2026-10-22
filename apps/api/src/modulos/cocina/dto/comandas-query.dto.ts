@@ -1,7 +1,8 @@
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 
 export class ComandasQueryDto {
-  @IsNotEmpty({ message: 'El parámetro area es obligatorio' })
+  // sin área: vista general con las comandas de todas las áreas
+  @IsOptional()
   @IsString()
-  area!: string;
+  area?: string;
 }

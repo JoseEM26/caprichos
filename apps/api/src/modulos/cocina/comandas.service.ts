@@ -262,9 +262,18 @@ export class ComandasService {
    * NUNCA devuelve teléfono ni dirección (RQ-COC-01-12).
    * Orden: más antiguas primero.
    */
-  async listarComandas(areaRef: string) {
+  async listarComandas(areaRef?: string, sincronizar = true): Promise<any[]> {
     // 1. Sincronizar pedidos pendientes primero
-    await this.sincronizarPendientes();
+    if (sincronizar) {
+      await this.sincronizarPendientes();
+    }
+
+    // Vista general (RQ-COC-01-09): sin área devuelve las comandas de todas las áreas, las más antiguas primero
+    if (!areaRef) {
+      const areas = await this.prisma.areaCocina.findMany({ where: { activo: true }, orderBy: { id: 'asc' } });
+      const listas = await Promise.all(areas.map((a) => this.listarComandas(a.id.toString(), false)));
+      return listas.flat().sort((x: any, y: any) => (y.minutos ?? 0) - (x.minutos ?? 0));
+    }
 
     // 2. Buscar el área
     const area = await this.buscarArea(areaRef);

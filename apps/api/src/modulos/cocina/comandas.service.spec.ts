@@ -248,6 +248,30 @@ describe('ComandasService', () => {
     });
   });
 
+  describe('vista general sin área', () => {
+    it('devuelve las comandas de todas las áreas activas, las más antiguas primero, sincronizando una sola vez', async () => {
+      const ahora = Date.now();
+      const pedido = (id: bigint, codigo: string, minAtras: number, areaId: bigint) => ({
+        id,
+        codigo,
+        creado_en: new Date(ahora - minAtras * 60000),
+        modalidad: 'DELIVERY',
+        lineas: [{ id: id * 10n, nombre: 'Producto', cantidad: 1, area_id: areaId, opciones: [], nombres_persona: [], producto: { categoria: { area_id: areaId } }, opcionesElegidas: [] }],
+      });
+      prisma.pedido.findMany.mockResolvedValue([]);
+      prisma.areaCocina.findMany.mockResolvedValue([{ id: 1n, nombre: 'Barra' }, { id: 3n, nombre: 'Postres' }]);
+      prisma.areaCocina.findFirst.mockImplementation(async ({ where }: any) => ({ id: where.OR ? 1n : 1n, nombre: 'Barra' }));
+      prisma.comandaArea.findMany
+        .mockResolvedValueOnce([{ pedido_id: 1n, area_id: 1n, estado: 'EN_COCINA', llego_en: new Date(), pedido: pedido(1n, 'CP-1', 10, 1n) }])
+        .mockResolvedValueOnce([{ pedido_id: 2n, area_id: 3n, estado: 'EN_COCINA', llego_en: new Date(), pedido: pedido(2n, 'CP-2', 40, 3n) }]);
+
+      const todas = await service.listarComandas();
+
+      expect(prisma.pedido.findMany).toHaveBeenCalledTimes(1); // una sola sincronización
+      expect(todas.map((c: any) => c.ticket)).toEqual(['CP-2', 'CP-1']);
+    });
+  });
+
   describe('pedido de dos áreas: una despeja (sigue en COLA), la segunda lo deja LISTO', () => {
     it('al completarse un pedido de MESA avisa al mozo; uno de DELIVERY no', async () => {
       const probar = async (modalidad: string) => {
