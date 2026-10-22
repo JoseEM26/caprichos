@@ -54,6 +54,17 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'repartos', accion: 'entregar' },
   { modulo: 'repartos', accion: 'reportar' },
   { modulo: 'repartos', accion: 'liquidar' },
+  // Cocina, Stock y Recetas (Ola 5)
+  { modulo: 'cocina', accion: 'ver' },
+  { modulo: 'cocina', accion: 'despejar' },
+  { modulo: 'cocina', accion: 'devolver' },
+  { modulo: 'cocina', accion: 'agotar' },
+  { modulo: 'cocina', accion: 'demanda' },
+  { modulo: 'stock', accion: 'ver' },
+  { modulo: 'stock', accion: 'editar' },
+  { modulo: 'stock', accion: 'movimientos' },
+  { modulo: 'recetas', accion: 'ver' },
+  { modulo: 'recetas', accion: 'editar' },
 ] as const;
 
 export const MATRIZ: Record<string, string[]> = {
@@ -69,11 +80,25 @@ export const MATRIZ: Record<string, string[]> = {
     'caja/ver',
     'repartos/ver',
     'repartos/liquidar',
+    'cocina/ver',
+    'stock/ver',
   ],
-  COCINA: ['pedidos/ver', 'pedidos/cambiar_estado'],
+  COCINA: [
+    'pedidos/ver',
+    'pedidos/cambiar_estado',
+    'cocina/ver',
+    'cocina/despejar',
+    'cocina/devolver',
+    'cocina/agotar',
+    'cocina/demanda',
+  ],
   MOZO: [],
   CALLCENTER: [],
-  ALMACEN: [],
+  ALMACEN: [
+    'stock/ver',
+    'stock/editar',
+    'stock/movimientos',
+  ],
   REPARTIDOR: [
     'repartos/ver',
     'repartos/tomar',

@@ -57,8 +57,15 @@ export class LocalService {
 
     const pausaParam = parametros.find((p) => p.clave === 'pausa_alta_demanda')?.valor;
     const tiempoParam = parametros.find((p) => p.clave === 'tiempo_prometido_min')?.valor;
-    const tiempoPrometidoMin =
+    const tiempoBaseMin =
       typeof tiempoParam === 'number' ? tiempoParam : Number(tiempoParam) || null;
+    // alta demanda vigente (ola 5, cocina): suma sus minutos al tiempo prometido de la carta
+    const altaDemanda = await this.prisma.altaDemanda.findFirst({
+      where: { hasta: null },
+      orderBy: { id: 'desc' },
+    });
+    const tiempoPrometidoMin =
+      tiempoBaseMin !== null ? tiempoBaseMin + (altaDemanda?.minutos ?? 0) : null;
 
     const pausaAltaDemanda =
       typeof pausaParam === 'boolean'
@@ -84,6 +91,7 @@ export class LocalService {
         cierra: null,
         pausaAltaDemanda: true,
         tiempoPrometidoMin,
+        altaDemandaMin: altaDemanda?.minutos ?? 0,
       };
     }
 
@@ -103,6 +111,7 @@ export class LocalService {
           cierra: null,
           pausaAltaDemanda: false,
           tiempoPrometidoMin,
+          altaDemandaMin: altaDemanda?.minutos ?? 0,
         };
       }
 
@@ -118,6 +127,7 @@ export class LocalService {
           cierra: null,
           pausaAltaDemanda: false,
           tiempoPrometidoMin,
+          altaDemandaMin: altaDemanda?.minutos ?? 0,
         };
       }
 
@@ -130,6 +140,7 @@ export class LocalService {
           cierra: cierraEsp,
           pausaAltaDemanda: false,
           tiempoPrometidoMin,
+          altaDemandaMin: altaDemanda?.minutos ?? 0,
         };
       }
 
@@ -142,6 +153,7 @@ export class LocalService {
           cierra: cierraEsp,
           pausaAltaDemanda: false,
           tiempoPrometidoMin,
+          altaDemandaMin: altaDemanda?.minutos ?? 0,
         };
       }
 
@@ -154,6 +166,7 @@ export class LocalService {
         cierra: cierraEsp,
         pausaAltaDemanda: false,
         tiempoPrometidoMin,
+        altaDemandaMin: altaDemanda?.minutos ?? 0,
       };
     }
 
@@ -171,6 +184,7 @@ export class LocalService {
         cierra: null,
         pausaAltaDemanda: false,
         tiempoPrometidoMin,
+        altaDemandaMin: altaDemanda?.minutos ?? 0,
       };
     }
 
@@ -186,6 +200,7 @@ export class LocalService {
         cierra: null,
         pausaAltaDemanda: false,
         tiempoPrometidoMin,
+        altaDemandaMin: altaDemanda?.minutos ?? 0,
       };
     }
 
@@ -198,6 +213,7 @@ export class LocalService {
         cierra,
         pausaAltaDemanda: false,
         tiempoPrometidoMin,
+        altaDemandaMin: altaDemanda?.minutos ?? 0,
       };
     }
 
@@ -210,6 +226,7 @@ export class LocalService {
         cierra,
         pausaAltaDemanda: false,
         tiempoPrometidoMin,
+        altaDemandaMin: altaDemanda?.minutos ?? 0,
       };
     }
 
@@ -222,6 +239,7 @@ export class LocalService {
       cierra,
       pausaAltaDemanda: false,
       tiempoPrometidoMin,
+      altaDemandaMin: altaDemanda?.minutos ?? 0,
     };
   }
 

@@ -49,6 +49,37 @@ export class AuthService {
     private readonly auditoria: AuditoriaService,
   ) {}
 
+  /** Quién es el usuario de la sesión y qué puede hacer (el front arma su menú con esto). */
+  async yo(partyId: bigint): Promise<{
+    partyId: string;
+    nombres: string;
+    rol: string;
+    debeCambiar: boolean;
+    permisos: string[];
+  }> {
+    const cuenta = await this.prisma.userAccount.findUnique({
+      where: { party_id: partyId },
+      include: { party: { include: { persona: true } } },
+    });
+    if (!cuenta) {
+      throw new HttpException(
+        { codigo: 'USUARIO_NO_ENCONTRADO', mensaje: 'La cuenta ya no existe' },
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+    const filas = await this.prisma.rolPermiso.findMany({
+      where: { rol: cuenta.rol },
+      include: { permiso: true },
+    });
+    return {
+      partyId: cuenta.party_id.toString(),
+      nombres: cuenta.party.persona?.nombres || '',
+      rol: cuenta.rol,
+      debeCambiar: cuenta.debe_cambiar,
+      permisos: filas.map((f) => `${f.permiso.modulo}/${f.permiso.accion}`).sort(),
+    };
+  }
+
   async ingresar(
     dto: IngresarDto,
     ip?: string,

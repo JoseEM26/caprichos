@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   Post,
   Req,
   Res,
@@ -109,6 +110,14 @@ export class AuthController {
     });
 
     return resultado;
+  }
+
+  @UseGuards(AccesoGuard)
+  @SoloCambioClave()
+  @Get('yo')
+  async yo(@Req() req: Request) {
+    const usuario = (req as any).usuario as UsuarioAutenticado;
+    return this.authService.yo(usuario.partyId);
   }
 
   @UseGuards(AccesoGuard)

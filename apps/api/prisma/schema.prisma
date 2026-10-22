@@ -166,6 +166,9 @@ model ListaValor {
   lista           Lista            @relation(fields: [lista_id], references: [id])
   productoTamanos ProductoTamano[]
   opciones        Opcion[]
+  movimientosOrigen  MovimientoStock[] @relation("MovimientoStockOrigen")
+  movimientosDestino MovimientoStock[] @relation("MovimientoStockDestino")
+  recetas            Receta[]
 
   @@unique([lista_id, nombre])
   @@map("lista_valor")
@@ -221,6 +224,9 @@ model AreaCocina {
   activo       Boolean       @default(true)
   categorias   Categoria[]
   pedidoLineas PedidoLinea[]
+  comandas     ComandaArea[]
+  altasDemanda AltaDemanda[]
+  lugaresStock LugarStock[]
 
   @@map("area_cocina")
 }
@@ -257,18 +263,23 @@ model Producto {
   grupos             ProductoGrupo[]
   sabores            Sabor[]
   pedidoLineas       PedidoLinea[]
+  agotados           Agotado[]
+  stocks             Stock[]
+  movimientosStock   MovimientoStock[]
+  recetas            Receta[]
 
   @@map("producto")
 }
 
 model ProductoTamano {
-  id              BigInt     @id @default(autoincrement())
+  id              BigInt        @id @default(autoincrement())
   producto_id     BigInt
   tamano_valor_id BigInt
-  precio          Decimal    @db.Decimal(12, 2)
-  activo          Boolean    @default(true)
-  producto        Producto   @relation(fields: [producto_id], references: [id])
-  tamano_valor    ListaValor @relation(fields: [tamano_valor_id], references: [id])
+  precio          Decimal       @db.Decimal(12, 2)
+  activo          Boolean       @default(true)
+  producto        Producto      @relation(fields: [producto_id], references: [id])
+  tamano_valor    ListaValor    @relation(fields: [tamano_valor_id], references: [id])
+  recetaLineas    RecetaLinea[]
 
   @@unique([producto_id, tamano_valor_id])
   @@map("producto_tamano")
@@ -299,6 +310,8 @@ model Opcion {
   grupo               GrupoOpciones        @relation(fields: [grupo_id], references: [id])
   valor               ListaValor           @relation(fields: [valor_id], references: [id])
   pedidoLineaOpciones PedidoLineaOpcion[]
+  agotados            Agotado[]
+  ajustes             AjusteOpcion[]
 
   @@unique([grupo_id, valor_id])
   @@map("opcion")
@@ -323,6 +336,7 @@ model Sabor {
   activo        Boolean   @default(true)
   agotado_hasta DateTime? @db.Timestamptz
   producto      Producto  @relation(fields: [producto_id], references: [id])
+  agotados      Agotado[]
 
   @@unique([producto_id, nombre])
   @@map("sabor")
@@ -399,6 +413,8 @@ model Pedido {
   cobro                  Cobro?
   incidentes             IncidenteEntrega[]
   mensajesReparto        MensajeReparto[]
+  comandas               ComandaArea[]
+  movimientosStock       MovimientoStock[]
 
   @@map("pedido")
 }
@@ -612,6 +628,188 @@ model MensajeReparto {
   @@id([pedido_id, numero])
   @@map("mensaje_reparto")
 }
+
+// ---------- Ola 5: cocina por áreas, stock y recetas (FT-COC-01..03, FT-STK-01..03) ----------
+
+model ComandaArea {
+  pedido_id     BigInt
+  area_id       BigInt
+  estado        String    @default("EN_COCINA") // EN_COCINA | DESPEJADA
+  llego_en      DateTime  @default(now()) @db.Timestamptz
+  despejada_en  DateTime? @db.Timestamptz
+  despejada_por BigInt?
+  devuelta_en   DateTime? @db.Timestamptz
+  devuelta_por  BigInt?
+
+  pedido Pedido     @relation(fields: [pedido_id], references: [id])
+  area   AreaCocina @relation(fields: [area_id], references: [id])
+
+  @@id([pedido_id, area_id])
+  @@map("comanda_area")
+}
+
+model Agotado {
+  id            BigInt    @id @default(autoincrement())
+  producto_id   BigInt?
+  opcion_id     BigInt?
+  sabor_id      BigInt?
+  tipo          String?   // PRODUCTO | SABOR | OPCION
+  alcance       String    // HOY | HASTA_REACTIVAR | INDEFINIDO
+  desde         DateTime  @default(now()) @db.Timestamptz
+  hasta         DateTime? @db.Timestamptz
+  reactivado_en DateTime? @db.Timestamptz
+  por           BigInt
+
+  producto Producto? @relation(fields: [producto_id], references: [id])
+  opcion   Opcion?   @relation(fields: [opcion_id], references: [id])
+  sabor    Sabor?    @relation(fields: [sabor_id], references: [id])
+
+  @@map("agotado")
+}
+
+model AltaDemanda {
+  id      BigInt      @id @default(autoincrement())
+  minutos Int
+  pausa   Boolean     @default(false)
+  desde   DateTime    @default(now()) @db.Timestamptz
+  hasta   DateTime?   @db.Timestamptz
+  por     BigInt
+  area_id BigInt?
+
+  area AreaCocina? @relation(fields: [area_id], references: [id])
+
+  @@map("alta_demanda")
+}
+
+model LugarStock {
+  id             BigInt            @id @default(autoincrement())
+  nombre         String            @unique
+  tipo           String            // ALMACEN | AREA
+  area_id        BigInt?
+  area           AreaCocina?       @relation(fields: [area_id], references: [id])
+  insumosConsumo Insumo[]          @relation("InsumoLugarConsumo")
+  stocks         Stock[]
+  movimientos    MovimientoStock[]
+
+  @@map("lugar_stock")
+}
+
+model Insumo {
+  id               BigInt            @id @default(autoincrement())
+  nombre           String            @unique
+  unidad_compra    String
+  unidad_almacen   String
+  unidad_receta    String
+  factor_compra    Decimal           @db.Decimal(14, 3)
+  factor_receta    Decimal           @db.Decimal(14, 6)
+  minimo           Decimal           @db.Decimal(14, 3)
+  intermedio       Decimal?          @db.Decimal(14, 3)
+  maximo           Decimal           @db.Decimal(14, 3)
+  lugar_consumo_id BigInt?
+  costo_unit       Decimal?          @db.Decimal(12, 4)
+  proveedor_a      BigInt?
+  proveedor_b      BigInt?
+  proveedor_c      BigInt?
+  activo           Boolean           @default(true)
+
+  lugarConsumo     LugarStock?       @relation("InsumoLugarConsumo", fields: [lugar_consumo_id], references: [id])
+  stocks           Stock[]
+  movimientos      MovimientoStock[]
+  recetaLineas     RecetaLinea[]
+  ajustesOpcion    AjusteOpcion[]    @relation("AjusteInsumo")
+  ajustesReemplaza AjusteOpcion[]    @relation("AjusteReemplazaInsumo")
+
+  @@map("insumo")
+}
+
+model Stock {
+  id          BigInt      @id @default(autoincrement())
+  insumo_id   BigInt?
+  producto_id BigInt?
+  lugar_id    BigInt
+  cantidad    Decimal     @db.Decimal(14, 3)
+
+  insumo      Insumo?     @relation(fields: [insumo_id], references: [id])
+  producto    Producto?   @relation(fields: [producto_id], references: [id])
+  lugar       LugarStock  @relation(fields: [lugar_id], references: [id])
+
+  @@map("stock")
+}
+
+model MovimientoStock {
+  id                    BigInt            @id @default(autoincrement())
+  tipo                  String            // ENTRADA | SALIDA | AJUSTE | MERMA | DEVOLUCION | VENTA | PRODUCCION_CONSUMO | PRODUCCION_ALTA | TRASLADO_SALIDA | TRASLADO_ENTRADA | DIFERENCIA_CONTEO | ANULACION
+  insumo_id             BigInt?
+  producto_id           BigInt?
+  lugar_id              BigInt
+  cantidad              Decimal           @db.Decimal(14, 3)
+  origen_valor_id       BigInt?
+  destino_valor_id      BigInt?
+  pedido_id             BigInt?
+  produccion_id         BigInt?
+  traslado_id           BigInt?
+  compra_id             BigInt?
+  nota                  String?
+  movimiento_anulado_id BigInt?
+  por                   BigInt
+  en                    DateTime          @default(now()) @db.Timestamptz
+
+  insumo                Insumo?           @relation(fields: [insumo_id], references: [id])
+  producto              Producto?         @relation(fields: [producto_id], references: [id])
+  lugar                 LugarStock        @relation(fields: [lugar_id], references: [id])
+  origen_valor          ListaValor?       @relation("MovimientoStockOrigen", fields: [origen_valor_id], references: [id])
+  destino_valor         ListaValor?       @relation("MovimientoStockDestino", fields: [destino_valor_id], references: [id])
+  pedido                Pedido?           @relation(fields: [pedido_id], references: [id])
+  movimientoAnulado     MovimientoStock?  @relation("MovimientosAnulados", fields: [movimiento_anulado_id], references: [id])
+  movimientosRevertidos MovimientoStock[] @relation("MovimientosAnulados")
+
+  @@map("movimiento_stock")
+}
+
+model Receta {
+  id              BigInt        @id @default(autoincrement())
+  producto_id     BigInt
+  tamano_valor_id BigInt?
+  es_produccion   Boolean       @default(false)
+  rinde           Decimal?      @db.Decimal(14, 3)
+
+  producto        Producto      @relation(fields: [producto_id], references: [id])
+  tamano_valor    ListaValor?   @relation(fields: [tamano_valor_id], references: [id])
+  lineas          RecetaLinea[]
+
+  @@unique([producto_id, tamano_valor_id, es_produccion])
+  @@map("receta")
+}
+
+model RecetaLinea {
+  receta_id          BigInt
+  insumo_id          BigInt
+  cantidad           Decimal         @db.Decimal(14, 3)
+  producto_tamano_id BigInt?
+
+  receta             Receta          @relation(fields: [receta_id], references: [id])
+  insumo             Insumo          @relation(fields: [insumo_id], references: [id])
+  productoTamano     ProductoTamano? @relation(fields: [producto_tamano_id], references: [id])
+
+  @@id([receta_id, insumo_id])
+  @@map("receta_linea")
+}
+
+model AjusteOpcion {
+  opcion_id           BigInt
+  insumo_id           BigInt
+  efecto              String          // SUMA | QUITA | REEMPLAZA
+  reemplaza_insumo_id BigInt?
+  cantidad            Decimal?        @db.Decimal(14, 3)
+
+  opcion              Opcion          @relation(fields: [opcion_id], references: [id])
+  insumo              Insumo          @relation("AjusteInsumo", fields: [insumo_id], references: [id])
+  reemplazaInsumo     Insumo?         @relation("AjusteReemplazaInsumo", fields: [reemplaza_insumo_id], references: [id])
+
+  @@id([opcion_id, insumo_id])
+  @@map("ajuste_opcion")
+}
+
 
 
 

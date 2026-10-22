@@ -56,6 +56,9 @@ describe('AuthService', () => {
         findUnique: jest.fn(),
         update: jest.fn(),
       },
+      rolPermiso: {
+        findMany: jest.fn(),
+      },
     };
 
     jwtService = {
@@ -534,6 +537,39 @@ describe('AuthService', () => {
           partyId: BigInt(10),
         }),
       );
+    });
+  });
+
+  describe('yo', () => {
+    it('devuelve el usuario con su rol y sus permisos ordenados', async () => {
+      prisma.userAccount.findUnique.mockResolvedValue({
+        party_id: 7n,
+        rol: 'COCINA',
+        debe_cambiar: false,
+        party: { persona: { nombres: 'Luis' } },
+      });
+      prisma.rolPermiso.findMany.mockResolvedValue([
+        { permiso: { modulo: 'cocina', accion: 'ver' } },
+        { permiso: { modulo: 'cocina', accion: 'despejar' } },
+      ]);
+
+      const r = await service.yo(7n);
+
+      expect(r).toEqual({
+        partyId: '7',
+        nombres: 'Luis',
+        rol: 'COCINA',
+        debeCambiar: false,
+        permisos: ['cocina/despejar', 'cocina/ver'],
+      });
+      expect(prisma.rolPermiso.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { rol: 'COCINA' } }),
+      );
+    });
+
+    it('cuenta que ya no existe -> 401 USUARIO_NO_ENCONTRADO', async () => {
+      prisma.userAccount.findUnique.mockResolvedValue(null);
+      await expect(service.yo(9n)).rejects.toMatchObject({ status: 401 });
     });
   });
 

@@ -24,6 +24,9 @@ describe('LocalService', () => {
         findUnique: jest.fn(),
         upsert: jest.fn(),
       },
+      altaDemanda: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
       horarioDia: {
         findUnique: jest.fn(),
         findMany: jest.fn(),
@@ -55,6 +58,44 @@ describe('LocalService', () => {
   });
 
   describe('obtenerEstadoCarta', () => {
+    it('alta demanda vigente suma sus minutos al tiempo prometido', async () => {
+      const ahora = new Date('2026-10-20T20:00:00.000Z');
+      prismaMock.parametro.findMany.mockResolvedValue([{ clave: 'tiempo_prometido_min', valor: 35 }]);
+      prismaMock.altaDemanda.findFirst.mockResolvedValue({ minutos: 30 });
+      prismaMock.fechaEspecial.findUnique.mockResolvedValue(null);
+      prismaMock.horarioDia.findUnique.mockResolvedValue(null);
+
+      const r = await service.obtenerEstadoCarta(ahora);
+
+      expect(r.tiempoPrometidoMin).toBe(65);
+      expect(r.altaDemandaMin).toBe(30);
+    });
+
+    it('sin tiempo base, la alta demanda igual se informa en altaDemandaMin', async () => {
+      const ahora = new Date('2026-10-20T20:00:00.000Z');
+      prismaMock.parametro.findMany.mockResolvedValue([]);
+      prismaMock.altaDemanda.findFirst.mockResolvedValue({ minutos: 30 });
+      prismaMock.fechaEspecial.findUnique.mockResolvedValue(null);
+      prismaMock.horarioDia.findUnique.mockResolvedValue(null);
+
+      const r = await service.obtenerEstadoCarta(ahora);
+
+      expect(r.tiempoPrometidoMin).toBeNull();
+      expect(r.altaDemandaMin).toBe(30);
+    });
+
+    it('sin alta demanda el tiempo prometido no cambia', async () => {
+      const ahora = new Date('2026-10-20T20:00:00.000Z');
+      prismaMock.parametro.findMany.mockResolvedValue([{ clave: 'tiempo_prometido_min', valor: 35 }]);
+      prismaMock.fechaEspecial.findUnique.mockResolvedValue(null);
+      prismaMock.horarioDia.findUnique.mockResolvedValue(null);
+
+      const r = await service.obtenerEstadoCarta(ahora);
+
+      expect(r.tiempoPrometidoMin).toBe(35);
+      expect(r.altaDemandaMin).toBe(0);
+    });
+
     it('estado cerrado por horario (antes de abrir)', async () => {
       // Martes 2026-10-20 a las 10:00 Lima (15:00 UTC)
       const ahora = new Date('2026-10-20T15:00:00.000Z');
