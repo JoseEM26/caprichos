@@ -112,6 +112,11 @@ export function CuentaProvider({ children }: { children: ReactNode }) {
   return <Contexto.Provider value={valor}>{children}</Contexto.Provider>;
 }
 
+/** Igual que useCuenta, pero devuelve null fuera de un CuentaProvider (por ejemplo en pruebas o pantallas sin cuenta) */
+export function useCuentaOpcional(): ContextoCuenta | null {
+  return useContext(Contexto);
+}
+
 export function useCuenta(): ContextoCuenta {
   const c = useContext(Contexto);
   if (!c) throw new Error('useCuenta debe usarse dentro de un CuentaProvider');

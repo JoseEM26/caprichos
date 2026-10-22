@@ -1,3 +1,4 @@
+import { PuntosService } from '../clientes/puntos.service';
 import {
   BadRequestException,
   ConflictException,
@@ -5,6 +6,7 @@ import {
   HttpStatus,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../comun/prisma/prisma.service';
@@ -34,6 +36,7 @@ export class PedidosService {
     private readonly zonasService: ZonasService,
     private readonly eventosGateway: EventosGateway,
     private readonly ofertasService: OfertasService,
+    @Optional() private readonly puntosService?: PuntosService,
   ) {}
 
   /**
@@ -457,6 +460,37 @@ export class PedidosService {
       entregaOrigen = null;
     }
 
+    // canje de puntos (DT-55): solo con cuenta, sin cupón y hasta el monto de los productos
+    const puntosCanje = Number(Number(dto.puntosCanje || 0).toFixed(2));
+    if (puntosCanje > 0) {
+      const partyCliente = origen?.clientePartyId;
+      if (!partyCliente || !this.puntosService) {
+        throw new BadRequestException({
+          codigo: 'PUNTOS_REQUIEREN_CUENTA',
+          mensaje: 'Ingresa con tu cuenta para usar tus puntos',
+        });
+      }
+      if (desgloseDescuento.cuponId || desgloseDescuento.cuponEmitidoId) {
+        throw new BadRequestException({
+          codigo: 'PUNTOS_CON_CUPON',
+          mensaje: 'No se pueden usar puntos y un cupón en el mismo pedido',
+        });
+      }
+      const saldo = await this.puntosService.obtenerSaldo(partyCliente as any);
+      if (puntosCanje > saldo) {
+        throw new BadRequestException({
+          codigo: 'PUNTOS_INSUFICIENTES',
+          mensaje: `Solo tienes ${saldo.toFixed(2)} puntos`,
+        });
+      }
+      if (puntosCanje > Math.max(0, subtotalCalculado - descuentoAplicado)) {
+        throw new BadRequestException({
+          codigo: 'TOPE_CANJE_EXCEDIDO',
+          mensaje: 'No puedes usar más puntos que el total de tus productos',
+        });
+      }
+    }
+
     const totalCalculado = Number(Math.max(0, subtotalCalculado - descuentoAplicado + (envio ?? 0)).toFixed(2));
 
     // 8. Validación de pago
@@ -638,6 +672,25 @@ export class PedidosService {
       return pedido;
     });
 
+    // 9.5. Canje de puntos: se descuenta del saldo y del total del pedido
+    let totalFinal = Number(pedidoCreado.total);
+    if (puntosCanje > 0 && this.puntosService && origen?.clientePartyId) {
+      try {
+        await this.puntosService.canjear(origen.clientePartyId as any, puntosCanje, pedidoCreado.id);
+        totalFinal = Number(Math.max(0, totalFinal - puntosCanje).toFixed(2));
+        await this.prisma.pedido.update({
+          where: { id: pedidoCreado.id },
+          data: { total: new Prisma.Decimal(totalFinal) },
+        });
+      } catch (err) {
+        await this.prisma.pedido.update({
+          where: { id: pedidoCreado.id },
+          data: { estado: 'ANULADO', motivo_anulacion: 'Canje de puntos rechazado' },
+        });
+        throw err;
+      }
+    }
+
     // 10. Emitir evento en tiempo real por WebSocket
     try {
       this.eventosGateway.emitirAdmin('pedido:nuevo', {
@@ -657,7 +710,8 @@ export class PedidosService {
       subtotal: Number(pedidoCreado.subtotal),
       descuento: Number(pedidoCreado.descuento || 0),
       envio: pedidoCreado.envio !== null ? Number(pedidoCreado.envio) : null,
-      total: Number(pedidoCreado.total),
+      total: totalFinal,
+      puntosCanjeados: puntosCanje,
       mensaje:
         origen?.canal === 'MOZO'
           ? 'Pedido enviado a cocina'

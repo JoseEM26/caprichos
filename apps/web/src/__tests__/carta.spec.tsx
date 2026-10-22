@@ -301,12 +301,13 @@ describe('Pruebas de la Carta Pública (front-carta)', () => {
     fireEvent.click(btnEnviar);
     fireEvent.click(btnEnviar);
 
+    const envios = () => postSpy.mock.calls.filter((c) => c[0] === '/pedidos');
     await waitFor(() => {
-      expect(postSpy).toHaveBeenCalledTimes(1);
+      expect(envios()).toHaveLength(1);
     });
 
     // Verificar que la cabecera Idempotency-Key fue enviada
-    const callArgs = postSpy.mock.calls[0];
+    const callArgs = envios()[0];
     expect(callArgs[0]).toBe('/pedidos');
     expect(callArgs[2]?.headers).toHaveProperty('Idempotency-Key');
   });
@@ -380,7 +381,7 @@ describe('Pruebas de la Carta Pública (front-carta)', () => {
     ).toBeInTheDocument();
 
     // La API NO debió ser llamada
-    expect(postSpy).not.toHaveBeenCalled();
+    expect(postSpy.mock.calls.filter((c) => c[0] === '/pedidos')).toHaveLength(0);
   });
 
   // 6. Carta cerrada bloquea el envío
@@ -432,6 +433,6 @@ describe('Pruebas de la Carta Pública (front-carta)', () => {
     expect(btnContinuar).toBeDisabled();
 
     // No se llama a la API
-    expect(postSpy).not.toHaveBeenCalled();
+    expect(postSpy.mock.calls.filter((c) => c[0] === '/pedidos')).toHaveLength(0);
   });
 });

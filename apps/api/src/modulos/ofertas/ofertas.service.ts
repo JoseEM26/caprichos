@@ -1235,6 +1235,37 @@ export class OfertasService {
   // CÁLCULO DE DESCUENTOS Y PROMOCIONES PARA PEDIDO
   // ==========================================
 
+  /** Igual que al crear el pedido, pero sin guardar nada: sirve para mostrar el total antes de enviar. */
+  async vistaPreviaDescuentos(
+    lineas: { productoId: string; cantidad: number; subtotal: number; precioUnitario: number }[],
+    cuponCodigo?: string,
+  ): Promise<{ descuentoTotal: number; detalles: { tipo: string; nombre: string; monto: number }[] }> {
+    const validas = (lineas || []).filter((l) => /^\d+$/.test(String(l.productoId)) && Number(l.cantidad) > 0);
+    if (validas.length === 0) return { descuentoTotal: 0, detalles: [] };
+    const productos = await this.prisma.producto.findMany({
+      where: { id: { in: validas.map((l) => BigInt(l.productoId)) } },
+      select: { id: true, categoria_id: true, no_suma_beneficios: true },
+    });
+    const porId = new Map(productos.map((p) => [String(p.id), p]));
+    const lineasCalc = validas.map((l) => {
+      const prod = porId.get(String(l.productoId));
+      return {
+        productoId: BigInt(l.productoId),
+        categoriaId: prod?.categoria_id ?? null,
+        cantidad: Number(l.cantidad),
+        subtotal: Number(l.subtotal),
+        precioUnitario: Number(l.precioUnitario),
+        noSumaBeneficios: prod?.no_suma_beneficios ?? false,
+      };
+    });
+    const subtotal = Number(lineasCalc.reduce((a, l) => a + l.subtotal, 0).toFixed(2));
+    const desglose = await this.calcularDescuentosParaPedido({ subtotal, lineas: lineasCalc, canal: 'CARTA', cuponCodigo: cuponCodigo || null });
+    return {
+      descuentoTotal: desglose.descuentoTotal,
+      detalles: (desglose.detalles || []).map((d: any) => ({ tipo: String(d.tipo ?? ''), nombre: String(d.nombre ?? ''), monto: Number(d.montoDescontado ?? 0) })),
+    };
+  }
+
   async calcularDescuentosParaPedido(params: {
     subtotal: number;
     lineas: Array<{

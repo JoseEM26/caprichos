@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import { calcularTotalPedido } from '@caprichos/compartido';
 import { api, ErrorApi } from '../comun/api';
@@ -6,6 +6,8 @@ import { MapaUbicacion } from '../comun/mapa/MapaUbicacion';
 import { BuscadorDireccion } from '../comun/mapa/BuscadorDireccion';
 import { enlaceGoogleMaps } from '../comun/mapa/leaflet';
 import { useCarrito } from './CarritoContext';
+import { PuntosCanje } from './cuenta/PuntosCanje';
+import { useCuentaOpcional } from './cuenta/CuentaContext';
 import {
   ConsultaEnvioRespuesta,
   DatosLocalCarta,
@@ -78,6 +80,9 @@ export function FormularioCheckout({
     valor: number;
   } | null>(null);
   const [cargandoCupon, setCargandoCupon] = useState(false);
+  const [puntosAplicados, setPuntosAplicados] = useState(0);
+  const [promos, setPromos] = useState<{ total: number; detalles: { nombre: string; monto: number }[] }>({ total: 0, detalles: [] });
+  const cuentaCtx = useCuentaOpcional();
   const [mensajeCupon, setMensajeCupon] = useState<string | null>(null);
 
   // Idempotency-Key único por intento
@@ -89,6 +94,24 @@ export function FormularioCheckout({
 
   // Prevención de doble toque estricta
   const peticionEnCursoRef = useRef(false);
+
+  // lo que descontará el servidor (promociones automáticas y cupón), para mostrar el mismo total que se cobra
+  const clavePromos = JSON.stringify([lineas.map((l) => [l.productoId, l.cantidad, l.subtotal]), cuponAplicado?.codigo]);
+  useEffect(() => {
+    if (!checkoutAbierto || lineas.length === 0) return;
+    let vigente = true;
+    api
+      .post<{ descuentoTotal: number; detalles: { nombre: string; monto: number }[] }>('/carta/descuentos/vista-previa', {
+        lineas: lineas.map((l) => ({ productoId: l.productoId, cantidad: l.cantidad, subtotal: l.subtotal, precioUnitario: l.precioUnitario })),
+        cuponCodigo: cuponAplicado?.codigo,
+      })
+      .then((r) => vigente && setPromos({ total: r.descuentoTotal, detalles: r.detalles }))
+      .catch(() => vigente && setPromos({ total: 0, detalles: [] }));
+    return () => {
+      vigente = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkoutAbierto, clavePromos]);
 
   if (!checkoutAbierto) return null;
 
@@ -102,7 +125,7 @@ export function FormularioCheckout({
         calcularTotalPedido({
           subtotal,
           envio: costoEnvioEfectivo,
-        }) - descuentoCupon
+        }) - (promos.total > 0 ? promos.total : descuentoCupon) - (cuponAplicado ? 0 : puntosAplicados)
       ).toFixed(2),
     ),
   );
@@ -335,6 +358,7 @@ export function FormularioCheckout({
         razonSocial: tipoComprobante === 'FACTURA' ? razonSocial.trim() : undefined,
       },
       cuponCodigo: cuponAplicado ? cuponAplicado.codigo : undefined,
+      puntosCanje: !cuponAplicado && puntosAplicados > 0 ? puntosAplicados : undefined,
     };
 
     try {
@@ -346,6 +370,7 @@ export function FormularioCheckout({
 
       limpiarCarrito();
       cerrarCheckout();
+      void cuentaCtx?.refrescar();
       setPedidoConfirmado({
         id: respuesta.id,
         codigo: respuesta.codigo,
@@ -1206,6 +1231,15 @@ export function FormularioCheckout({
           </div>
 
           {/* Campo de cupón */}
+          {!cuponAplicado && cuentaCtx && (
+            <PuntosCanje
+              totalPedido={Math.max(0, subtotal)}
+              puntosAplicados={puntosAplicados}
+              alAplicar={setPuntosAplicados}
+            />
+          )}
+
+          {puntosAplicados === 0 && (
           <div
             style={{
               border: '1px solid var(--cp-line)',
@@ -1305,6 +1339,7 @@ export function FormularioCheckout({
               </div>
             )}
           </div>
+          )}
 
           {/* Resumen de totales */}
           <div
@@ -1323,12 +1358,26 @@ export function FormularioCheckout({
               <span style={{ fontWeight: 700 }}>S/ {subtotal.toFixed(2)}</span>
             </div>
 
-            {cuponAplicado && (
+            {puntosAplicados > 0 && !cuponAplicado && (
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--cp-rust)' }}>
-                <span>Cupón {cuponAplicado.codigo}</span>
-                <span style={{ fontWeight: 700 }}>−S/ {cuponAplicado.descuentoCalculado.toFixed(2)}</span>
+                <span>Puntos canjeados</span>
+                <span style={{ fontWeight: 700 }}>−S/ {puntosAplicados.toFixed(2)}</span>
               </div>
             )}
+
+            {promos.detalles.length > 0
+              ? promos.detalles.map((d, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--cp-rust)' }}>
+                    <span>{d.nombre}</span>
+                    <span style={{ fontWeight: 700 }}>−S/ {d.monto.toFixed(2)}</span>
+                  </div>
+                ))
+              : cuponAplicado && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--cp-rust)' }}>
+                    <span>Cupón {cuponAplicado.codigo}</span>
+                    <span style={{ fontWeight: 700 }}>−S/ {cuponAplicado.descuentoCalculado.toFixed(2)}</span>
+                  </div>
+                )}
 
             {modalidad === 'DELIVERY' && (
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
