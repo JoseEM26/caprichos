@@ -24,6 +24,7 @@ import { ReservasModule } from './modulos/reservas/reservas.module';
 import { SalonModule } from './modulos/salon/salon.module';
 import { ComprobantesModule } from './modulos/comprobantes/comprobantes.module';
 import { ReclamosModule } from './modulos/reclamos/reclamos.module';
+import { NotificacionesModule } from './modulos/notificaciones/notificaciones.module';
 import { DireccionesModule } from './modulos/direcciones/direcciones.module';
 
 @Module({
@@ -55,6 +56,7 @@ import { DireccionesModule } from './modulos/direcciones/direcciones.module';
     ComprobantesModule,
     ReclamosModule,
     DireccionesModule,
+    NotificacionesModule,
   ],
   providers: [
     PinoLoggerService,

@@ -5,6 +5,7 @@ import { CambiarClave } from './admin/CambiarClave';
 import { AdminShell } from './admin/AdminShell';
 import { MODULOS } from './admin/modulos';
 import { Escritorio } from './admin/Escritorio';
+import { Perfil } from './admin/Perfil';
 import { CartaPublica } from './carta/CartaPublica';
 import { TerminosPage, PrivacidadPage, ReclamosPublicoPage } from './carta/legal';
 import { PantallaCocinaView } from './pantalla/PantallaCocinaView';
@@ -50,6 +51,7 @@ export function RutasApp() {
       >
         <Route index element={<Escritorio />} />
         <Route path="escritorio" element={<Escritorio />} />
+        <Route path="perfil" element={<Perfil />} />
 
         {MODULOS.filter((m) => m.ruta !== '/admin').map((m) => {
           const rutaRelativa = m.ruta.replace(/^\/admin\/?/, '');
