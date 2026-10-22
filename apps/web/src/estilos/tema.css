@@ -1,0 +1,65 @@
+:root {
+  --cp-navy: #0B2C3E;       /* tinta */
+  --cp-cream: #FBF4EC;      /* fondo */
+  --cp-orange: #E67929;     /* acento */
+  --cp-gold: #D99E39;       /* dorado */
+  --cp-rust: #B2500F;       /* precio / avisos / error */
+  --cp-soft: #2C4C5D;       /* apagado */
+  --cp-line: #E3D6C6;       /* línea */
+  --cp-line2: #D9CFC2;      /* línea secundaria */
+  --cp-white: #FFFFFF;      /* tarjeta */
+  --cp-sand: #F3E9DB;       /* fondo suave */
+  --cp-green: #2F7A45;      /* verde */
+  --cp-greenbg: #DFF3E3;    /* verde fondo suave */
+  --cp-ok: #2F9E57;
+
+  --fuente-titulos: 'Montserrat', system-ui, -apple-system, sans-serif;
+  --fuente-texto: 'Open Sans', system-ui, -apple-system, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background-color: var(--cp-cream);
+  color: var(--cp-navy);
+  font-family: var(--fuente-texto);
+  font-size: 14px;
+  line-height: 20px;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--fuente-titulos);
+  font-weight: 800;
+  margin: 0;
+  color: var(--cp-navy);
+}
+
+button {
+  min-height: 44px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input, select, textarea {
+  font-family: inherit;
+  color: var(--cp-navy);
+}
+
+@keyframes cp-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes cp-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(0.96); }
+}
+
+@keyframes cp-dot {
+  0%, 80%, 100% { transform: scale(0); opacity: 0.3; }
+  40% { transform: scale(1); opacity: 1; }
+}
