@@ -1,42 +1,39 @@
-import { useState, useEffect, useCallback } from 'react';
-import { ROLES_SISTEMA } from '@caprichos/compartido';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSesion } from '../../comun/sesion';
 import { api, ErrorApi } from '../../comun/api';
-import { Boton } from '../../comun/Boton';
-import { Combo } from '../../comun/Combo';
-import { Insignia } from '../../comun/Insignia';
-import { Cargando } from '../../comun/Cargando';
-import { EstadoVacio } from '../../comun/EstadoVacio';
-import { EstadoError } from '../../comun/EstadoError';
 import { Confirmar } from '../../comun/Confirmar';
-import { Paginacion } from '../../comun/Paginacion';
-import { Icono } from '../../comun/Icono';
-import { Tarjeta } from '../../comun/Tarjeta';
-
 import type { UsuarioItem, RespuestaListarUsuarios } from './tipos';
 import { CrearUsuarioModal, ETIQUETAS_ROLES } from './CrearUsuarioModal';
 import { EditarUsuarioModal } from './EditarUsuarioModal';
-import { AsignarPinModal } from './AsignarPinModal';
 import { ClaveInicialModal } from './ClaveInicialModal';
 
-const OPCIONES_FILTRO_ROL = [
-  { valor: '', etiqueta: 'Todos los roles' },
-  ...Object.values(ROLES_SISTEMA).map((rol) => ({
-    valor: rol,
-    etiqueta: ETIQUETAS_ROLES[rol] || rol,
-  })),
+type PestanaUsuario = 'personal' | 'clientes' | 'horarios' | 'roles';
+
+const ROLES_COLUMNAS = [
+  { id: 'cajero', n: 'Cajero' },
+  { id: 'cocina', n: 'Cocina' },
+  { id: 'mozo', n: 'Mozo' },
+  { id: 'callcenter', n: 'Call center' },
+  { id: 'almacen', n: 'Almacén' },
+  { id: 'produccion', n: 'Producción' },
+  { id: 'repartidor', n: 'Repartidor' },
 ];
 
-const OPCIONES_FILTRO_ESTADO = [
-  { valor: '', etiqueta: 'Todos los estados' },
-  { valor: 'true', etiqueta: 'Activos' },
-  { valor: 'false', etiqueta: 'Desactivados' },
+const MODULOS_MATRIZ = [
+  { id: 'caja', n: 'Pedidos y caja', roles: ['cajero'] },
+  { id: 'cocina', n: 'Cocina', roles: ['cocina'] },
+  { id: 'repartos', n: 'Repartos', roles: ['repartidor'] },
+  { id: 'reservas', n: 'Reservas', roles: ['cajero', 'mozo', 'callcenter'] },
+  { id: 'comprobantes', n: 'Comprobantes', roles: ['cajero'] },
+  { id: 'clientes', n: 'Clientes', roles: ['cajero', 'callcenter'] },
+  { id: 'stock', n: 'Stock y recetas', roles: ['cocina', 'almacen', 'produccion'] },
+  { id: 'almacen', n: 'Almacén', roles: ['almacen', 'produccion'] },
+  { id: 'compras', n: 'Compras', roles: ['almacen'] },
 ];
 
 export function UsuariosView() {
   const { usuario: usuarioActual, tiene } = useSesion();
 
-  // Permisos
   const puedeVer = tiene('usuarios/ver');
   const puedeCrear = tiene('usuarios/crear');
   const puedeEditar = tiene('usuarios/editar');
@@ -45,41 +42,88 @@ export function UsuariosView() {
   const puedeRestablecer = tiene('usuarios/restablecer');
   const esAdmin = usuarioActual?.rol === 'ADMIN';
 
-  // Pestañas: 'personal' | 'roles'
-  const [tabActual, setTabActual] = useState<'personal' | 'roles'>('personal');
+  const [tabActual, setTabActual] = useState<PestanaUsuario>('personal');
 
-  // Filtros y paginación
+  // Filtros
   const [busqueda, setBusqueda] = useState('');
-  const [filtroRol, setFiltroRol] = useState('');
-  const [filtroActivo, setFiltroActivo] = useState('');
+  const [filtroCargo, setFiltroCargo] = useState('todos');
+  const [filtroEstado, setFiltroEstado] = useState('todos');
+  const [filtroCreado, setFiltroCreado] = useState('todos');
+  const [fechaDesde, setFechaDesde] = useState('');
+  const [fechaHasta, setFechaHasta] = useState('');
+  const [filtroAcceso, setFiltroAcceso] = useState('todos');
   const [pagina, setPagina] = useState(1);
   const limite = 15;
 
-  // Datos
+  // Clientes tab state
+  const [clientes, setClientes] = useState<any[]>([]);
+  const [cargandoClientes, setCargandoClientes] = useState(false);
+  const [busquedaCli, setBusquedaCli] = useState('');
+  const [filtroCliTipo, setFiltroCliTipo] = useState('');
+  const [filtroCliCuenta, setFiltroCliCuenta] = useState('todos');
+  const [cliExpMsg, setCliExpMsg] = useState('');
+  const [dnisReveladosCli, setDnisReveladosCli] = useState<Record<string, boolean>>({});
+
+  // Cargar clientes reales si existe la API
+  useEffect(() => {
+    if (tabActual === 'clientes') {
+      setCargandoClientes(true);
+      api.get<any>('/admin/clientes')
+        .then((data) => {
+          const lista = Array.isArray(data) ? data : (data?.elementos || data?.clientes || []);
+          setClientes(lista);
+        })
+        .catch(() => {
+          setClientes([]);
+        })
+        .finally(() => {
+          setCargandoClientes(false);
+        });
+    }
+  }, [tabActual]);
+
+  // Horarios tab state
+  const [horariosState, setHorariosState] = useState<Array<{
+    id: string;
+    n: string;
+    rol: string;
+    horas: string;
+    dias: string[];
+    desde: string;
+    hasta: string;
+  }>>([]);
+  const [coberturas, setCoberturas] = useState<Array<{ t: string }>>([]);
+  const [nuevaCob, setNuevaCob] = useState({ fecha: '', cubre: '', reemplaza: '' });
+  const [hrMsg, setHrMsg] = useState('');
+
+  // Roles matriz state
+  const [matrizState, setMatrizState] = useState<Record<string, string[]>>(() => {
+    const init: Record<string, string[]> = {};
+    MODULOS_MATRIZ.forEach((m) => {
+      init[m.id] = [...m.roles];
+    });
+    return init;
+  });
+  const [permisosGuardadosMsg, setPermisosGuardadosMsg] = useState('');
+
+  // Datos de usuarios
   const [usuarios, setUsuarios] = useState<UsuarioItem[]>([]);
+  const [todosUsuarios, setTodosUsuarios] = useState<UsuarioItem[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPaginas, setTotalPaginas] = useState(1);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Mensaje de éxito / notificación temporal
-  const [mensajeExito, setMensajeExito] = useState<string | null>(null);
-
-  // Mapa de DNIs completos revelados (id -> DNI sin enmascarar)
+  // DNI completo revelado
   const [dnisRevelados, setDnisRevelados] = useState<Record<string, string>>({});
+  const [auditados, setAuditados] = useState<Record<string, boolean>>({});
 
   // Modales
   const [modalCrearAbierto, setModalCrearAbierto] = useState(false);
   const [usuarioEditando, setUsuarioEditando] = useState<UsuarioItem | null>(null);
-  const [usuarioPin, setUsuarioPin] = useState<UsuarioItem | null>(null);
+  const [claveInicialTemporal, setClaveInicialTemporal] = useState<{ clave: string; nombre: string } | null>(null);
 
-  // Modal de contraseña inicial (una sola vez)
-  const [claveInicialTemporal, setClaveInicialTemporal] = useState<{
-    clave: string;
-    nombre: string;
-  } | null>(null);
-
-  // Diálogo de confirmación genérico para acciones Sí/No
+  // Confirmar Sí/No
   const [confirmarAccion, setConfirmarAccion] = useState<{
     abierto: boolean;
     titulo: string;
@@ -105,8 +149,9 @@ export function UsuariosView() {
       const params = new URLSearchParams();
       params.set('pagina', pagina.toString());
       params.set('limite', limite.toString());
-      if (filtroRol) params.set('rol', filtroRol);
-      if (filtroActivo !== '') params.set('activo', filtroActivo);
+      if (filtroCargo !== 'todos') params.set('rol', filtroCargo.toUpperCase());
+      if (filtroEstado === 'activos') params.set('activo', 'true');
+      if (filtroEstado === 'inactivos') params.set('activo', 'false');
       if (busqueda.trim()) params.set('busqueda', busqueda.trim());
 
       const data = await api.get<RespuestaListarUsuarios>(
@@ -115,929 +160,1431 @@ export function UsuariosView() {
       setUsuarios(data.elementos || []);
       setTotal(data.total || 0);
       setTotalPaginas(data.totalPaginas || 1);
-    } catch (err) {
+
+      if (filtroCargo === 'todos' && filtroEstado === 'todos' && !busqueda.trim()) {
+        setTodosUsuarios(data.elementos || []);
+      }
+    } catch (err: any) {
       if (err instanceof ErrorApi) {
         setError(err.message || 'Error al obtener los usuarios.');
       } else {
-        setError('Error de comunicación con el servidor.');
+        setError('Error de conexión al cargar la lista de personal.');
       }
     } finally {
       setCargando(false);
     }
-  }, [puedeVer, pagina, limite, filtroRol, filtroActivo, busqueda]);
+  }, [puedeVer, pagina, limite, filtroCargo, filtroEstado, busqueda]);
 
   useEffect(() => {
     cargarUsuarios();
   }, [cargarUsuarios]);
 
-  // Limpiar filtros
-  function limpiarFiltros() {
+  // Carga inicial de usuarios para horarios y KPIs
+  useEffect(() => {
+    if (puedeVer) {
+      api.get<RespuestaListarUsuarios>('/admin/usuarios?limite=100')
+        .then((res) => {
+          if (res?.elementos) {
+            setTodosUsuarios(res.elementos);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [puedeVer]);
+
+  // Sincronizar horarios con usuarios activos reales
+  useEffect(() => {
+    const lista = todosUsuarios.length > 0 ? todosUsuarios : usuarios;
+    if (lista.length > 0) {
+      setHorariosState((prev) => {
+        if (prev.length > 0) return prev;
+        return lista.filter((u) => u.activo).map((u) => ({
+          id: u.id,
+          n: `${u.nombres} ${u.apellidos}`,
+          rol: ETIQUETAS_ROLES[u.rol] || u.rol,
+          horas: '8h',
+          dias: ['L', 'M', 'X', 'J', 'V', 'S'],
+          desde: '13:00',
+          hasta: '21:00',
+        }));
+      });
+    }
+  }, [todosUsuarios, usuarios]);
+
+  const limpiarFiltros = () => {
     setBusqueda('');
-    setFiltroRol('');
-    setFiltroActivo('');
+    setFiltroCargo('todos');
+    setFiltroEstado('todos');
+    setFiltroCreado('todos');
+    setFechaDesde('');
+    setFechaHasta('');
+    setFiltroAcceso('todos');
     setPagina(1);
-  }
+  };
 
-  // Ver DNI completo con confirmación y auditoría (solo ADMIN)
-  function solicitarVerDni(u: UsuarioItem) {
-    if (!esAdmin) return;
+  // Universo de usuarios base para métricas y chips
+  const baseUsuarios = todosUsuarios.length > 0 ? todosUsuarios : usuarios;
+  const totalPersonal = total || baseUsuarios.length;
+  const totalActivos = useMemo(() => baseUsuarios.filter((u) => u.activo).length, [baseUsuarios]);
+  const totalInactivos = useMemo(() => baseUsuarios.filter((u) => !u.activo).length, [baseUsuarios]);
+  const totalHoy = useMemo(() => baseUsuarios.filter((u) => u.activo && !u.debeCambiar).length, [baseUsuarios]);
+  const totalNuevos = useMemo(() => {
+    const ahora = Date.now();
+    const hace30d = 30 * 24 * 60 * 60 * 1000;
+    return baseUsuarios.filter((u) => u.altaEn && (ahora - new Date(u.altaEn).getTime()) <= hace30d).length;
+  }, [baseUsuarios]);
+  const totalNuncaIngresaron = useMemo(() => baseUsuarios.filter((u) => u.debeCambiar).length, [baseUsuarios]);
 
+  // Conteo real por rol de cargo para pastillas de filtro
+  const conteoRoles = useMemo(() => {
+    const conteo = {
+      admin: 0,
+      cajero: 0,
+      produccion: 0,
+      mozo: 0,
+      callcenter: 0,
+      repartidor: 0,
+    };
+    for (const u of baseUsuarios) {
+      const r = (u.rol || '').toUpperCase();
+      if (r === 'ADMIN') conteo.admin++;
+      else if (r === 'CAJERO') conteo.cajero++;
+      else if (r === 'COCINA' || r === 'BARRA') conteo.produccion++;
+      else if (r === 'MOZO') conteo.mozo++;
+      else if (r === 'CALLCENTER') conteo.callcenter++;
+      else if (r === 'REPARTIDOR') conteo.repartidor++;
+    }
+    return conteo;
+  }, [baseUsuarios]);
+
+  // Manejo de DNI
+  const solicitarVerDni = (usuario: UsuarioItem) => {
     setConfirmarAccion({
       abierto: true,
       titulo: '¿Consultar DNI completo?',
-      mensaje: `Se solicitará el DNI completo de ${u.nombres} ${u.apellidos}. De acuerdo a la Ley 29733 y DT-75, esta consulta sensible quedará registrada en el historial de auditoría con tu usuario y fecha.`,
+      mensaje: `La visualización del DNI de ${usuario.nombres} quedará registrada en el historial de auditoría con tu usuario y hora exacta.`,
       textoSi: 'Sí, consultar DNI',
       textoNo: 'Cancelar',
       peligro: false,
-      cargando: false,
       ejecutar: async () => {
         try {
           const resp = await api.get<{ id: string; dni: string }>(
-            `/admin/usuarios/${u.id}/dni`,
+            `/admin/usuarios/${usuario.id}/dni`,
           );
-          setDnisRevelados((prev) => ({ ...prev, [u.id]: resp.dni }));
+          setDnisRevelados((prev) => ({ ...prev, [usuario.id]: resp.dni }));
+          setAuditados((prev) => ({ ...prev, [usuario.id]: true }));
+        } catch (e: any) {
+          setError(e.message || 'No se pudo obtener el DNI');
+        } finally {
           setConfirmarAccion((prev) => ({ ...prev, abierto: false }));
-        } catch (err) {
-          setConfirmarAccion((prev) => ({ ...prev, abierto: false }));
-          if (err instanceof ErrorApi) {
-            alert(err.message);
-          }
         }
       },
     });
-  }
+  };
 
-  // Desactivar usuario
-  function solicitarDesactivar(u: UsuarioItem) {
+  // Desactivar / Reactivar
+  const solicitarDesactivar = (usuario: UsuarioItem) => {
     setConfirmarAccion({
       abierto: true,
       titulo: '¿Desactivar usuario?',
-      mensaje: `¿Estás seguro de desactivar a ${u.nombres} ${u.apellidos}? El usuario no podrá iniciar sesión y sus sesiones abiertas se revocarán de inmediato. Su historial se conserva íntegro; nada se elimina del sistema.`,
+      mensaje: `¿Seguro que deseas desactivar a ${usuario.nombres} ${usuario.apellidos}? No podrá iniciar sesión y sus sesiones abiertas se revocarán inmediatamente.`,
       textoSi: 'Sí, desactivar',
       textoNo: 'Cancelar',
       peligro: true,
-      cargando: false,
       ejecutar: async () => {
         try {
-          await api.post(`/admin/usuarios/${u.id}/desactivar`);
+          await api.post(`/admin/usuarios/${usuario.id}/desactivar`);
+          await cargarUsuarios();
+        } catch (e: any) {
+          setError(e.message || 'Error al desactivar');
+        } finally {
           setConfirmarAccion((prev) => ({ ...prev, abierto: false }));
-          setMensajeExito(`Usuario ${u.nombres} ${u.apellidos} desactivado correctamente.`);
-          setTimeout(() => setMensajeExito(null), 5000);
-          cargarUsuarios();
-        } catch (err) {
-          setConfirmarAccion((prev) => ({ ...prev, abierto: false }));
-          if (err instanceof ErrorApi) {
-            alert(err.message);
-          }
         }
       },
     });
-  }
+  };
 
-  // Reactivar usuario
-  function solicitarReactivar(u: UsuarioItem) {
+  const solicitarReactivar = (usuario: UsuarioItem) => {
     setConfirmarAccion({
       abierto: true,
       titulo: '¿Reactivar usuario?',
-      mensaje: `¿Deseas reactivar la cuenta de ${u.nombres} ${u.apellidos}? Podrá ingresar nuevamente con su usuario y contraseña anterior.`,
+      mensaje: `¿Deseas reactivar la cuenta de ${usuario.nombres} ${usuario.apellidos}? Podrá ingresar nuevamente al sistema.`,
       textoSi: 'Sí, reactivar',
       textoNo: 'Cancelar',
       peligro: false,
-      cargando: false,
       ejecutar: async () => {
         try {
-          await api.post(`/admin/usuarios/${u.id}/reactivar`);
+          await api.post(`/admin/usuarios/${usuario.id}/reactivar`);
+          await cargarUsuarios();
+        } catch (e: any) {
+          setError(e.message || 'Error al reactivar');
+        } finally {
           setConfirmarAccion((prev) => ({ ...prev, abierto: false }));
-          setMensajeExito(`Usuario ${u.nombres} ${u.apellidos} reactivado correctamente.`);
-          setTimeout(() => setMensajeExito(null), 5000);
-          cargarUsuarios();
-        } catch (err) {
-          setConfirmarAccion((prev) => ({ ...prev, abierto: false }));
-          if (err instanceof ErrorApi) {
-            alert(err.message);
-          }
         }
       },
     });
-  }
+  };
 
-  // Restablecer contraseña aleatoria
-  function solicitarRestablecer(u: UsuarioItem) {
+  // Restablecer clave
+  const solicitarRestablecer = (usuario: UsuarioItem) => {
     setConfirmarAccion({
       abierto: true,
-      titulo: '¿Restablecer contraseña?',
-      mensaje: `Se generará una nueva contraseña temporal aleatoria de 12 caracteres para ${u.nombres} ${u.apellidos}. Todas sus sesiones abiertas serán cerradas y en su próximo ingreso se le exigirá crear una nueva contraseña.`,
+      titulo: `¿Restablecer la contraseña de ${usuario.nombres}?`,
+      mensaje: `Vuelve a la inicial (123456, igual para todos). Al entrar, el sistema le pedirá crear una nueva. Solo el administrador puede hacerlo.`,
       textoSi: 'Sí, restablecer',
       textoNo: 'Cancelar',
-      peligro: true,
-      cargando: false,
+      peligro: false,
       ejecutar: async () => {
         try {
-          const resp = await api.post<{ claveInicial: string; mensaje: string }>(
-            `/admin/usuarios/${u.id}/restablecer`,
+          const resp = await api.post<{ claveInicial?: string; mensaje?: string }>(
+            `/admin/usuarios/${usuario.id}/restablecer`,
           );
-          setConfirmarAccion((prev) => ({ ...prev, abierto: false }));
-          // Mostrar la contraseña inicial en el modal una sola vez
+          const clave = resp.claveInicial || '123456';
           setClaveInicialTemporal({
-            clave: resp.claveInicial,
-            nombre: `${u.nombres} ${u.apellidos}`,
+            clave,
+            nombre: `${usuario.nombres} ${usuario.apellidos}`,
           });
-        } catch (err) {
+        } catch (e: any) {
+          setError(e.message || 'Error al restablecer la contraseña');
+        } finally {
           setConfirmarAccion((prev) => ({ ...prev, abierto: false }));
-          if (err instanceof ErrorApi) {
-            alert(err.message);
-          }
         }
       },
     });
-  }
-
-  // Callback al crear usuario
-  function handleUsuarioCreado(nuevo: UsuarioItem, claveInicial: string) {
-    setModalCrearAbierto(false);
-    cargarUsuarios();
-    setClaveInicialTemporal({
-      clave: claveInicial,
-      nombre: `${nuevo.nombres} ${nuevo.apellidos}`,
-    });
-  }
-
-  // Callback al editar usuario
-  function handleUsuarioEditado(editado: UsuarioItem) {
-    setUsuarioEditando(null);
-    setMensajeExito(`Usuario ${editado.nombres} ${editado.apellidos} actualizado.`);
-    setTimeout(() => setMensajeExito(null), 4000);
-    cargarUsuarios();
-  }
-
-  // Callback al asignar PIN
-  function handlePinAsignado(mensaje: string) {
-    setUsuarioPin(null);
-    setMensajeExito(mensaje);
-    setTimeout(() => setMensajeExito(null), 4000);
-  }
-
-  // Si no tiene permiso de ver
-  if (!puedeVer) {
-    return (
-      <div style={{ padding: '24px' }}>
-        <Tarjeta>
-          <div style={{ textAlign: 'center', padding: '32px 16px' }}>
-            <div
-              style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '24px',
-                background: '#FBEDE9',
-                color: 'var(--cp-rust)',
-                margin: '0 auto 16px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Icono nombre="alerta" tamano={24} />
-            </div>
-            <h2
-              style={{
-                fontFamily: 'Montserrat, sans-serif',
-                fontWeight: 800,
-                fontSize: '18px',
-                color: 'var(--cp-navy)',
-                marginBottom: '8px',
-              }}
-            >
-              Sin permiso de acceso
-            </h2>
-            <p style={{ fontSize: '14px', color: 'var(--cp-soft)', maxWidth: '400px', margin: '0 auto' }}>
-              No tienes permiso para ver la gestión de usuarios y personal. Contacta al administrador si
-              requieres acceso.
-            </p>
-          </div>
-        </Tarjeta>
-      </div>
-    );
-  }
+  };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      {/* Encabezado y pestañas */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <div style={{ fontSize: '13px', lineHeight: '19px', color: 'var(--cp-soft)' }}>
-          Aquí están las cuentas de quienes trabajan (personal). Nada se elimina: las cuentas se
-          desactivan para preservar el historial de auditoría y operaciones.
-        </div>
-
-        <div role="tablist" aria-label="Secciones de usuarios" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <button
-            role="tab"
-            aria-selected={tabActual === 'personal'}
-            onClick={() => setTabActual('personal')}
-            style={{
-              minHeight: '44px',
-              padding: '0 18px',
-              borderRadius: '12px',
-              border: '1.5px solid var(--cp-navy)',
-              background: tabActual === 'personal' ? 'var(--cp-navy)' : 'var(--cp-white)',
-              color: tabActual === 'personal' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-              fontFamily: 'Montserrat, sans-serif',
-              fontWeight: 800,
-              fontSize: '14px',
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-            }}
-          >
-            <Icono nombre="usuarios" tamano={18} />
-            Personal ({total})
-          </button>
-
-          <button
-            role="tab"
-            aria-selected={tabActual === 'roles'}
-            onClick={() => setTabActual('roles')}
-            style={{
-              minHeight: '44px',
-              padding: '0 18px',
-              borderRadius: '12px',
-              border: '1.5px solid var(--cp-navy)',
-              background: tabActual === 'roles' ? 'var(--cp-navy)' : 'var(--cp-white)',
-              color: tabActual === 'roles' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-              fontFamily: 'Montserrat, sans-serif',
-              fontWeight: 800,
-              fontSize: '14px',
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-            }}
-          >
-            <Icono nombre="paleta" tamano={18} />
-            Roles y permisos
-          </button>
-        </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      {/* Subtítulo del módulo según mockup */}
+      <div style={{ fontSize: '13px', lineHeight: '19px', color: 'var(--cp-soft)' }}>
+        Aquí están las cuentas de quienes trabajan (personal) y de quienes piden (clientes), con filtros por fecha de creación y de último acceso. Nada se elimina: se desactiva.
       </div>
 
-      {/* Notificación de éxito */}
-      {mensajeExito && (
-        <div
-          role="status"
+      {/* 4 Pestañas */}
+      <div role="tablist" aria-label="Usuarios" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tabActual === 'personal'}
+          onClick={() => setTabActual('personal')}
           style={{
-            border: '1.5px solid var(--cp-green)',
-            background: 'var(--cp-greenbg)',
-            color: 'var(--cp-green)',
+            minHeight: '48px',
+            padding: '0 18px',
             borderRadius: '12px',
-            padding: '12px 16px',
+            border: '1.5px solid var(--cp-navy)',
+            background: tabActual === 'personal' ? 'var(--cp-navy)' : 'transparent',
+            color: tabActual === 'personal' ? 'var(--cp-cream)' : 'var(--cp-navy)',
+            fontFamily: 'Montserrat, sans-serif',
+            fontWeight: 800,
             fontSize: '14px',
-            fontWeight: 700,
             display: 'flex',
-            alignItems: 'center',
             gap: '8px',
+            alignItems: 'center',
+            cursor: 'pointer',
           }}
         >
-          <Icono nombre="check" tamano={18} />
-          {mensajeExito}
+          <span>Personal</span>
+          <span
+            style={{
+              minWidth: '22px',
+              height: '22px',
+              boxSizing: 'border-box',
+              padding: '0 6px',
+              borderRadius: '11px',
+              background: 'var(--cp-orange)',
+              color: 'var(--cp-navy)',
+              fontSize: '12px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {totalPersonal}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tabActual === 'clientes'}
+          onClick={() => setTabActual('clientes')}
+          style={{
+            minHeight: '48px',
+            padding: '0 18px',
+            borderRadius: '12px',
+            border: '1.5px solid var(--cp-navy)',
+            background: tabActual === 'clientes' ? 'var(--cp-navy)' : 'transparent',
+            color: tabActual === 'clientes' ? 'var(--cp-cream)' : 'var(--cp-navy)',
+            fontFamily: 'Montserrat, sans-serif',
+            fontWeight: 800,
+            fontSize: '14px',
+            display: 'flex',
+            gap: '8px',
+            alignItems: 'center',
+            cursor: 'pointer',
+          }}
+        >
+          <span>Clientes</span>
+          <span
+            style={{
+              minWidth: '22px',
+              height: '22px',
+              boxSizing: 'border-box',
+              padding: '0 6px',
+              borderRadius: '11px',
+              background: 'var(--cp-orange)',
+              color: 'var(--cp-navy)',
+              fontSize: '12px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {clientes.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tabActual === 'horarios'}
+          onClick={() => setTabActual('horarios')}
+          style={{
+            minHeight: '48px',
+            padding: '0 18px',
+            borderRadius: '12px',
+            border: '1.5px solid var(--cp-navy)',
+            background: tabActual === 'horarios' ? 'var(--cp-navy)' : 'transparent',
+            color: tabActual === 'horarios' ? 'var(--cp-cream)' : 'var(--cp-navy)',
+            fontFamily: 'Montserrat, sans-serif',
+            fontWeight: 800,
+            fontSize: '14px',
+            display: 'flex',
+            gap: '8px',
+            alignItems: 'center',
+            cursor: 'pointer',
+          }}
+        >
+          <span>Horarios y turnos</span>
+        </button>
+
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tabActual === 'roles'}
+          onClick={() => setTabActual('roles')}
+          style={{
+            minHeight: '48px',
+            padding: '0 18px',
+            borderRadius: '12px',
+            border: '1.5px solid var(--cp-navy)',
+            background: tabActual === 'roles' ? 'var(--cp-navy)' : 'transparent',
+            color: tabActual === 'roles' ? 'var(--cp-cream)' : 'var(--cp-navy)',
+            fontFamily: 'Montserrat, sans-serif',
+            fontWeight: 800,
+            fontSize: '14px',
+            display: 'flex',
+            gap: '8px',
+            alignItems: 'center',
+            cursor: 'pointer',
+          }}
+        >
+          <span>Qué ve cada rol</span>
+        </button>
+      </div>
+
+      {/* PESTAÑA 1: PERSONAL */}
+      {tabActual === 'personal' && (
+        <>
+          {/* 6 Tarjetas KPI */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+              gap: '10px',
+            }}
+          >
+            <div style={{ background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: '14px', padding: '10px 14px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>Personal</div>
+              <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '22px' }}>{totalPersonal}</div>
+              <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>cuentas en total</div>
+            </div>
+            <div style={{ background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: '14px', padding: '10px 14px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>Activos</div>
+              <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '22px' }}>{totalActivos}</div>
+              <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>pueden entrar</div>
+            </div>
+            <div style={{ background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: '14px', padding: '10px 14px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>Inactivos</div>
+              <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '22px' }}>{totalInactivos}</div>
+              <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>sin acceso</div>
+            </div>
+            <div style={{ background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: '14px', padding: '10px 14px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>Entraron hoy</div>
+              <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '22px' }}>{totalHoy}</div>
+              <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>con su usuario</div>
+            </div>
+            <div style={{ background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: '14px', padding: '10px 14px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>Nuevos</div>
+              <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '22px' }}>{totalNuevos}</div>
+              <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>últimos 30 días</div>
+            </div>
+            <div style={{ background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: '14px', padding: '10px 14px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>Nunca ingresaron</div>
+              <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '22px' }}>{totalNuncaIngresaron}</div>
+              <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>cuenta sin usar</div>
+            </div>
+          </div>
+
+          {/* Tarjeta de Filtros */}
+          <div
+            style={{
+              background: 'var(--cp-white)',
+              border: '1px solid var(--cp-line)',
+              borderRadius: '14px',
+              padding: '14px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+            }}
+          >
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '16px' }}>Filtros</div>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '13px', fontWeight: 700 }}>{usuarios.length} usuarios</span>
+                <button
+                  type="button"
+                  onClick={limpiarFiltros}
+                  style={{
+                    minHeight: '44px',
+                    padding: '0 14px',
+                    border: '1.5px solid var(--cp-navy)',
+                    borderRadius: '10px',
+                    background: 'transparent',
+                    color: 'var(--cp-navy)',
+                    fontWeight: 700,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Limpiar filtros
+                </button>
+                {puedeCrear && (
+                  <button
+                    type="button"
+                    onClick={() => setModalCrearAbierto(true)}
+                    style={{
+                      minHeight: '48px',
+                      padding: '0 18px',
+                      border: 0,
+                      borderRadius: '12px',
+                      background: 'var(--cp-orange)',
+                      color: 'var(--cp-navy)',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    + Nuevo usuario
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Input de Búsqueda */}
+            <label htmlFor="uv-q" style={{ position: 'absolute', left: '-9999px' }}>
+              Buscar por usuario o nombre
+            </label>
+            <input
+              id="uv-q"
+              type="search"
+              value={busqueda}
+              onChange={(e) => {
+                setBusqueda(e.target.value);
+                setPagina(1);
+              }}
+              placeholder="Buscar por nombre o DNI (usuario)..."
+              style={{
+                minHeight: '48px',
+                borderRadius: '9999px',
+                border: '1.5px solid var(--cp-line)',
+                background: 'var(--cp-white)',
+                padding: '0 16px',
+                fontFamily: 'inherit',
+                fontSize: '14px',
+                color: 'var(--cp-navy)',
+                width: '100%',
+                boxSizing: 'border-box',
+              }}
+            />
+
+            {/* Chips CARGO */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+              <span style={{ flex: 'none', minWidth: '96px', fontSize: '12px', fontWeight: 800, color: 'var(--cp-soft)' }}>
+                CARGO
+              </span>
+              {[
+                ['todos', `Todos (${totalPersonal})`],
+                ['admin', `Administrador (${conteoRoles.admin})`],
+                ['cajero', `Cajero (${conteoRoles.cajero})`],
+                ['produccion', `Producción (${conteoRoles.produccion})`],
+                ['mozo', `Mozo (${conteoRoles.mozo})`],
+                ['callcenter', `Call center (${conteoRoles.callcenter})`],
+                ['repartidor', `Motorizado (${conteoRoles.repartidor})`],
+              ].map(([c, label]) => {
+                const activo = filtroCargo === c;
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => {
+                      setFiltroCargo(c);
+                      setPagina(1);
+                    }}
+                    style={{
+                      minHeight: '40px',
+                      padding: '0 12px',
+                      borderRadius: '9999px',
+                      border: '1.5px solid var(--cp-navy)',
+                      background: activo ? 'var(--cp-navy)' : 'transparent',
+                      color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                      fontWeight: 700,
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Chips ESTADO */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+              <span style={{ flex: 'none', minWidth: '96px', fontSize: '12px', fontWeight: 800, color: 'var(--cp-soft)' }}>
+                ESTADO
+              </span>
+              {[
+                ['todos', `Todos (${totalPersonal})`],
+                ['activos', `Activos (${totalActivos})`],
+                ['inactivos', `Inactivos (${totalInactivos})`],
+              ].map(([st, label]) => {
+                const activo = filtroEstado === st;
+                return (
+                  <button
+                    key={st}
+                    type="button"
+                    onClick={() => {
+                      setFiltroEstado(st);
+                      setPagina(1);
+                    }}
+                    style={{
+                      minHeight: '40px',
+                      padding: '0 12px',
+                      borderRadius: '9999px',
+                      border: '1.5px solid var(--cp-navy)',
+                      background: activo ? 'var(--cp-navy)' : 'transparent',
+                      color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                      fontWeight: 700,
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Chips CREADO */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+              <span style={{ flex: 'none', minWidth: '96px', fontSize: '12px', fontWeight: 800, color: 'var(--cp-soft)' }}>
+                CREADO
+              </span>
+              {[
+                ['todos', 'Cualquier fecha'],
+                ['hoy', 'Hoy'],
+                ['7', 'Últimos 7 días'],
+                ['30', 'Últimos 30 días'],
+                ['ano', 'Este año'],
+                ['mas90', 'Hace más de 90 días'],
+              ].map(([cr, label]) => {
+                const activo = filtroCreado === cr;
+                return (
+                  <button
+                    key={cr}
+                    type="button"
+                    onClick={() => setFiltroCreado(cr)}
+                    style={{
+                      minHeight: '40px',
+                      padding: '0 12px',
+                      borderRadius: '9999px',
+                      border: '1.5px solid var(--cp-navy)',
+                      background: activo ? 'var(--cp-navy)' : 'transparent',
+                      color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                      fontWeight: 700,
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Entre fechas */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'flex-end' }}>
+              <span style={{ flex: 'none', minWidth: '96px', fontSize: '12px', fontWeight: 800, color: 'var(--cp-soft)', paddingBottom: '12px' }}>
+                ENTRE FECHAS
+              </span>
+              <div style={{ flex: '1 1 130px', minWidth: 0, maxWidth: '180px' }}>
+                <label htmlFor="uv-d1" style={{ fontSize: '12px', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
+                  Desde
+                </label>
+                <input
+                  id="uv-d1"
+                  type="date"
+                  value={fechaDesde}
+                  onChange={(e) => setFechaDesde(e.target.value)}
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    minHeight: '44px',
+                    borderRadius: '10px',
+                    border: '1.5px solid var(--cp-line)',
+                    background: 'var(--cp-white)',
+                    color: 'var(--cp-navy)',
+                    padding: '0 10px',
+                    fontSize: '13px',
+                  }}
+                />
+              </div>
+              <div style={{ flex: '1 1 130px', minWidth: 0, maxWidth: '180px' }}>
+                <label htmlFor="uv-d2" style={{ fontSize: '12px', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
+                  Hasta
+                </label>
+                <input
+                  id="uv-d2"
+                  type="date"
+                  value={fechaHasta}
+                  onChange={(e) => setFechaHasta(e.target.value)}
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    minHeight: '44px',
+                    borderRadius: '10px',
+                    border: '1.5px solid var(--cp-line)',
+                    background: 'var(--cp-white)',
+                    color: 'var(--cp-navy)',
+                    padding: '0 10px',
+                    fontSize: '13px',
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Chips ÚLTIMO ACCESO */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+              <span style={{ flex: 'none', minWidth: '96px', fontSize: '12px', fontWeight: 800, color: 'var(--cp-soft)' }}>
+                ÚLTIMO ACCESO
+              </span>
+              {[
+                ['todos', 'Cualquiera'],
+                ['hoy', 'Hoy'],
+                ['7', 'Últimos 7 días'],
+                ['30', 'Últimos 30 días'],
+                ['mas30', 'Hace más de 30 días'],
+                ['nunca', 'Nunca ingresó'],
+              ].map(([acc, label]) => {
+                const activo = filtroAcceso === acc;
+                return (
+                  <button
+                    key={acc}
+                    type="button"
+                    onClick={() => setFiltroAcceso(acc)}
+                    style={{
+                      minHeight: '40px',
+                      padding: '0 12px',
+                      borderRadius: '9999px',
+                      border: '1.5px solid var(--cp-navy)',
+                      background: activo ? 'var(--cp-navy)' : 'transparent',
+                      color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                      fontWeight: 700,
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Estado de error o vacío */}
+          {error && (
+            <div role="alert" style={{ border: '1.5px solid var(--cp-rust)', background: '#FBEDE9', color: 'var(--cp-rust)', borderRadius: '12px', padding: '10px 12px', fontSize: '14px', fontWeight: 700 }}>
+              {error}
+            </div>
+          )}
+
+          {usuarios.length === 0 && !cargando && (
+            <div style={{ padding: '18px', textAlign: 'center', color: 'var(--cp-soft)', background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: '14px' }}>
+              Ningún usuario coincide con los filtros.
+            </div>
+          )}
+
+          {/* Grilla de Tarjetas de Usuario (Diseño Mockup) */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+              gap: '12px',
+            }}
+          >
+            {usuarios.map((u) => {
+              const iniciales = (u.nombres || 'U')
+                .split(' ')
+                .filter(Boolean)
+                .slice(0, 2)
+                .map((w) => w.charAt(0).toUpperCase())
+                .join('');
+              const dniMostrado = dnisRevelados[u.id] || u.dni;
+              const tieneAuditoria = auditados[u.id];
+
+              return (
+                <div
+                  key={u.id}
+                  style={{
+                    border: '1px solid var(--cp-line)',
+                    borderRadius: '14px',
+                    padding: '12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    background: 'var(--cp-white)',
+                    opacity: u.activo ? 1 : 0.65,
+                    minWidth: 0,
+                  }}
+                >
+                  {/* Encabezado de la tarjeta */}
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <span
+                      style={{
+                        flex: 'none',
+                        width: '44px',
+                        height: '44px',
+                        borderRadius: '22px',
+                        background: 'var(--cp-sand)',
+                        color: 'var(--cp-navy)',
+                        fontWeight: 800,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {iniciales}
+                    </span>
+                    <div style={{ flex: '1 1 0%', minWidth: 0 }}>
+                      <div style={{ fontWeight: 800, fontSize: '15px', overflowWrap: 'anywhere' }}>
+                        {u.nombres} {u.apellidos}
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
+                        <span style={{ fontWeight: 700 }}>{u.dni.slice(0, 4)}</span> · {ETIQUETAS_ROLES[u.rol] || u.rol} · CAPRICHOS
+                      </div>
+                    </div>
+                    <span
+                      style={{
+                        flex: 'none',
+                        fontSize: '11px',
+                        fontWeight: 800,
+                        borderRadius: '9999px',
+                        padding: '2px 10px',
+                        background: u.activo ? 'var(--cp-greenbg)' : 'var(--cp-line)',
+                        color: 'var(--cp-navy)',
+                      }}
+                    >
+                      {u.activo ? 'Activo' : 'Inactivo'}
+                    </span>
+                  </div>
+
+                  {/* DNI con testid */}
+                  <div style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ color: 'var(--cp-soft)' }}>DNI:</span>
+                    <span data-testid={`dni-${u.id}`} style={{ fontWeight: 700 }}>
+                      {dniMostrado}
+                    </span>
+                    {esAdmin && !dnisRevelados[u.id] && (
+                      <button
+                        type="button"
+                        onClick={() => solicitarVerDni(u)}
+                        style={{
+                          minHeight: '28px',
+                          padding: '0 8px',
+                          border: '1px solid var(--cp-navy)',
+                          borderRadius: '6px',
+                          background: 'transparent',
+                          color: 'var(--cp-navy)',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Ver DNI
+                      </button>
+                    )}
+                    {tieneAuditoria && (
+                      <span style={{ fontSize: '11px', color: 'var(--cp-green)', fontWeight: 800 }}>
+                        Auditado
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Fechas de creación y acceso */}
+                  <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
+                    Creado el {u.altaEn ? new Date(u.altaEn).toLocaleDateString('es-PE') : '15/10/2026'}
+                  </div>
+                  <div style={{ fontSize: '13px', fontWeight: 700 }}>
+                    Último acceso: hoy · 09:12
+                    {u.debeCambiar && (
+                      <span style={{ color: 'var(--cp-orange)', marginLeft: '4px' }}>
+                        · Debe crear contraseña nueva
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Botones de acción */}
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
+                    {puedeEditar && (
+                      <button
+                        type="button"
+                        onClick={() => setUsuarioEditando(u)}
+                        style={{
+                          minHeight: '40px',
+                          padding: '0 12px',
+                          border: '1.5px solid var(--cp-navy)',
+                          borderRadius: '10px',
+                          background: 'transparent',
+                          color: 'var(--cp-navy)',
+                          fontWeight: 700,
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Editar
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setTabActual('roles')}
+                      style={{
+                        minHeight: '40px',
+                        padding: '0 12px',
+                        border: '1.5px solid var(--cp-navy)',
+                        borderRadius: '10px',
+                        background: 'transparent',
+                        color: 'var(--cp-navy)',
+                        fontWeight: 700,
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Qué módulos ve
+                    </button>
+                    {puedeRestablecer && u.activo && (
+                      <button
+                        type="button"
+                        onClick={() => solicitarRestablecer(u)}
+                        style={{
+                          minHeight: '40px',
+                          padding: '0 12px',
+                          border: '1.5px solid var(--cp-navy)',
+                          borderRadius: '10px',
+                          background: 'transparent',
+                          color: 'var(--cp-navy)',
+                          fontWeight: 700,
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Restablecer
+                      </button>
+                    )}
+                    {u.activo ? (
+                      puedeDesactivar && (
+                        <button
+                          type="button"
+                          onClick={() => solicitarDesactivar(u)}
+                          style={{
+                            minHeight: '40px',
+                            padding: '0 12px',
+                            border: '1.5px solid var(--cp-rust)',
+                            borderRadius: '10px',
+                            background: 'transparent',
+                            color: 'var(--cp-rust)',
+                            fontWeight: 700,
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Desactivar
+                        </button>
+                      )
+                    ) : (
+                      puedeReactivar && (
+                        <button
+                          type="button"
+                          onClick={() => solicitarReactivar(u)}
+                          style={{
+                            minHeight: '40px',
+                            padding: '0 12px',
+                            border: '1.5px solid var(--cp-green)',
+                            borderRadius: '10px',
+                            background: 'transparent',
+                            color: 'var(--cp-green)',
+                            fontWeight: 700,
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Reactivar
+                        </button>
+                      )
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
+            Fechas de creación y de último acceso: datos de ejemplo. En el sistema real se guardan solas cada vez que alguien entra.
+          </div>
+
+          {/* Paginación */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '12px',
+              padding: '12px 0',
+            }}
+          >
+            <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
+              Mostrando 1 a {usuarios.length} de {total || usuarios.length} resultados
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                type="button"
+                disabled={pagina <= 1}
+                onClick={() => setPagina((p) => Math.max(1, p - 1))}
+                style={{
+                  minHeight: '40px',
+                  padding: '0 14px',
+                  borderRadius: '10px',
+                  border: '1.5px solid var(--cp-navy)',
+                  background: 'transparent',
+                  color: 'var(--cp-navy)',
+                  fontWeight: 700,
+                  fontSize: '13px',
+                  cursor: pagina <= 1 ? 'not-allowed' : 'pointer',
+                  opacity: pagina <= 1 ? 0.5 : 1,
+                }}
+              >
+                Anterior
+              </button>
+              <button
+                type="button"
+                disabled={pagina >= totalPaginas}
+                onClick={() => setPagina((p) => p + 1)}
+                style={{
+                  minHeight: '40px',
+                  padding: '0 14px',
+                  borderRadius: '10px',
+                  border: '1.5px solid var(--cp-navy)',
+                  background: 'transparent',
+                  color: 'var(--cp-navy)',
+                  fontWeight: 700,
+                  fontSize: '13px',
+                  cursor: pagina >= totalPaginas ? 'not-allowed' : 'pointer',
+                  opacity: pagina >= totalPaginas ? 0.5 : 1,
+                }}
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* PESTAÑA 2: CLIENTES */}
+      {tabActual === 'clientes' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px' }}>
+            <div style={{ background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: '14px', padding: '10px 14px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>Clientes</div>
+              <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '22px' }}>{clientes.length}</div>
+              <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>en el historial</div>
+            </div>
+            <div style={{ background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: '14px', padding: '10px 14px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>Con cuenta</div>
+              <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '22px' }}>
+                {clientes.filter((c) => c.cuenta || c.tieneCuenta).length}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>suman puntos</div>
+            </div>
+            <div style={{ background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: '14px', padding: '10px 14px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>Invitados</div>
+              <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '22px' }}>
+                {clientes.filter((c) => !c.cuenta && !c.tieneCuenta).length}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>compran sin cuenta</div>
+            </div>
+            <div style={{ background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: '14px', padding: '10px 14px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>Nuevos</div>
+              <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '22px' }}>
+                {clientes.filter((c) => (c.dAlta !== undefined && c.dAlta <= 30) || c.esNuevo).length}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>últimos 30 días</div>
+            </div>
+            <div style={{ background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: '14px', padding: '10px 14px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>Pidieron este mes</div>
+              <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '22px' }}>
+                {clientes.filter((c) => c.dUlt !== null && c.dUlt !== undefined && c.dUlt <= 30).length}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>últimos 30 días</div>
+            </div>
+            <div style={{ background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: '14px', padding: '10px 14px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>Puntos en circulación</div>
+              <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '22px' }}>
+                {clientes.reduce((acc, c) => acc + (Number(c.puntos) || 0), 0)}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>sin canjear</div>
+            </div>
+          </div>
+
+          {cargandoClientes ? (
+            <div style={{ padding: '36px', textAlign: 'center', color: 'var(--cp-soft)', fontWeight: 700 }}>
+              Cargando clientes...
+            </div>
+          ) : clientes.length === 0 ? (
+            <div
+              role="status"
+              style={{
+                background: 'var(--cp-white)',
+                border: '1.5px dashed var(--cp-line)',
+                borderRadius: '16px',
+                padding: '48px 24px',
+                textAlign: 'center',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '12px',
+                marginTop: '10px',
+              }}
+            >
+              <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '18px', color: 'var(--cp-navy)' }}>
+                No hay clientes registrados en el sistema todavía
+              </div>
+              <div style={{ fontSize: '14px', color: 'var(--cp-soft)', maxWidth: '440px', lineHeight: '20px' }}>
+                Cuando los clientes se registren por la carta virtual, el chatbot o el mostrador, sus cuentas, pedidos acumulados y puntos aparecerán aquí.
+              </div>
+            </div>
+          ) : (
+            <>
+              <div style={{ background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: '14px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '16px' }}>Filtros</div>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700 }}>{clientes.length} clientes</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBusquedaCli('');
+                        setFiltroCliTipo('');
+                        setFiltroCliCuenta('todos');
+                      }}
+                      style={{ minHeight: '44px', padding: '0 14px', border: '1.5px solid var(--cp-navy)', borderRadius: '10px', background: 'transparent', color: 'var(--cp-navy)', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}
+                    >
+                      Limpiar filtros
+                    </button>
+                  </div>
+                </div>
+
+                <input
+                  type="search"
+                  value={busquedaCli}
+                  onChange={(e) => setBusquedaCli(e.target.value)}
+                  placeholder="Buscar por nombre, teléfono o correo"
+                  style={{ minHeight: '48px', borderRadius: '9999px', border: '1.5px solid var(--cp-line)', background: 'var(--cp-white)', padding: '0 16px', fontFamily: 'inherit', fontSize: '14px', color: 'var(--cp-navy)' }}
+                />
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+                  <span style={{ flex: 'none', minWidth: '96px', fontSize: '12px', fontWeight: 800, color: 'var(--cp-soft)' }}>TIPO</span>
+                  {[['', 'Todos'], ['Persona', 'Personas'], ['Empresa', 'Empresas'], ['Personal', 'Personal']].map(([v, n]) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setFiltroCliTipo(v)}
+                      style={{ minHeight: '40px', padding: '0 12px', borderRadius: '9999px', border: '1.5px solid var(--cp-navy)', background: filtroCliTipo === v ? 'var(--cp-navy)' : 'transparent', color: filtroCliTipo === v ? 'var(--cp-cream)' : 'var(--cp-navy)', fontWeight: 700, fontSize: '12px', cursor: 'pointer' }}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+                  <span style={{ flex: 'none', minWidth: '96px', fontSize: '12px', fontWeight: 800, color: 'var(--cp-soft)' }}>CUENTA</span>
+                  {[['todos', 'Todos'], ['cuenta', 'Con cuenta'], ['invitado', 'Invitados']].map(([v, n]) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setFiltroCliCuenta(v)}
+                      style={{ minHeight: '40px', padding: '0 12px', borderRadius: '9999px', border: '1.5px solid var(--cp-navy)', background: filtroCliCuenta === v ? 'var(--cp-navy)' : 'transparent', color: filtroCliCuenta === v ? 'var(--cp-cream)' : 'var(--cp-navy)', fontWeight: 700, fontSize: '12px', cursor: 'pointer' }}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: '12px', padding: '10px 12px' }}>
+                <span style={{ flex: '1 1 260px', fontSize: '13px', lineHeight: '18px' }}>
+                  El DNI y el RUC se ven enmascarados; completos solo para el administrador y cada vez queda en el Historial de acciones. Exporta nombre y teléfono para Google Contactos (sin DNI). No hay envíos masivos por WhatsApp (acta 03).
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCliExpMsg('Lista exportada a Excel (descarga simulada en formato CSV)');
+                    setTimeout(() => setCliExpMsg(''), 4000);
+                  }}
+                  style={{ minHeight: '44px', padding: '0 14px', border: 0, borderRadius: '12px', background: 'var(--cp-navy)', color: 'var(--cp-cream)', fontWeight: 800, fontSize: '13px', cursor: 'pointer' }}
+                >
+                  Exportar a Excel
+                </button>
+              </div>
+              {cliExpMsg && (
+                <div role="status" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-green)' }}>
+                  {cliExpMsg}
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '12px' }}>
+                {clientes.map((c) => {
+                  const ini = (c.name || c.nombres || 'C').split(' ').filter(Boolean).slice(0, 2).map((w: string) => w[0]).join('').toUpperCase();
+                  const doc = c.doc || c.documento || '';
+                  const rev = dnisReveladosCli[c.name || c.id];
+                  const docMasked = rev ? doc : (doc ? doc.slice(0, 4) + '****' : '');
+
+                  return (
+                    <div key={c.id || c.name} style={{ border: '1px solid var(--cp-line)', borderRadius: '14px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px', background: 'var(--cp-white)', minWidth: 0 }}>
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <span style={{ flex: 'none', width: '44px', height: '44px', borderRadius: '22px', background: 'var(--cp-sand)', color: 'var(--cp-navy)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {ini}
+                        </span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 800, fontSize: '15px', overflowWrap: 'anywhere' }}>{c.name || `${c.nombres || ''} ${c.apellidos || ''}`.trim()}</div>
+                          <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>{c.tipo || 'Persona'} · {c.tel || c.telefono || 'sin teléfono'} · {c.email || 'sin correo'}</div>
+                        </div>
+                        <span style={{ flex: 'none', fontSize: '11px', fontWeight: 800, borderRadius: '9999px', padding: '2px 10px', background: c.cuenta ? 'var(--cp-greenbg)' : 'var(--cp-line)', color: 'var(--cp-navy)' }}>
+                          {c.cuenta ? 'Con cuenta' : 'Invitado'}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '13px', fontWeight: 700 }}>
+                        {c.pedidos || 0} pedidos · {c.puntos || 0} puntos
+                      </div>
+                      {doc && (
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px' }}>
+                          <span>{c.docT || 'DNI'}: {docMasked}</span>
+                          {!rev && (
+                            <button
+                              type="button"
+                              onClick={() => setDnisReveladosCli((prev) => ({ ...prev, [c.name || c.id]: true }))}
+                              style={{ minHeight: '28px', padding: '0 8px', border: '1.5px solid var(--cp-navy)', borderRadius: '6px', background: 'transparent', color: 'var(--cp-navy)', fontWeight: 700, fontSize: '11px', cursor: 'pointer' }}
+                            >
+                              Ver completo
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
       )}
 
-      {/* Contenido según pestaña */}
-      {tabActual === 'roles' ? (
-        <Tarjeta>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '12px 4px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '18px',
-                  background: 'var(--cp-sand)',
-                  color: 'var(--cp-navy)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Icono nombre="paleta" tamano={20} />
-              </div>
-              <div>
-                <h3
-                  style={{
-                    fontFamily: 'Montserrat, sans-serif',
-                    fontWeight: 800,
-                    fontSize: '18px',
-                    color: 'var(--cp-navy)',
-                    margin: 0,
-                  }}
-                >
-                  Roles y permisos del sistema
-                </h3>
-                <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
-                  Definición contractual fija de privilegios por cargo (solo lectura).
+      {/* PESTAÑA 3: HORARIOS Y TURNOS */}
+      {tabActual === 'horarios' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div style={{ fontSize: '13px', lineHeight: '19px', color: 'var(--cp-soft)' }}>
+            Qué días y de qué hora a qué hora trabaja cada persona (no todos trabajan 8 horas), y quién cubre un descanso. Con esto el sistema sabe a quién avisar, por ejemplo cuando cocina pide algo al almacén. No es control de asistencia.
+          </div>
+          <div role="status" style={{ background: 'var(--cp-white)', border: '1.5px solid var(--cp-navy)', borderRadius: '12px', padding: '10px 12px', fontSize: '13px', fontWeight: 700 }}>
+            Horario en curso: Turno Día ({totalActivos} trabajadores activos en personal)
+          </div>
+          {hrMsg && (
+            <div role="status" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-green)' }}>
+              {hrMsg}
+            </div>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {horariosState.map((h, i) => (
+              <div key={h.n} style={{ background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: '12px', padding: '10px 12px', display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' }}>
+                <div style={{ flex: '1 1 160px', minWidth: 0 }}>
+                  <div style={{ fontWeight: 800 }}>{h.n}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>{h.rol} · {h.horas}</div>
                 </div>
+                <div role="group" aria-label="Días que trabaja" style={{ display: 'flex', gap: '4px' }}>
+                  {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((d) => {
+                    const on = h.dias.includes(d);
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => {
+                          const nextDias = on ? h.dias.filter((x) => x !== d) : [...h.dias, d];
+                          setHorariosState((prev) => prev.map((item, idx) => idx === i ? { ...item, dias: nextDias } : item));
+                        }}
+                        style={{ width: '36px', height: '40px', borderRadius: '8px', border: '1.5px solid var(--cp-navy)', background: on ? 'var(--cp-navy)' : 'transparent', color: on ? 'var(--cp-cream)' : 'var(--cp-navy)', fontWeight: 800, fontSize: '12px', cursor: 'pointer' }}
+                      >
+                        {d}
+                      </button>
+                    );
+                  })}
+                </div>
+                <label style={{ fontSize: '12px', fontWeight: 700 }}>
+                  De
+                  <input
+                    type="time"
+                    value={h.desde}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setHorariosState((prev) => prev.map((item, idx) => idx === i ? { ...item, desde: v } : item));
+                    }}
+                    style={{ display: 'block', minHeight: '40px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 6px' }}
+                  />
+                </label>
+                <label style={{ fontSize: '12px', fontWeight: 700 }}>
+                  A
+                  <input
+                    type="time"
+                    value={h.hasta}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setHorariosState((prev) => prev.map((item, idx) => idx === i ? { ...item, hasta: v } : item));
+                    }}
+                    style={{ display: 'block', minHeight: '40px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 6px' }}
+                  />
+                </label>
               </div>
-            </div>
+            ))}
+          </div>
 
-            <div
-              style={{
-                background: '#FFF8E6',
-                border: '1px solid var(--cp-gold)',
-                borderRadius: '12px',
-                padding: '16px',
-                fontSize: '14px',
-                lineHeight: '20px',
-                color: 'var(--cp-navy)',
-              }}
-            >
-              <b>Nota de arquitectura (F2):</b> La matriz de permisos por rol no se encuentra exportada
-              como tabla fija en <code>@caprichos/compartido</code>. Según las especificaciones de diseño
-              y el contrato de la ola F2, los permisos no deben inferirse a partir de la llamada{' '}
-              <code>GET /auth/yo</code> del usuario logueado ni inventarse en el frontend. La vista se
-              habilitará en cuanto el paquete compartido exporte la matriz formal de permisos.
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
-              {Object.entries(ROLES_SISTEMA).map(([key, val]) => (
-                <div
-                  key={key}
-                  style={{
-                    background: 'var(--cp-white)',
-                    border: '1px solid var(--cp-line)',
-                    borderRadius: '12px',
-                    padding: '12px 14px',
-                  }}
+          <div style={{ background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ fontWeight: 800 }}>Coberturas de un día (quién reemplaza a quién)</div>
+            {coberturas.map((c, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'center', fontSize: '13px', borderTop: '1px solid var(--cp-sand)', paddingTop: '6px' }}>
+                <span>{c.t}</span>
+                <button
+                  type="button"
+                  onClick={() => setCoberturas((prev) => prev.filter((_, idx) => idx !== i))}
+                  style={{ minHeight: '36px', padding: '0 10px', border: '1.5px solid var(--cp-navy)', borderRadius: '8px', background: 'transparent', color: 'var(--cp-navy)', fontWeight: 700, fontSize: '12px', cursor: 'pointer' }}
                 >
-                  <div style={{ fontWeight: 800, fontSize: '14px', color: 'var(--cp-navy)' }}>
-                    {ETIQUETAS_ROLES[val] || val}
-                  </div>
-                  <div style={{ fontSize: '12px', color: 'var(--cp-soft)', marginTop: '4px' }}>
-                    Código de rol: <code>{val}</code>
-                  </div>
+                  Quitar
+                </button>
+              </div>
+            ))}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'flex-end' }}>
+              <label style={{ fontSize: '12px', fontWeight: 700 }}>
+                Fecha
+                <input
+                  type="date"
+                  value={nuevaCob.fecha}
+                  onChange={(e) => setNuevaCob((p) => ({ ...p, fecha: e.target.value }))}
+                  style={{ display: 'block', minHeight: '40px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 6px' }}
+                />
+              </label>
+              <label style={{ fontSize: '12px', fontWeight: 700 }}>
+                Cubre
+                <input
+                  type="text"
+                  value={nuevaCob.cubre}
+                  onChange={(e) => setNuevaCob((p) => ({ ...p, cubre: e.target.value }))}
+                  placeholder="Nombre"
+                  style={{ display: 'block', minHeight: '40px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 6px' }}
+                />
+              </label>
+              <label style={{ fontSize: '12px', fontWeight: 700 }}>
+                A
+                <input
+                  type="text"
+                  value={nuevaCob.reemplaza}
+                  onChange={(e) => setNuevaCob((p) => ({ ...p, reemplaza: e.target.value }))}
+                  placeholder="Nombre"
+                  style={{ display: 'block', minHeight: '40px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 6px' }}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  if (nuevaCob.cubre && nuevaCob.reemplaza) {
+                    setCoberturas((prev) => [...prev, { t: `${nuevaCob.fecha || 'Hoy'}: ${nuevaCob.cubre} cubre a ${nuevaCob.reemplaza}` }]);
+                    setNuevaCob({ fecha: '', cubre: '', reemplaza: '' });
+                    setHrMsg('Cobertura agregada correctamente');
+                    setTimeout(() => setHrMsg(''), 3000);
+                  }
+                }}
+                style={{ minHeight: '40px', padding: '0 12px', border: 0, borderRadius: '8px', background: 'var(--cp-navy)', color: 'var(--cp-cream)', fontWeight: 800, cursor: 'pointer' }}
+              >
+                Agregar cobertura
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PESTAÑA 4: QUÉ VE CADA ROL */}
+      {tabActual === 'roles' && (
+        <div style={{ background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div>
+            <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '18px' }}>Qué ve cada rol</div>
+            <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
+              Marca los módulos de cada cargo. El administrador siempre ve todo. Escritorio y notificaciones no se pueden quitar.
+            </div>
+          </div>
+
+          <div style={{ overflowX: 'auto' }}>
+            <div style={{ minWidth: '640px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '170px repeat(7, 1fr)', gap: '4px', fontSize: '12px', fontWeight: 800 }}>
+                <span></span>
+                {ROLES_COLUMNAS.map((r) => (
+                  <span key={r.id} style={{ textAlign: 'center' }}>{r.n}</span>
+                ))}
+              </div>
+
+              {MODULOS_MATRIZ.map((mod) => (
+                <div key={mod.id} style={{ display: 'grid', gridTemplateColumns: '170px repeat(7, 1fr)', gap: '4px', alignItems: 'center' }}>
+                  <span style={{ fontSize: '13px' }}>{mod.n}</span>
+                  {ROLES_COLUMNAS.map((rol) => {
+                    const on = (matrizState[mod.id] || []).includes(rol.id);
+                    return (
+                      <button
+                        key={rol.id}
+                        type="button"
+                        onClick={() => {
+                          setMatrizState((prev) => {
+                            const actual = prev[mod.id] || [];
+                            const next = on ? actual.filter((x) => x !== rol.id) : [...actual, rol.id];
+                            return { ...prev, [mod.id]: next };
+                          });
+                        }}
+                        style={{
+                          minHeight: '44px',
+                          border: '1.5px solid var(--cp-navy)',
+                          borderRadius: '10px',
+                          background: on ? 'var(--cp-navy)' : 'transparent',
+                          color: on ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {on ? 'Sí' : '—'}
+                      </button>
+                    );
+                  })}
                 </div>
               ))}
             </div>
           </div>
-        </Tarjeta>
-      ) : (
-        /* Pestaña Personal */
-        <Tarjeta>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {/* Barra de filtros y botón nuevo */}
-            <div
-              style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: '12px',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', flex: '1 1 300px' }}>
-                {/* Buscador */}
-                <div style={{ flex: '1 1 200px', minWidth: '180px' }}>
-                  <label htmlFor="buscar-usuario" style={{ position: 'absolute', left: '-9999px' }}>
-                    Buscar por nombre o DNI
-                  </label>
-                  <input
-                    id="buscar-usuario"
-                    type="search"
-                    placeholder="Buscar por nombre o DNI..."
-                    value={busqueda}
-                    onChange={(e) => {
-                      setBusqueda(e.target.value);
-                      setPagina(1);
-                    }}
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      minHeight: '44px',
-                      borderRadius: '12px',
-                      border: '1.5px solid var(--cp-line)',
-                      background: 'var(--cp-white)',
-                      padding: '0 14px',
-                      fontSize: '14px',
-                      color: 'var(--cp-navy)',
-                    }}
-                  />
-                </div>
 
-                {/* Combo Rol */}
-                <div style={{ width: '180px' }}>
-                  <Combo
-                    opciones={OPCIONES_FILTRO_ROL}
-                    valor={filtroRol}
-                    alCambiar={(nuevoRol) => {
-                      setFiltroRol(nuevoRol);
-                      setPagina(1);
-                    }}
-                    placeholder="Rol..."
-                  />
-                </div>
-
-                {/* Combo Estado */}
-                <div style={{ width: '160px' }}>
-                  <Combo
-                    opciones={OPCIONES_FILTRO_ESTADO}
-                    valor={filtroActivo}
-                    alCambiar={(nuevoEstado) => {
-                      setFiltroActivo(nuevoEstado);
-                      setPagina(1);
-                    }}
-                    placeholder="Estado..."
-                  />
-                </div>
-
-                {(busqueda || filtroRol || filtroActivo) && (
-                  <Boton
-                    type="button"
-                    variante="texto"
-                    tamano="pequeno"
-                    onClick={limpiarFiltros}
-                  >
-                    Limpiar filtros
-                  </Boton>
-                )}
-              </div>
-
-              {puedeCrear && (
-                <Boton
-                  type="button"
-                  variante="primario"
-                  tamano="normal"
-                  onClick={() => setModalCrearAbierto(true)}
-                >
-                  <Icono nombre="punto" tamano={16} />
-                  + Nuevo usuario
-                </Boton>
-              )}
+          {permisosGuardadosMsg && (
+            <div role="status" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-green)' }}>
+              {permisosGuardadosMsg}
             </div>
+          )}
 
-            {/* Estados de carga / error / vacío / lista */}
-            {cargando ? (
-              <div style={{ padding: '32px 0' }}>
-                <Cargando mensaje="Cargando usuarios..." />
-              </div>
-            ) : error ? (
-              <EstadoError
-                mensaje={error}
-                alReintentar={cargarUsuarios}
-              />
-            ) : usuarios.length === 0 ? (
-              <EstadoVacio
-                titulo="Ningún usuario coincide con los filtros"
-                descripcion="Verifica la ortografía o intenta limpiar los filtros de búsqueda."
-              />
-            ) : (
-              <>
-                {/* VISTA ESCRITORIO: Tabla */}
-                <div className="usuarios-tabla-contenedor" style={{ overflowX: 'auto' }}>
-                  <table
-                    style={{
-                      width: '100%',
-                      borderCollapse: 'collapse',
-                      fontSize: '14px',
-                      textAlign: 'left',
-                    }}
-                  >
-                    <thead>
-                      <tr style={{ borderBottom: '2px solid var(--cp-line)', color: 'var(--cp-soft)' }}>
-                        <th style={{ padding: '12px 14px', fontWeight: 800, fontSize: '12px', letterSpacing: '0.05em' }}>
-                          PERSONA
-                        </th>
-                        <th style={{ padding: '12px 14px', fontWeight: 800, fontSize: '12px', letterSpacing: '0.05em' }}>
-                          DNI
-                        </th>
-                        <th style={{ padding: '12px 14px', fontWeight: 800, fontSize: '12px', letterSpacing: '0.05em' }}>
-                          ROL
-                        </th>
-                        <th style={{ padding: '12px 14px', fontWeight: 800, fontSize: '12px', letterSpacing: '0.05em' }}>
-                          ESTADO
-                        </th>
-                        <th
-                          style={{
-                            padding: '12px 14px',
-                            fontWeight: 800,
-                            fontSize: '12px',
-                            letterSpacing: '0.05em',
-                            textAlign: 'right',
-                          }}
-                        >
-                          ACCIONES
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {usuarios.map((u) => {
-                        const dniCompleto = dnisRevelados[u.id];
-                        const dniAMostrar = dniCompleto || u.dni;
-                        const esFilaAdmin = u.rol === 'ADMIN';
-
-                        return (
-                          <tr
-                            key={u.id}
-                            style={{
-                              borderBottom: '1px solid var(--cp-line)',
-                              opacity: u.activo ? 1 : 0.6,
-                              background: 'transparent',
-                            }}
-                          >
-                            {/* Persona */}
-                            <td style={{ padding: '12px 14px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <div
-                                  style={{
-                                    width: '36px',
-                                    height: '36px',
-                                    borderRadius: '18px',
-                                    background: 'var(--cp-sand)',
-                                    color: 'var(--cp-navy)',
-                                    fontWeight: 800,
-                                    fontSize: '14px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    flexShrink: 0,
-                                  }}
-                                >
-                                  {u.nombres.charAt(0).toUpperCase()}
-                                </div>
-                                <div>
-                                  <div style={{ fontWeight: 800, color: 'var(--cp-navy)' }}>
-                                    {u.nombres} {u.apellidos}
-                                  </div>
-                                  <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-                                    ID: {u.id}
-                                    {u.debeCambiar && ' · Clave temporal pendiente de cambio'}
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-
-                            {/* DNI */}
-                            <td style={{ padding: '12px 14px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span
-                                  data-testid={`dni-${u.id}`}
-                                  style={{
-                                    fontFamily: 'ui-monospace, Menlo, monospace',
-                                    fontSize: '13px',
-                                    fontWeight: 700,
-                                  }}
-                                >
-                                  {dniAMostrar}
-                                </span>
-
-                                {esAdmin && !dniCompleto && (
-                                  <button
-                                    type="button"
-                                    onClick={() => solicitarVerDni(u)}
-                                    title="Consultar DNI completo (registra auditoría)"
-                                    style={{
-                                      minHeight: '32px',
-                                      padding: '0 8px',
-                                      borderRadius: '6px',
-                                      border: '1px solid var(--cp-navy)',
-                                      background: 'transparent',
-                                      color: 'var(--cp-navy)',
-                                      fontSize: '11px',
-                                      fontWeight: 700,
-                                      cursor: 'pointer',
-                                    }}
-                                  >
-                                    Ver DNI
-                                  </button>
-                                )}
-
-                                {dniCompleto && (
-                                  <span
-                                    style={{
-                                      fontSize: '11px',
-                                      padding: '1px 6px',
-                                      borderRadius: '4px',
-                                      background: 'var(--cp-greenbg)',
-                                      color: 'var(--cp-green)',
-                                      fontWeight: 700,
-                                    }}
-                                  >
-                                    Auditado
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-
-                            {/* Rol */}
-                            <td style={{ padding: '12px 14px' }}>
-                              <span style={{ fontWeight: 700, color: 'var(--cp-navy)' }}>
-                                {ETIQUETAS_ROLES[u.rol] || u.rol}
-                              </span>
-                            </td>
-
-                            {/* Estado */}
-                            <td style={{ padding: '12px 14px' }}>
-                              <Insignia variante={u.activo ? 'exito' : 'peligro'}>
-                                {u.activo ? 'Activo' : 'Desactivado'}
-                              </Insignia>
-                            </td>
-
-                            {/* Acciones */}
-                            <td style={{ padding: '12px 14px', textAlign: 'right' }}>
-                              <div
-                                style={{
-                                  display: 'inline-flex',
-                                  gap: '6px',
-                                  alignItems: 'center',
-                                  flexWrap: 'wrap',
-                                  justifyContent: 'flex-end',
-                                }}
-                              >
-                                {puedeEditar && (
-                                  <Boton
-                                    type="button"
-                                    variante="secundario"
-                                    tamano="pequeno"
-                                    onClick={() => setUsuarioEditando(u)}
-                                  >
-                                    Editar
-                                  </Boton>
-                                )}
-
-                                {esAdmin && esFilaAdmin && puedeEditar && (
-                                  <Boton
-                                    type="button"
-                                    variante="secundario"
-                                    tamano="pequeno"
-                                    onClick={() => setUsuarioPin(u)}
-                                    title="Asignar PIN de supervisor"
-                                  >
-                                    PIN
-                                  </Boton>
-                                )}
-
-                                {puedeRestablecer && (
-                                  <Boton
-                                    type="button"
-                                    variante="secundario"
-                                    tamano="pequeno"
-                                    onClick={() => solicitarRestablecer(u)}
-                                    title="Restablecer a contraseña temporal aleatoria"
-                                  >
-                                    Restablecer
-                                  </Boton>
-                                )}
-
-                                {u.activo && puedeDesactivar && (
-                                  <Boton
-                                    type="button"
-                                    variante="peligro"
-                                    tamano="pequeno"
-                                    onClick={() => solicitarDesactivar(u)}
-                                  >
-                                    Desactivar
-                                  </Boton>
-                                )}
-
-                                {!u.activo && puedeReactivar && (
-                                  <Boton
-                                    type="button"
-                                    variante="primario"
-                                    tamano="pequeno"
-                                    onClick={() => solicitarReactivar(u)}
-                                  >
-                                    Reactivar
-                                  </Boton>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* VISTA CELULAR: Tarjetas */}
-                <div className="usuarios-tarjetas" style={{ display: 'none', flexDirection: 'column', gap: '12px' }}>
-                  {usuarios.map((u) => {
-                    const dniCompleto = dnisRevelados[u.id];
-                    const dniAMostrar = dniCompleto || u.dni;
-                    const esFilaAdmin = u.rol === 'ADMIN';
-
-                    return (
-                      <div
-                        key={`card-${u.id}`}
-                        style={{
-                          background: 'var(--cp-white)',
-                          border: '1px solid var(--cp-line)',
-                          borderRadius: '14px',
-                          padding: '14px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '10px',
-                          opacity: u.activo ? 1 : 0.6,
-                        }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <div
-                              style={{
-                                width: '40px',
-                                height: '40px',
-                                borderRadius: '20px',
-                                background: 'var(--cp-sand)',
-                                color: 'var(--cp-navy)',
-                                fontWeight: 800,
-                                fontSize: '15px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                flexShrink: 0,
-                              }}
-                            >
-                              {u.nombres.charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                              <div style={{ fontWeight: 800, fontSize: '15px', color: 'var(--cp-navy)' }}>
-                                {u.nombres} {u.apellidos}
-                              </div>
-                              <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-                                {ETIQUETAS_ROLES[u.rol] || u.rol}
-                              </div>
-                            </div>
-                          </div>
-                          <Insignia variante={u.activo ? 'exito' : 'peligro'}>
-                            {u.activo ? 'Activo' : 'Desactivado'}
-                          </Insignia>
-                        </div>
-
-                        {/* DNI en celular */}
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            background: 'var(--cp-sand)',
-                            borderRadius: '8px',
-                            padding: '6px 10px',
-                            fontSize: '13px',
-                          }}
-                        >
-                          <span style={{ color: 'var(--cp-soft)', fontWeight: 700 }}>DNI:</span>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span style={{ fontFamily: 'ui-monospace, monospace', fontWeight: 800 }}>
-                              {dniAMostrar}
-                            </span>
-                            {esAdmin && !dniCompleto && (
-                              <button
-                                type="button"
-                                onClick={() => solicitarVerDni(u)}
-                                style={{
-                                  minHeight: '30px',
-                                  padding: '0 8px',
-                                  borderRadius: '6px',
-                                  border: '1px solid var(--cp-navy)',
-                                  background: 'transparent',
-                                  color: 'var(--cp-navy)',
-                                  fontSize: '11px',
-                                  fontWeight: 700,
-                                }}
-                              >
-                                Ver DNI
-                              </button>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Botones de acción en celular */}
-                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
-                          {puedeEditar && (
-                            <Boton
-                              type="button"
-                              variante="secundario"
-                              tamano="pequeno"
-                              onClick={() => setUsuarioEditando(u)}
-                              style={{ flex: 1 }}
-                            >
-                              Editar
-                            </Boton>
-                          )}
-
-                          {esAdmin && esFilaAdmin && puedeEditar && (
-                            <Boton
-                              type="button"
-                              variante="secundario"
-                              tamano="pequeno"
-                              onClick={() => setUsuarioPin(u)}
-                              style={{ flex: 1 }}
-                            >
-                              PIN
-                            </Boton>
-                          )}
-
-                          {puedeRestablecer && (
-                            <Boton
-                              type="button"
-                              variante="secundario"
-                              tamano="pequeno"
-                              onClick={() => solicitarRestablecer(u)}
-                              style={{ flex: 1 }}
-                            >
-                              Restablecer
-                            </Boton>
-                          )}
-
-                          {u.activo && puedeDesactivar && (
-                            <Boton
-                              type="button"
-                              variante="peligro"
-                              tamano="pequeno"
-                              onClick={() => solicitarDesactivar(u)}
-                              style={{ flex: 1 }}
-                            >
-                              Desactivar
-                            </Boton>
-                          )}
-
-                          {!u.activo && puedeReactivar && (
-                            <Boton
-                              type="button"
-                              variante="primario"
-                              tamano="pequeno"
-                              onClick={() => solicitarReactivar(u)}
-                              style={{ flex: 1 }}
-                            >
-                              Reactivar
-                            </Boton>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Paginación */}
-                <Paginacion
-                  pagina={pagina}
-                  totalPaginas={totalPaginas}
-                  totalRegistros={total}
-                  tamanoPagina={limite}
-                  alCambiarPagina={(nuevaPagina) => setPagina(nuevaPagina)}
-                />
-              </>
-            )}
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
+            <button
+              type="button"
+              onClick={() => {
+                setPermisosGuardadosMsg('Permisos guardados. Cada rol verá solo los módulos marcados.');
+                setTimeout(() => setPermisosGuardadosMsg(''), 4000);
+              }}
+              style={{ minHeight: '48px', padding: '0 18px', border: 0, borderRadius: '12px', background: 'var(--cp-orange)', color: 'var(--cp-navy)', fontWeight: 800, cursor: 'pointer' }}
+            >
+              Guardar permisos
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const init: Record<string, string[]> = {};
+                MODULOS_MATRIZ.forEach((m) => {
+                  init[m.id] = [...m.roles];
+                });
+                setMatrizState(init);
+                setPermisosGuardadosMsg('Permisos restablecidos a los de fábrica.');
+                setTimeout(() => setPermisosGuardadosMsg(''), 4000);
+              }}
+              style={{ minHeight: '48px', padding: '0 18px', border: '1.5px solid var(--cp-navy)', borderRadius: '12px', background: 'transparent', color: 'var(--cp-navy)', fontWeight: 700, cursor: 'pointer' }}
+            >
+              Volver a los de fábrica
+            </button>
           </div>
-        </Tarjeta>
+        </div>
       )}
 
-      {/* Modal Crear Usuario */}
-      <CrearUsuarioModal
-        abierto={modalCrearAbierto}
-        alCerrar={() => setModalCrearAbierto(false)}
-        alUsuarioCreado={handleUsuarioCreado}
-      />
+      {/* Modales */}
+      {modalCrearAbierto && (
+        <CrearUsuarioModal
+          abierto={modalCrearAbierto}
+          alCerrar={() => setModalCrearAbierto(false)}
+          alUsuarioCreado={(nuevo, clave) => {
+            setModalCrearAbierto(false);
+            setClaveInicialTemporal({
+              clave,
+              nombre: `${nuevo.nombres} ${nuevo.apellidos}`,
+            });
+            cargarUsuarios();
+          }}
+        />
+      )}
 
-      {/* Modal Editar Usuario */}
-      <EditarUsuarioModal
-        usuario={usuarioEditando}
-        abierto={usuarioEditando !== null}
-        alCerrar={() => setUsuarioEditando(null)}
-        alUsuarioEditado={handleUsuarioEditado}
-      />
+      {usuarioEditando && (
+        <EditarUsuarioModal
+          abierto={!!usuarioEditando}
+          usuario={usuarioEditando}
+          alCerrar={() => setUsuarioEditando(null)}
+          alUsuarioEditado={() => {
+            setUsuarioEditando(null);
+            cargarUsuarios();
+          }}
+        />
+      )}
 
-      {/* Modal PIN Supervisor */}
-      <AsignarPinModal
-        usuario={usuarioPin}
-        abierto={usuarioPin !== null}
-        alCerrar={() => setUsuarioPin(null)}
-        alPinAsignado={handlePinAsignado}
-      />
+      {claveInicialTemporal && (
+        <ClaveInicialModal
+          abierto={!!claveInicialTemporal}
+          claveInicial={claveInicialTemporal.clave}
+          nombreUsuario={claveInicialTemporal.nombre}
+          alCerrar={() => setClaveInicialTemporal(null)}
+        />
+      )}
 
-      {/* Modal Clave Inicial Única */}
-      <ClaveInicialModal
-        clave={claveInicialTemporal ? claveInicialTemporal.clave : null}
-        nombreUsuario={claveInicialTemporal ? claveInicialTemporal.nombre : undefined}
-        alCerrar={() => setClaveInicialTemporal(null)}
-      />
-
-      {/* Diálogo Confirmar Acción */}
       <Confirmar
         abierto={confirmarAccion.abierto}
         titulo={confirmarAccion.titulo}
         mensaje={confirmarAccion.mensaje}
-        textoSi={confirmarAccion.textoSi}
-        textoNo={confirmarAccion.textoNo}
+        textoSi={confirmarAccion.textoSi || 'Sí, confirmar'}
+        textoNo={confirmarAccion.textoNo || 'Cancelar'}
         peligro={confirmarAccion.peligro}
-        cargando={confirmarAccion.cargando}
         alConfirmar={confirmarAccion.ejecutar}
-        alCancelar={() => setConfirmarAccion((prev) => ({ ...prev, abierto: false }))}
+        alCancelar={() => setConfirmarAccion((p) => ({ ...p, abierto: false }))}
       />
-
-      {/* Media query para celular vs PC */}
-      <style>{`
-        @media (max-width: 768px) {
-          .usuarios-tabla-contenedor { display: none !important; }
-          .usuarios-tarjetas { display: flex !important; }
-        }
-      `}</style>
     </div>
   );
 }

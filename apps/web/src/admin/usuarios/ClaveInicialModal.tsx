@@ -3,23 +3,27 @@ import { Boton } from '../../comun/Boton';
 import { Icono } from '../../comun/Icono';
 
 export interface ClaveInicialModalProps {
-  clave: string | null;
+  clave?: string | null;
+  claveInicial?: string | null;
+  abierto?: boolean;
   nombreUsuario?: string;
   alCerrar: () => void;
 }
 
 export function ClaveInicialModal({
   clave,
+  claveInicial,
+  abierto = true,
   nombreUsuario,
   alCerrar,
 }: ClaveInicialModalProps) {
   const [copiado, setCopiado] = useState(false);
+  const valorClave = clave || claveInicial || null;
 
-  if (!clave) return null;
+  if (!abierto || !valorClave) return null;
 
   async function copiarAlPortapapeles() {
-    if (!clave) return;
-    const valorClave = clave;
+    if (!valorClave) return;
     try {
       if (navigator?.clipboard?.writeText) {
         await navigator.clipboard.writeText(valorClave);
@@ -144,7 +148,7 @@ export function ClaveInicialModal({
                 userSelect: 'all',
               }}
             >
-              {clave}
+              {valorClave}
             </div>
           </div>
           <Boton

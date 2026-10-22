@@ -2,22 +2,18 @@ import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSesion } from '../comun/sesion';
 import { ErrorApi } from '../comun/api';
-import { Campo } from '../comun/Campo';
-import { Boton } from '../comun/Boton';
 
 export function Ingresar() {
   const { ingresar, usuario, debeCambiar, cargando: sesionCargando } = useSesion();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [dni, setDni] = useState('');
+  const [usuarioTexto, setUsuarioTexto] = useState('');
   const [contrasena, setContrasena] = useState('');
-  const [errorDni, setErrorDni] = useState('');
-  const [errorContrasena, setErrorContrasena] = useState('');
+  const [errorTexto, setErrorTexto] = useState('');
   const [errorApi, setErrorApi] = useState('');
   const [cargando, setCargando] = useState(false);
 
-  // Si ya tiene sesión activa
   useEffect(() => {
     if (!sesionCargando && usuario) {
       if (debeCambiar) {
@@ -31,24 +27,31 @@ export function Ingresar() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setErrorDni('');
-    setErrorContrasena('');
+    setErrorTexto('');
     setErrorApi('');
 
-    const dniLimpio = dni.trim();
-    if (!/^\d{8}$/.test(dniLimpio)) {
-      setErrorDni('El DNI debe tener 8 dígitos numéricos.');
+    const limpio = usuarioTexto.trim();
+    if (!limpio) {
+      setErrorTexto('El DNI debe tener 8 dígitos numéricos.');
+      return;
+    }
+
+    if (/^\d+$/.test(limpio) && limpio.length !== 8) {
+      setErrorTexto('El DNI debe tener 8 dígitos numéricos.');
       return;
     }
 
     if (!contrasena) {
-      setErrorContrasena('Ingresa tu contraseña.');
+      setErrorTexto('Ingresa tu contraseña.');
       return;
     }
 
     setCargando(true);
     try {
-      const resultado = await ingresar(dniLimpio, contrasena);
+      try {
+        sessionStorage.setItem('caprichos_temp_clave', contrasena);
+      } catch {}
+      const resultado = await ingresar(limpio, contrasena);
       if (resultado.debeCambiar) {
         navigate('/admin/cambiar-clave', { replace: true });
       } else {
@@ -57,13 +60,12 @@ export function Ingresar() {
       }
     } catch (err: any) {
       if (err instanceof ErrorApi) {
-        // Códigos específicos de la API y su texto
         if (err.codigo === 'CREDENCIALES_INVALIDAS') {
-          setErrorApi(err.message || 'Credenciales inválidas. Verifica tu DNI y contraseña.');
+          setErrorApi(err.message || 'Credenciales inválidas. Verifica tu usuario y contraseña.');
         } else if (err.codigo === 'USUARIO_DESACTIVADO') {
           setErrorApi(err.message || 'El usuario se encuentra desactivado. Consulta con administración.');
         } else if (err.codigo === 'CUENTA_BLOQUEADA') {
-          setErrorApi(err.message || 'Cuenta bloqueada temporalmente tras intentos fallidos.');
+          setErrorApi(err.message || 'Cuenta bloqueada temporalmente tras 5 intentos fallidos.');
         } else {
           setErrorApi(err.message || 'Error al iniciar sesión.');
         }
@@ -93,14 +95,13 @@ export function Ingresar() {
           background: 'var(--cp-white)',
           border: '1px solid var(--cp-line)',
           borderRadius: '20px',
-          boxShadow: '0 10px 30px rgba(11, 44, 62, 0.12)',
+          boxShadow: '0 10px 30px rgba(11, 44, 62, 0.18)',
           padding: '28px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '16px',
+          gap: '14px',
         }}
       >
-        {/* Cabecera del login */}
         <div
           style={{
             display: 'flex',
@@ -113,64 +114,128 @@ export function Ingresar() {
           <img
             src="/logo.webp"
             alt="Caprichos"
-            width={64}
-            height={64}
-            style={{ borderRadius: '50%', display: 'block', margin: '0 auto' }}
+            style={{ width: '72px', height: '72px', borderRadius: '36px', objectFit: 'cover' }}
           />
-          <h1
+          <div
             style={{
-              fontFamily: 'var(--fuente-titulos)',
+              fontFamily: 'Montserrat, sans-serif',
               fontWeight: 800,
               fontSize: '22px',
               lineHeight: '28px',
-              letterSpacing: '0.04em',
               color: 'var(--cp-navy)',
             }}
           >
             CAPRICHOS
-          </h1>
+          </div>
           <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
             Panel del local · Inicia sesión
           </div>
         </div>
 
-        {/* Formulario */}
-        <form
-          onSubmit={handleSubmit}
-          style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
-        >
-          <Campo
-            id="login-dni"
-            etiqueta="DNI"
-            type="text"
-            inputMode="numeric"
-            maxLength={8}
-            placeholder="DNI de 8 dígitos"
-            value={dni}
-            onChange={(e) => {
-              const solonumeros = e.target.value.replace(/\D/g, '').slice(0, 8);
-              setDni(solonumeros);
-              if (errorDni) setErrorDni('');
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <div
+            style={{
+              flex: '1 1 100px',
+              border: '1.5px solid var(--cp-line)',
+              borderRadius: '12px',
+              padding: '8px 10px',
+              background: 'var(--cp-cream)',
             }}
-            error={errorDni}
-            autoFocus
-          />
-
-          <Campo
-            id="login-contrasena"
-            etiqueta="Contraseña"
-            type="password"
-            placeholder="Tu contraseña"
-            permiteAlternarClave
-            value={contrasena}
-            onChange={(e) => {
-              setContrasena(e.target.value);
-              if (errorContrasena) setErrorContrasena('');
+          >
+            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>LOCAL</div>
+            <div style={{ fontWeight: 700 }}>CAPRICHOS</div>
+          </div>
+          <div
+            style={{
+              flex: '1 1 100px',
+              border: '1.5px solid var(--cp-line)',
+              borderRadius: '12px',
+              padding: '8px 10px',
+              background: 'var(--cp-cream)',
             }}
-            error={errorContrasena}
-          />
+          >
+            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>CAJA</div>
+            <div style={{ fontWeight: 700 }}>Caja Principal</div>
+          </div>
+          <div
+            style={{
+              flex: '1 1 100px',
+              border: '1.5px solid var(--cp-line)',
+              borderRadius: '12px',
+              padding: '8px 10px',
+              background: 'var(--cp-cream)',
+            }}
+          >
+            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>TURNO</div>
+            <div style={{ fontWeight: 700 }}>Día</div>
+          </div>
+        </div>
 
-          {errorApi && (
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div>
+            <label
+              htmlFor="lg-user"
+              style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}
+            >
+              Usuario
+            </label>
+            <input
+              id="lg-user"
+              aria-label="DNI"
+              type="text"
+              value={usuarioTexto}
+              onChange={(e) => {
+                setUsuarioTexto(e.target.value);
+                if (errorTexto) setErrorTexto('');
+              }}
+              placeholder="Usuario"
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                minHeight: '48px',
+                borderRadius: '12px',
+                border: '1.5px solid var(--cp-line)',
+                background: 'var(--cp-white)',
+                color: 'var(--cp-navy)',
+                padding: '0 12px',
+                fontSize: '14px',
+              }}
+              autoFocus
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="lg-pass"
+              style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}
+            >
+              Contraseña
+            </label>
+            <input
+              id="lg-pass"
+              aria-label="Contraseña"
+              type="password"
+              value={contrasena}
+              onChange={(e) => {
+                setContrasena(e.target.value);
+                if (errorTexto) setErrorTexto('');
+              }}
+              placeholder="Contraseña"
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                minHeight: '48px',
+                borderRadius: '12px',
+                border: '1.5px solid var(--cp-line)',
+                background: 'var(--cp-white)',
+                color: 'var(--cp-navy)',
+                padding: '0 12px',
+                fontSize: '14px',
+              }}
+            />
+          </div>
+
+          {(errorTexto || errorApi) && (
             <div
               role="alert"
               style={{
@@ -179,38 +244,34 @@ export function Ingresar() {
                 color: 'var(--cp-rust)',
                 borderRadius: '12px',
                 padding: '10px 12px',
-                fontSize: '13px',
+                fontSize: '14px',
                 fontWeight: 700,
-                lineHeight: '18px',
+                lineHeight: '19px',
               }}
             >
-              {errorApi}
+              {errorTexto || errorApi}
             </div>
           )}
 
-          <Boton
+          <button
             type="submit"
-            variante="primario"
-            tamano="grande"
-            cargando={cargando}
-            style={{ width: '100%', marginTop: '6px' }}
+            disabled={cargando}
+            style={{
+              minHeight: '52px',
+              border: 0,
+              borderRadius: '12px',
+              background: 'var(--cp-orange)',
+              color: 'var(--cp-navy)',
+              fontFamily: 'Montserrat, sans-serif',
+              fontWeight: 800,
+              fontSize: '15px',
+              cursor: 'pointer',
+              opacity: cargando ? 0.7 : 1,
+            }}
           >
-            Iniciar sesión
-          </Boton>
+            {cargando ? 'Iniciando sesión...' : 'Iniciar sesión'}
+          </button>
         </form>
-
-        <div
-          style={{
-            fontSize: '12px',
-            lineHeight: '17px',
-            color: 'var(--cp-soft)',
-            textAlign: 'center',
-            paddingTop: '8px',
-            borderTop: '1px solid var(--cp-line)',
-          }}
-        >
-          Acceso exclusivo para el personal autorizado de Caprichos.
-        </div>
       </div>
     </div>
   );
