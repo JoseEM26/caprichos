@@ -43,14 +43,41 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'pedidos', accion: 'anular' },
   { modulo: 'zonas', accion: 'ver' },
   { modulo: 'zonas', accion: 'editar' },
+  // Caja y Repartos (Ola 4)
+  { modulo: 'caja', accion: 'abrir' },
+  { modulo: 'caja', accion: 'cobrar' },
+  { modulo: 'caja', accion: 'movimientos' },
+  { modulo: 'caja', accion: 'cerrar' },
+  { modulo: 'caja', accion: 'ver' },
+  { modulo: 'repartos', accion: 'ver' },
+  { modulo: 'repartos', accion: 'tomar' },
+  { modulo: 'repartos', accion: 'entregar' },
+  { modulo: 'repartos', accion: 'reportar' },
+  { modulo: 'repartos', accion: 'liquidar' },
 ] as const;
 
 export const MATRIZ: Record<string, string[]> = {
   ADMIN: PERMISOS.map((p) => `${p.modulo}/${p.accion}`),
-  CAJERO: ['pedidos/ver', 'pedidos/cambiar_estado', 'pedidos/anular'],
+  CAJERO: [
+    'pedidos/ver',
+    'pedidos/cambiar_estado',
+    'pedidos/anular',
+    'caja/abrir',
+    'caja/cobrar',
+    'caja/movimientos',
+    'caja/cerrar',
+    'caja/ver',
+    'repartos/ver',
+    'repartos/liquidar',
+  ],
   COCINA: ['pedidos/ver', 'pedidos/cambiar_estado'],
   MOZO: [],
   CALLCENTER: [],
   ALMACEN: [],
-  REPARTIDOR: [],
+  REPARTIDOR: [
+    'repartos/ver',
+    'repartos/tomar',
+    'repartos/entregar',
+    'repartos/reportar',
+  ],
 };

@@ -27,8 +27,10 @@ model Party {
   persona    Person?
   documentos PartyIdentifier[]
   usuario    UserAccount?
-  sesiones   Sesion[]
-  pedidos    Pedido[]
+  sesiones          Sesion[]
+  pedidos           Pedido[]          @relation("ClientePedido")
+  pedidosRepartidos Pedido[]          @relation("RepartidorPedido")
+  liquidaciones     Liquidacion[]     @relation("LiquidacionesRepartidor")
 
   @@map("party")
 }
@@ -193,9 +195,10 @@ model Archivo {
   ruta       String     @unique
   tipo_mime  String
   bytes      Int
-  privado    Boolean    @default(false)
+  privado    Boolean            @default(false)
   foto_local FotoLocal?
   productos  Producto[]
+  incidentes IncidenteEntrega[]
 
   @@map("archivo")
 }
@@ -381,10 +384,21 @@ model Pedido {
   motivo_anulacion       String?
   anulacion_aprobada_por BigInt?
   creado_en              DateTime                @default(now()) @db.Timestamptz
-  party                  Party?                  @relation(fields: [party_id], references: [id])
+  // Reparto (Ola 4)
+  repartidor_party_id    BigInt?
+  tomado_en              DateTime?               @db.Timestamptz
+  salio_en               DateTime?               @db.Timestamptz
+  llego_en               DateTime?               @db.Timestamptz
+  motivo_falla           String?
+
+  party                  Party?                  @relation("ClientePedido", fields: [party_id], references: [id])
+  repartidor             Party?                  @relation("RepartidorPedido", fields: [repartidor_party_id], references: [id])
   zona                   ZonaReparto?            @relation(fields: [zona_id], references: [id])
   lineas                 PedidoLinea[]
   historial              PedidoEstadoHistorial[]
+  cobro                  Cobro?
+  incidentes             IncidenteEntrega[]
+  mensajesReparto        MensajeReparto[]
 
   @@map("pedido")
 }
@@ -446,5 +460,158 @@ model SecuenciaPedido {
 
   @@map("secuencia_pedido")
 }
+
+// ---------- Ola 4: caja, cobros, cierres y reparto ----------
+
+model Caja {
+  id          BigInt      @id @default(autoincrement())
+  fecha       DateTime    @unique @db.Date
+  apertura    Decimal     @default(0) @db.Decimal(12, 2)
+  estado      String      @default("ABIERTA")
+  abierta_por BigInt
+  cerrada_por BigInt?
+  cerrada_en  DateTime?   @db.Timestamptz
+
+  cobros        Cobro[]
+  movimientos   MovimientoCaja[]
+  liquidaciones Liquidacion[]
+  cierre        CierreCaja?
+  conteos       ConteoCierre[]
+
+  @@map("caja")
+}
+
+model Cobro {
+  id               BigInt      @id @default(autoincrement())
+  pedido_id        BigInt      @unique
+  caja_id          BigInt
+  total            Decimal     @db.Decimal(12, 2)
+  credito_personal Boolean     @default(false)
+  cobrado_por      BigInt
+  en               DateTime    @default(now()) @db.Timestamptz
+  anulado_en       DateTime?   @db.Timestamptz
+  anulado_por      BigInt?
+  motivo_anulacion String?
+
+  pedido           Pedido      @relation(fields: [pedido_id], references: [id])
+  caja             Caja        @relation(fields: [caja_id], references: [id])
+  pagos            CobroPago[]
+
+  @@map("cobro")
+}
+
+model CobroPago {
+  id       BigInt   @id @default(autoincrement())
+  cobro_id BigInt
+  medio    String
+  monto    Decimal  @db.Decimal(12, 2)
+  recibido Decimal? @db.Decimal(12, 2)
+  vuelto   Decimal? @db.Decimal(12, 2)
+
+  cobro    Cobro    @relation(fields: [cobro_id], references: [id])
+
+  @@map("cobro_pago")
+}
+
+model MovimientoCaja {
+  id               BigInt    @id @default(autoincrement())
+  caja_id          BigInt
+  tipo             String
+  monto            Decimal   @db.Decimal(12, 2)
+  motivo           String
+  anulado_en       DateTime? @db.Timestamptz
+  motivo_anulacion String?
+
+  caja             Caja      @relation(fields: [caja_id], references: [id])
+
+  @@map("movimiento_caja")
+}
+
+model Liquidacion {
+  id                  BigInt   @id @default(autoincrement())
+  caja_id             BigInt
+  repartidor_party_id BigInt
+  esperado            Decimal  @db.Decimal(12, 2)
+  entregado           Decimal  @db.Decimal(12, 2)
+  en                  DateTime @default(now()) @db.Timestamptz
+
+  caja                Caja     @relation(fields: [caja_id], references: [id])
+  repartidor          Party    @relation("LiquidacionesRepartidor", fields: [repartidor_party_id], references: [id])
+
+  @@map("liquidacion")
+}
+
+model CierreCaja {
+  caja_id      BigInt        @id
+  conteo       Json
+  resultado    String
+  aprobado_por BigInt?
+  nota         String?
+
+  caja         Caja          @relation(fields: [caja_id], references: [id])
+  medios       CierreMedio[]
+
+  @@map("cierre_caja")
+}
+
+model ConteoCierre {
+  caja_id   BigInt
+  intento   Int      @db.SmallInt
+  conteo    Json
+  medios    Json
+  resultado String
+  por       BigInt
+  en        DateTime @default(now()) @db.Timestamptz
+
+  caja      Caja     @relation(fields: [caja_id], references: [id])
+
+  @@id([caja_id, intento])
+  @@map("conteo_cierre")
+}
+
+model CierreMedio {
+  caja_id    BigInt
+  medio      String
+  sistema    Decimal    @db.Decimal(12, 2)
+  visto      Decimal    @db.Decimal(12, 2)
+  diferencia Decimal?   @default(dbgenerated("(visto - sistema)")) @db.Decimal(12, 2)
+
+  cierre     CierreCaja @relation(fields: [caja_id], references: [caja_id])
+
+  @@id([caja_id, medio])
+  @@map("cierre_medio")
+}
+
+model IncidenteEntrega {
+  id              BigInt    @id @default(autoincrement())
+  pedido_id       BigInt
+  motivo          String
+  intento         Int
+  en              DateTime  @default(now()) @db.Timestamptz
+  cierre          String?
+  recargo         Decimal?  @db.Decimal(12, 2)
+  cerrado_por     BigInt?
+  contactos       Json      @default("[]")
+  foto_archivo_id BigInt?
+
+  pedido          Pedido    @relation(fields: [pedido_id], references: [id])
+  foto_archivo    Archivo?  @relation(fields: [foto_archivo_id], references: [id])
+
+  @@map("incidente_entrega")
+}
+
+model MensajeReparto {
+  pedido_id     BigInt
+  numero        Int       @db.SmallInt
+  enviado_en    DateTime  @default(now()) @db.Timestamptz
+  respondido_en DateTime? @db.Timestamptz
+  estado        String    @default("ENVIADO")
+
+  pedido        Pedido    @relation(fields: [pedido_id], references: [id])
+
+  @@id([pedido_id, numero])
+  @@map("mensaje_reparto")
+}
+
 
 

@@ -15,6 +15,9 @@ import { ArchivosModule } from './modulos/archivos/archivos.module';
 import { ZonasModule } from './modulos/zonas/zonas.module';
 import { PedidosModule } from './modulos/pedidos/pedidos.module';
 import { PedidosAdminModule } from './modulos/pedidos-admin/pedidos-admin.module';
+import { CajaModule } from './modulos/caja/caja.module';
+import { CierreModule } from './modulos/cierre/cierre.module';
+import { RepartosModule } from './modulos/repartos/repartos.module';
 
 @Module({
   imports: [
@@ -35,6 +38,9 @@ import { PedidosAdminModule } from './modulos/pedidos-admin/pedidos-admin.module
     ZonasModule,
     PedidosModule,
     PedidosAdminModule,
+    CajaModule,
+    CierreModule,
+    RepartosModule,
   ],
   providers: [
     PinoLoggerService,

@@ -14,7 +14,8 @@
     "test:cov": "jest --coverage",
     "prisma:generate": "prisma generate",
     "seed:carta": "ts-node prisma/seed-carta.ts",
-    "seed:zonas": "ts-node prisma/seed-zonas.ts"
+    "seed:zonas": "ts-node prisma/seed-zonas.ts",
+    "seed:caja": "ts-node prisma/seed-caja.ts"
   },
   "dependencies": {
     "@caprichos/compartido": "workspace:*",
