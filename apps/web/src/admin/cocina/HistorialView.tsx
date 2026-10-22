@@ -1,9 +1,7 @@
 import { useState } from 'react';
 import type { HistorialComanda } from './cocinaTipos';
 import { devolverComanda } from './cocinaApi';
-import { Boton } from '../../comun/Boton';
 import { Confirmar } from '../../comun/Confirmar';
-import { EstadoVacio } from '../../comun/EstadoVacio';
 import { EstadoError } from '../../comun/EstadoError';
 
 export interface HistorialViewProps {
@@ -27,17 +25,17 @@ export function HistorialView({
   const [errorAccion, setErrorAccion] = useState<string | null>(null);
 
   const formatearHora = (isoStr?: string | null) => {
-    if (!isoStr) return '--:--';
+    if (!isoStr) return '';
     try {
       const d = new Date(isoStr);
-      if (isNaN(d.getTime())) return '--:--';
+      if (isNaN(d.getTime())) return isoStr;
       return d.toLocaleTimeString('es-PE', {
         hour: '2-digit',
         minute: '2-digit',
         hour12: false,
       });
     } catch {
-      return '--:--';
+      return isoStr;
     }
   };
 
@@ -63,7 +61,12 @@ export function HistorialView({
   return (
     <section
       aria-label="Historial del día en cocina"
-      style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+        fontFamily: 'Montserrat, system-ui, sans-serif',
+      }}
     >
       <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
         Lo despejado hoy en {nombreAreaActual || 'esta área'}, con la hora en que
@@ -75,100 +78,109 @@ export function HistorialView({
       {errorAccion && <EstadoError mensaje={errorAccion} />}
 
       {historial.length === 0 ? (
-        <EstadoVacio
-          titulo="Sin pedidos despejados"
-          mensaje="Todavía no se despejó ninguna comanda hoy en esta área."
-        />
+        <div style={{ color: 'var(--cp-soft)', fontSize: '13px', padding: '8px 0' }}>
+          Todavía no se despejó nada hoy.
+        </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {historial.map((item) => (
-            <div
-              key={item.id}
-              style={{
-                background: 'var(--cp-white)',
-                border: '1px solid var(--cp-line)',
-                borderRadius: '12px',
-                padding: '12px 14px',
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: '12px',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
+          {historial.map((h) => {
+            const itemsStr =
+              h.lineas && h.lineas.length > 0
+                ? h.lineas
+                    .map((l) => `${l.cantidad}× ${l.nombre}`)
+                    .join(', ')
+                : 'Pedido';
+
+            const horaLlego = formatearHora(h.llego_en);
+            const horaDespejo = formatearHora(h.despejada_en);
+            const minsPrep =
+              h.tiempoPreparacionMin !== undefined
+                ? ` (${h.tiempoPreparacionMin} min de preparación)`
+                : '';
+
+            return (
               <div
+                key={h.id}
                 style={{
+                  background: 'var(--cp-white)',
+                  border: '1px solid var(--cp-line)',
+                  borderRadius: '12px',
+                  padding: '10px 12px',
                   display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '10px',
                   alignItems: 'center',
-                  gap: '12px',
-                  minWidth: '240px',
-                  flex: 1,
                 }}
               >
                 <span
                   style={{
-                    fontFamily: 'var(--fuente-titulos)',
+                    fontFamily: 'Montserrat, sans-serif',
                     fontWeight: 800,
-                    fontSize: '16px',
+                    minWidth: '80px',
                     color: 'var(--cp-navy)',
-                    minWidth: '90px',
                   }}
                 >
-                  {item.ticket || item.codigo}
+                  {h.ticket || h.codigo}
                 </span>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <div style={{ fontSize: '13px', color: 'var(--cp-navy)' }}>
-                    {item.lineas.map((l, idx) => (
-                      <span key={l.id || idx}>
-                        <b>{l.cantidad}×</b> {l.nombre}
-                        {idx < item.lineas.length - 1 ? ', ' : ''}
-                      </span>
-                    ))}
-                  </div>
+                <span
+                  style={{
+                    flex: '1 1 220px',
+                    minWidth: 0,
+                    fontSize: '13px',
+                    color: 'var(--cp-navy)',
+                  }}
+                >
+                  {itemsStr}
+                  {h.areaNombre ? ` · ${h.areaNombre}` : ''}
+                  <br />
+                  <span style={{ color: 'var(--cp-soft)' }}>
+                    Llegó {horaLlego} · despejado {horaDespejo}
+                    {minsPrep}
+                  </span>
+                </span>
 
-                  <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-                    Llegó: {formatearHora(item.llego_en)} · Despejado:{' '}
-                    {formatearHora(item.despejada_en)} ({item.tiempoPreparacionMin}{' '}
-                    min de preparación)
-                    {item.areaNombre && ` · ${item.areaNombre}`}
-                  </div>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setComandaParaDevolver(h)}
+                  disabled={devolviendo}
+                  style={{
+                    minHeight: '44px',
+                    padding: '0 14px',
+                    border: '1.5px solid var(--cp-navy)',
+                    borderRadius: '10px',
+                    background: 'transparent',
+                    color: 'var(--cp-navy)',
+                    fontWeight: 800,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Devolver a la pantalla
+                </button>
               </div>
-
-              <Boton
-                variante="secundario"
-                onClick={() => setComandaParaDevolver(item)}
-                style={{
-                  minHeight: '44px',
-                  padding: '0 14px',
-                  border: '1.5px solid var(--cp-navy)',
-                  borderRadius: '10px',
-                  background: 'transparent',
-                  color: 'var(--cp-navy)',
-                  fontWeight: 800,
-                  fontSize: '13px',
-                }}
-              >
-                Devolver a la pantalla
-              </Boton>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
-      {/* Modal de confirmación para Devolver comanda */}
       <Confirmar
-        abierto={Boolean(comandaParaDevolver)}
-        titulo={`¿Devolver comanda ${comandaParaDevolver?.ticket || comandaParaDevolver?.codigo} a la pantalla?`}
-        mensaje="Volverá a aparecer como pendiente en la pantalla de cocina. Si el pedido ya estaba en estado listo, regresará a cocina."
-        textoSi="Sí, devolver"
+        abierto={!!comandaParaDevolver}
+        titulo={`¿Devolver comanda ${
+          comandaParaDevolver?.ticket || comandaParaDevolver?.codigo
+        } a la pantalla?`}
+        mensaje={`Vuelve a aparecer en ${
+          comandaParaDevolver?.areaNombre || 'cocina'
+        } como pendiente. Úsalo si se despejó por error.`}
+        textoConfirmar="Sí, devolver"
         textoNo="No, cancelar"
-        peligro
-        cargando={devolviendo}
-        alConfirmar={ejecutarDevolucion}
+        alConfirmar={ejecucionDevolucionWrapper}
         alCancelar={() => setComandaParaDevolver(null)}
       />
     </section>
   );
+
+  function ejecucionDevolucionWrapper() {
+    ejecutarDevolucion();
+  }
 }

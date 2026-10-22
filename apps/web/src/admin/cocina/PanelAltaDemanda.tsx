@@ -1,7 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { AltaDemandaEstado } from './cocinaTipos';
 import { configurarAltaDemanda } from './cocinaApi';
-import { Boton } from '../../comun/Boton';
 import { Confirmar } from '../../comun/Confirmar';
 
 export interface PanelAltaDemandaProps {
@@ -16,23 +15,29 @@ export function PanelAltaDemanda({
   alCambiarEstado,
 }: PanelAltaDemandaProps) {
   const [minutosSeleccionados, setMinutosSeleccionados] = useState<number>(
-    estado.activa && estado.minutos > 0 ? estado.minutos : 15,
+    estado.activa && estado.minutos > 0 ? estado.minutos : 10,
   );
   const [minutosInput, setMinutosInput] = useState<string>(
-    String(estado.activa && estado.minutos > 0 ? estado.minutos : 15),
+    String(estado.activa && estado.minutos > 0 ? estado.minutos : 10),
   );
   const [pausaPedidos, setPausaPedidos] = useState<boolean>(estado.pausa);
   const [errorLocal, setErrorLocal] = useState<string | null>(null);
-  const [guardando, setGuardando] = useState(false);
+  const [, setGuardando] = useState(false);
 
-  // Modal de confirmación para activar/apagar o modificar
   const [confirmandoAccion, setConfirmandoAccion] = useState<{
     activa: boolean;
     minutos: number;
     pausa: boolean;
   } | null>(null);
 
-  // Manejar cambio en input libre de minutos
+  useEffect(() => {
+    if (estado.activa && estado.minutos > 0) {
+      setMinutosSeleccionados(estado.minutos);
+      setMinutosInput(String(estado.minutos));
+    }
+    setPausaPedidos(estado.pausa);
+  }, [estado.activa, estado.minutos, estado.pausa]);
+
   const handleCambioInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const valStr = e.target.value;
     setMinutosInput(valStr);
@@ -56,7 +61,6 @@ export function PanelAltaDemanda({
     setMinutosInput(String(min));
     setErrorLocal(null);
 
-    // Si ya está activa, solicitar confirmación para actualizar el tiempo
     if (estado.activa && min !== estado.minutos) {
       setConfirmandoAccion({
         activa: true,
@@ -81,14 +85,12 @@ export function PanelAltaDemanda({
 
   const clickBotonPrincipal = () => {
     if (estado.activa) {
-      // Confirmar apagar
       setConfirmandoAccion({
         activa: false,
         minutos: 0,
         pausa: false,
       });
     } else {
-      // Validar minutos
       const num = parseInt(minutosInput, 10);
       if (isNaN(num) || num < 5 || num > 180) {
         setErrorLocal('Los minutos deben estar entre 5 y 180.');
@@ -119,81 +121,72 @@ export function PanelAltaDemanda({
     }
   };
 
-  const textoQuienActivo = estado.activa
-    ? estado.mensaje || (estado.activado_por ? `activó ${estado.activado_por}` : null)
-    : null;
+  const quienActivo = estado.activado_por || estado.mensaje || '';
+
+  const labelPrincipal = estado.activa
+    ? `Alta demanda: ACTIVADA (+${estado.minutos} min${
+        estado.pausa ? ', pedidos en pausa' : ''
+      }${quienActivo ? ' · activó ' + quienActivo : ''})`
+    : 'Alta demanda: apagada';
 
   return (
-    <section
-      aria-label="Control de alta demanda"
-      style={{
-        background: 'var(--cp-white)',
-        border: '1px solid var(--cp-line)',
-        borderRadius: '14px',
-        padding: '14px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '10px',
-      }}
-    >
+    <>
       <div
         style={{
+          background: 'var(--cp-white)',
+          border: '1px solid var(--cp-line)',
+          borderRadius: '14px',
+          padding: '12px',
           display: 'flex',
           flexWrap: 'wrap',
           gap: '8px',
           alignItems: 'center',
+          fontFamily: 'Montserrat, system-ui, sans-serif',
+          boxSizing: 'border-box',
         }}
       >
-        {/* Interruptor principal de alta demanda */}
-        <Boton
-          variante={estado.activa ? 'peligro' : 'secundario'}
+        <button
+          type="button"
           onClick={clickBotonPrincipal}
           style={{
             minHeight: '44px',
-            padding: '0 16px',
+            padding: '0 14px',
             borderRadius: '12px',
             fontWeight: 800,
             fontSize: '13px',
+            cursor: 'pointer',
             border: '1.5px solid var(--cp-rust)',
             background: estado.activa ? 'var(--cp-rust)' : 'transparent',
-            color: estado.activa ? 'var(--cp-white)' : 'var(--cp-rust)',
+            color: estado.activa ? 'var(--cp-white)' : 'var(--cp-navy)',
           }}
         >
-          {estado.activa
-            ? `Alta demanda: ACTIVADA (+${estado.minutos} min${
-                estado.pausa ? ', pedidos en pausa' : ''
-              }${textoQuienActivo ? ` · ${textoQuienActivo}` : ''})`
-            : 'Alta demanda: apagada'}
-        </Boton>
+          {labelPrincipal}
+        </button>
 
-        {/* Atajos de minutos */}
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          {ATAJOS_MINUTOS.map((m) => {
-            const estaActivo = minutosSeleccionados === m;
-            return (
-              <button
-                key={m}
-                type="button"
-                onClick={() => seleccionarAtajo(m)}
-                style={{
-                  minHeight: '44px',
-                  padding: '0 12px',
-                  borderRadius: '9999px',
-                  border: '1.5px solid var(--cp-navy)',
-                  fontWeight: 700,
-                  fontSize: '12px',
-                  background: estaActivo ? 'var(--cp-navy)' : 'transparent',
-                  color: estaActivo ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                  cursor: 'pointer',
-                }}
-              >
-                +{m} min
-              </button>
-            );
-          })}
-        </div>
+        {ATAJOS_MINUTOS.map((min) => {
+          const seleccionado = minutosSeleccionados === min;
+          return (
+            <button
+              key={min}
+              type="button"
+              onClick={() => seleccionarAtajo(min)}
+              style={{
+                minHeight: '44px',
+                padding: '0 12px',
+                borderRadius: '9999px',
+                border: '1.5px solid var(--cp-navy)',
+                fontWeight: 700,
+                fontSize: '12px',
+                background: seleccionado ? 'var(--cp-navy)' : 'transparent',
+                color: seleccionado ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                cursor: 'pointer',
+              }}
+            >
+              +{min} min
+            </button>
+          );
+        })}
 
-        {/* Input libre de minutos con validación de 5 a 180 */}
         <label
           style={{
             display: 'flex',
@@ -204,123 +197,118 @@ export function PanelAltaDemanda({
             color: 'var(--cp-navy)',
           }}
         >
-          Otro (min):
+          Otro (min)
           <input
             type="number"
-            min={5}
+            min={1}
             max={180}
             value={minutosInput}
             onChange={handleCambioInput}
             aria-label="Minutos extra de espera"
             style={{
               width: '76px',
-              minHeight: '44px',
               boxSizing: 'border-box',
+              minHeight: '44px',
               borderRadius: '10px',
-              border: `1.5px solid ${
-                errorLocal && (parseInt(minutosInput, 10) < 5 || parseInt(minutosInput, 10) > 180)
-                  ? 'var(--cp-rust)'
-                  : 'var(--cp-navy)'
-              }`,
+              border: '1.5px solid var(--cp-navy)',
               background: 'var(--cp-white)',
               padding: '0 8px',
               fontSize: '14px',
               fontWeight: 700,
-              textAlign: 'center',
+              color: 'var(--cp-navy)',
             }}
           />
         </label>
 
-        {/* Chips de pausa de pedidos (solo válidos con alta demanda activa) */}
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            disabled={!estado.activa}
-            onClick={() => alternarPausa(false)}
-            style={{
-              minHeight: '44px',
-              padding: '0 12px',
-              borderRadius: '9999px',
-              border: '1.5px solid var(--cp-navy)',
-              fontWeight: 700,
-              fontSize: '12px',
-              background: !estado.pausa ? 'var(--cp-navy)' : 'transparent',
-              color: !estado.pausa ? 'var(--cp-cream)' : 'var(--cp-navy)',
-              opacity: !estado.activa ? 0.5 : 1,
-              cursor: !estado.activa ? 'not-allowed' : 'pointer',
-            }}
-          >
-            Seguir recibiendo pedidos
-          </button>
-
-          <button
-            type="button"
-            disabled={!estado.activa}
-            onClick={() => alternarPausa(true)}
-            style={{
-              minHeight: '44px',
-              padding: '0 12px',
-              borderRadius: '9999px',
-              border: '1.5px solid var(--cp-rust)',
-              fontWeight: 700,
-              fontSize: '12px',
-              background: estado.pausa ? 'var(--cp-rust)' : 'transparent',
-              color: estado.pausa ? 'var(--cp-white)' : 'var(--cp-rust)',
-              opacity: !estado.activa ? 0.5 : 1,
-              cursor: !estado.activa ? 'not-allowed' : 'pointer',
-            }}
-          >
-            Pausar pedidos
-          </button>
-        </div>
-      </div>
-
-      {/* Error de validación local */}
-      {errorLocal && (
-        <div
-          role="alert"
+        <button
+          type="button"
+          onClick={() => alternarPausa(false)}
           style={{
-            fontSize: '13px',
-            color: 'var(--cp-rust)',
+            minHeight: '44px',
+            padding: '0 12px',
+            borderRadius: '9999px',
+            border: '1.5px solid var(--cp-navy)',
             fontWeight: 700,
+            fontSize: '12px',
+            background: !pausaPedidos ? 'var(--cp-navy)' : 'transparent',
+            color: !pausaPedidos ? 'var(--cp-cream)' : 'var(--cp-navy)',
+            cursor: 'pointer',
           }}
         >
-          {errorLocal}
-        </div>
-      )}
+          Seguir recibiendo pedidos
+        </button>
 
-      {/* Mensaje descriptivo del mockup */}
-      <div style={{ fontSize: '12px', color: 'var(--cp-soft)', lineHeight: '18px' }}>
-        Alta demanda: la carta y el chatbot avisan que la entrega tarda más (tiempo
-        normal + los minutos que elijas, hasta 3 horas). Pausar pedidos: además la
-        carta y el chatbot dejan de recibir pedidos nuevos y el bot pasa a un asesor;
-        sirve para una emergencia. Solo vale mientras la alta demanda está activada.
+        <button
+          type="button"
+          onClick={() => alternarPausa(true)}
+          style={{
+            minHeight: '44px',
+            padding: '0 12px',
+            borderRadius: '9999px',
+            border: '1.5px solid var(--cp-navy)',
+            fontWeight: 700,
+            fontSize: '12px',
+            background: pausaPedidos ? 'var(--cp-navy)' : 'transparent',
+            color: pausaPedidos ? 'var(--cp-cream)' : 'var(--cp-navy)',
+            cursor: 'pointer',
+          }}
+        >
+          Pausar pedidos
+        </button>
+
+        {errorLocal && (
+          <div
+            role="alert"
+            style={{
+              flex: '1 1 100%',
+              fontSize: '12px',
+              fontWeight: 700,
+              color: 'var(--cp-rust)',
+            }}
+          >
+            {errorLocal}
+          </div>
+        )}
+
+        <div
+          style={{
+            flex: '1 1 100%',
+            fontSize: '12px',
+            color: 'var(--cp-soft)',
+            lineHeight: '17px',
+          }}
+        >
+          Alta demanda: la carta y el chatbot avisan que la entrega tarda más
+          (tiempo normal + los minutos que elijas, hasta 3 horas). Pausar
+          pedidos: además la carta y el chatbot dejan de recibir pedidos nuevos y
+          el bot pasa a un asesor; sirve para una emergencia. Solo vale mientras
+          la alta demanda está activada.
+        </div>
       </div>
 
-      {/* Confirmación Sí/No obligatoria */}
       <Confirmar
-        abierto={Boolean(confirmandoAccion)}
+        abierto={!!confirmandoAccion}
         titulo={
           confirmandoAccion?.activa
-            ? '¿Confirmar alta demanda?'
-            : '¿Apagar la alta demanda?'
+            ? '¿Confirmar alta demanda? ¿Activar la alta demanda?'
+            : '¿Confirmar alta demanda? ¿Apagar la alta demanda?'
         }
         mensaje={
           confirmandoAccion?.activa
-            ? `Se aplicarán +${confirmandoAccion.minutos} minutos de espera a la entrega en la carta y el chatbot.${
+            ? `La carta y el chatbot avisarán que la entrega tarda más (+${confirmandoAccion.minutos} min).${
                 confirmandoAccion.pausa
                   ? ' Además, la carta y el chatbot dejarán de recibir pedidos nuevos.'
                   : ''
-              } Lo verán al instante todas las áreas de cocina.`
-            : 'La carta y el chatbot volverán al tiempo de entrega normal (de 25 a 35 minutos) y el bot volverá a atender.'
+              }`
+            : 'La carta y el chatbot vuelven a decir de 25 a 35 minutos y el bot vuelve a atender.'
         }
-        textoSi={confirmandoAccion?.activa ? 'Sí, aplicar' : 'Sí, apagar'}
+        textoConfirmar={
+          confirmandoAccion?.activa ? 'Sí, activar' : 'Sí, apagar'
+        }
         textoNo="No, cancelar"
-        peligro={!confirmandoAccion?.activa || confirmandoAccion?.pausa}
-        cargando={guardando}
         alConfirmar={ejecutarConfiguracion}
         alCancelar={() => setConfirmandoAccion(null)}
       />
-    </section>
+    </>
   );
 }

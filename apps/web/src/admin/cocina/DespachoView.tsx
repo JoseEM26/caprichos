@@ -1,59 +1,123 @@
+import { useState } from 'react';
 import type { PedidoDespacho } from './cocinaTipos';
-import { EstadoVacio } from '../../comun/EstadoVacio';
+import { Confirmar } from '../../comun/Confirmar';
 import { EstadoError } from '../../comun/EstadoError';
 
 export interface DespachoViewProps {
   pedidos: PedidoDespacho[];
   error?: string | null;
   alReintentar?: () => void;
+  alMarcarDespachado?: (pedidoId: string) => Promise<void> | void;
 }
 
 export function DespachoView({
   pedidos,
   error,
   alReintentar,
+  alMarcarDespachado,
 }: DespachoViewProps) {
+  const [mensajeDespacho, setMensajeDespacho] = useState<string | null>(null);
+  const [pedidoParaDespachar, setPedidoParaDespachar] =
+    useState<PedidoDespacho | null>(null);
+
   const formatoModalidad = (p: PedidoDespacho) => {
     const mod = (p.modalidad || '').toUpperCase();
-    if (mod === 'MESA') {
+    if (mod === 'MESA' || mod === 'LOCAL') {
       return p.mesa ? `Mesa ${p.mesa}` : 'En mesa';
     }
     if (mod === 'DELIVERY') return 'Delivery';
-    if (mod === 'RECOGER') return 'Para recoger';
-    return mod;
+    if (mod === 'RECOGER' || mod === 'LLEVAR') return 'Para llevar';
+    return p.modalidad || 'Para llevar';
+  };
+
+  const getTextoEntrega = (p: PedidoDespacho) => {
+    const mod = (p.modalidad || '').toUpperCase();
+    if (mod === 'DELIVERY') return 'Entregado a reparto';
+    if (mod === 'MESA' || mod === 'LOCAL') return 'Entregado al mozo';
+    return 'Entregado al cliente';
+  };
+
+  const handleImprimir = (p: PedidoDespacho) => {
+    const cod = p.ticket || p.codigo;
+    setMensajeDespacho(
+      `Copia de despacho de ${cod} enviada a la ticketera de caja (simulado).`,
+    );
+    setTimeout(() => setMensajeDespacho(null), 5000);
+  };
+
+  const ejecutarDespacho = async () => {
+    if (!pedidoParaDespachar) return;
+    if (alMarcarDespachado) {
+      await alMarcarDespachado(pedidoParaDespachar.id);
+    }
+    setMensajeDespacho(
+      `Pedido ${
+        pedidoParaDespachar.ticket || pedidoParaDespachar.codigo
+      } marcado como despachado.`,
+    );
+    setPedidoParaDespachar(null);
+    setTimeout(() => setMensajeDespacho(null), 5000);
   };
 
   return (
     <section
       aria-label="Vista de despacho"
-      style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+        fontFamily: 'Montserrat, system-ui, sans-serif',
+      }}
     >
       <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
         Despacho: cada pedido completo, de todas las áreas, con el nombre del
         cliente. Así no hay que ir a caja a pedir el voucher.
       </div>
 
+      {mensajeDespacho && (
+        <div
+          role="status"
+          style={{
+            fontSize: '13px',
+            fontWeight: 700,
+            color: '#2F7A45',
+            background: 'var(--cp-white)',
+            border: '1px solid #2F7A45',
+            borderRadius: '10px',
+            padding: '8px 12px',
+          }}
+        >
+          {mensajeDespacho}
+        </div>
+      )}
+
       {error && <EstadoError mensaje={error} alReintentar={alReintentar} />}
 
       {pedidos.length === 0 ? (
-        <EstadoVacio
-          titulo="Sin pedidos por despachar"
-          mensaje="No hay pedidos pendientes en cocina ni despacho en este momento."
-        />
+        <div style={{ color: 'var(--cp-soft)', fontSize: '13px', padding: '8px 0' }}>
+          No hay pedidos para despachar.
+        </div>
       ) : (
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
             gap: '12px',
             alignItems: 'start',
-            width: '100%',
           }}
         >
           {pedidos.map((p) => {
-            const esCompleto = p.completo || p.estado === 'LISTO';
-            const colorBorde = esCompleto ? 'var(--cp-green)' : 'var(--cp-line)';
-            const colorEstado = esCompleto ? 'var(--cp-green)' : 'var(--cp-rust)';
+            const esCompleto =
+              p.completo ||
+              p.estado === 'LISTO' ||
+              (p.areas && p.areas.length > 0 && p.areas.every((a) => a.despejado));
+
+            const colorBorde = esCompleto ? '#2F9E57' : 'var(--cp-line)';
+            const estadoTexto = esCompleto
+              ? 'Completo: listo para entregar'
+              : p.estadoDespacho || 'Pendiente';
+
+            const giveText = getTextoEntrega(p);
 
             return (
               <div
@@ -62,65 +126,47 @@ export function DespachoView({
                 style={{
                   background: 'var(--cp-white)',
                   border: `2px solid ${colorBorde}`,
-                  borderRadius: '14px',
-                  padding: '14px',
+                  borderRadius: '12px',
+                  padding: '12px',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '8px',
-                  boxShadow: '0 2px 8px rgba(11, 44, 62, 0.05)',
+                  gap: '6px',
+                  boxSizing: 'border-box',
                 }}
               >
-                {/* Nombre del cliente (solo el nombre, DT-81) */}
                 <div
                   style={{
-                    fontFamily: 'var(--fuente-titulos)',
+                    fontFamily: 'Montserrat, sans-serif',
                     fontWeight: 800,
                     fontSize: '17px',
                     color: 'var(--cp-navy)',
                   }}
                 >
-                  {p.cliente || p.cliente_nombre || 'Cliente sin nombre'}
+                  {p.cliente || p.cliente_nombre || 'Cliente'}
                 </div>
 
-                {/* Código y modalidad */}
                 <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-                  <b>{p.ticket || p.codigo}</b> · {formatoModalidad(p)}
-                  {p.canal ? ` · Canal ${p.canal}` : ''}
+                  {p.ticket || p.codigo} · {formatoModalidad(p)}
                 </div>
 
-                {/* Desglose por áreas */}
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '6px',
-                    margin: '4px 0',
-                    borderTop: '1px solid var(--cp-line)',
-                    borderBottom: '1px solid var(--cp-line)',
-                    padding: '8px 0',
-                  }}
-                >
-                  {p.areas.map((a) => (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {(p.areas || []).map((a) => (
                     <div
                       key={a.areaId}
                       style={{
                         display: 'flex',
                         justifyContent: 'space-between',
-                        alignItems: 'center',
+                        gap: '8px',
                         fontSize: '13px',
                       }}
                     >
-                      <span style={{ fontWeight: 700, color: 'var(--cp-navy)' }}>
-                        {a.areaNombre}
+                      <span>
+                        <b>{a.areaNombre}</b>
                       </span>
                       <span
                         style={{
                           fontWeight: 800,
-                          fontSize: '12px',
-                          color: a.despejado ? 'var(--cp-green)' : 'var(--cp-rust)',
-                          background: a.despejado ? '#E6F4EA' : '#FFF0E6',
-                          borderRadius: '9999px',
-                          padding: '2px 8px',
+                          color: a.despejado ? '#2F7A45' : 'var(--cp-rust)',
                         }}
                       >
                         {a.despejado ? 'Despejado' : 'Falta despejar'}
@@ -129,25 +175,78 @@ export function DespachoView({
                   ))}
                 </div>
 
-                {/* Estado global de despacho */}
+                <div
+                  style={{
+                    fontWeight: 800,
+                    color: esCompleto ? '#2F9E57' : 'var(--cp-rust)',
+                    marginTop: '4px',
+                  }}
+                >
+                  {estadoTexto}
+                </div>
+
                 <div
                   style={{
                     display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    fontWeight: 800,
-                    fontSize: '14px',
-                    color: colorEstado,
+                    gap: '6px',
+                    flexWrap: 'wrap',
+                    marginTop: '4px',
                   }}
                 >
-                  <span>Estado:</span>
-                  <span>{esCompleto ? 'Completo' : 'Pendiente'}</span>
+                  {esCompleto && (
+                    <button
+                      type="button"
+                      onClick={() => setPedidoParaDespachar(p)}
+                      style={{
+                        minHeight: '44px',
+                        padding: '0 12px',
+                        border: 0,
+                        borderRadius: '10px',
+                        background: 'var(--cp-navy)',
+                        color: 'var(--cp-cream)',
+                        fontWeight: 800,
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {giveText}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleImprimir(p)}
+                    style={{
+                      minHeight: '44px',
+                      padding: '0 12px',
+                      border: '1.5px solid var(--cp-navy)',
+                      borderRadius: '10px',
+                      background: 'transparent',
+                      color: 'var(--cp-navy)',
+                      fontWeight: 700,
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Imprimir copia de despacho
+                  </button>
                 </div>
               </div>
             );
           })}
         </div>
       )}
+
+      <Confirmar
+        abierto={!!pedidoParaDespachar}
+        titulo={`¿Marcar ${
+          pedidoParaDespachar?.ticket || pedidoParaDespachar?.codigo
+        } como despachado?`}
+        mensaje="Sale de la vista de despacho."
+        textoConfirmar="Sí, despachar"
+        textoNo="No, cancelar"
+        alConfirmar={ejecutarDespacho}
+        alCancelar={() => setPedidoParaDespachar(null)}
+      />
     </section>
   );
 }

@@ -19,6 +19,7 @@ export interface LineaComanda {
   opciones?: Array<string | { id?: string; nombre: string; grupo?: string }>;
   personas?: string[];
   nota?: string | null;
+  area?: string;
 }
 
 export interface Comanda {
@@ -31,6 +32,7 @@ export interface Comanda {
   canal: string;
   modalidad: string;
   mesa?: string | null;
+  mozo?: string | null;
   nota?: string | null;
   minutos: number;
   minutosEspera?: number;
@@ -100,9 +102,11 @@ export interface AgotadoItem {
   opcionId?: string | null;
   opcion_id?: string | null;
   opcionNombre?: string | null;
+  nombre?: string | null;
   desde: string;
   hasta: string | null;
   por: string;
+  activado_por?: string | null;
 }
 
 export interface AltaDemandaEstado {

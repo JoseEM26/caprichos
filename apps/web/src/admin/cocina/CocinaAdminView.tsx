@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import type {
   AltaDemandaEstado,
   AreaCocina,
@@ -9,6 +8,7 @@ import type {
 } from './cocinaTipos';
 import {
   despejarComanda,
+  devolverComanda,
   listarAreasCocina,
   listarComandasArea,
   listarDespacho,
@@ -23,31 +23,39 @@ import {
 import { ComandaTarjeta } from './ComandaTarjeta';
 import { PanelAltaDemanda } from './PanelAltaDemanda';
 import { ModalAgotados } from './ModalAgotados';
+import { ModalMermaIndividual } from './ModalMermaIndividual';
+import { ModalMermaVarios } from './ModalMermaVarios';
+import { ModalPedirAlmacen } from './ModalPedirAlmacen';
 import { HistorialView } from './HistorialView';
 import { DespachoView } from './DespachoView';
 import { Confirmar } from '../../comun/Confirmar';
 import { Cargando } from '../../comun/Cargando';
-import { EstadoVacio } from '../../comun/EstadoVacio';
 import { EstadoError } from '../../comun/EstadoError';
 import { useEventos } from '../../comun/socket';
 import { useSesion } from '../../comun/sesion';
 
-export type ModoCocina = 'comandas' | 'historial' | 'despacho';
+export type ModoCocina = 'area' | 'hist' | 'desp';
+
+const AREAS_MOCKUP = [
+  { id: 'todas', n: 'Todas' },
+  { id: 'bebidas', n: 'Bebidas' },
+  { id: 'postres', n: 'Postres' },
+  { id: 'salados', n: 'Salados' },
+] as const;
 
 export function CocinaAdminView() {
-  const navigate = useNavigate();
   const { tiene } = useSesion();
 
-  // Permisos requeridos
   const puedeVer = tiene('cocina/ver');
   const puedeDespejar = tiene('cocina/despejar');
 
-  // Estado de navegación
-  const [modo, setModo] = useState<ModoCocina>('comandas');
-  const [areas, setAreas] = useState<AreaCocina[]>([]);
-  const [areaSeleccionada, setAreaSeleccionada] = useState<string>(''); // '' = Todas las áreas
+  // Modo de pestañas: 'area' (Pantalla del área), 'hist' (Historial), 'desp' (Despacho)
+  const [modo, setModo] = useState<ModoCocina>('area');
+  const [areaActiva, setAreaActiva] = useState<string>('todas');
+  const [areaSeleccionada, setAreaSeleccionada] = useState<string>('');
+  const [areasApi, setAreasApi] = useState<AreaCocina[]>([]);
 
-  // Estado de datos
+  // Datos
   const [comandas, setComandas] = useState<Comanda[]>([]);
   const [historial, setHistorial] = useState<HistorialComanda[]>([]);
   const [despacho, setDespacho] = useState<PedidoDespacho[]>([]);
@@ -57,90 +65,81 @@ export function CocinaAdminView() {
     pausa: false,
   });
 
-  // Estados de carga y error
+  // Estados de carga / error
   const [cargandoInicial, setCargandoInicial] = useState<boolean>(true);
-  const [cargandoDatos, setCargandoDatos] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Audio y notificaciones en vivo
+  // Audio
   const [silenciado, setSilenciadoEstado] = useState<boolean>(estaSilenciado());
-  const [avisoVisual, setAvisoVisual] = useState<string | null>(null);
 
-  // Modal Agotados ("Se acabó algo")
+  // Modales
   const [modalAgotadosAbierto, setModalAgotadosAbierto] = useState<boolean>(false);
+  const [modalMermaIndAbierto, setModalMermaIndAbierto] = useState<boolean>(false);
+  const [modalMermaVariosAbierto, setModalMermaVariosAbierto] = useState<boolean>(false);
+  const [modalPedirAlmacenAbierto, setModalPedirAlmacenAbierto] = useState<boolean>(false);
+  const [kFullAbierto, setKFullAbierto] = useState<boolean>(false);
 
-  // Confirmación de Despeje
+  // Despeje con confirmación
   const [comandaParaDespejar, setComandaParaDespejar] = useState<Comanda | null>(null);
   const [despejando, setDespejando] = useState<boolean>(false);
 
-  // 1. Cargar áreas de cocina
+  // Floating Undo toast
+  const [undoInfo, setUndoInfo] = useState<{
+    pedidoId: string;
+    areaId: string;
+    texto: string;
+  } | null>(null);
+
   const cargarAreas = useCallback(async () => {
     try {
       const res = await listarAreasCocina();
-      setAreas(res);
-      if (!areaSeleccionada && res.length > 0) {
-        setAreaSeleccionada(res[0].id);
-      }
+      setAreasApi(res);
       return res;
-    } catch (err: any) {
-      setError(err?.message || 'Error al cargar áreas de cocina');
+    } catch {
       return [];
     }
-  }, [areaSeleccionada]);
+  }, []);
 
-  // 2. Cargar comandas activas
   const cargarComandas = useCallback(async (areaId: string) => {
     try {
-      setCargandoDatos(true);
       setError(null);
       const res = await listarComandasArea(areaId);
       setComandas(res);
     } catch (err: any) {
       setError(err?.message || 'Error al cargar comandas de cocina');
-    } finally {
-      setCargandoDatos(false);
     }
   }, []);
 
-  // 3. Cargar historial
   const cargarHistorial = useCallback(async (areaId: string) => {
     try {
-      setCargandoDatos(true);
       setError(null);
       const res = await listarHistorialCocina(areaId);
       setHistorial(res);
     } catch (err: any) {
       setError(err?.message || 'Error al cargar historial de cocina');
-    } finally {
-      setCargandoDatos(false);
     }
   }, []);
 
-  // 4. Cargar despacho
   const cargarDespacho = useCallback(async () => {
     try {
-      setCargandoDatos(true);
       setError(null);
       const res = await listarDespacho();
       setDespacho(res);
     } catch (err: any) {
       setError(err?.message || 'Error al cargar vista de despacho');
-    } finally {
-      setCargandoDatos(false);
     }
   }, []);
 
-  // 5. Cargar estado de alta demanda
   const cargarAltaDemanda = useCallback(async () => {
     try {
-      const estado = await obtenerAltaDemanda();
-      setAltaDemanda(estado);
+      const res = await obtenerAltaDemanda();
+      setAltaDemanda(res);
     } catch {
-      // No bloquear pantalla si falla alta demanda
+      // Ignorar fallo secundario
     }
   }, []);
 
-  // Inicialización
+  // Inicialización (montaje inicial)
   useEffect(() => {
     if (!puedeVer) {
       setCargandoInicial(false);
@@ -151,7 +150,7 @@ export function CocinaAdminView() {
       try {
         setCargandoInicial(true);
         const listaAreas = await listarAreasCocina();
-        setAreas(listaAreas);
+        setAreasApi(listaAreas);
         const areaDefault = listaAreas.length > 0 ? listaAreas[0].id : '';
         setAreaSeleccionada(areaDefault);
         await cargarAltaDemanda();
@@ -165,15 +164,15 @@ export function CocinaAdminView() {
     inicializar();
   }, [puedeVer, cargarAltaDemanda]);
 
-  // Recargar según modo y área activa
+  // Recarga al cambiar modo o área activa
   useEffect(() => {
     if (cargandoInicial || !puedeVer) return;
 
-    if (modo === 'comandas') {
+    if (modo === 'area') {
       cargarComandas(areaSeleccionada);
-    } else if (modo === 'historial') {
+    } else if (modo === 'hist') {
       cargarHistorial(areaSeleccionada);
-    } else if (modo === 'despacho') {
+    } else if (modo === 'desp') {
       cargarDespacho();
     }
   }, [
@@ -186,49 +185,31 @@ export function CocinaAdminView() {
     cargarDespacho,
   ]);
 
-  // Sincronizaciones Socket.IO en vivo
-  useEventos('pedido:nuevo', (datos: any) => {
+  // Socket.IO
+  useEventos('pedido:nuevo', () => {
     reproducirCampanaCocina();
-
-    const codigoTicket = datos?.codigo || datos?.ticket || 'Nuevo';
-    setAvisoVisual(`¡Nuevo pedido en cocina! (${codigoTicket})`);
-    setTimeout(() => setAvisoVisual(null), 6000);
-
     cargarAreas();
-    if (modo === 'comandas') cargarComandas(areaSeleccionada);
-    if (modo === 'despacho') cargarDespacho();
+    if (modo === 'area') cargarComandas(areaSeleccionada);
+    if (modo === 'desp') cargarDespacho();
   });
 
   useEventos('cocina:comanda', () => {
     cargarAreas();
-    if (modo === 'comandas') cargarComandas(areaSeleccionada);
-    if (modo === 'historial') cargarHistorial(areaSeleccionada);
-    if (modo === 'despacho') cargarDespacho();
+    if (modo === 'area') cargarComandas(areaSeleccionada);
+    if (modo === 'hist') cargarHistorial(areaSeleccionada);
+    if (modo === 'desp') cargarDespacho();
   });
 
   useEventos('pedido:estado', () => {
     cargarAreas();
-    if (modo === 'comandas') cargarComandas(areaSeleccionada);
-    if (modo === 'despacho') cargarDespacho();
+    if (modo === 'area') cargarComandas(areaSeleccionada);
+    if (modo === 'desp') cargarDespacho();
   });
 
   useEventos('cocina:alta-demanda', (datos: AltaDemandaEstado) => {
     setAltaDemanda(datos);
-    if (datos.activa) {
-      setAvisoVisual(
-        `Alta demanda activada (+${datos.minutos} min)${
-          datos.mensaje ? ` · ${datos.mensaje}` : ''
-        }`,
-      );
-    } else {
-      setAvisoVisual(
-        `Alta demanda desactivada${datos.mensaje ? ` · ${datos.mensaje}` : ''}`,
-      );
-    }
-    setTimeout(() => setAvisoVisual(null), 6000);
   });
 
-  // Alternar sonido activado / silenciado
   const alternarSonido = () => {
     const nuevo = !silenciado;
     setSilenciadoEstado(nuevo);
@@ -239,7 +220,23 @@ export function CocinaAdminView() {
     reproducirCampanaCocina(true);
   };
 
-  // Ejecución de Despeje con confirmación Sí/No
+  const seleccionarAreaMockup = (areaId: string) => {
+    setAreaActiva(areaId);
+    if (areaId === 'todas') {
+      setAreaSeleccionada('');
+      return;
+    }
+    const match = areasApi.find((a) => {
+      const nom = a.nombre.toLowerCase();
+      if (areaId === 'bebidas') return nom.includes('bebida') || nom.includes('barra');
+      if (areaId === 'salados') return nom.includes('salado') || nom.includes('cocina');
+      if (areaId === 'postres') return nom.includes('postre');
+      return false;
+    });
+    setAreaSeleccionada(match ? match.id : areaId);
+  };
+
+  // Despejar comanda
   const ejecutarDespeje = async () => {
     if (!comandaParaDespejar) return;
     try {
@@ -248,8 +245,20 @@ export function CocinaAdminView() {
         comandaParaDespejar.pedidoId,
         comandaParaDespejar.areaId,
       );
+
+      const cod = comandaParaDespejar.ticket || comandaParaDespejar.codigo;
+      const nomArea =
+        areaActiva === 'todas'
+          ? ''
+          : ` (${AREAS_MOCKUP.find((a) => a.id === areaActiva)?.n || areaActiva})`;
+      setUndoInfo({
+        pedidoId: comandaParaDespejar.pedidoId,
+        areaId: comandaParaDespejar.areaId,
+        texto: `${cod}: despejado${nomArea}`,
+      });
+
       setComandaParaDespejar(null);
-      await Promise.all([cargarComandas(areaSeleccionada), cargarAreas()]);
+      await cargarComandas(areaSeleccionada);
     } catch (err: any) {
       setError(err?.message || 'Error al despejar la comanda');
       setComandaParaDespejar(null);
@@ -258,9 +267,20 @@ export function CocinaAdminView() {
     }
   };
 
+  // Deshacer despeje
+  const ejecutarDeshacer = async () => {
+    if (!undoInfo) return;
+    try {
+      await devolverComanda(undoInfo.pedidoId, undoInfo.areaId);
+      setUndoInfo(null);
+      await cargarComandas(areaSeleccionada);
+    } catch (err: any) {
+      setError(err?.message || 'No se pudo deshacer el despeje');
+    }
+  };
+
   const nombreAreaActual =
-    areas.find((a) => a.id === areaSeleccionada)?.nombre ||
-    (areaSeleccionada === '' ? 'Todas las áreas' : 'Área');
+    AREAS_MOCKUP.find((a) => a.id === areaActiva)?.n || 'Todas';
 
   if (!puedeVer) {
     return (
@@ -283,58 +303,21 @@ export function CocinaAdminView() {
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: '14px',
-        padding: '16px',
-        maxWidth: '1600px',
-        margin: '0 auto',
+        gap: '16px',
         width: '100%',
         boxSizing: 'border-box',
+        fontFamily: 'Montserrat, system-ui, sans-serif',
+        color: 'var(--cp-navy)',
       }}
     >
-      {/* Banner de aviso visual en vivo si llega un evento */}
-      {avisoVisual && (
-        <div
-          role="status"
-          style={{
-            background: 'var(--cp-navy)',
-            color: 'var(--cp-cream)',
-            border: '2px solid var(--cp-gold)',
-            borderRadius: '12px',
-            padding: '10px 16px',
-            fontSize: '14px',
-            fontWeight: 800,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            boxShadow: '0 6px 18px rgba(11, 44, 62, 0.3)',
-          }}
-        >
-          <span>{avisoVisual}</span>
-          <button
-            onClick={() => setAvisoVisual(null)}
-            aria-label="Cerrar aviso"
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--cp-cream)',
-              fontWeight: 800,
-              fontSize: '16px',
-              cursor: 'pointer',
-            }}
-          >
-            ×
-          </button>
-        </div>
-      )}
-
-      {/* Tiempos de referencia (los umbrales vienen de la configuración) */}
+      {/* 1. Texto de referencia Kevin literal del mockup */}
       <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
-        Tiempos desde que el cliente terminó su pedido: 25 min lo ideal, naranja desde 35
-        (retraso) y rojo desde 50 (crítico). Cada área ve solo lo suyo y lo despeja con un
-        toque cuando lo terminó.
+        Tiempos de Kevin, desde que el cliente terminó su pedido: 25 min lo ideal,
+        naranja desde 35 (retraso) y rojo desde 50 (crítico). Cada área ve solo lo
+        suyo y lo despeja con un toque cuando lo terminó (acta 03).
       </div>
 
-      {/* Barra superior de acciones rápidas */}
+      {/* 2. Barra de botones superiores */}
       <div
         style={{
           display: 'flex',
@@ -348,7 +331,7 @@ export function CocinaAdminView() {
           onClick={() => setModalAgotadosAbierto(true)}
           style={{
             minHeight: '44px',
-            padding: '0 16px',
+            padding: '0 14px',
             borderRadius: '12px',
             fontWeight: 800,
             fontSize: '13px',
@@ -359,6 +342,60 @@ export function CocinaAdminView() {
           }}
         >
           Se acabó algo
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setModalMermaIndAbierto(true)}
+          style={{
+            minHeight: '44px',
+            padding: '0 14px',
+            borderRadius: '12px',
+            fontWeight: 800,
+            fontSize: '13px',
+            cursor: 'pointer',
+            border: '1.5px solid var(--cp-navy)',
+            background: 'transparent',
+            color: 'var(--cp-navy)',
+          }}
+        >
+          Registrar merma
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setModalMermaVariosAbierto(true)}
+          style={{
+            minHeight: '44px',
+            padding: '0 14px',
+            borderRadius: '12px',
+            fontWeight: 800,
+            fontSize: '13px',
+            cursor: 'pointer',
+            border: '1.5px solid var(--cp-navy)',
+            background: 'var(--cp-sand)',
+            color: 'var(--cp-navy)',
+          }}
+        >
+          Merma de varios productos
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setModalPedirAlmacenAbierto(true)}
+          style={{
+            minHeight: '44px',
+            padding: '0 14px',
+            borderRadius: '12px',
+            fontWeight: 800,
+            fontSize: '13px',
+            cursor: 'pointer',
+            border: '1.5px solid var(--cp-navy)',
+            background: 'transparent',
+            color: 'var(--cp-navy)',
+          }}
+        >
+          Pedir al almacén
         </button>
 
         <button
@@ -396,279 +433,514 @@ export function CocinaAdminView() {
         >
           Probar sonido
         </button>
-
-        <button
-          type="button"
-          onClick={() => navigate('/pantalla/cocina')}
-          style={{
-            minHeight: '44px',
-            padding: '0 16px',
-            borderRadius: '12px',
-            border: 0,
-            background: 'var(--cp-orange)',
-            color: 'var(--cp-navy)',
-            fontWeight: 800,
-            fontSize: '13px',
-            marginLeft: 'auto',
-            cursor: 'pointer',
-          }}
-        >
-          Pantalla completa (Modo TV)
-        </button>
       </div>
 
-      {/* Panel de Alta demanda */}
+      {/* 3. Panel de Alta demanda */}
       <PanelAltaDemanda
         estado={altaDemanda}
         alCambiarEstado={(nuevo) => setAltaDemanda(nuevo)}
       />
 
-      {/* Selector de Áreas */}
+      {/* 4. Selector de Área y Pantalla completa */}
       <div
         style={{
           display: 'flex',
           flexWrap: 'wrap',
-          gap: '8px',
+          gap: '6px',
           alignItems: 'center',
         }}
       >
-        <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--cp-navy)' }}>
-          Área:
-        </span>
+        <span style={{ fontSize: '12px', fontWeight: 700 }}>Área</span>
 
-        {areas.map((a) => {
-          const seleccionada = areaSeleccionada === a.id;
-          const conteo = a.comandasPendientes ?? a.comandas_pendientes ?? 0;
-
+        {AREAS_MOCKUP.map((a) => {
+          const activa = areaActiva === a.id;
           return (
             <button
               key={a.id}
               type="button"
-              onClick={() => setAreaSeleccionada(a.id)}
+              onClick={() => seleccionarAreaMockup(a.id)}
               style={{
                 minHeight: '44px',
                 padding: '0 14px',
                 borderRadius: '9999px',
                 border: '1.5px solid var(--cp-navy)',
-                background: seleccionada ? 'var(--cp-navy)' : 'transparent',
-                color: seleccionada ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                background: activa ? 'var(--cp-navy)' : 'transparent',
+                color: activa ? 'var(--cp-cream)' : 'var(--cp-navy)',
                 fontWeight: 700,
-                fontSize: '13px',
+                fontSize: '12px',
                 cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
               }}
             >
-              <span>{a.nombre}</span>
-              <span
-                style={{
-                  background: seleccionada ? 'var(--cp-orange)' : 'var(--cp-sand)',
-                  color: 'var(--cp-navy)',
-                  fontWeight: 800,
-                  fontSize: '11px',
-                  borderRadius: '9999px',
-                  padding: '1px 7px',
-                }}
-              >
-                {conteo}
-              </span>
+              {a.n}
             </button>
           );
         })}
 
-        {/* Vista general opcional con todas las áreas (RQ-COC-01-09) */}
         <button
           type="button"
-          onClick={() => setAreaSeleccionada('')}
+          onClick={() => setKFullAbierto(true)}
           style={{
             minHeight: '44px',
             padding: '0 14px',
-            borderRadius: '9999px',
-            border: '1.5px solid var(--cp-navy)',
-            background: areaSeleccionada === '' ? 'var(--cp-navy)' : 'transparent',
-            color: areaSeleccionada === '' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-            fontWeight: 700,
-            fontSize: '13px',
+            borderRadius: '12px',
+            border: 0,
+            background: 'var(--cp-orange)',
+            color: 'var(--cp-navy)',
+            fontWeight: 800,
+            fontSize: '12px',
             cursor: 'pointer',
           }}
         >
-          Todas las áreas
+          Pantalla completa, sin desplazar
         </button>
       </div>
 
-      {/* Selector de Modos de Cocina: Comandas / Historial / Despacho */}
+      {/* 5. Selector de Pestañas: Pantalla del área / Historial / Despacho */}
       <div
         role="group"
         aria-label="Vista de cocina"
-        style={{
-          display: 'flex',
-          gap: '8px',
-          flexWrap: 'wrap',
-          borderBottom: '1px solid var(--cp-line)',
-          paddingBottom: '10px',
-        }}
+        style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}
       >
         <button
           type="button"
-          onClick={() => setModo('comandas')}
+          onClick={() => setModo('area')}
           style={{
             minHeight: '44px',
             padding: '0 16px',
             borderRadius: '12px',
             border: '1.5px solid var(--cp-navy)',
-            background: modo === 'comandas' ? 'var(--cp-navy)' : 'transparent',
-            color: modo === 'comandas' ? 'var(--cp-cream)' : 'var(--cp-navy)',
+            background: modo === 'area' ? 'var(--cp-navy)' : 'transparent',
+            color: modo === 'area' ? 'var(--cp-cream)' : 'var(--cp-navy)',
             fontWeight: 800,
             fontSize: '13px',
             cursor: 'pointer',
           }}
         >
-          En cocina
+          Pantalla del área
         </button>
-
         <button
           type="button"
-          onClick={() => setModo('historial')}
+          onClick={() => setModo('hist')}
           style={{
             minHeight: '44px',
             padding: '0 16px',
             borderRadius: '12px',
             border: '1.5px solid var(--cp-navy)',
-            background: modo === 'historial' ? 'var(--cp-navy)' : 'transparent',
-            color: modo === 'historial' ? 'var(--cp-cream)' : 'var(--cp-navy)',
+            background: modo === 'hist' ? 'var(--cp-navy)' : 'transparent',
+            color: modo === 'hist' ? 'var(--cp-cream)' : 'var(--cp-navy)',
             fontWeight: 800,
             fontSize: '13px',
             cursor: 'pointer',
           }}
         >
-          Historial del día
+          Historial
         </button>
-
         <button
           type="button"
-          onClick={() => setModo('despacho')}
+          onClick={() => setModo('desp')}
           style={{
             minHeight: '44px',
             padding: '0 16px',
             borderRadius: '12px',
             border: '1.5px solid var(--cp-navy)',
-            background: modo === 'despacho' ? 'var(--cp-navy)' : 'transparent',
-            color: modo === 'despacho' ? 'var(--cp-cream)' : 'var(--cp-navy)',
+            background: modo === 'desp' ? 'var(--cp-navy)' : 'transparent',
+            color: modo === 'desp' ? 'var(--cp-cream)' : 'var(--cp-navy)',
             fontWeight: 800,
             fontSize: '13px',
             cursor: 'pointer',
           }}
         >
-          Vista de despacho
+          Despacho
         </button>
       </div>
 
-      {/* Manejo de error general */}
-      {error && (
-        <EstadoError
-          mensaje={error}
-          alReintentar={() => {
-            if (modo === 'comandas') cargarComandas(areaSeleccionada);
-            if (modo === 'historial') cargarHistorial(areaSeleccionada);
-            if (modo === 'despacho') cargarDespacho();
-          }}
+      {/* Mensajes de error general */}
+      {error && <EstadoError mensaje={error} />}
+
+      {/* 6. Contenido según la pestaña activa */}
+      {modo === 'area' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div
+            style={{
+              fontFamily: 'Montserrat, sans-serif',
+              fontWeight: 800,
+              fontSize: '15px',
+              letterSpacing: '0.04em',
+            }}
+          >
+            EN COCINA · {comandas.length}
+          </div>
+
+          {comandas.length === 0 ? (
+            <div style={{ color: 'var(--cp-soft)', fontSize: '13px' }}>
+              Sin pedidos para esta área.
+            </div>
+          ) : (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+                gap: '12px',
+                alignItems: 'start',
+              }}
+            >
+              {comandas.map((c) => (
+                <ComandaTarjeta
+                  key={c.id}
+                  comanda={c}
+                  mostrarArea={areaActiva === 'todas'}
+                  onDespejar={puedeDespejar ? (com) => setComandaParaDespejar(com) : undefined}
+                  despejando={despejando}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {modo === 'hist' && (
+        <HistorialView
+          historial={historial}
+          nombreAreaActual={nombreAreaActual}
+          alDevolverExito={() => cargarHistorial(areaSeleccionada)}
         />
       )}
 
-      {/* 1. MODO: COMANDAS EN COCINA */}
-      {modo === 'comandas' && (
-        <section aria-label="Comandas en cocina">
+      {modo === 'desp' && <DespachoView pedidos={despacho} />}
+
+      {/* Floating Undo Toast (Deshacer) */}
+      {undoInfo && (
+        <div
+          role="status"
+          style={{
+            position: 'fixed',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            bottom: '16px',
+            zIndex: 95,
+            display: 'flex',
+            gap: '10px',
+            alignItems: 'center',
+            background: 'var(--cp-navy)',
+            color: 'var(--cp-cream)',
+            borderRadius: '14px',
+            padding: '10px 12px 10px 16px',
+            boxShadow: '0 10px 30px rgba(11,44,62,0.4)',
+            maxWidth: 'calc(100% - 24px)',
+          }}
+        >
+          <span style={{ fontSize: '14px', fontWeight: 700 }}>
+            {undoInfo.texto}
+          </span>
+          <button
+            type="button"
+            onClick={ejecutarDeshacer}
+            style={{
+              minHeight: '44px',
+              padding: '0 16px',
+              border: 0,
+              borderRadius: '10px',
+              background: 'var(--cp-orange)',
+              color: 'var(--cp-navy)',
+              fontWeight: 800,
+              cursor: 'pointer',
+            }}
+          >
+            Deshacer
+          </button>
+          <button
+            type="button"
+            onClick={() => setUndoInfo(null)}
+            aria-label="Cerrar aviso"
+            style={{
+              width: '44px',
+              height: '44px',
+              borderRadius: '22px',
+              border: 0,
+              background: 'rgba(255,255,255,0.12)',
+              color: 'var(--cp-cream)',
+              fontSize: '18px',
+              fontWeight: 800,
+              cursor: 'pointer',
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {/* Modal Pantalla Completa (isKfull) */}
+      {kFullAbierto && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 99,
+            background: 'var(--cp-navy)',
+            color: 'var(--cp-cream)',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            padding: '12px',
+            gap: '10px',
+            boxSizing: 'border-box',
+          }}
+        >
           <div
             style={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginBottom: '10px',
+              gap: '8px',
+              flexWrap: 'wrap',
             }}
           >
-            <h3
+            <span
               style={{
-                fontFamily: 'var(--fuente-titulos)',
+                fontFamily: 'Montserrat, sans-serif',
                 fontWeight: 800,
-                fontSize: '16px',
-                letterSpacing: '0.04em',
-                color: 'var(--cp-navy)',
+                fontSize: '22px',
+                letterSpacing: '0.05em',
               }}
             >
-              EN COCINA · {comandas.length}
-            </h3>
+              {areaActiva === 'todas'
+                ? 'TODAS LAS ÁREAS'
+                : nombreAreaActual.toUpperCase()}
+            </span>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {AREAS_MOCKUP.map((a) => {
+                const activa = areaActiva === a.id;
+                return (
+                  <button
+                    key={a.id}
+                    type="button"
+                    onClick={() => seleccionarAreaMockup(a.id)}
+                    style={{
+                      minHeight: '44px',
+                      padding: '0 14px',
+                      borderRadius: '9999px',
+                      border: '1.5px solid var(--cp-cream)',
+                      background: activa ? 'var(--cp-cream)' : 'transparent',
+                      color: activa ? 'var(--cp-navy)' : 'var(--cp-cream)',
+                      fontWeight: 700,
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {a.n}
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => setKFullAbierto(false)}
+                style={{
+                  minHeight: '44px',
+                  padding: '0 16px',
+                  borderRadius: '12px',
+                  border: '1.5px solid var(--cp-cream)',
+                  background: 'transparent',
+                  color: 'var(--cp-cream)',
+                  fontWeight: 800,
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                }}
+              >
+                Salir
+              </button>
+            </div>
           </div>
 
-          {cargandoDatos && <Cargando mensaje="Actualizando comandas..." />}
-
-          {!cargandoDatos && comandas.length === 0 && (
-            <EstadoVacio
-              titulo="Sin pedidos pendientes"
-              mensaje={`No hay pedidos en cola para ${nombreAreaActual}.`}
-            />
-          )}
-
-          {!cargandoDatos && comandas.length > 0 && (
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: '10px' }}>
             <div
               style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                gap: '12px',
-                alignItems: 'start',
-                width: '100%',
+                flex: '1 1 0',
+                minWidth: 0,
+                minHeight: 0,
+                overflowY: 'auto',
+                background: '#14405A',
+                borderRadius: '14px',
+                padding: '10px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
               }}
             >
-              {comandas.map((cmd) => (
-                <ComandaTarjeta
-                  key={cmd.id}
-                  comanda={cmd}
-                  onDespejar={puedeDespejar ? setComandaParaDespejar : undefined}
-                />
-              ))}
+              <div
+                style={{
+                  fontFamily: 'Montserrat, sans-serif',
+                  fontWeight: 800,
+                  fontSize: '18px',
+                }}
+              >
+                EN COCINA · {comandas.length}
+              </div>
+
+              {comandas.length === 0 ? (
+                <div style={{ fontSize: '16px', opacity: 0.8 }}>Sin pedidos.</div>
+              ) : (
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                    gap: '10px',
+                  }}
+                >
+                  {comandas.map((k) => (
+                    <div
+                      key={k.id}
+                      style={{
+                        background: 'var(--cp-cream)',
+                        color: 'var(--cp-navy)',
+                        borderRadius: '12px',
+                        padding: '12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontFamily: 'Montserrat, sans-serif',
+                            fontWeight: 800,
+                            fontSize: '22px',
+                          }}
+                        >
+                          {k.ticket || k.codigo}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: '16px',
+                            fontWeight: 800,
+                            borderRadius: '9999px',
+                            padding: '2px 12px',
+                            background:
+                              (k.minutos ?? 0) >= 50
+                                ? 'var(--cp-rust)'
+                                : (k.minutos ?? 0) >= 35
+                                ? 'var(--cp-orange)'
+                                : 'var(--cp-line)',
+                            color:
+                              (k.minutos ?? 0) >= 50
+                                ? 'var(--cp-white)'
+                                : 'var(--cp-navy)',
+                          }}
+                        >
+                          {k.minutos ?? 0} min
+                        </span>
+                      </div>
+
+                      <div
+                        style={{
+                          fontSize: '15px',
+                          fontWeight: 800,
+                          color: 'var(--cp-rust)',
+                        }}
+                      >
+                        {k.modalidad || 'Para llevar'}
+                      </div>
+
+                      {(k.lineas || []).map((it, idx) => {
+                        const opcStr = (it.opciones || [])
+                          .map((o: any) => (typeof o === 'string' ? o : o?.nombre || o?.texto || ''))
+                          .filter(Boolean)
+                          .join(' · ');
+                        return (
+                          <div
+                            key={it.id || idx}
+                            style={{ fontSize: '16px', lineHeight: '20px' }}
+                          >
+                            <b>{it.cantidad}×</b> {it.nombre}{' '}
+                            {opcStr && (
+                              <span
+                                style={{
+                                  fontSize: '13px',
+                                  color: 'var(--cp-soft)',
+                                }}
+                              >
+                                {opcStr}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+
+                      {k.nota && (
+                        <div
+                          style={{
+                            border: '2px dashed var(--cp-rust)',
+                            borderRadius: '8px',
+                            padding: '4px 8px',
+                            fontSize: '14px',
+                            fontWeight: 700,
+                          }}
+                        >
+                          Nota: {k.nota}
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => setComandaParaDespejar(k)}
+                        style={{
+                          minHeight: '52px',
+                          marginTop: 'auto',
+                          border: 0,
+                          borderRadius: '12px',
+                          background: 'var(--cp-orange)',
+                          color: 'var(--cp-navy)',
+                          fontWeight: 800,
+                          fontSize: '17px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Despejar
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-        </section>
+          </div>
+        </div>
       )}
 
-      {/* 2. MODO: HISTORIAL DEL DÍA */}
-      {modo === 'historial' && (
-        <HistorialView
-          historial={historial}
-          nombreAreaActual={nombreAreaActual}
-          alDevolverExito={() => cargarHistorial(areaSeleccionada)}
-          error={error}
-          alReintentar={() => cargarHistorial(areaSeleccionada)}
-        />
-      )}
-
-      {/* 3. MODO: VISTA DE DESPACHO */}
-      {modo === 'despacho' && (
-        <DespachoView
-          pedidos={despacho}
-          error={error}
-          alReintentar={cargarDespacho}
-        />
-      )}
-
-      {/* Modal de confirmación para Despejar comanda */}
+      {/* Confirmación Sí/No de Despeje */}
       <Confirmar
-        abierto={Boolean(comandaParaDespejar)}
-        titulo={`¿Despejar comanda ${comandaParaDespejar?.ticket || comandaParaDespejar?.codigo}?`}
-        mensaje={`Se marcará como completada para el área ${
-          comandaParaDespejar?.areaNombre || nombreAreaActual
-        }. Si todas las áreas del pedido ya despejaron, el pedido pasará automáticamente a estado LISTO.`}
-        textoSi="Sí, despejar"
+        abierto={!!comandaParaDespejar}
+        titulo={`¿Despejar comanda ${
+          comandaParaDespejar?.ticket || comandaParaDespejar?.codigo
+        }?`}
+        mensaje="Saldrá de la vista de preparación y quedará en el historial del día."
+        textoConfirmar="Sí, despejar"
         textoNo="No, cancelar"
-        cargando={despejando}
         alConfirmar={ejecutarDespeje}
         alCancelar={() => setComandaParaDespejar(null)}
       />
 
-      {/* Diálogo modal "Se acabó algo" */}
+      {/* Modales */}
       <ModalAgotados
         abierto={modalAgotadosAbierto}
         alCerrar={() => setModalAgotadosAbierto(false)}
+      />
+      <ModalMermaIndividual
+        abierto={modalMermaIndAbierto}
+        alCerrar={() => setModalMermaIndAbierto(false)}
+      />
+      <ModalMermaVarios
+        abierto={modalMermaVariosAbierto}
+        alCerrar={() => setModalMermaVariosAbierto(false)}
+      />
+      <ModalPedirAlmacen
+        abierto={modalPedirAlmacenAbierto}
+        alCerrar={() => setModalPedirAlmacenAbierto(false)}
       />
     </div>
   );
