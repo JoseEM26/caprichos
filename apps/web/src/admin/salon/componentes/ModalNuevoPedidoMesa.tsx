@@ -13,6 +13,8 @@ export interface ModalNuevoPedidoMesaProps {
   pisos: PisoSalon[];
   mesaPreseleccionadaId?: string;
   mesasPreseleccionadasIds?: string[];
+  /** Desde Pedidos y caja se abre en «¿Qué vas a hacer?» (local, para llevar o delivery) */
+  pasoInicial?: 'modal';
   reservaIdPreseleccionada?: string;
   alExitoPedido?: (pedido: any) => void;
   alRefrescarMesas?: () => Promise<void>;
@@ -39,6 +41,7 @@ export function ModalNuevoPedidoMesa({
   pisos = [],
   mesaPreseleccionadaId,
   mesasPreseleccionadasIds = [],
+  pasoInicial,
   reservaIdPreseleccionada,
   alExitoPedido,
   alRefrescarMesas,
@@ -58,7 +61,7 @@ export function ModalNuevoPedidoMesa({
 
   // Pasos: 'modal' | 'floor' | 'plan' | 'cli' | 'items'
   const [paso, setPaso] = useState<'modal' | 'floor' | 'plan' | 'cli' | 'items'>(
-    todasLasMesasIniciales.length > 0 ? 'items' : 'plan',
+    todasLasMesasIniciales.length > 0 ? 'items' : (pasoInicial ?? 'plan'),
   );
 
   // Modalidad: 'local' | 'llevar' | 'delivery'

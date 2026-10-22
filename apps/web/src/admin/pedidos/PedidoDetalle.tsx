@@ -3,6 +3,7 @@ import { Pedido, pedidosApi } from './pedidosApi';
 import { ModalCobrar } from './ModalCobrar';
 import { ModalAnular } from './ModalAnular';
 import { ModalUbicar } from './ModalUbicar';
+import { ModalPrecuenta } from '../salon/componentes/ModalPrecuenta';
 import { ModalConfirmarPago } from './ModalConfirmarPago';
 import { canalLabel, modLabel, getBadge } from './PedidosAdminView';
 
@@ -21,6 +22,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
   const [abrirCobrar, setAbrirCobrar] = useState(false);
   const [abrirAnular, setAbrirAnular] = useState(false);
   const [abrirUbicar, setAbrirUbicar] = useState(false);
+  const [abrirPrecuenta, setAbrirPrecuenta] = useState(false);
   const [abrirConfirmarPago, setAbrirConfirmarPago] = useState(false);
 
   // Estados locales para acciones
@@ -274,7 +276,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
                 </div>
                 <button
                   type="button"
-                  onClick={() => alert(`Precuenta para Mesa ${pedido.mesa_nombre || ''} enviada a impresión.`)}
+                  onClick={() => setAbrirPrecuenta(true)}
                   style={{
                     minHeight: 44,
                     border: '1.5px solid var(--cp-navy, #0B2C3E)',
@@ -920,6 +922,22 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
             setAbrirAnular(false);
             alActualizar();
           }}
+        />
+      )}
+
+      {abrirPrecuenta && (
+        <ModalPrecuenta
+          abierto={true}
+          alCerrar={() => setAbrirPrecuenta(false)}
+          mesa={pedido.mesa_nombre || ''}
+          lineas={(pedido.lineas || []).map((l) => ({
+            cantidad: l.cantidad,
+            nombre: l.nombre,
+            detalle: [l.tamano, ...(l.opciones || l.opcionesElegidas || []).map((o) => o.opcion_nombre || o.nombre)]
+              .filter(Boolean)
+              .join(' · '),
+          }))}
+          total={Number(pedido.total)}
         />
       )}
 

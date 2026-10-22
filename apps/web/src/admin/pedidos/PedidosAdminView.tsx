@@ -4,6 +4,9 @@ import { EstadoError } from '../../comun/EstadoError';
 import { useEventos } from '../../comun/socket';
 import { pedidosApi, Pedido } from './pedidosApi';
 import { PedidoDetalle } from './PedidoDetalle';
+import { ModalNuevoPedidoMesa } from '../salon/componentes/ModalNuevoPedidoMesa';
+import { salonApi } from '../salon/api';
+import type { PisoSalon } from '../salon/tipos';
 import { reproducirCampana } from './audioAlerta';
 import './pedidos.css';
 
@@ -125,6 +128,8 @@ export function PedidosAdminView() {
   const [errorCarga, setErrorCarga] = useState<string>('');
 
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
+  const [nuevoPedidoAbierto, setNuevoPedidoAbierto] = useState(false);
+  const [pisosSalon, setPisosSalon] = useState<PisoSalon[]>([]);
   const [pedidoSeleccionadoId, setPedidoSeleccionadoId] = useState<string | null>(null);
 
   // Pestaña activa del mockup: Por confirmar | Pago por coordinar | En curso | Cerrados
@@ -347,7 +352,15 @@ export function PedidosAdminView() {
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button
               type="button"
-              onClick={() => alert('Abriendo nuevo pedido en salón / mostrador...')}
+              onClick={async () => {
+                try {
+                  const r = await salonApi.obtenerMesas();
+                  setPisosSalon(r.pisos || []);
+                } catch {
+                  setPisosSalon([]);
+                }
+                setNuevoPedidoAbierto(true);
+              }}
               style={{
                 flex: '1 1 150px',
                 minHeight: 52,
@@ -905,6 +918,16 @@ export function PedidosAdminView() {
           />
         )}
       </div>
+      {nuevoPedidoAbierto && (
+        <ModalNuevoPedidoMesa
+          abierto={true}
+          pasoInicial="modal"
+          pisos={pisosSalon}
+          alCerrar={() => setNuevoPedidoAbierto(false)}
+          alExitoPedido={() => void cargarDatos()}
+          alRefrescarMesas={async () => void cargarDatos()}
+        />
+      )}
     </div>
   );
 }

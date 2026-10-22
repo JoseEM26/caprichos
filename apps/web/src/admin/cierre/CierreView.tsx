@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useConfirmarAsync } from '../../comun/useConfirmarAsync';
 import { useSesion } from '../../comun/sesion';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
@@ -10,6 +11,7 @@ type TabCierre = 'turno' | 'historial';
 
 export function CierreView() {
   const { usuario, tiene } = useSesion();
+  const { confirmar, dialogo } = useConfirmarAsync();
   const puedeVer = tiene('caja/ver') || tiene('caja/cerrar') || usuario?.rol === 'ADMIN' || usuario?.rol === 'CAJERO';
   const esAdmin = usuario?.rol === 'ADMIN';
 
@@ -198,10 +200,10 @@ export function CierreView() {
       return;
     }
 
-    const conf = window.confirm(
-      `¿Registrar el ${tipoMov === 'INGRESO' ? 'ingreso' : 'egreso'} de s/ ${num.toFixed(2)}?\n` +
-      `Queda en el turno con tu nombre. ${tipoMov === 'EGRESO' ? 'Resta del efectivo esperado en caja.' : 'Suma al efectivo esperado en caja.'}`
-    );
+    const conf = await confirmar({
+      titulo: `¿Registrar el ${tipoMov === 'INGRESO' ? 'ingreso' : 'egreso'} de s/ ${num.toFixed(2)}?`,
+      mensaje: `Queda en el turno con tu nombre. ${tipoMov === 'EGRESO' ? 'Resta del efectivo esperado en caja.' : 'Suma al efectivo esperado en caja.'}`,
+    });
     if (!conf) return;
 
     try {
@@ -219,10 +221,10 @@ export function CierreView() {
 
   const handleAbrirCaja = async () => {
     const num = parseFloat(montoAbrir) || 0;
-    const conf = window.confirm(
-      `¿Abrir la caja?\n` +
-      `Se abre con el monto indicado (normalmente s/ 0.00). Las ventas de hoy empiezan desde cero; lo anterior queda en el historial.`
-    );
+    const conf = await confirmar({
+      titulo: `¿Abrir la caja?`,
+      mensaje: `Se abre con el monto indicado (normalmente s/ 0.00). Las ventas de hoy empiezan desde cero; lo anterior queda en el historial.`,
+    });
     if (!conf) return;
 
     try {
@@ -236,10 +238,10 @@ export function CierreView() {
   };
 
   const handleRecibirEfectivoRider = async (r: RepartidorPorLiquidar) => {
-    const conf = window.confirm(
-      `¿Recibir s/ ${r.pendiente.toFixed(2)} de ${r.nombre}?\n` +
-      `El efectivo entra a la caja y cuenta en el efectivo esperado del cierre.`
-    );
+    const conf = await confirmar({
+      titulo: `¿Recibir s/ ${r.pendiente.toFixed(2)} de ${r.nombre}?`,
+      mensaje: `El efectivo entra a la caja y cuenta en el efectivo esperado del cierre.`,
+    });
     if (!conf) return;
 
     try {
@@ -294,10 +296,10 @@ export function CierreView() {
 
     const difTot = Math.round((totalEfectivoContado - efectivoEsperado) * 100) / 100;
     const txtDif = Math.abs(difTot) < 0.005 ? 'cuadrada' : `con una diferencia de s/ ${Math.abs(difTot).toFixed(2)} ${difTot > 0 ? 'de sobrante' : 'de faltante'}`;
-    const conf = window.confirm(
-      `¿Cerrar la caja ${txtDif}?\n` +
-      `Se guarda el cierre en el historial, que no se puede borrar ni editar. Mañana la caja se abre en cero.`
-    );
+    const conf = await confirmar({
+      titulo: `¿Cerrar la caja ${txtDif}?`,
+      mensaje: `Se guarda el cierre en el historial, que no se puede borrar ni editar. Mañana la caja se abre en cero.`,
+    });
     if (!conf) return;
 
     setCerrandoCaja(true);
@@ -346,6 +348,7 @@ export function CierreView() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {dialogo}
       {/* 1. SELECTOR DE PESTAÑAS (Turno actual | Historial de cierres) */}
       <div role="tablist" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         <button
