@@ -51,3 +51,6 @@ apps/*/src/**/*.map
 
 # fotos subidas en desarrollo
 apps/api/data/uploads/
+
+# índice de CodeGraph (se regenera con codegraph init -i)
+.codegraph/
