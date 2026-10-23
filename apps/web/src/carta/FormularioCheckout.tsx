@@ -186,7 +186,12 @@ export function FormularioCheckout({
   };
 
   // Fija el punto de entrega (GPS, búsqueda o toque en el mapa) y consulta la zona y el envío
-  const fijarPunto = async (lat: number, lng: number, origen: 'GPS' | 'MAPA') => {
+  const fijarPunto = async (lat: number, lng: number, origen: 'GPS' | 'MAPA', precisionM?: number) => {
+    // una computadora sin GPS calcula la ubicación por la red y puede errar cientos de metros o kilómetros
+    const avisoPrecision =
+      precisionM && precisionM > 150
+        ? ` Tu equipo la calculó de forma aproximada (±${precisionM >= 1000 ? `${(precisionM / 1000).toFixed(1)} km` : `${Math.round(precisionM)} m`}): mueve el punto rojo hasta tu puerta.`
+        : '';
     setCoordenadas({ lat, lng });
     setOrigenPunto(origen);
     setMapaVisible(true);
@@ -198,7 +203,7 @@ export function FormularioCheckout({
       if (!res.cubierto) {
         setZonaEnvio(null);
         setCostoEnvio(null);
-        setMensajeGps('FUERA_DE_COBERTURA: Tu ubicación está fuera de la zona de reparto');
+        setMensajeGps(`FUERA_DE_COBERTURA: Tu ubicación está fuera de la zona de reparto.${avisoPrecision}`);
       } else {
         setZonaEnvio(res.zona);
         // Si el subtotal supera gratisDesde
@@ -207,7 +212,7 @@ export function FormularioCheckout({
         setMensajeGps(
           `Ubicación encontrada (Envío: ${
             tarifaFinal === 0 ? 'GRATIS' : `S/ ${tarifaFinal?.toFixed(2)}`
-          })`,
+          }).${avisoPrecision}`,
         );
       }
     } catch {
@@ -228,7 +233,7 @@ export function FormularioCheckout({
 
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
-        await fijarPunto(pos.coords.latitude, pos.coords.longitude, 'GPS');
+        await fijarPunto(pos.coords.latitude, pos.coords.longitude, 'GPS', pos.coords.accuracy);
         setCargandoGps(false);
       },
       () => {
