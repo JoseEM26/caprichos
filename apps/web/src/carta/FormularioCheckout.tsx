@@ -83,6 +83,14 @@ export function FormularioCheckout({
   const [puntosAplicados, setPuntosAplicados] = useState(0);
   const [promos, setPromos] = useState<{ total: number; detalles: { nombre: string; monto: number }[] }>({ total: 0, detalles: [] });
   const cuentaCtx = useCuentaOpcional();
+  const clienteCuenta = cuentaCtx?.cliente ?? null;
+  // Acceso: con sesión se usa la cuenta; sin ella el cliente elige ingresar o seguir como invitado
+  const [comoInvitado, setComoInvitado] = useState(false);
+  const [verPuntos, setVerPuntos] = useState(false);
+  useEffect(() => {
+    if (clienteCuenta && !nombre.trim()) setNombre(clienteCuenta.nombre);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clienteCuenta]);
   const [mensajeCupon, setMensajeCupon] = useState<string | null>(null);
 
   // Idempotency-Key único por intento
@@ -233,6 +241,9 @@ export function FormularioCheckout({
 
   // Validaciones del formulario
   const validarFormulario = (): string | null => {
+    if (!clienteCuenta && !comoInvitado) {
+      return 'Elige si ingresas con tu cuenta o continúas como invitado';
+    }
     if (!nombre.trim()) {
       return 'El nombre es obligatorio';
     }
@@ -405,8 +416,8 @@ export function FormularioCheckout({
   };
 
   const mediosPagoDisponibles = datosLocal?.mediosPago || {
-    yape: { activo: true, numero: '999888777' },
-    plin: { activo: true, numero: '999888777' },
+    yape: { activo: true, numero: '123456789' },
+    plin: { activo: true, numero: '123456789' },
     efectivo: { activo: true },
     tarjeta: { activo: true },
   };
@@ -558,7 +569,80 @@ export function FormularioCheckout({
             </div>
           </div>
 
-          {/* Paso 2: Datos de contacto */}
+          {/* Paso 2: Acceso (cuenta o invitado) */}
+          {!clienteCuenta && !comoInvitado && (
+            <div
+              style={{
+                backgroundColor: 'var(--cp-white)',
+                padding: '14px',
+                borderRadius: '14px',
+                border: '1px solid var(--cp-line)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
+              }}
+            >
+              <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 700, fontSize: '14px' }}>
+                ¿Cómo quieres continuar?
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
+                Ingresa con tu cuenta para acumular puntos en este pedido, o sigue como invitado.
+              </div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => cuentaCtx?.abrirPanel()}
+                  style={{
+                    flex: '1 1 160px',
+                    minHeight: '44px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    backgroundColor: 'var(--cp-navy)',
+                    color: 'var(--cp-white)',
+                    fontWeight: 800,
+                    fontSize: '14px',
+                  }}
+                >
+                  Ingresar con mi cuenta
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setComoInvitado(true)}
+                  style={{
+                    flex: '1 1 160px',
+                    minHeight: '44px',
+                    borderRadius: '10px',
+                    border: '1.5px solid var(--cp-navy)',
+                    backgroundColor: 'var(--cp-white)',
+                    color: 'var(--cp-navy)',
+                    fontWeight: 800,
+                    fontSize: '14px',
+                  }}
+                >
+                  Continuar como invitado
+                </button>
+              </div>
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setVerPuntos((v) => !v)}
+                  aria-expanded={verPuntos}
+                  style={{ background: 'none', border: 'none', padding: 0, fontSize: '12px', fontWeight: 700, color: 'var(--cp-navy)', textDecoration: 'underline', cursor: 'pointer' }}
+                >
+                  ¿Cómo funcionan los puntos?
+                </button>
+                {verPuntos && (
+                  <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--cp-soft)', lineHeight: '17px' }}>
+                    Con tu cuenta ganas puntos por cada pedido pagado. Los usas como descuento en tus
+                    próximos pedidos (1 punto = S/ 1). Como invitado no se acumulan puntos.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Paso 2b: Datos de contacto (cuenta o invitado) */}
+          {(clienteCuenta || comoInvitado) && (
           <div
             style={{
               backgroundColor: 'var(--cp-white)',
@@ -579,6 +663,25 @@ export function FormularioCheckout({
             >
               Tus datos de contacto
             </div>
+
+            {clienteCuenta ? (
+              <div style={{ fontSize: '13px' }}>
+                Pides con la cuenta de <b>{clienteCuenta.nombre}</b> · DNI {clienteCuenta.dniMascara}
+              </div>
+            ) : (
+              <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
+                Sigues como invitado: solo necesitamos tu nombre y celular.{' '}
+                <button type="button" onClick={() => cuentaCtx?.abrirPanel()} style={{ background: 'none', border: 'none', padding: 0, fontSize: '12px', fontWeight: 700, color: 'var(--cp-navy)', textDecoration: 'underline', cursor: 'pointer' }}>
+                  Ingresar para acumular puntos
+                </button>{' '}
+                <button type="button" onClick={() => setVerPuntos((v) => !v)} aria-expanded={verPuntos} aria-label="¿Cómo funcionan los puntos?" style={{ width: 20, height: 20, minWidth: 20, minHeight: 20, borderRadius: 10, border: '1.5px solid var(--cp-navy)', background: 'var(--cp-white)', color: 'var(--cp-navy)', fontSize: '11px', fontWeight: 800, cursor: 'pointer', lineHeight: '16px', padding: 0 }}>?</button>
+                {verPuntos && (
+                  <div style={{ marginTop: '6px', lineHeight: '17px' }}>
+                    Con tu cuenta ganas puntos por cada pedido pagado y los usas como descuento en tus próximos pedidos (1 punto = S/ 1).
+                  </div>
+                )}
+              </div>
+            )}
 
             <div>
               <label
@@ -648,6 +751,7 @@ export function FormularioCheckout({
               />
             </div>
           </div>
+          )}
 
           {/* Paso 3: Dirección y ubicación (solo si Delivery) */}
           {modalidad === 'DELIVERY' && (
@@ -672,6 +776,7 @@ export function FormularioCheckout({
                 Ubicación para delivery
               </div>
 
+              {!(coordenadas && origenPunto === 'GPS') && (
               <div>
                 <label
                   htmlFor="f-direccion"
@@ -683,7 +788,7 @@ export function FormularioCheckout({
                     marginBottom: '4px',
                   }}
                 >
-                  Dirección escrita
+                  Dirección escrita (si no usas tu ubicación actual)
                 </label>
                 <input
                   id="f-direccion"
@@ -703,6 +808,7 @@ export function FormularioCheckout({
                   }}
                 />
               </div>
+              )}
 
               <div>
                 <label
@@ -1109,7 +1215,7 @@ export function FormularioCheckout({
                     {metodoPago}:{' '}
                     {mediosPagoDisponibles[metodoPago.toLowerCase()]?.numero ||
                       datosLocal?.telefono ||
-                      '999888777'}
+                      '123456789'}
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
                     Titular: {datosLocal?.nombre || 'Caprichos'}
@@ -1121,7 +1227,7 @@ export function FormularioCheckout({
                     copiarTexto(
                       mediosPagoDisponibles[metodoPago.toLowerCase()]?.numero ||
                         datosLocal?.telefono ||
-                        '999888777',
+                        '123456789',
                       'pago-tel',
                     )
                   }
@@ -1157,14 +1263,14 @@ export function FormularioCheckout({
                     {mediosPagoDisponibles.transferencia?.banco || 'BCP'}
                   </div>
                   <div style={{ fontSize: '12px' }}>
-                    Cuenta: {mediosPagoDisponibles.transferencia?.cuenta || '191-00000000-0-00'}
+                    Cuenta: {mediosPagoDisponibles.transferencia?.cuenta || '123456789'}
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() =>
                     copiarTexto(
-                      mediosPagoDisponibles.transferencia?.cuenta || '191-00000000-0-00',
+                      mediosPagoDisponibles.transferencia?.cuenta || '123456789',
                       'pago-cta',
                     )
                   }
@@ -1231,7 +1337,7 @@ export function FormularioCheckout({
           </div>
 
           {/* Campo de cupón */}
-          {!cuponAplicado && cuentaCtx && (
+          {!cuponAplicado && clienteCuenta && (
             <PuntosCanje
               totalPedido={Math.max(0, subtotal)}
               puntosAplicados={puntosAplicados}

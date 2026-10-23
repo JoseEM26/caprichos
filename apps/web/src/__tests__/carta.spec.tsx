@@ -285,6 +285,7 @@ describe('Pruebas de la Carta Pública (front-carta)', () => {
     fireEvent.click(screen.getByText('Preparar pedido'));
 
     // Llenar datos de contacto válidos
+    fireEvent.click(screen.getByRole('button', { name: /Continuar como invitado/i }));
     fireEvent.change(screen.getByLabelText(/Nombre completo/i), {
       target: { value: 'Carlos Mendoza' },
     });
@@ -353,6 +354,7 @@ describe('Pruebas de la Carta Pública (front-carta)', () => {
     fireEvent.click(screen.getByText('Preparar factura'));
 
     // Llenar datos de cliente válidos
+    fireEvent.click(screen.getByRole('button', { name: /Continuar como invitado/i }));
     fireEvent.change(screen.getByLabelText(/Nombre completo/i), {
       target: { value: 'Empresa Demo SAC' },
     });

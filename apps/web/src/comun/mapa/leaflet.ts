@@ -4,8 +4,8 @@ import './mapa.css';
 
 export { L };
 
-/** Zona de reparto (Campoy, Mangomarca, Huachipa) */
-export const CENTRO_DEFECTO: [number, number] = [-12.0165, -76.975];
+/** Caprichos Campoy: el mapa abre aquí mientras el cliente no marque otro punto */
+export const CENTRO_DEFECTO: [number, number] = [-12.0196436, -76.963255];
 
 export const URL_TESELAS = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 export const ATRIBUCION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';

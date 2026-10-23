@@ -20,9 +20,9 @@ import { ActualizarPagosDto } from './dto/actualizar-pagos.dto';
 
 export const PAGOS_DEFAULT = {
   efectivo: { activo: true },
-  yape: { activo: true, numero: '(pendiente)' },
-  plin: { activo: true, numero: '(pendiente)' },
-  transferencia: { activo: true, cuenta: '(pendiente)', banco: '(pendiente)' },
+  yape: { activo: true, numero: '123456789' },
+  plin: { activo: true, numero: '123456789' },
+  transferencia: { activo: true, cuenta: '123456789', banco: 'BCP' },
   tarjeta: { activo: true },
 };
 
