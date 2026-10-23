@@ -13,6 +13,7 @@ import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { LocalService } from '../local/local.service';
 import { ZonasService } from '../zonas/zonas.service';
 import { OfertasService } from '../ofertas/ofertas.service';
+import { PuntosService } from '../clientes/puntos.service';
 import { CrearPedidoDto } from './dto/crear-pedido.dto';
 
 describe('PedidosService', () => {
@@ -22,6 +23,7 @@ describe('PedidosService', () => {
   let zonasServiceMock: any;
   let eventosGatewayMock: any;
   let ofertasServiceMock: any;
+  let puntosServiceMock: any;
 
   const mockProductoCafe = {
     id: 1n,
@@ -160,6 +162,11 @@ describe('PedidosService', () => {
       emitirAdmin: jest.fn(),
     };
 
+    puntosServiceMock = {
+      obtenerSaldo: jest.fn().mockResolvedValue(0),
+      canjear: jest.fn().mockResolvedValue({ puntosCanjeados: 0, saldoRestante: 0 }),
+    };
+
     ofertasServiceMock = {
       calcularDescuentosParaPedido: jest.fn().mockResolvedValue({
         descuentoTotal: 0,
@@ -179,6 +186,7 @@ describe('PedidosService', () => {
         { provide: ZonasService, useValue: zonasServiceMock },
         { provide: EventosGateway, useValue: eventosGatewayMock },
         { provide: OfertasService, useValue: ofertasServiceMock },
+        { provide: PuntosService, useValue: puntosServiceMock },
       ],
     }).compile();
 
@@ -475,6 +483,39 @@ describe('PedidosService', () => {
       expect(res.subtotal).toBe(28.0);
       expect(res.descuento).toBe(5.0);
       expect(res.total).toBe(28.0);
+    });
+
+    describe('canje de puntos (DT-55)', () => {
+      it('rechaza un canje mayor al monto elegible con TOPE_CANJE_EXCEDIDO', async () => {
+        // Subtotal = 28 sin descuento: elegible = 28. Canje de 30 excede el monto de productos
+        puntosServiceMock.obtenerSaldo.mockResolvedValue(50);
+
+        const err = await service
+          .crear({ ...pedidoBaseDto, puntosCanje: 30 }, 'idemp-canje-tope', { clientePartyId: 200n })
+          .catch((e) => e);
+
+        expect(err.getResponse()).toMatchObject({ codigo: 'TOPE_CANJE_EXCEDIDO' });
+        expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+        expect(puntosServiceMock.canjear).not.toHaveBeenCalled();
+      });
+
+      it('acepta un canje menor al monto elegible y descuenta el total', async () => {
+        puntosServiceMock.obtenerSaldo.mockResolvedValue(50);
+        prismaMock.pedido.create.mockResolvedValue({
+          id: 101n,
+          codigo: 'CP-W003',
+          estado: 'COLA',
+          subtotal: 28.0,
+          envio: 5.0,
+          total: 33.0,
+        });
+
+        await service.crear({ ...pedidoBaseDto, puntosCanje: 10 }, 'idemp-canje-ok', { clientePartyId: 200n });
+
+        expect(puntosServiceMock.canjear).toHaveBeenCalledWith(200n, 10, 101n);
+        const ultimoUpdate = prismaMock.pedido.update.mock.calls.at(-1)[0];
+        expect(ultimoUpdate.data.total.toNumber()).toBe(23.0);
+      });
     });
 
     it('falta cabecera Idempotency-Key -> 400 CLAVE_REQUERIDA', async () => {

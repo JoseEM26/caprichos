@@ -144,7 +144,7 @@ export class CrearPedidoDto {
   @IsString()
   cuponCodigo?: string;
 
-  /** Puntos de la cuenta que se canjean como descuento (1 punto = S/ 1); solo con sesión de cliente */
+  /** Puntos de la cuenta que se canjean como descuento; solo con sesión de cliente */
   @IsOptional()
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })

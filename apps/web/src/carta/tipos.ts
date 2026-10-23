@@ -87,6 +87,7 @@ export interface DatosLocalCarta {
   mediosPago: Record<string, MedioPagoInfo>;
   envioGratisDesde: number | null;
   pedidoMinimo: number | null;
+  puntosPorcentaje?: number;
 }
 
 export interface ConsultaEnvioRespuesta {

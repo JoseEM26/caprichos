@@ -442,4 +442,49 @@ describe('OfertasService', () => {
       expect(res.descuentoTotal).toBe(2.0);
     });
   });
+
+  describe('vistaPreviaDescuentos (montoCanjeable)', () => {
+    it('devuelve como canjeable solo lo que no tiene descuento ni está marcado sin beneficios', async () => {
+      prismaMock.reglaAcumulacion.upsert.mockResolvedValueOnce({
+        id: 1,
+        cupon_con_descuento: false,
+        promo_con_descuento: false,
+      });
+      prismaMock.producto.findMany.mockResolvedValueOnce([
+        { id: 10n, categoria_id: 1n, no_suma_beneficios: false },
+        { id: 20n, categoria_id: 2n, no_suma_beneficios: true },
+        { id: 30n, categoria_id: 2n, no_suma_beneficios: false },
+      ]);
+      prismaMock.oferta.findMany.mockResolvedValueOnce([
+        {
+          id: 1n,
+          tipo: 'DESCUENTO',
+          nombre: '10% en Frappés',
+          descuento_tipo: 'PORCENTAJE',
+          descuento_valor: new Prisma.Decimal(10),
+          alcance_categoria_id: 1n,
+          alcance_producto_id: null,
+          compra_minima: null,
+          dias: [],
+          hora_desde: null,
+          hora_hasta: null,
+          fecha_desde: null,
+          fecha_hasta: null,
+          canales: ['CARTA'],
+          limite_usos: null,
+          usos_actuales: 0,
+          activo: true,
+        },
+      ]);
+
+      const res = await service.vistaPreviaDescuentos([
+        { productoId: '10', cantidad: 1, subtotal: 20.0, precioUnitario: 20.0 }, // con descuento de 10%
+        { productoId: '20', cantidad: 1, subtotal: 30.0, precioUnitario: 30.0 }, // no suma puntos
+        { productoId: '30', cantidad: 1, subtotal: 25.0, precioUnitario: 25.0 }, // elegible
+      ]);
+
+      expect(res.descuentoTotal).toBe(2.0);
+      expect(res.montoCanjeable).toBe(25.0);
+    });
+  });
 });

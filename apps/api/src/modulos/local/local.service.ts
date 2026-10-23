@@ -250,7 +250,15 @@ export class LocalService {
     const [parametros, horarios] = await Promise.all([
       this.prisma.parametro.findMany({
         where: {
-          clave: { in: ['local_datos', 'local_pagos', 'envio_gratis_monto', 'pedido_minimo'] },
+          clave: {
+            in: [
+              'local_datos',
+              'local_pagos',
+              'envio_gratis_monto',
+              'pedido_minimo',
+              'puntos_porcentaje',
+            ],
+          },
         },
       }),
       this.prisma.horarioDia.findMany({
@@ -262,6 +270,7 @@ export class LocalService {
     const pagosParam = parametros.find((p) => p.clave === 'local_pagos')?.valor as any;
     const envioGratis = parametros.find((p) => p.clave === 'envio_gratis_monto')?.valor;
     const pedidoMinimo = parametros.find((p) => p.clave === 'pedido_minimo')?.valor;
+    const puntosPorcentaje = Number(parametros.find((p) => p.clave === 'puntos_porcentaje')?.valor);
 
     const datos = datosParam ?? DATOS_LOCAL_DEFAULT;
     const pagos = pagosParam ?? PAGOS_DEFAULT;
@@ -292,6 +301,7 @@ export class LocalService {
       mediosPago: mediosPagoVisibles,
       envioGratisDesde: typeof envioGratis === 'number' ? envioGratis : null,
       pedidoMinimo: typeof pedidoMinimo === 'number' ? pedidoMinimo : null,
+      puntosPorcentaje: puntosPorcentaje > 0 ? puntosPorcentaje : 5,
     };
   }
 

@@ -26,6 +26,9 @@ describe('PuntosService', () => {
         findUnique: jest.fn(),
         update: jest.fn(),
       },
+      pedidoLinea: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       partyRole: {
         findFirst: jest.fn(),
       },
@@ -69,6 +72,9 @@ describe('PuntosService', () => {
         customer_detail: { party_role_id: 50n, puntos: '1.50' },
       });
       prismaMock.parametro.findUnique.mockResolvedValue({ clave: 'puntos_porcentaje', valor: 5 });
+      prismaMock.pedidoLinea.findMany.mockResolvedValue([
+        { id: 1n, producto_id: 7n, oferta_id: null, linea_combo_id: null, cantidad: 2, precio_unit: '35.00', subtotal: '70.00', producto: { no_suma_beneficios: false } },
+      ]);
 
       const res = await service.acumularPorPedido(101n);
 
@@ -85,6 +91,38 @@ describe('PuntosService', () => {
         }),
       );
       expect(prismaMock.customerDetail.update).toHaveBeenCalled();
+    });
+
+    it('no suma puntos por productos marcados, de promoción ni con descuento; descuenta lo canjeado', async () => {
+      prismaMock.movimientoPuntos.findFirst.mockResolvedValue(null);
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 102n,
+        codigo: 'CP-0102',
+        party_id: 200n,
+        total: '90.00',
+        envio: '0.00',
+        puntos_canjeados: '10.00',
+        cupon_id: null,
+        cupon_emitido_id: null,
+        descuento_detalle: [{ lineasAfectadas: [{ productoId: '8' }] }],
+      });
+      prismaMock.partyRole.findFirst.mockResolvedValue({
+        id: 50n,
+        party_id: 200n,
+        customer_detail: { party_role_id: 50n, puntos: '0.00' },
+      });
+      prismaMock.parametro.findUnique.mockResolvedValue({ clave: 'puntos_porcentaje', valor: 5 });
+      prismaMock.pedidoLinea.findMany.mockResolvedValue([
+        { id: 1n, producto_id: 7n, oferta_id: null, linea_combo_id: null, cantidad: 1, precio_unit: '60.00', subtotal: '60.00', producto: { no_suma_beneficios: false } },
+        { id: 2n, producto_id: 8n, oferta_id: null, linea_combo_id: null, cantidad: 1, precio_unit: '20.00', subtotal: '20.00', producto: { no_suma_beneficios: false } },
+        { id: 3n, producto_id: 9n, oferta_id: null, linea_combo_id: null, cantidad: 1, precio_unit: '20.00', subtotal: '20.00', producto: { no_suma_beneficios: true } },
+        { id: 4n, producto_id: 6n, oferta_id: 3n, linea_combo_id: null, cantidad: 1, precio_unit: '15.00', subtotal: '15.00', producto: { no_suma_beneficios: false } },
+      ]);
+
+      const res = await service.acumularPorPedido(102n);
+
+      // elegible: 60 (los otros tres quedan fuera) - 10 canjeados = 50 -> 5 % = 2.50
+      expect(res.puntos).toBe(2.5);
     });
 
     it('es IDEMPOTENTE: no acumula de nuevo si ya existe movimiento SUMA', async () => {
@@ -125,6 +163,44 @@ describe('PuntosService', () => {
       });
 
       const res = await service.acumularPorPedido(103n);
+      expect(res.sumados).toBe(false);
+      expect(res.puntos).toBe(0);
+      expect(prismaMock.movimientoPuntos.create).not.toHaveBeenCalled();
+    });
+
+    it('no acumula si el pedido tiene party pero no rol CLIENTE activo', async () => {
+      prismaMock.movimientoPuntos.findFirst.mockResolvedValue(null);
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 104n,
+        codigo: 'CP-0104',
+        party_id: 300n,
+        total: '70.00',
+        envio: '0.00',
+        cupon_id: null,
+        cupon_emitido_id: null,
+      });
+      prismaMock.partyRole.findFirst.mockResolvedValue(null);
+      prismaMock.pedidoLinea.findMany.mockResolvedValue([
+        { id: 1n, producto_id: 7n, oferta_id: null, linea_combo_id: null, cantidad: 2, precio_unit: '35.00', subtotal: '70.00', producto: { no_suma_beneficios: false } },
+      ]);
+
+      const res = await service.acumularPorPedido(104n);
+      expect(res.sumados).toBe(false);
+      expect(res.puntos).toBe(0);
+      expect(prismaMock.movimientoPuntos.create).not.toHaveBeenCalled();
+    });
+
+    it('no acumula si el pedido usó cupón emitido (cupon_emitido_id)', async () => {
+      prismaMock.movimientoPuntos.findFirst.mockResolvedValue(null);
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 105n,
+        party_id: 200n,
+        total: '60.00',
+        cupon_id: null,
+        cupon_emitido_id: 77n,
+      });
+
+      const res = await service.acumularPorPedido(105n);
       expect(res.sumados).toBe(false);
       expect(res.puntos).toBe(0);
       expect(prismaMock.movimientoPuntos.create).not.toHaveBeenCalled();
@@ -221,6 +297,32 @@ describe('PuntosService', () => {
           }),
         }),
       );
+    });
+
+    it('canje con pedido: el tope es el monto elegible (sin descuento ni promoción), no el total', async () => {
+      prismaMock.customerDetail.findFirst.mockResolvedValue({ puntos: '100.00' });
+      prismaMock.partyRole.findFirst.mockResolvedValue({
+        id: 50n,
+        party_id: 200n,
+        customer_detail: { party_role_id: 50n, puntos: '100.00' },
+      });
+      prismaMock.customerDetail.update.mockResolvedValue({ puntos: '40.00' });
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 300n,
+        total: '100.00',
+        envio: '0.00',
+        descuento_detalle: [{ lineasAfectadas: [{ productoId: '8' }] }],
+      });
+      prismaMock.pedidoLinea.findMany.mockResolvedValue([
+        { id: 1n, producto_id: 7n, oferta_id: null, linea_combo_id: null, cantidad: 1, precio_unit: '60.00', subtotal: '60.00', producto: { no_suma_beneficios: false } },
+        { id: 2n, producto_id: 8n, oferta_id: null, linea_combo_id: null, cantidad: 1, precio_unit: '40.00', subtotal: '40.00', producto: { no_suma_beneficios: false } },
+      ]);
+
+      const err = await service.canjear(200n, 65, 300n).catch((e) => e);
+      expect(err.getResponse()).toMatchObject({ codigo: 'TOPE_CANJE_EXCEDIDO' });
+
+      const res = await service.canjear(200n, 60, 300n);
+      expect(res.puntosCanjeados).toBe(60);
     });
 
     it('rechaza el canje si se piden más puntos que el saldo', async () => {

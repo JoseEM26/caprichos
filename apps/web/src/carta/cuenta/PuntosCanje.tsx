@@ -101,7 +101,7 @@ export function PuntosCanje({ totalPedido, puntosAplicados, alAplicar }: PropsPu
 
     if (numInput > totalPedido) {
       setMensaje({
-        texto: `No puedes usar más puntos que el total de tu pedido (S/ ${totalPedido.toFixed(2)}).`,
+        texto: `Solo puedes usar hasta S/ ${totalPedido.toFixed(2)} en puntos: se aplican a productos sin promoción ni descuento.`,
         tipo: 'error',
       });
       return;
@@ -163,7 +163,7 @@ export function PuntosCanje({ totalPedido, puntosAplicados, alAplicar }: PropsPu
         </div>
 
         <div style={{ fontSize: 12, lineHeight: '16px', color: 'var(--soft, var(--cp-soft, #5A6D7C))' }}>
-          Tienes <b>{saldoDisponible.toFixed(2)}</b> puntos disponibles (1 punto = S/ 1 de descuento).{' '}
+          Tienes <b>{saldoDisponible.toFixed(2)}</b> puntos disponibles.{' '}
           {numInput > 0 && numInput <= saldoDisponible && `Te quedan ${saldoRestante.toFixed(2)} puntos.`}
         </div>
 

@@ -1,3 +1,4 @@
+import { montoElegiblePuntos } from '../ofertas/puntos-elegibles.util';
 import {
   BadRequestException,
   Injectable,
@@ -49,8 +50,25 @@ export class PuntosService {
     return Math.max(0, Math.round(saldo * 100) / 100);
   }
 
+  /** Productos sin descuento ni promoción de un pedido: la base que suma y que se puede canjear. */
+  private async montoElegiblePedido(pId: bigint, descuentoDetalle: unknown): Promise<number> {
+    const lineas = await this.prisma.pedidoLinea.findMany({
+      where: { pedido_id: pId },
+      include: { producto: { select: { no_suma_beneficios: true } } },
+    });
+    return montoElegiblePuntos(
+      lineas.map((l) => ({
+        productoId: l.producto_id ?? `linea-${l.id}`,
+        subtotal: Number(l.subtotal ?? Number(l.precio_unit) * l.cantidad),
+        noSumaBeneficios: l.producto?.no_suma_beneficios ?? true,
+        enPromocion: l.oferta_id !== null || l.linea_combo_id !== null,
+      })),
+      (descuentoDetalle as any) ?? [],
+    );
+  }
+
   /**
-   * Acumula el 5% (o porcentaje configurado) de lo pagado en productos al cobrar un pedido.
+   * Acumula el 5% (o porcentaje configurado) de lo pagado en productos sin descuento al cobrar un pedido. Los puntos no vencen.
    * Totalmente IDEMPOTENTE: si ya se sumó para este pedido, devuelve el registro existente sin duplicar.
    */
   async acumularPorPedido(pedidoId: bigint | string): Promise<{ puntos: number; sumados: boolean }> {
@@ -117,12 +135,10 @@ export class PuntosService {
       porcentaje = 5;
     }
 
-    // 4. Calcular base de cálculo: solo productos, sin envío (DT-73, DT-55)
-    const montoTotal = Number(pedido.total);
-    const montoEnvio = Number(pedido.envio || 0);
+    // 4. Base: solo productos sin descuento ni promoción, sin envío ni lo pagado con puntos (DT-73, DT-65)
+    const elegible = await this.montoElegiblePedido(pId, pedido.descuento_detalle);
     const montoCanje = Number(pedido.puntos_canjeados || 0);
-    // Base de productos pagados en dinero (sin incluir lo pagado con puntos ni envío)
-    const baseCalculo = Math.max(0, montoTotal - montoEnvio);
+    const baseCalculo = Math.max(0, elegible - montoCanje);
 
     const puntosCalculados = Math.round((baseCalculo * (porcentaje / 100)) * 100) / 100;
     if (puntosCalculados <= 0) {
@@ -303,11 +319,11 @@ export class PuntosService {
         where: { id: pId },
       });
       if (pedido) {
-        const maxCanjeable = Math.max(0, Number(pedido.total) - Number(pedido.envio || 0));
+        const maxCanjeable = await this.montoElegiblePedido(pId, pedido.descuento_detalle);
         if (puntos > maxCanjeable) {
           throw new BadRequestException({
             codigo: 'TOPE_CANJE_EXCEDIDO',
-            mensaje: `No puedes canjear más puntos que el total de productos (S/ ${maxCanjeable.toFixed(2)})`,
+            mensaje: `Los puntos solo se usan en productos sin descuento ni promoción (S/ ${maxCanjeable.toFixed(2)})`,
           });
         }
       }
@@ -496,26 +512,5 @@ export class PuntosService {
           }
         : null,
     }));
-  }
-
-  /**
-   * Consulta si hay puntos próximos a vencer según parámetro puntos_vencen_meses (default 12).
-   */
-  async puntosPorVencer(partyId: bigint | string): Promise<{ mesesVigencia: number; puntosPorVencer: number }> {
-    let meses = 12;
-    try {
-      const param = await this.prisma.parametro.findUnique({
-        where: { clave: 'puntos_vencen_meses' },
-      });
-      if (param && param.valor) meses = Number(param.valor);
-    } catch {
-      meses = 12;
-    }
-
-    // Por el momento se devuelve 0 puntos por vencer en la primera versión según FT-CLI-02
-    return {
-      mesesVigencia: meses,
-      puntosPorVencer: 0,
-    };
   }
 }

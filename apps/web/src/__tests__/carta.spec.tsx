@@ -7,6 +7,8 @@ import { CajonCarrito } from '../carta/CajonCarrito';
 import { ProductoCarta, EstadoLocalCarta, DatosLocalCarta } from '../carta/tipos';
 import { api } from '../comun/api';
 import { calcularPrecioLinea, calcularTotalPedido } from '@caprichos/compartido';
+import * as cuentaModulo from '../carta/cuenta/CuentaContext';
+import { PuntosCanje } from '../carta/cuenta/PuntosCanje';
 
 const productoEjemplo: ProductoCarta = {
   id: 'prod-1',
@@ -436,5 +438,85 @@ describe('Pruebas de la Carta Pública (front-carta)', () => {
 
     // No se llama a la API
     expect(postSpy.mock.calls.filter((c) => c[0] === '/pedidos')).toHaveLength(0);
+  });
+});
+
+describe('Carta ▸ puntos (reglas vigentes)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('invitado ve el texto de puntos sin «1 punto = S/ 1» y dice que no vencen', async () => {
+    vi.spyOn(api, 'post').mockResolvedValue({ descuentoTotal: 0, detalles: [] });
+
+    function WrapperPuntos() {
+      const { agregarLinea, abrirCheckout } = useCarrito();
+      return (
+        <div>
+          <button
+            onClick={() => {
+              agregarLinea({
+                productoId: 'prod-1',
+                nombre: 'Postre',
+                precioBase: 8,
+                cantidad: 1,
+                opciones: [],
+                precioUnitario: 8,
+                subtotal: 8,
+              });
+              abrirCheckout();
+            }}
+          >
+            Preparar pedido
+          </button>
+          <FormularioCheckout estadoLocal={estadoAbierto} datosLocal={datosLocalEjemplo} />
+        </div>
+      );
+    }
+
+    render(
+      <CarritoProvider>
+        <WrapperPuntos />
+      </CarritoProvider>,
+    );
+
+    fireEvent.click(screen.getByText('Preparar pedido'));
+    fireEvent.click(screen.getByRole('button', { name: /Continuar como invitado/i }));
+    fireEvent.click(screen.getByRole('button', { name: /¿Cómo funcionan los puntos\?/i }));
+
+    expect(screen.getByText(/no vencen/i)).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/1 punto = S\/ 1/);
+  });
+
+  it('PuntosCanje rechaza más puntos que el monto canjeable', () => {
+    const alAplicar = vi.fn();
+    vi.spyOn(cuentaModulo, 'useCuenta').mockReturnValue({
+      cliente: {
+        partyId: '100',
+        nombre: 'Ana',
+        dniMascara: '4521****',
+        correo: 'ana@ejemplo.com',
+        cumpleanos: '14/03',
+        puntos: 30,
+      },
+      panelAbierto: false,
+      abrirPanel: vi.fn(),
+      cerrarPanel: vi.fn(),
+      ingresar: vi.fn(),
+      registrar: vi.fn(),
+      salir: vi.fn(),
+      refrescar: vi.fn(),
+    });
+
+    // totalPedido es el monto canjeable (sin promos ni descuentos)
+    render(<PuntosCanje totalPedido={12} puntosAplicados={0} alAplicar={alAplicar} />);
+
+    fireEvent.change(screen.getByLabelText(/¿Cuántos puntos deseas usar\?/i), { target: { value: '20' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar' }));
+
+    expect(alAplicar).not.toHaveBeenCalled();
+    expect(
+      screen.getByText('Solo puedes usar hasta S/ 12.00 en puntos: se aplican a productos sin promoción ni descuento.'),
+    ).toBeInTheDocument();
   });
 });

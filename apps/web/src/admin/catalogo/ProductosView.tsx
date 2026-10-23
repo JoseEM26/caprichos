@@ -266,8 +266,8 @@ export function ProductosView() {
         ? `¿Volver a sumar puntos con «${p.nombre}»?`
         : `¿Marcar «${p.nombre}» como «no suma puntos ni aplica cupones»?`,
       mensaje: actual
-        ? 'Vuelve a sumar puntos y a aceptar cupones.'
-        : 'Sirve para promociones muy ajustadas (por ejemplo, un 2×1 de campaña). Vale en la carta, la caja y el chatbot.',
+        ? 'Vuelve a sumar puntos, a pagarse con puntos y a aceptar cupones.'
+        : 'Mientras esté activo, el producto no suma puntos, no se puede pagar con puntos y no aplica cupones. Sirve para promociones muy ajustadas (por ejemplo, un 2×1 de campaña). Vale en la carta, la caja y el chatbot.',
       accion: async () => {
         try {
           await catalogoApi.editarProducto(p.id, { noSumaBeneficios: !actual });

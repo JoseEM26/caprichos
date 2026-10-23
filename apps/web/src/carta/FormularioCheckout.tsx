@@ -81,7 +81,7 @@ export function FormularioCheckout({
   } | null>(null);
   const [cargandoCupon, setCargandoCupon] = useState(false);
   const [puntosAplicados, setPuntosAplicados] = useState(0);
-  const [promos, setPromos] = useState<{ total: number; detalles: { nombre: string; monto: number }[] }>({ total: 0, detalles: [] });
+  const [promos, setPromos] = useState<{ total: number; canjeable: number | null; detalles: { nombre: string; monto: number }[] }>({ total: 0, canjeable: null, detalles: [] });
   const cuentaCtx = useCuentaOpcional();
   const clienteCuenta = cuentaCtx?.cliente ?? null;
   // Acceso: con sesión se usa la cuenta; sin ella el cliente elige ingresar o seguir como invitado
@@ -109,12 +109,12 @@ export function FormularioCheckout({
     if (!checkoutAbierto || lineas.length === 0) return;
     let vigente = true;
     api
-      .post<{ descuentoTotal: number; detalles: { nombre: string; monto: number }[] }>('/carta/descuentos/vista-previa', {
+      .post<{ descuentoTotal: number; montoCanjeable?: number; detalles: { nombre: string; monto: number }[] }>('/carta/descuentos/vista-previa', {
         lineas: lineas.map((l) => ({ productoId: l.productoId, cantidad: l.cantidad, subtotal: l.subtotal, precioUnitario: l.precioUnitario })),
         cuponCodigo: cuponAplicado?.codigo,
       })
-      .then((r) => vigente && setPromos({ total: Number(r?.descuentoTotal) || 0, detalles: Array.isArray(r?.detalles) ? r.detalles : [] }))
-      .catch(() => vigente && setPromos({ total: 0, detalles: [] }));
+      .then((r) => vigente && setPromos({ total: Number(r?.descuentoTotal) || 0, canjeable: typeof r?.montoCanjeable === 'number' ? r.montoCanjeable : null, detalles: Array.isArray(r?.detalles) ? r.detalles : [] }))
+      .catch(() => vigente && setPromos({ total: 0, canjeable: null, detalles: [] }));
     return () => {
       vigente = false;
     };
@@ -415,6 +415,9 @@ export function FormularioCheckout({
     }
   };
 
+  const pctPuntos = datosLocal?.puntosPorcentaje ?? 5;
+  const textoPuntos = `Con tu cuenta ganas el ${pctPuntos} % de lo que pagas en puntos, y no vencen. Los usas como descuento en tus próximos pedidos, solo en productos sin promoción ni descuento.`;
+
   const mediosPagoDisponibles = datosLocal?.mediosPago || {
     yape: { activo: true, numero: '123456789' },
     plin: { activo: true, numero: '123456789' },
@@ -633,8 +636,7 @@ export function FormularioCheckout({
                 </button>
                 {verPuntos && (
                   <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--cp-soft)', lineHeight: '17px' }}>
-                    Con tu cuenta ganas puntos por cada pedido pagado. Los usas como descuento en tus
-                    próximos pedidos (1 punto = S/ 1). Como invitado no se acumulan puntos.
+                    {textoPuntos} Como invitado no se acumulan puntos.
                   </div>
                 )}
               </div>
@@ -677,7 +679,7 @@ export function FormularioCheckout({
                 <button type="button" onClick={() => setVerPuntos((v) => !v)} aria-expanded={verPuntos} aria-label="¿Cómo funcionan los puntos?" style={{ width: 20, height: 20, minWidth: 20, minHeight: 20, borderRadius: 10, border: '1.5px solid var(--cp-navy)', background: 'var(--cp-white)', color: 'var(--cp-navy)', fontSize: '11px', fontWeight: 800, cursor: 'pointer', lineHeight: '16px', padding: 0 }}>?</button>
                 {verPuntos && (
                   <div style={{ marginTop: '6px', lineHeight: '17px' }}>
-                    Con tu cuenta ganas puntos por cada pedido pagado y los usas como descuento en tus próximos pedidos (1 punto = S/ 1).
+                    {textoPuntos}
                   </div>
                 )}
               </div>
@@ -1339,7 +1341,7 @@ export function FormularioCheckout({
           {/* Campo de cupón */}
           {!cuponAplicado && clienteCuenta && (
             <PuntosCanje
-              totalPedido={Math.max(0, subtotal)}
+              totalPedido={Math.max(0, promos.canjeable ?? 0)}
               puntosAplicados={puntosAplicados}
               alAplicar={setPuntosAplicados}
             />

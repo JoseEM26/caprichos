@@ -1,3 +1,4 @@
+import { montoElegiblePuntos } from '../ofertas/puntos-elegibles.util';
 import { PuntosService } from '../clientes/puntos.service';
 import {
   BadRequestException,
@@ -490,10 +491,11 @@ export class PedidosService {
           mensaje: `Solo tienes ${saldo.toFixed(2)} puntos`,
         });
       }
-      if (puntosCanje > Math.max(0, subtotalCalculado - descuentoAplicado)) {
+      const montoCanjeable = montoElegiblePuntos(lineasCalculadas, desgloseDescuento.detalles);
+      if (puntosCanje > montoCanjeable) {
         throw new BadRequestException({
           codigo: 'TOPE_CANJE_EXCEDIDO',
-          mensaje: 'No puedes usar más puntos que el total de tus productos',
+          mensaje: 'Los puntos solo se usan en productos sin descuento ni promoción',
         });
       }
     }
