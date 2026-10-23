@@ -6,6 +6,7 @@ export interface BannerCarta {
   tag?: string;
   title?: string;
   sub?: string;
+  target?: string;
 }
 
 interface PortadaCartaProps {
@@ -22,23 +23,32 @@ interface PortadaCartaProps {
 export function PortadaCarta({ datosLocal, estadoLocal, fotoDestacada, banner, onPedir, onVerCarta }: PortadaCartaProps) {
   const movil = useEsMovil();
 
-  const mostrarBanner = !!banner && banner.activo !== false && !!banner.title;
-  const tagBanner = banner?.tag ?? '';
-  const titleBanner = banner?.title ?? '';
-  const subBanner = banner?.sub ?? '';
+  const mostrarBanner = !banner || banner.activo !== false;
+  const tagBanner = banner?.tag || 'NOVEDAD DEL MES';
+  const titleBanner = banner?.title || 'Frappe Maracuyá Tropical';
+  const subBanner = banner?.sub || 'Con pulpa natural de maracuyá y crema batida.';
 
-  const medios = Object.entries(datosLocal?.mediosPago ?? {})
-    .filter(([, m]) => m.activo)
-    .map(([k]) => k.charAt(0).toUpperCase() + k.slice(1));
-  const entrega = estadoLocal?.tiempoPrometidoMin
-    ? `${estadoLocal.altaDemandaMin ? 'Alta demanda: entrega' : 'Entrega'} en unos ${estadoLocal.tiempoPrometidoMin + (estadoLocal.altaDemandaMin || 0)} min`
-    : null;
+  const mediosActivos = Object.entries(datosLocal?.mediosPago ?? {})
+    .filter(([k, m]) => m.activo && k.toLowerCase() !== 'efectivo')
+    .map(([k]) => (k.toLowerCase() === 'pos' ? 'Tarjeta' : k.charAt(0).toUpperCase() + k.slice(1)));
+  const textoMedios = mediosActivos.length > 0 ? mediosActivos.join(' · ') : 'Yape · Plin · Tarjeta';
+
+  const minProm = estadoLocal?.tiempoPrometidoMin ?? 35;
+  const minExtra = estadoLocal?.altaDemandaMin ?? 0;
+  const entrega = minExtra > 0
+    ? `Alta demanda: entrega en unos ${minProm + minExtra} min`
+    : `Entrega en unos ${minProm} min`;
+  const envioGratis = datosLocal?.envioGratisDesde ?? 70;
+  const montoEnvioGratis = Number.isInteger(envioGratis) ? String(envioGratis) : envioGratis.toFixed(2);
+
   const datos = [
-    estadoLocal && { t: estadoLocal.texto, color: estadoLocal.abierta ? '#2F9E57' : 'var(--cp-rust)' },
-    datosLocal?.envioGratisDesde != null && { t: `Delivery gratis desde S/ ${datosLocal.envioGratisDesde.toFixed(2)}`, color: 'var(--cp-orange)' },
-    entrega && { t: entrega, color: estadoLocal?.altaDemandaMin ? 'var(--cp-rust)' : 'var(--cp-orange)' },
-    medios.length > 0 && { t: medios.join(' · '), color: 'var(--cp-orange)' },
-  ].filter(Boolean) as { t: string; color: string }[];
+    estadoLocal
+      ? { t: estadoLocal.texto, color: estadoLocal.abierta ? '#2F9E57' : 'var(--cp-rust)' }
+      : { t: 'Abierto hoy hasta las 11:00 p. m.', color: '#2F9E57' },
+    { t: `Delivery gratis por compras de más de s/ ${montoEnvioGratis}`, color: 'var(--cp-orange)' },
+    { t: entrega, color: minExtra > 0 ? 'var(--cp-rust)' : 'var(--cp-orange)' },
+    { t: textoMedios, color: 'var(--cp-orange)' },
+  ];
 
   return (
     <div style={{ width: '100%', maxWidth: 1200, boxSizing: 'border-box', margin: '0 auto', padding: movil ? '12px 16px 0' : '24px 24px 0' }}>
@@ -49,7 +59,7 @@ export function PortadaCarta({ datosLocal, estadoLocal, fotoDestacada, banner, o
           style={{
             position: 'relative',
             overflow: 'hidden',
-            background: 'linear-gradient(155deg, var(--cp-navy) 55%, #3b5a3f)',
+            background: 'linear-gradient(155deg, var(--cp-navy) 55%, color-mix(in srgb, var(--cp-navy) 65%, var(--cp-orange)))',
             color: 'var(--cp-cream)',
             borderRadius: movil ? 22 : 28,
             padding: movil ? '18px 16px' : '36px 40px',

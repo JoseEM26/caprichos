@@ -133,6 +133,10 @@ export class CrearDestacadaDto {
   @IsOptional()
   @IsString()
   portada_url?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  activo?: boolean;
 }
 
 export class ActualizarDestacadaDto {
@@ -147,6 +151,10 @@ export class ActualizarDestacadaDto {
   @IsOptional()
   @IsString()
   portada_url?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  activo?: boolean;
 
   @IsOptional()
   @IsBoolean()

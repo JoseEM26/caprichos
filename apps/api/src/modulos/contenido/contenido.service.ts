@@ -138,6 +138,27 @@ function urlArchivo(ruta: string): string {
   return `/archivos/${ruta.replace(/^\/+/, '')}`;
 }
 
+function extraerPieDeRuta(ruta?: string | null): string {
+  if (!ruta) return '';
+  const idx = ruta.indexOf('#');
+  if (idx < 0) return '';
+  const params = new URLSearchParams(ruta.slice(idx + 1));
+  return params.get('pie') || '';
+}
+
+function extraerOffDeRuta(ruta?: string | null): boolean {
+  if (!ruta) return false;
+  const idx = ruta.indexOf('#');
+  if (idx < 0) return false;
+  const params = new URLSearchParams(ruta.slice(idx + 1));
+  return params.get('off') === '1';
+}
+
+interface DestacadasMeta {
+  activos: Record<string, boolean>;
+  fotosMeta: Record<string, Array<{ id?: string; url: string; pie: string; orden: number }>>;
+}
+
 @Injectable()
 export class ContenidoService {
   private readonly logger = new Logger(ContenidoService.name);
@@ -209,34 +230,62 @@ export class ContenidoService {
     }));
 
     // 4. Destacadas («Momentos Caprichos»)
-    // Regla RN-CAP-064 / RQ-CON-03-08: Un círculo sin fotos NO se ve en la carta
-    const destacadasDb = await this.prisma.destacada.findMany({
-      where: { archivada: false },
-      orderBy: { orden: 'asc' },
-      include: {
-        fotos: {
-          include: { archivo: true },
-          orderBy: { orden: 'asc' },
+    // Regla RN-CAP-064 / RQ-CON-03-08: Un círculo sin fotos o desactivado NO se ve en la carta
+    const [destacadasDb, metaDestacadas] = await Promise.all([
+      this.prisma.destacada.findMany({
+        where: { archivada: false },
+        orderBy: { orden: 'asc' },
+        include: {
+          fotos: {
+            include: { archivo: true },
+            orderBy: { orden: 'asc' },
+          },
+          portada_archivo: true,
         },
-        portada_archivo: true,
-      },
+      }),
+      this.leerMetaDestacadas(),
+    ]);
+
+    const destacadasConFotos = destacadasDb.filter((d) => {
+      const idStr = d.id.toString();
+      const activo =
+        metaDestacadas.activos[idStr] !== undefined
+          ? metaDestacadas.activos[idStr]
+          : !extraerOffDeRuta(d.portada_archivo?.ruta);
+      if (activo === false) return false;
+      const fotosMeta = metaDestacadas.fotosMeta[idStr];
+      const cantFotos = fotosMeta ? fotosMeta.length : d.fotos.length;
+      return cantFotos > 0;
     });
 
-    const destacadasConFotos = destacadasDb.filter((d) => d.fotos.length > 0);
-    const destacadas = destacadasConFotos.map((d) => ({
-      id: d.id.toString(),
-      titulo: d.titulo,
-      orden: d.orden,
-      portada_url: d.portada_archivo
-        ? urlArchivo(d.portada_archivo.ruta)
-        : d.fotos[0]?.archivo?.ruta
-        ? urlArchivo(d.fotos[0].archivo.ruta)
-        : null,
-      fotos: d.fotos.map((f) => ({
-        id: f.archivo.id.toString(),
-        url: urlArchivo(f.archivo.ruta),
-      })),
-    }));
+    const destacadas = destacadasConFotos.map((d) => {
+      const idStr = d.id.toString();
+      const fotosMeta = metaDestacadas.fotosMeta[idStr];
+      const fotos =
+        fotosMeta && fotosMeta.length > 0
+          ? fotosMeta.map((fm, idx) => ({
+              id: fm.id || `${idStr}-${idx + 1}`,
+              url: urlArchivo(fm.url),
+              pie: fm.pie ?? extraerPieDeRuta(fm.url),
+            }))
+          : d.fotos.map((f) => ({
+              id: f.archivo.id.toString(),
+              url: urlArchivo(f.archivo.ruta),
+              pie: extraerPieDeRuta(f.archivo.ruta),
+            }));
+      return {
+        id: idStr,
+        titulo: d.titulo,
+        orden: d.orden,
+        activo: true,
+        portada_url: d.portada_archivo
+          ? urlArchivo(d.portada_archivo.ruta)
+          : fotos[0]?.url
+          ? fotos[0].url
+          : null,
+        fotos,
+      };
+    });
 
     // 5. Ranking del mes actual (más vendidos con estrellas)
     // Regla RN-CAP-052 / RQ-CAR-03-01 / 03: tres estrellas al primero, una a los dos siguientes.
@@ -733,31 +782,71 @@ export class ContenidoService {
   // ADMINISTRATIVO: DESTACADAS DE LA CARTA (FT-CON-03)
   // =========================================================================
 
-  async listarDestacadasAdmin() {
-    const destacadas = await this.prisma.destacada.findMany({
-      orderBy: { orden: 'asc' },
-      include: {
-        fotos: {
-          include: { archivo: true },
-          orderBy: { orden: 'asc' },
-        },
-        portada_archivo: true,
-      },
+  private async leerMetaDestacadas(): Promise<DestacadasMeta> {
+    const param = await this.prisma.parametro.findUnique({
+      where: { clave: 'carta_destacadas_meta' },
     });
+    const val = (param?.valor as any) || {};
+    return {
+      activos: val.activos && typeof val.activos === 'object' ? val.activos : {},
+      fotosMeta: val.fotosMeta && typeof val.fotosMeta === 'object' ? val.fotosMeta : {},
+    };
+  }
 
-    return destacadas.map((d) => ({
-      id: d.id.toString(),
-      titulo: d.titulo,
-      orden: d.orden,
-      archivada: d.archivada,
-      portada_url: d.portada_archivo
-        ? urlArchivo(d.portada_archivo.ruta)
-        : null,
-      fotos: d.fotos.map((f) => ({
-        id: f.archivo.id.toString(),
-        url: urlArchivo(f.archivo.ruta),
-      })),
-    }));
+  private async guardarMetaDestacadas(meta: DestacadasMeta): Promise<void> {
+    await this.prisma.parametro.upsert({
+      where: { clave: 'carta_destacadas_meta' },
+      update: { valor: meta as any },
+      create: { clave: 'carta_destacadas_meta', valor: meta as any },
+    });
+  }
+
+  async listarDestacadasAdmin() {
+    const [destacadas, meta] = await Promise.all([
+      this.prisma.destacada.findMany({
+        orderBy: { orden: 'asc' },
+        include: {
+          fotos: {
+            include: { archivo: true },
+            orderBy: { orden: 'asc' },
+          },
+          portada_archivo: true,
+        },
+      }),
+      this.leerMetaDestacadas(),
+    ]);
+
+    return destacadas.map((d) => {
+      const idStr = d.id.toString();
+      const activo =
+        meta.activos[idStr] !== undefined
+          ? meta.activos[idStr]
+          : !extraerOffDeRuta(d.portada_archivo?.ruta);
+      const fotosMeta = meta.fotosMeta[idStr];
+      const fotos =
+        fotosMeta && fotosMeta.length > 0
+          ? fotosMeta.map((fm, idx) => ({
+              id: fm.id || `${idStr}-${idx + 1}`,
+              url: urlArchivo(fm.url),
+              pie: fm.pie ?? extraerPieDeRuta(fm.url),
+            }))
+          : d.fotos.map((f) => ({
+              id: f.archivo.id.toString(),
+              url: urlArchivo(f.archivo.ruta),
+              pie: extraerPieDeRuta(f.archivo.ruta),
+            }));
+      return {
+        id: idStr,
+        titulo: d.titulo,
+        orden: d.orden,
+        activo,
+        archivada: d.archivada,
+        portada_url: d.portada_archivo
+          ? urlArchivo(d.portada_archivo.ruta)
+          : null,
+        fotos,
+      };
+    });
   }
 
   async crearDestacada(dto: CrearDestacadaDto, usuario?: UsuarioAutenticado) {
@@ -788,6 +877,12 @@ export class ContenidoService {
         archivada: false,
       },
     });
+
+    if (dto.activo !== undefined) {
+      const meta = await this.leerMetaDestacadas();
+      meta.activos[creada.id.toString()] = dto.activo;
+      await this.guardarMetaDestacadas(meta);
+    }
 
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
@@ -834,9 +929,18 @@ export class ContenidoService {
       data,
     });
 
+    let metaCambiada = false;
+    const meta = await this.leerMetaDestacadas();
+    if (dto.activo !== undefined) {
+      meta.activos[id] = dto.activo;
+      metaCambiada = true;
+    }
+
     if (dto.fotos !== undefined) {
       await this.prisma.destacadaFoto.deleteMany({ where: { destacada_id: destacadaId } });
       let ord = 1;
+      const vistos = new Set<string>();
+      const fotosMetaList: Array<{ id?: string; url: string; pie: string; orden: number }> = [];
       for (const item of dto.fotos) {
         let archivo = await this.prisma.archivo.findFirst({ where: { ruta: item.url } });
         if (!archivo) {
@@ -844,14 +948,31 @@ export class ContenidoService {
             data: { ruta: item.url, tipo_mime: 'image/webp', bytes: 1024, privado: false },
           });
         }
-        await this.prisma.destacadaFoto.create({
-          data: {
-            destacada_id: destacadaId,
-            archivo_id: archivo.id,
-            orden: item.orden ?? ord++,
-          },
+        const ordenItem = item.orden ?? ord++;
+        fotosMetaList.push({
+          id: archivo.id.toString(),
+          url: item.url,
+          pie: item.pie ?? extraerPieDeRuta(item.url),
+          orden: ordenItem,
         });
+        const keyArchivo = archivo.id.toString();
+        if (!vistos.has(keyArchivo)) {
+          vistos.add(keyArchivo);
+          await this.prisma.destacadaFoto.create({
+            data: {
+              destacada_id: destacadaId,
+              archivo_id: archivo.id,
+              orden: ordenItem,
+            },
+          });
+        }
       }
+      meta.fotosMeta[id] = fotosMetaList;
+      metaCambiada = true;
+    }
+
+    if (metaCambiada) {
+      await this.guardarMetaDestacadas(meta);
     }
 
     await this.auditoria.registrar({
@@ -877,6 +998,12 @@ export class ContenidoService {
       data: { archivada: archivar },
     });
 
+    if (!archivar) {
+      const meta = await this.leerMetaDestacadas();
+      meta.activos[id] = false;
+      await this.guardarMetaDestacadas(meta);
+    }
+
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
       modulo: 'destacadas',
@@ -899,6 +1026,13 @@ export class ContenidoService {
     await this.prisma.destacada.delete({
       where: { id: destacadaId },
     });
+
+    const meta = await this.leerMetaDestacadas();
+    if (meta.activos[id] !== undefined || meta.fotosMeta[id] !== undefined) {
+      delete meta.activos[id];
+      delete meta.fotosMeta[id];
+      await this.guardarMetaDestacadas(meta);
+    }
 
     await this.auditoria.registrar({
       categoria: 'CAMBIO',

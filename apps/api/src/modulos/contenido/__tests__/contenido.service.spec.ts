@@ -302,6 +302,7 @@ describe('ContenidoService', () => {
   describe('ADMINISTRATIVO: DESTACADAS (DT-06 Excepción eliminar)', () => {
     it('permite eliminar una destacada para siempre', async () => {
       prisma.destacada.delete.mockResolvedValue({ id: BigInt(5) });
+      prisma.parametro.findUnique.mockResolvedValue(null);
 
       const res = await service.eliminarDestacada('5', mockUsuario as any);
 
@@ -310,6 +311,97 @@ describe('ContenidoService', () => {
         where: { id: BigInt(5) },
       });
       expect(auditoria.registrar).toHaveBeenCalled();
+    });
+
+    it('guarda leyenda (pie) y estado activo de una destacada en parametro carta_destacadas_meta y filtra las desactivadas en la carta pública', async () => {
+      prisma.destacada.findUnique.mockResolvedValue({
+        id: BigInt(1),
+        titulo: 'Clientes felices',
+        orden: 1,
+        archivada: false,
+      });
+      prisma.destacada.update.mockResolvedValue({ id: BigInt(1) });
+      prisma.destacadaFoto.deleteMany.mockResolvedValue({ count: 0 });
+      prisma.destacadaFoto.create.mockResolvedValue({});
+      prisma.archivo.findFirst.mockResolvedValue({
+        id: BigInt(77),
+        ruta: 'publico/foto_cliente.webp',
+      });
+      prisma.parametro.findUnique.mockResolvedValue(null);
+      prisma.parametro.upsert.mockResolvedValue({});
+
+      const upd = await service.actualizarDestacada(
+        '1',
+        {
+          activo: true,
+          fotos: [{ url: '/archivos/publico/foto_cliente.webp', pie: 'Tarde de waffles', orden: 1 }],
+        },
+        mockUsuario as any,
+      );
+
+      expect(upd.ok).toBe(true);
+      expect(prisma.parametro.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { clave: 'carta_destacadas_meta' },
+          create: expect.objectContaining({
+            clave: 'carta_destacadas_meta',
+            valor: expect.objectContaining({
+              activos: { '1': true },
+              fotosMeta: {
+                '1': [
+                  expect.objectContaining({
+                    url: '/archivos/publico/foto_cliente.webp',
+                    pie: 'Tarde de waffles',
+                  }),
+                ],
+              },
+            }),
+          }),
+        }),
+      );
+
+      // Ahora probamos obtenerContenidoPublicoCarta con una activa (con leyenda) y una desactivada
+      prisma.versionCarta.findFirst.mockResolvedValue(null);
+      prisma.novedad.findMany.mockResolvedValue([]);
+      prisma.rankingMes.findMany.mockResolvedValue([]);
+      prisma.parametro.findUnique.mockImplementation(async ({ where }: any) => {
+        if (where.clave === 'carta_destacadas_meta') {
+          return {
+            clave: 'carta_destacadas_meta',
+            valor: {
+              activos: { '1': true, '2': false },
+              fotosMeta: {
+                '1': [{ id: '77', url: '/archivos/publico/foto_cliente.webp', pie: 'Tarde de waffles', orden: 1 }],
+                '2': [{ id: '78', url: '/archivos/publico/local.webp', pie: 'Local', orden: 1 }],
+              },
+            },
+          };
+        }
+        return null;
+      });
+      prisma.destacada.findMany.mockResolvedValue([
+        {
+          id: BigInt(1),
+          titulo: 'Clientes felices',
+          orden: 1,
+          archivada: false,
+          portada_archivo: null,
+          fotos: [{ archivo: { id: BigInt(77), ruta: 'publico/foto_cliente.webp' } }],
+        },
+        {
+          id: BigInt(2),
+          titulo: 'Nuestro local',
+          orden: 2,
+          archivada: false,
+          portada_archivo: null,
+          fotos: [{ archivo: { id: BigInt(78), ruta: 'publico/local.webp' } }],
+        },
+      ]);
+
+      const carta = await service.obtenerContenidoPublicoCarta();
+      expect(carta.destacadas).toHaveLength(1);
+      expect(carta.destacadas[0].titulo).toBe('Clientes felices');
+      expect((carta.destacadas[0].fotos[0] as any).pie).toBe('Tarde de waffles');
     });
   });
 

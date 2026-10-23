@@ -11,9 +11,25 @@ export interface InfoRankingProducto {
 interface TarjetaProductoProps {
   producto: ProductoCarta;
   rankingInfo?: InfoRankingProducto | null;
+  organizacion?: 'SECCIONES' | 'LISTA' | 'TARJETAS';
 }
 
-export function TarjetaProducto({ producto, rankingInfo }: TarjetaProductoProps) {
+const PRODUCTOS_100_CACAO = new Set([
+  'FRAPPE MOCA',
+  'ICED CHOCOLATE',
+  'CHOCOLATE CALIENTE',
+]);
+
+function fmt(n: number): string {
+  const num = Math.round(n * 100) / 100;
+  return 's/ ' + (Number.isInteger(num) ? String(num) : num.toFixed(2));
+}
+
+export function TarjetaProducto({
+  producto,
+  rankingInfo,
+  organizacion = 'SECCIONES',
+}: TarjetaProductoProps) {
   const { abrirModalProducto } = useCarrito();
   const movil = useEsMovil();
 
@@ -27,155 +43,202 @@ export function TarjetaProducto({ producto, rankingInfo }: TarjetaProductoProps)
 
   const iniciales = producto.nombre
     .split(' ')
-    .filter(Boolean)
+    .filter((w) => w.length > 2)
     .slice(0, 2)
     .map((w) => w[0]?.toUpperCase())
     .join('');
 
-  // Cálculo de precio "desde"
-  const textoPrecio = (() => {
+  const minPrecio = (() => {
     if (producto.tamanos && producto.tamanos.length > 0) {
-      const precios = producto.tamanos.map((t) => t.precio);
-      const min = Math.min(...precios);
-      if (producto.tamanos.length > 1) {
-        return `desde S/ ${min.toFixed(2)}`;
-      }
-      return `S/ ${min.toFixed(2)}`;
+      return Math.min(...producto.tamanos.map((t) => t.precio));
     }
-    return `S/ ${producto.precio.toFixed(2)}`;
+    return producto.precio;
   })();
 
+  const esDuoCompartir =
+    producto.nombre.trim().toUpperCase() === 'DÚO PARA COMPARTIR' &&
+    minPrecio === 33;
+  const textoPrecioAnterior = esDuoCompartir ? fmt(38) : '';
+
+  const variosTamanos = Boolean(producto.tamanos && producto.tamanos.length > 1);
+  const textoPrecio =
+    (variosTamanos && !textoPrecioAnterior ? 'Desde ' : '') + fmt(minPrecio);
+
   const tieneOpciones =
-    (producto.tamanos && producto.tamanos.length > 1) ||
-    (producto.grupos && producto.grupos.length > 0);
+    variosTamanos || Boolean(producto.grupos && producto.grupos.length > 0);
+
+  const tagCacao = PRODUCTOS_100_CACAO.has(producto.nombre.trim().toUpperCase())
+    ? '100% CACAO'
+    : '';
+
+  const esLista = organizacion === 'LISTA';
+  const cardDir = movil ? 'row' : esLista ? 'row' : 'column';
+  const imgW = movil ? '100px' : esLista ? '120px' : '100%';
+  const imgRatio = movil ? '1/1' : esLista ? '1/1' : '4/3';
+  const imgPad = movil ? '8px' : '0';
+  const imgRad = movil ? '10px' : '0';
+  const initFs = movil ? 22 : 44;
+  const cardPad = movil ? '8px 10px 8px 2px' : '12px';
+  const nameFs = movil ? 13 : 15;
+  const priceFs = movil ? 15 : 18;
 
   return (
     <article
       data-testid={`producto-${producto.id}`}
-      className="cp-tarjeta"
+      className="card cp-tarjeta"
       style={{
         backgroundColor: 'var(--cp-white)',
         border: '1px solid var(--cp-line)',
         borderRadius: '12px',
-        boxShadow: '0 6px 18px rgba(11, 44, 62, 0.12)',
+        boxShadow: '0 6px 18px color-mix(in srgb, var(--cp-navy) 12%, transparent)',
         overflow: 'hidden',
         display: 'flex',
-        flexDirection: 'column',
+        flexDirection: cardDir,
         opacity: estaAgotado ? 0.6 : 1,
       }}
     >
-      {/* Zona de imagen / iniciales: la foto se ve completa (contain) sobre su propia versión difuminada, como en el mockup */}
+      {/* Zona de imagen / iniciales */}
       <button
         type="button"
         onClick={() => !estaAgotado && abrirModalProducto(producto)}
         aria-label={`Ver ${producto.nombre}`}
-        style={{ border: 0, padding: 0, background: 'transparent', display: 'block', width: '100%', minHeight: 0, cursor: estaAgotado ? 'default' : 'pointer' }}
-      >
-      <div
         style={{
-          position: 'relative',
-          width: '100%',
-          aspectRatio: '4/3',
-          backgroundColor: 'var(--cp-sand)',
-          overflow: 'hidden',
+          border: 0,
+          padding: imgPad,
+          boxSizing: 'border-box',
+          background: 'transparent',
+          display: 'block',
+          width: imgW,
+          flex: 'none',
+          alignSelf: 'flex-start',
+          cursor: estaAgotado ? 'default' : 'pointer',
         }}
       >
         {producto.fotoUrl ? (
-          <>
+          <span
+            style={{
+              position: 'relative',
+              display: 'block',
+              width: '100%',
+              aspectRatio: imgRatio,
+              overflow: 'hidden',
+              background: 'var(--cp-gold)',
+              borderRadius: imgRad,
+            }}
+          >
             <img
               src={producto.fotoUrl}
               alt=""
               aria-hidden="true"
               loading="lazy"
-              style={{ position: 'absolute', left: '-8%', top: '-8%', width: '116%', height: '116%', objectFit: 'cover', filter: 'blur(16px)', opacity: 0.5 }}
+              style={{
+                position: 'absolute',
+                left: '-8%',
+                top: '-8%',
+                width: '116%',
+                height: '116%',
+                objectFit: 'cover',
+                filter: 'blur(16px)',
+                opacity: 0.5,
+              }}
             />
             <img
               src={producto.fotoUrl}
               alt={producto.nombre}
               loading="lazy"
-              style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'center' }}
+              style={{
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+                objectPosition: 'center',
+              }}
             />
-          </>
+            {estaAgotado && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '10px',
+                  left: '10px',
+                  backgroundColor: 'var(--cp-navy)',
+                  color: '#FFFFFF',
+                  padding: '4px 10px',
+                  borderRadius: '9999px',
+                  fontSize: '11px',
+                  fontFamily: 'var(--fuente-titulos)',
+                  fontWeight: 800,
+                  letterSpacing: '0.06em',
+                }}
+              >
+                AGOTADO
+              </span>
+            )}
+          </span>
         ) : (
-          <div
+          <span
             style={{
               width: '100%',
-              height: '100%',
+              aspectRatio: imgRatio,
+              background: 'var(--cp-gold)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontFamily: 'var(--fuente-titulos)',
+              fontFamily: 'Montserrat, sans-serif',
               fontWeight: 800,
-              fontSize: '36px',
+              fontSize: `${initFs}px`,
               color: 'var(--cp-navy)',
-              backgroundColor: 'var(--cp-sand)',
+              borderRadius: imgRad,
             }}
           >
             {iniciales}
-          </div>
+          </span>
         )}
-
-        {/* Badge de Agotado */}
-        {estaAgotado && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '10px',
-              left: '10px',
-              backgroundColor: 'var(--cp-navy)',
-              color: '#FFFFFF',
-              padding: '4px 10px',
-              borderRadius: '9999px',
-              fontSize: '11px',
-              fontFamily: 'var(--fuente-titulos)',
-              fontWeight: 800,
-              letterSpacing: '0.06em',
-            }}
-          >
-            AGOTADO
-          </div>
-        )}
-      </div>
       </button>
 
       {/* Cuerpo de la tarjeta */}
       <div
         style={{
-          padding: movil ? '12px' : '16px',
+          padding: cardPad,
           display: 'flex',
           flexDirection: 'column',
-          flex: 1,
           gap: '6px',
+          flex: 1,
+          minWidth: 0,
         }}
       >
-        <h3
+        <div
           style={{
-            fontFamily: 'var(--fuente-titulos)',
+            fontFamily: 'Montserrat, sans-serif',
             fontWeight: 700,
-            fontSize: movil ? '13px' : '15px',
+            fontSize: `${nameFs}px`,
             lineHeight: '20px',
             color: 'var(--cp-navy)',
           }}
         >
           {producto.nombre}
-        </h3>
+        </div>
 
         {producto.descripcion && (
-          <p
+          <div
             style={{
-              margin: 0,
               fontSize: '12px',
-              lineHeight: '16px',
+              lineHeight: '17px',
               color: 'var(--cp-soft)',
               flex: 1,
-              display: '-webkit-box',
-              WebkitLineClamp: movil ? 2 : 4,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
+              ...(movil
+                ? {
+                    display: '-webkit-box',
+                    WebkitBoxOrient: 'vertical',
+                    WebkitLineClamp: 2,
+                    overflow: 'hidden',
+                  }
+                : {}),
             }}
           >
             {producto.descripcion}
-          </p>
+          </div>
         )}
 
         {rankingInfo && (
@@ -188,54 +251,88 @@ export function TarjetaProducto({ producto, rankingInfo }: TarjetaProductoProps)
                 color: 'var(--cp-navy)',
                 borderRadius: '9999px',
                 padding: '2px 10px',
-                display: 'inline-block',
               }}
             >
-              {rankingInfo.textoEstrellas || (rankingInfo.estrellas === 3 ? '★★★ Más comprado del mes' : '★ Más comprado del mes')}
+              {rankingInfo.textoEstrellas ||
+                (rankingInfo.estrellas === 3
+                  ? '★★★ MÁS COMPRADO DEL MES'
+                  : '★ MÁS COMPRADO DEL MES')}
+            </span>
+          </div>
+        )}
+
+        {tagCacao && (
+          <div>
+            <span
+              style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                background: 'var(--cp-navy)',
+                color: 'var(--cp-cream)',
+                borderRadius: '9999px',
+                padding: '2px 10px',
+              }}
+            >
+              {tagCacao}
             </span>
           </div>
         )}
 
         <div
           style={{
-            marginTop: 'auto',
-            paddingTop: '8px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: '8px',
+            marginTop: '4px',
           }}
         >
-          <span
-            style={{
-              fontFamily: 'var(--fuente-titulos)',
-              fontWeight: 800,
-              fontSize: movil ? '15px' : '18px',
-              color: 'var(--cp-rust)',
-            }}
-          >
-            {textoPrecio}
+          <span style={{ display: 'flex', flexDirection: 'column' }}>
+            <span
+              style={{
+                fontFamily: 'Montserrat, sans-serif',
+                fontWeight: 800,
+                fontSize: `${priceFs}px`,
+                color: 'var(--cp-rust)',
+              }}
+            >
+              {textoPrecio}
+            </span>
+            {textoPrecioAnterior && (
+              <span
+                style={{
+                  fontSize: '12px',
+                  textDecoration: 'line-through',
+                  color: 'var(--cp-soft)',
+                }}
+              >
+                {textoPrecioAnterior}
+              </span>
+            )}
           </span>
 
           <button
             onClick={() => !estaAgotado && abrirModalProducto(producto)}
             disabled={estaAgotado}
-            aria-label={estaAgotado ? `${producto.nombre} agotado` : `Pedir ${producto.nombre}`}
+            className="add"
+            aria-label={
+              estaAgotado
+                ? `${producto.nombre} agotado`
+                : `Pedir ${producto.nombre}`
+            }
             style={{
               minHeight: '44px',
               padding: '0 16px',
               borderRadius: '12px',
               border: 0,
               backgroundColor: estaAgotado ? 'var(--cp-line)' : 'var(--cp-orange)',
-              color: estaAgotado ? 'var(--cp-soft)' : '#FFFFFF',
-              fontFamily: 'var(--fuente-titulos)',
+              color: estaAgotado ? 'var(--cp-soft)' : 'var(--cp-navy)',
               fontWeight: 800,
               fontSize: '13px',
               cursor: estaAgotado ? 'not-allowed' : 'pointer',
-              transition: 'background-color 0.15s ease',
             }}
           >
-            {estaAgotado ? 'Agotado' : tieneOpciones ? 'Elegir' : 'Agregar'}
+            {estaAgotado ? 'Agotado' : tieneOpciones ? 'Personalizar' : 'Agregar'}
           </button>
         </div>
       </div>

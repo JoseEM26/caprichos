@@ -24,13 +24,44 @@ import { FormularioCheckout } from './FormularioCheckout';
 import { PantallaConfirmacion } from './PantallaConfirmacion';
 import { NotificacionAgregado } from './NotificacionAgregado';
 import { DecoracionAnimada } from './contenido/DecoracionAnimada';
-import { VisorHistoriasModal } from './contenido/VisorHistoriasModal';
+import { VisorHistoriasModal, extraerOffDeUrl, limpiarUrlFoto } from './contenido/VisorHistoriasModal';
 import type { HistoriaCírculo } from './contenido/VisorHistoriasModal';
-import { PromosCarta } from './contenido/PromosCarta';
-import type { PromoCarta } from './contenido/PromosCarta';
 import { FormularioComentarios } from './contenido/FormularioComentarios';
+import { ordenarNovedadesCarta, obtenerEtiquetaNovedad } from './PaginaNovedades';
 import type { NovedadCarta } from './PaginaNovedades';
 import type { BannerCarta } from './PortadaCarta';
+
+const INFO_CATEGORIA: Record<string, { title: string; note: string }> = {
+  COMBOS: { title: 'Combos Dúo', note: 'Precio por tamaño de bebida' },
+  FRAPPES: { title: 'Frappes', note: 'Todos al mismo precio: 12 oz s/ 14.50 · 16 oz s/ 16.50 · 21 oz s/ 17.50' },
+  ICED: { title: 'Iced', note: 'Bebidas frías con hielo' },
+  FROZEN: { title: 'Frozen', note: 'Solo tamaño extra de 21 oz' },
+  CALIENTES: { title: 'Calientes', note: 'Servidas en taza de vidrio' },
+  WAFFLES: { title: 'Waffles', note: 'Completo o 1/2' },
+  SALADOS: { title: 'Salados', note: 'Hamburguesas, sándwiches, papas, petit pan y empanadas' },
+  CROISSANTS: { title: 'Croissants artesanales', note: 'Hojaldrados, hechos a mano' },
+  POSTRES: { title: 'Postres', note: 'Donas, galletas, tortas y postres individuales' },
+  COMPLEMENTOS: { title: 'Postres', note: 'Donas, galletas, tortas y postres individuales' },
+};
+
+const FOTOS_RESPALDO_NOVEDADES: Record<string, { id: string; url: string; orden: number }[]> = {
+  'Fin de semana de waffles': [
+    { id: 'seed-waf-1', url: '/archivos/publico/seed/waffle_oreo.webp', orden: 0 },
+  ],
+  'Martes de 2x1 en Latte Coffe': [
+    { id: 'seed-lat-1', url: '/archivos/publico/seed/iced_latte_coffee.webp', orden: 0 },
+    { id: 'seed-lat-2', url: '/archivos/publico/seed/mocaccino.webp', orden: 1 },
+    { id: 'seed-lat-3', url: '/archivos/publico/seed/caramel_macchiato.webp', orden: 2 },
+  ],
+  'Así preparamos nuestro Frappe Oreo': [
+    { id: 'seed-oreo-1', url: '/archivos/publico/seed/frappe_oreo.webp', orden: 0 },
+  ],
+  'Nuevo: Frappe Maracuyá Tropical': [
+    { id: 'seed-mar-1', url: '/archivos/publico/seed/frappe_maracuya.webp', orden: 0 },
+    { id: 'seed-mar-2', url: '/archivos/publico/seed/frappe_strawberry.webp', orden: 1 },
+    { id: 'seed-mar-3', url: '/archivos/publico/seed/frappe_berries.webp', orden: 2 },
+  ],
+};
 
 interface ContenidoCarta {
   decoracion: string;
@@ -40,7 +71,6 @@ interface ContenidoCarta {
   destacadas: HistoriaCírculo[];
   rankingMes: { productoId: string; puesto: number; estrellas: number; textoEstrellas: string }[];
   banner: BannerCarta;
-  promos: PromoCarta[];
 }
 
 // El administrativo guarda la paleta por rol; la carta la lee con sus variables --cp-*
@@ -149,15 +179,53 @@ function ContenidoCartaPublica() {
   );
   const organizacion = contenido?.organizacion ?? 'SECCIONES';
 
+  const destacadasVisibles = useMemo(() => {
+    return (contenido?.destacadas ?? [])
+      .filter((d) => d.activo !== false && !extraerOffDeUrl(d.portada_url) && Array.isArray(d.fotos) && d.fotos.length > 0)
+      .map((d) => ({
+        ...d,
+        portada_url: limpiarUrlFoto(d.portada_url || d.fotos[0]?.url || ''),
+      }));
+  }, [contenido]);
+
+  const novedadesEnriquecidas = useMemo(() => {
+    const lista = (contenido?.novedades ?? []).map((n) => {
+      if (Array.isArray(n.fotos) && n.fotos.length > 0) return n;
+      const respaldo = FOTOS_RESPALDO_NOVEDADES[n.titulo];
+      return respaldo ? { ...n, fotos: respaldo } : n;
+    });
+    return ordenarNovedadesCarta(lista);
+  }, [contenido]);
+
   const irACarta = () => {
     setPagina('carta');
     setCategoriaActivaId('todo');
     setTimeout(() => document.getElementById('carta-lista')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   };
 
+  const pedirDestacadoPortada = () => {
+    const objetivo = (contenido?.banner?.target || 'FRAPPE MARACUYÁ').toUpperCase();
+    const prod = categorias
+      .flatMap((c) => c.productos)
+      .find((p) => p.nombre.toUpperCase() === objetivo);
+    if (prod) {
+      abrirModalProducto(prod);
+    } else {
+      irACarta();
+    }
+  };
+
   const cambiarPagina = (p: PaginaCarta) => {
     setPagina(p);
     window.scrollTo({ top: 0 });
+  };
+
+  const irArriba = () => {
+    try {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch {
+      window.scrollTo(0, 0);
+    }
   };
 
   if (cargando) {
@@ -196,6 +264,26 @@ function ContenidoCartaPublica() {
     );
   }
 
+  const nombreMarca = (datosLocal?.nombre || 'Caprichos').toUpperCase();
+  const descLocal =
+    'Creamos momentos para compartir con experiencias gastronómicas artesanales: ingredientes premium, procesos hechos a mano y sin químicos.';
+  const dirLocal = datosLocal?.direccion || 'Campoy, San Juan de Lurigancho, Lima';
+  const horarioTexto = 'Todos los días, de 2:00 pm a 10:00 pm';
+  const mapaUrl =
+    'https://www.google.com/maps/search/?api=1&query=Caprichos%20Campoy%20Lima';
+  const telLocal = datosLocal?.telefono || '9XX XXX XXX';
+  const waNum = String(datosLocal?.whatsapp || '51900000000').replace(/\D/g, '');
+  const waUrl = `https://wa.me/${waNum || '51900000000'}`;
+  const envioGratis = datosLocal?.envioGratisDesde ?? 70;
+  const pedidoMin = datosLocal?.pedidoMinimo ?? 14.5;
+  const fmtMonto = (m: number) => `s/ ${Number.isInteger(m) ? m : m.toFixed(2)}`;
+  const lineaPie = `Horario: ${horarioTexto} · Delivery gratis por compras de más de ${fmtMonto(envioGratis)} · Pedido mínimo de delivery ${fmtMonto(pedidoMin)}`;
+  const redes = [
+    { n: datosLocal?.redes?.instagramNombre || '@caprichos (ejemplo)', url: datosLocal?.redes?.instagram || 'https://www.instagram.com/' },
+    { n: 'Facebook', url: datosLocal?.redes?.facebook || 'https://www.facebook.com/' },
+    { n: 'TikTok', url: datosLocal?.redes?.tiktok || 'https://www.tiktok.com/' },
+  ].filter((r) => r.url);
+
   return (
     <div
       style={{
@@ -227,7 +315,7 @@ function ContenidoCartaPublica() {
       />
 
       {pagina === 'conocenos' && <PaginaConocenos datosLocal={datosLocal} estadoLocal={estadoLocal} />}
-      {pagina === 'novedades' && <PaginaNovedades novedades={contenido?.novedades ?? []} datosLocal={datosLocal} estadoLocal={estadoLocal} onVerCarta={irACarta} />}
+      {pagina === 'novedades' && <PaginaNovedades novedades={novedadesEnriquecidas} datosLocal={datosLocal} estadoLocal={estadoLocal} onVerCarta={irACarta} />}
 
       {pagina === 'carta' && !busqueda.trim() && categoriaActivaId === 'todo' && (
         <PortadaCarta
@@ -235,21 +323,45 @@ function ContenidoCartaPublica() {
           estadoLocal={estadoLocal}
           fotoDestacada={fotoDestacada}
           banner={contenido?.banner}
-          onPedir={irACarta}
+          onPedir={pedirDestacadoPortada}
           onVerCarta={irACarta}
         />
       )}
 
-      {pagina === 'carta' && !busqueda.trim() && categoriaActivaId === 'todo' && (contenido?.destacadas.length ?? 0) > 0 && (
+      {pagina === 'carta' && !busqueda.trim() && categoriaActivaId === 'todo' && destacadasVisibles.length > 0 && (
         <div style={{ maxWidth: 1200, width: '100%', boxSizing: 'border-box', margin: '0 auto', padding: movil ? '20px 16px 0' : '32px 24px 0' }}>
           <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: movil ? 17 : 22, marginBottom: 10 }}>Momentos Caprichos</div>
-          <div style={{ display: 'flex', gap: movil ? 10 : 18, overflowX: 'auto', paddingBottom: 4 }}>
-            {contenido!.destacadas.map((d, i) => (
-              <button key={d.id} aria-label={`Ver fotos: ${d.titulo}`} onClick={() => setVisor(i)}
-                style={{ flex: '0 0 auto', border: 0, background: 'transparent', padding: 0, width: movil ? 68 : 96, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, color: 'var(--cp-navy)' }}>
+          <div style={{ display: 'flex', gap: movil ? 10 : 18, overflowX: 'auto', scrollSnapType: 'x proximity', paddingBottom: 4, scrollbarWidth: 'none' }}>
+            {destacadasVisibles.map((d, i) => (
+              <button
+                key={d.id}
+                aria-label={`Ver fotos: ${d.titulo}`}
+                onClick={() => setVisor(i)}
+                style={{
+                  flex: 'none',
+                  scrollSnapAlign: 'start',
+                  border: 0,
+                  background: 'transparent',
+                  padding: 0,
+                  width: movil ? 68 : 96,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 6,
+                  color: 'var(--cp-navy)',
+                  cursor: 'pointer',
+                }}
+              >
                 <span style={{ width: movil ? 60 : 84, height: movil ? 60 : 84, borderRadius: '50%', padding: 3, boxSizing: 'border-box', background: 'linear-gradient(135deg, var(--cp-orange), var(--cp-rust))', display: 'block' }}>
-                  <span style={{ width: '100%', height: '100%', borderRadius: '50%', border: '2px solid var(--cp-cream)', boxSizing: 'border-box', overflow: 'hidden', background: 'var(--cp-sand)', display: 'block' }}>
-                    {d.portada_url && <img src={d.portada_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                  <span style={{ width: '100%', height: '100%', borderRadius: '50%', border: '2px solid var(--cp-cream)', boxSizing: 'border-box', overflow: 'hidden', background: 'color-mix(in srgb, var(--cp-line) 55%, var(--cp-white))', color: 'var(--cp-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                    {d.portada_url ? (
+                      <img src={d.portada_url} alt="" style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M3 8h4l2-3h6l2 3h4v11H3z" />
+                        <circle cx="12" cy="13.5" r="3.5" />
+                      </svg>
+                    )}
                   </span>
                 </span>
                 <span style={{ fontSize: 11, fontWeight: 700, lineHeight: '14px', textAlign: 'center' }}>{d.titulo}</span>
@@ -259,38 +371,56 @@ function ContenidoCartaPublica() {
         </div>
       )}
 
-      {pagina === 'carta' && !busqueda.trim() && categoriaActivaId === 'todo' && (contenido?.novedades.length ?? 0) > 0 && (
+      {pagina === 'carta' && !busqueda.trim() && novedadesEnriquecidas.length > 0 && (
         <div style={{ maxWidth: 1200, width: '100%', boxSizing: 'border-box', margin: '0 auto', padding: movil ? '20px 16px 0' : '32px 24px 0' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
             <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: movil ? 17 : 22 }}>Novedades</span>
             <button onClick={() => cambiarPagina('novedades')} style={{ minHeight: 36, padding: 0, border: 0, background: 'transparent', color: 'var(--cp-rust)', fontWeight: 800, fontSize: 13 }}>Ver todas</button>
           </div>
-          <div style={{ display: 'flex', gap: movil ? 10 : 16, overflowX: 'auto', scrollSnapType: 'x mandatory' }}>
-            {contenido!.novedades.slice(0, 4).map((n) => (
-              <button key={n.id} onClick={() => cambiarPagina('novedades')}
-                style={{ flex: movil ? '0 0 66%' : '0 0 300px', scrollSnapAlign: 'start', border: '1px solid var(--cp-line)', padding: 0, borderRadius: movil ? 16 : 20, background: 'var(--cp-white)', color: 'var(--cp-navy)', textAlign: 'left', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                <span style={{ position: 'relative', display: 'block', width: '100%', aspectRatio: '16 / 9', background: 'var(--cp-gold)' }}>
-                  {n.fotos[0] && <img src={n.fotos[0].url} alt="" loading="lazy" style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
-                  <span style={{ position: 'absolute', left: 8, top: 8, fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 10, letterSpacing: '0.08em', background: 'var(--cp-orange)', color: 'var(--cp-navy)', borderRadius: 9999, padding: '3px 9px' }}>
-                    {n.tipo === 'BANNER' ? 'EN PORTADA' : n.tipo === 'PROMOCION' ? 'PROMO' : n.tipo === 'IMAGEN' ? 'NOVEDAD' : n.tipo}
+          <div style={{ display: 'flex', gap: movil ? 10 : 16, overflowX: 'auto', scrollSnapType: 'x mandatory', scrollbarWidth: 'none' }}>
+            {novedadesEnriquecidas.slice(0, 4).map((n) => {
+              const badge = obtenerEtiquetaNovedad(n);
+              const esAviso = (n.tipo || '').toUpperCase() === 'AVISO' && badge !== 'NOVEDAD';
+              const fotoPrincipal = n.fotos[0]?.url ? limpiarUrlFoto(n.fotos[0].url) : '';
+              return (
+                <button
+                  key={n.id}
+                  onClick={() => cambiarPagina('novedades')}
+                  style={{
+                    flex: movil ? '0 0 66%' : '0 0 300px',
+                    scrollSnapAlign: 'start',
+                    border: '1px solid var(--cp-line)',
+                    padding: 0,
+                    borderRadius: movil ? 14 : 20,
+                    background: esAviso ? 'var(--cp-navy)' : 'var(--cp-white)',
+                    color: esAviso ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                    textAlign: 'left',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
+                  }}
+                >
+                  {fotoPrincipal && (
+                    <span style={{ position: 'relative', display: 'block', width: '100%', aspectRatio: '16 / 9', background: 'var(--cp-gold)' }}>
+                      <img src={fotoPrincipal} alt="" loading="lazy" style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <span style={{ position: 'absolute', left: 8, top: 8, fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 10, letterSpacing: '0.08em', background: 'var(--cp-orange)', color: 'var(--cp-navy)', borderRadius: 9999, padding: '3px 9px' }}>
+                        {badge}
+                      </span>
+                    </span>
+                  )}
+                  <span style={{ padding: '10px 12px 12px', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    {!fotoPrincipal && (
+                      <span style={{ alignSelf: 'flex-start', fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 10, letterSpacing: '0.08em', background: 'var(--cp-orange)', color: 'var(--cp-navy)', borderRadius: 9999, padding: '3px 9px' }}>
+                        {badge}
+                      </span>
+                    )}
+                    <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 14, lineHeight: '18px' }}>{n.titulo}</span>
                   </span>
-                </span>
-                <span style={{ padding: '10px 12px 12px', fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 14, lineHeight: '18px' }}>{n.titulo}</span>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
         </div>
-      )}
-
-      {pagina === 'carta' && !busqueda.trim() && categoriaActivaId === 'todo' && (
-        <PromosCarta
-          promos={contenido?.promos ?? []}
-          fotoDe={(nombre) => categorias.flatMap((c) => c.productos).find((p) => p.nombre === nombre)?.fotoUrl ?? null}
-          onAbrir={(nombre) => {
-            const prod = categorias.flatMap((c) => c.productos).find((p) => p.nombre === nombre);
-            if (prod) abrirModalProducto(prod);
-          }}
-        />
       )}
 
       {/* Lista de productos por categoría */}
@@ -300,6 +430,7 @@ function ContenidoCartaPublica() {
         style={{
           maxWidth: '1200px',
           width: '100%',
+          boxSizing: 'border-box',
           margin: '0 auto',
           padding: movil ? '8px 16px 48px' : '24px 24px 64px',
           flex: 1,
@@ -309,7 +440,7 @@ function ContenidoCartaPublica() {
           <div
             style={{
               textAlign: 'center',
-              padding: '64px 20px',
+              padding: '48px 0',
               color: 'var(--cp-soft)',
             }}
           >
@@ -319,16 +450,18 @@ function ContenidoCartaPublica() {
                 fontWeight: 800,
                 fontSize: '20px',
                 color: 'var(--cp-navy)',
-                marginBottom: '8px',
               }}
             >
-              No encontramos resultados para &ldquo;{busqueda}&rdquo;
+              No encontramos &ldquo;{busqueda}&rdquo;
             </div>
-            <p style={{ margin: 0, fontSize: '14px' }}>
-              Prueba con otra palabra o borra el buscador para ver toda la carta.
-            </p>
+            <div style={{ marginTop: '4px', color: 'var(--cp-soft)' }}>
+              Prueba con otra palabra o elige una categoría.
+            </div>
             <button
-              onClick={() => setBusqueda('')}
+              onClick={() => {
+                setBusqueda('');
+                setCategoriaActivaId('todo');
+              }}
               style={{
                 marginTop: '16px',
                 minHeight: '44px',
@@ -336,7 +469,7 @@ function ContenidoCartaPublica() {
                 borderRadius: '12px',
                 border: 0,
                 backgroundColor: 'var(--cp-orange)',
-                color: '#FFFFFF',
+                color: 'var(--cp-navy)',
                 fontFamily: 'var(--fuente-titulos)',
                 fontWeight: 800,
                 fontSize: '14px',
@@ -346,94 +479,224 @@ function ContenidoCartaPublica() {
             </button>
           </div>
         ) : (
-          secciones.map((cat) => (
-            <section
-              key={cat.id}
-              id={`categoria-${cat.id}`}
-              style={{
-                marginTop: movil ? '24px' : '32px',
-                scrollMarginTop: '140px',
-              }}
-            >
-              {/* Título de categoría estilo mockup con líneas decorativas */}
-              <div
+          secciones.map((cat) => {
+            const clave = cat.nombre.trim().toUpperCase();
+            const infoCat = INFO_CATEGORIA[clave] ?? { title: cat.nombre, note: '' };
+            return (
+              <section
+                key={cat.id}
+                id={`categoria-${cat.id}`}
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  marginBottom: '16px',
+                  marginTop: '32px',
+                  scrollMarginTop: '140px',
                 }}
               >
-                <span
+                {/* Título de categoría estilo mockup con líneas decorativas */}
+                <div
                   style={{
-                    flex: 1,
-                    height: '3px',
-                    backgroundColor: 'var(--cp-orange)',
-                    borderRadius: '2px',
-                  }}
-                />
-                <h2
-                  style={{
-                    fontFamily: 'var(--fuente-titulos)',
-                    fontWeight: 800,
-                    fontSize: movil ? '22px' : '28px',
-                    lineHeight: movil ? '28px' : '34px',
-                    letterSpacing: '0.03em',
-                    color: 'var(--cp-navy)',
-                    textAlign: 'center',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '16px',
+                    marginBottom: '16px',
                   }}
                 >
-                  {cat.nombre}
-                </h2>
-                <span
-                  style={{
-                    flex: 1,
-                    height: '3px',
-                    backgroundColor: 'var(--cp-orange)',
-                    borderRadius: '2px',
-                  }}
-                />
-              </div>
+                  <span
+                    style={{
+                      flex: 1,
+                      height: '3px',
+                      backgroundColor: 'var(--cp-orange)',
+                      borderRadius: '2px',
+                    }}
+                  />
+                  <h2
+                    style={{
+                      margin: 0,
+                      fontFamily: 'var(--fuente-titulos)',
+                      fontWeight: 800,
+                      fontSize: '28px',
+                      lineHeight: '34px',
+                      letterSpacing: '0.03em',
+                      color: 'var(--cp-navy)',
+                      textAlign: 'center',
+                    }}
+                  >
+                    {infoCat.title}
+                  </h2>
+                  <span
+                    style={{
+                      flex: 1,
+                      height: '3px',
+                      backgroundColor: 'var(--cp-orange)',
+                      borderRadius: '2px',
+                    }}
+                  />
+                </div>
+                {infoCat.note && (
+                  <div style={{ textAlign: 'center', fontSize: '13px', color: 'var(--cp-soft)', margin: '-8px 0 16px' }}>
+                    {infoCat.note}
+                  </div>
+                )}
 
-              {/* Grid de productos responsiva */}
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: organizacion === 'LISTA' ? '1fr' : organizacion === 'TARJETAS' ? 'repeat(auto-fill, minmax(320px, 1fr))' : 'repeat(auto-fill, minmax(230px, 1fr))',
-                  gap: '16px',
-                }}
-              >
-                {cat.productos.map((prod) => (
-                  <TarjetaProducto key={prod.id} producto={prod} rankingInfo={rankingPorProducto.get(String(prod.id))} />
-                ))}
-              </div>
-            </section>
-          ))
+                {/* Grid de productos responsiva */}
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: movil
+                      ? '1fr'
+                      : organizacion === 'LISTA'
+                        ? '1fr'
+                        : organizacion === 'TARJETAS'
+                          ? 'repeat(auto-fill, minmax(320px, 1fr))'
+                          : 'repeat(auto-fill, minmax(230px, 1fr))',
+                    gap: '16px',
+                  }}
+                >
+                  {cat.productos.map((prod) => (
+                    <TarjetaProducto
+                      key={prod.id}
+                      producto={prod}
+                      rankingInfo={rankingPorProducto.get(String(prod.id))}
+                      organizacion={organizacion}
+                    />
+                  ))}
+                </div>
+              </section>
+            );
+          })
         )}
       </main>
       )}
 
       {pagina === 'carta' && <FormularioComentarios />}
 
-      {visor !== null && contenido && (
-        <VisorHistoriasModal historias={contenido.destacadas} destacadaIdxInicial={visor} onCerrar={() => setVisor(null)} />
+      {visor !== null && destacadasVisibles.length > 0 && (
+        <VisorHistoriasModal historias={destacadasVisibles} destacadaIdxInicial={visor} onCerrar={() => setVisor(null)} />
       )}
 
-      {/* Pie informativo */}
+      {/* Pie de página estilo mockup (4 columnas en fondo oscuro) */}
       <footer
         style={{
-          borderTop: '1px solid var(--cp-line)',
-          backgroundColor: 'var(--cp-sand)',
-          padding: '24px 16px',
-          textAlign: 'center',
-          fontSize: '12px',
-          color: 'var(--cp-soft)',
+          marginTop: movil ? 24 : 40,
+          backgroundColor: 'var(--cp-navy)',
+          color: 'var(--cp-cream)',
         }}
       >
-        <div style={{ fontWeight: 700, color: 'var(--cp-navy)', marginBottom: '4px' }}>
-          {datosLocal?.nombre || 'Caprichos'}
+        <div
+          style={{
+            maxWidth: 1200,
+            margin: '0 auto',
+            padding: movil ? '24px 16px 8px' : '36px 24px 12px',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: movil ? 20 : 32,
+            boxSizing: 'border-box',
+          }}
+        >
+          <div style={{ flex: '1.4 1 240px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <img src="/logo.webp" alt="" style={{ width: 40, height: 40, borderRadius: 20, objectFit: 'cover' }} />
+              <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 18, letterSpacing: '0.04em' }}>
+                {nombreMarca}
+              </span>
+            </div>
+            <div style={{ fontSize: 13, lineHeight: '19px', opacity: 0.85 }}>{descLocal}</div>
+          </div>
+
+          <div style={{ flex: '1 1 200px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 13, letterSpacing: '0.08em', color: 'var(--cp-orange)' }}>
+              VISÍTANOS
+            </div>
+            <div style={{ fontSize: 13, lineHeight: '19px' }}>{dirLocal}</div>
+            <div style={{ fontSize: 13, lineHeight: '19px', opacity: 0.85 }}>{horarioTexto}</div>
+            <a
+              href={mapaUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-cream)', textDecoration: 'underline', minHeight: 32, display: 'flex', alignItems: 'center' }}
+            >
+              Cómo llegar
+            </a>
+          </div>
+
+          <div style={{ flex: '1 1 200px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 13, letterSpacing: '0.08em', color: 'var(--cp-orange)' }}>
+              CONTACTO
+            </div>
+            <div style={{ fontSize: 13, lineHeight: '19px' }}>{telLocal}</div>
+            <a
+              href={waUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                minHeight: 40,
+                padding: '0 14px',
+                boxSizing: 'border-box',
+                borderRadius: 12,
+                background: 'var(--cp-orange)',
+                color: 'var(--cp-navy)',
+                fontWeight: 800,
+                fontSize: 13,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textDecoration: 'none',
+                alignSelf: 'flex-start',
+              }}
+            >
+              Escríbenos por WhatsApp
+            </a>
+          </div>
+
+          <div style={{ flex: '1 1 200px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 13, letterSpacing: '0.08em', color: 'var(--cp-orange)' }}>
+              SÍGUENOS
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {redes.map((r) => (
+                <a
+                  key={r.n}
+                  href={r.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    minHeight: 36,
+                    padding: '0 12px',
+                    boxSizing: 'border-box',
+                    borderRadius: 9999,
+                    border: '1.5px solid var(--cp-cream)',
+                    color: 'var(--cp-cream)',
+                    fontWeight: 700,
+                    fontSize: 12,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    textDecoration: 'none',
+                  }}
+                >
+                  {r.n}
+                </a>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 14, marginTop: 4, flexWrap: 'wrap' }}>
+              <button onClick={() => cambiarPagina('carta')} style={{ minHeight: 36, padding: 0, border: 0, background: 'transparent', color: 'var(--cp-cream)', fontWeight: 700, fontSize: 13, textDecoration: 'underline' }}>
+                Carta
+              </button>
+              <button onClick={() => cambiarPagina('novedades')} style={{ minHeight: 36, padding: 0, border: 0, background: 'transparent', color: 'var(--cp-cream)', fontWeight: 700, fontSize: 13, textDecoration: 'underline' }}>
+                Novedades
+              </button>
+              <button onClick={() => cambiarPagina('conocenos')} style={{ minHeight: 36, padding: 0, border: 0, background: 'transparent', color: 'var(--cp-cream)', fontWeight: 700, fontSize: 13, textDecoration: 'underline' }}>
+                Conócenos
+              </button>
+              <button onClick={irArriba} style={{ minHeight: 36, padding: 0, border: 0, background: 'transparent', color: 'var(--cp-cream)', fontWeight: 700, fontSize: 13, textDecoration: 'underline' }}>
+                Volver arriba
+              </button>
+            </div>
+          </div>
         </div>
-        <div>{datosLocal?.direccion} {datosLocal?.telefono ? `· Tel: ${datosLocal.telefono}` : ''}</div>
+        <div style={{ borderTop: '1px solid color-mix(in srgb, var(--cp-cream) 25%, transparent)' }}>
+          <div style={{ maxWidth: 1200, margin: '0 auto', padding: '12px 24px', fontSize: 12, lineHeight: '17px', opacity: 0.8, textAlign: 'center' }}>
+            {lineaPie} · © 2026 Caprichos
+          </div>
+        </div>
       </footer>
 
       {/* Ventana modal de detalle del producto */}
