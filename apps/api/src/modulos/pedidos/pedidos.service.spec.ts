@@ -15,6 +15,7 @@ import { ZonasService } from '../zonas/zonas.service';
 import { OfertasService } from '../ofertas/ofertas.service';
 import { PuntosService } from '../clientes/puntos.service';
 import { CrearPedidoDto } from './dto/crear-pedido.dto';
+import { generarTokenSeguimiento } from './seguimiento.tokens';
 
 describe('PedidosService', () => {
   let service: PedidosService;
@@ -216,6 +217,7 @@ describe('PedidosService', () => {
       expect(res.envio).toBe(5.0);
       expect(res.total).toBe(33.0);
       expect(res.mensaje).toBe('Un asesor te escribirá para coordinar el pago');
+      expect(res.seguimientoToken).toBe(generarTokenSeguimiento(100n));
 
       expect(zonasServiceMock.detectar).toHaveBeenCalledWith(
         pedidoBaseDto.entrega!.lat,

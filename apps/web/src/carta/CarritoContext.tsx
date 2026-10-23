@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { calcularSubtotalPedido } from '@caprichos/compartido';
 import { LineaCarrito, PedidoConfirmado, ProductoCarta } from './tipos';
+import type { PedidoGuardado } from './seguimiento';
 
 const CLAVE_SESSION_STORAGE = 'caprichos_carrito';
 
@@ -31,6 +32,8 @@ interface CarritoContextoValor {
   cerrarToast: () => void;
   pedidoConfirmado: PedidoConfirmado | null;
   setPedidoConfirmado: (p: PedidoConfirmado | null) => void;
+  seguimientoAbierto: PedidoGuardado | null;
+  setSeguimientoAbierto: (p: PedidoGuardado | null) => void;
 }
 
 const CarritoContext = createContext<CarritoContextoValor | undefined>(undefined);
@@ -56,6 +59,7 @@ export function CarritoProvider({ children }: { children: React.ReactNode }) {
   const [productoEnModal, setProductoEnModal] = useState<ProductoCarta | null>(null);
   const [notificacion, setNotificacion] = useState<NotificacionAgregadoItem | null>(null);
   const [pedidoConfirmado, setPedidoConfirmado] = useState<PedidoConfirmado | null>(null);
+  const [seguimientoAbierto, setSeguimientoAbierto] = useState<PedidoGuardado | null>(null);
 
   // Guardar en sessionStorage ante cada cambio
   useEffect(() => {
@@ -161,6 +165,8 @@ export function CarritoProvider({ children }: { children: React.ReactNode }) {
         cerrarToast,
         pedidoConfirmado,
         setPedidoConfirmado,
+        seguimientoAbierto,
+        setSeguimientoAbierto,
       }}
     >
       {children}

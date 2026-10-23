@@ -169,4 +169,5 @@ export interface PedidoConfirmado {
   mensaje: string;
   clienteNombre: string;
   modalidad: ModalidadEntrega;
+  seguimientoToken: string;
 }

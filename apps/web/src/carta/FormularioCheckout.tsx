@@ -8,6 +8,7 @@ import { enlaceGoogleMaps } from '../comun/mapa/leaflet';
 import { useCarrito } from './CarritoContext';
 import { PuntosCanje } from './cuenta/PuntosCanje';
 import { useCuentaOpcional } from './cuenta/CuentaContext';
+import { guardarPedido } from './seguimiento';
 import {
   ConsultaEnvioRespuesta,
   DatosLocalCarta,
@@ -387,6 +388,13 @@ export function FormularioCheckout({
       limpiarCarrito();
       cerrarCheckout();
       void cuentaCtx?.refrescar();
+      guardarPedido({
+        codigo: respuesta.codigo,
+        token: respuesta.seguimientoToken,
+        modalidad,
+        nombre: nombre.trim(),
+        creadoEn: new Date().toISOString(),
+      });
       setPedidoConfirmado({
         id: respuesta.id,
         codigo: respuesta.codigo,
@@ -397,6 +405,7 @@ export function FormularioCheckout({
         mensaje: respuesta.mensaje,
         clienteNombre: nombre.trim(),
         modalidad,
+        seguimientoToken: respuesta.seguimientoToken,
       });
     } catch (err) {
       if (err instanceof ErrorApi) {

@@ -17,6 +17,7 @@ import { ZonasService } from '../zonas/zonas.service';
 import { OfertasService } from '../ofertas/ofertas.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { CrearPedidoDto } from './dto/crear-pedido.dto';
+import { generarTokenSeguimiento } from './seguimiento.tokens';
 
 export interface OrigenPedido {
   canal?: 'CARTA' | 'MOZO' | 'CAJA';
@@ -68,6 +69,7 @@ export class PedidosService {
         id: pedidoExistente.id.toString(),
         codigo: pedidoExistente.codigo,
         estado: pedidoExistente.estado,
+        seguimientoToken: generarTokenSeguimiento(pedidoExistente.id),
         subtotal: Number(pedidoExistente.subtotal),
         descuento: Number(pedidoExistente.descuento || 0),
         envio: pedidoExistente.envio !== null ? Number(pedidoExistente.envio) : null,
@@ -717,6 +719,7 @@ export class PedidosService {
       id: pedidoCreado.id.toString(),
       codigo: pedidoCreado.codigo,
       estado: pedidoCreado.estado,
+      seguimientoToken: generarTokenSeguimiento(pedidoCreado.id),
       subtotal: Number(pedidoCreado.subtotal),
       descuento: Number(pedidoCreado.descuento || 0),
       envio: pedidoCreado.envio !== null ? Number(pedidoCreado.envio) : null,
