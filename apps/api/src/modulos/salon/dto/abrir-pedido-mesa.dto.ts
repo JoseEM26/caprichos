@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsOptional,
   IsString,
   ValidateNested,
@@ -26,6 +27,21 @@ export class AbrirPedidoMesaDto {
   @IsOptional()
   @IsString()
   nota?: string;
+
+  @IsOptional()
+  @IsString()
+  cuponCodigo?: string;
+
+  @IsOptional()
+  @IsString()
+  canal?: 'MOZO' | 'CAJA';
+
+  @IsOptional()
+  @IsBoolean()
+  esPersonal?: boolean;
+
+  @IsOptional()
+  colaboradorPartyId?: number | string;
 
   // reserva que se sienta con este pedido (viene de POST /admin/reservas/:id/sentar)
   @IsOptional()

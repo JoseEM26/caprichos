@@ -5,10 +5,11 @@ import { SalonModule } from '../salon/salon.module';
 import { ZonasModule } from '../zonas/zonas.module';
 import { ClientesModule } from '../clientes/clientes.module';
 import { StockModule } from '../stock/stock.module';
+import { PedidosModule } from '../pedidos/pedidos.module';
 import { UbicarPedidoService } from './ubicar-pedido.service';
 
 @Module({
-  imports: [SalonModule, ZonasModule, ClientesModule, StockModule],
+  imports: [SalonModule, ZonasModule, ClientesModule, StockModule, PedidosModule],
   controllers: [PedidosAdminController],
   providers: [
     PedidosEstadoService,

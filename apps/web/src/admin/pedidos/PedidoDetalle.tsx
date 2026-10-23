@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { Confirmar } from '../../comun/Confirmar';
 import { Pedido, pedidosApi } from './pedidosApi';
 import { ModalCobrar } from './ModalCobrar';
 import { ModalAnular } from './ModalAnular';
@@ -6,6 +7,12 @@ import { ModalUbicar } from './ModalUbicar';
 import { ModalPrecuenta } from '../salon/componentes/ModalPrecuenta';
 import { ModalConfirmarPago } from './ModalConfirmarPago';
 import { canalLabel, modLabel, getBadge } from './PedidosAdminView';
+import {
+  listarPersonalActivo,
+  registrarConsumoCredito,
+  ColaboradorActivo,
+} from '../creditos/creditosApi';
+import { salonApi } from '../salon/api';
 
 export interface PedidoDetalleProps {
   pedido: Pedido;
@@ -24,14 +31,46 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
   const [abrirUbicar, setAbrirUbicar] = useState(false);
   const [abrirPrecuenta, setAbrirPrecuenta] = useState(false);
   const [abrirConfirmarPago, setAbrirConfirmarPago] = useState(false);
+  const [abrirCreditoPersonal, setAbrirCreditoPersonal] = useState(false);
+
+  // Confirmar genérico Sí/No para acciones que cambian datos
+  const [accionConfirmar, setAccionConfirmar] = useState<{
+    titulo: string;
+    mensaje: string;
+    textoConfirmar?: string;
+    ejecutar: () => Promise<void>;
+  } | null>(null);
 
   // Estados locales para acciones
   const [tipoComp, setTipoComp] = useState<string>(pedido.comprobante_tipo || 'Nota de venta');
+  const [comprobanteSubido, setComprobanteSubido] = useState<string | null>(null);
   const [msgTicket, setMsgTicket] = useState('');
   const [msgEtiquetas, setMsgEtiquetas] = useState('');
   const [msgComprobante, setMsgComprobante] = useState('');
+  const [errorAccion, setErrorAccion] = useState<string | null>(null);
+  const [mensajeExito, setMensajeExito] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
   const [coordinandoDestino, setCoordinandoDestino] = useState('Merma');
+
+  // Estado modal Crédito del personal
+  const [personalLista, setPersonalLista] = useState<ColaboradorActivo[]>([]);
+  const [personalElegidoId, setPersonalElegidoId] = useState<string>('');
+  const [errorCredito, setErrorCredito] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (abrirCreditoPersonal) {
+      setErrorCredito(null);
+      listarPersonalActivo()
+        .then((lista) => {
+          const arr = Array.isArray(lista) ? lista : [];
+          setPersonalLista(arr);
+          if (arr.length > 0 && !personalElegidoId) {
+            setPersonalElegidoId(String(arr[0].partyId));
+          }
+        })
+        .catch(() => setPersonalLista([]));
+    }
+  }, [abrirCreditoPersonal]);
 
   const est = String(pedido.estado || '').toUpperCase();
   const pag = String(pedido.pago_estado || '').toUpperCase();
@@ -39,8 +78,21 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
   const esDelivery = mod === 'DELIVERY';
   const esMesa = mod === 'MESA';
   const estaPagado = pag === 'PAGADO';
-  const esPorConfirmar = (est === 'COLA' || est === 'NUEVO') && !estaPagado && (pedido.canal === 'CARTA' || pedido.canal === 'BOT');
-  const esPagoPorCoordinar = (pedido.canal === 'CARTA' || pedido.canal === 'BOT') && !estaPagado && est !== 'ANULADO' && est !== 'ENTREGADO' && est !== 'COLA' && est !== 'NUEVO';
+  const tienePagoCoordinado = Boolean(pedido.pago_coordinado_en) || pag === 'COORDINADO';
+  const esPorConfirmar =
+    (est === 'COLA' || est === 'NUEVO') &&
+    !estaPagado &&
+    !tienePagoCoordinado &&
+    !esMesa;
+  const esPagoPorCoordinar =
+    !esMesa &&
+    !estaPagado &&
+    !tienePagoCoordinado &&
+    est !== 'ANULADO' &&
+    est !== 'RECHAZADO' &&
+    est !== 'ENTREGADO' &&
+    est !== 'COLA' &&
+    est !== 'NUEVO';
 
   // Configuración de estado visual (badge del mockup)
   const stBadge = getBadge(pedido);
@@ -55,17 +107,34 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
     ? `https://wa.me/51${phoneClean}?text=${encodeURIComponent(`Hola ${pedido.cliente_nombre || ''}, te escribimos de Caprichos sobre tu pedido ${pedido.codigo}.`)}`
     : '#';
 
-  // Transiciones de estado
+  // Transiciones de estado con confirmación Sí/No
   const cambiarEstado = async (nuevoEstado: string, motivo?: string) => {
     setProcesando(true);
+    setErrorAccion(null);
     try {
       await pedidosApi.cambiarEstado(pedido.id, nuevoEstado, motivo);
       alActualizar();
     } catch (err: any) {
-      alert(err?.message || 'Error al actualizar el estado del pedido');
+      setErrorAccion(err?.message || 'Error al actualizar el estado del pedido');
     } finally {
       setProcesando(false);
     }
+  };
+
+  const pedirConfirmacionEstado = (
+    nuevoEstado: string,
+    titulo: string,
+    mensaje: string,
+    motivo?: string,
+  ) => {
+    setAccionConfirmar({
+      titulo,
+      mensaje,
+      textoConfirmar: 'Sí, continuar',
+      ejecutar: async () => {
+        await cambiarEstado(nuevoEstado, motivo);
+      },
+    });
   };
 
   const tabs: Array<{ id: TabDetalle; label: string }> = [
@@ -106,36 +175,68 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
           {esDelivery && (
             <>
               <br />
-              {pedido.entrega_direccion || 'Av. Los Jazmines 123, Campoy'}
-              {!hasMapCoords && (
-                <>
-                  <br />
+              {pedido.entrega_direccion || 'Sin dirección registrada'}
+              <br />
+              {!hasMapCoords ? (
+                <button
+                  type="button"
+                  onClick={() => setAbrirUbicar(true)}
+                  style={{
+                    minHeight: 44,
+                    padding: '0 14px',
+                    marginTop: 4,
+                    border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                    borderRadius: 10,
+                    background: 'rgb(255, 241, 201)',
+                    color: 'var(--cp-navy, #0B2C3E)',
+                    fontWeight: 800,
+                    fontSize: 13,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Ubicar en el mapa (falta la ubicación)
+                </button>
+              ) : (
+                <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center', marginTop: 4, flexWrap: 'wrap' }}>
+                  <a
+                    href={`https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=17/${lat}/${lng}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      fontWeight: 800,
+                      color: 'var(--cp-teal, #2C6E7F)',
+                      textDecoration: 'underline',
+                    }}
+                  >
+                    Ver en el mapa
+                  </a>
                   <button
                     type="button"
                     onClick={() => setAbrirUbicar(true)}
                     style={{
-                      minHeight: 44,
-                      padding: '0 14px',
-                      marginTop: 4,
+                      minHeight: 34,
+                      padding: '0 10px',
                       border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                      borderRadius: 10,
-                      background: 'rgb(255, 241, 201)',
+                      borderRadius: 9999,
+                      background: 'transparent',
                       color: 'var(--cp-navy, #0B2C3E)',
-                      fontWeight: 800,
-                      fontSize: 13,
+                      fontWeight: 700,
+                      fontSize: 12,
                       cursor: 'pointer',
                     }}
                   >
-                    Ubicar en el mapa (falta la ubicación)
+                    Corregir ubicación en el mapa
                   </button>
-                </>
+                </span>
               )}
             </>
           )}
           {esMesa && pedido.mesa_nombre && (
             <>
               <br />
-              Mesa {pedido.mesa_nombre}
+              {String(pedido.mesa_nombre).toLowerCase().startsWith('mesa')
+                ? pedido.mesa_nombre
+                : `Mesa ${pedido.mesa_nombre}`}
             </>
           )}
         </div>
@@ -292,6 +393,75 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
                 </button>
               </div>
             )}
+
+            {/* Comprobante de pago subido (imagen) */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ fontSize: 13, fontWeight: 700 }}>Comprobante de pago digital</div>
+              {comprobanteSubido ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <img
+                    src={comprobanteSubido}
+                    alt="Comprobante de pago"
+                    style={{
+                      maxWidth: '100%',
+                      maxHeight: 200,
+                      objectFit: 'contain',
+                      border: '1px solid var(--cp-line, #E3D6C6)',
+                      borderRadius: 10,
+                      background: 'var(--cp-white, #FFFFFF)',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setComprobanteSubido(null)}
+                    style={{
+                      alignSelf: 'flex-start',
+                      minHeight: 36,
+                      padding: '0 12px',
+                      borderRadius: 8,
+                      border: '1.5px solid var(--cp-rust, #B2500F)',
+                      background: 'transparent',
+                      color: 'var(--cp-rust, #B2500F)',
+                      fontWeight: 700,
+                      fontSize: 12,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Quitar comprobante
+                  </button>
+                </div>
+              ) : (
+                <label
+                  style={{
+                    minHeight: 44,
+                    border: '1.5px dashed var(--cp-navy, #0B2C3E)',
+                    borderRadius: 12,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'var(--cp-navy, #0B2C3E)',
+                    fontWeight: 800,
+                    fontSize: 13,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Subir comprobante de pago
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = () => setComprobanteSubido(reader.result as string);
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    style={{ position: 'absolute', left: -9999 }}
+                  />
+                </label>
+              )}
+            </div>
 
             <div
               style={{
@@ -631,6 +801,16 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
 
       {/* FOOTER (.cj-foot) */}
       <div className="cj-foot" style={{ gap: 8, padding: '12px 16px' }}>
+        {errorAccion && (
+          <div role="alert" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-rust, #B2500F)' }}>
+            {errorAccion}
+          </div>
+        )}
+        {mensajeExito && (
+          <div role="status" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-green, #2F7A45)' }}>
+            {mensajeExito}
+          </div>
+        )}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 16 }}>
           <span>Total</span>
           <span>S/ {totalNum.toFixed(2)}</span>
@@ -736,7 +916,14 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
             <div style={{ fontSize: 13, fontWeight: 700 }}>Cuando termines de hablar con el cliente, elige cómo se cierra:</div>
             <button
               type="button"
-              onClick={() => cambiarEstado('EN_CAMINO', 'Reprogramada la entrega')}
+              onClick={() =>
+                pedirConfirmacionEstado(
+                  'EN_CAMINO',
+                  `¿Reprogramar la entrega de ${pedido.codigo}?`,
+                  'El pedido volverá a salir a reparto con cargo adicional de flete.',
+                  'Reprogramada la entrega',
+                )
+              }
               style={{
                 minHeight: 48,
                 border: '1.5px solid var(--cp-navy, #0B2C3E)',
@@ -766,7 +953,14 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
             </button>
             <button
               type="button"
-              onClick={() => cambiarEstado('ENTREGADO', 'Cobrado igual sin entrega')}
+              onClick={() =>
+                pedirConfirmacionEstado(
+                  'ENTREGADO',
+                  `¿Cerrar el pedido ${pedido.codigo} como cobrado igual?`,
+                  `Se cerrará el pedido y lo preparado quedará registrado como ${coordinandoDestino}.`,
+                  `Cobrado igual sin entrega (${coordinandoDestino})`,
+                )
+              }
               style={{
                 minHeight: 48,
                 border: '1.5px solid var(--cp-navy, #0B2C3E)',
@@ -803,7 +997,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
             </button>
             <button
               type="button"
-              onClick={() => alert('Cobro a crédito del personal registrado.')}
+              onClick={() => setAbrirCreditoPersonal(true)}
               style={{
                 flex: '1 1 180px',
                 minHeight: 48,
@@ -825,7 +1019,13 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
           <button
             type="button"
             disabled={procesando}
-            onClick={() => cambiarEstado('ENTREGADO')}
+            onClick={() =>
+              pedirConfirmacionEstado(
+                'ENTREGADO',
+                `¿Marcar ${pedido.codigo} como entregado y cerrar?`,
+                'El pedido pasará a la pestaña Cerrados.',
+              )
+            }
             style={{
               minHeight: 52,
               border: 0,
@@ -842,11 +1042,25 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
         )}
 
         {/* 5. Si está en mesa y listo para servir */}
-        {esMesa && est === 'PREPARANDO' && (
+        {esMesa && (est === 'PREPARANDO' || (est === 'LISTO' && !pedido.entregado_mesa_en)) && (
           <button
             type="button"
             disabled={procesando}
-            onClick={() => cambiarEstado('LISTO')}
+            onClick={() =>
+              setAccionConfirmar({
+                titulo: `¿Confirmas que ya llevaste ${pedido.codigo} a la mesa?`,
+                mensaje: 'Quedará registrado como servido en mesa.',
+                textoConfirmar: 'Sí, ya lo llevé',
+                ejecutar: async () => {
+                  if (est === 'LISTO') {
+                    await salonApi.marcarEntregadoMesa(String(pedido.id));
+                    alActualizar();
+                  } else {
+                    await cambiarEstado('LISTO');
+                  }
+                },
+              })
+            }
             style={{
               minHeight: 52,
               border: 0,
@@ -961,12 +1175,167 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
         <ModalConfirmarPago
           pedido={pedido}
           alCerrar={() => setAbrirConfirmarPago(false)}
-          alConfirmarExitoso={() => {
+          alConfirmarExitoso={(datos) => {
+            if (datos?.comprobanteImg) {
+              setComprobanteSubido(datos.comprobanteImg);
+            }
             setAbrirConfirmarPago(false);
             alActualizar();
           }}
         />
       )}
+
+      {/* Modal Cobrar a crédito del personal */}
+      {abrirCreditoPersonal && (
+        <>
+          <div
+            onClick={() => setAbrirCreditoPersonal(false)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 55,
+              background: 'rgba(11, 44, 62, 0.55)',
+            }}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Cobrar a crédito del personal"
+            style={{
+              position: 'fixed',
+              zIndex: 60,
+              left: '50%',
+              top: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: 'min(480px, calc(100% - 24px))',
+              background: 'var(--cp-cream, #FBF4EC)',
+              borderRadius: 20,
+              boxShadow: '0 20px 50px rgba(11, 44, 62, 0.4)',
+              padding: 20,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+            }}
+          >
+            <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 20, color: 'var(--cp-navy, #0B2C3E)' }}>
+              Cobrar {pedido.codigo} a crédito del personal
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)' }}>
+              Se aplica el 15 % de descuento al personal sobre S/ {totalNum.toFixed(2)} ={' '}
+              <b>S/ {(Math.round(totalNum * 0.85 * 100) / 100).toFixed(2)}</b>.
+            </div>
+            <label htmlFor="cr-emp" style={{ fontWeight: 800, fontSize: 13 }}>
+              Trabajador (usuario)
+            </label>
+            <select
+              id="cr-emp"
+              value={personalElegidoId}
+              onChange={(e) => setPersonalElegidoId(e.target.value)}
+              style={{
+                width: '100%',
+                minHeight: 46,
+                borderRadius: 10,
+                border: '1.5px solid var(--cp-line, #E3D6C6)',
+                background: 'var(--cp-white, #FFFFFF)',
+                padding: '0 12px',
+                fontSize: 14,
+              }}
+            >
+              {personalLista.map((u) => (
+                <option key={u.partyId} value={String(u.partyId)}>
+                  {u.nombre} ({u.rol})
+                </option>
+              ))}
+            </select>
+            {errorCredito && (
+              <div role="alert" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-rust, #B2500F)' }}>
+                {errorCredito}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                disabled={!personalElegidoId || procesando}
+                onClick={() => {
+                  const emp = personalLista.find(
+                    (u) => String(u.partyId) === String(personalElegidoId),
+                  );
+                  const montoDesc = (Math.round(totalNum * 0.85 * 100) / 100).toFixed(2);
+                  setAccionConfirmar({
+                    titulo: `¿Anotar S/ ${montoDesc} en la cuenta de ${emp?.nombre || 'este trabajador'}?`,
+                    mensaje: `Se aplicará el descuento del personal y el pedido ${pedido.codigo} quedará pagado a crédito.`,
+                    textoConfirmar: 'Sí, anotar',
+                    ejecutar: async () => {
+                      setProcesando(true);
+                      setErrorCredito(null);
+                      try {
+                        await registrarConsumoCredito(pedido.id, personalElegidoId);
+                        setAbrirCreditoPersonal(false);
+                        setMensajeExito(
+                          `Consumo anotado a crédito de ${emp?.nombre || 'personal'}.`,
+                        );
+                        alActualizar();
+                      } catch (err: any) {
+                        setErrorCredito(
+                          err?.message || 'Error al registrar el consumo a crédito',
+                        );
+                      } finally {
+                        setProcesando(false);
+                      }
+                    },
+                  });
+                }}
+                style={{
+                  flex: 1,
+                  minHeight: 48,
+                  border: 0,
+                  borderRadius: 12,
+                  background: 'var(--cp-orange, #E67929)',
+                  color: 'var(--cp-navy, #0B2C3E)',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                }}
+              >
+                Anotar consumo
+              </button>
+              <button
+                type="button"
+                onClick={() => setAbrirCreditoPersonal(false)}
+                style={{
+                  flex: 1,
+                  minHeight: 48,
+                  border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                  borderRadius: 12,
+                  background: 'transparent',
+                  color: 'var(--cp-navy, #0B2C3E)',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                }}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Diálogo Confirmar genérico Sí/No */}
+      <Confirmar
+        abierto={Boolean(accionConfirmar)}
+        titulo={accionConfirmar?.titulo || '¿Confirmar acción?'}
+        mensaje={accionConfirmar?.mensaje || ''}
+        textoConfirmar={accionConfirmar?.textoConfirmar || 'Sí'}
+        textoNo="No"
+        cargando={procesando}
+        alConfirmar={async () => {
+          if (accionConfirmar) {
+            const fn = accionConfirmar.ejecutar;
+            setAccionConfirmar(null);
+            await fn();
+          }
+        }}
+        alCancelar={() => setAccionConfirmar(null)}
+      />
     </>
   );
 }

@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsIn,
   IsInt,
   IsNotEmpty,
@@ -149,4 +150,15 @@ export class CrearPedidoDto {
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   puntosCanje?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  esPersonal?: boolean;
+
+  @IsOptional()
+  colaboradorPartyId?: number | string;
+
+  @IsOptional()
+  @IsString()
+  canal?: 'MOZO' | 'CAJA';
 }

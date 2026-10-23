@@ -1,10 +1,16 @@
 import { useState } from 'react';
+import { Confirmar } from '../../comun/Confirmar';
 import { pedidosApi, Pedido } from './pedidosApi';
 
 export interface ModalConfirmarPagoProps {
   pedido: Pedido;
   alCerrar: () => void;
-  alConfirmarExitoso: () => void;
+  alConfirmarExitoso: (datosPago?: {
+    medio: string;
+    comprobanteImg: string | null;
+    codigoOp: string;
+    montoPagaCon: string;
+  }) => void;
 }
 
 const MEDIOS_PC = ['Yape', 'Plin', 'Efectivo', 'Tarjeta', 'Transferencia'] as const;
@@ -17,10 +23,14 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
   const [comprobanteImg, setComprobanteImg] = useState<string | null>(null);
   const [msg, setMsg] = useState('');
   const [enviando, setEnviando] = useState(false);
+  const [confirmandoSiNo, setConfirmandoSiNo] = useState(false);
 
   const esEfectivo = medio.toLowerCase() === 'efectivo';
   const esTarjeta = medio.toLowerCase() === 'tarjeta';
   const esDigital = !esEfectivo && !esTarjeta;
+  const esDelivery = (pedido.modalidad || '').toUpperCase() === 'DELIVERY';
+  const tieneUbicacion =
+    (pedido.entrega_lat != null && pedido.entrega_lng != null) || Boolean(pedido.zona);
 
   const phone = pedido.cliente_telefono || '';
   const cleanPhone = phone.replace(/\D/g, '');
@@ -40,22 +50,48 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
     }
   };
 
-  const handleConfirmar = async () => {
+  const handleConfirmar = () => {
     if (!contactado) {
       setMsg('Marca la casilla confirmando que hablaste con el cliente.');
+      return;
+    }
+    if (esDelivery && !tieneUbicacion) {
+      setMsg('Para delivery primero ubica la dirección en el mapa (calcula la zona y el envío).');
       return;
     }
     if (esDigital && !comprobanteImg) {
       setMsg('Sube el comprobante del pago para continuar.');
       return;
     }
+    setMsg('');
+    setConfirmandoSiNo(true);
+  };
 
+  const ejecutarConfirmacion = async () => {
     setEnviando(true);
     setMsg('');
     try {
-      await pedidosApi.cambiarEstado(pedido.id, 'COLA', 'Confirmado con cliente y pago verificado');
-      alConfirmarExitoso();
+      await pedidosApi.registrarPago(
+        pedido.id,
+        medio.toUpperCase(),
+        esDigital ? 'PAGADO' : 'COORDINADO',
+      );
+      if (String(pedido.estado).toUpperCase() === 'NUEVO') {
+        await pedidosApi.cambiarEstado(
+          pedido.id,
+          'COLA',
+          'Confirmado con cliente y pago verificado',
+        );
+      }
+      setConfirmandoSiNo(false);
+      alConfirmarExitoso({
+        medio,
+        comprobanteImg,
+        codigoOp,
+        montoPagaCon,
+      });
     } catch (err: any) {
+      setConfirmandoSiNo(false);
       setMsg(err?.message || 'Error al confirmar el pedido');
     } finally {
       setEnviando(false);
@@ -408,6 +444,17 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
           </button>
         </div>
       </div>
+
+      <Confirmar
+        abierto={confirmandoSiNo}
+        titulo={`¿Confirmar el pedido ${pedido.codigo} y enviarlo a cocina?`}
+        mensaje={`Se registrará el medio de pago (${medio}) y el pedido pasará a las pantallas de cocina.`}
+        textoConfirmar="Sí, confirmar"
+        textoNo="No"
+        cargando={enviando}
+        alConfirmar={ejecutarConfirmacion}
+        alCancelar={() => setConfirmandoSiNo(false)}
+      />
     </>
   );
 }

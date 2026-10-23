@@ -18,10 +18,11 @@ import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { CrearPedidoDto } from './dto/crear-pedido.dto';
 
 export interface OrigenPedido {
-  canal?: 'CARTA' | 'MOZO';
+  canal?: 'CARTA' | 'MOZO' | 'CAJA';
   usuarioPartyId?: bigint | string | number;
   /** Cliente con cuenta que hace el pedido en la carta (suma puntos) */
   clientePartyId?: bigint | string | number;
+  esPersonal?: boolean;
   mesasIds?: (bigint | string | number)[];
   mesaNombre?: string;
   omitirChequeoCarta?: boolean;
@@ -78,7 +79,10 @@ export class PedidosService {
     }
 
     // 2. Comprobar que la carta esté abierta y sin pausa (omitido si es MOZO o se indica explícitamente)
-    const omitirCarta = origen?.canal === 'MOZO' || origen?.omitirChequeoCarta === true;
+    const omitirCarta =
+      origen?.canal === 'MOZO' ||
+      origen?.canal === 'CAJA' ||
+      origen?.omitirChequeoCarta === true;
     if (!omitirCarta) {
       const estadoCarta = await this.localService.obtenerEstadoCarta();
       if (!estadoCarta.abierta) {
@@ -89,8 +93,11 @@ export class PedidosService {
       }
     }
 
-    // 3. Validar datos de cliente (opcional para pedidos de mozo en mesa)
-    const esMozo = origen?.canal === 'MOZO';
+    // 3. Validar datos de cliente (opcional para pedidos de mozo/caja en panel admin)
+    const esMozo =
+      origen?.canal === 'MOZO' ||
+      origen?.canal === 'CAJA' ||
+      origen?.omitirChequeoCarta === true;
     let clienteNombre: string | null = null;
     let telefonoLimpio: string | null = null;
 
@@ -565,6 +572,7 @@ export class PedidosService {
           comprobante_doc: comprobanteDoc,
           comprobante_razon: comprobanteRazon,
           nota: dto.nota?.trim() || null,
+          es_personal: Boolean(origen?.esPersonal),
           clave_idempotencia: claveIdempotencia,
           pasa_cocina_en: new Date(),
         },

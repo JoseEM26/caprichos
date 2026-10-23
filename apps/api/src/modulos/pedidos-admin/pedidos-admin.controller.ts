@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Headers,
+  Optional,
   Param,
   Post,
   Query,
@@ -18,6 +19,8 @@ import { RegistrarPagoDto } from './dto/registrar-pago.dto';
 import { CocinaQueryDto } from './dto/cocina-query.dto';
 import { UbicarPedidoDto } from './dto/ubicar-pedido.dto';
 import { UbicarPedidoService } from './ubicar-pedido.service';
+import { PedidosService } from '../pedidos/pedidos.service';
+import { CrearPedidoDto } from '../pedidos/dto/crear-pedido.dto';
 
 @Controller('admin/pedidos')
 @UseGuards(AccesoGuard)
@@ -25,7 +28,29 @@ export class PedidosAdminController {
   constructor(
     private readonly pedidosEstadoService: PedidosEstadoService,
     private readonly ubicarPedidoService: UbicarPedidoService,
+    @Optional() private readonly pedidosService?: PedidosService,
   ) {}
+
+  @Post()
+  @Permiso('pedidos', 'ver')
+  async crear(
+    @Body() dto: CrearPedidoDto,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Req() req: any,
+  ) {
+    const key =
+      idempotencyKey ||
+      `adm-${req.usuario?.partyId ?? 'anon'}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const canal =
+      dto.canal || (req.usuario?.rol === 'MOZO' ? 'MOZO' : 'CAJA');
+    return this.pedidosService!.crear(dto, key, {
+      canal,
+      usuarioPartyId: req.usuario?.partyId,
+      clientePartyId: dto.colaboradorPartyId,
+      esPersonal: dto.esPersonal,
+      omitirChequeoCarta: true,
+    });
+  }
 
   @Get()
   @Permiso('pedidos', 'ver')

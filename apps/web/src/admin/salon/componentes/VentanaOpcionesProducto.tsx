@@ -66,16 +66,26 @@ export function VentanaOpcionesProducto({
 
   // Categorías de bebidas
   const esBebida = useMemo(() => {
-    const cat = (producto as any).categoria?.nombre || (producto as any).categoriaId || '';
-    const norm = cat.toLowerCase();
+    const cat = [
+      (producto as any).categoria?.nombre,
+      (producto as any).categoriaNombre,
+      (producto as any).categoriaId,
+      producto.nombre,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
     return (
-      norm.includes('frappe') ||
-      norm.includes('iced') ||
-      norm.includes('frozen') ||
-      norm.includes('caliente') ||
-      norm.includes('bebida') ||
-      norm.includes('café') ||
-      norm.includes('cafe')
+      cat.includes('frappe') ||
+      cat.includes('iced') ||
+      cat.includes('frozen') ||
+      cat.includes('caliente') ||
+      cat.includes('bebida') ||
+      cat.includes('café') ||
+      cat.includes('cafe') ||
+      cat.includes('jugo') ||
+      cat.includes('infusi') ||
+      cat.includes('chocolate')
     );
   }, [producto]);
 
@@ -329,11 +339,16 @@ export function VentanaOpcionesProducto({
             ? g.opciones.filter((o) => o.nombre.toLowerCase().includes(qBuscada))
             : g.opciones;
 
+          const esUnica = (g as any).tipo === 'RADIO' || g.maximo === 1;
           const reqTexto = g.obligatorio
             ? 'Obligatorio · elige 1'
             : g.maximo
             ? `Opcional · hasta ${g.maximo}`
             : 'Opcional';
+
+          const seleccionadasGrupo = opcionesActuales.filter((op) =>
+            g.opciones.some((go) => go.id === op.id),
+          );
 
           return (
             <div key={g.id}>
@@ -341,14 +356,48 @@ export function VentanaOpcionesProducto({
                 style={{
                   display: 'flex',
                   justifyContent: 'space-between',
+                  alignItems: 'center',
                   gap: '8px',
                   marginBottom: '6px',
                   flexWrap: 'wrap',
                 }}
               >
-                <span style={{ fontWeight: 800, color: 'var(--cp-navy)' }}>{g.nombre}</span>
-                <span style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>{reqTexto}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <span style={{ fontWeight: 800, fontSize: '14px', color: 'var(--cp-navy)' }}>
+                    {g.nombre}
+                  </span>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      padding: '2px 8px',
+                      borderRadius: '9999px',
+                      fontSize: '11px',
+                      fontWeight: 800,
+                      letterSpacing: '0.03em',
+                      background: g.obligatorio ? '#FDE8E4' : '#EFE6D5',
+                      color: g.obligatorio ? 'var(--cp-rust)' : 'var(--cp-soft)',
+                    }}
+                  >
+                    {g.obligatorio ? 'OBLIGATORIO' : 'OPCIONAL'}
+                  </span>
+                </div>
+                <span style={{ fontSize: '12px', color: 'var(--cp-soft)', fontWeight: 600 }}>
+                  {reqTexto}
+                </span>
               </div>
+
+              {seleccionadasGrupo.length > 0 && (
+                <div
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    color: 'var(--cp-teal)',
+                    marginBottom: '6px',
+                  }}
+                >
+                  Elegido: {seleccionadasGrupo.map((s) => s.nombre).join(', ')}
+                </div>
+              )}
 
               {g.opciones.length > 8 && (
                 <input
@@ -383,33 +432,56 @@ export function VentanaOpcionesProducto({
                 {opcionesVisibles.map((o) => {
                   const elegida = opcionesActuales.some((op) => op.id === o.id);
                   const extraNum = Number(o.precioExtra || 0);
-                  const mark = elegida ? '[✓]' : '[ ]';
 
                   return (
                     <button
                       key={o.id}
                       type="button"
                       onClick={() => alternarOpcion(g, o)}
+                      aria-pressed={elegida}
                       style={{
                         minHeight: '44px',
-                        padding: '0 10px',
-                        borderRadius: '10px',
+                        padding: '6px 12px',
+                        borderRadius: '12px',
                         border: elegida
-                          ? '1.5px solid var(--cp-orange)'
+                          ? '2px solid var(--cp-orange)'
                           : '1.5px solid var(--cp-line)',
                         background: elegida ? '#FFF1E8' : 'var(--cp-white)',
                         color: 'var(--cp-navy)',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '8px',
+                        gap: '10px',
                         textAlign: 'left',
                         fontSize: '13px',
+                        fontWeight: elegida ? 700 : 600,
                         lineHeight: '16px',
                         cursor: 'pointer',
                       }}
                     >
-                      <span aria-hidden="true" style={{ fontWeight: 800 }}>
-                        {mark}
+                      <span
+                        aria-hidden="true"
+                        style={{
+                          flex: 'none',
+                          width: '18px',
+                          height: '18px',
+                          borderRadius: esUnica ? '50%' : '5px',
+                          border: elegida
+                            ? esUnica
+                              ? '5px solid var(--cp-orange)'
+                              : '2px solid var(--cp-orange)'
+                            : '2px solid var(--cp-navy)',
+                          background:
+                            elegida && !esUnica ? 'var(--cp-orange)' : 'var(--cp-white)',
+                          color: 'var(--cp-navy)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '11px',
+                          fontWeight: 900,
+                          boxSizing: 'border-box',
+                        }}
+                      >
+                        {!esUnica && elegida ? '✓' : ''}
                       </span>
                       <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
                         {o.nombre}
@@ -562,7 +634,7 @@ export function VentanaOpcionesProducto({
             <span>
               Unidad {unidadActualIdx + 1} de {cantidad}: elige sus opciones (mismo tamaño).
             </span>
-            <div style={{ display: 'flex', gap: '6px' }}>
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
               {Array.from({ length: cantidad }).map((_, idx) => (
                 <button
                   key={idx}
@@ -585,6 +657,32 @@ export function VentanaOpcionesProducto({
                   {idx + 1}
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={() => {
+                  const baseOpts = opcionesPorUnidad[unidadActualIdx] || [];
+                  setOpcionesPorUnidad((prev) => {
+                    const next = { ...prev };
+                    for (let i = 0; i < cantidad; i++) {
+                      next[i] = [...baseOpts];
+                    }
+                    return next;
+                  });
+                }}
+                style={{
+                  minHeight: '32px',
+                  padding: '0 10px',
+                  borderRadius: '16px',
+                  border: '1.5px solid var(--cp-navy)',
+                  background: 'var(--cp-white)',
+                  color: 'var(--cp-navy)',
+                  fontWeight: 800,
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+              >
+                Copiar a todas
+              </button>
             </div>
           </div>
         )}

@@ -24,7 +24,7 @@ export function modLabel(m?: string | null) {
   if (!m) return 'Local';
   const mu = m.toUpperCase();
   if (mu === 'DELIVERY') return 'Delivery';
-  if (mu === 'LLEVAR') return 'Para llevar';
+  if (mu === 'LLEVAR' || mu === 'RECOGER') return 'Para llevar';
   if (mu === 'MESA') return 'En mesa';
   return m;
 }
@@ -32,7 +32,13 @@ export function modLabel(m?: string | null) {
 export function getBadge(p: Pedido) {
   const est = String(p.estado || '').toUpperCase();
   const pag = String(p.pago_estado || '').toUpperCase();
-  const esPorConfirmar = (est === 'COLA' || est === 'NUEVO') && pag !== 'PAGADO' && (p.canal === 'CARTA' || p.canal === 'BOT');
+  const mod = String(p.modalidad || '').toUpperCase();
+  const tieneCoordinado = Boolean(p.pago_coordinado_en) || pag === 'COORDINADO';
+  const esPorConfirmar =
+    (est === 'COLA' || est === 'NUEVO') &&
+    pag !== 'PAGADO' &&
+    !tieneCoordinado &&
+    mod !== 'MESA';
   if (esPorConfirmar) {
     return { l: 'Por confirmar', bg: 'var(--cp-orange, #E67929)', fg: 'var(--cp-navy, #0B2C3E)' };
   }
@@ -71,7 +77,9 @@ const TABS_CAJA: TabDef[] = [
     filtro: (p) => {
       const e = String(p.estado || '').toUpperCase();
       const pag = String(p.pago_estado || '').toUpperCase();
-      return (e === 'COLA' || e === 'NUEVO') && pag !== 'PAGADO' && (p.canal === 'CARTA' || p.canal === 'BOT');
+      const mod = String(p.modalidad || '').toUpperCase();
+      const tieneCoordinado = Boolean(p.pago_coordinado_en) || pag === 'COORDINADO';
+      return (e === 'COLA' || e === 'NUEVO') && pag !== 'PAGADO' && !tieneCoordinado && mod !== 'MESA';
     },
   },
   {
@@ -80,7 +88,18 @@ const TABS_CAJA: TabDef[] = [
     filtro: (p) => {
       const e = String(p.estado || '').toUpperCase();
       const pag = String(p.pago_estado || '').toUpperCase();
-      return (p.canal === 'CARTA' || p.canal === 'BOT') && pag !== 'PAGADO' && e !== 'ANULADO' && e !== 'ENTREGADO' && e !== 'COLA';
+      const mod = String(p.modalidad || '').toUpperCase();
+      const tieneCoordinado = Boolean(p.pago_coordinado_en) || pag === 'COORDINADO';
+      return (
+        mod !== 'MESA' &&
+        pag !== 'PAGADO' &&
+        !tieneCoordinado &&
+        e !== 'ANULADO' &&
+        e !== 'RECHAZADO' &&
+        e !== 'ENTREGADO' &&
+        e !== 'COLA' &&
+        e !== 'NUEVO'
+      );
     },
   },
   {
@@ -88,8 +107,15 @@ const TABS_CAJA: TabDef[] = [
     n: 'En curso',
     filtro: (p) => {
       const e = String(p.estado || '').toUpperCase();
-      return ['COLA', 'PREPARANDO', 'LISTO', 'EN_CAMINO', 'RUTA', 'PREP'].includes(e) &&
-        !((p.canal === 'CARTA' || p.canal === 'BOT') && String(p.pago_estado).toUpperCase() !== 'PAGADO' && e === 'COLA');
+      const pag = String(p.pago_estado || '').toUpperCase();
+      const mod = String(p.modalidad || '').toUpperCase();
+      const tieneCoordinado = Boolean(p.pago_coordinado_en) || pag === 'COORDINADO';
+      const esNuevoPorConfirmar =
+        (e === 'COLA' || e === 'NUEVO') && pag !== 'PAGADO' && !tieneCoordinado && mod !== 'MESA';
+      return (
+        ['COLA', 'PREPARANDO', 'LISTO', 'EN_CAMINO', 'RUTA', 'PREP'].includes(e) &&
+        !esNuevoPorConfirmar
+      );
     },
   },
   {
@@ -104,23 +130,23 @@ const TABS_CAJA: TabDef[] = [
 
 const CANALES_OPCIONES = [
   { id: 'all', n: 'Todos' },
-  { id: 'CARTA', n: 'Carta' },
-  { id: 'BOT', n: 'WhatsApp bot' },
+  { id: 'CARTA', n: 'Web' },
+  { id: 'BOT', n: 'WhatsApp' },
   { id: 'MOZO', n: 'Mozo' },
-  { id: 'TELEFONO', n: 'Teléfono' },
+  { id: 'CAJA', n: 'Caja' },
 ];
 
 const MODALIDADES_OPCIONES = [
   { id: 'all', n: 'Todas' },
   { id: 'DELIVERY', n: 'Delivery' },
   { id: 'LLEVAR', n: 'Para llevar' },
-  { id: 'MESA', n: 'En el local' },
+  { id: 'MESA', n: 'En mesa' },
 ];
 
 const COBRO_OPCIONES = [
   { id: 'all', n: 'Todos' },
-  { id: 'paid', n: 'Cobrados' },
-  { id: 'unpaid', n: 'Por cobrar' },
+  { id: 'paid', n: 'Cobrado' },
+  { id: 'unpaid', n: 'Pendiente' },
 ];
 
 export function PedidosAdminView() {
@@ -129,6 +155,7 @@ export function PedidosAdminView() {
 
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [nuevoPedidoAbierto, setNuevoPedidoAbierto] = useState(false);
+  const [pedidoRepetir, setPedidoRepetir] = useState<Pedido | null>(null);
   const [pisosSalon, setPisosSalon] = useState<PisoSalon[]>([]);
   const [pedidoSeleccionadoId, setPedidoSeleccionadoId] = useState<string | null>(null);
 
@@ -178,7 +205,14 @@ export function PedidosAdminView() {
     const nuevosFiltrados = pedidos.filter((p) => {
       if (!filtro(p)) return false;
       if (canalFiltro !== 'all' && String(p.canal).toUpperCase() !== canalFiltro) return false;
-      if (modalidadFiltro !== 'all' && String(p.modalidad).toUpperCase() !== modalidadFiltro) return false;
+      if (modalidadFiltro !== 'all') {
+        const modP = String(p.modalidad).toUpperCase();
+        if (modalidadFiltro === 'LLEVAR') {
+          if (modP !== 'LLEVAR' && modP !== 'RECOGER') return false;
+        } else if (modP !== modalidadFiltro) {
+          return false;
+        }
+      }
       if (cobroFiltro !== 'all') {
         const pag = String(p.pago_estado).toUpperCase() === 'PAGADO';
         if (cobroFiltro === 'paid' && !pag) return false;
@@ -277,7 +311,14 @@ export function PedidosAdminView() {
       if (!filtroTab(p)) return false;
 
       if (canalFiltro !== 'all' && String(p.canal).toUpperCase() !== canalFiltro) return false;
-      if (modalidadFiltro !== 'all' && String(p.modalidad).toUpperCase() !== modalidadFiltro) return false;
+      if (modalidadFiltro !== 'all') {
+        const modP = String(p.modalidad).toUpperCase();
+        if (modalidadFiltro === 'LLEVAR') {
+          if (modP !== 'LLEVAR' && modP !== 'RECOGER') return false;
+        } else if (modP !== modalidadFiltro) {
+          return false;
+        }
+      }
       if (cobroFiltro !== 'all') {
         const pag = String(p.pago_estado).toUpperCase() === 'PAGADO';
         if (cobroFiltro === 'paid' && !pag) return false;
@@ -914,7 +955,10 @@ export function PedidosAdminView() {
           <PedidoDetalle
             pedido={pedidoSeleccionado}
             alActualizar={cargarDatos}
-            alRepetir={(p) => alert(`Repitiendo pedido ${p.codigo}...`)}
+            alRepetir={(p) => {
+              setPedidoRepetir(p);
+              setNuevoPedidoAbierto(true);
+            }}
           />
         )}
       </div>
@@ -923,8 +967,17 @@ export function PedidosAdminView() {
           abierto={true}
           pasoInicial="modal"
           pisos={pisosSalon}
-          alCerrar={() => setNuevoPedidoAbierto(false)}
-          alExitoPedido={() => void cargarDatos()}
+          pedidoRepetir={pedidoRepetir}
+          alCerrar={() => {
+            setNuevoPedidoAbierto(false);
+            setPedidoRepetir(null);
+          }}
+          alExitoPedido={(res) => {
+            if (res?.id) {
+              setPedidoSeleccionadoId(String(res.id));
+            }
+            void cargarDatos();
+          }}
           alRefrescarMesas={async () => void cargarDatos()}
         />
       )}

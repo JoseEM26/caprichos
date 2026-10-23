@@ -73,6 +73,9 @@ export interface Pedido {
   comprobante_razon?: string | null;
   nota?: string | null;
   mesa_nombre?: string | null;
+  es_personal?: boolean;
+  pago_coordinado_en?: string | null;
+  entregado_mesa_en?: string | null;
   creado_en: string;
   minutosEspera?: number;
   color?: ColorEspera;
@@ -210,6 +213,70 @@ export const pedidosApi = {
     dto: { lat: number; lng: number; direccion?: string; referencia?: string },
   ): Promise<{ id: string; codigo: string; zona: string; envio: number; total: number; lat: number; lng: number }> {
     return api.post(`/admin/pedidos/${id}/ubicacion`, dto);
+  },
+
+  async registrarPago(
+    id: string | number,
+    metodo: string,
+    estado: 'COORDINADO' | 'PAGADO' = 'PAGADO',
+  ): Promise<Pedido> {
+    return api.post<Pedido>(`/admin/pedidos/${id}/pago`, { metodo, estado });
+  },
+
+  async crearPedidoAdmin(
+    dto: {
+      modalidad: 'DELIVERY' | 'RECOGER' | 'MESA';
+      cliente: { nombre: string; telefono: string };
+      lineas: Array<{
+        productoId: string | number;
+        tamanoId?: string | number;
+        cantidad: number;
+        opciones?: (string | number)[];
+        nota?: string;
+        personas?: string[];
+      }>;
+      pago: {
+        metodo: 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TARJETA' | 'TRANSFERENCIA';
+        pagaCon?: number;
+      };
+      entrega?: {
+        direccion?: string;
+        referencia?: string;
+        lat?: number;
+        lng?: number;
+        origen?: 'GPS' | 'ESCRITA' | 'MAPA' | 'WHATSAPP' | 'ENLACE';
+      };
+      comprobante?: {
+        tipo: 'BOLETA' | 'FACTURA';
+        dni?: string;
+        ruc?: string;
+        razonSocial?: string;
+      };
+      nota?: string;
+      cuponCodigo?: string;
+      esPersonal?: boolean;
+      colaboradorPartyId?: string | number;
+      canal?: 'MOZO' | 'CAJA';
+    },
+    idempotencyKey?: string,
+  ): Promise<any> {
+    const headers: Record<string, string> = {};
+    if (idempotencyKey) {
+      headers['Idempotency-Key'] = idempotencyKey;
+    }
+    try {
+      return await api.post('/admin/pedidos', dto, { headers });
+    } catch (err: any) {
+      if (
+        err?.statusCode === 404 ||
+        err?.status === 404 ||
+        String(err?.message || '').includes('Cannot POST') ||
+        String(err?.message || '').includes('Not Found')
+      ) {
+        return api.post('/pedidos', dto, { headers });
+      }
+      throw err;
+    }
   },
 
   async marcarPagoCoordinado(id: string | number): Promise<{ id: string; pago_estado: string }> {

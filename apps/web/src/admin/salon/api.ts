@@ -48,6 +48,14 @@ export interface AbrirPedidoMesaPayload {
   }>;
   nota?: string;
   reservaId?: string;
+  cuponCodigo?: string;
+  canal?: 'MOZO' | 'CAJA';
+  esPersonal?: boolean;
+  colaboradorPartyId?: string | number;
+  cliente?: {
+    nombre: string;
+    telefono: string;
+  };
 }
 
 export interface CrearReservaPayload {

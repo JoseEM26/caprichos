@@ -242,6 +242,7 @@ export class SalonService {
       comprobante: dto.comprobante,
       nota: dto.nota,
       mesa: mesaNombre,
+      cuponCodigo: dto.cuponCodigo,
     };
 
     const idempotencyKey =
@@ -252,8 +253,10 @@ export class SalonService {
 
     try {
       resultadoPedido = await this.pedidosService.crear(pedidoDto, idempotencyKey, {
-        canal: 'MOZO',
+        canal: dto.canal === 'CAJA' ? 'CAJA' : 'MOZO',
         usuarioPartyId: usuario?.partyId,
+        clientePartyId: dto.colaboradorPartyId,
+        esPersonal: dto.esPersonal,
         mesasIds,
         mesaNombre,
         omitirChequeoCarta: true,
