@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -85,23 +86,58 @@ export class IniciativasService {
 
   /**
    * Genera el siguiente código secuencial IN-0001, IN-0002...
+   * Toma el mayor número existente, no la última fila por id.
    */
   async generarCodigo(): Promise<string> {
-    const ultima = await this.prisma.iniciativa.findFirst({
-      orderBy: { id: 'desc' },
-      select: { codigo: true, id: true },
+    return this.formatearCodigo(await this.siguienteNumeroCodigo());
+  }
+
+  private async siguienteNumeroCodigo(): Promise<number> {
+    // ponytail: lee todos los códigos; con miles de iniciativas, usar MAX sobre SQL
+    const filas = await this.prisma.iniciativa.findMany({ select: { codigo: true } });
+    const mayor = filas.reduce((max, f) => {
+      const num = parseInt(f.codigo.replace(/\D/g, ''), 10);
+      return !isNaN(num) && num > max ? num : max;
+    }, 0);
+    return mayor + 1;
+  }
+
+  private formatearCodigo(numero: number): string {
+    return `IN-${String(numero).padStart(4, '0')}`;
+  }
+
+  private esCodigoDuplicado(error: any): boolean {
+    if (error?.code !== 'P2002') return false;
+    return JSON.stringify(error?.meta?.target ?? '').includes('codigo');
+  }
+
+  private async crearFila(
+    codigo: string,
+    dto: CrearIniciativaDto,
+    usuarioId: bigint,
+    archivoId: bigint | null,
+  ) {
+    return this.prisma.iniciativa.create({
+      data: {
+        codigo,
+        tipo: dto.tipo,
+        area: dto.area,
+        titulo: dto.titulo.trim(),
+        detalle: dto.detalle.trim(),
+        archivo_id: archivoId,
+        estado: 'NUEVA',
+        creado_por: usuarioId,
+      },
+      include: {
+        autor: {
+          include: {
+            party: {
+              include: { persona: true },
+            },
+          },
+        },
+      },
     });
-
-    if (!ultima) {
-      return 'IN-0001';
-    }
-
-    const numDesdeCodigo = parseInt(ultima.codigo.replace(/\D/g, ''), 10);
-    const siguiente = !isNaN(numDesdeCodigo) && numDesdeCodigo > 0
-      ? numDesdeCodigo + 1
-      : Number(ultima.id) + 1;
-
-    return `IN-${String(siguiente).padStart(4, '0')}`;
   }
 
   /**
@@ -275,31 +311,31 @@ export class IniciativasService {
       });
     }
 
-    const codigo = await this.generarCodigo();
     const usuarioId = await this.obtenerUserAccountId(usuarioActual.partyId);
     const archivoId = dto.archivoId ? BigInt(dto.archivoId) : null;
+    const base = await this.siguienteNumeroCodigo();
 
-    const iniciativa = await this.prisma.iniciativa.create({
-      data: {
-        codigo,
-        tipo: dto.tipo,
-        area: dto.area,
-        titulo: dto.titulo.trim(),
-        detalle: dto.detalle.trim(),
-        archivo_id: archivoId,
-        estado: 'NUEVA',
-        creado_por: usuarioId,
-      },
-      include: {
-        autor: {
-          include: {
-            party: {
-              include: { persona: true },
-            },
-          },
-        },
-      },
-    });
+    // Dos subidas a la vez pueden pedir el mismo código: se reintenta con el siguiente.
+    let iniciativa: Awaited<ReturnType<IniciativasService['crearFila']>> | null = null;
+    for (let intento = 0; intento < 5 && !iniciativa; intento++) {
+      try {
+        iniciativa = await this.crearFila(
+          this.formatearCodigo(base + intento),
+          dto,
+          usuarioId,
+          archivoId,
+        );
+      } catch (error: any) {
+        if (!this.esCodigoDuplicado(error)) throw error;
+      }
+    }
+
+    if (!iniciativa) {
+      throw new ConflictException({
+        codigo: 'CODIGO_DUPLICADO',
+        mensaje: 'No se pudo generar el código de la iniciativa. Inténtalo de nuevo.',
+      });
+    }
 
     // Auditoría de acción en la misma transacción lógica
     await this.auditoria.registrar({

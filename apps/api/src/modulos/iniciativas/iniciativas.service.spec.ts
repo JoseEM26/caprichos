@@ -1,4 +1,4 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { IniciativasService } from './iniciativas.service';
 import { PrismaService } from '../../comun/prisma/prisma.service';
@@ -77,15 +77,25 @@ describe('IniciativasService', () => {
 
   describe('generarCodigo', () => {
     it('genera IN-0001 si no hay iniciativas', async () => {
-      prisma.iniciativa.findFirst.mockResolvedValue(null);
+      prisma.iniciativa.findMany.mockResolvedValue([]);
       const codigo = await service.generarCodigo();
       expect(codigo).toBe('IN-0001');
     });
 
     it('genera el código siguiente secuencialmente', async () => {
-      prisma.iniciativa.findFirst.mockResolvedValue({ id: BigInt(7), codigo: 'IN-0007' });
+      prisma.iniciativa.findMany.mockResolvedValue([{ codigo: 'IN-0007' }]);
       const codigo = await service.generarCodigo();
       expect(codigo).toBe('IN-0008');
+    });
+
+    it('usa el mayor código aunque los ids estén desordenados', async () => {
+      prisma.iniciativa.findMany.mockResolvedValue([
+        { codigo: 'IN-0009' },
+        { codigo: 'IN-0002' },
+        { codigo: 'IN-0004' },
+      ]);
+      const codigo = await service.generarCodigo();
+      expect(codigo).toBe('IN-0010');
     });
   });
 
@@ -165,32 +175,38 @@ describe('IniciativasService', () => {
   });
 
   describe('crear', () => {
-    it('crea iniciativa, asigna código y registra auditoría', async () => {
-      prisma.userAccount.findUnique.mockResolvedValue({ id: BigInt(2) });
-      prisma.iniciativa.findFirst.mockResolvedValue(null);
-      prisma.iniciativa.create.mockResolvedValue({
-        id: BigInt(5),
-        codigo: 'IN-0001',
-        tipo: 'IDEA',
-        area: 'CARTA_WEB',
-        titulo: 'Nuevo combo',
-        detalle: 'Vender waffle + café',
-        archivo_id: null,
-        estado: 'NUEVA',
-        creado_en: new Date(),
-        creado_por: BigInt(2),
+    const dtoIdea = {
+      tipo: TipoIniciativa.IDEA,
+      area: AreaIniciativa.CARTA_WEB,
+      titulo: 'Nuevo combo',
+      detalle: 'Vender waffle + café',
+    };
+
+    const filaCreada = (codigo: string) => ({
+      id: BigInt(5),
+      codigo,
+      tipo: 'IDEA',
+      area: 'CARTA_WEB',
+      titulo: 'Nuevo combo',
+      detalle: 'Vender waffle + café',
+      archivo_id: null,
+      estado: 'NUEVA',
+      creado_en: new Date(),
+      creado_por: BigInt(2),
+    });
+
+    const errorP2002 = (target: unknown) =>
+      Object.assign(new Error('Unique constraint failed'), {
+        code: 'P2002',
+        meta: { target },
       });
 
-      const res = await service.crear(
-        {
-          tipo: TipoIniciativa.IDEA,
-          area: AreaIniciativa.CARTA_WEB,
-          titulo: 'Nuevo combo',
-          detalle: 'Vender waffle + café',
-        },
-        usuarioMozo,
-        '192.168.1.50',
-      );
+    it('crea iniciativa, asigna código y registra auditoría', async () => {
+      prisma.userAccount.findUnique.mockResolvedValue({ id: BigInt(2) });
+      prisma.iniciativa.findMany.mockResolvedValue([]);
+      prisma.iniciativa.create.mockResolvedValue(filaCreada('IN-0001'));
+
+      const res = await service.crear(dtoIdea, usuarioMozo, '192.168.1.50');
 
       expect(res.codigo).toBe('IN-0001');
       expect(res.estado).toBe('NUEVA');
@@ -203,6 +219,57 @@ describe('IniciativasService', () => {
           partyId: BigInt(2),
         }),
       );
+    });
+
+    it('reintenta con el siguiente código si hay P2002 sobre codigo', async () => {
+      prisma.userAccount.findUnique.mockResolvedValue({ id: BigInt(2) });
+      prisma.iniciativa.findMany.mockResolvedValue([{ codigo: 'IN-0003' }]);
+      prisma.iniciativa.create
+        .mockRejectedValueOnce(errorP2002(['codigo']))
+        .mockResolvedValueOnce(filaCreada('IN-0005'));
+
+      const res = await service.crear(dtoIdea, usuarioMozo);
+
+      expect(prisma.iniciativa.create).toHaveBeenCalledTimes(2);
+      expect(prisma.iniciativa.create.mock.calls[0][0].data.codigo).toBe('IN-0004');
+      expect(prisma.iniciativa.create.mock.calls[1][0].data.codigo).toBe('IN-0005');
+      expect(res.codigo).toBe('IN-0005');
+    });
+
+    it('relanza un error que no es P2002 sobre codigo', async () => {
+      prisma.userAccount.findUnique.mockResolvedValue({ id: BigInt(2) });
+      prisma.iniciativa.findMany.mockResolvedValue([]);
+      const fallo = new Error('conexión perdida');
+      prisma.iniciativa.create.mockRejectedValue(fallo);
+
+      await expect(service.crear(dtoIdea, usuarioMozo)).rejects.toBe(fallo);
+      expect(prisma.iniciativa.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('relanza un P2002 de otro campo sin reintentar', async () => {
+      prisma.userAccount.findUnique.mockResolvedValue({ id: BigInt(2) });
+      prisma.iniciativa.findMany.mockResolvedValue([]);
+      const otro = errorP2002(['creado_por']);
+      prisma.iniciativa.create.mockRejectedValue(otro);
+
+      await expect(service.crear(dtoIdea, usuarioMozo)).rejects.toBe(otro);
+      expect(prisma.iniciativa.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('tras 5 intentos fallidos responde 409 con CODIGO_DUPLICADO', async () => {
+      prisma.userAccount.findUnique.mockResolvedValue({ id: BigInt(2) });
+      prisma.iniciativa.findMany.mockResolvedValue([]);
+      prisma.iniciativa.create.mockRejectedValue(errorP2002(['codigo']));
+
+      const error = await service.crear(dtoIdea, usuarioMozo).catch((e) => e);
+
+      expect(error).toBeInstanceOf(ConflictException);
+      expect(error.getResponse()).toEqual({
+        codigo: 'CODIGO_DUPLICADO',
+        mensaje: 'No se pudo generar el código de la iniciativa. Inténtalo de nuevo.',
+      });
+      expect(prisma.iniciativa.create).toHaveBeenCalledTimes(5);
+      expect(auditoria.registrar).not.toHaveBeenCalled();
     });
   });
 
