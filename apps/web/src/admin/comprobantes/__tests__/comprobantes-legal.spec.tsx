@@ -505,4 +505,200 @@ describe('Ola F5: Comprobantes y Obligaciones Legales', () => {
     expect(screen.queryByRole('button', { name: /eliminar/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /borrar/i })).not.toBeInTheDocument();
   });
+
+  // --- Prueba 9: Navegación por pasos cortos en el detalle de reclamos ---
+  it('9. ReclamosAdminView navega por pasos cortos (cliente, detalle, respuesta) y responde con confirmación Sí/No', async () => {
+    const mockReclamo: ReclamoAdminItem = {
+      id: '8',
+      numero: 'LR-2026-000008',
+      tipo: 'QUEJA',
+      nombre: 'Marcos Soto',
+      documento: '44332211',
+      domicilio: 'Jr. Ica 321',
+      telefono: '911223344',
+      correo: 'marcos@test.com',
+      pedido_id: null,
+      detalle: 'Mala atención del personal de barra al entregar pedido.',
+      monto_reclamado: null,
+      estado: 'RECIBIDO',
+      respuesta: null,
+      respondido_por: null,
+      respondido_en: null,
+      fecha_limite: '2026-11-10',
+      diasHabilesRestantes: 5,
+      plazoTexto: 'Faltan 5 días hábiles',
+      creado_en: '2026-10-22T10:00:00Z',
+    };
+
+    vi.spyOn(comprobantesApi, 'listarReclamos').mockResolvedValue({
+      total: 1,
+      pagina: 1,
+      limite: 20,
+      items: [mockReclamo],
+    });
+
+    const mockDetalle: ReclamoAdminDetalle = {
+      ...mockReclamo,
+      pedido: null,
+    };
+    vi.spyOn(comprobantesApi, 'obtenerReclamoPorId').mockResolvedValue(mockDetalle);
+    const spyResponder = vi.spyOn(comprobantesApi, 'responderReclamo').mockResolvedValue({
+      ...mockDetalle,
+      estado: 'RESPONDIDO',
+      respuesta: 'Se tomaron las medidas correctivas pertinentes con el personal.',
+    });
+
+    render(<ReclamosAdminView />);
+
+    await waitFor(() => {
+      expect(screen.getByText('LR-2026-000008')).toBeInTheDocument();
+    });
+
+    // Abrir modal
+    fireEvent.click(screen.getByRole('button', { name: /Ver detalle/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('QUEJA: LR-2026-000008')).toBeInTheDocument();
+    });
+
+    // Paso 1: Datos del cliente visibles
+    expect(screen.getByText(/Paso 1: Datos del consumidor/i)).toBeInTheDocument();
+    expect(screen.getAllByText('Marcos Soto')[0]).toBeInTheDocument();
+
+    // Avanzar a Paso 2 con botón "Siguiente →"
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente →/i }));
+    expect(screen.getByText(/Paso 2: Detalle de los hechos/i)).toBeInTheDocument();
+
+    // Avanzar a Paso 3 con tab o botón
+    fireEvent.click(screen.getByRole('tab', { name: /Respuesta/i }));
+    expect(screen.getByText(/Paso 3: Respuesta del administrador/i)).toBeInTheDocument();
+
+    // Escribir respuesta formal (< 20 caracteres -> botón deshabilitado)
+    const textarea = screen.getByLabelText(/Respuesta formal al consumidor/i);
+    const botonResponder = screen.getByRole('button', { name: /^Responder$/i });
+    expect(botonResponder).toBeDisabled();
+
+    fireEvent.change(textarea, {
+      target: { value: 'Se tomaron las medidas correctivas pertinentes con el personal.' },
+    });
+    expect(botonResponder).not.toBeDisabled();
+
+    // Clic en Responder abre diálogo de Confirmar Sí/No
+    fireEvent.click(botonResponder);
+    await waitFor(() => {
+      expect(screen.getByText(/¿Confirmar respuesta formal\?/i)).toBeInTheDocument();
+    });
+
+    // Confirmar Sí
+    const botonConfirmar = screen.getByRole('button', { name: /Sí, registrar respuesta/i });
+    fireEvent.click(botonConfirmar);
+
+    await waitFor(() => {
+      expect(spyResponder).toHaveBeenCalledWith(
+        '8',
+        'Se tomaron las medidas correctivas pertinentes con el personal.',
+      );
+    });
+
+    // Sin botón de eliminar en ningún paso
+    expect(screen.queryByRole('button', { name: /eliminar/i })).not.toBeInTheDocument();
+  });
+
+  // --- Prueba 10: Filtros y búsqueda en ReclamosAdminView ---
+  it('10. ReclamosAdminView filtra por búsqueda y píldoras de estado y tipo', async () => {
+    const r1: ReclamoAdminItem = {
+      id: '1',
+      numero: 'LR-2026-000001',
+      tipo: 'RECLAMO',
+      nombre: 'Rosa Díaz',
+      documento: '45218890',
+      domicilio: 'Av. Primavera 100',
+      telefono: '987111222',
+      correo: null,
+      pedido_id: '101',
+      detalle: 'Pedido entregado frío y demorado.',
+      monto_reclamado: 25.0,
+      estado: 'RESPONDIDO',
+      respuesta: 'Atendido oportunamente.',
+      respondido_por: '1',
+      respondido_en: '2026-10-21T18:00:00Z',
+      fecha_limite: '2026-11-12',
+      diasHabilesRestantes: 13,
+      plazoTexto: 'Faltan 13 días',
+      creado_en: '2026-10-21T12:00:00Z',
+    };
+
+    const r2: ReclamoAdminItem = {
+      id: '2',
+      numero: 'LR-2026-000002',
+      tipo: 'QUEJA',
+      nombre: 'Luis Ramos',
+      documento: '46330012',
+      domicilio: 'Calle Grau 45',
+      telefono: '999000111',
+      correo: null,
+      pedido_id: null,
+      detalle: 'La música estaba muy alta en el salón.',
+      monto_reclamado: null,
+      estado: 'RECIBIDO',
+      respuesta: null,
+      respondido_por: null,
+      respondido_en: null,
+      fecha_limite: '2026-11-12',
+      diasHabilesRestantes: 13,
+      plazoTexto: 'Faltan 13 días',
+      creado_en: '2026-10-21T14:00:00Z',
+    };
+
+    const spyListar = vi.spyOn(comprobantesApi, 'listarReclamos').mockResolvedValue({
+      total: 2,
+      pagina: 1,
+      limite: 20,
+      items: [r1, r2],
+    });
+
+    render(<ReclamosAdminView />);
+
+    await waitFor(() => {
+      expect(screen.getByText('LR-2026-000001')).toBeInTheDocument();
+      expect(screen.getByText('LR-2026-000002')).toBeInTheDocument();
+    });
+
+    // Filtrar con la búsqueda por "Rosa"
+    const inputBusqueda = screen.getByPlaceholderText(/Buscar por número, cliente o detalle/i);
+    fireEvent.change(inputBusqueda, { target: { value: 'Rosa' } });
+
+    // Sólo debe mostrar a Rosa Díaz
+    expect(screen.getByText('LR-2026-000001')).toBeInTheDocument();
+    expect(screen.queryByText('LR-2026-000002')).not.toBeInTheDocument();
+
+    // Limpiar búsqueda
+    fireEvent.change(inputBusqueda, { target: { value: '' } });
+    expect(screen.getByText('LR-2026-000001')).toBeInTheDocument();
+    expect(screen.getByText('LR-2026-000002')).toBeInTheDocument();
+
+    // Clic en píldora "Recibidos"
+    const pildoraRecibidos = screen.getByRole('button', { name: /^Recibidos$/i });
+    fireEvent.click(pildoraRecibidos);
+
+    await waitFor(() => {
+      expect(spyListar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          estado: 'RECIBIDO',
+        }),
+      );
+    });
+
+    // Clic en píldora "Quejas"
+    const pildoraQuejas = screen.getByRole('button', { name: /^Quejas$/i });
+    fireEvent.click(pildoraQuejas);
+
+    await waitFor(() => {
+      expect(spyListar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tipo: 'QUEJA',
+        }),
+      );
+    });
+  });
 });

@@ -49,6 +49,8 @@ export function ComprobantesView() {
     const p = searchParams.get('pedidoId');
     if (t === 'nota') {
       setTabActivo('nota');
+    } else if (t === 'emitir') {
+      setTabActivo('emitir');
     }
     if (p) {
       setPedidoIdSeleccionado(p);
@@ -66,35 +68,69 @@ export function ComprobantesView() {
     }
   };
 
+  const irANotaDeVenta = (pedidoId: string) => {
+    setPedidoIdSeleccionado(pedidoId);
+    setTabActivo('nota');
+    setSearchParams({ tab: 'nota', pedidoId });
+  };
+
   return (
     <div className="comprobantes-contenedor">
-      <div className="no-imprimir" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <h1 style={{ fontSize: '24px', color: 'var(--cp-navy)' }}>
-          Gestión de Comprobantes
-        </h1>
-        <p style={{ margin: 0, color: 'var(--cp-soft)', fontSize: '14px' }}>
-          Emisión correlativa interna (NV01), cola para facturador externo y reimpresión de comprobantes.
-        </p>
-      </div>
-
-      <div className="comprobantes-tabs no-imprimir">
+      {/* Pestañas de navegación tipo píldora - Sin título duplicado */}
+      <div className="comprobantes-tabs no-imprimir" role="tablist" aria-label="Secciones de comprobantes">
         <button
           type="button"
+          role="tab"
+          aria-selected={tabActivo === 'emitir'}
           className={`comprobantes-tab-btn ${tabActivo === 'emitir' ? 'activo' : ''}`}
           onClick={() => cambiarTab('emitir')}
         >
-          Por emitir (SUNAT / Facturador)
+          <svg
+            viewBox="0 0 24 24"
+            width="18"
+            height="18"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="16" y1="13" x2="8" y2="13" />
+            <line x1="16" y1="17" x2="8" y2="17" />
+            <polyline points="10 9 9 9 8 9" />
+          </svg>
+          Por emitir en el facturador
         </button>
         <button
           type="button"
+          role="tab"
+          aria-selected={tabActivo === 'nota'}
           className={`comprobantes-tab-btn ${tabActivo === 'nota' ? 'activo' : ''}`}
           onClick={() => cambiarTab('nota')}
         >
-          Nota de venta (NV01)
+          <svg
+            viewBox="0 0 24 24"
+            width="18"
+            height="18"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M6 9V2h12v7" />
+            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+            <rect x="6" y="14" width="12" height="8" />
+          </svg>
+          Nota de venta
         </button>
       </div>
 
-      {tabActivo === 'emitir' && <PorEmitirTab />}
+      {tabActivo === 'emitir' && <PorEmitirTab alVerNota={irANotaDeVenta} />}
 
       {tabActivo === 'nota' && (
         <NotaVentaVista

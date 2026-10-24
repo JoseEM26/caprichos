@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSesion } from '../../comun/sesion';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoVacio } from '../../comun/EstadoVacio';
@@ -17,15 +17,17 @@ import {
   formatearSoles,
   obtenerEstiloUrgencia,
 } from './utilidades';
+import './reclamos.css';
 
 export function ReclamosAdminView() {
   const { usuario, tiene } = useSesion();
   const esAdmin = usuario?.rol === 'ADMIN';
   const puedeResponder = tiene('reclamos/responder') || esAdmin;
 
-  // Filtros
+  // Filtros de estado y tipo
   const [filtroEstado, setFiltroEstado] = useState<string>('todos');
   const [filtroTipo, setFiltroTipo] = useState<string>('todos');
+  const [busqueda, setBusqueda] = useState<string>('');
   const [pagina, setPagina] = useState(1);
   const limite = 20;
 
@@ -35,17 +37,17 @@ export function ReclamosAdminView() {
   const [reclamos, setReclamos] = useState<ReclamoAdminItem[]>([]);
   const [total, setTotal] = useState(0);
 
-  // Modal de Detalle
+  // Modal de Detalle por pasos cortos
   const [reclamoDetalle, setReclamoDetalle] = useState<ReclamoAdminDetalle | null>(null);
   const [cargandoDetalle, setCargandoDetalle] = useState(false);
   const [errorDetalle, setErrorDetalle] = useState<string | null>(null);
+  const [pasoModal, setPasoModal] = useState<number>(1);
 
   // Acciones: En revisión
   const [mostrarConfirmarRevision, setMostrarConfirmarRevision] = useState(false);
   const [marcandoRevision, setMarcandoRevision] = useState(false);
 
   // Acciones: Responder
-  const [mostrarModalResponder, setMostrarModalResponder] = useState(false);
   const [textoRespuesta, setTextoRespuesta] = useState('');
   const [errorRespuesta, setErrorRespuesta] = useState<string | null>(null);
   const [mostrarConfirmarResponder, setMostrarConfirmarResponder] = useState(false);
@@ -75,10 +77,35 @@ export function ReclamosAdminView() {
     cargarReclamos(pagina);
   }, [cargarReclamos, pagina]);
 
+  // Filtrado local por término de búsqueda (número, cliente, documento, detalle, teléfono)
+  const reclamosFiltrados = useMemo(() => {
+    const q = busqueda.trim().toLowerCase();
+    if (!q) return reclamos;
+    return reclamos.filter((r) => {
+      const num = r.numero.toLowerCase();
+      const nom = r.nombre.toLowerCase();
+      const doc = r.documento.toLowerCase();
+      const det = r.detalle.toLowerCase();
+      const tel = (r.telefono || '').toLowerCase();
+      const ped = (r.pedido_id || '').toLowerCase();
+      return (
+        num.includes(q) ||
+        nom.includes(q) ||
+        doc.includes(q) ||
+        det.includes(q) ||
+        tel.includes(q) ||
+        ped.includes(q)
+      );
+    });
+  }, [reclamos, busqueda]);
+
   const abrirDetalle = async (item: ReclamoAdminItem) => {
     setCargandoDetalle(true);
     setErrorDetalle(null);
     setReclamoDetalle(null);
+    setPasoModal(1);
+    setTextoRespuesta('');
+    setErrorRespuesta(null);
     try {
       const detalle = await comprobantesApi.obtenerReclamoPorId(item.id);
       setReclamoDetalle(detalle);
@@ -109,7 +136,7 @@ export function ReclamosAdminView() {
   const validarRespuesta = () => {
     const limpia = textoRespuesta.trim();
     if (limpia.length < 20) {
-      setErrorRespuesta('La respuesta debe tener al menos 20 caracteres');
+      setErrorRespuesta('La respuesta formal debe tener al menos 20 caracteres');
       return;
     }
     setErrorRespuesta(null);
@@ -122,13 +149,12 @@ export function ReclamosAdminView() {
     try {
       await comprobantesApi.responderReclamo(reclamoDetalle.id, textoRespuesta.trim());
       setMostrarConfirmarResponder(false);
-      setMostrarModalResponder(false);
       setTextoRespuesta('');
       const actualizado = await comprobantesApi.obtenerReclamoPorId(reclamoDetalle.id);
       setReclamoDetalle(actualizado);
       await cargarReclamos(pagina);
     } catch (err: any) {
-      setErrorRespuesta(err?.message || 'Error al registrar la respuesta');
+      setErrorRespuesta(err?.message || 'Error al registrar la respuesta formal');
       setMostrarConfirmarResponder(false);
     } finally {
       setEnviandoRespuesta(false);
@@ -138,17 +164,48 @@ export function ReclamosAdminView() {
   const totalPaginas = Math.max(1, Math.ceil(total / limite));
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* Cabecera */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-        <div>
-          <h1 style={{ fontSize: '24px', color: 'var(--cp-navy)' }}>
-            Libro de Reclamaciones
-          </h1>
-          <p style={{ margin: '4px 0 0', color: 'var(--cp-soft)', fontSize: '14px' }}>
-            Atención obligatoria de reclamos y quejas virtuales según el D.S. 011-2011-PCM y Ley 29733.
-          </p>
+    <div className="reclamos-contenedor">
+      {/* 1. Barra superior de controles: Búsqueda y Actualizar */}
+      <div className="reclamos-barra-controles">
+        <div className="reclamos-buscador-envoltura">
+          <svg
+            viewBox="0 0 24 24"
+            width="18"
+            height="18"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ color: 'var(--cp-soft)', flexShrink: 0 }}
+            aria-hidden="true"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <label htmlFor="buscador-reclamos" style={{ position: 'absolute', left: -9999 }}>
+            Buscar reclamo
+          </label>
+          <input
+            id="buscador-reclamos"
+            type="search"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar por número, cliente o detalle..."
+            className="reclamos-buscador-input"
+          />
+          {busqueda && (
+            <button
+              type="button"
+              onClick={() => setBusqueda('')}
+              className="reclamos-buscador-limpiar"
+              aria-label="Limpiar búsqueda"
+            >
+              ×
+            </button>
+          )}
         </div>
+
         <Boton
           variante="secundario"
           onClick={() => cargarReclamos(pagina)}
@@ -158,21 +215,10 @@ export function ReclamosAdminView() {
         </Boton>
       </div>
 
-      {/* Barra de Filtros */}
-      <div
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '12px',
-          alignItems: 'center',
-          backgroundColor: 'var(--cp-white)',
-          padding: '12px 16px',
-          borderRadius: '12px',
-          border: '1px solid var(--cp-line)',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--cp-navy)' }}>Estado:</span>
+      {/* 2. Barra de filtros con píldoras */}
+      <div className="reclamos-filtros-seccion">
+        <div className="reclamos-grupo-pildoras">
+          <span className="reclamos-pildora-etiqueta">Estado:</span>
           {(['todos', 'RECIBIDO', 'EN_REVISION', 'RESPONDIDO'] as const).map((est) => (
             <button
               key={est}
@@ -181,25 +227,21 @@ export function ReclamosAdminView() {
                 setFiltroEstado(est);
                 setPagina(1);
               }}
-              style={{
-                minHeight: '36px',
-                padding: '0 12px',
-                borderRadius: '8px',
-                border: '1.5px solid var(--cp-navy)',
-                fontSize: '12px',
-                fontWeight: 700,
-                cursor: 'pointer',
-                backgroundColor: filtroEstado === est ? 'var(--cp-navy)' : 'transparent',
-                color: filtroEstado === est ? 'var(--cp-cream)' : 'var(--cp-navy)',
-              }}
+              className={`reclamos-pildora-btn ${filtroEstado === est ? 'activa' : ''}`}
             >
-              {est === 'todos' ? 'Todos' : est === 'EN_REVISION' ? 'En revisión' : est === 'RECIBIDO' ? 'Recibidos' : 'Respondidos'}
+              {est === 'todos'
+                ? 'Todos'
+                : est === 'EN_REVISION'
+                ? 'En revisión'
+                : est === 'RECIBIDO'
+                ? 'Recibidos'
+                : 'Respondidos'}
             </button>
           ))}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>
-          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--cp-navy)' }}>Tipo:</span>
+        <div className="reclamos-grupo-pildoras">
+          <span className="reclamos-pildora-etiqueta">Tipo:</span>
           {(['todos', 'RECLAMO', 'QUEJA'] as const).map((tipo) => (
             <button
               key={tipo}
@@ -208,25 +250,21 @@ export function ReclamosAdminView() {
                 setFiltroTipo(tipo);
                 setPagina(1);
               }}
-              style={{
-                minHeight: '36px',
-                padding: '0 12px',
-                borderRadius: '8px',
-                border: '1.5px solid var(--cp-navy)',
-                fontSize: '12px',
-                fontWeight: 700,
-                cursor: 'pointer',
-                backgroundColor: filtroTipo === tipo ? 'var(--cp-navy)' : 'transparent',
-                color: filtroTipo === tipo ? 'var(--cp-cream)' : 'var(--cp-navy)',
-              }}
+              className={`reclamos-pildora-btn ${filtroTipo === tipo ? 'activa' : ''}`}
             >
               {tipo === 'todos' ? 'Todos' : tipo === 'RECLAMO' ? 'Reclamos' : 'Quejas'}
             </button>
           ))}
         </div>
+
+        <div className="reclamos-contador-resumen">
+          {busqueda.trim()
+            ? `Mostrando ${reclamosFiltrados.length} de ${total} registros`
+            : `${total} ${total === 1 ? 'registro en total' : 'registros en total'}`}
+        </div>
       </div>
 
-      {/* Contenido principal */}
+      {/* 3. Contenido principal: Estados y Tarjetas */}
       {cargando && reclamos.length === 0 && (
         <Cargando mensaje="Cargando solicitudes del Libro de Reclamaciones..." />
       )}
@@ -238,90 +276,115 @@ export function ReclamosAdminView() {
         />
       )}
 
-      {!cargando && !error && reclamos.length === 0 && (
+      {!cargando && !error && reclamosFiltrados.length === 0 && (
         <EstadoVacio
-          titulo="No hay reclamos registrados"
-          mensaje="No se encontraron registros con los filtros seleccionados."
+          titulo="No se encontraron registros"
+          mensaje="No hay reclamos o quejas que coincidan con los filtros y búsqueda seleccionados."
         />
       )}
 
-      {reclamos.length > 0 && (
+      {reclamosFiltrados.length > 0 && (
         <>
-          <div className="tabla-tactil-envoltura">
-            <table className="tabla-tactil">
-              <thead>
-                <tr>
-                  <th>Número</th>
-                  <th>Tipo</th>
-                  <th>Cliente</th>
-                  <th>Documento</th>
-                  <th>Plazo legal</th>
-                  <th>Estado</th>
-                  <th>Fecha</th>
-                  <th style={{ textAlign: 'right' }}>Acción</th>
-                </tr>
-              </thead>
-              <tbody>
-                {reclamos.map((r) => {
-                  const urg = obtenerEstiloUrgencia(r.diasHabilesRestantes);
-                  const fechaStr = r.creado_en ? new Date(r.creado_en).toLocaleDateString('es-PE') : '-';
-                  const docMostrar = enmascararDocumento(r.documento, esAdmin);
+          <div className="reclamos-grid-tarjetas">
+            {reclamosFiltrados.map((r) => {
+              const urg = obtenerEstiloUrgencia(r.diasHabilesRestantes);
+              const fechaStr = r.creado_en
+                ? new Date(r.creado_en).toLocaleDateString('es-PE', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                  })
+                : '-';
+              const docMostrar = enmascararDocumento(r.documento, esAdmin);
 
-                  return (
-                    <tr key={r.id}>
-                      <td style={{ fontWeight: 800 }}>{r.numero}</td>
-                      <td>
-                        <Insignia variante={r.tipo === 'RECLAMO' ? 'peligro' : 'aviso'}>
-                          {r.tipo}
-                        </Insignia>
-                      </td>
-                      <td style={{ fontWeight: 600 }}>{r.nombre}</td>
-                      <td style={{ fontFamily: 'monospace' }}>{docMostrar}</td>
-                      <td>
-                        <span
-                          style={{
-                            display: 'inline-block',
-                            padding: '4px 8px',
-                            borderRadius: '6px',
-                            fontSize: '12px',
-                            fontWeight: 700,
-                            backgroundColor: urg.bg,
-                            color: urg.fg,
-                            border: `1px solid ${urg.borde}`,
-                          }}
-                        >
-                          {r.plazoTexto || urg.etiqueta}
+              return (
+                <article
+                  key={r.id}
+                  className="reclamo-tarjeta"
+                  style={{ borderLeft: `6px solid ${urg.borde}` }}
+                >
+                  {/* Cabecera */}
+                  <div className="reclamo-tarjeta-cabecera">
+                    <div className="reclamo-tarjeta-titulo-grupo">
+                      <span className="reclamo-numero">{r.numero}</span>
+                      <span className="reclamo-fecha">{fechaStr}</span>
+                    </div>
+
+                    <div className="reclamo-tarjeta-insignias">
+                      <Insignia variante={r.tipo === 'RECLAMO' ? 'peligro' : 'aviso'}>
+                        {r.tipo === 'RECLAMO' ? 'Reclamo' : 'Queja'}
+                      </Insignia>
+                      <Insignia
+                        variante={
+                          r.estado === 'RESPONDIDO'
+                            ? 'exito'
+                            : r.estado === 'EN_REVISION'
+                            ? 'aviso'
+                            : 'neutro'
+                        }
+                      >
+                        {r.estado === 'EN_REVISION'
+                          ? 'En revisión'
+                          : r.estado === 'RECIBIDO'
+                          ? 'Recibido'
+                          : 'Respondido'}
+                      </Insignia>
+                    </div>
+                  </div>
+
+                  {/* Plazo legal */}
+                  <div className="reclamo-tarjeta-plazo">
+                    <span
+                      className="reclamo-plazo-badge"
+                      style={{
+                        backgroundColor: urg.bg,
+                        color: urg.fg,
+                        borderColor: urg.borde,
+                      }}
+                    >
+                      {r.plazoTexto || urg.etiqueta}
+                    </span>
+                  </div>
+
+                  {/* Datos del cliente y pedido */}
+                  <div className="reclamo-tarjeta-datos">
+                    <div className="reclamo-dato-fila">
+                      <span className="reclamo-dato-etiqueta">Cliente:</span>
+                      <span className="reclamo-dato-valor reclamo-cliente-nombre">{r.nombre}</span>
+                    </div>
+                    <div className="reclamo-dato-fila">
+                      <span className="reclamo-dato-etiqueta">Documento:</span>
+                      <span className="reclamo-dato-valor reclamo-doc">{docMostrar}</span>
+                    </div>
+                    {r.pedido_id && (
+                      <div className="reclamo-dato-fila">
+                        <span className="reclamo-dato-etiqueta">Pedido:</span>
+                        <span className="reclamo-dato-valor">
+                          #{r.pedido_id}
+                          {r.monto_reclamado != null && ` · ${formatearSoles(r.monto_reclamado)}`}
                         </span>
-                      </td>
-                      <td>
-                        <Insignia
-                          variante={
-                            r.estado === 'RESPONDIDO'
-                              ? 'exito'
-                              : r.estado === 'EN_REVISION'
-                                ? 'aviso'
-                                : 'neutro'
-                          }
-                        >
-                          {r.estado === 'EN_REVISION' ? 'EN REVISIÓN' : r.estado}
-                        </Insignia>
-                      </td>
-                      <td style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-                        {fechaStr}
-                      </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <Boton
-                          variante="secundario"
-                          onClick={() => abrirDetalle(r)}
-                        >
-                          Ver detalle
-                        </Boton>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Resumen del detalle */}
+                  <div className="reclamo-tarjeta-resumen" title={r.detalle}>
+                    <span style={{ fontWeight: 700, color: 'var(--cp-soft)' }}>Detalle: </span>
+                    {r.detalle}
+                  </div>
+
+                  {/* Botón de acción */}
+                  <div className="reclamo-tarjeta-pie">
+                    <Boton
+                      variante="secundario"
+                      onClick={() => abrirDetalle(r)}
+                    >
+                      Ver detalle
+                    </Boton>
+                  </div>
+                </article>
+              );
+            })}
           </div>
 
           <Paginacion
@@ -334,43 +397,18 @@ export function ReclamosAdminView() {
         </>
       )}
 
-      {/* Modal de Detalle de Reclamo (auditado con VER_RECLAMO) */}
+      {/* 4. Modal de Detalle por Pasos Cortos (auditado con VER_RECLAMO en API) */}
       {(cargandoDetalle || reclamoDetalle || errorDetalle) && (
         <div
           role="dialog"
           aria-modal="true"
           aria-labelledby="titulo-detalle-reclamo"
-          style={{
-            position: 'fixed',
-            left: 0,
-            top: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 90,
-            backgroundColor: 'rgba(11, 44, 62, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '16px',
-          }}
+          className="reclamo-modal-overlay"
         >
-          <div
-            style={{
-              backgroundColor: 'var(--cp-white)',
-              borderRadius: '16px',
-              border: '1.5px solid var(--cp-navy)',
-              boxShadow: '0 16px 40px rgba(0,0,0,0.3)',
-              padding: '24px',
-              maxWidth: '640px',
-              width: '100%',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '16px',
-            }}
-          >
-            {cargandoDetalle && <Cargando mensaje="Consultando detalle y auditando acceso..." />}
+          <div className="reclamo-modal-contenedor">
+            {cargandoDetalle && (
+              <Cargando mensaje="Consultando detalle y auditando acceso..." />
+            )}
 
             {errorDetalle && (
               <div>
@@ -385,134 +423,302 @@ export function ReclamosAdminView() {
 
             {reclamoDetalle && !cargandoDetalle && (
               <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                {/* Cabecera del modal */}
+                <div className="reclamo-modal-cabecera">
                   <div>
-                    <h3 id="titulo-detalle-reclamo" style={{ fontSize: '20px', color: 'var(--cp-navy)' }}>
-                      {reclamoDetalle.tipo}: {reclamoDetalle.numero}
-                    </h3>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' }}>
+                    <div className="reclamo-modal-meta">
+                      <Insignia
+                        variante={reclamoDetalle.tipo === 'RECLAMO' ? 'peligro' : 'aviso'}
+                      >
+                        {reclamoDetalle.tipo}
+                      </Insignia>
                       <Insignia
                         variante={
                           reclamoDetalle.estado === 'RESPONDIDO'
                             ? 'exito'
                             : reclamoDetalle.estado === 'EN_REVISION'
-                              ? 'aviso'
-                              : 'neutro'
+                            ? 'aviso'
+                            : 'neutro'
                         }
                       >
-                        {reclamoDetalle.estado === 'EN_REVISION' ? 'EN REVISIÓN' : reclamoDetalle.estado}
+                        {reclamoDetalle.estado === 'EN_REVISION'
+                          ? 'En revisión'
+                          : reclamoDetalle.estado === 'RECIBIDO'
+                          ? 'Recibido'
+                          : 'Respondido'}
                       </Insignia>
-                      <span
-                        style={{
-                          fontSize: '12px',
-                          fontWeight: 700,
-                          padding: '2px 8px',
-                          borderRadius: '6px',
-                          ...(() => {
-                            const u = obtenerEstiloUrgencia(reclamoDetalle.diasHabilesRestantes);
-                            return { backgroundColor: u.bg, color: u.fg, border: `1px solid ${u.borde}` };
-                          })(),
-                        }}
-                      >
-                        {reclamoDetalle.plazoTexto} (Límite: {reclamoDetalle.fecha_limite})
-                      </span>
+                      {(() => {
+                        const urg = obtenerEstiloUrgencia(reclamoDetalle.diasHabilesRestantes);
+                        return (
+                          <span
+                            className="reclamo-plazo-badge"
+                            style={{
+                              backgroundColor: urg.bg,
+                              color: urg.fg,
+                              borderColor: urg.borde,
+                            }}
+                          >
+                            {reclamoDetalle.plazoTexto || urg.etiqueta}
+                          </span>
+                        );
+                      })()}
                     </div>
+
+                    <h3 id="titulo-detalle-reclamo" className="reclamo-modal-titulo">
+                      {reclamoDetalle.tipo}: {reclamoDetalle.numero}
+                    </h3>
+
+                    <p className="reclamo-modal-subtitulo">
+                      Plazo legal: 15 días hábiles · Límite: {reclamoDetalle.fecha_limite}
+                    </p>
                   </div>
+
                   <button
                     type="button"
                     onClick={() => setReclamoDetalle(null)}
-                    style={{
-                      border: 0,
-                      background: 'transparent',
-                      fontSize: '22px',
-                      fontWeight: 800,
-                      color: 'var(--cp-navy)',
-                      cursor: 'pointer',
-                      padding: '4px 8px',
-                    }}
+                    className="reclamo-btn-cerrar"
                     aria-label="Cerrar detalle"
                   >
                     ×
                   </button>
                 </div>
 
-                {/* Datos del Cliente */}
-                <div style={{ border: '1px solid var(--cp-line)', borderRadius: '10px', padding: '12px', backgroundColor: 'var(--cp-cream)' }}>
-                  <div style={{ fontWeight: 800, fontSize: '13px', marginBottom: '6px' }}>DATOS DEL CONSUMIDOR</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px', fontSize: '13px' }}>
-                    <div><b>Nombre:</b> {reclamoDetalle.nombre}</div>
-                    <div><b>Documento:</b> <span style={{ fontFamily: 'monospace' }}>{enmascararDocumento(reclamoDetalle.documento, esAdmin)}</span></div>
-                    <div><b>Domicilio:</b> {reclamoDetalle.domicilio}</div>
-                    <div><b>Teléfono:</b> {enmascararDocumento(reclamoDetalle.telefono, esAdmin)}</div>
-                    {reclamoDetalle.correo && <div><b>Correo:</b> {reclamoDetalle.correo}</div>}
-                    {reclamoDetalle.pedido && <div><b>Pedido:</b> {reclamoDetalle.pedido.codigo} (S/ {reclamoDetalle.pedido.total})</div>}
-                    {reclamoDetalle.monto_reclamado !== null && (
-                      <div><b>Monto reclamado:</b> {formatearSoles(reclamoDetalle.monto_reclamado)}</div>
+                {/* Barra de Pasos Cortos (Stepper) */}
+                <div className="reclamo-stepper" role="tablist" aria-label="Pasos del detalle">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={pasoModal === 1}
+                    className={`reclamo-step-btn ${pasoModal === 1 ? 'activo' : ''}`}
+                    onClick={() => setPasoModal(1)}
+                  >
+                    <span className="step-num">1</span>
+                    <span>Datos del cliente</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={pasoModal === 2}
+                    className={`reclamo-step-btn ${pasoModal === 2 ? 'activo' : ''}`}
+                    onClick={() => setPasoModal(2)}
+                  >
+                    <span className="step-num">2</span>
+                    <span>Detalle del reclamo</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={pasoModal === 3}
+                    className={`reclamo-step-btn ${pasoModal === 3 ? 'activo' : ''}`}
+                    onClick={() => setPasoModal(3)}
+                  >
+                    <span className="step-num">3</span>
+                    <span>Respuesta</span>
+                  </button>
+                </div>
+
+                {/* Contenido del paso seleccionado */}
+                <div className="reclamo-step-cuerpo">
+                  {pasoModal === 1 && (
+                    <div className="reclamo-paso-panel">
+                      <div className="reclamo-seccion-titulo">
+                        Paso 1: Datos del consumidor
+                      </div>
+                      <div className="reclamo-cuadricula-datos">
+                        <div className="reclamo-campo-info">
+                          <span className="campo-etiqueta">Nombre completo</span>
+                          <span className="campo-valor">{reclamoDetalle.nombre}</span>
+                        </div>
+                        <div className="reclamo-campo-info">
+                          <span className="campo-etiqueta">Documento de identidad</span>
+                          <span className="campo-valor doc-mono">
+                            {enmascararDocumento(reclamoDetalle.documento, esAdmin)}
+                          </span>
+                        </div>
+                        <div className="reclamo-campo-info">
+                          <span className="campo-etiqueta">Domicilio</span>
+                          <span className="campo-valor">{reclamoDetalle.domicilio}</span>
+                        </div>
+                        <div className="reclamo-campo-info">
+                          <span className="campo-etiqueta">Teléfono de contacto</span>
+                          <span className="campo-valor">
+                            {enmascararDocumento(reclamoDetalle.telefono, esAdmin)}
+                          </span>
+                        </div>
+                        <div className="reclamo-campo-info">
+                          <span className="campo-etiqueta">Correo electrónico</span>
+                          <span className="campo-valor">
+                            {reclamoDetalle.correo || 'No proporcionado'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {pasoModal === 2 && (
+                    <div className="reclamo-paso-panel">
+                      <div className="reclamo-seccion-titulo">
+                        Paso 2: Detalle de los hechos y pedido
+                      </div>
+                      <div className="reclamo-cuadricula-datos">
+                        <div className="reclamo-campo-info">
+                          <span className="campo-etiqueta">Pedido relacionado</span>
+                          <span className="campo-valor">
+                            {reclamoDetalle.pedido
+                              ? `${reclamoDetalle.pedido.codigo} (S/ ${Number(
+                                  reclamoDetalle.pedido.total,
+                                ).toFixed(2)})`
+                              : reclamoDetalle.pedido_id
+                              ? `#${reclamoDetalle.pedido_id}`
+                              : 'Sin pedido asociado'}
+                          </span>
+                        </div>
+                        <div className="reclamo-campo-info">
+                          <span className="campo-etiqueta">Monto reclamado</span>
+                          <span className="campo-valor">
+                            {reclamoDetalle.monto_reclamado != null
+                              ? formatearSoles(reclamoDetalle.monto_reclamado)
+                              : 'No especificado'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div
+                          className="campo-etiqueta"
+                          style={{ marginBottom: '6px', fontWeight: 700, color: 'var(--cp-soft)' }}
+                        >
+                          Descripción detallada registrada por el consumidor:
+                        </div>
+                        <div className="reclamo-detalle-caja">
+                          {reclamoDetalle.detalle}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {pasoModal === 3 && (
+                    <div className="reclamo-paso-panel">
+                      <div className="reclamo-seccion-titulo">
+                        Paso 3: Respuesta del administrador
+                      </div>
+
+                      {reclamoDetalle.estado === 'RESPONDIDO' ? (
+                        <div className="reclamo-respuesta-enviada">
+                          <div className="respuesta-enviada-titulo">
+                            Respuesta formal registrada (Atendido)
+                          </div>
+                          <div className="respuesta-enviada-cuerpo">
+                            {reclamoDetalle.respuesta}
+                          </div>
+                          <div className="respuesta-enviada-meta">
+                            Respondido el:{' '}
+                            {reclamoDetalle.respondido_en
+                              ? new Date(reclamoDetalle.respondido_en).toLocaleString('es-PE')
+                              : '-'}
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          {puedeResponder && reclamoDetalle.estado === 'RECIBIDO' && (
+                            <div className="reclamo-aviso-revision">
+                              <span>El reclamo está recibido y pendiente de análisis.</span>
+                              <Boton
+                                variante="secundario"
+                                onClick={() => setMostrarConfirmarRevision(true)}
+                              >
+                                Poner en revisión
+                              </Boton>
+                            </div>
+                          )}
+
+                          {puedeResponder ? (
+                            <div className="reclamo-campo-respuesta">
+                              <label
+                                htmlFor="campo-respuesta-reclamo"
+                                className="campo-etiqueta"
+                                style={{ fontWeight: 700 }}
+                              >
+                                Respuesta formal al consumidor (mínimo 20 caracteres):
+                              </label>
+                              <textarea
+                                id="campo-respuesta-reclamo"
+                                rows={4}
+                                value={textoRespuesta}
+                                onChange={(e) => {
+                                  setTextoRespuesta(e.target.value);
+                                  if (errorRespuesta) setErrorRespuesta(null);
+                                }}
+                                placeholder="Escribe la respuesta formal y fundamentada para el consumidor..."
+                                className="reclamo-textarea"
+                              />
+                              <div className="reclamo-textarea-footer">
+                                <span>
+                                  {textoRespuesta.trim().length} / 20 caracteres mínimos
+                                </span>
+                                {errorRespuesta && (
+                                  <span className="reclamo-error-txt">{errorRespuesta}</span>
+                                )}
+                              </div>
+                              <div
+                                style={{
+                                  marginTop: '12px',
+                                  display: 'flex',
+                                  justifyContent: 'flex-end',
+                                }}
+                              >
+                                <Boton
+                                  variante="primario"
+                                  onClick={validarRespuesta}
+                                  deshabilitado={
+                                    textoRespuesta.trim().length < 20 || enviandoRespuesta
+                                  }
+                                >
+                                  Responder
+                                </Boton>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="reclamo-sin-permiso">
+                              No tienes permisos asignados para responder a este reclamo.
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Pie de navegación del modal */}
+                <div className="reclamo-modal-pie">
+                  <div className="pie-nav-izq">
+                    {pasoModal > 1 && (
+                      <Boton
+                        variante="secundario"
+                        onClick={() => setPasoModal((p) => p - 1)}
+                      >
+                        ← Anterior
+                      </Boton>
                     )}
                   </div>
-                </div>
 
-                {/* Detalle del reclamo */}
-                <div>
-                  <div style={{ fontWeight: 800, fontSize: '13px', marginBottom: '4px' }}>
-                    DETALLE DEL RECLAMO O QUEJA
+                  <div className="pie-nav-der">
+                    {pasoModal < 3 ? (
+                      <Boton
+                        variante="primario"
+                        onClick={() => setPasoModal((p) => p + 1)}
+                      >
+                        Siguiente →
+                      </Boton>
+                    ) : (
+                      <Boton
+                        variante="secundario"
+                        onClick={() => setReclamoDetalle(null)}
+                      >
+                        Cerrar
+                      </Boton>
+                    )}
                   </div>
-                  <div
-                    style={{
-                      padding: '12px',
-                      borderRadius: '8px',
-                      backgroundColor: 'var(--cp-sand)',
-                      fontSize: '14px',
-                      lineHeight: '20px',
-                      whiteSpace: 'pre-wrap',
-                    }}
-                  >
-                    {reclamoDetalle.detalle}
-                  </div>
-                </div>
-
-                {/* Respuesta si ya fue respondido */}
-                {reclamoDetalle.estado === 'RESPONDIDO' && (
-                  <div style={{ border: '1.5px solid var(--cp-green)', borderRadius: '10px', padding: '12px', backgroundColor: 'var(--cp-greenbg)' }}>
-                    <div style={{ fontWeight: 800, fontSize: '13px', color: 'var(--cp-green)', marginBottom: '4px' }}>
-                      RESPUESTA FORMAL (YA RESPONDIDO)
-                    </div>
-                    <div style={{ fontSize: '14px', lineHeight: '20px', whiteSpace: 'pre-wrap', color: 'var(--cp-navy)' }}>
-                      {reclamoDetalle.respuesta}
-                    </div>
-                    <div style={{ fontSize: '12px', color: 'var(--cp-soft)', marginTop: '8px' }}>
-                      Respondido el: {reclamoDetalle.respondido_en ? new Date(reclamoDetalle.respondido_en).toLocaleString('es-PE') : '-'}
-                    </div>
-                  </div>
-                )}
-
-                {/* Botones de acción */}
-                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', flexWrap: 'wrap', marginTop: '12px' }}>
-                  <Boton variante="secundario" onClick={() => setReclamoDetalle(null)}>
-                    Cerrar
-                  </Boton>
-
-                  {puedeResponder && reclamoDetalle.estado === 'RECIBIDO' && (
-                    <Boton
-                      variante="secundario"
-                      onClick={() => setMostrarConfirmarRevision(true)}
-                    >
-                      En revisión
-                    </Boton>
-                  )}
-
-                  {puedeResponder && reclamoDetalle.estado !== 'RESPONDIDO' && (
-                    <Boton
-                      variante="primario"
-                      onClick={() => {
-                        setTextoRespuesta('');
-                        setErrorRespuesta(null);
-                        setMostrarModalResponder(true);
-                      }}
-                    >
-                      Responder
-                    </Boton>
-                  )}
                 </div>
               </>
             )}
@@ -520,7 +726,7 @@ export function ReclamosAdminView() {
         </div>
       )}
 
-      {/* Confirmar "En revisión" */}
+      {/* Confirmar "En revisión" (Sí/No) */}
       {mostrarConfirmarRevision && reclamoDetalle && (
         <Confirmar
           abierto={mostrarConfirmarRevision}
@@ -534,112 +740,12 @@ export function ReclamosAdminView() {
         />
       )}
 
-      {/* Modal para escribir respuesta */}
-      {mostrarModalResponder && reclamoDetalle && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="titulo-responder-reclamo"
-          style={{
-            position: 'fixed',
-            left: 0,
-            top: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 95,
-            backgroundColor: 'rgba(11, 44, 62, 0.55)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '16px',
-          }}
-        >
-          <div
-            style={{
-              backgroundColor: 'var(--cp-white)',
-              borderRadius: '16px',
-              border: '1.5px solid var(--cp-navy)',
-              boxShadow: '0 16px 40px rgba(0,0,0,0.3)',
-              padding: '24px',
-              maxWidth: '520px',
-              width: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '16px',
-            }}
-          >
-            <div>
-              <h3 id="titulo-responder-reclamo" style={{ fontSize: '18px', color: 'var(--cp-navy)' }}>
-                Responder a {reclamoDetalle.numero}
-              </h3>
-              <p style={{ margin: '4px 0 0', color: 'var(--cp-soft)', fontSize: '13px' }}>
-                Cliente: <b>{reclamoDetalle.nombre}</b>. Esta respuesta es formal y única (mínimo 20 caracteres).
-              </p>
-            </div>
-
-            <div>
-              <label
-                htmlFor="campo-respuesta-reclamo"
-                style={{ display: 'block', fontWeight: 700, fontSize: '13px', marginBottom: '6px' }}
-              >
-                Respuesta formal al consumidor
-              </label>
-              <textarea
-                id="campo-respuesta-reclamo"
-                rows={5}
-                value={textoRespuesta}
-                onChange={(e) => {
-                  setTextoRespuesta(e.target.value);
-                  if (errorRespuesta) setErrorRespuesta(null);
-                }}
-                placeholder="Escribe la respuesta detallada de la empresa..."
-                style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  borderRadius: '8px',
-                  border: '1.5px solid var(--cp-line)',
-                  padding: '10px 12px',
-                  fontFamily: 'inherit',
-                  fontSize: '14px',
-                  resize: 'vertical',
-                }}
-              />
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '12px', color: 'var(--cp-soft)' }}>
-                <span>{textoRespuesta.trim().length} / 20 caracteres mínimos</span>
-                {errorRespuesta && (
-                  <span style={{ color: 'var(--cp-rust)', fontWeight: 700 }}>
-                    {errorRespuesta}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-              <Boton
-                variante="secundario"
-                onClick={() => setMostrarModalResponder(false)}
-                deshabilitado={enviandoRespuesta}
-              >
-                Cancelar
-              </Boton>
-              <Boton
-                variante="primario"
-                onClick={validarRespuesta}
-                deshabilitado={textoRespuesta.trim().length < 20 || enviandoRespuesta}
-              >
-                Continuar
-              </Boton>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Confirmar respuesta Sí/No */}
+      {/* Confirmar respuesta formal (Sí/No) */}
       {mostrarConfirmarResponder && reclamoDetalle && (
         <Confirmar
           abierto={mostrarConfirmarResponder}
           titulo="¿Confirmar respuesta formal?"
-          mensaje={`¿Confirmas el envío de esta respuesta para el reclamo ${reclamoDetalle.numero}? Esta acción cierra el reclamo y no se puede editar ni borrar.`}
+          mensaje={`¿Confirmas el envío de esta respuesta para el reclamo ${reclamoDetalle.numero}? Esta acción registra la respuesta formal y cierra el reclamo.`}
           textoConfirmar="Sí, registrar respuesta"
           textoNo="No, corregir"
           alConfirmar={handleResponder}

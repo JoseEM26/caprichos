@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSesion } from '../../comun/sesion';
+import { Boton } from '../../comun/Boton';
+import { Campo } from '../../comun/Campo';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoVacio } from '../../comun/EstadoVacio';
 import { EstadoError } from '../../comun/EstadoError';
-import { Boton } from '../../comun/Boton';
-import { Campo } from '../../comun/Campo';
 import { comprobantesApi } from './comprobantesApi';
-import type { NotaVentaDatos } from './tipos';
 import { enmascararDocumento, formatearSoles } from './utilidades';
+import type { NotaVentaDatos } from './tipos';
 
 interface NotaVentaVistaProps {
   pedidoIdInicial?: string;
@@ -87,35 +87,56 @@ export function NotaVentaVista({ pedidoIdInicial, alCerrar }: NotaVentaVistaProp
   const docMostrar = enmascararDocumento(docCliente, esAdmin);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      <div className="no-imprimir" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
+      {/* Panel de búsqueda estilo tarjeta limpia */}
+      <div className="no-imprimir comprobantes-panel-busqueda">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
           <div>
-            <h2 style={{ fontSize: '18px', color: 'var(--cp-navy)' }}>
-              Nota de venta interna (NV01)
-            </h2>
-            <p style={{ margin: '4px 0 0', color: 'var(--cp-soft)', fontSize: '13px' }}>
+            <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '16px', color: 'var(--cp-navy)' }}>
+              Buscar nota de venta por pedido
+            </div>
+            <div style={{ margin: '4px 0 0', color: 'var(--cp-soft)', fontSize: '13px' }}>
               Visualización y reimpresión con formato térmico de 80 mm para pedidos cobrados.
-            </p>
+            </div>
           </div>
           {alCerrar && (
             <Boton variante="secundario" onClick={alCerrar}>
-              Cerrar vista
+              Volver a la cola
             </Boton>
           )}
         </div>
 
-        <form onSubmit={handleBuscar} style={{ display: 'flex', gap: '10px', alignItems: 'flex-end', maxWidth: '480px' }}>
-          <div style={{ flex: 1 }}>
+        <form onSubmit={handleBuscar} style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', maxWidth: '520px', flexWrap: 'wrap' }}>
+          <div style={{ flex: '1 1 240px' }}>
             <Campo
               id="buscar-pedido-id"
               etiqueta="ID del pedido cobrado"
               value={pedidoId}
               onChange={(e) => setPedidoId(e.target.value)}
-              placeholder="Ej: 1, 42 o UUID"
+              placeholder="Ej: 30, 42 o UUID"
             />
           </div>
-          <Boton variante="primario" type="submit" cargando={cargando} deshabilitado={!pedidoId.trim()}>
+          <Boton
+            variante="primario"
+            type="submit"
+            cargando={cargando}
+            deshabilitado={!pedidoId.trim()}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              style={{ marginRight: '6px' }}
+            >
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
             Cargar nota
           </Boton>
         </form>
@@ -140,19 +161,53 @@ export function NotaVentaVista({ pedidoIdInicial, alCerrar }: NotaVentaVistaProp
       )}
 
       {nota && !cargando && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
-          <div className="no-imprimir" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', width: '100%' }}>
+          {/* Botones de acción grandes */}
+          <div className="no-imprimir" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center', width: '100%', maxWidth: '440px' }}>
             <Boton
               variante="primario"
               onClick={handleImprimirActual}
+              style={{ minHeight: '44px', flex: '1 1 180px' }}
             >
+              <svg
+                viewBox="0 0 24 24"
+                width="18"
+                height="18"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+                style={{ marginRight: '6px' }}
+              >
+                <path d="M6 9V2h12v7" />
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                <rect x="6" y="14" width="12" height="8" />
+              </svg>
               Imprimir en ticketera (80 mm)
             </Boton>
             <Boton
               variante="oscuro"
               onClick={handleReimprimir}
               cargando={reimprimiendo}
+              style={{ minHeight: '44px', flex: '1 1 180px' }}
             >
+              <svg
+                viewBox="0 0 24 24"
+                width="18"
+                height="18"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+                style={{ marginRight: '6px' }}
+              >
+                <polyline points="1 4 1 10 7 10" />
+                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+              </svg>
               Reimprimir (marcar COPIA)
             </Boton>
           </div>

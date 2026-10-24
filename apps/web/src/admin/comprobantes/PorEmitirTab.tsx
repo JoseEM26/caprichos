@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSesion } from '../../comun/sesion';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoVacio } from '../../comun/EstadoVacio';
@@ -9,24 +9,45 @@ import { Insignia } from '../../comun/Insignia';
 import { Boton } from '../../comun/Boton';
 import { Campo } from '../../comun/Campo';
 import { comprobantesApi } from './comprobantesApi';
+import { enmascararDocumento, formatearSoles } from './utilidades';
 import type { ComprobantePorEmitir } from './tipos';
-import { enmascararDocumento, formatearSoles, copiarAlPortapapeles } from './utilidades';
 
-export function PorEmitirTab() {
+interface PorEmitirTabProps {
+  alVerNota?: (pedidoId: string) => void;
+}
+
+async function copiarAlPortapapeles(texto: string): Promise<boolean> {
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(texto);
+      return true;
+    } catch {
+      // fallback
+    }
+  }
+  return false;
+}
+
+export function PorEmitirTab({ alVerNota }: PorEmitirTabProps) {
   const { usuario } = useSesion();
   const esAdmin = usuario?.rol === 'ADMIN';
 
+  const [comprobantes, setComprobantes] = useState<ComprobantePorEmitir[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [comprobantes, setComprobantes] = useState<ComprobantePorEmitir[]>([]);
-  const [total, setTotal] = useState(0);
   const [pagina, setPagina] = useState(1);
-  const limite = 20;
+  const [limite] = useState(20);
+  const [total, setTotal] = useState(0);
 
-  // Mensaje temporal al copiar
+  // Filtros en cliente
+  const [busqueda, setBusqueda] = useState('');
+  const [filtroTipo, setFiltroTipo] = useState<'TODOS' | 'BOLETA' | 'FACTURA'>('TODOS');
+  const [filtroEstado, setFiltroEstado] = useState<'TODOS' | 'POR_EMITIR'>('TODOS');
+
+  // Estado para copiar
   const [mensajeCopia, setMensajeCopia] = useState<string | null>(null);
 
-  // Modal para Marcar Emitido
+  // Modal para ingresar referencia externa y marcar emitido
   const [itemParaEmitir, setItemParaEmitir] = useState<ComprobantePorEmitir | null>(null);
   const [referencia, setReferencia] = useState('');
   const [errorReferencia, setErrorReferencia] = useState<string | null>(null);
@@ -105,6 +126,27 @@ export function PorEmitirTab() {
     }
   };
 
+  // Filtrado de comprobantes
+  const comprobantesFiltrados = useMemo(() => {
+    return comprobantes.filter((c) => {
+      if (filtroTipo !== 'TODOS' && c.tipo !== filtroTipo) {
+        return false;
+      }
+      if (filtroEstado !== 'TODOS' && c.emision !== filtroEstado) {
+        return false;
+      }
+      if (busqueda.trim()) {
+        const q = busqueda.trim().toLowerCase();
+        const coincideNumero = c.numero_texto?.toLowerCase().includes(q) ?? false;
+        const coincidePedido = (c.codigo_pedido || c.codigo || '').toLowerCase().includes(q);
+        const coincideDoc = (c.documento || '').toLowerCase().includes(q);
+        const coincideRazon = (c.razon_social || '').toLowerCase().includes(q);
+        return coincideNumero || coincidePedido || coincideDoc || coincideRazon;
+      }
+      return true;
+    });
+  }, [comprobantes, filtroTipo, filtroEstado, busqueda]);
+
   if (cargando && comprobantes.length === 0) {
     return <Cargando mensaje="Cargando comprobantes por emitir..." />;
   }
@@ -121,38 +163,129 @@ export function PorEmitirTab() {
   const totalPaginas = Math.max(1, Math.ceil(total / limite));
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-        <div>
-          <h2 style={{ fontSize: '18px', color: 'var(--cp-navy)' }}>
-            Cola por emitir en facturador externo
-          </h2>
-          <p style={{ margin: '4px 0 0', color: 'var(--cp-soft)', fontSize: '13px' }}>
-            Boletas y facturas emitidas internamente pendientes de registro en SUNAT / facturador externo (DT-11).
-          </p>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
+      {/* Barra de Filtros, Búsqueda y Actualización */}
+      <div className="comprobantes-barra-filtros">
+        <div className="comprobantes-busqueda-fila">
+          <label htmlFor="busqueda-comprobantes" style={{ position: 'absolute', left: -9999 }}>
+            Buscar comprobante
+          </label>
+          <input
+            id="busqueda-comprobantes"
+            type="search"
+            className="comprobantes-busqueda-input"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar por número, pedido, cliente o documento..."
+          />
+
+          <Boton
+            variante="secundario"
+            onClick={() => cargarComprobantes(pagina)}
+            cargando={cargando}
+            title="Actualizar lista de comprobantes"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M23 4v6h-6" />
+              <path d="M1 20v-6h6" />
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+            </svg>
+            Actualizar cola
+          </Boton>
         </div>
-        <Boton
-          variante="secundario"
-          onClick={() => cargarComprobantes(pagina)}
-          cargando={cargando}
-        >
-          Actualizar cola
-        </Boton>
+
+        {/* Fila de píldoras de filtro */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+            <div className="comprobantes-pildoras-grupo">
+              <span className="comprobantes-pildora-etiqueta">Tipo:</span>
+              <button
+                type="button"
+                className={`comprobantes-pildora ${filtroTipo === 'TODOS' ? 'activa' : ''}`}
+                onClick={() => setFiltroTipo('TODOS')}
+              >
+                Todos
+              </button>
+              <button
+                type="button"
+                className={`comprobantes-pildora ${filtroTipo === 'BOLETA' ? 'activa' : ''}`}
+                onClick={() => setFiltroTipo('BOLETA')}
+              >
+                Boletas
+              </button>
+              <button
+                type="button"
+                className={`comprobantes-pildora ${filtroTipo === 'FACTURA' ? 'activa' : ''}`}
+                onClick={() => setFiltroTipo('FACTURA')}
+              >
+                Facturas
+              </button>
+            </div>
+
+            <div className="comprobantes-pildoras-grupo">
+              <span className="comprobantes-pildora-etiqueta">Estado:</span>
+              <button
+                type="button"
+                className={`comprobantes-pildora ${filtroEstado === 'TODOS' ? 'activa' : ''}`}
+                onClick={() => setFiltroEstado('TODOS')}
+              >
+                Todos
+              </button>
+              <button
+                type="button"
+                className={`comprobantes-pildora ${filtroEstado === 'POR_EMITIR' ? 'activa' : ''}`}
+                onClick={() => setFiltroEstado('POR_EMITIR')}
+              >
+                Por emitir
+              </button>
+            </div>
+          </div>
+
+          <div style={{ fontSize: '13px', color: 'var(--cp-soft)', fontWeight: 700 }}>
+            {comprobantesFiltrados.length} {comprobantesFiltrados.length === 1 ? 'pendiente' : 'pendientes'}
+          </div>
+        </div>
       </div>
 
       {mensajeCopia && (
         <div
           role="status"
           style={{
-            padding: '10px 14px',
-            borderRadius: '8px',
+            padding: '12px 16px',
+            borderRadius: '10px',
             backgroundColor: 'var(--cp-greenbg)',
             color: 'var(--cp-green)',
             fontWeight: 700,
-            fontSize: '13px',
-            border: '1px solid var(--cp-green)',
+            fontSize: '14px',
+            border: '1.5px solid var(--cp-green)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
           }}
         >
+          <svg
+            viewBox="0 0 24 24"
+            width="18"
+            height="18"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
           {mensajeCopia}
         </div>
       )}
@@ -162,72 +295,147 @@ export function PorEmitirTab() {
           titulo="No hay comprobantes pendientes"
           mensaje="Todas las boletas y facturas han sido emitidas o aún no se han generado cobros."
         />
+      ) : comprobantesFiltrados.length === 0 ? (
+        <EstadoVacio
+          titulo="Ningún comprobante coincide"
+          mensaje="No se encontraron comprobantes que coincidan con la búsqueda o filtros seleccionados."
+        />
       ) : (
         <>
-          <div className="tabla-tactil-envoltura">
-            <table className="tabla-tactil">
-              <thead>
-                <tr>
-                  <th>Tipo</th>
-                  <th>Número</th>
-                  <th>Pedido</th>
-                  <th>Documento</th>
-                  <th>Razón social / Cliente</th>
-                  <th>Total</th>
-                  <th>Fecha</th>
-                  <th style={{ textAlign: 'right' }}>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {comprobantes.map((c) => {
-                  const docMostrar = enmascararDocumento(c.documento, esAdmin);
-                  const fechaStr = c.fecha_lima || (c.fecha ? new Date(c.fecha).toLocaleString('es-PE') : '-');
+          {/* Cuadrícula de Tarjetas de Comprobante */}
+          <div className="comprobantes-grid">
+            {comprobantesFiltrados.map((c) => {
+              const docMostrar = enmascararDocumento(c.documento, esAdmin);
+              const fechaStr = c.fecha_lima || (c.fecha ? new Date(c.fecha).toLocaleString('es-PE') : '-');
 
-                  return (
-                    <tr key={c.id}>
-                      <td>
-                        <Insignia variante={c.tipo === 'FACTURA' ? 'aviso' : 'acento'}>
-                          {c.tipo}
-                        </Insignia>
-                      </td>
-                      <td style={{ fontWeight: 800 }}>{c.numero_texto}</td>
-                      <td>
-                        <span style={{ fontWeight: 700, color: 'var(--cp-navy)' }}>
-                          {c.codigo_pedido || c.codigo || '-'}
-                        </span>
-                      </td>
-                      <td style={{ fontFamily: 'monospace', fontWeight: 600 }}>
+              return (
+                <div key={c.id} className="comprobante-card">
+                  {/* Cabecera de la tarjeta: Insignia de tipo, estado y número */}
+                  <div className="comprobante-card-cabecera">
+                    <div className="comprobante-card-insignias">
+                      <Insignia variante={c.tipo === 'FACTURA' ? 'aviso' : c.tipo === 'BOLETA' ? 'acento' : 'neutro'}>
+                        {c.tipo === 'BOLETA' ? 'Boleta' : c.tipo === 'FACTURA' ? 'Factura' : c.tipo}
+                      </Insignia>
+                      <Insignia variante="aviso">
+                        Por emitir
+                      </Insignia>
+                    </div>
+                    <div className="comprobante-card-numero">
+                      {c.numero_texto}
+                    </div>
+                  </div>
+
+                  {/* Datos del comprobante */}
+                  <div className="comprobante-datos-grid">
+                    <div className="comprobante-dato-item">
+                      <span className="comprobante-dato-label">Pedido</span>
+                      <span className="comprobante-dato-valor codigo">
+                        {c.codigo_pedido || c.codigo || '-'}
+                      </span>
+                    </div>
+
+                    <div className="comprobante-dato-item">
+                      <span className="comprobante-dato-label">Documento</span>
+                      <span className="comprobante-dato-valor mono">
                         {docMostrar}
-                      </td>
-                      <td>{c.razon_social || '-'}</td>
-                      <td style={{ fontWeight: 800, color: 'var(--cp-rust)' }}>
-                        {formatearSoles(c.total)}
-                      </td>
-                      <td style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
+                      </span>
+                    </div>
+
+                    <div className="comprobante-dato-item comprobante-dato-full">
+                      <span className="comprobante-dato-label">Razón social / Cliente</span>
+                      <span className="comprobante-dato-valor">
+                        {c.razon_social || '-'}
+                      </span>
+                    </div>
+
+                    <div className="comprobante-dato-item comprobante-dato-full">
+                      <span className="comprobante-dato-label">Fecha de emisión</span>
+                      <span className="comprobante-dato-valor" style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
                         {fechaStr}
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                          <Boton
-                            variante="secundario"
-                            onClick={() => handleCopiar(c)}
-                            title="Copiar datos al portapapeles"
-                          >
-                            Copiar datos
-                          </Boton>
-                          <Boton
-                            variante="primario"
-                            onClick={() => iniciarMarcarEmitido(c)}
-                          >
-                            Marcar emitido
-                          </Boton>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Fila de Total destacado */}
+                  <div className="comprobante-total-fila">
+                    <span className="comprobante-total-label">Total a emitir</span>
+                    <span className="comprobante-total-monto">
+                      {formatearSoles(c.total)}
+                    </span>
+                  </div>
+
+                  {/* Acciones claras y grandes */}
+                  <div className="comprobante-acciones">
+                    <Boton
+                      variante="secundario"
+                      onClick={() => handleCopiar(c)}
+                      title="Copiar datos al portapapeles"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="16"
+                        height="16"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                        style={{ marginRight: '6px' }}
+                      >
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                      </svg>
+                      Copiar datos
+                    </Boton>
+
+                    <Boton
+                      variante="primario"
+                      onClick={() => iniciarMarcarEmitido(c)}
+                      title="Marcar como emitido en el facturador"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="16"
+                        height="16"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                        style={{ marginRight: '6px' }}
+                      >
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                        <polyline points="22 4 12 14.01 9 11.01" />
+                      </svg>
+                      Marcar emitido
+                    </Boton>
+
+                    {alVerNota && (c.pedido_id || c.id) && (
+                      <button
+                        type="button"
+                        onClick={() => alVerNota(c.pedido_id || c.id)}
+                        style={{
+                          width: '100%',
+                          minHeight: '36px',
+                          border: 'none',
+                          background: 'transparent',
+                          color: 'var(--cp-navy)',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          textDecoration: 'underline',
+                          padding: '4px',
+                        }}
+                      >
+                        Ver nota de venta térmica
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           <Paginacion
@@ -253,11 +461,12 @@ export function PorEmitirTab() {
             right: 0,
             bottom: 0,
             zIndex: 90,
-            backgroundColor: 'rgba(11, 44, 62, 0.45)',
+            backgroundColor: 'rgba(11, 44, 62, 0.5)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             padding: '16px',
+            backdropFilter: 'blur(2px)',
           }}
         >
           <div
@@ -265,20 +474,21 @@ export function PorEmitirTab() {
               backgroundColor: 'var(--cp-white)',
               borderRadius: '16px',
               border: '1.5px solid var(--cp-navy)',
-              boxShadow: '0 12px 36px rgba(0,0,0,0.25)',
+              boxShadow: '0 16px 40px rgba(0, 0, 0, 0.25)',
               padding: '24px',
               maxWidth: '440px',
               width: '100%',
               display: 'flex',
               flexDirection: 'column',
               gap: '16px',
+              boxSizing: 'border-box',
             }}
           >
             <div>
-              <h3 id="titulo-marcar-emitido" style={{ fontSize: '18px', color: 'var(--cp-navy)' }}>
+              <h3 id="titulo-marcar-emitido" style={{ fontSize: '18px', color: 'var(--cp-navy)', margin: 0, fontWeight: 800 }}>
                 Marcar como emitido
               </h3>
-              <p style={{ margin: '6px 0 0', color: 'var(--cp-soft)', fontSize: '13px' }}>
+              <p style={{ margin: '8px 0 0', color: 'var(--cp-soft)', fontSize: '13px', lineHeight: '18px' }}>
                 Comprobante: <b>{itemParaEmitir.tipo} {itemParaEmitir.numero_texto}</b>
                 <br />
                 Pedido: <b>{itemParaEmitir.codigo_pedido || itemParaEmitir.codigo}</b> · Monto: <b>{formatearSoles(itemParaEmitir.total)}</b>

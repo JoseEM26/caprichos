@@ -1,83 +1,291 @@
-/* Estilos de comprobantes y nota de venta (80mm) */
+/* Estilos de comprobantes y nota de venta (80mm) - Rediseño con Tarjetas */
 
 .comprobantes-contenedor {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
   width: 100%;
+  box-sizing: border-box;
 }
 
+/* Pestañas de navegación estilo píldoras */
 .comprobantes-tabs {
   display: flex;
   gap: 8px;
   border-bottom: 2px solid var(--cp-line);
-  padding-bottom: 8px;
-  margin-bottom: 12px;
+  padding-bottom: 12px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
 }
 
 .comprobantes-tab-btn {
   min-height: 44px;
-  padding: 0 18px;
-  border-radius: 8px;
+  padding: 0 20px;
+  border-radius: 9999px;
   font-weight: 700;
   font-size: 14px;
   cursor: pointer;
   border: 1.5px solid var(--cp-navy);
   transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: inherit;
+  background-color: var(--cp-white);
+  color: var(--cp-navy);
 }
 
 .comprobantes-tab-btn.activo {
   background-color: var(--cp-navy);
   color: var(--cp-cream);
+  border-color: var(--cp-navy);
+  box-shadow: 0 2px 8px rgba(11, 44, 62, 0.2);
 }
 
-.comprobantes-tab-btn:not(.activo) {
-  background-color: transparent;
-  color: var(--cp-navy);
+.comprobantes-tab-btn:not(.activo):hover {
+  background-color: var(--cp-sand);
 }
 
-/* Tabla táctil */
-.tabla-tactil-envoltura {
-  width: 100%;
-  overflow-x: auto;
+/* Barra de filtros y búsqueda */
+.comprobantes-barra-filtros {
+  background-color: var(--cp-white);
   border: 1px solid var(--cp-line);
-  border-radius: 12px;
+  border-radius: 14px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 2px 8px rgba(11, 44, 62, 0.04);
+}
+
+.comprobantes-busqueda-fila {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.comprobantes-busqueda-input {
+  flex: 1 1 200px;
+  min-width: 0;
+  box-sizing: border-box;
+  height: 44px;
+  min-height: 44px;
+  border-radius: 9999px;
+  border: 1.5px solid var(--cp-line);
+  background-color: var(--cp-cream);
+  color: var(--cp-navy);
+  padding: 0 16px;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.comprobantes-busqueda-input:focus {
+  border-color: var(--cp-orange);
+  box-shadow: 0 0 0 3px rgba(230, 121, 41, 0.2);
   background-color: var(--cp-white);
 }
 
-.tabla-tactil {
-  width: 100%;
-  border-collapse: collapse;
-  text-align: left;
+.comprobantes-pildoras-grupo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
-.tabla-tactil th {
-  background-color: var(--cp-sand);
-  color: var(--cp-navy);
+.comprobantes-pildora-etiqueta {
+  font-size: 12px;
   font-weight: 800;
+  color: var(--cp-soft);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-right: 2px;
+}
+
+.comprobantes-pildora {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 9999px;
+  border: 1.5px solid var(--cp-line);
+  background-color: var(--cp-white);
+  color: var(--cp-navy);
   font-size: 13px;
-  padding: 12px 14px;
-  border-bottom: 1.5px solid var(--cp-line);
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+  font-family: inherit;
 }
 
-.tabla-tactil td {
-  padding: 12px 14px;
+.comprobantes-pildora:hover {
+  border-color: var(--cp-navy);
+  background-color: var(--cp-sand);
+}
+
+.comprobantes-pildora.activa {
+  background-color: var(--cp-navy);
+  color: var(--cp-cream);
+  border-color: var(--cp-navy);
+}
+
+/* Cuadrícula de tarjetas de comprobantes */
+.comprobantes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Tarjeta individual de comprobante */
+.comprobante-card {
+  background-color: var(--cp-white);
+  border: 1.5px solid var(--cp-line);
+  border-radius: 16px;
+  box-shadow: 0 4px 14px rgba(11, 44, 62, 0.07);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  box-sizing: border-box;
+}
+
+.comprobante-card:hover {
+  border-color: var(--cp-orange);
+  box-shadow: 0 8px 24px rgba(11, 44, 62, 0.12);
+}
+
+.comprobante-card-cabecera {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
   border-bottom: 1px solid var(--cp-line);
+  padding-bottom: 10px;
+}
+
+.comprobante-card-insignias {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.comprobante-card-numero {
+  font-family: Montserrat, sans-serif;
+  font-weight: 800;
+  font-size: 16px;
+  color: var(--cp-navy);
+  text-align: right;
+  word-break: break-all;
+}
+
+/* Cuadrícula de datos del comprobante */
+.comprobante-datos-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+}
+
+.comprobante-dato-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.comprobante-dato-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--cp-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.comprobante-dato-valor {
   font-size: 14px;
-  vertical-align: middle;
+  font-weight: 600;
+  color: var(--cp-navy);
+  word-break: break-word;
 }
 
-.tabla-tactil tr:hover {
-  background-color: rgba(230, 121, 41, 0.05);
+.comprobante-dato-valor.codigo {
+  font-weight: 800;
+  color: var(--cp-navy);
 }
 
-/* Nota de venta ticket 80 mm */
+.comprobante-dato-valor.mono {
+  font-family: 'Courier New', Courier, monospace;
+  font-weight: 700;
+}
+
+.comprobante-dato-full {
+  grid-column: 1 / -1;
+}
+
+/* Fila de total */
+.comprobante-total-fila {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  background-color: var(--cp-sand);
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--cp-line);
+}
+
+.comprobante-total-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--cp-navy);
+}
+
+.comprobante-total-monto {
+  font-family: Montserrat, sans-serif;
+  font-weight: 800;
+  font-size: 20px;
+  color: var(--cp-rust);
+}
+
+/* Botones de acción de la tarjeta */
+.comprobante-acciones {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.comprobante-acciones > button,
+.comprobante-acciones > * {
+  flex: 1 1 120px;
+}
+
+/* Tarjeta del buscador en Nota de Venta */
+.comprobantes-panel-busqueda {
+  background-color: var(--cp-white);
+  border: 1.5px solid var(--cp-line);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 14px rgba(11, 44, 62, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Ticket de 80 mm */
 .ticket-vista {
   width: min(100%, 340px);
   margin: 0 auto;
   background-color: var(--cp-white);
   border: 1px solid var(--cp-line2);
-  box-shadow: 0 4px 14px rgba(11, 44, 62, 0.12);
+  box-shadow: 0 6px 20px rgba(11, 44, 62, 0.14);
+  border-radius: 8px;
   padding: 20px 16px;
   font-family: 'Courier New', Courier, monospace;
   font-size: 13px;
@@ -121,6 +329,47 @@
   font-size: 12px;
   border-radius: 4px;
   margin: 6px 0;
+}
+
+/* Ajustes para móviles (390px) */
+@media (max-width: 480px) {
+  .comprobantes-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .comprobante-acciones {
+    flex-direction: column;
+  }
+
+  .comprobante-acciones > button,
+  .comprobante-acciones > * {
+    width: 100%;
+    flex: 1 1 auto;
+  }
+
+  .comprobantes-tabs {
+    flex-direction: column;
+  }
+
+  .comprobantes-tab-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .comprobantes-busqueda-fila {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .comprobantes-busqueda-input {
+    width: 100%;
+    flex: none;
+    height: 44px;
+  }
+
+  .comprobantes-pildoras-grupo {
+    width: 100%;
+  }
 }
 
 /* Impresión física de 80 mm */
