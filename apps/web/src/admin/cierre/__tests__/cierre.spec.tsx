@@ -291,6 +291,26 @@ describe('Ola F5: Caja y Cierres', () => {
     expect(screen.getByRole('button', { name: 'Cerrar caja y cuadrar' })).toBeInTheDocument();
   });
 
+  it('el cajero ve que la caja de un día anterior sigue abierta, no «Caja cerrada», y puede cerrarla', async () => {
+    vi.spyOn(pedidosApi, 'obtenerCajaActual').mockResolvedValue({
+      abierta: false,
+      caja: null,
+      cajaAnteriorAbierta: { fecha: '2026-10-22' },
+    } as any);
+    vi.spyOn(pedidosApi, 'listarMovimientos').mockResolvedValue([]);
+    vi.spyOn(pedidosApi, 'listar').mockResolvedValue({ items: [] } as any);
+    vi.spyOn(cierreApi, 'listarRepartidoresPorLiquidar').mockResolvedValue([]);
+    const esperado = vi.spyOn(cierreApi, 'obtenerEsperado');
+
+    render(<CierreView />);
+
+    expect(await screen.findByText(/La caja del 22\/10\/2026 sigue abierta/)).toBeInTheDocument();
+    expect(screen.queryByText('Caja cerrada. Se abre en cero cada mañana.')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Abrir caja' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cerrar caja y cuadrar' })).toBeInTheDocument();
+    expect(esperado).not.toHaveBeenCalled();
+  });
+
   it('el cajero cuenta con el arqueo del servidor y no pide el esperado', async () => {
     vi.spyOn(pedidosApi, 'obtenerCajaActual').mockResolvedValue({ abierta: true, caja: { id: 7, estado: 'ABIERTA', apertura: 0 } } as any);
     vi.spyOn(pedidosApi, 'listarMovimientos').mockResolvedValue([]);

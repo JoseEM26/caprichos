@@ -120,6 +120,7 @@ export interface CajaInfo {
 export interface CajaActualRespuesta {
   caja: CajaInfo | null;
   abierta: boolean;
+  cajaAnteriorAbierta?: { fecha: string } | null;
   totalesPorMedio: Record<string, number>;
   resumen: {
     apertura: number;

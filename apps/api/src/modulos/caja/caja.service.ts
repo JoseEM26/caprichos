@@ -13,6 +13,7 @@ import {
   bloquearCaja,
   calcularMontosCaja,
   enPesos,
+  errorCajaAnteriorAbierta,
   esCentimosValidos,
 } from './caja.calculo';
 import { AbrirCajaDto } from './dto/abrir-caja.dto';
@@ -31,6 +32,8 @@ export interface EstadoCajaDia {
     cerrada_en: Date | null;
   } | null;
   abierta: boolean;
+  // Caja de un día anterior que sigue abierta (solo la fecha, sin montos): la ven todos los roles
+  cajaAnteriorAbierta?: { fecha: string } | null;
   totalesPorMedio?: Record<string, number>;
   resumen?: {
     apertura: number;
@@ -112,16 +115,9 @@ export class CajaService {
     }
 
     // una caja de un día anterior sin cerrar bloquea la de hoy: se pide cerrarla primero (arqueo ciego)
-    const abiertaAnterior = await this.prisma.caja.findFirst({ where: { estado: 'ABIERTA' } });
-    if (abiertaAnterior) {
-      const dia = abiertaAnterior.fecha.toISOString().slice(0, 10).split('-').reverse().join('/');
-      throw new HttpException(
-        {
-          codigo: 'CAJA_ANTERIOR_SIN_CERRAR',
-          mensaje: `La caja del ${dia} sigue abierta: ciérrala en «Caja y cierres» antes de abrir la de hoy`,
-        },
-        HttpStatus.CONFLICT,
-      );
+    const errorAnterior = await errorCajaAnteriorAbierta(this.prisma);
+    if (errorAnterior) {
+      throw errorAnterior;
     }
 
     let caja;
@@ -194,9 +190,16 @@ export class CajaService {
     });
 
     if (!caja) {
+      const anterior = await this.prisma.caja.findFirst({
+        where: { estado: 'ABIERTA' },
+        select: { fecha: true },
+      });
       return {
         caja: null,
         abierta: false,
+        cajaAnteriorAbierta: anterior
+          ? { fecha: anterior.fecha.toISOString().slice(0, 10) }
+          : null,
         ...(usuario?.rol === 'ADMIN' ? this.resumenVacio() : {}),
       };
     }
@@ -308,13 +311,13 @@ export class CajaService {
     });
 
     if (!caja) {
-      throw this.errorCajaNoAbierta();
+      throw await this.errorCajaNoAbierta();
     }
 
     const mov = await this.prisma.$transaction(async (tx) => {
       const cajaBloqueada = await bloquearCaja(tx, caja.id);
       if (!cajaBloqueada || cajaBloqueada.estado !== 'ABIERTA') {
-        throw this.errorCajaNoAbierta();
+        throw await this.errorCajaNoAbierta();
       }
 
       return tx.movimientoCaja.create({
@@ -356,13 +359,16 @@ export class CajaService {
     };
   }
 
-  private errorCajaNoAbierta() {
-    return new HttpException(
-      {
-        codigo: 'CAJA_CERRADA',
-        mensaje: 'No hay una caja abierta para registrar movimientos',
-      },
-      HttpStatus.CONFLICT,
+  private async errorCajaNoAbierta() {
+    return (
+      (await errorCajaAnteriorAbierta(this.prisma)) ??
+      new HttpException(
+        {
+          codigo: 'CAJA_CERRADA',
+          mensaje: 'No hay una caja abierta para registrar movimientos',
+        },
+        HttpStatus.CONFLICT,
+      )
     );
   }
 

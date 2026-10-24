@@ -23,6 +23,7 @@ import {
   aCentimos,
   bloquearCaja,
   enPesos,
+  errorCajaAnteriorAbierta,
   esCentimosValidos,
 } from './caja.calculo';
 import { CobrarDto } from './dto/cobrar.dto';
@@ -226,12 +227,15 @@ export class CobrosService {
       const caja = cajaHoy ? await bloquearCaja(tx, cajaHoy.id) : null;
 
       if (!caja) {
-        throw new HttpException(
-          {
-            codigo: 'CAJA_CERRADA',
-            mensaje: 'Abre la caja para cobrar',
-          },
-          HttpStatus.CONFLICT,
+        throw (
+          (await errorCajaAnteriorAbierta(tx)) ??
+          new HttpException(
+            {
+              codigo: 'CAJA_CERRADA',
+              mensaje: 'Abre la caja para cobrar',
+            },
+            HttpStatus.CONFLICT,
+          )
         );
       }
 

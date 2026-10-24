@@ -1,3 +1,4 @@
+import { HttpException, HttpStatus } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
 /** Medios de pago que admite un cobro (RN-CAP-011). */
@@ -46,6 +47,24 @@ export function esCentimosValidos(valor: number): boolean {
 export async function bloquearCaja(tx: Prisma.TransactionClient, cajaId: bigint) {
   await tx.$queryRaw`SELECT id FROM caja WHERE id = ${cajaId} FOR UPDATE`;
   return tx.caja.findUnique({ where: { id: cajaId } });
+}
+
+/**
+ * Si una caja abierta de un día anterior impide tener la de hoy, devuelve el error que lo dice
+ * (CAJA_ANTERIOR_SIN_CERRAR). Abrir, cobrar y registrar movimientos lo usan: así no piden
+ * «abre la caja» cuando la de hoy no se puede abrir. Si no hay ninguna abierta, devuelve null.
+ */
+export async function errorCajaAnteriorAbierta(tx: Prisma.TransactionClient) {
+  const anterior = await tx.caja.findFirst({ where: { estado: 'ABIERTA' } });
+  if (!anterior) return null;
+  const dia = anterior.fecha.toISOString().slice(0, 10).split('-').reverse().join('/');
+  return new HttpException(
+    {
+      codigo: 'CAJA_ANTERIOR_SIN_CERRAR',
+      mensaje: `La caja del ${dia} sigue abierta: ciérrala en «Caja y cierres» antes de cobrar, registrar movimientos o abrir la de hoy`,
+    },
+    HttpStatus.CONFLICT,
+  );
 }
 
 /**

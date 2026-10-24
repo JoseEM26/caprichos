@@ -1,11 +1,26 @@
 import { Prisma } from '@prisma/client';
-import { aCentimos, calcularMontosCaja, efectivoDelRepartidor, esCentimosValidos } from './caja.calculo';
+import {
+  aCentimos,
+  calcularMontosCaja,
+  efectivoDelRepartidor,
+  errorCajaAnteriorAbierta,
+  esCentimosValidos,
+} from './caja.calculo';
 import { calcularTotalConteo } from '../cierre/cierre.util';
 
 describe('caja.calculo', () => {
   it('suma en céntimos: 0,1 + 0,2 es exactamente 0,30 (sin errores de float)', () => {
     expect(aCentimos(0.1) + aCentimos(0.2)).toBe(aCentimos(0.3));
     expect(calcularTotalConteo({ '0.1': 3, '0.2': 1 })).toBe(0.5);
+  });
+
+  it('si una caja de otro día sigue abierta, el error lo dice con su fecha; si no hay ninguna, no hay error', async () => {
+    const tx: any = { caja: { findFirst: jest.fn().mockResolvedValue({ fecha: new Date('2026-10-22T00:00:00.000Z') }) } };
+    await expect(errorCajaAnteriorAbierta(tx)).resolves.toMatchObject({
+      response: { codigo: 'CAJA_ANTERIOR_SIN_CERRAR', mensaje: expect.stringContaining('22/10/2026') },
+    });
+    tx.caja.findFirst.mockResolvedValue(null);
+    await expect(errorCajaAnteriorAbierta(tx)).resolves.toBeNull();
   });
 
   it('rechaza montos con más de dos decimales', () => {

@@ -64,6 +64,7 @@ describe('CobrosService', () => {
     prismaMock = {
       caja: {
         findUnique: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue(null),
       },
       pedido: {
         findUnique: jest.fn(),
@@ -139,6 +140,15 @@ describe('CobrosService', () => {
           status: HttpStatus.CONFLICT,
         }),
       );
+    });
+
+    it('sin caja de hoy pero con una de otro día abierta, dice que hay que cerrarla (no «abre la caja»)', async () => {
+      prismaMock.caja.findUnique.mockResolvedValue(null);
+      prismaMock.caja.findFirst.mockResolvedValue({ id: 7n, fecha: new Date('2026-10-22T00:00:00.000Z'), estado: 'ABIERTA' });
+
+      await expect(
+        service.cobrar({ pedidoId: '100', pagos: [{ medio: 'EFECTIVO', monto: 50 }] }, cajeroUsuario),
+      ).rejects.toMatchObject({ response: { codigo: 'CAJA_ANTERIOR_SIN_CERRAR' } });
     });
 
     it('caja cerrada no cobra -> 409 CAJA_CERRADA si la caja está en estado CERRADA', async () => {

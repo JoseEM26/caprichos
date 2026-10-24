@@ -140,6 +140,17 @@ describe('CajaService', () => {
       expect(res.efectivoEsperado).toBe(0);
     });
 
+    it('sin caja de hoy avisa de la caja de otro día que sigue abierta, solo con la fecha (también al cajero)', async () => {
+      prismaMock.caja.findUnique.mockResolvedValue(null);
+      prismaMock.caja.findFirst.mockResolvedValue({ fecha: new Date('2026-10-22T00:00:00.000Z') });
+
+      const res = await service.obtenerCajaActual({ rol: 'CAJERO' });
+
+      expect(res.caja).toBeNull();
+      expect(res.cajaAnteriorAbierta).toEqual({ fecha: '2026-10-22' });
+      expect(res).not.toHaveProperty('efectivoEsperado');
+    });
+
     it('debe calcular totales por medio y efectivo esperado correctamente', async () => {
       prismaMock.caja.findUnique.mockResolvedValue({
         id: 1n,

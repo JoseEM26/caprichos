@@ -29,7 +29,7 @@ export function CierreView() {
   const [errorCarga, setErrorCarga] = useState('');
   const [cajaAbierta, setCajaAbierta] = useState(false);
   // Caja de un día anterior que nunca se cerró (no es la de hoy)
-  const [cajaPendiente, setCajaPendiente] = useState<{ id: number; fecha: string } | null>(null);
+  const [cajaPendiente, setCajaPendiente] = useState<{ fecha: string } | null>(null);
   const [cajaId, setCajaId] = useState('');
   const cajeroNombre = usuario?.nombres ? `${usuario.nombres} (${usuario.rol?.toLowerCase() || 'cajero'})` : 'Cajera de turno';
   const [aperturaMonto, setAperturaMonto] = useState(0);
@@ -103,6 +103,8 @@ export function CierreView() {
         const cActual = await pedidosApi.obtenerCajaActual();
         if (cActual) {
           setCajaAbierta(cActual.abierta || cActual.caja?.estado === 'ABIERTA');
+          // Una caja de otro día sin cerrar también la ve el cajero: no debe leerse como «Caja cerrada»
+          setCajaPendiente(cActual.cajaAnteriorAbierta ?? null);
           if (cActual.caja) {
             setCajaId(`CJ-${String(cActual.caja.id).padStart(4, '0')}`);
             setAperturaMonto(Number(cActual.caja.apertura || 0));
@@ -127,7 +129,7 @@ export function CierreView() {
                 setAperturaMonto(esp.apertura || 0);
                 setCajaPendiente(null);
               } else {
-                setCajaPendiente({ id: esp.cajaId, fecha: fechaCaja });
+                setCajaPendiente({ fecha: fechaCaja });
               }
             }
           }
