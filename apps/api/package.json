@@ -21,7 +21,9 @@
     "seed:compras": "ts-node prisma/seed-compras.ts",
     "seed:almacen": "ts-node prisma/seed-almacen-personal.ts",
     "seed:mensajes": "ts-node prisma/seed-atencion-mensajes.ts",
-    "seed:contenido": "ts-node prisma/seed-contenido-notificaciones.ts"
+    "seed:contenido": "ts-node prisma/seed-contenido-notificaciones.ts",
+    "seed:demo": "tsx prisma/seed-demo.ts",
+    "seed:usuarios-demo": "tsx prisma/seed-usuarios-demo.ts"
   },
   "dependencies": {
     "@caprichos/compartido": "workspace:*",

@@ -54,3 +54,6 @@ apps/api/data/uploads/
 
 # índice de CodeGraph (se regenera con codegraph init -i)
 .codegraph/
+
+# Respaldos de la demo (datos personales de clientes): nunca al repositorio
+infra/demo/respaldos/

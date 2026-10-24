@@ -17,13 +17,28 @@ async function bootstrap() {
   app.useLogger(pinoLogger);
   app.use(cookieParser());
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-  app.enableCors({ origin: true, credentials: true });
 
   const configService = app.get(ConfigService);
   const puerto = configService.get<number>('PORT', 3000);
   const ambiente = configService.get<string>('NODE_ENV', 'development');
   const version = configService.get<string>('APP_VERSION', '0.1.0');
   const commit = configService.get<string>('GIT_COMMIT', 'dev-local');
+
+  // Configuración de trust proxy para proxy inverso (Caddy / Cloudflare)
+  const trustProxy = configService.get<string>('TRUST_PROXY', '1');
+  if (trustProxy) {
+    const expressApp = app.getHttpAdapter().getInstance();
+    expressApp.set('trust proxy', trustProxy === 'true' || trustProxy === '1' ? 1 : trustProxy);
+  }
+
+  // Configuración de CORS estricto o por origen configurado
+  const corsOrigin = configService.get<string>('CORS_ORIGIN');
+  if (corsOrigin && corsOrigin !== '*') {
+    const origenes = corsOrigin.split(',').map((o) => o.trim());
+    app.enableCors({ origin: origenes, credentials: true });
+  } else {
+    app.enableCors({ origin: true, credentials: true });
+  }
 
   await app.listen(puerto, '0.0.0.0');
 

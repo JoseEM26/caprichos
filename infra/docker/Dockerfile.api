@@ -65,11 +65,16 @@ ENV NODE_ENV=production \
     UPLOADS_DIR=/data/uploads
 
 RUN apk add --no-cache openssl dumb-init curl \
+    && npm install -g prisma@6.19.3 tsx \
     && addgroup -g 1001 -S nodejs \
     && adduser -S nestjs -u 1001 \
     && mkdir -p /data/uploads && chown -R nestjs:nodejs /data
 
 COPY --from=prod --chown=nestjs:nodejs /out/ ./
+COPY --chown=nestjs:nodejs mockup/ /app/mockup/
+COPY --chown=nestjs:nodejs docs/analisis/ /app/docs/analisis/
+# Las semillas de demostración (prisma/seed-*.ts) importan los permisos del código fuente
+COPY --chown=nestjs:nodejs apps/api/src/modulos/acceso/permisos.ts /app/src/modulos/acceso/permisos.ts
 
 USER nestjs
 
