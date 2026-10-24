@@ -269,7 +269,7 @@ function TarjetaSeguimiento({ pedido, creacion, otros, onElegir, onCerrar }: Tar
   );
 }
 
-function PasoPedido({ paso, numero }: { paso: PasoSeguimiento; numero: number }) {
+export function PasoPedido({ paso, numero }: { paso: PasoSeguimiento; numero: number }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
       <span

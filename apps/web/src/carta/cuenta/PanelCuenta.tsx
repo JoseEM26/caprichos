@@ -126,7 +126,7 @@ function BotonesFoto() {
 }
 
 /** Ventana «Tu cuenta Caprichos»: ingresar, crear cuenta, ver mis puntos y editar mi perfil (mockup Main ▸ cuenta). */
-export function PanelCuenta() {
+export function PanelCuenta({ alVerPedidos }: { alVerPedidos?: () => void } = {}) {
   const { cliente, panelAbierto, cerrarPanel, ingresar, registrar, actualizarPerfil, salir } = useCuenta();
   const [pestana, setPestana] = useState<'in' | 'new'>('in');
   const [dni, setDni] = useState('');
@@ -377,6 +377,15 @@ export function PanelCuenta() {
               <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 34 }}>{cliente.puntos}</span>
               <span style={{ fontSize: 12, opacity: 0.85 }}>Los acumulas con cada pedido que haces con tu cuenta y los usas en tus siguientes pedidos.</span>
             </div>
+            <button
+              onClick={() => {
+                cerrarPanel();
+                alVerPedidos?.();
+              }}
+              style={botonSecundario}
+            >
+              Mis pedidos
+            </button>
             <button onClick={() => setConfirmarSalida(true)} style={botonSecundario}>
               Cerrar sesión
             </button>

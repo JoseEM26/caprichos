@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { CarritoProvider, useCarrito } from '../carta/CarritoContext';
 import { CabeceraCarta } from '../carta/CabeceraCarta';
 import { FormularioCheckout } from '../carta/FormularioCheckout';
 import { PantallaConfirmacion } from '../carta/PantallaConfirmacion';
+import { MisPedidos } from '../carta/MisPedidos';
 import { EstadoLocalCarta, DatosLocalCarta } from '../carta/tipos';
 import { guardarPedido, leerPedidosGuardados, PedidoGuardado, EstadoSeguimiento } from '../carta/seguimiento';
 import { api, ErrorApi } from '../comun/api';
@@ -70,8 +71,15 @@ function renderCabecera() {
         onCategoria={() => {}}
       />
       <PantallaConfirmacion />
+      <MisPedidos />
     </CarritoProvider>
   );
+}
+
+// Abre «Mi pedido» / «Mis pedidos» y después el detalle de uno de la lista
+async function abrirPedido(codigo: string) {
+  fireEvent.click(screen.getByRole('button', { name: /^Mis? pedidos?$/ }));
+  fireEvent.click(await screen.findByRole('button', { name: new RegExp(`^#${codigo}(?!\\d)`) }));
 }
 
 beforeEach(() => {
@@ -86,6 +94,10 @@ beforeEach(() => {
     salir: vi.fn(),
     refrescar: vi.fn(),
   } as unknown as ReturnType<typeof cuentaModulo.useCuenta>);
+  // Por defecto, cada pedido consultado en lote responde con el estado de la API de prueba
+  vi.spyOn(api, 'post').mockImplementation(async (_ruta: string, cuerpo: any) => ({
+    resultados: cuerpo.pedidos.map((p: { codigo: string }) => estadoApi({ codigo: p.codigo })),
+  }));
 });
 
 afterEach(() => {
@@ -160,16 +172,16 @@ describe('seguimiento del pedido en la carta', () => {
     });
   });
 
-  it('recupera los pedidos guardados al recargar y abre el más reciente con «Mi pedido»', async () => {
+  it('recupera los pedidos guardados al recargar y abre su detalle desde «Mi pedido»', async () => {
     guardarPedido(pedidoGuardado('PED-001'));
     vi.spyOn(api, 'get').mockResolvedValue(estadoApi());
 
     render(renderCabecera());
 
-    fireEvent.click(screen.getByRole('button', { name: /Mi pedido/i }));
+    await abrirPedido('PED-001');
 
-    expect(await screen.findByText('¡Gracias, Carlos!')).toBeInTheDocument();
-    expect(screen.getByText(/Recibimos tu pedido #PED-001/)).toBeInTheDocument();
+    expect(await screen.findByText('Pedido #PED-001')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Mis pedidos/ })).toBeInTheDocument();
   });
 
   it('quita el pedido de la lista cuando la API responde 404', async () => {
@@ -177,22 +189,24 @@ describe('seguimiento del pedido en la carta', () => {
     vi.spyOn(api, 'get').mockRejectedValue(new ErrorApi('NO_ENCONTRADO', 'no', 404));
 
     render(renderCabecera());
-    fireEvent.click(screen.getByRole('button', { name: /Mi pedido/i }));
+    await abrirPedido('PED-404');
 
     expect(await screen.findByText(/No encontramos este pedido/)).toBeInTheDocument();
     expect(leerPedidosGuardados()).toEqual([]);
   });
 
   it('el botón «Mi pedido» aparece solo si hay pedidos guardados', () => {
-    const { rerender } = render(renderCabecera());
+    render(renderCabecera());
     expect(screen.queryByRole('button', { name: /Mi pedido/i })).not.toBeInTheDocument();
 
-    guardarPedido(pedidoGuardado('PED-010'));
-    rerender(renderCabecera());
+    act(() => guardarPedido(pedidoGuardado('PED-010')));
     expect(screen.getByRole('button', { name: /Mi pedido/i })).toBeInTheDocument();
 
-    localStorage.clear();
-    rerender(renderCabecera());
+    // Otra pestaña borra los pedidos: el navegador avisa con el evento storage
+    act(() => {
+      localStorage.clear();
+      window.dispatchEvent(new Event('storage'));
+    });
     expect(screen.queryByRole('button', { name: /Mi pedido/i })).not.toBeInTheDocument();
   });
 
@@ -201,7 +215,7 @@ describe('seguimiento del pedido en la carta', () => {
     vi.spyOn(api, 'get').mockResolvedValue(estadoApi());
 
     render(renderCabecera());
-    fireEvent.click(screen.getByRole('button', { name: /Mi pedido/i }));
+    await abrirPedido('PED-001');
 
     expect(await screen.findByText('En preparación en cocina')).toBeInTheDocument();
     expect(screen.getAllByText('En camino').length).toBeGreaterThan(0);
@@ -225,46 +239,41 @@ describe('seguimiento del pedido en la carta', () => {
     );
 
     render(renderCabecera());
-    fireEvent.click(screen.getByRole('button', { name: /Mi pedido/i }));
+    await abrirPedido('PED-001');
 
     expect(await screen.findByText('Tu pedido fue anulado')).toBeInTheDocument();
     expect(screen.queryByText('Entregado')).not.toBeInTheDocument();
   });
 
-  it('un pedido terminado hace más de 3 horas se quita al consultarlo', async () => {
+  it('un pedido terminado se conserva en el navegador aunque pasen más de 3 horas', async () => {
     const hace4Horas = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
     guardarPedido(pedidoGuardado('PED-VIEJO', { creadoEn: hace4Horas }));
-    vi.spyOn(api, 'get').mockResolvedValue(estadoApi({ codigo: 'PED-VIEJO', terminado: true, estado: 'ENTREGADO' }));
+    vi.spyOn(api, 'post').mockResolvedValue({
+      resultados: [estadoApi({ codigo: 'PED-VIEJO', terminado: true, estado: 'ENTREGADO', estadoEtiqueta: 'Entregado' })],
+    });
 
     render(renderCabecera());
     fireEvent.click(screen.getByRole('button', { name: /Mi pedido/i }));
 
-    await waitFor(() => expect(leerPedidosGuardados()).toEqual([]));
-  });
-
-  it('un pedido terminado hace menos de 3 horas se conserva', async () => {
-    guardarPedido(pedidoGuardado('PED-NUEVO'));
-    vi.spyOn(api, 'get').mockResolvedValue(estadoApi({ codigo: 'PED-NUEVO', terminado: true, estado: 'ENTREGADO' }));
-
-    render(renderCabecera());
-    fireEvent.click(screen.getByRole('button', { name: /Mi pedido/i }));
-
-    expect(await screen.findByText('En preparación en cocina')).toBeInTheDocument();
+    await waitFor(() => expect(leerPedidosGuardados()[0]?.terminado).toBe(true));
     expect(leerPedidosGuardados()).toHaveLength(1);
   });
 
-  it('con varios pedidos, la pantalla ofrece los otros con su estado para elegir', async () => {
+  it('con varios pedidos, la lista muestra el estado de cada uno', async () => {
     guardarPedido(pedidoGuardado('PED-001'));
     guardarPedido(pedidoGuardado('PED-002'));
-    vi.spyOn(api, 'get').mockImplementation(async (ruta: string) =>
-      ruta.includes('PED-002') ? estadoApi({ codigo: 'PED-002', estadoEtiqueta: 'Listo para recoger' }) : estadoApi(),
-    );
+    vi.spyOn(api, 'post').mockResolvedValue({
+      resultados: [
+        estadoApi({ codigo: 'PED-001' }),
+        estadoApi({ codigo: 'PED-002', estadoEtiqueta: 'Listo para recoger' }),
+      ],
+    });
 
     render(renderCabecera());
-    fireEvent.click(screen.getByRole('button', { name: /Mi pedido/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Mis pedidos/i }));
 
-    expect(await screen.findByText('Tus otros pedidos')).toBeInTheDocument();
     expect(await screen.findByText('Listo para recoger')).toBeInTheDocument();
+    expect(screen.getByText('En camino')).toBeInTheDocument();
   });
 
   it('si localStorage lanza error, la carta no se rompe y no muestra «Mi pedido»', () => {

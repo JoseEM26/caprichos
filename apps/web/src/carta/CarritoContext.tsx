@@ -34,6 +34,8 @@ interface CarritoContextoValor {
   setPedidoConfirmado: (p: PedidoConfirmado | null) => void;
   seguimientoAbierto: PedidoGuardado | null;
   setSeguimientoAbierto: (p: PedidoGuardado | null) => void;
+  listaPedidosAbierta: boolean;
+  setListaPedidosAbierta: (abierta: boolean) => void;
 }
 
 const CarritoContext = createContext<CarritoContextoValor | undefined>(undefined);
@@ -60,6 +62,7 @@ export function CarritoProvider({ children }: { children: React.ReactNode }) {
   const [notificacion, setNotificacion] = useState<NotificacionAgregadoItem | null>(null);
   const [pedidoConfirmado, setPedidoConfirmado] = useState<PedidoConfirmado | null>(null);
   const [seguimientoAbierto, setSeguimientoAbierto] = useState<PedidoGuardado | null>(null);
+  const [listaPedidosAbierta, setListaPedidosAbierta] = useState(false);
 
   // Guardar en sessionStorage ante cada cambio
   useEffect(() => {
@@ -167,6 +170,8 @@ export function CarritoProvider({ children }: { children: React.ReactNode }) {
         setPedidoConfirmado,
         seguimientoAbierto,
         setSeguimientoAbierto,
+        listaPedidosAbierta,
+        setListaPedidosAbierta,
       }}
     >
       {children}

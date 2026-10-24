@@ -22,6 +22,7 @@ import { VentanaProductoCarta } from './VentanaProductoCarta';
 import { CajonCarrito } from './CajonCarrito';
 import { FormularioCheckout } from './FormularioCheckout';
 import { PantallaConfirmacion } from './PantallaConfirmacion';
+import { MisPedidos } from './MisPedidos';
 import { NotificacionAgregado } from './NotificacionAgregado';
 import { DecoracionAnimada } from './contenido/DecoracionAnimada';
 import { VisorHistoriasModal, extraerOffDeUrl, limpiarUrlFoto } from './contenido/VisorHistoriasModal';
@@ -102,7 +103,7 @@ function ContenidoCartaPublica() {
   const [pagina, setPagina] = useState<PaginaCarta>('carta');
   const movil = useEsMovil();
 
-  const { productoEnModal, cerrarModalProducto, abrirModalProducto } = useCarrito();
+  const { productoEnModal, cerrarModalProducto, abrirModalProducto, setListaPedidosAbierta } = useCarrito();
 
   const cargarDatos = async () => {
     setCargando(true);
@@ -681,11 +682,14 @@ function ContenidoCartaPublica() {
       {/* Pantalla de confirmación de pedido */}
       <PantallaConfirmacion />
 
+      {/* Historial de pedidos («Mis pedidos») */}
+      <MisPedidos />
+
       {/* Notificación Toast "Agregado a tu pedido" */}
       <NotificacionAgregado />
 
       {/* Cuenta del cliente */}
-      <PanelCuenta />
+      <PanelCuenta alVerPedidos={() => setListaPedidosAbierta(true)} />
     </div>
   );
 }

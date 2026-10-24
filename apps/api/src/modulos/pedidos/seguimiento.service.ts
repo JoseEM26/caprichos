@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { obtenerFechaHoraLima } from '../local/local.util';
-import { verificarTokenSeguimiento } from './seguimiento.tokens';
+import { generarTokenSeguimiento, verificarTokenSeguimiento } from './seguimiento.tokens';
 
 type Modalidad = 'DELIVERY' | 'RECOGER' | 'MESA';
 
@@ -112,6 +112,35 @@ export interface SeguimientoPedido {
   pasos: PasoSeguimiento[];
 }
 
+// Campos que necesita el seguimiento: nada personal (nombre, teléfono, dirección, coordenadas)
+const SELECCION_SEGUIMIENTO = {
+  id: true,
+  codigo: true,
+  estado: true,
+  modalidad: true,
+  total: true,
+  creado_en: true,
+  pasa_cocina_en: true,
+  listo_en: true,
+  despachado_en: true,
+  entregado_en: true,
+  historial: {
+    select: { estado_nuevo: true, en: true },
+    orderBy: { en: 'asc' as const },
+  },
+};
+
+const TAMANO_PAGINA_CUENTA = 10;
+const MAX_PRODUCTOS_RESUMEN = 3;
+
+export const MAX_PEDIDOS_LOTE = 20;
+
+export interface PedidoCuenta extends SeguimientoPedido {
+  creadoEn: string;
+  resumen: string;
+  seguimientoToken: string;
+}
+
 type PedidoSeguimiento = {
   id: bigint;
   codigo: string;
@@ -138,22 +167,7 @@ export class SeguimientoService {
   async obtener(codigo: string, token: string | undefined): Promise<SeguimientoPedido> {
     const pedido = await this.prisma.pedido.findUnique({
       where: { codigo },
-      select: {
-        id: true,
-        codigo: true,
-        estado: true,
-        modalidad: true,
-        total: true,
-        creado_en: true,
-        pasa_cocina_en: true,
-        listo_en: true,
-        despachado_en: true,
-        entregado_en: true,
-        historial: {
-          select: { estado_nuevo: true, en: true },
-          orderBy: { en: 'asc' },
-        },
-      },
+      select: SELECCION_SEGUIMIENTO,
     });
 
     if (!pedido || !verificarTokenSeguimiento(pedido.id, token)) {
@@ -164,6 +178,55 @@ export class SeguimientoService {
     }
 
     return this.construir(pedido as PedidoSeguimiento);
+  }
+
+  /**
+   * Varios pedidos del invitado en una consulta (POST /carta/seguimiento/lote).
+   * Cada entrada sin token válido o inexistente responde igual: { codigo, noEncontrado: true }.
+   */
+  async obtenerLote(pedidos: { codigo: string; t?: string }[]): Promise<(SeguimientoPedido | { codigo: string; noEncontrado: true })[]> {
+    const encontrados = await this.prisma.pedido.findMany({
+      where: { codigo: { in: pedidos.map((p) => p.codigo) } },
+      select: SELECCION_SEGUIMIENTO,
+    });
+    const porCodigo = new Map(encontrados.map((p) => [p.codigo, p]));
+
+    return pedidos.map(({ codigo, t }) => {
+      const pedido = porCodigo.get(codigo);
+      if (!pedido || !verificarTokenSeguimiento(pedido.id, t)) return { codigo, noEncontrado: true as const };
+      return this.construir(pedido as PedidoSeguimiento);
+    });
+  }
+
+  /**
+   * Historial de pedidos de la cuenta del cliente, del más nuevo al más viejo (10 por página).
+   * Solo los pedidos cuyo party_id es el de la sesión.
+   */
+  async pedidosDeCuenta(partyId: bigint, pagina: number): Promise<{ pedidos: PedidoCuenta[]; pagina: number; hayMas: boolean }> {
+    const filas = await this.prisma.pedido.findMany({
+      where: { party_id: partyId },
+      orderBy: [{ creado_en: 'desc' }, { id: 'desc' }],
+      skip: (pagina - 1) * TAMANO_PAGINA_CUENTA,
+      take: TAMANO_PAGINA_CUENTA + 1,
+      select: {
+        ...SELECCION_SEGUIMIENTO,
+        lineas: {
+          where: { linea_combo_id: null },
+          orderBy: { id: 'asc' },
+          select: { nombre: true, cantidad: true },
+        },
+      },
+    });
+
+    const hayMas = filas.length > TAMANO_PAGINA_CUENTA;
+    const pedidos = filas.slice(0, TAMANO_PAGINA_CUENTA).map((fila) => ({
+      ...this.construir(fila as PedidoSeguimiento),
+      creadoEn: fila.creado_en.toISOString(),
+      resumen: resumenProductos(fila.lineas),
+      seguimientoToken: generarTokenSeguimiento(fila.id),
+    }));
+
+    return { pedidos, pagina, hayMas };
   }
 
   private construir(pedido: PedidoSeguimiento): SeguimientoPedido {
@@ -203,4 +266,11 @@ export class SeguimientoService {
       null;
     return fecha ? obtenerFechaHoraLima(fecha).horaMinutos : null;
   }
+}
+
+// «2 x Frappe Oreo, 1 x Waffle y 2 más»: hasta 3 productos y el resto como cuenta
+function resumenProductos(lineas: { nombre: string; cantidad: number }[]): string {
+  const partes = lineas.slice(0, MAX_PRODUCTOS_RESUMEN).map((l) => `${l.cantidad} x ${l.nombre}`);
+  const restantes = lineas.length - MAX_PRODUCTOS_RESUMEN;
+  return restantes > 0 ? `${partes.join(', ')} y ${restantes} más` : partes.join(', ');
 }

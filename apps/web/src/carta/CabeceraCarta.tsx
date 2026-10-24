@@ -3,7 +3,7 @@ import { DatosLocalCarta, EstadoLocalCarta } from './tipos';
 import { useCarrito } from './CarritoContext';
 import { useCuenta } from './cuenta/CuentaContext';
 import { useEsMovil } from './useEsMovil';
-import { leerPedidosGuardados } from './seguimiento';
+import { usePedidosGuardados } from './seguimiento';
 
 export type PaginaCarta = 'carta' | 'novedades' | 'conocenos';
 
@@ -55,7 +55,7 @@ export function CabeceraCarta({
   categoriaActivaId,
   onCategoria,
 }: CabeceraCartaProps) {
-  const { cantidadTotal, subtotal, abrirCajon, setSeguimientoAbierto } = useCarrito();
+  const { cantidadTotal, subtotal, abrirCajon, setListaPedidosAbierta } = useCarrito();
   const { cliente, abrirPanel } = useCuenta();
   const movil = useEsMovil();
   // en pantallas medianas «Mi pedido» queda solo con el icono para que la cabecera no baje a dos filas
@@ -73,8 +73,11 @@ export function CabeceraCarta({
   const esCarta = pagina === 'carta';
   const cerrado = estadoLocal && (!estadoLocal.abierta || estadoLocal.pausaAltaDemanda);
   const alto = movil ? 40 : 44;
-  // Pedidos guardados en este navegador; el más reciente va primero
-  const guardados = leerPedidosGuardados();
+  // Pedidos guardados en este navegador (el más reciente va primero) y cuántos siguen activos
+  const guardados = usePedidosGuardados();
+  const activos = guardados.filter((p) => !p.terminado).length;
+  const etiquetaPedidos = guardados.length === 1 && !cliente ? 'Mi pedido' : 'Mis pedidos';
+  const mostrarPedidos = guardados.length > 0 || cliente !== null;
 
   const mover = (px: number) => franja.current?.scrollBy({ left: px, behavior: 'smooth' });
   const chips = [{ id: 'todo', nombre: 'TODA LA CARTA' }, ...categorias];
@@ -153,7 +156,7 @@ export function CabeceraCarta({
         </nav>
 
         {esCarta ? (
-          <div style={{ order: movil ? 5 : 3, flex: movil ? '1 1 100%' : guardados.length > 0 ? '1 1 150px' : '1 1 240px', minWidth: movil ? '100%' : guardados.length > 0 ? 110 : 180 }}>
+          <div style={{ order: movil ? 5 : 3, flex: movil ? '1 1 100%' : mostrarPedidos ? '1 1 150px' : '1 1 240px', minWidth: movil ? '100%' : mostrarPedidos ? 110 : 180 }}>
             <label htmlFor="buscar-carta" style={{ position: 'absolute', left: '-9999px' }}>
               Buscar en la carta
             </label>
@@ -181,11 +184,11 @@ export function CabeceraCarta({
           <div style={{ order: 3, flex: 1 }} />
         )}
 
-        {guardados.length > 0 && (
+        {mostrarPedidos && (
           <button
-            onClick={() => setSeguimientoAbierto(guardados[0])}
-            aria-label="Mi pedido"
-            title="Mi pedido"
+            onClick={() => setListaPedidosAbierta(true)}
+            aria-label={etiquetaPedidos}
+            title={etiquetaPedidos}
             style={{
               order: movil ? 2 : 4,
               flex: 'none',
@@ -208,7 +211,15 @@ export function CabeceraCarta({
               <path d="M6 3h12v18l-3-2-3 2-3-2-3 2z" />
               <path d="M9 8h6M9 12h6" />
             </svg>
-            {!(movil || angosto) && <span>Mi pedido</span>}
+            {!(movil || angosto) && <span>{etiquetaPedidos}</span>}
+            {activos > 0 && (
+              <span
+                aria-label={`${activos} ${activos === 1 ? 'pedido activo' : 'pedidos activos'}`}
+                style={{ minWidth: 18, height: 18, padding: '0 5px', boxSizing: 'border-box', borderRadius: 9, backgroundColor: 'var(--cp-orange)', color: '#FFFFFF', fontSize: 11, lineHeight: '18px', textAlign: 'center', fontWeight: 800 }}
+              >
+                {activos}
+              </span>
+            )}
           </button>
         )}
 
