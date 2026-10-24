@@ -927,7 +927,7 @@ export function CocinaAdminView() {
             left: '50%',
             transform: 'translateX(-50%)',
             bottom: '16px',
-            zIndex: 95,
+            zIndex: 120,
             display: 'flex',
             gap: '10px',
             alignItems: 'center',
