@@ -57,7 +57,7 @@ export function FormularioCheckout({
   const [direccion, setDireccion] = useState('');
   const [referencia, setReferencia] = useState('');
   const [coordenadas, setCoordenadas] = useState<{ lat: number; lng: number } | null>(null);
-  const [zonaEnvio, setZonaEnvio] = useState<string | null>(null);
+  const [, setZonaEnvio] = useState<string | null>(null);
   const [costoEnvio, setCostoEnvio] = useState<number | null>(null);
   const [cargandoGps, setCargandoGps] = useState(false);
   const [mensajeGps, setMensajeGps] = useState<string | null>(null);
