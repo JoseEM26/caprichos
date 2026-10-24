@@ -56,6 +56,9 @@ describe('PedidosEstadoService', () => {
       pedidoEstadoHistorial: {
         create: jest.fn(),
       },
+      cobro: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
       userAccount: {
         findMany: jest.fn(),
       },
@@ -540,6 +543,64 @@ describe('PedidosEstadoService', () => {
         codigo: 'CP-W001',
         estado: 'ANULADO',
       });
+    });
+  });
+
+  describe('anulación de un entregado sin cobro (FT-CIE-02)', () => {
+    const entregado = { id: 10n, codigo: 'CP-W062', modalidad: 'RECOGER', estado: 'ENTREGADO' };
+
+    it('con PIN de supervisor válido un cajero anula el entregado sin cobro; queda quién lo aprobó', async () => {
+      const supervisorHash = await argon2.hash('654321');
+      prismaMock.pedido.findUnique.mockResolvedValue(entregado);
+      prismaMock.userAccount.findMany.mockResolvedValue([
+        { id: 99n, party_id: 99n, rol: 'ADMIN', activo: true, pin_hash: supervisorHash },
+      ]);
+      prismaMock.pedido.update.mockResolvedValue({ ...entregado, estado: 'ANULADO' });
+
+      const res = await service.cambiarEstado(
+        10n,
+        { estado: 'ANULADO', motivo: 'Pedido entregado sin cobrar, error de caja' },
+        cajeroAuth,
+        '654321',
+      );
+
+      expect(res.estado).toBe('ANULADO');
+      expect(prismaMock.pedido.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ estado: 'ANULADO', anulacion_aprobada_por: 99n }),
+        }),
+      );
+    });
+
+    it('no se anula si tiene un cobro vigente (409 PEDIDO_COBRADO)', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue(entregado);
+      prismaMock.cobro.findFirst.mockResolvedValue({ id: 5n });
+
+      await expect(
+        service.cambiarEstado(10n, { estado: 'ANULADO', motivo: 'Pedido entregado sin cobrar' }, adminAuth),
+      ).rejects.toMatchObject({ response: { codigo: 'PEDIDO_COBRADO' } });
+      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+    });
+
+    it('un cajero sin PIN no lo anula (403 PIN_INVALIDO)', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue(entregado);
+
+      await expect(
+        service.cambiarEstado(10n, { estado: 'ANULADO', motivo: 'Pedido entregado sin cobrar' }, cajeroAuth),
+      ).rejects.toMatchObject({ response: { codigo: 'PIN_INVALIDO' } });
+      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+    });
+
+    it('un ADMIN lo anula solo con motivo, sin PIN, y queda como aprobado por él mismo', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue(entregado);
+      prismaMock.pedido.update.mockResolvedValue({ ...entregado, estado: 'ANULADO' });
+
+      await service.cambiarEstado(10n, { estado: 'ANULADO', motivo: 'Pedido entregado sin cobrar' }, adminAuth);
+
+      expect(prismaMock.userAccount.findMany).not.toHaveBeenCalled();
+      expect(prismaMock.pedido.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ anulacion_aprobada_por: 1n }) }),
+      );
     });
   });
 

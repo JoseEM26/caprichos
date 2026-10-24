@@ -14,6 +14,11 @@ import {
 import * as argon2 from 'argon2';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
+import {
+  exigirPinNoBloqueado,
+  limpiarIntentosPin,
+  registrarFalloPin,
+} from '../../comun/redis/intentos-pin';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
@@ -121,19 +126,8 @@ export class PedidosEstadoService {
     const claveIntentos = `pin:supervisor:intentos:${partyIdOperador ?? 'general'}`;
     const redis = this.redisService.obtenerCliente();
 
-    // 1. Verificar si está bloqueado por demasiados intentos fallidos (DT-61)
-    if (redis) {
-      const intentosActuales = await redis.get(claveIntentos);
-      if (intentosActuales && parseInt(intentosActuales, 10) >= 3) {
-        throw new HttpException(
-          {
-            codigo: 'PIN_BLOQUEADO',
-            mensaje: 'Demasiados intentos fallidos de PIN de supervisor. Bloqueado temporalmente por 10 minutos.',
-          },
-          HttpStatus.FORBIDDEN,
-        );
-      }
-    }
+    // 1. Bloqueo por demasiados intentos fallidos (DT-61); sin Redis no se valida nada (503)
+    await exigirPinNoBloqueado(redis, claveIntentos);
 
     // 2. Validar formato del PIN (exactamente 6 dígitos numéricos)
     const pinLimpio = typeof pinSupervisor === 'string' ? pinSupervisor.trim() : '';
@@ -168,12 +162,7 @@ export class PedidosEstadoService {
 
     // 4. Si el PIN es incorrecto o no se proveyó
     if (!supervisorValido) {
-      if (redis) {
-        const fallos = await redis.incr(claveIntentos);
-        if (fallos === 1) {
-          await redis.expire(claveIntentos, 10 * 60); // 10 minutos
-        }
-      }
+      await registrarFalloPin(redis, claveIntentos);
 
       await this.auditoria.registrar({
         categoria: 'ACCESO',
@@ -197,9 +186,7 @@ export class PedidosEstadoService {
     }
 
     // 5. PIN válido: reiniciar contador de fallos
-    if (redis) {
-      await redis.del(claveIntentos);
-    }
+    await limpiarIntentosPin(redis, claveIntentos);
 
     return supervisorValido;
   }
@@ -456,16 +443,31 @@ export class PedidosEstadoService {
 
     // 1. Manejo de Anulación (DT-61)
     if (nuevoEstado === 'ANULADO') {
-      // Estados desde los que se permite anular: COLA, PREPARANDO, LISTO
-      if (!['COLA', 'PREPARANDO', 'LISTO'].includes(estadoAnterior)) {
+      // Estados desde los que se permite anular: COLA, PREPARANDO, LISTO; y ENTREGADO sin cobro vigente
+      // (FT-CIE-02: un pedido que no se cobró no puede quedar pendiente y bloquear el cierre)
+      const entregadoSinCobro = estadoAnterior === 'ENTREGADO';
+      if (!['COLA', 'PREPARANDO', 'LISTO'].includes(estadoAnterior) && !entregadoSinCobro) {
         throw new ConflictException({
           codigo: 'TRANSICION_INVALIDA',
           mensaje: `No se puede anular un pedido en estado ${estadoAnterior}`,
         });
       }
 
-      // Validar permiso de anular
-      if (usuarioActual.rol !== 'ADMIN') {
+      if (entregadoSinCobro) {
+        const cobroVigente = await this.prisma.cobro.findFirst({
+          where: { pedido_id: pedido.id, anulado_en: null },
+          select: { id: true },
+        });
+        if (cobroVigente) {
+          throw new ConflictException({
+            codigo: 'PEDIDO_COBRADO',
+            mensaje: 'No se puede anular: el pedido tiene un cobro vigente. Anula primero el cobro.',
+          });
+        }
+      }
+
+      // Validar permiso de anular (en un entregado sin cobro lo autoriza el PIN de supervisor)
+      if (!entregadoSinCobro && usuarioActual.rol !== 'ADMIN') {
         const tienePermiso = await this.prisma.rolPermiso.findFirst({
           where: {
             rol: usuarioActual.rol,
@@ -493,13 +495,12 @@ export class PedidosEstadoService {
         });
       }
 
-      // Verificación de PIN de supervisor (6 dígitos, ADMIN activo)
-      const supervisor = await this.verificarPinSupervisor(
-        pinSupervisor,
-        usuarioActual.partyId,
-        ip,
-        pedido.id,
-      );
+      // PIN de supervisor (6 dígitos, ADMIN activo). Un ADMIN anula un entregado sin cobro solo con motivo
+      const conPin = !(entregadoSinCobro && usuarioActual.rol === 'ADMIN');
+      const aprobadoPor = conPin
+        ? (await this.verificarPinSupervisor(pinSupervisor, usuarioActual.partyId, ip, pedido.id))
+            .party_id
+        : usuarioActual.partyId;
 
       // Actualizar pedido a ANULADO
       const pedidoActualizado = await this.prisma.pedido.update({
@@ -509,7 +510,7 @@ export class PedidosEstadoService {
           anulado_en: ahora,
           anulado_por: usuarioActual.partyId,
           motivo_anulacion: motivo,
-          anulacion_aprobada_por: supervisor.party_id,
+          anulacion_aprobada_por: aprobadoPor,
         },
       });
 
@@ -549,7 +550,7 @@ export class PedidosEstadoService {
         despues: { estado: 'ANULADO', motivo },
         motivo,
         partyId: usuarioActual.partyId,
-        conPinAdmin: true,
+        conPinAdmin: conPin,
         ip,
       });
 

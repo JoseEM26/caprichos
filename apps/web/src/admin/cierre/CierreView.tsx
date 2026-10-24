@@ -4,7 +4,8 @@ import { useSesion } from '../../comun/sesion';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { HistorialCierres } from './HistorialCierres';
-import { cierreApi, calcularTotalEfectivo, RepartidorPorLiquidar } from './cierreApi';
+import { cierreApi, calcularTotalEfectivo, PendienteCobro, RepartidorPorLiquidar } from './cierreApi';
+import { PendientesCobroCierre } from './PendientesCobroCierre';
 import { pedidosApi, MovimientoCaja, Pedido } from '../pedidos/pedidosApi';
 import { ErrorApi } from '../../comun/api';
 
@@ -37,7 +38,7 @@ export function CierreView() {
   const [movimientos, setMovimientos] = useState<MovimientoCaja[]>([]);
   const [esperado, setEsperado] = useState<any>(null);
   const [repartidores, setRepartidores] = useState<RepartidorPorLiquidar[]>([]);
-  const [pedidosAbiertos, setPedidosAbiertos] = useState<Pedido[]>([]);
+  const [pedidosAbiertos, setPedidosAbiertos] = useState<PendienteCobro[]>([]);
   const [pedidosCobrados, setPedidosCobrados] = useState<Pedido[]>([]);
 
   // Mensaje de éxito/notificación y error de la pantalla
@@ -154,22 +155,23 @@ export function CierreView() {
         setRepartidores([]);
       }
 
-      // 5. Pedidos abiertos y cobrados
+      // 5. Pedidos sin cobrar de cualquier día (los que bloquean el cierre; el admin los ve de entrada,
+      // el cajero los ve con el PIN de supervisor) y cobrados del turno
+      if (esAdmin) {
+        try {
+          setPedidosAbiertos(await cierreApi.listarPendientesDeCobro());
+        } catch {
+          setPedidosAbiertos([]);
+        }
+      }
       try {
         const peds = await pedidosApi.listar({ limite: 100 });
         const items = peds.items || [];
-        setPedidosAbiertos(
-          items.filter((p) => {
-            const e = String(p.estado || '').toUpperCase();
-            const pag = String(p.pago_estado || '').toUpperCase();
-            return pag !== 'PAGADO' && e !== 'ANULADO' && e !== 'RECHAZADO' && e !== 'ENTREGADO';
-          })
-        );
         setPedidosCobrados(
           items.filter((p) => String(p.pago_estado || '').toUpperCase() === 'PAGADO')
         );
       } catch {
-        setPedidosAbiertos([]);
+        setPedidosCobrados([]);
       }
     } catch (err: any) {
       setErrorCarga(err?.message || 'Error al cargar los datos de caja y cierre');
@@ -1536,41 +1538,13 @@ export function CierreView() {
                   )}
                 </div>
 
-                {/* Pedidos pendientes si existen */}
-                {pedidosAbiertos.length > 0 && (
-                  <div
-                    style={{
-                      background: 'var(--cp-white, #FFFFFF)',
-                      border: '1.5px dashed var(--cp-rust, #B2500F)',
-                      borderRadius: 12,
-                      padding: 12,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 4,
-                    }}
-                  >
-                    <div style={{ fontWeight: 800, color: 'var(--cp-rust, #B2500F)', fontSize: 13 }}>
-                      Pendientes: impiden cerrar la caja
-                    </div>
-                    {pedidosAbiertos.map((p) => (
-                      <div
-                        key={p.id}
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          fontSize: 12,
-                          borderTop: '1px solid var(--cp-sand, #EDE1D1)',
-                          paddingTop: 4,
-                        }}
-                      >
-                        <b>{p.codigo}</b>
-                        <span>{p.cliente_nombre || 'Cliente'}</span>
-                        <span style={{ color: 'var(--cp-rust, #B2500F)', fontWeight: 700 }}>Por confirmar / Sin cobrar</span>
-                        <span>s/ {Number(p.total || 0).toFixed(2)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                {/* Pedidos sin cobrar que impiden el cierre: se cobran o se anulan desde aquí */}
+                <PendientesCobroCierre
+                  esAdmin={esAdmin}
+                  pendientes={pedidosAbiertos}
+                  setPendientes={setPedidosAbiertos}
+                  alCambiarTurno={cargarTurno}
+                />
 
                 <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                   <button

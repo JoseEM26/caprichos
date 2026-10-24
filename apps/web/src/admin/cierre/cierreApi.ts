@@ -1,4 +1,16 @@
 import { api } from '../../comun/api';
+import type { CobrarDto } from '../pedidos/pedidosApi';
+
+/** Pedido sin cobrar de cualquier día: bloquea el cierre hasta cobrarlo o anularlo (RN-CAP-079). */
+export interface PendienteCobro {
+  id: number;
+  codigo: string;
+  canal: string;
+  modalidad: string;
+  estado: string;
+  total: number;
+  fecha: string;
+}
 
 export interface ConteoDenominaciones {
   '200'?: number;
@@ -188,6 +200,18 @@ export const cierreApi = {
     api.get<MontosEsperados>('/admin/cierre/esperado', {
       headers: { 'x-pin-supervisor': pinSupervisor.trim() },
     }),
+
+  // Solo admin o con el PIN de supervisor (el servidor lo exige).
+  listarPendientesDeCobro: (pinSupervisor?: string) => {
+    const headers: Record<string, string> = {};
+    if (pinSupervisor?.trim()) {
+      headers['x-pin-supervisor'] = pinSupervisor.trim();
+    }
+    return api.get<PendienteCobro[]>('/admin/cierre/pendientes', { headers });
+  },
+
+  cobrarPendiente: (id: string | number, dto: CobrarDto) =>
+    api.post<unknown>(`/admin/cierre/pendientes/${id}/cobrar`, dto),
 
   listarRepartidoresPorLiquidar: () =>
     api.get<RepartidorPorLiquidar[]>('/admin/cierre/repartidores'),

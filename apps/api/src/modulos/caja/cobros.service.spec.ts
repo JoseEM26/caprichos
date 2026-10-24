@@ -885,4 +885,78 @@ describe('CobrosService', () => {
       ).resolves.toMatchObject({ pago_estado: 'PAGADO' });
     });
   });
+
+  describe('PIN de supervisor sin Redis', () => {
+    it('con Redis caído no anula aunque el PIN sea correcto: 503 PIN_NO_DISPONIBLE', async () => {
+      redisClientMock.get.mockRejectedValue(new Error('ECONNREFUSED'));
+      prismaMock.cobro.findUnique.mockResolvedValue({ caja_id: 10n });
+
+      await expect(
+        service.anularCobro('5', { motivo: 'Cobro duplicado de prueba' }, '123456', adminUsuario),
+      ).rejects.toMatchObject({ status: HttpStatus.SERVICE_UNAVAILABLE, response: { codigo: 'PIN_NO_DISPONIBLE' } });
+      expect(prismaMock.userAccount.findMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('cobrar en cierre', () => {
+    const pedidoDeAyer = {
+      id: 100n,
+      codigo: 'CP-W062',
+      total: new Prisma.Decimal(42),
+      estado: 'ENTREGADO',
+      pago_estado: 'PENDIENTE',
+      pago_metodo: null,
+      es_personal: false,
+      cobro: null,
+    };
+
+    const cobroCreado = (cajaId: bigint) => ({
+      id: 900n,
+      pedido_id: 100n,
+      caja_id: cajaId,
+      total: new Prisma.Decimal(42),
+      credito_personal: false,
+      cobrado_por: 2n,
+      en: new Date('2026-10-24T15:00:00.000Z'),
+      pagos: [{ id: 1n, medio: 'EFECTIVO', monto: new Prisma.Decimal(42), recibido: null, vuelto: null }],
+    });
+
+    it('cobra un pedido de otro día en la caja que se cierra y lo deja marcado como cobrado durante el cierre', async () => {
+      prismaMock.caja.findUnique.mockResolvedValue({ id: 7n, estado: 'ABIERTA' });
+      prismaMock.pedido.findUnique.mockResolvedValue(pedidoDeAyer);
+      prismaMock.cobro.create.mockResolvedValue(cobroCreado(7n));
+      prismaMock.pedido.update.mockResolvedValue({ pago_estado: 'PAGADO' });
+
+      await service.cobrarEnCierre(7n, { pedidoId: '100', pagos: [{ medio: 'EFECTIVO', monto: 42 }] }, cajeroUsuario);
+
+      expect(prismaMock.cobro.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ caja_id: 7n, cobrado_por: 2n }) }),
+      );
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accion: 'COBRAR_EN_CIERRE',
+          despues: expect.objectContaining({ cobrado_durante_cierre: true }),
+        }),
+      );
+    });
+
+    it('sin doble cobro: un pedido ya cobrado no se cobra otra vez en el cierre (YA_COBRADO)', async () => {
+      prismaMock.caja.findUnique.mockResolvedValue({ id: 7n, estado: 'ABIERTA' });
+      prismaMock.pedido.findUnique.mockResolvedValue({ ...pedidoDeAyer, pago_estado: 'PAGADO' });
+
+      await expect(
+        service.cobrarEnCierre(7n, { pedidoId: '100', pagos: [{ medio: 'EFECTIVO', monto: 42 }] }, cajeroUsuario),
+      ).rejects.toMatchObject({ response: { codigo: 'YA_COBRADO' } });
+      expect(prismaMock.cobro.create).not.toHaveBeenCalled();
+    });
+
+    it('no cobra en una caja que ya está cerrada (CAJA_CERRADA)', async () => {
+      prismaMock.caja.findUnique.mockResolvedValue({ id: 7n, estado: 'CERRADA' });
+
+      await expect(
+        service.cobrarEnCierre(7n, { pedidoId: '100', pagos: [{ medio: 'EFECTIVO', monto: 42 }] }, cajeroUsuario),
+      ).rejects.toMatchObject({ response: { codigo: 'CAJA_CERRADA' } });
+      expect(prismaMock.cobro.create).not.toHaveBeenCalled();
+    });
+  });
 });

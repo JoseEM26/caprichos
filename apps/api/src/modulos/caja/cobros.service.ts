@@ -14,6 +14,11 @@ import { Prisma } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
+import {
+  exigirPinNoBloqueado,
+  limpiarIntentosPin,
+  registrarFalloPin,
+} from '../../comun/redis/intentos-pin';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { obtenerFechaHoraLima } from '../local/local.util';
@@ -30,7 +35,6 @@ import { CobrarDto } from './dto/cobrar.dto';
 import { AnularCobroDto } from './dto/anular-cobro.dto';
 
 /** Bloqueo de PIN de supervisor tras 3 fallos seguidos (FT-CAJ-02, RQ-CAJ-02-12). */
-const SEGUNDOS_BLOQUEO_PIN = 5 * 60;
 
 @Injectable()
 export class CobrosService {
@@ -76,19 +80,8 @@ export class CobrosService {
     const claveIntentos = `pin:supervisor:intentos:${partyIdOperador ?? 'general'}`;
     const redis = this.redisService.obtenerCliente();
 
-    // 1. Verificar si está bloqueado por demasiados intentos fallidos (DT-61)
-    if (redis) {
-      const intentosActuales = await redis.get(claveIntentos);
-      if (intentosActuales && parseInt(intentosActuales, 10) >= 3) {
-        throw new HttpException(
-          {
-            codigo: 'PIN_BLOQUEADO',
-            mensaje: 'Demasiados intentos fallidos de PIN de supervisor. Espera 5 minutos.',
-          },
-          HttpStatus.FORBIDDEN,
-        );
-      }
-    }
+    // 1. Bloqueo por demasiados intentos fallidos (DT-61); sin Redis no se valida nada (503)
+    await exigirPinNoBloqueado(redis, claveIntentos);
 
     // 2. Validar formato del PIN (exactamente 6 dígitos numéricos)
     const pinLimpio = typeof pinSupervisor === 'string' ? pinSupervisor.trim() : '';
@@ -123,12 +116,7 @@ export class CobrosService {
 
     // 4. Si el PIN es incorrecto o no se proveyó
     if (!supervisorValido) {
-      if (redis) {
-        const fallos = await redis.incr(claveIntentos);
-        if (fallos === 1) {
-          await redis.expire(claveIntentos, SEGUNDOS_BLOQUEO_PIN);
-        }
-      }
+      await registrarFalloPin(redis, claveIntentos);
 
       await this.auditoria.registrar({
         categoria: 'ACCESO',
@@ -152,9 +140,7 @@ export class CobrosService {
     }
 
     // 5. PIN válido: reiniciar contador de fallos
-    if (redis) {
-      await redis.del(claveIntentos);
-    }
+    await limpiarIntentosPin(redis, claveIntentos);
 
     return supervisorValido;
   }
@@ -194,6 +180,26 @@ export class CobrosService {
       ip = posibleIp;
     }
 
+    this.validarPagos(dto);
+
+    const { fechaDate } = this.obtenerFechaHoyLima();
+    const cajaHoy = await this.prisma.caja.findUnique({
+      where: { fecha: fechaDate },
+    });
+
+    return this.registrarCobro(dto, usuario, ip, cajaHoy?.id ?? null, false);
+  }
+
+  /**
+   * Cobra un pedido pendiente desde «Caja y cierres» (FT-CIE-02, cobro durante el cierre): el cobro
+   * va a la caja que se está cerrando, sea del día que sea, y el pedido queda con la fecha real del cobro.
+   */
+  async cobrarEnCierre(cajaId: bigint, dto: CobrarDto, usuario: any, ip?: string) {
+    this.validarPagos(dto);
+    return this.registrarCobro(dto, usuario, ip, cajaId, true);
+  }
+
+  private validarPagos(dto: CobrarDto) {
     if (!dto.pagos || !Array.isArray(dto.pagos) || dto.pagos.length === 0) {
       throw new BadRequestException({
         codigo: 'PAGOS_REQUERIDOS',
@@ -216,15 +222,18 @@ export class CobrosService {
         });
       }
     }
+  }
 
-    const { fechaDate } = this.obtenerFechaHoyLima();
-    const cajaHoy = await this.prisma.caja.findUnique({
-      where: { fecha: fechaDate },
-    });
-
+  private async registrarCobro(
+    dto: CobrarDto,
+    usuario: any,
+    ip: string | undefined,
+    cajaId: bigint | null,
+    enCierre: boolean,
+  ) {
     // La caja se bloquea antes de leer el pedido: dos cobros no pasan a la vez y no se cobra en una caja que se cierra
     const { cobro, pedidoActualizado, pedidoCodigo, pagoMetodo } = await this.prisma.$transaction(async (tx) => {
-      const caja = cajaHoy ? await bloquearCaja(tx, cajaHoy.id) : null;
+      const caja = cajaId ? await bloquearCaja(tx, cajaId) : null;
 
       if (!caja) {
         throw (
@@ -398,7 +407,7 @@ export class CobrosService {
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
       modulo: 'caja',
-      accion: 'COBRAR',
+      accion: enCierre ? 'COBRAR_EN_CIERRE' : 'COBRAR',
       resultado: 'OK',
       entidad: 'cobro',
       entidadId: cobro.id,
@@ -409,6 +418,7 @@ export class CobrosService {
         total: Number(cobro.total),
         pago_estado: 'PAGADO',
         pago_metodo: pagoMetodo,
+        cobrado_durante_cierre: enCierre,
         pagos: cobro.pagos.map((p) => ({
           medio: p.medio,
           monto: Number(p.monto),

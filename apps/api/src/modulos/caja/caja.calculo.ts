@@ -90,38 +90,27 @@ export function pedidosRepartoDelDia(cliente: ClienteCaja, fechaIso: string) {
 }
 
 /**
- * Efectivo (en céntimos) que el repartidor debe entregar por un pedido: lo cobrado en efectivo
- * si hay cobro vigente, o el total si es contra entrega sin cobro.
+ * Efectivo (en céntimos) que el repartidor trae y debe liquidar: solo el contra entrega, es decir,
+ * pedido en efectivo sin cobro vigente en caja (RN-CAP-088). Lo cobrado en caja ya entra por su medio.
  */
 export function efectivoDelRepartidor(p: {
   total: unknown;
   pago_metodo: string | null;
-  cobro: { anulado_en: Date | null; pagos: { medio: string; monto: unknown }[] } | null;
+  cobro: { anulado_en: Date | null } | null;
 }): number {
-  if (p.cobro && !p.cobro.anulado_en) {
-    return p.cobro.pagos.reduce(
-      (acc, pago) =>
-        (pago.medio || '').toUpperCase() === 'EFECTIVO' ? acc + aCentimos(pago.monto) : acc,
-      0,
-    );
-  }
+  if (p.cobro && !p.cobro.anulado_en) return 0;
   return p.pago_metodo === 'EFECTIVO' ? aCentimos(p.total) : 0;
 }
 
 /**
- * Montos que el sistema espera en la caja. El efectivo del repartidor no cuenta hasta que se
- * liquida (RN-CAP-088): sus cobros se excluyen y la liquidación suma lo que entregó.
+ * Montos que el sistema espera en la caja. Todo cobro vigente de la caja cuenta por su medio,
+ * también el de un delivery cobrado en caja. El efectivo contra entrega del repartidor no cuenta
+ * hasta que se liquida (RN-CAP-088): la liquidación suma lo que entregó, sin duplicarlo.
  */
 export async function calcularMontosCaja(
   cliente: ClienteCaja,
   caja: { id: bigint; fecha: Date; apertura: unknown },
 ): Promise<MontosSistema> {
-  const fechaIso = new Date(caja.fecha).toISOString().slice(0, 10);
-  const reparto = await pedidosRepartoDelDia(cliente, fechaIso);
-  const idsDeReparto = new Set(
-    reparto.filter((p) => efectivoDelRepartidor(p) > 0).map((p) => String(p.id)),
-  );
-
   const cobros = await cliente.cobro.findMany({
     where: { caja_id: caja.id, anulado_en: null },
     include: { pagos: true },
@@ -134,12 +123,11 @@ export async function calcularMontosCaja(
   let sistemaTarjeta = 0;
 
   for (const cobro of cobros) {
-    const esDeReparto = idsDeReparto.has(String(cobro.pedido_id));
     for (const pago of cobro.pagos) {
       const medio = (pago.medio || '').trim().toUpperCase();
       const monto = aCentimos(pago.monto);
       if (medio === 'EFECTIVO') {
-        if (!esDeReparto) ventasEfectivo += monto;
+        ventasEfectivo += monto;
       } else if (medio === 'YAPE') {
         sistemaYape += monto;
       } else if (medio === 'PLIN') {

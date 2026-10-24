@@ -8,8 +8,15 @@ import { Prisma } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
+import {
+  exigirPinNoBloqueado,
+  limpiarIntentosPin,
+  registrarFalloPin,
+} from '../../comun/redis/intentos-pin';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { AuditoriaService } from '../auditoria/auditoria.service';
+import { CobrosService } from '../caja/cobros.service';
+import { CobrarDto } from '../caja/dto/cobrar.dto';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import {
   ClienteCaja,
@@ -27,9 +34,6 @@ import { CerrarCajaDto } from './dto/cerrar-caja.dto';
 import { LiquidarRepartidorDto } from './dto/liquidar.dto';
 import { HistorialCierresDto } from './dto/historial.dto';
 import { calcularTotalConteo } from './cierre.util';
-
-/** Bloqueo de PIN de supervisor tras 3 fallos seguidos (FT-CAJ-02, RQ-CAJ-02-12). */
-const SEGUNDOS_BLOQUEO_PIN = 5 * 60;
 
 /** Diferencia por medio en céntimos (visto − sistema). Cuadra si todas son cero. */
 function compararConSistema(
@@ -68,6 +72,7 @@ export class CierreService {
     private readonly redisService: RedisService,
     private readonly auditoria: AuditoriaService,
     private readonly eventosGateway: EventosGateway,
+    private readonly cobrosService: CobrosService,
   ) {}
 
   /**
@@ -132,27 +137,10 @@ export class CierreService {
     cliente: Pick<PrismaService, 'userAccount'> = this.prisma,
   ): Promise<{ party_id: bigint; id: bigint }> {
     const claveIntentos = `pin:supervisor:intentos:${partyIdOperador ?? 'general'}`;
-    const redis = this.redisService?.obtenerCliente?.();
+    const redis = this.redisService.obtenerCliente();
 
-    if (redis) {
-      try {
-        const intentosActuales = await redis.get(claveIntentos);
-        if (intentosActuales && parseInt(intentosActuales, 10) >= 3) {
-          throw new HttpException(
-            {
-              codigo: 'PIN_BLOQUEADO',
-              mensaje:
-                'Demasiados intentos fallidos de PIN de supervisor. Espera 5 minutos.',
-            },
-            HttpStatus.FORBIDDEN,
-          );
-        }
-      } catch (e: any) {
-        if (e?.response?.codigo === 'PIN_BLOQUEADO') {
-          throw e;
-        }
-      }
-    }
+    // Sin Redis no se valida ningún PIN (503): el bloqueo de intentos no puede saltarse
+    await exigirPinNoBloqueado(redis, claveIntentos);
 
     const pinLimpio = typeof pinSupervisor === 'string' ? pinSupervisor.trim() : '';
     const formatoValido = /^\d{6}$/.test(pinLimpio);
@@ -184,16 +172,7 @@ export class CierreService {
     }
 
     if (!supervisorValido) {
-      if (redis) {
-        try {
-          const fallos = await redis.incr(claveIntentos);
-          if (fallos === 1) {
-            await redis.expire(claveIntentos, SEGUNDOS_BLOQUEO_PIN);
-          }
-        } catch {
-          // Ignorar fallo de Redis si no está disponible
-        }
-      }
+      await registrarFalloPin(redis, claveIntentos);
 
       await this.auditoria.registrar({
         categoria: 'ACCESO',
@@ -217,13 +196,7 @@ export class CierreService {
     }
 
     // PIN válido: reiniciar contador de fallos
-    if (redis) {
-      try {
-        await redis.del(claveIntentos);
-      } catch {
-        // Ignorar fallo de Redis
-      }
-    }
+    await limpiarIntentosPin(redis, claveIntentos);
 
     return supervisorValido;
   }
@@ -798,6 +771,80 @@ export class CierreService {
       entregado: enPesos(entregado),
       diferencia,
     };
+  }
+
+  /**
+   * Pedidos sin cobrar de cualquier día, los mismos que bloquean el cierre (RN-CAP-079).
+   * Solo admin o con PIN de supervisor válido.
+   */
+  async listarPendientesDeCobro(
+    usuario: UsuarioAutenticado,
+    pinSupervisor?: string,
+    ip?: string,
+  ) {
+    await this.exigirAdminOPin(usuario, pinSupervisor, ip);
+
+    const pedidos = await this.prisma.pedido.findMany({
+      where: {
+        pago_estado: { in: ['PENDIENTE', 'COORDINADO'] },
+        estado: { not: 'ANULADO' },
+        NOT: { cobro: { anulado_en: null } },
+      },
+      orderBy: { creado_en: 'asc' },
+      select: {
+        id: true,
+        codigo: true,
+        canal: true,
+        modalidad: true,
+        estado: true,
+        total: true,
+        creado_en: true,
+      },
+    });
+
+    return pedidos.map((p) => ({
+      id: Number(p.id),
+      codigo: p.codigo,
+      canal: p.canal,
+      modalidad: p.modalidad,
+      estado: p.estado,
+      total: enPesos(aCentimos(p.total)),
+      fecha: p.creado_en,
+    }));
+  }
+
+  /**
+   * Cobra un pedido pendiente en la caja que se cierra (cualquier día). Mismo cobro que en Pedidos y caja,
+   * con bloqueo de la caja y sin doble cobro; queda marcado como cobrado durante el cierre.
+   */
+  async cobrarPendienteDeCierre(
+    pedidoId: string,
+    dto: CobrarDto,
+    usuario: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const cajaAbierta = await this.obtenerCajaAbierta();
+    let id: bigint;
+    try {
+      id = BigInt(pedidoId);
+    } catch {
+      throw new HttpException(
+        { codigo: 'ID_INVALIDO', mensaje: 'El identificador del pedido no es válido' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    return this.cobrosService.cobrarEnCierre(
+      cajaAbierta.id,
+      { ...dto, pedidoId: id.toString() },
+      usuario,
+      ip,
+    );
+  }
+
+  /** Lo que pide la pantalla de cierre a un cajero: el PIN de supervisor, o ser admin. */
+  private async exigirAdminOPin(usuario: UsuarioAutenticado, pinSupervisor?: string, ip?: string) {
+    if (usuario?.rol === 'ADMIN') return;
+    await this.verificarPinSupervisor(pinSupervisor, usuario?.partyId, ip);
   }
 
   /**

@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Boton } from '../../comun/Boton';
 import { Confirmar } from '../../comun/Confirmar';
-import { pedidosApi, Pedido, PagoItem } from './pedidosApi';
+import { pedidosApi, Pedido, PagoItem, CobrarDto } from './pedidosApi';
 import { ErrorApi } from '../../comun/api';
 
 const MEDIOS_PAGO = [
@@ -16,6 +16,8 @@ export interface ModalCobrarProps {
   pedido: Pedido;
   alCerrar: () => void;
   alCobrarExitoso: () => void;
+  /** Cobro por otro endpoint (p. ej. un pedido de otro día desde el cierre). Por defecto, la caja de hoy. */
+  cobrar?: (dto: CobrarDto) => Promise<unknown>;
 }
 
 interface FilaPago {
@@ -28,6 +30,7 @@ export function ModalCobrar({
   pedido,
   alCerrar,
   alCobrarExitoso,
+  cobrar = pedidosApi.cobrar,
 }: ModalCobrarProps) {
   const totalPedido = Number(pedido.total) || 0;
 
@@ -142,7 +145,7 @@ export function ModalCobrar({
     });
 
     try {
-      await pedidosApi.cobrar({
+      await cobrar({
         pedidoId: pedido.id,
         pagos: itemsDto,
       });

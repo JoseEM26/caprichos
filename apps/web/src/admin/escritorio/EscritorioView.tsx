@@ -36,7 +36,8 @@ function formatearIso(d: Date): string {
 }
 
 export function EscritorioView() {
-  const { usuario } = useSesion();
+  const { usuario, tiene } = useSesion();
+  const puedeVerInformes = tiene('informes/ver');
   const navigate = useNavigate();
 
   const rolCodigo = (usuario?.rol || 'ADMIN').toUpperCase();
@@ -156,7 +157,8 @@ export function EscritorioView() {
 
   useEffect(() => {
     let montado = true;
-    if (!errorFechas) {
+    // Sin informes/ver el servidor responde 403: el widget no lo pide y muestra los valores en cero
+    if (!errorFechas && puedeVerInformes) {
       api
         .get<ResumenApi>(`/admin/informes/resumen?desde=${desde}&hasta=${hasta}&canal=${canal}`)
         .then((res: any) => {
@@ -167,7 +169,7 @@ export function EscritorioView() {
     return () => {
       montado = false;
     };
-  }, [desde, hasta, canal, errorFechas]);
+  }, [desde, hasta, canal, errorFechas, puedeVerInformes]);
 
   // KPIs reales o en cero
   const kpisAdmin = datosApi?.kpisS || [

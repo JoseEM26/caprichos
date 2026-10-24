@@ -7,6 +7,7 @@ import { RedisService } from '../../comun/redis/redis.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
+import { CobrosService } from '../caja/cobros.service';
 import { ArqueoDto } from './dto/arqueo.dto';
 import { CerrarCajaDto } from './dto/cerrar-caja.dto';
 
@@ -216,6 +217,7 @@ describe('CierreService', () => {
         { provide: RedisService, useValue: redisServiceMock },
         { provide: AuditoriaService, useValue: auditoriaMock },
         { provide: EventosGateway, useValue: eventosGatewayMock },
+        { provide: CobrosService, useValue: { cobrarEnCierre: jest.fn() } },
       ],
     }).compile();
 
@@ -361,7 +363,7 @@ describe('CierreService', () => {
       }
     });
 
-    it('bloquea por 10 minutos en Redis tras 3 pines erróneos y audita PIN_FALLIDO', async () => {
+    it('bloquea por 5 minutos en Redis tras 3 pines erróneos y audita PIN_FALLIDO', async () => {
       const pinHashAdmin = await argon2.hash('654321');
       prismaMock.userAccount.findMany.mockResolvedValue([
         { id: 1n, party_id: 1n, rol: 'ADMIN', pin_hash: pinHashAdmin, activo: true },
@@ -499,7 +501,7 @@ describe('CierreService', () => {
   // 6. Liquidación de repartidores
   // -------------------------------------------------------------------------
   describe('6. liquidación de repartidores', () => {
-    it('lista pedidos delivery entregados cobrados en efectivo y calcula saldo por liquidar', async () => {
+    it('lista solo el contra entrega en efectivo (lo cobrado en caja no es del repartidor) y calcula saldo por liquidar', async () => {
       // 2 pedidos delivery entregados para el repartidor 55
       prismaMock.pedido.findMany.mockResolvedValue([
         {
@@ -553,9 +555,9 @@ describe('CierreService', () => {
         repartidorPartyId: 55,
         nombre: 'Marcos Ruta',
         pedidos: expect.any(Array),
-        totalCobrado: 100.0,
+        totalCobrado: 60.0,
         totalLiquidado: 30.0,
-        pendiente: 70.0,
+        pendiente: 30.0,
       });
     });
 
@@ -869,6 +871,33 @@ describe('CierreService', () => {
         service.verificarPinSupervisor('000000', 101n, '127.0.0.1', 10n),
       ).rejects.toMatchObject({ response: { codigo: 'PIN_INVALIDO' } });
       expect(redisMock.expire).toHaveBeenCalledWith(expect.any(String), 5 * 60);
+    });
+
+    it('pedidos sin cobrar: el cajero sin PIN de supervisor no los ve (PIN_INVALIDO)', async () => {
+      await expect(service.listarPendientesDeCobro(mockUsuarioCajero)).rejects.toMatchObject({
+        response: { codigo: 'PIN_INVALIDO' },
+      });
+      expect(prismaMock.pedido.findMany).not.toHaveBeenCalled();
+    });
+
+    it('pedidos sin cobrar: el admin los ve de cualquier día, sin anulados ni cobrados', async () => {
+      prismaMock.pedido.findMany.mockResolvedValue([
+        { id: 74n, codigo: 'CP-W062', canal: 'CARTA', modalidad: 'RECOGER', estado: 'ENTREGADO', total: 42, creado_en: new Date('2026-10-23T20:21:00Z') },
+      ]);
+
+      const lista = await service.listarPendientesDeCobro(mockUsuarioAdmin);
+
+      expect(lista).toEqual([
+        expect.objectContaining({ id: 74, codigo: 'CP-W062', total: 42, estado: 'ENTREGADO' }),
+      ]);
+      expect(prismaMock.pedido.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            pago_estado: { in: ['PENDIENTE', 'COORDINADO'] },
+            estado: { not: 'ANULADO' },
+          }),
+        }),
+      );
     });
   });
 });

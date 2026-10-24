@@ -16,6 +16,7 @@ import { ArqueoDto } from './dto/arqueo.dto';
 import { CerrarCajaDto } from './dto/cerrar-caja.dto';
 import { LiquidarRepartidorDto } from './dto/liquidar.dto';
 import { HistorialCierresDto } from './dto/historial.dto';
+import { CobrarDto } from '../caja/dto/cobrar.dto';
 
 @Controller('admin/cierre')
 @UseGuards(AccesoGuard)
@@ -83,6 +84,33 @@ export class CierreController {
   @Permiso('repartos', 'liquidar')
   async listarRepartidores() {
     return this.cierreService.listarRepartidoresPorLiquidar();
+  }
+
+  /**
+   * Pedidos sin cobrar de cualquier día que bloquean el cierre. Admin o PIN de supervisor.
+   */
+  @Get('pendientes')
+  @Permiso('caja', 'cerrar')
+  async pendientesDeCobro(
+    @Headers('x-pin-supervisor') pinSupervisor: string | undefined,
+    @Req() req: any,
+  ) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.cierreService.listarPendientesDeCobro(req.usuario, pinSupervisor, ip);
+  }
+
+  /**
+   * Cobra un pedido pendiente en la caja que se cierra (Cobrar ahora desde el cierre).
+   */
+  @Post('pendientes/:id/cobrar')
+  @Permiso('caja', 'cobrar')
+  async cobrarPendiente(
+    @Param('id') id: string,
+    @Body() dto: CobrarDto,
+    @Req() req: any,
+  ) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.cierreService.cobrarPendienteDeCierre(id, dto, req.usuario, ip);
   }
 
   /**
