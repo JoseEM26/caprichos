@@ -144,7 +144,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar }: Props) {
         ? `OPCIONAL · HASTA ${g.maximo}`
         : 'OPCIONAL';
 
-  const nombreSticker = recortar((nombres[0] ?? '').trim() || 'TU NOMBRE', 14);
+  const nombreSticker = (i: number): string => recortar((nombres[i] ?? '').trim() || 'TU NOMBRE', 14);
 
   return (
     <>
@@ -349,11 +349,11 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar }: Props) {
             )}
 
             {esBebida && !esCombo && (
-              <div style={{ border: '1.5px solid var(--cp-line)', borderRadius: 14, padding: '10px 12px', background: 'var(--cp-white)', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                <div style={{ flex: '1 1 150px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <div style={{ ...titulo, fontWeight: 800, fontSize: 14 }}>¿Para quién es?</div>
-                  {Array.from({ length: cantidad }, (_, i) => (
-                    <label key={i} style={{ fontSize: 11, fontWeight: 700, display: 'block', color: 'var(--cp-soft)' }}>
+              <div style={{ border: '1.5px solid var(--cp-line)', borderRadius: 14, padding: '10px 12px', background: 'var(--cp-white)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ ...titulo, fontWeight: 800, fontSize: 14 }}>¿Para quién es?</div>
+                {Array.from({ length: cantidad }, (_, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <label style={{ flex: '1 1 150px', minWidth: 0, fontSize: 11, fontWeight: 700, display: 'block', color: 'var(--cp-soft)' }}>
                       {`Ingresa el nombre de la persona que tomará esta bebida${cantidad > 1 ? ` (${i + 1} de ${cantidad})` : ''}`}
                       <input
                         type="text"
@@ -370,22 +370,22 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar }: Props) {
                         style={{ display: 'block', width: '100%', boxSizing: 'border-box', minHeight: 40, marginTop: 2, borderRadius: 10, border: '1.5px solid var(--cp-line)', background: 'var(--cp-cream)', color: 'var(--cp-navy)', padding: '0 10px', fontSize: 14 }}
                       />
                     </label>
-                  ))}
-                  <div style={{ fontSize: 11, lineHeight: '14px', color: 'var(--cp-soft)' }}>Vacío = ponemos tu nombre.</div>
-                </div>
-                <div
-                  aria-label="Así se verá la etiqueta del vaso"
-                  style={{ flex: 'none', width: 158, fontFamily: "'Courier New', monospace", fontSize: 10, lineHeight: '13px', color: '#111', background: '#fff', border: '1px solid var(--cp-line)', borderRadius: 8, boxShadow: '0 2px 8px rgba(11,44,62,0.14)', overflow: 'hidden' }}
-                >
-                  <div style={{ background: 'var(--cp-navy)', color: 'var(--cp-cream)', padding: '2px 8px', display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
-                    <span>BEBIDA 1</span>
-                    <span>ETIQUETA</span>
+                    <div
+                      aria-label={`Así se verá la etiqueta del vaso ${i + 1}`}
+                      style={{ flex: 'none', width: 158, fontFamily: "'Courier New', monospace", fontSize: 10, lineHeight: '13px', color: '#111', background: '#fff', border: '1px solid var(--cp-line)', borderRadius: 8, boxShadow: '0 2px 8px rgba(11,44,62,0.14)', overflow: 'hidden' }}
+                    >
+                      <div style={{ background: 'var(--cp-navy)', color: 'var(--cp-cream)', padding: '2px 8px', display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+                        <span>{`BEBIDA ${i + 1}`}</span>
+                        <span>ETIQUETA</span>
+                      </div>
+                      <div style={{ padding: '5px 8px' }}>
+                        <div style={{ ...titulo, fontWeight: 800, fontSize: 17, lineHeight: '20px', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{nombreSticker(i)}</div>
+                        <div style={{ ...titulo, fontWeight: 700, fontSize: 11, lineHeight: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{recortar(producto.nombre, 18)}</div>
+                      </div>
+                    </div>
                   </div>
-                  <div style={{ padding: '5px 8px' }}>
-                    <div style={{ ...titulo, fontWeight: 800, fontSize: 17, lineHeight: '20px', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{nombreSticker}</div>
-                    <div style={{ ...titulo, fontWeight: 700, fontSize: 11, lineHeight: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{recortar(producto.nombre, 18)}</div>
-                  </div>
-                </div>
+                ))}
+                <div style={{ fontSize: 11, lineHeight: '14px', color: 'var(--cp-soft)' }}>Vacío = ponemos tu nombre.</div>
               </div>
             )}
 
