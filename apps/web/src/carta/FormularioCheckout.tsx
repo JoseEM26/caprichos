@@ -1816,7 +1816,7 @@ export function FormularioCheckout({
 
                     {modalidad === 'DELIVERY' && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-                        <span>Costo de envío{zonaEnvio ? ` (${zonaEnvio})` : ''}</span>
+                        <span>Costo de envío</span>
                         <span style={{ fontWeight: 700 }}>
                           {costoEnvio !== null
                             ? costoEnvio === 0

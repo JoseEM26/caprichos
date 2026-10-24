@@ -42,6 +42,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar }: Props) {
   });
   const [cantidad, setCantidad] = useState(1);
   const [nombres, setNombres] = useState<string[]>([]);
+  const [avisoNombres, setAvisoNombres] = useState(false);
   const [nota, setNota] = useState('');
   const [busquedas, setBusquedas] = useState<Record<string, string>>({});
   const [zoom, setZoom] = useState(false);
@@ -92,6 +93,17 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar }: Props) {
 
   const agregar = () => {
     if (!valido) return;
+    // en las bebidas el nombre de quien la toma es obligatorio: va en la etiqueta del vaso
+    if (esBebida && !esCombo) {
+      const faltan = Array.from({ length: cantidad }, (_, i) => i).filter((i) => !(nombres[i] ?? '').trim());
+      if (faltan.length > 0) {
+        setAvisoNombres(true);
+        const campo = document.getElementById(`nombre-bebida-${faltan[0]}`);
+        campo?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+        campo?.focus();
+        return;
+      }
+    }
     const personas = Array.from({ length: cantidad }, (_, i) => (esBebida ? (nombres[i] ?? '').trim() : ''));
     agregarLinea({
       productoId: producto.id,
@@ -354,7 +366,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar }: Props) {
                 {Array.from({ length: cantidad }, (_, i) => (
                   <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
                     <label style={{ flex: '1 1 150px', minWidth: 0, fontSize: 11, fontWeight: 700, display: 'block', color: 'var(--cp-soft)' }}>
-                      {`Ingresa el nombre de la persona que tomará esta bebida${cantidad > 1 ? ` (${i + 1} de ${cantidad})` : ''}`}
+                      {`Ingresa el nombre de la persona que tomará esta bebida${cantidad > 1 ? ` (${i + 1} de ${cantidad})` : ''} *`}
                       <input
                         type="text"
                         value={nombres[i] ?? ''}
@@ -367,7 +379,10 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar }: Props) {
                         }
                         placeholder="Ej.: Lucía"
                         maxLength={30}
-                        style={{ display: 'block', width: '100%', boxSizing: 'border-box', minHeight: 40, marginTop: 2, borderRadius: 10, border: '1.5px solid var(--cp-line)', background: 'var(--cp-cream)', color: 'var(--cp-navy)', padding: '0 10px', fontSize: 14 }}
+                        id={`nombre-bebida-${i}`}
+                        required
+                        aria-invalid={avisoNombres && !(nombres[i] ?? '').trim()}
+                        style={{ display: 'block', width: '100%', boxSizing: 'border-box', minHeight: 40, marginTop: 2, borderRadius: 10, border: `1.5px solid ${avisoNombres && !(nombres[i] ?? '').trim() ? 'var(--cp-rust)' : 'var(--cp-line)'}`, background: 'var(--cp-cream)', color: 'var(--cp-navy)', padding: '0 10px', fontSize: 14 }}
                       />
                     </label>
                     <div
@@ -385,7 +400,13 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar }: Props) {
                     </div>
                   </div>
                 ))}
-                <div style={{ fontSize: 11, lineHeight: '14px', color: 'var(--cp-soft)' }}>Vacío = ponemos tu nombre.</div>
+                {avisoNombres && Array.from({ length: cantidad }, (_, i) => i).some((i) => !(nombres[i] ?? '').trim()) ? (
+                  <div role="alert" style={{ fontSize: 12, lineHeight: '16px', fontWeight: 700, color: 'var(--cp-rust)', background: 'var(--cp-sand)', borderRadius: 8, padding: '8px 10px' }}>
+                    Escribe el nombre de quien tomará cada bebida. Va en la etiqueta del vaso.
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 11, lineHeight: '14px', color: 'var(--cp-soft)' }}>Obligatorio: el nombre va en la etiqueta del vaso.</div>
+                )}
               </div>
             )}
 
