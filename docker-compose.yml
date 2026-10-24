@@ -45,8 +45,12 @@ services:
       REDIS_PORT: 6379
       APP_VERSION: 0.1.0
       GIT_COMMIT: dev-local
+      # fotos y comprobantes (ADR-012): carpeta persistente, no se pierde al recrear el contenedor
+      UPLOADS_DIR: /data/uploads
     ports:
       - "3000:3000"
+    volumes:
+      - uploads_data:/data/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -67,3 +71,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  uploads_data:
