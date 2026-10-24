@@ -33,20 +33,6 @@ import {
 type ModoVista = 'mapa' | 'lista';
 type FiltroRetraso = 'todos' | NivelEspera;
 
-function agruparPorZona(
-  pedidos: PedidoReparto[],
-): { zona: string; pedidos: PedidoReparto[] }[] {
-  const mapa = new Map<string, PedidoReparto[]>();
-  for (const p of pedidos) {
-    const z = p.zona || 'Sin zona';
-    if (!mapa.has(z)) mapa.set(z, []);
-    mapa.get(z)!.push(p);
-  }
-  return Array.from(mapa.entries()).map(([zona, items]) => ({
-    zona,
-    pedidos: items,
-  }));
-}
 
 export function RepartosView() {
   const { tiene, usuario } = useSesion();
@@ -80,6 +66,7 @@ export function RepartosView() {
 
   // Estado de pantalla completa (Decisión 2 del dueño)
   const [pantallaCompleta, setPantallaCompleta] = useState(false);
+  const [panelRutaAbierto, setPanelRutaAbierto] = useState(false);
 
   // Modal de ayuda rápida "¿Cómo funciona?" (Decisión 1 del dueño)
   const [ayudaAbierta, setAyudaAbierta] = useState(false);
@@ -401,9 +388,11 @@ export function RepartosView() {
   }, [pedidoSeleccionadoId, pedidosBase]);
 
   // Agrupación por zona para la vista Lista
-  const gruposPorZona = useMemo(() => {
-    return agruparPorZona(pedidosFiltrados);
-  }, [pedidosFiltrados]);
+  // La lista es general: los que más esperan primero; la zona es solo un filtro opcional
+  const listaPorEspera = useMemo(
+    () => [...pedidosFiltrados].sort((a, b) => (b.minutosEspera ?? 0) - (a.minutosEspera ?? 0)),
+    [pedidosFiltrados],
+  );
 
   // Manejador al tocar fondo del mapa para ocultar/mostrar controles en celular
   const handleTocarMapa = () => {
@@ -429,6 +418,17 @@ export function RepartosView() {
         boxSizing: 'border-box',
         position: 'relative',
         paddingBottom: esRolRepartidor && movil ? '80px' : '20px',
+        ...(pantallaCompleta
+          ? {
+              position: 'fixed',
+              inset: 0,
+              zIndex: 3000,
+              padding: '8px 8px 0',
+              gap: '8px',
+              background: 'var(--cp-cream, #FFFDF8)',
+              overflow: 'hidden',
+            }
+          : {}),
       }}
     >
       {/* 1) FILA SUPERIOR COMPACTA: Selector «Ver como:», alternancia [Mapa] [Lista], Fullscreen y Ayuda «?» */}
@@ -443,7 +443,14 @@ export function RepartosView() {
         }}
       >
         {/* Selector de Repartidor / Caja (solo para admin/cajero o si puede liquidar) */}
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div
+          style={{
+            display: pantallaCompleta ? 'none' : 'flex',
+            gap: '6px',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+          }}
+        >
           <span style={{ fontWeight: 800, fontSize: '13px', color: 'var(--cp-navy, #0B2C3E)' }}>
             {esRolRepartidor ? 'Soy:' : 'Ver como:'}
           </span>
@@ -757,14 +764,20 @@ export function RepartosView() {
         <EstadoError mensaje={error} alReintentar={cargarDatos} />
       ) : modoVista === 'mapa' ? (
         /* VISTA MAPA PRINCIPAL (Decisión 2 del dueño) */
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '14px',
+            ...(pantallaCompleta ? { flex: '1 1 auto', minHeight: 0, position: 'relative' } : {}),
+          }}
+        >
           {/* Componente de Mapa Leaflet con Zonas Sombreadas y Marcadores */}
           <MapaRepartos
             puntos={puntosMapa}
             zonas={zonasGeo}
             conteoPorZona={conteosPorZona}
             zonaFiltroActiva={filtroZona !== 'todas' ? filtroZona : undefined}
-            onSeleccionarZona={(z) => setFiltroZona((prev) => (prev === z ? 'todas' : z))}
             seleccionadoId={pedidoSeleccionadoId}
             onSeleccionarPunto={(id) =>
               setPedidoSeleccionadoId((prev) => (prev === id ? null : id))
@@ -776,6 +789,25 @@ export function RepartosView() {
             onAlternarPantallaCompleta={alternarPantallaCompleta}
           />
 
+          <div
+            style={
+              pantallaCompleta
+                ? {
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    maxHeight: '45vh',
+                    overflowY: 'auto',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    zIndex: 1000,
+                    paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+                  }
+                : { display: 'contents' }
+            }
+          >
           {/* Hoja Inferior del Pedido Seleccionado (Decisión 7 del dueño) */}
           {pedidoSeleccionado && (
             <ResumenPedidoReparto
@@ -796,7 +828,28 @@ export function RepartosView() {
           )}
 
           {/* Panel de Ruta Sugerida e Iniciar Ruta (Decisión 4 del dueño) */}
-          {pedidosCandidatosRuta.length > 0 && (
+          {pantallaCompleta && pedidosCandidatosRuta.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setPanelRutaAbierto((v) => !v)}
+              aria-expanded={panelRutaAbierto}
+              style={{
+                minHeight: '48px',
+                margin: '0 8px 8px',
+                padding: '0 16px',
+                borderRadius: '14px',
+                border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                background: 'var(--cp-cream, #FFFDF8)',
+                color: 'var(--cp-navy, #0B2C3E)',
+                fontWeight: 800,
+                fontSize: '14px',
+                cursor: 'pointer',
+              }}
+            >
+              {panelRutaAbierto ? 'Ocultar ruta sugerida' : `Ruta sugerida (${rutaCalculada.paradas?.length ?? pedidosCandidatosRuta.length})`}
+            </button>
+          )}
+          {pedidosCandidatosRuta.length > 0 && (!pantallaCompleta || panelRutaAbierto) && (
             <PanelRutaSugerida
               ruta={rutaCalculada}
               pedidosCandidatos={pedidosCandidatosRuta}
@@ -807,6 +860,7 @@ export function RepartosView() {
               maxParadas={config.maxPedidosPorRepartidor}
             />
           )}
+          </div>
         </div>
       ) : (
         /* VISTA LISTA SECUNDARIA (Doble Vista, Decisión 2) */
@@ -859,54 +913,34 @@ export function RepartosView() {
             })}
           </div>
 
-          {gruposPorZona.length === 0 ? (
+          {listaPorEspera.length === 0 ? (
             <EstadoVacio
               mensaje={
-                pedidosFiltrados.length === 0
+                pedidosBase.length === 0
                   ? 'No hay pedidos en esta vista.'
                   : 'No hay pedidos para la zona o filtro seleccionado.'
               }
             />
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {gruposPorZona.map((grupo) => (
-                <div
-                  key={grupo.zona}
-                  style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}
-                >
-                  <div
-                    style={{
-                      fontSize: '14px',
-                      fontWeight: 800,
-                      color: 'var(--cp-navy, #0B2C3E)',
-                      paddingLeft: '4px',
-                    }}
-                  >
-                    {grupo.zona} · {grupo.pedidos.length}{' '}
-                    {grupo.pedidos.length === 1 ? 'pedido' : 'pedidos'}
-                  </div>
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))',
-                      gap: '14px',
-                      alignItems: 'start',
-                    }}
-                  >
-                    {grupo.pedidos.map((pedido) => (
-                      <TarjetaReparto
-                        key={pedido.id}
-                        pedido={pedido}
-                        esDisponible={pedido.estado === 'LISTO' && !pedido.repartidor_party_id}
-                        esMio={
-                          pedido.repartidor_party_id === usuario?.partyId ||
-                          pedido.estado === 'EN_CAMINO'
-                        }
-                        alActualizar={cargarDatos}
-                      />
-                    ))}
-                  </div>
-                </div>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))',
+                gap: '14px',
+                alignItems: 'start',
+              }}
+            >
+              {listaPorEspera.map((pedido) => (
+                <TarjetaReparto
+                  key={pedido.id}
+                  pedido={pedido}
+                  esDisponible={pedido.estado === 'LISTO' && !pedido.repartidor_party_id}
+                  esMio={
+                    pedido.repartidor_party_id === usuario?.partyId ||
+                    pedido.estado === 'EN_CAMINO'
+                  }
+                  alActualizar={cargarDatos}
+                />
               ))}
             </div>
           )}

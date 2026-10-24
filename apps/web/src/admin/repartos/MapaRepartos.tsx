@@ -169,20 +169,7 @@ export function MapaRepartos({
           fillColor: z.colorBase,
           fillOpacity: opacidadRelleno,
           dashArray: esActiva ? undefined : '5, 5',
-        });
-
-        // Tooltip con el nombre de la zona y número de pedidos
-        const tooltipHtml = `<strong>${z.codigo}</strong>: ${cant} ${cant === 1 ? 'pedido' : 'pedidos'}`;
-        poly.bindTooltip(tooltipHtml, {
-          sticky: true,
-          direction: 'center',
-          className: 'cp-etiqueta-zona',
-        });
-
-        // Al tocar la zona se filtran los pedidos de esa zona (RQ-DEL-02-13)
-        poly.on('click', (e) => {
-          L.DomEvent.stopPropagation(e);
-          alSeleccionarZonaRef.current?.(z.codigo);
+          interactive: false, // solo referencia: no se toca ni filtra
         });
 
         poly.addTo(gZonas);
@@ -301,7 +288,7 @@ export function MapaRepartos({
       style={{
         position: 'relative',
         width: '100%',
-        height: esPantallaCompleta ? '100vh' : altura,
+        ...(esPantallaCompleta ? { flex: '1 1 auto', minHeight: 0 } : { height: altura }),
         background: '#E8EFE6',
         borderRadius: esPantallaCompleta ? '0' : '16px',
         overflow: 'hidden',

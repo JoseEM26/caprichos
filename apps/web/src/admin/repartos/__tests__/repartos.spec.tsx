@@ -353,7 +353,7 @@ describe('Ola F5 y Siguiente: Repartos y Mapa (Decisiones del Dueño 1 a 8)', ()
     expect(screen.getByTestId('pin-2')).toHaveTextContent(/1\.\s*Diego Ramos/);
   });
 
-  it('Decisión 5: Franja de colores (sombrear zonas Z2-Z7) y filtro al tocar una zona (RQ-DEL-02-13)', async () => {
+  it('Decisión 5: las zonas se sombrean solo como referencia: tocarlas no oculta ningún pedido', async () => {
     vi.spyOn(repartosApi, 'listarDisponibles').mockResolvedValue([
       { ...pedidoEjemplo, id: '201', codigo: 'CP-0201', zona: 'Z4' },
       { ...pedidoEjemplo, id: '202', codigo: 'CP-0202', zona: 'Z4' },
@@ -371,12 +371,12 @@ describe('Ola F5 y Siguiente: Repartos y Mapa (Decisiones del Dueño 1 a 8)', ()
       expect(screen.getByTestId('zona-poly-Z7')).toBeInTheDocument();
     });
 
-    // Al tocar la zona Z4 se filtran los pedidos de esa zona (RQ-DEL-02-13)
+    // Tocar la zona no filtra: siguen todos los pedidos en el mapa
     fireEvent.click(screen.getByTestId('zona-poly-Z4'));
 
     expect(screen.getByTestId('pin-201')).toBeInTheDocument();
     expect(screen.getByTestId('pin-202')).toBeInTheDocument();
-    expect(screen.queryByTestId('pin-204')).not.toBeInTheDocument();
+    expect(screen.getByTestId('pin-204')).toBeInTheDocument();
   });
 
   it('Decisión 7: Resumen abajo con horas de cada paso, botón Reportar problema y un solo botón grande de estado', async () => {
@@ -415,7 +415,7 @@ describe('Ola F5 y Siguiente: Repartos y Mapa (Decisiones del Dueño 1 a 8)', ()
     });
   });
 
-  it('agrupación por zona en vista Lista («Z4 · 3 pedidos»)', async () => {
+  it('la vista Lista es general, ordenada por espera (el que más espera primero), sin grupos por zona', async () => {
     vi.spyOn(repartosApi, 'listarDisponibles').mockResolvedValueOnce([
       { ...pedidoEjemplo, id: '201', codigo: 'CP-0201', zona: 'Z4' },
       { ...pedidoEjemplo, id: '202', codigo: 'CP-0202', zona: 'Z4' },
@@ -433,8 +433,9 @@ describe('Ola F5 y Siguiente: Repartos y Mapa (Decisiones del Dueño 1 a 8)', ()
     fireEvent.click(botonLista);
 
     await waitFor(() => {
-      expect(screen.getByText('Z4 · 3 pedidos')).toBeInTheDocument();
-      expect(screen.getByText('Z7 · 1 pedido')).toBeInTheDocument();
+      expect(screen.getByText('CP-0201')).toBeInTheDocument();
     });
+    expect(screen.queryByText('Z4 · 3 pedidos')).not.toBeInTheDocument();
+    expect(screen.queryByText('Z7 · 1 pedido')).not.toBeInTheDocument();
   });
 });
