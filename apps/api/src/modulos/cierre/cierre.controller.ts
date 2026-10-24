@@ -54,12 +54,16 @@ export class CierreController {
 
   /**
    * Montos esperados por el sistema antes de cerrar.
-   * Solo para rol ADMIN.
+   * Administrador directo; otro rol solo con el PIN de la supervisora (cabecera x-pin-supervisor).
    */
   @Get('esperado')
   @Permiso('caja', 'ver')
-  async obtenerEsperado(@Req() req: any) {
-    return this.cierreService.obtenerEsperado(req.usuario);
+  async obtenerEsperado(
+    @Headers('x-pin-supervisor') pinSupervisor: string | undefined,
+    @Req() req: any,
+  ) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.cierreService.obtenerEsperado(req.usuario, pinSupervisor, ip);
   }
 
   /**
@@ -67,8 +71,8 @@ export class CierreController {
    */
   @Get('historial')
   @Permiso('caja', 'ver')
-  async historial(@Query() query: HistorialCierresDto) {
-    return this.cierreService.historial(query);
+  async historial(@Query() query: HistorialCierresDto, @Req() req: any) {
+    return this.cierreService.historial(query, req.usuario);
   }
 
   /**
@@ -99,7 +103,7 @@ export class CierreController {
    */
   @Get(':id')
   @Permiso('caja', 'ver')
-  async obtenerPorId(@Param('id') id: string) {
-    return this.cierreService.obtenerCierrePorId(id);
+  async obtenerPorId(@Param('id') id: string, @Req() req: any) {
+    return this.cierreService.obtenerCierrePorId(id, req.usuario);
   }
 }

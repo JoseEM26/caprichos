@@ -6,8 +6,15 @@ import { EstadoError } from '../../comun/EstadoError';
 import { HistorialCierres } from './HistorialCierres';
 import { cierreApi, calcularTotalEfectivo, RepartidorPorLiquidar } from './cierreApi';
 import { pedidosApi, MovimientoCaja, Pedido } from '../pedidos/pedidosApi';
+import { ErrorApi } from '../../comun/api';
 
 type TabCierre = 'turno' | 'historial';
+
+// Monto en soles: solo dígitos y un punto, máximo dos decimales (sin negativos ni letras)
+const limpiarMonto = (v: string) => v.replace(/[^\d.]/g, '').replace(/^(\d*\.?\d{0,2}).*$/, '$1');
+
+// Hoy en Lima como AAAA-MM-DD, para comparar con la fecha de la caja
+const hoyLima = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
 
 export function CierreView() {
   const { usuario, tiene } = useSesion();
@@ -20,9 +27,10 @@ export function CierreView() {
   // Estados de datos
   const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState('');
-  const [cajaAbierta, setCajaAbierta] = useState(true);
+  const [cajaAbierta, setCajaAbierta] = useState(false);
+  // Caja de un día anterior que nunca se cerró (no es la de hoy)
+  const [cajaPendiente, setCajaPendiente] = useState<{ id: number; fecha: string } | null>(null);
   const [cajaId, setCajaId] = useState('');
-  const horaApertura = '14:00';
   const cajeroNombre = usuario?.nombres ? `${usuario.nombres} (${usuario.rol?.toLowerCase() || 'cajero'})` : 'Cajera de turno';
   const [aperturaMonto, setAperturaMonto] = useState(0);
 
@@ -32,8 +40,10 @@ export function CierreView() {
   const [pedidosAbiertos, setPedidosAbiertos] = useState<Pedido[]>([]);
   const [pedidosCobrados, setPedidosCobrados] = useState<Pedido[]>([]);
 
-  // Mensaje de éxito/notificación
+  // Mensaje de éxito/notificación y error de la pantalla
   const [cjMsg, setCjMsg] = useState('');
+  const [cjError, setCjError] = useState('');
+  const [guardando, setGuardando] = useState(false);
 
   // Modales
   const [abrirModalMov, setAbrirModalMov] = useState(false);
@@ -45,9 +55,11 @@ export function CierreView() {
   const [montoMov, setMontoMov] = useState('');
   const [motivoMov, setMotivoMov] = useState('');
   const [errorMov, setErrorMov] = useState('');
+  const [movAnular, setMovAnular] = useState<{ id: string; motivo: string } | null>(null);
 
   // Estados modal abrir
   const [montoAbrir, setMontoAbrir] = useState('0.00');
+  const [errorAbrir, setErrorAbrir] = useState('');
 
   // Estados modal cierre y arqueo
   const [faseCierre, setFaseCierre] = useState<'verificar' | 'arqueo'>('verificar');
@@ -76,6 +88,8 @@ export function CierreView() {
   const [obsCierre, setObsCierre] = useState('');
   const [pinSupervisora, setPinSupervisora] = useState('');
   const [revisadoCuadra, setRevisadoCuadra] = useState<boolean | null>(null);
+  const [intentosArqueo, setIntentosArqueo] = useState(0);
+  const [requierePin, setRequierePin] = useState(false);
   const [pinVerificado, setPinVerificado] = useState(false);
   const [msgCierreError, setMsgCierreError] = useState('');
   const [cerrandoCaja, setCerrandoCaja] = useState(false);
@@ -98,19 +112,28 @@ export function CierreView() {
         // En mock mode puede fallar
       }
 
-      // 2. Esperado (solo admin o si está habilitado)
-      try {
-        const esp = await cierreApi.obtenerEsperado();
-        if (esp) {
-          setEsperado(esp);
-          if (esp.cajaId) {
-            setCajaAbierta(true);
-            setCajaId(`CJ-${String(esp.cajaId).padStart(4, '0')}`);
-            setAperturaMonto(esp.apertura || 0);
+      // 2. Esperado: solo el administrador lo pide. El cajero cuenta a ciegas (DT-61).
+      if (esAdmin) {
+        try {
+          const esp = await cierreApi.obtenerEsperado();
+          if (esp) {
+            setEsperado(esp);
+            if (esp.cajaId) {
+              // La fecha de la caja es un día (UTC medianoche): se compara con el día de Lima
+              const fechaCaja = String(esp.fecha).slice(0, 10);
+              if (fechaCaja === hoyLima()) {
+                setCajaAbierta(true);
+                setCajaId(`CJ-${String(esp.cajaId).padStart(4, '0')}`);
+                setAperturaMonto(esp.apertura || 0);
+                setCajaPendiente(null);
+              } else {
+                setCajaPendiente({ id: esp.cajaId, fecha: fechaCaja });
+              }
+            }
           }
+        } catch {
+          //
         }
-      } catch {
-        //
       }
 
       // 3. Movimientos
@@ -151,36 +174,42 @@ export function CierreView() {
     } finally {
       setCargando(false);
     }
-  }, []);
+  }, [esAdmin]);
 
   useEffect(() => {
     cargarTurno();
   }, [cargarTurno]);
 
-  // Cálculos de ventas y efectivo
+  // Ventas por medio: el efectivo es lo vendido en efectivo, no el esperado en caja
+  const ventasEfectivo = esperado?.desglose?.ventasEfectivo ?? 0;
   const ventasTotales = useMemo(() => {
     if (esperado) {
-      const { efectivo = 0, yape = 0, plin = 0, transferencia = 0, tarjeta = 0 } = esperado.medios || {};
-      return efectivo + yape + plin + transferencia + tarjeta;
+      const { yape = 0, plin = 0, transferencia = 0, tarjeta = 0 } = esperado.medios || {};
+      return ventasEfectivo + yape + plin + transferencia + tarjeta;
     }
     return pedidosCobrados.reduce((acc, p) => acc + Number(p.total || 0), 0);
-  }, [esperado, pedidosCobrados]);
+  }, [esperado, pedidosCobrados, ventasEfectivo]);
 
-  const ventasEfectivo = esperado?.desglose?.ventasEfectivo ?? 0;
+  const movimientosVigentes = useMemo(() => movimientos.filter((m) => !m.anulado_en), [movimientos]);
+
   const ingresosExtra = useMemo(() => {
     if (esperado?.desglose?.ingresos !== undefined) return esperado.desglose.ingresos;
-    return movimientos.filter((m) => m.tipo === 'INGRESO').reduce((acc, m) => acc + Number(m.monto || 0), 0);
-  }, [esperado, movimientos]);
+    return movimientosVigentes.filter((m) => m.tipo === 'INGRESO').reduce((acc, m) => acc + Number(m.monto || 0), 0);
+  }, [esperado, movimientosVigentes]);
 
   const egresosGasto = useMemo(() => {
     if (esperado?.desglose?.egresos !== undefined) return esperado.desglose.egresos;
-    return movimientos.filter((m) => m.tipo === 'EGRESO').reduce((acc, m) => acc + Number(m.monto || 0), 0);
-  }, [esperado, movimientos]);
+    return movimientosVigentes.filter((m) => m.tipo === 'EGRESO').reduce((acc, m) => acc + Number(m.monto || 0), 0);
+  }, [esperado, movimientosVigentes]);
 
   const efectivoEsperado = useMemo(() => {
     if (esperado?.efectivoEsperado !== undefined) return esperado.efectivoEsperado;
     return aperturaMonto + ventasEfectivo + ingresosExtra - egresosGasto;
   }, [esperado, aperturaMonto, ventasEfectivo, ingresosExtra, egresosGasto]);
+
+  // Pedidos cobrados por medio (solo para el número de pedidos de cada tarjeta)
+  const pedidosPorMedio = (medio: string) =>
+    pedidosCobrados.filter((p) => String(p.pago_metodo || '').toUpperCase() === medio).length;
 
   // Total contado en conteo
   const totalEfectivoContado = useMemo(() => {
@@ -188,10 +217,53 @@ export function CierreView() {
     return calcularTotalEfectivo(todos);
   }, [conteoBilletes, conteoMonedas]);
 
+  // Cada medio contado frente a lo que el sistema espera (el mismo criterio del servidor: 0,005)
+  const filasCuadre = esperado
+    ? [
+        { medio: 'Efectivo', sistema: efectivoEsperado, contado: totalEfectivoContado },
+        { medio: 'Yape', sistema: esperado.medios?.yape ?? 0, contado: Number(limpiarMonto(mediosDigitales.yape)) || 0 },
+        { medio: 'Plin', sistema: esperado.medios?.plin ?? 0, contado: Number(limpiarMonto(mediosDigitales.plin)) || 0 },
+        { medio: 'Transferencia', sistema: esperado.medios?.transferencia ?? 0, contado: Number(limpiarMonto(mediosDigitales.transferencia)) || 0 },
+        { medio: 'Tarjeta', sistema: esperado.medios?.tarjeta ?? 0, contado: Number(limpiarMonto(mediosDigitales.tarjeta)) || 0 },
+      ].map((f) => ({ ...f, dif: Math.round((f.contado - f.sistema) * 100) / 100 }))
+    : [];
+  const cuadraEnSistema = filasCuadre.length > 0 && filasCuadre.every((f) => Math.abs(f.dif) < 0.005);
+  // El admin ve la diferencia y la supervisora firma con su PIN; el cajero, si el arqueo no cuadra o van 3 intentos
+  const necesitaPin = esAdmin ? !cuadraEnSistema : revisadoCuadra === false || intentosArqueo >= 3 || requierePin;
+
+  const armarConteo = () => {
+    const conteo: Record<string, number> = {};
+    for (const [k, v] of Object.entries({ ...conteoBilletes, ...conteoMonedas })) {
+      const n = parseInt(v || '0', 10);
+      if (n > 0) conteo[k] = n;
+    }
+    return conteo;
+  };
+
+  const armarMedios = () => ({
+    yape: Number(limpiarMonto(mediosDigitales.yape)) || 0,
+    plin: Number(limpiarMonto(mediosDigitales.plin)) || 0,
+    transferencia: Number(limpiarMonto(mediosDigitales.transferencia)) || 0,
+    tarjeta: Number(limpiarMonto(mediosDigitales.tarjeta)) || 0,
+  });
+
+  const errorDeServidor = (err: unknown, respaldo: string) => (err instanceof ErrorApi ? err.message : respaldo);
+
+  const abrirCierre = () => {
+    setFaseCierre('verificar');
+    setRevisadoCuadra(null);
+    setPinVerificado(false);
+    setPinSupervisora('');
+    setRequierePin(false);
+    setMsgCierreError('');
+    setAbrirModalCierre(true);
+  };
+
   // Acciones
   const handleRegistrarMovimiento = async () => {
-    const num = parseFloat(montoMov);
-    if (isNaN(num) || num <= 0) {
+    if (guardando) return;
+    const num = Number(limpiarMonto(montoMov));
+    if (!montoMov || isNaN(num) || num <= 0) {
       setErrorMov('Escribe un monto válido mayor a cero.');
       return;
     }
@@ -206,6 +278,7 @@ export function CierreView() {
     });
     if (!conf) return;
 
+    setGuardando(true);
     try {
       await pedidosApi.crearMovimiento(tipoMov, num, motivoMov.trim());
       setAbrirModalMov(false);
@@ -215,67 +288,136 @@ export function CierreView() {
       setCjMsg('Movimiento registrado.');
       cargarTurno();
     } catch (err: any) {
-      setErrorMov(err?.message || 'Error al registrar el movimiento.');
+      setErrorMov(errorDeServidor(err, 'Error al registrar el movimiento.'));
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const handleAnularMovimiento = async () => {
+    if (!movAnular || guardando) return;
+    if (movAnular.motivo.trim().length < 3) {
+      setCjError('Escribe el motivo de la anulación (al menos 3 letras).');
+      return;
+    }
+    const conf = await confirmar({
+      titulo: '¿Anular este movimiento?',
+      mensaje: 'Deja de contar en el efectivo esperado. Queda en el historial con el motivo.',
+    });
+    if (!conf) return;
+
+    setGuardando(true);
+    try {
+      await pedidosApi.anularMovimiento(movAnular.id, movAnular.motivo.trim());
+      setMovAnular(null);
+      setCjError('');
+      setCjMsg('Movimiento anulado.');
+      cargarTurno();
+    } catch (err: any) {
+      setCjError(errorDeServidor(err, 'No se pudo anular el movimiento.'));
+    } finally {
+      setGuardando(false);
     }
   };
 
   const handleAbrirCaja = async () => {
-    const num = parseFloat(montoAbrir) || 0;
+    if (guardando) return;
+    const num = Number(limpiarMonto(montoAbrir));
+    if (montoAbrir === '' || isNaN(num) || num < 0) {
+      setErrorAbrir('Escribe un monto válido, cero o mayor.');
+      return;
+    }
     const conf = await confirmar({
       titulo: `¿Abrir la caja?`,
       mensaje: `Se abre con el monto indicado (normalmente s/ 0.00). Las ventas de hoy empiezan desde cero; lo anterior queda en el historial.`,
     });
     if (!conf) return;
 
+    setGuardando(true);
     try {
       await pedidosApi.abrirCaja(num);
       setAbrirModalAbrir(false);
+      setErrorAbrir('');
       setCjMsg(`Caja abierta con s/ ${num.toFixed(2)}.`);
       cargarTurno();
     } catch (err: any) {
-      alert(err?.message || 'Error al abrir la caja.');
+      setErrorAbrir(errorDeServidor(err, 'Error al abrir la caja.'));
+    } finally {
+      setGuardando(false);
     }
   };
 
   const handleRecibirEfectivoRider = async (r: RepartidorPorLiquidar) => {
+    if (guardando) return;
     const conf = await confirmar({
       titulo: `¿Recibir s/ ${r.pendiente.toFixed(2)} de ${r.nombre}?`,
       mensaje: `El efectivo entra a la caja y cuenta en el efectivo esperado del cierre.`,
     });
     if (!conf) return;
 
+    setGuardando(true);
     try {
       await cierreApi.liquidarRepartidor({
         repartidorPartyId: r.repartidorPartyId,
         entregado: r.pendiente,
       });
+      setCjError('');
       setCjMsg(`Efectivo recibido de ${r.nombre}.`);
       cargarTurno();
     } catch (err: any) {
-      alert(err?.message || 'Error al liquidar repartidor.');
+      setCjError(errorDeServidor(err, 'Error al liquidar repartidor.'));
+    } finally {
+      setGuardando(false);
     }
   };
 
-  const handleRevisarCuadre = () => {
+  // Cajero: el arqueo lo compara el servidor (todos los medios, mismo criterio) y guarda el intento
+  const handleRevisarCuadre = async () => {
+    if (guardando) return;
     setMsgCierreError('');
-    const difEfe = Math.abs(totalEfectivoContado - efectivoEsperado);
-    const cuadra = difEfe < 0.05;
-    setRevisadoCuadra(cuadra);
-    if (!cuadra && !esAdmin) {
-      setMsgCierreError('No cuadra: la supervisora debe escribir su PIN para revisar el detalle y cerrar.');
+    setGuardando(true);
+    try {
+      const res = await cierreApi.realizarArqueo(
+        { conteo: armarConteo(), medios: armarMedios() },
+        requierePin || intentosArqueo >= 3 ? pinSupervisora : undefined,
+      );
+      setRevisadoCuadra(res.resultado === 'CUADRA');
+      setIntentosArqueo(res.intento);
+      setRequierePin(false);
+    } catch (err: any) {
+      if (err instanceof ErrorApi && err.codigo === 'PIN_REQUERIDO') {
+        setRequierePin(true);
+      }
+      setMsgCierreError(errorDeServidor(err, 'No se pudo revisar el arqueo.'));
+    } finally {
+      setGuardando(false);
     }
   };
 
-  const handleVerificarPinSupervisora = () => {
-    if (pinSupervisora.trim() === '123456' || pinSupervisora.trim() === '000000') {
+  // El PIN lo valida el servidor; solo si lo acepta se muestra el detalle del cuadre
+  const handleVerificarPinSupervisora = async () => {
+    if (guardando) return;
+    const pin = pinSupervisora.trim();
+    if (!/^\d{6}$/.test(pin)) {
+      setMsgCierreError('El PIN de la supervisora tiene 6 dígitos.');
+      return;
+    }
+    setGuardando(true);
+    try {
+      const datos = await cierreApi.verificarPinSupervisor(pin);
+      setEsperado(datos);
       setPinVerificado(true);
       setMsgCierreError('');
-    } else {
-      setMsgCierreError('El PIN de la supervisora no es correcto.');
+    } catch (err: any) {
+      setPinVerificado(false);
+      setMsgCierreError(errorDeServidor(err, 'No se pudo verificar el PIN de la supervisora.'));
+    } finally {
+      setGuardando(false);
     }
   };
 
   const handleConfirmarCierre = async () => {
+    if (guardando || cerrandoCaja) return;
     setMsgCierreError('');
     if (pedidosAbiertos.length > 0) {
       setMsgCierreError('Hay pedidos sin cobrar o por confirmar. Resuélvelos antes de cerrar.');
@@ -289,46 +431,59 @@ export function CierreView() {
       setMsgCierreError('Toca «Revisar» para saber si cuadra antes de cerrar.');
       return;
     }
-    if (!esAdmin && revisadoCuadra === false && !pinVerificado) {
-      setMsgCierreError('No cuadra: la supervisora debe escribir su PIN para revisar el detalle y cerrar.');
-      return;
+    if (necesitaPin) {
+      if (!esAdmin && !pinVerificado) {
+        setMsgCierreError('No cuadra: la supervisora debe escribir su PIN para revisar el detalle y cerrar.');
+        return;
+      }
+      if (!pinSupervisora.trim()) {
+        setMsgCierreError('Escribe el PIN de la supervisora de 6 dígitos.');
+        return;
+      }
+      if (obsCierre.trim().length < 3) {
+        setMsgCierreError('Escribe una nota de al menos 3 caracteres para cerrar con diferencias.');
+        return;
+      }
     }
 
-    const difTot = Math.round((totalEfectivoContado - efectivoEsperado) * 100) / 100;
-    const txtDif = Math.abs(difTot) < 0.005 ? 'cuadrada' : `con una diferencia de s/ ${Math.abs(difTot).toFixed(2)} ${difTot > 0 ? 'de sobrante' : 'de faltante'}`;
+    // El cajero no ve la diferencia (cierre ciego): la pregunta es neutra
+    let titulo = '¿Cerrar la caja?';
+    if (esAdmin) {
+      const difTot = Math.round((totalEfectivoContado - efectivoEsperado) * 100) / 100;
+      const txtDif = Math.abs(difTot) < 0.005 ? 'cuadrada' : `con una diferencia de s/ ${Math.abs(difTot).toFixed(2)} ${difTot > 0 ? 'de sobrante' : 'de faltante'}`;
+      titulo = `¿Cerrar la caja ${txtDif}?`;
+    }
     const conf = await confirmar({
-      titulo: `¿Cerrar la caja ${txtDif}?`,
+      titulo,
       mensaje: `Se guarda el cierre en el historial, que no se puede borrar ni editar. Mañana la caja se abre en cero.`,
     });
     if (!conf) return;
 
     setCerrandoCaja(true);
     try {
-      const todosConteo: Record<string, number> = {};
-      for (const [k, v] of Object.entries({ ...conteoBilletes, ...conteoMonedas })) {
-        const val = parseInt(v, 10);
-        if (val > 0) todosConteo[k] = val;
-      }
       await cierreApi.cerrarCaja(
         {
-          conteo: todosConteo,
-          medios: {
-            yape: parseFloat(mediosDigitales.yape) || 0,
-            plin: parseFloat(mediosDigitales.plin) || 0,
-            transferencia: parseFloat(mediosDigitales.transferencia) || 0,
-            tarjeta: parseFloat(mediosDigitales.tarjeta) || 0,
-          },
+          conteo: armarConteo(),
+          medios: armarMedios(),
           nota: obsCierre.trim() || undefined,
         },
-        pinVerificado ? pinSupervisora : undefined
+        necesitaPin ? pinSupervisora.trim() : undefined,
       );
 
       setAbrirModalCierre(false);
       setCjMsg('Caja cerrada. El cierre quedó registrado en el historial inmutable.');
       setTabActiva('historial');
+      setIntentosArqueo(0);
+      setRequierePin(false);
       cargarTurno();
     } catch (err: any) {
-      setMsgCierreError(err?.message || 'Error al cerrar la caja.');
+      if (err instanceof ErrorApi && (err.codigo === 'PIN_REQUERIDO' || err.codigo === 'NOTA_REQUERIDA')) {
+        setRequierePin(true);
+      }
+      if (err instanceof ErrorApi && err.codigo === 'PIN_INVALIDO') {
+        setPinVerificado(false);
+      }
+      setMsgCierreError(errorDeServidor(err, 'Error al cerrar la caja.'));
     } finally {
       setCerrandoCaja(false);
     }
@@ -414,6 +569,12 @@ export function CierreView() {
         </div>
       )}
 
+      {cjError && (
+        <div role="alert" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-rust, #B2500F)' }}>
+          {cjError}
+        </div>
+      )}
+
       {errorCarga && <EstadoError mensaje={errorCarga} alReintentar={cargarTurno} />}
 
       {/* 2. PESTAÑA: TURNO ACTUAL */}
@@ -436,7 +597,9 @@ export function CierreView() {
             <div>
               <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 16, color: 'var(--cp-navy, #0B2C3E)' }}>
                 {cajaAbierta
-                  ? `Caja abierta desde las ${horaApertura} · ${cajeroNombre} · apertura s/ ${aperturaMonto.toFixed(2)}`
+                  ? `Caja abierta · ${cajeroNombre} · apertura s/ ${aperturaMonto.toFixed(2)}`
+                  : cajaPendiente
+                  ? `La caja del ${cajaPendiente.fecha.split('-').reverse().join('/')} sigue abierta. Ciérrala antes de abrir la de hoy.`
                   : 'Caja cerrada. Se abre en cero cada mañana.'}
               </div>
               <div style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)' }}>
@@ -447,6 +610,7 @@ export function CierreView() {
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {cajaAbierta ? (
                 <>
+                  {tiene('caja/movimientos') && (
                   <button
                     type="button"
                     onClick={() => {
@@ -469,16 +633,11 @@ export function CierreView() {
                   >
                     Registrar movimiento
                   </button>
+                  )}
+                  {tiene('caja/cerrar') && (
                   <button
                     type="button"
-                    onClick={() => {
-                      setFaseCierre('verificar');
-                      setRevisadoCuadra(null);
-                      setPinVerificado(false);
-                      setPinSupervisora('');
-                      setMsgCierreError('');
-                      setAbrirModalCierre(true);
-                    }}
+                    onClick={abrirCierre}
                     style={{
                       minHeight: 48,
                       border: 0,
@@ -494,29 +653,56 @@ export function CierreView() {
                   >
                     Cerrar caja y cuadrar
                   </button>
+                  )}
                 </>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMontoAbrir('0.00');
-                    setAbrirModalAbrir(true);
-                  }}
-                  style={{
-                    minHeight: 48,
-                    border: 0,
-                    borderRadius: 12,
-                    background: 'var(--cp-orange, #E67929)',
-                    color: 'var(--cp-navy, #0B2C3E)',
-                    fontFamily: 'Montserrat, sans-serif',
-                    fontWeight: 800,
-                    fontSize: 15,
-                    padding: '0 18px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Abrir caja
-                </button>
+                <>
+                  {/* Una caja de un día anterior sigue abierta: se cierra antes de abrir la de hoy */}
+                  {cajaPendiente && tiene('caja/cerrar') && (
+                    <button
+                      type="button"
+                      onClick={abrirCierre}
+                      style={{
+                        minHeight: 48,
+                        border: 0,
+                        borderRadius: 12,
+                        background: 'var(--cp-orange, #E67929)',
+                        color: 'var(--cp-navy, #0B2C3E)',
+                        fontFamily: 'Montserrat, sans-serif',
+                        fontWeight: 800,
+                        fontSize: 15,
+                        padding: '0 18px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Cerrar caja y cuadrar
+                    </button>
+                  )}
+                  {!cajaPendiente && tiene('caja/abrir') && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMontoAbrir('0.00');
+                        setErrorAbrir('');
+                        setAbrirModalAbrir(true);
+                      }}
+                      style={{
+                        minHeight: 48,
+                        border: 0,
+                        borderRadius: 12,
+                        background: 'var(--cp-orange, #E67929)',
+                        color: 'var(--cp-navy, #0B2C3E)',
+                        fontFamily: 'Montserrat, sans-serif',
+                        fontWeight: 800,
+                        fontSize: 15,
+                        padding: '0 18px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Abrir caja
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -566,12 +752,11 @@ export function CierreView() {
                       }}
                     >
                       {[
-                        { n: 'Efectivo', t: esperado?.medios?.efectivo ?? 0, c: esperado?.medios?.efectivo ? 1 : 0 },
-                        { n: 'Yape', t: esperado?.medios?.yape ?? 0, c: esperado?.medios?.yape ? 1 : 0 },
-                        { n: 'Plin', t: esperado?.medios?.plin ?? 0, c: esperado?.medios?.plin ? 1 : 0 },
-                        { n: 'Transferencia', t: esperado?.medios?.transferencia ?? 0, c: esperado?.medios?.transferencia ? 1 : 0 },
-                        { n: 'Tarjeta', t: esperado?.medios?.tarjeta ?? 0, c: esperado?.medios?.tarjeta ? 1 : 0 },
-                        { n: 'Otros', t: 0, c: 0 },
+                        { n: 'Efectivo', t: ventasEfectivo, c: pedidosPorMedio('EFECTIVO') },
+                        { n: 'Yape', t: esperado?.medios?.yape ?? 0, c: pedidosPorMedio('YAPE') },
+                        { n: 'Plin', t: esperado?.medios?.plin ?? 0, c: pedidosPorMedio('PLIN') },
+                        { n: 'Transferencia', t: esperado?.medios?.transferencia ?? 0, c: pedidosPorMedio('TRANSFERENCIA') },
+                        { n: 'Tarjeta', t: esperado?.medios?.tarjeta ?? 0, c: pedidosPorMedio('TARJETA') },
                       ].map((m) => (
                         <div
                           key={m.n}
@@ -653,7 +838,6 @@ export function CierreView() {
                       }}
                     >
                       <span>Total esperado</span>
-                      <span style={{ position: 'absolute', opacity: 0, pointerEvents: 'none' }}>TOTAL EFECTIVO ESPERADO</span>
                       <span>S/ {efectivoEsperado.toFixed(2)}</span>
                     </div>
                   </div>
@@ -685,28 +869,106 @@ export function CierreView() {
                       key={m.id}
                       style={{
                         display: 'flex',
-                        justifyContent: 'space-between',
-                        gap: 10,
+                        flexDirection: 'column',
+                        gap: 6,
                         borderTop: '1px solid var(--cp-sand, #EDE1D1)',
                         paddingTop: 6,
                         fontSize: 13,
                       }}
                     >
-                      <div>
-                        <b>{m.tipo === 'INGRESO' ? 'Ingreso' : 'Egreso'}</b> · {m.motivo}
-                        <div style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)' }}>
-                          {cajeroNombre}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                        <div>
+                          <b>{m.tipo === 'INGRESO' ? 'Ingreso' : 'Egreso'}</b> · {m.motivo}
+                          {m.anulado_en && (
+                            <div style={{ fontSize: 12, color: 'var(--cp-rust, #B2500F)', fontWeight: 700 }}>
+                              Anulado{m.motivo_anulacion ? `: ${m.motivo_anulacion}` : ''}
+                            </div>
+                          )}
+                        </div>
+                        <div
+                          style={{
+                            fontWeight: 800,
+                            color: m.anulado_en
+                              ? 'var(--cp-soft, #2C4C5D)'
+                              : m.tipo === 'INGRESO'
+                              ? 'var(--cp-green, #2F7A45)'
+                              : 'var(--cp-rust, #B2500F)',
+                            textDecoration: m.anulado_en ? 'line-through' : 'none',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {m.tipo === 'INGRESO' ? '+ ' : '− '}s/ {Number(m.monto || 0).toFixed(2)}
                         </div>
                       </div>
-                      <div
-                        style={{
-                          fontWeight: 800,
-                          color: m.tipo === 'INGRESO' ? 'var(--cp-green, #2F7A45)' : 'var(--cp-rust, #B2500F)',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {m.tipo === 'INGRESO' ? '+ ' : '− '}s/ {Number(m.monto || 0).toFixed(2)}
-                      </div>
+                      {!m.anulado_en && tiene('caja/movimientos') &&
+                        (movAnular?.id === m.id ? (
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            <input
+                              aria-label="Motivo de la anulación"
+                              placeholder="Motivo de la anulación"
+                              value={movAnular.motivo}
+                              onChange={(e) => setMovAnular({ id: m.id, motivo: e.target.value })}
+                              style={{
+                                flex: '1 1 200px',
+                                minHeight: 44,
+                                borderRadius: 10,
+                                border: '1.5px solid var(--cp-line, #E3D6C6)',
+                                padding: '0 10px',
+                              }}
+                            />
+                            <button
+                              type="button"
+                              disabled={guardando}
+                              onClick={handleAnularMovimiento}
+                              style={{
+                                minHeight: 44,
+                                padding: '0 14px',
+                                borderRadius: 10,
+                                border: 0,
+                                background: 'var(--cp-rust, #B2500F)',
+                                color: '#FFFFFF',
+                                fontWeight: 800,
+                                cursor: guardando ? 'not-allowed' : 'pointer',
+                              }}
+                            >
+                              Anular movimiento
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setMovAnular(null)}
+                              style={{
+                                minHeight: 44,
+                                padding: '0 14px',
+                                borderRadius: 10,
+                                border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                                background: 'transparent',
+                                color: 'var(--cp-navy, #0B2C3E)',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Volver
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setMovAnular({ id: m.id, motivo: '' })}
+                            style={{
+                              alignSelf: 'flex-start',
+                              minHeight: 44,
+                              padding: '0 14px',
+                              borderRadius: 10,
+                              border: '1.5px solid var(--cp-rust, #B2500F)',
+                              background: 'transparent',
+                              color: 'var(--cp-rust, #B2500F)',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Anular
+                          </button>
+                        ))}
                     </div>
                   ))
                 )}
@@ -911,11 +1173,11 @@ export function CierreView() {
               </label>
               <input
                 id="mv-m"
-                type="number"
-                step="0.1"
+                type="text"
+                inputMode="decimal"
                 placeholder="0.00"
                 value={montoMov}
-                onChange={(e) => setMontoMov(e.target.value)}
+                onChange={(e) => setMontoMov(limpiarMonto(e.target.value))}
                 style={{
                   width: '100%',
                   boxSizing: 'border-box',
@@ -962,6 +1224,7 @@ export function CierreView() {
             <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
               <button
                 type="button"
+                disabled={guardando}
                 onClick={handleRegistrarMovimiento}
                 style={{
                   flex: 1,
@@ -1065,10 +1328,10 @@ export function CierreView() {
               </label>
               <input
                 id="ab-ini"
-                type="number"
-                step="0.1"
+                type="text"
+                inputMode="decimal"
                 value={montoAbrir}
-                onChange={(e) => setMontoAbrir(e.target.value)}
+                onChange={(e) => setMontoAbrir(limpiarMonto(e.target.value))}
                 style={{
                   width: '100%',
                   boxSizing: 'border-box',
@@ -1083,9 +1346,16 @@ export function CierreView() {
               />
             </div>
 
+            {errorAbrir && (
+              <div role="alert" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-rust, #B2500F)' }}>
+                {errorAbrir}
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
               <button
                 type="button"
+                disabled={guardando}
                 onClick={handleAbrirCaja}
                 style={{
                   flex: 1,
@@ -1371,11 +1641,12 @@ export function CierreView() {
                         <div key={d} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                           <span style={{ width: 44, fontSize: 12, fontWeight: 700 }}>S/ {d}</span>
                           <input
-                            type="number"
-                            min="0"
+                            type="text"
+                            inputMode="numeric"
+                            aria-label={`Cantidad de billetes de S/ ${d}`}
                             placeholder="0"
                             value={conteoBilletes[d]}
-                            onChange={(e) => setConteoBilletes({ ...conteoBilletes, [d]: e.target.value })}
+                            onChange={(e) => setConteoBilletes({ ...conteoBilletes, [d]: e.target.value.replace(/\D/g, '') })}
                             style={{
                               width: 60,
                               minHeight: 36,
@@ -1401,11 +1672,12 @@ export function CierreView() {
                         <div key={d} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                           <span style={{ width: 44, fontSize: 12, fontWeight: 700 }}>S/ {Number(d).toFixed(2)}</span>
                           <input
-                            type="number"
-                            min="0"
+                            type="text"
+                            inputMode="numeric"
+                            aria-label={`Cantidad de monedas de S/ ${Number(d).toFixed(2)}`}
                             placeholder="0"
                             value={conteoMonedas[d]}
-                            onChange={(e) => setConteoMonedas({ ...conteoMonedas, [d]: e.target.value })}
+                            onChange={(e) => setConteoMonedas({ ...conteoMonedas, [d]: e.target.value.replace(/\D/g, '') })}
                             style={{
                               width: 60,
                               minHeight: 36,
@@ -1438,17 +1710,18 @@ export function CierreView() {
                 >
                   <div style={{ fontWeight: 800, fontSize: 14 }}>2. Medios digitales (lo que ves en la app o voucher)</div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 8 }}>
-                    {(['yape', 'plin', 'transferencia', 'tarjeta', 'otros'] as const).map((m) => (
+                    {(['yape', 'plin', 'transferencia', 'tarjeta'] as const).map((m) => (
                       <div key={m}>
                         <label style={{ fontSize: 11, fontWeight: 700, textTransform: 'capitalize', color: 'var(--cp-soft, #2C4C5D)' }}>
                           {m}
                         </label>
                         <input
-                          type="number"
-                          step="0.1"
+                          type="text"
+                          inputMode="decimal"
+                          aria-label={`Monto en ${m}`}
                           placeholder="0.00"
                           value={mediosDigitales[m]}
-                          onChange={(e) => setMediosDigitales({ ...mediosDigitales, [m]: e.target.value })}
+                          onChange={(e) => setMediosDigitales({ ...mediosDigitales, [m]: limpiarMonto(e.target.value) })}
                           style={{
                             width: '100%',
                             boxSizing: 'border-box',
@@ -1469,6 +1742,7 @@ export function CierreView() {
                   <div>
                     <button
                       type="button"
+                      disabled={guardando}
                       onClick={handleRevisarCuadre}
                       style={{
                         minHeight: 44,
@@ -1489,7 +1763,7 @@ export function CierreView() {
                         ¡Cuadra! Todo en orden.
                       </div>
                     )}
-                    {revisadoCuadra === false && !pinVerificado && (
+                    {(revisadoCuadra === false || requierePin) && !pinVerificado && (
                       <div style={{ marginTop: 8, border: '1px solid var(--cp-rust, #B2500F)', background: '#FFF0ED', borderRadius: 10, padding: 10 }}>
                         <div style={{ color: 'var(--cp-rust, #B2500F)', fontWeight: 700, fontSize: 13 }}>
                           No cuadra: la supervisora debe escribir su PIN para revisar el detalle y cerrar.
@@ -1497,9 +1771,12 @@ export function CierreView() {
                         <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
                           <input
                             type="password"
+                            inputMode="numeric"
+                            maxLength={6}
+                            aria-label="PIN de la supervisora"
                             placeholder="PIN de la supervisora"
                             value={pinSupervisora}
-                            onChange={(e) => setPinSupervisora(e.target.value)}
+                            onChange={(e) => setPinSupervisora(e.target.value.replace(/\D/g, ''))}
                             style={{
                               flex: 1,
                               minHeight: 38,
@@ -1510,6 +1787,7 @@ export function CierreView() {
                           />
                           <button
                             type="button"
+                            disabled={guardando}
                             onClick={handleVerificarPinSupervisora}
                             style={{
                               minHeight: 38,
@@ -1531,8 +1809,9 @@ export function CierreView() {
                 )}
 
                 {/* Detalle de comparación si es Admin o si el PIN fue validado */}
-                {(esAdmin || pinVerificado) && (
+                {(esAdmin || pinVerificado) && filasCuadre.length > 0 && (
                   <div
+                    data-testid="detalle-cuadre"
                     style={{
                       background: 'var(--cp-white, #FFFFFF)',
                       border: '1px solid var(--cp-line, #E3D6C6)',
@@ -1546,21 +1825,51 @@ export function CierreView() {
                     <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 2 }}>
                       {esAdmin ? 'Resultado del cuadre' : 'Detalle (abierto con PIN de la supervisora)'}
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, borderTop: '1px solid var(--cp-sand, #EDE1D1)', paddingTop: 4 }}>
-                      <b>Efectivo</b>
-                      <span>Sist. s/ {efectivoEsperado.toFixed(2)}</span>
-                      <span>Cont. s/ {totalEfectivoContado.toFixed(2)}</span>
-                      <b style={{ color: Math.abs(totalEfectivoContado - efectivoEsperado) < 0.05 ? 'var(--cp-green, #2F7A45)' : 'var(--cp-rust, #B2500F)' }}>
-                        {Math.abs(totalEfectivoContado - efectivoEsperado) < 0.05 ? 'Cuadrado +s/ 0.00' : `${totalEfectivoContado >= efectivoEsperado ? '+' : ''}s/ ${(totalEfectivoContado - efectivoEsperado).toFixed(2)}`}
-                      </b>
-                    </div>
+                    {filasCuadre.map((f) => (
+                      <div
+                        key={f.medio}
+                        style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, borderTop: '1px solid var(--cp-sand, #EDE1D1)', paddingTop: 4 }}
+                      >
+                        <b>{f.medio}</b>
+                        <span>Sist. s/ {f.sistema.toFixed(2)}</span>
+                        <span>Cont. s/ {f.contado.toFixed(2)}</span>
+                        <b style={{ color: Math.abs(f.dif) < 0.005 ? 'var(--cp-green, #2F7A45)' : 'var(--cp-rust, #B2500F)' }}>
+                          {Math.abs(f.dif) < 0.005 ? 'Cuadra' : `${f.dif > 0 ? '+' : '−'} s/ ${Math.abs(f.dif).toFixed(2)}`}
+                        </b>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* El administrador firma la diferencia con su PIN */}
+                {esAdmin && necesitaPin && (
+                  <div>
+                    <label htmlFor="cl-pin" style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>
+                      PIN de la supervisora (la diferencia se cierra con su PIN)
+                    </label>
+                    <input
+                      id="cl-pin"
+                      type="password"
+                      inputMode="numeric"
+                      maxLength={6}
+                      value={pinSupervisora}
+                      onChange={(e) => setPinSupervisora(e.target.value.replace(/\D/g, ''))}
+                      style={{
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        minHeight: 44,
+                        borderRadius: 10,
+                        border: '1.5px solid var(--cp-line, #E3D6C6)',
+                        padding: '0 10px',
+                      }}
+                    />
                   </div>
                 )}
 
                 {/* Observaciones */}
                 <div>
                   <label htmlFor="cl-o" style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>
-                    Observaciones (opcional)
+                    {necesitaPin ? 'Nota explicativa (obligatoria, mínimo 3 caracteres)' : 'Observaciones (opcional)'}
                   </label>
                   <textarea
                     id="cl-o"
@@ -1588,7 +1897,7 @@ export function CierreView() {
                 <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                   <button
                     type="button"
-                    disabled={cerrandoCaja}
+                    disabled={cerrandoCaja || guardando}
                     onClick={handleConfirmarCierre}
                     style={{
                       flex: 1,
@@ -1600,7 +1909,7 @@ export function CierreView() {
                       fontFamily: 'Montserrat, sans-serif',
                       fontWeight: 800,
                       fontSize: 15,
-                      cursor: cerrandoCaja ? 'not-allowed' : 'pointer',
+                      cursor: cerrandoCaja || guardando ? 'not-allowed' : 'pointer',
                     }}
                   >
                     {cerrandoCaja ? 'Cerrando...' : 'Cerrar caja'}

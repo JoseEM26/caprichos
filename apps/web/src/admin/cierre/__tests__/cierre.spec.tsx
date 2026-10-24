@@ -4,6 +4,8 @@ import { ArqueoCiegoForm } from '../ArqueoCiegoForm';
 import { HistorialCierres } from '../HistorialCierres';
 import { CierreView } from '../CierreView';
 import { cierreApi } from '../cierreApi';
+import { pedidosApi } from '../../pedidos/pedidosApi';
+import { ErrorApi } from '../../../comun/api';
 import * as sesionModulo from '../../../comun/sesion';
 
 describe('Ola F5: Caja y Cierres', () => {
@@ -202,9 +204,14 @@ describe('Ola F5: Caja y Cierres', () => {
   });
 
   it('muestra el resumen esperado solo cuando el rol es ADMIN en CierreView', async () => {
+    const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+    vi.spyOn(pedidosApi, 'obtenerCajaActual').mockResolvedValue({ abierta: true, caja: { id: 10, estado: 'ABIERTA', apertura: 50 } } as any);
+    vi.spyOn(pedidosApi, 'listarMovimientos').mockResolvedValue([]);
+    vi.spyOn(pedidosApi, 'listar').mockResolvedValue({ items: [] } as any);
+    vi.spyOn(cierreApi, 'listarRepartidoresPorLiquidar').mockResolvedValue([]);
     vi.spyOn(cierreApi, 'obtenerEsperado').mockResolvedValueOnce({
       cajaId: 10,
-      fecha: '2026-10-21',
+      fecha: `${hoy}T00:00:00.000Z`,
       apertura: 50,
       efectivoEsperado: 355,
       medios: {
@@ -244,8 +251,111 @@ describe('Ola F5: Caja y Cierres', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('seccion-esperado-admin')).toBeInTheDocument();
-      expect(screen.getByText(/TOTAL EFECTIVO ESPERADO/)).toBeInTheDocument();
+      expect(screen.getByText('Total esperado')).toBeInTheDocument();
       expect(screen.getByText(/S\/ 355\.00/)).toBeInTheDocument();
     });
+  });
+
+  it('una caja de un día anterior abierta no se muestra como la caja de hoy', async () => {
+    vi.spyOn(pedidosApi, 'obtenerCajaActual').mockResolvedValue({ abierta: false, caja: null } as any);
+    vi.spyOn(pedidosApi, 'listarMovimientos').mockResolvedValue([]);
+    vi.spyOn(pedidosApi, 'listar').mockResolvedValue({ items: [] } as any);
+    vi.spyOn(cierreApi, 'listarRepartidoresPorLiquidar').mockResolvedValue([]);
+    vi.spyOn(cierreApi, 'obtenerEsperado').mockResolvedValue({
+      cajaId: 7,
+      fecha: '2026-10-22T00:00:00.000Z',
+      apertura: 10,
+      efectivoEsperado: 170,
+      medios: { efectivo: 170, yape: 0, plin: 0, transferencia: 0, tarjeta: 0 },
+      desglose: { ventasEfectivo: 160, ingresos: 0, egresos: 0 },
+    });
+    vi.spyOn(sesionModulo, 'useSesion').mockReturnValue({
+      usuario: { partyId: '1', nombres: 'Admin Kevin', rol: 'ADMIN' },
+      permisos: ['caja/ver', 'caja/cerrar', 'caja/abrir', 'caja/movimientos'],
+      debeCambiar: false,
+      cargando: false,
+      autenticado: true,
+      ingresar: vi.fn(),
+      salir: vi.fn(),
+      renovar: vi.fn(),
+      refrescarYo: vi.fn(),
+      marcarClaveCambiada: vi.fn(),
+      tiene: vi.fn().mockReturnValue(true),
+    });
+
+    render(<CierreView />);
+
+    expect(await screen.findByText(/La caja del 22\/10\/2026 sigue abierta/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Registrar movimiento' })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('seccion-esperado-admin')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cerrar caja y cuadrar' })).toBeInTheDocument();
+  });
+
+  it('el cajero cuenta con el arqueo del servidor y no pide el esperado', async () => {
+    vi.spyOn(pedidosApi, 'obtenerCajaActual').mockResolvedValue({ abierta: true, caja: { id: 7, estado: 'ABIERTA', apertura: 0 } } as any);
+    vi.spyOn(pedidosApi, 'listarMovimientos').mockResolvedValue([]);
+    vi.spyOn(pedidosApi, 'listar').mockResolvedValue({ items: [] } as any);
+    vi.spyOn(cierreApi, 'listarRepartidoresPorLiquidar').mockResolvedValue([]);
+    const esperado = vi.spyOn(cierreApi, 'obtenerEsperado');
+    const arqueo = vi.spyOn(cierreApi, 'realizarArqueo').mockResolvedValue({ resultado: 'NO_CUADRA', intento: 1 });
+
+    render(<CierreView />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Cerrar caja y cuadrar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ya revisé: continuar al conteo' }));
+    fireEvent.change(screen.getByLabelText('Cantidad de billetes de S/ 100'), { target: { value: '3' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar si cuadra' }));
+
+    await waitFor(() =>
+      expect(arqueo).toHaveBeenCalledWith({ conteo: { '100': 3 }, medios: { yape: 0, plin: 0, transferencia: 0, tarjeta: 0 } }, undefined),
+    );
+    expect(await screen.findByText(/No cuadra: la supervisora debe escribir su PIN/)).toBeInTheDocument();
+    expect(esperado).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Sist\./)).not.toBeInTheDocument();
+  });
+
+  it('el PIN de la supervisora lo valida el servidor, no el navegador', async () => {
+    vi.spyOn(pedidosApi, 'obtenerCajaActual').mockResolvedValue({ abierta: true, caja: { id: 7, estado: 'ABIERTA', apertura: 0 } } as any);
+    vi.spyOn(pedidosApi, 'listarMovimientos').mockResolvedValue([]);
+    vi.spyOn(pedidosApi, 'listar').mockResolvedValue({ items: [] } as any);
+    vi.spyOn(cierreApi, 'listarRepartidoresPorLiquidar').mockResolvedValue([]);
+    vi.spyOn(cierreApi, 'realizarArqueo').mockResolvedValue({ resultado: 'NO_CUADRA', intento: 1 });
+    const verificar = vi
+      .spyOn(cierreApi, 'verificarPinSupervisor')
+      .mockRejectedValue(new ErrorApi('PIN_INVALIDO', 'PIN de supervisor inválido o no proporcionado', 403));
+
+    render(<CierreView />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Cerrar caja y cuadrar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ya revisé: continuar al conteo' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar si cuadra' }));
+
+    const pin = await screen.findByLabelText('PIN de la supervisora');
+    fireEvent.change(pin, { target: { value: '123456' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Verificar' }));
+
+    expect(await screen.findByText('PIN de supervisor inválido o no proporcionado')).toBeInTheDocument();
+    expect(verificar).toHaveBeenCalledWith('123456');
+    expect(screen.queryByTestId('detalle-cuadre')).not.toBeInTheDocument();
+  });
+
+  it('la fecha de la caja no cambia de día al mostrarla en Lima', async () => {
+    vi.spyOn(cierreApi, 'obtenerHistorial').mockResolvedValue({
+      cierres: [
+        {
+          cajaId: 9,
+          fecha: '2026-10-23T00:00:00.000Z',
+          apertura: 0,
+          cerradaPor: 2,
+          cerradaEn: '2026-10-23T03:00:00.000Z',
+          cierre: { resultado: 'CUADRA', aprobadoPor: null, nota: null, medios: [{ medio: 'EFECTIVO', sistema: 100, visto: 100, diferencia: 0 }] },
+        },
+      ],
+      total: 1,
+      pagina: 1,
+      limite: 20,
+      totalPaginas: 1,
+    });
+
+    render(<HistorialCierres />);
+    expect(await screen.findByText(/23\/10\/2026/)).toBeInTheDocument();
   });
 });

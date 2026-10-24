@@ -224,6 +224,7 @@ export class CreditosService {
       include: {
         lineas: true,
         consumoPersonal: true,
+        cobro: true,
       },
     });
 
@@ -231,6 +232,22 @@ export class CreditosService {
       throw new NotFoundException({
         codigo: 'PEDIDO_NO_ENCONTRADO',
         mensaje: 'El pedido no existe',
+      });
+    }
+
+    // un pedido ya cobrado en caja no se carga también a crédito (dos cobros del mismo pedido)
+    if (pedido.pago_estado === 'PAGADO' || (pedido.cobro && !pedido.cobro.anulado_en)) {
+      throw new ConflictException({
+        codigo: 'YA_COBRADO',
+        mensaje: 'El pedido ya fue cobrado',
+      });
+    }
+
+    // RN-CAP-131 / RQ-USR-03-06: por la carta virtual no se consume crédito del personal
+    if (['CARTA', 'BOT', 'CHATBOT'].includes(pedido.canal)) {
+      throw new BadRequestException({
+        codigo: 'CANAL_NO_PERMITIDO',
+        mensaje: 'Por la carta virtual no se consume crédito del personal',
       });
     }
 
@@ -272,6 +289,15 @@ export class CreditosService {
       throw new BadRequestException({
         codigo: 'COLABORADOR_DESACTIVADO',
         mensaje: 'El colaborador se encuentra desactivado',
+      });
+    }
+
+    // RQ-USR-03-08: el crédito es solo para el personal (con cuenta o con rol de empleado), no para clientes
+    const esPersonal = Boolean(party.usuario) || Boolean(party.roles?.some((r) => r.employee_detail));
+    if (!esPersonal) {
+      throw new BadRequestException({
+        codigo: 'NO_ES_PERSONAL',
+        mensaje: 'El crédito del personal solo se da a trabajadores del local',
       });
     }
 

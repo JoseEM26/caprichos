@@ -12,7 +12,8 @@ export function calcularTotalConteo(conteo: Record<string, number> | undefined |
     return 0;
   }
 
-  let total = 0;
+  // Se suma en céntimos enteros para no acumular errores de redondeo de los floats.
+  let totalCentimos = 0;
   for (const denom of DENOMINACIONES) {
     const k1 = denom.toString();
     const k2 = denom === 0.5 ? '0.50' : denom === 0.2 ? '0.20' : denom === 0.1 ? '0.10' : k1;
@@ -20,9 +21,9 @@ export function calcularTotalConteo(conteo: Record<string, number> | undefined |
       (conteo as any)[k1] ?? (conteo as any)[k2] ?? (conteo as any)[denom] ?? 0,
     );
     if (!isNaN(cant) && cant > 0) {
-      total += cant * denom;
+      totalCentimos += cant * Math.round(denom * 100);
     }
   }
 
-  return Math.round(total * 100) / 100;
+  return totalCentimos / 100;
 }

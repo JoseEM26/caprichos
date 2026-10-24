@@ -26,11 +26,16 @@ describe('CajaService', () => {
       },
       movimientoCaja: {
         create: jest.fn(),
-        findMany: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
         findUnique: jest.fn(),
         update: jest.fn(),
       },
+      cobro: { findMany: jest.fn().mockResolvedValue([]) },
+      pedido: { findMany: jest.fn().mockResolvedValue([]) },
+      liquidacion: { findMany: jest.fn().mockResolvedValue([]) },
+      $queryRaw: jest.fn().mockResolvedValue([]),
     };
+    prismaMock.$transaction = jest.fn().mockImplementation(async (cb: any) => cb(prismaMock));
 
     auditoriaMock = {
       registrar: jest.fn().mockResolvedValue(undefined),
@@ -128,7 +133,7 @@ describe('CajaService', () => {
     it('debe retornar caja en null y totales en 0 si no hay caja hoy', async () => {
       prismaMock.caja.findUnique.mockResolvedValue(null);
 
-      const res = await service.obtenerCajaActual();
+      const res = await service.obtenerCajaActual({ rol: 'ADMIN' });
 
       expect(res.caja).toBeNull();
       expect(res.abierta).toBe(false);
@@ -210,18 +215,57 @@ describe('CajaService', () => {
         ],
       });
 
-      const res = await service.obtenerCajaActual();
+      // El cálculo de montos lee cobros y movimientos de sus tablas: se alimentan con los mismos datos
+      prismaMock.cobro.findMany.mockResolvedValue([
+        { id: 1n, pedido_id: 1n, anulado_en: null, pagos: [{ medio: 'EFECTIVO', monto: new Prisma.Decimal(100) }] },
+        {
+          id: 2n,
+          pedido_id: 2n,
+          anulado_en: null,
+          pagos: [
+            { medio: 'YAPE', monto: new Prisma.Decimal(50) },
+            { medio: 'EFECTIVO', monto: new Prisma.Decimal(30) },
+          ],
+        },
+      ]);
+      prismaMock.movimientoCaja.findMany.mockResolvedValue([
+        { id: 1n, tipo: 'INGRESO', monto: new Prisma.Decimal(20) },
+        { id: 2n, tipo: 'EGRESO', monto: new Prisma.Decimal(15) },
+      ]);
+
+      const res = await service.obtenerCajaActual({ rol: 'ADMIN' });
 
       expect(res.abierta).toBe(true);
-      expect(res.totalesPorMedio.EFECTIVO).toBe(130); // 100 + 30
-      expect(res.totalesPorMedio.YAPE).toBe(50);
-      expect(res.resumen.apertura).toBe(50);
-      expect(res.resumen.cobrosEfectivo).toBe(130);
-      expect(res.resumen.vueltosEfectivo).toBe(20);
-      expect(res.resumen.ingresos).toBe(20);
-      expect(res.resumen.egresos).toBe(15);
+      expect(res.totalesPorMedio!.EFECTIVO).toBe(130); // 100 + 30
+      expect(res.totalesPorMedio!.YAPE).toBe(50);
+      expect(res.resumen!.apertura).toBe(50);
+      expect(res.resumen!.cobrosEfectivo).toBe(130);
+      expect(res.resumen!.vueltosEfectivo).toBe(20);
+      expect(res.resumen!.ingresos).toBe(20);
+      expect(res.resumen!.egresos).toBe(15);
       // Efectivo esperado = 50 + 130 + 20 - 15 = 185
       expect(res.efectivoEsperado).toBe(185);
+    });
+
+    it('al cajero solo le muestra si la caja está abierta, sin totales ni efectivo esperado (DT-61)', async () => {
+      prismaMock.caja.findUnique.mockResolvedValue({
+        id: 1n,
+        fecha: new Date('2026-10-21T00:00:00.000Z'),
+        apertura: new Prisma.Decimal(50),
+        estado: 'ABIERTA',
+        abierta_por: 2n,
+        cerrada_por: null,
+        cerrada_en: null,
+        cobros: [],
+        movimientos: [],
+      });
+
+      const res = await service.obtenerCajaActual({ rol: 'CAJERO' });
+
+      expect(res.abierta).toBe(true);
+      expect(res.efectivoEsperado).toBeUndefined();
+      expect(res.totalesPorMedio).toBeUndefined();
+      expect(res.resumen).toBeUndefined();
     });
   });
 
@@ -276,6 +320,7 @@ describe('CajaService', () => {
     });
 
     it('debe anular un movimiento con motivo sin borrarlo', async () => {
+      prismaMock.caja.findUnique.mockResolvedValue({ id: 1n, estado: 'ABIERTA' });
       prismaMock.movimientoCaja.findUnique.mockResolvedValue({
         id: 5n,
         anulado_en: null,
@@ -328,6 +373,34 @@ describe('CajaService', () => {
           status: HttpStatus.CONFLICT,
         }),
       );
+    });
+  });
+
+  describe('reglas nuevas de caja', () => {
+    it('abrir dos veces a la vez: la segunda choca con la fecha única y responde CAJA_YA_ABIERTA (409)', async () => {
+      prismaMock.caja.findUnique.mockResolvedValue(null);
+      prismaMock.caja.findFirst.mockResolvedValue(null);
+      prismaMock.caja.create.mockRejectedValue(Object.assign(new Error('unique'), { code: 'P2002' }));
+
+      await expect(service.abrirCaja({ apertura: 0 } as any, { partyId: 1n, rol: 'ADMIN' })).rejects.toMatchObject({
+        response: { codigo: 'CAJA_YA_ABIERTA' },
+        status: HttpStatus.CONFLICT,
+      });
+    });
+
+    it('la apertura admite como máximo dos decimales (MONTO_INVALIDO)', async () => {
+      await expect(service.abrirCaja({ apertura: 10.005 } as any, { partyId: 1n, rol: 'ADMIN' })).rejects.toMatchObject({
+        response: { codigo: 'MONTO_INVALIDO' },
+      });
+    });
+
+    it('no se anula un movimiento de una caja cerrada (un cierre no se edita)', async () => {
+      prismaMock.movimientoCaja.findUnique.mockResolvedValue({ id: 6n, caja_id: 1n, anulado_en: null });
+      prismaMock.caja.findUnique.mockResolvedValue({ id: 1n, estado: 'CERRADA' });
+
+      await expect(
+        service.anularMovimiento('6', { motivo: 'Error en monto' } as any, cajeroUsuario),
+      ).rejects.toMatchObject({ response: { codigo: 'CAJA_CERRADA' } });
     });
   });
 });

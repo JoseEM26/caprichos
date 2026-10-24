@@ -183,6 +183,12 @@ export const cierreApi = {
     return api.post<CierreCajaRespuesta>('/admin/cierre/cerrar', dto, { headers });
   },
 
+  // El servidor valida el PIN de supervisora y solo entonces entrega el esperado.
+  verificarPinSupervisor: (pinSupervisor: string) =>
+    api.get<MontosEsperados>('/admin/cierre/esperado', {
+      headers: { 'x-pin-supervisor': pinSupervisor.trim() },
+    }),
+
   listarRepartidoresPorLiquidar: () =>
     api.get<RepartidorPorLiquidar[]>('/admin/cierre/repartidores'),
 

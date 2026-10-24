@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
+import { Paginacion } from '../../comun/Paginacion';
 import { useSesion } from '../../comun/sesion';
 import {
   cierreApi,
@@ -8,12 +9,35 @@ import {
   DetalleCierreCompleto,
 } from './cierreApi';
 
+// Las fechas de caja son de día (DATE, medianoche UTC): se muestran tal cual, sin cambio de zona.
+const fechaDeCaja = (fecha: string) =>
+  new Date(fecha).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' });
+
+const horaDeCierre = (iso: string) =>
+  new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima' });
+
+// Estado del cierre según el efectivo; si el efectivo cuadra pero el arqueo no, es «No cuadra»
+const estadoCierre = (c: ItemHistorialCierre) => {
+  const dif = c.cierre?.medios?.find((m) => m.medio.toLowerCase() === 'efectivo')?.diferencia ?? 0;
+  if (Math.abs(dif) >= 0.005) return dif > 0 ? 'sobrante' : 'faltante';
+  return c.cierre?.resultado === 'NO_CUADRA' ? 'otros' : 'cuadrado';
+};
+
+const ETIQUETA_ESTADO: Record<string, string> = {
+  cuadrado: 'Cuadrado',
+  sobrante: 'Sobrante',
+  faltante: 'Faltante',
+  otros: 'No cuadra',
+};
+
 export function HistorialCierres() {
   const { usuario } = useSesion();
   const esAdmin = usuario?.rol === 'ADMIN';
 
   const [cierres, setCierres] = useState<ItemHistorialCierre[]>([]);
   const [total, setTotal] = useState(0);
+  const [pagina, setPagina] = useState(1);
+  const [totalPaginas, setTotalPaginas] = useState(1);
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<'todos' | 'cuadrado' | 'sobrante' | 'faltante'>('todos');
@@ -26,25 +50,25 @@ export function HistorialCierres() {
   const [detalle, setDetalle] = useState<DetalleCierreCompleto | null>(null);
   const [cargandoDetalle, setCargandoDetalle] = useState(false);
   const [errorDetalle, setErrorDetalle] = useState<string | null>(null);
-  const [msgTicket, setMsgTicket] = useState('');
 
   const cargarHistorial = useCallback(async () => {
     setError(null);
     try {
       const res = await cierreApi.obtenerHistorial({
-        pagina: 1,
-        limite: 50,
+        pagina,
+        limite: 20,
         desde: desde || undefined,
         hasta: hasta || undefined,
       });
       setCierres(res.cierres);
       setTotal(res.total);
+      setTotalPaginas(res.totalPaginas);
     } catch (err: any) {
       setError(err?.message || 'Error al cargar el historial de cierres');
     } finally {
       setCargando(false);
     }
-  }, [desde, hasta]);
+  }, [pagina, desde, hasta]);
 
   useEffect(() => {
     cargarHistorial();
@@ -54,7 +78,6 @@ export function HistorialCierres() {
     setDetalleId(id);
     setCargandoDetalle(true);
     setErrorDetalle(null);
-    setMsgTicket('');
     try {
       const res = await cierreApi.obtenerCierrePorId(id);
       setDetalle(res);
@@ -71,13 +94,9 @@ export function HistorialCierres() {
     setErrorDetalle(null);
   };
 
+  // El filtro de estado se aplica a la página que está en pantalla
   const cierresFiltrados = useMemo(() => {
-    return cierres.filter((c) => {
-      const dif = c.cierre?.medios?.find((m) => m.medio.toLowerCase() === 'efectivo')?.diferencia ?? 0;
-      const estado = Math.abs(dif) < 0.005 ? 'cuadrado' : dif > 0 ? 'sobrante' : 'faltante';
-      if (filtroEstado !== 'todos' && estado !== filtroEstado) return false;
-      return true;
-    });
+    return cierres.filter((c) => filtroEstado === 'todos' || estadoCierre(c) === filtroEstado);
   }, [cierres, filtroEstado]);
 
   return (
@@ -109,7 +128,10 @@ export function HistorialCierres() {
               id="cj-f"
               type="date"
               value={desde}
-              onChange={(e) => setDesde(e.target.value)}
+              onChange={(e) => {
+                setDesde(e.target.value);
+                setPagina(1);
+              }}
               style={{
                 minHeight: 44,
                 borderRadius: 10,
@@ -130,7 +152,10 @@ export function HistorialCierres() {
               id="cj-t"
               type="date"
               value={hasta}
-              onChange={(e) => setHasta(e.target.value)}
+              onChange={(e) => {
+                setHasta(e.target.value);
+                setPagina(1);
+              }}
               style={{
                 minHeight: 44,
                 borderRadius: 10,
@@ -172,7 +197,7 @@ export function HistorialCierres() {
           </div>
         </div>
         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-soft, #2C4C5D)' }}>
-          {cierresFiltrados.length} de {total} cierres
+          {total} {total === 1 ? 'cierre' : 'cierres'} con esas fechas
         </div>
       </div>
 
@@ -206,15 +231,11 @@ export function HistorialCierres() {
         >
           {cierresFiltrados.map((h) => {
             const dif = h.cierre?.medios?.find((m) => m.medio.toLowerCase() === 'efectivo')?.diferencia ?? 0;
-            const cuadra = Math.abs(dif) < 0.005;
-            const col = cuadra ? 'var(--cp-green, #2F7A45)' : dif > 0 ? 'var(--cp-soft, #2C4C5D)' : 'var(--cp-rust, #B2500F)';
-            const estLabel = cuadra ? 'Cuadrado' : dif > 0 ? 'Sobrante' : 'Faltante';
+            const estado = estadoCierre(h);
+            const col = estado === 'cuadrado' ? 'var(--cp-green, #2F7A45)' : estado === 'sobrante' ? 'var(--cp-soft, #2C4C5D)' : 'var(--cp-rust, #B2500F)';
             const difTexto = (dif > 0 ? '+' : '') + `s/ ${Math.abs(dif).toFixed(2)}`;
 
-            const totalVendido = (h.cierre?.medios || []).reduce((acc, m) => acc + (m.visto || m.sistema || 0), 0);
-            const fechaStr = new Date(h.fecha).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
-            const horaAbre = '14:00';
-            const horaCierra = h.cerradaEn ? new Date(h.cerradaEn).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : '22:05';
+            const fechaStr = fechaDeCaja(h.fecha);
 
             return (
               <button
@@ -238,24 +259,23 @@ export function HistorialCierres() {
                     CZ-{String(h.cajaId).padStart(4, '0')} <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--cp-soft, #2C4C5D)' }}>· Caja #{h.cajaId}</span>
                   </span>
                   <span style={{ fontSize: 12, fontWeight: 800, color: col }}>
-                    {estLabel} {difTexto}
+                    {ETIQUETA_ESTADO[estado]} {estado === 'cuadrado' || estado === 'otros' ? '' : difTexto}
                   </span>
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)' }}>
-                  {fechaStr} · {horaAbre} a {horaCierra}
+                  {fechaStr}
+                  {h.cerradaEn ? ` · cerrada a las ${horaDeCierre(h.cerradaEn)}` : ''}
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--cp-navy, #0B2C3E)' }}>
-                  {h.cerradaPor ? `Usuario #${h.cerradaPor}` : (usuario?.nombres || 'Cajera de turno')}
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, color: 'var(--cp-navy, #0B2C3E)' }}>
-                  <span>Vendido</span>
-                  <span>s/ {totalVendido.toFixed(2)}</span>
+                  {h.cerradaPor ? `Usuario #${h.cerradaPor}` : 'Sin dato de cajero'}
                 </div>
               </button>
             );
           })}
         </div>
       )}
+
+      <Paginacion pagina={pagina} totalPaginas={totalPaginas} alCambiarPagina={setPagina} totalRegistros={total} tamanoPagina={20} />
 
       {/* Modal Detalle de Cierre formato Ticket 80 mm */}
       {detalleId && (
@@ -327,6 +347,7 @@ export function HistorialCierres() {
             ) : detalle ? (
               <>
                 <div
+                  id="ticket-cierre"
                   style={{
                     alignSelf: 'center',
                     width: 'min(100%, 320px)',
@@ -348,9 +369,9 @@ export function HistorialCierres() {
                     CIERRE DE CAJA CZ-{String(detalle.cajaId).padStart(4, '0')}
                   </div>
                   <div style={{ textAlign: 'center' }}>------------------------------</div>
-                  <div>Fecha: {new Date(detalle.fecha).toLocaleDateString('es-PE')}</div>
-                  <div>Abre 14:00 · Cierra {detalle.cerradaEn ? new Date(detalle.cerradaEn).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : '22:05'}</div>
-                  <div>Cajero: {detalle.cerradaPor ? `Usuario #${detalle.cerradaPor}` : (usuario?.nombres || 'Cajera de turno')}</div>
+                  <div>Fecha: {fechaDeCaja(detalle.fecha)}</div>
+                  {detalle.cerradaEn && <div>Cierre: {horaDeCierre(detalle.cerradaEn)}</div>}
+                  <div>Cajero: {detalle.cerradaPor ? `Usuario #${detalle.cerradaPor}` : 'Sin dato de cajero'}</div>
                   <div>Apertura: s/ {detalle.apertura.toFixed(2)}</div>
                   <div style={{ textAlign: 'center' }}>------------------------------</div>
                   {esAdmin ? (
@@ -365,7 +386,7 @@ export function HistorialCierres() {
                           <div key={m.medio} style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '2px 0' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                               <span>{m.medio}</span>
-                              <span>s/ {(m.visto || m.sistema || 0).toFixed(2)}</span>
+                              <span>s/ {m.visto.toFixed(2)}</span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--cp-soft, #2C4C5D)' }}>
                               <span>Sist. S/ {m.sistema.toFixed(2)}</span>
@@ -377,10 +398,6 @@ export function HistorialCierres() {
                           </div>
                         );
                       })}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, borderTop: '1px solid var(--cp-line, #E3D6C6)', paddingTop: 4 }}>
-                        <span>TOTAL VENDIDO</span>
-                        <span>s/ {(detalle.medios || []).reduce((acc, m) => acc + (m.visto || m.sistema || 0), 0).toFixed(2)}</span>
-                      </div>
                     </div>
                   ) : (
                     <div
@@ -419,10 +436,17 @@ export function HistorialCierres() {
                   )}
                 </div>
 
+                <style>{`
+                  @media print {
+                    body * { visibility: hidden !important; }
+                    #ticket-cierre, #ticket-cierre * { visibility: visible !important; }
+                    #ticket-cierre { position: absolute; left: 0; top: 0; width: 80mm; box-shadow: none; border: 0; }
+                  }
+                `}</style>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <button
                     type="button"
-                    onClick={() => setMsgTicket('Ticket de cierre enviado a la ticketera (simulado).')}
+                    onClick={() => window.print()}
                     style={{
                       flex: 1,
                       minHeight: 44,
@@ -438,7 +462,7 @@ export function HistorialCierres() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setMsgTicket('PDF del cierre listo para descargar (simulado).')}
+                    onClick={() => window.print()}
                     style={{
                       flex: 1,
                       minHeight: 44,
@@ -453,11 +477,6 @@ export function HistorialCierres() {
                     Descargar PDF
                   </button>
                 </div>
-                {msgTicket && (
-                  <div role="status" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-green, #2F7A45)', textAlign: 'center' }}>
-                    {msgTicket}
-                  </div>
-                )}
               </>
             ) : null}
           </div>

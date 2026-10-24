@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsDateString, IsInt, IsOptional, Max, Min } from 'class-validator';
 
 export class HistorialCierresDto {
   @IsOptional()
@@ -12,13 +12,14 @@ export class HistorialCierresDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(100)
   limite?: number = 20;
 
   @IsOptional()
-  @IsString()
+  @IsDateString({}, { message: 'La fecha desde debe tener formato AAAA-MM-DD' })
   desde?: string;
 
   @IsOptional()
-  @IsString()
+  @IsDateString({}, { message: 'La fecha hasta debe tener formato AAAA-MM-DD' })
   hasta?: string;
 }

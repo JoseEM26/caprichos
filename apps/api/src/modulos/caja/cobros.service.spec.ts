@@ -74,6 +74,7 @@ describe('CobrosService', () => {
         create: jest.fn(),
         findUnique: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         delete: jest.fn(),
       },
       cobroPago: {
@@ -82,6 +83,7 @@ describe('CobrosService', () => {
       userAccount: {
         findMany: jest.fn(),
       },
+      $queryRaw: jest.fn().mockResolvedValue([]),
       $transaction: jest.fn().mockImplementation(async (cb) => {
         return cb(prismaMock);
       }),
@@ -581,7 +583,7 @@ describe('CobrosService', () => {
       );
     });
 
-    it('3 fallos de PIN bloquean 10 min en Redis -> 403 PIN_BLOQUEADO', async () => {
+    it('3 fallos de PIN bloquean 5 min en Redis -> 403 PIN_BLOQUEADO', async () => {
       redisClientMock.get.mockResolvedValue('3');
 
       await expect(
@@ -679,20 +681,15 @@ describe('CobrosService', () => {
     });
 
     it('anula exitosamente con PIN supervisor, revierte pedido a PENDIENTE y audita', async () => {
-      prismaMock.cobro.findUnique.mockResolvedValue({
-        id: 10n,
-        pedido_id: 100n,
-        anulado_en: null,
-        caja: { estado: 'ABIERTA' },
-      });
-
-      prismaMock.cobro.update.mockResolvedValue({
-        id: 10n,
-        pedido_id: 100n,
-        anulado_en: new Date(),
-        anulado_por: 2n,
-        motivo_anulacion: 'Cliente solicitó cambio de medio de pago',
-      });
+      prismaMock.cobro.findUnique
+        .mockResolvedValueOnce({ caja_id: 10n })
+        .mockResolvedValueOnce({
+          id: 10n,
+          pedido_id: 100n,
+          anulado_en: null,
+          caja: { estado: 'ABIERTA' },
+          pagos: [{ medio: 'EFECTIVO', monto: new Prisma.Decimal(50), recibido: null, vuelto: null }],
+        });
 
       prismaMock.pedido.update.mockResolvedValue({
         id: 100n,
@@ -716,6 +713,7 @@ describe('CobrosService', () => {
           accion: 'ANULAR_COBRO',
           resultado: 'OK',
           conPinAdmin: true,
+          despues: expect.objectContaining({ aprobado_por: '1' }),
         }),
       );
     });
@@ -843,6 +841,38 @@ describe('CobrosService', () => {
           status: HttpStatus.CONFLICT,
         }),
       );
+    });
+  });
+
+  describe('reglas nuevas de cobro', () => {
+    it('rechaza un medio de pago que no existe (MEDIO_INVALIDO)', async () => {
+      await expect(
+        service.cobrar({ pedidoId: '100', pagos: [{ medio: 'BITCOIN', monto: 50 }] }, cajeroUsuario),
+      ).rejects.toMatchObject({ response: { codigo: 'MEDIO_INVALIDO' } });
+    });
+
+    it('con la caja sin abrir pide abrirla para cobrar', async () => {
+      prismaMock.caja.findUnique.mockResolvedValue(null);
+      await expect(
+        service.cobrar({ pedidoId: '100', pagos: [{ medio: 'EFECTIVO', monto: 50 }] }, cajeroUsuario),
+      ).rejects.toMatchObject({ response: { codigo: 'CAJA_CERRADA', mensaje: 'Abre la caja para cobrar' } });
+    });
+
+    it('la suma de pagos se compara en céntimos: 0,10 + 0,20 cuadra con 0,30', async () => {
+      prismaMock.caja.findUnique.mockResolvedValue({ id: 10n, estado: 'ABIERTA' });
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 100n, codigo: 'CP-0100', total: new Prisma.Decimal(0.3), estado: 'ENTREGADO',
+        pago_estado: 'PENDIENTE', es_personal: false, cobro: null,
+      });
+      prismaMock.cobro.create.mockImplementation(({ data }: any) =>
+        Promise.resolve({ id: 1n, pedido_id: 100n, caja_id: 10n, total: data.total, credito_personal: false,
+          cobrado_por: 2n, en: new Date(), pagos: [] }),
+      );
+      prismaMock.pedido.update.mockResolvedValue({ id: 100n, pago_estado: 'PAGADO' });
+
+      await expect(
+        service.cobrar({ pedidoId: '100', pagos: [{ medio: 'EFECTIVO', monto: 0.1 }, { medio: 'YAPE', monto: 0.2 }] }, cajeroUsuario),
+      ).resolves.toMatchObject({ pago_estado: 'PAGADO' });
     });
   });
 });

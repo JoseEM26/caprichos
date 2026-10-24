@@ -87,6 +87,38 @@ describe('CreditosService', () => {
   });
 
   describe('registrarConsumo', () => {
+    it('no carga a crédito un pedido ya cobrado en caja (YA_COBRADO)', async () => {
+      prisma.pedido.findUnique.mockResolvedValue({
+        id: BigInt(11), codigo: 'P-0011', total: '20.00', estado: 'PENDIENTE', canal: 'PERSONAL',
+        pago_estado: 'PAGADO', consumoPersonal: null, lineas: [], cobro: { anulado_en: null },
+      });
+      await expect(service.registrarConsumo(11, 9)).rejects.toMatchObject({
+        response: { codigo: 'YA_COBRADO' },
+      });
+    });
+
+    it('no se consume crédito por la carta virtual (CANAL_NO_PERMITIDO)', async () => {
+      prisma.pedido.findUnique.mockResolvedValue({
+        id: BigInt(12), codigo: 'P-0012', total: '20.00', estado: 'PENDIENTE', canal: 'CARTA',
+        pago_estado: 'PENDIENTE', consumoPersonal: null, lineas: [], cobro: null,
+      });
+      await expect(service.registrarConsumo(12, 9)).rejects.toMatchObject({
+        response: { codigo: 'CANAL_NO_PERMITIDO' },
+      });
+    });
+
+    it('el crédito no se da a clientes sin cuenta ni rol de empleado (NO_ES_PERSONAL)', async () => {
+      prisma.pedido.findUnique.mockResolvedValue({
+        id: BigInt(13), codigo: 'P-0013', total: '20.00', estado: 'PENDIENTE', canal: 'PERSONAL',
+        pago_estado: 'PENDIENTE', consumoPersonal: null, lineas: [], cobro: null,
+      });
+      prisma.party.findUnique.mockResolvedValue({
+        id: BigInt(20), persona: { nombres: 'Cliente', apellidos: 'Suelto' }, usuario: null, roles: [],
+      });
+      await expect(service.registrarConsumo(13, 20)).rejects.toMatchObject({
+        response: { codigo: 'NO_ES_PERSONAL' },
+      });
+    });
     it('calcula descuento del 25 % solo a líneas elegibles (sin combos ni docenas) y registra consumo', async () => {
       prisma.parametro.findUnique.mockResolvedValue({ valor: 25 });
       prisma.pedido.findUnique.mockResolvedValue({

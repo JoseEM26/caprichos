@@ -205,6 +205,7 @@ describe('CierreService', () => {
       userAccount: {
         findMany: jest.fn().mockResolvedValue([]),
       },
+      $queryRaw: jest.fn().mockResolvedValue([]),
       $transaction: jest.fn().mockImplementation(async (cb) => cb(prismaMock)),
     };
 
@@ -467,15 +468,8 @@ describe('CierreService', () => {
 
       const resCerrar = await service.cerrar(dtoCerrar, mockUsuarioCajero, '654321');
 
-      expect(resCerrar.medios).toEqual(
-        expect.arrayContaining([
-          { medio: 'EFECTIVO', sistema: 355.0, visto: 350.0, diferencia: -5.0 },
-          { medio: 'YAPE', sistema: 200.0, visto: 210.0, diferencia: 10.0 },
-          { medio: 'PLIN', sistema: 0.0, visto: 0.0, diferencia: 0.0 },
-          { medio: 'TRANSFERENCIA', sistema: 50.0, visto: 50.0, diferencia: 0.0 },
-          { medio: 'TARJETA', sistema: 100.0, visto: 90.0, diferencia: -10.0 },
-        ]),
-      );
+      // El cajero no recibe el esperado ni la diferencia (DT-61)
+      expect(resCerrar.medios).toBeUndefined();
 
       // Verificación de consulta GET por ID
       prismaMock.cierreCaja.findUnique.mockResolvedValue({
@@ -494,7 +488,7 @@ describe('CierreService', () => {
         ],
       });
 
-      const detalle = await service.obtenerCierrePorId(10n);
+      const detalle = await service.obtenerCierrePorId(10n, mockUsuarioAdmin);
       expect(detalle.resultado).toBe('NO_CUADRA');
       expect(detalle.medios).toHaveLength(5);
       expect(detalle.medios.find((m) => m.medio === 'YAPE')?.diferencia).toBe(10.0);
@@ -567,14 +561,14 @@ describe('CierreService', () => {
 
     it('registra entrega de efectivo, calcula diferencia y audita liquidación', async () => {
       // Mock de listado con saldo pendiente de 70.00
-      jest.spyOn(service, 'listarRepartidoresPorLiquidar').mockResolvedValue([
+      jest.spyOn(service as any, 'repartidoresConEfectivo').mockResolvedValue([
         {
-          repartidorPartyId: 55,
+          repartidorPartyId: '55',
           nombre: 'Marcos Ruta',
           pedidos: [],
-          totalCobrado: 100.0,
-          totalLiquidado: 30.0,
-          pendiente: 70.0,
+          cobradoCentimos: 10000,
+          liquidadoCentimos: 3000,
+          pendienteCentimos: 7000,
         },
       ]);
 
@@ -644,9 +638,17 @@ describe('CierreService', () => {
   // 8. Montos esperados del sistema (solo ADMIN)
   // -------------------------------------------------------------------------
   describe('8. montos esperados en vivo', () => {
-    it('permite consultar montos esperados solo a usuarios con rol ADMIN', async () => {
-      // CAJERO es rechazado con 403
+    it('el cajero solo ve el esperado con un PIN de supervisor válido; el ADMIN lo ve directo', async () => {
+      // CAJERO sin PIN o con PIN errado es rechazado con 403
+      prismaMock.userAccount.findMany.mockResolvedValue([
+        { id: 1n, party_id: 1n, rol: 'ADMIN', pin_hash: await argon2.hash('654321'), activo: true },
+      ]);
       await expect(service.obtenerEsperado(mockUsuarioCajero)).rejects.toThrow(HttpException);
+      await expect(service.obtenerEsperado(mockUsuarioCajero, '111111')).rejects.toThrow(HttpException);
+
+      // CAJERO con el PIN correcto de la supervisora recibe el detalle
+      const conPin = await service.obtenerEsperado(mockUsuarioCajero, '654321');
+      expect(conPin.cajaId).toBe(10);
 
       // ADMIN recibe totales en vivo
       const esperado = await service.obtenerEsperado(mockUsuarioAdmin);
@@ -665,6 +667,7 @@ describe('CierreService', () => {
             ventasEfectivo: 300.0,
             ingresos: 20.0,
             egresos: 15.0,
+            liquidadoRepartidores: 0,
           },
         }),
       );
@@ -676,14 +679,14 @@ describe('CierreService', () => {
   // -------------------------------------------------------------------------
   describe('9. validaciones de cierre adicionales', () => {
     it('rechaza cerrar la caja si existen repartidores con efectivo pendiente por liquidar (RN-CAP-097 / RQ-CIE-02-08)', async () => {
-      jest.spyOn(service, 'listarRepartidoresPorLiquidar').mockResolvedValue([
+      jest.spyOn(service as any, 'repartidoresConEfectivo').mockResolvedValue([
         {
-          repartidorPartyId: 77,
+          repartidorPartyId: '77',
           nombre: 'Luis Mensajero',
           pedidos: [],
-          totalCobrado: 50.0,
-          totalLiquidado: 0.0,
-          pendiente: 50.0,
+          cobradoCentimos: 5000,
+          liquidadoCentimos: 0,
+          pendienteCentimos: 5000,
         },
       ]);
 
@@ -765,12 +768,15 @@ describe('CierreService', () => {
         },
       ]);
 
-      const res = await service.historial({
-        pagina: 1,
-        limite: 10,
-        desde: '2026-10-01',
-        hasta: '2026-10-31',
-      });
+      const res = await service.historial(
+        {
+          pagina: 1,
+          limite: 10,
+          desde: '2026-10-01',
+          hasta: '2026-10-31',
+        },
+        mockUsuarioAdmin,
+      );
 
       expect(res.total).toBe(1);
       expect(res.pagina).toBe(1);
@@ -782,10 +788,10 @@ describe('CierreService', () => {
     it('retorna 404 si el cierre no existe al buscar por ID', async () => {
       prismaMock.cierreCaja.findUnique.mockResolvedValue(null);
 
-      await expect(service.obtenerCierrePorId(999)).rejects.toThrow(HttpException);
+      await expect(service.obtenerCierrePorId(999, mockUsuarioAdmin)).rejects.toThrow(HttpException);
 
       try {
-        await service.obtenerCierrePorId(999);
+        await service.obtenerCierrePorId(999, mockUsuarioAdmin);
       } catch (e: any) {
         expect(e.getStatus()).toBe(HttpStatus.NOT_FOUND);
         expect(e.getResponse().codigo).toBe('CIERRE_NO_ENCONTRADO');
@@ -793,10 +799,10 @@ describe('CierreService', () => {
     });
 
     it('retorna 400 si el ID proporcionado no es un número válido', async () => {
-      await expect(service.obtenerCierrePorId('invalido')).rejects.toThrow(HttpException);
+      await expect(service.obtenerCierrePorId('invalido', mockUsuarioAdmin)).rejects.toThrow(HttpException);
 
       try {
-        await service.obtenerCierrePorId('invalido');
+        await service.obtenerCierrePorId('invalido', mockUsuarioAdmin);
       } catch (e: any) {
         expect(e.getStatus()).toBe(HttpStatus.BAD_REQUEST);
         expect(e.getResponse().codigo).toBe('ID_INVALIDO');
@@ -840,6 +846,29 @@ describe('CierreService', () => {
         expect(e.getStatus()).toBe(HttpStatus.NOT_FOUND);
         expect(e.getResponse().codigo).toBe('REPARTIDOR_NO_ENCONTRADO');
       }
+    });
+  });
+
+  describe('reglas nuevas de cierre', () => {
+    it('el historial de cierres es solo para el administrador (cajero recibe SOLO_ADMIN)', async () => {
+      await expect(service.historial({ pagina: 1, limite: 10 }, mockUsuarioCajero)).rejects.toMatchObject({
+        response: { codigo: 'SOLO_ADMIN' },
+      });
+    });
+
+    it('no liquida a un repartidor sin efectivo pendiente (SIN_EFECTIVO_PENDIENTE)', async () => {
+      jest.spyOn(service as any, 'repartidoresConEfectivo').mockResolvedValue([]);
+      await expect(
+        service.liquidarRepartidor({ repartidorPartyId: 55, entregado: 10 }, mockUsuarioCajero),
+      ).rejects.toMatchObject({ response: { codigo: 'SIN_EFECTIVO_PENDIENTE' } });
+    });
+
+    it('bloquea el PIN de supervisor 5 minutos tras 3 fallos (300 s en Redis)', async () => {
+      prismaMock.userAccount.findMany.mockResolvedValue([]);
+      await expect(
+        service.verificarPinSupervisor('000000', 101n, '127.0.0.1', 10n),
+      ).rejects.toMatchObject({ response: { codigo: 'PIN_INVALIDO' } });
+      expect(redisMock.expire).toHaveBeenCalledWith(expect.any(String), 5 * 60);
     });
   });
 });

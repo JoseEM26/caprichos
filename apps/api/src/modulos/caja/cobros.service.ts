@@ -18,8 +18,18 @@ import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { obtenerFechaHoraLima } from '../local/local.util';
 import { enmascararDni } from '../usuarios/usuarios.util';
+import {
+  MEDIOS_COBRO,
+  aCentimos,
+  bloquearCaja,
+  enPesos,
+  esCentimosValidos,
+} from './caja.calculo';
 import { CobrarDto } from './dto/cobrar.dto';
 import { AnularCobroDto } from './dto/anular-cobro.dto';
+
+/** Bloqueo de PIN de supervisor tras 3 fallos seguidos (FT-CAJ-02, RQ-CAJ-02-12). */
+const SEGUNDOS_BLOQUEO_PIN = 5 * 60;
 
 @Injectable()
 export class CobrosService {
@@ -54,7 +64,7 @@ export class CobrosService {
 
   /**
    * Verifica el PIN de 6 dígitos contra algún usuario ADMIN activo en la base de datos (DT-61).
-   * 3 intentos fallidos consecutivos bloquean 10 minutos en Redis.
+   * 3 intentos fallidos consecutivos bloquean 5 minutos en Redis (FT-CAJ-02, RQ-CAJ-02-12).
    */
   async verificarPinSupervisor(
     pinSupervisor?: string,
@@ -72,7 +82,7 @@ export class CobrosService {
         throw new HttpException(
           {
             codigo: 'PIN_BLOQUEADO',
-            mensaje: 'Demasiados intentos fallidos de PIN de supervisor. Bloqueado temporalmente por 10 minutos.',
+            mensaje: 'Demasiados intentos fallidos de PIN de supervisor. Espera 5 minutos.',
           },
           HttpStatus.FORBIDDEN,
         );
@@ -115,7 +125,7 @@ export class CobrosService {
       if (redis) {
         const fallos = await redis.incr(claveIntentos);
         if (fallos === 1) {
-          await redis.expire(claveIntentos, 10 * 60); // 10 minutos
+          await redis.expire(claveIntentos, SEGUNDOS_BLOQUEO_PIN);
         }
       }
 
@@ -190,105 +200,130 @@ export class CobrosService {
       });
     }
 
-    // 1. Validar que exista una caja ABIERTA hoy
-    const { fechaDate } = this.obtenerFechaHoyLima();
-    const caja = await this.prisma.caja.findUnique({
-      where: { fecha: fechaDate },
-    });
-
-    if (!caja || caja.estado !== 'ABIERTA') {
-      throw new HttpException(
-        {
-          codigo: 'CAJA_CERRADA',
-          mensaje: 'No hay una caja abierta para hoy; no se puede cobrar',
-        },
-        HttpStatus.CONFLICT,
-      );
-    }
-
-    // 2. Obtener pedido
-    const pedidoId = this.parsearId(dto.pedidoId);
-    const pedido = await this.prisma.pedido.findUnique({
-      where: { id: pedidoId },
-      include: { cobro: true },
-    });
-
-    if (!pedido) {
-      throw new HttpException(
-        {
-          codigo: 'PEDIDO_NO_ENCONTRADO',
-          mensaje: 'El pedido no existe',
-        },
-        HttpStatus.NOT_FOUND,
-      );
-    }
-
-    // 3. Validar estado del pedido
-    if (pedido.estado === 'ANULADO') {
-      throw new HttpException(
-        {
-          codigo: 'PEDIDO_ANULADO',
-          mensaje: 'No se puede cobrar un pedido anulado',
-        },
-        HttpStatus.CONFLICT,
-      );
-    }
-
-    if (pedido.pago_estado === 'PAGADO' || (pedido.cobro && !pedido.cobro.anulado_en)) {
-      throw new HttpException(
-        {
-          codigo: 'YA_COBRADO',
-          mensaje: 'El pedido ya fue cobrado',
-        },
-        HttpStatus.CONFLICT,
-      );
-    }
-
-    // 4. Validar que la suma de los pagos cuadre exactamente con el total del pedido
-    const totalPedido = Number(pedido.total);
-    const totalPagos = Number(
-      dto.pagos.reduce((acc, p) => acc + Number(p.monto), 0).toFixed(2),
-    );
-    const diferencia = Number((totalPagos - totalPedido).toFixed(2));
-
-    if (Math.abs(diferencia) > 0.001) {
-      throw new HttpException(
-        {
-          codigo: 'PAGO_NO_CUADRA',
-          mensaje: `La suma de los pagos (S/ ${totalPagos.toFixed(2)}) no coincide con el total del pedido (S/ ${totalPedido.toFixed(2)})`,
-          diferencia,
-        },
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
-    // 5. Validar vuelto y efectivo
     for (const p of dto.pagos) {
-      if (p.medio.toUpperCase() === 'EFECTIVO' && p.recibido !== undefined && p.recibido !== null) {
-        if (Number(p.recibido) < Number(p.monto)) {
-          throw new HttpException(
-            {
-              codigo: 'EFECTIVO_INSUFICIENTE',
-              mensaje: 'El efectivo recibido es menor al monto a pagar',
-            },
-            HttpStatus.BAD_REQUEST,
-          );
-        }
+      const medio = String(p.medio || '').toUpperCase();
+      if (!MEDIOS_COBRO.includes(medio)) {
+        throw new BadRequestException({
+          codigo: 'MEDIO_INVALIDO',
+          mensaje: `Medio de pago no admitido: ${p.medio}`,
+        });
+      }
+      if (!esCentimosValidos(Number(p.monto)) || (p.recibido != null && !esCentimosValidos(Number(p.recibido)))) {
+        throw new BadRequestException({
+          codigo: 'MONTO_INVALIDO',
+          mensaje: 'Los montos admiten como máximo dos decimales',
+        });
       }
     }
 
-    // 6. Determinar método de pago (el medio o MIXTO si hay más de uno)
-    const distinctMedios = Array.from(new Set(dto.pagos.map((p) => p.medio.toUpperCase())));
-    const pagoMetodo = distinctMedios.length > 1 ? 'MIXTO' : distinctMedios[0];
+    const { fechaDate } = this.obtenerFechaHoyLima();
+    const cajaHoy = await this.prisma.caja.findUnique({
+      where: { fecha: fechaDate },
+    });
 
-    // 7. Transacción en base de datos
-    const { cobro, pedidoActualizado } = await this.prisma.$transaction(async (tx) => {
+    // La caja se bloquea antes de leer el pedido: dos cobros no pasan a la vez y no se cobra en una caja que se cierra
+    const { cobro, pedidoActualizado, pedidoCodigo, pagoMetodo } = await this.prisma.$transaction(async (tx) => {
+      const caja = cajaHoy ? await bloquearCaja(tx, cajaHoy.id) : null;
+
+      if (!caja) {
+        throw new HttpException(
+          {
+            codigo: 'CAJA_CERRADA',
+            mensaje: 'Abre la caja para cobrar',
+          },
+          HttpStatus.CONFLICT,
+        );
+      }
+
+      if (caja.estado !== 'ABIERTA') {
+        throw new HttpException(
+          {
+            codigo: 'CAJA_CERRADA',
+            mensaje: 'La caja de hoy ya está cerrada; no se puede cobrar',
+          },
+          HttpStatus.CONFLICT,
+        );
+      }
+
+      // Obtener pedido
+      const pedidoId = this.parsearId(dto.pedidoId);
+      const pedido = await tx.pedido.findUnique({
+        where: { id: pedidoId },
+        include: { cobro: true },
+      });
+
+      if (!pedido) {
+        throw new HttpException(
+          {
+            codigo: 'PEDIDO_NO_ENCONTRADO',
+            mensaje: 'El pedido no existe',
+          },
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      if (pedido.estado === 'ANULADO') {
+        throw new HttpException(
+          {
+            codigo: 'PEDIDO_ANULADO',
+            mensaje: 'No se puede cobrar un pedido anulado',
+          },
+          HttpStatus.CONFLICT,
+        );
+      }
+
+      if (pedido.pago_estado === 'PAGADO' || (pedido.cobro && !pedido.cobro.anulado_en)) {
+        throw new HttpException(
+          {
+            codigo: 'YA_COBRADO',
+            mensaje: 'El pedido ya fue cobrado',
+          },
+          HttpStatus.CONFLICT,
+        );
+      }
+
+      // Los montos de los pagos deben sumar exactamente el total (en céntimos, sin floats)
+      const totalPedido = aCentimos(pedido.total);
+      const totalPagos = dto.pagos.reduce((acc, p) => acc + aCentimos(p.monto), 0);
+      const diferencia = totalPagos - totalPedido;
+
+      if (diferencia !== 0) {
+        throw new HttpException(
+          {
+            codigo: 'PAGO_NO_CUADRA',
+            mensaje: `La suma de los pagos (S/ ${enPesos(totalPagos).toFixed(2)}) no coincide con el total del pedido (S/ ${enPesos(totalPedido).toFixed(2)})`,
+            diferencia: enPesos(diferencia),
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Validar vuelto y efectivo
+      for (const p of dto.pagos) {
+        if (p.medio.toUpperCase() === 'EFECTIVO' && p.recibido !== undefined && p.recibido !== null) {
+          if (aCentimos(p.recibido) < aCentimos(p.monto)) {
+            throw new HttpException(
+              {
+                codigo: 'EFECTIVO_INSUFICIENTE',
+                mensaje: 'El efectivo recibido es menor al monto a pagar',
+              },
+              HttpStatus.BAD_REQUEST,
+            );
+          }
+        }
+      }
+
+      // Determinar método de pago (el medio o MIXTO si hay más de uno)
+      const distinctMedios = Array.from(new Set(dto.pagos.map((p) => p.medio.toUpperCase())));
+      const pagoMetodo = distinctMedios.length > 1 ? 'MIXTO' : distinctMedios[0];
+
       // un pedido tiene un solo cobro: si el anterior fue anulado, se reemplaza por el nuevo.
       // La anulación (quién, cuándo, motivo y montos) queda en la auditoría encadenada.
       if (pedido.cobro && pedido.cobro.anulado_en) {
         await tx.cobroPago.deleteMany({ where: { cobro_id: pedido.cobro.id } });
         await tx.cobro.delete({ where: { id: pedido.cobro.id } });
       }
+
       const nuevoCobro = await tx.cobro.create({
         data: {
           pedido_id: pedido.id,
@@ -299,20 +334,14 @@ export class CobrosService {
           pagos: {
             create: dto.pagos.map((p) => {
               const esEfectivo = p.medio.toUpperCase() === 'EFECTIVO';
-              const recibido =
-                esEfectivo && p.recibido !== undefined && p.recibido !== null
-                  ? new Prisma.Decimal(p.recibido)
-                  : null;
-              const vuelto =
-                esEfectivo && p.recibido !== undefined && p.recibido !== null
-                  ? new Prisma.Decimal(Number((Number(p.recibido) - Number(p.monto)).toFixed(2)))
-                  : null;
-
+              const conRecibido = esEfectivo && p.recibido !== undefined && p.recibido !== null;
               return {
                 medio: p.medio.toUpperCase(),
-                monto: new Prisma.Decimal(p.monto),
-                recibido,
-                vuelto,
+                monto: new Prisma.Decimal(enPesos(aCentimos(p.monto))),
+                recibido: conRecibido ? new Prisma.Decimal(enPesos(aCentimos(p.recibido))) : null,
+                vuelto: conRecibido
+                  ? new Prisma.Decimal(enPesos(aCentimos(p.recibido) - aCentimos(p.monto)))
+                  : null,
               };
             }),
           },
@@ -328,20 +357,20 @@ export class CobrosService {
         },
       });
 
-      return { cobro: nuevoCobro, pedidoActualizado: pedAct };
+      return { cobro: nuevoCobro, pedidoActualizado: pedAct, pedidoCodigo: pedido.codigo, pagoMetodo };
     });
 
     // el cobro genera la nota de venta con su correlativo (RQ-LEG-01-01); es idempotente y también se
     // crea al consultarla, así que un fallo aquí no deshace el cobro
     try {
-      await this.comprobantesService?.emitirParaPedido(pedido.id, undefined, usuario);
+      await this.comprobantesService?.emitirParaPedido(cobro.pedido_id, undefined, usuario);
     } catch {
       // se genera al pedir el comprobante
     }
 
     // la mesa se libera al cobrar (RN-CAP-054); si falla no se deshace el cobro: se libera a mano
     try {
-      await this.salonService?.liberarMesasDePedido(pedido.id);
+      await this.salonService?.liberarMesasDePedido(cobro.pedido_id);
     } catch {
       // idempotente: el mozo o caja pueden liberarla a mano con Sí/No
     }
@@ -350,9 +379,9 @@ export class CobrosService {
     // (los servicios guardan su propio registro para reintentar):
     //   puntos del cliente (5 %, DT-55), descuento de stock por receta (FT-STK-03) y cupones impresos (DT-56)
     for (const paso of [
-      () => this.puntosService?.acumularPorPedido(pedido.id),
-      () => this.stockService?.descontarPorPedido(pedido.id),
-      () => this.ofertasService?.emitirCuponesParaPedido(pedido.id),
+      () => this.puntosService?.acumularPorPedido(cobro.pedido_id),
+      () => this.stockService?.descontarPorPedido(cobro.pedido_id),
+      () => this.ofertasService?.emitirCuponesParaPedido(cobro.pedido_id),
     ]) {
       try {
         await paso();
@@ -370,13 +399,9 @@ export class CobrosService {
       entidad: 'cobro',
       entidadId: cobro.id,
       partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
-      antes: {
-        pago_estado: pedido.pago_estado,
-        pago_metodo: pedido.pago_metodo,
-      },
       despues: {
         cobro_id: cobro.id.toString(),
-        pedido_id: pedido.id.toString(),
+        pedido_id: cobro.pedido_id.toString(),
         total: Number(cobro.total),
         pago_estado: 'PAGADO',
         pago_metodo: pagoMetodo,
@@ -393,8 +418,8 @@ export class CobrosService {
     // 9. Emitir evento en vivo para pantallas de administración
     try {
       this.eventosGateway?.emitirAdmin?.('pedido:pago', {
-        id: pedido.id.toString(),
-        codigo: pedido.codigo,
+        id: cobro.pedido_id.toString(),
+        codigo: pedidoCodigo,
       });
     } catch {
       // Ignorar fallo de socket
@@ -442,16 +467,15 @@ export class CobrosService {
 
     const cobroId = this.parsearId(id);
 
-    // 1. Validar PIN de supervisor
-    await this.verificarPinSupervisor(pinSupervisor, usuario?.partyId, ip, cobroId);
+    // 1. Validar PIN de supervisor (quien aprueba queda registrado)
+    const supervisor = await this.verificarPinSupervisor(pinSupervisor, usuario?.partyId, ip, cobroId);
 
-    // 2. Buscar cobro
-    const cobro = await this.prisma.cobro.findUnique({
+    const cobroCaja = await this.prisma.cobro.findUnique({
       where: { id: cobroId },
-      include: { caja: true, pedido: true },
+      select: { caja_id: true },
     });
 
-    if (!cobro) {
+    if (!cobroCaja) {
       throw new HttpException(
         {
           codigo: 'COBRO_NO_ENCONTRADO',
@@ -461,33 +485,50 @@ export class CobrosService {
       );
     }
 
-    if (cobro.anulado_en) {
-      throw new HttpException(
-        {
-          codigo: 'COBRO_YA_ANULADO',
-          mensaje: 'El cobro ya fue previamente anulado',
-        },
-        HttpStatus.CONFLICT,
-      );
-    }
-
-    // RN-CAP-096: solo con el cobro en la caja abierta
-    if (cobro.caja.estado !== 'ABIERTA') {
-      throw new HttpException(
-        {
-          codigo: 'CAJA_CERRADA',
-          mensaje: 'Solo se puede anular un cobro perteneciente a una caja abierta',
-        },
-        HttpStatus.CONFLICT,
-      );
-    }
-
     const ahora = new Date();
 
-    // 3. Transacción para marcar anulado y regresar pedido a PENDIENTE
-    await this.prisma.$transaction(async (tx) => {
-      await tx.cobro.update({
-        where: { id: cobro.id },
+    // 2. Con la caja bloqueada: el cobro se revisa y se anula en una sola operación
+    const cobro = await this.prisma.$transaction(async (tx) => {
+      await bloquearCaja(tx, cobroCaja.caja_id);
+
+      const actual = await tx.cobro.findUnique({
+        where: { id: cobroId },
+        include: { caja: true, pagos: true },
+      });
+
+      if (!actual) {
+        throw new HttpException(
+          {
+            codigo: 'COBRO_NO_ENCONTRADO',
+            mensaje: 'El cobro no existe',
+          },
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      if (actual.anulado_en) {
+        throw new HttpException(
+          {
+            codigo: 'COBRO_YA_ANULADO',
+            mensaje: 'El cobro ya fue previamente anulado',
+          },
+          HttpStatus.CONFLICT,
+        );
+      }
+
+      // RN-CAP-096: solo con el cobro en la caja abierta
+      if (actual.caja.estado !== 'ABIERTA') {
+        throw new HttpException(
+          {
+            codigo: 'CAJA_CERRADA',
+            mensaje: 'Solo se puede anular un cobro perteneciente a una caja abierta',
+          },
+          HttpStatus.CONFLICT,
+        );
+      }
+
+      const marcados = await tx.cobro.updateMany({
+        where: { id: actual.id, anulado_en: null },
         data: {
           anulado_en: ahora,
           anulado_por: BigInt(usuario.partyId),
@@ -495,12 +536,24 @@ export class CobrosService {
         },
       });
 
+      if (marcados.count === 0) {
+        throw new HttpException(
+          {
+            codigo: 'COBRO_YA_ANULADO',
+            mensaje: 'El cobro ya fue previamente anulado',
+          },
+          HttpStatus.CONFLICT,
+        );
+      }
+
       await tx.pedido.update({
-        where: { id: cobro.pedido_id },
+        where: { id: actual.pedido_id },
         data: {
           pago_estado: 'PENDIENTE',
         },
       });
+
+      return actual;
     });
 
     // el cobro anulado devuelve el stock y reversa los puntos que había sumado
@@ -515,7 +568,15 @@ export class CobrosService {
       }
     }
 
-    // 4. Auditar
+    // 3. Auditar: quién pidió, quién aprobó con su PIN, motivo y los pagos anulados
+    //    (el cobro anulado se reemplaza si el pedido se vuelve a cobrar; aquí queda su contenido)
+    const pagosAnulados = cobro.pagos.map((p) => ({
+      medio: p.medio,
+      monto: Number(p.monto),
+      recibido: p.recibido !== null && p.recibido !== undefined ? Number(p.recibido) : null,
+      vuelto: p.vuelto !== null && p.vuelto !== undefined ? Number(p.vuelto) : null,
+    }));
+
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
       modulo: 'caja',
@@ -529,10 +590,12 @@ export class CobrosService {
       antes: {
         anulado_en: null,
         pago_estado: 'PAGADO',
+        pagos: pagosAnulados,
       },
       despues: {
         anulado_en: ahora.toISOString(),
         anulado_por: usuario.partyId.toString(),
+        aprobado_por: String(supervisor.party_id),
         motivo: dto.motivo.trim(),
         pago_estado: 'PENDIENTE',
       },

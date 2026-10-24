@@ -8,9 +8,40 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { obtenerFechaHoraLima } from '../local/local.util';
+import {
+  aCentimos,
+  bloquearCaja,
+  calcularMontosCaja,
+  enPesos,
+  esCentimosValidos,
+} from './caja.calculo';
 import { AbrirCajaDto } from './dto/abrir-caja.dto';
 import { CrearMovimientoDto } from './dto/movimiento.dto';
 import { AnularMovimientoDto } from './dto/anular-movimiento.dto';
+
+/** Estado de la caja del día. Los totales y el efectivo esperado solo los recibe el administrador. */
+export interface EstadoCajaDia {
+  caja: {
+    id: string;
+    fecha: string;
+    apertura: number;
+    estado: string;
+    abierta_por: string;
+    cerrada_por: string | null;
+    cerrada_en: Date | null;
+  } | null;
+  abierta: boolean;
+  totalesPorMedio?: Record<string, number>;
+  resumen?: {
+    apertura: number;
+    cobrosEfectivo: number;
+    vueltosEfectivo: number;
+    ingresos: number;
+    egresos: number;
+    liquidadoRepartidores: number;
+  };
+  efectivoEsperado?: number;
+}
 
 @Injectable()
 export class CajaService {
@@ -46,6 +77,25 @@ export class CajaService {
   async abrirCaja(dto: AbrirCajaDto, usuario: any, ip?: string) {
     const { fechaDate, fechaIso } = this.obtenerFechaHoyLima();
 
+    const aperturaMonto =
+      dto?.apertura !== undefined && dto?.apertura !== null
+        ? Number(dto.apertura)
+        : 0;
+
+    if (isNaN(aperturaMonto) || aperturaMonto < 0) {
+      throw new BadRequestException({
+        codigo: 'MONTO_INVALIDO',
+        mensaje: 'El monto de apertura no puede ser negativo',
+      });
+    }
+
+    if (!esCentimosValidos(aperturaMonto)) {
+      throw new BadRequestException({
+        codigo: 'MONTO_INVALIDO',
+        mensaje: 'El monto de apertura admite como máximo dos decimales',
+      });
+    }
+
     // Validar si ya existe una caja registrada para hoy (abierta o cerrada)
     const existente = await this.prisma.caja.findUnique({
       where: { fecha: fechaDate },
@@ -74,26 +124,29 @@ export class CajaService {
       );
     }
 
-    const aperturaMonto =
-      dto?.apertura !== undefined && dto?.apertura !== null
-        ? Number(dto.apertura)
-        : 0;
-
-    if (isNaN(aperturaMonto) || aperturaMonto < 0) {
-      throw new BadRequestException({
-        codigo: 'MONTO_INVALIDO',
-        mensaje: 'El monto de apertura no puede ser negativo',
+    let caja;
+    try {
+      caja = await this.prisma.caja.create({
+        data: {
+          fecha: fechaDate,
+          apertura: new Prisma.Decimal(aperturaMonto),
+          estado: 'ABIERTA',
+          abierta_por: BigInt(usuario.partyId),
+        },
       });
+    } catch (e: any) {
+      // dos aperturas a la vez: la segunda choca con la fecha única o con la caja abierta única
+      if (e?.code === 'P2002') {
+        throw new HttpException(
+          {
+            codigo: 'CAJA_YA_ABIERTA',
+            mensaje: 'Ya existe una caja registrada para el día de hoy',
+          },
+          HttpStatus.CONFLICT,
+        );
+      }
+      throw e;
     }
-
-    const caja = await this.prisma.caja.create({
-      data: {
-        fecha: fechaDate,
-        apertura: new Prisma.Decimal(aperturaMonto),
-        estado: 'ABIERTA',
-        abierta_por: BigInt(usuario.partyId),
-      },
-    });
 
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
@@ -124,10 +177,10 @@ export class CajaService {
   }
 
   /**
-   * Obtiene la caja del día, totales por medio de pago hoy y el efectivo esperado.
-   * Efectivo esperado = apertura + cobros en efectivo - vueltos + ingresos - egresos.
+   * Estado de la caja del día. Solo el administrador ve los totales y el efectivo esperado
+   * (cierre ciego para el cajero, DT-61): el resto recibe únicamente si la caja está abierta.
    */
-  async obtenerCajaActual(usuario?: any) {
+  async obtenerCajaActual(usuario?: any): Promise<EstadoCajaDia> {
     const { fechaDate, fechaIso } = this.obtenerFechaHoyLima();
 
     const caja = await this.prisma.caja.findUnique({
@@ -144,32 +197,34 @@ export class CajaService {
       return {
         caja: null,
         abierta: false,
-        totalesPorMedio: {
-          EFECTIVO: 0,
-          YAPE: 0,
-          PLIN: 0,
-          TARJETA: 0,
-          TRANSFERENCIA: 0,
-        },
-        resumen: {
-          apertura: 0,
-          cobrosEfectivo: 0,
-          vueltosEfectivo: 0,
-          ingresos: 0,
-          egresos: 0,
-        },
-        efectivoEsperado: 0,
+        ...(usuario?.rol === 'ADMIN' ? this.resumenVacio() : {}),
       };
     }
 
-    const totalesPorMedio: Record<string, number> = {
+    const estado = {
+      caja: {
+        id: caja.id.toString(),
+        fecha: fechaIso,
+        apertura: enPesos(aCentimos(caja.apertura)),
+        estado: caja.estado,
+        abierta_por: caja.abierta_por.toString(),
+        cerrada_por: caja.cerrada_por ? caja.cerrada_por.toString() : null,
+        cerrada_en: caja.cerrada_en,
+      },
+      abierta: caja.estado === 'ABIERTA',
+    };
+
+    if (usuario?.rol !== 'ADMIN') {
+      return estado;
+    }
+
+    const totalesEnCentimos: Record<string, number> = {
       EFECTIVO: 0,
       YAPE: 0,
       PLIN: 0,
       TARJETA: 0,
       TRANSFERENCIA: 0,
     };
-
     let cobrosEfectivo = 0;
     let vueltosEfectivo = 0;
 
@@ -177,14 +232,11 @@ export class CajaService {
       if (cobro.anulado_en) continue;
       for (const pago of cobro.pagos) {
         const medio = (pago.medio || '').toUpperCase();
-        totalesPorMedio[medio] = Number(
-          ((totalesPorMedio[medio] || 0) + Number(pago.monto)).toFixed(2),
-        );
-
+        totalesEnCentimos[medio] = (totalesEnCentimos[medio] || 0) + aCentimos(pago.monto);
         if (medio === 'EFECTIVO') {
-          cobrosEfectivo += Number(pago.monto);
+          cobrosEfectivo += aCentimos(pago.monto);
           if (pago.vuelto) {
-            vueltosEfectivo += Number(pago.vuelto);
+            vueltosEfectivo += aCentimos(pago.vuelto);
           }
         }
       }
@@ -192,41 +244,49 @@ export class CajaService {
 
     let ingresos = 0;
     let egresos = 0;
-
     for (const mov of caja.movimientos) {
       if (mov.anulado_en) continue;
-      if (mov.tipo === 'INGRESO') {
-        ingresos += Number(mov.monto);
-      } else if (mov.tipo === 'EGRESO') {
-        egresos += Number(mov.monto);
-      }
+      if (mov.tipo === 'INGRESO') ingresos += aCentimos(mov.monto);
+      else if (mov.tipo === 'EGRESO') egresos += aCentimos(mov.monto);
     }
 
-    const apertura = Number(caja.apertura);
-    const efectivoEsperado = Number(
-      (apertura + cobrosEfectivo + ingresos - egresos).toFixed(2),
-    );
+    const montos = await calcularMontosCaja(this.prisma, caja);
 
     return {
-      caja: {
-        id: caja.id.toString(),
-        fecha: fechaIso,
-        apertura,
-        estado: caja.estado,
-        abierta_por: caja.abierta_por.toString(),
-        cerrada_por: caja.cerrada_por ? caja.cerrada_por.toString() : null,
-        cerrada_en: caja.cerrada_en,
-      },
-      abierta: caja.estado === 'ABIERTA',
-      totalesPorMedio,
+      ...estado,
+      totalesPorMedio: Object.fromEntries(
+        Object.entries(totalesEnCentimos).map(([medio, c]) => [medio, enPesos(c)]),
+      ),
       resumen: {
-        apertura,
-        cobrosEfectivo: Number(cobrosEfectivo.toFixed(2)),
-        vueltosEfectivo: Number(vueltosEfectivo.toFixed(2)),
-        ingresos: Number(ingresos.toFixed(2)),
-        egresos: Number(egresos.toFixed(2)),
+        apertura: enPesos(aCentimos(caja.apertura)),
+        cobrosEfectivo: enPesos(cobrosEfectivo),
+        vueltosEfectivo: enPesos(vueltosEfectivo),
+        ingresos: enPesos(ingresos),
+        egresos: enPesos(egresos),
+        liquidadoRepartidores: montos.liquidadoEfectivo,
       },
-      efectivoEsperado,
+      efectivoEsperado: montos.esperadoEfectivo,
+    };
+  }
+
+  private resumenVacio(): Omit<EstadoCajaDia, 'caja' | 'abierta'> {
+    return {
+      totalesPorMedio: {
+        EFECTIVO: 0,
+        YAPE: 0,
+        PLIN: 0,
+        TARJETA: 0,
+        TRANSFERENCIA: 0,
+      },
+      resumen: {
+        apertura: 0,
+        cobrosEfectivo: 0,
+        vueltosEfectivo: 0,
+        ingresos: 0,
+        egresos: 0,
+        liquidadoRepartidores: 0,
+      },
+      efectivoEsperado: 0,
     };
   }
 
@@ -234,29 +294,37 @@ export class CajaService {
    * Registra un ingreso o egreso en la caja chica.
    */
   async crearMovimiento(dto: CrearMovimientoDto, usuario: any, ip?: string) {
+    if (!esCentimosValidos(dto.monto)) {
+      throw new BadRequestException({
+        codigo: 'MONTO_INVALIDO',
+        mensaje: 'El monto admite como máximo dos decimales',
+      });
+    }
+
     const { fechaDate } = this.obtenerFechaHoyLima();
 
     const caja = await this.prisma.caja.findUnique({
       where: { fecha: fechaDate },
     });
 
-    if (!caja || caja.estado !== 'ABIERTA') {
-      throw new HttpException(
-        {
-          codigo: 'CAJA_CERRADA',
-          mensaje: 'No hay una caja abierta para registrar movimientos',
-        },
-        HttpStatus.CONFLICT,
-      );
+    if (!caja) {
+      throw this.errorCajaNoAbierta();
     }
 
-    const mov = await this.prisma.movimientoCaja.create({
-      data: {
-        caja_id: caja.id,
-        tipo: dto.tipo,
-        monto: new Prisma.Decimal(dto.monto),
-        motivo: dto.motivo.trim(),
-      },
+    const mov = await this.prisma.$transaction(async (tx) => {
+      const cajaBloqueada = await bloquearCaja(tx, caja.id);
+      if (!cajaBloqueada || cajaBloqueada.estado !== 'ABIERTA') {
+        throw this.errorCajaNoAbierta();
+      }
+
+      return tx.movimientoCaja.create({
+        data: {
+          caja_id: caja.id,
+          tipo: dto.tipo,
+          monto: new Prisma.Decimal(dto.monto),
+          motivo: dto.motivo.trim(),
+        },
+      });
     });
 
     await this.auditoria.registrar({
@@ -286,6 +354,16 @@ export class CajaService {
       anulado_en: null,
       motivo_anulacion: null,
     };
+  }
+
+  private errorCajaNoAbierta() {
+    return new HttpException(
+      {
+        codigo: 'CAJA_CERRADA',
+        mensaje: 'No hay una caja abierta para registrar movimientos',
+      },
+      HttpStatus.CONFLICT,
+    );
   }
 
   /**
@@ -320,6 +398,7 @@ export class CajaService {
 
   /**
    * Anula un movimiento de caja chico con motivo (no se borra físicamente, RN-CAP-014).
+   * Solo con la caja abierta: un cierre no se edita (RN-CAP-080).
    */
   async anularMovimiento(
     id: bigint | string | number,
@@ -329,11 +408,11 @@ export class CajaService {
   ) {
     const movimientoId = this.parsearId(id);
 
-    const mov = await this.prisma.movimientoCaja.findUnique({
+    const movPrevio = await this.prisma.movimientoCaja.findUnique({
       where: { id: movimientoId },
     });
 
-    if (!mov) {
+    if (!movPrevio) {
       throw new HttpException(
         {
           codigo: 'MOVIMIENTO_NO_ENCONTRADO',
@@ -343,7 +422,7 @@ export class CajaService {
       );
     }
 
-    if (mov.anulado_en) {
+    if (movPrevio.anulado_en) {
       throw new HttpException(
         {
           codigo: 'MOVIMIENTO_YA_ANULADO',
@@ -355,12 +434,37 @@ export class CajaService {
 
     const ahora = new Date();
 
-    const actualizado = await this.prisma.movimientoCaja.update({
-      where: { id: movimientoId },
-      data: {
-        anulado_en: ahora,
-        motivo_anulacion: dto.motivo.trim(),
-      },
+    const { mov, actualizado } = await this.prisma.$transaction(async (tx) => {
+      const caja = await bloquearCaja(tx, movPrevio.caja_id);
+      if (!caja || caja.estado !== 'ABIERTA') {
+        throw new HttpException(
+          {
+            codigo: 'CAJA_CERRADA',
+            mensaje: 'Solo se puede anular un movimiento de una caja abierta',
+          },
+          HttpStatus.CONFLICT,
+        );
+      }
+
+      const actual = await tx.movimientoCaja.findUnique({ where: { id: movimientoId } });
+      if (actual?.anulado_en) {
+        throw new HttpException(
+          {
+            codigo: 'MOVIMIENTO_YA_ANULADO',
+            mensaje: 'El movimiento de caja ya fue anulado',
+          },
+          HttpStatus.CONFLICT,
+        );
+      }
+
+      const anulado = await tx.movimientoCaja.update({
+        where: { id: movimientoId },
+        data: {
+          anulado_en: ahora,
+          motivo_anulacion: dto.motivo.trim(),
+        },
+      });
+      return { mov: actual ?? movPrevio, actualizado: anulado };
     });
 
     await this.auditoria.registrar({

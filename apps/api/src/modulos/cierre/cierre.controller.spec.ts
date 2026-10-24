@@ -91,16 +91,16 @@ describe('CierreController', () => {
   });
 
   it('GET /admin/cierre/esperado delega a service.obtenerEsperado', async () => {
-    const res = await controller.obtenerEsperado(mockReq);
+    const res = await controller.obtenerEsperado('654321', mockReq);
     expect(res).toEqual({ cajaId: 10, efectivoEsperado: 355.0 });
-    expect(serviceMock.obtenerEsperado).toHaveBeenCalledWith(mockUsuario);
+    expect(serviceMock.obtenerEsperado).toHaveBeenCalledWith(mockUsuario, '654321', '127.0.0.1');
   });
 
   it('GET /admin/cierre/historial delega a service.historial', async () => {
     const query = { pagina: 1, limite: 10 };
-    const res = await controller.historial(query);
+    const res = await controller.historial(query, mockReq);
     expect(res).toEqual({ cierres: [], total: 0 });
-    expect(serviceMock.historial).toHaveBeenCalledWith(query);
+    expect(serviceMock.historial).toHaveBeenCalledWith(query, mockUsuario);
   });
 
   it('GET /admin/cierre/repartidores delega a service.listarRepartidoresPorLiquidar', async () => {
@@ -121,8 +121,8 @@ describe('CierreController', () => {
   });
 
   it('GET /admin/cierre/:id delega a service.obtenerCierrePorId', async () => {
-    const res = await controller.obtenerPorId('10');
+    const res = await controller.obtenerPorId('10', mockReq);
     expect(res).toEqual({ cajaId: 10, resultado: 'CUADRA' });
-    expect(serviceMock.obtenerCierrePorId).toHaveBeenCalledWith('10');
+    expect(serviceMock.obtenerCierrePorId).toHaveBeenCalledWith('10', mockUsuario);
   });
 });

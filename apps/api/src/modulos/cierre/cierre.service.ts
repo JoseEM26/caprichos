@@ -1,33 +1,64 @@
 import {
-  BadRequestException,
-  ConflictException,
-  ForbiddenException,
   HttpException,
   HttpStatus,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
+import {
+  ClienteCaja,
+  MontosSistema,
+  aCentimos,
+  bloquearCaja,
+  calcularMontosCaja,
+  efectivoDelRepartidor,
+  enPesos,
+  esCentimosValidos,
+  pedidosRepartoDelDia,
+} from '../caja/caja.calculo';
 import { ArqueoDto } from './dto/arqueo.dto';
 import { CerrarCajaDto } from './dto/cerrar-caja.dto';
 import { LiquidarRepartidorDto } from './dto/liquidar.dto';
 import { HistorialCierresDto } from './dto/historial.dto';
 import { calcularTotalConteo } from './cierre.util';
 
-export interface MontosSistema {
-  esperadoEfectivo: number;
-  sistemaYape: number;
-  sistemaPlin: number;
-  sistemaTransferencia: number;
-  sistemaTarjeta: number;
-  ventasEfectivo: number;
-  ingresos: number;
-  egresos: number;
+/** Bloqueo de PIN de supervisor tras 3 fallos seguidos (FT-CAJ-02, RQ-CAJ-02-12). */
+const SEGUNDOS_BLOQUEO_PIN = 5 * 60;
+
+/** Diferencia por medio en céntimos (visto − sistema). Cuadra si todas son cero. */
+function compararConSistema(
+  vistos: { efectivo: number; yape: number; plin: number; transferencia: number; tarjeta: number },
+  montos: MontosSistema,
+) {
+  const difEfectivo = aCentimos(vistos.efectivo) - aCentimos(montos.esperadoEfectivo);
+  const difYape = aCentimos(vistos.yape) - aCentimos(montos.sistemaYape);
+  const difPlin = aCentimos(vistos.plin) - aCentimos(montos.sistemaPlin);
+  const difTransferencia = aCentimos(vistos.transferencia) - aCentimos(montos.sistemaTransferencia);
+  const difTarjeta = aCentimos(vistos.tarjeta) - aCentimos(montos.sistemaTarjeta);
+
+  const cuadra = [difEfectivo, difYape, difPlin, difTransferencia, difTarjeta].every((d) => d === 0);
+
+  return {
+    resultado: (cuadra ? 'CUADRA' : 'NO_CUADRA') as 'CUADRA' | 'NO_CUADRA',
+    cuadra,
+    difEfectivo: enPesos(difEfectivo),
+    difYape: enPesos(difYape),
+    difPlin: enPesos(difPlin),
+    difTransferencia: enPesos(difTransferencia),
+    difTarjeta: enPesos(difTarjeta),
+  };
+}
+
+function exigirAdmin(usuario: UsuarioAutenticado | undefined, mensaje: string) {
+  if (usuario?.rol !== 'ADMIN') {
+    throw new HttpException({ codigo: 'SOLO_ADMIN', mensaje }, HttpStatus.FORBIDDEN);
+  }
 }
 
 @Injectable()
@@ -60,9 +91,24 @@ export class CierreService {
   }
 
   /**
-   * Calcula los montos esperados por el sistema para una caja dada:
-   * Efectivo esperado = apertura + cobros en efectivo (monto - vuelto) + ingresos - egresos.
-   * Medios digitales = suma de cobro_pago de ese medio, sin cobros anulados.
+   * Bloquea la caja y comprueba que siga abierta. Todo lo que escribe en la caja pasa por aquí.
+   */
+  private async bloquearCajaAbierta(tx: Prisma.TransactionClient, cajaId: bigint) {
+    const caja = await bloquearCaja(tx, cajaId);
+    if (!caja || caja.estado !== 'ABIERTA') {
+      throw new HttpException(
+        {
+          codigo: 'CAJA_CERRADA',
+          mensaje: 'La caja ya fue cerrada; no admite más cambios.',
+        },
+        HttpStatus.CONFLICT,
+      );
+    }
+    return caja;
+  }
+
+  /**
+   * Calcula los montos esperados por el sistema para una caja dada (ver caja.calculo.ts).
    */
   async calcularMontosSistema(cajaId: bigint): Promise<MontosSistema> {
     const caja = await this.prisma.caja.findUnique({
@@ -71,94 +117,19 @@ export class CierreService {
     if (!caja) {
       throw new NotFoundException('Caja no encontrada');
     }
-
-    // 1. Cobros de la caja no anulados
-    const cobros = await this.prisma.cobro.findMany({
-      where: {
-        caja_id: cajaId,
-        anulado_en: null,
-      },
-      include: {
-        pagos: true,
-      },
-    });
-
-    let ventasEfectivo = 0;
-    let sistemaYape = 0;
-    let sistemaPlin = 0;
-    let sistemaTransferencia = 0;
-    let sistemaTarjeta = 0;
-
-    for (const cobro of cobros) {
-      for (const pago of cobro.pagos) {
-        const medioNorm = (pago.medio || '').trim().toUpperCase();
-        if (medioNorm === 'EFECTIVO') {
-          // Fórmula: cobros en efectivo (monto - vuelto)
-          const monto = Number(pago.monto);
-          const vuelto = Number(pago.vuelto ?? 0);
-          let neto = monto;
-          if (pago.recibido !== null && pago.recibido !== undefined) {
-            neto = Number(pago.recibido) - vuelto;
-          } else if (vuelto > 0) {
-            neto = monto - vuelto;
-          }
-          ventasEfectivo += neto;
-        } else if (medioNorm === 'YAPE') {
-          sistemaYape += Number(pago.monto);
-        } else if (medioNorm === 'PLIN') {
-          sistemaPlin += Number(pago.monto);
-        } else if (medioNorm === 'TRANSFERENCIA') {
-          sistemaTransferencia += Number(pago.monto);
-        } else if (medioNorm === 'TARJETA') {
-          sistemaTarjeta += Number(pago.monto);
-        }
-      }
-    }
-
-    // 2. Movimientos de caja no anulados
-    const movimientos = await this.prisma.movimientoCaja.findMany({
-      where: {
-        caja_id: cajaId,
-        anulado_en: null,
-      },
-    });
-
-    let ingresos = 0;
-    let egresos = 0;
-    for (const mov of movimientos) {
-      const tipoNorm = (mov.tipo || '').trim().toUpperCase();
-      if (tipoNorm === 'INGRESO') {
-        ingresos += Number(mov.monto);
-      } else if (tipoNorm === 'EGRESO') {
-        egresos += Number(mov.monto);
-      }
-    }
-
-    const apertura = Number(caja.apertura);
-    const esperadoEfectivo =
-      Math.round((apertura + ventasEfectivo + ingresos - egresos) * 100) / 100;
-
-    return {
-      esperadoEfectivo,
-      sistemaYape: Math.round(sistemaYape * 100) / 100,
-      sistemaPlin: Math.round(sistemaPlin * 100) / 100,
-      sistemaTransferencia: Math.round(sistemaTransferencia * 100) / 100,
-      sistemaTarjeta: Math.round(sistemaTarjeta * 100) / 100,
-      ventasEfectivo: Math.round(ventasEfectivo * 100) / 100,
-      ingresos: Math.round(ingresos * 100) / 100,
-      egresos: Math.round(egresos * 100) / 100,
-    };
+    return calcularMontosCaja(this.prisma, caja);
   }
 
   /**
    * Valida el PIN de 6 dígitos de un ADMIN activo contra user_account.pin_hash con argon2.
-   * Tras 3 intentos fallidos bloquea temporalmente por 10 minutos en Redis (DT-61).
+   * Tras 3 intentos fallidos bloquea temporalmente por 5 minutos en Redis (FT-CAJ-02).
    */
   async verificarPinSupervisor(
     pinSupervisor?: string,
     partyIdOperador?: bigint,
     ip?: string,
     cajaId?: bigint,
+    cliente: Pick<PrismaService, 'userAccount'> = this.prisma,
   ): Promise<{ party_id: bigint; id: bigint }> {
     const claveIntentos = `pin:supervisor:intentos:${partyIdOperador ?? 'general'}`;
     const redis = this.redisService?.obtenerCliente?.();
@@ -171,7 +142,7 @@ export class CierreService {
             {
               codigo: 'PIN_BLOQUEADO',
               mensaje:
-                'Demasiados intentos fallidos de PIN de supervisor. Bloqueado temporalmente por 10 minutos.',
+                'Demasiados intentos fallidos de PIN de supervisor. Espera 5 minutos.',
             },
             HttpStatus.FORBIDDEN,
           );
@@ -189,7 +160,7 @@ export class CierreService {
     let supervisorValido: { party_id: bigint; id: bigint } | null = null;
 
     if (formatoValido) {
-      const admins = await this.prisma.userAccount.findMany({
+      const admins = await cliente.userAccount.findMany({
         where: {
           rol: 'ADMIN',
           activo: true,
@@ -217,7 +188,7 @@ export class CierreService {
         try {
           const fallos = await redis.incr(claveIntentos);
           if (fallos === 1) {
-            await redis.expire(claveIntentos, 10 * 60);
+            await redis.expire(claveIntentos, SEGUNDOS_BLOQUEO_PIN);
           }
         } catch {
           // Ignorar fallo de Redis si no está disponible
@@ -267,63 +238,57 @@ export class CierreService {
     pinSupervisor?: string,
     ip?: string,
   ) {
-    const caja = await this.obtenerCajaAbierta();
+    const cajaAbierta = await this.obtenerCajaAbierta();
 
-    // Contar intentos previos para esta caja
-    const conteosPrevios = await this.prisma.conteoCierre.count({
-      where: { caja_id: caja.id },
-    });
+    const { resultado, nuevoIntento } = await this.prisma.$transaction(async (tx) => {
+      const caja = await this.bloquearCajaAbierta(tx, cajaAbierta.id);
 
-    const nuevoIntento = conteosPrevios + 1;
+      // Contar intentos previos para esta caja
+      const conteosPrevios = await tx.conteoCierre.count({
+        where: { caja_id: caja.id },
+      });
 
-    // Si ya fallaron 3 intentos previos, cualquier arqueo subsiguiente exige PIN de supervisor
-    if (conteosPrevios >= 3) {
-      if (!pinSupervisor) {
-        throw new HttpException(
-          {
-            codigo: 'PIN_REQUERIDO',
-            mensaje:
-              'Se alcanzó el límite de 3 intentos de arqueo. Debe proceder al cierre con PIN de supervisor.',
-          },
-          HttpStatus.FORBIDDEN,
-        );
+      const nuevoIntento = conteosPrevios + 1;
+
+      // Si ya fallaron 3 intentos previos, cualquier arqueo subsiguiente exige PIN de supervisor
+      if (conteosPrevios >= 3) {
+        if (!pinSupervisor) {
+          throw new HttpException(
+            {
+              codigo: 'PIN_REQUERIDO',
+              mensaje:
+                'Se alcanzó el límite de 3 intentos de arqueo. Debe proceder al cierre con PIN de supervisor.',
+            },
+            HttpStatus.FORBIDDEN,
+          );
+        }
+        await this.verificarPinSupervisor(pinSupervisor, usuario.partyId, ip, caja.id, tx);
       }
-      await this.verificarPinSupervisor(pinSupervisor, usuario.partyId, ip, caja.id);
-    }
 
-    const vistoEfectivo = calcularTotalConteo(dto.conteo);
-    const vistoYape = Number(dto.medios?.yape ?? 0);
-    const vistoPlin = Number(dto.medios?.plin ?? 0);
-    const vistoTransferencia = Number(dto.medios?.transferencia ?? 0);
-    const vistoTarjeta = Number(dto.medios?.tarjeta ?? 0);
+      const montos = await calcularMontosCaja(tx, caja);
+      const comparacion = compararConSistema(
+        {
+          efectivo: calcularTotalConteo(dto.conteo),
+          yape: Number(dto.medios?.yape ?? 0),
+          plin: Number(dto.medios?.plin ?? 0),
+          transferencia: Number(dto.medios?.transferencia ?? 0),
+          tarjeta: Number(dto.medios?.tarjeta ?? 0),
+        },
+        montos,
+      );
 
-    const montos = await this.calcularMontosSistema(caja.id);
+      await tx.conteoCierre.create({
+        data: {
+          caja_id: caja.id,
+          intento: nuevoIntento,
+          conteo: dto.conteo as any,
+          medios: dto.medios as any,
+          resultado: comparacion.resultado,
+          por: usuario.partyId,
+        },
+      });
 
-    const difEfectivo = Math.round((vistoEfectivo - montos.esperadoEfectivo) * 100) / 100;
-    const difYape = Math.round((vistoYape - montos.sistemaYape) * 100) / 100;
-    const difPlin = Math.round((vistoPlin - montos.sistemaPlin) * 100) / 100;
-    const difTransferencia =
-      Math.round((vistoTransferencia - montos.sistemaTransferencia) * 100) / 100;
-    const difTarjeta = Math.round((vistoTarjeta - montos.sistemaTarjeta) * 100) / 100;
-
-    const cuadra =
-      Math.abs(difEfectivo) < 0.005 &&
-      Math.abs(difYape) < 0.005 &&
-      Math.abs(difPlin) < 0.005 &&
-      Math.abs(difTransferencia) < 0.005 &&
-      Math.abs(difTarjeta) < 0.005;
-
-    const resultado: 'CUADRA' | 'NO_CUADRA' = cuadra ? 'CUADRA' : 'NO_CUADRA';
-
-    await this.prisma.conteoCierre.create({
-      data: {
-        caja_id: caja.id,
-        intento: nuevoIntento,
-        conteo: dto.conteo as any,
-        medios: dto.medios as any,
-        resultado,
-        por: usuario.partyId,
-      },
+      return { resultado: comparacion.resultado, nuevoIntento };
     });
 
     await this.auditoria.registrar({
@@ -332,7 +297,7 @@ export class CierreService {
       accion: 'ARQUEO',
       resultado: 'OK',
       entidad: 'caja',
-      entidadId: caja.id,
+      entidadId: cajaAbierta.id,
       despues: {
         intento: nuevoIntento,
         resultado,
@@ -360,158 +325,121 @@ export class CierreService {
     pinSupervisor?: string,
     ip?: string,
   ) {
-    const caja = await this.obtenerCajaAbierta();
+    const cajaAbierta = await this.obtenerCajaAbierta();
 
-    // 1. Validar que no haya cobros en curso ni pedidos pendientes de confirmación
-    const cobrosEnCurso = await this.prisma.pedido.count({
-      where: {
-        pago_estado: { in: ['PENDIENTE', 'COORDINADO'] },
-        estado: { not: 'ANULADO' },
-      },
-    });
+    const cierre = await this.prisma.$transaction(async (tx) => {
+      const caja = await this.bloquearCajaAbierta(tx, cajaAbierta.id);
 
-    if (cobrosEnCurso > 0) {
-      throw new HttpException(
-        {
-          codigo: 'COBROS_EN_CURSO',
-          mensaje: `No se puede cerrar la caja: hay ${cobrosEnCurso} pedido(s) con cobro en curso o por confirmar.`,
+      // 1. No puede haber cobros en curso ni pedidos pendientes de confirmación
+      const cobrosEnCurso = await tx.pedido.count({
+        where: {
+          pago_estado: { in: ['PENDIENTE', 'COORDINADO'] },
+          estado: { not: 'ANULADO' },
         },
-        HttpStatus.CONFLICT,
-      );
-    }
+      });
 
-    // 2. Validar que no haya pedidos delivery entregados cobrados en efectivo sin liquidar (RN-CAP-097 / RQ-CIE-02-08)
-    const repartidores = await this.listarRepartidoresPorLiquidar();
-    const pendientes = repartidores.filter((r) => r.pendiente > 0);
-    if (pendientes.length > 0) {
-      const nombres = pendientes.map((r) => r.nombre).join(', ');
-      throw new HttpException(
-        {
-          codigo: 'REPARTIDORES_SIN_LIQUIDAR',
-          mensaje: `No se puede cerrar la caja: falta liquidar a repartidor(es): ${nombres}.`,
-        },
-        HttpStatus.CONFLICT,
-      );
-    }
-
-    // 2. Obtener conteo y medios (del body o del último intento registrado)
-    let conteo = dto.conteo;
-    let medios = dto.medios;
-
-    const conteosCaja = await this.prisma.conteoCierre.findMany({
-      where: { caja_id: caja.id },
-      orderBy: { intento: 'desc' },
-    });
-
-    if (!conteo || !medios) {
-      if (conteosCaja.length === 0) {
+      if (cobrosEnCurso > 0) {
         throw new HttpException(
           {
-            codigo: 'ARQUEO_REQUERIDO',
-            mensaje: 'Debe realizar el arqueo ciego antes de cerrar la caja.',
+            codigo: 'COBROS_EN_CURSO',
+            mensaje: `No se puede cerrar la caja: hay ${cobrosEnCurso} pedido(s) con cobro en curso o por confirmar.`,
           },
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-      conteo = conteo ?? (conteosCaja[0].conteo as any);
-      medios = medios ?? (conteosCaja[0].medios as any);
-    }
-
-    const vistoEfectivo = calcularTotalConteo(conteo);
-    const vistoYape = Number(medios?.yape ?? 0);
-    const vistoPlin = Number(medios?.plin ?? 0);
-    const vistoTransferencia = Number(medios?.transferencia ?? 0);
-    const vistoTarjeta = Number(medios?.tarjeta ?? 0);
-
-    const montos = await this.calcularMontosSistema(caja.id);
-
-    const difEfectivo = Math.round((vistoEfectivo - montos.esperadoEfectivo) * 100) / 100;
-    const difYape = Math.round((vistoYape - montos.sistemaYape) * 100) / 100;
-    const difPlin = Math.round((vistoPlin - montos.sistemaPlin) * 100) / 100;
-    const difTransferencia =
-      Math.round((vistoTransferencia - montos.sistemaTransferencia) * 100) / 100;
-    const difTarjeta = Math.round((vistoTarjeta - montos.sistemaTarjeta) * 100) / 100;
-
-    const cuadra =
-      Math.abs(difEfectivo) < 0.005 &&
-      Math.abs(difYape) < 0.005 &&
-      Math.abs(difPlin) < 0.005 &&
-      Math.abs(difTransferencia) < 0.005 &&
-      Math.abs(difTarjeta) < 0.005;
-
-    const resultado: 'CUADRA' | 'NO_CUADRA' = cuadra ? 'CUADRA' : 'NO_CUADRA';
-
-    let supervisorPartyId: bigint | null = null;
-
-    // Si no cuadra o se han agotado los 3 intentos, se exige supervisor y notas
-    if (!cuadra || conteosCaja.length >= 3) {
-      if (!dto.nota || typeof dto.nota !== 'string' || dto.nota.trim().length < 3) {
-        throw new HttpException(
-          {
-            codigo: 'NOTA_REQUERIDA',
-            mensaje:
-              'Se requiere una nota explicativa de al menos 3 caracteres para cerrar la caja con diferencias.',
-          },
-          HttpStatus.BAD_REQUEST,
+          HttpStatus.CONFLICT,
         );
       }
 
-      if (!pinSupervisor) {
+      // 2. Ningún repartidor con efectivo sin liquidar (RN-CAP-097 / RQ-CIE-02-08)
+      const repartidores = await this.repartidoresConEfectivo(tx, caja);
+      const pendientes = repartidores.filter((r) => r.pendienteCentimos > 0);
+      if (pendientes.length > 0) {
+        const nombres = pendientes.map((r) => r.nombre).join(', ');
         throw new HttpException(
           {
-            codigo: 'PIN_REQUERIDO',
-            mensaje:
-              'El cierre no cuadra o se alcanzaron los intentos máximos: se requiere el PIN de supervisor.',
+            codigo: 'REPARTIDORES_SIN_LIQUIDAR',
+            mensaje: `No se puede cerrar la caja: falta liquidar a repartidor(es): ${nombres}.`,
           },
-          HttpStatus.FORBIDDEN,
+          HttpStatus.CONFLICT,
         );
       }
 
-      const supervisor = await this.verificarPinSupervisor(
-        pinSupervisor,
-        usuario.partyId,
-        ip,
-        caja.id,
-      );
-      supervisorPartyId = supervisor.party_id;
-    }
+      // 3. Conteo y medios: del body o del último intento registrado
+      let conteo = dto.conteo;
+      let medios = dto.medios;
 
-    const mediosData = [
-      {
-        medio: 'EFECTIVO',
-        sistema: montos.esperadoEfectivo,
-        visto: vistoEfectivo,
-        diferencia: difEfectivo,
-      },
-      {
-        medio: 'YAPE',
-        sistema: montos.sistemaYape,
-        visto: vistoYape,
-        diferencia: difYape,
-      },
-      {
-        medio: 'PLIN',
-        sistema: montos.sistemaPlin,
-        visto: vistoPlin,
-        diferencia: difPlin,
-      },
-      {
-        medio: 'TRANSFERENCIA',
-        sistema: montos.sistemaTransferencia,
-        visto: vistoTransferencia,
-        diferencia: difTransferencia,
-      },
-      {
-        medio: 'TARJETA',
-        sistema: montos.sistemaTarjeta,
-        visto: vistoTarjeta,
-        diferencia: difTarjeta,
-      },
-    ];
+      const conteosCaja = await tx.conteoCierre.findMany({
+        where: { caja_id: caja.id },
+        orderBy: { intento: 'desc' },
+      });
 
-    // Transacción de cierre
-    await this.prisma.$transaction(async (tx) => {
-      // 1. Crear cierre_caja
+      if (!conteo || !medios) {
+        if (conteosCaja.length === 0) {
+          throw new HttpException(
+            {
+              codigo: 'ARQUEO_REQUERIDO',
+              mensaje: 'Debe realizar el arqueo ciego antes de cerrar la caja.',
+            },
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+        conteo = conteo ?? (conteosCaja[0].conteo as any);
+        medios = medios ?? (conteosCaja[0].medios as any);
+      }
+
+      const montos = await calcularMontosCaja(tx, caja);
+      const vistos = {
+        efectivo: calcularTotalConteo(conteo),
+        yape: Number(medios?.yape ?? 0),
+        plin: Number(medios?.plin ?? 0),
+        transferencia: Number(medios?.transferencia ?? 0),
+        tarjeta: Number(medios?.tarjeta ?? 0),
+      };
+      const comparacion = compararConSistema(vistos, montos);
+      const { resultado, cuadra } = comparacion;
+
+      let supervisorPartyId: bigint | null = null;
+
+      // Si no cuadra o se han agotado los 3 intentos, se exige supervisor y notas
+      if (!cuadra || conteosCaja.length >= 3) {
+        if (!dto.nota || typeof dto.nota !== 'string' || dto.nota.trim().length < 3) {
+          throw new HttpException(
+            {
+              codigo: 'NOTA_REQUERIDA',
+              mensaje:
+                'Se requiere una nota explicativa de al menos 3 caracteres para cerrar la caja con diferencias.',
+            },
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+
+        if (!pinSupervisor) {
+          throw new HttpException(
+            {
+              codigo: 'PIN_REQUERIDO',
+              mensaje:
+                'El cierre no cuadra o se alcanzaron los intentos máximos: se requiere el PIN de supervisor.',
+            },
+            HttpStatus.FORBIDDEN,
+          );
+        }
+
+        const supervisor = await this.verificarPinSupervisor(
+          pinSupervisor,
+          usuario.partyId,
+          ip,
+          caja.id,
+          tx,
+        );
+        supervisorPartyId = supervisor.party_id;
+      }
+
+      const mediosData = [
+        { medio: 'EFECTIVO', sistema: montos.esperadoEfectivo, visto: vistos.efectivo, diferencia: comparacion.difEfectivo },
+        { medio: 'YAPE', sistema: montos.sistemaYape, visto: vistos.yape, diferencia: comparacion.difYape },
+        { medio: 'PLIN', sistema: montos.sistemaPlin, visto: vistos.plin, diferencia: comparacion.difPlin },
+        { medio: 'TRANSFERENCIA', sistema: montos.sistemaTransferencia, visto: vistos.transferencia, diferencia: comparacion.difTransferencia },
+        { medio: 'TARJETA', sistema: montos.sistemaTarjeta, visto: vistos.tarjeta, diferencia: comparacion.difTarjeta },
+      ];
+
       await tx.cierreCaja.create({
         data: {
           caja_id: caja.id,
@@ -522,7 +450,7 @@ export class CierreService {
         },
       });
 
-      // 2. Crear cierre_medio por cada medio (diferencia es columna generada en BD)
+      // diferencia es columna generada en BD
       for (const m of mediosData) {
         await tx.cierreMedio.create({
           data: {
@@ -534,7 +462,6 @@ export class CierreService {
         });
       }
 
-      // 3. Marcar caja CERRADA
       await tx.caja.update({
         where: { id: caja.id },
         data: {
@@ -543,7 +470,11 @@ export class CierreService {
           cerrada_en: new Date(),
         },
       });
+
+      return { caja, resultado, supervisorPartyId, mediosData };
     });
+
+    const { caja, resultado, supervisorPartyId, mediosData } = cierre;
 
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
@@ -577,7 +508,8 @@ export class CierreService {
       resultado,
       aprobadoPor: supervisorPartyId ? Number(supervisorPartyId) : null,
       nota: dto.nota?.trim() ?? null,
-      medios: mediosData,
+      // El cajero no ve el esperado ni la diferencia (DT-61)
+      medios: usuario.rol === 'ADMIN' ? mediosData : undefined,
     };
   }
 
@@ -585,18 +517,12 @@ export class CierreService {
    * Consulta los montos esperados por el sistema en vivo antes de cerrar.
    * Solo el rol ADMIN puede acceder a este endpoint (cierre ciego para cajeros).
    */
-  async obtenerEsperado(usuario: UsuarioAutenticado) {
-    if (usuario.rol !== 'ADMIN') {
-      throw new HttpException(
-        {
-          codigo: 'SOLO_ADMIN',
-          mensaje: 'Solo el administrador puede ver los montos del sistema antes de cerrar.',
-        },
-        HttpStatus.FORBIDDEN,
-      );
-    }
-
+  async obtenerEsperado(usuario: UsuarioAutenticado, pinSupervisor?: string, ip?: string) {
     const caja = await this.obtenerCajaAbierta();
+    // el administrador lo ve directo; otro rol solo con el PIN de la supervisora (RQ-CIE-02-05, HU-CAP-199)
+    if (usuario?.rol !== 'ADMIN') {
+      await this.verificarPinSupervisor(pinSupervisor, usuario?.partyId, ip, caja.id);
+    }
     const montos = await this.calcularMontosSistema(caja.id);
 
     return {
@@ -615,14 +541,17 @@ export class CierreService {
         ventasEfectivo: montos.ventasEfectivo,
         ingresos: montos.ingresos,
         egresos: montos.egresos,
+        liquidadoRepartidores: montos.liquidadoEfectivo,
       },
     };
   }
 
   /**
-   * Historial de cierres de caja con paginación y filtros de fecha.
+   * Historial de cierres de caja con paginación y filtros de fecha. Solo administrador (HU-CAP-046).
    */
-  async historial(query: HistorialCierresDto) {
+  async historial(query: HistorialCierresDto, usuario: UsuarioAutenticado) {
+    exigirAdmin(usuario, 'Solo el administrador puede consultar el historial de cierres.');
+
     const pagina = Number(query.pagina ?? 1);
     const limite = Number(query.limite ?? 20);
     const skip = (pagina - 1) * limite;
@@ -690,9 +619,11 @@ export class CierreService {
   }
 
   /**
-   * Consulta el detalle de un cierre por ID (mostrando diferencias y medios).
+   * Consulta el detalle de un cierre por ID (mostrando diferencias y medios). Solo administrador.
    */
-  async obtenerCierrePorId(id: bigint | number | string) {
+  async obtenerCierrePorId(id: bigint | number | string, usuario: UsuarioAutenticado) {
+    exigirAdmin(usuario, 'Solo el administrador puede ver el detalle de un cierre.');
+
     let cajaId: bigint;
     try {
       cajaId = BigInt(id);
@@ -744,124 +675,32 @@ export class CierreService {
   }
 
   /**
-   * Lista los repartidores con pedidos DELIVERY ENTREGADO del día cobrados en efectivo contra entrega
-   * y el efectivo pendiente que debe entregar cada uno (FT-CIE-01).
+   * Lista los repartidores con efectivo cobrado del día que aún no liquidan (FT-CIE-01).
    */
   async listarRepartidoresPorLiquidar() {
     const caja = await this.obtenerCajaAbierta();
+    const repartidores = await this.repartidoresConEfectivo(this.prisma, caja);
 
-    // 1. Pedidos DELIVERY ENTREGADOS con repartidor asignado
-    const pedidos = await this.prisma.pedido.findMany({
-      where: {
-        modalidad: 'DELIVERY',
-        estado: 'ENTREGADO',
-        repartidor_party_id: { not: null },
-      },
-      include: {
-        repartidor: {
-          include: {
-            persona: true,
-          },
-        },
-        cobro: {
-          include: {
-            pagos: true,
-          },
-        },
-      },
-    });
-
-    // 2. Filtrar solo los cobrados en efectivo contra entrega (no anulados)
-    const porRepartidorMap = new Map<
-      string,
-      {
-        repartidorPartyId: string;
-        nombre: string;
-        pedidos: Array<{ id: number; codigo: string; total: number; entregadoEn: Date | null }>;
-        totalCobradoEfectivo: number;
-      }
-    >();
-
-    for (const p of pedidos) {
-      const repId = String(p.repartidor_party_id);
-      let efectivoPedido = 0;
-
-      if (p.cobro && !p.cobro.anulado_en) {
-        for (const pago of p.cobro.pagos) {
-          if ((pago.medio || '').toUpperCase() === 'EFECTIVO') {
-            efectivoPedido += Number(pago.monto);
-          }
-        }
-      } else if (p.pago_metodo === 'EFECTIVO') {
-        efectivoPedido = Number(p.total);
-      }
-
-      if (efectivoPedido > 0) {
-        if (!porRepartidorMap.has(repId)) {
-          const nombres = p.repartidor?.persona?.nombres ?? '';
-          const apellidos = p.repartidor?.persona?.apellidos ?? '';
-          const nombreCompleto = `${nombres} ${apellidos}`.trim() || `Repartidor #${repId}`;
-
-          porRepartidorMap.set(repId, {
-            repartidorPartyId: repId,
-            nombre: nombreCompleto,
-            pedidos: [],
-            totalCobradoEfectivo: 0,
-          });
-        }
-
-        const repData = porRepartidorMap.get(repId)!;
-        repData.pedidos.push({
-          id: Number(p.id),
-          codigo: p.codigo,
-          total: efectivoPedido,
-          entregadoEn: p.entregado_en,
-        });
-        repData.totalCobradoEfectivo += efectivoPedido;
-      }
-    }
-
-    // 3. Liquidaciones ya registradas para esta caja
-    const liquidacionesCaja = await this.prisma.liquidacion.findMany({
-      where: { caja_id: caja.id },
-    });
-
-    const liquidadoMap = new Map<string, number>();
-    for (const liq of liquidacionesCaja) {
-      const repId = String(liq.repartidor_party_id);
-      liquidadoMap.set(
-        repId,
-        (liquidadoMap.get(repId) ?? 0) + Number(liq.entregado),
-      );
-    }
-
-    const resultado = Array.from(porRepartidorMap.values()).map((r) => {
-      const totalCobrado = Math.round(r.totalCobradoEfectivo * 100) / 100;
-      const totalLiquidado = Math.round((liquidadoMap.get(r.repartidorPartyId) ?? 0) * 100) / 100;
-      const pendiente = Math.max(0, Math.round((totalCobrado - totalLiquidado) * 100) / 100);
-
-      return {
-        repartidorPartyId: Number(r.repartidorPartyId),
-        nombre: r.nombre,
-        pedidos: r.pedidos,
-        totalCobrado,
-        totalLiquidado,
-        pendiente,
-      };
-    });
-
-    return resultado;
+    return repartidores.map((r) => ({
+      repartidorPartyId: Number(r.repartidorPartyId),
+      nombre: r.nombre,
+      pedidos: r.pedidos,
+      totalCobrado: enPesos(r.cobradoCentimos),
+      totalLiquidado: enPesos(r.liquidadoCentimos),
+      pendiente: enPesos(r.pendienteCentimos),
+    }));
   }
 
   /**
-   * Registra la liquidación de efectivo de un repartidor (FT-CIE-01).
+   * Registra la liquidación de efectivo de un repartidor: liquida todo lo que cobró ese día
+   * (el saldo queda en cero) y registra lo que entregó y la diferencia (FT-CIE-01, RQ-CIE-01-08).
    */
   async liquidarRepartidor(
     dto: LiquidarRepartidorDto,
     usuario: UsuarioAutenticado,
     ip?: string,
   ) {
-    const caja = await this.obtenerCajaAbierta();
+    const cajaAbierta = await this.obtenerCajaAbierta();
     let repartidorPartyId: bigint;
     try {
       repartidorPartyId = BigInt(dto.repartidorPartyId);
@@ -870,6 +709,16 @@ export class CierreService {
         {
           codigo: 'ID_INVALIDO',
           mensaje: 'repartidorPartyId proporcionado no es válido.',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    if (!esCentimosValidos(Number(dto.entregado))) {
+      throw new HttpException(
+        {
+          codigo: 'MONTO_INVALIDO',
+          mensaje: 'El monto entregado admite como máximo dos decimales.',
         },
         HttpStatus.BAD_REQUEST,
       );
@@ -891,24 +740,37 @@ export class CierreService {
       );
     }
 
-    // Calcular el efectivo esperado pendiente de liquidar
-    const repartidores = await this.listarRepartidoresPorLiquidar();
-    const repInfo = repartidores.find(
-      (r) => String(r.repartidorPartyId) === String(dto.repartidorPartyId),
-    );
+    const { liquidacion, esperado, entregado } = await this.prisma.$transaction(async (tx) => {
+      const caja = await this.bloquearCajaAbierta(tx, cajaAbierta.id);
 
-    const esperado = repInfo ? repInfo.pendiente : 0;
-    const entregado = Math.round(Number(dto.entregado) * 100) / 100;
-    const diferencia = Math.round((entregado - esperado) * 100) / 100;
+      const repartidores = await this.repartidoresConEfectivo(tx, caja);
+      const info = repartidores.find((r) => r.repartidorPartyId === String(repartidorPartyId));
+      const pendiente = info?.pendienteCentimos ?? 0;
 
-    const liquidacion = await this.prisma.liquidacion.create({
-      data: {
-        caja_id: caja.id,
-        repartidor_party_id: repartidorPartyId,
-        esperado,
-        entregado,
-      },
+      if (pendiente <= 0) {
+        throw new HttpException(
+          {
+            codigo: 'SIN_EFECTIVO_PENDIENTE',
+            mensaje: 'El repartidor no tiene efectivo pendiente por liquidar.',
+          },
+          HttpStatus.CONFLICT,
+        );
+      }
+
+      const entregadoCentimos = aCentimos(dto.entregado);
+      const liq = await tx.liquidacion.create({
+        data: {
+          caja_id: caja.id,
+          repartidor_party_id: repartidorPartyId,
+          esperado: enPesos(pendiente),
+          entregado: enPesos(entregadoCentimos),
+        },
+      });
+
+      return { liquidacion: liq, esperado: pendiente, entregado: entregadoCentimos };
     });
+
+    const diferencia = enPesos(entregado - esperado);
 
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
@@ -918,10 +780,10 @@ export class CierreService {
       entidad: 'liquidacion',
       entidadId: liquidacion.id,
       despues: {
-        cajaId: String(caja.id),
+        cajaId: String(cajaAbierta.id),
         repartidorPartyId: String(repartidorPartyId),
-        esperado,
-        entregado,
+        esperado: enPesos(esperado),
+        entregado: enPesos(entregado),
         diferencia,
       },
       partyId: usuario.partyId,
@@ -930,11 +792,78 @@ export class CierreService {
 
     return {
       id: Number(liquidacion.id),
-      cajaId: Number(caja.id),
+      cajaId: Number(cajaAbierta.id),
       repartidorPartyId: Number(repartidorPartyId),
-      esperado,
-      entregado,
+      esperado: enPesos(esperado),
+      entregado: enPesos(entregado),
       diferencia,
     };
+  }
+
+  /**
+   * Efectivo cobrado por repartidor en la caja (en céntimos): cobrado, liquidado y pendiente.
+   * Los pedidos se filtran por el día de la caja (hora de Lima) y las liquidaciones por caja.
+   */
+  private async repartidoresConEfectivo(cliente: ClienteCaja, caja: { id: bigint; fecha: Date }) {
+    const fechaIso = new Date(caja.fecha).toISOString().slice(0, 10);
+    const pedidos = await pedidosRepartoDelDia(cliente, fechaIso);
+
+    const porRepartidor = new Map<
+      string,
+      {
+        repartidorPartyId: string;
+        nombre: string;
+        pedidos: Array<{ id: number; codigo: string; total: number; entregadoEn: Date | null }>;
+        cobradoCentimos: number;
+      }
+    >();
+
+    for (const p of pedidos) {
+      const centimos = efectivoDelRepartidor(p);
+      if (centimos <= 0) continue;
+
+      const repId = String(p.repartidor_party_id);
+      if (!porRepartidor.has(repId)) {
+        const nombres = p.repartidor?.persona?.nombres ?? '';
+        const apellidos = p.repartidor?.persona?.apellidos ?? '';
+        const nombreCompleto = `${nombres} ${apellidos}`.trim() || `Repartidor #${repId}`;
+
+        porRepartidor.set(repId, {
+          repartidorPartyId: repId,
+          nombre: nombreCompleto,
+          pedidos: [],
+          cobradoCentimos: 0,
+        });
+      }
+
+      const repData = porRepartidor.get(repId)!;
+      repData.pedidos.push({
+        id: Number(p.id),
+        codigo: p.codigo,
+        total: enPesos(centimos),
+        entregadoEn: p.entregado_en,
+      });
+      repData.cobradoCentimos += centimos;
+    }
+
+    // Cada liquidación salda lo que el repartidor debía (esperado); la diferencia con lo entregado queda registrada
+    const liquidaciones = await cliente.liquidacion.findMany({
+      where: { caja_id: caja.id },
+    });
+
+    const liquidadoMap = new Map<string, number>();
+    for (const liq of liquidaciones) {
+      const repId = String(liq.repartidor_party_id);
+      liquidadoMap.set(repId, (liquidadoMap.get(repId) ?? 0) + aCentimos(liq.esperado));
+    }
+
+    return Array.from(porRepartidor.values()).map((r) => {
+      const liquidadoCentimos = liquidadoMap.get(r.repartidorPartyId) ?? 0;
+      return {
+        ...r,
+        liquidadoCentimos,
+        pendienteCentimos: Math.max(0, r.cobradoCentimos - liquidadoCentimos),
+      };
+    });
   }
 }
