@@ -122,6 +122,11 @@ jobs:
         with:
           ref: ${{ needs.validar-y-determinar.outputs.ref }}
 
+      - name: Liberar espacio en disco del ejecutor
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
+          df -h / | tail -1
+
       - name: Metadatos de imagen
         id: meta
         run: |
@@ -149,7 +154,10 @@ jobs:
           file: infra/docker/Dockerfile.api
           push: false
           load: true
-          tags: caprichos-api:test
+          tags: |
+            caprichos-api:test
+            ${{ steps.meta.outputs.image_api }}
+            ghcr.io/${{ steps.meta.outputs.owner }}/caprichos-api:${{ needs.validar-y-determinar.outputs.short_sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -172,7 +180,10 @@ jobs:
           file: infra/docker/Dockerfile.web
           push: false
           load: true
-          tags: caprichos-web:test
+          tags: |
+            caprichos-web:test
+            ${{ steps.meta.outputs.image_web }}
+            ghcr.io/${{ steps.meta.outputs.owner }}/caprichos-web:${{ needs.validar-y-determinar.outputs.short_sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -188,27 +199,18 @@ jobs:
           severity: CRITICAL
 
       # 3. Publicar imágenes verificadas en GHCR
-      - name: Publicar imagen API en GHCR
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: infra/docker/Dockerfile.api
-          push: true
-          tags: |
-            ${{ steps.meta.outputs.image_api }}
-            ghcr.io/${{ steps.meta.outputs.owner }}/caprichos-api:${{ needs.validar-y-determinar.outputs.short_sha }}
-          cache-from: type=gha
-
-      - name: Publicar imagen Web en GHCR
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: infra/docker/Dockerfile.web
-          push: true
-          tags: |
-            ${{ steps.meta.outputs.image_web }}
-            ghcr.io/${{ steps.meta.outputs.owner }}/caprichos-web:${{ needs.validar-y-determinar.outputs.short_sha }}
-          cache-from: type=gha
+      - name: Publicar en GHCR las imágenes ya escaneadas (sin reconstruir)
+        env:
+          IMAGE_API: ${{ steps.meta.outputs.image_api }}
+          IMAGE_WEB: ${{ steps.meta.outputs.image_web }}
+          OWNER: ${{ steps.meta.outputs.owner }}
+          SHORT_SHA: ${{ needs.validar-y-determinar.outputs.short_sha }}
+        run: |
+          set -e
+          docker push "$IMAGE_API"
+          docker push "$IMAGE_WEB"
+          docker push "ghcr.io/${OWNER}/caprichos-api:${SHORT_SHA}" || true
+          docker push "ghcr.io/${OWNER}/caprichos-web:${SHORT_SHA}" || true
 
   deploy-ssh:
     name: Despliegue por SSH en VPS
