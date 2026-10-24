@@ -12,7 +12,12 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BASE_COMPOSE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+# En el repositorio los compose están junto a scripts/; en el servidor están en ../compose/
+if [[ -f "${SCRIPT_DIR}/../docker-compose.base.yml" ]]; then
+  BASE_COMPOSE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+else
+  BASE_COMPOSE_DIR="$(cd "${SCRIPT_DIR}/../compose" && pwd)"
+fi
 
 AMBIENTE="${1:-}"
 TAG_DESTINO="${2:-}"

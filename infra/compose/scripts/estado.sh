@@ -9,7 +9,12 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BASE_COMPOSE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+# En el repositorio los compose están junto a scripts/; en el servidor están en ../compose/
+if [[ -f "${SCRIPT_DIR}/../docker-compose.base.yml" ]]; then
+  BASE_COMPOSE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+else
+  BASE_COMPOSE_DIR="$(cd "${SCRIPT_DIR}/../compose" && pwd)"
+fi
 
 OBJETIVO="${1:-todos}"
 
@@ -78,7 +83,7 @@ verificar_proxy() {
   echo "------------------------------------------------------------------------"
   echo "   ESTADO: PROXY TRAEFIK AUTÓNOMO"
   echo "------------------------------------------------------------------------"
-  local PROXY_DIR="${BASE_COMPOSE_DIR}/proxy"
+  local PROXY_DIR="${BASE_COMPOSE_DIR}/proxy"; [[ -d /opt/caprichos/proxy ]] && PROXY_DIR=/opt/caprichos/proxy
   if [[ -f "${PROXY_DIR}/docker-compose.yml" ]]; then
     docker compose -f "${PROXY_DIR}/docker-compose.yml" ps || true
   fi

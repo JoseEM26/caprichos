@@ -223,6 +223,12 @@ jobs:
       group: deploy-${{ needs.validar-y-determinar.outputs.ambiente }}
       cancel-in-progress: false
     steps:
+      - name: Checkout (scripts y archivos compose de esta versión)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validar-y-determinar.outputs.ref }}
+          sparse-checkout: infra/compose
+
       - name: Configurar llave y huella SSH (sin StrictHostKeyChecking=no)
         env:
           SSH_KEY: ${{ secrets.SSH_KEY }}
@@ -241,6 +247,16 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
+
+      - name: Sincronizar scripts y compose en el VPS
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -e
+          SSH="ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes ${SSH_USER:-deploy}@${SSH_HOST}"
+          tar -czf - -C infra/compose scripts | $SSH 'mkdir -p /opt/caprichos && tar -xzf - -C /opt/caprichos && chmod +x /opt/caprichos/scripts/*.sh'
+          tar -czf - -C infra/compose docker-compose.base.yml docker-compose.demo.yml docker-compose.staging.yml docker-compose.prod.yml | $SSH 'mkdir -p /opt/caprichos/compose && tar -xzf - -C /opt/caprichos/compose'
 
       - name: Ejecutar despliegue en el VPS vía SSH
         env:

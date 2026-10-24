@@ -12,7 +12,12 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BASE_COMPOSE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+# En el repositorio los compose están junto a scripts/; en el servidor están en ../compose/
+if [[ -f "${SCRIPT_DIR}/../docker-compose.base.yml" ]]; then
+  BASE_COMPOSE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+else
+  BASE_COMPOSE_DIR="$(cd "${SCRIPT_DIR}/../compose" && pwd)"
+fi
 
 OBJETIVO="${1:-}"
 SERVICIO="${2:-}"
@@ -27,7 +32,7 @@ fi
 
 if [[ "$OBJETIVO" == "proxy" ]]; then
   echo "==> Mostrando registros en tiempo real de Traefik (Ctrl+C para salir)..."
-  docker compose -f "${BASE_COMPOSE_DIR}/proxy/docker-compose.yml" logs -f --tail=100
+  docker compose -f "$([[ -d /opt/caprichos/proxy ]] && echo /opt/caprichos/proxy || echo "${BASE_COMPOSE_DIR}/proxy")/docker-compose.yml" logs -f --tail=100
   exit 0
 fi
 
