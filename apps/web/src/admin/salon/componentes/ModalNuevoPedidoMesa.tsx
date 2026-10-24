@@ -56,8 +56,6 @@ export function ModalNuevoPedidoMesa({
   alExitoPedido,
   alRefrescarMesas,
 }: ModalNuevoPedidoMesaProps) {
-  if (!abierto) return null;
-
   const todasLasMesasIniciales = useMemo(() => {
     const list: string[] = [];
     if (mesaPreseleccionadaId) list.push(mesaPreseleccionadaId);
@@ -263,6 +261,9 @@ export function ModalNuevoPedidoMesa({
   // Modal Liberar mesa
   const [mesaParaLiberar, setMesaParaLiberar] = useState<MesaSalon | null>(null);
 
+  // Aviso al tocar una mesa que no se puede elegir
+  const [avisoMesa, setAvisoMesa] = useState<string | null>(null);
+
   // Cargar carta al montar
   useEffect(() => {
     let cancel = false;
@@ -340,8 +341,10 @@ export function ModalNuevoPedidoMesa({
     }
 
     if (mesa.estado === 'OCUPADA') {
+      setAvisoMesa(`${mesa.nombre || `Mesa ${mesa.numero}`} está ocupada. Elige una mesa libre.`);
       return;
     }
+    setAvisoMesa(null);
 
     if (modoPlano === 'one') {
       setMesasSeleccionadas([mesa.id]);
@@ -485,6 +488,7 @@ export function ModalNuevoPedidoMesa({
         };
       });
 
+      // desde Pedidos y caja el canal es CAJA; el mozo desde el salón sigue siendo MOZO
       const canalEnvio: 'MOZO' | 'CAJA' = pasoInicial === 'modal' ? 'CAJA' : 'MOZO';
       let res: any;
 
@@ -616,6 +620,15 @@ export function ModalNuevoPedidoMesa({
     }
     return '';
   }, [paso, modalidad, pisosActivos, pisoActual, textoMesas, cliNombre]);
+
+  const motivoNoEnviar =
+    lineas.length === 0
+      ? 'Agrega al menos un producto para enviarlo.'
+      : modalidad === 'local' && mesasSeleccionadas.length === 0
+        ? 'Elige una mesa para enviarlo.'
+        : '';
+
+  if (!abierto) return null;
 
   return (
     <>
@@ -1310,6 +1323,21 @@ export function ModalNuevoPedidoMesa({
                   onSeleccionarMesaSalon={handleClicMesa}
                 />
               </div>
+              {avisoMesa && (
+                <div
+                  role="alert"
+                  style={{
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    color: 'var(--cp-rust)',
+                    background: 'var(--cp-sand)',
+                    borderRadius: '10px',
+                    padding: '8px 12px',
+                  }}
+                >
+                  {avisoMesa}
+                </div>
+              )}
 
               {/* Barra inferior de confirmación de mesas (solo al juntar varias) */}
               {modoPlano === 'join' && (
@@ -1767,9 +1795,9 @@ export function ModalNuevoPedidoMesa({
                     style={{
                       display: 'grid',
                       gridTemplateColumns: conImagenes
-                        ? 'repeat(auto-fill, minmax(150px, 1fr))'
+                        ? 'repeat(auto-fill, minmax(160px, 1fr))'
                         : 'repeat(auto-fill, minmax(180px, 1fr))',
-                      gap: '10px',
+                      gap: '14px',
                       maxHeight: '52vh',
                       overflowY: 'auto',
                       padding: '4px',
@@ -1784,41 +1812,77 @@ export function ModalNuevoPedidoMesa({
                           background: 'var(--cp-white)',
                           border: '1px solid var(--cp-line)',
                           borderRadius: '12px',
-                          padding: '10px',
+                          padding: 0,
+                          overflow: 'hidden',
                           display: 'flex',
                           flexDirection: 'column',
-                          gap: '6px',
                           textAlign: 'left',
                           cursor: 'pointer',
                           color: 'var(--cp-navy)',
                         }}
                       >
-                        {conImagenes && p.fotoUrl && (
-                          <img
-                            src={p.fotoUrl}
-                            alt={p.nombre}
+                        {conImagenes && (
+                          <span
                             style={{
+                              display: 'block',
                               width: '100%',
-                              height: '90px',
-                              objectFit: 'cover',
-                              borderRadius: '8px',
+                              aspectRatio: '4 / 3',
+                              background: 'var(--cp-gold)',
+                              flex: 'none',
                             }}
-                          />
+                          >
+                            {p.fotoUrl ? (
+                              <img
+                                src={p.fotoUrl}
+                                alt={p.nombre}
+                                loading="lazy"
+                                style={{
+                                  display: 'block',
+                                  width: '100%',
+                                  height: '100%',
+                                  objectFit: 'cover',
+                                }}
+                              />
+                            ) : (
+                              <span
+                                style={{
+                                  display: 'flex',
+                                  width: '100%',
+                                  height: '100%',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontFamily: 'Montserrat, sans-serif',
+                                  fontWeight: 800,
+                                  fontSize: '22px',
+                                  color: 'var(--cp-navy)',
+                                }}
+                              >
+                                {p.nombre
+                                  .split(' ')
+                                  .filter((w) => w.length > 2)
+                                  .slice(0, 2)
+                                  .map((w) => w[0]?.toUpperCase())
+                                  .join('')}
+                              </span>
+                            )}
+                          </span>
                         )}
-                        <div
-                          style={{
-                            fontFamily: 'Montserrat, sans-serif',
-                            fontWeight: 800,
-                            fontSize: '14px',
-                            lineHeight: '18px',
-                          }}
-                        >
-                          {p.nombre}
-                        </div>
-                        <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-                          {(p.tamanos || []).length > 0 ? 'Desde ' : ''}S/{' '}
-                          {Number(p.precio || 0).toFixed(2)}
-                        </div>
+                        <span style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '10px 12px 12px' }}>
+                          <span
+                            style={{
+                              fontFamily: 'Montserrat, sans-serif',
+                              fontWeight: 800,
+                              fontSize: '14px',
+                              lineHeight: '18px',
+                            }}
+                          >
+                            {p.nombre}
+                          </span>
+                          <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-soft)' }}>
+                            {(p.tamanos || []).length > 0 ? 'Desde ' : ''}S/{' '}
+                            {Number(p.precio || 0).toFixed(2)}
+                          </span>
+                        </span>
                       </button>
                     ))}
                   </div>
@@ -2414,6 +2478,11 @@ export function ModalNuevoPedidoMesa({
                   {modalidad === 'local' ? 'Enviar directo a cocina' : 'Registrar pedido'} · S/{' '}
                   {total.toFixed(2)}
                 </button>
+                {motivoNoEnviar && (
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)', textAlign: 'center' }}>
+                    {motivoNoEnviar}
+                  </div>
+                )}
               </div>
             </div>
           )}

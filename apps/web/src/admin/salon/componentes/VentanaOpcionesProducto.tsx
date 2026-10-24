@@ -28,6 +28,8 @@ export interface VentanaOpcionesProductoProps {
   alAgregar: (config: ProductoConfigurado) => void;
 }
 
+const recortar = (t: string, n: number): string => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
+
 export function VentanaOpcionesProducto({
   producto,
   alCerrar,
@@ -57,6 +59,7 @@ export function VentanaOpcionesProducto({
   const [nombresPorUnidad, setNombresPorUnidad] = useState<Record<number, string>>({
     0: '',
   });
+  const [avisoNombres, setAvisoNombres] = useState(false);
 
   // Nota de cocina
   const [notaCocina, setNotaCocina] = useState('');
@@ -169,8 +172,21 @@ export function VentanaOpcionesProducto({
 
   const puedeAgregar = gruposFaltantes.length === 0;
 
+  // En las bebidas el nombre de quien la toma es obligatorio: va en la etiqueta del vaso
+  const nombresFaltantes = esBebida
+    ? Array.from({ length: cantidad }, (_, k) => k).filter((k) => !(nombresPorUnidad[k] ?? '').trim())
+    : [];
+
   const handleAgregar = () => {
     if (!puedeAgregar) return;
+
+    if (nombresFaltantes.length > 0) {
+      setAvisoNombres(true);
+      const campo = document.getElementById(`nombre-bebida-${nombresFaltantes[0]}`);
+      campo?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+      campo?.focus();
+      return;
+    }
 
     const unidades: ConfiguracionUnidad[] = [];
     if (personalizarPorUnidad) {
@@ -505,7 +521,7 @@ export function VentanaOpcionesProducto({
           );
         })}
 
-        {/* Nombres para stickers si es bebida */}
+        {/* ¿Para quién es?: una etiqueta simulada por cada bebida, como en la carta (el nombre es obligatorio) */}
         {esBebida && (
           <div
             style={{
@@ -514,28 +530,27 @@ export function VentanaOpcionesProducto({
               padding: '10px',
               display: 'flex',
               flexDirection: 'column',
-              gap: '6px',
+              gap: '10px',
               background: 'var(--cp-white)',
             }}
           >
-            <div style={{ fontWeight: 800, color: 'var(--cp-navy)' }}>
-              Nombre para la etiqueta de cada bebida
-            </div>
-            <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-              Sale en grande en el sticker del vaso (acta 03). Si se deja vacío, va el nombre del cliente.
-            </div>
-            {Array.from({ length: personalizarPorUnidad ? 1 : cantidad }).map((_, i) => {
-              const k = personalizarPorUnidad ? unidadActualIdx : i;
-              return (
-                <label key={k} style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-navy)' }}>
-                  Ingresa el nombre de la persona que tomará esta bebida ({k + 1} de {cantidad})
+            <div style={{ fontWeight: 800, color: 'var(--cp-navy)' }}>¿Para quién es?</div>
+            {Array.from({ length: cantidad }, (_, k) => (
+              <div key={k} style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <label
+                  style={{ flex: '1 1 150px', minWidth: 0, fontSize: '12px', fontWeight: 700, display: 'block', color: 'var(--cp-soft)' }}
+                >
+                  {`Ingresa el nombre de la persona que tomará esta bebida${cantidad > 1 ? ` (${k + 1} de ${cantidad})` : ''} *`}
                   <input
                     type="text"
+                    id={`nombre-bebida-${k}`}
                     value={nombresPorUnidad[k] || ''}
                     onChange={(e) =>
                       setNombresPorUnidad((prev) => ({ ...prev, [k]: e.target.value }))
                     }
-                    placeholder="Ej.: Lucía"
+                    placeholder="Ej.: Lucía o Mesa 4"
+                    maxLength={30}
+                    aria-invalid={avisoNombres && !(nombresPorUnidad[k] ?? '').trim()}
                     style={{
                       display: 'block',
                       width: '100%',
@@ -543,15 +558,95 @@ export function VentanaOpcionesProducto({
                       minHeight: '42px',
                       marginTop: '4px',
                       borderRadius: '10px',
-                      border: '1.5px solid var(--cp-line)',
+                      border: `1.5px solid ${avisoNombres && !(nombresPorUnidad[k] ?? '').trim() ? 'var(--cp-rust)' : 'var(--cp-line)'}`,
                       background: 'var(--cp-cream)',
+                      color: 'var(--cp-navy)',
                       padding: '0 10px',
-                      fontSize: '13px',
+                      fontSize: '14px',
                     }}
                   />
                 </label>
-              );
-            })}
+                <div
+                  aria-label={`Así se verá la etiqueta del vaso ${k + 1}`}
+                  style={{
+                    flex: 'none',
+                    width: '158px',
+                    fontFamily: "'Courier New', monospace",
+                    fontSize: '10px',
+                    lineHeight: '13px',
+                    color: '#111',
+                    background: '#fff',
+                    border: '1px solid var(--cp-line)',
+                    borderRadius: '8px',
+                    boxShadow: '0 2px 8px rgba(11,44,62,0.14)',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div
+                    style={{
+                      background: 'var(--cp-navy)',
+                      color: 'var(--cp-cream)',
+                      padding: '2px 8px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      fontWeight: 700,
+                    }}
+                  >
+                    <span>{`BEBIDA ${k + 1}`}</span>
+                    <span>ETIQUETA</span>
+                  </div>
+                  <div style={{ padding: '5px 8px' }}>
+                    <div
+                      style={{
+                        fontFamily: 'Montserrat, sans-serif',
+                        fontWeight: 800,
+                        fontSize: '17px',
+                        lineHeight: '20px',
+                        textTransform: 'uppercase',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {recortar((nombresPorUnidad[k] || '').trim() || 'TU NOMBRE', 14)}
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: 'Montserrat, sans-serif',
+                        fontWeight: 700,
+                        fontSize: '11px',
+                        lineHeight: '14px',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {recortar(producto.nombre, 18)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {avisoNombres && nombresFaltantes.length > 0 ? (
+              <div
+                role="alert"
+                style={{
+                  fontSize: '12px',
+                  lineHeight: '16px',
+                  fontWeight: 700,
+                  color: 'var(--cp-rust)',
+                  background: 'var(--cp-sand)',
+                  borderRadius: '8px',
+                  padding: '8px 10px',
+                }}
+              >
+                Escribe el nombre de quien tomará cada bebida. Va en la etiqueta del vaso.
+              </div>
+            ) : (
+              <div style={{ fontSize: '11px', lineHeight: '14px', color: 'var(--cp-soft)' }}>
+                Obligatorio: el nombre va en la etiqueta del vaso.
+              </div>
+            )}
           </div>
         )}
 

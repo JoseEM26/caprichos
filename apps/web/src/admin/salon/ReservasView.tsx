@@ -1746,18 +1746,20 @@ export function ReservasView() {
       )}
 
       {/* Modal Nuevo Pedido de Mesa (conectado con Sentar) */}
-      <ModalNuevoPedidoMesa
-        abierto={modalNuevoPedidoAbierto}
-        alCerrar={() => {
-          setModalNuevoPedidoAbierto(false);
-          setMesasParaPedido([]);
-          setReservaIdParaPedido(undefined);
-        }}
-        pisos={pisosSalon}
-        mesasPreseleccionadasIds={mesasParaPedido}
-        reservaIdPreseleccionada={reservaIdParaPedido}
-        alRefrescarMesas={cargarDatos}
-      />
+      {modalNuevoPedidoAbierto && (
+        <ModalNuevoPedidoMesa
+          abierto={true}
+          alCerrar={() => {
+            setModalNuevoPedidoAbierto(false);
+            setMesasParaPedido([]);
+            setReservaIdParaPedido(undefined);
+          }}
+          pisos={pisosSalon}
+          mesasPreseleccionadasIds={mesasParaPedido}
+          reservaIdPreseleccionada={reservaIdParaPedido}
+          alRefrescarMesas={cargarDatos}
+        />
+      )}
     </div>
   );
 }

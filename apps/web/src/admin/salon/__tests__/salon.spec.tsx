@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { ModalDisenoTexto } from '../componentes/ModalDisenoTexto';
 import { ModalEditarElemento } from '../componentes/ModalEditarElemento';
 import { ModalNuevoPedidoMesa } from '../componentes/ModalNuevoPedidoMesa';
@@ -604,5 +604,173 @@ describe('Módulo Salón (Ola F5: Plano, Pedido del mozo y Reservas)', () => {
         screen.getByRole('dialog', { name: 'Nuevo pedido de mesa' }),
       ).toBeInTheDocument();
     });
+  });
+
+  // -------------------------------------------------------------------------
+  // 8. Bebida: etiqueta simulada y nombre obligatorio
+  // -------------------------------------------------------------------------
+  it('8. La etiqueta de la bebida muestra el nombre al escribir y no agrega sin nombre (foco al primer campo)', async () => {
+    const pisosMock = [
+      {
+        id: '1',
+        nombre: 'Piso 1',
+        activo: true,
+        mesas: [
+          { id: 'm1', pisoId: '1', tipo: 'MESA', numero: 1, nombre: 'Mesa 1', asientos: 4, x: 2, y: 5, ancho: 2, alto: 2, activo: true, estado: 'LIBRE' as const },
+        ],
+      },
+    ];
+    vi.mocked(salonApi.obtenerCarta).mockResolvedValue({
+      categorias: [
+        {
+          id: 'cat-1',
+          nombre: 'Bebidas',
+          orden: 1,
+          productos: [
+            { id: 'prod-1', nombre: 'Café Americano', descripcion: 'Café tostado', fotoUrl: null, precio: 8.5, tamanos: [], grupos: [], sabores: [], noSumaBeneficios: false, disponible: true, agotadoHasta: null },
+          ],
+        },
+      ],
+    });
+
+    render(
+      <ModalNuevoPedidoMesa abierto={true} alCerrar={vi.fn()} pisos={pisosMock} mesasPreseleccionadasIds={['m1']} />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Café Americano')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText('Café Americano'));
+    await waitFor(() => {
+      expect(screen.getByText('Agregar al pedido')).toBeInTheDocument();
+    });
+
+    const campo = screen.getByPlaceholderText('Ej.: Lucía o Mesa 4') as HTMLInputElement;
+    fireEvent.change(campo, { target: { value: 'Lucía' } });
+    const etiqueta = screen.getByLabelText('Así se verá la etiqueta del vaso 1');
+    expect(within(etiqueta).getByText('Lucía')).toBeInTheDocument();
+
+    // Sin nombre: no agrega, muestra el aviso y enfoca el campo vacío
+    fireEvent.change(campo, { target: { value: '' } });
+    fireEvent.click(screen.getByText('Agregar al pedido'));
+    expect(screen.getByRole('alert')).toHaveTextContent('Escribe el nombre de quien tomará cada bebida');
+    expect(document.activeElement).toBe(campo);
+    expect(screen.queryByText('Aún no agregas productos.', { exact: false })).toBeInTheDocument();
+  });
+
+  // -------------------------------------------------------------------------
+  // 9. Tarjetas: la foto llena su espacio sin deformarse
+  // -------------------------------------------------------------------------
+  it('9. Las tarjetas de producto muestran la foto con object-fit cover', async () => {
+    const pisosMock = [
+      {
+        id: '1',
+        nombre: 'Piso 1',
+        activo: true,
+        mesas: [
+          { id: 'm1', pisoId: '1', tipo: 'MESA', numero: 1, nombre: 'Mesa 1', asientos: 4, x: 2, y: 5, ancho: 2, alto: 2, activo: true, estado: 'LIBRE' as const },
+        ],
+      },
+    ];
+    vi.mocked(salonApi.obtenerCarta).mockResolvedValue({
+      categorias: [
+        {
+          id: 'cat-1',
+          nombre: 'Postres',
+          orden: 1,
+          productos: [
+            { id: 'p1', nombre: 'Torta', descripcion: 'Torta', fotoUrl: '/fotos/torta.jpg', precio: 12, tamanos: [], grupos: [], sabores: [], noSumaBeneficios: false, disponible: true, agotadoHasta: null },
+            { id: 'p2', nombre: 'Galleta', descripcion: 'Galleta', fotoUrl: null, precio: 4, tamanos: [], grupos: [], sabores: [], noSumaBeneficios: false, disponible: true, agotadoHasta: null },
+          ],
+        },
+      ],
+    });
+
+    render(
+      <ModalNuevoPedidoMesa abierto={true} alCerrar={vi.fn()} pisos={pisosMock} mesasPreseleccionadasIds={['m1']} />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('img', { name: 'Torta' })).toBeInTheDocument();
+    });
+    expect((screen.getByRole('img', { name: 'Torta' }) as HTMLImageElement).style.objectFit).toBe('cover');
+    // Sin foto: la tarjeta muestra iniciales, igual que la carta
+    expect(screen.getByText('G', { exact: true })).toBeInTheDocument();
+  });
+
+  // -------------------------------------------------------------------------
+  // 10. Mesa ocupada: aviso al tocarla
+  // -------------------------------------------------------------------------
+  it('10. Tocar una mesa ocupada avisa en vez de no hacer nada', async () => {
+    const pisosMock = [
+      {
+        id: '1',
+        nombre: 'Piso 1',
+        activo: true,
+        mesas: [
+          { id: 'm1', pisoId: '1', tipo: 'MESA', numero: 1, nombre: 'Mesa 1', asientos: 4, x: 2, y: 5, ancho: 2, alto: 2, activo: true, estado: 'OCUPADA' as const },
+        ],
+      },
+    ];
+    vi.mocked(salonApi.obtenerCarta).mockResolvedValue({ categorias: [] });
+
+    render(<ModalNuevoPedidoMesa abierto={true} alCerrar={vi.fn()} pisos={pisosMock} />);
+
+    fireEvent.click(await screen.findByTestId('elemento-plano-m1'));
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Mesa 1 está ocupada. Elige una mesa libre.');
+  });
+
+  // -------------------------------------------------------------------------
+  // 11. Pedido abierto desde Pedidos y caja se envía con canal CAJA y el nombre de la bebida
+  // -------------------------------------------------------------------------
+  it('11. El pedido abierto desde Caja se envía con canal CAJA y el nombre de la bebida en personas', async () => {
+    const pisosMock = [
+      {
+        id: '1',
+        nombre: 'Piso 1',
+        activo: true,
+        mesas: [
+          { id: 'm1', pisoId: '1', tipo: 'MESA', numero: 1, nombre: 'Mesa 1', asientos: 4, x: 2, y: 5, ancho: 2, alto: 2, activo: true, estado: 'LIBRE' as const },
+        ],
+      },
+    ];
+    vi.mocked(salonApi.obtenerCarta).mockResolvedValue({
+      categorias: [
+        {
+          id: 'cat-1',
+          nombre: 'Bebidas',
+          orden: 1,
+          productos: [
+            { id: 'prod-1', nombre: 'Café Americano', descripcion: 'Café tostado', fotoUrl: null, precio: 8.5, tamanos: [], grupos: [], sabores: [], noSumaBeneficios: false, disponible: true, agotadoHasta: null },
+          ],
+        },
+      ],
+    });
+    vi.mocked(salonApi.abrirPedidoMesa).mockResolvedValue({ id: 'ped-1' } as any);
+
+    render(
+      <ModalNuevoPedidoMesa abierto={true} alCerrar={vi.fn()} pisos={pisosMock} pasoInicial="modal" mesasPreseleccionadasIds={['m1']} />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Café Americano')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText('Café Americano'));
+    await waitFor(() => {
+      expect(screen.getByText('Agregar al pedido')).toBeInTheDocument();
+    });
+    fireEvent.change(screen.getByPlaceholderText('Ej.: Lucía o Mesa 4'), { target: { value: 'Lucía' } });
+    fireEvent.click(screen.getByText('Agregar al pedido'));
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar directo a cocina' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, enviar comanda' }));
+
+    await waitFor(() => {
+      expect(salonApi.abrirPedidoMesa).toHaveBeenCalledTimes(1);
+    });
+    const [payload] = vi.mocked(salonApi.abrirPedidoMesa).mock.calls[0];
+    expect(payload.canal).toBe('CAJA');
+    expect(payload.mesas).toEqual(['m1']);
+    expect(payload.lineas[0].personas).toEqual(['Lucía']);
   });
 });
