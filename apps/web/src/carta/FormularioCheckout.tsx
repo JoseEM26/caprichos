@@ -96,10 +96,15 @@ export function FormularioCheckout({
   // Acceso: con sesión se usa la cuenta; sin ella el cliente elige ingresar o seguir como invitado
   const [comoInvitado, setComoInvitado] = useState(false);
   const [verPuntos, setVerPuntos] = useState(false);
+  // Con sesión el pedido usa el nombre y el teléfono de la cuenta; el teléfono puede cambiarse solo para este pedido
+  const [otroTelefono, setOtroTelefono] = useState(false);
+  const [guardarTelefono, setGuardarTelefono] = useState(true);
   useEffect(() => {
-    if (clienteCuenta && !nombre.trim()) setNombre(clienteCuenta.nombre);
+    if (!clienteCuenta) return;
+    setNombre(clienteCuenta.nombre);
+    if (clienteCuenta.telefono && !otroTelefono) setTelefono(clienteCuenta.telefono);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clienteCuenta]);
+  }, [clienteCuenta, otroTelefono]);
   const [mensajeCupon, setMensajeCupon] = useState<string | null>(null);
 
   // Idempotency-Key único por intento
@@ -480,6 +485,9 @@ export function FormularioCheckout({
       limpiarCarrito();
       cerrarCheckout();
       void cuentaCtx?.refrescar();
+      if (clienteCuenta && !clienteCuenta.telefono && guardarTelefono && /^9\d{8}$/.test(telefono.trim())) {
+        void cuentaCtx?.actualizarPerfil({ telefono: telefono.trim() }).catch(() => undefined);
+      }
       guardarPedido({
         codigo: respuesta.codigo,
         token: respuesta.seguimientoToken,
@@ -934,6 +942,7 @@ export function FormularioCheckout({
                         </div>
                       )}
 
+                      {!clienteCuenta && (
                       <div>
                         <label
                           htmlFor="f-nombre"
@@ -966,7 +975,23 @@ export function FormularioCheckout({
                           }}
                         />
                       </div>
+                      )}
 
+                      {clienteCuenta && clienteCuenta.telefono && !otroTelefono ? (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap', fontSize: '13px' }}>
+                          <span>
+                            Te contactamos al <b>{clienteCuenta.telefono}</b>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => { setOtroTelefono(true); setTelefono(''); }}
+                            style={{ background: 'none', border: 'none', padding: 0, minHeight: 'auto', fontSize: '12px', fontWeight: 700, color: 'var(--cp-navy)', textDecoration: 'underline', cursor: 'pointer' }}
+                          >
+                            Usar otro número para este pedido
+                          </button>
+                        </div>
+                      ) : (
+                        <>
                       <div>
                         <label
                           htmlFor="f-tel"
@@ -1001,6 +1026,23 @@ export function FormularioCheckout({
                           }}
                         />
                       </div>
+                          {clienteCuenta && otroTelefono && clienteCuenta.telefono && (
+                            <button
+                              type="button"
+                              onClick={() => setOtroTelefono(false)}
+                              style={{ alignSelf: 'flex-start', background: 'none', border: 'none', padding: 0, minHeight: 'auto', fontSize: '12px', fontWeight: 700, color: 'var(--cp-navy)', textDecoration: 'underline', cursor: 'pointer' }}
+                            >
+                              Usar mi número guardado ({clienteCuenta.telefono})
+                            </button>
+                          )}
+                          {clienteCuenta && !clienteCuenta.telefono && (
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--cp-soft)' }}>
+                              <input type="checkbox" checked={guardarTelefono} onChange={(e) => setGuardarTelefono(e.target.checked)} />
+                              Guardar este número en mi perfil para los próximos pedidos
+                            </label>
+                          )}
+                        </>
+                      )}
                     </div>
                   )}
                 </>
