@@ -779,6 +779,45 @@ export function OfertasAdminView() {
                     opacity: pr.activo ? 1 : 0.6,
                   }}
                 >
+                  {pr.imagenUrl ? (
+                    <div
+                      style={{
+                        width: '100%',
+                        height: '140px',
+                        borderRadius: '10px',
+                        overflow: 'hidden',
+                        backgroundColor: 'var(--cp-sand)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <img
+                        src={pr.imagenUrl}
+                        alt={pr.nombre}
+                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                      />
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        width: '100%',
+                        height: '140px',
+                        borderRadius: '10px',
+                        backgroundColor: 'var(--cp-gold)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontFamily: 'Montserrat, sans-serif',
+                        fontWeight: 800,
+                        fontSize: '44px',
+                        color: 'var(--cp-navy)',
+                      }}
+                    >
+                      {(pr.nombre.trim()[0] || 'P').toUpperCase()}
+                    </div>
+                  )}
+
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'flex-start' }}>
                     <span
                       style={{
@@ -974,6 +1013,45 @@ export function OfertasAdminView() {
                     opacity: d.activo ? 1 : 0.6,
                   }}
                 >
+                  {d.imagenUrl ? (
+                    <div
+                      style={{
+                        width: '100%',
+                        height: '140px',
+                        borderRadius: '10px',
+                        overflow: 'hidden',
+                        backgroundColor: 'var(--cp-sand)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <img
+                        src={d.imagenUrl}
+                        alt={d.nombre}
+                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                      />
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        width: '100%',
+                        height: '140px',
+                        borderRadius: '10px',
+                        backgroundColor: 'var(--cp-gold)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontFamily: 'Montserrat, sans-serif',
+                        fontWeight: 800,
+                        fontSize: '44px',
+                        color: 'var(--cp-navy)',
+                      }}
+                    >
+                      {(d.nombre.trim()[0] || 'D').toUpperCase()}
+                    </div>
+                  )}
+
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'flex-start' }}>
                     <span
                       style={{

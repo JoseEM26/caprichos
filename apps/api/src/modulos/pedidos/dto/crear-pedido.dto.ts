@@ -54,6 +54,9 @@ export class LineaPedidoDto {
   @IsOptional()
   tamanoId?: number | string;
 
+  @IsOptional()
+  ofertaId?: number | string | null;
+
   @IsInt({ message: 'La cantidad debe ser un entero' })
   @Min(1, { message: 'La cantidad mínima es 1' })
   cantidad!: number;

@@ -1,4 +1,4 @@
-import { api } from '../../comun/api';
+import { api, clienteFetch } from '../../comun/api';
 
 export interface ComboPrecioItem {
   tamanoValorId?: string;
@@ -67,6 +67,8 @@ export interface OfertaItem {
   activo: boolean;
   creadoEn: string;
   vigenteAhora?: boolean;
+  imagenArchivoId?: string | null;
+  imagenUrl?: string | null;
   combosPrecio?: ComboPrecioItem[];
   combosPrecios?: ComboPrecioItem[];
   combosParte?: ComboParteItem[];
@@ -201,5 +203,14 @@ export const ofertasApi = {
 
   async anularCuponEmitido(id: string, motivo: string): Promise<any> {
     return api.post(`/admin/cupones/emitidos/${id}/anular`, { motivo });
+  },
+
+  async subirFoto(file: File): Promise<{ id: string; url: string }> {
+    const formData = new FormData();
+    formData.append('archivo', file);
+    return clienteFetch<{ id: string; url: string }>('/admin/archivos', {
+      method: 'POST',
+      body: formData,
+    });
   },
 };

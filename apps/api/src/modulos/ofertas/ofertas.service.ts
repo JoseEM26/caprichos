@@ -69,6 +69,7 @@ export class OfertasService {
       include: {
         categoria: true,
         producto: true,
+        imagen_archivo: true,
         combosPrecio: {
           include: { tamano_valor: true },
         },
@@ -85,6 +86,7 @@ export class OfertasService {
       include: {
         categoria: true,
         producto: true,
+        imagen_archivo: true,
         combosPrecio: {
           include: { tamano_valor: true },
         },
@@ -168,6 +170,7 @@ export class OfertasService {
           no_suma_beneficios: dto.noSumaBeneficios ?? false,
           orden: dto.orden ?? 0,
           activo: dto.activo ?? false,
+          imagen_archivo_id: dto.imagenArchivoId ? BigInt(dto.imagenArchivoId) : null,
         },
       });
 
@@ -214,6 +217,7 @@ export class OfertasService {
         include: {
           categoria: true,
           producto: true,
+          imagen_archivo: true,
           combosPrecio: { include: { tamano_valor: true } },
           combosParte: true,
         },
@@ -314,6 +318,11 @@ export class OfertasService {
     if (dto.noSumaBeneficios !== undefined) data.no_suma_beneficios = dto.noSumaBeneficios;
     if (dto.orden !== undefined) data.orden = dto.orden;
     if (dto.activo !== undefined) data.activo = dto.activo;
+    if (dto.imagenArchivoId !== undefined) {
+      data.imagen_archivo = dto.imagenArchivoId
+        ? { connect: { id: BigInt(dto.imagenArchivoId) } }
+        : { disconnect: true };
+    }
 
     const actualizada = await this.prisma.$transaction(async (tx) => {
       await tx.oferta.update({
@@ -366,6 +375,7 @@ export class OfertasService {
         include: {
           categoria: true,
           producto: true,
+          imagen_archivo: true,
           combosPrecio: { include: { tamano_valor: true } },
           combosParte: true,
         },
@@ -395,6 +405,7 @@ export class OfertasService {
       include: {
         categoria: true,
         producto: true,
+        imagen_archivo: true,
         combosPrecio: { include: { tamano_valor: true } },
         combosParte: true,
       },
@@ -1286,10 +1297,10 @@ export class OfertasService {
     const regla = await this.obtenerReglasAcumulacion();
     const ahora = new Date();
 
-    // 1. Evaluar descuentos automáticos vigentes (RN-CAP-132, RQ-OFE-02-05)
+    // 1. Evaluar descuentos automáticos y promociones vigentes (RN-CAP-132, RQ-OFE-02-05, RQ-OFE-01-04)
     const descuentosCandidatos = await this.prisma.oferta.findMany({
       where: {
-        tipo: 'DESCUENTO',
+        tipo: { in: ['DESCUENTO', 'LLEVA_PAGA'] },
         activo: true,
       },
       include: { categoria: true, producto: true },
@@ -1310,66 +1321,110 @@ export class OfertasService {
       const minCompra = d.compra_minima ? Number(d.compra_minima) : 0;
       if (subtotal < minCompra) continue;
 
-      let baseLinea = 0;
+      let monto = 0;
       const lineasAfectadas: any[] = [];
 
-      if (d.alcance_categoria_id) {
-        const matching = lineasElegibles.filter(
-          (l) => l.categoriaId && l.categoriaId === d.alcance_categoria_id,
+      if (d.tipo === 'DESCUENTO') {
+        let baseLinea = 0;
+
+        if (d.alcance_categoria_id) {
+          const matching = lineasElegibles.filter(
+            (l) => l.categoriaId && l.categoriaId === d.alcance_categoria_id,
+          );
+          for (const m of matching) {
+            baseLinea += m.subtotal;
+            lineasAfectadas.push({
+              productoId: m.productoId.toString(),
+              cantidad: m.cantidad,
+              subtotal: m.subtotal,
+              descuento: 0,
+            });
+          }
+        } else if (d.alcance_producto_id) {
+          const matching = lineasElegibles.filter((l) => l.productoId === d.alcance_producto_id);
+          for (const m of matching) {
+            baseLinea += m.subtotal;
+            lineasAfectadas.push({
+              productoId: m.productoId.toString(),
+              cantidad: m.cantidad,
+              subtotal: m.subtotal,
+              descuento: 0,
+            });
+          }
+        } else {
+          // Toda la carta
+          baseLinea = lineasElegibles.reduce((acc, l) => acc + l.subtotal, 0);
+          for (const l of lineasElegibles) {
+            lineasAfectadas.push({
+              productoId: l.productoId.toString(),
+              cantidad: l.cantidad,
+              subtotal: l.subtotal,
+              descuento: 0,
+            });
+          }
+        }
+
+        if (baseLinea <= 0) continue;
+
+        const valor = Number(d.descuento_valor);
+        if (d.descuento_tipo === 'PORCENTAJE') {
+          monto = Number(((baseLinea * valor) / 100).toFixed(2));
+        } else {
+          monto = Math.min(valor, baseLinea);
+        }
+      } else if (d.tipo === 'LLEVA_PAGA') {
+        const lleva = d.lleva || 2;
+        const paga = d.paga || 1;
+        if (lleva <= paga || lleva <= 0) continue;
+
+        let matching: typeof lineasElegibles = [];
+        if (d.alcance_producto_id) {
+          matching = lineasElegibles.filter((l) => l.productoId === d.alcance_producto_id);
+        } else if (d.alcance_categoria_id) {
+          matching = lineasElegibles.filter((l) => l.categoriaId && l.categoriaId === d.alcance_categoria_id);
+        } else {
+          matching = lineasElegibles;
+        }
+
+        if (matching.length === 0) continue;
+
+        const preciosUnidades: number[] = [];
+        for (const m of matching) {
+          for (let u = 0; u < m.cantidad; u++) {
+            preciosUnidades.push(m.precioUnitario);
+          }
+          lineasAfectadas.push({
+            productoId: m.productoId.toString(),
+            cantidad: m.cantidad,
+            subtotal: m.subtotal,
+            descuento: 0,
+          });
+        }
+
+        const totalUnidades = preciosUnidades.length;
+        if (totalUnidades < lleva) continue;
+
+        const numGrupos = Math.floor(totalUnidades / lleva);
+        const unidadesBonificadas = numGrupos * (lleva - paga);
+
+        preciosUnidades.sort((a, b) => a - b);
+        monto = Number(
+          preciosUnidades.slice(0, unidadesBonificadas).reduce((acc, p) => acc + p, 0).toFixed(2),
         );
-        for (const m of matching) {
-          baseLinea += m.subtotal;
-          lineasAfectadas.push({
-            productoId: m.productoId.toString(),
-            cantidad: m.cantidad,
-            subtotal: m.subtotal,
-            descuento: 0,
-          });
-        }
-      } else if (d.alcance_producto_id) {
-        const matching = lineasElegibles.filter((l) => l.productoId === d.alcance_producto_id);
-        for (const m of matching) {
-          baseLinea += m.subtotal;
-          lineasAfectadas.push({
-            productoId: m.productoId.toString(),
-            cantidad: m.cantidad,
-            subtotal: m.subtotal,
-            descuento: 0,
-          });
-        }
-      } else {
-        // Toda la carta
-        baseLinea = lineasElegibles.reduce((acc, l) => acc + l.subtotal, 0);
-        for (const l of lineasElegibles) {
-          lineasAfectadas.push({
-            productoId: l.productoId.toString(),
-            cantidad: l.cantidad,
-            subtotal: l.subtotal,
-            descuento: 0,
-          });
-        }
       }
 
-      if (baseLinea <= 0) continue;
-
-      const valor = Number(d.descuento_valor);
-      let monto = 0;
-      if (d.descuento_tipo === 'PORCENTAJE') {
-        monto = Number(((baseLinea * valor) / 100).toFixed(2));
-      } else {
-        monto = Math.min(valor, baseLinea);
-      }
+      if (monto <= 0) continue;
 
       if (!mejorDescuentoAutomatico || monto > mejorDescuentoAutomatico.monto) {
         mejorDescuentoAutomatico = {
           oferta: d,
           monto,
           detalles: {
-            tipo: 'DESCUENTO',
+            tipo: d.tipo === 'LLEVA_PAGA' ? 'PROMO' : 'DESCUENTO',
             id: d.id.toString(),
             nombre: d.nombre,
-            descuentoTipo: d.descuento_tipo as any,
-            descuentoValor: valor,
+            descuentoTipo: d.tipo === 'LLEVA_PAGA' ? 'MONTO' : (d.descuento_tipo as any),
+            descuentoValor: d.tipo === 'LLEVA_PAGA' ? monto : Number(d.descuento_valor),
             montoDescontado: monto,
             alcance: d.alcance_categoria_id ? 'CATEGORIA' : (d.alcance_producto_id ? 'PRODUCTO' : 'TODA'),
             alcanceId: d.alcance_categoria_id ? d.alcance_categoria_id.toString() : (d.alcance_producto_id ? d.alcance_producto_id.toString() : null),
@@ -1504,6 +1559,12 @@ export class OfertasService {
       categoriaNombre: o.categoria?.nombre || null,
       productoNombre: o.producto?.nombre || null,
       vigenteAhora: estaVigente(o, canal),
+      imagenArchivoId: o.imagen_archivo_id ? o.imagen_archivo_id.toString() : null,
+      imagenUrl: o.imagen_archivo
+        ? o.imagen_archivo.ruta.startsWith('http')
+          ? o.imagen_archivo.ruta
+          : `/archivos/${o.imagen_archivo.ruta}`
+        : null,
       combosPrecio: Array.isArray(o.combosPrecio)
         ? o.combosPrecio.map((cp: any) => ({
             tamanoValorId: cp.tamano_valor_id.toString(),

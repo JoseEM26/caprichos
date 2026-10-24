@@ -2,6 +2,8 @@ interface ModalConfirmacionProps {
   abierto: boolean;
   titulo: string;
   mensaje: string;
+  textoConfirmar?: string;
+  textoCancelar?: string;
   onConfirmar: () => void;
   onCancelar: () => void;
 }
@@ -10,6 +12,8 @@ export function ModalConfirmacion({
   abierto,
   titulo,
   mensaje,
+  textoConfirmar = 'Confirmar',
+  textoCancelar = 'Cancelar',
   onConfirmar,
   onCancelar,
 }: ModalConfirmacionProps) {
@@ -78,7 +82,7 @@ export function ModalConfirmacion({
               cursor: 'pointer',
             }}
           >
-            Sí
+            {textoConfirmar}
           </button>
           <button
             type="button"
@@ -95,7 +99,7 @@ export function ModalConfirmacion({
               cursor: 'pointer',
             }}
           >
-            No
+            {textoCancelar}
           </button>
         </div>
       </div>

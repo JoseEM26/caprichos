@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { OfertaItem } from './ofertasApi';
+import { OfertaItem, ofertasApi } from './ofertasApi';
+import { ModalConfirmacion } from './ModalConfirmacion';
 
 const DIAS = [
   ['lun', 'Lunes', 'Lun'],
@@ -66,12 +67,18 @@ export function ModalLlevaPaga({
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
   const [canal, setCanal] = useState('todos');
+  const [fotoUrl, setFotoUrl] = useState<string | null>(null);
+  const [fotoArchivoId, setFotoArchivoId] = useState<string | null>(null);
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
+  const [confirmarQuitarFoto, setConfirmarQuitarFoto] = useState(false);
   const [mensajeError, setMensajeError] = useState('');
   const [guardando, setGuardando] = useState(false);
 
   useEffect(() => {
     if (ofertaAEditar) {
       setNombre(ofertaAEditar.nombre || '');
+      setFotoUrl(ofertaAEditar.imagenUrl || null);
+      setFotoArchivoId(ofertaAEditar.imagenArchivoId || null);
       const mm = /^(\d+)x(\d+)$/.exec(ofertaAEditar.subtipo || '');
       setQLleva(mm ? Number(mm[1]) : 2);
       setQPaga(mm ? Number(mm[2]) : 1);
@@ -102,6 +109,8 @@ export function ModalLlevaPaga({
       setMensajeError('');
     } else {
       setNombre('');
+      setFotoUrl(null);
+      setFotoArchivoId(null);
       setQLleva(2);
       setQPaga(1);
       setPrecio('');
@@ -156,6 +165,31 @@ export function ModalLlevaPaga({
     (p) => !catSeleccionada || (p.categoria && p.categoria.toLowerCase() === catSeleccionada.toLowerCase()),
   );
 
+  const manejarSubidaFoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setSubiendoFoto(true);
+    try {
+      const res = await ofertasApi.subirFoto(file);
+      setFotoUrl(res.url);
+      setFotoArchivoId(res.id);
+    } catch (err: any) {
+      setMensajeError(err?.message || 'Error al subir la imagen');
+    } finally {
+      setSubiendoFoto(false);
+    }
+  };
+
+  const pedirQuitarFoto = () => {
+    setConfirmarQuitarFoto(true);
+  };
+
+  const confirmarQuitar = () => {
+    setFotoUrl(null);
+    setFotoArchivoId(null);
+    setConfirmarQuitarFoto(false);
+  };
+
   const validarYGuardar = async () => {
     if (!nombre.trim()) {
       setMensajeError('Escribe el nombre de la promoción.');
@@ -198,6 +232,7 @@ export function ModalLlevaPaga({
         fechaInicio: fechaDesde || undefined,
         fechaFin: fechaHasta || undefined,
         canales: canal === 'todos' ? ['TODOS'] : [canal.toUpperCase()],
+        imagenArchivoId: fotoArchivoId,
         llevaPaga: {
           lleva: qLleva,
           paga: qPaga,
@@ -808,6 +843,109 @@ export function ModalLlevaPaga({
           </div>
         </div>
 
+        {/* Foto de la oferta */}
+        <div
+          style={{
+            border: '1.5px solid var(--cp-navy)',
+            borderRadius: '16px',
+            padding: '16px',
+            backgroundColor: 'var(--cp-white)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+          }}
+        >
+          <div style={{ fontWeight: 800, color: 'var(--cp-navy)' }}>
+            Foto de la oferta (opcional)
+          </div>
+          <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
+            Si no subes una foto, en la carta y en el panel se mostrará la letra inicial.
+          </div>
+
+          <div style={{ display: 'flex', gap: '14px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div
+              style={{
+                width: '100px',
+                height: '100px',
+                borderRadius: '12px',
+                border: '1.5px dashed var(--cp-soft)',
+                backgroundColor: 'var(--cp-sand)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden',
+                position: 'relative',
+              }}
+            >
+              {fotoUrl ? (
+                <img
+                  src={fotoUrl}
+                  alt="Vista previa"
+                  style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                />
+              ) : (
+                <span
+                  style={{
+                    fontFamily: 'Montserrat, sans-serif',
+                    fontWeight: 800,
+                    fontSize: '32px',
+                    color: 'var(--cp-navy)',
+                  }}
+                >
+                  {nombre.trim() ? nombre.trim()[0].toUpperCase() : '2'}
+                </span>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <label
+                style={{
+                  minHeight: '44px',
+                  padding: '0 16px',
+                  border: '1.5px solid var(--cp-navy)',
+                  borderRadius: '12px',
+                  backgroundColor: 'var(--cp-navy)',
+                  color: 'var(--cp-cream)',
+                  fontWeight: 700,
+                  fontSize: '13px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  cursor: 'pointer',
+                }}
+              >
+                {subiendoFoto ? 'Subiendo...' : fotoUrl ? 'Cambiar foto' : 'Subir foto'}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={manejarSubidaFoto}
+                  disabled={subiendoFoto}
+                  style={{ position: 'absolute', left: -9999 }}
+                />
+              </label>
+
+              {fotoUrl && (
+                <button
+                  type="button"
+                  onClick={pedirQuitarFoto}
+                  style={{
+                    minHeight: '44px',
+                    padding: '0 16px',
+                    border: '1.5px solid var(--cp-rust)',
+                    borderRadius: '12px',
+                    backgroundColor: 'transparent',
+                    color: 'var(--cp-rust)',
+                    fontWeight: 700,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Quitar foto
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
         {mensajeError && (
           <div role="alert" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-rust)' }}>
             {mensajeError}
@@ -851,6 +989,14 @@ export function ModalLlevaPaga({
             Cancelar
           </button>
         </div>
+
+        <ModalConfirmacion
+          abierto={confirmarQuitarFoto}
+          titulo="¿Quitar la foto de la promoción?"
+          mensaje="Se mostrará la letra inicial hasta que subas otra."
+          onConfirmar={confirmarQuitar}
+          onCancelar={() => setConfirmarQuitarFoto(false)}
+        />
       </div>
     </div>
   );

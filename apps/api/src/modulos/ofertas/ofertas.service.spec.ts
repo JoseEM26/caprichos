@@ -441,6 +441,95 @@ describe('OfertasService', () => {
       // Solo aplica 10% sobre los 20 soles elegibles -> 2.00
       expect(res.descuentoTotal).toBe(2.0);
     });
+
+    it('aplica promoción automática LLEVA_PAGA (2x1) descontando la unidad correspondiente', async () => {
+      prismaMock.reglaAcumulacion.upsert.mockResolvedValueOnce({
+        id: 1,
+        cupon_con_descuento: true,
+        promo_con_descuento: true,
+      });
+      prismaMock.producto.findMany.mockResolvedValueOnce([
+        { id: 20n, categoria_id: 3n, no_suma_beneficios: false },
+      ]);
+      prismaMock.oferta.findMany.mockResolvedValueOnce([
+        {
+          id: 8n,
+          tipo: 'LLEVA_PAGA',
+          nombre: '2x1 ICED COFFE',
+          lleva: 2,
+          paga: 1,
+          alcance_categoria_id: null,
+          alcance_producto_id: 20n,
+          descuento_tipo: null,
+          descuento_valor: new Prisma.Decimal(9.0),
+          compra_minima: null,
+          dias: [],
+          hora_desde: null,
+          hora_hasta: null,
+          fecha_desde: null,
+          fecha_hasta: null,
+          canales: ['CARTA'],
+          limite_usos: null,
+          usos_actuales: 0,
+          activo: true,
+        },
+      ]);
+
+      const res = await service.calcularDescuentosParaPedido({
+        subtotal: 18.0,
+        lineas: [
+          { productoId: 20n, cantidad: 2, subtotal: 18.0, precioUnitario: 9.0, noSumaBeneficios: false },
+        ],
+        canal: 'CARTA',
+      });
+
+      // 2 unidades de 9.00 -> 1 unidad gratis = 9.00 de descuento
+      expect(res.descuentoTotal).toBe(9.0);
+      expect(res.detalles.some((d) => d.nombre === '2x1 ICED COFFE')).toBe(true);
+    });
+  });
+
+  describe('soporte de imagen en oferta', () => {
+    it('mapea correctamente imagenArchivoId e imagenUrl si la oferta tiene archivo', async () => {
+      prismaMock.oferta.findUnique.mockResolvedValueOnce({
+        id: 10n,
+        tipo: 'COMBO',
+        nombre: 'Combo Especial',
+        descripcion: 'Con foto',
+        lleva: null,
+        paga: null,
+        alcance_categoria_id: null,
+        alcance_producto_id: null,
+        descuento_tipo: null,
+        descuento_valor: null,
+        compra_minima: null,
+        dias: [],
+        hora_desde: null,
+        hora_hasta: null,
+        fecha_desde: null,
+        fecha_hasta: null,
+        canales: ['CARTA'],
+        limite_usos: null,
+        usos_actuales: 0,
+        noSumaBeneficios: false,
+        orden: 1,
+        activo: true,
+        creado_en: new Date(),
+        categoria: null,
+        producto: null,
+        imagen_archivo_id: 42n,
+        imagen_archivo: {
+          id: 42n,
+          ruta: 'publico/ofertas/combo.webp',
+        },
+        combosPrecio: [],
+        combosParte: [],
+      });
+
+      const oferta = await service.obtenerOfertaPorId(10n);
+      expect(oferta.imagenArchivoId).toBe('42');
+      expect(oferta.imagenUrl).toBe('/archivos/publico/ofertas/combo.webp');
+    });
   });
 
   describe('vistaPreviaDescuentos (montoCanjeable)', () => {

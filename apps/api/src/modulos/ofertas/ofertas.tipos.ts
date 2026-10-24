@@ -47,6 +47,8 @@ export interface OfertaItem {
   categoriaNombre?: string | null;
   productoNombre?: string | null;
   vigenteAhora?: boolean;
+  imagenArchivoId?: string | null;
+  imagenUrl?: string | null;
 }
 
 export interface ReglaAcumulacionItem {

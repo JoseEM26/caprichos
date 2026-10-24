@@ -354,6 +354,7 @@ export class PedidosService {
 
       lineasCalculadas.push({
         productoId: prodDb.id,
+        ofertaId: l.ofertaId ? BigInt(l.ofertaId) : null,
         categoriaId: prodDb.categoria_id,
         noSumaBeneficios: prodDb.no_suma_beneficios,
         nombre: prodDb.nombre,
@@ -568,7 +569,9 @@ export class PedidosService {
           descuento: new Prisma.Decimal(descuentoAplicado),
           envio: envio !== null ? new Prisma.Decimal(envio) : null,
           total: new Prisma.Decimal(totalCalculado),
-          oferta_id: desgloseDescuento.ofertaId ? BigInt(desgloseDescuento.ofertaId) : null,
+          oferta_id: desgloseDescuento.ofertaId
+            ? BigInt(desgloseDescuento.ofertaId)
+            : (lineasCalculadas.find((l) => l.ofertaId)?.ofertaId ?? null),
           cupon_id: desgloseDescuento.cuponId ? BigInt(desgloseDescuento.cuponId) : null,
           cupon_emitido_id: desgloseDescuento.cuponEmitidoId ? BigInt(desgloseDescuento.cuponEmitidoId) : null,
           descuento_detalle: desgloseDescuento.detalles.length > 0 ? (desgloseDescuento.detalles as any) : undefined,
@@ -588,6 +591,7 @@ export class PedidosService {
           data: {
             pedido_id: pedido.id,
             producto_id: lin.productoId,
+            oferta_id: lin.ofertaId ?? null,
             nombre: lin.nombre,
             tamano: lin.tamano,
             cantidad: lin.cantidad,

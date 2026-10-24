@@ -143,6 +143,9 @@ export class CrearOfertaDto {
   activo?: boolean;
 
   @IsOptional()
+  imagenArchivoId?: string | number | null;
+
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ComboPrecioDto)

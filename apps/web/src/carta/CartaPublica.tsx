@@ -18,6 +18,8 @@ import { CuentaProvider } from './cuenta/CuentaContext';
 import { PanelCuenta } from './cuenta/PanelCuenta';
 import { useEsMovil } from './useEsMovil';
 import { TarjetaProducto } from './TarjetaProducto';
+import { TarjetaOferta } from './TarjetaOferta';
+import type { OfertaItem } from '../admin/ofertas/ofertasApi';
 import { VentanaProductoCarta } from './VentanaProductoCarta';
 import { CajonCarrito } from './CajonCarrito';
 import { FormularioCheckout } from './FormularioCheckout';
@@ -91,6 +93,7 @@ function normalizarTexto(txt: string): string {
 
 function ContenidoCartaPublica() {
   const [categorias, setCategorias] = useState<CategoriaCarta[]>([]);
+  const [ofertas, setOfertas] = useState<OfertaItem[]>([]);
   const [estadoLocal, setEstadoLocal] = useState<EstadoLocalCarta | null>(null);
   const [datosLocal, setDatosLocal] = useState<DatosLocalCarta | null>(null);
   const [contenido, setContenido] = useState<ContenidoCarta | null>(null);
@@ -109,15 +112,17 @@ function ContenidoCartaPublica() {
     setCargando(true);
     setError(null);
     try {
-      const [resCarta, resEstado, resLocal, resContenido] = await Promise.all([
+      const [resCarta, resEstado, resLocal, resContenido, resOfertas] = await Promise.all([
         api.get<CategoriaCarta[]>('/carta'),
         api.get<EstadoLocalCarta>('/carta/estado').catch(() => null),
         api.get<DatosLocalCarta>('/carta/local').catch(() => null),
         api.get<ContenidoCarta>('/carta/contenido').catch(() => null),
+        api.get<OfertaItem[]>('/carta/ofertas').catch(() => []),
       ]);
       if (resContenido) setContenido(resContenido);
 
       setCategorias(Array.isArray(resCarta) ? resCarta : []);
+      setOfertas(Array.isArray(resOfertas) ? resOfertas : []);
       if (resEstado) setEstadoLocal(resEstado);
       if (resLocal) setDatosLocal(resLocal);
 
@@ -135,6 +140,39 @@ function ContenidoCartaPublica() {
   useEffect(() => {
     cargarDatos();
   }, []);
+
+  // Todos los productos planos para vincular ofertas
+  const todosLosProductos = useMemo(
+    () => categorias.flatMap((c) => c.productos),
+    [categorias],
+  );
+
+  // Filtrado reactivo de ofertas por búsqueda
+  const ofertasFiltradas = useMemo(() => {
+    const qLimpio = normalizarTexto(busqueda.trim());
+    if (!qLimpio) return ofertas;
+
+    const terminos = qLimpio.split(/\s+/).filter(Boolean);
+    return ofertas.filter((o) => {
+      const texto = normalizarTexto(`${o.nombre} ${o.descripcion || ''} ${o.productoNombre || ''}`);
+      return terminos.every((t) => texto.includes(t));
+    });
+  }, [ofertas, busqueda]);
+
+  // Si se debe mostrar la sección de promociones
+  const mostrarPromociones =
+    (categoriaActivaId === 'todo' || categoriaActivaId === 'promociones') &&
+    ofertasFiltradas.length > 0;
+
+  // Lista de chips para la cabecera (Promociones destacada después de TODA LA CARTA)
+  const categoriasChips = useMemo(() => {
+    const lista: { id: string; nombre: string }[] = [];
+    if (ofertas.length > 0) {
+      lista.push({ id: 'promociones', nombre: 'PROMOCIONES' });
+    }
+    lista.push(...categorias.map((c) => ({ id: c.id, nombre: c.nombre })));
+    return lista;
+  }, [ofertas, categorias]);
 
   // Filtrado reactivo de categorías y productos por término de búsqueda
   const categoriasFiltradas = useMemo(() => {
@@ -160,9 +198,12 @@ function ContenidoCartaPublica() {
 
   // Con «TODO» se ve la portada y todas las secciones; con una categoría, solo esa (como el mockup)
   const secciones = useMemo(() => {
+    if (categoriaActivaId === 'promociones') return [];
     if (busqueda.trim() || categoriaActivaId === 'todo') return categoriasFiltradas;
     return categoriasFiltradas.filter((c) => c.id === categoriaActivaId);
   }, [categoriasFiltradas, categoriaActivaId, busqueda]);
+
+  const sinResultados = !mostrarPromociones && secciones.length === 0;
 
   const fotoDestacada = useMemo(() => {
     const prod = categorias.flatMap((c) => c.productos).find((p) => p.nombre === 'FRAPPE MARACUYÁ' && p.fotoUrl);
@@ -307,7 +348,7 @@ function ContenidoCartaPublica() {
         datosLocal={datosLocal}
         pagina={pagina}
         onPagina={cambiarPagina}
-        categorias={categorias.map((c) => ({ id: c.id, nombre: c.nombre }))}
+        categorias={categoriasChips}
         categoriaActivaId={categoriaActivaId}
         onCategoria={(id) => {
           setCategoriaActivaId(id);
@@ -393,7 +434,7 @@ function ContenidoCartaPublica() {
           flex: 1,
         }}
       >
-        {secciones.length === 0 ? (
+        {sinResultados ? (
           <div
             style={{
               textAlign: 'center',
@@ -436,13 +477,11 @@ function ContenidoCartaPublica() {
             </button>
           </div>
         ) : (
-          secciones.map((cat) => {
-            const clave = cat.nombre.trim().toUpperCase();
-            const infoCat = INFO_CATEGORIA[clave] ?? { title: cat.nombre, note: '' };
-            return (
+          <>
+            {mostrarPromociones && (
               <section
-                key={cat.id}
-                id={`categoria-${cat.id}`}
+                id="categoria-promociones"
+                data-testid="categoria-promociones"
                 style={{
                   marginTop: '32px',
                   scrollMarginTop: '140px',
@@ -477,7 +516,7 @@ function ContenidoCartaPublica() {
                       textAlign: 'center',
                     }}
                   >
-                    {infoCat.title}
+                    Promociones
                   </h2>
                   <span
                     style={{
@@ -488,13 +527,10 @@ function ContenidoCartaPublica() {
                     }}
                   />
                 </div>
-                {infoCat.note && (
-                  <div style={{ textAlign: 'center', fontSize: '13px', color: 'var(--cp-soft)', margin: '-8px 0 16px' }}>
-                    {infoCat.note}
-                  </div>
-                )}
+                <div style={{ textAlign: 'center', fontSize: '13px', color: 'var(--cp-soft)', margin: '-8px 0 16px' }}>
+                  Combos especiales, 2x1 y promociones por tiempo limitado
+                </div>
 
-                {/* Grid de productos responsiva */}
                 <div
                   style={{
                     display: 'grid',
@@ -508,18 +544,108 @@ function ContenidoCartaPublica() {
                     gap: '16px',
                   }}
                 >
-                  {cat.productos.map((prod) => (
-                    <TarjetaProducto
-                      key={prod.id}
-                      producto={prod}
-                      rankingInfo={rankingPorProducto.get(String(prod.id))}
-                      organizacion={organizacion}
+                  {ofertasFiltradas.map((ofe) => (
+                    <TarjetaOferta
+                      key={ofe.id}
+                      oferta={ofe}
+                      productos={todosLosProductos}
+                      categorias={categorias}
+                      onSeleccionarCategoria={(catId) => {
+                        setCategoriaActivaId(catId);
+                        setBusqueda('');
+                      }}
                     />
                   ))}
                 </div>
               </section>
-            );
-          })
+            )}
+
+            {categoriaActivaId !== 'promociones' &&
+              secciones.map((cat) => {
+                const clave = cat.nombre.trim().toUpperCase();
+                const infoCat = INFO_CATEGORIA[clave] ?? { title: cat.nombre, note: '' };
+                return (
+                  <section
+                    key={cat.id}
+                    id={`categoria-${cat.id}`}
+                    style={{
+                      marginTop: '32px',
+                      scrollMarginTop: '140px',
+                    }}
+                  >
+                    {/* Título de categoría estilo mockup con líneas decorativas */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '16px',
+                        marginBottom: '16px',
+                      }}
+                    >
+                      <span
+                        style={{
+                          flex: 1,
+                          height: '3px',
+                          backgroundColor: 'var(--cp-orange)',
+                          borderRadius: '2px',
+                        }}
+                      />
+                      <h2
+                        style={{
+                          margin: 0,
+                          fontFamily: 'var(--fuente-titulos)',
+                          fontWeight: 800,
+                          fontSize: '28px',
+                          lineHeight: '34px',
+                          letterSpacing: '0.03em',
+                          color: 'var(--cp-navy)',
+                          textAlign: 'center',
+                        }}
+                      >
+                        {infoCat.title}
+                      </h2>
+                      <span
+                        style={{
+                          flex: 1,
+                          height: '3px',
+                          backgroundColor: 'var(--cp-orange)',
+                          borderRadius: '2px',
+                        }}
+                      />
+                    </div>
+                    {infoCat.note && (
+                      <div style={{ textAlign: 'center', fontSize: '13px', color: 'var(--cp-soft)', margin: '-8px 0 16px' }}>
+                        {infoCat.note}
+                      </div>
+                    )}
+
+                    {/* Grid de productos responsiva */}
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: movil
+                          ? '1fr'
+                          : organizacion === 'LISTA'
+                            ? '1fr'
+                            : organizacion === 'TARJETAS'
+                              ? 'repeat(auto-fill, minmax(320px, 1fr))'
+                              : 'repeat(auto-fill, minmax(230px, 1fr))',
+                        gap: '16px',
+                      }}
+                    >
+                      {cat.productos.map((prod) => (
+                        <TarjetaProducto
+                          key={prod.id}
+                          producto={prod}
+                          rankingInfo={rankingPorProducto.get(String(prod.id))}
+                          organizacion={organizacion}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                );
+              })}
+          </>
         )}
       </main>
       )}

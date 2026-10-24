@@ -120,6 +120,9 @@ export class ActualizarOfertaDto {
   activo?: boolean;
 
   @IsOptional()
+  imagenArchivoId?: string | number | null;
+
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ComboPrecioDto)
