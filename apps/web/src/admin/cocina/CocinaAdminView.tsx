@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import type {
   AltaDemandaEstado,
   AreaCocina,
@@ -14,6 +15,9 @@ import {
   listarDespacho,
   listarHistorialCocina,
   obtenerAltaDemanda,
+  pedirInsumosAlmacen,
+  registrarMermaIndividual,
+  registrarMermaMultiple,
 } from './cocinaApi';
 import {
   estaSilenciado,
@@ -21,7 +25,6 @@ import {
   setSilenciado,
 } from './audioAlerta';
 import { ComandaTarjeta } from './ComandaTarjeta';
-import { PanelAltaDemanda } from './PanelAltaDemanda';
 import { ModalAgotados } from './ModalAgotados';
 import { ModalMermaIndividual } from './ModalMermaIndividual';
 import { ModalMermaVarios } from './ModalMermaVarios';
@@ -43,13 +46,38 @@ const AREAS_MOCKUP = [
   { id: 'salados', n: 'Salados' },
 ] as const;
 
+/**
+ * Ordena las comandas por hora de llegada ascendente (FIFO estricto).
+ * La comanda que llegó primero (menor fecha / mayor tiempo transcurrido) va primero.
+ */
+export function ordenarComandasPorHoraLlegada(lista: Comanda[]): Comanda[] {
+  return [...lista].sort((a, b) => {
+    const fechaA = a.llego_en || a.creado_en ? new Date(a.llego_en || a.creado_en!).getTime() : 0;
+    const fechaB = b.llego_en || b.creado_en ? new Date(b.llego_en || b.creado_en!).getTime() : 0;
+    if (fechaA > 0 && fechaB > 0 && fechaA !== fechaB) {
+      return fechaA - fechaB; // Ascendente (menor timestamp = más antiguo = llegó primero)
+    }
+    const minA = a.minutos ?? a.minutosEspera ?? 0;
+    const minB = b.minutos ?? b.minutosEspera ?? 0;
+    if (minA !== minB) {
+      return minB - minA; // Mayor tiempo transcurrido = llegó primero
+    }
+    const pIdA = a.pedidoId ? BigInt(a.pedidoId) : 0n;
+    const pIdB = b.pedidoId ? BigInt(b.pedidoId) : 0n;
+    if (pIdA !== pIdB) {
+      return pIdA < pIdB ? -1 : 1;
+    }
+    return (a.codigo || a.ticket || '').localeCompare(b.codigo || b.ticket || '');
+  });
+}
+
 export function CocinaAdminView() {
   const { tiene } = useSesion();
 
   const puedeVer = tiene('cocina/ver');
   const puedeDespejar = tiene('cocina/despejar');
 
-  // Modo de pestañas: 'area' (Pantalla del área), 'hist' (Historial), 'desp' (Despacho)
+  // Modo de pestañas: 'area' (Pantalla del área), 'hist' (Despejadas hoy), 'desp' (Despacho)
   const [modo, setModo] = useState<ModoCocina>('area');
   const [areaActiva, setAreaActiva] = useState<string>('todas');
   const [areaSeleccionada, setAreaSeleccionada] = useState<string>('');
@@ -65,12 +93,17 @@ export function CocinaAdminView() {
     pausa: false,
   });
 
-  // Estados de carga / error
+  // Estados de carga / error / retroalimentación
   const [cargandoInicial, setCargandoInicial] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [mensajeAccion, setMensajeAccion] = useState<string | null>(null);
 
   // Audio
   const [silenciado, setSilenciadoEstado] = useState<boolean>(estaSilenciado());
+
+  // Tooltip de ayuda activa en barra de acciones
+  const [ayudaActiva, setAyudaActiva] = useState<string | null>(null);
+  const [ayudaHover, setAyudaHover] = useState<string | null>(null);
 
   // Modales
   const [modalAgotadosAbierto, setModalAgotadosAbierto] = useState<boolean>(false);
@@ -104,7 +137,7 @@ export function CocinaAdminView() {
     try {
       setError(null);
       const res = await listarComandasArea(areaId);
-      setComandas(res);
+      setComandas(ordenarComandasPorHoraLlegada(res));
     } catch (err: any) {
       setError(err?.message || 'Error al cargar comandas de cocina');
     }
@@ -184,6 +217,20 @@ export function CocinaAdminView() {
     cargarHistorial,
     cargarDespacho,
   ]);
+
+  // Auto-cierre de mensaje de retroalimentación
+  useEffect(() => {
+    if (!mensajeAccion) return;
+    const t = setTimeout(() => setMensajeAccion(null), 4000);
+    return () => clearTimeout(t);
+  }, [mensajeAccion]);
+
+  // Cerrar tooltips al hacer click afuera
+  useEffect(() => {
+    const alClicAfuera = () => setAyudaActiva(null);
+    window.addEventListener('click', alClicAfuera);
+    return () => window.removeEventListener('click', alClicAfuera);
+  }, []);
 
   // Socket.IO
   useEventos('pedido:nuevo', () => {
@@ -298,6 +345,112 @@ export function CocinaAdminView() {
     );
   }
 
+  // Componente interno para botón de acción con icono y tooltip '?'
+  const renderBotonAccion = (
+    id: string,
+    texto: string,
+    explicacion: string,
+    onClick: () => void,
+    estilosBoton: React.CSSProperties,
+    icono: React.ReactNode,
+  ) => {
+    const abierto = ayudaActiva === id || ayudaHover === id;
+
+    return (
+      <div
+        key={id}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          position: 'relative',
+          gap: '2px',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={onClick}
+          style={{
+            minHeight: '44px',
+            padding: '0 14px',
+            borderRadius: '12px',
+            fontWeight: 800,
+            fontSize: '13px',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            boxSizing: 'border-box',
+            ...estilosBoton,
+          }}
+        >
+          {icono}
+          <span>{texto}</span>
+        </button>
+
+        <button
+          type="button"
+          aria-label={`¿Para qué sirve ${texto}?`}
+          aria-expanded={abierto}
+          aria-controls={`tooltip-${id}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            setAyudaActiva((prev) => (prev === id ? null : id));
+          }}
+          onMouseEnter={() => setAyudaHover(id)}
+          onMouseLeave={() => setAyudaHover(null)}
+          onFocus={() => setAyudaHover(id)}
+          onBlur={() => setAyudaHover(null)}
+          style={{
+            width: '28px',
+            height: '28px',
+            borderRadius: '14px',
+            border: '1.5px solid var(--cp-soft)',
+            background: abierto ? 'var(--cp-navy)' : 'var(--cp-cream)',
+            color: abierto ? 'var(--cp-cream)' : 'var(--cp-navy)',
+            fontWeight: 800,
+            fontSize: '13px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            padding: 0,
+            flexShrink: 0,
+          }}
+        >
+          ?
+        </button>
+
+        {abierto && (
+          <div
+            id={`tooltip-${id}`}
+            role="tooltip"
+            style={{
+              position: 'absolute',
+              top: 'calc(100% + 6px)',
+              left: 0,
+              zIndex: 80,
+              background: 'var(--cp-navy)',
+              color: 'var(--cp-cream)',
+              fontSize: '12px',
+              lineHeight: '1.4',
+              fontWeight: 600,
+              borderRadius: '8px',
+              padding: '8px 12px',
+              boxShadow: '0 8px 24px rgba(11, 44, 62, 0.35)',
+              minWidth: '220px',
+              maxWidth: '300px',
+              pointerEvents: 'none',
+              whiteSpace: 'normal',
+            }}
+          >
+            {explicacion}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div
       style={{
@@ -310,147 +463,291 @@ export function CocinaAdminView() {
         color: 'var(--cp-navy)',
       }}
     >
-      {/* 1. Texto de referencia Kevin literal del mockup */}
-      <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
-        Tiempos de Kevin, desde que el cliente terminó su pedido: 25 min lo ideal,
-        naranja desde 35 (retraso) y rojo desde 50 (crítico). Cada área ve solo lo
-        suyo y lo despeja con un toque cuando lo terminó (acta 03).
+      {/* 1. Texto de ayuda de los tiempos */}
+      <div style={{ fontSize: '13px', color: 'var(--cp-soft)', lineHeight: '1.5' }}>
+        Cada área ve solo lo suyo y lo despeja con un toque cuando lo terminó. Los
+        tiempos cuentan desde que el cliente terminó su pedido: naranja desde 35
+        min (retraso) y rojo desde 50 min (crítico).
       </div>
 
-      {/* 2. Barra de botones superiores */}
+      {/* 2. Indicador pequeño de solo lectura de Alta Demanda (RQ-COC-03) */}
+      {altaDemanda.activa && (
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <Link
+            to="/admin/configuracion"
+            data-testid="indicador-alta-demanda"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 14px',
+              borderRadius: '10px',
+              background: 'var(--cp-rust)',
+              color: 'var(--cp-white)',
+              fontWeight: 800,
+              fontSize: '13px',
+              textDecoration: 'none',
+              boxShadow: '0 2px 8px rgba(184, 51, 42, 0.25)',
+              transition: 'opacity 0.2s ease',
+            }}
+            title="Ir a Configuración para cambiar alta demanda"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+            <span>
+              Alta demanda +{altaDemanda.minutos} min
+              {altaDemanda.pausa ? ' · Pedidos pausados' : ''}
+            </span>
+            <span
+              style={{
+                fontSize: '11px',
+                textDecoration: 'underline',
+                opacity: 0.9,
+                fontWeight: 600,
+              }}
+            >
+              Configurar
+            </span>
+          </Link>
+        </div>
+      )}
+
+      {/* 3. Mensaje de retroalimentación de acción */}
+      {mensajeAccion && (
+        <div
+          role="status"
+          style={{
+            padding: '10px 14px',
+            borderRadius: '10px',
+            background: 'var(--cp-greenbg, #e8f5e9)',
+            border: '1px solid #2f9e57',
+            color: '#1b5e20',
+            fontSize: '13px',
+            fontWeight: 700,
+          }}
+        >
+          {mensajeAccion}
+        </div>
+      )}
+
+      {/* 4. Barra de acciones de cocina con iconos SVG y '?' accesible */}
+      <div
+        role="toolbar"
+        aria-label="Acciones de cocina"
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '10px',
+          alignItems: 'center',
+        }}
+      >
+        {renderBotonAccion(
+          'agotado',
+          'Marcar agotado',
+          'Marca un producto, sabor u opción que se acabó hoy. Deja de ofrecerse al instante en la carta y el chatbot.',
+          () => setModalAgotadosAbierto(true),
+          {
+            border: 0,
+            background: 'var(--cp-rust)',
+            color: 'var(--cp-white)',
+          },
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+          </svg>,
+        )}
+
+        {renderBotonAccion(
+          'pedir-almacen',
+          'Pedir al almacén',
+          'Pide insumos necesarios al almacén central. Suena en su pantalla hasta que marquen recibido.',
+          () => setModalPedirAlmacenAbierto(true),
+          {
+            border: '1.5px solid var(--cp-navy)',
+            background: 'transparent',
+            color: 'var(--cp-navy)',
+          },
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+            <line x1="12" y1="22.08" x2="12" y2="12" />
+          </svg>,
+        )}
+
+        {renderBotonAccion(
+          'merma-ind',
+          'Registrar merma',
+          'Registra la pérdida de un producto o insumo por caída, error de comanda, desecho o calibración.',
+          () => setModalMermaIndAbierto(true),
+          {
+            border: '1.5px solid var(--cp-navy)',
+            background: 'transparent',
+            color: 'var(--cp-navy)',
+          },
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            <line x1="10" y1="11" x2="10" y2="17" />
+            <line x1="14" y1="11" x2="14" y2="17" />
+          </svg>,
+        )}
+
+        {renderBotonAccion(
+          'merma-varios',
+          'Merma de varios productos',
+          'Registra mermas en lote para varios productos simultáneamente con destino común o específico.',
+          () => setModalMermaVariosAbierto(true),
+          {
+            border: '1.5px solid var(--cp-navy)',
+            background: 'var(--cp-sand)',
+            color: 'var(--cp-navy)',
+          },
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <line x1="8" y1="6" x2="21" y2="6" />
+            <line x1="8" y1="12" x2="21" y2="12" />
+            <line x1="8" y1="18" x2="21" y2="18" />
+            <line x1="3" y1="6" x2="3.01" y2="6" />
+            <line x1="3" y1="12" x2="3.01" y2="12" />
+            <line x1="3" y1="18" x2="3.01" y2="18" />
+          </svg>,
+        )}
+
+        {renderBotonAccion(
+          'sonido',
+          silenciado ? 'Sonido: silenciado' : 'Sonido: activado',
+          'Activa o silencia el aviso sonoro que suena al llegar una comanda nueva.',
+          alternarSonido,
+          {
+            border: '1.5px solid var(--cp-navy)',
+            background: 'transparent',
+            color: 'var(--cp-navy)',
+          },
+          silenciado ? (
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+              <line x1="23" y1="9" x2="17" y2="15" />
+              <line x1="17" y1="9" x2="23" y2="15" />
+            </svg>
+          ) : (
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+            </svg>
+          ),
+        )}
+
+        {renderBotonAccion(
+          'probar-sonido',
+          'Probar sonido',
+          'Reproduce la campana de alerta para verificar el volumen del dispositivo.',
+          probarSonido,
+          {
+            border: '1.5px dashed var(--cp-soft)',
+            background: 'transparent',
+            color: 'var(--cp-soft)',
+          },
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+          </svg>,
+        )}
+      </div>
+
+      {/* 5. Selector de Área y Pantalla completa */}
       <div
         style={{
           display: 'flex',
           flexWrap: 'wrap',
           gap: '8px',
           alignItems: 'center',
+          marginTop: '4px',
         }}
       >
-        <button
-          type="button"
-          onClick={() => setModalAgotadosAbierto(true)}
-          style={{
-            minHeight: '44px',
-            padding: '0 14px',
-            borderRadius: '12px',
-            fontWeight: 800,
-            fontSize: '13px',
-            cursor: 'pointer',
-            border: 0,
-            background: 'var(--cp-rust)',
-            color: 'var(--cp-white)',
-          }}
-        >
-          Se acabó algo
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setModalMermaIndAbierto(true)}
-          style={{
-            minHeight: '44px',
-            padding: '0 14px',
-            borderRadius: '12px',
-            fontWeight: 800,
-            fontSize: '13px',
-            cursor: 'pointer',
-            border: '1.5px solid var(--cp-navy)',
-            background: 'transparent',
-            color: 'var(--cp-navy)',
-          }}
-        >
-          Registrar merma
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setModalMermaVariosAbierto(true)}
-          style={{
-            minHeight: '44px',
-            padding: '0 14px',
-            borderRadius: '12px',
-            fontWeight: 800,
-            fontSize: '13px',
-            cursor: 'pointer',
-            border: '1.5px solid var(--cp-navy)',
-            background: 'var(--cp-sand)',
-            color: 'var(--cp-navy)',
-          }}
-        >
-          Merma de varios productos
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setModalPedirAlmacenAbierto(true)}
-          style={{
-            minHeight: '44px',
-            padding: '0 14px',
-            borderRadius: '12px',
-            fontWeight: 800,
-            fontSize: '13px',
-            cursor: 'pointer',
-            border: '1.5px solid var(--cp-navy)',
-            background: 'transparent',
-            color: 'var(--cp-navy)',
-          }}
-        >
-          Pedir al almacén
-        </button>
-
-        <button
-          type="button"
-          onClick={alternarSonido}
-          style={{
-            minHeight: '44px',
-            padding: '0 14px',
-            borderRadius: '12px',
-            fontWeight: 800,
-            fontSize: '13px',
-            cursor: 'pointer',
-            border: '1.5px solid var(--cp-navy)',
-            background: 'transparent',
-            color: 'var(--cp-navy)',
-          }}
-        >
-          {silenciado ? 'Sonido: silenciado' : 'Sonido: activado'}
-        </button>
-
-        <button
-          type="button"
-          onClick={probarSonido}
-          style={{
-            minHeight: '44px',
-            padding: '0 14px',
-            borderRadius: '12px',
-            fontWeight: 800,
-            fontSize: '13px',
-            cursor: 'pointer',
-            border: '1.5px dashed var(--cp-soft)',
-            background: 'transparent',
-            color: 'var(--cp-soft)',
-          }}
-        >
-          Probar sonido
-        </button>
-      </div>
-
-      {/* 3. Panel de Alta demanda */}
-      <PanelAltaDemanda
-        estado={altaDemanda}
-        alCambiarEstado={(nuevo) => setAltaDemanda(nuevo)}
-      />
-
-      {/* 4. Selector de Área y Pantalla completa */}
-      <div
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '6px',
-          alignItems: 'center',
-        }}
-      >
-        <span style={{ fontSize: '12px', fontWeight: 700 }}>Área</span>
+        <span style={{ fontSize: '12px', fontWeight: 700, marginRight: '4px' }}>
+          Área
+        </span>
 
         {AREAS_MOCKUP.map((a) => {
           const activa = areaActiva === a.id;
@@ -461,7 +758,7 @@ export function CocinaAdminView() {
               onClick={() => seleccionarAreaMockup(a.id)}
               style={{
                 minHeight: '44px',
-                padding: '0 14px',
+                padding: '0 16px',
                 borderRadius: '9999px',
                 border: '1.5px solid var(--cp-navy)',
                 background: activa ? 'var(--cp-navy)' : 'transparent',
@@ -469,6 +766,7 @@ export function CocinaAdminView() {
                 fontWeight: 700,
                 fontSize: '12px',
                 cursor: 'pointer',
+                transition: 'all 0.15s ease',
               }}
             >
               {a.n}
@@ -481,7 +779,7 @@ export function CocinaAdminView() {
           onClick={() => setKFullAbierto(true)}
           style={{
             minHeight: '44px',
-            padding: '0 14px',
+            padding: '0 16px',
             borderRadius: '12px',
             border: 0,
             background: 'var(--cp-orange)',
@@ -489,24 +787,27 @@ export function CocinaAdminView() {
             fontWeight: 800,
             fontSize: '12px',
             cursor: 'pointer',
+            marginLeft: 'auto',
           }}
         >
           Pantalla completa, sin desplazar
         </button>
       </div>
 
-      {/* 5. Selector de Pestañas: Pantalla del área / Historial / Despacho */}
+      {/* 6. Selector de Pestañas: Pantalla del área / Despejadas hoy / Despacho */}
       <div
-        role="group"
+        role="tablist"
         aria-label="Vista de cocina"
-        style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}
+        style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}
       >
         <button
+          role="tab"
+          aria-selected={modo === 'area'}
           type="button"
           onClick={() => setModo('area')}
           style={{
             minHeight: '44px',
-            padding: '0 16px',
+            padding: '0 18px',
             borderRadius: '12px',
             border: '1.5px solid var(--cp-navy)',
             background: modo === 'area' ? 'var(--cp-navy)' : 'transparent',
@@ -519,11 +820,13 @@ export function CocinaAdminView() {
           Pantalla del área
         </button>
         <button
+          role="tab"
+          aria-selected={modo === 'hist'}
           type="button"
           onClick={() => setModo('hist')}
           style={{
             minHeight: '44px',
-            padding: '0 16px',
+            padding: '0 18px',
             borderRadius: '12px',
             border: '1.5px solid var(--cp-navy)',
             background: modo === 'hist' ? 'var(--cp-navy)' : 'transparent',
@@ -533,14 +836,16 @@ export function CocinaAdminView() {
             cursor: 'pointer',
           }}
         >
-          Historial
+          Despejadas hoy
         </button>
         <button
+          role="tab"
+          aria-selected={modo === 'desp'}
           type="button"
           onClick={() => setModo('desp')}
           style={{
             minHeight: '44px',
-            padding: '0 16px',
+            padding: '0 18px',
             borderRadius: '12px',
             border: '1.5px solid var(--cp-navy)',
             background: modo === 'desp' ? 'var(--cp-navy)' : 'transparent',
@@ -557,9 +862,9 @@ export function CocinaAdminView() {
       {/* Mensajes de error general */}
       {error && <EstadoError mensaje={error} />}
 
-      {/* 6. Contenido según la pestaña activa */}
+      {/* 7. Contenido según la pestaña activa */}
       {modo === 'area' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', width: '100%' }}>
           <div
             style={{
               fontFamily: 'Montserrat, sans-serif',
@@ -572,16 +877,18 @@ export function CocinaAdminView() {
           </div>
 
           {comandas.length === 0 ? (
-            <div style={{ color: 'var(--cp-soft)', fontSize: '13px' }}>
+            <div style={{ color: 'var(--cp-soft)', fontSize: '13px', padding: '16px 0' }}>
               Sin pedidos para esta área.
             </div>
           ) : (
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
-                gap: '12px',
-                alignItems: 'start',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))',
+                gap: '16px',
+                width: '100%',
+                alignItems: 'stretch',
+                boxSizing: 'border-box',
               }}
             >
               {comandas.map((c) => (
@@ -602,7 +909,10 @@ export function CocinaAdminView() {
         <HistorialView
           historial={historial}
           nombreAreaActual={nombreAreaActual}
-          alDevolverExito={() => cargarHistorial(areaSeleccionada)}
+          alDevolverExito={async () => {
+            await cargarHistorial(areaSeleccionada);
+            await cargarComandas(areaSeleccionada);
+          }}
         />
       )}
 
@@ -669,7 +979,7 @@ export function CocinaAdminView() {
         </div>
       )}
 
-      {/* Modal Pantalla Completa (isKfull) */}
+      {/* Modal Pantalla Completa (kFullAbierto) */}
       {kFullAbierto && (
         <div
           style={{
@@ -681,8 +991,8 @@ export function CocinaAdminView() {
             overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
-            padding: '12px',
-            gap: '10px',
+            padding: '16px',
+            gap: '14px',
             boxSizing: 'border-box',
           }}
         >
@@ -691,7 +1001,7 @@ export function CocinaAdminView() {
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              gap: '8px',
+              gap: '10px',
               flexWrap: 'wrap',
             }}
           >
@@ -699,7 +1009,7 @@ export function CocinaAdminView() {
               style={{
                 fontFamily: 'Montserrat, sans-serif',
                 fontWeight: 800,
-                fontSize: '22px',
+                fontSize: '24px',
                 letterSpacing: '0.05em',
               }}
             >
@@ -707,7 +1017,7 @@ export function CocinaAdminView() {
                 ? 'TODAS LAS ÁREAS'
                 : nombreAreaActual.toUpperCase()}
             </span>
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               {AREAS_MOCKUP.map((a) => {
                 const activa = areaActiva === a.id;
                 return (
@@ -751,7 +1061,7 @@ export function CocinaAdminView() {
             </div>
           </div>
 
-          <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: '10px' }}>
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
             <div
               style={{
                 flex: '1 1 0',
@@ -760,10 +1070,10 @@ export function CocinaAdminView() {
                 overflowY: 'auto',
                 background: '#14405A',
                 borderRadius: '14px',
-                padding: '10px',
+                padding: '16px',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '8px',
+                gap: '12px',
               }}
             >
               <div
@@ -777,13 +1087,16 @@ export function CocinaAdminView() {
               </div>
 
               {comandas.length === 0 ? (
-                <div style={{ fontSize: '16px', opacity: 0.8 }}>Sin pedidos.</div>
+                <div style={{ fontSize: '16px', opacity: 0.8, padding: '24px 0' }}>
+                  Sin pedidos para esta área.
+                </div>
               ) : (
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                    gap: '10px',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))',
+                    gap: '16px',
+                    width: '100%',
                   }}
                 >
                   {comandas.map((k) => (
@@ -792,11 +1105,12 @@ export function CocinaAdminView() {
                       style={{
                         background: 'var(--cp-cream)',
                         color: 'var(--cp-navy)',
-                        borderRadius: '12px',
-                        padding: '12px',
+                        borderRadius: '14px',
+                        padding: '16px',
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '6px',
+                        gap: '10px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                       }}
                     >
                       <div
@@ -817,10 +1131,10 @@ export function CocinaAdminView() {
                         </span>
                         <span
                           style={{
-                            fontSize: '16px',
+                            fontSize: '15px',
                             fontWeight: 800,
                             borderRadius: '9999px',
-                            padding: '2px 12px',
+                            padding: '3px 12px',
                             background:
                               (k.minutos ?? 0) >= 50
                                 ? 'var(--cp-rust)'
@@ -839,7 +1153,7 @@ export function CocinaAdminView() {
 
                       <div
                         style={{
-                          fontSize: '15px',
+                          fontSize: '14px',
                           fontWeight: 800,
                           color: 'var(--cp-rust)',
                         }}
@@ -847,38 +1161,42 @@ export function CocinaAdminView() {
                         {k.modalidad || 'Para llevar'}
                       </div>
 
-                      {(k.lineas || []).map((it, idx) => {
-                        const opcStr = (it.opciones || [])
-                          .map((o: any) => (typeof o === 'string' ? o : o?.nombre || o?.texto || ''))
-                          .filter(Boolean)
-                          .join(' · ');
-                        return (
-                          <div
-                            key={it.id || idx}
-                            style={{ fontSize: '16px', lineHeight: '20px' }}
-                          >
-                            <b>{it.cantidad}×</b> {it.nombre}{' '}
-                            {opcStr && (
-                              <span
-                                style={{
-                                  fontSize: '13px',
-                                  color: 'var(--cp-soft)',
-                                }}
-                              >
-                                {opcStr}
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {(k.lineas || []).map((it, idx) => {
+                          const opcStr = (it.opciones || [])
+                            .map((o: any) =>
+                              typeof o === 'string' ? o : o?.nombre || o?.texto || '',
+                            )
+                            .filter(Boolean)
+                            .join(' · ');
+                          return (
+                            <div
+                              key={it.id || idx}
+                              style={{ fontSize: '15px', lineHeight: '20px' }}
+                            >
+                              <b>{it.cantidad}×</b> {it.nombre}{' '}
+                              {opcStr && (
+                                <span
+                                  style={{
+                                    fontSize: '13px',
+                                    color: 'var(--cp-soft)',
+                                  }}
+                                >
+                                  ({opcStr})
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
 
                       {k.nota && (
                         <div
                           style={{
-                            border: '2px dashed var(--cp-rust)',
+                            border: '1.5px dashed var(--cp-rust)',
                             borderRadius: '8px',
-                            padding: '4px 8px',
-                            fontSize: '14px',
+                            padding: '6px 10px',
+                            fontSize: '13px',
                             fontWeight: 700,
                           }}
                         >
@@ -890,14 +1208,14 @@ export function CocinaAdminView() {
                         type="button"
                         onClick={() => setComandaParaDespejar(k)}
                         style={{
-                          minHeight: '52px',
+                          minHeight: '48px',
                           marginTop: 'auto',
                           border: 0,
                           borderRadius: '12px',
                           background: 'var(--cp-orange)',
                           color: 'var(--cp-navy)',
                           fontWeight: 800,
-                          fontSize: '17px',
+                          fontSize: '15px',
                           cursor: 'pointer',
                         }}
                       >
@@ -918,14 +1236,14 @@ export function CocinaAdminView() {
         titulo={`¿Despejar comanda ${
           comandaParaDespejar?.ticket || comandaParaDespejar?.codigo
         }?`}
-        mensaje="Saldrá de la vista de preparación y quedará en el historial del día."
+        mensaje="Saldrá de la vista de preparación y quedará en «Despejadas hoy»."
         textoConfirmar="Sí, despejar"
         textoNo="No, cancelar"
         alConfirmar={ejecutarDespeje}
         alCancelar={() => setComandaParaDespejar(null)}
       />
 
-      {/* Modales */}
+      {/* Modales conectados con la API */}
       <ModalAgotados
         abierto={modalAgotadosAbierto}
         alCerrar={() => setModalAgotadosAbierto(false)}
@@ -933,14 +1251,56 @@ export function CocinaAdminView() {
       <ModalMermaIndividual
         abierto={modalMermaIndAbierto}
         alCerrar={() => setModalMermaIndAbierto(false)}
+        alGuardar={async (datos) => {
+          try {
+            await registrarMermaIndividual({
+              insumoId: datos.insumoId || datos.insumo,
+              cantidad: datos.cantidad,
+              origen: datos.origen,
+              motivo: datos.motivo,
+            });
+            setMensajeAccion(`Merma registrada: ${datos.cantidad} de ${datos.insumo}.`);
+          } catch (err: any) {
+            setError(err?.message || 'Error al registrar merma');
+          }
+        }}
       />
       <ModalMermaVarios
         abierto={modalMermaVariosAbierto}
         alCerrar={() => setModalMermaVariosAbierto(false)}
+        alGuardar={async (filas) => {
+          try {
+            const lineas = filas.map((f) => ({
+              insumoId: f.id || f.n,
+              cantidad: parseFloat(f.q.replace(',', '.')),
+              origen: f.origen,
+              destino: `Merma · ${f.motivo}`,
+            }));
+            await registrarMermaMultiple({
+              motivoGlobal: 'Desecho',
+              lineas,
+            });
+            setMensajeAccion(`Merma múltiple registrada para ${lineas.length} productos.`);
+          } catch (err: any) {
+            setError(err?.message || 'Error al registrar merma múltiple');
+          }
+        }}
       />
       <ModalPedirAlmacen
         abierto={modalPedirAlmacenAbierto}
         alCerrar={() => setModalPedirAlmacenAbierto(false)}
+        alEnviar={async (datos) => {
+          try {
+            await pedirInsumosAlmacen({
+              items: datos.items,
+              nota: datos.nota,
+              area: nombreAreaActual,
+            });
+            setMensajeAccion('Pedido de insumos enviado al almacén con éxito.');
+          } catch (err: any) {
+            setError(err?.message || 'Error al enviar pedido al almacén');
+          }
+        }}
       />
     </div>
   );

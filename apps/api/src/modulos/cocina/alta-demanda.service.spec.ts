@@ -66,6 +66,45 @@ describe('AltaDemandaService', () => {
     jest.clearAllMocks();
   });
 
+  describe('obtenerEstado', () => {
+    it('devuelve el estado activo con minutos, pausa, autor y mensaje', async () => {
+      const fecha = new Date('2026-10-24T12:00:00.000Z');
+      prisma.altaDemanda.findFirst.mockResolvedValueOnce({
+        id: 10n,
+        minutos: 45,
+        pausa: true,
+        desde: fecha,
+        hasta: null,
+        por: 50n,
+      });
+      prisma.person.findUnique.mockResolvedValueOnce({
+        nombres: 'José',
+        apellidos: 'Espinoza',
+      });
+
+      const res = await service.obtenerEstado();
+
+      expect(res.activa).toBe(true);
+      expect(res.minutos).toBe(45);
+      expect(res.pausa).toBe(true);
+      expect(res.por).toBe('50');
+      expect(res.activado_por).toBe('José Espinoza');
+      expect(res.mensaje).toBe('activó José Espinoza');
+      expect(res.desde).toBe(fecha);
+    });
+
+    it('devuelve estado apagado cuando no hay registro activo', async () => {
+      prisma.altaDemanda.findFirst.mockResolvedValueOnce(null); // activo: null
+      prisma.altaDemanda.findFirst.mockResolvedValueOnce(null); // ultimo: null
+
+      const res = await service.obtenerEstado();
+
+      expect(res.activa).toBe(false);
+      expect(res.minutos).toBe(0);
+      expect(res.pausa).toBe(false);
+    });
+  });
+
   describe('validaciones de configuración', () => {
     it('lanza 400 MINUTOS_INVALIDOS si los minutos están fuera del rango [5, 180]', async () => {
       // Menos de 5

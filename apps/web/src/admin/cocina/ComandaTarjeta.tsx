@@ -57,10 +57,13 @@ export function ComandaTarjeta({
     return () => clearInterval(interval);
   }, [comanda.creado_en, comanda.minutos]);
 
-  const colorRaw = comanda.color || comanda.colorEspera;
-  const colorCalculado: ColorComanda = colorRaw
-    ? (colorRaw.toUpperCase() as ColorComanda)
-    : obtenerColorMinutos(minutosEnVivo);
+  const colorCalculado: ColorComanda = (() => {
+    if (minutosEnVivo >= 50) return 'ROJO';
+    if (minutosEnVivo >= 35) return 'NARANJA';
+    const colorRaw = comanda.color || comanda.colorEspera;
+    if (colorRaw) return colorRaw.toUpperCase() as ColorComanda;
+    return obtenerColorMinutos(minutosEnVivo);
+  })();
 
   const tBg =
     colorCalculado === 'ROJO'
@@ -93,14 +96,16 @@ export function ComandaTarjeta({
       data-testid={`comanda-${comanda.codigo || comanda.ticket}`}
       style={{
         background: 'var(--cp-white)',
-        border: '1px solid var(--cp-line)',
-        borderRadius: '12px',
-        padding: '12px',
+        border: '1.5px solid var(--cp-line)',
+        borderRadius: '14px',
+        padding: '16px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '8px',
+        gap: '12px',
         fontFamily: 'Montserrat, system-ui, sans-serif',
         boxSizing: 'border-box',
+        boxShadow: '0 2px 8px rgba(11, 44, 62, 0.05)',
+        width: '100%',
       }}
     >
       <div

@@ -77,6 +77,44 @@ export async function configurarAltaDemanda(dto: {
   return api.put<AltaDemandaEstado>('/admin/cocina/alta-demanda', dto);
 }
 
+export async function pedirInsumosAlmacen(dto: {
+  items: { insumo: string; cantidad: number; unidad: string }[];
+  nota?: string;
+  area?: string;
+}): Promise<any> {
+  return api.post('/admin/almacen/pedidos-internos', dto);
+}
+
+export async function registrarMermaIndividual(dto: {
+  insumoId: string | number;
+  cantidad: number;
+  origen: string;
+  motivo: string;
+  nota?: string;
+}): Promise<any> {
+  return api.post('/admin/almacen/movimientos', {
+    tipo: 'MERMA',
+    insumoId: dto.insumoId,
+    cantidad: dto.cantidad,
+    origen: dto.origen,
+    destino: `Merma · ${dto.motivo}`,
+    motivo: dto.motivo,
+    nota: dto.nota,
+  });
+}
+
+export async function registrarMermaMultiple(dto: {
+  motivoGlobal?: string;
+  lineas: {
+    insumoId: string | number;
+    cantidad: number;
+    origen: string;
+    destino: string;
+  }[];
+}): Promise<any> {
+  return api.post('/admin/almacen/movimientos-merma-multiple', dto);
+}
+
 /**
  * Consulta la carta pública y extrae todos los productos, sabores y opciones
  * para el buscador reactivo del diálogo "Se acabó algo".

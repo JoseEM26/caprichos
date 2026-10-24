@@ -125,7 +125,7 @@ export function ModalAgotados({ abierto, alCerrar }: ModalAgotadosProps) {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Se acabó algo"
+        aria-label="Marcar agotado"
         style={{
           position: 'fixed',
           zIndex: 70,
@@ -164,7 +164,7 @@ export function ModalAgotados({ abierto, alCerrar }: ModalAgotadosProps) {
               lineHeight: '27px',
             }}
           >
-            Se acabó algo
+            Marcar agotado
           </div>
           <button
             type="button"

@@ -38,7 +38,8 @@ export class AltaDemandaService {
 
   /**
    * GET /admin/cocina/alta-demanda
-   * Devuelve el estado actual de la alta demanda y la pausa en cocina.
+   * Devuelve el estado actual de la alta demanda y la pausa en cocina,
+   * incluyendo quién realizó la última activación/desactivación y cuándo.
    */
   async obtenerEstado() {
     const activo = await this.prisma.altaDemanda.findFirst({
@@ -47,12 +48,22 @@ export class AltaDemandaService {
     });
 
     if (!activo) {
+      const ultimo = await this.prisma.altaDemanda.findFirst({
+        orderBy: { id: 'desc' },
+      });
+      const nombreUsuario = ultimo ? await this.obtenerNombreUsuario(ultimo.por) : undefined;
       return {
         activa: false,
         minutos: 0,
         pausa: false,
+        desde: ultimo?.hasta ?? ultimo?.desde,
+        por: ultimo?.por?.toString(),
+        activado_por: nombreUsuario,
+        mensaje: nombreUsuario ? `desactivó ${nombreUsuario}` : undefined,
       };
     }
+
+    const nombreUsuario = await this.obtenerNombreUsuario(activo.por);
 
     return {
       activa: true,
@@ -60,6 +71,8 @@ export class AltaDemandaService {
       pausa: activo.pausa,
       desde: activo.desde,
       por: activo.por.toString(),
+      activado_por: nombreUsuario,
+      mensaje: `activó ${nombreUsuario}`,
     };
   }
 

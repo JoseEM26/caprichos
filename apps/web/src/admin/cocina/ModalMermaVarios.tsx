@@ -9,6 +9,7 @@ export interface ModalMermaVariosProps {
 }
 
 interface FilaMerma {
+  id?: string;
   n: string;
   stock: number;
   u: string;
@@ -43,6 +44,7 @@ export function ModalMermaVarios({
         if (!activo) return;
         if (Array.isArray(res) && res.length > 0) {
           const mapeados: FilaMerma[] = res.map((r) => ({
+            id: r.id?.toString(),
             n: r.nombre,
             stock: Number(r.stockActual || r.stock || 0),
             u: r.unidadMedida || r.unidad || 'unidades',
@@ -65,6 +67,7 @@ export function ModalMermaVarios({
               for (const c of cats) {
                 for (const p of c.productos || []) {
                   prods.push({
+                    id: p.id?.toString(),
                     n: p.nombre,
                     stock: Number(p.stock ?? 0),
                     u: 'unidades',

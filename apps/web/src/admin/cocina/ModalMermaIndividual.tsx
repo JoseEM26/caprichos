@@ -8,6 +8,7 @@ export interface ModalMermaIndividualProps {
   alGuardar?: (datos: {
     tipo: string;
     insumo: string;
+    insumoId?: string | number;
     cantidad: number;
     origen: string;
     motivo: string;
@@ -126,6 +127,7 @@ export function ModalMermaIndividual({
       await alGuardar({
         tipo,
         insumo,
+        insumoId: sp?.id || insumo,
         cantidad: q,
         origen,
         motivo,

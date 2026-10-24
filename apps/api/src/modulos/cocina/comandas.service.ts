@@ -13,6 +13,7 @@ import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import {
   calcularColor,
+  calcularSiguienteMedianocheLima,
   ColorEspera,
   extraerNombreCombo,
   extraerOpciones,
@@ -149,6 +150,7 @@ export class ComandasService {
 
     const esPrimeraVez = comandasExistentes.length === 0;
     const ahora = new Date();
+    const llegoEn = pedido.pasa_cocina_en ?? pedido.creado_en ?? ahora;
 
     for (const areaId of areasACrear) {
       await this.prisma.comandaArea.create({
@@ -156,7 +158,7 @@ export class ComandasService {
           pedido_id: pId,
           area_id: areaId,
           estado: 'EN_COCINA',
-          llego_en: ahora,
+          llego_en: llegoEn,
         },
       });
     }
@@ -268,11 +270,16 @@ export class ComandasService {
       await this.sincronizarPendientes();
     }
 
-    // Vista general (RQ-COC-01-09): sin área devuelve las comandas de todas las áreas, las más antiguas primero
+    // Vista general (RQ-COC-01-09): sin área devuelve las comandas de todas las áreas, orden FIFO por hora de llegada (desempate por id)
     if (!areaRef) {
       const areas = await this.prisma.areaCocina.findMany({ where: { activo: true }, orderBy: { id: 'asc' } });
       const listas = await Promise.all(areas.map((a) => this.listarComandas(a.id.toString(), false)));
-      return listas.flat().sort((x: any, y: any) => (y.minutos ?? 0) - (x.minutos ?? 0));
+      return listas.flat().sort((x: any, y: any) => {
+        const tX = new Date(x.creado_en || x.llego_en).getTime();
+        const tY = new Date(y.creado_en || y.llego_en).getTime();
+        if (tX !== tY) return tX - tY;
+        return Number(BigInt(x.pedidoId) - BigInt(y.pedidoId));
+      });
     }
 
     // 2. Buscar el área
@@ -310,11 +317,10 @@ export class ComandasService {
           },
         },
       },
-      orderBy: {
-        pedido: {
-          creado_en: 'asc', // Más antiguas primero
-        },
-      },
+      orderBy: [
+        { llego_en: 'asc' },
+        { pedido_id: 'asc' },
+      ],
     });
 
     return comandas.map((c) => {
@@ -424,6 +430,13 @@ export class ComandasService {
       throw new NotFoundException({
         codigo: 'COMANDA_NO_ENCONTRADA',
         mensaje: 'Comanda no encontrada para el área especificada',
+      });
+    }
+
+    if (comanda.estado === 'DESPEJADA') {
+      throw new ConflictException({
+        codigo: 'COMANDA_YA_DESPEJADA',
+        mensaje: 'La comanda ya ha sido despejada',
       });
     }
 
@@ -561,7 +574,7 @@ export class ComandasService {
       });
     }
 
-    if (['EN_CAMINO', 'ENTREGADO'].includes(pedido.estado)) {
+    if (['EN_CAMINO', 'ENTREGADO', 'ANULADO', 'RECHAZADO'].includes(pedido.estado)) {
       throw new ConflictException({
         codigo: 'ESTADO_INVALIDO',
         mensaje: `No se puede devolver una comanda de un pedido que ya está en ${pedido.estado}`,
@@ -581,6 +594,13 @@ export class ComandasService {
       throw new NotFoundException({
         codigo: 'COMANDA_NO_ENCONTRADA',
         mensaje: 'Comanda no encontrada para el área especificada',
+      });
+    }
+
+    if (comanda.estado !== 'DESPEJADA') {
+      throw new ConflictException({
+        codigo: 'COMANDA_NO_DESPEJADA',
+        mensaje: 'La comanda no está despejada',
       });
     }
 
@@ -678,6 +698,7 @@ export class ComandasService {
    */
   async historial(areaRef?: string) {
     const inicioDiaLima = obtenerInicioDiaLima();
+    const finDiaLima = calcularSiguienteMedianocheLima();
 
     let areaIdFiltro: bigint | null = null;
     if (areaRef && areaRef.trim().length > 0) {
@@ -688,7 +709,10 @@ export class ComandasService {
     const comandas = await this.prisma.comandaArea.findMany({
       where: {
         estado: 'DESPEJADA',
-        despejada_en: { gte: inicioDiaLima },
+        despejada_en: {
+          gte: inicioDiaLima,
+          lt: finDiaLima,
+        },
         ...(areaIdFiltro !== null ? { area_id: areaIdFiltro } : {}),
       },
       include: {
@@ -709,9 +733,10 @@ export class ComandasService {
           },
         },
       },
-      orderBy: {
-        despejada_en: 'desc',
-      },
+      orderBy: [
+        { despejada_en: 'desc' },
+        { pedido_id: 'desc' },
+      ],
     });
 
     return comandas.map((c) => {
@@ -772,10 +797,14 @@ export class ComandasService {
     await this.sincronizarPendientes();
 
     const inicioDiaLima = obtenerInicioDiaLima();
+    const finDiaLima = calcularSiguienteMedianocheLima();
 
     const pedidos = await this.prisma.pedido.findMany({
       where: {
-        creado_en: { gte: inicioDiaLima },
+        creado_en: {
+          gte: inicioDiaLima,
+          lt: finDiaLima,
+        },
         estado: { in: ['COLA', 'PREPARANDO', 'LISTO'] },
       },
       include: {
@@ -785,9 +814,14 @@ export class ComandasService {
           },
         },
       },
-      orderBy: {
-        creado_en: 'asc',
-      },
+    });
+
+    // Orden FIFO: hora de llegada ascendente (desempate por id)
+    pedidos.sort((a, b) => {
+      const horaA = new Date(a.pasa_cocina_en ?? a.creado_en).getTime();
+      const horaB = new Date(b.pasa_cocina_en ?? b.creado_en).getTime();
+      if (horaA !== horaB) return horaA - horaB;
+      return Number(a.id - b.id);
     });
 
     return pedidos.map((p) => {
@@ -816,6 +850,7 @@ export class ComandasService {
         canal: p.canal,
         modalidad: p.modalidad,
         mesa,
+        llego_en: p.pasa_cocina_en ?? p.creado_en,
         creado_en: p.creado_en,
         listo_en: p.listo_en,
         areas,

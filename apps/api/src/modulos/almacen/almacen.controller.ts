@@ -16,6 +16,7 @@ import { MermaMultipleDto } from './dto/merma-multiple.dto';
 import { ProduccionTandasDto } from './dto/produccion-tandas.dto';
 import { CierreDiaDto } from './dto/cierre-dia.dto';
 import { AlmacenQueryDto } from './dto/almacen-query.dto';
+import { CrearPedidoInternoDto } from './dto/crear-pedido-interno.dto';
 
 @Controller('admin/almacen')
 @UseGuards(AccesoGuard)
@@ -108,6 +109,12 @@ export class AlmacenController {
   @Permiso('almacen', 'pedidos_internos')
   async listarPedidosInternos() {
     return this.almacenService.listarPedidosInternos();
+  }
+
+  @Post('pedidos-internos')
+  @Permiso('almacen', 'pedidos_internos')
+  async crearPedidoInterno(@Body() dto: CrearPedidoInternoDto, @Req() req: any) {
+    return this.almacenService.crearPedidoInterno(dto, req.usuario, req.ip);
   }
 
   @Post('pedidos-internos/:id/entregar')

@@ -378,6 +378,21 @@ describe('ComandasService', () => {
 
       await expect(service.despejar(8n, 1n, mockUsuario)).rejects.toThrow(ConflictException);
     });
+
+    it('da 409 ConflictException si la comanda ya está DESPEJADA', async () => {
+      prisma.pedido.findUnique.mockResolvedValue({
+        id: 8n,
+        codigo: 'CP-0008',
+        estado: 'COLA',
+      });
+      prisma.comandaArea.findUnique.mockResolvedValue({
+        pedido_id: 8n,
+        area_id: 1n,
+        estado: 'DESPEJADA',
+      });
+
+      await expect(service.despejar(8n, 1n, mockUsuario)).rejects.toThrow(ConflictException);
+    });
   });
 
   describe('devolver comanda', () => {
@@ -436,6 +451,37 @@ describe('ComandasService', () => {
       });
 
       await expect(service.devolver(10n, 1n, mockUsuario)).rejects.toThrow(ConflictException);
+    });
+
+    it('no permite devolver si el pedido ya se entregó (ENTREGADO) o anuló', async () => {
+      prisma.pedido.findUnique.mockResolvedValue({
+        id: 11n,
+        codigo: 'CP-0011',
+        estado: 'ENTREGADO',
+      });
+      await expect(service.devolver(11n, 1n, mockUsuario)).rejects.toThrow(ConflictException);
+
+      prisma.pedido.findUnique.mockResolvedValue({
+        id: 12n,
+        codigo: 'CP-0012',
+        estado: 'ANULADO',
+      });
+      await expect(service.devolver(12n, 1n, mockUsuario)).rejects.toThrow(ConflictException);
+    });
+
+    it('rechaza devolver si la comanda no está en estado DESPEJADA', async () => {
+      prisma.pedido.findUnique.mockResolvedValue({
+        id: 13n,
+        codigo: 'CP-0013',
+        estado: 'COLA',
+      });
+      prisma.comandaArea.findUnique.mockResolvedValue({
+        pedido_id: 13n,
+        area_id: 1n,
+        estado: 'EN_COCINA',
+      });
+
+      await expect(service.devolver(13n, 1n, mockUsuario)).rejects.toThrow(ConflictException);
     });
   });
 

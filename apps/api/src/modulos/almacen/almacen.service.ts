@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
   Optional,
@@ -14,6 +15,7 @@ import { MermaMultipleDto } from './dto/merma-multiple.dto';
 import { ProduccionTandasDto } from './dto/produccion-tandas.dto';
 import { CierreDiaDto } from './dto/cierre-dia.dto';
 import { AlmacenQueryDto } from './dto/almacen-query.dto';
+import { CrearPedidoInternoDto } from './dto/crear-pedido-interno.dto';
 
 @Injectable()
 export class AlmacenService {
@@ -368,22 +370,59 @@ export class AlmacenService {
 
     await this.prisma.$transaction(async (tx) => {
       for (const linea of dto.lineas) {
-        const insumoId = this.parsearId(linea.insumoId, 'insumo');
+        const entityId = this.parsearId(linea.insumoId, 'insumo o producto');
         const origenLugar = await this.obtenerLugarPorNombre(linea.origen);
         const cantDecimal = new Prisma.Decimal(linea.cantidad);
+        const cantNum = Number(linea.cantidad);
 
-        await tx.stock.updateMany({
-          where: { insumo_id: insumoId, lugar_id: origenLugar.id },
+        // Buscar primero como Insumo, luego como Producto
+        const insumo = await tx.insumo.findUnique({ where: { id: entityId } });
+        let producto = null;
+        if (!insumo) {
+          producto = await tx.producto.findUnique({ where: { id: entityId } });
+        }
+
+        if (!insumo && !producto) {
+          throw new NotFoundException({
+            codigo: 'ITEM_NO_ENCONTRADO',
+            mensaje: `El insumo o producto con ID ${entityId.toString()} no existe`,
+          });
+        }
+
+        const nombre = insumo ? insumo.nombre : producto!.nombre;
+        const unidad = insumo ? insumo.unidad_almacen : 'unidades';
+
+        // Buscar stock actual en el origen
+        const stock = insumo
+          ? await tx.stock.findFirst({
+              where: { insumo_id: entityId, lugar_id: origenLugar.id },
+            })
+          : await tx.stock.findFirst({
+              where: { producto_id: entityId, lugar_id: origenLugar.id },
+            });
+
+        const stockDisponible = stock ? Number(stock.cantidad) : 0;
+        if (cantNum > stockDisponible) {
+          throw new BadRequestException({
+            codigo: 'STOCK_INSUFICIENTE',
+            mensaje: `Solo hay ${stockDisponible} ${unidad} de ${nombre} en ${origenLugar.nombre}.`,
+          });
+        }
+
+        // Descontar atómicamente del stock
+        await tx.stock.update({
+          where: { id: stock!.id },
           data: { cantidad: { decrement: cantDecimal } },
         });
 
         const mov = await tx.movimientoStock.create({
           data: {
             tipo: 'MERMA',
-            insumo_id: insumoId,
+            insumo_id: insumo ? entityId : null,
+            producto_id: producto ? entityId : null,
             lugar_id: origenLugar.id,
             cantidad: cantDecimal.negated(),
-            nota: `Merma múltiple (${linea.destino})`,
+            nota: `Merma múltiple (${linea.destino || 'Desecho'})`,
             por: usuario ? usuario.partyId : BigInt(1),
           },
         });
@@ -404,6 +443,8 @@ export class AlmacenService {
         ip,
       });
     }
+
+    this.eventosGateway?.emitirAdmin('stock:cambio', {});
 
     return { ok: true, lineasMermadas: idsCreados.length };
   }
@@ -1050,6 +1091,82 @@ export class AlmacenService {
     }));
   }
 
+  async crearPedidoInterno(
+    dto: CrearPedidoInternoDto,
+    usuario?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    let areaId: bigint | null = null;
+
+    if (dto.areaId) {
+      areaId = this.parsearId(dto.areaId, 'area');
+    } else if (dto.area && dto.area.trim().length > 0) {
+      const area = await this.prisma.areaCocina.findFirst({
+        where: { nombre: { equals: dto.area.trim(), mode: 'insensitive' } },
+      });
+      if (area) {
+        areaId = area.id;
+      }
+    }
+
+    if (!areaId) {
+      const defaultArea = await this.prisma.areaCocina.findFirst({
+        where: { activo: true },
+        orderBy: { id: 'asc' },
+      });
+      areaId = defaultArea?.id ?? BigInt(1);
+    }
+
+    const areaRecord = await this.prisma.areaCocina.findUnique({
+      where: { id: areaId },
+    });
+    const areaNombre = areaRecord?.nombre || 'Cocina';
+
+    const pedido = await this.prisma.pedidoInterno.create({
+      data: {
+        area_id: areaId,
+        detalle: {
+          items: dto.items as any,
+          nota: dto.nota || null,
+        } as unknown as Prisma.InputJsonValue,
+        estado: 'PENDIENTE',
+        por: usuario ? usuario.partyId : BigInt(1),
+        en: new Date(),
+      },
+    });
+
+    if (usuario) {
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'almacen',
+        accion: 'CREAR_PEDIDO_INTERNO',
+        resultado: 'OK',
+        entidad: 'pedido_interno',
+        entidadId: pedido.id,
+        partyId: usuario.partyId,
+        despues: {
+          areaId: areaId.toString(),
+          itemsCount: dto.items.length,
+          nota: dto.nota,
+        },
+        ip,
+      });
+    }
+
+    this.eventosGateway?.emitirAdmin('almacen:pedido_interno', {
+      id: pedido.id.toString(),
+      area: areaNombre,
+      estado: 'PENDIENTE',
+    });
+
+    return {
+      ok: true,
+      id: pedido.id.toString(),
+      estado: pedido.estado,
+      area: areaNombre,
+    };
+  }
+
   async entregarPedidoInterno(
     id: string | number | bigint,
     usuario?: UsuarioAutenticado,
@@ -1068,13 +1185,107 @@ export class AlmacenService {
       });
     }
 
-    const actualizado = await this.prisma.pedidoInterno.update({
-      where: { id: pedId },
-      data: {
-        estado: 'ENTREGADO',
-        entregado_por: usuario ? usuario.partyId : BigInt(1),
-        entregado_en: new Date(),
-      },
+    if (ped.estado === 'ENTREGADO') {
+      throw new ConflictException({
+        codigo: 'PEDIDO_INTERNO_YA_ENTREGADO',
+        mensaje: 'El pedido interno ya fue entregado',
+      });
+    }
+
+    const almacenLugar = await this.obtenerLugarPorNombre('Almacén central');
+    const destinoLugar = await this.obtenerLugarPorNombre(ped.area?.nombre || 'Cocina');
+    const ahora = new Date();
+
+    const detalleObj: any = ped.detalle;
+    const items: any[] = Array.isArray(detalleObj)
+      ? detalleObj
+      : Array.isArray(detalleObj?.items)
+      ? detalleObj.items
+      : [];
+
+    const trasladosCreados: bigint[] = [];
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const item of items) {
+        const cantNum = Number(item.cantidad);
+        if (isNaN(cantNum) || cantNum <= 0) continue;
+        const cantDecimal = new Prisma.Decimal(cantNum);
+
+        let insumo = null;
+        if (item.insumoId) {
+          try {
+            insumo = await tx.insumo.findUnique({
+              where: { id: BigInt(item.insumoId) },
+            });
+          } catch {}
+        }
+        if (!insumo && item.insumo) {
+          insumo = await tx.insumo.findFirst({
+            where: {
+              nombre: { equals: item.insumo.trim(), mode: 'insensitive' },
+            },
+          });
+        }
+
+        if (insumo) {
+          // Descontar stock central
+          const stockCentral = await tx.stock.findFirst({
+            where: { insumo_id: insumo.id, lugar_id: almacenLugar.id },
+          });
+
+          if (stockCentral) {
+            await tx.stock.update({
+              where: { id: stockCentral.id },
+              data: { cantidad: { decrement: cantDecimal } },
+            });
+          } else {
+            await tx.stock.create({
+              data: {
+                insumo_id: insumo.id,
+                lugar_id: almacenLugar.id,
+                cantidad: cantDecimal.negated(),
+              },
+            });
+          }
+
+          // Movimiento de salida de almacén central
+          await tx.movimientoStock.create({
+            data: {
+              tipo: 'TRASLADO_SALIDA',
+              insumo_id: insumo.id,
+              lugar_id: almacenLugar.id,
+              cantidad: cantDecimal.negated(),
+              nota: `Entrega de pedido interno #${pedId.toString()} para ${destinoLugar.nombre}`,
+              por: usuario ? usuario.partyId : BigInt(1),
+            },
+          });
+
+          // Crear traslado por recibir hacia el área
+          const traslado = await tx.traslado.create({
+            data: {
+              insumo_id: insumo.id,
+              destino_lugar_id: destinoLugar.id,
+              enviado: cantDecimal,
+              estado: 'POR_RECIBIR',
+              pedido_interno_id: pedId,
+              enviado_por: usuario ? usuario.partyId : BigInt(1),
+              enviado_en: ahora,
+              nota: `Pedido interno #${pedId.toString()}`,
+            },
+          });
+
+          trasladosCreados.push(traslado.id);
+        }
+      }
+
+      await tx.pedidoInterno.update({
+        where: { id: pedId },
+        data: {
+          estado: 'ENTREGADO',
+          entregado_por: usuario ? usuario.partyId : BigInt(1),
+          entregado_en: ahora,
+        },
+      });
     });
 
     if (usuario) {
@@ -1082,15 +1293,22 @@ export class AlmacenService {
         categoria: 'CAMBIO',
         modulo: 'almacen',
         accion: 'ENTREGAR_PEDIDO_INTERNO',
+        resultado: 'OK',
         entidad: 'pedido_interno',
         entidadId: pedId,
         partyId: usuario.partyId,
-        despues: { estado: 'ENTREGADO' },
+        despues: { estado: 'ENTREGADO', trasladosCount: trasladosCreados.length },
         ip,
       });
     }
 
-    return { ok: true, id: pedId.toString(), estado: actualizado.estado };
+    this.eventosGateway?.emitirAdmin('almacen:pedido_interno', {
+      id: pedId.toString(),
+      estado: 'ENTREGADO',
+    });
+    this.eventosGateway?.emitirAdmin('stock:cambio', {});
+
+    return { ok: true, id: pedId.toString(), estado: 'ENTREGADO', traslados: trasladosCreados.length };
   }
 
   async listarTraslados() {

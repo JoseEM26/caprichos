@@ -60,11 +60,11 @@ export function HistorialView({
 
   return (
     <section
-      aria-label="Historial del día en cocina"
+      aria-label="Despejadas hoy en cocina"
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: '8px',
+        gap: '12px',
         fontFamily: 'Montserrat, system-ui, sans-serif',
       }}
     >
@@ -78,11 +78,11 @@ export function HistorialView({
       {errorAccion && <EstadoError mensaje={errorAccion} />}
 
       {historial.length === 0 ? (
-        <div style={{ color: 'var(--cp-soft)', fontSize: '13px', padding: '8px 0' }}>
+        <div style={{ color: 'var(--cp-soft)', fontSize: '13px', padding: '16px 0' }}>
           Todavía no se despejó nada hoy.
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {historial.map((h) => {
             const itemsStr =
               h.lineas && h.lineas.length > 0
@@ -103,20 +103,22 @@ export function HistorialView({
                 key={h.id}
                 style={{
                   background: 'var(--cp-white)',
-                  border: '1px solid var(--cp-line)',
-                  borderRadius: '12px',
-                  padding: '10px 12px',
+                  border: '1.5px solid var(--cp-line)',
+                  borderRadius: '14px',
+                  padding: '14px 16px',
                   display: 'flex',
                   flexWrap: 'wrap',
-                  gap: '10px',
+                  gap: '12px',
                   alignItems: 'center',
+                  boxShadow: '0 2px 6px rgba(11, 44, 62, 0.04)',
                 }}
               >
                 <span
                   style={{
                     fontFamily: 'Montserrat, sans-serif',
                     fontWeight: 800,
-                    minWidth: '80px',
+                    minWidth: '90px',
+                    fontSize: '16px',
                     color: 'var(--cp-navy)',
                   }}
                 >
@@ -125,16 +127,17 @@ export function HistorialView({
 
                 <span
                   style={{
-                    flex: '1 1 220px',
+                    flex: '1 1 240px',
                     minWidth: 0,
                     fontSize: '13px',
+                    lineHeight: '1.4',
                     color: 'var(--cp-navy)',
                   }}
                 >
-                  {itemsStr}
+                  <strong style={{ fontWeight: 700 }}>{itemsStr}</strong>
                   {h.areaNombre ? ` · ${h.areaNombre}` : ''}
                   <br />
-                  <span style={{ color: 'var(--cp-soft)' }}>
+                  <span style={{ color: 'var(--cp-soft)', fontSize: '12px' }}>
                     Llegó {horaLlego} · despejado {horaDespejo}
                     {minsPrep}
                   </span>
@@ -146,9 +149,9 @@ export function HistorialView({
                   disabled={devolviendo}
                   style={{
                     minHeight: '44px',
-                    padding: '0 14px',
+                    padding: '0 16px',
                     border: '1.5px solid var(--cp-navy)',
-                    borderRadius: '10px',
+                    borderRadius: '12px',
                     background: 'transparent',
                     color: 'var(--cp-navy)',
                     fontWeight: 800,
@@ -171,7 +174,7 @@ export function HistorialView({
         } a la pantalla?`}
         mensaje={`Vuelve a aparecer en ${
           comandaParaDevolver?.areaNombre || 'cocina'
-        } como pendiente. Úsalo si se despejó por error.`}
+        } como pendiente en su lugar por hora de llegada. Úsalo si se despejó por error.`}
         textoConfirmar="Sí, devolver"
         textoNo="No, cancelar"
         alConfirmar={ejecucionDevolucionWrapper}
