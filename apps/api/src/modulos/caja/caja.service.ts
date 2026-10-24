@@ -34,6 +34,14 @@ export interface EstadoCajaDia {
   abierta: boolean;
   // Caja de un día anterior que sigue abierta (solo la fecha, sin montos): la ven todos los roles
   cajaAnteriorAbierta?: { fecha: string } | null;
+  cobrados?: Array<{
+    pedidoId: string;
+    codigo: string;
+    cliente: string | null;
+    total: number;
+    medios: string[];
+    en: Date;
+  }>;
   totalesPorMedio?: Record<string, number>;
   resumen?: {
     apertura: number;
@@ -183,7 +191,7 @@ export class CajaService {
       where: { fecha: fechaDate },
       include: {
         cobros: {
-          include: { pagos: true },
+          include: { pagos: true, pedido: { select: { codigo: true, cliente_nombre: true } } },
         },
         movimientos: true,
       },
@@ -215,6 +223,17 @@ export class CajaService {
         cerrada_en: caja.cerrada_en,
       },
       abierta: caja.estado === 'ABIERTA',
+      // Pedidos cobrados en esta caja (sin montos esperados): los ve cualquier rol que abre la caja
+      cobrados: caja.cobros
+        .filter((c) => !c.anulado_en)
+        .map((c) => ({
+          pedidoId: c.pedido_id.toString(),
+          codigo: c.pedido.codigo,
+          cliente: c.pedido.cliente_nombre,
+          total: enPesos(aCentimos(c.total)),
+          medios: c.pagos.map((p) => (p.medio || '').toUpperCase()),
+          en: c.en,
+        })),
     };
 
     if (usuario?.rol !== 'ADMIN') {

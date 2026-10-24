@@ -117,10 +117,21 @@ export interface CajaInfo {
   cerrada_en: string | null;
 }
 
+/** Pedido cobrado en la caja abierta (sin montos esperados). */
+export interface CobroTurno {
+  pedidoId: string;
+  codigo: string;
+  cliente: string | null;
+  total: number;
+  medios: string[];
+  en: string;
+}
+
 export interface CajaActualRespuesta {
   caja: CajaInfo | null;
   abierta: boolean;
   cajaAnteriorAbierta?: { fecha: string } | null;
+  cobrados?: CobroTurno[];
   totalesPorMedio: Record<string, number>;
   resumen: {
     apertura: number;

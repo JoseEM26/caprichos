@@ -191,8 +191,10 @@ describe('CierreService', () => {
       pedido: {
         count: jest.fn().mockResolvedValue(0),
         findMany: jest.fn().mockResolvedValue([]),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
       party: {
+        findMany: jest.fn().mockResolvedValue([]),
         findUnique: jest.fn().mockResolvedValue({
           id: 55n,
           tipo: 'PERSONA',
@@ -608,6 +610,26 @@ describe('CierreService', () => {
         }),
       );
     });
+
+    it('al liquidar, sus pedidos contra entrega dejan de estar pendientes de cobro (no bloquean el cierre)', async () => {
+      jest.spyOn(service as any, 'repartidoresConEfectivo').mockResolvedValue([
+        {
+          repartidorPartyId: '55',
+          nombre: 'Marcos Ruta',
+          pedidos: [{ id: 502, codigo: 'CP-W102', total: 60, entregadoEn: new Date() }],
+          cobradoCentimos: 6000,
+          liquidadoCentimos: 0,
+          pendienteCentimos: 6000,
+        },
+      ]);
+
+      await service.liquidarRepartidor({ repartidorPartyId: 55, entregado: 60 }, mockUsuarioCajero);
+
+      expect(prismaMock.pedido.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: [502n] }, pago_estado: 'PENDIENTE' },
+        data: { pago_estado: 'PAGADO' },
+      });
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -787,6 +809,21 @@ describe('CierreService', () => {
       expect(res.cierres[0].cierre?.resultado).toBe('CUADRA');
     });
 
+    it('el historial muestra el nombre de quien cerró la caja, no solo su ID', async () => {
+      prismaMock.caja.count.mockResolvedValue(1);
+      prismaMock.caja.findMany.mockResolvedValue([
+        { ...mockCajaAbierta, id: 10n, estado: 'CERRADA', cerrada_por: 101n, cerrada_en: new Date(), cierre: { resultado: 'CUADRA', aprobado_por: null, nota: null, medios: [] } },
+      ]);
+      prismaMock.party.findMany.mockResolvedValue([
+        { id: 101n, persona: { nombres: 'Ana', apellidos: 'Caja' } },
+      ]);
+
+      const res = await service.historial({ pagina: 1, limite: 10 }, mockUsuarioAdmin);
+
+      expect(res.cierres[0].cerradaPor).toBe(101);
+      expect(res.cierres[0].cerradaPorNombre).toBe('Ana Caja');
+    });
+
     it('retorna 404 si el cierre no existe al buscar por ID', async () => {
       prismaMock.cierreCaja.findUnique.mockResolvedValue(null);
 
@@ -824,7 +861,7 @@ describe('CierreService', () => {
       try {
         await service.obtenerCajaAbierta();
       } catch (e: any) {
-        expect(e.getStatus()).toBe(HttpStatus.BAD_REQUEST);
+        expect(e.getStatus()).toBe(HttpStatus.CONFLICT);
         expect(e.getResponse().codigo).toBe('NO_HAY_CAJA_ABIERTA');
       }
     });

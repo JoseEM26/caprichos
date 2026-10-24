@@ -163,7 +163,11 @@ describe('CajaService', () => {
         cobros: [
           {
             id: 1n,
+            pedido_id: 11n,
+            total: new Prisma.Decimal(100),
+            en: new Date('2026-10-24T15:00:00Z'),
             anulado_en: null,
+            pedido: { codigo: 'CP-W001', cliente_nombre: 'Ana' },
             pagos: [
               {
                 medio: 'EFECTIVO',
@@ -175,7 +179,11 @@ describe('CajaService', () => {
           },
           {
             id: 2n,
+            pedido_id: 12n,
+            total: new Prisma.Decimal(50),
+            en: new Date('2026-10-24T16:00:00Z'),
             anulado_en: null,
+            pedido: { codigo: 'CP-W002', cliente_nombre: null },
             pagos: [
               {
                 medio: 'YAPE',
@@ -256,6 +264,11 @@ describe('CajaService', () => {
       expect(res.resumen!.egresos).toBe(15);
       // Efectivo esperado = 50 + 130 + 20 - 15 = 185
       expect(res.efectivoEsperado).toBe(185);
+      // Pedidos cobrados en esta caja (solo del turno, con sus medios)
+      expect(res.cobrados).toEqual([
+        { pedidoId: '11', codigo: 'CP-W001', cliente: 'Ana', total: 100, medios: ['EFECTIVO'], en: new Date('2026-10-24T15:00:00Z') },
+        { pedidoId: '12', codigo: 'CP-W002', cliente: null, total: 50, medios: ['YAPE', 'EFECTIVO'], en: new Date('2026-10-24T16:00:00Z') },
+      ]);
     });
 
     it('al cajero solo le muestra si la caja está abierta, sin totales ni efectivo esperado (DT-61)', async () => {

@@ -6,7 +6,7 @@ import { EstadoError } from '../../comun/EstadoError';
 import { HistorialCierres } from './HistorialCierres';
 import { cierreApi, calcularTotalEfectivo, PendienteCobro, RepartidorPorLiquidar } from './cierreApi';
 import { PendientesCobroCierre } from './PendientesCobroCierre';
-import { pedidosApi, MovimientoCaja, Pedido } from '../pedidos/pedidosApi';
+import { pedidosApi, MovimientoCaja, CobroTurno } from '../pedidos/pedidosApi';
 import { ErrorApi } from '../../comun/api';
 
 type TabCierre = 'turno' | 'historial';
@@ -39,7 +39,7 @@ export function CierreView() {
   const [esperado, setEsperado] = useState<any>(null);
   const [repartidores, setRepartidores] = useState<RepartidorPorLiquidar[]>([]);
   const [pedidosAbiertos, setPedidosAbiertos] = useState<PendienteCobro[]>([]);
-  const [pedidosCobrados, setPedidosCobrados] = useState<Pedido[]>([]);
+  const [pedidosCobrados, setPedidosCobrados] = useState<CobroTurno[]>([]);
 
   // Mensaje de éxito/notificación y error de la pantalla
   const [cjMsg, setCjMsg] = useState('');
@@ -106,6 +106,7 @@ export function CierreView() {
           setCajaAbierta(cActual.abierta || cActual.caja?.estado === 'ABIERTA');
           // Una caja de otro día sin cerrar también la ve el cajero: no debe leerse como «Caja cerrada»
           setCajaPendiente(cActual.cajaAnteriorAbierta ?? null);
+          setPedidosCobrados(cActual.cobrados ?? []);
           if (cActual.caja) {
             setCajaId(`CJ-${String(cActual.caja.id).padStart(4, '0')}`);
             setAperturaMonto(Number(cActual.caja.apertura || 0));
@@ -156,22 +157,13 @@ export function CierreView() {
       }
 
       // 5. Pedidos sin cobrar de cualquier día (los que bloquean el cierre; el admin los ve de entrada,
-      // el cajero los ve con el PIN de supervisor) y cobrados del turno
+      // el cajero los ve con el PIN de supervisor)
       if (esAdmin) {
         try {
           setPedidosAbiertos(await cierreApi.listarPendientesDeCobro());
         } catch {
           setPedidosAbiertos([]);
         }
-      }
-      try {
-        const peds = await pedidosApi.listar({ limite: 100 });
-        const items = peds.items || [];
-        setPedidosCobrados(
-          items.filter((p) => String(p.pago_estado || '').toUpperCase() === 'PAGADO')
-        );
-      } catch {
-        setPedidosCobrados([]);
       }
     } catch (err: any) {
       setErrorCarga(err?.message || 'Error al cargar los datos de caja y cierre');
@@ -191,7 +183,7 @@ export function CierreView() {
       const { yape = 0, plin = 0, transferencia = 0, tarjeta = 0 } = esperado.medios || {};
       return ventasEfectivo + yape + plin + transferencia + tarjeta;
     }
-    return pedidosCobrados.reduce((acc, p) => acc + Number(p.total || 0), 0);
+    return pedidosCobrados.reduce((acc, p) => acc + p.total, 0);
   }, [esperado, pedidosCobrados, ventasEfectivo]);
 
   const movimientosVigentes = useMemo(() => movimientos.filter((m) => !m.anulado_en), [movimientos]);
@@ -212,8 +204,8 @@ export function CierreView() {
   }, [esperado, aperturaMonto, ventasEfectivo, ingresosExtra, egresosGasto]);
 
   // Pedidos cobrados por medio (solo para el número de pedidos de cada tarjeta)
-  const pedidosPorMedio = (medio: string) =>
-    pedidosCobrados.filter((p) => String(p.pago_metodo || '').toUpperCase() === medio).length;
+  // Cuenta los pedidos que tienen un pago en ese medio (un pedido mixto cuenta en cada medio)
+  const pedidosPorMedio = (medio: string) => pedidosCobrados.filter((p) => p.medios.includes(medio)).length;
 
   // Total contado en conteo
   const totalEfectivoContado = useMemo(() => {
@@ -532,28 +524,30 @@ export function CierreView() {
         >
           Turno actual
         </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tabActiva === 'historial'}
-          onClick={() => {
-            setTabActiva('historial');
-            setCjMsg('');
-          }}
-          style={{
-            minHeight: 44,
-            padding: '0 16px',
-            borderRadius: 9999,
-            border: '1.5px solid var(--cp-navy, #0B2C3E)',
-            background: tabActiva === 'historial' ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
-            color: tabActiva === 'historial' ? 'var(--cp-cream, #FBF4EC)' : 'var(--cp-navy, #0B2C3E)',
-            fontWeight: 700,
-            fontSize: 14,
-            cursor: 'pointer',
-          }}
-        >
-          Historial de cierres
-        </button>
+        {esAdmin && (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tabActiva === 'historial'}
+            onClick={() => {
+              setTabActiva('historial');
+              setCjMsg('');
+            }}
+            style={{
+              minHeight: 44,
+              padding: '0 16px',
+              borderRadius: 9999,
+              border: '1.5px solid var(--cp-navy, #0B2C3E)',
+              background: tabActiva === 'historial' ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
+              color: tabActiva === 'historial' ? 'var(--cp-cream, #FBF4EC)' : 'var(--cp-navy, #0B2C3E)',
+              fontWeight: 700,
+              fontSize: 14,
+              cursor: 'pointer',
+            }}
+          >
+            Historial de cierres
+          </button>
+        )}
       </div>
 
       {/* Banner de mensaje de éxito si existe */}
@@ -1482,7 +1476,7 @@ export function CierreView() {
                   ) : (
                     pedidosCobrados.map((p) => (
                       <div
-                        key={p.id}
+                        key={p.pedidoId}
                         style={{
                           display: 'flex',
                           justifyContent: 'space-between',
@@ -1492,9 +1486,9 @@ export function CierreView() {
                         }}
                       >
                         <span>
-                          <b>{p.codigo}</b> · {p.cliente_nombre || 'Cliente'} ({p.pago_metodo || 'Efectivo'})
+                          <b>{p.codigo}</b> · {p.cliente || 'Cliente'} ({p.medios.join(' + ') || 'Efectivo'})
                         </span>
-                        <span style={{ fontWeight: 700 }}>s/ {Number(p.total || 0).toFixed(2)}</span>
+                        <span style={{ fontWeight: 700 }}>s/ {p.total.toFixed(2)}</span>
                       </div>
                     ))
                   )}

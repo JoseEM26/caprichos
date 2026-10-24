@@ -75,6 +75,20 @@ export class CierreService {
     private readonly cobrosService: CobrosService,
   ) {}
 
+  /** Nombre de la persona de cada party (quién cerró la caja): el historial muestra nombres, no IDs. */
+  private async nombresDePartes(ids: bigint[]) {
+    const partes = await this.prisma.party.findMany({
+      where: { id: { in: ids } },
+      include: { persona: true },
+    });
+    return new Map(
+      partes.map((p) => [
+        String(p.id),
+        `${p.persona?.nombres ?? ''} ${p.persona?.apellidos ?? ''}`.trim() || `Usuario #${p.id}`,
+      ]),
+    );
+  }
+
   /**
    * Obtiene la caja actualmente abierta (solo puede haber una según ux_una_caja_abierta).
    */
@@ -89,7 +103,8 @@ export class CierreService {
           codigo: 'NO_HAY_CAJA_ABIERTA',
           mensaje: 'No hay ninguna caja abierta actualmente.',
         },
-        HttpStatus.BAD_REQUEST,
+        // 409 igual que CAJA_CERRADA: un segundo cierre o arqueo sobre una caja ya cerrada es un conflicto
+        HttpStatus.CONFLICT,
       );
     }
     return caja;
@@ -561,11 +576,16 @@ export class CierreService {
       }),
     ]);
 
+    const nombres = await this.nombresDePartes(
+      cajas.flatMap((c) => (c.cerrada_por ? [c.cerrada_por] : [])),
+    );
+
     const items = cajas.map((c) => ({
       cajaId: Number(c.id),
       fecha: c.fecha,
       apertura: Number(c.apertura),
       cerradaPor: c.cerrada_por ? Number(c.cerrada_por) : null,
+      cerradaPorNombre: c.cerrada_por ? (nombres.get(String(c.cerrada_por)) ?? null) : null,
       cerradaEn: c.cerrada_en,
       cierre: c.cierre
         ? {
@@ -636,6 +656,9 @@ export class CierreService {
       aprobadoPor: cierre.aprobado_por ? Number(cierre.aprobado_por) : null,
       nota: cierre.nota,
       cerradaPor: cierre.caja.cerrada_por ? Number(cierre.caja.cerrada_por) : null,
+      cerradaPorNombre: cierre.caja.cerrada_por
+        ? ((await this.nombresDePartes([cierre.caja.cerrada_por])).get(String(cierre.caja.cerrada_por)) ?? null)
+        : null,
       cerradaEn: cierre.caja.cerrada_en,
       conteo: cierre.conteo,
       medios: cierre.medios.map((m) => ({
@@ -738,6 +761,13 @@ export class CierreService {
           esperado: enPesos(pendiente),
           entregado: enPesos(entregadoCentimos),
         },
+      });
+
+      // Ese efectivo ya entró a caja por la liquidación: sus pedidos dejan de estar pendientes de cobro.
+      // Si siguieran PENDIENTE bloquearían el cierre, y cobrarlos después contaría el efectivo dos veces.
+      await tx.pedido.updateMany({
+        where: { id: { in: (info?.pedidos ?? []).map((p) => BigInt(p.id)) }, pago_estado: 'PENDIENTE' },
+        data: { pago_estado: 'PAGADO' },
       });
 
       return { liquidacion: liq, esperado: pendiente, entregado: entregadoCentimos };

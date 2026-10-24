@@ -333,6 +333,17 @@ describe('Ola F5: Caja y Cierres', () => {
     expect(screen.queryByText(/Sist\./)).not.toBeInTheDocument();
   });
 
+  it('al cajero no se le ofrece la pestaña de historial (el servidor responde 403)', async () => {
+    vi.spyOn(pedidosApi, 'obtenerCajaActual').mockResolvedValue({ abierta: true, caja: { id: 7, estado: 'ABIERTA', apertura: 0 } } as any);
+    vi.spyOn(pedidosApi, 'listarMovimientos').mockResolvedValue([]);
+    vi.spyOn(cierreApi, 'listarRepartidoresPorLiquidar').mockResolvedValue([]);
+
+    render(<CierreView />);
+
+    expect(await screen.findByRole('tab', { name: 'Turno actual' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Historial de cierres' })).not.toBeInTheDocument();
+  });
+
   it('el PIN de la supervisora lo valida el servidor, no el navegador', async () => {
     vi.spyOn(pedidosApi, 'obtenerCajaActual').mockResolvedValue({ abierta: true, caja: { id: 7, estado: 'ABIERTA', apertura: 0 } } as any);
     vi.spyOn(pedidosApi, 'listarMovimientos').mockResolvedValue([]);

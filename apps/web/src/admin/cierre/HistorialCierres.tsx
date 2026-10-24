@@ -267,7 +267,7 @@ export function HistorialCierres() {
                   {h.cerradaEn ? ` · cerrada a las ${horaDeCierre(h.cerradaEn)}` : ''}
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--cp-navy, #0B2C3E)' }}>
-                  {h.cerradaPor ? `Usuario #${h.cerradaPor}` : 'Sin dato de cajero'}
+                  {h.cerradaPorNombre ?? (h.cerradaPor ? `Usuario #${h.cerradaPor}` : 'Sin dato de cajero')}
                 </div>
               </button>
             );
@@ -371,7 +371,7 @@ export function HistorialCierres() {
                   <div style={{ textAlign: 'center' }}>------------------------------</div>
                   <div>Fecha: {fechaDeCaja(detalle.fecha)}</div>
                   {detalle.cerradaEn && <div>Cierre: {horaDeCierre(detalle.cerradaEn)}</div>}
-                  <div>Cajero: {detalle.cerradaPor ? `Usuario #${detalle.cerradaPor}` : 'Sin dato de cajero'}</div>
+                  <div>Cajero: {detalle.cerradaPorNombre ?? (detalle.cerradaPor ? `Usuario #${detalle.cerradaPor}` : 'Sin dato de cajero')}</div>
                   <div>Apertura: s/ {detalle.apertura.toFixed(2)}</div>
                   <div style={{ textAlign: 'center' }}>------------------------------</div>
                   {esAdmin ? (

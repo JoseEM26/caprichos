@@ -119,6 +119,7 @@ export interface ItemHistorialCierre {
   fecha: string;
   apertura: number;
   cerradaPor: number | null;
+  cerradaPorNombre?: string | null;
   cerradaEn: string | null;
   cierre: {
     resultado: 'CUADRA' | 'NO_CUADRA';
@@ -144,6 +145,7 @@ export interface DetalleCierreCompleto {
   aprobadoPor: number | null;
   nota: string | null;
   cerradaPor: number | null;
+  cerradaPorNombre?: string | null;
   cerradaEn: string | null;
   conteo: Record<string, number> | null;
   medios: CierreMedioDetalle[];
