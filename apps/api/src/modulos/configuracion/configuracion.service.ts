@@ -18,6 +18,11 @@ export const CLAVES_NUMERICAS = [
   'rep_naranja_min',
   'rep_rojo_min',
   'rep_max_pedidos',
+  'reparto_retrasado_min',
+  'reparto_tarde_min',
+  'reparto_muy_tarde_min',
+  'reparto_velocidad_kmh',
+  'reparto_max_pedidos',
 ] as const;
 
 export const CLAVES_TEXTO = [
@@ -105,6 +110,68 @@ export class ConfiguracionService {
         throw new BadRequestException({
           codigo: 'VALOR_INVALIDO',
           mensaje: 'El valor debe ser un objeto o estructura válida',
+        });
+      }
+    }
+
+    // Validaciones específicas para parámetros de reparto
+    if (clave === 'reparto_retrasado_min' && (valor < 1 || valor > 180)) {
+      throw new BadRequestException({
+        codigo: 'RANGO_INVALIDO',
+        mensaje: 'El umbral retrasado debe estar entre 1 y 180 minutos',
+      });
+    }
+    if (clave === 'reparto_tarde_min' && (valor < 2 || valor > 240)) {
+      throw new BadRequestException({
+        codigo: 'RANGO_INVALIDO',
+        mensaje: 'El umbral tarde debe estar entre 2 y 240 minutos',
+      });
+    }
+    if (clave === 'reparto_muy_tarde_min' && (valor < 3 || valor > 360)) {
+      throw new BadRequestException({
+        codigo: 'RANGO_INVALIDO',
+        mensaje: 'El umbral muy tarde debe estar entre 3 y 360 minutos',
+      });
+    }
+    if (clave === 'reparto_velocidad_kmh' && (valor < 5 || valor > 100)) {
+      throw new BadRequestException({
+        codigo: 'RANGO_INVALIDO',
+        mensaje: 'La velocidad media debe estar entre 5 y 100 km/h',
+      });
+    }
+    if (clave === 'reparto_max_pedidos' && (valor < 1 || valor > 20)) {
+      throw new BadRequestException({
+        codigo: 'RANGO_INVALIDO',
+        mensaje: 'El máximo de pedidos por repartidor debe estar entre 1 y 20',
+      });
+    }
+
+    if (
+      clave === 'reparto_retrasado_min' ||
+      clave === 'reparto_tarde_min' ||
+      clave === 'reparto_muy_tarde_min'
+    ) {
+      const params = await this.prisma.parametro.findMany({
+        where: {
+          clave: { in: ['reparto_retrasado_min', 'reparto_tarde_min', 'reparto_muy_tarde_min'] },
+        },
+      });
+      let retrasado = 20;
+      let tarde = 30;
+      let muyTarde = 45;
+      for (const p of params) {
+        if (p.clave === 'reparto_retrasado_min' && p.valor != null) retrasado = Number(p.valor);
+        if (p.clave === 'reparto_tarde_min' && p.valor != null) tarde = Number(p.valor);
+        if (p.clave === 'reparto_muy_tarde_min' && p.valor != null) muyTarde = Number(p.valor);
+      }
+      if (clave === 'reparto_retrasado_min') retrasado = valor;
+      if (clave === 'reparto_tarde_min') tarde = valor;
+      if (clave === 'reparto_muy_tarde_min') muyTarde = valor;
+
+      if (!(retrasado < tarde && tarde < muyTarde)) {
+        throw new BadRequestException({
+          codigo: 'ORDEN_UMBRALES_INVALIDO',
+          mensaje: 'Los umbrales deben estar en orden ascendente (retrasado < tarde < muy tarde)',
         });
       }
     }

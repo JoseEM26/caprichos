@@ -172,6 +172,29 @@ describe('ConfiguracionService', () => {
       const resModo = await service.actualizar('envio_gratis_modo', 'MONTO', adminAuth);
       expect(resModo.valor).toBe('MONTO');
     });
+
+    it('valida rangos y orden ascendente en parámetros de reparto', async () => {
+      prismaMock.parametro.findMany.mockResolvedValue([
+        { clave: 'reparto_retrasado_min', valor: 20 },
+        { clave: 'reparto_tarde_min', valor: 30 },
+        { clave: 'reparto_muy_tarde_min', valor: 45 },
+      ]);
+      prismaMock.parametro.findUnique.mockResolvedValue(null);
+      prismaMock.parametro.upsert.mockResolvedValue({ clave: 'reparto_retrasado_min', valor: 22 });
+
+      const res = await service.actualizar('reparto_retrasado_min', 22, adminAuth);
+      expect(res.clave).toBe('reparto_retrasado_min');
+
+      // Violación de orden ascendente (retrasado >= tarde)
+      await expect(
+        service.actualizar('reparto_retrasado_min', 35, adminAuth),
+      ).rejects.toThrow(BadRequestException);
+
+      // Violación de rango
+      await expect(
+        service.actualizar('reparto_velocidad_kmh', 2, adminAuth),
+      ).rejects.toThrow(BadRequestException);
+    });
   });
 
   describe('actualizarPausaAltaDemanda', () => {

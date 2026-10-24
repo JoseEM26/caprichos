@@ -73,6 +73,8 @@ export function AdminShell() {
   const [saliendo, setSaliendo] = useState(false);
   const [ahora, setAhora] = useState(() => new Date());
   const [enLinea, setEnLinea] = useState<boolean>(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
+  const [controlesVisiblesRepartidor, setControlesVisiblesRepartidor] = useState(true);
+  const [masRepartidorAbierto, setMasRepartidorAbierto] = useState(false);
 
   useEffect(() => {
     const t = setInterval(() => setAhora(new Date()), 30000);
@@ -80,10 +82,16 @@ export function AdminShell() {
     const alCaer = () => setEnLinea(false);
     window.addEventListener('online', alIr);
     window.addEventListener('offline', alCaer);
+
+    // Decisión 6: tocar el mapa oculta/muestra los controles
+    const alAlternarControles = () => setControlesVisiblesRepartidor((v) => !v);
+    window.addEventListener('caprichos:toggle-controles', alAlternarControles);
+
     return () => {
       clearInterval(t);
       window.removeEventListener('online', alIr);
       window.removeEventListener('offline', alCaer);
+      window.removeEventListener('caprichos:toggle-controles', alAlternarControles);
     };
   }, []);
 
@@ -452,6 +460,310 @@ export function AdminShell() {
     </div>
   );
 
+  const esRolRepartidor = rol === 'REPARTIDOR';
+  const esRepartidorMovil = esRolRepartidor && movil;
+
+  const enRepartosMapa =
+    location.pathname === '/admin/repartos' &&
+    !location.search.includes('vista=lista') &&
+    !location.search.includes('vista=mios');
+  const enRepartosMios =
+    location.pathname === '/admin/repartos' &&
+    (location.search.includes('vista=lista') || location.search.includes('vista=mios'));
+
+  const barraInferiorRepartidor = (
+    <>
+      {/* Modal / Menú Más para repartidor */}
+      {masRepartidorAbierto && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Opciones del repartidor"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1050,
+            background: 'rgba(11, 44, 62, 0.65)',
+            display: 'flex',
+            alignItems: 'flex-end',
+            justifyContent: 'center',
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setMasRepartidorAbierto(false);
+          }}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '480px',
+              background: 'var(--cp-white)',
+              borderRadius: '20px 20px 0 0',
+              padding: '20px',
+              paddingBottom: 'max(24px, env(safe-area-inset-bottom, 24px))',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              boxShadow: '0 -8px 24px rgba(0, 0, 0, 0.25)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {avatar(40)}
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: '15px', color: 'var(--cp-navy)' }}>
+                    {usuario?.nombres}
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
+                    Repartidor · Caprichos
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                aria-label="Cerrar opciones"
+                onClick={() => setMasRepartidorAbierto(false)}
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '18px',
+                  border: 'none',
+                  background: 'var(--cp-cream)',
+                  fontSize: '20px',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  color: 'var(--cp-navy)',
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <hr style={{ border: 'none', borderTop: '1px solid var(--cp-line)', margin: '4px 0' }} />
+
+            <button
+              type="button"
+              onClick={() => {
+                setMasRepartidorAbierto(false);
+                navigate('/admin/perfil');
+              }}
+              style={{
+                minHeight: '48px',
+                border: '1.5px solid var(--cp-line)',
+                borderRadius: '12px',
+                background: 'transparent',
+                color: 'var(--cp-navy)',
+                fontWeight: 700,
+                fontSize: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                padding: '0 16px',
+                gap: '10px',
+                cursor: 'pointer',
+              }}
+            >
+              <Icono nombre="usuarios" tamano={18} />
+              <span>Mi perfil</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setMasRepartidorAbierto(false);
+                navigate('/admin/notificaciones');
+              }}
+              style={{
+                minHeight: '48px',
+                border: '1.5px solid var(--cp-line)',
+                borderRadius: '12px',
+                background: 'transparent',
+                color: 'var(--cp-navy)',
+                fontWeight: 700,
+                fontSize: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0 16px',
+                cursor: 'pointer',
+              }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Icono nombre="notificaciones" tamano={18} />
+                <span>Notificaciones</span>
+              </span>
+              {totalNotif > 0 && (
+                <span
+                  style={{
+                    background: 'var(--cp-orange)',
+                    color: 'var(--cp-navy)',
+                    padding: '2px 8px',
+                    borderRadius: '10px',
+                    fontSize: '12px',
+                    fontWeight: 800,
+                  }}
+                >
+                  {totalNotif}
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setMasRepartidorAbierto(false);
+                setConfirmarSalida(true);
+              }}
+              style={{
+                minHeight: '48px',
+                border: '1.5px solid var(--cp-rust)',
+                borderRadius: '12px',
+                background: 'transparent',
+                color: 'var(--cp-rust)',
+                fontWeight: 800,
+                fontSize: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                padding: '0 16px',
+                gap: '10px',
+                cursor: 'pointer',
+              }}
+            >
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+              <span>Cerrar sesión</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Barra mínima de 3 botones grandes (Decisión 6 del dueño) */}
+      <nav
+        aria-label="Navegación del repartidor"
+        style={{
+          position: 'fixed',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 1000,
+          background: 'rgba(11, 44, 62, 0.96)',
+          backdropFilter: 'blur(8px)',
+          borderTop: '1.5px solid rgba(255, 255, 255, 0.15)',
+          paddingTop: '8px',
+          paddingLeft: '12px',
+          paddingRight: '12px',
+          paddingBottom: 'max(14px, env(safe-area-inset-bottom, 14px))',
+          display: 'flex',
+          gap: '8px',
+          justifyContent: 'space-around',
+          alignItems: 'center',
+          boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.35)',
+          transform: controlesVisiblesRepartidor ? 'translateY(0)' : 'translateY(110%)',
+          transition: 'transform 0.25s ease',
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => {
+            setMasRepartidorAbierto(false);
+            navigate('/admin/repartos?vista=mapa');
+          }}
+          aria-current={enRepartosMapa ? 'page' : undefined}
+          style={{
+            flex: 1,
+            minHeight: '52px',
+            borderRadius: '12px',
+            border: 'none',
+            background: enRepartosMapa ? 'var(--cp-orange)' : 'rgba(255, 255, 255, 0.12)',
+            color: enRepartosMapa ? 'var(--cp-navy)' : 'var(--cp-cream)',
+            fontFamily: 'Montserrat, sans-serif',
+            fontWeight: 800,
+            fontSize: '13px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '2px',
+            cursor: 'pointer',
+          }}
+        >
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" />
+            <line x1="8" y1="2" x2="8" y2="18" />
+            <line x1="16" y1="6" x2="16" y2="22" />
+          </svg>
+          <span>Mapa</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setMasRepartidorAbierto(false);
+            navigate('/admin/repartos?vista=mios');
+          }}
+          aria-current={enRepartosMios ? 'page' : undefined}
+          style={{
+            flex: 1,
+            minHeight: '52px',
+            borderRadius: '12px',
+            border: 'none',
+            background: enRepartosMios ? 'var(--cp-orange)' : 'rgba(255, 255, 255, 0.12)',
+            color: enRepartosMios ? 'var(--cp-navy)' : 'var(--cp-cream)',
+            fontFamily: 'Montserrat, sans-serif',
+            fontWeight: 800,
+            fontSize: '13px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '2px',
+            cursor: 'pointer',
+          }}
+        >
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="1" y="3" width="15" height="13" />
+            <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+            <circle cx="5.5" cy="18.5" r="2.5" />
+            <circle cx="18.5" cy="18.5" r="2.5" />
+          </svg>
+          <span>Mis entregas</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMasRepartidorAbierto((v) => !v)}
+          aria-expanded={masRepartidorAbierto}
+          aria-label="Más opciones"
+          style={{
+            flex: 1,
+            minHeight: '52px',
+            borderRadius: '12px',
+            border: 'none',
+            background: masRepartidorAbierto ? 'var(--cp-orange)' : 'rgba(255, 255, 255, 0.12)',
+            color: masRepartidorAbierto ? 'var(--cp-navy)' : 'var(--cp-cream)',
+            fontFamily: 'Montserrat, sans-serif',
+            fontWeight: 800,
+            fontSize: '13px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '2px',
+            cursor: 'pointer',
+          }}
+        >
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+            <circle cx="12" cy="12" r="2.5" />
+            <circle cx="19" cy="12" r="2.5" />
+            <circle cx="5" cy="12" r="2.5" />
+          </svg>
+          <span>Más</span>
+        </button>
+      </nav>
+    </>
+  );
+
   return (
     <div
       style={{
@@ -468,20 +780,36 @@ export function AdminShell() {
         lineHeight: '20px',
       }}
     >
-      {movil ? barraMovil : menuPC}
+      {/* Navegación según rol y dispositivo (Decisión 6: Repartidor en celular sin barra lateral ni cabecera grande) */}
+      {esRepartidorMovil ? null : movil ? barraMovil : menuPC}
 
       <div style={{ flex: '1 1 0', minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
-        {barraEstado}
-        <main style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: movil ? 16 : 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-            <div>
-              <h1 style={{ margin: 0, fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 26, lineHeight: '32px' }}>{titulo.titulo}</h1>
-              {titulo.subtitulo && <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>{titulo.subtitulo}</div>}
+        {esRepartidorMovil ? null : barraEstado}
+        <main
+          style={{
+            flex: 1,
+            minHeight: 0,
+            overflowY: 'auto',
+            padding: esRepartidorMovil ? 0 : movil ? 16 : 24,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: esRepartidorMovil ? 0 : 16,
+          }}
+        >
+          {!esRepartidorMovil && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div>
+                <h1 style={{ margin: 0, fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 26, lineHeight: '32px' }}>{titulo.titulo}</h1>
+                {titulo.subtitulo && <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>{titulo.subtitulo}</div>}
+              </div>
             </div>
-          </div>
+          )}
           <Outlet />
         </main>
       </div>
+
+      {/* Barra inferior del repartidor en celular (Decisión 6 del dueño) */}
+      {esRepartidorMovil && barraInferiorRepartidor}
 
       <Confirmar
         abierto={confirmarSalida}

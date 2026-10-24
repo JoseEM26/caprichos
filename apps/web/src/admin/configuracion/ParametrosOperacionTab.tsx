@@ -92,6 +92,36 @@ const META_PARAMETROS: Record<string, MetaParametro> = {
     tipo: 'numero',
     sufijo: 'pedidos',
   },
+  reparto_retrasado_min: {
+    nombre: 'Alerta Retrasado de reparto (amarillo)',
+    descripcion: 'Minutos para marcar pedidos en alerta amarilla (Retrasado) en el mapa de reparto.',
+    tipo: 'numero',
+    sufijo: 'minutos',
+  },
+  reparto_tarde_min: {
+    nombre: 'Alerta Tarde de reparto (naranja)',
+    descripcion: 'Minutos para marcar pedidos en alerta naranja (Tarde) en el mapa de reparto.',
+    tipo: 'numero',
+    sufijo: 'minutos',
+  },
+  reparto_muy_tarde_min: {
+    nombre: 'Alerta Muy tarde de reparto (rojo palpitando)',
+    descripcion: 'Minutos para marcar pedidos en estado crítico (rojo palpitando) en el mapa de reparto.',
+    tipo: 'numero',
+    sufijo: 'minutos',
+  },
+  reparto_velocidad_kmh: {
+    nombre: 'Velocidad media de reparto',
+    descripcion: 'Velocidad promedio estimada en moto (km/h) para cálculo de distancias y tiempos de entrega.',
+    tipo: 'numero',
+    sufijo: 'km/h',
+  },
+  reparto_max_pedidos: {
+    nombre: 'Máximo de pedidos por repartidor (reparto)',
+    descripcion: 'Cantidad límite de órdenes simultáneas por repartidor en el módulo de reparto.',
+    tipo: 'numero',
+    sufijo: 'pedidos',
+  },
   pausa_alta_demanda: {
     nombre: 'Pausa por alta demanda',
     descripcion: 'Detiene temporalmente el ingreso de nuevos pedidos. Solo lectura: la gestiona cocina.',

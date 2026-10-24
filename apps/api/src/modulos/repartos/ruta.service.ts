@@ -18,6 +18,10 @@ export interface ResultadoRuta {
   orden: string[];
   paso: string[];
   ruta: [number, number][];
+  totalParadas?: number;
+  distanciaKm?: number;
+  tiempoMin?: number;
+  velocidadKmh?: number;
 }
 
 export interface ResumenSectoresYZonas {
@@ -86,18 +90,27 @@ export class RutaService {
   }
 
   /**
-   * Factor de ponderación por minutos de espera (DT-80):
-   * x1.0 hasta naranja (< 35 min)
-   * x1.5 desde naranja hasta rojo (35 a 50 min)
-   * x2.5 desde rojo (>= 50 min)
+   * Factor de ponderación por minutos de espera (DT-80 / Decisión dueño):
+   * Soporta 3 umbrales propios de reparto (retrasado 20, tarde 30, muy tarde 45)
+   * o 2 umbrales de compatibilidad hacia atrás (naranja 35, rojo 50).
    */
   calcularFactorEspera(
     minutosEspera: number,
-    naranjaMin = 35,
-    rojoMin = 50,
+    u1 = 20,
+    u2 = 30,
+    u3 = 45,
   ): number {
-    if (minutosEspera >= rojoMin) return 2.5;
-    if (minutosEspera >= naranjaMin) return 1.5;
+    // Si se pasan solo 2 umbrales (compatibilidad con naranjaMin=35, rojoMin=50)
+    if (arguments.length === 3 && u2 > u1) {
+      const naranjaMin = u1;
+      const rojoMin = u2;
+      if (minutosEspera >= rojoMin) return 2.5;
+      if (minutosEspera >= naranjaMin) return 1.5;
+      return 1.0;
+    }
+    if (minutosEspera >= u3) return 2.5;
+    if (minutosEspera >= u2) return 1.8;
+    if (minutosEspera >= u1) return 1.3;
     return 1.0;
   }
 
@@ -108,10 +121,14 @@ export class RutaService {
   calcularCosto(
     distanciaKm: number,
     minutosEspera: number,
-    naranjaMin = 35,
-    rojoMin = 50,
+    u1 = 20,
+    u2 = 30,
+    u3 = 45,
   ): number {
-    const factor = this.calcularFactorEspera(minutosEspera, naranjaMin, rojoMin);
+    const factor =
+      arguments.length === 3
+        ? this.calcularFactorEspera(minutosEspera, u1, u2)
+        : this.calcularFactorEspera(minutosEspera, u1, u2, u3);
     return distanciaKm * 3 - minutosEspera * factor;
   }
 
@@ -123,11 +140,23 @@ export class RutaService {
     pedidosPropios: PedidoRutaInput[],
     pedidosDisponibles: PedidoRutaInput[] = [],
     localCoords: Coordenadas = COORDENADAS_LOCAL_DEFAULT,
-    umbrales: { naranjaMin: number; rojoMin: number } = { naranjaMin: 35, rojoMin: 50 },
+    umbrales: {
+      retrasadoMin?: number;
+      tardeMin?: number;
+      muyTardeMin?: number;
+      naranjaMin?: number;
+      rojoMin?: number;
+    } = {},
     repMax = 3,
+    velocidadKmh = 25,
   ): ResultadoRuta {
     const orden: string[] = [];
     const ruta: [number, number][] = [[localCoords.lat, localCoords.lng]];
+
+    // Umbrales a usar para priorización
+    const uRetrasado = umbrales.retrasadoMin ?? umbrales.naranjaMin ?? 20;
+    const uTarde = umbrales.tardeMin ?? (umbrales.rojoMin != null ? umbrales.rojoMin - 10 : 30);
+    const uMuyTarde = umbrales.muyTardeMin ?? umbrales.rojoMin ?? 45;
 
     // 1. Ruta greedy punto a punto para los pedidos propios
     const restantes = [...pedidosPropios];
@@ -137,8 +166,14 @@ export class RutaService {
       restantes.sort((a, b) => {
         const distA = this.haversineKm(posActual.lat, posActual.lng, a.lat, a.lng);
         const distB = this.haversineKm(posActual.lat, posActual.lng, b.lat, b.lng);
-        const costoA = this.calcularCosto(distA, a.minutosEspera, umbrales.naranjaMin, umbrales.rojoMin);
-        const costoB = this.calcularCosto(distB, b.minutosEspera, umbrales.naranjaMin, umbrales.rojoMin);
+        const costoA =
+          umbrales.naranjaMin != null && umbrales.rojoMin != null && umbrales.retrasadoMin == null
+            ? this.calcularCosto(distA, a.minutosEspera, umbrales.naranjaMin, umbrales.rojoMin)
+            : this.calcularCosto(distA, a.minutosEspera, uRetrasado, uTarde, uMuyTarde);
+        const costoB =
+          umbrales.naranjaMin != null && umbrales.rojoMin != null && umbrales.retrasadoMin == null
+            ? this.calcularCosto(distB, b.minutosEspera, umbrales.naranjaMin, umbrales.rojoMin)
+            : this.calcularCosto(distB, b.minutosEspera, uRetrasado, uTarde, uMuyTarde);
         return costoA - costoB;
       });
 
@@ -183,7 +218,25 @@ export class RutaService {
       }
     }
 
-    return { orden, paso, ruta };
+    // 3. Cálculo de distancia total aproximada (km) y tiempo estimado (min) por haversine
+    let distanciaKm = 0;
+    for (let i = 0; i < ruta.length - 1; i++) {
+      distanciaKm += this.haversineKm(ruta[i][0], ruta[i][1], ruta[i + 1][0], ruta[i + 1][1]);
+    }
+    distanciaKm = Number(distanciaKm.toFixed(2));
+    const velocidad = velocidadKmh > 0 ? velocidadKmh : 25;
+    const tiempoMin = Math.round((distanciaKm / velocidad) * 60);
+    const totalParadas = orden.length;
+
+    return {
+      orden,
+      paso,
+      ruta,
+      totalParadas,
+      distanciaKm,
+      tiempoMin,
+      velocidadKmh: velocidad,
+    };
   }
 
   /**

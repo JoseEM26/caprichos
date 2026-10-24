@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Post,
+  Put,
   Query,
   Req,
   UseGuards,
@@ -14,11 +15,34 @@ import { RepartosService } from './repartos.service';
 import { FiltrarRepartosDto } from './dto/filtrar-repartos.dto';
 import { ReportarFallaDto } from './dto/reportar-falla.dto';
 import { ResolverFallaDto } from './dto/resolver-falla.dto';
+import { ActualizarConfigRepartoDto } from './dto/actualizar-config-reparto.dto';
 
 @Controller('admin/repartos')
 @UseGuards(AccesoGuard)
 export class RepartosController {
   constructor(private readonly repartosService: RepartosService) {}
+
+  @Get('config')
+  @Permiso('repartos', 'ver')
+  async obtenerConfig() {
+    return this.repartosService.obtenerConfig();
+  }
+
+  @Put('config')
+  @Permiso('configuracion', 'editar')
+  async actualizarConfig(
+    @Body() dto: ActualizarConfigRepartoDto,
+    @Req() req: any,
+  ) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.repartosService.actualizarConfig(dto, req.usuario, ip);
+  }
+
+  @Get('zonas')
+  @Permiso('repartos', 'ver')
+  async listarZonas() {
+    return this.repartosService.listarZonas();
+  }
 
   @Get('disponibles')
   @Permiso('repartos', 'ver')

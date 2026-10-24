@@ -6,6 +6,7 @@ import { PedidoReparto, repartosApi, MensajeReparto } from './repartosApi';
 import { ModalReportarFalla } from './ModalReportarFalla';
 import { ModalResolverFalla } from './ModalResolverFalla';
 import { ErrorApi } from '../../comun/api';
+import { clasificarEspera } from './calculoRuta';
 
 interface TarjetaRepartoProps {
   pedido: PedidoReparto;
@@ -70,19 +71,17 @@ export function TarjetaReparto({
     }
   };
 
-  // Color de borde y badge según minutos de espera
-  const colorBorde =
-    pedido.color === 'rojo'
-      ? 'var(--cp-rust, #B2500F)'
-      : pedido.color === 'naranja'
-      ? 'var(--cp-gold, #D99E39)'
-      : 'var(--cp-green, #2F7A45)';
+  // Color de borde y badge según minutos de espera (Decisión 3 del dueño: 20/30/45)
+  const infoEspera = clasificarEspera(pedido.minutosEspera);
+  const colorBorde = infoEspera.colorHex;
 
   const badgeColor =
-    pedido.color === 'rojo'
-      ? { bg: '#FDE8E8', fg: '#9B1C1C', texto: `${pedido.minutosEspera} min (crítico)` }
-      : pedido.color === 'naranja'
-      ? { bg: '#FEF08A', fg: '#713F12', texto: `${pedido.minutosEspera} min (espera)` }
+    infoEspera.nivel === 'muy_tarde'
+      ? { bg: '#FDE8E8', fg: '#9B1C1C', texto: `${pedido.minutosEspera} min (Muy tarde)` }
+      : infoEspera.nivel === 'tarde'
+      ? { bg: '#FFEDD5', fg: '#7C2D12', texto: `${pedido.minutosEspera} min (Tarde)` }
+      : infoEspera.nivel === 'retrasado'
+      ? { bg: '#FEF08A', fg: '#713F12', texto: `${pedido.minutosEspera} min (Retrasado)` }
       : { bg: '#DEF7EC', fg: '#03543F', texto: `${pedido.minutosEspera} min` };
 
   // Cobro contra entrega

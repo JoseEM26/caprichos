@@ -47,6 +47,9 @@ describe('RepartosController', () => {
       entregar: jest.fn(),
       reportarFalla: jest.fn(),
       resolverFalla: jest.fn(),
+      obtenerConfig: jest.fn(),
+      actualizarConfig: jest.fn(),
+      listarZonas: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -154,5 +157,37 @@ describe('RepartosController', () => {
     const res = await controller.resolverFalla('10', dto, reqMock);
     expect(serviceMock.resolverFalla).toHaveBeenCalledWith('10', dto, adminAuth, '127.0.0.1');
     expect(res.ok).toBe(true);
+  });
+
+  it('GET /admin/repartos/config delega a service.obtenerConfig', async () => {
+    const configMock = {
+      retrasadoMin: 20,
+      tardeMin: 30,
+      muyTardeMin: 45,
+      velocidadKmh: 25,
+      maxPedidos: 3,
+      localCoords: { lat: -12.0147, lng: -76.966 },
+    };
+    serviceMock.obtenerConfig.mockResolvedValue(configMock);
+    const res = await controller.obtenerConfig();
+    expect(serviceMock.obtenerConfig).toHaveBeenCalled();
+    expect(res).toEqual(configMock);
+  });
+
+  it('PUT /admin/repartos/config delega a service.actualizarConfig con dto y usuario', async () => {
+    const dto = { retrasadoMin: 22, tardeMin: 32, muyTardeMin: 48 };
+    serviceMock.actualizarConfig.mockResolvedValue({ ...dto, velocidadKmh: 25, maxPedidos: 3 });
+    const reqMock: any = { usuario: adminAuth, ip: '127.0.0.1' };
+    const res = await controller.actualizarConfig(dto, reqMock);
+    expect(serviceMock.actualizarConfig).toHaveBeenCalledWith(dto, adminAuth, '127.0.0.1');
+    expect(res.retrasadoMin).toBe(22);
+  });
+
+  it('GET /admin/repartos/zonas delega a service.listarZonas', async () => {
+    const zonasMock = [{ id: '1', codigo: 'Z2', nombre: 'Zona Z2', tarifa: 2, activa: true, puntos: 4 }];
+    serviceMock.listarZonas.mockResolvedValue(zonasMock);
+    const res = await controller.listarZonas();
+    expect(serviceMock.listarZonas).toHaveBeenCalled();
+    expect(res).toEqual(zonasMock);
   });
 });

@@ -5,3 +5,5 @@ export * from './HorarioTab';
 export * from './FechasEspecialesTab';
 export * from './PagosTab';
 export * from './ParametrosOperacionTab';
+export * from './SeccionRepartoConfig';
+export * from './SeccionAltaDemanda';

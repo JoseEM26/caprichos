@@ -1,14 +1,28 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useSesion } from '../../comun/sesion';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { EstadoVacio } from '../../comun/EstadoVacio';
 import { useEventos } from '../../comun/socket';
 import { Confirmar } from '../../comun/Confirmar';
-import { MapaPedidos, PuntoPedido } from '../../comun/mapa/MapaPedidos';
+import { useEsMovil } from '../../carta/useEsMovil';
+import { MapaRepartos, PuntoRepartoMapa } from './MapaRepartos';
 import { TarjetaReparto } from './TarjetaReparto';
 import { ResumenPedidoReparto } from './ResumenPedidoReparto';
+import { PanelRutaSugerida } from './PanelRutaSugerida';
 import { useAccionesReparto } from './useAccionesReparto';
+import {
+  clasificarEspera,
+  sugerirOrdenRuta,
+  calcularMetricasRuta,
+  ConfigReparto,
+  CONFIG_REPARTO_DEFECTO,
+  COORDENADAS_TIENDA_DEFECTO,
+  NivelEspera,
+  PedidoParaRuta,
+} from './calculoRuta';
+import { ZonaGeoItem, ZONAS_GEO_DEFECTO } from './zonasGeo';
 import {
   repartosApi,
   PedidoReparto,
@@ -17,7 +31,7 @@ import {
 } from './repartosApi';
 
 type ModoVista = 'mapa' | 'lista';
-type TipoTile = 'todos' | 'disp' | 'ruta' | 'prob' | 'done';
+type FiltroRetraso = 'todos' | NivelEspera;
 
 function agruparPorZona(
   pedidos: PedidoReparto[],
@@ -36,23 +50,41 @@ function agruparPorZona(
 
 export function RepartosView() {
   const { tiene, usuario } = useSesion();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const movil = useEsMovil();
+
   const puedeVer = tiene('repartos/ver');
   const puedeLiquidar = tiene('repartos/liquidar');
   const esRolRepartidor = usuario?.rol === 'REPARTIDOR';
 
-  // Modo de vista: 'mapa' por defecto (acta 03, DT-59, RQ-DEL-02-01)
-  const [modoVista, setModoVista] = useState<ModoVista>('mapa');
+  // Configuración de reparto (umbrales y velocidad media)
+  const [config, setConfig] = useState<ConfigReparto>(CONFIG_REPARTO_DEFECTO);
 
-  // Filtro de rol / repartidor: arranca en 'all' ("Todos (caja)") como en el mockup
+  // Polígonos de zonas de reparto (Decisión 5)
+  const [zonasGeo, setZonasGeo] = useState<ZonaGeoItem[]>(ZONAS_GEO_DEFECTO);
+
+  // Modo de vista: 'mapa' por defecto; sincronizado con URL si viene ?vista=lista o ?vista=mios
+  const vistaUrl = searchParams.get('vista');
+  const [modoVista, setModoVista] = useState<ModoVista>(
+    vistaUrl === 'lista' || vistaUrl === 'mios' ? 'lista' : 'mapa',
+  );
+
+  // Filtro de rol / repartidor: arranca en 'all' ("Todos (caja)") o el id del repartidor
   const [filtroRider, setFiltroRider] = useState<string>('all');
-
-  // Tarjeta activa: arranca en 'todos' en azul marino como en el mockup
-  const [filtroTile, setFiltroTile] = useState<TipoTile>('todos');
 
   // Filtro de zona: arranca en 'todas'
   const [filtroZona, setFiltroZona] = useState<string>('todas');
 
-  // Datos
+  // Tres filtros de tiempo de espera (Decisión 3 del dueño: Retrasado, Tarde, Muy tarde)
+  const [filtroRetraso, setFiltroRetraso] = useState<FiltroRetraso>('todos');
+
+  // Estado de pantalla completa (Decisión 2 del dueño)
+  const [pantallaCompleta, setPantallaCompleta] = useState(false);
+
+  // Modal de ayuda rápida "¿Cómo funciona?" (Decisión 1 del dueño)
+  const [ayudaAbierta, setAyudaAbierta] = useState(false);
+
+  // Datos de la API
   const [disponibles, setDisponibles] = useState<PedidoReparto[]>([]);
   const [datosMios, setDatosMios] = useState<RespuestaMios>({
     pedidos: [],
@@ -61,30 +93,74 @@ export function RepartosView() {
     ruta: [],
   });
   const [todos, setTodos] = useState<PedidoReparto[]>([]);
-  const [resumen, setResumen] = useState<ResumenRepartos | null>(null);
+  const [, setResumen] = useState<ResumenRepartos | null>(null);
 
-  // Selección de pedido en el mapa
+  // Selección de pedido para la hoja inferior (Decisión 7)
   const [pedidoSeleccionadoId, setPedidoSeleccionadoId] = useState<string | null>(null);
+
+  // Paradas de ruta seleccionadas manualmente o por sugerencia (Decisión 4)
+  const [paradasRutaIds, setParadasRutaIds] = useState<string[]>([]);
+  const [ordenManualRuta, setOrdenManualRuta] = useState<string[]>([]);
 
   // Estados de carga
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Actualizar modo de vista si cambia la URL (Decisión 6: navegación por botones del celular)
+  useEffect(() => {
+    if (vistaUrl === 'mapa') {
+      setModoVista('mapa');
+    } else if (vistaUrl === 'lista' || vistaUrl === 'mios') {
+      setModoVista('lista');
+    }
+  }, [vistaUrl]);
+
+  // Sincronizar Fullscreen API con el estado local
+  useEffect(() => {
+    const alCambiarFullscreen = () => {
+      setPantallaCompleta(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', alCambiarFullscreen);
+    return () => {
+      document.removeEventListener('fullscreenchange', alCambiarFullscreen);
+    };
+  }, []);
+
+  const alternarPantallaCompleta = () => {
+    if (!document.fullscreenElement) {
+      const el = document.documentElement;
+      if (el.requestFullscreen) {
+        el.requestFullscreen().catch(() => {});
+      }
+      setPantallaCompleta(true);
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
+      setPantallaCompleta(false);
+    }
+  };
 
   const cargarDatos = useCallback(async () => {
     if (!puedeVer) return;
     setError(null);
 
     try {
-      const [disp, res, mios, tod] = await Promise.all([
+      const [disp, res, mios, tod, cfg, zGeo] = await Promise.all([
         repartosApi.listarDisponibles().catch(() => []),
         repartosApi.obtenerResumen().catch(() => null),
         repartosApi.listarMios().catch(() => ({ pedidos: [], orden: [], paso: [], ruta: [] })),
         repartosApi.listarTodos().catch(() => []),
+        repartosApi.obtenerConfig().catch(() => CONFIG_REPARTO_DEFECTO),
+        repartosApi.obtenerZonasPoligonos().catch(() => ZONAS_GEO_DEFECTO),
       ]);
+
       setDisponibles(disp);
       setResumen(res);
       setDatosMios(mios);
       setTodos(tod);
+      if (cfg) setConfig(cfg);
+      if (zGeo) setZonasGeo(zGeo);
     } catch (err: any) {
       setError(err?.message || 'Error al cargar los repartos');
     } finally {
@@ -131,193 +207,194 @@ export function RepartosView() {
       return (
         rId === filtroRider ||
         o.repartidor?.nombre?.toLowerCase().includes(filtroRider) ||
-        (filtroTile === 'disp' && !rId)
+        (!rId && o.estado === 'LISTO')
       );
     });
-  }, [todos, disponibles, datosMios, esRolRepartidor, puedeLiquidar, filtroRider, filtroTile, usuario]);
+  }, [todos, disponibles, datosMios, esRolRepartidor, puedeLiquidar, filtroRider, usuario]);
 
-  // Conteos reactivos para los 5 azulejos métricos (rpTiles)
-  const conteoTiles = useMemo(() => {
-    const totalCount = pedidosBase.length;
-    const dispCount = pedidosBase.filter(
-      (p) => p.estado === 'LISTO' && !p.repartidor_party_id && !p.repartidor,
-    ).length;
-    const rutaCount = pedidosBase.filter((p) => p.estado === 'EN_CAMINO').length;
-    const probCount = pedidosBase.filter((p) => !!p.motivo_falla).length;
-    const entregadosCount = pedidosBase.filter((p) => p.estado === 'ENTREGADO').length;
+  // Conteos para los 3 filtros de espera superiores (Decisión 3 del dueño)
+  const conteosEspera = useMemo(() => {
+    let retrasados = 0;
+    let tardes = 0;
+    let muyTardes = 0;
 
-    return {
-      todos: totalCount,
-      disp: dispCount,
-      ruta: rutaCount,
-      prob: probCount,
-      done: entregadosCount,
-    };
-  }, [pedidosBase]);
+    for (const p of pedidosBase) {
+      if (p.estado === 'ENTREGADO') continue;
+      const info = clasificarEspera(p.minutosEspera, config);
+      if (info.nivel === 'retrasado') retrasados++;
+      else if (info.nivel === 'tarde') tardes++;
+      else if (info.nivel === 'muy_tarde') muyTardes++;
+    }
 
-  const rpTiles = [
-    {
-      id: 'todos' as TipoTile,
-      n: 'Todos',
-      v: conteoTiles.todos,
-      on: filtroTile === 'todos',
-      bg: filtroTile === 'todos' ? 'var(--cp-navy)' : 'var(--cp-white)',
-      fg: filtroTile === 'todos' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-      bd: filtroTile === 'todos' ? 'var(--cp-navy)' : 'var(--cp-line)',
-      ariaLabel: 'Todos',
-    },
-    {
-      id: 'disp' as TipoTile,
-      n: 'Disponibles',
-      v: conteoTiles.disp,
-      on: filtroTile === 'disp',
-      bg: filtroTile === 'disp' ? 'var(--cp-orange)' : 'var(--cp-white)',
-      fg: 'var(--cp-navy)',
-      bd: filtroTile === 'disp' ? 'var(--cp-orange)' : 'var(--cp-line)',
-      ariaLabel: 'Disponibles',
-    },
-    {
-      id: 'ruta' as TipoTile,
-      n: 'En ruta',
-      v: conteoTiles.ruta,
-      on: filtroTile === 'ruta',
-      bg: filtroTile === 'ruta' ? 'var(--cp-navy)' : 'var(--cp-white)',
-      fg: filtroTile === 'ruta' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-      bd: filtroTile === 'ruta' ? 'var(--cp-navy)' : 'var(--cp-line)',
-      ariaLabel: 'En ruta · Mis pedidos',
-    },
-    {
-      id: 'prob' as TipoTile,
-      n: 'Con problema',
-      v: conteoTiles.prob,
-      on: filtroTile === 'prob',
-      bg: filtroTile === 'prob' ? 'var(--cp-rust)' : 'var(--cp-white)',
-      fg: filtroTile === 'prob' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-      bd: filtroTile === 'prob' ? 'var(--cp-rust)' : 'var(--cp-line)',
-      ariaLabel: 'Con problema',
-    },
-    {
-      id: 'done' as TipoTile,
-      n: 'Entregados',
-      v: conteoTiles.done,
-      on: filtroTile === 'done',
-      bg: filtroTile === 'done' ? 'var(--cp-ok, #2E8B57)' : 'var(--cp-white)',
-      fg: filtroTile === 'done' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-      bd: filtroTile === 'done' ? 'var(--cp-ok, #2E8B57)' : 'var(--cp-line)',
-      ariaLabel: 'Entregados',
-    },
-  ];
+    return { retrasados, tardes, muyTardes };
+  }, [pedidosBase, config]);
 
-  // Pedidos filtrados según azulejo activo y zona
+  // Filtrado de pedidos según zona y filtro de espera
   const pedidosFiltrados = useMemo(() => {
     let lista = pedidosBase;
 
-    if (filtroTile === 'disp') {
-      lista = lista.filter(
-        (p) => p.estado === 'LISTO' && !p.repartidor_party_id && !p.repartidor,
-      );
-    } else if (filtroTile === 'ruta') {
-      lista = lista.filter((p) => p.estado === 'EN_CAMINO');
-    } else if (filtroTile === 'prob') {
-      lista = lista.filter((p) => !!p.motivo_falla);
-    } else if (filtroTile === 'done') {
-      lista = lista.filter((p) => p.estado === 'ENTREGADO');
-    }
-
+    // Filtro por zona
     if (filtroZona !== 'todas') {
       lista = lista.filter((p) => p.zona === filtroZona);
     }
 
-    return lista;
-  }, [pedidosBase, filtroTile, filtroZona]);
-
-  // Conteos por zona para las pastillas punteadas de «Dónde hay más»
-  const zonasContadas = useMemo(() => {
-    if (resumen?.zonas && Object.keys(resumen.zonas).length > 0) {
-      return resumen.zonas;
+    // Filtro por tiempo de retraso (Decisión 3 del dueño)
+    if (filtroRetraso !== 'todos') {
+      lista = lista.filter((p) => {
+        const info = clasificarEspera(p.minutosEspera, config);
+        return info.nivel === filtroRetraso;
+      });
     }
+
+    return lista;
+  }, [pedidosBase, filtroZona, filtroRetraso, config]);
+
+  // Conteos por zona para el sombreado y las pastillas (Decisión 5)
+  const conteosPorZona = useMemo(() => {
     const mapa: Record<string, number> = {};
     for (const p of pedidosBase) {
-      if (p.zona) {
+      if (p.zona && p.estado !== 'ENTREGADO') {
         mapa[p.zona] = (mapa[p.zona] || 0) + 1;
       }
     }
     return mapa;
-  }, [resumen, pedidosBase]);
+  }, [pedidosBase]);
 
-  // Lados cardinales (Norte, Sur, Este, Oeste)
-  const ladosContados = useMemo(() => {
-    if (resumen?.lados && Object.keys(resumen.lados).length > 0) {
-      return resumen.lados;
-    }
-    return { Norte: 0, Sur: 0, Este: 0, Oeste: 0 };
-  }, [resumen]);
-
-  const maxLado = useMemo(() => {
-    return Math.max(1, ...Object.values(ladosContados));
-  }, [ladosContados]);
-
-  // Pedidos para el mapa Leaflet
-  const puntosMapa: PuntoPedido[] = useMemo(() => {
-    const ordenMios = datosMios.orden || [];
-    return pedidosFiltrados
+  // Candidatos para la ruta sugerida (pedidos listos y pedidos que ya van en camino)
+  const pedidosCandidatosRuta = useMemo((): PedidoParaRuta[] => {
+    return pedidosBase
       .filter((p) => {
         if (p.lat == null || p.lng == null) return false;
-        if (filtroTile === 'todos') {
-          return p.estado === 'LISTO' || p.estado === 'EN_CAMINO';
-        }
-        return true;
+        if (p.estado === 'ENTREGADO') return false;
+        // Pedidos listos o pedidos que ya van en camino del repartidor
+        return (
+          p.estado === 'LISTO' ||
+          p.estado === 'EN_CAMINO' ||
+          datosMios.pedidos.some((m) => m.id === p.id)
+        );
       })
+      .map((p) => ({
+        id: p.id,
+        codigo: p.codigo,
+        cliente_nombre: p.cliente_nombre,
+        direccion: p.direccion,
+        lat: p.lat!,
+        lng: p.lng!,
+        minutosEspera: p.minutosEspera,
+        zona: p.zona,
+        estado: p.estado,
+        total: p.total,
+        pago_metodo: p.pago_metodo,
+        pago_estado: p.pago_estado,
+        paga_con: p.paga_con,
+      }));
+  }, [pedidosBase, datosMios.pedidos]);
+
+  // Inicializar paradas sugeridas si no se han seleccionado manualmente
+  useEffect(() => {
+    if (pedidosCandidatosRuta.length > 0 && paradasRutaIds.length === 0) {
+      const sugeridas = sugerirOrdenRuta(
+        pedidosCandidatosRuta,
+        COORDENADAS_TIENDA_DEFECTO,
+        config,
+        config.maxPedidosPorRepartidor,
+      );
+      const ids = sugeridas.map((p) => p.id);
+      setParadasRutaIds(ids);
+      setOrdenManualRuta(ids);
+    }
+  }, [pedidosCandidatosRuta, config]);
+
+  // Cálculo de la ruta activa según paradas seleccionadas y su orden
+  const rutaCalculada = useMemo(() => {
+    const seleccionadosMap = new Map(pedidosCandidatosRuta.map((p) => [p.id, p]));
+    const paradasOrdenadas: PedidoParaRuta[] = [];
+
+    // Usar orden manual establecido
+    for (const id of ordenManualRuta) {
+      if (paradasRutaIds.includes(id) && seleccionadosMap.has(id)) {
+        paradasOrdenadas.push(seleccionadosMap.get(id)!);
+      }
+    }
+
+    // Agregar paradas seleccionadas que aún no estaban en el orden manual
+    for (const id of paradasRutaIds) {
+      if (!ordenManualRuta.includes(id) && seleccionadosMap.has(id)) {
+        paradasOrdenadas.push(seleccionadosMap.get(id)!);
+      }
+    }
+
+    return calcularMetricasRuta(
+      paradasOrdenadas,
+      COORDENADAS_TIENDA_DEFECTO,
+      config.velocidadMediaKmH,
+    );
+  }, [pedidosCandidatosRuta, paradasRutaIds, ordenManualRuta, config]);
+
+  // Manejadores para el panel de ruta sugerida
+  const handleAlternarSeleccionParada = (id: string) => {
+    setParadasRutaIds((prev) => {
+      if (prev.includes(id)) {
+        return prev.filter((x) => x !== id);
+      } else {
+        const limite = config.maxPedidosPorRepartidor ?? 3;
+        if (prev.length >= limite) {
+          return prev; // No exceder el máximo configurable
+        }
+        return [...prev, id];
+      }
+    });
+  };
+
+  const handleMoverParada = (origenIdx: number, destinoIdx: number) => {
+    if (
+      origenIdx < 0 ||
+      destinoIdx < 0 ||
+      origenIdx >= rutaCalculada.paradas.length ||
+      destinoIdx >= rutaCalculada.paradas.length
+    ) {
+      return;
+    }
+
+    const nuevoOrden = [...rutaCalculada.paradas.map((p) => p.id)];
+    const [movido] = nuevoOrden.splice(origenIdx, 1);
+    nuevoOrden.splice(destinoIdx, 0, movido);
+    setOrdenManualRuta(nuevoOrden);
+  };
+
+  // Puntos para el mapa interactivo
+  const puntosMapa: PuntoRepartoMapa[] = useMemo(() => {
+    const ordenMap = new Map(rutaCalculada.paradas.map((p, idx) => [p.id, idx + 1]));
+
+    return pedidosFiltrados
+      .filter((p) => p.lat != null && p.lng != null)
       .map((p) => {
-        const idx = ordenMios.indexOf(String(p.id));
-        const ordenNumero = idx !== -1 ? idx + 1 : undefined;
+        const infoEspera = clasificarEspera(p.minutosEspera, config);
+        const numeroOrden = ordenMap.get(p.id);
+
         return {
           id: p.id,
           lat: p.lat!,
           lng: p.lng!,
           etiqueta: p.cliente_nombre,
-          detalle: `${p.codigo}${p.estado === 'EN_CAMINO' ? ' · en camino' : ''}${
-            p.repartidor?.nombre ? ` · ${p.repartidor.nombre}` : ''
-          }`,
-          color: p.color,
-          orden: ordenNumero,
+          codigo: p.codigo,
+          detalle: p.estado === 'EN_CAMINO' ? 'en camino' : undefined,
+          color: infoEspera.color,
+          orden: numeroOrden,
         };
       });
-  }, [pedidosFiltrados, filtroTile, datosMios.orden]);
+  }, [pedidosFiltrados, rutaCalculada.paradas, config]);
 
-  // Pedidos sin ubicar (lat/lng nulos)
-  const pedidosFaltaUbicar = useMemo(() => {
-    return pedidosFiltrados.filter((p) => p.lat == null || p.lng == null);
-  }, [pedidosFiltrados]);
+  // Coordenadas para la línea de ruta sugerida en el mapa
+  const rutaCoordenadasMapa: Array<[number, number]> = useMemo(() => {
+    if (rutaCalculada.paradas.length === 0) return [];
+    return [
+      [COORDENADAS_TIENDA_DEFECTO.lat, COORDENADAS_TIENDA_DEFECTO.lng],
+      ...rutaCalculada.paradas.map((p): [number, number] => [p.lat, p.lng]),
+    ];
+  }, [rutaCalculada.paradas]);
 
-  // Pedidos de "mis pedidos" ordenados según la ruta de la API
-  const pedidosMiosOrdenados = useMemo(() => {
-    const orden = datosMios.orden || [];
-    return [...datosMios.pedidos].sort((a, b) => {
-      const idxA = orden.indexOf(String(a.id));
-      const idxB = orden.indexOf(String(b.id));
-      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-      if (idxA !== -1) return -1;
-      if (idxB !== -1) return 1;
-      return 0;
-    });
-  }, [datosMios]);
-
-  // Cartel flotante sobre el mapa idéntico al mockup (rmNote)
-  const rmNote = useMemo(() => {
-    if (!esRolRepartidor && filtroRider === 'all') {
-      return 'Vista de caja: todos los pedidos listos y en camino.';
-    }
-    if (datosMios.pedidos.length > 0) {
-      const nombres = pedidosMiosOrdenados
-        .map((p, i) => `${i + 1} ${p.cliente_nombre.split(' ')[0]}`)
-        .join(' → ');
-      return `La línea naranja es la ruta sugerida: pesa la cercanía y, más, el que lleva más esperando (solo sugerencia). Orden: ${nombres}`;
-    }
-    return 'Toca un punto para ver el pedido y tomarlo. Los anillos son kilómetros desde el local.';
-  }, [esRolRepartidor, filtroRider, datosMios.pedidos.length, pedidosMiosOrdenados]);
-
-  // Pedido seleccionado al tocar un punto
+  // Pedido seleccionado al tocar un marcador
   const pedidoSeleccionado = useMemo(() => {
     if (!pedidoSeleccionadoId) return null;
     return pedidosBase.find((p) => p.id === pedidoSeleccionadoId) || null;
@@ -327,6 +404,11 @@ export function RepartosView() {
   const gruposPorZona = useMemo(() => {
     return agruparPorZona(pedidosFiltrados);
   }, [pedidosFiltrados]);
+
+  // Manejador al tocar fondo del mapa para ocultar/mostrar controles en celular
+  const handleTocarMapa = () => {
+    window.dispatchEvent(new CustomEvent('caprichos:toggle-controles'));
+  };
 
   if (!puedeVer) {
     return (
@@ -338,380 +420,363 @@ export function RepartosView() {
 
   return (
     <div
+      className={pantallaCompleta ? 'cp-repartos-fullscreen' : ''}
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: '16px',
+        gap: '12px',
         width: '100%',
         boxSizing: 'border-box',
+        position: 'relative',
+        paddingBottom: esRolRepartidor && movil ? '80px' : '20px',
       }}
     >
-      {/* 1) Fila «Ver como:» / «Soy:» */}
-      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-        <span style={{ fontWeight: 700 }}>
-          {esRolRepartidor ? 'Soy:' : 'Ver como:'}
-        </span>
-        {(!esRolRepartidor || puedeLiquidar) && (
-          <button
-            type="button"
-            onClick={() => {
-              setFiltroRider('all');
-              setPedidoSeleccionadoId(null);
-            }}
-            style={{
-              minHeight: '44px',
-              padding: '0 14px',
-              borderRadius: '9999px',
-              border: '1.5px solid var(--cp-navy)',
-              background: filtroRider === 'all' ? 'var(--cp-navy)' : 'transparent',
-              color: filtroRider === 'all' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-              fontWeight: 700,
-              fontSize: '13px',
-              cursor: 'pointer',
-            }}
-          >
-            Todos (caja)
-          </button>
-        )}
-        {[
-          { id: 'r1', n: 'Repartidor 1' },
-          { id: 'r2', n: 'Repartidor 2' },
-          { id: 'r3', n: 'Repartidor 3' },
-        ].map((r) => {
-          const activo = filtroRider === r.id;
-          return (
+      {/* 1) FILA SUPERIOR COMPACTA: Selector «Ver como:», alternancia [Mapa] [Lista], Fullscreen y Ayuda «?» */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '8px',
+          flexWrap: 'wrap',
+          padding: '0 4px',
+        }}
+      >
+        {/* Selector de Repartidor / Caja (solo para admin/cajero o si puede liquidar) */}
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontWeight: 800, fontSize: '13px', color: 'var(--cp-navy, #0B2C3E)' }}>
+            {esRolRepartidor ? 'Soy:' : 'Ver como:'}
+          </span>
+          {(!esRolRepartidor || puedeLiquidar) && (
             <button
-              key={r.id}
               type="button"
               onClick={() => {
-                setFiltroRider(r.id);
+                setFiltroRider('all');
                 setPedidoSeleccionadoId(null);
               }}
               style={{
-                minHeight: '44px',
-                padding: '0 14px',
+                minHeight: '38px',
+                padding: '0 12px',
                 borderRadius: '9999px',
-                border: '1.5px solid var(--cp-navy)',
-                background: activo ? 'var(--cp-navy)' : 'transparent',
-                color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                background: filtroRider === 'all' ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
+                color: filtroRider === 'all' ? 'var(--cp-cream, #FFFDF8)' : 'var(--cp-navy, #0B2C3E)',
                 fontWeight: 700,
-                fontSize: '13px',
+                fontSize: '12px',
                 cursor: 'pointer',
               }}
             >
-              {r.n}
+              Todos (caja)
             </button>
-          );
-        })}
-      </div>
-
-      {/* 2) 5 Tarjetas métricas (rpTiles) */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-          gap: '10px',
-        }}
-      >
-        {rpTiles.map((tile) => (
-          <button
-            key={tile.id}
-            type="button"
-            role="tab"
-            aria-label={tile.ariaLabel}
-            aria-selected={tile.on}
-            aria-pressed={tile.on}
-            onClick={() => {
-              setFiltroTile(tile.id);
-              setPedidoSeleccionadoId(null);
-            }}
-            style={{
-              textAlign: 'left',
-              minHeight: '64px',
-              border: `1.5px solid ${tile.bd}`,
-              borderRadius: '14px',
-              background: tile.bg,
-              color: tile.fg,
-              padding: '8px 12px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 0,
-              cursor: 'pointer',
-            }}
-          >
-            <span style={{ fontSize: '12px', fontWeight: 700, opacity: 0.85 }}>
-              {tile.n}
-            </span>
-            <span
-              style={{
-                fontFamily: 'Montserrat, sans-serif',
-                fontWeight: 800,
-                fontSize: '24px',
-                lineHeight: '30px',
-              }}
-            >
-              {tile.v}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      {/* 3) Sección colapsable "¿Cómo funciona?" */}
-      <details style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
-        <summary
-          style={{
-            minHeight: '44px',
-            display: 'flex',
-            alignItems: 'center',
-            cursor: 'pointer',
-            fontWeight: 700,
-          }}
-        >
-          ¿Cómo funciona?
-        </summary>
-        <div style={{ lineHeight: '19px', paddingBottom: '6px' }}>
-          Cada pedido listo aparece como Disponible. El repartidor que lo toma se lo queda y a los demás les desaparece. Desde su celular abre la dirección en Waze o Google Maps. Caja y call center ven quién tomó cada pedido. Si algo falla, el repartidor lo reporta y caja y call center coordinan con el cliente por WhatsApp.
-        </div>
-      </details>
-
-      {/* 4) Alternancia [Mapa] [Lista] con leyenda exacta */}
-      <div
-        role="group"
-        aria-label="Vista de repartos"
-        style={{
-          display: 'flex',
-          gap: '6px',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-        }}
-      >
-        <button
-          type="button"
-          aria-pressed={modoVista === 'mapa'}
-          onClick={() => setModoVista('mapa')}
-          style={{
-            minHeight: '44px',
-            padding: '0 16px',
-            borderRadius: '12px',
-            border: '1.5px solid var(--cp-navy)',
-            background: modoVista === 'mapa' ? 'var(--cp-navy)' : 'transparent',
-            color: modoVista === 'mapa' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-            fontWeight: 800,
-            fontSize: '13px',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          Mapa
-        </button>
-        <button
-          type="button"
-          aria-pressed={modoVista === 'lista'}
-          onClick={() => setModoVista('lista')}
-          style={{
-            minHeight: '44px',
-            padding: '0 16px',
-            borderRadius: '12px',
-            border: '1.5px solid var(--cp-navy)',
-            background: modoVista === 'lista' ? 'var(--cp-navy)' : 'transparent',
-            color: modoVista === 'lista' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-            fontWeight: 800,
-            fontSize: '13px',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          Lista
-        </button>
-        <span style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-          Verde: menos de 35 min · Naranja: retraso · Rojo: más de 50 min (crítico)
-        </span>
-      </div>
-
-      {cargando ? (
-        <div style={{ padding: '40px 0' }}>
-          <Cargando mensaje="Cargando pedidos de reparto..." />
-        </div>
-      ) : error ? (
-        <EstadoError mensaje={error} alReintentar={cargarDatos} />
-      ) : modoVista === 'mapa' ? (
-        /* VISTA MAPA (Principal) */
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {/* Fila compacta «Dónde hay más:» con cardinales y pastillas de zona punteadas que filtran */}
-          <div
-            aria-label="Pedidos por lado y por zona"
-            style={{
-              display: 'flex',
-              gap: '6px',
-              flexWrap: 'wrap',
-              alignItems: 'center',
-              flex: 'none',
-            }}
-          >
-            <span
-              style={{
-                fontSize: '12px',
-                fontWeight: 700,
-                color: 'var(--cp-soft)',
-              }}
-            >
-              Dónde hay más:
-            </span>
-            {Object.entries(ladosContados).map(([lado, cant]) => (
-              <span
-                key={lado}
-                style={{
-                  minHeight: '32px',
-                  boxSizing: 'border-box',
-                  padding: '0 10px',
-                  borderRadius: '9999px',
-                  border: '1.5px solid var(--cp-navy)',
-                  background:
-                    Number(cant) > 0
-                      ? `color-mix(in srgb, var(--cp-orange) ${Math.round(20 + (60 * Number(cant)) / maxLado)}%, var(--cp-white))`
-                      : 'transparent',
-                  color: 'var(--cp-navy)',
-                  fontSize: '12px',
-                  fontWeight: 800,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                }}
-              >
-                {cant} {lado}
-              </span>
-            ))}
-            {Object.keys(zonasContadas).length > 0 && (
-              <>
-                <span
-                  style={{
-                    width: '1px',
-                    height: '20px',
-                    background: 'var(--cp-line)',
-                  }}
-                />
-                {Object.entries(zonasContadas)
-                  .sort(([a], [b]) => a.localeCompare(b))
-                  .map(([zona, cant]) => {
-                    const activa = filtroZona === zona;
-                    return (
-                      <button
-                        key={zona}
-                        type="button"
-                        aria-label={zona}
-                        onClick={() => setFiltroZona(activa ? 'todas' : zona)}
-                        style={{
-                          minHeight: '32px',
-                          boxSizing: 'border-box',
-                          padding: '0 10px',
-                          borderRadius: '9999px',
-                          border: activa
-                            ? '1.5px solid var(--cp-navy)'
-                            : '1.5px dashed var(--cp-soft)',
-                          background: activa ? 'var(--cp-navy)' : 'transparent',
-                          color: activa ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                          fontSize: '12px',
-                          fontWeight: 700,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <span aria-hidden="true">{zona}: {cant}</span>
-                      </button>
-                    );
-                  })}
-              </>
-            )}
-          </div>
-
-          {/* Aviso de pedidos sin ubicar en el mapa */}
-          {pedidosFaltaUbicar.length > 0 && (
-            <div
-              role="status"
-              style={{
-                background: '#FFF6E3',
-                border: '1.5px solid var(--cp-gold, #D4A373)',
-                borderRadius: '12px',
-                padding: '10px 14px',
-                fontSize: '13px',
-                fontWeight: 700,
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: '8px',
-              }}
-            >
-              <span>
-                Hay {pedidosFaltaUbicar.length} pedido(s) sin ubicación en esta vista (no aparecen en el mapa).
-              </span>
+          )}
+          {[
+            { id: 'r1', n: 'Repartidor 1' },
+            { id: 'r2', n: 'Repartidor 2' },
+            { id: 'r3', n: 'Repartidor 3' },
+          ].map((r) => {
+            const activo = filtroRider === r.id;
+            return (
               <button
+                key={r.id}
                 type="button"
-                onClick={() => setModoVista('lista')}
+                onClick={() => {
+                  setFiltroRider(r.id);
+                  setPedidoSeleccionadoId(null);
+                }}
                 style={{
-                  minHeight: '36px',
+                  minHeight: '38px',
                   padding: '0 12px',
-                  border: '1.5px solid var(--cp-navy)',
-                  borderRadius: '8px',
-                  background: 'transparent',
-                  color: 'var(--cp-navy)',
+                  borderRadius: '9999px',
+                  border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                  background: activo ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
+                  color: activo ? 'var(--cp-cream, #FFFDF8)' : 'var(--cp-navy, #0B2C3E)',
                   fontWeight: 700,
                   fontSize: '12px',
                   cursor: 'pointer',
                 }}
               >
-                Ver en Lista
+                {r.n}
               </button>
-            </div>
-          )}
+            );
+          })}
+        </div>
 
-          {/* Caja del mapa idéntica a la del mockup */}
+        {/* Doble vista [Mapa] [Lista], Botón Pantalla Completa y Botón «?» (Decisiones 1 y 2) */}
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
           <div
+            role="group"
+            aria-label="Alternar vista de repartos"
             style={{
-              position: 'relative',
-              flex: 'none',
-              background: '#E8EFE6',
-              border: '1px solid var(--cp-line)',
-              borderRadius: '16px',
-              overflow: 'hidden',
-              width: '100%',
+              display: 'inline-flex',
+              background: 'var(--cp-cream, #FFFDF8)',
+              border: '1.5px solid var(--cp-navy, #0B2C3E)',
+              borderRadius: '12px',
+              padding: '2px',
             }}
           >
-            {/* Cartel flotante con fondo traslúcido */}
-            <div
+            <button
+              type="button"
+              aria-pressed={modoVista === 'mapa'}
+              onClick={() => {
+                setModoVista('mapa');
+                setSearchParams({ vista: 'mapa' });
+              }}
               style={{
-                position: 'absolute',
-                left: '10px',
-                top: '10px',
-                background: 'rgba(255, 255, 255, 0.92)',
-                borderRadius: '10px',
-                padding: '6px 10px',
+                minHeight: '36px',
+                padding: '0 14px',
+                borderRadius: '9px',
+                border: 'none',
+                background: modoVista === 'mapa' ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
+                color: modoVista === 'mapa' ? 'var(--cp-cream, #FFFDF8)' : 'var(--cp-navy, #0B2C3E)',
+                fontWeight: 800,
                 fontSize: '12px',
-                lineHeight: '16px',
-                fontWeight: 700,
-                maxWidth: '60%',
-                zIndex: 1000,
-                pointerEvents: 'none',
-                boxShadow: '0 2px 8px rgba(11, 44, 62, 0.1)',
+                cursor: 'pointer',
               }}
             >
-              {rmNote}
-            </div>
-
-            <MapaPedidos
-              puntos={puntosMapa}
-              seleccionado={pedidoSeleccionadoId}
-              onSeleccionar={(id) =>
-                setPedidoSeleccionadoId((prev) => (prev === id ? null : id))
-              }
-              altura="min(62vh, 560px)"
-            />
+              Mapa
+            </button>
+            <button
+              type="button"
+              aria-pressed={modoVista === 'lista'}
+              onClick={() => {
+                setModoVista('lista');
+                setSearchParams({ vista: 'lista' });
+              }}
+              style={{
+                minHeight: '36px',
+                padding: '0 14px',
+                borderRadius: '9px',
+                border: 'none',
+                background: modoVista === 'lista' ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
+                color: modoVista === 'lista' ? 'var(--cp-cream, #FFFDF8)' : 'var(--cp-navy, #0B2C3E)',
+                fontWeight: 800,
+                fontSize: '12px',
+                cursor: 'pointer',
+              }}
+            >
+              Lista
+            </button>
           </div>
 
-          {/* Resumen del pedido seleccionado al tocar un punto (RQ-DEL-02-15) */}
+          {/* Botón Pantalla Completa en PC y Celular (Decisión 2) */}
+          <button
+            type="button"
+            onClick={alternarPantallaCompleta}
+            aria-label={pantallaCompleta ? 'Salir de pantalla completa' : 'Pantalla completa'}
+            title={pantallaCompleta ? 'Salir de pantalla completa' : 'Pantalla completa'}
+            style={{
+              minHeight: '40px',
+              padding: '0 10px',
+              borderRadius: '10px',
+              border: '1.5px solid var(--cp-navy, #0B2C3E)',
+              background: pantallaCompleta ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
+              color: pantallaCompleta ? 'var(--cp-cream, #FFFDF8)' : 'var(--cp-navy, #0B2C3E)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polyline points="15 3 21 3 21 9" />
+              <polyline points="9 21 3 21 3 15" />
+              <line x1="21" y1="3" x2="14" y2="10" />
+              <line x1="3" y1="21" x2="10" y2="14" />
+            </svg>
+          </button>
+
+          {/* Icono «?» pequeño para ayuda (Decisión 1 del dueño) */}
+          <button
+            type="button"
+            onClick={() => setAyudaAbierta(true)}
+            aria-label="¿Cómo funciona el módulo de repartos?"
+            title="¿Cómo funciona?"
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '18px',
+              border: '1.5px solid var(--cp-navy, #0B2C3E)',
+              background: 'transparent',
+              color: 'var(--cp-navy, #0B2C3E)',
+              fontWeight: 800,
+              fontSize: '14px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            ?
+          </button>
+        </div>
+      </div>
+
+      {/* 2) TRES FILTROS DE TIEMPO DE ESPERA ARRIBA DEL MAPA (Decisión 3 del dueño) */}
+      <div
+        role="group"
+        aria-label="Filtros por tiempo de espera"
+        style={{
+          display: 'flex',
+          gap: '8px',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          padding: '0 4px',
+        }}
+      >
+        <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft, #5A6E78)' }}>
+          Espera:
+        </span>
+
+        {/* Filtro Todos los tiempos */}
+        <button
+          type="button"
+          onClick={() => setFiltroRetraso('todos')}
+          aria-pressed={filtroRetraso === 'todos'}
+          style={{
+            minHeight: '36px',
+            padding: '0 12px',
+            borderRadius: '9999px',
+            border: '1.5px solid var(--cp-navy, #0B2C3E)',
+            background: filtroRetraso === 'todos' ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
+            color: filtroRetraso === 'todos' ? 'var(--cp-cream, #FFFDF8)' : 'var(--cp-navy, #0B2C3E)',
+            fontWeight: 700,
+            fontSize: '12px',
+            cursor: 'pointer',
+          }}
+        >
+          Todos
+        </button>
+
+        {/* 1. Amarillo: Retrasado (desde 20 min) */}
+        <button
+          type="button"
+          onClick={() => setFiltroRetraso((prev) => (prev === 'retrasado' ? 'todos' : 'retrasado'))}
+          aria-pressed={filtroRetraso === 'retrasado'}
+          style={{
+            minHeight: '36px',
+            padding: '0 12px',
+            borderRadius: '9999px',
+            border: '1.5px solid #D99E39',
+            background: filtroRetraso === 'retrasado' ? '#D99E39' : '#FEF3C7',
+            color: '#78350F',
+            fontWeight: 800,
+            fontSize: '12px',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+          }}
+        >
+          <span style={{ width: '8px', height: '8px', borderRadius: '4px', background: '#D99E39' }} />
+          <span>Retrasado ({conteosEspera.retrasados})</span>
+        </button>
+
+        {/* 2. Naranja: Tarde (desde 30 min) */}
+        <button
+          type="button"
+          onClick={() => setFiltroRetraso((prev) => (prev === 'tarde' ? 'todos' : 'tarde'))}
+          aria-pressed={filtroRetraso === 'tarde'}
+          style={{
+            minHeight: '36px',
+            padding: '0 12px',
+            borderRadius: '9999px',
+            border: '1.5px solid #E67929',
+            background: filtroRetraso === 'tarde' ? '#E67929' : '#FFEDD5',
+            color: '#7C2D12',
+            fontWeight: 800,
+            fontSize: '12px',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+          }}
+        >
+          <span style={{ width: '8px', height: '8px', borderRadius: '4px', background: '#E67929' }} />
+          <span>Tarde ({conteosEspera.tardes})</span>
+        </button>
+
+        {/* 3. Rojo palpitando: Muy tarde (desde 45 min) */}
+        <button
+          type="button"
+          onClick={() => setFiltroRetraso((prev) => (prev === 'muy_tarde' ? 'todos' : 'muy_tarde'))}
+          aria-pressed={filtroRetraso === 'muy_tarde'}
+          style={{
+            minHeight: '36px',
+            padding: '0 12px',
+            borderRadius: '9999px',
+            border: '1.5px solid #C4412B',
+            background: filtroRetraso === 'muy_tarde' ? '#C4412B' : '#FEE2E2',
+            color: filtroRetraso === 'muy_tarde' ? '#FFFFFF' : '#991B1B',
+            fontWeight: 800,
+            fontSize: '12px',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+          }}
+        >
+          <span
+            style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '4px',
+              background: '#C4412B',
+              animation: 'cp-pin-palpita 0.9s ease-in-out infinite alternate',
+            }}
+          />
+          <span>Muy tarde ({conteosEspera.muyTardes})</span>
+        </button>
+
+        {/* Pastillas de filtro rápido por zona si hay filtro activo */}
+        {filtroZona !== 'todas' && (
+          <button
+            type="button"
+            onClick={() => setFiltroZona('todas')}
+            style={{
+              minHeight: '36px',
+              padding: '0 10px',
+              borderRadius: '9999px',
+              border: '1.5px dashed var(--cp-navy, #0B2C3E)',
+              background: 'transparent',
+              color: 'var(--cp-navy, #0B2C3E)',
+              fontSize: '12px',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            Zona {filtroZona} × (quitar filtro)
+          </button>
+        )}
+      </div>
+
+      {cargando ? (
+        <div style={{ padding: '60px 0' }}>
+          <Cargando mensaje="Cargando pedidos de reparto..." />
+        </div>
+      ) : error ? (
+        <EstadoError mensaje={error} alReintentar={cargarDatos} />
+      ) : modoVista === 'mapa' ? (
+        /* VISTA MAPA PRINCIPAL (Decisión 2 del dueño) */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {/* Componente de Mapa Leaflet con Zonas Sombreadas y Marcadores */}
+          <MapaRepartos
+            puntos={puntosMapa}
+            zonas={zonasGeo}
+            conteoPorZona={conteosPorZona}
+            zonaFiltroActiva={filtroZona !== 'todas' ? filtroZona : undefined}
+            onSeleccionarZona={(z) => setFiltroZona((prev) => (prev === z ? 'todas' : z))}
+            seleccionadoId={pedidoSeleccionadoId}
+            onSeleccionarPunto={(id) =>
+              setPedidoSeleccionadoId((prev) => (prev === id ? null : id))
+            }
+            rutaPuntos={rutaCoordenadasMapa}
+            altura={movil ? 'calc(100vh - 160px)' : 'min(65vh, 600px)'}
+            onTocarMapa={handleTocarMapa}
+            esPantallaCompleta={pantallaCompleta}
+            onAlternarPantallaCompleta={alternarPantallaCompleta}
+          />
+
+          {/* Hoja Inferior del Pedido Seleccionado (Decisión 7 del dueño) */}
           {pedidoSeleccionado && (
             <ResumenPedidoReparto
               pedido={pedidoSeleccionado}
@@ -725,92 +790,31 @@ export function RepartosView() {
               }
               puedeLiquidar={puedeLiquidar}
               alCerrar={() => setPedidoSeleccionadoId(null)}
+              alActualizar={cargarDatos}
               acciones={acciones}
             />
           )}
 
-          {/* Ruta sugerida de entrega y paradas cuando se examina la ruta de un repartidor */}
-          {(filtroTile === 'ruta' || esRolRepartidor) && datosMios.pedidos.length > 0 && (
-            <div
-              style={{
-                background: 'var(--cp-white)',
-                border: '1px solid var(--cp-line)',
-                borderRadius: '14px',
-                padding: '16px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '12px',
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <span
-                  style={{
-                    fontFamily: 'Montserrat, sans-serif',
-                    fontWeight: 800,
-                    fontSize: '16px',
-                    color: 'var(--cp-navy)',
-                  }}
-                >
-                  Ruta sugerida de entrega ({pedidosMiosOrdenados.length} paradas)
-                </span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {pedidosMiosOrdenados.map((p, idx) => (
-                  <div
-                    key={p.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '10px 12px',
-                      background: 'var(--cp-cream)',
-                      borderRadius: '10px',
-                      fontSize: '13px',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span
-                        style={{
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '12px',
-                          background: 'var(--cp-orange)',
-                          color: 'var(--cp-navy)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontWeight: 800,
-                          fontSize: '12px',
-                        }}
-                      >
-                        {idx + 1}
-                      </span>
-                      <span style={{ fontWeight: 800 }}>{p.codigo}</span>
-                      <span>·</span>
-                      <span>{p.cliente_nombre}</span>
-                    </div>
-                    <span style={{ color: 'var(--cp-soft)', fontWeight: 600 }}>
-                      {p.zona || 'Sin zona'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
+          {/* Panel de Ruta Sugerida e Iniciar Ruta (Decisión 4 del dueño) */}
+          {pedidosCandidatosRuta.length > 0 && (
+            <PanelRutaSugerida
+              ruta={rutaCalculada}
+              pedidosCandidatos={pedidosCandidatosRuta}
+              paradasSeleccionadasIds={paradasRutaIds}
+              onAlternarSeleccionParada={handleAlternarSeleccionParada}
+              onMoverParada={handleMoverParada}
+              config={config}
+              maxParadas={config.maxPedidosPorRepartidor}
+            />
           )}
         </div>
       ) : (
-        /* VISTA LISTA */
+        /* VISTA LISTA SECUNDARIA (Doble Vista, Decisión 2) */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {/* Fila de pastillas por zona en vista Lista (rzChips del mockup) */}
+          {/* Filtro por zona para la lista */}
           <div
             role="group"
-            aria-label="Zona"
+            aria-label="Filtrar por zona"
             style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}
           >
             <button
@@ -820,9 +824,9 @@ export function RepartosView() {
                 minHeight: '40px',
                 padding: '0 12px',
                 borderRadius: '9999px',
-                border: '1.5px solid var(--cp-navy)',
-                background: filtroZona === 'todas' ? 'var(--cp-navy)' : 'transparent',
-                color: filtroZona === 'todas' ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                background: filtroZona === 'todas' ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
+                color: filtroZona === 'todas' ? 'var(--cp-cream, #FFFDF8)' : 'var(--cp-navy, #0B2C3E)',
                 fontWeight: 700,
                 fontSize: '12px',
                 cursor: 'pointer',
@@ -830,7 +834,7 @@ export function RepartosView() {
             >
               Todas las zonas
             </button>
-            {Object.entries(zonasContadas).map(([z, cant]) => {
+            {Object.entries(conteosPorZona).map(([z, cant]) => {
               const activo = filtroZona === z;
               return (
                 <button
@@ -841,9 +845,9 @@ export function RepartosView() {
                     minHeight: '40px',
                     padding: '0 12px',
                     borderRadius: '9999px',
-                    border: '1.5px solid var(--cp-navy)',
-                    background: activo ? 'var(--cp-navy)' : 'transparent',
-                    color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                    border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                    background: activo ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
+                    color: activo ? 'var(--cp-cream, #FFFDF8)' : 'var(--cp-navy, #0B2C3E)',
                     fontWeight: 700,
                     fontSize: '12px',
                     cursor: 'pointer',
@@ -860,7 +864,7 @@ export function RepartosView() {
               mensaje={
                 pedidosFiltrados.length === 0
                   ? 'No hay pedidos en esta vista.'
-                  : 'No hay pedidos para la zona seleccionada.'
+                  : 'No hay pedidos para la zona o filtro seleccionado.'
               }
             />
           ) : (
@@ -874,7 +878,7 @@ export function RepartosView() {
                     style={{
                       fontSize: '14px',
                       fontWeight: 800,
-                      color: 'var(--cp-navy)',
+                      color: 'var(--cp-navy, #0B2C3E)',
                       paddingLeft: '4px',
                     }}
                   >
@@ -884,8 +888,7 @@ export function RepartosView() {
                   <div
                     style={{
                       display: 'grid',
-                      gridTemplateColumns:
-                        'repeat(auto-fill, minmax(310px, 1fr))',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))',
                       gap: '14px',
                       alignItems: 'start',
                     }}
@@ -894,9 +897,7 @@ export function RepartosView() {
                       <TarjetaReparto
                         key={pedido.id}
                         pedido={pedido}
-                        esDisponible={
-                          pedido.estado === 'LISTO' && !pedido.repartidor_party_id
-                        }
+                        esDisponible={pedido.estado === 'LISTO' && !pedido.repartidor_party_id}
                         esMio={
                           pedido.repartidor_party_id === usuario?.partyId ||
                           pedido.estado === 'EN_CAMINO'
@@ -909,6 +910,101 @@ export function RepartosView() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Modal accesible de Ayuda "¿Cómo funciona?" (Decisión 1 del dueño) */}
+      {ayudaAbierta && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="titulo-ayuda-repartos"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 2000,
+            background: 'rgba(11, 44, 62, 0.65)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setAyudaAbierta(false);
+          }}
+        >
+          <div
+            style={{
+              background: 'var(--cp-white, #FFFFFF)',
+              borderRadius: '16px',
+              padding: '24px',
+              maxWidth: '460px',
+              width: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
+              boxShadow: '0 8px 30px rgba(0, 0, 0, 0.25)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2
+                id="titulo-ayuda-repartos"
+                style={{
+                  margin: 0,
+                  fontFamily: 'Montserrat, sans-serif',
+                  fontWeight: 800,
+                  fontSize: '18px',
+                  color: 'var(--cp-navy, #0B2C3E)',
+                }}
+              >
+                ¿Cómo funciona Repartos?
+              </h2>
+              <button
+                type="button"
+                aria-label="Cerrar ayuda"
+                onClick={() => setAyudaAbierta(false)}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  fontSize: '22px',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  color: 'var(--cp-soft, #5A6E78)',
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <p style={{ margin: 0, fontSize: '14px', lineHeight: '21px', color: 'var(--cp-navy, #0B2C3E)' }}>
+              Cada pedido listo aparece disponible en el mapa. El repartidor que lo toma se lo adjudica
+              y a los demás les desaparece. Desde su celular navega por Google Maps o Waze con todas las
+              paradas ordenadas.
+            </p>
+            <p style={{ margin: 0, fontSize: '13px', lineHeight: '20px', color: 'var(--cp-soft, #5A6E78)' }}>
+              Los tres colores superiores indican el tiempo de espera desde que se terminó el pedido:
+              verde (&lt; 20 min), amarillo (Retrasado desde 20 min), naranja (Tarde desde 30 min) y
+              rojo palpitando (Muy tarde desde 45 min).
+            </p>
+
+            <button
+              type="button"
+              onClick={() => setAyudaAbierta(false)}
+              style={{
+                marginTop: '6px',
+                minHeight: '44px',
+                borderRadius: '10px',
+                border: 'none',
+                background: 'var(--cp-navy, #0B2C3E)',
+                color: 'var(--cp-cream, #FFFDF8)',
+                fontWeight: 800,
+                fontSize: '14px',
+                cursor: 'pointer',
+              }}
+            >
+              Entendido
+            </button>
+          </div>
         </div>
       )}
 

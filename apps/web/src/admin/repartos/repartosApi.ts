@@ -1,6 +1,8 @@
 import { api } from '../../comun/api';
+import { ConfigReparto, CONFIG_REPARTO_DEFECTO } from './calculoRuta';
+import { ZonaGeoItem, ZONAS_GEO_DEFECTO } from './zonasGeo';
 
-export type ColorEspera = 'verde' | 'naranja' | 'rojo';
+export type ColorEspera = 'verde' | 'amarillo' | 'naranja' | 'rojo';
 
 export interface PedidoReparto {
   id: string;
@@ -122,4 +124,37 @@ export const repartosApi = {
       `/admin/repartos/${id}/resolver`,
       dto,
     ),
+
+  obtenerConfig: async (): Promise<ConfigReparto> => {
+    try {
+      const res = await api.get<ConfigReparto>('/admin/repartos/config');
+      return {
+        ...CONFIG_REPARTO_DEFECTO,
+        ...res,
+      };
+    } catch {
+      return CONFIG_REPARTO_DEFECTO;
+    }
+  },
+
+  obtenerZonasPoligonos: async (): Promise<ZonaGeoItem[]> => {
+    try {
+      const zonas = await api.get<Array<{ codigo: string; poligono: any }>>('/admin/zonas');
+      if (Array.isArray(zonas) && zonas.length > 0) {
+        return ZONAS_GEO_DEFECTO.map((def) => {
+          const match = zonas.find((z) => z.codigo === def.codigo);
+          if (match && Array.isArray(match.poligono) && match.poligono.length > 0) {
+            return {
+              ...def,
+              poligonos: [match.poligono],
+            };
+          }
+          return def;
+        });
+      }
+    } catch {
+      // Fallback a los polígonos oficiales
+    }
+    return ZONAS_GEO_DEFECTO;
+  },
 };

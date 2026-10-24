@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useSearchParams, useLocation } from 'react-router-dom';
 import { useSesion } from '../../comun/sesion';
 import { api } from '../../comun/api';
 import { Confirmar } from '../../comun/Confirmar';
 import { HorarioTab } from './HorarioTab';
 import { FechasEspecialesTab } from './FechasEspecialesTab';
 import { ZonasRepartoView } from './ZonasRepartoView';
+import { SeccionAltaDemanda } from './SeccionAltaDemanda';
+import { SeccionRepartoConfig } from './SeccionRepartoConfig';
 
 export interface InfoLocalState {
   // local
@@ -304,6 +307,12 @@ const CATEGORIAS_CONFIG: CategoriaConfig[] = [
     ],
   },
   {
+    id: 'demanda',
+    n: 'Alta demanda y pausa de pedidos',
+    d: 'Minutos extra de entrega y pausa para carta y chatbot',
+    fields: [],
+  },
+  {
     id: 'zonas',
     n: 'Zonas de reparto (mapa)',
     d: 'Puntos que limitan cada zona',
@@ -437,8 +446,14 @@ const VALORES_MOCK_PROHIBIDOS = new Set([
 ]);
 
 export function ConfiguracionLocalView() {
-  const { tiene } = useSesion();
-  const puedeEditar = tiene('local/editar') || tiene('configuracion/editar');
+  const { tiene, usuario } = useSesion();
+  const esAdmin = usuario?.rol === 'ADMIN' || tiene('ADMIN');
+  const puedeEditar = esAdmin || tiene('local/editar') || tiene('configuracion/editar');
+  const puedeEditarDemanda =
+    esAdmin ||
+    tiene('cocina/demanda') ||
+    tiene('local/editar') ||
+    tiene('configuracion/editar');
 
   const sanitizar = (obj: any): InfoLocalState => {
     const res = { ...INFO_DEFAULT, ...obj };
@@ -453,7 +468,19 @@ export function ConfiguracionLocalView() {
     return res;
   };
 
-  const [tabId, setTabId] = useState<string>('local');
+  const location = useLocation();
+  const [, setSearchParams] = useSearchParams();
+  const tabParam = useMemo(() => {
+    return new URLSearchParams(location.search).get('tab');
+  }, [location.search]);
+
+  const [tabId, setTabId] = useState<string>(() => tabParam || 'local');
+
+  useEffect(() => {
+    if (tabParam && tabParam !== tabId) {
+      setTabId(tabParam);
+    }
+  }, [tabParam, tabId]);
   const [info, setInfo] = useState<InfoLocalState>(() => {
     try {
       const saved = localStorage.getItem('caprichos_local_info');
@@ -660,6 +687,14 @@ export function ConfiguracionLocalView() {
                 aria-selected={activo}
                 onClick={() => {
                   setTabId(c.id);
+                  setSearchParams(
+                    (prev) => {
+                      const next = new URLSearchParams(prev);
+                      next.set('tab', c.id);
+                      return next;
+                    },
+                    { replace: true },
+                  );
                   setMensaje('');
                 }}
                 style={{
@@ -912,9 +947,68 @@ export function ConfiguracionLocalView() {
             </div>
           )}
 
+          {/* Subcaso: ALTA DEMANDA Y PAUSA DE PEDIDOS */}
+          {tabId === 'demanda' && (
+            <SeccionAltaDemanda puedeEditar={puedeEditarDemanda} />
+          )}
+
+          {/* Subcaso: REPARTO Y TIEMPOS DE ESPERA */}
+          {tabId === 'reparto' && (
+            <SeccionRepartoConfig puedeEditar={puedeEditar} />
+          )}
+
           {/* Subcaso: CAMPOS REGULARES DE OTRAS CATEGORÍAS */}
-          {tabId !== 'horario' && tabId !== 'zonas' && (
+          {tabId !== 'horario' && tabId !== 'zonas' && tabId !== 'demanda' && tabId !== 'reparto' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {tabId === 'operacion' && (
+                <div
+                  style={{
+                    background: 'var(--cp-cream)',
+                    border: '1.5px dashed var(--cp-orange)',
+                    borderRadius: '12px',
+                    padding: '14px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    marginBottom: '8px',
+                  }}
+                >
+                  <div style={{ fontWeight: 800, fontSize: '14px', color: 'var(--cp-navy)' }}>
+                    Alta demanda y pausa de pedidos
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--cp-soft)', lineHeight: '17px' }}>
+                    Si necesitas sumar minutos extra de entrega por congestión en cocina o pausar la recepción de pedidos en la carta y chatbot, puedes gestionarlo desde la sección dedicada.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTabId('demanda');
+                      setSearchParams(
+                        (prev) => {
+                          const next = new URLSearchParams(prev);
+                          next.set('tab', 'demanda');
+                          return next;
+                        },
+                        { replace: true },
+                      );
+                    }}
+                    style={{
+                      alignSelf: 'flex-start',
+                      minHeight: '40px',
+                      padding: '0 14px',
+                      borderRadius: '10px',
+                      border: '1.5px solid var(--cp-navy)',
+                      background: 'transparent',
+                      color: 'var(--cp-navy)',
+                      fontWeight: 700,
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Ir a Alta demanda y pausa de pedidos
+                  </button>
+                </div>
+              )}
               {!puedeEditar && (
                 <div
                   role="status"
@@ -1097,44 +1191,46 @@ export function ConfiguracionLocalView() {
           )}
 
           {/* Botones de acción inferiores */}
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px' }}>
-            <button
-              type="button"
-              disabled={!puedeEditar}
-              onClick={() => setConfirmarGuardar(true)}
-              style={{
-                flex: '1 1 200px',
-                minHeight: '52px',
-                border: 0,
-                borderRadius: '12px',
-                background: 'var(--cp-orange)',
-                color: 'var(--cp-navy)',
-                fontFamily: 'Montserrat, sans-serif',
-                fontWeight: 800,
-                fontSize: '15px',
-                cursor: !puedeEditar ? 'not-allowed' : 'pointer',
-                opacity: !puedeEditar ? 0.6 : 1,
-              }}
-            >
-              Guardar cambios
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirmarDescartar(true)}
-              style={{
-                flex: '1 1 160px',
-                minHeight: '52px',
-                border: '1.5px solid var(--cp-navy)',
-                borderRadius: '12px',
-                background: 'transparent',
-                color: 'var(--cp-navy)',
-                fontWeight: 700,
-                cursor: 'pointer',
-              }}
-            >
-              Descartar
-            </button>
-          </div>
+          {tabId !== 'horario' && tabId !== 'zonas' && tabId !== 'demanda' && (
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px' }}>
+              <button
+                type="button"
+                disabled={!puedeEditar}
+                onClick={() => setConfirmarGuardar(true)}
+                style={{
+                  flex: '1 1 200px',
+                  minHeight: '52px',
+                  border: 0,
+                  borderRadius: '12px',
+                  background: 'var(--cp-orange)',
+                  color: 'var(--cp-navy)',
+                  fontFamily: 'Montserrat, sans-serif',
+                  fontWeight: 800,
+                  fontSize: '15px',
+                  cursor: !puedeEditar ? 'not-allowed' : 'pointer',
+                  opacity: !puedeEditar ? 0.6 : 1,
+                }}
+              >
+                Guardar cambios
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmarDescartar(true)}
+                style={{
+                  flex: '1 1 160px',
+                  minHeight: '52px',
+                  border: '1.5px solid var(--cp-navy)',
+                  borderRadius: '12px',
+                  background: 'transparent',
+                  color: 'var(--cp-navy)',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                Descartar
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
