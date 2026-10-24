@@ -278,7 +278,7 @@ describe('ComprobantesService', () => {
       prismaMock.pedido.findUnique.mockResolvedValue({
         id: 107n,
         pago_estado: 'PENDIENTE',
-        cobro: null,
+        cobros: [],
       });
 
       await expect(service.obtenerPorPedido(107n, cajeroUsuario)).rejects.toThrow(HttpException);
@@ -306,11 +306,12 @@ describe('ComprobantesService', () => {
         total: 50,
         pago_estado: 'PAGADO',
         pago_metodo: 'YAPE',
-        cobro: {
+        cobros: [{
           id: 1n,
           en: fechaFija,
+          anulado_en: null,
           pagos: [{ id: 1n, medio: 'YAPE', monto: 50, recibido: 50, vuelto: 0 }],
-        },
+        }],
         lineas: [
           {
             id: 1n,
@@ -360,7 +361,7 @@ describe('ComprobantesService', () => {
         subtotal: 30,
         envio: 0,
         total: 30,
-        cobro: { id: 2n, en: fechaFija, pagos: [] },
+        cobros: [{ id: 2n, en: fechaFija, anulado_en: null, pagos: [] }],
         lineas: [],
         comprobante: {
           id: 30n,

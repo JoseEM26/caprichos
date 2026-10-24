@@ -345,7 +345,7 @@ describe('CierreService', () => {
       }
     });
 
-    it('tras 3 intentos de arqueo previos, exige PIN de supervisor para nuevo intento o cierre', async () => {
+    it('tras 3 arqueos que no cuadraron, exige PIN de supervisor para el cuarto intento o el cierre', async () => {
       prismaMock.conteoCierre.count.mockResolvedValue(3);
 
       const dtoArqueo: ArqueoDto = {
@@ -363,6 +363,56 @@ describe('CierreService', () => {
         expect(e.getStatus()).toBe(HttpStatus.FORBIDDEN);
         expect(e.getResponse().codigo).toBe('PIN_REQUERIDO');
       }
+    });
+
+    it('un arqueo que cuadra no suma: con 3 intentos previos y solo 1 que no cuadró, el cuarto no pide PIN', async () => {
+      prismaMock.conteoCierre.count.mockImplementation(async ({ where }: any) =>
+        where.resultado === 'NO_CUADRA' ? 1 : 3,
+      );
+
+      // mismo conteo que el arqueo que cuadra del bloque 1
+      const dtoCuadra: ArqueoDto = {
+        conteo: { '200': 1, '100': 1, '50': 1, '5': 1 },
+        medios: { yape: 200.0, plin: 0.0, transferencia: 50.0, tarjeta: 100.0 },
+      };
+
+      const resultado = await service.arqueo(dtoCuadra, mockUsuarioCajero);
+
+      expect(resultado).toEqual({ resultado: 'CUADRA', intento: 4 });
+    });
+
+    it('con 3 arqueos que no cuadraron aunque haya más intentos en total, el cuarto exige PIN', async () => {
+      prismaMock.conteoCierre.count.mockImplementation(async ({ where }: any) =>
+        where.resultado === 'NO_CUADRA' ? 3 : 5,
+      );
+
+      const dtoArqueo: ArqueoDto = {
+        conteo: { '200': 1 },
+        medios: { yape: 200 },
+      };
+
+      await expect(service.arqueo(dtoArqueo, mockUsuarioCajero, undefined)).rejects.toMatchObject({
+        response: { codigo: 'PIN_REQUERIDO' },
+      });
+    });
+
+    it('en el cierre tampoco cuentan los arqueos que cuadraron: con 3 que cuadraron y 1 que no, no pide PIN', async () => {
+      const cuadra = { conteo: { '200': 1, '100': 1, '50': 1, '5': 1 }, medios: { yape: 200, plin: 0, transferencia: 50, tarjeta: 100 } };
+      prismaMock.conteoCierre.findMany.mockResolvedValue([
+        { intento: 4, resultado: 'CUADRA', ...cuadra },
+        { intento: 3, resultado: 'CUADRA', ...cuadra },
+        { intento: 2, resultado: 'CUADRA', ...cuadra },
+        { intento: 1, resultado: 'NO_CUADRA', conteo: { '200': 1 }, medios: { yape: 200 } },
+      ]);
+
+      const dtoCerrar: CerrarCajaDto = {
+        conteo: { '200': 1, '100': 1, '50': 1, '5': 1 },
+        medios: { yape: 200, plin: 0, transferencia: 50, tarjeta: 100 },
+      };
+
+      // Cuadra con el sistema: el cierre no exige PIN de supervisor (puede fallar por otra causa del mock, no por el PIN)
+      const error = await service.cerrar(dtoCerrar, mockUsuarioCajero, undefined).catch((e) => e);
+      expect(error?.getResponse?.()?.codigo).not.toBe('PIN_REQUERIDO');
     });
 
     it('bloquea por 5 minutos en Redis tras 3 pines erróneos y audita PIN_FALLIDO', async () => {
@@ -518,10 +568,10 @@ describe('CierreService', () => {
           repartidor: {
             persona: { nombres: 'Marcos', apellidos: 'Ruta' },
           },
-          cobro: {
+          cobros: [{
             anulado_en: null,
             pagos: [{ medio: 'EFECTIVO', monto: 40.0 }],
-          },
+          }],
         },
         {
           id: 502n,
@@ -535,7 +585,7 @@ describe('CierreService', () => {
           repartidor: {
             persona: { nombres: 'Marcos', apellidos: 'Ruta' },
           },
-          cobro: null,
+          cobros: [],
         },
       ]);
 

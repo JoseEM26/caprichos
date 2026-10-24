@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
+import { cobroVigente } from '../caja/caja.calculo';
 import { FiltrarCreditosDto } from './dto/filtrar-creditos.dto';
 
 const NOMBRES_MESES = [
@@ -224,7 +225,7 @@ export class CreditosService {
       include: {
         lineas: true,
         consumoPersonal: true,
-        cobro: true,
+        cobros: true,
       },
     });
 
@@ -236,7 +237,7 @@ export class CreditosService {
     }
 
     // un pedido ya cobrado en caja no se carga también a crédito (dos cobros del mismo pedido)
-    if (pedido.pago_estado === 'PAGADO' || (pedido.cobro && !pedido.cobro.anulado_en)) {
+    if (pedido.pago_estado === 'PAGADO' || cobroVigente(pedido.cobros)) {
       throw new ConflictException({
         codigo: 'YA_COBRADO',
         mensaje: 'El pedido ya fue cobrado',

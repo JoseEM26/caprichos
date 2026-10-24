@@ -53,6 +53,7 @@ export interface Pedido {
   codigo: string;
   canal: string;
   modalidad: string;
+  repartidor_party_id?: string | number | null;
   estado: EstadoPedido | string;
   cliente_nombre?: string | null;
   cliente_telefono?: string | null;

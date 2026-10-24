@@ -84,9 +84,19 @@ export function pedidosRepartoDelDia(cliente: ClienteCaja, fechaIso: string) {
     },
     include: {
       repartidor: { include: { persona: true } },
-      cobro: { include: { pagos: true } },
+      cobros: { include: { pagos: true } },
     },
   });
+}
+
+/**
+ * Cobro vigente de un pedido: el que no está anulado. Un pedido puede tener varios cobros
+ * (el anulado se conserva, RNF-CAP-014), pero solo uno vigente.
+ */
+export function cobroVigente<T extends { anulado_en: Date | null }>(
+  cobros: T[] | null | undefined,
+): T | null {
+  return (cobros ?? []).find((c) => !c.anulado_en) ?? null;
 }
 
 /**
@@ -96,9 +106,9 @@ export function pedidosRepartoDelDia(cliente: ClienteCaja, fechaIso: string) {
 export function efectivoDelRepartidor(p: {
   total: unknown;
   pago_metodo: string | null;
-  cobro: { anulado_en: Date | null } | null;
+  cobros: { anulado_en: Date | null }[];
 }): number {
-  if (p.cobro && !p.cobro.anulado_en) return 0;
+  if (cobroVigente(p.cobros)) return 0;
   return p.pago_metodo === 'EFECTIVO' ? aCentimos(p.total) : 0;
 }
 

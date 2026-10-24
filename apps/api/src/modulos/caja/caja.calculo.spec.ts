@@ -30,14 +30,24 @@ describe('caja.calculo', () => {
 
   it('el efectivo del repartidor es solo el contra entrega: un pedido cobrado en caja no es suyo', () => {
     // cobrado en caja (con cobro vigente): entra en la caja por su medio, no se liquida aparte
-    expect(efectivoDelRepartidor({ total: 40, pago_metodo: 'EFECTIVO', cobro: { anulado_en: null } })).toBe(0);
-    expect(efectivoDelRepartidor({ total: 40, pago_metodo: 'YAPE', cobro: { anulado_en: null } })).toBe(0);
+    expect(efectivoDelRepartidor({ total: 40, pago_metodo: 'EFECTIVO', cobros: [{ anulado_en: null }] })).toBe(0);
+    expect(efectivoDelRepartidor({ total: 40, pago_metodo: 'YAPE', cobros: [{ anulado_en: null }] })).toBe(0);
     // contra entrega en efectivo: lo trae el repartidor y lo liquida
-    expect(efectivoDelRepartidor({ total: 40, pago_metodo: 'EFECTIVO', cobro: null })).toBe(4000);
+    expect(efectivoDelRepartidor({ total: 40, pago_metodo: 'EFECTIVO', cobros: [] })).toBe(4000);
     // cobro anulado: vuelve a ser contra entrega
-    expect(efectivoDelRepartidor({ total: 40, pago_metodo: 'EFECTIVO', cobro: { anulado_en: new Date() } })).toBe(4000);
+    expect(
+      efectivoDelRepartidor({ total: 40, pago_metodo: 'EFECTIVO', cobros: [{ anulado_en: new Date() }] }),
+    ).toBe(4000);
+    // anulado y vuelto a cobrar: lo que cuenta es el cobro vigente, no el anulado que se conserva
+    expect(
+      efectivoDelRepartidor({
+        total: 40,
+        pago_metodo: 'EFECTIVO',
+        cobros: [{ anulado_en: new Date() }, { anulado_en: null }],
+      }),
+    ).toBe(0);
     // contra entrega con Yape: no hay efectivo que liquidar
-    expect(efectivoDelRepartidor({ total: 40, pago_metodo: 'YAPE', cobro: null })).toBe(0);
+    expect(efectivoDelRepartidor({ total: 40, pago_metodo: 'YAPE', cobros: [] })).toBe(0);
   });
 
   it('delivery cobrado en caja cuenta en la caja y el contra entrega solo al liquidarse, sin duplicar', async () => {
@@ -79,5 +89,40 @@ describe('caja.calculo', () => {
     expect(montos.liquidadoEfectivo).toBe(25);
     // el Yape cobrado en caja cuenta por su medio
     expect(montos.sistemaYape).toBe(20);
+  });
+
+  it('el cobro anulado (conservado, RNF-CAP-014) no cuenta en lo esperado: solo los vigentes de la caja', async () => {
+    const cobros = [
+      { id: 1n, caja_id: 10n, anulado_en: null, pagos: [{ medio: 'EFECTIVO', monto: new Prisma.Decimal(30) }] },
+      {
+        id: 2n,
+        caja_id: 10n,
+        anulado_en: new Date('2026-10-21T15:00:00.000Z'),
+        pagos: [{ medio: 'EFECTIVO', monto: new Prisma.Decimal(999) }],
+      },
+    ];
+    const cliente: any = {
+      pedido: { findMany: jest.fn().mockResolvedValue([]) },
+      // el mock aplica el filtro real: solo devuelve los cobros de la caja que cumplen anulado_en
+      cobro: {
+        findMany: jest.fn(async ({ where }: any) =>
+          cobros.filter((c) => c.caja_id === where.caja_id && c.anulado_en === where.anulado_en),
+        ),
+      },
+      movimientoCaja: { findMany: jest.fn().mockResolvedValue([]) },
+      liquidacion: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+
+    const montos = await calcularMontosCaja(cliente, {
+      id: 10n,
+      fecha: new Date('2026-10-21T00:00:00.000Z'),
+      apertura: new Prisma.Decimal(50),
+    });
+
+    expect(cliente.cobro.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ anulado_en: null }) }),
+    );
+    expect(montos.esperadoEfectivo).toBe(80);
+    expect(montos.ventasEfectivo).toBe(30);
   });
 });

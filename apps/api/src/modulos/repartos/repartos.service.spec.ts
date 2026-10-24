@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { RepartosService } from './repartos.service';
-import { RutaService } from './ruta.service';
+import { COORDENADAS_LOCAL_DEFAULT, RutaService } from './ruta.service';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
@@ -54,6 +54,11 @@ describe('RepartosService', () => {
           { clave: 'rep_max_pedidos', valor: 3 },
           { clave: 'rep_msg3_seg', valor: 90 },
         ]),
+        findUnique: jest.fn(),
+        upsert: jest.fn(),
+      },
+      zonaReparto: {
+        findMany: jest.fn(),
       },
       pedido: {
         findMany: jest.fn(),
@@ -279,6 +284,23 @@ describe('RepartosService', () => {
       expect(auditoriaMock.registrar).toHaveBeenCalledWith(
         expect.objectContaining({ accion: 'LLEGUE' }),
       );
+    });
+
+    it('POST :id/entregar de un delivery sin repartidor: 409 REPARTIDOR_REQUERIDO, no se marca entregado', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 34n,
+        codigo: 'CP-0106',
+        modalidad: 'DELIVERY',
+        estado: 'EN_CAMINO',
+        repartidor_party_id: null,
+        zona: null,
+      });
+
+      await expect(service.entregar('34', adminAuth)).rejects.toMatchObject({
+        status: 409,
+        response: { codigo: 'REPARTIDOR_REQUERIDO' },
+      });
+      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
     });
 
     it('POST :id/entregar cambia a ENTREGADO sin cobrar si es contra entrega en efectivo', async () => {
@@ -533,7 +555,7 @@ describe('RepartosService', () => {
       expect(items[0].id).toBe('60');
       expect(items[0].cobro_pendiente_efectivo).toBe(true);
       expect(items[0].paga_con).toBe(100);
-      expect(items[0].color).toBe('verde');
+      expect(items[0].color).toBe('VERDE');
     });
 
     it('GET mios retorna los pedidos asignados con orden, paso y ruta', async () => {
@@ -561,6 +583,182 @@ describe('RepartosService', () => {
       expect(res.orden).toEqual(['70']);
       expect(Array.isArray(res.paso)).toBe(true);
       expect(Array.isArray(res.ruta)).toBe(true);
+      expect(res.distanciaKm).toBeDefined();
+      expect(res.tiempoMin).toBeDefined();
+      expect(res.totalParadas).toBe(1);
+    });
+  });
+
+  describe('7. Umbrales de color y tiempos de espera de reparto', () => {
+    it('calcula los cuatro colores según umbrales (VERDE, RETRASADO, TARDE, MUY_TARDE)', () => {
+      const ahora = new Date();
+      const hace10Min = new Date(ahora.getTime() - 10 * 60000);
+      const hace22Min = new Date(ahora.getTime() - 22 * 60000);
+      const hace35Min = new Date(ahora.getTime() - 35 * 60000);
+      const hace50Min = new Date(ahora.getTime() - 50 * 60000);
+
+      const rVerde = service.calcularMinutosYColor(hace10Min, ahora, 20, 30, 45);
+      expect(rVerde.minutosEspera).toBe(10);
+      expect(rVerde.color).toBe('VERDE');
+
+      const rAmarillo = service.calcularMinutosYColor(hace22Min, ahora, 20, 30, 45);
+      expect(rAmarillo.minutosEspera).toBe(22);
+      expect(rAmarillo.color).toBe('RETRASADO');
+
+      const rNaranja = service.calcularMinutosYColor(hace35Min, ahora, 20, 30, 45);
+      expect(rNaranja.minutosEspera).toBe(35);
+      expect(rNaranja.color).toBe('TARDE');
+
+      const rRojo = service.calcularMinutosYColor(hace50Min, ahora, 20, 30, 45);
+      expect(rRojo.minutosEspera).toBe(50);
+      expect(rRojo.color).toBe('MUY_TARDE');
+    });
+  });
+
+  describe('8. Visibilidad restringida para REPARTIDOR (RQ-DEL-02-03)', () => {
+    it('un repartidor solo consulta sus pedidos asignados y los disponibles', async () => {
+      prismaMock.parametro.findMany.mockResolvedValue([]);
+      prismaMock.pedido.findMany.mockResolvedValue([]);
+
+      await service.listarTodos({}, repartidor1);
+
+      expect(prismaMock.pedido.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            modalidad: 'DELIVERY',
+            AND: [
+              {
+                OR: [
+                  { repartidor_party_id: 101n },
+                  {
+                    repartidor_party_id: null,
+                    estado: 'LISTO',
+                    motivo_falla: null,
+                  },
+                ],
+              },
+            ],
+          }),
+        }),
+      );
+    });
+
+    it('un admin puede ver todos y filtrar por repartidor', async () => {
+      prismaMock.parametro.findMany.mockResolvedValue([]);
+      prismaMock.pedido.findMany.mockResolvedValue([]);
+
+      await service.listarTodos({ repartidor: '102' }, adminAuth);
+
+      expect(prismaMock.pedido.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            modalidad: 'DELIVERY',
+            repartidor_party_id: 102n,
+          }),
+        }),
+      );
+    });
+  });
+
+  describe('9. Configuración de Reparto (GET / PUT admin/repartos/config)', () => {
+    it('obtiene la configuración actual con valores por defecto', async () => {
+      prismaMock.parametro.findMany.mockResolvedValue([]);
+
+      const config = await service.obtenerConfig();
+
+      expect(config.retrasadoMin).toBe(20);
+      expect(config.tardeMin).toBe(30);
+      expect(config.muyTardeMin).toBe(45);
+      expect(config.velocidadKmh).toBe(25);
+      expect(config.maxPedidos).toBe(3);
+      expect(config.localCoords).toEqual(COORDENADAS_LOCAL_DEFAULT);
+    });
+
+    it('actualiza los umbrales respetando orden ascendente y audita cada cambio', async () => {
+      prismaMock.parametro.findMany.mockResolvedValue([
+        { clave: 'reparto_retrasado_min', valor: 20 },
+        { clave: 'reparto_tarde_min', valor: 30 },
+        { clave: 'reparto_muy_tarde_min', valor: 45 },
+      ]);
+      prismaMock.parametro.findUnique.mockResolvedValue(null);
+      prismaMock.parametro.upsert.mockResolvedValue({ clave: 'reparto_retrasado_min', valor: 25 });
+
+      const res = await service.actualizarConfig(
+        { retrasadoMin: 25, tardeMin: 35, muyTardeMin: 50 },
+        adminAuth,
+        '127.0.0.1',
+      );
+
+      expect(prismaMock.parametro.upsert).toHaveBeenCalled();
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          categoria: 'CAMBIO',
+          modulo: 'configuracion',
+          accion: 'PARAMETRO',
+        }),
+      );
+      expect(res).toBeDefined();
+    });
+
+    it('rechaza umbrales que no respeten el orden ascendente estricto', async () => {
+      prismaMock.parametro.findMany.mockResolvedValue([]);
+
+      try {
+        await service.actualizarConfig({ retrasadoMin: 40, tardeMin: 30 }, adminAuth);
+        throw new Error('Debería haber fallado');
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(BadRequestException);
+        expect(err.getResponse().codigo).toBe('ORDEN_UMBRALES_INVALIDO');
+      }
+    });
+
+    it('rechaza valores fuera de rango razonable', async () => {
+      prismaMock.parametro.findMany.mockResolvedValue([]);
+
+      try {
+        await service.actualizarConfig({ velocidadKmh: 3 }, adminAuth);
+        throw new Error('Debería haber fallado');
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(BadRequestException);
+        expect(err.getResponse().codigo).toBe('RANGO_INVALIDO');
+      }
+
+      try {
+        await service.actualizarConfig({ maxPedidos: 0 }, adminAuth);
+        throw new Error('Debería haber fallado');
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(BadRequestException);
+        expect(err.getResponse().codigo).toBe('RANGO_INVALIDO');
+      }
+    });
+  });
+
+  describe('10. Zonas de reparto (GET admin/repartos/zonas)', () => {
+    it('devuelve las zonas con código, tarifa, polígono y centroide calculado', async () => {
+      const zonasDb = [
+        {
+          id: 1n,
+          codigo: 'Z2',
+          tarifa: new Prisma.Decimal(2),
+          activa: true,
+          poligono: [
+            [-12.01, -76.97],
+            [-12.03, -76.97],
+            [-12.03, -76.95],
+            [-12.01, -76.95],
+          ],
+        },
+      ];
+      prismaMock.zonaReparto.findMany.mockResolvedValue(zonasDb);
+
+      const res = await service.listarZonas();
+
+      expect(res).toHaveLength(1);
+      expect(res[0].codigo).toBe('Z2');
+      expect(res[0].nombre).toBe('Zona Z2');
+      expect(res[0].tarifa).toBe(2);
+      expect(res[0].puntos).toBe(4);
+      expect(res[0].centro).toEqual([-12.02, -76.96]);
     });
   });
 });

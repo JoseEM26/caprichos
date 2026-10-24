@@ -465,7 +465,7 @@ model Pedido {
   cuponEmitido           CuponEmitido?           @relation("PedidoCuponEmitido", fields: [cupon_emitido_id], references: [id])
   lineas                 PedidoLinea[]
   historial              PedidoEstadoHistorial[]
-  cobro                  Cobro?
+  cobros                 Cobro[]
   incidentes             IncidenteEntrega[]
   mensajesReparto        MensajeReparto[]
   comandas               ComandaArea[]
@@ -571,7 +571,9 @@ model Caja {
 
 model Cobro {
   id               BigInt      @id @default(autoincrement())
-  pedido_id        BigInt      @unique
+  // Un pedido puede tener varios cobros, pero solo uno vigente (anulado_en IS NULL): índice único parcial
+  // cobro_pedido_vigente_key, creado en la migración 20261024200000_cobro_anulado_conservado (Prisma no lo declara).
+  pedido_id        BigInt
   caja_id          BigInt
   total            Decimal     @db.Decimal(12, 2)
   credito_personal Boolean     @default(false)

@@ -96,7 +96,8 @@ export function ArqueoCiegoForm({ alCerrarCajaExitoso }: ArqueoCiegoFormProps) {
       setResultadoArqueo(res);
 
       if (res.resultado === 'NO_CUADRA') {
-        const nuevosIntentos = Math.max(intentosFallidos + 1, res.intento || 0);
+        // Solo los arqueos que no cuadran suman para el PIN; un arqueo que cuadra no suma
+        const nuevosIntentos = intentosFallidos + 1;
         setIntentosFallidos(nuevosIntentos);
         if (nuevosIntentos >= 3) {
           setRequierePin(true);
@@ -128,7 +129,7 @@ export function ArqueoCiegoForm({ alCerrarCajaExitoso }: ArqueoCiegoFormProps) {
   const handleIntentarCerrarCaja = () => {
     setErrorCierre(null);
 
-    // Si no cuadra tras 3 intentos o la API exige PIN, validar que el supervisor haya puesto PIN y nota >= 3
+    // Si ya van 3 arqueos que no cuadraron o la API exige PIN, validar que el supervisor haya puesto PIN y nota >= 3
     const exigePinSupervisor = intentosFallidos >= 3 || requierePin;
     if (exigePinSupervisor) {
       if (!pinSupervisor.trim()) {
@@ -576,7 +577,7 @@ export function ArqueoCiegoForm({ alCerrarCajaExitoso }: ArqueoCiegoFormProps) {
           )}
         </div>
 
-        {/* Sección de PIN de Supervisor (se muestra si falló 3 intentos o si la API lo pide) */}
+        {/* Sección de PIN de Supervisor (se muestra si van 3 arqueos que no cuadraron o si la API lo pide) */}
         {(requierePin || intentosFallidos >= 3) && (
           <div
             data-testid="seccion-pin-supervisor"
@@ -596,7 +597,7 @@ export function ArqueoCiegoForm({ alCerrarCajaExitoso }: ArqueoCiegoFormProps) {
               </span>
               <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: 'var(--cp-soft)' }}>
                 {intentosFallidos >= 3
-                  ? 'Se alcanzó el límite de 3 intentos de arqueo. Se exige PIN de supervisor para cerrar.'
+                  ? 'Se alcanzaron 3 arqueos que no cuadraron. Se exige PIN de supervisor para cerrar.'
                   : 'Si el arqueo no cuadra, el cierre requiere PIN de supervisor y una nota explicativa.'}
               </p>
             </div>

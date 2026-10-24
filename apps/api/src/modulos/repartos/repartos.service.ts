@@ -20,15 +20,21 @@ import {
 import { FiltrarRepartosDto } from './dto/filtrar-repartos.dto';
 import { ReportarFallaDto } from './dto/reportar-falla.dto';
 import { ResolverFallaDto } from './dto/resolver-falla.dto';
+import { ActualizarConfigRepartoDto } from './dto/actualizar-config-reparto.dto';
 
-export type ColorEspera = 'verde' | 'naranja' | 'rojo';
+export type ColorEsperaReparto = 'VERDE' | 'RETRASADO' | 'TARDE' | 'MUY_TARDE';
+export type ColorEspera = 'verde' | 'naranja' | 'rojo' | ColorEsperaReparto;
 
 export interface ParametrosReparto {
-  naranjaMin: number;
-  rojoMin: number;
+  retrasadoMin: number;
+  tardeMin: number;
+  muyTardeMin: number;
+  velocidadKmh: number;
   maxPedidos: number;
   msg3Seg: number;
   localCoords: Coordenadas;
+  naranjaMin: number;
+  rojoMin: number;
 }
 
 @Injectable()
@@ -53,10 +59,18 @@ export class RepartosService {
 
   /**
    * Obtiene los parámetros operativos de reparto desde la tabla parametro o defaults.
+   * Valores por defecto definidos por el dueño:
+   * - Retrasado: 20 min
+   * - Tarde: 30 min
+   * - Muy tarde: 45 min
+   * - Velocidad media: 25 km/h
+   * - Máximo de pedidos por repartidor: 3
    */
   async obtenerParametrosReparto(): Promise<ParametrosReparto> {
-    let naranjaMin = 35;
-    let rojoMin = 50;
+    let retrasadoMin = 20;
+    let tardeMin = 30;
+    let muyTardeMin = 45;
+    let velocidadKmh = 25;
     let maxPedidos = 3;
     let msg3Seg = 90;
     let localCoords = COORDENADAS_LOCAL_DEFAULT;
@@ -66,6 +80,11 @@ export class RepartosService {
         where: {
           clave: {
             in: [
+              'reparto_retrasado_min',
+              'reparto_tarde_min',
+              'reparto_muy_tarde_min',
+              'reparto_velocidad_kmh',
+              'reparto_max_pedidos',
               'rep_naranja_min',
               'rep_rojo_min',
               'rep_max_pedidos',
@@ -82,17 +101,28 @@ export class RepartosService {
       let lng: number | undefined;
 
       for (const p of params) {
-        if (p.clave === 'rep_naranja_min' && p.valor != null) {
+        if (p.clave === 'reparto_retrasado_min' && p.valor != null) {
           const v = Number(p.valor);
-          if (!isNaN(v) && v >= 0) naranjaMin = v;
+          if (!isNaN(v) && v > 0) retrasadoMin = v;
         }
-        if (p.clave === 'rep_rojo_min' && p.valor != null) {
+        if (p.clave === 'reparto_tarde_min' && p.valor != null) {
           const v = Number(p.valor);
-          if (!isNaN(v) && v >= 0) rojoMin = v;
+          if (!isNaN(v) && v > 0) tardeMin = v;
         }
-        if (p.clave === 'rep_max_pedidos' && p.valor != null) {
+        if (p.clave === 'reparto_muy_tarde_min' && p.valor != null) {
+          const v = Number(p.valor);
+          if (!isNaN(v) && v > 0) muyTardeMin = v;
+        }
+        if (p.clave === 'reparto_velocidad_kmh' && p.valor != null) {
+          const v = Number(p.valor);
+          if (!isNaN(v) && v > 0) velocidadKmh = v;
+        }
+        if (p.clave === 'reparto_max_pedidos' && p.valor != null) {
           const v = Number(p.valor);
           if (!isNaN(v) && v > 0) maxPedidos = v;
+        } else if (p.clave === 'rep_max_pedidos' && p.valor != null) {
+          const v = Number(p.valor);
+          if (!isNaN(v) && v > 0 && maxPedidos === 3) maxPedidos = v;
         }
         if (p.clave === 'rep_msg3_seg' && p.valor != null) {
           const v = Number(p.valor);
@@ -118,26 +148,40 @@ export class RepartosService {
       // Fallback a los defaults
     }
 
-    return { naranjaMin, rojoMin, maxPedidos, msg3Seg, localCoords };
+    return {
+      retrasadoMin,
+      tardeMin,
+      muyTardeMin,
+      velocidadKmh,
+      maxPedidos,
+      msg3Seg,
+      localCoords,
+      naranjaMin: tardeMin,
+      rojoMin: muyTardeMin,
+    };
   }
 
   /**
-   * Calcula los minutos transcurridos y el color de espera según umbrales (DT-69).
+   * Calcula los minutos transcurridos y el color de espera según umbrales de reparto:
+   * VERDE (< retrasadoMin), RETRASADO (amarillo), TARDE (naranja), MUY_TARDE (rojo palpitando).
    */
   calcularMinutosYColor(
     creadoEn: Date,
     ahora: Date = new Date(),
-    naranjaMin = 35,
-    rojoMin = 50,
-  ): { minutosEspera: number; color: ColorEspera } {
+    retrasadoMin = 20,
+    tardeMin = 30,
+    muyTardeMin = 45,
+  ): { minutosEspera: number; color: ColorEsperaReparto } {
     const diffMs = ahora.getTime() - new Date(creadoEn).getTime();
     const minutosEspera = Math.max(0, Math.floor(diffMs / 60000));
 
-    let color: ColorEspera = 'verde';
-    if (minutosEspera >= rojoMin) {
-      color = 'rojo';
-    } else if (minutosEspera >= naranjaMin) {
-      color = 'naranja';
+    let color: ColorEsperaReparto = 'VERDE';
+    if (minutosEspera >= muyTardeMin) {
+      color = 'MUY_TARDE';
+    } else if (minutosEspera >= tardeMin) {
+      color = 'TARDE';
+    } else if (minutosEspera >= retrasadoMin) {
+      color = 'RETRASADO';
     }
 
     return { minutosEspera, color };
@@ -148,18 +192,28 @@ export class RepartosService {
    */
   private formatearPedidoReparto(
     p: any,
-    config: { naranjaMin: number; rojoMin: number },
+    config: ParametrosReparto,
     ahora: Date = new Date(),
   ) {
     const { minutosEspera, color } = this.calcularMinutosYColor(
       p.creado_en,
       ahora,
-      config.naranjaMin,
-      config.rojoMin,
+      config.retrasadoMin,
+      config.tardeMin,
+      config.muyTardeMin,
     );
 
     const cobroPendienteEfectivo =
       p.pago_estado !== 'PAGADO' && p.pago_metodo === 'EFECTIVO';
+
+    const totalNum = Number(p.total);
+    const pagaConNum = p.paga_con != null ? Number(p.paga_con) : null;
+    const vuelto =
+      pagaConNum != null && pagaConNum > totalNum
+        ? Number((pagaConNum - totalNum).toFixed(2))
+        : 0;
+
+    const cobro = p.pago_estado === 'PAGADO' ? 0 : totalNum;
 
     return {
       id: String(p.id),
@@ -172,16 +226,22 @@ export class RepartosService {
       referencia: p.entrega_referencia,
       lat: p.entrega_lat != null ? Number(p.entrega_lat) : null,
       lng: p.entrega_lng != null ? Number(p.entrega_lng) : null,
+      coordenadas:
+        p.entrega_lat != null && p.entrega_lng != null
+          ? { lat: Number(p.entrega_lat), lng: Number(p.entrega_lng) }
+          : null,
       zona: p.zona?.codigo ?? null,
       zona_id: p.zona_id ? String(p.zona_id) : null,
       minutosEspera,
       color,
-      total: Number(p.total),
+      total: totalNum,
+      cobro,
       pago_estado: p.pago_estado,
       pago_metodo: p.pago_metodo,
       cobro_pendiente_efectivo: cobroPendienteEfectivo,
       cobroPendienteEfectivo,
-      paga_con: p.paga_con != null ? Number(p.paga_con) : null,
+      paga_con: pagaConNum,
+      vuelto,
       repartidor_party_id: p.repartidor_party_id ? String(p.repartidor_party_id) : null,
       tomado_en: p.tomado_en,
       salio_en: p.salio_en,
@@ -266,8 +326,9 @@ export class RepartosService {
         minutosEspera: this.calcularMinutosYColor(
           p.creado_en,
           ahora,
-          config.naranjaMin,
-          config.rojoMin,
+          config.retrasadoMin,
+          config.tardeMin,
+          config.muyTardeMin,
         ).minutosEspera,
         zona: p.zona?.codigo ?? null,
       }));
@@ -280,8 +341,9 @@ export class RepartosService {
       minutosEspera: this.calcularMinutosYColor(
         p.creado_en,
         ahora,
-        config.naranjaMin,
-        config.rojoMin,
+        config.retrasadoMin,
+        config.tardeMin,
+        config.muyTardeMin,
       ).minutosEspera,
       zona: p.zona?.codigo ?? null,
     }));
@@ -290,8 +352,13 @@ export class RepartosService {
       inputPropios,
       inputDisponibles,
       config.localCoords,
-      { naranjaMin: config.naranjaMin, rojoMin: config.rojoMin },
+      {
+        retrasadoMin: config.retrasadoMin,
+        tardeMin: config.tardeMin,
+        muyTardeMin: config.muyTardeMin,
+      },
       config.maxPedidos,
+      config.velocidadKmh,
     );
 
     return {
@@ -299,29 +366,54 @@ export class RepartosService {
       orden: rutaCalculada.orden,
       paso: rutaCalculada.paso,
       ruta: rutaCalculada.ruta,
+      totalParadas: rutaCalculada.totalParadas,
+      distanciaKm: rutaCalculada.distanciaKm,
+      tiempoMin: rutaCalculada.tiempoMin,
+      velocidadKmh: rutaCalculada.velocidadKmh,
     };
   }
 
   /**
    * 1) GET /admin/repartos?repartidor= (repartos/ver):
+   * RQ-DEL-02-03: Si el usuario es REPARTIDOR, SOLO ve sus entregas asignadas
+   * y los pedidos disponibles para tomar.
    * Caja y admin ven todos los repartidores y pedidos filtrables.
    */
-  async listarTodos(filtros: FiltrarRepartosDto, _usuario: UsuarioAutenticado) {
+  async listarTodos(filtros: FiltrarRepartosDto, usuario: UsuarioAutenticado) {
     const config = await this.obtenerParametrosReparto();
     const where: Prisma.PedidoWhereInput = {
       modalidad: 'DELIVERY',
     };
 
-    if (filtros.repartidor) {
-      try {
-        where.repartidor_party_id = BigInt(filtros.repartidor);
-      } catch {
-        // Ignora si no es numérico
+    if (usuario && usuario.rol === 'REPARTIDOR') {
+      const miPartyId = BigInt(usuario.partyId);
+      where.AND = [
+        {
+          OR: [
+            { repartidor_party_id: miPartyId },
+            {
+              repartidor_party_id: null,
+              estado: 'LISTO',
+              motivo_falla: null,
+            },
+          ],
+        },
+      ];
+      if (filtros.estado) {
+        where.estado = filtros.estado;
       }
-    }
+    } else {
+      if (filtros.repartidor) {
+        try {
+          where.repartidor_party_id = BigInt(filtros.repartidor);
+        } catch {
+          // Ignora si no es numérico
+        }
+      }
 
-    if (filtros.estado) {
-      where.estado = filtros.estado;
+      if (filtros.estado) {
+        where.estado = filtros.estado;
+      }
     }
 
     const pedidos = await this.prisma.pedido.findMany({
@@ -356,6 +448,166 @@ export class RepartosService {
               nombre: repartidorNombre,
             }
           : null,
+      };
+    });
+  }
+
+  /**
+   * 2) GET /admin/repartos/config (repartos/ver):
+   * Devuelve los parámetros operativos de reparto vigentes (umbrales, velocidad, límite y coordenadas).
+   */
+  async obtenerConfig() {
+    const config = await this.obtenerParametrosReparto();
+    return {
+      retrasadoMin: config.retrasadoMin,
+      tardeMin: config.tardeMin,
+      muyTardeMin: config.muyTardeMin,
+      velocidadKmh: config.velocidadKmh,
+      maxPedidos: config.maxPedidos,
+      localCoords: config.localCoords,
+    };
+  }
+
+  /**
+   * PUT /admin/repartos/config (configuracion/editar):
+   * Actualiza umbrales y parámetros de reparto con validación de orden ascendente y rangos,
+   * y registra auditoría de cambio por parámetro.
+   */
+  async actualizarConfig(
+    dto: ActualizarConfigRepartoDto,
+    usuarioActual?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const actual = await this.obtenerParametrosReparto();
+
+    const nuevoRetrasado = dto.retrasadoMin ?? actual.retrasadoMin;
+    const nuevoTarde = dto.tardeMin ?? actual.tardeMin;
+    const nuevoMuyTarde = dto.muyTardeMin ?? actual.muyTardeMin;
+    const nuevoVelocidad = dto.velocidadKmh ?? actual.velocidadKmh;
+    const nuevoMaxPedidos = dto.maxPedidos ?? actual.maxPedidos;
+
+    // Validación de orden ascendente estricto
+    if (!(nuevoRetrasado < nuevoTarde && nuevoTarde < nuevoMuyTarde)) {
+      throw new BadRequestException({
+        codigo: 'ORDEN_UMBRALES_INVALIDO',
+        mensaje:
+          'Los umbrales deben estar en orden ascendente (retrasado < tarde < muy tarde)',
+      });
+    }
+
+    // Validación de rangos razonables
+    if (nuevoRetrasado < 1 || nuevoRetrasado > 180) {
+      throw new BadRequestException({
+        codigo: 'RANGO_INVALIDO',
+        mensaje: 'El umbral retrasado debe estar entre 1 y 180 minutos',
+      });
+    }
+    if (nuevoTarde < 2 || nuevoTarde > 240) {
+      throw new BadRequestException({
+        codigo: 'RANGO_INVALIDO',
+        mensaje: 'El umbral tarde debe estar entre 2 y 240 minutos',
+      });
+    }
+    if (nuevoMuyTarde < 3 || nuevoMuyTarde > 360) {
+      throw new BadRequestException({
+        codigo: 'RANGO_INVALIDO',
+        mensaje: 'El umbral muy tarde debe estar entre 3 y 360 minutos',
+      });
+    }
+    if (nuevoVelocidad < 5 || nuevoVelocidad > 100) {
+      throw new BadRequestException({
+        codigo: 'RANGO_INVALIDO',
+        mensaje: 'La velocidad media debe estar entre 5 y 100 km/h',
+      });
+    }
+    if (nuevoMaxPedidos < 1 || nuevoMaxPedidos > 20) {
+      throw new BadRequestException({
+        codigo: 'RANGO_INVALIDO',
+        mensaje: 'El máximo de pedidos por repartidor debe estar entre 1 y 20',
+      });
+    }
+
+    const updates: Array<{ clave: string; valor: number }> = [];
+    if (dto.retrasadoMin !== undefined) {
+      updates.push({ clave: 'reparto_retrasado_min', valor: dto.retrasadoMin });
+    }
+    if (dto.tardeMin !== undefined) {
+      updates.push({ clave: 'reparto_tarde_min', valor: dto.tardeMin });
+    }
+    if (dto.muyTardeMin !== undefined) {
+      updates.push({ clave: 'reparto_muy_tarde_min', valor: dto.muyTardeMin });
+    }
+    if (dto.velocidadKmh !== undefined) {
+      updates.push({ clave: 'reparto_velocidad_kmh', valor: dto.velocidadKmh });
+    }
+    if (dto.maxPedidos !== undefined) {
+      updates.push({ clave: 'reparto_max_pedidos', valor: dto.maxPedidos });
+      updates.push({ clave: 'rep_max_pedidos', valor: dto.maxPedidos });
+    }
+
+    for (const u of updates) {
+      const anterior = await this.prisma.parametro.findUnique({
+        where: { clave: u.clave },
+      });
+
+      await this.prisma.parametro.upsert({
+        where: { clave: u.clave },
+        create: { clave: u.clave, valor: u.valor },
+        update: { valor: u.valor },
+      });
+
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'configuracion',
+        accion: 'PARAMETRO',
+        resultado: 'OK',
+        entidad: 'parametro',
+        antes: anterior ? { clave: u.clave, valor: anterior.valor } : null,
+        despues: { clave: u.clave, valor: u.valor },
+        partyId: usuarioActual?.partyId ? BigInt(usuarioActual.partyId) : undefined,
+        ip,
+      });
+    }
+
+    return this.obtenerConfig();
+  }
+
+  /**
+   * 4) GET /admin/repartos/zonas (repartos/ver):
+   * Devuelve las zonas de reparto registradas en BD con código, nombre, tarifa, activa,
+   * polígono y centroide calculado (sin inventar datos).
+   */
+  async listarZonas() {
+    const zonas = await this.prisma.zonaReparto.findMany({
+      orderBy: { codigo: 'asc' },
+    });
+
+    return zonas.map((z) => {
+      const poligono = (Array.isArray(z.poligono) ? z.poligono : []) as [number, number][];
+
+      let centro: [number, number] | null = null;
+      if (poligono.length > 0) {
+        let sumLat = 0;
+        let sumLng = 0;
+        for (const p of poligono) {
+          sumLat += Number(p[0]);
+          sumLng += Number(p[1]);
+        }
+        centro = [
+          Number((sumLat / poligono.length).toFixed(6)),
+          Number((sumLng / poligono.length).toFixed(6)),
+        ];
+      }
+
+      return {
+        id: String(z.id),
+        codigo: z.codigo,
+        nombre: `Zona ${z.codigo}`,
+        tarifa: Number(z.tarifa),
+        activa: z.activa,
+        puntos: poligono.length,
+        poligono,
+        centro,
       };
     });
   }
@@ -762,6 +1014,13 @@ export class RepartosService {
       throw new BadRequestException({
         codigo: 'ESTADO_INVALIDO',
         mensaje: `Solo se puede entregar un pedido EN_CAMINO (estado actual: ${pedido.estado})`,
+      });
+    }
+
+    if (pedido.modalidad === 'DELIVERY' && !pedido.repartidor_party_id) {
+      throw new ConflictException({
+        codigo: 'REPARTIDOR_REQUERIDO',
+        mensaje: 'Asigna un repartidor antes de marcar el pedido como entregado',
       });
     }
 

@@ -83,17 +83,42 @@ describe('Ola F5: Caja y Cierres', () => {
     });
   });
 
-  it('el PIN no queda en el estado', async () => {
-    vi.spyOn(cierreApi, 'realizarArqueo').mockResolvedValueOnce({
-      resultado: 'NO_CUADRA',
-      intento: 3,
-    });
+  it('un arqueo que cuadra no suma: dos que no cuadraron y uno que cuadra no piden PIN', async () => {
+    vi.spyOn(cierreApi, 'realizarArqueo')
+      .mockResolvedValueOnce({ resultado: 'NO_CUADRA', intento: 1 })
+      .mockResolvedValueOnce({ resultado: 'NO_CUADRA', intento: 2 })
+      .mockResolvedValueOnce({ resultado: 'CUADRA', intento: 3 });
 
     render(<ArqueoCiegoForm />);
 
-    // Simulamos que ya está en intento 3 forzando el botón revisar
     const botonRevisar = screen.getByRole('button', { name: /revisar arqueo ciego/i });
-    fireEvent.click(botonRevisar);
+    for (const n of [1, 2, 3]) {
+      fireEvent.click(botonRevisar);
+      await waitFor(() => {
+        expect(screen.getByText(`Intento #${n}`)).toBeInTheDocument();
+      });
+    }
+
+    expect(screen.queryByTestId('seccion-pin-supervisor')).not.toBeInTheDocument();
+  });
+
+  it('el PIN no queda en el estado', async () => {
+    vi.spyOn(cierreApi, 'realizarArqueo')
+      .mockResolvedValueOnce({ resultado: 'NO_CUADRA', intento: 1 })
+      .mockResolvedValueOnce({ resultado: 'NO_CUADRA', intento: 2 })
+      .mockResolvedValueOnce({ resultado: 'NO_CUADRA', intento: 3 })
+      .mockResolvedValue({ resultado: 'NO_CUADRA', intento: 4 });
+
+    render(<ArqueoCiegoForm />);
+
+    // Tres arqueos que no cuadran: a partir de ahí se pide el PIN del supervisor
+    const botonRevisar = screen.getByRole('button', { name: /revisar arqueo ciego/i });
+    for (const n of [1, 2, 3]) {
+      fireEvent.click(botonRevisar);
+      await waitFor(() => {
+        expect(screen.getByText(`Intento #${n}`)).toBeInTheDocument();
+      });
+    }
 
     await waitFor(() => {
       expect(screen.getByTestId('pin-supervisor-input')).toBeInTheDocument();

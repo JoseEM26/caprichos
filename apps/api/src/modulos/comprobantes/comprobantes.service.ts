@@ -12,6 +12,7 @@ import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { LocalService } from '../local/local.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
+import { cobroVigente } from '../caja/caja.calculo';
 import {
   extraerOpciones,
   enmascararDni,
@@ -220,7 +221,7 @@ export class ComprobantesService {
       telefono: localParam.telefono || '999999999',
     };
 
-    const fechaCobro = pedido.cobro?.en ?? comprobante.creado_en ?? pedido.creado_en;
+    const fechaCobro = cobroVigente<any>(pedido.cobros)?.en ?? comprobante.creado_en ?? pedido.creado_en;
     const fechaLima = formatearFechaHoraLima(new Date(fechaCobro));
 
     // Detalle de productos con opciones y cantidades
@@ -237,7 +238,7 @@ export class ComprobantesService {
     }));
 
     // Medios de pago y vuelto
-    const cobro = pedido.cobro;
+    const cobro = cobroVigente<any>(pedido.cobros);
     const pagos = (cobro?.pagos || []).map((p: any) => ({
       id: p.id.toString(),
       medio: p.medio,
@@ -322,7 +323,7 @@ export class ComprobantesService {
     const pedido = await this.prisma.pedido.findUnique({
       where: { id: pedidoId },
       include: {
-        cobro: {
+        cobros: {
           include: { pagos: true },
         },
         lineas: {
@@ -340,7 +341,7 @@ export class ComprobantesService {
     }
 
     // RN-CAP-037: Si el pedido aún no se cobró -> 409 PEDIDO_SIN_COBRAR
-    if (pedido.pago_estado !== 'PAGADO' || !pedido.cobro || pedido.cobro.anulado_en) {
+    if (pedido.pago_estado !== 'PAGADO' || !cobroVigente(pedido.cobros)) {
       throw new HttpException(
         {
           codigo: 'PEDIDO_SIN_COBRAR',
@@ -390,7 +391,7 @@ export class ComprobantesService {
     const pedido = await this.prisma.pedido.findUnique({
       where: { id: pedidoId },
       include: {
-        cobro: {
+        cobros: {
           include: { pagos: true },
         },
         lineas: {
@@ -407,7 +408,7 @@ export class ComprobantesService {
       });
     }
 
-    if (pedido.pago_estado !== 'PAGADO' || !pedido.cobro || pedido.cobro.anulado_en) {
+    if (pedido.pago_estado !== 'PAGADO' || !cobroVigente(pedido.cobros)) {
       throw new HttpException(
         {
           codigo: 'PEDIDO_SIN_COBRAR',

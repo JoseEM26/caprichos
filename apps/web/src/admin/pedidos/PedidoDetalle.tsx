@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Confirmar } from '../../comun/Confirmar';
 import { Pedido, pedidosApi } from './pedidosApi';
 import { ModalCobrar } from './ModalCobrar';
@@ -93,6 +94,8 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
     est !== 'ENTREGADO' &&
     est !== 'COLA' &&
     est !== 'NUEVO';
+  // Delivery sin repartidor: el servidor no lo deja pasar a ENTREGADO (409 REPARTIDOR_REQUERIDO)
+  const sinRepartidor = pedido.modalidad === 'DELIVERY' && !pedido.repartidor_party_id;
 
   // Configuración de estado visual (badge del mockup)
   const stBadge = getBadge(pedido);
@@ -1014,11 +1017,19 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
           </div>
         )}
 
-        {/* 4. Si está listo y para entregar */}
+        {/* 4. Si está listo y para entregar. Un delivery sin repartidor no se entrega (REPARTIDOR_REQUERIDO) */}
+        {est === 'LISTO' && sinRepartidor && (
+          <div role="alert" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-rust, #B2500F)' }}>
+            Asigna un repartidor antes de marcar el pedido como entregado.{' '}
+            <Link to="/admin/repartos" style={{ color: 'inherit', textDecoration: 'underline' }}>
+              Ir a Repartos
+            </Link>
+          </div>
+        )}
         {est === 'LISTO' && (
           <button
             type="button"
-            disabled={procesando}
+            disabled={procesando || sinRepartidor}
             onClick={() =>
               pedirConfirmacionEstado(
                 'ENTREGADO',

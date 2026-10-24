@@ -89,7 +89,7 @@ export function CierreView() {
   const [obsCierre, setObsCierre] = useState('');
   const [pinSupervisora, setPinSupervisora] = useState('');
   const [revisadoCuadra, setRevisadoCuadra] = useState<boolean | null>(null);
-  const [intentosArqueo, setIntentosArqueo] = useState(0);
+  const [arqueosNoCuadra, setArqueosNoCuadra] = useState(0);
   const [requierePin, setRequierePin] = useState(false);
   const [pinVerificado, setPinVerificado] = useState(false);
   const [msgCierreError, setMsgCierreError] = useState('');
@@ -224,8 +224,8 @@ export function CierreView() {
       ].map((f) => ({ ...f, dif: Math.round((f.contado - f.sistema) * 100) / 100 }))
     : [];
   const cuadraEnSistema = filasCuadre.length > 0 && filasCuadre.every((f) => Math.abs(f.dif) < 0.005);
-  // El admin ve la diferencia y la supervisora firma con su PIN; el cajero, si el arqueo no cuadra o van 3 intentos
-  const necesitaPin = esAdmin ? !cuadraEnSistema : revisadoCuadra === false || intentosArqueo >= 3 || requierePin;
+  // El admin ve la diferencia y la supervisora firma con su PIN; el cajero, si el arqueo no cuadra o ya van 3 arqueos que no cuadraron
+  const necesitaPin = esAdmin ? !cuadraEnSistema : revisadoCuadra === false || arqueosNoCuadra >= 3 || requierePin;
 
   const armarConteo = () => {
     const conteo: Record<string, number> = {};
@@ -375,10 +375,10 @@ export function CierreView() {
     try {
       const res = await cierreApi.realizarArqueo(
         { conteo: armarConteo(), medios: armarMedios() },
-        requierePin || intentosArqueo >= 3 ? pinSupervisora : undefined,
+        requierePin || arqueosNoCuadra >= 3 ? pinSupervisora : undefined,
       );
       setRevisadoCuadra(res.resultado === 'CUADRA');
-      setIntentosArqueo(res.intento);
+      setArqueosNoCuadra(res.resultado === 'NO_CUADRA' ? arqueosNoCuadra + 1 : arqueosNoCuadra);
       setRequierePin(false);
     } catch (err: any) {
       if (err instanceof ErrorApi && err.codigo === 'PIN_REQUERIDO') {
@@ -469,7 +469,7 @@ export function CierreView() {
       setAbrirModalCierre(false);
       setCjMsg('Caja cerrada. El cierre quedó registrado en el historial inmutable.');
       setTabActiva('historial');
-      setIntentosArqueo(0);
+      setArqueosNoCuadra(0);
       setRequierePin(false);
       cargarTurno();
     } catch (err: any) {

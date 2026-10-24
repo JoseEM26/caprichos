@@ -27,6 +27,7 @@ import {
   MEDIOS_COBRO,
   aCentimos,
   bloquearCaja,
+  cobroVigente,
   enPesos,
   errorCajaAnteriorAbierta,
   esCentimosValidos,
@@ -262,7 +263,7 @@ export class CobrosService {
       const pedidoId = this.parsearId(dto.pedidoId);
       const pedido = await tx.pedido.findUnique({
         where: { id: pedidoId },
-        include: { cobro: true },
+        include: { cobros: true },
       });
 
       if (!pedido) {
@@ -285,7 +286,7 @@ export class CobrosService {
         );
       }
 
-      if (pedido.pago_estado === 'PAGADO' || (pedido.cobro && !pedido.cobro.anulado_en)) {
+      if (pedido.pago_estado === 'PAGADO' || cobroVigente(pedido.cobros)) {
         throw new HttpException(
           {
             codigo: 'YA_COBRADO',
@@ -330,13 +331,8 @@ export class CobrosService {
       const distinctMedios = Array.from(new Set(dto.pagos.map((p) => p.medio.toUpperCase())));
       const pagoMetodo = distinctMedios.length > 1 ? 'MIXTO' : distinctMedios[0];
 
-      // un pedido tiene un solo cobro: si el anterior fue anulado, se reemplaza por el nuevo.
-      // La anulación (quién, cuándo, motivo y montos) queda en la auditoría encadenada.
-      if (pedido.cobro && pedido.cobro.anulado_en) {
-        await tx.cobroPago.deleteMany({ where: { cobro_id: pedido.cobro.id } });
-        await tx.cobro.delete({ where: { id: pedido.cobro.id } });
-      }
-
+      // Un pedido puede tener varios cobros, pero solo uno vigente (lo garantiza el índice parcial).
+      // El cobro anulado anterior se conserva con quién, cuándo y por qué (RNF-CAP-014).
       const nuevoCobro = await tx.cobro.create({
         data: {
           pedido_id: pedido.id,
@@ -583,7 +579,7 @@ export class CobrosService {
     }
 
     // 3. Auditar: quién pidió, quién aprobó con su PIN, motivo y los pagos anulados
-    //    (el cobro anulado se reemplaza si el pedido se vuelve a cobrar; aquí queda su contenido)
+    //    (el cobro anulado se conserva como fila; si el pedido se vuelve a cobrar, el nuevo cobro es otra fila)
     const pagosAnulados = cobro.pagos.map((p) => ({
       medio: p.medio,
       monto: Number(p.monto),

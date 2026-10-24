@@ -120,7 +120,7 @@ describe('CobrosService', () => {
       pago_estado: 'PENDIENTE',
       pago_metodo: null,
       es_personal: false,
-      cobro: null,
+      cobros: [],
     };
 
     it('caja cerrada no cobra -> 409 CAJA_CERRADA si no hay caja abierta hoy', async () => {
@@ -243,7 +243,7 @@ describe('CobrosService', () => {
       prismaMock.caja.findUnique.mockResolvedValue(cajaAbiertaMock);
       prismaMock.pedido.findUnique.mockResolvedValue({
         ...pedidoMock,
-        cobro: { id: 50n, anulado_en: null },
+        cobros: [{ id: 50n, anulado_en: null }],
       });
 
       await expect(
@@ -468,11 +468,32 @@ describe('CobrosService', () => {
       expect(salonMock.liberarMesasDePedido).toHaveBeenCalledWith(100n);
     });
 
-    it('cobrar de nuevo un pedido cuyo cobro fue anulado -> reemplaza el cobro anulado (un cobro por pedido)', async () => {
+    it('con un cobro anulado y otro vigente -> 409 YA_COBRADO (solo cuenta el vigente)', async () => {
       prismaMock.caja.findUnique.mockResolvedValue(cajaAbiertaMock);
       prismaMock.pedido.findUnique.mockResolvedValue({
         ...pedidoMock,
-        cobro: { id: 7n, anulado_en: new Date('2026-10-21T20:00:00.000Z') },
+        cobros: [
+          { id: 7n, anulado_en: new Date('2026-10-21T20:00:00.000Z') },
+          { id: 8n, anulado_en: null },
+        ],
+      });
+
+      await expect(
+        service.cobrar({ pedidoId: '100', pagos: [{ medio: 'EFECTIVO', monto: 50 }] }, cajeroUsuario),
+      ).rejects.toThrow(
+        expect.objectContaining({
+          response: expect.objectContaining({ codigo: 'YA_COBRADO' }),
+          status: HttpStatus.CONFLICT,
+        }),
+      );
+      expect(prismaMock.cobro.create).not.toHaveBeenCalled();
+    });
+
+    it('cobrar de nuevo un pedido cuyo cobro fue anulado -> conserva el anulado y crea una fila nueva', async () => {
+      prismaMock.caja.findUnique.mockResolvedValue(cajaAbiertaMock);
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        ...pedidoMock,
+        cobros: [{ id: 7n, anulado_en: new Date('2026-10-21T20:00:00.000Z') }],
       });
       prismaMock.cobro.create.mockResolvedValue({
         id: 9n,
@@ -489,8 +510,9 @@ describe('CobrosService', () => {
       const res = await service.cobrar({ pedidoId: '100', pagos: [{ medio: 'YAPE', monto: 50 }] }, cajeroUsuario);
 
       expect(res.id).toBe('9');
-      expect(prismaMock.cobroPago.deleteMany).toHaveBeenCalledWith({ where: { cobro_id: 7n } });
-      expect(prismaMock.cobro.delete).toHaveBeenCalledWith({ where: { id: 7n } });
+      // RNF-CAP-014: el cobro anulado no se borra; el nuevo es otra fila
+      expect(prismaMock.cobroPago.deleteMany).not.toHaveBeenCalled();
+      expect(prismaMock.cobro.delete).not.toHaveBeenCalled();
       expect(prismaMock.cobro.create).toHaveBeenCalledTimes(1);
     });
 
@@ -872,7 +894,7 @@ describe('CobrosService', () => {
       prismaMock.caja.findUnique.mockResolvedValue({ id: 10n, estado: 'ABIERTA' });
       prismaMock.pedido.findUnique.mockResolvedValue({
         id: 100n, codigo: 'CP-0100', total: new Prisma.Decimal(0.3), estado: 'ENTREGADO',
-        pago_estado: 'PENDIENTE', es_personal: false, cobro: null,
+        pago_estado: 'PENDIENTE', es_personal: false, cobros: [],
       });
       prismaMock.cobro.create.mockImplementation(({ data }: any) =>
         Promise.resolve({ id: 1n, pedido_id: 100n, caja_id: 10n, total: data.total, credito_personal: false,
@@ -907,7 +929,7 @@ describe('CobrosService', () => {
       pago_estado: 'PENDIENTE',
       pago_metodo: null,
       es_personal: false,
-      cobro: null,
+      cobros: [],
     };
 
     const cobroCreado = (cajaId: bigint) => ({

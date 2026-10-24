@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
+import { cobroVigente } from '../caja/caja.calculo';
 import { FiltroInformeDto, FiltroMapaDto } from './dto/filtro-informe.dto';
 import {
   IndicadoresData,
@@ -86,7 +87,7 @@ export class InformesService {
       where,
       include: {
         lineas: { include: { producto: { include: { categoria: true } } } },
-        cobro: { include: { pagos: true } },
+        cobros: { include: { pagos: true } },
       },
       orderBy: { creado_en: 'asc' },
     });
@@ -426,7 +427,7 @@ export class InformesService {
     });
     const cierresCount = await this.prisma.cierreCaja.count();
     const cobrarCount = await this.prisma.pedido.count({
-      where: { ...where, estado: { notIn: ['RECHAZADO', 'ANULADO', 'ENTREGADO'] }, cobro: null },
+      where: { ...where, estado: { notIn: ['RECHAZADO', 'ANULADO', 'ENTREGADO'] }, cobros: { none: { anulado_en: null } } },
     });
     const stockBajoCount = await this.prisma.stock.count({
       where: { insumo: { activo: true }, cantidad: { lt: 10 } },
@@ -787,7 +788,7 @@ export class InformesService {
 
       case 'pago': {
         const cobroPagos = await this.prisma.cobroPago.findMany({
-          where: { cobro: { pedido: where } },
+          where: { cobro: { anulado_en: null, pedido: where } },
         });
         const pMap: Record<string, { count: number; monto: number }> = {};
         let totP = 0;
@@ -879,6 +880,7 @@ export class InformesService {
 
       case 'medios': {
         const cobroPagos = await this.prisma.cobroPago.findMany({
+          where: { cobro: { anulado_en: null } },
           include: { cobro: true },
         });
         const fMap: Record<string, Record<string, number>> = {};
@@ -940,7 +942,7 @@ export class InformesService {
 
       case 'cobrar': {
         const pendientes = await this.prisma.pedido.findMany({
-          where: { ...where, estado: { notIn: ['RECHAZADO', 'ANULADO', 'ENTREGADO'] }, cobro: null },
+          where: { ...where, estado: { notIn: ['RECHAZADO', 'ANULADO', 'ENTREGADO'] }, cobros: { none: { anulado_en: null } } },
           orderBy: { creado_en: 'desc' },
         });
         const totPend = pendientes.reduce((acc, p) => acc + Number(p.total || 0), 0);
@@ -1292,7 +1294,7 @@ export class InformesService {
             ...where,
             OR: [{ canal: 'CARTA' }, { modalidad: 'DELIVERY' }],
           },
-          include: { cobro: true },
+          include: { cobros: true },
         });
         const repMap: Record<string, { count: number; monto: number; cobrados: number }> = {};
         for (const p of pedidos) {
@@ -1300,7 +1302,7 @@ export class InformesService {
           repMap[repNombre] = repMap[repNombre] || { count: 0, monto: 0, cobrados: 0 };
           repMap[repNombre].count += 1;
           repMap[repNombre].monto += Number(p.total || 0);
-          if (p.cobro) repMap[repNombre].cobrados += 1;
+          if (cobroVigente(p.cobros)) repMap[repNombre].cobrados += 1;
         }
         const rows = Object.entries(repMap).map(([r, data]) => [
           r,

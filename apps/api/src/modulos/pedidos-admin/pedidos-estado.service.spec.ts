@@ -303,6 +303,7 @@ describe('PedidosEstadoService', () => {
         codigo: 'CP-W001',
         modalidad: 'DELIVERY',
         estado: 'EN_CAMINO',
+        repartidor_party_id: 55n,
       };
       prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);
       prismaMock.pedido.update.mockResolvedValue({
@@ -316,6 +317,27 @@ describe('PedidosEstadoService', () => {
   });
 
   describe('transición inválida (409)', () => {
+    it('un delivery sin repartidor no pasa a ENTREGADO: 409 REPARTIDOR_REQUERIDO y no se actualiza', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 10n,
+        codigo: 'CP-W001',
+        modalidad: 'DELIVERY',
+        estado: 'EN_CAMINO',
+        repartidor_party_id: null,
+      });
+
+      await expect(
+        service.cambiarEstado(10n, { estado: 'ENTREGADO' }, cajeroAuth),
+      ).rejects.toMatchObject({
+        status: 409,
+        response: {
+          codigo: 'REPARTIDOR_REQUERIDO',
+          mensaje: 'Asigna un repartidor antes de marcar el pedido como entregado',
+        },
+      });
+      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+    });
+
     it('debe rechazar salto de COLA a ENTREGADO con 409', async () => {
       const pedidoMock = {
         id: 10n,

@@ -35,6 +35,12 @@ import { LiquidarRepartidorDto } from './dto/liquidar.dto';
 import { HistorialCierresDto } from './dto/historial.dto';
 import { calcularTotalConteo } from './cierre.util';
 
+/**
+ * Arqueos que NO cuadraron antes de exigir PIN de supervisor. Un arqueo que cuadra no suma.
+ * Los intentos se numeran todos (incluidos los que cuadran); solo los NO_CUADRA cuentan para el PIN.
+ */
+const ARQUEOS_NO_CUADRA_PARA_PIN = 3;
+
 /** Diferencia por medio en céntimos (visto − sistema). Cuadra si todas son cero. */
 function compararConSistema(
   vistos: { efectivo: number; yape: number; plin: number; transferencia: number; tarjeta: number },
@@ -231,21 +237,24 @@ export class CierreService {
     const { resultado, nuevoIntento } = await this.prisma.$transaction(async (tx) => {
       const caja = await this.bloquearCajaAbierta(tx, cajaAbierta.id);
 
-      // Contar intentos previos para esta caja
+      // Número del intento: todos los arqueos de la caja cuentan para la numeración
       const conteosPrevios = await tx.conteoCierre.count({
         where: { caja_id: caja.id },
       });
 
       const nuevoIntento = conteosPrevios + 1;
 
-      // Si ya fallaron 3 intentos previos, cualquier arqueo subsiguiente exige PIN de supervisor
-      if (conteosPrevios >= 3) {
+      // Desde el cuarto intento exige PIN de supervisor, pero solo si los tres anteriores no cuadraron
+      const noCuadraPrevios = await tx.conteoCierre.count({
+        where: { caja_id: caja.id, resultado: 'NO_CUADRA' },
+      });
+      if (noCuadraPrevios >= ARQUEOS_NO_CUADRA_PARA_PIN) {
         if (!pinSupervisor) {
           throw new HttpException(
             {
               codigo: 'PIN_REQUERIDO',
               mensaje:
-                'Se alcanzó el límite de 3 intentos de arqueo. Debe proceder al cierre con PIN de supervisor.',
+                'Se alcanzaron 3 arqueos que no cuadraron. Debe proceder al cierre con PIN de supervisor.',
             },
             HttpStatus.FORBIDDEN,
           );
@@ -305,7 +314,7 @@ export class CierreService {
    * Cierra la caja del día.
    * Crea cierre_caja (inmutable) y cierre_medio por medio.
    * Exige que no haya cobros en curso.
-   * Si no cuadra o tras 3 intentos, exige PIN de supervisor y notas.
+   * Si no cuadra o tras 3 arqueos que no cuadraron, exige PIN de supervisor y notas.
    */
   async cerrar(
     dto: CerrarCajaDto,
@@ -386,8 +395,9 @@ export class CierreService {
 
       let supervisorPartyId: bigint | null = null;
 
-      // Si no cuadra o se han agotado los 3 intentos, se exige supervisor y notas
-      if (!cuadra || conteosCaja.length >= 3) {
+      // Si no cuadra o ya hubo 3 arqueos que no cuadraron, se exige supervisor y notas
+      const noCuadraPrevios = conteosCaja.filter((c) => c.resultado === 'NO_CUADRA').length;
+      if (!cuadra || noCuadraPrevios >= ARQUEOS_NO_CUADRA_PARA_PIN) {
         if (!dto.nota || typeof dto.nota !== 'string' || dto.nota.trim().length < 3) {
           throw new HttpException(
             {
@@ -818,7 +828,7 @@ export class CierreService {
       where: {
         pago_estado: { in: ['PENDIENTE', 'COORDINADO'] },
         estado: { not: 'ANULADO' },
-        NOT: { cobro: { anulado_en: null } },
+        cobros: { none: { anulado_en: null } },
       },
       orderBy: { creado_en: 'asc' },
       select: {

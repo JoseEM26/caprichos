@@ -26,6 +26,10 @@ import { enmascararDni } from '../usuarios/usuarios.util';
 import { FiltrarPedidosDto } from './dto/filtrar-pedidos.dto';
 import { CambiarEstadoDto } from './dto/cambiar-estado.dto';
 import { RegistrarPagoDto } from './dto/registrar-pago.dto';
+import {
+  calcularSiguienteMedianocheLima,
+  obtenerInicioDiaLima,
+} from '../cocina/cocina.util';
 
 export type ColorEspera = 'verde' | 'naranja' | 'rojo';
 
@@ -115,7 +119,7 @@ export class PedidosEstadoService {
 
   /**
    * Verifica el PIN de 6 dígitos contra algún usuario ADMIN activo en la base de datos (DT-61).
-   * 3 intentos fallidos consecutivos bloquean 10 minutos en Redis.
+   * 3 intentos fallidos consecutivos bloquean 5 minutos en Redis; sin Redis responde 503 (comun/redis/intentos-pin).
    */
   async verificarPinSupervisor(
     pinSupervisor?: string,
@@ -319,6 +323,12 @@ export class PedidosEstadoService {
           },
           zona: true,
         },
+      });
+      // Desempate por id en caso de misma hora de llegada
+      pedidos.sort((a, b) => {
+        const diff = new Date(a.creado_en).getTime() - new Date(b.creado_en).getTime();
+        if (diff !== 0) return diff;
+        return Number(a.id - b.id);
       });
     }
 
@@ -604,6 +614,14 @@ export class PedidosEstadoService {
       throw new ConflictException({
         codigo: 'TRANSICION_INVALIDA',
         mensaje: `No se puede cambiar el pedido del estado ${estadoAnterior} a ${nuevoEstado} para modalidad ${pedido.modalidad}`,
+      });
+    }
+
+    // Un delivery no se marca entregado sin repartidor: su efectivo no tendría quién lo liquide
+    if (nuevoEstado === 'ENTREGADO' && pedido.modalidad === 'DELIVERY' && !pedido.repartidor_party_id) {
+      throw new ConflictException({
+        codigo: 'REPARTIDOR_REQUERIDO',
+        mensaje: 'Asigna un repartidor antes de marcar el pedido como entregado',
       });
     }
 
