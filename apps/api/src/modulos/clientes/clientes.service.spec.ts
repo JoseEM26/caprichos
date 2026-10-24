@@ -18,6 +18,14 @@ import { PuntosService } from './puntos.service';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
+import { ArchivosService } from '../archivos/archivos.service';
+import { PayloadTooLargeException } from '@nestjs/common';
+
+const tipoEsperado = (buf: Buffer): string => {
+  if (buf[0] === 0xff) return 'image/jpeg';
+  if (buf[0] === 0x89) return 'image/png';
+  return 'image/webp';
+};
 
 describe('ClientesService', () => {
   let service: ClientesService;
@@ -26,6 +34,7 @@ describe('ClientesService', () => {
   let jwtMock: any;
   let auditoriaMock: any;
   let puntosMock: any;
+  let archivosMock: any;
 
   beforeEach(async () => {
     prismaMock = {
@@ -65,6 +74,9 @@ describe('ClientesService', () => {
       consent: {
         create: jest.fn(),
       },
+      archivo: {
+        findUnique: jest.fn(),
+      },
       $transaction: jest.fn(async (cb) => cb(prismaMock)),
     };
 
@@ -93,6 +105,10 @@ describe('ClientesService', () => {
       obtenerSaldo: jest.fn().mockResolvedValue(10),
     };
 
+    archivosMock = {
+      subirArchivo: jest.fn().mockResolvedValue({ id: '55', url: '/archivos/publico/2026/10/foto.webp' }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ClientesService,
@@ -107,6 +123,7 @@ describe('ClientesService', () => {
         },
         { provide: AuditoriaService, useValue: auditoriaMock },
         { provide: PuntosService, useValue: puntosMock },
+        { provide: ArchivosService, useValue: archivosMock },
       ],
     }).compile();
 
@@ -144,6 +161,7 @@ describe('ClientesService', () => {
         dni: '45217890',
         nombre: 'Ana Pérez',
         contrasena: 'ClaveSegura2026',
+        telefono: '912345678',
         correo: 'ana@ejemplo.com',
         cumpleanos: '1995-03-14',
         aceptaDatos: true,
@@ -169,6 +187,7 @@ describe('ClientesService', () => {
           dni: '45217890',
           nombre: 'Ana Pérez',
           contrasena: 'ClaveSegura2026',
+          telefono: '912345678',
           cumpleanos: '1995-03-14',
           aceptaDatos: false,
         }),
@@ -187,10 +206,160 @@ describe('ClientesService', () => {
           dni: '45217890',
           nombre: 'Ana Pérez',
           contrasena: 'ClaveSegura2026',
+          telefono: '912345678',
           cumpleanos: '1995-03-14',
           aceptaDatos: true,
         }),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('foto de perfil', () => {
+    const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
+    const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10]);
+    const WEBP = Buffer.concat([Buffer.from('RIFF'), Buffer.from([4, 0, 0, 0]), Buffer.from('WEBP')]);
+    const archivoFile = (buffer: Buffer, mimetype: string) => ({ buffer, size: buffer.length, mimetype, originalname: 'foto.png' }) as any;
+
+    beforeEach(() => {
+      prismaMock.person.update.mockResolvedValue({});
+      prismaMock.party.findUnique.mockResolvedValue({ id: 100n, persona: { nombres: 'Ana', foto_archivo_id: 55n }, documentos: [], contactos: [], roles: [] });
+      prismaMock.archivo.findUnique.mockResolvedValue({ id: 55n, ruta: 'publico/2026/10/foto.webp' });
+    });
+
+    it('acepta JPEG, PNG y WebP, verificados por bytes, y enlaza la foto a la persona de la sesión', async () => {
+      for (const buf of [JPEG, PNG, WEBP]) {
+        archivosMock.subirArchivo.mockClear();
+        await service.subirFoto(100n, archivoFile(buf, 'image/png'), '127.0.0.1');
+        expect(archivosMock.subirArchivo).toHaveBeenCalledWith(expect.objectContaining({ mimetype: tipoEsperado(buf) }), false, expect.objectContaining({ partyId: 100n }), '127.0.0.1');
+      }
+      expect(prismaMock.person.update).toHaveBeenCalledWith({ where: { party_id: 100n }, data: { foto_archivo_id: 55n } });
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'CLIENTE_FOTO_SUBIDA', partyId: 100n }));
+    });
+
+    it('rechaza un archivo que dice ser PNG o JPEG pero no tiene bytes de imagen', async () => {
+      const texto = Buffer.from('<html>no soy una imagen</html>');
+      await expect(service.subirFoto(100n, archivoFile(texto, 'image/png'))).rejects.toThrow(BadRequestException);
+      await expect(service.subirFoto(100n, archivoFile(texto, 'image/jpeg'))).rejects.toThrow(BadRequestException);
+      expect(archivosMock.subirArchivo).not.toHaveBeenCalled();
+      expect(prismaMock.person.update).not.toHaveBeenCalled();
+    });
+
+    it('rechaza una foto de más de 2 MB con 413', async () => {
+      const grande = Buffer.concat([PNG, Buffer.alloc(2 * 1024 * 1024)]);
+      await expect(service.subirFoto(100n, archivoFile(grande, 'image/png'))).rejects.toThrow(PayloadTooLargeException);
+      expect(archivosMock.subirArchivo).not.toHaveBeenCalled();
+    });
+
+    it('quitar foto desvincula la foto sin tocar el archivo', async () => {
+      await service.quitarFoto(100n);
+      expect(prismaMock.person.update).toHaveBeenCalledWith({ where: { party_id: 100n }, data: { foto_archivo_id: null } });
+      expect(prismaMock.archivo).not.toHaveProperty('delete');
+      expect(archivosMock.subirArchivo).not.toHaveBeenCalled();
+    });
+
+    it('yo devuelve fotoUrl con la ruta pública del archivo, y null sin foto', async () => {
+      const conFoto = await service.yo(100n);
+      expect(conFoto?.fotoUrl).toBe('/archivos/publico/2026/10/foto.webp');
+
+      prismaMock.party.findUnique.mockResolvedValueOnce({ id: 101n, persona: { nombres: 'Luis', foto_archivo_id: null }, documentos: [], contactos: [], roles: [] });
+      const sinFoto = await service.yo(101n);
+      expect(sinFoto?.fotoUrl).toBeNull();
+    });
+  });
+
+  describe('teléfono y perfil de la cuenta', () => {
+    const datosRegistro = {
+      dni: '45217890',
+      nombre: 'Ana Pérez',
+      contrasena: 'ClaveSegura2026',
+      cumpleanos: '1995-03-14',
+      aceptaDatos: true,
+    };
+
+    it('registro guarda el celular como contacto TELEFONO principal', async () => {
+      prismaMock.partyIdentifier.findFirst.mockResolvedValue(null);
+      prismaMock.party.create.mockResolvedValue({ id: 100n });
+      prismaMock.partyRole.create.mockResolvedValue({ id: 1n });
+      prismaMock.party.findUnique.mockResolvedValue({ id: 100n, persona: { nombres: 'Ana Pérez' }, documentos: [], roles: [] });
+
+      await service.registro({ ...datosRegistro, telefono: '912345678' });
+
+      expect(prismaMock.contactMechanism.create).toHaveBeenCalledWith({
+        data: { party_id: 100n, tipo: 'TELEFONO', valor: '912345678', principal: true },
+      });
+    });
+
+    it('registro rechaza teléfono que no tiene 9 dígitos empezando con 9', async () => {
+      for (const telefono of ['', '812345678', '91234567', '9123456789', '91234abcd']) {
+        await expect(service.registro({ ...datosRegistro, telefono })).rejects.toThrow(BadRequestException);
+      }
+      expect(prismaMock.party.create).not.toHaveBeenCalled();
+    });
+
+    it('yo devuelve el teléfono y null si el cliente no lo tiene', async () => {
+      prismaMock.party.findUnique.mockResolvedValueOnce({
+        id: 100n,
+        persona: { nombres: 'Ana' },
+        documentos: [],
+        contactos: [{ tipo: 'CORREO', valor: 'ana@ejemplo.com' }, { tipo: 'TELEFONO', valor: '912345678' }],
+        roles: [],
+      });
+      const conTelefono = await service.yo(100n);
+      expect(conTelefono?.telefono).toBe('912345678');
+
+      prismaMock.party.findUnique.mockResolvedValueOnce({ id: 101n, persona: { nombres: 'Luis' }, documentos: [], contactos: [], roles: [] });
+      const sinTelefono = await service.yo(101n);
+      expect(sinTelefono?.telefono).toBeNull();
+    });
+
+    it('actualizarPerfil guarda nombre, teléfono, correo y cumpleaños', async () => {
+      prismaMock.person.update.mockResolvedValue({});
+      prismaMock.contactMechanism.findFirst.mockResolvedValue({ id: 7n });
+      prismaMock.party.findUnique.mockResolvedValue({ id: 100n, persona: { nombres: 'Ana Pérez' }, documentos: [], contactos: [], roles: [] });
+
+      await service.actualizarPerfil(100n, {
+        nombre: 'Ana Pérez Gil',
+        telefono: '987654321',
+        correo: 'ana.nueva@ejemplo.com',
+        cumpleanos: '14/03',
+      }, '127.0.0.1');
+
+      expect(prismaMock.person.update).toHaveBeenCalledWith({
+        where: { party_id: 100n },
+        data: { nombres: 'Ana Pérez Gil', correo: 'ana.nueva@ejemplo.com', cumple_dia: 14, cumple_mes: 3 },
+      });
+      expect(prismaMock.contactMechanism.update).toHaveBeenCalledWith({ where: { id: 7n }, data: { valor: '987654321' } });
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'CLIENTE_PERFIL_EDITADO', partyId: 100n }));
+    });
+
+    it('actualizarPerfil nunca cambia el DNI ni la contraseña aunque se envíen', async () => {
+      prismaMock.person.update.mockResolvedValue({});
+      prismaMock.party.findUnique.mockResolvedValue({ id: 100n, persona: { nombres: 'Ana Pérez' }, documentos: [], contactos: [], roles: [] });
+
+      await service.actualizarPerfil(100n, { nombre: 'Ana Pérez', dni: '11111111', contrasena: 'OtraClave2026' } as any);
+
+      const datos = prismaMock.person.update.mock.calls[0][0].data;
+      expect(datos).not.toHaveProperty('dni');
+      expect(datos).not.toHaveProperty('contrasena');
+      expect(prismaMock.customerAccount.upsert).not.toHaveBeenCalled();
+      expect(prismaMock.customerAccount.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('actualizarPerfil rechaza nombre corto, teléfono inválido, correo inválido y cumpleaños inválido', async () => {
+      await expect(service.actualizarPerfil(100n, { nombre: 'Al' })).rejects.toThrow(BadRequestException);
+      await expect(service.actualizarPerfil(100n, { telefono: '123' })).rejects.toThrow(BadRequestException);
+      await expect(service.actualizarPerfil(100n, { correo: 'sin-arroba' })).rejects.toThrow(BadRequestException);
+      await expect(service.actualizarPerfil(100n, { cumpleanos: '32/13' })).rejects.toThrow(BadRequestException);
+      expect(prismaMock.person.update).not.toHaveBeenCalled();
+    });
+
+    it('actualizarPerfil con correo vacío quita el correo', async () => {
+      prismaMock.person.update.mockResolvedValue({});
+      prismaMock.party.findUnique.mockResolvedValue({ id: 100n, persona: { nombres: 'Ana Pérez' }, documentos: [], contactos: [], roles: [] });
+
+      await service.actualizarPerfil(100n, { correo: '' });
+
+      expect(prismaMock.person.update).toHaveBeenCalledWith({ where: { party_id: 100n }, data: { correo: null } });
     });
   });
 

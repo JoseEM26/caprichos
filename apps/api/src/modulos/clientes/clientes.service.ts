@@ -3,14 +3,17 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  PayloadTooLargeException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { Prisma } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { Request } from 'express';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
+import { ArchivosService } from '../archivos/archivos.service';
 import { PuntosService } from './puntos.service';
 import {
   AjustarPuntosDto,
@@ -19,9 +22,25 @@ import {
   EditarClienteAdminDto,
   IngresoClienteDto,
   NotificacionCliente,
+  PerfilClienteDto,
   RegistrarMostradorDto,
   RegistroClienteDto,
 } from './clientes.tipos';
+
+const TELEFONO_CELULAR = /^9\d{8}$/;
+const FOTO_MAX_BYTES = 2 * 1024 * 1024;
+
+/** Tipo real de la imagen según sus primeros bytes (no la extensión ni el Content-Type que manda el cliente). */
+export function tipoImagenPorBytes(buf: Buffer): string | null {
+  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg';
+  if (buf.length >= 8 && buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) {
+    return 'image/png';
+  }
+  if (buf.length >= 12 && buf.subarray(0, 4).toString('ascii') === 'RIFF' && buf.subarray(8, 12).toString('ascii') === 'WEBP') {
+    return 'image/webp';
+  }
+  return null;
+}
 
 export function enmascararDoc(doc: string): string {
   const s = String(doc || '').trim();
@@ -59,6 +78,11 @@ export function formatearCumpleanos(dia?: number | null, mes?: number | null): s
   return `${String(dia).padStart(2, '0')}/${String(mes).padStart(2, '0')}`;
 }
 
+export function telefonoDeContactos(contactos: { tipo: string; valor: string }[] = []): string | null {
+  const telefono = contactos.find((c) => c.tipo === 'TELEFONO') ?? contactos.find((c) => c.tipo === 'WHATSAPP');
+  return telefono?.valor ?? null;
+}
+
 @Injectable()
 export class ClientesService {
   constructor(
@@ -68,6 +92,7 @@ export class ClientesService {
     private readonly configService: ConfigService,
     private readonly auditoria: AuditoriaService,
     private readonly puntosService: PuntosService,
+    private readonly archivos: ArchivosService,
   ) {}
 
   /**
@@ -133,6 +158,13 @@ export class ClientesService {
       throw new BadRequestException({
         codigo: 'NOMBRE_REQUERIDO',
         mensaje: 'Escribe tu nombre.',
+      });
+    }
+
+    if (!TELEFONO_CELULAR.test(String(dto.telefono || '').trim())) {
+      throw new BadRequestException({
+        codigo: 'TELEFONO_INVALIDO',
+        mensaje: 'El teléfono celular debe tener 9 dígitos y empezar con 9.',
       });
     }
 
@@ -206,6 +238,8 @@ export class ClientesService {
           },
         });
 
+        await this.guardarTelefono(tx, partyId, dto.telefono.trim());
+
         // Asegurar cuenta de cliente con hash
         await tx.customerAccount.upsert({
           where: { party_id: partyId },
@@ -271,6 +305,8 @@ export class ClientesService {
             activo: true,
           },
         });
+
+        await this.guardarTelefono(tx, party.id, dto.telefono.trim());
 
         if (dto.correo?.trim()) {
           await tx.contactMechanism.create({
@@ -441,6 +477,7 @@ export class ClientesService {
       include: {
         persona: true,
         documentos: true,
+        contactos: true,
         roles: {
           where: { rol: 'CLIENTE', hasta: null },
           include: { customer_detail: true },
@@ -453,15 +490,192 @@ export class ClientesService {
     const dniDoc = party.documentos.find((d) => d.tipo === 'DNI');
     const dni = dniDoc ? dniDoc.numero : '';
     const puntos = await this.puntosService.obtenerSaldo(id);
+    const fotoId = party.persona?.foto_archivo_id;
+    const foto = fotoId ? await this.prisma.archivo.findUnique({ where: { id: fotoId } }) : null;
 
     return {
       partyId: id.toString(),
       nombre: party.persona?.nombres || 'Cliente',
       dniMascara: enmascararDoc(dni),
       correo: party.persona?.correo || null,
+      telefono: telefonoDeContactos(party.contactos),
+      fotoUrl: foto ? `/archivos/${foto.ruta}` : null,
       cumpleanos: formatearCumpleanos(party.persona?.cumple_dia, party.persona?.cumple_mes),
       puntos,
     };
+  }
+
+  /**
+   * Edición del perfil desde la cuenta del cliente (PUT /carta/cuenta/perfil).
+   * Solo toca nombre, teléfono, correo y cumpleaños: nunca el DNI ni la contraseña.
+   */
+  async actualizarPerfil(partyId: bigint | string, dto: PerfilClienteDto, ip?: string): Promise<ClienteSesion | null> {
+    const id = BigInt(partyId);
+
+    if (dto.nombre !== undefined && String(dto.nombre).trim().length < 3) {
+      throw new BadRequestException({
+        codigo: 'NOMBRE_REQUERIDO',
+        mensaje: 'Escribe tu nombre.',
+      });
+    }
+
+    if (dto.telefono !== undefined && !TELEFONO_CELULAR.test(String(dto.telefono).trim())) {
+      throw new BadRequestException({
+        codigo: 'TELEFONO_INVALIDO',
+        mensaje: 'El teléfono celular debe tener 9 dígitos y empezar con 9.',
+      });
+    }
+
+    const correo = dto.correo !== undefined ? String(dto.correo).trim() : undefined;
+    if (correo && !/^\S+@\S+\.\S+$/.test(correo)) {
+      throw new BadRequestException({
+        codigo: 'CORREO_INVALIDO',
+        mensaje: 'El correo no es válido.',
+      });
+    }
+
+    const cumple = dto.cumpleanos !== undefined ? parsearCumpleanos(dto.cumpleanos) : null;
+    if (dto.cumpleanos !== undefined && !cumple) {
+      throw new BadRequestException({
+        codigo: 'FECHA_INVALIDA',
+        mensaje: 'La fecha de cumpleaños no es válida.',
+      });
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      if (dto.nombre !== undefined || correo !== undefined || cumple) {
+        await tx.person.update({
+          where: { party_id: id },
+          data: {
+            ...(dto.nombre !== undefined ? { nombres: dto.nombre.trim() } : {}),
+            ...(correo !== undefined ? { correo: correo || null } : {}),
+            ...(cumple ? { cumple_dia: cumple.dia, cumple_mes: cumple.mes } : {}),
+          },
+        });
+      }
+
+      if (dto.telefono !== undefined) {
+        await this.guardarTelefono(tx, id, dto.telefono.trim());
+      }
+    });
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'clientes',
+      accion: 'CLIENTE_PERFIL_EDITADO',
+      entidad: 'party',
+      entidadId: id,
+      despues: { camposEditados: Object.keys(dto).filter((k) => dto[k as keyof PerfilClienteDto] !== undefined) },
+      partyId: id,
+      ip,
+    });
+
+    return this.yo(id);
+  }
+
+  /**
+   * Foto de perfil opcional (POST /carta/cuenta/foto). Solo JPEG, PNG o WebP de máximo 2 MB,
+   * verificados por bytes. El archivo lo guarda ArchivosService; aquí solo se enlaza a la persona.
+   */
+  async subirFoto(partyId: bigint | string, file: Express.Multer.File, ip?: string): Promise<ClienteSesion | null> {
+    const id = BigInt(partyId);
+
+    if (!file?.buffer) {
+      throw new BadRequestException({
+        codigo: 'ARCHIVO_REQUERIDO',
+        mensaje: 'Elige una foto para tu perfil.',
+      });
+    }
+
+    if (file.buffer.length > FOTO_MAX_BYTES) {
+      throw new PayloadTooLargeException({
+        codigo: 'FOTO_GRANDE',
+        mensaje: 'La foto no puede pasar de 2 MB.',
+      });
+    }
+
+    const tipo = tipoImagenPorBytes(file.buffer);
+    if (!tipo) {
+      throw new BadRequestException({
+        codigo: 'FOTO_TIPO_NO_PERMITIDO',
+        mensaje: 'Solo se aceptan fotos JPEG, PNG o WebP.',
+      });
+    }
+
+    let archivo: { id: string };
+    try {
+      archivo = await this.archivos.subirArchivo(
+        { ...file, mimetype: tipo } as Express.Multer.File,
+        false,
+        { partyId: id, rol: 'CLIENTE', debeCambiar: false },
+        ip,
+      );
+    } catch {
+      throw new BadRequestException({
+        codigo: 'FOTO_NO_VALIDA',
+        mensaje: 'No pudimos leer esa imagen. Prueba con otra foto.',
+      });
+    }
+
+    await this.prisma.person.update({
+      where: { party_id: id },
+      data: { foto_archivo_id: BigInt(archivo.id) },
+    });
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'clientes',
+      accion: 'CLIENTE_FOTO_SUBIDA',
+      entidad: 'party',
+      entidadId: id,
+      partyId: id,
+      ip,
+    });
+
+    return this.yo(id);
+  }
+
+  /**
+   * Quita la foto del perfil (DELETE /carta/cuenta/foto). Solo desvincula: el archivo queda en disco.
+   */
+  async quitarFoto(partyId: bigint | string, ip?: string): Promise<ClienteSesion | null> {
+    const id = BigInt(partyId);
+
+    await this.prisma.person.update({
+      where: { party_id: id },
+      data: { foto_archivo_id: null },
+    });
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'clientes',
+      accion: 'CLIENTE_FOTO_QUITADA',
+      entidad: 'party',
+      entidadId: id,
+      partyId: id,
+      ip,
+    });
+
+    return this.yo(id);
+  }
+
+  /**
+   * Deja el celular como contacto TELEFONO principal (el mismo que lee y edita el admin de Clientes).
+   */
+  private async guardarTelefono(tx: Prisma.TransactionClient, partyId: bigint, telefono: string) {
+    const existente = await tx.contactMechanism.findFirst({
+      where: { party_id: partyId, tipo: 'TELEFONO' },
+    });
+    if (existente) {
+      await tx.contactMechanism.update({
+        where: { id: existente.id },
+        data: { valor: telefono },
+      });
+    } else {
+      await tx.contactMechanism.create({
+        data: { party_id: partyId, tipo: 'TELEFONO', valor: telefono, principal: true },
+      });
+    }
   }
 
   /**

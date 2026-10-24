@@ -3,6 +3,8 @@ export interface ClienteSesion {
   nombre: string;
   dniMascara: string;
   correo: string | null;
+  telefono: string | null;
+  fotoUrl: string | null;
   cumpleanos: string | null;
   puntos: number;
 }
@@ -11,9 +13,17 @@ export interface RegistroClienteDto {
   dni: string;
   nombre: string;
   contrasena: string;
+  telefono: string; // celular de 9 dígitos que empieza con 9
   correo?: string;
   cumpleanos: string; // YYYY-MM-DD o DD/MM
   aceptaDatos: boolean;
+}
+
+export interface PerfilClienteDto {
+  nombre?: string;
+  telefono?: string;
+  correo?: string;
+  cumpleanos?: string; // YYYY-MM-DD o DD/MM
 }
 
 export interface IngresoClienteDto {

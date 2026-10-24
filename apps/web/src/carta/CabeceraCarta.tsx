@@ -233,10 +233,15 @@ export function CabeceraCarta({
             gap: 6,
           }}
         >
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <circle cx="12" cy="8" r="4" />
-            <path d="M4 21c1-4 4-6 8-6s7 2 8 6" />
-          </svg>
+          {cliente?.fotoUrl ? (
+            // mismo recuadro de 18 px que el icono: la cabecera no cambia de ancho con o sin foto
+            <img src={cliente.fotoUrl} alt="" width={18} height={18} style={{ width: 18, height: 18, borderRadius: 9, objectFit: 'cover', flex: 'none' }} />
+          ) : (
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="8" r="4" />
+              <path d="M4 21c1-4 4-6 8-6s7 2 8 6" />
+            </svg>
+          )}
           <span>{cliente ? `${cliente.puntos} pts` : 'Ingresar'}</span>
         </button>
 

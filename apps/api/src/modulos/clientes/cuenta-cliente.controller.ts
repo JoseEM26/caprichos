@@ -1,15 +1,21 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Post,
+  Put,
   Req,
   Res,
+  UnauthorizedException,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Request, Response } from 'express';
 import { ClientesService } from './clientes.service';
-import { IngresoClienteDto, RegistroClienteDto } from './clientes.tipos';
+import { IngresoClienteDto, PerfilClienteDto, RegistroClienteDto } from './clientes.tipos';
 
 @Controller('carta/cuenta')
 export class CuentaClienteController {
@@ -75,6 +81,49 @@ export class CuentaClienteController {
       httpOnly: true,
     });
     return { ok: true };
+  }
+
+  @Put('perfil')
+  async actualizarPerfil(@Body() dto: PerfilClienteDto, @Req() req: Request) {
+    const cliente = await this.clientesService.clienteDesdeRequest(req);
+    if (!cliente) {
+      throw new UnauthorizedException({
+        codigo: 'SESION_REQUERIDA',
+        mensaje: 'Inicia sesión para editar tu perfil.',
+      });
+    }
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    const actualizado = await this.clientesService.actualizarPerfil(cliente.partyId, dto, ip);
+    return { cliente: actualizado };
+  }
+
+  @Post('foto')
+  @UseInterceptors(FileInterceptor('foto'))
+  async subirFoto(@UploadedFile() file: Express.Multer.File, @Req() req: Request) {
+    const cliente = await this.clientesService.clienteDesdeRequest(req);
+    if (!cliente) {
+      throw new UnauthorizedException({
+        codigo: 'SESION_REQUERIDA',
+        mensaje: 'Inicia sesión para cambiar tu foto.',
+      });
+    }
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    const actualizado = await this.clientesService.subirFoto(cliente.partyId, file, ip);
+    return { cliente: actualizado };
+  }
+
+  @Delete('foto')
+  async quitarFoto(@Req() req: Request) {
+    const cliente = await this.clientesService.clienteDesdeRequest(req);
+    if (!cliente) {
+      throw new UnauthorizedException({
+        codigo: 'SESION_REQUERIDA',
+        mensaje: 'Inicia sesión para quitar tu foto.',
+      });
+    }
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    const actualizado = await this.clientesService.quitarFoto(cliente.partyId, ip);
+    return { cliente: actualizado };
   }
 
   @Get('notificaciones')
