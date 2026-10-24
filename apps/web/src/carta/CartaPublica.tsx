@@ -27,7 +27,7 @@ import { DecoracionAnimada } from './contenido/DecoracionAnimada';
 import { VisorHistoriasModal, extraerOffDeUrl, limpiarUrlFoto } from './contenido/VisorHistoriasModal';
 import type { HistoriaCírculo } from './contenido/VisorHistoriasModal';
 import { FormularioComentarios } from './contenido/FormularioComentarios';
-import { ordenarNovedadesCarta, obtenerEtiquetaNovedad } from './PaginaNovedades';
+import { FranjaNovedades, ordenarNovedadesCarta } from './PaginaNovedades';
 import type { NovedadCarta } from './PaginaNovedades';
 import type { BannerCarta } from './PortadaCarta';
 
@@ -372,55 +372,11 @@ function ContenidoCartaPublica() {
       )}
 
       {pagina === 'carta' && !busqueda.trim() && novedadesEnriquecidas.length > 0 && (
-        <div style={{ maxWidth: 1200, width: '100%', boxSizing: 'border-box', margin: '0 auto', padding: movil ? '20px 16px 0' : '32px 24px 0' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
-            <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: movil ? 17 : 22 }}>Novedades</span>
-            <button onClick={() => cambiarPagina('novedades')} style={{ minHeight: 36, padding: 0, border: 0, background: 'transparent', color: 'var(--cp-rust)', fontWeight: 800, fontSize: 13 }}>Ver todas</button>
-          </div>
-          <div style={{ display: 'flex', gap: movil ? 10 : 16, overflowX: 'auto', scrollSnapType: 'x mandatory', scrollbarWidth: 'none' }}>
-            {novedadesEnriquecidas.slice(0, 4).map((n) => {
-              const badge = obtenerEtiquetaNovedad(n);
-              const esAviso = (n.tipo || '').toUpperCase() === 'AVISO' && badge !== 'NOVEDAD';
-              const fotoPrincipal = n.fotos[0]?.url ? limpiarUrlFoto(n.fotos[0].url) : '';
-              return (
-                <button
-                  key={n.id}
-                  onClick={() => cambiarPagina('novedades')}
-                  style={{
-                    flex: movil ? '0 0 66%' : '0 0 300px',
-                    scrollSnapAlign: 'start',
-                    border: '1px solid var(--cp-line)',
-                    padding: 0,
-                    borderRadius: movil ? 14 : 20,
-                    background: esAviso ? 'var(--cp-navy)' : 'var(--cp-white)',
-                    color: esAviso ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                    textAlign: 'left',
-                    overflow: 'hidden',
-                    display: 'flex',
-                    flexDirection: 'column',
-                  }}
-                >
-                  {fotoPrincipal && (
-                    <span style={{ position: 'relative', display: 'block', width: '100%', aspectRatio: '16 / 9', background: 'var(--cp-gold)' }}>
-                      <img src={fotoPrincipal} alt="" loading="lazy" style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-                      <span style={{ position: 'absolute', left: 8, top: 8, fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 10, letterSpacing: '0.08em', background: 'var(--cp-orange)', color: 'var(--cp-navy)', borderRadius: 9999, padding: '3px 9px' }}>
-                        {badge}
-                      </span>
-                    </span>
-                  )}
-                  <span style={{ padding: '10px 12px 12px', display: 'flex', flexDirection: 'column', gap: 3 }}>
-                    {!fotoPrincipal && (
-                      <span style={{ alignSelf: 'flex-start', fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 10, letterSpacing: '0.08em', background: 'var(--cp-orange)', color: 'var(--cp-navy)', borderRadius: 9999, padding: '3px 9px' }}>
-                        {badge}
-                      </span>
-                    )}
-                    <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 14, lineHeight: '18px' }}>{n.titulo}</span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        <FranjaNovedades
+          novedades={novedadesEnriquecidas}
+          onVerTodas={() => cambiarPagina('novedades')}
+          onVerCarta={irACarta}
+        />
       )}
 
       {/* Lista de productos por categoría */}

@@ -1,6 +1,7 @@
 import {
   IsBoolean,
   IsEnum,
+  IsIn,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -20,6 +21,9 @@ export class ActualizarBorradorDisenoDto {
   @IsOptional()
   contenido?: any;
 }
+
+/** Tamaño del cuadro de una novedad en la cuadrícula de la carta. */
+export const TAMANOS_NOVEDAD = ['CHICO', 'MEDIANO', 'GRANDE', 'ANCHO'];
 
 export class CrearNovedadDto {
   @IsNotEmpty({ message: 'El tipo es obligatorio' })
@@ -66,6 +70,10 @@ export class CrearNovedadDto {
   @IsOptional()
   @IsBoolean()
   activo?: boolean;
+
+  @IsOptional()
+  @IsIn(TAMANOS_NOVEDAD)
+  tamano?: string;
 
   @IsOptional()
   fotos?: string[];
@@ -116,6 +124,10 @@ export class ActualizarNovedadDto {
   @IsOptional()
   @IsBoolean()
   activo?: boolean;
+
+  @IsOptional()
+  @IsIn(TAMANOS_NOVEDAD)
+  tamano?: string;
 
   @IsOptional()
   fotos?: string[];

@@ -1623,6 +1623,7 @@ model Novedad {
   hasta        DateTime?     @db.Date
   orden        Int           @default(0)
   activo       Boolean       @default(false)
+  tamano       String        @default("MEDIANO") // CHICO | MEDIANO | GRANDE | ANCHO
   creado_en    DateTime      @default(now()) @db.Timestamptz
 
   fotos        NovedadFoto[]

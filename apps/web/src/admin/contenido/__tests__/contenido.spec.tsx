@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { PortadaCarta } from '../../../carta/PortadaCarta';
 import { PaginaNovedades } from '../../../carta/PaginaNovedades';
 import { VisorHistoriasModal } from '../../../carta/contenido/VisorHistoriasModal';
 import { DestacadasView } from '../DestacadasView';
+import { NovedadesView } from '../NovedadesView';
 import { CartaPublica } from '../../../carta/CartaPublica';
 import { api } from '../../../comun/api';
 
@@ -30,7 +31,7 @@ describe('Carta pública: contenido administrable', () => {
   it('novedades: estado vacío real y filtro por tipo', () => {
     const base = { orden: 0, activo: true, fotos: [] };
     const { rerender } = render(<PaginaNovedades novedades={[]} onVerCarta={() => {}} />);
-    expect(screen.getByText('Aún no hay novedades')).toBeTruthy();
+    expect(screen.getByText('Pronto tendremos novedades para ti')).toBeTruthy();
     rerender(<PaginaNovedades onVerCarta={() => {}} novedades={[
       { ...base, id: '1', tipo: 'AVISO', titulo: 'Aviso uno' },
       { ...base, id: '2', tipo: 'VIDEO', titulo: 'Video dos' },
@@ -195,5 +196,91 @@ describe('Carta pública: contenido administrable', () => {
     // Al tocar el círculo de Momentos Caprichos se abre el visor con la leyenda
     fireEvent.click(screen.getByLabelText('Ver fotos: Clientes felices'));
     expect(screen.getByText('Tarde con amigos')).toBeTruthy();
+  });
+});
+
+describe('Administrativo: novedades (agregar, editar, eliminar y tamaño)', () => {
+  const novedadBase = {
+    id: '5',
+    tipo: 'PROMOCION',
+    titulo: 'Dos por uno',
+    texto: 'Solo esta semana',
+    tema: null,
+    video_url: null,
+    evento_fecha: null,
+    evento_lugar: null,
+    desde: null,
+    hasta: null,
+    orden: 1,
+    activo: true,
+    tamano: 'MEDIANO',
+    fotos: [],
+  };
+
+  async function abrirDisenador() {
+    render(<NovedadesView />);
+    await waitFor(() => expect(screen.getByText('Abrir el diseñador en pantalla completa')).toBeTruthy());
+    fireEvent.click(screen.getByText('Abrir el diseñador en pantalla completa'));
+  }
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.spyOn(api, 'get').mockResolvedValue([novedadBase]);
+  });
+
+  it('agregar: «+ Nueva novedad» abre el formulario y guarda con tamaño por defecto MEDIANO', async () => {
+    const postSpy = vi.spyOn(api, 'post').mockResolvedValue({ ok: true });
+    await abrirDisenador();
+
+    fireEvent.click(screen.getByText('+ Nueva novedad'));
+    const dialogo = screen.getByRole('dialog', { name: 'Editar novedad' });
+    fireEvent.change(within(dialogo).getByLabelText('Título'), { target: { value: 'Llegó el verano' } });
+    fireEvent.click(within(dialogo).getByText('Listo'));
+
+    await waitFor(() => {
+      expect(postSpy).toHaveBeenCalledWith(
+        '/admin/contenido/novedades',
+        expect.objectContaining({ titulo: 'Llegó el verano', tamano: 'MEDIANO' }),
+      );
+    });
+  });
+
+  it('eliminar: «No» conserva la novedad; «Sí» la elimina con su id', async () => {
+    const delSpy = vi.spyOn(api, 'delete').mockResolvedValue({ ok: true });
+    await abrirDisenador();
+
+    fireEvent.click(screen.getByText('Editar'));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Editar novedad' })).getByText('Eliminar'));
+    expect(screen.getByText('¿Eliminar esta novedad?')).toBeTruthy();
+    expect(screen.getByText('Se quita de la carta y no se puede deshacer.')).toBeTruthy();
+
+    fireEvent.click(screen.getByText('No, conservarla'));
+    expect(delSpy).not.toHaveBeenCalled();
+    expect(screen.queryByText('¿Eliminar esta novedad?')).toBeNull();
+
+    fireEvent.click(screen.getByText('Eliminar', { selector: 'button' }));
+    fireEvent.click(screen.getByText('Sí, eliminar'));
+
+    await waitFor(() => {
+      expect(delSpy).toHaveBeenCalledWith('/admin/contenido/novedades/5');
+    });
+  });
+
+  it('selector de tamaño: elegir Grande envía tamano GRANDE al guardar', async () => {
+    const putSpy = vi.spyOn(api, 'put').mockResolvedValue({ ok: true });
+    await abrirDisenador();
+
+    fireEvent.click(screen.getByText('Editar'));
+    const dialogo = screen.getByRole('dialog', { name: 'Editar novedad' });
+    fireEvent.click(within(dialogo).getByRole('radio', { name: 'Grande' }));
+    expect(within(dialogo).getByRole('radio', { name: 'Grande' }).getAttribute('aria-checked')).toBe('true');
+    fireEvent.click(within(dialogo).getByText('Listo'));
+
+    await waitFor(() => {
+      expect(putSpy).toHaveBeenCalledWith(
+        '/admin/contenido/novedades/5',
+        expect.objectContaining({ titulo: 'Dos por uno', tamano: 'GRANDE' }),
+      );
+    });
   });
 });

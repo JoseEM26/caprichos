@@ -16,6 +16,7 @@ import {
   CrearMensajeCartaDto,
   CrearNovedadDto,
   GuardarPaletaDto,
+  TAMANOS_NOVEDAD,
 } from './contenido.dto';
 
 export const PAL_DEFAULT: Record<string, Record<string, string>> = {
@@ -138,6 +139,11 @@ function urlArchivo(ruta: string): string {
   return `/archivos/${ruta.replace(/^\/+/, '')}`;
 }
 
+/** Tamaño del cuadro de una novedad; ausente o inválido cuenta como MEDIANO. */
+function tamanoNovedad(valor?: string | null): string {
+  return TAMANOS_NOVEDAD.includes(valor ?? '') ? (valor as string) : 'MEDIANO';
+}
+
 function extraerPieDeRuta(ruta?: string | null): string {
   if (!ruta) return '';
   const idx = ruta.indexOf('#');
@@ -223,6 +229,7 @@ export class ContenidoService {
       evento_lugar: n.evento_lugar,
       orden: n.orden,
       activo: n.activo,
+      tamano: tamanoNovedad(n.tamano),
       fotos: n.fotos.map((f) => ({
         id: f.archivo.id.toString(),
         url: urlArchivo(f.archivo.ruta),
@@ -634,6 +641,7 @@ export class ContenidoService {
       hasta: n.hasta,
       orden: n.orden,
       activo: n.activo,
+      tamano: tamanoNovedad(n.tamano),
       fotos: n.fotos.map((f) => ({
         id: f.archivo.id.toString(),
         url: urlArchivo(f.archivo.ruta),
@@ -658,6 +666,7 @@ export class ContenidoService {
         hasta: dto.hasta ? new Date(dto.hasta) : null,
         orden: nuevoOrden,
         activo: dto.activo ?? true,
+        tamano: tamanoNovedad(dto.tamano),
       },
     });
 
@@ -698,6 +707,7 @@ export class ContenidoService {
     if (dto.hasta !== undefined) data.hasta = dto.hasta ? new Date(dto.hasta) : null;
     if (dto.orden !== undefined) data.orden = dto.orden;
     if (dto.activo !== undefined) data.activo = dto.activo;
+    if (dto.tamano !== undefined) data.tamano = tamanoNovedad(dto.tamano);
 
     await this.prisma.novedad.update({
       where: { id: novedadId },
@@ -725,6 +735,26 @@ export class ContenidoService {
       id,
       mensaje: 'Novedad actualizada exitosamente',
     };
+  }
+
+  async eliminarNovedad(id: string, usuario?: UsuarioAutenticado) {
+    const novedadId = BigInt(id);
+    const existente = await this.prisma.novedad.findUnique({ where: { id: novedadId } });
+    if (!existente) throw new NotFoundException('Novedad no encontrada');
+
+    // Las filas de novedad_foto se borran en cascada; los archivos se conservan.
+    await this.prisma.novedad.delete({ where: { id: novedadId } });
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'novedades',
+      accion: 'ELIMINAR_NOVEDAD',
+      resultado: 'OK',
+      partyId: usuario?.partyId,
+      antes: { id, titulo: existente.titulo, tipo: existente.tipo },
+    });
+
+    return { ok: true };
   }
 
   async publicarNovedades(usuario?: UsuarioAutenticado) {

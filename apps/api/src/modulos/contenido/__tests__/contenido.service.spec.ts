@@ -6,11 +6,13 @@ jest.mock('../../../comun/socket/eventos.gateway', () => ({
 }));
 
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { validate } from 'class-validator';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ContenidoService } from '../contenido.service';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../../auditoria/auditoria.service';
 import { EventosGateway } from '../../../comun/socket/eventos.gateway';
+import { CrearNovedadDto } from '../contenido.dto';
 
 describe('ContenidoService', () => {
   let service: ContenidoService;
@@ -39,6 +41,7 @@ describe('ContenidoService', () => {
         findUnique: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+        delete: jest.fn(),
         aggregate: jest.fn(),
       },
       novedadFoto: {
@@ -425,6 +428,69 @@ describe('ContenidoService', () => {
       expect(prisma.parametro.delete).toHaveBeenCalledWith({
         where: { clave: 'carta_paleta_decoracion_borrador' },
       });
+    });
+  });
+
+  describe('ADMINISTRATIVO: NOVEDADES (tamaño y eliminar)', () => {
+    it('crea la novedad con el tamaño elegido y MEDIANO si no llega', async () => {
+      prisma.novedad.aggregate.mockResolvedValue({ _max: { orden: 3 } });
+      prisma.novedad.create.mockResolvedValue({ id: BigInt(9), titulo: 'Nueva' });
+
+      await service.crearNovedad({ tipo: 'AVISO', titulo: 'Nueva', tamano: 'GRANDE' } as any, mockUsuario as any);
+      expect(prisma.novedad.create.mock.calls[0][0].data.tamano).toBe('GRANDE');
+
+      await service.crearNovedad({ tipo: 'AVISO', titulo: 'Sin tamaño' } as any, mockUsuario as any);
+      expect(prisma.novedad.create.mock.calls[1][0].data.tamano).toBe('MEDIANO');
+    });
+
+    it('rechaza un tamaño fuera de CHICO, MEDIANO, GRANDE y ANCHO', async () => {
+      const dto = Object.assign(new CrearNovedadDto(), { tipo: 'AVISO', titulo: 'X', tamano: 'XL' });
+      const errores = await validate(dto);
+      expect(errores.some((e) => e.property === 'tamano')).toBe(true);
+    });
+
+    it('actualiza el tamaño de una novedad existente', async () => {
+      prisma.novedad.findUnique.mockResolvedValue({ id: BigInt(4), titulo: 'Vieja' });
+      prisma.novedad.update.mockResolvedValue({});
+
+      await service.actualizarNovedad('4', { tamano: 'ANCHO' } as any, mockUsuario as any);
+
+      expect(prisma.novedad.update.mock.calls[0][0].data.tamano).toBe('ANCHO');
+    });
+
+    it('elimina una novedad existente y registra auditoría', async () => {
+      prisma.novedad.findUnique.mockResolvedValue({ id: BigInt(4), titulo: 'Vieja', tipo: 'AVISO' });
+      prisma.novedad.delete.mockResolvedValue({});
+
+      const res = await service.eliminarNovedad('4', mockUsuario as any);
+
+      expect(res).toEqual({ ok: true });
+      expect(prisma.novedad.delete).toHaveBeenCalledWith({ where: { id: BigInt(4) } });
+      expect(auditoria.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({ modulo: 'novedades', accion: 'ELIMINAR_NOVEDAD' }),
+      );
+    });
+
+    it('eliminar una novedad inexistente responde 404 y no borra nada', async () => {
+      prisma.novedad.findUnique.mockResolvedValue(null);
+
+      await expect(service.eliminarNovedad('99', mockUsuario as any)).rejects.toThrow(NotFoundException);
+      expect(prisma.novedad.delete).not.toHaveBeenCalled();
+    });
+
+    it('la carta pública trae tamano y usa MEDIANO cuando falta o no es válido', async () => {
+      prisma.versionCarta.findFirst.mockResolvedValue(null);
+      prisma.parametro.findUnique.mockResolvedValue(null);
+      prisma.destacada.findMany.mockResolvedValue([]);
+      prisma.rankingMes.findMany.mockResolvedValue([]);
+      prisma.novedad.findMany.mockResolvedValue([
+        { id: BigInt(1), tipo: 'BANNER', titulo: 'Grande', orden: 1, activo: true, tamano: 'GRANDE', fotos: [] },
+        { id: BigInt(2), tipo: 'AVISO', titulo: 'Raro', orden: 2, activo: true, tamano: 'XL', fotos: [] },
+      ]);
+
+      const res = await service.obtenerContenidoPublicoCarta();
+
+      expect(res.novedades.map((n: any) => n.tamano)).toEqual(['GRANDE', 'MEDIANO']);
     });
   });
 });

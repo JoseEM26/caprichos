@@ -1,7 +1,8 @@
-import { useState, type CSSProperties } from 'react';
+import { useRef, useState, type CSSProperties, type KeyboardEvent as RKeyboardEvent, type PointerEvent as RPointerEvent } from 'react';
 import { DatosLocalCarta, EstadoLocalCarta } from './tipos';
 import { useEsMovil } from './useEsMovil';
-import { VisorHistoriasModal, type HistoriaCírculo } from './contenido/VisorHistoriasModal';
+import { NovedadDetalle } from './NovedadDetalle';
+import { EstadoError } from '../comun/EstadoError';
 
 export interface FotoNovedad {
   id: string;
@@ -17,6 +18,8 @@ export interface NovedadCarta {
   video_url?: string;
   evento_fecha?: string;
   evento_lugar?: string;
+  /** CHICO, MEDIANO, GRANDE o ANCHO. Ausente o inválido: MEDIANO. */
+  tamano?: string;
   orden: number;
   activo: boolean;
   fotos: FotoNovedad[];
@@ -27,7 +30,12 @@ interface PaginaNovedadesProps {
   datosLocal?: DatosLocalCarta | null;
   estadoLocal?: EstadoLocalCarta | null;
   onVerCarta: () => void;
+  cargando?: boolean;
+  error?: string | null;
+  alReintentar?: () => void;
 }
+
+export type TamanoNovedad = 'CHICO' | 'MEDIANO' | 'GRANDE' | 'ANCHO';
 
 const ETIQUETA: Record<string, string> = {
   PROMOCION: 'PROMO',
@@ -51,6 +59,50 @@ const FILTROS = [
   { id: 'AVISO', nombre: 'Avisos' },
 ];
 
+/** Posición en la cuadrícula del contrato: PC de 4 columnas, celular de 2. */
+const POSICION_PC: Record<TamanoNovedad, CSSProperties> = {
+  CHICO: { gridColumn: 'span 1', gridRow: 'span 1' },
+  MEDIANO: { gridColumn: 'span 2', gridRow: 'span 1' },
+  GRANDE: { gridColumn: 'span 2', gridRow: 'span 2' },
+  ANCHO: { gridColumn: 'span 4', gridRow: 'span 1' },
+};
+const POSICION_MOVIL: Record<TamanoNovedad, CSSProperties> = {
+  CHICO: { gridColumn: 'span 1', gridRow: 'span 1' },
+  MEDIANO: { gridColumn: 'span 2', gridRow: 'span 1' },
+  GRANDE: { gridColumn: 'span 2', gridRow: 'span 2' },
+  ANCHO: { gridColumn: 'span 2', gridRow: 'span 1' },
+};
+
+const INSIGNIA: CSSProperties = {
+  fontFamily: 'Montserrat, sans-serif',
+  fontWeight: 800,
+  fontSize: 11,
+  letterSpacing: '0.08em',
+  background: 'var(--cp-orange)',
+  color: 'var(--cp-navy)',
+  borderRadius: 9999,
+  padding: '4px 10px',
+};
+
+/** Animaciones y efectos. Con prefers-reduced-motion no hay movimiento. */
+const ESTILOS = `
+@keyframes cp-nov-entrada { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes cp-nov-pulso { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+.cp-nov-card { transition: transform .25s ease, box-shadow .25s ease; animation: cp-nov-entrada .55s ease backwards; }
+.cp-nov-card:hover { transform: translateY(-4px); box-shadow: 0 14px 28px rgba(11, 44, 62, 0.2); }
+.cp-nov-card:has(.cp-nov-abrir:focus-visible) { outline: 2px solid var(--cp-orange); outline-offset: 3px; }
+.cp-nov-foto { transition: transform .5s ease; }
+.cp-nov-card:hover .cp-nov-foto { transform: scale(1.06); }
+.cp-nov-skel { animation: cp-nov-pulso 1.4s ease-in-out infinite; }
+.cp-nov-carrusel { scrollbar-width: none; }
+.cp-nov-carrusel::-webkit-scrollbar { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .cp-nov-card, .cp-nov-skel { animation: none !important; transition: none !important; }
+  .cp-nov-card:hover { transform: none; }
+  .cp-nov-card:hover .cp-nov-foto { transform: none; }
+}
+`;
+
 export function esNovedadDestacada(n: NovedadCarta): boolean {
   if (n.tema && /destacad/i.test(n.tema)) return true;
   if (/martes de 2x1/i.test(n.titulo || '')) return true;
@@ -72,32 +124,70 @@ export function obtenerEtiquetaNovedad(n: NovedadCarta): string {
   return ETIQUETA[t] ?? 'NOVEDAD';
 }
 
+export function tamanoDeNovedad(n: NovedadCarta): TamanoNovedad {
+  const t = (n.tamano || '').toUpperCase();
+  return t === 'CHICO' || t === 'GRANDE' || t === 'ANCHO' ? t : 'MEDIANO';
+}
+
+export function posicionMosaico(tamano: TamanoNovedad, movil: boolean): CSSProperties {
+  return (movil ? POSICION_MOVIL : POSICION_PC)[tamano];
+}
+
+function coincideFiltro(n: NovedadCarta, filtro: string): boolean {
+  if (filtro === 'todo') return true;
+  const t = (n.tipo || '').toUpperCase();
+  if (filtro === 'IMAGEN') {
+    return t === 'IMAGEN' || t === 'BANNER' || (t === 'AVISO' && /nuevo:/i.test(n.titulo || ''));
+  }
+  if (filtro === 'FOTOS') {
+    return t === 'FOTOS' || t === 'GALERIA';
+  }
+  return t === filtro.toUpperCase();
+}
+
+function MosaicoEsqueleto({ movil }: { movil: boolean }) {
+  const tamanos: TamanoNovedad[] = ['GRANDE', 'CHICO', 'CHICO', 'MEDIANO', 'ANCHO', 'CHICO'];
+  return (
+    <div role="status" aria-label="Cargando novedades" style={estiloMosaico(movil)}>
+      {tamanos.map((t, i) => (
+        <div
+          key={i}
+          aria-hidden="true"
+          className="cp-nov-skel"
+          style={{ ...posicionMosaico(t, movil), borderRadius: movil ? 12 : 16, background: 'color-mix(in srgb, var(--cp-line) 60%, var(--cp-white))' }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function estiloMosaico(movil: boolean): CSSProperties {
+  return {
+    display: 'grid',
+    gridTemplateColumns: movil ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))',
+    gridAutoRows: movil ? 170 : 230,
+    gridAutoFlow: 'dense',
+    gap: movil ? 10 : 16,
+  };
+}
+
 export function PaginaNovedades({
   novedades = [],
   datosLocal,
   estadoLocal,
   onVerCarta,
+  cargando = false,
+  error = null,
+  alReintentar,
 }: PaginaNovedadesProps) {
   const movil = useEsMovil();
   const [filtroActivo, setFiltroActivo] = useState('todo');
-  const [galeriaActiva, setGaleriaActiva] = useState<HistoriaCírculo | null>(null);
+  const [abierta, setAbierta] = useState<NovedadCarta | null>(null);
 
   const newsAll = ordenarNovedadesCarta(novedades);
   const heroItems = newsAll
     .filter((n) => esNovedadDestacada(n) || (n.tipo || '').toUpperCase() === 'BANNER')
     .slice(0, 5);
-
-  const coincideFiltro = (n: NovedadCarta, filtro: string): boolean => {
-    if (filtro === 'todo') return true;
-    const t = (n.tipo || '').toUpperCase();
-    if (filtro === 'IMAGEN') {
-      return t === 'IMAGEN' || t === 'BANNER' || (t === 'AVISO' && /nuevo:/i.test(n.titulo || ''));
-    }
-    if (filtro === 'FOTOS') {
-      return t === 'FOTOS' || t === 'GALERIA';
-    }
-    return t === filtro.toUpperCase();
-  };
 
   const restItems = newsAll.filter(
     (n) => !heroItems.includes(n) && coincideFiltro(n, filtroActivo),
@@ -105,6 +195,10 @@ export function PaginaNovedades({
   const baseFiltradas = newsAll.filter((n) => coincideFiltro(n, filtroActivo));
   const novedadesFiltradas =
     filtroActivo === 'todo' && restItems.length > 0 ? restItems : baseFiltradas;
+
+  // Como en el mockup, solo aparecen los filtros que tienen novedades (Todo siempre)
+  const chips = FILTROS.map((f) => ({ ...f, cuenta: newsAll.filter((n) => coincideFiltro(n, f.id)).length }))
+    .filter((f) => f.id === 'todo' || f.cuenta > 0);
 
   const mediosPago = Object.entries(datosLocal?.mediosPago ?? {})
     .filter(([, m]) => m.activo)
@@ -137,26 +231,12 @@ export function PaginaNovedades({
   const abLh = movil ? '19px' : '22px';
   const abCardPad = movil ? '14px' : '20px';
   const abH = movil ? 15 : 18;
-  const abBtn = movil ? 44 : 48;
   const heroW = movil ? '92%' : '100%';
   const heroAr = movil ? '4 / 3' : '21 / 9';
   const heroPad = movil ? '14px' : '28px';
   const heroTitleFs = movil ? 22 : 34;
 
-  const abrirGaleriaNovedad = (item: NovedadCarta) => {
-    const fotos = (item.fotos || []).filter((f) => f.url);
-    if (fotos.length === 0) return;
-    setGaleriaActiva({
-      id: item.id,
-      titulo: item.titulo,
-      portada_url: fotos[0]?.url || null,
-      fotos: fotos.map((f, idx) => ({
-        id: f.id || `${item.id}-${idx}`,
-        url: f.url,
-        pie: item.titulo,
-      })),
-    });
-  };
+  const irCarta = onVerCarta;
 
   return (
     <div
@@ -171,6 +251,8 @@ export function PaginaNovedades({
         gap: abGap,
       }}
     >
+      <style>{ESTILOS}</style>
+
       {/* Cabecera visual de la sección (líneas 285-290 de Main.dc.html) */}
       <div
         style={{
@@ -235,10 +317,10 @@ export function PaginaNovedades({
       </div>
 
       {/* Carrusel de Banners Destacados (líneas 291-308 de Main.dc.html) */}
-      {heroItems.length > 0 && (
+      {!cargando && !error && heroItems.length > 0 && (
         <>
           <div
-            className="noscroll"
+            className="cp-nov-carrusel"
             aria-label="Destacados"
             style={{
               display: 'flex',
@@ -250,14 +332,15 @@ export function PaginaNovedades({
             {heroItems.map((item) => {
               const foto = item.fotos[0]?.url;
               const badge = obtenerEtiquetaNovedad(item);
+              const tipoUp = (item.tipo || '').toUpperCase();
               const textoBtn =
-                (item.tipo || '').toUpperCase() === 'BANNER'
+                tipoUp === 'BANNER'
                   ? /waffle/i.test(item.titulo || '')
                     ? 'Ver waffles'
                     : 'Ver la carta'
                   : 'Aprovechar';
               return (
-                <div
+                <article
                   key={`dest-${item.id}`}
                   style={{
                     position: 'relative',
@@ -273,7 +356,7 @@ export function PaginaNovedades({
                   {foto && (
                     <img
                       src={foto}
-                      alt={item.titulo}
+                      alt=""
                       style={{
                         position: 'absolute',
                         left: 0,
@@ -285,6 +368,7 @@ export function PaginaNovedades({
                     />
                   )}
                   <div
+                    aria-hidden="true"
                     style={{
                       position: 'absolute',
                       left: 0,
@@ -294,6 +378,13 @@ export function PaginaNovedades({
                       background:
                         'linear-gradient(to top, rgba(11, 44, 62, 0.92), rgba(11, 44, 62, 0))',
                     }}
+                  />
+                  <button
+                    type="button"
+                    className="cp-nov-abrir"
+                    aria-label={`Ver detalle de ${item.titulo}`}
+                    onClick={() => setAbierta(item)}
+                    style={{ position: 'absolute', inset: 0, border: 0, padding: 0, background: 'transparent', cursor: 'pointer' }}
                   />
                   <div
                     style={{
@@ -305,23 +396,10 @@ export function PaginaNovedades({
                       display: 'flex',
                       flexDirection: 'column',
                       gap: 6,
+                      pointerEvents: 'none',
                     }}
                   >
-                    <span
-                      style={{
-                        alignSelf: 'flex-start',
-                        fontFamily: 'Montserrat, sans-serif',
-                        fontWeight: 800,
-                        fontSize: 11,
-                        letterSpacing: '0.08em',
-                        background: 'var(--cp-orange)',
-                        color: 'var(--cp-navy)',
-                        borderRadius: 9999,
-                        padding: '4px 10px',
-                      }}
-                    >
-                      {badge}
-                    </span>
+                    <span style={{ ...INSIGNIA, alignSelf: 'flex-start', fontSize: 11 }}>{badge}</span>
                     <span
                       style={{
                         fontFamily: 'Montserrat, sans-serif',
@@ -333,13 +411,7 @@ export function PaginaNovedades({
                       {item.titulo}
                     </span>
                     {item.texto && (
-                      <span
-                        style={{
-                          fontSize: abTxt,
-                          lineHeight: abLh,
-                          opacity: 0.95,
-                        }}
-                      >
+                      <span style={{ fontSize: abTxt, lineHeight: abLh, opacity: 0.95 }}>
                         {item.texto}
                       </span>
                     )}
@@ -360,6 +432,7 @@ export function PaginaNovedades({
                           display: 'inline-flex',
                           alignItems: 'center',
                           textDecoration: 'none',
+                          pointerEvents: 'auto',
                         }}
                       >
                         {item.video_url.includes('tiktok')
@@ -370,7 +443,7 @@ export function PaginaNovedades({
                       </a>
                     ) : (
                       <button
-                        onClick={onVerCarta}
+                        onClick={irCarta}
                         style={{
                           alignSelf: 'flex-start',
                           minHeight: 44,
@@ -381,13 +454,14 @@ export function PaginaNovedades({
                           color: 'var(--cp-navy)',
                           fontWeight: 800,
                           cursor: 'pointer',
+                          pointerEvents: 'auto',
                         }}
                       >
                         {textoBtn}
                       </button>
                     )}
                   </div>
-                </div>
+                </article>
               );
             })}
           </div>
@@ -405,43 +479,70 @@ export function PaginaNovedades({
       )}
 
       {/* Barra de filtros (línea 309 de Main.dc.html) */}
-      <div
-        className="noscroll"
-        role="group"
-        aria-label="Filtrar novedades"
-        style={{
-          display: 'flex',
-          gap: 6,
-          overflowX: 'auto',
-        }}
-      >
-        {FILTROS.map((f) => {
-          const activo = filtroActivo === f.id;
-          return (
-            <button
-              key={f.id}
-              onClick={() => setFiltroActivo(f.id)}
-              style={{
-                flex: 'none',
-                minHeight: 40,
-                padding: '0 14px',
-                borderRadius: 9999,
-                border: '1.5px solid var(--cp-navy)',
-                background: activo ? 'var(--cp-navy)' : 'transparent',
-                color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                fontWeight: 700,
-                fontSize: 13,
-                cursor: 'pointer',
-              }}
-            >
-              {f.nombre}
-            </button>
-          );
-        })}
-      </div>
+      {!cargando && !error && newsAll.length > 0 && (
+        <div
+          className="cp-nov-carrusel"
+          role="group"
+          aria-label="Filtrar novedades"
+          style={{
+            display: 'flex',
+            gap: 6,
+            overflowX: 'auto',
+          }}
+        >
+          {chips.map((f) => {
+            const activo = filtroActivo === f.id;
+            return (
+              <button
+                key={f.id}
+                onClick={() => setFiltroActivo(f.id)}
+                aria-pressed={activo}
+                className="cp-nov-chip"
+                style={{
+                  flex: 'none',
+                  minHeight: 40,
+                  padding: '0 14px',
+                  borderRadius: 9999,
+                  border: '1.5px solid var(--cp-navy)',
+                  background: activo ? 'var(--cp-navy)' : 'transparent',
+                  color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                <span>{f.nombre}</span>
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 800,
+                    background: activo ? 'var(--cp-orange)' : 'var(--cp-line)',
+                    color: 'var(--cp-navy)',
+                    borderRadius: 9999,
+                    padding: '1px 7px',
+                  }}
+                >
+                  {f.cuenta}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
-      {/* Grid de novedades (líneas 310-328 de Main.dc.html) */}
-      {novedadesFiltradas.length === 0 ? (
+      {/* Mosaico de novedades: tamaño por novedad según el contrato */}
+      {cargando ? (
+        <MosaicoEsqueleto movil={movil} />
+      ) : error ? (
+        <EstadoError
+          titulo="No se pudieron cargar las novedades"
+          mensaje={error}
+          alReintentar={alReintentar}
+        />
+      ) : novedadesFiltradas.length === 0 ? (
         <div
           style={{
             textAlign: 'center',
@@ -457,11 +558,9 @@ export function PaginaNovedades({
               color: 'var(--cp-navy)',
             }}
           >
-            Aún no hay novedades
+            Pronto tendremos novedades para ti
           </div>
-          <div style={{ marginTop: 4 }}>
-            Pronto habrá más novedades. Mientras tanto, mira la carta.
-          </div>
+          <div style={{ marginTop: 4 }}>Mientras tanto, mira la carta.</div>
           <button
             onClick={onVerCarta}
             style={{
@@ -480,286 +579,137 @@ export function PaginaNovedades({
           </button>
         </div>
       ) : (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: movil ? '1fr' : 'repeat(2, 1fr)',
-            gap: abGap,
-            alignItems: 'start',
-          }}
-        >
-          {novedadesFiltradas.map((item) => {
+        <div style={estiloMosaico(movil)}>
+          {novedadesFiltradas.map((item, i) => {
+            const tamano = tamanoDeNovedad(item);
             const foto = item.fotos[0]?.url;
-            const extras = (item.fotos || []).slice(1).filter((f) => f.url);
             const tipoUp = (item.tipo || '').toUpperCase();
             const esVideo = tipoUp === 'VIDEO' || !!item.video_url;
             const esAviso = tipoUp === 'AVISO' && !/nuevo:/i.test(item.titulo || '');
-            const etiqueta = obtenerEtiquetaNovedad(item);
-            const insignia: CSSProperties = {
-              fontFamily: 'Montserrat, sans-serif',
-              fontWeight: 800,
-              fontSize: 11,
-              letterSpacing: '0.08em',
-              background: 'var(--cp-orange)',
-              color: 'var(--cp-navy)',
-              borderRadius: 9999,
-              padding: '4px 10px',
-            };
-            const fecha = item.evento_fecha ? new Date(item.evento_fecha) : null;
-            const lineaEvento = fecha
-              ? `${String(fecha.getUTCDate()).padStart(2, '0')}/${String(
-                  fecha.getUTCMonth() + 1,
-                ).padStart(2, '0')}${item.evento_lugar ? ` · ${item.evento_lugar}` : ''}`
-              : null;
-
+            const compacta = tamano === 'CHICO';
             return (
               <article
                 key={item.id}
+                data-tamano={tamano}
+                className="cp-nov-card"
                 style={{
-                  background: esAviso ? 'var(--cp-navy)' : 'var(--cp-white)',
-                  color: esAviso ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                  border: '1px solid var(--cp-line)',
-                  borderRadius: abRad,
+                  ...posicionMosaico(tamano, movil),
+                  position: 'relative',
                   overflow: 'hidden',
-                  display: 'flex',
-                  flexDirection: 'column',
+                  borderRadius: abRad,
+                  background: 'var(--cp-navy)',
+                  color: '#FFFFFF',
+                  margin: 0,
+                  animationDelay: `${i * 70}ms`,
                 }}
               >
+                <button
+                  type="button"
+                  className="cp-nov-abrir"
+                  aria-label={`Ver detalle de ${item.titulo}`}
+                  onClick={() => setAbierta(item)}
+                  style={{ position: 'absolute', inset: 0, zIndex: 2, border: 0, padding: 0, background: 'transparent', cursor: 'pointer', borderRadius: 'inherit' }}
+                />
                 {foto ? (
-                  <div
-                    onClick={() => abrirGaleriaNovedad(item)}
-                    style={{
-                      position: 'relative',
-                      aspectRatio: '16 / 10',
-                      background: 'var(--cp-gold)',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <img
-                      src={foto}
-                      alt={item.titulo}
-                      loading="lazy"
-                      style={{
-                        position: 'absolute',
-                        left: 0,
-                        top: 0,
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                      }}
-                    />
-                    <span style={{ ...insignia, position: 'absolute', left: 10, top: 10 }}>
-                      {etiqueta}
-                    </span>
-                    {esVideo && (
-                      <span
-                        aria-hidden="true"
-                        style={{
-                          position: 'absolute',
-                          left: '50%',
-                          top: '50%',
-                          transform: 'translate(-50%, -50%)',
-                          width: 56,
-                          height: 56,
-                          borderRadius: 28,
-                          background: 'rgba(11, 44, 62, 0.7)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <svg viewBox="0 0 24 24" width="26" height="26" fill="#FFFFFF">
-                          <path d="M8 5v14l11-7z" />
-                        </svg>
-                      </span>
-                    )}
-                  </div>
+                  <img
+                    className="cp-nov-foto"
+                    src={foto}
+                    alt=""
+                    loading="lazy"
+                    draggable={false}
+                    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
                 ) : (
-                  !esAviso && (
-                    <div
-                      style={{
-                        position: 'relative',
-                        aspectRatio: '16 / 10',
-                        background: 'color-mix(in srgb, var(--cp-line) 55%, var(--cp-white))',
-                        color: 'var(--cp-soft)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 6,
-                      }}
-                    >
-                      <span style={{ ...insignia, position: 'absolute', left: 10, top: 10 }}>
-                        {etiqueta}
-                      </span>
-                      <svg
-                        viewBox="0 0 24 24"
-                        width="34"
-                        height="34"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.6"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
+                  <div
+                    aria-hidden="true"
+                    style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    {!esAviso && (
+                      <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="var(--cp-cream)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
                         <path d="M3 8h4l2-3h6l2 3h4v11H3z" />
                         <circle cx="12" cy="13.5" r="3.5" />
                       </svg>
-                      <span
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 800,
-                          letterSpacing: '0.06em',
-                        }}
-                      >
-                        FOTO O VIDEO
-                      </span>
-                    </div>
-                  )
+                    )}
+                  </div>
                 )}
-
-                {extras.length > 0 && (
-                  <button
-                    onClick={() => abrirGaleriaNovedad(item)}
-                    aria-label={`Ver todas las fotos de ${item.titulo}`}
+                <div
+                  aria-hidden="true"
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    background:
+                      'linear-gradient(to top, rgba(11, 44, 62, 0.92) 0%, rgba(11, 44, 62, 0.35) 45%, rgba(11, 44, 62, 0) 70%)',
+                  }}
+                />
+                <span style={{ ...INSIGNIA, position: 'absolute', left: 10, top: 10, zIndex: 1 }}>
+                  {obtenerEtiquetaNovedad(item)}
+                </span>
+                {esVideo && foto && (
+                  <span
+                    aria-hidden="true"
                     style={{
-                      border: 0,
-                      padding: 6,
-                      background: 'var(--cp-white)',
+                      position: 'absolute',
+                      left: '50%',
+                      top: '50%',
+                      transform: 'translate(-50%, -50%)',
+                      width: 56,
+                      height: 56,
+                      borderRadius: 28,
+                      background: 'rgba(11, 44, 62, 0.7)',
                       display: 'flex',
-                      gap: 6,
-                      cursor: 'pointer',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      zIndex: 1,
                     }}
                   >
-                    {extras.slice(0, 3).map((x, i) => {
-                      const more = i === 2 && extras.length > 3;
-                      return (
-                        <span
-                          key={x.id || i}
-                          style={{
-                            position: 'relative',
-                            flex: 1,
-                            aspectRatio: '1 / 1',
-                            borderRadius: 10,
-                            overflow: 'hidden',
-                            background: 'var(--cp-gold)',
-                          }}
-                        >
-                          <img
-                            src={x.url}
-                            alt=""
-                            loading="lazy"
-                            style={{
-                              position: 'absolute',
-                              left: 0,
-                              top: 0,
-                              width: '100%',
-                              height: '100%',
-                              objectFit: 'cover',
-                            }}
-                          />
-                          {more && (
-                            <span
-                              style={{
-                                position: 'absolute',
-                                inset: 0,
-                                background: 'rgba(11, 44, 62, 0.6)',
-                                color: '#FFFFFF',
-                                fontFamily: 'Montserrat, sans-serif',
-                                fontWeight: 800,
-                                fontSize: 16,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                              }}
-                            >
-                              +{extras.length - 2}
-                            </span>
-                          )}
-                        </span>
-                      );
-                    })}
-                  </button>
+                    <svg viewBox="0 0 24 24" width="26" height="26" fill="#FFFFFF">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </span>
                 )}
-
                 <div
                   style={{
-                    padding: abCardPad,
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    zIndex: 1,
+                    padding: compacta ? '10px 12px' : movil ? '12px 14px' : '18px 20px',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: 8,
+                    gap: 6,
+                    pointerEvents: 'none',
                   }}
                 >
-                  {esAviso && !foto && (
-                    <span style={{ ...insignia, alignSelf: 'flex-start' }}>{etiqueta}</span>
-                  )}
-                  <div
+                  <span
                     style={{
                       fontFamily: 'Montserrat, sans-serif',
                       fontWeight: 800,
-                      fontSize: abH,
+                      fontSize: compacta ? 14 : 18,
                       lineHeight: 1.2,
+                      display: '-webkit-box',
+                      WebkitLineClamp: compacta ? 2 : 3,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
                     }}
                   >
                     {item.titulo}
-                  </div>
-                  {(lineaEvento || item.texto) && (
-                    <div
+                  </span>
+                  {!compacta && item.texto && (
+                    <span
                       style={{
-                        fontSize: abTxt,
-                        lineHeight: abLh,
+                        fontSize: 13,
+                        lineHeight: '18px',
                         opacity: 0.92,
-                        whiteSpace: 'pre-line',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
                       }}
                     >
-                      {[lineaEvento, item.texto].filter(Boolean).join('\n')}
-                    </div>
+                      {item.texto}
+                    </span>
                   )}
-                  {item.video_url && (
-                    <a
-                      href={item.video_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        marginTop: 4,
-                        minHeight: abBtn,
-                        boxSizing: 'border-box',
-                        borderRadius: 12,
-                        background: 'var(--cp-orange)',
-                        color: 'var(--cp-navy)',
-                        fontWeight: 800,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        textDecoration: 'none',
-                      }}
-                    >
-                      {item.video_url.includes('tiktok')
-                        ? 'Ver en TikTok'
-                        : item.video_url.includes('instagram')
-                          ? 'Ver en Instagram'
-                          : 'Ver más'}
-                    </a>
-                  )}
-                  {!item.video_url &&
-                    (tipoUp === 'PROMOCION' || tipoUp === 'PROMO' || tipoUp === 'BANNER') && (
-                      <button
-                        onClick={onVerCarta}
-                        style={{
-                          marginTop: 4,
-                          minHeight: abBtn,
-                          border: 0,
-                          borderRadius: 12,
-                          background: 'var(--cp-orange)',
-                          color: 'var(--cp-navy)',
-                          fontWeight: 800,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Aprovechar
-                      </button>
-                    )}
                 </div>
               </article>
             );
@@ -868,14 +818,165 @@ export function PaginaNovedades({
         </div>
       )}
 
-      {/* Visor de imágenes de la galería */}
-      {galeriaActiva && (
-        <VisorHistoriasModal
-          historias={[galeriaActiva]}
-          destacadaIdxInicial={0}
-          onCerrar={() => setGaleriaActiva(null)}
+      {abierta && (
+        <NovedadDetalle
+          key={abierta.id}
+          novedad={abierta}
+          etiqueta={obtenerEtiquetaNovedad(abierta)}
+          onCerrar={() => setAbierta(null)}
+          onVerCarta={irCarta}
         />
       )}
     </div>
+  );
+}
+
+/** Franja «Novedades» del inicio de la carta: carrusel por arrastre, flechas en PC y ventana de detalle. */
+export function FranjaNovedades({
+  novedades,
+  onVerTodas,
+  onVerCarta,
+}: {
+  novedades: NovedadCarta[];
+  onVerTodas: () => void;
+  onVerCarta: () => void;
+}) {
+  const movil = useEsMovil();
+  const pista = useRef<HTMLDivElement>(null);
+  const arrastre = useRef<{ x: number; izq: number } | null>(null);
+  const seArrastro = useRef(false);
+  const [abierta, setAbierta] = useState<NovedadCarta | null>(null);
+
+  const desplazar = (d: number) => {
+    const el = pista.current;
+    if (!el) return;
+    el.scrollBy({ left: d * el.clientWidth * 0.8, behavior: 'smooth' });
+  };
+
+  const alBajar = (e: RPointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== 'mouse' || !pista.current) return;
+    arrastre.current = { x: e.clientX, izq: pista.current.scrollLeft };
+    seArrastro.current = false;
+  };
+  const alMover = (e: RPointerEvent<HTMLDivElement>) => {
+    if (!arrastre.current || !pista.current) return;
+    const dx = e.clientX - arrastre.current.x;
+    if (Math.abs(dx) > 5) seArrastro.current = true;
+    pista.current.scrollLeft = arrastre.current.izq - dx;
+  };
+  const alSoltar = () => {
+    arrastre.current = null;
+  };
+  const alTeclear = (e: RKeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'ArrowRight') desplazar(1);
+    if (e.key === 'ArrowLeft') desplazar(-1);
+  };
+
+  const flecha = (lado: 'left' | 'right'): CSSProperties => ({
+    position: 'absolute',
+    top: '50%',
+    [lado]: -14,
+    transform: 'translateY(-50%)',
+    zIndex: 1,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    border: '1.5px solid var(--cp-navy)',
+    background: 'var(--cp-white)',
+    color: 'var(--cp-navy)',
+    fontSize: 20,
+    fontWeight: 800,
+    cursor: 'pointer',
+    boxShadow: '0 4px 12px rgba(11, 44, 62, 0.15)',
+  });
+
+  return (
+    <section
+      aria-label="Novedades"
+      style={{ maxWidth: 1200, width: '100%', boxSizing: 'border-box', margin: '0 auto', padding: movil ? '20px 16px 0' : '32px 24px 0' }}
+    >
+      <style>{ESTILOS}</style>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
+        <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: movil ? 17 : 22 }}>Novedades</span>
+        <button onClick={onVerTodas} style={{ minHeight: 36, padding: 0, border: 0, background: 'transparent', color: 'var(--cp-rust)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>Ver todas</button>
+      </div>
+      <div style={{ position: 'relative' }}>
+        {!movil && (
+          <button type="button" aria-label="Novedad anterior" onClick={() => desplazar(-1)} style={flecha('left')}>‹</button>
+        )}
+        <div
+          ref={pista}
+          className="cp-nov-carrusel"
+          role="region"
+          aria-label="Carrusel de novedades"
+          tabIndex={0}
+          onKeyDown={alTeclear}
+          onPointerDown={alBajar}
+          onPointerMove={alMover}
+          onPointerUp={alSoltar}
+          onPointerLeave={alSoltar}
+          onDragStart={(e) => e.preventDefault()}
+          style={{ display: 'flex', gap: movil ? 10 : 16, overflowX: 'auto', paddingBottom: 4, cursor: 'grab', userSelect: 'none' }}
+        >
+          {novedades.map((n) => {
+            const badge = obtenerEtiquetaNovedad(n);
+            const esAviso = (n.tipo || '').toUpperCase() === 'AVISO' && badge !== 'NOVEDAD';
+            const fotoPrincipal = n.fotos[0]?.url ?? '';
+            return (
+              <button
+                key={n.id}
+                type="button"
+                aria-label={`Ver detalle de ${n.titulo}`}
+                onClick={() => {
+                  if (!seArrastro.current) setAbierta(n);
+                }}
+                style={{
+                  flex: movil ? '0 0 66%' : '0 0 300px',
+                  border: '1px solid var(--cp-line)',
+                  padding: 0,
+                  borderRadius: movil ? 14 : 20,
+                  background: esAviso ? 'var(--cp-navy)' : 'var(--cp-white)',
+                  color: esAviso ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                  textAlign: 'left',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  cursor: 'pointer',
+                }}
+              >
+                {fotoPrincipal && (
+                  <span style={{ position: 'relative', display: 'block', width: '100%', aspectRatio: '16 / 9', background: 'var(--cp-gold)' }}>
+                    <img src={fotoPrincipal} alt="" loading="lazy" draggable={false} style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <span style={{ position: 'absolute', left: 8, top: 8, fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 10, letterSpacing: '0.08em', background: 'var(--cp-orange)', color: 'var(--cp-navy)', borderRadius: 9999, padding: '3px 9px' }}>
+                      {badge}
+                    </span>
+                  </span>
+                )}
+                <span style={{ padding: '10px 12px 12px', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  {!fotoPrincipal && (
+                    <span style={{ alignSelf: 'flex-start', fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 10, letterSpacing: '0.08em', background: 'var(--cp-orange)', color: 'var(--cp-navy)', borderRadius: 9999, padding: '3px 9px' }}>
+                      {badge}
+                    </span>
+                  )}
+                  <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 14, lineHeight: '18px' }}>{n.titulo}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        {!movil && (
+          <button type="button" aria-label="Novedad siguiente" onClick={() => desplazar(1)} style={flecha('right')}>›</button>
+        )}
+      </div>
+      {abierta && (
+        <NovedadDetalle
+          key={abierta.id}
+          novedad={abierta}
+          etiqueta={obtenerEtiquetaNovedad(abierta)}
+          onCerrar={() => setAbierta(null)}
+          onVerCarta={onVerCarta}
+        />
+      )}
+    </section>
   );
 }

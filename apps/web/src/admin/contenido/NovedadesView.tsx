@@ -23,6 +23,7 @@ interface NovedadAdmin {
   hasta: string | null;
   orden: number;
   activo: boolean;
+  tamano: string;
   fotos: FotoNovedad[];
 }
 
@@ -44,6 +45,76 @@ const CHIPS_AGREGAR = [
   { id: 'VIDEO', n: 'Video (TikTok o Instagram)' },
   { id: 'AVISO', n: 'Aviso' },
 ];
+
+/** Tamaño del cuadro en la cuadrícula de 4 columnas de la carta (PC). En celular: ver contrato nov. */
+const TAMANOS_CUADRO = [
+  { id: 'CHICO', n: 'Chico', cols: 1, rows: 1 },
+  { id: 'MEDIANO', n: 'Mediano', cols: 2, rows: 1 },
+  { id: 'GRANDE', n: 'Grande', cols: 2, rows: 2 },
+  { id: 'ANCHO', n: 'Ancho', cols: 4, rows: 1 },
+];
+
+function medidaTamano(id: string) {
+  return TAMANOS_CUADRO.find((t) => t.id === id) ?? TAMANOS_CUADRO[1];
+}
+
+/** Dibujo pequeño de la proporción: cuadrícula de 4 x 2 con el cuadro marcado. */
+function DibujoTamano({ cols, rows, activo }: { cols: number; rows: number; activo: boolean }) {
+  return (
+    <svg viewBox="0 0 28 14" width="28" height="14" aria-hidden="true" focusable="false">
+      <rect x="0.5" y="0.5" width="27" height="13" rx="2" fill="none" stroke="currentColor" strokeOpacity="0.35" />
+      <rect
+        x="0.5"
+        y="0.5"
+        width={cols * 6.75 - 0.5}
+        height={rows * 6.5 - 0.5}
+        rx="1.5"
+        fill={activo ? 'var(--cp-orange)' : 'currentColor'}
+        fillOpacity={activo ? 1 : 0.55}
+      />
+    </svg>
+  );
+}
+
+/** Vista previa en vivo: el cuadro elegido dentro de una cuadrícula en miniatura de 4 columnas. */
+function VistaTamano({ tamano, titulo }: { tamano: string; titulo: string }) {
+  const medida = medidaTamano(tamano);
+  return (
+    <div style={{ flex: '1 1 220px', maxWidth: 360, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-soft)' }}>Vista previa en la carta (PC, 4 columnas)</span>
+      <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gridTemplateRows: 'repeat(2, 56px)' }}>
+        {Array.from({ length: 8 }).map((_, i) => (
+          <span key={i} style={{ border: '1px dashed var(--cp-line)' }} />
+        ))}
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            width: `${medida.cols * 25}%`,
+            height: `${medida.rows * 50}%`,
+            boxSizing: 'border-box',
+            border: '2px solid var(--cp-navy)',
+            borderRadius: 8,
+            background: 'var(--cp-orange)',
+            color: 'var(--cp-navy)',
+            padding: 6,
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            fontSize: 11,
+            fontWeight: 800,
+            lineHeight: '14px',
+          }}
+        >
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{titulo || 'Título de la novedad'}</span>
+          <span style={{ fontSize: 10, opacity: 0.8 }}>{medida.n}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function badgeDeNovedad(n: NovedadAdmin): string {
   if (n.tema) return n.tema.toUpperCase();
@@ -79,11 +150,13 @@ export function NovedadesView() {
   const [hastaEdit, setHastaEdit] = useState('');
   const [activoEdit, setActivoEdit] = useState(true);
   const [fotosEdit, setFotosEdit] = useState<string[]>([]);
+  const [tamanoEdit, setTamanoEdit] = useState('MEDIANO');
 
   // Confirmaciones
   const [confirmarPublicar, setConfirmarPublicar] = useState(false);
   const [confirmarDescartar, setConfirmarDescartar] = useState(false);
   const [guardandoAccion, setGuardandoAccion] = useState(false);
+  const [novedadAEliminar, setNovedadAEliminar] = useState<NovedadAdmin | null>(null);
 
   const cargarDatos = async () => {
     setCargando(true);
@@ -113,7 +186,8 @@ export function NovedadesView() {
   const marcarModificado = () => setDirty(true);
 
   // Mover de orden
-  const moverNovedad = (idx: number, dir: -1 | 1) => {
+  const moverNovedad = (id: string, dir: -1 | 1) => {
+    const idx = novedades.findIndex((n) => n.id === id);
     const targetIdx = idx + dir;
     if (targetIdx < 0 || targetIdx >= novedades.length) return;
     const copia = [...novedades];
@@ -158,6 +232,7 @@ export function NovedadesView() {
         desde: n.desde || undefined,
         hasta: n.hasta || undefined,
         activo: false, // duplicada inactiva por defecto
+        tamano: n.tamano,
         fotos: n.fotos.map((f) => f.url),
       });
       await cargarDatos();
@@ -182,6 +257,7 @@ export function NovedadesView() {
       hasta: null,
       orden: novedades.length + 1,
       activo: true,
+      tamano: 'MEDIANO',
       fotos: [],
     };
     setEditando(nuevaTemp);
@@ -195,6 +271,7 @@ export function NovedadesView() {
     setDesdeEdit('');
     setHastaEdit('');
     setActivoEdit(true);
+    setTamanoEdit('MEDIANO');
     setFotosEdit([]);
   };
 
@@ -210,6 +287,7 @@ export function NovedadesView() {
     setDesdeEdit(n.desde ? n.desde.slice(0, 10) : '');
     setHastaEdit(n.hasta ? n.hasta.slice(0, 10) : '');
     setActivoEdit(n.activo);
+    setTamanoEdit(n.tamano || 'MEDIANO');
     setFotosEdit(n.fotos.map((f) => f.url));
   };
 
@@ -244,6 +322,7 @@ export function NovedadesView() {
       desde: desdeEdit || undefined,
       hasta: hastaEdit || undefined,
       activo: activoEdit,
+      tamano: tamanoEdit,
       fotos: fotosEdit,
     };
 
@@ -258,6 +337,27 @@ export function NovedadesView() {
       marcarModificado();
     } catch (err: any) {
       alert(err?.message || 'Error al guardar la novedad');
+    }
+  };
+
+  const pedirEliminar = (n: NovedadAdmin) => {
+    setEditando(null);
+    setNovedadAEliminar(n);
+  };
+
+  const ejecutarEliminar = async () => {
+    if (!novedadAEliminar) return;
+    setGuardandoAccion(true);
+    try {
+      await api.delete(`/admin/contenido/novedades/${novedadAEliminar.id}`);
+      setNovedadAEliminar(null);
+      await cargarDatos();
+      setMensaje('Novedad eliminada');
+      setTimeout(() => setMensaje(null), 3000);
+    } catch (err: any) {
+      alert(err?.message || 'Error al eliminar la novedad');
+    } finally {
+      setGuardandoAccion(false);
     }
   };
 
@@ -380,7 +480,7 @@ export function NovedadesView() {
           Diseñador de Novedades y publicidad
         </div>
         <div style={{ fontSize: 14, lineHeight: '21px', color: 'var(--cp-soft)', maxWidth: 640 }}>
-          Se abre en pantalla completa y muestra la página <b>Novedades</b> exactamente como la ve el cliente. Allí mismo agregas promociones, banners, fotos, eventos, videos de TikTok o Instagram y avisos; los ordenas arrastrando o con las flechas; los activas, destacas, duplicas, programas y editas. Nada se elimina: se desactiva. Los cambios llegan a la carta al publicar.
+          Se abre en pantalla completa y muestra la página <b>Novedades</b> exactamente como la ve el cliente. Allí mismo agregas promociones, banners, fotos, eventos, videos de TikTok o Instagram y avisos; los ordenas con ↑ ↓; eliges el tamaño del cuadro; los activas, destacas, duplicas, programas, editas o eliminas. Eliminar quita la novedad al instante; desactivarla solo la oculta. El orden y los estados llegan a la carta al publicar.
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
           {dirty ? (
@@ -451,6 +551,21 @@ export function NovedadesView() {
             <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 13, letterSpacing: '0.06em' }}>
               DISEÑADOR DE NOVEDADES
             </span>
+            <button
+              onClick={() => abrirCrear('PROMOCION')}
+              style={{
+                minHeight: 44,
+                padding: '0 16px',
+                border: 0,
+                borderRadius: 10,
+                background: 'var(--cp-orange)',
+                color: 'var(--cp-navy)',
+                fontWeight: 800,
+                cursor: 'pointer',
+              }}
+            >
+              + Nueva novedad
+            </button>
             <span style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
               <span style={{ fontSize: 12, fontWeight: 700 }}>Agregar</span>
               {CHIPS_AGREGAR.map((t) => (
@@ -458,7 +573,7 @@ export function NovedadesView() {
                   key={t.n}
                   onClick={() => abrirCrear(t.id)}
                   style={{
-                    minHeight: 38,
+                    minHeight: 44,
                     padding: '0 12px',
                     borderRadius: 9999,
                     border: '1.5px dashed var(--cp-cream)',
@@ -548,7 +663,7 @@ export function NovedadesView() {
                   key={f.id}
                   onClick={() => setFiltroEstado(f.id)}
                   style={{
-                    minHeight: 40,
+                    minHeight: 44,
                     padding: '0 12px',
                     borderRadius: 9999,
                     border: '1.5px solid var(--cp-navy)',
@@ -598,8 +713,8 @@ export function NovedadesView() {
                 <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 13, letterSpacing: '0.08em' }}>
                   EN PORTADA <span style={{ fontWeight: 600, letterSpacing: 0, color: 'var(--cp-soft)' }}>· destacadas y banners; la carta muestra hasta 5 activas</span>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16 }}>
-                  {enPortada.map((n, idx) => (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(340px, 100%), 1fr))', gap: 16 }}>
+                  {enPortada.map((n) => (
                     <div
                       key={n.id}
                       style={{
@@ -629,8 +744,8 @@ export function NovedadesView() {
                         </div>
                       </div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                        <button onClick={() => moverNovedad(idx, -1)} aria-label="Mover antes" style={{ width: 44, minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 800, cursor: 'pointer' }}>←</button>
-                        <button onClick={() => moverNovedad(idx, 1)} aria-label="Mover después" style={{ width: 44, minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 800, cursor: 'pointer' }}>→</button>
+                        <button onClick={() => moverNovedad(n.id, -1)} aria-label="Subir" style={{ width: 44, minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 800, cursor: 'pointer' }}>↑</button>
+                        <button onClick={() => moverNovedad(n.id, 1)} aria-label="Bajar" style={{ width: 44, minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 800, cursor: 'pointer' }}>↓</button>
                         <button onClick={() => abrirEditar(n)} style={{ flex: '1 1 90px', minHeight: 44, border: 0, borderRadius: 10, background: 'var(--cp-orange)', color: 'var(--cp-navy)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>Editar</button>
                         <button onClick={() => toggleActivo(n.id)} style={{ flex: '1 1 90px', minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
                           {n.activo ? 'Desactivar' : 'Activar'}
@@ -639,6 +754,7 @@ export function NovedadesView() {
                           ★ Destacada
                         </button>
                         <button onClick={() => duplicar(n)} style={{ flex: '1 1 80px', minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Duplicar</button>
+                        <button onClick={() => pedirEliminar(n)} style={{ flex: '1 1 80px', minHeight: 44, border: '1.5px solid var(--cp-rust)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-rust)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Eliminar</button>
                       </div>
                     </div>
                   ))}
@@ -658,7 +774,7 @@ export function NovedadesView() {
                     key={c.id}
                     onClick={() => setFiltroTipo(c.id)}
                     style={{
-                      minHeight: 40,
+                      minHeight: 44,
                       padding: '0 14px',
                       borderRadius: 9999,
                       border: '1.5px solid var(--cp-navy)',
@@ -679,8 +795,8 @@ export function NovedadesView() {
                 No hay nada en esta sección con los filtros elegidos.
               </div>
             )}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16, alignItems: 'start' }}>
-              {listaRegular.map((n, idx) => {
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(340px, 100%), 1fr))', gap: 16, alignItems: 'start' }}>
+              {listaRegular.map((n) => {
                 const esAviso = n.tipo === 'AVISO';
                 return (
                   <div
@@ -763,8 +879,8 @@ export function NovedadesView() {
                       </div>
                     </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                      <button onClick={() => moverNovedad(idx, -1)} aria-label="Mover antes" style={{ width: 44, minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 800, cursor: 'pointer' }}>←</button>
-                      <button onClick={() => moverNovedad(idx, 1)} aria-label="Mover después" style={{ width: 44, minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 800, cursor: 'pointer' }}>→</button>
+                      <button onClick={() => moverNovedad(n.id, -1)} aria-label="Subir" style={{ width: 44, minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 800, cursor: 'pointer' }}>↑</button>
+                      <button onClick={() => moverNovedad(n.id, 1)} aria-label="Bajar" style={{ width: 44, minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 800, cursor: 'pointer' }}>↓</button>
                       <button onClick={() => abrirEditar(n)} style={{ flex: '1 1 90px', minHeight: 44, border: 0, borderRadius: 10, background: 'var(--cp-orange)', color: 'var(--cp-navy)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>Editar</button>
                       <button onClick={() => toggleActivo(n.id)} style={{ flex: '1 1 90px', minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
                         {n.activo ? 'Desactivar' : 'Activar'}
@@ -773,6 +889,7 @@ export function NovedadesView() {
                         ☆ Destacar
                       </button>
                       <button onClick={() => duplicar(n)} style={{ flex: '1 1 80px', minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Duplicar</button>
+                      <button onClick={() => pedirEliminar(n)} style={{ flex: '1 1 80px', minHeight: 44, border: '1.5px solid var(--cp-rust)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-rust)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Eliminar</button>
                     </div>
                   </div>
                 );
@@ -883,14 +1000,52 @@ export function NovedadesView() {
               </div>
             </div>
 
+            {/* Tamaño del cuadro */}
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>Tamaño del cuadro</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'flex-start' }}>
+                <div role="radiogroup" aria-label="Tamaño del cuadro" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, flex: '1 1 260px', minWidth: 0 }}>
+                  {TAMANOS_CUADRO.map((t) => {
+                    const activo = tamanoEdit === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        role="radio"
+                        aria-checked={activo}
+                        onClick={() => setTamanoEdit(t.id)}
+                        style={{
+                          minHeight: 44,
+                          padding: '0 14px 0 10px',
+                          borderRadius: 9999,
+                          border: '1.5px solid var(--cp-navy)',
+                          background: activo ? 'var(--cp-navy)' : 'transparent',
+                          color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                          fontWeight: 700,
+                          fontSize: 13,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                        }}
+                      >
+                        <DibujoTamano cols={t.cols} rows={t.rows} activo={activo} />
+                        {t.n}
+                      </button>
+                    );
+                  })}
+                </div>
+                <VistaTamano tamano={tamanoEdit} titulo={tituloEdit} />
+              </div>
+            </div>
+
             {/* Atajos de fecha */}
             <div>
               <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>Atajos de fecha</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                <button onClick={() => aplicarAtajoFecha('finde')} style={{ minHeight: 40, padding: '0 12px', borderRadius: 9999, border: '1.5px solid var(--cp-navy)', background: 'transparent', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Solo este fin de semana</button>
-                <button onClick={() => aplicarAtajoFecha('semana')} style={{ minHeight: 40, padding: '0 12px', borderRadius: 9999, border: '1.5px solid var(--cp-navy)', background: 'transparent', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Toda la semana</button>
-                <button onClick={() => aplicarAtajoFecha('mes')} style={{ minHeight: 40, padding: '0 12px', borderRadius: 9999, border: '1.5px solid var(--cp-navy)', background: 'transparent', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Todo el mes</button>
-                <button onClick={() => aplicarAtajoFecha('anio')} style={{ minHeight: 40, padding: '0 12px', borderRadius: 9999, border: '1.5px solid var(--cp-navy)', background: 'transparent', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Hasta fin de año</button>
+                <button onClick={() => aplicarAtajoFecha('finde')} style={{ minHeight: 44, padding: '0 12px', borderRadius: 9999, border: '1.5px solid var(--cp-navy)', background: 'transparent', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Solo este fin de semana</button>
+                <button onClick={() => aplicarAtajoFecha('semana')} style={{ minHeight: 44, padding: '0 12px', borderRadius: 9999, border: '1.5px solid var(--cp-navy)', background: 'transparent', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Toda la semana</button>
+                <button onClick={() => aplicarAtajoFecha('mes')} style={{ minHeight: 44, padding: '0 12px', borderRadius: 9999, border: '1.5px solid var(--cp-navy)', background: 'transparent', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Todo el mes</button>
+                <button onClick={() => aplicarAtajoFecha('anio')} style={{ minHeight: 44, padding: '0 12px', borderRadius: 9999, border: '1.5px solid var(--cp-navy)', background: 'transparent', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Hasta fin de año</button>
               </div>
             </div>
 
@@ -926,23 +1081,43 @@ export function NovedadesView() {
               </button>
             </div>
 
-            <button
-              onClick={guardarModalEdicion}
-              style={{
-                minHeight: 52,
-                borderRadius: 12,
-                fontFamily: 'var(--fuente-titulos)',
-                fontWeight: 800,
-                fontSize: 15,
-                border: 0,
-                background: 'var(--cp-orange)',
-                color: 'var(--cp-navy)',
-                cursor: 'pointer',
-                marginTop: 8,
-              }}
-            >
-              Listo
-            </button>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+              {editando.id !== 'nueva' && (
+                <button
+                  onClick={() => pedirEliminar(editando)}
+                  style={{
+                    minHeight: 52,
+                    padding: '0 18px',
+                    borderRadius: 12,
+                    border: '1.5px solid var(--cp-rust)',
+                    background: 'transparent',
+                    color: 'var(--cp-rust)',
+                    fontWeight: 800,
+                    fontSize: 15,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Eliminar
+                </button>
+              )}
+              <button
+                onClick={guardarModalEdicion}
+                style={{
+                  flex: '1 1 160px',
+                  minHeight: 52,
+                  borderRadius: 12,
+                  fontFamily: 'var(--fuente-titulos)',
+                  fontWeight: 800,
+                  fontSize: 15,
+                  border: 0,
+                  background: 'var(--cp-orange)',
+                  color: 'var(--cp-navy)',
+                  cursor: 'pointer',
+                }}
+              >
+                Listo
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -957,6 +1132,19 @@ export function NovedadesView() {
         cargando={guardandoAccion}
         alConfirmar={ejecutarPublicar}
         alCancelar={() => setConfirmarPublicar(false)}
+      />
+
+      {/* Confirmar eliminar */}
+      <Confirmar
+        abierto={novedadAEliminar !== null}
+        titulo="¿Eliminar esta novedad?"
+        mensaje="Se quita de la carta y no se puede deshacer."
+        textoConfirmar="Sí, eliminar"
+        textoNo="No, conservarla"
+        peligro
+        cargando={guardandoAccion}
+        alConfirmar={ejecutarEliminar}
+        alCancelar={() => setNovedadAEliminar(null)}
       />
 
       {/* Confirmar descartar */}

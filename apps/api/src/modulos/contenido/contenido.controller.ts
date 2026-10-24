@@ -98,6 +98,12 @@ export class ContenidoAdminController {
     return this.contenidoService.actualizarNovedad(id, dto, req.usuario);
   }
 
+  @Delete('novedades/:id')
+  @Permiso('novedades', 'editar')
+  async eliminarNovedad(@Param('id') id: string, @Req() req: any) {
+    return this.contenidoService.eliminarNovedad(id, req.usuario);
+  }
+
   @Post('novedades/publicar')
   @Permiso('novedades', 'editar')
   async publicarNovedades(@Req() req: any) {
