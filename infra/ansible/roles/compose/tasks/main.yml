@@ -1,0 +1,42 @@
+---
+# ==============================================================================
+# Rol: compose
+# Propósito: Preparar el host para ejecución exclusiva con Docker Compose
+#            (sin Swarm ni Dokploy), directorios de despliegue y permisos.
+# Ref: cd-tarea.txt, ADR-015
+# ==============================================================================
+
+- name: Asegurar que el usuario {{ deploy_user }} pertenezca al grupo docker
+  ansible.builtin.user:
+    name: "{{ deploy_user }}"
+    groups: docker
+    append: true
+
+- name: Comprobar estado de Docker Swarm en el host
+  ansible.builtin.command:
+    cmd: docker info --format '{{ '{{' }}.Swarm.LocalNodeState{{ '}}' }}'
+  register: docker_swarm_state
+  changed_when: false
+
+- name: Desactivar Docker Swarm si está activo y se solicita explícitamente
+  ansible.builtin.command:
+    cmd: docker swarm leave --force
+  when:
+    - docker_swarm_leave | default(false) | bool
+    - docker_swarm_state.stdout == 'active'
+  changed_when: true
+
+- name: Crear directorios de despliegue de Caprichos con permisos restringidos
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: docker
+    mode: "0750"
+  loop: "{{ caprichos_subdirs }}"
+
+- name: Crear red Docker perimetral externa para el proxy Traefik (caprichos-proxy-net)
+  community.docker.docker_network:
+    name: caprichos-proxy-net
+    driver: bridge
+    state: present

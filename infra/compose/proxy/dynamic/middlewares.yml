@@ -1,0 +1,55 @@
+# ==============================================================================
+# Middlewares dinámicos de Traefik para Caprichos
+# ==============================================================================
+
+http:
+  middlewares:
+    # Cabeceras de seguridad para Producción (indexable)
+    sec-headers-prod:
+      headers:
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        stsPreload: true
+        contentTypeNosniff: true
+        browserXssFilter: true
+        frameDeny: false
+        customFrameOptionsValue: "SAMEORIGIN"
+        referrerPolicy: "strict-origin-when-cross-origin"
+        permissionsPolicy: "camera=(), microphone=(), geolocation=()"
+
+    # Cabeceras de seguridad para Demo y Staging (bloquea indexación de buscadores)
+    sec-headers-demo:
+      headers:
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        contentTypeNosniff: true
+        browserXssFilter: true
+        frameDeny: false
+        customFrameOptionsValue: "SAMEORIGIN"
+        referrerPolicy: "strict-origin-when-cross-origin"
+        customResponseHeaders:
+          X-Robots-Tag: "noindex, nofollow, noarchive"
+
+    # Rate limiting para endpoint de autenticación (/auth/ingresar)
+    rate-limit-login:
+      rateLimit:
+        average: 10
+        burst: 20
+        period: "1s"
+
+    # Rate limiting general para rutas públicas
+    rate-limit-public:
+      rateLimit:
+        average: 60
+        burst: 100
+        period: "1s"
+
+    # Compresión gzip/brotli
+    compress-resp:
+      compress: {}
+
+    # Eliminación de prefijo /api para compatibilidad
+    strip-api-prefix:
+      stripPrefix:
+        prefixes:
+          - "/api"

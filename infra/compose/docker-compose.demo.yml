@@ -1,0 +1,109 @@
+# ==============================================================================
+# Caprichos — Sobrescritura para Ambiente DEMO
+# ==============================================================================
+# Uso:
+#   docker compose -f docker-compose.base.yml -f docker-compose.demo.yml [comandos]
+# ==============================================================================
+
+name: caprichos-demo
+
+services:
+  postgres:
+    container_name: caprichos-demo-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-caprichos_demo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-caprichos_demo}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    container_name: caprichos-demo-redis
+    volumes:
+      - redis_data:/data
+
+  api:
+    image: ${GHCR_REPO:-ghcr.io/joseem26}/caprichos-api:${TAG:-demo}
+    container_name: caprichos-demo-api
+    environment:
+      PORT: 3000
+      NODE_ENV: production
+      DATABASE_URL: ${DB_ESQUEMA:-postgresql}://${POSTGRES_USER:-caprichos_demo}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-caprichos_demo}?schema=public
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      UPLOADS_DIR: /data/uploads
+      APP_VERSION: ${APP_VERSION:-0.1.0}
+      GIT_COMMIT: ${TAG:-demo}
+      DOMINIO_BASE: ${DOMINIO_DEMO:-207-244-232-127.sslip.io}
+      CORS_ORIGIN: https://${DOMINIO_DEMO:-207-244-232-127.sslip.io}
+      TRUST_PROXY: "1"
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=caprichos-proxy-net
+      # Rutas API
+      - "traefik.http.routers.demo-api.rule=Host(`${DOMINIO_DEMO:-localhost}`) && (PathPrefix(`/auth`) || PathPrefix(`/carta`) || PathPrefix(`/pedidos`) || PathPrefix(`/archivos`) || PathPrefix(`/uploads`) || PathPrefix(`/socket.io`) || PathPrefix(`/salud`) || PathPrefix(`/version`) || PathPrefix(`/reclamos/constancia`) || (Path(`/reclamos`) && Method(`POST`)))"
+      - traefik.http.routers.demo-api.entrypoints=websecure
+      - traefik.http.routers.demo-api.tls=true
+      - traefik.http.routers.demo-api.tls.certresolver=letsencrypt
+      - traefik.http.routers.demo-api.priority=200
+      - traefik.http.routers.demo-api.service=demo-api
+      - traefik.http.routers.demo-api.middlewares=sec-headers-demo@file
+      # Rate limit en login
+      - "traefik.http.routers.demo-login.rule=Host(`${DOMINIO_DEMO:-localhost}`) && Path(`/auth/ingresar`) && Method(`POST`)"
+      - traefik.http.routers.demo-login.entrypoints=websecure
+      - traefik.http.routers.demo-login.tls=true
+      - traefik.http.routers.demo-login.tls.certresolver=letsencrypt
+      - traefik.http.routers.demo-login.priority=400
+      - traefik.http.routers.demo-login.service=demo-api
+      - traefik.http.routers.demo-login.middlewares=rate-limit-login@file,sec-headers-demo@file
+      # Admin API (JSON)
+      - "traefik.http.routers.demo-admin-api.rule=Host(`${DOMINIO_DEMO:-localhost}`) && PathPrefix(`/admin`)"
+      - traefik.http.routers.demo-admin-api.entrypoints=websecure
+      - traefik.http.routers.demo-admin-api.tls=true
+      - traefik.http.routers.demo-admin-api.tls.certresolver=letsencrypt
+      - traefik.http.routers.demo-admin-api.priority=200
+      - traefik.http.routers.demo-admin-api.service=demo-api
+      - traefik.http.routers.demo-admin-api.middlewares=sec-headers-demo@file
+      # Prefijo /api
+      - "traefik.http.routers.demo-api-prefijo.rule=Host(`${DOMINIO_DEMO:-localhost}`) && PathPrefix(`/api`)"
+      - traefik.http.routers.demo-api-prefijo.entrypoints=websecure
+      - traefik.http.routers.demo-api-prefijo.tls=true
+      - traefik.http.routers.demo-api-prefijo.tls.certresolver=letsencrypt
+      - traefik.http.routers.demo-api-prefijo.priority=200
+      - traefik.http.routers.demo-api-prefijo.service=demo-api
+      - traefik.http.routers.demo-api-prefijo.middlewares=strip-api-prefix@file,sec-headers-demo@file
+      - traefik.http.services.demo-api.loadbalancer.server.port=3000
+
+  web:
+    image: ${GHCR_REPO:-ghcr.io/joseem26}/caprichos-web:${TAG:-demo}
+    container_name: caprichos-demo-web
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=caprichos-proxy-net
+      # Admin SPA (HTML)
+      - "traefik.http.routers.demo-admin-html.rule=Host(`${DOMINIO_DEMO:-localhost}`) && PathPrefix(`/admin`) && HeaderRegexp(`Accept`, `text/html`)"
+      - traefik.http.routers.demo-admin-html.entrypoints=websecure
+      - traefik.http.routers.demo-admin-html.tls=true
+      - traefik.http.routers.demo-admin-html.tls.certresolver=letsencrypt
+      - traefik.http.routers.demo-admin-html.priority=300
+      - traefik.http.routers.demo-admin-html.service=demo-web
+      - traefik.http.routers.demo-admin-html.middlewares=sec-headers-demo@file
+      # Carta y resto del sitio
+      - "traefik.http.routers.demo-web.rule=Host(`${DOMINIO_DEMO:-localhost}`)"
+      - traefik.http.routers.demo-web.entrypoints=websecure
+      - traefik.http.routers.demo-web.tls=true
+      - traefik.http.routers.demo-web.tls.certresolver=letsencrypt
+      - traefik.http.routers.demo-web.priority=1
+      - traefik.http.routers.demo-web.middlewares=sec-headers-demo@file
+      - traefik.http.services.demo-web.loadbalancer.server.port=80
+
+volumes:
+  postgres_data:
+    name: caprichos_demo_postgres_data
+  redis_data:
+    name: caprichos_demo_redis_data
+  uploads_data:
+    name: caprichos_demo_uploads_data

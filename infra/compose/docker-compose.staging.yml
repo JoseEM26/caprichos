@@ -1,0 +1,109 @@
+# ==============================================================================
+# Caprichos — Sobrescritura para Ambiente STAGING (Pruebas)
+# ==============================================================================
+# Uso:
+#   docker compose -f docker-compose.base.yml -f docker-compose.staging.yml [comandos]
+# ==============================================================================
+
+name: caprichos-staging
+
+services:
+  postgres:
+    container_name: caprichos-staging-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-caprichos_staging}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-caprichos_staging}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    container_name: caprichos-staging-redis
+    volumes:
+      - redis_data:/data
+
+  api:
+    image: ${GHCR_REPO:-ghcr.io/joseem26}/caprichos-api:${TAG:-staging}
+    container_name: caprichos-staging-api
+    environment:
+      PORT: 3000
+      NODE_ENV: staging
+      DATABASE_URL: ${DB_ESQUEMA:-postgresql}://${POSTGRES_USER:-caprichos_staging}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-caprichos_staging}?schema=public
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      UPLOADS_DIR: /data/uploads
+      APP_VERSION: ${APP_VERSION:-0.1.0-staging}
+      GIT_COMMIT: ${TAG:-staging}
+      DOMINIO_BASE: ${DOMINIO_STAGING:-staging.caprichos.pe}
+      CORS_ORIGIN: https://${DOMINIO_STAGING:-staging.caprichos.pe}
+      TRUST_PROXY: "1"
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=caprichos-proxy-net
+      # Rutas API
+      - "traefik.http.routers.staging-api.rule=Host(`${DOMINIO_STAGING:-staging.caprichos.pe}`) && (PathPrefix(`/auth`) || PathPrefix(`/carta`) || PathPrefix(`/pedidos`) || PathPrefix(`/archivos`) || PathPrefix(`/uploads`) || PathPrefix(`/socket.io`) || PathPrefix(`/salud`) || PathPrefix(`/version`) || PathPrefix(`/reclamos/constancia`) || (Path(`/reclamos`) && Method(`POST`)))"
+      - traefik.http.routers.staging-api.entrypoints=websecure
+      - traefik.http.routers.staging-api.tls=true
+      - traefik.http.routers.staging-api.tls.certresolver=letsencrypt
+      - traefik.http.routers.staging-api.priority=200
+      - traefik.http.routers.staging-api.service=staging-api
+      - traefik.http.routers.staging-api.middlewares=sec-headers-demo@file
+      # Rate limit en login
+      - "traefik.http.routers.staging-login.rule=Host(`${DOMINIO_STAGING:-staging.caprichos.pe}`) && Path(`/auth/ingresar`) && Method(`POST`)"
+      - traefik.http.routers.staging-login.entrypoints=websecure
+      - traefik.http.routers.staging-login.tls=true
+      - traefik.http.routers.staging-login.tls.certresolver=letsencrypt
+      - traefik.http.routers.staging-login.priority=400
+      - traefik.http.routers.staging-login.service=staging-api
+      - traefik.http.routers.staging-login.middlewares=rate-limit-login@file,sec-headers-demo@file
+      # Admin API (JSON)
+      - "traefik.http.routers.staging-admin-api.rule=Host(`${DOMINIO_STAGING:-staging.caprichos.pe}`) && PathPrefix(`/admin`)"
+      - traefik.http.routers.staging-admin-api.entrypoints=websecure
+      - traefik.http.routers.staging-admin-api.tls=true
+      - traefik.http.routers.staging-admin-api.tls.certresolver=letsencrypt
+      - traefik.http.routers.staging-admin-api.priority=200
+      - traefik.http.routers.staging-admin-api.service=staging-api
+      - traefik.http.routers.staging-admin-api.middlewares=sec-headers-demo@file
+      # Prefijo /api
+      - "traefik.http.routers.staging-api-prefijo.rule=Host(`${DOMINIO_STAGING:-staging.caprichos.pe}`) && PathPrefix(`/api`)"
+      - traefik.http.routers.staging-api-prefijo.entrypoints=websecure
+      - traefik.http.routers.staging-api-prefijo.tls=true
+      - traefik.http.routers.staging-api-prefijo.tls.certresolver=letsencrypt
+      - traefik.http.routers.staging-api-prefijo.priority=200
+      - traefik.http.routers.staging-api-prefijo.service=staging-api
+      - traefik.http.routers.staging-api-prefijo.middlewares=strip-api-prefix@file,sec-headers-demo@file
+      - traefik.http.services.staging-api.loadbalancer.server.port=3000
+
+  web:
+    image: ${GHCR_REPO:-ghcr.io/joseem26}/caprichos-web:${TAG:-staging}
+    container_name: caprichos-staging-web
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=caprichos-proxy-net
+      # Admin SPA (HTML)
+      - "traefik.http.routers.staging-admin-html.rule=Host(`${DOMINIO_STAGING:-staging.caprichos.pe}`) && PathPrefix(`/admin`) && HeaderRegexp(`Accept`, `text/html`)"
+      - traefik.http.routers.staging-admin-html.entrypoints=websecure
+      - traefik.http.routers.staging-admin-html.tls=true
+      - traefik.http.routers.staging-admin-html.tls.certresolver=letsencrypt
+      - traefik.http.routers.staging-admin-html.priority=300
+      - traefik.http.routers.staging-admin-html.service=staging-web
+      - traefik.http.routers.staging-admin-html.middlewares=sec-headers-demo@file
+      # Web principal
+      - "traefik.http.routers.staging-web.rule=Host(`${DOMINIO_STAGING:-staging.caprichos.pe}`)"
+      - traefik.http.routers.staging-web.entrypoints=websecure
+      - traefik.http.routers.staging-web.tls=true
+      - traefik.http.routers.staging-web.tls.certresolver=letsencrypt
+      - traefik.http.routers.staging-web.priority=1
+      - traefik.http.routers.staging-web.middlewares=sec-headers-demo@file
+      - traefik.http.services.staging-web.loadbalancer.server.port=80
+
+volumes:
+  postgres_data:
+    name: caprichos_staging_postgres_data
+  redis_data:
+    name: caprichos_staging_redis_data
+  uploads_data:
+    name: caprichos_staging_uploads_data

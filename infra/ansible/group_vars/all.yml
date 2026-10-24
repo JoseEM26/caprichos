@@ -19,6 +19,11 @@ deploy_user_ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBPY78g36QgX+dM
 # Configuración del servicio SSH
 ssh_port: 22
 
+# Control perimetral de firewall para HTTP (80) y HTTPS (443):
+# - true: Solo permite tráfico proveniente de las IPs oficiales de Cloudflare (Producción).
+# - false: Permite tráfico HTTP/HTTPS desde cualquier origen (Demo con sslip.io antes del dominio).
+proxy_cloudflare: true
+
 # Paquetes base esenciales para el sistema
 base_packages:
   - "apt-transport-https"

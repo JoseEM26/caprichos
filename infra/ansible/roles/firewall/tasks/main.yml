@@ -36,6 +36,7 @@
     proto: tcp
     comment: "Cloudflare proxy HTTP IPv4"
   loop: "{{ cloudflare_ipv4_ranges }}"
+  when: proxy_cloudflare | default(true) | bool
 
 - name: Permitir tráfico HTTPS (443) exclusivamente desde rangos IPv4 de Cloudflare
   community.general.ufw:
@@ -45,6 +46,7 @@
     proto: tcp
     comment: "Cloudflare proxy HTTPS IPv4"
   loop: "{{ cloudflare_ipv4_ranges }}"
+  when: proxy_cloudflare | default(true) | bool
 
 - name: Permitir tráfico HTTP (80) exclusivamente desde rangos IPv6 de Cloudflare
   community.general.ufw:
@@ -54,6 +56,7 @@
     proto: tcp
     comment: "Cloudflare proxy HTTP IPv6"
   loop: "{{ cloudflare_ipv6_ranges }}"
+  when: proxy_cloudflare | default(true) | bool
 
 - name: Permitir tráfico HTTPS (443) exclusivamente desde rangos IPv6 de Cloudflare
   community.general.ufw:
@@ -63,6 +66,23 @@
     proto: tcp
     comment: "Cloudflare proxy HTTPS IPv6"
   loop: "{{ cloudflare_ipv6_ranges }}"
+  when: proxy_cloudflare | default(true) | bool
+
+- name: Permitir tráfico HTTP (80) desde cualquier origen (sin Cloudflare)
+  community.general.ufw:
+    rule: allow
+    port: "80"
+    proto: tcp
+    comment: "Acceso HTTP directo publico"
+  when: not (proxy_cloudflare | default(true) | bool)
+
+- name: Permitir tráfico HTTPS (443) desde cualquier origen (sin Cloudflare)
+  community.general.ufw:
+    rule: allow
+    port: "443"
+    proto: tcp
+    comment: "Acceso HTTPS directo publico"
+  when: not (proxy_cloudflare | default(true) | bool)
 
 - name: Habilitar y activar el firewall UFW
   community.general.ufw:
@@ -107,7 +127,15 @@
     cmd: "ufw route allow proto tcp from {{ item.0 }} to any port {{ item.1 }} comment 'Cloudflare a contenedor {{ item.1 }}'"
   loop: "{{ cloudflare_ipv4_ranges | product(['80', '443']) | list }}"
   register: ufw_route_v4
+  when: proxy_cloudflare | default(true) | bool
   changed_when: "'Skipping' not in ufw_route_v4.stdout"
+
+- name: Permitir hacia los contenedores 80 y 443 desde cualquier origen (sin Cloudflare)
+  ansible.builtin.command:
+    cmd: "ufw route allow proto tcp from any to any port 80,443 comment 'Trafico publico a contenedor 80/443'"
+  register: ufw_route_direct
+  when: not (proxy_cloudflare | default(true) | bool)
+  changed_when: "'Skipping' not in ufw_route_direct.stdout"
 
 - name: Recargar UFW si cambiaron las reglas de Docker
   ansible.builtin.command:

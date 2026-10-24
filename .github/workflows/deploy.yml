@@ -1,0 +1,281 @@
+name: Deploy Caprichos por SSH
+
+on:
+  push:
+    branches:
+      - main
+      - ola-1
+  workflow_dispatch:
+    inputs:
+      ambiente:
+        description: 'Ambiente a desplegar (demo o prod)'
+        required: true
+        default: 'demo'
+        type: choice
+        options:
+          - demo
+          - prod
+      tag:
+        description: 'Tag de versión (obligatorio para prod, ej. v0.3.0)'
+        required: false
+        type: string
+      confirmacion:
+        description: 'Para producción escriba literalmente: PRODUCCION'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  validar-y-determinar:
+    name: Validar autorización y parámetros
+    runs-on: ubuntu-latest
+    outputs:
+      ambiente: ${{ steps.evaluar.outputs.ambiente }}
+      tag: ${{ steps.evaluar.outputs.tag }}
+      ref: ${{ steps.evaluar.outputs.ref }}
+      short_sha: ${{ steps.evaluar.outputs.short_sha }}
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validar condiciones de despliegue
+        id: evaluar
+        env:
+          EVENTO: ${{ github.event_name }}
+          IN_AMBIENTE: ${{ github.event.inputs.ambiente }}
+          IN_TAG: ${{ github.event.inputs.tag }}
+          IN_CONFIRMACION: ${{ github.event.inputs.confirmacion }}
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+
+          if [ "$EVENTO" = "workflow_dispatch" ]; then
+            ENV_DEST="$IN_AMBIENTE"
+            TAG_DEST="$IN_TAG"
+            CONFIRMACION="$IN_CONFIRMACION"
+
+            if [ "$ENV_DEST" = "prod" ]; then
+              echo "==> Validando despliegue deliberado a PRODUCCIÓN..."
+
+              # 1. Validación de confirmación explícita
+              if [ "$CONFIRMACION" != "PRODUCCION" ]; then
+                echo "::error::Para desplegar a producción debe escribir exactamente 'PRODUCCION' en el campo de confirmación."
+                exit 1
+              fi
+
+              # 2. Validación de formato de tag
+              if [[ -z "$TAG_DEST" || ! "$TAG_DEST" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                echo "::error::En producción es obligatorio indicar un tag semántico válido (ej. v0.3.0). Recibido: '$TAG_DEST'."
+                exit 1
+              fi
+
+              # 3. Validación de existencia del tag en el repositorio
+              if ! git rev-parse "refs/tags/${TAG_DEST}" >/dev/null 2>&1; then
+                echo "::error::El tag '${TAG_DEST}' no existe en el repositorio."
+                exit 1
+              fi
+
+              TAG_COMMIT=$(git rev-list -n 1 "refs/tags/${TAG_DEST}")
+              echo "    ✓ Tag ${TAG_DEST} localizado en commit ${TAG_COMMIT}."
+
+              # 4. Validación de que el commit del tag esté integrado en main
+              git fetch origin main:refs/remotes/origin/main
+              if ! git merge-base --is-ancestor "$TAG_COMMIT" origin/main; then
+                echo "::error::El commit ${TAG_COMMIT} correspondiente al tag ${TAG_DEST} NO está integrado en la rama 'main'."
+                exit 1
+              fi
+              echo "    ✓ El commit del tag está verificado y presente en la rama main."
+
+            else
+              # Modo manual para demo
+              if [ -z "$TAG_DEST" ]; then
+                TAG_DEST="$SHORT_SHA"
+              fi
+            fi
+
+          else
+            # Disparado por push a ramas (ola-1 o main)
+            ENV_DEST="demo"
+            TAG_DEST="$SHORT_SHA"
+          fi
+
+          echo "ambiente=${ENV_DEST}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG_DEST}" >> "$GITHUB_OUTPUT"
+          if [ "$ENV_DEST" = "prod" ]; then echo "ref=refs/tags/${TAG_DEST}" >> "$GITHUB_OUTPUT"; else echo "ref=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"; fi
+
+  build-and-push:
+    name: Construcción, escaneo y publicación en GHCR
+    needs: validar-y-determinar
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      image_api: ${{ steps.meta.outputs.image_api }}
+      image_web: ${{ steps.meta.outputs.image_web }}
+    steps:
+      - name: Checkout del repositorio (el commit exacto a desplegar)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validar-y-determinar.outputs.ref }}
+
+      - name: Metadatos de imagen
+        id: meta
+        run: |
+          OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+          TAG="${{ needs.validar-y-determinar.outputs.tag }}"
+          echo "owner=${OWNER}" >> "$GITHUB_OUTPUT"
+          echo "image_api=ghcr.io/${OWNER}/caprichos-api:${TAG}" >> "$GITHUB_OUTPUT"
+          echo "image_web=ghcr.io/${OWNER}/caprichos-web:${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Iniciar sesión en GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 1. Construir y escanear API
+      - name: Construir imagen API para escaneo
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/Dockerfile.api
+          push: false
+          load: true
+          tags: caprichos-api:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Escanear imagen API con Trivy
+        uses: aquasecurity/trivy-action@v0.33.1
+        with:
+          version: 'v0.75.0'
+          image-ref: caprichos-api:test
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: CRITICAL
+
+      # 2. Construir y escanear Web
+      - name: Construir imagen Web para escaneo
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/Dockerfile.web
+          push: false
+          load: true
+          tags: caprichos-web:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Escanear imagen Web con Trivy
+        uses: aquasecurity/trivy-action@v0.33.1
+        with:
+          version: 'v0.75.0'
+          image-ref: caprichos-web:test
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: CRITICAL
+
+      # 3. Publicar imágenes verificadas en GHCR
+      - name: Publicar imagen API en GHCR
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/Dockerfile.api
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image_api }}
+            ghcr.io/${{ steps.meta.outputs.owner }}/caprichos-api:${{ needs.validar-y-determinar.outputs.short_sha }}
+          cache-from: type=gha
+
+      - name: Publicar imagen Web en GHCR
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/Dockerfile.web
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image_web }}
+            ghcr.io/${{ steps.meta.outputs.owner }}/caprichos-web:${{ needs.validar-y-determinar.outputs.short_sha }}
+          cache-from: type=gha
+
+  deploy-ssh:
+    name: Despliegue por SSH en VPS
+    needs: [validar-y-determinar, build-and-push]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: ${{ needs.validar-y-determinar.outputs.ambiente }}
+    concurrency:
+      group: deploy-${{ needs.validar-y-determinar.outputs.ambiente }}
+      cancel-in-progress: false
+    steps:
+      - name: Configurar llave y huella SSH (sin StrictHostKeyChecking=no)
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          for v in SSH_KEY SSH_HOST SSH_KNOWN_HOSTS; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Falta el secreto $v en GitHub (Settings > Secrets and variables > Actions)."
+              exit 1
+            fi
+          done
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Ejecutar despliegue en el VPS vía SSH
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          AMBIENTE: ${{ needs.validar-y-determinar.outputs.ambiente }}
+          TAG: ${{ needs.validar-y-determinar.outputs.tag }}
+          GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
+        run: |
+          echo "==> Desplegando [${AMBIENTE}] con la versión ${TAG}..."
+          # El token viaja por la entrada estándar: no queda en la línea de comandos ni en los procesos del servidor
+          printf '%s' "$GHCR_READ_TOKEN" | ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "${SSH_USER:-deploy}@${SSH_HOST}" \
+            "IFS= read -r GHCR_READ_TOKEN; export GHCR_READ_TOKEN; /opt/caprichos/scripts/desplegar.sh '${AMBIENTE}' '${TAG}'"
+
+      - name: Borrar la llave del ejecutor
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+      - name: Registrar resumen del despliegue en Job Summary
+        if: always()
+        run: |
+          cat << 'EOF' >> "$GITHUB_STEP_SUMMARY"
+          ## 🚀 Resumen de Despliegue por SSH — Caprichos
+
+          | Parámetro | Detalle |
+          |---|---|
+          | **Ambiente** | `${{ needs.validar-y-determinar.outputs.ambiente }}` |
+          | **Versión (Tag)** | `${{ needs.validar-y-determinar.outputs.tag }}` |
+          | **Commit SHA** | `${{ github.sha }}` |
+          | **Disparado por** | `@${{ github.actor }}` (`${{ github.event_name }}`) |
+          | **Entorno GitHub** | `${{ needs.validar-y-determinar.outputs.ambiente }}` |
+          | **Imágenes GHCR** | `${{ needs.build-and-push.outputs.image_api }}` <br> `${{ needs.build-and-push.outputs.image_web }}` |
+
+          ### 🔒 Seguridad y Garantías del Proceso
+          - **Aprobación deliberada de Producción:** Ejecución manual exclusiva por `workflow_dispatch` con confirmación literal y verificación de tag y commit en `main`.
+          - **Contenedor efímero:** Migraciones de base de datos validadas previamente con `prisma migrate deploy`.
+          - **Arranque seguro:** Despliegue con verificación de healthcheck y rollback automático ante cualquier anomalía.
+          - **SSH endurecido:** Autenticación por llave ed25519 dedicada y verificación de host fingerprint.
+          EOF
