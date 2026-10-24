@@ -529,7 +529,9 @@ describe('Carta ▸ puntos (reglas vigentes)', () => {
 
     expect(alAplicar).not.toHaveBeenCalled();
     expect(
-      screen.getByText('Solo puedes usar hasta S/ 12.00 en puntos: se aplican a productos sin promoción ni descuento.'),
+      screen.getByText(
+        'Solo puedes usar hasta 12 puntos en este pedido: se aplican a productos sin promoción ni descuento.',
+      ),
     ).toBeInTheDocument();
   });
 });

@@ -79,12 +79,28 @@ export function PuntosCanje({ totalPedido, puntosAplicados, alAplicar }: PropsPu
   }
 
   const saldoDisponible = cliente.puntos;
-  const numInput = parseFloat(valorInput.replace(',', '.')) || 0;
+  // Los puntos se ganan con decimales (5 % del total) pero se usan en números enteros, para que el cliente
+  // sepa exactamente cuánto descuenta; la fracción que sobra se queda en su saldo.
+  const maximoUsable = Math.floor(Math.min(saldoDisponible, totalPedido) + 1e-9);
+  const numInput = parseInt(valorInput, 10) || 0;
   const saldoRestante = Math.max(0, Math.round((saldoDisponible - numInput) * 100) / 100);
+
+  // sin puntos no hay nada que ofrecer: el bloque no se muestra
+  if (saldoDisponible <= 0 && puntosAplicados <= 0) return null;
+
+  if (maximoUsable < 1 && puntosAplicados <= 0) {
+    return (
+      <div style={contenedor}>
+        <div style={{ fontSize: 12, lineHeight: '16px', color: 'var(--soft, var(--cp-soft, #5A6D7C))' }}>
+          Tienes <b>{saldoDisponible.toFixed(2)}</b> puntos. Se pueden usar desde 1 punto, en productos sin promoción ni descuento.
+        </div>
+      </div>
+    );
+  }
 
   const aplicar = () => {
     setMensaje(null);
-    if (isNaN(numInput) || numInput <= 0) {
+    if (numInput <= 0) {
       alAplicar(0);
       setValorInput('');
       setMensaje({ texto: 'Se quitaron los puntos del pedido.', tipo: 'ok' });
@@ -99,9 +115,9 @@ export function PuntosCanje({ totalPedido, puntosAplicados, alAplicar }: PropsPu
       return;
     }
 
-    if (numInput > totalPedido) {
+    if (numInput > maximoUsable) {
       setMensaje({
-        texto: `Solo puedes usar hasta S/ ${totalPedido.toFixed(2)} en puntos: se aplican a productos sin promoción ni descuento.`,
+        texto: `Solo puedes usar hasta ${maximoUsable} ${maximoUsable === 1 ? 'punto' : 'puntos'} en este pedido: se aplican a productos sin promoción ni descuento.`,
         tipo: 'error',
       });
       return;
@@ -134,10 +150,10 @@ export function PuntosCanje({ totalPedido, puntosAplicados, alAplicar }: PropsPu
           <input
             id="f-canje"
             type="text"
-            inputMode="decimal"
+            inputMode="numeric"
             value={valorInput}
             onChange={(e) => {
-              setValorInput(e.target.value);
+              setValorInput(e.target.value.replace(/\D/g, '').slice(0, 5));
               setMensaje(null);
             }}
             placeholder="0"
@@ -163,7 +179,7 @@ export function PuntosCanje({ totalPedido, puntosAplicados, alAplicar }: PropsPu
         </div>
 
         <div style={{ fontSize: 12, lineHeight: '16px', color: 'var(--soft, var(--cp-soft, #5A6D7C))' }}>
-          Tienes <b>{saldoDisponible.toFixed(2)}</b> puntos disponibles.{' '}
+          Tienes <b>{saldoDisponible.toFixed(2)}</b> puntos. Puedes usar hasta <b>{maximoUsable}</b>, en números enteros.{' '}
           {numInput > 0 && numInput <= saldoDisponible && `Te quedan ${saldoRestante.toFixed(2)} puntos.`}
         </div>
 
