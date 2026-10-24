@@ -63,6 +63,7 @@ describe('StockService', () => {
       },
       receta: {
         findMany: jest.fn(),
+        findFirst: jest.fn(),
       },
       recetaLinea: {
         findMany: jest.fn(),
@@ -75,6 +76,7 @@ describe('StockService', () => {
       },
       producto: {
         findMany: jest.fn().mockResolvedValue([]),
+        findUnique: jest.fn(),
         update: jest.fn(),
       },
       sabor: {
@@ -85,6 +87,7 @@ describe('StockService', () => {
       },
       agotado: {
         create: jest.fn(),
+        updateMany: jest.fn(),
       },
     };
 
@@ -398,6 +401,253 @@ describe('StockService', () => {
       const res = await service.revertirPorPedido('100');
       expect(res).toEqual({ ok: true, yaRevertido: true });
       expect(prisma.movimientoStock.findMany).not.toHaveBeenCalled();
+    });
+
+    it('revierte producto terminado por tanda con producto_id (DT-58)', async () => {
+      prisma.movimientoStock.findFirst.mockResolvedValueOnce(null);
+      prisma.movimientoStock.findMany.mockResolvedValueOnce([
+        {
+          id: 702n,
+          tipo: 'VENTA',
+          insumo_id: null,
+          producto_id: 55n,
+          lugar_id: 20n,
+          cantidad: new Prisma.Decimal(2),
+        },
+      ]);
+
+      prisma.stock.findFirst.mockResolvedValueOnce({
+        id: 855n,
+        producto_id: 55n,
+        lugar_id: 20n,
+        cantidad: new Prisma.Decimal(3),
+      });
+
+      prisma.stock.update.mockResolvedValueOnce({
+        id: 855n,
+        cantidad: new Prisma.Decimal(5),
+      });
+
+      const res = await service.revertirPorPedido('101');
+      expect(res).toEqual({ ok: true, movimientosRevertidos: 1 });
+      expect(prisma.movimientoStock.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            tipo: 'ANULACION',
+            producto_id: 55n,
+            cantidad: new Prisma.Decimal(2),
+          }),
+        }),
+      );
+    });
+  });
+
+  describe('productos por tanda y alertas en descontarPorPedido (DT-58, RN-CAP-041)', () => {
+    it('descuenta stock de producto terminado cuando tiene receta por tanda', async () => {
+      prisma.movimientoStock.findFirst.mockResolvedValueOnce(null); // sin cobro previo
+      prisma.pedido.findUnique.mockResolvedValueOnce({
+        id: 200n,
+        estado: 'PAGADO',
+        party_id: 1n,
+        lineas: [{ producto_id: 55n, cantidad: 2, tamano: null, area_id: null }],
+      });
+      prisma.lugarStock.findFirst.mockResolvedValueOnce({ id: 10n, nombre: 'Almacén central', tipo: 'ALMACEN' });
+      prisma.lugarStock.findFirst.mockResolvedValueOnce({ id: 20n, nombre: 'Cocina', tipo: 'AREA' });
+      prisma.lugarStock.findMany.mockResolvedValueOnce([]);
+      prisma.receta.findMany.mockResolvedValueOnce([]); // sin receta unitaria
+      prisma.receta.findFirst.mockResolvedValueOnce({ id: 9n, producto_id: 55n, es_produccion: true }); // receta tanda
+      prisma.stock.findFirst.mockResolvedValueOnce({
+        id: 900n,
+        producto_id: 55n,
+        lugar_id: 20n,
+        cantidad: new Prisma.Decimal(10),
+      });
+      prisma.stock.update.mockResolvedValueOnce({
+        id: 900n,
+        cantidad: new Prisma.Decimal(8),
+      });
+
+      const res = await service.descontarPorPedido('200');
+      expect(res.ok).toBe(true);
+      expect(prisma.movimientoStock.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            tipo: 'VENTA',
+            producto_id: 55n,
+            cantidad: new Prisma.Decimal(2),
+          }),
+        }),
+      );
+    });
+
+    it('emite alerta stock:negativo cuando una venta deja saldo menor a cero', async () => {
+      prisma.movimientoStock.findFirst.mockResolvedValueOnce(null);
+      prisma.pedido.findUnique.mockResolvedValueOnce({
+        id: 201n,
+        estado: 'PAGADO',
+        party_id: 1n,
+        lineas: [{ producto_id: 30n, cantidad: 1, tamano: null, area_id: null }],
+      });
+      prisma.lugarStock.findFirst.mockResolvedValueOnce({ id: 10n, nombre: 'Almacén central', tipo: 'ALMACEN' });
+      prisma.lugarStock.findFirst.mockResolvedValueOnce({ id: 20n, nombre: 'Cocina', tipo: 'AREA' });
+      prisma.lugarStock.findMany.mockResolvedValueOnce([]);
+      prisma.receta.findMany.mockResolvedValueOnce([
+        {
+          id: 1n,
+          tamano_valor_id: null,
+          lineas: [{ insumo_id: 5n, cantidad: new Prisma.Decimal(100) }],
+        },
+      ]);
+      prisma.insumo.findUnique.mockResolvedValueOnce({
+        id: 5n,
+        nombre: 'Leche entera',
+        factor_compra: new Prisma.Decimal(1),
+        factor_receta: new Prisma.Decimal(1000),
+        minimo: new Prisma.Decimal(2),
+        lugar_consumo_id: 20n,
+      });
+      prisma.stock.findFirst.mockResolvedValueOnce({
+        id: 950n,
+        insumo_id: 5n,
+        lugar_id: 20n,
+        cantidad: new Prisma.Decimal(0.05),
+      });
+      prisma.stock.update.mockResolvedValueOnce({
+        id: 950n,
+        cantidad: new Prisma.Decimal(-0.05), // negativo!
+      });
+      prisma.recetaLinea.findMany.mockResolvedValueOnce([]);
+
+      const res = await service.descontarPorPedido('201');
+      expect(res.ok).toBe(true);
+      expect(eventosGateway.emitirAdmin).toHaveBeenCalledWith(
+        'stock:negativo',
+        expect.objectContaining({
+          insumoId: '5',
+          saldo: -0.05,
+        }),
+      );
+    });
+  });
+
+  describe('verificarYReactivarAgotados (FT-STK-01 / RN-CAP-041)', () => {
+    it('reactiva producto cuando todos sus insumos tienen stock positivo', async () => {
+      prisma.producto.findUnique.mockResolvedValueOnce({
+        id: 30n,
+        nombre: 'Cappuccino',
+        agotado_hasta: new Date('2099-12-31T23:59:59.999Z'),
+      });
+      prisma.recetaLinea.findMany.mockResolvedValueOnce([
+        { receta: { producto_id: 30n, es_produccion: false } },
+      ]);
+      prisma.recetaLinea.findMany.mockResolvedValueOnce([
+        { insumo_id: 5n },
+      ]);
+      prisma.stock.findMany.mockResolvedValueOnce([
+        { id: 950n, insumo_id: 5n, cantidad: new Prisma.Decimal(5) }, // stock > 0
+      ]);
+
+      const res = await service.verificarYReactivarAgotados(['5']);
+      expect(res.reactivados).toContain('30');
+      expect(prisma.producto.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 30n },
+          data: { agotado_hasta: null },
+        }),
+      );
+    });
+
+    it('no apaga productos por tanda cuando se agota un insumo si no son de receta unitaria', async () => {
+      prisma.movimientoStock.findFirst.mockResolvedValueOnce(null);
+      prisma.pedido.findUnique.mockResolvedValueOnce({
+        id: 301n,
+        estado: 'PAGADO',
+        party_id: 1n,
+        lineas: [{ producto_id: 10n, cantidad: 1, tamano: null, area_id: null }],
+      });
+      prisma.lugarStock.findFirst.mockResolvedValueOnce({ id: 10n, nombre: 'Almacén central', tipo: 'ALMACEN' });
+      prisma.lugarStock.findFirst.mockResolvedValueOnce({ id: 20n, nombre: 'Cocina', tipo: 'AREA' });
+      prisma.lugarStock.findMany.mockResolvedValueOnce([]);
+      prisma.receta.findMany.mockResolvedValueOnce([
+        {
+          id: 1n,
+          tamano_valor_id: null,
+          lineas: [{ insumo_id: 88n, cantidad: new Prisma.Decimal(50) }],
+        },
+      ]);
+      prisma.insumo.findUnique.mockResolvedValueOnce({
+        id: 88n,
+        nombre: 'Harina común',
+        factor_compra: new Prisma.Decimal(1),
+        factor_receta: new Prisma.Decimal(1000),
+        minimo: new Prisma.Decimal(1),
+        lugar_consumo_id: 20n,
+      });
+      prisma.stock.findFirst.mockResolvedValueOnce({
+        id: 951n,
+        insumo_id: 88n,
+        lugar_id: 20n,
+        cantidad: new Prisma.Decimal(0.05),
+      });
+      prisma.stock.update.mockResolvedValueOnce({
+        id: 951n,
+        cantidad: new Prisma.Decimal(0), // Agotado
+      });
+      // Líneas que usan el insumo 88: una receta unitaria (id 10) y una de tanda (id 99, empanada)
+      prisma.recetaLinea.findMany.mockResolvedValueOnce([
+        { receta: { producto_id: 10n, es_produccion: false } },
+        { receta: { producto_id: 99n, es_produccion: true } },
+      ]);
+      prisma.producto.update.mockClear();
+
+      await service.descontarPorPedido('301');
+
+      // Debe apagar producto 10n (receta unitaria), pero NO producto 99n (tanda)
+      expect(prisma.producto.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 10n },
+          data: expect.objectContaining({ agotado_hasta: expect.anything() }),
+        }),
+      );
+      expect(prisma.producto.update).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 99n },
+        }),
+      );
+    });
+
+    it('registra porUsuarioId en el movimiento ANULACION al revertir pedido', async () => {
+      prisma.movimientoStock.findFirst.mockResolvedValueOnce(null);
+      prisma.movimientoStock.findMany.mockResolvedValueOnce([
+        {
+          id: 703n,
+          tipo: 'VENTA',
+          insumo_id: 1n,
+          lugar_id: 20n,
+          cantidad: new Prisma.Decimal(1),
+        },
+      ]);
+      prisma.stock.findFirst.mockResolvedValueOnce({
+        id: 801n,
+        insumo_id: 1n,
+        lugar_id: 20n,
+        cantidad: new Prisma.Decimal(5),
+      });
+      prisma.stock.update.mockResolvedValueOnce({
+        id: 801n,
+        cantidad: new Prisma.Decimal(6),
+      });
+
+      const res = await service.revertirPorPedido('100', undefined, '42');
+      expect(res.ok).toBe(true);
+      expect(prisma.movimientoStock.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            tipo: 'ANULACION',
+            por: 42n,
+          }),
+        }),
+      );
     });
   });
 });

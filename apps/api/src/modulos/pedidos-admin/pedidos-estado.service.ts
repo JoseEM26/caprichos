@@ -527,7 +527,7 @@ export class PedidosEstadoService {
       // un pedido anulado devuelve el stock y reversa los puntos si ya se había cobrado
       for (const paso of [
         () => this.puntosService?.reversarPorPedido(pedido.id),
-        () => this.stockService?.revertirPorPedido(pedido.id),
+        () => this.stockService?.revertirPorPedido(pedido.id, undefined, usuarioActual?.partyId),
       ]) {
         try {
           await paso();

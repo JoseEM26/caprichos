@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { almacenApi, RecetaProduccionItem, RegistrarProduccionDto } from './almacenApi';
+import { Confirmar } from '../../comun/Confirmar';
 
 interface ModalRegistrarProduccionProps {
   abierto: boolean;
@@ -18,6 +19,7 @@ export const ModalRegistrarProduccion: React.FC<ModalRegistrarProduccionProps> =
   const [unidadesReales, setUnidadesReales] = useState('');
   const [cargando, setCargando] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [confirmarAbierto, setConfirmarAbierto] = useState(false);
 
   useEffect(() => {
     if (abierto) {
@@ -25,6 +27,7 @@ export const ModalRegistrarProduccion: React.FC<ModalRegistrarProduccionProps> =
       setErrorMsg('');
       setTandas('1');
       setUnidadesReales('');
+      setConfirmarAbierto(false);
       almacenApi
         .listarRecetasProduccion()
         .then((res) => {
@@ -46,7 +49,7 @@ export const ModalRegistrarProduccion: React.FC<ModalRegistrarProduccionProps> =
   const tandasNum = parseFloat(tandas) || 0;
   const unidadesEstimadas = recetaSel ? Math.round(recetaSel.rindePorTanda * tandasNum) : 0;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!recetaId) {
       setErrorMsg('Debe seleccionar una receta.');
@@ -56,7 +59,11 @@ export const ModalRegistrarProduccion: React.FC<ModalRegistrarProduccionProps> =
       setErrorMsg('El número de tandas debe ser mayor a 0.');
       return;
     }
+    setErrorMsg('');
+    setConfirmarAbierto(true);
+  };
 
+  const ejecutarGuardar = async () => {
     const dto: RegistrarProduccionDto = {
       recetaId,
       tandas: tandasNum,
@@ -67,10 +74,12 @@ export const ModalRegistrarProduccion: React.FC<ModalRegistrarProduccionProps> =
       setCargando(true);
       setErrorMsg('');
       await almacenApi.registrarProduccion(dto);
+      setConfirmarAbierto(false);
       alGuardar();
       alCerrar();
     } catch (err: any) {
       setErrorMsg(err.message || 'Error al registrar la producción.');
+      setConfirmarAbierto(false);
     } finally {
       setCargando(false);
     }
@@ -335,6 +344,17 @@ export const ModalRegistrarProduccion: React.FC<ModalRegistrarProduccionProps> =
           </div>
         </form>
       </div>
+
+      {confirmarAbierto && (
+        <Confirmar
+          abierto={confirmarAbierto}
+          titulo="¿Confirmar producción del día?"
+          mensaje={`Se consumirá materia prima y se añadirán ${unidadesReales || unidadesEstimadas} unidades de ${recetaSel?.productoNombre || 'producto'}.`}
+          textoConfirmar="Sí, registrar producción"
+          alConfirmar={ejecutarGuardar}
+          alCancelar={() => setConfirmarAbierto(false)}
+        />
+      )}
     </>
   );
 };

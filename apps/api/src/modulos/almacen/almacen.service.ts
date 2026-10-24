@@ -16,6 +16,7 @@ import { ProduccionTandasDto } from './dto/produccion-tandas.dto';
 import { CierreDiaDto } from './dto/cierre-dia.dto';
 import { AlmacenQueryDto } from './dto/almacen-query.dto';
 import { CrearPedidoInternoDto } from './dto/crear-pedido-interno.dto';
+import { StockService } from '../stock/stock.service';
 
 @Injectable()
 export class AlmacenService {
@@ -23,6 +24,7 @@ export class AlmacenService {
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditoriaService,
     @Optional() private readonly eventosGateway?: EventosGateway,
+    @Optional() private readonly stockService?: StockService,
   ) {}
 
   private parsearId(id: bigint | string | number, entidad = 'entidad'): bigint {
@@ -237,7 +239,13 @@ export class AlmacenService {
     const cantidadDecimal = new Prisma.Decimal(dto.cantidad);
     const cantidadNum = Number(dto.cantidad);
 
-    if (['SALIDA', 'MERMA', 'DEVOLUCION'].includes(dto.tipo)) {
+    const esMermaReparto =
+      dto.tipo === 'MERMA' &&
+      (Boolean(dto.origen?.toLowerCase().includes('reparto')) ||
+       Boolean(dto.motivo?.toLowerCase().includes('reparto')) ||
+       Boolean(dto.nota?.toLowerCase().includes('reparto')));
+
+    if (['SALIDA', 'MERMA', 'DEVOLUCION'].includes(dto.tipo) && !esMermaReparto) {
       const stockExistente = await this.prisma.stock.findFirst({
         where: { insumo_id: insumoId, lugar_id: origenLugar.id },
       });
@@ -252,6 +260,22 @@ export class AlmacenService {
     }
 
     const resultado = await this.prisma.$transaction(async (tx) => {
+      if (esMermaReparto) {
+        // FT-DEL-03 / RN-CAP-126 / RQ-ALM-03-11:
+        // Merma en reparto es PURAMENTE INFORMATIVA, NO descuenta stock (ya se descontó al salir/cocinarse)
+        const notaFinal = `Merma informativa en reparto (${dto.motivo || 'Reparto'})${dto.nota ? ` · ${dto.nota}` : ''}`;
+        const mov = await tx.movimientoStock.create({
+          data: {
+            tipo: 'MERMA',
+            insumo_id: insumoId,
+            lugar_id: origenLugar.id,
+            cantidad: new Prisma.Decimal(0),
+            nota: notaFinal,
+            por: usuario ? usuario.partyId : BigInt(1),
+          },
+        });
+        return { mov };
+      }
       if (
         dto.tipo === 'SALIDA' &&
         destinoLugar &&
@@ -351,10 +375,15 @@ export class AlmacenService {
       lugarId: origenLugar.id.toString(),
     });
 
+    if (dto.tipo === 'ENTRADA' && typeof this.stockService?.verificarYReactivarAgotados === 'function') {
+      await this.stockService.verificarYReactivarAgotados([insumoId]);
+    }
+
     return {
       ok: true,
       id: resultado.mov.id.toString(),
       tipo: dto.tipo,
+      trasladoId: resultado.trasladoId || undefined,
     };
   }
 
@@ -392,28 +421,36 @@ export class AlmacenService {
         const nombre = insumo ? insumo.nombre : producto!.nombre;
         const unidad = insumo ? insumo.unidad_almacen : 'unidades';
 
-        // Buscar stock actual en el origen
-        const stock = insumo
-          ? await tx.stock.findFirst({
-              where: { insumo_id: entityId, lugar_id: origenLugar.id },
-            })
-          : await tx.stock.findFirst({
-              where: { producto_id: entityId, lugar_id: origenLugar.id },
+        const esMermaReparto =
+          Boolean(linea.origen?.toLowerCase().includes('reparto')) ||
+          Boolean(linea.destino?.toLowerCase().includes('reparto'));
+
+        if (!esMermaReparto) {
+          // Buscar stock actual en el origen
+          const stock = insumo
+            ? await tx.stock.findFirst({
+                where: { insumo_id: entityId, lugar_id: origenLugar.id },
+              })
+            : await tx.stock.findFirst({
+                where: { producto_id: entityId, lugar_id: origenLugar.id },
+              });
+
+          const stockDisponible = stock ? Number(stock.cantidad) : 0;
+          if (cantNum > stockDisponible) {
+            throw new BadRequestException({
+              codigo: 'STOCK_INSUFICIENTE',
+              mensaje: `Solo hay ${stockDisponible} ${unidad} de ${nombre} en ${origenLugar.nombre}.`,
             });
+          }
 
-        const stockDisponible = stock ? Number(stock.cantidad) : 0;
-        if (cantNum > stockDisponible) {
-          throw new BadRequestException({
-            codigo: 'STOCK_INSUFICIENTE',
-            mensaje: `Solo hay ${stockDisponible} ${unidad} de ${nombre} en ${origenLugar.nombre}.`,
-          });
+          if (stock) {
+            // Descontar atómicamente del stock
+            await tx.stock.update({
+              where: { id: stock.id },
+              data: { cantidad: { decrement: cantDecimal } },
+            });
+          }
         }
-
-        // Descontar atómicamente del stock
-        await tx.stock.update({
-          where: { id: stock!.id },
-          data: { cantidad: { decrement: cantDecimal } },
-        });
 
         const mov = await tx.movimientoStock.create({
           data: {
@@ -421,8 +458,10 @@ export class AlmacenService {
             insumo_id: insumo ? entityId : null,
             producto_id: producto ? entityId : null,
             lugar_id: origenLugar.id,
-            cantidad: cantDecimal.negated(),
-            nota: `Merma múltiple (${linea.destino || 'Desecho'})`,
+            cantidad: esMermaReparto ? new Prisma.Decimal(0) : cantDecimal.negated(),
+            nota: esMermaReparto
+              ? `Merma informativa en reparto (${linea.destino || 'Reparto'})`
+              : `Merma múltiple (${linea.destino || 'Desecho'})`,
             por: usuario ? usuario.partyId : BigInt(1),
           },
         });
@@ -498,6 +537,14 @@ export class AlmacenService {
           },
           data: { cantidad: { increment: deltaInverso } },
         });
+      } else if (movOriginal.producto_id) {
+        await tx.stock.updateMany({
+          where: {
+            producto_id: movOriginal.producto_id,
+            lugar_id: movOriginal.lugar_id,
+          },
+          data: { cantidad: { increment: deltaInverso } },
+        });
       }
 
       const movAnulacion = await tx.movimientoStock.create({
@@ -527,6 +574,19 @@ export class AlmacenService {
         despues: { motivo, movimientoAnuladoId: movId.toString() },
         ip,
       });
+    }
+
+    this.eventosGateway?.emitirAdmin('stock:cambio', {
+      insumoId: movOriginal.insumo_id?.toString(),
+      productoId: movOriginal.producto_id?.toString(),
+      lugarId: movOriginal.lugar_id.toString(),
+    });
+
+    if (deltaInverso.greaterThan(0) && typeof this.stockService?.verificarYReactivarAgotados === 'function') {
+      await this.stockService.verificarYReactivarAgotados(
+        movOriginal.insumo_id ? [movOriginal.insumo_id] : [],
+        movOriginal.producto_id ? [movOriginal.producto_id] : [],
+      );
     }
 
     return { ok: true, id: resultado.id.toString() };
@@ -775,6 +835,10 @@ export class AlmacenService {
 
     this.eventosGateway?.emitirAdmin('stock:cambio', {});
 
+    if (typeof this.stockService?.verificarYReactivarAgotados === 'function') {
+      await this.stockService.verificarYReactivarAgotados([], [receta.producto_id]);
+    }
+
     return {
       id: resultado.id.toString(),
       tandas: dto.tandas,
@@ -877,6 +941,13 @@ export class AlmacenService {
         despues: { motivo },
         ip,
       });
+    }
+
+    this.eventosGateway?.emitirAdmin('stock:cambio', {});
+
+    if (typeof this.stockService?.verificarYReactivarAgotados === 'function') {
+      const insumosADevolver = prod.receta.lineas.map((l: any) => l.insumo_id);
+      await this.stockService.verificarYReactivarAgotados(insumosADevolver, []);
     }
 
     return { ok: true, id: prodId.toString() };
@@ -1422,6 +1493,15 @@ export class AlmacenService {
         despues: { recibido: recibidoNum, diferencia: diferenciaNum },
         ip,
       });
+    }
+
+    this.eventosGateway?.emitirAdmin('stock:cambio', {
+      insumoId: traslado.insumo_id.toString(),
+      lugarId: traslado.destino_lugar_id.toString(),
+    });
+
+    if (typeof this.stockService?.verificarYReactivarAgotados === 'function') {
+      await this.stockService.verificarYReactivarAgotados([traslado.insumo_id]);
     }
 
     return { ok: true, id: trasladoId.toString(), estado: 'RECIBIDO' };

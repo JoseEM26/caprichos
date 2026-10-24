@@ -128,7 +128,7 @@ export class StockService {
           stockOrigen = await tx.stock.update({
             where: { id: stockOrigen.id },
             data: {
-              cantidad: stockOrigen.cantidad.minus(cantDecimal),
+              cantidad: { decrement: cantDecimal },
             },
           });
         }
@@ -160,7 +160,7 @@ export class StockService {
           stockDestino = await tx.stock.update({
             where: { id: stockDestino.id },
             data: {
-              cantidad: stockDestino.cantidad.plus(cantDecimal),
+              cantidad: { increment: cantDecimal },
             },
           });
         }
@@ -259,7 +259,7 @@ export class StockService {
         st = await tx.stock.update({
           where: { id: st.id },
           data: {
-            cantidad: st.cantidad.plus(delta),
+            cantidad: { increment: delta },
           },
         });
       }
@@ -318,6 +318,10 @@ export class StockService {
         nombre: insumo.nombre,
         saldo: nuevoStock,
       });
+    }
+
+    if (delta.greaterThan(0)) {
+      await this.verificarYReactivarAgotados([insumoId]);
     }
 
     return {
@@ -549,6 +553,9 @@ export class StockService {
     const almacenCentral = await runner.lugarStock.findFirst({
       where: { tipo: 'ALMACEN' },
     });
+    const lugarCocina = await runner.lugarStock.findFirst({
+      where: { nombre: 'Cocina' },
+    });
     const lugaresAreas =
       (await runner.lugarStock.findMany({
         where: { tipo: 'AREA' },
@@ -561,7 +568,11 @@ export class StockService {
     }
 
     const insumosAgotadosDetectados = new Set<string>();
+    const productosAgotadosDetectados = new Set<string>();
     const insumosModificados = new Set<string>();
+    const productosModificados = new Set<string>();
+    const alertasNegativo: Array<{ insumoId?: string; productoId?: string; lugarId: string; nombre: string; saldo: number }> = [];
+    const alertasBajo: Array<{ insumoId?: string; lugarId: string; nombre: string; saldo: number }> = [];
 
     await (txExterno ? Promise.resolve() : this.prisma.$transaction(async (tx: any) => {
       const db = txExterno || tx;
@@ -569,7 +580,7 @@ export class StockService {
       for (const linea of pedido.lineas) {
         if (!linea.producto_id) continue;
 
-        // Buscar recetas del producto
+        // Buscar recetas del producto (producción unitaria / al momento)
         const recetas = await db.receta.findMany({
           where: {
             producto_id: linea.producto_id,
@@ -584,8 +595,86 @@ export class StockService {
           },
         });
 
-        // Un producto sin receta no descuenta nada ni da error
-        if (recetas.length === 0) continue;
+        // Si no tiene receta unitaria, verificar si es producto terminado / por tanda (DT-58)
+        if (recetas.length === 0) {
+          const recetaTanda = db.receta?.findFirst
+            ? await db.receta.findFirst({
+                where: {
+                  producto_id: linea.producto_id,
+                  es_produccion: true,
+                },
+              })
+            : null;
+
+          let lugarProdADescontar = linea.area_id
+            ? (mapaAreaLugar.get(linea.area_id.toString()) || null)
+            : null;
+          if (!lugarProdADescontar && lugarCocina) {
+            lugarProdADescontar = lugarCocina.id;
+          }
+          if (!lugarProdADescontar && almacenCentral) {
+            lugarProdADescontar = almacenCentral.id;
+          }
+
+          if (lugarProdADescontar) {
+            let st = await db.stock.findFirst({
+              where: { producto_id: linea.producto_id, lugar_id: lugarProdADescontar },
+            });
+
+            if (recetaTanda || st) {
+              const cantDecimal = new Prisma.Decimal(linea.cantidad);
+              if (!st) {
+                st = await db.stock.create({
+                  data: {
+                    producto_id: linea.producto_id,
+                    lugar_id: lugarProdADescontar,
+                    cantidad: cantDecimal.negated(),
+                  },
+                });
+              } else {
+                st = await db.stock.update({
+                  where: { id: st.id },
+                  data: {
+                    cantidad: { decrement: cantDecimal },
+                  },
+                });
+              }
+
+              await db.movimientoStock.create({
+                data: {
+                  tipo: 'VENTA',
+                  producto_id: linea.producto_id,
+                  lugar_id: lugarProdADescontar,
+                  cantidad: cantDecimal,
+                  pedido_id: id,
+                  por: pedido.party_id || BigInt(1),
+                  nota: `Venta · pedido ${id}`,
+                },
+              });
+
+              const nuevoSaldo = Number(st.cantidad);
+              productosModificados.add(linea.producto_id.toString());
+
+              if (nuevoSaldo <= 0) {
+                productosAgotadosDetectados.add(linea.producto_id.toString());
+              }
+
+              if (nuevoSaldo < 0) {
+                const prodDb = await db.producto.findUnique({
+                  where: { id: linea.producto_id },
+                  select: { nombre: true },
+                });
+                alertasNegativo.push({
+                  productoId: linea.producto_id.toString(),
+                  lugarId: lugarProdADescontar.toString(),
+                  nombre: prodDb?.nombre || `Producto ${linea.producto_id}`,
+                  saldo: nuevoSaldo,
+                });
+              }
+            }
+          }
+          continue;
+        }
 
         // Determinar tamano_valor_id
         let tamanoValorId: bigint | null = null;
@@ -637,16 +726,23 @@ export class StockService {
           if (!lugarIdADescontar && linea.area_id) {
             lugarIdADescontar = mapaAreaLugar.get(linea.area_id.toString()) || null;
           }
+          if (!lugarIdADescontar && lugarCocina) {
+            lugarIdADescontar = lugarCocina.id;
+          }
           if (!lugarIdADescontar && almacenCentral) {
             lugarIdADescontar = almacenCentral.id;
           }
           if (!lugarIdADescontar) continue;
 
-          const factorReceta = Number(insumoDb.factor_receta) || 1;
-          const cantidadEnAlmacen = item.cantidad / factorReceta;
-          const cantDecimal = new Prisma.Decimal(cantidadEnAlmacen);
+          const cantidadEnAlmacen = convertirAUnidadAlmacen(
+            item.cantidad,
+            'receta',
+            insumoDb.factor_compra,
+            insumoDb.factor_receta,
+          );
+          const cantDecimal = new Prisma.Decimal(cantidadEnAlmacen).toDecimalPlaces(3);
 
-          // Actualizar stock (permite negativo: se deja vender)
+          // Actualizar stock de forma atómica (permite negativo: se deja vender)
           let st = await db.stock.findFirst({
             where: { insumo_id: insumoIdBig, lugar_id: lugarIdADescontar },
           });
@@ -663,7 +759,7 @@ export class StockService {
             st = await db.stock.update({
               where: { id: st.id },
               data: {
-                cantidad: st.cantidad.minus(cantDecimal),
+                cantidad: { decrement: cantDecimal },
               },
             });
           }
@@ -687,25 +783,77 @@ export class StockService {
           if (nuevoSaldo <= 0) {
             insumosAgotadosDetectados.add(insumoIdBig.toString());
           }
+
+          if (nuevoSaldo < 0) {
+            alertasNegativo.push({
+              insumoId: insumoIdBig.toString(),
+              lugarId: lugarIdADescontar.toString(),
+              nombre: insumoDb.nombre,
+              saldo: nuevoSaldo,
+            });
+          }
+
+          if (nuevoSaldo <= Number(insumoDb.minimo)) {
+            alertasBajo.push({
+              insumoId: insumoIdBig.toString(),
+              lugarId: lugarIdADescontar.toString(),
+              nombre: insumoDb.nombre,
+              saldo: nuevoSaldo,
+            });
+          }
         }
       }
 
+      const ahora = new Date();
       // Si algún insumo llegó a 0 o menos, apagar productos que lo usan (escribiendo agotado_hasta como cocina)
+      // Exclusivo para recetas unitarias/al momento: los productos por tanda se apagan cuando se agota su producto terminado
       if (insumosAgotadosDetectados.size > 0) {
-        const ahora = new Date();
         for (const insIdStr of insumosAgotadosDetectados) {
           const recsConInsumo = await db.recetaLinea.findMany({
             where: { insumo_id: BigInt(insIdStr) },
             include: { receta: true },
           });
 
+          const prodsAgotar = new Set<bigint>();
           for (const rl of recsConInsumo) {
-            const prodId = rl.receta.producto_id;
+            if (rl.receta && !rl.receta.es_produccion) {
+              prodsAgotar.add(rl.receta.producto_id);
+            }
+          }
+
+          for (const prodId of prodsAgotar) {
             await db.producto.update({
               where: { id: prodId },
               data: { agotado_hasta: FECHA_HASTA_REACTIVAR },
             });
 
+            if (db.agotado?.create) {
+              await db.agotado.create({
+                data: {
+                  producto_id: prodId,
+                  tipo: 'PRODUCTO',
+                  alcance: 'HASTA_REACTIVAR',
+                  desde: ahora,
+                  hasta: FECHA_HASTA_REACTIVAR,
+                  por: BigInt(1),
+                  reactivado_en: null,
+                },
+              });
+            }
+          }
+        }
+      }
+
+      // Si algún producto terminado por tanda llegó a 0 o menos, apagarlo
+      if (productosAgotadosDetectados.size > 0) {
+        for (const prodIdStr of productosAgotadosDetectados) {
+          const prodId = BigInt(prodIdStr);
+          await db.producto.update({
+            where: { id: prodId },
+            data: { agotado_hasta: FECHA_HASTA_REACTIVAR },
+          });
+
+          if (db.agotado?.create) {
             await db.agotado.create({
               data: {
                 producto_id: prodId,
@@ -727,8 +875,18 @@ export class StockService {
       for (const insId of insumosModificados) {
         this.eventosGateway.emitirAdmin('stock:cambio', { insumoId: insId });
       }
+      for (const prodId of productosModificados) {
+        this.eventosGateway.emitirAdmin('stock:cambio', { productoId: prodId });
+      }
 
-      if (insumosAgotadosDetectados.size > 0) {
+      for (const alerta of alertasNegativo) {
+        this.eventosGateway.emitirAdmin('stock:negativo', alerta);
+      }
+      for (const alerta of alertasBajo) {
+        this.eventosGateway.emitirAdmin('stock:bajo', alerta);
+      }
+
+      if (insumosAgotadosDetectados.size > 0 || productosAgotadosDetectados.size > 0) {
         // Consultar productos actualmente agotados y emitir carta:disponibilidad
         const ahora = new Date();
         const productosAgotados = await this.prisma.producto.findMany({
@@ -762,9 +920,14 @@ export class StockService {
    * FT-STK-03: Revierte lo descontado al anular un pedido (movimiento ANULACION).
    * Idempotente: si ya tiene movimientos ANULACION, no duplica.
    */
-  async revertirPorPedido(pedidoId: bigint | string | number, txExterno?: any) {
+  async revertirPorPedido(
+    pedidoId: bigint | string | number,
+    txExterno?: any,
+    porUsuarioId?: bigint | string | number,
+  ) {
     const id = this.parsearId(pedidoId, 'pedido');
     const runner = txExterno || this.prisma;
+    const porId = porUsuarioId ? this.parsearId(porUsuarioId, 'usuario') : BigInt(1);
 
     // Verificar si ya fue revertido
     const previaAnulacion = await runner.movimientoStock.findFirst({
@@ -790,49 +953,82 @@ export class StockService {
       return { ok: true, movimientosRevertidos: 0 };
     }
 
+    const insumosRevertidos: bigint[] = [];
+    const productosRevertidos: bigint[] = [];
+
     await (txExterno ? Promise.resolve() : this.prisma.$transaction(async (tx: any) => {
       const db = txExterno || tx;
 
       for (const mov of ventas) {
-        if (!mov.insumo_id) continue;
+        if (!mov.insumo_id && !mov.producto_id) continue;
 
-        // Reponer stock
-        let st = await db.stock.findFirst({
-          where: { insumo_id: mov.insumo_id, lugar_id: mov.lugar_id },
-        });
+        if (mov.insumo_id) {
+          insumosRevertidos.push(mov.insumo_id);
+          // Reponer stock insumo de forma atómica
+          let st = await db.stock.findFirst({
+            where: { insumo_id: mov.insumo_id, lugar_id: mov.lugar_id },
+          });
 
-        if (!st) {
-          await db.stock.create({
-            data: {
-              insumo_id: mov.insumo_id,
-              lugar_id: mov.lugar_id,
-              cantidad: mov.cantidad,
-            },
+          if (!st) {
+            await db.stock.create({
+              data: {
+                insumo_id: mov.insumo_id,
+                lugar_id: mov.lugar_id,
+                cantidad: mov.cantidad,
+              },
+            });
+          } else {
+            await db.stock.update({
+              where: { id: st.id },
+              data: {
+                cantidad: { increment: mov.cantidad },
+              },
+            });
+          }
+        } else if (mov.producto_id) {
+          productosRevertidos.push(mov.producto_id);
+          // Reponer stock producto terminado de forma atómica
+          let st = await db.stock.findFirst({
+            where: { producto_id: mov.producto_id, lugar_id: mov.lugar_id },
           });
-        } else {
-          await db.stock.update({
-            where: { id: st.id },
-            data: {
-              cantidad: st.cantidad.plus(mov.cantidad),
-            },
-          });
+
+          if (!st) {
+            await db.stock.create({
+              data: {
+                producto_id: mov.producto_id,
+                lugar_id: mov.lugar_id,
+                cantidad: mov.cantidad,
+              },
+            });
+          } else {
+            await db.stock.update({
+              where: { id: st.id },
+              data: {
+                cantidad: { increment: mov.cantidad },
+              },
+            });
+          }
         }
 
         // Crear movimiento ANULACION
         await db.movimientoStock.create({
           data: {
             tipo: 'ANULACION',
-            insumo_id: mov.insumo_id,
+            insumo_id: mov.insumo_id || null,
+            producto_id: mov.producto_id || null,
             lugar_id: mov.lugar_id,
             cantidad: mov.cantidad,
             pedido_id: id,
             movimiento_anulado_id: mov.id,
-            por: BigInt(1),
+            por: porId,
             nota: `Anulación · pedido ${id}`,
           },
         });
       }
     }));
+
+    // Reactivar disponibilidad si corresponde (insumo o producto repuesto)
+    await this.verificarYReactivarAgotados(insumosRevertidos, productosRevertidos);
 
     if (this.eventosGateway) {
       for (const mov of ventas) {
@@ -842,9 +1038,148 @@ export class StockService {
             lugarId: mov.lugar_id.toString(),
           });
         }
+        if (mov.producto_id) {
+          this.eventosGateway.emitirAdmin('stock:cambio', {
+            productoId: mov.producto_id.toString(),
+            lugarId: mov.lugar_id.toString(),
+          });
+        }
       }
     }
 
     return { ok: true, movimientosRevertidos: ventas.length };
+  }
+
+  /**
+   * FT-STK-01 / RN-CAP-041: Reactivación automática de productos cuando entra stock.
+   * Si un producto o insumo estaba agotado y ahora tiene stock disponible (> 0),
+   * se limpia agotado_hasta y se cierra el registro de Agotado correspondiente.
+   */
+  async verificarYReactivarAgotados(
+    insumosIds: Array<bigint | string | number> = [],
+    productosIds: Array<bigint | string | number> = [],
+    tx?: any,
+  ) {
+    const db = tx || this.prisma;
+    const ahora = new Date();
+    const reactivados: bigint[] = [];
+
+    // 1. Reactivar productos por tanda / terminados directamente si tienen stock > 0
+    for (const pId of productosIds) {
+      if (!pId) continue;
+      const prodId = this.parsearId(pId, 'producto');
+      const stocks = (await db.stock?.findMany?.({
+        where: { producto_id: prodId },
+      })) || [];
+      const totalStock = stocks.reduce((acc: number, s: any) => acc + Number(s.cantidad), 0);
+      if (totalStock > 0) {
+        const prod = await db.producto?.findUnique?.({ where: { id: prodId } });
+        if (prod && prod.agotado_hasta && prod.agotado_hasta > ahora) {
+          await db.producto?.update?.({
+            where: { id: prodId },
+            data: { agotado_hasta: null },
+          });
+          if (db.agotado?.updateMany) {
+            await db.agotado.updateMany({
+              where: {
+                producto_id: prodId,
+                reactivado_en: null,
+              },
+              data: { reactivado_en: ahora },
+            });
+          }
+          reactivados.push(prodId);
+        }
+      }
+    }
+
+    // 2. Reactivar productos basados en insumos
+    for (const iId of insumosIds) {
+      if (!iId) continue;
+      const insumoId = this.parsearId(iId, 'insumo');
+      const lineas = (await db.recetaLinea?.findMany?.({
+        where: { insumo_id: insumoId },
+        include: { receta: true },
+      })) || [];
+
+      const prodsCandidatos = new Set<bigint>();
+      for (const l of lineas) {
+        if (l.receta && !l.receta.es_produccion) {
+          prodsCandidatos.add(l.receta.producto_id);
+        }
+      }
+
+      for (const prodId of prodsCandidatos) {
+        const prod = await db.producto?.findUnique?.({ where: { id: prodId } });
+        if (prod && prod.agotado_hasta && prod.agotado_hasta > ahora) {
+          // Verificar si TODOS los insumos requeridos por sus recetas tienen stock > 0
+          const todasLineas = (await db.recetaLinea?.findMany?.({
+            where: {
+              receta: {
+                producto_id: prodId,
+                es_produccion: false,
+              },
+            },
+            select: { insumo_id: true },
+          })) || [];
+
+          let todosConStock = true;
+          for (const tl of todasLineas) {
+            const stInsumo = (await db.stock?.findMany?.({
+              where: { insumo_id: tl.insumo_id },
+            })) || [];
+            const totalInsumo = stInsumo.reduce((acc: number, s: any) => acc + Number(s.cantidad), 0);
+            if (totalInsumo <= 0) {
+              todosConStock = false;
+              break;
+            }
+          }
+
+          if (todosConStock) {
+            await db.producto?.update?.({
+              where: { id: prodId },
+              data: { agotado_hasta: null },
+            });
+            if (db.agotado?.updateMany) {
+              await db.agotado.updateMany({
+                where: {
+                  producto_id: prodId,
+                  reactivado_en: null,
+                },
+                data: { reactivado_en: ahora },
+              });
+            }
+            reactivados.push(prodId);
+          }
+        }
+      }
+    }
+
+    // Emitir carta:disponibilidad si hubo reactivaciones
+    if (reactivados.length > 0 && this.eventosGateway) {
+      const productosAgotados = await this.prisma.producto.findMany({
+        where: { agotado_hasta: { gt: ahora } },
+        select: { id: true },
+      });
+      const saboresAgotados = await this.prisma.sabor.findMany({
+        where: { agotado_hasta: { gt: ahora } },
+        select: { id: true },
+      });
+      const opcionesAgotadas = await this.prisma.opcion.findMany({
+        where: { agotado_hasta: { gt: ahora } },
+        select: { id: true },
+      });
+
+      this.eventosGateway.emitirAdmin('carta:disponibilidad', {
+        productos: productosAgotados.map((p: any) => p.id.toString()),
+        sabores: saboresAgotados.map((s: any) => s.id.toString()),
+        opciones: opcionesAgotadas.map((o: any) => o.id.toString()),
+        productoIds: productosAgotados.map((p: any) => p.id.toString()),
+        saborIds: saboresAgotados.map((s: any) => s.id.toString()),
+        opcionIds: opcionesAgotadas.map((o: any) => o.id.toString()),
+      });
+    }
+
+    return { reactivados: reactivados.map((id) => id.toString()) };
   }
 }

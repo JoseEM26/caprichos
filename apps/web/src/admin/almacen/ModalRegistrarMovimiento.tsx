@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { almacenApi, InsumoStockItem, RegistrarMovimientoDto } from './almacenApi';
+import { Confirmar } from '../../comun/Confirmar';
 
 interface ModalRegistrarMovimientoProps {
   abierto: boolean;
@@ -23,6 +24,7 @@ export const ModalRegistrarMovimiento: React.FC<ModalRegistrarMovimientoProps> =
   const [cargando, setCargando] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [busquedaInsumo, setBusquedaInsumo] = useState('');
+  const [confirmarAbierto, setConfirmarAbierto] = useState(false);
 
   useEffect(() => {
     if (abierto) {
@@ -34,6 +36,7 @@ export const ModalRegistrarMovimiento: React.FC<ModalRegistrarMovimientoProps> =
       setMotivo('');
       setErrorMsg('');
       setBusquedaInsumo('');
+      setConfirmarAbierto(false);
     }
   }, [abierto, insumos]);
 
@@ -62,7 +65,7 @@ export const ModalRegistrarMovimiento: React.FC<ModalRegistrarMovimientoProps> =
     (i) => !busquedaInsumo || i.nombre.toLowerCase().includes(busquedaInsumo.toLowerCase()),
   );
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!insumoId) {
       setErrorMsg('Debe seleccionar un insumo.');
@@ -77,7 +80,12 @@ export const ModalRegistrarMovimiento: React.FC<ModalRegistrarMovimientoProps> =
       setErrorMsg('El origen es obligatorio.');
       return;
     }
+    setErrorMsg('');
+    setConfirmarAbierto(true);
+  };
 
+  const ejecutarGuardar = async () => {
+    const cantNum = parseFloat(cantidad);
     const dto: RegistrarMovimientoDto = {
       tipo,
       insumoId,
@@ -91,10 +99,12 @@ export const ModalRegistrarMovimiento: React.FC<ModalRegistrarMovimientoProps> =
       setCargando(true);
       setErrorMsg('');
       await almacenApi.registrarMovimiento(dto);
+      setConfirmarAbierto(false);
       alGuardar();
       alCerrar();
     } catch (err: any) {
       setErrorMsg(err.message || 'Error al registrar el movimiento.');
+      setConfirmarAbierto(false);
     } finally {
       setCargando(false);
     }
@@ -423,6 +433,17 @@ export const ModalRegistrarMovimiento: React.FC<ModalRegistrarMovimientoProps> =
           </div>
         </form>
       </div>
+
+      {confirmarAbierto && (
+        <Confirmar
+          abierto={confirmarAbierto}
+          titulo={`¿Confirmar movimiento de ${tipo}?`}
+          mensaje={`Se registrará un movimiento de ${tipo} de ${cantidad} ${insumoSel?.unidad || 'unidades'} de ${insumoSel?.nombre || 'insumo'}.`}
+          textoConfirmar="Sí, registrar"
+          alConfirmar={ejecutarGuardar}
+          alCancelar={() => setConfirmarAbierto(false)}
+        />
+      )}
     </>
   );
 };

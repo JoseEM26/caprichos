@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { almacenApi, CierreDiaResumen, CerrarDiaDto } from './almacenApi';
+import { Confirmar } from '../../comun/Confirmar';
 
 interface ModalCerrarDiaProps {
   abierto: boolean;
@@ -26,11 +27,13 @@ export const ModalCerrarDia: React.FC<ModalCerrarDiaProps> = ({
   const [items, setItems] = useState<ItemCierreForm[]>([]);
   const [cargando, setCargando] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [confirmarAbierto, setConfirmarAbierto] = useState(false);
 
   useEffect(() => {
     if (abierto) {
       setCargando(true);
       setErrorMsg('');
+      setConfirmarAbierto(false);
       almacenApi
         .obtenerResumenCierreDia()
         .then((res) => {
@@ -56,7 +59,7 @@ export const ModalCerrarDia: React.FC<ModalCerrarDiaProps> = ({
 
   if (!abierto) return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     for (let i = 0; i < items.length; i++) {
       const it = items[i];
@@ -66,7 +69,11 @@ export const ModalCerrarDia: React.FC<ModalCerrarDiaProps> = ({
         return;
       }
     }
+    setErrorMsg('');
+    setConfirmarAbierto(true);
+  };
 
+  const ejecutarCerrarDia = async () => {
     const dto: CerrarDiaDto = {
       fecha: resumen?.fecha,
       items: items.map((it) => ({
@@ -81,10 +88,12 @@ export const ModalCerrarDia: React.FC<ModalCerrarDiaProps> = ({
       setCargando(true);
       setErrorMsg('');
       await almacenApi.cerrarDia(dto);
+      setConfirmarAbierto(false);
       alGuardar();
       alCerrar();
     } catch (err: any) {
       setErrorMsg(err.message || 'Error al procesar el cierre del día.');
+      setConfirmarAbierto(false);
     } finally {
       setCargando(false);
     }
@@ -336,6 +345,17 @@ export const ModalCerrarDia: React.FC<ModalCerrarDiaProps> = ({
           </form>
         )}
       </div>
+
+      {confirmarAbierto && (
+        <Confirmar
+          abierto={confirmarAbierto}
+          titulo="¿Confirmar cierre del día?"
+          mensaje="Se ajustará el inventario según el conteo físico y los sobrantes pasarán a merma."
+          textoConfirmar="Sí, confirmar cierre"
+          alConfirmar={ejecutarCerrarDia}
+          alCancelar={() => setConfirmarAbierto(false)}
+        />
+      )}
     </>
   );
 };

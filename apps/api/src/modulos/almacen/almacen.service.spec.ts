@@ -179,6 +179,39 @@ describe('AlmacenService', () => {
         ),
       ).rejects.toThrow(BadRequestException);
     });
+
+    it('debe registrar merma en reparto como informativa sin descontar stock (RN-CAP-126)', async () => {
+      prisma.insumo.findUnique.mockResolvedValue({ id: 1n, nombre: 'Empanada', unidad_almacen: 'UNIDAD' });
+      prisma.lugarStock.findUnique.mockResolvedValue({ id: 30n, nombre: 'Reparto' });
+      prisma.stock.update.mockClear();
+      prisma.movimientoStock.create.mockResolvedValue({
+        id: 105n,
+        tipo: 'MERMA',
+        cantidad: new Prisma.Decimal(0),
+      });
+
+      const res = await service.registrarMovimiento(
+        {
+          insumoId: 1,
+          tipo: 'MERMA',
+          cantidad: 2,
+          origen: 'Reparto',
+          motivo: 'reparto - caído de moto',
+        },
+        mockUsuario,
+      );
+
+      expect(res.ok).toBe(true);
+      expect(prisma.stock.update).not.toHaveBeenCalled();
+      expect(prisma.movimientoStock.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            tipo: 'MERMA',
+            cantidad: new Prisma.Decimal(0),
+          }),
+        }),
+      );
+    });
   });
 
   describe('anularMovimiento', () => {
@@ -214,6 +247,36 @@ describe('AlmacenService', () => {
       expect(prisma.stock.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           data: { cantidad: { increment: expect.anything() } },
+        }),
+      );
+    });
+
+    it('debe revertir stock de producto cuando el movimiento original tiene producto_id', async () => {
+      prisma.movimientoStock.findUnique.mockResolvedValue({
+        id: 102n,
+        insumo_id: null,
+        producto_id: 50n,
+        lugar_id: 11n,
+        tipo: 'MERMA',
+        cantidad: new Prisma.Decimal('-3.00'),
+      });
+      prisma.movimientoStock.findFirst.mockResolvedValue(null);
+      prisma.movimientoStock.create.mockResolvedValue({
+        id: 103n,
+        tipo: 'ANULACION',
+      });
+
+      const res = await service.anularMovimiento(
+        102,
+        'Merma de producto mal registrada',
+        mockUsuario,
+      );
+
+      expect(res.ok).toBe(true);
+      expect(prisma.stock.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { producto_id: 50n, lugar_id: 11n },
+          data: { cantidad: { increment: new Prisma.Decimal('3.00') } },
         }),
       );
     });

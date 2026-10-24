@@ -569,7 +569,7 @@ export class CobrosService {
     // el cobro anulado devuelve el stock y reversa los puntos que había sumado
     for (const paso of [
       () => this.puntosService?.reversarPorPedido(cobro.pedido_id),
-      () => this.stockService?.revertirPorPedido(cobro.pedido_id),
+      () => this.stockService?.revertirPorPedido(cobro.pedido_id, undefined, usuario?.partyId),
     ]) {
       try {
         await paso();
