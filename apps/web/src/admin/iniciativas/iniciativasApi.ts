@@ -1,4 +1,4 @@
-import { api } from '../../comun/api';
+import { api, clienteFetch } from '../../comun/api';
 
 export interface ComentarioIniciativa {
   id: string;
@@ -96,15 +96,9 @@ export async function subirCapturaIniciativa(archivo: File): Promise<{ id: strin
   formData.append('archivo', archivo);
   formData.append('privado', 'true');
 
-  const res = await fetch('/admin/archivos', {
+  // clienteFetch manda el token de sesión y lo renueva si caducó; con fetch solo con cookies el servidor responde 401
+  return clienteFetch<{ id: string; url: string }>('/admin/archivos', {
     method: 'POST',
-    credentials: 'include',
     body: formData,
   });
-
-  if (!res.ok) {
-    throw new Error('Error al subir la captura de la iniciativa');
-  }
-
-  return res.json();
 }

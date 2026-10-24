@@ -64,8 +64,8 @@ export function NuevaIniciativaModal({
 
       const res = await subirCapturaIniciativa(file);
       setArchivoId(res.id);
-    } catch {
-      setError('Error al subir la imagen. Intenta de nuevo.');
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : 'Error al subir la imagen. Intenta de nuevo.');
       setFotoVistaPrevia(null);
       setArchivoId(null);
     } finally {
