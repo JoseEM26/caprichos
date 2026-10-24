@@ -298,6 +298,10 @@ describe('Pruebas de la Carta Pública (front-carta)', () => {
     // Elegir modalidad Recoger para no pedir dirección
     fireEvent.click(screen.getByText('Recoger en el local'));
 
+    // Avanzar paso 1 -> paso 2 -> paso 3
+    fireEvent.click(screen.getByRole('button', { name: /Continuar/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Continuar/i }));
+
     const btnEnviar = screen.getByRole('button', { name: /Enviar pedido/i });
 
     // Dos toques rápidos consecutivos
@@ -365,7 +369,11 @@ describe('Pruebas de la Carta Pública (front-carta)', () => {
     });
     fireEvent.click(screen.getByText('Recoger en el local'));
 
-    // Seleccionar Factura
+    // Avanzar paso 1 -> paso 2 -> paso 3 (Pago)
+    fireEvent.click(screen.getByRole('button', { name: /Continuar/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Continuar/i }));
+
+    // Seleccionar Factura en paso 3
     fireEvent.click(screen.getByRole('button', { name: 'Factura' }));
 
     // Ingresar RUC inválido de 10 dígitos
@@ -494,10 +502,12 @@ describe('Carta ▸ puntos (reglas vigentes)', () => {
       cliente: {
         partyId: '100',
         nombre: 'Ana',
+        telefono: '987654321',
         dniMascara: '4521****',
         correo: 'ana@ejemplo.com',
         cumpleanos: '14/03',
         puntos: 30,
+        fotoUrl: null,
       },
       panelAbierto: false,
       abrirPanel: vi.fn(),
@@ -506,6 +516,9 @@ describe('Carta ▸ puntos (reglas vigentes)', () => {
       registrar: vi.fn(),
       salir: vi.fn(),
       refrescar: vi.fn(),
+      actualizarPerfil: vi.fn(),
+      subirFoto: vi.fn(),
+      quitarFoto: vi.fn(),
     });
 
     // totalPedido es el monto canjeable (sin promos ni descuentos)
@@ -518,5 +531,240 @@ describe('Carta ▸ puntos (reglas vigentes)', () => {
     expect(
       screen.getByText('Solo puedes usar hasta S/ 12.00 en puntos: se aplican a productos sin promoción ni descuento.'),
     ).toBeInTheDocument();
+  });
+});
+
+describe('Checkout por apartados y mapa a pantalla completa (Mejoras 1 y 2)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function WrapperCheckout() {
+    const { agregarLinea, abrirCheckout } = useCarrito();
+    return (
+      <div>
+        <button
+          onClick={() => {
+            agregarLinea({
+              productoId: 'prod-1',
+              nombre: 'Frappé Clásico',
+              precioBase: 14.5,
+              cantidad: 1,
+              opciones: [],
+              precioUnitario: 14.5,
+              subtotal: 14.5,
+            });
+            abrirCheckout();
+          }}
+        >
+          Iniciar Checkout
+        </button>
+        <FormularioCheckout
+          estadoLocal={estadoAbierto}
+          datosLocal={datosLocalEjemplo}
+        />
+      </div>
+    );
+  }
+
+  it('indicador de pasos refleja paso actual y completados, y permite volver tocando el círculo', async () => {
+    render(
+      <CarritoProvider>
+        <WrapperCheckout />
+      </CarritoProvider>,
+    );
+
+    fireEvent.click(screen.getByText('Iniciar Checkout'));
+
+    // Paso 1 actual
+    const paso1Btn = screen.getByLabelText(/Paso 1: Tus datos \(actual\)/i);
+    expect(paso1Btn).toBeInTheDocument();
+    expect(paso1Btn).toHaveAttribute('aria-current', 'step');
+
+    // Paso 2 y 3 pendientes
+    const paso2Btn = screen.getByLabelText(/Paso 2: Ubicación/i);
+    expect(paso2Btn).toBeDisabled();
+
+    // Completar paso 1
+    fireEvent.click(screen.getByRole('button', { name: /Continuar como invitado/i }));
+    fireEvent.change(screen.getByLabelText(/Nombre completo/i), { target: { value: 'Lucía Pérez' } });
+    fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '987654321' } });
+
+    // Avanzar a paso 2
+    fireEvent.click(screen.getByRole('button', { name: /Continuar/i }));
+
+    // Ahora paso 2 es actual y paso 1 completado
+    expect(screen.getByLabelText(/Paso 2: Ubicación \(actual\)/i)).toBeInTheDocument();
+    const paso1Completado = screen.getByLabelText(/Paso 1: Tus datos \(completado\)/i);
+    expect(paso1Completado).toBeInTheDocument();
+    expect(paso1Completado).not.toBeDisabled();
+
+    // Tocar el círculo del paso 1 completado vuelve a él
+    fireEvent.click(paso1Completado);
+    expect(screen.getByLabelText(/Paso 1: Tus datos \(actual\)/i)).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Lucía Pérez')).toBeInTheDocument();
+  });
+
+  it('no se puede avanzar con datos inválidos y se muestra el error en su apartado', async () => {
+    render(
+      <CarritoProvider>
+        <WrapperCheckout />
+      </CarritoProvider>,
+    );
+
+    fireEvent.click(screen.getByText('Iniciar Checkout'));
+
+    // Sin elegir invitado ni cuenta
+    fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
+    expect(screen.getByText('Elige si ingresas con tu cuenta o continúas como invitado')).toBeInTheDocument();
+
+    // Con invitado pero sin nombre
+    fireEvent.click(screen.getByRole('button', { name: /Continuar como invitado/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
+    expect(screen.getByText('El nombre es obligatorio')).toBeInTheDocument();
+
+    // Con teléfono inválido
+    fireEvent.change(screen.getByLabelText(/Nombre completo/i), { target: { value: 'Mateo' } });
+    fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '12345' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
+    expect(screen.getByText('El teléfono debe tener 9 dígitos y empezar con 9')).toBeInTheDocument();
+
+    // Corregir teléfono y avanzar a Paso 2 en Delivery sin dirección
+    fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '912345678' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
+
+    // Ahora en paso 2 sin dirección ni coordenadas
+    expect(screen.getByLabelText(/Paso 2: Ubicación \(actual\)/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
+    expect(
+      screen.getByText('Para delivery debes indicar una dirección de al menos 5 caracteres o usar tu ubicación'),
+    ).toBeInTheDocument();
+  });
+
+  it('Atrás conserva lo escrito en los apartados', async () => {
+    render(
+      <CarritoProvider>
+        <WrapperCheckout />
+      </CarritoProvider>,
+    );
+
+    fireEvent.click(screen.getByText('Iniciar Checkout'));
+
+    fireEvent.click(screen.getByRole('button', { name: /Continuar como invitado/i }));
+    fireEvent.change(screen.getByLabelText(/Nombre completo/i), { target: { value: 'Rodrigo Torres' } });
+    fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '998877665' } });
+
+    // Avanzar a paso 2
+    fireEvent.click(screen.getByRole('button', { name: /Continuar/i }));
+
+    // Escribir dirección y referencia
+    fireEvent.change(screen.getByLabelText(/Dirección escrita/i), { target: { value: 'Calle Los Robles 450' } });
+    fireEvent.change(screen.getByLabelText(/Referencia/i), { target: { value: 'Casa con reja negra' } });
+
+    // Presionar Atrás
+    fireEvent.click(screen.getByRole('button', { name: /Atrás/i }));
+
+    // Volver a paso 1: conserva nombre y teléfono
+    expect(screen.getByLabelText(/Paso 1: Tus datos \(actual\)/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Nombre completo/i)).toHaveValue('Rodrigo Torres');
+    expect(screen.getByLabelText(/Teléfono celular/i)).toHaveValue('998877665');
+
+    // Volver a avanzar a paso 2: conserva dirección y referencia
+    fireEvent.click(screen.getByRole('button', { name: /Continuar/i }));
+    expect(screen.getByLabelText(/Paso 2: Ubicación \(actual\)/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Dirección escrita/i)).toHaveValue('Calle Los Robles 450');
+    expect(screen.getByLabelText(/Referencia/i)).toHaveValue('Casa con reja negra');
+  });
+
+  it('«Marcar en el mapa» abre la pantalla completa con el marcador de la tienda y «Confirmar ubicación» la cierra con el punto confirmado', async () => {
+    vi.spyOn(api, 'get').mockImplementation(async (url: string) => {
+      if (url.includes('/carta/direcciones')) {
+        return {
+          resultados: [
+            { texto: 'Av. Campoy 450, San Juan de Lurigancho', lat: -12.019, lng: -76.963 },
+          ],
+          apagado: false,
+        };
+      }
+      if (url.includes('/carta/envio')) {
+        return { cubierto: true, zona: 'Zona Campoy', tarifa: 4.5, gratisDesde: 50 };
+      }
+      return {};
+    });
+
+    render(
+      <CarritoProvider>
+        <WrapperCheckout />
+      </CarritoProvider>,
+    );
+
+    fireEvent.click(screen.getByText('Iniciar Checkout'));
+    fireEvent.click(screen.getByRole('button', { name: /Continuar como invitado/i }));
+    fireEvent.change(screen.getByLabelText(/Nombre completo/i), { target: { value: 'Mariana' } });
+    fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '987112233' } });
+    fireEvent.click(screen.getByRole('button', { name: /Continuar/i }));
+
+    // En paso 2 tocar «Marcar en el mapa»
+    fireEvent.click(screen.getByRole('button', { name: /Marcar en el mapa/i }));
+
+    // Se abre la ventana a pantalla completa
+    const modalMapa = screen.getByRole('dialog', { name: 'Marca dónde recibes tu pedido' });
+    expect(modalMapa).toBeInTheDocument();
+    expect(screen.getByText('Marca dónde recibes tu pedido')).toBeInTheDocument();
+    expect(screen.getByLabelText('Cerrar mapa')).toBeInTheDocument();
+
+    // Marcador de la tienda visible en el mapa
+    expect(modalMapa.textContent).toContain('Caprichos');
+    expect(modalMapa.textContent).toContain(datosLocalEjemplo.direccion);
+
+    // Botón confirmar deshabilitado hasta que haya punto
+    const btnConfirmar = screen.getByRole('button', { name: /Confirmar ubicación/i });
+    expect(btnConfirmar).toBeDisabled();
+
+    // Seleccionar dirección en el buscador
+    const inputBuscar = screen.getByLabelText(/Buscar dirección/i);
+    fireEvent.change(inputBuscar, { target: { value: 'Av. Campoy' } });
+
+    const optResult = await screen.findByRole('button', { name: /Av. Campoy 450/i });
+    fireEvent.click(optResult);
+
+    // Ahora punto confirmado habilitado
+    await waitFor(() => {
+      expect(btnConfirmar).not.toBeDisabled();
+    });
+
+    // Confirmar ubicación cierra la pantalla completa y marca confirmada en el formulario
+    fireEvent.click(btnConfirmar);
+    expect(screen.queryByRole('dialog', { name: 'Marca dónde recibes tu pedido' })).not.toBeInTheDocument();
+    expect(screen.getByText('Ubicación confirmada')).toBeInTheDocument();
+  });
+
+  it('recoger muestra la tienda en un mapa pequeño de solo lectura con su dirección', async () => {
+    render(
+      <CarritoProvider>
+        <WrapperCheckout />
+      </CarritoProvider>,
+    );
+
+    fireEvent.click(screen.getByText('Iniciar Checkout'));
+    fireEvent.click(screen.getByRole('button', { name: /Continuar como invitado/i }));
+    fireEvent.change(screen.getByLabelText(/Nombre completo/i), { target: { value: 'Diego' } });
+    fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '912345678' } });
+
+    // Elegir recoger
+    fireEvent.click(screen.getByText('Recoger en el local'));
+    fireEvent.click(screen.getByRole('button', { name: /Continuar/i }));
+
+    // En paso 2 muestra «Recoges en Caprichos» y mapa con la dirección de la tienda
+    expect(screen.getByText('Recoges en Caprichos')).toBeInTheDocument();
+    expect(screen.getAllByText(new RegExp(datosLocalEjemplo.direccion)).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByRole('application', { name: 'Ubicación de Caprichos para recoger' })).toBeInTheDocument();
+    // No hay botones de marcar en el mapa ni dirección escrita
+    expect(screen.queryByText(/Marcar en el mapa/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Dirección escrita/i)).not.toBeInTheDocument();
   });
 });

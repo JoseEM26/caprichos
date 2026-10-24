@@ -34,6 +34,12 @@ export const DATOS_LOCAL_DEFAULT = {
   redes: { instagram: '', facebook: '', tiktok: '' },
 };
 
+/** Coordenadas por defecto de Caprichos Campoy */
+export const COORDENADAS_LOCAL_DEFAULT = {
+  lat: -12.0196436,
+  lng: -76.963255,
+};
+
 @Injectable()
 export class LocalService {
   constructor(
@@ -291,12 +297,23 @@ export class LocalService {
       cerrado: h.cerrado,
     }));
 
+    const lat =
+      typeof datos.lat === 'number' && !isNaN(datos.lat)
+        ? datos.lat
+        : COORDENADAS_LOCAL_DEFAULT.lat;
+    const lng =
+      typeof datos.lng === 'number' && !isNaN(datos.lng)
+        ? datos.lng
+        : COORDENADAS_LOCAL_DEFAULT.lng;
+
     return {
       nombre: datos.nombre ?? DATOS_LOCAL_DEFAULT.nombre,
       direccion: datos.direccion ?? DATOS_LOCAL_DEFAULT.direccion,
       telefono: datos.telefono ?? DATOS_LOCAL_DEFAULT.telefono,
       whatsapp: datos.whatsapp ?? DATOS_LOCAL_DEFAULT.whatsapp,
       redes: datos.redes ?? DATOS_LOCAL_DEFAULT.redes,
+      lat,
+      lng,
       horario: horarioFormateado,
       mediosPago: mediosPagoVisibles,
       envioGratisDesde: typeof envioGratis === 'number' ? envioGratis : null,

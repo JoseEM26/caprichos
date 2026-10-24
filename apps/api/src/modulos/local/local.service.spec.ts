@@ -408,6 +408,8 @@ describe('LocalService', () => {
 
       expect(res.nombre).toBe('Caprichos Café');
       expect(res.direccion).toBe('Calle Los Pinos 100');
+      expect(res.lat).toBe(-12.0196436);
+      expect(res.lng).toBe(-76.963255);
       expect(res.envioGratisDesde).toBe(60);
       expect(res.pedidoMinimo).toBe(20);
       expect(res.mediosPago.efectivo).toBeDefined();
@@ -415,6 +417,28 @@ describe('LocalService', () => {
       expect(res.mediosPago.plin).toBeUndefined(); // Inactivo
       expect(res.horario[0].dia).toBe('Lunes');
       expect(res.horario[1].dia).toBe('Martes');
+    });
+
+    it('obtenerDatosPublicosLocal devuelve lat y lng personalizados cuando existen en local_datos', async () => {
+      prismaMock.parametro.findMany.mockResolvedValue([
+        {
+          clave: 'local_datos',
+          valor: {
+            nombre: 'Caprichos Sucursal',
+            direccion: 'Av. Las Palmas 500',
+            telefono: '911222333',
+            lat: -12.1005,
+            lng: -77.0305,
+          },
+        },
+      ]);
+      prismaMock.horarioDia.findMany.mockResolvedValue([]);
+
+      const res = await service.obtenerDatosPublicosLocal();
+
+      expect(res.lat).toBe(-12.1005);
+      expect(res.lng).toBe(-77.0305);
+      expect(res.direccion).toBe('Av. Las Palmas 500');
     });
 
     it('actualizarDatosLocal guarda en parámetro y audita', async () => {

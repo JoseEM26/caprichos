@@ -37,6 +37,15 @@ export function FormularioCheckout({
     setPedidoConfirmado,
   } = useCarrito();
 
+  // Control de apartados (pasos 1, 2, 3)
+  const [paso, setPaso] = useState<1 | 2 | 3>(1);
+  const [pasoMaximo, setPasoMaximo] = useState<1 | 2 | 3>(1);
+  const [errorPaso, setErrorPaso] = useState<string | null>(null);
+  const contenidoRef = useRef<HTMLDivElement>(null);
+
+  // Modal de mapa a pantalla completa
+  const [mapaCompletoAbierto, setMapaCompletoAbierto] = useState(false);
+
   // Modalidad (DELIVERY o RECOGER)
   const [modalidad, setModalidad] = useState<ModalidadEntrega>('DELIVERY');
 
@@ -53,7 +62,6 @@ export function FormularioCheckout({
   const [cargandoGps, setCargandoGps] = useState(false);
   const [mensajeGps, setMensajeGps] = useState<string | null>(null);
   const [origenPunto, setOrigenPunto] = useState<'GPS' | 'MAPA'>('GPS');
-  const [mapaVisible, setMapaVisible] = useState(false);
   const [ubicacionConfirmada, setUbicacionConfirmada] = useState(false);
 
   // Comprobante (Boleta o Factura)
@@ -103,6 +111,14 @@ export function FormularioCheckout({
 
   // Prevención de doble toque estricta
   const peticionEnCursoRef = useRef(false);
+
+  // Datos y coordenadas de la tienda física
+  const tiendaCoords = {
+    lat: datosLocal?.lat ?? -12.0196436,
+    lng: datosLocal?.lng ?? -76.963255,
+    nombre: datosLocal?.nombre ?? 'Caprichos',
+    direccion: datosLocal?.direccion ?? 'Av. Principal 123',
+  };
 
   // lo que descontará el servidor (promociones automáticas y cupón), para mostrar el mismo total que se cobra
   const clavePromos = JSON.stringify([lineas.map((l) => [l.productoId, l.cantidad, l.subtotal]), cuponAplicado?.codigo]);
@@ -188,14 +204,12 @@ export function FormularioCheckout({
 
   // Fija el punto de entrega (GPS, búsqueda o toque en el mapa) y consulta la zona y el envío
   const fijarPunto = async (lat: number, lng: number, origen: 'GPS' | 'MAPA', precisionM?: number) => {
-    // una computadora sin GPS calcula la ubicación por la red y puede errar cientos de metros o kilómetros
     const avisoPrecision =
       precisionM && precisionM > 150
         ? ` Tu equipo la calculó de forma aproximada (±${precisionM >= 1000 ? `${(precisionM / 1000).toFixed(1)} km` : `${Math.round(precisionM)} m`}): mueve el punto rojo hasta tu puerta.`
         : '';
     setCoordenadas({ lat, lng });
     setOrigenPunto(origen);
-    setMapaVisible(true);
     setUbicacionConfirmada(false);
 
     try {
@@ -207,7 +221,6 @@ export function FormularioCheckout({
         setMensajeGps(`FUERA_DE_COBERTURA: Tu ubicación está fuera de la zona de reparto.${avisoPrecision}`);
       } else {
         setZonaEnvio(res.zona);
-        // Si el subtotal supera gratisDesde
         const tarifaFinal = subtotal > res.gratisDesde ? 0 : res.tarifa;
         setCostoEnvio(tarifaFinal);
         setMensajeGps(
@@ -245,20 +258,22 @@ export function FormularioCheckout({
     );
   };
 
-  // Validaciones del formulario
-  const validarFormulario = (): string | null => {
+  // Validaciones del formulario separadas por apartado
+  const validarPaso1 = (): string | null => {
     if (!clienteCuenta && !comoInvitado) {
       return 'Elige si ingresas con tu cuenta o continúas como invitado';
     }
     if (!nombre.trim()) {
       return 'El nombre es obligatorio';
     }
-
     const telLimpio = telefono.trim();
     if (!/^9\d{8}$/.test(telLimpio)) {
       return 'El teléfono debe tener 9 dígitos y empezar con 9';
     }
+    return null;
+  };
 
+  const validarPaso2 = (): string | null => {
     if (modalidad === 'DELIVERY') {
       if (!coordenadas && direccion.trim().length < 5) {
         return 'Para delivery debes indicar una dirección de al menos 5 caracteres o usar tu ubicación';
@@ -267,7 +282,10 @@ export function FormularioCheckout({
         return 'Confirma con «Mi pedido llega aquí» que el punto rojo es donde recibirás tu pedido';
       }
     }
+    return null;
+  };
 
+  const validarPaso3 = (): string | null => {
     if (tipoComprobante === 'FACTURA') {
       const rucLimpio = ruc.trim();
       if (!/^\d{11}$/.test(rucLimpio)) {
@@ -293,35 +311,109 @@ export function FormularioCheckout({
     return null;
   };
 
+  const validarPaso = (num: 1 | 2 | 3): string | null => {
+    if (num === 1) return validarPaso1();
+    if (num === 2) return validarPaso2();
+    if (num === 3) return validarPaso3();
+    return null;
+  };
+
+  const hacerScrollArriba = () => {
+    if (!contenidoRef.current) return;
+    if (typeof contenidoRef.current.scrollTo === 'function') {
+      contenidoRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      contenidoRef.current.scrollTop = 0;
+    }
+  };
+
+  const avanzarPaso = () => {
+    const error = validarPaso(paso);
+    if (error) {
+      setErrorPaso(error);
+      return;
+    }
+    setErrorPaso(null);
+    const siguiente = (paso + 1) as 2 | 3;
+    setPaso(siguiente);
+    setPasoMaximo((prev) => Math.max(prev, siguiente) as 1 | 2 | 3);
+    hacerScrollArriba();
+  };
+
+  const retrocederPaso = () => {
+    setErrorPaso(null);
+    setPaso((prev) => (prev > 1 ? ((prev - 1) as 1 | 2 | 3) : 1));
+    hacerScrollArriba();
+  };
+
+  const esCompletado = (num: 1 | 2 | 3): boolean => {
+    if (num === paso) return false;
+    if (num < paso) return true;
+    if (num === 1) return validarPaso1() === null && pasoMaximo >= 2;
+    if (num === 2) return validarPaso1() === null && validarPaso2() === null && pasoMaximo >= 3;
+    return false;
+  };
+
+  const irAPaso = (nuevoPaso: 1 | 2 | 3) => {
+    if (nuevoPaso === paso) return;
+    if (nuevoPaso < paso) {
+      setErrorPaso(null);
+      setPaso(nuevoPaso);
+      hacerScrollArriba();
+      return;
+    }
+    // Para avanzar a un paso superior, validar los anteriores
+    for (let p = paso; p < nuevoPaso; p++) {
+      const err = validarPaso(p as 1 | 2 | 3);
+      if (err) {
+        setErrorPaso(err);
+        return;
+      }
+    }
+    setErrorPaso(null);
+    setPaso(nuevoPaso);
+    setPasoMaximo((prev) => Math.max(prev, nuevoPaso) as 1 | 2 | 3);
+    hacerScrollArriba();
+  };
+
   // Enviar pedido a la API
   const enviarPedido = async (e?: FormEvent) => {
     if (e) e.preventDefault();
 
-    // Verificación de doble toque
     if (peticionEnCursoRef.current || enviando) {
       return;
     }
 
-    // Carta cerrada
     if (estadoLocal && (!estadoLocal.abierta || estadoLocal.pausaAltaDemanda)) {
       setErrorEnvio('La carta se encuentra cerrada o en pausa: no se pueden enviar pedidos.');
       return;
     }
 
-    const error = validarFormulario();
-    if (error) {
-      setErrorEnvio(error);
+    const err1 = validarPaso1();
+    if (err1) {
+      setPaso(1);
+      setErrorPaso(err1);
+      return;
+    }
+    const err2 = validarPaso2();
+    if (err2) {
+      setPaso(2);
+      setErrorPaso(err2);
+      return;
+    }
+    const err3 = validarPaso3();
+    if (err3) {
+      setPaso(3);
+      setErrorPaso(err3);
       return;
     }
 
+    setErrorPaso(null);
     setErrorEnvio(null);
     setEnviando(true);
     peticionEnCursoRef.current = true;
 
-    // Transformar líneas del carrito al DTO de la API
-    // Si DT-62 aplicó (unidades con diferentes opciones), cada unidad se envía como una línea separada
     const lineasDto: any[] = [];
-
     for (const lin of lineas) {
       if (lin.unidades && lin.unidades.length > 1) {
         for (const u of lin.unidades) {
@@ -440,1158 +532,1584 @@ export function FormularioCheckout({
   };
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Tus datos y el pago"
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 70,
-        backgroundColor: 'rgba(11, 44, 62, 0.65)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '16px',
-        overflowY: 'auto',
-      }}
-    >
+    <>
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Tus datos y el pago"
         style={{
-          width: 'min(580px, 100%)',
-          maxHeight: '92vh',
-          backgroundColor: 'var(--cp-cream)',
-          borderRadius: '20px',
-          boxShadow: '0 20px 50px rgba(11, 44, 62, 0.3)',
+          position: 'fixed',
+          inset: 0,
+          zIndex: 70,
+          backgroundColor: 'rgba(11, 44, 62, 0.65)',
           display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          position: 'relative',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '16px',
+          overflowY: 'auto',
         }}
       >
-        {/* Cabecera */}
         <div
           style={{
-            padding: '16px 20px',
-            backgroundColor: 'var(--cp-white)',
-            borderBottom: '1px solid var(--cp-line)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <h2
-            style={{
-              fontFamily: 'var(--fuente-titulos)',
-              fontWeight: 800,
-              fontSize: '20px',
-              color: 'var(--cp-navy)',
-            }}
-          >
-            Tus datos y el pago
-          </h2>
-          <button
-            onClick={cerrarCheckout}
-            aria-label="Cerrar formulario de pedido"
-            style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '22px',
-              border: '1.5px solid var(--cp-navy)',
-              backgroundColor: 'transparent',
-              color: 'var(--cp-navy)',
-              fontSize: '20px',
-              fontWeight: 800,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            ×
-          </button>
-        </div>
-
-        {/* Contenido scrolleable del formulario */}
-        <form
-          onSubmit={enviarPedido}
-          style={{
-            flex: 1,
-            overflowY: 'auto',
-            padding: '20px',
+            width: 'min(580px, 100%)',
+            maxHeight: '92vh',
+            backgroundColor: 'var(--cp-cream)',
+            borderRadius: '20px',
+            boxShadow: '0 20px 50px rgba(11, 44, 62, 0.3)',
             display: 'flex',
             flexDirection: 'column',
-            gap: '20px',
+            overflow: 'hidden',
+            position: 'relative',
           }}
         >
-          {/* Paso 1: Modalidad de entrega */}
+          {/* Cabecera */}
           <div
             style={{
+              padding: '16px 20px',
               backgroundColor: 'var(--cp-white)',
-              padding: '14px',
-              borderRadius: '14px',
-              border: '1px solid var(--cp-line)',
+              borderBottom: '1px solid var(--cp-line)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
             }}
           >
-            <div
+            <h2
               style={{
                 fontFamily: 'var(--fuente-titulos)',
-                fontWeight: 700,
-                fontSize: '14px',
-                marginBottom: '8px',
+                fontWeight: 800,
+                fontSize: '20px',
+                color: 'var(--cp-navy)',
+                margin: 0,
               }}
             >
-              ¿Cómo deseas recibir tu pedido?
-            </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                type="button"
-                onClick={() => setModalidad('DELIVERY')}
-                style={{
-                  flex: 1,
-                  minHeight: '44px',
-                  borderRadius: '10px',
-                  border:
-                    modalidad === 'DELIVERY'
-                      ? '2px solid var(--cp-orange)'
-                      : '1.5px solid var(--cp-line)',
-                  backgroundColor:
-                    modalidad === 'DELIVERY' ? 'var(--cp-sand)' : 'var(--cp-white)',
-                  color: 'var(--cp-navy)',
-                  fontWeight: 800,
-                  fontSize: '14px',
-                }}
-              >
-                Delivery
-              </button>
-              <button
-                type="button"
-                onClick={() => setModalidad('RECOGER')}
-                style={{
-                  flex: 1,
-                  minHeight: '44px',
-                  borderRadius: '10px',
-                  border:
-                    modalidad === 'RECOGER'
-                      ? '2px solid var(--cp-orange)'
-                      : '1.5px solid var(--cp-line)',
-                  backgroundColor:
-                    modalidad === 'RECOGER' ? 'var(--cp-sand)' : 'var(--cp-white)',
-                  color: 'var(--cp-navy)',
-                  fontWeight: 800,
-                  fontSize: '14px',
-                }}
-              >
-                Recoger en el local
-              </button>
+              Tus datos y el pago
+            </h2>
+            <button
+              onClick={cerrarCheckout}
+              aria-label="Cerrar formulario de pedido"
+              style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '22px',
+                border: '1.5px solid var(--cp-navy)',
+                backgroundColor: 'transparent',
+                color: 'var(--cp-navy)',
+                fontSize: '20px',
+                fontWeight: 800,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              ×
+            </button>
+          </div>
+
+          {/* Indicador de pasos arriba, fijo debajo del título */}
+          <div
+            style={{
+              padding: '12px 16px',
+              backgroundColor: 'var(--cp-white)',
+              borderBottom: '1px solid var(--cp-line)',
+              position: 'relative',
+            }}
+          >
+            {/* Línea conectora entre círculos */}
+            <div
+              style={{
+                position: 'absolute',
+                top: '28px',
+                left: 'calc(16.66% + 15px)',
+                right: 'calc(16.66% + 15px)',
+                height: '2px',
+                backgroundColor: 'var(--cp-line)',
+                zIndex: 0,
+              }}
+            />
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                position: 'relative',
+                zIndex: 1,
+              }}
+            >
+              {[
+                { num: 1 as const, nombre: 'Tus datos' },
+                { num: 2 as const, nombre: 'Ubicación' },
+                { num: 3 as const, nombre: 'Pago' },
+              ].map((item) => {
+                const activo = paso === item.num;
+                const completado = esCompletado(item.num);
+                const navegable = completado || item.num < paso;
+
+                return (
+                  <button
+                    key={item.num}
+                    type="button"
+                    disabled={!navegable}
+                    onClick={() => navegable && irAPaso(item.num)}
+                    aria-current={activo ? 'step' : undefined}
+                    aria-label={`Paso ${item.num}: ${item.nombre}${completado ? ' (completado)' : activo ? ' (actual)' : ''}`}
+                    style={{
+                      flex: 1,
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      cursor: navegable ? 'pointer' : 'default',
+                      gap: '6px',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 800,
+                        fontSize: '14px',
+                        backgroundColor: activo
+                          ? 'var(--cp-orange)'
+                          : completado
+                          ? 'var(--cp-sand)'
+                          : 'var(--cp-white)',
+                        color: activo
+                          ? '#FFFFFF'
+                          : completado
+                          ? 'var(--cp-navy)'
+                          : 'var(--cp-soft)',
+                        border: activo
+                          ? '2px solid var(--cp-orange)'
+                          : completado
+                          ? '2px solid var(--cp-navy)'
+                          : '2px solid var(--cp-line)',
+                        boxShadow: activo ? '0 2px 6px rgba(230,121,41,0.35)' : 'none',
+                        transition: 'all 0.2s ease',
+                      }}
+                    >
+                      {completado ? (
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      ) : (
+                        item.num
+                      )}
+                    </div>
+                    <span
+                      style={{
+                        fontSize: '12px',
+                        fontWeight: activo ? 800 : 700,
+                        color: activo
+                          ? 'var(--cp-orange)'
+                          : completado
+                          ? 'var(--cp-navy)'
+                          : 'var(--cp-soft)',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {item.nombre}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* Paso 2: Acceso (cuenta o invitado) */}
-          {!clienteCuenta && !comoInvitado && (
+          {/* Formulario y contenido de apartados */}
+          <form
+            onSubmit={enviarPedido}
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              minHeight: 0,
+            }}
+          >
+            {/* Contenido scrolleable del apartado activo */}
+            <div
+              ref={contenidoRef}
+              style={{
+                flex: 1,
+                overflowY: 'auto',
+                padding: '20px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+              }}
+            >
+              {/* ================= APARTADO 1: TUS DATOS ================= */}
+              {paso === 1 && (
+                <>
+                  {/* Modalidad de entrega */}
+                  <div
+                    style={{
+                      backgroundColor: 'var(--cp-white)',
+                      padding: '14px',
+                      borderRadius: '14px',
+                      border: '1px solid var(--cp-line)',
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontFamily: 'var(--fuente-titulos)',
+                        fontWeight: 700,
+                        fontSize: '14px',
+                        marginBottom: '8px',
+                      }}
+                    >
+                      ¿Cómo deseas recibir tu pedido?
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setModalidad('DELIVERY')}
+                        style={{
+                          flex: 1,
+                          minHeight: '44px',
+                          borderRadius: '10px',
+                          border:
+                            modalidad === 'DELIVERY'
+                              ? '2px solid var(--cp-orange)'
+                              : '1.5px solid var(--cp-line)',
+                          backgroundColor:
+                            modalidad === 'DELIVERY' ? 'var(--cp-sand)' : 'var(--cp-white)',
+                          color: 'var(--cp-navy)',
+                          fontWeight: 800,
+                          fontSize: '14px',
+                        }}
+                      >
+                        Delivery
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setModalidad('RECOGER')}
+                        style={{
+                          flex: 1,
+                          minHeight: '44px',
+                          borderRadius: '10px',
+                          border:
+                            modalidad === 'RECOGER'
+                              ? '2px solid var(--cp-orange)'
+                              : '1.5px solid var(--cp-line)',
+                          backgroundColor:
+                            modalidad === 'RECOGER' ? 'var(--cp-sand)' : 'var(--cp-white)',
+                          color: 'var(--cp-navy)',
+                          fontWeight: 800,
+                          fontSize: '14px',
+                        }}
+                      >
+                        Recoger en el local
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Acceso (cuenta o invitado) */}
+                  {!clienteCuenta && !comoInvitado && (
+                    <div
+                      style={{
+                        backgroundColor: 'var(--cp-white)',
+                        padding: '14px',
+                        borderRadius: '14px',
+                        border: '1px solid var(--cp-line)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '10px',
+                      }}
+                    >
+                      <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 700, fontSize: '14px' }}>
+                        ¿Cómo quieres continuar?
+                      </div>
+                      <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
+                        Ingresa con tu cuenta para acumular puntos en este pedido, o sigue como invitado.
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          onClick={() => cuentaCtx?.abrirPanel()}
+                          style={{
+                            flex: '1 1 160px',
+                            minHeight: '44px',
+                            borderRadius: '10px',
+                            border: 'none',
+                            backgroundColor: 'var(--cp-navy)',
+                            color: 'var(--cp-white)',
+                            fontWeight: 800,
+                            fontSize: '14px',
+                          }}
+                        >
+                          Ingresar con mi cuenta
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setComoInvitado(true)}
+                          style={{
+                            flex: '1 1 160px',
+                            minHeight: '44px',
+                            borderRadius: '10px',
+                            border: '1.5px solid var(--cp-navy)',
+                            backgroundColor: 'var(--cp-white)',
+                            color: 'var(--cp-navy)',
+                            fontWeight: 800,
+                            fontSize: '14px',
+                          }}
+                        >
+                          Continuar como invitado
+                        </button>
+                      </div>
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => setVerPuntos((v) => !v)}
+                          aria-expanded={verPuntos}
+                          style={{ background: 'none', border: 'none', padding: 0, fontSize: '12px', fontWeight: 700, color: 'var(--cp-navy)', textDecoration: 'underline', cursor: 'pointer' }}
+                        >
+                          ¿Cómo funcionan los puntos?
+                        </button>
+                        {verPuntos && (
+                          <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--cp-soft)', lineHeight: '17px' }}>
+                            {textoPuntos} Como invitado no se acumulan puntos.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Datos de contacto */}
+                  {(clienteCuenta || comoInvitado) && (
+                    <div
+                      style={{
+                        backgroundColor: 'var(--cp-white)',
+                        padding: '14px',
+                        borderRadius: '14px',
+                        border: '1px solid var(--cp-line)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '12px',
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontFamily: 'var(--fuente-titulos)',
+                          fontWeight: 700,
+                          fontSize: '14px',
+                        }}
+                      >
+                        Tus datos de contacto
+                      </div>
+
+                      {clienteCuenta ? (
+                        <div style={{ fontSize: '13px' }}>
+                          Pides con la cuenta de <b>{clienteCuenta.nombre}</b> · DNI {clienteCuenta.dniMascara}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
+                          Sigues como invitado: solo necesitamos tu nombre y celular.{' '}
+                          <button type="button" onClick={() => cuentaCtx?.abrirPanel()} style={{ background: 'none', border: 'none', padding: 0, fontSize: '12px', fontWeight: 700, color: 'var(--cp-navy)', textDecoration: 'underline', cursor: 'pointer' }}>
+                            Ingresar para acumular puntos
+                          </button>{' '}
+                          <button type="button" onClick={() => setVerPuntos((v) => !v)} aria-expanded={verPuntos} aria-label="¿Cómo funcionan los puntos?" style={{ width: 20, height: 20, minWidth: 20, minHeight: 20, borderRadius: 10, border: '1.5px solid var(--cp-navy)', background: 'var(--cp-white)', color: 'var(--cp-navy)', fontSize: '11px', fontWeight: 800, cursor: 'pointer', lineHeight: '16px', padding: 0 }}>?</button>
+                          {verPuntos && (
+                            <div style={{ marginTop: '6px', lineHeight: '17px' }}>
+                              {textoPuntos}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <div>
+                        <label
+                          htmlFor="f-nombre"
+                          style={{
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            color: 'var(--cp-soft)',
+                            display: 'block',
+                            marginBottom: '4px',
+                          }}
+                        >
+                          Nombre completo
+                        </label>
+                        <input
+                          id="f-nombre"
+                          type="text"
+                          value={nombre}
+                          onChange={(e) => setNombre(e.target.value)}
+                          placeholder="Tu nombre y apellido"
+                          required
+                          style={{
+                            width: '100%',
+                            minHeight: '44px',
+                            borderRadius: '10px',
+                            border: '1.5px solid var(--cp-line)',
+                            backgroundColor: 'var(--cp-cream)',
+                            color: 'var(--cp-navy)',
+                            padding: '0 12px',
+                            fontSize: '14px',
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label
+                          htmlFor="f-tel"
+                          style={{
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            color: 'var(--cp-soft)',
+                            display: 'block',
+                            marginBottom: '4px',
+                          }}
+                        >
+                          Teléfono celular (9 dígitos)
+                        </label>
+                        <input
+                          id="f-tel"
+                          type="tel"
+                          inputMode="numeric"
+                          maxLength={9}
+                          value={telefono}
+                          onChange={(e) => setTelefono(e.target.value.replace(/\D/g, ''))}
+                          placeholder="Ej.: 987654321"
+                          required
+                          style={{
+                            width: '100%',
+                            minHeight: '44px',
+                            borderRadius: '10px',
+                            border: '1.5px solid var(--cp-line)',
+                            backgroundColor: 'var(--cp-cream)',
+                            color: 'var(--cp-navy)',
+                            padding: '0 12px',
+                            fontSize: '14px',
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* ================= APARTADO 2: UBICACIÓN ================= */}
+              {paso === 2 && (
+                <>
+                  {modalidad === 'DELIVERY' ? (
+                    <div
+                      style={{
+                        backgroundColor: 'var(--cp-white)',
+                        padding: '16px',
+                        borderRadius: '14px',
+                        border: '1px solid var(--cp-line)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '12px',
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontFamily: 'var(--fuente-titulos)',
+                          fontWeight: 700,
+                          fontSize: '14px',
+                        }}
+                      >
+                        Ubicación para delivery
+                      </div>
+
+                      {!(coordenadas && origenPunto === 'GPS') && (
+                        <div>
+                          <label
+                            htmlFor="f-direccion"
+                            style={{
+                              fontSize: '12px',
+                              fontWeight: 700,
+                              color: 'var(--cp-soft)',
+                              display: 'block',
+                              marginBottom: '4px',
+                            }}
+                          >
+                            Dirección escrita (si no usas tu ubicación actual)
+                          </label>
+                          <input
+                            id="f-direccion"
+                            type="text"
+                            value={direccion}
+                            onChange={(e) => setDireccion(e.target.value)}
+                            placeholder="Calle, número, urbanización..."
+                            style={{
+                              width: '100%',
+                              minHeight: '44px',
+                              borderRadius: '10px',
+                              border: '1.5px solid var(--cp-line)',
+                              backgroundColor: 'var(--cp-cream)',
+                              color: 'var(--cp-navy)',
+                              padding: '0 12px',
+                              fontSize: '14px',
+                            }}
+                          />
+                        </div>
+                      )}
+
+                      <div>
+                        <label
+                          htmlFor="f-referencia"
+                          style={{
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            color: 'var(--cp-soft)',
+                            display: 'block',
+                            marginBottom: '4px',
+                          }}
+                        >
+                          Referencia (opcional)
+                        </label>
+                        <input
+                          id="f-referencia"
+                          type="text"
+                          value={referencia}
+                          onChange={(e) => setReferencia(e.target.value)}
+                          placeholder="Frente al parque, portón blanco..."
+                          style={{
+                            width: '100%',
+                            minHeight: '44px',
+                            borderRadius: '10px',
+                            border: '1.5px solid var(--cp-line)',
+                            backgroundColor: 'var(--cp-cream)',
+                            color: 'var(--cp-navy)',
+                            padding: '0 12px',
+                            fontSize: '14px',
+                          }}
+                        />
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          <button
+                            type="button"
+                            onClick={obtenerUbicacionGps}
+                            disabled={cargandoGps}
+                            style={{
+                              flex: '1 1 160px',
+                              minHeight: '44px',
+                              borderRadius: '10px',
+                              border: '1.5px solid var(--cp-navy)',
+                              backgroundColor: 'var(--cp-sand)',
+                              color: 'var(--cp-navy)',
+                              fontWeight: 700,
+                              fontSize: '13px',
+                            }}
+                          >
+                            {cargandoGps ? 'Obteniendo ubicación...' : 'Usar mi ubicación actual'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setMapaCompletoAbierto(true)}
+                            style={{
+                              flex: '1 1 160px',
+                              minHeight: '44px',
+                              borderRadius: '10px',
+                              border: '1.5px solid var(--cp-navy)',
+                              backgroundColor: 'var(--cp-white)',
+                              color: 'var(--cp-navy)',
+                              fontWeight: 700,
+                              fontSize: '13px',
+                            }}
+                          >
+                            Marcar en el mapa
+                          </button>
+                        </div>
+
+                        {coordenadas && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
+                              Revisa que el punto rojo sea donde recibirás tu pedido.{' '}
+                              <a
+                                href={enlaceGoogleMaps(coordenadas.lat, coordenadas.lng)}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                Ver en Google Maps
+                              </a>
+                            </div>
+                            {ubicacionConfirmada ? (
+                              <div
+                                role="status"
+                                style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-green)' }}
+                              >
+                                Ubicación confirmada
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setUbicacionConfirmada(true)}
+                                disabled={costoEnvio === null && Boolean(mensajeGps?.includes('FUERA_DE_COBERTURA'))}
+                                style={{
+                                  minHeight: '44px',
+                                  borderRadius: '10px',
+                                  border: 'none',
+                                  backgroundColor: 'var(--cp-navy)',
+                                  color: 'var(--cp-white)',
+                                  fontWeight: 700,
+                                  fontSize: '14px',
+                                }}
+                              >
+                                Mi pedido llega aquí
+                              </button>
+                            )}
+                          </div>
+                        )}
+
+                        {mensajeGps && (
+                          <div
+                            role="status"
+                            style={{
+                              fontSize: '12px',
+                              lineHeight: '16px',
+                              fontWeight: 600,
+                              color: mensajeGps.includes('FUERA_DE_COBERTURA')
+                                ? 'var(--cp-rust)'
+                                : 'var(--cp-green)',
+                            }}
+                          >
+                            {mensajeGps}
+                          </div>
+                        )}
+
+                        {!coordenadas && (
+                          <div
+                            style={{
+                              fontSize: '11px',
+                              color: 'var(--cp-soft)',
+                              fontStyle: 'italic',
+                            }}
+                          >
+                            Si solo escribes la dirección, el costo de envío se confirma por WhatsApp al procesar tu pedido.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    /* Modalidad RECOGER: tienda en mapa pequeño de solo lectura con su dirección */
+                    <div
+                      style={{
+                        backgroundColor: 'var(--cp-white)',
+                        padding: '16px',
+                        borderRadius: '14px',
+                        border: '1px solid var(--cp-line)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '12px',
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontFamily: 'var(--fuente-titulos)',
+                          fontWeight: 800,
+                          fontSize: '15px',
+                          color: 'var(--cp-navy)',
+                        }}
+                      >
+                        Recoges en Caprichos
+                      </div>
+
+                      <div style={{ fontSize: '13px', color: 'var(--cp-navy)', lineHeight: '18px' }}>
+                        <strong>Dirección del local:</strong> {tiendaCoords.direccion}
+                      </div>
+
+                      <MapaUbicacion
+                        punto={null}
+                        local={tiendaCoords}
+                        altura={180}
+                        soloLectura={true}
+                        ajustarA="local"
+                        etiqueta="Ubicación de Caprichos para recoger"
+                      />
+
+                      <div style={{ fontSize: '12px', color: 'var(--cp-soft)', lineHeight: '16px' }}>
+                        Te avisaremos cuando tu pedido esté listo para que pases a recogerlo por nuestro local.
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* ================= APARTADO 3: PAGO ================= */}
+              {paso === 3 && (
+                <>
+                  {/* Comprobante Boleta o Factura (DT-77) */}
+                  <div
+                    style={{
+                      backgroundColor: 'var(--cp-white)',
+                      padding: '14px',
+                      borderRadius: '14px',
+                      border: '1px solid var(--cp-line)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px',
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontFamily: 'var(--fuente-titulos)',
+                        fontWeight: 700,
+                        fontSize: '14px',
+                      }}
+                    >
+                      Comprobante de pago
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setTipoComprobante('BOLETA')}
+                        style={{
+                          flex: 1,
+                          minHeight: '44px',
+                          borderRadius: '10px',
+                          border:
+                            tipoComprobante === 'BOLETA'
+                              ? '2px solid var(--cp-orange)'
+                              : '1.5px solid var(--cp-line)',
+                          backgroundColor:
+                            tipoComprobante === 'BOLETA' ? 'var(--cp-sand)' : 'var(--cp-white)',
+                          color: 'var(--cp-navy)',
+                          fontWeight: 700,
+                          fontSize: '13px',
+                        }}
+                      >
+                        Boleta
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTipoComprobante('FACTURA')}
+                        style={{
+                          flex: 1,
+                          minHeight: '44px',
+                          borderRadius: '10px',
+                          border:
+                            tipoComprobante === 'FACTURA'
+                              ? '2px solid var(--cp-orange)'
+                              : '1.5px solid var(--cp-line)',
+                          backgroundColor:
+                            tipoComprobante === 'FACTURA' ? 'var(--cp-sand)' : 'var(--cp-white)',
+                          color: 'var(--cp-navy)',
+                          fontWeight: 700,
+                          fontSize: '13px',
+                        }}
+                      >
+                        Factura
+                      </button>
+                    </div>
+
+                    {tipoComprobante === 'BOLETA' ? (
+                      <div>
+                        <label
+                          htmlFor="f-dni"
+                          style={{
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            color: 'var(--cp-soft)',
+                            display: 'block',
+                            marginBottom: '4px',
+                          }}
+                        >
+                          DNI (opcional, 8 dígitos)
+                        </label>
+                        <input
+                          id="f-dni"
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={8}
+                          value={dni}
+                          onChange={(e) => setDni(e.target.value.replace(/\D/g, ''))}
+                          placeholder="8 dígitos numéricos"
+                          style={{
+                            width: '100%',
+                            minHeight: '44px',
+                            borderRadius: '10px',
+                            border: '1.5px solid var(--cp-line)',
+                            backgroundColor: 'var(--cp-cream)',
+                            color: 'var(--cp-navy)',
+                            padding: '0 12px',
+                            fontSize: '14px',
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div>
+                          <label
+                            htmlFor="f-ruc"
+                            style={{
+                              fontSize: '12px',
+                              fontWeight: 700,
+                              color: 'var(--cp-soft)',
+                              display: 'block',
+                              marginBottom: '4px',
+                            }}
+                          >
+                            RUC (11 dígitos obligatorio)
+                          </label>
+                          <input
+                            id="f-ruc"
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={11}
+                            value={ruc}
+                            onChange={(e) => setRuc(e.target.value.replace(/\D/g, ''))}
+                            placeholder="11 dígitos (ej.: 20123456789)"
+                            required
+                            style={{
+                              width: '100%',
+                              minHeight: '44px',
+                              borderRadius: '10px',
+                              border: '1.5px solid var(--cp-line)',
+                              backgroundColor: 'var(--cp-cream)',
+                              color: 'var(--cp-navy)',
+                              padding: '0 12px',
+                              fontSize: '14px',
+                            }}
+                          />
+                        </div>
+
+                        <div>
+                          <label
+                            htmlFor="f-rs"
+                            style={{
+                              fontSize: '12px',
+                              fontWeight: 700,
+                              color: 'var(--cp-soft)',
+                              display: 'block',
+                              marginBottom: '4px',
+                            }}
+                          >
+                            Razón social (obligatorio)
+                          </label>
+                          <input
+                            id="f-rs"
+                            type="text"
+                            value={razonSocial}
+                            onChange={(e) => setRazonSocial(e.target.value)}
+                            placeholder="Nombre o razón social de la empresa"
+                            required
+                            style={{
+                              width: '100%',
+                              minHeight: '44px',
+                              borderRadius: '10px',
+                              border: '1.5px solid var(--cp-line)',
+                              backgroundColor: 'var(--cp-cream)',
+                              color: 'var(--cp-navy)',
+                              padding: '0 12px',
+                              fontSize: '14px',
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Medio de pago */}
+                  <div
+                    style={{
+                      backgroundColor: 'var(--cp-white)',
+                      padding: '14px',
+                      borderRadius: '14px',
+                      border: '1px solid var(--cp-line)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px',
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontFamily: 'var(--fuente-titulos)',
+                        fontWeight: 700,
+                        fontSize: '14px',
+                      }}
+                    >
+                      Medio de pago
+                    </div>
+
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                      {(['YAPE', 'PLIN', 'EFECTIVO', 'TARJETA', 'TRANSFERENCIA'] as MetodoPago[]).map(
+                        (m) => {
+                          const claveConfig = m.toLowerCase();
+                          const estaConfigurado =
+                            claveConfig === 'efectivo' ||
+                            claveConfig === 'tarjeta' ||
+                            mediosPagoDisponibles[claveConfig]?.activo !== false;
+
+                          if (!estaConfigurado) return null;
+
+                          const seleccionado = metodoPago === m;
+                          return (
+                            <button
+                              key={m}
+                              type="button"
+                              onClick={() => setMetodoPago(m)}
+                              style={{
+                                minHeight: '44px',
+                                padding: '0 14px',
+                                borderRadius: '10px',
+                                border: seleccionado
+                                  ? '2px solid var(--cp-orange)'
+                                  : '1.5px solid var(--cp-line)',
+                                backgroundColor: seleccionado
+                                  ? 'var(--cp-sand)'
+                                  : 'var(--cp-white)',
+                                color: 'var(--cp-navy)',
+                                fontWeight: 700,
+                                fontSize: '13px',
+                              }}
+                            >
+                              {m}
+                            </button>
+                          );
+                        },
+                      )}
+                    </div>
+
+                    {/* Datos copiables del medio de pago */}
+                    {(metodoPago === 'YAPE' || metodoPago === 'PLIN') && (
+                      <div
+                        style={{
+                          backgroundColor: 'var(--cp-sand)',
+                          padding: '10px 12px',
+                          borderRadius: '10px',
+                          fontSize: '13px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontWeight: 700 }}>
+                            {metodoPago}:{' '}
+                            {mediosPagoDisponibles[metodoPago.toLowerCase()]?.numero ||
+                              datosLocal?.telefono ||
+                              '123456789'}
+                          </div>
+                          <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
+                            Titular: {datosLocal?.nombre || 'Caprichos'}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            copiarTexto(
+                              mediosPagoDisponibles[metodoPago.toLowerCase()]?.numero ||
+                                datosLocal?.telefono ||
+                                '123456789',
+                              'pago-tel',
+                            )
+                          }
+                          style={{
+                            minHeight: '36px',
+                            padding: '0 10px',
+                            border: '1px solid var(--cp-navy)',
+                            borderRadius: '8px',
+                            backgroundColor: 'var(--cp-white)',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                          }}
+                        >
+                          {copiadoKey === 'pago-tel' ? 'Copiado' : 'Copiar'}
+                        </button>
+                      </div>
+                    )}
+
+                    {metodoPago === 'TRANSFERENCIA' && (
+                      <div
+                        style={{
+                          backgroundColor: 'var(--cp-sand)',
+                          padding: '10px 12px',
+                          borderRadius: '10px',
+                          fontSize: '13px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontWeight: 700 }}>
+                            {mediosPagoDisponibles.transferencia?.banco || 'BCP'}
+                          </div>
+                          <div style={{ fontSize: '12px' }}>
+                            Cuenta: {mediosPagoDisponibles.transferencia?.cuenta || '123456789'}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            copiarTexto(
+                              mediosPagoDisponibles.transferencia?.cuenta || '123456789',
+                              'pago-cta',
+                            )
+                          }
+                          style={{
+                            minHeight: '36px',
+                            padding: '0 10px',
+                            border: '1px solid var(--cp-navy)',
+                            borderRadius: '8px',
+                            backgroundColor: 'var(--cp-white)',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                          }}
+                        >
+                          {copiadoKey === 'pago-cta' ? 'Copiado' : 'Copiar'}
+                        </button>
+                      </div>
+                    )}
+
+                    {metodoPago === 'TARJETA' && (
+                      <div style={{ fontSize: '12px', color: 'var(--cp-soft)', lineHeight: '16px' }}>
+                        Pagas con tarjeta de débito o crédito cuando recibes o recoges tu pedido (pos inalámbrico).
+                      </div>
+                    )}
+
+                    {metodoPago === 'EFECTIVO' && (
+                      <div>
+                        <label
+                          htmlFor="f-paga-con"
+                          style={{
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            color: 'var(--cp-soft)',
+                            display: 'block',
+                            marginBottom: '4px',
+                          }}
+                        >
+                          Paga con (monto en soles)
+                        </label>
+                        <input
+                          id="f-paga-con"
+                          type="number"
+                          step="0.10"
+                          min={totalCalculado}
+                          value={pagaCon}
+                          onChange={(e) => setPagaCon(e.target.value)}
+                          placeholder={`Ej.: ${Math.ceil(totalCalculado / 10) * 10}`}
+                          style={{
+                            width: '100%',
+                            minHeight: '44px',
+                            borderRadius: '10px',
+                            border: '1.5px solid var(--cp-line)',
+                            backgroundColor: 'var(--cp-cream)',
+                            color: 'var(--cp-navy)',
+                            padding: '0 12px',
+                            fontSize: '14px',
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    <div style={{ fontSize: '12px', color: 'var(--cp-soft)', lineHeight: '16px' }}>
+                      Tu pedido pasa directo a cocina. Un asesor te contactará por WhatsApp para coordinar el pago.
+                    </div>
+                  </div>
+
+                  {/* Campo de cupón / puntos */}
+                  {!cuponAplicado && clienteCuenta && (
+                    <PuntosCanje
+                      totalPedido={Math.max(0, promos.canjeable ?? 0)}
+                      puntosAplicados={puntosAplicados}
+                      alAplicar={setPuntosAplicados}
+                    />
+                  )}
+
+                  {puntosAplicados === 0 && (
+                    <div
+                      style={{
+                        border: '1px solid var(--cp-line)',
+                        borderRadius: '12px',
+                        padding: '12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px',
+                        backgroundColor: 'var(--cp-white)',
+                      }}
+                    >
+                      <label htmlFor="f-cup" style={{ fontWeight: 700, fontSize: '14px', color: 'var(--cp-navy)' }}>
+                        ¿Tienes un cupón? <span style={{ fontWeight: 500, color: 'var(--cp-soft)' }}>(opcional)</span>
+                      </label>
+                      {!cuponAplicado ? (
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <input
+                            id="f-cup"
+                            type="text"
+                            value={cuponCodigo}
+                            onChange={(e) => {
+                              setCuponCodigo(e.target.value);
+                              setMensajeCupon(null);
+                            }}
+                            placeholder="Código"
+                            style={{
+                              flex: 1,
+                              minWidth: 0,
+                              boxSizing: 'border-box',
+                              minHeight: '44px',
+                              borderRadius: '12px',
+                              border: '1.5px solid var(--cp-line)',
+                              backgroundColor: 'var(--cp-cream)',
+                              color: 'var(--cp-navy)',
+                              padding: '0 12px',
+                              textTransform: 'uppercase',
+                              fontSize: '14px',
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={aplicarCupon}
+                            disabled={cargandoCupon || !cuponCodigo.trim()}
+                            style={{
+                              minHeight: '44px',
+                              padding: '0 16px',
+                              border: '1.5px solid var(--cp-navy)',
+                              borderRadius: '12px',
+                              backgroundColor: 'transparent',
+                              color: 'var(--cp-navy)',
+                              fontWeight: 800,
+                              cursor: cargandoCupon || !cuponCodigo.trim() ? 'not-allowed' : 'pointer',
+                              opacity: cargandoCupon || !cuponCodigo.trim() ? 0.6 : 1,
+                            }}
+                          >
+                            {cargandoCupon ? '...' : 'Aplicar'}
+                          </button>
+                        </div>
+                      ) : (
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            gap: '8px',
+                          }}
+                        >
+                          <span style={{ fontWeight: 800, color: 'var(--cp-navy)' }}>{cuponAplicado.codigo}</span>
+                          <button
+                            type="button"
+                            onClick={removerCupon}
+                            style={{
+                              minHeight: '40px',
+                              padding: '0 8px',
+                              border: 0,
+                              backgroundColor: 'transparent',
+                              color: 'var(--cp-rust)',
+                              fontWeight: 700,
+                              textDecoration: 'underline',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Quitar cupón
+                          </button>
+                        </div>
+                      )}
+                      {mensajeCupon && (
+                        <div
+                          style={{
+                            fontSize: '12px',
+                            lineHeight: '17px',
+                            fontWeight: 600,
+                            color: cuponAplicado ? '#2F7A45' : 'var(--cp-rust)',
+                          }}
+                        >
+                          {mensajeCupon}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Resumen de totales */}
+                  <div
+                    style={{
+                      backgroundColor: 'var(--cp-white)',
+                      padding: '14px',
+                      borderRadius: '14px',
+                      border: '1px solid var(--cp-line)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
+                      <span>Subtotal productos</span>
+                      <span style={{ fontWeight: 700 }}>S/ {subtotal.toFixed(2)}</span>
+                    </div>
+
+                    {puntosAplicados > 0 && !cuponAplicado && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--cp-rust)' }}>
+                        <span>Puntos canjeados</span>
+                        <span style={{ fontWeight: 700 }}>−S/ {puntosAplicados.toFixed(2)}</span>
+                      </div>
+                    )}
+
+                    {promos.detalles.length > 0
+                      ? promos.detalles.map((d, i) => (
+                          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--cp-rust)' }}>
+                            <span>{d.nombre}</span>
+                            <span style={{ fontWeight: 700 }}>−S/ {d.monto.toFixed(2)}</span>
+                          </div>
+                        ))
+                      : cuponAplicado && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--cp-rust)' }}>
+                            <span>Cupón {cuponAplicado.codigo}</span>
+                            <span style={{ fontWeight: 700 }}>−S/ {cuponAplicado.descuentoCalculado.toFixed(2)}</span>
+                          </div>
+                        )}
+
+                    {modalidad === 'DELIVERY' && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
+                        <span>Costo de envío{zonaEnvio ? ` (${zonaEnvio})` : ''}</span>
+                        <span style={{ fontWeight: 700 }}>
+                          {costoEnvio !== null
+                            ? costoEnvio === 0
+                              ? 'GRATIS'
+                              : `S/ ${costoEnvio.toFixed(2)}`
+                            : 'Se confirma por WhatsApp'}
+                        </span>
+                      </div>
+                    )}
+
+                    <div
+                      style={{
+                        borderTop: '1px solid var(--cp-line)',
+                        paddingTop: '8px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        fontFamily: 'var(--fuente-titulos)',
+                        fontWeight: 800,
+                        fontSize: '18px',
+                        color: 'var(--cp-navy)',
+                      }}
+                    >
+                      <span>Total a pagar</span>
+                      <span style={{ color: 'var(--cp-rust)' }}>S/ {totalCalculado.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Pie del formulario con total pequeño, error y botones */}
             <div
               style={{
+                padding: '14px 20px',
                 backgroundColor: 'var(--cp-white)',
-                padding: '14px',
-                borderRadius: '14px',
-                border: '1px solid var(--cp-line)',
+                borderTop: '1px solid var(--cp-line)',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '10px',
               }}
             >
-              <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 700, fontSize: '14px' }}>
-                ¿Cómo quieres continuar?
-              </div>
-              <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
-                Ingresa con tu cuenta para acumular puntos en este pedido, o sigue como invitado.
-              </div>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  onClick={() => cuentaCtx?.abrirPanel()}
-                  style={{
-                    flex: '1 1 160px',
-                    minHeight: '44px',
-                    borderRadius: '10px',
-                    border: 'none',
-                    backgroundColor: 'var(--cp-navy)',
-                    color: 'var(--cp-white)',
-                    fontWeight: 800,
-                    fontSize: '14px',
-                  }}
-                >
-                  Ingresar con mi cuenta
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setComoInvitado(true)}
-                  style={{
-                    flex: '1 1 160px',
-                    minHeight: '44px',
-                    borderRadius: '10px',
-                    border: '1.5px solid var(--cp-navy)',
-                    backgroundColor: 'var(--cp-white)',
-                    color: 'var(--cp-navy)',
-                    fontWeight: 800,
-                    fontSize: '14px',
-                  }}
-                >
-                  Continuar como invitado
-                </button>
-              </div>
-              <div>
-                <button
-                  type="button"
-                  onClick={() => setVerPuntos((v) => !v)}
-                  aria-expanded={verPuntos}
-                  style={{ background: 'none', border: 'none', padding: 0, fontSize: '12px', fontWeight: 700, color: 'var(--cp-navy)', textDecoration: 'underline', cursor: 'pointer' }}
-                >
-                  ¿Cómo funcionan los puntos?
-                </button>
-                {verPuntos && (
-                  <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--cp-soft)', lineHeight: '17px' }}>
-                    {textoPuntos} Como invitado no se acumulan puntos.
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Paso 2b: Datos de contacto (cuenta o invitado) */}
-          {(clienteCuenta || comoInvitado) && (
-          <div
-            style={{
-              backgroundColor: 'var(--cp-white)',
-              padding: '14px',
-              borderRadius: '14px',
-              border: '1px solid var(--cp-line)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px',
-            }}
-          >
-            <div
-              style={{
-                fontFamily: 'var(--fuente-titulos)',
-                fontWeight: 700,
-                fontSize: '14px',
-              }}
-            >
-              Tus datos de contacto
-            </div>
-
-            {clienteCuenta ? (
-              <div style={{ fontSize: '13px' }}>
-                Pides con la cuenta de <b>{clienteCuenta.nombre}</b> · DNI {clienteCuenta.dniMascara}
-              </div>
-            ) : (
-              <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-                Sigues como invitado: solo necesitamos tu nombre y celular.{' '}
-                <button type="button" onClick={() => cuentaCtx?.abrirPanel()} style={{ background: 'none', border: 'none', padding: 0, fontSize: '12px', fontWeight: 700, color: 'var(--cp-navy)', textDecoration: 'underline', cursor: 'pointer' }}>
-                  Ingresar para acumular puntos
-                </button>{' '}
-                <button type="button" onClick={() => setVerPuntos((v) => !v)} aria-expanded={verPuntos} aria-label="¿Cómo funcionan los puntos?" style={{ width: 20, height: 20, minWidth: 20, minHeight: 20, borderRadius: 10, border: '1.5px solid var(--cp-navy)', background: 'var(--cp-white)', color: 'var(--cp-navy)', fontSize: '11px', fontWeight: 800, cursor: 'pointer', lineHeight: '16px', padding: 0 }}>?</button>
-                {verPuntos && (
-                  <div style={{ marginTop: '6px', lineHeight: '17px' }}>
-                    {textoPuntos}
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div>
-              <label
-                htmlFor="f-nombre"
-                style={{
-                  fontSize: '12px',
-                  fontWeight: 700,
-                  color: 'var(--cp-soft)',
-                  display: 'block',
-                  marginBottom: '4px',
-                }}
-              >
-                Nombre completo
-              </label>
-              <input
-                id="f-nombre"
-                type="text"
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-                placeholder="Tu nombre y apellido"
-                required
-                style={{
-                  width: '100%',
-                  minHeight: '44px',
-                  borderRadius: '10px',
-                  border: '1.5px solid var(--cp-line)',
-                  backgroundColor: 'var(--cp-cream)',
-                  color: 'var(--cp-navy)',
-                  padding: '0 12px',
-                  fontSize: '14px',
-                }}
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="f-tel"
-                style={{
-                  fontSize: '12px',
-                  fontWeight: 700,
-                  color: 'var(--cp-soft)',
-                  display: 'block',
-                  marginBottom: '4px',
-                }}
-              >
-                Teléfono celular (9 dígitos)
-              </label>
-              <input
-                id="f-tel"
-                type="tel"
-                inputMode="numeric"
-                maxLength={9}
-                value={telefono}
-                onChange={(e) => setTelefono(e.target.value.replace(/\D/g, ''))}
-                placeholder="Ej.: 987654321"
-                required
-                style={{
-                  width: '100%',
-                  minHeight: '44px',
-                  borderRadius: '10px',
-                  border: '1.5px solid var(--cp-line)',
-                  backgroundColor: 'var(--cp-cream)',
-                  color: 'var(--cp-navy)',
-                  padding: '0 12px',
-                  fontSize: '14px',
-                }}
-              />
-            </div>
-          </div>
-          )}
-
-          {/* Paso 3: Dirección y ubicación (solo si Delivery) */}
-          {modalidad === 'DELIVERY' && (
-            <div
-              style={{
-                backgroundColor: 'var(--cp-white)',
-                padding: '14px',
-                borderRadius: '14px',
-                border: '1px solid var(--cp-line)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '12px',
-              }}
-            >
+              {/* Total pequeño visible en los 3 apartados */}
               <div
                 style={{
-                  fontFamily: 'var(--fuente-titulos)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  fontSize: '13px',
+                  color: 'var(--cp-navy)',
                   fontWeight: 700,
-                  fontSize: '14px',
                 }}
               >
-                Ubicación para delivery
+                <span>Total a pagar:</span>
+                <span style={{ fontSize: '16px', fontWeight: 800, color: 'var(--cp-rust)' }}>
+                  S/ {totalCalculado.toFixed(2)}
+                </span>
               </div>
 
-              {!(coordenadas && origenPunto === 'GPS') && (
-              <div>
-                <label
-                  htmlFor="f-direccion"
+              {/* Mensaje de error del apartado o de la API */}
+              {(errorPaso || errorEnvio) && (
+                <div
+                  role="alert"
                   style={{
-                    fontSize: '12px',
+                    backgroundColor: '#FDECEA',
+                    color: 'var(--cp-rust)',
+                    border: '1.5px solid var(--cp-rust)',
+                    borderRadius: '10px',
+                    padding: '8px 12px',
+                    fontSize: '13px',
                     fontWeight: 700,
-                    color: 'var(--cp-soft)',
-                    display: 'block',
-                    marginBottom: '4px',
+                    lineHeight: '17px',
                   }}
                 >
-                  Dirección escrita (si no usas tu ubicación actual)
-                </label>
-                <input
-                  id="f-direccion"
-                  type="text"
-                  value={direccion}
-                  onChange={(e) => setDireccion(e.target.value)}
-                  placeholder="Calle, número, urbanización..."
-                  style={{
-                    width: '100%',
-                    minHeight: '44px',
-                    borderRadius: '10px',
-                    border: '1.5px solid var(--cp-line)',
-                    backgroundColor: 'var(--cp-cream)',
-                    color: 'var(--cp-navy)',
-                    padding: '0 12px',
-                    fontSize: '14px',
-                  }}
-                />
-              </div>
+                  {errorPaso || errorEnvio}
+                </div>
               )}
 
-              <div>
-                <label
-                  htmlFor="f-referencia"
-                  style={{
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    color: 'var(--cp-soft)',
-                    display: 'block',
-                    marginBottom: '4px',
-                  }}
-                >
-                  Referencia (opcional)
-                </label>
-                <input
-                  id="f-referencia"
-                  type="text"
-                  value={referencia}
-                  onChange={(e) => setReferencia(e.target.value)}
-                  placeholder="Frente al parque, portón blanco..."
-                  style={{
-                    width: '100%',
-                    minHeight: '44px',
-                    borderRadius: '10px',
-                    border: '1.5px solid var(--cp-line)',
-                    backgroundColor: 'var(--cp-cream)',
-                    color: 'var(--cp-navy)',
-                    padding: '0 12px',
-                    fontSize: '14px',
-                  }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {/* Botones de navegación según el paso */}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {paso > 1 && (
                   <button
                     type="button"
-                    onClick={obtenerUbicacionGps}
-                    disabled={cargandoGps}
+                    onClick={retrocederPaso}
                     style={{
-                      flex: '1 1 160px',
-                      minHeight: '44px',
-                      borderRadius: '10px',
-                      border: '1.5px solid var(--cp-navy)',
-                      backgroundColor: 'var(--cp-sand)',
-                      color: 'var(--cp-navy)',
-                      fontWeight: 700,
-                      fontSize: '13px',
-                    }}
-                  >
-                    {cargandoGps ? 'Obteniendo ubicación...' : 'Usar mi ubicación actual'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMapaVisible((v) => !v)}
-                    aria-expanded={mapaVisible}
-                    style={{
-                      flex: '1 1 160px',
-                      minHeight: '44px',
-                      borderRadius: '10px',
-                      border: '1.5px solid var(--cp-navy)',
+                      flex: '0 0 100px',
+                      minHeight: '48px',
+                      borderRadius: '12px',
+                      border: '1.5px solid var(--cp-line)',
                       backgroundColor: 'var(--cp-white)',
                       color: 'var(--cp-navy)',
-                      fontWeight: 700,
-                      fontSize: '13px',
+                      fontFamily: 'var(--fuente-titulos)',
+                      fontWeight: 800,
+                      fontSize: '14px',
+                      cursor: 'pointer',
                     }}
                   >
-                    {mapaVisible ? 'Ocultar el mapa' : 'Marcar en el mapa'}
+                    Atrás
                   </button>
-                </div>
-
-                {mapaVisible && (
-                  <>
-                    <BuscadorDireccion
-                      onElegir={(p, texto) => {
-                        if (!direccion.trim()) setDireccion(texto.split(',').slice(0, 2).join(',').trim());
-                        void fijarPunto(p.lat, p.lng, 'MAPA');
-                      }}
-                    />
-                    <MapaUbicacion
-                      punto={coordenadas}
-                      onCambiar={(p) => void fijarPunto(p.lat, p.lng, 'MAPA')}
-                    />
-                    {!coordenadas && (
-                      <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-                        Toca el mapa para poner el punto donde recibirás tu pedido; puedes arrastrarlo.
-                      </div>
-                    )}
-                  </>
                 )}
 
-                {coordenadas && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-                      Revisa que el punto rojo sea donde recibirás tu pedido.{' '}
-                      <a href={enlaceGoogleMaps(coordenadas.lat, coordenadas.lng)} target="_blank" rel="noreferrer">
-                        Ver en Google Maps
-                      </a>
-                    </div>
-                    {ubicacionConfirmada ? (
-                      <div role="status" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-green)' }}>
-                        Ubicación confirmada
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setUbicacionConfirmada(true)}
-                        disabled={costoEnvio === null && mensajeGps?.includes('FUERA_DE_COBERTURA')}
-                        style={{
-                          minHeight: '44px',
-                          borderRadius: '10px',
-                          border: 'none',
-                          backgroundColor: 'var(--cp-navy)',
-                          color: 'var(--cp-white)',
-                          fontWeight: 700,
-                          fontSize: '14px',
-                        }}
-                      >
-                        Mi pedido llega aquí
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {mensajeGps && (
-                  <div
-                    role="status"
+                {paso < 3 ? (
+                  <button
+                    type="button"
+                    onClick={avanzarPaso}
                     style={{
-                      fontSize: '12px',
-                      lineHeight: '16px',
-                      fontWeight: 600,
-                      color: mensajeGps.includes('FUERA_DE_COBERTURA')
-                        ? 'var(--cp-rust)'
-                        : 'var(--cp-green)',
+                      flex: 1,
+                      minHeight: '48px',
+                      borderRadius: '12px',
+                      border: 'none',
+                      backgroundColor: 'var(--cp-navy)',
+                      color: 'var(--cp-white)',
+                      fontFamily: 'var(--fuente-titulos)',
+                      fontWeight: 800,
+                      fontSize: '15px',
+                      cursor: 'pointer',
                     }}
                   >
-                    {mensajeGps}
-                  </div>
-                )}
-
-                {!coordenadas && (
-                  <div
+                    Continuar
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={enviando}
+                    onClick={() => void enviarPedido()}
                     style={{
-                      fontSize: '11px',
-                      color: 'var(--cp-soft)',
-                      fontStyle: 'italic',
+                      flex: 1,
+                      minHeight: '48px',
+                      borderRadius: '12px',
+                      border: 0,
+                      backgroundColor: enviando ? 'var(--cp-line)' : 'var(--cp-orange)',
+                      color: enviando ? 'var(--cp-soft)' : '#FFFFFF',
+                      fontFamily: 'var(--fuente-titulos)',
+                      fontWeight: 800,
+                      fontSize: '15px',
+                      cursor: enviando ? 'not-allowed' : 'pointer',
                     }}
                   >
-                    Si solo escribes la dirección, el costo de envío se confirma por WhatsApp al procesar tu pedido.
-                  </div>
+                    {enviando ? 'Enviando pedido...' : `Enviar pedido · S/ ${totalCalculado.toFixed(2)}`}
+                  </button>
                 )}
               </div>
-            </div>
-          )}
 
-          {/* Paso 4: Comprobante Boleta o Factura (DT-77) */}
-          <div
-            style={{
-              backgroundColor: 'var(--cp-white)',
-              padding: '14px',
-              borderRadius: '14px',
-              border: '1px solid var(--cp-line)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px',
-            }}
-          >
-            <div
-              style={{
-                fontFamily: 'var(--fuente-titulos)',
-                fontWeight: 700,
-                fontSize: '14px',
-              }}
-            >
-              Comprobante de pago
-            </div>
-
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                type="button"
-                onClick={() => setTipoComprobante('BOLETA')}
-                style={{
-                  flex: 1,
-                  minHeight: '44px',
-                  borderRadius: '10px',
-                  border:
-                    tipoComprobante === 'BOLETA'
-                      ? '2px solid var(--cp-orange)'
-                      : '1.5px solid var(--cp-line)',
-                  backgroundColor:
-                    tipoComprobante === 'BOLETA' ? 'var(--cp-sand)' : 'var(--cp-white)',
-                  color: 'var(--cp-navy)',
-                  fontWeight: 700,
-                  fontSize: '13px',
-                }}
-              >
-                Boleta
-              </button>
-              <button
-                type="button"
-                onClick={() => setTipoComprobante('FACTURA')}
-                style={{
-                  flex: 1,
-                  minHeight: '44px',
-                  borderRadius: '10px',
-                  border:
-                    tipoComprobante === 'FACTURA'
-                      ? '2px solid var(--cp-orange)'
-                      : '1.5px solid var(--cp-line)',
-                  backgroundColor:
-                    tipoComprobante === 'FACTURA' ? 'var(--cp-sand)' : 'var(--cp-white)',
-                  color: 'var(--cp-navy)',
-                  fontWeight: 700,
-                  fontSize: '13px',
-                }}
-              >
-                Factura
-              </button>
-            </div>
-
-            {tipoComprobante === 'BOLETA' ? (
-              <div>
-                <label
-                  htmlFor="f-dni"
-                  style={{
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    color: 'var(--cp-soft)',
-                    display: 'block',
-                    marginBottom: '4px',
-                  }}
-                >
-                  DNI (opcional, 8 dígitos)
-                </label>
-                <input
-                  id="f-dni"
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={8}
-                  value={dni}
-                  onChange={(e) => setDni(e.target.value.replace(/\D/g, ''))}
-                  placeholder="8 dígitos numéricos"
-                  style={{
-                    width: '100%',
-                    minHeight: '44px',
-                    borderRadius: '10px',
-                    border: '1.5px solid var(--cp-line)',
-                    backgroundColor: 'var(--cp-cream)',
-                    color: 'var(--cp-navy)',
-                    padding: '0 12px',
-                    fontSize: '14px',
-                  }}
-                />
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div>
-                  <label
-                    htmlFor="f-ruc"
-                    style={{
-                      fontSize: '12px',
-                      fontWeight: 700,
-                      color: 'var(--cp-soft)',
-                      display: 'block',
-                      marginBottom: '4px',
-                    }}
-                  >
-                    RUC (11 dígitos obligatorio)
-                  </label>
-                  <input
-                    id="f-ruc"
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={11}
-                    value={ruc}
-                    onChange={(e) => setRuc(e.target.value.replace(/\D/g, ''))}
-                    placeholder="11 dígitos (ej.: 20123456789)"
-                    required
-                    style={{
-                      width: '100%',
-                      minHeight: '44px',
-                      borderRadius: '10px',
-                      border: '1.5px solid var(--cp-line)',
-                      backgroundColor: 'var(--cp-cream)',
-                      color: 'var(--cp-navy)',
-                      padding: '0 12px',
-                      fontSize: '14px',
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="f-rs"
-                    style={{
-                      fontSize: '12px',
-                      fontWeight: 700,
-                      color: 'var(--cp-soft)',
-                      display: 'block',
-                      marginBottom: '4px',
-                    }}
-                  >
-                    Razón social (obligatorio)
-                  </label>
-                  <input
-                    id="f-rs"
-                    type="text"
-                    value={razonSocial}
-                    onChange={(e) => setRazonSocial(e.target.value)}
-                    placeholder="Nombre o razón social de la empresa"
-                    required
-                    style={{
-                      width: '100%',
-                      minHeight: '44px',
-                      borderRadius: '10px',
-                      border: '1.5px solid var(--cp-line)',
-                      backgroundColor: 'var(--cp-cream)',
-                      color: 'var(--cp-navy)',
-                      padding: '0 12px',
-                      fontSize: '14px',
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Paso 5: Medio de pago */}
-          <div
-            style={{
-              backgroundColor: 'var(--cp-white)',
-              padding: '14px',
-              borderRadius: '14px',
-              border: '1px solid var(--cp-line)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px',
-            }}
-          >
-            <div
-              style={{
-                fontFamily: 'var(--fuente-titulos)',
-                fontWeight: 700,
-                fontSize: '14px',
-              }}
-            >
-              Medio de pago
-            </div>
-
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {(['YAPE', 'PLIN', 'EFECTIVO', 'TARJETA', 'TRANSFERENCIA'] as MetodoPago[]).map(
-                (m) => {
-                  const claveConfig = m.toLowerCase();
-                  const estaConfigurado =
-                    claveConfig === 'efectivo' ||
-                    claveConfig === 'tarjeta' ||
-                    mediosPagoDisponibles[claveConfig]?.activo !== false;
-
-                  if (!estaConfigurado) return null;
-
-                  const seleccionado = metodoPago === m;
-                  return (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => setMetodoPago(m)}
-                      style={{
-                        minHeight: '44px',
-                        padding: '0 14px',
-                        borderRadius: '10px',
-                        border: seleccionado
-                          ? '2px solid var(--cp-orange)'
-                          : '1.5px solid var(--cp-line)',
-                        backgroundColor: seleccionado
-                          ? 'var(--cp-sand)'
-                          : 'var(--cp-white)',
-                        color: 'var(--cp-navy)',
-                        fontWeight: 700,
-                        fontSize: '13px',
-                      }}
-                    >
-                      {m}
-                    </button>
-                  );
-                },
-              )}
-            </div>
-
-            {/* Datos copiables del medio de pago */}
-            {(metodoPago === 'YAPE' || metodoPago === 'PLIN') && (
-              <div
-                style={{
-                  backgroundColor: 'var(--cp-sand)',
-                  padding: '10px 12px',
-                  borderRadius: '10px',
-                  fontSize: '13px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <div>
-                  <div style={{ fontWeight: 700 }}>
-                    {metodoPago}:{' '}
-                    {mediosPagoDisponibles[metodoPago.toLowerCase()]?.numero ||
-                      datosLocal?.telefono ||
-                      '123456789'}
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
-                    Titular: {datosLocal?.nombre || 'Caprichos'}
-                  </div>
-                </div>
+              <div style={{ textAlign: 'center' }}>
                 <button
                   type="button"
-                  onClick={() =>
-                    copiarTexto(
-                      mediosPagoDisponibles[metodoPago.toLowerCase()]?.numero ||
-                        datosLocal?.telefono ||
-                        '123456789',
-                      'pago-tel',
-                    )
-                  }
-                  style={{
-                    minHeight: '36px',
-                    padding: '0 10px',
-                    border: '1px solid var(--cp-navy)',
-                    borderRadius: '8px',
-                    backgroundColor: 'var(--cp-white)',
-                    fontSize: '12px',
-                    fontWeight: 700,
+                  onClick={() => {
+                    cerrarCheckout();
+                    abrirCajon();
                   }}
-                >
-                  {copiadoKey === 'pago-tel' ? 'Copiado' : 'Copiar'}
-                </button>
-              </div>
-            )}
-
-            {metodoPago === 'TRANSFERENCIA' && (
-              <div
-                style={{
-                  backgroundColor: 'var(--cp-sand)',
-                  padding: '10px 12px',
-                  borderRadius: '10px',
-                  fontSize: '13px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <div>
-                  <div style={{ fontWeight: 700 }}>
-                    {mediosPagoDisponibles.transferencia?.banco || 'BCP'}
-                  </div>
-                  <div style={{ fontSize: '12px' }}>
-                    Cuenta: {mediosPagoDisponibles.transferencia?.cuenta || '123456789'}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() =>
-                    copiarTexto(
-                      mediosPagoDisponibles.transferencia?.cuenta || '123456789',
-                      'pago-cta',
-                    )
-                  }
                   style={{
-                    minHeight: '36px',
-                    padding: '0 10px',
-                    border: '1px solid var(--cp-navy)',
-                    borderRadius: '8px',
-                    backgroundColor: 'var(--cp-white)',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                  }}
-                >
-                  {copiadoKey === 'pago-cta' ? 'Copiado' : 'Copiar'}
-                </button>
-              </div>
-            )}
-
-            {metodoPago === 'TARJETA' && (
-              <div style={{ fontSize: '12px', color: 'var(--cp-soft)', lineHeight: '16px' }}>
-                Pagas con tarjeta de débito o crédito cuando recibes o recoges tu pedido (pos inalámbrico).
-              </div>
-            )}
-
-            {metodoPago === 'EFECTIVO' && (
-              <div>
-                <label
-                  htmlFor="f-paga-con"
-                  style={{
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    color: 'var(--cp-soft)',
-                    display: 'block',
-                    marginBottom: '4px',
-                  }}
-                >
-                  Paga con (monto en soles)
-                </label>
-                <input
-                  id="f-paga-con"
-                  type="number"
-                  step="0.10"
-                  min={totalCalculado}
-                  value={pagaCon}
-                  onChange={(e) => setPagaCon(e.target.value)}
-                  placeholder={`Ej.: ${Math.ceil(totalCalculado / 10) * 10}`}
-                  style={{
-                    width: '100%',
-                    minHeight: '44px',
-                    borderRadius: '10px',
-                    border: '1.5px solid var(--cp-line)',
-                    backgroundColor: 'var(--cp-cream)',
-                    color: 'var(--cp-navy)',
-                    padding: '0 12px',
-                    fontSize: '14px',
-                  }}
-                />
-              </div>
-            )}
-
-            <div style={{ fontSize: '12px', color: 'var(--cp-soft)', lineHeight: '16px' }}>
-              Tu pedido pasa directo a cocina. Un asesor te contactará por WhatsApp para coordinar el pago.
-            </div>
-          </div>
-
-          {/* Campo de cupón */}
-          {!cuponAplicado && clienteCuenta && (
-            <PuntosCanje
-              totalPedido={Math.max(0, promos.canjeable ?? 0)}
-              puntosAplicados={puntosAplicados}
-              alAplicar={setPuntosAplicados}
-            />
-          )}
-
-          {puntosAplicados === 0 && (
-          <div
-            style={{
-              border: '1px solid var(--cp-line)',
-              borderRadius: '12px',
-              padding: '12px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '8px',
-              backgroundColor: 'var(--cp-white)',
-            }}
-          >
-            <label htmlFor="f-cup" style={{ fontWeight: 700, fontSize: '14px', color: 'var(--cp-navy)' }}>
-              ¿Tienes un cupón? <span style={{ fontWeight: 500, color: 'var(--cp-soft)' }}>(opcional)</span>
-            </label>
-            {!cuponAplicado ? (
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input
-                  id="f-cup"
-                  type="text"
-                  value={cuponCodigo}
-                  onChange={(e) => {
-                    setCuponCodigo(e.target.value);
-                    setMensajeCupon(null);
-                  }}
-                  placeholder="Código"
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    boxSizing: 'border-box',
-                    minHeight: '44px',
-                    borderRadius: '12px',
-                    border: '1.5px solid var(--cp-line)',
-                    backgroundColor: 'var(--cp-cream)',
-                    color: 'var(--cp-navy)',
-                    padding: '0 12px',
-                    textTransform: 'uppercase',
-                    fontSize: '14px',
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={aplicarCupon}
-                  disabled={cargandoCupon || !cuponCodigo.trim()}
-                  style={{
-                    minHeight: '44px',
-                    padding: '0 16px',
-                    border: '1.5px solid var(--cp-navy)',
-                    borderRadius: '12px',
-                    backgroundColor: 'transparent',
-                    color: 'var(--cp-navy)',
-                    fontWeight: 800,
-                    cursor: cargandoCupon || !cuponCodigo.trim() ? 'not-allowed' : 'pointer',
-                    opacity: cargandoCupon || !cuponCodigo.trim() ? 0.6 : 1,
-                  }}
-                >
-                  {cargandoCupon ? '...' : 'Aplicar'}
-                </button>
-              </div>
-            ) : (
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: '8px',
-                }}
-              >
-                <span style={{ fontWeight: 800, color: 'var(--cp-navy)' }}>{cuponAplicado.codigo}</span>
-                <button
-                  type="button"
-                  onClick={removerCupon}
-                  style={{
-                    minHeight: '40px',
-                    padding: '0 8px',
                     border: 0,
                     backgroundColor: 'transparent',
-                    color: 'var(--cp-rust)',
+                    color: 'var(--cp-soft)',
+                    fontSize: '12px',
                     fontWeight: 700,
                     textDecoration: 'underline',
                     cursor: 'pointer',
+                    padding: '4px',
                   }}
                 >
-                  Quitar cupón
+                  Volver a mi pedido
                 </button>
               </div>
-            )}
-            {mensajeCupon && (
-              <div
-                style={{
-                  fontSize: '12px',
-                  lineHeight: '17px',
-                  fontWeight: 600,
-                  color: cuponAplicado ? '#2F7A45' : 'var(--cp-rust)',
-                }}
-              >
-                {mensajeCupon}
-              </div>
-            )}
-          </div>
-          )}
+            </div>
+          </form>
+        </div>
+      </div>
 
-          {/* Resumen de totales */}
+      {/* ================= MODAL MAPA A PANTALLA COMPLETA ================= */}
+      {mapaCompletoAbierto && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Marca dónde recibes tu pedido"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 90,
+            backgroundColor: 'var(--cp-white)',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          {/* Barra superior */}
           <div
             style={{
               backgroundColor: 'var(--cp-white)',
-              padding: '14px',
-              borderRadius: '14px',
-              border: '1px solid var(--cp-line)',
+              borderBottom: '1px solid var(--cp-line)',
+              padding: '12px 16px',
               display: 'flex',
               flexDirection: 'column',
-              gap: '8px',
+              gap: '10px',
+              zIndex: 10,
+              boxShadow: '0 2px 8px rgba(11,44,62,0.06)',
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-              <span>Subtotal productos</span>
-              <span style={{ fontWeight: 700 }}>S/ {subtotal.toFixed(2)}</span>
-            </div>
-
-            {puntosAplicados > 0 && !cuponAplicado && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--cp-rust)' }}>
-                <span>Puntos canjeados</span>
-                <span style={{ fontWeight: 700 }}>−S/ {puntosAplicados.toFixed(2)}</span>
-              </div>
-            )}
-
-            {promos.detalles.length > 0
-              ? promos.detalles.map((d, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--cp-rust)' }}>
-                    <span>{d.nombre}</span>
-                    <span style={{ fontWeight: 700 }}>−S/ {d.monto.toFixed(2)}</span>
-                  </div>
-                ))
-              : cuponAplicado && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--cp-rust)' }}>
-                    <span>Cupón {cuponAplicado.codigo}</span>
-                    <span style={{ fontWeight: 700 }}>−S/ {cuponAplicado.descuentoCalculado.toFixed(2)}</span>
-                  </div>
-                )}
-
-            {modalidad === 'DELIVERY' && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-                <span>Costo de envío{zonaEnvio ? ` (${zonaEnvio})` : ''}</span>
-                <span style={{ fontWeight: 700 }}>
-                  {costoEnvio !== null
-                    ? costoEnvio === 0
-                      ? 'GRATIS'
-                      : `S/ ${costoEnvio.toFixed(2)}`
-                    : 'Se confirma por WhatsApp'}
-                </span>
-              </div>
-            )}
-
             <div
               style={{
-                borderTop: '1px solid var(--cp-line)',
-                paddingTop: '8px',
                 display: 'flex',
+                alignItems: 'center',
                 justifyContent: 'space-between',
-                fontFamily: 'var(--fuente-titulos)',
-                fontWeight: 800,
-                fontSize: '18px',
-                color: 'var(--cp-navy)',
               }}
             >
-              <span>Total a pagar</span>
-              <span style={{ color: 'var(--cp-rust)' }}>S/ {totalCalculado.toFixed(2)}</span>
+              <h3
+                style={{
+                  fontFamily: 'var(--fuente-titulos)',
+                  fontWeight: 800,
+                  fontSize: '18px',
+                  color: 'var(--cp-navy)',
+                  margin: 0,
+                }}
+              >
+                Marca dónde recibes tu pedido
+              </h3>
+              <button
+                type="button"
+                onClick={() => setMapaCompletoAbierto(false)}
+                aria-label="Cerrar mapa"
+                style={{
+                  minWidth: '44px',
+                  minHeight: '44px',
+                  width: '44px',
+                  height: '44px',
+                  borderRadius: '22px',
+                  border: '1.5px solid var(--cp-navy)',
+                  backgroundColor: 'transparent',
+                  color: 'var(--cp-navy)',
+                  fontSize: '22px',
+                  fontWeight: 800,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+              >
+                ×
+              </button>
             </div>
+
+            <BuscadorDireccion
+              onElegir={(p, texto) => {
+                if (!direccion.trim()) {
+                  setDireccion(texto.split(',').slice(0, 2).join(',').trim());
+                }
+                void fijarPunto(p.lat, p.lng, 'MAPA');
+              }}
+            />
           </div>
 
-          {/* Mensaje de error general de la API o validación */}
-          {errorEnvio && (
-            <div
-              role="alert"
-              style={{
-                backgroundColor: '#FDECEA',
-                color: 'var(--cp-rust)',
-                border: '1.5px solid var(--cp-rust)',
-                borderRadius: '12px',
-                padding: '10px 14px',
-                fontSize: '13px',
-                fontWeight: 700,
-                lineHeight: '18px',
-              }}
-            >
-              {errorEnvio}
-            </div>
-          )}
+          {/* Espacio del mapa a pantalla completa */}
+          <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
+            <MapaUbicacion
+              punto={coordenadas}
+              local={tiendaCoords}
+              onCambiar={(p) => void fijarPunto(p.lat, p.lng, 'MAPA')}
+              altura="100%"
+              ajustarA="ambos"
+              etiqueta="Mapa de pantalla completa para marcar la entrega"
+              style={{ width: '100%', height: '100%', borderRadius: 0, border: 'none' }}
+            />
+          </div>
 
-          {/* Botones de acción */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <button
-              type="submit"
-              disabled={enviando}
-              style={{
-                width: '100%',
-                minHeight: '52px',
-                borderRadius: '12px',
-                border: 0,
-                backgroundColor: enviando ? 'var(--cp-line)' : 'var(--cp-orange)',
-                color: enviando ? 'var(--cp-soft)' : '#FFFFFF',
-                fontFamily: 'var(--fuente-titulos)',
-                fontWeight: 800,
-                fontSize: '16px',
-                cursor: enviando ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {enviando ? 'Enviando pedido...' : `Enviar pedido · S/ ${totalCalculado.toFixed(2)}`}
-            </button>
+          {/* Barra inferior */}
+          <div
+            style={{
+              backgroundColor: 'var(--cp-white)',
+              borderTop: '1px solid var(--cp-line)',
+              padding: '12px 16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px',
+              zIndex: 10,
+              boxShadow: '0 -2px 8px rgba(11,44,62,0.06)',
+            }}
+          >
+            {mensajeGps ? (
+              <div
+                role="status"
+                style={{
+                  fontSize: '13px',
+                  lineHeight: '18px',
+                  fontWeight: 600,
+                  color: mensajeGps.includes('FUERA_DE_COBERTURA')
+                    ? 'var(--cp-rust)'
+                    : 'var(--cp-green)',
+                }}
+              >
+                {mensajeGps}
+              </div>
+            ) : (
+              <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
+                Toca o arrastra en el mapa para marcar dónde recibirás tu pedido.
+              </div>
+            )}
 
             <button
               type="button"
               onClick={() => {
-                cerrarCheckout();
-                abrirCajon();
+                setUbicacionConfirmada(true);
+                setMapaCompletoAbierto(false);
               }}
+              disabled={
+                !coordenadas ||
+                (costoEnvio === null && Boolean(mensajeGps?.includes('FUERA_DE_COBERTURA')))
+              }
               style={{
-                minHeight: '44px',
-                border: 0,
-                backgroundColor: 'transparent',
-                color: 'var(--cp-soft)',
-                fontSize: '13px',
-                fontWeight: 700,
-                textDecoration: 'underline',
+                width: '100%',
+                minHeight: '48px',
+                borderRadius: '12px',
+                border: 'none',
+                backgroundColor:
+                  !coordenadas || (costoEnvio === null && Boolean(mensajeGps?.includes('FUERA_DE_COBERTURA')))
+                    ? 'var(--cp-line)'
+                    : 'var(--cp-orange)',
+                color:
+                  !coordenadas || (costoEnvio === null && Boolean(mensajeGps?.includes('FUERA_DE_COBERTURA')))
+                    ? 'var(--cp-soft)'
+                    : '#FFFFFF',
+                fontFamily: 'var(--fuente-titulos)',
+                fontWeight: 800,
+                fontSize: '15px',
+                cursor:
+                  !coordenadas || (costoEnvio === null && Boolean(mensajeGps?.includes('FUERA_DE_COBERTURA')))
+                    ? 'not-allowed'
+                    : 'pointer',
               }}
             >
-              Volver a mi pedido
+              Confirmar ubicación
             </button>
           </div>
-        </form>
-      </div>
-    </div>
+        </div>
+      )}
+    </>
   );
 }

@@ -88,6 +88,8 @@ export interface DatosLocalCarta {
   envioGratisDesde: number | null;
   pedidoMinimo: number | null;
   puntosPorcentaje?: number;
+  lat?: number;
+  lng?: number;
 }
 
 export interface ConsultaEnvioRespuesta {
