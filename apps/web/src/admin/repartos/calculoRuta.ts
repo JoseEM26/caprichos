@@ -153,6 +153,9 @@ export interface RutaCalculada {
   tiempoAproxMin: number;
   urlGoogleMaps: string;
   urlWazePrimeraParada?: string;
+  urlAppleMapsPrimeraParada?: string;
+  /** geo: abre el selector de apps de navegación en Android */
+  urlGeoPrimeraParada?: string;
 }
 
 /**
@@ -265,6 +268,14 @@ export function calcularMetricasRuta(
     tiempoAproxMin: tiempoAcumulado,
     urlGoogleMaps,
     urlWazePrimeraParada,
+    urlAppleMapsPrimeraParada:
+      coordenadasParadas.length > 0
+        ? `https://maps.apple.com/?daddr=${coordenadasParadas[0].lat},${coordenadasParadas[0].lng}&dirflg=d`
+        : undefined,
+    urlGeoPrimeraParada:
+      coordenadasParadas.length > 0
+        ? `geo:${coordenadasParadas[0].lat},${coordenadasParadas[0].lng}?q=${coordenadasParadas[0].lat},${coordenadasParadas[0].lng}`
+        : undefined,
   };
 }
 

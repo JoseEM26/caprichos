@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   PedidoParaRuta,
   ParadaRuta,
@@ -29,19 +30,56 @@ export function PanelRutaSugerida({
 }: PanelRutaSugeridaProps) {
   const limite = maxParadas ?? config.maxPedidosPorRepartidor ?? 3;
 
-  const iniciarGoogleMaps = () => {
-    if (ruta.urlGoogleMaps) {
-      alIniciarRuta?.();
-      window.open(ruta.urlGoogleMaps, '_blank', 'noopener,noreferrer');
+  const [menuNavegacion, setMenuNavegacion] = useState(false);
+
+  const abrirNavegador = (url?: string) => {
+    if (!url) return;
+    alIniciarRuta?.();
+    setMenuNavegacion(false);
+    if (url.startsWith('geo:')) {
+      window.location.href = url; // Android muestra todas las apps de mapas instaladas
+    } else {
+      window.open(url, '_blank', 'noopener,noreferrer');
     }
   };
 
-  const iniciarWaze = () => {
-    if (ruta.urlWazePrimeraParada) {
-      alIniciarRuta?.();
-      window.open(ruta.urlWazePrimeraParada, '_blank', 'noopener,noreferrer');
-    }
-  };
+  const esAndroid = typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent);
+  const esIOS = typeof navigator !== 'undefined' && /iphone|ipad|ipod/i.test(navigator.userAgent);
+
+  const opcionesNavegacion = [
+    {
+      id: 'google',
+      titulo: 'Google Maps',
+      detalle: ruta.totalParadas > 1 ? `Ruta completa con las ${ruta.totalParadas} paradas` : 'Ruta hasta el cliente',
+      url: ruta.urlGoogleMaps,
+    },
+    {
+      id: 'waze',
+      titulo: 'Waze',
+      detalle: ruta.totalParadas > 1 ? 'Va a la parada 1; al entregar, abre la siguiente' : 'Ruta hasta el cliente',
+      url: ruta.urlWazePrimeraParada,
+    },
+    ...(esIOS
+      ? [
+          {
+            id: 'apple',
+            titulo: 'Apple Maps',
+            detalle: ruta.totalParadas > 1 ? 'Va a la parada 1' : 'Ruta hasta el cliente',
+            url: ruta.urlAppleMapsPrimeraParada,
+          },
+        ]
+      : []),
+    ...(esAndroid
+      ? [
+          {
+            id: 'otra',
+            titulo: 'Otra aplicación',
+            detalle: 'Elige entre las apps de mapas de tu celular',
+            url: ruta.urlGeoPrimeraParada,
+          },
+        ]
+      : []),
+  ];
 
   return (
     <div
@@ -121,7 +159,9 @@ export function PanelRutaSugerida({
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
             <button
               type="button"
-              onClick={iniciarGoogleMaps}
+              onClick={() => setMenuNavegacion((v) => !v)}
+              aria-haspopup="menu"
+              aria-expanded={menuNavegacion}
               style={{
                 minHeight: '48px',
                 padding: '0 18px',
@@ -155,24 +195,42 @@ export function PanelRutaSugerida({
               <span>Iniciar ruta</span>
             </button>
 
-            {ruta.totalParadas === 1 && ruta.urlWazePrimeraParada && (
-              <button
-                type="button"
-                onClick={iniciarWaze}
+            {menuNavegacion && (
+              <div
+                role="menu"
+                aria-label="Elegir aplicación de navegación"
                 style={{
-                  minHeight: '48px',
-                  padding: '0 14px',
-                  borderRadius: '12px',
-                  border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                  background: 'transparent',
-                  color: 'var(--cp-navy, #0B2C3E)',
-                  fontWeight: 800,
-                  fontSize: '13px',
-                  cursor: 'pointer',
+                  flexBasis: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
                 }}
               >
-                Waze
-              </button>
+                {opcionesNavegacion.map((o) => (
+                  <button
+                    key={o.id}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => abrirNavegador(o.url)}
+                    style={{
+                      minHeight: '52px',
+                      padding: '8px 14px',
+                      borderRadius: '12px',
+                      border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                      background: 'var(--cp-cream, #FFFDF8)',
+                      color: 'var(--cp-navy, #0B2C3E)',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '2px',
+                    }}
+                  >
+                    <span style={{ fontWeight: 800, fontSize: '14px' }}>{o.titulo}</span>
+                    <span style={{ fontSize: '12px', color: 'var(--cp-soft, #5A6E78)' }}>{o.detalle}</span>
+                  </button>
+                ))}
+              </div>
             )}
           </div>
         )}

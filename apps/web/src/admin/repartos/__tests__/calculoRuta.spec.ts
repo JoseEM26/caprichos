@@ -231,3 +231,15 @@ describe('Módulo de Cálculo de Ruta y Tiempos de Espera (calculoRuta.ts)', () 
     });
   });
 });
+
+describe('enlaces para otras aplicaciones de navegación', () => {
+  it('la ruta trae enlaces de Waze, Apple Maps y geo: a la primera parada', () => {
+    const ruta = calcularMetricasRuta(
+      [{ id: '1', codigo: 'CP-1', cliente_nombre: 'Ana', lat: -12.02, lng: -76.96, minutosEspera: 30 } as never],
+      { lat: -12.0196436, lng: -76.963255 },
+    );
+    expect(ruta.urlWazePrimeraParada).toContain('waze.com');
+    expect(ruta.urlAppleMapsPrimeraParada).toContain('maps.apple.com');
+    expect(ruta.urlGeoPrimeraParada).toBe('geo:-12.02,-76.96?q=-12.02,-76.96');
+  });
+});
