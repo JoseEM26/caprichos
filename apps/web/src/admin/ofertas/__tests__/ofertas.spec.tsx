@@ -142,4 +142,41 @@ describe('OfertasAdminView', () => {
       ).toBeInTheDocument();
     });
   });
+
+  it('el selector de producto de Nuevo descuento no ofrece el producto de un combo', async () => {
+    (api.get as any).mockImplementation((url: string) => {
+      if (url === '/admin/ofertas') {
+        return Promise.resolve([
+          ...mockOfertas,
+          { id: '3', tipo: 'COMBO', nombre: 'Combo Frappé Dúo', activo: true, orden: 3, alcanceProductoId: '10', combosPrecio: [], combosParte: [] },
+        ]);
+      }
+      if (url === '/carta') {
+        return Promise.resolve([
+          {
+            id: 1,
+            nombre: 'Frappés',
+            productos: [
+              { id: 10, nombre: 'Frappé Combo Base', precio: 12, noSumaBeneficios: false },
+              { id: 20, nombre: 'Frappé Normal', precio: 9, noSumaBeneficios: false },
+            ],
+          },
+        ]);
+      }
+      if (url === '/admin/cupones') return Promise.resolve(mockCupones);
+      if (url === '/admin/cupones/emitidos') return Promise.resolve([]);
+      if (url === '/admin/ofertas/reglas') return Promise.resolve(mockReglas);
+      return Promise.resolve([]);
+    });
+
+    render(<OfertasAdminView />);
+
+    fireEvent.click(await screen.findByRole('tab', { name: /Descuentos/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /Nuevo descuento/i }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Un producto' }));
+    fireEvent.click(await screen.findByRole('button', { name: /PRODUCTO: Elige un producto/i }));
+
+    expect(await screen.findByText('Frappé Normal')).toBeInTheDocument();
+    expect(screen.queryByText('Frappé Combo Base')).not.toBeInTheDocument();
+  });
 });

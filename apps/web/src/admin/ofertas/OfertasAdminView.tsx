@@ -275,7 +275,7 @@ export function OfertasAdminView() {
 
   // Catálogo para autocompletar y partes
   const [categorias, setCategorias] = useState<Array<{ id: string; nombre: string; productos: any[] }>>([]);
-  const [productos, setProductos] = useState<Array<{ id: string; nombre: string; categoriaId?: string; categoria?: string; precio?: number }>>([]);
+  const [productos, setProductos] = useState<Array<{ id: string; nombre: string; categoriaId?: string; categoria?: string; precio?: number; noSumaBeneficios?: boolean }>>([]);
   const [, setCargando] = useState(false);
 
   // Estados de ayuda y modales
@@ -350,6 +350,7 @@ export function OfertasAdminView() {
                 categoriaId: String(c.id),
                 categoria: c.nombre,
                 precio: p.precio,
+                noSumaBeneficios: Boolean(p.noSumaBeneficios),
               });
             });
           });
@@ -373,6 +374,14 @@ export function OfertasAdminView() {
     () => ofertas.filter((o) => o.tipo === 'COMBO' || o.tipo === 'LLEVA_PAGA'),
     [ofertas],
   );
+
+  // Los combos tienen precio propio: no se descuentan ni entran a 2x1; se gestionan solo en Ofertas.
+  const productosConDescuento = useMemo(() => {
+    const deCombo = new Set(
+      ofertas.filter((o) => o.tipo === 'COMBO' && o.alcanceProductoId).map((o) => String(o.alcanceProductoId)),
+    );
+    return productos.filter((p) => !p.noSumaBeneficios && !deCombo.has(p.id));
+  }, [productos, ofertas]);
 
   const descuentos = useMemo(
     () => ofertas.filter((o) => o.tipo === 'DESCUENTO' || o.tipo === 'DESCUENTO_AUTOMATICO'),
@@ -2072,7 +2081,7 @@ export function OfertasAdminView() {
           setLlevaPagaAEditar(null);
         }}
         onGuardar={guardarOfertaHandler}
-        productosDisponibles={productos}
+        productosDisponibles={productosConDescuento}
       />
 
       <ModalDescuento
@@ -2083,7 +2092,7 @@ export function OfertasAdminView() {
           setDescuentoAEditar(null);
         }}
         onGuardar={guardarOfertaHandler}
-        productosDisponibles={productos}
+        productosDisponibles={productosConDescuento}
       />
 
       <ModalCupon
@@ -2095,7 +2104,7 @@ export function OfertasAdminView() {
           setCuponAEditar(null);
         }}
         onGuardar={guardarCuponHandler}
-        productosDisponibles={productos}
+        productosDisponibles={productosConDescuento}
       />
 
       <ModalHistorialCupones

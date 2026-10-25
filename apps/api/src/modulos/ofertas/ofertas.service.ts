@@ -1308,8 +1308,15 @@ export class OfertasService {
 
     const descuentosVigentes = descuentosCandidatos.filter((d) => estaVigente(d, canal, ahora));
 
-    // Filtrar líneas elegibles (excluyendo aquellas con no_suma_beneficios según DT-65)
-    const lineasElegibles = lineas.filter((l) => !l.noSumaBeneficios);
+    // Un combo tiene precio propio: su producto nunca recibe descuento ni entra a 2x1 (además de no_suma_beneficios, DT-65)
+    const combos = await this.prisma.oferta.findMany({
+      where: { tipo: 'COMBO', alcance_producto_id: { not: null } },
+      select: { alcance_producto_id: true },
+    });
+    const productosCombo = new Set(combos.map((c) => String(c.alcance_producto_id)));
+    const lineasElegibles = lineas.filter(
+      (l) => !l.noSumaBeneficios && !productosCombo.has(String(l.productoId)),
+    );
 
     let mejorDescuentoAutomatico: {
       oferta: any;

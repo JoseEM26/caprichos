@@ -44,7 +44,8 @@ describe('OfertasService', () => {
 
     prismaMock = {
       oferta: {
-        findMany: jest.fn(),
+        // Por defecto no hay combos; cada prueba sobreescribe la respuesta con mockResolvedValueOnce.
+        findMany: jest.fn().mockResolvedValue([]),
         findUnique: jest.fn(),
         findFirst: jest.fn(),
         create: jest.fn(),
@@ -486,6 +487,83 @@ describe('OfertasService', () => {
       // 2 unidades de 9.00 -> 1 unidad gratis = 9.00 de descuento
       expect(res.descuentoTotal).toBe(9.0);
       expect(res.detalles.some((d) => d.nombre === '2x1 ICED COFFE')).toBe(true);
+    });
+
+    it('sigue bonificando el 2x1 de un producto normal aunque exista un combo en la base', async () => {
+      prismaMock.reglaAcumulacion.upsert.mockResolvedValueOnce({ id: 1, cupon_con_descuento: false });
+      prismaMock.oferta.findMany
+        .mockResolvedValueOnce([
+          {
+            id: 8n, tipo: 'LLEVA_PAGA', nombre: '2x1 ICED COFFE', lleva: 2, paga: 1,
+            alcance_categoria_id: null, alcance_producto_id: 20n, descuento_tipo: null,
+            descuento_valor: null, compra_minima: null, dias: [], hora_desde: null, hora_hasta: null,
+            fecha_desde: null, fecha_hasta: null, canales: ['CARTA'], limite_usos: null, usos_actuales: 0, activo: true,
+          },
+        ])
+        .mockResolvedValueOnce([{ alcance_producto_id: 99n }]); // combo de otro producto
+
+      const res = await service.calcularDescuentosParaPedido({
+        subtotal: 18.0,
+        lineas: [{ productoId: 20n, cantidad: 2, subtotal: 18.0, precioUnitario: 9.0 }],
+        canal: 'CARTA',
+      });
+
+      expect(res.descuentoTotal).toBe(9.0);
+    });
+
+    it('una linea de producto de combo no recibe el descuento de toda la carta', async () => {
+      prismaMock.reglaAcumulacion.upsert.mockResolvedValueOnce({ id: 1, cupon_con_descuento: false });
+      prismaMock.oferta.findMany
+        .mockResolvedValueOnce([
+          {
+            id: 1n, tipo: 'DESCUENTO', nombre: '10% en toda la carta', descuento_tipo: 'PORCENTAJE',
+            descuento_valor: new Prisma.Decimal(10), alcance_categoria_id: null, alcance_producto_id: null,
+            compra_minima: null, dias: [], hora_desde: null, hora_hasta: null, fecha_desde: null,
+            fecha_hasta: null, canales: ['CARTA'], limite_usos: null, usos_actuales: 0, activo: true,
+          },
+        ])
+        .mockResolvedValueOnce([{ alcance_producto_id: 10n }]); // producto 10 es el articulo de un combo
+
+      const res = await service.calcularDescuentosParaPedido({
+        subtotal: 50.0,
+        lineas: [
+          { productoId: 10n, cantidad: 1, subtotal: 20.0, precioUnitario: 20.0, noSumaBeneficios: false }, // combo
+          { productoId: 20n, cantidad: 1, subtotal: 30.0, precioUnitario: 30.0, noSumaBeneficios: false },
+        ],
+        canal: 'CARTA',
+      });
+
+      // Solo el producto 20 es elegible: 10% de 30.00 = 3.00 (no 5.00)
+      expect(res.descuentoTotal).toBe(3.0);
+    });
+
+    it('el 2x1 de toda la carta ignora la linea del combo al elegir las unidades bonificadas', async () => {
+      prismaMock.reglaAcumulacion.upsert.mockResolvedValueOnce({ id: 1, cupon_con_descuento: false });
+      prismaMock.oferta.findMany
+        .mockResolvedValueOnce([
+          {
+            id: 9n, tipo: 'LLEVA_PAGA', nombre: '2x1 general', lleva: 2, paga: 1,
+            alcance_categoria_id: null, alcance_producto_id: null, descuento_tipo: null,
+            descuento_valor: null, compra_minima: null, dias: [], hora_desde: null, hora_hasta: null,
+            fecha_desde: null, fecha_hasta: null, canales: ['CARTA'], limite_usos: null, usos_actuales: 0, activo: true,
+          },
+        ])
+        .mockResolvedValueOnce([{ alcance_producto_id: 10n }]);
+
+      const res = await service.calcularDescuentosParaPedido({
+        subtotal: 73.0,
+        lineas: [
+          { productoId: 20n, cantidad: 2, subtotal: 18.0, precioUnitario: 9.0 },
+          { productoId: 30n, cantidad: 2, subtotal: 50.0, precioUnitario: 25.0 },
+          { productoId: 10n, cantidad: 1, subtotal: 5.0, precioUnitario: 5.0 }, // combo: precio barato que no debe contar
+        ],
+        canal: 'CARTA',
+      });
+
+      // Unidades elegibles: 9, 9, 25, 25 -> 2 grupos de 2 -> se bonifican las 2 mas baratas: 9 + 9 = 18
+      expect(res.descuentoTotal).toBe(18.0);
+      expect(res.detalles).toHaveLength(1);
+      expect(res.detalles[0].tipo).toBe('PROMO');
     });
   });
 
