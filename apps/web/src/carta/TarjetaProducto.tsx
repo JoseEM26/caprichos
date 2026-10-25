@@ -8,10 +8,11 @@ export interface InfoRankingProducto {
   textoEstrellas?: string;
 }
 
-interface TarjetaProductoProps {
+export interface TarjetaProductoProps {
   producto: ProductoCarta;
   rankingInfo?: InfoRankingProducto | null;
   organizacion?: 'SECCIONES' | 'LISTA' | 'TARJETAS';
+  insigniaBeneficio?: string | null;
 }
 
 const PRODUCTOS_100_CACAO = new Set([
@@ -29,6 +30,7 @@ export function TarjetaProducto({
   producto,
   rankingInfo,
   organizacion = 'SECCIONES',
+  insigniaBeneficio,
 }: TarjetaProductoProps) {
   const { abrirModalProducto } = useCarrito();
   const movil = useEsMovil();
@@ -238,6 +240,26 @@ export function TarjetaProducto({
             }}
           >
             {producto.descripcion}
+          </div>
+        )}
+
+        {insigniaBeneficio && (
+          <div>
+            <span
+              data-testid={`insignia-beneficio-${producto.id}`}
+              style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                background: 'var(--cp-rust)',
+                color: '#FFFFFF',
+                borderRadius: '9999px',
+                padding: '2px 10px',
+                display: 'inline-block',
+                fontFamily: 'Montserrat, sans-serif',
+              }}
+            >
+              {insigniaBeneficio}
+            </span>
           </div>
         )}
 

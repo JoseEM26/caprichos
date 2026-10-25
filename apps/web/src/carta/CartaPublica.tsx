@@ -33,6 +33,9 @@ import { FormularioComentarios } from './contenido/FormularioComentarios';
 import { FranjaNovedades, ordenarNovedadesCarta } from './PaginaNovedades';
 import type { NovedadCarta } from './PaginaNovedades';
 import type { BannerCarta } from './PortadaCarta';
+import { FranjaAvisoCarta } from './FranjaAvisoCarta';
+import { useBeneficiosCarta } from './useBeneficiosCarta';
+import { ModalAvisoEntrada } from './ModalAvisoEntrada';
 
 const INFO_CATEGORIA: Record<string, { title: string; note: string }> = {
   COMBOS: { title: 'Combos Dúo', note: 'Precio por tamaño de bebida' },
@@ -239,6 +242,21 @@ function ContenidoCartaPublica() {
     return ordenarNovedadesCarta(lista);
   }, [contenido]);
 
+  const mapaBeneficios = useBeneficiosCarta(ofertas, categorias);
+
+  const irAPromociones = () => {
+    setPagina('carta');
+    setCategoriaActivaId('todo');
+    setTimeout(() => {
+      const el = document.getElementById('categoria-promociones');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        setCategoriaActivaId('promociones');
+      }
+    }, 100);
+  };
+
   const irACarta = () => {
     setPagina('carta');
     setCategoriaActivaId('todo');
@@ -354,6 +372,13 @@ function ContenidoCartaPublica() {
           setCategoriaActivaId(id);
           setBusqueda('');
         }}
+      />
+
+      {/* Franja de aviso de promociones de hoy */}
+      <FranjaAvisoCarta
+        ofertas={ofertas}
+        categorias={categorias}
+        onVerPromociones={irAPromociones}
       />
 
       {pagina === 'conocenos' && <PaginaConocenos datosLocal={datosLocal} estadoLocal={estadoLocal} />}
@@ -639,6 +664,7 @@ function ContenidoCartaPublica() {
                           producto={prod}
                           rankingInfo={rankingPorProducto.get(String(prod.id))}
                           organizacion={organizacion}
+                          insigniaBeneficio={mapaBeneficios.get(String(prod.id))}
                         />
                       ))}
                     </div>
@@ -797,7 +823,20 @@ function ContenidoCartaPublica() {
       <PieLegal />
 
       {/* Cajón lateral del carrito */}
-      <CajonCarrito estadoLocal={estadoLocal} />
+      <CajonCarrito
+        estadoLocal={estadoLocal}
+        datosLocal={datosLocal}
+        ofertas={ofertas}
+        categorias={categorias}
+      />
+
+      {/* Ventana opcional de bienvenida con la mejor promoción del día */}
+      <ModalAvisoEntrada
+        ofertas={ofertas}
+        categorias={categorias}
+        estadoLocal={estadoLocal}
+        onVerPromocion={irAPromociones}
+      />
 
       {/* Formulario de Checkout */}
       <FormularioCheckout

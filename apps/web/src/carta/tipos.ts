@@ -56,6 +56,7 @@ export interface EstadoLocalCarta {
   pausaAltaDemanda: boolean;
   tiempoPrometidoMin: number | null;
   altaDemandaMin: number;
+  cartaAvisoEntrada?: boolean;
 }
 
 export interface MedioPagoInfo {
@@ -86,6 +87,7 @@ export interface DatosLocalCarta {
   horario: HorarioDiaCarta[];
   mediosPago: Record<string, MedioPagoInfo>;
   envioGratisDesde: number | null;
+  envioGratisModo?: 'desde' | 'mas_de' | string;
   pedidoMinimo: number | null;
   puntosPorcentaje?: number;
   lat?: number;

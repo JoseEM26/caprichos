@@ -9,6 +9,7 @@ export async function main() {
   // 1. Parámetros por defecto de fidelización/puntos (si faltan)
   const parametros = [
     { clave: 'puntos_porcentaje', valor: 5 },
+    { clave: 'carta_aviso_entrada', valor: 'no' },
   ];
 
   for (const p of parametros) {

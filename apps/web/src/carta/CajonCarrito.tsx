@@ -1,13 +1,23 @@
 import { useState } from 'react';
 import { useCarrito } from './CarritoContext';
-import { EstadoLocalCarta } from './tipos';
+import { CategoriaCarta, DatosLocalCarta, EstadoLocalCarta } from './tipos';
 import { api } from '../comun/api';
+import { OfertaItem } from '../admin/ofertas/ofertasApi';
+import { AvisoTeFaltaPoco } from './AvisoTeFaltaPoco';
 
-interface CajonCarritoProps {
+export interface CajonCarritoProps {
   estadoLocal: EstadoLocalCarta | null;
+  datosLocal?: DatosLocalCarta | null;
+  ofertas?: OfertaItem[];
+  categorias?: CategoriaCarta[];
 }
 
-export function CajonCarrito({ estadoLocal }: CajonCarritoProps) {
+export function CajonCarrito({
+  estadoLocal,
+  datosLocal = null,
+  ofertas = [],
+  categorias = [],
+}: CajonCarritoProps) {
   const {
     lineas,
     subtotal,
@@ -57,6 +67,13 @@ export function CajonCarrito({ estadoLocal }: CajonCarritoProps) {
     setCuponAplicado(null);
     setCuponCodigo('');
     setMensajeCupon(null);
+  };
+
+  const handleAgregarProducto = (productoId: string) => {
+    const linea = lineas.find((l) => String(l.productoId) === String(productoId));
+    if (linea) {
+      actualizarCantidad(linea.id, linea.cantidad + 1);
+    }
   };
 
   if (!cajonAbierto) return null;
@@ -403,6 +420,16 @@ export function CajonCarrito({ estadoLocal }: CajonCarritoProps) {
               gap: '12px',
             }}
           >
+            {/* Aviso inteligente de beneficio próximo */}
+            <AvisoTeFaltaPoco
+              lineas={lineas}
+              subtotal={subtotal}
+              ofertas={ofertas}
+              categorias={categorias}
+              datosLocal={datosLocal}
+              onAgregarProducto={handleAgregarProducto}
+            />
+
             {/* Campo de cupón */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <label htmlFor="c-cup" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-navy)' }}>
