@@ -80,6 +80,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
   const esMesa = mod === 'MESA';
   const estaPagado = pag === 'PAGADO';
   const tienePagoCoordinado = Boolean(pedido.pago_coordinado_en) || pag === 'COORDINADO';
+  const tieneCobroVigente = estaPagado || Boolean(pedido.cobro_vigente_id);
   const esPorConfirmar =
     (est === 'COLA' || est === 'NUEVO') &&
     !estaPagado &&
@@ -96,6 +97,20 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
     est !== 'NUEVO';
   // Delivery sin repartidor: el servidor no lo deja pasar a ENTREGADO (409 REPARTIDOR_REQUERIDO)
   const sinRepartidor = pedido.modalidad === 'DELIVERY' && !pedido.repartidor_party_id;
+
+  const handleAbrirAnular = async () => {
+    if (tieneCobroVigente && !pedido.cobro_vigente_id) {
+      try {
+        const pedDet = await pedidosApi.obtenerPorId(pedido.id);
+        if (pedDet.cobro_vigente_id) {
+          pedido.cobro_vigente_id = pedDet.cobro_vigente_id;
+        }
+      } catch {
+        // Continuar si falla
+      }
+    }
+    setAbrirAnular(true);
+  };
 
   // Configuración de estado visual (badge del mockup)
   const stBadge = getBadge(pedido);
@@ -1108,7 +1123,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
           {est !== 'ANULADO' && (
             <button
               type="button"
-              onClick={() => setAbrirAnular(true)}
+              onClick={handleAbrirAnular}
               style={{
                 flex: '1 1 120px',
                 minHeight: 44,
@@ -1120,7 +1135,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
                 cursor: 'pointer',
               }}
             >
-              Anular pedido
+              {tieneCobroVigente ? 'Anular cobro' : 'Anular pedido'}
             </button>
           )}
         </div>
@@ -1142,6 +1157,8 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
         <ModalAnular
           pedidoId={pedido.id}
           codigoPedido={pedido.codigo}
+          esCobro={tieneCobroVigente}
+          cobroId={pedido.cobro_vigente_id ?? undefined}
           alCerrar={() => setAbrirAnular(false)}
           alAnularExitoso={() => {
             setAbrirAnular(false);

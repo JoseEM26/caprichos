@@ -7,6 +7,7 @@ import {
 import { ModalRegistrarMovimiento } from './ModalRegistrarMovimiento';
 import { ModalRegistrarProduccion } from './ModalRegistrarProduccion';
 import { ModalCerrarDia } from './ModalCerrarDia';
+import { Confirmar } from '../../comun/Confirmar';
 
 export const AlmacenView: React.FC = () => {
   const [movimientos, setMovimientos] = useState<MovimientoItem[]>([]);
@@ -26,6 +27,7 @@ export const AlmacenView: React.FC = () => {
   const [movAnularId, setMovAnularId] = useState<string | null>(null);
   const [motivoAnular, setMotivoAnular] = useState('');
   const [anulando, setAnulando] = useState(false);
+  const [confirmarAnularAbierto, setConfirmarAnularAbierto] = useState(false);
 
   const cargarDatos = async () => {
     try {
@@ -84,14 +86,21 @@ export const AlmacenView: React.FC = () => {
     return counts;
   }, [movimientos]);
 
-  const handleAnularMovimiento = async (id: string) => {
+  const solicitarAnular = (id?: string) => {
+    if (id) setMovAnularId(id);
     if (!motivoAnular.trim()) {
       alert('Debe especificar el motivo de anulación.');
       return;
     }
+    setConfirmarAnularAbierto(true);
+  };
+
+  const ejecutarAnularMovimiento = async () => {
+    if (!movAnularId || !motivoAnular.trim()) return;
     try {
       setAnulando(true);
-      await almacenApi.anularMovimiento(id, motivoAnular.trim());
+      await almacenApi.anularMovimiento(movAnularId, motivoAnular.trim());
+      setConfirmarAnularAbierto(false);
       setMovAnularId(null);
       setMotivoAnular('');
       setMensajeExito('Movimiento anulado e invertido en stock.');
@@ -692,7 +701,7 @@ export const AlmacenView: React.FC = () => {
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleAnularMovimiento(m.id)}
+                        onClick={() => solicitarAnular(m.id)}
                         disabled={anulando}
                         style={{
                           border: 0,
@@ -767,6 +776,15 @@ export const AlmacenView: React.FC = () => {
           setMensajeExito('Cierre del día completado con éxito.');
           setTimeout(() => setMensajeExito(''), 4000);
         }}
+      />
+
+      <Confirmar
+        abierto={confirmarAnularAbierto}
+        titulo="¿Confirmar anulación del movimiento?"
+        mensaje={`Se revertirá el movimiento en el inventario y se registrará en el historial.`}
+        textoConfirmar="Sí, anular movimiento"
+        alConfirmar={ejecutarAnularMovimiento}
+        alCancelar={() => setConfirmarAnularAbierto(false)}
       />
     </div>
   );

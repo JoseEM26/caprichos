@@ -64,6 +64,7 @@ export interface Pedido {
   pago_metodo?: string | null;
   pago_estado?: string | null;
   pago_preferido?: string | null;
+  cobro_vigente_id?: string | number | null;
   paga_con?: string | number | null;
   subtotal: string | number;
   descuento: string | number;

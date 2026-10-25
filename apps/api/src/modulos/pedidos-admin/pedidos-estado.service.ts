@@ -246,6 +246,11 @@ export class PedidosEstadoService {
             },
           },
           zona: true,
+          cobros: {
+            where: { anulado_en: null },
+            select: { id: true },
+            take: 1,
+          },
         },
       }),
       this.obtenerUmbrales(),
@@ -262,8 +267,11 @@ export class PedidosEstadoService {
         umbrales.rojoMin,
       );
 
+      const cobroVigenteId = p.cobros?.[0]?.id ? String(p.cobros[0].id) : null;
+
       return {
         ...p,
+        cobro_vigente_id: cobroVigenteId,
         comprobante_doc: esAdmin ? p.comprobante_doc : enmascararDni(p.comprobante_doc || ''),
         minutosEspera,
         color,
@@ -381,6 +389,11 @@ export class PedidosEstadoService {
           orderBy: { en: 'asc' },
         },
         zona: true,
+        cobros: {
+          where: { anulado_en: null },
+          select: { id: true },
+          take: 1,
+        },
       },
     });
 
@@ -414,8 +427,11 @@ export class PedidosEstadoService {
       });
     }
 
+    const cobroVigenteId = pedido.cobros?.[0]?.id ? String(pedido.cobros[0].id) : null;
+
     return {
       ...pedido,
+      cobro_vigente_id: cobroVigenteId,
       comprobante_doc: esAdmin
         ? pedido.comprobante_doc
         : enmascararDni(pedido.comprobante_doc || ''),

@@ -70,8 +70,20 @@ export function ModalAnular({
     setErrorMensaje('');
 
     try {
-      if (esCobro && cobroId) {
-        await pedidosApi.anularCobro(cobroId, motivoParaEnviar, pinParaEnviar);
+      let idCobro = cobroId;
+      if (esCobro && !idCobro) {
+        try {
+          const pedDet = await pedidosApi.obtenerPorId(pedidoId);
+          if (pedDet.cobro_vigente_id) {
+            idCobro = pedDet.cobro_vigente_id;
+          }
+        } catch {
+          // Continuar
+        }
+      }
+
+      if (esCobro && idCobro) {
+        await pedidosApi.anularCobro(idCobro, motivoParaEnviar, pinParaEnviar);
       } else {
         await pedidosApi.cambiarEstado(
           pedidoId,

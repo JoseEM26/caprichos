@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { almacenApi, CierreDiaResumen, CerrarDiaDto } from './almacenApi';
+import { almacenApi, ProductoCierreDiaItem, CierreDiaDto } from './almacenApi';
 import { Confirmar } from '../../comun/Confirmar';
 
 interface ModalCerrarDiaProps {
@@ -9,13 +9,14 @@ interface ModalCerrarDiaProps {
 }
 
 interface ItemCierreForm {
-  insumoId: string;
+  insumoId?: string;
+  productoId?: string;
   nombre: string;
-  stockTeorico: number;
+  sistema: number;
   unidad: string;
   conteoReal: string;
   desechoMerma: string;
-  motivo: string;
+  destino: string;
 }
 
 export const ModalCerrarDia: React.FC<ModalCerrarDiaProps> = ({
@@ -23,7 +24,6 @@ export const ModalCerrarDia: React.FC<ModalCerrarDiaProps> = ({
   alCerrar,
   alGuardar,
 }) => {
-  const [resumen, setResumen] = useState<CierreDiaResumen | null>(null);
   const [items, setItems] = useState<ItemCierreForm[]>([]);
   const [cargando, setCargando] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -35,23 +35,23 @@ export const ModalCerrarDia: React.FC<ModalCerrarDiaProps> = ({
       setErrorMsg('');
       setConfirmarAbierto(false);
       almacenApi
-        .obtenerResumenCierreDia()
-        .then((res) => {
-          setResumen(res);
+        .obtenerProductosCierreDia()
+        .then((res: ProductoCierreDiaItem[]) => {
           setItems(
-            res.insumosSensibles.map((ins) => ({
-              insumoId: ins.insumoId,
-              nombre: ins.nombre,
-              stockTeorico: ins.stockTeorico,
-              unidad: ins.unidad,
-              conteoReal: String(ins.stockTeorico),
+            res.map((it) => ({
+              insumoId: it.insumoId,
+              productoId: it.productoId,
+              nombre: it.nombre,
+              sistema: Number(it.sistema || 0),
+              unidad: it.unidad || 'unidades',
+              conteoReal: String(Number(it.sistema || 0)),
               desechoMerma: '0',
-              motivo: 'Cierre del día',
+              destino: 'Desecho',
             })),
           );
         })
         .catch((err: any) => {
-          setErrorMsg(err.message || 'Error al cargar datos para el cierre.');
+          setErrorMsg(err.message || 'Error al cargar productos del día para el cierre.');
         })
         .finally(() => setCargando(false));
     }
@@ -61,11 +61,24 @@ export const ModalCerrarDia: React.FC<ModalCerrarDiaProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (items.length === 0) {
+      setErrorMsg('No hay productos ni insumos para cerrar.');
+      return;
+    }
     for (let i = 0; i < items.length; i++) {
       const it = items[i];
       const real = parseFloat(it.conteoReal);
       if (isNaN(real) || real < 0) {
         setErrorMsg(`Conteo inválido para ${it.nombre}.`);
+        return;
+      }
+      const b = parseFloat(it.desechoMerma);
+      if (isNaN(b) || b < 0) {
+        setErrorMsg(`Cantidad a botar inválida para ${it.nombre}.`);
+        return;
+      }
+      if (b > real) {
+        setErrorMsg(`En ${it.nombre}: no puedes botar más de lo que contaste.`);
         return;
       }
     }
@@ -74,13 +87,17 @@ export const ModalCerrarDia: React.FC<ModalCerrarDiaProps> = ({
   };
 
   const ejecutarCerrarDia = async () => {
-    const dto: CerrarDiaDto = {
-      fecha: resumen?.fecha,
-      items: items.map((it) => ({
+    const dto: CierreDiaDto = {
+      fecha: new Date().toISOString(),
+      filas: items.map((it) => ({
         insumoId: it.insumoId,
-        conteoReal: parseFloat(it.conteoReal),
-        desechoMerma: parseFloat(it.desechoMerma) || 0,
-        motivo: it.motivo || 'Sobrante fin del día a merma',
+        productoId: it.productoId,
+        nombre: it.nombre,
+        sistema: it.sistema,
+        contado: parseFloat(it.conteoReal) || 0,
+        botar: parseFloat(it.desechoMerma) || 0,
+        destino: it.destino || 'Desecho',
+        unidad: it.unidad,
       })),
     };
 
@@ -148,7 +165,7 @@ export const ModalCerrarDia: React.FC<ModalCerrarDiaProps> = ({
               Cerrar el día (sobrantes a merma)
             </h2>
             <div style={{ fontSize: 12, color: 'var(--cp-soft)' }}>
-              Verifica el stock sobrante de productos frescos. Lo no vendido del día se envía a merma.
+              Verifica el stock sobrante de productos de producción e insumos frescos. Lo que botas pasa a merma y la diferencia de conteo queda registrada.
             </div>
           </div>
           <button
@@ -180,119 +197,137 @@ export const ModalCerrarDia: React.FC<ModalCerrarDiaProps> = ({
           </div>
         )}
 
-        {cargando && !resumen ? (
+        {cargando && items.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 24, color: 'var(--cp-soft)' }}>
-            Cargando insumos sensibles...
+            Cargando productos del día...
           </div>
         ) : items.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 24, color: 'var(--cp-soft)' }}>
-            No se encontraron insumos perecibles para cerrar hoy.
+            No se encontraron productos de producción ni insumos frescos para cerrar hoy.
           </div>
         ) : (
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {items.map((it, idx) => (
-                <div
-                  key={it.insumoId}
-                  style={{
-                    background: 'var(--cp-cream)',
-                    borderRadius: 10,
-                    padding: 12,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 8,
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, fontSize: 14 }}>{it.nombre}</span>
-                    <span style={{ fontSize: 12, color: 'var(--cp-soft)' }}>
-                      Stock sistema: <b>{it.stockTeorico} {it.unidad}</b>
-                    </span>
+              {items.map((it, idx) => {
+                const c = parseFloat(it.conteoReal);
+                const b = parseFloat(it.desechoMerma);
+                const valido = !isNaN(c) && !isNaN(b) && c >= 0 && b >= 0 && b <= c;
+                const queda = valido ? Math.round((c - b) * 100) / 100 : 0;
+                const dif = valido ? Math.round(Math.max(0, it.sistema - c) * 100) / 100 : 0;
+
+                return (
+                  <div
+                    key={it.productoId ? `prod-${it.productoId}` : `ins-${it.insumoId || idx}`}
+                    style={{
+                      background: 'var(--cp-cream)',
+                      borderRadius: 10,
+                      padding: 12,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 8,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 700, fontSize: 14 }}>{it.nombre}</span>
+                      <span style={{ fontSize: 12, color: 'var(--cp-soft)' }}>
+                        Stock sistema: <b>{it.sistema} {it.unidad}</b>
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8 }}>
+                      <div>
+                        <label style={{ fontSize: 11, color: 'var(--cp-soft)', display: 'block' }}>
+                          Conteo físico real
+                        </label>
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          value={it.conteoReal}
+                          onChange={(e) => {
+                            const updated = [...items];
+                            updated[idx].conteoReal = e.target.value;
+                            setItems(updated);
+                          }}
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            minHeight: 36,
+                            borderRadius: 6,
+                            border: '1px solid var(--cp-line)',
+                            padding: '0 8px',
+                            background: 'var(--cp-white)',
+                            fontSize: 13,
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: 11, color: 'var(--cp-soft)', display: 'block' }}>
+                          Desecho a merma
+                        </label>
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          value={it.desechoMerma}
+                          onChange={(e) => {
+                            const updated = [...items];
+                            updated[idx].desechoMerma = e.target.value;
+                            setItems(updated);
+                          }}
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            minHeight: 36,
+                            borderRadius: 6,
+                            border: '1px solid var(--cp-line)',
+                            padding: '0 8px',
+                            background: 'var(--cp-white)',
+                            fontSize: 13,
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: 11, color: 'var(--cp-soft)', display: 'block' }}>
+                          Destino de merma
+                        </label>
+                        <select
+                          value={it.destino}
+                          onChange={(e) => {
+                            const updated = [...items];
+                            updated[idx].destino = e.target.value;
+                            setItems(updated);
+                          }}
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            minHeight: 36,
+                            borderRadius: 6,
+                            border: '1px solid var(--cp-line)',
+                            padding: '0 8px',
+                            background: 'var(--cp-white)',
+                            fontSize: 13,
+                          }}
+                        >
+                          <option value="Desecho">Desecho</option>
+                          <option value="Donación">Donación</option>
+                          <option value="Personal">Personal</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {valido && (
+                      <div style={{ fontSize: 12, color: 'var(--cp-soft)', marginTop: 2 }}>
+                        Queda en stock: <b>{queda} {it.unidad}</b>
+                        {b > 0 && ` · Merma: ${b} ${it.unidad} (${it.destino.toLowerCase()})`}
+                        {dif > 0 && ` · Diferencia de conteo: ${dif} ${it.unidad}`}
+                      </div>
+                    )}
                   </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
-                    <div>
-                      <label style={{ fontSize: 11, color: 'var(--cp-soft)', display: 'block' }}>
-                        Conteo físico real
-                      </label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        min="0"
-                        value={it.conteoReal}
-                        onChange={(e) => {
-                          const updated = [...items];
-                          updated[idx].conteoReal = e.target.value;
-                          setItems(updated);
-                        }}
-                        style={{
-                          width: '100%',
-                          boxSizing: 'border-box',
-                          minHeight: 36,
-                          borderRadius: 6,
-                          border: '1px solid var(--cp-line)',
-                          padding: '0 8px',
-                          background: 'var(--cp-white)',
-                          fontSize: 13,
-                        }}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ fontSize: 11, color: 'var(--cp-soft)', display: 'block' }}>
-                        Desecho a merma
-                      </label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        min="0"
-                        value={it.desechoMerma}
-                        onChange={(e) => {
-                          const updated = [...items];
-                          updated[idx].desechoMerma = e.target.value;
-                          setItems(updated);
-                        }}
-                        style={{
-                          width: '100%',
-                          boxSizing: 'border-box',
-                          minHeight: 36,
-                          borderRadius: 6,
-                          border: '1px solid var(--cp-line)',
-                          padding: '0 8px',
-                          background: 'var(--cp-white)',
-                          fontSize: 13,
-                        }}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ fontSize: 11, color: 'var(--cp-soft)', display: 'block' }}>
-                        Motivo merma
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Ej. Sobrante noche"
-                        value={it.motivo}
-                        onChange={(e) => {
-                          const updated = [...items];
-                          updated[idx].motivo = e.target.value;
-                          setItems(updated);
-                        }}
-                        style={{
-                          width: '100%',
-                          boxSizing: 'border-box',
-                          minHeight: 36,
-                          borderRadius: 6,
-                          border: '1px solid var(--cp-line)',
-                          padding: '0 8px',
-                          background: 'var(--cp-white)',
-                          fontSize: 13,
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div
@@ -350,7 +385,7 @@ export const ModalCerrarDia: React.FC<ModalCerrarDiaProps> = ({
         <Confirmar
           abierto={confirmarAbierto}
           titulo="¿Confirmar cierre del día?"
-          mensaje="Se ajustará el inventario según el conteo físico y los sobrantes pasarán a merma."
+          mensaje="Lo que botas pasa a merma con el destino elegido, la diferencia de conteo queda registrada y lo demás sigue en el stock."
           textoConfirmar="Sí, confirmar cierre"
           alConfirmar={ejecutarCerrarDia}
           alCancelar={() => setConfirmarAbierto(false)}

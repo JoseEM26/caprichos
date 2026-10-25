@@ -78,25 +78,33 @@ export interface RegistrarProduccionDto {
   unidadesReales?: number;
 }
 
-export interface CierreDiaResumen {
-  fecha: string;
-  insumosSensibles: Array<{
-    insumoId: string;
-    nombre: string;
-    stockTeorico: number;
-    unidad: string;
-  }>;
+export interface ProductoCierreDiaItem {
+  productoId?: string;
+  insumoId?: string;
+  nombre: string;
+  sistema: number;
+  unidad: string;
 }
 
-export interface CerrarDiaDto {
-  fecha?: string;
-  items: Array<{
-    insumoId: string | number;
-    conteoReal: number;
-    desechoMerma?: number;
-    motivo?: string;
-  }>;
+export interface FilaCierreDiaDto {
+  insumoId?: string | number;
+  productoId?: string | number;
+  nombre: string;
+  sistema: number;
+  contado: number;
+  botar: number;
+  destino: string;
+  unidad?: string;
 }
+
+export interface CierreDiaDto {
+  lugarId?: string | number;
+  fecha?: string;
+  filas: FilaCierreDiaDto[];
+}
+
+export type CierreDiaResumen = ProductoCierreDiaItem[];
+export type CerrarDiaDto = CierreDiaDto;
 
 export interface ListarMovimientosRespuesta {
   conteos: {
@@ -150,22 +158,25 @@ export const almacenApi = {
     api.post<MovimientoItem>('/admin/almacen/movimientos', dto),
 
   anularMovimiento: (id: string, motivo: string) =>
-    api.patch<{ ok: boolean }>(`/admin/almacen/movimientos/${id}/anular`, { motivo }),
+    api.post<{ ok: boolean }>(`/admin/almacen/movimientos/${id}/anular`, { motivo }),
 
   listarRecetasProduccion: () =>
-    api.get<RecetaProduccionItem[]>('/admin/almacen/recetas-produccion'),
+    api.get<RecetaProduccionItem[]>('/admin/almacen/produccion/recetas'),
 
   registrarProduccion: (dto: RegistrarProduccionDto) =>
-    api.post<{ ok: boolean; documento: string; tandas: number; unidades: number }>('/admin/almacen/produccion-tandas', dto),
+    api.post<{ ok: boolean; documento: string; tandas: number; unidades: number }>('/admin/almacen/produccion', dto),
+
+  obtenerProductosCierreDia: () =>
+    api.get<ProductoCierreDiaItem[]>('/admin/almacen/cierre-dia/productos'),
 
   obtenerResumenCierreDia: () =>
-    api.get<CierreDiaResumen>('/admin/almacen/cierre-dia/resumen'),
+    api.get<ProductoCierreDiaItem[]>('/admin/almacen/cierre-dia/productos'),
 
-  cerrarDia: (dto: CerrarDiaDto) =>
-    api.post<{ ok: boolean; mermasRegistradas: number; fecha: string }>('/admin/almacen/cierre-dia', dto),
+  cerrarDia: (dto: CierreDiaDto) =>
+    api.post<{ ok: boolean; id?: string }>('/admin/almacen/cierre-dia', dto),
 
   listarLugares: () =>
-    api.get<LugarItem[]>('/admin/almacen/lugares'),
+    api.get<LugarItem[]>('/admin/stock/lugares'),
 
   listarInsumos: async (): Promise<InsumoStockItem[]> => {
     const res = await api.get<any[]>('/admin/stock/insumos');

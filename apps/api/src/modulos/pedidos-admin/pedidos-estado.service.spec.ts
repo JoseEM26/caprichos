@@ -640,6 +640,23 @@ describe('PedidosEstadoService', () => {
 
       const res = await service.obtenerPorId(10n, cajeroAuth);
       expect(res.comprobante_doc).toBe('12****78');
+      expect(res.cobro_vigente_id).toBeNull();
+    });
+
+    it('debe entregar cobro_vigente_id cuando el pedido tiene un cobro activo', async () => {
+      const pedidoMock = {
+        id: 10n,
+        codigo: 'CP-W001',
+        comprobante_doc: '12345678',
+        creado_en: new Date(),
+        lineas: [],
+        historial: [],
+        cobros: [{ id: 99n }],
+      };
+      prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);
+
+      const res = await service.obtenerPorId(10n, cajeroAuth);
+      expect(res.cobro_vigente_id).toBe('99');
     });
 
     it('debe entregar comprobante_doc completo para rol ADMIN en obtenerPorId y auditar VER_COMPROBANTE', async () => {

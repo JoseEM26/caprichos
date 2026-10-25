@@ -50,3 +50,48 @@ describe('Entregar un delivery sin repartidor', () => {
     expect(screen.getByRole('button', { name: 'Entregar al cliente y cerrar' })).toBeEnabled();
   });
 });
+
+describe('Botón de anulación según estado de pago (PedidoDetalle)', () => {
+  it('muestra "Anular cobro" cuando el pedido está PAGADO y abre modal con esCobro', () => {
+    const pedidoPagado: Pedido = {
+      id: '2',
+      codigo: 'CP-PAG01',
+      canal: 'CAJA',
+      modalidad: 'LLEVAR',
+      estado: 'PREPARANDO',
+      pago_estado: 'PAGADO',
+      cobro_vigente_id: '88',
+      subtotal: 20,
+      descuento: 0,
+      total: 20,
+      lineas: [],
+    } as unknown as Pedido;
+
+    renderDetalle(pedidoPagado);
+
+    const btnAnularCobro = screen.getByRole('button', { name: 'Anular cobro' });
+    expect(btnAnularCobro).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Anular pedido' })).not.toBeInTheDocument();
+  });
+
+  it('muestra "Anular pedido" cuando el pedido NO está pagado', () => {
+    const pedidoNoPagado: Pedido = {
+      id: '3',
+      codigo: 'CP-NOPAG',
+      canal: 'CAJA',
+      modalidad: 'LLEVAR',
+      estado: 'PREPARANDO',
+      pago_estado: 'PENDIENTE',
+      subtotal: 20,
+      descuento: 0,
+      total: 20,
+      lineas: [],
+    } as unknown as Pedido;
+
+    renderDetalle(pedidoNoPagado);
+
+    const btnAnularPedido = screen.getByRole('button', { name: 'Anular pedido' });
+    expect(btnAnularPedido).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Anular cobro' })).not.toBeInTheDocument();
+  });
+});
