@@ -38,13 +38,13 @@ services:
       APP_VERSION: ${APP_VERSION:-0.1.0}
       GIT_COMMIT: ${TAG:-demo}
       DOMINIO_BASE: ${DOMINIO_DEMO:-207-244-232-127.sslip.io}
-      CORS_ORIGIN: https://${DOMINIO_DEMO:-207-244-232-127.sslip.io}
+      CORS_ORIGIN: https://${DOMINIO_DEMO:-207-244-232-127.sslip.io},https://${DOMINIO_ALT:-alt1.invalid},https://${DOMINIO_ALT2:-alt2.invalid}
       TRUST_PROXY: "1"
     labels:
       - traefik.enable=true
       - traefik.docker.network=caprichos-proxy-net
       # Rutas API
-      - "traefik.http.routers.demo-api.rule=Host(`${DOMINIO_DEMO:-localhost}`) && (PathPrefix(`/auth`) || PathPrefix(`/carta`) || PathPrefix(`/pedidos`) || PathPrefix(`/archivos`) || PathPrefix(`/uploads`) || PathPrefix(`/socket.io`) || PathPrefix(`/salud`) || PathPrefix(`/version`) || PathPrefix(`/reclamos/constancia`) || (Path(`/reclamos`) && Method(`POST`)))"
+      - "traefik.http.routers.demo-api.rule=(Host(`${DOMINIO_DEMO:-localhost}`) || Host(`${DOMINIO_ALT:-alt1.invalid}`) || Host(`${DOMINIO_ALT2:-alt2.invalid}`)) && (PathPrefix(`/auth`) || PathPrefix(`/carta`) || PathPrefix(`/pedidos`) || PathPrefix(`/archivos`) || PathPrefix(`/uploads`) || PathPrefix(`/socket.io`) || PathPrefix(`/salud`) || PathPrefix(`/version`) || PathPrefix(`/reclamos/constancia`) || (Path(`/reclamos`) && Method(`POST`)))"
       - traefik.http.routers.demo-api.entrypoints=websecure
       - traefik.http.routers.demo-api.tls=true
       - traefik.http.routers.demo-api.tls.certresolver=letsencrypt
@@ -52,7 +52,7 @@ services:
       - traefik.http.routers.demo-api.service=demo-api
       - traefik.http.routers.demo-api.middlewares=sec-headers-demo@file
       # Rate limit en login
-      - "traefik.http.routers.demo-login.rule=Host(`${DOMINIO_DEMO:-localhost}`) && Path(`/auth/ingresar`) && Method(`POST`)"
+      - "traefik.http.routers.demo-login.rule=(Host(`${DOMINIO_DEMO:-localhost}`) || Host(`${DOMINIO_ALT:-alt1.invalid}`) || Host(`${DOMINIO_ALT2:-alt2.invalid}`)) && Path(`/auth/ingresar`) && Method(`POST`)"
       - traefik.http.routers.demo-login.entrypoints=websecure
       - traefik.http.routers.demo-login.tls=true
       - traefik.http.routers.demo-login.tls.certresolver=letsencrypt
@@ -60,7 +60,7 @@ services:
       - traefik.http.routers.demo-login.service=demo-api
       - traefik.http.routers.demo-login.middlewares=rate-limit-login@file,sec-headers-demo@file
       # Admin API (JSON)
-      - "traefik.http.routers.demo-admin-api.rule=Host(`${DOMINIO_DEMO:-localhost}`) && PathPrefix(`/admin`)"
+      - "traefik.http.routers.demo-admin-api.rule=(Host(`${DOMINIO_DEMO:-localhost}`) || Host(`${DOMINIO_ALT:-alt1.invalid}`) || Host(`${DOMINIO_ALT2:-alt2.invalid}`)) && PathPrefix(`/admin`)"
       - traefik.http.routers.demo-admin-api.entrypoints=websecure
       - traefik.http.routers.demo-admin-api.tls=true
       - traefik.http.routers.demo-admin-api.tls.certresolver=letsencrypt
@@ -68,7 +68,7 @@ services:
       - traefik.http.routers.demo-admin-api.service=demo-api
       - traefik.http.routers.demo-admin-api.middlewares=sec-headers-demo@file
       # Prefijo /api
-      - "traefik.http.routers.demo-api-prefijo.rule=Host(`${DOMINIO_DEMO:-localhost}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.demo-api-prefijo.rule=(Host(`${DOMINIO_DEMO:-localhost}`) || Host(`${DOMINIO_ALT:-alt1.invalid}`) || Host(`${DOMINIO_ALT2:-alt2.invalid}`)) && PathPrefix(`/api`)"
       - traefik.http.routers.demo-api-prefijo.entrypoints=websecure
       - traefik.http.routers.demo-api-prefijo.tls=true
       - traefik.http.routers.demo-api-prefijo.tls.certresolver=letsencrypt
@@ -84,7 +84,7 @@ services:
       - traefik.enable=true
       - traefik.docker.network=caprichos-proxy-net
       # Admin SPA (HTML)
-      - "traefik.http.routers.demo-admin-html.rule=Host(`${DOMINIO_DEMO:-localhost}`) && PathPrefix(`/admin`) && HeaderRegexp(`Accept`, `text/html`)"
+      - "traefik.http.routers.demo-admin-html.rule=(Host(`${DOMINIO_DEMO:-localhost}`) || Host(`${DOMINIO_ALT:-alt1.invalid}`) || Host(`${DOMINIO_ALT2:-alt2.invalid}`)) && PathPrefix(`/admin`) && HeaderRegexp(`Accept`, `text/html`)"
       - traefik.http.routers.demo-admin-html.entrypoints=websecure
       - traefik.http.routers.demo-admin-html.tls=true
       - traefik.http.routers.demo-admin-html.tls.certresolver=letsencrypt
@@ -92,7 +92,7 @@ services:
       - traefik.http.routers.demo-admin-html.service=demo-web
       - traefik.http.routers.demo-admin-html.middlewares=sec-headers-demo@file
       # Carta y resto del sitio
-      - "traefik.http.routers.demo-web.rule=Host(`${DOMINIO_DEMO:-localhost}`)"
+      - "traefik.http.routers.demo-web.rule=(Host(`${DOMINIO_DEMO:-localhost}`) || Host(`${DOMINIO_ALT:-alt1.invalid}`) || Host(`${DOMINIO_ALT2:-alt2.invalid}`))"
       - traefik.http.routers.demo-web.entrypoints=websecure
       - traefik.http.routers.demo-web.tls=true
       - traefik.http.routers.demo-web.tls.certresolver=letsencrypt
