@@ -11,6 +11,8 @@ import {
   type ConteosIniciativas,
 } from './iniciativasApi';
 import { NuevaIniciativaModal } from './NuevaIniciativaModal';
+import { FotoIniciativa } from './FotoIniciativa';
+import { VisorCapturaModal } from './VisorCapturaModal';
 
 const COLOR_TIPO: Record<string, string> = {
   QUEJA: '#BA1A1A',
@@ -65,6 +67,13 @@ export function IniciativasView() {
     iniciativaTitulo: string;
     nuevoEstado: string;
     etiquetaEstado: string;
+  } | null>(null);
+
+  // Visor de captura ampliada
+  const [capturaAmpliada, setCapturaAmpliada] = useState<{
+    url: string;
+    titulo: string;
+    codigo: string;
   } | null>(null);
 
   const cargarDatos = async () => {
@@ -561,18 +570,40 @@ export function IniciativasView() {
 
               <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
                 {item.fotoUrl && (
-                  <img
-                    src={item.fotoUrl}
-                    alt="Captura de la iniciativa"
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCapturaAmpliada({
+                        url: item.fotoUrl!,
+                        titulo: item.titulo,
+                        codigo: item.codigo,
+                      })
+                    }
+                    title="Clic para ver captura en grande"
+                    aria-label={`Ver captura de ${item.codigo}`}
                     style={{
                       flex: 'none',
-                      width: '96px',
-                      height: '72px',
-                      objectFit: 'cover',
+                      background: 'transparent',
+                      border: 0,
+                      padding: 0,
+                      cursor: 'pointer',
                       borderRadius: '10px',
-                      border: '1px solid var(--cp-line)',
+                      display: 'inline-block',
                     }}
-                  />
+                  >
+                    <FotoIniciativa
+                      src={item.fotoUrl}
+                      alt={`Captura de ${item.codigo}`}
+                      style={{
+                        width: '96px',
+                        height: '72px',
+                        objectFit: 'cover',
+                        borderRadius: '10px',
+                        border: '1px solid var(--cp-line)',
+                        display: 'block',
+                      }}
+                    />
+                  </button>
                 )}
                 <div style={{ flex: '1 1 200px', minWidth: 0, fontSize: '14px', lineHeight: '20px', overflowWrap: 'anywhere' }}>
                   {item.detalle}
@@ -606,16 +637,42 @@ export function IniciativasView() {
               {abierta && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', borderTop: '1px solid var(--cp-line)', paddingTop: '10px' }}>
                   {item.fotoUrl && (
-                    <img
-                      src={item.fotoUrl}
-                      alt="Captura ampliada"
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCapturaAmpliada({
+                          url: item.fotoUrl!,
+                          titulo: item.titulo,
+                          codigo: item.codigo,
+                        })
+                      }
+                      title="Clic para ver captura en grande"
+                      aria-label={`Ver captura ampliada de ${item.codigo}`}
                       style={{
-                        width: '100%',
-                        maxWidth: '520px',
+                        width: 'fit-content',
+                        maxWidth: '100%',
+                        background: 'transparent',
+                        border: 0,
+                        padding: 0,
+                        cursor: 'pointer',
                         borderRadius: '12px',
-                        border: '1px solid var(--cp-line)',
+                        display: 'block',
                       }}
-                    />
+                    >
+                      <FotoIniciativa
+                        src={item.fotoUrl}
+                        alt={`Captura ampliada de ${item.codigo}`}
+                        style={{
+                          width: '100%',
+                          maxWidth: '520px',
+                          maxHeight: '360px',
+                          objectFit: 'cover',
+                          borderRadius: '12px',
+                          border: '1px solid var(--cp-line)',
+                          display: 'block',
+                        }}
+                      />
+                    </button>
                   )}
 
                   {/* Acciones de estado (solo administrador) */}
@@ -829,6 +886,15 @@ export function IniciativasView() {
         textoNo="No, cancelar"
         alConfirmar={handleEjecutarCambioEstado}
         alCancelar={() => setConfirmarEstado(null)}
+      />
+
+      {/* Visor de Captura Ampliada */}
+      <VisorCapturaModal
+        abierto={!!capturaAmpliada}
+        fotoUrl={capturaAmpliada?.url || null}
+        titulo={capturaAmpliada?.titulo}
+        codigo={capturaAmpliada?.codigo}
+        alCerrar={() => setCapturaAmpliada(null)}
       />
     </div>
   );

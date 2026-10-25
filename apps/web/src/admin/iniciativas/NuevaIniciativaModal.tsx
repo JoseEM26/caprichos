@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Confirmar } from '../../comun/Confirmar';
 import { subirCapturaIniciativa } from './iniciativasApi';
 
@@ -45,6 +45,18 @@ export function NuevaIniciativaModal({
   const [subiendoFoto, setSubiendoFoto] = useState<boolean>(false);
   const [confirmando, setConfirmando] = useState<boolean>(false);
 
+  useEffect(() => {
+    return () => {
+      if (fotoVistaPrevia && fotoVistaPrevia.startsWith('blob:')) {
+        try {
+          URL.revokeObjectURL(fotoVistaPrevia);
+        } catch {
+          // Ignorar
+        }
+      }
+    };
+  }, [fotoVistaPrevia]);
+
   if (!abierto) return null;
 
   const handleSeleccionarFoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -59,6 +71,13 @@ export function NuevaIniciativaModal({
     try {
       setSubiendoFoto(true);
       setError('');
+      if (fotoVistaPrevia && fotoVistaPrevia.startsWith('blob:')) {
+        try {
+          URL.revokeObjectURL(fotoVistaPrevia);
+        } catch {
+          // Ignorar
+        }
+      }
       const previewUrl = URL.createObjectURL(file);
       setFotoVistaPrevia(previewUrl);
 
@@ -74,6 +93,13 @@ export function NuevaIniciativaModal({
   };
 
   const quitarFoto = () => {
+    if (fotoVistaPrevia && fotoVistaPrevia.startsWith('blob:')) {
+      try {
+        URL.revokeObjectURL(fotoVistaPrevia);
+      } catch {
+        // Ignorar
+      }
+    }
     setArchivoId(null);
     setFotoVistaPrevia(null);
   };

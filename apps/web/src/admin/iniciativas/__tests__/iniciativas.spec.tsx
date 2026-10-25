@@ -158,4 +158,37 @@ describe('IniciativasView', () => {
 
     expect(screen.queryByText('CAMBIAR ESTADO (solo administrador)')).not.toBeInTheDocument();
   });
+
+  it('muestra miniatura en tarjeta y detalle, y al hacer clic abre el visor con botón Cerrar', async () => {
+    const datosConFoto: api.RespuestaIniciativas = {
+      ...datosEjemplo,
+      elementos: [
+        {
+          ...datosEjemplo.elementos[0],
+          archivoId: '10',
+          fotoUrl: '/admin/archivos/10',
+        },
+      ],
+    };
+    vi.spyOn(api, 'listarIniciativas').mockResolvedValue(datosConFoto);
+
+    render(<IniciativasView />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Ver captura de IN-0003' })).toBeInTheDocument();
+    });
+
+    // Clic en la miniatura de la tarjeta para abrir el visor
+    fireEvent.click(screen.getByRole('button', { name: 'Ver captura de IN-0003' }));
+
+    // Se abre el visor modal con la captura ampliada y botón Cerrar
+    expect(screen.getByRole('dialog', { name: 'Visor de captura' })).toBeInTheDocument();
+    expect(screen.getByText('Captura adjunta · IN-0003')).toBeInTheDocument();
+    const btnCerrar = screen.getByRole('button', { name: 'Cerrar' });
+    expect(btnCerrar).toBeInTheDocument();
+
+    // Clic en Cerrar
+    fireEvent.click(btnCerrar);
+    expect(screen.queryByRole('dialog', { name: 'Visor de captura' })).not.toBeInTheDocument();
+  });
 });

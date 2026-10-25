@@ -64,9 +64,13 @@ describe('AccesoGuard', () => {
     );
   });
 
-  const crearContexto = (headers: Record<string, string> = {}) => {
+  const crearContexto = (
+    headers: Record<string, string> = {},
+    query: Record<string, any> = {},
+  ) => {
     const req: any = {
       headers,
+      query,
       ip: '127.0.0.1',
     };
     const context = {
@@ -295,6 +299,53 @@ describe('AccesoGuard', () => {
       partyId: BigInt(30),
       rol: 'ADMIN',
       debeCambiar: false,
+    });
+  });
+
+  it('debe permitir acceso cuando se pasa una lista de permisos alternativos y el usuario tiene uno de ellos', async () => {
+    const { context } = crearContexto({
+      authorization: 'Bearer token-valido',
+    });
+
+    jwtService.verifyAsync.mockResolvedValue({
+      sub: '50',
+      partyId: '50',
+      rol: 'MOZO',
+    });
+
+    prisma.userAccount.findUnique.mockResolvedValue({
+      party_id: BigInt(50),
+      rol: 'MOZO',
+      activo: true,
+      debe_cambiar: false,
+    });
+
+    reflector.getAllAndOverride.mockImplementation((key) => {
+      if (key === CLAVE_SOLO_CAMBIO_CLAVE) return false;
+      if (key === CLAVE_PERMISO)
+        return [
+          { modulo: 'archivos', accion: 'ver' },
+          { modulo: 'iniciativas', accion: 'ver' },
+        ];
+      return null;
+    });
+
+    prisma.rolPermiso.findFirst.mockResolvedValue({
+      rol: 'MOZO',
+      permiso_id: BigInt(99),
+    });
+
+    const resultado = await guard.canActivate(context);
+
+    expect(resultado).toBe(true);
+    expect(prisma.rolPermiso.findFirst).toHaveBeenCalledWith({
+      where: {
+        rol: 'MOZO',
+        OR: [
+          { permiso: { modulo: 'archivos', accion: 'ver' } },
+          { permiso: { modulo: 'iniciativas', accion: 'ver' } },
+        ],
+      },
     });
   });
 });

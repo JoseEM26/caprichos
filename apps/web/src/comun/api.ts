@@ -205,3 +205,107 @@ export const api = {
   delete: <T = any>(ruta: string, opciones?: RequestInit) =>
     clienteFetch<T>(ruta, { ...opciones, method: 'DELETE' }),
 };
+
+const cacheBlobs = new Map<string, Promise<string>>();
+
+export function limpiarCacheBlobs(): void {
+  for (const [, promesa] of cacheBlobs) {
+    promesa
+      .then((url) => {
+        if (url && url.startsWith('blob:')) {
+          try {
+            URL.revokeObjectURL(url);
+          } catch {
+            // Ignorar error si ya fue revocado
+          }
+        }
+      })
+      .catch(() => {});
+  }
+  cacheBlobs.clear();
+}
+
+/**
+ * Descarga un archivo privado (ej. /admin/archivos/:id) con cabecera Authorization: Bearer.
+ * Gestiona renovación de token si expira (401) y almacena el Blob URL en memoria para no repetir peticiones.
+ */
+export async function obtenerBlobAutenticado(ruta: string): Promise<string> {
+  if (!ruta) return '';
+  if (ruta.startsWith('blob:') || ruta.startsWith('data:')) {
+    return ruta;
+  }
+
+  const enCache = cacheBlobs.get(ruta);
+  if (enCache) {
+    return enCache;
+  }
+
+  const fetchPromesa = (async () => {
+    const cabeceras: Record<string, string> = {
+      Accept: 'image/*,application/octet-stream,*/*',
+    };
+    if (tokenAcceso) {
+      cabeceras['Authorization'] = `Bearer ${tokenAcceso}`;
+    }
+
+    const respuesta = await fetch(ruta, {
+      method: 'GET',
+      headers: cabeceras,
+      credentials: 'include',
+    });
+
+    if (respuesta.status === 401) {
+      if (!promesaRenovacion) {
+        promesaRenovacion = ejecutarRenovacion();
+      }
+      try {
+        await promesaRenovacion;
+      } catch {
+        throw new ErrorApi('SESION_EXPIRADA', 'La sesión ha expirado', 401);
+      }
+
+      const retryHeaders: Record<string, string> = {
+        Accept: 'image/*,application/octet-stream,*/*',
+      };
+      if (tokenAcceso) {
+        retryHeaders['Authorization'] = `Bearer ${tokenAcceso}`;
+      }
+
+      const resRetry = await fetch(ruta, {
+        method: 'GET',
+        headers: retryHeaders,
+        credentials: 'include',
+      });
+
+      if (!resRetry.ok) {
+        throw new ErrorApi(
+          'ERROR_DESCARGA',
+          `Error al descargar archivo: ${resRetry.status}`,
+          resRetry.status,
+        );
+      }
+
+      const blob = await resRetry.blob();
+      return URL.createObjectURL(blob);
+    }
+
+    if (!respuesta.ok) {
+      throw new ErrorApi(
+        'ERROR_DESCARGA',
+        `Error al descargar archivo: ${respuesta.status}`,
+        respuesta.status,
+      );
+    }
+
+    const blob = await respuesta.blob();
+    return URL.createObjectURL(blob);
+  })();
+
+  fetchPromesa.catch(() => {
+    cacheBlobs.delete(ruta);
+  });
+
+  cacheBlobs.set(ruta, fetchPromesa);
+  return fetchPromesa;
+}
+

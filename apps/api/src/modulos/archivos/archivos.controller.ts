@@ -23,7 +23,10 @@ export class ArchivosController {
 
   @Post('admin/archivos')
   @UseGuards(AccesoGuard)
-  @Permiso('archivos', 'subir')
+  @Permiso([
+    { modulo: 'archivos', accion: 'subir' },
+    { modulo: 'iniciativas', accion: 'crear' },
+  ])
   @UseInterceptors(FileInterceptor('archivo'))
   async subir(
     @UploadedFile() file: Express.Multer.File,
@@ -52,7 +55,10 @@ export class ArchivosController {
 
   @Get('admin/archivos/:id')
   @UseGuards(AccesoGuard)
-  @Permiso('archivos', 'ver')
+  @Permiso([
+    { modulo: 'archivos', accion: 'ver' },
+    { modulo: 'iniciativas', accion: 'ver' },
+  ])
   async servirPrivado(
     @Param('id') id: string,
     @Req() req: any,

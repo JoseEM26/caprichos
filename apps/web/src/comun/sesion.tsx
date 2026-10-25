@@ -7,7 +7,7 @@ import {
   useCallback,
   useMemo,
 } from 'react';
-import { api, setTokenAcceso } from './api';
+import { api, setTokenAcceso, limpiarCacheBlobs } from './api';
 
 export interface UsuarioSesion {
   partyId: string;
@@ -143,6 +143,7 @@ export function SesionProvider({ children }: SesionProviderProps) {
     } finally {
       marcarSesion(false);
       setTokenAcceso(null);
+      limpiarCacheBlobs();
       setUsuario(null);
       setPermisos([]);
       setDebeCambiar(false);

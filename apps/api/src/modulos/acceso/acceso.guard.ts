@@ -26,18 +26,15 @@ export class AccesoGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest();
     const authHeader = req.headers['authorization'];
+    let token: string | undefined;
 
-    if (!authHeader || typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
-      throw new HttpException(
-        { codigo: 'NO_AUTENTICADO', mensaje: 'Token de autorización no proporcionado' },
-        HttpStatus.UNAUTHORIZED,
-      );
+    if (authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+      token = authHeader.slice(7).trim();
     }
 
-    const token = authHeader.slice(7).trim();
     if (!token) {
       throw new HttpException(
-        { codigo: 'NO_AUTENTICADO', mensaje: 'Token de autorización vacío' },
+        { codigo: 'NO_AUTENTICADO', mensaje: 'Token de autorización no proporcionado' },
         HttpStatus.UNAUTHORIZED,
       );
     }
@@ -104,19 +101,25 @@ export class AccesoGuard implements CanActivate {
       );
     }
 
-    const permisoRequerido = this.reflector.getAllAndOverride<{ modulo: string; accion: string }>(
+    const permisoRequerido = this.reflector.getAllAndOverride<any>(
       CLAVE_PERMISO,
       [context.getHandler(), context.getClass()],
     );
 
     if (permisoRequerido) {
+      const lista: Array<{ modulo: string; accion: string }> = Array.isArray(permisoRequerido)
+        ? permisoRequerido
+        : [permisoRequerido];
+
       const rolPermiso = await this.prisma.rolPermiso.findFirst({
         where: {
           rol: userAccount.rol,
-          permiso: {
-            modulo: permisoRequerido.modulo,
-            accion: permisoRequerido.accion,
-          },
+          OR: lista.map((p) => ({
+            permiso: {
+              modulo: p.modulo,
+              accion: p.accion,
+            },
+          })),
         },
       });
 
@@ -126,8 +129,8 @@ export class AccesoGuard implements CanActivate {
 
         await this.auditoria.registrar({
           categoria: 'ACCESO',
-          modulo: permisoRequerido.modulo,
-          accion: permisoRequerido.accion,
+          modulo: lista[0].modulo,
+          accion: lista[0].accion,
           resultado: 'RECHAZADO',
           motivo: 'SIN_PERMISO',
           partyId: userAccount.party_id,
