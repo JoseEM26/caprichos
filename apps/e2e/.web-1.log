@@ -1,4 +1,0 @@
-$ vite preview --port 5274 --host 127.0.0.1
-  ➜  Local:   http://127.0.0.1:5274/
-Killed
-[ELIFECYCLE] Command failed with exit code 137.
