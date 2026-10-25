@@ -57,3 +57,9 @@ apps/api/data/uploads/
 
 # Respaldos de la demo (datos personales de clientes): nunca al repositorio
 infra/demo/respaldos/
+
+apps/e2e/playwright-report/
+apps/e2e/test-results/
+apps/e2e/playwright-report*/
+apps/e2e/test-results*/
+apps/e2e/.stack-pids*.json
