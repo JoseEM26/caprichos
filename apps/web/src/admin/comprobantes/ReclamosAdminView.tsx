@@ -18,11 +18,15 @@ import {
   obtenerEstiloUrgencia,
 } from './utilidades';
 import './reclamos.css';
+import { QuejasWhatsAppTab } from '../reclamos/QuejasWhatsAppTab';
 
 export function ReclamosAdminView() {
   const { usuario, tiene } = useSesion();
   const esAdmin = usuario?.rol === 'ADMIN';
   const puedeResponder = tiene('reclamos/responder') || esAdmin;
+
+  // Pestaña principal: Libro de Reclamaciones (Legal) vs Quejas de WhatsApp (Chatbot)
+  const [pestanaModulo, setPestanaModulo] = useState<'libro' | 'whatsapp'>('libro');
 
   // Filtros de estado y tipo
   const [filtroEstado, setFiltroEstado] = useState<string>('todos');
@@ -165,8 +169,46 @@ export function ReclamosAdminView() {
 
   return (
     <div className="reclamos-contenedor">
-      {/* 1. Barra superior de controles: Búsqueda y Actualizar */}
-      <div className="reclamos-barra-controles">
+      {/* Selector de pestaña: Libro de Reclamaciones (Legal) vs Quejas de WhatsApp (Informal) */}
+      <div
+        role="tablist"
+        aria-label="Pestañas de atención y reclamos"
+        style={{
+          display: 'flex',
+          gap: '8px',
+          borderBottom: '2px solid var(--cp-line)',
+          paddingBottom: '12px',
+          marginBottom: '16px',
+        }}
+      >
+        <button
+          role="tab"
+          aria-selected={pestanaModulo === 'libro'}
+          type="button"
+          onClick={() => setPestanaModulo('libro')}
+          className={`reclamos-pildora-btn ${pestanaModulo === 'libro' ? 'activa' : ''}`}
+          style={{ padding: '8px 16px', fontSize: '14px', borderRadius: '10px' }}
+        >
+          Libro de Reclamaciones (Legal)
+        </button>
+        <button
+          role="tab"
+          aria-selected={pestanaModulo === 'whatsapp'}
+          type="button"
+          onClick={() => setPestanaModulo('whatsapp')}
+          className={`reclamos-pildora-btn ${pestanaModulo === 'whatsapp' ? 'activa' : ''}`}
+          style={{ padding: '8px 16px', fontSize: '14px', borderRadius: '10px' }}
+        >
+          Quejas de WhatsApp (Chatbot)
+        </button>
+      </div>
+
+      {pestanaModulo === 'whatsapp' ? (
+        <QuejasWhatsAppTab puedeResponder={puedeResponder} />
+      ) : (
+        <>
+          {/* 1. Barra superior de controles: Búsqueda y Actualizar */}
+          <div className="reclamos-barra-controles">
         <div className="reclamos-buscador-envoltura">
           <svg
             viewBox="0 0 24 24"
@@ -740,18 +782,20 @@ export function ReclamosAdminView() {
         />
       )}
 
-      {/* Confirmar respuesta formal (Sí/No) */}
-      {mostrarConfirmarResponder && reclamoDetalle && (
-        <Confirmar
-          abierto={mostrarConfirmarResponder}
-          titulo="¿Confirmar respuesta formal?"
-          mensaje={`¿Confirmas el envío de esta respuesta para el reclamo ${reclamoDetalle.numero}? Esta acción registra la respuesta formal y cierra el reclamo.`}
-          textoConfirmar="Sí, registrar respuesta"
-          textoNo="No, corregir"
-          alConfirmar={handleResponder}
-          alCancelar={() => setMostrarConfirmarResponder(false)}
-          cargando={enviandoRespuesta}
-        />
+          {/* Confirmar respuesta formal (Sí/No) */}
+          {mostrarConfirmarResponder && reclamoDetalle && (
+            <Confirmar
+              abierto={mostrarConfirmarResponder}
+              titulo="¿Confirmar respuesta formal?"
+              mensaje={`¿Confirmas el envío de esta respuesta para el reclamo ${reclamoDetalle.numero}? Esta acción registra la respuesta formal y cierra el reclamo.`}
+              textoConfirmar="Sí, registrar respuesta"
+              textoNo="No, corregir"
+              alConfirmar={handleResponder}
+              alCancelar={() => setMostrarConfirmarResponder(false)}
+              cargando={enviandoRespuesta}
+            />
+          )}
+        </>
       )}
     </div>
   );

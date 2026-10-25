@@ -8,6 +8,7 @@ import { FechasEspecialesTab } from './FechasEspecialesTab';
 import { ZonasRepartoView } from './ZonasRepartoView';
 import { SeccionAltaDemanda } from './SeccionAltaDemanda';
 import { SeccionRepartoConfig } from './SeccionRepartoConfig';
+import { ParametrosOperacionTab } from './ParametrosOperacionTab';
 
 export interface InfoLocalState {
   // local
@@ -414,6 +415,12 @@ const CATEGORIAS_CONFIG: CategoriaConfig[] = [
       { k: 'ruc', l: 'RUC', ph: 'Número de RUC (11 dígitos)' },
       { k: 'direccionFiscal', l: 'Dirección fiscal', ph: 'Dirección fiscal registrada' },
     ],
+  },
+  {
+    id: 'parametros',
+    n: 'Parámetros del sistema',
+    d: 'WhatsApp, tiempos de reparto, encuestas y umbrales operativos',
+    fields: [],
   },
 ];
 
@@ -957,8 +964,13 @@ export function ConfiguracionLocalView() {
             <SeccionRepartoConfig puedeEditar={puedeEditar} />
           )}
 
+          {/* Subcaso: PARÁMETROS DEL SISTEMA (WHATSAPP, REPARTO, ENCUESTAS) */}
+          {tabId === 'parametros' && (
+            <ParametrosOperacionTab puedeVer={true} puedeEditar={puedeEditar} />
+          )}
+
           {/* Subcaso: CAMPOS REGULARES DE OTRAS CATEGORÍAS */}
-          {tabId !== 'horario' && tabId !== 'zonas' && tabId !== 'demanda' && tabId !== 'reparto' && (
+          {tabId !== 'horario' && tabId !== 'zonas' && tabId !== 'demanda' && tabId !== 'reparto' && tabId !== 'parametros' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {tabId === 'operacion' && (
                 <div

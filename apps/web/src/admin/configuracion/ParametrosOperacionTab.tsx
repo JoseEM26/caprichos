@@ -133,6 +133,70 @@ const META_PARAMETROS: Record<string, MetaParametro> = {
     tipo: 'numero',
     sufijo: 'minutos',
   },
+  carta_aviso_entrada: {
+    nombre: 'Aviso de promociones al entrar',
+    descripcion: 'Muestra una ventana modal con la mejor promoción del día al ingresar a la carta virtual (máximo una vez al día por dispositivo).',
+    tipo: 'sino',
+  },
+  reparto_insistencia_min: {
+    nombre: 'Tiempo para insistencia en la puerta',
+    descripcion: 'Minutos de espera tras la llegada del repartidor antes de enviar el aviso 3 de insistencia al cliente.',
+    tipo: 'numero',
+    sufijo: 'minutos',
+  },
+  reparto_espera_max_min: {
+    nombre: 'Tiempo máximo de espera en la puerta',
+    descripcion: 'Minutos de tolerancia máxima en la puerta antes de considerar la entrega como fallida y ofrecer reprogramación.',
+    tipo: 'numero',
+    sufijo: 'minutos',
+  },
+  reparto_recargo_reprogramacion: {
+    nombre: 'Recargo por reprogramación de delivery',
+    descripcion: 'Monto en soles a cobrar como recargo por segundo intento de envío tras espera agotada en la puerta.',
+    tipo: 'numero',
+    sufijo: 'S/',
+  },
+  encuesta_espera_min: {
+    nombre: 'Espera para encuesta posventa',
+    descripcion: 'Minutos transcurridos tras la entrega del pedido antes de enviar automáticamente la encuesta de satisfacción por WhatsApp.',
+    tipo: 'numero',
+    sufijo: 'minutos',
+  },
+  encuesta_puntaje_queja: {
+    nombre: 'Umbral de queja en encuesta',
+    descripcion: 'Puntajes iguales o menores a este valor (1 a 5) son derivados automáticamente como quejas al módulo de Reclamos.',
+    tipo: 'numero',
+  },
+  whatsapp_aviso_salida_activo: {
+    nombre: 'Aviso WhatsApp: Delivery en camino',
+    descripcion: 'Envía aviso automático al cliente con tiempo estimado cuando el repartidor sale con el pedido.',
+    tipo: 'sino',
+  },
+  whatsapp_aviso_llegada_activo: {
+    nombre: 'Aviso WhatsApp: Repartidor en la puerta',
+    descripcion: 'Envía aviso automático al cliente indicando que el repartidor llegó a su dirección y la insistencia posterior.',
+    tipo: 'sino',
+  },
+  whatsapp_aviso_espera_activo: {
+    nombre: 'Aviso WhatsApp: Espera agotada y reprogramación',
+    descripcion: 'Notifica al cliente el retiro del repartidor por tiempo agotado y ofrece botones para reprogramar el envío.',
+    tipo: 'sino',
+  },
+  whatsapp_aviso_recojo_activo: {
+    nombre: 'Aviso WhatsApp: Pedido listo para recoger',
+    descripcion: 'Envía aviso automático al cliente cuando su pedido para llevar o recojo pasa a estado listo.',
+    tipo: 'sino',
+  },
+  whatsapp_aviso_pago_confirmado_activo: {
+    nombre: 'Aviso WhatsApp: Pago confirmado',
+    descripcion: 'Notifica al cliente que Caja confirmó su comprobante de pago y que el pedido está en preparación.',
+    tipo: 'sino',
+  },
+  whatsapp_aviso_encuesta_activo: {
+    nombre: 'Aviso WhatsApp: Encuesta de satisfacción posventa',
+    descripcion: 'Envía encuesta interactiva de calificación del 1 al 5 al cliente tras la entrega de su pedido.',
+    tipo: 'sino',
+  },
 };
 
 interface ParametrosOperacionTabProps {
@@ -159,6 +223,12 @@ export function ParametrosOperacionTab({
   const [errorServidor, setErrorServidor] = useState<string | null>(null);
   const [mensajeGuardado, setMensajeGuardado] = useState<string | null>(null);
 
+  // Estado del conector de WhatsApp (solo lectura, sin secretos)
+  const [estadoWhatsApp, setEstadoWhatsApp] = useState<{
+    conectado: boolean;
+    modo: 'meta' | 'simulado';
+  } | null>(null);
+
   const cargarParametros = async () => {
     if (!puedeVer) {
       setCargando(false);
@@ -173,6 +243,15 @@ export function ParametrosOperacionTab({
         (p) => p.clave !== 'local_datos' && p.clave !== 'local_pagos',
       );
       setParametros(filtrados);
+
+      try {
+        const infoWa = await api.get<{ conectado: boolean; modo: 'meta' | 'simulado' }>(
+          '/admin/reclamos/whatsapp/estado-conexion',
+        );
+        setEstadoWhatsApp(infoWa);
+      } catch {
+        setEstadoWhatsApp({ conectado: false, modo: 'simulado' });
+      }
     } catch (err) {
       const msg =
         err instanceof ErrorApi
@@ -229,6 +308,8 @@ export function ParametrosOperacionTab({
     setErrorServidor(null);
     if (typeof item.valor === 'boolean') {
       setNuevoValorInput(item.valor ? 'true' : 'false');
+    } else if (typeof item.valor === 'string' && (item.valor.toLowerCase() === 'si' || item.valor.toLowerCase() === 'no')) {
+      setNuevoValorInput(item.valor.toLowerCase() === 'si' ? 'true' : 'false');
     } else if (typeof item.valor === 'number') {
       setNuevoValorInput(String(item.valor));
     } else if (typeof item.valor === 'string') {
@@ -270,7 +351,7 @@ export function ParametrosOperacionTab({
     if (tipo === 'numero') {
       valorFinal = Number(nuevoValorInput.trim());
     } else if (tipo === 'sino') {
-      valorFinal = nuevoValorInput === 'true';
+      valorFinal = nuevoValorInput === 'true' || nuevoValorInput === 'si' ? 'si' : 'no';
     }
 
     setGuardando(true);
@@ -308,6 +389,9 @@ export function ParametrosOperacionTab({
     }
     if (typeof valor === 'boolean') {
       return valor ? 'Sí' : 'No';
+    }
+    if (typeof valor === 'string' && (valor.toLowerCase() === 'si' || valor.toLowerCase() === 'no')) {
+      return valor.toLowerCase() === 'si' ? 'Sí' : 'No';
     }
     if (typeof valor === 'object' && valor !== null) {
       return JSON.stringify(valor);
@@ -363,6 +447,66 @@ export function ParametrosOperacionTab({
             {mensajeGuardado}
           </span>
         )}
+      </div>
+
+      {/* Indicador solo-lectura de estado de conexión con WhatsApp (sin exponer secretos) */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '12px',
+          padding: '14px 18px',
+          background:
+            estadoWhatsApp?.modo === 'meta' && estadoWhatsApp?.conectado
+              ? '#EBF7EE'
+              : 'var(--cp-sand)',
+          border: '1px solid var(--cp-line)',
+          borderRadius: '14px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span
+            style={{
+              width: '12px',
+              height: '12px',
+              borderRadius: '50%',
+              background:
+                estadoWhatsApp?.modo === 'meta' && estadoWhatsApp?.conectado
+                  ? 'var(--cp-green)'
+                  : 'var(--cp-soft)',
+            }}
+          />
+          <div>
+            <div
+              style={{
+                fontFamily: 'var(--fuente-titulos)',
+                fontWeight: 800,
+                fontSize: '14px',
+                color: 'var(--cp-navy)',
+              }}
+            >
+              WhatsApp:{' '}
+              {estadoWhatsApp?.modo === 'meta' && estadoWhatsApp?.conectado
+                ? 'conectado con Meta'
+                : 'modo simulado (no se envia nada)'}
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
+              {estadoWhatsApp?.modo === 'meta' && estadoWhatsApp?.conectado
+                ? 'Conexión activa con WhatsApp Cloud API de Meta. Los mensajes saldrán a teléfonos reales.'
+                : 'Modo seguro por defecto sin credenciales externas. Los mensajes se guardan en la base de datos con estado SIMULADO.'}
+            </div>
+          </div>
+        </div>
+
+        <Insignia
+          variante={
+            estadoWhatsApp?.modo === 'meta' && estadoWhatsApp?.conectado ? 'exito' : 'neutro'
+          }
+        >
+          {estadoWhatsApp?.modo === 'meta' && estadoWhatsApp?.conectado ? 'Meta' : 'Simulado'}
+        </Insignia>
       </div>
 
       {!puedeEditar && (

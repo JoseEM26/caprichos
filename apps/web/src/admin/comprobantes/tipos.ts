@@ -176,3 +176,44 @@ export interface CartaLegalInfo {
   privacidad: string;
   reclamoPlazoDiasHabiles: number;
 }
+
+export interface QuejaWhatsAppItem {
+  id: string;
+  origen: string;
+  pedidoId: string | null;
+  pedidoCodigo: string | null;
+  cliente: string;
+  telefonoEnmascarado: string;
+  puntaje: number | null;
+  texto: string;
+  estado: 'NUEVA' | 'EN_REVISION' | 'RESUELTA';
+  atendidaPor: string | null;
+  resolucion: string | null;
+  creadaEn: string;
+  actualizadaEn: string;
+}
+
+export interface ResumenQuejasWhatsApp {
+  promedio: number;
+  totalEncuestas: number;
+  totalQuejas: number;
+  todas: number;
+  nuevas: number;
+  enRevision: number;
+  resueltas: number;
+}
+
+export interface RespuestaListarQuejasWhatsApp {
+  resumen: ResumenQuejasWhatsApp;
+  quejas: QuejaWhatsAppItem[];
+  total: number;
+  pagina: number;
+  limite: number;
+  totalPaginas: number;
+}
+
+export interface EstadoConexionWhatsAppInfo {
+  conectado: boolean;
+  modo: 'meta' | 'simulado';
+  razon?: string;
+}

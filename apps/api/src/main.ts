@@ -11,6 +11,7 @@ import { PinoLoggerService } from './comun/logger/pino-logger.service';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
+    rawBody: true,
   });
 
   const pinoLogger = app.get(PinoLoggerService);

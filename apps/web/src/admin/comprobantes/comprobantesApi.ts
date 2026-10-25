@@ -7,6 +7,9 @@ import type {
   CartaLegalInfo,
   ConstanciaReclamoPublico,
   ConsultaConstanciaPublica,
+  RespuestaListarQuejasWhatsApp,
+  QuejaWhatsAppItem,
+  EstadoConexionWhatsAppInfo,
 } from './tipos';
 
 export const comprobantesApi = {
@@ -125,5 +128,39 @@ export const comprobantesApi = {
     return clienteFetch<ConsultaConstanciaPublica>(
       `/reclamos/constancia/${encodeURIComponent(numero.trim())}?${params.toString()}`,
     );
+  },
+
+  // Quejas informales de WhatsApp (Chatbot)
+  async listarQuejasWhatsApp(filtros: {
+    estado?: string;
+    pagina?: number;
+    limite?: number;
+  } = {}): Promise<RespuestaListarQuejasWhatsApp> {
+    const params = new URLSearchParams();
+    if (filtros.estado) params.set('estado', filtros.estado);
+    if (filtros.pagina) params.set('pagina', String(filtros.pagina));
+    if (filtros.limite) params.set('limite', String(filtros.limite));
+    const qs = params.toString();
+    return clienteFetch<RespuestaListarQuejasWhatsApp>(
+      `/admin/reclamos/whatsapp${qs ? `?${qs}` : ''}`,
+    );
+  },
+
+  async obtenerQuejaWhatsApp(id: string): Promise<QuejaWhatsAppItem> {
+    return clienteFetch<QuejaWhatsAppItem>(`/admin/reclamos/whatsapp/${encodeURIComponent(id)}`);
+  },
+
+  async cambiarEstadoQuejaWhatsApp(
+    id: string,
+    dto: { estado: 'EN_REVISION' | 'RESUELTA'; nota?: string },
+  ): Promise<{ ok: boolean; id: string; estado: string }> {
+    return clienteFetch(`/admin/reclamos/whatsapp/${encodeURIComponent(id)}/estado`, {
+      method: 'POST',
+      body: JSON.stringify(dto),
+    });
+  },
+
+  async obtenerEstadoWhatsApp(): Promise<EstadoConexionWhatsAppInfo> {
+    return clienteFetch<EstadoConexionWhatsAppInfo>('/admin/reclamos/whatsapp/estado-conexion');
   },
 };

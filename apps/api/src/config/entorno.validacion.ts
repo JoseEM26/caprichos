@@ -52,6 +52,34 @@ export class VariablesEntorno {
   @IsString()
   @IsOptional()
   GIT_COMMIT: string = 'dev-local';
+
+  @IsString()
+  @IsOptional()
+  OPENAI_API_KEY?: string;
+
+  @IsString()
+  @IsOptional()
+  OPENAI_MODEL?: string;
+
+  @IsString()
+  @IsOptional()
+  WHATSAPP_TOKEN?: string;
+
+  @IsString()
+  @IsOptional()
+  WHATSAPP_PHONE_ID?: string;
+
+  @IsString()
+  @IsOptional()
+  WHATSAPP_VERIFY_TOKEN?: string;
+
+  @IsString()
+  @IsOptional()
+  WHATSAPP_APP_SECRET?: string;
+
+  @IsString()
+  @IsOptional()
+  ADMIN_WHATSAPP_NUMBERS?: string;
 }
 
 export function validarEntorno(config: Record<string, unknown>) {
