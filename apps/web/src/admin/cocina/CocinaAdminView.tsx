@@ -26,8 +26,7 @@ import {
 } from './audioAlerta';
 import { ComandaTarjeta } from './ComandaTarjeta';
 import { ModalAgotados } from './ModalAgotados';
-import { ModalMermaIndividual } from './ModalMermaIndividual';
-import { ModalMermaVarios } from './ModalMermaVarios';
+import { ModalMerma } from './ModalMerma';
 import { ModalPedirAlmacen } from './ModalPedirAlmacen';
 import { HistorialView } from './HistorialView';
 import { DespachoView } from './DespachoView';
@@ -107,8 +106,7 @@ export function CocinaAdminView() {
 
   // Modales
   const [modalAgotadosAbierto, setModalAgotadosAbierto] = useState<boolean>(false);
-  const [modalMermaIndAbierto, setModalMermaIndAbierto] = useState<boolean>(false);
-  const [modalMermaVariosAbierto, setModalMermaVariosAbierto] = useState<boolean>(false);
+  const [modalMermaAbierto, setModalMermaAbierto] = useState<boolean>(false);
   const [modalPedirAlmacenAbierto, setModalPedirAlmacenAbierto] = useState<boolean>(false);
   const [kFullAbierto, setKFullAbierto] = useState<boolean>(false);
 
@@ -261,10 +259,6 @@ export function CocinaAdminView() {
     const nuevo = !silenciado;
     setSilenciadoEstado(nuevo);
     setSilenciado(nuevo);
-  };
-
-  const probarSonido = () => {
-    reproducirCampanaCocina(true);
   };
 
   const seleccionarAreaMockup = (areaId: string) => {
@@ -607,10 +601,10 @@ export function CocinaAdminView() {
         )}
 
         {renderBotonAccion(
-          'merma-ind',
-          'Registrar merma',
-          'Registra la pérdida de un producto o insumo por caída, error de comanda, desecho o calibración.',
-          () => setModalMermaIndAbierto(true),
+          'merma',
+          'Registrar mermas',
+          'Registra la pérdida de uno o varios productos o insumos por caída, vencimiento, mala preparación o calibración.',
+          () => setModalMermaAbierto(true),
           {
             border: '1.5px solid var(--cp-navy)',
             background: 'transparent',
@@ -634,47 +628,28 @@ export function CocinaAdminView() {
           </svg>,
         )}
 
-        {renderBotonAccion(
-          'merma-varios',
-          'Merma de varios productos',
-          'Registra mermas en lote para varios productos simultáneamente con destino común o específico.',
-          () => setModalMermaVariosAbierto(true),
-          {
-            border: '1.5px solid var(--cp-navy)',
-            background: 'var(--cp-sand)',
+        <button
+          type="button"
+          role="switch"
+          aria-checked={!silenciado}
+          aria-label={silenciado ? 'Sonido apagado. Clic para encender' : 'Sonido encendido. Clic para apagar'}
+          onClick={alternarSonido}
+          style={{
+            minHeight: '44px',
+            padding: '0 14px',
+            borderRadius: '12px',
+            border: `1.5px solid ${!silenciado ? '#22C55E' : 'var(--cp-navy)'}`,
+            background: !silenciado ? '#DCFCE7' : 'transparent',
             color: 'var(--cp-navy)',
-          },
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <line x1="8" y1="6" x2="21" y2="6" />
-            <line x1="8" y1="12" x2="21" y2="12" />
-            <line x1="8" y1="18" x2="21" y2="18" />
-            <line x1="3" y1="6" x2="3.01" y2="6" />
-            <line x1="3" y1="12" x2="3.01" y2="12" />
-            <line x1="3" y1="18" x2="3.01" y2="18" />
-          </svg>,
-        )}
-
-        {renderBotonAccion(
-          'sonido',
-          silenciado ? 'Sonido: silenciado' : 'Sonido: activado',
-          'Activa o silencia el aviso sonoro que suena al llegar una comanda nueva.',
-          alternarSonido,
-          {
-            border: '1.5px solid var(--cp-navy)',
-            background: 'transparent',
-            color: 'var(--cp-navy)',
-          },
-          silenciado ? (
+            fontWeight: 800,
+            fontSize: '13px',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}
+        >
+          {silenciado ? (
             <svg
               width="16"
               height="16"
@@ -705,34 +680,18 @@ export function CocinaAdminView() {
               <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
               <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
             </svg>
-          ),
-        )}
-
-        {renderBotonAccion(
-          'probar-sonido',
-          'Probar sonido',
-          'Reproduce la campana de alerta para verificar el volumen del dispositivo.',
-          probarSonido,
-          {
-            border: '1.5px dashed var(--cp-soft)',
-            background: 'transparent',
-            color: 'var(--cp-soft)',
-          },
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-          </svg>,
-        )}
+          )}
+          <span>Sonido</span>
+          <span
+            style={{
+              width: '10px',
+              height: '10px',
+              borderRadius: '50%',
+              background: !silenciado ? '#22C55E' : 'var(--cp-soft)',
+              marginLeft: '2px',
+            }}
+          />
+        </button>
       </div>
 
       {/* 5. Selector de Área y Pantalla completa */}
@@ -1248,41 +1207,35 @@ export function CocinaAdminView() {
         abierto={modalAgotadosAbierto}
         alCerrar={() => setModalAgotadosAbierto(false)}
       />
-      <ModalMermaIndividual
-        abierto={modalMermaIndAbierto}
-        alCerrar={() => setModalMermaIndAbierto(false)}
-        alGuardar={async (datos) => {
+      <ModalMerma
+        abierto={modalMermaAbierto}
+        alCerrar={() => setModalMermaAbierto(false)}
+        alGuardar={async (lineas, codigoSupervisor) => {
           try {
-            await registrarMermaIndividual({
-              insumoId: datos.insumoId || datos.insumo,
-              cantidad: datos.cantidad,
-              origen: datos.origen,
-              motivo: datos.motivo,
-            });
-            setMensajeAccion(`Merma registrada: ${datos.cantidad} de ${datos.insumo}.`);
+            if (lineas.length === 1) {
+              const l = lineas[0];
+              await registrarMermaIndividual({
+                insumoId: l.insumoId,
+                cantidad: l.cantidad,
+                origen: l.origen,
+                motivo: l.motivo,
+              }, codigoSupervisor);
+              setMensajeAccion(`Merma registrada: ${l.cantidad} ${l.unidad} de ${l.insumoNombre}.`);
+            } else {
+              await registrarMermaMultiple({
+                motivoGlobal: 'Desecho',
+                lineas: lineas.map((l) => ({
+                  insumoId: l.insumoId,
+                  cantidad: l.cantidad,
+                  origen: l.origen,
+                  destino: l.destino,
+                })),
+              }, codigoSupervisor);
+              setMensajeAccion(`Merma múltiple registrada para ${lineas.length} líneas.`);
+            }
           } catch (err: any) {
             setError(err?.message || 'Error al registrar merma');
-          }
-        }}
-      />
-      <ModalMermaVarios
-        abierto={modalMermaVariosAbierto}
-        alCerrar={() => setModalMermaVariosAbierto(false)}
-        alGuardar={async (filas) => {
-          try {
-            const lineas = filas.map((f) => ({
-              insumoId: f.id || f.n,
-              cantidad: parseFloat(f.q.replace(',', '.')),
-              origen: f.origen,
-              destino: `Merma · ${f.motivo}`,
-            }));
-            await registrarMermaMultiple({
-              motivoGlobal: 'Desecho',
-              lineas,
-            });
-            setMensajeAccion(`Merma múltiple registrada para ${lineas.length} productos.`);
-          } catch (err: any) {
-            setError(err?.message || 'Error al registrar merma múltiple');
+            throw err;
           }
         }}
       />
@@ -1294,11 +1247,12 @@ export function CocinaAdminView() {
             await pedirInsumosAlmacen({
               items: datos.items,
               nota: datos.nota,
-              area: nombreAreaActual,
+              area: 'Cocina',
             });
             setMensajeAccion('Pedido de insumos enviado al almacén con éxito.');
           } catch (err: any) {
             setError(err?.message || 'Error al enviar pedido al almacén');
+            throw err;
           }
         }}
       />

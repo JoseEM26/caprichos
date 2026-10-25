@@ -190,10 +190,8 @@ describe('coc-pantalla: Nuevos requerimientos de pantalla de cocina', () => {
     // Botones presentes
     expect(screen.getByRole('button', { name: /^Marcar agotado$/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Pedir al almacén$/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^Registrar merma$/i })).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: /^Merma de varios productos$/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Registrar mermas$/i })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: /Sonido/i })).toBeInTheDocument();
 
     // Botón de ayuda ? para Marcar agotado
     const btnAyudaAgotado = screen.getByRole('button', {

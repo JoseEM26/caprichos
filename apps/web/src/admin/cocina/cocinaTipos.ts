@@ -125,4 +125,43 @@ export interface ItemCartaBuscable {
   nombre: string;
   subtitulo: string;
   categoriaNombre?: string;
+  fotoUrl?: string | null;
+  categoriaId?: string;
+  precio?: number;
+  sabores?: Array<{ id: string; nombre: string; disponible: boolean }>;
+  opciones?: Array<{ id: string; nombre: string; disponible: boolean; grupoNombre?: string }>;
 }
+
+export interface InsumoExistenciaCocina {
+  insumoId: string;
+  nombre: string;
+  unidad: string;
+  stockCocina: number;
+  stockMinimo: number;
+  stockAlmacen: number;
+}
+
+export interface PedidoInternoItem {
+  id: string;
+  area: string;
+  detalle: {
+    items: Array<{ insumoId?: string | number; insumo: string; cantidad: number; unidad?: string }>;
+    nota?: string | null;
+  };
+  estado: string; // 'PENDIENTE' | 'ENTREGADO' | 'RECIBIDO'
+  en: string;
+}
+
+export interface TrasladoItem {
+  id: string;
+  insumoId: string;
+  insumoNombre: string;
+  destino: string;
+  enviado: number;
+  recibido: number | null;
+  diferencia: number | null;
+  estado: string; // 'POR_RECIBIR' | 'RECIBIDO'
+  enviadoEn: string;
+  recibidoEn?: string | null;
+}
+

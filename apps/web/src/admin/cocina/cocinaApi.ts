@@ -6,9 +6,12 @@ import type {
   Comanda,
   DuracionAgotado,
   HistorialComanda,
+  InsumoExistenciaCocina,
   ItemCartaBuscable,
   PedidoDespacho,
+  PedidoInternoItem,
   TipoAgotado,
+  TrasladoItem,
 } from './cocinaTipos';
 
 export async function listarAreasCocina(): Promise<AreaCocina[]> {
@@ -78,41 +81,90 @@ export async function configurarAltaDemanda(dto: {
 }
 
 export async function pedirInsumosAlmacen(dto: {
-  items: { insumo: string; cantidad: number; unidad: string }[];
+  items: { insumo: string; cantidad: number; unidad: string; insumoId?: string | number }[];
   nota?: string;
   area?: string;
 }): Promise<any> {
   return api.post('/admin/almacen/pedidos-internos', dto);
 }
 
-export async function registrarMermaIndividual(dto: {
-  insumoId: string | number;
-  cantidad: number;
-  origen: string;
-  motivo: string;
-  nota?: string;
-}): Promise<any> {
-  return api.post('/admin/almacen/movimientos', {
-    tipo: 'MERMA',
-    insumoId: dto.insumoId,
-    cantidad: dto.cantidad,
-    origen: dto.origen,
-    destino: `Merma · ${dto.motivo}`,
-    motivo: dto.motivo,
-    nota: dto.nota,
-  });
-}
-
-export async function registrarMermaMultiple(dto: {
-  motivoGlobal?: string;
-  lineas: {
+export async function registrarMermaIndividual(
+  dto: {
     insumoId: string | number;
     cantidad: number;
     origen: string;
-    destino: string;
-  }[];
-}): Promise<any> {
-  return api.post('/admin/almacen/movimientos-merma-multiple', dto);
+    motivo: string;
+    nota?: string;
+  },
+  codigoSupervisor?: string,
+): Promise<any> {
+  const headers: Record<string, string> = {};
+  if (codigoSupervisor) {
+    headers['X-Codigo-Supervisor'] = codigoSupervisor.trim();
+    headers['X-Pin-Supervisor'] = codigoSupervisor.trim();
+  }
+  return api.post(
+    '/admin/almacen/movimientos',
+    {
+      tipo: 'MERMA',
+      insumoId: dto.insumoId,
+      cantidad: dto.cantidad,
+      origen: dto.origen,
+      destino: `Merma · ${dto.motivo}`,
+      motivo: dto.motivo,
+      nota: dto.nota,
+    },
+    Object.keys(headers).length > 0 ? { headers } : undefined,
+  );
+}
+
+export async function registrarMermaMultiple(
+  dto: {
+    motivoGlobal?: string;
+    lineas: {
+      insumoId: string | number;
+      cantidad: number;
+      origen: string;
+      destino: string;
+    }[];
+  },
+  codigoSupervisor?: string,
+): Promise<any> {
+  const headers: Record<string, string> = {};
+  if (codigoSupervisor) {
+    headers['X-Codigo-Supervisor'] = codigoSupervisor.trim();
+    headers['X-Pin-Supervisor'] = codigoSupervisor.trim();
+  }
+  return api.post(
+    '/admin/almacen/movimientos-merma-multiple',
+    dto,
+    Object.keys(headers).length > 0 ? { headers } : undefined,
+  );
+}
+
+export async function obtenerExistenciasParaPedir(): Promise<InsumoExistenciaCocina[]> {
+  return api.get<InsumoExistenciaCocina[]>('/admin/cocina/existencias-para-pedir');
+}
+
+export async function listarPedidosInternos(): Promise<PedidoInternoItem[]> {
+  return api.get<PedidoInternoItem[]>('/admin/almacen/pedidos-internos');
+}
+
+export async function listarTraslados(): Promise<TrasladoItem[]> {
+  return api.get<TrasladoItem[]>('/admin/almacen/traslados');
+}
+
+export async function confirmarRecepcionTraslado(
+  trasladoId: string,
+  recibido: number,
+): Promise<any> {
+  return api.post(`/admin/almacen/traslados/${encodeURIComponent(trasladoId)}/confirmar-recepcion`, {
+    recibido,
+  });
+}
+
+export async function obtenerCartaCategorias(): Promise<any[]> {
+  return api.get<any[]>('/carta');
 }
 
 /**
@@ -129,37 +181,57 @@ export async function buscarItemsDeCarta(): Promise<ItemCartaBuscable[]> {
     for (const cat of categorias) {
       const prods = cat.productos || [];
       for (const p of prods) {
+        const saboresList = (p.sabores || []).map((s: any) => ({
+          id: s.id.toString(),
+          nombre: s.nombre,
+          disponible: s.disponible !== false,
+        }));
+
+        const opcionesList: Array<{ id: string; nombre: string; disponible: boolean; grupoNombre?: string }> = [];
+        for (const g of p.grupos || []) {
+          for (const op of g.opciones || []) {
+            opcionesList.push({
+              id: op.id.toString(),
+              nombre: op.nombre,
+              disponible: op.disponible !== false,
+              grupoNombre: g.nombre,
+            });
+          }
+        }
+
         items.push({
           tipo: 'PRODUCTO',
           id: p.id.toString(),
           nombre: p.nombre,
           subtitulo: `Producto · ${cat.nombre}`,
           categoriaNombre: cat.nombre,
+          categoriaId: cat.id?.toString(),
+          fotoUrl: p.fotoUrl || null,
+          precio: p.precio,
+          sabores: saboresList,
+          opciones: opcionesList,
         });
 
-        const sabores = p.sabores || [];
-        for (const s of sabores) {
+        for (const s of saboresList) {
           items.push({
             tipo: 'SABOR',
-            id: s.id.toString(),
+            id: s.id,
             nombre: `${s.nombre}`,
             subtitulo: `Sabor de ${p.nombre}`,
             categoriaNombre: cat.nombre,
+            categoriaId: cat.id?.toString(),
           });
         }
 
-        const grupos = p.grupos || [];
-        for (const g of grupos) {
-          const opciones = g.opciones || [];
-          for (const op of opciones) {
-            items.push({
-              tipo: 'OPCION',
-              id: op.id.toString(),
-              nombre: `${op.nombre}`,
-              subtitulo: `Opción de ${p.nombre} (${g.nombre})`,
-              categoriaNombre: cat.nombre,
-            });
-          }
+        for (const op of opcionesList) {
+          items.push({
+            tipo: 'OPCION',
+            id: op.id,
+            nombre: `${op.nombre}`,
+            subtitulo: `Opción de ${p.nombre}${op.grupoNombre ? ` (${op.grupoNombre})` : ''}`,
+            categoriaNombre: cat.nombre,
+            categoriaId: cat.id?.toString(),
+          });
         }
       }
     }
@@ -169,3 +241,4 @@ export async function buscarItemsDeCarta(): Promise<ItemCartaBuscable[]> {
     return [];
   }
 }
+
