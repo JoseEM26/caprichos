@@ -31,6 +31,8 @@ export interface PedidoReparto {
   llego_en: string | null;
   entregado_en: string | null;
   motivo_falla: string | null;
+  alerta_tomado_sin_salir?: boolean;
+  minutos_sin_salir?: number;
   creado_en: string;
   repartidor?: {
     id: string;
@@ -51,6 +53,27 @@ export interface ResumenRepartos {
   lados?: Record<string, number>;
   zonas?: Record<string, number>;
   [key: string]: any;
+}
+
+export interface PedidoPerdido {
+  pedidoId: string;
+  codigo: string;
+  motivo: 'OTRO_REPARTIDOR' | 'NO_DISPONIBLE' | 'LIMITE' | 'ANULADO';
+  tomadoPor?: string;
+}
+
+export interface RespuestaIniciarRuta {
+  tomados: PedidoReparto[];
+  perdidos: PedidoPerdido[];
+}
+
+export interface LiberarPedidoDto {
+  motivo: string;
+}
+
+export interface ReasignarPedidoDto {
+  repartidorPartyId: string;
+  motivo: string;
 }
 
 export interface MensajeReparto {
@@ -101,6 +124,15 @@ export const repartosApi = {
 
   tomarPedido: (id: string) =>
     api.post<PedidoReparto>(`/admin/repartos/${id}/tomar`),
+
+  iniciarRuta: (body: { pedidoIds: string[] }) =>
+    api.post<RespuestaIniciarRuta>('/admin/repartos/iniciar-ruta', body),
+
+  liberarPedido: (id: string, motivo: string) =>
+    api.post<PedidoReparto>(`/admin/repartos/${id}/liberar`, { motivo }),
+
+  reasignarPedido: (id: string, repartidorPartyId: string, motivo: string) =>
+    api.post<PedidoReparto>(`/admin/repartos/${id}/reasignar`, { repartidorPartyId, motivo }),
 
   salir: (id: string) =>
     api.post<PedidoReparto>(`/admin/repartos/${id}/salir`),

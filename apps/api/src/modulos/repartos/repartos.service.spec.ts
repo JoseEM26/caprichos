@@ -82,6 +82,14 @@ describe('RepartosService', () => {
         findFirst: jest.fn(),
         update: jest.fn(),
       },
+      person: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      userAccount: {
+        findUnique: jest.fn(),
+      },
+      $transaction: jest.fn((cb) => cb(prismaMock)),
+      $queryRaw: jest.fn().mockResolvedValue([]),
     };
 
     auditoriaMock = {
@@ -759,6 +767,383 @@ describe('RepartosService', () => {
       expect(res[0].tarifa).toBe(2);
       expect(res[0].puntos).toBe(4);
       expect(res[0].centro).toEqual([-12.02, -76.96]);
+    });
+  });
+
+  describe('11. Iniciar ruta atómica e idempotente (POST admin/repartos/iniciar-ruta)', () => {
+    it('inicia ruta con éxito asignando y saliendo a EN_CAMINO en un solo paso', async () => {
+      const lockedRows = [
+        {
+          id: 10n,
+          codigo: 'CP-010',
+          modalidad: 'DELIVERY',
+          estado: 'LISTO',
+          repartidor_party_id: null,
+          anulado_en: null,
+          motivo_falla: null,
+          entrega_lat: new Prisma.Decimal(-12.02),
+          entrega_lng: new Prisma.Decimal(-76.96),
+        },
+        {
+          id: 20n,
+          codigo: 'CP-020',
+          modalidad: 'DELIVERY',
+          estado: 'LISTO',
+          repartidor_party_id: null,
+          anulado_en: null,
+          motivo_falla: null,
+          entrega_lat: new Prisma.Decimal(-12.025),
+          entrega_lng: new Prisma.Decimal(-76.965),
+        },
+      ];
+      prismaMock.$queryRaw.mockResolvedValue(lockedRows);
+      prismaMock.pedido.findMany
+        .mockResolvedValueOnce([]) // pedidos activos previos
+        .mockResolvedValueOnce([
+          {
+            ...lockedRows[0],
+            total: new Prisma.Decimal(30),
+            creado_en: new Date(),
+            zona: { codigo: 'Z2' },
+          },
+          {
+            ...lockedRows[1],
+            total: new Prisma.Decimal(25),
+            creado_en: new Date(),
+            zona: { codigo: 'Z2' },
+          },
+        ]);
+
+      const res = await service.iniciarRuta(
+        { pedidoIds: ['10', '20'] },
+        repartidor1,
+        '127.0.0.1',
+      );
+
+      expect(res.tomados).toHaveLength(2);
+      expect(res.perdidos).toHaveLength(0);
+      expect(res.tomados[0].codigo).toBe('CP-010');
+      expect(res.tomados[1].codigo).toBe('CP-020');
+      expect(prismaMock.pedido.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 10n },
+          data: expect.objectContaining({
+            repartidor_party_id: 101n,
+            estado: 'EN_CAMINO',
+          }),
+        }),
+      );
+      expect(eventosGatewayMock.emitirAdmin).toHaveBeenCalledWith(
+        'pedido:estado',
+        expect.objectContaining({ estado: 'EN_CAMINO' }),
+      );
+    });
+
+    it('reporta perdidos individualmente (OTRO_REPARTIDOR, LIMITE, ANULADO, NO_DISPONIBLE) sin fallar en bloque', async () => {
+      const lockedRows = [
+        {
+          id: 10n,
+          codigo: 'CP-010',
+          modalidad: 'DELIVERY',
+          estado: 'LISTO',
+          repartidor_party_id: 102n, // tomado por Carlos
+          anulado_en: null,
+          motivo_falla: null,
+          entrega_lat: new Prisma.Decimal(-12.02),
+          entrega_lng: new Prisma.Decimal(-76.96),
+        },
+        {
+          id: 11n,
+          codigo: 'CP-011',
+          modalidad: 'DELIVERY',
+          estado: 'ANULADO',
+          repartidor_party_id: null,
+          anulado_en: new Date(),
+          motivo_falla: null,
+          entrega_lat: new Prisma.Decimal(-12.02),
+          entrega_lng: new Prisma.Decimal(-76.96),
+        },
+        {
+          id: 12n,
+          codigo: 'CP-012',
+          modalidad: 'DELIVERY',
+          estado: 'LISTO',
+          repartidor_party_id: null,
+          anulado_en: null,
+          motivo_falla: null,
+          entrega_lat: null, // falta ubicar
+          entrega_lng: null,
+        },
+        {
+          id: 13n,
+          codigo: 'CP-013',
+          modalidad: 'DELIVERY',
+          estado: 'LISTO',
+          repartidor_party_id: null,
+          anulado_en: null,
+          motivo_falla: null,
+          entrega_lat: new Prisma.Decimal(-12.02),
+          entrega_lng: new Prisma.Decimal(-76.96),
+        },
+        {
+          id: 14n,
+          codigo: 'CP-014',
+          modalidad: 'DELIVERY',
+          estado: 'LISTO',
+          repartidor_party_id: null,
+          anulado_en: null,
+          motivo_falla: null,
+          entrega_lat: new Prisma.Decimal(-12.02),
+          entrega_lng: new Prisma.Decimal(-76.96),
+        },
+      ];
+
+      prismaMock.$queryRaw.mockResolvedValue(lockedRows);
+      prismaMock.person.findMany.mockResolvedValue([
+        { party_id: 102n, nombres: 'Carlos', apellidos: 'Soto' },
+      ]);
+      // Repartidor ya lleva 2 pedidos activos (límite 3)
+      prismaMock.pedido.findMany
+        .mockResolvedValueOnce([{ id: 1010n }, { id: 1011n }])
+        .mockResolvedValueOnce([
+          {
+            ...lockedRows[3], // CP-013 es el único tomado (ocupa el cupo 3)
+            total: new Prisma.Decimal(20),
+            creado_en: new Date(),
+            zona: { codigo: 'Z2' },
+          },
+        ]);
+
+      const res = await service.iniciarRuta(
+        { pedidoIds: ['10', '11', '12', '13', '14'] },
+        repartidor1,
+      );
+
+      expect(res.tomados).toHaveLength(1);
+      expect(res.tomados[0].codigo).toBe('CP-013');
+
+      expect(res.perdidos).toHaveLength(4);
+      expect(res.perdidos).toEqual([
+        { pedidoId: '10', codigo: 'CP-010', motivo: 'OTRO_REPARTIDOR', tomadoPor: 'Carlos Soto' },
+        { pedidoId: '11', codigo: 'CP-011', motivo: 'ANULADO' },
+        { pedidoId: '12', codigo: 'CP-012', motivo: 'NO_DISPONIBLE' },
+        { pedidoId: '14', codigo: 'CP-014', motivo: 'LIMITE' },
+      ]);
+    });
+
+    it('es idempotente: reintento de red o doble toque con pedido ya tomado no duplica ni falla', async () => {
+      const lockedRows = [
+        {
+          id: 50n,
+          codigo: 'CP-050',
+          modalidad: 'DELIVERY',
+          estado: 'LISTO',
+          repartidor_party_id: 101n, // ya asignado a este mismo repartidor
+          anulado_en: null,
+          motivo_falla: null,
+          entrega_lat: new Prisma.Decimal(-12.02),
+          entrega_lng: new Prisma.Decimal(-76.96),
+        },
+      ];
+      prismaMock.$queryRaw.mockResolvedValue(lockedRows);
+      prismaMock.pedido.findMany
+        .mockResolvedValueOnce([{ id: 50n }])
+        .mockResolvedValueOnce([
+          {
+            ...lockedRows[0],
+            estado: 'EN_CAMINO',
+            total: new Prisma.Decimal(35),
+            creado_en: new Date(),
+            zona: { codigo: 'Z2' },
+          },
+        ]);
+
+      const res = await service.iniciarRuta({ pedidoIds: ['50'] }, repartidor1);
+
+      expect(res.tomados).toHaveLength(1);
+      expect(res.perdidos).toHaveLength(0);
+      expect(res.tomados[0].codigo).toBe('CP-050');
+    });
+
+    it('simula concurrencia atómica con Promise.all sin colisiones', async () => {
+      // Repartidor 1 toma primero CP-100, Repartidor 2 intenta el mismo
+      const row100Inicial = {
+        id: 100n,
+        codigo: 'CP-100',
+        modalidad: 'DELIVERY',
+        estado: 'LISTO',
+        repartidor_party_id: null,
+        anulado_en: null,
+        motivo_falla: null,
+        entrega_lat: new Prisma.Decimal(-12.02),
+        entrega_lng: new Prisma.Decimal(-76.96),
+      };
+
+      // Mock para repartidor 1 (encuentra libre y toma)
+      prismaMock.$queryRaw.mockResolvedValueOnce([row100Inicial]);
+      prismaMock.pedido.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          {
+            ...row100Inicial,
+            estado: 'EN_CAMINO',
+            repartidor_party_id: 101n,
+            total: new Prisma.Decimal(40),
+            creado_en: new Date(),
+            zona: { codigo: 'Z2' },
+          },
+        ]);
+
+      const resRider1 = await service.iniciarRuta({ pedidoIds: ['100'] }, repartidor1);
+      expect(resRider1.tomados).toHaveLength(1);
+      expect(resRider1.perdidos).toHaveLength(0);
+
+      // Mock para repartidor 2 (encuentra ya tomado por rider 1)
+      const row100YaTomado = {
+        ...row100Inicial,
+        repartidor_party_id: 101n,
+      };
+      prismaMock.$queryRaw.mockResolvedValueOnce([row100YaTomado]);
+      prismaMock.person.findMany.mockResolvedValueOnce([
+        { party_id: 101n, nombres: 'Juan', apellidos: 'Rider' },
+      ]);
+      prismaMock.pedido.findMany.mockResolvedValueOnce([]);
+
+      const resRider2 = await service.iniciarRuta({ pedidoIds: ['100'] }, repartidor2);
+      expect(resRider2.tomados).toHaveLength(0);
+      expect(resRider2.perdidos).toHaveLength(1);
+      expect(resRider2.perdidos[0].motivo).toBe('OTRO_REPARTIDOR');
+      expect(resRider2.perdidos[0].tomadoPor).toBe('Juan Rider');
+    });
+  });
+
+  describe('12. Liberar y reasignar por Caja/Admin', () => {
+    it('liberarPedido regresa el pedido a LISTO sin repartidor asignado', async () => {
+      const pedidoTomado = {
+        id: 300n,
+        codigo: 'CP-300',
+        modalidad: 'DELIVERY',
+        estado: 'LISTO',
+        repartidor_party_id: 101n,
+        tomado_en: new Date(),
+        salio_en: null,
+        total: new Prisma.Decimal(50),
+        creado_en: new Date(),
+        zona: { codigo: 'Z2' },
+      };
+      prismaMock.pedido.findUnique.mockResolvedValue(pedidoTomado);
+      prismaMock.pedido.update.mockResolvedValue({
+        ...pedidoTomado,
+        repartidor_party_id: null,
+        tomado_en: null,
+        salio_en: null,
+        estado: 'LISTO',
+      });
+
+      const res = await service.liberarPedido(
+        '300',
+        { motivo: 'Repartidor pinchó llanta' },
+        adminAuth,
+      );
+
+      expect(res.repartidor_party_id).toBeNull();
+      expect(res.estado).toBe('LISTO');
+      expect(prismaMock.pedidoEstadoHistorial.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            pedido_id: 300n,
+            estado_nuevo: 'LISTO',
+            motivo: expect.stringContaining('Repartidor pinchó llanta'),
+          }),
+        }),
+      );
+      expect(eventosGatewayMock.emitirAdmin).toHaveBeenCalledWith(
+        'pedido:estado',
+        expect.objectContaining({ id: 300, estado: 'LISTO', repartidor_party_id: null }),
+      );
+    });
+
+    it('liberarPedido rechaza liberar un pedido que ya fue entregado', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 301n,
+        codigo: 'CP-301',
+        estado: 'ENTREGADO',
+        repartidor_party_id: 101n,
+      });
+
+      await expect(
+        service.liberarPedido('301', { motivo: 'Error' }, adminAuth),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('reasignarPedido transfiere el pedido a otro repartidor disponible', async () => {
+      const pedidoTomado = {
+        id: 400n,
+        codigo: 'CP-400',
+        modalidad: 'DELIVERY',
+        estado: 'LISTO',
+        repartidor_party_id: 101n,
+        total: new Prisma.Decimal(30),
+        creado_en: new Date(),
+        zona: { codigo: 'Z2' },
+      };
+      prismaMock.pedido.findUnique.mockResolvedValue(pedidoTomado);
+      prismaMock.userAccount.findUnique.mockResolvedValue({
+        party_id: 102n,
+        rol: 'REPARTIDOR',
+        activo: true,
+        party: { persona: { nombres: 'Carlos' } },
+      });
+      prismaMock.pedido.count.mockResolvedValue(1); // tiene 1 pedido activo (límite 3)
+      prismaMock.pedido.update.mockResolvedValue({
+        ...pedidoTomado,
+        repartidor_party_id: 102n,
+        tomado_en: new Date(),
+      });
+
+      const res = await service.reasignarPedido(
+        '400',
+        { repartidorPartyId: '102', motivo: 'Cambio de turno' },
+        adminAuth,
+      );
+
+      expect(res.repartidor_party_id).toBe('102');
+      expect(prismaMock.pedidoEstadoHistorial.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            pedido_id: 400n,
+            motivo: expect.stringContaining('Cambio de turno'),
+          }),
+        }),
+      );
+    });
+
+    it('detecta alerta ámbar para caja cuando un pedido tomado no sale tras N minutos', async () => {
+      const ahora = new Date();
+      const tomadoHace15Min = new Date(ahora.getTime() - 15 * 60 * 1000);
+
+      const pedidoSinSalir = {
+        id: 500n,
+        codigo: 'CP-500',
+        modalidad: 'DELIVERY',
+        estado: 'LISTO',
+        repartidor_party_id: 101n,
+        tomado_en: tomadoHace15Min,
+        salio_en: null,
+        total: new Prisma.Decimal(25),
+        creado_en: new Date(ahora.getTime() - 25 * 60 * 1000),
+        zona: { codigo: 'Z2' },
+      };
+
+      prismaMock.parametro.findMany.mockResolvedValue([
+        { clave: 'reparto_tomado_sin_salir_min', valor: 10 },
+      ]);
+      prismaMock.pedido.findMany.mockResolvedValue([pedidoSinSalir]);
+
+      const lista = await service.listarTodos({}, adminAuth);
+      expect(lista).toHaveLength(1);
+      expect(lista[0].alerta_tomado_sin_salir).toBe(true);
+      expect(lista[0].minutos_sin_salir).toBeGreaterThanOrEqual(15);
     });
   });
 });

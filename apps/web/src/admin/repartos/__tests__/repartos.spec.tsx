@@ -3,6 +3,8 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { RepartosView } from '../RepartosView';
 import { TarjetaReparto } from '../TarjetaReparto';
+import { PanelRutaSugerida } from '../PanelRutaSugerida';
+import { ResumenPedidoReparto } from '../ResumenPedidoReparto';
 import { ModalReportarFalla } from '../ModalReportarFalla';
 import { repartosApi, PedidoReparto } from '../repartosApi';
 import * as sesionModulo from '../../../comun/sesion';
@@ -20,8 +22,35 @@ vi.mock('../MapaRepartos', () => ({
     onSeleccionarPunto,
     esPantallaCompleta,
     onAlternarPantallaCompleta,
+    rutasSugeridas,
+    rutaActivaId,
+    onSeleccionarRutaSugerida,
+    mostrarRutasSugeridas,
+    onAlternarMostrarRutasSugeridas,
   }: any) => (
     <div data-testid="mock-mapa-repartos">
+      {onAlternarMostrarRutasSugeridas && (
+        <button
+          data-testid="mock-btn-ver-rutas"
+          onClick={onAlternarMostrarRutasSugeridas}
+        >
+          {mostrarRutasSugeridas ? 'Ocultar rutas sugeridas' : 'Ver rutas sugeridas'}
+        </button>
+      )}
+      {mostrarRutasSugeridas && rutasSugeridas && (
+        <div data-testid="mock-rutas-sugeridas-lista">
+          {rutasSugeridas.map((r: any) => (
+            <button
+              key={r.id}
+              data-testid={`mock-ruta-${r.id}`}
+              data-activa={r.id === rutaActivaId ? 'true' : 'false'}
+              onClick={() => onSeleccionarRutaSugerida && onSeleccionarRutaSugerida(r)}
+            >
+              {r.nombre}: {r.totalPedidos} pedidos · ~{r.tiempoMin} min
+            </button>
+          ))}
+        </div>
+      )}
       <div data-testid="zonas-container">
         {(zonas || []).map((z: any) => (
           <button
@@ -437,5 +466,202 @@ describe('Ola F5 y Siguiente: Repartos y Mapa (Decisiones del Dueño 1 a 8)', ()
     });
     expect(screen.queryByText('Z4 · 3 pedidos')).not.toBeInTheDocument();
     expect(screen.queryByText('Z7 · 1 pedido')).not.toBeInTheDocument();
+  });
+
+  it('ausencia de coordenadas GPS en el DOM en TarjetaReparto y ResumenPedidoReparto', () => {
+    const pedidoConCoords: PedidoReparto = {
+      ...pedidoEjemplo,
+      lat: -12.045678,
+      lng: -77.034567,
+    };
+
+    const { container: containerTarjeta } = render(
+      <TarjetaReparto pedido={pedidoConCoords} alActualizar={vi.fn()} esDisponible={true} />,
+    );
+    expect(containerTarjeta.textContent).not.toMatch(/-12\.\d+/);
+    expect(containerTarjeta.textContent).not.toMatch(/-77\.\d+/);
+
+    const mockAcciones: any = {
+      cargandoAccion: false,
+      errorAccion: null,
+      setErrorAccion: vi.fn(),
+      tomar: vi.fn(),
+      salir: vi.fn(),
+      llegue: vi.fn(),
+      entregar: vi.fn(),
+      liberar: vi.fn(),
+      reasignar: vi.fn(),
+    };
+
+    const { container: containerResumen } = render(
+      <ResumenPedidoReparto
+        pedido={pedidoConCoords}
+        acciones={mockAcciones}
+        esDisponible={true}
+        alActualizar={vi.fn()}
+      />,
+    );
+    expect(containerResumen.textContent).not.toMatch(/-12\.\d+/);
+    expect(containerResumen.textContent).not.toMatch(/-77\.\d+/);
+  });
+
+  it('PanelRutaSugerida muestra casillas por parada, respeta límite y permite iniciar ruta', async () => {
+    const candidatos = [
+      { id: 'p1', codigo: 'CP-1001', cliente_nombre: 'Ana Paz', direccion: 'Calle 1', lat: -12.04, lng: -77.03, minutosEspera: 10, total: 30 },
+      { id: 'p2', codigo: 'CP-1002', cliente_nombre: 'Beto Ruiz', direccion: 'Calle 2', lat: -12.05, lng: -77.02, minutosEspera: 15, total: 35 },
+      { id: 'p3', codigo: 'CP-1003', cliente_nombre: 'Carla Sol', direccion: 'Calle 3', lat: -12.06, lng: -77.01, minutosEspera: 20, total: 40 },
+      { id: 'p4', codigo: 'CP-1004', cliente_nombre: 'Daniel Vega', direccion: 'Calle 4', lat: -12.07, lng: -77.00, minutosEspera: 25, total: 45 },
+    ];
+
+    const mockAlternar = vi.fn();
+    const mockIniciar = vi.fn();
+
+    const rutaMock = {
+      paradas: [
+        { ...candidatos[0], orden: 1, distanciaTramoKm: 1, tiempoTramoMin: 3, distanciaAcumuladaKm: 1, tiempoAcumuladoMin: 3 },
+        { ...candidatos[1], orden: 2, distanciaTramoKm: 1.5, tiempoTramoMin: 4, distanciaAcumuladaKm: 2.5, tiempoAcumuladoMin: 7 },
+      ],
+      totalParadas: 2,
+      distanciaAproxKm: 2.5,
+      tiempoAproxMin: 7,
+      urlGoogleMaps: 'https://maps.google.com',
+    };
+
+    render(
+      <PanelRutaSugerida
+        ruta={rutaMock}
+        pedidosCandidatos={candidatos}
+        paradasSeleccionadasIds={['p1', 'p2']}
+        onAlternarSeleccionParada={mockAlternar}
+        onMoverParada={vi.fn()}
+        maxParadas={3}
+        alIniciarRuta={mockIniciar}
+      />,
+    );
+
+    const checkboxP1 = screen.getByRole('checkbox', { name: /incluir pedido cp-1001/i });
+    const checkboxP2 = screen.getByRole('checkbox', { name: /incluir pedido cp-1002/i });
+    const checkboxP3 = screen.getByRole('checkbox', { name: /incluir pedido cp-1003/i });
+    expect(checkboxP1).toBeChecked();
+    expect(checkboxP2).toBeChecked();
+    expect(checkboxP3).not.toBeChecked();
+
+    fireEvent.click(checkboxP3);
+    expect(mockAlternar).toHaveBeenCalledWith('p3');
+
+    const btnIniciar = screen.getByRole('button', { name: /iniciar ruta/i });
+    fireEvent.click(btnIniciar);
+
+    await waitFor(() => {
+      expect(screen.getByText(/¿iniciar ruta de reparto\?/i)).toBeInTheDocument();
+      expect(screen.getByText(/vas a llevar estos 2 pedidos: cp-1001, cp-1002\./i)).toBeInTheDocument();
+    });
+
+    const btnConfirmar = screen.getByRole('button', { name: /sí, iniciar ruta/i });
+    fireEvent.click(btnConfirmar);
+    expect(mockIniciar).toHaveBeenCalledWith(['p1', 'p2']);
+  });
+
+  it('PanelRutaSugerida muestra aviso claro por cada pedido perdido', () => {
+    const avisos = [
+      { pedidoId: 'p1', codigo: 'CP-W090', motivo: 'OTRO_REPARTIDOR' as const, tomadoPor: 'Carlos' },
+      { pedidoId: 'p2', codigo: 'CP-W091', motivo: 'LIMITE' as const },
+      { pedidoId: 'p3', codigo: 'CP-W092', motivo: 'ANULADO' as const },
+    ];
+
+    const mockCerrar = vi.fn();
+
+    render(
+      <PanelRutaSugerida
+        ruta={{ paradas: [], totalParadas: 0, distanciaAproxKm: 0, tiempoAproxMin: 0, urlGoogleMaps: '' }}
+        pedidosCandidatos={[]}
+        paradasSeleccionadasIds={[]}
+        onAlternarSeleccionParada={vi.fn()}
+        onMoverParada={vi.fn()}
+        avisosPerdidos={avisos}
+        onCerrarAvisoPerdido={mockCerrar}
+      />,
+    );
+
+    const banner = screen.getByTestId('banner-pedidos-perdidos');
+    expect(banner).toBeInTheDocument();
+    expect(screen.getByText('El pedido CP-W090 ya lo tomó Carlos')).toBeInTheDocument();
+    expect(screen.getByText('El pedido CP-W091 superó el límite máximo de pedidos permitidos')).toBeInTheDocument();
+    expect(screen.getByText('El pedido CP-W092 fue anulado o devuelto a cocina')).toBeInTheDocument();
+
+    const btnCerrar = screen.getByRole('button', { name: /descartar aviso para cp-w090/i });
+    fireEvent.click(btnCerrar);
+    expect(mockCerrar).toHaveBeenCalledWith('p1');
+  });
+
+  it('muestra alerta ámbar de tomado sin salir y permite liberar a caja/admin', async () => {
+    const pedidoConAlerta: PedidoReparto = {
+      ...pedidoEjemplo,
+      estado: 'LISTO',
+      repartidor_party_id: '99',
+      repartidor: { id: '99', nombre: 'Juan Repartidor' },
+      tomado_en: '2026-10-21T18:00:00Z',
+      alerta_tomado_sin_salir: true,
+      minutos_sin_salir: 14,
+    };
+
+    const mockActualizar = vi.fn();
+    const spyLiberar = vi.spyOn(repartosApi, 'liberarPedido').mockResolvedValueOnce({ id: '101', estado: 'LISTO' } as any);
+
+    render(
+      <TarjetaReparto
+        pedido={pedidoConAlerta}
+        esDisponible={false}
+        puedeLiquidar={true}
+        alActualizar={mockActualizar}
+      />,
+    );
+
+    const alerta = screen.getByTestId('alerta-tomado-sin-salir');
+    expect(alerta).toBeInTheDocument();
+    expect(alerta).toHaveTextContent(/tomado hace 14 min sin salir \(posible repartidor desconectado\)/i);
+
+    const btnLiberar = screen.getByRole('button', { name: /liberar a disponibles/i });
+    fireEvent.click(btnLiberar);
+
+    await waitFor(() => {
+      expect(screen.getByText(/¿liberar este pedido\?/i)).toBeInTheDocument();
+    });
+
+    const btnConfirmar = screen.getByRole('button', { name: /sí, confirmar/i });
+    fireEvent.click(btnConfirmar);
+
+    await waitFor(() => {
+      expect(spyLiberar).toHaveBeenCalledWith('101', expect.any(String));
+      expect(mockActualizar).toHaveBeenCalled();
+    });
+  });
+
+  it('RepartosView muestra contador de cola de espera y botón Ver rutas sugeridas', async () => {
+    vi.spyOn(repartosApi, 'listarDisponibles').mockResolvedValueOnce([
+      { ...pedidoEjemplo, id: '301', codigo: 'CP-0301', lat: -12.04, lng: -77.03, minutosEspera: 25 },
+      { ...pedidoEjemplo, id: '302', codigo: 'CP-0302', lat: -12.05, lng: -77.02, minutosEspera: 15 },
+    ]);
+
+    render(
+      <MemoryRouter>
+        <RepartosView />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      const contador = screen.getByTestId('contador-cola-espera');
+      expect(contador).toBeInTheDocument();
+      expect(contador).toHaveTextContent(/2 pedidos esperando repartidor/i);
+      expect(contador).toHaveTextContent(/listos ordenados del más antiguo al más nuevo/i);
+    });
+
+    const btnVerRutas = screen.getByTestId('mock-btn-ver-rutas');
+    expect(btnVerRutas).toHaveTextContent(/ver rutas sugeridas/i);
+
+    fireEvent.click(btnVerRutas);
+    await waitFor(() => {
+      expect(screen.getByTestId('mock-rutas-sugeridas-lista')).toBeInTheDocument();
+    });
   });
 });

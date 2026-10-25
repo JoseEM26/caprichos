@@ -42,6 +42,9 @@ describe('RepartosController', () => {
       obtenerResumen: jest.fn(),
       consultarMensajes: jest.fn(),
       tomarPedido: jest.fn(),
+      iniciarRuta: jest.fn(),
+      liberarPedido: jest.fn(),
+      reasignarPedido: jest.fn(),
       salir: jest.fn(),
       llegue: jest.fn(),
       entregar: jest.fn(),
@@ -189,5 +192,32 @@ describe('RepartosController', () => {
     const res = await controller.listarZonas();
     expect(serviceMock.listarZonas).toHaveBeenCalled();
     expect(res).toEqual(zonasMock);
+  });
+
+  it('POST /admin/repartos/iniciar-ruta delega a service.iniciarRuta', async () => {
+    serviceMock.iniciarRuta.mockResolvedValue({ tomados: [{ id: '1' }], perdidos: [] });
+    const reqMock: any = { usuario: repartidorAuth, ip: '127.0.0.1' };
+    const dto = { pedidoIds: ['1'] };
+    const res = await controller.iniciarRuta(dto, reqMock);
+    expect(serviceMock.iniciarRuta).toHaveBeenCalledWith(dto, repartidorAuth, '127.0.0.1');
+    expect(res.tomados).toHaveLength(1);
+  });
+
+  it('POST /admin/repartos/:id/liberar delega a service.liberarPedido', async () => {
+    serviceMock.liberarPedido.mockResolvedValue({ id: '10', estado: 'LISTO' });
+    const reqMock: any = { usuario: adminAuth, ip: '127.0.0.1' };
+    const dto = { motivo: 'Problema con moto' };
+    const res = await controller.liberarPedido('10', dto, reqMock);
+    expect(serviceMock.liberarPedido).toHaveBeenCalledWith('10', dto, adminAuth, '127.0.0.1');
+    expect(res.estado).toBe('LISTO');
+  });
+
+  it('POST /admin/repartos/:id/reasignar delega a service.reasignarPedido', async () => {
+    serviceMock.reasignarPedido.mockResolvedValue({ id: '10', repartidor_party_id: '102' });
+    const reqMock: any = { usuario: adminAuth, ip: '127.0.0.1' };
+    const dto = { repartidorPartyId: '102', motivo: 'Cambio de turno' };
+    const res = await controller.reasignarPedido('10', dto, reqMock);
+    expect(serviceMock.reasignarPedido).toHaveBeenCalledWith('10', dto, adminAuth, '127.0.0.1');
+    expect(res.repartidor_party_id).toBe('102');
   });
 });

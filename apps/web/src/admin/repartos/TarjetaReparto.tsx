@@ -234,6 +234,26 @@ export function TarjetaReparto({
     );
   };
 
+  const handleLiberar = () => {
+    pedirConfirmacion(
+      '¿Liberar este pedido?',
+      `El pedido ${pedido.codigo} volverá a la lista de pedidos disponibles sin repartidor asignado.`,
+      async () => {
+        try {
+          setCargandoAccion(true);
+          await repartosApi.liberarPedido(pedido.id, 'Liberado por caja/administrador');
+          setConfirmarAccion((prev) => ({ ...prev, abierto: false }));
+          alActualizar();
+        } catch (err: any) {
+          setConfirmarAccion((prev) => ({ ...prev, abierto: false }));
+          setErrorAccion(err instanceof ErrorApi ? err.message : 'Error al liberar pedido');
+        } finally {
+          setCargandoAccion(false);
+        }
+      },
+    );
+  };
+
   return (
     <>
       <div
@@ -533,6 +553,74 @@ export function TarjetaReparto({
           <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-soft)' }}>
             Tomado por: {pedido.repartidor.nombre || `Repartidor #${pedido.repartidor.id}`}
           </div>
+        )}
+
+        {/* Alerta ámbar para caja cuando lleva más de N min sin salir (posible repartidor desconectado) */}
+        {pedido.alerta_tomado_sin_salir && (
+          <div
+            role="status"
+            data-testid="alerta-tomado-sin-salir"
+            style={{
+              background: '#FEF3C7',
+              border: '1.5px solid var(--cp-gold, #D97706)',
+              borderRadius: '10px',
+              padding: '10px 12px',
+              fontSize: '13px',
+              fontWeight: 700,
+              color: '#92400E',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+            }}
+          >
+            <div>
+              Alerta caja: Tomado hace {pedido.minutos_sin_salir ?? 10} min sin salir (posible repartidor desconectado)
+            </div>
+            {puedeLiquidar && (
+              <button
+                type="button"
+                onClick={handleLiberar}
+                disabled={cargandoAccion}
+                style={{
+                  alignSelf: 'flex-start',
+                  minHeight: '36px',
+                  padding: '0 12px',
+                  borderRadius: '8px',
+                  border: '1.5px solid #92400E',
+                  background: 'var(--cp-white)',
+                  color: '#92400E',
+                  fontWeight: 800,
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+              >
+                Liberar a disponibles
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Liberar pedido por caja/administrador */}
+        {puedeLiquidar && (pedido.repartidor || pedido.repartidor_party_id) && pedido.estado !== 'ENTREGADO' && !pedido.alerta_tomado_sin_salir && (
+          <button
+            type="button"
+            onClick={handleLiberar}
+            disabled={cargandoAccion}
+            style={{
+              minHeight: '38px',
+              padding: '0 12px',
+              borderRadius: '8px',
+              border: '1.5px solid var(--cp-navy)',
+              background: 'transparent',
+              color: 'var(--cp-navy)',
+              fontWeight: 800,
+              fontSize: '12px',
+              cursor: 'pointer',
+              alignSelf: 'flex-start',
+            }}
+          >
+            Liberar pedido (caja)
+          </button>
         )}
 
         {/* Falla reportada */}

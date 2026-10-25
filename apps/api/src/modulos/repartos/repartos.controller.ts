@@ -16,6 +16,9 @@ import { FiltrarRepartosDto } from './dto/filtrar-repartos.dto';
 import { ReportarFallaDto } from './dto/reportar-falla.dto';
 import { ResolverFallaDto } from './dto/resolver-falla.dto';
 import { ActualizarConfigRepartoDto } from './dto/actualizar-config-reparto.dto';
+import { IniciarRutaDto } from './dto/iniciar-ruta.dto';
+import { LiberarPedidoDto } from './dto/liberar-pedido.dto';
+import { ReasignarPedidoDto } from './dto/reasignar-pedido.dto';
 
 @Controller('admin/repartos')
 @UseGuards(AccesoGuard)
@@ -74,11 +77,40 @@ export class RepartosController {
     return this.repartosService.listarTodos(filtros, req.usuario);
   }
 
+  @Post('iniciar-ruta')
+  @Permiso('repartos', 'tomar')
+  async iniciarRuta(@Body() dto: IniciarRutaDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.repartosService.iniciarRuta(dto, req.usuario, ip);
+  }
+
   @Post(':id/tomar')
   @Permiso('repartos', 'tomar')
   async tomarPedido(@Param('id') id: string, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.repartosService.tomarPedido(id, req.usuario, ip);
+  }
+
+  @Post(':id/liberar')
+  @Permiso('repartos', 'liquidar')
+  async liberarPedido(
+    @Param('id') id: string,
+    @Body() dto: LiberarPedidoDto,
+    @Req() req: any,
+  ) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.repartosService.liberarPedido(id, dto, req.usuario, ip);
+  }
+
+  @Post(':id/reasignar')
+  @Permiso('repartos', 'liquidar')
+  async reasignarPedido(
+    @Param('id') id: string,
+    @Body() dto: ReasignarPedidoDto,
+    @Req() req: any,
+  ) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.repartosService.reasignarPedido(id, dto, req.usuario, ip);
   }
 
   @Post(':id/salir')

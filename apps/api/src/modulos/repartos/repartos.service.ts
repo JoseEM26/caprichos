@@ -21,6 +21,9 @@ import { FiltrarRepartosDto } from './dto/filtrar-repartos.dto';
 import { ReportarFallaDto } from './dto/reportar-falla.dto';
 import { ResolverFallaDto } from './dto/resolver-falla.dto';
 import { ActualizarConfigRepartoDto } from './dto/actualizar-config-reparto.dto';
+import { IniciarRutaDto } from './dto/iniciar-ruta.dto';
+import { LiberarPedidoDto } from './dto/liberar-pedido.dto';
+import { ReasignarPedidoDto } from './dto/reasignar-pedido.dto';
 
 export type ColorEsperaReparto = 'VERDE' | 'RETRASADO' | 'TARDE' | 'MUY_TARDE';
 export type ColorEspera = 'verde' | 'naranja' | 'rojo' | ColorEsperaReparto;
@@ -35,6 +38,7 @@ export interface ParametrosReparto {
   localCoords: Coordenadas;
   naranjaMin: number;
   rojoMin: number;
+  tomadoSinSalirMin: number;
 }
 
 @Injectable()
@@ -73,6 +77,7 @@ export class RepartosService {
     let velocidadKmh = 25;
     let maxPedidos = 3;
     let msg3Seg = 90;
+    let tomadoSinSalirMin = 10;
     let localCoords = COORDENADAS_LOCAL_DEFAULT;
 
     try {
@@ -85,6 +90,7 @@ export class RepartosService {
               'reparto_muy_tarde_min',
               'reparto_velocidad_kmh',
               'reparto_max_pedidos',
+              'reparto_tomado_sin_salir_min',
               'rep_naranja_min',
               'rep_rojo_min',
               'rep_max_pedidos',
@@ -116,6 +122,10 @@ export class RepartosService {
         if (p.clave === 'reparto_velocidad_kmh' && p.valor != null) {
           const v = Number(p.valor);
           if (!isNaN(v) && v > 0) velocidadKmh = v;
+        }
+        if (p.clave === 'reparto_tomado_sin_salir_min' && p.valor != null) {
+          const v = Number(p.valor);
+          if (!isNaN(v) && v > 0) tomadoSinSalirMin = v;
         }
         if (p.clave === 'reparto_max_pedidos' && p.valor != null) {
           const v = Number(p.valor);
@@ -158,6 +168,7 @@ export class RepartosService {
       localCoords,
       naranjaMin: tardeMin,
       rojoMin: muyTardeMin,
+      tomadoSinSalirMin,
     };
   }
 
@@ -215,6 +226,17 @@ export class RepartosService {
 
     const cobro = p.pago_estado === 'PAGADO' ? 0 : totalNum;
 
+    // Alerta ámbar para Caja/Admin: pedido tomado que no sale en N minutos
+    let alertaTomadoSinSalir = false;
+    let minutosSinSalir = 0;
+    if (p.tomado_en != null && p.salio_en == null && p.estado === 'LISTO') {
+      const diffMs = ahora.getTime() - new Date(p.tomado_en).getTime();
+      minutosSinSalir = Math.max(0, Math.floor(diffMs / 60000));
+      if (minutosSinSalir >= (config.tomadoSinSalirMin ?? 10)) {
+        alertaTomadoSinSalir = true;
+      }
+    }
+
     return {
       id: String(p.id),
       codigo: p.codigo,
@@ -248,6 +270,8 @@ export class RepartosService {
       llego_en: p.llego_en,
       entregado_en: p.entregado_en,
       motivo_falla: p.motivo_falla,
+      alerta_tomado_sin_salir: alertaTomadoSinSalir,
+      minutos_sin_salir: minutosSinSalir,
       creado_en: p.creado_en,
     };
   }
@@ -284,6 +308,22 @@ export class RepartosService {
   async listarMios(usuario: UsuarioAutenticado) {
     const config = await this.obtenerParametrosReparto();
     const partyId = BigInt(usuario.partyId);
+
+    // Si un pedido asignado a este repartidor fue anulado o regresó a cocina antes de salir, se libera la asignación
+    await this.prisma.pedido.updateMany({
+      where: {
+        repartidor_party_id: partyId,
+        salio_en: null,
+        OR: [
+          { estado: { in: ['ANULADO', 'COLA', 'PREPARANDO'] } },
+          { anulado_en: { not: null } },
+        ],
+      },
+      data: {
+        repartidor_party_id: null,
+        tomado_en: null,
+      },
+    });
 
     const pedidosPropios = await this.prisma.pedido.findMany({
       where: {
@@ -1377,5 +1417,549 @@ export class RepartosService {
         total: Number(pedidoActualizado.total),
       },
     };
+  }
+
+  /**
+   * POST /admin/repartos/iniciar-ruta (repartos/tomar)
+   * Toma de forma atómica e idempotente múltiples pedidos para una ruta y los pasa a EN_CAMINO.
+   * Utiliza SELECT ... FOR UPDATE con IDs ordenados para evitar interbloqueos (deadlocks).
+   */
+  async iniciarRuta(
+    dto: IniciarRutaDto,
+    usuario: UsuarioAutenticado,
+    ip?: string,
+  ): Promise<{
+    tomados: any[];
+    perdidos: Array<{
+      pedidoId: string;
+      codigo: string;
+      motivo: 'OTRO_REPARTIDOR' | 'NO_DISPONIBLE' | 'LIMITE' | 'ANULADO';
+      tomadoPor?: string;
+    }>;
+  }> {
+    const partyId = BigInt(usuario.partyId);
+    const config = await this.obtenerParametrosReparto();
+    const pedidoIds = [...new Set((dto?.pedidoIds || []).map((id) => String(id).trim()).filter(Boolean))];
+
+    if (pedidoIds.length === 0) {
+      return { tomados: [], perdidos: [] };
+    }
+
+    // Convertir a BigInt válidos
+    const validBigIntIds: bigint[] = [];
+    const invalidIds: string[] = [];
+
+    for (const idStr of pedidoIds) {
+      try {
+        validBigIntIds.push(BigInt(idStr));
+      } catch {
+        invalidIds.push(idStr);
+      }
+    }
+
+    // Orden ascendente determinista para evitar interbloqueos en transacciones concurrentes
+    const idsOrdenadosAsc = validBigIntIds
+      .slice()
+      .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+
+    const ahora = new Date();
+
+    const resultadoTransaccion = await this.prisma.$transaction(
+      async (tx) => {
+        const perdidos: Array<{
+          pedidoId: string;
+          codigo: string;
+          motivo: 'OTRO_REPARTIDOR' | 'NO_DISPONIBLE' | 'LIMITE' | 'ANULADO';
+          tomadoPor?: string;
+        }> = [];
+
+        for (const inv of invalidIds) {
+          perdidos.push({
+            pedidoId: inv,
+            codigo: 'DESCONOCIDO',
+            motivo: 'NO_DISPONIBLE',
+          });
+        }
+
+        if (idsOrdenadosAsc.length === 0) {
+          return { tomadosIds: [], perdidos };
+        }
+
+        // 1. Bloqueo pesimista determinista SELECT ... FOR UPDATE en orden de ID
+        const lockedRows: any[] = await tx.$queryRaw`
+          SELECT p.id, p.codigo, p.modalidad, p.estado, p.repartidor_party_id,
+                 p.anulado_en, p.motivo_falla, p.entrega_lat, p.entrega_lng
+          FROM pedido p
+          WHERE p.id IN (${Prisma.join(idsOrdenadosAsc)})
+          ORDER BY p.id ASC
+          FOR UPDATE
+        `;
+
+        const mapaBloqueados = new Map<string, any>(
+          lockedRows.map((r) => [String(r.id), r]),
+        );
+
+        // Nombres de repartidores de pedidos tomados por otros
+        const otrosPartyIds = [
+          ...new Set(
+            lockedRows
+              .filter((p) => p.repartidor_party_id != null && BigInt(p.repartidor_party_id) !== partyId)
+              .map((p) => BigInt(p.repartidor_party_id)),
+          ),
+        ];
+
+        const personasOtros = otrosPartyIds.length > 0
+          ? await tx.person.findMany({
+              where: { party_id: { in: otrosPartyIds } },
+            })
+          : [];
+
+        const nombresOtrosMap = new Map<string, string>(
+          personasOtros.map((per) => [
+            String(per.party_id),
+            `${per.nombres}${per.apellidos ? ` ${per.apellidos}` : ''}`.trim(),
+          ]),
+        );
+
+        // 2. Pedidos activos que ya lleva el repartidor (en LISTO o EN_CAMINO)
+        const pedidosActivosPrevios = await tx.pedido.findMany({
+          where: {
+            repartidor_party_id: partyId,
+            estado: { in: ['LISTO', 'EN_CAMINO'] },
+          },
+          select: { id: true },
+        });
+
+        const idsActivosPrevios = new Set(
+          pedidosActivosPrevios.map((p) => String(p.id)),
+        );
+
+        let cupoUsado = idsActivosPrevios.size;
+        const tomadosIds: bigint[] = [];
+
+        // 3. Procesar en el orden de la ruta solicitado por el repartidor
+        for (const idStr of pedidoIds) {
+          const p = mapaBloqueados.get(idStr);
+
+          if (!p) {
+            perdidos.push({
+              pedidoId: idStr,
+              codigo: 'DESCONOCIDO',
+              motivo: 'NO_DISPONIBLE',
+            });
+            continue;
+          }
+
+          const esMio = p.repartidor_party_id != null && BigInt(p.repartidor_party_id) === partyId;
+
+          // Idempotencia: el pedido ya pertenecía a este mismo repartidor
+          if (esMio) {
+            if (p.estado === 'LISTO') {
+              // Estaba asignado pero aún no había salido -> sale ahora
+              await tx.pedido.update({
+                where: { id: p.id },
+                data: {
+                  salio_en: ahora,
+                  estado: 'EN_CAMINO',
+                },
+              });
+
+              await tx.mensajeReparto.upsert({
+                where: {
+                  pedido_id_numero: {
+                    pedido_id: p.id,
+                    numero: 1,
+                  },
+                },
+                create: {
+                  pedido_id: p.id,
+                  numero: 1,
+                  enviado_en: ahora,
+                  estado: 'PENDIENTE',
+                },
+                update: {
+                  enviado_en: ahora,
+                  estado: 'PENDIENTE',
+                },
+              });
+
+              await tx.pedidoEstadoHistorial.create({
+                data: {
+                  pedido_id: p.id,
+                  estado_anterior: 'LISTO',
+                  estado_nuevo: 'EN_CAMINO',
+                  motivo: 'Salida en ruta por repartidor (idempotente)',
+                  por_party_id: partyId,
+                  en: ahora,
+                },
+              });
+
+              await this.auditoria.registrar({
+                categoria: 'CAMBIO',
+                modulo: 'repartos',
+                accion: 'INICIAR_RUTA',
+                resultado: 'OK',
+                entidad: 'pedido',
+                entidadId: p.id,
+                partyId,
+                ip,
+              });
+
+              tomadosIds.push(p.id);
+            } else if (p.estado === 'EN_CAMINO') {
+              // Ya está en camino por este repartidor (doble clic / reintento)
+              tomadosIds.push(p.id);
+            } else {
+              perdidos.push({
+                pedidoId: idStr,
+                codigo: p.codigo,
+                motivo: p.anulado_en != null ? 'ANULADO' : 'NO_DISPONIBLE',
+              });
+            }
+            continue;
+          }
+
+          // Si no era mío:
+          // Validar anulado
+          if (p.anulado_en != null || p.estado === 'ANULADO') {
+            perdidos.push({
+              pedidoId: idStr,
+              codigo: p.codigo,
+              motivo: 'ANULADO',
+            });
+            continue;
+          }
+
+          // Validar si otro repartidor ya lo tomó
+          if (p.repartidor_party_id != null) {
+            const tomadoPor =
+              nombresOtrosMap.get(String(p.repartidor_party_id)) ||
+              `Repartidor #${p.repartidor_party_id}`;
+            perdidos.push({
+              pedidoId: idStr,
+              codigo: p.codigo,
+              motivo: 'OTRO_REPARTIDOR',
+              tomadoPor,
+            });
+            continue;
+          }
+
+          // Validar estado LISTO, DELIVERY, sin falla y con ubicación válida
+          if (
+            p.modalidad !== 'DELIVERY' ||
+            p.estado !== 'LISTO' ||
+            p.motivo_falla != null ||
+            p.entrega_lat == null ||
+            p.entrega_lng == null
+          ) {
+            perdidos.push({
+              pedidoId: idStr,
+              codigo: p.codigo,
+              motivo: 'NO_DISPONIBLE',
+            });
+            continue;
+          }
+
+          // Validar límite máximo de pedidos simultáneos
+          if (cupoUsado >= config.maxPedidos) {
+            perdidos.push({
+              pedidoId: idStr,
+              codigo: p.codigo,
+              motivo: 'LIMITE',
+            });
+            continue;
+          }
+
+          // Asignar y salir en un solo paso atómico
+          await tx.pedido.update({
+            where: { id: p.id },
+            data: {
+              repartidor_party_id: partyId,
+              tomado_en: ahora,
+              salio_en: ahora,
+              estado: 'EN_CAMINO',
+            },
+          });
+
+          await tx.mensajeReparto.upsert({
+            where: {
+              pedido_id_numero: {
+                pedido_id: p.id,
+                numero: 1,
+              },
+            },
+            create: {
+              pedido_id: p.id,
+              numero: 1,
+              enviado_en: ahora,
+              estado: 'PENDIENTE',
+            },
+            update: {
+              enviado_en: ahora,
+              estado: 'PENDIENTE',
+            },
+          });
+
+          await tx.pedidoEstadoHistorial.create({
+            data: {
+              pedido_id: p.id,
+              estado_anterior: 'LISTO',
+              estado_nuevo: 'EN_CAMINO',
+              motivo: 'Ruta iniciada por repartidor',
+              por_party_id: partyId,
+              en: ahora,
+            },
+          });
+
+          await this.auditoria.registrar({
+            categoria: 'CAMBIO',
+            modulo: 'repartos',
+            accion: 'INICIAR_RUTA',
+            resultado: 'OK',
+            entidad: 'pedido',
+            entidadId: p.id,
+            partyId,
+            ip,
+          });
+
+          cupoUsado++;
+          tomadosIds.push(p.id);
+        }
+
+        const tomadosFilas = tomadosIds.length > 0
+          ? await tx.pedido.findMany({
+              where: { id: { in: tomadosIds } },
+              include: { zona: true },
+            })
+          : [];
+
+        return {
+          tomadosFilas,
+          tomadosIds,
+          perdidos,
+        };
+      },
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+        timeout: 10000,
+      },
+    );
+
+    // Mapear los tomados respetando el orden de la ruta solicitada
+    const filasMap = new Map((resultadoTransaccion.tomadosFilas || []).map((f) => [String(f.id), f]));
+    const tomados = resultadoTransaccion.tomadosIds
+      .map((id) => filasMap.get(String(id)))
+      .filter(Boolean)
+      .map((p) => this.formatearPedidoReparto(p, config, ahora));
+
+    // Emitir eventos en tiempo real para actualizar pantallas
+    for (const t of tomados) {
+      this.eventosGateway?.emitirAdmin('pedido:estado', {
+        id: Number(t.id),
+        codigo: t.codigo,
+        estado: 'EN_CAMINO',
+        repartidor_party_id: String(partyId),
+      });
+    }
+
+    return {
+      tomados,
+      perdidos: resultadoTransaccion.perdidos,
+    };
+  }
+
+  /**
+   * POST /admin/repartos/:id/liberar (repartos/liquidar - Caja/Admin)
+   * Libera la asignación de un pedido tomado para que regrese a la cola de disponibles.
+   */
+  async liberarPedido(
+    id: string | bigint,
+    dto: LiberarPedidoDto,
+    usuario: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const pedidoId = this.parsearId(id);
+    const partyId = BigInt(usuario.partyId);
+    const config = await this.obtenerParametrosReparto();
+
+    const pedido = await this.prisma.pedido.findUnique({
+      where: { id: pedidoId },
+      include: { zona: true },
+    });
+
+    if (!pedido) {
+      throw new NotFoundException({
+        codigo: 'PEDIDO_NO_ENCONTRADO',
+        mensaje: 'Pedido no encontrado',
+      });
+    }
+
+    if (!pedido.repartidor_party_id) {
+      throw new BadRequestException({
+        codigo: 'SIN_REPARTIDOR',
+        mensaje: 'El pedido no tiene ningún repartidor asignado',
+      });
+    }
+
+    if (pedido.estado === 'ENTREGADO') {
+      throw new ConflictException({
+        codigo: 'YA_ENTREGADO',
+        mensaje: 'No se puede liberar un pedido que ya fue entregado',
+      });
+    }
+
+    const ahora = new Date();
+    const anteriorRepartidorId = pedido.repartidor_party_id;
+
+    const actualizado = await this.prisma.pedido.update({
+      where: { id: pedidoId },
+      data: {
+        repartidor_party_id: null,
+        tomado_en: null,
+        salio_en: null,
+        estado: 'LISTO',
+      },
+      include: { zona: true },
+    });
+
+    await this.prisma.pedidoEstadoHistorial.create({
+      data: {
+        pedido_id: pedidoId,
+        estado_anterior: pedido.estado,
+        estado_nuevo: 'LISTO',
+        motivo: `Liberado por caja/admin: ${dto.motivo} (estaba con repartidor #${anteriorRepartidorId})`,
+        por_party_id: partyId,
+        en: ahora,
+      },
+    });
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'repartos',
+      accion: 'LIBERAR',
+      resultado: 'OK',
+      entidad: 'pedido',
+      entidadId: pedidoId,
+      partyId,
+      ip,
+      motivo: dto.motivo,
+    });
+
+    this.eventosGateway?.emitirAdmin('pedido:estado', {
+      id: Number(pedido.id),
+      codigo: pedido.codigo,
+      estado: 'LISTO',
+      repartidor_party_id: null,
+    });
+
+    return this.formatearPedidoReparto(actualizado, config, ahora);
+  }
+
+  /**
+   * POST /admin/repartos/:id/reasignar (repartos/liquidar - Caja/Admin)
+   * Reasigna un pedido a otro repartidor activo que tenga cupo disponible.
+   */
+  async reasignarPedido(
+    id: string | bigint,
+    dto: ReasignarPedidoDto,
+    usuario: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const pedidoId = this.parsearId(id);
+    const partyId = BigInt(usuario.partyId);
+    const nuevoRepartidorPartyId = this.parsearId(dto.repartidorPartyId);
+    const config = await this.obtenerParametrosReparto();
+
+    const pedido = await this.prisma.pedido.findUnique({
+      where: { id: pedidoId },
+      include: { zona: true },
+    });
+
+    if (!pedido) {
+      throw new NotFoundException({
+        codigo: 'PEDIDO_NO_ENCONTRADO',
+        mensaje: 'Pedido no encontrado',
+      });
+    }
+
+    if (pedido.estado === 'ENTREGADO') {
+      throw new ConflictException({
+        codigo: 'YA_ENTREGADO',
+        mensaje: 'No se puede reasignar un pedido que ya fue entregado',
+      });
+    }
+
+    // Verificar que el nuevo repartidor existe y tiene rol REPARTIDOR activo
+    const userAccount = await this.prisma.userAccount.findUnique({
+      where: { party_id: nuevoRepartidorPartyId },
+      include: { party: { include: { persona: true } } },
+    });
+
+    if (!userAccount || userAccount.rol !== 'REPARTIDOR' || !userAccount.activo) {
+      throw new BadRequestException({
+        codigo: 'REPARTIDOR_INVALIDO',
+        mensaje: 'El usuario destino no es un repartidor activo válido',
+      });
+    }
+
+    // Verificar que el nuevo repartidor no supere el límite
+    const pedidosActivosNuevo = await this.prisma.pedido.count({
+      where: {
+        repartidor_party_id: nuevoRepartidorPartyId,
+        estado: { in: ['LISTO', 'EN_CAMINO'] },
+      },
+    });
+
+    if (pedidosActivosNuevo >= config.maxPedidos) {
+      throw new ConflictException({
+        codigo: 'LIMITE_PEDIDOS',
+        mensaje: `El repartidor ya tiene ${pedidosActivosNuevo} pedidos activos (máximo: ${config.maxPedidos})`,
+      });
+    }
+
+    const ahora = new Date();
+    const anteriorRepartidorId = pedido.repartidor_party_id;
+
+    const actualizado = await this.prisma.pedido.update({
+      where: { id: pedidoId },
+      data: {
+        repartidor_party_id: nuevoRepartidorPartyId,
+        tomado_en: ahora,
+        estado: pedido.estado === 'EN_CAMINO' ? 'EN_CAMINO' : 'LISTO',
+      },
+      include: { zona: true },
+    });
+
+    await this.prisma.pedidoEstadoHistorial.create({
+      data: {
+        pedido_id: pedidoId,
+        estado_anterior: pedido.estado,
+        estado_nuevo: actualizado.estado,
+        motivo: `Reasignado por caja/admin: ${dto.motivo} (de #${anteriorRepartidorId || 'nadie'} a #${nuevoRepartidorPartyId})`,
+        por_party_id: partyId,
+        en: ahora,
+      },
+    });
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'repartos',
+      accion: 'REASIGNAR',
+      resultado: 'OK',
+      entidad: 'pedido',
+      entidadId: pedidoId,
+      partyId,
+      ip,
+      motivo: dto.motivo,
+    });
+
+    this.eventosGateway?.emitirAdmin('pedido:estado', {
+      id: Number(pedido.id),
+      codigo: pedido.codigo,
+      estado: actualizado.estado,
+      repartidor_party_id: String(nuevoRepartidorPartyId),
+    });
+
+    return this.formatearPedidoReparto(actualizado, config, ahora);
   }
 }

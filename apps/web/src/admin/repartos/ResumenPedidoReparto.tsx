@@ -241,6 +241,51 @@ export function ResumenPedidoReparto({
         </div>
       )}
 
+      {/* Alerta ámbar para caja cuando lleva más de N min sin salir (posible repartidor desconectado) */}
+      {pedido.alerta_tomado_sin_salir && (
+        <div
+          role="status"
+          data-testid="alerta-tomado-sin-salir"
+          style={{
+            background: '#FEF3C7',
+            border: '1.5px solid var(--cp-gold, #D97706)',
+            borderRadius: '10px',
+            padding: '10px 12px',
+            fontSize: '13px',
+            fontWeight: 700,
+            color: '#92400E',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px',
+          }}
+        >
+          <div>
+            Alerta caja: Tomado hace {pedido.minutos_sin_salir ?? 10} min sin salir (posible repartidor desconectado)
+          </div>
+          {puedeLiquidar && (
+            <button
+              type="button"
+              onClick={() => acciones.liberar(pedido, 'Liberado por caja: demora sin salir')}
+              disabled={acciones.cargandoAccion}
+              style={{
+                alignSelf: 'flex-start',
+                minHeight: '36px',
+                padding: '0 12px',
+                borderRadius: '8px',
+                border: '1.5px solid #92400E',
+                background: 'var(--cp-white, #FFFFFF)',
+                color: '#92400E',
+                fontWeight: 800,
+                fontSize: '12px',
+                cursor: 'pointer',
+              }}
+            >
+              Liberar a disponibles
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Horas de cada paso registrado (Decisión 7 del dueño) */}
       {pasos.length > 0 && (
         <div
@@ -548,6 +593,29 @@ export function ResumenPedidoReparto({
             ? `Tomado por Repartidor #${pedido.repartidor_party_id}`
             : 'Sin repartidor asignado'}
         </div>
+      )}
+
+      {/* Liberar pedido por caja/administrador */}
+      {puedeLiquidar && (pedido.repartidor || pedido.repartidor_party_id) && pedido.estado !== 'ENTREGADO' && !pedido.alerta_tomado_sin_salir && (
+        <button
+          type="button"
+          onClick={() => acciones.liberar(pedido, 'Liberado por caja/administrador')}
+          disabled={acciones.cargandoAccion}
+          style={{
+            minHeight: '44px',
+            padding: '0 14px',
+            borderRadius: '12px',
+            border: '1.5px solid var(--cp-navy, #0B2C3E)',
+            background: 'transparent',
+            color: 'var(--cp-navy, #0B2C3E)',
+            fontWeight: 800,
+            fontSize: '13px',
+            cursor: 'pointer',
+            width: '100%',
+          }}
+        >
+          Liberar pedido a disponibles (caja)
+        </button>
       )}
 
       {/* Modal para reportar entrega fallida / incidente */}

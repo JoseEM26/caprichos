@@ -16,6 +16,8 @@ import {
   clasificarEspera,
   sugerirOrdenRuta,
   calcularMetricasRuta,
+  sugerirRutasPorSector,
+  RutaSugeridaSector,
   ConfigReparto,
   CONFIG_REPARTO_DEFECTO,
   COORDENADAS_TIENDA_DEFECTO,
@@ -28,6 +30,7 @@ import {
   PedidoReparto,
   ResumenRepartos,
   RespuestaMios,
+  PedidoPerdido,
 } from './repartosApi';
 
 type ModoVista = 'mapa' | 'lista';
@@ -88,6 +91,12 @@ export function RepartosView() {
   // Paradas de ruta seleccionadas manualmente o por sugerencia (Decisión 4)
   const [paradasRutaIds, setParadasRutaIds] = useState<string[]>([]);
   const [ordenManualRuta, setOrdenManualRuta] = useState<string[]>([]);
+
+  // Rutas sugeridas por sector (Decisión firmada)
+  const [mostrarRutasSugeridas, setMostrarRutasSugeridas] = useState(false);
+  const [rutaSugeridaActivaId, setRutaSugeridaActivaId] = useState<string | null>(null);
+  const [avisosPerdidos, setAvisosPerdidos] = useState<PedidoPerdido[]>([]);
+  const [cargandoInicioRuta, setCargandoInicioRuta] = useState(false);
 
   // Estados de carga
   const [cargando, setCargando] = useState(true);
@@ -277,11 +286,49 @@ export function RepartosView() {
       }));
   }, [pedidosBase, datosMios.pedidos]);
 
+  // Candidatos para rutas sugeridas por sector: pedidos disponibles con coordenadas
+  const pedidosParaSectores = useMemo((): PedidoParaRuta[] => {
+    return disponibles
+      .filter((p) => p.lat != null && p.lng != null && !isNaN(p.lat) && !isNaN(p.lng))
+      .map((p) => ({
+        id: p.id,
+        codigo: p.codigo,
+        cliente_nombre: p.cliente_nombre,
+        direccion: p.direccion,
+        lat: p.lat!,
+        lng: p.lng!,
+        minutosEspera: p.minutosEspera,
+        zona: p.zona,
+        estado: p.estado,
+        total: p.total,
+        pago_metodo: p.pago_metodo,
+        pago_estado: p.pago_estado,
+        paga_con: p.paga_con,
+      }));
+  }, [disponibles]);
+
+  // Rutas sugeridas agrupadas por sector cardinal (hasta 3 de mayor urgencia)
+  const rutasSugeridas = useMemo(() => {
+    return sugerirRutasPorSector(pedidosParaSectores, COORDENADAS_TIENDA_DEFECTO, config, 3);
+  }, [pedidosParaSectores, config]);
+
+  const rutaActiva = useMemo(() => {
+    if (!rutaSugeridaActivaId) return null;
+    return rutasSugeridas.find((r) => r.id === rutaSugeridaActivaId) || null;
+  }, [rutaSugeridaActivaId, rutasSugeridas]);
+
+  const candidatosParaPanel = useMemo(() => {
+    if (rutaActiva && rutaActiva.pedidos.length > 0) {
+      return rutaActiva.pedidos;
+    }
+    return pedidosCandidatosRuta;
+  }, [rutaActiva, pedidosCandidatosRuta]);
+
   // Inicializar paradas sugeridas si no se han seleccionado manualmente
   useEffect(() => {
-    if (pedidosCandidatosRuta.length > 0 && paradasRutaIds.length === 0) {
+    if (candidatosParaPanel.length > 0 && paradasRutaIds.length === 0) {
       const sugeridas = sugerirOrdenRuta(
-        pedidosCandidatosRuta,
+        candidatosParaPanel,
         COORDENADAS_TIENDA_DEFECTO,
         config,
         config.maxPedidosPorRepartidor,
@@ -290,11 +337,11 @@ export function RepartosView() {
       setParadasRutaIds(ids);
       setOrdenManualRuta(ids);
     }
-  }, [pedidosCandidatosRuta, config]);
+  }, [candidatosParaPanel, config]);
 
   // Cálculo de la ruta activa según paradas seleccionadas y su orden
   const rutaCalculada = useMemo(() => {
-    const seleccionadosMap = new Map(pedidosCandidatosRuta.map((p) => [p.id, p]));
+    const seleccionadosMap = new Map(candidatosParaPanel.map((p) => [p.id, p]));
     const paradasOrdenadas: PedidoParaRuta[] = [];
 
     // Usar orden manual establecido
@@ -316,7 +363,7 @@ export function RepartosView() {
       COORDENADAS_TIENDA_DEFECTO,
       config.velocidadMediaKmH,
     );
-  }, [pedidosCandidatosRuta, paradasRutaIds, ordenManualRuta, config]);
+  }, [candidatosParaPanel, paradasRutaIds, ordenManualRuta, config]);
 
   // Manejadores para el panel de ruta sugerida
   const handleAlternarSeleccionParada = (id: string) => {
@@ -347,6 +394,41 @@ export function RepartosView() {
     const [movido] = nuevoOrden.splice(origenIdx, 1);
     nuevoOrden.splice(destinoIdx, 0, movido);
     setOrdenManualRuta(nuevoOrden);
+  };
+
+  const handleSeleccionarRutaSugerida = (ruta: RutaSugeridaSector) => {
+    setRutaSugeridaActivaId(ruta.id);
+    const limite = config.maxPedidosPorRepartidor ?? 3;
+    const iniciales = ruta.pedidos.slice(0, limite).map((p) => p.id);
+    setParadasRutaIds(iniciales);
+    setOrdenManualRuta(ruta.pedidos.map((p) => p.id));
+    setPanelRutaAbierto(true);
+  };
+
+  const handleIniciarRuta = async (idsAIniciar?: string[]) => {
+    const ids = idsAIniciar && idsAIniciar.length > 0 ? idsAIniciar : paradasRutaIds;
+    if (ids.length === 0) return;
+
+    setCargandoInicioRuta(true);
+    try {
+      const res = await repartosApi.iniciarRuta({ pedidoIds: ids });
+      if (res.perdidos && res.perdidos.length > 0) {
+        setAvisosPerdidos(res.perdidos);
+      } else {
+        setAvisosPerdidos([]);
+      }
+      await cargarDatos();
+
+      if (res.tomados && res.tomados.length > 0) {
+        if (rutaCalculada.urlGoogleMaps) {
+          window.open(rutaCalculada.urlGoogleMaps, '_blank', 'noopener,noreferrer');
+        }
+      }
+    } catch (err: any) {
+      acciones.setErrorAccion(err?.message || 'Error al iniciar la ruta');
+    } finally {
+      setCargandoInicioRuta(false);
+    }
   };
 
   // Puntos para el mapa interactivo
@@ -756,6 +838,44 @@ export function RepartosView() {
         )}
       </div>
 
+      {/* Contador visible de pedidos esperando repartidor */}
+      <div
+        role="status"
+        data-testid="contador-cola-espera"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '8px 14px',
+          background: disponibles.length > 0 ? '#EFF6FF' : 'var(--cp-cream, #FFFDF8)',
+          border: '1.5px solid var(--cp-line, #E3D6C6)',
+          borderRadius: '12px',
+          fontSize: '13px',
+          fontWeight: 800,
+          color: 'var(--cp-navy, #0B2C3E)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span
+            style={{
+              display: 'inline-block',
+              width: '10px',
+              height: '10px',
+              borderRadius: '50%',
+              background: disponibles.length > 0 ? 'var(--cp-orange, #E67929)' : 'var(--cp-green, #2F7A45)',
+            }}
+          />
+          <span>
+            {disponibles.length} {disponibles.length === 1 ? 'pedido esperando repartidor' : 'pedidos esperando repartidor'}
+          </span>
+        </div>
+        {disponibles.length > 0 && (
+          <span style={{ fontSize: '12px', color: 'var(--cp-soft, #5A6E78)', fontWeight: 600 }}>
+            Listos ordenados del más antiguo al más nuevo
+          </span>
+        )}
+      </div>
+
       {cargando ? (
         <div style={{ padding: '60px 0' }}>
           <Cargando mensaje="Cargando pedidos de reparto..." />
@@ -787,6 +907,11 @@ export function RepartosView() {
             onTocarMapa={handleTocarMapa}
             esPantallaCompleta={pantallaCompleta}
             onAlternarPantallaCompleta={alternarPantallaCompleta}
+            rutasSugeridas={rutasSugeridas}
+            rutaActivaId={rutaSugeridaActivaId}
+            onSeleccionarRutaSugerida={handleSeleccionarRutaSugerida}
+            mostrarRutasSugeridas={mostrarRutasSugeridas}
+            onAlternarMostrarRutasSugeridas={() => setMostrarRutasSugeridas((v) => !v)}
           />
 
           <div
@@ -828,7 +953,7 @@ export function RepartosView() {
           )}
 
           {/* Panel de Ruta Sugerida e Iniciar Ruta (Decisión 4 del dueño) */}
-          {pantallaCompleta && pedidosCandidatosRuta.length > 0 && (
+          {pantallaCompleta && candidatosParaPanel.length > 0 && (
             <button
               type="button"
               onClick={() => setPanelRutaAbierto((v) => !v)}
@@ -846,18 +971,24 @@ export function RepartosView() {
                 cursor: 'pointer',
               }}
             >
-              {panelRutaAbierto ? 'Ocultar ruta sugerida' : `Ruta sugerida (${rutaCalculada.paradas?.length ?? pedidosCandidatosRuta.length})`}
+              {panelRutaAbierto ? 'Ocultar ruta sugerida' : `Ruta sugerida (${rutaCalculada.paradas?.length ?? candidatosParaPanel.length})`}
             </button>
           )}
-          {pedidosCandidatosRuta.length > 0 && (!pantallaCompleta || panelRutaAbierto) && (
+          {candidatosParaPanel.length > 0 && (!pantallaCompleta || panelRutaAbierto) && (
             <PanelRutaSugerida
               ruta={rutaCalculada}
-              pedidosCandidatos={pedidosCandidatosRuta}
+              pedidosCandidatos={candidatosParaPanel}
               paradasSeleccionadasIds={paradasRutaIds}
               onAlternarSeleccionParada={handleAlternarSeleccionParada}
               onMoverParada={handleMoverParada}
               config={config}
               maxParadas={config.maxPedidosPorRepartidor}
+              alIniciarRuta={handleIniciarRuta}
+              avisosPerdidos={avisosPerdidos}
+              onCerrarAvisoPerdido={(pedidoId) =>
+                setAvisosPerdidos((prev) => prev.filter((p) => p.pedidoId !== pedidoId))
+              }
+              cargandoInicio={cargandoInicioRuta}
             />
           )}
           </div>
@@ -939,6 +1070,7 @@ export function RepartosView() {
                     pedido.repartidor_party_id === usuario?.partyId ||
                     pedido.estado === 'EN_CAMINO'
                   }
+                  puedeLiquidar={puedeLiquidar}
                   alActualizar={cargarDatos}
                 />
               ))}
