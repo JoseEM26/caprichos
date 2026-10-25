@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
+import { RequiereCodigoSupervisor } from '../supervisor-codigo/requiere-codigo-supervisor.decorator';
 import { UsuariosService } from './usuarios.service';
 import { CrearUsuarioDto } from './dto/crear-usuario.dto';
 import { EditarUsuarioDto } from './dto/editar-usuario.dto';
@@ -44,6 +45,9 @@ export class UsuariosController {
 
   @Patch(':id')
   @Permiso('usuarios', 'editar')
+  @RequiereCodigoSupervisor('usuarios/cambiar_rol', {
+    condicion: (req) => Boolean(req.body?.rol),
+  })
   async editar(
     @Param('id') id: string,
     @Body() dto: EditarUsuarioDto,
@@ -55,6 +59,7 @@ export class UsuariosController {
 
   @Post(':id/desactivar')
   @Permiso('usuarios', 'desactivar')
+  @RequiereCodigoSupervisor('usuarios/desactivar')
   async desactivar(@Param('id') id: string, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.usuariosService.desactivar(id, req.usuario, ip);

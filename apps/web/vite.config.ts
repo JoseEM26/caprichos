@@ -34,6 +34,10 @@ const proxyConfig = {
     target: apiTarget,
     changeOrigin: true,
   },
+  '/whatsapp': {
+    target: apiTarget,
+    changeOrigin: true,
+  },
   '/socket.io': {
     target: apiTarget,
     ws: true,

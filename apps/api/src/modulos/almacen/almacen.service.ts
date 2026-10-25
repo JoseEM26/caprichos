@@ -17,6 +17,7 @@ import { CierreDiaDto } from './dto/cierre-dia.dto';
 import { AlmacenQueryDto } from './dto/almacen-query.dto';
 import { CrearPedidoInternoDto } from './dto/crear-pedido-interno.dto';
 import { StockService } from '../stock/stock.service';
+import { SupervisorCodigoService } from '../supervisor-codigo/supervisor-codigo.service';
 
 @Injectable()
 export class AlmacenService {
@@ -25,6 +26,7 @@ export class AlmacenService {
     private readonly auditoria: AuditoriaService,
     @Optional() private readonly eventosGateway?: EventosGateway,
     @Optional() private readonly stockService?: StockService,
+    @Optional() private readonly supervisorCodigoService?: SupervisorCodigoService,
   ) {}
 
   private parsearId(id: bigint | string | number, entidad = 'entidad'): bigint {
@@ -218,6 +220,7 @@ export class AlmacenService {
     dto: MovimientoAlmacenDto,
     usuario?: UsuarioAutenticado,
     ip?: string,
+    pinSupervisor?: string,
   ) {
     const insumoId = this.parsearId(dto.insumoId, 'insumo');
     const insumo = await this.prisma.insumo.findUnique({
@@ -256,6 +259,24 @@ export class AlmacenService {
           codigo: 'STOCK_INSUFICIENTE',
           mensaje: `Solo hay ${stockDisponible} ${insumo.unidad_almacen} de ${insumo.nombre} en ${origenLugar.nombre}.`,
         });
+      }
+    }
+
+    // Merma o ajuste grande (>= 10 unidades/kg) requiere código de supervisor
+    if (
+      (dto.tipo === 'MERMA' || dto.tipo === 'AJUSTE') &&
+      cantidadNum >= 10 &&
+      !esMermaReparto
+    ) {
+      if (this.supervisorCodigoService) {
+        await this.supervisorCodigoService.verificarYConsumirCodigo(
+          pinSupervisor,
+          usuario?.partyId,
+          'almacen/merma_grande',
+          ip,
+          'insumo',
+          insumoId,
+        );
       }
     }
 

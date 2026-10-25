@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AlmacenService } from './almacen.service';
 import { PrismaService } from '../../comun/prisma/prisma.service';
@@ -178,6 +178,76 @@ describe('AlmacenService', () => {
           mockUsuario,
         ),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    describe('código del supervisor en mermas grandes (>= 10)', () => {
+      const prepararMerma = () => {
+        prisma.insumo.findUnique.mockResolvedValue({ id: 1n, nombre: 'Harina', unidad_almacen: 'KG' });
+        prisma.lugarStock.findUnique.mockResolvedValue({ id: 10n, nombre: 'Almacén Principal' });
+        prisma.lugarStock.findFirst.mockResolvedValue({ id: 10n, nombre: 'Almacén Principal' });
+        prisma.stock.findFirst.mockResolvedValue({
+          id: 5n,
+          insumo_id: 1n,
+          lugar_id: 10n,
+          cantidad: new Prisma.Decimal('50.00'),
+        });
+        prisma.movimientoStock.create.mockResolvedValue({
+          id: 101n,
+          insumo_id: 1n,
+          lugar_id: 10n,
+          tipo: 'MERMA',
+          cantidad: new Prisma.Decimal('-15.00'),
+          creado_en: new Date(),
+          insumo: { id: 1n, nombre: 'Harina', unidad_almacen: 'KG' },
+          lugar: { id: 10n, nombre: 'Almacén Principal' },
+        });
+      };
+
+      it('rechaza la merma de 15 si el código del supervisor no es válido y no toca el stock', async () => {
+        prepararMerma();
+        const verificar = jest.fn().mockRejectedValue(new ForbiddenException({ codigo: 'CODIGO_INVALIDO' }));
+        (service as any).supervisorCodigoService = { verificarYConsumirCodigo: verificar };
+
+        await expect(
+          service.registrarMovimiento(
+            { insumoId: 1, tipo: 'MERMA', cantidad: 15, origen: 'ALMACEN', motivo: 'Vencido' } as any,
+            mockUsuario,
+          ),
+        ).rejects.toMatchObject({ response: { codigo: 'CODIGO_INVALIDO' } });
+
+        expect(verificar).toHaveBeenCalledTimes(1);
+        expect(prisma.stock.update).not.toHaveBeenCalled();
+        expect(prisma.movimientoStock.create).not.toHaveBeenCalled();
+      });
+
+      it('acepta la merma de 15 con un código válido y entrega el código recibido al verificador', async () => {
+        prepararMerma();
+        const verificar = jest.fn().mockResolvedValue(undefined);
+        (service as any).supervisorCodigoService = { verificarYConsumirCodigo: verificar };
+
+        const res = await service.registrarMovimiento(
+          { insumoId: 1, tipo: 'MERMA', cantidad: 15, origen: 'ALMACEN', motivo: 'Vencido' } as any,
+          mockUsuario,
+          undefined,
+          '123456',
+        );
+
+        expect(res.ok).toBe(true);
+        expect(verificar).toHaveBeenCalledWith('123456', 1n, 'almacen/merma_grande', undefined, 'insumo', expect.anything());
+      });
+
+      it('no pide código para una merma pequeña (< 10)', async () => {
+        prepararMerma();
+        const verificar = jest.fn();
+        (service as any).supervisorCodigoService = { verificarYConsumirCodigo: verificar };
+
+        await service.registrarMovimiento(
+          { insumoId: 1, tipo: 'MERMA', cantidad: 2, origen: 'ALMACEN', motivo: 'Se cayó' } as any,
+          mockUsuario,
+        );
+
+        expect(verificar).not.toHaveBeenCalled();
+      });
     });
 
     it('debe registrar merma en reparto como informativa sin descontar stock (RN-CAP-126)', async () => {

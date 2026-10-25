@@ -34,6 +34,9 @@ function esperarUrl(url: string, timeoutMs = 30000): Promise<void> {
 }
 
 export default async function globalSetup(config: FullConfig) {
+  process.env.JWT_SECRET = process.env.JWT_SECRET || 'secreto-test-jwt-super-seguro-min-32-chars!!';
+  process.env.WHATSAPP_APP_SECRET = process.env.WHATSAPP_APP_SECRET || 'test-whatsapp-secret-super-seguro-123456';
+  process.env.WHATSAPP_VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'test-verify-token-123456';
   console.log('\n[E2E SETUP] 1. Recreando base de datos caprichos_test...');
   const dbUrl = await recrearBaseDatosTest();
 

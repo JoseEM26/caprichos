@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Boton } from '../../comun/Boton';
 import { Confirmar } from '../../comun/Confirmar';
+import { CampoCodigoSupervisor } from '../../comun/CampoCodigoSupervisor';
 import {
   cierreApi,
   DENOMINACIONES_LISTA,
@@ -108,11 +109,17 @@ export function ArqueoCiegoForm({ alCerrarCajaExitoso }: ArqueoCiegoFormProps) {
       }
     } catch (err: any) {
       if (err instanceof ErrorApi) {
-        if (err.codigo === 'PIN_REQUERIDO') {
+        if (err.codigo === 'PIN_REQUERIDO' || err.codigo === 'CODIGO_REQUERIDO') {
           setRequierePin(true);
           setErrorArqueo(
-            err.message || 'Se requiere el PIN de supervisor para continuar con el arqueo.',
+            err.message || 'Se requiere el código de supervisor para continuar con el arqueo.',
           );
+        } else if (err.codigo === 'CODIGO_INVALIDO' || err.codigo === 'PIN_INVALIDO') {
+          setErrorArqueo('Código de supervisor inválido. Pídelo a la supervisora.');
+        } else if (err.codigo === 'CODIGO_BLOQUEADO' || err.codigo === 'PIN_BLOQUEADO') {
+          setErrorArqueo('Demasiados intentos fallidos. Bloqueado temporalmente por 5 minutos.');
+        } else if (err.codigo === 'SUPERVISOR_SIN_CONFIGURAR') {
+          setErrorArqueo('El local aún no tiene configurado el código de supervisor. El administrador debe generarlo desde su pantalla.');
         } else {
           setErrorArqueo(err.message || 'Error al procesar el arqueo');
         }
@@ -120,7 +127,7 @@ export function ArqueoCiegoForm({ alCerrarCajaExitoso }: ArqueoCiegoFormProps) {
         setErrorArqueo('Error inesperado al conectar con el servidor');
       }
     } finally {
-      // Limpiar el PIN del estado por seguridad tras el envío
+      // Limpiar el código del estado por seguridad tras el envío
       setPinSupervisor('');
       setRevisando(false);
     }
@@ -129,11 +136,11 @@ export function ArqueoCiegoForm({ alCerrarCajaExitoso }: ArqueoCiegoFormProps) {
   const handleIntentarCerrarCaja = () => {
     setErrorCierre(null);
 
-    // Si ya van 3 arqueos que no cuadraron o la API exige PIN, validar que el supervisor haya puesto PIN y nota >= 3
+    // Si ya van 3 arqueos que no cuadraron o la API exige código, validar que el supervisor haya puesto código y nota >= 3
     const exigePinSupervisor = intentosFallidos >= 3 || requierePin;
     if (exigePinSupervisor) {
       if (!pinSupervisor.trim()) {
-        setErrorCierre('Se alcanzó el límite de intentos: se requiere el PIN de 6 dígitos del supervisor.');
+        setErrorCierre('Se alcanzó el límite de intentos: se requiere el código de 6 dígitos del supervisor.');
         return;
       }
       if (!nota.trim() || nota.trim().length < 3) {
@@ -577,7 +584,7 @@ export function ArqueoCiegoForm({ alCerrarCajaExitoso }: ArqueoCiegoFormProps) {
           )}
         </div>
 
-        {/* Sección de PIN de Supervisor (se muestra si van 3 arqueos que no cuadraron o si la API lo pide) */}
+        {/* Sección de Código de Supervisor (se muestra si van 3 arqueos que no cuadraron o si la API lo pide) */}
         {(requierePin || intentosFallidos >= 3) && (
           <div
             data-testid="seccion-pin-supervisor"
@@ -597,40 +604,19 @@ export function ArqueoCiegoForm({ alCerrarCajaExitoso }: ArqueoCiegoFormProps) {
               </span>
               <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: 'var(--cp-soft)' }}>
                 {intentosFallidos >= 3
-                  ? 'Se alcanzaron 3 arqueos que no cuadraron. Se exige PIN de supervisor para cerrar.'
-                  : 'Si el arqueo no cuadra, el cierre requiere PIN de supervisor y una nota explicativa.'}
+                  ? 'Se alcanzaron 3 arqueos que no cuadraron. Se exige código de supervisor para cerrar.'
+                  : 'Si el arqueo no cuadra, el cierre requiere código de supervisor y una nota explicativa.'}
               </p>
             </div>
 
-            <div>
-              <label
-                htmlFor="pin-supervisor-input"
-                style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: 'var(--cp-navy)', marginBottom: '4px' }}
-              >
-                PIN de supervisor (6 dígitos)
-              </label>
-              <input
-                id="pin-supervisor-input"
-                data-testid="pin-supervisor-input"
-                type="password"
-                inputMode="numeric"
-                maxLength={6}
-                value={pinSupervisor}
-                onChange={(e) => setPinSupervisor(e.target.value.replace(/\D/g, ''))}
-                placeholder="******"
-                style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  minHeight: '44px',
-                  borderRadius: '10px',
-                  border: '1.5px solid var(--cp-line)',
-                  padding: '0 12px',
-                  fontSize: '16px',
-                  letterSpacing: '0.2em',
-                  background: 'var(--cp-white)',
-                }}
-              />
-            </div>
+            <CampoCodigoSupervisor
+              id="pin-supervisor-input"
+              dataTestId="pin-supervisor-input"
+              valor={pinSupervisor}
+              onChange={setPinSupervisor}
+              etiqueta="Código del supervisor (6 dígitos)"
+              ayuda="Pídelo a la supervisora: lo ve en su pantalla y cambia cada 30 segundos"
+            />
           </div>
         )}
 

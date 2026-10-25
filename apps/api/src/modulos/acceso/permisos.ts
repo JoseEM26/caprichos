@@ -151,6 +151,8 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'pantallas', accion: 'ver' },
   { modulo: 'pantallas', accion: 'vincular' },
   { modulo: 'pantallas', accion: 'desactivar' },
+  // Supervisor: código rotativo general (TOTP)
+  { modulo: 'supervisor', accion: 'ver_codigo' },
 ] as const;
 
 export const MATRIZ: Record<string, string[]> = {

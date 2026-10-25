@@ -21,6 +21,7 @@ import {
 } from '../../comun/redis/intentos-pin';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
+import { SupervisorCodigoService } from '../supervisor-codigo/supervisor-codigo.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { enmascararDni } from '../usuarios/usuarios.util';
 import { FiltrarPedidosDto } from './dto/filtrar-pedidos.dto';
@@ -51,6 +52,7 @@ export class PedidosEstadoService {
     @Optional() private readonly salonService?: SalonService,
     @Optional() private readonly puntosService?: PuntosService,
     @Optional() private readonly stockService?: StockService,
+    @Optional() private readonly supervisorCodigoService?: SupervisorCodigoService,
   ) {}
 
   private parsearId(id: bigint | string | number): bigint {
@@ -118,81 +120,37 @@ export class PedidosEstadoService {
   }
 
   /**
-   * Verifica el PIN de 6 dígitos contra algún usuario ADMIN activo en la base de datos (DT-61).
-   * 3 intentos fallidos consecutivos bloquean 5 minutos en Redis; sin Redis responde 503 (comun/redis/intentos-pin).
+   * Verifica el código rotativo de 6 dígitos del supervisor (RFC 6238 TOTP).
+   * 3 intentos fallidos consecutivos bloquean 5 minutos en Redis.
    */
   async verificarPinSupervisor(
     pinSupervisor?: string,
     partyIdOperador?: bigint,
     ip?: string,
     pedidoId?: bigint,
-  ): Promise<{ party_id: bigint; id: bigint }> {
-    const claveIntentos = `pin:supervisor:intentos:${partyIdOperador ?? 'general'}`;
-    const redis = this.redisService.obtenerCliente();
-
-    // 1. Bloqueo por demasiados intentos fallidos (DT-61); sin Redis no se valida nada (503)
-    await exigirPinNoBloqueado(redis, claveIntentos);
-
-    // 2. Validar formato del PIN (exactamente 6 dígitos numéricos)
-    const pinLimpio = typeof pinSupervisor === 'string' ? pinSupervisor.trim() : '';
-    const formatoValido = /^\d{6}$/.test(pinLimpio);
-
-    let supervisorValido: { party_id: bigint; id: bigint } | null = null;
-
-    if (formatoValido) {
-      // 3. Buscar supervisores activos con rol ADMIN y PIN configurado
-      const admins = await this.prisma.userAccount.findMany({
-        where: {
-          rol: 'ADMIN',
-          activo: true,
-          pin_hash: { not: null },
-        },
-      });
-
-      for (const admin of admins) {
-        if (admin.pin_hash) {
-          try {
-            const coincide = await argon2.verify(admin.pin_hash, pinLimpio);
-            if (coincide) {
-              supervisorValido = { party_id: admin.party_id, id: admin.id };
-              break;
-            }
-          } catch {
-            // Continuar evaluando otros administradores
-          }
-        }
-      }
-    }
-
-    // 4. Si el PIN es incorrecto o no se proveyó
-    if (!supervisorValido) {
-      await registrarFalloPin(redis, claveIntentos);
-
-      await this.auditoria.registrar({
-        categoria: 'ACCESO',
-        modulo: 'pedidos',
-        accion: 'PIN_FALLIDO',
-        resultado: 'RECHAZADO',
-        entidad: 'pedido',
-        entidadId: pedidoId,
-        motivo: 'Intento de anulación con PIN de supervisor inválido o no proporcionado',
-        partyId: partyIdOperador,
+  ): Promise<{ party_id?: bigint; id?: bigint }> {
+    if (this.supervisorCodigoService) {
+      return this.supervisorCodigoService.verificarYConsumirCodigo(
+        pinSupervisor,
+        partyIdOperador,
+        'pedidos/anular',
         ip,
-      });
-
-      throw new HttpException(
-        {
-          codigo: 'PIN_INVALIDO',
-          mensaje: 'PIN de supervisor inválido o no proporcionado',
-        },
-        HttpStatus.FORBIDDEN,
+        'pedido',
+        pedidoId,
       );
     }
 
-    // 5. PIN válido: reiniciar contador de fallos
-    await limpiarIntentosPin(redis, claveIntentos);
-
-    return supervisorValido;
+    const claveIntentos = `pin:supervisor:intentos:${partyIdOperador ?? 'general'}`;
+    const redis = this.redisService.obtenerCliente();
+    await exigirPinNoBloqueado(redis, claveIntentos);
+    await registrarFalloPin(redis, claveIntentos);
+    throw new HttpException(
+      {
+        codigo: 'CODIGO_INVALIDO',
+        mensaje: 'Código de supervisor inválido o no proporcionado',
+      },
+      HttpStatus.FORBIDDEN,
+    );
   }
 
   /**
@@ -450,6 +408,7 @@ export class PedidosEstadoService {
     usuarioActual: UsuarioAutenticado,
     pinSupervisor?: string,
     ip?: string,
+    codigoVerificado = false,
   ) {
     const pedidoId = this.parsearId(id);
     const pedido = await this.prisma.pedido.findUnique({
@@ -521,12 +480,14 @@ export class PedidosEstadoService {
         });
       }
 
-      // PIN de supervisor (6 dígitos, ADMIN activo). Un ADMIN anula un entregado sin cobro solo con motivo
+      // Código de supervisor (6 dígitos, ADMIN activo). Un ADMIN anula un entregado sin cobro solo con motivo
       const conPin = !(entregadoSinCobro && usuarioActual.rol === 'ADMIN');
-      const aprobadoPor = conPin
-        ? (await this.verificarPinSupervisor(pinSupervisor, usuarioActual.partyId, ip, pedido.id))
-            .party_id
-        : usuarioActual.partyId;
+      const aprobadoPor = !conPin
+        ? usuarioActual.partyId
+        : codigoVerificado
+          ? usuarioActual.partyId
+          : (await this.verificarPinSupervisor(pinSupervisor, usuarioActual.partyId, ip, pedido.id))
+              .party_id ?? usuarioActual.partyId;
 
       // Actualizar pedido a ANULADO
       const pedidoActualizado = await this.prisma.pedido.update({

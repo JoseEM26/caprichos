@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
+import { RequiereCodigoSupervisor } from '../supervisor-codigo/requiere-codigo-supervisor.decorator';
 import { CajaService } from './caja.service';
 import { CobrosService } from './cobros.service';
 import { AbrirCajaDto } from './dto/abrir-caja.dto';
@@ -48,18 +49,29 @@ export class CajaController {
 
   @Post('cobros/:id/anular')
   @Permiso('caja', 'cobrar')
+  @RequiereCodigoSupervisor('caja/anular_cobro')
   async anularCobro(
     @Param('id') id: string,
     @Body() dto: AnularCobroDto,
     @Headers('x-pin-supervisor') pinSupervisor: string | undefined,
     @Req() req: any,
+    @Headers('x-codigo-supervisor') codigoSupervisor?: string,
   ) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     const pin =
+      codigoSupervisor ||
       pinSupervisor ||
+      req.headers?.['x-codigo-supervisor'] ||
       req.headers?.['x-pin-supervisor'] ||
       req.headers?.['X-Pin-Supervisor'];
-    return this.cobrosService.anularCobro(id, dto, pin, req.usuario, ip);
+    return this.cobrosService.anularCobro(
+      id,
+      dto,
+      pin,
+      req.usuario,
+      ip,
+      ...(req.codigoSupervisorVerificado ? [true] : []),
+    );
   }
 
   @Post('movimientos')
@@ -77,6 +89,7 @@ export class CajaController {
 
   @Post('movimientos/:id/anular')
   @Permiso('caja', 'movimientos')
+  @RequiereCodigoSupervisor('caja/anular_movimiento')
   async anularMovimiento(
     @Param('id') id: string,
     @Body() dto: AnularMovimientoDto,

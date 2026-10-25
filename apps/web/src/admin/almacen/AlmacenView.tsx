@@ -8,6 +8,7 @@ import { ModalRegistrarMovimiento } from './ModalRegistrarMovimiento';
 import { ModalRegistrarProduccion } from './ModalRegistrarProduccion';
 import { ModalCerrarDia } from './ModalCerrarDia';
 import { Confirmar } from '../../comun/Confirmar';
+import { CampoCodigoSupervisor } from '../../comun/CampoCodigoSupervisor';
 
 export const AlmacenView: React.FC = () => {
   const [movimientos, setMovimientos] = useState<MovimientoItem[]>([]);
@@ -17,6 +18,7 @@ export const AlmacenView: React.FC = () => {
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [cargando, setCargando] = useState(true);
   const [mensajeExito, setMensajeExito] = useState('');
+  const [mensajeError, setMensajeError] = useState('');
 
   // Modales
   const [modalMovAbierto, setModalMovAbierto] = useState(false);
@@ -26,19 +28,28 @@ export const AlmacenView: React.FC = () => {
   // Anulación
   const [movAnularId, setMovAnularId] = useState<string | null>(null);
   const [motivoAnular, setMotivoAnular] = useState('');
+  const [codigoSupervisorAnular, setCodigoSupervisorAnular] = useState('');
   const [anulando, setAnulando] = useState(false);
   const [confirmarAnularAbierto, setConfirmarAnularAbierto] = useState(false);
+
+  // Pedidos internos y entrega
+  const [pedidosInternos, setPedidosInternos] = useState<any[]>([]);
+  const [pedidoEntregarId, setPedidoEntregarId] = useState<string | null>(null);
+  const [entregando, setEntregando] = useState(false);
+  const [confirmarEntregarAbierto, setConfirmarEntregarAbierto] = useState(false);
 
   const cargarDatos = async () => {
     try {
       setCargando(true);
-      const [resMovs, resInsumos] = await Promise.all([
+      const [resMovs, resInsumos, resPeds] = await Promise.all([
         almacenApi.listarMovimientos().catch(() => ({ conteos: { todos: 0, entradas: 0, salidas: 0, mermas: 0, devoluciones: 0 }, movimientos: [] })),
         almacenApi.listarInsumos().catch(() => []),
+        almacenApi.listarPedidosInternos().catch(() => []),
       ]);
 
       setMovimientos(resMovs.movimientos);
       setInsumos(resInsumos);
+      setPedidosInternos(Array.isArray(resPeds) ? resPeds : []);
     } finally {
       setCargando(false);
     }
@@ -89,7 +100,11 @@ export const AlmacenView: React.FC = () => {
   const solicitarAnular = (id?: string) => {
     if (id) setMovAnularId(id);
     if (!motivoAnular.trim()) {
-      alert('Debe especificar el motivo de anulación.');
+      setMensajeError('Debe especificar el motivo de anulación.');
+      return;
+    }
+    if (!/^\d{6}$/.test(codigoSupervisorAnular.trim())) {
+      setMensajeError('El código del supervisor debe ser de 6 dígitos numéricos.');
       return;
     }
     setConfirmarAnularAbierto(true);
@@ -99,19 +114,52 @@ export const AlmacenView: React.FC = () => {
     if (!movAnularId || !motivoAnular.trim()) return;
     try {
       setAnulando(true);
-      await almacenApi.anularMovimiento(movAnularId, motivoAnular.trim());
+      setMensajeError('');
+      await almacenApi.anularMovimiento(
+        movAnularId,
+        motivoAnular.trim(),
+        codigoSupervisorAnular.trim(),
+      );
       setConfirmarAnularAbierto(false);
       setMovAnularId(null);
       setMotivoAnular('');
+      setCodigoSupervisorAnular('');
       setMensajeExito('Movimiento anulado e invertido en stock.');
       cargarDatos();
       setTimeout(() => setMensajeExito(''), 4000);
     } catch (err: any) {
-      alert(err.message || 'Error al anular movimiento');
+      setMensajeError(err.message || 'Error al anular movimiento');
     } finally {
       setAnulando(false);
     }
   };
+
+  const solicitarEntregar = (id: string) => {
+    setPedidoEntregarId(id);
+    setConfirmarEntregarAbierto(true);
+  };
+
+  const ejecutarEntregar = async () => {
+    if (!pedidoEntregarId) return;
+    try {
+      setEntregando(true);
+      await almacenApi.entregarPedidoInterno(pedidoEntregarId);
+      setConfirmarEntregarAbierto(false);
+      setPedidoEntregarId(null);
+      setMensajeExito('Pedido interno entregado: insumos trasladados a Cocina.');
+      cargarDatos();
+      setTimeout(() => setMensajeExito(''), 4000);
+    } catch (err: any) {
+      setMensajeError(err.message || 'Error al entregar pedido interno');
+      setTimeout(() => setMensajeError(''), 5000);
+    } finally {
+      setEntregando(false);
+    }
+  };
+
+  const pedidosPendientes = useMemo(() => {
+    return pedidosInternos.filter((p) => p.estado === 'PENDIENTE');
+  }, [pedidosInternos]);
 
   const getTipoBadge = (tipo: string) => {
     const t = (tipo || '').toUpperCase();
@@ -305,6 +353,106 @@ export const AlmacenView: React.FC = () => {
           }}
         >
           ✓ {mensajeExito}
+        </div>
+      )}
+
+      {mensajeError && (
+        <div
+          style={{
+            padding: '10px 14px',
+            borderRadius: 8,
+            background: 'rgb(253, 236, 232)',
+            color: 'var(--cp-rust)',
+            fontWeight: 700,
+            fontSize: 13,
+            border: '1px solid var(--cp-rust)',
+          }}
+        >
+          {mensajeError}
+        </div>
+      )}
+
+      {/* Pedidos internos pendientes solicitados por Cocina */}
+      {pedidosPendientes.length > 0 && (
+        <div
+          style={{
+            background: 'var(--cp-white)',
+            border: '2px solid var(--cp-orange)',
+            borderRadius: 12,
+            padding: 16,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 12,
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--cp-navy)' }}>
+              Pedidos internos de Cocina ({pedidosPendientes.length})
+            </div>
+            <span style={{ fontSize: 12, color: 'var(--cp-soft)' }}>
+              Al pulsar «Ya se lo pasé», se descontará del almacén y pasará a traslado por recibir en cocina.
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {pedidosPendientes.map((p) => {
+              const itemsList = Array.isArray(p.detalle?.items)
+                ? p.detalle.items
+                : Array.isArray(p.detalle)
+                ? p.detalle
+                : [];
+              const itemsStr = itemsList.map((it: any) => `${it.cantidad} ${it.unidad || ''} ${it.insumo || ''}`).join(', ');
+
+              return (
+                <div
+                  key={p.id}
+                  style={{
+                    background: 'var(--cp-sand, #F7F3EB)',
+                    border: '1px solid var(--cp-line)',
+                    borderRadius: 10,
+                    padding: '12px 14px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: 12,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <div style={{ flex: '1 1 240px' }}>
+                    <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--cp-navy)' }}>
+                      Pedido #{p.id} · {p.area || 'Cocina'}
+                    </div>
+                    <div style={{ fontSize: 13, color: 'var(--cp-navy)', marginTop: 2 }}>
+                      {itemsStr || 'Insumos solicitados'}
+                    </div>
+                    {p.detalle?.nota && (
+                      <div style={{ fontSize: 12, color: 'var(--cp-soft)', fontStyle: 'italic', marginTop: 2 }}>
+                        Nota: «{p.detalle.nota}»
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => solicitarEntregar(p.id)}
+                    style={{
+                      minHeight: 44,
+                      padding: '0 18px',
+                      borderRadius: 10,
+                      border: 0,
+                      background: 'var(--cp-orange)',
+                      color: 'var(--cp-navy)',
+                      fontWeight: 800,
+                      fontSize: 13,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Ya se lo pasé
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -682,12 +830,18 @@ export const AlmacenView: React.FC = () => {
                         background: 'var(--cp-white)',
                       }}
                     />
+                    <CampoCodigoSupervisor
+                      id="anular-movimiento-codigo"
+                      valor={codigoSupervisorAnular}
+                      onChange={setCodigoSupervisorAnular}
+                    />
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
                       <button
                         type="button"
                         onClick={() => {
                           setMovAnularId(null);
                           setMotivoAnular('');
+                          setCodigoSupervisorAnular('');
                         }}
                         style={{
                           border: 0,
@@ -785,6 +939,17 @@ export const AlmacenView: React.FC = () => {
         textoConfirmar="Sí, anular movimiento"
         alConfirmar={ejecutarAnularMovimiento}
         alCancelar={() => setConfirmarAnularAbierto(false)}
+      />
+
+      <Confirmar
+        abierto={confirmarEntregarAbierto}
+        titulo="¿Confirmar entrega de insumos?"
+        mensaje="Al confirmar, se descontarán los insumos del stock de almacén central y quedarán registrados como traslado para que Cocina confirme su recepción."
+        textoConfirmar="Sí, ya se lo pasé"
+        textoNo="No, cancelar"
+        cargando={entregando}
+        alConfirmar={ejecutarEntregar}
+        alCancelar={() => setConfirmarEntregarAbierto(false)}
       />
     </div>
   );

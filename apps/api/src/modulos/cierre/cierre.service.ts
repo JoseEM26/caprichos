@@ -3,6 +3,7 @@ import {
   HttpStatus,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import * as argon2 from 'argon2';
@@ -16,6 +17,7 @@ import {
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { CobrosService } from '../caja/cobros.service';
+import { SupervisorCodigoService } from '../supervisor-codigo/supervisor-codigo.service';
 import { CobrarDto } from '../caja/dto/cobrar.dto';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import {
@@ -79,6 +81,7 @@ export class CierreService {
     private readonly auditoria: AuditoriaService,
     private readonly eventosGateway: EventosGateway,
     private readonly cobrosService: CobrosService,
+    @Optional() private readonly supervisorCodigoService?: SupervisorCodigoService,
   ) {}
 
   /** Nombre de la persona de cada party (quién cerró la caja): el historial muestra nombres, no IDs. */
@@ -147,79 +150,39 @@ export class CierreService {
   }
 
   /**
-   * Valida el PIN de 6 dígitos de un ADMIN activo contra user_account.pin_hash con argon2.
-   * Tras 3 intentos fallidos bloquea temporalmente por 5 minutos en Redis (FT-CAJ-02).
+   * Verifica el código rotativo de 6 dígitos del supervisor (RFC 6238 TOTP).
+   * 3 intentos fallidos consecutivos bloquean 5 minutos en Redis (FT-CAJ-02).
    */
   async verificarPinSupervisor(
     pinSupervisor?: string,
     partyIdOperador?: bigint,
     ip?: string,
     cajaId?: bigint,
-    cliente: Pick<PrismaService, 'userAccount'> = this.prisma,
-  ): Promise<{ party_id: bigint; id: bigint }> {
-    const claveIntentos = `pin:supervisor:intentos:${partyIdOperador ?? 'general'}`;
-    const redis = this.redisService.obtenerCliente();
-
-    // Sin Redis no se valida ningún PIN (503): el bloqueo de intentos no puede saltarse
-    await exigirPinNoBloqueado(redis, claveIntentos);
-
-    const pinLimpio = typeof pinSupervisor === 'string' ? pinSupervisor.trim() : '';
-    const formatoValido = /^\d{6}$/.test(pinLimpio);
-
-    let supervisorValido: { party_id: bigint; id: bigint } | null = null;
-
-    if (formatoValido) {
-      const admins = await cliente.userAccount.findMany({
-        where: {
-          rol: 'ADMIN',
-          activo: true,
-          pin_hash: { not: null },
-        },
-      });
-
-      for (const admin of admins) {
-        if (admin.pin_hash) {
-          try {
-            const coincide = await argon2.verify(admin.pin_hash, pinLimpio);
-            if (coincide) {
-              supervisorValido = { party_id: admin.party_id, id: admin.id };
-              break;
-            }
-          } catch {
-            // Continuar con el siguiente admin
-          }
-        }
-      }
-    }
-
-    if (!supervisorValido) {
-      await registrarFalloPin(redis, claveIntentos);
-
-      await this.auditoria.registrar({
-        categoria: 'ACCESO',
-        modulo: 'cierre',
-        accion: 'PIN_FALLIDO',
-        resultado: 'RECHAZADO',
-        entidad: 'caja',
-        entidadId: cajaId,
-        motivo: 'Intento de cierre o conteo con PIN de supervisor inválido o no proporcionado',
-        partyId: partyIdOperador,
+    _cliente?: any,
+    accion = 'cierre',
+  ): Promise<{ party_id?: bigint; id?: bigint }> {
+    if (this.supervisorCodigoService) {
+      return this.supervisorCodigoService.verificarYConsumirCodigo(
+        pinSupervisor,
+        partyIdOperador,
+        accion,
         ip,
-      });
-
-      throw new HttpException(
-        {
-          codigo: 'PIN_INVALIDO',
-          mensaje: 'PIN de supervisor inválido o no proporcionado',
-        },
-        HttpStatus.FORBIDDEN,
+        'caja',
+        cajaId,
       );
     }
 
-    // PIN válido: reiniciar contador de fallos
-    await limpiarIntentosPin(redis, claveIntentos);
-
-    return supervisorValido;
+    const claveIntentos = `pin:supervisor:intentos:${partyIdOperador ?? 'general'}`;
+    const redis = this.redisService.obtenerCliente();
+    await exigirPinNoBloqueado(redis, claveIntentos);
+    await registrarFalloPin(redis, claveIntentos);
+    throw new HttpException(
+      {
+        codigo: 'CODIGO_INVALIDO',
+        mensaje: 'Código de supervisor inválido o no proporcionado',
+      },
+      HttpStatus.FORBIDDEN,
+    );
   }
 
   /**
@@ -427,7 +390,7 @@ export class CierreService {
           caja.id,
           tx,
         );
-        supervisorPartyId = supervisor.party_id;
+        supervisorPartyId = supervisor.party_id ?? null;
       }
 
       const mediosData = [

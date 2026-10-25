@@ -353,7 +353,7 @@ describe('Ola F5: Caja y Cierres', () => {
     await waitFor(() =>
       expect(arqueo).toHaveBeenCalledWith({ conteo: { '100': 3 }, medios: { yape: 0, plin: 0, transferencia: 0, tarjeta: 0 } }, undefined),
     );
-    expect(await screen.findByText(/No cuadra: la supervisora debe escribir su PIN/)).toBeInTheDocument();
+    expect(await screen.findByText(/No cuadra: la supervisora debe escribir su (código|PIN)/)).toBeInTheDocument();
     expect(esperado).not.toHaveBeenCalled();
     expect(screen.queryByText(/Sist\./)).not.toBeInTheDocument();
   });
@@ -377,18 +377,18 @@ describe('Ola F5: Caja y Cierres', () => {
     vi.spyOn(cierreApi, 'realizarArqueo').mockResolvedValue({ resultado: 'NO_CUADRA', intento: 1 });
     const verificar = vi
       .spyOn(cierreApi, 'verificarPinSupervisor')
-      .mockRejectedValue(new ErrorApi('PIN_INVALIDO', 'PIN de supervisor inválido o no proporcionado', 403));
+      .mockRejectedValue(new ErrorApi('CODIGO_INVALIDO', 'Código de supervisor inválido o no proporcionado', 403));
 
     render(<CierreView />);
     fireEvent.click(await screen.findByRole('button', { name: 'Cerrar caja y cuadrar' }));
     fireEvent.click(screen.getByRole('button', { name: 'Ya revisé: continuar al conteo' }));
     fireEvent.click(screen.getByRole('button', { name: 'Revisar si cuadra' }));
 
-    const pin = await screen.findByLabelText('PIN de la supervisora');
+    const pin = await screen.findByLabelText(/Código de la supervisora/i);
     fireEvent.change(pin, { target: { value: '123456' } });
     fireEvent.click(screen.getByRole('button', { name: 'Verificar' }));
 
-    expect(await screen.findByText('PIN de supervisor inválido o no proporcionado')).toBeInTheDocument();
+    expect(await screen.findByText('Código de supervisor inválido o no proporcionado')).toBeInTheDocument();
     expect(verificar).toHaveBeenCalledWith('123456');
     expect(screen.queryByTestId('detalle-cuadre')).not.toBeInTheDocument();
   });

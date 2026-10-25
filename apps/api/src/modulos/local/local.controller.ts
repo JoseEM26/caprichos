@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
+import { RequiereCodigoSupervisor } from '../supervisor-codigo/requiere-codigo-supervisor.decorator';
 import { LocalService } from './local.service';
 import {
   ActualizarHorarioDiaDto,
@@ -36,6 +37,7 @@ export class LocalController {
 
   @Put('horario')
   @Permiso('local', 'editar')
+  @RequiereCodigoSupervisor('local/horario')
   async actualizarHorario(
     @Body() body: ActualizarHorarioDiaDto[] | ActualizarHorarioSemanaDto,
     @Req() req: any,

@@ -570,59 +570,22 @@ export class UsuariosService {
   }
 
   /**
-   * Asigna un PIN de 6 dígitos a un usuario con rol ADMIN.
-   * Guarda el hash con argon2id.
+   * DEPRECADO: El PIN fijo de supervisor ha sido retirado en favor del código rotativo TOTP (RFC 6238).
+   * La columna user_account.pin_hash se preserva en base de datos pero este endpoint responde 410 GONE.
    */
-  async asignarPin(id: bigint | string | number, dto: AsignarPinDto, usuarioActual?: UsuarioAutenticado, ip?: string) {
-    const accountId = this.parsearId(id);
-    const usuario = await this.prisma.userAccount.findUnique({
-      where: { id: accountId },
-      include: {
-        party: {
-          include: {
-            documentos: { where: { tipo: 'DNI' } },
-          },
-        },
+  async asignarPin(
+    _id: bigint | string | number,
+    _dto: AsignarPinDto,
+    _usuarioActual?: UsuarioAutenticado,
+    _ip?: string,
+  ) {
+    throw new HttpException(
+      {
+        codigo: 'PIN_DEPRECADO',
+        mensaje:
+          'El PIN fijo de supervisor ha sido retirado. Ahora se utiliza el código rotativo general del supervisor.',
       },
-    });
-
-    if (!usuario) {
-      throw new NotFoundException({
-        codigo: 'USUARIO_NO_ENCONTRADO',
-        mensaje: 'Usuario no encontrado',
-      });
-    }
-
-    if (usuario.rol !== 'ADMIN') {
-      throw new BadRequestException({
-        codigo: 'ROL_INVALIDO',
-        mensaje: 'Solo los administradores pueden tener un PIN asignado',
-      });
-    }
-
-    const pinHash = await argon2.hash(dto.pin, { type: argon2.argon2id });
-    const dniDoc = usuario.party?.documentos?.[0]?.numero ?? '';
-
-    await this.prisma.userAccount.update({
-      where: { id: usuario.id },
-      data: { pin_hash: pinHash },
-    });
-
-    await this.auditoria.registrar({
-      categoria: 'CAMBIO',
-      modulo: 'usuarios',
-      accion: 'ASIGNAR_PIN',
-      resultado: 'OK',
-      entidad: 'user_account',
-      entidadId: usuario.id,
-      antes: { tienePin: !!usuario.pin_hash, dni: enmascararDni(dniDoc) },
-      despues: { tienePin: true, dni: enmascararDni(dniDoc) },
-      partyId: usuarioActual?.partyId,
-      ip,
-    });
-
-    return {
-      mensaje: 'PIN de administrador asignado exitosamente',
-    };
+      HttpStatus.GONE,
+    );
   }
 }

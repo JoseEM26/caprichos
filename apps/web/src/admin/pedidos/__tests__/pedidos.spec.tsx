@@ -303,11 +303,11 @@ describe('Ola F4: Pedidos y Caja', () => {
       />,
     );
 
-    // Ingresar motivo y PIN válido
+    // Ingresar motivo y código válido
     const inputMotivo = screen.getByLabelText(/Motivo detallado/i);
     fireEvent.change(inputMotivo, { target: { value: 'Cliente desistió de esperar' } });
 
-    const inputPin = screen.getByLabelText(/PIN del supervisor/i);
+    const inputPin = screen.getByLabelText(/Código del supervisor/i);
     fireEvent.change(inputPin, { target: { value: '123456' } });
 
     const btnAnular = screen.getByRole('button', { name: /Confirmar anulación/i });
@@ -329,7 +329,7 @@ describe('Ola F4: Pedidos y Caja', () => {
     });
   });
 
-  it('4. El PIN no queda en el estado tras enviar la anulación', async () => {
+  it('4. El código no queda en el estado tras enviar la anulación', async () => {
     vi.spyOn(pedidosApi, 'cambiarEstado').mockResolvedValue({} as any);
 
     render(
@@ -344,7 +344,7 @@ describe('Ola F4: Pedidos y Caja', () => {
     const inputMotivo = screen.getByLabelText(/Motivo detallado/i);
     fireEvent.change(inputMotivo, { target: { value: 'Cliente no llegó a recoger' } });
 
-    const inputPin = screen.getByLabelText(/PIN del supervisor/i) as HTMLInputElement;
+    const inputPin = screen.getByLabelText(/Código del supervisor/i) as HTMLInputElement;
     fireEvent.change(inputPin, { target: { value: '654321' } });
     expect(inputPin.value).toBe('654321');
 
@@ -355,7 +355,7 @@ describe('Ola F4: Pedidos y Caja', () => {
     const btnSi = screen.getByRole('button', { name: /Sí, anular/i });
     fireEvent.click(btnSi);
 
-    // Inmediatamente tras enviar, el campo del PIN queda en blanco (limpiado del estado)
+    // Inmediatamente tras enviar, el campo del código queda en blanco (limpiado del estado)
     await waitFor(() => {
       expect(inputPin.value).toBe('');
     });

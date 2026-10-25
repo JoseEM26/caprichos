@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
+import { RequiereCodigoSupervisor } from '../supervisor-codigo/requiere-codigo-supervisor.decorator';
 import { ComandasService } from './comandas.service';
 import { AgotadosService } from './agotados.service';
 import { AltaDemandaService } from './alta-demanda.service';
@@ -102,6 +103,9 @@ export class CocinaController {
 
   @Put('alta-demanda')
   @Permiso('cocina', 'demanda')
+  @RequiereCodigoSupervisor('cocina/alta_demanda_pausa', {
+    condicion: (req) => Boolean(req.body?.pausa),
+  })
   async configurarAltaDemanda(@Body() dto: AltaDemandaDto, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.altaDemandaService.configurar(dto, req.usuario, ip);

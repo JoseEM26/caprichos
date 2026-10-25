@@ -67,3 +67,5 @@ apps/e2e/.stack-pids*.json
 /data/
 apps/e2e/.api-*.log
 apps/e2e/.web-*.log
+apps/e2e/capturas/
+docs/capturas-reparto/

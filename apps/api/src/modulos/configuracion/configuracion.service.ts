@@ -23,10 +23,22 @@ export const CLAVES_NUMERICAS = [
   'reparto_muy_tarde_min',
   'reparto_velocidad_kmh',
   'reparto_max_pedidos',
+  'reparto_insistencia_min',
+  'reparto_espera_max_min',
+  'reparto_recargo_reprogramacion',
+  'encuesta_espera_min',
+  'encuesta_puntaje_queja',
 ] as const;
 
 export const CLAVES_TEXTO = [
   'envio_gratis_modo',
+  'carta_aviso_entrada',
+  'whatsapp_aviso_salida_activo',
+  'whatsapp_aviso_llegada_activo',
+  'whatsapp_aviso_espera_activo',
+  'whatsapp_aviso_recojo_activo',
+  'whatsapp_aviso_pago_confirmado_activo',
+  'whatsapp_aviso_encuesta_activo',
 ] as const;
 
 export const CLAVES_OBJETO = [
@@ -99,7 +111,23 @@ export class ConfiguracionService {
         });
       }
     } else if ((CLAVES_TEXTO as readonly string[]).includes(clave)) {
-      if (typeof valor !== 'string' || valor.trim().length === 0) {
+      if (clave === 'carta_aviso_entrada' || clave.startsWith('whatsapp_aviso_')) {
+        const valNorm =
+          typeof valor === 'boolean'
+            ? valor
+              ? 'si'
+              : 'no'
+            : typeof valor === 'string'
+              ? valor.toLowerCase().trim()
+              : '';
+        if (valNorm !== 'si' && valNorm !== 'no') {
+          throw new BadRequestException({
+            codigo: 'VALOR_INVALIDO',
+            mensaje: 'El valor debe ser "si" o "no"',
+          });
+        }
+        valor = valNorm;
+      } else if (typeof valor !== 'string' || valor.trim().length === 0) {
         throw new BadRequestException({
           codigo: 'VALOR_INVALIDO',
           mensaje: 'El valor debe ser una cadena de texto no vacía',

@@ -157,8 +157,18 @@ export const almacenApi = {
   registrarMovimiento: (dto: RegistrarMovimientoDto) =>
     api.post<MovimientoItem>('/admin/almacen/movimientos', dto),
 
-  anularMovimiento: (id: string, motivo: string) =>
-    api.post<{ ok: boolean }>(`/admin/almacen/movimientos/${id}/anular`, { motivo }),
+  anularMovimiento: (id: string, motivo: string, codigoSupervisor?: string) => {
+    const headers: Record<string, string> = {};
+    if (codigoSupervisor?.trim()) {
+      headers['x-codigo-supervisor'] = codigoSupervisor.trim();
+      headers['x-pin-supervisor'] = codigoSupervisor.trim();
+    }
+    return api.post<{ ok: boolean }>(
+      `/admin/almacen/movimientos/${id}/anular`,
+      { motivo },
+      { headers },
+    );
+  },
 
   listarRecetasProduccion: () =>
     api.get<RecetaProduccionItem[]>('/admin/almacen/produccion/recetas'),
@@ -177,6 +187,14 @@ export const almacenApi = {
 
   listarLugares: () =>
     api.get<LugarItem[]>('/admin/stock/lugares'),
+
+  listarPedidosInternos: async (): Promise<any[]> => {
+    return api.get<any[]>('/admin/almacen/pedidos-internos');
+  },
+
+  entregarPedidoInterno: async (id: string): Promise<any> => {
+    return api.post<any>(`/admin/almacen/pedidos-internos/${id}/entregar`);
+  },
 
   listarInsumos: async (): Promise<InsumoStockItem[]> => {
     const res = await api.get<any[]>('/admin/stock/insumos');

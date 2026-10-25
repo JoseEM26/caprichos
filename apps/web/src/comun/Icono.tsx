@@ -72,6 +72,8 @@ export const TRAZOS_ICONOS: Record<string, string> = {
   silencio: 'M11 5L6 9H2v6h4l5 4V5z M23 9l-6 6 M17 9l6 6',
   imprimir: 'M6 9V2h12v7 M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2 M6 14h12v8H6z',
   billete: 'M2 6h20v12H2z M12 12m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0 M6 9h.01 M18 15h.01',
+  seguridad: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
+  copiar: 'M8 4v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7.5L16.5 4H10a2 2 0 0 0-2 2z M4 8v12a2 2 0 0 0 2 2h8',
 };
 
 export interface IconoProps extends Omit<SVGProps<SVGSVGElement>, 'name'> {

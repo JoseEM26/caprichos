@@ -3,6 +3,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  HttpStatus,
   NotFoundException,
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
@@ -382,64 +383,16 @@ describe('UsuariosService', () => {
     });
   });
 
-  describe('asignarPin', () => {
-    it('asigna PIN de 6 dígitos a un ADMIN con argon2id', async () => {
-      const adminUser = {
-        id: 1n,
-        party_id: 1n,
-        rol: 'ADMIN',
-        pin_hash: null,
-        party: {
-          documentos: [{ tipo: 'DNI', numero: '87654321' }],
-        },
-      };
-
-      prismaMock.userAccount.findUnique.mockResolvedValue(adminUser);
-      prismaMock.userAccount.update.mockResolvedValue({ ...adminUser, pin_hash: 'hash-pin' });
-
-      const res = await service.asignarPin(1n, { pin: '123456' }, adminAuth);
-
-      expect(res.mensaje).toContain('PIN de administrador asignado');
-      expect(prismaMock.userAccount.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: 1n },
-          data: expect.objectContaining({
-            pin_hash: expect.stringMatching(/^\$argon2id\$/),
-          }),
-        }),
-      );
-
-      // La auditoría NO debe incluir el PIN ni el hash
-      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
-        expect.objectContaining({
-          categoria: 'CAMBIO',
-          modulo: 'usuarios',
-          accion: 'ASIGNAR_PIN',
-          despues: expect.objectContaining({
-            tienePin: true,
-          }),
-        }),
-      );
-      const llamadaAuditoria = auditoriaMock.registrar.mock.calls[0][0];
-      const auditoriaSerializada = JSON.stringify(llamadaAuditoria, (_, v) =>
-        typeof v === 'bigint' ? v.toString() : v,
-      );
-      expect(auditoriaSerializada).not.toContain('123456');
-    });
-
-    it('rechaza asignar PIN a un usuario con rol distinto de ADMIN', async () => {
-      const cajeroUser = {
-        id: 2n,
-        party_id: 2n,
-        rol: 'CAJERO',
-        party: { documentos: [] },
-      };
-
-      prismaMock.userAccount.findUnique.mockResolvedValue(cajeroUser);
-
+  describe('asignarPin (deprecado)', () => {
+    it('responde 410 GONE PIN_DEPRECADO indicando que el PIN fijo fue retirado', async () => {
       await expect(
-        service.asignarPin(2n, { pin: '123456' }, adminAuth),
-      ).rejects.toThrow(BadRequestException);
+        service.asignarPin(1n, { pin: '123456' }, adminAuth),
+      ).rejects.toMatchObject({
+        status: HttpStatus.GONE,
+        response: expect.objectContaining({
+          codigo: 'PIN_DEPRECADO',
+        }),
+      });
     });
   });
 

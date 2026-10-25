@@ -48,13 +48,14 @@ La semilla crea los siguientes datos mínimos en `caprichos_test`:
 - **Ofertas:** Promoción 2x1 en Café Americano (tipo LLEVA_PAGA).
 - **Horario:** Local abierto de 00:00 a 23:59 los 7 días de la semana.
 - **Usuarios de prueba:**
-  - ADMIN: DNI `20000001`, PIN supervisor `123456`.
+  - ADMIN: DNI `20000001` (acceso a pantalla Código del supervisor y autorización de acciones sensibles).
   - CAJERO: DNI `20000002`.
   - MOZO: DNI `20000003`.
   - COCINA: DNI `20000004`.
   - ALMACEN: DNI `20000005`.
   - REPARTIDOR: DNI `20000006`.
   - Las contraseñas se generan de forma criptográfica en memoria en cada ejecución y se pasan a las pruebas vía `process.env.E2E_PASSWORDS`.
+  - **Código del supervisor (TOTP):** En cada ejecución, la semilla genera un secreto criptográfico determinista de 20 bytes en `supervisor_secreto`. En pruebas que requieran autorización de supervisor (anulaciones, arqueos, mermas grandes), se utiliza el helper `obtenerCodigoSupervisorVigente(prisma)` de `apps/e2e/src/supervisor-totp.ts`. El PIN fijo anterior queda retirado y deprecado.
 
 ## Cómo agregar una prueba
 

@@ -57,12 +57,14 @@ export class LocalService {
     // Consulta de parámetros relevantes
     const parametros = await this.prisma.parametro.findMany({
       where: {
-        clave: { in: ['pausa_alta_demanda', 'tiempo_prometido_min'] },
+        clave: { in: ['pausa_alta_demanda', 'tiempo_prometido_min', 'carta_aviso_entrada'] },
       },
     });
 
     const pausaParam = parametros.find((p) => p.clave === 'pausa_alta_demanda')?.valor;
     const tiempoParam = parametros.find((p) => p.clave === 'tiempo_prometido_min')?.valor;
+    const avisoParam = parametros.find((p) => p.clave === 'carta_aviso_entrada')?.valor;
+    const cartaAvisoEntrada = avisoParam === 'si' || avisoParam === true;
     const tiempoBaseMin =
       typeof tiempoParam === 'number' ? tiempoParam : Number(tiempoParam) || null;
     // alta demanda vigente (ola 5, cocina): suma sus minutos al tiempo prometido de la carta
@@ -98,6 +100,7 @@ export class LocalService {
         pausaAltaDemanda: true,
         tiempoPrometidoMin,
         altaDemandaMin: altaDemanda?.minutos ?? 0,
+        cartaAvisoEntrada,
       };
     }
 
@@ -118,6 +121,7 @@ export class LocalService {
           pausaAltaDemanda: false,
           tiempoPrometidoMin,
           altaDemandaMin: altaDemanda?.minutos ?? 0,
+          cartaAvisoEntrada,
         };
       }
 
@@ -134,6 +138,7 @@ export class LocalService {
           pausaAltaDemanda: false,
           tiempoPrometidoMin,
           altaDemandaMin: altaDemanda?.minutos ?? 0,
+          cartaAvisoEntrada,
         };
       }
 
@@ -147,6 +152,7 @@ export class LocalService {
           pausaAltaDemanda: false,
           tiempoPrometidoMin,
           altaDemandaMin: altaDemanda?.minutos ?? 0,
+          cartaAvisoEntrada,
         };
       }
 
@@ -160,6 +166,7 @@ export class LocalService {
           pausaAltaDemanda: false,
           tiempoPrometidoMin,
           altaDemandaMin: altaDemanda?.minutos ?? 0,
+          cartaAvisoEntrada,
         };
       }
 
@@ -173,6 +180,7 @@ export class LocalService {
         pausaAltaDemanda: false,
         tiempoPrometidoMin,
         altaDemandaMin: altaDemanda?.minutos ?? 0,
+        cartaAvisoEntrada,
       };
     }
 
@@ -191,6 +199,7 @@ export class LocalService {
         pausaAltaDemanda: false,
         tiempoPrometidoMin,
         altaDemandaMin: altaDemanda?.minutos ?? 0,
+        cartaAvisoEntrada,
       };
     }
 
@@ -207,6 +216,7 @@ export class LocalService {
         pausaAltaDemanda: false,
         tiempoPrometidoMin,
         altaDemandaMin: altaDemanda?.minutos ?? 0,
+        cartaAvisoEntrada,
       };
     }
 
@@ -220,6 +230,7 @@ export class LocalService {
         pausaAltaDemanda: false,
         tiempoPrometidoMin,
         altaDemandaMin: altaDemanda?.minutos ?? 0,
+        cartaAvisoEntrada,
       };
     }
 
@@ -233,6 +244,7 @@ export class LocalService {
         pausaAltaDemanda: false,
         tiempoPrometidoMin,
         altaDemandaMin: altaDemanda?.minutos ?? 0,
+        cartaAvisoEntrada,
       };
     }
 
@@ -246,6 +258,7 @@ export class LocalService {
       pausaAltaDemanda: false,
       tiempoPrometidoMin,
       altaDemandaMin: altaDemanda?.minutos ?? 0,
+      cartaAvisoEntrada,
     };
   }
 
@@ -261,6 +274,7 @@ export class LocalService {
               'local_datos',
               'local_pagos',
               'envio_gratis_monto',
+              'envio_gratis_modo',
               'pedido_minimo',
               'puntos_porcentaje',
             ],
@@ -275,6 +289,7 @@ export class LocalService {
     const datosParam = parametros.find((p) => p.clave === 'local_datos')?.valor as any;
     const pagosParam = parametros.find((p) => p.clave === 'local_pagos')?.valor as any;
     const envioGratis = parametros.find((p) => p.clave === 'envio_gratis_monto')?.valor;
+    const envioGratisModo = parametros.find((p) => p.clave === 'envio_gratis_modo')?.valor;
     const pedidoMinimo = parametros.find((p) => p.clave === 'pedido_minimo')?.valor;
     const puntosPorcentaje = Number(parametros.find((p) => p.clave === 'puntos_porcentaje')?.valor);
 
@@ -317,6 +332,7 @@ export class LocalService {
       horario: horarioFormateado,
       mediosPago: mediosPagoVisibles,
       envioGratisDesde: typeof envioGratis === 'number' ? envioGratis : null,
+      envioGratisModo: typeof envioGratisModo === 'string' ? envioGratisModo : 'mas_de',
       pedidoMinimo: typeof pedidoMinimo === 'number' ? pedidoMinimo : null,
       puntosPorcentaje: puntosPorcentaje > 0 ? puntosPorcentaje : 5,
     };

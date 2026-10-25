@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Boton } from '../../comun/Boton';
 import { Confirmar } from '../../comun/Confirmar';
+import { CampoCodigoSupervisor } from '../../comun/CampoCodigoSupervisor';
 import { pedidosApi } from './pedidosApi';
 import { ErrorApi } from '../../comun/api';
 
@@ -31,7 +32,7 @@ export function ModalAnular({
   alAnularExitoso,
 }: ModalAnularProps) {
   const [motivo, setMotivo] = useState<string>('');
-  const [pin, setPin] = useState<string>('');
+  const [codigo, setCodigo] = useState<string>('');
   const [errorMensaje, setErrorMensaje] = useState<string>('');
   const [enviando, setEnviando] = useState<boolean>(false);
   const [mostrarConfirmar, setMostrarConfirmar] = useState<boolean>(false);
@@ -44,9 +45,9 @@ export function ModalAnular({
       return false;
     }
 
-    const pinTrim = pin.trim();
-    if (!/^\d{6}$/.test(pinTrim)) {
-      setErrorMensaje('El PIN del supervisor debe ser de exactamente 6 dígitos numéricos.');
+    const codigoTrim = codigo.trim();
+    if (!/^\d{6}$/.test(codigoTrim)) {
+      setErrorMensaje('El código del supervisor debe ser de exactamente 6 dígitos numéricos.');
       return false;
     }
 
@@ -60,11 +61,11 @@ export function ModalAnular({
   };
 
   const ejecutarAnulacion = async () => {
-    const pinParaEnviar = pin.trim();
+    const codigoParaEnviar = codigo.trim();
     const motivoParaEnviar = motivo.trim();
 
-    // Regla crítica de seguridad: el PIN no queda en el estado tras enviar
-    setPin('');
+    // Regla de seguridad: el código no queda en el estado tras enviar
+    setCodigo('');
     setMostrarConfirmar(false);
     setEnviando(true);
     setErrorMensaje('');
@@ -83,19 +84,27 @@ export function ModalAnular({
       }
 
       if (esCobro && idCobro) {
-        await pedidosApi.anularCobro(idCobro, motivoParaEnviar, pinParaEnviar);
+        await pedidosApi.anularCobro(idCobro, motivoParaEnviar, codigoParaEnviar);
       } else {
         await pedidosApi.cambiarEstado(
           pedidoId,
           'ANULADO',
           motivoParaEnviar,
-          pinParaEnviar,
+          codigoParaEnviar,
         );
       }
       alAnularExitoso();
     } catch (err: any) {
       if (err instanceof ErrorApi) {
-        setErrorMensaje(err.message || 'Error al anular');
+        if (err.codigo === 'CODIGO_INVALIDO' || err.codigo === 'PIN_INVALIDO') {
+          setErrorMensaje('Código del supervisor inválido. Pídelo nuevamente a la supervisora.');
+        } else if (err.codigo === 'CODIGO_BLOQUEADO' || err.codigo === 'PIN_BLOQUEADO') {
+          setErrorMensaje('Demasiados intentos fallidos. Bloqueado temporalmente por 5 minutos.');
+        } else if (err.codigo === 'SUPERVISOR_SIN_CONFIGURAR') {
+          setErrorMensaje('El local aún no tiene configurado el código de supervisor. El administrador debe generarlo desde su pantalla.');
+        } else {
+          setErrorMensaje(err.message || 'Error al anular');
+        }
       } else {
         setErrorMensaje(err?.message || 'Error al procesar la anulación');
       }
@@ -105,7 +114,7 @@ export function ModalAnular({
   };
 
   const manejarCerrar = () => {
-    setPin('');
+    setCodigo('');
     alCerrar();
   };
 
@@ -258,47 +267,17 @@ export function ModalAnular({
           />
         </div>
 
-        {/* PIN de supervisor (6 dígitos enmascarado) */}
-        <div>
-          <label
-            htmlFor="anular-pin"
-            style={{
-              fontWeight: 700,
-              fontSize: 13,
-              display: 'block',
-              marginBottom: 4,
-            }}
-          >
-            PIN del supervisor (6 dígitos)
-          </label>
-          <input
-            id="anular-pin"
-            type="password"
-            maxLength={6}
-            autoComplete="off"
-            value={pin}
-            onChange={(e) => {
-              const v = e.target.value.replace(/\D/g, '').slice(0, 6);
-              setPin(v);
-              setErrorMensaje('');
-            }}
-            placeholder="******"
-            style={{
-              width: '100%',
-              boxSizing: 'border-box',
-              minHeight: 44,
-              borderRadius: 10,
-              border: '1.5px solid var(--cp-line, #E3D6C6)',
-              background: 'var(--cp-white, #FFFFFF)',
-              padding: '0 12px',
-              fontSize: 18,
-              letterSpacing: '0.2em',
-            }}
-          />
-          <div style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)', marginTop: 4 }}>
-            Ingresado en persona en la caja; nunca se guarda ni se muestra.
-          </div>
-        </div>
+        {/* Código de supervisor (6 dígitos) */}
+        <CampoCodigoSupervisor
+          id="anular-pin"
+          valor={codigo}
+          onChange={(v) => {
+            setCodigo(v);
+            setErrorMensaje('');
+          }}
+          etiqueta="Código del supervisor (6 dígitos)"
+          ayuda="Pídelo a la supervisora: lo ve en su pantalla y cambia cada 30 segundos"
+        />
 
         {/* Mensaje de error */}
         {errorMensaje && (
@@ -323,7 +302,7 @@ export function ModalAnular({
           <Boton
             variante="peligro"
             cargando={enviando}
-            disabled={enviando || motivo.trim().length < 5 || pin.length !== 6}
+            disabled={enviando || motivo.trim().length < 5 || codigo.length !== 6}
             onClick={iniciarAnulacion}
             style={{
               flex: 1,

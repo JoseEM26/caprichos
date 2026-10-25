@@ -234,6 +234,29 @@ describe('LocalService', () => {
       expect(res.texto).toBe('Cocina temporalmente saturada');
       expect(res.pausaAltaDemanda).toBe(true);
     });
+
+    it('informa cartaAvisoEntrada activado o desactivado', async () => {
+      const ahora = new Date('2026-10-20T18:00:00.000Z');
+      prismaMock.parametro.findMany.mockResolvedValue([
+        { clave: 'carta_aviso_entrada', valor: 'si' },
+      ]);
+      prismaMock.fechaEspecial.findUnique.mockResolvedValue(null);
+      prismaMock.horarioDia.findUnique.mockResolvedValue({
+        dia_semana: 2,
+        cerrado: false,
+        abre: horaToDate('14:00'),
+        cierra: horaToDate('22:00'),
+      });
+
+      const resActivo = await service.obtenerEstadoCarta(ahora);
+      expect(resActivo.cartaAvisoEntrada).toBe(true);
+
+      prismaMock.parametro.findMany.mockResolvedValue([
+        { clave: 'carta_aviso_entrada', valor: 'no' },
+      ]);
+      const resInactivo = await service.obtenerEstadoCarta(ahora);
+      expect(resInactivo.cartaAvisoEntrada).toBe(false);
+    });
   });
 
   describe('actualizarHorarioAdmin', () => {
@@ -411,6 +434,7 @@ describe('LocalService', () => {
       expect(res.lat).toBe(-12.0196436);
       expect(res.lng).toBe(-76.963255);
       expect(res.envioGratisDesde).toBe(60);
+      expect(res.envioGratisModo).toBe('mas_de');
       expect(res.pedidoMinimo).toBe(20);
       expect(res.mediosPago.efectivo).toBeDefined();
       expect(res.mediosPago.yape).toBeDefined();

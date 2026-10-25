@@ -1,5 +1,6 @@
 import { execSync } from 'child_process';
 import * as path from 'path';
+import * as crypto from 'crypto';
 import { PrismaClient, Prisma } from '@prisma/client';
 import * as argon2 from 'argon2';
 import {
@@ -10,6 +11,7 @@ import {
   obtenerDbUrl,
   NOMBRE_DB,
 } from '../src/credenciales';
+import { derivarClaveCifrado } from '../src/supervisor-totp';
 
 // Importar roles y permisos oficiales del backend compilado
 // @ts-ignore
@@ -137,6 +139,25 @@ export async function sembrarDatosPrueba(dbUrlTest?: string): Promise<ResultadoS
       where: { nombre: 'Cocina' },
       update: { tipo: 'AREA', area_id: cocinaArea.id },
       create: { nombre: 'Cocina', tipo: 'AREA', area_id: cocinaArea.id },
+    });
+
+    // 2.5 Lista de Tamaños
+    const listaTamanos = await prisma.lista.upsert({
+      where: { codigo: 'TAMANOS' },
+      update: { nombre: 'Tamaños' },
+      create: { codigo: 'TAMANOS', nombre: 'Tamaños' },
+    });
+
+    await prisma.listaValor.upsert({
+      where: { id: 1 },
+      update: { nombre: 'Regular', lista_id: listaTamanos.id, orden: 1, activo: true },
+      create: { id: 1, nombre: 'Regular', lista_id: listaTamanos.id, orden: 1, activo: true },
+    });
+
+    await prisma.listaValor.upsert({
+      where: { id: 2 },
+      update: { nombre: 'Único', lista_id: listaTamanos.id, orden: 2, activo: true },
+      create: { id: 2, nombre: 'Único', lista_id: listaTamanos.id, orden: 2, activo: true },
     });
 
     // 3. Categorías
@@ -469,6 +490,9 @@ export async function sembrarDatosPrueba(dbUrlTest?: string): Promise<ResultadoS
       { clave: 'terminos_texto', valor: 'Términos de prueba' },
       { clave: 'privacidad_texto', valor: 'Privacidad de prueba' },
       { clave: 'reclamo_plazo_dias_habiles', valor: 15 },
+      { clave: 'envio_gratis_monto', valor: 70 },
+      { clave: 'envio_gratis_modo', valor: 'mas_de' },
+      { clave: 'carta_aviso_entrada', valor: 'no' },
     ];
 
     for (const p of parametros) {
@@ -495,6 +519,7 @@ export async function sembrarDatosPrueba(dbUrlTest?: string): Promise<ResultadoS
       'COCINA',
       'ALMACEN',
       'REPARTIDOR',
+      'REPARTIDOR_2',
     ];
 
     const credencialesGeneradas: Record<RolPrueba, { dni: string; clave: string }> = {} as any;
@@ -509,6 +534,16 @@ export async function sembrarDatosPrueba(dbUrlTest?: string): Promise<ResultadoS
       mapaEnvClaves[rol] = clave;
       process.env[`E2E_PASSWORD_${rol}`] = clave;
 
+      const nombrePersona =
+        rol === 'REPARTIDOR'
+          ? 'Juan'
+          : rol === 'REPARTIDOR_2'
+          ? 'Carlos'
+          : rol;
+      const apellidoPersona =
+        rol === 'REPARTIDOR' || rol === 'REPARTIDOR_2' ? 'Delivery' : 'E2E Test';
+      const rolEnBd = rol === 'REPARTIDOR_2' ? 'REPARTIDOR' : rol;
+
       await prisma.$transaction(async (tx) => {
         let ident = await tx.partyIdentifier.findUnique({
           where: { tipo_numero: { tipo: 'DNI', numero: dni } },
@@ -519,14 +554,14 @@ export async function sembrarDatosPrueba(dbUrlTest?: string): Promise<ResultadoS
           partyId = ident.party_id;
           await tx.person.upsert({
             where: { party_id: partyId },
-            update: { nombres: rol, apellidos: 'E2E Test' },
-            create: { party_id: partyId, nombres: rol, apellidos: 'E2E Test' },
+            update: { nombres: nombrePersona, apellidos: apellidoPersona },
+            create: { party_id: partyId, nombres: nombrePersona, apellidos: apellidoPersona },
           });
 
           await tx.userAccount.upsert({
             where: { party_id: partyId },
             update: {
-              rol,
+              rol: rolEnBd,
               hash,
               debe_cambiar: false,
               activo: true,
@@ -534,7 +569,7 @@ export async function sembrarDatosPrueba(dbUrlTest?: string): Promise<ResultadoS
             },
             create: {
               party_id: partyId,
-              rol,
+              rol: rolEnBd,
               hash,
               debe_cambiar: false,
               activo: true,
@@ -550,8 +585,8 @@ export async function sembrarDatosPrueba(dbUrlTest?: string): Promise<ResultadoS
           await tx.person.create({
             data: {
               party_id: partyId,
-              nombres: rol,
-              apellidos: 'E2E Test',
+              nombres: nombrePersona,
+              apellidos: apellidoPersona,
             },
           });
 
@@ -566,7 +601,7 @@ export async function sembrarDatosPrueba(dbUrlTest?: string): Promise<ResultadoS
           await tx.userAccount.create({
             data: {
               party_id: partyId,
-              rol,
+              rol: rolEnBd,
               hash,
               debe_cambiar: false,
               activo: true,
@@ -623,6 +658,182 @@ export async function sembrarDatosPrueba(dbUrlTest?: string): Promise<ResultadoS
         activo: true,
       },
     });
+
+    // 9. Sembrar secreto de supervisor determinístico en memoria sin escribir a disco
+    const claveDerivadaDet = derivarClaveCifrado();
+    const secretoDeterministic = Buffer.from('caprichos-sup-sec-01', 'utf-8'); // 20 bytes exactos
+    const ivBytes = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv('aes-256-gcm', claveDerivadaDet, ivBytes);
+    const cifrado = Buffer.concat([cipher.update(secretoDeterministic), cipher.final()]);
+    const tagBytes = cipher.getAuthTag();
+
+    const adminIdent = await prisma.partyIdentifier.findFirst({ where: { numero: DNIS_POR_ROL.ADMIN } });
+    const adminPartyId = adminIdent?.party_id || BigInt(1);
+
+    await prisma.supervisorSecreto.upsert({
+      where: { local_codigo: 'CAPRICHOS' },
+      update: {
+        secreto_cifrado: cifrado.toString('base64'),
+        iv: ivBytes.toString('base64'),
+        tag: tagBytes.toString('base64'),
+        actualizado_en: new Date(),
+      },
+      create: {
+        local_codigo: 'CAPRICHOS',
+        secreto_cifrado: cifrado.toString('base64'),
+        iv: ivBytes.toString('base64'),
+        tag: tagBytes.toString('base64'),
+        creado_por: adminPartyId,
+      },
+    });
+
+    // 10. Pedidos Delivery en estado LISTO distribuidos en distintos sectores (Norte, Sur, Este)
+    const prodCafe = mapaProductos.get('Café Americano');
+    const ahora = new Date();
+
+    const pedidosDeliveryPrueba = [
+      // Sector Norte (4 pedidos para probar iniciar ruta eligiendo 2 de 4 y concurrencia)
+      {
+        codigo: 'CP-D001',
+        cliente_nombre: 'Ana Norte',
+        cliente_telefono: '987111001',
+        entrega_direccion: 'Av. Gran Chimu 120, SJL',
+        entrega_lat: -12.008,
+        entrega_lng: -76.963,
+        minutosListo: 40,
+        total: 20.0,
+      },
+      {
+        codigo: 'CP-D002',
+        cliente_nombre: 'Bruno Norte',
+        cliente_telefono: '987111002',
+        entrega_direccion: 'Jr. Los Claveles 340, SJL',
+        entrega_lat: -12.005,
+        entrega_lng: -76.962,
+        minutosListo: 35,
+        total: 20.0,
+      },
+      {
+        codigo: 'CP-D003',
+        cliente_nombre: 'Carla Norte',
+        cliente_telefono: '987111003',
+        entrega_direccion: 'Calle Las Flores 560, SJL',
+        entrega_lat: -12.002,
+        entrega_lng: -76.961,
+        minutosListo: 25,
+        total: 20.0,
+      },
+      {
+        codigo: 'CP-D004',
+        cliente_nombre: 'Diego Norte',
+        cliente_telefono: '987111004',
+        entrega_direccion: 'Av. Canto Grande 780, SJL',
+        entrega_lat: -11.999,
+        entrega_lng: -76.96,
+        minutosListo: 15,
+        total: 20.0,
+      },
+      // Sector Sur (2 pedidos)
+      {
+        codigo: 'CP-D005',
+        cliente_nombre: 'Elena Sur',
+        cliente_telefono: '987111005',
+        entrega_direccion: 'Av. Malecon Checa 890, SJL',
+        entrega_lat: -12.03,
+        entrega_lng: -76.965,
+        minutosListo: 22,
+        total: 20.0,
+      },
+      {
+        codigo: 'CP-D006',
+        cliente_nombre: 'Fernando Sur',
+        cliente_telefono: '987111006',
+        entrega_direccion: 'Jr. Piramides del Sol 1100, SJL',
+        entrega_lat: -12.035,
+        entrega_lng: -76.967,
+        minutosListo: 18,
+        total: 20.0,
+      },
+      // Sector Este (2 pedidos)
+      {
+        codigo: 'CP-D007',
+        cliente_nombre: 'Gabriela Este',
+        cliente_telefono: '987111007',
+        entrega_direccion: 'Av. Santa Rosa 450, SJL',
+        entrega_lat: -12.019,
+        entrega_lng: -76.95,
+        minutosListo: 30,
+        total: 20.0,
+      },
+      {
+        codigo: 'CP-D008',
+        cliente_nombre: 'Hector Este',
+        cliente_telefono: '987111008',
+        entrega_direccion: 'Calle Los Sauces 210, SJL',
+        entrega_lat: -12.018,
+        entrega_lng: -76.945,
+        minutosListo: 12,
+        total: 20.0,
+      },
+    ];
+
+    for (const p of pedidosDeliveryPrueba) {
+      const fechaListo = new Date(ahora.getTime() - p.minutosListo * 60 * 1000);
+      const fechaCreado = new Date(fechaListo.getTime() - 10 * 60 * 1000);
+
+      const ped = await prisma.pedido.upsert({
+        where: { codigo: p.codigo },
+        update: {
+          modalidad: 'DELIVERY',
+          estado: 'LISTO',
+          repartidor_party_id: null,
+          entrega_lat: new Prisma.Decimal(p.entrega_lat),
+          entrega_lng: new Prisma.Decimal(p.entrega_lng),
+          entrega_direccion: p.entrega_direccion,
+          cliente_nombre: p.cliente_nombre,
+          cliente_telefono: p.cliente_telefono,
+          total: new Prisma.Decimal(p.total),
+          subtotal: new Prisma.Decimal(p.total),
+          listo_en: fechaListo,
+          creado_en: fechaCreado,
+        },
+        create: {
+          codigo: p.codigo,
+          modalidad: 'DELIVERY',
+          estado: 'LISTO',
+          canal: 'CARTA',
+          pago_metodo: 'EFECTIVO',
+          pago_estado: 'PENDIENTE',
+          entrega_lat: new Prisma.Decimal(p.entrega_lat),
+          entrega_lng: new Prisma.Decimal(p.entrega_lng),
+          entrega_direccion: p.entrega_direccion,
+          cliente_nombre: p.cliente_nombre,
+          cliente_telefono: p.cliente_telefono,
+          total: new Prisma.Decimal(p.total),
+          subtotal: new Prisma.Decimal(p.total),
+          listo_en: fechaListo,
+          creado_en: fechaCreado,
+        },
+      });
+
+      if (prodCafe) {
+        const lineaExistente = await prisma.pedidoLinea.findFirst({
+          where: { pedido_id: ped.id },
+        });
+        if (!lineaExistente) {
+          await prisma.pedidoLinea.create({
+            data: {
+              pedido_id: ped.id,
+              producto_id: prodCafe.id,
+              nombre: 'Café Americano',
+              cantidad: 2,
+              precio_unit: new Prisma.Decimal(10.0),
+              subtotal: new Prisma.Decimal(20.0),
+            },
+          });
+        }
+      }
+    }
 
     // Exponer contraseñas al proceso en memoria
     process.env.E2E_PASSWORDS = JSON.stringify(mapaEnvClaves);

@@ -4,6 +4,7 @@ import { ModalAnular } from '../pedidos/ModalAnular';
 import { pedidosApi, Pedido } from '../pedidos/pedidosApi';
 import { cierreApi, PendienteCobro } from './cierreApi';
 import { ErrorApi } from '../../comun/api';
+import { CampoCodigoSupervisor } from '../../comun/CampoCodigoSupervisor';
 
 export interface PendientesCobroCierreProps {
   esAdmin: boolean;
@@ -32,7 +33,7 @@ export function PendientesCobroCierre({
   setPendientes,
   alCambiarTurno,
 }: PendientesCobroCierreProps) {
-  const [pin, setPin] = useState('');
+  const [codigo, setCodigo] = useState('');
   const [desbloqueado, setDesbloqueado] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
@@ -41,21 +42,33 @@ export function PendientesCobroCierre({
 
   const mostrarLista = esAdmin || desbloqueado;
 
-  const verConPin = async () => {
-    if (!/^\d{6}$/.test(pin.trim())) {
-      setError('El PIN del supervisor debe ser de exactamente 6 dígitos numéricos.');
+  const verConCodigo = async () => {
+    if (!/^\d{6}$/.test(codigo.trim())) {
+      setError('El código del supervisor debe ser de exactamente 6 dígitos numéricos.');
       return;
     }
     setCargando(true);
     setError('');
     try {
-      const lista = await cierreApi.listarPendientesDeCobro(pin);
+      const lista = await cierreApi.listarPendientesDeCobro(codigo);
       setPendientes(lista);
       setDesbloqueado(true);
     } catch (err: unknown) {
-      setError(err instanceof ErrorApi ? err.message : 'No se pudo cargar la lista. Intenta de nuevo.');
+      if (err instanceof ErrorApi) {
+        if (err.codigo === 'CODIGO_INVALIDO' || err.codigo === 'PIN_INVALIDO') {
+          setError('Código del supervisor inválido. Pídelo nuevamente a la supervisora.');
+        } else if (err.codigo === 'CODIGO_BLOQUEADO' || err.codigo === 'PIN_BLOQUEADO') {
+          setError(err.message || 'Demasiados intentos fallidos de código de supervisor. Espera 5 minutos.');
+        } else if (err.codigo === 'SUPERVISOR_SIN_CONFIGURAR') {
+          setError('El local aún no tiene configurado el código de supervisor. El administrador debe generarlo desde su pantalla.');
+        } else {
+          setError(err.message);
+        }
+      } else {
+        setError('No se pudo cargar la lista. Intenta de nuevo.');
+      }
     } finally {
-      setPin('');
+      setCodigo('');
       setCargando(false);
     }
   };
@@ -92,24 +105,27 @@ export function PendientesCobroCierre({
       {!mostrarLista ? (
         <>
           <div style={{ fontSize: 13 }}>
-            Ingresa el PIN de supervisor para ver los pedidos sin cobrar de cualquier día.
+            Ingresa el código del supervisor para ver los pedidos sin cobrar de cualquier día.
           </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <input
-              type="password"
-              inputMode="numeric"
-              maxLength={6}
-              aria-label="PIN del supervisor"
-              placeholder="PIN (6 dígitos)"
-              value={pin}
-              onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-              style={{ flex: 1, minHeight: 44, minWidth: 140, padding: '0 12px', borderRadius: 10, border: '1.5px solid var(--cp-sand, #EDE1D1)', fontSize: 16 }}
-            />
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <CampoCodigoSupervisor
+                id="codigo-supervisor-pendientes"
+                valor={codigo}
+                onChange={(v) => {
+                  setCodigo(v);
+                  setError('');
+                }}
+                error={error}
+                etiqueta="Código del supervisor (6 dígitos)"
+                ayuda="Pídelo a la supervisora: lo ve en su pantalla y cambia cada 30 segundos"
+              />
+            </div>
             <button
               type="button"
-              onClick={verConPin}
+              onClick={verConCodigo}
               disabled={cargando}
-              style={{ minHeight: 44, padding: '0 16px', borderRadius: 10, border: 0, background: 'var(--cp-navy, #0B2C3E)', color: '#fff', fontWeight: 800, cursor: 'pointer' }}
+              style={{ minHeight: 44, marginTop: 24, padding: '0 16px', borderRadius: 10, border: 0, background: 'var(--cp-navy, #0B2C3E)', color: '#fff', fontWeight: 800, cursor: 'pointer' }}
             >
               {cargando ? 'Verificando…' : 'Ver pedidos'}
             </button>
@@ -150,7 +166,7 @@ export function PendientesCobroCierre({
         </>
       )}
 
-      {error && (
+      {error && mostrarLista && (
         <div role="alert" style={{ color: 'var(--cp-rust, #B2500F)', fontSize: 13, fontWeight: 700 }}>
           {error}
         </div>

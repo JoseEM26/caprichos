@@ -114,7 +114,7 @@ model UserAccount {
   rol                   String
   hash                  String
   debe_cambiar          Boolean                @default(true)
-  pin_hash              String?
+  pin_hash              String?                // OBSOLETO: El PIN fijo se retiró en favor del código rotativo general (supervisor_secreto). Se mantiene por compatibilidad histórica sin uso.
   activo                Boolean                @default(true)
   alta_en               DateTime               @default(now()) @db.Date
   party                 Party                  @relation(fields: [party_id], references: [id])
@@ -483,6 +483,9 @@ model Pedido {
   solicitudesCambio      SolicitudCambio[]
   encuesta               Encuesta?
   printJobs              PrintJob[]
+  whatsappMensajes       WhatsappMensaje[]
+  encuestaPosventa       EncuestaPosventa?
+  quejasWhatsapp         QuejaWhatsapp[]
 
   @@map("pedido")
 }
@@ -1515,6 +1518,7 @@ model Conversacion {
   tomadoPorUsuario   UserAccount?       @relation(fields: [tomado_por], references: [id])
   mensajes           MensajeChat[]
   solicitudesReserva SolicitudReserva[]
+  whatsappMensajes   WhatsappMensaje[]
 
   @@map("conversacion")
 }
@@ -1755,6 +1759,94 @@ model UsoExterno {
 
   @@map("uso_externo")
 }
+
+model SupervisorSecreto {
+  id              BigInt   @id @default(autoincrement())
+  local_codigo    String   @unique @default("CAPRICHOS")
+  secreto_cifrado String
+  iv              String
+  tag             String
+  creado_por      BigInt?
+  creado_en       DateTime @default(now()) @db.Timestamptz
+  actualizado_en  DateTime @updatedAt @db.Timestamptz
+
+  @@map("supervisor_secreto")
+}
+
+// ---------- Chatbot WhatsApp Fase 1 (Avisos, Webhook, Encuestas y Quejas) ----------
+
+model WhatsappMensaje {
+  id                   BigInt        @id @default(autoincrement())
+  direccion            String        // ENTRANTE | SALIENTE
+  wa_message_id        String?       @unique
+  telefono_enmascarado String
+  telefono_hash        String
+  tipo                 String        // TEXTO | BOTON | PLANTILLA | IMAGEN | INTERACTIVO | SISTEMA
+  plantilla            String?
+  estado               String        @default("ENCOLADO") // ENCOLADO | ENVIADO | ENTREGADO | LEIDO | FALLIDO | SIMULADO
+  error_codigo         String?
+  error_detalle        String?
+  pedido_id            BigInt?
+  conversacion_id      BigInt?
+  creado_en            DateTime      @default(now()) @db.Timestamptz
+  actualizado_en       DateTime      @updatedAt @db.Timestamptz
+
+  pedido               Pedido?       @relation(fields: [pedido_id], references: [id])
+  conversacion         Conversacion? @relation(fields: [conversacion_id], references: [id])
+
+  @@index([telefono_hash])
+  @@index([creado_en])
+  @@index([pedido_id])
+  @@map("whatsapp_mensaje")
+}
+
+model ClienteWhatsappConsentimiento {
+  id            BigInt   @id @default(autoincrement())
+  telefono_hash String   @unique
+  acepta        Boolean  @default(true)
+  origen        String   @default("WEBHOOK_BAJA") // WEBHOOK_BAJA | WEBHOOK_ALTA | MANUAL
+  en            DateTime @default(now()) @db.Timestamptz
+
+  @@map("cliente_whatsapp_consentimiento")
+}
+
+model EncuestaPosventa {
+  id            BigInt    @id @default(autoincrement())
+  pedido_id     BigInt    @unique
+  enviada_en    DateTime  @default(now()) @db.Timestamptz
+  respondida_en DateTime? @db.Timestamptz
+  puntaje       Int?      @db.SmallInt
+  comentario    String?
+  estado        String    @default("ENVIADA") // ENVIADA | RESPONDIDA | EXPIRADA | SIMULADA
+  creado_en     DateTime  @default(now()) @db.Timestamptz
+  actualizado_en DateTime @updatedAt @db.Timestamptz
+
+  pedido        Pedido    @relation(fields: [pedido_id], references: [id], onDelete: Cascade)
+
+  @@map("encuesta_posventa")
+}
+
+model QuejaWhatsapp {
+  id            BigInt    @id @default(autoincrement())
+  origen        String    @default("ENCUESTA") // ENCUESTA | CHAT
+  pedido_id     BigInt?
+  cliente       String
+  telefono_hash String?
+  puntaje       Int?      @db.SmallInt
+  texto         String
+  estado        String    @default("NUEVA") // NUEVA | EN_REVISION | RESUELTA
+  atendida_por  String?
+  resolucion    String?
+  creada_en     DateTime  @default(now()) @db.Timestamptz
+  actualizada_en DateTime @updatedAt @db.Timestamptz
+
+  pedido        Pedido?   @relation(fields: [pedido_id], references: [id])
+
+  @@index([estado])
+  @@index([pedido_id])
+  @@map("queja_whatsapp")
+}
+
 
 
 

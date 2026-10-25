@@ -59,3 +59,14 @@ describe('matriz de permisos de COCINA (coc-api)', () => {
     }
   });
 });
+
+describe('permiso supervisor/ver_codigo', () => {
+  it('solo ADMIN tiene supervisor/ver_codigo; ningún otro rol lo tiene', () => {
+    expect(MATRIZ.ADMIN).toContain('supervisor/ver_codigo');
+    const otrosRoles = ['CAJERO', 'COCINA', 'MOZO', 'CALLCENTER', 'ALMACEN', 'REPARTIDOR'];
+    for (const r of otrosRoles) {
+      expect(MATRIZ[r]).not.toContain('supervisor/ver_codigo');
+    }
+  });
+});
+

@@ -31,12 +31,12 @@ describe('intentos-pin (falla cerrado)', () => {
     await expect(limpiarIntentosPin(redis, clave)).rejects.toMatchObject({ status: 503 });
   });
 
-  it('tres fallos seguidos bloquean 5 minutos (PIN_BLOQUEADO 403)', async () => {
+  it('tres fallos seguidos bloquean 5 minutos (CODIGO_BLOQUEADO 403)', async () => {
     const redis: any = { get: jest.fn().mockResolvedValue('3') };
 
     await expect(exigirPinNoBloqueado(redis, clave)).rejects.toMatchObject({
       status: HttpStatus.FORBIDDEN,
-      response: { codigo: 'PIN_BLOQUEADO', mensaje: expect.stringContaining('5 minutos') },
+      response: { codigo: 'CODIGO_BLOQUEADO', mensaje: expect.stringContaining('5 minutos') },
     });
   });
 

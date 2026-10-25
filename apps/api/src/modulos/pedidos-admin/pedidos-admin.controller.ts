@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
+import { RequiereCodigoSupervisor } from '../supervisor-codigo/requiere-codigo-supervisor.decorator';
 import { PedidosEstadoService } from './pedidos-estado.service';
 import { FiltrarPedidosDto } from './dto/filtrar-pedidos.dto';
 import { CambiarEstadoDto } from './dto/cambiar-estado.dto';
@@ -73,19 +74,29 @@ export class PedidosAdminController {
 
   @Post(':id/estado')
   @Permiso('pedidos', 'cambiar_estado')
+  @RequiereCodigoSupervisor('pedidos/anular', {
+    condicion: (req) => req.body?.estado === 'ANULADO',
+  })
   async cambiarEstado(
     @Param('id') id: string,
     @Body() dto: CambiarEstadoDto,
     @Headers('x-pin-supervisor') pinSupervisor: string | undefined,
     @Req() req: any,
+    @Headers('x-codigo-supervisor') codigoSupervisor?: string,
   ) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    const codigo =
+      codigoSupervisor ||
+      pinSupervisor ||
+      req.headers?.['x-codigo-supervisor'] ||
+      req.headers?.['x-pin-supervisor'];
     return this.pedidosEstadoService.cambiarEstado(
       id,
       dto,
       req.usuario,
-      pinSupervisor,
+      codigo,
       ip,
+      ...(req.codigoSupervisorVerificado ? [true] : []),
     );
   }
 

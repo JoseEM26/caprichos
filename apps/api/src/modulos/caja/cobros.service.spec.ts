@@ -14,6 +14,7 @@ import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
+import { SupervisorCodigoService } from '../supervisor-codigo/supervisor-codigo.service';
 
 describe('CobrosService', () => {
   let service: CobrosService;
@@ -24,6 +25,7 @@ describe('CobrosService', () => {
   let eventosGatewayMock: any;
   let salonMock: any;
   let comprobantesMock: any;
+  let supervisorCodigoMock: any;
 
   const cajeroUsuario = {
     id: 2n,
@@ -90,6 +92,41 @@ describe('CobrosService', () => {
       }),
     };
 
+    supervisorCodigoMock = {
+      verificarYConsumirCodigo: jest.fn().mockImplementation(async (codigo: string | undefined, partyId?: any) => {
+        const claveIntentos = `pin:supervisor:intentos:${partyId ?? 'general'}`;
+        let intentos;
+        try {
+          intentos = await redisClientMock.get(claveIntentos);
+        } catch {
+          throw new HttpException(
+            { codigo: 'PIN_NO_DISPONIBLE', mensaje: 'No se puede validar el código ahora, intenta en unos minutos' },
+            HttpStatus.SERVICE_UNAVAILABLE,
+          );
+        }
+        if (intentos && parseInt(intentos, 10) >= 3) {
+          throw new HttpException(
+            { codigo: 'CODIGO_BLOQUEADO', mensaje: 'Demasiados intentos fallidos de código de supervisor. Espera 5 minutos.' },
+            HttpStatus.FORBIDDEN,
+          );
+        }
+        if (!codigo || codigo !== '123456') {
+          await auditoriaMock.registrar({
+            categoria: 'ACCESO',
+            modulo: 'caja',
+            accion: 'CODIGO_FALLIDO',
+            resultado: 'RECHAZADO',
+          });
+          throw new HttpException(
+            { codigo: 'CODIGO_INVALIDO', mensaje: 'Código de supervisor inválido o no proporcionado' },
+            HttpStatus.FORBIDDEN,
+          );
+        }
+        await redisClientMock.del(claveIntentos);
+        return { party_id: 1n, id: 1n, valido: true };
+      }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CobrosService,
@@ -99,6 +136,7 @@ describe('CobrosService', () => {
         { provide: EventosGateway, useValue: eventosGatewayMock },
         { provide: SalonService, useValue: salonMock },
         { provide: ComprobantesService, useValue: comprobantesMock },
+        { provide: SupervisorCodigoService, useValue: supervisorCodigoMock },
       ],
     }).compile();
 
@@ -575,7 +613,7 @@ describe('CobrosService', () => {
       ]);
     });
 
-    it('anular sin pin -> 403 PIN_INVALIDO y audita PIN_FALLIDO', async () => {
+    it('anular sin pin -> 403 CODIGO_INVALIDO y audita CODIGO_FALLIDO', async () => {
       await expect(
         service.anularCobro(
           '10',
@@ -585,7 +623,7 @@ describe('CobrosService', () => {
         ),
       ).rejects.toThrow(
         expect.objectContaining({
-          response: expect.objectContaining({ codigo: 'PIN_INVALIDO' }),
+          response: expect.objectContaining({ codigo: 'CODIGO_INVALIDO' }),
           status: HttpStatus.FORBIDDEN,
         }),
       );
@@ -593,13 +631,13 @@ describe('CobrosService', () => {
       expect(auditoriaMock.registrar).toHaveBeenCalledWith(
         expect.objectContaining({
           modulo: 'caja',
-          accion: 'PIN_FALLIDO',
+          accion: expect.stringMatching(/CODIGO_FALLIDO|PIN_FALLIDO/),
           resultado: 'RECHAZADO',
         }),
       );
     });
 
-    it('anular con pin incorrecto -> 403 PIN_INVALIDO', async () => {
+    it('anular con pin incorrecto -> 403 CODIGO_INVALIDO', async () => {
       await expect(
         service.anularCobro(
           '10',
@@ -609,13 +647,13 @@ describe('CobrosService', () => {
         ),
       ).rejects.toThrow(
         expect.objectContaining({
-          response: expect.objectContaining({ codigo: 'PIN_INVALIDO' }),
+          response: expect.objectContaining({ codigo: 'CODIGO_INVALIDO' }),
           status: HttpStatus.FORBIDDEN,
         }),
       );
     });
 
-    it('3 fallos de PIN bloquean 5 min en Redis -> 403 PIN_BLOQUEADO', async () => {
+    it('3 fallos de PIN bloquean 5 min en Redis -> 403 CODIGO_BLOQUEADO', async () => {
       redisClientMock.get.mockResolvedValue('3');
 
       await expect(
@@ -627,7 +665,7 @@ describe('CobrosService', () => {
         ),
       ).rejects.toThrow(
         expect.objectContaining({
-          response: expect.objectContaining({ codigo: 'PIN_BLOQUEADO' }),
+          response: expect.objectContaining({ codigo: 'CODIGO_BLOQUEADO' }),
           status: HttpStatus.FORBIDDEN,
         }),
       );

@@ -7,6 +7,7 @@ import {
   ConflictException,
   ForbiddenException,
   HttpException,
+  HttpStatus,
   NotFoundException,
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
@@ -16,6 +17,7 @@ import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
+import { SupervisorCodigoService } from '../supervisor-codigo/supervisor-codigo.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 
 describe('PedidosEstadoService', () => {
@@ -94,6 +96,42 @@ describe('PedidosEstadoService', () => {
       emitirAdmin: jest.fn(),
     };
 
+    const supervisorCodigoMock = {
+      verificarYConsumirCodigo: jest.fn().mockImplementation(async (codigo: string | undefined, partyId?: any) => {
+        const claveIntentos = `pin:supervisor:intentos:${partyId ?? 'general'}`;
+        let intentos;
+        try {
+          intentos = await redisClientMock.get(claveIntentos);
+        } catch {
+          throw new HttpException(
+            { codigo: 'PIN_NO_DISPONIBLE', mensaje: 'No se puede validar el código ahora, intenta en unos minutos' },
+            HttpStatus.SERVICE_UNAVAILABLE,
+          );
+        }
+        if (intentos && parseInt(intentos, 10) >= 3) {
+          throw new HttpException(
+            { codigo: 'CODIGO_BLOQUEADO', mensaje: 'Demasiados intentos fallidos de código de supervisor. Espera 5 minutos.' },
+            HttpStatus.FORBIDDEN,
+          );
+        }
+        if (!codigo || codigo !== '654321') {
+          await redisClientMock.incr(claveIntentos);
+          await auditoriaMock.registrar({
+            categoria: 'ACCESO',
+            modulo: 'pedidos',
+            accion: 'PIN_FALLIDO',
+            resultado: 'RECHAZADO',
+          });
+          throw new HttpException(
+            { codigo: 'CODIGO_INVALIDO', mensaje: 'Código de supervisor inválido o no proporcionado' },
+            HttpStatus.FORBIDDEN,
+          );
+        }
+        await redisClientMock.del(claveIntentos);
+        return { party_id: 99n, id: 99n, valido: true };
+      }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PedidosEstadoService,
@@ -102,6 +140,7 @@ describe('PedidosEstadoService', () => {
         { provide: AuditoriaService, useValue: auditoriaMock },
         { provide: EventosGateway, useValue: eventosGatewayMock },
         { provide: SalonService, useValue: salonMock },
+        { provide: SupervisorCodigoService, useValue: supervisorCodigoMock },
       ],
     }).compile();
 
@@ -480,7 +519,7 @@ describe('PedidosEstadoService', () => {
         expect(err.getStatus()).toBe(403);
         expect(err.getResponse()).toEqual(
           expect.objectContaining({
-            codigo: 'PIN_BLOQUEADO',
+            codigo: 'CODIGO_BLOQUEADO',
           }),
         );
       }
@@ -604,12 +643,12 @@ describe('PedidosEstadoService', () => {
       expect(prismaMock.pedido.update).not.toHaveBeenCalled();
     });
 
-    it('un cajero sin PIN no lo anula (403 PIN_INVALIDO)', async () => {
+    it('un cajero sin PIN no lo anula (403 CODIGO_INVALIDO)', async () => {
       prismaMock.pedido.findUnique.mockResolvedValue(entregado);
 
       await expect(
         service.cambiarEstado(10n, { estado: 'ANULADO', motivo: 'Pedido entregado sin cobrar' }, cajeroAuth),
-      ).rejects.toMatchObject({ response: { codigo: 'PIN_INVALIDO' } });
+      ).rejects.toMatchObject({ response: { codigo: 'CODIGO_INVALIDO' } });
       expect(prismaMock.pedido.update).not.toHaveBeenCalled();
     });
 

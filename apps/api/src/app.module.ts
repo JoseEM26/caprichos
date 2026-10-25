@@ -38,6 +38,8 @@ import { IniciativasModule } from './modulos/iniciativas/iniciativas.module';
 import { MensajesModule } from './modulos/mensajes/mensajes.module';
 import { PantallasModule } from './modulos/pantallas/pantallas.module';
 import { ContenidoModule } from './modulos/contenido/contenido.module';
+import { SupervisorCodigoModule } from './modulos/supervisor-codigo/supervisor-codigo.module';
+import { ChatbotModule } from './modulos/chatbot/chatbot.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -45,6 +47,7 @@ import { ContenidoModule } from './modulos/contenido/contenido.module';
       validate: validarEntorno,
     }),
     ComunModule,
+    SupervisorCodigoModule,
     SaludModule,
     VersionModule,
     AuditoriaModule,
@@ -65,6 +68,7 @@ import { ContenidoModule } from './modulos/contenido/contenido.module';
     ReservasModule,
     SalonModule,
     ComprobantesModule,
+    ChatbotModule,
     ReclamosModule,
     DireccionesModule,
     NotificacionesModule,

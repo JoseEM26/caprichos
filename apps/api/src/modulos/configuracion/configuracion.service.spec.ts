@@ -171,6 +171,18 @@ describe('ConfiguracionService', () => {
       });
       const resModo = await service.actualizar('envio_gratis_modo', 'MONTO', adminAuth);
       expect(resModo.valor).toBe('MONTO');
+
+      prismaMock.parametro.findUnique.mockResolvedValue(null);
+      prismaMock.parametro.upsert.mockResolvedValue({
+        clave: 'carta_aviso_entrada',
+        valor: 'si',
+      });
+      const resAviso = await service.actualizar('carta_aviso_entrada', true, adminAuth);
+      expect(resAviso.valor).toBe('si');
+
+      await expect(
+        service.actualizar('carta_aviso_entrada', 'quizas', adminAuth),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('valida rangos y orden ascendente en parámetros de reparto', async () => {

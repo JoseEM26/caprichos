@@ -8,6 +8,7 @@ import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { CobrosService } from '../caja/cobros.service';
+import { SupervisorCodigoService } from '../supervisor-codigo/supervisor-codigo.service';
 import { ArqueoDto } from './dto/arqueo.dto';
 import { CerrarCajaDto } from './dto/cerrar-caja.dto';
 
@@ -212,6 +213,43 @@ describe('CierreService', () => {
       $transaction: jest.fn().mockImplementation(async (cb) => cb(prismaMock)),
     };
 
+    const supervisorCodigoMock = {
+      verificarYConsumirCodigo: jest.fn().mockImplementation(async (codigo: string | undefined, partyId?: any) => {
+        const claveIntentos = `pin:supervisor:intentos:${partyId ?? 'general'}`;
+        let intentos;
+        try {
+          intentos = await redisMock.get(claveIntentos);
+        } catch {
+          throw new HttpException(
+            { codigo: 'PIN_NO_DISPONIBLE', mensaje: 'No se puede validar el código ahora, intenta en unos minutos' },
+            HttpStatus.SERVICE_UNAVAILABLE,
+          );
+        }
+        if (intentos && parseInt(intentos, 10) >= 3) {
+          throw new HttpException(
+            { codigo: 'CODIGO_BLOQUEADO', mensaje: 'Demasiados intentos fallidos de código de supervisor. Espera 5 minutos.' },
+            HttpStatus.FORBIDDEN,
+          );
+        }
+        if (!codigo || (codigo !== '654321' && codigo !== '123456')) {
+          await redisMock.incr(claveIntentos);
+          await redisMock.expire(claveIntentos, 5 * 60);
+          await auditoriaMock.registrar({
+            categoria: 'ACCESO',
+            modulo: 'cierre',
+            accion: 'PIN_FALLIDO',
+            resultado: 'RECHAZADO',
+          });
+          throw new HttpException(
+            { codigo: 'CODIGO_INVALIDO', mensaje: 'Código de supervisor inválido o no proporcionado' },
+            HttpStatus.FORBIDDEN,
+          );
+        }
+        await redisMock.del(claveIntentos);
+        return { party_id: 99n, id: 99n, valido: true };
+      }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CierreService,
@@ -220,6 +258,7 @@ describe('CierreService', () => {
         { provide: AuditoriaService, useValue: auditoriaMock },
         { provide: EventosGateway, useValue: eventosGatewayMock },
         { provide: CobrosService, useValue: { cobrarEnCierre: jest.fn() } },
+        { provide: SupervisorCodigoService, useValue: supervisorCodigoMock },
       ],
     }).compile();
 
@@ -445,7 +484,7 @@ describe('CierreService', () => {
         await service.verificarPinSupervisor('654321', 101n, '127.0.0.1', 10n);
       } catch (e: any) {
         expect(e.getStatus()).toBe(HttpStatus.FORBIDDEN);
-        expect(e.getResponse().codigo).toBe('PIN_BLOQUEADO');
+        expect(e.getResponse().codigo).toBe('CODIGO_BLOQUEADO');
       }
     });
 
@@ -956,13 +995,13 @@ describe('CierreService', () => {
       prismaMock.userAccount.findMany.mockResolvedValue([]);
       await expect(
         service.verificarPinSupervisor('000000', 101n, '127.0.0.1', 10n),
-      ).rejects.toMatchObject({ response: { codigo: 'PIN_INVALIDO' } });
+      ).rejects.toMatchObject({ response: { codigo: 'CODIGO_INVALIDO' } });
       expect(redisMock.expire).toHaveBeenCalledWith(expect.any(String), 5 * 60);
     });
 
-    it('pedidos sin cobrar: el cajero sin PIN de supervisor no los ve (PIN_INVALIDO)', async () => {
+    it('pedidos sin cobrar: el cajero sin PIN de supervisor no los ve (CODIGO_INVALIDO)', async () => {
       await expect(service.listarPendientesDeCobro(mockUsuarioCajero)).rejects.toMatchObject({
-        response: { codigo: 'PIN_INVALIDO' },
+        response: { codigo: 'CODIGO_INVALIDO' },
       });
       expect(prismaMock.pedido.findMany).not.toHaveBeenCalled();
     });

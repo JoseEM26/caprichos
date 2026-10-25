@@ -8,6 +8,7 @@ import {
   obtenerStockInsumo,
   obtenerPrismaTest,
   SUPERVISOR_PIN,
+  obtenerCodigoSupervisorVigente,
   PUERTO_API,
   SLOT,
 } from '../../src';
@@ -31,11 +32,15 @@ test.describe('Suite E2E - Módulo de Caja y Cierres', () => {
   const prisma = obtenerPrismaTest();
   const redisDb = 2 + SLOT;
 
-  // Helper para limpiar contadores de intentos de PIN en Redis
+  // Helper para limpiar contadores de intentos y códigos consumidos en Redis
   function limpiarRedisIntentos() {
     try {
       execSync(
-        `docker exec caprichos-redis-dev redis-cli -n ${redisDb} --scan --pattern "pin:supervisor:intentos:*" | xargs -r docker exec -i caprichos-redis-dev redis-cli -n ${redisDb} del`,
+        `docker exec caprichos-redis-dev redis-cli -n ${redisDb} --scan --pattern "pin:supervisor:*" | xargs -r docker exec -i caprichos-redis-dev redis-cli -n ${redisDb} del`,
+        { stdio: ['ignore', 'ignore', 'ignore'] },
+      );
+      execSync(
+        `docker exec caprichos-redis-dev redis-cli -n ${redisDb} --scan --pattern "supervisor:codigo:*" | xargs -r docker exec -i caprichos-redis-dev redis-cli -n ${redisDb} del`,
         { stdio: ['ignore', 'ignore', 'ignore'] },
       );
     } catch {
@@ -56,15 +61,27 @@ test.describe('Suite E2E - Módulo de Caja y Cierres', () => {
     await prisma.liquidacion.deleteMany();
     await prisma.caja.deleteMany();
 
-    // 2. Eliminar pedidos y relaciones dependientes
-    await prisma.comprobante.deleteMany();
-    await prisma.pedidoEstadoHistorial.deleteMany();
-    await prisma.pedidoMesa.deleteMany();
-    await prisma.movimientoStock.deleteMany();
+    // 2. Eliminar pedidos creados en caja y relaciones dependientes (preservando los pedidos delivery CP-D00*)
+    const pedidosCaja = await prisma.pedido.findMany({
+      where: { NOT: { codigo: { startsWith: 'CP-D00' } } },
+      select: { id: true },
+    });
+    const idsCaja = pedidosCaja.map((p) => p.id);
+
+    await prisma.comprobante.deleteMany({ where: { pedido_id: { in: idsCaja } } });
+    await prisma.pedidoEstadoHistorial.deleteMany({ where: { pedido_id: { in: idsCaja } } });
+    await prisma.pedidoMesa.deleteMany({ where: { pedido_id: { in: idsCaja } } });
+    await prisma.movimientoStock.deleteMany({ where: { pedido_id: { in: idsCaja } } });
     await prisma.pedidoLineaOpcion.deleteMany();
-    await prisma.pedidoLinea.deleteMany();
+    await prisma.pedidoLinea.deleteMany({ where: { pedido_id: { in: idsCaja } } });
     await prisma.comandaArea.deleteMany();
-    await prisma.pedido.deleteMany();
+    await prisma.pedido.deleteMany({ where: { id: { in: idsCaja } } });
+
+    // Poner pedidos delivery en COBRADO y PAGADO para que no bloqueen los arqueos ni cierres de caja
+    await prisma.pedido.updateMany({
+      where: { codigo: { startsWith: 'CP-D00' } },
+      data: { estado: 'COBRADO', pago_estado: 'PAGADO' },
+    });
 
     // 3. Restaurar stock inicial de Café en grano (20 kg almacén central, 5 kg barra = 25 kg)
     await prisma.stock.updateMany({
@@ -378,13 +395,15 @@ test.describe('Suite E2E - Módulo de Caja y Cierres', () => {
     });
     expect(cobroSinAnularDb?.anulado_en).toBeNull();
 
-    // 6. Anular el cobro CON el PIN de supervisor correcto
+    // 6. Anular el cobro CON el código de supervisor correcto
+    const codigoSupervisor = await obtenerCodigoSupervisorVigente(prisma);
     const resConPin = await fetch(`${apiBaseUrl}/admin/caja/cobros/${cobroId}/anular`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${sesionCajero.accessToken}`,
-        'X-Pin-Supervisor': pinSupervisor,
+        'X-Codigo-Supervisor': codigoSupervisor,
+        'X-Pin-Supervisor': codigoSupervisor,
       },
       body: JSON.stringify({
         motivo: 'Cobro cobrado por duplicado por error del cajero',
@@ -464,33 +483,35 @@ test.describe('Suite E2E - Módulo de Caja y Cierres', () => {
 
       expect(resIntento.status).toBe(403);
       const dataIntento = await resIntento.json();
-      expect(dataIntento.codigo).toBe('PIN_INVALIDO');
+      expect(['CODIGO_INVALIDO', 'PIN_INVALIDO']).toContain(dataIntento.codigo);
     }
 
-    // 3. El 4to intento con el PIN CORRECTO de supervisor debe ser BLOQUEADO por Redis (PIN_BLOQUEADO)
+    // 3. El 4to intento con el código CORRECTO de supervisor debe ser BLOQUEADO por Redis (CODIGO_BLOQUEADO)
+    const codigoSupervisor = await obtenerCodigoSupervisorVigente(prisma);
     const resBloqueado = await fetch(`${apiBaseUrl}/admin/caja/cobros/${cobroId}/anular`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${sesionCajero.accessToken}`,
-        'X-Pin-Supervisor': pinSupervisor,
+        'X-Codigo-Supervisor': codigoSupervisor,
+        'X-Pin-Supervisor': codigoSupervisor,
       },
       body: JSON.stringify({
-        motivo: 'Intento con pin real estando bloqueado',
+        motivo: 'Intento con codigo real estando bloqueado',
       }),
     });
 
     expect(resBloqueado.status).toBe(403);
     const dataBloqueado = await resBloqueado.json();
-    expect(dataBloqueado.codigo).toBe('PIN_BLOQUEADO');
-    expect(dataBloqueado.mensaje).toBe('Demasiados intentos fallidos de PIN de supervisor. Espera 5 minutos.');
+    expect(['CODIGO_BLOQUEADO', 'PIN_BLOQUEADO']).toContain(dataBloqueado.codigo);
+    expect(dataBloqueado.mensaje).toMatch(/Demasiados intentos fallidos.*Espera 5 minutos/i);
 
     // 4. Verificar que el cobro no se haya anulado en base de datos
     const cobroDb = await prisma.cobro.findUnique({ where: { id: cobroId } });
     expect(cobroDb?.anulado_en).toBeNull();
 
     // 5. Verificar mensaje de error claro en la interfaz gráfica
-    // El cajero intenta usar el PIN de supervisor bloqueado en Cierre de caja
+    // El cajero intenta usar el código de supervisor bloqueado en Cierre de caja
     await loginPorUi(page, 'CAJERO');
     await page.goto('/admin/cierre', { waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: 'Cerrar caja y cuadrar' }).click();
@@ -498,14 +519,14 @@ test.describe('Suite E2E - Módulo de Caja y Cierres', () => {
     const modalCierre = page.getByRole('dialog', { name: 'Cerrar caja y cuadrar' });
     await expect(modalCierre).toBeVisible();
 
-    // Intentar ver pedidos sin cobrar usando el PIN bloqueado
-    const inputPin = modalCierre.getByLabel('PIN del supervisor');
-    await inputPin.fill(pinSupervisor);
+    // Intentar ver pedidos sin cobrar usando el código bloqueado
+    const inputPin = modalCierre.getByLabel(/Código del supervisor/i);
+    await inputPin.fill(codigoSupervisor);
     await modalCierre.getByRole('button', { name: 'Ver pedidos' }).click();
 
     // Debe mostrar claramente el mensaje de bloqueo por intentos
     await expect(
-      modalCierre.getByText('Demasiados intentos fallidos de PIN de supervisor. Espera 5 minutos.'),
+      modalCierre.getByText(/Demasiados intentos fallidos.*Espera 5 minutos/i),
     ).toBeVisible({ timeout: 8000 });
   });
 
@@ -542,9 +563,10 @@ test.describe('Suite E2E - Módulo de Caja y Cierres', () => {
     // 5. Verificar sección de pedidos sin cobrar que impiden el cierre
     await expect(modalCierre.getByText('Pedidos sin cobrar: impiden cerrar la caja')).toBeVisible();
 
-    // El cajero ingresa PIN de supervisor para desbloquear la vista de pendientes
-    const inputPinPendientes = modalCierre.getByLabel('PIN del supervisor');
-    await inputPinPendientes.fill(pinSupervisor);
+    // El cajero ingresa código de supervisor para desbloquear la vista de pendientes
+    const codSup1 = await obtenerCodigoSupervisorVigente(prisma);
+    const inputPinPendientes = modalCierre.getByLabel(/Código del supervisor/i);
+    await inputPinPendientes.fill(codSup1);
     await modalCierre.getByRole('button', { name: 'Ver pedidos' }).click();
 
     // 6. Verificar que aparecen los botones "Cobrar ahora" y "Anular con motivo"
@@ -572,8 +594,10 @@ test.describe('Suite E2E - Módulo de Caja y Cierres', () => {
     await page.getByRole('button', { name: 'Cerrar caja y cuadrar' }).click();
     await expect(modalCierre).toBeVisible();
 
-    // Desbloquear pendientes con PIN de supervisor
-    await modalCierre.getByLabel('PIN del supervisor').fill(pinSupervisor);
+    // Desbloquear pendientes con código de supervisor (limpiando consumo previo en Redis)
+    limpiarRedisIntentos();
+    const codSup2 = await obtenerCodigoSupervisorVigente(prisma);
+    await modalCierre.getByLabel(/Código del supervisor/i).fill(codSup2);
     await modalCierre.getByRole('button', { name: 'Ver pedidos' }).click();
     await expect(modalCierre.getByText('CP-E2E-SIN-COBRO')).toBeVisible({ timeout: 8000 });
 
@@ -584,8 +608,10 @@ test.describe('Suite E2E - Módulo de Caja y Cierres', () => {
     const modalAnularPendiente = page.getByRole('dialog', { name: 'Anular pedido' });
     await expect(modalAnularPendiente).toBeVisible();
 
+    limpiarRedisIntentos();
+    const codSup3 = await obtenerCodigoSupervisorVigente(prisma);
     await modalAnularPendiente.locator('#anular-motivo').fill('Cliente no cancelo y se retiro del local');
-    await modalAnularPendiente.locator('#anular-pin').fill(pinSupervisor);
+    await modalAnularPendiente.locator('#anular-pin').fill(codSup3);
 
     await modalAnularPendiente.getByRole('button', { name: 'Confirmar anulación' }).click();
     await confirmarSiNo(page, 'si');
@@ -815,9 +841,10 @@ test.describe('Suite E2E - Módulo de Caja y Cierres', () => {
     const modalAnular = page.getByRole('dialog', { name: /Anular cobro/i });
     await expect(modalAnular).toBeVisible();
 
-    // Ingresar motivo y PIN de supervisor
+    // Ingresar motivo y código de supervisor
+    const codSupCobro = await obtenerCodigoSupervisorVigente(prisma);
     await modalAnular.locator('#anular-motivo').fill('Anulación del cobro solicitada por el cliente en caja');
-    await modalAnular.locator('#anular-pin').fill(pinSupervisor);
+    await modalAnular.locator('#anular-pin').fill(codSupCobro);
 
     await modalAnular.getByRole('button', { name: 'Confirmar anulación' }).click();
     await confirmarSiNo(page, 'si');

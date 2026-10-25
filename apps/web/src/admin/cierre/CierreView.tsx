@@ -390,12 +390,12 @@ export function CierreView() {
     }
   };
 
-  // El PIN lo valida el servidor; solo si lo acepta se muestra el detalle del cuadre
+  // El código lo valida el servidor; solo si lo acepta se muestra el detalle del cuadre
   const handleVerificarPinSupervisora = async () => {
     if (guardando) return;
     const pin = pinSupervisora.trim();
     if (!/^\d{6}$/.test(pin)) {
-      setMsgCierreError('El PIN de la supervisora tiene 6 dígitos.');
+      setMsgCierreError('El código de la supervisora tiene 6 dígitos.');
       return;
     }
     setGuardando(true);
@@ -406,7 +406,19 @@ export function CierreView() {
       setMsgCierreError('');
     } catch (err: any) {
       setPinVerificado(false);
-      setMsgCierreError(errorDeServidor(err, 'No se pudo verificar el PIN de la supervisora.'));
+      if (err instanceof ErrorApi) {
+        if (err.codigo === 'CODIGO_INVALIDO' || err.codigo === 'PIN_INVALIDO') {
+          setMsgCierreError('Código de supervisor inválido o no proporcionado');
+        } else if (err.codigo === 'CODIGO_BLOQUEADO' || err.codigo === 'PIN_BLOQUEADO') {
+          setMsgCierreError('Demasiados intentos fallidos. Bloqueado temporalmente por 5 minutos.');
+        } else if (err.codigo === 'SUPERVISOR_SIN_CONFIGURAR') {
+          setMsgCierreError('El local aún no tiene configurado el código de supervisor. El administrador debe generarlo desde su pantalla.');
+        } else {
+          setMsgCierreError(errorDeServidor(err, 'No se pudo verificar el código de la supervisora.'));
+        }
+      } else {
+        setMsgCierreError(errorDeServidor(err, 'No se pudo verificar el código de la supervisora.'));
+      }
     } finally {
       setGuardando(false);
     }
@@ -429,11 +441,11 @@ export function CierreView() {
     }
     if (necesitaPin) {
       if (!esAdmin && !pinVerificado) {
-        setMsgCierreError('No cuadra: la supervisora debe escribir su PIN para revisar el detalle y cerrar.');
+        setMsgCierreError('No cuadra: la supervisora debe escribir su código para revisar el detalle y cerrar.');
         return;
       }
       if (!pinSupervisora.trim()) {
-        setMsgCierreError('Escribe el PIN de la supervisora de 6 dígitos.');
+        setMsgCierreError('Escribe el código de la supervisora de 6 dígitos.');
         return;
       }
       if (obsCierre.trim().length < 3) {
@@ -1736,15 +1748,15 @@ export function CierreView() {
                     {(revisadoCuadra === false || requierePin) && !pinVerificado && (
                       <div style={{ marginTop: 8, border: '1px solid var(--cp-rust, #B2500F)', background: '#FFF0ED', borderRadius: 10, padding: 10 }}>
                         <div style={{ color: 'var(--cp-rust, #B2500F)', fontWeight: 700, fontSize: 13 }}>
-                          No cuadra: la supervisora debe escribir su PIN para revisar el detalle y cerrar.
+                          No cuadra: la supervisora debe escribir su código para revisar el detalle y cerrar.
                         </div>
-                        <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                        <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center' }}>
                           <input
                             type="password"
                             inputMode="numeric"
                             maxLength={6}
-                            aria-label="PIN de la supervisora"
-                            placeholder="PIN de la supervisora"
+                            aria-label="Código de la supervisora"
+                            placeholder="Código de la supervisora"
                             value={pinSupervisora}
                             onChange={(e) => setPinSupervisora(e.target.value.replace(/\D/g, ''))}
                             style={{
@@ -1778,7 +1790,7 @@ export function CierreView() {
                   </div>
                 )}
 
-                {/* Detalle de comparación si es Admin o si el PIN fue validado */}
+                {/* Detalle de comparación si es Admin o si el código fue validado */}
                 {(esAdmin || pinVerificado) && filasCuadre.length > 0 && (
                   <div
                     data-testid="detalle-cuadre"
@@ -1793,7 +1805,7 @@ export function CierreView() {
                     }}
                   >
                     <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 2 }}>
-                      {esAdmin ? 'Resultado del cuadre' : 'Detalle (abierto con PIN de la supervisora)'}
+                      {esAdmin ? 'Resultado del cuadre' : 'Detalle (abierto con código del supervisor)'}
                     </div>
                     {filasCuadre.map((f) => (
                       <div
@@ -1811,17 +1823,19 @@ export function CierreView() {
                   </div>
                 )}
 
-                {/* El administrador firma la diferencia con su PIN */}
+                {/* El administrador firma la diferencia con el código rotativo */}
                 {esAdmin && necesitaPin && (
                   <div>
                     <label htmlFor="cl-pin" style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>
-                      PIN de la supervisora (la diferencia se cierra con su PIN)
+                      Código del supervisor (la diferencia se cierra con su código)
                     </label>
                     <input
                       id="cl-pin"
                       type="password"
                       inputMode="numeric"
                       maxLength={6}
+                      aria-label="Código de la supervisora"
+                      placeholder="Código del supervisor"
                       value={pinSupervisora}
                       onChange={(e) => setPinSupervisora(e.target.value.replace(/\D/g, ''))}
                       style={{

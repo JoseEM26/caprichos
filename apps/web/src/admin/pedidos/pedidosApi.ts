@@ -213,6 +213,7 @@ export const pedidosApi = {
   ): Promise<Pedido> {
     const headers: Record<string, string> = {};
     if (pinSupervisor) {
+      headers['X-Codigo-Supervisor'] = pinSupervisor.trim();
       headers['X-Pin-Supervisor'] = pinSupervisor.trim();
     }
     return api.post<Pedido>(
@@ -311,6 +312,7 @@ export const pedidosApi = {
 
   async anularCobro(id: string | number, motivo: string, pinSupervisor: string): Promise<any> {
     const headers: Record<string, string> = {
+      'X-Codigo-Supervisor': pinSupervisor.trim(),
       'X-Pin-Supervisor': pinSupervisor.trim(),
     };
     return api.post<any>(

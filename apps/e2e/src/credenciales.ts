@@ -1,7 +1,7 @@
 import { execSync } from 'child_process';
 import * as crypto from 'crypto';
 
-export type RolPrueba = 'ADMIN' | 'CAJERO' | 'MOZO' | 'COCINA' | 'ALMACEN' | 'REPARTIDOR';
+export type RolPrueba = 'ADMIN' | 'CAJERO' | 'MOZO' | 'COCINA' | 'ALMACEN' | 'REPARTIDOR' | 'REPARTIDOR_2';
 
 export const DNIS_POR_ROL: Record<RolPrueba, string> = {
   ADMIN: '20000001',
@@ -10,6 +10,7 @@ export const DNIS_POR_ROL: Record<RolPrueba, string> = {
   COCINA: '20000004',
   ALMACEN: '20000005',
   REPARTIDOR: '20000006',
+  REPARTIDOR_2: '20000007',
 };
 
 export const SUPERVISOR_PIN = '123456';

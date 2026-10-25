@@ -20,7 +20,7 @@ function redisNoDisponible(): HttpException {
   );
 }
 
-/** Lanza PIN_BLOQUEADO si la clave ya tiene 3 fallos; 503 si Redis no responde. */
+/** Lanza CODIGO_BLOQUEADO si la clave ya tiene 3 fallos; 503 si Redis no responde. */
 export async function exigirPinNoBloqueado(redis: Redis, clave: string): Promise<void> {
   let actuales: string | null;
   try {
@@ -31,13 +31,18 @@ export async function exigirPinNoBloqueado(redis: Redis, clave: string): Promise
   if (actuales && parseInt(actuales, 10) >= MAX_INTENTOS_PIN) {
     throw new HttpException(
       {
-        codigo: 'PIN_BLOQUEADO',
-        mensaje: 'Demasiados intentos fallidos de PIN de supervisor. Espera 5 minutos.',
+        codigo: 'CODIGO_BLOQUEADO',
+        mensaje: 'Demasiados intentos fallidos de código de supervisor. Espera 5 minutos.',
       },
       HttpStatus.FORBIDDEN,
     );
   }
 }
+
+export const exigirCodigoNoBloqueado = exigirPinNoBloqueado;
+export const registrarFalloCodigo = registrarFalloPin;
+export const limpiarIntentosCodigo = limpiarIntentosPin;
+
 
 /** Suma un fallo y fija el bloqueo de 5 minutos en el primero. */
 export async function registrarFalloPin(redis: Redis, clave: string): Promise<void> {

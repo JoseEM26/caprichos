@@ -184,6 +184,7 @@ export const cierreApi = {
   realizarArqueo: (dto: ArqueoDto, pinSupervisor?: string) => {
     const headers: Record<string, string> = {};
     if (pinSupervisor?.trim()) {
+      headers['x-codigo-supervisor'] = pinSupervisor.trim();
       headers['x-pin-supervisor'] = pinSupervisor.trim();
     }
     return api.post<ArqueoRespuesta>('/admin/cierre/arqueo', dto, { headers });
@@ -192,21 +193,26 @@ export const cierreApi = {
   cerrarCaja: (dto: CerrarCajaDto, pinSupervisor?: string) => {
     const headers: Record<string, string> = {};
     if (pinSupervisor?.trim()) {
+      headers['x-codigo-supervisor'] = pinSupervisor.trim();
       headers['x-pin-supervisor'] = pinSupervisor.trim();
     }
     return api.post<CierreCajaRespuesta>('/admin/cierre/cerrar', dto, { headers });
   },
 
-  // El servidor valida el PIN de supervisora y solo entonces entrega el esperado.
+  // El servidor valida el código/PIN de supervisora y solo entonces entrega el esperado.
   verificarPinSupervisor: (pinSupervisor: string) =>
     api.get<MontosEsperados>('/admin/cierre/esperado', {
-      headers: { 'x-pin-supervisor': pinSupervisor.trim() },
+      headers: {
+        'x-codigo-supervisor': pinSupervisor.trim(),
+        'x-pin-supervisor': pinSupervisor.trim(),
+      },
     }),
 
-  // Solo admin o con el PIN de supervisor (el servidor lo exige).
+  // Solo admin o con el código de supervisor (el servidor lo exige).
   listarPendientesDeCobro: (pinSupervisor?: string) => {
     const headers: Record<string, string> = {};
     if (pinSupervisor?.trim()) {
+      headers['x-codigo-supervisor'] = pinSupervisor.trim();
       headers['x-pin-supervisor'] = pinSupervisor.trim();
     }
     return api.get<PendienteCobro[]>('/admin/cierre/pendientes', { headers });
