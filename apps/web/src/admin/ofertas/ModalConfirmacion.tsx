@@ -33,7 +33,8 @@ export function ModalConfirmacion({
       />
       {/* Diálogo */}
       <div
-        role="alertdialog"
+        role="dialog"
+        aria-modal="true"
         aria-label="Confirmar acción"
         style={{
           position: 'absolute',

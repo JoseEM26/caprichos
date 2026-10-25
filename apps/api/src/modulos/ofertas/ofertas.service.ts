@@ -136,6 +136,31 @@ export class OfertasService {
 
     const tipoFinal = dto.tipo === 'DESCUENTO_AUTOMATICO' ? 'DESCUENTO' : dto.tipo;
     const descTipoFinal = dto.descuentoTipo === 'MONTO_FIJO' ? 'MONTO' : dto.descuentoTipo;
+
+    // Validación de límites de descuento y compra mínima
+    if (dto.descuentoValor !== undefined && dto.descuentoValor !== null) {
+      if (descTipoFinal === 'PORCENTAJE') {
+        if (dto.descuentoValor < 1 || dto.descuentoValor > 100) {
+          throw new BadRequestException({
+            codigo: 'DESCUENTO_PORCENTAJE_INVALIDO',
+            mensaje: 'El porcentaje de descuento debe estar entre 1 y 100',
+          });
+        }
+      } else if (descTipoFinal === 'MONTO') {
+        if (dto.descuentoValor <= 0) {
+          throw new BadRequestException({
+            codigo: 'DESCUENTO_MONTO_INVALIDO',
+            mensaje: 'El monto de descuento debe ser mayor que 0',
+          });
+        }
+      }
+    }
+    if (dto.compraMinima !== undefined && dto.compraMinima !== null && dto.compraMinima < 0) {
+      throw new BadRequestException({
+        codigo: 'COMPRA_MINIMA_INVALIDA',
+        mensaje: 'La compra mínima debe ser mayor o igual a 0',
+      });
+    }
     const diasFinal = dto.dias ?? dto.diasSemana ?? [];
     const horaDesdeStr = dto.horaDesde ?? dto.horaInicio;
     const horaHastaStr = dto.horaHasta ?? dto.horaFin;
@@ -181,10 +206,29 @@ export class OfertasService {
           if (t.tamanoValorId) {
             tamanoId = BigInt(t.tamanoValorId);
           } else {
-            const tv = await tx.listaValor.findFirst({
+            let tv = await tx.listaValor.findFirst({
               where: { nombre: { contains: t.tamanoNombre || 'Regular', mode: 'insensitive' } },
             });
-            if (tv) tamanoId = tv.id;
+            if (!tv) {
+              tv = await tx.listaValor.findFirst();
+              if (!tv) {
+                let lista = await tx.lista.findFirst({ where: { codigo: 'TAMANOS' } });
+                if (!lista) {
+                  lista = await tx.lista.create({
+                    data: { codigo: 'TAMANOS', nombre: 'Tamaños' },
+                  });
+                }
+                tv = await tx.listaValor.create({
+                  data: {
+                    lista_id: lista.id,
+                    nombre: t.tamanoNombre || 'Único',
+                    orden: 1,
+                    activo: true,
+                  },
+                });
+              }
+            }
+            tamanoId = tv.id;
           }
           await tx.comboPrecio.create({
             data: {
@@ -200,13 +244,40 @@ export class OfertasService {
       if (tipoFinal === 'COMBO' && Array.isArray(partesFinal)) {
         for (const p of partesFinal) {
           const tipoParte = p.tipo ?? (p.tipoParte === 'OPCIONES' ? 'A_ELECCION' : p.tipoParte) ?? 'A_ELECCION';
+          const catIds: bigint[] = [];
+          for (const c of p.categorias || []) {
+            if (typeof c === 'bigint') {
+              catIds.push(c);
+            } else if (typeof c === 'number' || (typeof c === 'string' && /^\d+$/.test(c))) {
+              catIds.push(BigInt(c));
+            } else if (typeof c === 'string' && c.trim()) {
+              const cat = await tx.categoria.findFirst({
+                where: { nombre: { contains: c.trim(), mode: 'insensitive' } },
+              });
+              if (cat) catIds.push(cat.id);
+            }
+          }
+          const prodIds: bigint[] = [];
+          for (const pr of p.productos || []) {
+            const val = typeof pr === 'object' ? pr.productoId || pr.id : pr;
+            if (typeof val === 'bigint') {
+              prodIds.push(val);
+            } else if (typeof val === 'number' || (typeof val === 'string' && /^\d+$/.test(val))) {
+              prodIds.push(BigInt(val));
+            } else if (typeof val === 'string' && val.trim()) {
+              const prod = await tx.producto.findFirst({
+                where: { nombre: { contains: val.trim(), mode: 'insensitive' } },
+              });
+              if (prod) prodIds.push(prod.id);
+            }
+          }
           await tx.comboParte.create({
             data: {
               oferta_id: oferta.id,
               tipo: tipoParte,
               cantidad: p.cantidad || 1,
-              categorias: (p.categorias || []).map((c: any) => BigInt(c)),
-              productos: (p.productos || []).map((pr: any) => BigInt(typeof pr === 'object' ? pr.productoId || pr.id : pr)),
+              categorias: catIds,
+              productos: prodIds,
             },
           });
         }
@@ -275,6 +346,33 @@ export class OfertasService {
       }
     }
 
+    const descTipoCheck = dto.descuentoTipo !== undefined
+      ? (dto.descuentoTipo === 'MONTO_FIJO' ? 'MONTO' : dto.descuentoTipo)
+      : ofertaExistente.descuento_tipo;
+    if (dto.descuentoValor !== undefined && dto.descuentoValor !== null) {
+      if (descTipoCheck === 'PORCENTAJE') {
+        if (dto.descuentoValor < 1 || dto.descuentoValor > 100) {
+          throw new BadRequestException({
+            codigo: 'DESCUENTO_PORCENTAJE_INVALIDO',
+            mensaje: 'El porcentaje de descuento debe estar entre 1 y 100',
+          });
+        }
+      } else if (descTipoCheck === 'MONTO') {
+        if (dto.descuentoValor <= 0) {
+          throw new BadRequestException({
+            codigo: 'DESCUENTO_MONTO_INVALIDO',
+            mensaje: 'El monto de descuento debe ser mayor que 0',
+          });
+        }
+      }
+    }
+    if (dto.compraMinima !== undefined && dto.compraMinima !== null && dto.compraMinima < 0) {
+      throw new BadRequestException({
+        codigo: 'COMPRA_MINIMA_INVALIDA',
+        mensaje: 'La compra mínima debe ser mayor o igual a 0',
+      });
+    }
+
     const data: Prisma.OfertaUpdateInput = {};
     if (dto.tipo !== undefined) data.tipo = dto.tipo === 'DESCUENTO_AUTOMATICO' ? 'DESCUENTO' : dto.tipo;
     if (dto.nombre !== undefined) data.nombre = dto.nombre.trim();
@@ -338,10 +436,29 @@ export class OfertasService {
           if (t.tamanoValorId) {
             tamanoId = BigInt(t.tamanoValorId);
           } else {
-            const tv = await tx.listaValor.findFirst({
+            let tv = await tx.listaValor.findFirst({
               where: { nombre: { contains: t.tamanoNombre || 'Regular', mode: 'insensitive' } },
             });
-            if (tv) tamanoId = tv.id;
+            if (!tv) {
+              tv = await tx.listaValor.findFirst();
+              if (!tv) {
+                let lista = await tx.lista.findFirst({ where: { codigo: 'TAMANOS' } });
+                if (!lista) {
+                  lista = await tx.lista.create({
+                    data: { codigo: 'TAMANOS', nombre: 'Tamaños' },
+                  });
+                }
+                tv = await tx.listaValor.create({
+                  data: {
+                    lista_id: lista.id,
+                    nombre: t.tamanoNombre || 'Único',
+                    orden: 1,
+                    activo: true,
+                  },
+                });
+              }
+            }
+            tamanoId = tv.id;
           }
           await tx.comboPrecio.create({
             data: {
@@ -358,13 +475,40 @@ export class OfertasService {
         await tx.comboParte.deleteMany({ where: { oferta_id: BigInt(id) } });
         for (const p of partesFinal) {
           const tipoParte = p.tipo ?? (p.tipoParte === 'OPCIONES' ? 'A_ELECCION' : p.tipoParte) ?? 'A_ELECCION';
+          const catIds: bigint[] = [];
+          for (const c of p.categorias || []) {
+            if (typeof c === 'bigint') {
+              catIds.push(c);
+            } else if (typeof c === 'number' || (typeof c === 'string' && /^\d+$/.test(c))) {
+              catIds.push(BigInt(c));
+            } else if (typeof c === 'string' && c.trim()) {
+              const cat = await tx.categoria.findFirst({
+                where: { nombre: { contains: c.trim(), mode: 'insensitive' } },
+              });
+              if (cat) catIds.push(cat.id);
+            }
+          }
+          const prodIds: bigint[] = [];
+          for (const pr of p.productos || []) {
+            const val = typeof pr === 'object' ? pr.productoId || pr.id : pr;
+            if (typeof val === 'bigint') {
+              prodIds.push(val);
+            } else if (typeof val === 'number' || (typeof val === 'string' && /^\d+$/.test(val))) {
+              prodIds.push(BigInt(val));
+            } else if (typeof val === 'string' && val.trim()) {
+              const prod = await tx.producto.findFirst({
+                where: { nombre: { contains: val.trim(), mode: 'insensitive' } },
+              });
+              if (prod) prodIds.push(prod.id);
+            }
+          }
           await tx.comboParte.create({
             data: {
               oferta_id: BigInt(id),
               tipo: tipoParte,
               cantidad: p.cantidad || 1,
-              categorias: (p.categorias || []).map((c: any) => BigInt(c)),
-              productos: (p.productos || []).map((pr: any) => BigInt(typeof pr === 'object' ? pr.productoId || pr.id : pr)),
+              categorias: catIds,
+              productos: prodIds,
             },
           });
         }

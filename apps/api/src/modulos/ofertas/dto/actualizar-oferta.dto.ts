@@ -9,9 +9,10 @@ import {
   IsOptional,
   IsString,
   Min,
+  Validate,
   ValidateNested,
 } from 'class-validator';
-import { ComboParteDto, ComboPrecioDto } from './crear-oferta.dto';
+import { ComboParteDto, ComboPrecioDto, EsDescuentoValorValidoConstraint } from './crear-oferta.dto';
 
 export class ActualizarOfertaDto {
   @IsOptional()
@@ -49,12 +50,12 @@ export class ActualizarOfertaDto {
 
   @IsOptional()
   @IsNumber({}, { message: 'descuentoValor debe ser un número' })
-  @Min(0)
+  @Validate(EsDescuentoValorValidoConstraint)
   descuentoValor?: number | null;
 
   @IsOptional()
   @IsNumber({}, { message: 'compraMinima debe ser un número' })
-  @Min(0)
+  @Min(0, { message: 'La compra mínima debe ser mayor o igual a 0' })
   compraMinima?: number | null;
 
   @IsOptional()

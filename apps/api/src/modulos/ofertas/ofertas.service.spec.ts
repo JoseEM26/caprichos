@@ -8,6 +8,9 @@ import { RedisService } from '../../comun/redis/redis.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { Prisma } from '@prisma/client';
+import { validate } from 'class-validator';
+import { plainToInstance } from 'class-transformer';
+import { CrearOfertaDto } from './dto/crear-oferta.dto';
 
 describe('OfertasService', () => {
   let service: OfertasService;
@@ -200,6 +203,119 @@ describe('OfertasService', () => {
       expect(auditoriaMock.registrar).toHaveBeenCalledWith(
         expect.objectContaining({ accion: 'desactivar' }),
       );
+    });
+
+    it('rechaza crear oferta con porcentaje mayor a 100 (150%) (RN-OFE-PCT-MAX)', async () => {
+      prismaMock.producto.findFirst.mockResolvedValueOnce(null);
+      prismaMock.oferta.findUnique.mockResolvedValueOnce(null);
+
+      await expect(
+        service.crearOferta({
+          tipo: 'DESCUENTO',
+          nombre: 'Descuento Loco',
+          descuentoTipo: 'PORCENTAJE',
+          descuentoValor: 150,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rechaza crear oferta con porcentaje negativo o 0 (-5% o 0%)', async () => {
+      prismaMock.producto.findFirst.mockResolvedValueOnce(null);
+      prismaMock.oferta.findUnique.mockResolvedValueOnce(null);
+
+      await expect(
+        service.crearOferta({
+          tipo: 'DESCUENTO',
+          nombre: 'Descuento Negativo',
+          descuentoTipo: 'PORCENTAJE',
+          descuentoValor: -5,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rechaza crear oferta con monto de descuento negativo (-5) o cero', async () => {
+      prismaMock.producto.findFirst.mockResolvedValueOnce(null);
+      prismaMock.oferta.findUnique.mockResolvedValueOnce(null);
+
+      await expect(
+        service.crearOferta({
+          tipo: 'DESCUENTO',
+          nombre: 'Descuento Monto Negativo',
+          descuentoTipo: 'MONTO',
+          descuentoValor: -5,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rechaza crear oferta con compra mínima negativa (-5)', async () => {
+      prismaMock.producto.findFirst.mockResolvedValueOnce(null);
+      prismaMock.oferta.findUnique.mockResolvedValueOnce(null);
+
+      await expect(
+        service.crearOferta({
+          tipo: 'DESCUENTO',
+          nombre: 'Descuento Minima Negativa',
+          descuentoTipo: 'PORCENTAJE',
+          descuentoValor: 10,
+          compraMinima: -5,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rechaza actualizar oferta con porcentaje mayor a 100 (150%) o compra mínima negativa (-5)', async () => {
+      prismaMock.oferta.findUnique.mockResolvedValueOnce({
+        id: 1n,
+        tipo: 'DESCUENTO',
+        nombre: 'Descuento Base',
+        descuento_tipo: 'PORCENTAJE',
+      });
+
+      await expect(
+        service.actualizarOferta('1', {
+          descuentoValor: 150,
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      prismaMock.oferta.findUnique.mockResolvedValueOnce({
+        id: 1n,
+        tipo: 'DESCUENTO',
+        nombre: 'Descuento Base',
+        descuento_tipo: 'PORCENTAJE',
+      });
+
+      await expect(
+        service.actualizarOferta('1', {
+          compraMinima: -5,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('el DTO CrearOfertaDto rechaza mediante class-validator valores 150% y -5', async () => {
+      const dto1 = plainToInstance(CrearOfertaDto, {
+        tipo: 'DESCUENTO',
+        nombre: 'Oferta 150',
+        descuentoTipo: 'PORCENTAJE',
+        descuentoValor: 150,
+      });
+      const errors1 = await validate(dto1);
+      expect(errors1.some((e) => e.property === 'descuentoValor')).toBe(true);
+
+      const dto2 = plainToInstance(CrearOfertaDto, {
+        tipo: 'DESCUENTO',
+        nombre: 'Oferta -5',
+        descuentoTipo: 'PORCENTAJE',
+        descuentoValor: -5,
+      });
+      const errors2 = await validate(dto2);
+      expect(errors2.some((e) => e.property === 'descuentoValor')).toBe(true);
+
+      const dto3 = plainToInstance(CrearOfertaDto, {
+        tipo: 'DESCUENTO',
+        nombre: 'Oferta Compra Minima -5',
+        compraMinima: -5,
+      });
+      const errors3 = await validate(dto3);
+      expect(errors3.some((e) => e.property === 'compraMinima')).toBe(true);
     });
   });
 

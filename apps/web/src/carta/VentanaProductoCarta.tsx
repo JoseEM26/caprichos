@@ -10,6 +10,8 @@ interface Props {
   /** Las bebidas piden el nombre de quien la toma, una por unidad (DT-57 f) */
   esBebida: boolean;
   onCerrar: () => void;
+  soloLectura?: boolean;
+  esMovilPreview?: boolean;
 }
 
 const fmt = (n: number): string => `S/ ${n.toFixed(2)}`;
@@ -27,9 +29,10 @@ const nombreCorto = (g: GrupoOpcionesCarta): string => (g.nombre.includes(' · '
  * previa de la etiqueta del vaso, y los combos armados paso a paso. (La personalización unidad por
  * unidad, DT-62, es del pedido de caja y mozo: VentanaProducto.)
  */
-export function VentanaProductoCarta({ producto, esBebida, onCerrar }: Props) {
+export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura = false, esMovilPreview }: Props) {
   const { agregarLinea } = useCarrito();
-  const movil = useEsMovil();
+  const esMovilDetectado = useEsMovil();
+  const movil = esMovilPreview !== undefined ? esMovilPreview : esMovilDetectado;
 
   const [tamanoId, setTamanoId] = useState<string | null>(producto.tamanos[0]?.id ?? null);
   const [sel, setSel] = useState<Record<string, string[]>>(() => {
@@ -440,11 +443,28 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar }: Props) {
                 </button>
               </div>
               <button
-                onClick={agregar}
-                disabled={!valido}
-                style={{ flex: '1 1 200px', minHeight: 52, border: 0, borderRadius: 12, background: valido ? 'var(--cp-orange)' : 'var(--cp-line)', color: valido ? '#fff' : 'var(--cp-soft)', ...titulo, fontWeight: 800, fontSize: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 16px' }}
+                onClick={soloLectura ? undefined : agregar}
+                disabled={soloLectura ? true : !valido}
+                aria-label={soloLectura ? 'Vista previa deshabilitada' : undefined}
+                style={{
+                  flex: '1 1 200px',
+                  minHeight: 52,
+                  border: 0,
+                  borderRadius: 12,
+                  background: soloLectura ? 'var(--cp-sand)' : valido ? 'var(--cp-orange)' : 'var(--cp-line)',
+                  color: soloLectura ? 'var(--cp-navy)' : valido ? '#fff' : 'var(--cp-soft)',
+                  ...titulo,
+                  fontWeight: 800,
+                  fontSize: 14,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '0 16px',
+                  cursor: soloLectura ? 'not-allowed' : 'pointer',
+                  opacity: soloLectura ? 0.9 : 1,
+                }}
               >
-                <span>{valido ? 'Agregar al pedido' : 'Elige las opciones obligatorias'}</span>
+                <span>{soloLectura ? 'Vista previa' : valido ? 'Agregar al pedido' : 'Elige las opciones obligatorias'}</span>
                 <span>{fmt(unitario * cantidad)}</span>
               </button>
             </div>

@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { OfertaItem, ofertasApi } from './ofertasApi';
 import { ModalConfirmacion } from './ModalConfirmacion';
+import { PrevisualizacionCarta } from './PrevisualizacionCarta';
 
 const DIAS = [
   ['lun', 'Lunes', 'Lun'],
@@ -20,6 +21,7 @@ const CANALES = [
 ];
 
 const CATEGORIAS_DEF = [
+  'Combos',
   'Frappes',
   'Iced',
   'Frozen',
@@ -31,7 +33,7 @@ const CATEGORIAS_DEF = [
 ];
 
 interface ComponenteLlevaPaga {
-  tipo: 'PRODUCTO' | 'CATEGORIA' | 'TIPO';
+  tipo: 'PRODUCTO' | 'CATEGORIA';
   nombre: string;
   cantidad: number;
 }
@@ -41,8 +43,9 @@ interface ModalLlevaPagaProps {
   ofertaAEditar?: OfertaItem | null;
   onCerrar: () => void;
   onGuardar: (datos: any) => Promise<void>;
-  productosDisponibles?: Array<{ id: string; nombre: string; categoria?: string; precio?: number }>;
+  productosDisponibles?: Array<{ id: string; nombre: string; categoriaId?: string; categoria?: string; precio?: number; noSumaBeneficios?: boolean }>;
   categoriasDisponibles?: string[];
+  categorias?: Array<{ id: string; nombre: string; productos?: any[] }>;
 }
 
 export function ModalLlevaPaga({
@@ -52,29 +55,52 @@ export function ModalLlevaPaga({
   onGuardar,
   productosDisponibles = [],
   categoriasDisponibles = CATEGORIAS_DEF,
+  categorias = [],
 }: ModalLlevaPagaProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Paso del asistente (1 a 4)
+  const [paso, setPaso] = useState<1 | 2 | 3 | 4>(1);
+
+  // Paso 1: Nombre, foto y a qué aplica
   const [nombre, setNombre] = useState('');
-  const [qLleva, setQLleva] = useState(2);
-  const [qPaga, setQPaga] = useState(1);
-  const [precio, setPrecio] = useState('');
+  const [fotoUrl, setFotoUrl] = useState<string | null>(null);
+  const [fotoArchivoId, setFotoArchivoId] = useState<string | null>(null);
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
+  const [confirmarQuitarFoto, setConfirmarQuitarFoto] = useState(false);
   const [componentes, setComponentes] = useState<ComponenteLlevaPaga[]>([]);
   const [modoComp, setModoComp] = useState<'PRODUCTO' | 'CATEGORIA'>('PRODUCTO');
   const [catSeleccionada, setCatSeleccionada] = useState('Frappes');
   const [prodSeleccionado, setProdSeleccionado] = useState('');
+
+  // Paso 2: Condiciones
   const [dias, setDias] = useState<string[]>([]);
   const [horaDesde, setHoraDesde] = useState('');
   const [horaHasta, setHoraHasta] = useState('');
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
   const [canal, setCanal] = useState('todos');
-  const [fotoUrl, setFotoUrl] = useState<string | null>(null);
-  const [fotoArchivoId, setFotoArchivoId] = useState<string | null>(null);
-  const [subiendoFoto, setSubiendoFoto] = useState(false);
-  const [confirmarQuitarFoto, setConfirmarQuitarFoto] = useState(false);
+
+  // Paso 3: Beneficio
+  const [qLleva, setQLleva] = useState(2);
+  const [qPaga, setQPaga] = useState(1);
+  const [precio, setPrecio] = useState('');
+
+  // Control
   const [mensajeError, setMensajeError] = useState('');
+  const [confirmarGuardar, setConfirmarGuardar] = useState(false);
   const [guardando, setGuardando] = useState(false);
 
+  const listaCategoriasNombres = useMemo(() => {
+    if (categorias && categorias.length > 0) {
+      return categorias.map((c) => c.nombre);
+    }
+    return categoriasDisponibles;
+  }, [categorias, categoriasDisponibles]);
+
   useEffect(() => {
+    if (!abierto) return;
+
     if (ofertaAEditar) {
       setNombre(ofertaAEditar.nombre || '');
       setFotoUrl(ofertaAEditar.imagenUrl || null);
@@ -86,7 +112,7 @@ export function ModalLlevaPaga({
       if (ofertaAEditar.llevaPaga && ofertaAEditar.llevaPaga.componentes) {
         setComponentes(
           ofertaAEditar.llevaPaga.componentes.map((c) => ({
-            tipo: c.tipo,
+            tipo: c.tipo === 'CATEGORIA' ? 'CATEGORIA' : 'PRODUCTO',
             nombre: c.nombre,
             cantidad: c.cantidad,
           })),
@@ -99,13 +125,16 @@ export function ModalLlevaPaga({
             cantidad: mm ? Number(mm[1]) : 2,
           },
         ]);
+      } else {
+        setComponentes([]);
       }
-      setDias((ofertaAEditar.diasSemana || []).map((d) => DIAS[d % 7]?.[0] || 'lun'));
-      setHoraDesde(ofertaAEditar.horaInicio || '');
-      setHoraHasta(ofertaAEditar.horaFin || '');
-      setFechaDesde(ofertaAEditar.fechaInicio ? ofertaAEditar.fechaInicio.slice(0, 10) : '');
-      setFechaHasta(ofertaAEditar.fechaFin ? ofertaAEditar.fechaFin.slice(0, 10) : '');
+      setDias((ofertaAEditar.diasSemana || ofertaAEditar.dias || []).map((d) => DIAS[d % 7]?.[0] || 'lun'));
+      setHoraDesde(ofertaAEditar.horaInicio || ofertaAEditar.horaDesde || '');
+      setHoraHasta(ofertaAEditar.horaFin || ofertaAEditar.horaHasta || '');
+      setFechaDesde(ofertaAEditar.fechaInicio ? ofertaAEditar.fechaInicio.slice(0, 10) : ofertaAEditar.fechaDesde ? ofertaAEditar.fechaDesde.slice(0, 10) : '');
+      setFechaHasta(ofertaAEditar.fechaFin ? ofertaAEditar.fechaFin.slice(0, 10) : ofertaAEditar.fechaHasta ? ofertaAEditar.fechaHasta.slice(0, 10) : '');
       setCanal(ofertaAEditar.canales && ofertaAEditar.canales[0] ? ofertaAEditar.canales[0].toLowerCase() : 'todos');
+      setPaso(1);
       setMensajeError('');
     } else {
       setNombre('');
@@ -121,11 +150,39 @@ export function ModalLlevaPaga({
       setFechaDesde('');
       setFechaHasta('');
       setCanal('todos');
+      setPaso(1);
       setMensajeError('');
     }
   }, [ofertaAEditar, abierto]);
 
-  if (!abierto) return null;
+  // Accesibilidad: auto-focus y Escape
+  useEffect(() => {
+    if (!abierto) return;
+
+    const timer = setTimeout(() => {
+      dialogRef.current?.focus();
+    }, 50);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (confirmarQuitarFoto) {
+          setConfirmarQuitarFoto(false);
+          return;
+        }
+        if (confirmarGuardar) {
+          setConfirmarGuardar(false);
+          return;
+        }
+        onCerrar();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [abierto, confirmarQuitarFoto, confirmarGuardar, onCerrar]);
 
   const totalUnidades = componentes.reduce((acc, c) => acc + c.cantidad, 0);
 
@@ -161,10 +218,6 @@ export function ModalLlevaPaga({
     setComponentes((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const prodsCategoria = productosDisponibles.filter(
-    (p) => !catSeleccionada || (p.categoria && p.categoria.toLowerCase() === catSeleccionada.toLowerCase()),
-  );
-
   const manejarSubidaFoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -180,37 +233,117 @@ export function ModalLlevaPaga({
     }
   };
 
-  const pedirQuitarFoto = () => {
-    setConfirmarQuitarFoto(true);
-  };
-
   const confirmarQuitar = () => {
     setFotoUrl(null);
     setFotoArchivoId(null);
     setConfirmarQuitarFoto(false);
   };
 
-  const validarYGuardar = async () => {
-    if (!nombre.trim()) {
-      setMensajeError('Escribe el nombre de la promoción.');
-      return;
-    }
-    const pNum = parseFloat(precio.replace(',', '.'));
-    if (isNaN(pNum) || !(pNum > 0)) {
-      setMensajeError('Escribe el precio.');
-      return;
-    }
-    if (qPaga >= qLleva) {
-      setMensajeError('Debe pagar menos de lo que lleva (por ejemplo, lleva 2 y paga 1).');
-      return;
-    }
-    if (totalUnidades !== qLleva) {
-      setMensajeError(
-        `Esta promoción lleva ${qLleva} unidades y el contenido suma ${totalUnidades}. Agrega o quita unidades para que coincida.`,
-      );
-      return;
+  // CÁLCULO DEL EJEMPLO DIDÁCTICO CON PRODUCTOS REALES
+  const ejemploCalculado = useMemo(() => {
+    // Buscar un producto representativo del catálogo aplicable
+    let productoEjemplo = productosDisponibles.find((p) => {
+      return componentes.some((c) => {
+        if (c.tipo === 'PRODUCTO') return c.nombre.toLowerCase() === p.nombre.toLowerCase();
+        if (c.tipo === 'CATEGORIA') return p.categoria && c.nombre.toLowerCase() === p.categoria.toLowerCase();
+        return false;
+      });
+    });
+
+    if (!productoEjemplo && productosDisponibles.length > 0) {
+      productoEjemplo = productosDisponibles[0];
     }
 
+    const nombreProd = productoEjemplo?.nombre || 'Iced Coffee';
+    const precioUnit = productoEjemplo?.precio || 9;
+
+    const pNum = parseFloat(precio.replace(',', '.')) || (precioUnit * qPaga);
+    const totalNormal = precioUnit * qLleva;
+    const totalPaga = pNum;
+    const totalAhorro = Math.max(0, totalNormal - totalPaga);
+    const pctAhorro = totalNormal > 0 ? Math.round((totalAhorro / totalNormal) * 100) : 0;
+
+    return {
+      nombreProducto: nombreProd,
+      precioUnitario: precioUnit,
+      totalNormal,
+      totalPaga,
+      totalAhorro,
+      pctAhorro,
+      texto: `Si el cliente pide ${qLleva} ${nombreProd} de S/ ${precioUnit.toFixed(2)}: paga S/ ${totalPaga.toFixed(2)}, ahorra S/ ${totalAhorro.toFixed(2)}${pctAhorro > 0 ? ` (${pctAhorro} %)` : ''}.`,
+    };
+  }, [componentes, productosDisponibles, precio, qLleva, qPaga]);
+
+  // Validación por paso
+  const validarPasoActual = (pasoAValidar: number): boolean => {
+    setMensajeError('');
+    if (pasoAValidar === 1) {
+      if (!nombre.trim()) {
+        setMensajeError('Escribe el nombre de la promoción.');
+        return false;
+      }
+      if (componentes.length === 0) {
+        setMensajeError('Agrega al menos un producto o categoría a la promoción.');
+        return false;
+      }
+      return true;
+    }
+
+    if (pasoAValidar === 2) {
+      if ((horaDesde && !horaHasta) || (!horaDesde && horaHasta)) {
+        setMensajeError('Escribe las dos horas (desde y hasta) o déjalas vacías.');
+        return false;
+      }
+      if (horaDesde && horaHasta && horaDesde >= horaHasta) {
+        setMensajeError('La hora de inicio debe ser antes de la hora final.');
+        return false;
+      }
+      if (fechaDesde && fechaHasta && fechaDesde > fechaHasta) {
+        setMensajeError('La fecha de inicio no puede ser después de la final.');
+        return false;
+      }
+      return true;
+    }
+
+    if (pasoAValidar === 3) {
+      const pNum = parseFloat(precio.replace(',', '.'));
+      if (isNaN(pNum) || !(pNum > 0)) {
+        setMensajeError('Escribe el precio de la promoción.');
+        return false;
+      }
+      if (qPaga >= qLleva) {
+        setMensajeError('Debe pagar menos de lo que lleva (por ejemplo, lleva 2 y paga 1).');
+        return false;
+      }
+      if (totalUnidades !== qLleva) {
+        setMensajeError(
+          `Esta promoción lleva ${qLleva} unidades y el contenido suma ${totalUnidades}. Agrega o quita unidades para que coincida.`,
+        );
+        return false;
+      }
+      return true;
+    }
+
+    return true;
+  };
+
+  const irSiguientePaso = () => {
+    if (validarPasoActual(paso)) {
+      if (paso < 4) {
+        setPaso((prev) => (prev + 1) as any);
+      }
+    }
+  };
+
+  const irPasoAnterior = () => {
+    setMensajeError('');
+    if (paso > 1) {
+      setPaso((prev) => (prev - 1) as any);
+    }
+  };
+
+  const ejecutarGuardar = async () => {
+    setConfirmarGuardar(false);
     setGuardando(true);
     setMensajeError('');
     try {
@@ -218,6 +351,7 @@ export function ModalLlevaPaga({
         const idx = DIAS.findIndex((x) => x[0] === code);
         return idx + 1;
       });
+      const pNum = parseFloat(precio.replace(',', '.'));
 
       const payload = {
         nombre: nombre.trim(),
@@ -227,10 +361,15 @@ export function ModalLlevaPaga({
         descuentoTipo: 'MONTO_FIJO',
         descuentoValor: pNum,
         diasSemana: diasNum,
+        dias: diasNum,
         horaInicio: horaDesde || undefined,
+        horaDesde: horaDesde || undefined,
         horaFin: horaHasta || undefined,
+        horaHasta: horaHasta || undefined,
         fechaInicio: fechaDesde || undefined,
+        fechaDesde: fechaDesde || undefined,
         fechaFin: fechaHasta || undefined,
+        fechaHasta: fechaHasta || undefined,
         canales: canal === 'todos' ? ['TODOS'] : [canal.toUpperCase()],
         imagenArchivoId: fotoArchivoId,
         llevaPaga: {
@@ -254,9 +393,38 @@ export function ModalLlevaPaga({
     }
   };
 
+  const letraInicial = (nombre.trim()[0] || 'P').toUpperCase();
+
+  const ofertaEnVivo: Partial<OfertaItem> = {
+    id: ofertaAEditar?.id || 'nuevo-lleva-paga',
+    nombre: nombre || 'Promoción 2x1',
+    tipo: 'LLEVA_PAGA',
+    subtipo: `${qLleva}x${qPaga}`,
+    descuentoValor: parseFloat(precio.replace(',', '.')) || 0,
+    imagenUrl: fotoUrl,
+    imagenArchivoId: fotoArchivoId,
+    dias: dias.map((code) => DIAS.findIndex((x) => x[0] === code) + 1),
+    horaDesde: horaDesde || null,
+    horaHasta: horaHasta || null,
+    fechaDesde: fechaDesde || null,
+    fechaHasta: fechaHasta || null,
+    canales: canal === 'todos' ? ['TODOS'] : [canal.toUpperCase()],
+    activo: true,
+  };
+
+  if (!abierto) return null;
+
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 60 }}>
-      {/* Fondo clickeable */}
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 60,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
       <div
         onClick={onCerrar}
         style={{
@@ -265,45 +433,52 @@ export function ModalLlevaPaga({
           backgroundColor: 'rgba(11, 44, 62, 0.55)',
           zIndex: 60,
         }}
+        aria-hidden="true"
       />
 
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-label="Llevas más, pagas menos"
+        aria-label={ofertaAEditar ? 'Editar promoción 2x1' : 'Nueva promoción 2x1'}
+        tabIndex={-1}
         style={{
-          position: 'absolute',
+          position: 'relative',
           zIndex: 65,
-          left: '50%',
-          top: '50%',
-          transform: 'translate(-50%, -50%)',
-          width: 'min(840px, calc(100% - 24px))',
-          maxHeight: 'calc(100% - 24px)',
-          overflowY: 'auto',
+          width: 'min(920px, calc(100% - 24px))',
+          maxHeight: 'min(860px, calc(100% - 24px))',
           backgroundColor: 'var(--cp-cream)',
           borderRadius: '20px',
           boxShadow: '0 20px 50px rgba(11, 44, 62, 0.4)',
           padding: '20px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '12px',
+          gap: '14px',
+          boxSizing: 'border-box',
+          overflowY: 'auto',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div
-            style={{
-              fontFamily: 'Montserrat, sans-serif',
-              fontWeight: 800,
-              fontSize: '20px',
-              color: 'var(--cp-navy)',
-            }}
-          >
-            {ofertaAEditar ? 'Editar oferta' : 'Llevas más, pagas menos'}
+        {/* Cabecera */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1.5px solid var(--cp-line)', paddingBottom: '12px' }}>
+          <div>
+            <div
+              style={{
+                fontFamily: 'Montserrat, sans-serif',
+                fontWeight: 800,
+                fontSize: '22px',
+                color: 'var(--cp-navy)',
+              }}
+            >
+              {ofertaAEditar ? 'Editar promoción 2x1' : 'Nueva promoción 2x1 (lleva X paga Y)'}
+            </div>
+            <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
+              Asistente por pasos para configurar promociones por volumen
+            </div>
           </div>
           <button
             type="button"
             onClick={onCerrar}
-            aria-label="Cerrar"
+            aria-label="Cerrar modal"
             style={{
               width: '44px',
               height: '44px',
@@ -314,688 +489,677 @@ export function ModalLlevaPaga({
               fontSize: '20px',
               fontWeight: 800,
               cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
             ×
           </button>
         </div>
 
-        {/* Nombre */}
-        <div>
-          <label htmlFor="pb-n" style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>
-            Nombre de la promoción
-          </label>
-          <input
-            id="pb-n"
-            type="text"
-            value={nombre}
-            onChange={(e) => {
-              setNombre(e.target.value);
-              setMensajeError('');
-            }}
-            placeholder="Ejemplo: 2x1 LATTE COFFE"
-            style={{
-              width: '100%',
-              boxSizing: 'border-box',
-              minHeight: '48px',
-              borderRadius: '12px',
-              border: '1.5px solid var(--cp-line)',
-              backgroundColor: 'var(--cp-white)',
-              padding: '0 12px',
-              fontSize: '14px',
-            }}
-          />
-        </div>
-
-        {/* Cantidad: lleva y paga */}
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-          <div style={{ flex: '1 1 100%', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <div style={{ fontWeight: 700 }}>Cantidad: lleva y paga</div>
-            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontWeight: 700, fontSize: '13px' }}>Lleva</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const nextL = Math.max(2, qLleva - 1);
-                    setQLleva(nextL);
-                    setQPaga((p) => Math.min(p, nextL - 1));
-                  }}
-                  aria-label="Llevar menos"
-                  style={{
-                    width: '44px',
-                    height: '44px',
-                    borderRadius: '22px',
-                    border: '1.5px solid var(--cp-navy)',
-                    backgroundColor: 'transparent',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                  }}
-                >
-                  −
-                </button>
-                <b style={{ minWidth: '24px', textAlign: 'center', fontSize: '18px' }}>{qLleva}</b>
-                <button
-                  type="button"
-                  onClick={() => setQLleva(Math.min(12, qLleva + 1))}
-                  aria-label="Llevar más"
-                  style={{
-                    width: '44px',
-                    height: '44px',
-                    borderRadius: '22px',
-                    border: '1.5px solid var(--cp-navy)',
-                    backgroundColor: 'transparent',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                  }}
-                >
-                  +
-                </button>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontWeight: 700, fontSize: '13px' }}>Paga</span>
-                <button
-                  type="button"
-                  onClick={() => setQPaga(Math.max(1, qPaga - 1))}
-                  aria-label="Pagar menos"
-                  style={{
-                    width: '44px',
-                    height: '44px',
-                    borderRadius: '22px',
-                    border: '1.5px solid var(--cp-navy)',
-                    backgroundColor: 'transparent',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                  }}
-                >
-                  −
-                </button>
-                <b style={{ minWidth: '24px', textAlign: 'center', fontSize: '18px' }}>{qPaga}</b>
-                <button
-                  type="button"
-                  onClick={() => setQPaga(Math.min(qLleva - 1, qPaga + 1))}
-                  aria-label="Pagar más"
-                  style={{
-                    width: '44px',
-                    height: '44px',
-                    borderRadius: '22px',
-                    border: '1.5px solid var(--cp-navy)',
-                    backgroundColor: 'transparent',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                  }}
-                >
-                  +
-                </button>
-              </div>
-
-              <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '18px' }}>
-                = {qLleva}x{qPaga}
-              </span>
-            </div>
-
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-              <span style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>Atajos:</span>
-              {[
-                [2, 1],
-                [3, 2],
-              ].map(([l, p]) => (
-                <button
-                  key={`${l}x${p}`}
-                  type="button"
-                  onClick={() => {
-                    setQLleva(l);
-                    setQPaga(p);
-                  }}
-                  style={{
-                    minHeight: '44px',
-                    padding: '0 12px',
-                    borderRadius: '9999px',
-                    border: '1.5px solid var(--cp-navy)',
-                    backgroundColor: qLleva === l && qPaga === p ? 'var(--cp-navy)' : 'transparent',
-                    color: qLleva === l && qPaga === p ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                    fontWeight: 700,
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {l}x{p}
-                </button>
-              ))}
-            </div>
-            <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-              Puedes crear cualquier combinación (5x4, 4x3…). Las que guardes quedan como atajo y como tipo en Ofertas.
-            </div>
-          </div>
-
-          <div style={{ flex: '1 1 120px' }}>
-            <label htmlFor="pb-p" style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>
-              Precio (s/)
-            </label>
-            <input
-              id="pb-p"
-              type="text"
-              value={precio}
-              onChange={(e) => setPrecio(e.target.value)}
-              style={{
-                width: '100%',
-                boxSizing: 'border-box',
-                minHeight: '44px',
-                borderRadius: '12px',
-                border: '1.5px solid var(--cp-line)',
-                backgroundColor: 'var(--cp-white)',
-                padding: '0 12px',
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Qué contiene */}
-        <div style={{ borderTop: '1px solid var(--cp-line)', paddingTop: '10px' }}>
-          <div style={{ fontWeight: 800, marginBottom: '2px' }}>Qué contiene (se descuenta cada uno por separado)</div>
-          <div
-            style={{
-              fontSize: '13px',
-              fontWeight: 700,
-              color: totalUnidades === qLleva ? 'var(--cp-ok)' : 'var(--cp-rust)',
-              marginBottom: '6px',
-            }}
-          >
-            Llevas {totalUnidades} de {qLleva} unidades {totalUnidades === qLleva ? '✓' : `(faltan ${qLleva - totalUnidades})`}.
-            El contenido es el límite: solo se puede llevar lo que agregues aquí.
-          </div>
-
-          {componentes.map((c, idx) => (
-            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0' }}>
-              <span style={{ flex: 1, fontSize: '14px' }}>
-                {c.cantidad} × {c.nombre}
-              </span>
-              <button
-                type="button"
-                onClick={() => modificarCantidadComp(idx, -1)}
-                aria-label="Menos"
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '18px',
-                  border: '1.5px solid var(--cp-navy)',
-                  backgroundColor: 'transparent',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                }}
-              >
-                −
-              </button>
-              <button
-                type="button"
-                onClick={() => modificarCantidadComp(idx, 1)}
-                aria-label="Más"
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '18px',
-                  border: '1.5px solid var(--cp-navy)',
-                  backgroundColor: 'transparent',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                }}
-              >
-                +
-              </button>
-              <button
-                type="button"
-                onClick={() => quitarComponente(idx)}
-                style={{
-                  minHeight: '44px',
-                  padding: '0 8px',
-                  border: 0,
-                  backgroundColor: 'transparent',
-                  color: 'var(--cp-rust)',
-                  fontWeight: 700,
-                  textDecoration: 'underline',
-                  cursor: 'pointer',
-                }}
-              >
-                Quitar
-              </button>
-            </div>
-          ))}
-        </div>
-
-        {/* Agregar un componente */}
-        <div
+        {/* Indicador de progreso por pasos */}
+        <nav
+          aria-label="Progreso del asistente"
           style={{
-            border: '1.5px dashed var(--cp-soft)',
-            borderRadius: '12px',
-            padding: '12px',
             display: 'flex',
-            flexDirection: 'column',
+            alignItems: 'center',
             gap: '8px',
+            backgroundColor: 'var(--cp-white)',
+            borderRadius: '14px',
+            padding: '10px 14px',
+            border: '1px solid var(--cp-line)',
+            flexWrap: 'wrap',
           }}
         >
-          <div style={{ fontWeight: 700 }}>Agregar un componente</div>
-          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              onClick={() => setModoComp('PRODUCTO')}
-              style={{
-                minHeight: '44px',
-                padding: '0 12px',
-                borderRadius: '9999px',
-                border: '1.5px solid var(--cp-navy)',
-                backgroundColor: modoComp === 'PRODUCTO' ? 'var(--cp-navy)' : 'transparent',
-                color: modoComp === 'PRODUCTO' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                fontWeight: 700,
-                fontSize: '12px',
-                cursor: 'pointer',
-              }}
-            >
-              Un producto
-            </button>
-            <button
-              type="button"
-              onClick={() => setModoComp('CATEGORIA')}
-              style={{
-                minHeight: '44px',
-                padding: '0 12px',
-                borderRadius: '9999px',
-                border: '1.5px solid var(--cp-navy)',
-                backgroundColor: modoComp === 'CATEGORIA' ? 'var(--cp-navy)' : 'transparent',
-                color: modoComp === 'CATEGORIA' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                fontWeight: 700,
-                fontSize: '12px',
-                cursor: 'pointer',
-              }}
-            >
-              Cualquiera de una categoría
-            </button>
-          </div>
-
-          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-            {categoriasDisponibles.map((cat) => (
+          {[
+            { num: 1, titulo: '1. Nombre y a qué aplica' },
+            { num: 2, titulo: '2. Condiciones' },
+            { num: 3, titulo: '3. Beneficio' },
+            { num: 4, titulo: '4. Vista previa y ejemplo' },
+          ].map((st) => {
+            const esActivo = paso === st.num;
+            const esCompletado = paso > st.num;
+            return (
               <button
-                key={cat}
+                key={st.num}
                 type="button"
-                onClick={() => setCatSeleccionada(cat)}
+                onClick={() => {
+                  if (st.num < paso || validarPasoActual(paso)) {
+                    setPaso(st.num as any);
+                  }
+                }}
+                aria-current={esActivo ? 'step' : undefined}
                 style={{
-                  minHeight: '44px',
-                  padding: '0 12px',
-                  borderRadius: '9999px',
-                  border: '1.5px solid var(--cp-navy)',
-                  backgroundColor: catSeleccionada === cat ? 'var(--cp-navy)' : 'transparent',
-                  color: catSeleccionada === cat ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                  fontWeight: 700,
-                  fontSize: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: 'transparent',
+                  border: 0,
+                  padding: '6px 10px',
+                  borderRadius: '8px',
+                  backgroundColor: esActivo ? 'var(--cp-sand)' : 'transparent',
+                  color: esActivo ? 'var(--cp-navy)' : esCompletado ? '#2E7D32' : 'var(--cp-soft)',
+                  fontWeight: esActivo ? 800 : 700,
+                  fontSize: '13px',
                   cursor: 'pointer',
                 }}
               >
-                {cat}
-              </button>
-            ))}
-          </div>
-
-          {modoComp === 'PRODUCTO' && (
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', maxHeight: '130px', overflowY: 'auto' }}>
-              {prodsCategoria.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => setProdSeleccionado(p.nombre)}
+                <span
                   style={{
-                    minHeight: '38px',
-                    padding: '0 10px',
-                    borderRadius: '10px',
-                    border: '1.5px solid var(--cp-navy)',
-                    backgroundColor: prodSeleccionado === p.nombre ? 'var(--cp-navy)' : 'transparent',
-                    color: prodSeleccionado === p.nombre ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                    fontWeight: 700,
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '12px',
+                    backgroundColor: esActivo ? 'var(--cp-navy)' : esCompletado ? '#2E7D32' : 'var(--cp-line)',
+                    color: esActivo || esCompletado ? '#fff' : 'var(--cp-navy)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     fontSize: '12px',
-                    cursor: 'pointer',
+                    fontWeight: 800,
                   }}
                 >
-                  {p.nombre}
-                </button>
-              ))}
-            </div>
-          )}
+                  {esCompletado ? '✓' : st.num}
+                </span>
+                <span>{st.titulo}</span>
+              </button>
+            );
+          })}
+        </nav>
 
-          <button
-            type="button"
-            onClick={agregarComponente}
+        {/* Error de validación */}
+        {mensajeError && (
+          <div
+            role="alert"
             style={{
-              minHeight: '44px',
-              border: '1.5px solid var(--cp-navy)',
+              backgroundColor: 'color-mix(in srgb, var(--cp-rust) 15%, var(--cp-cream))',
+              border: '1.5px solid var(--cp-rust)',
               borderRadius: '12px',
-              backgroundColor: 'transparent',
-              color: 'var(--cp-navy)',
-              fontWeight: 800,
-              cursor: 'pointer',
+              padding: '10px 14px',
+              color: 'var(--cp-rust)',
+              fontWeight: 700,
+              fontSize: '13px',
             }}
           >
-            Agregar al contenido
-          </button>
-        </div>
+            {mensajeError}
+          </div>
+        )}
 
-        {/* ¿Cuándo vale? */}
-        <div
-          style={{
-            border: '1.5px dashed var(--cp-soft)',
-            borderRadius: '12px',
-            padding: '12px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px',
-          }}
-        >
-          <div style={{ fontWeight: 800 }}>¿Cuándo vale?</div>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: '4px' }}>
-              Días{' '}
-              <span style={{ fontWeight: 600, color: 'var(--cp-soft)' }}>
-                · {dias.length && dias.length < 7 ? 'solo los marcados' : 'todos los días (sin marcar)'}
-              </span>
+        {/* ============================================================== */}
+        {/* PASO 1: NOMBRE Y A QUÉ APLICA                                 */}
+        {/* ============================================================== */}
+        {paso === 1 && (
+          <div
+            data-testid="paso-1-lleva-paga"
+            style={{
+              backgroundColor: 'var(--cp-white)',
+              border: '1px solid var(--cp-line)',
+              borderRadius: '14px',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
+            }}
+          >
+            <div style={{ fontWeight: 800, fontSize: '16px', color: 'var(--cp-navy)' }}>
+              Paso 1 de 4: Nombre y a qué aplica
             </div>
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-              {DIAS.map(([code, , abrev]) => {
-                const activo = dias.includes(code);
-                return (
-                  <button
-                    key={code}
-                    type="button"
-                    onClick={() => toggleDia(code)}
-                    aria-pressed={activo}
+
+            <div>
+              <label htmlFor="lp-nombre" style={{ fontWeight: 700, fontSize: '13px', display: 'block', marginBottom: '4px' }}>
+                Nombre de la promoción *
+              </label>
+              <input
+                id="lp-nombre"
+                type="text"
+                value={nombre}
+                onChange={(e) => {
+                  setNombre(e.target.value);
+                  setMensajeError('');
+                }}
+                placeholder="Ej.: 2x1 en Frappes, Lleva 3 Paga 2 en Postres"
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  minHeight: '44px',
+                  borderRadius: '10px',
+                  border: '1.5px solid var(--cp-line)',
+                  padding: '0 12px',
+                  fontSize: '14px',
+                }}
+              />
+            </div>
+
+            {/* Foto opcional */}
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: '6px' }}>Foto de la promoción (opcional)</div>
+              <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                {fotoUrl ? (
+                  <div style={{ width: '80px', height: '80px', borderRadius: '10px', overflow: 'hidden' }}>
+                    <img src={fotoUrl} alt="Vista previa" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </div>
+                ) : (
+                  <div
                     style={{
-                      minWidth: '48px',
-                      minHeight: '44px',
-                      padding: '0 8px',
+                      width: '80px',
+                      height: '80px',
                       borderRadius: '10px',
+                      backgroundColor: 'var(--cp-gold)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 800,
+                      fontSize: '28px',
+                      color: 'var(--cp-navy)',
+                    }}
+                  >
+                    {letraInicial}
+                  </div>
+                )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      minHeight: '36px',
+                      padding: '0 12px',
+                      borderRadius: '8px',
                       border: '1.5px solid var(--cp-navy)',
-                      backgroundColor: activo ? 'var(--cp-navy)' : 'transparent',
-                      color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
                       fontWeight: 700,
                       fontSize: '12px',
                       cursor: 'pointer',
                     }}
                   >
-                    {abrev}
-                  </button>
-                );
-              })}
+                    {subiendoFoto ? 'Subiendo...' : fotoUrl ? 'Cambiar foto' : 'Subir foto'}
+                    <input type="file" accept="image/*" onChange={manejarSubidaFoto} style={{ display: 'none' }} />
+                  </label>
+                  {fotoUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmarQuitarFoto(true)}
+                      style={{ border: 0, background: 'transparent', color: 'var(--cp-rust)', fontSize: '11px', fontWeight: 700, cursor: 'pointer', textAlign: 'left' }}
+                    >
+                      Quitar foto
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
 
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <div style={{ flex: '1 1 110px' }}>
-              <label htmlFor="pb-hd" style={{ fontWeight: 700, fontSize: '13px', display: 'block', marginBottom: '4px' }}>
-                Desde la hora
-              </label>
-              <input
-                id="pb-hd"
-                type="time"
-                value={horaDesde}
-                onChange={(e) => setHoraDesde(e.target.value)}
-                style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  minHeight: '44px',
-                  borderRadius: '10px',
-                  border: '1.5px solid var(--cp-line)',
-                  backgroundColor: 'var(--cp-white)',
-                  color: 'var(--cp-navy)',
-                  padding: '0 10px',
-                  fontSize: '14px',
-                }}
-              />
-            </div>
-            <div style={{ flex: '1 1 110px' }}>
-              <label htmlFor="pb-hh" style={{ fontWeight: 700, fontSize: '13px', display: 'block', marginBottom: '4px' }}>
-                Hasta la hora
-              </label>
-              <input
-                id="pb-hh"
-                type="time"
-                value={horaHasta}
-                onChange={(e) => setHoraHasta(e.target.value)}
-                style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  minHeight: '44px',
-                  borderRadius: '10px',
-                  border: '1.5px solid var(--cp-line)',
-                  backgroundColor: 'var(--cp-white)',
-                  color: 'var(--cp-navy)',
-                  padding: '0 10px',
-                  fontSize: '14px',
-                }}
-              />
-            </div>
-            <div style={{ flex: '1 1 130px' }}>
-              <label htmlFor="pb-vd" style={{ fontWeight: 700, fontSize: '13px', display: 'block', marginBottom: '4px' }}>
-                Vigente desde
-              </label>
-              <input
-                id="pb-vd"
-                type="date"
-                value={fechaDesde}
-                onChange={(e) => setFechaDesde(e.target.value)}
-                style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  minHeight: '44px',
-                  borderRadius: '10px',
-                  border: '1.5px solid var(--cp-line)',
-                  backgroundColor: 'var(--cp-white)',
-                  color: 'var(--cp-navy)',
-                  padding: '0 10px',
-                  fontSize: '14px',
-                }}
-              />
-            </div>
-            <div style={{ flex: '1 1 130px' }}>
-              <label htmlFor="pb-vh" style={{ fontWeight: 700, fontSize: '13px', display: 'block', marginBottom: '4px' }}>
-                Hasta
-              </label>
-              <input
-                id="pb-vh"
-                type="date"
-                value={fechaHasta}
-                onChange={(e) => setFechaHasta(e.target.value)}
-                style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  minHeight: '44px',
-                  borderRadius: '10px',
-                  border: '1.5px solid var(--cp-line)',
-                  backgroundColor: 'var(--cp-white)',
-                  color: 'var(--cp-navy)',
-                  padding: '0 10px',
-                  fontSize: '14px',
-                }}
-              />
-            </div>
-          </div>
+            {/* A qué aplica: Selector de productos / categorías */}
+            <div style={{ borderTop: '1px solid var(--cp-line)', paddingTop: '12px' }}>
+              <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: '8px' }}>
+                ¿Qué productos o categorías entran en la promoción?
+              </div>
 
-          <div>
-            <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: '4px' }}>Dónde vale</div>
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-              {CANALES.map((c) => (
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
                 <button
-                  key={c.clave}
                   type="button"
-                  onClick={() => setCanal(c.clave)}
+                  onClick={() => setModoComp('PRODUCTO')}
                   style={{
-                    minHeight: '44px',
-                    padding: '0 12px',
-                    borderRadius: '9999px',
+                    minHeight: '36px',
+                    padding: '0 14px',
+                    borderRadius: '8px',
                     border: '1.5px solid var(--cp-navy)',
-                    backgroundColor: canal === c.clave ? 'var(--cp-navy)' : 'transparent',
-                    color: canal === c.clave ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                    backgroundColor: modoComp === 'PRODUCTO' ? 'var(--cp-navy)' : 'transparent',
+                    color: modoComp === 'PRODUCTO' ? 'var(--cp-cream)' : 'var(--cp-navy)',
                     fontWeight: 700,
                     fontSize: '12px',
                     cursor: 'pointer',
                   }}
                 >
-                  {c.nombre}
+                  Por producto
                 </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Foto de la oferta */}
-        <div
-          style={{
-            border: '1.5px solid var(--cp-navy)',
-            borderRadius: '16px',
-            padding: '16px',
-            backgroundColor: 'var(--cp-white)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px',
-          }}
-        >
-          <div style={{ fontWeight: 800, color: 'var(--cp-navy)' }}>
-            Foto de la oferta (opcional)
-          </div>
-          <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
-            Si no subes una foto, en la carta y en el panel se mostrará la letra inicial.
-          </div>
-
-          <div style={{ display: 'flex', gap: '14px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <div
-              style={{
-                width: '100px',
-                height: '100px',
-                borderRadius: '12px',
-                border: '1.5px dashed var(--cp-soft)',
-                backgroundColor: 'var(--cp-sand)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                overflow: 'hidden',
-                position: 'relative',
-              }}
-            >
-              {fotoUrl ? (
-                <img
-                  src={fotoUrl}
-                  alt="Vista previa"
-                  style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                />
-              ) : (
-                <span
-                  style={{
-                    fontFamily: 'Montserrat, sans-serif',
-                    fontWeight: 800,
-                    fontSize: '32px',
-                    color: 'var(--cp-navy)',
-                  }}
-                >
-                  {nombre.trim() ? nombre.trim()[0].toUpperCase() : '2'}
-                </span>
-              )}
-            </div>
-
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-              <label
-                style={{
-                  minHeight: '44px',
-                  padding: '0 16px',
-                  border: '1.5px solid var(--cp-navy)',
-                  borderRadius: '12px',
-                  backgroundColor: 'var(--cp-navy)',
-                  color: 'var(--cp-cream)',
-                  fontWeight: 700,
-                  fontSize: '13px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                }}
-              >
-                {subiendoFoto ? 'Subiendo...' : fotoUrl ? 'Cambiar foto' : 'Subir foto'}
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={manejarSubidaFoto}
-                  disabled={subiendoFoto}
-                  style={{ position: 'absolute', left: -9999 }}
-                />
-              </label>
-
-              {fotoUrl && (
                 <button
                   type="button"
-                  onClick={pedirQuitarFoto}
+                  onClick={() => setModoComp('CATEGORIA')}
                   style={{
-                    minHeight: '44px',
-                    padding: '0 16px',
-                    border: '1.5px solid var(--cp-rust)',
-                    borderRadius: '12px',
-                    backgroundColor: 'transparent',
-                    color: 'var(--cp-rust)',
+                    minHeight: '36px',
+                    padding: '0 14px',
+                    borderRadius: '8px',
+                    border: '1.5px solid var(--cp-navy)',
+                    backgroundColor: modoComp === 'CATEGORIA' ? 'var(--cp-navy)' : 'transparent',
+                    color: modoComp === 'CATEGORIA' ? 'var(--cp-cream)' : 'var(--cp-navy)',
                     fontWeight: 700,
-                    fontSize: '13px',
+                    fontSize: '12px',
                     cursor: 'pointer',
                   }}
                 >
-                  Quitar foto
+                  Por categoría completa
                 </button>
-              )}
-            </div>
-          </div>
-        </div>
+              </div>
 
-        {mensajeError && (
-          <div role="alert" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-rust)' }}>
-            {mensajeError}
+              {modoComp === 'PRODUCTO' ? (
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <select
+                    value={prodSeleccionado}
+                    onChange={(e) => setProdSeleccionado(e.target.value)}
+                    style={{ flex: 1, minWidth: '200px', minHeight: '40px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 10px' }}
+                  >
+                    <option value="">Selecciona un producto...</option>
+                    {productosDisponibles.map((p) => (
+                      <option key={p.id} value={p.nombre}>
+                        {p.nombre} {p.precio ? `(s/ ${p.precio.toFixed(2)})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={agregarComponente}
+                    style={{ minHeight: '40px', padding: '0 16px', borderRadius: '8px', border: 0, backgroundColor: 'var(--cp-orange)', color: 'var(--cp-navy)', fontWeight: 800, cursor: 'pointer' }}
+                  >
+                    + Agregar
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <select
+                    value={catSeleccionada}
+                    onChange={(e) => setCatSeleccionada(e.target.value)}
+                    style={{ flex: 1, minWidth: '200px', minHeight: '40px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 10px' }}
+                  >
+                    {listaCategoriasNombres.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={agregarComponente}
+                    style={{ minHeight: '40px', padding: '0 16px', borderRadius: '8px', border: 0, backgroundColor: 'var(--cp-orange)', color: 'var(--cp-navy)', fontWeight: 800, cursor: 'pointer' }}
+                  >
+                    + Agregar categoría
+                  </button>
+                </div>
+              )}
+
+              {/* Lista de componentes agregados */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '12px' }}>
+                {componentes.map((c, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      backgroundColor: 'var(--cp-sand)',
+                      fontSize: '13px',
+                    }}
+                  >
+                    <span><strong>{c.nombre}</strong> ({c.tipo === 'PRODUCTO' ? 'Producto' : 'Toda la categoría'})</span>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <button type="button" onClick={() => modificarCantidadComp(idx, -1)} style={{ width: '28px', height: '28px', borderRadius: '14px', border: '1px solid var(--cp-navy)', background: 'transparent', fontWeight: 800, cursor: 'pointer' }}>-</button>
+                      <span style={{ fontWeight: 800 }}>{c.cantidad}</span>
+                      <button type="button" onClick={() => modificarCantidadComp(idx, 1)} style={{ width: '28px', height: '28px', borderRadius: '14px', border: '1px solid var(--cp-navy)', background: 'transparent', fontWeight: 800, cursor: 'pointer' }}>+</button>
+                      <button type="button" onClick={() => quitarComponente(idx)} style={{ border: 0, background: 'transparent', color: 'var(--cp-rust)', fontWeight: 800, cursor: 'pointer', marginLeft: '6px' }}>×</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            type="button"
-            onClick={validarYGuardar}
-            disabled={guardando}
+        {/* ============================================================== */}
+        {/* PASO 2: CONDICIONES (DÍAS, HORARIOS, CANALES, VIGENCIA)        */}
+        {/* ============================================================== */}
+        {paso === 2 && (
+          <div
+            data-testid="paso-2-lleva-paga"
             style={{
-              flex: 1,
-              minHeight: '52px',
-              border: 0,
-              borderRadius: '12px',
-              backgroundColor: 'var(--cp-orange)',
-              color: 'var(--cp-navy)',
-              fontFamily: 'Montserrat, sans-serif',
-              fontWeight: 800,
-              fontSize: '15px',
-              cursor: guardando ? 'not-allowed' : 'pointer',
+              backgroundColor: 'var(--cp-white)',
+              border: '1px solid var(--cp-line)',
+              borderRadius: '14px',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
             }}
           >
-            {guardando ? 'Guardando...' : 'Guardar oferta'}
-          </button>
+            <div style={{ fontWeight: 800, fontSize: '16px', color: 'var(--cp-navy)' }}>
+              Paso 2 de 4: Condiciones de aplicación
+            </div>
+
+            {/* Días */}
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: '6px' }}>Días que aplica:</div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {DIAS.map(([code, full]) => {
+                  const on = dias.includes(code);
+                  return (
+                    <button
+                      key={code}
+                      type="button"
+                      onClick={() => toggleDia(code)}
+                      aria-pressed={on}
+                      style={{
+                        minHeight: '34px',
+                        padding: '0 12px',
+                        borderRadius: '9999px',
+                        border: '1.5px solid var(--cp-navy)',
+                        backgroundColor: on ? 'var(--cp-navy)' : 'transparent',
+                        color: on ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                        fontWeight: 700,
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {full}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Horario */}
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: '130px' }}>
+                <label htmlFor="lp-h-desde" style={{ fontSize: '12px', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
+                  Hora desde:
+                </label>
+                <input
+                  id="lp-h-desde"
+                  type="time"
+                  value={horaDesde}
+                  onChange={(e) => setHoraDesde(e.target.value)}
+                  style={{ width: '100%', minHeight: '38px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 8px' }}
+                />
+              </div>
+              <div style={{ flex: 1, minWidth: '130px' }}>
+                <label htmlFor="lp-h-hasta" style={{ fontSize: '12px', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
+                  Hora hasta:
+                </label>
+                <input
+                  id="lp-h-hasta"
+                  type="time"
+                  value={horaHasta}
+                  onChange={(e) => setHoraHasta(e.target.value)}
+                  style={{ width: '100%', minHeight: '38px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 8px' }}
+                />
+              </div>
+            </div>
+
+            {/* Canales y Fechas */}
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: '140px' }}>
+                <label htmlFor="lp-canal" style={{ fontSize: '12px', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
+                  Canales válidos:
+                </label>
+                <select
+                  id="lp-canal"
+                  value={canal}
+                  onChange={(e) => setCanal(e.target.value)}
+                  style={{ width: '100%', minHeight: '38px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 8px' }}
+                >
+                  {CANALES.map((c) => (
+                    <option key={c.clave} value={c.clave}>
+                      {c.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ flex: 1, minWidth: '130px' }}>
+                <label htmlFor="lp-f-desde" style={{ fontSize: '12px', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
+                  Fecha inicio (opcional):
+                </label>
+                <input
+                  id="lp-f-desde"
+                  type="date"
+                  value={fechaDesde}
+                  onChange={(e) => setFechaDesde(e.target.value)}
+                  style={{ width: '100%', minHeight: '38px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 8px' }}
+                />
+              </div>
+              <div style={{ flex: 1, minWidth: '130px' }}>
+                <label htmlFor="lp-f-hasta" style={{ fontSize: '12px', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
+                  Fecha fin (opcional):
+                </label>
+                <input
+                  id="lp-f-hasta"
+                  type="date"
+                  value={fechaHasta}
+                  onChange={(e) => setFechaHasta(e.target.value)}
+                  style={{ width: '100%', minHeight: '38px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 8px' }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ============================================================== */}
+        {/* PASO 3: BENEFICIO (LLEVA X PAGA Y, PRECIO)                    */}
+        {/* ============================================================== */}
+        {paso === 3 && (
+          <div
+            data-testid="paso-3-lleva-paga"
+            style={{
+              backgroundColor: 'var(--cp-white)',
+              border: '1px solid var(--cp-line)',
+              borderRadius: '14px',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
+            }}
+          >
+            <div style={{ fontWeight: 800, fontSize: '16px', color: 'var(--cp-navy)' }}>
+              Paso 3 de 4: Beneficio (Lleva X, Paga Y)
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: '130px' }}>
+                <label htmlFor="lp-q-lleva" style={{ fontWeight: 700, fontSize: '13px', display: 'block', marginBottom: '4px' }}>
+                  Lleva (unidades) *
+                </label>
+                <input
+                  id="lp-q-lleva"
+                  type="number"
+                  min={2}
+                  max={20}
+                  value={qLleva}
+                  onChange={(e) => setQLleva(parseInt(e.target.value) || 2)}
+                  style={{ width: '100%', minHeight: '42px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 12px', fontSize: '16px', fontWeight: 800 }}
+                />
+              </div>
+
+              <div style={{ flex: 1, minWidth: '130px' }}>
+                <label htmlFor="lp-q-paga" style={{ fontWeight: 700, fontSize: '13px', display: 'block', marginBottom: '4px' }}>
+                  Paga (unidades) *
+                </label>
+                <input
+                  id="lp-q-paga"
+                  type="number"
+                  min={1}
+                  max={qLleva - 1}
+                  value={qPaga}
+                  onChange={(e) => setQPaga(parseInt(e.target.value) || 1)}
+                  style={{ width: '100%', minHeight: '42px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 12px', fontSize: '16px', fontWeight: 800 }}
+                />
+              </div>
+
+              <div style={{ flex: 1, minWidth: '150px' }}>
+                <label htmlFor="lp-precio" style={{ fontWeight: 700, fontSize: '13px', display: 'block', marginBottom: '4px' }}>
+                  Precio final de la promo (S/) *
+                </label>
+                <input
+                  id="lp-precio"
+                  type="number"
+                  step="0.5"
+                  min={0.1}
+                  value={precio}
+                  onChange={(e) => setPrecio(e.target.value)}
+                  placeholder="Ej.: 11.50"
+                  style={{ width: '100%', minHeight: '42px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 12px', fontSize: '16px', fontWeight: 800, color: 'var(--cp-rust)' }}
+                />
+              </div>
+            </div>
+
+            <div
+              style={{
+                backgroundColor: 'var(--cp-sand)',
+                borderRadius: '10px',
+                padding: '10px 14px',
+                fontSize: '13px',
+                color: 'var(--cp-navy)',
+              }}
+            >
+              <strong>Resumen del beneficio:</strong> Promoción <strong>{qLleva}x{qPaga}</strong> con precio especial de <strong>S/ {parseFloat(precio) ? parseFloat(precio).toFixed(2) : '0.00'}</strong>.
+              Total de unidades asignadas en el Paso 1: <strong>{totalUnidades}</strong> de <strong>{qLleva}</strong> necesarias.
+            </div>
+          </div>
+        )}
+
+        {/* ============================================================== */}
+        {/* PASO 4: PREVISUALIZACIÓN Y EJEMPLO CALCULADO                   */}
+        {/* ============================================================== */}
+        {paso === 4 && (
+          <div
+            data-testid="paso-4-lleva-paga"
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
+            }}
+          >
+            {/* Ejemplo didáctico calculado con productos reales */}
+            <div
+              data-testid="ejemplo-calculado-lleva-paga"
+              style={{
+                backgroundColor: '#DCFCE7',
+                border: '1.5px solid #2E7D32',
+                borderRadius: '14px',
+                padding: '14px 16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px',
+              }}
+            >
+              <div style={{ fontWeight: 800, fontSize: '15px', color: '#166534' }}>
+                Ejemplo real calculado para el cliente
+              </div>
+              <div style={{ fontSize: '14px', lineHeight: '20px', color: '#14532D', fontWeight: 700 }}>
+                {ejemploCalculado.texto}
+              </div>
+              <div style={{ fontSize: '12px', color: '#166534' }}>
+                Calculado con los precios reales del catálogo para demostrar exactamente el valor para tu cliente.
+              </div>
+            </div>
+
+            {/* Previsualización interactiva */}
+            <div
+              style={{
+                backgroundColor: 'var(--cp-white)',
+                border: '1px solid var(--cp-line)',
+                borderRadius: '14px',
+                padding: '16px',
+              }}
+            >
+              <div style={{ fontWeight: 800, fontSize: '15px', color: 'var(--cp-navy)', marginBottom: '8px' }}>
+                Previsualización en la carta
+              </div>
+              <PrevisualizacionCarta
+                oferta={ofertaEnVivo}
+                productosDisponibles={productosDisponibles}
+                categoriasDisponibles={categorias}
+                vistaInicial="tarjeta"
+                dispositivoInicial="pc"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Navegación inferior */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '10px',
+            borderTop: '1.5px solid var(--cp-line)',
+            paddingTop: '12px',
+          }}
+        >
           <button
             type="button"
-            onClick={onCerrar}
+            onClick={irPasoAnterior}
+            disabled={paso === 1}
             style={{
-              flex: 1,
-              minHeight: '52px',
-              border: '1.5px solid var(--cp-navy)',
+              minHeight: '44px',
+              padding: '0 20px',
               borderRadius: '12px',
+              border: '1.5px solid var(--cp-navy)',
               backgroundColor: 'transparent',
               color: 'var(--cp-navy)',
               fontWeight: 800,
-              cursor: 'pointer',
+              fontSize: '14px',
+              cursor: paso === 1 ? 'not-allowed' : 'pointer',
+              opacity: paso === 1 ? 0.3 : 1,
             }}
           >
-            Cancelar
+            ← Atrás
           </button>
+
+          {paso < 4 ? (
+            <button
+              type="button"
+              onClick={irSiguientePaso}
+              data-testid="btn-siguiente-paso"
+              style={{
+                minHeight: '44px',
+                padding: '0 24px',
+                borderRadius: '12px',
+                border: 0,
+                backgroundColor: 'var(--cp-orange)',
+                color: 'var(--cp-navy)',
+                fontWeight: 800,
+                fontSize: '14px',
+                cursor: 'pointer',
+              }}
+            >
+              Siguiente →
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmarGuardar(true)}
+              disabled={guardando}
+              data-testid="btn-guardar-lleva-paga"
+              style={{
+                minHeight: '44px',
+                padding: '0 28px',
+                borderRadius: '12px',
+                border: 0,
+                backgroundColor: 'var(--cp-orange)',
+                color: 'var(--cp-navy)',
+                fontWeight: 800,
+                fontSize: '14px',
+                cursor: guardando ? 'wait' : 'pointer',
+              }}
+            >
+              {guardando ? 'Guardando...' : 'Guardar promoción'}
+            </button>
+          )}
         </div>
 
+        {/* Confirmación para quitar foto */}
         <ModalConfirmacion
           abierto={confirmarQuitarFoto}
-          titulo="¿Quitar la foto de la promoción?"
-          mensaje="Se mostrará la letra inicial hasta que subas otra."
+          titulo="¿Quitar foto de la promoción?"
+          mensaje="La promoción se mostrará con la letra inicial sobre fondo dorado."
           onConfirmar={confirmarQuitar}
           onCancelar={() => setConfirmarQuitarFoto(false)}
+        />
+
+        {/* Confirmación para guardar */}
+        <ModalConfirmacion
+          abierto={confirmarGuardar}
+          titulo={ofertaAEditar ? '¿Guardar cambios de la promoción?' : '¿Guardar nueva promoción?'}
+          mensaje={`¿Deseas confirmar y guardar "${nombre}" en la carta virtual?`}
+          onConfirmar={ejecutarGuardar}
+          onCancelar={() => setConfirmarGuardar(false)}
         />
       </div>
     </div>

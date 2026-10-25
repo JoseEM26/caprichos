@@ -9,6 +9,7 @@ interface TarjetaOfertaProps {
   productos: ProductoCarta[];
   categorias: CategoriaCarta[];
   onSeleccionarCategoria?: (categoriaId: string) => void;
+  esMovilPreview?: boolean;
 }
 
 function fmt(n: number): string {
@@ -21,9 +22,11 @@ export function TarjetaOferta({
   productos,
   categorias: _categorias,
   onSeleccionarCategoria,
+  esMovilPreview,
 }: TarjetaOfertaProps) {
   const { abrirModalProducto } = useCarrito();
-  const movil = useEsMovil();
+  const esMovilDetectado = useEsMovil();
+  const movil = esMovilPreview !== undefined ? esMovilPreview : esMovilDetectado;
 
   // Buscar el producto vinculado si tiene alcanceProductoId
   const productoVinculado = useMemo(() => {

@@ -13,6 +13,7 @@ import { ModalDescuento } from './ModalDescuento';
 import { ModalCupon } from './ModalCupon';
 import { ModalHistorialCupones, HistorialMovimiento } from './ModalHistorialCupones';
 import { ModalConfirmacion } from './ModalConfirmacion';
+import { ModalPrevisualizacionCarta } from './ModalPrevisualizacionCarta';
 import { api } from '../../comun/api';
 
 const NOMBRES_DIAS_CORTO: Record<number, string> = {
@@ -298,6 +299,10 @@ export function OfertasAdminView() {
   const [busquedaEmitidos, setBusquedaEmitidos] = useState('');
 
   const [modalHistorialAbierto, setModalHistorialAbierto] = useState(false);
+
+  // Modal para ver cómo se ve en la carta
+  const [modalPreviewAbierto, setModalPreviewAbierto] = useState(false);
+  const [ofertaParaPreview, setOfertaParaPreview] = useState<OfertaItem | null>(null);
 
   // Modal confirmación
   const [confirmacion, setConfirmacion] = useState<{
@@ -902,49 +907,76 @@ export function OfertasAdminView() {
                     ))}
                   </div>
 
-                  <div style={{ display: 'flex', gap: '6px', marginTop: 'auto' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: 'auto' }}>
                     <button
                       type="button"
                       onClick={() => {
-                        if (pr.tipo === 'COMBO') {
-                          setComboAEditar(pr);
-                          setModalComboAbierto(true);
-                        } else {
-                          setLlevaPagaAEditar(pr);
-                          setModalLlevaPagaAbierto(true);
-                        }
+                        setOfertaParaPreview(pr);
+                        setModalPreviewAbierto(true);
                       }}
+                      aria-label={`Ver cómo se ve ${pr.nombre} en la carta`}
                       style={{
-                        flex: 1,
-                        minHeight: '44px',
-                        border: '1.5px solid var(--cp-navy)',
+                        width: '100%',
+                        minHeight: '38px',
+                        border: '1.5px solid var(--cp-line)',
                         borderRadius: '10px',
-                        backgroundColor: 'transparent',
+                        backgroundColor: 'var(--cp-sand)',
                         color: 'var(--cp-navy)',
                         fontWeight: 700,
                         fontSize: '12px',
                         cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                       }}
                     >
-                      Editar
+                      Ver como se ve en la carta
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => pedirCambioEstadoOferta(pr)}
-                      style={{
-                        flex: 1,
-                        minHeight: '44px',
-                        border: '1.5px solid var(--cp-navy)',
-                        borderRadius: '10px',
-                        backgroundColor: 'transparent',
-                        color: 'var(--cp-navy)',
-                        fontWeight: 700,
-                        fontSize: '12px',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {pr.activo ? 'Desactivar' : 'Activar'}
-                    </button>
+
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (pr.tipo === 'COMBO') {
+                            setComboAEditar(pr);
+                            setModalComboAbierto(true);
+                          } else {
+                            setLlevaPagaAEditar(pr);
+                            setModalLlevaPagaAbierto(true);
+                          }
+                        }}
+                        style={{
+                          flex: 1,
+                          minHeight: '44px',
+                          border: '1.5px solid var(--cp-navy)',
+                          borderRadius: '10px',
+                          backgroundColor: 'transparent',
+                          color: 'var(--cp-navy)',
+                          fontWeight: 700,
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => pedirCambioEstadoOferta(pr)}
+                        style={{
+                          flex: 1,
+                          minHeight: '44px',
+                          border: '1.5px solid var(--cp-navy)',
+                          borderRadius: '10px',
+                          backgroundColor: 'transparent',
+                          color: 'var(--cp-navy)',
+                          fontWeight: 700,
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {pr.activo ? 'Desactivar' : 'Activar'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -1119,44 +1151,71 @@ export function OfertasAdminView() {
                     {Number(d.compraMinima) > 0 ? `Compra mínima s/ ${d.compraMinima}` : 'Sin compra mínima'}
                   </div>
 
-                  <div style={{ display: 'flex', gap: '6px', marginTop: 'auto' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: 'auto' }}>
                     <button
                       type="button"
                       onClick={() => {
-                        setDescuentoAEditar(d);
-                        setModalDescuentoAbierto(true);
+                        setOfertaParaPreview(d);
+                        setModalPreviewAbierto(true);
                       }}
+                      aria-label={`Ver cómo se ve ${d.nombre} en la carta`}
                       style={{
-                        flex: 1,
-                        minHeight: '44px',
-                        border: '1.5px solid var(--cp-navy)',
+                        width: '100%',
+                        minHeight: '38px',
+                        border: '1.5px solid var(--cp-line)',
                         borderRadius: '10px',
-                        backgroundColor: 'transparent',
+                        backgroundColor: 'var(--cp-sand)',
                         color: 'var(--cp-navy)',
                         fontWeight: 700,
                         fontSize: '12px',
                         cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                       }}
                     >
-                      Editar
+                      Ver como se ve en la carta
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => pedirCambioEstadoOferta(d)}
-                      style={{
-                        flex: 1,
-                        minHeight: '44px',
-                        border: '1.5px solid var(--cp-navy)',
-                        borderRadius: '10px',
-                        backgroundColor: 'transparent',
-                        color: 'var(--cp-navy)',
-                        fontWeight: 700,
-                        fontSize: '12px',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {d.activo ? 'Desactivar' : 'Activar'}
-                    </button>
+
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDescuentoAEditar(d);
+                          setModalDescuentoAbierto(true);
+                        }}
+                        style={{
+                          flex: 1,
+                          minHeight: '44px',
+                          border: '1.5px solid var(--cp-navy)',
+                          borderRadius: '10px',
+                          backgroundColor: 'transparent',
+                          color: 'var(--cp-navy)',
+                          fontWeight: 700,
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => pedirCambioEstadoOferta(d)}
+                        style={{
+                          flex: 1,
+                          minHeight: '44px',
+                          border: '1.5px solid var(--cp-navy)',
+                          borderRadius: '10px',
+                          backgroundColor: 'transparent',
+                          color: 'var(--cp-navy)',
+                          fontWeight: 700,
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {d.activo ? 'Desactivar' : 'Activar'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -2071,6 +2130,7 @@ export function OfertasAdminView() {
         }}
         onGuardar={guardarOfertaHandler}
         productosDisponibles={productos}
+        categorias={categorias}
       />
 
       <ModalLlevaPaga
@@ -2082,6 +2142,7 @@ export function OfertasAdminView() {
         }}
         onGuardar={guardarOfertaHandler}
         productosDisponibles={productosConDescuento}
+        categorias={categorias}
       />
 
       <ModalDescuento
@@ -2093,6 +2154,7 @@ export function OfertasAdminView() {
         }}
         onGuardar={guardarOfertaHandler}
         productosDisponibles={productosConDescuento}
+        categorias={categorias}
       />
 
       <ModalCupon
@@ -2111,6 +2173,17 @@ export function OfertasAdminView() {
         abierto={modalHistorialAbierto}
         onCerrar={() => setModalHistorialAbierto(false)}
         movimientos={movimientosHistorial}
+      />
+
+      <ModalPrevisualizacionCarta
+        abierto={modalPreviewAbierto}
+        oferta={ofertaParaPreview}
+        onCerrar={() => {
+          setModalPreviewAbierto(false);
+          setOfertaParaPreview(null);
+        }}
+        productosDisponibles={productos}
+        categoriasDisponibles={categorias}
       />
 
       <ModalConfirmacion

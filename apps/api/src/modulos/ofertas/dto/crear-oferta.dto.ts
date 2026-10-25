@@ -9,12 +9,49 @@ import {
   IsOptional,
   IsString,
   Min,
+  Validate,
   ValidateNested,
+  ValidationArguments,
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
 } from 'class-validator';
 
+@ValidatorConstraint({ name: 'esDescuentoValorValido', async: false })
+export class EsDescuentoValorValidoConstraint implements ValidatorConstraintInterface {
+  validate(valor: any, args: ValidationArguments) {
+    if (valor === undefined || valor === null) return true;
+    if (typeof valor !== 'number' || isNaN(valor)) return false;
+    const objeto = args.object as any;
+    const tipo = objeto.descuentoTipo;
+    if (tipo === 'PORCENTAJE') {
+      return valor >= 1 && valor <= 100;
+    }
+    if (tipo === 'MONTO' || tipo === 'MONTO_FIJO') {
+      return valor > 0 && valor <= 9999.99;
+    }
+    return valor > 0;
+  }
+
+  defaultMessage(args: ValidationArguments) {
+    const objeto = args.object as any;
+    const tipo = objeto.descuentoTipo;
+    if (tipo === 'PORCENTAJE') {
+      return 'El porcentaje de descuento debe estar entre 1 y 100';
+    }
+    if (tipo === 'MONTO' || tipo === 'MONTO_FIJO') {
+      return 'El monto de descuento debe ser mayor que 0 y máximo 9999.99';
+    }
+    return 'El valor del descuento debe ser mayor a 0';
+  }
+}
+
 export class ComboPrecioDto {
-  @IsNotEmpty({ message: 'tamanoValorId es requerido' })
-  tamanoValorId!: string | number;
+  @IsOptional()
+  tamanoValorId?: string | number;
+
+  @IsOptional()
+  @IsString()
+  tamanoNombre?: string;
 
   @IsNumber({}, { message: 'El precio debe ser un número válido' })
   @Min(0, { message: 'El precio debe ser mayor o igual a 0' })
@@ -22,12 +59,24 @@ export class ComboPrecioDto {
 }
 
 export class ComboParteDto {
+  @IsOptional()
+  @IsString()
+  nombre?: string;
+
+  @IsOptional()
+  @IsString()
+  tipoParte?: string;
+
   @IsIn(['A_ELECCION', 'UNA_DE', 'FIJO'], { message: 'Tipo de parte no válido' })
   tipo!: 'A_ELECCION' | 'UNA_DE' | 'FIJO';
 
   @IsInt({ message: 'La cantidad debe ser un entero' })
   @Min(1, { message: 'La cantidad debe ser al menos 1' })
   cantidad!: number;
+
+  @IsOptional()
+  @IsInt()
+  orden?: number;
 
   @IsOptional()
   @IsArray({ message: 'categorias debe ser un arreglo' })
@@ -72,12 +121,12 @@ export class CrearOfertaDto {
 
   @IsOptional()
   @IsNumber({}, { message: 'descuentoValor debe ser un número' })
-  @Min(0)
+  @Validate(EsDescuentoValorValidoConstraint)
   descuentoValor?: number;
 
   @IsOptional()
   @IsNumber({}, { message: 'compraMinima debe ser un número' })
-  @Min(0)
+  @Min(0, { message: 'La compra mínima debe ser mayor o igual a 0' })
   compraMinima?: number;
 
   @IsOptional()
