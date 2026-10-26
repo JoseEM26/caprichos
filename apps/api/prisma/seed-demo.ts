@@ -84,6 +84,7 @@ async function configurarParametrosDemo() {
     { clave: 'reserva_tolerancia_min', valor: 15 },
     { clave: 'tolerancia_reserva_min', valor: 15 },
     { clave: 'alta_demanda_min_base', valor: 0 },
+    { clave: 'chatbot_activo', valor: 'no' },
   ];
 
   for (const p of params) {

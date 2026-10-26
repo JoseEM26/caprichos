@@ -127,16 +127,27 @@ describe('ComprasView', () => {
     expect(screen.getByText('+ Registrar compra')).toBeInTheDocument();
   });
 
-  it('permite cambiar a la pestaña Pedir a proveedores y muestra botón de WhatsApp', async () => {
+  it('permite cambiar a la pestaña Por pedir y muestra botón de WhatsApp', async () => {
     render(<ComprasView />);
 
-    const botonTabPedir = await screen.findByRole('button', { name: /pedir a proveedores/i });
+    const botonTabPedir = await screen.findByRole('button', { name: /por pedir|pedir a proveedores/i });
     fireEvent.click(botonTabPedir);
 
     await waitFor(() => {
-      expect(screen.getByText('Pedir por WhatsApp ↗')).toBeInTheDocument();
+      expect(screen.getByText(/Pedir al proveedor \(WhatsApp\)|Pedir por WhatsApp/i)).toBeInTheDocument();
       expect(screen.getByText('Leche entera')).toBeInTheDocument();
     });
+  });
+
+  it('muestra el botón + Compra rápida y abre el modal de compra suelta', async () => {
+    render(<ComprasView />);
+
+    const botonRapida = await screen.findByRole('button', { name: /\+ compra rápida/i });
+    expect(botonRapida).toBeInTheDocument();
+    fireEvent.click(botonRapida);
+
+    expect(screen.getByRole('dialog', { name: /compra rápida \(sin proveedor\)/i })).toBeInTheDocument();
+    expect(screen.getByText(/Costo total/i)).toBeInTheDocument();
   });
 
   it('permite cambiar a la pestaña Proveedores y ver los proveedores registrados', async () => {

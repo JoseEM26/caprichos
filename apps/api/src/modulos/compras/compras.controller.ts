@@ -16,6 +16,7 @@ import { CrearProveedorDto } from './dto/crear-proveedor.dto';
 import { ActualizarProveedorDto } from './dto/actualizar-proveedor.dto';
 import { CrearPedidoProveedorDto } from './dto/crear-pedido-proveedor.dto';
 import { CrearCompraDto } from './dto/crear-compra.dto';
+import { CompraRapidaDto } from './dto/compra-rapida.dto';
 import { RecibirPedidoDto } from './dto/recibir-pedido.dto';
 import { AnularCompraDto } from './dto/anular-compra.dto';
 import { ComprasQueryDto } from './dto/compras-query.dto';
@@ -119,7 +120,13 @@ export class ComprasController {
     return this.comprasService.registrarCompra(dto, req.usuario, req.ip);
   }
 
-  @Post('recibir-pedido/:pedidoId')
+  @Post('compra-rapida')
+  @Permiso('compras', 'crear')
+  async registrarCompraRapida(@Body() dto: CompraRapidaDto, @Req() req: any) {
+    return this.comprasService.registrarCompraRapida(dto, req.usuario, req.ip);
+  }
+
+  @Post(['recibir-pedido/:pedidoId', 'pedidos-proveedor/:pedidoId/recibir'])
   @Permiso('compras', 'crear')
   async recibirPedidoProveedor(
     @Param('pedidoId') pedidoId: string,

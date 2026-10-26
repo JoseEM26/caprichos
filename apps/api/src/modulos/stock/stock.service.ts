@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
   Optional,
@@ -43,6 +44,13 @@ export class StockService {
     usuario: UsuarioAutenticado,
     ip?: string,
   ) {
+    if (dto.tipo === 'ENTRADA') {
+      throw new ConflictException({
+        codigo: 'INGRESO_SOLO_COMPRAS',
+        mensaje: 'Los ingresos se registran en Compras',
+      });
+    }
+
     // 1. Validar motivo obligatorio en ajustes y mermas
     if (dto.tipo === 'AJUSTE' || dto.tipo === 'MERMA') {
       if (!dto.motivo || !dto.motivo.trim()) {

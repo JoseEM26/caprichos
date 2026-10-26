@@ -7,13 +7,30 @@ import {
   CompraItem,
 } from './comprasApi';
 import { ModalRegistrarCompra } from './ModalRegistrarCompra';
+import { ModalCompraRapida } from './ModalCompraRapida';
 import { ModalProveedor } from './ModalProveedor';
 import { ModalHistorialProveedor } from './ModalHistorialProveedor';
 import { ModalDetalleCompra } from './ModalDetalleCompra';
 
+const getInitialTab = (): 'pedir' | 'compras' | 'proveedores' => {
+  if (typeof window !== 'undefined') {
+    const p = new URLSearchParams(window.location.search).get('tab');
+    if (p === 'pedir') return 'pedir';
+    if (p === 'proveedores') return 'proveedores';
+  }
+  return 'compras';
+};
+
 export const ComprasView: React.FC = () => {
   // Pestaña activa: 'pedir' | 'compras' | 'proveedores'
-  const [tabActiva, setTabActiva] = useState<'pedir' | 'compras' | 'proveedores'>('compras');
+  const [tabActiva, setTabActiva] = useState<'pedir' | 'compras' | 'proveedores'>(getInitialTab);
+
+  useEffect(() => {
+    const actual = getInitialTab();
+    if (actual !== tabActiva) {
+      setTabActiva(actual);
+    }
+  }, []);
 
   // Datos
   const [resumen, setResumen] = useState<ComprasResumen | null>(null);
@@ -29,6 +46,7 @@ export const ComprasView: React.FC = () => {
 
   // Modales
   const [modalCompraAbierto, setModalCompraAbierto] = useState(false);
+  const [modalCompraRapidaAbierto, setModalCompraRapidaAbierto] = useState(false);
   const [modalProveedorAbierto, setModalProveedorAbierto] = useState(false);
   const [proveedorAEditar, setProveedorAEditar] = useState<ProveedorItem | null>(null);
   const [proveedorHistorial, setProveedorHistorial] = useState<ProveedorItem | null>(null);
@@ -255,7 +273,7 @@ export const ComprasView: React.FC = () => {
               cursor: 'pointer',
             }}
           >
-            Pedir a proveedores {insumosPedir.length > 0 ? `(${insumosPedir.length})` : ''}
+            Por pedir {insumosPedir.length > 0 ? `(${insumosPedir.length})` : ''}
           </button>
 
           <button
@@ -295,24 +313,44 @@ export const ComprasView: React.FC = () => {
           </button>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setModalCompraAbierto(true)}
-          style={{
-            minHeight: 44,
-            padding: '0 16px',
-            border: 0,
-            borderRadius: 9999,
-            background: 'var(--cp-orange)',
-            color: 'var(--cp-navy)',
-            fontFamily: 'Montserrat, sans-serif',
-            fontWeight: 800,
-            fontSize: 14,
-            cursor: 'pointer',
-          }}
-        >
-          + Registrar compra
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => setModalCompraRapidaAbierto(true)}
+            style={{
+              minHeight: 44,
+              padding: '0 16px',
+              border: '1.5px solid var(--cp-navy)',
+              borderRadius: 9999,
+              background: 'transparent',
+              color: 'var(--cp-navy)',
+              fontFamily: 'Montserrat, sans-serif',
+              fontWeight: 800,
+              fontSize: 14,
+              cursor: 'pointer',
+            }}
+          >
+            + Compra rápida
+          </button>
+          <button
+            type="button"
+            onClick={() => setModalCompraAbierto(true)}
+            style={{
+              minHeight: 44,
+              padding: '0 16px',
+              border: 0,
+              borderRadius: 9999,
+              background: 'var(--cp-orange)',
+              color: 'var(--cp-navy)',
+              fontFamily: 'Montserrat, sans-serif',
+              fontWeight: 800,
+              fontSize: 14,
+              cursor: 'pointer',
+            }}
+          >
+            + Registrar compra
+          </button>
+        </div>
       </div>
 
       {/* CONTENIDO PESTAÑA 1: PEDIR A PROVEEDORES */}
@@ -409,7 +447,7 @@ export const ComprasView: React.FC = () => {
                           {prov ? prov.nombreComercial || prov.razonSocial : 'Insumos sin proveedor asignado'}
                         </div>
                         <div style={{ fontSize: 12, color: 'var(--cp-soft)' }}>
-                          {tieneTel ? `WhatsApp: ${prov?.telefono}` : '⚠ Sin teléfono registrado'}
+                          {tieneTel ? `WhatsApp: ${prov?.telefono}` : 'Sin teléfono registrado'}
                           {prov?.diasCredito ? ` · Crédito ${prov.diasCredito} días` : ''}
                         </div>
                       </div>
@@ -433,7 +471,7 @@ export const ComprasView: React.FC = () => {
                               textDecoration: 'none',
                             }}
                           >
-                            Pedir por WhatsApp ↗
+                            Pedir al proveedor (WhatsApp)
                           </a>
                         )}
                         {prov && (
@@ -835,6 +873,16 @@ export const ComprasView: React.FC = () => {
         }}
         proveedores={proveedores.filter((p) => p.activo)}
         insumos={insumosPedir}
+      />
+
+      <ModalCompraRapida
+        abierto={modalCompraRapidaAbierto}
+        alCerrar={() => setModalCompraRapidaAbierto(false)}
+        alGuardar={() => {
+          cargarDatos();
+          setMensajeExito('Compra rápida registrada exitosamente.');
+          setTimeout(() => setMensajeExito(''), 4000);
+        }}
       />
 
       <ModalProveedor

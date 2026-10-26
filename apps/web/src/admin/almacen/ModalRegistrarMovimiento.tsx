@@ -15,7 +15,7 @@ export const ModalRegistrarMovimiento: React.FC<ModalRegistrarMovimientoProps> =
   alGuardar,
   insumos,
 }) => {
-  const [tipo, setTipo] = useState<'ENTRADA' | 'SALIDA' | 'MERMA' | 'DEVOLUCION'>('ENTRADA');
+  const [tipo, setTipo] = useState<'SALIDA' | 'MERMA' | 'DEVOLUCION'>('SALIDA');
   const [insumoId, setInsumoId] = useState('');
   const [cantidad, setCantidad] = useState('');
   const [origen, setOrigen] = useState('Almacén central');
@@ -28,7 +28,7 @@ export const ModalRegistrarMovimiento: React.FC<ModalRegistrarMovimientoProps> =
 
   useEffect(() => {
     if (abierto) {
-      setTipo('ENTRADA');
+      setTipo('SALIDA');
       setInsumoId(insumos[0]?.id || '');
       setCantidad('');
       setOrigen('Almacén central');
@@ -41,16 +41,13 @@ export const ModalRegistrarMovimiento: React.FC<ModalRegistrarMovimientoProps> =
   }, [abierto, insumos]);
 
   // Ajustar sugerencias de origen/destino según tipo de movimiento
-  const handleTipoChange = (t: 'ENTRADA' | 'SALIDA' | 'MERMA' | 'DEVOLUCION') => {
+  const handleTipoChange = (t: 'SALIDA' | 'MERMA' | 'DEVOLUCION') => {
     setTipo(t);
-    if (t === 'ENTRADA') {
-      setOrigen('Proveedor');
-      setDestino('Almacén central');
-    } else if (t === 'SALIDA') {
+    if (t === 'SALIDA') {
       setOrigen('Almacén central');
       setDestino('Cocina');
     } else if (t === 'MERMA') {
-      setOrigen('Producción');
+      setOrigen('Almacén central');
       setDestino('Merma');
     } else if (t === 'DEVOLUCION') {
       setOrigen('Cocina');
@@ -192,13 +189,11 @@ export const ModalRegistrarMovimiento: React.FC<ModalRegistrarMovimientoProps> =
               Tipo de movimiento
             </label>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {(['ENTRADA', 'SALIDA', 'MERMA', 'DEVOLUCION'] as const).map((t) => {
+              {(['SALIDA', 'MERMA', 'DEVOLUCION'] as const).map((t) => {
                 const activo = tipo === t;
                 const label =
-                  t === 'ENTRADA'
-                    ? 'Entrada'
-                    : t === 'SALIDA'
-                    ? 'Salida'
+                  t === 'SALIDA'
+                    ? 'Salida (hacia cocina)'
                     : t === 'MERMA'
                     ? 'Merma'
                     : 'Devolución';

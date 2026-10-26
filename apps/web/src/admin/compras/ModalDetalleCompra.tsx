@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { comprasApi, CompraItem } from './comprasApi';
+import React, { useState, useEffect } from 'react';
+import { comprasApi, CompraItem, RecibirPedidoDto } from './comprasApi';
+import { Confirmar } from '../../comun/Confirmar';
 
 interface ModalDetalleCompraProps {
   abierto: boolean;
@@ -19,36 +20,129 @@ export const ModalDetalleCompra: React.FC<ModalDetalleCompraProps> = ({
   const [motivoAnular, setMotivoAnular] = useState('');
   const [mostrandoAnular, setMostrandoAnular] = useState(false);
 
+  // Estados para recibir pedido pendiente
+  const [comprobanteTipo, setComprobanteTipo] = useState('FACTURA');
+  const [comprobanteNumero, setComprobanteNumero] = useState('');
+  const [condicion, setCondicion] = useState<'CONTADO' | 'CREDITO'>('CONTADO');
+  const [diasCredito, setDiasCredito] = useState('0');
+  const [lineasRecibir, setLineasRecibir] = useState<Record<string, { recibido: number; costoUnit: number }>>({});
+
+  // Modales de confirmación Sí/No
+  const [confirmarAnularAbierto, setConfirmarAnularAbierto] = useState(false);
+  const [confirmarPagarAbierto, setConfirmarPagarAbierto] = useState(false);
+  const [confirmarRecibirAbierto, setConfirmarRecibirAbierto] = useState(false);
+
+  const esPedidoPorRecibir =
+    Boolean(compra?.esPedidoPorRecibir) ||
+    compra?.estado === 'Por recibir' ||
+    compra?.estado === 'PENDIENTE';
+
+  useEffect(() => {
+    if (abierto && compra) {
+      setErrorMsg('');
+      setMotivoAnular('');
+      setMostrandoAnular(false);
+      setComprobanteTipo('FACTURA');
+      setComprobanteNumero('');
+      setCondicion('CONTADO');
+      setDiasCredito('0');
+      setConfirmarAnularAbierto(false);
+      setConfirmarPagarAbierto(false);
+      setConfirmarRecibirAbierto(false);
+
+      const inicialLineas: Record<string, { recibido: number; costoUnit: number }> = {};
+      for (const l of compra.lineas || []) {
+        inicialLineas[l.insumoId] = {
+          recibido: Number(l.cantidadCompra ?? l.cantidad ?? 0),
+          costoUnit: Number(l.costoUnit ?? 0),
+        };
+      }
+      setLineasRecibir(inicialLineas);
+    }
+  }, [abierto, compra]);
+
   if (!abierto || !compra) return null;
 
-  const handleMarcarPagada = async () => {
+  const ejecutarMarcarPagada = async () => {
     try {
       setCargando(true);
       setErrorMsg('');
       await comprasApi.marcarPagada(compra.id);
+      setConfirmarPagarAbierto(false);
       alActualizar();
       alCerrar();
     } catch (err: any) {
       setErrorMsg(err.message || 'Error al marcar compra como pagada.');
+      setConfirmarPagarAbierto(false);
     } finally {
       setCargando(false);
     }
   };
 
-  const handleAnular = async (e: React.FormEvent) => {
+  const ejecutarAnular = async () => {
+    try {
+      setCargando(true);
+      setErrorMsg('');
+      await comprasApi.anularCompra(compra.id, motivoAnular.trim());
+      setConfirmarAnularAbierto(false);
+      alActualizar();
+      alCerrar();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error al anular compra.');
+      setConfirmarAnularAbierto(false);
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  const handleValidarAnular = (e: React.FormEvent) => {
     e.preventDefault();
     if (!motivoAnular.trim()) {
       setErrorMsg('Debe ingresar el motivo de anulación.');
       return;
     }
+    setErrorMsg('');
+    setConfirmarAnularAbierto(true);
+  };
+
+  const handleValidarRecibir = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!comprobanteNumero.trim()) {
+      setErrorMsg('Ingrese el número de comprobante.');
+      return;
+    }
+    if (condicion === 'CREDITO' && !(parseInt(diasCredito, 10) > 0)) {
+      setErrorMsg('Especifique los días de crédito.');
+      return;
+    }
+    setErrorMsg('');
+    setConfirmarRecibirAbierto(true);
+  };
+
+  const ejecutarRecibir = async () => {
+    const rawId = compra.rawId || compra.id.replace('PED-', '');
+    const dto: RecibirPedidoDto = {
+      comprobanteTipo,
+      comprobanteNumero: comprobanteNumero.trim(),
+      condicion,
+      diasCredito: condicion === 'CREDITO' ? parseInt(diasCredito, 10) : 0,
+      lineas: compra.lineas.map((l) => ({
+        insumoId: l.insumoId,
+        recibido: lineasRecibir[l.insumoId]?.recibido ?? Number(l.cantidadCompra ?? l.cantidad ?? 0),
+        costoUnit: lineasRecibir[l.insumoId]?.costoUnit ?? Number(l.costoUnit ?? 0),
+      })),
+    };
+
     try {
       setCargando(true);
       setErrorMsg('');
-      await comprasApi.anularCompra(compra.id, motivoAnular.trim());
+      await comprasApi.recibirPedido(rawId, dto);
+      setConfirmarRecibirAbierto(false);
       alActualizar();
       alCerrar();
     } catch (err: any) {
-      setErrorMsg(err.message || 'Error al anular compra.');
+      setErrorMsg(err.message || 'Error al recibir el pedido.');
+      setConfirmarRecibirAbierto(false);
     } finally {
       setCargando(false);
     }
@@ -227,10 +321,253 @@ export const ModalDetalleCompra: React.FC<ModalDetalleCompraProps> = ({
           </div>
         </div>
 
+        {/* Panel de Recepción si es pedido por recibir */}
+        {esPedidoPorRecibir && (
+          <form
+            onSubmit={handleValidarRecibir}
+            style={{
+              background: 'rgb(255, 248, 235)',
+              border: '1.5px solid var(--cp-orange)',
+              borderRadius: 12,
+              padding: 16,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div
+                style={{
+                  fontWeight: 800,
+                  fontSize: 14,
+                  color: 'var(--cp-navy)',
+                  fontFamily: 'Montserrat, sans-serif',
+                }}
+              >
+                Recepción del pedido de proveedor
+              </div>
+              <span
+                style={{
+                  fontSize: 11,
+                  background: 'var(--cp-cream)',
+                  padding: '2px 8px',
+                  borderRadius: 9999,
+                  fontWeight: 700,
+                }}
+              >
+                Entrada a Almacén central
+              </span>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--cp-soft)' }}>
+              Al recibir el pedido, el stock aumentará automáticamente en Almacén central y se registrará la compra con su comprobante.
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                gap: 10,
+              }}
+            >
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, marginBottom: 4 }}>
+                  Tipo comprobante
+                </label>
+                <select
+                  value={comprobanteTipo}
+                  onChange={(e) => setComprobanteTipo(e.target.value)}
+                  style={{
+                    width: '100%',
+                    minHeight: 38,
+                    borderRadius: 6,
+                    border: '1px solid var(--cp-line)',
+                    padding: '0 8px',
+                    background: 'var(--cp-white)',
+                  }}
+                >
+                  <option value="FACTURA">Factura</option>
+                  <option value="BOLETA">Boleta</option>
+                  <option value="NOTA_VENTA">Nota de venta</option>
+                  <option value="GUIA">Guía de remisión</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, marginBottom: 4 }}>
+                  Número comprobante *
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej. F001-00042"
+                  value={comprobanteNumero}
+                  onChange={(e) => setComprobanteNumero(e.target.value)}
+                  required
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    minHeight: 38,
+                    borderRadius: 6,
+                    border: '1px solid var(--cp-line)',
+                    padding: '0 8px',
+                    background: 'var(--cp-white)',
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, marginBottom: 4 }}>
+                  Condición de pago
+                </label>
+                <select
+                  value={condicion}
+                  onChange={(e) => setCondicion(e.target.value as any)}
+                  style={{
+                    width: '100%',
+                    minHeight: 38,
+                    borderRadius: 6,
+                    border: '1px solid var(--cp-line)',
+                    padding: '0 8px',
+                    background: 'var(--cp-white)',
+                  }}
+                >
+                  <option value="CONTADO">Contado</option>
+                  <option value="CREDITO">Crédito</option>
+                </select>
+              </div>
+
+              {condicion === 'CREDITO' && (
+                <div>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 700, marginBottom: 4 }}>
+                    Días crédito
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={diasCredito}
+                    onChange={(e) => setDiasCredito(e.target.value)}
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      minHeight: 38,
+                      borderRadius: 6,
+                      border: '1px solid var(--cp-line)',
+                      padding: '0 8px',
+                      background: 'var(--cp-white)',
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Insumos a recibir con cantidad y costo */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ fontSize: 11, fontWeight: 700 }}>Cantidades y costos recibidos:</div>
+              {compra.lineas.map((l) => {
+                const nombre = l.insumoNombre || l.nombre || 'Insumo';
+                const cant =
+                  lineasRecibir[l.insumoId]?.recibido ??
+                  Number(l.cantidadCompra ?? l.cantidad ?? 0);
+                const costo = lineasRecibir[l.insumoId]?.costoUnit ?? Number(l.costoUnit ?? 0);
+                return (
+                  <div
+                    key={l.insumoId}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '2fr 1fr 1fr',
+                      gap: 8,
+                      alignItems: 'center',
+                      background: 'var(--cp-white)',
+                      padding: '6px 10px',
+                      borderRadius: 6,
+                      border: '1px solid var(--cp-line)',
+                      fontSize: 12,
+                    }}
+                  >
+                    <div>
+                      <b>{nombre}</b> {l.unidad ? `(${l.unidad})` : ''}
+                    </div>
+                    <div>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={cant}
+                        onChange={(e) =>
+                          setLineasRecibir({
+                            ...lineasRecibir,
+                            [l.insumoId]: {
+                              recibido: parseFloat(e.target.value) || 0,
+                              costoUnit: costo,
+                            },
+                          })
+                        }
+                        placeholder="Recibido"
+                        style={{
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          padding: '4px 6px',
+                          borderRadius: 4,
+                          border: '1px solid var(--cp-line)',
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={costo}
+                        onChange={(e) =>
+                          setLineasRecibir({
+                            ...lineasRecibir,
+                            [l.insumoId]: {
+                              recibido: cant,
+                              costoUnit: parseFloat(e.target.value) || 0,
+                            },
+                          })
+                        }
+                        placeholder="Costo unit."
+                        style={{
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          padding: '4px 6px',
+                          borderRadius: 4,
+                          border: '1px solid var(--cp-line)',
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+              <button
+                type="submit"
+                disabled={cargando}
+                style={{
+                  minHeight: 40,
+                  padding: '0 20px',
+                  borderRadius: 9999,
+                  border: 0,
+                  background: 'var(--cp-orange)',
+                  color: 'var(--cp-navy)',
+                  fontFamily: 'Montserrat, sans-serif',
+                  fontWeight: 800,
+                  fontSize: 13,
+                  cursor: cargando ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {cargando ? 'Procesando...' : 'Recibir pedido y dar entrada'}
+              </button>
+            </div>
+          </form>
+        )}
+
         {/* Panel de Anulación */}
         {mostrandoAnular && (
           <form
-            onSubmit={handleAnular}
+            onSubmit={handleValidarAnular}
             style={{
               background: 'rgb(253, 236, 232)',
               borderRadius: 10,
@@ -327,10 +664,10 @@ export const ModalDetalleCompra: React.FC<ModalDetalleCompraProps> = ({
           </div>
 
           <div style={{ display: 'flex', gap: 10 }}>
-            {compra.estado !== 'ANULADA' && compra.estadoPago !== 'PAGADA' && (
+            {compra.estado !== 'ANULADA' && !esPedidoPorRecibir && compra.estadoPago !== 'PAGADA' && (
               <button
                 type="button"
-                onClick={handleMarcarPagada}
+                onClick={() => setConfirmarPagarAbierto(true)}
                 disabled={cargando}
                 style={{
                   minHeight: 40,
@@ -367,6 +704,43 @@ export const ModalDetalleCompra: React.FC<ModalDetalleCompraProps> = ({
           </div>
         </div>
       </div>
+
+      {confirmarRecibirAbierto && (
+        <Confirmar
+          abierto={confirmarRecibirAbierto}
+          titulo="¿Confirmar recepción del pedido?"
+          mensaje={`Se registrará la compra con comprobante ${comprobanteTipo} ${comprobanteNumero} y el stock aumentará en Almacén central.`}
+          textoConfirmar="Sí, recibir"
+          textoNo="No, revisar"
+          alConfirmar={ejecutarRecibir}
+          alCancelar={() => setConfirmarRecibirAbierto(false)}
+        />
+      )}
+
+      {confirmarPagarAbierto && (
+        <Confirmar
+          abierto={confirmarPagarAbierto}
+          titulo="¿Marcar compra como pagada?"
+          mensaje={`Se registrará el pago de la compra ${compra.comprobanteTipo} ${compra.comprobanteNumero} por s/ ${compra.montoTotal.toFixed(2)}.`}
+          textoConfirmar="Sí, marcar pagada"
+          textoNo="No, cancelar"
+          alConfirmar={ejecutarMarcarPagada}
+          alCancelar={() => setConfirmarPagarAbierto(false)}
+        />
+      )}
+
+      {confirmarAnularAbierto && (
+        <Confirmar
+          abierto={confirmarAnularAbierto}
+          titulo="¿Confirmar anulación de la compra?"
+          mensaje={`Se revertirán las entradas de stock en Almacén central para la compra ${compra.comprobanteTipo} ${compra.comprobanteNumero}. Motivo: "${motivoAnular}".`}
+          peligro
+          textoConfirmar="Sí, anular compra"
+          textoNo="No, mantener"
+          alConfirmar={ejecutarAnular}
+          alCancelar={() => setConfirmarAnularAbierto(false)}
+        />
+      )}
     </>
   );
 };

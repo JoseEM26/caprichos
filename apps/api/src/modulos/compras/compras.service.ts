@@ -14,9 +14,11 @@ import { CrearProveedorDto } from './dto/crear-proveedor.dto';
 import { ActualizarProveedorDto } from './dto/actualizar-proveedor.dto';
 import { CrearPedidoProveedorDto } from './dto/crear-pedido-proveedor.dto';
 import { CrearCompraDto } from './dto/crear-compra.dto';
+import { CompraRapidaDto } from './dto/compra-rapida.dto';
 import { RecibirPedidoDto } from './dto/recibir-pedido.dto';
 import { AnularCompraDto } from './dto/anular-compra.dto';
 import { ComprasQueryDto } from './dto/compras-query.dto';
+import { StockService } from '../stock/stock.service';
 
 @Injectable()
 export class ComprasService {
@@ -24,6 +26,7 @@ export class ComprasService {
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditoriaService,
     @Optional() private readonly eventosGateway?: EventosGateway,
+    @Optional() private readonly stockService?: StockService,
   ) {}
 
   private parsearId(id: bigint | string | number, entidad = 'entidad'): bigint {
@@ -1040,6 +1043,11 @@ export class ComprasService {
       total,
     });
 
+    const insumosIds = dto.lineas.map((l) => this.parsearId(l.insumoId, 'insumo'));
+    if (typeof this.stockService?.verificarYReactivarAgotados === 'function') {
+      await this.stockService.verificarYReactivarAgotados(insumosIds, []);
+    }
+
     return {
       id: resultado.id.toString(),
       total,
@@ -1213,5 +1221,196 @@ export class ComprasService {
     }
 
     return { ok: true, id: compraId.toString(), anulada: true };
+  }
+
+  // ==========================================
+  // COMPRA RÁPIDA (SIN PROVEEDOR)
+  // ==========================================
+  private async obtenerOCrearProveedorGenerico(tx: Prisma.TransactionClient | PrismaService) {
+    let party = await tx.party.findFirst({
+      where: {
+        tipo: 'ORGANIZACION',
+        organizacion: {
+          razon_social: 'Compras varias (sin proveedor)',
+        },
+      },
+      include: { organizacion: true },
+    });
+
+    if (!party) {
+      party = await tx.party.create({
+        data: {
+          tipo: 'ORGANIZACION',
+          estado: 'ACTIVO',
+          documentos: {
+            create: {
+              tipo: 'RUC',
+              numero: '00000000000',
+            },
+          },
+          organizacion: {
+            create: {
+              razon_social: 'Compras varias (sin proveedor)',
+              nombre_comercial: 'Compra rápida',
+            },
+          },
+          roles: {
+            create: {
+              rol: 'PROVEEDOR',
+            },
+          },
+        },
+        include: { organizacion: true },
+      });
+    }
+
+    return party;
+  }
+
+  async registrarCompraRapida(
+    dto: CompraRapidaDto,
+    usuario?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const insumoId = this.parsearId(dto.insumoId, 'insumo');
+    const insumo = await this.prisma.insumo.findUnique({
+      where: { id: insumoId },
+    });
+
+    if (!insumo) {
+      throw new NotFoundException({
+        codigo: 'INSUMO_NO_ENCONTRADO',
+        mensaje: 'El insumo no existe',
+      });
+    }
+
+    let almacenLugar = await this.prisma.lugarStock.findFirst({
+      where: { tipo: 'ALMACEN' },
+    });
+    if (!almacenLugar) {
+      almacenLugar = await this.prisma.lugarStock.create({
+        data: { nombre: 'Almacén central', tipo: 'ALMACEN' },
+      });
+    }
+
+    const cantidadDecimal = new Prisma.Decimal(dto.cantidad);
+    const costoTotalDecimal = new Prisma.Decimal(dto.costoTotal);
+    const costoUnit = dto.cantidad > 0 ? Number(dto.costoTotal) / Number(dto.cantidad) : 0;
+    const factorCompra = Number(insumo.factor_compra) || 1;
+    const costoUnitAlmacen = costoUnit;
+
+    const resultado = await this.prisma.$transaction(async (tx) => {
+      const provGenerico = await this.obtenerOCrearProveedorGenerico(tx);
+      const timestamp = Date.now();
+      const comprobanteNum = `CR-${timestamp}`;
+
+      const notaFinal = `Compra rápida (${dto.medioPago})${dto.nota ? ` · ${dto.nota}` : ''}`;
+
+      const compra = await tx.compra.create({
+        data: {
+          proveedor_party_id: provGenerico.id,
+          comprobante_tipo: 'COMPRA_RAPIDA',
+          comprobante_numero: comprobanteNum,
+          condicion: 'CONTADO',
+          total: costoTotalDecimal,
+          fecha_compra: new Date(),
+          nota: notaFinal,
+          pagada_en: new Date(),
+          pagada_por: usuario ? usuario.partyId : null,
+          registrado_por: usuario ? usuario.partyId : null,
+        },
+      });
+
+      await tx.compraLinea.create({
+        data: {
+          compra_id: compra.id,
+          insumo_id: insumoId,
+          cantidad_compra: cantidadDecimal,
+          costo_unit: new Prisma.Decimal(costoUnit),
+        },
+      });
+
+      // Actualizar costo unitario del insumo
+      await tx.insumo.update({
+        where: { id: insumoId },
+        data: { costo_unit: new Prisma.Decimal(costoUnitAlmacen) },
+      });
+
+      // Incrementar stock en almacén central
+      const stockActual = await tx.stock.findFirst({
+        where: { insumo_id: insumoId, lugar_id: almacenLugar.id },
+      });
+
+      let nuevoStockNum = Number(dto.cantidad);
+      if (stockActual) {
+        const updated = await tx.stock.update({
+          where: { id: stockActual.id },
+          data: { cantidad: { increment: cantidadDecimal } },
+        });
+        nuevoStockNum = Number(updated.cantidad);
+      } else {
+        await tx.stock.create({
+          data: {
+            insumo_id: insumoId,
+            lugar_id: almacenLugar.id,
+            cantidad: cantidadDecimal,
+          },
+        });
+      }
+
+      // Crear movimiento de stock ENTRADA
+      const mov = await tx.movimientoStock.create({
+        data: {
+          tipo: 'ENTRADA',
+          insumo_id: insumoId,
+          lugar_id: almacenLugar.id,
+          cantidad: cantidadDecimal,
+          compra_id: compra.id,
+          nota: notaFinal,
+          por: usuario ? usuario.partyId : BigInt(1),
+        },
+      });
+
+      return { compra, mov, nuevoStock: nuevoStockNum };
+    });
+
+    if (usuario) {
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'compras',
+        accion: 'COMPRA_RAPIDA',
+        entidad: 'compra',
+        entidadId: resultado.compra.id,
+        partyId: usuario.partyId,
+        despues: {
+          insumo: insumo.nombre,
+          cantidad: dto.cantidad,
+          costoTotal: dto.costoTotal,
+          medioPago: dto.medioPago,
+          nota: dto.nota,
+        },
+        ip,
+      });
+    }
+
+    this.eventosGateway?.emitirAdmin('stock:cambio', {
+      insumoId: insumoId.toString(),
+      lugarId: almacenLugar.id.toString(),
+    });
+
+    if (typeof this.stockService?.verificarYReactivarAgotados === 'function') {
+      await this.stockService.verificarYReactivarAgotados([insumoId], []);
+    }
+
+    return {
+      ok: true,
+      id: resultado.compra.id.toString(),
+      movimientoId: resultado.mov.id.toString(),
+      insumo: insumo.nombre,
+      cantidad: dto.cantidad,
+      costoTotal: dto.costoTotal,
+      medioPago: dto.medioPago,
+      nuevoStock: resultado.nuevoStock,
+    };
   }
 }

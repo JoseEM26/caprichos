@@ -10,6 +10,7 @@ export interface NotificacionAdmin {
   desde: string | null;
   modulo: string;
   accion: string;
+  ruta?: string;
 }
 
 export interface ResumenNotificaciones {
@@ -39,6 +40,7 @@ export function useNotificaciones(): ResumenNotificaciones {
 
   useEventos('pedido:estado', cargar);
   useEventos('pedido:nuevo', cargar);
+  useEventos('stock:cambio', cargar);
 
   return resumen;
 }

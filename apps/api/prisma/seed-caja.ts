@@ -17,6 +17,7 @@ export async function main() {
     { clave: 'rep_max_pedidos', valor: 3 },
     { clave: 'rep_naranja_min', valor: 35 },
     { clave: 'rep_rojo_min', valor: 50 },
+    { clave: 'chatbot_activo', valor: 'no' },
   ];
 
   for (const p of parametrosIniciales) {

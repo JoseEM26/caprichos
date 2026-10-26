@@ -432,8 +432,14 @@ export function AdminShell() {
                     <button
                       type="button"
                       onClick={() => {
-                        const m = MODULOS.find((x) => x.clave === n.modulo);
-                        if (m) ir(m.ruta);
+                        if (n.ruta) {
+                          ir(n.ruta);
+                        } else if (n.modulo === 'compras') {
+                          ir('/admin/compras?tab=pedir');
+                        } else {
+                          const m = MODULOS.find((x) => x.clave === n.modulo);
+                          if (m) ir(m.ruta);
+                        }
                         setCampanaAbierta(false);
                       }}
                       style={{ minHeight: 44, padding: '0 14px', border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'transparent', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 13 }}

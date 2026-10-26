@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSesion } from '../../comun/sesion';
 import { api } from '../../comun/api';
+import { useNotificaciones } from '../useNotificaciones';
 
 interface ResumenApi {
   kpisS?: { n: string; v: string; dTxt?: string; dCol?: string }[];
@@ -39,9 +40,14 @@ export function EscritorioView() {
   const { usuario, tiene } = useSesion();
   const puedeVerInformes = tiene('informes/ver');
   const navigate = useNavigate();
+  const resumen = useNotificaciones();
 
   const rolCodigo = (usuario?.rol || 'ADMIN').toUpperCase();
   const esAdmin = rolCodigo === 'ADMIN';
+  const puedeCompras = tiene('compras/ver') || tiene('stock/ver') || esAdmin;
+  const notifStockBajo = puedeCompras
+    ? resumen?.notificaciones?.find((n) => n.id === 'stock-bajo')
+    : null;
 
   // Nombres y cargos
   const nombreUsuario = usuario?.nombres || (esAdmin ? 'Kevin Rosales' : 'Personal');
@@ -284,6 +290,68 @@ export function EscritorioView() {
           ? `Hola, ${nombreUsuario}. Este es tu escritorio de Administrador.`
           : `Hola, ${nombreUsuario}. Este es tu escritorio de ${rolEtiqueta}: solo muestra lo que corresponde a tu rol.`}
       </div>
+
+      {/* Aviso de stock bajo para roles con permiso de compras */}
+      {notifStockBajo && (
+        <div
+          role="alert"
+          style={{
+            background: 'rgb(253, 236, 232)',
+            border: '1.5px solid var(--cp-rust)',
+            borderRadius: '12px',
+            padding: '12px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="var(--cp-rust)"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+            <div>
+              <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '14px', color: 'var(--cp-rust)' }}>
+                {notifStockBajo.titulo}
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--cp-navy)' }}>
+                {notifStockBajo.detalle}
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/admin/compras?tab=pedir')}
+            style={{
+              minHeight: '40px',
+              padding: '0 16px',
+              border: 0,
+              borderRadius: '10px',
+              background: 'var(--cp-rust)',
+              color: 'var(--cp-white)',
+              fontFamily: 'Montserrat, sans-serif',
+              fontWeight: 800,
+              fontSize: '13px',
+              cursor: 'pointer',
+            }}
+          >
+            Pedir al proveedor
+          </button>
+        </div>
+      )}
 
       {esAdmin ? (
         <>

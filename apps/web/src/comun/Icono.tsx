@@ -36,6 +36,8 @@ export const TRAZOS_ICONOS: Record<string, string> = {
     'M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z M3.27 6.96L12 12.01l8.73-5.05 M12 22.08V12',
   stock:
     'M12 2L2 7l10 5 10-5-10-5z M2 17l10 5 10-5 M2 12l10 5 10-5',
+  recetas:
+    'M4 19.5A2.5 2.5 0 0 1 6.5 17H20 M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z M8 6h8 M8 10h6',
   informes: 'M18 20V10 M12 20V4 M6 20v-6',
   indicadores: 'M22 12h-4l-3 9L9 3l-3 9H2',
   mirest:

@@ -11,6 +11,7 @@ import { CierreView } from './cierre';
 import { ComprobantesView, ReclamosAdminView } from './comprobantes';
 import { PlanoView, ReservasView } from './salon';
 import { StockView } from './stock';
+import { RecetasView } from './recetas';
 import { ProductosView, ListasCategoriasView } from './catalogo';
 import { ClientesAdminView } from './clientes';
 import { OfertasAdminView } from './ofertas';
@@ -227,6 +228,15 @@ export const MODULOS: DefinicionModulo[] = [
     permisoMinimo: 'stock/ver',
     componente: StockView,
     icono: 'stock',
+  },
+  {
+    clave: 'recetas',
+    nombre: 'Recetas',
+    grupo: 'Compras y stock',
+    ruta: '/admin/recetas',
+    permisoMinimo: 'stock/ver',
+    componente: RecetasView,
+    icono: 'recetas',
   },
 
   // --- Análisis ---

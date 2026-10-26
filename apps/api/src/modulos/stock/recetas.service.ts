@@ -50,9 +50,6 @@ export class RecetasService {
           },
         },
         recetas: {
-          where: {
-            es_produccion: false,
-          },
           include: {
             lineas: {
               include: {
@@ -74,6 +71,14 @@ export class RecetasService {
       if (!tieneReceta) {
         platosSinMargen++;
       }
+
+      // Identificar tipo de receta: 'PRODUCCION' o 'VENTA'
+      const recetaProd = prod.recetas.find((r) => r.es_produccion && r.lineas.length > 0);
+      const recetaVenta = prod.recetas.find((r) => !r.es_produccion && r.lineas.length > 0);
+      const recetaActiva = recetaProd || recetaVenta || prod.recetas[0];
+      const esProduccion = Boolean(recetaProd && (!recetaVenta || recetaProd === recetaActiva));
+      const tipoReceta = tieneReceta ? (esProduccion ? 'PRODUCCION' : 'VENTA') : 'NINGUNA';
+      const rinde = recetaActiva?.rinde ? Number(recetaActiva.rinde) : null;
 
       // Tomamos el primer tamaño o el tamaño por defecto para el resumen en la lista
       const primerTamano = prod.tamanos[0];
@@ -97,7 +102,11 @@ export class RecetasService {
             const costoUnitReceta = costoUnitAlmacen / factor;
             suma += Number(l.cantidad) * costoUnitReceta;
           }
-          costoTotal = suma;
+          if (recetaTamano.es_produccion && recetaTamano.rinde && Number(recetaTamano.rinde) > 0) {
+            costoTotal = suma / Number(recetaTamano.rinde);
+          } else {
+            costoTotal = suma;
+          }
         }
       }
 
@@ -112,6 +121,9 @@ export class RecetasService {
         categoriaId: prod.categoria_id?.toString() ?? null,
         categoriaNombre: prod.categoria?.nombre ?? null,
         tieneReceta,
+        esProduccion,
+        tipoReceta,
+        rinde,
         precio: precioVenta,
         costo,
         margenSoles,
@@ -147,9 +159,6 @@ export class RecetasService {
           },
         },
         recetas: {
-          where: {
-            es_produccion: false,
-          },
           include: {
             lineas: {
               include: {
@@ -169,8 +178,14 @@ export class RecetasService {
     }
 
     const tieneReceta = producto.recetas.some((r) => r.lineas.length > 0);
+    const recetaProd = producto.recetas.find((r) => r.es_produccion && r.lineas.length > 0);
+    const recetaVenta = producto.recetas.find((r) => !r.es_produccion && r.lineas.length > 0);
+    const recetaActiva = recetaProd || recetaVenta || producto.recetas[0];
+    const esProduccion = Boolean(recetaProd && (!recetaVenta || recetaProd === recetaActiva));
+    const tipoReceta = tieneReceta ? (esProduccion ? 'PRODUCCION' : 'VENTA') : 'NINGUNA';
+    const rinde = recetaActiva?.rinde ? Number(recetaActiva.rinde) : null;
 
-    const recetaGeneral = producto.recetas.find((r) => r.tamano_valor_id === null);
+    const recetaGeneral = producto.recetas.find((r) => r.tamano_valor_id === null) || producto.recetas[0];
 
     const tamanos = producto.tamanos.map((pt) => {
       const receta =
@@ -199,7 +214,11 @@ export class RecetasService {
             subtotalCosto: Math.round(subtotal * 100) / 100,
           });
         }
-        costoTotal = suma;
+        if (receta.es_produccion && receta.rinde && Number(receta.rinde) > 0) {
+          costoTotal = suma / Number(receta.rinde);
+        } else {
+          costoTotal = suma;
+        }
       }
 
       const precio = Number(pt.precio);
@@ -225,6 +244,9 @@ export class RecetasService {
       productoNombre: producto.nombre,
       categoria: producto.categoria?.nombre ?? null,
       tieneReceta,
+      esProduccion,
+      tipoReceta,
+      rinde,
       tamanos,
     };
   }
@@ -263,7 +285,6 @@ export class RecetasService {
       where: {
         producto_id: id,
         tamano_valor_id: tamanoValorId,
-        es_produccion: esProduccion,
       },
       include: {
         lineas: true,
@@ -281,14 +302,30 @@ export class RecetasService {
       });
 
       if (!rec) {
-        rec = await tx.receta.create({
-          data: {
+        const recExistente = await tx.receta.findFirst({
+          where: {
             producto_id: id,
             tamano_valor_id: tamanoValorId,
-            es_produccion: esProduccion,
-            rinde: dto.rinde != null ? new Prisma.Decimal(dto.rinde) : null,
           },
         });
+        if (recExistente) {
+          rec = await tx.receta.update({
+            where: { id: recExistente.id },
+            data: {
+              es_produccion: esProduccion,
+              rinde: dto.rinde != null ? new Prisma.Decimal(dto.rinde) : null,
+            },
+          });
+        } else {
+          rec = await tx.receta.create({
+            data: {
+              producto_id: id,
+              tamano_valor_id: tamanoValorId,
+              es_produccion: esProduccion,
+              rinde: dto.rinde != null ? new Prisma.Decimal(dto.rinde) : null,
+            },
+          });
+        }
       } else {
         rec = await tx.receta.update({
           where: { id: rec.id },

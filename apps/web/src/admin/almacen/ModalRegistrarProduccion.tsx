@@ -15,8 +15,7 @@ export const ModalRegistrarProduccion: React.FC<ModalRegistrarProduccionProps> =
 }) => {
   const [recetas, setRecetas] = useState<RecetaProduccionItem[]>([]);
   const [recetaId, setRecetaId] = useState('');
-  const [tandas, setTandas] = useState('1');
-  const [unidadesReales, setUnidadesReales] = useState('');
+  const [unidades, setUnidades] = useState('');
   const [cargando, setCargando] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [confirmarAbierto, setConfirmarAbierto] = useState(false);
@@ -25,8 +24,7 @@ export const ModalRegistrarProduccion: React.FC<ModalRegistrarProduccionProps> =
     if (abierto) {
       setCargando(true);
       setErrorMsg('');
-      setTandas('1');
-      setUnidadesReales('');
+      setUnidades('');
       setConfirmarAbierto(false);
       almacenApi
         .listarRecetasProduccion()
@@ -46,8 +44,29 @@ export const ModalRegistrarProduccion: React.FC<ModalRegistrarProduccionProps> =
   if (!abierto) return null;
 
   const recetaSel = recetas.find((r) => r.id === recetaId);
-  const tandasNum = parseFloat(tandas) || 0;
-  const unidadesEstimadas = recetaSel ? Math.round(recetaSel.rindePorTanda * tandasNum) : 0;
+  const unidadesNum = parseFloat(unidades) || 0;
+  const rinde = (recetaSel?.rindePorTanda || 1);
+  const factor = rinde > 0 ? unidadesNum / rinde : 0;
+
+  // Cálculo de insumos consumidos en vivo
+  const insumosCalculados = (recetaSel?.insumos || []).map((ins) => {
+    const cantBase = ins.cantidadPorTanda || 0;
+    const gasto = Math.round(cantBase * factor * 1000) / 1000;
+    const stockCocina = ins.stockCocina ?? 0;
+    const falta = gasto > stockCocina;
+    return {
+      ...ins,
+      gasto,
+      stockCocina,
+      falta,
+    };
+  });
+
+  const hayStockInsuficiente = insumosCalculados.some((i) => i.falta);
+
+  const lineaVivaInsumos = insumosCalculados.length > 0 && unidadesNum > 0
+    ? insumosCalculados.map((i) => `${i.gasto} ${i.unidad} de ${i.nombre}`).join(', ')
+    : '';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,8 +74,8 @@ export const ModalRegistrarProduccion: React.FC<ModalRegistrarProduccionProps> =
       setErrorMsg('Debe seleccionar una receta.');
       return;
     }
-    if (tandasNum <= 0) {
-      setErrorMsg('El número de tandas debe ser mayor a 0.');
+    if (unidadesNum <= 0) {
+      setErrorMsg('Escriba cuántas unidades salieron (mayor a 0).');
       return;
     }
     setErrorMsg('');
@@ -66,8 +85,8 @@ export const ModalRegistrarProduccion: React.FC<ModalRegistrarProduccionProps> =
   const ejecutarGuardar = async () => {
     const dto: RegistrarProduccionDto = {
       recetaId,
-      tandas: tandasNum,
-      unidadesReales: unidadesReales ? parseFloat(unidadesReales) : undefined,
+      unidadesObtenidas: unidadesNum,
+      tandas: factor,
     };
 
     try {
@@ -99,7 +118,7 @@ export const ModalRegistrarProduccion: React.FC<ModalRegistrarProduccionProps> =
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Registrar producción del día"
+        aria-label="Hoy preparé..."
         style={{
           position: 'fixed',
           zIndex: 60,
@@ -130,10 +149,10 @@ export const ModalRegistrarProduccion: React.FC<ModalRegistrarProduccionProps> =
                 fontSize: 18,
               }}
             >
-              Registrar producción del día
+              Hoy preparé...
             </h2>
-            <div style={{ fontSize: 12, color: 'var(--cp-soft)' }}>
-              La producción entra al almacén y descuenta insumos de cocina o almacén (acta 02).
+            <div style={{ fontSize: 12, color: 'var(--cp-soft)', marginTop: 2 }}>
+              Los insumos que se gastan se descuentan de cocina; lo que preparaste suma al stock de cocina.
             </div>
           </div>
           <button
@@ -148,6 +167,24 @@ export const ModalRegistrarProduccion: React.FC<ModalRegistrarProduccionProps> =
           >
             ✕
           </button>
+        </div>
+
+        <div
+          style={{
+            padding: '8px 12px',
+            borderRadius: 8,
+            background: 'var(--cp-cream)',
+            borderLeft: '4px solid var(--cp-blue, #2563eb)',
+            fontSize: 12,
+            fontWeight: 600,
+            color: 'var(--cp-navy)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <span>Se descuenta de: <strong>Cocina</strong></span>
+          <span style={{ fontSize: 11, color: 'var(--cp-soft)' }}>Ingresa a: <strong>Cocina</strong></span>
         </div>
 
         {errorMsg && (
@@ -168,17 +205,18 @@ export const ModalRegistrarProduccion: React.FC<ModalRegistrarProduccionProps> =
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {/* Receta */}
           <div>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
-              Receta de producción
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 6 }}>
+              Producto elaborado (se prepara por tanda)
             </label>
             {recetas.length === 0 ? (
               <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
-                No hay recetas configuradas con producción en lote.
+                No hay recetas configuradas de tipo "Se prepara por tanda".
               </div>
             ) : (
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {recetas.map((r) => {
                   const sel = r.id === recetaId;
+                  const rindeTexto = r.rindePorTanda;
                   return (
                     <button
                       key={r.id}
@@ -196,7 +234,7 @@ export const ModalRegistrarProduccion: React.FC<ModalRegistrarProduccionProps> =
                         cursor: 'pointer',
                       }}
                     >
-                      {r.nombre} ({r.rindePorTanda} {r.unidadResultado}/tanda)
+                      {r.nombre} ({rindeTexto} {r.unidadResultado || 'und'}/tanda)
                     </button>
                   );
                 })}
@@ -204,56 +242,35 @@ export const ModalRegistrarProduccion: React.FC<ModalRegistrarProduccionProps> =
             )}
           </div>
 
-          {/* Tandas */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
-                Número de tandas
-              </label>
-              <input
-                type="number"
-                step="0.5"
-                min="0.5"
-                value={tandas}
-                onChange={(e) => setTandas(e.target.value)}
-                style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  minHeight: 40,
-                  borderRadius: 8,
-                  border: '1.5px solid var(--cp-line)',
-                  padding: '0 10px',
-                  background: 'var(--cp-cream)',
-                  fontSize: 14,
-                }}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
-                Unidades reales obtenidas (opcional)
-              </label>
-              <input
-                type="number"
-                placeholder={`Sugerido: ${unidadesEstimadas}`}
-                value={unidadesReales}
-                onChange={(e) => setUnidadesReales(e.target.value)}
-                style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  minHeight: 40,
-                  borderRadius: 8,
-                  border: '1.5px solid var(--cp-line)',
-                  padding: '0 10px',
-                  background: 'var(--cp-cream)',
-                  fontSize: 14,
-                }}
-              />
-            </div>
+          {/* Cuántas unidades salieron */}
+          <div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+              Cuántas unidades salieron
+            </label>
+            <input
+              type="number"
+              step="any"
+              min="0.1"
+              placeholder="Ej: 12"
+              value={unidades}
+              onChange={(e) => setUnidades(e.target.value)}
+              required
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                minHeight: 42,
+                borderRadius: 8,
+                border: '1.5px solid var(--cp-line)',
+                padding: '0 12px',
+                background: 'var(--cp-cream)',
+                fontSize: 15,
+                fontWeight: 600,
+              }}
+            />
           </div>
 
-          {/* Resumen de producción calculada */}
-          {recetaSel && (
+          {/* Línea viva de cálculo */}
+          {recetaSel && unidadesNum > 0 && (
             <div
               style={{
                 background: 'var(--cp-cream)',
@@ -262,33 +279,47 @@ export const ModalRegistrarProduccion: React.FC<ModalRegistrarProduccionProps> =
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 8,
+                border: '1px solid var(--cp-line)',
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 12, color: 'var(--cp-soft)' }}>Resultado de producción:</span>
-                <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 16 }}>
-                  {unidadesReales ? unidadesReales : unidadesEstimadas} {recetaSel.unidadResultado}
-                </span>
+              <div style={{ fontSize: 13, color: 'var(--cp-navy)', fontWeight: 600 }}>
+                Se gastará de cocina: {lineaVivaInsumos}
               </div>
 
-              {recetaSel.insumos.length > 0 && (
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, marginTop: 4, marginBottom: 4 }}>
-                    Insumos a descontar automáticamente:
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
-                    {recetaSel.insumos.map((ins) => {
-                      const cantTotal = Math.round(ins.cantidadPorTanda * tandasNum * 100) / 100;
-                      return (
-                        <div key={ins.insumoId} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span>• {ins.nombre}:</span>
-                          <b>
-                            {cantTotal} {ins.unidad} (Stock disponible: {ins.stockCocina + ins.stockAlmacen} {ins.unidad})
-                          </b>
-                        </div>
-                      );
-                    })}
-                  </div>
+              {insumosCalculados.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
+                  {insumosCalculados.map((ins) => (
+                    <div
+                      key={ins.insumoId}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        fontSize: 12,
+                        color: ins.falta ? 'var(--cp-rust)' : 'var(--cp-navy)',
+                      }}
+                    >
+                      <span>
+                        • {ins.nombre}: {ins.gasto} {ins.unidad}
+                      </span>
+                      <span>
+                        (Cocina disponible: {ins.stockCocina} {ins.unidad})
+                        {ins.falta && ' - Insuficiente'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {hayStockInsuficiente && (
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: 'var(--cp-rust)',
+                    fontWeight: 700,
+                    marginTop: 4,
+                  }}
+                >
+                  Atención: No hay suficiente stock en Cocina para completar esta cantidad.
                 </div>
               )}
             </div>
@@ -324,7 +355,7 @@ export const ModalRegistrarProduccion: React.FC<ModalRegistrarProduccionProps> =
             </button>
             <button
               type="submit"
-              disabled={cargando || recetas.length === 0}
+              disabled={cargando || recetas.length === 0 || unidadesNum <= 0}
               style={{
                 minHeight: 44,
                 padding: '0 20px',
@@ -335,8 +366,8 @@ export const ModalRegistrarProduccion: React.FC<ModalRegistrarProduccionProps> =
                 fontFamily: 'Montserrat, sans-serif',
                 fontWeight: 800,
                 fontSize: 14,
-                cursor: cargando || recetas.length === 0 ? 'not-allowed' : 'pointer',
-                opacity: cargando || recetas.length === 0 ? 0.7 : 1,
+                cursor: cargando || recetas.length === 0 || unidadesNum <= 0 ? 'not-allowed' : 'pointer',
+                opacity: cargando || recetas.length === 0 || unidadesNum <= 0 ? 0.7 : 1,
               }}
             >
               {cargando ? 'Registrando...' : 'Registrar producción'}
@@ -349,7 +380,7 @@ export const ModalRegistrarProduccion: React.FC<ModalRegistrarProduccionProps> =
         <Confirmar
           abierto={confirmarAbierto}
           titulo="¿Confirmar producción del día?"
-          mensaje={`Se consumirá materia prima y se añadirán ${unidadesReales || unidadesEstimadas} unidades de ${recetaSel?.productoNombre || 'producto'}.`}
+          mensaje={`Se prepararon ${unidadesNum} unidades de ${recetaSel?.nombre || 'producto'}. Se descontará materia prima de Cocina y sumará al stock de Cocina.`}
           textoConfirmar="Sí, registrar producción"
           alConfirmar={ejecutarGuardar}
           alCancelar={() => setConfirmarAbierto(false)}

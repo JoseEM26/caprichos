@@ -50,8 +50,21 @@ describe('AlmacenService', () => {
         findFirst: jest.fn(),
       },
       lugarStock: {
-        findFirst: jest.fn().mockResolvedValue({ id: 10n, nombre: 'Almacén Principal' }),
-        findUnique: jest.fn().mockResolvedValue({ id: 10n, nombre: 'Almacén Principal' }),
+        findFirst: jest.fn().mockImplementation(async (args: any) => {
+          if (args?.where?.nombre?.contains && /cocina/i.test(args.where.nombre.contains)) {
+            return { id: 11n, nombre: 'Cocina' };
+          }
+          return { id: 10n, nombre: 'Almacén Principal' };
+        }),
+        findUnique: jest.fn().mockImplementation(async (args: any) => {
+          if (args?.where?.nombre && /cocina/i.test(args.where.nombre)) {
+            return { id: 11n, nombre: 'Cocina' };
+          }
+          if (args?.where?.id === 11n) {
+            return { id: 11n, nombre: 'Cocina' };
+          }
+          return { id: 10n, nombre: 'Almacén central' };
+        }),
         findMany: jest.fn(),
         create: jest.fn(),
       },
@@ -85,6 +98,8 @@ describe('AlmacenService', () => {
       },
       produccion: {
         create: jest.fn().mockResolvedValue({ id: 99n, documento: 'PROD-0001' }),
+        findUnique: jest.fn(),
+        update: jest.fn(),
       },
       producto: {
         findUnique: jest.fn(),
@@ -116,44 +131,24 @@ describe('AlmacenService', () => {
   });
 
   describe('registrarMovimiento', () => {
-    it('debe registrar entrada sumando al stock', async () => {
-      prisma.insumo.findUnique.mockResolvedValue({ id: 1n, nombre: 'Harina', unidad_almacen: 'KG' });
-      prisma.lugarStock.findFirst.mockResolvedValue({ id: 10n, nombre: 'Almacén Principal' });
-      prisma.stock.findFirst.mockResolvedValue({
-        id: 5n,
-        insumo_id: 1n,
-        lugar_id: 10n,
-        cantidad: new Prisma.Decimal('20.00'),
-      });
-      prisma.movimientoStock.create.mockResolvedValue({
-        id: 100n,
-        insumo_id: 1n,
-        lugar_id: 10n,
-        tipo: 'ENTRADA',
-        cantidad: new Prisma.Decimal('10.00'),
-        creado_en: new Date(),
-        insumo: { id: 1n, nombre: 'Harina', unidad_almacen: 'KG' },
-        lugar: { id: 10n, nombre: 'Almacén Principal' },
-      });
-
-      const res = await service.registrarMovimiento(
-        {
-          insumoId: 1,
-          tipo: 'ENTRADA',
-          cantidad: 10,
-          origen: 'ALMACEN',
-          motivo: 'Compra menor local',
+    it('debe rechazar ENTRADA manual con 409 ConflictException indicando que los ingresos van por Compras', async () => {
+      await expect(
+        service.registrarMovimiento(
+          {
+            insumoId: 1,
+            tipo: 'ENTRADA',
+            cantidad: 10,
+            origen: 'ALMACEN',
+            motivo: 'Compra menor local',
+          } as any,
+          mockUsuario,
+        ),
+      ).rejects.toMatchObject({
+        response: {
+          codigo: 'INGRESO_SOLO_COMPRAS',
+          mensaje: 'Los ingresos se registran en Compras',
         },
-        mockUsuario,
-      );
-
-      expect(res).toHaveProperty('id', '100');
-      expect(prisma.stock.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: 5n },
-          data: { cantidad: { increment: expect.anything() } },
-        }),
-      );
+      });
     });
 
     it('debe rechazar salida si el stock es insuficiente', async () => {
@@ -370,7 +365,12 @@ describe('AlmacenService', () => {
           },
         ],
       });
-      prisma.lugarStock.findFirst.mockResolvedValue({ id: 11n, nombre: 'Cocina' });
+      prisma.lugarStock.findFirst.mockImplementation(async (args: any) => {
+        if (args?.where?.nombre?.contains === 'Cocina') {
+          return { id: 11n, nombre: 'Cocina' };
+        }
+        return { id: 10n, nombre: 'Almacén central' };
+      });
       prisma.stock.findFirst.mockResolvedValue({
         id: 20n,
         insumo_id: 1n,
@@ -394,6 +394,154 @@ describe('AlmacenService', () => {
           data: expect.objectContaining({
             tipo: 'PRODUCCION_CONSUMO',
           }),
+        }),
+      );
+    });
+
+    it('permite registrar producción por unidades con cálculo decimal exacto descontando de Cocina', async () => {
+      prisma.receta.findUnique.mockResolvedValue({
+        id: 1n,
+        rinde: new Prisma.Decimal('10'),
+        es_produccion: true,
+        producto_id: 5n,
+        producto: { id: 5n, nombre: 'Alfajores' },
+        lineas: [
+          {
+            insumo_id: 1n,
+            cantidad: new Prisma.Decimal('0.5'), // 0.5 kg por cada 10 alfajores
+            insumo: { id: 1n, nombre: 'Maicena', unidad_almacen: 'KG' },
+          },
+        ],
+      });
+      prisma.lugarStock.findFirst.mockImplementation(async (args: any) => {
+        if (args?.where?.nombre?.contains === 'Cocina') {
+          return { id: 11n, nombre: 'Cocina' };
+        }
+        return { id: 10n, nombre: 'Almacén central' };
+      });
+      prisma.stock.findFirst.mockResolvedValue({
+        id: 20n,
+        insumo_id: 1n,
+        lugar_id: 11n,
+        cantidad: new Prisma.Decimal('5.0'),
+      });
+      prisma.produccion.create.mockResolvedValue({ id: 101n });
+      prisma.movimientoStock.create.mockResolvedValue({ id: 201n });
+
+      // Preparó 15 unidades: factor = 15 / 10 = 1.5; gasto = 1.5 * 0.5 = 0.75 kg
+      const res = await service.registrarProduccion(
+        {
+          recetaId: 1,
+          unidadesObtenidas: 15,
+        },
+        mockUsuario,
+      );
+
+      expect(res.unidades).toBe(15);
+      expect(prisma.stock.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { insumo_id: 1n, lugar_id: 11n },
+          data: { cantidad: { decrement: new Prisma.Decimal(0.75) } },
+        }),
+      );
+      expect(prisma.movimientoStock.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            tipo: 'PRODUCCION_CONSUMO',
+            cantidad: new Prisma.Decimal(-0.75),
+            lugar_id: 11n,
+          }),
+        }),
+      );
+    });
+
+    it('rechaza registrar producción si no hay suficiente stock en Cocina', async () => {
+      prisma.receta.findUnique.mockResolvedValue({
+        id: 1n,
+        rinde: new Prisma.Decimal('10'),
+        es_produccion: true,
+        producto_id: 5n,
+        producto: { id: 5n, nombre: 'Alfajores' },
+        lineas: [
+          {
+            insumo_id: 1n,
+            cantidad: new Prisma.Decimal('1.0'),
+            insumo: { id: 1n, nombre: 'Harina', unidad_almacen: 'KG' },
+          },
+        ],
+      });
+      prisma.lugarStock.findFirst.mockImplementation(async (args: any) => {
+        if (args?.where?.nombre?.contains === 'Cocina') {
+          return { id: 11n, nombre: 'Cocina' };
+        }
+        return { id: 10n, nombre: 'Almacén central' };
+      });
+      // Solo hay 0.2 kg en Cocina
+      prisma.stock.findFirst.mockResolvedValue({
+        id: 20n,
+        insumo_id: 1n,
+        lugar_id: 11n,
+        cantidad: new Prisma.Decimal('0.2'),
+      });
+
+      await expect(
+        service.registrarProduccion(
+          {
+            recetaId: 1,
+            unidadesObtenidas: 20, // Requiere 2.0 kg
+          },
+          mockUsuario,
+        ),
+      ).rejects.toMatchObject({
+        response: {
+          codigo: 'STOCK_MATERIA_PRIMA_INSUFICIENTE',
+        },
+      });
+    });
+
+    it('anularProduccion revierte exactamente las unidades y los insumos en Cocina', async () => {
+      prisma.produccion.findUnique.mockResolvedValue({
+        id: 101n,
+        anulado_en: null,
+        unidades: new Prisma.Decimal('15'),
+        tandas: new Prisma.Decimal('1.5'),
+        receta: {
+          id: 1n,
+          rinde: new Prisma.Decimal('10'),
+          producto_id: 5n,
+          producto: { id: 5n, nombre: 'Alfajores' },
+          lineas: [
+            {
+              insumo_id: 1n,
+              cantidad: new Prisma.Decimal('0.5'),
+              insumo: { id: 1n, nombre: 'Maicena', unidad_almacen: 'KG' },
+            },
+          ],
+        },
+      });
+      prisma.produccion.update.mockResolvedValue({ id: 101n, anulado_en: new Date() });
+      prisma.movimientoStock.create.mockResolvedValue({ id: 301n });
+
+      const res = await service.anularProduccion(
+        101,
+        'Error de lote',
+        mockUsuario,
+        undefined,
+      );
+
+      expect(res.ok).toBe(true);
+      // Revertir producto en Cocina
+      expect(prisma.stock.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { producto_id: 5n, lugar_id: 11n },
+          data: { cantidad: { decrement: new Prisma.Decimal(15) } },
+        }),
+      );
+      // Devolver insumos en Cocina (1.5 * 0.5 = 0.75)
+      expect(prisma.stock.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { insumo_id: 1n, lugar_id: 11n },
+          data: { cantidad: { increment: new Prisma.Decimal(0.75) } },
         }),
       );
     });

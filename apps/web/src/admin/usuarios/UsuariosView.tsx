@@ -27,6 +27,7 @@ const MODULOS_MATRIZ = [
   { id: 'comprobantes', n: 'Comprobantes', roles: ['cajero'] },
   { id: 'clientes', n: 'Clientes', roles: ['cajero', 'callcenter'] },
   { id: 'stock', n: 'Stock y recetas', roles: ['cocina', 'almacen', 'produccion'] },
+  { id: 'recetas', n: 'Recetas', roles: ['cocina', 'almacen', 'produccion'] },
   { id: 'almacen', n: 'Almacén', roles: ['almacen', 'produccion'] },
   { id: 'compras', n: 'Compras', roles: ['almacen'] },
 ];

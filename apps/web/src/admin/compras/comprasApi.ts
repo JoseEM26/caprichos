@@ -132,6 +132,30 @@ export interface CrearCompraDto {
   }>;
 }
 
+export interface CompraRapidaDto {
+  insumoId: string | number;
+  cantidad: number;
+  costoTotal: number;
+  medioPago: string;
+  nota?: string;
+}
+
+export interface RecibirPedidoLineaDto {
+  insumoId: string | number;
+  recibido: number;
+  costoUnit: number;
+}
+
+export interface RecibirPedidoDto {
+  comprobanteTipo: string;
+  comprobanteNumero: string;
+  condicion: 'CONTADO' | 'CREDITO';
+  diasCredito?: number;
+  fechaCompra?: string;
+  nota?: string;
+  lineas: RecibirPedidoLineaDto[];
+}
+
 export const comprasApi = {
   obtenerResumen: () =>
     api.get<ComprasResumen>('/admin/compras/resumen'),
@@ -151,8 +175,26 @@ export const comprasApi = {
   obtenerHistorialProveedor: (id: string) =>
     api.get<{ compras: CompraItem[]; totalCompras: number }>(`/admin/compras/proveedores/${id}/historial`),
 
-  listarInsumosParaPedir: (incluirRegulares = false) =>
-    api.get<InsumoParaPedir[]>(`/admin/compras/insumos-para-pedir?incluirRegulares=${incluirRegulares}`),
+  listarInsumosParaPedir: async (incluirRegulares = false): Promise<InsumoParaPedir[]> => {
+    const raw = await api.get<any[]>(`/admin/compras/insumos-para-pedir?incluirRegulares=${incluirRegulares}`);
+    if (!Array.isArray(raw)) return [];
+    return raw.map((i) => ({
+      id: String(i.id),
+      nombre: i.nombre,
+      unidadAlmacen: i.unidadAlmacen || 'KG',
+      unidadCompra: i.unidadCompra || i.unidadAlmacen || 'BOLSA',
+      factorConversion: Number(i.factorCompra) || 1,
+      costoUnitario: Number(i.costoUnitario || i.costoUnit || 0),
+      stockActual: Number(i.stockActual) || 0,
+      stockMinimo: Number(i.minimo ?? i.stockMinimo ?? 0),
+      stockIdeal: Number(i.maximo ?? i.stockIdeal ?? 0),
+      cantidadSugerida: Number(i.sugeridoCompra ?? i.cantidadSugerida ?? 0),
+      proveedorId: i.proveedorA?.id ? String(i.proveedorA.id) : undefined,
+      proveedorNombre: i.proveedorA?.nombre || undefined,
+      proveedorTelefono: i.proveedorA?.telefono || undefined,
+      estadoStock: i.nivel || (i.stockActual <= (i.minimo || 0) ? 'BAJO' : 'REGULAR'),
+    }));
+  },
 
   crearPedidoProveedor: (dto: CrearPedidoProveedorDto) =>
     api.post<{ id: string; estado: string; enviadoEn: string | null }>('/admin/compras/pedidos-proveedor', dto),
@@ -214,8 +256,18 @@ export const comprasApi = {
   registrarCompra: (dto: CrearCompraDto) =>
     api.post<CompraItem>('/admin/compras', dto),
 
-  recibirPedido: (pedidoId: string, dto?: { comprobanteTipo?: string; comprobanteNumero?: string; montoTotal?: number }) =>
-    api.post<{ ok: boolean; compraId: string }>(`/admin/compras/pedidos-proveedor/${pedidoId}/recibir`, dto || {}),
+  registrarCompraRapida: (dto: CompraRapidaDto) =>
+    api.post<{ ok: boolean; id: string; movimientoId: string; nuevoStock: number }>('/admin/compras/compra-rapida', dto),
+
+  listarInsumos: async () => {
+    return api.get<any[]>('/admin/stock/insumos');
+  },
+
+  recibirPedido: (pedidoId: string, dto: RecibirPedidoDto) =>
+    api.post<{ ok: boolean; id?: string; comprobanteTipo?: string; comprobanteNumero?: string }>(
+      `/admin/compras/recibir-pedido/${pedidoId}`,
+      dto,
+    ),
 
   marcarPagada: (compraId: string) =>
     api.patch<{ ok: boolean; estadoPago: string }>(`/admin/compras/${compraId}/pagar`),

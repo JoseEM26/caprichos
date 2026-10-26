@@ -4,7 +4,7 @@ import { Confirmar } from '../../comun/Confirmar';
 
 interface ModalMovimientoProps {
   insumoInicial?: InsumoItem | null;
-  tipoInicial?: 'ENTRADA' | 'SALIDA' | 'MERMA' | 'DEVOLUCION' | 'TRASLADO' | 'AJUSTE';
+  tipoInicial?: 'SALIDA' | 'MERMA' | 'DEVOLUCION' | 'TRASLADO' | 'AJUSTE';
   insumos: InsumoItem[];
   lugares: LugarStockItem[];
   alCerrar: () => void;
@@ -13,13 +13,13 @@ interface ModalMovimientoProps {
 
 export function ModalMovimiento({
   insumoInicial,
-  tipoInicial = 'ENTRADA',
+  tipoInicial = 'SALIDA',
   insumos,
   lugares,
   alCerrar,
   alGuardar,
 }: ModalMovimientoProps) {
-  const [tipo, setTipo] = useState<'ENTRADA' | 'SALIDA' | 'MERMA' | 'DEVOLUCION' | 'TRASLADO' | 'AJUSTE'>(tipoInicial);
+  const [tipo, setTipo] = useState<'SALIDA' | 'MERMA' | 'DEVOLUCION' | 'TRASLADO' | 'AJUSTE'>(tipoInicial);
   const [insumoId, setInsumoId] = useState(insumoInicial ? insumoInicial.id : insumos[0]?.id || '');
   const [cantidad, setCantidad] = useState('1');
 
@@ -38,7 +38,6 @@ export function ModalMovimiento({
   const insumoSeleccionado = insumos.find((i) => i.id === insumoId);
 
   const tiposMovimiento = [
-    { id: 'ENTRADA', label: 'Entrada' },
     { id: 'SALIDA', label: 'Salida' },
     { id: 'MERMA', label: 'Merma' },
     { id: 'DEVOLUCION', label: 'Devolución' },

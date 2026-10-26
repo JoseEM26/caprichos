@@ -74,7 +74,8 @@ export interface RegistrarMovimientoDto {
 
 export interface RegistrarProduccionDto {
   recetaId: string | number;
-  tandas: number;
+  unidadesObtenidas?: number;
+  tandas?: number;
   unidadesReales?: number;
 }
 

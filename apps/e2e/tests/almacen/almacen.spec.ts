@@ -17,10 +17,11 @@ test.describe('Suite E2E - Módulo de Almacén y Stock', () => {
   test.beforeEach(() => {
     limpiarRedisSupervisor();
   });
-  test('(1) ALMACEN registra ingreso de un insumo: stock almacén sube y queda movimiento con quien y cuando', async ({
+  test('(1) Ingreso de insumos va por Compras (compra rápida): Almacén no tiene Entrada y 409 en API', async ({
     page,
   }) => {
     const prisma = obtenerPrismaTest();
+    const apiBaseUrl = process.env.API_BASE_URL || `http://127.0.0.1:${3100 + Number(process.env.E2E_SLOT || 0)}`;
 
     // 1. Obtener usuario de Almacén y su partyId
     const dniAlmacen = obtenerDniRol('ALMACEN');
@@ -38,56 +39,69 @@ test.describe('Suite E2E - Módulo de Almacén y Stock', () => {
     // 3. Iniciar sesión por UI con el rol ALMACEN
     await loginPorUi(page, 'ALMACEN');
 
-    // 4. Navegar al módulo de Almacén
+    // 4. Navegar a Almacén: verificar que ENTRADA manual NO existe en el modal de Almacén
     await page.goto('/admin/almacen', { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('button', { name: 'Registrar movimiento' })).toBeVisible({
       timeout: 10000,
     });
 
-    // 5. Abrir el modal de registro de movimiento
     await page.getByRole('button', { name: 'Registrar movimiento' }).click();
-
     const dialogMov = page.getByRole('dialog', { name: 'Registrar movimiento de almacén' });
     await expect(dialogMov).toBeVisible({ timeout: 5000 });
 
-    // 6. Seleccionar Tipo ENTRADA
-    const btnEntrada = dialogMov.getByRole('button', { name: 'Entrada', exact: true });
-    await btnEntrada.click();
+    // En Almacén desapareció el tipo "Entrada" (ahora solo Salida, Merma, Devolución)
+    await expect(dialogMov.getByRole('button', { name: 'Entrada', exact: true })).toHaveCount(0);
+    await dialogMov.getByRole('button', { name: 'Cancelar' }).click();
 
-    // 7. Seleccionar insumo Café en grano
-    const btnInsumo = dialogMov.getByRole('button', { name: /Café en grano/i });
-    await btnInsumo.click();
-
-    // 8. Llenar cantidad = 5, origen y destino
-    const inputCantidad = dialogMov.locator('input[type="number"]');
-    await inputCantidad.fill('5');
-
-    const inputOrigen = dialogMov.getByPlaceholder('Ej. Almacén central, Cocina...');
-    await inputOrigen.fill('Almacén central');
-
-    // 9. Enviar formulario dentro del modal
-    const btnSubmit = dialogMov.getByRole('button', {
-      name: 'Registrar movimiento',
-      exact: true,
+    // 5. Verificar que la API rechaza POST /admin/almacen/movimientos con tipo ENTRADA respondiendo 409
+    const sesionAlmacen = await loginPorApi('ALMACEN');
+    const insumoCafe = await prisma.insumo.findFirst({ where: { nombre: 'Café en grano' } });
+    const resApiRechazada = await fetch(`${apiBaseUrl}/admin/almacen/movimientos`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${sesionAlmacen.accessToken}`,
+      },
+      body: JSON.stringify({
+        tipo: 'ENTRADA',
+        insumoId: Number(insumoCafe!.id),
+        cantidad: 5,
+        origen: 'ALMACEN',
+      }),
     });
-    await btnSubmit.click();
+    expect(resApiRechazada.status).toBe(409);
+    const bodyRechazo = await resApiRechazada.json();
+    expect(bodyRechazo.message || bodyRechazo.mensaje).toMatch(/Los ingresos se registran en Compras/i);
 
-    // 10. Diálogo de confirmación Sí/No
-    const headingConfirmar = page.getByRole('heading', { name: /¿Confirmar movimiento de ENTRADA\?/i });
-    await expect(headingConfirmar).toBeVisible({ timeout: 5000 });
+    // 6. El ingreso se registra en Compras > Compra rápida por UI
+    await page.goto('/admin/compras', { waitUntil: 'domcontentloaded' });
+    const btnCompraRapida = page.getByRole('button', { name: /\+ Compra rápida/i });
+    await expect(btnCompraRapida).toBeVisible({ timeout: 10000 });
+    await btnCompraRapida.click();
 
-    // Confirmar pulsando "Sí, registrar"
+    const dialogRapida = page.getByRole('dialog', { name: /Compra rápida \(sin proveedor\)/i });
+    await expect(dialogRapida).toBeVisible({ timeout: 5000 });
+
+    // Seleccionar insumo Café en grano
+    await dialogRapida.locator('#compra-rapida-insumo').selectOption({ label: `${insumoCafe!.nombre} (${insumoCafe!.unidad_almacen})` });
+
+    // Llenar cantidad = 5 y costo = 75
+    await dialogRapida.locator('#compra-rapida-cantidad').fill('5');
+    await dialogRapida.locator('#compra-rapida-costo').fill('75');
+
+    // Registrar y confirmar
+    await dialogRapida.getByRole('button', { name: 'Registrar compra', exact: true }).click();
+    await expect(page.getByRole('heading', { name: /¿Confirmar compra rápida\?/i })).toBeVisible({ timeout: 5000 });
     await confirmarSiNo(page, 'si');
 
-    // 11. Verificar mensaje de éxito en la interfaz
-    const mensajeExito = page.getByText(/Movimiento registrado/i);
-    await expect(mensajeExito).toBeVisible({ timeout: 8000 });
+    // 7. Verificar mensaje de éxito
+    await expect(page.getByText(/Compra rápida registrada exitosamente/i)).toBeVisible({ timeout: 8000 });
 
-    // 12. Verificar en BD que el stock subió exactamente 5 KG
+    // 8. Verificar en BD que el stock subió exactamente 5 KG
     const stockNuevo = await obtenerStockInsumo('Café en grano', 'Almacén central');
     expect(Number(stockNuevo)).toBe(stockInicialNum + 5);
 
-    // 13. Verificar que el movimiento quedó registrado con 'por' y timestamp 'en'
+    // 9. Verificar que el movimiento quedó registrado con 'por' y timestamp 'en'
     const ultimoMov = await obtenerUltimoMovimientoStock({ tipo: 'ENTRADA' });
     expect(ultimoMov).not.toBeNull();
     expect(ultimoMov!.insumo?.nombre).toBe('Café en grano');
@@ -305,11 +319,11 @@ test.describe('Suite E2E - Módulo de Almacén y Stock', () => {
     await loginPorUi(page, 'ALMACEN');
     await page.goto('/admin/almacen', { waitUntil: 'domcontentloaded' });
 
-    const btnProduccion = page.getByRole('button', { name: 'Registrar la producción del día' });
+    const btnProduccion = page.getByRole('button', { name: /Hoy preparé\.\.\./i });
     await expect(btnProduccion).toBeVisible({ timeout: 10000 });
     await btnProduccion.click();
 
-    const dialogProd = page.getByRole('dialog', { name: 'Registrar producción del día' });
+    const dialogProd = page.getByRole('dialog', { name: /Hoy preparé/i });
     await expect(dialogProd).toBeVisible({ timeout: 5000 });
 
     // Seleccionar receta Torta de Chocolate
@@ -321,7 +335,7 @@ test.describe('Suite E2E - Módulo de Almacén y Stock', () => {
     await btnSubmit.click();
 
     // Diálogo de confirmación Sí/No
-    const headingConfirmar = page.getByRole('heading', { name: '¿Confirmar producción del día?' });
+    const headingConfirmar = page.getByRole('heading', { name: /¿Confirmar producción del día\?/i });
     await expect(headingConfirmar).toBeVisible({ timeout: 5000 });
     await confirmarSiNo(page, 'si');
 
@@ -397,28 +411,28 @@ test.describe('Suite E2E - Módulo de Almacén y Stock', () => {
     await loginPorUi(page, 'ALMACEN');
     await page.goto('/admin/almacen', { waitUntil: 'domcontentloaded' });
 
-    // Registrar ENTRADA de 10 KG por la UI
+    // Registrar MERMA de 3 KG por la UI (en Almacén no hay Entrada manual; se registran mermas, salidas o ajustes)
     await page.getByRole('button', { name: 'Registrar movimiento' }).click();
     const dialogMov = page.getByRole('dialog', { name: 'Registrar movimiento de almacén' });
     await expect(dialogMov).toBeVisible({ timeout: 5000 });
 
-    await dialogMov.getByRole('button', { name: 'Entrada', exact: true }).click();
+    await dialogMov.getByRole('button', { name: 'Merma', exact: true }).click();
     await dialogMov.getByRole('button', { name: /Café en grano/i }).click();
 
     const inputCantidad = dialogMov.locator('input[type="number"]');
-    await inputCantidad.fill('10');
+    await inputCantidad.fill('3');
     const inputOrigen = dialogMov.getByPlaceholder('Ej. Almacén central, Cocina...');
     await inputOrigen.fill('Almacén central');
 
     await dialogMov.getByRole('button', { name: 'Registrar movimiento', exact: true }).click();
-    await expect(page.getByRole('heading', { name: /¿Confirmar movimiento de ENTRADA\?/i })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('heading', { name: /¿Confirmar movimiento de MERMA\?/i })).toBeVisible({ timeout: 5000 });
     await confirmarSiNo(page, 'si');
 
     await expect(page.getByText(/Movimiento registrado/i)).toBeVisible({ timeout: 8000 });
 
-    // Stock subió a previo + 10
-    const stockConEntrada = Number(await obtenerStockInsumo('Café en grano', 'Almacén central'));
-    expect(stockConEntrada).toBe(stockInsumoPrevio + 10);
+    // Stock disminuyó en 3 (merma)
+    const stockConMerma = Number(await obtenerStockInsumo('Café en grano', 'Almacén central'));
+    expect(stockConMerma).toBe(stockInsumoPrevio - 3);
 
     // Anular el movimiento 100% por la UI:
     // Buscar el botón 'Anular' en la tarjeta superior recién creada
@@ -429,7 +443,7 @@ test.describe('Suite E2E - Módulo de Almacén y Stock', () => {
     // Rellenar motivo y código de supervisor en el formulario inline
     const inputMotivo = page.getByPlaceholder('Motivo de anulación...');
     await expect(inputMotivo).toBeVisible({ timeout: 5000 });
-    await inputMotivo.fill('Error de pesaje en recepción');
+    await inputMotivo.fill('Error de pesaje en merma');
 
     const codSupAlm = await obtenerCodigoSupervisorVigente(prisma);
     await page.locator('#anular-movimiento-codigo').fill(codSupAlm);
@@ -455,7 +469,7 @@ test.describe('Suite E2E - Módulo de Almacén y Stock', () => {
       orderBy: { id: 'desc' },
     });
     expect(movAnulacionInsumo).not.toBeNull();
-    expect(Number(movAnulacionInsumo!.cantidad)).toBe(-10);
+    expect(Number(movAnulacionInsumo!.cantidad)).toBe(3);
 
     // --- PARTE B: PRODUCTO TERMINADO ELABORADO ---
     const prodTorta = await prisma.producto.findFirst({
@@ -588,19 +602,19 @@ test.describe('Suite E2E - Módulo de Almacén y Stock', () => {
     });
     expect(prodTortaEstado!.agotado_hasta).toBeNull(); // NO está agotado
 
-    // 3. Reponer stock del insumo Café en grano registrando un ingreso
-    const resIngreso = await fetch(`${apiBaseUrl}/admin/almacen/movimientos`, {
+    // 3. Reponer stock del insumo Café en grano registrando un ingreso por compra rápida (única puerta de entrada)
+    const resIngreso = await fetch(`${apiBaseUrl}/admin/compras/compra-rapida`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${sesionAlmacen.accessToken}`,
       },
       body: JSON.stringify({
-        tipo: 'ENTRADA',
         insumoId: Number(insumoCafe!.id),
         cantidad: 15,
-        origen: 'Reposición Proveedor',
-        destino: 'Almacén central',
+        costoTotal: 150,
+        medioPago: 'EFECTIVO',
+        nota: 'Reposición rápida de café',
       }),
     });
     expect(resIngreso.ok).toBe(true);

@@ -16,6 +16,7 @@ export interface Notificacion {
   /** Módulo del administrativo donde se resuelve (clave de modulos.ts) */
   modulo: string;
   accion: string;
+  ruta?: string;
 }
 
 export interface ResumenNotificaciones {
@@ -229,6 +230,30 @@ export class NotificacionesService {
           desde: reclamos[0].creado_en.toISOString(),
           modulo: 'reclamos',
           accion: 'Ir a Reclamos',
+        });
+      }
+    }
+
+    if (puede('compras/ver') || puede('stock/ver')) {
+      const insumos = await this.prisma.insumo.findMany({
+        where: { activo: true },
+        include: { stocks: true },
+      });
+      const bajos = insumos.filter((ins: any) => {
+        const stockTotal = (ins.stocks || []).reduce((acc: number, s: any) => acc + Number(s.cantidad), 0);
+        return stockTotal <= Number(ins.minimo);
+      });
+      if (bajos.length > 0) {
+        conteos.compras = bajos.length;
+        lista.push({
+          id: 'stock-bajo',
+          titulo: `${bajos.length} ${bajos.length === 1 ? 'insumo con stock bajo' : 'insumos con stock bajo'}`,
+          detalle: 'Insumos que han llegado o están por debajo de su stock mínimo.',
+          prioridad: 'ALTA',
+          desde: null,
+          modulo: 'compras',
+          accion: 'Pedir al proveedor',
+          ruta: '/admin/compras?tab=pedir',
         });
       }
     }

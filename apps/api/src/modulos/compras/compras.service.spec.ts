@@ -47,6 +47,7 @@ describe('ComprasService', () => {
       party: {
         findMany: jest.fn(),
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
         create: jest.fn(),
       },
       partyIdentifier: {
@@ -453,6 +454,102 @@ describe('ComprasService', () => {
       expect(pedido).toBeDefined();
       expect(pedido?.estado).toBe('Por recibir');
       expect(pedido?.esPedidoPorRecibir).toBe(true);
+    });
+  });
+
+  describe('registrarCompraRapida', () => {
+    it('registra una compra rápida suelta, actualiza costo unitario, incrementa stock en Almacén y audita', async () => {
+      prisma.insumo.findUnique.mockResolvedValue({
+        id: 1n,
+        nombre: 'Huevos de granja',
+        unidad_almacen: 'UNIDAD',
+        unidad_compra: 'BANDEJA',
+        factor_compra: new Prisma.Decimal(30),
+      });
+
+      prisma.party.findFirst.mockResolvedValue({
+        id: 999n,
+        organizacion: { razon_social: 'Compras varias (sin proveedor)' },
+      });
+
+      prisma.lugarStock.findFirst.mockResolvedValue({
+        id: 10n,
+        nombre: 'Almacén central',
+      });
+
+      prisma.stock.findFirst.mockResolvedValue({
+        id: 50n,
+        insumo_id: 1n,
+        lugar_id: 10n,
+        cantidad: new Prisma.Decimal('10.00'),
+      });
+
+      prisma.compra.create.mockResolvedValue({
+        id: 77n,
+        proveedor_party_id: 999n,
+        comprobante_tipo: 'TICKET',
+        comprobante_numero: 'CR-001',
+        total: new Prisma.Decimal('45.00'),
+      });
+
+      prisma.compraLinea.create.mockResolvedValue({ id: 101n });
+      prisma.insumo.update.mockResolvedValue({ id: 1n });
+      prisma.stock.update.mockResolvedValue({ id: 50n, cantidad: new Prisma.Decimal('13.00') });
+      prisma.movimientoStock.create.mockResolvedValue({ id: 801n });
+
+      const res = await service.registrarCompraRapida(
+        {
+          insumoId: '1',
+          cantidad: 3,
+          costoTotal: 45,
+          medioPago: 'EFECTIVO',
+          nota: 'Comprado en bodega de la esquina',
+        },
+        mockUsuario,
+        '127.0.0.1',
+      );
+
+      expect(res.ok).toBe(true);
+      expect(res.id).toBe('77');
+      expect(res.costoTotal).toBe(45);
+      expect(res.nuevoStock).toBe(13);
+
+      expect(prisma.compra.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            proveedor_party_id: 999n,
+            total: new Prisma.Decimal(45),
+            condicion: 'CONTADO',
+          }),
+        }),
+      );
+
+      expect(prisma.insumo.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 1n },
+          data: { costo_unit: new Prisma.Decimal(15) },
+        }),
+      );
+
+      expect(prisma.movimientoStock.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            tipo: 'ENTRADA',
+            insumo_id: 1n,
+            lugar_id: 10n,
+            cantidad: new Prisma.Decimal(3),
+          }),
+        }),
+      );
+
+      expect(auditoria.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          modulo: 'compras',
+          accion: 'COMPRA_RAPIDA',
+        }),
+      );
+
+      expect(eventosGateway.emitirAdmin).toHaveBeenCalledWith('stock:cambio', expect.anything());
     });
   });
 });

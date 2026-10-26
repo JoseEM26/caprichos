@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { comprasApi, ProveedorItem, InsumoParaPedir, CrearCompraDto } from './comprasApi';
+import { Confirmar } from '../../comun/Confirmar';
 
 interface ModalRegistrarCompraProps {
   abierto: boolean;
@@ -40,6 +41,7 @@ export const ModalRegistrarCompra: React.FC<ModalRegistrarCompraProps> = ({
 
   // Selector buscador de insumos por línea
   const [busquedaInsumo, setBusquedaInsumo] = useState<Record<number, string>>({});
+  const [confirmarAbierto, setConfirmarAbierto] = useState(false);
 
   useEffect(() => {
     if (abierto) {
@@ -55,6 +57,7 @@ export const ModalRegistrarCompra: React.FC<ModalRegistrarCompraProps> = ({
       ]);
       setErrorMsg('');
       setBusquedaInsumo({});
+      setConfirmarAbierto(false);
     }
   }, [abierto, proveedores]);
 
@@ -138,6 +141,11 @@ export const ModalRegistrarCompra: React.FC<ModalRegistrarCompraProps> = ({
       return;
     }
 
+    setErrorMsg('');
+    setConfirmarAbierto(true);
+  };
+
+  const ejecutarGuardar = async () => {
     const tipoMapeado =
       compTipo === 'Factura'
         ? 'FACTURA'
@@ -173,10 +181,12 @@ export const ModalRegistrarCompra: React.FC<ModalRegistrarCompraProps> = ({
       setCargando(true);
       setErrorMsg('');
       await comprasApi.registrarCompra(dto);
+      setConfirmarAbierto(false);
       alGuardar();
       alCerrar();
     } catch (err: any) {
       setErrorMsg(err.message || 'Error al registrar la compra.');
+      setConfirmarAbierto(false);
     } finally {
       setCargando(false);
     }
@@ -704,6 +714,18 @@ export const ModalRegistrarCompra: React.FC<ModalRegistrarCompraProps> = ({
           </div>
         </form>
       </div>
+
+      {confirmarAbierto && (
+        <Confirmar
+          abierto={confirmarAbierto}
+          titulo="¿Confirmar registro de compra?"
+          mensaje={`Se registrará la compra con ${proveedorSel?.nombreComercial || 'proveedor'} por un total de s/ ${totalCalculado.toFixed(2)} y se ingresará el stock a Almacén central.`}
+          textoConfirmar="Sí, registrar"
+          textoNo="No, revisar"
+          alConfirmar={ejecutarGuardar}
+          alCancelar={() => setConfirmarAbierto(false)}
+        />
+      )}
     </>
   );
 };

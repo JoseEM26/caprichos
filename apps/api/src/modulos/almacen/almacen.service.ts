@@ -222,6 +222,13 @@ export class AlmacenService {
     ip?: string,
     pinSupervisor?: string,
   ) {
+    if (dto.tipo === 'ENTRADA') {
+      throw new ConflictException({
+        codigo: 'INGRESO_SOLO_COMPRAS',
+        mensaje: 'Los ingresos se registran en Compras',
+      });
+    }
+
     const insumoId = this.parsearId(dto.insumoId, 'insumo');
     const insumo = await this.prisma.insumo.findUnique({
       where: { id: insumoId },
@@ -396,7 +403,7 @@ export class AlmacenService {
       lugarId: origenLugar.id.toString(),
     });
 
-    if (dto.tipo === 'ENTRADA' && typeof this.stockService?.verificarYReactivarAgotados === 'function') {
+    if ((dto.tipo as string) === 'ENTRADA' && typeof this.stockService?.verificarYReactivarAgotados === 'function') {
       await this.stockService.verificarYReactivarAgotados([insumoId]);
     }
 
@@ -660,6 +667,7 @@ export class AlmacenService {
           nombre: ins.nombre,
           unidad: ins.unidad_almacen,
           porTanda: necPorTanda,
+          cantidadPorTanda: necPorTanda,
           stockCocina: cantCocina,
           stockAlmacen: cantAlm,
           stockTotal: cantTotal,
@@ -671,8 +679,10 @@ export class AlmacenService {
       resultado.push({
         id: rec.id.toString(),
         nombre: rec.producto.nombre,
+        productoNombre: rec.producto.nombre,
         productoId: rec.producto_id.toString(),
         tandaBase: yieldUnidades,
+        rindePorTanda: yieldUnidades,
         tandasMaximas: Math.floor(tandasMax * 10) / 10,
         insumos: insumosDetalle,
       });
@@ -702,106 +712,81 @@ export class AlmacenService {
       });
     }
 
+    const rinde = Number(receta.rinde) > 0 ? Number(receta.rinde) : 1;
+    let yieldTotal: number;
+    let tandasCalculadas: number;
+
+    if (dto.unidadesObtenidas !== undefined && dto.unidadesObtenidas !== null) {
+      yieldTotal = Number(dto.unidadesObtenidas);
+      tandasCalculadas = dto.tandas !== undefined && dto.tandas !== null
+        ? Number(dto.tandas)
+        : yieldTotal / rinde;
+    } else if (dto.tandas !== undefined && dto.tandas !== null) {
+      tandasCalculadas = Number(dto.tandas);
+      yieldTotal = dto.unidadesReales !== undefined
+        ? Number(dto.unidadesReales)
+        : Math.round(rinde * tandasCalculadas);
+    } else {
+      yieldTotal = rinde;
+      tandasCalculadas = 1;
+    }
+
     const cocinaLugar = await this.obtenerLugarPorNombre('Cocina');
-    const almacenLugar = await this.obtenerLugarPorNombre('Almacén central');
 
     const faltantes: string[] = [];
-    let maxAlcanza = 99999;
 
+    // Se descuenta exclusivamente de Cocina
     for (const lin of receta.lineas) {
       const ins = lin.insumo;
       const necPorTanda = Number(lin.cantidad);
-      const necTotal = necPorTanda * dto.tandas;
+      const necTotal = (yieldTotal / rinde) * necPorTanda;
 
       const stockCocina = await this.prisma.stock.findFirst({
         where: { insumo_id: ins.id, lugar_id: cocinaLugar.id },
       });
-      const stockAlm = await this.prisma.stock.findFirst({
-        where: { insumo_id: ins.id, lugar_id: almacenLugar.id },
-      });
 
       const cantCocina = stockCocina ? Number(stockCocina.cantidad) : 0;
-      const cantAlm = stockAlm ? Number(stockAlm.cantidad) : 0;
-      const cantTotal = cantCocina + cantAlm;
 
-      const tandasPosibles = necPorTanda > 0 ? cantTotal / necPorTanda : 999;
-      if (tandasPosibles < maxAlcanza) {
-        maxAlcanza = tandasPosibles;
-      }
-
-      if (cantTotal < necTotal) {
-        faltantes.push(`${ins.nombre} (faltan ${(necTotal - cantTotal).toFixed(2)} ${ins.unidad_almacen})`);
+      if (cantCocina < necTotal) {
+        faltantes.push(`${ins.nombre} (requiere ${necTotal.toFixed(2)} ${ins.unidad_almacen}, en Cocina hay ${cantCocina.toFixed(2)})`);
       }
     }
 
     if (faltantes.length > 0) {
-      const tandasMaxFloor = Math.floor(maxAlcanza * 10) / 10;
       throw new BadRequestException({
         codigo: 'STOCK_MATERIA_PRIMA_INSUFICIENTE',
-        mensaje: `No alcanza el stock para ${dto.tandas} tandas: faltan ${faltantes.join(', ')}. Con lo que hay solo alcanzan ${tandasMaxFloor} tandas.`,
+        mensaje: `No alcanza el stock en Cocina: faltan ${faltantes.join(', ')}. Pide insumos al almacén primero.`,
       });
     }
-
-    const yieldTotal =
-      dto.unidadesReales !== undefined
-        ? dto.unidadesReales
-        : Math.round(Number(receta.rinde || 24) * dto.tandas);
 
     const resultado = await this.prisma.$transaction(async (tx) => {
       for (const lin of receta.lineas) {
         const ins = lin.insumo;
         const necPorTanda = Number(lin.cantidad);
-        let restante = necPorTanda * dto.tandas;
+        const necTotal = (yieldTotal / rinde) * necPorTanda;
+        const necTotalDecimal = new Prisma.Decimal(necTotal);
 
-        const stockCocina = await tx.stock.findFirst({
+        await tx.stock.updateMany({
           where: { insumo_id: ins.id, lugar_id: cocinaLugar.id },
+          data: { cantidad: { decrement: necTotalDecimal } },
         });
-        const cantCocina = stockCocina ? Number(stockCocina.cantidad) : 0;
 
-        const aTomarCocina = Math.min(cantCocina, restante);
-        if (aTomarCocina > 0) {
-          await tx.stock.update({
-            where: { id: stockCocina!.id },
-            data: { cantidad: { decrement: new Prisma.Decimal(aTomarCocina) } },
-          });
-
-          await tx.movimientoStock.create({
-            data: {
-              tipo: 'PRODUCCION_CONSUMO',
-              insumo_id: ins.id,
-              lugar_id: cocinaLugar.id,
-              cantidad: new Prisma.Decimal(-aTomarCocina),
-              nota: `Producción de ${receta.producto.nombre} (${dto.tandas} tandas)`,
-              por: usuario ? usuario.partyId : BigInt(1),
-            },
-          });
-
-          restante -= aTomarCocina;
-        }
-
-        if (restante > 0) {
-          await tx.stock.updateMany({
-            where: { insumo_id: ins.id, lugar_id: almacenLugar.id },
-            data: { cantidad: { decrement: new Prisma.Decimal(restante) } },
-          });
-
-          await tx.movimientoStock.create({
-            data: {
-              tipo: 'PRODUCCION_CONSUMO',
-              insumo_id: ins.id,
-              lugar_id: almacenLugar.id,
-              cantidad: new Prisma.Decimal(-restante),
-              nota: `Producción de ${receta.producto.nombre} (${restante.toFixed(2)} ${ins.unidad_almacen} salieron de almacén central)`,
-              por: usuario ? usuario.partyId : BigInt(1),
-            },
-          });
-        }
+        await tx.movimientoStock.create({
+          data: {
+            tipo: 'PRODUCCION_CONSUMO',
+            insumo_id: ins.id,
+            lugar_id: cocinaLugar.id,
+            cantidad: necTotalDecimal.negated(),
+            nota: `Producción de ${receta.producto.nombre} (${yieldTotal} unidades)`,
+            por: usuario ? usuario.partyId : BigInt(1),
+          },
+        });
       }
 
       const prod = await tx.produccion.create({
         data: {
           receta_id: recetaId,
-          tandas: new Prisma.Decimal(dto.tandas),
+          tandas: new Prisma.Decimal(tandasCalculadas),
           unidades: new Prisma.Decimal(yieldTotal),
           por: usuario ? usuario.partyId : BigInt(1),
         },
@@ -833,7 +818,7 @@ export class AlmacenService {
           lugar_id: cocinaLugar.id,
           cantidad: new Prisma.Decimal(yieldTotal),
           produccion_id: prod.id,
-          nota: `Producción del día · PRD-${prod.id.toString()}`,
+          nota: `Producción del día · PRD-${prod.id.toString()} (${yieldTotal} unidades)`,
           por: usuario ? usuario.partyId : BigInt(1),
         },
       });
@@ -931,7 +916,10 @@ export class AlmacenService {
 
       for (const lin of prod.receta.lineas) {
         const necPorTanda = Number(lin.cantidad);
-        const cantDevolver = necPorTanda * Number(prod.tandas);
+        const rinde = Number(prod.receta.rinde) > 0 ? Number(prod.receta.rinde) : 1;
+        const cantDevolver = Number(prod.tandas) > 0
+          ? Number(prod.tandas) * necPorTanda
+          : (Number(prod.unidades) / rinde) * necPorTanda;
 
         await tx.stock.updateMany({
           where: { insumo_id: lin.insumo_id, lugar_id: cocinaLugar.id },

@@ -94,14 +94,14 @@ describe('AlmacenView', () => {
     vi.spyOn(almacenApi, 'listarInsumos').mockResolvedValue(mockInsumos);
   });
 
-  it('renderiza banner de acciones, advertencia de stock bajo y botones principales', async () => {
+  it('renderiza banner de acciones sin aviso de stock bajo y con botón Hoy preparé', async () => {
     render(<AlmacenView />);
 
     await waitFor(() => {
       expect(screen.getByText('Gestionar listas')).toBeInTheDocument();
-      expect(screen.getByText(/Stock bajo \(1\) · pedir a proveedores/i)).toBeInTheDocument();
+      expect(screen.queryByText(/Stock bajo.*pedir a proveedores/i)).not.toBeInTheDocument();
       expect(screen.getByText('Registrar movimiento')).toBeInTheDocument();
-      expect(screen.getByText('Registrar la producción del día')).toBeInTheDocument();
+      expect(screen.getByText('Hoy preparé...')).toBeInTheDocument();
       expect(screen.getByText('Cerrar el día (sobrantes a merma)')).toBeInTheDocument();
     });
   });

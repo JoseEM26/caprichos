@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { InsumoItem, LugarStockItem } from './tipos';
 import { stockApi } from './stockApi';
 import { ModalMovimiento } from './ModalMovimiento';
+import { ModalRegistrarProduccion } from '../almacen/ModalRegistrarProduccion';
 import { ExistenciasTab } from './ExistenciasTab';
 import { MovimientosTab } from './MovimientosTab';
 import { Confirmar } from '../../comun/Confirmar';
@@ -17,11 +18,14 @@ export function ProduccionAlmacenTab({
   lugares,
   onActualizar,
 }: ProduccionAlmacenTabProps) {
+  // Modal de producción simple ("Hoy preparé...")
+  const [modalProduccionAbierto, setModalProduccionAbierto] = useState(false);
+
   // Modal de movimiento general con tipo configurable
   const [modalMovimientoAbierto, setModalMovimientoAbierto] = useState(false);
   const [tipoMovimientoInicial, setTipoMovimientoInicial] = useState<
-    'ENTRADA' | 'SALIDA' | 'MERMA' | 'DEVOLUCION' | 'TRASLADO' | 'AJUSTE'
-  >('ENTRADA');
+    'SALIDA' | 'MERMA' | 'DEVOLUCION' | 'TRASLADO' | 'AJUSTE'
+  >('SALIDA');
 
   // Modal para cerrar el día (sobrantes a merma)
   const [confirmarCierreDia, setConfirmarCierreDia] = useState(false);
@@ -42,7 +46,7 @@ export function ProduccionAlmacenTab({
   }, [cargarPedidos]);
 
   const abrirModalConTipo = (
-    tipo: 'ENTRADA' | 'SALIDA' | 'MERMA' | 'DEVOLUCION' | 'TRASLADO' | 'AJUSTE',
+    tipo: 'SALIDA' | 'MERMA' | 'DEVOLUCION' | 'TRASLADO' | 'AJUSTE',
   ) => {
     setTipoMovimientoInicial(tipo);
     setModalMovimientoAbierto(true);
@@ -114,7 +118,7 @@ export function ProduccionAlmacenTab({
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
               <button
                 type="button"
-                onClick={() => abrirModalConTipo('ENTRADA')}
+                onClick={() => setModalProduccionAbierto(true)}
                 style={{
                   minHeight: '44px',
                   padding: '0 16px',
@@ -338,6 +342,17 @@ export function ProduccionAlmacenTab({
         </div>
         <MovimientosTab insumos={insumos} lugares={lugares} />
       </div>
+
+      {/* Modal de producción "Hoy preparé..." */}
+      {modalProduccionAbierto && (
+        <ModalRegistrarProduccion
+          abierto={modalProduccionAbierto}
+          alCerrar={() => setModalProduccionAbierto(false)}
+          alGuardar={() => {
+            if (onActualizar) onActualizar();
+          }}
+        />
+      )}
 
       {/* Modal de movimiento para las acciones Producir, Pedir al almacén, Merma */}
       {modalMovimientoAbierto && (

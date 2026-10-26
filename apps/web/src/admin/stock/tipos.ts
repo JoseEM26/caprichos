@@ -61,6 +61,9 @@ export interface ProductoRecetaItem {
   categoriaId: string | null;
   categoriaNombre: string | null;
   tieneReceta: boolean;
+  esProduccion?: boolean;
+  tipoReceta?: 'VENTA' | 'PRODUCCION' | 'NINGUNA';
+  rinde?: number | null;
   precio: number;
   costo: number | null;
   margenSoles: number | null;
@@ -93,6 +96,9 @@ export interface RecetaProductoDetalle {
   productoNombre: string;
   categoria: string | null;
   tieneReceta: boolean;
+  esProduccion?: boolean;
+  tipoReceta?: 'VENTA' | 'PRODUCCION' | 'NINGUNA';
+  rinde?: number | null;
   tamanos: RecetaTamanoDetalle[];
 }
 
