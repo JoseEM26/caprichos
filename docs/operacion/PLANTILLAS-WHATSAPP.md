@@ -17,6 +17,7 @@ Todas las plantillas pertenecen a la categoría **Utilidad (UTILITY)** y están 
 | `PAGO_CONFIRMADO` | `caprichos_pago_confirmado` | Utilidad | Español (`es`) | 2 |
 | `PEDIDO_LISTO_RECOJO` | `caprichos_pedido_listo_recojo` | Utilidad | Español (`es`) | 2 |
 | `ENCUESTA_POSVENTA` | `caprichos_encuesta_posventa` | Utilidad | Español (`es`) | 2 |
+| `REABRIR_CONVERSACION` | `caprichos_reabrir_conversacion` | Utilidad | Español (`es`) | 1 |
 
 ---
 
@@ -137,6 +138,21 @@ Hola {{1}}, gracias por tu compra en Caprichos (pedido {{2}}). ¿Como calificari
   1. `1-2 Malo`
   2. `3 Regular`
   3. `4-5 Excelente`
+
+---
+
+## 8. Reapertura de Conversación (Fuera de ventana de 24 horas)
+
+- **Nombre de plantilla:** `caprichos_reabrir_conversacion`
+- **Categoría:** Utilidad (Utility)
+- **Idioma:** Español (`es` o `es_PE`)
+- **Texto del cuerpo (Body):**
+```text
+Hola {{1}}, nos comunicamos de Caprichos para dar seguimiento a tu consulta. ¿En que podemos ayudarte?
+```
+- **Ejemplo de variables para Meta:**
+  - `{{1}}`: `Carlos`
+- **Botones:** Ninguno
 
 ---
 

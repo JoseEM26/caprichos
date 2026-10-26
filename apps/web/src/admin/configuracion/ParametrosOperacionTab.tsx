@@ -167,6 +167,11 @@ const META_PARAMETROS: Record<string, MetaParametro> = {
     descripcion: 'Puntajes iguales o menores a este valor (1 a 5) son derivados automáticamente como quejas al módulo de Reclamos.',
     tipo: 'numero',
   },
+  chatbot_activo: {
+    nombre: 'Chatbot de WhatsApp activo',
+    descripcion: 'Habilita el motor conversacional automático en WhatsApp para responder saludos, menú, horarios y derivaciones a personas.',
+    tipo: 'sino',
+  },
   whatsapp_aviso_salida_activo: {
     nombre: 'Aviso WhatsApp: Delivery en camino',
     descripcion: 'Envía aviso automático al cliente con tiempo estimado cuando el repartidor sale con el pedido.',

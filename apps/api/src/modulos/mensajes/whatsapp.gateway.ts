@@ -1,8 +1,6 @@
 /**
- * Puerto de salida hacia WhatsApp (ADR-009). El servicio de mensajes solo conoce esta interfaz.
- * Hoy se usa `WhatsAppLocalGateway` (guarda el mensaje en `mensaje_chat`, sin salir a Meta).
- * Cuando lleguen las credenciales de la Cloud API se escribe `WhatsAppCloudGateway` (enviar por
- * Graph API y guardar el `meta_id`) y solo se cambia el `useClass` del proveedor en MensajesModule.
+ * Puerto de salida hacia WhatsApp (ADR-009).
+ * El servicio de mensajes solo conoce esta interfaz.
  */
 export interface MensajeEnviado {
   id: string;
@@ -10,10 +8,30 @@ export interface MensajeEnviado {
   texto: string;
   en: Date;
   metaId: string | null;
+  estado?: string;
+  errorCodigo?: string | null;
+  errorDetalle?: string | null;
+  modo?: 'meta' | 'simulado';
+  whatsappMensajeId?: bigint | null;
 }
 
 export interface WhatsAppGateway {
-  enviarTexto(conversacionId: bigint, telefono: string, texto: string, autor: 'BOT' | 'PERSONA'): Promise<MensajeEnviado>;
+  enviarTexto(
+    conversacionId: bigint,
+    telefono: string,
+    texto: string,
+    autor: 'BOT' | 'PERSONA',
+  ): Promise<MensajeEnviado>;
+
+  enviarPlantilla?(
+    conversacionId: bigint,
+    telefono: string,
+    plantilla: string,
+    variables?: string[] | Record<string, string>,
+    autor?: 'BOT' | 'PERSONA',
+  ): Promise<MensajeEnviado>;
+
+  estaConectado?(): { conectado: boolean; modo: 'meta' | 'simulado'; razon?: string };
 }
 
 export const WHATSAPP_GATEWAY = 'WHATSAPP_GATEWAY';

@@ -92,6 +92,10 @@ describe('QuejasWhatsappService y Controller', () => {
           { puntaje: 1 },
         ]),
       },
+      whatsappMensaje: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
     };
 
     mockAuditoria = {

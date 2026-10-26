@@ -1,7 +1,22 @@
-import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
-import { ListarConversacionesDto, TextoDto, TomarDto } from './dto/mensajes.dto';
+import {
+  EditarNombreContactoDto,
+  ListarConversacionesDto,
+  TextoDto,
+  TomarDto,
+} from './dto/mensajes.dto';
 import { MensajesService } from './mensajes.service';
 
 const ipDe = (req: any): string | undefined => {
@@ -36,6 +51,22 @@ export class MensajesController {
   @Permiso('mensajes', 'enviar')
   enviar(@Param('id') id: string, @Body() dto: TextoDto, @Req() req: any) {
     return this.mensajes.enviar(id, dto.texto, req.usuario, ipDe(req));
+  }
+
+  @Post('conversaciones/:id/reabrir-plantilla')
+  @Permiso('mensajes', 'enviar')
+  reabrirPlantilla(@Param('id') id: string, @Req() req: any) {
+    return this.mensajes.reabrirConPlantilla(id, req.usuario, ipDe(req));
+  }
+
+  @Post('conversaciones/:id/mensajes/:mensajeId/reintentar')
+  @Permiso('mensajes', 'enviar')
+  reintentar(
+    @Param('id') id: string,
+    @Param('mensajeId') mensajeId: string,
+    @Req() req: any,
+  ) {
+    return this.mensajes.reintentarMensaje(id, mensajeId, req.usuario, ipDe(req));
   }
 
   @Post('conversaciones/:id/pulir')
@@ -85,5 +116,15 @@ export class MensajesController {
   @Permiso('mensajes', 'enviar')
   rechazarPago(@Param('id') id: string, @Req() req: any) {
     return this.mensajes.rechazarPago(id, req.usuario, ipDe(req));
+  }
+
+  @Patch('conversaciones/:id/nombre')
+  @Permiso('mensajes', 'tomar')
+  editarNombre(
+    @Param('id') id: string,
+    @Body() dto: EditarNombreContactoDto,
+    @Req() req: any,
+  ) {
+    return this.mensajes.editarNombre(id, dto, req.usuario, ipDe(req));
   }
 }

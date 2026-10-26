@@ -3,11 +3,18 @@ export interface BotonAccion {
   titulo: string;
 }
 
+export interface FilaLista {
+  id: string;
+  titulo: string;
+  descripcion?: string;
+}
+
 export interface OpcionesEnvio {
   pedidoId?: bigint | string;
   conversacionId?: bigint | string;
   replyToWaMessageId?: string;
   plantillaNombre?: string;
+  tituloSeccion?: string;
 }
 
 export interface ResultadoEnvioWhatsApp {
@@ -45,6 +52,14 @@ export interface WhatsAppMensajeriaPuerto {
     telefono: string,
     texto: string,
     botones: BotonAccion[],
+    opciones?: OpcionesEnvio,
+  ): Promise<ResultadoEnvioWhatsApp>;
+
+  enviarLista(
+    telefono: string,
+    texto: string,
+    botonTexto: string,
+    filas: FilaLista[],
     opciones?: OpcionesEnvio,
   ): Promise<ResultadoEnvioWhatsApp>;
 

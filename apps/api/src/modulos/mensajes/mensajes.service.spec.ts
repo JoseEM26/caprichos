@@ -63,6 +63,21 @@ describe('MensajesService', () => {
             party: null,
             mensajes: [],
           },
+          {
+            id: 4n,
+            telefono: 'wa-user:usr_meta_999',
+            identificador_tipo: 'USUARIO_WA',
+            nombre_contacto: 'Usuario Sin Fono',
+            nombre_editado: false,
+            party_id: null,
+            duenio: 'BOT',
+            urgente: false,
+            estado: 'ABIERTA',
+            tomado_por: null,
+            ultima_actividad: new Date(),
+            party: null,
+            mensajes: [],
+          },
         ]),
         findUnique: jest.fn().mockImplementation(({ where }) => {
           if (where.id === 1n) {
@@ -74,6 +89,10 @@ describe('MensajesService', () => {
               urgente: true,
               estado: 'ABIERTA',
               tomado_por: 100n,
+              nombre_contacto: 'Ana Perfil WA',
+              nombre_editado: false,
+              flujo: { nombre_perfil_wa: 'Ana Perfil WA' },
+              identificador_tipo: 'TELEFONO',
               ultima_actividad: new Date(),
               party: { persona: { nombres: 'Ana', apellidos: 'Pérez' } },
               tomadoPorUsuario: { party: { persona: { nombres: 'Kevin', apellidos: 'R.' } } },
@@ -88,20 +107,56 @@ describe('MensajesService', () => {
               urgente: false,
               estado: 'VALIDAR_PAGO',
               tomado_por: null,
+              nombre_contacto: null,
+              nombre_editado: false,
+              flujo: {},
+              identificador_tipo: 'TELEFONO',
               ultima_actividad: new Date(),
               party: { persona: { nombres: 'Rosa', apellidos: 'Díaz' } },
               tomadoPorUsuario: null,
             });
           }
+          if (where.id === 4n) {
+            return Promise.resolve({
+              id: 4n,
+              telefono: 'wa-user:usr_meta_999',
+              identificador_tipo: 'USUARIO_WA',
+              nombre_contacto: 'Usuario Sin Fono',
+              nombre_editado: false,
+              flujo: { nombre_perfil_wa: 'Usuario Sin Fono' },
+              party_id: null,
+              duenio: 'PERSONA',
+              tomado_por: 100n,
+              urgente: false,
+              estado: 'ABIERTA',
+              ultima_actividad: new Date(),
+              party: null,
+            });
+          }
           return Promise.resolve(null);
         }),
-        update: jest.fn().mockResolvedValue({ id: 1n }),
+        update: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: 1n, ...data })),
       },
       mensajeChat: {
         findMany: jest.fn().mockResolvedValue([
           { id: 10n, autor: 'CLIENTE', direccion: 'ENTRA', tipo: 'TEXTO', contenido: { texto: 'Hola' }, en: new Date() },
           { id: 11n, autor: 'BOT', direccion: 'SALE', tipo: 'TEXTO', contenido: { texto: '¡Hola!' }, en: new Date() },
         ]),
+        findUnique: jest.fn().mockImplementation(({ where }) => {
+          if (where.id === 500n) {
+            return Promise.resolve({
+              id: 500n,
+              conversacion_id: 1n,
+              direccion: 'SALE',
+              autor: 'PERSONA',
+              tipo: 'TEXTO',
+              contenido: { texto: 'Texto que falló', estado: 'FALLIDO', errorCodigo: 'DESTINATARIO_NO_VERIFICADO' },
+              en: new Date(),
+            });
+          }
+          return Promise.resolve(null);
+        }),
+        update: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: 500n, ...data })),
       },
       pedido: {
         findFirst: jest.fn().mockResolvedValue({
@@ -141,12 +196,19 @@ describe('MensajesService', () => {
     service = new MensajesService(prisma, auditoria, gateway, eventos);
   });
 
-  it('listar retorna chats, conteos y filtra por texto', async () => {
+  it('listar retorna chats, conteos y filtra por texto con nombres según jerarquía', async () => {
     const r = await service.listar('todos', '');
-    expect(r.conteos.todos).toBe(3);
+    expect(r.conteos.todos).toBe(4);
     expect(r.conteos.atender).toBe(2);
-    expect(r.conteos.bot).toBe(1);
-    expect(r.chats.length).toBe(3);
+    expect(r.conteos.bot).toBe(2);
+    expect(r.chats.length).toBe(4);
+
+    // Chat 3 sin party muestra teléfono enmascarado (+51 9*** ***66)
+    expect(r.chats[2].nombre).toBe('+51 9*** ***66');
+
+    // Chat 4 sin teléfono muestra perfil de usuario de WhatsApp
+    expect(r.chats[3].nombre).toBe('Usuario Sin Fono');
+    expect(r.chats[3].identificador_tipo).toBe('USUARIO_WA');
 
     const filtrado = await service.listar('todos', 'Ana');
     expect(filtrado.chats.length).toBe(1);
@@ -265,5 +327,303 @@ describe('MensajesService', () => {
         data: expect.objectContaining({ estado: 'ABIERTA', duenio: 'BOT' }),
       }),
     );
+  });
+
+  describe('Responder a remitente sin teléfono', () => {
+    it('falla con 400 y mensaje claro si se intenta enviar a un remitente sin teléfono', async () => {
+      await expect(service.enviar('4', 'Hola', usuarioAdmin)).rejects.toMatchObject({
+        response: {
+          codigo: 'CONTACTO_SIN_TELEFONO',
+          mensaje: 'Este contacto no comparte su numero: no se puede responder desde aqui todavia',
+        },
+      });
+      expect(gateway.enviarTexto).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('editarNombre', () => {
+    it('actualiza el nombre de contacto, establece nombre_editado=true, audita sin teléfono completo y emite socket', async () => {
+      const res = await service.editarNombre('1', { nombre: 'Don Pepe Café' }, usuarioAdmin, '192.168.1.50');
+
+      expect(res.ok).toBe(true);
+      expect(prisma.conversacion.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 1n },
+          data: {
+            nombre_contacto: 'Don Pepe Café',
+            nombre_editado: true,
+          },
+        }),
+      );
+
+      // Verificación estricta de auditoría: NUNCA teléfono completo
+      expect(auditoria.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          categoria: 'CAMBIO',
+          modulo: 'mensajes',
+          accion: 'EDITAR_NOMBRE_CONTACTO',
+          entidad: 'conversacion',
+          entidadId: 1n,
+          despues: {
+            nombre_contacto: 'Don Pepe Café',
+            nombre_editado: true,
+            identificador_tipo: 'TELEFONO',
+          },
+        }),
+      );
+
+      const llamadaAuditoria = auditoria.registrar.mock.calls[0][0];
+      const jsonAuditoria = JSON.stringify(llamadaAuditoria, (_, v) =>
+        typeof v === 'bigint' ? v.toString() : v,
+      );
+      expect(jsonAuditoria).not.toContain('999888777'); // NUNCA teléfono completo
+
+      expect(eventos.emitirAdmin).toHaveBeenCalledWith('mensajes:actualizado', { id: '1' });
+    });
+
+    it('con revertir=true restaura el nombre original de WhatsApp y nombre_editado=false', async () => {
+      const res = await service.editarNombre('1', { revertir: true }, usuarioAdmin);
+
+      expect(res.ok).toBe(true);
+      expect(prisma.conversacion.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 1n },
+          data: {
+            nombre_contacto: 'Ana Perfil WA',
+            nombre_editado: false,
+          },
+        }),
+      );
+
+      expect(auditoria.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accion: 'REVERTIR_NOMBRE_CONTACTO',
+          despues: {
+            nombre_contacto: 'Ana Perfil WA',
+            nombre_editado: false,
+            identificador_tipo: 'TELEFONO',
+          },
+        }),
+      );
+    });
+
+    it('rechaza nombres inválidos: menores a 2 caracteres, mayores a 60 caracteres o solo espacios', async () => {
+      await expect(service.editarNombre('1', { nombre: 'A' }, usuarioAdmin)).rejects.toMatchObject({
+        response: { codigo: 'NOMBRE_INVALIDO' },
+      });
+
+      await expect(service.editarNombre('1', { nombre: '   ' }, usuarioAdmin)).rejects.toMatchObject({
+        response: { codigo: 'NOMBRE_INVALIDO' },
+      });
+
+      await expect(service.editarNombre('1', { nombre: 'X'.repeat(61) }, usuarioAdmin)).rejects.toMatchObject({
+        response: { codigo: 'NOMBRE_INVALIDO' },
+      });
+    });
+  });
+
+  describe('Control de ventana de 24 horas', () => {
+    let ventana24h: any;
+
+    beforeEach(() => {
+      ventana24h = {
+        esVentanaAbierta: jest.fn().mockResolvedValue(true),
+      };
+      service = new MensajesService(prisma, auditoria, gateway, eventos, ventana24h);
+    });
+
+    it('permite enviar texto libre cuando la ventana está abierta', async () => {
+      ventana24h.esVentanaAbierta.mockResolvedValue(true);
+      const res = await service.enviar('1', 'Hola cliente dentro de 24h', usuarioAdmin);
+      expect(res.id).toBe('msg-1');
+      expect(ventana24h.esVentanaAbierta).toHaveBeenCalledWith('999888777', 1n);
+      expect(gateway.enviarTexto).toHaveBeenCalled();
+    });
+
+    it('rechaza texto libre con 409 VENTANA_CERRADA cuando pasaron más de 24 horas', async () => {
+      ventana24h.esVentanaAbierta.mockResolvedValue(false);
+      let errorCapturado: any;
+      try {
+        await service.enviar('1', 'Hola cliente fuera de 24h', usuarioAdmin);
+      } catch (e) {
+        errorCapturado = e;
+      }
+
+      expect(errorCapturado).toBeDefined();
+      expect(errorCapturado.getStatus()).toBe(409);
+      expect(errorCapturado.getResponse()).toEqual({
+        codigo: 'VENTANA_CERRADA',
+        mensaje:
+          'Pasaron mas de 24 horas desde el ultimo mensaje del cliente. Solo se puede escribir con una plantilla aprobada',
+        plantillaReapertura: 'caprichos_reabrir_conversacion',
+      });
+      expect(gateway.enviarTexto).not.toHaveBeenCalled();
+    });
+
+    it('reabrirConPlantilla envía la plantilla caprichos_reabrir_conversacion y audita', async () => {
+      gateway.enviarPlantilla = jest.fn().mockResolvedValue({
+        id: 'msg-plantilla-1',
+        autor: 'PERSONA',
+        texto: '[Plantilla: caprichos_reabrir_conversacion]',
+        metaId: 'wamid.123',
+        estado: 'ENVIADO',
+      });
+
+      const res = await service.reabrirConPlantilla('1', usuarioAdmin, '192.168.1.10');
+      expect(res.ok).toBe(true);
+      expect(gateway.enviarPlantilla).toHaveBeenCalledWith(
+        1n,
+        '999888777',
+        'caprichos_reabrir_conversacion',
+        ['Ana Perfil WA'],
+        'PERSONA',
+      );
+      expect(auditoria.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accion: 'ENVIAR_PLANTILLA_REAPERTURA',
+          entidad: 'conversacion',
+          entidadId: 1n,
+        }),
+      );
+    });
+  });
+
+  describe('Límite de tasa por usuario (20 mensajes/minuto)', () => {
+    let redisClient: any;
+    let redisService: any;
+
+    beforeEach(() => {
+      redisClient = {
+        incr: jest.fn().mockResolvedValue(1),
+        expire: jest.fn().mockResolvedValue(1),
+      };
+      redisService = {
+        obtenerCliente: jest.fn().mockReturnValue(redisClient),
+      };
+      service = new MensajesService(prisma, auditoria, gateway, eventos, undefined, redisService);
+    });
+
+    it('permite el envío e incrementa el contador cuando no supera 20 mensajes', async () => {
+      redisClient.incr.mockResolvedValue(5);
+
+      const res = await service.enviar('1', 'Mensaje dentro del límite', usuarioAdmin);
+      expect(res.id).toBe('msg-1');
+      expect(redisClient.incr).toHaveBeenCalledWith('ratelimit:mensajes:usuario:10');
+    });
+
+    it('bloquea con 429 LIMITE_ENVIO cuando el usuario supera 20 mensajes en el minuto', async () => {
+      redisClient.incr.mockResolvedValue(21);
+
+      let errorCapturado: any;
+      try {
+        await service.enviar('1', 'Mensaje bloqueado por tasa', usuarioAdmin);
+      } catch (e) {
+        errorCapturado = e;
+      }
+
+      expect(errorCapturado).toBeDefined();
+      expect(errorCapturado.getStatus()).toBe(429);
+      expect(errorCapturado.getResponse().codigo).toBe('LIMITE_ENVIO');
+      expect(errorCapturado.getResponse().mensaje).toContain('Superaste el limite de 20 mensajes por minuto');
+      expect(gateway.enviarTexto).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Reintentar mensaje fallido', () => {
+    beforeEach(() => {
+      prisma.mensajeChat.findFirst = jest.fn().mockImplementation(({ where }) => {
+        if (where.id === 500n && where.conversacion_id === 1n) {
+          return Promise.resolve({
+            id: 500n,
+            conversacion_id: 1n,
+            direccion: 'SALE',
+            autor: 'PERSONA',
+            tipo: 'TEXTO',
+            contenido: { texto: 'Texto que falló', estado: 'FALLIDO', errorCodigo: 'DESTINATARIO_NO_VERIFICADO' },
+            en: new Date(),
+          });
+        }
+        return Promise.resolve(null);
+      });
+      service = new MensajesService(prisma, auditoria, gateway, eventos);
+    });
+
+    it('reintenta con éxito y actualiza el mensaje anterior', async () => {
+      gateway.enviarTexto.mockResolvedValue({
+        id: 'msg-reintento-ok',
+        autor: 'PERSONA',
+        texto: 'Texto que falló',
+        metaId: 'wamid.retry.123',
+        estado: 'ENVIADO',
+      });
+
+      const res = await service.reintentarMensaje('1', '500', usuarioAdmin);
+      expect(res.ok).toBe(true);
+      expect(res.id).toBe('500');
+      expect(gateway.enviarTexto).toHaveBeenCalledWith(1n, '999888777', 'Texto que falló', 'PERSONA');
+      expect(prisma.mensajeChat.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 500n },
+          data: expect.objectContaining({
+            meta_id: 'wamid.retry.123',
+          }),
+        }),
+      );
+    });
+
+    it('falla con 404 si el mensaje no existe en la conversación', async () => {
+      await expect(service.reintentarMensaje('1', '99999', usuarioAdmin)).rejects.toMatchObject({
+        response: { codigo: 'MENSAJE_NO_ENCONTRADO' },
+      });
+    });
+  });
+
+  describe('Mapeo de errores de Meta en el envío', () => {
+    it('mapea DESTINATARIO_NO_VERIFICADO a mensaje comprensible en español sin secretos', async () => {
+      gateway.enviarTexto.mockResolvedValue({
+        id: 'msg-fallido',
+        autor: 'PERSONA',
+        texto: 'Hola',
+        metaId: null,
+        estado: 'FALLIDO',
+        errorCodigo: 'DESTINATARIO_NO_VERIFICADO',
+        errorDetalle: 'Recipient phone number not in allowed list',
+      });
+
+      let errorCapturado: any;
+      try {
+        await service.enviar('1', 'Hola', usuarioAdmin);
+      } catch (e) {
+        errorCapturado = e;
+      }
+
+      expect(errorCapturado).toBeDefined();
+      expect(errorCapturado.getStatus()).toBe(400);
+      expect(errorCapturado.getResponse().codigo).toBe('DESTINATARIO_NO_VERIFICADO');
+      expect(errorCapturado.getResponse().mensaje).toBe('Este numero no esta autorizado en el numero de prueba de Meta');
+    });
+
+    it('mapea TOKEN_VENCIDO a mensaje claro para el usuario', async () => {
+      gateway.enviarTexto.mockResolvedValue({
+        id: 'msg-fallido-token',
+        autor: 'PERSONA',
+        texto: 'Hola',
+        metaId: null,
+        estado: 'FALLIDO',
+        errorCodigo: 'TOKEN_VENCIDO',
+      });
+
+      let errorCapturado: any;
+      try {
+        await service.enviar('1', 'Hola', usuarioAdmin);
+      } catch (e) {
+        errorCapturado = e;
+      }
+
+      expect(errorCapturado).toBeDefined();
+      expect(errorCapturado.getStatus()).toBe(400);
+      expect(errorCapturado.getResponse().codigo).toBe('TOKEN_VENCIDO');
+      expect(errorCapturado.getResponse().mensaje).toBe('El acceso a WhatsApp vencio: avisa a quien administra la cuenta');
+    });
   });
 });

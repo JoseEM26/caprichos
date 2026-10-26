@@ -23,6 +23,11 @@ import {
   hashTelefono,
   normalizarTelefono,
 } from '../utilidades/enmascarar.util';
+import {
+  limpiarNombrePerfil,
+  obtenerNombreMostrar,
+} from '../../mensajes/utilidades/nombre-contacto.util';
+import { EjecutorConversacionService } from '../conversacion/ejecutor-conversacion.service';
 
 export const MAX_MEDIA_BYTES = 5 * 1024 * 1024; // 5 MB
 export const TIPOS_MEDIA_PERMITIDOS = [
@@ -47,6 +52,7 @@ export class WhatsappWebhookService {
     private readonly mensajeria: WhatsAppMensajeriaPuerto,
     private readonly archivosService: ArchivosService,
     @Optional() private readonly eventos?: EventosGateway,
+    @Optional() private readonly motorConversacion?: EjecutorConversacionService,
   ) {
     this.verifyToken = this.configService.get<string>('WHATSAPP_VERIFY_TOKEN', '').trim();
     this.appSecret = this.configService.get<string>('WHATSAPP_APP_SECRET', '').trim();
@@ -140,6 +146,17 @@ export class WhatsappWebhookService {
           ...(errorDetalle ? { error_detalle: errorDetalle } : {}),
         },
       });
+
+      const waMsg = await this.prisma.whatsappMensaje.findFirst({
+        where: { wa_message_id: waMessageId },
+        select: { conversacion_id: true },
+      });
+
+      if (waMsg?.conversacion_id) {
+        this.eventos?.emitirAdmin('mensajes:actualizado', {
+          id: waMsg.conversacion_id.toString(),
+        });
+      }
     } catch (err: any) {
       this.logger.error(`Error actualizando estado para waMessageId ${waMessageId}: ${err.message}`);
     }
@@ -204,12 +221,53 @@ export class WhatsappWebhookService {
   /**
    * Procesa un mensaje entrante de un cliente (texto, interactivo/botón o imagen).
    */
-  private async procesarMensajeEntrante(msg: any) {
+  private async procesarMensajeEntrante(msg: any, contacts: any[] = []) {
     const waMessageId = msg.id;
-    const rawFrom = String(msg.from || '');
-    const telefonoNorm = normalizarTelefono(rawFrom);
-    const telHash = hashTelefono(telefonoNorm);
-    const telMask = enmascararTelefono(telefonoNorm);
+
+    // Contacto y nombre de perfil defensivo (contacts[].profile.name)
+    const listaContactos = Array.isArray(contacts) ? contacts : [];
+    const contact =
+      listaContactos.find(
+        (c) =>
+          (c.wa_id && (c.wa_id === msg.from || c.wa_id === msg.from_user_id)) ||
+          (c.user_id && (c.user_id === msg.from || c.user_id === msg.from_user_id)),
+      ) ||
+      (listaContactos.length > 0 ? listaContactos[0] : null);
+
+    const rawProfileName = contact?.profile?.name || msg.profile?.name;
+    const nombrePerfil = limpiarNombrePerfil(rawProfileName);
+
+    // Identificación: teléfono normalizado o identificador de usuario (BSUID)
+    const rawFrom = String(msg.from || contact?.wa_id || '').trim();
+    const esTelefonoValido = /^\+?\d{7,15}$/.test(rawFrom);
+
+    let identificador: string;
+    let tipoIdentificador: string;
+    let telefonoNorm: string | null = null;
+    let telHash: string;
+    let telMask: string;
+
+    if (esTelefonoValido) {
+      telefonoNorm = normalizarTelefono(rawFrom);
+      identificador = telefonoNorm;
+      tipoIdentificador = 'TELEFONO';
+      telHash = hashTelefono(telefonoNorm);
+      telMask = enmascararTelefono(telefonoNorm);
+    } else {
+      const rawUserId = String(
+        msg.from_user_id ||
+          contact?.user_id ||
+          (!esTelefonoValido && rawFrom ? rawFrom : '') ||
+          '',
+      ).trim();
+      const userId = rawUserId || (msg.id ? `desconocido_${msg.id}` : `anonimo_${Date.now()}`);
+      identificador = `wa-user:${userId}`;
+      tipoIdentificador = 'USUARIO_WA';
+      telefonoNorm = null;
+      telHash = hashTelefono(identificador);
+      telMask = 'Usuario de WhatsApp';
+    }
+
     const tipo = msg.type;
 
     // IDEMPOTENCIA: Verificar si ya procesamos este wa_message_id
@@ -258,6 +316,48 @@ export class WhatsappWebhookService {
       texto = `[Mensaje de tipo ${tipo}]`;
     }
 
+    // Asociar a conversación existente o crearla de forma defensiva
+    let conversacion = await this.prisma.conversacion.findUnique({
+      where: { telefono: identificador },
+    });
+
+    if (!conversacion) {
+      conversacion = await this.prisma.conversacion.create({
+        data: {
+          telefono: identificador,
+          duenio: 'BOT',
+          estado: 'ABIERTA',
+          nombre_contacto: nombrePerfil,
+          nombre_editado: false,
+          identificador_tipo: tipoIdentificador,
+          flujo: nombrePerfil ? { nombre_perfil_wa: nombrePerfil } : undefined,
+          ultima_actividad: new Date(),
+        },
+      });
+    } else {
+      const flujoActual = (conversacion.flujo as any) || {};
+      const dataUpdate: any = { ultima_actividad: new Date() };
+
+      // Preservar en flujo el último perfil recibido de WhatsApp
+      if (nombrePerfil && flujoActual.nombre_perfil_wa !== nombrePerfil) {
+        dataUpdate.flujo = { ...flujoActual, nombre_perfil_wa: nombrePerfil };
+      }
+
+      // Actualizar nombre_contacto solo si NO ha sido editado a mano
+      if (!conversacion.nombre_editado && nombrePerfil && conversacion.nombre_contacto !== nombrePerfil) {
+        dataUpdate.nombre_contacto = nombrePerfil;
+      }
+
+      if (conversacion.identificador_tipo !== tipoIdentificador) {
+        dataUpdate.identificador_tipo = tipoIdentificador;
+      }
+
+      conversacion = await this.prisma.conversacion.update({
+        where: { id: conversacion.id },
+        data: dataUpdate,
+      });
+    }
+
     // 1. Detección de consentimiento Ley 29733 (BAJA / STOP / NO MAS / ALTA)
     const textoNorm = texto.toLowerCase().trim();
     if (textoNorm === 'baja' || textoNorm === 'stop' || textoNorm === 'no mas') {
@@ -278,11 +378,13 @@ export class WhatsappWebhookService {
 
       this.logger.log(`Consentimiento revocado (BAJA) para cliente ${telMask}`);
 
-      // Confirmar al cliente
-      await this.mensajeria.enviarTexto(
-        telefonoNorm,
-        'Hemos registrado tu solicitud de baja. No te enviaremos mas mensajes promocionales ni informativos, salvo comunicaciones estrictamente operativas de pedidos que tengas en curso. Si deseas volver a recibir avisos escribe ALTA.',
-      );
+      // Confirmar al cliente (solo si tiene número de teléfono)
+      if (telefonoNorm) {
+        await this.mensajeria.enviarTexto(
+          telefonoNorm,
+          'Hemos registrado tu solicitud de baja. No te enviaremos mas mensajes promocionales ni informativos, salvo comunicaciones estrictamente operativas de pedidos que tengas en curso. Si deseas volver a recibir avisos escribe ALTA.',
+        );
+      }
     } else if (textoNorm === 'alta' || textoNorm === 'start') {
       await this.prisma.clienteWhatsappConsentimiento.upsert({
         where: { telefono_hash: telHash },
@@ -298,54 +400,39 @@ export class WhatsappWebhookService {
           en: new Date(),
         },
       });
-      await this.mensajeria.enviarTexto(
-        telefonoNorm,
-        'Has reactivado los avisos de Caprichos. Te mantendremos informado sobre el estado de tus pedidos.',
-      );
+      if (telefonoNorm) {
+        await this.mensajeria.enviarTexto(
+          telefonoNorm,
+          'Has reactivado los avisos de Caprichos. Te mantendremos informado sobre el estado de tus pedidos.',
+        );
+      }
     }
 
-    // 2. Buscar último pedido activo o reciente del cliente para asociarlo
-    const pedidoReciente = await this.prisma.pedido.findFirst({
-      where: {
-        OR: [
-          { cliente_telefono: { contains: telefonoNorm.slice(-8) } },
-          { cliente_telefono: telefonoNorm },
-        ],
-      },
-      orderBy: { creado_en: 'desc' },
-      select: { id: true, codigo: true, cliente_nombre: true, estado: true, modalidad: true },
-    });
+    // 2. Buscar último pedido activo o reciente del cliente para asociarlo (solo si tiene teléfono)
+    const pedidoReciente = telefonoNorm
+      ? await this.prisma.pedido.findFirst({
+          where: {
+            OR: [
+              { cliente_telefono: { contains: telefonoNorm.slice(-8) } },
+              { cliente_telefono: telefonoNorm },
+            ],
+          },
+          orderBy: { creado_en: 'desc' },
+          select: { id: true, codigo: true, cliente_nombre: true, estado: true, modalidad: true },
+        })
+      : null;
 
     // 3. Procesamiento de encuesta posventa
-    await this.procesarPosibleEncuesta(telHash, telMask, texto, buttonPayload, pedidoReciente);
+    await this.procesarPosibleEncuesta(telHash, telMask, texto, buttonPayload, pedidoReciente, conversacion);
 
-    // 4. Procesamiento de respuesta a reprogramación
-    await this.procesarPosibleReprogramacion(texto, buttonPayload, pedidoReciente, telMask, telefonoNorm);
+    // 4. Procesamiento de respuesta a reprogramación (solo con teléfono)
+    if (telefonoNorm) {
+      await this.procesarPosibleReprogramacion(texto, buttonPayload, pedidoReciente, telMask, telefonoNorm);
+    }
 
     // 5. Procesamiento de imagen de voucher
     if (imagenBuffer && pedidoReciente) {
       await this.guardarVoucherPrivado(imagenBuffer, imagenMime, pedidoReciente, telMask);
-    }
-
-    // 6. Asociar a conversación existente en módulo mensajes sin romper su flujo
-    let conversacion = await this.prisma.conversacion.findUnique({
-      where: { telefono: telefonoNorm },
-    });
-
-    if (!conversacion) {
-      conversacion = await this.prisma.conversacion.create({
-        data: {
-          telefono: telefonoNorm,
-          duenio: 'BOT',
-          estado: 'ABIERTA',
-          ultima_actividad: new Date(),
-        },
-      });
-    } else {
-      await this.prisma.conversacion.update({
-        where: { id: conversacion.id },
-        data: { ultima_actividad: new Date() },
-      });
     }
 
     // Registrar mensaje en mensaje_chat del módulo de mensajes
@@ -376,6 +463,41 @@ export class WhatsappWebhookService {
 
     // Notificar por websocket a la consola de mensajes
     this.eventos?.emitirAdmin('mensajes:actualizado', { id: conversacion.id.toString() });
+
+    // 6. Invocación segura del motor de conversación (Ola 1 Agente B)
+    // El bot responde únicamente si la conversación le pertenece y el cliente no solicitó baja/alta
+    const esComandoBajaOAlta =
+      textoNorm === 'baja' ||
+      textoNorm === 'stop' ||
+      textoNorm === 'no mas' ||
+      textoNorm === 'alta' ||
+      textoNorm === 'start';
+
+    if (this.motorConversacion && !esComandoBajaOAlta && conversacion.duenio === 'BOT') {
+      const consentimiento = await this.prisma.clienteWhatsappConsentimiento.findUnique({
+        where: { telefono_hash: telHash },
+      });
+      const consentimientoRevocado = consentimiento && !consentimiento.acepta;
+
+      if (!consentimientoRevocado) {
+        try {
+          await this.motorConversacion.procesarMensajeEntrante(conversacion.id, {
+            texto,
+            buttonPayload,
+            listReplyId: msg.interactive?.type === 'list_reply' ? msg.interactive.list_reply.id : undefined,
+            tipo,
+            waMessageId,
+            telefono: telefonoNorm || undefined,
+            telMask,
+          });
+        } catch (err: any) {
+          this.logger.error(
+            `Error al invocar motor conversacional para conversación ${conversacion.id}: ${err.message}`,
+          );
+        }
+      }
+    }
+
     return true;
   }
 
@@ -440,6 +562,7 @@ export class WhatsappWebhookService {
     texto: string,
     buttonPayload: string | null,
     pedido: any,
+    conversacion?: any,
   ) {
     if (!pedido) return;
 
@@ -487,12 +610,17 @@ export class WhatsappWebhookService {
       const umbralQueja = typeof paramQueja?.valor === 'number' ? paramQueja.valor : 2;
 
       if (puntaje <= umbralQueja) {
+        const nombreCliente =
+          (conversacion ? obtenerNombreMostrar(conversacion) : null) ||
+          pedido.cliente_nombre ||
+          telMask;
+
         // Registrar queja en queja_whatsapp
         const queja = await this.prisma.quejaWhatsapp.create({
           data: {
             origen: 'ENCUESTA',
             pedido_id: pedido.id,
-            cliente: pedido.cliente_nombre || telMask,
+            cliente: nombreCliente,
             telefono_hash: telHash,
             puntaje,
             texto: texto || `Calificación baja en encuesta posventa (${puntaje}/5)`,
@@ -528,8 +656,10 @@ export class WhatsappWebhookService {
           ? 'Gracias por tu respuesta. Lamentamos que tu experiencia no haya sido optima; nuestro equipo revisara tu caso para contactarte y mejorar.'
           : 'Muchas gracias por calificar nuestro servicio. Esperamos atenderte nuevamente pronto.';
 
-      // Enviar agradecimiento (ventana está abierta porque el cliente acaba de escribir)
-      await this.mensajeria.enviarTexto(pedido.cliente_telefono || telMask, agradecimiento);
+      // Enviar agradecimiento si el cliente tiene teléfono
+      if (pedido.cliente_telefono) {
+        await this.mensajeria.enviarTexto(pedido.cliente_telefono, agradecimiento);
+      }
     }
   }
 
@@ -612,7 +742,7 @@ export class WhatsappWebhookService {
         // 2. Mensajes entrantes
         if (Array.isArray(val.messages)) {
           for (const msg of val.messages) {
-            const nuevo = await this.procesarMensajeEntrante(msg);
+            const nuevo = await this.procesarMensajeEntrante(msg, val.contacts);
             if (nuevo) mensajesProcesados++;
           }
         }

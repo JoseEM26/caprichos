@@ -60,3 +60,36 @@ export async function aprobarPagoChat(id: string): Promise<{ ok: boolean }> {
 export async function rechazarPagoChat(id: string): Promise<{ ok: boolean }> {
   return api.post<{ ok: boolean }>(`/admin/mensajes/conversaciones/${id}/rechazar-pago`, {});
 }
+
+export async function editarNombreContacto(
+  id: string,
+  datos: { nombre?: string; revertir?: boolean },
+): Promise<{
+  ok: boolean;
+  id: string;
+  nombre: string;
+  nombre_contacto: string | null;
+  nombre_editado: boolean;
+  identificador_tipo: 'TELEFONO' | 'USUARIO_WA';
+}> {
+  return api.patch(`/admin/mensajes/conversaciones/${id}/nombre`, datos);
+}
+
+export async function reabrirConversacionPlantilla(
+  id: string,
+): Promise<{ ok: boolean; id: string }> {
+  return api.post<{ ok: boolean; id: string }>(
+    `/admin/mensajes/conversaciones/${id}/reabrir-plantilla`,
+    {},
+  );
+}
+
+export async function reintentarMensaje(
+  conversacionId: string,
+  mensajeId: string,
+): Promise<{ ok: boolean; id: string }> {
+  return api.post<{ ok: boolean; id: string }>(
+    `/admin/mensajes/conversaciones/${conversacionId}/mensajes/${mensajeId}/reintentar`,
+    {},
+  );
+}

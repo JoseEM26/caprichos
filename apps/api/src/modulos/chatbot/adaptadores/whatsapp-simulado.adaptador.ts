@@ -3,6 +3,7 @@ import { PrismaService } from '../../../comun/prisma/prisma.service';
 import {
   BotonAccion,
   EstadoConexionWhatsApp,
+  FilaLista,
   OpcionesEnvio,
   ResultadoEnvioWhatsApp,
   WhatsAppMensajeriaPuerto,
@@ -169,6 +170,52 @@ export class WhatsAppSimuladoAdaptador implements WhatsAppMensajeriaPuerto {
       };
     } catch (error: any) {
       this.logger.error(`[SIMULADO] Error guardando botones simulados: ${error.message}`);
+      return {
+        exito: false,
+        estado: 'FALLIDO',
+        errorCodigo: 'ERROR_BD_SIMULADO',
+        errorDetalle: error.message,
+      };
+    }
+  }
+
+  async enviarLista(
+    telefono: string,
+    texto: string,
+    botonTexto: string,
+    filas: FilaLista[],
+    opciones?: OpcionesEnvio,
+  ): Promise<ResultadoEnvioWhatsApp> {
+    const waMessageId = this.generarWaMessageId();
+    const telHash = hashTelefono(telefono);
+    const telMask = enmascararTelefono(telefono);
+    const titulosFilas = filas.slice(0, 10).map((f) => f.titulo).join(', ');
+
+    this.logger.log(`[SIMULADO] Enviar lista [${titulosFilas}] con botón '${botonTexto}' a ${telMask}`);
+
+    try {
+      const registro = await this.prisma.whatsappMensaje.create({
+        data: {
+          direccion: 'SALIENTE',
+          wa_message_id: waMessageId,
+          telefono_enmascarado: telMask,
+          telefono_hash: telHash,
+          tipo: 'LISTA',
+          plantilla: null,
+          estado: 'SIMULADO',
+          pedido_id: this.parsearId(opciones?.pedidoId),
+          conversacion_id: this.parsearId(opciones?.conversacionId),
+        },
+      });
+
+      return {
+        exito: true,
+        id: registro.id.toString(),
+        waMessageId,
+        estado: 'SIMULADO',
+      };
+    } catch (error: any) {
+      this.logger.error(`[SIMULADO] Error guardando lista simulada: ${error.message}`);
       return {
         exito: false,
         estado: 'FALLIDO',

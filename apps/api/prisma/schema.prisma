@@ -1512,6 +1512,9 @@ model Conversacion {
   urgente            Boolean            @default(false)
   estado             String             @default("ABIERTA") // ABIERTA | VALIDAR_PAGO | ATENDIDA
   flujo              Json?
+  nombre_contacto    String?
+  nombre_editado     Boolean            @default(false)
+  identificador_tipo String             @default("TELEFONO") // TELEFONO | USUARIO_WA
   ultima_actividad   DateTime           @default(now()) @db.Timestamptz
 
   party              Party?             @relation(fields: [party_id], references: [id])
@@ -1524,17 +1527,20 @@ model Conversacion {
 }
 
 model MensajeChat {
-  id              BigInt       @id @default(autoincrement())
-  conversacion_id BigInt
-  direccion       String       // ENTRA | SALE
-  autor           String       // CLIENTE | BOT | PERSONA
-  tipo            String       // TEXTO | IMAGEN | AUDIO | BOTON | PLANTILLA | SISTEMA
-  contenido       Json
-  meta_id         String?      @unique
-  en              DateTime     @default(now()) @db.Timestamptz
+  id                  BigInt           @id @default(autoincrement())
+  conversacion_id     BigInt
+  direccion           String           // ENTRA | SALE
+  autor               String           // CLIENTE | BOT | PERSONA
+  tipo                String           // TEXTO | IMAGEN | AUDIO | BOTON | PLANTILLA | SISTEMA
+  contenido           Json
+  meta_id             String?          @unique
+  whatsapp_mensaje_id BigInt?
+  en                  DateTime         @default(now()) @db.Timestamptz
 
-  conversacion    Conversacion @relation(fields: [conversacion_id], references: [id], onDelete: Cascade)
+  conversacion        Conversacion     @relation(fields: [conversacion_id], references: [id], onDelete: Cascade)
+  whatsappMensaje     WhatsappMensaje? @relation(fields: [whatsapp_mensaje_id], references: [id], onDelete: SetNull)
 
+  @@index([whatsapp_mensaje_id])
   @@map("mensaje_chat")
 }
 
@@ -1793,6 +1799,7 @@ model WhatsappMensaje {
 
   pedido               Pedido?       @relation(fields: [pedido_id], references: [id])
   conversacion         Conversacion? @relation(fields: [conversacion_id], references: [id])
+  mensajesChat         MensajeChat[]
 
   @@index([telefono_hash])
   @@index([creado_en])

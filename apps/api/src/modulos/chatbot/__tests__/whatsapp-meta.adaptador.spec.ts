@@ -238,6 +238,40 @@ describe('WhatsAppMetaAdaptador', () => {
     expect(payloadEnviado.interactive.action.buttons[0].reply.title).toBe('Boton 1');
   });
 
+  it('envía lista interactiva limitando a máximo 10 filas', async () => {
+    let payloadEnviado: any = null;
+    global.fetch = jest.fn().mockImplementation((_url, opt: any) => {
+      payloadEnviado = JSON.parse(opt.body);
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        text: jest.fn().mockResolvedValue(JSON.stringify({ messages: [{ id: 'wamid.list' }] })),
+      });
+    });
+
+    const filasPrueba = Array.from({ length: 15 }, (_, i) => ({
+      id: `item_${i + 1}`,
+      titulo: `Opción ${i + 1}`,
+      descripcion: `Detalle ${i + 1}`,
+    }));
+
+    const resultado = await adaptador.enviarLista(
+      '987654321',
+      'Elige de la lista:',
+      'Ver lista',
+      filasPrueba,
+      { tituloSeccion: 'Categorías' },
+    );
+
+    expect(resultado.exito).toBe(true);
+    expect(payloadEnviado.type).toBe('interactive');
+    expect(payloadEnviado.interactive.type).toBe('list');
+    expect(payloadEnviado.interactive.action.button).toBe('Ver lista');
+    expect(payloadEnviado.interactive.action.sections[0].title).toBe('Categorías');
+    expect(payloadEnviado.interactive.action.sections[0].rows).toHaveLength(10);
+    expect(payloadEnviado.interactive.action.sections[0].rows[0].id).toBe('item_1');
+  });
+
   it('marca mensaje como leído enviando status read', async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,

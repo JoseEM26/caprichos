@@ -33,6 +33,7 @@ export const CLAVES_NUMERICAS = [
 export const CLAVES_TEXTO = [
   'envio_gratis_modo',
   'carta_aviso_entrada',
+  'chatbot_activo',
   'whatsapp_aviso_salida_activo',
   'whatsapp_aviso_llegada_activo',
   'whatsapp_aviso_espera_activo',
@@ -111,7 +112,11 @@ export class ConfiguracionService {
         });
       }
     } else if ((CLAVES_TEXTO as readonly string[]).includes(clave)) {
-      if (clave === 'carta_aviso_entrada' || clave.startsWith('whatsapp_aviso_')) {
+      if (
+        clave === 'carta_aviso_entrada' ||
+        clave === 'chatbot_activo' ||
+        clave.startsWith('whatsapp_aviso_')
+      ) {
         const valNorm =
           typeof valor === 'boolean'
             ? valor

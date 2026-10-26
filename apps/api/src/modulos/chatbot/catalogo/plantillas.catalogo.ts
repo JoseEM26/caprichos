@@ -64,4 +64,12 @@ export const CATALOGO_PLANTILLAS: Record<string, DefinicionPlantilla> = {
     texto: 'Hola {{1}}, gracias por tu compra en Caprichos (pedido {{2}}). ¿Como calificarias tu atencion del 1 al 5?',
     descripcion: 'Plantilla de encuesta posventa enviada tras la entrega del pedido.',
   },
+  REABRIR_CONVERSACION: {
+    nombre: 'caprichos_reabrir_conversacion',
+    categoria: 'UTILITY',
+    idioma: 'es',
+    variables: ['nombre_cliente'],
+    texto: 'Hola {{1}}, nos comunicamos de Caprichos para dar seguimiento a tu consulta. ¿En que podemos ayudarte?',
+    descripcion: 'Plantilla de utilidad para reabrir la conversación cuando la ventana de 24 horas está cerrada.',
+  },
 };

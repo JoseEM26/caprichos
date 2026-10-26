@@ -3,6 +3,7 @@ import { Confirmar } from '../../comun/Confirmar';
 import { useEventos } from '../../comun/socket';
 import {
   aprobarPagoChat,
+  editarNombreContacto,
   enviarMensaje,
   listarConversaciones,
   listarRespuestasRapidas,
@@ -10,11 +11,14 @@ import {
   obtenerDetalleConversacion,
   pausarBot,
   pulirMensaje,
+  reabrirConversacionPlantilla,
   rechazarPagoChat,
+  reintentarMensaje,
   reanudarBot,
   soltarChat,
   tomarChat,
 } from './mensajesApi';
+import { ModalEditarNombre, IconoLapiz } from './ModalEditarNombre';
 import {
   ChatResumen,
   DetalleConversacion,
@@ -22,6 +26,11 @@ import {
   FiltroChat,
   RespuestaRapida,
 } from './mensajesTipos';
+
+function esUsuarioWhatsApp(c?: { identificador_tipo?: string; telefono?: string } | null): boolean {
+  if (!c) return false;
+  return c.identificador_tipo === 'USUARIO_WA' || (Boolean(c.telefono) && c.telefono!.startsWith('wa-user:'));
+}
 
 const ESTADOS_BG: Record<EstadoChat, string> = {
   atencion: '#FBE9DF',
@@ -96,6 +105,65 @@ export function MensajesView() {
     accion: () => Promise<void>;
   } | null>(null);
 
+  // Modal para editar nombre de contacto
+  const [modalEditarAbierto, setModalEditarAbierto] = useState(false);
+
+  const handleGuardarNombre = async (nuevoNombre: string) => {
+    if (!detalle) return;
+    const res = await editarNombreContacto(detalle.id, { nombre: nuevoNombre });
+    setDetalle((prev) =>
+      prev
+        ? {
+            ...prev,
+            nombre: res.nombre,
+            nombre_contacto: res.nombre_contacto,
+            nombre_editado: res.nombre_editado,
+          }
+        : null,
+    );
+    setChats((prev) =>
+      prev.map((c) =>
+        c.id === detalle.id
+          ? {
+              ...c,
+              nombre: res.nombre,
+              nombre_contacto: res.nombre_contacto,
+              nombre_editado: res.nombre_editado,
+            }
+          : c,
+      ),
+    );
+    setMensajeCopiado(`Nombre actualizado a: ${res.nombre}`);
+  };
+
+  const handleRevertirNombre = async () => {
+    if (!detalle) return;
+    const res = await editarNombreContacto(detalle.id, { revertir: true });
+    setDetalle((prev) =>
+      prev
+        ? {
+            ...prev,
+            nombre: res.nombre,
+            nombre_contacto: res.nombre_contacto,
+            nombre_editado: res.nombre_editado,
+          }
+        : null,
+    );
+    setChats((prev) =>
+      prev.map((c) =>
+        c.id === detalle.id
+          ? {
+              ...c,
+              nombre: res.nombre,
+              nombre_contacto: res.nombre_contacto,
+              nombre_editado: res.nombre_editado,
+            }
+          : c,
+      ),
+    );
+    setMensajeCopiado(`Nombre restablecido a: ${res.nombre}`);
+  };
+
   // Cargar lista de conversaciones
   const cargarLista = useCallback(async (mantenerSeleccion = true) => {
     try {
@@ -164,6 +232,48 @@ export function MensajesView() {
   });
 
   // Acciones sobre el chat
+  const handleReabrirPlantilla = () => {
+    if (!detalle || !chatSeleccionadoId) return;
+    setConfirmarAccion({
+      titulo: '¿Reabrir conversación con plantilla?',
+      mensaje:
+        'Pasaron mas de 24 horas desde el ultimo mensaje del cliente. ¿Deseas enviar la plantilla aprobada para retomar el contacto?',
+      textoSi: 'Sí, reabrir',
+      accion: async () => {
+        try {
+          await reabrirConversacionPlantilla(chatSeleccionadoId);
+          setTextoMensaje('');
+          setTextoPulido(null);
+          setPulirError(null);
+          await cargarDetalle(chatSeleccionadoId);
+          await cargarLista(true);
+        } catch (e: any) {
+          setPulirError(e?.message || 'Error al enviar la plantilla');
+        }
+      },
+    });
+  };
+
+  const handleReintentarMensaje = (mensajeId: string) => {
+    if (!detalle || !chatSeleccionadoId) return;
+    setConfirmarAccion({
+      titulo: '¿Reintentar envío de mensaje?',
+      mensaje: '¿Deseas intentar enviar nuevamente este mensaje al cliente?',
+      textoSi: 'Sí, reintentar',
+      accion: async () => {
+        try {
+          await reintentarMensaje(chatSeleccionadoId, mensajeId);
+          setPulirError(null);
+          await cargarDetalle(chatSeleccionadoId);
+          await cargarLista(true);
+        } catch (err: any) {
+          setPulirError(err?.message || 'Error al reintentar mensaje');
+          await cargarDetalle(chatSeleccionadoId);
+        }
+      },
+    });
+  };
+
   const handleEnviarMensaje = async (textoAEnviar?: string) => {
     const txt = (textoAEnviar !== undefined ? textoAEnviar : textoMensaje).trim();
     if (!txt || !chatSeleccionadoId || enviando) return;
@@ -177,6 +287,27 @@ export function MensajesView() {
       await cargarLista(true);
     } catch (err: any) {
       setPulirError(err?.message || 'Error al enviar mensaje');
+      await cargarDetalle(chatSeleccionadoId);
+      if (err?.codigo === 'VENTANA_CERRADA' || err?.message?.includes('24 horas')) {
+        setConfirmarAccion({
+          titulo: '¿Reabrir conversación con plantilla?',
+          mensaje:
+            'Pasaron mas de 24 horas desde el ultimo mensaje del cliente. Solo se puede escribir con una plantilla aprobada. ¿Deseas enviar la plantilla de reapertura?',
+          textoSi: 'Sí, reabrir',
+          accion: async () => {
+            try {
+              await reabrirConversacionPlantilla(chatSeleccionadoId);
+              setTextoMensaje('');
+              setTextoPulido(null);
+              setPulirError(null);
+              await cargarDetalle(chatSeleccionadoId);
+              await cargarLista(true);
+            } catch (e: any) {
+              setPulirError(e?.message || 'Error al enviar la plantilla');
+            }
+          },
+        });
+      }
     } finally {
       setEnviando(false);
     }
@@ -307,7 +438,7 @@ export function MensajesView() {
   };
 
   const handleCopiarCelular = () => {
-    if (!detalle?.telefono) return;
+    if (!detalle?.telefono || esUsuarioWhatsApp(detalle)) return;
     const num = detalle.telefono.replace(/\D/g, '');
     try {
       navigator.clipboard.writeText(num);
@@ -512,7 +643,26 @@ export function MensajesView() {
                     </span>
                     <span className="cv-rb">
                       <span className="cv-r1">
-                        <b className="cv-rn">{c.nombre}</b>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                          <b className="cv-rn">{c.nombre}</b>
+                          {esUsuarioWhatsApp(c) && (
+                            <span
+                              style={{
+                                fontSize: '10px',
+                                fontWeight: 700,
+                                padding: '1px 6px',
+                                borderRadius: '10px',
+                                background: '#E0F2FE',
+                                color: '#0369A1',
+                                border: '1px solid #BAE6FD',
+                                whiteSpace: 'nowrap',
+                                flexShrink: 0,
+                              }}
+                            >
+                              Usuario de WhatsApp
+                            </span>
+                          )}
+                        </span>
                         <span
                           className="cv-rt"
                           style={{ color: tieneSinLeer ? '#00A884' : '#667781' }}
@@ -565,9 +715,48 @@ export function MensajesView() {
                   {obtenerIniciales(detalle.nombre)}
                 </span>
                 <span className="cv-hb">
-                  <b className="cv-hn">{detalle.nombre}</b>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <b className="cv-hn">{detalle.nombre}</b>
+                    {esUsuarioWhatsApp(detalle) && (
+                      <span
+                        style={{
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          padding: '2px 8px',
+                          borderRadius: '12px',
+                          background: '#E0F2FE',
+                          color: '#0369A1',
+                          border: '1px solid #BAE6FD',
+                        }}
+                      >
+                        Usuario de WhatsApp
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setModalEditarAbierto(true)}
+                      title="Editar nombre"
+                      aria-label="Editar nombre"
+                      style={{
+                        background: '#FFFFFF',
+                        border: '1px solid var(--cp-line, #CBD5E1)',
+                        borderRadius: '6px',
+                        padding: '2px 8px',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        color: 'var(--cp-navy, #0B2C3E)',
+                      }}
+                    >
+                      <IconoLapiz tamano={13} />
+                      <span>Editar nombre</span>
+                    </button>
+                  </span>
                   <span className="cv-hs">
-                    {detalle.telefono}
+                    {esUsuarioWhatsApp(detalle) ? 'Usuario de WhatsApp' : detalle.telefono}
                     {detalle.modalidad ? ` · ${detalle.modalidad}` : ''}
                   </span>
                 </span>
@@ -580,6 +769,38 @@ export function MensajesView() {
                   {detalle.urgente ? `URGENTE · ${ESTADOS_LABEL[detalle.estado]}` : ESTADOS_LABEL[detalle.estado]}
                 </span>
               </div>
+
+              {/* Modo Simulado Banner */}
+              {detalle.simulado && (
+                <div
+                  role="status"
+                  className="cv-banner"
+                  style={{ background: '#FFF7ED', color: '#9A3412', borderBottom: '1px solid #FED7AA' }}
+                >
+                  <span>Modo simulado: no se envia a WhatsApp</span>
+                </div>
+              )}
+
+              {/* Ventana de 24 horas cerrada Banner */}
+              {detalle.ventanaAbierta === false && !esUsuarioWhatsApp(detalle) && (
+                <div
+                  role="status"
+                  className="cv-banner"
+                  style={{ background: '#FEF3C7', color: '#92400E', borderBottom: '1px solid #FDE68A' }}
+                >
+                  <span>
+                    Pasaron mas de 24 horas desde el ultimo mensaje del cliente. Solo se puede escribir con una plantilla aprobada.
+                  </span>
+                  <button
+                    type="button"
+                    className="cv-bbtn"
+                    style={{ borderColor: '#B45309', color: '#B45309' }}
+                    onClick={handleReabrirPlantilla}
+                  >
+                    Reabrir con plantilla
+                  </button>
+                </div>
+              )}
 
               {/* Banner Informativo */}
               {bannerInfo && (
@@ -635,9 +856,55 @@ export function MensajesView() {
                           </div>
                         )}
                         <div className="cv-txt">{m.texto}</div>
-                        <div className="cv-meta">
+                        <div className="cv-meta" style={{ flexWrap: 'wrap', gap: '6px' }}>
                           <span>{m.hora}</span>
-                          {!esCliente && <span className="cv-ck">✓✓</span>}
+                          {!esCliente && (
+                            <>
+                              {m.estado === 'FALLIDO' ? (
+                                <span
+                                  style={{
+                                    color: '#C0392B',
+                                    fontWeight: 700,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                  }}
+                                >
+                                  <span>
+                                    {m.motivoFallo
+                                      ? `No se pudo enviar: ${m.motivoFallo}`
+                                      : 'No se pudo enviar'}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleReintentarMensaje(m.id)}
+                                    style={{
+                                      border: '1px solid #C0392B',
+                                      background: '#FFFFFF',
+                                      color: '#C0392B',
+                                      borderRadius: '4px',
+                                      padding: '1px 6px',
+                                      fontSize: '11px',
+                                      fontWeight: 700,
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    Reintentar
+                                  </button>
+                                </span>
+                              ) : m.estado === 'SIMULADO' ? (
+                                <span style={{ color: '#667781' }}>
+                                  Modo simulado: no se envia a WhatsApp
+                                </span>
+                              ) : m.estado === 'LEIDO' ? (
+                                <span style={{ color: '#0284C7', fontWeight: 600 }}>Leido</span>
+                              ) : m.estado === 'ENTREGADO' ? (
+                                <span style={{ color: '#667781' }}>Entregado</span>
+                              ) : (
+                                <span style={{ color: '#667781' }}>Enviado</span>
+                              )}
+                            </>
+                          )}
                         </div>
                       </div>
                     );
@@ -736,37 +1003,55 @@ export function MensajesView() {
               )}
 
               {/* Compositor de mensaje */}
-              <div className="cv-comp">
-                <input
-                  type="text"
-                  placeholder="Escribe un mensaje"
-                  aria-label="Escribe un mensaje"
-                  value={textoMensaje}
-                  disabled={detalle.ocupado}
-                  onChange={(e) => setTextoMensaje(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleEnviarMensaje();
+              {esUsuarioWhatsApp(detalle) ? (
+                <div
+                  role="alert"
+                  style={{
+                    padding: '12px 16px',
+                    margin: '8px 14px',
+                    borderRadius: '10px',
+                    background: 'var(--cp-sand, #F8FAFC)',
+                    color: 'var(--cp-navy, #0B2C3E)',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    border: '1px solid var(--cp-line, #CBD5E1)',
                   }}
-                />
-                <button
-                  className="cv-polbtn"
-                  aria-label="Pulir el mensaje para que sea más amable"
-                  disabled={detalle.ocupado}
-                  onClick={handlePulir}
                 >
-                  Pulir
-                </button>
-                <button
-                  className="cv-send"
-                  aria-label="Enviar mensaje"
-                  disabled={detalle.ocupado || enviando}
-                  onClick={() => handleEnviarMensaje()}
-                >
-                  <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-                    <path d="M3 20l18-8L3 4v6l11 2-11 2z" fill="#fff" />
-                  </svg>
-                </button>
-              </div>
+                  Este contacto no comparte su numero: no se puede responder desde aqui todavia
+                </div>
+              ) : (
+                <div className="cv-comp">
+                  <input
+                    type="text"
+                    placeholder="Escribe un mensaje"
+                    aria-label="Escribe un mensaje"
+                    value={textoMensaje}
+                    disabled={detalle.ocupado}
+                    onChange={(e) => setTextoMensaje(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleEnviarMensaje();
+                    }}
+                  />
+                  <button
+                    className="cv-polbtn"
+                    aria-label="Pulir el mensaje para que sea más amable"
+                    disabled={detalle.ocupado}
+                    onClick={handlePulir}
+                  >
+                    Pulir
+                  </button>
+                  <button
+                    className="cv-send"
+                    aria-label="Enviar mensaje"
+                    disabled={detalle.ocupado || enviando}
+                    onClick={() => handleEnviarMensaje()}
+                  >
+                    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+                      <path d="M3 20l18-8L3 4v6l11 2-11 2z" fill="#fff" />
+                    </svg>
+                  </button>
+                </div>
+              )}
 
               {/* Menú Más Acciones */}
               <details className="cv-more">
@@ -776,14 +1061,18 @@ export function MensajesView() {
                     <button onClick={handleMarcarAtendido}>Marcar atendido</button>
                   )}
                   <button onClick={handleCopiarProductos}>Copiar solo productos</button>
-                  <button onClick={handleCopiarCelular}>Copiar celular</button>
-                  <a
-                    href={`https://wa.me/51${detalle.telefono.replace(/\D/g, '')}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Abrir en WhatsApp
-                  </a>
+                  {!esUsuarioWhatsApp(detalle) && (
+                    <>
+                      <button onClick={handleCopiarCelular}>Copiar celular</button>
+                      <a
+                        href={`https://wa.me/51${detalle.telefono.replace(/\D/g, '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Abrir en WhatsApp
+                      </a>
+                    </>
+                  )}
                 </div>
                 {mensajeCopiado && (
                   <div
@@ -819,6 +1108,20 @@ export function MensajesView() {
             await acc();
           }}
           alCancelar={() => setConfirmarAccion(null)}
+        />
+      )}
+
+      {/* Modal Editar Nombre */}
+      {detalle && (
+        <ModalEditarNombre
+          abierto={modalEditarAbierto}
+          conversacionId={detalle.id}
+          nombreActual={detalle.nombre}
+          nombreEditado={Boolean(detalle.nombre_editado)}
+          nombrePerfilWa={detalle.nombre_contacto}
+          alCerrar={() => setModalEditarAbierto(false)}
+          alGuardar={handleGuardarNombre}
+          alRevertir={handleRevertirNombre}
         />
       )}
     </div>

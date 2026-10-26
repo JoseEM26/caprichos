@@ -1,13 +1,21 @@
 import { Module } from '@nestjs/common';
+import { ComunModule } from '../../comun/comun.module';
+import { ChatbotModule } from '../chatbot/chatbot.module';
 import { MensajesController } from './mensajes.controller';
 import { MensajesService } from './mensajes.service';
 import { WHATSAPP_GATEWAY } from './whatsapp.gateway';
+import { WhatsAppMetaGateway } from './whatsapp-meta.gateway';
 import { WhatsAppLocalGateway } from './whatsapp-local.gateway';
 
 @Module({
+  imports: [ComunModule, ChatbotModule],
   controllers: [MensajesController],
-  // Al llegar las credenciales de Meta: cambiar useClass por WhatsAppCloudGateway (único cambio).
-  providers: [MensajesService, { provide: WHATSAPP_GATEWAY, useClass: WhatsAppLocalGateway }],
-  exports: [MensajesService],
+  providers: [
+    MensajesService,
+    WhatsAppLocalGateway,
+    WhatsAppMetaGateway,
+    { provide: WHATSAPP_GATEWAY, useClass: WhatsAppMetaGateway },
+  ],
+  exports: [MensajesService, WHATSAPP_GATEWAY, WhatsAppMetaGateway],
 })
 export class MensajesModule {}

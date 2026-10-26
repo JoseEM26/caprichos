@@ -9,12 +9,13 @@ vi.mock('../../../comun/socket', () => ({
 
 describe('MensajesView (/admin/mensajes)', () => {
   const chatsMock = {
-    conteos: { todos: 2, atender: 1, bot: 1, atendidos: 0 },
+    conteos: { todos: 3, atender: 1, bot: 2, atendidos: 0 },
     chats: [
       {
         id: '1',
         nombre: 'Ana Pérez',
         telefono: '999888777',
+        identificador_tipo: 'TELEFONO' as const,
         estado: 'atencion' as const,
         urgente: true,
         ultimo: 'Mi pedido llegó sin salsa',
@@ -25,11 +26,23 @@ describe('MensajesView (/admin/mensajes)', () => {
         id: '2',
         nombre: 'Rosa Díaz',
         telefono: '977666555',
+        identificador_tipo: 'TELEFONO' as const,
         estado: 'validar' as const,
         urgente: false,
         ultimo: 'Foto',
         hora: '21:35',
         sinLeer: 1,
+      },
+      {
+        id: '3',
+        nombre: 'Contacto Anónimo WA',
+        telefono: 'wa-user:usr_123',
+        identificador_tipo: 'USUARIO_WA' as const,
+        estado: 'bot' as const,
+        urgente: false,
+        ultimo: 'Buenas',
+        hora: '21:40',
+        sinLeer: 0,
       },
     ],
   };
@@ -129,6 +142,210 @@ describe('MensajesView (/admin/mensajes)', () => {
 
     await waitFor(() => {
       expect(api.pausarBot).toHaveBeenCalledWith('1');
+    });
+  });
+
+  it('5. Muestra la etiqueta Usuario de WhatsApp para remitentes sin teléfono en lista y detalle', async () => {
+    render(<MensajesView />);
+    await waitFor(() => {
+      expect(screen.getByText('Contacto Anónimo WA')).toBeInTheDocument();
+      expect(screen.getAllByText('Usuario de WhatsApp').length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  it('6. Muestra el botón Editar nombre junto al contacto y abre el modal', async () => {
+    render(<MensajesView />);
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Editar nombre' })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Editar nombre' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog', { name: 'Editar nombre de contacto' })).toBeInTheDocument();
+    });
+  });
+
+  it('7. En un chat sin teléfono muestra aviso que no se puede responder y oculta opciones de llamada', async () => {
+    const detalleSinTel = {
+      ...detalleMock,
+      id: '3',
+      nombre: 'Contacto Anónimo WA',
+      telefono: 'wa-user:usr_123',
+      identificador_tipo: 'USUARIO_WA' as const,
+    };
+    vi.spyOn(api, 'obtenerDetalleConversacion').mockResolvedValue(detalleSinTel);
+
+    render(<MensajesView />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Este contacto no comparte su numero: no se puede responder desde aqui todavia'),
+      ).toBeInTheDocument();
+      expect(screen.queryByPlaceholderText('Escribe un mensaje')).not.toBeInTheDocument();
+    });
+  });
+
+  it('8. Muestra indicadores de estado accesibles en mensajes salientes y modo simulado', async () => {
+    const detalleConEstados = {
+      ...detalleMock,
+      simulado: true,
+      mensajes: [
+        {
+          id: '10',
+          autor: 'PERSONA' as const,
+          saliente: true,
+          imagen: false,
+          texto: 'Mensaje leído',
+          hora: '21:05',
+          estado: 'LEIDO',
+        },
+        {
+          id: '11',
+          autor: 'PERSONA' as const,
+          saliente: true,
+          imagen: false,
+          texto: 'Mensaje entregado',
+          hora: '21:06',
+          estado: 'ENTREGADO',
+        },
+        {
+          id: '12',
+          autor: 'PERSONA' as const,
+          saliente: true,
+          imagen: false,
+          texto: 'Mensaje enviado',
+          hora: '21:07',
+          estado: 'ENVIADO',
+        },
+        {
+          id: '13',
+          autor: 'PERSONA' as const,
+          saliente: true,
+          imagen: false,
+          texto: 'Mensaje simulado',
+          hora: '21:08',
+          estado: 'SIMULADO',
+        },
+      ],
+    };
+    vi.spyOn(api, 'obtenerDetalleConversacion').mockResolvedValue(detalleConEstados);
+
+    render(<MensajesView />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Modo simulado: no se envia a WhatsApp').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText('Leido')).toBeInTheDocument();
+      expect(screen.getByText('Entregado')).toBeInTheDocument();
+      expect(screen.getByText('Enviado')).toBeInTheDocument();
+    });
+  });
+
+  it('9. Muestra motivo de fallo y botón Reintentar con confirmación Sí/No', async () => {
+    const detalleConFallo = {
+      ...detalleMock,
+      mensajes: [
+        {
+          id: '20',
+          autor: 'PERSONA' as const,
+          saliente: true,
+          imagen: false,
+          texto: 'Hola, tenemos un retraso',
+          hora: '21:10',
+          estado: 'FALLIDO',
+          errorCodigo: 'DESTINATARIO_NO_VERIFICADO',
+          motivoFallo: 'Este numero no esta autorizado en el numero de prueba de Meta',
+        },
+      ],
+    };
+    vi.spyOn(api, 'obtenerDetalleConversacion').mockResolvedValue(detalleConFallo);
+    const spyReintentar = vi.spyOn(api, 'reintentarMensaje').mockResolvedValue({ ok: true, id: '20' });
+
+    render(<MensajesView />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('No se pudo enviar: Este numero no esta autorizado en el numero de prueba de Meta'),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Reintentar' })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+
+    // Diálogo Confirmar
+    await waitFor(() => {
+      expect(screen.getByText('¿Reintentar envío de mensaje?')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Sí, reintentar' })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, reintentar' }));
+
+    await waitFor(() => {
+      expect(spyReintentar).toHaveBeenCalledWith('1', '20');
+    });
+  });
+
+  it('10. Notifica ventana de 24 horas cerrada y permite reabrir con plantilla mediante confirmación', async () => {
+    const detalleVentanaCerrada = {
+      ...detalleMock,
+      ventanaAbierta: false,
+    };
+    vi.spyOn(api, 'obtenerDetalleConversacion').mockResolvedValue(detalleVentanaCerrada);
+    const spyReabrir = vi.spyOn(api, 'reabrirConversacionPlantilla').mockResolvedValue({ ok: true, id: 'msg-pl' });
+
+    render(<MensajesView />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          'Pasaron mas de 24 horas desde el ultimo mensaje del cliente. Solo se puede escribir con una plantilla aprobada.',
+        ),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Reabrir con plantilla' })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reabrir con plantilla' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('¿Reabrir conversación con plantilla?')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Sí, reabrir' })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, reabrir' }));
+
+    await waitFor(() => {
+      expect(spyReabrir).toHaveBeenCalledWith('1');
+    });
+  });
+
+  it('11. Cuando el envío libre falla por ventana cerrada (409), ofrece diálogo para reabrir con plantilla', async () => {
+    render(<MensajesView />);
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('Escribe un mensaje')).toBeInTheDocument();
+    });
+
+    const error409 = {
+      codigo: 'VENTANA_CERRADA',
+      message:
+        'Pasaron mas de 24 horas desde el ultimo mensaje del cliente. Solo se puede escribir con una plantilla aprobada',
+      statusCode: 409,
+    };
+    vi.spyOn(api, 'enviarMensaje').mockRejectedValue(error409);
+    const spyReabrir = vi.spyOn(api, 'reabrirConversacionPlantilla').mockResolvedValue({ ok: true, id: 'msg-pl-2' });
+
+    const input = screen.getByPlaceholderText('Escribe un mensaje');
+    fireEvent.change(input, { target: { value: 'Mensaje enviado tarde' } });
+    fireEvent.click(screen.getByLabelText('Enviar mensaje'));
+
+    await waitFor(() => {
+      expect(screen.getByText('¿Reabrir conversación con plantilla?')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Sí, reabrir' })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, reabrir' }));
+
+    await waitFor(() => {
+      expect(spyReabrir).toHaveBeenCalledWith('1');
     });
   });
 });

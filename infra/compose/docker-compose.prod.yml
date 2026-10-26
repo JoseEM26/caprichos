@@ -43,6 +43,16 @@ services:
       DOMINIO_BASE: ${DOMINIO_PROD:-caprichos.pe}
       CORS_ORIGIN: https://${DOMINIO_PROD:-caprichos.pe},https://${DOMINIO_ADMIN:-admin.caprichos.pe}
       TRUST_PROXY: "1"
+      # Chatbot de WhatsApp: los valores viven solo en el .env del servidor (nunca en Git)
+      WHATSAPP_TOKEN: ${WHATSAPP_TOKEN:-}
+      WHATSAPP_PHONE_ID: ${WHATSAPP_PHONE_ID:-}
+      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
+      WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}
+      WHATSAPP_API_VERSION: ${WHATSAPP_API_VERSION:-v25.0}
+      ADMIN_WHATSAPP_NUMBERS: ${ADMIN_WHATSAPP_NUMBERS:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
+      CARTA_URL_PUBLICA: ${CARTA_URL_PUBLICA:-}
     labels:
       - traefik.enable=true
       - traefik.docker.network=caprichos-proxy-net
@@ -55,7 +65,7 @@ services:
       - traefik.http.routers.prod-api-subdomain.service=prod-api
       - traefik.http.routers.prod-api-subdomain.middlewares=sec-headers-prod@file,rate-limit-public@file
       # Rutas API bajo dominio principal y admin
-      - "traefik.http.routers.prod-api.rule=(Host(`${DOMINIO_PROD:-caprichos.pe}`) || Host(`${DOMINIO_ADMIN:-admin.caprichos.pe}`)) && (PathPrefix(`/auth`) || PathPrefix(`/carta`) || PathPrefix(`/pedidos`) || PathPrefix(`/archivos`) || PathPrefix(`/uploads`) || PathPrefix(`/socket.io`) || PathPrefix(`/salud`) || PathPrefix(`/version`) || PathPrefix(`/reclamos/constancia`) || (Path(`/reclamos`) && Method(`POST`)))"
+      - "traefik.http.routers.prod-api.rule=(Host(`${DOMINIO_PROD:-caprichos.pe}`) || Host(`${DOMINIO_ADMIN:-admin.caprichos.pe}`)) && (PathPrefix(`/auth`) || PathPrefix(`/carta`) || PathPrefix(`/pedidos`) || PathPrefix(`/archivos`) || PathPrefix(`/uploads`) || PathPrefix(`/socket.io`) || PathPrefix(`/salud`) || PathPrefix(`/whatsapp`) || PathPrefix(`/version`) || PathPrefix(`/reclamos/constancia`) || (Path(`/reclamos`) && Method(`POST`)))"
       - traefik.http.routers.prod-api.entrypoints=websecure
       - traefik.http.routers.prod-api.tls=true
       - traefik.http.routers.prod-api.tls.certresolver=letsencrypt

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import * as crypto from 'crypto';
-import { obtenerPrismaTest, loginPorUi } from '../../src';
+import { obtenerPrismaTest, loginPorUi, confirmarSiNo } from '../../src';
 
 const APP_SECRET = process.env.WHATSAPP_APP_SECRET || 'test-whatsapp-secret-super-seguro-123456';
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'test-verify-token-123456';
@@ -283,5 +283,119 @@ test.describe('WhatsApp Chatbot E2E - Fase 1', () => {
     const contenidoConfig = await page.content();
     expect(contenidoConfig).not.toContain('EAAB');
     expect(contenidoConfig).not.toContain('test-whatsapp-secret');
+  });
+
+  test('8. Identificación defensiva y edición de nombre de contacto en Mensajes', async ({ request, page }) => {
+    // 1. Mensaje de remitente 1 con teléfono y profile.name
+    const wamid1 = `wamid.e2e_con_tel_${Date.now()}`;
+    const payloadConTel = JSON.stringify({
+      object: 'whatsapp_business_account',
+      entry: [
+        {
+          id: 'WHATSAPP_BUSINESS_ACCOUNT_ID',
+          changes: [
+            {
+              field: 'messages',
+              value: {
+                messaging_product: 'whatsapp',
+                contacts: [{ profile: { name: 'Cliente Con Fono E2E' }, wa_id: '51988887777' }],
+                messages: [
+                  {
+                    id: wamid1,
+                    from: '51988887777',
+                    timestamp: String(Math.floor(Date.now() / 1000)),
+                    type: 'text',
+                    text: { body: 'Hola, tengo una consulta' },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    const res1 = await request.post(`${apiBaseUrl}/whatsapp/webhook`, {
+      data: payloadConTel,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Hub-Signature-256': calcularFirma(payloadConTel),
+      },
+    });
+    expect(res1.status()).toBe(200);
+
+    // 2. Mensaje de remitente 2 sin teléfono (BSUID / from_user_id)
+    const wamid2 = `wamid.e2e_sin_tel_${Date.now()}`;
+    const payloadSinTel = JSON.stringify({
+      object: 'whatsapp_business_account',
+      entry: [
+        {
+          id: 'WHATSAPP_BUSINESS_ACCOUNT_ID',
+          changes: [
+            {
+              field: 'messages',
+              value: {
+                messaging_product: 'whatsapp',
+                contacts: [{ profile: { name: 'Cliente Sin Fono E2E' }, user_id: 'usr_e2e_9988' }],
+                messages: [
+                  {
+                    id: wamid2,
+                    from_user_id: 'usr_e2e_9988',
+                    timestamp: String(Math.floor(Date.now() / 1000)),
+                    type: 'text',
+                    text: { body: 'Hola desde usuario sin fono' },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    const res2 = await request.post(`${apiBaseUrl}/whatsapp/webhook`, {
+      data: payloadSinTel,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Hub-Signature-256': calcularFirma(payloadSinTel),
+      },
+    });
+    expect(res2.status()).toBe(200);
+
+    // 3. Verificar que existen dos conversaciones distintas en BD y que no se mezclan
+    const conv1 = await prisma.conversacion.findUnique({ where: { telefono: '51988887777' } });
+    const conv2 = await prisma.conversacion.findUnique({ where: { telefono: 'wa-user:usr_e2e_9988' } });
+    expect(conv1).not.toBeNull();
+    expect(conv2).not.toBeNull();
+    expect(conv1?.id).not.toBe(conv2?.id);
+    expect(conv2?.identificador_tipo).toBe('USUARIO_WA');
+
+    // 4. Iniciar sesión por UI y navegar a Mensajes
+    await loginPorUi(page, 'ADMIN');
+    await page.goto('/admin/mensajes');
+
+    // 5. Verificar que ambas conversaciones se ven en la lista y la etiqueta Usuario de WhatsApp
+    await expect(page.getByText('Cliente Con Fono E2E')).toBeVisible();
+    await expect(page.getByText('Cliente Sin Fono E2E')).toBeVisible();
+    await expect(page.getByText('Usuario de WhatsApp').first()).toBeVisible();
+
+    // 6. Seleccionar la conversación del cliente con teléfono y editar su nombre
+    await page.getByText('Cliente Con Fono E2E').click();
+    await page.getByRole('button', { name: 'Editar nombre' }).click();
+
+    // Modal de edición
+    const inputNombre = page.getByLabel(/Nombre o alias del contacto/i);
+    await expect(inputNombre).toBeVisible();
+    await inputNombre.fill('Cliente Editado E2E');
+    await page.getByRole('button', { name: 'Guardar' }).click();
+
+    // Confirmar en el diálogo Sí/No
+    await confirmarSiNo(page, 'si');
+
+    // 7. Verificar el cambio de nombre reflejado en la cabecera y en la lista
+    await expect(
+      page.getByRole('heading', { level: 2 }).or(page.locator('.cv-hn')).getByText('Cliente Editado E2E'),
+    ).toBeVisible();
+    await expect(page.locator('.cv-rn').getByText('Cliente Editado E2E')).toBeVisible();
   });
 });

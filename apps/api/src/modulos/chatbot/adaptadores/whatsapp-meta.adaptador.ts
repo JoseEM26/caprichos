@@ -4,6 +4,7 @@ import { PrismaService } from '../../../comun/prisma/prisma.service';
 import {
   BotonAccion,
   EstadoConexionWhatsApp,
+  FilaLista,
   OpcionesEnvio,
   ResultadoEnvioWhatsApp,
   WhatsAppMensajeriaPuerto,
@@ -79,7 +80,38 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
     const details = errorObj.error_data?.details || '';
     const fullLower = `${msg} ${details}`.toLowerCase();
 
-    // 1. Fuera de ventana de 24 horas (código 131047)
+    // 1. Destinatario no verificado en el número de prueba de Meta (código 131030 o allowed list)
+    if (
+      code === 131030 ||
+      fullLower.includes('allowed list') ||
+      fullLower.includes('not in allowed list') ||
+      fullLower.includes('recipient is not in')
+    ) {
+      return {
+        codigo: 'DESTINATARIO_NO_VERIFICADO',
+        mensaje: 'Este numero no esta autorizado en el numero de prueba de Meta',
+        reintentable: false,
+        httpStatus: status,
+      };
+    }
+
+    // 2. Token vencido o credenciales inválidas (código 190, 401)
+    if (
+      code === 190 ||
+      fullLower.includes('session has expired') ||
+      fullLower.includes('token expired') ||
+      fullLower.includes('invalid oauth') ||
+      (status === 401 && fullLower.includes('token'))
+    ) {
+      return {
+        codigo: 'TOKEN_VENCIDO',
+        mensaje: 'El acceso a WhatsApp vencio: avisa a quien administra la cuenta',
+        reintentable: false,
+        httpStatus: status,
+      };
+    }
+
+    // 3. Fuera de ventana de 24 horas (código 131047)
     if (
       code === 131047 ||
       fullLower.includes('24 hours') ||
@@ -95,7 +127,7 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
       };
     }
 
-    // 2. Número inválido o no registrado (código 131026, 131009, 100)
+    // 4. Número inválido o no registrado (código 131026, 131009, 100)
     if (
       code === 131026 ||
       code === 131009 ||
@@ -446,6 +478,90 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
         telefono_enmascarado: telMask,
         telefono_hash: telHash,
         tipo: 'BOTON',
+        plantilla: null,
+        estado,
+        error_codigo: resultado.error?.codigo || null,
+        error_detalle: resultado.error?.mensaje || null,
+        pedido_id: this.parsearId(opciones?.pedidoId),
+        conversacion_id: this.parsearId(opciones?.conversacionId),
+      },
+    });
+
+    return {
+      exito: resultado.exito,
+      id: registro.id.toString(),
+      waMessageId,
+      estado,
+      errorCodigo: resultado.error?.codigo,
+      errorDetalle: resultado.error?.mensaje,
+      reintentos: resultado.intentos,
+    };
+  }
+
+  async enviarLista(
+    telefono: string,
+    texto: string,
+    botonTexto: string,
+    filas: FilaLista[],
+    opciones?: OpcionesEnvio,
+  ): Promise<ResultadoEnvioWhatsApp> {
+    const telNorm = normalizarTelefono(telefono);
+    const telHash = hashTelefono(telefono);
+    const telMask = enmascararTelefono(telefono);
+
+    if (!this.token || !this.phoneId) {
+      return {
+        exito: false,
+        estado: 'FALLIDO',
+        errorCodigo: 'SIN_CREDENCIALES_META',
+        errorDetalle: 'Faltan WHATSAPP_TOKEN o WHATSAPP_PHONE_ID en la configuración',
+      };
+    }
+
+    const url = `https://graph.facebook.com/${this.apiVersion}/${this.phoneId}/messages`;
+
+    // Meta permite máximo 10 filas en listas interactivas
+    const filasFormateadas = filas.slice(0, 10).map((fila) => ({
+      id: fila.id.slice(0, 200),
+      title: fila.titulo.slice(0, 24),
+      ...(fila.descripcion ? { description: fila.descripcion.slice(0, 72) } : {}),
+    }));
+
+    const payload: any = {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: telNorm,
+      type: 'interactive',
+      interactive: {
+        type: 'list',
+        body: { text: texto.slice(0, 1024) },
+        action: {
+          button: (botonTexto || 'Ver opciones').slice(0, 20),
+          sections: [
+            {
+              title: (opciones?.tituloSeccion || 'Opciones').slice(0, 24),
+              rows: filasFormateadas,
+            },
+          ],
+        },
+      },
+    };
+
+    if (opciones?.replyToWaMessageId) {
+      payload.context = { message_id: opciones.replyToWaMessageId };
+    }
+
+    const resultado = await this.ejecutarConReintentos(url, payload, telMask);
+    const waMessageId = resultado.data?.messages?.[0]?.id;
+    const estado = resultado.exito ? 'ENVIADO' : 'FALLIDO';
+
+    const registro = await this.prisma.whatsappMensaje.create({
+      data: {
+        direccion: 'SALIENTE',
+        wa_message_id: waMessageId || null,
+        telefono_enmascarado: telMask,
+        telefono_hash: telHash,
+        tipo: 'LISTA',
         plantilla: null,
         estado,
         error_codigo: resultado.error?.codigo || null,

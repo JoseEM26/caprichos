@@ -40,11 +40,21 @@ services:
       DOMINIO_BASE: ${DOMINIO_DEMO:-207-244-232-127.sslip.io}
       CORS_ORIGIN: https://${DOMINIO_DEMO:-207-244-232-127.sslip.io},https://${DOMINIO_ALT:-alt1.invalid},https://${DOMINIO_ALT2:-alt2.invalid}
       TRUST_PROXY: "1"
+      # Chatbot de WhatsApp: los valores viven solo en el .env del servidor (nunca en Git)
+      WHATSAPP_TOKEN: ${WHATSAPP_TOKEN:-}
+      WHATSAPP_PHONE_ID: ${WHATSAPP_PHONE_ID:-}
+      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
+      WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}
+      WHATSAPP_API_VERSION: ${WHATSAPP_API_VERSION:-v25.0}
+      ADMIN_WHATSAPP_NUMBERS: ${ADMIN_WHATSAPP_NUMBERS:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
+      CARTA_URL_PUBLICA: ${CARTA_URL_PUBLICA:-}
     labels:
       - traefik.enable=true
       - traefik.docker.network=caprichos-proxy-net
       # Rutas API
-      - "traefik.http.routers.demo-api.rule=(Host(`${DOMINIO_DEMO:-localhost}`) || Host(`${DOMINIO_ALT:-alt1.invalid}`) || Host(`${DOMINIO_ALT2:-alt2.invalid}`)) && (PathPrefix(`/auth`) || PathPrefix(`/carta`) || PathPrefix(`/pedidos`) || PathPrefix(`/archivos`) || PathPrefix(`/uploads`) || PathPrefix(`/socket.io`) || PathPrefix(`/salud`) || PathPrefix(`/version`) || PathPrefix(`/reclamos/constancia`) || (Path(`/reclamos`) && Method(`POST`)))"
+      - "traefik.http.routers.demo-api.rule=(Host(`${DOMINIO_DEMO:-localhost}`) || Host(`${DOMINIO_ALT:-alt1.invalid}`) || Host(`${DOMINIO_ALT2:-alt2.invalid}`)) && (PathPrefix(`/auth`) || PathPrefix(`/carta`) || PathPrefix(`/pedidos`) || PathPrefix(`/archivos`) || PathPrefix(`/uploads`) || PathPrefix(`/socket.io`) || PathPrefix(`/salud`) || PathPrefix(`/whatsapp`) || PathPrefix(`/version`) || PathPrefix(`/reclamos/constancia`) || (Path(`/reclamos`) && Method(`POST`)))"
       - traefik.http.routers.demo-api.entrypoints=websecure
       - traefik.http.routers.demo-api.tls=true
       - traefik.http.routers.demo-api.tls.certresolver=letsencrypt

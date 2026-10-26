@@ -142,6 +142,18 @@ describe('ConfiguracionService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
+    it('valida que chatbot_activo acepte solo "si" o "no"', async () => {
+      prismaMock.parametro.findUnique.mockResolvedValueOnce({ clave: 'chatbot_activo', valor: 'no' });
+      prismaMock.parametro.upsert.mockResolvedValueOnce({ clave: 'chatbot_activo', valor: 'si' });
+
+      const res = await service.actualizar('chatbot_activo', 'si', adminAuth);
+      expect(res.valor).toBe('si');
+
+      await expect(
+        service.actualizar('chatbot_activo', 'invalido', adminAuth),
+      ).rejects.toThrow(BadRequestException);
+    });
+
     it('permite todas las claves válidas especificadas', async () => {
       const clavesNumericas = [
         'tiempo_prometido_min',

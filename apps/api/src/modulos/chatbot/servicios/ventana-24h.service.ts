@@ -35,13 +35,16 @@ export class Ventana24hService {
    * Determina si la ventana de 24 horas está abierta para el cliente.
    * La ventana está abierta si existe un mensaje ENTRANTE recibido en las últimas 24 horas.
    */
-  async esVentanaAbierta(telefono: string): Promise<boolean> {
+  async esVentanaAbierta(telefono: string, conversacionId?: bigint): Promise<boolean> {
     const telHash = hashTelefono(telefono);
     const hace24h = new Date(Date.now() - DURACION_VENTANA_24H_MS);
 
     const ultimoMensajeEntrante = await this.prisma.whatsappMensaje.findFirst({
       where: {
-        telefono_hash: telHash,
+        OR: [
+          { telefono_hash: telHash },
+          ...(conversacionId ? [{ conversacion_id: conversacionId }] : []),
+        ],
         direccion: 'ENTRANTE',
         creado_en: { gte: hace24h },
       },
@@ -49,7 +52,21 @@ export class Ventana24hService {
       select: { id: true, creado_en: true },
     });
 
-    return Boolean(ultimoMensajeEntrante);
+    if (ultimoMensajeEntrante) return true;
+
+    if (conversacionId) {
+      const chatEntrante = await this.prisma.mensajeChat.findFirst({
+        where: {
+          conversacion_id: conversacionId,
+          direccion: 'ENTRA',
+          en: { gte: hace24h },
+        },
+        select: { id: true },
+      });
+      if (chatEntrante) return true;
+    }
+
+    return false;
   }
 
   /**

@@ -15,6 +15,7 @@ describe('WhatsappWebhookController y Service', () => {
   let mockConfigService: any;
   let mockMensajeria: any;
   let mockArchivos: any;
+  let mockMotor: any;
 
   const TEST_VERIFY_TOKEN = 'mi_token_verificacion_seguro_123';
   const TEST_APP_SECRET = 'secreto_app_meta_para_firmas_32_bytes_hex';
@@ -33,19 +34,21 @@ describe('WhatsappWebhookController y Service', () => {
     mockPrisma = {
       whatsappMensaje: {
         findUnique: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue({ conversacion_id: BigInt(42) }),
         create: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: BigInt(1), ...data })),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       clienteWhatsappConsentimiento: {
         upsert: jest.fn().mockResolvedValue({ id: BigInt(1) }),
+        findUnique: jest.fn().mockResolvedValue(null),
       },
       pedido: {
         findFirst: jest.fn().mockResolvedValue(null),
       },
       conversacion: {
         findUnique: jest.fn().mockResolvedValue(null),
-        create: jest.fn().mockResolvedValue({ id: BigInt(42), telefono: '51987654321' }),
-        update: jest.fn().mockResolvedValue({ id: BigInt(42) }),
+        create: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: BigInt(42), duenio: 'BOT', ...data })),
+        update: jest.fn().mockImplementation(({ where, data }) => Promise.resolve({ id: where?.id || BigInt(42), duenio: 'BOT', ...data })),
       },
       mensajeChat: {
         create: jest.fn().mockResolvedValue({ id: BigInt(99) }),
@@ -73,11 +76,17 @@ describe('WhatsappWebhookController y Service', () => {
       subirArchivo: jest.fn().mockResolvedValue({ id: 'arch-1', url: '/admin/archivos/1' }),
     };
 
+    mockMotor = {
+      procesarMensajeEntrante: jest.fn().mockResolvedValue(true),
+    };
+
     service = new WhatsappWebhookService(
       mockConfigService as ConfigService,
       mockPrisma as PrismaService,
       mockMensajeria as WhatsAppMensajeriaPuerto,
       mockArchivos as ArchivosService,
+      undefined,
+      mockMotor as any,
     );
 
     controller = new WhatsappWebhookController(service);
@@ -314,6 +323,332 @@ describe('WhatsappWebhookController y Service', () => {
           error_codigo: '131047',
         }),
       });
+    });
+
+    it('emite el evento mensajes:actualizado al recibir un cambio de estado para refrescar en vivo', async () => {
+      const mockEventos = { emitirAdmin: jest.fn() };
+      const serviceConEventos = new WhatsappWebhookService(
+        mockConfigService as ConfigService,
+        mockPrisma as PrismaService,
+        mockMensajeria as WhatsAppMensajeriaPuerto,
+        mockArchivos as ArchivosService,
+        mockEventos as any,
+        mockMotor as any,
+      );
+
+      mockPrisma.whatsappMensaje.findFirst = jest.fn().mockResolvedValue({ conversacion_id: 42n });
+
+      const payload = {
+        object: 'whatsapp_business_account',
+        entry: [
+          {
+            changes: [
+              {
+                value: {
+                  statuses: [{ id: 'wamid.live_status', status: 'read' }],
+                },
+              },
+            ],
+          },
+        ],
+      };
+
+      await serviceConEventos.procesarPayload(payload);
+
+      expect(mockEventos.emitirAdmin).toHaveBeenCalledWith('mensajes:actualizado', {
+        id: '42',
+      });
+    });
+
+    it('identificación con teléfono y sin teléfono: dos remitentes distintos sin mezclarse', async () => {
+      mockPrisma.whatsappMensaje.findUnique.mockResolvedValue(null);
+      mockPrisma.conversacion.findUnique.mockResolvedValue(null);
+
+      // 1. Remitente con teléfono normal
+      const payloadConTel = {
+        object: 'whatsapp_business_account',
+        entry: [
+          {
+            changes: [
+              {
+                value: {
+                  contacts: [{ profile: { name: 'Rosa E2E' }, wa_id: '51987654321' }],
+                  messages: [{ id: 'wamid.conTel', from: '51987654321', type: 'text', text: { body: 'Hola' } }],
+                },
+              },
+            ],
+          },
+        ],
+      };
+      await service.procesarPayload(payloadConTel);
+
+      expect(mockPrisma.conversacion.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            telefono: '51987654321',
+            identificador_tipo: 'TELEFONO',
+            nombre_contacto: 'Rosa E2E',
+          }),
+        }),
+      );
+
+      // 2. Remitente 1 sin teléfono (BSUID / user_id)
+      const payloadSinTel1 = {
+        object: 'whatsapp_business_account',
+        entry: [
+          {
+            changes: [
+              {
+                value: {
+                  contacts: [{ profile: { name: 'Remitente Anonimo 1' }, user_id: 'usr_meta_001' }],
+                  messages: [{ id: 'wamid.sinTel1', from_user_id: 'usr_meta_001', type: 'text', text: { body: 'Mensaje 1' } }],
+                },
+              },
+            ],
+          },
+        ],
+      };
+      await service.procesarPayload(payloadSinTel1);
+
+      expect(mockPrisma.conversacion.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            telefono: 'wa-user:usr_meta_001',
+            identificador_tipo: 'USUARIO_WA',
+            nombre_contacto: 'Remitente Anonimo 1',
+          }),
+        }),
+      );
+
+      // 3. Remitente 2 sin teléfono (otro BSUID distinto)
+      const payloadSinTel2 = {
+        object: 'whatsapp_business_account',
+        entry: [
+          {
+            changes: [
+              {
+                value: {
+                  contacts: [{ profile: { name: 'Remitente Anonimo 2' }, user_id: 'usr_meta_002' }],
+                  messages: [{ id: 'wamid.sinTel2', from_user_id: 'usr_meta_002', type: 'text', text: { body: 'Mensaje 2' } }],
+                },
+              },
+            ],
+          },
+        ],
+      };
+      await service.procesarPayload(payloadSinTel2);
+
+      expect(mockPrisma.conversacion.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            telefono: 'wa-user:usr_meta_002',
+            identificador_tipo: 'USUARIO_WA',
+            nombre_contacto: 'Remitente Anonimo 2',
+          }),
+        }),
+      );
+    });
+
+    it('guarda y actualiza nombre_contacto con contacts[].profile.name limpio', async () => {
+      mockPrisma.whatsappMensaje.findUnique.mockResolvedValue(null);
+
+      // Conversación existente sin editar
+      mockPrisma.conversacion.findUnique.mockResolvedValue({
+        id: BigInt(50),
+        telefono: '51987654321',
+        nombre_contacto: 'Nombre Viejo',
+        nombre_editado: false,
+        flujo: {},
+      });
+
+      const payload = {
+        object: 'whatsapp_business_account',
+        entry: [
+          {
+            changes: [
+              {
+                value: {
+                  contacts: [{ profile: { name: '  Carlos \n\r WhatsApp Nuevo  ' }, wa_id: '51987654321' }],
+                  messages: [{ id: 'wamid.updateName', from: '51987654321', type: 'text', text: { body: 'Hola' } }],
+                },
+              },
+            ],
+          },
+        ],
+      };
+
+      await service.procesarPayload(payload);
+
+      expect(mockPrisma.conversacion.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: BigInt(50) },
+          data: expect.objectContaining({
+            nombre_contacto: 'Carlos WhatsApp Nuevo',
+          }),
+        }),
+      );
+    });
+
+    it('nombre editado a mano NO se pisa cuando nombre_editado = true', async () => {
+      mockPrisma.whatsappMensaje.findUnique.mockResolvedValue(null);
+
+      // Conversación existente con nombre editado a mano
+      mockPrisma.conversacion.findUnique.mockResolvedValue({
+        id: BigInt(51),
+        telefono: '51987654321',
+        nombre_contacto: 'Don Pepe Manual',
+        nombre_editado: true,
+        flujo: { nombre_perfil_wa: 'Pepe WA' },
+      });
+
+      const payload = {
+        object: 'whatsapp_business_account',
+        entry: [
+          {
+            changes: [
+              {
+                value: {
+                  contacts: [{ profile: { name: 'Pepe WhatsApp Diferente' }, wa_id: '51987654321' }],
+                  messages: [{ id: 'wamid.noPisar', from: '51987654321', type: 'text', text: { body: 'Hola' } }],
+                },
+              },
+            ],
+          },
+        ],
+      };
+
+      await service.procesarPayload(payload);
+
+      // Se verifica que nombre_contacto NO esté en data del update
+      expect(mockPrisma.conversacion.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: BigInt(51) },
+          data: expect.not.objectContaining({
+            nombre_contacto: expect.anything(),
+          }),
+        }),
+      );
+    });
+
+    it('invoca al motor de conversación cuando la conversación está en manos del bot (duenio = BOT)', async () => {
+      mockPrisma.whatsappMensaje.findUnique.mockResolvedValue(null);
+      mockPrisma.conversacion.findUnique.mockResolvedValue({
+        id: BigInt(60),
+        telefono: '51987654321',
+        duenio: 'BOT',
+        tomado_por: null,
+      });
+
+      const payload = {
+        object: 'whatsapp_business_account',
+        entry: [
+          {
+            changes: [
+              {
+                value: {
+                  messages: [
+                    {
+                      id: 'wamid.motor.activo',
+                      from: '51987654321',
+                      type: 'text',
+                      text: { body: 'Hola' },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      };
+
+      await service.procesarPayload(payload);
+
+      expect(mockMotor.procesarMensajeEntrante).toHaveBeenCalledWith(
+        BigInt(60),
+        expect.objectContaining({
+          texto: 'Hola',
+          waMessageId: 'wamid.motor.activo',
+        }),
+      );
+    });
+
+    it('NO invoca al motor de conversación si la conversación pertenece a PERSONA', async () => {
+      mockMotor.procesarMensajeEntrante.mockClear();
+      mockPrisma.whatsappMensaje.findUnique.mockResolvedValue(null);
+      mockPrisma.conversacion.findUnique.mockResolvedValue({
+        id: BigInt(61),
+        telefono: '51987654321',
+        duenio: 'PERSONA',
+        tomado_por: BigInt(2),
+      });
+      mockPrisma.conversacion.update.mockResolvedValueOnce({
+        id: BigInt(61),
+        telefono: '51987654321',
+        duenio: 'PERSONA',
+        tomado_por: BigInt(2),
+      });
+
+      const payload = {
+        object: 'whatsapp_business_account',
+        entry: [
+          {
+            changes: [
+              {
+                value: {
+                  messages: [
+                    {
+                      id: 'wamid.motor.persona',
+                      from: '51987654321',
+                      type: 'text',
+                      text: { body: 'Hola asesor' },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      };
+
+      await service.procesarPayload(payload);
+
+      expect(mockMotor.procesarMensajeEntrante).not.toHaveBeenCalled();
+    });
+
+    it('NO invoca al motor de conversación ante comandos de baja o alta (BAJA/STOP)', async () => {
+      mockMotor.procesarMensajeEntrante.mockClear();
+      mockPrisma.whatsappMensaje.findUnique.mockResolvedValue(null);
+      mockPrisma.conversacion.findUnique.mockResolvedValue({
+        id: BigInt(62),
+        telefono: '51987654321',
+        duenio: 'BOT',
+      });
+
+      const payload = {
+        object: 'whatsapp_business_account',
+        entry: [
+          {
+            changes: [
+              {
+                value: {
+                  messages: [
+                    {
+                      id: 'wamid.motor.baja',
+                      from: '51987654321',
+                      type: 'text',
+                      text: { body: 'BAJA' },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      };
+
+      await service.procesarPayload(payload);
+
+      expect(mockMotor.procesarMensajeEntrante).not.toHaveBeenCalled();
     });
   });
 });

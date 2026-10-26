@@ -1,10 +1,18 @@
 import { HttpException, HttpStatus, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
+import { RedisService } from '../../comun/redis/redis.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
-import { WHATSAPP_GATEWAY, WhatsAppGateway } from './whatsapp.gateway';
+import { Ventana24hService } from '../chatbot/servicios/ventana-24h.service';
+import { MensajeEnviado, WHATSAPP_GATEWAY, WhatsAppGateway } from './whatsapp.gateway';
 import { pulirMensaje } from './pulir.util';
+import {
+  esRemitenteSinTelefono,
+  obtenerNombreMostrar,
+} from './utilidades/nombre-contacto.util';
+import { mapearErrorWhatsApp } from './utilidades/error-whatsapp.util';
+import { EditarNombreContactoDto } from './dto/mensajes.dto';
 
 export type EstadoChat = 'bot' | 'atencion' | 'validar' | 'atendido' | 'pausado';
 export type FiltroChat = 'todos' | 'atender' | 'bot' | 'atendidos';
@@ -39,8 +47,8 @@ const textoDe = (m: { tipo: string; contenido: any }): string => {
   const t = m.contenido?.texto ?? '';
   return m.tipo === 'IMAGEN' ? String(t).replace(/^\[Imagen:\s*/, '').replace(/\]$/, '') : String(t);
 };
-const nombreDe = (p: any, telefono: string): string =>
-  p?.persona ? `${p.persona.nombres} ${p.persona.apellidos ?? ''}`.trim() : telefono;
+const nombreUsuario = (p: any, fallback: string): string =>
+  p?.persona ? `${p.persona.nombres} ${p.persona.apellidos ?? ''}`.trim() : fallback;
 
 /**
  * Consola de chats con dueño único (FT-ATN-01..02). Todo sale de `conversacion`, `mensaje_chat`
@@ -53,7 +61,32 @@ export class MensajesService {
     private readonly auditoria: AuditoriaService,
     @Inject(WHATSAPP_GATEWAY) private readonly gateway: WhatsAppGateway,
     @Optional() private readonly eventos?: EventosGateway,
+    @Optional() private readonly ventana24hService?: Ventana24hService,
+    @Optional() private readonly redisService?: RedisService,
   ) {}
+
+  /** Límite de 20 mensajes por minuto por usuario para evitar abusos (Redis). */
+  private async verificarLimiteTasaUsuario(partyId: bigint): Promise<void> {
+    if (!this.redisService) return;
+    try {
+      const redis = this.redisService.obtenerCliente();
+      const clave = `ratelimit:mensajes:usuario:${partyId}`;
+      const cuenta = await redis.incr(clave);
+      if (cuenta === 1) {
+        await redis.expire(clave, 60);
+      }
+      if (cuenta > 20) {
+        throw error(
+          HttpStatus.TOO_MANY_REQUESTS,
+          'LIMITE_ENVIO',
+          'Superaste el limite de 20 mensajes por minuto. Espera un momento',
+        );
+      }
+    } catch (err: any) {
+      if (err instanceof HttpException) throw err;
+      // Si Redis no está disponible o falla por red, no interrumpir la atención del operador
+    }
+  }
 
   private readonly incluir = {
     party: { include: { persona: true } },
@@ -78,7 +111,7 @@ export class MensajesService {
   }
 
   private dueno(c: any): string | null {
-    return c.tomado_por ? nombreDe(c.tomadoPorUsuario?.party, 'otra persona') : null;
+    return c.tomado_por ? nombreUsuario(c.tomadoPorUsuario?.party, 'otra persona') : null;
   }
 
   /** Quien no es dueño no puede escribir ni decidir sin tomar el chat (RN-CAP-102). */
@@ -119,8 +152,11 @@ export class MensajesService {
       const prefijo = !ult ? '' : ult.autor === 'CLIENTE' ? '' : ult.autor === 'BOT' ? 'Bot: ' : 'Tú: ';
       return {
         id: c.id.toString(),
-        nombre: nombreDe(c.party, c.telefono),
+        nombre: obtenerNombreMostrar(c),
         telefono: c.telefono,
+        identificador_tipo: c.identificador_tipo,
+        nombre_contacto: c.nombre_contacto,
+        nombre_editado: c.nombre_editado,
         estado,
         urgente: c.urgente,
         ultimo: ult ? prefijo + (ult.tipo === 'IMAGEN' ? 'Foto' : textoDe(ult)) : '',
@@ -134,7 +170,10 @@ export class MensajesService {
     const chats = filas.filter(
       (f) =>
         (filtro === 'todos' || GRUPOS[filtro].includes(f.estado)) &&
-        (!termino || f.nombre.toLowerCase().includes(termino) || (digitos !== '' && f.telefono.replace(/\D/g, '').includes(digitos))),
+        (!termino ||
+          f.nombre.toLowerCase().includes(termino) ||
+          (f.nombre_contacto && f.nombre_contacto.toLowerCase().includes(termino)) ||
+          (!esRemitenteSinTelefono(f) && digitos !== '' && f.telefono.replace(/\D/g, '').includes(digitos))),
     );
     return {
       conteos: { todos: filas.length, atender: cuenta('atender'), bot: cuenta('bot'), atendidos: cuenta('atendidos') },
@@ -144,7 +183,29 @@ export class MensajesService {
 
   async detalle(id: string, usuario: UsuarioAutenticado) {
     const c = await this.cargar(id);
-    const mensajes = await this.prisma.mensajeChat.findMany({ where: { conversacion_id: c.id }, orderBy: { en: 'asc' } });
+    const mensajes = await this.prisma.mensajeChat.findMany({
+      where: { conversacion_id: c.id },
+      include: { whatsappMensaje: true },
+      orderBy: { en: 'asc' },
+    });
+
+    // Relación adicional por meta_id si whatsapp_mensaje_id aún no está enlazado
+    const metaIdsSinRelacion = mensajes
+      .filter((m) => !m.whatsappMensaje && m.meta_id)
+      .map((m) => m.meta_id as string);
+
+    const waPorMetaId = new Map<string, any>();
+    if (metaIdsSinRelacion.length > 0) {
+      const encontrados = await this.prisma.whatsappMensaje.findMany({
+        where: { wa_message_id: { in: metaIdsSinRelacion } },
+      });
+      for (const item of encontrados) {
+        if (item.wa_message_id) {
+          waPorMetaId.set(item.wa_message_id, item);
+        }
+      }
+    }
+
     const estado = estadoDe(c);
     const condicion: any[] = [{ cliente_telefono: c.telefono }];
     if (c.party_id) condicion.push({ party_id: c.party_id });
@@ -160,24 +221,57 @@ export class MensajesService {
     const base = Number(parametro?.valor) || null;
     const alta = await this.prisma.altaDemanda.findFirst({ where: { hasta: null }, orderBy: { id: 'desc' } });
     const yo = await this.yo(usuario);
+
+    const estadoConexion = this.gateway.estaConectado ? this.gateway.estaConectado() : { modo: 'simulado' as const };
+    const modo = estadoConexion.modo;
+    const simulado = modo === 'simulado';
+
+    let ventanaAbierta = true;
+    if (this.ventana24hService && !esRemitenteSinTelefono(c)) {
+      ventanaAbierta = await this.ventana24hService.esVentanaAbierta(c.telefono, c.id);
+    }
+
     return {
       id: c.id.toString(),
-      nombre: nombreDe(c.party, c.telefono),
+      nombre: obtenerNombreMostrar(c),
       telefono: c.telefono,
+      identificador_tipo: c.identificador_tipo,
+      nombre_contacto: c.nombre_contacto,
+      nombre_editado: c.nombre_editado,
       modalidad: pedido ? MODALIDADES[pedido.modalidad] ?? pedido.modalidad : null,
       estado,
       urgente: c.urgente,
       dueno: this.dueno(c),
       esMio: !!c.tomado_por && c.tomado_por === yo,
       ocupado: !!c.tomado_por && c.tomado_por !== yo,
-      mensajes: mensajes.map((m) => ({
-        id: m.id.toString(),
-        autor: m.autor,
-        saliente: m.direccion === 'SALE',
-        imagen: m.tipo === 'IMAGEN',
-        texto: textoDe(m),
-        hora: hora(m.en),
-      })),
+      ventanaAbierta,
+      modo,
+      simulado,
+      mensajes: mensajes.map((m) => {
+        const wa = m.whatsappMensaje || (m.meta_id ? waPorMetaId.get(m.meta_id) : null);
+        const contenido = (m.contenido as any) || {};
+        const estadoMsg =
+          wa?.estado ||
+          contenido.estado ||
+          (m.direccion === 'SALE' ? (m.meta_id ? 'ENVIADO' : 'SIMULADO') : undefined);
+        const errorCodigo = wa?.error_codigo || contenido.errorCodigo || null;
+        const errorDetalle = wa?.error_detalle || contenido.errorDetalle || null;
+        const motivoFallo =
+          estadoMsg === 'FALLIDO' ? mapearErrorWhatsApp(errorCodigo, errorDetalle) : null;
+
+        return {
+          id: m.id.toString(),
+          autor: m.autor,
+          saliente: m.direccion === 'SALE',
+          imagen: m.tipo === 'IMAGEN',
+          texto: textoDe(m),
+          hora: hora(m.en),
+          estado: estadoMsg,
+          errorCodigo,
+          errorDetalle,
+          motivoFallo,
+        };
+      }),
       pedido: pedido
         ? {
             id: pedido.id.toString(),
@@ -215,11 +309,222 @@ export class MensajesService {
     if (!limpio) throw error(HttpStatus.BAD_REQUEST, 'MENSAJE_VACIO', 'Escribe un mensaje');
     const c = await this.cargar(id);
     await this.exigirLibreOMio(c, usuario, 'Toca «Tomar el chat» para escribir.');
+    if (esRemitenteSinTelefono(c)) {
+      throw error(
+        HttpStatus.CONFLICT,
+        'CONTACTO_SIN_TELEFONO',
+        'Este contacto no comparte su numero: no se puede responder desde aqui todavia',
+      );
+    }
+
+    // Límite de 20 mensajes por minuto por usuario
+    await this.verificarLimiteTasaUsuario(usuario.partyId);
+
+    // Verificación de ventana de 24 horas
+    if (this.ventana24hService) {
+      const abierta = await this.ventana24hService.esVentanaAbierta(c.telefono, c.id);
+      if (!abierta) {
+        throw new HttpException(
+          {
+            codigo: 'VENTANA_CERRADA',
+            mensaje:
+              'Pasaron mas de 24 horas desde el ultimo mensaje del cliente. Solo se puede escribir con una plantilla aprobada',
+            plantillaReapertura: 'caprichos_reabrir_conversacion',
+          },
+          HttpStatus.CONFLICT,
+        );
+      }
+    }
+
     const m = await this.gateway.enviarTexto(c.id, c.telefono, limpio, 'PERSONA');
     // al escribir una persona, el bot calla: el chat deja de ser urgente y queda a cargo de la persona
     await this.tocar(c.id, { duenio: 'PERSONA', urgente: false, estado: c.estado === 'ATENDIDA' ? 'ABIERTA' : c.estado });
-    await this.auditar(usuario, 'ENVIAR', c.id, { mensajeId: m.id }, ip);
+    await this.auditar(usuario, 'ENVIAR', c.id, { mensajeId: m.id, estado: m.estado }, ip);
+
+    if (m.estado === 'FALLIDO') {
+      const mensajeError = mapearErrorWhatsApp(m.errorCodigo, m.errorDetalle);
+      throw new HttpException(
+        {
+          codigo: m.errorCodigo || 'ENVIO_FALLIDO',
+          mensaje: mensajeError,
+          mensajeId: m.id,
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
     return { id: m.id };
+  }
+
+  async reabrirConPlantilla(id: string, usuario: UsuarioAutenticado, ip?: string) {
+    const c = await this.cargar(id);
+    await this.exigirLibreOMio(c, usuario, 'Toca «Tomar el chat» para enviar la plantilla.');
+
+    if (esRemitenteSinTelefono(c)) {
+      throw error(
+        HttpStatus.CONFLICT,
+        'CONTACTO_SIN_TELEFONO',
+        'Este contacto no comparte su numero: no se puede responder desde aqui todavia',
+      );
+    }
+
+    await this.verificarLimiteTasaUsuario(usuario.partyId);
+
+    const nombreCliente = c.nombre_contacto || (c.party as any)?.persona?.nombres || 'Cliente';
+    const nombrePlantilla = 'caprichos_reabrir_conversacion';
+
+    let m: MensajeEnviado;
+    if (this.gateway.enviarPlantilla) {
+      m = await this.gateway.enviarPlantilla(
+        c.id,
+        c.telefono,
+        nombrePlantilla,
+        [nombreCliente],
+        'PERSONA',
+      );
+    } else {
+      m = await this.gateway.enviarTexto(
+        c.id,
+        c.telefono,
+        `Hola ${nombreCliente}, nos comunicamos de Caprichos para dar seguimiento a tu consulta. ¿En que podemos ayudarte?`,
+        'PERSONA',
+      );
+    }
+
+    await this.tocar(c.id, {
+      duenio: 'PERSONA',
+      urgente: false,
+      estado: c.estado === 'ATENDIDA' ? 'ABIERTA' : c.estado,
+    });
+
+    await this.auditar(
+      usuario,
+      'ENVIAR_PLANTILLA_REAPERTURA',
+      c.id,
+      {
+        mensajeId: m.id,
+        plantilla: nombrePlantilla,
+      },
+      ip,
+    );
+
+    if (m.estado === 'FALLIDO') {
+      const mensajeError = mapearErrorWhatsApp(m.errorCodigo, m.errorDetalle);
+      throw new HttpException(
+        {
+          codigo: m.errorCodigo || 'ENVIO_FALLIDO',
+          mensaje: mensajeError,
+          mensajeId: m.id,
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    return { ok: true, id: m.id };
+  }
+
+  async reintentarMensaje(id: string, mensajeId: string, usuario: UsuarioAutenticado, ip?: string) {
+    const c = await this.cargar(id);
+    await this.exigirLibreOMio(c, usuario, 'Toca «Tomar el chat» para reintentar el mensaje.');
+
+    if (esRemitenteSinTelefono(c)) {
+      throw error(
+        HttpStatus.CONFLICT,
+        'CONTACTO_SIN_TELEFONO',
+        'Este contacto no comparte su numero: no se puede responder desde aqui todavia',
+      );
+    }
+
+    await this.verificarLimiteTasaUsuario(usuario.partyId);
+
+    let nMensaje: bigint;
+    try {
+      nMensaje = BigInt(mensajeId);
+    } catch {
+      throw error(HttpStatus.NOT_FOUND, 'MENSAJE_NO_ENCONTRADO', 'No se encontró el mensaje a reintentar');
+    }
+
+    const mensajeAnterior = await this.prisma.mensajeChat.findUnique({
+      where: { id: nMensaje },
+    });
+
+    if (!mensajeAnterior || mensajeAnterior.conversacion_id !== c.id) {
+      throw error(HttpStatus.NOT_FOUND, 'MENSAJE_NO_ENCONTRADO', 'No se encontró el mensaje a reintentar');
+    }
+
+    const contenidoObj = (mensajeAnterior.contenido as any) || {};
+    const texto = String(contenidoObj.texto || '');
+    const esPlantilla = mensajeAnterior.tipo === 'PLANTILLA';
+
+    let m: MensajeEnviado;
+    if (esPlantilla && this.gateway.enviarPlantilla) {
+      const plantilla = contenidoObj.plantilla || 'caprichos_reabrir_conversacion';
+      const variables = contenidoObj.variables || [];
+      m = await this.gateway.enviarPlantilla(c.id, c.telefono, plantilla, variables, 'PERSONA');
+    } else {
+      if (this.ventana24hService) {
+        const abierta = await this.ventana24hService.esVentanaAbierta(c.telefono, c.id);
+        if (!abierta) {
+          throw new HttpException(
+            {
+              codigo: 'VENTANA_CERRADA',
+              mensaje:
+                'Pasaron mas de 24 horas desde el ultimo mensaje del cliente. Solo se puede escribir con una plantilla aprobada',
+              plantillaReapertura: 'caprichos_reabrir_conversacion',
+            },
+            HttpStatus.CONFLICT,
+          );
+        }
+      }
+      m = await this.gateway.enviarTexto(c.id, c.telefono, texto, 'PERSONA');
+    }
+
+    const nuevoWhatsappMensajeId = m.whatsappMensajeId || null;
+    await this.prisma.mensajeChat.update({
+      where: { id: mensajeAnterior.id },
+      data: {
+        en: new Date(),
+        meta_id: m.metaId || null,
+        ...(nuevoWhatsappMensajeId ? { whatsapp_mensaje_id: nuevoWhatsappMensajeId } : {}),
+        contenido: {
+          ...contenidoObj,
+          estado: m.estado,
+          errorDetalle: m.errorDetalle || null,
+          errorCodigo: m.errorCodigo || null,
+        },
+      },
+    });
+
+    await this.tocar(c.id, {
+      duenio: 'PERSONA',
+      urgente: false,
+      estado: c.estado === 'ATENDIDA' ? 'ABIERTA' : c.estado,
+    });
+
+    await this.auditar(
+      usuario,
+      'REINTENTAR_MENSAJE',
+      c.id,
+      {
+        mensajeId: mensajeAnterior.id.toString(),
+        nuevoEstado: m.estado,
+      },
+      ip,
+    );
+
+    if (m.estado === 'FALLIDO') {
+      const mensajeError = mapearErrorWhatsApp(m.errorCodigo, m.errorDetalle);
+      throw new HttpException(
+        {
+          codigo: m.errorCodigo || 'ENVIO_FALLIDO',
+          mensaje: mensajeError,
+          mensajeId: mensajeAnterior.id.toString(),
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    return { ok: true, id: mensajeAnterior.id.toString() };
   }
 
   pulir(id: string, texto: string, nombre: string) {
@@ -307,5 +612,81 @@ export class MensajesService {
     await this.tocar(c.id, { estado: 'ABIERTA', duenio: 'BOT', urgente: false, tomado_por: null, tomado_en: null });
     await this.auditar(usuario, 'RECHAZAR_PAGO', c.id, undefined, ip);
     return { ok: true };
+  }
+
+  /**
+   * Modifica o revierte el nombre de contacto asignado a una conversación.
+   * Permiso: mensajes/tomar.
+   * Auditoría: registra antes y después sin exponer el teléfono completo.
+   * Evento: emite 'mensajes:actualizado' por socket para refrescar clientes.
+   */
+  async editarNombre(
+    id: string,
+    dto: EditarNombreContactoDto,
+    usuario: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const c = await this.cargar(id);
+    let nuevoNombre: string | null = null;
+    let nuevoEditado = false;
+
+    if (dto.revertir) {
+      nuevoEditado = false;
+      const flujoActual = (c.flujo as any) || {};
+      nuevoNombre = flujoActual.nombre_perfil_wa ?? null;
+    } else {
+      const limpio = String(dto.nombre ?? '').trim();
+      if (!limpio || limpio.length < 2 || limpio.length > 60) {
+        throw error(
+          HttpStatus.BAD_REQUEST,
+          'NOMBRE_INVALIDO',
+          'El nombre debe tener entre 2 y 60 caracteres y no puede consistir únicamente en espacios',
+        );
+      }
+      nuevoEditado = true;
+      nuevoNombre = limpio;
+    }
+
+    const actualizada = await this.prisma.conversacion.update({
+      where: { id: c.id },
+      data: {
+        nombre_contacto: nuevoNombre,
+        nombre_editado: nuevoEditado,
+      },
+      include: this.incluir,
+    });
+
+    // Auditoría sin registrar número telefónico completo
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'mensajes',
+      accion: dto.revertir ? 'REVERTIR_NOMBRE_CONTACTO' : 'EDITAR_NOMBRE_CONTACTO',
+      resultado: 'OK',
+      entidad: 'conversacion',
+      entidadId: c.id,
+      antes: {
+        nombre_contacto: c.nombre_contacto,
+        nombre_editado: c.nombre_editado,
+        identificador_tipo: c.identificador_tipo,
+      },
+      despues: {
+        nombre_contacto: nuevoNombre,
+        nombre_editado: nuevoEditado,
+        identificador_tipo: c.identificador_tipo,
+      },
+      partyId: usuario.partyId,
+      ip,
+    });
+
+    this.aviso(c.id);
+
+    return {
+      ok: true,
+      id: actualizada.id.toString(),
+      nombre: obtenerNombreMostrar(actualizada),
+      nombre_contacto: actualizada.nombre_contacto,
+      nombre_editado: actualizada.nombre_editado,
+      identificador_tipo: actualizada.identificador_tipo,
+    };
   }
 }

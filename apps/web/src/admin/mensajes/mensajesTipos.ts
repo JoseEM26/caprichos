@@ -8,12 +8,19 @@ export interface MensajeItem {
   imagen: boolean;
   texto: string;
   hora: string;
+  estado?: string;
+  errorCodigo?: string | null;
+  errorDetalle?: string | null;
+  motivoFallo?: string | null;
 }
 
 export interface ChatResumen {
   id: string;
   nombre: string;
   telefono: string;
+  identificador_tipo?: 'TELEFONO' | 'USUARIO_WA';
+  nombre_contacto?: string | null;
+  nombre_editado?: boolean;
   estado: EstadoChat;
   urgente: boolean;
   ultimo: string;
@@ -42,12 +49,18 @@ export interface DetalleConversacion {
   id: string;
   nombre: string;
   telefono: string;
+  identificador_tipo?: 'TELEFONO' | 'USUARIO_WA';
+  nombre_contacto?: string | null;
+  nombre_editado?: boolean;
   modalidad: string | null;
   estado: EstadoChat;
   urgente: boolean;
   dueno: string | null;
   esMio: boolean;
   ocupado: boolean;
+  ventanaAbierta?: boolean;
+  modo?: 'meta' | 'simulado';
+  simulado?: boolean;
   mensajes: MensajeItem[];
   pedido: DetallePedidoChat | null;
   solicitud: DetalleSolicitudChat | null;

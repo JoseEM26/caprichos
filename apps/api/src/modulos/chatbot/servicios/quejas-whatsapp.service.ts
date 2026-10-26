@@ -8,6 +8,7 @@ import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../../acceso/acceso.tipos';
 import { enmascararTelefono } from '../utilidades/enmascarar.util';
+import { obtenerNombreMostrar } from '../../mensajes/utilidades/nombre-contacto.util';
 
 @Injectable()
 export class QuejasWhatsappService {
@@ -87,23 +88,51 @@ export class QuejasWhatsappService {
       resueltas: todasQuejas.filter((q) => q.estado === 'RESUELTA').length,
     };
 
-    const quejasFormateadas = quejasDb.map((q) => ({
-      id: q.id.toString(),
-      origen: q.origen,
-      pedidoId: q.pedido_id ? q.pedido_id.toString() : null,
-      pedidoCodigo: q.pedido?.codigo || null,
-      cliente: q.cliente,
-      telefonoEnmascarado: q.pedido?.cliente_telefono
-        ? enmascararTelefono(q.pedido.cliente_telefono)
-        : '***',
-      puntaje: q.puntaje,
-      texto: q.texto,
-      estado: q.estado,
-      atendidaPor: q.atendida_por,
-      resolucion: q.resolucion,
-      creadaEn: q.creada_en.toISOString(),
-      actualizadaEn: q.actualizada_en.toISOString(),
-    }));
+    const pedidoIds = quejasDb.map((q) => q.pedido_id).filter(Boolean) as bigint[];
+    const msgs =
+      pedidoIds.length > 0 && this.prisma?.whatsappMensaje
+        ? await this.prisma.whatsappMensaje.findMany({
+            where: { pedido_id: { in: pedidoIds } },
+            select: {
+              pedido_id: true,
+              conversacion: {
+                include: { party: { include: { persona: true } } },
+              },
+            },
+          })
+        : [];
+    const convPorPedido = new Map<string, any>();
+    for (const m of msgs) {
+      if (m.pedido_id && m.conversacion && !convPorPedido.has(m.pedido_id.toString())) {
+        convPorPedido.set(m.pedido_id.toString(), m.conversacion);
+      }
+    }
+
+    const quejasFormateadas = quejasDb.map((q) => {
+      const conv = q.pedido_id ? convPorPedido.get(q.pedido_id.toString()) : null;
+      const clienteNombre = conv ? obtenerNombreMostrar(conv) : q.cliente;
+      const esSinTel = conv?.identificador_tipo === 'USUARIO_WA';
+
+      return {
+        id: q.id.toString(),
+        origen: q.origen,
+        pedidoId: q.pedido_id ? q.pedido_id.toString() : null,
+        pedidoCodigo: q.pedido?.codigo || null,
+        cliente: clienteNombre,
+        telefonoEnmascarado: esSinTel
+          ? 'Usuario de WhatsApp'
+          : q.pedido?.cliente_telefono
+          ? enmascararTelefono(q.pedido.cliente_telefono)
+          : '***',
+        puntaje: q.puntaje,
+        texto: q.texto,
+        estado: q.estado,
+        atendidaPor: q.atendida_por,
+        resolucion: q.resolucion,
+        creadaEn: q.creada_en.toISOString(),
+        actualizadaEn: q.actualizada_en.toISOString(),
+      };
+    });
 
     return {
       resumen: {
@@ -149,13 +178,30 @@ export class QuejasWhatsappService {
       });
     }
 
+    let conv: any = null;
+    if (q.pedido_id && this.prisma?.whatsappMensaje) {
+      const msg = await this.prisma.whatsappMensaje.findFirst({
+        where: { pedido_id: q.pedido_id },
+        select: {
+          conversacion: {
+            include: { party: { include: { persona: true } } },
+          },
+        },
+      });
+      conv = msg?.conversacion;
+    }
+    const clienteNombre = conv ? obtenerNombreMostrar(conv) : q.cliente;
+    const esSinTel = conv?.identificador_tipo === 'USUARIO_WA';
+
     return {
       id: q.id.toString(),
       origen: q.origen,
       pedidoId: q.pedido_id ? q.pedido_id.toString() : null,
       pedidoCodigo: q.pedido?.codigo || null,
-      cliente: q.cliente,
-      telefonoEnmascarado: q.pedido?.cliente_telefono
+      cliente: clienteNombre,
+      telefonoEnmascarado: esSinTel
+        ? 'Usuario de WhatsApp'
+        : q.pedido?.cliente_telefono
         ? enmascararTelefono(q.pedido.cliente_telefono)
         : '***',
       puntaje: q.puntaje,
