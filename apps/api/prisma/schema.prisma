@@ -1518,13 +1518,16 @@ model Conversacion {
   nombre_contacto    String?
   nombre_editado     Boolean            @default(false)
   identificador_tipo String             @default("TELEFONO") // TELEFONO | USUARIO_WA
+  motivo_derivacion  String?
   ultima_actividad   DateTime           @default(now()) @db.Timestamptz
 
   party              Party?             @relation(fields: [party_id], references: [id])
   tomadoPorUsuario   UserAccount?       @relation(fields: [tomado_por], references: [id])
   mensajes           MensajeChat[]
   solicitudesReserva SolicitudReserva[]
+  solicitudesCambio  SolicitudCambio[]
   whatsappMensajes   WhatsappMensaje[]
+  ia_consumos        IaConsumo[]
 
   @@map("conversacion")
 }
@@ -1576,16 +1579,27 @@ model SolicitudReserva {
 }
 
 model SolicitudCambio {
-  id           BigInt    @id @default(autoincrement())
-  pedido_id    BigInt
-  tipo         String    // DIRECCION | PEDIDO | CANCELAR
-  detalle      String?
-  estado       String    @default("PENDIENTE") // PENDIENTE | ACEPTADA | RECHAZADA
-  decidido_por BigInt?
-  motivo       String?
-  creado_en    DateTime  @default(now()) @db.Timestamptz
+  id                BigInt        @id @default(autoincrement())
+  pedido_id         BigInt
+  conversacion_id   BigInt?
+  tipo              String        // DIRECCION | PEDIDO | CANCELAR
+  detalle           String?
+  estado            String        @default("PENDIENTE") // PENDIENTE | ACEPTADA | RECHAZADA
+  nueva_direccion   String?
+  nueva_referencia  String?
+  nueva_zona_id     BigInt?
+  nueva_zona_nombre String?
+  nuevo_envio       Decimal?      @db.Decimal(10, 2)
+  recargo_envio     Decimal?      @db.Decimal(10, 2)
+  lat               Decimal?      @db.Decimal(10, 7)
+  lng               Decimal?      @db.Decimal(10, 7)
+  decidido_por      BigInt?
+  decidido_en       DateTime?     @db.Timestamptz
+  motivo            String?
+  creado_en         DateTime      @default(now()) @db.Timestamptz
 
-  pedido       Pedido    @relation(fields: [pedido_id], references: [id])
+  pedido            Pedido        @relation(fields: [pedido_id], references: [id])
+  conversacion      Conversacion? @relation(fields: [conversacion_id], references: [id])
 
   @@map("solicitud_cambio")
 }
@@ -1860,6 +1874,24 @@ model QuejaWhatsapp {
   @@index([estado])
   @@index([pedido_id])
   @@map("queja_whatsapp")
+}
+
+model IaConsumo {
+  id                  BigInt        @id @default(autoincrement())
+  fecha               DateTime      @default(now()) @db.Timestamptz
+  conversacion_id     BigInt?
+  modelo              String        @db.VarChar(100)
+  tokens_entrada      Int           @default(0)
+  tokens_salida       Int           @default(0)
+  costo_usd_estimado  Decimal       @default(0) @db.Decimal(10, 6)
+  herramientas_usadas Json?
+  resultado           String        @db.VarChar(50)
+
+  conversacion        Conversacion? @relation(fields: [conversacion_id], references: [id], onDelete: SetNull)
+
+  @@index([fecha])
+  @@index([conversacion_id])
+  @@map("ia_consumo")
 }
 
 

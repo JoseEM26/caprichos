@@ -30,12 +30,15 @@ export const CLAVES_NUMERICAS = [
   'encuesta_puntaje_queja',
   'chatbot_pago_recordatorio_min',
   'chatbot_pago_expira_min',
+  'chatbot_ia_tope_mensual_usd',
+  'chatbot_ia_max_por_hora_telefono',
 ] as const;
 
 export const CLAVES_TEXTO = [
   'envio_gratis_modo',
   'carta_aviso_entrada',
   'chatbot_activo',
+  'chatbot_ia_activo',
   'chatbot_pago_recordatorio_activo',
   'whatsapp_aviso_salida_activo',
   'whatsapp_aviso_llegada_activo',
@@ -118,6 +121,7 @@ export class ConfiguracionService {
       if (
         clave === 'carta_aviso_entrada' ||
         clave === 'chatbot_activo' ||
+        clave === 'chatbot_ia_activo' ||
         clave.startsWith('whatsapp_aviso_')
       ) {
         const valNorm =

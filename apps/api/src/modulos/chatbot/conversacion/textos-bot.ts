@@ -876,5 +876,7 @@ export const TEXTOS_BOT = {
 
 export * from './textos-reserva';
 export * from './flujos/pago/textos-pago';
+export * from './textos-ia';
+export * from './flujos/cambios/textos-cambios';
 
 

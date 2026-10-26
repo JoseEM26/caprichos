@@ -2,6 +2,7 @@ import { BotonAccion, FilaLista } from '../puerto/whatsapp-mensajeria.puerto';
 import { EstadoCarritoPedido, EstadoPedidoFlujo } from './flujos/pedido/tipos-pedido';
 import { EstadoPagoFlujo, EstadoPagoConversacion } from './flujos/pago/tipos-pago';
 import { EstadoReservaFlujo, EstadoFlujoReserva } from './flujos/reserva/tipos-reserva';
+import { EstadoCambiosFlujo, EstadoFlujoCambios } from './flujos/cambios/tipos-cambios';
 export {
   BotonAccion,
   FilaLista,
@@ -11,6 +12,8 @@ export {
   EstadoPagoConversacion,
   EstadoReservaFlujo,
   EstadoFlujoReserva,
+  EstadoCambiosFlujo,
+  EstadoFlujoCambios,
 };
 
 /**
@@ -46,6 +49,8 @@ export type EstadoConversacion =
   | EstadoPagoFlujo
   // Estados de subflujo de reservas (Ola 3, Agente F):
   | EstadoReservaFlujo
+  // Estados de subflujo de cambios (Ola 3, Agente E):
+  | EstadoCambiosFlujo
   // Estados de mockup Chatbot.dc.html:
   | 'MODAL'
   | 'LOC'
@@ -125,6 +130,9 @@ export interface AccionPasarAPersona {
   tipo: 'pasarAPersona';
   motivo: string;
   mensajeCliente?: string;
+  esUrgente?: boolean;
+  crearQueja?: boolean;
+  quejaTexto?: string;
 }
 
 /**
@@ -181,6 +189,33 @@ export interface AccionEnviarImagen {
   caption?: string;
 }
 
+/**
+ * Acción transaccional: registrar una solicitud de cambio de pedido o dirección (Ola 3, Agente E).
+ */
+export interface AccionCrearSolicitudCambio {
+  tipo: 'crearSolicitudCambio';
+  pedidoId: string;
+  pedidoCodigo: string;
+  tipoCambio: 'DIRECCION' | 'PEDIDO' | 'CANCELAR';
+  detalle: string;
+  nuevaDireccion?: string;
+  nuevaReferencia?: string;
+  nuevaZonaId?: string;
+  nuevaZonaNombre?: string;
+  nuevoEnvio?: number;
+  recargoEnvio?: number;
+  lat?: number;
+  lng?: number;
+}
+
+/**
+ * Acción de consulta a la Inteligencia Artificial (Ola 3, Agente G).
+ */
+export interface AccionConsultarIa {
+  tipo: 'consultarIa';
+  pregunta: string;
+}
+
 export type AccionMensaje =
   | AccionEnviarTexto
   | AccionEnviarBotones
@@ -190,7 +225,9 @@ export type AccionMensaje =
   | AccionCrearPedido
   | AccionCrearSolicitudReserva
   | AccionCancelarReservaCliente
-  | AccionCambiarReservaCliente;
+  | AccionCambiarReservaCliente
+  | AccionCrearSolicitudCambio
+  | AccionConsultarIa;
 
 /**
  * Estructura tipada del objeto JSON guardado en `conversacion.flujo`.
@@ -212,6 +249,8 @@ export interface FlujoConversacion {
   pago?: EstadoPagoConversacion | null;
   /** Subflujo transaccional de Reserva (Ola 3, Agente F) */
   reserva?: EstadoFlujoReserva | null;
+  /** Subflujo transaccional de Cambios (Ola 3, Agente E) */
+  cambios?: EstadoFlujoCambios | null;
   /** Gancho para Ola 3: Contexto de dudas resueltas por IA */
   duda_ia?: {
     historial?: any[];
@@ -270,6 +309,10 @@ export interface ContextoConversacion {
   franjasDisponiblesReserva?: string[];
   /** Contador de solicitudes de reserva pendientes para el teléfono (máx 3) */
   solicitudesPendientesTelefono?: number;
+  /** Contador de solicitudes de cambio pendientes para el teléfono (máx 3) */
+  solicitudesCambioPendientesTelefono?: number;
+  /** Habilita derivación a la IA para dudas (Ola 3, Agente G) */
+  chatbotIaActivo?: boolean;
   /** Reservas activas del cliente para consulta / cambio / cancelación */
   reservasActivasCliente?: Array<{
     id: string;

@@ -30,9 +30,12 @@ import {
   ResultadoTransicion,
 } from './tipos-conversacion';
 import { RegistroSubFlujos } from './flujos/registro-flujos';
+import { TEXTOS_CAMBIOS } from './flujos/cambios/textos-cambios';
 import './flujos/pedido/flujo-pedido';
 import './flujos/pago/flujo-pago';
 import './flujos/reserva/flujo-reserva';
+import './flujos/ia/flujo-ia';
+import './flujos/cambios/flujo-cambios';
 
 /** Palabras clave para detectar saludos o solicitud del menú */
 const PALABRAS_SALUDO = [
@@ -159,6 +162,15 @@ const PALABRAS_HORARIO_UBICACION = [
   'mapa',
   'llegar',
   'donde estan',
+];
+
+/** Palabras clave para intención de queja o reclamo urgente (HU-CAP-129, HU-CAP-141) */
+const PALABRAS_QUEJA = [
+  'mala atencion',
+  'reclamo',
+  'quiero hablar con el encargado',
+  'pesimo servicio',
+  'queja',
 ];
 
 /** Palabras clave para intención de hablar con una persona */
@@ -366,25 +378,58 @@ export function transicionarEstado(
     textoOriginal.match(/CP-\d{4}/i) || texto.match(/CP-\d{4}/i);
   const codigoDetectado = matchCodigo ? matchCodigo[0].toUpperCase() : null;
 
-  // 3. Detección de intención explícita de hablar con una persona
+  // 3. Detección de queja escrita o intención explícita de hablar con una persona
+  const esQueja = coincideAlgunaPalabra(texto, PALABRAS_QUEJA);
   const esPersona =
     idInteractivo === 'persona' ||
     idInteractivo === 'btn_persona' ||
     coincideAlgunaPalabra(texto, PALABRAS_PERSONA);
 
-  if (esPersona) {
+  if (esQueja) {
     const nuevoEstado: EstadoConversacion = 'ATENCION_PERSONA';
     return {
       nuevoEstado,
       acciones: [
         {
           tipo: 'pasarAPersona',
-          motivo: 'CLIENTE_SOLICITO_PERSONA',
+          motivo: 'QUEJA_ESCRITA_URGENTE',
+          mensajeCliente: entrada.textoOriginal,
+          esUrgente: true,
+          crearQueja: true,
+          quejaTexto: entrada.textoOriginal,
+        },
+        {
+          tipo: 'enviarTexto',
+          texto: TEXTOS_CAMBIOS.quejaUrgenteRecibida(),
+        },
+      ],
+      nuevoFlujo: {
+        ...flujo,
+        estado: nuevoEstado,
+        repreguntasFallidas: 0,
+      },
+    };
+  }
+
+  if (esPersona) {
+    const nuevoEstado: EstadoConversacion = 'ATENCION_PERSONA';
+    const estaCerrado = contexto.datosLocal && contexto.datosLocal.abierta === false;
+    const horaAbre = contexto.datosLocal?.abre || '15:00';
+    const horaCierra = contexto.datosLocal?.cierra || '23:00';
+
+    return {
+      nuevoEstado,
+      acciones: [
+        {
+          tipo: 'pasarAPersona',
+          motivo: estaCerrado ? 'FUERA_DE_HORARIO' : 'CLIENTE_SOLICITO_PERSONA',
           mensajeCliente: entrada.textoOriginal,
         },
         {
           tipo: 'enviarTexto',
-          texto: TEXTOS_BOT.pasarAPersona(),
+          texto: estaCerrado
+            ? TEXTOS_CAMBIOS.fueraDeHorario(horaAbre, horaCierra, horaAbre)
+            : TEXTOS_BOT.pasarAPersona(),
         },
       ],
       nuevoFlujo: {
@@ -1101,6 +1146,24 @@ export function transicionarEstado(
   }
 
   // 12. Mensaje no entendido:
+  // Si la IA para dudas está activa (chatbot_ia_activo === 'si'), se invoca a la IA en lugar de la repregunta:
+  if (contexto.chatbotIaActivo) {
+    return {
+      nuevoEstado: 'DUDA_IA',
+      acciones: [
+        {
+          tipo: 'consultarIa',
+          pregunta: entrada.textoOriginal || entrada.texto,
+        },
+      ],
+      nuevoFlujo: {
+        ...flujo,
+        estado: 'DUDA_IA',
+        repreguntasFallidas: 0,
+      },
+    };
+  }
+
   // - Primera vez (repreguntasFallidas === 0): repregunta una vez mostrando opciones (mockup línea 305).
   // - Segunda vez consecutiva (repreguntasFallidas >= 1): pasa a una persona del equipo (mockup línea 304).
   if (flujo.repreguntasFallidas === 0) {

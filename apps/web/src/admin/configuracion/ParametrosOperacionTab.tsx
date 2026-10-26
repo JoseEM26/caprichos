@@ -219,6 +219,23 @@ const META_PARAMETROS: Record<string, MetaParametro> = {
     tipo: 'numero',
     sufijo: 'min',
   },
+  chatbot_ia_activo: {
+    nombre: 'Chatbot: Inteligencia Artificial para dudas (OpenAI)',
+    descripcion: 'Habilita la IA (OpenAI) para resolver dudas de la carta, promociones, horarios y recomendaciones en WhatsApp con solo lectura.',
+    tipo: 'sino',
+  },
+  chatbot_ia_tope_mensual_usd: {
+    nombre: 'Chatbot: Tope mensual de gasto en IA (USD)',
+    descripcion: 'Límite máximo en dólares por mes calendario para consumo de OpenAI. Al alcanzarse, la IA se apaga y alerta a Caja.',
+    tipo: 'numero',
+    sufijo: 'USD',
+  },
+  chatbot_ia_max_por_hora_telefono: {
+    nombre: 'Chatbot: Límite de consultas a la IA por hora y teléfono',
+    descripcion: 'Máximo número de preguntas a la IA que un mismo teléfono puede realizar en el lapso de una hora (anti-abuso).',
+    tipo: 'numero',
+    sufijo: 'consultas/h',
+  },
 };
 
 interface ParametrosOperacionTabProps {
@@ -251,6 +268,20 @@ export function ParametrosOperacionTab({
     modo: 'meta' | 'simulado';
   } | null>(null);
 
+  // Estado del consumo de IA del mes actual (solo lectura, Ola 3 Agente G)
+  const [consumoIa, setConsumoIa] = useState<{
+    periodo: string;
+    llamadasTotal: number;
+    tokensEntrada: number;
+    tokensSalida: number;
+    tokensTotal: number;
+    costoUsdEstimado: number;
+    topeMensualUsd: number;
+    porcentajeConsumido: number;
+    topeAlcanzado: boolean;
+    iaActiva: boolean;
+  } | null>(null);
+
   const cargarParametros = async () => {
     if (!puedeVer) {
       setCargando(false);
@@ -273,6 +304,28 @@ export function ParametrosOperacionTab({
         setEstadoWhatsApp(infoWa);
       } catch {
         setEstadoWhatsApp({ conectado: false, modo: 'simulado' });
+      }
+
+      try {
+        const infoIa = await api.get<{
+          periodo: string;
+          llamadasTotal: number;
+          tokensEntrada: number;
+          tokensSalida: number;
+          tokensTotal: number;
+          costoUsdEstimado: number;
+          topeMensualUsd: number;
+          porcentajeConsumido: number;
+          topeAlcanzado: boolean;
+          iaActiva: boolean;
+        }>('/admin/configuracion/ia-consumo');
+        if (infoIa && typeof (infoIa as any).tokensTotal === 'number') {
+          setConsumoIa(infoIa);
+        } else {
+          setConsumoIa(null);
+        }
+      } catch {
+        setConsumoIa(null);
       }
     } catch (err) {
       const msg =
@@ -530,6 +583,58 @@ export function ParametrosOperacionTab({
           {estadoWhatsApp?.modo === 'meta' && estadoWhatsApp?.conectado ? 'Meta' : 'Simulado'}
         </Insignia>
       </div>
+
+      {consumoIa && typeof (consumoIa as any).tokensTotal === 'number' && (
+        <div
+          data-testid="tarjeta-consumo-ia"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            padding: '14px 18px',
+            background: 'var(--cp-white)',
+            border: '1px solid var(--cp-line)',
+            borderRadius: '14px',
+            gap: '12px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '24px' }}>🤖</span>
+            <div>
+              <div
+                style={{
+                  fontFamily: 'var(--fuente-titulos)',
+                  fontWeight: 800,
+                  fontSize: '14px',
+                  color: 'var(--cp-navy)',
+                }}
+              >
+                Consumo de la IA este mes ({consumoIa.periodo})
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
+                {consumoIa.llamadasTotal} consultas · {consumoIa.tokensTotal.toLocaleString()} tokens · Costo estimado: ${consumoIa.costoUsdEstimado.toFixed(4)} USD / Tope: ${consumoIa.topeMensualUsd.toFixed(2)} USD ({consumoIa.porcentajeConsumido}% consumido)
+              </div>
+            </div>
+          </div>
+
+          <Insignia
+            variante={
+              consumoIa.topeAlcanzado
+                ? 'peligro'
+                : consumoIa.iaActiva
+                ? 'exito'
+                : 'neutro'
+            }
+          >
+            {consumoIa.topeAlcanzado
+              ? 'Tope alcanzado'
+              : consumoIa.iaActiva
+              ? 'IA activa'
+              : 'IA inactiva'}
+          </Insignia>
+        </div>
+      )}
 
       {!puedeEditar && (
         <div

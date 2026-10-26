@@ -10,8 +10,10 @@ import { SeguimientoService } from '../../pedidos/seguimiento.service';
 import { PedidosService } from '../../pedidos/pedidos.service';
 import { ZonasService } from '../../zonas/zonas.service';
 import { ReservasService } from '../../reservas/reservas.service';
+import { ChatbotIaService } from '../ia/chatbot-ia.service';
 import { BOTON_VOLVER_MENU, TEXTOS_BOT } from './textos-bot';
 import { TEXTOS_RESERVA } from './textos-reserva';
+import { TEXTOS_IA, BOTONES_IA_ESTANDAR, BOTONES_IA_CON_PEDIDO } from './textos-ia';
 import { obtenerFechaLimaActual } from './flujos/reserva/flujo-reserva';
 import {
   WHATSAPP_MENSAJERIA_PUERTO,
@@ -19,6 +21,7 @@ import {
 } from '../puerto/whatsapp-mensajeria.puerto';
 import {
   enmascararTelefono,
+  hashTelefono,
   normalizarTelefono,
 } from '../utilidades/enmascarar.util';
 import {
@@ -61,6 +64,7 @@ export class EjecutorConversacionService {
     @Optional()
     @Inject(forwardRef(() => ReservasService))
     private readonly reservasService?: ReservasService,
+    @Optional() private readonly chatbotIaService?: ChatbotIaService,
   ) {}
 
   /**
@@ -357,6 +361,7 @@ export class EjecutorConversacionService {
     // 6.b Consultar franjas de reserva si el flujo está en reserva o es intención de reserva
     let franjasDisponiblesReserva: string[] | undefined;
     let solicitudesPendientesTelefono: number | undefined;
+    let solicitudesCambioPendientesTelefono: number | undefined;
     let reservasActivasCliente: Array<{ id: string; fecha: string; hora: string; personas: number; mesas: string[] }> | undefined;
 
     try {
@@ -391,6 +396,17 @@ export class EjecutorConversacionService {
           },
         });
 
+        // Conteo de solicitudes de cambio pendientes para pedidos del teléfono/conversación
+        solicitudesCambioPendientesTelefono = await this.prisma.solicitudCambio.count({
+          where: {
+            estado: 'PENDIENTE',
+            OR: [
+              { conversacion_id: conversacion.id },
+              { pedido: { cliente_telefono: rawTel } },
+            ],
+          },
+        });
+
         // Reservas activas del cliente (para cancelar o cambiar)
         const ahoraLima = new Date();
         const reservasDb = await this.prisma.reserva.findMany({
@@ -418,6 +434,15 @@ export class EjecutorConversacionService {
       this.logger.warn(`Error al consultar reservas para contexto: ${err.message}`);
     }
 
+    let chatbotIaActivo = false;
+    if (this.chatbotIaService) {
+      try {
+        chatbotIaActivo = await this.chatbotIaService.estaDisponible();
+      } catch (err: any) {
+        this.logger.warn(`Error comprobando disponibilidad de IA: ${err.message}`);
+      }
+    }
+
     const contexto: ContextoConversacion = {
       conversacionId: conversacion.id.toString(),
       nombreCliente: nombreMostrar,
@@ -436,7 +461,9 @@ export class EjecutorConversacionService {
       resultadoEnvio,
       franjasDisponiblesReserva,
       solicitudesPendientesTelefono,
+      solicitudesCambioPendientesTelefono,
       reservasActivasCliente,
+      chatbotIaActivo,
     };
 
     // 7. Normalizar entrada y ejecutar la máquina de estados pura
@@ -565,7 +592,7 @@ export class EjecutorConversacionService {
         });
       } else if (accion.tipo === 'pasarAPersona') {
         // Reglas de MensajesService: dueño PERSONA, estado de atención ABIERTA, notificación campana
-        const esUrgente = accion.motivo?.includes('URGENTE') ?? false;
+        const esUrgente = accion.esUrgente ?? (accion.motivo?.includes('URGENTE') ?? false);
 
         await this.prisma.conversacion.update({
           where: { id: conversacion.id },
@@ -576,11 +603,62 @@ export class EjecutorConversacionService {
               !conversacion.estado || conversacion.estado === 'ATENDIDA'
                 ? 'ABIERTA'
                 : conversacion.estado,
+            motivo_derivacion: accion.motivo,
             tomado_por: null,
             tomado_en: null,
             ultima_actividad: new Date(),
           },
         });
+
+        // Registro de queja en tabla queja_whatsapp si corresponde (HU-CAP-129, HU-CAP-141)
+        if (accion.crearQueja) {
+          try {
+            const rawIdentificador = (conversacion.telefono || '').trim();
+            const telHash = hashTelefono(rawIdentificador || `conv_${conversacion.id}`);
+            const textoQueja = (accion.quejaTexto || accion.mensajeCliente || 'Reclamo en chat').slice(0, 500);
+
+            // Evitar duplicados: verificar si ya existe una queja no resuelta en los últimos 30 min
+            const hace30Min = new Date(Date.now() - 30 * 60 * 1000);
+            const quejaExistente = await this.prisma.quejaWhatsapp.findFirst({
+              where: {
+                origen: 'CHAT',
+                telefono_hash: telHash,
+                texto: textoQueja,
+                creada_en: { gte: hace30Min },
+              },
+            });
+
+            if (!quejaExistente) {
+              await this.prisma.quejaWhatsapp.create({
+                data: {
+                  origen: 'CHAT',
+                  cliente: nombreMostrar,
+                  telefono_hash: telHash,
+                  texto: textoQueja,
+                  estado: 'NUEVA',
+                  pedido_id: contexto.pedidoActivo?.id ? BigInt(contexto.pedidoActivo.id) : null,
+                },
+              });
+
+              const notifQueja = await this.prisma.notificacion.create({
+                data: {
+                  tipo: 'QUEJA_WHATSAPP',
+                  rol_destino: null,
+                  titulo: `Queja WhatsApp urgente (${nombreMostrar})`,
+                  mensaje: `Reclamo: "${textoQueja.slice(0, 100)}"`,
+                  enlace: '/admin/reclamos',
+                },
+              });
+
+              this.eventos?.emitirAdmin('notificaciones:nueva', {
+                id: notifQueja.id.toString(),
+                titulo: notifQueja.titulo,
+              });
+            }
+          } catch (err: any) {
+            this.logger.error(`Error guardando queja_whatsapp: ${err.message}`, err.stack);
+          }
+        }
 
         const tituloNotif = esUrgente
           ? `URGENTE: Atención en WhatsApp (${nombreMostrar})`
@@ -798,6 +876,156 @@ export class EjecutorConversacionService {
         } catch (err: any) {
           this.logger.error(`Error registrando cambio de reserva desde chatbot: ${err.message}`, err.stack);
         }
+      } else if (accion.tipo === 'crearSolicitudCambio') {
+        try {
+          await this.prisma.solicitudCambio.create({
+            data: {
+              pedido_id: BigInt(accion.pedidoId),
+              conversacion_id: conversacion.id,
+              tipo: accion.tipoCambio,
+              detalle: accion.detalle,
+              nueva_direccion: accion.nuevaDireccion,
+              nueva_referencia: accion.nuevaReferencia,
+              nueva_zona_id: accion.nuevaZonaId ? BigInt(accion.nuevaZonaId) : null,
+              nueva_zona_nombre: accion.nuevaZonaNombre,
+              nuevo_envio: accion.nuevoEnvio != null ? accion.nuevoEnvio : null,
+              recargo_envio: accion.recargoEnvio != null ? accion.recargoEnvio : null,
+              lat: accion.lat != null ? accion.lat : null,
+              lng: accion.lng != null ? accion.lng : null,
+              estado: 'PENDIENTE',
+            },
+          });
+
+          // Notificación campana para Caja y Admin
+          const tituloNotif = `Solicitud de cambio: ${accion.pedidoCodigo} (${accion.tipoCambio})`;
+          const mensajeNotif = `${accion.detalle} (${nombreMostrar}).`;
+
+          const notif = await this.prisma.notificacion.create({
+            data: {
+              tipo: 'ATENCION_WHATSAPP',
+              rol_destino: null,
+              titulo: tituloNotif,
+              mensaje: mensajeNotif,
+              enlace: '/admin/mensajes',
+            },
+          });
+
+          this.eventos?.emitirAdmin('notificaciones:nueva', {
+            id: notif.id.toString(),
+            titulo: tituloNotif,
+          });
+
+          this.eventos?.emitirAdmin('mensajes:actualizado', { id: conversacion.id.toString() });
+        } catch (err: any) {
+          this.logger.error(`Error registrando solicitud de cambio: ${err.message}`, err.stack);
+        }
+      } else if (accion.tipo === 'consultarIa') {
+        let textoRespuesta = TEXTOS_IA.errorConsulta();
+        let botonesEnvio = BOTONES_IA_ESTANDAR;
+        let esDerivacion = false;
+        let motivoDeriv = 'CONSULTA_IA_FALLIDA';
+
+        if (this.chatbotIaService) {
+          try {
+            // Historial corto (últimos 6 mensajes)
+            const ultimosMensajes = await this.prisma.mensajeChat.findMany({
+              where: { conversacion_id: conversacion.id },
+              orderBy: { en: 'desc' },
+              take: 6,
+            });
+            const historial = ultimosMensajes.reverse().map((m) => ({
+              autor: m.autor,
+              texto: (m.contenido as any)?.texto || '',
+            }));
+
+            const resIa = await this.chatbotIaService.procesarConsulta({
+              textoUsuario: accion.pregunta,
+              conversacionId: conversacion.id,
+              telefonoCliente,
+              primerNombre: nombreMostrar,
+              historialReciente: historial,
+              waMessageId: entradaRaw.waMessageId,
+            });
+
+            textoRespuesta = resIa.respuestaTexto;
+            esDerivacion = resIa.necesitaDerivar || !resIa.exito;
+            motivoDeriv = resIa.motivoDerivacion || 'CONSULTA_IA_DERIVADA';
+
+            if (resIa.quierePedir) {
+              botonesEnvio = BOTONES_IA_CON_PEDIDO;
+            }
+          } catch (err: any) {
+            this.logger.error(`Error procesando consulta con ChatbotIaService: ${err.message}`, err.stack);
+            textoRespuesta = TEXTOS_IA.errorConsulta();
+            esDerivacion = true;
+          }
+        } else {
+          textoRespuesta = TEXTOS_IA.iaApagadaODerivada();
+          esDerivacion = true;
+        }
+
+        if (esDerivacion) {
+          await this.prisma.conversacion.update({
+            where: { id: conversacion.id },
+            data: {
+              duenio: 'PERSONA',
+              urgente: false,
+              estado:
+                !conversacion.estado || conversacion.estado === 'ATENDIDA'
+                  ? 'ABIERTA'
+                  : conversacion.estado,
+              tomado_por: null,
+              tomado_en: null,
+              ultima_actividad: new Date(),
+            },
+          });
+
+          const tituloNotif = `Atención en WhatsApp: duda de cliente (${nombreMostrar})`;
+          const mensajeNotif = `Consulta del cliente: "${accion.pregunta.slice(0, 100)}". Requiere atención de un asesor (${motivoDeriv}).`;
+
+          const notif = await this.prisma.notificacion.create({
+            data: {
+              tipo: 'ATENCION_WHATSAPP',
+              rol_destino: null,
+              titulo: tituloNotif,
+              mensaje: mensajeNotif,
+              enlace: '/admin/mensajes',
+            },
+          });
+
+          this.eventos?.emitirAdmin('notificaciones:nueva', {
+            id: notif.id.toString(),
+            titulo: tituloNotif,
+          });
+        }
+
+        let metaId: string | null = null;
+        if (destinoEnvio) {
+          const res = await this.mensajeria.enviarBotones(
+            destinoEnvio,
+            textoRespuesta,
+            botonesEnvio,
+            {
+              conversacionId: conversacion.id,
+              replyToWaMessageId: entradaRaw.waMessageId,
+            },
+          );
+          metaId = res.waMessageId || null;
+        }
+
+        await this.prisma.mensajeChat.create({
+          data: {
+            conversacion_id: conversacion.id,
+            direccion: 'SALE',
+            autor: 'BOT',
+            tipo: 'BOTON',
+            contenido: {
+              texto: textoRespuesta,
+              botones: botonesEnvio,
+            } as any,
+            meta_id: metaId,
+          },
+        });
       }
     }
 
