@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Confirmar } from '../../comun/Confirmar';
 import { useEventos } from '../../comun/socket';
 import {
+  aplicarCambioChat,
   aprobarPagoChat,
   editarNombreContacto,
   enviarMensaje,
@@ -12,6 +13,7 @@ import {
   pausarBot,
   pulirMensaje,
   reabrirConversacionPlantilla,
+  rechazarCambioChat,
   rechazarPagoChat,
   reintentarMensaje,
   reanudarBot,
@@ -107,6 +109,19 @@ export function MensajesView() {
 
   // Modal para editar nombre de contacto
   const [modalEditarAbierto, setModalEditarAbierto] = useState(false);
+
+  // Modal para rechazar cambio de pedido
+  const [modalRechazoCambio, setModalRechazoCambio] = useState<{
+    abierto: boolean;
+    motivo: string;
+    enviando: boolean;
+    error: string | null;
+  }>({
+    abierto: false,
+    motivo: '',
+    enviando: false,
+    error: null,
+  });
 
   const handleGuardarNombre = async (nuevoNombre: string) => {
     if (!detalle) return;
@@ -421,6 +436,59 @@ export function MensajesView() {
         await cargarLista(true);
       },
     });
+  };
+
+  const handleAplicarCambio = () => {
+    if (!detalle || !chatSeleccionadoId || !detalle.solicitud) return;
+    const sol = detalle.solicitud;
+    const desc =
+      sol.tipo === 'DIRECCION'
+        ? `Se actualizará la dirección del pedido ${sol.pedido} a: ${sol.nuevaDireccion || sol.detalle}${sol.nuevaZonaNombre ? ` (${sol.nuevaZonaNombre})` : ''}${sol.recargoEnvio && sol.recargoEnvio > 0 ? ` con recargo de s/ ${sol.recargoEnvio.toFixed(2)}` : ''}. Se enviará confirmación por WhatsApp.`
+        : sol.tipo === 'CANCELAR'
+        ? `Se cancelará el pedido ${sol.pedido} y se notificará al cliente por WhatsApp.`
+        : `Se aplicará el cambio en el pedido ${sol.pedido} y se notificará por WhatsApp.`;
+
+    setConfirmarAccion({
+      titulo: `¿Aplicar cambio en el pedido ${sol.pedido}?`,
+      mensaje: desc,
+      textoSi: 'Sí, aplicar cambio',
+      accion: async () => {
+        try {
+          await aplicarCambioChat(chatSeleccionadoId);
+          await cargarDetalle(chatSeleccionadoId);
+          await cargarLista(true);
+        } catch (err: any) {
+          setPulirError(err?.message || 'Error al aplicar el cambio');
+        }
+      },
+    });
+  };
+
+  const handleAbrirRechazarCambio = () => {
+    if (!detalle?.solicitud) return;
+    setModalRechazoCambio({
+      abierto: true,
+      motivo: '',
+      enviando: false,
+      error: null,
+    });
+  };
+
+  const handleConfirmarRechazoCambio = async () => {
+    if (!chatSeleccionadoId || !modalRechazoCambio.motivo.trim()) return;
+    setModalRechazoCambio((prev) => ({ ...prev, enviando: true, error: null }));
+    try {
+      await rechazarCambioChat(chatSeleccionadoId, modalRechazoCambio.motivo.trim());
+      setModalRechazoCambio({ abierto: false, motivo: '', enviando: false, error: null });
+      await cargarDetalle(chatSeleccionadoId);
+      await cargarLista(true);
+    } catch (err: any) {
+      setModalRechazoCambio((prev) => ({
+        ...prev,
+        enviando: false,
+        error: err?.message || 'Error al rechazar el cambio',
+      }));
+    }
   };
 
   const handleCopiarProductos = () => {
@@ -802,6 +870,18 @@ export function MensajesView() {
                 </div>
               )}
 
+              {/* Motivo de derivación si existe */}
+              {detalle.motivoDerivacion && (
+                <div
+                  role="status"
+                  className="cv-banner"
+                  style={{ background: '#FFF1C9', color: '#8A5800', borderBottom: '1px solid #FFE29A', fontWeight: 600 }}
+                  data-testid="banner-motivo-derivacion"
+                >
+                  <span>⚠️ Derivado a asesor: {detalle.motivoDerivacion}</span>
+                </div>
+              )}
+
               {/* Banner Informativo */}
               {bannerInfo && (
                 <div className="cv-banner" style={{ background: bannerInfo[1] }}>
@@ -916,12 +996,66 @@ export function MensajesView() {
 
               {/* Solicitud de cambio si existe */}
               {detalle.solicitud && (
-                <div className="cv-order" style={{ borderLeftColor: '#E67929' }}>
-                  <b>Solicitud del cliente: {detalle.solicitud.tipo}</b>
-                  <div>{detalle.solicitud.detalle}</div>
-                  <div style={{ color: '#54656F' }}>
-                    Pedido {detalle.solicitud.pedido} · estado: {detalle.solicitud.estadoPedido} · {detalle.solicitud.hora}
+                <div className="cv-order" style={{ borderLeftColor: '#E67929' }} data-testid="seccion-solicitud-cambio">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <b style={{ color: '#C05621' }}>
+                      Solicitud de {detalle.solicitud.tipo === 'DIRECCION' ? 'cambio de dirección' : detalle.solicitud.tipo === 'CANCELAR' ? 'cancelación' : 'cambio de pedido'}
+                    </b>
+                    <span
+                      style={{
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        padding: '2px 8px',
+                        borderRadius: '10px',
+                        background: detalle.solicitud.estadoSolicitud === 'APLICADA' ? '#D1FAE5' : detalle.solicitud.estadoSolicitud === 'RECHAZADA' ? '#FEE2E2' : '#FEF3C7',
+                        color: detalle.solicitud.estadoSolicitud === 'APLICADA' ? '#065F46' : detalle.solicitud.estadoSolicitud === 'RECHAZADA' ? '#991B1B' : '#92400E',
+                      }}
+                    >
+                      {detalle.solicitud.estadoSolicitud || 'PENDIENTE'}
+                    </span>
                   </div>
+                  <div><b>Detalle:</b> {detalle.solicitud.detalle}</div>
+                  {detalle.solicitud.nuevaDireccion && (
+                    <div style={{ marginTop: '2px' }}>
+                      <b>Nueva dirección:</b> {detalle.solicitud.nuevaDireccion}
+                    </div>
+                  )}
+                  {detalle.solicitud.nuevaReferencia && (
+                    <div style={{ color: '#54656F', fontSize: '13px' }}>
+                      Ref: {detalle.solicitud.nuevaReferencia}
+                    </div>
+                  )}
+                  {detalle.solicitud.nuevaZonaNombre && (
+                    <div style={{ marginTop: '2px', fontSize: '13px', color: '#1E293B' }}>
+                      <b>Zona:</b> {detalle.solicitud.nuevaZonaNombre}
+                      {detalle.solicitud.recargoEnvio !== undefined && detalle.solicitud.recargoEnvio !== null && detalle.solicitud.recargoEnvio > 0 ? (
+                        <span style={{ color: '#C05621', fontWeight: 600 }}>
+                          {' '}(Recargo: +s/ {Number(detalle.solicitud.recargoEnvio).toFixed(2)} · Envío nuevo: s/ {Number(detalle.solicitud.nuevoEnvio || 0).toFixed(2)})
+                        </span>
+                      ) : null}
+                    </div>
+                  )}
+                  <div style={{ color: '#54656F', fontSize: '12px', marginTop: '4px' }}>
+                    Pedido {detalle.solicitud.pedido} · Estado pedido: {detalle.solicitud.estadoPedido} · Solicitado a las {detalle.solicitud.hora}
+                  </div>
+                  {(!detalle.solicitud.estadoSolicitud || detalle.solicitud.estadoSolicitud === 'PENDIENTE') && (
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+                      <button
+                        className="cv-ok"
+                        style={{ padding: '6px 12px', fontSize: '13px' }}
+                        onClick={handleAplicarCambio}
+                      >
+                        Aplicar cambio
+                      </button>
+                      <button
+                        className="cv-no"
+                        style={{ padding: '6px 12px', fontSize: '13px' }}
+                        onClick={handleAbrirRechazarCambio}
+                      >
+                        Rechazar cambio
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1151,6 +1285,98 @@ export function MensajesView() {
           alGuardar={handleGuardarNombre}
           alRevertir={handleRevertirNombre}
         />
+      )}
+
+      {/* Modal Rechazar Solicitud de Cambio */}
+      {modalRechazoCambio.abierto && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              background: '#FFFFFF',
+              borderRadius: '12px',
+              padding: '24px',
+              maxWidth: '440px',
+              width: '90%',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+            }}
+          >
+            <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: 700, color: 'var(--cp-navy, #0B2C3E)' }}>
+              ¿Rechazar solicitud de cambio?
+            </h3>
+            <p style={{ margin: '0 0 16px 0', fontSize: '14px', color: '#64748B' }}>
+              Ingresa el motivo del rechazo. Este motivo se enviará al cliente por WhatsApp con honestidad y empatía.
+            </p>
+            <textarea
+              rows={3}
+              value={modalRechazoCambio.motivo}
+              onChange={(e) => setModalRechazoCambio((prev) => ({ ...prev, motivo: e.target.value }))}
+              placeholder="Ej. El pedido ya está empacado y en la puerta para salir..."
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                borderRadius: '8px',
+                border: '1px solid #CBD5E1',
+                fontSize: '14px',
+                fontFamily: 'inherit',
+                boxSizing: 'border-box',
+                resize: 'vertical',
+              }}
+            />
+            {modalRechazoCambio.error && (
+              <div style={{ color: '#DC2626', fontSize: '13px', marginTop: '6px' }}>
+                {modalRechazoCambio.error}
+              </div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
+              <button
+                type="button"
+                onClick={() => setModalRechazoCambio({ abierto: false, motivo: '', enviando: false, error: null })}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid #CBD5E1',
+                  borderRadius: '6px',
+                  padding: '8px 16px',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  color: '#475569',
+                }}
+              >
+                No, cancelar
+              </button>
+              <button
+                type="button"
+                disabled={!modalRechazoCambio.motivo.trim() || modalRechazoCambio.enviando}
+                onClick={handleConfirmarRechazoCambio}
+                style={{
+                  background: '#DC2626',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '8px 16px',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  cursor: modalRechazoCambio.motivo.trim() && !modalRechazoCambio.enviando ? 'pointer' : 'not-allowed',
+                  opacity: modalRechazoCambio.motivo.trim() && !modalRechazoCambio.enviando ? 1 : 0.6,
+                }}
+              >
+                {modalRechazoCambio.enviando ? 'Rechazando...' : 'Sí, rechazar cambio'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

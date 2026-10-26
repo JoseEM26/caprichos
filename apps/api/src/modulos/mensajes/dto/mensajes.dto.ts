@@ -52,3 +52,10 @@ export class RechazarPagoDto {
   @MaxLength(300, { message: 'El motivo es demasiado largo' })
   motivo?: string;
 }
+
+export class RechazarCambioDto {
+  @IsString({ message: 'El motivo debe ser una cadena de texto' })
+  @IsNotEmpty({ message: 'El motivo es obligatorio' })
+  @Length(3, 300, { message: 'El motivo debe tener entre 3 y 300 caracteres' })
+  motivo!: string;
+}

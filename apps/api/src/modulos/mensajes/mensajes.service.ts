@@ -15,6 +15,7 @@ import { enmascararTelefono } from '../chatbot/utilidades/enmascarar.util';
 import { mapearErrorWhatsApp } from './utilidades/error-whatsapp.util';
 import { EditarNombreContactoDto } from './dto/mensajes.dto';
 import { BOTONES_PAGO_RECHAZADO, TEXTOS_PAGO } from '../chatbot/conversacion/flujos/pago/textos-pago';
+import { TEXTOS_CAMBIOS } from '../chatbot/conversacion/flujos/cambios/textos-cambios';
 
 export type EstadoChat = 'bot' | 'atencion' | 'validar' | 'atendido' | 'pausado';
 export type FiltroChat = 'todos' | 'atender' | 'bot' | 'atendidos';
@@ -170,6 +171,7 @@ export class MensajesService {
         urgente: c.urgente,
         ultimo: ult ? prefijo + (ult.tipo === 'IMAGEN' ? 'Foto' : textoDe(ult)) : '',
         hora: ult ? hora(ult.en) : hora(c.ultima_actividad),
+        ultimaActividadDate: c.ultima_actividad,
         sinLeer,
       };
     });
@@ -184,6 +186,14 @@ export class MensajesService {
           (f.nombre_contacto && f.nombre_contacto.toLowerCase().includes(termino)) ||
           (!esRemitenteSinTelefono(f) && digitos !== '' && f.telefono.replace(/\D/g, '').includes(digitos))),
     );
+
+    // En cola de atención: ordenar urgentes primero y por antigüedad (más antiguos primero)
+    if (filtro === 'atender') {
+      chats.sort((a, b) => {
+        if (a.urgente !== b.urgente) return a.urgente ? -1 : 1;
+        return a.ultimaActividadDate.getTime() - b.ultimaActividadDate.getTime();
+      });
+    }
     return {
       conteos: { todos: filas.length, atender: cuenta('atender'), bot: cuenta('bot'), atendidos: cuenta('atendidos') },
       chats,
@@ -301,14 +311,23 @@ export class MensajesService {
         : null,
       solicitud: solicitud && pedido
         ? {
+            id: solicitud.id.toString(),
             tipo: TIPOS_CAMBIO[solicitud.tipo] ?? solicitud.tipo,
+            tipoRaw: solicitud.tipo,
             detalle: solicitud.detalle ?? '',
+            nuevaDireccion: (solicitud as any).nueva_direccion ?? null,
+            nuevaReferencia: (solicitud as any).nueva_referencia ?? null,
+            nuevaZonaNombre: (solicitud as any).nueva_zona_nombre ?? null,
+            nuevoEnvio: (solicitud as any).nuevo_envio != null ? Number((solicitud as any).nuevo_envio) : null,
+            recargoEnvio: (solicitud as any).recargo_envio != null ? Number((solicitud as any).recargo_envio) : null,
             pedido: pedido.codigo,
             pedidoId: pedido.id.toString(),
             estadoPedido: pedido.estado,
+            estadoSolicitud: solicitud.estado,
             hora: hora(solicitud.creado_en),
           }
         : null,
+      motivoDerivacion: c.motivo_derivacion || (c.flujo as any)?.motivoDerivacion || null,
       solicitudReserva: solicitudReserva
         ? {
             id: solicitudReserva.id.toString(),
@@ -573,8 +592,13 @@ export class MensajesService {
   async soltar(id: string, usuario: UsuarioAutenticado, ip?: string) {
     const c = await this.cargar(id);
     await this.exigirLibreOMio(c, usuario, 'Solo quien lo atiende puede soltarlo.');
-    await this.tocar(c.id, { tomado_por: null, tomado_en: null });
+    await this.tocar(c.id, { duenio: 'BOT', tomado_por: null, tomado_en: null, urgente: false });
     await this.auditar(usuario, 'SOLTAR', c.id, undefined, ip);
+    try {
+      await this.gateway.enviarTexto(c.id, c.telefono, TEXTOS_CAMBIOS.botRetomaAtencion(), 'BOT');
+    } catch {
+      // opcional si falla gateway
+    }
     return { ok: true };
   }
 
@@ -589,6 +613,11 @@ export class MensajesService {
     const c = await this.cargar(id);
     await this.tocar(c.id, { duenio: 'BOT', urgente: false, tomado_por: null, tomado_en: null });
     await this.auditar(usuario, 'REANUDAR_BOT', c.id, undefined, ip);
+    try {
+      await this.gateway.enviarTexto(c.id, c.telefono, TEXTOS_CAMBIOS.botRetomaAtencion(), 'BOT');
+    } catch {
+      // opcional
+    }
     return { ok: true };
   }
 
@@ -597,6 +626,11 @@ export class MensajesService {
     await this.exigirLibreOMio(c, usuario, 'Toca «Tomar el chat» para cerrarlo.');
     await this.tocar(c.id, { estado: 'ATENDIDA', duenio: 'BOT', urgente: false, tomado_por: null, tomado_en: null });
     await this.auditar(usuario, 'MARCAR_ATENDIDO', c.id, undefined, ip);
+    try {
+      await this.gateway.enviarTexto(c.id, c.telefono, TEXTOS_CAMBIOS.botRetomaAtencion(), 'BOT');
+    } catch {
+      // opcional
+    }
     return { ok: true };
   }
 
@@ -850,5 +884,178 @@ export class MensajesService {
       nombre_editado: actualizada.nombre_editado,
       identificador_tipo: actualizada.identificador_tipo,
     };
+  }
+
+  /**
+   * Aplica la solicitud de cambio pendiente sobre el pedido (HU-CAP-140).
+   * Permiso: mensajes/enviar.
+   * Reglas: actualiza pedido (dirección/zona o anulación), audita y notifica al cliente por WhatsApp.
+   */
+  async aplicarCambio(id: string, usuario: UsuarioAutenticado, ip?: string) {
+    const c = await this.cargar(id);
+    await this.exigirLibreOMio(c, usuario, 'Toca «Tomar el chat» para decidir tú.');
+    const d = await this.pedidoDelChat(c);
+    if (!d.pedido) throw error(HttpStatus.CONFLICT, 'SIN_PEDIDO', 'No hay un pedido abierto para este chat');
+
+    const pedidoId = BigInt(d.pedido.id);
+    const solicitud = await this.prisma.solicitudCambio.findFirst({
+      where: { pedido_id: pedidoId, estado: 'PENDIENTE' },
+      orderBy: { id: 'desc' },
+    });
+
+    if (!solicitud) {
+      throw error(HttpStatus.CONFLICT, 'SIN_SOLICITUD', 'No hay una solicitud de cambio pendiente');
+    }
+
+    const ahora = new Date();
+    const pedidoActual = await this.prisma.pedido.findUnique({
+      where: { id: pedidoId },
+    });
+    if (!pedidoActual) throw error(HttpStatus.NOT_FOUND, 'PEDIDO_NO_ENCONTRADO', 'Pedido no encontrado');
+
+    if (solicitud.tipo === 'DIRECCION') {
+      const dataUpdate: any = {};
+      if (solicitud.nueva_direccion) dataUpdate.entrega_direccion = solicitud.nueva_direccion;
+      if (solicitud.nueva_referencia) dataUpdate.entrega_referencia = solicitud.nueva_referencia;
+      if (solicitud.nueva_zona_id) dataUpdate.zona_id = solicitud.nueva_zona_id;
+      if (solicitud.nuevo_envio != null) {
+        dataUpdate.envio = solicitud.nuevo_envio;
+        if (pedidoActual.pago_estado !== 'PAGADO') {
+          const subtotal = Number(pedidoActual.subtotal);
+          const desc = Number(pedidoActual.descuento);
+          const nuevoTotal = (subtotal - desc + Number(solicitud.nuevo_envio)).toFixed(2);
+          dataUpdate.total = nuevoTotal;
+        }
+      }
+      if (solicitud.lat != null) dataUpdate.entrega_lat = solicitud.lat;
+      if (solicitud.lng != null) dataUpdate.entrega_lng = solicitud.lng;
+
+      await this.prisma.pedido.update({
+        where: { id: pedidoId },
+        data: dataUpdate,
+      });
+
+      await this.prisma.solicitudCambio.update({
+        where: { id: solicitud.id },
+        data: {
+          estado: 'ACEPTADA',
+          decidido_por: usuario.partyId,
+          decidido_en: ahora,
+        },
+      });
+
+      const dirFinal = solicitud.nueva_direccion || 'la nueva dirección indicada';
+      const textoCliente = TEXTOS_CAMBIOS.cambioDireccionAplicadoCliente(pedidoActual.codigo, dirFinal);
+      await this.gateway.enviarTexto(c.id, c.telefono, textoCliente, 'PERSONA');
+
+      await this.auditar(usuario, 'APLICAR_CAMBIO_DIRECCION', c.id, {
+        pedido: pedidoActual.codigo,
+        solicitudId: solicitud.id.toString(),
+        nuevaDireccion: solicitud.nueva_direccion,
+      }, ip);
+    } else if (solicitud.tipo === 'PEDIDO') {
+      await this.prisma.solicitudCambio.update({
+        where: { id: solicitud.id },
+        data: {
+          estado: 'ACEPTADA',
+          decidido_por: usuario.partyId,
+          decidido_en: ahora,
+        },
+      });
+
+      const textoCliente = TEXTOS_CAMBIOS.cambioPedidoAplicadoCliente(pedidoActual.codigo);
+      await this.gateway.enviarTexto(c.id, c.telefono, textoCliente, 'PERSONA');
+
+      await this.auditar(usuario, 'APLICAR_CAMBIO_PEDIDO', c.id, {
+        pedido: pedidoActual.codigo,
+        solicitudId: solicitud.id.toString(),
+        detalle: solicitud.detalle,
+      }, ip);
+    } else if (solicitud.tipo === 'CANCELAR') {
+      await this.prisma.pedido.update({
+        where: { id: pedidoId },
+        data: {
+          estado: 'ANULADO',
+          anulado_en: ahora,
+          anulado_por: usuario.partyId,
+          motivo_anulacion: solicitud.detalle || 'Cancelado por el cliente desde WhatsApp',
+        },
+      });
+
+      await this.prisma.solicitudCambio.update({
+        where: { id: solicitud.id },
+        data: {
+          estado: 'ACEPTADA',
+          decidido_por: usuario.partyId,
+          decidido_en: ahora,
+        },
+      });
+
+      const textoCliente = TEXTOS_CAMBIOS.cancelacionAplicadaCliente(pedidoActual.codigo);
+      await this.gateway.enviarTexto(c.id, c.telefono, textoCliente, 'PERSONA');
+
+      this.eventos?.emitirAdmin('pedido:estado', {
+        id: Number(pedidoActual.id),
+        codigo: pedidoActual.codigo,
+        estado: 'ANULADO',
+      });
+
+      await this.auditar(usuario, 'APLICAR_CANCELACION_PEDIDO', c.id, {
+        pedido: pedidoActual.codigo,
+        solicitudId: solicitud.id.toString(),
+      }, ip);
+    }
+
+    this.eventos?.emitirAdmin('mensajes:actualizado', { id: c.id.toString() });
+    return { ok: true };
+  }
+
+  /**
+   * Rechaza la solicitud de cambio con motivo obligatorio (HU-CAP-140).
+   * Notifica el motivo al cliente por WhatsApp y audita quién y cuándo.
+   */
+  async rechazarCambio(id: string, motivo: string, usuario: UsuarioAutenticado, ip?: string) {
+    const motivoLimpio = String(motivo || '').trim();
+    if (!motivoLimpio || motivoLimpio.length < 3) {
+      throw error(HttpStatus.BAD_REQUEST, 'MOTIVO_REQUERIDO', 'Debes ingresar un motivo de rechazo (mínimo 3 caracteres)');
+    }
+
+    const c = await this.cargar(id);
+    await this.exigirLibreOMio(c, usuario, 'Toca «Tomar el chat» para decidir tú.');
+    const d = await this.pedidoDelChat(c);
+    if (!d.pedido) throw error(HttpStatus.CONFLICT, 'SIN_PEDIDO', 'No hay un pedido abierto para este chat');
+
+    const pedidoId = BigInt(d.pedido.id);
+    const solicitud = await this.prisma.solicitudCambio.findFirst({
+      where: { pedido_id: pedidoId, estado: 'PENDIENTE' },
+      orderBy: { id: 'desc' },
+    });
+
+    if (!solicitud) {
+      throw error(HttpStatus.CONFLICT, 'SIN_SOLICITUD', 'No hay una solicitud de cambio pendiente');
+    }
+
+    const ahora = new Date();
+    await this.prisma.solicitudCambio.update({
+      where: { id: solicitud.id },
+      data: {
+        estado: 'RECHAZADA',
+        motivo: motivoLimpio,
+        decidido_por: usuario.partyId,
+        decidido_en: ahora,
+      },
+    });
+
+    const textoCliente = TEXTOS_CAMBIOS.cambioRechazadoCliente(d.pedido.codigo, motivoLimpio);
+    await this.gateway.enviarTexto(c.id, c.telefono, textoCliente, 'PERSONA');
+
+    await this.auditar(usuario, 'RECHAZAR_CAMBIO', c.id, {
+      pedido: d.pedido.codigo,
+      solicitudId: solicitud.id.toString(),
+      motivo: motivoLimpio,
+    }, ip);
+
+    this.eventos?.emitirAdmin('mensajes:actualizado', { id: c.id.toString() });
+    return { ok: true };
   }
 }

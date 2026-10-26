@@ -61,6 +61,14 @@ export async function rechazarPagoChat(id: string): Promise<{ ok: boolean }> {
   return api.post<{ ok: boolean }>(`/admin/mensajes/conversaciones/${id}/rechazar-pago`, {});
 }
 
+export async function aplicarCambioChat(id: string): Promise<{ ok: boolean }> {
+  return api.post<{ ok: boolean }>(`/admin/mensajes/conversaciones/${id}/aplicar-cambio`, {});
+}
+
+export async function rechazarCambioChat(id: string, motivo: string): Promise<{ ok: boolean }> {
+  return api.post<{ ok: boolean }>(`/admin/mensajes/conversaciones/${id}/rechazar-cambio`, { motivo });
+}
+
 export async function editarNombreContacto(
   id: string,
   datos: { nombre?: string; revertir?: boolean },

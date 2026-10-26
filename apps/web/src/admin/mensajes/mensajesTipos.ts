@@ -37,11 +37,19 @@ export interface DetallePedidoChat {
 }
 
 export interface DetalleSolicitudChat {
+  id?: string;
   tipo: string;
+  tipoRaw?: string;
   detalle: string;
+  nuevaDireccion?: string | null;
+  nuevaReferencia?: string | null;
+  nuevaZonaNombre?: string | null;
+  nuevoEnvio?: number | null;
+  recargoEnvio?: number | null;
   pedido: string;
   pedidoId: string;
   estadoPedido: string;
+  estadoSolicitud?: string;
   hora: string;
 }
 
@@ -77,6 +85,7 @@ export interface DetalleConversacion {
   solicitudReserva?: DetalleSolicitudReservaChat | null;
   tiempoPrometidoMin: number | null;
   altaDemanda: boolean;
+  motivoDerivacion?: string | null;
 }
 
 export interface RespuestaRapida {
