@@ -25,3 +25,6 @@ export interface ResumenPedido {
   total: number;
   estado: 'PENDIENTE' | 'CONFIRMADO' | 'EN_PREPARACION' | 'LISTO' | 'ENTREGADO' | 'ANULADO';
 }
+
+export * from './etiquetas.js';
+

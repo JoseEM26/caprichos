@@ -1742,26 +1742,38 @@ model DeviceKey {
   ultima_conexion  DateTime?   @db.Timestamptz
   activo           Boolean     @default(true)
   creado_en        DateTime    @default(now()) @db.Timestamptz
+  ultimo_latido    DateTime?   @db.Timestamptz
+  latido_version   String?
+  latido_impresora String?
+  latido_detalle   String?
 
   area             AreaCocina? @relation(fields: [area_id], references: [id])
+  printJobs        PrintJob[]
 
   @@map("device_key")
 }
 
 model PrintJob {
-  id         BigInt      @id @default(autoincrement())
-  pedido_id  BigInt
-  area_id    BigInt?
-  tipo       String      // COMANDA | ETIQUETA_GENERAL | ETIQUETA_BEBIDA | COPIA_DESPACHO
-  estado     String      @default("PENDIENTE") // PENDIENTE | IMPRESO | ERROR
-  intentos   Int         @default(0)
-  impresora  String?
-  error      String?
-  creado_en  DateTime    @default(now()) @db.Timestamptz
-  impreso_en DateTime?   @db.Timestamptz
+  id                  BigInt      @id @default(autoincrement())
+  pedido_id           BigInt
+  area_id             BigInt?
+  tipo                String      // ETIQUETA_GENERAL | ETIQUETA_AREA | ETIQUETA_BEBIDA
+  clave_idempotencia  String?     @unique
+  payload             Json        @default("{}")
+  copia               Boolean     @default(false)
+  estado              String      @default("PENDIENTE") // PENDIENTE | IMPRIMIENDO | IMPRESO | FALLIDO
+  intentos            Int         @default(0)
+  impresora           String?
+  error               String?
+  en                  DateTime    @default(now()) @db.Timestamptz
+  creado_en           DateTime    @default(now()) @db.Timestamptz
+  tomado_en           DateTime?   @db.Timestamptz
+  impreso_en          DateTime?   @db.Timestamptz
+  device_key_id       BigInt?
 
-  pedido     Pedido      @relation(fields: [pedido_id], references: [id])
-  area       AreaCocina? @relation(fields: [area_id], references: [id])
+  pedido              Pedido      @relation(fields: [pedido_id], references: [id])
+  area                AreaCocina? @relation(fields: [area_id], references: [id])
+  deviceKey           DeviceKey?  @relation(fields: [device_key_id], references: [id])
 
   @@map("print_job")
 }

@@ -10,6 +10,7 @@ import {
   PedidoPorCobrar,
 } from './pedidosApi';
 import { ErrorApi } from '../../comun/api';
+import { TarjetaImpresionEtiquetas } from '../impresion/TarjetaImpresionEtiquetas';
 
 export interface ModalCajaProps {
   cajaInfo: CajaActualRespuesta | null;
@@ -24,7 +25,7 @@ export function ModalCaja({
   alActualizarCaja,
   alSeleccionarPedidoPorCobrar,
 }: ModalCajaProps) {
-  const [pestana, setPestana] = useState<'movimientos' | 'por_coordinar' | 'abrir'>(
+  const [pestana, setPestana] = useState<'movimientos' | 'por_coordinar' | 'abrir' | 'impresion'>(
     !cajaInfo?.abierta ? 'abrir' : 'movimientos',
   );
 
@@ -318,6 +319,32 @@ export function ModalCaja({
             }}
           >
             Por coordinar
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setPestana('impresion');
+              setErrorMensaje('');
+            }}
+            style={{
+              minHeight: 44,
+              padding: '0 14px',
+              borderRadius: 9999,
+              border: '1.5px solid var(--cp-navy, #0B2C3E)',
+              background:
+                pestana === 'impresion'
+                  ? 'var(--cp-navy, #0B2C3E)'
+                  : 'transparent',
+              color:
+                pestana === 'impresion'
+                  ? 'var(--cp-cream, #FBF4EC)'
+                  : 'var(--cp-navy, #0B2C3E)',
+              fontWeight: 700,
+              fontSize: 13,
+            }}
+          >
+            Impresión de etiquetas
           </button>
         </div>
 
@@ -764,6 +791,13 @@ export function ModalCaja({
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* PESTAÑA: IMPRESIÓN DE ETIQUETAS */}
+        {pestana === 'impresion' && (
+          <div style={{ marginTop: 8 }}>
+            <TarjetaImpresionEtiquetas />
           </div>
         )}
       </div>

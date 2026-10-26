@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Pedido } from './pedidosApi';
 import {
   armarEtiquetas,
@@ -6,14 +6,16 @@ import {
   EtiquetaAreaDatos,
   EtiquetaBebidaDatos,
 } from './etiquetasPedido';
+import { Confirmar } from '../../comun/Confirmar';
+import { impresionApi } from '../impresion/impresionApi';
 
 export interface EtiquetasPedidoProps {
   pedido: Pedido;
   onReimprimir?: (tipo: 'general' | 'area' | 'bebida') => void;
 }
 
-const AYUDA_HONESTA_REIMPRIMIR =
-  'La impresión automática llega en la próxima etapa. Esta es la vista previa de lo que saldrá';
+const AYUDA_REIMPRIMIR =
+  'Envía una copia a la cola de impresión de la etiquetera de caja.';
 
 /**
  * Separador elegante de línea continua con 3 rombos al centro
@@ -615,9 +617,74 @@ export function EtiquetaBebida({ datos }: { datos: EtiquetaBebidaDatos }) {
  */
 export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) {
   const resumen = armarEtiquetas(pedido);
+  const [tipoConfirmar, setTipoConfirmar] = useState<'general' | 'area' | 'bebida' | null>(null);
+  const [reimprimiendo, setReimprimiendo] = useState<boolean>(false);
+  const [mensajeExito, setMensajeExito] = useState<string | null>(null);
+  const [mensajeError, setMensajeError] = useState<string | null>(null);
+
+  const handleConfirmarReimpresion = async () => {
+    if (!tipoConfirmar) return;
+    setReimprimiendo(true);
+    setMensajeExito(null);
+    setMensajeError(null);
+    try {
+      if (onReimprimir) {
+        onReimprimir(tipoConfirmar);
+      }
+      const res = await impresionApi.reimprimirEtiquetas(String(pedido.id), tipoConfirmar);
+      setMensajeExito(res?.mensaje || 'Etiqueta encolada para reimpresión correctamente');
+      setTipoConfirmar(null);
+    } catch (err: any) {
+      setMensajeError(err?.message || 'Error al encolar la reimpresión');
+      setTipoConfirmar(null);
+    } finally {
+      setReimprimiendo(false);
+    }
+  };
+
+  const tituloModal =
+    tipoConfirmar === 'general'
+      ? '¿Reimprimir etiqueta general?'
+      : tipoConfirmar === 'area'
+      ? '¿Reimprimir etiquetas por área?'
+      : '¿Reimprimir etiquetas de bebida?';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18, width: '100%' }}>
+      {/* Mensajes de retroalimentación */}
+      {mensajeExito && (
+        <div
+          role="status"
+          style={{
+            fontSize: 13,
+            fontWeight: 700,
+            color: 'var(--cp-green, #2F7A45)',
+            background: 'var(--cp-sand, #EDE1D1)',
+            padding: '10px 14px',
+            borderRadius: 8,
+            borderLeft: '4px solid var(--cp-green, #2F7A45)',
+          }}
+        >
+          {mensajeExito}
+        </div>
+      )}
+      {mensajeError && (
+        <div
+          role="alert"
+          style={{
+            fontSize: 13,
+            fontWeight: 700,
+            color: 'var(--cp-rust, #B2500F)',
+            background: '#FBE9DF',
+            padding: '10px 14px',
+            borderRadius: 8,
+            borderLeft: '4px solid var(--cp-rust, #B2500F)',
+          }}
+        >
+          {mensajeError}
+        </div>
+      )}
+
       {/* Estado y nota explicativa */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <div
@@ -654,8 +721,7 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
           <button
             type="button"
-            disabled={!onReimprimir}
-            onClick={() => onReimprimir?.('general')}
+            onClick={() => setTipoConfirmar('general')}
             style={{
               minHeight: 44,
               padding: '0 14px',
@@ -665,14 +731,14 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
               color: 'var(--cp-navy, #0B2C3E)',
               fontWeight: 800,
               fontSize: 12,
-              cursor: onReimprimir ? 'pointer' : 'not-allowed',
-              opacity: onReimprimir ? 1 : 0.6,
+              cursor: 'pointer',
+              opacity: 1,
             }}
           >
             Reimprimir la general
           </button>
           <span style={{ fontSize: 11, color: 'var(--cp-soft, #2C4C5D)', lineHeight: '15px' }}>
-            {AYUDA_HONESTA_REIMPRIMIR}
+            {AYUDA_REIMPRIMIR}
           </span>
         </div>
       </section>
@@ -695,8 +761,7 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
           <button
             type="button"
-            disabled={!onReimprimir}
-            onClick={() => onReimprimir?.('area')}
+            onClick={() => setTipoConfirmar('area')}
             style={{
               minHeight: 44,
               padding: '0 14px',
@@ -706,14 +771,14 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
               color: 'var(--cp-navy, #0B2C3E)',
               fontWeight: 800,
               fontSize: 12,
-              cursor: onReimprimir ? 'pointer' : 'not-allowed',
-              opacity: onReimprimir ? 1 : 0.6,
+              cursor: 'pointer',
+              opacity: 1,
             }}
           >
             Reimprimir las de área
           </button>
           <span style={{ fontSize: 11, color: 'var(--cp-soft, #2C4C5D)', lineHeight: '15px' }}>
-            {AYUDA_HONESTA_REIMPRIMIR}
+            {AYUDA_REIMPRIMIR}
           </span>
         </div>
       </section>
@@ -749,8 +814,7 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
           <button
             type="button"
-            disabled={!onReimprimir}
-            onClick={() => onReimprimir?.('bebida')}
+            onClick={() => setTipoConfirmar('bebida')}
             style={{
               minHeight: 44,
               padding: '0 14px',
@@ -760,17 +824,31 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
               color: 'var(--cp-navy, #0B2C3E)',
               fontWeight: 800,
               fontSize: 12,
-              cursor: onReimprimir ? 'pointer' : 'not-allowed',
-              opacity: onReimprimir ? 1 : 0.6,
+              cursor: 'pointer',
+              opacity: 1,
             }}
           >
             Reimprimir las de bebida
           </button>
           <span style={{ fontSize: 11, color: 'var(--cp-soft, #2C4C5D)', lineHeight: '15px' }}>
-            {AYUDA_HONESTA_REIMPRIMIR}
+            {AYUDA_REIMPRIMIR}
           </span>
         </div>
       </section>
+
+      {/* Modal de confirmación Sí/No */}
+      {Boolean(tipoConfirmar) && (
+        <Confirmar
+          abierto={Boolean(tipoConfirmar)}
+          titulo={tituloModal}
+          mensaje="Se encolará una copia de la etiqueta para que el agente local de caja la imprima."
+          textoSi="Sí, reimprimir"
+          textoNo="No, cancelar"
+          cargando={reimprimiendo}
+          alConfirmar={handleConfirmarReimpresion}
+          alCancelar={() => setTipoConfirmar(null)}
+        />
+      )}
     </div>
   );
 }

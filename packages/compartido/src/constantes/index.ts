@@ -9,3 +9,6 @@ export const ROLES_SISTEMA = {
 } as const;
 
 export type RolSistema = (typeof ROLES_SISTEMA)[keyof typeof ROLES_SISTEMA];
+
+export * from './etiquetas.js';
+

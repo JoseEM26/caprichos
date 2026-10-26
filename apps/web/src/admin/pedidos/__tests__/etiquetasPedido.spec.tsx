@@ -262,19 +262,25 @@ describe('EtiquetasPedido (componente React)', () => {
     expect(screen.getByText(/Sale en: Etiquetera de barra/i)).toBeInTheDocument();
     expect(screen.getByText(/Sale en: Etiquetera de cocina/i)).toBeInTheDocument();
 
-    // 5. Botones visibles pero deshabilitados con texto de ayuda honesto
+    // 5. Botones habilitados con confirmación Sí/No que llaman al endpoint
     const btnGeneral = screen.getByRole('button', { name: /Reimprimir la general/i });
     const btnAreas = screen.getByRole('button', { name: /Reimprimir las de área/i });
     const btnBebida = screen.getByRole('button', { name: /Reimprimir las de bebida/i });
 
-    expect(btnGeneral).toBeDisabled();
-    expect(btnAreas).toBeDisabled();
-    expect(btnBebida).toBeDisabled();
+    expect(btnGeneral).toBeEnabled();
+    expect(btnAreas).toBeEnabled();
+    expect(btnBebida).toBeEnabled();
 
     const textosAyuda = screen.getAllByText(
-      'La impresión automática llega en la próxima etapa. Esta es la vista previa de lo que saldrá',
+      'Envía una copia a la cola de impresión de la etiquetera de caja.',
     );
     expect(textosAyuda).toHaveLength(3);
+
+    // Al hacer click en Reimprimir la general abre el modal de confirmación
+    fireEvent.click(btnGeneral);
+    expect(screen.getByText('¿Reimprimir etiqueta general?')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Sí, reimprimir/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /No, cancelar/i })).toBeInTheDocument();
   });
 
   it('muestra "Este pedido no tiene bebidas." cuando no hay ítems de barra', () => {

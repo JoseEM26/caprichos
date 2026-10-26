@@ -40,6 +40,7 @@ import { PantallasModule } from './modulos/pantallas/pantallas.module';
 import { ContenidoModule } from './modulos/contenido/contenido.module';
 import { SupervisorCodigoModule } from './modulos/supervisor-codigo/supervisor-codigo.module';
 import { ChatbotModule } from './modulos/chatbot/chatbot.module';
+import { ImpresionModule } from './modulos/impresion/impresion.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -83,6 +84,7 @@ import { ChatbotModule } from './modulos/chatbot/chatbot.module';
     ComprasModule,
     AlmacenModule,
     ContenidoModule,
+    ImpresionModule,
   ],
   providers: [
     PinoLoggerService,

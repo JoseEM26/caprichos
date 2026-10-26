@@ -1,5 +1,6 @@
 import { PuntosService } from '../clientes/puntos.service';
 import { StockService } from '../stock/stock.service';
+import { ImpresionService } from '../impresion/impresion.service';
 import { SalonService } from '../salon/salon.service';
 import {
   BadRequestException,
@@ -53,6 +54,7 @@ export class PedidosEstadoService {
     @Optional() private readonly puntosService?: PuntosService,
     @Optional() private readonly stockService?: StockService,
     @Optional() private readonly supervisorCodigoService?: SupervisorCodigoService,
+    @Optional() private readonly impresionService?: ImpresionService,
   ) {}
 
   private parsearId(id: bigint | string | number): bigint {
@@ -666,6 +668,15 @@ export class PedidosEstadoService {
         await this.salonService?.avisarListo(pedido.id);
       } catch {
         // el aviso es informativo
+      }
+    }
+
+    // Al aceptar caja el pedido (pasa a COLA o a PREPARANDO), encolado idempotente no bloqueante de etiquetas
+    if (nuevoEstado === 'PREPARANDO' || nuevoEstado === 'COLA') {
+      try {
+        await this.impresionService?.encolarEtiquetasPedido(pedido.id);
+      } catch {
+        // El encolado nunca bloquea ni hace fallar la aceptación del pedido
       }
     }
 

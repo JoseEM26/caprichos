@@ -10,6 +10,7 @@ import { SeccionAltaDemanda } from './SeccionAltaDemanda';
 import { SeccionRepartoConfig } from './SeccionRepartoConfig';
 import { ParametrosOperacionTab } from './ParametrosOperacionTab';
 import { ChatbotConfiguracionTab } from './ChatbotConfiguracionTab';
+import { TarjetaImpresionEtiquetas } from '../impresion/TarjetaImpresionEtiquetas';
 
 export interface InfoLocalState {
   // local
@@ -427,6 +428,12 @@ const CATEGORIAS_CONFIG: CategoriaConfig[] = [
     id: 'chatbot',
     n: 'Chatbot y seguridad',
     d: 'Textos, interruptores de función, anti-spam y privacidad Ley 29733',
+    fields: [],
+  },
+  {
+    id: 'impresion',
+    n: 'Impresión de etiquetas',
+    d: 'Estado del agente de caja, trabajos y llaves',
     fields: [],
   },
 ];
@@ -982,8 +989,13 @@ export function ConfiguracionLocalView() {
             <ChatbotConfiguracionTab puedeVer={puedeVer} puedeEditar={puedeEditar} />
           )}
 
+          {/* Subcaso: IMPRESIÓN DE ETIQUETAS */}
+          {tabId === 'impresion' && (
+            <TarjetaImpresionEtiquetas />
+          )}
+
           {/* Subcaso: CAMPOS REGULARES DE OTRAS CATEGORÍAS */}
-          {tabId !== 'horario' && tabId !== 'zonas' && tabId !== 'demanda' && tabId !== 'reparto' && tabId !== 'parametros' && tabId !== 'chatbot' && (
+          {tabId !== 'horario' && tabId !== 'zonas' && tabId !== 'demanda' && tabId !== 'reparto' && tabId !== 'parametros' && tabId !== 'chatbot' && tabId !== 'impresion' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {tabId === 'operacion' && (
                 <div
@@ -1216,7 +1228,7 @@ export function ConfiguracionLocalView() {
           )}
 
           {/* Botones de acción inferiores */}
-          {tabId !== 'horario' && tabId !== 'zonas' && tabId !== 'demanda' && (
+          {tabId !== 'horario' && tabId !== 'zonas' && tabId !== 'demanda' && tabId !== 'impresion' && (
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px' }}>
               <button
                 type="button"
