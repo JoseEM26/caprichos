@@ -22,6 +22,39 @@ export interface MetaErrorParsed {
   httpStatus?: number;
 }
 
+export interface DestinatarioMeta {
+  recipient_type: 'individual';
+  recipient?: string;
+  to?: string;
+}
+
+/**
+ * Función pura que construye el par de campos de destinatario correcto para Meta WhatsApp Cloud API:
+ * - BSUID (PE.xxxx o con prefijo wa-user:) -> {"recipient_type": "individual", "recipient": "<BSUID>"}
+ * - Número E.164 (con o sin +) -> {"recipient_type": "individual", "to": "<numero sin +>"}
+ * - Vacío -> {"recipient_type": "individual", "to": ""}
+ */
+export function construirDestinatario(identificador?: string | null): DestinatarioMeta {
+  const raw = String(identificador ?? '').trim();
+  const sinPrefijo = raw.replace(/^wa-user:/i, '').trim();
+  const rawDest = sinPrefijo.replace(/^\+/, '').trim();
+
+  // Si contiene punto o empieza con dos letras y punto (ej. PE.1048174911395155, PE.123)
+  if (rawDest.includes('.') || /^[A-Za-z]{2}\./i.test(rawDest)) {
+    return {
+      recipient_type: 'individual',
+      recipient: rawDest,
+    };
+  }
+
+  // Número E.164 o vacío
+  const cleanNumber = normalizarTelefono(rawDest) || rawDest.replace(/\D/g, '');
+  return {
+    recipient_type: 'individual',
+    to: cleanNumber,
+  };
+}
+
 @Injectable()
 export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
   private readonly logger = new Logger(WhatsAppMetaAdaptador.name);
@@ -64,9 +97,13 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
 
   /**
    * Clasifica los errores devueltos por Meta WhatsApp Cloud API.
-   * Identifica si el error es reintentable (429, 5xx) o definitivo (24h, número inválido, plantilla rechazada).
+   * Identifica si el error es reintentable (429, 5xx) o definitivo (24h, número inválido, plantilla rechazada, BSUID no permitido).
    */
-  public clasificarErrorMeta(status: number, bodyText: string): MetaErrorParsed {
+  public clasificarErrorMeta(
+    status: number,
+    bodyText: string,
+    esBsuid?: boolean,
+  ): MetaErrorParsed {
     let parsed: any = null;
     try {
       parsed = JSON.parse(bodyText);
@@ -79,6 +116,32 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
     const msg = errorObj.message || bodyText;
     const details = errorObj.error_data?.details || '';
     const fullLower = `${msg} ${details}`.toLowerCase();
+
+    // 0. BSUID no permitido o rechazado por Meta (código 100, 131009 o detalles de recipient/formato)
+    if (
+      esBsuid ||
+      fullLower.includes('recipient') ||
+      fullLower.includes('bsuid') ||
+      code === 100
+    ) {
+      if (
+        code === 100 ||
+        code === 131009 ||
+        code === 131026 ||
+        fullLower.includes('recipient') ||
+        fullLower.includes('bsuid') ||
+        fullLower.includes('parameter') ||
+        fullLower.includes('format')
+      ) {
+        return {
+          codigo: 'BSUID_NO_PERMITIDO',
+          mensaje:
+            'Meta no permite escribir a este contacto por su identificador. Pidele su numero de celular.',
+          reintentable: false,
+          httpStatus: status,
+        };
+      }
+    }
 
     // 1. Destinatario no verificado en el número de prueba de Meta (código 131030 o allowed list)
     if (
@@ -228,7 +291,8 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
           return { exito: true, data, intentos: intento };
         }
 
-        const errorParsed = this.clasificarErrorMeta(respuesta.status, texto);
+        const esBsuid = Boolean(payload && 'recipient' in payload);
+        const errorParsed = this.clasificarErrorMeta(respuesta.status, texto, esBsuid);
 
         // Si NO es reintentable, fallar de inmediato
         if (!errorParsed.reintentable || intento >= this.maxReintentos) {
@@ -281,7 +345,7 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
     texto: string,
     opciones?: OpcionesEnvio,
   ): Promise<ResultadoEnvioWhatsApp> {
-    const telNorm = normalizarTelefono(telefono);
+    const destinatario = construirDestinatario(telefono);
     const telHash = hashTelefono(telefono);
     const telMask = enmascararTelefono(telefono);
 
@@ -297,8 +361,7 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
     const url = `https://graph.facebook.com/${this.apiVersion}/${this.phoneId}/messages`;
     const payload: any = {
       messaging_product: 'whatsapp',
-      recipient_type: 'individual',
-      to: telNorm,
+      ...destinatario,
       type: 'text',
       text: { preview_url: false, body: texto },
     };
@@ -346,7 +409,7 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
     variables?: Record<string, string> | string[],
     opciones?: OpcionesEnvio,
   ): Promise<ResultadoEnvioWhatsApp> {
-    const telNorm = normalizarTelefono(telefono);
+    const destinatario = construirDestinatario(telefono);
     const telHash = hashTelefono(telefono);
     const telMask = enmascararTelefono(telefono);
 
@@ -380,8 +443,7 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
 
     const payload: any = {
       messaging_product: 'whatsapp',
-      recipient_type: 'individual',
-      to: telNorm,
+      ...destinatario,
       type: 'template',
       template: {
         name: nombre,
@@ -427,7 +489,7 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
     botones: BotonAccion[],
     opciones?: OpcionesEnvio,
   ): Promise<ResultadoEnvioWhatsApp> {
-    const telNorm = normalizarTelefono(telefono);
+    const destinatario = construirDestinatario(telefono);
     const telHash = hashTelefono(telefono);
     const telMask = enmascararTelefono(telefono);
 
@@ -453,8 +515,7 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
 
     const payload: any = {
       messaging_product: 'whatsapp',
-      recipient_type: 'individual',
-      to: telNorm,
+      ...destinatario,
       type: 'interactive',
       interactive: {
         type: 'button',
@@ -505,7 +566,7 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
     filas: FilaLista[],
     opciones?: OpcionesEnvio,
   ): Promise<ResultadoEnvioWhatsApp> {
-    const telNorm = normalizarTelefono(telefono);
+    const destinatario = construirDestinatario(telefono);
     const telHash = hashTelefono(telefono);
     const telMask = enmascararTelefono(telefono);
 
@@ -529,8 +590,7 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
 
     const payload: any = {
       messaging_product: 'whatsapp',
-      recipient_type: 'individual',
-      to: telNorm,
+      ...destinatario,
       type: 'interactive',
       interactive: {
         type: 'list',

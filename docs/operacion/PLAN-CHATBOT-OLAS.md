@@ -47,6 +47,7 @@ Completado y verificado el 25/10/2026:
 6. **El número de prueba solo puede enviar a destinatarios verificados** (hasta 5). Puede recibir de cualquiera, pero no se puede contestar a quien no esté verificado.
 7. **El túnel temporal cambia de dirección cada vez que se enciende.** Hay que volver a registrar el webhook con la nueva.
 8. **Fuera de las 24 horas solo se permiten plantillas aprobadas** (ver `PLANTILLAS-WHATSAPP.md`).
+9. **Meta ya puede identificar al usuario por BSUID sin telefono; el envio usa el campo recipient.**
 
 ## 3. Olas de trabajo
 
@@ -93,3 +94,4 @@ Reglas de ejecución: máximo 2 o 3 agentes a la vez, cada ola verificada (tipos
 | 25/10/2026 | Detectado un remitente sin teléfono que dejó una conversación con teléfono vacío. Corrección en curso (Ola 0). |
 | 25/10/2026 | Ola 1 Agente B completada: motor de conversación puro por máquina de estados en conversacion.flujo, saludo con botones, pedido informativo, horario y ubicación con LocalService, pase a persona con notificación por campana, repregunta/derivación ante no entendidos, método enviarLista, rate limit de 5 respuestas/min en Redis, e interruptor chatbot_activo en configuración y admin. |
 | 25/10/2026 | Ola 1 Agente A completada: pasarela real WhatsAppMetaGateway en Mensajes conectada a WhatsAppMensajeriaPuerto (Cloud API de Meta o Simulado), control estricto de ventana de 24 horas con plantilla de utilidad caprichos_reabrir_conversacion, mapeo de errores comprensibles en español sin secretos, estados por mensaje enlazados a whatsapp_mensaje (Enviado, Entregado, Leido, Fallido con botón Reintentar), rate limit de 20 msgs/min por usuario en Redis y actualización en tiempo real por WebSocket. |
+| 25/10/2026 | Soporte de respuestas a usuarios identificados por BSUID (sin teléfono) en Meta WhatsApp Cloud API mediante función construirDestinatario (campo recipient), habilitación en MensajesService y motor conversacional, enmascarado seguro y mapeo de rechazo de identificador. |

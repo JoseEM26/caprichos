@@ -63,19 +63,31 @@ export function obtenerNombreMostrar(c: DatosConversacionContacto): string {
     }
   }
 
+  const sinTelefono = esRemitenteSinTelefono(c);
+
   // 3. Nombre de perfil de WhatsApp
   const perfilWa = (
     c.nombre_contacto?.trim() ||
     (c.flujo as any)?.nombre_perfil_wa?.trim() ||
     ''
   ).trim();
+
+  if (sinTelefono) {
+    if (perfilWa.length > 0) {
+      if (perfilWa.toLowerCase().startsWith('usuario de whatsapp')) {
+        return perfilWa;
+      }
+      return `Usuario de WhatsApp (${perfilWa})`;
+    }
+    return 'Usuario de WhatsApp';
+  }
+
   if (perfilWa.length > 0) {
     return perfilWa;
   }
 
   // 4. Teléfono enmascarado (solo si tiene número de teléfono)
-  const sinTelefono = esRemitenteSinTelefono(c);
-  if (!sinTelefono && c.telefono && c.telefono.trim().length > 0) {
+  if (c.telefono && c.telefono.trim().length > 0) {
     const mask = enmascararTelefono(c.telefono);
     if (mask && mask !== '***') {
       return mask;

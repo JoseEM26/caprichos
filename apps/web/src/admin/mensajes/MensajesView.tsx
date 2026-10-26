@@ -782,7 +782,7 @@ export function MensajesView() {
               )}
 
               {/* Ventana de 24 horas cerrada Banner */}
-              {detalle.ventanaAbierta === false && !esUsuarioWhatsApp(detalle) && (
+              {detalle.ventanaAbierta === false && (
                 <div
                   role="status"
                   className="cv-banner"
@@ -1003,7 +1003,7 @@ export function MensajesView() {
               )}
 
               {/* Compositor de mensaje */}
-              {esUsuarioWhatsApp(detalle) ? (
+              {!detalle.telefono || !detalle.telefono.trim() ? (
                 <div
                   role="alert"
                   style={{
@@ -1017,7 +1017,7 @@ export function MensajesView() {
                     border: '1px solid var(--cp-line, #CBD5E1)',
                   }}
                 >
-                  Este contacto no comparte su numero: no se puede responder desde aqui todavia
+                  Este contacto no tiene ningun identificador: no se puede responder
                 </div>
               ) : (
                 <div className="cv-comp">

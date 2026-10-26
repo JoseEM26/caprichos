@@ -166,23 +166,42 @@ describe('MensajesView (/admin/mensajes)', () => {
     });
   });
 
-  it('7. En un chat sin teléfono muestra aviso que no se puede responder y oculta opciones de llamada', async () => {
-    const detalleSinTel = {
+  it('7. En un chat sin ningún identificador muestra aviso y oculta el compositor', async () => {
+    const detalleSinIdentificador = {
       ...detalleMock,
       id: '3',
-      nombre: 'Contacto Anónimo WA',
-      telefono: 'wa-user:usr_123',
+      nombre: 'Contacto Sin Identificador',
+      telefono: '',
       identificador_tipo: 'USUARIO_WA' as const,
     };
-    vi.spyOn(api, 'obtenerDetalleConversacion').mockResolvedValue(detalleSinTel);
+    vi.spyOn(api, 'obtenerDetalleConversacion').mockResolvedValue(detalleSinIdentificador);
 
     render(<MensajesView />);
 
     await waitFor(() => {
       expect(
-        screen.getByText('Este contacto no comparte su numero: no se puede responder desde aqui todavia'),
+        screen.getByText('Este contacto no tiene ningun identificador: no se puede responder'),
       ).toBeInTheDocument();
       expect(screen.queryByPlaceholderText('Escribe un mensaje')).not.toBeInTheDocument();
+    });
+  });
+
+  it('7b. En un chat USUARIO_WA con BSUID permite responder y oculta opciones de llamada', async () => {
+    const detalleBsuid = {
+      ...detalleMock,
+      id: '3',
+      nombre: 'Contacto BSUID WA',
+      telefono: 'wa-user:PE.1048174911395155',
+      identificador_tipo: 'USUARIO_WA' as const,
+    };
+    vi.spyOn(api, 'obtenerDetalleConversacion').mockResolvedValue(detalleBsuid);
+
+    render(<MensajesView />);
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('Escribe un mensaje')).toBeInTheDocument();
+      expect(screen.queryByText('Copiar celular')).not.toBeInTheDocument();
+      expect(screen.queryByText('Abrir en WhatsApp')).not.toBeInTheDocument();
     });
   });
 

@@ -133,6 +133,23 @@ describe('MensajesService', () => {
               party: null,
             });
           }
+          if (where.id === 5n) {
+            return Promise.resolve({
+              id: 5n,
+              telefono: '',
+              identificador_tipo: 'USUARIO_WA',
+              nombre_contacto: null,
+              nombre_editado: false,
+              flujo: {},
+              party_id: null,
+              duenio: 'PERSONA',
+              tomado_por: 100n,
+              urgente: false,
+              estado: 'ABIERTA',
+              ultima_actividad: new Date(),
+              party: null,
+            });
+          }
           return Promise.resolve(null);
         }),
         update: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: 1n, ...data })),
@@ -206,9 +223,10 @@ describe('MensajesService', () => {
     // Chat 3 sin party muestra teléfono enmascarado (+51 9*** ***66)
     expect(r.chats[2].nombre).toBe('+51 9*** ***66');
 
-    // Chat 4 sin teléfono muestra perfil de usuario de WhatsApp
-    expect(r.chats[3].nombre).toBe('Usuario Sin Fono');
+    // Chat 4 sin teléfono muestra perfil de usuario de WhatsApp con prefijo Usuario de WhatsApp
+    expect(r.chats[3].nombre).toBe('Usuario de WhatsApp (Usuario Sin Fono)');
     expect(r.chats[3].identificador_tipo).toBe('USUARIO_WA');
+    expect(r.chats[3].telefono).toBe('***');
 
     const filtrado = await service.listar('todos', 'Ana');
     expect(filtrado.chats.length).toBe(1);
@@ -329,12 +347,32 @@ describe('MensajesService', () => {
     );
   });
 
-  describe('Responder a remitente sin teléfono', () => {
-    it('falla con 400 y mensaje claro si se intenta enviar a un remitente sin teléfono', async () => {
-      await expect(service.enviar('4', 'Hola', usuarioAdmin)).rejects.toMatchObject({
+  describe('Responder a usuario identificado por BSUID (USUARIO_WA)', () => {
+    it('permite enviar mensaje a contacto USUARIO_WA con su BSUID', async () => {
+      gateway.enviarTexto.mockResolvedValueOnce({
+        id: 'msg-bsuid-ok',
+        autor: 'PERSONA',
+        texto: 'Hola contacto BSUID',
+        en: new Date(),
+        metaId: 'wamid.bsuid.1',
+        estado: 'ENVIADO',
+      });
+
+      const res = await service.enviar('4', 'Hola contacto BSUID', usuarioAdmin);
+      expect(res.id).toBe('msg-bsuid-ok');
+      expect(gateway.enviarTexto).toHaveBeenCalledWith(
+        4n,
+        'wa-user:usr_meta_999',
+        'Hola contacto BSUID',
+        'PERSONA',
+      );
+    });
+
+    it('bloquea el envío solo si no hay ningún identificador (vacío)', async () => {
+      await expect(service.enviar('5', 'Hola', usuarioAdmin)).rejects.toMatchObject({
         response: {
-          codigo: 'CONTACTO_SIN_TELEFONO',
-          mensaje: 'Este contacto no comparte su numero: no se puede responder desde aqui todavia',
+          codigo: 'CONTACTO_SIN_IDENTIFICADOR',
+          mensaje: 'Este contacto no tiene ningun identificador: no se puede responder',
         },
       });
       expect(gateway.enviarTexto).not.toHaveBeenCalled();
@@ -624,6 +662,32 @@ describe('MensajesService', () => {
       expect(errorCapturado.getStatus()).toBe(400);
       expect(errorCapturado.getResponse().codigo).toBe('TOKEN_VENCIDO');
       expect(errorCapturado.getResponse().mensaje).toBe('El acceso a WhatsApp vencio: avisa a quien administra la cuenta');
+    });
+
+    it('mapea BSUID_NO_PERMITIDO a mensaje claro y sin secretos técnicos', async () => {
+      gateway.enviarTexto.mockResolvedValue({
+        id: 'msg-fallido-bsuid',
+        autor: 'PERSONA',
+        texto: 'Hola',
+        metaId: null,
+        estado: 'FALLIDO',
+        errorCodigo: 'BSUID_NO_PERMITIDO',
+        errorDetalle: 'Invalid recipient format for BSUID parameter 100',
+      });
+
+      let errorCapturado: any;
+      try {
+        await service.enviar('1', 'Hola', usuarioAdmin);
+      } catch (e) {
+        errorCapturado = e;
+      }
+
+      expect(errorCapturado).toBeDefined();
+      expect(errorCapturado.getStatus()).toBe(400);
+      expect(errorCapturado.getResponse().codigo).toBe('BSUID_NO_PERMITIDO');
+      expect(errorCapturado.getResponse().mensaje).toBe(
+        'Meta no permite escribir a este contacto por su identificador. Pidele su numero de celular.',
+      );
     });
   });
 });

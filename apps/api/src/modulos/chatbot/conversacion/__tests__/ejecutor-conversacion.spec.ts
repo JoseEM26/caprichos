@@ -365,10 +365,10 @@ describe('EjecutorConversacionService (Integración de Conversación)', () => {
       );
     });
 
-    it('maneja remitente sin teléfono registrando mensajes sin invocar al puerto de Meta', async () => {
+    it('responde a remitente USUARIO_WA identificado por BSUID invocando al puerto de Meta', async () => {
       mockPrisma.conversacion.findUnique.mockResolvedValueOnce({
         id: 13n,
-        telefono: 'wa-user:usr_99999',
+        telefono: 'wa-user:PE.1048174911395155',
         identificador_tipo: 'USUARIO_WA',
         duenio: 'BOT',
         tomado_por: null,
@@ -377,15 +377,21 @@ describe('EjecutorConversacionService (Integración de Conversación)', () => {
 
       const ok = await service.procesarMensajeEntrante(13n, {
         texto: 'hola',
-        waMessageId: 'wamid.sin_tel.1',
+        waMessageId: 'wamid.bsuid.1',
       });
 
       expect(ok).toBe(true);
-      // El puerto no es invocado porque Meta requiere formato E.164
-      expect(mockMensajeria.enviarBotones).not.toHaveBeenCalled();
-      // Pero sí se registra en mensaje_chat para auditoría
+      // El puerto sí es invocado enviando al BSUID
+      expect(mockMensajeria.enviarBotones).toHaveBeenCalledWith(
+        'wa-user:PE.1048174911395155',
+        expect.stringContaining('Hola'),
+        expect.any(Array),
+        expect.objectContaining({
+          conversacionId: 13n,
+          replyToWaMessageId: 'wamid.bsuid.1',
+        }),
+      );
       expect(mockPrisma.mensajeChat.create).toHaveBeenCalled();
-      // Y se actualiza el flujo a MENU
       expect(mockPrisma.conversacion.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -393,6 +399,27 @@ describe('EjecutorConversacionService (Integración de Conversación)', () => {
           }),
         }),
       );
+    });
+
+    it('maneja remitente sin ningún identificador registrando mensaje sin invocar al puerto de Meta', async () => {
+      mockPrisma.conversacion.findUnique.mockResolvedValueOnce({
+        id: 14n,
+        telefono: '',
+        identificador_tipo: 'USUARIO_WA',
+        duenio: 'BOT',
+        tomado_por: null,
+        flujo: { version: 1, estado: 'INICIO', repreguntasFallidas: 0 },
+      });
+
+      const ok = await service.procesarMensajeEntrante(14n, {
+        texto: 'hola',
+        waMessageId: 'wamid.sin_id.1',
+      });
+
+      expect(ok).toBe(true);
+      // Al no haber ningún identificador, no puede invocar al puerto
+      expect(mockMensajeria.enviarBotones).not.toHaveBeenCalled();
+      expect(mockPrisma.mensajeChat.create).toHaveBeenCalled();
     });
   });
 });

@@ -117,7 +117,7 @@ describe('nombre-contacto.util', () => {
       expect(res).toBe('Contacto sin nombre');
     });
 
-    it('Nivel 5 para usuario de WhatsApp sin nombre ni teléfono', () => {
+    it('Nivel 5 para usuario de WhatsApp sin nombre ni teléfono muestra Usuario de WhatsApp', () => {
       const res = obtenerNombreMostrar({
         nombre_editado: false,
         nombre_contacto: null,
@@ -125,18 +125,18 @@ describe('nombre-contacto.util', () => {
         telefono: 'wa-user:usr_998877',
         identificador_tipo: 'USUARIO_WA',
       });
-      expect(res).toBe('Contacto sin nombre');
+      expect(res).toBe('Usuario de WhatsApp');
     });
 
-    it('Usuario de WhatsApp con nombre de perfil muestra su nombre de perfil', () => {
+    it('Usuario de WhatsApp con nombre de perfil muestra Usuario de WhatsApp más el nombre de perfil', () => {
       const res = obtenerNombreMostrar({
         nombre_editado: false,
         nombre_contacto: 'Lucía BSUID',
         party: null,
-        telefono: 'wa-user:usr_998877',
+        telefono: 'wa-user:PE.187654326',
         identificador_tipo: 'USUARIO_WA',
       });
-      expect(res).toBe('Lucía BSUID');
+      expect(res).toBe('Usuario de WhatsApp (Lucía BSUID)');
     });
   });
 });

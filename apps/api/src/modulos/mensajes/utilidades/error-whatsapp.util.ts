@@ -39,6 +39,18 @@ export function mapearErrorWhatsApp(codigo?: string | null, detalle?: string | n
     return 'Pasaron mas de 24 horas desde el ultimo mensaje del cliente. Solo se puede escribir con una plantilla aprobada';
   }
 
+  // BSUID o identificador no permitido o rechazado por Meta (100 / 131009 / formato / recipient)
+  if (
+    c === 'BSUID_NO_PERMITIDO' ||
+    c === 'IDENTIFICADOR_NO_PERMITIDO' ||
+    d.includes('por su identificador') ||
+    d.includes('pidele su numero') ||
+    ((c === 'NUMERO_INVALIDO' || c === 'ERROR_META' || d.includes('100') || d.includes('131009') || d.includes('131026')) &&
+      (d.includes('recipient') || d.includes('bsuid') || d.includes('identificador') || d.includes('format')))
+  ) {
+    return 'Meta no permite escribir a este contacto por su identificador. Pidele su numero de celular.';
+  }
+
   // Número inválido o no registrado en WhatsApp
   if (
     c === 'NUMERO_INVALIDO' ||
@@ -72,9 +84,9 @@ export function mapearErrorWhatsApp(codigo?: string | null, detalle?: string | n
     return 'Se alcanzo el limite de envio: espera un momento';
   }
 
-  // Contacto sin teléfono
-  if (c === 'CONTACTO_SIN_TELEFONO') {
-    return 'Este contacto no comparte su numero: no se puede responder desde aqui todavia';
+  // Contacto sin identificador ni teléfono
+  if (c === 'CONTACTO_SIN_IDENTIFICADOR' || c === 'CONTACTO_SIN_TELEFONO') {
+    return 'Este contacto no tiene ningun identificador: no se puede responder';
   }
 
   // Límite por minuto por usuario

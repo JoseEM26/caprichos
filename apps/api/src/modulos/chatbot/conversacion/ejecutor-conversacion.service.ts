@@ -203,17 +203,21 @@ export class EjecutorConversacionService {
     const flujoPrevio = (conversacion.flujo as any) as FlujoConversacion | null;
     const resultado = transicionarEstado(flujoPrevio, entradaNorm, contexto);
 
-    // 8. Determinar si el contacto cuenta con número utilizable
+    // 8. Determinar destino (número E.164 normalizado o BSUID de Meta)
     const sinTelefono = esRemitenteSinTelefono(conversacion);
-    const telefonoDestino = sinTelefono ? null : normalizarTelefono(conversacion.telefono);
-    const telMask = entradaRaw.telMask || (sinTelefono ? 'Usuario de WhatsApp' : enmascararTelefono(conversacion.telefono));
+    const destinoEnvio = sinTelefono
+      ? conversacion.telefono?.trim() || null
+      : normalizarTelefono(conversacion.telefono) || null;
+    const telMask =
+      entradaRaw.telMask ||
+      (conversacion.telefono ? enmascararTelefono(conversacion.telefono) : 'Usuario de WhatsApp');
 
     // 9. Ejecutar las acciones devueltas por el motor
     for (const accion of resultado.acciones) {
       if (accion.tipo === 'enviarTexto') {
         let metaId: string | null = null;
-        if (telefonoDestino) {
-          const res = await this.mensajeria.enviarTexto(telefonoDestino, accion.texto, {
+        if (destinoEnvio) {
+          const res = await this.mensajeria.enviarTexto(destinoEnvio, accion.texto, {
             conversacionId: conversacion.id,
             replyToWaMessageId: entradaRaw.waMessageId,
           });
@@ -233,9 +237,9 @@ export class EjecutorConversacionService {
         });
       } else if (accion.tipo === 'enviarBotones') {
         let metaId: string | null = null;
-        if (telefonoDestino) {
+        if (destinoEnvio) {
           const res = await this.mensajeria.enviarBotones(
-            telefonoDestino,
+            destinoEnvio,
             accion.texto,
             accion.botones.slice(0, 3),
             {
@@ -261,9 +265,9 @@ export class EjecutorConversacionService {
         });
       } else if (accion.tipo === 'enviarLista') {
         let metaId: string | null = null;
-        if (telefonoDestino) {
+        if (destinoEnvio) {
           const res = await this.mensajeria.enviarLista(
-            telefonoDestino,
+            destinoEnvio,
             accion.texto,
             accion.botonTexto,
             accion.filas.slice(0, 10),

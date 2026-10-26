@@ -1,5 +1,8 @@
 import { ConfigService } from '@nestjs/config';
-import { WhatsAppMetaAdaptador } from '../adaptadores/whatsapp-meta.adaptador';
+import {
+  WhatsAppMetaAdaptador,
+  construirDestinatario,
+} from '../adaptadores/whatsapp-meta.adaptador';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 
 describe('WhatsAppMetaAdaptador', () => {
@@ -284,6 +287,277 @@ describe('WhatsAppMetaAdaptador', () => {
     expect(mockPrisma.whatsappMensaje.updateMany).toHaveBeenCalledWith({
       where: { wa_message_id: 'wamid.test' },
       data: { estado: 'LEIDO' },
+    });
+  });
+
+  describe('construirDestinatario (función pura)', () => {
+    it('BSUID con prefijo wa-user devuelve recipient y no to', () => {
+      const res = construirDestinatario('wa-user:PE.1048174911395155');
+      expect(res).toEqual({
+        recipient_type: 'individual',
+        recipient: 'PE.1048174911395155',
+      });
+      expect(res.to).toBeUndefined();
+    });
+
+    it('BSUID con prefijo wa-user corto devuelve recipient', () => {
+      const res = construirDestinatario('wa-user:PE.123');
+      expect(res).toEqual({
+        recipient_type: 'individual',
+        recipient: 'PE.123',
+      });
+      expect(res.to).toBeUndefined();
+    });
+
+    it('BSUID sin prefijo devuelve recipient y no to', () => {
+      const res = construirDestinatario('PE.1048174911395155');
+      expect(res).toEqual({
+        recipient_type: 'individual',
+        recipient: 'PE.1048174911395155',
+      });
+      expect(res.to).toBeUndefined();
+    });
+
+    it('BSUID sin prefijo corto devuelve recipient', () => {
+      const res = construirDestinatario('PE.123');
+      expect(res).toEqual({
+        recipient_type: 'individual',
+        recipient: 'PE.123',
+      });
+      expect(res.to).toBeUndefined();
+    });
+
+    it('E.164 con + devuelve to sin + y no recipient', () => {
+      const res = construirDestinatario('+51987654321');
+      expect(res).toEqual({
+        recipient_type: 'individual',
+        to: '51987654321',
+      });
+      expect(res.recipient).toBeUndefined();
+    });
+
+    it('E.164 sin + devuelve to y no recipient', () => {
+      const res = construirDestinatario('51987654321');
+      expect(res).toEqual({
+        recipient_type: 'individual',
+        to: '51987654321',
+      });
+      expect(res.recipient).toBeUndefined();
+    });
+
+    it('identificador vacío devuelve to vacío', () => {
+      const res = construirDestinatario('');
+      expect(res).toEqual({
+        recipient_type: 'individual',
+        to: '',
+      });
+      expect(res.recipient).toBeUndefined();
+    });
+  });
+
+  describe('Cuerpo exacto en los cuatro métodos de envío (recipient vs to)', () => {
+    let payloadCapturado: any;
+
+    beforeEach(() => {
+      payloadCapturado = null;
+      global.fetch = jest.fn().mockImplementation((_url, opt: any) => {
+        payloadCapturado = JSON.parse(opt.body);
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          text: jest.fn().mockResolvedValue(
+            JSON.stringify({ messages: [{ id: 'wamid.test.123' }] }),
+          ),
+        });
+      });
+    });
+
+    it('enviarTexto con BSUID envía recipient y NO to', async () => {
+      await adaptador.enviarTexto('wa-user:PE.1048174911395155', 'Hola por BSUID');
+      expect(payloadCapturado).toEqual(
+        expect.objectContaining({
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          recipient: 'PE.1048174911395155',
+          type: 'text',
+          text: { preview_url: false, body: 'Hola por BSUID' },
+        }),
+      );
+      expect(payloadCapturado.to).toBeUndefined();
+    });
+
+    it('enviarTexto con teléfono envía to y NO recipient', async () => {
+      await adaptador.enviarTexto('+51987654321', 'Hola por teléfono');
+      expect(payloadCapturado).toEqual(
+        expect.objectContaining({
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: '51987654321',
+          type: 'text',
+          text: { preview_url: false, body: 'Hola por teléfono' },
+        }),
+      );
+      expect(payloadCapturado.recipient).toBeUndefined();
+    });
+
+    it('enviarPlantilla con BSUID envía recipient y NO to', async () => {
+      await adaptador.enviarPlantilla('PE.123', 'caprichos_reabrir_conversacion', 'es', ['Cliente']);
+      expect(payloadCapturado).toEqual(
+        expect.objectContaining({
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          recipient: 'PE.123',
+          type: 'template',
+          template: expect.objectContaining({
+            name: 'caprichos_reabrir_conversacion',
+            language: { code: 'es' },
+          }),
+        }),
+      );
+      expect(payloadCapturado.to).toBeUndefined();
+    });
+
+    it('enviarPlantilla con teléfono envía to y NO recipient', async () => {
+      await adaptador.enviarPlantilla('51987654321', 'caprichos_reabrir_conversacion', 'es', ['Cliente']);
+      expect(payloadCapturado).toEqual(
+        expect.objectContaining({
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: '51987654321',
+          type: 'template',
+        }),
+      );
+      expect(payloadCapturado.recipient).toBeUndefined();
+    });
+
+    it('enviarBotones con BSUID envía recipient y NO to', async () => {
+      await adaptador.enviarBotones('wa-user:PE.123', 'Elige:', [{ id: '1', titulo: 'Opcion' }]);
+      expect(payloadCapturado).toEqual(
+        expect.objectContaining({
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          recipient: 'PE.123',
+          type: 'interactive',
+        }),
+      );
+      expect(payloadCapturado.to).toBeUndefined();
+    });
+
+    it('enviarBotones con teléfono envía to y NO recipient', async () => {
+      await adaptador.enviarBotones('987654321', 'Elige:', [{ id: '1', titulo: 'Opcion' }]);
+      expect(payloadCapturado).toEqual(
+        expect.objectContaining({
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: '51987654321',
+          type: 'interactive',
+        }),
+      );
+      expect(payloadCapturado.recipient).toBeUndefined();
+    });
+
+    it('enviarLista con BSUID envía recipient y NO to', async () => {
+      await adaptador.enviarLista('wa-user:PE.123', 'Lista:', 'Ver', [{ id: '1', titulo: 'Fila' }]);
+      expect(payloadCapturado).toEqual(
+        expect.objectContaining({
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          recipient: 'PE.123',
+          type: 'interactive',
+        }),
+      );
+      expect(payloadCapturado.to).toBeUndefined();
+    });
+
+    it('enviarLista con teléfono envía to y NO recipient', async () => {
+      await adaptador.enviarLista('+51987654321', 'Lista:', 'Ver', [{ id: '1', titulo: 'Fila' }]);
+      expect(payloadCapturado).toEqual(
+        expect.objectContaining({
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: '51987654321',
+          type: 'interactive',
+        }),
+      );
+      expect(payloadCapturado.recipient).toBeUndefined();
+    });
+  });
+
+  describe('Mapeo de errores al rechazar BSUID por Meta', () => {
+    it('clasifica error 100 de Meta sobre recipient como BSUID_NO_PERMITIDO con mensaje amigable', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        text: jest.fn().mockResolvedValue(
+          JSON.stringify({
+            error: {
+              code: 100,
+              message: 'Invalid parameter',
+              error_data: { details: 'Invalid recipient format or identifier not allowed' },
+            },
+          }),
+        ),
+      } as any);
+
+      const res = await adaptador.enviarTexto('wa-user:PE.123456789', 'Prueba error BSUID');
+      expect(res.exito).toBe(false);
+      expect(res.errorCodigo).toBe('BSUID_NO_PERMITIDO');
+      expect(res.errorDetalle).toBe(
+        'Meta no permite escribir a este contacto por su identificador. Pidele su numero de celular.',
+      );
+    });
+
+    it('clasifica error 131009 con BSUID como BSUID_NO_PERMITIDO', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        text: jest.fn().mockResolvedValue(
+          JSON.stringify({
+            error: {
+              code: 131009,
+              message: 'Parameter value is not valid',
+            },
+          }),
+        ),
+      } as any);
+
+      const res = await adaptador.enviarPlantilla('PE.123', 'caprichos_reabrir_conversacion', 'es');
+      expect(res.exito).toBe(false);
+      expect(res.errorCodigo).toBe('BSUID_NO_PERMITIDO');
+      expect(res.errorDetalle).toBe(
+        'Meta no permite escribir a este contacto por su identificador. Pidele su numero de celular.',
+      );
+    });
+  });
+
+  describe('Enmascarado seguro de BSUID', () => {
+    it('enmascara BSUID en logs y BD sin registrar nunca el identificador completo', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        text: jest.fn().mockResolvedValue(
+          JSON.stringify({ messages: [{ id: 'wamid.bsuid.ok' }] }),
+        ),
+      } as any);
+
+      const loggerWarnSpy = jest.spyOn((adaptador as any).logger, 'warn');
+      const loggerLogSpy = jest.spyOn((adaptador as any).logger, 'log');
+
+      await adaptador.enviarTexto('wa-user:PE.187654326', 'Prueba enmascarado');
+
+      expect(mockPrisma.whatsappMensaje.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            telefono_enmascarado: 'PE.187***6',
+          }),
+        }),
+      );
+
+      // Verificar que los logs no tengan el BSUID completo
+      for (const call of [...loggerWarnSpy.mock.calls, ...loggerLogSpy.mock.calls]) {
+        const txt = JSON.stringify(call);
+        expect(txt).not.toContain('187654326');
+      }
     });
   });
 });

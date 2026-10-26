@@ -160,5 +160,36 @@ describe('WhatsAppMetaGateway', () => {
         }),
       );
     });
+
+    it('envía texto y plantilla a usuario identificado por BSUID (USUARIO_WA)', async () => {
+      const resTexto = await gateway.enviarTexto(
+        4n,
+        'wa-user:PE.1048174911395155',
+        'Hola por BSUID',
+        'PERSONA',
+      );
+      expect(mensajeria.enviarTexto).toHaveBeenCalledWith(
+        'wa-user:PE.1048174911395155',
+        'Hola por BSUID',
+        { conversacionId: 4n },
+      );
+      expect(resTexto.estado).toBe('ENVIADO');
+
+      const resPlantilla = await gateway.enviarPlantilla(
+        4n,
+        'wa-user:PE.1048174911395155',
+        'caprichos_reabrir_conversacion',
+        ['Usuario'],
+        'PERSONA',
+      );
+      expect(mensajeria.enviarPlantilla).toHaveBeenCalledWith(
+        'wa-user:PE.1048174911395155',
+        'caprichos_reabrir_conversacion',
+        'es',
+        ['Usuario'],
+        { conversacionId: 4n },
+      );
+      expect(resPlantilla.estado).toBe('ENVIADO');
+    });
   });
 });

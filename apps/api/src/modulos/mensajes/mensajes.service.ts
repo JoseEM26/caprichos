@@ -11,6 +11,7 @@ import {
   esRemitenteSinTelefono,
   obtenerNombreMostrar,
 } from './utilidades/nombre-contacto.util';
+import { enmascararTelefono } from '../chatbot/utilidades/enmascarar.util';
 import { mapearErrorWhatsApp } from './utilidades/error-whatsapp.util';
 import { EditarNombreContactoDto } from './dto/mensajes.dto';
 
@@ -137,6 +138,13 @@ export class MensajesService {
     });
   }
 
+  private tieneIdentificador(c: { telefono?: string | null }): boolean {
+    if (!c.telefono) return false;
+    const limpio = c.telefono.trim();
+    if (!limpio || limpio === 'wa-user:') return false;
+    return true;
+  }
+
   async listar(filtro: FiltroChat = 'todos', q = '') {
     const todas = await this.prisma.conversacion.findMany({
       orderBy: { ultima_actividad: 'desc' },
@@ -153,7 +161,7 @@ export class MensajesService {
       return {
         id: c.id.toString(),
         nombre: obtenerNombreMostrar(c),
-        telefono: c.telefono,
+        telefono: esRemitenteSinTelefono(c) ? enmascararTelefono(c.telefono) : c.telefono,
         identificador_tipo: c.identificador_tipo,
         nombre_contacto: c.nombre_contacto,
         nombre_editado: c.nombre_editado,
@@ -227,14 +235,14 @@ export class MensajesService {
     const simulado = modo === 'simulado';
 
     let ventanaAbierta = true;
-    if (this.ventana24hService && !esRemitenteSinTelefono(c)) {
+    if (this.ventana24hService) {
       ventanaAbierta = await this.ventana24hService.esVentanaAbierta(c.telefono, c.id);
     }
 
     return {
       id: c.id.toString(),
       nombre: obtenerNombreMostrar(c),
-      telefono: c.telefono,
+      telefono: esRemitenteSinTelefono(c) ? enmascararTelefono(c.telefono) : c.telefono,
       identificador_tipo: c.identificador_tipo,
       nombre_contacto: c.nombre_contacto,
       nombre_editado: c.nombre_editado,
@@ -309,11 +317,11 @@ export class MensajesService {
     if (!limpio) throw error(HttpStatus.BAD_REQUEST, 'MENSAJE_VACIO', 'Escribe un mensaje');
     const c = await this.cargar(id);
     await this.exigirLibreOMio(c, usuario, 'Toca «Tomar el chat» para escribir.');
-    if (esRemitenteSinTelefono(c)) {
+    if (!this.tieneIdentificador(c)) {
       throw error(
         HttpStatus.CONFLICT,
-        'CONTACTO_SIN_TELEFONO',
-        'Este contacto no comparte su numero: no se puede responder desde aqui todavia',
+        'CONTACTO_SIN_IDENTIFICADOR',
+        'Este contacto no tiene ningun identificador: no se puede responder',
       );
     }
 
@@ -360,11 +368,11 @@ export class MensajesService {
     const c = await this.cargar(id);
     await this.exigirLibreOMio(c, usuario, 'Toca «Tomar el chat» para enviar la plantilla.');
 
-    if (esRemitenteSinTelefono(c)) {
+    if (!this.tieneIdentificador(c)) {
       throw error(
         HttpStatus.CONFLICT,
-        'CONTACTO_SIN_TELEFONO',
-        'Este contacto no comparte su numero: no se puede responder desde aqui todavia',
+        'CONTACTO_SIN_IDENTIFICADOR',
+        'Este contacto no tiene ningun identificador: no se puede responder',
       );
     }
 
@@ -427,11 +435,11 @@ export class MensajesService {
     const c = await this.cargar(id);
     await this.exigirLibreOMio(c, usuario, 'Toca «Tomar el chat» para reintentar el mensaje.');
 
-    if (esRemitenteSinTelefono(c)) {
+    if (!this.tieneIdentificador(c)) {
       throw error(
         HttpStatus.CONFLICT,
-        'CONTACTO_SIN_TELEFONO',
-        'Este contacto no comparte su numero: no se puede responder desde aqui todavia',
+        'CONTACTO_SIN_IDENTIFICADOR',
+        'Este contacto no tiene ningun identificador: no se puede responder',
       );
     }
 
