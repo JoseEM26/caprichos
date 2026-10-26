@@ -6,12 +6,18 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc",
+    "test": "vitest run src",
+    "probar": "node dist/cli.js probar",
+    "volcar": "node dist/cli.js volcar",
+    "start": "node dist/index.js",
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
     "@caprichos/compartido": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "^5.7.3"
+    "@types/node": "^26.6.5",
+    "typescript": "^5.7.3",
+    "vitest": "^5.0.5"
   }
 }
