@@ -9,6 +9,7 @@ import { ZonasRepartoView } from './ZonasRepartoView';
 import { SeccionAltaDemanda } from './SeccionAltaDemanda';
 import { SeccionRepartoConfig } from './SeccionRepartoConfig';
 import { ParametrosOperacionTab } from './ParametrosOperacionTab';
+import { ChatbotConfiguracionTab } from './ChatbotConfiguracionTab';
 
 export interface InfoLocalState {
   // local
@@ -422,6 +423,12 @@ const CATEGORIAS_CONFIG: CategoriaConfig[] = [
     d: 'WhatsApp, tiempos de reparto, encuestas y umbrales operativos',
     fields: [],
   },
+  {
+    id: 'chatbot',
+    n: 'Chatbot y seguridad',
+    d: 'Textos, interruptores de función, anti-spam y privacidad Ley 29733',
+    fields: [],
+  },
 ];
 
 const SLOTS_FOTOS = [
@@ -455,6 +462,7 @@ const VALORES_MOCK_PROHIBIDOS = new Set([
 export function ConfiguracionLocalView() {
   const { tiene, usuario } = useSesion();
   const esAdmin = usuario?.rol === 'ADMIN' || tiene('ADMIN');
+  const puedeVer = esAdmin || tiene('local/ver') || tiene('configuracion/ver');
   const puedeEditar = esAdmin || tiene('local/editar') || tiene('configuracion/editar');
   const puedeEditarDemanda =
     esAdmin ||
@@ -969,8 +977,13 @@ export function ConfiguracionLocalView() {
             <ParametrosOperacionTab puedeVer={true} puedeEditar={puedeEditar} />
           )}
 
+          {/* Subcaso: CONFIGURACIÓN Y SEGURIDAD DEL CHATBOT */}
+          {tabId === 'chatbot' && (
+            <ChatbotConfiguracionTab puedeVer={puedeVer} puedeEditar={puedeEditar} />
+          )}
+
           {/* Subcaso: CAMPOS REGULARES DE OTRAS CATEGORÍAS */}
-          {tabId !== 'horario' && tabId !== 'zonas' && tabId !== 'demanda' && tabId !== 'reparto' && tabId !== 'parametros' && (
+          {tabId !== 'horario' && tabId !== 'zonas' && tabId !== 'demanda' && tabId !== 'reparto' && tabId !== 'parametros' && tabId !== 'chatbot' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {tabId === 'operacion' && (
                 <div

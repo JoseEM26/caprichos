@@ -11,6 +11,7 @@ import { PedidosService } from '../../pedidos/pedidos.service';
 import { ZonasService } from '../../zonas/zonas.service';
 import { ReservasService } from '../../reservas/reservas.service';
 import { ChatbotIaService } from '../ia/chatbot-ia.service';
+import { ChatbotConfiguracionService } from '../configuracion/chatbot-configuracion.service';
 import { BOTON_VOLVER_MENU, TEXTOS_BOT } from './textos-bot';
 import { TEXTOS_RESERVA } from './textos-reserva';
 import { TEXTOS_IA, BOTONES_IA_ESTANDAR, BOTONES_IA_CON_PEDIDO } from './textos-ia';
@@ -65,6 +66,7 @@ export class EjecutorConversacionService {
     @Inject(forwardRef(() => ReservasService))
     private readonly reservasService?: ReservasService,
     @Optional() private readonly chatbotIaService?: ChatbotIaService,
+    @Optional() private readonly chatbotConfiguracionService?: ChatbotConfiguracionService,
   ) {}
 
   /**
@@ -185,6 +187,32 @@ export class EjecutorConversacionService {
       const flujoExistente = (conversacion.flujo as any) || {};
       if (flujoExistente.ultimo_wa_message_id === entradaRaw.waMessageId) {
         this.logger.log(`Mensaje ${entradaRaw.waMessageId} ya registrado en flujo de conversación. Omitiendo.`);
+        return false;
+      }
+    }
+
+    // 4.b Límite de mensajes por teléfono y protección anti-spam en Redis (Ola 4, Agente I)
+    if (this.chatbotConfiguracionService) {
+      const identificadorAntiSpam = entradaRaw.telefono || conversacion.telefono;
+      const antiSpamCheck = await this.chatbotConfiguracionService.verificarAntiSpam(identificadorAntiSpam);
+      if (!antiSpamCheck.permitido) {
+        if (antiSpamCheck.enviarAvisoSpam && antiSpamCheck.mensajeAviso) {
+          this.logger.warn(
+            `Límite anti-spam alcanzado para ${entradaRaw.telMask || 'cliente'}. Enviando respuesta amable una sola vez.`,
+          );
+          await this.mensajeria.enviarTexto(
+            conversacion.telefono,
+            antiSpamCheck.mensajeAviso,
+            {
+              replyToWaMessageId: entradaRaw.waMessageId,
+              conversacionId: conversacion.id,
+            },
+          );
+        } else {
+          this.logger.warn(
+            `Límite anti-spam activo para ${entradaRaw.telMask || 'cliente'}. Silenciando respuesta.`,
+          );
+        }
         return false;
       }
     }
@@ -443,6 +471,17 @@ export class EjecutorConversacionService {
       }
     }
 
+    let funcionesActivas: any = undefined;
+    let textosPersonalizados: Record<string, string> | undefined = undefined;
+    if (this.chatbotConfiguracionService) {
+      try {
+        funcionesActivas = await this.chatbotConfiguracionService.obtenerFuncionesActivas();
+        textosPersonalizados = await this.chatbotConfiguracionService.obtenerTextosBot();
+      } catch (err: any) {
+        this.logger.warn(`Error obteniendo configuración del bot: ${err.message}`);
+      }
+    }
+
     const contexto: ContextoConversacion = {
       conversacionId: conversacion.id.toString(),
       nombreCliente: nombreMostrar,
@@ -464,6 +503,8 @@ export class EjecutorConversacionService {
       solicitudesCambioPendientesTelefono,
       reservasActivasCliente,
       chatbotIaActivo,
+      funcionesActivas,
+      textosPersonalizados,
     };
 
     // 7. Normalizar entrada y ejecutar la máquina de estados pura

@@ -32,6 +32,9 @@ export const CLAVES_NUMERICAS = [
   'chatbot_pago_expira_min',
   'chatbot_ia_tope_mensual_usd',
   'chatbot_ia_max_por_hora_telefono',
+  'chatbot_antispam_max_minuto',
+  'chatbot_antispam_max_hora',
+  'chatbot_retencion_dias',
 ] as const;
 
 export const CLAVES_TEXTO = [
@@ -40,6 +43,19 @@ export const CLAVES_TEXTO = [
   'chatbot_activo',
   'chatbot_ia_activo',
   'chatbot_pago_recordatorio_activo',
+  'chatbot_avisos_equipo_activo',
+  'chatbot_funcion_pedido',
+  'chatbot_funcion_pago',
+  'chatbot_funcion_reservas',
+  'chatbot_funcion_cambios',
+  'chatbot_funcion_promociones',
+  'chatbot_texto_bienvenida',
+  'chatbot_texto_despedida',
+  'chatbot_texto_pase_persona',
+  'chatbot_texto_fuera_horario',
+  'chatbot_texto_no_entiendo',
+  'chatbot_texto_no_entiendo_derivacion',
+  'chatbot_texto_indicacion_pago',
   'whatsapp_aviso_salida_activo',
   'whatsapp_aviso_llegada_activo',
   'whatsapp_aviso_espera_activo',
@@ -122,6 +138,8 @@ export class ConfiguracionService {
         clave === 'carta_aviso_entrada' ||
         clave === 'chatbot_activo' ||
         clave === 'chatbot_ia_activo' ||
+        clave === 'chatbot_avisos_equipo_activo' ||
+        clave.startsWith('chatbot_funcion_') ||
         clave.startsWith('whatsapp_aviso_')
       ) {
         const valNorm =
@@ -139,6 +157,20 @@ export class ConfiguracionService {
           });
         }
         valor = valNorm;
+      } else if (clave.startsWith('chatbot_texto_')) {
+        if (typeof valor !== 'string' || valor.trim().length === 0) {
+          throw new BadRequestException({
+            codigo: 'VALOR_INVALIDO',
+            mensaje: 'El texto no puede estar vacío',
+          });
+        }
+        if (valor.trim().length > 1024) {
+          throw new BadRequestException({
+            codigo: 'TEXTO_EXCEDE_LIMITE_WHATSAPP',
+            mensaje: 'El texto excede el límite de 1024 caracteres de WhatsApp',
+          });
+        }
+        valor = valor.trim();
       } else if (typeof valor !== 'string' || valor.trim().length === 0) {
         throw new BadRequestException({
           codigo: 'VALOR_INVALIDO',

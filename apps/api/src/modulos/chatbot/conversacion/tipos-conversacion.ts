@@ -321,6 +321,17 @@ export interface ContextoConversacion {
     personas: number;
     mesas: string[];
   }>;
+  /** Interruptores por función en la configuración del chatbot (Ola 4, Agente I) */
+  funcionesActivas?: {
+    pedido: boolean;
+    pago: boolean;
+    reservas: boolean;
+    cambios: boolean;
+    ia: boolean;
+    promociones: boolean;
+  };
+  /** Textos configurados/personalizados del bot de WhatsApp (Ola 4, Agente I) */
+  textosPersonalizados?: Record<string, string>;
 }
 
 /**

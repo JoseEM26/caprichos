@@ -8,6 +8,7 @@ import {
   Logger,
   Optional,
   UnauthorizedException,
+  forwardRef,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
@@ -28,6 +29,7 @@ import {
   obtenerNombreMostrar,
 } from '../../mensajes/utilidades/nombre-contacto.util';
 import { EjecutorConversacionService } from '../conversacion/ejecutor-conversacion.service';
+import { AvisosInternosService } from '../avisos-internos/avisos-internos.service';
 
 export const MAX_MEDIA_BYTES = 5 * 1024 * 1024; // 5 MB
 export const TIPOS_MEDIA_PERMITIDOS = [
@@ -53,6 +55,9 @@ export class WhatsappWebhookService {
     private readonly archivosService: ArchivosService,
     @Optional() private readonly eventos?: EventosGateway,
     @Optional() private readonly motorConversacion?: EjecutorConversacionService,
+    @Optional()
+    @Inject(forwardRef(() => AvisosInternosService))
+    private readonly avisosInternosService?: AvisosInternosService,
   ) {
     this.verifyToken = this.configService.get<string>('WHATSAPP_VERIFY_TOKEN', '').trim();
     this.appSecret = this.configService.get<string>('WHATSAPP_APP_SECRET', '').trim();
@@ -477,6 +482,21 @@ export class WhatsappWebhookService {
 
     // Notificar por websocket a la consola de mensajes
     this.eventos?.emitirAdmin('mensajes:actualizado', { id: conversacion.id.toString() });
+
+    // 5.5. Interceptar acciones de botones del equipo si el remitente es un miembro del equipo
+    if (this.avisosInternosService && buttonPayload) {
+      try {
+        const respuestaAccion = await this.avisosInternosService.procesarAccionEquipo(
+          telefonoNorm || rawFrom,
+          buttonPayload,
+        );
+        if (respuestaAccion.procesado) {
+          return true;
+        }
+      } catch (err: any) {
+        this.logger.warn(`Error al procesar acción de equipo: ${err.message}`);
+      }
+    }
 
     // 6. Invocación segura del motor de conversación (Ola 1 Agente B)
     // El bot responde únicamente si la conversación le pertenece y el cliente no solicitó baja/alta

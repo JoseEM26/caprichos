@@ -278,11 +278,18 @@ export const TEXTOS_BOT = {
   saludoBienvenida: (
     nombre?: string | null,
     datosLocal?: DatosHorarioLocal | null,
+    textoPersonalizado?: string | null,
   ): string => {
     const nombreLimpio = String(nombre || '').trim();
-    const saludoBase = nombreLimpio
-      ? `CAPRICHOS DEL MES · Frappe Maracuyá Tropical 🍓\n\n¡Hola, ${nombreLimpio}! ☕ Soy Capri, la asistente de Caprichos. ¿En qué te podemos ayudar hoy? 🧁`
-      : 'CAPRICHOS DEL MES · Frappe Maracuyá Tropical 🍓\n\n¡Hola! ☕ Soy Capri, la asistente de Caprichos. ¿En qué te podemos ayudar hoy? 🧁';
+    let saludoBase = textoPersonalizado ? textoPersonalizado.trim() : '';
+
+    if (!saludoBase) {
+      saludoBase = nombreLimpio
+        ? `CAPRICHOS DEL MES · Frappe Maracuyá Tropical 🍓\n\n¡Hola, ${nombreLimpio}! ☕ Soy Capri, la asistente de Caprichos. ¿En qué te podemos ayudar hoy? 🧁`
+        : 'CAPRICHOS DEL MES · Frappe Maracuyá Tropical 🍓\n\n¡Hola! ☕ Soy Capri, la asistente de Caprichos. ¿En qué te podemos ayudar hoy? 🧁';
+    } else if (saludoBase.includes('{nombre}')) {
+      saludoBase = saludoBase.replace('{nombre}', nombreLimpio || 'cliente');
+    }
 
     if (datosLocal?.pausaAltaDemanda) {
       const motivo = datosLocal.motivoPausa || 'alta demanda de pedidos';
@@ -302,6 +309,16 @@ export const TEXTOS_BOT = {
     }
 
     return saludoBase;
+  },
+
+  /**
+   * Mensaje de despedida cuando el cliente agradece o se despide.
+   */
+  despedida: (textoPersonalizado?: string | null): string => {
+    return (
+      textoPersonalizado?.trim() ||
+      'Gracias por comunicarte con Caprichos ☕. ¡Esperamos verte pronto! 🧁'
+    );
   },
 
   /**
@@ -359,22 +376,31 @@ export const TEXTOS_BOT = {
   /**
    * Pase a persona (mockup línea 141).
    */
-  pasarAPersona: (): string => {
-    return 'Te paso con alguien del equipo. Ya les avisé con tu nombre y tu número; en unos minutos te escriben.';
+  pasarAPersona: (textoPersonalizado?: string | null): string => {
+    return (
+      textoPersonalizado?.trim() ||
+      'Te paso con alguien del equipo. Ya les avisé con tu nombre y tu número; en unos minutos te escriben.'
+    );
   },
 
   /**
    * Primera repregunta cuando no se entiende el mensaje (mockup línea 305).
    */
-  noEntiendoRepregunta: (): string => {
-    return 'No estoy seguro de haber entendido. ¿Qué necesitas? Puedes elegir una opción o escribirme de otra forma.';
+  noEntiendoRepregunta: (textoPersonalizado?: string | null): string => {
+    return (
+      textoPersonalizado?.trim() ||
+      'No estoy seguro de haber entendido. ¿Qué necesitas? Puedes elegir una opción o escribirme de otra forma.'
+    );
   },
 
   /**
    * Derivación automática tras no entender por segunda vez (mockup línea 304).
    */
-  noEntiendoDerivacion: (): string => {
-    return 'No logro entender bien tu mensaje, mejor te paso con una persona del equipo para ayudarte.';
+  noEntiendoDerivacion: (textoPersonalizado?: string | null): string => {
+    return (
+      textoPersonalizado?.trim() ||
+      'No logro entender bien tu mensaje, mejor te paso con una persona del equipo para ayudarte.'
+    );
   },
 
   /**

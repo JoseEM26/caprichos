@@ -9,6 +9,8 @@ import { PedidosModule } from '../pedidos/pedidos.module';
 import { ZonasModule } from '../zonas/zonas.module';
 import { ReservasModule } from '../reservas/reservas.module';
 import { ChatbotIaModule } from './ia/chatbot-ia.module';
+import { ChatbotConfiguracionModule } from './configuracion/chatbot-configuracion.module';
+import { AvisosInternosModule } from './avisos-internos/avisos-internos.module';
 import { WhatsappWebhookController } from './controladores/whatsapp-webhook.controller';
 import { QuejasWhatsappController } from './controladores/quejas-whatsapp.controller';
 import { WhatsAppMetaAdaptador } from './adaptadores/whatsapp-meta.adaptador';
@@ -35,6 +37,8 @@ import { EjecutorConversacionService } from './conversacion/ejecutor-conversacio
     ZonasModule,
     forwardRef(() => ReservasModule),
     ChatbotIaModule,
+    ChatbotConfiguracionModule,
+    forwardRef(() => AvisosInternosModule),
   ],
   controllers: [WhatsappWebhookController, QuejasWhatsappController],
   providers: [
@@ -61,6 +65,8 @@ import { EjecutorConversacionService } from './conversacion/ejecutor-conversacio
     WhatsappWebhookService,
     EjecutorConversacionService,
     ChatbotIaModule,
+    ChatbotConfiguracionModule,
+    AvisosInternosModule,
   ],
 })
 export class ChatbotModule {}

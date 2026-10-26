@@ -31,6 +31,10 @@ import {
 } from './tipos-conversacion';
 import { RegistroSubFlujos } from './flujos/registro-flujos';
 import { TEXTOS_CAMBIOS } from './flujos/cambios/textos-cambios';
+import {
+  TEXTOS_FUNCIONES_DESACTIVADAS,
+  BOTONES_FUNCION_PAUSADA,
+} from '../configuracion/chatbot-configuracion.tipos';
 import './flujos/pedido/flujo-pedido';
 import './flujos/pago/flujo-pago';
 import './flujos/reserva/flujo-reserva';
@@ -200,6 +204,18 @@ const PALABRAS_PREGUNTAR = [
   'consulta',
   'consultas',
   'preguntas',
+];
+
+/** Palabras clave para intención de despedida o agradecimiento */
+const PALABRAS_DESPEDIDA = [
+  'gracias',
+  'muchas gracias',
+  'chau',
+  'adios',
+  'hasta luego',
+  'bye',
+  'hasta pronto',
+  'nos vemos',
 ];
 
 function coincideAlgunaPalabra(texto: string, lista: string[]): boolean {
@@ -429,7 +445,7 @@ export function transicionarEstado(
           tipo: 'enviarTexto',
           texto: estaCerrado
             ? TEXTOS_CAMBIOS.fueraDeHorario(horaAbre, horaCierra, horaAbre)
-            : TEXTOS_BOT.pasarAPersona(),
+            : TEXTOS_BOT.pasarAPersona(contexto.textosPersonalizados?.chatbot_texto_pase_persona),
         },
       ],
       nuevoFlujo: {
@@ -438,6 +454,131 @@ export function transicionarEstado(
         repreguntasFallidas: 0,
       },
     };
+  }
+
+  // 3.b Verificación de interruptores de funciones desactivadas (Ola 4, Agente I)
+  if (contexto.funcionesActivas) {
+    // a) Función Pedido desactivada
+    if (contexto.funcionesActivas.pedido === false) {
+      const pidePedido =
+        idInteractivo === 'pedir' ||
+        idInteractivo === 'btn_pedido' ||
+        flujo.estado === 'PEDIDO' ||
+        String(flujo.estado).startsWith('PED_') ||
+        coincideAlgunaPalabra(texto, PALABRAS_PEDIDO);
+
+      if (pidePedido) {
+        return {
+          nuevoEstado: 'MENU',
+          acciones: [
+            {
+              tipo: 'enviarBotones',
+              texto: TEXTOS_FUNCIONES_DESACTIVADAS.pedido,
+              botones: BOTONES_FUNCION_PAUSADA,
+            },
+          ],
+          nuevoFlujo: {
+            ...flujo,
+            estado: 'MENU',
+            repreguntasFallidas: 0,
+          },
+        };
+      }
+    }
+
+    // b) Función Reservas desactivada
+    if (contexto.funcionesActivas.reservas === false) {
+      const pideReserva =
+        idInteractivo === 'reservar' ||
+        idInteractivo === 'btn_reserva' ||
+        flujo.estado === 'RESERVA' ||
+        String(flujo.estado).startsWith('RES_') ||
+        String(flujo.estado).startsWith('RESERVA_') ||
+        coincideAlgunaPalabra(texto, PALABRAS_RESERVA);
+
+      if (pideReserva) {
+        return {
+          nuevoEstado: 'MENU',
+          acciones: [
+            {
+              tipo: 'enviarBotones',
+              texto: TEXTOS_FUNCIONES_DESACTIVADAS.reservas,
+              botones: [
+                { id: 'btn_persona', titulo: 'Hablar con asesor' },
+                BOTON_VOLVER_MENU,
+              ],
+            },
+          ],
+          nuevoFlujo: {
+            ...flujo,
+            estado: 'MENU',
+            repreguntasFallidas: 0,
+          },
+        };
+      }
+    }
+
+    // c) Función Cambios desactivada
+    if (contexto.funcionesActivas.cambios === false) {
+      const pideCambios =
+        idInteractivo === 'c_dir' ||
+        idInteractivo === 'c_ped' ||
+        String(flujo.estado).startsWith('CAMBIO_') ||
+        coincideAlgunaPalabra(texto, PALABRAS_CAMBIO_DIR) ||
+        coincideAlgunaPalabra(texto, PALABRAS_CAMBIO_PED);
+
+      if (pideCambios) {
+        return {
+          nuevoEstado: 'ATENCION_PERSONA',
+          acciones: [
+            {
+              tipo: 'pasarAPersona',
+              motivo: 'CAMBIOS_PAUSADO',
+              mensajeCliente: entrada.textoOriginal,
+            },
+            {
+              tipo: 'enviarTexto',
+              texto: TEXTOS_FUNCIONES_DESACTIVADAS.cambios,
+            },
+          ],
+          nuevoFlujo: {
+            ...flujo,
+            estado: 'ATENCION_PERSONA',
+            repreguntasFallidas: 0,
+          },
+        };
+      }
+    }
+
+    // d) Función Pago desactivada
+    if (contexto.funcionesActivas.pago === false) {
+      const pidePago =
+        idInteractivo === 'pay' ||
+        flujo.estado === 'PAGO' ||
+        String(flujo.estado).startsWith('PAGO_');
+
+      if (pidePago) {
+        return {
+          nuevoEstado: 'ATENCION_PERSONA',
+          acciones: [
+            {
+              tipo: 'pasarAPersona',
+              motivo: 'PAGO_PAUSADO',
+              mensajeCliente: entrada.textoOriginal,
+            },
+            {
+              tipo: 'enviarTexto',
+              texto: TEXTOS_FUNCIONES_DESACTIVADAS.pago,
+            },
+          ],
+          nuevoFlujo: {
+            ...flujo,
+            estado: 'ATENCION_PERSONA',
+            repreguntasFallidas: 0,
+          },
+        };
+      }
+    }
   }
 
   // 4. Delegación a subflujos modulares registrados (Ola 2 Pedidos, Ola 2 Pagos, Ola 3 Reservas)
@@ -483,6 +624,24 @@ export function transicionarEstado(
     coincideAlgunaPalabra(texto, PALABRAS_PROMOS);
 
   if (esPromociones) {
+    if (contexto.funcionesActivas?.promociones === false) {
+      return {
+        nuevoEstado: 'CARTA_PROMOS',
+        acciones: [
+          {
+            tipo: 'enviarBotones',
+            texto: TEXTOS_FUNCIONES_DESACTIVADAS.promociones,
+            botones: [BOTON_VER_CARTA, BOTON_VOLVER_MENU],
+          },
+        ],
+        nuevoFlujo: {
+          ...flujo,
+          estado: 'CARTA_PROMOS',
+          repreguntasFallidas: 0,
+        },
+      };
+    }
+
     const nuevoEstado: EstadoConversacion = 'CARTA_PROMOS';
     return {
       nuevoEstado,
@@ -1116,7 +1275,11 @@ export function transicionarEstado(
       acciones: [
         {
           tipo: 'enviarLista',
-          texto: TEXTOS_BOT.saludoBienvenida(contexto.nombreCliente, contexto.datosLocal),
+          texto: TEXTOS_BOT.saludoBienvenida(
+            contexto.nombreCliente,
+            contexto.datosLocal,
+            contexto.textosPersonalizados?.chatbot_texto_bienvenida,
+          ),
           botonTexto: BOTON_LISTA_MENU,
           tituloSeccion: TITULO_SECCION_MENU,
           filas: filasMenu,
@@ -1140,6 +1303,25 @@ export function transicionarEstado(
       nuevoFlujo: {
         ...flujo,
         estado: 'HORARIO',
+        repreguntasFallidas: 0,
+      },
+    };
+  }
+
+  // 11.b Despedida o agradecimiento del cliente
+  if (coincideAlgunaPalabra(texto, PALABRAS_DESPEDIDA)) {
+    return {
+      nuevoEstado: 'MENU',
+      acciones: [
+        {
+          tipo: 'enviarBotones',
+          texto: TEXTOS_BOT.despedida(contexto.textosPersonalizados?.chatbot_texto_despedida),
+          botones: [BOTON_VOLVER_MENU],
+        },
+      ],
+      nuevoFlujo: {
+        ...flujo,
+        estado: 'MENU',
         repreguntasFallidas: 0,
       },
     };
@@ -1173,7 +1355,9 @@ export function transicionarEstado(
       acciones: [
         {
           tipo: 'enviarLista',
-          texto: TEXTOS_BOT.noEntiendoRepregunta(),
+          texto: TEXTOS_BOT.noEntiendoRepregunta(
+            contexto.textosPersonalizados?.chatbot_texto_no_entiendo,
+          ),
           botonTexto: BOTON_LISTA_MENU,
           tituloSeccion: TITULO_SECCION_MENU,
           filas: FILAS_MENU_PRINCIPAL,
@@ -1199,7 +1383,9 @@ export function transicionarEstado(
       },
       {
         tipo: 'enviarTexto',
-        texto: TEXTOS_BOT.noEntiendoDerivacion(),
+        texto: TEXTOS_BOT.noEntiendoDerivacion(
+          contexto.textosPersonalizados?.chatbot_texto_no_entiendo_derivacion,
+        ),
       },
     ],
     nuevoFlujo: {
