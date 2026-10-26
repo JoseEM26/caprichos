@@ -401,47 +401,126 @@ describe('Rutas sugeridas por sector geográfico (decisión firmada por direcci�
     });
   });
 
-  describe('Sugerencia de hasta 3 rutas de mayor urgencia', () => {
-    it('sugiere hasta 3 rutas con colores accesibles distintos y ordenadas por urgencia de espera', () => {
-      // Pedidos en 4 sectores distintos
+  describe('Sugerencia de hasta 5 rutas: sectores, más cercana y más urgente', () => {
+    const cfg = { umbralRetrasadoMin: 20, umbralTardeMin: 30, umbralMuyTardeMin: 45 };
+    const p = (id: string, dLat: number, dLng: number, espera: number): PedidoParaRuta => ({
+      id,
+      codigo: `CP-${id.toUpperCase()}`,
+      cliente_nombre: id,
+      lat: local.lat + dLat,
+      lng: local.lng + dLng,
+      minutosEspera: espera,
+    });
+
+    it('sugiere varias rutas por sector con colores accesibles distintos, etiquetas y ordenadas por urgencia', () => {
       const pedidos: PedidoParaRuta[] = [
-        // Sector Norte: 2 pedidos con espera alta (50 min -> MUY_TARDE)
-        { id: 'n1', codigo: 'CP-N1', cliente_nombre: 'N1', lat: local.lat + 0.02, lng: local.lng, minutosEspera: 50 },
-        { id: 'n2', codigo: 'CP-N2', cliente_nombre: 'N2', lat: local.lat + 0.03, lng: local.lng, minutosEspera: 45 },
-
-        // Sector Este: 2 pedidos con espera media (32 min -> TARDE)
-        { id: 'e1', codigo: 'CP-E1', cliente_nombre: 'E1', lat: local.lat, lng: local.lng + 0.02, minutosEspera: 32 },
-        { id: 'e2', codigo: 'CP-E2', cliente_nombre: 'E2', lat: local.lat, lng: local.lng + 0.03, minutosEspera: 30 },
-
-        // Sector Sur: 2 pedidos con espera leve (22 min -> RETRASADO)
-        { id: 's1', codigo: 'CP-S1', cliente_nombre: 'S1', lat: local.lat - 0.02, lng: local.lng, minutosEspera: 22 },
-        { id: 's2', codigo: 'CP-S2', cliente_nombre: 'S2', lat: local.lat - 0.03, lng: local.lng, minutosEspera: 21 },
-
-        // Sector Oeste: 2 pedidos recién salidos (5 min -> NORMAL)
-        { id: 'o1', codigo: 'CP-O1', cliente_nombre: 'O1', lat: local.lat, lng: local.lng - 0.02, minutosEspera: 5 },
-        { id: 'o2', codigo: 'CP-O2', cliente_nombre: 'O2', lat: local.lat, lng: local.lng - 0.03, minutosEspera: 4 },
+        p('n1', 0.02, 0, 50), p('n2', 0.03, 0, 45),
+        p('e1', 0, 0.02, 32), p('e2', 0, 0.03, 30),
+        p('s1', -0.02, 0, 22), p('s2', -0.03, 0, 21),
+        p('o1', 0, -0.02, 5), p('o2', 0, -0.03, 4),
       ];
 
-      const sugerencias = sugerirRutasPorSector(pedidos, local, {
-        umbralRetrasadoMin: 20,
-        umbralTardeMin: 30,
-        umbralMuyTardeMin: 45,
+      const sugerencias = sugerirRutasPorSector(pedidos, local, cfg);
+
+      expect(sugerencias).toHaveLength(5);
+      const nombres = sugerencias.map((r) => r.nombre);
+      expect(nombres).toContain('Ruta más urgente');
+      expect(nombres).toContain('Ruta más cercana');
+      expect(nombres).toContain('Ruta Norte');
+      // Orden descendente por urgencia
+      for (let i = 1; i < sugerencias.length; i++) {
+        expect(sugerencias[i - 1].urgencia).toBeGreaterThanOrEqual(sugerencias[i].urgencia);
+      }
+      // Colores distintos y de la paleta de 5
+      expect(new Set(sugerencias.map((r) => r.color)).size).toBe(5);
+      expect(sugerencias[0].color).toBe('#1E40AF');
+      expect(sugerencias[4].color).toBe('#0E7490');
+      // Cada ruta trae pedidos, minutos y distancia
+      for (const r of sugerencias) {
+        expect(r.totalPedidos).toBe(r.pedidos.length);
+        expect(r.tiempoMin).toBeGreaterThanOrEqual(0);
+        expect(r.distanciaKm).toBeGreaterThanOrEqual(0);
+      }
+    });
+
+    it('parte un sector con más pedidos que el máximo por repartidor en varias rutas, la más urgente primero', () => {
+      // 7 pedidos al Norte; máximo por repartidor = 3 -> partes de 3, 3 y 1
+      const pedidos: PedidoParaRuta[] = [
+        p('a', 0.01, 0, 10), p('b', 0.012, 0, 60), p('c', 0.014, 0, 20),
+        p('d', 0.016, 0, 50), p('e', 0.018, 0, 5), p('f', 0.02, 0, 40), p('g', 0.022, 0, 30),
+      ];
+
+      const sugerencias = sugerirRutasPorSector(pedidos, local, { ...cfg, maxPedidosPorRepartidor: 3 }, 10);
+      const norte = sugerencias.filter((r) => r.sector === 'Norte');
+
+      expect(norte).toHaveLength(3);
+      expect(norte.map((r) => r.nombre)).toEqual([
+        'Ruta Norte (parte 1 de 3)',
+        'Ruta Norte (parte 2 de 3)',
+        'Ruta Norte (parte 3 de 3)',
+      ]);
+      expect(norte.map((r) => r.totalPedidos)).toEqual([3, 3, 1]);
+      // Cubre todos los pedidos sin repetir, y la parte 1 tiene a los más urgentes (60, 50, 40)
+      const ids = norte.flatMap((r) => r.pedidos.map((x) => x.id)).sort();
+      expect(ids).toEqual(['a', 'b', 'c', 'd', 'e', 'f', 'g']);
+      expect(norte[0].pedidos.map((x) => x.id).sort()).toEqual(['b', 'd', 'f']);
+    });
+
+    it('agrega la ruta más cercana (N más cercanos al local, sin importar el sector)', () => {
+      const pedidos: PedidoParaRuta[] = [
+        p('lejano-n', 0.05, 0, 60),
+        p('cerca-e', 0, 0.004, 1),
+        p('cerca-o', 0, -0.004, 2),
+        p('cerca-s', -0.004, 0, 3),
+      ];
+      const sugerencias = sugerirRutasPorSector(pedidos, local, { ...cfg, maxPedidosPorRepartidor: 3 });
+      const cercana = sugerencias.find((r) => r.nombre === 'Ruta más cercana');
+      expect(cercana).toBeDefined();
+      expect(cercana!.pedidos.map((x) => x.id).sort()).toEqual(['cerca-e', 'cerca-o', 'cerca-s']);
+    });
+
+    it('no duplica: si la ruta más cercana o más urgente tienen el mismo conjunto de pedidos que un sector, no se repiten', () => {
+      // Todos los pedidos están en el Norte y son solo 3: sector, cercana y urgente son el mismo conjunto
+      const pedidos: PedidoParaRuta[] = [p('x', 0.01, 0, 10), p('y', 0.012, 0, 20), p('z', 0.014, 0, 30)];
+      const sugerencias = sugerirRutasPorSector(pedidos, local, { ...cfg, maxPedidosPorRepartidor: 3 });
+      expect(sugerencias).toHaveLength(1);
+      expect(sugerencias[0].nombre).toBe('Ruta Norte');
+    });
+
+    it('nunca sugiere más del límite (5 por defecto) y conserva las especiales dentro del cupo', () => {
+      // 8 sectores con 2 pedidos cada uno
+      const pedidos: PedidoParaRuta[] = [];
+      const offsets: Array<[number, number]> = [
+        [0.02, 0], [0.02, 0.02], [0, 0.02], [-0.02, 0.02], [-0.02, 0], [-0.02, -0.02], [0, -0.02], [0.02, -0.02],
+      ];
+      offsets.forEach(([dLat, dLng], i) => {
+        pedidos.push(p(`s${i}a`, dLat, dLng, 10 + i));
+        pedidos.push(p(`s${i}b`, dLat * 1.5, dLng * 1.5, 20 + i));
       });
+      const sugerencias = sugerirRutasPorSector(pedidos, local, { ...cfg, maxPedidosPorRepartidor: 3 });
+      expect(sugerencias).toHaveLength(5);
+      const nombres = sugerencias.map((r) => r.nombre);
+      expect(nombres).toContain('Ruta más cercana');
+      expect(nombres).toContain('Ruta más urgente');
+    });
 
-      // Máximo 3 rutas sugeridas
-      expect(sugerencias).toHaveLength(3);
+    it('ignora pedidos sin coordenadas válidas y devuelve lista vacía si no hay pedidos', () => {
+      const sinCoords: PedidoParaRuta = { id: 'sin', codigo: 'CP-SIN', cliente_nombre: 'Sin', lat: NaN, lng: NaN, minutosEspera: 90 };
+      expect(sugerirRutasPorSector([], local, cfg)).toEqual([]);
+      expect(sugerirRutasPorSector([sinCoords], local, cfg)).toEqual([]);
 
-      // La primera debe ser la de mayor urgencia (Norte, con pedidos en 50 min)
-      expect(sugerencias[0].nombre).toContain('Norte');
-      expect(sugerencias[1].nombre).toContain('Este');
-      expect(sugerencias[2].nombre).toContain('Sur');
+      const conCoords = p('ok', 0.01, 0, 5);
+      const sug = sugerirRutasPorSector([sinCoords, conCoords], local, cfg);
+      const ids = sug.flatMap((r) => r.pedidos.map((x) => x.id));
+      expect(ids).not.toContain('sin');
+      expect(ids).toContain('ok');
+    });
 
-      // Colores de buen contraste distintos
-      const colores = sugerencias.map((r) => r.color);
-      expect(new Set(colores).size).toBe(3);
-      expect(colores[0]).toBe('#1E40AF'); // Azul
-      expect(colores[1]).toBe('#C2410C'); // Naranja óxido
-      expect(colores[2]).toBe('#15803D'); // Verde bosque
+    it('pedido en el mismo punto del local no rompe el cálculo (distancia 0)', () => {
+      const enLocal = p('local', 0, 0, 15);
+      const sug = sugerirRutasPorSector([enLocal, p('otro', 0.01, 0, 5)], local, cfg);
+      expect(sug.length).toBeGreaterThanOrEqual(1);
+      expect(sug.every((r) => Number.isFinite(r.distanciaKm) && Number.isFinite(r.tiempoMin))).toBe(true);
     });
   });
 });

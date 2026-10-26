@@ -345,7 +345,12 @@ export const PALETA_RUTAS_SUGERIDAS = [
   { color: '#1E40AF', nombreColor: 'Azul zafiro' },
   { color: '#C2410C', nombreColor: 'Naranja óxido' },
   { color: '#15803D', nombreColor: 'Verde bosque' },
+  { color: '#7C3AED', nombreColor: 'Violeta' },
+  { color: '#0E7490', nombreColor: 'Petróleo' },
 ];
+
+/** Máximo de rutas sugeridas a la vez (decisión de producto: hasta 5). */
+export const MAX_RUTAS_SUGERIDAS = 5;
 
 export interface RutaSugeridaSector {
   id: string;
@@ -570,56 +575,147 @@ export function agruparPorSectorYFusionar(
   return grupos;
 }
 
+function tieneCoordenadas(p: PedidoParaRuta): boolean {
+  return p.lat != null && p.lng != null && !isNaN(p.lat) && !isNaN(p.lng);
+}
+
+/** Parte una lista en bloques de hasta `max`, ordenada de mayor a menor espera (más urgente primero). */
+function partirPorUrgencia(pedidos: PedidoParaRuta[], max: number): PedidoParaRuta[][] {
+  const orden = [...pedidos].sort((a, b) => (b.minutosEspera || 0) - (a.minutosEspera || 0));
+  const partes: PedidoParaRuta[][] = [];
+  for (let i = 0; i < orden.length; i += max) {
+    partes.push(orden.slice(i, i + max));
+  }
+  return partes;
+}
+
+/** Clave de deduplicación: mismo conjunto de pedidos = misma ruta. */
+function claveConjunto(pedidos: PedidoParaRuta[]): string {
+  return pedidos
+    .map((p) => p.id)
+    .sort()
+    .join('|');
+}
+
+function construirRuta(
+  id: string,
+  nombre: string,
+  sector: string,
+  pedidos: PedidoParaRuta[],
+  origen: Coordenadas,
+  config: Partial<ConfigReparto>,
+): RutaSugeridaSector {
+  const pedidosOrdenados = optimizarOrdenSector(pedidos, origen);
+  const metricas = calcularMetricasRuta(
+    pedidosOrdenados,
+    origen,
+    config.velocidadMediaKmH ?? CONFIG_REPARTO_DEFECTO.velocidadMediaKmH,
+  );
+
+  const maxEspera = Math.max(0, ...pedidosOrdenados.map((p) => p.minutosEspera || 0));
+  let sumaPonderada = 0;
+  for (const p of pedidosOrdenados) {
+    const factor = calcularFactorUrgencia(p.minutosEspera, config);
+    sumaPonderada += (p.minutosEspera || 0) * factor;
+  }
+  const urgencia = maxEspera * 2 + sumaPonderada + pedidosOrdenados.length * 10;
+
+  return {
+    id,
+    nombre,
+    sector,
+    color: PALETA_RUTAS_SUGERIDAS[0].color, // se reasigna al final según la posición
+    pedidos: pedidosOrdenados,
+    totalPedidos: pedidosOrdenados.length,
+    distanciaKm: metricas.distanciaAproxKm,
+    tiempoMin: metricas.tiempoAproxMin,
+    urgencia,
+    coordenadasRuta: [
+      [origen.lat, origen.lng],
+      ...pedidosOrdenados.map((p): [number, number] => [p.lat, p.lng]),
+    ],
+  };
+}
+
 /**
- * Sugiere hasta 3 rutas de mayor urgencia organizadas por sector geográfico.
+ * Sugiere hasta `limiteRutas` rutas (por defecto 5), ordenadas por urgencia:
+ * 1) una ruta por sector cardinal; un sector con más pedidos que `maxPedidosPorRepartidor`
+ *    se parte en varias rutas (por urgencia), cada una optimizada con 2-opt;
+ * 2) siempre que haya lugar: «Ruta más cercana» (los N más cerca del local) y
+ *    «Ruta más urgente» (los N con más espera), sin duplicar un conjunto ya sugerido.
  */
 export function sugerirRutasPorSector(
   pedidos: PedidoParaRuta[],
   origen: Coordenadas = COORDENADAS_TIENDA_DEFECTO,
   config: Partial<ConfigReparto> = {},
-  limiteRutas = 3,
+  limiteRutas = MAX_RUTAS_SUGERIDAS,
 ): RutaSugeridaSector[] {
   const maxPorRepartidor =
     config.maxPedidosPorRepartidor ?? CONFIG_REPARTO_DEFECTO.maxPedidosPorRepartidor;
   const grupos = agruparPorSectorYFusionar(pedidos, origen, maxPorRepartidor);
 
-  const rutas: RutaSugeridaSector[] = grupos.map((g, idx) => {
-    const pedidosOrdenados = optimizarOrdenSector(g.pedidos, origen);
-    const metricas = calcularMetricasRuta(
-      pedidosOrdenados,
-      origen,
-      config.velocidadMediaKmH ?? CONFIG_REPARTO_DEFECTO.velocidadMediaKmH,
-    );
+  // 1) Rutas por sector, partiendo los sectores que superan el máximo por repartidor
+  const rutasSector: RutaSugeridaSector[] = [];
+  for (const g of grupos) {
+    const partes = partirPorUrgencia(g.pedidos, maxPorRepartidor);
+    partes.forEach((parte, i) => {
+      const nombre =
+        partes.length > 1 ? `${g.nombreRuta} (parte ${i + 1} de ${partes.length})` : g.nombreRuta;
+      rutasSector.push(
+        construirRuta(
+          `ruta-sector-${g.sector.toLowerCase()}-${i}`,
+          nombre,
+          g.sector,
+          parte,
+          origen,
+          config,
+        ),
+      );
+    });
+  }
 
-    const maxEspera = Math.max(0, ...pedidosOrdenados.map((p) => p.minutosEspera || 0));
-    let sumaPonderada = 0;
-    for (const p of pedidosOrdenados) {
-      const factor = calcularFactorUrgencia(p.minutosEspera, config);
-      sumaPonderada += (p.minutosEspera || 0) * factor;
-    }
-    const urgencia = maxEspera * 2 + sumaPonderada + pedidosOrdenados.length * 10;
+  // 2) Rutas especiales: las N más cercanas y las N más urgentes
+  const conCoordenadas = pedidos.filter(tieneCoordenadas);
+  const masCercanas = [...conCoordenadas]
+    .sort(
+      (a, b) =>
+        distanciaHaversineKm(origen.lat, origen.lng, a.lat, a.lng) -
+        distanciaHaversineKm(origen.lat, origen.lng, b.lat, b.lng),
+    )
+    .slice(0, maxPorRepartidor);
+  const masUrgentes = [...conCoordenadas]
+    .sort((a, b) => (b.minutosEspera || 0) - (a.minutosEspera || 0))
+    .slice(0, maxPorRepartidor);
 
-    const coordenadasRuta: Array<[number, number]> = [
-      [origen.lat, origen.lng],
-      ...pedidosOrdenados.map((p): [number, number] => [p.lat, p.lng]),
-    ];
+  // Deduplicación: el primer conjunto gana (sectores primero, luego cercana y urgente)
+  const vistos = new Set<string>();
+  const sinDuplicar = (rutas: RutaSugeridaSector[]) =>
+    rutas.filter((r) => {
+      const clave = claveConjunto(r.pedidos);
+      if (vistos.has(clave)) return false;
+      vistos.add(clave);
+      return true;
+    });
 
-    return {
-      id: `ruta-sector-${g.sector.toLowerCase()}-${idx}`,
-      nombre: g.nombreRuta,
-      sector: g.sector,
-      color: PALETA_RUTAS_SUGERIDAS[idx % PALETA_RUTAS_SUGERIDAS.length].color,
-      pedidos: pedidosOrdenados,
-      totalPedidos: pedidosOrdenados.length,
-      distanciaKm: metricas.distanciaAproxKm,
-      tiempoMin: metricas.tiempoAproxMin,
-      urgencia,
-      coordenadasRuta,
-    };
-  });
+  const sectoresUnicas = sinDuplicar(rutasSector);
+  const especiales = sinDuplicar(
+    [
+      masCercanas.length > 0
+        ? construirRuta('ruta-mas-cercana', 'Ruta más cercana', 'Cercana', masCercanas, origen, config)
+        : null,
+      masUrgentes.length > 0
+        ? construirRuta('ruta-mas-urgente', 'Ruta más urgente', 'Urgente', masUrgentes, origen, config)
+        : null,
+    ].filter((r): r is RutaSugeridaSector => r !== null),
+  ).slice(0, limiteRutas);
 
-  rutas.sort((a, b) => b.urgencia - a.urgencia);
-  const seleccionadas = rutas.slice(0, limiteRutas);
+  // Las especiales siempre entran si caben; el resto del cupo lo llenan los sectores más urgentes
+  const cupoSectores = Math.max(0, limiteRutas - especiales.length);
+  const porUrgencia = (a: RutaSugeridaSector, b: RutaSugeridaSector) => b.urgencia - a.urgencia;
+  const seleccionadas = [
+    ...[...sectoresUnicas].sort(porUrgencia).slice(0, cupoSectores),
+    ...especiales,
+  ].sort(porUrgencia);
 
   return seleccionadas.map((r, i) => ({
     ...r,

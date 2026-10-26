@@ -665,3 +665,151 @@ describe('Ola F5 y Siguiente: Repartos y Mapa (Decisiones del Dueño 1 a 8)', ()
     });
   });
 });
+
+describe('Reparto de caja: mapa y contadores solo con pedidos activos, sin teléfonos ni coordenadas en pantalla', () => {
+  const local = { lat: -12.0196436, lng: -76.963255 };
+  const base = {
+    modalidad: 'DELIVERY',
+    cliente_telefono: '987654321',
+    direccion: 'Av. Test 123',
+    referencia: null,
+    zona: 'Z1',
+    zona_id: '1',
+    color: 'naranja',
+    total: 45.0,
+    pago_estado: 'PENDIENTE',
+    pago_metodo: 'EFECTIVO',
+    cobro_pendiente_efectivo: true,
+    paga_con: 50.0,
+    repartidor_party_id: null,
+    tomado_en: null,
+    salio_en: null,
+    llego_en: null,
+    entregado_en: null,
+    motivo_falla: null,
+    creado_en: '2026-10-21T19:00:00Z',
+  } as any;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(sesionModulo, 'useSesion').mockReturnValue({
+      usuario: { partyId: '1', nombres: 'Caja', rol: 'CAJERO' },
+      permisos: ['repartos/ver', 'repartos/liquidar'],
+      debeCambiar: false,
+      cargando: false,
+      autenticado: true,
+      ingresar: vi.fn(),
+      salir: vi.fn(),
+      renovar: vi.fn(),
+      refrescarYo: vi.fn(),
+      marcarClaveCambiada: vi.fn(),
+      tiene: vi.fn().mockImplementation((permiso: string) => ['repartos/ver', 'repartos/liquidar'].includes(permiso)),
+    });
+    vi.spyOn(socketModulo, 'useEventos').mockImplementation(() => {});
+    vi.spyOn(repartosApi, 'obtenerResumen').mockResolvedValue({ lados: {}, zonas: {} } as any);
+    vi.spyOn(repartosApi, 'listarMios').mockResolvedValue({ pedidos: [], orden: [], paso: [], ruta: [] } as any);
+    vi.spyOn(repartosApi, 'obtenerConfig').mockResolvedValue({
+      umbralRetrasadoMin: 20,
+      umbralTardeMin: 30,
+      umbralMuyTardeMin: 45,
+      velocidadMediaKmH: 20,
+      maxPedidosPorRepartidor: 3,
+    });
+  });
+
+  it('el mapa y los contadores no incluyen ANULADO ni ENTREGADO aunque la lista los traiga', async () => {
+    const listos = [
+      { ...base, id: 'l1', codigo: 'CP-L1', cliente_nombre: 'Rosa Uno', estado: 'LISTO', lat: local.lat + 0.02, lng: local.lng, minutosEspera: 50 },
+      { ...base, id: 'l2', codigo: 'CP-L2', cliente_nombre: 'Ana Dos', estado: 'LISTO', lat: local.lat, lng: local.lng + 0.02, minutosEspera: 25, repartidor_party_id: '102', repartidor: { id: '102', nombre: 'Luis' } },
+      { ...base, id: 'l3', codigo: 'CP-L3', cliente_nombre: 'Eva Tres', estado: 'EN_CAMINO', lat: local.lat - 0.02, lng: local.lng, minutosEspera: 35, repartidor_party_id: '102', repartidor: { id: '102', nombre: 'Luis' } },
+    ];
+    const trampas = [
+      { ...base, id: 'x1', codigo: 'CP-W021', cliente_nombre: 'Anulado Uno', estado: 'ANULADO', lat: local.lat + 0.01, lng: local.lng + 0.01, minutosEspera: 80 },
+      { ...base, id: 'x2', codigo: 'CP-W076', cliente_nombre: 'Entregado Dos', estado: 'ENTREGADO', lat: local.lat + 0.01, lng: local.lng - 0.01, minutosEspera: 90 },
+    ];
+    vi.spyOn(repartosApi, 'listarDisponibles').mockResolvedValue([listos[0]] as any);
+    vi.spyOn(repartosApi, 'listarTodos').mockResolvedValue([...listos, ...trampas] as any);
+
+    render(
+      <MemoryRouter>
+        <RepartosView />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('pin-l1')).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId('pin-l2')).toBeInTheDocument();
+    expect(screen.getByTestId('pin-l3')).toBeInTheDocument();
+    expect(screen.queryByTestId('pin-x1')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('pin-x2')).not.toBeInTheDocument();
+
+    // Contadores: 1 retrasado (25), 1 tarde (35), 1 muy tarde (50); los anulados de 80 y 90 min no cuentan
+    expect(screen.getByRole('button', { name: /^retrasado \(1\)/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^tarde \(1\)/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^muy tarde \(1\)/i })).toBeInTheDocument();
+
+    // Ningún teléfono ni número largo visible en la página
+    const texto = document.body.textContent || '';
+    expect(texto).not.toContain('987654321');
+    expect(texto).not.toMatch(/\d{7,}/);
+    expect(texto).not.toMatch(/-?\d+\.\d{3,}/);
+  });
+
+  it('un nombre que es un teléfono se muestra como cliente sin nombre, sin el número', async () => {
+    const pedido = { ...base, id: 'n1', codigo: 'CP-N1', cliente_nombre: '792627476-1', estado: 'LISTO', lat: local.lat + 0.02, lng: local.lng, minutosEspera: 10 };
+    vi.spyOn(repartosApi, 'listarDisponibles').mockResolvedValue([pedido] as any);
+    vi.spyOn(repartosApi, 'listarTodos').mockResolvedValue([pedido] as any);
+
+    render(
+      <MemoryRouter>
+        <RepartosView />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('pin-n1')).toHaveTextContent('Cliente sin nombre');
+    });
+    expect(document.body.textContent || '').not.toContain('792627476');
+  });
+
+  it('Ver rutas sugeridas muestra varias rutas, incluida la más cercana, y ninguna tiene coordenadas en el texto', async () => {
+    const enSector = (id: string, dLat: number, dLng: number, espera: number) => ({
+      ...base, id, codigo: `CP-${id.toUpperCase()}`, cliente_nombre: `Cliente ${id}`, estado: 'LISTO',
+      lat: local.lat + dLat, lng: local.lng + dLng, minutosEspera: espera,
+    });
+    const disponibles = [
+      enSector('norte', 0.02, 0, 50),
+      enSector('este', 0, 0.02, 32),
+      enSector('sur', -0.02, 0, 22),
+      enSector('oeste', 0, -0.02, 5),
+    ];
+    vi.spyOn(repartosApi, 'listarDisponibles').mockResolvedValue(disponibles as any);
+    vi.spyOn(repartosApi, 'listarTodos').mockResolvedValue(disponibles as any);
+
+    render(
+      <MemoryRouter>
+        <RepartosView />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('contador-cola-espera')).toHaveTextContent(/4 pedidos esperando repartidor/i);
+    });
+
+    fireEvent.click(screen.getByTestId('mock-btn-ver-rutas'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('mock-rutas-sugeridas-lista')).toBeInTheDocument();
+    });
+    const botones = screen.getByTestId('mock-rutas-sugeridas-lista').querySelectorAll('button');
+    expect(botones.length).toBeGreaterThanOrEqual(3);
+    const textos = Array.from(botones).map((b) => b.textContent || '');
+    expect(textos.some((t) => t.includes('Ruta más cercana'))).toBe(true);
+    expect(textos.some((t) => t.includes('Ruta Norte'))).toBe(true);
+    for (const t of textos) {
+      expect(t).not.toMatch(/-?\d+\.\d{3,}/);
+    }
+  });
+});

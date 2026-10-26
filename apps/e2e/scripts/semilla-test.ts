@@ -775,9 +775,54 @@ export async function sembrarDatosPrueba(dbUrlTest?: string): Promise<ResultadoS
         minutosListo: 12,
         total: 20.0,
       },
+      // Sector Oeste (2 pedidos LISTO, al oeste del local de la semilla)
+      {
+        codigo: 'CP-D009',
+        cliente_nombre: 'Ivan Oeste',
+        cliente_telefono: '987111009',
+        entrega_direccion: 'Av. Oeste 100, SJL',
+        entrega_lat: -12.021,
+        entrega_lng: -76.975,
+        minutosListo: 28,
+        total: 20.0,
+      },
+      {
+        codigo: 'CP-D010',
+        cliente_nombre: 'Julia Oeste',
+        cliente_telefono: '987111010',
+        entrega_direccion: 'Jr. Occidente 200, SJL',
+        entrega_lat: -12.017,
+        entrega_lng: -76.98,
+        minutosListo: 8,
+        total: 20.0,
+      },
+      // Trampas: el mapa NO debe dibujarlas. CP-D011 ANULADO al este, CP-D012 ENTREGADO al sur
+      {
+        codigo: 'CP-D011',
+        estado: 'ANULADO',
+        cliente_nombre: 'Trampa Anulada',
+        cliente_telefono: '987111011',
+        entrega_direccion: 'Av. Trampa 300, SJL',
+        entrega_lat: -12.016,
+        entrega_lng: -76.94,
+        minutosListo: 80,
+        total: 20.0,
+      },
+      {
+        codigo: 'CP-D012',
+        estado: 'ENTREGADO',
+        cliente_nombre: 'Trampa Entregada',
+        cliente_telefono: '987111012',
+        entrega_direccion: 'Av. Trampa 400, SJL',
+        entrega_lat: -12.04,
+        entrega_lng: -76.963,
+        minutosListo: 90,
+        total: 20.0,
+      },
     ];
 
-    for (const p of pedidosDeliveryPrueba) {
+    for (const p of pedidosDeliveryPrueba as Array<(typeof pedidosDeliveryPrueba)[number] & { estado?: string }>) {
+      const estadoPedido = p.estado ?? 'LISTO';
       const fechaListo = new Date(ahora.getTime() - p.minutosListo * 60 * 1000);
       const fechaCreado = new Date(fechaListo.getTime() - 10 * 60 * 1000);
 
@@ -785,7 +830,7 @@ export async function sembrarDatosPrueba(dbUrlTest?: string): Promise<ResultadoS
         where: { codigo: p.codigo },
         update: {
           modalidad: 'DELIVERY',
-          estado: 'LISTO',
+          estado: estadoPedido,
           repartidor_party_id: null,
           entrega_lat: new Prisma.Decimal(p.entrega_lat),
           entrega_lng: new Prisma.Decimal(p.entrega_lng),
@@ -800,7 +845,7 @@ export async function sembrarDatosPrueba(dbUrlTest?: string): Promise<ResultadoS
         create: {
           codigo: p.codigo,
           modalidad: 'DELIVERY',
-          estado: 'LISTO',
+          estado: estadoPedido,
           canal: 'CARTA',
           pago_metodo: 'EFECTIVO',
           pago_estado: 'PENDIENTE',

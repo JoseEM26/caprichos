@@ -668,6 +668,58 @@ describe('RepartosService', () => {
     });
   });
 
+  describe('8b. Vista activa de reparto: solo pedidos vivos salvo historial explícito', () => {
+    it('por defecto solo consulta LISTO y EN_CAMINO (sin ANULADO, ENTREGADO ni otras modalidades)', async () => {
+      prismaMock.parametro.findMany.mockResolvedValue([]);
+      prismaMock.pedido.findMany.mockResolvedValue([]);
+
+      await service.listarTodos({}, adminAuth);
+
+      expect(prismaMock.pedido.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            modalidad: 'DELIVERY',
+            estado: { in: ['LISTO', 'EN_CAMINO'] },
+          }),
+        }),
+      );
+    });
+
+    it('con historial=true no restringe el estado', async () => {
+      prismaMock.parametro.findMany.mockResolvedValue([]);
+      prismaMock.pedido.findMany.mockResolvedValue([]);
+
+      await service.listarTodos({ historial: 'true' }, adminAuth);
+
+      const args = prismaMock.pedido.findMany.mock.calls.at(-1)[0];
+      expect(args.where.estado).toBeUndefined();
+    });
+
+    it('un estado explícito prevalece sobre la vista activa', async () => {
+      prismaMock.parametro.findMany.mockResolvedValue([]);
+      prismaMock.pedido.findMany.mockResolvedValue([]);
+
+      await service.listarTodos({ estado: 'ENTREGADO' }, adminAuth);
+
+      expect(prismaMock.pedido.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ estado: 'ENTREGADO' }) }),
+      );
+    });
+
+    it('el repartidor también recibe solo pedidos activos', async () => {
+      prismaMock.parametro.findMany.mockResolvedValue([]);
+      prismaMock.pedido.findMany.mockResolvedValue([]);
+
+      await service.listarTodos({}, repartidor1);
+
+      expect(prismaMock.pedido.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ estado: { in: ['LISTO', 'EN_CAMINO'] } }),
+        }),
+      );
+    });
+  });
+
   describe('9. Configuración de Reparto (GET / PUT admin/repartos/config)', () => {
     it('obtiene la configuración actual con valores por defecto', async () => {
       prismaMock.parametro.findMany.mockResolvedValue([]);

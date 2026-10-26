@@ -18,6 +18,9 @@ import {
   RutaService,
 } from './ruta.service';
 import { FiltrarRepartosDto } from './dto/filtrar-repartos.dto';
+
+/** Estados de pedido que siguen vivos en el reparto: los únicos que muestra la vista activa. */
+export const ESTADOS_ACTIVOS_REPARTO = ['LISTO', 'EN_CAMINO'] as const;
 import { ReportarFallaDto } from './dto/reportar-falla.dto';
 import { ResolverFallaDto } from './dto/resolver-falla.dto';
 import { ActualizarConfigRepartoDto } from './dto/actualizar-config-reparto.dto';
@@ -439,21 +442,20 @@ export class RepartosService {
           ],
         },
       ];
-      if (filtros.estado) {
-        where.estado = filtros.estado;
+    } else if (filtros.repartidor) {
+      try {
+        where.repartidor_party_id = BigInt(filtros.repartidor);
+      } catch {
+        // Ignora si no es numérico
       }
-    } else {
-      if (filtros.repartidor) {
-        try {
-          where.repartidor_party_id = BigInt(filtros.repartidor);
-        } catch {
-          // Ignora si no es numérico
-        }
-      }
+    }
 
-      if (filtros.estado) {
-        where.estado = filtros.estado;
-      }
+    // Por defecto solo pedidos activos de reparto (listos o en camino). Anulados, entregados
+    // y demás estados quedan fuera salvo que se pida el estado o el historial explícitamente.
+    if (filtros.estado) {
+      where.estado = filtros.estado;
+    } else if (filtros.historial !== 'true') {
+      where.estado = { in: [...ESTADOS_ACTIVOS_REPARTO] };
     }
 
     const pedidos = await this.prisma.pedido.findMany({

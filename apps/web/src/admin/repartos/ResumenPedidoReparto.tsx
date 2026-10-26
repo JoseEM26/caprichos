@@ -590,7 +590,7 @@ export function ResumenPedidoReparto({
           {pedido.repartidor?.nombre
             ? `Tomado por ${pedido.repartidor.nombre}`
             : pedido.repartidor_party_id
-            ? `Tomado por Repartidor #${pedido.repartidor_party_id}`
+            ? 'Tomado por un repartidor asignado'
             : 'Sin repartidor asignado'}
         </div>
       )}

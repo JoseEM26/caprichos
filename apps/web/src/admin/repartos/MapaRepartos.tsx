@@ -3,6 +3,7 @@ import { L, ATRIBUCION, URL_TESELAS } from '../../comun/mapa/leaflet';
 import { ZonaGeoItem, ZONAS_GEO_DEFECTO } from './zonasGeo';
 import { COORDENADAS_TIENDA_DEFECTO, RutaSugeridaSector } from './calculoRuta';
 import type { ColorEspera } from './repartosApi';
+import { planificarEtiquetas, nombreEtiqueta, anchoTexto, ModoEtiqueta } from './etiquetasMapa';
 
 export interface PuntoRepartoMapa {
   id: string;
@@ -13,6 +14,18 @@ export interface PuntoRepartoMapa {
   detalle?: string;
   color: ColorEspera;
   orden?: number;   // 1, 2, 3 si forma parte de la ruta sugerida
+  minutosEspera?: number;
+  enReparto?: boolean; // ya tiene repartidor (en camino o asignado): pin con anillo
+}
+
+interface EntradaEtiqueta {
+  id: string;
+  pos: L.LatLngTuple;
+  marker: L.Marker;
+  elementos: Record<Exclude<ModoEtiqueta, 'oculta'>, HTMLElement>;
+  anchoCompleta: number;
+  anchoCodigo: number;
+  prioridad: number;
 }
 
 export interface MapaRepartosProps {
@@ -48,9 +61,10 @@ function crearIconoPin(
   color: ColorEspera,
   orden?: number,
   elegido = false,
+  enReparto = false,
 ): L.DivIcon {
   const numStr = orden ? String(orden) : '';
-  const clases = `cp-pin ${color} ${elegido ? 'elegido' : ''}`.trim();
+  const clases = `cp-pin ${color} ${elegido ? 'elegido' : ''} ${enReparto ? 'en-reparto' : ''}`.trim();
 
   return L.divIcon({
     className: clases,
@@ -93,14 +107,20 @@ export function MapaRepartos({
   const alTocarMapaRef = useRef(onTocarMapa);
   alTocarMapaRef.current = onTocarMapa;
 
+  const entradasEtiquetaRef = useRef<EntradaEtiqueta[]>([]);
+  const recalcularEtiquetasRef = useRef<() => void>(() => {});
+
   // 1. Inicialización de Leaflet
   useEffect(() => {
     if (!contenedorRef.current) return;
 
     const map = L.map(contenedorRef.current, {
-      zoomControl: true,
+      zoomControl: false,
       attributionControl: false,
     }).setView(CENTRO_LIMA, 14);
+
+    // Zoom abajo a la izquierda: los botones de arriba (rutas, pantalla completa) no lo tapan
+    L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
     L.tileLayer(URL_TESELAS, {
       attribution: ATRIBUCION,
@@ -119,6 +139,9 @@ export function MapaRepartos({
       if (e.originalEvent?._stopped) return;
       alTocarMapaRef.current?.();
     });
+
+    // Las etiquetas dependen de la posición en pantalla: se recalculan al mover o hacer zoom
+    map.on('zoomend moveend', () => recalcularEtiquetasRef.current());
 
     const timer = setTimeout(() => {
       map.invalidateSize();
@@ -163,10 +186,11 @@ export function MapaRepartos({
             opacity: esActiva ? 1.0 : 0.85,
           });
 
-          // Etiqueta permanente y accesible con el nombre y métricas de la ruta
-          const textoEtiqueta = `${r.nombre}: ${r.totalPedidos} pedidos · ~${r.tiempoMin} min`;
-          linea.bindTooltip(textoEtiqueta, {
-            permanent: true,
+          // Nombre de la ruta: permanente solo en la elegida (evita encimar nombres en el mapa);
+          // las demás lo muestran al pasar el cursor y está en la lista inferior con pedidos, min y km
+          linea.bindTooltip(r.nombre, {
+            permanent: esActiva,
+            sticky: true,
             direction: 'center',
             className: `cp-etiqueta-linea-ruta ${esActiva ? 'activa' : ''}`,
           });
@@ -192,13 +216,15 @@ export function MapaRepartos({
     }
   }, [mostrarRutasSugeridas, rutasSugeridas, rutaActivaId, rutaPuntos]);
 
-  // 3. Dibujar Marcadores de Pedidos y Tienda Caprichos (SOLO nombre de cliente y código)
+  // 3. Marcadores de pedidos y tienda. Cada etiqueta usa planificarEtiquetas: nombre + código,
+  //    solo código si choca, u oculta si no cabe. Se recalcula al mover o hacer zoom.
   useEffect(() => {
     const map = mapaRef.current;
     const gMarcadores = capaMarcadoresRef.current;
     if (!map || !gMarcadores) return;
 
     gMarcadores.clearLayers();
+    entradasEtiquetaRef.current = [];
 
     // Marcador Tienda Física de Caprichos
     const marcadorTienda = L.marker(CENTRO_LIMA, {
@@ -223,7 +249,7 @@ export function MapaRepartos({
       todasCoords.push(pos);
 
       const esElegido = p.id === seleccionadoId;
-      const icono = crearIconoPin(p.color, p.orden, esElegido);
+      const icono = crearIconoPin(p.color, p.orden, esElegido, !!p.enReparto);
 
       const marker = L.marker(pos, {
         icon: icono,
@@ -231,32 +257,35 @@ export function MapaRepartos({
       });
 
       // Solo nombre del cliente y código del pedido (sin coordenadas ni datos técnicos)
+      const nombre = nombreEtiqueta(p.etiqueta);
+      const linea2 = `${p.codigo}${p.detalle ? ` · ${p.detalle}` : ''}`;
       const numeroPrefijo = p.orden ? `${p.orden}. ` : '';
-      const tooltipContenido = document.createElement('div');
-      tooltipContenido.className = 'cp-etiqueta-pedido';
-      tooltipContenido.style.cssText = 'pointer-events:none;';
 
+      const completa = document.createElement('div');
+      completa.className = 'cp-etiqueta-pedido';
+      completa.style.cssText = 'pointer-events:none;';
       const divNombre = document.createElement('div');
       divNombre.style.fontWeight = '800';
       divNombre.style.fontSize = '12px';
+      divNombre.style.whiteSpace = 'nowrap';
       divNombre.style.color = 'var(--cp-navy, #0B2C3E)';
-      divNombre.textContent = `${numeroPrefijo}${p.etiqueta}`;
-
+      divNombre.textContent = `${numeroPrefijo}${nombre}`;
       const divCodigo = document.createElement('div');
       divCodigo.style.fontSize = '10px';
+      divCodigo.style.whiteSpace = 'nowrap';
       divCodigo.style.color = '#5A6E78';
       divCodigo.style.marginTop = '1px';
-      divCodigo.textContent = `${p.codigo}${p.detalle ? ` · ${p.detalle}` : ''}`;
+      divCodigo.textContent = linea2;
+      completa.appendChild(divNombre);
+      completa.appendChild(divCodigo);
 
-      tooltipContenido.appendChild(divNombre);
-      tooltipContenido.appendChild(divCodigo);
+      const soloCodigo = document.createElement('div');
+      soloCodigo.className = 'cp-etiqueta-pedido';
+      soloCodigo.style.cssText = 'pointer-events:none;font-size:11px;font-weight:800;white-space:nowrap;color:var(--cp-navy, #0B2C3E);';
+      soloCodigo.textContent = `${numeroPrefijo}${p.codigo}`;
 
-      marker.bindTooltip(tooltipContenido, {
-        permanent: true,
-        direction: 'right',
-        offset: [12, -14],
-        className: `cp-etiqueta ${esElegido ? 'cp-etiqueta-activa' : ''}`,
-      });
+      const prioridad =
+        (esElegido ? 2_000_000 : 0) + (p.orden ? 1_000_000 - p.orden * 1000 : 0) + (p.minutosEspera || 0);
 
       marker.on('click', (e) => {
         L.DomEvent.stopPropagation(e);
@@ -264,7 +293,54 @@ export function MapaRepartos({
       });
 
       marker.addTo(gMarcadores);
+      // Atributo técnico (no visible) para localizar el pin del pedido en pruebas
+      marker.getElement()?.setAttribute('data-codigo', p.codigo);
+      entradasEtiquetaRef.current.push({
+        id: p.id,
+        pos,
+        marker,
+        elementos: { completa, codigo: soloCodigo },
+        anchoCompleta: anchoTexto(`${numeroPrefijo}${nombre}`, 7.5),
+        anchoCodigo: anchoTexto(`${numeroPrefijo}${p.codigo}`, 7),
+        prioridad,
+      });
     });
+
+    const recalcularEtiquetas = () => {
+      const m = mapaRef.current;
+      if (!m) return;
+      const entradas = entradasEtiquetaRef.current;
+      // El marcador de la tienda (icono de 110x24 anclado en 8,12) es un obstáculo fijo
+      const tienda = m.latLngToContainerPoint(CENTRO_LIMA);
+      const modos = planificarEtiquetas(
+        entradas.map((e) => {
+          const pt = m.latLngToContainerPoint(e.pos);
+          return {
+            id: e.id,
+            x: pt.x,
+            y: pt.y,
+            anchoCompleta: e.anchoCompleta,
+            anchoCodigo: e.anchoCodigo,
+            prioridad: e.prioridad,
+          };
+        }),
+        [{ x0: tienda.x - 8, x1: tienda.x + 102, y0: tienda.y - 12, y1: tienda.y + 12 }],
+      );
+      entradas.forEach((e) => {
+        const modo = modos.get(e.id) ?? 'oculta';
+        e.marker.unbindTooltip();
+        if (modo === 'oculta') return;
+        e.marker.bindTooltip(e.elementos[modo], {
+          permanent: true,
+          direction: 'right',
+          offset: [12, -14],
+          className: `cp-etiqueta ${e.id === seleccionadoId ? 'cp-etiqueta-activa' : ''}`,
+        });
+        e.marker.openTooltip();
+      });
+    };
+    recalcularEtiquetasRef.current = recalcularEtiquetas;
+    recalcularEtiquetas();
 
     if (todasCoords.length > 1) {
       map.fitBounds(L.latLngBounds(todasCoords), {
@@ -451,6 +527,9 @@ export function MapaRepartos({
               filter: drop-shadow(0 0 8px rgba(196, 65, 43, 0.8));
             }
           }
+          .cp-pin.en-reparto span {
+            box-shadow: 0 0 0 3px #FFFFFF, 0 0 0 5px #0B2C3E !important;
+          }
           .cp-etiqueta-activa {
             border: 2px solid var(--cp-navy, #0B2C3E) !important;
             box-shadow: 0 3px 10px rgba(11, 44, 62, 0.3) !important;
@@ -484,7 +563,25 @@ export function MapaRepartos({
         />
       </div>
 
-      {/* Lista accesible de hasta 3 rutas sugeridas debajo del mapa al estar activo */}
+      {mostrarRutasSugeridas && rutasSugeridas.length === 0 && (
+        <div
+          role="status"
+          data-testid="sin-pedidos-para-rutas"
+          style={{
+            padding: '12px 14px',
+            borderRadius: '12px',
+            background: 'var(--cp-cream, #FFFDF8)',
+            border: '1.5px solid var(--cp-line, #E3D6C6)',
+            fontSize: '13px',
+            fontWeight: 800,
+            color: 'var(--cp-navy, #0B2C3E)',
+          }}
+        >
+          No hay pedidos listos para repartir
+        </div>
+      )}
+
+      {/* Lista de rutas sugeridas debajo del mapa al estar activo (todas, con desplazamiento) */}
       {mostrarRutasSugeridas && rutasSugeridas.length > 0 && (
         <div
           role="region"
@@ -512,7 +609,7 @@ export function MapaRepartos({
               gap: '6px',
             }}
           >
-            <span>Rutas sugeridas por sector (toca para seleccionar):</span>
+            <span>Rutas sugeridas (toca una para elegirla):</span>
           </div>
 
           <div
@@ -520,6 +617,8 @@ export function MapaRepartos({
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
               gap: '10px',
+              maxHeight: '320px',
+              overflowY: 'auto',
             }}
           >
             {rutasSugeridas.map((r) => {

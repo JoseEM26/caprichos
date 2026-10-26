@@ -22,6 +22,8 @@ test.describe('Reparto: Rutas sugeridas por sector, limpieza de mapa e iniciar r
             'CP-D006',
             'CP-D007',
             'CP-D008',
+            'CP-D009',
+            'CP-D010',
           ],
         },
       },
@@ -34,6 +36,16 @@ test.describe('Reparto: Rutas sugeridas por sector, limpieza de mapa e iniciar r
         llego_en: null,
         entregado_en: null,
       },
+    });
+
+    // Trampas de la semilla: un ANULADO y un ENTREGADO que el mapa nunca debe dibujar
+    await prisma.pedido.updateMany({
+      where: { codigo: 'CP-D011' },
+      data: { estado: 'ANULADO', repartidor_party_id: null },
+    });
+    await prisma.pedido.updateMany({
+      where: { codigo: 'CP-D012' },
+      data: { estado: 'ENTREGADO', repartidor_party_id: null },
     });
 
     // Asegurar que los repartidores de prueba no tengan pedidos pendientes residuales
@@ -329,4 +341,57 @@ test.describe('Reparto: Rutas sugeridas por sector, limpieza de mapa e iniciar r
     await context1.close();
     await context2.close();
   });
+  test('4. Caja ve solo pedidos activos en el mapa (sin anulados ni entregados), varias rutas y ningún teléfono ni coordenada en pantalla', async ({
+    page,
+  }) => {
+    await loginPorUi(page, 'ADMIN');
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto('/admin/repartos', { waitUntil: 'domcontentloaded' });
+
+    await expect(page.locator('.leaflet-container')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('contador-cola-espera')).toBeVisible();
+
+    // Los pedidos LISTO de la semilla sí aparecen en el mapa (pin con su código)
+    for (const codigo of ['CP-D001', 'CP-D005', 'CP-D007', 'CP-D009']) {
+      await expect(page.locator(`[data-codigo="${codigo}"]`)).toHaveCount(1, { timeout: 10000 });
+    }
+
+    // Trampas: ni el pin ni el texto del anulado y del entregado aparecen
+    await expect(page.locator('[data-codigo="CP-D011"]')).toHaveCount(0);
+    await expect(page.locator('[data-codigo="CP-D012"]')).toHaveCount(0);
+    const textoSinTrampas = await page.locator('body').innerText();
+    expect(textoSinTrampas).not.toContain('CP-D011');
+    expect(textoSinTrampas).not.toContain('CP-D012');
+
+    // Varias rutas sugeridas, incluida la más cercana
+    await page.getByTestId('btn-ver-rutas-sugeridas').click();
+    const contenedorRutas = page.getByTestId('contenedor-rutas-sugeridas');
+    await expect(contenedorRutas).toBeVisible({ timeout: 10000 });
+    const botonesRuta = contenedorRutas.locator('[data-testid^="btn-ruta-"]');
+    expect(await botonesRuta.count()).toBeGreaterThanOrEqual(3);
+    await expect(contenedorRutas).toContainText('Ruta más cercana');
+    await expect(contenedorRutas).toContainText('Ruta Norte');
+
+    // Texto visible sin teléfonos ni coordenadas
+    const texto = await page.locator('body').innerText();
+    expect(texto).not.toMatch(/-?\d+\.\d{3,}/);
+    expect(texto).not.toMatch(/\d{7,}/);
+    expect(texto).not.toContain('987111001');
+
+    // Captura opcional de PC (solo si E2E_CAPTURAS_DIR está definido; fuera del repo)
+    const dirCapturas = process.env.E2E_CAPTURAS_DIR;
+    if (dirCapturas) {
+      await page.screenshot({ path: path.join(dirCapturas, 'pc-1280-mapa-varias-rutas.png') });
+    }
+
+    // Celular 390px: sin scroll horizontal y con el mismo mapa y rutas
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForTimeout(600);
+    const anchoPagina = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(anchoPagina).toBeLessThanOrEqual(390);
+    if (dirCapturas) {
+      await page.screenshot({ path: path.join(dirCapturas, 'movil-390-mapa-varias-rutas.png') });
+    }
+  });
+
 });

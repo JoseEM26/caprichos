@@ -395,7 +395,7 @@ export function TarjetaReparto({
               {pedido.cliente_nombre}
             </div>
             <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-              {pedido.cliente_telefono || 'Sin teléfono registrado'}
+              {telUrl ? 'Teléfono registrado (usa Llamar o WhatsApp)' : 'Sin teléfono registrado'}
             </div>
           </div>
 
@@ -551,7 +551,7 @@ export function TarjetaReparto({
         {/* Si ya fue tomado por otro repartidor */}
         {pedido.repartidor && !esMio && (
           <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-soft)' }}>
-            Tomado por: {pedido.repartidor.nombre || `Repartidor #${pedido.repartidor.id}`}
+            Tomado por: {pedido.repartidor.nombre || 'repartidor asignado'}
           </div>
         )}
 

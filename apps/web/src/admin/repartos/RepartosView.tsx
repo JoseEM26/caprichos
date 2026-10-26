@@ -25,6 +25,7 @@ import {
   PedidoParaRuta,
 } from './calculoRuta';
 import { ZonaGeoItem, ZONAS_GEO_DEFECTO } from './zonasGeo';
+import { nombreClienteVisible } from './textoVisible';
 import {
   repartosApi,
   PedidoReparto,
@@ -151,10 +152,14 @@ export function RepartosView() {
         repartosApi.obtenerZonasPoligonos().catch(() => ZONAS_GEO_DEFECTO),
       ]);
 
-      setDisponibles(disp);
+      // Los nombres se limpian aquí una sola vez: ningún teléfono ni número largo llega a la pantalla
+      const sinNumeros = <T extends { cliente_nombre: string }>(lista: T[]) =>
+        lista.map((p) => ({ ...p, cliente_nombre: nombreClienteVisible(p.cliente_nombre) }));
+
+      setDisponibles(sinNumeros(disp));
       setResumen(res);
-      setDatosMios(mios);
-      setTodos(tod);
+      setDatosMios({ ...mios, pedidos: sinNumeros(mios.pedidos) });
+      setTodos(sinNumeros(tod));
       if (cfg) setConfig(cfg);
       if (zGeo) setZonasGeo(zGeo);
     } catch (err: any) {
@@ -183,7 +188,10 @@ export function RepartosView() {
 
   // Lista consolidada de pedidos según rol y selección "Ver como:"
   const pedidosBase = useMemo(() => {
-    const todosLista = todos.length > 0 ? todos : [...disponibles, ...datosMios.pedidos];
+    // Solo pedidos de reparto vivos: LISTO (esperando o asignado) y EN_CAMINO
+    const todosLista = (todos.length > 0 ? todos : [...disponibles, ...datosMios.pedidos]).filter(
+      (o) => o.estado === 'LISTO' || o.estado === 'EN_CAMINO',
+    );
 
     if (esRolRepartidor && !puedeLiquidar) {
       return todosLista.filter(
@@ -307,9 +315,9 @@ export function RepartosView() {
       }));
   }, [disponibles]);
 
-  // Rutas sugeridas agrupadas por sector cardinal (hasta 3 de mayor urgencia)
+  // Rutas sugeridas por sector cardinal, más cercana y más urgente (hasta 5)
   const rutasSugeridas = useMemo(() => {
-    return sugerirRutasPorSector(pedidosParaSectores, COORDENADAS_TIENDA_DEFECTO, config, 3);
+    return sugerirRutasPorSector(pedidosParaSectores, COORDENADAS_TIENDA_DEFECTO, config);
   }, [pedidosParaSectores, config]);
 
   const rutaActiva = useMemo(() => {
@@ -441,15 +449,19 @@ export function RepartosView() {
         const infoEspera = clasificarEspera(p.minutosEspera, config);
         const numeroOrden = ordenMap.get(p.id);
 
+        // En reparto = EN_CAMINO, o LISTO ya con repartidor asignado; esperando = LISTO sin repartidor
+        const enReparto = p.estado === 'EN_CAMINO' || !!p.repartidor_party_id;
         return {
           id: p.id,
           lat: p.lat!,
           lng: p.lng!,
           etiqueta: p.cliente_nombre,
           codigo: p.codigo,
-          detalle: p.estado === 'EN_CAMINO' ? 'en camino' : undefined,
+          detalle: enReparto ? 'en reparto' : 'esperando repartidor',
           color: infoEspera.color,
           orden: numeroOrden,
+          minutosEspera: p.minutosEspera,
+          enReparto,
         };
       });
   }, [pedidosFiltrados, rutaCalculada.paradas, config]);
