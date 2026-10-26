@@ -9,6 +9,7 @@ import { Perfil } from './admin/Perfil';
 import { CartaPublica } from './carta/CartaPublica';
 import { TerminosPage, PrivacidadPage, ReclamosPublicoPage } from './carta/legal';
 import { PantallaCocinaView } from './pantalla/PantallaCocinaView';
+import { PaginaMascota } from './mascota/PaginaMascota';
 
 export function RutasApp() {
   return (
@@ -18,6 +19,7 @@ export function RutasApp() {
       <Route path="/legal/terminos" element={<TerminosPage />} />
       <Route path="/legal/privacidad" element={<PrivacidadPage />} />
       <Route path="/reclamos" element={<ReclamosPublicoPage />} />
+      <Route path="/mascota" element={<PaginaMascota />} />
 
       {/* 2. Pantallas de cocina y TV */}
       <Route
