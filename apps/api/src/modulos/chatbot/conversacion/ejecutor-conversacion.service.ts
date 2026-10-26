@@ -7,6 +7,9 @@ import { LocalService } from '../../local/local.service';
 import { CatalogoService } from '../../catalogo/catalogo.service';
 import { OfertasService } from '../../ofertas/ofertas.service';
 import { SeguimientoService } from '../../pedidos/seguimiento.service';
+import { PedidosService } from '../../pedidos/pedidos.service';
+import { ZonasService } from '../../zonas/zonas.service';
+import { BOTON_VOLVER_MENU, TEXTOS_BOT } from './textos-bot';
 import {
   WHATSAPP_MENSAJERIA_PUERTO,
   WhatsAppMensajeriaPuerto,
@@ -48,6 +51,8 @@ export class EjecutorConversacionService {
     @Optional() private readonly ofertasService?: OfertasService,
     @Optional() private readonly seguimientoService?: SeguimientoService,
     @Optional() private readonly eventos?: EventosGateway,
+    @Optional() private readonly pedidosService?: PedidosService,
+    @Optional() private readonly zonasService?: ZonasService,
   ) {}
 
   /**
@@ -298,7 +303,51 @@ export class EjecutorConversacionService {
       errorServicio = true;
     }
 
+    let minutosInactividad = 0;
+    let inactividadExpirada = false;
+    if (conversacion.ultima_actividad) {
+      const ms = Date.now() - new Date(conversacion.ultima_actividad).getTime();
+      minutosInactividad = Math.floor(ms / (60 * 1000));
+      if (minutosInactividad >= 30) {
+        inactividadExpirada = true;
+      }
+    }
+
+    let pedidosHoyTelefono = 0;
+    if (telefonoCliente) {
+      try {
+        const inicioHoy = new Date();
+        inicioHoy.setHours(0, 0, 0, 0);
+        pedidosHoyTelefono = await this.prisma.pedido.count({
+          where: {
+            cliente_telefono: { contains: telefonoCliente.slice(-8) },
+            creado_en: { gte: inicioHoy },
+          },
+        });
+      } catch (err: any) {
+        this.logger.warn(`Error consultando pedidos de hoy: ${err.message}`);
+      }
+    }
+
+    let resultadoEnvio: any = null;
+    if (
+      entradaRaw.ubicacion &&
+      entradaRaw.ubicacion.latitud != null &&
+      entradaRaw.ubicacion.longitud != null &&
+      this.zonasService
+    ) {
+      try {
+        resultadoEnvio = await this.zonasService.consultarEnvio(
+          entradaRaw.ubicacion.latitud,
+          entradaRaw.ubicacion.longitud,
+        );
+      } catch (err: any) {
+        this.logger.warn(`Error consultando cobertura/envío por ubicación: ${err.message}`);
+      }
+    }
+
     const contexto: ContextoConversacion = {
+      conversacionId: conversacion.id.toString(),
       nombreCliente: nombreMostrar,
       telefonoCliente,
       cartaUrlPublica,
@@ -309,6 +358,10 @@ export class EjecutorConversacionService {
       pedidoActivo,
       errorServicio,
       limiteConsultasExcedido,
+      pedidosHoyTelefono,
+      minutosInactividad,
+      inactividadExpirada,
+      resultadoEnvio,
     };
 
     // 7. Normalizar entrada y ejecutar la máquina de estados pura
@@ -449,6 +502,111 @@ export class EjecutorConversacionService {
         });
 
         this.logger.log(`Conversación ${conversacion.id} derivada a PERSONA. Notificación campana id ${notif.id}.`);
+      } else if (accion.tipo === 'crearPedido') {
+        let codigoFinal = 'CP-0000';
+        try {
+          if (this.pedidosService) {
+            const pedidoCreado = await this.pedidosService.crear(
+              accion.dto,
+              accion.claveIdempotencia,
+              { canal: 'WHATSAPP' },
+            );
+            codigoFinal = pedidoCreado.codigo;
+
+            // Notificación campana a Caja/Admin
+            const tituloNotif = `Nuevo pedido WhatsApp: ${pedidoCreado.codigo}`;
+            const notif = await this.prisma.notificacion.create({
+              data: {
+                tipo: 'PEDIDO_NUEVO',
+                rol_destino: null,
+                titulo: tituloNotif,
+                mensaje: `Nuevo pedido ${pedidoCreado.codigo} por S/ ${Number(pedidoCreado.total).toFixed(2)} (${nombreMostrar}).`,
+                enlace: '/admin/pedidos',
+              },
+            });
+            this.eventos?.emitirAdmin('notificaciones:nueva', {
+              id: notif.id.toString(),
+              titulo: tituloNotif,
+            });
+          }
+        } catch (err: any) {
+          this.logger.error(`Error creando pedido desde chatbot: ${err.message}`, err.stack);
+          await this.prisma.conversacion.update({
+            where: { id: conversacion.id },
+            data: {
+              duenio: 'PERSONA',
+              urgente: true,
+              estado: 'ABIERTA',
+              ultima_actividad: new Date(),
+            },
+          });
+          const textoError = TEXTOS_BOT.errorServicio();
+          if (destinoEnvio) {
+            await this.mensajeria.enviarTexto(destinoEnvio, textoError, {
+              conversacionId: conversacion.id,
+              replyToWaMessageId: entradaRaw.waMessageId,
+            });
+          }
+          await this.prisma.mensajeChat.create({
+            data: {
+              conversacion_id: conversacion.id,
+              direccion: 'SALE',
+              autor: 'BOT',
+              tipo: 'TEXTO',
+              contenido: { texto: textoError },
+            },
+          });
+          const notif = await this.prisma.notificacion.create({
+            data: {
+              tipo: 'ATENCION_WHATSAPP',
+              rol_destino: null,
+              titulo: `Fallo al crear pedido WhatsApp (${nombreMostrar})`,
+              mensaje: `Error: ${err.message}. El asesor debe confirmar el pedido manualmente.`,
+              enlace: '/admin/mensajes',
+            },
+          });
+          this.eventos?.emitirAdmin('notificaciones:nueva', {
+            id: notif.id.toString(),
+            titulo: notif.titulo,
+          });
+          continue;
+        }
+
+        const textoConfirmacion = TEXTOS_BOT.pedidoConfirmadoExito({
+          codigo: codigoFinal,
+          tiempoMin: accion.tiempoEstimadoMin,
+          tiempoMax: accion.tiempoEstimadoMax,
+          esPagoDigital: accion.esPagoDigital,
+          datosPago: accion.datosPagoTexto,
+        });
+
+        let metaId: string | null = null;
+        if (destinoEnvio) {
+          const res = await this.mensajeria.enviarBotones(
+            destinoEnvio,
+            textoConfirmacion,
+            [BOTON_VOLVER_MENU],
+            {
+              conversacionId: conversacion.id,
+              replyToWaMessageId: entradaRaw.waMessageId,
+            },
+          );
+          metaId = res.waMessageId || null;
+        }
+
+        await this.prisma.mensajeChat.create({
+          data: {
+            conversacion_id: conversacion.id,
+            direccion: 'SALE',
+            autor: 'BOT',
+            tipo: 'BOTON',
+            contenido: {
+              texto: textoConfirmacion,
+              botones: [BOTON_VOLVER_MENU],
+            } as any,
+            meta_id: metaId,
+          },
+        });
       }
     }
 

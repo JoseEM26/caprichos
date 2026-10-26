@@ -29,6 +29,8 @@ import {
   FlujoConversacion,
   ResultadoTransicion,
 } from './tipos-conversacion';
+import { RegistroSubFlujos } from './flujos/registro-flujos';
+import './flujos/pedido/flujo-pedido';
 
 /** Palabras clave para detectar saludos o solicitud del menú */
 const PALABRAS_SALUDO = [
@@ -328,6 +330,31 @@ export function transicionarEstado(
     };
   }
 
+  // 2.b Expiración por inactividad (30 minutos sin respuesta descarta carrito y notifica)
+  if (
+    contexto.inactividadExpirada &&
+    flujo.pedido &&
+    (flujo.pedido.items?.length > 0 || String(flujo.estado).startsWith('PEDIDO'))
+  ) {
+    const nuevoEstado: EstadoConversacion = 'MENU';
+    return {
+      nuevoEstado,
+      acciones: [
+        {
+          tipo: 'enviarBotones',
+          texto: TEXTOS_BOT.pedidoExpiradoInactividad(),
+          botones: BOTONES_MENU_PRINCIPAL,
+        },
+      ],
+      nuevoFlujo: {
+        ...flujo,
+        estado: nuevoEstado,
+        pedido: null,
+        repreguntasFallidas: 0,
+      },
+    };
+  }
+
   const texto = entrada.texto;
   const textoOriginal = entrada.textoOriginal;
   const idInteractivo = entrada.id;
@@ -366,29 +393,14 @@ export function transicionarEstado(
     };
   }
 
-  // 4. Intención: "Hacer un pedido" (gancho Ola 2)
-  const esPedido =
-    idInteractivo === 'pedir' ||
-    idInteractivo === 'btn_pedido' ||
-    coincideAlgunaPalabra(texto, PALABRAS_PEDIDO);
-
-  if (esPedido) {
-    const nuevoEstado: EstadoConversacion = 'MENU';
-    return {
-      nuevoEstado,
-      acciones: [
-        {
-          tipo: 'enviarBotones',
-          texto: TEXTOS_BOT.pedidoProximamente(contexto.cartaUrlPublica),
-          botones: [BOTON_VOLVER_MENU],
-        },
-      ],
-      nuevoFlujo: {
-        ...flujo,
-        estado: nuevoEstado,
-        repreguntasFallidas: 0,
-      },
-    };
+  // 4. Delegación a subflujos modulares registrados (Ola 2 Pedidos, Ola 2 Pagos, Ola 3 Reservas)
+  for (const subFlujo of RegistroSubFlujos.obtenerFlujos()) {
+    if (subFlujo.puedeManejar(flujo, entrada, contexto)) {
+      const res = subFlujo.transicionar(flujo, entrada, contexto);
+      if (res) {
+        return res;
+      }
+    }
   }
 
   // 5. Intención: "Reservar mesa" (gancho Ola 3)

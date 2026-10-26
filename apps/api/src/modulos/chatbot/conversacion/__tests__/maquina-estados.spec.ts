@@ -301,18 +301,20 @@ describe('Máquina de Estados del Bot Conversacional (transicionarEstado)', () =
     });
   });
 
-  describe('2. Olas siguientes honestas: Hacer un pedido y Reservar mesa', () => {
-    it('al pulsar "pedir" responde con texto del mockup + línea honesta y botón Volver al menú', () => {
+  describe('2. Flujo de Pedidos (Ola 2) y Reservar mesa honesta (Ola 3)', () => {
+    it('al pulsar "pedir" inicia el flujo real de pedido preguntando la modalidad', () => {
       const entrada = normalizarEntrada({ listRowId: 'pedir' });
       const resultado = transicionarEstado(null, entrada, contextoBase);
 
-      expect(resultado.nuevoEstado).toBe('MENU');
+      expect(resultado.nuevoEstado).toBe('PEDIDO_MODALIDAD');
       expect(resultado.acciones[0].tipo).toBe('enviarBotones');
       if (resultado.acciones[0].tipo === 'enviarBotones') {
         expect(resultado.acciones[0].texto).toContain('Perfecto. ¿Cómo lo quieres?');
-        expect(resultado.acciones[0].texto).toContain('Esta opción estará disponible muy pronto');
-        expect(resultado.acciones[0].texto).toContain('https://carta.caprichos.pe');
-        expect(resultado.acciones[0].botones).toEqual([BOTON_VOLVER_MENU]);
+        expect(resultado.acciones[0].botones).toHaveLength(2);
+        expect(resultado.acciones[0].botones.map((b) => b.id)).toEqual([
+          'ped_mod_delivery',
+          'ped_mod_recojer',
+        ]);
       }
     });
 

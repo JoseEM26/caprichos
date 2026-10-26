@@ -14,7 +14,7 @@ export function canalLabel(c?: string | null) {
   if (!c) return 'Web';
   const cu = c.toUpperCase();
   if (cu === 'CARTA') return 'Web';
-  if (cu === 'BOT') return 'WhatsApp';
+  if (cu === 'BOT' || cu === 'WHATSAPP') return 'WhatsApp';
   if (cu === 'MOZO') return 'Mozo';
   if (cu === 'CAJA') return 'Caja';
   return c;
@@ -204,7 +204,14 @@ export function PedidosAdminView() {
     const q = busqueda.trim().toLowerCase();
     const nuevosFiltrados = pedidos.filter((p) => {
       if (!filtro(p)) return false;
-      if (canalFiltro !== 'all' && String(p.canal).toUpperCase() !== canalFiltro) return false;
+      if (canalFiltro !== 'all') {
+        const cu = String(p.canal).toUpperCase();
+        if (canalFiltro === 'BOT' || canalFiltro === 'WHATSAPP') {
+          if (cu !== 'BOT' && cu !== 'WHATSAPP') return false;
+        } else if (cu !== canalFiltro) {
+          return false;
+        }
+      }
       if (modalidadFiltro !== 'all') {
         const modP = String(p.modalidad).toUpperCase();
         if (modalidadFiltro === 'LLEVAR') {
@@ -310,7 +317,14 @@ export function PedidosAdminView() {
     return pedidos.filter((p) => {
       if (!filtroTab(p)) return false;
 
-      if (canalFiltro !== 'all' && String(p.canal).toUpperCase() !== canalFiltro) return false;
+      if (canalFiltro !== 'all') {
+        const cu = String(p.canal).toUpperCase();
+        if (canalFiltro === 'BOT' || canalFiltro === 'WHATSAPP') {
+          if (cu !== 'BOT' && cu !== 'WHATSAPP') return false;
+        } else if (cu !== canalFiltro) {
+          return false;
+        }
+      }
       if (modalidadFiltro !== 'all') {
         const modP = String(p.modalidad).toUpperCase();
         if (modalidadFiltro === 'LLEVAR') {

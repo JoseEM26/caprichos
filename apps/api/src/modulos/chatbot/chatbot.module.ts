@@ -6,6 +6,7 @@ import { LocalModule } from '../local/local.module';
 import { CatalogoModule } from '../catalogo/catalogo.module';
 import { OfertasModule } from '../ofertas/ofertas.module';
 import { PedidosModule } from '../pedidos/pedidos.module';
+import { ZonasModule } from '../zonas/zonas.module';
 import { WhatsappWebhookController } from './controladores/whatsapp-webhook.controller';
 import { QuejasWhatsappController } from './controladores/quejas-whatsapp.controller';
 import { WhatsAppMetaAdaptador } from './adaptadores/whatsapp-meta.adaptador';
@@ -27,6 +28,7 @@ import { EjecutorConversacionService } from './conversacion/ejecutor-conversacio
     CatalogoModule,
     OfertasModule,
     PedidosModule,
+    ZonasModule,
   ],
   controllers: [WhatsappWebhookController, QuejasWhatsappController],
   providers: [

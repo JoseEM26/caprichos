@@ -1,5 +1,6 @@
 import { BotonAccion, FilaLista } from '../puerto/whatsapp-mensajeria.puerto';
-export { BotonAccion, FilaLista };
+import { EstadoCarritoPedido, EstadoPedidoFlujo } from './flujos/pedido/tipos-pedido';
+export { BotonAccion, FilaLista, EstadoCarritoPedido, EstadoPedidoFlujo };
 
 /**
  * Versión actual del esquema del objeto `conversacion.flujo`.
@@ -9,24 +10,6 @@ export const ESQUEMA_FLUJO_VERSION = 2;
 
 /**
  * Estados activos de la máquina de estados del bot conversacional de Caprichos.
- *
- * Estados de la Ola 1 y ampliación:
- * - INICIO: Estado inicial al abrir o restablecer una conversación.
- * - MENU: Menú principal del bot con mensaje interactivo de lista ('Ver opciones').
- * - CARTA_CATEGORIAS: Navegación de categorías reales de la carta virtual.
- * - CARTA_PRODUCTOS: Lista de productos reales de una categoría seleccionada.
- * - CARTA_PRODUCTO_DETALLE: Detalle de un producto con sus opciones, tamaños y disponibilidad.
- * - CARTA_PROMOS: Vista de promociones y ofertas vigentes de hoy.
- * - MI_PEDIDO: Solicitud de código de pedido o selección de pedido activo.
- * - MI_PEDIDO_DETALLE: Opciones y estado real del pedido seleccionado.
- * - PREGUNTAS: Menú de preguntas frecuentes del mockup con respuestas desde la BD.
- * - HORARIO: Consulta de horario de atención del local.
- * - UBICACION: Consulta de dirección física y enlace al mapa.
- * - ATENCION_PERSONA: La conversación fue derivada a una persona del equipo (el bot permanece en silencio).
- *
- * Ganchos documentados y estados del mockup Chatbot.dc.html para Olas 2 y 3:
- * - PEDIDO, PAGO, RESERVA, DUDA_IA
- * - MODAL, LOC, CAT, PROD, VARIANT, GROUP, MORE, PROMO, SUMMARY, PAY, CASH, RES_PEOPLE, RES_TIME, MINE, ASK
  */
 export type EstadoConversacion =
   | 'INICIO'
@@ -46,6 +29,8 @@ export type EstadoConversacion =
   | 'PAGO'
   | 'RESERVA'
   | 'DUDA_IA'
+  // Estados de subflujo de pedidos (Ola 2, Agente C):
+  | EstadoPedidoFlujo
   // Estados de mockup Chatbot.dc.html:
   | 'MODAL'
   | 'LOC'
@@ -66,7 +51,14 @@ export type EstadoConversacion =
 /**
  * Tipos de entrada reconocidos por el normalizador del motor.
  */
-export type TipoEntrada = 'texto' | 'boton' | 'lista';
+export type TipoEntrada = 'texto' | 'boton' | 'lista' | 'ubicacion';
+
+export interface UbicacionEntrada {
+  latitud: number;
+  longitud: number;
+  nombre?: string;
+  direccion?: string;
+}
 
 /**
  * Entrada normalizada para procesamiento determinista y puro.
@@ -79,6 +71,8 @@ export interface EntradaNormalizada {
   textoOriginal: string;
   /** Identificador de botón interactivo o elemento de lista si aplica */
   id?: string;
+  /** Coordenadas y dirección geográfica si el cliente compartió ubicación */
+  ubicacion?: UbicacionEntrada;
 }
 
 /**
@@ -118,11 +112,25 @@ export interface AccionPasarAPersona {
   mensajeCliente?: string;
 }
 
+/**
+ * Acción transaccional: invocar la creación del pedido en PedidosService.
+ */
+export interface AccionCrearPedido {
+  tipo: 'crearPedido';
+  dto: any;
+  claveIdempotencia: string;
+  tiempoEstimadoMin: number;
+  tiempoEstimadoMax: number;
+  esPagoDigital: boolean;
+  datosPagoTexto?: string;
+}
+
 export type AccionMensaje =
   | AccionEnviarTexto
   | AccionEnviarBotones
   | AccionEnviarLista
-  | AccionPasarAPersona;
+  | AccionPasarAPersona
+  | AccionCrearPedido;
 
 /**
  * Estructura tipada del objeto JSON guardado en `conversacion.flujo`.
@@ -138,12 +146,8 @@ export interface FlujoConversacion {
   paginaCategorias?: number;
   paginaProductos?: number;
   productoSeleccionadoId?: string;
-  /** Gancho para Ola 2: Carrito y selección de productos */
-  pedido?: {
-    categoriaId?: string;
-    productoId?: string;
-    items?: any[];
-  } | null;
+  /** Subflujo transaccional de Pedido (Ola 2, Agente C) */
+  pedido?: EstadoCarritoPedido | null;
   /** Gancho para Ola 2: Coordinación de pago */
   pago?: {
     metodo?: string;
@@ -183,6 +187,7 @@ export interface DatosHorarioLocal {
  * Contexto complementario inyectado a las transiciones puras.
  */
 export interface ContextoConversacion {
+  conversacionId?: string | bigint;
   nombreCliente?: string | null;
   telefonoCliente?: string | null;
   cartaUrlPublica?: string;
@@ -193,6 +198,21 @@ export interface ContextoConversacion {
   pedidoActivo?: any;
   errorServicio?: boolean;
   limiteConsultasExcedido?: boolean;
+  pedidosHoyTelefono?: number;
+  minutosInactividad?: number;
+  inactividadExpirada?: boolean;
+  resultadoEnvio?: {
+    cubierto: boolean;
+    zona?: any;
+    tarifa?: number | null;
+    gratisDesde?: number;
+  } | null;
+  resultadoCupon?: {
+    valido: boolean;
+    descuento?: number;
+    cuponId?: string;
+    mensaje?: string;
+  } | null;
 }
 
 /**
@@ -203,3 +223,4 @@ export interface ResultadoTransicion {
   acciones: AccionMensaje[];
   nuevoFlujo: FlujoConversacion;
 }
+

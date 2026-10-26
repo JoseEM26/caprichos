@@ -20,7 +20,7 @@ import { CrearPedidoDto } from './dto/crear-pedido.dto';
 import { generarTokenSeguimiento } from './seguimiento.tokens';
 
 export interface OrigenPedido {
-  canal?: 'CARTA' | 'MOZO' | 'CAJA';
+  canal?: 'CARTA' | 'MOZO' | 'CAJA' | 'WHATSAPP' | 'BOT';
   usuarioPartyId?: bigint | string | number;
   /** Cliente con cuenta que hace el pedido en la carta (suma puntos) */
   clientePartyId?: bigint | string | number;
@@ -632,7 +632,9 @@ export class PedidosService {
           motivo:
             origen?.canal === 'MOZO'
               ? 'Pedido abierto por el mozo'
-              : 'Pedido creado desde la carta virtual',
+              : origen?.canal === 'WHATSAPP' || origen?.canal === 'BOT'
+                ? 'Pedido creado desde WhatsApp'
+                : 'Pedido creado desde la carta virtual',
           por_party_id: mozoPartyId,
         },
       });
@@ -732,7 +734,9 @@ export class PedidosService {
       mensaje:
         origen?.canal === 'MOZO'
           ? 'Pedido enviado a cocina'
-          : 'Un asesor te escribirá para coordinar el pago',
+          : origen?.canal === 'WHATSAPP' || origen?.canal === 'BOT'
+            ? 'Pedido enviado a cocina'
+            : 'Un asesor te escribirá para coordinar el pago',
     };
   }
 

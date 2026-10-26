@@ -98,6 +98,82 @@ export const BOTONES_MI_PEDIDO: BotonAccion[] = [
   { id: 'btn_persona', titulo: 'Hablar con asesor' },
 ];
 
+// Botones específicos del flujo de Pedido (Ola 2, Agente C)
+export const BOTONES_PEDIDO_MODALIDAD: BotonAccion[] = [
+  { id: 'ped_mod_delivery', titulo: 'Delivery' },
+  { id: 'ped_mod_recojer', titulo: 'Para recoger' },
+];
+
+export const BOTONES_PEDIDO_UBICACION: BotonAccion[] = [
+  { id: 'ped_loc_share', titulo: 'Compartir ubicación' },
+  { id: 'ped_loc_escribir', titulo: 'Escribir dirección' },
+];
+
+export const BOTONES_PEDIDO_UBICACION_FALLIDA: BotonAccion[] = [
+  { id: 'ped_mod_recojer', titulo: 'Para recoger' },
+  { id: 'ped_loc_escribir', titulo: 'Escribir dirección' },
+  BOTON_VOLVER_MENU,
+];
+
+export const BOTONES_PEDIDO_ACCION_CARRITO: BotonAccion[] = [
+  { id: 'ped_otro', titulo: 'Agregar producto' },
+  { id: 'ped_ver_carrito', titulo: 'Ver mi pedido' },
+  { id: 'ped_continuar', titulo: 'Continuar' },
+];
+
+export const BOTONES_PEDIDO_VER_CARRITO: BotonAccion[] = [
+  { id: 'ped_continuar', titulo: 'Continuar' },
+  { id: 'ped_otro', titulo: 'Agregar producto' },
+  { id: 'ped_quitar', titulo: 'Quitar producto' },
+];
+
+export const BOTONES_PEDIDO_OFERTA_CALIFICA: BotonAccion[] = [
+  { id: 'ped_promo_si', titulo: 'Sí, aplicar promo' },
+  { id: 'ped_promo_no', titulo: 'No, gracias' },
+];
+
+export const BOTONES_PEDIDO_OFERTA_FALTA: BotonAccion[] = [
+  { id: 'ped_otro', titulo: 'Agregar producto' },
+  { id: 'ped_promo_seguir', titulo: 'Seguir sin promo' },
+];
+
+export const BOTONES_PEDIDO_PREGUNTA_CUPON: BotonAccion[] = [
+  { id: 'ped_cupon_si', titulo: 'Tengo un cupón' },
+  { id: 'ped_cupon_no', titulo: 'No tengo cupón' },
+];
+
+export const BOTONES_PEDIDO_NOMBRE_CONFIRMAR: BotonAccion[] = [
+  { id: 'ped_nombre_ok', titulo: 'Sí, es correcto' },
+  { id: 'ped_nombre_otro', titulo: 'Escribir mi nombre' },
+];
+
+export const BOTONES_PEDIDO_COMPROBANTE: BotonAccion[] = [
+  { id: 'ped_comp_ninguno', titulo: 'Sin comprobante' },
+  { id: 'ped_comp_boleta', titulo: 'Boleta' },
+  { id: 'ped_comp_factura', titulo: 'Factura' },
+];
+
+export const BOTONES_PEDIDO_CONFIRMAR_FINAL: BotonAccion[] = [
+  { id: 'ped_confirmar', titulo: 'Confirmar pedido' },
+  { id: 'ped_cambiar', titulo: 'Cambiar algo' },
+];
+
+export const BOTONES_PEDIDO_CANCELAR_CONFIRMAR: BotonAccion[] = [
+  { id: 'ped_cancelar_si', titulo: 'Sí, cancelar' },
+  { id: 'ped_cancelar_no', titulo: 'No, continuar' },
+];
+
+export const BOTONES_PEDIDO_NOTAS: BotonAccion[] = [
+  { id: 'ped_nota_sin', titulo: 'Sin notas' },
+  { id: 'ped_continuar', titulo: 'Continuar' },
+];
+
+export const BOTONES_PEDIDO_CANTIDADES: BotonAccion[] = [
+  { id: 'ped_cant_1', titulo: '1 unidad' },
+  { id: 'ped_cant_2', titulo: '2 unidades' },
+  { id: 'ped_cant_3', titulo: '3 unidades' },
+];
+
 // Filas de Preguntas Frecuentes (mockup líneas 215-221: DUDAS)
 export const FILAS_PREGUNTAS_FRECUENTES: FilaLista[] = [
   {
@@ -540,4 +616,253 @@ export const TEXTOS_BOT = {
     const gratisTexto = envioGratis ? ` Además, ¡el envío es gratis en compras a partir de s/ ${envioGratis.toFixed(2)}!` : '';
     return `El pedido mínimo para delivery es ${minTexto} en productos.${gratisTexto} La tarifa exacta depende de tu ubicación en nuestras zonas de reparto.`;
   },
+
+  // =========================================================================
+  // FLUJO DE PEDIDO POR BOTONES (Ola 2, Agente C - Mockup Chatbot.dc.html)
+  // =========================================================================
+
+  pedidoModalidad: (): string => {
+    return 'Perfecto. ¿Cómo lo quieres?';
+  },
+
+  pedidoPedirUbicacion: (): string => {
+    return 'Anotado: Delivery. ¿Dónde te lo llevamos? Comparte tu ubicación actual para que el repartidor te encuentre.';
+  },
+
+  pedidoUbicacionClipAyuda: (): string => {
+    return 'Toca el clip 📎 y selecciona "Ubicación" para compartir tu ubicación actual, o escribe tu dirección.';
+  },
+
+  pedidoFueraDeCobertura: (): string => {
+    return 'Tu ubicación está fuera de nuestra zona de reparto. Puedes pedir para recoger en el local.';
+  },
+
+  pedidoUbicacionExitosa: (tarifa: number, esGratis: boolean, gratisDesde?: number): string => {
+    if (esGratis) {
+      const gTexto = gratisDesde ? ` por compras mayores a S/ ${gratisDesde.toFixed(2)}` : '';
+      return `Tu ubicación fue localizada correctamente. El envío a tu ubicación es gratis${gTexto}. Elige una categoría:`;
+    }
+    return `Tu ubicación fue localizada correctamente. El envío a tu ubicación cuesta S/ ${tarifa.toFixed(2)}. Elige una categoría:`;
+  },
+
+  pedidoEscribirDireccionPrompt: (): string => {
+    return 'Sin problema, escríbeme tu dirección cuando termines tu pedido (distrito, calle, manzana y lote). Un asesor te escribe, te ubica en el mapa y te confirma el costo del envío. Elige una categoría.';
+  },
+
+  pedidoPedirReferencia: (): string => {
+    return 'Por favor indícanos una referencia para el repartidor (por ejemplo: frente al parque, portón blanco, timbre 2):';
+  },
+
+  pedidoRecojoConfirmado: (): string => {
+    return 'Anotado: Para recoger. Elige una categoría.';
+  },
+
+  pedidoCategoriasPrompt: (): string => {
+    return 'Elige una categoría:';
+  },
+
+  pedidoCategoriaSeleccionada: (catNombre: string): string => {
+    return `Estos son nuestros ${catNombre.toLowerCase()}. ¿Cuál te provoca?`;
+  },
+
+  pedidoProductoAgotado: (nombre: string, alternativas: string[] = []): string => {
+    const altTexto = alternativas.length > 0 ? ` Te sugiero ${alternativas.join(' o ')}.` : '';
+    return `Por ahora no hay stock de ${nombre}.${altTexto}`;
+  },
+
+  pedidoCategoriaVacia: (): string => {
+    return 'Por ahora no tenemos productos disponibles en esta categoría. Te invitamos a revisar nuestras otras categorías.';
+  },
+
+  pedidoPreguntarTamano: (nombreProd: string): string => {
+    return `${nombreProd}. ¿Qué presentación prefieres?`;
+  },
+
+  pedidoPreguntarGrupo: (nombreGrupo: string, obligatorio: boolean): string => {
+    return obligatorio
+      ? `¿${nombreGrupo}? Es obligatorio.`
+      : `¿Quieres ${nombreGrupo.toLowerCase()}? Es opcional.`;
+  },
+
+  pedidoOpcionObligatoriaFaltante: (nombreGrupo: string): string => {
+    return `Por favor elige una opción de ${nombreGrupo} para continuar (es obligatorio).`;
+  },
+
+  pedidoPreguntarSabor: (): string => {
+    return '¿Qué sabor prefieres?';
+  },
+
+  pedidoPreguntarNotas: (nombreProd: string): string => {
+    return `¿Tienes alguna indicación especial para ${nombreProd}? Si no tienes notas, presiona Continuar.`;
+  },
+
+  pedidoPreguntarCantidad: (nombreProd: string): string => {
+    return `¿Cuántas unidades deseas de ${nombreProd}? (máximo 20):`;
+  },
+
+  pedidoProductoAgregado: (nombreProd: string, subtotalLinea: number, hintOferta?: string): string => {
+    const hint = hintOferta ? `\n\n${hintOferta}` : '';
+    return `Agregué ${nombreProd} (S/ ${subtotalLinea.toFixed(2)}) a tu pedido. ¿Quieres algo más?${hint}`;
+  },
+
+  pedidoVerCarrito: (itemsTexto: string, subtotal: number): string => {
+    return `🛒 *Tu pedido actual:*\n${itemsTexto}\n\n*Subtotal:* S/ ${subtotal.toFixed(2)}`;
+  },
+
+  pedidoProductoEliminado: (nombreProd: string): string => {
+    return `Eliminé ${nombreProd} de tu pedido.`;
+  },
+
+  pedidoCarritoVacio: (): string => {
+    return 'Tu carrito está vacío. Elige una categoría para empezar a agregar productos:';
+  },
+
+  pedidoOfertaCalifica: (nombreOferta: string, ahorro: number): string => {
+    return `🏷 Tu pedido califica para «${nombreOferta}»: te ahorras S/ ${ahorro.toFixed(2)} (los adicionales se cobran aparte). ¿La aplico?`;
+  },
+
+  pedidoOfertaFaltaPoco: (faltan: number, miss: string[], nombreOferta: string, precio: number): string => {
+    return `🏷 Con ${faltan} más (${miss.join(' + ')}) se aplica «${nombreOferta}»: pagas S/ ${precio.toFixed(2)} por los productos. ¿Quieres agregarlo?`;
+  },
+
+  pedidoPreguntaCupon: (): string => {
+    return '¿Cuentas con un cupón de descuento?';
+  },
+
+  pedidoIngresarCuponPrompt: (): string => {
+    return 'Por favor escribe el código de tu cupón:';
+  },
+
+  pedidoCuponAplicado: (codigo: string, descuento: number): string => {
+    return `Listo, apliqué el cupón «${codigo}»: ahorras S/ ${descuento.toFixed(2)}.`;
+  },
+
+  pedidoCuponInvalido: (mensaje?: string): string => {
+    return mensaje || 'El código de cupón ingresado no es válido o ya expiró.';
+  },
+
+  pedidoMinimoNoAlcanzado: (minimo: number, faltante: number): string => {
+    return `El pedido mínimo para delivery es S/ ${minimo.toFixed(2)} en productos. Te faltan S/ ${faltante.toFixed(2)}; agrega algo más.`;
+  },
+
+  pedidoConfirmarNombre: (nombrePerfil: string): string => {
+    return `¿Confirmas que tu nombre es ${nombrePerfil}? 👤`;
+  },
+
+  pedidoIngresarNombre: (): string => {
+    return 'Por favor escribe tu nombre completo para el pedido:';
+  },
+
+  pedidoIngresarTelefono: (): string => {
+    return 'Por favor escribe tu número de celular de 9 dígitos para coordinar tu pedido y la entrega:';
+  },
+
+  pedidoTelefonoInvalido: (): string => {
+    return 'El número ingresado no es válido. Debe tener 9 dígitos y empezar con 9 (ejemplo: 987654321). Por favor escríbelo nuevamente:';
+  },
+
+  pedidoMedioPago: (): string => {
+    return '¿Cómo pagarás?';
+  },
+
+  pedidoMontoEfectivo: (): string => {
+    return '¿Con cuánto pagas? Te preparamos el vuelto 💵';
+  },
+
+  pedidoPagaConMenorQueTotal: (total: number): string => {
+    return `El monto debe ser al menos de S/ ${total.toFixed(2)}. ¿Con cuánto pagarás?`;
+  },
+
+  pedidoComprobanteTipo: (): string => {
+    return '¿Deseas algún comprobante de pago?';
+  },
+
+  pedidoComprobanteDni: (): string => {
+    return 'Por favor escribe tu número de DNI (8 dígitos) o escribe "omitir":';
+  },
+
+  pedidoComprobanteRuc: (): string => {
+    return 'Por favor escribe el RUC de tu empresa (11 dígitos):';
+  },
+
+  pedidoComprobanteRazon: (): string => {
+    return 'Por favor escribe la Razón Social de tu empresa:';
+  },
+
+  pedidoResumenFinal: (params: {
+    lineasTexto: string;
+    descuentoTexto?: string;
+    envioTexto: string;
+    total: number;
+    modalidad: string;
+    direccionTexto?: string;
+    pagoTexto: string;
+    tiempoMin: number;
+    tiempoMax: number;
+    avisoDemanda?: string;
+  }): string => {
+    const {
+      lineasTexto,
+      descuentoTexto,
+      envioTexto,
+      total,
+      modalidad,
+      direccionTexto,
+      pagoTexto,
+      tiempoMin,
+      tiempoMax,
+      avisoDemanda,
+    } = params;
+
+    const descBloque = descuentoTexto ? `\n${descuentoTexto}` : '';
+    const dirBloque = direccionTexto ? `\n${direccionTexto}` : '';
+    const demandaBloque = avisoDemanda ? `\n\n${avisoDemanda}` : '';
+
+    return (
+      `Este es tu resumen:\n` +
+      `${lineasTexto}${descBloque}\n` +
+      `Envío: ${envioTexto}\n` +
+      `*Total: S/ ${total.toFixed(2)}*\n\n` +
+      `Modalidad: ${modalidad}${dirBloque}\n` +
+      `Pago: ${pagoTexto}\n` +
+      `Tiempo estimado: ${tiempoMin} a ${tiempoMax} minutos${demandaBloque}\n\n` +
+      `¿Confirmo tu pedido?`
+    );
+  },
+
+  pedidoConfirmadoExito: (params: {
+    codigo: string;
+    tiempoMin: number;
+    tiempoMax: number;
+    esPagoDigital: boolean;
+    datosPago?: string;
+  }): string => {
+    const { codigo, tiempoMin, tiempoMax, esPagoDigital, datosPago } = params;
+    const pagoMensaje = esPagoDigital
+      ? ' Si pagas por Yape, Plin o transferencia, envíanos aquí la captura de tu comprobante.'
+      : '';
+    const datosBloque = datosPago ? `\n\n${datosPago}` : '';
+
+    return (
+      `Listo. Tu pedido ${codigo} ya está en cocina 👩‍🍳. Te llega de ${tiempoMin} a ${tiempoMax} minutos. ` +
+      `Una persona del equipo te escribe por este chat para coordinar el pago.${pagoMensaje}${datosBloque}`
+    );
+  },
+
+  pedidoConfirmarCancelar: (): string => {
+    return '¿Estás seguro de que deseas cancelar tu pedido actual? Se descartarán los productos de tu carrito.';
+  },
+
+  pedidoCancelado: (): string => {
+    return 'Tu pedido fue cancelado y el carrito fue descartado. ¿En qué te puedo ayudar hoy?';
+  },
+
+  pedidoExpiradoInactividad: (): string => {
+    return 'Tu pedido anterior expiró por inactividad (más de 30 minutos sin respuesta). Tu carrito fue descartado. ¿En qué te puedo ayudar hoy?';
+  },
+
+  pedidoLimiteDiarioAlcanzado: (): string => {
+    return 'Has alcanzado el límite de 10 pedidos diarios por WhatsApp. Un asesor te atenderá personalmente.';
+  },
 };
+

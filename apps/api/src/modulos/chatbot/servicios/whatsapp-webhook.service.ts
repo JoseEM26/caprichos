@@ -287,6 +287,7 @@ export class WhatsappWebhookService {
     let tipoRegistro = 'TEXTO';
     let imagenBuffer: Buffer | null = null;
     let imagenMime = '';
+    let ubicacion: { latitud: number; longitud: number; nombre?: string; direccion?: string } | undefined;
 
     if (tipo === 'text') {
       texto = String(msg.text?.body || '').trim();
@@ -304,6 +305,19 @@ export class WhatsappWebhookService {
         buttonPayload = String(msg.interactive.list_reply.id || '').trim();
         texto = String(msg.interactive.list_reply.title || '').trim();
       }
+    } else if (tipo === 'location') {
+      tipoRegistro = 'UBICACION';
+      const lat = Number(msg.location?.latitude);
+      const lng = Number(msg.location?.longitude);
+      const locNombre = msg.location?.name ? String(msg.location.name).trim() : undefined;
+      const locDir = msg.location?.address ? String(msg.location.address).trim() : undefined;
+      ubicacion = {
+        latitud: lat,
+        longitud: lng,
+        nombre: locNombre,
+        direccion: locDir,
+      };
+      texto = locDir || locNombre || `Ubicación compartida: ${lat}, ${lng}`;
     } else if (tipo === 'image') {
       tipoRegistro = 'IMAGEN';
       texto = String(msg.image?.caption || '[Imagen de comprobante adjunta]').trim();
@@ -489,6 +503,7 @@ export class WhatsappWebhookService {
             waMessageId,
             telefono: telefonoNorm || undefined,
             telMask,
+            ubicacion,
           });
         } catch (err: any) {
           this.logger.error(

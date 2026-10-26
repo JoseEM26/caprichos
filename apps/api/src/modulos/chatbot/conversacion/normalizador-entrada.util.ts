@@ -1,4 +1,4 @@
-import { EntradaNormalizada, TipoEntrada } from './tipos-conversacion';
+import { EntradaNormalizada, TipoEntrada, UbicacionEntrada } from './tipos-conversacion';
 
 /**
  * Normaliza una cadena de texto para comparaciones seguras e insensibles a diacríticos:
@@ -25,10 +25,11 @@ export interface EntradaRawInput {
   listRowId?: string | null;
   textoOriginal?: string | null;
   tipo?: string | null;
+  ubicacion?: UbicacionEntrada;
 }
 
 /**
- * Normaliza cualquier entrada entrante (texto libre, respuesta de botón o de lista)
+ * Normaliza cualquier entrada entrante (texto libre, respuesta de botón o de lista, o ubicación compartida)
  * a una estructura uniforme y determinista.
  */
 export function normalizarEntrada(raw: EntradaRawInput): EntradaNormalizada {
@@ -36,7 +37,9 @@ export function normalizarEntrada(raw: EntradaRawInput): EntradaNormalizada {
   const idBotonOLista = String(raw.buttonPayload || raw.listReplyId || raw.listRowId || '').trim();
 
   let tipo: TipoEntrada = 'texto';
-  if (raw.tipo === 'button' || (raw.buttonPayload && raw.buttonPayload !== raw.texto)) {
+  if (raw.tipo === 'location' || raw.ubicacion) {
+    tipo = 'ubicacion';
+  } else if (raw.tipo === 'button' || (raw.buttonPayload && raw.buttonPayload !== raw.texto)) {
     tipo = 'boton';
   } else if (raw.tipo === 'interactive' || raw.listReplyId) {
     tipo = raw.listReplyId ? 'lista' : 'boton';
@@ -51,5 +54,7 @@ export function normalizarEntrada(raw: EntradaRawInput): EntradaNormalizada {
     texto: textoNormalizado,
     textoOriginal,
     id: idBotonOLista || undefined,
+    ubicacion: raw.ubicacion,
   };
 }
+
