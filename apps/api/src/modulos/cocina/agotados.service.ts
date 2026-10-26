@@ -1,9 +1,11 @@
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
   Optional,
+  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
@@ -14,6 +16,7 @@ import {
   calcularSiguienteMedianocheLima,
   FECHA_HASTA_REACTIVAR,
 } from './cocina.util';
+import { AvisosInternosService } from '../chatbot/avisos-internos/avisos-internos.service';
 
 export interface AgotadosActivos {
   productos: string[];
@@ -30,6 +33,9 @@ export class AgotadosService {
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditoriaService,
     @Optional() private readonly eventosGateway?: EventosGateway,
+    @Optional()
+    @Inject(forwardRef(() => AvisosInternosService))
+    private readonly avisosInternosService?: AvisosInternosService,
   ) {}
 
   private parsearId(id: bigint | string | number, entidad = 'agotado'): bigint {
@@ -244,6 +250,13 @@ export class AgotadosService {
     // Emite disponibilidad actualizada
     const disponibles = await this.activos();
     this.eventosGateway?.emitirAdmin('carta:disponibilidad', disponibles);
+
+    // Aviso interno a Almacén/Equipo (asíncrono, best-effort)
+    if (this.avisosInternosService) {
+      setImmediate(() => {
+        this.avisosInternosService?.notificarElementoAgotado(dto.tipo, entidadId).catch(() => {});
+      });
+    }
 
     return {
       ok: true,

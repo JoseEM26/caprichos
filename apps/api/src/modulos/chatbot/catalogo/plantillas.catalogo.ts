@@ -96,4 +96,20 @@ export const CATALOGO_PLANTILLAS: Record<string, DefinicionPlantilla> = {
     texto: 'Hola {{1}}, te informamos sobre tu reserva: {{2}}.',
     descripcion: 'Aviso sobre cambio o estado de la reserva.',
   },
+  EQUIPO_NUEVO_PEDIDO: {
+    nombre: 'caprichos_equipo_nuevo_pedido',
+    categoria: 'UTILITY',
+    idioma: 'es',
+    variables: ['codigo_pedido', 'modalidad_cliente', 'monto_total'],
+    texto: 'Aviso para el equipo de Caprichos: se ha registrado el nuevo pedido {{1}} ({{2}}) por un total de S/ {{3}}. Por favor revisarlo en el sistema.',
+    descripcion: 'Aviso al personal del equipo fuera de la ventana de 24h ante un nuevo pedido.',
+  },
+  EQUIPO_ALERTA_ALMACEN: {
+    nombre: 'caprichos_equipo_alerta_almacen',
+    categoria: 'UTILITY',
+    idioma: 'es',
+    variables: ['nombre_insumo', 'tipo_alerta', 'stock_actual'],
+    texto: 'Aviso de almacen de Caprichos: el insumo {{1}} se encuentra en estado {{2}} (Stock: {{3}}). Por favor coordinar su reposicion.',
+    descripcion: 'Aviso al personal del equipo fuera de la ventana de 24h cuando un insumo esta agotado o por pedir.',
+  },
 };

@@ -5,9 +5,12 @@ import {
   ConflictException,
   HttpException,
   HttpStatus,
+  Inject,
   Injectable,
+  Logger,
   NotFoundException,
   Optional,
+  forwardRef,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../comun/prisma/prisma.service';
@@ -18,6 +21,7 @@ import { OfertasService } from '../ofertas/ofertas.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { CrearPedidoDto } from './dto/crear-pedido.dto';
 import { generarTokenSeguimiento } from './seguimiento.tokens';
+import { AvisosInternosService } from '../chatbot/avisos-internos/avisos-internos.service';
 
 export interface OrigenPedido {
   canal?: 'CARTA' | 'MOZO' | 'CAJA' | 'WHATSAPP' | 'BOT';
@@ -33,6 +37,8 @@ export interface OrigenPedido {
 
 @Injectable()
 export class PedidosService {
+  private readonly logger = new Logger(PedidosService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly localService: LocalService,
@@ -40,6 +46,9 @@ export class PedidosService {
     private readonly eventosGateway: EventosGateway,
     private readonly ofertasService: OfertasService,
     @Optional() private readonly puntosService?: PuntosService,
+    @Optional()
+    @Inject(forwardRef(() => AvisosInternosService))
+    private readonly avisosInternosService?: AvisosInternosService,
   ) {}
 
   /**
@@ -718,6 +727,15 @@ export class PedidosService {
       });
     } catch {
       // Ignorar si el servidor de websocket no está listo en pruebas
+    }
+
+    // 10.5. Notificación interna por WhatsApp al equipo (asíncrono, best-effort)
+    if (this.avisosInternosService) {
+      setImmediate(() => {
+        this.avisosInternosService?.notificarNuevoPedido(pedidoCreado.id).catch((err) => {
+          this.logger.warn(`No se pudo emitir aviso interno de nuevo pedido: ${err.message}`);
+        });
+      });
     }
 
     // 11. Respuesta 201

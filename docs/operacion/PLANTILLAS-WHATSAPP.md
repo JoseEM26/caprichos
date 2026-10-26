@@ -18,6 +18,8 @@ Todas las plantillas pertenecen a la categoría **Utilidad (UTILITY)** y están 
 | `PEDIDO_LISTO_RECOJO` | `caprichos_pedido_listo_recojo` | Utilidad | Español (`es`) | 2 |
 | `ENCUESTA_POSVENTA` | `caprichos_encuesta_posventa` | Utilidad | Español (`es`) | 2 |
 | `REABRIR_CONVERSACION` | `caprichos_reabrir_conversacion` | Utilidad | Español (`es`) | 1 |
+| `EQUIPO_NUEVO_PEDIDO` | `caprichos_equipo_nuevo_pedido` | Utilidad | Español (`es`) | 3 |
+| `EQUIPO_ALERTA_ALMACEN` | `caprichos_equipo_alerta_almacen` | Utilidad | Español (`es`) | 3 |
 
 ---
 
@@ -152,6 +154,40 @@ Hola {{1}}, nos comunicamos de Caprichos para dar seguimiento a tu consulta. ¿E
 ```
 - **Ejemplo de variables para Meta:**
   - `{{1}}`: `Carlos`
+- **Botones:** Ninguno
+
+---
+
+## 9. Aviso Interno al Equipo: Nuevo Pedido (Fuera de ventana 24h)
+
+- **Nombre de plantilla:** `caprichos_equipo_nuevo_pedido`
+- **Categoría:** Utilidad (Utility)
+- **Idioma:** Español (`es` o `es_PE`)
+- **Texto del cuerpo (Body):**
+```text
+Aviso para el equipo de Caprichos: se ha registrado el nuevo pedido {{1}} ({{2}}) por un total de S/ {{3}}. Por favor revisarlo en el sistema.
+```
+- **Ejemplo de variables para Meta:**
+  - `{{1}}`: `CP-W015`
+  - `{{2}}`: `Delivery - Ana Pérez`
+  - `{{3}}`: `42.50`
+- **Botones:** Ninguno
+
+---
+
+## 10. Aviso Interno al Equipo: Alerta de Almacén (Fuera de ventana 24h)
+
+- **Nombre de plantilla:** `caprichos_equipo_alerta_almacen`
+- **Categoría:** Utilidad (Utility)
+- **Idioma:** Español (`es` o `es_PE`)
+- **Texto del cuerpo (Body):**
+```text
+Aviso de almacen de Caprichos: el insumo {{1}} se encuentra en estado {{2}} (Stock: {{3}}). Por favor coordinar su reposicion.
+```
+- **Ejemplo de variables para Meta:**
+  - `{{1}}`: `Leche Evaporada`
+  - `{{2}}`: `Agotado`
+  - `{{3}}`: `0.00 UND`
 - **Botones:** Ninguno
 
 ---

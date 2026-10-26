@@ -1,9 +1,11 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
   Optional,
+  forwardRef,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../comun/prisma/prisma.service';
@@ -14,6 +16,7 @@ import { MovimientoManualDto } from './dto/movimiento-manual.dto';
 import { MovimientosQueryDto } from './dto/movimientos-query.dto';
 import { convertirAUnidadAlmacen, insumosDeLinea } from './receta.util';
 import { FECHA_HASTA_REACTIVAR } from '../cocina/cocina.util';
+import { AvisosInternosService } from '../chatbot/avisos-internos/avisos-internos.service';
 
 @Injectable()
 export class StockService {
@@ -21,6 +24,9 @@ export class StockService {
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditoriaService,
     @Optional() private readonly eventosGateway?: EventosGateway,
+    @Optional()
+    @Inject(forwardRef(() => AvisosInternosService))
+    private readonly avisosInternosService?: AvisosInternosService,
   ) {}
 
   private parsearId(id: bigint | string | number, entidad = 'entidad'): bigint {
@@ -918,6 +924,23 @@ export class StockService {
           saborIds: saboresAgotados.map((s) => s.id.toString()),
           opcionIds: opcionesAgotadas.map((o) => o.id.toString()),
         });
+      }
+    }
+
+    // Avisos internos al equipo por WhatsApp cuando Almacén debe saber algo (asíncrono, best-effort)
+    if (this.avisosInternosService) {
+      for (const insIdStr of insumosAgotadosDetectados) {
+        setImmediate(() => {
+          this.avisosInternosService?.notificarInsumoAgotado(insIdStr).catch(() => {});
+        });
+      }
+      for (const alerta of alertasBajo) {
+        if (alerta.insumoId) {
+          const insId = alerta.insumoId;
+          setImmediate(() => {
+            this.avisosInternosService?.notificarInsumoBajoStock(insId).catch(() => {});
+          });
+        }
       }
     }
 
