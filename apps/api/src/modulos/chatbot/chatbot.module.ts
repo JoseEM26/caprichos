@@ -33,7 +33,7 @@ import { EjecutorConversacionService } from './conversacion/ejecutor-conversacio
     LocalModule,
     CatalogoModule,
     OfertasModule,
-    PedidosModule,
+    forwardRef(() => PedidosModule),
     ZonasModule,
     forwardRef(() => ReservasModule),
     ChatbotIaModule,
@@ -66,7 +66,6 @@ import { EjecutorConversacionService } from './conversacion/ejecutor-conversacio
     EjecutorConversacionService,
     ChatbotIaModule,
     ChatbotConfiguracionModule,
-    AvisosInternosModule,
   ],
 })
 export class ChatbotModule {}
