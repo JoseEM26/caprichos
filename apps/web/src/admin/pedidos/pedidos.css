@@ -103,5 +103,7 @@
   }
   .cj-right .cj-scroll {
     overflow: visible;
+    flex: 1 1 auto;
+    min-height: auto;
   }
 }

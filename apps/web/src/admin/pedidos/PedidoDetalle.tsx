@@ -7,6 +7,7 @@ import { ModalAnular } from './ModalAnular';
 import { ModalUbicar } from './ModalUbicar';
 import { ModalPrecuenta } from '../salon/componentes/ModalPrecuenta';
 import { ModalConfirmarPago } from './ModalConfirmarPago';
+import { EtiquetasPedido } from './EtiquetasPedido';
 import { canalLabel, modLabel, getBadge } from './PedidosAdminView';
 import {
   listarPersonalActivo,
@@ -46,7 +47,6 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
   const [tipoComp, setTipoComp] = useState<string>(pedido.comprobante_tipo || 'Nota de venta');
   const [comprobanteSubido, setComprobanteSubido] = useState<string | null>(null);
   const [msgTicket, setMsgTicket] = useState('');
-  const [msgEtiquetas, setMsgEtiquetas] = useState('');
   const [msgComprobante, setMsgComprobante] = useState('');
   const [errorAccion, setErrorAccion] = useState<string | null>(null);
   const [mensajeExito, setMensajeExito] = useState<string | null>(null);
@@ -598,142 +598,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
 
         {/* TAB: ETIQUETAS */}
         {tab === 'etiquetas' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ fontSize: 12, lineHeight: '17px', color: 'var(--cp-soft, #2C4C5D)' }}>
-              Sale una general en caja, una por área en su etiquetera y una por vaso en barra.
-            </div>
-            <div style={{ fontWeight: 800, fontSize: 13 }}>
-              {pedido.lineas?.length || 1} producto(s) en este pedido
-            </div>
-
-            {msgEtiquetas && (
-              <div role="status" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-green, #2F7A45)' }}>
-                {msgEtiquetas}
-              </div>
-            )}
-
-            {/* 1. General */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 14 }}>
-                1. Etiqueta general del pedido
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)' }}>
-                Una por pedido, para la bolsa o la bandeja. Sale en la etiquetera de caja.
-              </div>
-              <div
-                style={{
-                  width: 230,
-                  fontFamily: "'Courier New', monospace",
-                  fontSize: 12,
-                  lineHeight: '15px',
-                  color: '#111',
-                  background: 'var(--cp-white, #FFFFFF)',
-                  border: '1px solid var(--cp-line, #E3D6C6)',
-                  borderRadius: 8,
-                  boxShadow: '0 3px 10px rgba(11, 44, 62, 0.15)',
-                  overflow: 'hidden',
-                }}
-              >
-                <div style={{ background: 'var(--cp-navy, #0B2C3E)', color: 'var(--cp-cream, #FBF4EC)', padding: '5px 10px', fontWeight: 700, letterSpacing: '0.08em' }}>
-                  CAPRICHOS · PEDIDO
-                </div>
-                <div style={{ padding: '8px 10px' }}>
-                  <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 22, lineHeight: '26px' }}>
-                    {pedido.codigo}
-                  </div>
-                  <div style={{ fontWeight: 700 }}>{pedido.modalidad} · {pedido.cliente_nombre || 'Cliente'}</div>
-                  <div>{pedido.canal} · {new Date(pedido.creado_en).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-                  <div style={{ borderTop: '1px dashed #999', margin: '5px 0' }} />
-                  <div>{pedido.lineas?.reduce((acc, l) => acc + l.cantidad, 0) || 1} productos</div>
-                  <div>Total: S/ {totalNum.toFixed(2)}</div>
-                </div>
-                <div style={{ background: 'var(--cp-sand, #EDE1D1)', padding: '3px 10px', fontSize: 12 }}>
-                  Sale en: Etiquetera Caja
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setMsgEtiquetas('Etiqueta general enviada a la etiquetera de caja.')}
-                style={{
-                  alignSelf: 'flex-start',
-                  minHeight: 44,
-                  padding: '0 14px',
-                  border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                  borderRadius: 10,
-                  background: 'transparent',
-                  color: 'var(--cp-navy, #0B2C3E)',
-                  fontWeight: 800,
-                  fontSize: 12,
-                  cursor: 'pointer',
-                }}
-              >
-                Reimprimir la general
-              </button>
-            </div>
-
-            {/* 2. Por área */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 14 }}>
-                2. Etiquetas por área
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)' }}>
-                Una por cada área que tiene productos en el pedido.
-              </div>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                <div
-                  style={{
-                    width: 230,
-                    fontFamily: "'Courier New', monospace",
-                    fontSize: 12,
-                    lineHeight: '15px',
-                    color: '#111',
-                    background: 'var(--cp-white, #FFFFFF)',
-                    border: '1px solid var(--cp-line, #E3D6C6)',
-                    borderRadius: 8,
-                    boxShadow: '0 3px 10px rgba(11, 44, 62, 0.15)',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <div style={{ background: '#7A3516', color: '#FFF', padding: '5px 10px', fontWeight: 700, letterSpacing: '0.08em' }}>
-                    ÁREA · COCINA
-                  </div>
-                  <div style={{ padding: '8px 10px' }}>
-                    <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 18 }}>
-                      {pedido.codigo} · {pedido.cliente_nombre || 'Cliente'}
-                    </div>
-                    <div>{pedido.modalidad}</div>
-                    <div style={{ borderTop: '1px dashed #999', margin: '5px 0' }} />
-                    {(pedido.lineas || []).slice(0, 3).map((l, i) => (
-                      <div key={i}>
-                        <b>{l.cantidad}× {l.nombre}</b>
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{ background: 'var(--cp-sand, #EDE1D1)', padding: '3px 10px', fontSize: 12 }}>
-                    Sale en: Etiquetera Cocina
-                  </div>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setMsgEtiquetas('Etiquetas de área enviadas a las impresoras.')}
-                style={{
-                  alignSelf: 'flex-start',
-                  minHeight: 44,
-                  padding: '0 14px',
-                  border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                  borderRadius: 10,
-                  background: 'transparent',
-                  color: 'var(--cp-navy, #0B2C3E)',
-                  fontWeight: 800,
-                  fontSize: 12,
-                  cursor: 'pointer',
-                }}
-              >
-                Reimprimir las de área
-              </button>
-            </div>
-          </div>
+          <EtiquetasPedido pedido={pedido} />
         )}
 
         {/* TAB: COMPROBANTE */}
