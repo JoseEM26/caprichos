@@ -3,6 +3,9 @@ import { ComunModule } from '../../comun/comun.module';
 import { ArchivosModule } from '../archivos/archivos.module';
 import { AuditoriaModule } from '../auditoria/auditoria.module';
 import { LocalModule } from '../local/local.module';
+import { CatalogoModule } from '../catalogo/catalogo.module';
+import { OfertasModule } from '../ofertas/ofertas.module';
+import { PedidosModule } from '../pedidos/pedidos.module';
 import { WhatsappWebhookController } from './controladores/whatsapp-webhook.controller';
 import { QuejasWhatsappController } from './controladores/quejas-whatsapp.controller';
 import { WhatsAppMetaAdaptador } from './adaptadores/whatsapp-meta.adaptador';
@@ -16,7 +19,15 @@ import { WHATSAPP_MENSAJERIA_PUERTO } from './puerto/whatsapp-mensajeria.puerto'
 import { EjecutorConversacionService } from './conversacion/ejecutor-conversacion.service';
 
 @Module({
-  imports: [ComunModule, ArchivosModule, AuditoriaModule, LocalModule],
+  imports: [
+    ComunModule,
+    ArchivosModule,
+    AuditoriaModule,
+    LocalModule,
+    CatalogoModule,
+    OfertasModule,
+    PedidosModule,
+  ],
   controllers: [WhatsappWebhookController, QuejasWhatsappController],
   providers: [
     WhatsAppMetaAdaptador,

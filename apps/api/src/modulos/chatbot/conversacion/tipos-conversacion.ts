@@ -1,30 +1,43 @@
 import { BotonAccion, FilaLista } from '../puerto/whatsapp-mensajeria.puerto';
+export { BotonAccion, FilaLista };
 
 /**
  * Versión actual del esquema del objeto `conversacion.flujo`.
  * Permite migraciones de estado fluidas en futuras olas sin invalidar datos previos.
  */
-export const ESQUEMA_FLUJO_VERSION = 1;
+export const ESQUEMA_FLUJO_VERSION = 2;
 
 /**
  * Estados activos de la máquina de estados del bot conversacional de Caprichos.
  *
- * Estados de la Ola 1:
+ * Estados de la Ola 1 y ampliación:
  * - INICIO: Estado inicial al abrir o restablecer una conversación.
- * - MENU: Menú principal del bot con las opciones troncales.
+ * - MENU: Menú principal del bot con mensaje interactivo de lista ('Ver opciones').
+ * - CARTA_CATEGORIAS: Navegación de categorías reales de la carta virtual.
+ * - CARTA_PRODUCTOS: Lista de productos reales de una categoría seleccionada.
+ * - CARTA_PRODUCTO_DETALLE: Detalle de un producto con sus opciones, tamaños y disponibilidad.
+ * - CARTA_PROMOS: Vista de promociones y ofertas vigentes de hoy.
+ * - MI_PEDIDO: Solicitud de código de pedido o selección de pedido activo.
+ * - MI_PEDIDO_DETALLE: Opciones y estado real del pedido seleccionado.
+ * - PREGUNTAS: Menú de preguntas frecuentes del mockup con respuestas desde la BD.
  * - HORARIO: Consulta de horario de atención del local.
  * - UBICACION: Consulta de dirección física y enlace al mapa.
  * - ATENCION_PERSONA: La conversación fue derivada a una persona del equipo (el bot permanece en silencio).
  *
- * Ganchos vacíos y documentados para olas posteriores:
- * - PEDIDO: Navegación de categorías, productos, opciones y carrito (Ola 2, FT-BOT-01).
- * - PAGO: Envío de datos bancarios/billeteras y recepción de comprobantes (Ola 2, FT-BOT-02).
- * - RESERVA: Gestión de reservas de mesa por WhatsApp (Ola 3).
- * - DUDA_IA: Asistente con modelo de lenguaje para responder dudas de la carta (Ola 3, FT-BOT-03).
+ * Ganchos documentados y estados del mockup Chatbot.dc.html para Olas 2 y 3:
+ * - PEDIDO, PAGO, RESERVA, DUDA_IA
+ * - MODAL, LOC, CAT, PROD, VARIANT, GROUP, MORE, PROMO, SUMMARY, PAY, CASH, RES_PEOPLE, RES_TIME, MINE, ASK
  */
 export type EstadoConversacion =
   | 'INICIO'
   | 'MENU'
+  | 'CARTA_CATEGORIAS'
+  | 'CARTA_PRODUCTOS'
+  | 'CARTA_PRODUCTO_DETALLE'
+  | 'CARTA_PROMOS'
+  | 'MI_PEDIDO'
+  | 'MI_PEDIDO_DETALLE'
+  | 'PREGUNTAS'
   | 'HORARIO'
   | 'UBICACION'
   | 'ATENCION_PERSONA'
@@ -32,7 +45,23 @@ export type EstadoConversacion =
   | 'PEDIDO'
   | 'PAGO'
   | 'RESERVA'
-  | 'DUDA_IA';
+  | 'DUDA_IA'
+  // Estados de mockup Chatbot.dc.html:
+  | 'MODAL'
+  | 'LOC'
+  | 'CAT'
+  | 'PROD'
+  | 'VARIANT'
+  | 'GROUP'
+  | 'MORE'
+  | 'PROMO'
+  | 'SUMMARY'
+  | 'PAY'
+  | 'CASH'
+  | 'RES_PEOPLE'
+  | 'RES_TIME'
+  | 'MINE'
+  | 'ASK';
 
 /**
  * Tipos de entrada reconocidos por el normalizador del motor.
@@ -104,6 +133,11 @@ export interface FlujoConversacion {
   repreguntasFallidas: number;
   nombre_perfil_wa?: string;
   ultimo_wa_message_id?: string;
+  codigoPedido?: string;
+  categoriaSeleccionadaId?: string;
+  paginaCategorias?: number;
+  paginaProductos?: number;
+  productoSeleccionadoId?: string;
   /** Gancho para Ola 2: Carrito y selección de productos */
   pedido?: {
     categoriaId?: string;
@@ -137,9 +171,12 @@ export interface DatosHorarioLocal {
   cierra?: string | null;
   textoEstado?: string;
   direccion: string;
+  referencia?: string;
   enlaceMapa: string;
+  telefono?: string;
   motivoPausa?: string;
   pausaAltaDemanda?: boolean;
+  altaDemandaMinutosExtra?: number;
 }
 
 /**
@@ -147,8 +184,15 @@ export interface DatosHorarioLocal {
  */
 export interface ContextoConversacion {
   nombreCliente?: string | null;
+  telefonoCliente?: string | null;
   cartaUrlPublica?: string;
   datosLocal?: DatosHorarioLocal;
+  datosLocalPublicos?: any;
+  categoriasCarta?: any[];
+  ofertas?: any[];
+  pedidoActivo?: any;
+  errorServicio?: boolean;
+  limiteConsultasExcedido?: boolean;
 }
 
 /**

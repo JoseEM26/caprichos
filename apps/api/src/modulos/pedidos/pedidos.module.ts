@@ -12,6 +12,6 @@ import { ClientesModule } from '../clientes/clientes.module';
   imports: [LocalModule, ZonasModule, OfertasModule, ClientesModule],
   controllers: [PedidosController, SeguimientoController],
   providers: [PedidosService, SeguimientoService],
-  exports: [PedidosService],
+  exports: [PedidosService, SeguimientoService],
 })
 export class PedidosModule {}

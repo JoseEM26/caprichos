@@ -4,6 +4,9 @@ import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { RedisService } from '../../../comun/redis/redis.service';
 import { EventosGateway } from '../../../comun/socket/eventos.gateway';
 import { LocalService } from '../../local/local.service';
+import { CatalogoService } from '../../catalogo/catalogo.service';
+import { OfertasService } from '../../ofertas/ofertas.service';
+import { SeguimientoService } from '../../pedidos/seguimiento.service';
 import {
   WHATSAPP_MENSAJERIA_PUERTO,
   WhatsAppMensajeriaPuerto,
@@ -41,6 +44,9 @@ export class EjecutorConversacionService {
     private readonly redisService: RedisService,
     @Inject(WHATSAPP_MENSAJERIA_PUERTO)
     private readonly mensajeria: WhatsAppMensajeriaPuerto,
+    @Optional() private readonly catalogoService?: CatalogoService,
+    @Optional() private readonly ofertasService?: OfertasService,
+    @Optional() private readonly seguimientoService?: SeguimientoService,
     @Optional() private readonly eventos?: EventosGateway,
   ) {}
 
@@ -77,7 +83,23 @@ export class EjecutorConversacionService {
       return respuestas <= 5;
     } catch (err: any) {
       this.logger.warn(`Redis no disponible para rate limit del chatbot: ${err.message}`);
-      // Comportamiento defensivo: permite la respuesta si Redis está inactivo
+      return true;
+    }
+  }
+
+  /**
+   * Límite estricto de seguridad: máximo 5 consultas de estado de pedido por minuto (requisito d).
+   */
+  private async verificarRateLimitPedido(conversacionId: string | bigint): Promise<boolean> {
+    try {
+      const redis = this.redisService.obtenerCliente();
+      const clave = `chatbot:rate-limit-pedido:${conversacionId.toString()}`;
+      const consultas = await redis.incr(clave);
+      if (consultas === 1) {
+        await redis.expire(clave, 60);
+      }
+      return consultas <= 5;
+    } catch (err: any) {
       return true;
     }
   }
@@ -150,7 +172,7 @@ export class EjecutorConversacionService {
       }
     }
 
-    // 5. Rate limit: máximo 5 respuestas por minuto
+    // 5. Rate limit general: máximo 5 respuestas por minuto
     const permitidoRateLimit = await this.verificarRateLimit(conversacion.id);
     if (!permitidoRateLimit) {
       this.logger.warn(
@@ -159,15 +181,42 @@ export class EjecutorConversacionService {
       return false;
     }
 
-    // 6. Preparar datos del contexto
+    // 6. Preparar datos del contexto consumiendo servicios y la Base de Datos
     const nombreMostrar = obtenerNombreMostrar(conversacion);
     const cartaUrlPublica = this.configService.get<string>('CARTA_URL_PUBLICA', '').trim();
+    const telefonoCliente = normalizarTelefono(conversacion.telefono);
 
-    // Consultar horarios y datos del local
+    let errorServicio = false;
     let datosLocal: DatosHorarioLocal | undefined;
+    let datosLocalPublicos: any = null;
+    let categoriasCarta: any[] = [];
+    let ofertas: any[] = [];
+    let pedidoActivo: any = null;
+    let limiteConsultasExcedido = false;
+
     try {
+      // a) Consulta de datos del local y estado de apertura
       const estadoCarta = await this.localService.obtenerEstadoCarta(new Date());
-      const datosLocalRaw: any = await this.localService.obtenerDatosLocal();
+      const datosPublicos =
+        typeof (this.localService as any).obtenerDatosPublicosLocal === 'function'
+          ? await (this.localService as any).obtenerDatosPublicosLocal()
+          : (await (this.localService as any).obtenerDatosLocal?.()) || {};
+
+      const carta = this.catalogoService ? await this.catalogoService.obtenerCarta() : [];
+
+      datosLocalPublicos = datosPublicos;
+      categoriasCarta = carta || [];
+
+      if (this.ofertasService) {
+        ofertas = await this.ofertasService.listarOfertas(undefined, true, 'WHATSAPP');
+      }
+
+      const altaDemandaExtra = (estadoCarta as any)?.altaDemandaExtra || 0;
+      const mapaUrl =
+        datosPublicos?.lat && datosPublicos?.lng
+          ? `https://www.google.com/maps?q=${datosPublicos.lat},${datosPublicos.lng}`
+          : 'https://www.google.com/maps?q=-12.0196436,-76.963255';
+
       datosLocal = {
         abierta: estadoCarta.abierta,
         abre: estadoCarta.abre,
@@ -175,27 +224,91 @@ export class EjecutorConversacionService {
         textoEstado: estadoCarta.texto,
         pausaAltaDemanda: estadoCarta.pausaAltaDemanda,
         motivoPausa: estadoCarta.motivo === 'PAUSA' ? estadoCarta.texto : undefined,
-        direccion: datosLocalRaw?.direccion || 'Av. Principal 123',
-        enlaceMapa:
-          datosLocalRaw?.enlace_mapa ||
-          datosLocalRaw?.mapa_url ||
-          'https://www.google.com/maps?q=-12.0196436,-76.963255',
+        direccion: datosPublicos?.direccion || 'Campoy, San Juan de Lurigancho, Lima',
+        enlaceMapa: mapaUrl,
+        telefono: datosPublicos?.telefono || datosPublicos?.whatsapp || '9XX XXX XXX',
+        altaDemandaMinutosExtra: altaDemandaExtra,
       };
+
+      // b) Búsqueda y validación estricta de "Mi pedido" (requisito d)
+      const matchCodigo =
+        entradaRaw.texto?.match(/CP-\d{4}/i) ||
+        entradaRaw.textoOriginal?.match(/CP-\d{4}/i);
+      const codigoBuscado = matchCodigo ? matchCodigo[0].toUpperCase() : null;
+
+      const idInteractivo = entradaRaw.buttonPayload || entradaRaw.listRowId;
+      const codigoId = idInteractivo?.startsWith('ord_') ? idInteractivo.replace('ord_', '') : null;
+      const codigoFinal = codigoBuscado || codigoId;
+
+      const flujoExistente = (conversacion.flujo as any) || {};
+
+      if (codigoFinal) {
+        const rateLimitPedidoOk = await this.verificarRateLimitPedido(conversacion.id);
+        if (!rateLimitPedidoOk) {
+          limiteConsultasExcedido = true;
+        } else {
+          const pedidoEncontrado = await this.prisma.pedido.findUnique({
+            where: { codigo: codigoFinal },
+          });
+
+          // Seguridad estricta: nunca exponer datos de otro cliente.
+          // Si el pedido tiene teléfono registrado, debe coincidir con el teléfono de la conversación.
+          if (pedidoEncontrado) {
+            const telPedido = normalizarTelefono(pedidoEncontrado.cliente_telefono || '');
+            if (!telPedido || !telefonoCliente || telPedido === telefonoCliente) {
+              pedidoActivo = pedidoEncontrado;
+            } else {
+              // Pertenece a otro cliente: rechazar
+              pedidoActivo = null;
+            }
+          } else {
+            pedidoActivo = null;
+          }
+        }
+      } else if (flujoExistente.codigoPedido) {
+        const rateLimitPedidoOk = await this.verificarRateLimitPedido(conversacion.id);
+        if (!rateLimitPedidoOk) {
+          limiteConsultasExcedido = true;
+        } else {
+          const pedidoEncontrado = await this.prisma.pedido.findUnique({
+            where: { codigo: flujoExistente.codigoPedido },
+          });
+          if (pedidoEncontrado) {
+            const telPedido = normalizarTelefono(pedidoEncontrado.cliente_telefono || '');
+            if (!telPedido || !telefonoCliente || telPedido === telefonoCliente) {
+              pedidoActivo = pedidoEncontrado;
+            }
+          }
+        }
+      } else if (telefonoCliente) {
+        // Buscar el último pedido activo del cliente en las últimas 24 horas
+        const pedidoReciente = await this.prisma.pedido.findFirst({
+          where: {
+            cliente_telefono: { contains: telefonoCliente.slice(-8) },
+            creado_en: { gte: new Date(Date.now() - 24 * 3600 * 1000) },
+          },
+          orderBy: { creado_en: 'desc' },
+        });
+        if (pedidoReciente) {
+          pedidoActivo = pedidoReciente;
+        }
+      }
     } catch (err: any) {
-      this.logger.warn(`No se pudieron obtener datos del local: ${err.message}`);
-      datosLocal = {
-        abierta: true,
-        abre: '17:00',
-        cierra: '23:00',
-        direccion: 'Av. Principal 123',
-        enlaceMapa: 'https://www.google.com/maps?q=-12.0196436,-76.963255',
-      };
+      this.logger.error(`Error consultando base de datos o servicios del chatbot: ${err.message}`, err.stack);
+      errorServicio = true;
     }
 
     const contexto: ContextoConversacion = {
-      nombreCliente: nombreMostrar !== 'Contacto sin nombre' ? nombreMostrar : null,
+      nombreCliente: nombreMostrar,
+      telefonoCliente,
       cartaUrlPublica,
       datosLocal,
+      datosLocalPublicos,
+      categoriasCarta,
+      ofertas,
+      pedidoActivo,
+      errorServicio,
+      limiteConsultasExcedido,
     };
 
     // 7. Normalizar entrada y ejecutar la máquina de estados pura
@@ -296,11 +409,13 @@ export class EjecutorConversacionService {
         });
       } else if (accion.tipo === 'pasarAPersona') {
         // Reglas de MensajesService: dueño PERSONA, estado de atención ABIERTA, notificación campana
+        const esUrgente = accion.motivo?.includes('URGENTE') ?? false;
+
         await this.prisma.conversacion.update({
           where: { id: conversacion.id },
           data: {
             duenio: 'PERSONA',
-            urgente: false,
+            urgente: esUrgente,
             estado:
               !conversacion.estado || conversacion.estado === 'ATENDIDA'
                 ? 'ABIERTA'
@@ -311,8 +426,12 @@ export class EjecutorConversacionService {
           },
         });
 
-        const tituloNotif = 'Solicitud de atención humana en WhatsApp';
-        const mensajeNotif = `El cliente (${telMask}) solicitó hablar con una persona.`;
+        const tituloNotif = esUrgente
+          ? `URGENTE: Atención en WhatsApp (${nombreMostrar})`
+          : `Atención requerida en WhatsApp (${nombreMostrar})`;
+        const mensajeNotif = accion.mensajeCliente
+          ? `Cliente escribió: "${accion.mensajeCliente.slice(0, 100)}". Motivo: ${accion.motivo}`
+          : `El cliente solicitó hablar con una persona (${accion.motivo}).`;
 
         const notif = await this.prisma.notificacion.create({
           data: {

@@ -22,6 +22,8 @@ export interface EntradaRawInput {
   texto?: string | null;
   buttonPayload?: string | null;
   listReplyId?: string | null;
+  listRowId?: string | null;
+  textoOriginal?: string | null;
   tipo?: string | null;
 }
 
@@ -30,8 +32,8 @@ export interface EntradaRawInput {
  * a una estructura uniforme y determinista.
  */
 export function normalizarEntrada(raw: EntradaRawInput): EntradaNormalizada {
-  const textoOriginal = String(raw.texto || '').trim();
-  const idBotonOLista = String(raw.buttonPayload || raw.listReplyId || '').trim();
+  const textoOriginal = String(raw.textoOriginal || raw.texto || '').trim();
+  const idBotonOLista = String(raw.buttonPayload || raw.listReplyId || raw.listRowId || '').trim();
 
   let tipo: TipoEntrada = 'texto';
   if (raw.tipo === 'button' || (raw.buttonPayload && raw.buttonPayload !== raw.texto)) {

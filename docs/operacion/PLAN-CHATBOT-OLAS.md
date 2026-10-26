@@ -26,6 +26,7 @@ Este documento registra qué se decidió, qué se construye en cada ola y qué s
 | Quejas | No se avisa a un grupo de WhatsApp. Se guardan en tabla, se ven en Reclamos con fuente «WhatsApp» y se notifica por la campana. |
 | Pruebas de esta etapa | Solo programación: pruebas automáticas con el adaptador simulado. Sin Playwright. La prueba real la hace el responsable con su celular. |
 | Quién aprueba | La IA nunca aprueba pagos ni documentos. El pago lo confirma una persona de Caja. |
+| Menú y textos idénticos al mockup Chatbot.dc.html | El menú principal se envía como mensaje interactivo de lista con el botón 'Ver opciones' y las filas del mockup: Hacer un pedido, Reservar mesa, Ver la carta, Mi pedido, Preguntar algo, Hablar con persona. Los textos y emojis replican fielmente el guión del mockup. La información mostrada se alimenta en tiempo real de la base de datos (LocalService, CatalogoService, OfertasService y SeguimientoService); la IA nunca inventa datos ni aprueba pagos. |
 
 ## 2. Estado de la conexión con Meta (etapa de pruebas)
 
@@ -56,13 +57,13 @@ Completado y verificado el 25/10/2026:
 | 0 | bot-contactos | Nombre del contacto (perfil de WhatsApp y edición manual con confirmación). Corrección del remitente sin teléfono, que dejaba la conversación con teléfono vacío y mezclaba remitentes. | En curso |
 | 1 | A. Envío real | Que Mensajes envíe por Meta (texto en ventana de 24 horas, plantilla fuera), con estado de cada mensaje y errores claros. Reemplaza la pasarela simulada de la consola. | Pendiente |
 | 1 | B. Motor de conversación | Menú de bienvenida, botones y listas, memoria del paso por cliente, horario del local, pase a una persona y comando BAJA. Sin pedidos todavía. | Pendiente |
-| 2 | C. Pedido por botones | Categoría, producto y opciones, carrito, entrega y confirmación, con las mismas reglas de la carta (ofertas, agotados, local abierto, tarifas). FT-BOT-01. | Pendiente |
-| 2 | D. Pago por WhatsApp | Datos de pago, voucher, aprobación por Caja y seguimiento del pedido. FT-BOT-02. Depende de C. | Pendiente |
-| 2 | E. Cambios y derivación | Cambios después del pedido y pase a una persona si el bot no entiende (una repregunta y luego deriva). FT-ATN-02. | Pendiente |
-| 3 | F. Reservas | Pedir una reserva por WhatsApp con las reglas existentes. | Pendiente |
-| 3 | G. IA para dudas | OpenAI con herramientas de solo lectura (carta, precios, horario, estado del pedido), tope de gasto, sin inventar datos y con pase a persona. FT-BOT-03. | Pendiente |
-| 4 | H. Avisos internos | Pedido nuevo y aviso a Almacén por WhatsApp a los números del equipo. Sin grupos. | Pendiente |
-| 4 | I. Configuración y seguridad | Textos del bot editables, interruptor por función, consumo de IA, límite de mensajes por teléfono y privacidad de datos (Ley 29733). | Pendiente |
+| 2 | C. Pedido por botones | Categoría, producto y opciones, carrito, entrega y confirmación, con las mismas reglas de la carta (ofertas, agotados, local abierto, tarifas); usa los textos y botones exactos del mockup. FT-BOT-01. | Pendiente |
+| 2 | D. Pago por WhatsApp | Datos de pago, voucher, aprobación por Caja y seguimiento del pedido; usa los textos y botones exactos del mockup. FT-BOT-02. Depende de C. | Pendiente |
+| 2 | E. Cambios y derivación | Cambios después del pedido y pase a una persona si el bot no entiende (una repregunta y luego deriva); usa los textos y botones exactos del mockup. FT-ATN-02. | Pendiente |
+| 3 | F. Reservas | Pedir una reserva por WhatsApp con las reglas existentes; usa los textos y botones exactos del mockup. | Pendiente |
+| 3 | G. IA para dudas | OpenAI con herramientas de solo lectura (carta, precios, horario, estado del pedido), tope de gasto, sin inventar datos y con pase a persona; usa los textos y botones exactos del mockup. FT-BOT-03. | Pendiente |
+| 4 | H. Avisos internos | Pedido nuevo y aviso a Almacén por WhatsApp a los números del equipo. Sin grupos; usa los textos y botones exactos del mockup. | Pendiente |
+| 4 | I. Configuración y seguridad | Textos del bot editables, interruptor por función, consumo de IA, límite de mensajes por teléfono y privacidad de datos (Ley 29733); usa los textos y botones exactos del mockup. | Pendiente |
 
 Reglas de ejecución: máximo 2 o 3 agentes a la vez, cada ola verificada (tipos, pruebas unitarias y construcción) y subida en commits ordenados antes de pasar a la siguiente.
 
@@ -95,3 +96,4 @@ Reglas de ejecución: máximo 2 o 3 agentes a la vez, cada ola verificada (tipos
 | 25/10/2026 | Ola 1 Agente B completada: motor de conversación puro por máquina de estados en conversacion.flujo, saludo con botones, pedido informativo, horario y ubicación con LocalService, pase a persona con notificación por campana, repregunta/derivación ante no entendidos, método enviarLista, rate limit de 5 respuestas/min en Redis, e interruptor chatbot_activo en configuración y admin. |
 | 25/10/2026 | Ola 1 Agente A completada: pasarela real WhatsAppMetaGateway en Mensajes conectada a WhatsAppMensajeriaPuerto (Cloud API de Meta o Simulado), control estricto de ventana de 24 horas con plantilla de utilidad caprichos_reabrir_conversacion, mapeo de errores comprensibles en español sin secretos, estados por mensaje enlazados a whatsapp_mensaje (Enviado, Entregado, Leido, Fallido con botón Reintentar), rate limit de 20 msgs/min por usuario en Redis y actualización en tiempo real por WebSocket. |
 | 25/10/2026 | Soporte de respuestas a usuarios identificados por BSUID (sin teléfono) en Meta WhatsApp Cloud API mediante función construirDestinatario (campo recipient), habilitación en MensajesService y motor conversacional, enmascarado seguro y mapeo de rechazo de identificador. |
+| 25/10/2026 | Menú y textos del bot alineados al mockup Chatbot.dc.html: menú principal interactivo de lista con botón 'Ver opciones' y las 6 filas del mockup (Hacer un pedido, Reservar mesa, Ver la carta, Mi pedido, Preguntar algo, Hablar con persona) respetando límites de Meta; navegación completa de la carta virtual en el chat con categorías, productos, precios, tamaños, opciones y disponibilidad consumiendo CatalogoService; promociones vigentes y 'Hoy no aplica' con OfertasService; seguimiento de 'Mi pedido' y '¿Cuánto falta?' con SeguimientoService validando número de teléfono del cliente y limitando a 5 consultas/minuto; preguntas frecuentes del mockup con datos reales del local y configuración; pase a persona y derivación ante errores de servicio/BD con aviso honesto y notificación a Caja por la campana. |
