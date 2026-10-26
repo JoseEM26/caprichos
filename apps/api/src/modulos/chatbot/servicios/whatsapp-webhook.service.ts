@@ -446,7 +446,7 @@ export class WhatsappWebhookService {
 
     // 5. Procesamiento de imagen de voucher
     if (imagenBuffer && pedidoReciente) {
-      await this.guardarVoucherPrivado(imagenBuffer, imagenMime, pedidoReciente, telMask);
+      await this.guardarVoucherPrivado(imagenBuffer, imagenMime, pedidoReciente, telMask, conversacion);
     }
 
     // Registrar mensaje en mensaje_chat del módulo de mensajes
@@ -524,8 +524,14 @@ export class WhatsappWebhookService {
     mimeType: string,
     pedido: any,
     telMask: string,
+    conversacion?: any,
   ) {
     try {
+      if (buffer.length > 5 * 1024 * 1024) {
+        this.logger.warn(`Voucher rechazado: tamaño ${buffer.length} supera los 5MB permitidos.`);
+        return;
+      }
+
       const fileMock: Express.Multer.File = {
         buffer,
         size: buffer.length,
@@ -541,6 +547,33 @@ export class WhatsappWebhookService {
 
       const archivoSubido = await this.archivosService.subirArchivo(fileMock, true);
 
+      // Enlazar captura a la conversación y al pedido (estado VALIDAR_PAGO)
+      if (conversacion?.id) {
+        const flujoActual = (conversacion.flujo as any) || {};
+        const pagoPrev = flujoActual.pago || {};
+        const capturasEnviadas = (pagoPrev.capturasEnviadas || 0) + 1;
+
+        await this.prisma.conversacion.update({
+          where: { id: conversacion.id },
+          data: {
+            estado: 'VALIDAR_PAGO',
+            flujo: {
+              ...flujoActual,
+              pago: {
+                ...pagoPrev,
+                pedidoId: pedido.id.toString(),
+                pedidoCodigo: pedido.codigo,
+                medio: pedido.pago_preferido || pedido.pago_metodo,
+                monto: Number(pedido.total || 0),
+                comprobanteArchivoId: archivoSubido.id,
+                capturasEnviadas,
+                timestampUltimoVoucher: Date.now(),
+              },
+            },
+          },
+        });
+      }
+
       // Notificación de campana a Caja
       const tituloNotif = 'Comprobante de pago recibido';
       const mensajeNotif = `El cliente (${telMask}) envio un comprobante para el pedido ${pedido.codigo}.`;
@@ -551,7 +584,7 @@ export class WhatsappWebhookService {
           rol_destino: 'CAJA',
           titulo: tituloNotif,
           mensaje: mensajeNotif,
-          enlace: '/admin/caja',
+          enlace: '/admin/mensajes',
         },
       });
 

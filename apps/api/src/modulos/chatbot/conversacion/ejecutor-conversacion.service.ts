@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { RedisService } from '../../../comun/redis/redis.service';
@@ -9,7 +9,10 @@ import { OfertasService } from '../../ofertas/ofertas.service';
 import { SeguimientoService } from '../../pedidos/seguimiento.service';
 import { PedidosService } from '../../pedidos/pedidos.service';
 import { ZonasService } from '../../zonas/zonas.service';
+import { ReservasService } from '../../reservas/reservas.service';
 import { BOTON_VOLVER_MENU, TEXTOS_BOT } from './textos-bot';
+import { TEXTOS_RESERVA } from './textos-reserva';
+import { obtenerFechaLimaActual } from './flujos/reserva/flujo-reserva';
 import {
   WHATSAPP_MENSAJERIA_PUERTO,
   WhatsAppMensajeriaPuerto,
@@ -29,11 +32,13 @@ import {
   DatosHorarioLocal,
   FlujoConversacion,
 } from './tipos-conversacion';
+import { obtenerFechaHoraLima } from '../../local/local.util';
 
 export interface EntradaProcesarMensaje extends EntradaRawInput {
   waMessageId?: string;
   telefono?: string;
   telMask?: string;
+  id?: string;
 }
 
 @Injectable()
@@ -53,6 +58,9 @@ export class EjecutorConversacionService {
     @Optional() private readonly eventos?: EventosGateway,
     @Optional() private readonly pedidosService?: PedidosService,
     @Optional() private readonly zonasService?: ZonasService,
+    @Optional()
+    @Inject(forwardRef(() => ReservasService))
+    private readonly reservasService?: ReservasService,
   ) {}
 
   /**
@@ -346,6 +354,70 @@ export class EjecutorConversacionService {
       }
     }
 
+    // 6.b Consultar franjas de reserva si el flujo está en reserva o es intención de reserva
+    let franjasDisponiblesReserva: string[] | undefined;
+    let solicitudesPendientesTelefono: number | undefined;
+    let reservasActivasCliente: Array<{ id: string; fecha: string; hora: string; personas: number; mesas: string[] }> | undefined;
+
+    try {
+      const flujoPrevioParaReserva = (conversacion.flujo as any) as FlujoConversacion | null;
+      if (
+        this.reservasService &&
+        (flujoPrevioParaReserva?.estado === 'RESERVA' ||
+          String(flujoPrevioParaReserva?.estado).startsWith('RESERVA_') ||
+          (entradaRaw as any).id === 'reservar' ||
+          entradaRaw.buttonPayload === 'reservar' ||
+          entradaRaw.texto?.includes('reserva'))
+      ) {
+        const fechaParaFranjas =
+          (flujoPrevioParaReserva?.reserva as any)?.datos?.fechaIso || obtenerFechaLimaActual(0).fechaIso;
+        const personasParaFranjas = (flujoPrevioParaReserva?.reserva as any)?.datos?.personas || 2;
+        franjasDisponiblesReserva = await this.reservasService.obtenerFranjasDisponibles(
+          fechaParaFranjas,
+          personasParaFranjas,
+        );
+      }
+
+      // Conteo de solicitudes pendientes para el teléfono
+      const rawTel = (conversacion.telefono || '').trim();
+      if (rawTel) {
+        solicitudesPendientesTelefono = await this.prisma.solicitudReserva.count({
+          where: {
+            estado: 'PENDIENTE',
+            OR: [
+              { conversacion_id: conversacion.id },
+              { telefono: rawTel },
+            ],
+          },
+        });
+
+        // Reservas activas del cliente (para cancelar o cambiar)
+        const ahoraLima = new Date();
+        const reservasDb = await this.prisma.reserva.findMany({
+          where: {
+            estado: 'ACTIVA',
+            telefono: rawTel,
+            hora: { gte: ahoraLima },
+          },
+          include: { mesas: { include: { mesa: true } } },
+          orderBy: { hora: 'asc' },
+        });
+
+        reservasActivasCliente = reservasDb.map((r) => {
+          const { fechaIso: f, horaMinutos: h } = obtenerFechaHoraLima(r.hora);
+          return {
+            id: r.id.toString(),
+            fecha: f,
+            hora: h,
+            personas: r.personas,
+            mesas: r.mesas.map((rm) => rm.mesa?.nombre || rm.mesa?.numero?.toString() || '').filter(Boolean),
+          };
+        });
+      }
+    } catch (err: any) {
+      this.logger.warn(`Error al consultar reservas para contexto: ${err.message}`);
+    }
+
     const contexto: ContextoConversacion = {
       conversacionId: conversacion.id.toString(),
       nombreCliente: nombreMostrar,
@@ -362,6 +434,9 @@ export class EjecutorConversacionService {
       minutosInactividad,
       inactividadExpirada,
       resultadoEnvio,
+      franjasDisponiblesReserva,
+      solicitudesPendientesTelefono,
+      reservasActivasCliente,
     };
 
     // 7. Normalizar entrada y ejecutar la máquina de estados pura
@@ -456,6 +531,34 @@ export class EjecutorConversacionService {
               texto: accion.texto,
               botonTexto: accion.botonTexto,
               filas: accion.filas.slice(0, 10),
+            } as any,
+            meta_id: metaId,
+          },
+        });
+      } else if (accion.tipo === 'enviarImagen') {
+        let metaId: string | null = null;
+        if (destinoEnvio) {
+          const res = await this.mensajeria.enviarImagen(
+            destinoEnvio,
+            accion.url,
+            accion.caption,
+            {
+              conversacionId: conversacion.id,
+              replyToWaMessageId: entradaRaw.waMessageId,
+            },
+          );
+          metaId = res.waMessageId || null;
+        }
+
+        await this.prisma.mensajeChat.create({
+          data: {
+            conversacion_id: conversacion.id,
+            direccion: 'SALE',
+            autor: 'BOT',
+            tipo: 'IMAGEN',
+            contenido: {
+              url: accion.url,
+              texto: accion.caption,
             } as any,
             meta_id: metaId,
           },
@@ -607,6 +710,94 @@ export class EjecutorConversacionService {
             meta_id: metaId,
           },
         });
+      } else if (accion.tipo === 'crearSolicitudReserva') {
+        try {
+          const fechaHora = new Date(`${accion.fechaIso}T${accion.hora}:00-05:00`);
+          const solicitud = await this.prisma.solicitudReserva.create({
+            data: {
+              conversacion_id: conversacion.id,
+              personas: accion.personas,
+              hora: fechaHora,
+              estado: 'PENDIENTE',
+              nombre: accion.nombre,
+              telefono: accion.telefono,
+              nota: accion.nota,
+            },
+          });
+
+          // Notificación campana para Caja y Salón (ADMIN, CAJA, MOZO)
+          const tituloNotif = `Nueva solicitud de reserva: ${accion.nombre} (${accion.personas} pers.)`;
+          const mensajeNotif = `Solicitud para ${accion.personas} personas el ${accion.fechaTexto} a las ${accion.hora}. Tel: ${accion.telefono}${accion.nota ? ' · Nota: ' + accion.nota : ''}`;
+
+          const notif = await this.prisma.notificacion.create({
+            data: {
+              tipo: 'RESERVA_NUEVA',
+              rol_destino: null,
+              titulo: tituloNotif,
+              mensaje: mensajeNotif,
+              enlace: '/admin/reservas',
+            },
+          });
+
+          this.eventos?.emitirAdmin('notificaciones:nueva', {
+            id: notif.id.toString(),
+            titulo: tituloNotif,
+          });
+
+          this.eventos?.emitirAdmin('reserva:solicitud_nueva', {
+            id: solicitud.id.toString(),
+            nombre: accion.nombre,
+            personas: accion.personas,
+            hora: fechaHora.toISOString(),
+          });
+        } catch (err: any) {
+          this.logger.error(`Error guardando solicitud de reserva: ${err.message}`, err.stack);
+        }
+      } else if (accion.tipo === 'cancelarReservaCliente') {
+        try {
+          if (this.reservasService && accion.reservaId) {
+            await this.reservasService.cancelar(
+              accion.reservaId,
+              { motivo: accion.motivo || 'Cancelado por el cliente desde WhatsApp' },
+            );
+
+            const notif = await this.prisma.notificacion.create({
+              data: {
+                tipo: 'RESERVA_CANCELADA',
+                rol_destino: null,
+                titulo: `Reserva #${accion.reservaId} cancelada por WhatsApp`,
+                mensaje: `El cliente (${nombreMostrar}) canceló su reserva desde WhatsApp. La mesa ha sido liberada.`,
+                enlace: '/admin/reservas',
+              },
+            });
+
+            this.eventos?.emitirAdmin('notificaciones:nueva', {
+              id: notif.id.toString(),
+              titulo: notif.titulo,
+            });
+          }
+        } catch (err: any) {
+          this.logger.error(`Error cancelando reserva desde chatbot: ${err.message}`, err.stack);
+        }
+      } else if (accion.tipo === 'cambiarReservaCliente') {
+        try {
+          const notif = await this.prisma.notificacion.create({
+            data: {
+              tipo: 'ATENCION_WHATSAPP',
+              rol_destino: null,
+              titulo: `Solicitud de cambio de reserva #${accion.reservaId} (${nombreMostrar})`,
+              mensaje: `Detalle del cambio: ${accion.detalle}`,
+              enlace: '/admin/reservas',
+            },
+          });
+
+          this.eventos?.emitirAdmin('notificaciones:nueva', {
+            id: notif.id.toString(),
+            titulo: notif.titulo,
+          });
+        } catch (err: any) {
+          this.logger.error(`Error registrando cambio de reserva desde chatbot: ${err.message}`, err.stack);
+        }
       }
     }
 

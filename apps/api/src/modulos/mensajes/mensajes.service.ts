@@ -14,6 +14,7 @@ import {
 import { enmascararTelefono } from '../chatbot/utilidades/enmascarar.util';
 import { mapearErrorWhatsApp } from './utilidades/error-whatsapp.util';
 import { EditarNombreContactoDto } from './dto/mensajes.dto';
+import { BOTONES_PAGO_RECHAZADO, TEXTOS_PAGO } from '../chatbot/conversacion/flujos/pago/textos-pago';
 
 export type EstadoChat = 'bot' | 'atencion' | 'validar' | 'atendido' | 'pausado';
 export type FiltroChat = 'todos' | 'atender' | 'bot' | 'atendidos';
@@ -225,6 +226,12 @@ export class MensajesService {
     const solicitud = pedido
       ? await this.prisma.solicitudCambio.findFirst({ where: { pedido_id: pedido.id, estado: 'PENDIENTE' }, orderBy: { id: 'desc' } })
       : null;
+    const solicitudReserva = this.prisma.solicitudReserva
+      ? await this.prisma.solicitudReserva.findFirst({
+          where: { conversacion_id: c.id, estado: 'PENDIENTE' },
+          orderBy: { id: 'desc' },
+        })
+      : null;
     const parametro = await this.prisma.parametro.findUnique({ where: { clave: 'tiempo_prometido_min' } });
     const base = Number(parametro?.valor) || null;
     const alta = await this.prisma.altaDemanda.findFirst({ where: { hasta: null }, orderBy: { id: 'desc' } });
@@ -300,6 +307,17 @@ export class MensajesService {
             pedidoId: pedido.id.toString(),
             estadoPedido: pedido.estado,
             hora: hora(solicitud.creado_en),
+          }
+        : null,
+      solicitudReserva: solicitudReserva
+        ? {
+            id: solicitudReserva.id.toString(),
+            personas: solicitudReserva.personas,
+            hora: solicitudReserva.hora ? hora(solicitudReserva.hora) : null,
+            fecha: solicitudReserva.hora ? solicitudReserva.hora.toISOString().slice(0, 10) : null,
+            nombre: solicitudReserva.nombre || c.nombre_contacto || null,
+            telefono: solicitudReserva.telefono || c.telefono || null,
+            nota: solicitudReserva.nota || null,
           }
         : null,
       tiempoPrometidoMin: base === null ? null : base + (alta?.minutos ?? 0),
@@ -587,39 +605,175 @@ export class MensajesService {
     return d;
   }
 
-  /** Aprueba el pago coordinado (DT-57: el pedido ya está en cocina; no se reenvía). */
+  /** Aprueba el pago coordinado (HU-CAP-030, HU-CAP-132: pasa a cocina y notifica al cliente). */
   async aprobarPago(id: string, usuario: UsuarioAutenticado, ip?: string) {
     const c = await this.cargar(id);
     if (c.estado !== 'VALIDAR_PAGO') throw error(HttpStatus.CONFLICT, 'SIN_PAGO_POR_REVISAR', 'Este chat no tiene un pago por revisar');
     await this.exigirLibreOMio(c, usuario, 'Toca «Tomar el chat» para decidir tú.');
     const d = await this.pedidoDelChat(c);
     if (!d.pedido) throw error(HttpStatus.CONFLICT, 'SIN_PEDIDO', 'No hay un pedido abierto para este chat');
+
     const ahora = new Date();
+    const pedidoId = BigInt(d.pedido.id);
+    const pedidoActual = this.prisma.pedido.findUnique
+      ? await this.prisma.pedido.findUnique({
+          where: { id: pedidoId },
+          select: { id: true, estado: true, pasa_cocina_en: true },
+        })
+      : null;
+
+    const pasaCocinaEn = pedidoActual?.pasa_cocina_en ?? ahora;
+    const nuevoEstado =
+      pedidoActual?.estado === 'COLA' || !pedidoActual?.pasa_cocina_en
+        ? 'PREPARANDO'
+        : pedidoActual?.estado;
+
     await this.prisma.pedido.update({
-      where: { id: BigInt(d.pedido.id) },
-      data: { pago_estado: 'COORDINADO', pago_coordinado_en: ahora, pago_coordinado_por: usuario.partyId },
+      where: { id: pedidoId },
+      data: {
+        pago_estado: 'COORDINADO',
+        pago_coordinado_en: ahora,
+        pago_coordinado_por: usuario.partyId,
+        pasa_cocina_en: pasaCocinaEn,
+        estado: nuevoEstado,
+      },
     });
-    const min = d.tiempoPrometidoMin;
-    await this.gateway.enviarTexto(
-      c.id, c.telefono,
-      `Pago verificado. Tu pedido ${d.pedido.codigo} ya entró a preparación${min ? ` y llega en unos ${min} minutos` : ''}.`,
-      'BOT',
-    );
-    await this.tocar(c.id, { estado: 'ATENDIDA', duenio: 'BOT', urgente: false, tomado_por: null, tomado_en: null });
-    await this.auditar(usuario, 'APROBAR_PAGO', c.id, { pedido: d.pedido.codigo }, ip);
+
+    // Notificar eventos por socket (cocina y pedidos)
+    this.eventos?.emitirAdmin('cocina:comanda-actualizada', { pedidoId: d.pedido.id });
+    this.eventos?.emitirAdmin('pedido:estado', {
+      id: Number(d.pedido.id),
+      codigo: d.pedido.codigo,
+      estado: nuevoEstado,
+    });
+
+    const min = d.tiempoPrometidoMin ?? undefined;
+    const textoAprobado = TEXTOS_PAGO.pagoAprobadoCliente(d.pedido.codigo, min);
+    await this.gateway.enviarTexto(c.id, c.telefono, textoAprobado, 'BOT');
+
+    const flujoActual = (c.flujo as any) || {};
+    await this.tocar(c.id, {
+      estado: 'ATENDIDA',
+      duenio: 'BOT',
+      urgente: false,
+      tomado_por: null,
+      tomado_en: null,
+      flujo: {
+        ...flujoActual,
+        estado: 'MENU',
+        pago: null,
+      },
+    });
+    await this.auditar(usuario, 'APROBAR_PAGO', c.id, { pedido: d.pedido.codigo, por: usuario.partyId?.toString() }, ip);
     return { ok: true };
   }
 
-  async rechazarPago(id: string, usuario: UsuarioAutenticado, ip?: string) {
+  async rechazarPago(
+    id: string,
+    motivoOUsuario?: string | UsuarioAutenticado,
+    usuarioOIp?: UsuarioAutenticado | string,
+    posibleIp?: string,
+  ) {
+    let motivo: string | undefined;
+    let usuario: UsuarioAutenticado;
+    let ip: string | undefined;
+
+    if (typeof motivoOUsuario === 'string' || motivoOUsuario === undefined) {
+      motivo = motivoOUsuario;
+      usuario = usuarioOIp as UsuarioAutenticado;
+      ip = posibleIp;
+    } else {
+      usuario = motivoOUsuario;
+      ip = usuarioOIp as string | undefined;
+    }
+
     const c = await this.cargar(id);
     if (c.estado !== 'VALIDAR_PAGO') throw error(HttpStatus.CONFLICT, 'SIN_PAGO_POR_REVISAR', 'Este chat no tiene un pago por revisar');
     await this.exigirLibreOMio(c, usuario, 'Toca «Tomar el chat» para decidir tú.');
-    await this.gateway.enviarTexto(
-      c.id, c.telefono, 'No pudimos verificar tu pago con esa captura. ¿Puedes enviarnos otra, por favor?', 'BOT',
-    );
-    await this.tocar(c.id, { estado: 'ABIERTA', duenio: 'BOT', urgente: false, tomado_por: null, tomado_en: null });
-    await this.auditar(usuario, 'RECHAZAR_PAGO', c.id, undefined, ip);
-    return { ok: true };
+
+    const flujoActual = (c.flujo as any) || {};
+    const flujoPago = flujoActual.pago || {};
+    const intentosPrevios = Number(flujoPago.intentosRechazo || 0);
+    const intentosNuevos = intentosPrevios + 1;
+
+    // Si supera los 3 intentos: derivar a persona con urgencia
+    if (intentosNuevos >= 3) {
+      await this.gateway.enviarTexto(
+        c.id,
+        c.telefono,
+        TEXTOS_PAGO.pagoRechazadoLimiteSuperado(),
+        'BOT',
+      );
+
+      await this.tocar(c.id, {
+        estado: 'ABIERTA',
+        duenio: 'PERSONA',
+        urgente: true,
+        tomado_por: null,
+        tomado_en: null,
+        flujo: {
+          ...flujoActual,
+          estado: 'ATENCION_PERSONA',
+          pago: {
+            ...flujoPago,
+            intentosRechazo: intentosNuevos,
+            ultimoMotivoRechazo: motivo,
+          },
+        },
+      });
+
+      const notif = await this.prisma.notificacion.create({
+        data: {
+          tipo: 'ATENCION_WHATSAPP',
+          rol_destino: 'CAJA',
+          titulo: `Pago rechazado (3 intentos) - chat #${c.id}`,
+          mensaje: `El cliente superó los 3 intentos de comprobante${motivo ? '. Motivo: ' + motivo : ''}. Requiere atención de Caja.`,
+          enlace: '/admin/mensajes',
+        },
+      });
+      this.eventos?.emitirAdmin('notificaciones:nueva', {
+        id: notif.id.toString(),
+        titulo: notif.titulo,
+      });
+
+      await this.auditar(usuario, 'RECHAZAR_PAGO_LIMITE', c.id, { intentos: intentosNuevos, motivo }, ip);
+      return { ok: true, escalado: true };
+    }
+
+    // Menos de 3 intentos: enviar motivo con opciones interactivas
+    const textoRechazo = TEXTOS_PAGO.pagoRechazadoCliente(motivo);
+    if (this.gateway.enviarBotones) {
+      await this.gateway.enviarBotones(
+        c.id,
+        c.telefono,
+        textoRechazo,
+        BOTONES_PAGO_RECHAZADO,
+        'BOT',
+      );
+    } else {
+      await this.gateway.enviarTexto(c.id, c.telefono, textoRechazo, 'BOT');
+    }
+
+    await this.tocar(c.id, {
+      estado: 'ABIERTA',
+      duenio: 'BOT',
+      urgente: false,
+      tomado_por: null,
+      tomado_en: null,
+      flujo: {
+        ...flujoActual,
+        estado: 'PAGO_RECHAZADO_OPCIONES',
+        pago: {
+          ...flujoPago,
+          estadoInterno: 'PAGO_RECHAZADO_OPCIONES',
+          intentosRechazo: intentosNuevos,
+          ultimoMotivoRechazo: motivo,
+        },
+      },
+    });
+
+    await this.auditar(usuario, 'RECHAZAR_PAGO', c.id, { intentos: intentosNuevos, motivo }, ip);
+    return { ok: true, escalado: false };
   }
 
   /**

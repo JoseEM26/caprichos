@@ -47,4 +47,27 @@ describe('WhatsAppMensajeriaProvider (Selección de Adaptador)', () => {
 
     expect(adaptador).toBe(mockSimulado);
   });
+
+  it('WhatsAppSimuladoAdaptador simula enviarImagen correctamente y persiste mensaje', async () => {
+    const mockPrisma = {
+      whatsappMensaje: {
+        create: jest.fn().mockImplementation(({ data }) =>
+          Promise.resolve({ id: BigInt(202), ...data }),
+        ),
+      },
+    } as any;
+    const simuladorReal = new WhatsAppSimuladoAdaptador(mockPrisma);
+    const res = await simuladorReal.enviarImagen('51987654321', 'http://ejemplo.com/qr.png', 'Caption QR');
+
+    expect(res.exito).toBe(true);
+    expect(res.estado).toBe('SIMULADO');
+    expect(mockPrisma.whatsappMensaje.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          tipo: 'IMAGEN',
+          estado: 'SIMULADO',
+        }),
+      }),
+    );
+  });
 });

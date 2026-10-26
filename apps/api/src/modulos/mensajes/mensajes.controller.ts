@@ -14,6 +14,7 @@ import { Permiso } from '../acceso/permiso.decorator';
 import {
   EditarNombreContactoDto,
   ListarConversacionesDto,
+  RechazarPagoDto,
   TextoDto,
   TomarDto,
 } from './dto/mensajes.dto';
@@ -114,8 +115,12 @@ export class MensajesController {
 
   @Post('conversaciones/:id/rechazar-pago')
   @Permiso('mensajes', 'enviar')
-  rechazarPago(@Param('id') id: string, @Req() req: any) {
-    return this.mensajes.rechazarPago(id, req.usuario, ipDe(req));
+  rechazarPago(
+    @Param('id') id: string,
+    @Body() dto: RechazarPagoDto,
+    @Req() req: any,
+  ) {
+    return this.mensajes.rechazarPago(id, dto?.motivo, req.usuario, ipDe(req));
   }
 
   @Patch('conversaciones/:id/nombre')

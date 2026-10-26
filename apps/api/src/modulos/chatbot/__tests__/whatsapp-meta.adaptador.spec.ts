@@ -560,4 +560,67 @@ describe('WhatsAppMetaAdaptador', () => {
       }
     });
   });
+
+  describe('Envío de imágenes (enviarImagen)', () => {
+    it('envía imagen con URL correctamente a Meta y persiste tipo IMAGEN', async () => {
+      const mockRespuesta = {
+        messaging_product: 'whatsapp',
+        messages: [{ id: 'wamid.img.123' }],
+      };
+
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        text: jest.fn().mockResolvedValue(JSON.stringify(mockRespuesta)),
+      } as any);
+
+      const resultado = await adaptador.enviarImagen(
+        '51987654321',
+        'https://ejemplo.com/qr-pago.png',
+        'Escanea este QR para pagar tu pedido',
+        { pedidoId: '55' },
+      );
+
+      expect(resultado.exito).toBe(true);
+      expect(resultado.waMessageId).toBe('wamid.img.123');
+      expect(resultado.estado).toBe('ENVIADO');
+      expect(mockPrisma.whatsappMensaje.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            tipo: 'IMAGEN',
+            direccion: 'SALIENTE',
+            estado: 'ENVIADO',
+          }),
+        }),
+      );
+
+      const bodyEnviado = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
+      expect(bodyEnviado.type).toBe('image');
+      expect(bodyEnviado.image.link).toBe('https://ejemplo.com/qr-pago.png');
+      expect(bodyEnviado.image.caption).toBe('Escanea este QR para pagar tu pedido');
+    });
+
+    it('envía imagen con ID de archivo/media correctamente a Meta', async () => {
+      const mockRespuesta = {
+        messaging_product: 'whatsapp',
+        messages: [{ id: 'wamid.img.id.456' }],
+      };
+
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        text: jest.fn().mockResolvedValue(JSON.stringify(mockRespuesta)),
+      } as any);
+
+      const resultado = await adaptador.enviarImagen(
+        '51987654321',
+        'media_id_123456789',
+      );
+
+      expect(resultado.exito).toBe(true);
+      const bodyEnviado = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
+      expect(bodyEnviado.type).toBe('image');
+      expect(bodyEnviado.image.id).toBe('media_id_123456789');
+    });
+  });
 });

@@ -28,12 +28,15 @@ export const CLAVES_NUMERICAS = [
   'reparto_recargo_reprogramacion',
   'encuesta_espera_min',
   'encuesta_puntaje_queja',
+  'chatbot_pago_recordatorio_min',
+  'chatbot_pago_expira_min',
 ] as const;
 
 export const CLAVES_TEXTO = [
   'envio_gratis_modo',
   'carta_aviso_entrada',
   'chatbot_activo',
+  'chatbot_pago_recordatorio_activo',
   'whatsapp_aviso_salida_activo',
   'whatsapp_aviso_llegada_activo',
   'whatsapp_aviso_espera_activo',

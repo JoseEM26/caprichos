@@ -37,7 +37,9 @@ export function normalizarEntrada(raw: EntradaRawInput): EntradaNormalizada {
   const idBotonOLista = String(raw.buttonPayload || raw.listReplyId || raw.listRowId || '').trim();
 
   let tipo: TipoEntrada = 'texto';
-  if (raw.tipo === 'location' || raw.ubicacion) {
+  if (raw.tipo === 'image' || raw.tipo === 'imagen') {
+    tipo = 'image';
+  } else if (raw.tipo === 'location' || raw.ubicacion) {
     tipo = 'ubicacion';
   } else if (raw.tipo === 'button' || (raw.buttonPayload && raw.buttonPayload !== raw.texto)) {
     tipo = 'boton';

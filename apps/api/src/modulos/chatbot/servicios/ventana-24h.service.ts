@@ -15,7 +15,7 @@ export const DURACION_VENTANA_24H_MS = 24 * 60 * 60 * 1000;
 
 export interface PayloadMensajeNegocio {
   textoLibre: string;
-  plantillaClave: keyof typeof CATALOGO_PLANTILLAS;
+  plantillaClave?: keyof typeof CATALOGO_PLANTILLAS;
   variablesPlantilla?: Record<string, string> | string[];
   botones?: BotonAccion[];
 }
@@ -154,7 +154,7 @@ export class Ventana24hService {
     // 3. Ventana CERRADA: Obligatorio uso de plantilla aprobada
     this.logger.log(`Ventana de 24h CERRADA para ${telMask}. Requiere plantilla aprobada.`);
 
-    const definicion = CATALOGO_PLANTILLAS[payload.plantillaClave];
+    const definicion = payload.plantillaClave ? CATALOGO_PLANTILLAS[payload.plantillaClave] : undefined;
     if (!definicion) {
       const errorDetalle = `No existe plantilla configurada para la clave '${String(payload.plantillaClave)}'`;
       this.logger.error(`Fallo de plantilla: ${errorDetalle}`);

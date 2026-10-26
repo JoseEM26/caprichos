@@ -45,6 +45,16 @@ export interface DetalleSolicitudChat {
   hora: string;
 }
 
+export interface DetalleSolicitudReservaChat {
+  id: string;
+  personas: number | null;
+  hora: string | null;
+  fecha: string | null;
+  nombre: string | null;
+  telefono: string | null;
+  nota: string | null;
+}
+
 export interface DetalleConversacion {
   id: string;
   nombre: string;
@@ -64,6 +74,7 @@ export interface DetalleConversacion {
   mensajes: MensajeItem[];
   pedido: DetallePedidoChat | null;
   solicitud: DetalleSolicitudChat | null;
+  solicitudReserva?: DetalleSolicitudReservaChat | null;
   tiempoPrometidoMin: number | null;
   altaDemanda: boolean;
 }

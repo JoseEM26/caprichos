@@ -925,6 +925,34 @@ export function MensajesView() {
                 </div>
               )}
 
+              {/* Solicitud de reserva si existe */}
+              {detalle.solicitudReserva && (
+                <div className="cv-order" style={{ borderLeftColor: '#E67929' }}>
+                  <b>Solicitud de reserva pendiente</b>
+                  <div>
+                    {detalle.solicitudReserva.personas} personas · {detalle.solicitudReserva.fecha} a las {detalle.solicitudReserva.hora}
+                  </div>
+                  {detalle.solicitudReserva.nota && (
+                    <div style={{ fontSize: '13px', color: '#54656F' }}>
+                      Nota: {detalle.solicitudReserva.nota}
+                    </div>
+                  )}
+                  <div style={{ marginTop: '6px' }}>
+                    <a
+                      href="/admin/reservas"
+                      style={{
+                        color: 'var(--cp-navy)',
+                        fontWeight: 700,
+                        textDecoration: 'underline',
+                        fontSize: '13px',
+                      }}
+                    >
+                      Ver y gestionar en Reservas
+                    </a>
+                  </div>
+                </div>
+              )}
+
               {/* Pedido armado si existe */}
               {detalle.pedido && (
                 <div className="cv-order">

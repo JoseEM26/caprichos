@@ -18,4 +18,23 @@ export class WhatsAppLocalGateway implements WhatsAppGateway {
     });
     return { id: m.id.toString(), autor, texto, en: m.en, metaId: null };
   }
+
+  async enviarBotones(
+    conversacionId: bigint,
+    _telefono: string,
+    texto: string,
+    botones: { id: string; titulo: string }[],
+    autor: 'BOT' | 'PERSONA' = 'BOT',
+  ): Promise<MensajeEnviado> {
+    const m = await this.prisma.mensajeChat.create({
+      data: {
+        conversacion_id: conversacionId,
+        direccion: 'SALE',
+        autor,
+        tipo: 'BOTONES',
+        contenido: { texto, botones },
+      },
+    });
+    return { id: m.id.toString(), autor, texto, en: m.en, metaId: null };
+  }
 }

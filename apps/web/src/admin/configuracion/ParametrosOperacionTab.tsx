@@ -202,6 +202,23 @@ const META_PARAMETROS: Record<string, MetaParametro> = {
     descripcion: 'Envía encuesta interactiva de calificación del 1 al 5 al cliente tras la entrega de su pedido.',
     tipo: 'sino',
   },
+  chatbot_pago_recordatorio_activo: {
+    nombre: 'Recordatorio WhatsApp: Comprobante de pago pendiente',
+    descripcion: 'Envía un recordatorio automático cordial al cliente si pasan los minutos configurados sin enviar la captura del pago digital.',
+    tipo: 'sino',
+  },
+  chatbot_pago_recordatorio_min: {
+    nombre: 'Minutos para recordatorio de pago digital',
+    descripcion: 'Tiempo de espera antes de enviar el recordatorio cordial al cliente solicitando su captura de pago.',
+    tipo: 'numero',
+    sufijo: 'min',
+  },
+  chatbot_pago_expira_min: {
+    nombre: 'Minutos para alerta de pago por expirar a Caja',
+    descripcion: 'Tiempo de espera antes de emitir alerta a la consola de Caja para decidir si contactar o anular (0 para apagar).',
+    tipo: 'numero',
+    sufijo: 'min',
+  },
 };
 
 interface ParametrosOperacionTabProps {

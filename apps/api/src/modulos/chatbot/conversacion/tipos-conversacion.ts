@@ -1,6 +1,17 @@
 import { BotonAccion, FilaLista } from '../puerto/whatsapp-mensajeria.puerto';
 import { EstadoCarritoPedido, EstadoPedidoFlujo } from './flujos/pedido/tipos-pedido';
-export { BotonAccion, FilaLista, EstadoCarritoPedido, EstadoPedidoFlujo };
+import { EstadoPagoFlujo, EstadoPagoConversacion } from './flujos/pago/tipos-pago';
+import { EstadoReservaFlujo, EstadoFlujoReserva } from './flujos/reserva/tipos-reserva';
+export {
+  BotonAccion,
+  FilaLista,
+  EstadoCarritoPedido,
+  EstadoPedidoFlujo,
+  EstadoPagoFlujo,
+  EstadoPagoConversacion,
+  EstadoReservaFlujo,
+  EstadoFlujoReserva,
+};
 
 /**
  * Versión actual del esquema del objeto `conversacion.flujo`.
@@ -31,6 +42,10 @@ export type EstadoConversacion =
   | 'DUDA_IA'
   // Estados de subflujo de pedidos (Ola 2, Agente C):
   | EstadoPedidoFlujo
+  // Estados de subflujo de pagos (Ola 2, Agente D):
+  | EstadoPagoFlujo
+  // Estados de subflujo de reservas (Ola 3, Agente F):
+  | EstadoReservaFlujo
   // Estados de mockup Chatbot.dc.html:
   | 'MODAL'
   | 'LOC'
@@ -51,7 +66,7 @@ export type EstadoConversacion =
 /**
  * Tipos de entrada reconocidos por el normalizador del motor.
  */
-export type TipoEntrada = 'texto' | 'boton' | 'lista' | 'ubicacion';
+export type TipoEntrada = 'texto' | 'boton' | 'lista' | 'ubicacion' | 'image' | 'imagen';
 
 export interface UbicacionEntrada {
   latitud: number;
@@ -125,12 +140,57 @@ export interface AccionCrearPedido {
   datosPagoTexto?: string;
 }
 
+/**
+ * Acción transaccional: registrar una solicitud de reserva pendiente en SolicitudReserva (Ola 3, Agente F).
+ */
+export interface AccionCrearSolicitudReserva {
+  tipo: 'crearSolicitudReserva';
+  personas: number;
+  fechaIso: string;
+  fechaTexto: string;
+  hora: string;
+  nombre: string;
+  telefono: string;
+  nota?: string;
+}
+
+/**
+ * Acción transaccional: cancelar una reserva activa del cliente por WhatsApp.
+ */
+export interface AccionCancelarReservaCliente {
+  tipo: 'cancelarReservaCliente';
+  reservaId: string;
+  motivo?: string;
+}
+
+/**
+ * Acción transaccional: solicitar cambio de una reserva activa del cliente.
+ */
+export interface AccionCambiarReservaCliente {
+  tipo: 'cambiarReservaCliente';
+  reservaId: string;
+  detalle: string;
+}
+
+/**
+ * Acción de respuesta: envío de imagen (ej. código QR de pago o voucher).
+ */
+export interface AccionEnviarImagen {
+  tipo: 'enviarImagen';
+  url: string;
+  caption?: string;
+}
+
 export type AccionMensaje =
   | AccionEnviarTexto
   | AccionEnviarBotones
   | AccionEnviarLista
+  | AccionEnviarImagen
   | AccionPasarAPersona
-  | AccionCrearPedido;
+  | AccionCrearPedido
+  | AccionCrearSolicitudReserva
+  | AccionCancelarReservaCliente
+  | AccionCambiarReservaCliente;
 
 /**
  * Estructura tipada del objeto JSON guardado en `conversacion.flujo`.
@@ -148,17 +208,10 @@ export interface FlujoConversacion {
   productoSeleccionadoId?: string;
   /** Subflujo transaccional de Pedido (Ola 2, Agente C) */
   pedido?: EstadoCarritoPedido | null;
-  /** Gancho para Ola 2: Coordinación de pago */
-  pago?: {
-    metodo?: string;
-    comprobanteArchivoId?: string;
-  } | null;
-  /** Gancho para Ola 3: Reserva de salón */
-  reserva?: {
-    fecha?: string;
-    hora?: string;
-    personas?: number;
-  } | null;
+  /** Subflujo transaccional de Pago (Ola 2, Agente D) */
+  pago?: EstadoPagoConversacion | null;
+  /** Subflujo transaccional de Reserva (Ola 3, Agente F) */
+  reserva?: EstadoFlujoReserva | null;
   /** Gancho para Ola 3: Contexto de dudas resueltas por IA */
   duda_ia?: {
     historial?: any[];
@@ -213,6 +266,18 @@ export interface ContextoConversacion {
     cuponId?: string;
     mensaje?: string;
   } | null;
+  /** Franjas de reserva disponibles para la fecha y personas seleccionadas */
+  franjasDisponiblesReserva?: string[];
+  /** Contador de solicitudes de reserva pendientes para el teléfono (máx 3) */
+  solicitudesPendientesTelefono?: number;
+  /** Reservas activas del cliente para consulta / cambio / cancelación */
+  reservasActivasCliente?: Array<{
+    id: string;
+    fecha: string;
+    hora: string;
+    personas: number;
+    mesas: string[];
+  }>;
 }
 
 /**

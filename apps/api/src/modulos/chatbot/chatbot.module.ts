@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { ComunModule } from '../../comun/comun.module';
 import { ArchivosModule } from '../archivos/archivos.module';
 import { AuditoriaModule } from '../auditoria/auditoria.module';
@@ -7,6 +7,7 @@ import { CatalogoModule } from '../catalogo/catalogo.module';
 import { OfertasModule } from '../ofertas/ofertas.module';
 import { PedidosModule } from '../pedidos/pedidos.module';
 import { ZonasModule } from '../zonas/zonas.module';
+import { ReservasModule } from '../reservas/reservas.module';
 import { WhatsappWebhookController } from './controladores/whatsapp-webhook.controller';
 import { QuejasWhatsappController } from './controladores/quejas-whatsapp.controller';
 import { WhatsAppMetaAdaptador } from './adaptadores/whatsapp-meta.adaptador';
@@ -15,6 +16,8 @@ import { WhatsAppMensajeriaProvider } from './proveedor/whatsapp-mensajeria.prov
 import { WhatsappWebhookService } from './servicios/whatsapp-webhook.service';
 import { Ventana24hService } from './servicios/ventana-24h.service';
 import { ChatbotPlanificadorService } from './servicios/chatbot-planificador.service';
+import { RecordatorioReservasTarea } from './servicios/recordatorio-reservas.tarea';
+import { TareaRecordatorioPagoService } from './servicios/tarea-recordatorio-pago.service';
 import { QuejasWhatsappService } from './servicios/quejas-whatsapp.service';
 import { WHATSAPP_MENSAJERIA_PUERTO } from './puerto/whatsapp-mensajeria.puerto';
 import { EjecutorConversacionService } from './conversacion/ejecutor-conversacion.service';
@@ -29,6 +32,7 @@ import { EjecutorConversacionService } from './conversacion/ejecutor-conversacio
     OfertasModule,
     PedidosModule,
     ZonasModule,
+    forwardRef(() => ReservasModule),
   ],
   controllers: [WhatsappWebhookController, QuejasWhatsappController],
   providers: [
@@ -38,6 +42,8 @@ import { EjecutorConversacionService } from './conversacion/ejecutor-conversacio
     WhatsappWebhookService,
     Ventana24hService,
     ChatbotPlanificadorService,
+    RecordatorioReservasTarea,
+    TareaRecordatorioPagoService,
     QuejasWhatsappService,
     EjecutorConversacionService,
   ],
@@ -47,6 +53,8 @@ import { EjecutorConversacionService } from './conversacion/ejecutor-conversacio
     WhatsAppSimuladoAdaptador,
     Ventana24hService,
     ChatbotPlanificadorService,
+    RecordatorioReservasTarea,
+    TareaRecordatorioPagoService,
     QuejasWhatsappService,
     WhatsappWebhookService,
     EjecutorConversacionService,

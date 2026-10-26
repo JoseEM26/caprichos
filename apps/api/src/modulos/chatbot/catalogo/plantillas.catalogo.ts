@@ -72,4 +72,28 @@ export const CATALOGO_PLANTILLAS: Record<string, DefinicionPlantilla> = {
     texto: 'Hola {{1}}, nos comunicamos de Caprichos para dar seguimiento a tu consulta. ¿En que podemos ayudarte?',
     descripcion: 'Plantilla de utilidad para reabrir la conversación cuando la ventana de 24 horas está cerrada.',
   },
+  RESERVA_CONFIRMADA: {
+    nombre: 'caprichos_reserva_confirmada',
+    categoria: 'UTILITY',
+    idioma: 'es',
+    variables: ['nombre_cliente', 'fecha_hora', 'personas'],
+    texto: 'Hola {{1}}, tu reserva para {{3}} personas el {{2}} esta confirmada. Te esperamos.',
+    descripcion: 'Aviso al cliente cuando su solicitud de reserva es aprobada.',
+  },
+  RESERVA_RECORDATORIO: {
+    nombre: 'caprichos_reserva_recordatorio',
+    categoria: 'UTILITY',
+    idioma: 'es',
+    variables: ['nombre_cliente', 'fecha_hora'],
+    texto: 'Hola {{1}}, te recordamos tu reserva de mesa para hoy a las {{2}}. Te esperamos.',
+    descripcion: 'Recordatorio opcional 2 horas antes de la reserva.',
+  },
+  RESERVA_ACTUALIZACION: {
+    nombre: 'caprichos_reserva_actualizacion',
+    categoria: 'UTILITY',
+    idioma: 'es',
+    variables: ['nombre_cliente', 'mensaje'],
+    texto: 'Hola {{1}}, te informamos sobre tu reserva: {{2}}.',
+    descripcion: 'Aviso sobre cambio o estado de la reserva.',
+  },
 };

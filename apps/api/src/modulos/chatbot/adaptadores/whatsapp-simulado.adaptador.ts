@@ -225,6 +225,52 @@ export class WhatsAppSimuladoAdaptador implements WhatsAppMensajeriaPuerto {
     }
   }
 
+  async enviarImagen(
+    telefono: string,
+    urlOArchivo: string,
+    caption?: string,
+    opciones?: OpcionesEnvio,
+  ): Promise<ResultadoEnvioWhatsApp> {
+    const waMessageId = this.generarWaMessageId();
+    const telHash = hashTelefono(telefono);
+    const telMask = enmascararTelefono(telefono);
+
+    this.logger.log(
+      `[SIMULADO] Enviar imagen (${urlOArchivo}) a ${telMask}${caption ? ` con caption: '${caption.slice(0, 30)}...'` : ''}`,
+    );
+
+    try {
+      const registro = await this.prisma.whatsappMensaje.create({
+        data: {
+          direccion: 'SALIENTE',
+          wa_message_id: waMessageId,
+          telefono_enmascarado: telMask,
+          telefono_hash: telHash,
+          tipo: 'IMAGEN',
+          plantilla: null,
+          estado: 'SIMULADO',
+          pedido_id: this.parsearId(opciones?.pedidoId),
+          conversacion_id: this.parsearId(opciones?.conversacionId),
+        },
+      });
+
+      return {
+        exito: true,
+        id: registro.id.toString(),
+        waMessageId,
+        estado: 'SIMULADO',
+      };
+    } catch (error: any) {
+      this.logger.error(`[SIMULADO] Error guardando imagen simulada: ${error.message}`);
+      return {
+        exito: false,
+        estado: 'FALLIDO',
+        errorCodigo: 'ERROR_BD_SIMULADO',
+        errorDetalle: error.message,
+      };
+    }
+  }
+
   async marcarLeido(waMessageId: string): Promise<boolean> {
     this.logger.log(`[SIMULADO] Marcar como leído mensaje ${waMessageId}`);
     try {

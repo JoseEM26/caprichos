@@ -503,6 +503,14 @@ export const TEXTOS_BOT = {
     const code = info.codigo;
     const st = info.estado.toLowerCase();
 
+    if (st === 'esperando_pago') {
+      return `Tu pedido ${code} está registrado y esperando la captura de tu pago 📲.`;
+    }
+
+    if (st === 'validando_pago') {
+      return `Tu pedido ${code} tiene su captura en revisión por Caja 👩‍💻. En unos momentos te confirmamos.`;
+    }
+
     if (st === 'entregado') {
       return `Tu pedido ${code} figura como entregado. Si hubo algún problema, ya avisé a una persona del equipo para que te escriba.`;
     }
@@ -865,4 +873,8 @@ export const TEXTOS_BOT = {
     return 'Has alcanzado el límite de 10 pedidos diarios por WhatsApp. Un asesor te atenderá personalmente.';
   },
 };
+
+export * from './textos-reserva';
+export * from './flujos/pago/textos-pago';
+
 

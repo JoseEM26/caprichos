@@ -937,6 +937,9 @@ model Reserva {
   estado             String        @default("ACTIVA")
   motivo_cancelacion String?
   pedido_id          BigInt?
+  recordatorio_enviado Boolean     @default(false)
+  origen             String        @default("LOCAL")
+  nota               String?
 
   pedido             Pedido?            @relation(fields: [pedido_id], references: [id])
   mesas              ReservaMesa[]
@@ -1560,6 +1563,11 @@ model SolicitudReserva {
   hora            DateTime?     @db.Timestamptz
   estado          String        @default("PENDIENTE") // PENDIENTE | APROBADA | RECHAZADA
   reserva_id      BigInt?
+  nombre          String?
+  telefono        String?
+  nota            String?
+  motivo_rechazo  String?
+  creado_en       DateTime      @default(now()) @db.Timestamptz
 
   conversacion    Conversacion? @relation(fields: [conversacion_id], references: [id])
   reserva         Reserva?      @relation(fields: [reserva_id], references: [id])

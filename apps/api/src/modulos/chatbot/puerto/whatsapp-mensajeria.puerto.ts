@@ -63,6 +63,13 @@ export interface WhatsAppMensajeriaPuerto {
     opciones?: OpcionesEnvio,
   ): Promise<ResultadoEnvioWhatsApp>;
 
+  enviarImagen(
+    telefono: string,
+    urlOArchivo: string,
+    caption?: string,
+    opciones?: OpcionesEnvio,
+  ): Promise<ResultadoEnvioWhatsApp>;
+
   marcarLeido(waMessageId: string): Promise<boolean>;
 
   estaConectado(): EstadoConexionWhatsApp;

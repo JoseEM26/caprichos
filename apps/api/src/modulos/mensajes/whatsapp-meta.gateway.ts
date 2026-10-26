@@ -125,4 +125,55 @@ export class WhatsAppMetaGateway implements WhatsAppGateway {
       whatsappMensajeId,
     };
   }
+
+  async enviarBotones(
+    conversacionId: bigint,
+    telefono: string,
+    texto: string,
+    botones: { id: string; titulo: string }[],
+    autor: 'BOT' | 'PERSONA' = 'BOT',
+  ): Promise<MensajeEnviado> {
+    const estadoConexion = this.mensajeria.estaConectado();
+
+    const resultado = await this.mensajeria.enviarBotones(
+      telefono,
+      texto,
+      botones,
+      { conversacionId },
+    );
+
+    const whatsappMensajeId = resultado.id ? BigInt(resultado.id) : null;
+    const metaId = resultado.waMessageId || null;
+
+    const m = await this.prisma.mensajeChat.create({
+      data: {
+        conversacion_id: conversacionId,
+        direccion: 'SALE',
+        autor,
+        tipo: 'BOTONES',
+        contenido: {
+          texto,
+          botones,
+          ...(resultado.errorDetalle ? { errorDetalle: resultado.errorDetalle } : {}),
+          ...(resultado.errorCodigo ? { errorCodigo: resultado.errorCodigo } : {}),
+          estado: resultado.estado,
+        },
+        meta_id: metaId,
+        whatsapp_mensaje_id: whatsappMensajeId,
+      },
+    });
+
+    return {
+      id: m.id.toString(),
+      autor,
+      texto,
+      en: m.en,
+      metaId,
+      estado: resultado.estado,
+      errorCodigo: resultado.errorCodigo || null,
+      errorDetalle: resultado.errorDetalle || null,
+      modo: estadoConexion.modo,
+      whatsappMensajeId,
+    };
+  }
 }

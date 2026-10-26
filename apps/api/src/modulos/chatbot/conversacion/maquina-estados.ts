@@ -31,6 +31,8 @@ import {
 } from './tipos-conversacion';
 import { RegistroSubFlujos } from './flujos/registro-flujos';
 import './flujos/pedido/flujo-pedido';
+import './flujos/pago/flujo-pago';
+import './flujos/reserva/flujo-reserva';
 
 /** Palabras clave para detectar saludos o solicitud del menú */
 const PALABRAS_SALUDO = [
@@ -689,7 +691,21 @@ export function transicionarEstado(
 
     // Pedido activo encontrado y verificado
     const pedido = contexto.pedidoActivo;
-    const st = String(pedido?.estado || 'COLA').toLowerCase();
+    let st = String(pedido?.estado || 'COLA').toLowerCase();
+    if (
+      pedido?.pago_metodo &&
+      ['YAPE', 'PLIN', 'TRANSFERENCIA'].includes(pedido.pago_metodo) &&
+      pedido.pago_estado === 'PENDIENTE'
+    ) {
+      if (
+        flujo.estado === 'PAGO_VALIDANDO' ||
+        (flujo.pago as any)?.estadoInterno === 'VALIDAR_PAGO'
+      ) {
+        st = 'validando_pago';
+      } else {
+        st = 'esperando_pago';
+      }
+    }
     const esEnRuta = st === 'en_camino' || st === 'ruta';
 
     // Manejo de sub-intenciones sobre el pedido activo:

@@ -157,6 +157,19 @@ export const salonApi = {
       `/admin/reservas/${id}/sentar`,
     ),
 
+  listarSolicitudes: (estado?: string) => {
+    const qs = estado ? `?estado=${estado}` : '';
+    return api.get<any[]>(`/admin/reservas/solicitudes${qs}`);
+  },
+
+  aprobarSolicitud: (
+    id: string,
+    payload: { mesas: string[]; personas?: number; hora?: string; nombre?: string; telefono?: string },
+  ) => api.post<{ solicitud: any; reserva: Reserva }>(`/admin/reservas/solicitudes/${id}/aprobar`, payload),
+
+  rechazarSolicitud: (id: string, payload: { motivo: string; alternativas?: string }) =>
+    api.post<any>(`/admin/reservas/solicitudes/${id}/rechazar`, payload),
+
   // =========================================================================
   // CARTA (para armar pedido del mozo)
   // =========================================================================

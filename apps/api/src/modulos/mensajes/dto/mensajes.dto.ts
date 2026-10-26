@@ -45,3 +45,10 @@ export class EditarNombreContactoDto {
   @IsBoolean({ message: 'revertir debe ser un booleano' })
   revertir?: boolean;
 }
+
+export class RechazarPagoDto {
+  @IsOptional()
+  @IsString({ message: 'El motivo debe ser una cadena de texto' })
+  @MaxLength(300, { message: 'El motivo es demasiado largo' })
+  motivo?: string;
+}

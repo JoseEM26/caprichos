@@ -116,4 +116,58 @@ export class ReservasController {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.reservasService.sentar(id, req.usuario, ip);
   }
+
+  /**
+   * 4) GET /admin/reservas/disponibilidad (reservas/ver)
+   * Consulta franjas horarias disponibles para una fecha y cantidad de personas.
+   */
+  @Get('disponibilidad')
+  @Permiso('reservas', 'ver')
+  async disponibilidad(
+    @Query('fecha') fecha: string,
+    @Query('personas') personas: string,
+  ) {
+    const p = parseInt(personas, 10) || 2;
+    return this.reservasService.obtenerFranjasDisponibles(fecha, p);
+  }
+
+  /**
+   * 5) GET /admin/reservas/solicitudes (reservas/ver)
+   * Lista solicitudes de reserva generadas desde WhatsApp.
+   */
+  @Get('solicitudes')
+  @Permiso('reservas', 'ver')
+  async listarSolicitudes(@Query('estado') estado?: string) {
+    return this.reservasService.listarSolicitudes({ estado });
+  }
+
+  /**
+   * 6) POST /admin/reservas/solicitudes/:id/aprobar (reservas/editar)
+   * Aprueba la solicitud asignando mesas y notifica al cliente por WhatsApp.
+   */
+  @Post('solicitudes/:id/aprobar')
+  @Permiso('reservas', 'editar')
+  async aprobarSolicitud(
+    @Param('id') id: string,
+    @Body() body: any,
+    @Req() req: any,
+  ) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.reservasService.aprobarSolicitud(id, body, req.usuario, ip);
+  }
+
+  /**
+   * 7) POST /admin/reservas/solicitudes/:id/rechazar (reservas/editar)
+   * Rechaza la solicitud con motivo obligatorio y notifica al cliente por WhatsApp.
+   */
+  @Post('solicitudes/:id/rechazar')
+  @Permiso('reservas', 'editar')
+  async rechazarSolicitud(
+    @Param('id') id: string,
+    @Body() body: { motivo: string; alternativas?: string },
+    @Req() req: any,
+  ) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.reservasService.rechazarSolicitud(id, body, req.usuario, ip);
+  }
 }

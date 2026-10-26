@@ -31,6 +31,14 @@ export interface WhatsAppGateway {
     autor?: 'BOT' | 'PERSONA',
   ): Promise<MensajeEnviado>;
 
+  enviarBotones?(
+    conversacionId: bigint,
+    telefono: string,
+    texto: string,
+    botones: { id: string; titulo: string }[],
+    autor?: 'BOT' | 'PERSONA',
+  ): Promise<MensajeEnviado>;
+
   estaConectado?(): { conectado: boolean; modo: 'meta' | 'simulado'; razon?: string };
 }
 

@@ -642,6 +642,73 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
     };
   }
 
+  async enviarImagen(
+    telefono: string,
+    urlOArchivo: string,
+    caption?: string,
+    opciones?: OpcionesEnvio,
+  ): Promise<ResultadoEnvioWhatsApp> {
+    const destinatario = construirDestinatario(telefono);
+    const telHash = hashTelefono(telefono);
+    const telMask = enmascararTelefono(telefono);
+
+    if (!this.token || !this.phoneId) {
+      return {
+        exito: false,
+        estado: 'FALLIDO',
+        errorCodigo: 'SIN_CREDENCIALES_META',
+        errorDetalle: 'Faltan WHATSAPP_TOKEN o WHATSAPP_PHONE_ID en la configuración',
+      };
+    }
+
+    const url = `https://graph.facebook.com/${this.apiVersion}/${this.phoneId}/messages`;
+    const esUrl = urlOArchivo.startsWith('http://') || urlOArchivo.startsWith('https://');
+
+    const payload: any = {
+      messaging_product: 'whatsapp',
+      ...destinatario,
+      type: 'image',
+      image: {
+        ...(esUrl ? { link: urlOArchivo } : { id: urlOArchivo }),
+        ...(caption ? { caption: caption.slice(0, 1024) } : {}),
+      },
+    };
+
+    if (opciones?.replyToWaMessageId) {
+      payload.context = { message_id: opciones.replyToWaMessageId };
+    }
+
+    const resultado = await this.ejecutarConReintentos(url, payload, telMask);
+    const waMessageId = resultado.data?.messages?.[0]?.id;
+    const estado = resultado.exito ? 'ENVIADO' : 'FALLIDO';
+
+    const registro = await this.prisma.whatsappMensaje.create({
+      data: {
+        direccion: 'SALIENTE',
+        wa_message_id: waMessageId || null,
+        telefono_enmascarado: telMask,
+        telefono_hash: telHash,
+        tipo: 'IMAGEN',
+        plantilla: null,
+        estado,
+        error_codigo: resultado.error?.codigo || null,
+        error_detalle: resultado.error?.mensaje || null,
+        pedido_id: this.parsearId(opciones?.pedidoId),
+        conversacion_id: this.parsearId(opciones?.conversacionId),
+      },
+    });
+
+    return {
+      exito: resultado.exito,
+      id: registro.id.toString(),
+      waMessageId,
+      estado,
+      errorCodigo: resultado.error?.codigo,
+      errorDetalle: resultado.error?.mensaje,
+      reintentos: resultado.intentos,
+    };
+  }
+
   async marcarLeido(waMessageId: string): Promise<boolean> {
     if (!this.token || !this.phoneId) return false;
 

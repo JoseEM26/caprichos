@@ -2,6 +2,9 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Optional,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
@@ -11,6 +14,9 @@ import { formatearHora, obtenerFechaHoraLima } from '../local/local.util';
 import { CrearReservaDto } from './dto/crear-reserva.dto';
 import { ActualizarReservaDto } from './dto/actualizar-reserva.dto';
 import { CancelarReservaDto } from './dto/cancelar-reserva.dto';
+import { Ventana24hService } from '../chatbot/servicios/ventana-24h.service';
+import { TEXTOS_RESERVA } from '../chatbot/conversacion/textos-reserva';
+import { generarFranjasPorDefecto } from '../chatbot/conversacion/flujos/reserva/flujo-reserva';
 
 @Injectable()
 export class ReservasService {
@@ -18,6 +24,9 @@ export class ReservasService {
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditoriaService,
     private readonly eventosGateway: EventosGateway,
+    @Optional()
+    @Inject(forwardRef(() => Ventana24hService))
+    private readonly ventana24hService?: Ventana24hService,
   ) {}
 
   /**
@@ -790,5 +799,392 @@ export class ReservasService {
     });
 
     return this.serializarReserva(reserva);
+  }
+
+  /**
+   * Obtiene las franjas horarias disponibles para una fecha (YYYY-MM-DD) y número de personas.
+   * Valida horario de atención (excluye si está cerrado, usa hora_inicio = abre + 1h, hora_fin = cierra - 1h en pasos de 30m).
+   * Filtra las franjas que no tengan mesas con asientos suficientes libres.
+   */
+  async obtenerFranjasDisponibles(
+    fechaIso: string,
+    personas: number,
+    ahora: Date = new Date(),
+  ): Promise<string[]> {
+    // 1. Obtener horario del día (America/Lima)
+    const fechaDate = new Date(`${fechaIso}T00:00:00.000Z`);
+    const fechaEspecial = await this.prisma.fechaEspecial.findUnique({
+      where: { fecha: fechaDate },
+    });
+
+    let abre: string | null = null;
+    let cierra: string | null = null;
+
+    if (fechaEspecial) {
+      if (fechaEspecial.cerrado) {
+        return [];
+      }
+      abre = formatearHora(fechaEspecial.abre);
+      cierra = formatearHora(fechaEspecial.cierra);
+    } else {
+      const d = new Date(`${fechaIso}T12:00:00-05:00`);
+      const { diaSemana } = obtenerFechaHoraLima(d);
+      const horario = await this.prisma.horarioDia.findUnique({
+        where: { dia_semana: diaSemana },
+      });
+
+      if (!horario || horario.cerrado || !horario.abre || !horario.cierra) {
+        return [];
+      }
+      abre = formatearHora(horario.abre);
+      cierra = formatearHora(horario.cierra);
+    }
+
+    if (!abre || !cierra) {
+      return [];
+    }
+
+    // 2. Generar slots cada 30 minutos (1h después de abrir hasta 1h antes de cerrar)
+    const franjasBase = generarFranjasPorDefecto(abre, cierra);
+
+    // 3. Si la fecha es hoy, filtrar slots pasados
+    const { fechaIso: hoyLima, horaMinutos: horaActualLima } = obtenerFechaHoraLima(ahora);
+    const franjasFuturas = franjasBase.filter((h) => {
+      if (fechaIso === hoyLima) {
+        return h > horaActualLima;
+      }
+      return true;
+    });
+
+    // 4. Consultar mesas activas
+    const mesasActivas = await this.prisma.elementoPlano.findMany({
+      where: { activo: true, tipo: 'MESA' },
+    });
+
+    const totalAsientosSalon = mesasActivas.reduce((sum, m) => sum + (m.asientos ?? 0), 0);
+    if (totalAsientosSalon < personas) {
+      return [];
+    }
+
+    // 5. Consultar reservas activas del día
+    const inicioDia = new Date(`${fechaIso}T00:00:00-05:00`);
+    const finDia = new Date(`${fechaIso}T23:59:59.999-05:00`);
+
+    const reservasDia = await this.prisma.reserva.findMany({
+      where: {
+        estado: { in: ['ACTIVA', 'SENTADA'] },
+        hora: { gte: inicioDia, lte: finDia },
+      },
+      include: { mesas: true },
+    });
+
+    const toleranciaMin = await this.obtenerToleranciaMin();
+
+    // 6. Para cada franja, comprobar si hay mesas suficientes disponibles
+    const franjasDisponibles: string[] = [];
+
+    for (const horaSlot of franjasFuturas) {
+      const slotTime = new Date(`${fechaIso}T${horaSlot}:00-05:00`).getTime();
+      const mesasOcupadasIds = new Set<string>();
+
+      for (const res of reservasDia) {
+        const resTime = res.hora.getTime();
+        const duracionReservaMs = 60 * 60 * 1000;
+        if (
+          slotTime >= resTime - toleranciaMin * 60 * 1000 &&
+          slotTime < resTime + duracionReservaMs
+        ) {
+          for (const rm of res.mesas) {
+            if (rm.mesa_id) {
+              mesasOcupadasIds.add(rm.mesa_id.toString());
+            }
+          }
+        }
+      }
+
+      const mesasLibres = mesasActivas.filter((m) => !mesasOcupadasIds.has(m.id.toString()));
+      const asientosLibres = mesasLibres.reduce((sum, m) => sum + (m.asientos ?? 0), 0);
+
+      if (asientosLibres >= personas) {
+        franjasDisponibles.push(horaSlot);
+      }
+    }
+
+    return franjasDisponibles;
+  }
+
+  /**
+   * Serializa una solicitud de reserva para respuestas JSON.
+   */
+  serializarSolicitud(s: any) {
+    return {
+      id: s.id.toString(),
+      conversacion_id: s.conversacion_id ? s.conversacion_id.toString() : null,
+      personas: s.personas,
+      hora: s.hora instanceof Date ? s.hora.toISOString() : s.hora,
+      estado: (s.estado || 'PENDIENTE').toLowerCase(),
+      reserva_id: s.reserva_id ? s.reserva_id.toString() : null,
+      nombre: s.nombre || s.conversacion?.nombre_contacto || null,
+      telefono: s.telefono || s.conversacion?.telefono || null,
+      nota: s.nota || null,
+      motivo_rechazo: s.motivo_rechazo || null,
+      creado_en: s.creado_en instanceof Date ? s.creado_en.toISOString() : s.creado_en || null,
+    };
+  }
+
+  /**
+   * Lista solicitudes de reserva.
+   */
+  async listarSolicitudes(filtros?: { estado?: string }) {
+    const where: any = {};
+    if (filtros?.estado) {
+      where.estado = filtros.estado.toUpperCase();
+    }
+
+    const solicitudes = await this.prisma.solicitudReserva.findMany({
+      where,
+      include: {
+        conversacion: true,
+        reserva: {
+          include: {
+            mesas: {
+              include: { mesa: true },
+            },
+          },
+        },
+      },
+      orderBy: { id: 'desc' },
+    });
+
+    return solicitudes.map((s) => this.serializarSolicitud(s));
+  }
+
+  /**
+   * Aprueba una solicitud de reserva: crea la reserva con las mesas indicadas
+   * y notifica al cliente por WhatsApp.
+   */
+  async aprobarSolicitud(
+    id: bigint | string | number,
+    dto: {
+      mesas: (string | number)[];
+      personas?: number;
+      hora?: string;
+      nombre?: string;
+      telefono?: string;
+    },
+    usuario?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const sId = BigInt(id);
+    const solicitud = await this.prisma.solicitudReserva.findUnique({
+      where: { id: sId },
+      include: { conversacion: true },
+    });
+
+    if (!solicitud) {
+      throw new NotFoundException({
+        codigo: 'SOLICITUD_NO_ENCONTRADA',
+        mensaje: 'La solicitud de reserva no existe',
+      });
+    }
+
+    if (solicitud.estado !== 'PENDIENTE') {
+      throw new BadRequestException({
+        codigo: 'SOLICITUD_NO_PENDIENTE',
+        mensaje: `La solicitud ya se encuentra ${solicitud.estado.toLowerCase()}`,
+      });
+    }
+
+    const nombre = dto.nombre?.trim() || solicitud.nombre?.trim() || solicitud.conversacion?.nombre_contacto?.trim() || 'Cliente';
+    const telefono = dto.telefono?.trim() || solicitud.telefono?.trim() || solicitud.conversacion?.telefono?.trim() || '';
+    const personas = dto.personas ?? solicitud.personas ?? 2;
+    const horaIso = dto.hora || (solicitud.hora ? solicitud.hora.toISOString() : new Date().toISOString());
+
+    // 1. Reutiliza ReservasService.crear
+    const reserva = await this.crear(
+      {
+        nombre,
+        telefono,
+        personas,
+        hora: horaIso,
+        mesas: dto.mesas,
+      },
+      usuario,
+      ip,
+    );
+
+    // 2. Actualizar solicitud
+    const solicitudActualizada = await this.prisma.solicitudReserva.update({
+      where: { id: sId },
+      data: {
+        estado: 'APROBADA',
+        reserva_id: BigInt(reserva.id),
+      },
+      include: { conversacion: true },
+    });
+
+    // 3. Auditoría
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'reservas',
+      accion: 'APROBAR_SOLICITUD',
+      resultado: 'OK',
+      entidad: 'solicitud_reserva',
+      entidadId: sId,
+      despues: {
+        solicitudId: sId.toString(),
+        reservaId: reserva.id,
+        mesas: dto.mesas,
+      },
+      partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
+      ip,
+    });
+
+    // 4. Socket
+    this.eventosGateway?.emitirAdmin?.('reserva:solicitud_cambio', {
+      tipo: 'APROBADA',
+      solicitudId: sId.toString(),
+      reservaId: reserva.id,
+    });
+
+    // 5. Enviar mensaje de WhatsApp al cliente
+    const { fechaIso: fechaLima, horaMinutos: horaLima } = obtenerFechaHoraLima(new Date(horaIso));
+    const msgConfirmacion = TEXTOS_RESERVA.reservaConfirmadaCliente({
+      personas,
+      fechaTexto: fechaLima,
+      hora: horaLima,
+      toleranciaMin: reserva.tolerancia_min || 15,
+    });
+
+    if (this.ventana24hService && telefono) {
+      await this.ventana24hService.enviarMensajeNegocio(telefono, {
+        textoLibre: msgConfirmacion,
+        plantillaClave: 'RESERVA_CONFIRMADA',
+        variablesPlantilla: [nombre, `${fechaLima} ${horaLima}`, String(personas)],
+      }).catch(() => {});
+    }
+
+    if (solicitud.conversacion_id) {
+      await this.prisma.mensajeChat.create({
+        data: {
+          conversacion_id: solicitud.conversacion_id,
+          direccion: 'SALE',
+          autor: 'PERSONA',
+          tipo: 'TEXTO',
+          contenido: { texto: msgConfirmacion },
+        },
+      }).catch(() => {});
+    }
+
+    return {
+      solicitud: this.serializarSolicitud(solicitudActualizada),
+      reserva,
+    };
+  }
+
+  /**
+   * Rechaza una solicitud de reserva con motivo y alternativas opcionales,
+   * y notifica al cliente por WhatsApp.
+   */
+  async rechazarSolicitud(
+    id: bigint | string | number,
+    dto: { motivo: string; alternativas?: string },
+    usuario?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    if (!dto?.motivo || dto.motivo.trim().length < 5) {
+      throw new BadRequestException({
+        codigo: 'MOTIVO_REQUERIDO',
+        mensaje: 'El motivo de rechazo es obligatorio (mínimo 5 caracteres)',
+      });
+    }
+
+    const sId = BigInt(id);
+    const solicitud = await this.prisma.solicitudReserva.findUnique({
+      where: { id: sId },
+      include: { conversacion: true },
+    });
+
+    if (!solicitud) {
+      throw new NotFoundException({
+        codigo: 'SOLICITUD_NO_ENCONTRADA',
+        mensaje: 'La solicitud de reserva no existe',
+      });
+    }
+
+    if (solicitud.estado !== 'PENDIENTE') {
+      throw new BadRequestException({
+        codigo: 'SOLICITUD_NO_PENDIENTE',
+        mensaje: `La solicitud ya se encuentra ${solicitud.estado.toLowerCase()}`,
+      });
+    }
+
+    const solicitudActualizada = await this.prisma.solicitudReserva.update({
+      where: { id: sId },
+      data: {
+        estado: 'RECHAZADA',
+        motivo_rechazo: dto.motivo.trim(),
+      },
+      include: { conversacion: true },
+    });
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'reservas',
+      accion: 'RECHAZAR_SOLICITUD',
+      resultado: 'OK',
+      entidad: 'solicitud_reserva',
+      entidadId: sId,
+      despues: {
+        solicitudId: sId.toString(),
+        motivo: dto.motivo.trim(),
+        alternativas: dto.alternativas,
+      },
+      partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
+      ip,
+    });
+
+    this.eventosGateway?.emitirAdmin?.('reserva:solicitud_cambio', {
+      tipo: 'RECHAZADA',
+      solicitudId: sId.toString(),
+      motivo: dto.motivo.trim(),
+    });
+
+    // Enviar WhatsApp al cliente
+    const nombre = solicitud.nombre || solicitud.conversacion?.nombre_contacto || 'Cliente';
+    const telefono = solicitud.telefono || solicitud.conversacion?.telefono || '';
+    const { fechaIso: fechaLima, horaMinutos: horaLima } = solicitud.hora
+      ? obtenerFechaHoraLima(solicitud.hora)
+      : { fechaIso: '', horaMinutos: '' };
+
+    const msgRechazo = TEXTOS_RESERVA.reservaRechazadaCliente({
+      nombre,
+      fechaTexto: fechaLima,
+      hora: horaLima,
+      motivo: dto.motivo.trim(),
+      alternativas: dto.alternativas,
+    });
+
+    if (this.ventana24hService && telefono) {
+      await this.ventana24hService.enviarMensajeNegocio(telefono, {
+        textoLibre: msgRechazo,
+        plantillaClave: 'RESERVA_ACTUALIZACION',
+        variablesPlantilla: [nombre, `Solicitud no confirmada: ${dto.motivo.trim()}`],
+      }).catch(() => {});
+    }
+
+    if (solicitud.conversacion_id) {
+      await this.prisma.mensajeChat.create({
+        data: {
+          conversacion_id: solicitud.conversacion_id,
+          direccion: 'SALE',
+          autor: 'PERSONA',
+          tipo: 'TEXTO',
+          contenido: { texto: msgRechazo },
+        },
+      }).catch(() => {});
+    }
+
+    return this.serializarSolicitud(solicitudActualizada);
   }
 }

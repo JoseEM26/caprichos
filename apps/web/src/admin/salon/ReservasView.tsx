@@ -81,6 +81,7 @@ export function ReservasView() {
       const resMesas = salonApi.obtenerMesas ? await Promise.resolve(salonApi.obtenerMesas()).catch(() => null) : null;
       const resAgenda = salonApi.agenda ? await Promise.resolve(salonApi.agenda(diaIso)).catch(() => null) : null;
       const resReservas = salonApi.listarReservas ? await Promise.resolve(salonApi.listarReservas()).catch(() => null) : null;
+      const resSolicitudes = salonApi.listarSolicitudes ? await Promise.resolve(salonApi.listarSolicitudes()).catch(() => null) : null;
       if (salonApi.calendario) {
         await Promise.resolve(salonApi.calendario(mesIso)).catch(() => null);
       }
@@ -88,6 +89,20 @@ export function ReservasView() {
       if (resMesas?.pisos) setPisosSalon(resMesas.pisos);
       if (Array.isArray(resAgenda)) setAgendaReservas(resAgenda);
       if (Array.isArray(resReservas)) setReservas(resReservas);
+      if (Array.isArray(resSolicitudes)) {
+        setSolicitudes(
+          resSolicitudes.map((s: any) => ({
+            id: s.id,
+            nombre: s.nombre || 'Cliente',
+            tel: s.telefono || '',
+            personas: s.personas || 2,
+            hora: s.hora ? s.hora.slice(11, 16) : '',
+            estado: s.estado || 'pendiente',
+            mesa: s.mesa || undefined,
+            mesasIds: s.mesasIds || [],
+          })),
+        );
+      }
     } catch (err: any) {
       setErrorGlobal(err?.message || 'No fue posible cargar las reservas del local.');
     } finally {
@@ -1521,15 +1536,30 @@ export function ReservasView() {
           } a las ${confirmarAprobarSol.hora} y se le avisa al cliente por WhatsApp.`}
           textoConfirmar="Sí, aprobar"
           textoNo="No, cancelar"
-          alConfirmar={() => {
-            setSolicitudes((prev) =>
-              prev.map((s) =>
-                s.id === confirmarAprobarSol.id
-                  ? { ...s, estado: 'aprobada' as const }
-                  : s,
-              ),
-            );
-            setConfirmarAprobarSol(null);
+          alConfirmar={async () => {
+            try {
+              if (salonApi.aprobarSolicitud) {
+                const mesasParaAsignar =
+                  confirmarAprobarSol.mesasIds && confirmarAprobarSol.mesasIds.length > 0
+                    ? confirmarAprobarSol.mesasIds
+                    : todasLasMesas.slice(0, 1).map((m) => m.id);
+                await salonApi.aprobarSolicitud(confirmarAprobarSol.id, {
+                  mesas: mesasParaAsignar,
+                });
+              }
+              setSolicitudes((prev) =>
+                prev.map((s) =>
+                  s.id === confirmarAprobarSol.id
+                    ? { ...s, estado: 'aprobada' as const }
+                    : s,
+                ),
+              );
+              setConfirmarAprobarSol(null);
+              cargarDatos();
+            } catch (err: any) {
+              setErrorGlobal(err?.message || 'Error al aprobar solicitud de reserva.');
+              setConfirmarAprobarSol(null);
+            }
           }}
           alCancelar={() => setConfirmarAprobarSol(null)}
         />
@@ -1542,15 +1572,26 @@ export function ReservasView() {
           mensaje="Se le avisa por WhatsApp que no hay mesa a esa hora."
           textoConfirmar="Sí, rechazar"
           textoNo="No, cancelar"
-          alConfirmar={() => {
-            setSolicitudes((prev) =>
-              prev.map((s) =>
-                s.id === confirmarRechazarSol.id
-                  ? { ...s, estado: 'rechazada' as const }
-                  : s,
-              ),
-            );
-            setConfirmarRechazarSol(null);
+          alConfirmar={async () => {
+            try {
+              if (salonApi.rechazarSolicitud) {
+                await salonApi.rechazarSolicitud(confirmarRechazarSol.id, {
+                  motivo: 'No hay mesa disponible en el horario solicitado',
+                });
+              }
+              setSolicitudes((prev) =>
+                prev.map((s) =>
+                  s.id === confirmarRechazarSol.id
+                    ? { ...s, estado: 'rechazada' as const }
+                    : s,
+                ),
+              );
+              setConfirmarRechazarSol(null);
+              cargarDatos();
+            } catch (err: any) {
+              setErrorGlobal(err?.message || 'Error al rechazar solicitud de reserva.');
+              setConfirmarRechazarSol(null);
+            }
           }}
           alCancelar={() => setConfirmarRechazarSol(null)}
         />

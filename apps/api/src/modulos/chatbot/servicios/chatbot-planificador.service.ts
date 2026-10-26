@@ -3,6 +3,7 @@ import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { RedisService } from '../../../comun/redis/redis.service';
 import { EventosGateway } from '../../../comun/socket/eventos.gateway';
 import { Ventana24hService } from './ventana-24h.service';
+import { TareaRecordatorioPagoService } from './tarea-recordatorio-pago.service';
 import { enmascararTelefono, hashTelefono, normalizarTelefono } from '../utilidades/enmascarar.util';
 
 export interface ParametrosChatbot {
@@ -32,6 +33,7 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
     private readonly redisService: RedisService,
     private readonly ventana24hService: Ventana24hService,
     @Optional() private readonly eventos?: EventosGateway,
+    @Optional() private readonly tareaRecordatorioPago?: TareaRecordatorioPagoService,
   ) {}
 
   onModuleInit() {
@@ -465,6 +467,12 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
 
           avisosEncuesta++;
         }
+      }
+
+      if (this.tareaRecordatorioPago) {
+        await this.tareaRecordatorioPago.ejecutarCiclo(ahora).catch((err) => {
+          this.logger.error(`Error en ciclo de tareaRecordatorioPago: ${err.message}`, err.stack);
+        });
       }
 
       return {

@@ -318,16 +318,14 @@ describe('Máquina de Estados del Bot Conversacional (transicionarEstado)', () =
       }
     });
 
-    it('al pulsar "reservar" responde con texto del mockup + línea honesta y botones Volver y Hablar con asesor', () => {
+    it('al pulsar "reservar" inicia el flujo de reservas y pide cantidad de personas (Ola 3)', () => {
       const entrada = normalizarEntrada({ listRowId: 'reservar' });
       const resultado = transicionarEstado(null, entrada, contextoBase);
 
-      expect(resultado.nuevoEstado).toBe('MENU');
+      expect(resultado.nuevoEstado).toBe('RESERVA_PERSONAS');
       expect(resultado.acciones[0].tipo).toBe('enviarBotones');
       if (resultado.acciones[0].tipo === 'enviarBotones') {
-        expect(resultado.acciones[0].texto).toContain('¿Para cuántas personas es la reserva?');
-        expect(resultado.acciones[0].texto).toContain('Esta opción estará disponible muy pronto');
-        expect(resultado.acciones[0].botones).toEqual([BOTON_HABLAR_PERSONA, BOTON_VOLVER_MENU]);
+        expect(resultado.acciones[0].texto).toContain('¿Para cuántas personas');
       }
     });
   });
