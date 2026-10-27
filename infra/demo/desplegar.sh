@@ -51,6 +51,7 @@ if [[ "${1:-}" == "--remote" ]]; then
     "${SCRIPT_DIR}/desplegar.sh" \
     "${SCRIPT_DIR}/actualizar.sh" \
     "${SCRIPT_DIR}/docker-rollout" \
+    "${SCRIPT_DIR}/limpiar-imagenes.sh" \
     "${SCRIPT_DIR}/respaldar.sh" \
     "${SCRIPT_DIR}/logs.sh" \
     "${SCRIPT_DIR}/estado.sh" \
@@ -192,6 +193,15 @@ echo "========================================================================"
 echo "   DESPLIEGUE DE DEMOSTRACIÓN COMPLETADO"
 echo "========================================================================"
 compose ps
+
+# Limpieza automática de imágenes viejas (solo tras despliegue exitoso)
+echo "==> Ejecutando limpieza automática de imágenes antiguas..."
+if [[ -f "${SCRIPT_DIR}/limpiar-imagenes.sh" ]]; then
+  source "${SCRIPT_DIR}/limpiar-imagenes.sh"
+  limpiar_imagenes_viejas "$TAG" "inicial" "${IMAGENES_CONSERVAR:-5}" || {
+    echo "AVISO: La limpieza de imágenes no finalizó con éxito, pero el despliegue está completado." >&2
+  }
+fi
 echo "------------------------------------------------------------------------"
 echo "  Carta virtual:        ${URL_BASE}/"
 echo "  Panel administrativo: ${URL_BASE}/admin"

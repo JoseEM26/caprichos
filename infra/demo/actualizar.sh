@@ -14,6 +14,8 @@
 # 4. Monitorea la verificación de salud interna usando IDs dinámicos.
 # 5. Si la verificación de salud falla, realiza ROLLBACK automático a la versión
 #    anterior inmediatamente para evitar tiempo de inactividad.
+# 6. LIMPIEZA AUTOMÁTICA: Tras una actualización exitosa, elimina imágenes antiguas
+#    de la aplicación preservando las en uso, TAG actual, TAG previa y las 5 más recientes.
 #
 # Uso:
 #   ./actualizar.sh [NUEVA_TAG]
@@ -141,6 +143,16 @@ if [[ "$SALUDABLE" == "true" ]]; then
   echo "   Versión activa: ${NUEVA_TAG}"
   echo "========================================================================"
   compose ps
+
+  # Limpieza automática de imágenes viejas (solo tras actualización exitosa)
+  echo "==> Ejecutando limpieza automática de imágenes antiguas..."
+  if [[ -f "${SCRIPT_DIR}/limpiar-imagenes.sh" ]]; then
+    source "${SCRIPT_DIR}/limpiar-imagenes.sh"
+    limpiar_imagenes_viejas "$NUEVA_TAG" "$TAG_PREVIA" "${IMAGENES_CONSERVAR:-5}" || {
+      echo "AVISO: La limpieza de imágenes no finalizó con éxito, pero la actualización está completada." >&2
+    }
+  fi
+
   exit 0
 else
   echo ""

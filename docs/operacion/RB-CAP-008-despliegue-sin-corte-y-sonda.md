@@ -235,3 +235,28 @@ cd /opt/caprichos/scripts
 | Respuesta de salud | `curl -s https://<dominio>/api/salud` | HTTP 200 con JSON conteniendo la nueva versión |
 | Cola de WhatsApp | `redis-cli ping` y logs del worker | Sin acumulación de jobs fallidos en cola |
 | Socket en vivo | Abrir panel admin en navegador | Indicador de conexión en verde (sin reconexiones constantes) |
+
+---
+
+## 7. Limpieza automática de imágenes viejas (sc-infra3)
+
+Al finalizar un despliegue **100% exitoso**, el sistema ejecuta automáticamente una rutina de saneamiento de almacenamiento para evitar saturar el disco del VPS (donde se acumularon hasta 79 imágenes y 35 GB de espacio):
+
+1. **Momento de ejecución:** Corre **única y exclusivamente** al final de un despliegue exitoso (`desplegar.sh` y `actualizar.sh`). **Nunca** corre antes de comprobar la salud del nuevo contenedor ni durante una vuelta atrás (rollback).
+2. **Tolerancia a fallos:** La limpieza nunca hace fallar el despliegue. Si un comando de Docker reporta error, se emite una advertencia y el proceso culmina con éxito.
+3. **Aislamiento estricto de repositorios:** Solo toca imágenes de la aplicación Caprichos (`ghcr.io/<owner>/caprichos-api`, `ghcr.io/<owner>/caprichos-web`, `caprichos-api` y `caprichos-web`). **Jamás** evalúa ni elimina imágenes de infraestructura compartida como `postgres`, `redis`, `traefik` ni aplicaciones ajenas en el host.
+4. **Reglas de conservación (inmutabilidad y seguridad):**
+   - **Contenedores activos:** Cualquier imagen en uso por un contenedor en ejecución (verificada por nombre e ID `sha256`) se protege automáticamente.
+   - **TAG actual:** La versión que acaba de desplegarse se conserva siempre.
+   - **TAG previa:** La versión anterior se preserva obligatoriamente para garantizar la posibilidad de rollback inmediato sin necesidad de descargar capas.
+   - **Historial reciente:** Se conservan las últimas 5 etiquetas por repositorio ordenadas por fecha de creación (`IMAGENES_CONSERVAR`, configurable por variable de entorno, valor por defecto: 5).
+5. **Purga de capas huérfanas:** Ejecuta `docker image prune -f` para eliminar capas intermedias o colgantes (*dangling*).
+6. **Modo simulación:** Mediante `LIMPIEZA_SIMULACRO=1`, la rutina lista los candidatos a borrado y el espacio que se liberaría en MB/GB sin alterar el almacenamiento.
+7. **Herramienta autónoma:** El script `infra/compose/scripts/limpiar-imagenes.sh` (y `infra/demo/limpiar-imagenes.sh`) puede ejecutarse de forma independiente por el operador:
+   ```bash
+   # Simulación:
+   LIMPIEZA_SIMULACRO=1 ./limpiar-imagenes.sh
+   # Ejecución manual:
+   ./limpiar-imagenes.sh v0.3.1 v0.3.0 5
+   ```
+

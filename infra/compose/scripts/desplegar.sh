@@ -22,6 +22,9 @@
 #    con apagado ordenado (SIGTERM y stop_grace_period: 30s).
 # 8. Monitorea la salud posterior de los contenedores por ID dinámico.
 # 9. Si el nuevo contenedor no queda sano, revierte automáticamente a TAG_PREVIA.
+# 10. LIMPIEZA AUTOMÁTICA: Tras completar un despliegue 100% exitoso, elimina
+#     imágenes antiguas de la aplicación preservando las en uso, TAG actual,
+#     TAG previa y las 5 más recientes (IMAGENES_CONSERVAR). Nunca hace fallar el despliegue.
 # ==============================================================================
 
 set -euo pipefail
@@ -222,4 +225,15 @@ echo "   DESPLIEGUE SIN CORTE COMPLETADO CON ÉXITO [${AMBIENTE^^}]"
 echo "   Versión activa: ${TAG}"
 echo "========================================================================"
 compose ps
+
+# 10. Limpieza automática de imágenes viejas (SOLO tras despliegue 100% exitoso)
+# Regla de seguridad: nunca interrumpe ni hace fallar el despliegue
+echo "==> Ejecutando limpieza automática de imágenes antiguas..."
+if [[ -f "${SCRIPT_DIR}/limpiar-imagenes.sh" ]]; then
+  source "${SCRIPT_DIR}/limpiar-imagenes.sh"
+  limpiar_imagenes_viejas "$TAG" "$TAG_PREVIA" "${IMAGENES_CONSERVAR:-5}" || {
+    echo "AVISO: La limpieza de imágenes no finalizó con éxito, pero el despliegue está completado." >&2
+  }
+fi
+
 exit 0

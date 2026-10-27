@@ -109,6 +109,16 @@ Verifica:
 ./logs.sh staging
 ```
 
+### 3.5 Limpieza Automática de Imágenes Viejas de Docker (sc-infra3)
+Tras culminar un despliegue exitoso, `desplegar.sh` y `actualizar.sh` ejecutan automáticamente `limpiar-imagenes.sh`:
+- **Preserva:** contenedores activos, versión recién instalada (`TAG`), versión anterior (`TAG_PREVIA`) y las 5 etiquetas más recientes por repositorio (`IMAGENES_CONSERVAR=5`).
+- **Elimina:** imágenes antiguas no protegidas de `caprichos-api` y `caprichos-web`, y capas huérfanas (`docker image prune -f`).
+- **Seguridad:** Nunca afecta bases de datos (`postgres`), caché (`redis`), proxies (`traefik`) ni repositorios ajenos. Nunca interrumpe ni hace fallar el despliegue.
+- **Simulación:** Se puede probar sin borrar nada ejecutando:
+  ```bash
+  LIMPIEZA_SIMULACRO=1 ./limpiar-imagenes.sh
+  ```
+
 ---
 
 ## 4. Respaldos y Restauración de Datos

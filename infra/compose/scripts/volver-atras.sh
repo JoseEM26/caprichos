@@ -135,6 +135,8 @@ if [[ $SALUDABLE -eq 1 ]]; then
   echo "   VUELTA ATRÁS EXITOSA [${AMBIENTE^^}]"
   echo "   Versión activa: ${TAG_DESTINO}"
   echo "========================================================================"
+  # NOTA DE SEGURIDAD: En vuelta atrás (rollback) NO se ejecuta limpieza automática de imágenes
+  # para preservar los artefactos de la versión previa y fallida para diagnóstico forense.
   compose ps
   exit 0
 else
