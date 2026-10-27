@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { AccesoGuard } from './acceso.guard';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { SincronizadorPermisosService } from './sincronizador-permisos.service';
 
 @Global()
 @Module({
@@ -29,6 +30,7 @@ import { AuthService } from './auth.service';
   providers: [
     AccesoGuard,
     AuthService,
+    SincronizadorPermisosService,
   ],
   exports: [AccesoGuard, JwtModule, AuthService],
 })
