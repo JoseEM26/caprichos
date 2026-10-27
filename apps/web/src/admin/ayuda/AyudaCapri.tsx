@@ -95,7 +95,7 @@ export function AyudaCapri({ ruta }: AyudaCapriProps) {
           <span className="av" aria-hidden="true">
             <MascotaCapri
               estado={estadoCapri}
-              tamano={esMovil ? 76 : 88}
+              tamano={esMovil ? 104 : 128}
               forzarFallback2D={false}
             />
           </span>
@@ -124,7 +124,7 @@ export function AyudaCapri({ ruta }: AyudaCapriProps) {
             <div className="av" aria-hidden="true">
               <MascotaCapri
                 estado={estadoCapri}
-                tamano={52}
+                tamano={76}
                 forzarFallback2D={false}
               />
             </div>
@@ -171,7 +171,7 @@ export function AyudaCapri({ ruta }: AyudaCapriProps) {
                               className="ayuda-go"
                               onClick={() => manejarNavegacion(enlace.ruta)}
                             >
-                              Ir a {enlace.texto}
+                              {/^ir a /i.test(enlace.texto) ? enlace.texto : `Ir a ${enlace.texto}`}
                             </button>
                           ))}
                         </div>

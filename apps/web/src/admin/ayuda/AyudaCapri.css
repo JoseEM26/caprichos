@@ -30,7 +30,7 @@
   font-size: 13px;
   color: var(--cp-navy, #0B2C3E);
   box-shadow: 0 6px 18px rgba(11, 44, 62, 0.18);
-  max-width: 170px;
+  max-width: 200px;
   text-align: left;
   line-height: 1.35;
 }
@@ -81,7 +81,7 @@
     right: 16px;
     bottom: 16px;
     top: 16px;
-    width: 380px;
+    width: 440px;
     border-radius: 16px;
     border: 1px solid var(--cp-line, #E3D6C6);
   }
@@ -121,8 +121,8 @@
 }
 
 .ayuda-ph .av {
-  width: 52px;
-  height: 52px;
+  width: 76px;
+  height: 76px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
