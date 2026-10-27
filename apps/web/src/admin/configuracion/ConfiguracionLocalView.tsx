@@ -11,6 +11,7 @@ import { SeccionRepartoConfig } from './SeccionRepartoConfig';
 import { ParametrosOperacionTab } from './ParametrosOperacionTab';
 import { ChatbotConfiguracionTab } from './ChatbotConfiguracionTab';
 import { TarjetaImpresionEtiquetas } from '../impresion/TarjetaImpresionEtiquetas';
+import { TarjetaAyudaIaConfiguracion } from './TarjetaAyudaIaConfiguracion';
 
 export interface InfoLocalState {
   // local
@@ -434,6 +435,12 @@ const CATEGORIAS_CONFIG: CategoriaConfig[] = [
     id: 'impresion',
     n: 'Impresión de etiquetas',
     d: 'Estado del agente de caja, trabajos y llaves',
+    fields: [],
+  },
+  {
+    id: 'ayuda',
+    n: 'Asistente de ayuda con IA',
+    d: 'Capri, interruptor con IA y consumo mensual',
     fields: [],
   },
 ];
@@ -994,8 +1001,13 @@ export function ConfiguracionLocalView() {
             <TarjetaImpresionEtiquetas />
           )}
 
+          {/* Subcaso: ASISTENTE DE AYUDA CON IA */}
+          {tabId === 'ayuda' && (
+            <TarjetaAyudaIaConfiguracion />
+          )}
+
           {/* Subcaso: CAMPOS REGULARES DE OTRAS CATEGORÍAS */}
-          {tabId !== 'horario' && tabId !== 'zonas' && tabId !== 'demanda' && tabId !== 'reparto' && tabId !== 'parametros' && tabId !== 'chatbot' && tabId !== 'impresion' && (
+          {tabId !== 'horario' && tabId !== 'zonas' && tabId !== 'demanda' && tabId !== 'reparto' && tabId !== 'parametros' && tabId !== 'chatbot' && tabId !== 'impresion' && tabId !== 'ayuda' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {tabId === 'operacion' && (
                 <div
@@ -1228,7 +1240,7 @@ export function ConfiguracionLocalView() {
           )}
 
           {/* Botones de acción inferiores */}
-          {tabId !== 'horario' && tabId !== 'zonas' && tabId !== 'demanda' && tabId !== 'impresion' && (
+          {tabId !== 'horario' && tabId !== 'zonas' && tabId !== 'demanda' && tabId !== 'impresion' && tabId !== 'ayuda' && (
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px' }}>
               <button
                 type="button"

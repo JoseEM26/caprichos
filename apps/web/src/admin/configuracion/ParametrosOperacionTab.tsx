@@ -236,6 +236,11 @@ const META_PARAMETROS: Record<string, MetaParametro> = {
     tipo: 'numero',
     sufijo: 'consultas/h',
   },
+  ayuda_ia_activo: {
+    nombre: 'Asistente de ayuda con IA (Capri)',
+    descripcion: 'Habilita al asistente virtual Capri con IA para orientar a los usuarios en el panel de administración.',
+    tipo: 'sino',
+  },
 };
 
 interface ParametrosOperacionTabProps {

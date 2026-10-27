@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useSesion } from '../comun/sesion';
 import { Confirmar } from '../comun/Confirmar';
@@ -8,6 +8,9 @@ import { GRUPOS_MODULOS, MODULOS } from './modulos';
 import { TITULOS_VISTA } from './titulos';
 import { useNotificaciones } from './useNotificaciones';
 import type { NotificacionAdmin } from './useNotificaciones';
+
+// Carga diferida de la ayuda con Capri para no penalizar el tiempo de carga del panel
+const AyudaCapri = lazy(() => import('./ayuda/AyudaCapri'));
 
 const ZOOM_CELULAR = 0.82;
 const CLAVE_MENU = 'caprichos_menu_contraido';
@@ -827,6 +830,11 @@ export function AdminShell() {
         alConfirmar={alSalir}
         alCancelar={() => setConfirmarSalida(false)}
       />
+
+      {/* Asistente de ayuda del administrador (Capri) montado una vez para todo el panel */}
+      <Suspense fallback={null}>
+        <AyudaCapri />
+      </Suspense>
     </div>
   );
 }
