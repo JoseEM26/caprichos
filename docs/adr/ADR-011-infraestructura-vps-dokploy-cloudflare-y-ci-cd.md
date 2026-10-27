@@ -8,7 +8,7 @@ version: "1.0"
 owner: "Technical Lead"
 aprobadores: []
 fecha: 2026-10-20
-relacionados: [CAP-PENDIENTE, D-12, DT-30, DT-39, DT-40, DT-41, DT-42, DT-43, DEP-02, RNF-CAP-003]
+relacionados: [CAP-PENDIENTE, D-12, DT-30, DT-39, DT-40, DT-41, DT-42, DT-43, DEP-02, RNF-CAP-003, ADR-015, ADR-016]
 tags: [adr, infraestructura, devops, dokploy, cloudflare, g3]
 ---
 
@@ -17,6 +17,7 @@ tags: [adr, infraestructura, devops, dokploy, cloudflare, g3]
 - Estado: propuesto
 - Ticket: *(pendiente — R13, D-14)* - Fecha: 2026-10-20
 - Compatibilidad con M0: (pendiente — no hay lineamiento M0 para este cliente; se pide dispensa porque Caprichos no es un servicio de Aybar Corp; la decide el TL, DT-48)
+- **Ampliado / Sustituido parcialmente por:** **ADR-015** (sustitución de Dokploy por Docker Compose autónomo y GitHub Actions por SSH) y **ADR-016** (despliegue sin corte con docker-rollout, Traefik, colas BullMQ y Socket.IO con Redis).
 
 ## Contexto
 

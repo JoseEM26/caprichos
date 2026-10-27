@@ -1,0 +1,108 @@
+# Registro de cambios (CHANGELOG)
+
+Todos los cambios notables del proyecto Caprichos se documentan en este archivo. El contenido se organiza en orden cronologico inverso, agrupado por fecha y clasificado por temas operativos y tecnicos a partir de la historia de confirmaciones (`git log`) de la rama `ola-1`.
+
+---
+
+## 2026-10-27
+
+### Despliegue e infraestructura
+- **Llamada directa a script de relevo continuo**: Se corrigio la ejecucion del comando de despliegue para invocar directamente el script vendorizado `infra/compose/scripts/docker-rollout` tanto en la publicacion como en la vuelta atras. Esto previene el falso positivo que devolvia la verificacion del comando del sistema cuando el plugin no estaba instalado globalmente (`c628b02`).
+- **Despliegue sin corte (Rolling Rollout)**: Implementacion de relevo sin interrupcion de servicio para los contenedores `caprichos-api` y `caprichos-web`. El nuevo contenedor arranca en paralelo, valida su estado en `/api/salud`, y Traefik conmuta el trafico de manera transparente (`c856104`).
+- **Apagado ordenado del servidor**: Configuracion de ganchos de apagado (`enableShutdownHooks`) en NestJS y periodo de gracia de 30 segundos (`stop_grace_period: 30s`) en Docker Compose para permitir que las conexiones y transacciones en curso culminen limpiamente (`c856104`).
+- **Cola BullMQ para webhooks de WhatsApp**: Procesamiento asincrono de notificaciones de Meta mediante BullMQ sobre Redis. Incluye generacion de identificador de tarea por resumen sha256 para evitar duplicidad, concurrencia fija de 5 procesos, hasta 5 reintentos con retraso exponencial y respaldo de ejecucion en linea ante indisponibilidad de Redis (`c856104`).
+- **Coordinacion en Redis para tareas y tiempo real**: Inclusion de candado distribuido (`candado.util.ts`) para tareas programadas y adaptador de Socket.IO con Redis (`redis-io.adapter.ts`) para soportar escalamiento horizontal en multiples instancias (`c856104`).
+- **Resiliencia en el cliente web**: Incorporacion de reintentos automaticos ante respuestas 502, 503, 504 o fallas momentaneas de conexion en peticiones de lectura y en operaciones de escritura protegidas con la cabecera `Idempotency-Key` (`59e4d05`).
+- **Socket.IO exclusivamente sobre WebSocket**: Configuracion del cliente y servidor en tiempo real para operar solo con el protocolo WebSocket, evitando la dependencia de sesiones fijas (sticky sessions) entre multiples servidores (`59e4d05`).
+
+### Lectura de vouchers con IA
+- **Analisis inteligente de comprobantes Yape y Plin**: Integracion de vision artificial con OpenAI para la lectura automatica de capturas de pago. La IA extrae monto, numero de operacion, billetera detectada, titular y fecha, asignando un semaforo de confianza: Confiable, Observado, Raro, Ilegible o Sin lectura (`d51d50b`).
+- **Politica de decision humana obligatoria**: La inteligencia artificial actua unicamente como auxiliar de lectura; nunca aprueba ni rechaza transacciones de forma autonoma. La aprobacion final recae siempre en una persona de Caja o Call Center (`d51d50b`).
+- **Captura obligatoria de foto en sala**: Implementacion del flujo de cobro para mozos en mesa mediante `ModalPrecuenta` y `SubirVoucherMozo`. La aplicacion reduce la foto en el navegador (maximo 1600 px en formato JPEG al 85 %) y el mozo solo recibe confirmacion de legibilidad ("legible" o "no legible") sin acceso a semaforos internos de riesgo (`d51d50b`).
+- **Auditoria de vouchers en cierre de caja**: Incorporacion del componente `SeccionVouchersCierre` en el modulo de Caja y cierres para auditar todos los comprobantes digitales recibidos en el dia, con visualizador en alta resolucion y marcado individual de revisado (`d51d50b`).
+- **Parametros y consumo de IA**: Parametros configurables en el local (`voucher_ia_activo`, `voucher_titular_nombre`, `voucher_yape_numero`, `voucher_plin_numero`, `voucher_mozo_obligatorio`) sin tope de gasto, con registro discriminado de tokens y costos en `ia_consumo` bajo el origen `VOUCHER` (`d51d50b`).
+- **Registro persistente y permisos**: Creacion de la tabla `voucher_pago` y asignacion de permisos `vouchers/subir` (Mozo, Cajero, Administrador) y `vouchers/ver` (Cajero, Administrador) mediante migracion de esquema (`d51d50b`).
+
+### Asistente Capri
+- **Ajustes de la version 2D**: Correccion de lineas de expresion en la version vectorial de respaldo, elevacion del flequillo y afinamiento de pestanas (`8a8c1bd`).
+- **Minimizacion y expansion ergonomica**: Boton circular compacto en la esquina para ocultar a la mascota sin tapar los controles de envio o pulido de mensajes, con opcion de restaurar el tamano completo al pulsar el control de expansion (`8a8c1bd`).
+
+---
+
+## 2026-10-26
+
+### Mensajeria y WhatsApp
+- **Compatibilidad con prefijo telefonico 51**: Los controles de aprobacion y rechazo de pagos permanecen habilitados aunque el numero de chat cuente con prefijo de pais (`519...`) y el pedido no lo contenga (`14b306a`).
+- **Prioridad de vinculacion**: El pedido asociado al comprobante de pago recibe prioridad en la visualizacion y gestion de la conversacion (`14b306a`).
+- **Traspaso automatico a atencion humana**: Ante la recepcion de una captura de voucher en el chat, el chatbot transfiere de inmediato la conversacion a la cola de atencion humana en Caja (`14b306a`).
+- **Visualizacion de archivos privados en chat**: La foto del voucher se despliega dentro de la conversacion mediante peticion autenticada de archivo privado con el token de sesion de la operadora (`4a29812`).
+- **Persistencia de medios entrantes**: Toda fotografia entrante por la API de WhatsApp queda registrada y asociada formalmente al historial del mensaje (`4a29812`).
+- **Reconexion en tiempo real**: El canal de Socket.IO renueva su suscripcion con el token activo tras caidas o despliegues del servidor, complementado con un refresco de lista cada 20 segundos (`7541cb8`).
+
+### Chatbot de pedidos y reservas
+- **Identificacion por envase en bebidas**: Solicitud de nombre de cliente por cada vaso en categorias de bebidas (Frappes, Iced, Frozen y Calientes) con dialogo de confirmacion Si/No (`744fc51`).
+- **Ofrecimiento de numero de contacto**: El flujo de pedido ofrece la opcion rapida "Usar este numero" a partir del telefono de WhatsApp del remitente (`744fc51`).
+- **Comprobantes legales simplificados**: Restriccion de opciones de comprobante exclusivamente a Boleta o Factura (`744fc51`).
+- **Proteccion de comanda en cocina**: Los pedidos registrados con pago digital (Yape o Plin) no aparecen en las pantallas de Cocina hasta que su voucher es aprobado formalmente en Caja o Mensajes (`744fc51`).
+- **Remocion de tope de unidades**: Se retiro el limite artificial de 20 unidades por producto en el chatbot, admitiendo pedidos de cualquier volumen hasta el limite operativo de 9999 unidades (`22af0b5`).
+- **Notificaciones de reservas en la campana**: Las reservas pendientes de confirmacion ingresadas por WhatsApp se reflejan como alertas prioritarias en la campanita y en el contador del menu Reservas (`748707b`).
+- **Filtro de franjas horarias por fecha**: Correccion en la consulta de disponibilidad de mesas para evaluar las franjas de la fecha indicada por el cliente en el mensaje, evitando falsos rechazos por consultar la fecha de hoy (`4976350`).
+- **Precision en derivacion de mensajes**: Optimizacion de patrones en notas, nombres y fechas para que palabras de cortesia o solicitud de atencion no transfieran equivocadamente el chat a una persona (`0a75271`).
+
+### Asistente de ayuda Capri y documentacion
+- **Motor de ayuda del panel administrativo**: Construccion del cargador de 34 manuales Markdown normalizados en `apps/api/src/modulos/ayuda-admin` y grafo de conocimiento derivado en memoria con enlaces bidireccionales (`eda7053`).
+- **Busqueda contextual con IA opcional**: Recuperacion lexica de manuales con sinonimos y vecino a 1 salto jerarquico segun el rol del usuario; generacion de respuestas directas con OpenAI respaldada por modo de contingencia sin IA (`eda7053`).
+- **Privacidad y control presupuestal**: Filtro de sanitizacion para rechazar consultas con datos personales (DNI, telefonos, tarjetas), limites de uso por cuenta y registro detallado en `ia_consumo` (`eda7053`).
+- **Interfaz web de Capri**: Boton flotante con globo de dialogo, panel lateral en escritorio y hoja inferior en moviles, sugerencias rapidas y enlaces directos a las pantallas del sistema (`f4a75cc`).
+- **Sintesis y precision en respuestas**: Optimizacion del prompt a un maximo de 400 caracteres para entregar exclusivamente el proposito del modulo o los pasos numerados de la tarea solicitada (`0e66cac`).
+- **Nueva tarea de indicadores de escritorio**: Incorporacion de la tarea de interpretacion de metricas en el manual del Escritorio (`0e66cac`).
+- **Ampliacion visual del panel**: Incremento de tamano de cabecera y ancho de lectura del panel de ayuda para mayor comodidad de lectura (`9dfa945`).
+
+### Mascota Capri y modelado
+- **Redefinicion del personaje**: Capri se presenta como una chef mujer de estilo figurita de vinilo, con cabello castano, flequillo, colitas con lazos, mejillas sonrosadas y uniforme naranja y negro con vivos dorados (`1f7fd57`, `bd21d80`, `2357242`).
+- **Implementacion tecnica 3D y 2D**: Modelo procedural generado en Three.js con carga bajo demanda (lazy loading) para no retrasar la carga del panel, junto con una version vectorial SVG para navegadores livianos (`7820fe1`).
+- **Estados de animacion y entorno de prueba**: Siete estados gestuales integrados y pagina de verificacion tecnica en `/mascota` (`7820fe1`).
+
+### Impresion de etiquetas
+- **Agente local de impresion**: Desarrollo de la aplicacion de escritorio `apps/agente-local` para la estacion de Caja, encargada de consultar la cola del servidor y comunicarse con la etiquetera fisica (`ab0e0d4`).
+- **Generacion de comandos TSPL2**: Soporte de impresion en lenguaje nativo para tres formatos: etiqueta general del pedido, etiqueta por area de despacho y etiqueta individual por bebida (`ab0e0d4`).
+- **Cola centralizada en el servidor**: Tabla `print_job` con autenticacion por llave de agente, reclamo atomico de trabajos, latidos de conexion y confirmacion de reimpresion Si/No (`371312a`).
+
+### Correcciones de servidor
+- **Resolucion de dependencia circular**: Reorganizacion de importaciones entre `ChatbotModule`, `PedidosModule` y el modulo de avisos internos para permitir el arranque estable de la API (`c3c7299`).
+
+---
+
+## 2026-10-25
+
+### WhatsApp y chatbot (Fase 1 y 2)
+- **Motor conversacional por olas**: Estructuracion de la arquitectura por capas para mensajeria con WhatsApp Cloud API y modo simulado para desarrollo (`44d5558`, `f1ab21e`).
+- **Seguridad en webhooks**: Validacion de firmas criptograficas, procesamiento idempotente y gestion de la ventana de atencion de 24 horas mediante plantillas oficiales (`44d5558`).
+- **Flujo de pedidos interactivos**: Seleccion de productos por botones y listas de opciones, calculo de cupones, promociones y tarifas de envio, con creacion de pedido asociada al canal WhatsApp (`863bc1d`, `e9b4c7c`).
+- **Identificacion por BSUID**: Soporte para interacciones con usuarios identificados por identificador de Meta (BSUID) en lugar de numero telefonico directo (`1bb18f4`).
+- **Integracion con reclamos y soporte**: Registro automatico de quejas recibidas por WhatsApp en el Libro de reclamaciones y solicitudes de cambio de pedido atendidas desde Mensajes (`44d5558`, `b86bdd6`).
+- **Asistente de lectura de carta**: Integracion preliminar de consultas de carta y promociones mediante funcion-calling de solo lectura (`6fd8e23`).
+
+### Modulos operativos
+- **Optimizacion del mapa de repartos**: Rutas sugeridas por sector diferenciadas por colores, exclusion de datos sensibles en el mapa del conductor y boton atomico para iniciar ruta (`3cbbffc`, `99223bc`).
+- **Unificacion de compras y produccion**: Compras establecida como la via central de ingreso de insumos, reporte de elaboracion diaria Hoy prepare y recetas consolidadas en una sola vista (`ad3ca13`).
+- **Gestion simplificada en cocina**: Control rapido de productos agotados, modal unificado para reporte de mermas y seguimiento de pedidos internos al almacen en tres pasos (`9eb484f`).
+- **Reglas de promociones y combos**: Constructor guiado de combos en 4 pasos con validacion en servidor; exclusion de descuentos porcentuales sobre productos que ya forman parte de un combo cerrado (`a8afb18`, `d0f54e8`).
+- **Seguridad con codigo rotativo del supervisor**: Sustitucion del PIN estatico por un token TOTP dinamico de 30 segundos generado en pantalla protegida para el Administrador, requerido en anulaciones de pedidos, cierres con descuadre y mermas altas (`4d5cb9f`).
+- **Visor seguro de iniciativas**: Visualizacion y carga de imagenes privadas de iniciativas mediante descarga autenticada con token de sesion (`1261e15`).
+
+---
+
+## 2026-10-24
+
+### Infraestructura y aseguramiento de calidad
+- **Migracion a Docker Compose y SSH**: Sustitucion de la gestion por Dokploy por una infraestructura reproducible con Docker Compose, proxy perimetral Traefik y despliegues orquestados por GitHub Actions mediante SSH seguro (`f9424b8`).
+- **Publicacion segura en GHCR**: Compilacion unica de imagenes de API y Web en ejecutores de GitHub, liberando espacio en disco y publicando unicamente artefactos escaneados con Trivy libres de vulnerabilidades criticas (`5ea826b`).
+- **Sincronizacion de scripts de operacion**: Despliegue automatizado de scripts y archivos Compose en la carpeta `/opt/caprichos` del VPS (`1c70a85`).
+- **Soporte multidominio y certificados**: Configuracion de Traefik para atender `caprichos.pe` y `www.caprichos.pe` con renovacion automatica de certificados TLS via Let's Encrypt (`b074629`).
+- **Bateria de pruebas end-to-end con Playwright**: Creacion de 24 pruebas de integracion sobre un entorno aislado con semilla fija de base de datos (`44e9086`).
+
+### Modulos administrativos y experiencia de usuario
+- **Sincronizacion de Almacen y Caja**: Sincronizacion de anulacion de cobros protegida con codigo de supervisor en lugar de anular pedidos pagados (`2a22a1d`).
+- **Reposicion automatica de inventario**: La anulacion de cobros o pedidos repone automaticamente el stock de productos terminados registrando la identidad del operador responsable (`f2a62a6`).
+- **Redisenos visuales**: Simplificacion de vistas en Comprobantes, Libro de reclamaciones y Repartos sustituyendo tablas saturadas por tarjetas y filtros interactivos (`99c76ad`, `5314bc8`, `1ac830c`).

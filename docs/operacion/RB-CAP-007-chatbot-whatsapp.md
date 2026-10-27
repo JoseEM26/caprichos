@@ -149,6 +149,9 @@ El administrador puede encender o apagar cualquier aviso y modificar los tiempos
 
 | Clave | Tipo | Valor por Defecto | Efecto Operativo |
 |---|:---:|:---:|---|
+| `chatbot_activo` | Sí/No | `true` | Interruptor general del motor conversacional del chatbot. |
+| `chatbot_ia_activo` | Sí/No | `false` | Activa la IA de lenguaje (OpenAI) para preguntas libres y recomendaciones. |
+| `chatbot_ia_tope_mensual_usd` | Numérico | `20` | Tope máximo mensual en USD antes de desconectar automáticamente la IA. |
 | `whatsapp_aviso_salida_activo` | Sí/No | `false` | Envía aviso 1 al cliente al marcarse la salida del repartidor. |
 | `whatsapp_aviso_llegada_activo` | Sí/No | `false` | Envía aviso 2 al cliente al marcarse la llegada a la puerta. |
 | `whatsapp_aviso_espera_activo` | Sí/No | `false` | Envía aviso de espera agotada y ofrece reprogramación con recargo. |
@@ -163,7 +166,33 @@ El administrador puede encender o apagar cualquier aviso y modificar los tiempos
 
 ---
 
-## 6. Gestión de Quejas de WhatsApp vs Libro de Reclamaciones
+## 6. Reglas de Operación y Comportamiento del Chatbot
+
+### A. Flujo de Pedidos
+1. **Límites de cantidad:** Se eliminó el tope previo de 20 unidades por producto. Ahora el techo técnico es de 9,999 unidades para pedidos corporativos o eventos, y la validación final se realiza contra el pago.
+2. **Nombre por envase en bebidas:** En categorías de bebidas (`FRAPPES`, `ICED`, `FROZEN`, `CALIENTES`), el bot pregunta interactivamente si desea colocar un nombre personalizado a cada vaso para su rotulación en barra (ej. "Para María Elena"), con confirmación obligatoria Sí/No.
+3. **Captura inteligente de teléfono:** Cuando el cliente interactúa por primera vez, el bot le ofrece el botón interactivo *Usar este número* con su propio teléfono detectado. El prefijo internacional `51` ya no descarta la coincidencia.
+4. **Comprobantes tributarios:** El flujo solo admite **Boleta** o **Factura** (exigiendo RUC y razón social válidos). No se admiten notas de venta informales.
+5. **Mensaje de pago digital y cocina:** Al subir un voucher o elegir pago digital, el bot informa explícitamente al cliente: *«Pasa a cocina apenas validemos tu pago»*. La comanda **no aparece en la pantalla de Cocina** hasta que Caja valida y aprueba el comprobante en `/admin/mensajes`.
+
+### B. Flujo de Reservas
+1. **Franjas horarias dinámicas:** El bot consulta las franjas horarias disponibles para la **fecha elegida** (no las del día de hoy), calculando las mesas libres según el horario oficial.
+2. **Robustez en nombres y notas:** La nota, el nombre y los datos ingresados por el cliente no se confunden con una petición de hablar con una persona aunque contengan palabras como *"personas"*, *"atención"* o *"ayuda"*.
+3. **Alerta urgente en campana:** Toda solicitud de reserva genera una notificación en tiempo real en la campana de avisos para el personal de Salón y Caja con el contador actualizado de reservas pendientes.
+
+### C. Horario de atención: Demo vs Producción
+> [!IMPORTANT]
+> **HORARIO DE ATENCIÓN TEMPORAL EN DEMO:**
+> Para permitir pruebas continuas y revisiones de agentes a cualquier hora, la demo tiene configurado el horario **24/7**.
+> **Antes de pasar a producción:** Debe restaurarse el horario comercial real: **Lunes a Sábado de 14:00 a 22:00, con Domingo cerrado**, configurado en `LocalService` o parámetros del local. Fuera de ese rango, el bot informa al cliente que el local está cerrado y ofrece revisar la carta para el día siguiente.
+
+### D. Modo Pruebas vs Modo Público
+- En desarrollo, el número de Meta tiene un **límite estricto de 5 destinatarios de prueba**.
+- Para conectar el número comercial real del negocio y abrir el bot al público, siga paso a paso la [Guía: Cómo hacer público el bot de WhatsApp](./GUIA-hacer-publico-el-bot-de-whatsapp.md).
+
+---
+
+## 7. Gestión de Quejas de WhatsApp vs Libro de Reclamaciones
 
 Las calificaciones bajas (1 o 2 estrellas) o reclamos por chat se registran en `queja_whatsapp` y se gestionan en:
 **Panel Administrativo → Reclamos → Pestaña «Quejas de WhatsApp (Chatbot)»** (`/admin/reclamos`).
@@ -174,7 +203,7 @@ Las calificaciones bajas (1 o 2 estrellas) o reclamos por chat se registran en `
 
 ---
 
-## 7. Diagnóstico y Resolución de Problemas Frecuentes
+## 8. Diagnóstico y Resolución de Problemas Frecuentes
 
 ### Problema A: El Webhook devuelve 401 Unauthorized
 - **Causa:** `WHATSAPP_APP_SECRET` no coincide o la cabecera `X-Hub-Signature-256` está ausente.

@@ -8,7 +8,7 @@ version: "1.0"
 owner: "Technical Lead"
 aprobadores: []
 fecha: 2026-10-24
-relacionados: [ADR-011, ADR-012, RB-CAP-004, RB-CAP-005, RB-CAP-DEMO, INV-CAP-001]
+relacionados: [ADR-011, ADR-012, ADR-016, RB-CAP-004, RB-CAP-005, RB-CAP-DEMO, INV-CAP-001]
 tags: [adr, infraestructura, compose, traefik, github-actions, ssh, devops]
 ---
 
@@ -16,6 +16,7 @@ tags: [adr, infraestructura, compose, traefik, github-actions, ssh, devops]
 
 - **Estado:** borrador (draft — la IA propone; aprueba y firma el líder técnico)
 - **Reemplaza:** A **ADR-011** exclusivamente en lo referente al uso de Dokploy como orquestador y panel de despliegue. Mantiene intactas las decisiones de Ansible, Cloudflare (DNS, WAF, Full Strict), copias con restic (ADR-012) y arquitectura de ambientes.
+- **Ampliado por:** **ADR-016** (Despliegue sin corte con rolling rollout mediante docker-rollout, Traefik, drenado ordenado de conexiones, cola BullMQ para webhooks de WhatsApp, candado en Redis y adaptador Redis para Socket.IO).
 - **Fecha:** 2026-10-24
 
 ---
