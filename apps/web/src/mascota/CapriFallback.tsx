@@ -206,10 +206,24 @@ export function CapriFallback({
               transition: 'transform 0.3s ease',
             }}
           >
+            {/* Cabello castaño: atrás, colitas con moñitos naranjas */}
+            <circle cx="120" cy="104" r="48" fill="#4A2C1D" />
+            <ellipse cx="70" cy="122" rx="12" ry="20" fill="#4A2C1D" transform="rotate(25 70 122)" />
+            <ellipse cx="170" cy="122" rx="12" ry="20" fill="#4A2C1D" transform="rotate(-25 170 122)" />
+            <g fill="#E67929">
+              <ellipse cx="76" cy="104" rx="9" ry="6" transform="rotate(-25 76 104)" />
+              <ellipse cx="164" cy="104" rx="9" ry="6" transform="rotate(25 164 104)" />
+            </g>
+            <circle cx="76" cy="104" r="3.5" fill="#D99E39" />
+            <circle cx="164" cy="104" r="3.5" fill="#D99E39" />
+
             {/* Carita redonda color piel */}
             <circle cx="120" cy="106" r="44" fill="url(#capri-grad-piel)" />
             <ellipse cx="82" cy="108" rx="5" ry="8" fill="#F6BE94" />
             <ellipse cx="158" cy="108" rx="5" ry="8" fill="#F6BE94" />
+
+            {/* Flequillo */}
+            <path d="M 80 84 Q 90 70 108 80 Q 120 66 132 80 Q 150 70 160 84 Q 150 92 138 86 Q 120 96 102 86 Q 90 92 80 84 Z" fill="#4A2C1D" />
 
             {/* Gorro de chef: sombra bajo la banda, nube esponjosa y banda con cinta */}
             <g stroke="#E3D6C6" strokeWidth="1.5">
@@ -220,6 +234,11 @@ export function CapriFallback({
             </g>
             <rect x="84" y="62" width="72" height="6" fill="#1C1C22" />
             <rect x="84" y="68" width="72" height="3" rx="1.5" fill="#D99E39" />
+            <g fill="#E67929" stroke="#B2500F" strokeWidth="1">
+              <ellipse cx="146" cy="56" rx="11" ry="7" transform="rotate(-30 146 56)" />
+              <ellipse cx="160" cy="62" rx="11" ry="7" transform="rotate(30 160 62)" />
+            </g>
+            <circle cx="153" cy="59" r="4" fill="#D99E39" />
 
             {/* OJOS */}
             {esDormido ? (
@@ -241,17 +260,19 @@ export function CapriFallback({
                 <ellipse cx="101" cy="103" rx="12" ry="14" fill="#1C1C22" />
                 <circle cx="105" cy="97" r="5" fill="#FFFFFF" />
                 <circle cx="98" cy="106" r="2" fill="#FFFFFF" />
+                <path d="M 88 96 Q 101 86 114 96 M 87 98 L 82 94 M 90 94 L 86 89" stroke="#1C1C22" strokeWidth="2.6" strokeLinecap="round" fill="none" />
 
                 {/* Ojo Derecho */}
                 <ellipse cx="139" cy="103" rx="12" ry="14" fill="#1C1C22" />
                 <circle cx="143" cy="97" r="5" fill="#FFFFFF" />
                 <circle cx="136" cy="106" r="2" fill="#FFFFFF" />
+                <path d="M 126 96 Q 139 86 152 96 M 153 98 L 158 94 M 150 94 L 154 89" stroke="#1C1C22" strokeWidth="2.6" strokeLinecap="round" fill="none" />
               </g>
             )}
 
             {/* MEJILLAS (Rubor suave rosado) */}
-            <ellipse cx="88" cy="112" rx="7" ry="4.5" fill="#F78D74" opacity="0.85" />
-            <ellipse cx="152" cy="112" rx="7" ry="4.5" fill="#F78D74" opacity="0.85" />
+            <ellipse cx="88" cy="112" rx="9" ry="5.5" fill="#F78D74" opacity="0.9" />
+            <ellipse cx="152" cy="112" rx="9" ry="5.5" fill="#F78D74" opacity="0.9" />
 
             {/* BOCA */}
             {esHablando ? (

@@ -260,7 +260,6 @@ export function construirCapri(): PiezasCapri {
   const nudoLazo = new THREE.Mesh(geoBoton, matAzulMarino);
   nudoLazo.scale.setScalar(1.3);
   nudoLazo.position.set(0, 0.07, 0.36);
-  cuerpo.add(nudoLazo);
 
   // Zapatitos azul marino que asoman al frente de la falda
   const geoPiecito = registrarGeo(new THREE.SphereGeometry(0.17, 20, 16), geometrias);
@@ -300,6 +299,47 @@ export function construirCapri(): PiezasCapri {
     cabeza.add(oreja);
   }
 
+  // Cabello castaño: casquete atrás, flequillo, mechones laterales y dos colitas con moñitos
+  const matPelo = registrarMat(
+    new THREE.MeshStandardMaterial({ color: 0x4A2C1D, roughness: 0.55, metalness: 0 }),
+    materiales
+  );
+  const geoCasquete = registrarGeo(new THREE.SphereGeometry(0.58, 40, 30), geometrias);
+  const casquete = new THREE.Mesh(geoCasquete, matPelo);
+  casquete.position.set(0, 0.03, -0.07);
+  cabeza.add(casquete);
+
+  const geoFlequillo = registrarGeo(new THREE.SphereGeometry(0.15, 20, 20), geometrias);
+  [[-0.3, 0.3, 0.33, 0.9], [-0.1, 0.34, 0.37, 1], [0.1, 0.34, 0.37, 1], [0.3, 0.3, 0.33, 0.9]].forEach(([x, y, z, k]) => {
+    const m = new THREE.Mesh(geoFlequillo, matPelo);
+    m.scale.set(k, 0.8, 0.7);
+    m.position.set(x, y, z);
+    cabeza.add(m);
+  });
+
+  const geoMechon = registrarGeo(new THREE.CapsuleGeometry(0.08, 0.24, 6, 14), geometrias);
+  const geoColita = registrarGeo(new THREE.CapsuleGeometry(0.085, 0.22, 8, 16), geometrias);
+  const geoMonito = registrarGeo(new THREE.SphereGeometry(0.075, 14, 14), geometrias);
+  for (const lado of [-1, 1]) {
+    const mechon = new THREE.Mesh(geoMechon, matPelo);
+    mechon.position.set(lado * 0.5, -0.02, 0.12);
+    mechon.rotation.z = lado * 0.12;
+    cabeza.add(mechon);
+
+    const colita = new THREE.Mesh(geoColita, matPelo);
+    colita.position.set(lado * 0.66, -0.13, -0.05);
+    colita.rotation.z = lado * 0.55;
+    cabeza.add(colita);
+
+    const monoA = new THREE.Mesh(geoMonito, matNaranja);
+    monoA.scale.set(1.4, 0.9, 0.8);
+    monoA.position.set(lado * 0.6, 0.0, 0.0);
+    cabeza.add(monoA);
+    const monoB = new THREE.Mesh(geoMonito, matDorado);
+    monoB.position.set(lado * 0.6, 0.0, 0.05);
+    cabeza.add(monoB);
+  }
+
   // Gorro de chef: banda crema con cinta marino y dorado, y copa esponjosa encima
   const matTela = registrarMat(
     new THREE.MeshStandardMaterial({ color: COLORES_CAPRI.crema, roughness: 0.95, metalness: 0 }),
@@ -336,6 +376,39 @@ export function construirCapri(): PiezasCapri {
     const lobulo = new THREE.Mesh(geoLobulo, matTela);
     lobulo.position.set(Math.cos(angulo) * 0.3, 0.3, Math.sin(angulo) * 0.3);
     gorro.add(lobulo);
+  }
+
+  // Moñito naranja en el costado del gorro
+  const geoMonoGorro = registrarGeo(new THREE.SphereGeometry(0.09, 16, 16), geometrias);
+  const monoGorroIzq = new THREE.Mesh(geoMonoGorro, matNaranja);
+  monoGorroIzq.scale.set(1.3, 0.9, 0.7);
+  monoGorroIzq.position.set(0.3, 0.52, 0.26);
+  monoGorroIzq.rotation.z = 0.5;
+  cabeza.add(monoGorroIzq);
+  const monoGorroDer = new THREE.Mesh(geoMonoGorro, matNaranja);
+  monoGorroDer.scale.set(1.3, 0.9, 0.7);
+  monoGorroDer.position.set(0.5, 0.45, 0.2);
+  monoGorroDer.rotation.z = -0.5;
+  cabeza.add(monoGorroDer);
+  const nudoGorro = new THREE.Mesh(geoMonoGorro, matDorado);
+  nudoGorro.scale.setScalar(0.6);
+  nudoGorro.position.set(0.4, 0.49, 0.26);
+  cabeza.add(nudoGorro);
+
+  // Pestañas: arco oscuro sobre cada ojo con dos rayitas en la esquina externa
+  const geoPestana = registrarGeo(new THREE.TorusGeometry(0.14, 0.012, 8, 20, Math.PI * 0.75), geometrias);
+  const geoRayita = registrarGeo(new THREE.CapsuleGeometry(0.008, 0.06, 4, 8), geometrias);
+  for (const lado of [-1, 1]) {
+    const arco = new THREE.Mesh(geoPestana, matAzulMarino);
+    arco.position.set(lado * 0.2, 0.03, 0.52);
+    arco.rotation.z = Math.PI * 0.125;
+    cabeza.add(arco);
+    for (const [dx, dy, rz] of [[0.14, 0.1, -0.9], [0.17, 0.04, -1.3]]) {
+      const r = new THREE.Mesh(geoRayita, matAzulMarino);
+      r.position.set(lado * (0.2 + dx), 0.03 + dy, 0.5);
+      r.rotation.z = lado * rz;
+      cabeza.add(r);
+    }
   }
 
   // OJOS (Grandes, brillantes y expresivos)
@@ -404,12 +477,12 @@ export function construirCapri(): PiezasCapri {
   // MEJILLAS SUAVES (Rubor rosado pastel)
   const geoMejilla = registrarGeo(new THREE.SphereGeometry(0.068, 16, 16), geometrias);
   const mejillaIzq = new THREE.Mesh(geoMejilla, matMejilla);
-  mejillaIzq.scale.set(1, 0.6, 0.35);
+  mejillaIzq.scale.set(1.35, 0.8, 0.35);
   mejillaIzq.position.set(-0.32, -0.1, 0.42);
   cabeza.add(mejillaIzq);
 
   const mejillaDer = new THREE.Mesh(geoMejilla, matMejilla);
-  mejillaDer.scale.set(1, 0.6, 0.35);
+  mejillaDer.scale.set(1.35, 0.8, 0.35);
   mejillaDer.position.set(0.32, -0.1, 0.42);
   cabeza.add(mejillaDer);
 
