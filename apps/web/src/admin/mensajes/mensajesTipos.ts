@@ -27,6 +27,7 @@ export interface ChatResumen {
   ultimo: string;
   hora: string;
   sinLeer: number;
+  esperaMin?: number | null;
 }
 
 export interface DetallePedidoChat {

@@ -163,8 +163,11 @@ export class EjecutorConversacionService {
       return false;
     }
 
-    // 2. Solo responde si el dueño es estrictamente el BOT y no ha sido tomado por una persona
-    if (conversacion.duenio !== 'BOT' || conversacion.tomado_por !== null) {
+    // 2. Solo responde si el dueño es estrictamente el BOT y no ha sido tomado por una persona.
+    // Regla de contrato (Sección 3): Mientras hay un pago pendiente de validar (VALIDAR_PAGO), el bot
+    // sigue atendiendo menú, carta, horario, estado del pedido y nuevos pedidos; solo no decide el pago.
+    const esValidarPago = conversacion.estado === 'VALIDAR_PAGO';
+    if ((conversacion.duenio !== 'BOT' || conversacion.tomado_por !== null) && !esValidarPago) {
       this.logger.log(`Conversación ${conversacionId} en manos de PERSONA (${conversacion.duenio}). El bot calla.`);
       return false;
     }
@@ -517,12 +520,7 @@ export class EjecutorConversacionService {
       textosPersonalizados,
     };
 
-    // 7. Normalizar entrada y ejecutar la máquina de estados pura
-    const entradaNorm = normalizarEntrada(entradaRaw);
-    const flujoPrevio = (conversacion.flujo as any) as FlujoConversacion | null;
-    const resultado = transicionarEstado(flujoPrevio, entradaNorm, contexto);
-
-    // 8. Determinar destino (número E.164 normalizado o BSUID de Meta)
+    // 7. Determinar destino (número E.164 normalizado o BSUID de Meta)
     const sinTelefono = esRemitenteSinTelefono(conversacion);
     const destinoEnvio = sinTelefono
       ? conversacion.telefono?.trim() || null
@@ -530,6 +528,311 @@ export class EjecutorConversacionService {
     const telMask =
       entradaRaw.telMask ||
       (conversacion.telefono ? enmascararTelefono(conversacion.telefono) : 'Usuario de WhatsApp');
+
+    // 7.b Manejo de espera del cliente cuando la conversación está en VALIDAR_PAGO
+    // Regla de contrato (Sección 3): Mientras hay un pago pendiente de validar el bot sigue atendiendo
+    // menú, carta, horario, estado del pedido y nuevos pedidos; solo no decide el pago.
+    // Texto libre fuera de eso: responde una sola vez 'Ya avisé a una persona, te responde en breve'.
+    if (esValidarPago) {
+      const textoNorm = (entradaRaw.texto || entradaRaw.textoOriginal || '').trim().toLowerCase();
+      const payload = String(
+        entradaRaw.buttonPayload || entradaRaw.listReplyId || entradaRaw.listRowId || '',
+      ).trim();
+
+      const esCarta =
+        payload === 'btn_esp_carta' ||
+        payload === 'carta' ||
+        textoNorm === 'carta' ||
+        textoNorm.includes('ver la carta') ||
+        textoNorm.includes('ver carta') ||
+        textoNorm === 'la carta';
+
+      const esMenu =
+        payload === 'btn_menu' ||
+        payload === 'volver_menu' ||
+        payload === 'inicio' ||
+        textoNorm === 'menu' ||
+        textoNorm === 'inicio' ||
+        textoNorm === '0';
+
+      const esHorario =
+        payload === 'btn_horario' ||
+        payload === 'btn_ubicacion' ||
+        textoNorm.includes('horario') ||
+        textoNorm.includes('ubicacion') ||
+        textoNorm.includes('donde estan') ||
+        textoNorm.includes('a que hora');
+
+      const esEstadoPedido =
+        Boolean(textoNorm.match(/cp-\d{4}/i)) ||
+        payload.startsWith('ord_') ||
+        textoNorm.includes('mi pedido') ||
+        textoNorm.includes('estado');
+
+      const esNuevoPedido =
+        payload === 'pedir' ||
+        payload === 'delivery' ||
+        payload === 'recojo' ||
+        textoNorm === 'pedir' ||
+        textoNorm.includes('nuevo pedido');
+
+      const esSeguirEsperando =
+        payload === 'btn_esp_esperar' ||
+        textoNorm === 'seguir esperando' ||
+        textoNorm.includes('espero');
+
+      const esHablarPersona =
+        payload === 'btn_esp_persona' ||
+        textoNorm === 'asesor' ||
+        textoNorm.includes('persona') ||
+        textoNorm.includes('hablar con persona');
+
+      if (esCarta) {
+        const urlCarta = contexto.cartaUrlPublica || 'https://caprichos.pe/carta';
+        const textoCarta = `Puedes revisar nuestra carta completa aquí:\n👉 ${urlCarta}\n\nSeguimos revisando tu pago en Caja.`;
+        const botones = [
+          { id: 'btn_esp_esperar', titulo: 'Seguir esperando' },
+          { id: 'btn_esp_persona', titulo: 'Hablar con persona' },
+        ];
+        if (destinoEnvio) {
+          await this.mensajeria.enviarBotones(destinoEnvio, textoCarta, botones, {
+            conversacionId: conversacion.id,
+            replyToWaMessageId: entradaRaw.waMessageId,
+          });
+        }
+        await this.prisma.mensajeChat.create({
+          data: {
+            conversacion_id: conversacion.id,
+            direccion: 'SALE',
+            autor: 'BOT',
+            tipo: 'BOTON',
+            contenido: { texto: textoCarta, botones } as any,
+          },
+        });
+        await this.prisma.conversacion.update({
+          where: { id: conversacion.id },
+          data: {
+            estado: 'VALIDAR_PAGO',
+            duenio: 'PERSONA',
+            ultima_actividad: new Date(),
+          },
+        });
+        return true;
+      }
+
+      if (esMenu) {
+        const textoMenu = `Claro. Mientras revisamos tu pago en Caja, ¿en qué te puedo ayudar?`;
+        const botones = [
+          { id: 'btn_esp_carta', titulo: 'Ver la carta' },
+          { id: 'mipedido', titulo: 'Mi pedido' },
+          { id: 'btn_esp_persona', titulo: 'Hablar con persona' },
+        ];
+        if (destinoEnvio) {
+          await this.mensajeria.enviarBotones(destinoEnvio, textoMenu, botones, {
+            conversacionId: conversacion.id,
+            replyToWaMessageId: entradaRaw.waMessageId,
+          });
+        }
+        await this.prisma.mensajeChat.create({
+          data: {
+            conversacion_id: conversacion.id,
+            direccion: 'SALE',
+            autor: 'BOT',
+            tipo: 'BOTON',
+            contenido: { texto: textoMenu, botones } as any,
+          },
+        });
+        await this.prisma.conversacion.update({
+          where: { id: conversacion.id },
+          data: {
+            estado: 'VALIDAR_PAGO',
+            duenio: 'PERSONA',
+            ultima_actividad: new Date(),
+          },
+        });
+        return true;
+      }
+
+      if (esHorario) {
+        const datos = contexto.datosLocal;
+        const textoHorario = `🕒 *Horario de atención:* ${datos?.abre || '12:00'} a ${datos?.cierra || '23:00'}.\n📍 *Dirección:* ${datos?.direccion || 'Campoy, SJL'}.\n\nSeguimos validando tu pago en Caja.`;
+        const botones = [
+          { id: 'btn_esp_carta', titulo: 'Ver la carta' },
+          { id: 'btn_esp_persona', titulo: 'Hablar con persona' },
+        ];
+        if (destinoEnvio) {
+          await this.mensajeria.enviarBotones(destinoEnvio, textoHorario, botones, {
+            conversacionId: conversacion.id,
+            replyToWaMessageId: entradaRaw.waMessageId,
+          });
+        }
+        await this.prisma.mensajeChat.create({
+          data: {
+            conversacion_id: conversacion.id,
+            direccion: 'SALE',
+            autor: 'BOT',
+            tipo: 'BOTON',
+            contenido: { texto: textoHorario, botones } as any,
+          },
+        });
+        await this.prisma.conversacion.update({
+          where: { id: conversacion.id },
+          data: {
+            estado: 'VALIDAR_PAGO',
+            duenio: 'PERSONA',
+            ultima_actividad: new Date(),
+          },
+        });
+        return true;
+      }
+
+      if (esEstadoPedido && contexto.pedidoActivo) {
+        const p = contexto.pedidoActivo;
+        const textoPedido = `Tu pedido *${p.codigo}* está en estado: *${p.estado}* (Pago: *${p.pago_estado}*).\n\nSeguimos revisando tu comprobante en Caja.`;
+        if (destinoEnvio) {
+          await this.mensajeria.enviarTexto(destinoEnvio, textoPedido, {
+            conversacionId: conversacion.id,
+            replyToWaMessageId: entradaRaw.waMessageId,
+          });
+        }
+        await this.prisma.mensajeChat.create({
+          data: {
+            conversacion_id: conversacion.id,
+            direccion: 'SALE',
+            autor: 'BOT',
+            tipo: 'TEXTO',
+            contenido: { texto: textoPedido },
+          },
+        });
+        return true;
+      }
+
+      const esConsultaPermitida =
+        esCarta || esMenu || esHorario || esEstadoPedido || esNuevoPedido;
+
+      if (!esConsultaPermitida) {
+        const flujo = (conversacion.flujo as any) || {};
+        const pago = flujo.pago || {};
+
+        if (esSeguirEsperando) {
+          const respuesta =
+            'Seguimos revisando tu pago, ya avisamos de nuevo a Caja. Te avisaremos apenas esté validado.';
+          if (destinoEnvio) {
+            await this.mensajeria.enviarTexto(destinoEnvio, respuesta, {
+              conversacionId: conversacion.id,
+              replyToWaMessageId: entradaRaw.waMessageId,
+            });
+          }
+          await this.prisma.mensajeChat.create({
+            data: {
+              conversacion_id: conversacion.id,
+              direccion: 'SALE',
+              autor: 'BOT',
+              tipo: 'TEXTO',
+              contenido: { texto: respuesta },
+            },
+          });
+          return true;
+        }
+
+        if (esHablarPersona) {
+          const respuesta = 'Ya avisé a una persona, te responde en breve.';
+          if (destinoEnvio) {
+            await this.mensajeria.enviarTexto(destinoEnvio, respuesta, {
+              conversacionId: conversacion.id,
+              replyToWaMessageId: entradaRaw.waMessageId,
+            });
+          }
+          await this.prisma.mensajeChat.create({
+            data: {
+              conversacion_id: conversacion.id,
+              direccion: 'SALE',
+              autor: 'BOT',
+              tipo: 'TEXTO',
+              contenido: { texto: respuesta },
+            },
+          });
+          const notif = await this.prisma.notificacion.create({
+            data: {
+              tipo: 'ATENCION_WHATSAPP',
+              rol_destino: 'CAJA',
+              titulo: `Cliente solicita asesor en chat con pago pendiente (${nombreMostrar})`,
+              mensaje: `El cliente solicitó asesor humano mientras su comprobante está en revisión.`,
+              enlace: '/admin/mensajes',
+            },
+          });
+          this.eventos?.emitirAdmin('notificaciones:nueva', {
+            id: notif.id.toString(),
+            titulo: notif.titulo,
+          });
+          return true;
+        }
+
+        // Texto libre fuera de eso: el bot responde una sola vez
+        if (!pago.avisoPersonaEnviado) {
+          const respuesta = 'Ya avisé a una persona, te responde en breve.';
+          if (destinoEnvio) {
+            await this.mensajeria.enviarTexto(destinoEnvio, respuesta, {
+              conversacionId: conversacion.id,
+              replyToWaMessageId: entradaRaw.waMessageId,
+            });
+          }
+          await this.prisma.mensajeChat.create({
+            data: {
+              conversacion_id: conversacion.id,
+              direccion: 'SALE',
+              autor: 'BOT',
+              tipo: 'TEXTO',
+              contenido: { texto: respuesta },
+            },
+          });
+
+          const notif = await this.prisma.notificacion.create({
+            data: {
+              tipo: 'ATENCION_WHATSAPP',
+              rol_destino: 'CAJA',
+              titulo: `Mensaje de cliente en chat con pago pendiente (${nombreMostrar})`,
+              mensaje: `Cliente escribió: "${(entradaRaw.texto || entradaRaw.textoOriginal || '').slice(0, 100)}". Ya se le indicó que una persona le responde en breve.`,
+              enlace: '/admin/mensajes',
+            },
+          });
+          this.eventos?.emitirAdmin('notificaciones:nueva', {
+            id: notif.id.toString(),
+            titulo: notif.titulo,
+          });
+
+          await this.prisma.conversacion.update({
+            where: { id: conversacion.id },
+            data: {
+              flujo: {
+                ...flujo,
+                pago: {
+                  ...pago,
+                  avisoPersonaEnviado: true,
+                },
+              },
+            },
+          });
+          return true;
+        } else {
+          this.logger.log(
+            `Texto libre en VALIDAR_PAGO para conversación ${conversacion.id} ya tuvo aviso previo. El bot guarda silencio.`,
+          );
+          return true;
+        }
+      }
+
+      if (payload === 'btn_esp_carta') {
+        entradaRaw.buttonPayload = 'carta';
+        entradaRaw.listRowId = 'carta';
+        entradaRaw.texto = 'carta';
+      }
+    }
+
+    // 8. Normalizar entrada y ejecutar la máquina de estados pura
+    const entradaNorm = normalizarEntrada(entradaRaw);
+    const flujoPrevio = (conversacion.flujo as any) as FlujoConversacion | null;
+    const resultado = transicionarEstado(flujoPrevio, entradaNorm, contexto);
 
     // 9. Ejecutar las acciones devueltas por el motor
     for (const accion of resultado.acciones) {
@@ -1086,12 +1389,18 @@ export class EjecutorConversacionService {
       ultimo_wa_message_id: entradaRaw.waMessageId || undefined,
     };
 
+    const dataUpdate: any = {
+      flujo: flujoPersistir,
+      ultima_actividad: new Date(),
+    };
+    if (esValidarPago) {
+      dataUpdate.estado = 'VALIDAR_PAGO';
+      dataUpdate.duenio = 'PERSONA';
+    }
+
     await this.prisma.conversacion.update({
       where: { id: conversacion.id },
-      data: {
-        flujo: flujoPersistir,
-        ultima_actividad: new Date(),
-      },
+      data: dataUpdate,
     });
 
     // 11. Notificar por WebSocket a la consola de Mensajes

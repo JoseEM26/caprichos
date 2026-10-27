@@ -4,6 +4,7 @@ import { AuditoriaModule } from '../../auditoria/auditoria.module';
 import { ConfiguracionModule } from '../../configuracion/configuracion.module';
 import { ChatbotModule } from '../chatbot.module';
 import { AvisosInternosService } from './avisos-internos.service';
+import { AlertasEsperaService } from './alertas-espera.service';
 
 @Module({
   imports: [
@@ -12,7 +13,7 @@ import { AvisosInternosService } from './avisos-internos.service';
     ConfiguracionModule,
     forwardRef(() => ChatbotModule),
   ],
-  providers: [AvisosInternosService],
-  exports: [AvisosInternosService],
+  providers: [AvisosInternosService, AlertasEsperaService],
+  exports: [AvisosInternosService, AlertasEsperaService],
 })
 export class AvisosInternosModule {}

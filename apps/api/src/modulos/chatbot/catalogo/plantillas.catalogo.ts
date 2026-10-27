@@ -112,4 +112,12 @@ export const CATALOGO_PLANTILLAS: Record<string, DefinicionPlantilla> = {
     texto: 'Aviso de almacen de Caprichos: el insumo {{1}} se encuentra en estado {{2}} (Stock: {{3}}). Por favor coordinar su reposicion.',
     descripcion: 'Aviso al personal del equipo fuera de la ventana de 24h cuando un insumo esta agotado o por pedir.',
   },
+  AVISO_INTERNO: {
+    nombre: 'aviso_interno',
+    categoria: 'UTILITY',
+    idioma: 'es',
+    variables: ['titulo', 'detalle'],
+    texto: 'Aviso interno de Caprichos: *{{1}}*\n\n{{2}}',
+    descripcion: 'Aviso para administradores del equipo fuera de la ventana de 24h ante alertas operativas del sistema.',
+  },
 };

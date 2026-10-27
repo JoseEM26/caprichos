@@ -534,7 +534,12 @@ export class WhatsappWebhookService {
       textoNorm === 'alta' ||
       textoNorm === 'start';
 
-    if (this.motorConversacion && !esComandoBajaOAlta && conversacion.duenio === 'BOT') {
+    // El bot responde si la conversación le pertenece (duenio === 'BOT') o si está en estado VALIDAR_PAGO
+    // conforme a la regla de contrato: mientras hay un pago pendiente de validar el bot sigue atendiendo consultas operativas.
+    const puedeProcesarMotor =
+      conversacion.duenio === 'BOT' || conversacion.estado === 'VALIDAR_PAGO';
+
+    if (this.motorConversacion && !esComandoBajaOAlta && puedeProcesarMotor) {
       const consentimiento = await this.prisma.clienteWhatsappConsentimiento.findUnique({
         where: { telefono_hash: telHash },
       });

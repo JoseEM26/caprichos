@@ -117,6 +117,8 @@ model UserAccount {
   pin_hash              String?                // OBSOLETO: El PIN fijo se retiró en favor del código rotativo general (supervisor_secreto). Se mantiene por compatibilidad histórica sin uso.
   activo                Boolean                @default(true)
   alta_en               DateTime               @default(now()) @db.Date
+  alertas_whatsapp              Boolean                @default(false)
+  alertas_whatsapp_confirmado_en DateTime?              @db.Timestamptz
   party                 Party                  @relation(fields: [party_id], references: [id])
   r                     Rol                    @relation(fields: [rol], references: [codigo])
   iniciativasCreadas    Iniciativa[]           @relation("IniciativasCreadas")

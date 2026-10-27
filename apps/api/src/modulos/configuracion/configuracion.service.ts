@@ -35,6 +35,11 @@ export const CLAVES_NUMERICAS = [
   'chatbot_antispam_max_minuto',
   'chatbot_antispam_max_hora',
   'chatbot_retencion_dias',
+  'alerta_voucher_min_1',
+  'alerta_voucher_min_2',
+  'espera_cliente_aviso_min',
+  'chat_tomado_liberar_min',
+  'alerta_pedido_sin_confirmar_min',
 ] as const;
 
 export const CLAVES_TEXTO = [

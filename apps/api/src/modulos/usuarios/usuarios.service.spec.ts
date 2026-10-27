@@ -1,3 +1,4 @@
+jest.mock('../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {} }));
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   BadRequestException,

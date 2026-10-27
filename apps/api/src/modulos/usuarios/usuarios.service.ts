@@ -6,6 +6,9 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Inject,
+  Optional,
+  forwardRef,
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../../comun/prisma/prisma.service';
@@ -15,13 +18,23 @@ import { CrearUsuarioDto } from './dto/crear-usuario.dto';
 import { EditarUsuarioDto } from './dto/editar-usuario.dto';
 import { FiltrarUsuariosDto } from './dto/filtrar-usuarios.dto';
 import { AsignarPinDto } from './dto/asignar-pin.dto';
+import { ConfigurarAlertasWhatsappDto } from './dto/configurar-alertas-whatsapp.dto';
 import { enmascararDni, generarClaveAleatoria } from './usuarios.util';
+import {
+  ROLES_ALERTAS_WHATSAPP,
+  calcularEstadoAlertas,
+  normalizarCelularPeru,
+} from './alertas-whatsapp.util';
+import { AvisosInternosService } from '../chatbot/avisos-internos/avisos-internos.service';
 
 @Injectable()
 export class UsuariosService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditoriaService,
+    @Optional()
+    @Inject(forwardRef(() => AvisosInternosService))
+    private readonly avisosInternosService?: AvisosInternosService,
   ) {}
 
   private parsearId(id: bigint | string | number): bigint {
@@ -587,5 +600,319 @@ export class UsuariosService {
       },
       HttpStatus.GONE,
     );
+  }
+
+  /**
+   * Obtiene el estado de configuración de alertas por WhatsApp de un usuario.
+   * Regla de contrato: Solo usuarios con rol ADMIN pueden recibir alertas.
+   */
+  async obtenerAlertasWhatsapp(id: bigint | string | number) {
+    const accountId = this.parsearId(id);
+    const usuario = await this.prisma.userAccount.findUnique({
+      where: { id: accountId },
+      include: {
+        party: {
+          include: {
+            persona: true,
+            contactos: {
+              where: { tipo: 'WHATSAPP', activo: true },
+              orderBy: { principal: 'desc' },
+            },
+          },
+        },
+      },
+    });
+
+    if (!usuario) {
+      throw new NotFoundException({
+        codigo: 'USUARIO_NO_ENCONTRADO',
+        mensaje: 'Usuario no encontrado',
+      });
+    }
+
+    const contacto = usuario.party?.contactos?.find((c) => c.principal) || usuario.party?.contactos?.[0];
+    const celularVal = contacto?.valor || null;
+    const norm = celularVal ? normalizarCelularPeru(celularVal) : { valido: false };
+
+    const rolPermitido = ROLES_ALERTAS_WHATSAPP.includes(usuario.rol as any);
+    const alertasWhatsapp = Boolean(usuario.alertas_whatsapp);
+    const estado = calcularEstadoAlertas(alertasWhatsapp, usuario.alertas_whatsapp_confirmado_en);
+    const celular9 = norm.valido ? (norm.celular9 || null) : celularVal;
+
+    return {
+      usuarioId: usuario.id.toString(),
+      partyId: usuario.party_id.toString(),
+      nombres: usuario.party?.persona?.nombres ?? '',
+      apellidos: usuario.party?.persona?.apellidos ?? '',
+      rol: usuario.rol,
+      rolPermitido,
+      activo: usuario.activo,
+      alertasWhatsapp,
+      activa: alertasWhatsapp,
+      confirmado: Boolean(usuario.alertas_whatsapp_confirmado_en),
+      alertasWhatsappConfirmadoEn: usuario.alertas_whatsapp_confirmado_en,
+      confirmadoEn: usuario.alertas_whatsapp_confirmado_en,
+      celular: celular9,
+      numero: celular9,
+      celularNormalizado: norm.valido ? (norm.celularE164 || null) : null,
+      estado,
+    };
+  }
+
+  /**
+   * Guarda o actualiza el número de celular y la casilla de alertas de WhatsApp.
+   * Reglas de contrato:
+   * - Solo ADMIN.
+   * - El número se almacena en la tabla contact_mechanism (tipo WHATSAPP, principal=true, activo=true).
+   * - La casilla y confirmación van en user_account.
+   * - Si cambia el número, se borra la confirmación anterior.
+   * - Al activar la casilla y guardar número, se envía automáticamente un mensaje de prueba.
+   */
+  async configurarAlertasWhatsapp(
+    id: bigint | string | number,
+    dto: ConfigurarAlertasWhatsappDto,
+    usuarioActual?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const accountId = this.parsearId(id);
+    const usuario = await this.prisma.userAccount.findUnique({
+      where: { id: accountId },
+      include: {
+        party: {
+          include: {
+            persona: true,
+            contactos: {
+              where: { tipo: 'WHATSAPP', activo: true },
+              orderBy: { principal: 'desc' },
+            },
+          },
+        },
+      },
+    });
+
+    if (!usuario) {
+      throw new NotFoundException({
+        codigo: 'USUARIO_NO_ENCONTRADO',
+        mensaje: 'Usuario no encontrado',
+      });
+    }
+
+    if (!ROLES_ALERTAS_WHATSAPP.includes(usuario.rol as any)) {
+      throw new BadRequestException({
+        codigo: 'ROL_NO_PERMITIDO',
+        mensaje: 'Solo los usuarios con rol ADMIN pueden recibir alertas por WhatsApp',
+      });
+    }
+
+    const contactoExistente = usuario.party?.contactos?.find((c) => c.principal) || usuario.party?.contactos?.[0];
+    const celExistenteVal = contactoExistente?.valor || null;
+
+    const rawCelular = dto.celular ?? dto.numero;
+    const activaAlertas = Boolean(dto.alertasWhatsapp ?? dto.alertas_whatsapp ?? dto.activa);
+
+    let nuevoCelular9: string | null = null;
+    let nuevoCelularE164: string | null = null;
+
+    if (rawCelular && rawCelular.trim()) {
+      const norm = normalizarCelularPeru(rawCelular);
+      if (!norm.valido || !norm.celular9 || !norm.celularE164) {
+        throw new BadRequestException({
+          codigo: 'FORMATO_CELULAR_INVALIDO',
+          mensaje: 'El número debe ser un celular peruano de 9 dígitos que comience con 9',
+        });
+      }
+      nuevoCelular9 = norm.celular9;
+      nuevoCelularE164 = norm.celularE164;
+    } else if (celExistenteVal) {
+      const normExistente = normalizarCelularPeru(celExistenteVal);
+      nuevoCelular9 = normExistente.valido ? (normExistente.celular9 || null) : celExistenteVal;
+      nuevoCelularE164 = normExistente.valido ? (normExistente.celularE164 || null) : null;
+    }
+
+    if (activaAlertas && !nuevoCelular9) {
+      throw new BadRequestException({
+        codigo: 'CELULAR_REQUERIDO',
+        mensaje: 'Se requiere un número de celular peruano válido para activar las alertas por WhatsApp',
+      });
+    }
+
+    // Regla de contrato: Si cambia el número, se borra la confirmación y se pide de nuevo
+    const celExistenteSolo9 = celExistenteVal ? celExistenteVal.replace(/\D/g, '').slice(-9) : null;
+    const numeroCambio = Boolean(nuevoCelular9 && celExistenteSolo9 && nuevoCelular9 !== celExistenteSolo9);
+
+    await this.prisma.$transaction(async (tx) => {
+      if (nuevoCelular9) {
+        if (contactoExistente) {
+          await tx.contactMechanism.update({
+            where: { id: contactoExistente.id },
+            data: {
+              valor: nuevoCelular9,
+              principal: true,
+              activo: true,
+            },
+          });
+        } else {
+          await tx.contactMechanism.create({
+            data: {
+              party_id: usuario.party_id,
+              tipo: 'WHATSAPP',
+              valor: nuevoCelular9,
+              principal: true,
+              activo: true,
+            },
+          });
+        }
+      }
+
+      const nuevoConfirmadoEn = numeroCambio
+        ? null
+        : activaAlertas
+          ? usuario.alertas_whatsapp_confirmado_en
+          : null;
+
+      await tx.userAccount.update({
+        where: { id: usuario.id },
+        data: {
+          alertas_whatsapp: activaAlertas,
+          alertas_whatsapp_confirmado_en: nuevoConfirmadoEn,
+        },
+      });
+    });
+
+    // Enviar prueba si se guardó con casilla activa y no está confirmado
+    const debeEnviarPrueba = activaAlertas && (numeroCambio || !usuario.alertas_whatsapp_confirmado_en) && nuevoCelularE164;
+    if (debeEnviarPrueba && nuevoCelularE164) {
+      await this.avisosInternosService?.enviarPruebaAlertas(
+        usuario.id,
+        nuevoCelularE164,
+        usuario.party?.persona?.nombres || 'Administrador',
+      ).catch(() => {});
+    }
+
+    // Auditoría
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'usuarios',
+      accion: 'CONFIGURAR_ALERTAS_WHATSAPP',
+      resultado: 'OK',
+      entidad: 'user_account',
+      entidadId: usuario.id,
+      antes: {
+        alertasWhatsapp: usuario.alertas_whatsapp,
+        celular: celExistenteVal,
+        confirmadoEn: usuario.alertas_whatsapp_confirmado_en,
+      },
+      despues: {
+        alertasWhatsapp: dto.alertasWhatsapp,
+        celular: nuevoCelular9,
+        confirmadoEn: numeroCambio ? null : dto.alertasWhatsapp ? usuario.alertas_whatsapp_confirmado_en : null,
+      },
+      partyId: usuarioActual?.partyId,
+      ip,
+    });
+
+    return this.obtenerAlertasWhatsapp(id);
+  }
+
+  /**
+   * Envía un mensaje de prueba con botón interactivo "Sí, soy yo" para confirmar el número.
+   */
+  async enviarPruebaAlertasWhatsapp(
+    id: bigint | string | number,
+    usuarioActual?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const estado = await this.obtenerAlertasWhatsapp(id);
+    if (!estado.rolPermitido) {
+      throw new BadRequestException({
+        codigo: 'ROL_NO_PERMITIDO',
+        mensaje: 'Solo los usuarios con rol ADMIN pueden recibir alertas por WhatsApp',
+      });
+    }
+
+    if (!estado.celularNormalizado) {
+      throw new BadRequestException({
+        codigo: 'SIN_CELULAR_CONFIGURADO',
+        mensaje: 'El usuario no tiene un número de celular configurado para alertas',
+      });
+    }
+
+    const res = await this.avisosInternosService?.enviarPruebaAlertas(
+      estado.usuarioId,
+      estado.celularNormalizado!,
+      estado.nombres || 'Administrador',
+    );
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'usuarios',
+      accion: 'ENVIAR_PRUEBA_ALERTAS_WHATSAPP',
+      resultado: res?.exito ? 'OK' : 'RECHAZADO',
+      entidad: 'user_account',
+      entidadId: BigInt(estado.usuarioId),
+      despues: {
+        destino: estado.celularNormalizado,
+        exito: res?.exito,
+        error: res?.errorDetalle,
+      },
+      partyId: usuarioActual?.partyId,
+      ip,
+    }).catch(() => {});
+
+    return {
+      enviado: Boolean(res?.exito ?? true),
+      mensaje: res?.exito
+        ? 'Mensaje de prueba enviado exitosamente'
+        : res?.errorDetalle || 'No se pudo enviar la prueba',
+    };
+  }
+
+  /**
+   * Confirma la recepción de alertas por WhatsApp para el usuario.
+   */
+  async confirmarAlertasWhatsapp(
+    id: bigint | string | number,
+    usuarioActual?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const estado = await this.obtenerAlertasWhatsapp(id);
+    if (!estado.rolPermitido) {
+      throw new BadRequestException({
+        codigo: 'ROL_NO_PERMITIDO',
+        mensaje: 'Solo los usuarios con rol ADMIN pueden recibir alertas por WhatsApp',
+      });
+    }
+
+    if (!estado.celular) {
+      throw new BadRequestException({
+        codigo: 'SIN_CELULAR_CONFIGURADO',
+        mensaje: 'El usuario no tiene un número de celular configurado para confirmar',
+      });
+    }
+
+    const ahora = new Date();
+    await this.prisma.userAccount.update({
+      where: { id: BigInt(estado.usuarioId) },
+      data: {
+        alertas_whatsapp: true,
+        alertas_whatsapp_confirmado_en: ahora,
+      },
+    });
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'usuarios',
+      accion: 'CONFIRMAR_ALERTAS_WHATSAPP_PANEL',
+      resultado: 'OK',
+      entidad: 'user_account',
+      entidadId: BigInt(estado.usuarioId),
+      despues: {
+        confirmadoEn: ahora,
+      },
+      partyId: usuarioActual?.partyId,
+      ip,
+    });
+
+    return this.obtenerAlertasWhatsapp(id);
   }
 }

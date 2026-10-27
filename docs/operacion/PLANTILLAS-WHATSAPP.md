@@ -20,6 +20,7 @@ Todas las plantillas pertenecen a la categoría **Utilidad (UTILITY)** y están 
 | `REABRIR_CONVERSACION` | `caprichos_reabrir_conversacion` | Utilidad | Español (`es`) | 1 |
 | `EQUIPO_NUEVO_PEDIDO` | `caprichos_equipo_nuevo_pedido` | Utilidad | Español (`es`) | 3 |
 | `EQUIPO_ALERTA_ALMACEN` | `caprichos_equipo_alerta_almacen` | Utilidad | Español (`es`) | 3 |
+| `AVISO_INTERNO` | `aviso_interno` | Utilidad | Español (`es`) | 2 |
 
 ---
 
@@ -188,6 +189,24 @@ Aviso de almacen de Caprichos: el insumo {{1}} se encuentra en estado {{2}} (Sto
   - `{{1}}`: `Leche Evaporada`
   - `{{2}}`: `Agotado`
   - `{{3}}`: `0.00 UND`
+- **Botones:** Ninguno
+
+---
+
+## 11. Aviso Interno al Equipo: Alerta General del Sistema (Fuera de ventana 24h)
+
+- **Nombre de plantilla:** `aviso_interno`
+- **Categoría:** Utilidad (Utility)
+- **Idioma:** Español (`es` o `es_PE`)
+- **Texto del cuerpo (Body):**
+```text
+Aviso interno de Caprichos: *{{1}}*
+
+{{2}}
+```
+- **Ejemplo de variables para Meta:**
+  - `{{1}}`: `Voucher sin revisar (15 min)`
+  - `{{2}}`: `Comprobante de pago sin decision por mas de 15 min. Chat marcado urgente: https://caprichos.pe/admin/mensajes`
 - **Botones:** Ninguno
 
 ---

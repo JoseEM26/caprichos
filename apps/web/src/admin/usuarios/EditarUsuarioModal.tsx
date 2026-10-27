@@ -8,6 +8,8 @@ import { Confirmar } from '../../comun/Confirmar';
 import { Icono } from '../../comun/Icono';
 import type { UsuarioItem } from './tipos';
 import { ETIQUETAS_ROLES } from './CrearUsuarioModal';
+import { BloqueAlertasWhatsApp } from './BloqueAlertasWhatsApp';
+import { puedeRecibirAlertasWhatsApp } from './alertasWhatsappApi';
 
 export interface EditarUsuarioModalProps {
   usuario: UsuarioItem | null;
@@ -237,6 +239,14 @@ export function EditarUsuarioModal({
               error={errores.rol}
               deshabilitado={guardando}
             />
+
+            {puedeRecibirAlertasWhatsApp(rol) && (
+              <BloqueAlertasWhatsApp
+                usuarioId={usuario.id}
+                rol={rol}
+                deshabilitado={guardando}
+              />
+            )}
 
             <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
               <Boton

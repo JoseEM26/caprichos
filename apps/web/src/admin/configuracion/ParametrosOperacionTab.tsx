@@ -7,6 +7,7 @@ import { EstadoError } from '../../comun/EstadoError';
 import { EstadoVacio } from '../../comun/EstadoVacio';
 import { Confirmar } from '../../comun/Confirmar';
 import { Insignia } from '../../comun/Insignia';
+import { TarjetaUmbralesAlertasEspera } from './TarjetaUmbralesAlertasEspera';
 
 export interface ParametroItem {
   clave: string;
@@ -240,6 +241,36 @@ const META_PARAMETROS: Record<string, MetaParametro> = {
     nombre: 'Asistente de ayuda con IA (Capri)',
     descripcion: 'Habilita al asistente virtual Capri con IA para orientar a los usuarios en el panel de administración.',
     tipo: 'sino',
+  },
+  alerta_voucher_min_1: {
+    nombre: 'Primer aviso de voucher sin revisar',
+    descripcion: 'Minutos de espera tras recibir una captura de pago antes de enviar el primer aviso a los administradores.',
+    tipo: 'numero',
+    sufijo: 'minutos',
+  },
+  alerta_voucher_min_2: {
+    nombre: 'Segundo aviso de voucher sin revisar (urgente)',
+    descripcion: 'Minutos de espera antes del segundo aviso a los administradores y marcar el chat como urgente.',
+    tipo: 'numero',
+    sufijo: 'minutos',
+  },
+  espera_cliente_aviso_min: {
+    nombre: 'Aviso de espera al cliente por validación de pago',
+    descripcion: 'Minutos transcurridos antes de enviar al cliente el mensaje interactivo de tranquilidad.',
+    tipo: 'numero',
+    sufijo: 'minutos',
+  },
+  chat_tomado_liberar_min: {
+    nombre: 'Liberación de chat tomado y abandonado',
+    descripcion: 'Minutos de inactividad de la persona antes de liberar el chat de vuelta al bot (excepto VALIDAR_PAGO).',
+    tipo: 'numero',
+    sufijo: 'minutos',
+  },
+  alerta_pedido_sin_confirmar_min: {
+    nombre: 'Alerta de pedido nuevo sin confirmar en Caja',
+    descripcion: 'Minutos sin confirmación en Caja antes de alertar a los administradores por WhatsApp.',
+    tipo: 'numero',
+    sufijo: 'minutos',
   },
 };
 
@@ -640,6 +671,9 @@ export function ParametrosOperacionTab({
           </Insignia>
         </div>
       )}
+
+      {/* Tarjeta pequeña de umbrales de alertas y espera (solo ADMIN) */}
+      <TarjetaUmbralesAlertasEspera esAdmin={puedeEditar} alGuardar={cargarParametros} />
 
       {!puedeEditar && (
         <div

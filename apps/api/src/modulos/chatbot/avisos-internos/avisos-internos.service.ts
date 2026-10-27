@@ -5,6 +5,7 @@ import { RedisService } from '../../../comun/redis/redis.service';
 import { AuditoriaService } from '../../auditoria/auditoria.service';
 import { ConfiguracionService } from '../../configuracion/configuracion.service';
 import {
+  BotonAccion,
   ResultadoEnvioWhatsApp,
   WHATSAPP_MENSAJERIA_PUERTO,
   WhatsAppMensajeriaPuerto,
@@ -24,6 +25,10 @@ import {
   TEXTOS_AVISOS,
 } from './avisos-internos.textos';
 import { EventosGateway } from '../../../comun/socket/eventos.gateway';
+import {
+  ROLES_ALERTAS_WHATSAPP,
+  normalizarCelularPeru,
+} from '../../usuarios/alertas-whatsapp.util';
 
 @Injectable()
 export class AvisosInternosService {
@@ -45,6 +50,7 @@ export class AvisosInternosService {
   /**
    * Obtiene la lista de números del equipo configurados en ADMIN_WHATSAPP_NUMBERS.
    * Por seguridad (Ley 29733 / RNF), nunca se expone el valor crudo en logs.
+   * Se mantiene para compatibilidad con llamadas síncronas de pruebas.
    */
   public obtenerNumerosEquipo(): string[] {
     const configVal = this.configService.get<string>('ADMIN_WHATSAPP_NUMBERS');
@@ -58,6 +64,109 @@ export class AvisosInternosService {
       .split(',')
       .map((n) => normalizarTelefono(n.trim()))
       .filter((n) => n.length >= 8);
+  }
+
+  /**
+   * Obtiene la lista de teléfonos de administradores autorizados para recibir alertas por WhatsApp.
+   * Regla de contrato:
+   * - Solo usuarios con rol ADMIN, activos, casilla alertas_whatsapp activa y confirmados.
+   * - El número se lee del contacto principal de tipo WHATSAPP de su Party.
+   * - Compatibilidad: si NINGÚN usuario cumple las condiciones, se usa ADMIN_WHATSAPP_NUMBERS como respaldo
+   *   y se emite una advertencia en los logs del sistema.
+   */
+  public async obtenerDestinatariosAlertas(): Promise<string[]> {
+    try {
+      const usuarios = await this.prisma.userAccount.findMany({
+        where: {
+          activo: true,
+          rol: { in: [...ROLES_ALERTAS_WHATSAPP] },
+          alertas_whatsapp: true,
+          alertas_whatsapp_confirmado_en: { not: null },
+        },
+        include: {
+          party: {
+            include: {
+              contactos: {
+                where: { tipo: 'WHATSAPP', activo: true },
+                orderBy: { principal: 'desc' },
+              },
+            },
+          },
+        },
+      });
+
+      const telefonos: string[] = [];
+      for (const u of usuarios) {
+        const contacto = u.party?.contactos?.find((c) => c.principal) || u.party?.contactos?.[0];
+        if (contacto?.valor) {
+          const norm = normalizarCelularPeru(contacto.valor);
+          if (norm.valido && norm.celularE164) {
+            telefonos.push(norm.celularE164);
+          }
+        }
+      }
+
+      if (telefonos.length > 0) {
+        return Array.from(new Set(telefonos));
+      }
+
+      this.logger.warn(
+        'Ningún usuario administrador cumple las condiciones (activo, rol ADMIN, alertas activas y confirmadas). Usando ADMIN_WHATSAPP_NUMBERS como respaldo.',
+      );
+      return this.obtenerNumerosEquipo();
+    } catch (err: any) {
+      this.logger.error(`Error al obtener destinatarios de alertas WhatsApp: ${err.message}. Usando respaldo.`);
+      return this.obtenerNumerosEquipo();
+    }
+  }
+
+  /**
+   * Verifica dinámicamente si un número pertenece a un usuario autorizado para actuar con los botones del bot.
+   * Regla de contrato:
+   * - "Solo recibe y puede actuar con los botones del bot el usuario ACTIVO, con rol ADMIN, casilla activa y confirmado."
+   * - "Si se desactiva o se le quita la casilla, deja de recibir y de poder aprobar/rechazar desde WhatsApp al instante (se valida en cada envio y en cada accion, no solo al guardar)."
+   * - Si ningún usuario está configurado, usa ADMIN_WHATSAPP_NUMBERS como respaldo.
+   */
+  public async esTelefonoAutorizado(telefono: string): Promise<boolean> {
+    const norm = normalizarTelefono(telefono);
+    const soloDigitos = norm.replace(/\D/g, '');
+    const ultimos9 = soloDigitos.slice(-9);
+
+    try {
+      const usuarios = await this.prisma.userAccount.findMany({
+        where: {
+          activo: true,
+          rol: { in: [...ROLES_ALERTAS_WHATSAPP] },
+          alertas_whatsapp: true,
+          alertas_whatsapp_confirmado_en: { not: null },
+        },
+        include: {
+          party: {
+            include: {
+              contactos: {
+                where: { tipo: 'WHATSAPP', activo: true },
+              },
+            },
+          },
+        },
+      });
+
+      if (usuarios.length > 0) {
+        return usuarios.some((u) =>
+          u.party?.contactos?.some((c) => {
+            const cDigitos = c.valor.replace(/\D/g, '');
+            return cDigitos.endsWith(ultimos9);
+          }),
+        );
+      }
+
+      const respaldo = this.obtenerNumerosEquipo();
+      return respaldo.some((r) => r.replace(/\D/g, '').endsWith(ultimos9));
+    } catch (err: any) {
+      this.logger.error(`Error verificando autorización de teléfono: ${err.message}`);
+      const respaldo = this.obtenerNumerosEquipo();
+      return respaldo.some((r) => r.replace(/\D/g, '').endsWith(ultimos9));
+    }
   }
 
   /**
@@ -152,9 +261,9 @@ export class AvisosInternosService {
       };
     }
 
-    const numerosEquipo = this.obtenerNumerosEquipo();
+    const numerosEquipo = await this.obtenerDestinatariosAlertas();
     if (numerosEquipo.length === 0) {
-      this.logger.log('No se enviaron avisos: variable ADMIN_WHATSAPP_NUMBERS no configurada o vacía.');
+      this.logger.log('No se enviaron avisos: no hay destinatarios de alertas ni variable de respaldo configurada.');
       return {
         omitido: true,
         motivo: 'SIN_NUMEROS',
@@ -333,7 +442,7 @@ export class AvisosInternosService {
       };
     }
 
-    const numerosEquipo = this.obtenerNumerosEquipo();
+    const numerosEquipo = await this.obtenerDestinatariosAlertas();
     if (numerosEquipo.length === 0) {
       return {
         omitido: true,
@@ -541,18 +650,84 @@ export class AvisosInternosService {
   }
 
   /**
-   * Procesa la pulsación de los botones ✅ Aprobar / ❌ Rechazar desde el WhatsApp de Cocina/Admin
-   * (conforme a las reglas de negocio: la decisión la ejecuta la persona humana desde su celular).
+   * Procesa la pulsación de botones desde WhatsApp por parte del personal o administradores:
+   * - Confirmación de alertas WhatsApp (botón 'Sí, soy yo' con payload alr_conf_X)
+   * - Acciones sobre comanda (✅ Aprobar / ❌ Rechazar con ped_apr_X / ped_rec_X)
+   * - Confirmación de lectura de almacén (alm_ok_X)
+   *
+   * Regla de contrato:
+   * "Solo recibe y puede actuar con los botones del bot el usuario ACTIVO, con rol ADMIN, casilla activa y confirmado."
+   * Se valida dinámicamente en cada acción.
    */
   async procesarAccionEquipo(
     telefono: string,
     payload: string,
   ): Promise<{ procesado: boolean; mensaje?: string }> {
     const telefonoNorm = normalizarTelefono(telefono);
-    const numerosEquipo = this.obtenerNumerosEquipo();
 
-    // Solo los números autorizados en ADMIN_WHATSAPP_NUMBERS pueden ejecutar acciones
-    if (!numerosEquipo.includes(telefonoNorm)) {
+    // 1. Botón de confirmación de alertas WhatsApp: "Sí, soy yo" (payload: alr_conf_${usuarioId})
+    if (payload.startsWith('alr_conf_')) {
+      const usuarioIdStr = payload.replace('alr_conf_', '').trim();
+      let userAccount: any = null;
+      try {
+        userAccount = await this.prisma.userAccount.findUnique({
+          where: { id: BigInt(usuarioIdStr) },
+          include: {
+            party: {
+              include: {
+                persona: true,
+                contactos: { where: { tipo: 'WHATSAPP', activo: true } },
+              },
+            },
+          },
+        });
+      } catch (err: any) {
+        this.logger.error(`Error buscando usuario para confirmación de alertas: ${err.message}`);
+      }
+
+      if (
+        !userAccount ||
+        !userAccount.activo ||
+        !ROLES_ALERTAS_WHATSAPP.includes(userAccount.rol as any)
+      ) {
+        this.logger.warn(
+          `Intento de confirmación de alertas fallido para usuario ${usuarioIdStr}: inexistente, inactivo o rol no permitido.`,
+        );
+        return { procesado: true, mensaje: 'Usuario no encontrado o no autorizado' };
+      }
+
+      const ahora = new Date();
+      await this.prisma.userAccount.update({
+        where: { id: userAccount.id },
+        data: {
+          alertas_whatsapp: true,
+          alertas_whatsapp_confirmado_en: ahora,
+        },
+      });
+
+      const nombreUsuario = userAccount.party?.persona?.nombres || 'Administrador';
+      const respuestaTexto = `✅ ¡Listo, ${nombreUsuario}! Alertas de WhatsApp confirmadas. Recibirás las alertas del sistema en este número.`;
+      await this.mensajeria.enviarTexto(telefonoNorm, respuestaTexto).catch(() => {});
+
+      await this.auditoriaService.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'usuarios',
+        accion: 'CONFIRMAR_ALERTAS_WHATSAPP_BOT',
+        resultado: 'OK',
+        entidad: 'user_account',
+        entidadId: userAccount.id,
+        despues: { confirmadoEn: ahora, remitente: enmascararTelefono(telefonoNorm) },
+      }).catch(() => {});
+
+      return { procesado: true, mensaje: respuestaTexto };
+    }
+
+    // 2. Para el resto de acciones de equipo, validar rigurosamente la autorización dinámica
+    const autorizado = await this.esTelefonoAutorizado(telefonoNorm);
+    if (!autorizado) {
+      this.logger.warn(
+        `Acción ${payload} rechazada: teléfono ${enmascararTelefono(telefonoNorm)} no autorizado o usuario inactivo/sin casilla activa.`,
+      );
       return { procesado: false };
     }
 
@@ -606,5 +781,179 @@ export class AvisosInternosService {
     }
 
     return { procesado: false };
+  }
+
+  /**
+   * Emite una notificación a la campana del panel administrativo (tabla notificacion + WebSocket).
+   * Regla de contrato: "Siempre ademas el aviso va a la campana del panel (respaldo y registro)."
+   */
+  async emitirAvisoCampana(
+    titulo: string,
+    mensaje: string,
+    enlace = '/admin/mensajes',
+    partyDestino?: bigint,
+  ): Promise<void> {
+    try {
+      const notif = await this.prisma.notificacion.create({
+        data: {
+          tipo: 'ALERTA_INTERNA',
+          rol_destino: 'ADMIN',
+          party_destino: partyDestino || null,
+          titulo,
+          mensaje,
+          enlace,
+        },
+      });
+
+      this.eventosGateway?.emitirAdmin('notificaciones:nueva', {
+        id: notif.id.toString(),
+        titulo,
+        mensaje,
+        enlace,
+      });
+    } catch (err: any) {
+      this.logger.warn(`Error al emitir aviso a la campana del panel: ${err.message}`);
+    }
+  }
+
+  /**
+   * Envía una alerta operativa a todos los administradores autorizados.
+   * - Siempre emite a la campana del panel.
+   * - Respeta la ventana de 24 horas: si abierta, texto interactivo; si cerrada, plantilla 'aviso_interno'.
+   * - 24 horas al día (sin filtro de horario).
+   */
+  async enviarAvisoAdmin(
+    titulo: string,
+    detalle: string,
+    enlace: string,
+    botones?: BotonAccion[],
+    claveIdempotencia?: string,
+  ): Promise<ResultadoNotificacionEquipo> {
+    // Alerta va SIEMPRE a la campana del panel (respaldo y registro)
+    await this.emitirAvisoCampana(titulo, detalle, enlace);
+
+    const activo = await this.estanAvisosActivos();
+    if (!activo) {
+      return {
+        omitido: true,
+        motivo: 'DESACTIVADO',
+        destinatariosTotal: 0,
+        enviosExitosos: 0,
+        detalles: [],
+      };
+    }
+
+    const destinatarios = await this.obtenerDestinatariosAlertas();
+    if (destinatarios.length === 0) {
+      return {
+        omitido: true,
+        motivo: 'SIN_NUMEROS',
+        destinatariosTotal: 0,
+        enviosExitosos: 0,
+        detalles: [],
+      };
+    }
+
+    const textoCuerpo = `🔔 *[ALERTA CAPRICHOS]*\n\n*${titulo}*\n\n${detalle}\n\n👉 Ver en panel: ${enlace}`;
+    const detalles: ResultadoEnvioEquipo[] = [];
+    let exitosos = 0;
+
+    for (const telefono of destinatarios) {
+      const telMask = enmascararTelefono(telefono);
+      const telHash = hashTelefono(telefono);
+
+      if (claveIdempotencia) {
+        const claveIdempCompleta = `${claveIdempotencia}:${telHash}`;
+        const esPrimerEnvio = await this.adquirirIdempotencia(claveIdempCompleta);
+        if (!esPrimerEnvio) {
+          detalles.push({
+            telefonoEnmascarado: telMask,
+            exito: true,
+            modo: 'OMITIDO_IDEMPOTENTE',
+          });
+          continue;
+        }
+      }
+
+      const ventanaAbierta = await this.ventana24hService.esVentanaAbierta(telefono);
+      let resultado: ResultadoEnvioWhatsApp;
+      let modoEnvio: 'VENTANA_24H' | 'PLANTILLA';
+
+      if (ventanaAbierta) {
+        modoEnvio = 'VENTANA_24H';
+        if (botones && botones.length > 0) {
+          resultado = await this.enviarConReintentos(() =>
+            this.mensajeria.enviarBotones(telefono, textoCuerpo, botones),
+          );
+        } else {
+          resultado = await this.enviarConReintentos(() =>
+            this.mensajeria.enviarTexto(telefono, textoCuerpo),
+          );
+        }
+      } else {
+        modoEnvio = 'PLANTILLA';
+        const definicion = CATALOGO_PLANTILLAS.AVISO_INTERNO;
+        resultado = await this.enviarConReintentos(() =>
+          this.mensajeria.enviarPlantilla(
+            telefono,
+            definicion.nombre,
+            definicion.idioma,
+            [titulo, `${detalle}\n${enlace}`],
+          ),
+        );
+      }
+
+      if (resultado.exito) {
+        exitosos++;
+      }
+
+      detalles.push({
+        telefonoEnmascarado: telMask,
+        exito: resultado.exito,
+        modo: resultado.exito ? modoEnvio : 'ERROR',
+        waMessageId: resultado.waMessageId,
+        error: resultado.errorDetalle,
+      });
+    }
+
+    return {
+      omitido: false,
+      motivo: 'PROCESADO',
+      destinatariosTotal: destinatarios.length,
+      enviosExitosos: exitosos,
+      detalles,
+    };
+  }
+
+  /**
+   * Envía mensaje de prueba por WhatsApp con botón interactivo "Sí, soy yo" para confirmar alertas.
+   */
+  async enviarPruebaAlertas(
+    usuarioId: bigint | string,
+    telefono: string,
+    nombres = 'Administrador',
+  ): Promise<ResultadoEnvioWhatsApp> {
+    const norm = normalizarCelularPeru(telefono);
+    const telE164 = norm.valido && norm.celularE164 ? norm.celularE164 : normalizarTelefono(telefono);
+    const textoLibre = `Hola ${nombres}, este es un mensaje de prueba de Caprichos para confirmar la recepción de alertas del sistema. Por favor confirma pulsando el botón:`;
+    const botones: BotonAccion[] = [
+      {
+        id: `alr_conf_${usuarioId}`,
+        titulo: 'Sí, soy yo',
+      },
+    ];
+
+    const ventanaAbierta = await this.ventana24hService.esVentanaAbierta(telE164);
+    if (ventanaAbierta) {
+      return this.mensajeria.enviarBotones(telE164, textoLibre, botones);
+    } else {
+      const def = CATALOGO_PLANTILLAS.AVISO_INTERNO;
+      return this.mensajeria.enviarPlantilla(
+        telE164,
+        def.nombre,
+        def.idioma,
+        ['Prueba de Alertas WhatsApp', `Hola ${nombres}, confirma tu WhatsApp pulsando Sí, soy yo o respondiendo a este chat.`],
+      );
+    }
   }
 }

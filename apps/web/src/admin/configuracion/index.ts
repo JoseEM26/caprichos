@@ -9,3 +9,4 @@ export * from './SeccionRepartoConfig';
 export * from './SeccionAltaDemanda';
 export * from './ChatbotConfiguracionTab';
 export * from './TarjetaAyudaIaConfiguracion';
+export * from './TarjetaUmbralesAlertasEspera';

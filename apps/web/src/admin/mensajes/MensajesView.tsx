@@ -128,6 +128,31 @@ function FotoMensaje({
   );
 }
 
+export function obtenerEstiloEspera(minutos: number) {
+  if (minutos > 15) {
+    return {
+      fondo: '#FBEDE9',
+      borde: '1px solid var(--cp-rust, #B2500F)',
+      color: 'var(--cp-rust, #B2500F)',
+      label: `${minutos} min`,
+    };
+  }
+  if (minutos > 5) {
+    return {
+      fondo: '#FEF9EE',
+      borde: '1px solid var(--cp-gold, #D99E39)',
+      color: 'var(--cp-gold, #D99E39)',
+      label: `${minutos} min`,
+    };
+  }
+  return {
+    fondo: '#F0F2F5',
+    borde: '1px solid var(--cp-line, #E3D6C6)',
+    color: 'var(--cp-soft, #2C4C5D)',
+    label: `${minutos} min`,
+  };
+}
+
 export function MensajesView() {
   let tieneVouchersVer = true;
   try {
@@ -144,6 +169,17 @@ export function MensajesView() {
   const [chats, setChats] = useState<ChatResumen[]>([]);
   const [conteos, setConteos] = useState({ todos: 0, atender: 0, bot: 0, atendidos: 0 });
   const [filtro, setFiltro] = useState<FiltroChat>('todos');
+
+  const chatsOrdenados = useMemo(() => {
+    if (filtro === 'atender') {
+      return [...chats].sort((a, b) => {
+        const esperaA = typeof a.esperaMin === 'number' ? a.esperaMin : -1;
+        const esperaB = typeof b.esperaMin === 'number' ? b.esperaMin : -1;
+        return esperaB - esperaA;
+      });
+    }
+    return chats;
+  }, [chats, filtro]);
   const [busqueda, setBusqueda] = useState('');
   const [chatSeleccionadoId, setChatSeleccionadoId] = useState<string | null>(null);
   const [detalle, setDetalle] = useState<DetalleConversacion | null>(null);
@@ -763,10 +799,10 @@ export function MensajesView() {
           <div className="cv-rows">
             {cargando ? (
               <div className="cv-empty">Cargando conversaciones...</div>
-            ) : chats.length === 0 ? (
+            ) : chatsOrdenados.length === 0 ? (
               <div className="cv-empty">No hay conversaciones en esta pestaña.</div>
             ) : (
-              chats.map((c) => {
+              chatsOrdenados.map((c) => {
                 const seleccionado = c.id === chatSeleccionadoId;
                 const tieneSinLeer = c.sinLeer > 0;
                 return (
@@ -817,14 +853,37 @@ export function MensajesView() {
                         <span className="cv-last">{c.ultimo}</span>
                         {tieneSinLeer && <span className="cv-badge">{c.sinLeer}</span>}
                       </span>
-                      <span
-                        className="cv-pill"
-                        style={{
-                          background: c.urgente ? '#F8C9C9' : ESTADOS_BG[c.estado] || '#F0F2F5',
-                        }}
-                      >
-                        {c.urgente ? `URGENTE · ${ESTADOS_LABEL[c.estado]}` : ESTADOS_LABEL[c.estado]}
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        <span
+                          className="cv-pill"
+                          style={{
+                            background: c.urgente ? '#F8C9C9' : ESTADOS_BG[c.estado] || '#F0F2F5',
+                          }}
+                        >
+                          {c.urgente ? `URGENTE · ${ESTADOS_LABEL[c.estado]}` : ESTADOS_LABEL[c.estado]}
+                        </span>
+                        {c.esperaMin !== undefined && c.esperaMin !== null && (
+                          <span
+                            data-testid={`espera-badge-${c.id}`}
+                            className="cv-espera-badge"
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              padding: '2px 8px',
+                              borderRadius: '10px',
+                              background: obtenerEstiloEspera(c.esperaMin).fondo,
+                              border: obtenerEstiloEspera(c.esperaMin).borde,
+                              color: obtenerEstiloEspera(c.esperaMin).color,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              whiteSpace: 'nowrap',
+                            }}
+                            title={`Tiempo de espera: ${c.esperaMin} minutos`}
+                          >
+                            Espera: {c.esperaMin} min
+                          </span>
+                        )}
+                      </div>
                     </span>
                   </button>
                 );

@@ -5,6 +5,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   Req,
   UseGuards,
@@ -17,6 +18,7 @@ import { CrearUsuarioDto } from './dto/crear-usuario.dto';
 import { EditarUsuarioDto } from './dto/editar-usuario.dto';
 import { FiltrarUsuariosDto } from './dto/filtrar-usuarios.dto';
 import { AsignarPinDto } from './dto/asignar-pin.dto';
+import { ConfigurarAlertasWhatsappDto } from './dto/configurar-alertas-whatsapp.dto';
 
 @Controller('admin/usuarios')
 @UseGuards(AccesoGuard)
@@ -89,4 +91,34 @@ export class UsuariosController {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.usuariosService.asignarPin(id, dto, req.usuario, ip);
   }
+
+  @Get(':id/alertas-whatsapp')
+  @Permiso('usuarios', 'ver')
+  async obtenerAlertasWhatsapp(@Param('id') id: string) {
+    return this.usuariosService.obtenerAlertasWhatsapp(id);
+  }
+
+  @Put(':id/alertas-whatsapp')
+  @Permiso('usuarios', 'editar')
+  async configurarAlertasWhatsapp(
+    @Param('id') id: string,
+    @Body() dto: ConfigurarAlertasWhatsappDto,
+    @Req() req: any,
+  ) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.usuariosService.configurarAlertasWhatsapp(id, dto, req.usuario, ip);
+  }
+
+  @Post(':id/alertas-whatsapp/enviar-prueba')
+  @Permiso('usuarios', 'editar')
+  async enviarPruebaAlertasWhatsapp(
+    @Param('id') id: string,
+    @Req() req: any,
+  ) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.usuariosService.enviarPruebaAlertasWhatsapp(id, req.usuario, ip);
+  }
+
+  // La confirmación del número solo ocurre desde el botón «Sí, soy yo» que la persona pulsa en su WhatsApp;
+  // no hay endpoint manual para que otro usuario del panel la dé por hecha.
 }
