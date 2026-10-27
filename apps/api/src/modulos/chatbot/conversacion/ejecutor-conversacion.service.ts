@@ -15,7 +15,7 @@ import { ChatbotConfiguracionService } from '../configuracion/chatbot-configurac
 import { BOTON_VOLVER_MENU, TEXTOS_BOT } from './textos-bot';
 import { TEXTOS_RESERVA } from './textos-reserva';
 import { TEXTOS_IA, BOTONES_IA_ESTANDAR, BOTONES_IA_CON_PEDIDO } from './textos-ia';
-import { obtenerFechaLimaActual } from './flujos/reserva/flujo-reserva';
+import { obtenerFechaLimaActual, resolverFechaEntradaReserva } from './flujos/reserva/flujo-reserva';
 import {
   WHATSAPP_MENSAJERIA_PUERTO,
   WhatsAppMensajeriaPuerto,
@@ -402,8 +402,18 @@ export class EjecutorConversacionService {
           entradaRaw.buttonPayload === 'reservar' ||
           entradaRaw.texto?.includes('reserva'))
       ) {
+        // En el paso FECHA la fecha llega en este mismo mensaje: consultar las franjas de esa fecha
+        const estadoReservaPrevio = String(
+          (flujoPrevioParaReserva?.reserva as any)?.estadoInterno || flujoPrevioParaReserva?.estado || '',
+        );
+        const fechaElegida =
+          estadoReservaPrevio === 'RESERVA_FECHA' || estadoReservaPrevio === 'RESERVA_FECHA_OTRA'
+            ? resolverFechaEntradaReserva(normalizarEntrada(entradaRaw))?.fechaIso
+            : undefined;
         const fechaParaFranjas =
-          (flujoPrevioParaReserva?.reserva as any)?.datos?.fechaIso || obtenerFechaLimaActual(0).fechaIso;
+          fechaElegida ||
+          (flujoPrevioParaReserva?.reserva as any)?.datos?.fechaIso ||
+          obtenerFechaLimaActual(0).fechaIso;
         const personasParaFranjas = (flujoPrevioParaReserva?.reserva as any)?.datos?.personas || 2;
         franjasDisponiblesReserva = await this.reservasService.obtenerFranjasDisponibles(
           fechaParaFranjas,

@@ -114,6 +114,23 @@ export function parsearFechaUsuario(texto: string): { fechaIso: string; fechaTex
 /**
  * Normaliza una hora escrita por el usuario a formato HH:mm
  */
+/**
+ * Fecha elegida en el paso FECHA (botones Hoy/Mañana o fecha escrita). Se usa también desde el
+ * ejecutor para consultar las franjas de esa fecha y no las de la fecha anterior del flujo.
+ */
+export function resolverFechaEntradaReserva(entrada: {
+  id?: string;
+  texto?: string;
+  textoOriginal?: string;
+}): { fechaIso: string; fechaTexto: string } | null {
+  if (entrada.id === 'res_f_hoy' || entrada.texto === 'hoy') return obtenerFechaLimaActual(0);
+  if (entrada.id === 'res_f_manana' || entrada.texto === 'manana' || entrada.texto === 'mañana') {
+    return obtenerFechaLimaActual(1);
+  }
+  if (entrada.id === 'res_f_otra') return null;
+  return parsearFechaUsuario(entrada.textoOriginal || '');
+}
+
 export function parsearHoraUsuario(texto: string): string | null {
   const limpio = texto.toLowerCase().trim();
   // Formato 15:30 o 3:30pm o 1500
@@ -504,13 +521,9 @@ export class FlujoReservaSubFlujo implements SubFlujoConversacion {
     // PASO 2: FECHA
     // -------------------------------------------------------------------------
     if (estadoActual === 'RESERVA_FECHA' || estadoActual === 'RESERVA_FECHA_OTRA') {
-      let fechaResuelta: { fechaIso: string; fechaTexto: string } | null = null;
+      const fechaResuelta = resolverFechaEntradaReserva(entrada);
 
-      if (entrada.id === 'res_f_hoy' || entrada.texto === 'hoy') {
-        fechaResuelta = obtenerFechaLimaActual(0);
-      } else if (entrada.id === 'res_f_manana' || entrada.texto === 'manana' || entrada.texto === 'mañana') {
-        fechaResuelta = obtenerFechaLimaActual(1);
-      } else if (entrada.id === 'res_f_otra') {
+      if (entrada.id === 'res_f_otra') {
         return {
           nuevoEstado: 'RESERVA_FECHA_OTRA',
           acciones: [
@@ -529,9 +542,6 @@ export class FlujoReservaSubFlujo implements SubFlujoConversacion {
             },
           },
         };
-      } else {
-        // Tratar de parsear fecha escrita
-        fechaResuelta = parsearFechaUsuario(entrada.textoOriginal);
       }
 
       if (!fechaResuelta) {
