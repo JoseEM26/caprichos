@@ -229,6 +229,12 @@ function ContenidoCartaPublica() {
   );
   const organizacion = contenido?.organizacion ?? 'SECCIONES';
 
+  const fotosDestacadas = useMemo(() => {
+    return (contenido?.destacadas ?? []).flatMap((d) =>
+      d.activo !== false && Array.isArray(d.fotos) ? d.fotos.map((f) => limpiarUrlFoto(f.url)) : [],
+    ).filter(Boolean);
+  }, [contenido]);
+
   const destacadasVisibles = useMemo(() => {
     return (contenido?.destacadas ?? [])
       .filter((d) => d.activo !== false && !extraerOffDeUrl(d.portada_url) && Array.isArray(d.fotos) && d.fotos.length > 0)
@@ -386,7 +392,7 @@ function ContenidoCartaPublica() {
         onVerPromociones={irAPromociones}
       />
 
-      {pagina === 'conocenos' && <PaginaConocenos datosLocal={datosLocal} estadoLocal={estadoLocal} />}
+      {pagina === 'conocenos' && <PaginaConocenos datosLocal={datosLocal} estadoLocal={estadoLocal} fotos={fotosDestacadas} />}
       {pagina === 'novedades' && (
         <PaginaNovedades
           novedades={novedadesEnriquecidas}

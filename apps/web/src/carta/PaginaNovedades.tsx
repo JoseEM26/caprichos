@@ -3,6 +3,7 @@ import { DatosLocalCarta, EstadoLocalCarta } from './tipos';
 import { useEsMovil } from './useEsMovil';
 import { NovedadDetalle } from './NovedadDetalle';
 import { EstadoError } from '../comun/EstadoError';
+import { MosaicoMomentos } from './MosaicoMomentos';
 
 export interface FotoNovedad {
   id: string;
@@ -191,6 +192,8 @@ export function PaginaNovedades({
   const [abierta, setAbierta] = useState<NovedadCarta | null>(null);
 
   const newsAll = ordenarNovedadesCarta(novedades);
+  // Fotos reales de las novedades: el mosaico de Momentos las muestra primero.
+  const fotosDeNovedades = newsAll.flatMap((n) => n.fotos.map((f) => f.url)).filter(Boolean);
   const heroItems = newsAll
     .filter((n) => esNovedadDestacada(n) || (n.tipo || '').toUpperCase() === 'BANNER')
     .slice(0, 5);
@@ -771,6 +774,10 @@ export function PaginaNovedades({
             ))}
           </div>
         </div>
+      )}
+
+      {!cargando && !error && (
+        <MosaicoMomentos titulo="Momentos Caprichos" fotos={fotosDeNovedades} cantidad={8} />
       )}
 
       {redes.length > 0 && (

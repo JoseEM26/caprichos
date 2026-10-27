@@ -44,6 +44,7 @@ import { ImpresionModule } from './modulos/impresion/impresion.module';
 import { AyudaAdminModule } from './modulos/ayuda-admin/ayuda-admin.module';
 import { VouchersModule } from './modulos/vouchers/vouchers.module';
 import { MascotaModule } from './modulos/mascota/mascota.module';
+import { PantallaIngresoModule } from './modulos/pantalla-ingreso/pantalla-ingreso.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -91,6 +92,7 @@ import { MascotaModule } from './modulos/mascota/mascota.module';
     AyudaAdminModule,
     VouchersModule,
     MascotaModule,
+    PantallaIngresoModule,
   ],
   providers: [
     PinoLoggerService,

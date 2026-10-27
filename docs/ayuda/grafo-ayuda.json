@@ -715,6 +715,12 @@
       "modulo": "mirest"
     },
     {
+      "id": "mirest#cambiar-las-imagenes-de-la-pantalla-de-ingreso",
+      "tipo": "tarea",
+      "etiqueta": "cambiar las imágenes de la pantalla de ingreso",
+      "modulo": "mirest"
+    },
+    {
       "id": "notificaciones",
       "tipo": "modulo",
       "etiqueta": "Notificaciones (notificaciones)",
@@ -3834,6 +3840,16 @@
       "tipo": "ver_tambien",
       "origen": "mirest",
       "destino": "historial"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#cambiar-las-imagenes-de-la-pantalla-de-ingreso",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mirest#cambiar-las-imagenes-de-la-pantalla-de-ingreso",
+      "destino": "mirest"
     },
     {
       "tipo": "requiere_permiso",

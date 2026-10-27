@@ -1,10 +1,13 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { DatosLocalCarta, EstadoLocalCarta } from './tipos';
 import { useEsMovil } from './useEsMovil';
+import { MosaicoMomentos } from './MosaicoMomentos';
 
 interface PaginaConocenosProps {
   datosLocal: DatosLocalCarta | null;
   estadoLocal: EstadoLocalCarta | null;
+  /** Fotos reales del Diseñador (Momentos). Si no hay, el mosaico usa las de marca. */
+  fotos?: string[];
 }
 
 const titulo: CSSProperties = { fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 18 };
@@ -30,7 +33,7 @@ function Bloque({ children, gap = 10 }: { children: ReactNode; gap?: number }) {
 }
 
 /** Página «Conócenos» (mockup Main ▸ CONÓCENOS): quiénes somos, dónde estamos, horario y contacto. */
-export function PaginaConocenos({ datosLocal, estadoLocal }: PaginaConocenosProps) {
+export function PaginaConocenos({ datosLocal, estadoLocal, fotos = [] }: PaginaConocenosProps) {
   const movil = useEsMovil();
   const direccion = datosLocal?.direccion || 'Campoy, San Juan de Lurigancho, Lima';
   const telefono = datosLocal?.telefono || '';
@@ -49,6 +52,9 @@ export function PaginaConocenos({ datosLocal, estadoLocal }: PaginaConocenosProp
         <span style={{ fontSize: movil ? 14 : 16, lineHeight: movil ? '21px' : '24px', maxWidth: 720 }}>
           Creamos momentos para compartir con experiencias gastronómicas artesanales: ingredientes premium, procesos hechos a mano y sin químicos.
         </span>
+        <div style={{ marginTop: 10 }}>
+          <MosaicoMomentos fotos={fotos} cantidad={3} columnas={3} prioritaria />
+        </div>
       </div>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: movil ? 12 : 20, alignItems: 'stretch' }}>
@@ -103,6 +109,8 @@ export function PaginaConocenos({ datosLocal, estadoLocal }: PaginaConocenosProp
           )}
         </div>
       </div>
+
+      <MosaicoMomentos titulo="Momentos Caprichos" fotos={fotos} cantidad={8} />
     </div>
   );
 }

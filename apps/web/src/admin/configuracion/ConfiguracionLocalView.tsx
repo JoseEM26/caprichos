@@ -13,6 +13,7 @@ import { ChatbotConfiguracionTab } from './ChatbotConfiguracionTab';
 import { TarjetaImpresionEtiquetas } from '../impresion/TarjetaImpresionEtiquetas';
 import { TarjetaAyudaIaConfiguracion } from './TarjetaAyudaIaConfiguracion';
 import { TarjetaVouchersIaConfiguracion } from './TarjetaVouchersIaConfiguracion';
+import { TarjetaPantallaIngresoConfiguracion } from './TarjetaPantallaIngresoConfiguracion';
 
 export interface InfoLocalState {
   // local
@@ -450,6 +451,12 @@ const CATEGORIAS_CONFIG: CategoriaConfig[] = [
     d: 'Yape y Plin, interruptor con IA, titular y números',
     fields: [],
   },
+  {
+    id: 'ingreso',
+    n: 'Pantalla de ingreso',
+    d: 'Imágenes del carrusel y frase de la pantalla de ingreso',
+    fields: [],
+  },
 ];
 
 const SLOTS_FOTOS = [
@@ -484,6 +491,8 @@ export function ConfiguracionLocalView() {
   const { tiene, usuario } = useSesion();
   const esAdmin = usuario?.rol === 'ADMIN' || tiene('ADMIN');
   const puedeVer = esAdmin || tiene('local/ver') || tiene('configuracion/ver');
+  // Pantalla de ingreso: solo quien tiene configuracion/editar (ADMIN).
+  const puedeEditarIngreso = esAdmin || tiene('configuracion/editar');
   const puedeEditar = esAdmin || tiene('local/editar') || tiene('configuracion/editar');
   const puedeEditarDemanda =
     esAdmin ||
@@ -714,7 +723,7 @@ export function ConfiguracionLocalView() {
             gap: '8px',
           }}
         >
-          {CATEGORIAS_CONFIG.map((c) => {
+          {CATEGORIAS_CONFIG.filter((c) => c.id !== 'ingreso' || puedeEditarIngreso).map((c) => {
             const activo = tabId === c.id;
             return (
               <button
@@ -1018,8 +1027,13 @@ export function ConfiguracionLocalView() {
             <TarjetaVouchersIaConfiguracion />
           )}
 
+          {/* Subcaso: PANTALLA DE INGRESO (solo configuracion/editar) */}
+          {tabId === 'ingreso' && puedeEditarIngreso && (
+            <TarjetaPantallaIngresoConfiguracion />
+          )}
+
           {/* Subcaso: CAMPOS REGULARES DE OTRAS CATEGORÍAS */}
-          {tabId !== 'horario' && tabId !== 'zonas' && tabId !== 'demanda' && tabId !== 'reparto' && tabId !== 'parametros' && tabId !== 'chatbot' && tabId !== 'impresion' && tabId !== 'ayuda' && tabId !== 'vouchers' && (
+          {tabId !== 'horario' && tabId !== 'zonas' && tabId !== 'demanda' && tabId !== 'reparto' && tabId !== 'parametros' && tabId !== 'chatbot' && tabId !== 'impresion' && tabId !== 'ayuda' && tabId !== 'vouchers' && tabId !== 'ingreso' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {tabId === 'operacion' && (
                 <div
@@ -1252,7 +1266,7 @@ export function ConfiguracionLocalView() {
           )}
 
           {/* Botones de acción inferiores */}
-          {tabId !== 'horario' && tabId !== 'zonas' && tabId !== 'demanda' && tabId !== 'impresion' && tabId !== 'ayuda' && (
+          {tabId !== 'horario' && tabId !== 'zonas' && tabId !== 'demanda' && tabId !== 'impresion' && tabId !== 'ayuda' && tabId !== 'ingreso' && (
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px' }}>
               <button
                 type="button"

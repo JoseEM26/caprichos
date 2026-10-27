@@ -10,6 +10,7 @@ sugerencias:
   - ¿Cómo activo la pausa de pedidos por alta demanda?
   - ¿Por qué me pide el código del supervisor al pausar pedidos o cambiar parámetros?
   - ¿Cómo configuro las cuentas de Yape, Plin y medios de pago?
+  - ¿Cómo cambio las imágenes de la pantalla de ingreso?
 ---
 # Configuración del local
 
@@ -49,10 +50,25 @@ Requiere: [[supervisor-codigo]]
 Antes: [[cocina]]
 Ver tambien: [[historial]]
 
+## Como se hace: cambiar las imágenes de la pantalla de ingreso
+1. Entra a Configuración del local y pulsa la pestaña "Pantalla de ingreso". Solo el Administrador ve esta pestaña.
+2. En "Imágenes elegidas" verás las fotos que aparecen en la pantalla de ingreso del panel (/admin/ingresar), en el orden en que rotan. Puedes elegir hasta 5.
+3. En "Biblioteca de imágenes" marca la casilla de una foto para usarla o desmárcala para quitarla. Quitar una foto no la borra del sistema.
+4. Usa "Subir" y "Bajar" junto a cada imagen para cambiar el orden. Con varias imágenes, la pantalla las rota sola cada 6 segundos.
+5. Para usar tu propia foto, pulsa "Subir foto propia" y elige una imagen JPG, PNG o WebP. La foto se reduce en el navegador antes de subirla y queda disponible en la biblioteca.
+6. Para cambiar la frase, escribe hasta 80 caracteres en "Frase de la pantalla". Si la dejas vacía se usa "Hecho a mano, servido con cariño".
+7. Pulsa "Guardar pantalla de ingreso" y confirma con "Sí, guardar". El cambio se ve en la siguiente visita, como máximo en un minuto.
+Ver tambien: [[mirest]]
+
 ## Errores y dudas comunes
 - El sistema pide código de supervisor: la pausa de pedidos por alta demanda y la edición de parámetros sensibles de operación están protegidas por seguridad. Se debe consultar el código rotativo en el módulo Código del supervisor (pantalla /admin/supervisor-codigo) e ingresarlo antes de que expire su temporizador de 30 segundos.
 - La pausa de pedidos no se activa: la regla de negocio exige que la alta demanda esté encendida con un recargo de minutos antes de poder activar la pausa de pedidos.
 - Mis cambios no se reflejan: asegúrate de haber pulsado "Guardar cambios" al final de la pantalla y haber confirmado el diálogo emergente con "Sí, guardar".
+- No veo la pestaña "Pantalla de ingreso": solo la ve quien tiene el permiso configuracion/editar, que corresponde al Administrador.
+- No puedo elegir una sexta imagen: el máximo es 5. Quita una imagen antes de agregar otra.
+- Aparece "La imagen propia ... no existe en el sistema": la foto no se subió completa o fue eliminada. Vuelve a subirla con "Subir foto propia".
+- Al guardar aparece un aviso sobre la frase: no puede superar 80 caracteres ni contener los símbolos < o >.
+- Los cambios de la pantalla de ingreso no aparecen de inmediato: el servidor guarda la respuesta unos 60 segundos. Recarga la página de ingreso.
 
 ## Quien puede hacerlo
-El acceso general a Configuración del local requiere el permiso local/ver y corresponde al Administrador (ADMIN). La activación de alta demanda también puede ser visualizada por el personal de Cocina si cuentan con cocina/demanda, pero la modificación de parámetros globales y la pausa de pedidos requieren privilegios de administración y la validación con el código de supervisor.
+El acceso general a Configuración del local requiere el permiso local/ver y corresponde al Administrador (ADMIN). Las imágenes y la frase de la pantalla de ingreso requieren el permiso configuracion/editar, que solo tiene el Administrador. La activación de alta demanda también puede ser visualizada por el personal de Cocina si cuentan con cocina/demanda, pero la modificación de parámetros globales y la pausa de pedidos requieren privilegios de administración y la validación con el código de supervisor.
