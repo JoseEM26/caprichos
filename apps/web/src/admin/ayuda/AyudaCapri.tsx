@@ -111,7 +111,9 @@ export function AyudaCapri({ ruta }: AyudaCapriProps) {
             aria-label="Minimizar a Capri"
             title="Minimizar"
           >
-            −
+            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+              <path d="M2 6h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
           </button>
           <button
             type="button"
@@ -132,20 +134,30 @@ export function AyudaCapri({ ruta }: AyudaCapriProps) {
         </div>
       )}
 
-      {/* Capri minimizada: botón redondo pequeño */}
+      {/* Capri minimizada: botón redondo pequeño y, aparte, el botón para agrandarla */}
       {!abierto && minimizada && (
-        <button
-          type="button"
-          className="ayuda-fab-mini"
-          onClick={() => {
-            cambiarMinimizada(false);
-            abrir();
-          }}
-          aria-label="Abrir la ayuda de Capri"
-          title="Ayuda de Capri"
-        >
-          <MascotaCapri estado="reposo" tamano={44} forzarFallback2D />
-        </button>
+        <div className="ayuda-mini-wrap">
+          <button
+            type="button"
+            className="ayuda-fab-mini"
+            onClick={abrir}
+            aria-label="Abrir la ayuda de Capri"
+            title="Ayuda de Capri"
+          >
+            <MascotaCapri estado="reposo" tamano={44} forzarFallback2D />
+          </button>
+          <button
+            type="button"
+            className="ayuda-max"
+            onClick={() => cambiarMinimizada(false)}
+            aria-label="Agrandar a Capri"
+            title="Agrandar"
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+              <path d="M6 2v8M2 6h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
       )}
 
       {/* Fondo oscuro traslúcido en celular */}

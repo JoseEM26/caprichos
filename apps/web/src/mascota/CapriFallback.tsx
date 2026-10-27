@@ -223,7 +223,7 @@ export function CapriFallback({
             <ellipse cx="158" cy="108" rx="5" ry="8" fill="#F6BE94" />
 
             {/* Flequillo */}
-            <path d="M 80 84 Q 90 70 108 80 Q 120 66 132 80 Q 150 70 160 84 Q 150 92 138 86 Q 120 96 102 86 Q 90 92 80 84 Z" fill="#4A2C1D" />
+            <path d="M 77 92 Q 76 72 98 70 L 142 70 Q 164 72 163 92 Q 158 80 146 77 Q 128 84 112 78 Q 92 76 84 90 Q 80 94 77 92 Z" fill="#4A2C1D" />
 
             {/* Gorro de chef: sombra bajo la banda, nube esponjosa y banda con cinta */}
             <g stroke="#E3D6C6" strokeWidth="1.5">
@@ -260,13 +260,13 @@ export function CapriFallback({
                 <ellipse cx="101" cy="103" rx="12" ry="14" fill="#1C1C22" />
                 <circle cx="105" cy="97" r="5" fill="#FFFFFF" />
                 <circle cx="98" cy="106" r="2" fill="#FFFFFF" />
-                <path d="M 88 96 Q 101 86 114 96 M 87 98 L 82 94 M 90 94 L 86 89" stroke="#1C1C22" strokeWidth="2.6" strokeLinecap="round" fill="none" />
+                <path d="M 89 90 Q 101 80 113 90 M 87 98 L 82 94 M 90 94 L 86 89" stroke="#1C1C22" strokeWidth="2" strokeLinecap="round" fill="none" />
 
                 {/* Ojo Derecho */}
                 <ellipse cx="139" cy="103" rx="12" ry="14" fill="#1C1C22" />
                 <circle cx="143" cy="97" r="5" fill="#FFFFFF" />
                 <circle cx="136" cy="106" r="2" fill="#FFFFFF" />
-                <path d="M 126 96 Q 139 86 152 96 M 153 98 L 158 94 M 150 94 L 154 89" stroke="#1C1C22" strokeWidth="2.6" strokeLinecap="round" fill="none" />
+                <path d="M 127 90 Q 139 80 151 90 M 153 98 L 158 94 M 150 94 L 154 89" stroke="#1C1C22" strokeWidth="2" strokeLinecap="round" fill="none" />
               </g>
             )}
 

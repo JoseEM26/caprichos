@@ -1,0 +1,81 @@
+export type SemaforoVoucher =
+  | 'CONFIABLE'
+  | 'OBSERVADO'
+  | 'RARO'
+  | 'ILEGIBLE'
+  | 'SIN_LECTURA';
+
+export type MedioPagoVoucher = 'YAPE' | 'PLIN';
+
+export type OrigenVoucher = 'MOZO' | 'WHATSAPP' | 'CAJA';
+
+export interface VoucherExtraido {
+  legible: boolean;
+  monto: number | null;
+  moneda?: string;
+  operacion: string | null;
+  fecha: string | null;
+  hora: string | null;
+  titular: string | null;
+  destinoNumero: string | null;
+  medioDetectado: 'YAPE' | 'PLIN' | 'OTRO' | null;
+  confianza: number;
+  notas?: string;
+}
+
+export interface RespuestaSubirVoucherMozo {
+  id: string | number;
+  legible: boolean;
+  mensaje?: string;
+}
+
+export interface RespuestaSubirVoucherAdmin {
+  id: string | number;
+  legible: boolean;
+  semaforo: SemaforoVoucher;
+  motivos: string[];
+  extraido: VoucherExtraido;
+  archivoId?: string | number;
+  medio?: string;
+}
+
+export type RespuestaSubirVoucher =
+  | RespuestaSubirVoucherMozo
+  | RespuestaSubirVoucherAdmin;
+
+export interface VoucherPagoItem {
+  id: string | number;
+  pedidoId?: string | number | null;
+  conversacionId?: string | number | null;
+  mensajeId?: string | number | null;
+  archivoId: string | number;
+  origen: OrigenVoucher;
+  medio?: 'YAPE' | 'PLIN' | null;
+  subidoPor?: string | number | null;
+  hashImagen?: string | null;
+  extraido?: VoucherExtraido | null;
+  semaforo: SemaforoVoucher;
+  motivos: string[];
+  revisadoEn?: string | null;
+  revisadoPor?: string | number | null;
+  creadoEn: string;
+}
+
+export interface VoucherResumenChat {
+  id: string | number;
+  semaforo: SemaforoVoucher;
+  motivos: string[];
+  extraido?: VoucherExtraido | null;
+  medio?: string | null;
+  pedidoTotal?: number | null;
+  archivoId?: string | number | null;
+  revisadoEn?: string | null;
+}
+
+export interface ParametrosVoucherConfig {
+  voucher_ia_activo: boolean;
+  voucher_titular_nombre: string;
+  voucher_yape_numero: string;
+  voucher_plin_numero: string;
+  voucher_mozo_obligatorio: boolean;
+}
