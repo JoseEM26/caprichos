@@ -6,6 +6,7 @@ import {
   OnModuleInit,
   Optional,
 } from '@nestjs/common';
+import { flujoLiberadoParaBot } from '../conversacion/flujo-liberado.util';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { RedisService } from '../../../comun/redis/redis.service';
 import { EventosGateway } from '../../../comun/socket/eventos.gateway';
@@ -355,6 +356,7 @@ export class AlertasEsperaService implements OnModuleInit, OnModuleDestroy {
               tomado_en: null,
               urgente: false,
               ultima_actividad: ahora,
+              flujo: flujoLiberadoParaBot((chat as any).flujo) as any,
             },
           });
 

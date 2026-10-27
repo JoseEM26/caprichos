@@ -11,6 +11,7 @@ import {
   esRemitenteSinTelefono,
   obtenerNombreMostrar,
 } from './utilidades/nombre-contacto.util';
+import { flujoLiberadoParaBot } from '../chatbot/conversacion/flujo-liberado.util';
 import { enmascararTelefono } from '../chatbot/utilidades/enmascarar.util';
 import { mapearErrorWhatsApp } from './utilidades/error-whatsapp.util';
 import { EditarNombreContactoDto } from './dto/mensajes.dto';
@@ -632,7 +633,7 @@ export class MensajesService {
   async soltar(id: string, usuario: UsuarioAutenticado, ip?: string) {
     const c = await this.cargar(id);
     await this.exigirLibreOMio(c, usuario, 'Solo quien lo atiende puede soltarlo.');
-    await this.tocar(c.id, { duenio: 'BOT', tomado_por: null, tomado_en: null, urgente: false });
+    await this.tocar(c.id, { duenio: 'BOT', tomado_por: null, tomado_en: null, urgente: false, flujo: flujoLiberadoParaBot(c.flujo) as any });
     await this.auditar(usuario, 'SOLTAR', c.id, undefined, ip);
     try {
       await this.gateway.enviarTexto(c.id, c.telefono, TEXTOS_CAMBIOS.botRetomaAtencion(), 'BOT');
@@ -651,7 +652,7 @@ export class MensajesService {
 
   async reanudar(id: string, usuario: UsuarioAutenticado, ip?: string) {
     const c = await this.cargar(id);
-    await this.tocar(c.id, { duenio: 'BOT', urgente: false, tomado_por: null, tomado_en: null });
+    await this.tocar(c.id, { duenio: 'BOT', urgente: false, tomado_por: null, tomado_en: null, flujo: flujoLiberadoParaBot(c.flujo) as any });
     await this.auditar(usuario, 'REANUDAR_BOT', c.id, undefined, ip);
     try {
       await this.gateway.enviarTexto(c.id, c.telefono, TEXTOS_CAMBIOS.botRetomaAtencion(), 'BOT');
@@ -664,7 +665,7 @@ export class MensajesService {
   async marcarAtendido(id: string, usuario: UsuarioAutenticado, ip?: string) {
     const c = await this.cargar(id);
     await this.exigirLibreOMio(c, usuario, 'Toca «Tomar el chat» para cerrarlo.');
-    await this.tocar(c.id, { estado: 'ATENDIDA', duenio: 'BOT', urgente: false, tomado_por: null, tomado_en: null });
+    await this.tocar(c.id, { estado: 'ATENDIDA', duenio: 'BOT', urgente: false, tomado_por: null, tomado_en: null, flujo: flujoLiberadoParaBot(c.flujo) as any });
     await this.auditar(usuario, 'MARCAR_ATENDIDO', c.id, undefined, ip);
     try {
       await this.gateway.enviarTexto(c.id, c.telefono, TEXTOS_CAMBIOS.botRetomaAtencion(), 'BOT');
