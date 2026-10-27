@@ -832,9 +832,12 @@ export function AdminShell() {
       />
 
       {/* Asistente de ayuda del administrador (Capri) montado una vez para todo el panel */}
-      <Suspense fallback={null}>
-        <AyudaCapri />
-      </Suspense>
+      {/* El repartidor trabaja en la calle con una barra inferior propia: no se le muestra el botón flotante */}
+      {rol !== 'REPARTIDOR' && (
+        <Suspense fallback={null}>
+          <AyudaCapri />
+        </Suspense>
+      )}
     </div>
   );
 }

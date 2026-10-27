@@ -187,6 +187,10 @@ export class PedidosEstadoService {
       ];
     }
 
+    if (usuarioActual && usuarioActual.rol === 'REPARTIDOR') {
+      where.repartidor_party_id = BigInt(usuarioActual.partyId);
+    }
+
     const pagina = Math.max(1, Number(filtros.pagina) || 1);
     const limite = Math.min(100, Math.max(1, Number(filtros.limite) || 20));
     const skip = (pagina - 1) * limite;
@@ -371,6 +375,15 @@ export class PedidosEstadoService {
       });
     }
 
+    if (usuarioActual && usuarioActual.rol === 'REPARTIDOR') {
+      if (pedido.repartidor_party_id == null || BigInt(pedido.repartidor_party_id) !== BigInt(usuarioActual.partyId)) {
+        throw new ForbiddenException({
+          codigo: 'NO_ASIGNADO',
+          mensaje: 'Este pedido no está asignado a tu usuario',
+        });
+      }
+    }
+
     const umbrales = await this.obtenerUmbrales();
     const { minutosEspera, color, colorEspera } = this.calcularMinutosYColor(
       pedido.creado_en,
@@ -429,6 +442,15 @@ export class PedidosEstadoService {
         codigo: 'PEDIDO_NO_ENCONTRADO',
         mensaje: 'Pedido no encontrado',
       });
+    }
+
+    if (usuarioActual && usuarioActual.rol === 'REPARTIDOR') {
+      if (pedido.repartidor_party_id == null || BigInt(pedido.repartidor_party_id) !== BigInt(usuarioActual.partyId)) {
+        throw new ForbiddenException({
+          codigo: 'NO_ASIGNADO',
+          mensaje: 'Este pedido no está asignado a tu usuario',
+        });
+      }
     }
 
     const estadoAnterior = pedido.estado;
@@ -709,6 +731,15 @@ export class PedidosEstadoService {
         codigo: 'PEDIDO_NO_ENCONTRADO',
         mensaje: 'Pedido no encontrado',
       });
+    }
+
+    if (usuarioActual && usuarioActual.rol === 'REPARTIDOR') {
+      if (pedido.repartidor_party_id == null || BigInt(pedido.repartidor_party_id) !== BigInt(usuarioActual.partyId)) {
+        throw new ForbiddenException({
+          codigo: 'NO_ASIGNADO',
+          mensaje: 'Este pedido no está asignado a tu usuario',
+        });
+      }
     }
 
     const metodoUpper = dto.metodo.toUpperCase().trim();

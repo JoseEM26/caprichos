@@ -33,12 +33,13 @@ import {
   RespuestaMios,
   PedidoPerdido,
 } from './repartosApi';
+import { RepartidorView } from './RepartidorView';
 
 type ModoVista = 'mapa' | 'lista';
 type FiltroRetraso = 'todos' | NivelEspera;
 
 
-export function RepartosView() {
+function RepartosAdminView() {
   const { tiene, usuario } = useSesion();
   const [searchParams, setSearchParams] = useSearchParams();
   const movil = useEsMovil();
@@ -1199,4 +1200,25 @@ export function RepartosView() {
       />
     </div>
   );
+}
+
+export function RepartosView() {
+  const { tiene, usuario } = useSesion();
+  const puedeVer = tiene('repartos/ver');
+  const puedeLiquidar = tiene('repartos/liquidar');
+  const esRolRepartidor = usuario?.rol === 'REPARTIDOR';
+
+  if (!puedeVer) {
+    return (
+      <div style={{ padding: '24px' }}>
+        <EstadoError mensaje="No tienes permiso para ver el módulo de repartos." />
+      </div>
+    );
+  }
+
+  if (esRolRepartidor && !puedeLiquidar) {
+    return <RepartidorView />;
+  }
+
+  return <RepartosAdminView />;
 }

@@ -34,6 +34,8 @@ export interface PedidoReparto {
   alerta_tomado_sin_salir?: boolean;
   minutos_sin_salir?: number;
   creado_en: string;
+  cantidad_productos?: number;
+  cantidadProductos?: number;
   repartidor?: {
     id: string;
     nombre: string | null;
@@ -114,10 +116,11 @@ export const repartosApi = {
   consultarMensajes: (id: string) =>
     api.get<MensajeReparto[]>(`/admin/repartos/${id}/mensajes`),
 
-  listarTodos: (filtros?: { repartidor?: string; estado?: string }) => {
+  listarTodos: (filtros?: { repartidor?: string; estado?: string; historial?: string }) => {
     const params = new URLSearchParams();
     if (filtros?.repartidor) params.set('repartidor', filtros.repartidor);
     if (filtros?.estado) params.set('estado', filtros.estado);
+    if (filtros?.historial) params.set('historial', filtros.historial);
     const qs = params.toString();
     return api.get<PedidoReparto[]>(`/admin/repartos${qs ? `?${qs}` : ''}`);
   },

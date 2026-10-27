@@ -1025,27 +1025,9 @@
       "etiqueta": "Permiso: repartos/ver"
     },
     {
-      "id": "repartos#tomar-pedidos-e-iniciar-una-ruta",
-      "tipo": "tarea",
-      "etiqueta": "Tomar pedidos e iniciar una ruta",
-      "modulo": "repartos"
-    },
-    {
-      "id": "repartos#registrar-el-ciclo-de-entrega-en-camino",
-      "tipo": "tarea",
-      "etiqueta": "Registrar el ciclo de entrega en camino",
-      "modulo": "repartos"
-    },
-    {
       "id": "repartos#reportar-una-falla-en-la-entrega-no-contesta-o-direccion-erronea",
       "tipo": "tarea",
       "etiqueta": "Reportar una falla en la entrega (no contesta o direccion erronea)",
-      "modulo": "repartos"
-    },
-    {
-      "id": "repartos#resolver-un-incidente-reportado-supervisor-o-caja",
-      "tipo": "tarea",
-      "etiqueta": "Resolver un incidente reportado (Supervisor o Caja)",
       "modulo": "repartos"
     },
     {
@@ -4990,61 +4972,6 @@
     },
     {
       "tipo": "pertenece_a",
-      "origen": "repartos#tomar-pedidos-e-iniciar-una-ruta",
-      "destino": "repartos"
-    },
-    {
-      "tipo": "antes",
-      "origen": "repartos#tomar-pedidos-e-iniciar-una-ruta",
-      "destino": "cocina"
-    },
-    {
-      "tipo": "antes",
-      "origen": "repartos",
-      "destino": "cocina"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "repartos#tomar-pedidos-e-iniciar-una-ruta",
-      "destino": "zonas"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "repartos",
-      "destino": "zonas"
-    },
-    {
-      "tipo": "pertenece_a",
-      "origen": "repartos#registrar-el-ciclo-de-entrega-en-camino",
-      "destino": "repartos"
-    },
-    {
-      "tipo": "antes",
-      "origen": "repartos#registrar-el-ciclo-de-entrega-en-camino",
-      "destino": "repartos"
-    },
-    {
-      "tipo": "despues",
-      "origen": "repartos#registrar-el-ciclo-de-entrega-en-camino",
-      "destino": "cierre"
-    },
-    {
-      "tipo": "despues",
-      "origen": "repartos",
-      "destino": "cierre"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "repartos#registrar-el-ciclo-de-entrega-en-camino",
-      "destino": "caja"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "repartos",
-      "destino": "caja"
-    },
-    {
-      "tipo": "pertenece_a",
       "origen": "repartos#reportar-una-falla-en-la-entrega-no-contesta-o-direccion-erronea",
       "destino": "repartos"
     },
@@ -5057,31 +4984,6 @@
       "tipo": "ver_tambien",
       "origen": "repartos",
       "destino": "mensajes"
-    },
-    {
-      "tipo": "pertenece_a",
-      "origen": "repartos#resolver-un-incidente-reportado-supervisor-o-caja",
-      "destino": "repartos"
-    },
-    {
-      "tipo": "despues",
-      "origen": "repartos#resolver-un-incidente-reportado-supervisor-o-caja",
-      "destino": "caja"
-    },
-    {
-      "tipo": "despues",
-      "origen": "repartos",
-      "destino": "caja"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "repartos#resolver-un-incidente-reportado-supervisor-o-caja",
-      "destino": "cierre"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "repartos",
-      "destino": "cierre"
     },
     {
       "tipo": "requiere_permiso",

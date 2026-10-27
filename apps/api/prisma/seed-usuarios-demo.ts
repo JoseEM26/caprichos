@@ -1,3 +1,6 @@
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 import { PrismaClient } from '@prisma/client';
 import * as crypto from 'crypto';
 import * as argon2 from 'argon2';
@@ -29,7 +32,9 @@ const USUARIOS_DEMO: DefinicionUsuarioDemo[] = [
   { rol: 'MOZO', dni: '10000003', nombres: 'Mozo', apellidos: 'Salon' },
   { rol: 'COCINA', dni: '10000004', nombres: 'Cocinero', apellidos: 'Jefe' },
   { rol: 'ALMACEN', dni: '10000005', nombres: 'Almacenero', apellidos: 'Central' },
-  { rol: 'REPARTIDOR', dni: '10000006', nombres: 'Repartidor', apellidos: 'Motorizado' },
+  { rol: 'REPARTIDOR', dni: '10000006', nombres: 'Repartidor 1', apellidos: '' },
+  { rol: 'REPARTIDOR', dni: '10000007', nombres: 'Repartidor 2', apellidos: '' },
+  { rol: 'REPARTIDOR', dni: '10000008', nombres: 'Repartidor 3', apellidos: '' },
 ];
 
 export async function main() {

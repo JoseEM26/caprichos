@@ -114,10 +114,13 @@ describe('RepartosService', () => {
     rutaService = module.get<RutaService>(RutaService);
   });
 
-  describe('1. Límite de 3 pedidos por repartidor (DT-68 / RQ-DEL-02-20)', () => {
-    it('lanza 409 LIMITE_PEDIDOS si el repartidor ya tiene 3 pedidos activos', async () => {
-      // El repartidor ya tiene 3 pedidos activos en LISTO o EN_CAMINO
-      prismaMock.pedido.count.mockResolvedValue(3);
+  describe('1. Límite de pedidos por repartidor (rep_max_pedidos default 5)', () => {
+    it('lanza 409 LIMITE_PEDIDOS si el repartidor ya tiene 5 pedidos activos', async () => {
+      prismaMock.parametro.findMany.mockResolvedValue([
+        { clave: 'rep_max_pedidos', valor: 5 },
+      ]);
+      // El repartidor ya tiene 5 pedidos activos en LISTO o EN_CAMINO
+      prismaMock.pedido.count.mockResolvedValue(5);
 
       await expect(
         service.tomarPedido('10', repartidor1),
@@ -128,12 +131,12 @@ describe('RepartosService', () => {
       ).rejects.toMatchObject({
         response: {
           codigo: 'LIMITE_PEDIDOS',
-          mensaje: 'Ya llevas 3 pedidos: entrega alguno antes de tomar otro',
+          mensaje: 'Ya llevas 5 pedidos: entrega alguno antes de tomar otro',
         },
       });
     });
 
-    it('permite tomar pedido si tiene menos de 3 pedidos activos', async () => {
+    it('permite tomar pedido si tiene menos de 5 pedidos activos', async () => {
       prismaMock.pedido.count.mockResolvedValue(2);
       prismaMock.pedido.updateMany.mockResolvedValue({ count: 1 });
       const pedidoMock = {
@@ -398,6 +401,7 @@ describe('RepartosService', () => {
         id: 50n,
         codigo: 'CP-0106',
         estado: 'EN_CAMINO',
+        repartidor_party_id: 101n,
       });
 
       // Solo 1 llamada registrada
@@ -433,6 +437,7 @@ describe('RepartosService', () => {
         id: 51n,
         codigo: 'CP-0107',
         estado: 'EN_CAMINO',
+        repartidor_party_id: 101n,
       };
       prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);
       prismaMock.incidenteEntrega.count.mockResolvedValue(0); // Intento 1
@@ -634,18 +639,7 @@ describe('RepartosService', () => {
         expect.objectContaining({
           where: expect.objectContaining({
             modalidad: 'DELIVERY',
-            AND: [
-              {
-                OR: [
-                  { repartidor_party_id: 101n },
-                  {
-                    repartidor_party_id: null,
-                    estado: 'LISTO',
-                    motivo_falla: null,
-                  },
-                ],
-              },
-            ],
+            repartidor_party_id: 101n,
           }),
         }),
       );
@@ -730,7 +724,7 @@ describe('RepartosService', () => {
       expect(config.tardeMin).toBe(30);
       expect(config.muyTardeMin).toBe(45);
       expect(config.velocidadKmh).toBe(25);
-      expect(config.maxPedidos).toBe(3);
+      expect(config.maxPedidos).toBe(5);
       expect(config.localCoords).toEqual(COORDENADAS_LOCAL_DEFAULT);
     });
 

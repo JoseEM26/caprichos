@@ -78,7 +78,7 @@ export class RepartosService {
     let tardeMin = 30;
     let muyTardeMin = 45;
     let velocidadKmh = 25;
-    let maxPedidos = 3;
+    let maxPedidos = 5;
     let msg3Seg = 90;
     let tomadoSinSalirMin = 10;
     let localCoords = COORDENADAS_LOCAL_DEFAULT;
@@ -130,12 +130,12 @@ export class RepartosService {
           const v = Number(p.valor);
           if (!isNaN(v) && v > 0) tomadoSinSalirMin = v;
         }
-        if (p.clave === 'reparto_max_pedidos' && p.valor != null) {
+        if (p.clave === 'rep_max_pedidos' && p.valor != null) {
           const v = Number(p.valor);
           if (!isNaN(v) && v > 0) maxPedidos = v;
-        } else if (p.clave === 'rep_max_pedidos' && p.valor != null) {
+        } else if (p.clave === 'reparto_max_pedidos' && p.valor != null) {
           const v = Number(p.valor);
-          if (!isNaN(v) && v > 0 && maxPedidos === 3) maxPedidos = v;
+          if (!isNaN(v) && v > 0) maxPedidos = v;
         }
         if (p.clave === 'rep_msg3_seg' && p.valor != null) {
           const v = Number(p.valor);
@@ -208,6 +208,7 @@ export class RepartosService {
     p: any,
     config: ParametrosReparto,
     ahora: Date = new Date(),
+    usuarioActual?: UsuarioAutenticado,
   ) {
     const { minutosEspera, color } = this.calcularMinutosYColor(
       p.creado_en,
@@ -240,13 +241,31 @@ export class RepartosService {
       }
     }
 
+    // Cantidad total de productos en el pedido
+    const cantidadProductos = Array.isArray(p.lineas)
+      ? p.lineas.reduce((acc: number, l: any) => acc + (Number(l.cantidad) || 0), 0)
+      : (p._count?.lineas ?? 0);
+
+    // Regla de privacidad: el teléfono completo del cliente SOLO se muestra después de tomar el pedido.
+    // Si el usuario es REPARTIDOR y el pedido aún no está tomado por él, el teléfono se oculta (null).
+    let clienteTelefono: string | null = p.cliente_telefono ?? null;
+    const esRepartidor = usuarioActual?.rol === 'REPARTIDOR';
+    const esMio =
+      p.repartidor_party_id != null &&
+      usuarioActual?.partyId != null &&
+      BigInt(p.repartidor_party_id) === BigInt(usuarioActual.partyId);
+
+    if (esRepartidor && !esMio) {
+      clienteTelefono = null;
+    }
+
     return {
       id: String(p.id),
       codigo: p.codigo,
       modalidad: p.modalidad,
       estado: p.estado,
       cliente_nombre: p.cliente_nombre,
-      cliente_telefono: p.cliente_telefono,
+      cliente_telefono: clienteTelefono,
       direccion: p.entrega_direccion,
       referencia: p.entrega_referencia,
       lat: p.entrega_lat != null ? Number(p.entrega_lat) : null,
@@ -267,6 +286,8 @@ export class RepartosService {
       cobroPendienteEfectivo,
       paga_con: pagaConNum,
       vuelto,
+      cantidad_productos: cantidadProductos,
+      cantidadProductos,
       repartidor_party_id: p.repartidor_party_id ? String(p.repartidor_party_id) : null,
       tomado_en: p.tomado_en,
       salio_en: p.salio_en,
@@ -284,7 +305,7 @@ export class RepartosService {
    * Pedidos DELIVERY en estado LISTO sin repartidor, con posición, zona, minutos de espera,
    * color (verde/naranja/rojo), dirección, total, cobro pendiente en efectivo y paga_con.
    */
-  async listarDisponibles() {
+  async listarDisponibles(usuario?: UsuarioAutenticado) {
     const config = await this.obtenerParametrosReparto();
     const pedidos = await this.prisma.pedido.findMany({
       where: {
@@ -295,12 +316,13 @@ export class RepartosService {
       },
       include: {
         zona: true,
+        lineas: { select: { cantidad: true } },
       },
       orderBy: { creado_en: 'asc' },
     });
 
     const ahora = new Date();
-    return pedidos.map((p) => this.formatearPedidoReparto(p, config, ahora));
+    return pedidos.map((p) => this.formatearPedidoReparto(p, config, ahora, usuario));
   }
 
   /**
@@ -335,6 +357,7 @@ export class RepartosService {
       },
       include: {
         zona: true,
+        lineas: { select: { cantidad: true } },
       },
       orderBy: { creado_en: 'asc' },
     });
@@ -350,13 +373,14 @@ export class RepartosService {
       },
       include: {
         zona: true,
+        lineas: { select: { cantidad: true } },
       },
       orderBy: { creado_en: 'asc' },
     });
 
     const ahora = new Date();
     const propiosFormateados = pedidosPropios.map((p) =>
-      this.formatearPedidoReparto(p, config, ahora),
+      this.formatearPedidoReparto(p, config, ahora, usuario),
     );
 
     const inputPropios: PedidoRutaInput[] = pedidosPropios
@@ -404,12 +428,21 @@ export class RepartosService {
       config.velocidadKmh,
     );
 
+    // Asegurar que todos los pedidos propios aparezcan en el orden (incluso si alguno no tiene coordenadas)
+    const ordenCompleto = [...rutaCalculada.orden];
+    for (const p of pedidosPropios) {
+      const idStr = String(p.id);
+      if (!ordenCompleto.includes(idStr)) {
+        ordenCompleto.push(idStr);
+      }
+    }
+
     return {
       pedidos: propiosFormateados,
-      orden: rutaCalculada.orden,
+      orden: ordenCompleto,
       paso: rutaCalculada.paso,
       ruta: rutaCalculada.ruta,
-      totalParadas: rutaCalculada.totalParadas,
+      totalParadas: propiosFormateados.length,
       distanciaKm: rutaCalculada.distanciaKm,
       tiempoMin: rutaCalculada.tiempoMin,
       velocidadKmh: rutaCalculada.velocidadKmh,
@@ -418,11 +451,10 @@ export class RepartosService {
 
   /**
    * 1) GET /admin/repartos?repartidor= (repartos/ver):
-   * RQ-DEL-02-03: Si el usuario es REPARTIDOR, SOLO ve sus entregas asignadas
-   * y los pedidos disponibles para tomar.
+   * Si el usuario es REPARTIDOR, ve ÚNICA Y EXCLUSIVAMENTE sus pedidos asignados.
    * Caja y admin ven todos los repartidores y pedidos filtrables.
    */
-  async listarTodos(filtros: FiltrarRepartosDto, usuario: UsuarioAutenticado) {
+  async listarTodos(filtros: FiltrarRepartosDto, usuario?: UsuarioAutenticado) {
     const config = await this.obtenerParametrosReparto();
     const where: Prisma.PedidoWhereInput = {
       modalidad: 'DELIVERY',
@@ -430,18 +462,7 @@ export class RepartosService {
 
     if (usuario && usuario.rol === 'REPARTIDOR') {
       const miPartyId = BigInt(usuario.partyId);
-      where.AND = [
-        {
-          OR: [
-            { repartidor_party_id: miPartyId },
-            {
-              repartidor_party_id: null,
-              estado: 'LISTO',
-              motivo_falla: null,
-            },
-          ],
-        },
-      ];
+      where.repartidor_party_id = miPartyId;
     } else if (filtros.repartidor) {
       try {
         where.repartidor_party_id = BigInt(filtros.repartidor);
@@ -462,6 +483,7 @@ export class RepartosService {
       where,
       include: {
         zona: true,
+        lineas: { select: { cantidad: true } },
         repartidor: {
           include: {
             persona: true,
@@ -483,7 +505,7 @@ export class RepartosService {
       }
 
       return {
-        ...this.formatearPedidoReparto(p, config, ahora),
+        ...this.formatearPedidoReparto(p, config, ahora, usuario),
         repartidor: p.repartidor
           ? {
               id: String(p.repartidor.id),
@@ -658,7 +680,14 @@ export class RepartosService {
    * 4) GET /admin/repartos/resumen (repartos/ver):
    * Conteo por lado (Norte, Sur, Este, Oeste respecto del local) y por zona.
    */
-  async obtenerResumen() {
+  async obtenerResumen(usuario?: UsuarioAutenticado) {
+    if (usuario && usuario.rol === 'REPARTIDOR') {
+      return {
+        lados: { Norte: 0, Sur: 0, Este: 0, Oeste: 0 },
+        zonas: {},
+        total: 0,
+      };
+    }
     const config = await this.obtenerParametrosReparto();
     const pedidos = await this.prisma.pedido.findMany({
       where: {
@@ -779,7 +808,10 @@ export class RepartosService {
 
     const pedido = await this.prisma.pedido.findUniqueOrThrow({
       where: { id: pedidoId },
-      include: { zona: true },
+      include: {
+        zona: true,
+        lineas: { select: { cantidad: true } },
+      },
     });
 
     // Registrar en historial
@@ -814,7 +846,7 @@ export class RepartosService {
       repartidor_party_id: Number(partyId),
     });
 
-    return this.formatearPedidoReparto(pedido, config, ahora);
+    return this.formatearPedidoReparto(pedido, config, ahora, usuario);
   }
 
   /**
@@ -839,11 +871,14 @@ export class RepartosService {
       });
     }
 
-    if (usuario.rol === 'REPARTIDOR' && pedido.repartidor_party_id !== partyId) {
-      throw new ForbiddenException({
-        codigo: 'NO_ASIGNADO',
-        mensaje: 'Este pedido no está asignado a tu usuario',
-      });
+    if (usuario && usuario.rol === 'REPARTIDOR') {
+      const partyId = BigInt(usuario.partyId);
+      if (pedido.repartidor_party_id == null || BigInt(pedido.repartidor_party_id) !== partyId) {
+        throw new ForbiddenException({
+          codigo: 'NO_ASIGNADO',
+          mensaje: 'Este pedido no está asignado a tu usuario',
+        });
+      }
     }
 
     if (pedido.estado !== 'LISTO') {
@@ -861,7 +896,10 @@ export class RepartosService {
         estado: 'EN_CAMINO',
         salio_en: ahora,
       },
-      include: { zona: true },
+      include: {
+        zona: true,
+        lineas: { select: { cantidad: true } },
+      },
     });
 
     // Registrar aviso 1 pendiente
@@ -915,7 +953,7 @@ export class RepartosService {
       estado: 'EN_CAMINO',
     });
 
-    return this.formatearPedidoReparto(pedidoActualizado, config, ahora);
+    return this.formatearPedidoReparto(pedidoActualizado, config, ahora, usuario);
   }
 
   /**
@@ -940,11 +978,14 @@ export class RepartosService {
       });
     }
 
-    if (usuario.rol === 'REPARTIDOR' && pedido.repartidor_party_id !== partyId) {
-      throw new ForbiddenException({
-        codigo: 'NO_ASIGNADO',
-        mensaje: 'Este pedido no está asignado a tu usuario',
-      });
+    if (usuario && usuario.rol === 'REPARTIDOR') {
+      const partyId = BigInt(usuario.partyId);
+      if (pedido.repartidor_party_id == null || BigInt(pedido.repartidor_party_id) !== partyId) {
+        throw new ForbiddenException({
+          codigo: 'NO_ASIGNADO',
+          mensaje: 'Este pedido no está asignado a tu usuario',
+        });
+      }
     }
 
     if (pedido.estado !== 'EN_CAMINO') {
@@ -961,7 +1002,10 @@ export class RepartosService {
       data: {
         llego_en: ahora,
       },
-      include: { zona: true },
+      include: {
+        zona: true,
+        lineas: { select: { cantidad: true } },
+      },
     });
 
     // Registrar aviso 2 pendiente
@@ -1016,7 +1060,7 @@ export class RepartosService {
       llego_en: ahora,
     });
 
-    return this.formatearPedidoReparto(pedidoActualizado, config, ahora);
+    return this.formatearPedidoReparto(pedidoActualizado, config, ahora, usuario);
   }
 
   /**
@@ -1045,11 +1089,14 @@ export class RepartosService {
       });
     }
 
-    if (usuario.rol === 'REPARTIDOR' && pedido.repartidor_party_id !== partyId) {
-      throw new ForbiddenException({
-        codigo: 'NO_ASIGNADO',
-        mensaje: 'Este pedido no está asignado a tu usuario',
-      });
+    if (usuario && usuario.rol === 'REPARTIDOR') {
+      const partyId = BigInt(usuario.partyId);
+      if (pedido.repartidor_party_id == null || BigInt(pedido.repartidor_party_id) !== partyId) {
+        throw new ForbiddenException({
+          codigo: 'NO_ASIGNADO',
+          mensaje: 'Este pedido no está asignado a tu usuario',
+        });
+      }
     }
 
     if (pedido.estado !== 'EN_CAMINO') {
@@ -1074,7 +1121,10 @@ export class RepartosService {
         estado: 'ENTREGADO',
         entregado_en: ahora,
       },
-      include: { zona: true },
+      include: {
+        zona: true,
+        lineas: { select: { cantidad: true } },
+      },
     });
 
     const porRendirEfectivo =
@@ -1117,6 +1167,7 @@ export class RepartosService {
       pedidoActualizado,
       config,
       ahora,
+      usuario,
     );
     return {
       ...formateado,
@@ -1130,7 +1181,7 @@ export class RepartosService {
    * Consulta los avisos de reparto del pedido. Si pasó rep_msg3_seg (def 90s) desde el aviso 2
    * sin respuesta del cliente y no existe aviso 3, registra el aviso 3 como PENDIENTE.
    */
-  async consultarMensajes(id: string | bigint) {
+  async consultarMensajes(id: string | bigint, usuario?: UsuarioAutenticado) {
     const pedidoId = this.parsearId(id);
     const config = await this.obtenerParametrosReparto();
 
@@ -1143,6 +1194,16 @@ export class RepartosService {
         codigo: 'PEDIDO_NO_ENCONTRADO',
         mensaje: 'Pedido no encontrado',
       });
+    }
+
+    if (usuario && usuario.rol === 'REPARTIDOR') {
+      const partyId = BigInt(usuario.partyId);
+      if (pedido.repartidor_party_id == null || BigInt(pedido.repartidor_party_id) !== partyId) {
+        throw new ForbiddenException({
+          codigo: 'NO_ASIGNADO',
+          mensaje: 'Este pedido no está asignado a tu usuario',
+        });
+      }
     }
 
     let mensajes = await this.prisma.mensajeReparto.findMany({
@@ -1207,6 +1268,16 @@ export class RepartosService {
         codigo: 'PEDIDO_NO_ENCONTRADO',
         mensaje: 'Pedido no encontrado',
       });
+    }
+
+    if (usuario && usuario.rol === 'REPARTIDOR') {
+      const partyId = BigInt(usuario.partyId);
+      if (pedido.repartidor_party_id == null || BigInt(pedido.repartidor_party_id) !== partyId) {
+        throw new ForbiddenException({
+          codigo: 'NO_ASIGNADO',
+          mensaje: 'Este pedido no está asignado a tu usuario',
+        });
+      }
     }
 
     // Regla DT-70: al menos 2 llamadas registradas si es NO_CONTESTA
@@ -1324,6 +1395,16 @@ export class RepartosService {
         codigo: 'PEDIDO_NO_ENCONTRADO',
         mensaje: 'Pedido no encontrado',
       });
+    }
+
+    if (usuario && usuario.rol === 'REPARTIDOR') {
+      const partyId = BigInt(usuario.partyId);
+      if (pedido.repartidor_party_id == null || BigInt(pedido.repartidor_party_id) !== partyId) {
+        throw new ForbiddenException({
+          codigo: 'NO_ASIGNADO',
+          mensaje: 'Este pedido no está asignado a tu usuario',
+        });
+      }
     }
 
     const ahora = new Date();
@@ -1731,7 +1812,10 @@ export class RepartosService {
         const tomadosFilas = tomadosIds.length > 0
           ? await tx.pedido.findMany({
               where: { id: { in: tomadosIds } },
-              include: { zona: true },
+              include: {
+                zona: true,
+                lineas: { select: { cantidad: true } },
+              },
             })
           : [];
 
@@ -1752,7 +1836,7 @@ export class RepartosService {
     const tomados = resultadoTransaccion.tomadosIds
       .map((id) => filasMap.get(String(id)))
       .filter(Boolean)
-      .map((p) => this.formatearPedidoReparto(p, config, ahora));
+      .map((p) => this.formatearPedidoReparto(p, config, ahora, usuario));
 
     // Emitir eventos en tiempo real para actualizar pantallas
     for (const t of tomados) {
@@ -1794,6 +1878,16 @@ export class RepartosService {
         codigo: 'PEDIDO_NO_ENCONTRADO',
         mensaje: 'Pedido no encontrado',
       });
+    }
+
+    if (usuario && usuario.rol === 'REPARTIDOR') {
+      const partyId = BigInt(usuario.partyId);
+      if (pedido.repartidor_party_id == null || BigInt(pedido.repartidor_party_id) !== partyId) {
+        throw new ForbiddenException({
+          codigo: 'NO_ASIGNADO',
+          mensaje: 'Este pedido no está asignado a tu usuario',
+        });
+      }
     }
 
     if (!pedido.repartidor_party_id) {
@@ -1882,6 +1976,16 @@ export class RepartosService {
         codigo: 'PEDIDO_NO_ENCONTRADO',
         mensaje: 'Pedido no encontrado',
       });
+    }
+
+    if (usuario && usuario.rol === 'REPARTIDOR') {
+      const partyId = BigInt(usuario.partyId);
+      if (pedido.repartidor_party_id == null || BigInt(pedido.repartidor_party_id) !== partyId) {
+        throw new ForbiddenException({
+          codigo: 'NO_ASIGNADO',
+          mensaje: 'Este pedido no está asignado a tu usuario',
+        });
+      }
     }
 
     if (pedido.estado === 'ENTREGADO') {

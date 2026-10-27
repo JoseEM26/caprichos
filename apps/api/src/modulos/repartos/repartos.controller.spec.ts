@@ -73,8 +73,9 @@ describe('RepartosController', () => {
 
   it('GET /admin/repartos/disponibles delega a service.listarDisponibles', async () => {
     serviceMock.listarDisponibles.mockResolvedValue([{ id: '1' }]);
-    const res = await controller.listarDisponibles();
-    expect(serviceMock.listarDisponibles).toHaveBeenCalled();
+    const reqMock: any = { usuario: adminAuth };
+    const res = await controller.listarDisponibles(reqMock);
+    expect(serviceMock.listarDisponibles).toHaveBeenCalledWith(adminAuth);
     expect(res).toEqual([{ id: '1' }]);
   });
 
@@ -92,15 +93,17 @@ describe('RepartosController', () => {
       zonas: {},
       total: 1,
     });
-    const res = await controller.obtenerResumen();
-    expect(serviceMock.obtenerResumen).toHaveBeenCalled();
+    const reqMock: any = { usuario: adminAuth };
+    const res = await controller.obtenerResumen(reqMock);
+    expect(serviceMock.obtenerResumen).toHaveBeenCalledWith(adminAuth);
     expect(res.lados.Norte).toBe(1);
   });
 
   it('GET /admin/repartos/:id/mensajes delega a service.consultarMensajes', async () => {
     serviceMock.consultarMensajes.mockResolvedValue([{ numero: 1 }]);
-    const res = await controller.consultarMensajes('5');
-    expect(serviceMock.consultarMensajes).toHaveBeenCalledWith('5');
+    const reqMock: any = { usuario: repartidorAuth };
+    const res = await controller.consultarMensajes('5', reqMock);
+    expect(serviceMock.consultarMensajes).toHaveBeenCalledWith('5', repartidorAuth);
     expect(res).toHaveLength(1);
   });
 

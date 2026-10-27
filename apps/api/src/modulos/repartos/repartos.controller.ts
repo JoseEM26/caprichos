@@ -49,8 +49,10 @@ export class RepartosController {
 
   @Get('disponibles')
   @Permiso('repartos', 'ver')
-  async listarDisponibles() {
-    return this.repartosService.listarDisponibles();
+  async listarDisponibles(@Req() req?: any) {
+    return req?.usuario
+      ? this.repartosService.listarDisponibles(req.usuario)
+      : this.repartosService.listarDisponibles();
   }
 
   @Get('mios')
@@ -61,14 +63,18 @@ export class RepartosController {
 
   @Get('resumen')
   @Permiso('repartos', 'ver')
-  async obtenerResumen() {
-    return this.repartosService.obtenerResumen();
+  async obtenerResumen(@Req() req?: any) {
+    return req?.usuario
+      ? this.repartosService.obtenerResumen(req.usuario)
+      : this.repartosService.obtenerResumen();
   }
 
   @Get(':id/mensajes')
   @Permiso('repartos', 'ver')
-  async consultarMensajes(@Param('id') id: string) {
-    return this.repartosService.consultarMensajes(id);
+  async consultarMensajes(@Param('id') id: string, @Req() req?: any) {
+    return req?.usuario
+      ? this.repartosService.consultarMensajes(id, req.usuario)
+      : this.repartosService.consultarMensajes(id);
   }
 
   @Get()

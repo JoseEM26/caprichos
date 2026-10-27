@@ -147,7 +147,7 @@ export class RutaService {
       naranjaMin?: number;
       rojoMin?: number;
     } = {},
-    repMax = 3,
+    repMax = 5,
     velocidadKmh = 25,
   ): ResultadoRuta {
     const orden: string[] = [];

@@ -93,8 +93,8 @@ describe('Ola F5 y Siguiente: Repartos y Mapa (Decisiones del Dueño 1 a 8)', ()
     vi.clearAllMocks();
 
     vi.spyOn(sesionModulo, 'useSesion').mockReturnValue({
-      usuario: { partyId: '10', nombres: 'Repartidor Carlos', rol: 'REPARTIDOR' },
-      permisos: ['repartos/ver', 'repartos/tomar', 'repartos/entregar', 'repartos/reportar'],
+      usuario: { partyId: '10', nombres: 'Admin Repartos', rol: 'ADMIN' },
+      permisos: ['repartos/ver', 'repartos/tomar', 'repartos/entregar', 'repartos/reportar', 'repartos/liquidar'],
       debeCambiar: false,
       cargando: false,
       autenticado: true,
@@ -104,7 +104,7 @@ describe('Ola F5 y Siguiente: Repartos y Mapa (Decisiones del Dueño 1 a 8)', ()
       refrescarYo: vi.fn(),
       marcarClaveCambiada: vi.fn(),
       tiene: vi.fn().mockImplementation((permiso: string) => {
-        return ['repartos/ver', 'repartos/tomar', 'repartos/entregar', 'repartos/reportar'].includes(
+        return ['repartos/ver', 'repartos/tomar', 'repartos/entregar', 'repartos/reportar', 'repartos/liquidar'].includes(
           permiso,
         );
       }),

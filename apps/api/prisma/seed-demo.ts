@@ -1,4 +1,8 @@
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 import { PrismaClient } from '@prisma/client';
+import * as argon2 from 'argon2';
 import { ROLES, PERMISOS, MATRIZ } from '../src/modulos/acceso/permisos';
 import { main as sembrarCarta } from './seed-carta';
 import { main as sembrarZonas } from './seed-zonas';
@@ -78,7 +82,7 @@ async function configurarParametrosDemo() {
   });
 
   const params = [
-    { clave: 'rep_max_pedidos', valor: 3 },
+    { clave: 'rep_max_pedidos', valor: 5 },
     { clave: 'rep_naranja_min', valor: 35 },
     { clave: 'rep_rojo_min', valor: 50 },
     { clave: 'reserva_tolerancia_min', valor: 15 },
@@ -96,6 +100,97 @@ async function configurarParametrosDemo() {
     });
   }
   console.log('   ✓ Parámetros de pagos (123456789) y tiempos de entrega configurados.');
+}
+
+const REPARTIDORES_DEMO = [
+  { dni: '10000006', nombres: 'Repartidor 1' },
+  { dni: '10000007', nombres: 'Repartidor 2' },
+  { dni: '10000008', nombres: 'Repartidor 3' },
+];
+
+async function sembrarRepartidoresDemo() {
+  console.log('8. Asegurando al menos 3 usuarios con rol REPARTIDOR...');
+  const hashClaveDemo = await argon2.hash('123456', { type: argon2.argon2id });
+
+  for (const rep of REPARTIDORES_DEMO) {
+    const idRegistro = await prisma.partyIdentifier.findUnique({
+      where: {
+        tipo_numero: {
+          tipo: 'DNI',
+          numero: rep.dni,
+        },
+      },
+      include: {
+        party: {
+          include: { usuario: true, persona: true },
+        },
+      },
+    });
+
+    if (idRegistro) {
+      const partyId = idRegistro.party_id;
+      await prisma.person.upsert({
+        where: { party_id: partyId },
+        update: { nombres: rep.nombres },
+        create: { party_id: partyId, nombres: rep.nombres, apellidos: '' },
+      });
+
+      if (!idRegistro.party.usuario) {
+        await prisma.userAccount.create({
+          data: {
+            party_id: partyId,
+            rol: 'REPARTIDOR',
+            hash: hashClaveDemo,
+            debe_cambiar: false,
+            activo: true,
+          },
+        });
+      } else {
+        // Preservar clave existente si ya tiene cuenta (SIN cambiar claves de usuarios existentes)
+        await prisma.userAccount.update({
+          where: { party_id: partyId },
+          data: {
+            rol: 'REPARTIDOR',
+            activo: true,
+          },
+        });
+      }
+    } else {
+      const party = await prisma.party.create({
+        data: {
+          tipo: 'PERSONA',
+          estado: 'ACTIVO',
+        },
+      });
+
+      await prisma.person.create({
+        data: {
+          party_id: party.id,
+          nombres: rep.nombres,
+          apellidos: '',
+        },
+      });
+
+      await prisma.partyIdentifier.create({
+        data: {
+          party_id: party.id,
+          tipo: 'DNI',
+          numero: rep.dni,
+        },
+      });
+
+      await prisma.userAccount.create({
+        data: {
+          party_id: party.id,
+          rol: 'REPARTIDOR',
+          hash: hashClaveDemo,
+          debe_cambiar: false,
+          activo: true,
+        },
+      });
+    }
+  }
+  console.log('   ✓ Usuarios REPARTIDOR demo asegurados (DNI 10000006, 10000007, 10000008).');
 }
 
 export async function main() {
@@ -121,6 +216,8 @@ export async function main() {
   await sembrarLegal();
 
   await configurarParametrosDemo();
+
+  await sembrarRepartidoresDemo();
 
   console.log('====================================================');
   console.log('   SIEMBRA DE DEMOSTRACIÓN COMPLETADA CON ÉXITO');
