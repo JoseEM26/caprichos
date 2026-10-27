@@ -286,7 +286,7 @@ export function PaginaMascota() {
                 }}
               >
                 <li>
-                  <strong>Cabeza:</strong> Gorro de chef esponjoso crema (#FBF4EC) con ojos expresivos y mejillas suaves.
+                  <strong>Cabeza:</strong> Carita redonda color piel con ojos expresivos y mejillas suaves, y gorro de chef esponjoso crema (#FBF4EC) con cinta marino y dorada.
                 </li>
                 <li>
                   <strong>Cuerpo:</strong> Cono truncado naranja (#E67929) derivado directamente del isotipo.

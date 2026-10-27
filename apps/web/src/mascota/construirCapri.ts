@@ -291,38 +291,56 @@ export function construirCapri(): PiezasCapri {
   cabeza.position.y = 0.4;
   personaje.add(cabeza);
 
-  // Base cilíndrica del gorro (donde va la carita sonriente)
-  const geoBaseGorro = registrarGeo(new THREE.CylinderGeometry(0.5, 0.44, 0.52, 32), geometrias);
-  const baseGorro = new THREE.Mesh(geoBaseGorro, matCrema);
-  baseGorro.position.y = 0;
-  cabeza.add(baseGorro);
+  // Carita redonda color piel (así el gorro se lee como gorro y no como la cabeza)
+  const matPiel = registrarMat(
+    new THREE.MeshStandardMaterial({ color: 0xFFD9B5, roughness: 0.5, metalness: 0 }),
+    materiales
+  );
+  const geoCara = registrarGeo(new THREE.SphereGeometry(0.5, 40, 32), geometrias);
+  const cara = new THREE.Mesh(geoCara, matPiel);
+  cabeza.add(cara);
 
-  // Cinta marina con ribete en la base del gorro
-  const geoCintaGorro = registrarGeo(new THREE.TorusGeometry(0.46, 0.026, 16, 32), geometrias);
+  // Orejitas
+  const geoOreja = registrarGeo(new THREE.SphereGeometry(0.09, 16, 16), geometrias);
+  for (const lado of [-1, 1]) {
+    const oreja = new THREE.Mesh(geoOreja, matPiel);
+    oreja.scale.set(0.6, 1, 0.8);
+    oreja.position.set(lado * 0.5, -0.02, 0);
+    cabeza.add(oreja);
+  }
+
+  // Gorro de chef: banda crema con cinta marino y dorado, y copa esponjosa encima
+  const gorro = new THREE.Group();
+  gorro.name = 'capri-gorro';
+  gorro.position.y = 0.4;
+  cabeza.add(gorro);
+
+  const geoBandaGorro = registrarGeo(new THREE.CylinderGeometry(0.43, 0.41, 0.26, 36), geometrias);
+  const bandaGorro = new THREE.Mesh(geoBandaGorro, matCrema);
+  gorro.add(bandaGorro);
+
+  const geoCintaGorro = registrarGeo(new THREE.TorusGeometry(0.42, 0.022, 12, 36), geometrias);
   const cintaGorro = new THREE.Mesh(geoCintaGorro, matAzulMarino);
   cintaGorro.rotation.x = Math.PI / 2;
-  cintaGorro.position.y = -0.23;
-  cabeza.add(cintaGorro);
+  cintaGorro.position.y = -0.08;
+  gorro.add(cintaGorro);
+  const cintaDorada = new THREE.Mesh(geoCintaGorro, matDorado);
+  cintaDorada.rotation.x = Math.PI / 2;
+  cintaDorada.position.y = -0.12;
+  cintaDorada.scale.setScalar(0.99);
+  gorro.add(cintaDorada);
 
-  // Domo central superior del gorro esponjoso
-  const geoDomoCentro = registrarGeo(new THREE.SphereGeometry(0.56, 32, 24), geometrias);
+  const geoDomoCentro = registrarGeo(new THREE.SphereGeometry(0.4, 32, 24), geometrias);
   const domoCentro = new THREE.Mesh(geoDomoCentro, matCrema);
-  domoCentro.position.y = 0.45;
-  cabeza.add(domoCentro);
+  domoCentro.position.y = 0.42;
+  gorro.add(domoCentro);
 
-  // Pétalos / bultos redondeados de nube de chef (5 lóbulos perimetrales)
-  const numLobulos = 5;
-  const radioLobulo = 0.36;
-  const geoLobulo = registrarGeo(new THREE.SphereGeometry(0.35, 20, 20), geometrias);
-  for (let i = 0; i < numLobulos; i++) {
-    const angulo = (i / numLobulos) * Math.PI * 2;
+  const geoLobulo = registrarGeo(new THREE.SphereGeometry(0.26, 20, 20), geometrias);
+  for (let i = 0; i < 6; i++) {
+    const angulo = (i / 6) * Math.PI * 2;
     const lobulo = new THREE.Mesh(geoLobulo, matCrema);
-    lobulo.position.set(
-      Math.cos(angulo) * radioLobulo,
-      0.38,
-      Math.sin(angulo) * radioLobulo
-    );
-    cabeza.add(lobulo);
+    lobulo.position.set(Math.cos(angulo) * 0.3, 0.3, Math.sin(angulo) * 0.3);
+    gorro.add(lobulo);
   }
 
   // OJOS (Grandes, brillantes y expresivos)
@@ -392,12 +410,12 @@ export function construirCapri(): PiezasCapri {
   const geoMejilla = registrarGeo(new THREE.SphereGeometry(0.068, 16, 16), geometrias);
   const mejillaIzq = new THREE.Mesh(geoMejilla, matMejilla);
   mejillaIzq.scale.set(1, 0.6, 0.35);
-  mejillaIzq.position.set(-0.32, -0.05, 0.39);
+  mejillaIzq.position.set(-0.3, -0.07, 0.4);
   cabeza.add(mejillaIzq);
 
   const mejillaDer = new THREE.Mesh(geoMejilla, matMejilla);
   mejillaDer.scale.set(1, 0.6, 0.35);
-  mejillaDer.position.set(0.32, -0.05, 0.39);
+  mejillaDer.position.set(0.3, -0.07, 0.4);
   cabeza.add(mejillaDer);
 
   // SONRISA AMABLE
@@ -408,13 +426,13 @@ export function construirCapri(): PiezasCapri {
   const boca = new THREE.Mesh(geoBoca, matAzulMarino);
   boca.name = 'capri-boca';
   boca.rotation.z = Math.PI * 1.07;
-  boca.position.set(0, -0.11, 0.48);
+  boca.position.set(0, -0.13, 0.485);
   cabeza.add(boca);
 
   // ACCESORIO PENSAR (Signo / bombilla luminosa dorada que flota al pensar)
   const accesorioPensar = new THREE.Group();
   accesorioPensar.name = 'accesorio-pensar';
-  accesorioPensar.position.set(0.55, 0.9, 0.1);
+  accesorioPensar.position.set(0.7, 1.15, 0.1);
   accesorioPensar.scale.setScalar(0); // invisible en reposo
 
   const geoArcoInterrogacion = registrarGeo(
@@ -434,7 +452,7 @@ export function construirCapri(): PiezasCapri {
   // ACCESORIO BRILLO (Estrellitas de destello para estado contento)
   const accesorioBrillo = new THREE.Group();
   accesorioBrillo.name = 'accesorio-brillo';
-  accesorioBrillo.position.set(0, 0.95, 0);
+  accesorioBrillo.position.set(0, 1.4, 0);
   accesorioBrillo.scale.setScalar(0); // invisible en reposo
 
   const geoEstrella = registrarGeo(new THREE.OctahedronGeometry(0.09, 0), geometrias);

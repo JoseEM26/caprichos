@@ -63,6 +63,11 @@ export function CapriFallback({
             <stop offset="100%" stopColor="#E67929" />
           </linearGradient>
 
+          <linearGradient id="capri-grad-piel" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#FFE0C2" />
+            <stop offset="100%" stopColor="#F9C9A0" />
+          </linearGradient>
+
           {/* Gradiente sutil para el gorro crema */}
           <linearGradient id="capri-grad-gorro" x1="0%" y1="0%" x2="0%" y2="100%">
             <stop offset="0%" stopColor="#FFFFFF" />
@@ -201,28 +206,20 @@ export function CapriFallback({
               transition: 'transform 0.3s ease',
             }}
           >
-            {/* Lóbulos esponjosos del gorro de chef */}
-            {/* Lóbulo posterior / central */}
-            <circle cx="120" cy="62" r="38" fill="url(#capri-grad-gorro)" />
-            {/* Lóbulos laterales de nube */}
-            <circle cx="78" cy="74" r="28" fill="url(#capri-grad-gorro)" />
-            <circle cx="162" cy="74" r="28" fill="url(#capri-grad-gorro)" />
-            <circle cx="94" cy="50" r="26" fill="url(#capri-grad-gorro)" />
-            <circle cx="146" cy="50" r="26" fill="url(#capri-grad-gorro)" />
+            {/* Carita redonda color piel */}
+            <circle cx="120" cy="106" r="42" fill="url(#capri-grad-piel)" />
+            <ellipse cx="82" cy="108" rx="5" ry="8" fill="#F6BE94" />
+            <ellipse cx="158" cy="108" rx="5" ry="8" fill="#F6BE94" />
 
-            {/* Base cilíndrica del gorro donde reposa la carita */}
-            <path
-              d="M 72 88 C 72 78, 168 78, 168 88 L 164 124 C 164 130, 76 130, 76 124 Z"
-              fill="url(#capri-grad-gorro)"
-            />
-
-            {/* Cinta azul marino de la base del gorro */}
-            <path
-              d="M 75 120 Q 120 126 165 120"
-              stroke="#0B2C3E"
-              strokeWidth="4"
-              strokeLinecap="round"
-            />
+            {/* Gorro de chef: sombra bajo la banda, nube esponjosa y banda con cinta */}
+            <g stroke="#E3D6C6" strokeWidth="1.5">
+              <circle cx="120" cy="30" r="24" fill="url(#capri-grad-gorro)" />
+              <circle cx="94" cy="42" r="20" fill="url(#capri-grad-gorro)" />
+              <circle cx="146" cy="42" r="20" fill="url(#capri-grad-gorro)" />
+              <rect x="84" y="46" width="72" height="26" rx="9" fill="url(#capri-grad-gorro)" />
+            </g>
+            <rect x="84" y="62" width="72" height="6" fill="#0B2C3E" />
+            <rect x="84" y="68" width="72" height="3" rx="1.5" fill="#D99E39" />
 
             {/* OJOS */}
             {esDormido ? (
