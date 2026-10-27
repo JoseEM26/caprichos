@@ -731,7 +731,7 @@ export const TEXTOS_BOT = {
   },
 
   pedidoPreguntarCantidad: (nombreProd: string): string => {
-    return `¿Cuántas unidades deseas de ${nombreProd}? (máximo 20):`;
+    return `¿Cuántas unidades deseas de ${nombreProd}? Elige una opción o escribe el número:`;
   },
 
   pedidoProductoAgregado: (nombreProd: string, subtotalLinea: number, hintOferta?: string): string => {

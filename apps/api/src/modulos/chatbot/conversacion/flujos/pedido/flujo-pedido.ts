@@ -1076,7 +1076,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     else {
       const num = parseInt(entrada.textoOriginal.replace(/\D/g, ''), 10);
       if (!isNaN(num) && num > 0) {
-        cantidad = Math.min(20, num); // Límite de seguridad: máximo 20 por línea
+        cantidad = Math.min(9999, num); // Sin tope de negocio; 9999 solo evita desbordes por un error de tecleo
       }
     }
 
