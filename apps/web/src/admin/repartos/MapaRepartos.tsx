@@ -356,6 +356,8 @@ export function MapaRepartos({
     <div
       style={{
         position: 'relative',
+        // contiene los z-index internos de Leaflet (hasta 1000+): ningún diálogo del panel queda detrás del mapa
+        isolation: 'isolate',
         width: '100%',
         display: 'flex',
         flexDirection: 'column',
