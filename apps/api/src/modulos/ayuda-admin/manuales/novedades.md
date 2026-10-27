@@ -40,6 +40,14 @@ Ver tambien: [[ofertas]]
 4. Para pausar temporalmente una novedad sin eliminarla, desactiva su interruptor "Activo".
 Ver tambien: [[destacadas]]
 
+## Como se hace: personalizar el encabezado y previsualizar en PC o celular
+1. En la barra superior del diseñador de novedades, pulsa el botón "Editar encabezado".
+2. Modifica la etiqueta pequeña (por defecto "NOVEDADES"), el título principal ("Lo nuevo en Caprichos") o el subtítulo explicativo. Puedes restablecer los valores de fábrica con "Restablecer por defecto".
+3. Pulsa "Guardar borrador" y confirma en la ventana emergente con "Sí, guardar". Verás la actualización de inmediato en la cabecera del diseñador.
+4. Usa el conmutador "PC" o "Celular" para alternar entre la cuadrícula de 4 columnas de escritorio y la vista de 2 columnas de celular.
+5. Pulsa el botón "Vista previa carta" para revisar la página de novedades tal como la verá el cliente, o "Edición" para regresar al lienzo interactivo.
+Ver tambien: [[disenador]]
+
 ## Como se hace: publicar o descartar cambios
 1. Cuando realices cambios en el orden, la portada o el estado de las novedades, aparecerá en la cabecera el aviso de cambios pendientes.
 2. Pulsa el botón "Publicar en la carta".

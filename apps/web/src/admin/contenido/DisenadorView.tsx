@@ -1,10 +1,14 @@
-import { useState, useEffect, type ChangeEvent } from 'react';
+import { useState, useEffect, type ChangeEvent, useMemo } from 'react';
 import { api } from '../../comun/api';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { Confirmar } from '../../comun/Confirmar';
 import { DecoracionAnimada } from '../../carta/contenido/DecoracionAnimada';
 import { PAL_DEFAULT, normalizarUrlArchivo } from './paletas-constantes';
+import { PortadaCarta } from '../../carta/PortadaCarta';
+import { TarjetaProducto } from '../../carta/TarjetaProducto';
+import { CarritoProvider } from '../../carta/CarritoContext';
+import { ProductoCarta } from '../../carta/tipos';
 
 interface CategoriaAdmin {
   id: string;
@@ -36,17 +40,17 @@ interface PromoData {
   target?: string;
 }
 
-const TEMAS_INFO: Record<string, { n: string; glyphs: string[]; bg: string; fg: string; sample: string }> = {
-  ninguno: { n: 'Sin decoración', glyphs: [], bg: 'var(--cp-line)', fg: 'var(--cp-navy)', sample: '—' },
-  halloween: { n: 'Halloween', glyphs: ['🎃', '🦇', '👻', '✨'], bg: '#2B1B3F', fg: '#F6A04D', sample: '🎃 🦇 👻' },
-  navidad: { n: 'Navidad', glyphs: ['❄️', '🎄', '🎁', '⭐'], bg: '#1F6B3A', fg: '#FFFFFF', sample: '❄️ 🎄 🎁' },
-  anonuevo: { n: 'Año Nuevo', glyphs: ['🎉', '✨', '🎈', '🥂'], bg: '#1A1A2E', fg: '#F5C84B', sample: '🎉 ✨ 🥂' },
-  sanvalentin: { n: 'San Valentín', glyphs: ['❤️', '💕', '🌹', '✨'], bg: '#B83A5B', fg: '#FFFFFF', sample: '❤️ 🌹 ✨' },
-  madre: { n: 'Día de la Madre', glyphs: ['🌸', '💐', '🌷', '✨'], bg: '#D77FA1', fg: '#FFFFFF', sample: '🌸 💐 🌷' },
-  padre: { n: 'Día del Padre', glyphs: ['⭐', '🏆', '☕', '✨'], bg: 'var(--cp-soft)', fg: 'var(--cp-cream)', sample: '⭐ 🏆 ☕' },
-  patrias: { n: 'Fiestas Patrias', glyphs: ['🎉', '🎈', '✨', '🇵🇪'], bg: '#C8102E', fg: '#FFFFFF', sample: '🇵🇪 🎈 🎉' },
-  ninos: { n: 'Día del Niño', glyphs: ['🎈', '⭐', '🍭', '🎉'], bg: 'var(--cp-gold)', fg: 'var(--cp-navy)', sample: '🎈 🍭 ⭐' },
-  aniversario: { n: 'Aniversario', glyphs: ['🎈', '🎉', '🎂', '✨'], bg: 'var(--cp-orange)', fg: 'var(--cp-navy)', sample: '🎂 🎉 ✨' },
+const TEMAS_INFO: Record<string, { n: string; bg: string; fg: string; sample: string }> = {
+  ninguno: { n: 'Sin decoración', bg: 'var(--cp-line)', fg: 'var(--cp-navy)', sample: 'Estilo clásico' },
+  halloween: { n: 'Halloween', bg: '#2B1B3F', fg: '#F6A04D', sample: 'Naranja y morado' },
+  navidad: { n: 'Navidad', bg: '#1F6B3A', fg: '#FFFFFF', sample: 'Pino y rojo festivo' },
+  anonuevo: { n: 'Año Nuevo', bg: '#1A1A2E', fg: '#F5C84B', sample: 'Dorado y confeti' },
+  sanvalentin: { n: 'San Valentín', bg: '#B83A5B', fg: '#FFFFFF', sample: 'Rosas y corazones' },
+  madre: { n: 'Día de la Madre', bg: '#D77FA1', fg: '#FFFFFF', sample: 'Flores y tonos pastel' },
+  padre: { n: 'Día del Padre', bg: 'var(--cp-soft)', fg: 'var(--cp-cream)', sample: 'Azul y tonos sobrios' },
+  patrias: { n: 'Fiestas Patrias', bg: '#C8102E', fg: '#FFFFFF', sample: 'Rojo y blanco' },
+  ninos: { n: 'Día del Niño', bg: 'var(--cp-gold)', fg: 'var(--cp-navy)', sample: 'Amarillo festivo' },
+  aniversario: { n: 'Aniversario', bg: 'var(--cp-orange)', fg: 'var(--cp-navy)', sample: 'Dorado y fiesta' },
 };
 
 const LAYOUTS = [
@@ -63,13 +67,17 @@ export function DisenadorView() {
   const [dzFull, setDzFull] = useState(false);
   const [themeOpen, setThemeOpen] = useState(false);
 
+  // Conmutador PC / Celular y Modo de Vista
+  const [dispositivo, setDispositivo] = useState<'pc' | 'celular'>('pc');
+  const [modoVista, setModoVista] = useState<'edicion' | 'previa'>('edicion');
+
   const [layout, setLayout] = useState<'secciones' | 'lista' | 'grande'>('secciones');
   const [theme, setTheme] = useState('ninguno');
   const [banner, setBanner] = useState({
     activo: true,
-    tag: '',
-    title: '',
-    sub: '',
+    tag: 'NOVEDAD DEL MES',
+    title: 'Frappe Maracuyá Tropical',
+    sub: 'Con pulpa natural de maracuyá y crema batida.',
   });
   const [promos, setPromos] = useState<PromoData[]>([]);
 
@@ -141,7 +149,6 @@ export function DisenadorView() {
     categorias?: CategoriaAdmin[];
   }) => {
     setTieneBorrador(true);
-    // Guardar borrador en backend
     const l = nuevosCampos?.layout || layout;
     const orgBackend = l === 'lista' ? 'LISTA' : l === 'grande' ? 'TARJETAS' : 'SECCIONES';
     const t = nuevosCampos?.theme || theme;
@@ -248,29 +255,28 @@ export function DisenadorView() {
 
   const quitarFotoProducto = (prodId: string) => {
     setProductos(productos.map((p) => (p.id === prodId ? { ...p, fotoUrl: null } : p)));
-    const nuevaConf = {
-      ...productosConfig,
-      [prodId]: { ...productosConfig[prodId], fotoUrl: null },
-    };
+    const nuevaConf = { ...productosConfig };
+    if (nuevaConf[prodId]) {
+      delete nuevaConf[prodId].fotoUrl;
+    }
     setProductosConfig(nuevaConf);
     marcarModificado({ productosConfig: nuevaConf });
   };
 
   const guardarEdicionProducto = () => {
     if (!prodEditando) return;
-    const pId = prodEditando.id;
     const precioNum = parseFloat(prodEditPrecio) || prodEditando.precio;
     setProductos(
       productos.map((p) =>
-        p.id === pId
+        p.id === prodEditando.id
           ? { ...p, nombre: prodEditNombre, descripcion: prodEditDesc, precio: precioNum }
           : p,
       ),
     );
     const nuevaConf = {
       ...productosConfig,
-      [pId]: {
-        ...productosConfig[pId],
+      [prodEditando.id]: {
+        ...productosConfig[prodEditando.id],
         nombre: prodEditNombre,
         descripcion: prodEditDesc,
         precio: precioNum,
@@ -330,7 +336,7 @@ export function DisenadorView() {
       setMensajeEstado('¡Cambios publicados en la carta!');
       setTimeout(() => setMensajeEstado(null), 4000);
     } catch (err: any) {
-      alert(err?.message || 'Error al publicar los cambios');
+      setMensajeEstado(err?.message || 'Error al publicar los cambios');
     } finally {
       setGuardandoAccion(false);
     }
@@ -346,22 +352,60 @@ export function DisenadorView() {
       setMensajeEstado('Borrador descartado. Se restauró la versión publicada.');
       setTimeout(() => setMensajeEstado(null), 4000);
     } catch (err: any) {
-      alert(err?.message || 'Error al descartar');
+      setMensajeEstado(err?.message || 'Error al descartar');
     } finally {
       setGuardandoAccion(false);
     }
   };
 
+  const paletaActiva = PAL_DEFAULT[theme] || PAL_DEFAULT.ninguno;
+  const currentTemaInfo = TEMAS_INFO[theme] || TEMAS_INFO.ninguno;
+  const esCelular = dispositivo === 'celular';
+
+  // Productos para modo solo lectura fiel
+  const productosCarta: ProductoCarta[] = useMemo(() => {
+    return productos.map((p) => ({
+      id: p.id,
+      nombre: p.nombre,
+      descripcion: p.descripcion,
+      precio: p.precio,
+      fotoUrl: p.fotoUrl,
+      tamanos: [],
+      grupos: [],
+      sabores: [],
+      noSumaBeneficios: false,
+      disponible: !p.oculto,
+      agotadoHasta: null,
+    }));
+  }, [productos]);
+
+  const fotoDestacadaBanner = useMemo(() => {
+    const prod = productos.find((p) => /maracuy/i.test(p.nombre) && p.fotoUrl);
+    return prod?.fotoUrl ?? productos.find((p) => p.fotoUrl)?.fotoUrl ?? null;
+  }, [productos]);
+
   if (cargando) return <Cargando mensaje="Cargando diseñador de la carta..." />;
   if (error) return <EstadoError mensaje={error} alReintentar={cargarDatos} />;
 
-  const paletaActiva = PAL_DEFAULT[theme] || PAL_DEFAULT.ninguno;
-  const currentTemaInfo = TEMAS_INFO[theme] || TEMAS_INFO.ninguno;
-
   const LAY_CONFIG = {
-    secciones: { gridCols: 'repeat(auto-fill,minmax(230px,1fr))', cardDir: 'column' as const, imgW: '100%', imgRatio: '4/3' },
-    lista: { gridCols: 'repeat(auto-fill,minmax(420px,1fr))', cardDir: 'row' as const, imgW: '120px', imgRatio: '1/1' },
-    grande: { gridCols: 'repeat(auto-fill,minmax(340px,1fr))', cardDir: 'column' as const, imgW: '100%', imgRatio: '4/3' },
+    secciones: {
+      gridCols: esCelular ? '1fr' : 'repeat(auto-fill, minmax(230px, 1fr))',
+      cardDir: esCelular ? ('row' as const) : ('column' as const),
+      imgW: esCelular ? '100px' : '100%',
+      imgRatio: esCelular ? '1/1' : '4/3',
+    },
+    lista: {
+      gridCols: '1fr',
+      cardDir: 'row' as const,
+      imgW: esCelular ? '100px' : '120px',
+      imgRatio: '1/1',
+    },
+    grande: {
+      gridCols: esCelular ? '1fr' : 'repeat(auto-fill, minmax(320px, 1fr))',
+      cardDir: esCelular ? ('row' as const) : ('column' as const),
+      imgW: esCelular ? '100px' : '100%',
+      imgRatio: esCelular ? '1/1' : '4/3',
+    },
   }[layout];
 
   return (
@@ -384,7 +428,7 @@ export function DisenadorView() {
           Diseñador de la carta
         </div>
         <div style={{ fontSize: 14, lineHeight: '21px', color: 'var(--cp-soft)', maxWidth: 640 }}>
-          Se abre en pantalla completa y muestra la carta exactamente como la ve el cliente. Allí mismo eliges cómo se organiza (secciones en cuadrícula, lista o tarjetas grandes), mueves productos y categorías, cambias fotos, editas nombres, descripciones, precios y las dos promociones, y publicas.
+          Se abre en pantalla completa y muestra la carta exactamente como la ve el cliente. Elige la organización (secciones, lista o tarjetas grandes), mueve productos y categorías, edita fotos y precios, y previsualiza en vista PC o celular con conmutador en vivo.
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
           {tieneBorrador ? (
@@ -396,7 +440,7 @@ export function DisenadorView() {
               Todo publicado
             </span>
           )}
-          {mensajeEstado && <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--cp-soft)' }}>{mensajeEstado}</span>}
+          {mensajeEstado && <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--cp-rust)' }}>{mensajeEstado}</span>}
         </div>
         <button
           onClick={() => setDzFull(true)}
@@ -446,14 +490,94 @@ export function DisenadorView() {
               display: 'flex',
               flexWrap: 'wrap',
               alignItems: 'center',
-              gap: '8px 16px',
+              gap: '8px 12px',
             }}
           >
             <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 13, letterSpacing: '0.06em' }}>
               DISEÑADOR DE LA CARTA
             </span>
-            <span style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-              <span style={{ fontSize: 12, fontWeight: 700 }}>Organización</span>
+
+            {/* Conmutador Modo Vista */}
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center', border: '1.5px solid var(--cp-cream)', borderRadius: 9999, padding: 2 }}>
+              <button
+                type="button"
+                onClick={() => setModoVista('edicion')}
+                style={{
+                  minHeight: 34,
+                  padding: '0 12px',
+                  borderRadius: 9999,
+                  border: 0,
+                  background: modoVista === 'edicion' ? 'var(--cp-orange)' : 'transparent',
+                  color: modoVista === 'edicion' ? 'var(--cp-navy)' : 'var(--cp-cream)',
+                  fontWeight: 700,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                }}
+              >
+                Edición
+              </button>
+              <button
+                type="button"
+                onClick={() => setModoVista('previa')}
+                style={{
+                  minHeight: 34,
+                  padding: '0 12px',
+                  borderRadius: 9999,
+                  border: 0,
+                  background: modoVista === 'previa' ? 'var(--cp-orange)' : 'transparent',
+                  color: modoVista === 'previa' ? 'var(--cp-navy)' : 'var(--cp-cream)',
+                  fontWeight: 700,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                }}
+              >
+                Vista previa carta
+              </button>
+            </div>
+
+            {/* Conmutador Dispositivo PC / Celular */}
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center', border: '1.5px solid var(--cp-cream)', borderRadius: 9999, padding: 2 }}>
+              <button
+                type="button"
+                data-testid="btn-disenador-disp-pc"
+                onClick={() => setDispositivo('pc')}
+                style={{
+                  minHeight: 34,
+                  padding: '0 12px',
+                  borderRadius: 9999,
+                  border: 0,
+                  background: !esCelular ? 'var(--cp-orange)' : 'transparent',
+                  color: !esCelular ? 'var(--cp-navy)' : 'var(--cp-cream)',
+                  fontWeight: 700,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                }}
+              >
+                PC
+              </button>
+              <button
+                type="button"
+                data-testid="btn-disenador-disp-celular"
+                onClick={() => setDispositivo('celular')}
+                style={{
+                  minHeight: 34,
+                  padding: '0 12px',
+                  borderRadius: 9999,
+                  border: 0,
+                  background: esCelular ? 'var(--cp-orange)' : 'transparent',
+                  color: esCelular ? 'var(--cp-navy)' : 'var(--cp-cream)',
+                  fontWeight: 700,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                }}
+              >
+                Celular
+              </button>
+            </div>
+
+            {/* Selector de organización */}
+            <span style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
+              <span style={{ fontSize: 12, fontWeight: 700, marginRight: 2 }}>Organización:</span>
               {LAYOUTS.map((l) => {
                 const activo = layout === l.id;
                 return (
@@ -465,27 +589,29 @@ export function DisenadorView() {
                     }}
                     title={l.d}
                     style={{
-                      minHeight: 38,
-                      padding: '0 12px',
+                      minHeight: 34,
+                      padding: '0 10px',
                       borderRadius: 9999,
                       border: '1.5px solid var(--cp-cream)',
                       background: activo ? 'var(--cp-orange)' : 'transparent',
                       color: activo ? 'var(--cp-navy)' : 'var(--cp-cream)',
                       fontWeight: 700,
-                      fontSize: 12,
+                      fontSize: 11,
                       cursor: 'pointer',
                     }}
                   >
-                    {activo ? '✓ ' : ''}{l.n}
+                    {l.n}
                   </button>
                 );
               })}
             </span>
+
+            {/* Decoración */}
             <button
               onClick={() => setThemeOpen(!themeOpen)}
               style={{
-                minHeight: 38,
-                padding: '0 14px',
+                minHeight: 34,
+                padding: '0 12px',
                 borderRadius: 9999,
                 border: '1.5px solid var(--cp-cream)',
                 background: 'transparent',
@@ -497,6 +623,7 @@ export function DisenadorView() {
             >
               Decoración: {currentTemaInfo.n} ▾
             </button>
+
             <span style={{ flex: 1 }} />
             {tieneBorrador && (
               <span style={{ fontSize: 12, fontWeight: 700, borderRadius: 9999, padding: '3px 10px', background: 'var(--cp-gold)', color: 'var(--cp-navy)' }}>
@@ -507,7 +634,7 @@ export function DisenadorView() {
               onClick={() => setConfirmarPublicar(true)}
               disabled={!tieneBorrador}
               style={{
-                minHeight: 44,
+                minHeight: 38,
                 padding: '0 16px',
                 border: 0,
                 borderRadius: 10,
@@ -524,7 +651,7 @@ export function DisenadorView() {
               onClick={() => setConfirmarDescartar(true)}
               disabled={!tieneBorrador}
               style={{
-                minHeight: 44,
+                minHeight: 38,
                 padding: '0 16px',
                 border: '1.5px solid var(--cp-cream)',
                 borderRadius: 10,
@@ -540,7 +667,7 @@ export function DisenadorView() {
             <button
               onClick={() => setDzFull(false)}
               style={{
-                minHeight: 44,
+                minHeight: 38,
                 padding: '0 16px',
                 border: '1.5px solid var(--cp-cream)',
                 borderRadius: 10,
@@ -559,7 +686,7 @@ export function DisenadorView() {
             <div
               style={{
                 position: 'sticky',
-                top: 58,
+                top: 54,
                 zIndex: 99,
                 background: 'var(--cp-white)',
                 borderBottom: '1px solid var(--cp-line)',
@@ -568,7 +695,7 @@ export function DisenadorView() {
               }}
             >
               <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--cp-soft)', marginBottom: 8 }}>
-                DECORACIÓN FESTIVA: CAEN FIGURITAS Y LA CARTA CAMBIA UN POCO DE COLORES
+                DECORACIÓN FESTIVA DE LA CARTA
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 8 }}>
                 {Object.entries(TEMAS_INFO).map(([key, t]) => {
@@ -595,7 +722,7 @@ export function DisenadorView() {
                       <span style={{ display: 'block', background: t.bg, color: t.fg, padding: '8px 10px', fontWeight: 700, fontSize: 12 }}>
                         {t.n}
                       </span>
-                      <span style={{ display: 'block', padding: '8px 10px', fontSize: 18, minHeight: 30 }}>
+                      <span style={{ display: 'block', padding: '8px 10px', fontSize: 12, minHeight: 26, color: 'var(--cp-soft)' }}>
                         {t.sample}
                       </span>
                     </button>
@@ -605,376 +732,451 @@ export function DisenadorView() {
             </div>
           )}
 
-          {/* Decoración festiva animada en vista previa */}
           <DecoracionAnimada tema={theme} />
 
-          {/* Réplica de cabecera de la carta */}
-          <div style={{ borderBottom: `1px solid ${paletaActiva.line}` }}>
-            <div style={{ maxWidth: 1200, margin: '0 auto', padding: '12px 24px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px 20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <img src="/logo.webp" alt="Caprichos" style={{ width: 48, height: 48, borderRadius: 24, objectFit: 'cover' }} />
-                <div>
-                  <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 20, lineHeight: '24px', letterSpacing: '0.02em' }}>Caprichos</div>
-                  <div style={{ fontSize: 12, lineHeight: '16px', color: paletaActiva.soft }}>Cafetería artesanal en San Juan de Lurigancho</div>
-                </div>
-              </div>
-              <div style={{ flex: '1 1 220px', minWidth: 200, minHeight: 44, borderRadius: 9999, border: `1.5px solid ${paletaActiva.line}`, background: paletaActiva.card, display: 'flex', alignItems: 'center', padding: '0 16px', color: paletaActiva.soft, fontSize: 14 }}>
-                Buscar en la carta
-              </div>
-              <div style={{ minHeight: 44, padding: '0 18px', borderRadius: 12, background: paletaActiva.accent, color: paletaActiva.on, fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 14, display: 'flex', alignItems: 'center' }}>
-                Mi pedido · 0 productos · s/ 0
-              </div>
-            </div>
-
-            {/* Categorías con flechas para ordenar */}
-            <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px 12px', display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-              <span style={{ minHeight: 44, padding: '0 16px', borderRadius: 9999, border: `1.5px solid ${paletaActiva.ink}`, background: paletaActiva.ink, color: paletaActiva.bg, fontWeight: 700, fontSize: 12, letterSpacing: '0.05em', display: 'flex', alignItems: 'center' }}>
-                TODA LA CARTA
-              </span>
-              {categorias.map((c, i) => (
-                <div key={c.id} style={{ display: 'flex', alignItems: 'stretch', border: `1.5px solid ${paletaActiva.ink}`, borderRadius: 9999, overflow: 'hidden' }}>
-                  <button
-                    onClick={() => moverCategoria(i, -1)}
-                    disabled={i === 0}
-                    aria-label={`Mover ${c.nombre} antes`}
-                    style={{ width: 30, border: 0, background: 'transparent', color: paletaActiva.ink, fontWeight: 800, opacity: i > 0 ? 1 : 0.35, cursor: i > 0 ? 'pointer' : 'default' }}
-                  >
-                    ←
-                  </button>
-                  <span style={{ display: 'flex', alignItems: 'center', minHeight: 44, fontWeight: 700, fontSize: 12, letterSpacing: '0.05em' }}>
-                    {c.nombre}
-                  </span>
-                  <button
-                    onClick={() => moverCategoria(i, 1)}
-                    disabled={i === categorias.length - 1}
-                    aria-label={`Mover ${c.nombre} después`}
-                    style={{ width: 30, border: 0, background: 'transparent', color: paletaActiva.ink, fontWeight: 800, opacity: i < categorias.length - 1 ? 1 : 0.35, cursor: i < categorias.length - 1 ? 'pointer' : 'default' }}
-                  >
-                    →
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Banner de publicidad */}
-          <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 24px 0' }}>
-            <div style={{ border: `1.5px solid ${paletaActiva.ink}`, borderRadius: 16, background: paletaActiva.card, padding: '14px 16px', display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
-              <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 13, letterSpacing: '0.06em' }}>
-                BANNER DE PUBLICIDAD (acta 02)
-              </span>
-              <button
-                onClick={() => {
-                  const b = { ...banner, activo: !banner.activo };
-                  setBanner(b);
-                  marcarModificado({ banner: b });
-                }}
+          {/* VISTA PREVIA FIEL DE LA CARTA */}
+          {modoVista === 'previa' ? (
+            <CarritoProvider>
+              <div
                 style={{
-                  minHeight: 44,
-                  padding: '0 14px',
-                  borderRadius: 9999,
-                  border: `1.5px solid ${paletaActiva.ink}`,
-                  background: banner.activo ? paletaActiva.ink : 'transparent',
-                  color: banner.activo ? paletaActiva.bg : paletaActiva.ink,
-                  fontWeight: 700,
-                  fontSize: 12,
-                  cursor: 'pointer',
+                  padding: esCelular ? '24px 12px 64px' : '24px 24px 64px',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'flex-start',
                 }}
               >
-                {banner.activo ? 'Activado' : 'Desactivado'}
-              </button>
-              <input
-                type="text"
-                value={banner.tag}
-                onChange={(e) => {
-                  const b = { ...banner, tag: e.target.value };
-                  setBanner(b);
-                  marcarModificado({ banner: b });
-                }}
-                placeholder="Etiqueta"
-                style={{ flex: '1 1 140px', minWidth: 0, minHeight: 44, borderRadius: 10, border: `1.5px solid ${paletaActiva.line}`, background: paletaActiva.card, color: paletaActiva.ink, padding: '0 10px' }}
-              />
-              <input
-                type="text"
-                value={banner.title}
-                onChange={(e) => {
-                  const b = { ...banner, title: e.target.value };
-                  setBanner(b);
-                  marcarModificado({ banner: b });
-                }}
-                placeholder="Título del banner"
-                style={{ flex: '2 1 200px', minWidth: 0, minHeight: 44, borderRadius: 10, border: `1.5px solid ${paletaActiva.line}`, background: paletaActiva.card, color: paletaActiva.ink, padding: '0 10px' }}
-              />
-              <input
-                type="text"
-                value={banner.sub}
-                onChange={(e) => {
-                  const b = { ...banner, sub: e.target.value };
-                  setBanner(b);
-                  marcarModificado({ banner: b });
-                }}
-                placeholder="Texto del banner"
-                style={{ flex: '3 1 260px', minWidth: 0, minHeight: 44, borderRadius: 10, border: `1.5px solid ${paletaActiva.line}`, background: paletaActiva.card, color: paletaActiva.ink, padding: '0 10px' }}
-              />
-            </div>
-          </div>
-
-          {/* Las 2 Promociones de la parte superior */}
-          <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 24px 0', display: 'flex', flexWrap: 'wrap', gap: 16 }}>
-            {promos.map((p, idx) => {
-              const bg = p.theme === 'naranja' ? paletaActiva.accent : paletaActiva.ink;
-              const fg = p.theme === 'naranja' ? paletaActiva.on : paletaActiva.bg;
-              const acc = p.theme === 'naranja' ? paletaActiva.on : paletaActiva.accent;
-              return (
-                <div key={idx} style={{ flex: '1 1 440px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div style={{ borderRadius: 20, background: bg, color: fg, overflow: 'hidden', display: 'flex', alignItems: 'stretch' }}>
-                    <div style={{ flex: 1, padding: 24, display: 'flex', flexDirection: 'column', gap: 8, justifyContent: 'center', minWidth: 0 }}>
-                      <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 12, letterSpacing: '0.1em', color: acc }}>
-                        {p.tag}
-                      </span>
-                      <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 26, lineHeight: '30px', overflowWrap: 'anywhere' }}>
-                        {p.title}
-                      </span>
-                      <span style={{ fontSize: 14 }}>{p.sub}</span>
-                      <span style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-                        <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 32, color: acc }}>
-                          {p.price}
-                        </span>
-                        {p.old && <span style={{ fontSize: 16, textDecoration: 'line-through', opacity: 0.7 }}>{p.old}</span>}
-                        {p.badge && (
-                          <span style={{ fontSize: 12, fontWeight: 700, background: acc, color: bg, borderRadius: 9999, padding: '2px 10px' }}>
-                            {p.badge}
-                          </span>
-                        )}
-                      </span>
-                    </div>
-                    {(() => {
-                      const promoSrc = normalizarUrlArchivo(
-                        p.photo || productos.find((x) => x.nombre === (p.target || p.title))?.fotoUrl,
-                      );
-                      return promoSrc ? (
-                        <img src={promoSrc} alt={p.title} style={{ width: 200, objectFit: 'cover', flex: 'none' }} />
-                      ) : null;
-                    })()}
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    <button
-                      onClick={() => {
-                        setPromoEditIdx(idx);
-                        setPromoEditTag(p.tag);
-                        setPromoEditTitle(p.title);
-                        setPromoEditSub(p.sub);
-                        setPromoEditPrice(p.price);
-                        setPromoEditOld(p.old || '');
-                        setPromoEditBadge(p.badge || '');
+                <div
+                  data-testid={`preview-disenador-${dispositivo}`}
+                  style={{
+                    width: esCelular ? '390px' : '100%',
+                    maxWidth: esCelular ? '390px' : '1200px',
+                    minHeight: esCelular ? '640px' : '400px',
+                    border: esCelular ? '8px solid var(--cp-navy)' : '1px solid var(--cp-line)',
+                    borderRadius: esCelular ? '28px' : '16px',
+                    background: paletaActiva.bg,
+                    color: paletaActiva.ink,
+                    boxShadow: esCelular
+                      ? '0 14px 40px rgba(11, 44, 62, 0.25)'
+                      : '0 6px 20px rgba(11, 44, 62, 0.08)',
+                    boxSizing: 'border-box',
+                    overflow: 'hidden',
+                    position: 'relative',
+                  }}
+                >
+                  {/* Notch en celular */}
+                  {esCelular && (
+                    <div
+                      style={{
+                        width: '120px',
+                        height: '14px',
+                        backgroundColor: 'var(--cp-navy)',
+                        borderRadius: '0 0 10px 10px',
+                        margin: '0 auto 8px',
                       }}
-                      style={{ minHeight: 44, padding: '0 14px', border: `1.5px solid ${paletaActiva.ink}`, borderRadius: 10, background: paletaActiva.card, color: paletaActiva.ink, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
-                    >
-                      Editar texto y precio
-                    </button>
-                    <label style={{ minHeight: 44, padding: '0 14px', border: `1.5px solid ${paletaActiva.ink}`, borderRadius: 10, background: paletaActiva.card, display: 'flex', alignItems: 'center', color: paletaActiva.ink, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
-                      Cambiar foto
-                      <input type="file" accept="image/*" onChange={(e) => cambiarFotoPromo(idx, e)} style={{ position: 'absolute', left: -9999, width: 1, height: 1, opacity: 0 }} />
-                    </label>
-                    {p.photo && (
-                      <button
-                        onClick={() => {
-                          const copia = [...promos];
-                          copia[idx] = { ...copia[idx], photo: undefined };
-                          setPromos(copia);
-                          marcarModificado({ promos: copia });
-                        }}
-                        style={{ minHeight: 44, padding: '0 10px', border: 0, background: 'transparent', color: paletaActiva.price, fontWeight: 700, fontSize: 12, textDecoration: 'underline', cursor: 'pointer' }}
-                      >
-                        Quitar foto nueva
-                      </button>
-                    )}
-                    <button
-                      onClick={swapPromos}
-                      style={{ minHeight: 44, padding: '0 14px', border: `1.5px solid ${paletaActiva.ink}`, borderRadius: 10, background: paletaActiva.card, color: paletaActiva.ink, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
-                    >
-                      Intercambiar lugar
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                    />
+                  )}
 
-          {/* Secciones de categorías y productos */}
-          <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 24px 64px' }}>
-            <div style={{ background: paletaActiva.card, border: `1px solid ${paletaActiva.line}`, borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px 28px' }}>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-                  <span style={{ fontWeight: 700, fontSize: 13 }}>Ordenar</span>
-                  <span style={{ minHeight: 44, padding: '0 14px', borderRadius: 9999, border: `1.5px solid ${paletaActiva.ink}`, background: paletaActiva.ink, color: paletaActiva.bg, fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center' }}>Recomendado</span>
-                  <span style={{ minHeight: 44, padding: '0 14px', borderRadius: 9999, border: `1.5px solid ${paletaActiva.ink}`, fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center' }}>Precio: menor a mayor</span>
-                  <span style={{ minHeight: 44, padding: '0 14px', borderRadius: 9999, border: `1.5px solid ${paletaActiva.ink}`, fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center' }}>Precio: mayor a menor</span>
-                  <span style={{ minHeight: 44, padding: '0 14px', borderRadius: 9999, border: `1.5px solid ${paletaActiva.ink}`, fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center' }}>Nombre A-Z</span>
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-                  <span style={{ fontWeight: 700, fontSize: 13 }}>Precio</span>
-                  <span style={{ minHeight: 44, padding: '0 14px', borderRadius: 9999, border: `1.5px solid ${paletaActiva.ink}`, background: paletaActiva.ink, color: paletaActiva.bg, fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center' }}>Todos</span>
-                  <span style={{ minHeight: 44, padding: '0 14px', borderRadius: 9999, border: `1.5px solid ${paletaActiva.ink}`, fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center' }}>Hasta s/ 10</span>
-                  <span style={{ minHeight: 44, padding: '0 14px', borderRadius: 9999, border: `1.5px solid ${paletaActiva.ink}`, fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center' }}>s/ 10 a 20</span>
-                  <span style={{ minHeight: 44, padding: '0 14px', borderRadius: 9999, border: `1.5px solid ${paletaActiva.ink}`, fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center' }}>Más de s/ 20</span>
-                </div>
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px 16px', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-                  <span style={{ fontWeight: 700, fontSize: 13 }}>Mostrar solo</span>
-                  <span style={{ minHeight: 44, padding: '0 14px', borderRadius: 9999, border: `1.5px solid ${paletaActiva.ink}`, fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center' }}>Con promoción</span>
-                  <span style={{ minHeight: 44, padding: '0 14px', borderRadius: 9999, border: `1.5px solid ${paletaActiva.ink}`, fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center' }}>100% cacao</span>
-                  <span style={{ minHeight: 44, padding: '0 14px', borderRadius: 9999, border: `1.5px solid ${paletaActiva.ink}`, fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center' }}>Agregar directo</span>
-                </div>
-                <span style={{ fontSize: 13, color: paletaActiva.soft, fontWeight: 600 }}>{productos.length} productos</span>
-              </div>
-            </div>
-
-            {categorias.map((cat, catIdx) => {
-              const prodsCat = productos.filter((p) => p.categoriaId === cat.id);
-              return (
-                <div key={cat.id} style={{ marginTop: 32 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 8 }}>
-                    <span style={{ flex: 1, height: 3, background: paletaActiva.accent, borderRadius: 2 }} />
-                    <h2 style={{ margin: 0, fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 28, lineHeight: '34px', letterSpacing: '0.03em' }}>
-                      {cat.nombre}
-                    </h2>
-                    <span style={{ flex: 1, height: 3, background: paletaActiva.accent, borderRadius: 2 }} />
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: paletaActiva.soft }}>Mover esta categoría</span>
-                    <button
-                      onClick={() => moverCategoria(catIdx, -1)}
-                      disabled={catIdx === 0}
-                      aria-label={`Subir ${cat.nombre}`}
-                      style={{ width: 40, height: 36, border: `1.5px solid ${paletaActiva.ink}`, borderRadius: 10, background: paletaActiva.card, color: paletaActiva.ink, fontWeight: 800, opacity: catIdx > 0 ? 1 : 0.35, cursor: catIdx > 0 ? 'pointer' : 'default' }}
-                    >
-                      ↑
-                    </button>
-                    <button
-                      onClick={() => moverCategoria(catIdx, 1)}
-                      disabled={catIdx === categorias.length - 1}
-                      aria-label={`Bajar ${cat.nombre}`}
-                      style={{ width: 40, height: 36, border: `1.5px solid ${paletaActiva.ink}`, borderRadius: 10, background: paletaActiva.card, color: paletaActiva.ink, fontWeight: 800, opacity: catIdx < categorias.length - 1 ? 1 : 0.35, cursor: catIdx < categorias.length - 1 ? 'pointer' : 'default' }}
-                    >
-                      ↓
-                    </button>
+                  {/* Cabecera fiel de la carta */}
+                  <div style={{ padding: esCelular ? '12px 14px' : '16px 24px', borderBottom: `1px solid ${paletaActiva.line}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <img src="/logo.webp" alt="Caprichos" style={{ width: 40, height: 40, borderRadius: 20, objectFit: 'cover' }} />
+                      <div>
+                        <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 17, lineHeight: '20px' }}>Caprichos</div>
+                        <div style={{ fontSize: 11, color: paletaActiva.soft }}>Cafetería artesanal en Campoy</div>
+                      </div>
+                    </div>
+                    <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 9999, padding: '4px 10px', background: paletaActiva.accent, color: paletaActiva.on }}>
+                      Vista previa cliente
+                    </span>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: LAY_CONFIG.gridCols, gap: 16 }}>
-                    {prodsCat.map((p, pIdx) => {
-                      const pos = `${pIdx + 1} de ${prodsCat.length}`;
-                      const initials = p.nombre.split(' ').map((w) => w[0]).join('').slice(0, 2);
+                  {/* Portada Carta Banner */}
+                  <PortadaCarta
+                    datosLocal={null}
+                    estadoLocal={null}
+                    fotoDestacada={fotoDestacadaBanner}
+                    banner={banner}
+                    onPedir={() => {}}
+                    onVerCarta={() => {}}
+                  />
+
+                  {/* Lista de Secciones y Productos */}
+                  <div style={{ padding: esCelular ? '16px 12px 48px' : '24px 24px 64px', display: 'flex', flexDirection: 'column', gap: 28 }}>
+                    {categorias.map((cat) => {
+                      const prods = productosCarta.filter(
+                        (p) => productos.find((x) => x.id === p.id)?.categoriaId === cat.id,
+                      );
+                      if (prods.length === 0) return null;
                       return (
-                        <div
-                          key={p.id}
-                          style={{
-                            background: paletaActiva.card,
-                            border: `2px solid ${p.oculto ? 'var(--cp-line)' : paletaActiva.line}`,
-                            borderRadius: 12,
-                            boxShadow: '0 6px 18px rgba(11,44,62,0.12)',
-                            overflow: 'hidden',
-                            display: 'flex',
-                            flexDirection: 'column',
-                          }}
-                        >
-                          <div style={{ display: 'flex', flexDirection: LAY_CONFIG.cardDir, opacity: p.oculto ? 0.5 : 1, flex: 1 }}>
-                            <div style={{ width: LAY_CONFIG.imgW, flex: 'none', position: 'relative' }}>
-                              {p.fotoUrl ? (
-                                <img
-                                  src={p.fotoUrl}
-                                  alt={p.nombre}
-                                  style={{ width: '100%', aspectRatio: LAY_CONFIG.imgRatio, objectFit: 'contain', background: paletaActiva.card, display: 'block' }}
-                                />
-                              ) : (
-                                <span style={{ width: '100%', aspectRatio: LAY_CONFIG.imgRatio, background: paletaActiva.sec, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 44, color: paletaActiva.ink }}>
-                                  {initials}
-                                                                </span>
-                              )}
-                              <span style={{ position: 'absolute', left: 8, top: 8, fontSize: 12, fontWeight: 800, borderRadius: 9999, padding: '2px 10px', background: paletaActiva.ink, color: paletaActiva.bg }}>
-                                {pos}
-                              </span>
-                            </div>
-                            <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 0 }}>
-                              <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 700, fontSize: 15, lineHeight: '20px', overflowWrap: 'anywhere' }}>
-                                {p.nombre}
-                              </div>
-                              <div style={{ fontSize: 12, lineHeight: '17px', color: paletaActiva.soft, flex: 1 }}>
-                                {p.descripcion}
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 4 }}>
-                                <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 18, color: paletaActiva.price }}>
-                                  s/ {p.precio.toFixed(2)}
-                                </span>
-                                <span style={{ minHeight: 44, padding: '0 16px', borderRadius: 12, background: paletaActiva.accent, color: paletaActiva.on, fontWeight: 800, fontSize: 13, display: 'flex', alignItems: 'center' }}>
-                                  Personalizar
-                                </span>
-                              </div>
-                            </div>
+                        <div key={cat.id} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                            <span style={{ flex: 1, height: 3, backgroundColor: paletaActiva.accent, borderRadius: 2 }} />
+                            <h2 style={{ margin: 0, fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: esCelular ? 20 : 26, color: paletaActiva.ink, textAlign: 'center' }}>
+                              {cat.nombre}
+                            </h2>
+                            <span style={{ flex: 1, height: 3, backgroundColor: paletaActiva.accent, borderRadius: 2 }} />
                           </div>
-                          {/* Barra de acciones del producto */}
-                          <div style={{ padding: '8px 10px', borderTop: `1px dashed ${paletaActiva.line}`, background: paletaActiva.bg, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                            <button
-                              onClick={() => moverProducto(cat.id, p.id, -1)}
-                              disabled={pIdx === 0}
-                              aria-label="Mover antes"
-                              style={{ minWidth: 40, minHeight: 44, border: `1.5px solid ${paletaActiva.ink}`, borderRadius: 10, background: paletaActiva.card, color: paletaActiva.ink, fontWeight: 800, opacity: pIdx > 0 ? 1 : 0.35, cursor: pIdx > 0 ? 'pointer' : 'default' }}
-                            >
-                              ←
-                            </button>
-                            <button
-                              onClick={() => moverProducto(cat.id, p.id, 1)}
-                              disabled={pIdx === prodsCat.length - 1}
-                              aria-label="Mover después"
-                              style={{ minWidth: 40, minHeight: 44, border: `1.5px solid ${paletaActiva.ink}`, borderRadius: 10, background: paletaActiva.card, color: paletaActiva.ink, fontWeight: 800, opacity: pIdx < prodsCat.length - 1 ? 1 : 0.35, cursor: pIdx < prodsCat.length - 1 ? 'pointer' : 'default' }}
-                            >
-                              →
-                            </button>
-                            <button
-                              onClick={() => {
-                                setProdEditando(p);
-                                setProdEditNombre(p.nombre);
-                                setProdEditDesc(p.descripcion || '');
-                                setProdEditPrecio(p.precio.toString());
-                              }}
-                              style={{ minHeight: 44, padding: '0 10px', border: `1.5px solid ${paletaActiva.ink}`, borderRadius: 10, background: paletaActiva.card, color: paletaActiva.ink, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
-                            >
-                              Editar
-                            </button>
-                            <button
-                              onClick={() => moverProductoAlInicio(cat.id, p.id)}
-                              style={{ minHeight: 44, padding: '0 10px', border: `1.5px solid ${paletaActiva.ink}`, borderRadius: 10, background: paletaActiva.card, color: paletaActiva.ink, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
-                            >
-                              Al inicio
-                            </button>
-                            <label style={{ minHeight: 44, padding: '0 10px', border: `1.5px solid ${paletaActiva.ink}`, borderRadius: 10, background: paletaActiva.card, display: 'flex', alignItems: 'center', color: paletaActiva.ink, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
-                              Foto
-                              <input type="file" accept="image/*" onChange={(e) => cambiarFotoProducto(p.id, e)} style={{ position: 'absolute', left: -9999, width: 1, height: 1, opacity: 0 }} />
-                            </label>
-                            {productosConfig[p.id]?.fotoUrl && (
-                              <button
-                                onClick={() => quitarFotoProducto(p.id)}
-                                style={{ minHeight: 44, padding: '0 8px', border: 0, background: 'transparent', color: paletaActiva.price, fontWeight: 700, fontSize: 12, textDecoration: 'underline', cursor: 'pointer' }}
-                              >
-                                Quitar foto
-                              </button>
-                            )}
-                            <button
-                              onClick={() => toggleVisibilidadProducto(p.id)}
-                              style={{ minHeight: 44, padding: '0 10px', border: `1.5px solid ${paletaActiva.ink}`, borderRadius: 10, background: paletaActiva.card, color: paletaActiva.ink, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
-                            >
-                              {p.oculto ? 'Mostrar' : 'Ocultar'}
-                            </button>
+
+                          <div
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: LAY_CONFIG.gridCols,
+                              gap: 14,
+                            }}
+                          >
+                            {prods.map((prod) => (
+                              <TarjetaProducto
+                                key={prod.id}
+                                producto={prod}
+                                organizacion={layout === 'lista' ? 'LISTA' : layout === 'grande' ? 'TARJETAS' : 'SECCIONES'}
+                              />
+                            ))}
                           </div>
                         </div>
                       );
                     })}
                   </div>
                 </div>
-              );
-            })}
-          </div>
+              </div>
+            </CarritoProvider>
+          ) : (
+            /* MODO EDICIÓN CON LIENZO INTERACTIVO */
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'center',
+                padding: esCelular ? '16px 8px 60px' : '16px 24px 60px',
+              }}
+            >
+              <div
+                style={{
+                  width: esCelular ? '430px' : '100%',
+                  maxWidth: esCelular ? '430px' : '1200px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 20,
+                  border: esCelular ? '2px dashed var(--cp-line)' : 'none',
+                  borderRadius: esCelular ? 24 : 0,
+                  padding: esCelular ? 12 : 0,
+                  boxSizing: 'border-box',
+                }}
+              >
+                {/* Réplica de cabecera de la carta con categorías reordenables */}
+                <div style={{ borderBottom: `1px solid ${paletaActiva.line}`, paddingBottom: 12 }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px 20px', marginBottom: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <img src="/logo.webp" alt="Caprichos" style={{ width: 44, height: 44, borderRadius: 22, objectFit: 'cover' }} />
+                      <div>
+                        <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 18, lineHeight: '22px' }}>Caprichos</div>
+                        <div style={{ fontSize: 12, lineHeight: '16px', color: paletaActiva.soft }}>Cafetería artesanal en San Juan de Lurigancho</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Categorías con flechas para ordenar */}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                    <span style={{ minHeight: 38, padding: '0 14px', borderRadius: 9999, border: `1.5px solid ${paletaActiva.ink}`, background: paletaActiva.ink, color: paletaActiva.bg, fontWeight: 700, fontSize: 12, letterSpacing: '0.05em', display: 'flex', alignItems: 'center' }}>
+                      TODA LA CARTA
+                    </span>
+                    {categorias.map((c, i) => (
+                      <div key={c.id} style={{ display: 'flex', alignItems: 'stretch', border: `1.5px solid ${paletaActiva.ink}`, borderRadius: 9999, overflow: 'hidden' }}>
+                        <button
+                          onClick={() => moverCategoria(i, -1)}
+                          disabled={i === 0}
+                          aria-label={`Mover ${c.nombre} antes`}
+                          style={{ width: 28, border: 0, background: 'transparent', color: paletaActiva.ink, fontWeight: 800, opacity: i > 0 ? 1 : 0.35, cursor: i > 0 ? 'pointer' : 'default' }}
+                        >
+                          ←
+                        </button>
+                        <span style={{ display: 'flex', alignItems: 'center', minHeight: 38, padding: '0 8px', fontWeight: 700, fontSize: 12, letterSpacing: '0.04em' }}>
+                          {c.nombre}
+                        </span>
+                        <button
+                          onClick={() => moverCategoria(i, 1)}
+                          disabled={i === categorias.length - 1}
+                          aria-label={`Mover ${c.nombre} después`}
+                          style={{ width: 28, border: 0, background: 'transparent', color: paletaActiva.ink, fontWeight: 800, opacity: i < categorias.length - 1 ? 1 : 0.35, cursor: i < categorias.length - 1 ? 'pointer' : 'default' }}
+                        >
+                          →
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Banner de portada editable (Fiel a PortadaCarta) */}
+                <div style={{ border: `1.5px solid ${paletaActiva.ink}`, borderRadius: 20, background: paletaActiva.card, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 14, letterSpacing: '0.06em' }}>
+                      BANNER PRINCIPAL DE LA CARTA
+                    </span>
+                    <button
+                      onClick={() => {
+                        const b = { ...banner, activo: !banner.activo };
+                        setBanner(b);
+                        marcarModificado({ banner: b });
+                      }}
+                      style={{
+                        minHeight: 36,
+                        padding: '0 14px',
+                        borderRadius: 9999,
+                        border: `1.5px solid ${paletaActiva.ink}`,
+                        background: banner.activo ? paletaActiva.accent : 'transparent',
+                        color: banner.activo ? paletaActiva.on : paletaActiva.ink,
+                        fontWeight: 700,
+                        fontSize: 12,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {banner.activo ? 'Banner Activado' : 'Banner Oculto'}
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                    <input
+                      type="text"
+                      value={banner.tag}
+                      onChange={(e) => {
+                        const b = { ...banner, tag: e.target.value };
+                        setBanner(b);
+                        marcarModificado({ banner: b });
+                      }}
+                      placeholder="Etiqueta (ej. NOVEDAD DEL MES)"
+                      style={{ flex: '1 1 180px', minHeight: 40, borderRadius: 10, border: `1.5px solid ${paletaActiva.line}`, background: paletaActiva.card, color: paletaActiva.ink, padding: '0 10px', fontSize: 13 }}
+                    />
+                    <input
+                      type="text"
+                      value={banner.title}
+                      onChange={(e) => {
+                        const b = { ...banner, title: e.target.value };
+                        setBanner(b);
+                        marcarModificado({ banner: b });
+                      }}
+                      placeholder="Título principal"
+                      style={{ flex: '2 1 240px', minHeight: 40, borderRadius: 10, border: `1.5px solid ${paletaActiva.line}`, background: paletaActiva.card, color: paletaActiva.ink, padding: '0 10px', fontSize: 13 }}
+                    />
+                    <input
+                      type="text"
+                      value={banner.sub}
+                      onChange={(e) => {
+                        const b = { ...banner, sub: e.target.value };
+                        setBanner(b);
+                        marcarModificado({ banner: b });
+                      }}
+                      placeholder="Descripción o texto de apoyo"
+                      style={{ flex: '3 1 300px', minHeight: 40, borderRadius: 10, border: `1.5px solid ${paletaActiva.line}`, background: paletaActiva.card, color: paletaActiva.ink, padding: '0 10px', fontSize: 13 }}
+                    />
+                  </div>
+                </div>
+
+                {/* Promociones superiores editables */}
+                {promos.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
+                    {promos.map((p, idx) => {
+                      const bg = p.theme === 'naranja' ? paletaActiva.accent : paletaActiva.ink;
+                      const fg = p.theme === 'naranja' ? paletaActiva.on : paletaActiva.bg;
+                      const acc = p.theme === 'naranja' ? paletaActiva.on : paletaActiva.accent;
+                      return (
+                        <div key={idx} style={{ flex: '1 1 340px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          <div style={{ borderRadius: 18, background: bg, color: fg, overflow: 'hidden', display: 'flex', alignItems: 'stretch' }}>
+                            <div style={{ flex: 1, padding: 18, display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'center', minWidth: 0 }}>
+                              <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 11, letterSpacing: '0.1em', color: acc }}>
+                                {p.tag}
+                              </span>
+                              <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 22, lineHeight: '26px', overflowWrap: 'anywhere' }}>
+                                {p.title}
+                              </span>
+                              <span style={{ fontSize: 13, opacity: 0.9 }}>{p.sub}</span>
+                              <span style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+                                <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 26, color: acc }}>
+                                  {p.price}
+                                </span>
+                                {p.old && <span style={{ fontSize: 14, textDecoration: 'line-through', opacity: 0.7 }}>{p.old}</span>}
+                              </span>
+                            </div>
+                            {p.photo && (
+                              <img src={normalizarUrlArchivo(p.photo) || undefined} alt={p.title} style={{ width: 140, objectFit: 'cover', flex: 'none' }} />
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                            <button
+                              onClick={() => {
+                                setPromoEditIdx(idx);
+                                setPromoEditTag(p.tag);
+                                setPromoEditTitle(p.title);
+                                setPromoEditSub(p.sub);
+                                setPromoEditPrice(p.price);
+                                setPromoEditOld(p.old || '');
+                                setPromoEditBadge(p.badge || '');
+                              }}
+                              style={{ minHeight: 38, padding: '0 12px', border: `1.5px solid ${paletaActiva.ink}`, borderRadius: 10, background: paletaActiva.card, color: paletaActiva.ink, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
+                            >
+                              Editar promo
+                            </button>
+                            <label style={{ minHeight: 38, padding: '0 12px', border: `1.5px solid ${paletaActiva.ink}`, borderRadius: 10, background: paletaActiva.card, display: 'flex', alignItems: 'center', color: paletaActiva.ink, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+                              Foto
+                              <input type="file" accept="image/*" onChange={(e) => cambiarFotoPromo(idx, e)} style={{ position: 'absolute', left: -9999, width: 1, height: 1, opacity: 0 }} />
+                            </label>
+                            <button
+                              onClick={swapPromos}
+                              style={{ minHeight: 38, padding: '0 12px', border: `1.5px solid ${paletaActiva.ink}`, borderRadius: 10, background: paletaActiva.card, color: paletaActiva.ink, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
+                            >
+                              Cambiar orden
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Secciones de categorías y productos con lienzo interactivo */}
+                {categorias.map((cat, catIdx) => {
+                  const prodsCat = productos.filter((p) => p.categoriaId === cat.id);
+                  return (
+                    <div key={cat.id} style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                        <span style={{ flex: 1, height: 3, background: paletaActiva.accent, borderRadius: 2 }} />
+                        <h2 style={{ margin: 0, fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: esCelular ? 22 : 26, letterSpacing: '0.03em', textAlign: 'center' }}>
+                          {cat.nombre}
+                        </h2>
+                        <span style={{ flex: 1, height: 3, background: paletaActiva.accent, borderRadius: 2 }} />
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, margin: '-6px 0 6px' }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: paletaActiva.soft }}>Categoría:</span>
+                        <button
+                          onClick={() => moverCategoria(catIdx, -1)}
+                          disabled={catIdx === 0}
+                          aria-label={`Subir ${cat.nombre}`}
+                          style={{ minWidth: 36, minHeight: 34, border: `1.5px solid ${paletaActiva.ink}`, borderRadius: 8, background: paletaActiva.card, color: paletaActiva.ink, fontWeight: 800, opacity: catIdx > 0 ? 1 : 0.35, cursor: catIdx > 0 ? 'pointer' : 'default' }}
+                        >
+                          ↑
+                        </button>
+                        <button
+                          onClick={() => moverCategoria(catIdx, 1)}
+                          disabled={catIdx === categorias.length - 1}
+                          aria-label={`Bajar ${cat.nombre}`}
+                          style={{ minWidth: 36, minHeight: 34, border: `1.5px solid ${paletaActiva.ink}`, borderRadius: 8, background: paletaActiva.card, color: paletaActiva.ink, fontWeight: 800, opacity: catIdx < categorias.length - 1 ? 1 : 0.35, cursor: catIdx < categorias.length - 1 ? 'pointer' : 'default' }}
+                        >
+                          ↓
+                        </button>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: LAY_CONFIG.gridCols, gap: 16 }}>
+                        {prodsCat.map((p, pIdx) => {
+                          const pos = `${pIdx + 1} de ${prodsCat.length}`;
+                          const initials = p.nombre.split(' ').map((w) => w[0]).join('').slice(0, 2);
+                          return (
+                            <div
+                              key={p.id}
+                              style={{
+                                background: paletaActiva.card,
+                                border: `1px solid ${p.oculto ? 'var(--cp-line)' : paletaActiva.line}`,
+                                borderRadius: 12,
+                                boxShadow: '0 6px 18px rgba(11,44,62,0.08)',
+                                overflow: 'hidden',
+                                display: 'flex',
+                                flexDirection: 'column',
+                              }}
+                            >
+                              <div style={{ display: 'flex', flexDirection: LAY_CONFIG.cardDir, opacity: p.oculto ? 0.5 : 1, flex: 1 }}>
+                                <div style={{ width: LAY_CONFIG.imgW, flex: 'none', position: 'relative' }}>
+                                  {p.fotoUrl ? (
+                                    <img
+                                      src={p.fotoUrl}
+                                      alt={p.nombre}
+                                      style={{ width: '100%', aspectRatio: LAY_CONFIG.imgRatio, objectFit: 'contain', background: paletaActiva.card, display: 'block' }}
+                                    />
+                                  ) : (
+                                    <span style={{ width: '100%', aspectRatio: LAY_CONFIG.imgRatio, background: paletaActiva.sec, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: esCelular ? 24 : 36, color: paletaActiva.ink }}>
+                                      {initials}
+                                    </span>
+                                  )}
+                                  <span style={{ position: 'absolute', left: 8, top: 8, fontSize: 11, fontWeight: 800, borderRadius: 9999, padding: '2px 8px', background: paletaActiva.ink, color: paletaActiva.bg }}>
+                                    {pos}
+                                  </span>
+                                </div>
+                                <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 700, fontSize: 15, lineHeight: '20px', overflowWrap: 'anywhere' }}>
+                                    {p.nombre}
+                                  </div>
+                                  <div style={{ fontSize: 12, lineHeight: '17px', color: paletaActiva.soft, flex: 1 }}>
+                                    {p.descripcion}
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 4 }}>
+                                    <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 16, color: paletaActiva.price }}>
+                                      s/ {p.precio.toFixed(2)}
+                                    </span>
+                                    <span style={{ minHeight: 34, padding: '0 12px', borderRadius: 10, background: paletaActiva.accent, color: paletaActiva.on, fontWeight: 800, fontSize: 12, display: 'flex', alignItems: 'center' }}>
+                                      {p.oculto ? 'Oculto' : 'Visible'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                              {/* Barra de acciones del producto */}
+                              <div style={{ padding: '8px 10px', borderTop: `1px dashed ${paletaActiva.line}`, background: paletaActiva.bg, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                <button
+                                  onClick={() => moverProducto(cat.id, p.id, -1)}
+                                  disabled={pIdx === 0}
+                                  aria-label="Mover antes"
+                                  style={{ minWidth: 38, minHeight: 38, border: `1.5px solid ${paletaActiva.ink}`, borderRadius: 8, background: paletaActiva.card, color: paletaActiva.ink, fontWeight: 800, opacity: pIdx > 0 ? 1 : 0.35, cursor: pIdx > 0 ? 'pointer' : 'default' }}
+                                >
+                                  ←
+                                </button>
+                                <button
+                                  onClick={() => moverProducto(cat.id, p.id, 1)}
+                                  disabled={pIdx === prodsCat.length - 1}
+                                  aria-label="Mover después"
+                                  style={{ minWidth: 38, minHeight: 38, border: `1.5px solid ${paletaActiva.ink}`, borderRadius: 8, background: paletaActiva.card, color: paletaActiva.ink, fontWeight: 800, opacity: pIdx < prodsCat.length - 1 ? 1 : 0.35, cursor: pIdx < prodsCat.length - 1 ? 'pointer' : 'default' }}
+                                >
+                                  →
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setProdEditando(p);
+                                    setProdEditNombre(p.nombre);
+                                    setProdEditDesc(p.descripcion || '');
+                                    setProdEditPrecio(p.precio.toString());
+                                  }}
+                                  style={{ minHeight: 38, padding: '0 10px', border: `1.5px solid ${paletaActiva.ink}`, borderRadius: 8, background: paletaActiva.card, color: paletaActiva.ink, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
+                                >
+                                  Editar
+                                </button>
+                                <button
+                                  onClick={() => moverProductoAlInicio(cat.id, p.id)}
+                                  style={{ minHeight: 38, padding: '0 10px', border: `1.5px solid ${paletaActiva.ink}`, borderRadius: 8, background: paletaActiva.card, color: paletaActiva.ink, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
+                                >
+                                  Al inicio
+                                </button>
+                                <label style={{ minHeight: 38, padding: '0 10px', border: `1.5px solid ${paletaActiva.ink}`, borderRadius: 8, background: paletaActiva.card, display: 'flex', alignItems: 'center', color: paletaActiva.ink, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+                                  Foto
+                                  <input type="file" accept="image/*" onChange={(e) => cambiarFotoProducto(p.id, e)} style={{ position: 'absolute', left: -9999, width: 1, height: 1, opacity: 0 }} />
+                                </label>
+                                {productosConfig[p.id]?.fotoUrl && (
+                                  <button
+                                    onClick={() => quitarFotoProducto(p.id)}
+                                    style={{ minHeight: 38, padding: '0 6px', border: 0, background: 'transparent', color: paletaActiva.price, fontWeight: 700, fontSize: 12, textDecoration: 'underline', cursor: 'pointer' }}
+                                  >
+                                    Quitar foto
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => toggleVisibilidadProducto(p.id)}
+                                  style={{ minHeight: 38, padding: '0 10px', border: `1.5px solid ${paletaActiva.ink}`, borderRadius: 8, background: paletaActiva.card, color: paletaActiva.ink, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
+                                >
+                                  {p.oculto ? 'Mostrar' : 'Ocultar'}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

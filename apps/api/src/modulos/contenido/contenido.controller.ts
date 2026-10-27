@@ -16,6 +16,7 @@ import {
   ActualizarBorradorDisenoDto,
   ActualizarDestacadaDto,
   ActualizarNovedadDto,
+  ActualizarNovedadesEncabezadoDto,
   CrearDestacadaDto,
   CrearMensajeCartaDto,
   CrearNovedadDto,
@@ -75,6 +76,27 @@ export class ContenidoAdminController {
   }
 
   // --- Novedades y publicidad ---
+
+  @Get('novedades/encabezado')
+  @Permiso('novedades', 'ver')
+  async obtenerEncabezadoNovedades() {
+    return this.contenidoService.obtenerNovedadesEncabezadoAdmin();
+  }
+
+  @Put('novedades/encabezado')
+  @Permiso('novedades', 'editar')
+  async guardarBorradorEncabezado(
+    @Body() dto: ActualizarNovedadesEncabezadoDto,
+    @Req() req: any,
+  ) {
+    return this.contenidoService.guardarBorradorNovedadesEncabezado(dto, req.usuario);
+  }
+
+  @Post('novedades/descartar')
+  @Permiso('novedades', 'editar')
+  async descartarNovedadesBorrador(@Req() req: any) {
+    return this.contenidoService.descartarNovedadesEncabezado(req.usuario);
+  }
 
   @Get('novedades')
   @Permiso('novedades', 'ver')

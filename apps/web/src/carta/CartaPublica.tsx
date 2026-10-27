@@ -77,6 +77,11 @@ interface ContenidoCarta {
   destacadas: HistoriaCírculo[];
   rankingMes: { productoId: string; puesto: number; estrellas: number; textoEstrellas: string }[];
   banner: BannerCarta;
+  novedadesEncabezado?: {
+    etiqueta: string;
+    titulo: string;
+    subtitulo: string;
+  };
 }
 
 // El administrativo guarda la paleta por rol; la carta la lee con sus variables --cp-*
@@ -382,7 +387,15 @@ function ContenidoCartaPublica() {
       />
 
       {pagina === 'conocenos' && <PaginaConocenos datosLocal={datosLocal} estadoLocal={estadoLocal} />}
-      {pagina === 'novedades' && <PaginaNovedades novedades={novedadesEnriquecidas} datosLocal={datosLocal} estadoLocal={estadoLocal} onVerCarta={irACarta} />}
+      {pagina === 'novedades' && (
+        <PaginaNovedades
+          novedades={novedadesEnriquecidas}
+          datosLocal={datosLocal}
+          estadoLocal={estadoLocal}
+          onVerCarta={irACarta}
+          encabezado={contenido?.novedadesEncabezado}
+        />
+      )}
 
       {pagina === 'carta' && !busqueda.trim() && categoriaActivaId === 'todo' && (
         <PortadaCarta

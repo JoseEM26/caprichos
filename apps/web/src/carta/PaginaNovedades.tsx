@@ -33,6 +33,11 @@ interface PaginaNovedadesProps {
   cargando?: boolean;
   error?: string | null;
   alReintentar?: () => void;
+  encabezado?: {
+    etiqueta?: string;
+    titulo?: string;
+    subtitulo?: string;
+  };
 }
 
 export type TamanoNovedad = 'CHICO' | 'MEDIANO' | 'GRANDE' | 'ANCHO';
@@ -179,6 +184,7 @@ export function PaginaNovedades({
   cargando = false,
   error = null,
   alReintentar,
+  encabezado,
 }: PaginaNovedadesProps) {
   const movil = useEsMovil();
   const [filtroActivo, setFiltroActivo] = useState('todo');
@@ -291,7 +297,7 @@ export function PaginaNovedades({
             color: 'var(--cp-orange)',
           }}
         >
-          NOVEDADES
+          {encabezado?.etiqueta?.trim() || 'NOVEDADES'}
         </span>
         <span
           style={{
@@ -302,7 +308,7 @@ export function PaginaNovedades({
             lineHeight: abTitleLh,
           }}
         >
-          Lo nuevo en Caprichos
+          {encabezado?.titulo?.trim() || 'Lo nuevo en Caprichos'}
         </span>
         <span
           style={{
@@ -312,7 +318,7 @@ export function PaginaNovedades({
             maxWidth: 720,
           }}
         >
-          Promociones, lanzamientos, datos útiles y lo que pasa en nuestras redes.
+          {encabezado?.subtitulo?.trim() || 'Promociones, lanzamientos, datos útiles y lo que pasa en nuestras redes.'}
         </span>
       </div>
 

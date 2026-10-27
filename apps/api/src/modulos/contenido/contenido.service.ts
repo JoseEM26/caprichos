@@ -12,12 +12,19 @@ import {
   ActualizarBorradorDisenoDto,
   ActualizarDestacadaDto,
   ActualizarNovedadDto,
+  ActualizarNovedadesEncabezadoDto,
   CrearDestacadaDto,
   CrearMensajeCartaDto,
   CrearNovedadDto,
   GuardarPaletaDto,
   TAMANOS_NOVEDAD,
 } from './contenido.dto';
+
+export const NOVEDADES_ENCABEZADO_DEFAULT = {
+  etiqueta: 'NOVEDADES',
+  titulo: 'Lo nuevo en Caprichos',
+  subtitulo: 'Promociones, lanzamientos, datos útiles y lo que pasa en nuestras redes.',
+};
 
 export const PAL_DEFAULT: Record<string, Record<string, string>> = {
   ninguno: {
@@ -322,6 +329,16 @@ export class ContenidoService {
       };
     });
 
+    const paramEncabezado = await this.prisma.parametro.findUnique({
+      where: { clave: 'contenido_novedades_encabezado' },
+    });
+    const encVal = (paramEncabezado?.valor as any) || {};
+    const novedadesEncabezado = {
+      etiqueta: (encVal.etiqueta || '').trim() || NOVEDADES_ENCABEZADO_DEFAULT.etiqueta,
+      titulo: (encVal.titulo || '').trim() || NOVEDADES_ENCABEZADO_DEFAULT.titulo,
+      subtitulo: (encVal.subtitulo || '').trim() || NOVEDADES_ENCABEZADO_DEFAULT.subtitulo,
+    };
+
     return {
       versionCarta: {
         id: versionPublicada?.id.toString() ?? '1',
@@ -337,6 +354,7 @@ export class ContenidoService {
       destacadas,
       rankingMes: estrellasVisibles ? rankingMes : [],
       estrellasVisibles,
+      novedadesEncabezado,
       banner: contenidoConfig.banner ?? {
         activo: false,
         tag: '',
@@ -757,7 +775,106 @@ export class ContenidoService {
     return { ok: true };
   }
 
+  async obtenerNovedadesEncabezadoAdmin() {
+    const [publicadoParam, borradorParam] = await Promise.all([
+      this.prisma.parametro.findUnique({ where: { clave: 'contenido_novedades_encabezado' } }),
+      this.prisma.parametro.findUnique({ where: { clave: 'contenido_novedades_encabezado_borrador' } }),
+    ]);
+
+    const pubVal = (publicadoParam?.valor as any) || {};
+    const publicado = {
+      etiqueta: (pubVal.etiqueta || '').trim() || NOVEDADES_ENCABEZADO_DEFAULT.etiqueta,
+      titulo: (pubVal.titulo || '').trim() || NOVEDADES_ENCABEZADO_DEFAULT.titulo,
+      subtitulo: (pubVal.subtitulo || '').trim() || NOVEDADES_ENCABEZADO_DEFAULT.subtitulo,
+    };
+
+    const tieneBorrador = Boolean(borradorParam);
+    const borVal = (borradorParam?.valor as any) || {};
+    const encabezado = tieneBorrador
+      ? {
+          etiqueta: (borVal.etiqueta || '').trim() || NOVEDADES_ENCABEZADO_DEFAULT.etiqueta,
+          titulo: (borVal.titulo || '').trim() || NOVEDADES_ENCABEZADO_DEFAULT.titulo,
+          subtitulo: (borVal.subtitulo || '').trim() || NOVEDADES_ENCABEZADO_DEFAULT.subtitulo,
+        }
+      : publicado;
+
+    return {
+      encabezado,
+      publicado,
+      tieneBorrador,
+    };
+  }
+
+  async guardarBorradorNovedadesEncabezado(
+    dto: ActualizarNovedadesEncabezadoDto,
+    usuario?: UsuarioAutenticado,
+  ) {
+    const borrador = {
+      etiqueta: (dto.etiqueta || '').trim() || NOVEDADES_ENCABEZADO_DEFAULT.etiqueta,
+      titulo: (dto.titulo || '').trim() || NOVEDADES_ENCABEZADO_DEFAULT.titulo,
+      subtitulo: (dto.subtitulo || '').trim() || NOVEDADES_ENCABEZADO_DEFAULT.subtitulo,
+    };
+
+    await this.prisma.parametro.upsert({
+      where: { clave: 'contenido_novedades_encabezado_borrador' },
+      update: { valor: borrador as any },
+      create: { clave: 'contenido_novedades_encabezado_borrador', valor: borrador as any },
+    });
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'novedades',
+      accion: 'GUARDAR_BORRADOR_ENCABEZADO',
+      resultado: 'OK',
+      partyId: usuario?.partyId,
+      despues: borrador,
+    });
+
+    return {
+      ok: true,
+      encabezado: borrador,
+      tieneBorrador: true,
+      mensaje: 'Borrador del encabezado guardado',
+    };
+  }
+
+  async descartarNovedadesEncabezado(usuario?: UsuarioAutenticado) {
+    await this.prisma.parametro.deleteMany({
+      where: { clave: 'contenido_novedades_encabezado_borrador' },
+    });
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'novedades',
+      accion: 'DESCARTAR_BORRADOR_ENCABEZADO',
+      resultado: 'OK',
+      partyId: usuario?.partyId,
+    });
+
+    const datos = await this.obtenerNovedadesEncabezadoAdmin();
+    return {
+      ok: true,
+      ...datos,
+      mensaje: 'Borrador del encabezado descartado',
+    };
+  }
+
   async publicarNovedades(usuario?: UsuarioAutenticado) {
+    // Si hay borrador de encabezado de novedades, promoverlo a publicado
+    const borradorEncabezado = await this.prisma.parametro.findUnique({
+      where: { clave: 'contenido_novedades_encabezado_borrador' },
+    });
+    if (borradorEncabezado) {
+      await this.prisma.parametro.upsert({
+        where: { clave: 'contenido_novedades_encabezado' },
+        update: { valor: borradorEncabezado.valor as any },
+        create: { clave: 'contenido_novedades_encabezado', valor: borradorEncabezado.valor as any },
+      });
+      await this.prisma.parametro.deleteMany({
+        where: { clave: 'contenido_novedades_encabezado_borrador' },
+      });
+    }
+
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
       modulo: 'novedades',

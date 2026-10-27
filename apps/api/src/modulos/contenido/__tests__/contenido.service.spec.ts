@@ -74,6 +74,7 @@ describe('ContenidoService', () => {
         findUnique: jest.fn(),
         upsert: jest.fn(),
         delete: jest.fn(),
+        deleteMany: jest.fn(),
       },
       archivo: {
         findFirst: jest.fn(),
@@ -491,6 +492,102 @@ describe('ContenidoService', () => {
       const res = await service.obtenerContenidoPublicoCarta();
 
       expect(res.novedades.map((n: any) => n.tamano)).toEqual(['GRANDE', 'MEDIANO']);
+    });
+  });
+
+  describe('ADMINISTRATIVO: NOVEDADES (encabezado editable)', () => {
+    it('retorna valores por defecto cuando no hay parámetro guardado', async () => {
+      prisma.parametro.findUnique.mockResolvedValue(null);
+
+      const res = await service.obtenerNovedadesEncabezadoAdmin();
+
+      expect(res.encabezado.etiqueta).toBe('NOVEDADES');
+      expect(res.encabezado.titulo).toBe('Lo nuevo en Caprichos');
+      expect(res.encabezado.subtitulo).toContain('Promociones');
+      expect(res.tieneBorrador).toBe(false);
+    });
+
+    it('guarda borrador de encabezado y usa defaults si los campos son vacíos', async () => {
+      prisma.parametro.upsert.mockResolvedValue({});
+
+      const res = await service.guardarBorradorNovedadesEncabezado(
+        { etiqueta: '   ', titulo: 'Novedades de Verano', subtitulo: '' },
+        mockUsuario as any,
+      );
+
+      expect(res.ok).toBe(true);
+      expect(res.tieneBorrador).toBe(true);
+      expect(res.encabezado.etiqueta).toBe('NOVEDADES'); // fallback por vacío
+      expect(res.encabezado.titulo).toBe('Novedades de Verano');
+      expect(res.encabezado.subtitulo).toContain('Promociones'); // fallback por vacío
+      expect(prisma.parametro.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { clave: 'contenido_novedades_encabezado_borrador' },
+        }),
+      );
+    });
+
+    it('publicarNovedades promueve el borrador del encabezado al parámetro público', async () => {
+      prisma.parametro.findUnique.mockResolvedValue({
+        clave: 'contenido_novedades_encabezado_borrador',
+        valor: { etiqueta: 'LO NUEVO', titulo: 'Especiales', subtitulo: 'Ofertas' },
+      });
+      prisma.parametro.upsert.mockResolvedValue({});
+      prisma.parametro.deleteMany.mockResolvedValue({});
+
+      const pubRes = await service.publicarNovedades(mockUsuario as any);
+
+      expect(pubRes.ok).toBe(true);
+      expect(prisma.parametro.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { clave: 'contenido_novedades_encabezado' },
+          update: { valor: { etiqueta: 'LO NUEVO', titulo: 'Especiales', subtitulo: 'Ofertas' } },
+        }),
+      );
+      expect(prisma.parametro.deleteMany).toHaveBeenCalledWith({
+        where: { clave: 'contenido_novedades_encabezado_borrador' },
+      });
+    });
+
+    it('descartarNovedadesEncabezado elimina el borrador y vuelve al publicado', async () => {
+      prisma.parametro.deleteMany.mockResolvedValue({});
+      prisma.parametro.findUnique.mockResolvedValueOnce({
+        clave: 'contenido_novedades_encabezado',
+        valor: { etiqueta: 'ORIGINAL', titulo: 'Título Original', subtitulo: 'Sub Original' },
+      }).mockResolvedValueOnce(null);
+
+      const descRes = await service.descartarNovedadesEncabezado(mockUsuario as any);
+
+      expect(descRes.ok).toBe(true);
+      expect(descRes.encabezado.etiqueta).toBe('ORIGINAL');
+      expect(descRes.tieneBorrador).toBe(false);
+      expect(prisma.parametro.deleteMany).toHaveBeenCalledWith({
+        where: { clave: 'contenido_novedades_encabezado_borrador' },
+      });
+    });
+
+    it('la carta pública devuelve el encabezado publicado en novedadesEncabezado', async () => {
+      prisma.versionCarta.findFirst.mockResolvedValue(null);
+      prisma.parametro.findUnique.mockImplementation(async ({ where }: any) => {
+        if (where.clave === 'contenido_novedades_encabezado') {
+          return {
+            clave: 'contenido_novedades_encabezado',
+            valor: { etiqueta: 'NOVEDADES WEB', titulo: 'Descubre lo nuevo', subtitulo: 'Todo rico' },
+          };
+        }
+        return null;
+      });
+      prisma.novedad.findMany.mockResolvedValue([]);
+      prisma.destacada.findMany.mockResolvedValue([]);
+      prisma.rankingMes.findMany.mockResolvedValue([]);
+
+      const carta = await service.obtenerContenidoPublicoCarta();
+
+      expect(carta.novedadesEncabezado).toEqual({
+        etiqueta: 'NOVEDADES WEB',
+        titulo: 'Descubre lo nuevo',
+        subtitulo: 'Todo rico',
+      });
     });
   });
 });

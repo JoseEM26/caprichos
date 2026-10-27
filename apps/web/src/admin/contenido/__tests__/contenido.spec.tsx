@@ -6,6 +6,7 @@ import { PaginaNovedades } from '../../../carta/PaginaNovedades';
 import { VisorHistoriasModal } from '../../../carta/contenido/VisorHistoriasModal';
 import { DestacadasView } from '../DestacadasView';
 import { NovedadesView } from '../NovedadesView';
+import { DisenadorView } from '../DisenadorView';
 import { CartaPublica } from '../../../carta/CartaPublica';
 import { api } from '../../../comun/api';
 
@@ -282,5 +283,136 @@ describe('Administrativo: novedades (agregar, editar, eliminar y tamaño)', () =
         expect.objectContaining({ titulo: 'Dos por uno', tamano: 'GRANDE' }),
       );
     });
+  });
+
+  it('encabezado editable: permite editar etiqueta, título y subtítulo con confirmación y vista previa inmediata', async () => {
+    const putSpy = vi.spyOn(api, 'put').mockResolvedValue({ ok: true });
+    vi.spyOn(api, 'get').mockImplementation(async (ruta: string) => {
+      if (ruta === '/admin/contenido/novedades/encabezado') {
+        return {
+          encabezado: {
+            etiqueta: 'NOVEDADES',
+            titulo: 'Lo nuevo en Caprichos',
+            subtitulo: 'Promociones, lanzamientos, datos útiles y lo que pasa en nuestras redes.',
+          },
+          publicado: {
+            etiqueta: 'NOVEDADES',
+            titulo: 'Lo nuevo en Caprichos',
+            subtitulo: 'Promociones, lanzamientos, datos útiles y lo que pasa en nuestras redes.',
+          },
+          tieneBorrador: false,
+        };
+      }
+      return [novedadBase];
+    });
+
+    await abrirDisenador();
+
+    // Ver que el encabezado inicial está en pantalla
+    expect(screen.getByTestId('encabezado-etiqueta').textContent).toBe('NOVEDADES');
+    expect(screen.getByTestId('encabezado-titulo').textContent).toBe('Lo nuevo en Caprichos');
+
+    // Abrir edición del encabezado
+    fireEvent.click(screen.getByTestId('btn-editar-encabezado'));
+    const modalEnc = screen.getByRole('dialog', { name: 'Editar encabezado de Novedades' });
+
+    // Cambiar título y etiqueta
+    fireEvent.change(within(modalEnc).getByTestId('input-encabezado-etiqueta'), {
+      target: { value: 'ESPECIALES' },
+    });
+    fireEvent.change(within(modalEnc).getByTestId('input-encabezado-titulo'), {
+      target: { value: 'Temporada de Dulzura' },
+    });
+    fireEvent.change(within(modalEnc).getByTestId('input-encabezado-subtitulo'), {
+      target: { value: 'Nuevos sabores para disfrutar hoy.' },
+    });
+
+    // Guardar con diálogo Confirmar
+    fireEvent.click(within(modalEnc).getByTestId('btn-guardar-encabezado'));
+    expect(screen.getByText('¿Guardar cambios en el encabezado?')).toBeTruthy();
+    fireEvent.click(screen.getByText('Sí, guardar'));
+
+    await waitFor(() => {
+      expect(putSpy).toHaveBeenCalledWith(
+        '/admin/contenido/novedades/encabezado',
+        {
+          etiqueta: 'ESPECIALES',
+          titulo: 'Temporada de Dulzura',
+          subtitulo: 'Nuevos sabores para disfrutar hoy.',
+        },
+      );
+      // Vista previa inmediata reflejada
+      expect(screen.getByTestId('encabezado-etiqueta').textContent).toBe('ESPECIALES');
+      expect(screen.getByTestId('encabezado-titulo').textContent).toBe('Temporada de Dulzura');
+    });
+  });
+
+  it('conmutador PC / Celular y vista previa fiel en NovedadesView', async () => {
+    vi.spyOn(api, 'get').mockResolvedValue([novedadBase]);
+    await abrirDisenador();
+
+    // Conmutar a celular
+    const btnCel = screen.getByTestId('btn-novedades-disp-celular');
+    fireEvent.click(btnCel);
+
+    // Conmutar a vista previa fiel
+    fireEvent.click(screen.getByText('Vista previa carta'));
+    expect(screen.getByTestId('preview-novedades-celular')).toBeTruthy();
+
+    // Conmutar a PC en vista previa
+    const btnPc = screen.getByTestId('btn-novedades-disp-pc');
+    fireEvent.click(btnPc);
+    expect(screen.getByTestId('preview-novedades-pc')).toBeTruthy();
+  });
+});
+
+describe('Administrativo: Diseñador de la carta', () => {
+  const disenadorMock = {
+    tieneBorrador: false,
+    organizacionActual: 'SECCIONES',
+    decoracionActual: 'NINGUNO',
+    contenidoActual: {
+      banner: { activo: true, tag: 'BANNER VERANO', title: 'Frappe Frutas', sub: 'Refrescante' },
+      promos: [],
+      productosConfig: {},
+    },
+    categorias: [
+      { id: 'c1', nombre: 'BEBIDAS', orden: 1, oculto: false },
+    ],
+    productos: [
+      { id: 'pr1', categoriaId: 'c1', nombre: 'Frappe Fresa', descripcion: 'Fresa natural', precio: 15, orden: 1, oculto: false, fotoUrl: null },
+    ],
+  };
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.spyOn(api, 'get').mockResolvedValue(disenadorMock);
+  });
+
+  it('permite conmutar PC / Celular y cambiar a vista previa fiel de la carta', async () => {
+    render(
+      <MemoryRouter>
+        <DisenadorView />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText('Abrir el diseñador en pantalla completa')).toBeTruthy());
+    fireEvent.click(screen.getByText('Abrir el diseñador en pantalla completa'));
+
+    // Conmutar a celular
+    const btnCel = screen.getByTestId('btn-disenador-disp-celular');
+    fireEvent.click(btnCel);
+
+    // Cambiar a vista previa carta
+    fireEvent.click(screen.getByText('Vista previa carta'));
+    expect(screen.getByTestId('preview-disenador-celular')).toBeTruthy();
+    expect(screen.getByText('Vista previa cliente')).toBeTruthy();
+    expect(screen.getByText('BEBIDAS')).toBeTruthy();
+    expect(screen.getByText('Frappe Fresa')).toBeTruthy();
+
+    // Conmutar a PC
+    const btnPc = screen.getByTestId('btn-disenador-disp-pc');
+    fireEvent.click(btnPc);
+    expect(screen.getByTestId('preview-disenador-pc')).toBeTruthy();
   });
 });

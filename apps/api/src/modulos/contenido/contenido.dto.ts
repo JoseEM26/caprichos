@@ -133,6 +133,23 @@ export class ActualizarNovedadDto {
   fotos?: string[];
 }
 
+export class ActualizarNovedadesEncabezadoDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  etiqueta?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  titulo?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(250)
+  subtitulo?: string;
+}
+
 export class CrearDestacadaDto {
   @IsNotEmpty({ message: 'El título de la destacada es obligatorio' })
   @IsString()

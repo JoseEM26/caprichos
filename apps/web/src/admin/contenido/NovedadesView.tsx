@@ -1,9 +1,10 @@
-import { useState, useEffect, type ChangeEvent } from 'react';
+import { useState, useEffect, type ChangeEvent, useMemo } from 'react';
 import { api } from '../../comun/api';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { Confirmar } from '../../comun/Confirmar';
 import { normalizarUrlArchivo } from './paletas-constantes';
+import { PaginaNovedades, type NovedadCarta } from '../../carta/PaginaNovedades';
 
 interface FotoNovedad {
   id: string;
@@ -26,6 +27,18 @@ interface NovedadAdmin {
   tamano: string;
   fotos: FotoNovedad[];
 }
+
+interface EncabezadoNovedades {
+  etiqueta: string;
+  titulo: string;
+  subtitulo: string;
+}
+
+const ENCABEZADO_DEFAULT: EncabezadoNovedades = {
+  etiqueta: 'NOVEDADES',
+  titulo: 'Lo nuevo en Caprichos',
+  subtitulo: 'Promociones, lanzamientos, datos útiles y lo que pasa en nuestras redes.',
+};
 
 const TIPOS_NOVEDAD = [
   { id: 'PROMOCION', n: 'Promoción' },
@@ -137,7 +150,20 @@ export function NovedadesView() {
   const [dirty, setDirty] = useState(false);
   const [mensaje, setMensaje] = useState<string | null>(null);
 
-  // Modal de edición
+  // Conmutador PC / Celular y Modo de Vista
+  const [dispositivo, setDispositivo] = useState<'pc' | 'celular'>('pc');
+  const [modoVista, setModoVista] = useState<'edicion' | 'previa'>('edicion');
+
+  // Encabezado editable
+  const [encabezado, setEncabezado] = useState<EncabezadoNovedades>(ENCABEZADO_DEFAULT);
+  const [editandoEncabezado, setEditandoEncabezado] = useState(false);
+  const [etiquetaEdit, setEtiquetaEdit] = useState(ENCABEZADO_DEFAULT.etiqueta);
+  const [tituloEncEdit, setTituloEncEdit] = useState(ENCABEZADO_DEFAULT.titulo);
+  const [subtituloEncEdit, setSubtituloEncEdit] = useState(ENCABEZADO_DEFAULT.subtitulo);
+  const [confirmarGuardarEncabezado, setConfirmarGuardarEncabezado] = useState(false);
+  const [confirmarRestablecerEncabezado, setConfirmarRestablecerEncabezado] = useState(false);
+
+  // Modal de edición de novedad
   const [editando, setEditando] = useState<NovedadAdmin | null>(null);
   const [tipoEdit, setTipoEdit] = useState('PROMOCION');
   const [tituloEdit, setTituloEdit] = useState('');
@@ -151,6 +177,7 @@ export function NovedadesView() {
   const [activoEdit, setActivoEdit] = useState(true);
   const [fotosEdit, setFotosEdit] = useState<string[]>([]);
   const [tamanoEdit, setTamanoEdit] = useState('MEDIANO');
+  const [errorEdicionNovedad, setErrorEdicionNovedad] = useState<string | null>(null);
 
   // Confirmaciones
   const [confirmarPublicar, setConfirmarPublicar] = useState(false);
@@ -162,7 +189,14 @@ export function NovedadesView() {
     setCargando(true);
     setError(null);
     try {
-      const data = await api.get<NovedadAdmin[]>('/admin/contenido/novedades');
+      const [data, dataEnc] = await Promise.all([
+        api.get<NovedadAdmin[]>('/admin/contenido/novedades'),
+        api.get<{
+          encabezado: EncabezadoNovedades;
+          publicado: EncabezadoNovedades;
+          tieneBorrador: boolean;
+        }>('/admin/contenido/novedades/encabezado').catch(() => null),
+      ]);
       setNovedades(
         data.map((n) => ({
           ...n,
@@ -172,6 +206,15 @@ export function NovedadesView() {
           })),
         })),
       );
+      if (dataEnc?.encabezado) {
+        setEncabezado(dataEnc.encabezado);
+        setEtiquetaEdit(dataEnc.encabezado.etiqueta || ENCABEZADO_DEFAULT.etiqueta);
+        setTituloEncEdit(dataEnc.encabezado.titulo || ENCABEZADO_DEFAULT.titulo);
+        setSubtituloEncEdit(dataEnc.encabezado.subtitulo || ENCABEZADO_DEFAULT.subtitulo);
+        if (dataEnc.tieneBorrador) {
+          setDirty(true);
+        }
+      }
     } catch (err: any) {
       setError(err?.message || 'Error al cargar las novedades y publicidad');
     } finally {
@@ -239,7 +282,7 @@ export function NovedadesView() {
       setMensaje('Novedad duplicada (creada como inactiva)');
       setTimeout(() => setMensaje(null), 3000);
     } catch (err: any) {
-      alert(err?.message || 'Error al duplicar novedad');
+      setMensaje(err?.message || 'Error al duplicar novedad');
     }
   };
 
@@ -273,6 +316,7 @@ export function NovedadesView() {
     setActivoEdit(true);
     setTamanoEdit('MEDIANO');
     setFotosEdit([]);
+    setErrorEdicionNovedad(null);
   };
 
   const abrirEditar = (n: NovedadAdmin) => {
@@ -289,6 +333,7 @@ export function NovedadesView() {
     setActivoEdit(n.activo);
     setTamanoEdit(n.tamano || 'MEDIANO');
     setFotosEdit(n.fotos.map((f) => f.url));
+    setErrorEdicionNovedad(null);
   };
 
   const subirFoto = (e: ChangeEvent<HTMLInputElement>) => {
@@ -308,9 +353,10 @@ export function NovedadesView() {
 
   const guardarModalEdicion = async () => {
     if (!tituloEdit.trim()) {
-      alert('El título es obligatorio');
+      setErrorEdicionNovedad('El título es obligatorio');
       return;
     }
+    setErrorEdicionNovedad(null);
     const payload = {
       tipo: tipoEdit,
       titulo: tituloEdit.trim(),
@@ -336,7 +382,7 @@ export function NovedadesView() {
       await cargarDatos();
       marcarModificado();
     } catch (err: any) {
-      alert(err?.message || 'Error al guardar la novedad');
+      setErrorEdicionNovedad(err?.message || 'Error al guardar la novedad');
     }
   };
 
@@ -355,7 +401,57 @@ export function NovedadesView() {
       setMensaje('Novedad eliminada');
       setTimeout(() => setMensaje(null), 3000);
     } catch (err: any) {
-      alert(err?.message || 'Error al eliminar la novedad');
+      setMensaje(err?.message || 'Error al eliminar la novedad');
+    } finally {
+      setGuardandoAccion(false);
+    }
+  };
+
+  // Manejo del encabezado de novedades
+  const abrirEditorEncabezado = () => {
+    setEtiquetaEdit(encabezado.etiqueta);
+    setTituloEncEdit(encabezado.titulo);
+    setSubtituloEncEdit(encabezado.subtitulo);
+    setEditandoEncabezado(true);
+  };
+
+  const ejecutarGuardarEncabezado = async () => {
+    setGuardandoAccion(true);
+    try {
+      const payload: EncabezadoNovedades = {
+        etiqueta: etiquetaEdit.trim() || ENCABEZADO_DEFAULT.etiqueta,
+        titulo: tituloEncEdit.trim() || ENCABEZADO_DEFAULT.titulo,
+        subtitulo: subtituloEncEdit.trim() || ENCABEZADO_DEFAULT.subtitulo,
+      };
+      await api.put('/admin/contenido/novedades/encabezado', payload);
+      setEncabezado(payload);
+      setEditandoEncabezado(false);
+      setConfirmarGuardarEncabezado(false);
+      marcarModificado();
+      setMensaje('Borrador del encabezado guardado');
+      setTimeout(() => setMensaje(null), 3000);
+    } catch (err: any) {
+      setMensaje(err?.message || 'Error al guardar el encabezado');
+    } finally {
+      setGuardandoAccion(false);
+    }
+  };
+
+  const ejecutarRestablecerEncabezado = async () => {
+    setGuardandoAccion(true);
+    try {
+      await api.put('/admin/contenido/novedades/encabezado', ENCABEZADO_DEFAULT);
+      setEncabezado(ENCABEZADO_DEFAULT);
+      setEtiquetaEdit(ENCABEZADO_DEFAULT.etiqueta);
+      setTituloEncEdit(ENCABEZADO_DEFAULT.titulo);
+      setSubtituloEncEdit(ENCABEZADO_DEFAULT.subtitulo);
+      setEditandoEncabezado(false);
+      setConfirmarRestablecerEncabezado(false);
+      marcarModificado();
+      setMensaje('Encabezado restablecido a valores por defecto');
+      setTimeout(() => setMensaje(null), 3000);
+    } catch (err: any) {
+      setMensaje(err?.message || 'Error al restablecer encabezado');
     } finally {
       setGuardandoAccion(false);
     }
@@ -387,7 +483,6 @@ export function NovedadesView() {
   const ejecutarPublicar = async () => {
     setGuardandoAccion(true);
     try {
-      // Guardar orden y estados actuales
       for (const n of novedades) {
         await api.put(`/admin/contenido/novedades/${n.id}`, {
           tipo: n.tipo,
@@ -398,10 +493,10 @@ export function NovedadesView() {
       await api.post('/admin/contenido/novedades/publicar', {});
       setDirty(false);
       setConfirmarPublicar(false);
-      setMensaje('¡Novedades publicadas en la carta!');
+      setMensaje('¡Novedades y encabezado publicados en la carta!');
       setTimeout(() => setMensaje(null), 4000);
     } catch (err: any) {
-      alert(err?.message || 'Error al publicar novedades');
+      setMensaje(err?.message || 'Error al publicar novedades');
     } finally {
       setGuardandoAccion(false);
     }
@@ -410,17 +505,36 @@ export function NovedadesView() {
   const ejecutarDescartar = async () => {
     setGuardandoAccion(true);
     try {
+      await api.post('/admin/contenido/novedades/descartar', {}).catch(() => null);
       await cargarDatos();
       setDirty(false);
       setConfirmarDescartar(false);
       setMensaje('Cambios descartados');
       setTimeout(() => setMensaje(null), 3000);
     } catch (err: any) {
-      alert(err?.message || 'Error al descartar');
+      setMensaje(err?.message || 'Error al descartar');
     } finally {
       setGuardandoAccion(false);
     }
   };
+
+  // Novedades para previsualización fiel (formato NovedadCarta)
+  const novedadesParaPrevia: NovedadCarta[] = useMemo(() => {
+    return novedades.map((n) => ({
+      id: n.id,
+      tipo: n.tipo,
+      titulo: n.titulo,
+      texto: n.texto || undefined,
+      tema: n.tema || undefined,
+      video_url: n.video_url || undefined,
+      evento_fecha: n.evento_fecha || undefined,
+      evento_lugar: n.evento_lugar || undefined,
+      tamano: n.tamano,
+      orden: n.orden,
+      activo: n.activo,
+      fotos: n.fotos.map((f) => ({ id: f.id, url: f.url })),
+    }));
+  }, [novedades]);
 
   if (cargando) return <Cargando mensaje="Cargando novedades y publicidad..." />;
   if (error) return <EstadoError mensaje={error} alReintentar={cargarDatos} />;
@@ -460,6 +574,8 @@ export function NovedadesView() {
     (countByEstado.venc ? ` · ${countByEstado.venc} vencidas` : '') +
     (countByEstado.off ? ` · ${countByEstado.off} desactivadas` : '');
 
+  const esCelular = dispositivo === 'celular';
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Caja resumen en el administrativo */}
@@ -480,7 +596,7 @@ export function NovedadesView() {
           Diseñador de Novedades y publicidad
         </div>
         <div style={{ fontSize: 14, lineHeight: '21px', color: 'var(--cp-soft)', maxWidth: 640 }}>
-          Se abre en pantalla completa y muestra la página <b>Novedades</b> exactamente como la ve el cliente. Allí mismo agregas promociones, banners, fotos, eventos, videos de TikTok o Instagram y avisos; los ordenas con ↑ ↓; eliges el tamaño del cuadro; los activas, destacas, duplicas, programas, editas o eliminas. Eliminar quita la novedad al instante; desactivarla solo la oculta. El orden y los estados llegan a la carta al publicar.
+          Se abre en pantalla completa y muestra la página <b>Novedades</b> exactamente como la ve el cliente. Permite personalizar el encabezado de la sección, agregar promociones, banners, fotos, eventos, videos y avisos con conmutador PC y celular fiel a la carta pública.
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
           {dirty ? (
@@ -495,7 +611,7 @@ export function NovedadesView() {
           <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--cp-soft)' }}>
             {textoResumen}
           </span>
-          {mensaje && <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--cp-soft)' }}>{mensaje}</span>}
+          {mensaje && <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--cp-rust)' }}>{mensaje}</span>}
         </div>
         <button
           onClick={() => setNsFull(true)}
@@ -545,49 +661,152 @@ export function NovedadesView() {
               display: 'flex',
               flexWrap: 'wrap',
               alignItems: 'center',
-              gap: '8px 16px',
+              gap: '8px 12px',
             }}
           >
             <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 13, letterSpacing: '0.06em' }}>
               DISEÑADOR DE NOVEDADES
             </span>
-            <button
-              onClick={() => abrirCrear('PROMOCION')}
-              style={{
-                minHeight: 44,
-                padding: '0 16px',
-                border: 0,
-                borderRadius: 10,
-                background: 'var(--cp-orange)',
-                color: 'var(--cp-navy)',
-                fontWeight: 800,
-                cursor: 'pointer',
-              }}
-            >
-              + Nueva novedad
-            </button>
-            <span style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-              <span style={{ fontSize: 12, fontWeight: 700 }}>Agregar</span>
-              {CHIPS_AGREGAR.map((t) => (
+
+            {/* Conmutador Modo Vista */}
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center', border: '1.5px solid var(--cp-cream)', borderRadius: 9999, padding: 2 }}>
+              <button
+                type="button"
+                onClick={() => setModoVista('edicion')}
+                style={{
+                  minHeight: 34,
+                  padding: '0 12px',
+                  borderRadius: 9999,
+                  border: 0,
+                  background: modoVista === 'edicion' ? 'var(--cp-orange)' : 'transparent',
+                  color: modoVista === 'edicion' ? 'var(--cp-navy)' : 'var(--cp-cream)',
+                  fontWeight: 700,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                }}
+              >
+                Edición
+              </button>
+              <button
+                type="button"
+                onClick={() => setModoVista('previa')}
+                style={{
+                  minHeight: 34,
+                  padding: '0 12px',
+                  borderRadius: 9999,
+                  border: 0,
+                  background: modoVista === 'previa' ? 'var(--cp-orange)' : 'transparent',
+                  color: modoVista === 'previa' ? 'var(--cp-navy)' : 'var(--cp-cream)',
+                  fontWeight: 700,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                }}
+              >
+                Vista previa carta
+              </button>
+            </div>
+
+            {/* Conmutador Dispositivo PC / Celular */}
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center', border: '1.5px solid var(--cp-cream)', borderRadius: 9999, padding: 2 }}>
+              <button
+                type="button"
+                data-testid="btn-novedades-disp-pc"
+                onClick={() => setDispositivo('pc')}
+                style={{
+                  minHeight: 34,
+                  padding: '0 12px',
+                  borderRadius: 9999,
+                  border: 0,
+                  background: !esCelular ? 'var(--cp-orange)' : 'transparent',
+                  color: !esCelular ? 'var(--cp-navy)' : 'var(--cp-cream)',
+                  fontWeight: 700,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                }}
+              >
+                PC
+              </button>
+              <button
+                type="button"
+                data-testid="btn-novedades-disp-celular"
+                onClick={() => setDispositivo('celular')}
+                style={{
+                  minHeight: 34,
+                  padding: '0 12px',
+                  borderRadius: 9999,
+                  border: 0,
+                  background: esCelular ? 'var(--cp-orange)' : 'transparent',
+                  color: esCelular ? 'var(--cp-navy)' : 'var(--cp-cream)',
+                  fontWeight: 700,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                }}
+              >
+                Celular
+              </button>
+            </div>
+
+            {modoVista === 'edicion' && (
+              <>
                 <button
-                  key={t.n}
-                  onClick={() => abrirCrear(t.id)}
+                  onClick={() => abrirCrear('PROMOCION')}
                   style={{
-                    minHeight: 44,
-                    padding: '0 12px',
-                    borderRadius: 9999,
-                    border: '1.5px dashed var(--cp-cream)',
-                    background: 'transparent',
-                    color: 'var(--cp-cream)',
-                    fontWeight: 700,
-                    fontSize: 12,
+                    minHeight: 38,
+                    padding: '0 14px',
+                    border: 0,
+                    borderRadius: 10,
+                    background: 'var(--cp-orange)',
+                    color: 'var(--cp-navy)',
+                    fontWeight: 800,
+                    fontSize: 13,
                     cursor: 'pointer',
                   }}
                 >
-                  + {t.n}
+                  + Nueva novedad
                 </button>
-              ))}
-            </span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                  {CHIPS_AGREGAR.map((t, idx) => (
+                    <button
+                      key={`${t.id}-${idx}`}
+                      type="button"
+                      onClick={() => abrirCrear(t.id)}
+                      style={{
+                        minHeight: 32,
+                        padding: '0 10px',
+                        borderRadius: 9999,
+                        border: '1.5px dashed var(--cp-cream)',
+                        background: 'transparent',
+                        color: 'var(--cp-cream)',
+                        fontWeight: 700,
+                        fontSize: 11,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      + {t.n}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  data-testid="btn-editar-encabezado"
+                  onClick={abrirEditorEncabezado}
+                  style={{
+                    minHeight: 38,
+                    padding: '0 14px',
+                    borderRadius: 10,
+                    border: '1.5px solid var(--cp-cream)',
+                    background: 'transparent',
+                    color: 'var(--cp-cream)',
+                    fontWeight: 700,
+                    fontSize: 13,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Editar encabezado
+                </button>
+              </>
+            )}
+
             <span style={{ flex: 1 }} />
             {dirty && (
               <span style={{ fontSize: 12, fontWeight: 700, borderRadius: 9999, padding: '3px 10px', background: 'var(--cp-gold)', color: 'var(--cp-navy)' }}>
@@ -598,7 +817,7 @@ export function NovedadesView() {
               onClick={() => setConfirmarPublicar(true)}
               disabled={!dirty}
               style={{
-                minHeight: 44,
+                minHeight: 38,
                 padding: '0 16px',
                 border: 0,
                 borderRadius: 10,
@@ -615,7 +834,7 @@ export function NovedadesView() {
               onClick={() => setConfirmarDescartar(true)}
               disabled={!dirty}
               style={{
-                minHeight: 44,
+                minHeight: 38,
                 padding: '0 16px',
                 border: '1.5px solid var(--cp-cream)',
                 borderRadius: 10,
@@ -631,7 +850,7 @@ export function NovedadesView() {
             <button
               onClick={() => setNsFull(false)}
               style={{
-                minHeight: 44,
+                minHeight: 38,
                 padding: '0 16px',
                 border: '1.5px solid var(--cp-cream)',
                 borderRadius: 10,
@@ -645,257 +864,374 @@ export function NovedadesView() {
             </button>
           </div>
 
-          {/* Filtros de visualización por estado */}
-          <div style={{ maxWidth: 1200, margin: '0 auto', padding: '16px 24px 0', display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-            <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', color: 'var(--cp-soft)' }}>
-              MOSTRAR EN EL DISEÑADOR
-            </span>
-            {[
-              { id: 'todas', n: `Todas (${countByEstado.todas})` },
-              { id: 'act', n: `Activas (${countByEstado.act})` },
-              { id: 'prog', n: `Programadas (${countByEstado.prog})` },
-              { id: 'venc', n: `Vencidas (${countByEstado.venc})` },
-              { id: 'off', n: `Desactivadas (${countByEstado.off})` },
-            ].map((f) => {
-              const activo = filtroEstado === f.id;
-              return (
-                <button
-                  key={f.id}
-                  onClick={() => setFiltroEstado(f.id)}
-                  style={{
-                    minHeight: 44,
-                    padding: '0 12px',
-                    borderRadius: 9999,
-                    border: '1.5px solid var(--cp-navy)',
-                    background: activo ? 'var(--cp-navy)' : 'transparent',
-                    color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                    fontWeight: 700,
-                    fontSize: 12,
-                    cursor: 'pointer',
-                  }}
-                >
-                  {f.n}
-                </button>
-              );
-            })}
-          </div>
-
-          <div style={{ maxWidth: 1200, margin: '0 auto', padding: '12px 24px 40px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {/* Cabecera hero réplica del cliente */}
+          {/* VISTA PREVIA FIEL DE LA CARTA (Reutiliza PaginaNovedades exactamente) */}
+          {modoVista === 'previa' ? (
             <div
               style={{
-                position: 'relative',
-                overflow: 'hidden',
-                background: 'linear-gradient(155deg, var(--cp-navy) 55%, #3b5a3f)',
-                color: 'var(--cp-cream)',
-                borderRadius: 20,
-                padding: 24,
+                padding: esCelular ? '24px 12px 64px' : '24px 24px 64px',
                 display: 'flex',
-                flexDirection: 'column',
-                gap: 6,
+                justifyContent: 'center',
+                alignItems: 'flex-start',
               }}
             >
-              <span aria-hidden="true" style={{ position: 'absolute', right: -50, top: -50, width: 180, height: 180, borderRadius: '50%', background: 'var(--cp-orange)', opacity: 0.16 }} />
-              <span style={{ position: 'relative', fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 12, letterSpacing: '0.12em', color: 'var(--cp-orange)' }}>
-                NOVEDADES
-              </span>
-              <span style={{ position: 'relative', fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 28, lineHeight: '34px' }}>
-                Lo nuevo en Caprichos
-              </span>
-              <span style={{ position: 'relative', fontSize: 15, lineHeight: '22px', maxWidth: 720 }}>
-                Promociones, lanzamientos, datos útiles y lo que pasa en nuestras redes.
-              </span>
-            </div>
-
-            {/* SECCIÓN EN PORTADA (Banners) */}
-            {enPortada.length > 0 && (
-              <>
-                <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 13, letterSpacing: '0.08em' }}>
-                  EN PORTADA <span style={{ fontWeight: 600, letterSpacing: 0, color: 'var(--cp-soft)' }}>· destacadas y banners; la carta muestra hasta 5 activas</span>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(340px, 100%), 1fr))', gap: 16 }}>
-                  {enPortada.map((n) => (
-                    <div
-                      key={n.id}
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 6,
-                        minWidth: 0,
-                        opacity: n.activo ? 1 : 0.6,
-                        outline: '3px solid transparent',
-                        borderRadius: 22,
-                      }}
-                    >
-                      <div style={{ position: 'relative', aspectRatio: '16/9', borderRadius: 20, overflow: 'hidden', background: 'var(--cp-navy)', color: '#FFFFFF' }}>
-                        {n.fotos[0]?.url && (
-                          <img src={n.fotos[0].url} alt={n.titulo} style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-                        )}
-                        <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, top: '35%', background: 'linear-gradient(to top, rgba(11,44,62,0.92), rgba(11,44,62,0))' }} />
-                        <span style={{ position: 'absolute', right: 10, top: 10, fontSize: 11, fontWeight: 800, background: 'rgba(255,255,255,0.92)', color: '#0B2C3E', borderRadius: 9999, padding: '3px 10px' }}>
-                          {n.activo ? 'Activa' : 'Desactivada'}
-                        </span>
-                        <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: 16, display: 'flex', flexDirection: 'column', gap: 5 }}>
-                          <span style={{ alignSelf: 'flex-start', fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 11, letterSpacing: '0.08em', background: 'var(--cp-orange)', color: 'var(--cp-navy)', borderRadius: 9999, padding: '4px 10px' }}>
-                            {badgeDeNovedad(n)}
-                          </span>
-                          <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 20, lineHeight: 1.15 }}>{n.titulo}</span>
-                          <span style={{ fontSize: 14, lineHeight: '19px', opacity: 0.95 }}>{n.texto}</span>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                        <button onClick={() => moverNovedad(n.id, -1)} aria-label="Subir" style={{ width: 44, minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 800, cursor: 'pointer' }}>↑</button>
-                        <button onClick={() => moverNovedad(n.id, 1)} aria-label="Bajar" style={{ width: 44, minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 800, cursor: 'pointer' }}>↓</button>
-                        <button onClick={() => abrirEditar(n)} style={{ flex: '1 1 90px', minHeight: 44, border: 0, borderRadius: 10, background: 'var(--cp-orange)', color: 'var(--cp-navy)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>Editar</button>
-                        <button onClick={() => toggleActivo(n.id)} style={{ flex: '1 1 90px', minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
-                          {n.activo ? 'Desactivar' : 'Activar'}
-                        </button>
-                        <button onClick={() => toggleEnPortada(n.id)} style={{ flex: '1 1 90px', minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
-                          ★ Destacada
-                        </button>
-                        <button onClick={() => duplicar(n)} style={{ flex: '1 1 80px', minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Duplicar</button>
-                        <button onClick={() => pedirEliminar(n)} style={{ flex: '1 1 80px', minHeight: 44, border: '1.5px solid var(--cp-rust)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-rust)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Eliminar</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-
-            {/* SECCIÓN NOVEDADES */}
-            <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 13, letterSpacing: '0.08em' }}>
-              NOVEDADES
-            </div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {chipsTipoResto.map((c) => {
-                const activo = filtroTipo === c.id;
-                return (
-                  <button
-                    key={c.id}
-                    onClick={() => setFiltroTipo(c.id)}
-                    style={{
-                      minHeight: 44,
-                      padding: '0 14px',
-                      borderRadius: 9999,
-                      border: '1.5px solid var(--cp-navy)',
-                      background: activo ? 'var(--cp-navy)' : 'transparent',
-                      color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                      fontWeight: 700,
-                      fontSize: 13,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {c.n}
-                  </button>
-                );
-              })}
-            </div>
-            {listaRegular.length === 0 && (
-              <div style={{ color: 'var(--cp-soft)', fontSize: 14 }}>
-                No hay nada en esta sección con los filtros elegidos.
-              </div>
-            )}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(340px, 100%), 1fr))', gap: 16, alignItems: 'start' }}>
-              {listaRegular.map((n) => {
-                const esAviso = n.tipo === 'AVISO';
-                return (
+              <div
+                data-testid={`preview-novedades-${dispositivo}`}
+                style={{
+                  width: esCelular ? '390px' : '100%',
+                  maxWidth: esCelular ? '390px' : '1200px',
+                  minHeight: esCelular ? '640px' : '400px',
+                  border: esCelular ? '8px solid var(--cp-navy)' : '1px solid var(--cp-line)',
+                  borderRadius: esCelular ? '28px' : '16px',
+                  background: 'var(--cp-cream)',
+                  boxShadow: esCelular
+                    ? '0 14px 40px rgba(11, 44, 62, 0.25)'
+                    : '0 6px 20px rgba(11, 44, 62, 0.08)',
+                  boxSizing: 'border-box',
+                  overflow: 'hidden',
+                  position: 'relative',
+                }}
+              >
+                {/* Notch en celular */}
+                {esCelular && (
                   <div
-                    key={n.id}
                     style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 6,
-                      minWidth: 0,
-                      opacity: n.activo ? 1 : 0.6,
-                      borderRadius: 22,
+                      width: '120px',
+                      height: '14px',
+                      backgroundColor: 'var(--cp-navy)',
+                      borderRadius: '0 0 10px 10px',
+                      margin: '0 auto 8px',
                     }}
-                  >
-                    <div
+                  />
+                )}
+                <PaginaNovedades
+                  novedades={novedadesParaPrevia}
+                  encabezado={encabezado}
+                  onVerCarta={() => {}}
+                />
+              </div>
+            </div>
+          ) : (
+            /* MODO EDICIÓN CON LIENZO INTERACTIVO */
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'center',
+                padding: esCelular ? '16px 8px 60px' : '16px 24px 60px',
+              }}
+            >
+              <div
+                style={{
+                  width: esCelular ? '430px' : '100%',
+                  maxWidth: esCelular ? '430px' : '1200px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 16,
+                  border: esCelular ? '2px dashed var(--cp-line)' : 'none',
+                  borderRadius: esCelular ? 24 : 0,
+                  padding: esCelular ? 12 : 0,
+                  boxSizing: 'border-box',
+                }}
+              >
+                {/* Filtros de visualización por estado */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                  <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', color: 'var(--cp-soft)' }}>
+                    MOSTRAR:
+                  </span>
+                  {[
+                    { id: 'todas', n: `Todas (${countByEstado.todas})` },
+                    { id: 'act', n: `Activas (${countByEstado.act})` },
+                    { id: 'prog', n: `Programadas (${countByEstado.prog})` },
+                    { id: 'venc', n: `Vencidas (${countByEstado.venc})` },
+                    { id: 'off', n: `Desactivadas (${countByEstado.off})` },
+                  ].map((f) => {
+                    const activo = filtroEstado === f.id;
+                    return (
+                      <button
+                        key={f.id}
+                        onClick={() => setFiltroEstado(f.id)}
+                        style={{
+                          minHeight: 36,
+                          padding: '0 12px',
+                          borderRadius: 9999,
+                          border: '1.5px solid var(--cp-navy)',
+                          background: activo ? 'var(--cp-navy)' : 'transparent',
+                          color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                          fontWeight: 700,
+                          fontSize: 12,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {f.n}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Cabecera hero réplica del cliente (con textos editables) */}
+                <div
+                  data-testid="hero-encabezado-novedades"
+                  style={{
+                    position: 'relative',
+                    overflow: 'hidden',
+                    background: 'linear-gradient(155deg, var(--cp-navy) 55%, color-mix(in srgb, var(--cp-navy) 65%, var(--cp-orange)))',
+                    color: 'var(--cp-cream)',
+                    borderRadius: 20,
+                    padding: esCelular ? '18px 16px' : '24px 28px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
+                  }}
+                >
+                  <span aria-hidden="true" style={{ position: 'absolute', right: -50, top: -50, width: 180, height: 180, borderRadius: '50%', background: 'var(--cp-orange)', opacity: 0.16 }} />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                    <span
+                      data-testid="encabezado-etiqueta"
                       style={{
-                        background: esAviso ? 'var(--cp-navy)' : 'var(--cp-white)',
-                        color: esAviso ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                        border: '1px solid var(--cp-line)',
-                        borderRadius: 20,
-                        overflow: 'hidden',
-                        display: 'flex',
-                        flexDirection: 'column',
+                        position: 'relative',
+                        fontFamily: 'var(--fuente-titulos)',
+                        fontWeight: 800,
+                        fontSize: 12,
+                        letterSpacing: '0.12em',
+                        color: 'var(--cp-orange)',
                       }}
                     >
-                      {n.fotos[0]?.url ? (
-                        <div style={{ position: 'relative', aspectRatio: '16/10', background: 'var(--cp-gold)' }}>
-                          <img src={n.fotos[0].url} alt={n.titulo} style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-                          <span style={{ position: 'absolute', left: 10, top: 10, fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 11, letterSpacing: '0.08em', background: 'var(--cp-orange)', color: 'var(--cp-navy)', borderRadius: 9999, padding: '4px 10px' }}>
-                            {badgeDeNovedad(n)}
-                          </span>
-                          <span style={{ position: 'absolute', right: 10, top: 10, fontSize: 11, fontWeight: 800, background: 'rgba(255,255,255,0.92)', color: '#0B2C3E', borderRadius: 9999, padding: '3px 10px' }}>
-                            {n.activo ? 'Activa' : 'Desactivada'}
-                          </span>
-                          {n.video_url && (
-                            <span aria-hidden="true" style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 56, height: 56, borderRadius: 28, background: 'rgba(11,44,62,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <svg viewBox="0 0 24 24" width="26" height="26" fill="#FFFFFF" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
-                            </span>
-                          )}
-                        </div>
-                      ) : (
+                      {encabezado.etiqueta}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={abrirEditorEncabezado}
+                      style={{
+                        border: '1px solid var(--cp-orange)',
+                        borderRadius: 8,
+                        background: 'transparent',
+                        color: 'var(--cp-orange)',
+                        padding: '4px 10px',
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Editar textos
+                    </button>
+                  </div>
+                  <span
+                    data-testid="encabezado-titulo"
+                    style={{
+                      position: 'relative',
+                      fontFamily: 'var(--fuente-titulos)',
+                      fontWeight: 800,
+                      fontSize: esCelular ? 22 : 28,
+                      lineHeight: esCelular ? '28px' : '34px',
+                    }}
+                  >
+                    {encabezado.titulo}
+                  </span>
+                  <span
+                    data-testid="encabezado-subtitulo"
+                    style={{
+                      position: 'relative',
+                      fontSize: esCelular ? 13 : 15,
+                      lineHeight: '21px',
+                      maxWidth: 720,
+                      opacity: 0.95,
+                    }}
+                  >
+                    {encabezado.subtitulo}
+                  </span>
+                </div>
+
+                {/* SECCIÓN EN PORTADA (Banners) */}
+                {enPortada.length > 0 && (
+                  <>
+                    <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 13, letterSpacing: '0.08em' }}>
+                      EN PORTADA <span style={{ fontWeight: 600, letterSpacing: 0, color: 'var(--cp-soft)' }}>· hasta 5 activas en la carta</span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: esCelular ? '1fr' : 'repeat(auto-fill, minmax(min(340px, 100%), 1fr))', gap: 16 }}>
+                      {enPortada.map((n) => (
                         <div
+                          key={n.id}
                           style={{
-                            position: 'relative',
-                            aspectRatio: '16/10',
-                            background: esAviso ? 'color-mix(in srgb, var(--cp-line) 55%, var(--cp-white))' : 'var(--cp-gold)',
-                            color: 'var(--cp-navy)',
                             display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: 13,
-                            fontWeight: 700,
+                            flexDirection: 'column',
+                            gap: 6,
+                            minWidth: 0,
+                            opacity: n.activo ? 1 : 0.6,
+                            borderRadius: 22,
                           }}
                         >
-                          <span style={{ position: 'absolute', left: 10, top: 10, fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 11, letterSpacing: '0.08em', background: 'var(--cp-orange)', color: 'var(--cp-navy)', borderRadius: 9999, padding: '4px 10px' }}>
-                            {badgeDeNovedad(n)}
-                          </span>
-                          <span style={{ position: 'absolute', right: 10, top: 10, fontSize: 11, fontWeight: 800, background: 'rgba(255,255,255,0.92)', color: '#0B2C3E', borderRadius: 9999, padding: '3px 10px' }}>
-                            {n.activo ? 'Activa' : 'Desactivada'}
-                          </span>
-                          {n.video_url && (
-                            <span aria-hidden="true" style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 56, height: 56, borderRadius: 28, background: 'rgba(11,44,62,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <svg viewBox="0 0 24 24" width="26" height="26" fill="#FFFFFF" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
+                          <div style={{ position: 'relative', aspectRatio: '16/9', borderRadius: 20, overflow: 'hidden', background: 'var(--cp-navy)', color: '#FFFFFF' }}>
+                            {n.fotos[0]?.url && (
+                              <img src={n.fotos[0].url} alt={n.titulo} style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                            )}
+                            <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, top: '35%', background: 'linear-gradient(to top, rgba(11,44,62,0.92), rgba(11,44,62,0))' }} />
+                            <span style={{ position: 'absolute', right: 10, top: 10, fontSize: 11, fontWeight: 800, background: 'rgba(255,255,255,0.92)', color: '#0B2C3E', borderRadius: 9999, padding: '3px 10px' }}>
+                              {n.activo ? 'Activa' : 'Desactivada'}
                             </span>
-                          )}
-                        </div>
-                      )}
-                      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 18, lineHeight: 1.2 }}>{n.titulo}</div>
-                        <div style={{ fontSize: 14, lineHeight: '20px', opacity: 0.92, whiteSpace: 'pre-line' }}>{n.texto}</div>
-                        {n.evento_fecha && (
-                          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-rust)' }}>
-                            📅 {new Date(n.evento_fecha).toLocaleDateString()} {n.evento_lugar ? `· 📍 ${n.evento_lugar}` : ''}
+                            <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: 16, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                              <span style={{ alignSelf: 'flex-start', fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 11, letterSpacing: '0.08em', background: 'var(--cp-orange)', color: 'var(--cp-navy)', borderRadius: 9999, padding: '4px 10px' }}>
+                                {badgeDeNovedad(n)}
+                              </span>
+                              <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 18, lineHeight: 1.15 }}>{n.titulo}</span>
+                              <span style={{ fontSize: 13, lineHeight: '18px', opacity: 0.95 }}>{n.texto}</span>
+                            </div>
                           </div>
-                        )}
-                        {n.video_url && (
-                          <a href={n.video_url} target="_blank" rel="noopener noreferrer" style={{ marginTop: 4, minHeight: 48, borderRadius: 12, background: 'var(--cp-orange)', color: 'var(--cp-navy)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
-                            Ver en TikTok
-                          </a>
-                        )}
-                      </div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                            <button onClick={() => moverNovedad(n.id, -1)} aria-label="Subir" style={{ width: 44, minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 800, cursor: 'pointer' }}>↑</button>
+                            <button onClick={() => moverNovedad(n.id, 1)} aria-label="Bajar" style={{ width: 44, minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 800, cursor: 'pointer' }}>↓</button>
+                            <button onClick={() => abrirEditar(n)} style={{ flex: '1 1 90px', minHeight: 44, border: 0, borderRadius: 10, background: 'var(--cp-orange)', color: 'var(--cp-navy)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>Editar</button>
+                            <button onClick={() => toggleActivo(n.id)} style={{ flex: '1 1 90px', minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+                              {n.activo ? 'Desactivar' : 'Activar'}
+                            </button>
+                            <button onClick={() => toggleEnPortada(n.id)} style={{ flex: '1 1 90px', minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+                              Destacada
+                            </button>
+                            <button onClick={() => duplicar(n)} style={{ flex: '1 1 80px', minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Duplicar</button>
+                            <button onClick={() => pedirEliminar(n)} style={{ flex: '1 1 80px', minHeight: 44, border: '1.5px solid var(--cp-rust)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-rust)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Eliminar</button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                      <button onClick={() => moverNovedad(n.id, -1)} aria-label="Subir" style={{ width: 44, minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 800, cursor: 'pointer' }}>↑</button>
-                      <button onClick={() => moverNovedad(n.id, 1)} aria-label="Bajar" style={{ width: 44, minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 800, cursor: 'pointer' }}>↓</button>
-                      <button onClick={() => abrirEditar(n)} style={{ flex: '1 1 90px', minHeight: 44, border: 0, borderRadius: 10, background: 'var(--cp-orange)', color: 'var(--cp-navy)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>Editar</button>
-                      <button onClick={() => toggleActivo(n.id)} style={{ flex: '1 1 90px', minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
-                        {n.activo ? 'Desactivar' : 'Activar'}
+                  </>
+                )}
+
+                {/* SECCIÓN NOVEDADES */}
+                <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 13, letterSpacing: '0.08em' }}>
+                  NOVEDADES
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {chipsTipoResto.map((c) => {
+                    const activo = filtroTipo === c.id;
+                    return (
+                      <button
+                        key={c.id}
+                        onClick={() => setFiltroTipo(c.id)}
+                        style={{
+                          minHeight: 40,
+                          padding: '0 14px',
+                          borderRadius: 9999,
+                          border: '1.5px solid var(--cp-navy)',
+                          background: activo ? 'var(--cp-navy)' : 'transparent',
+                          color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                          fontWeight: 700,
+                          fontSize: 13,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {c.n}
                       </button>
-                      <button onClick={() => toggleEnPortada(n.id)} style={{ flex: '1 1 90px', minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
-                        ☆ Destacar
-                      </button>
-                      <button onClick={() => duplicar(n)} style={{ flex: '1 1 80px', minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Duplicar</button>
-                      <button onClick={() => pedirEliminar(n)} style={{ flex: '1 1 80px', minHeight: 44, border: '1.5px solid var(--cp-rust)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-rust)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Eliminar</button>
-                    </div>
+                    );
+                  })}
+                </div>
+                {listaRegular.length === 0 && (
+                  <div style={{ color: 'var(--cp-soft)', fontSize: 14 }}>
+                    No hay nada en esta sección con los filtros elegidos.
                   </div>
-                );
-              })}
+                )}
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: esCelular ? '1fr' : 'repeat(auto-fill, minmax(min(340px, 100%), 1fr))',
+                    gap: 16,
+                    alignItems: 'start',
+                  }}
+                >
+                  {listaRegular.map((n) => {
+                    const esAviso = n.tipo === 'AVISO';
+                    return (
+                      <div
+                        key={n.id}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 6,
+                          minWidth: 0,
+                          opacity: n.activo ? 1 : 0.6,
+                          borderRadius: 22,
+                        }}
+                      >
+                        <div
+                          style={{
+                            background: esAviso ? 'var(--cp-navy)' : 'var(--cp-white)',
+                            color: esAviso ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                            border: '1px solid var(--cp-line)',
+                            borderRadius: 20,
+                            overflow: 'hidden',
+                            display: 'flex',
+                            flexDirection: 'column',
+                          }}
+                        >
+                          {n.fotos[0]?.url ? (
+                            <div style={{ position: 'relative', aspectRatio: '16/10', background: 'var(--cp-gold)' }}>
+                              <img src={n.fotos[0].url} alt={n.titulo} style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                              <span style={{ position: 'absolute', left: 10, top: 10, fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 11, letterSpacing: '0.08em', background: 'var(--cp-orange)', color: 'var(--cp-navy)', borderRadius: 9999, padding: '4px 10px' }}>
+                                {badgeDeNovedad(n)}
+                              </span>
+                              <span style={{ position: 'absolute', right: 10, top: 10, fontSize: 11, fontWeight: 800, background: 'rgba(255,255,255,0.92)', color: '#0B2C3E', borderRadius: 9999, padding: '3px 10px' }}>
+                                {n.activo ? 'Activa' : 'Desactivada'}
+                              </span>
+                              {n.video_url && (
+                                <span aria-hidden="true" style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 56, height: 56, borderRadius: 28, background: 'rgba(11,44,62,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <svg viewBox="0 0 24 24" width="26" height="26" fill="#FFFFFF" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <div
+                              style={{
+                                position: 'relative',
+                                aspectRatio: '16/10',
+                                background: esAviso ? 'color-mix(in srgb, var(--cp-line) 55%, var(--cp-white))' : 'var(--cp-gold)',
+                                color: 'var(--cp-navy)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: 13,
+                                fontWeight: 700,
+                              }}
+                            >
+                              <span style={{ position: 'absolute', left: 10, top: 10, fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 11, letterSpacing: '0.08em', background: 'var(--cp-orange)', color: 'var(--cp-navy)', borderRadius: 9999, padding: '4px 10px' }}>
+                                {badgeDeNovedad(n)}
+                              </span>
+                              <span style={{ position: 'absolute', right: 10, top: 10, fontSize: 11, fontWeight: 800, background: 'rgba(255,255,255,0.92)', color: '#0B2C3E', borderRadius: 9999, padding: '3px 10px' }}>
+                                {n.activo ? 'Activa' : 'Desactivada'}
+                              </span>
+                            </div>
+                          )}
+                          <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 18, lineHeight: 1.2 }}>{n.titulo}</div>
+                            <div style={{ fontSize: 14, lineHeight: '20px', opacity: 0.92, whiteSpace: 'pre-line' }}>{n.texto}</div>
+                            {n.evento_fecha && (
+                              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-rust)' }}>
+                                Fecha: {new Date(n.evento_fecha).toLocaleDateString()} {n.evento_lugar ? `· ${n.evento_lugar}` : ''}
+                              </div>
+                            )}
+                            {n.video_url && (
+                              <a href={n.video_url} target="_blank" rel="noopener noreferrer" style={{ marginTop: 4, minHeight: 44, borderRadius: 12, background: 'var(--cp-orange)', color: 'var(--cp-navy)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
+                                Ver video
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                          <button onClick={() => moverNovedad(n.id, -1)} aria-label="Subir" style={{ width: 44, minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 800, cursor: 'pointer' }}>↑</button>
+                          <button onClick={() => moverNovedad(n.id, 1)} aria-label="Bajar" style={{ width: 44, minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 800, cursor: 'pointer' }}>↓</button>
+                          <button onClick={() => abrirEditar(n)} style={{ flex: '1 1 90px', minHeight: 44, border: 0, borderRadius: 10, background: 'var(--cp-orange)', color: 'var(--cp-navy)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>Editar</button>
+                          <button onClick={() => toggleActivo(n.id)} style={{ flex: '1 1 90px', minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+                            {n.activo ? 'Desactivar' : 'Activar'}
+                          </button>
+                          <button onClick={() => toggleEnPortada(n.id)} style={{ flex: '1 1 90px', minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+                            Destacar
+                          </button>
+                          <button onClick={() => duplicar(n)} style={{ flex: '1 1 80px', minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Duplicar</button>
+                          <button onClick={() => pedirEliminar(n)} style={{ flex: '1 1 80px', minHeight: 44, border: '1.5px solid var(--cp-rust)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-rust)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Eliminar</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -911,6 +1247,12 @@ export function NovedadesView() {
                 ×
               </button>
             </div>
+
+            {errorEdicionNovedad && (
+              <div style={{ background: '#FDE8E8', color: 'var(--cp-rust)', padding: '10px 14px', borderRadius: 8, fontSize: 13, fontWeight: 700 }}>
+                {errorEdicionNovedad}
+              </div>
+            )}
 
             {/* Tipo */}
             <div>
@@ -950,7 +1292,7 @@ export function NovedadesView() {
             {/* Etiqueta o tema */}
             <div>
               <label htmlFor="n-e" style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>Etiqueta o tema (opcional)</label>
-              <input id="n-e" type="text" value={temaEdit} onChange={(e) => setTemaEdit(e.target.value)} placeholder="Ejemplo: Navidad, Clientes, Aniversario" style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, borderRadius: 10, border: '1.5px solid var(--cp-line)', background: 'var(--cp-white)', color: 'var(--cp-navy)', padding: '0 10px', fontSize: 14 }} />
+              <input id="n-e" type="text" value={temaEdit} onChange={(e) => setTemaEdit(e.target.value)} placeholder="Ejemplo: Promoción, Menú, Aniversario" style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, borderRadius: 10, border: '1.5px solid var(--cp-line)', background: 'var(--cp-white)', color: 'var(--cp-navy)', padding: '0 10px', fontSize: 14 }} />
             </div>
 
             {/* Si es evento */}
@@ -976,7 +1318,7 @@ export function NovedadesView() {
             {/* Video URL */}
             {tipoEdit === 'VIDEO' && (
               <div>
-                <label htmlFor="n-l" style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>Enlace del video (TikTok, Instagram o YouTube)</label>
+                <label htmlFor="n-l" style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>Enlace del video</label>
                 <input id="n-l" type="text" value={videoUrlEdit} onChange={(e) => setVideoUrlEdit(e.target.value)} placeholder="https://www.tiktok.com/@caprichos" style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, borderRadius: 10, border: '1.5px solid var(--cp-line)', background: 'var(--cp-white)', color: 'var(--cp-navy)', padding: '0 10px', fontSize: 14 }} />
               </div>
             )}
@@ -1122,11 +1464,171 @@ export function NovedadesView() {
         </div>
       )}
 
+      {/* Modal Editar Encabezado de Novedades */}
+      {editandoEncabezado && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 125, background: 'rgba(11,44,62,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div role="dialog" aria-modal="true" aria-label="Editar encabezado de Novedades" style={{ width: 'min(580px, calc(100% - 24px))', background: 'var(--cp-white)', color: 'var(--cp-navy)', borderRadius: 20, boxShadow: '0 20px 50px rgba(11,44,62,0.4)', padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 20 }}>
+                Editar encabezado de Novedades
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditandoEncabezado(false)}
+                aria-label="Cerrar"
+                style={{ width: 36, height: 36, borderRadius: 18, border: '1.5px solid var(--cp-line)', background: 'transparent', fontWeight: 800, cursor: 'pointer' }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
+              Personaliza los tres textos que encabezan la sección Novedades de la carta virtual. Si dejas un campo vacío, se utilizará su valor por defecto.
+            </div>
+
+            {/* Campo Etiqueta */}
+            <div>
+              <label htmlFor="enc-etiqueta" style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>
+                Etiqueta pequeña (máx. 40 letras)
+              </label>
+              <input
+                id="enc-etiqueta"
+                data-testid="input-encabezado-etiqueta"
+                type="text"
+                maxLength={40}
+                value={etiquetaEdit}
+                onChange={(e) => setEtiquetaEdit(e.target.value)}
+                placeholder={ENCABEZADO_DEFAULT.etiqueta}
+                style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, borderRadius: 10, border: '1.5px solid var(--cp-line)', padding: '0 12px', fontSize: 14 }}
+              />
+            </div>
+
+            {/* Campo Título */}
+            <div>
+              <label htmlFor="enc-titulo" style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>
+                Título principal (máx. 100 letras)
+              </label>
+              <input
+                id="enc-titulo"
+                data-testid="input-encabezado-titulo"
+                type="text"
+                maxLength={100}
+                value={tituloEncEdit}
+                onChange={(e) => setTituloEncEdit(e.target.value)}
+                placeholder={ENCABEZADO_DEFAULT.titulo}
+                style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, borderRadius: 10, border: '1.5px solid var(--cp-line)', padding: '0 12px', fontSize: 14 }}
+              />
+            </div>
+
+            {/* Campo Subtítulo */}
+            <div>
+              <label htmlFor="enc-subtitulo" style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>
+                Subtítulo explicativo (máx. 250 letras)
+              </label>
+              <textarea
+                id="enc-subtitulo"
+                data-testid="input-encabezado-subtitulo"
+                rows={3}
+                maxLength={250}
+                value={subtituloEncEdit}
+                onChange={(e) => setSubtituloEncEdit(e.target.value)}
+                placeholder={ENCABEZADO_DEFAULT.subtitulo}
+                style={{ width: '100%', boxSizing: 'border-box', borderRadius: 10, border: '1.5px solid var(--cp-line)', padding: 10, fontSize: 14, fontFamily: 'inherit' }}
+              />
+            </div>
+
+            {/* Botones de acción */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'space-between', marginTop: 8 }}>
+              <button
+                type="button"
+                data-testid="btn-restablecer-encabezado"
+                onClick={() => setConfirmarRestablecerEncabezado(true)}
+                style={{
+                  minHeight: 44,
+                  padding: '0 14px',
+                  borderRadius: 10,
+                  border: '1.5px solid var(--cp-line)',
+                  background: 'transparent',
+                  color: 'var(--cp-rust)',
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                }}
+              >
+                Restablecer por defecto
+              </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setEditandoEncabezado(false)}
+                  style={{
+                    minHeight: 44,
+                    padding: '0 16px',
+                    borderRadius: 10,
+                    border: '1.5px solid var(--cp-line)',
+                    background: 'transparent',
+                    fontWeight: 700,
+                    fontSize: 13,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  data-testid="btn-guardar-encabezado"
+                  onClick={() => setConfirmarGuardarEncabezado(true)}
+                  style={{
+                    minHeight: 44,
+                    padding: '0 20px',
+                    borderRadius: 10,
+                    border: 0,
+                    background: 'var(--cp-orange)',
+                    color: 'var(--cp-navy)',
+                    fontFamily: 'var(--fuente-titulos)',
+                    fontWeight: 800,
+                    fontSize: 14,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Guardar borrador
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmar Guardar Encabezado */}
+      <Confirmar
+        abierto={confirmarGuardarEncabezado}
+        titulo="¿Guardar cambios en el encabezado?"
+        mensaje="Se actualizará el borrador con los nuevos textos. Los clientes los verán al pulsar Publicar cambios."
+        textoConfirmar="Sí, guardar"
+        textoNo="No, seguir editando"
+        cargando={guardandoAccion}
+        alConfirmar={ejecutarGuardarEncabezado}
+        alCancelar={() => setConfirmarGuardarEncabezado(false)}
+      />
+
+      {/* Confirmar Restablecer Encabezado */}
+      <Confirmar
+        abierto={confirmarRestablecerEncabezado}
+        titulo="¿Restablecer encabezado por defecto?"
+        mensaje="Los tres textos volverán a sus valores de fábrica originales."
+        textoConfirmar="Sí, restablecer"
+        textoNo="No, mantener actuales"
+        peligro
+        cargando={guardandoAccion}
+        alConfirmar={ejecutarRestablecerEncabezado}
+        alCancelar={() => setConfirmarRestablecerEncabezado(false)}
+      />
+
       {/* Confirmar publicar */}
       <Confirmar
         abierto={confirmarPublicar}
         titulo="¿Publicar los cambios de novedades?"
-        mensaje="Los clientes verán las novedades activas y vigentes en la carta virtual."
+        mensaje="Los clientes verán las novedades activas y el encabezado actualizado en la carta virtual."
         textoConfirmar="Sí, publicar"
         textoNo="No, seguir editando"
         cargando={guardandoAccion}
@@ -1151,7 +1653,7 @@ export function NovedadesView() {
       <Confirmar
         abierto={confirmarDescartar}
         titulo="¿Descartar los cambios sin publicar?"
-        mensaje="Volverán los últimos cambios publicados."
+        mensaje="Volverán los últimos cambios publicados de novedades y del encabezado."
         textoConfirmar="Sí, descartar"
         textoNo="No, mantener cambios"
         peligro

@@ -21,6 +21,8 @@ Permite organizar y personalizar la presentación de la carta virtual que ven lo
 2. En la barra superior, busca la sección "Organización".
 3. Elige uno de los tres estilos disponibles: "Secciones" (cuadrícula clásica con fotos medianas), "Lista" (filas horizontales compactas) o "Tarjetas grandes" (fotos amplias que resaltan el producto).
 4. Si deseas una ambientación festiva, pulsa el botón "Decoración" y selecciona uno de los temas disponibles como Halloween o Navidad.
+5. Utiliza el conmutador de dispositivo "PC" y "Celular" para previsualizar la distribución en pantalla ancha o en marco de celular.
+6. Pulsa el botón "Vista previa carta" para revisar la carta virtual en modo fiel de solo lectura con sus componentes reales, o "Edición" para regresar al lienzo interactivo.
 Ver tambien: [[paleta]]
 
 ## Como se hace: ordenar categorías y productos

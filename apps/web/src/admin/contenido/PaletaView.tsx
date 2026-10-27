@@ -138,7 +138,7 @@ export function PaletaView() {
       setMensaje('¡Colores publicados en la carta!');
       setTimeout(() => setMensaje(null), 4000);
     } catch (err: any) {
-      alert(err?.message || 'Error al publicar colores');
+      setMensaje(err?.message || 'Error al publicar colores');
     } finally {
       setGuardandoAccion(false);
     }
@@ -154,7 +154,7 @@ export function PaletaView() {
       setMensaje('Cambios descartados');
       setTimeout(() => setMensaje(null), 3000);
     } catch (err: any) {
-      alert(err?.message || 'Error al descartar cambios');
+      setMensaje(err?.message || 'Error al descartar cambios');
     } finally {
       setGuardandoAccion(false);
     }
