@@ -32,6 +32,8 @@ import {
   BOTONES_PEDIDO_CANCELAR_CONFIRMAR,
   BOTONES_PEDIDO_NOTAS,
   BOTONES_PEDIDO_CANTIDADES,
+  BOTONES_PEDIDO_NOMBRES_ENVASE,
+  BOTONES_PEDIDO_TELEFONO,
 } from '../../textos-bot';
 import { evaluarOfertasParaCarrito } from './aviso-te-falta-poco.util';
 
@@ -319,6 +321,12 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
 
       case 'PEDIDO_CANTIDAD':
         return this.pasoCantidad(flujo, pedido, entrada, contexto);
+
+      case 'PEDIDO_NOMBRES_ENVASE':
+        return this.pasoNombresEnvase(flujo, pedido, entrada, contexto);
+
+      case 'PEDIDO_NOMBRES_CONFIRMAR':
+        return this.pasoNombresConfirmar(flujo, pedido, entrada, contexto);
 
       case 'PEDIDO_ACCION_CARRITO':
       case 'PEDIDO_VER_CARRITO':
@@ -1082,6 +1090,115 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
 
     config.cantidad = cantidad;
 
+    // Bebidas: cada envase lleva un nombre distinto en su etiqueta; se piden uno por uno
+    if (this.esBebidaConNombres(config.categoriaNombre)) {
+      config.nombresEnvase = [];
+      return this.preguntarNombreEnvase(flujo, pedido, config);
+    }
+
+    return this.agregarLineaConfigurada(flujo, pedido, contexto);
+  }
+
+  private esBebidaConNombres(categoriaNombre: string): boolean {
+    const n = normalizarTexto(categoriaNombre || '').toUpperCase();
+    return ['FRAPPES', 'ICED', 'FROZEN', 'CALIENTES'].includes(n);
+  }
+
+  private preguntarNombreEnvase(
+    flujo: FlujoConversacion,
+    pedido: EstadoCarritoPedido,
+    config: ItemEnConfiguracionBot,
+  ): ResultadoTransicion {
+    const hechos = config.nombresEnvase?.length || 0;
+    pedido.estadoInterno = 'PEDIDO_NOMBRES_ENVASE';
+    return {
+      nuevoEstado: 'PEDIDO_NOMBRES_ENVASE',
+      acciones: [
+        {
+          tipo: 'enviarTexto',
+          texto: TEXTOS_BOT.pedidoPedirNombreEnvase(config.productoNombre, hechos + 1, config.cantidad),
+        },
+      ],
+      nuevoFlujo: { ...flujo, estado: 'PEDIDO_NOMBRES_ENVASE', pedido },
+    };
+  }
+
+  private confirmarNombresEnvase(
+    flujo: FlujoConversacion,
+    pedido: EstadoCarritoPedido,
+    config: ItemEnConfiguracionBot,
+  ): ResultadoTransicion {
+    pedido.estadoInterno = 'PEDIDO_NOMBRES_CONFIRMAR';
+    return {
+      nuevoEstado: 'PEDIDO_NOMBRES_CONFIRMAR',
+      acciones: [
+        {
+          tipo: 'enviarBotones',
+          texto: TEXTOS_BOT.pedidoConfirmarNombresEnvases(config.productoNombre, config.nombresEnvase || []),
+          botones: BOTONES_PEDIDO_NOMBRES_ENVASE,
+        },
+      ],
+      nuevoFlujo: { ...flujo, estado: 'PEDIDO_NOMBRES_CONFIRMAR', pedido },
+    };
+  }
+
+  private pasoNombresEnvase(
+    flujo: FlujoConversacion,
+    pedido: EstadoCarritoPedido,
+    entrada: EntradaNormalizada,
+    contexto: ContextoConversacion,
+  ): ResultadoTransicion {
+    const config = pedido.itemEnConfiguracion;
+    if (!config) return this.mostrarCategorias(flujo, pedido, contexto);
+
+    const texto = entrada.textoOriginal.trim();
+    if (!texto || entrada.id) {
+      return this.preguntarNombreEnvase(flujo, pedido, config);
+    }
+
+    const nombres = config.nombresEnvase || [];
+    // Si escribe todos los nombres juntos separados por coma ("Ana, Luis, Rosa") y coinciden con los envases
+    const separados = texto.split(',').map((n) => n.trim()).filter(Boolean);
+    if (nombres.length === 0 && config.cantidad > 1 && separados.length === config.cantidad) {
+      config.nombresEnvase = separados.map((n) => n.slice(0, 30));
+    } else {
+      config.nombresEnvase = [...nombres, texto.slice(0, 30)];
+    }
+
+    if ((config.nombresEnvase?.length || 0) < config.cantidad) {
+      return this.preguntarNombreEnvase(flujo, pedido, config);
+    }
+    return this.confirmarNombresEnvase(flujo, pedido, config);
+  }
+
+  private pasoNombresConfirmar(
+    flujo: FlujoConversacion,
+    pedido: EstadoCarritoPedido,
+    entrada: EntradaNormalizada,
+    contexto: ContextoConversacion,
+  ): ResultadoTransicion {
+    const config = pedido.itemEnConfiguracion;
+    if (!config) return this.mostrarCategorias(flujo, pedido, contexto);
+
+    if (entrada.id === 'ped_nom_si' || entrada.texto === 'si') {
+      return this.agregarLineaConfigurada(flujo, pedido, contexto);
+    }
+    if (entrada.id === 'ped_nom_no' || entrada.texto === 'no') {
+      config.nombresEnvase = [];
+      return this.preguntarNombreEnvase(flujo, pedido, config);
+    }
+    return this.confirmarNombresEnvase(flujo, pedido, config);
+  }
+
+  private agregarLineaConfigurada(
+    flujo: FlujoConversacion,
+    pedido: EstadoCarritoPedido,
+    contexto: ContextoConversacion,
+  ): ResultadoTransicion {
+    const config = pedido.itemEnConfiguracion;
+    if (!config) return this.mostrarCategorias(flujo, pedido, contexto);
+    const cantidad = config.cantidad;
+
     // Calcular precio unitario y subtotal de la línea
     const extrasTotal = config.opciones.reduce((s, o) => s + o.precioExtra, 0);
     const precioUnitario = Number((config.precioBase + extrasTotal).toFixed(2));
@@ -1117,6 +1234,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       sabor: config.sabor,
       nota: config.nota,
       noSumaBeneficios: config.noSumaBeneficios,
+      personas: config.nombresEnvase && config.nombresEnvase.length > 0 ? [...config.nombresEnvase] : undefined,
     };
 
     const nuevosItems = [...pedido.items, nuevaLinea];
@@ -1566,7 +1684,22 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     entrada: EntradaNormalizada,
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
-    const rawTel = entrada.textoOriginal.replace(/\D/g, '');
+    if (entrada.id === 'ped_tel_mismo' && pedido.telefonoSugerido) {
+      return this.avanzarHaciaCheckout(
+        flujo,
+        { ...pedido, cliente: { ...(pedido.cliente || {}), telefono: pedido.telefonoSugerido } },
+        contexto,
+      );
+    }
+    if (entrada.id === 'ped_tel_otro') {
+      return {
+        nuevoEstado: 'PEDIDO_INGRESAR_TELEFONO',
+        acciones: [{ tipo: 'enviarTexto', texto: TEXTOS_BOT.pedidoIngresarTelefono() }],
+        nuevoFlujo: { ...flujo, estado: 'PEDIDO_INGRESAR_TELEFONO', pedido: { ...pedido, telefonoSugerido: undefined } },
+      };
+    }
+
+    const rawTel = entrada.textoOriginal.replace(/\D/g, '').replace(/^51(?=9\d{8}$)/, '');
     const esValido = /^9\d{8}$/.test(rawTel);
 
     if (!esValido) {
@@ -1714,14 +1847,6 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     entrada: EntradaNormalizada,
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
-    if (entrada.id === 'ped_comp_ninguno' || entrada.texto.includes('sin comprobante')) {
-      const nuevoPedido: EstadoCarritoPedido = {
-        ...pedido,
-        comprobante: { tipo: 'NINGUNO' },
-      };
-      return this.avanzarHaciaCheckout(flujo, nuevoPedido, contexto);
-    }
-
     if (entrada.id === 'ped_comp_boleta' || entrada.texto.includes('boleta')) {
       const nuevoPedido: EstadoCarritoPedido = {
         ...pedido,
@@ -1938,6 +2063,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         cantidad: i.cantidad,
         opciones: i.opciones.map((o) => o.opcionId),
         nota: i.nota,
+        personas: i.personas,
       })),
       pago: {
         metodo: pedido.pago?.metodo || 'EFECTIVO',
@@ -2165,22 +2291,33 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       };
     }
 
-    // 6. Teléfono del cliente (si es usuario identificado por BSUID sin número)
-    const telExistente = contexto.telefonoCliente;
-    const esRemitenteSinTel = !telExistente || !/^9\d{8}$/.test(telExistente);
+    // 6. Teléfono del cliente: el número del chat llega como 51XXXXXXXXX; se ofrece usarlo o escribir otro
+    const telDigitos = String(contexto.telefonoCliente || '').replace(/\D/g, '');
+    const telExistente = /^51(9\d{8})$/.test(telDigitos)
+      ? telDigitos.slice(2)
+      : /^9\d{8}$/.test(telDigitos)
+        ? telDigitos
+        : '';
 
-    if (esRemitenteSinTel && !pedido.cliente?.telefono) {
+    if (!pedido.cliente?.telefono) {
       const nuevoPedido: EstadoCarritoPedido = {
         ...pedido,
+        telefonoSugerido: telExistente || undefined,
         estadoInterno: 'PEDIDO_INGRESAR_TELEFONO',
       };
       return {
         nuevoEstado: 'PEDIDO_INGRESAR_TELEFONO',
         acciones: [
-          {
-            tipo: 'enviarTexto',
-            texto: TEXTOS_BOT.pedidoIngresarTelefono(),
-          },
+          telExistente
+            ? {
+                tipo: 'enviarBotones',
+                texto: TEXTOS_BOT.pedidoConfirmarTelefono(telExistente),
+                botones: BOTONES_PEDIDO_TELEFONO,
+              }
+            : {
+                tipo: 'enviarTexto',
+                texto: TEXTOS_BOT.pedidoIngresarTelefono(),
+              },
         ],
         nuevoFlujo: {
           ...flujo,

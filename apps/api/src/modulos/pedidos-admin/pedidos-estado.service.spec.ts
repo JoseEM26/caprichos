@@ -789,7 +789,15 @@ describe('PedidosEstadoService', () => {
 
       expect(prismaMock.pedido.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { estado: { in: ['COLA', 'PREPARANDO'] } },
+          where: {
+            estado: { in: ['COLA', 'PREPARANDO'] },
+            NOT: {
+              pago_metodo: { in: ['YAPE', 'PLIN', 'TRANSFERENCIA'] },
+              pago_estado: 'PENDIENTE',
+              pago_coordinado_en: null,
+              modalidad: { not: 'MESA' },
+            },
+          },
           orderBy: { creado_en: 'asc' },
         }),
       );

@@ -280,6 +280,13 @@ export class PedidosEstadoService {
       pedidos = await this.prisma.pedido.findMany({
         where: {
           estado: { in: ['COLA', 'PREPARANDO'] },
+          // Pago digital (Yape, Plin, transferencia) sin validar: no pasa a cocina hasta aprobar el voucher o coordinar el pago
+          NOT: {
+            pago_metodo: { in: ['YAPE', 'PLIN', 'TRANSFERENCIA'] },
+            pago_estado: 'PENDIENTE',
+            pago_coordinado_en: null,
+            modalidad: { not: 'MESA' },
+          },
         },
         orderBy: { creado_en: 'asc' }, // Más viejos primero
         include: {

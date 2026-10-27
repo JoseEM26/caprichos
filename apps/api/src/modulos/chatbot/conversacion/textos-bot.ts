@@ -121,6 +121,16 @@ export const BOTONES_PEDIDO_ACCION_CARRITO: BotonAccion[] = [
   { id: 'ped_continuar', titulo: 'Continuar' },
 ];
 
+export const BOTONES_PEDIDO_TELEFONO: BotonAccion[] = [
+  { id: 'ped_tel_mismo', titulo: 'Usar este número' },
+  { id: 'ped_tel_otro', titulo: 'Escribir otro' },
+];
+
+export const BOTONES_PEDIDO_NOMBRES_ENVASE: BotonAccion[] = [
+  { id: 'ped_nom_si', titulo: 'Sí, correcto' },
+  { id: 'ped_nom_no', titulo: 'No, cambiar' },
+];
+
 export const BOTONES_PEDIDO_VER_CARRITO: BotonAccion[] = [
   { id: 'ped_continuar', titulo: 'Continuar' },
   { id: 'ped_otro', titulo: 'Agregar producto' },
@@ -148,7 +158,6 @@ export const BOTONES_PEDIDO_NOMBRE_CONFIRMAR: BotonAccion[] = [
 ];
 
 export const BOTONES_PEDIDO_COMPROBANTE: BotonAccion[] = [
-  { id: 'ped_comp_ninguno', titulo: 'Sin comprobante' },
   { id: 'ped_comp_boleta', titulo: 'Boleta' },
   { id: 'ped_comp_factura', titulo: 'Factura' },
 ];
@@ -791,6 +800,19 @@ export const TEXTOS_BOT = {
     return 'Por favor escribe tu número de celular de 9 dígitos para coordinar tu pedido y la entrega:';
   },
 
+  pedidoConfirmarTelefono: (tel: string): string => {
+    return `¿Usamos este número para coordinar tu pedido y la entrega: ${tel}?`;
+  },
+
+  pedidoPedirNombreEnvase: (producto: string, indice: number, total: number): string => {
+    return `Tu ${producto}: escribe el nombre para el envase ${indice} de ${total}. Irá en la etiqueta pegada al envase (máx. 14 letras se ven completas).`;
+  },
+
+  pedidoConfirmarNombresEnvases: (producto: string, nombres: string[]): string => {
+    const lista = nombres.map((n, i) => `${i + 1}. ${n}`).join('\n');
+    return `Estos son los nombres de tus ${nombres.length} envases de ${producto}:\n${lista}\n\n¿Está correcto?`;
+  },
+
   pedidoTelefonoInvalido: (): string => {
     return 'El número ingresado no es válido. Debe tener 9 dígitos y empezar con 9 (ejemplo: 987654321). Por favor escríbelo nuevamente:';
   },
@@ -808,7 +830,7 @@ export const TEXTOS_BOT = {
   },
 
   pedidoComprobanteTipo: (): string => {
-    return '¿Deseas algún comprobante de pago?';
+    return '¿Qué comprobante de pago deseas? Elige boleta o factura.';
   },
 
   pedidoComprobanteDni: (): string => {
@@ -872,14 +894,19 @@ export const TEXTOS_BOT = {
     datosPago?: string;
   }): string => {
     const { codigo, tiempoMin, tiempoMax, esPagoDigital, datosPago } = params;
-    const pagoMensaje = esPagoDigital
-      ? ' Si pagas por Yape, Plin o transferencia, envíanos aquí la captura de tu comprobante.'
-      : '';
     const datosBloque = datosPago ? `\n\n${datosPago}` : '';
+
+    if (esPagoDigital) {
+      return (
+        `Listo. Recibimos tu pedido ${codigo}. Pasa a cocina apenas validemos tu pago.\n` +
+        `Envíanos aquí la captura de tu comprobante (Yape, Plin o transferencia). Una persona del equipo la revisa y te avisa por este chat.` +
+        datosBloque
+      );
+    }
 
     return (
       `Listo. Tu pedido ${codigo} ya está en cocina 👩‍🍳. Te llega de ${tiempoMin} a ${tiempoMax} minutos. ` +
-      `Una persona del equipo te escribe por este chat para coordinar el pago.${pagoMensaje}${datosBloque}`
+      `Una persona del equipo te escribe por este chat para coordinar el pago.${datosBloque}`
     );
   },
 

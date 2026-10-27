@@ -12,6 +12,8 @@ export type EstadoPedidoFlujo =
   | 'PEDIDO_GRUPO_OPCION'
   | 'PEDIDO_SABOR'
   | 'PEDIDO_NOTA'
+  | 'PEDIDO_NOMBRES_ENVASE'
+  | 'PEDIDO_NOMBRES_CONFIRMAR'
   | 'PEDIDO_CANTIDAD'
   | 'PEDIDO_ACCION_CARRITO'
   | 'PEDIDO_VER_CARRITO'
@@ -55,6 +57,8 @@ export interface LineaCarritoBot {
   sabor?: string;
   nota?: string;
   noSumaBeneficios: boolean;
+  /** Un nombre por envase (bebidas): va en la etiqueta pegada al envase */
+  personas?: string[];
 }
 
 export interface ItemEnConfiguracionBot {
@@ -71,6 +75,8 @@ export interface ItemEnConfiguracionBot {
   nota?: string;
   cantidad: number;
   noSumaBeneficios: boolean;
+  /** Nombres de envase ya escritos mientras se pregunta uno por uno */
+  nombresEnvase?: string[];
 }
 
 export interface DatosEntregaBot {
@@ -111,6 +117,7 @@ export interface EstadoCarritoPedido {
   entrega?: DatosEntregaBot;
   cliente?: DatosClienteBot;
   items: LineaCarritoBot[];
+  telefonoSugerido?: string;
   itemEnConfiguracion?: ItemEnConfiguracionBot;
   paginaCategorias?: number;
   paginaProductos?: number;

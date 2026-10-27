@@ -175,7 +175,11 @@ describe('Flujo de Pedido por WhatsApp (Ola 2, Agente C - FT-BOT-01)', () => {
       entrada = normalizarEntrada({ buttonPayload: 'ped_nombre_si' });
       resultado = transicionarEstado(resultado.nuevoFlujo, entrada, contextoBase);
 
-      // 12. Teléfono (ya presente en contexto) -> Elegir Medio de Pago
+      // 12. Teléfono del chat: se ofrece usarlo -> Elegir Medio de Pago
+      expect(resultado.nuevoEstado).toBe('PEDIDO_INGRESAR_TELEFONO');
+      entrada = normalizarEntrada({ buttonPayload: 'ped_tel_mismo' });
+      resultado = transicionarEstado(resultado.nuevoFlujo, entrada, contextoBase);
+      expect(resultado.nuevoFlujo.pedido?.cliente?.telefono).toBe('987654321');
       expect(resultado.nuevoEstado).toBe('PEDIDO_MEDIO_PAGO');
       entrada = normalizarEntrada({ buttonPayload: 'ped_pago_efectivo' });
       resultado = transicionarEstado(resultado.nuevoFlujo, entrada, contextoBase);
@@ -187,7 +191,10 @@ describe('Flujo de Pedido por WhatsApp (Ola 2, Agente C - FT-BOT-01)', () => {
 
       // 14. Comprobante
       expect(resultado.nuevoEstado).toBe('PEDIDO_COMPROBANTE_TIPO');
-      entrada = normalizarEntrada({ buttonPayload: 'ped_comp_ninguno' });
+      entrada = normalizarEntrada({ buttonPayload: 'ped_comp_boleta' });
+      resultado = transicionarEstado(resultado.nuevoFlujo, entrada, contextoBase);
+      expect(resultado.nuevoEstado).toBe('PEDIDO_COMPROBANTE_DNI');
+      entrada = normalizarEntrada({ texto: '12345678', textoOriginal: '12345678' });
       resultado = transicionarEstado(resultado.nuevoFlujo, entrada, contextoBase);
 
       // 15. Resumen final con botones Confirmar o Cambiar

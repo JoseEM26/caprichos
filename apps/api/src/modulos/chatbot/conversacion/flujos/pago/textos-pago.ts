@@ -100,7 +100,7 @@ export const TEXTOS_PAGO = {
       detalle = `📲 Pago digital:\n• Monto: S/ ${tot}`;
     }
 
-    return `Listo. Tu pedido ${cod} ya está en cocina 👩‍🍳.\nTotal a pagar: S/ ${tot}\nMétodo de pago: ${med}\n\n${detalle}\n\nPor favor envíanos la captura de tu comprobante por aquí 📎 para verificar tu pago.`;
+    return `Listo. Recibimos tu pedido ${cod}; pasa a cocina apenas validemos tu pago.\nTotal a pagar: S/ ${tot}\nMétodo de pago: ${med}\n\n${detalle}\n\nPor favor envíanos la captura de tu comprobante por aquí 📎 para verificar tu pago.`;
   },
 
   voucherRecibido: (): string => {
