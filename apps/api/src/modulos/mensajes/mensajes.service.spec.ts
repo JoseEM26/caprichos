@@ -197,6 +197,9 @@ describe('MensajesService', () => {
       altaDemanda: {
         findFirst: jest.fn().mockResolvedValue(null),
       },
+      voucherPago: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
       respuestaRapida: {
         findMany: jest.fn().mockResolvedValue([
           { id: 1n, titulo: 'Pedido listo', texto: 'Tu pedido ya está listo.', activo: true },
@@ -241,6 +244,34 @@ describe('MensajesService', () => {
     expect(d.mensajes.length).toBe(2);
     expect(d.esMio).toBe(true);
     expect(d.ocupado).toBe(false);
+  });
+
+  it('detalle incluye informacion del voucher para quien tiene permiso vouchers/ver', async () => {
+    prisma.voucherPago.findFirst.mockResolvedValueOnce({
+      id: 77n,
+      semaforo: 'CONFIABLE',
+      motivos: ['Datos conformes'],
+      extraido: { legible: true, monto: 34.5 },
+      medio: 'YAPE',
+    });
+
+    const d = await service.detalle('1', usuarioAdmin);
+    expect(d.voucher).toBeDefined();
+    expect(d.voucher.id).toBe('77');
+    expect(d.voucher.semaforo).toBe('CONFIABLE');
+    expect(d.voucher.medio).toBe('YAPE');
+    expect(d.voucher.pedidoTotal).toBe('34.5');
+  });
+
+  it('detalle no incluye voucher si el usuario no tiene permiso vouchers/ver', async () => {
+    prisma.voucherPago.findFirst.mockResolvedValueOnce({
+      id: 77n,
+      semaforo: 'CONFIABLE',
+    });
+
+    const usuarioCocina = { partyId: 30n, rol: 'COCINA', debeCambiar: false };
+    const d = await service.detalle('1', usuarioCocina);
+    expect(d.voucher).toBeNull();
   });
 
   it('respuestasRapidas lista las plantillas activas', async () => {

@@ -153,6 +153,9 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'pantallas', accion: 'desactivar' },
   // Supervisor: código rotativo general (TOTP)
   { modulo: 'supervisor', accion: 'ver_codigo' },
+  // Vouchers y lectura IA (vch-api)
+  { modulo: 'vouchers', accion: 'subir' },
+  { modulo: 'vouchers', accion: 'ver' },
 ] as const;
 
 export const MATRIZ: Record<string, string[]> = {
@@ -175,6 +178,8 @@ export const MATRIZ: Record<string, string[]> = {
     'mesas/liberar',
     'repartos/ver',
     'repartos/liquidar',
+    'vouchers/subir',
+    'vouchers/ver',
   ],
   COCINA: [
     'pedidos/ver',
@@ -212,6 +217,7 @@ export const MATRIZ: Record<string, string[]> = {
     'iniciativas/comentar',
     'notificaciones/ver',
     'notificaciones/marcar',
+    'vouchers/subir',
   ],
   CALLCENTER: [
     'reservas/ver',

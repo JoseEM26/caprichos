@@ -286,6 +286,50 @@ export class CobrosService {
         }
       }
 
+      // Exigencia para el mozo en el cobro digital (vch-api)
+      const esMozo = (usuario?.rol || '').toUpperCase() === 'MOZO';
+      const tieneMedioDigital = dto.pagos.some((p) =>
+        ['YAPE', 'PLIN'].includes(p.medio.toUpperCase()),
+      );
+
+      if (esMozo && tieneMedioDigital) {
+        const paramMozoObligatorio = await tx.parametro.findUnique({
+          where: { clave: 'voucher_mozo_obligatorio' },
+        });
+        const obligatorio =
+          paramMozoObligatorio?.valor !== false &&
+          String(paramMozoObligatorio?.valor).toLowerCase().trim() !== 'false';
+
+        if (obligatorio) {
+          const voucher = await tx.voucherPago.findFirst({
+            where: { pedido_id: pedido.id },
+            orderBy: { creado_en: 'desc' },
+          });
+
+          if (!voucher) {
+            throw new HttpException(
+              {
+                codigo: 'VOUCHER_REQUERIDO',
+                mensaje:
+                  'Es obligatorio subir la foto del voucher para cobrar con Yape o Plin en mesa.',
+              },
+              HttpStatus.BAD_REQUEST,
+            );
+          }
+
+          const extraido = (voucher.extraido as any) || {};
+          if (voucher.semaforo === 'ILEGIBLE' || extraido.legible === false) {
+            throw new HttpException(
+              {
+                codigo: 'VOUCHER_NO_LEGIBLE',
+                mensaje: 'Este voucher no se lee bien. Vuelve a tomar la foto, por favor.',
+              },
+              HttpStatus.BAD_REQUEST,
+            );
+          }
+        }
+      }
+
       // Determinar método de pago (el medio o MIXTO si hay más de uno)
       const distinctMedios = Array.from(new Set(dto.pagos.map((p) => p.medio.toUpperCase())));
       const pagoMetodo = distinctMedios.length > 1 ? 'MIXTO' : distinctMedios[0];

@@ -87,6 +87,7 @@ export interface DetalleConversacion {
   tiempoPrometidoMin: number | null;
   altaDemanda: boolean;
   motivoDerivacion?: string | null;
+  voucher?: import('../vouchers/tipos').VoucherResumenChat | null;
 }
 
 export interface RespuestaRapida {

@@ -41,7 +41,10 @@ export class CajaController {
   }
 
   @Post('cobrar')
-  @Permiso('caja', 'cobrar')
+  @Permiso([
+    { modulo: 'caja', accion: 'cobrar' },
+    { modulo: 'mesas', accion: 'abrir' },
+  ])
   async cobrar(@Body() dto: CobrarDto, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.cobrosService.cobrar(dto, req.usuario, ip);

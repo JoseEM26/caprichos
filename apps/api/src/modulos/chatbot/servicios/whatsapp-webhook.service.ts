@@ -28,6 +28,7 @@ import {
   limpiarNombrePerfil,
   obtenerNombreMostrar,
 } from '../../mensajes/utilidades/nombre-contacto.util';
+import { VouchersService } from '../../vouchers/vouchers.service';
 import { EjecutorConversacionService } from '../conversacion/ejecutor-conversacion.service';
 import { AvisosInternosService } from '../avisos-internos/avisos-internos.service';
 
@@ -58,6 +59,9 @@ export class WhatsappWebhookService {
     @Optional()
     @Inject(forwardRef(() => AvisosInternosService))
     private readonly avisosInternosService?: AvisosInternosService,
+    @Optional()
+    @Inject(forwardRef(() => VouchersService))
+    private readonly vouchersService?: VouchersService,
   ) {
     this.verifyToken = this.configService.get<string>('WHATSAPP_VERIFY_TOKEN', '').trim();
     this.appSecret = this.configService.get<string>('WHATSAPP_APP_SECRET', '').trim();
@@ -642,6 +646,30 @@ export class WhatsappWebhookService {
       this.logger.log(
         `Voucher privado guardado para pedido ${pedido.codigo} (archivo id: ${archivoSubido.id})`,
       );
+
+      // Análisis y registro de voucher con IA en segundo plano (vch-api)
+      if (this.vouchersService) {
+        try {
+          this.vouchersService
+            .registrarDesdeWhatsapp(
+              buffer,
+              mimeType,
+              archivoSubido.id,
+              pedido,
+              conversacion,
+            )
+            .catch((err: any) => {
+              this.logger.error(
+                `Error en segundo plano al procesar voucher para pedido ${pedido.codigo}: ${err.message}`,
+              );
+            });
+        } catch (err: any) {
+          this.logger.error(
+            `Error lanzando procesamiento de voucher en segundo plano: ${err.message}`,
+          );
+        }
+      }
+
       return String(archivoSubido.id);
     } catch (err: any) {
       this.logger.error(`Error guardando comprobante privado: ${err.message}`);

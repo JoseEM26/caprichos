@@ -237,6 +237,7 @@ model Archivo {
   destacadasPortadas Destacada[]
   ofertasImagen      Oferta[]
   destacadasFotos    DestacadaFoto[]
+  vouchers           VoucherPago[]
 
   @@map("archivo")
 }
@@ -486,6 +487,7 @@ model Pedido {
   whatsappMensajes       WhatsappMensaje[]
   encuestaPosventa       EncuestaPosventa?
   quejasWhatsapp         QuejaWhatsapp[]
+  vouchers               VoucherPago[]
 
   @@map("pedido")
 }
@@ -1528,6 +1530,7 @@ model Conversacion {
   solicitudesCambio  SolicitudCambio[]
   whatsappMensajes   WhatsappMensaje[]
   ia_consumos        IaConsumo[]
+  vouchers           VoucherPago[]
 
   @@map("conversacion")
 }
@@ -1906,6 +1909,36 @@ model IaConsumo {
   @@index([conversacion_id])
   @@index([origen])
   @@map("ia_consumo")
+}
+
+model VoucherPago {
+  id              BigInt        @id @default(autoincrement())
+  pedido_id       BigInt?
+  conversacion_id BigInt?
+  mensaje_id      BigInt?
+  archivo_id      BigInt
+  origen          String        // MOZO | WHATSAPP | CAJA
+  medio           String?       // YAPE | PLIN
+  subido_por      BigInt?
+  hash_imagen     String?
+  operacion       String?
+  extraido        Json?
+  semaforo        String        // CONFIABLE | OBSERVADO | RARO | ILEGIBLE | SIN_LECTURA
+  motivos         String[]
+  revisado_en     DateTime?     @db.Timestamptz
+  revisado_por    BigInt?
+  creado_en       DateTime      @default(now()) @db.Timestamptz
+
+  pedido          Pedido?       @relation(fields: [pedido_id], references: [id], onDelete: SetNull)
+  archivo         Archivo       @relation(fields: [archivo_id], references: [id])
+  conversacion    Conversacion? @relation(fields: [conversacion_id], references: [id], onDelete: SetNull)
+
+  @@index([pedido_id])
+  @@index([conversacion_id])
+  @@index([operacion])
+  @@index([creado_en])
+  @@index([hash_imagen])
+  @@map("voucher_pago")
 }
 
 

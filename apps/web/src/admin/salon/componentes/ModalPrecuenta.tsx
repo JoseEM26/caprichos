@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Confirmar } from '../../../comun/Confirmar';
+import { SubirVoucherMozo } from '../../vouchers/SubirVoucherMozo';
 
 export interface LineaPrecuenta {
   cantidad: number;
@@ -15,7 +16,11 @@ export interface ModalPrecuentaProps {
   total: number;
   copias?: number;
   alImprimir?: () => Promise<void> | void;
+  pedidoId?: string | number;
+  alCobrar?: (medio: string, voucherId?: string | number) => Promise<void> | void;
 }
+
+const MEDIOS_COBRO_SALON = ['Efectivo', 'Yape', 'Plin', 'Tarjeta'] as const;
 
 export function ModalPrecuenta({
   abierto,
@@ -25,12 +30,25 @@ export function ModalPrecuenta({
   total,
   copias = 0,
   alImprimir,
+  pedidoId,
+  alCobrar,
 }: ModalPrecuentaProps) {
   const [confirmarImprimir, setConfirmarImprimir] = useState(false);
   const [imprimiendo, setImprimiendo] = useState(false);
   const [copiasLocales, setCopiasLocales] = useState(copias);
 
+  // Cobro del mozo en mesa
+  const [medioSeleccionado, setMedioSeleccionado] = useState<string>('Efectivo');
+  const [voucherId, setVoucherId] = useState<string | number | undefined>(undefined);
+  const [voucherLegible, setVoucherLegible] = useState<boolean>(false);
+  const [confirmarCobrar, setConfirmarCobrar] = useState<boolean>(false);
+  const [cobrando, setCobrando] = useState<boolean>(false);
+  const [cobroExitoso, setCobroExitoso] = useState<boolean>(false);
+
   if (!abierto) return null;
+
+  const esDigital = medioSeleccionado === 'Yape' || medioSeleccionado === 'Plin';
+  const puedeConfirmarCobro = !esDigital || voucherLegible;
 
   const handleConfirmarImpresion = async () => {
     try {
@@ -42,6 +60,19 @@ export function ModalPrecuenta({
     } finally {
       setImprimiendo(false);
       setConfirmarImprimir(false);
+    }
+  };
+
+  const handleEjecutarCobro = async () => {
+    try {
+      setCobrando(true);
+      if (alCobrar) {
+        await alCobrar(medioSeleccionado, voucherId);
+      }
+      setCobroExitoso(true);
+    } finally {
+      setCobrando(false);
+      setConfirmarCobrar(false);
     }
   };
 
@@ -76,11 +107,11 @@ export function ModalPrecuenta({
           style={{
             position: 'relative',
             zIndex: 60,
-            width: 'min(380px, calc(100% - 24px))',
+            width: 'min(420px, calc(100% - 24px))',
             maxHeight: 'calc(100% - 24px)',
             overflowY: 'auto',
             background: 'var(--cp-white)',
-            borderRadius: '6px',
+            borderRadius: '10px',
             boxShadow: '0 20px 50px rgba(11, 44, 62, 0.4)',
             padding: '18px',
             fontFamily: "'Courier New', monospace",
@@ -89,7 +120,7 @@ export function ModalPrecuenta({
             color: '#111',
             display: 'flex',
             flexDirection: 'column',
-            gap: '4px',
+            gap: '6px',
           }}
         >
           <div style={{ textAlign: 'center', fontWeight: 700, fontSize: '16px' }}>
@@ -133,7 +164,7 @@ export function ModalPrecuenta({
             QR
           </div>
           <div style={{ textAlign: 'center' }}>
-            Paga con Yape o Plin al 9XX XXX XXX (ejemplo) o entrega el efectivo al mozo;
+            Paga con Yape o Plin al 9XX XXX XXX o entrega el efectivo al mozo;
             el cajero cobra y emite el comprobante.
           </div>
           <div style={{ textAlign: 'center', fontSize: '12px' }}>
@@ -144,11 +175,110 @@ export function ModalPrecuenta({
               Copias impresas: {copiasLocales}
             </div>
           )}
+
+          {/* Sección de Cobro en Mesa por el Mozo */}
+          <div
+            style={{
+              borderTop: '1px dashed #111',
+              marginTop: '10px',
+              paddingTop: '10px',
+              fontFamily: 'Montserrat, sans-serif',
+            }}
+          >
+            <div
+              style={{
+                fontSize: '13px',
+                fontWeight: 800,
+                color: 'var(--cp-navy, #0B2C3E)',
+                marginBottom: '6px',
+              }}
+            >
+              Medio de pago en mesa:
+            </div>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {MEDIOS_COBRO_SALON.map((m) => {
+                const activo = medioSeleccionado === m;
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => {
+                      setMedioSeleccionado(m);
+                      if (m !== 'Yape' && m !== 'Plin') {
+                        setVoucherLegible(true);
+                      } else {
+                        setVoucherLegible(false);
+                        setVoucherId(undefined);
+                      }
+                    }}
+                    style={{
+                      minHeight: '38px',
+                      padding: '0 12px',
+                      borderRadius: '9999px',
+                      border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                      background: activo ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
+                      color: activo ? 'var(--cp-cream, #FBF4EC)' : 'var(--cp-navy, #0B2C3E)',
+                      fontWeight: 700,
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {m}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Subida de Voucher obligatorio para Yape o Plin */}
+            {esDigital && (
+              <SubirVoucherMozo
+                pedidoId={pedidoId || mesa}
+                medio={medioSeleccionado.toUpperCase() as 'YAPE' | 'PLIN'}
+                alVoucherValido={(info) => {
+                  setVoucherLegible(info.legible);
+                  if (info.legible) {
+                    setVoucherId(info.id);
+                  } else {
+                    setVoucherId(undefined);
+                  }
+                }}
+              />
+            )}
+
+            {/* Botón para confirmar cobro */}
+            <button
+              type="button"
+              disabled={!puedeConfirmarCobro || cobrando || cobroExitoso}
+              onClick={() => setConfirmarCobrar(true)}
+              data-testid="btn-confirmar-cobro-mozo"
+              style={{
+                marginTop: '10px',
+                width: '100%',
+                minHeight: '44px',
+                border: 0,
+                borderRadius: '10px',
+                background: puedeConfirmarCobro && !cobroExitoso
+                  ? 'var(--cp-green, #2F7A45)'
+                  : '#B0BEC5',
+                color: '#FFFFFF',
+                fontFamily: 'Montserrat, sans-serif',
+                fontWeight: 800,
+                cursor: puedeConfirmarCobro && !cobroExitoso ? 'pointer' : 'not-allowed',
+              }}
+            >
+              {cobroExitoso
+                ? 'Cobro registrado'
+                : esDigital && !voucherLegible
+                ? 'Sube el voucher para cobrar'
+                : `Confirmar cobro (${medioSeleccionado})`}
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={() => setConfirmarImprimir(true)}
             style={{
-              marginTop: '8px',
+              marginTop: '6px',
               minHeight: '44px',
               border: 0,
               borderRadius: '10px',
@@ -165,7 +295,7 @@ export function ModalPrecuenta({
             type="button"
             onClick={alCerrar}
             style={{
-              marginTop: '8px',
+              marginTop: '4px',
               minHeight: '44px',
               border: '1.5px solid var(--cp-navy)',
               borderRadius: '10px',
@@ -190,6 +320,17 @@ export function ModalPrecuenta({
         cargando={imprimiendo}
         alConfirmar={handleConfirmarImpresion}
         alCancelar={() => setConfirmarImprimir(false)}
+      />
+
+      <Confirmar
+        abierto={confirmarCobrar}
+        titulo={`¿Confirmar cobro de ${mesa}?`}
+        mensaje={`Queda registrado el cobro de S/ ${Number(total || 0).toFixed(2)} mediante ${medioSeleccionado}.`}
+        textoConfirmar="Sí, registrar cobro"
+        textoNo="No, cancelar"
+        cargando={cobrando}
+        alConfirmar={handleEjecutarCobro}
+        alCancelar={() => setConfirmarCobrar(false)}
       />
     </>
   );

@@ -14,6 +14,7 @@ import {
 import { enmascararTelefono } from '../chatbot/utilidades/enmascarar.util';
 import { mapearErrorWhatsApp } from './utilidades/error-whatsapp.util';
 import { EditarNombreContactoDto } from './dto/mensajes.dto';
+import { MATRIZ } from '../acceso/permisos';
 import { BOTONES_PAGO_RECHAZADO, TEXTOS_PAGO } from '../chatbot/conversacion/flujos/pago/textos-pago';
 import { TEXTOS_CAMBIOS } from '../chatbot/conversacion/flujos/cambios/textos-cambios';
 
@@ -262,6 +263,34 @@ export class MensajesService {
       ventanaAbierta = await this.ventana24hService.esVentanaAbierta(c.telefono, c.id);
     }
 
+    // Voucher de la conversación para quien tenga permiso vouchers/ver
+    let voucherDetalle: any = null;
+    const rol = (usuario?.rol || '').toUpperCase();
+    const tienePermisoVerVouchers =
+      rol === 'ADMIN' || (Boolean(MATRIZ[rol]) && MATRIZ[rol].includes('vouchers/ver'));
+
+    if (tienePermisoVerVouchers) {
+      const condicionesVoucher: any[] = [{ conversacion_id: c.id }];
+      if (pedido?.id) {
+        condicionesVoucher.push({ pedido_id: pedido.id });
+      }
+      const ultimoVoucher = await this.prisma.voucherPago.findFirst({
+        where: { OR: condicionesVoucher },
+        orderBy: { creado_en: 'desc' },
+      });
+
+      if (ultimoVoucher) {
+        voucherDetalle = {
+          id: ultimoVoucher.id.toString(),
+          semaforo: ultimoVoucher.semaforo,
+          motivos: ultimoVoucher.motivos,
+          extraido: ultimoVoucher.extraido,
+          medio: ultimoVoucher.medio,
+          pedidoTotal: pedido?.total ? pedido.total.toString() : null,
+        };
+      }
+    }
+
     return {
       id: c.id.toString(),
       nombre: obtenerNombreMostrar(c),
@@ -351,6 +380,7 @@ export class MensajesService {
         : null,
       tiempoPrometidoMin: base === null ? null : base + (alta?.minutos ?? 0),
       altaDemanda: !!alta,
+      voucher: voucherDetalle,
     };
   }
 

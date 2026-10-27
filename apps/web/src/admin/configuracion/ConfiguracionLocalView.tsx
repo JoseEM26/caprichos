@@ -12,6 +12,7 @@ import { ParametrosOperacionTab } from './ParametrosOperacionTab';
 import { ChatbotConfiguracionTab } from './ChatbotConfiguracionTab';
 import { TarjetaImpresionEtiquetas } from '../impresion/TarjetaImpresionEtiquetas';
 import { TarjetaAyudaIaConfiguracion } from './TarjetaAyudaIaConfiguracion';
+import { TarjetaVouchersIaConfiguracion } from './TarjetaVouchersIaConfiguracion';
 
 export interface InfoLocalState {
   // local
@@ -441,6 +442,12 @@ const CATEGORIAS_CONFIG: CategoriaConfig[] = [
     id: 'ayuda',
     n: 'Asistente de ayuda con IA',
     d: 'Capri, interruptor con IA y consumo mensual',
+    fields: [],
+  },
+  {
+    id: 'vouchers',
+    n: 'Lectura de vouchers con IA',
+    d: 'Yape y Plin, interruptor con IA, titular y números',
     fields: [],
   },
 ];
@@ -1006,8 +1013,13 @@ export function ConfiguracionLocalView() {
             <TarjetaAyudaIaConfiguracion />
           )}
 
+          {/* Subcaso: LECTURA DE VOUCHERS CON IA */}
+          {tabId === 'vouchers' && (
+            <TarjetaVouchersIaConfiguracion />
+          )}
+
           {/* Subcaso: CAMPOS REGULARES DE OTRAS CATEGORÍAS */}
-          {tabId !== 'horario' && tabId !== 'zonas' && tabId !== 'demanda' && tabId !== 'reparto' && tabId !== 'parametros' && tabId !== 'chatbot' && tabId !== 'impresion' && tabId !== 'ayuda' && (
+          {tabId !== 'horario' && tabId !== 'zonas' && tabId !== 'demanda' && tabId !== 'reparto' && tabId !== 'parametros' && tabId !== 'chatbot' && tabId !== 'impresion' && tabId !== 'ayuda' && tabId !== 'vouchers' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {tabId === 'operacion' && (
                 <div

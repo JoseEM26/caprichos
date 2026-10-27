@@ -8,6 +8,7 @@ import { cierreApi, calcularTotalEfectivo, PendienteCobro, RepartidorPorLiquidar
 import { PendientesCobroCierre } from './PendientesCobroCierre';
 import { pedidosApi, MovimientoCaja, CobroTurno } from '../pedidos/pedidosApi';
 import { ErrorApi } from '../../comun/api';
+import { SeccionVouchersCierre } from '../vouchers/SeccionVouchersCierre';
 
 type TabCierre = 'turno' | 'historial';
 
@@ -1077,6 +1078,12 @@ export function CierreView() {
                   </button>
                 </div>
               )}
+
+              {/* Vouchers digitales del día (Yape/Plin analizados con IA) */}
+              <SeccionVouchersCierre
+                fecha={hoyLima()}
+                puedeVer={tiene('vouchers/ver') || puedeVer}
+              />
             </>
           )}
         </>

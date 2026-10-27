@@ -22,6 +22,9 @@ import {
   tomarChat,
 } from './mensajesApi';
 import { ModalEditarNombre, IconoLapiz } from './ModalEditarNombre';
+import { useSesion } from '../../comun/sesion';
+import { TarjetaLecturaVoucher } from '../vouchers/TarjetaLecturaVoucher';
+import { VoucherResumenChat } from '../vouchers/tipos';
 import {
   ChatResumen,
   DetalleConversacion,
@@ -75,7 +78,15 @@ const obtenerIniciales = (nombre: string) => {
 };
 
 /** Foto del chat (voucher): se pide con la sesión porque el archivo es privado */
-function FotoMensaje({ archivoId }: { archivoId?: string | null }) {
+function FotoMensaje({
+  archivoId,
+  voucher,
+  puedeVer = true,
+}: {
+  archivoId?: string | null;
+  voucher?: VoucherResumenChat | null;
+  puedeVer?: boolean;
+}) {
   const [url, setUrl] = useState<string>('');
   const [fallo, setFallo] = useState(false);
 
@@ -102,17 +113,33 @@ function FotoMensaje({ archivoId }: { archivoId?: string | null }) {
     );
   }
   return (
-    <a href={url} target="_blank" rel="noreferrer" aria-label="Ver la foto completa" style={{ display: 'block' }}>
-      <img
-        src={url}
-        alt="Foto enviada por el cliente"
-        style={{ display: 'block', maxWidth: '100%', maxHeight: 280, borderRadius: 8, objectFit: 'contain' }}
-      />
-    </a>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      <a href={url} target="_blank" rel="noreferrer" aria-label="Ver la foto completa" style={{ display: 'block' }}>
+        <img
+          src={url}
+          alt="Foto enviada por el cliente"
+          style={{ display: 'block', maxWidth: '100%', maxHeight: 280, borderRadius: 8, objectFit: 'contain' }}
+        />
+      </a>
+      {voucher && puedeVer && (
+        <TarjetaLecturaVoucher voucher={voucher} puedeVer={puedeVer} />
+      )}
+    </div>
   );
 }
 
 export function MensajesView() {
+  let tieneVouchersVer = true;
+  try {
+    const sesion = useSesion();
+    tieneVouchersVer =
+      Boolean(sesion?.tiene?.('vouchers/ver')) ||
+      sesion?.usuario?.rol === 'ADMIN' ||
+      sesion?.usuario?.rol === 'CAJERO';
+  } catch {
+    tieneVouchersVer = true;
+  }
+
   const [cargando, setCargando] = useState(true);
   const [chats, setChats] = useState<ChatResumen[]>([]);
   const [conteos, setConteos] = useState({ todos: 0, atender: 0, bot: 0, atendidos: 0 });
@@ -978,7 +1005,19 @@ export function MensajesView() {
                             {esBot ? 'Capri (bot)' : 'Equipo'}
                           </div>
                         )}
-                        {m.imagen && <FotoMensaje archivoId={m.imagenId} />}
+                        {m.imagen && (
+                          <FotoMensaje
+                            archivoId={m.imagenId}
+                            voucher={
+                              m.imagenId &&
+                              detalle?.voucher?.archivoId &&
+                              String(m.imagenId) === String(detalle.voucher.archivoId)
+                                ? detalle.voucher
+                                : undefined
+                            }
+                            puedeVer={tieneVouchersVer}
+                          />
+                        )}
                         <div className="cv-txt">{m.texto}</div>
                         <div className="cv-meta" style={{ flexWrap: 'wrap', gap: '6px' }}>
                           <span>{m.hora}</span>
@@ -1150,6 +1189,16 @@ export function MensajesView() {
                       ? `Alta demanda activa: el tiempo prometido es de ${detalle.tiempoPrometidoMin || 25} minutos.`
                       : `Tiempo prometido: ${detalle.tiempoPrometidoMin || 25} minutos.`}
                   </div>
+
+                  {/* Lectura del voucher con IA si existe voucher en la conversación */}
+                  {detalle.voucher && (
+                    <TarjetaLecturaVoucher
+                      voucher={detalle.voucher}
+                      pedido={detalle.pedido}
+                      puedeVer={tieneVouchersVer}
+                    />
+                  )}
+
                   <div className="cv-payb">
                     <button className="cv-ok" onClick={handleAprobarPago}>
                       Aprobar el pago
