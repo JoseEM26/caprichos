@@ -42,6 +42,7 @@ import { SupervisorCodigoModule } from './modulos/supervisor-codigo/supervisor-c
 import { ChatbotModule } from './modulos/chatbot/chatbot.module';
 import { ImpresionModule } from './modulos/impresion/impresion.module';
 import { AyudaAdminModule } from './modulos/ayuda-admin/ayuda-admin.module';
+import { VouchersModule } from './modulos/vouchers/vouchers.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -87,6 +88,7 @@ import { AyudaAdminModule } from './modulos/ayuda-admin/ayuda-admin.module';
     ContenidoModule,
     ImpresionModule,
     AyudaAdminModule,
+    VouchersModule,
   ],
   providers: [
     PinoLoggerService,

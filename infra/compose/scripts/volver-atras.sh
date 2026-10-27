@@ -7,6 +7,7 @@
 #
 # Si no se especifica tag_objetivo, intenta leer la última versión estable registrada
 # o solicita ingresar el tag de versión al operador.
+# Emplea rolling rollout para restaurar la versión anterior sin interrumpir tráfico.
 # ==============================================================================
 
 set -euo pipefail
@@ -77,24 +78,49 @@ echo "========================================================================"
 sed -i "s|^TAG=.*|TAG=${TAG_DESTINO}|" "$ENV_FILE"
 export TAG="$TAG_DESTINO"
 
-# 2. Recrear api y web con la versión previa
-echo "==> Recreando contenedores api y web con la imagen ${TAG_DESTINO}..."
-compose up -d --no-deps api web
+# 2. Restaurar api y web con rolling rollout si está disponible
+rollout_restauracion() {
+  local SERVICIO="$1"
+  local TIMEOUT="${2:-60}"
+  echo "==> Restaurando '${SERVICIO}' a la versión ${TAG_DESTINO}..."
 
-# 3. Comprobar salud tras la restauración
+  if docker rollout --version &>/dev/null; then
+    docker rollout -f "$COMPOSE_BASE" -f "$COMPOSE_ENV" --env-file "$ENV_FILE" -t "$TIMEOUT" "$SERVICIO" || compose up -d --no-deps "$SERVICIO"
+  elif [[ -x "${SCRIPT_DIR}/docker-rollout" ]]; then
+    "${SCRIPT_DIR}/docker-rollout" rollout -f "$COMPOSE_BASE" -f "$COMPOSE_ENV" --env-file "$ENV_FILE" -t "$TIMEOUT" "$SERVICIO" || compose up -d --no-deps "$SERVICIO"
+  else
+    compose up -d --no-deps "$SERVICIO"
+  fi
+}
+
+rollout_restauracion api 60
+rollout_restauracion web 30
+
+# 3. Comprobar salud tras la restauración mediante IDs dinámicos
 echo "==> Verificando salud de los contenedores restaurados..."
 INTENTOS=0
 MAX_INTENTOS=25
 SALUDABLE=0
 
 while [[ $INTENTOS -lt $MAX_INTENTOS ]]; do
-  API_STATUS=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "caprichos-${AMBIENTE}-api" 2>/dev/null || echo "ausente")
-  WEB_STATUS=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "caprichos-${AMBIENTE}-web" 2>/dev/null || echo "ausente")
+  API_IDS=$(compose ps -q api 2>/dev/null || true)
+  WEB_IDS=$(compose ps -q web 2>/dev/null || true)
 
-  if [[ "$API_STATUS" == "healthy" && "$WEB_STATUS" == "healthy" ]]; then
+  TODOS_OK=1
+  for CID in $API_IDS $WEB_IDS; do
+    [[ -z "$CID" ]] && { TODOS_OK=0; continue; }
+    STATUS=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$CID" 2>/dev/null || echo "ausente")
+    if [[ "$STATUS" != "healthy" ]]; then
+      TODOS_OK=0
+      break
+    fi
+  done
+
+  if [[ $TODOS_OK -eq 1 ]]; then
     SALUDABLE=1
     break
   fi
+
   INTENTOS=$((INTENTOS + 1))
   sleep 2
 done

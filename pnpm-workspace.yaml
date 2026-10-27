@@ -10,3 +10,4 @@ allowBuilds:
   esbuild: true
   sharp: true
   prisma: true
+  msgpackr-extract: false

@@ -24,7 +24,7 @@ services:
 
   api:
     image: ${GHCR_REPO:-ghcr.io/joseem26}/caprichos-api:${TAG:-staging}
-    container_name: caprichos-staging-api
+    # Sin container_name fijo para permitir rolling rollout (coexistencia de 2 instancias)
     environment:
       PORT: 3000
       NODE_ENV: staging
@@ -89,7 +89,7 @@ services:
 
   web:
     image: ${GHCR_REPO:-ghcr.io/joseem26}/caprichos-web:${TAG:-staging}
-    container_name: caprichos-staging-web
+    # Sin container_name fijo para permitir rolling rollout (coexistencia de 2 instancias)
     labels:
       - traefik.enable=true
       - traefik.docker.network=caprichos-proxy-net

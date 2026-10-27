@@ -11,6 +11,7 @@ import { ReservasModule } from '../reservas/reservas.module';
 import { ChatbotIaModule } from './ia/chatbot-ia.module';
 import { ChatbotConfiguracionModule } from './configuracion/chatbot-configuracion.module';
 import { AvisosInternosModule } from './avisos-internos/avisos-internos.module';
+import { VouchersModule } from '../vouchers/vouchers.module';
 import { WhatsappWebhookController } from './controladores/whatsapp-webhook.controller';
 import { QuejasWhatsappController } from './controladores/quejas-whatsapp.controller';
 import { WhatsAppMetaAdaptador } from './adaptadores/whatsapp-meta.adaptador';
@@ -24,6 +25,7 @@ import { TareaRecordatorioPagoService } from './servicios/tarea-recordatorio-pag
 import { QuejasWhatsappService } from './servicios/quejas-whatsapp.service';
 import { WHATSAPP_MENSAJERIA_PUERTO } from './puerto/whatsapp-mensajeria.puerto';
 import { EjecutorConversacionService } from './conversacion/ejecutor-conversacion.service';
+import { ColaWebhookService } from './servicios/cola-webhook.service';
 
 @Module({
   imports: [
@@ -39,6 +41,7 @@ import { EjecutorConversacionService } from './conversacion/ejecutor-conversacio
     ChatbotIaModule,
     ChatbotConfiguracionModule,
     forwardRef(() => AvisosInternosModule),
+    forwardRef(() => VouchersModule),
   ],
   controllers: [WhatsappWebhookController, QuejasWhatsappController],
   providers: [
@@ -52,6 +55,7 @@ import { EjecutorConversacionService } from './conversacion/ejecutor-conversacio
     TareaRecordatorioPagoService,
     QuejasWhatsappService,
     EjecutorConversacionService,
+    ColaWebhookService,
   ],
   exports: [
     WHATSAPP_MENSAJERIA_PUERTO,
@@ -64,6 +68,7 @@ import { EjecutorConversacionService } from './conversacion/ejecutor-conversacio
     QuejasWhatsappService,
     WhatsappWebhookService,
     EjecutorConversacionService,
+    ColaWebhookService,
     ChatbotIaModule,
     ChatbotConfiguracionModule,
   ],

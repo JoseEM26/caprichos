@@ -5,6 +5,7 @@ import { EventosGateway } from '../../../comun/socket/eventos.gateway';
 import { Ventana24hService } from './ventana-24h.service';
 import { TareaRecordatorioPagoService } from './tarea-recordatorio-pago.service';
 import { enmascararTelefono, hashTelefono, normalizarTelefono } from '../utilidades/enmascarar.util';
+import { adquirirCandado, liberarCandado } from '../../../comun/redis/candado.util';
 
 export interface ParametrosChatbot {
   avisoSalidaActivo: boolean;
@@ -135,14 +136,17 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
 
     this.ejecutando = true;
     const lockKey = 'lock:chatbot:planificador';
-    const lockVal = `${Date.now()}-${Math.random()}`;
     let lockAdquirido = false;
+    let lockFallback = false;
+    let lockToken = '';
 
     try {
       const redis = this.redisService.obtenerCliente();
-      // Bloqueo distribuido de 25 segundos para evitar ejecuciones concurrentes entre réplicas
-      const resLock = await redis.set(lockKey, lockVal, 'EX', 25, 'NX').catch(() => null);
-      lockAdquirido = resLock === 'OK';
+      // Bloqueo distribuido seguro con SET NX PX (25s) y liberación solo con token propio
+      const candado = await adquirirCandado(redis, lockKey, 25000);
+      lockAdquirido = candado.adquirido;
+      lockFallback = candado.fallback;
+      lockToken = candado.token;
 
       if (!lockAdquirido) {
         return {
@@ -487,10 +491,10 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
       };
     } finally {
       this.ejecutando = false;
-      if (lockAdquirido) {
+      if (lockAdquirido && !lockFallback) {
         try {
           const redis = this.redisService.obtenerCliente();
-          await redis.del(lockKey).catch(() => {});
+          await liberarCandado(redis, lockKey, lockToken);
         } catch {}
       }
     }

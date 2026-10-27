@@ -68,10 +68,11 @@ cd /opt/caprichos/scripts
 # Ejemplo:
 ./desplegar.sh prod v0.3.0
 ```
-**Garantía de seguridad:**
-1. Ejecuta `prisma migrate deploy` en un contenedor efímero aislado. Si la migración falla, **no toca la aplicación en ejecución**.
-2. Actualiza `TAG` en `.env` y recrea `api` y `web`.
-3. Evalúa los healthchecks durante 60 segundos. Si reportan `unhealthy`, ejecuta **rollback automático** a la versión previa.
+**Garantía de despliegue sin corte (Zero-Downtime):**
+1. **Migraciones aditivas (Expand/Contract):** Ejecuta `prisma migrate deploy` en un contenedor efímero aislado antes de tocar los contenedores en ejecución. Toda migración debe ser aditiva (agregar tablas o columnas opcionales/con default) para garantizar la compatibilidad hacia atrás durante la coexistencia de versiones. Si la migración falla, **no toca la aplicación en ejecución**.
+2. **Rolling Rollout progresivo:** Mediante `docker-rollout` (o escala nativa a 2 instancias sin `container_name` fijo), levanta el nuevo contenedor de la API junto al antiguo. Traefik no le envía tráfico hasta que `/salud` responde HTTP 200 (`healthy`).
+3. **Apagado ordenado (SIGTERM):** Una vez que el nuevo contenedor está activo, el antiguo recibe SIGTERM y dispone de 30 segundos (`stop_grace_period: 30s`) para procesar solicitudes y colas en curso antes de detenerse. A continuación se realiza el mismo procedimiento con el frontend Web.
+4. **Protección automática ante fallos:** Si el nuevo contenedor no queda saludable en 60 segundos, se elimina automáticamente, se conserva el contenedor original intacto y se ejecuta rollback automático a la versión previa sin corte de servicio.
 
 ### 3.2 Forzar Vuelta Atrás Manual (Rollback)
 Si después de un despliegue exitoso se detecta un error funcional:
@@ -80,7 +81,7 @@ Si después de un despliegue exitoso se detecta un error funcional:
 # Ejemplo:
 ./volver-atras.sh prod v0.2.9
 ```
-El script reconfigura el `.env` a la versión previa, recrea los contenedores y valida su salud.
+El script reconfigura el `.env` a la versión previa, ejecuta rolling rollout a la versión anterior y valida su salud mediante IDs dinámicos.
 
 ### 3.3 Verificación y Diagnóstico
 ```bash

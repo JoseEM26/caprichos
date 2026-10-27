@@ -255,10 +255,10 @@ jobs:
         run: |
           set -e
           SSH="ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes ${SSH_USER:-deploy}@${SSH_HOST}"
-          tar -czf - -C infra/compose scripts | $SSH 'mkdir -p /opt/caprichos && tar -xzf - -C /opt/caprichos && chmod +x /opt/caprichos/scripts/*.sh'
+          tar -czf - -C infra/compose scripts | $SSH 'mkdir -p /opt/caprichos && tar -xzf - -C /opt/caprichos && chmod +x /opt/caprichos/scripts/*.sh /opt/caprichos/scripts/docker-rollout 2>/dev/null || chmod +x /opt/caprichos/scripts/*'
           tar -czf - -C infra/compose docker-compose.base.yml docker-compose.demo.yml docker-compose.staging.yml docker-compose.prod.yml | $SSH 'mkdir -p /opt/caprichos/compose && tar -xzf - -C /opt/caprichos/compose'
 
-      - name: Ejecutar despliegue en el VPS vía SSH
+      - name: Ejecutar despliegue sin corte (rolling rollout) en el VPS vía SSH
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
@@ -266,7 +266,7 @@ jobs:
           TAG: ${{ needs.validar-y-determinar.outputs.tag }}
           GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
         run: |
-          echo "==> Desplegando [${AMBIENTE}] con la versión ${TAG}..."
+          echo "==> Desplegando [${AMBIENTE}] con la versión ${TAG} mediante rolling rollout (sin corte)..."
           # El token viaja por la entrada estándar: no queda en la línea de comandos ni en los procesos del servidor
           printf '%s' "$GHCR_READ_TOKEN" | ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
             "${SSH_USER:-deploy}@${SSH_HOST}" \
@@ -293,7 +293,8 @@ jobs:
 
           ### 🔒 Seguridad y Garantías del Proceso
           - **Aprobación deliberada de Producción:** Ejecución manual exclusiva por `workflow_dispatch` con confirmación literal y verificación de tag y commit en `main`.
-          - **Contenedor efímero:** Migraciones de base de datos validadas previamente con `prisma migrate deploy`.
-          - **Arranque seguro:** Despliegue con verificación de healthcheck y rollback automático ante cualquier anomalía.
+          - **Despliegue sin corte (Rolling Rollout):** Despliegue con docker-rollout para api y web; el nuevo contenedor arranca junto al viejo, espera a estar sano antes de recibir tráfico de Traefik y se mantiene la versión previa si el nuevo falla.
+          - **Migraciones aditivas (Expand/Contract):** Migraciones de base de datos ejecutadas en contenedor efímero antes del cambio, compatibles hacia atrás durante la convivencia de versiones.
+          - **Arranque seguro:** Verificación de healthcheck posterior y vuelta atrás automática ante anomalías.
           - **SSH endurecido:** Autenticación por llave ed25519 dedicada y verificación de host fingerprint.
           EOF

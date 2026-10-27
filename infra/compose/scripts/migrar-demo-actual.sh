@@ -170,8 +170,15 @@ MAX_INTENTOS=30
 MIGRACION_OK=0
 
 while [[ $INTENTOS -lt $MAX_INTENTOS ]]; do
-  API_STATUS=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' caprichos-demo-api 2>/dev/null || echo "ausente")
-  WEB_STATUS=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' caprichos-demo-web 2>/dev/null || echo "ausente")
+  API_CID=$(docker compose --env-file "${DIR_NUEVO_DEMO}/.env" \
+    -f "${DIR_NUEVO_BASE}/compose/docker-compose.base.yml" \
+    -f "${DIR_NUEVO_BASE}/compose/docker-compose.demo.yml" ps -q api 2>/dev/null | head -n 1 || true)
+  WEB_CID=$(docker compose --env-file "${DIR_NUEVO_DEMO}/.env" \
+    -f "${DIR_NUEVO_BASE}/compose/docker-compose.base.yml" \
+    -f "${DIR_NUEVO_BASE}/compose/docker-compose.demo.yml" ps -q web 2>/dev/null | head -n 1 || true)
+
+  API_STATUS=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$API_CID" 2>/dev/null || echo "ausente")
+  WEB_STATUS=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$WEB_CID" 2>/dev/null || echo "ausente")
 
   if [[ "$API_STATUS" == "healthy" && "$WEB_STATUS" == "healthy" ]]; then
     MIGRACION_OK=1

@@ -170,5 +170,14 @@ describe('RecordatorioReservasTarea', () => {
       const [res1, res2] = await Promise.all([p1, p2]);
       expect(res2).toEqual({ recordatoriosEnviados: 0, vencidosNotificados: 0 });
     });
+
+    it('omite ejecución si otra réplica posee el candado distribuido en Redis', async () => {
+      mockRedisService.obtenerCliente().set.mockResolvedValue(null);
+
+      const res = await tarea.ejecutarCiclo();
+
+      expect(res.bloqueadoPorOtraInstancia).toBe(true);
+      expect(mockPrisma.reserva.findMany).not.toHaveBeenCalled();
+    });
   });
 });

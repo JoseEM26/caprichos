@@ -14,6 +14,7 @@ import { ReservasService } from '../../reservas/reservas.service';
 import { TEXTOS_RESERVA } from '../conversacion/textos-reserva';
 import { obtenerFechaHoraLima } from '../../local/local.util';
 import { normalizarTelefono } from '../utilidades/enmascarar.util';
+import { adquirirCandado, liberarCandado } from '../../../comun/redis/candado.util';
 
 @Injectable()
 export class RecordatorioReservasTarea implements OnModuleInit, OnModuleDestroy {
@@ -81,16 +82,34 @@ export class RecordatorioReservasTarea implements OnModuleInit, OnModuleDestroy 
   async ejecutarCiclo(ahora: Date = new Date()): Promise<{
     recordatoriosEnviados: number;
     vencidosNotificados: number;
+    bloqueadoPorOtraInstancia?: boolean;
   }> {
     if (this.ejecutando) {
       return { recordatoriosEnviados: 0, vencidosNotificados: 0 };
     }
 
     this.ejecutando = true;
+    const lockKey = 'lock:chatbot:recordatorio-reservas';
+    let lockAdquirido = false;
+    let lockFallback = false;
+    let lockToken = '';
     let recordatoriosEnviados = 0;
     let vencidosNotificados = 0;
 
     try {
+      const redis = this.redisService.obtenerCliente();
+      const candado = await adquirirCandado(redis, lockKey, 25000);
+      lockAdquirido = candado.adquirido;
+      lockFallback = candado.fallback;
+      lockToken = candado.token;
+
+      if (!lockAdquirido) {
+        return {
+          recordatoriosEnviados: 0,
+          vencidosNotificados: 0,
+          bloqueadoPorOtraInstancia: true,
+        };
+      }
       // 1. RECORDATORIO 2 HORAS ANTES (Opcional según parámetro)
       const recordatorioActivo = await this.esRecordatorioActivo();
       if (recordatorioActivo) {
@@ -180,6 +199,12 @@ export class RecordatorioReservasTarea implements OnModuleInit, OnModuleDestroy 
       }
     } finally {
       this.ejecutando = false;
+      if (lockAdquirido && !lockFallback) {
+        try {
+          const redis = this.redisService.obtenerCliente();
+          await liberarCandado(redis, lockKey, lockToken);
+        } catch {}
+      }
     }
 
     return { recordatoriosEnviados, vencidosNotificados };

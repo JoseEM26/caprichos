@@ -50,6 +50,7 @@ if [[ "${1:-}" == "--remote" ]]; then
     "${SCRIPT_DIR}/docker-compose.demo.yml" \
     "${SCRIPT_DIR}/desplegar.sh" \
     "${SCRIPT_DIR}/actualizar.sh" \
+    "${SCRIPT_DIR}/docker-rollout" \
     "${SCRIPT_DIR}/respaldar.sh" \
     "${SCRIPT_DIR}/logs.sh" \
     "${SCRIPT_DIR}/estado.sh" \
@@ -147,13 +148,17 @@ compose run --rm api tsx prisma/seed-demo.ts
 echo "==> [6/6] Levantando web y API..."
 compose up -d
 
-SERVICIOS=(caprichos-demo-postgres caprichos-demo-redis caprichos-demo-api caprichos-demo-web)
 for ((i = 0; i < 60; i++)); do
   PENDIENTES=0
-  for SERVICIO in "${SERVICIOS[@]}"; do
-    ESTADO="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$SERVICIO" 2>/dev/null || echo ausente)"
-    [[ "$ESTADO" == "healthy" || "$ESTADO" == "running" ]] || PENDIENTES=1
-  done
+  CONTENEDORES=($(compose ps -q 2>/dev/null || true))
+  if [[ ${#CONTENEDORES[@]} -eq 0 ]]; then
+    PENDIENTES=1
+  else
+    for CID in "${CONTENEDORES[@]}"; do
+      ESTADO="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$CID" 2>/dev/null || echo ausente)"
+      [[ "$ESTADO" == "healthy" || "$ESTADO" == "running" ]] || PENDIENTES=1
+    done
+  fi
   [[ $PENDIENTES -eq 0 ]] && break
   sleep 3
 done

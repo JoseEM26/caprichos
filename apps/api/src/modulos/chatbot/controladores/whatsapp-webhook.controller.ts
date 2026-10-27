@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Logger,
+  Optional,
   Post,
   Query,
   Req,
@@ -14,6 +15,7 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { WhatsappWebhookService } from '../servicios/whatsapp-webhook.service';
+import { ColaWebhookService } from '../servicios/cola-webhook.service';
 
 interface RequestConRawBody extends Request {
   rawBody?: Buffer;
@@ -23,7 +25,10 @@ interface RequestConRawBody extends Request {
 export class WhatsappWebhookController {
   private readonly logger = new Logger(WhatsappWebhookController.name);
 
-  constructor(private readonly webhookService: WhatsappWebhookService) {}
+  constructor(
+    private readonly webhookService: WhatsappWebhookService,
+    @Optional() private readonly colaWebhookService?: ColaWebhookService,
+  ) {}
 
   /**
    * Verificación inicial del Webhook solicitada por Meta (GET /whatsapp/webhook).
@@ -68,6 +73,11 @@ export class WhatsappWebhookController {
         codigo: 'FIRMA_INVALIDA',
         mensaje: 'La firma X-Hub-Signature-256 es requerida y debe coincidir con WHATSAPP_APP_SECRET',
       });
+    }
+
+    if (this.colaWebhookService) {
+      const resCola = await this.colaWebhookService.encolarOProcesar(rawBodyBuffer, body);
+      return { status: 'ok', ok: true, ...resCola };
     }
 
     const resultado = await this.webhookService.procesarPayload(body);

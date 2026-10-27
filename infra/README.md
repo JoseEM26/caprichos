@@ -148,3 +148,37 @@ Por políticas de seguridad, delegación externa o requerimiento de interacción
 5. **Carga de Secretos de Negocio en Dokploy:** Los valores sensibles (`DATABASE_URL`, `JWT_SECRET`, `OPENAI_API_KEY`, `WHATSAPP_TOKEN`, claves de B2/R2) residen exclusivamente en el gestor de contraseñas de José Ángel y se cargan manualmente en las variables de entorno de cada servicio en Dokploy (DT-43).
 6. **Configuración en Meta Developers:** Registro de la URL de webhook `https://api.caprichos.pe/webhook/whatsapp` y verificación del token en la consola de WhatsApp Cloud API.
 7. **Monitoreo en Uptime Kuma:** Creación de los 6 monitores (carta, `/salud`, websocket, webhook de WhatsApp, agente de impresión y respaldo diario) y configuración del canal de alertas de Telegram.
+
+---
+
+## 6. Despliegue Sin Corte (Rolling Rollout) y Regla Expand/Contract
+
+Para garantizar que un despliegue (en Demo, Staging o Producción) **nunca corte el servicio ni pierda mensajes de WhatsApp, pedidos de la carta virtual ni conexiones de WebSocket**, la infraestructura aplica las siguientes reglas de arquitectura:
+
+### 6.1 Despliegue Progresivo (Rolling Rollout) con Traefik y docker-rollout
+1. **Sin nombres fijos de contenedor (`container_name`):** Los servicios `api` y `web` no tienen `container_name` fijo en los archivos Compose (`docker-compose.prod.yml`, `docker-compose.demo.yml`, `docker-compose.staging.yml`), permitiendo que Docker Compose ejecute dos réplicas simultáneamente durante la rotación.
+2. **Escala y verificación de salud previa:** El plugin `docker-rollout` (o el script nativo de reemplazo ordenado en `desplegar.sh` / `actualizar.sh`) escala temporalmente el servicio a 2 instancias. El nuevo contenedor arranca junto al viejo.
+3. **Enrutamiento selectivo en Traefik:** Traefik detecta el nuevo contenedor pero **no le deriva tráfico** hasta que su healthcheck (`/salud`) reporte estado `healthy` (HTTP 200).
+4. **Apagado ordenado (Graceful Shutdown):** Una vez que el nuevo contenedor está sano y recibiendo tráfico, el contenedor antiguo recibe la señal `SIGTERM`. Gracias a `stop_grace_period: 30s` en `api`, el proceso termina las solicitudes HTTP en vuelo, procesa los jobs de la cola y cierra conexiones a PostgreSQL y Redis ordenadamente antes de ser detenido y retirado.
+5. **Volúmenes compartidos sin colisión:** El volumen `uploads_data` (`/data/uploads`) es un volumen con nombre compartido; ambas instancias pueden leer y escribir archivos multimedia concurrentemente sin conflictos.
+6. **Vuelta atrás sin corte:** Si el nuevo contenedor falla el healthcheck o no levanta en el tiempo límite (60s), el nuevo contenedor es eliminado automáticamente y el contenedor original se mantiene en ejecución sin haber sufrido interrupción.
+
+### 6.2 Regla de Migraciones de Base de Datos: Patrón Expand / Contract
+Dado que las migraciones (`prisma migrate deploy`) se ejecutan en un contenedor efímero **ANTES** de cambiar los contenedores y mientras los contenedores antiguos están atendiendo tráfico:
+
+> [!IMPORTANT]
+> **REGLA DE ORO DE MIGRACIONES EN CAPRICHOS (EXPAND/CONTRACT):**
+> Toda migración de base de datos debe ser **100% compatible hacia atrás**.
+
+- **Fase 1 — Expandir (Aditiva):**
+  - Solo se permiten cambios aditivos: crear tablas nuevas, agregar columnas opcionales (`NULL`), agregar columnas con valor por defecto (`DEFAULT`), o crear índices.
+  - **PROHIBIDO** en un despliegue con código nuevo: renombrar columnas/tablas existentes, eliminar columnas/tablas en uso, o convertir columnas a `NOT NULL` sin valor predeterminado.
+- **Fase 2 — Transición (Convivencia de Versiones):**
+  - Durante el rolling rollout, la versión anterior y la nueva versión leen y escriben a la misma base de datos simultáneamente sin generar errores de esquema.
+- **Fase 3 — Contraer (Limpieza Posterior):**
+  - La eliminación de columnas obsoletas o el cambio de constraints restrictivos solo se realiza en un release posterior, una vez que la versión anterior ya no se encuentre en ejecución en ningún servidor.
+
+### 6.3 Verificación en Scripts
+Los scripts de despliegue (`infra/compose/scripts/desplegar.sh` y `infra/demo/actualizar.sh`) validan formalmente:
+1. `prisma migrate deploy` se ejecuta y sale con código 0 antes de realizar cualquier cambio en los contenedores.
+2. Si la migración falla, el script aborta inmediatamente (`exit 1`) y los contenedores de producción permanecen intactos.

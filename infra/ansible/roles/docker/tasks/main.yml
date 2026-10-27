@@ -62,3 +62,19 @@
     name: docker
     state: started
     enabled: true
+
+- name: Asegurar directorio de plugins para Docker CLI
+  ansible.builtin.file:
+    path: /usr/local/lib/docker/cli-plugins
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Instalar plugin docker-rollout para despliegues sin corte (rolling rollout)
+  ansible.builtin.get_url:
+    url: "https://raw.githubusercontent.com/wowu/docker-rollout/main/docker-rollout"
+    dest: /usr/local/lib/docker/cli-plugins/docker-rollout
+    owner: root
+    group: root
+    mode: "0755"

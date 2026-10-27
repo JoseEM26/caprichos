@@ -4,6 +4,7 @@ import cookieParser from 'cookie-parser';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import { PinoLoggerService } from './comun/logger/pino-logger.service';
+import { RedisIoAdapter } from './comun/socket/redis-io.adapter';
 
 // Los ids de la base son BigInt: salen como texto en el JSON
 (BigInt.prototype as unknown as { toJSON: () => string }).toJSON = function () { return this.toString(); };
@@ -14,10 +15,18 @@ async function bootstrap() {
     rawBody: true,
   });
 
+  // Apagado ordenado: deja de aceptar peticiones, espera tareas en curso y cierra Prisma, Redis y colas
+  app.enableShutdownHooks();
+
   const pinoLogger = app.get(PinoLoggerService);
   app.useLogger(pinoLogger);
   app.use(cookieParser());
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+
+  // Adaptador de Redis para Socket.IO entre múltiples réplicas (fallback en memoria si Redis no está)
+  const redisIoAdapter = new RedisIoAdapter(app);
+  await redisIoAdapter.conectarRedis();
+  app.useWebSocketAdapter(redisIoAdapter);
 
   const configService = app.get(ConfigService);
   const puerto = configService.get<number>('PORT', 3000);

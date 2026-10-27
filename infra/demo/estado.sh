@@ -33,8 +33,12 @@ docker compose -f "$COMPOSE_FILE" ps
 echo ""
 # 2. Consumo de recursos
 echo "==> [2/4] Consumo actual de recursos (CPU y Memoria):"
-docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}" \
-  caprichos-demo-web caprichos-demo-api caprichos-demo-postgres caprichos-demo-redis 2>/dev/null || true
+CONTENEDORES=$(docker compose -f "$COMPOSE_FILE" ps -q 2>/dev/null || true)
+if [[ -n "$CONTENEDORES" ]]; then
+  docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}" $CONTENEDORES 2>/dev/null || true
+else
+  echo "    (Servicios no iniciados)"
+fi
 
 echo ""
 # 3. Verificación de salud interna

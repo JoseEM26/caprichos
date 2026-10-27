@@ -49,8 +49,18 @@ verificar_ambiente() {
   # Consumo de recursos
   echo ""
   echo "==> Consumo de recursos:"
-  docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}" \
-    "caprichos-${AMB}-api" "caprichos-${AMB}-web" "caprichos-${AMB}-postgres" "caprichos-${AMB}-redis" 2>/dev/null || echo "    (Servicios no iniciados)"
+  local CIDS
+  if [[ -f "$ENV_FILE" ]]; then
+    CIDS=$(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" -f "$COMPOSE_ENV" ps -q 2>/dev/null || true)
+  else
+    CIDS=$(docker compose -f "$COMPOSE_BASE" -f "$COMPOSE_ENV" ps -q 2>/dev/null || true)
+  fi
+
+  if [[ -n "$CIDS" ]]; then
+    docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}" $CIDS 2>/dev/null || echo "    (Servicios no iniciados)"
+  else
+    echo "    (Servicios no iniciados)"
+  fi
 
   # Verificación de aislamiento de puertos de base de datos y redis
   echo ""
@@ -71,10 +81,17 @@ verificar_ambiente() {
   fi
 
   # Prueba interna de salud si la API está arriba
-  if docker inspect --format '{{.State.Running}}' "caprichos-${AMB}-api" 2>/dev/null | grep -q true; then
+  local API_CID=""
+  if [[ -f "$ENV_FILE" ]]; then
+    API_CID=$(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" -f "$COMPOSE_ENV" ps -q api 2>/dev/null | head -n 1 || true)
+  else
+    API_CID=$(docker compose -f "$COMPOSE_BASE" -f "$COMPOSE_ENV" ps -q api 2>/dev/null | head -n 1 || true)
+  fi
+
+  if [[ -n "$API_CID" ]] && docker inspect --format '{{.State.Running}}' "$API_CID" 2>/dev/null | grep -q true; then
     echo ""
     echo "==> Respuesta de salud interna (/salud):"
-    docker exec "caprichos-${AMB}-api" curl -s -f http://localhost:3000/salud 2>/dev/null | jq . 2>/dev/null || echo "    ✓ Servicio activo (respuesta no JSON o jq ausente)"
+    docker exec "$API_CID" curl -s -f http://localhost:3000/salud 2>/dev/null | jq . 2>/dev/null || echo "    ✓ Servicio activo (respuesta no JSON o jq ausente)"
   fi
   echo ""
 }

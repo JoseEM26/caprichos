@@ -27,7 +27,7 @@ services:
 
   api:
     image: ${GHCR_REPO:-ghcr.io/joseem26}/caprichos-api:${TAG:?Defina TAG de version inmutable (ej. v0.3.0 o sha corto)}
-    container_name: caprichos-prod-api
+    # Sin container_name fijo para permitir rolling rollout (coexistencia de 2 instancias)
     environment:
       PORT: 3000
       NODE_ENV: production
@@ -100,7 +100,7 @@ services:
 
   web:
     image: ${GHCR_REPO:-ghcr.io/joseem26}/caprichos-web:${TAG:?Defina TAG de version inmutable (ej. v0.3.0 o sha corto)}
-    container_name: caprichos-prod-web
+    # Sin container_name fijo para permitir rolling rollout (coexistencia de 2 instancias)
     labels:
       - traefik.enable=true
       - traefik.docker.network=caprichos-proxy-net

@@ -15,7 +15,7 @@
 services:
   web:
     image: caprichos-web:${TAG:-demo}
-    container_name: caprichos-demo-web
+    # Sin container_name fijo para permitir rolling rollout (coexistencia de 2 instancias)
     restart: unless-stopped
     deploy:
       resources:
@@ -55,8 +55,9 @@ services:
 
   api:
     image: caprichos-api:${TAG:-demo}
-    container_name: caprichos-demo-api
+    # Sin container_name fijo para permitir rolling rollout (coexistencia de 2 instancias)
     restart: unless-stopped
+    stop_grace_period: 30s
     environment:
       PORT: 3000
       NODE_ENV: production
