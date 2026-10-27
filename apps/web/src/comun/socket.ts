@@ -27,6 +27,8 @@ export function conectarSocket(): Socket {
 
   tokenConectado = token;
   socketInstancia = io({
+    // solo websocket: con varios servidores detrás, el sondeo HTTP podría caer en otro servidor y cortarse
+    transports: ['websocket'],
     // función: en cada (re)conexión toma el token vigente, no el del primer intento
     auth: (cb) => cb({ token: getTokenAcceso() || '' }),
     autoConnect: true,

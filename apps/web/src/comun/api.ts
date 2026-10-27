@@ -86,6 +86,37 @@ async function ejecutarRenovacion(): Promise<string> {
   }
 }
 
+/**
+ * Reintentos ante un reinicio del servidor (despliegue): error de red o 502/503/504.
+ * Solo se repiten peticiones seguras: lecturas (GET/HEAD) o escrituras con Idempotency-Key.
+ */
+let pausasReintento: number[] = (import.meta as unknown as { env?: { MODE?: string } }).env?.MODE === 'test' ? [] : [600, 1500, 3000];
+
+export function configurarReintentos(pausasMs: number[]): void {
+  pausasReintento = pausasMs;
+}
+
+async function fetchConReintento(ruta: string, init: RequestInit): Promise<Response> {
+  const metodo = String(init.method || 'GET').toUpperCase();
+  const cab = (init.headers || {}) as Record<string, string>;
+  const seguro = metodo === 'GET' || metodo === 'HEAD' || Boolean(cab['Idempotency-Key']);
+  const pausas = seguro ? pausasReintento : [];
+
+  for (let intento = 0; ; intento++) {
+    try {
+      const resp = await fetch(ruta, init);
+      if ([502, 503, 504].includes(resp.status) && intento < pausas.length) {
+        await new Promise((r) => setTimeout(r, pausas[intento]));
+        continue;
+      }
+      return resp;
+    } catch (err) {
+      if (intento >= pausas.length) throw err;
+      await new Promise((r) => setTimeout(r, pausas[intento]));
+    }
+  }
+}
+
 export async function clienteFetch<T = any>(
   ruta: string,
   opciones: OpcionesApi = {},
@@ -105,7 +136,7 @@ export async function clienteFetch<T = any>(
     cabeceras['Authorization'] = `Bearer ${tokenAcceso}`;
   }
 
-  const respuesta = await fetch(ruta, {
+  const respuesta = await fetchConReintento(ruta, {
     ...resto,
     headers: cabeceras,
     credentials: 'include',
