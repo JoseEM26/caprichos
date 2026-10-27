@@ -214,6 +214,26 @@ export class NotificacionesService {
       }
     }
 
+    if (puede('reservas/ver')) {
+      const solicitudes = await this.prisma.solicitudReserva.findMany({
+        where: { estado: 'PENDIENTE' },
+        select: { creado_en: true },
+        orderBy: { creado_en: 'asc' },
+      });
+      conteos.reservas = solicitudes.length;
+      if (solicitudes.length) {
+        lista.push({
+          id: 'reservas',
+          titulo: plural(solicitudes.length, 'solicitud de reserva por revisar', 'solicitudes de reserva por revisar'),
+          detalle: 'Reservas pedidas por WhatsApp que esperan aprobación.',
+          prioridad: 'ALTA',
+          desde: solicitudes[0].creado_en.toISOString(),
+          modulo: 'reservas',
+          accion: 'Ir a Reservas',
+        });
+      }
+    }
+
     if (puede('reclamos/ver')) {
       const reclamos = await this.prisma.reclamo.findMany({
         where: { estado: { not: 'RESPONDIDO' } },

@@ -41,6 +41,9 @@ export function useNotificaciones(): ResumenNotificaciones {
   useEventos('pedido:estado', cargar);
   useEventos('pedido:nuevo', cargar);
   useEventos('stock:cambio', cargar);
+  useEventos('reserva:solicitud_nueva', cargar);
+  useEventos('reserva:cambio', cargar);
+  useEventos('notificaciones:nueva', cargar);
 
   return resumen;
 }

@@ -22,6 +22,7 @@ describe('NotificacionesService', () => {
       },
       comprobante: { count: jest.fn().mockResolvedValue(3) },
       reclamo: { findMany: jest.fn().mockResolvedValue([{ creado_en: hace(60) }]) },
+      solicitudReserva: { findMany: jest.fn().mockResolvedValue([{ creado_en: hace(30) }]) },
       insumo: { findMany: jest.fn().mockResolvedValue([]) },
       notificacion: {
         findMany: jest.fn().mockResolvedValue([
@@ -57,10 +58,10 @@ describe('NotificacionesService', () => {
 
   it('el administrador ve todo, con conteos y lo urgente primero', async () => {
     const r = await service.resumen({ partyId: 1n, rol: 'ADMIN', debeCambiar: false });
-    expect(r.conteos).toEqual({ caja: 2, cocina: 2, repartos: 1, comprobantes: 3, reclamos: 1 });
+    expect(r.conteos).toEqual({ caja: 2, cocina: 2, repartos: 1, comprobantes: 3, reservas: 1, reclamos: 1 });
     expect(r.notificaciones[0].prioridad).toBe('ALTA');
     expect(r.notificaciones.map((n) => n.id)).toEqual(
-      expect.arrayContaining(['por-cobrar', 'sin-ubicar', 'cocina-atrasados', 'repartos-listos', 'comprobantes', 'reclamos']),
+      expect.arrayContaining(['por-cobrar', 'sin-ubicar', 'cocina-atrasados', 'repartos-listos', 'comprobantes', 'reservas', 'reclamos']),
     );
     const prioridades = r.notificaciones.map((n) => n.prioridad);
     expect(prioridades).toEqual([...prioridades].sort((a, b) => ['ALTA', 'MEDIA', 'BAJA'].indexOf(a) - ['ALTA', 'MEDIA', 'BAJA'].indexOf(b)));
