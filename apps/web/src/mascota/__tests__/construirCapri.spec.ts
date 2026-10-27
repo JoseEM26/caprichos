@@ -37,7 +37,7 @@ describe('construirCapri.ts', () => {
     const piezas = construirCapri();
 
     // Verificamos constantes de color
-    expect(COLORES_CAPRI.azulMarino).toBe(0x0b2c3e);
+    expect(COLORES_CAPRI.azulMarino).toBe(0x1c1c22);
     expect(COLORES_CAPRI.crema).toBe(0xfbf4ec);
     expect(COLORES_CAPRI.naranja).toBe(0xe67929);
     expect(COLORES_CAPRI.dorado).toBe(0xd99e39);

@@ -110,13 +110,13 @@ export function CapriFallback({
             <path
               d="M 34 182 C 34 176, 50 176, 50 182 C 50 190, 34 190, 34 182 Z"
               fill="#FBF4EC"
-              stroke="#0B2C3E"
+              stroke="#1C1C22"
               strokeWidth="2.5"
             />
             {/* Dientes del tenedor redondeados */}
             <path
               d="M 37 186 L 37 197 M 42 186 L 42 199 M 47 186 L 47 197"
-              stroke="#0B2C3E"
+              stroke="#1C1C22"
               strokeWidth="3.2"
               strokeLinecap="round"
             />
@@ -156,14 +156,14 @@ export function CapriFallback({
               height="20"
               rx="5"
               fill="#FBF4EC"
-              stroke="#0B2C3E"
+              stroke="#1C1C22"
               strokeWidth="2.5"
             />
           </g>
 
           {/* 3. Base / Zapatitos */}
-          <ellipse cx="102" cy="214" rx="14" ry="8" fill="#0B2C3E" />
-          <ellipse cx="138" cy="214" rx="14" ry="8" fill="#0B2C3E" />
+          <ellipse cx="102" cy="214" rx="14" ry="8" fill="#1C1C22" />
+          <ellipse cx="138" cy="214" rx="14" ry="8" fill="#1C1C22" />
 
           {/* 4. Cuerpo: Cono / Triángulo Naranja del logo */}
           <path
@@ -174,7 +174,7 @@ export function CapriFallback({
           {/* Delantal azul marino */}
           <path
             d="M 96 128 L 84 196 C 94 204, 146 204, 156 196 L 144 128 Z"
-            fill="#0B2C3E"
+            fill="#1C1C22"
           />
 
           {/* Ribete dorado del delantal y cuello */}
@@ -207,7 +207,7 @@ export function CapriFallback({
             }}
           >
             {/* Carita redonda color piel */}
-            <circle cx="120" cy="106" r="42" fill="url(#capri-grad-piel)" />
+            <circle cx="120" cy="106" r="44" fill="url(#capri-grad-piel)" />
             <ellipse cx="82" cy="108" rx="5" ry="8" fill="#F6BE94" />
             <ellipse cx="158" cy="108" rx="5" ry="8" fill="#F6BE94" />
 
@@ -218,19 +218,19 @@ export function CapriFallback({
               <circle cx="146" cy="42" r="20" fill="url(#capri-grad-gorro)" />
               <rect x="84" y="46" width="72" height="26" rx="9" fill="url(#capri-grad-gorro)" />
             </g>
-            <rect x="84" y="62" width="72" height="6" fill="#0B2C3E" />
+            <rect x="84" y="62" width="72" height="6" fill="#1C1C22" />
             <rect x="84" y="68" width="72" height="3" rx="1.5" fill="#D99E39" />
 
             {/* OJOS */}
             {esDormido ? (
               // Ojos cerrados durmiendo: arcos curvos hacia abajo
-              <g stroke="#0B2C3E" strokeWidth="3.5" strokeLinecap="round">
+              <g stroke="#1C1C22" strokeWidth="3.5" strokeLinecap="round">
                 <path d="M 92 104 Q 101 112 110 104" />
                 <path d="M 130 104 Q 139 112 148 104" />
               </g>
             ) : esContento ? (
               // Ojos sonrientes de felicidad extrema: arcos curvos hacia arriba (^ ^)
-              <g stroke="#0B2C3E" strokeWidth="4" strokeLinecap="round">
+              <g stroke="#1C1C22" strokeWidth="4" strokeLinecap="round">
                 <path d="M 92 106 Q 101 96 110 106" />
                 <path d="M 130 106 Q 139 96 148 106" />
               </g>
@@ -238,13 +238,13 @@ export function CapriFallback({
               // Ojos grandes brillantes normales
               <g>
                 {/* Ojo Izquierdo */}
-                <ellipse cx="101" cy="103" rx="10" ry="12" fill="#0B2C3E" />
-                <circle cx="104" cy="99" r="4" fill="#FFFFFF" />
+                <ellipse cx="101" cy="103" rx="12" ry="14" fill="#1C1C22" />
+                <circle cx="105" cy="97" r="5" fill="#FFFFFF" />
                 <circle cx="98" cy="106" r="2" fill="#FFFFFF" />
 
                 {/* Ojo Derecho */}
-                <ellipse cx="139" cy="103" rx="10" ry="12" fill="#0B2C3E" />
-                <circle cx="142" cy="99" r="4" fill="#FFFFFF" />
+                <ellipse cx="139" cy="103" rx="12" ry="14" fill="#1C1C22" />
+                <circle cx="143" cy="97" r="5" fill="#FFFFFF" />
                 <circle cx="136" cy="106" r="2" fill="#FFFFFF" />
               </g>
             )}
@@ -256,12 +256,12 @@ export function CapriFallback({
             {/* BOCA */}
             {esHablando ? (
               // Boca abierta hablando
-              <ellipse cx="120" cy="114" rx="7" ry="9" fill="#0B2C3E" />
+              <ellipse cx="120" cy="114" rx="7" ry="9" fill="#1C1C22" />
             ) : esContento ? (
               // Sonrisa ancha
               <path
                 d="M 111 111 Q 120 122 129 111"
-                stroke="#0B2C3E"
+                stroke="#1C1C22"
                 strokeWidth="3.5"
                 strokeLinecap="round"
                 fill="#B2500F"
@@ -270,7 +270,7 @@ export function CapriFallback({
               // Sonrisa suave amable
               <path
                 d="M 113 112 Q 120 119 127 112"
-                stroke="#0B2C3E"
+                stroke="#1C1C22"
                 strokeWidth="3"
                 strokeLinecap="round"
               />
@@ -313,18 +313,18 @@ export function CapriFallback({
               <g transform="translate(162, 32)">
                 <path
                   d="M 6 8 C 6 4, 14 4, 14 8 C 14 11, 10 11, 10 15"
-                  stroke="#0B2C3E"
+                  stroke="#1C1C22"
                   strokeWidth="2.5"
                   strokeLinecap="round"
                   fill="none"
                 />
-                <circle cx="10" cy="19" r="1.5" fill="#0B2C3E" />
+                <circle cx="10" cy="19" r="1.5" fill="#1C1C22" />
               </g>
             )}
 
             {/* Dormido: Zzz flotantes */}
             {esDormido && (
-              <g className="capri-zzz-flotante" fill="#0B2C3E" opacity="0.75" fontWeight="bold">
+              <g className="capri-zzz-flotante" fill="#1C1C22" opacity="0.75" fontWeight="bold">
                 <text x="156" y="55" fontSize="16" fontFamily="sans-serif">Z</text>
                 <text x="172" y="42" fontSize="21" fontFamily="sans-serif">Z</text>
               </g>
