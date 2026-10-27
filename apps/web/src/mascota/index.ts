@@ -21,4 +21,15 @@ export {
 } from './construirCapri';
 export { tieneSoporteWebGL, prefiereMovimientoReducido } from './soporteWebGL';
 
+// Aspecto y configuración
+export * from './tiposAspecto';
+export * from './aspectoUtils';
+export {
+  useAspectoCapri,
+  cargarAspectoPublico,
+  limpiarCacheAspecto,
+  preestablecerAspectoCache,
+  type AspectoHeredado,
+} from './useAspectoCapri';
+
 export { MascotaCapri as default } from './MascotaCapri';

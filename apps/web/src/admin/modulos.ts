@@ -28,6 +28,7 @@ import {
   NovedadesView,
   PaletaView,
 } from './contenido';
+import { MascotaAdminView } from './mascota';
 import { CodigoSupervisorView } from './supervisor/CodigoSupervisorView';
 
 export type GrupoModulo =
@@ -304,6 +305,15 @@ export const MODULOS: DefinicionModulo[] = [
     permisoMinimo: 'local/ver',
     componente: PaletaView,
     icono: 'paleta',
+  },
+  {
+    clave: 'mascota',
+    nombre: 'Mascota Capri',
+    grupo: 'Configuración',
+    ruta: '/admin/mascota',
+    permisoMinimo: 'mascota/ver',
+    componente: MascotaAdminView,
+    icono: 'mascota',
   },
   {
     clave: 'mirest',

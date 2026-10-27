@@ -16,6 +16,7 @@ import {
   type PoseCapri,
 } from './animaciones';
 import { crearRendererWebGL } from './crearRendererWebGL';
+import type { AspectoCapri } from './tiposAspecto';
 
 export interface MascotaCapri3DProps {
   estado?: EstadoCapri;
@@ -23,6 +24,7 @@ export interface MascotaCapri3DProps {
   className?: string;
   alHacerClic?: () => void;
   onError?: (error: Error) => void;
+  aspecto?: AspectoCapri;
 }
 
 /**
@@ -35,10 +37,12 @@ export default function MascotaCapri3D({
   className = '',
   alHacerClic,
   onError,
+  aspecto,
 }: MascotaCapri3DProps) {
   const contenedorRef = useRef<HTMLDivElement>(null);
   const estadoRef = useRef<EstadoCapri>(estado);
   estadoRef.current = estado;
+  const aspectoSerializado = aspecto ? JSON.stringify(aspecto) : '';
 
   useEffect(() => {
     const contenedor = contenedorRef.current;
@@ -94,7 +98,7 @@ export default function MascotaCapri3D({
       scene.add(luzBorde);
 
       // 4. Construcción procedural del personaje
-      piezas = construirCapri();
+      piezas = construirCapri(aspecto);
       scene.add(piezas.raiz);
 
       // 5. Estado de animación
@@ -209,7 +213,7 @@ export default function MascotaCapri3D({
       }
       return () => {};
     }
-  }, [tamano, onError]);
+  }, [tamano, onError, aspectoSerializado]);
 
   return (
     <div

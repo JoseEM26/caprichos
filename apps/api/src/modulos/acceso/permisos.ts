@@ -156,6 +156,9 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   // Vouchers y lectura IA (vch-api)
   { modulo: 'vouchers', accion: 'subir' },
   { modulo: 'vouchers', accion: 'ver' },
+  // Mascota Capri (mas-api)
+  { modulo: 'mascota', accion: 'ver' },
+  { modulo: 'mascota', accion: 'editar' },
 ] as const;
 
 export const MATRIZ: Record<string, string[]> = {

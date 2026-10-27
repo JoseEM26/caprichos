@@ -9,12 +9,12 @@ pnpm --filter @caprichos/api ayuda:grafo
 
 ## Métricas del Grafo
 
-- **Nodos totales**: 194
-  - Módulos: 34
-  - Tareas (`## Como se hace`): 132
+- **Nodos totales**: 200
+  - Módulos: 35
+  - Tareas (`## Como se hace`): 136
   - Roles del sistema: 7
-  - Permisos requeridos: 21
-- **Aristas tipadas totales**: 852
+  - Permisos requeridos: 22
+- **Aristas tipadas totales**: 872
 
 ## Diagrama Mermaid de Módulos y Relaciones
 
@@ -37,6 +37,7 @@ flowchart TD
   iniciativas["Iniciativas (/admin/iniciativas)"]
   listas["Listas y categorías (/admin/listas)"]
   mapa["Mapa de entregas (/admin/mapa)"]
+  mascota["Mascota Capri (/admin/mascota)"]
   mensajes["Mensajes de WhatsApp (/admin/mensajes)"]
   mirest["Configuración del local (/admin/mirest)"]
   notificaciones["Notificaciones (/admin/notificaciones)"]
@@ -279,6 +280,15 @@ flowchart TD
   mapa -->|ver_tambien| repartos
   mapa -->|ver_tambien| informes
   mapa -->|despues| zonas
+  mascota -->|relacionado_con| disenador
+  disenador -->|relacionado_con| mascota
+  mascota -->|relacionado_con| novedades
+  novedades -->|relacionado_con| mascota
+  mascota -->|relacionado_con| paleta
+  paleta -->|relacionado_con| mascota
+  mascota -->|ver_tambien| paleta
+  mascota -->|antes| novedades
+  mascota -->|ver_tambien| disenador
   mensajes -->|relacionado_con| reclamos
   reclamos -->|relacionado_con| mensajes
   mensajes -->|relacionado_con| cocina
@@ -467,6 +477,7 @@ flowchart TD
 | `iniciativas` | Iniciativas | `/admin/iniciativas` |
 | `listas` | Listas y categorías | `/admin/listas` |
 | `mapa` | Mapa de entregas | `/admin/mapa` |
+| `mascota` | Mascota Capri | `/admin/mascota` |
 | `mensajes` | Mensajes de WhatsApp | `/admin/mensajes` |
 | `mirest` | Configuración del local | `/admin/mirest` |
 | `notificaciones` | Notificaciones | `/admin/notificaciones` |

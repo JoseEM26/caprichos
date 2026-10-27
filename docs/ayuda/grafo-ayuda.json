@@ -618,6 +618,36 @@
       "modulo": "mapa"
     },
     {
+      "id": "mascota",
+      "tipo": "modulo",
+      "etiqueta": "Mascota Capri (mascota)",
+      "modulo": "mascota",
+      "ruta": "/admin/mascota"
+    },
+    {
+      "id": "permiso:mascota/ver",
+      "tipo": "permiso",
+      "etiqueta": "Permiso: mascota/ver"
+    },
+    {
+      "id": "mascota#cambiar-la-apariencia-base-de-capri",
+      "tipo": "tarea",
+      "etiqueta": "cambiar la apariencia base de Capri",
+      "modulo": "mascota"
+    },
+    {
+      "id": "mascota#configurar-temas-y-temporadas",
+      "tipo": "tarea",
+      "etiqueta": "configurar temas y temporadas",
+      "modulo": "mascota"
+    },
+    {
+      "id": "mascota#restablecer-a-valores-de-fabrica",
+      "tipo": "tarea",
+      "etiqueta": "restablecer a valores de fabrica",
+      "modulo": "mascota"
+    },
+    {
       "id": "mensajes",
       "tipo": "modulo",
       "etiqueta": "Mensajes de WhatsApp (mensajes)",
@@ -737,6 +767,12 @@
       "id": "novedades#organizar-y-destacar-novedades",
       "tipo": "tarea",
       "etiqueta": "organizar y destacar novedades",
+      "modulo": "novedades"
+    },
+    {
+      "id": "novedades#personalizar-el-encabezado-y-previsualizar-en-pc-o-celular",
+      "tipo": "tarea",
+      "etiqueta": "personalizar el encabezado y previsualizar en PC o celular",
       "modulo": "novedades"
     },
     {
@@ -3499,6 +3535,96 @@
     },
     {
       "tipo": "requiere_permiso",
+      "origen": "mascota",
+      "destino": "permiso:mascota/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "mascota"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mascota",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "disenador",
+      "destino": "mascota"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mascota",
+      "destino": "novedades"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "novedades",
+      "destino": "mascota"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mascota",
+      "destino": "paleta"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "paleta",
+      "destino": "mascota"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mascota#cambiar-la-apariencia-base-de-capri",
+      "destino": "mascota"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mascota#cambiar-la-apariencia-base-de-capri",
+      "destino": "paleta"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mascota",
+      "destino": "paleta"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mascota#configurar-temas-y-temporadas",
+      "destino": "mascota"
+    },
+    {
+      "tipo": "antes",
+      "origen": "mascota#configurar-temas-y-temporadas",
+      "destino": "novedades"
+    },
+    {
+      "tipo": "antes",
+      "origen": "mascota",
+      "destino": "novedades"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mascota#configurar-temas-y-temporadas",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mascota",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mascota#restablecer-a-valores-de-fabrica",
+      "destino": "mascota"
+    },
+    {
+      "tipo": "despues",
+      "origen": "mascota#restablecer-a-valores-de-fabrica",
+      "destino": "mascota"
+    },
+    {
+      "tipo": "requiere_permiso",
       "origen": "mensajes",
       "destino": "permiso:mensajes/ver"
     },
@@ -3956,6 +4082,16 @@
       "tipo": "ver_tambien",
       "origen": "novedades",
       "destino": "destacadas"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "novedades#personalizar-el-encabezado-y-previsualizar-en-pc-o-celular",
+      "destino": "novedades"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "novedades#personalizar-el-encabezado-y-previsualizar-en-pc-o-celular",
+      "destino": "disenador"
     },
     {
       "tipo": "pertenece_a",

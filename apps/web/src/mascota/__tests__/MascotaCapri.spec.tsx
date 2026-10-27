@@ -44,6 +44,24 @@ describe('MascotaCapri.tsx', () => {
     expect(img).toHaveClass('capri-fallback');
   });
 
+  it('hereda y aplica el aspecto especificado en la prop aspecto', () => {
+    vi.spyOn(soporteWebGL, 'tieneSoporteWebGL').mockReturnValue(false);
+
+    const aspectoPersonalizado = {
+      piel: '#B77742',
+      cabello: { color: '#000000', estilo: 'mono' as const },
+      ojos: '#112233',
+      uniforme: { principal: '#E67929', delantal: '#1C1C22', ribete: '#D99E39' },
+      gorro: { tipo: 'corona' as const, color: '#D99E39' },
+      accesorios: ['corazon' as const],
+    };
+
+    const { container } = render(<MascotaCapri aspecto={aspectoPersonalizado} />);
+    expect(container.querySelector('#capri-gorro-corona')).not.toBeNull();
+    expect(container.querySelector('#capri-pelo-mono')).not.toBeNull();
+    expect(container.querySelector('#capri-acc-corazon')).not.toBeNull();
+  });
+
   describe('MascotaCapri3D y ciclo de vida de recursos', () => {
     it('inicializa el renderer WebGL, monta el canvas y limpia todos los recursos al desmontar', async () => {
       // Mock de WebGLRenderer para jsdom

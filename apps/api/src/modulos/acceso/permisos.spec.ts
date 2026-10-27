@@ -70,3 +70,16 @@ describe('permiso supervisor/ver_codigo', () => {
   });
 });
 
+describe('permisos mascota (mas-api)', () => {
+  it('solo ADMIN tiene mascota/ver y mascota/editar; ningún otro rol los tiene', () => {
+    expect(MATRIZ.ADMIN).toContain('mascota/ver');
+    expect(MATRIZ.ADMIN).toContain('mascota/editar');
+    const otrosRoles = ['CAJERO', 'COCINA', 'MOZO', 'CALLCENTER', 'ALMACEN', 'REPARTIDOR'];
+    for (const r of otrosRoles) {
+      expect(MATRIZ[r]).not.toContain('mascota/ver');
+      expect(MATRIZ[r]).not.toContain('mascota/editar');
+    }
+  });
+});
+
+
