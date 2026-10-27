@@ -58,6 +58,20 @@ export class ChatbotIaService {
   }
 
   /**
+   * Indica si la clave de API de OpenAI está configurada.
+   */
+  tieneApiKey(): boolean {
+    return Boolean(this.apiKey && this.apiKey.trim().length > 0);
+  }
+
+  /**
+   * Obtiene el modelo de OpenAI configurado.
+   */
+  obtenerModelo(): string {
+    return this.modelo;
+  }
+
+  /**
    * Procesa una consulta de usuario mediante OpenAI Chat Completions con function calling de solo lectura.
    */
   async procesarConsulta(parametros: ParametrosConsultaIa): Promise<ResultadoConsultaIa> {
@@ -343,9 +357,10 @@ export class ChatbotIaService {
    * Llamada nativa a la API de OpenAI Chat Completions con timeout estricto de 10 segundos.
    * Sin dependencias externas: usa fetch nativo.
    */
-  private async llamarOpenAIConTimeout(
+  async llamarOpenAIConTimeout(
     mensajes: MensajeOpenAI[],
     herramientas?: any[],
+    opciones?: { maxTokens?: number; temperature?: number },
   ): Promise<any> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos
@@ -353,8 +368,8 @@ export class ChatbotIaService {
     const cuerpo: Record<string, any> = {
       model: this.modelo,
       messages: mensajes,
-      temperature: 0.2, // Baja temperatura para precisión en carta y precios
-      max_tokens: 700,  // Máximo 700 tokens de salida según directiva
+      temperature: opciones?.temperature ?? 0.2, // Baja temperatura para precisión en carta y precios
+      max_tokens: opciones?.maxTokens ?? 700, // Máximo 700 tokens de salida según directiva
     };
 
     if (herramientas && herramientas.length > 0) {

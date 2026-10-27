@@ -1,0 +1,48 @@
+---
+modulo: creditos
+titulo: Créditos del personal
+ruta: /admin/creditos
+permiso: creditos/ver
+roles: [ADMIN]
+relacionados: [caja, usuarios]
+sugerencias:
+  - Como consulto los consumos que el personal tiene pendientes
+  - Como descargo el reporte de consumos para la planilla
+  - Como cambio el periodo de consulta entre semana o mes
+  - Cual es el porcentaje de descuento que se aplica al personal
+---
+# Créditos del personal
+
+## Para que sirve
+Modulo de seguimiento y control de los consumos a credito realizados por los colaboradores del local registrados en [[usuarios]]. Totaliza los consumos cobrados bajo esta modalidad en [[caja]] con descuento de personal para su deduccion en la planilla de pagos semanal o mensual.
+
+## Como se hace: Consultar los consumos por semana o por mes
+1. En la barra superior, elegir el tipo de periodo: Semana, Mes o Rango personalizado.
+2. Si se elige Semana, usar los botones Semana anterior o Semana siguiente para desplazarse entre semanas de trabajo.
+3. Si se elige Mes, usar Mes anterior o Mes siguiente para navegar entre los meses del ano.
+4. La pantalla actualizara automaticamente las tarjetas de resumen: Total del periodo a descontar, Total de consumos registrados y Colaboradores con consumo activo.
+Ver tambien: [[caja]]
+
+## Como se hace: Ver el desglose de consumos de un colaborador
+1. En la tabla principal de personal, ubicar la fila del colaborador registrado en [[usuarios]].
+2. La fila muestra el Rol, la cantidad de consumos del periodo y el Total en soles.
+3. Pulsar sobre la fila o en el boton Ver detalle para desplegar el acordeon.
+4. Se listaran todos los pedidos consumidos en [[caja]] con su fecha, codigo de pedido, platos solicitados y monto correspondiente con descuento aplicado.
+Antes: [[caja]]
+Ver tambien: [[usuarios]]
+
+## Como se hace: Exportar el reporte a Excel para recursos humanos o contabilidad
+1. Seleccionar el periodo que se desea liquidar (semana o mes cerrado).
+2. Pulsar el boton Descargar Excel en la parte superior derecha.
+3. El sistema descargara un archivo en formato Excel o CSV listo para el calculo de descuentos en planilla para su conciliacion con [[informes]].
+4. Aparecera un mensaje de confirmacion indicando el nombre del archivo descargado.
+Ver tambien: [[informes]]
+
+## Errores y dudas comunes
+- El porcentaje de descuento aplicado a los consumos del personal (por ejemplo, 25%) lo define el Administrador en la configuracion general del sistema y se muestra en la cabecera informativa.
+- Los consumos de credito solo se generan cuando al cobrar un pedido en caja se marca como Consumo de personal y se vincula al usuario del colaborador activo.
+- Si un colaborador no figura en la lista, verificar que su usuario este registrado y activo en el sistema.
+
+## Quien puede hacerlo
+- Unicamente el rol Administrador tiene acceso a consultar y exportar los Creditos del personal.
+- El personal no administrador no tiene acceso a este modulo por razones de privacidad salarial y control contable.

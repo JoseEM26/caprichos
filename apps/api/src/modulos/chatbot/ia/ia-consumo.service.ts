@@ -36,6 +36,23 @@ export class IaConsumoService {
   }
 
   /**
+   * Obtiene el valor del parámetro 'ayuda_ia_activo' (boolean, por defecto false).
+   */
+  async estaParametroAyudaIaActivo(): Promise<boolean> {
+    try {
+      const p = await this.prisma.parametro.findUnique({
+        where: { clave: 'ayuda_ia_activo' },
+      });
+      if (!p || p.valor === null || p.valor === undefined) return false;
+      const v = p.valor;
+      return v === true || String(v).toLowerCase().trim() === 'true' || String(v).toLowerCase().trim() === 'si';
+    } catch (err: any) {
+      this.logger.error(`Error consultando ayuda_ia_activo: ${err.message}`);
+      return false;
+    }
+  }
+
+  /**
    * Obtiene el tope mensual configurado en USD (por defecto 20).
    */
   async obtenerTopeMensualUsd(): Promise<number> {
@@ -211,6 +228,7 @@ export class IaConsumoService {
     tokensSalida: number;
     herramientasUsadas?: string[];
     resultado: 'EXITO' | 'TOPE_EXCEDIDO' | 'ERROR' | 'DERIVADO_PERSONA' | 'INYECCION_BLOQUEADA';
+    origen?: string;
   }): Promise<number> {
     const costoEstimado = calcularCostoEstimadoUsd(
       datos.modelo,
@@ -234,6 +252,7 @@ export class IaConsumoService {
           costo_usd_estimado: costoEstimado,
           herramientas_usadas: datos.herramientasUsadas || [],
           resultado: datos.resultado,
+          origen: datos.origen || 'CHATBOT',
         },
       });
 

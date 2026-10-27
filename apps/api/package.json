@@ -23,7 +23,8 @@
     "seed:mensajes": "ts-node prisma/seed-atencion-mensajes.ts",
     "seed:contenido": "ts-node prisma/seed-contenido-notificaciones.ts",
     "seed:demo": "tsx prisma/seed-demo.ts",
-    "seed:usuarios-demo": "tsx prisma/seed-usuarios-demo.ts"
+    "seed:usuarios-demo": "tsx prisma/seed-usuarios-demo.ts",
+    "ayuda:grafo": "ts-node scripts/generar-grafo.ts"
   },
   "dependencies": {
     "@caprichos/compartido": "workspace:*",

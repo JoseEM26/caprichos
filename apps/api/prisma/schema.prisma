@@ -1898,11 +1898,13 @@ model IaConsumo {
   costo_usd_estimado  Decimal       @default(0) @db.Decimal(10, 6)
   herramientas_usadas Json?
   resultado           String        @db.VarChar(50)
+  origen              String        @default("CHATBOT") @db.VarChar(50)
 
   conversacion        Conversacion? @relation(fields: [conversacion_id], references: [id], onDelete: SetNull)
 
   @@index([fecha])
   @@index([conversacion_id])
+  @@index([origen])
   @@map("ia_consumo")
 }
 
