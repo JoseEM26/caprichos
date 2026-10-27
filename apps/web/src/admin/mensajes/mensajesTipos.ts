@@ -6,6 +6,7 @@ export interface MensajeItem {
   autor: 'CLIENTE' | 'BOT' | 'PERSONA';
   saliente: boolean;
   imagen: boolean;
+  imagenId?: string | null;
   texto: string;
   hora: string;
   estado?: string;

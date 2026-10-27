@@ -289,6 +289,10 @@ export class MensajesService {
           autor: m.autor,
           saliente: m.direccion === 'SALE',
           imagen: m.tipo === 'IMAGEN',
+          imagenId:
+            m.tipo === 'IMAGEN'
+              ? String(contenido.archivoId || (c.flujo as any)?.pago?.comprobanteArchivoId || '') || null
+              : null,
           texto: textoDe(m),
           hora: hora(m.en),
           estado: estadoMsg,

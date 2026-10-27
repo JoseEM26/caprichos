@@ -58,6 +58,7 @@ export class ArchivosController {
   @Permiso([
     { modulo: 'archivos', accion: 'ver' },
     { modulo: 'iniciativas', accion: 'ver' },
+    { modulo: 'mensajes', accion: 'ver' },
   ])
   async servirPrivado(
     @Param('id') id: string,

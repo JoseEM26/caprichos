@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Confirmar } from '../../comun/Confirmar';
 import { useEventos } from '../../comun/socket';
+import { obtenerBlobAutenticado } from '../../comun/api';
 import {
   aplicarCambioChat,
   aprobarPagoChat,
@@ -72,6 +73,44 @@ const obtenerIniciales = (nombre: string) => {
   if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
   return (partes[0][0] + partes[1][0]).toUpperCase();
 };
+
+/** Foto del chat (voucher): se pide con la sesión porque el archivo es privado */
+function FotoMensaje({ archivoId }: { archivoId?: string | null }) {
+  const [url, setUrl] = useState<string>('');
+  const [fallo, setFallo] = useState(false);
+
+  useEffect(() => {
+    if (!archivoId) return;
+    let vigente = true;
+    obtenerBlobAutenticado(`/admin/archivos/${archivoId}`)
+      .then((u) => {
+        if (vigente) setUrl(u);
+      })
+      .catch(() => {
+        if (vigente) setFallo(true);
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [archivoId]);
+
+  if (!archivoId || fallo || !url) {
+    return (
+      <div className="cv-img">
+        <span>{fallo ? 'No se pudo cargar la foto' : archivoId ? 'Cargando foto…' : 'Foto'}</span>
+      </div>
+    );
+  }
+  return (
+    <a href={url} target="_blank" rel="noreferrer" aria-label="Ver la foto completa" style={{ display: 'block' }}>
+      <img
+        src={url}
+        alt="Foto enviada por el cliente"
+        style={{ display: 'block', maxWidth: '100%', maxHeight: 280, borderRadius: 8, objectFit: 'contain' }}
+      />
+    </a>
+  );
+}
 
 export function MensajesView() {
   const [cargando, setCargando] = useState(true);
@@ -939,11 +978,7 @@ export function MensajesView() {
                             {esBot ? 'Capri (bot)' : 'Equipo'}
                           </div>
                         )}
-                        {m.imagen && (
-                          <div className="cv-img">
-                            <span>Foto</span>
-                          </div>
-                        )}
+                        {m.imagen && <FotoMensaje archivoId={m.imagenId} />}
                         <div className="cv-txt">{m.texto}</div>
                         <div className="cv-meta" style={{ flexWrap: 'wrap', gap: '6px' }}>
                           <span>{m.hora}</span>

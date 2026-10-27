@@ -450,8 +450,31 @@ export class WhatsappWebhookService {
     }
 
     // 5. Procesamiento de imagen de voucher
+    let archivoMensajeId: string | null = null;
     if (imagenBuffer && pedidoReciente) {
-      await this.guardarVoucherPrivado(imagenBuffer, imagenMime, pedidoReciente, telMask, conversacion);
+      archivoMensajeId = await this.guardarVoucherPrivado(imagenBuffer, imagenMime, pedidoReciente, telMask, conversacion);
+    } else if (imagenBuffer) {
+      // Imagen sin pedido asociado: igual se guarda en privado para que el equipo la vea en el chat
+      try {
+        const sub = await this.archivosService.subirArchivo(
+          {
+            buffer: imagenBuffer,
+            size: imagenBuffer.length,
+            mimetype: imagenMime,
+            originalname: `imagen-wa-${Date.now()}.jpg`,
+            fieldname: 'file',
+            encoding: '7bit',
+            stream: null as any,
+            destination: '',
+            filename: '',
+            path: '',
+          } as Express.Multer.File,
+          true,
+        );
+        archivoMensajeId = String(sub.id);
+      } catch (err: any) {
+        this.logger.warn(`No se pudo guardar la imagen del chat: ${err.message}`);
+      }
     }
 
     // Registrar mensaje en mensaje_chat del módulo de mensajes
@@ -461,7 +484,7 @@ export class WhatsappWebhookService {
         direccion: 'ENTRA',
         autor: 'CLIENTE',
         tipo: tipoRegistro === 'IMAGEN' ? 'IMAGEN' : 'TEXTO',
-        contenido: { texto },
+        contenido: archivoMensajeId ? { texto, archivoId: archivoMensajeId } : { texto },
         meta_id: waMessageId || null,
       },
     });
@@ -545,11 +568,11 @@ export class WhatsappWebhookService {
     pedido: any,
     telMask: string,
     conversacion?: any,
-  ) {
+  ): Promise<string | null> {
     try {
       if (buffer.length > 5 * 1024 * 1024) {
         this.logger.warn(`Voucher rechazado: tamaño ${buffer.length} supera los 5MB permitidos.`);
-        return;
+        return null;
       }
 
       const fileMock: Express.Multer.File = {
@@ -616,8 +639,10 @@ export class WhatsappWebhookService {
       this.logger.log(
         `Voucher privado guardado para pedido ${pedido.codigo} (archivo id: ${archivoSubido.id})`,
       );
+      return String(archivoSubido.id);
     } catch (err: any) {
       this.logger.error(`Error guardando comprobante privado: ${err.message}`);
+      return null;
     }
   }
 
