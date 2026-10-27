@@ -7,6 +7,7 @@
 .cp-pin.rojo span { background: #C4412B; animation: cp-palpita 1s ease-in-out infinite alternate; }
 .cp-pin.local span { background: var(--cp-navy, #0B2C3E); }
 .cp-pin.elegido span { outline: 3px solid var(--cp-navy, #0B2C3E); }
+.cp-pin.resaltado span { background: #E67929; outline: 3px solid var(--cp-navy, #0B2C3E); }
 .cp-pin-num {
   position: absolute;
   top: 3px;

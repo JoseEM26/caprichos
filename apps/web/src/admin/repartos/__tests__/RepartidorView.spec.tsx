@@ -292,8 +292,8 @@ describe('RepartidorView - Pantalla Mobile-First de Repartidor', () => {
     await waitFor(() => {
       expect(screen.getByTestId('resumen-ruta-elegida')).toBeInTheDocument();
     });
-    expect(screen.getByText(/Ruta recalculada \(1 elegidos\):/i)).toBeInTheDocument();
-    expect(screen.getByTestId('btn-tomar-elegidos')).toHaveTextContent(/Tomar 1 pedido\(s\) e Iniciar Ruta/i);
+    expect(screen.getByText(/Elegidos: 1 pedido/i)).toBeInTheDocument();
+    expect(screen.getByTestId('btn-tomar-elegidos')).toHaveTextContent(/Tomar 1 pedido/i);
   });
 
   it('5. Conflicto atómico al tomar: muestra aviso claro si otro repartidor ganó un pedido', async () => {
@@ -387,5 +387,85 @@ describe('RepartidorView - Pantalla Mobile-First de Repartidor', () => {
         screen.getByRole('heading', { name: /Reportar entrega fallida/i }),
       ).toBeInTheDocument();
     });
+  });
+
+  it('8. En escritorio (contenido >= 1024 px) usa dos columnas con el mapa a la vista y sin botón Ver mapa', async () => {
+    const medida = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockReturnValue({ width: 1280, height: 800, top: 0, left: 0, right: 1280, bottom: 800, x: 0, y: 0, toJSON: () => ({}) } as DOMRect);
+
+    render(
+      <MemoryRouter>
+        <RepartosView />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('tarjeta-pedido-101')).toBeInTheDocument();
+    });
+
+    const raiz = screen.getByTestId('vista-repartidor');
+    expect(raiz.style.gridTemplateColumns).toContain('420px');
+    expect(screen.queryByTestId('btn-ver-mapa')).not.toBeInTheDocument();
+    expect(raiz.querySelector('.leaflet-container')).not.toBeNull();
+    // Las pestañas siguen siendo role=tab dentro de un tablist
+    expect(screen.getByRole('tablist', { name: 'Pestañas de reparto' })).toBeInTheDocument();
+    expect(screen.getAllByRole('tab')).toHaveLength(3);
+
+    medida.mockRestore();
+  });
+
+  it('9. En celular (contenido < 1024 px) una columna con barra inferior y el mapa solo en hoja a pantalla completa', async () => {
+    render(
+      <MemoryRouter>
+        <RepartosView />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('tarjeta-pedido-101')).toBeInTheDocument();
+    });
+
+    const raiz = screen.getByTestId('vista-repartidor');
+    expect(raiz.style.gridTemplateColumns).toBe('');
+    // El mapa no está apretado con la lista: no se renderiza hasta abrir la hoja
+    expect(raiz.querySelector('.leaflet-container')).toBeNull();
+
+    fireEvent.click(screen.getByTestId('btn-ver-mapa'));
+    const hoja = await screen.findByRole('dialog', { name: 'Mi ruta en el mapa' });
+    expect(hoja).toBeInTheDocument();
+    expect(hoja.querySelector('.leaflet-container')).not.toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar mapa' }));
+    expect(screen.queryByRole('dialog', { name: 'Mi ruta en el mapa' })).not.toBeInTheDocument();
+  });
+
+  it('10. Para elegir en celular: Ver en mapa abre la hoja con los sugeridos y la barra inferior muestra el botón de tomar', async () => {
+    render(
+      <MemoryRouter>
+        <RepartosView />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('tab-para-elegir')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId('tab-para-elegir'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('candidato-pedido-201')).toBeInTheDocument();
+    });
+
+    // Sin elegidos el botón de tomar está deshabilitado y no se confirma nada
+    expect(screen.getByTestId('btn-tomar-elegidos')).toBeDisabled();
+
+    fireEvent.click(screen.getByTestId('candidato-pedido-201'));
+    expect(screen.getByTestId('candidato-pedido-201')).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByTestId('btn-tomar-elegidos')).toBeEnabled();
+
+    fireEvent.click(screen.getByTestId('btn-ver-mapa'));
+    const hoja = await screen.findByRole('dialog', { name: 'Pedidos sugeridos en el mapa' });
+    expect(hoja.querySelector('.leaflet-container')).not.toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar mapa' }));
   });
 });

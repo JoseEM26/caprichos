@@ -1,7 +1,10 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import type { CSSProperties, KeyboardEvent, RefObject } from 'react';
 import { useSesion } from '../../comun/sesion';
 import { Confirmar } from '../../comun/Confirmar';
+import { useEsMovil } from '../../carta/useEsMovil';
 import { ModalReportarFalla } from './ModalReportarFalla';
+import { MapaRepartos, type PuntoRepartoMapa } from './MapaRepartos';
 import {
   repartosApi,
   PedidoReparto,
@@ -19,6 +22,8 @@ import {
 } from './calculoRuta';
 
 type PestanaRepartidor = 'mi_ruta' | 'para_elegir' | 'hechos_hoy';
+type EtapaId = 'salir' | 'llegue' | 'entregar';
+type MetricasRuta = ReturnType<typeof calcularMetricasRuta>;
 
 interface ConfirmarAccionModal {
   abierto: boolean;
@@ -28,8 +33,781 @@ interface ConfirmarAccionModal {
   peligro?: boolean;
 }
 
+interface InfoEtapa {
+  id: EtapaId;
+  texto: string;
+  fondo: string;
+  color: string;
+}
+
+const PESTANAS: Array<{ id: PestanaRepartidor; etiqueta: string; testid: string }> = [
+  { id: 'mi_ruta', etiqueta: 'Mi ruta', testid: 'tab-mi-ruta' },
+  { id: 'para_elegir', etiqueta: 'Para elegir', testid: 'tab-para-elegir' },
+  { id: 'hechos_hoy', etiqueta: 'Hechos hoy', testid: 'tab-hechos-hoy' },
+];
+
+// Paleta del proyecto
+const C = {
+  navy: '#0B2C3E',
+  crema: '#FBF4EC',
+  fondo: '#FFFDF9',
+  blanco: '#FFFFFF',
+  naranja: '#E67929',
+  dorado: '#D99E39',
+  rust: '#B2500F',
+  verde: '#2F7A45',
+  borde: '#E3D6C6',
+  suave: '#F4ECE1',
+  gris: '#5A6E78',
+} as const;
+
+const FUENTE_TITULOS = 'var(--fuente-titulos), Montserrat, sans-serif';
+const FUENTE_TEXTO = 'Montserrat, sans-serif';
+
+// Desde este ancho del contenido (no de la ventana) la vista pasa a dos columnas
+const ANCHO_ESCRITORIO = 1024;
+// AdminShell pinta su propia barra inferior del repartidor bajo 700 px (76 px de alto)
+const ALTO_BARRA_SHELL = 76;
+const ALTO_BARRA_PESTANAS = 72;
+const ALTO_RESUMEN_CELULAR = 120;
+
+const botonBase: CSSProperties = {
+  minHeight: 48,
+  padding: '0 14px',
+  borderRadius: 12,
+  border: 'none',
+  boxSizing: 'border-box',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  textAlign: 'center',
+  textDecoration: 'none',
+  fontFamily: FUENTE_TITULOS,
+  fontWeight: 800,
+  fontSize: 15,
+  cursor: 'pointer',
+};
+
+const tarjetaBase: CSSProperties = {
+  background: C.blanco,
+  border: `1.5px solid ${C.borde}`,
+  borderRadius: 16,
+  padding: 14,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 12,
+  boxShadow: '0 2px 8px rgba(11, 44, 62, 0.05)',
+};
+
+const chip = (fondo: string, color: string): CSSProperties => ({
+  fontSize: 12,
+  fontWeight: 800,
+  background: fondo,
+  color,
+  padding: '4px 8px',
+  borderRadius: 8,
+  whiteSpace: 'nowrap',
+});
+
+const SIN_RESALTADOS: string[] = [];
+
+const dosColumnas: CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 };
+
+function esEfectivoPendiente(p: PedidoReparto): boolean {
+  return p.pago_estado !== 'PAGADO' && (p.pago_metodo === 'EFECTIVO' || p.pago_metodo === 'efectivo');
+}
+
+const soles = (monto: number | string | null | undefined) => `S/ ${Number(monto || 0).toFixed(2)}`;
+const kmTexto = (km: number) => km.toFixed(1).replace('.', ',');
+const textoPedidos = (n: number) => (n === 1 ? '1 pedido' : `${n} pedidos`);
+
+function etapaDe(p: PedidoReparto): InfoEtapa {
+  if (p.estado !== 'EN_CAMINO') {
+    return { id: 'salir', texto: 'Salir a reparto', fondo: C.naranja, color: C.blanco };
+  }
+  if (!p.llego_en) {
+    return { id: 'llegue', texto: 'Llegué a destino', fondo: C.dorado, color: C.navy };
+  }
+  return { id: 'entregar', texto: 'Entregar pedido', fondo: C.verde, color: C.blanco };
+}
+
+function textoEstado(p: PedidoReparto): string {
+  if (p.estado !== 'EN_CAMINO') return 'Listo en tienda';
+  return p.llego_en ? 'En destino' : 'En camino';
+}
+
+/** Ancho del contenido de la vista (no de la ventana): decide entre dos columnas y una. */
+function useAnchoDe(ref: RefObject<HTMLElement | null>): number {
+  const [ancho, setAncho] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const medir = () => setAncho(el.getBoundingClientRect().width);
+    medir();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observador = new ResizeObserver(medir);
+    observador.observe(el);
+    return () => observador.disconnect();
+  }, [ref]);
+  return ancho;
+}
+
+/* ---------------------------------------------------------------- */
+/* Piezas reutilizables de la vista                                  */
+/* ---------------------------------------------------------------- */
+
+function CabeceraRepartidor({
+  nombre,
+  activos,
+  tope,
+  compacta,
+}: {
+  nombre: string;
+  activos: number;
+  tope: number;
+  compacta: boolean;
+}) {
+  return (
+    <header
+      data-testid="cabecera-repartidor"
+      style={{
+        background: C.navy,
+        color: C.blanco,
+        padding: compacta ? '14px 16px' : '16px 20px',
+        borderBottom: `3px solid ${C.naranja}`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: 10,
+        flexShrink: 0,
+      }}
+    >
+      <div>
+        <span
+          style={{
+            fontSize: 12,
+            fontWeight: 700,
+            letterSpacing: '0.08em',
+            color: C.dorado,
+            textTransform: 'uppercase',
+          }}
+        >
+          Panel Repartidor
+        </span>
+        <h1 style={{ margin: '2px 0 0 0', fontFamily: FUENTE_TITULOS, fontSize: 18, fontWeight: 800, color: C.blanco }}>
+          {nombre}
+        </h1>
+      </div>
+      <div
+        data-testid="badge-tope-pedidos"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          background: 'rgba(255, 255, 255, 0.12)',
+          border: '1.5px solid rgba(255, 255, 255, 0.25)',
+          borderRadius: 12,
+          padding: '6px 12px',
+          fontSize: 13,
+          fontWeight: 800,
+        }}
+      >
+        <span style={{ color: C.crema }}>Llevas:</span>
+        <span style={{ color: activos >= tope ? C.naranja : C.blanco, fontWeight: 900 }}>
+          {activos} / {tope} pedidos
+        </span>
+      </div>
+    </header>
+  );
+}
+
+function BarraPestanas({
+  pestana,
+  onCambiar,
+  contadores,
+  fija,
+}: {
+  pestana: PestanaRepartidor;
+  onCambiar: (p: PestanaRepartidor) => void;
+  contadores: Record<PestanaRepartidor, number>;
+  fija: boolean;
+}) {
+  const colorBadge: Record<PestanaRepartidor, { fondo: string; texto: string }> = {
+    mi_ruta: { fondo: C.naranja, texto: C.blanco },
+    para_elegir: { fondo: C.dorado, texto: C.navy },
+    hechos_hoy: { fondo: C.verde, texto: C.blanco },
+  };
+
+  return (
+    <nav
+      role="tablist"
+      aria-label="Pestañas de reparto"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+        gap: 6,
+        padding: fija ? '8px 10px' : '10px 14px',
+        background: fija ? C.navy : C.crema,
+        borderBottom: fija ? 'none' : `1.5px solid ${C.borde}`,
+        flexShrink: 0,
+      }}
+    >
+      {PESTANAS.map((t) => {
+        const seleccionada = pestana === t.id;
+        const n = contadores[t.id];
+        return (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            id={`pestana-${t.id}`}
+            aria-selected={seleccionada}
+            aria-controls="panel-repartidor"
+            data-testid={t.testid}
+            onClick={() => onCambiar(t.id)}
+            style={{
+              minHeight: 52,
+              borderRadius: 12,
+              cursor: 'pointer',
+              fontFamily: FUENTE_TITULOS,
+              fontWeight: 800,
+              fontSize: 14,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 2,
+              padding: '4px 6px',
+              border: seleccionada
+                ? `2px solid ${fija ? C.dorado : C.navy}`
+                : '1.5px solid transparent',
+              background: fija ? (seleccionada ? C.crema : 'transparent') : seleccionada ? C.blanco : 'transparent',
+              color: fija && !seleccionada ? C.crema : C.navy,
+            }}
+          >
+            <span>{t.etiqueta}</span>
+            {n > 0 && (
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  background: colorBadge[t.id].fondo,
+                  color: colorBadge[t.id].texto,
+                  borderRadius: 8,
+                  padding: '1px 6px',
+                }}
+              >
+                {n}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+function BotonEtapa({
+  pedido,
+  etapa,
+  grande = false,
+  onAccion,
+}: {
+  pedido: PedidoReparto;
+  etapa: InfoEtapa;
+  grande?: boolean;
+  onAccion: (p: PedidoReparto, etapa: EtapaId) => void;
+}) {
+  return (
+    <button
+      type="button"
+      data-testid={`btn-${etapa.id}-${pedido.id}`}
+      onClick={() => onAccion(pedido, etapa.id)}
+      style={{
+        ...botonBase,
+        width: '100%',
+        minHeight: grande ? 56 : 48,
+        fontSize: grande ? 17 : 15,
+        background: etapa.fondo,
+        color: etapa.color,
+      }}
+    >
+      {etapa.texto}
+    </button>
+  );
+}
+
+function BotonReportar({ pedido, onReportar }: { pedido: PedidoReparto; onReportar: (p: PedidoReparto) => void }) {
+  return (
+    <button
+      type="button"
+      data-testid={`btn-reportar-${pedido.id}`}
+      onClick={() => onReportar(pedido)}
+      style={{
+        ...botonBase,
+        width: '100%',
+        background: 'transparent',
+        color: C.rust,
+        border: `1.5px solid ${C.rust}`,
+        fontSize: 14,
+      }}
+    >
+      Reportar problema
+    </button>
+  );
+}
+
+/** Teléfono, llamada, WhatsApp, cobro, productos y GPS. Solo se usa con pedidos ya tomados. */
+function DetalleContacto({ pedido }: { pedido: PedidoReparto }) {
+  const enlace: CSSProperties = { ...botonBase, minHeight: 48, fontSize: 13 };
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div
+        style={{
+          background: C.crema,
+          borderRadius: 12,
+          padding: '10px 12px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 6,
+        }}
+      >
+        <div style={{ fontSize: 14, fontWeight: 800 }}>Cliente: {pedido.cliente_nombre || 'Cliente'}</div>
+        <div data-testid={`telefono-cliente-${pedido.id}`} style={{ fontSize: 14 }}>
+          Teléfono: <strong>{pedido.cliente_telefono ? pedido.cliente_telefono : 'No registrado'}</strong>
+        </div>
+        {pedido.cliente_telefono && (
+          <div style={dosColumnas}>
+            <a
+              href={`tel:${pedido.cliente_telefono}`}
+              style={{ ...enlace, background: C.blanco, border: `1.5px solid ${C.navy}`, color: C.navy }}
+            >
+              Llamar
+            </a>
+            <a
+              href={`https://wa.me/51${pedido.cliente_telefono.replace(/\D/g, '')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ ...enlace, background: C.verde, color: C.blanco }}
+            >
+              WhatsApp
+            </a>
+          </div>
+        )}
+      </div>
+
+      <div
+        style={{
+          padding: '8px 12px',
+          borderRadius: 10,
+          fontSize: 13,
+          fontWeight: 700,
+          background: esEfectivoPendiente(pedido) ? '#FFF4E5' : '#E8F5E9',
+          color: esEfectivoPendiente(pedido) ? C.rust : C.verde,
+          border: `1px solid ${esEfectivoPendiente(pedido) ? C.naranja : C.verde}`,
+        }}
+      >
+        {esEfectivoPendiente(pedido)
+          ? `Cobrar en efectivo: ${soles(pedido.total)}${
+              pedido.paga_con ? ` (Paga con ${soles(pedido.paga_con)})` : ''
+            }`
+          : `Ya pagado con ${pedido.pago_metodo || 'digital'}`}
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13 }}>
+        <span>
+          Productos: <strong>{pedido.cantidad_productos ?? 1}</strong>
+        </span>
+        <span>
+          Total: <strong style={{ fontSize: 15 }}>{soles(pedido.total)}</strong>
+        </span>
+      </div>
+
+      {pedido.lat != null && pedido.lng != null && (
+        <div style={dosColumnas}>
+          <a
+            href={`https://www.google.com/maps/dir/?api=1&destination=${pedido.lat},${pedido.lng}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ ...enlace, background: C.suave, border: `1px solid ${C.borde}`, color: C.navy }}
+          >
+            Google Maps
+          </a>
+          <a
+            href={`https://waze.com/ul?ll=${pedido.lat},${pedido.lng}&navigate=yes`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ ...enlace, background: C.suave, border: `1px solid ${C.borde}`, color: C.navy }}
+          >
+            Waze
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface FilaPedidoProps {
+  pedido: PedidoReparto;
+  config: ConfigReparto;
+  destacado: boolean;
+  onAccion: (p: PedidoReparto, etapa: EtapaId) => void;
+  onReportar: (p: PedidoReparto) => void;
+  onDestacar: (id: string | null) => void;
+}
+
+/** Siguiente parada: tarjeta grande con todo a la vista. */
+function TarjetaSiguiente({ pedido, config, destacado, onAccion, onReportar, onDestacar }: FilaPedidoProps) {
+  const espera = clasificarEspera(pedido.minutosEspera, config);
+  return (
+    <article
+      data-testid={`tarjeta-pedido-${pedido.id}`}
+      aria-label={`Siguiente parada ${pedido.codigo}`}
+      onMouseEnter={() => onDestacar(pedido.id)}
+      onMouseLeave={() => onDestacar(null)}
+      style={{
+        ...tarjetaBase,
+        gap: 14,
+        border: `2px solid ${destacado ? C.naranja : C.borde}`,
+        padding: 16,
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <span style={chip(C.naranja, C.blanco)}>Siguiente parada</span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: C.gris }}>
+          Parada #1 · {textoEstado(pedido)}
+        </span>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+        <strong style={{ fontFamily: FUENTE_TITULOS, fontSize: 22, color: C.navy }}>{pedido.codigo}</strong>
+        <span style={chip(espera.colorHex, C.blanco)}>{pedido.minutosEspera} min</span>
+      </div>
+
+      <div>
+        <div style={{ fontSize: 16, fontWeight: 800, color: C.navy }}>
+          {pedido.direccion || 'Dirección sin especificar'}
+        </div>
+        {pedido.referencia && (
+          <div style={{ fontSize: 13, color: C.gris, marginTop: 2 }}>Ref: {pedido.referencia}</div>
+        )}
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.rust, marginTop: 4 }}>
+          Zona: {pedido.zona || 'Local / General'}
+        </div>
+      </div>
+
+      <DetalleContacto pedido={pedido} />
+      <BotonEtapa pedido={pedido} etapa={etapaDe(pedido)} grande onAccion={onAccion} />
+      <BotonReportar pedido={pedido} onReportar={onReportar} />
+    </article>
+  );
+}
+
+/** Parada siguiente: fila compacta; el detalle se abre con un botón. */
+function FilaParada({ pedido, numero, config, destacado, onAccion, onReportar, onDestacar }: FilaPedidoProps & { numero: number }) {
+  const [abierta, setAbierta] = useState(false);
+  const espera = clasificarEspera(pedido.minutosEspera, config);
+  const idDetalle = `detalle-pedido-${pedido.id}`;
+  return (
+    <article
+      data-testid={`tarjeta-pedido-${pedido.id}`}
+      onMouseEnter={() => onDestacar(pedido.id)}
+      onMouseLeave={() => onDestacar(null)}
+      style={{ ...tarjetaBase, gap: 10, border: `1.5px solid ${destacado ? C.naranja : C.borde}`, padding: 12 }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={chip(C.navy, C.blanco)}>Parada #{numero}</span>
+          <strong style={{ fontSize: 15, color: C.navy }}>{pedido.codigo}</strong>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={chip(C.suave, C.gris)}>{textoEstado(pedido)}</span>
+          <span style={chip(espera.colorHex, C.blanco)}>{pedido.minutosEspera} min</span>
+        </div>
+      </div>
+
+      <div style={{ fontSize: 14, fontWeight: 700, color: C.navy }}>
+        {pedido.direccion || 'Dirección sin especificar'}
+      </div>
+
+      <div style={dosColumnas}>
+        <BotonEtapa pedido={pedido} etapa={etapaDe(pedido)} onAccion={onAccion} />
+        <button
+          type="button"
+          aria-expanded={abierta}
+          aria-controls={idDetalle}
+          onClick={() => setAbierta((v) => !v)}
+          style={{ ...botonBase, background: C.crema, color: C.navy, border: `1px solid ${C.borde}`, fontSize: 14 }}
+        >
+          {abierta ? 'Ocultar detalle' : 'Ver detalle'}
+        </button>
+      </div>
+
+      {abierta && (
+        <div id={idDetalle} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <DetalleContacto pedido={pedido} />
+          <BotonReportar pedido={pedido} onReportar={onReportar} />
+        </div>
+      )}
+    </article>
+  );
+}
+
+interface CandidatoProps {
+  pedido: PedidoReparto;
+  numero: number;
+  config: ConfigReparto;
+  seleccionado: boolean;
+  destacado: boolean;
+  onAlternar: (id: string) => void;
+  onDestacar: (id: string | null) => void;
+}
+
+/** Pedido sugerido en "Para elegir": casilla grande, se marca tocando la tarjeta. */
+function CandidatoPedido({ pedido, numero, config, seleccionado, destacado, onAlternar, onDestacar }: CandidatoProps) {
+  const espera = clasificarEspera(pedido.minutosEspera, config);
+  const alTeclado = (e: KeyboardEvent<HTMLElement>) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onAlternar(pedido.id);
+    }
+  };
+  return (
+    <article
+      data-testid={`candidato-pedido-${pedido.id}`}
+      role="checkbox"
+      aria-checked={seleccionado}
+      aria-label={`Elegir pedido ${pedido.codigo}`}
+      tabIndex={0}
+      onClick={() => onAlternar(pedido.id)}
+      onKeyDown={alTeclado}
+      onMouseEnter={() => onDestacar(pedido.id)}
+      onMouseLeave={() => onDestacar(null)}
+      style={{
+        ...tarjetaBase,
+        cursor: 'pointer',
+        gap: 10,
+        padding: 14,
+        background: seleccionado ? C.crema : C.blanco,
+        border: `2px solid ${seleccionado ? C.naranja : destacado ? C.dorado : C.borde}`,
+        boxShadow: seleccionado ? '0 4px 14px rgba(230, 121, 41, 0.15)' : tarjetaBase.boxShadow,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span
+            aria-hidden="true"
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 8,
+              border: `2px solid ${seleccionado ? C.naranja : C.navy}`,
+              background: seleccionado ? C.naranja : C.blanco,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            {seleccionado && (
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke={C.blanco} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="5 13 10 18 19 7" />
+              </svg>
+            )}
+          </span>
+          <strong style={{ fontSize: 16, color: C.navy }}>{pedido.codigo}</strong>
+          <span style={chip(C.suave, C.gris)}>Sugerida #{numero}</span>
+        </div>
+        <span style={chip(espera.colorHex, C.blanco)}>{pedido.minutosEspera} min</span>
+      </div>
+
+      <div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: C.navy }}>
+          {pedido.direccion || 'Dirección aproximada'}
+        </div>
+        {pedido.referencia && <div style={{ fontSize: 12, color: C.gris, marginTop: 2 }}>Ref: {pedido.referencia}</div>}
+        <div style={{ fontSize: 12, fontWeight: 700, color: C.rust, marginTop: 2 }}>
+          Zona: {pedido.zona || 'Local / General'}
+        </div>
+      </div>
+
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          fontSize: 13,
+          borderTop: `1px solid ${C.suave}`,
+          paddingTop: 8,
+        }}
+      >
+        <span>
+          Productos: <strong>{pedido.cantidad_productos ?? 1}</strong>
+        </span>
+        <span>
+          Total: <strong style={{ fontSize: 14 }}>{soles(pedido.total)}</strong>
+        </span>
+      </div>
+
+      <div style={{ fontSize: 12, fontWeight: 700, color: esEfectivoPendiente(pedido) ? C.rust : C.verde }}>
+        {esEfectivoPendiente(pedido)
+          ? `Cobrar en efectivo al entregar: ${soles(pedido.total)}`
+          : 'Ya pagado digitalmente'}
+      </div>
+
+      <div data-testid={`telefono-oculto-${pedido.id}`} style={{ fontSize: 12, color: C.gris, fontStyle: 'italic' }}>
+        Teléfono oculto hasta tomar
+      </div>
+    </article>
+  );
+}
+
+/** Resumen de lo elegido con el botón de tomar. Se usa en la columna (PC) y abajo fijo (celular). */
+function ResumenElegidos({
+  cantidad,
+  metricas,
+  onTomar,
+}: {
+  cantidad: number;
+  metricas: MetricasRuta | null;
+  onTomar: () => void;
+}) {
+  return (
+    <div
+      data-testid="resumen-ruta-elegida"
+      role="region"
+      aria-label="Resumen de pedidos elegidos"
+      style={{
+        background: C.navy,
+        color: C.blanco,
+        borderRadius: 16,
+        padding: '12px 14px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 10,
+        boxShadow: '0 -4px 20px rgba(11, 44, 62, 0.25)',
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', fontSize: 14 }}>
+        {cantidad === 0 || !metricas ? (
+          <span style={{ fontWeight: 700 }}>Marca los pedidos que vas a llevar</span>
+        ) : (
+          <>
+            <strong>Elegidos: {textoPedidos(cantidad)}</strong>
+            <span style={{ color: C.crema }}>
+              {kmTexto(metricas.distanciaAproxKm)} km · unos {Math.round(metricas.tiempoAproxMin)} min
+            </span>
+          </>
+        )}
+      </div>
+      <button
+        type="button"
+        data-testid="btn-tomar-elegidos"
+        onClick={onTomar}
+        disabled={cantidad === 0}
+        style={{
+          ...botonBase,
+          minHeight: 52,
+          fontSize: 16,
+          background: cantidad === 0 ? C.gris : C.naranja,
+          color: C.blanco,
+          cursor: cantidad === 0 ? 'not-allowed' : 'pointer',
+        }}
+      >
+        {cantidad === 0 ? 'Elige pedidos para tomar' : `Tomar ${cantidad} ${cantidad === 1 ? 'pedido' : 'pedidos'}`}
+      </button>
+    </div>
+  );
+}
+
+/** Hoja a pantalla completa con el mapa, para el celular. */
+function HojaMapa({
+  titulo,
+  puntos,
+  rutaPuntos,
+  seleccionadoId,
+  resaltadosIds,
+  onSeleccionarPunto,
+  onCerrar,
+}: {
+  titulo: string;
+  puntos: PuntoRepartoMapa[];
+  rutaPuntos: Array<[number, number]>;
+  seleccionadoId: string | null;
+  resaltadosIds: string[];
+  onSeleccionarPunto: (id: string) => void;
+  onCerrar: () => void;
+}) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={titulo}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 1100,
+        background: C.fondo,
+        display: 'flex',
+        flexDirection: 'column',
+        fontFamily: FUENTE_TEXTO,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 10,
+          padding: '10px 14px',
+          background: C.navy,
+          color: C.blanco,
+        }}
+      >
+        <strong style={{ fontFamily: FUENTE_TITULOS, fontSize: 16 }}>{titulo}</strong>
+        <button
+          type="button"
+          onClick={onCerrar}
+          aria-label="Cerrar mapa"
+          style={{
+            ...botonBase,
+            minWidth: 48,
+            background: 'transparent',
+            color: C.blanco,
+            border: '1.5px solid rgba(255, 255, 255, 0.4)',
+          }}
+        >
+          Cerrar
+        </button>
+      </div>
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: 8 }}>
+        <MapaRepartos
+          esPantallaCompleta
+          puntos={puntos}
+          rutaPuntos={rutaPuntos}
+          seleccionadoId={seleccionadoId}
+          resaltadosIds={resaltadosIds}
+          onSeleccionarPunto={onSeleccionarPunto}
+        />
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- */
+/* Vista principal                                                   */
+/* ---------------------------------------------------------------- */
+
 export function RepartidorView() {
   const { usuario } = useSesion();
+  const raizRef = useRef<HTMLDivElement>(null);
+  const anchoContenido = useAnchoDe(raizRef);
+  const escritorio = anchoContenido >= ANCHO_ESCRITORIO;
+  // AdminShell muestra su barra propia del repartidor bajo 700 px
+  const hayBarraShell = useEsMovil();
+  const desplazamientoBarra = hayBarraShell ? ALTO_BARRA_SHELL : 0;
+
   const [pestana, setPestana] = useState<PestanaRepartidor>('mi_ruta');
 
   const [cargando, setCargando] = useState(true);
@@ -47,7 +825,10 @@ export function RepartidorView() {
 
   // Selección en la pestaña "Para elegir"
   const [seleccionadosIds, setSeleccionadosIds] = useState<Set<string>>(new Set());
+  // Pedido resaltado (pasa el mouse por la lista o toca un pin)
+  const [destacadoId, setDestacadoId] = useState<string | null>(null);
   const [pedidosPerdidosAviso, setPedidosPerdidosAviso] = useState<PedidoPerdido[]>([]);
+  const [hojaMapaAbierta, setHojaMapaAbierta] = useState(false);
 
   // Modal Confirmar (Sí/No)
   const [confirmacion, setConfirmacion] = useState<ConfirmarAccionModal>({
@@ -100,7 +881,7 @@ export function RepartidorView() {
     });
   }, [datosMios]);
 
-  // Ruta sugerida de pedidos disponibles (hasta el tope configurable, default 5)
+  // Ruta sugerida de pedidos disponibles, en orden de parada (hasta el tope configurable, default 5)
   const rutaSugeridaDisponibles = useMemo(() => {
     const candidatos: PedidoParaRuta[] = disponibles
       .filter((p) => p.lat != null && p.lng != null)
@@ -117,16 +898,14 @@ export function RepartidorView() {
         pago_metodo: p.pago_metodo,
       }));
 
-    const ordenados = sugerirOrdenRuta(
-      candidatos,
-      COORDENADAS_TIENDA_DEFECTO,
-      config,
-      maxPedidos,
-    );
+    const ordenados = sugerirOrdenRuta(candidatos, COORDENADAS_TIENDA_DEFECTO, config, maxPedidos);
 
-    const ordenIds = new Set(ordenados.map((o) => o.id));
-    const enSugerida = disponibles.filter((p) => ordenIds.has(p.id));
-    const fueraSugerida = disponibles.filter((p) => !ordenIds.has(p.id));
+    const filaPorId = new Map(disponibles.map((p) => [p.id, p]));
+    const enSugerida = ordenados
+      .map((o) => filaPorId.get(o.id))
+      .filter((p): p is PedidoReparto => p !== undefined);
+    const idsSugeridos = new Set(enSugerida.map((p) => p.id));
+    const fueraSugerida = disponibles.filter((p) => !idsSugeridos.has(p.id));
     return [...enSugerida, ...fueraSugerida].slice(0, maxPedidos);
   }, [disponibles, config, maxPedidos]);
 
@@ -135,8 +914,8 @@ export function RepartidorView() {
     const elegidos = disponibles.filter((p) => seleccionadosIds.has(p.id));
     if (elegidos.length === 0) {
       return {
-        pedidosElegidosOrdenados: [],
-        metricasElegidos: null,
+        pedidosElegidosOrdenados: [] as PedidoReparto[],
+        metricasElegidos: null as MetricasRuta | null,
       };
     }
 
@@ -153,18 +932,9 @@ export function RepartidorView() {
       pago_metodo: p.pago_metodo,
     }));
 
-    const ordenados = sugerirOrdenRuta(
-      candidatos,
-      COORDENADAS_TIENDA_DEFECTO,
-      config,
-      elegidos.length,
-    );
+    const ordenados = sugerirOrdenRuta(candidatos, COORDENADAS_TIENDA_DEFECTO, config, elegidos.length);
 
-    const metricas = calcularMetricasRuta(
-      ordenados,
-      COORDENADAS_TIENDA_DEFECTO,
-      config.velocidadMediaKmH,
-    );
+    const metricas = calcularMetricasRuta(ordenados, COORDENADAS_TIENDA_DEFECTO, config.velocidadMediaKmH);
 
     const filasMap = new Map(elegidos.map((p) => [String(p.id), p]));
     const enOrden = ordenados.map((o) => filasMap.get(String(o.id))!).filter(Boolean);
@@ -184,6 +954,80 @@ export function RepartidorView() {
       return acc;
     }, 0);
   }, [hechosHoy]);
+
+  // Puntos y rutas para el mapa según la pestaña
+  const puntosMiRuta: PuntoRepartoMapa[] = useMemo(
+    () =>
+      pedidosActivos.flatMap((p, idx) =>
+        p.lat == null || p.lng == null
+          ? []
+          : [
+              {
+                id: p.id,
+                lat: p.lat,
+                lng: p.lng,
+                etiqueta: p.cliente_nombre,
+                codigo: p.codigo,
+                detalle: 'en tu ruta',
+                color: clasificarEspera(p.minutosEspera, config).color,
+                orden: idx + 1,
+                minutosEspera: p.minutosEspera,
+                enReparto: true,
+              },
+            ],
+      ),
+    [pedidosActivos, config],
+  );
+
+  const rutaMiRuta: Array<[number, number]> = useMemo(
+    () => [
+      [COORDENADAS_TIENDA_DEFECTO.lat, COORDENADAS_TIENDA_DEFECTO.lng],
+      ...pedidosActivos.flatMap((p): Array<[number, number]> =>
+        p.lat == null || p.lng == null ? [] : [[p.lat, p.lng]],
+      ),
+    ],
+    [pedidosActivos],
+  );
+
+  const puntosSugeridos: PuntoRepartoMapa[] = useMemo(
+    () =>
+      rutaSugeridaDisponibles.flatMap((p, idx) =>
+        p.lat == null || p.lng == null
+          ? []
+          : [
+              {
+                id: p.id,
+                lat: p.lat,
+                lng: p.lng,
+                etiqueta: p.cliente_nombre,
+                codigo: p.codigo,
+                detalle: 'disponible',
+                color: clasificarEspera(p.minutosEspera, config).color,
+                orden: idx + 1,
+                minutosEspera: p.minutosEspera,
+                enReparto: false,
+              },
+            ],
+      ),
+    [rutaSugeridaDisponibles, config],
+  );
+
+  const rutaElegidos: Array<[number, number]> = useMemo(
+    () => [
+      [COORDENADAS_TIENDA_DEFECTO.lat, COORDENADAS_TIENDA_DEFECTO.lng],
+      ...pedidosElegidosOrdenados.flatMap((p): Array<[number, number]> =>
+        p.lat == null || p.lng == null ? [] : [[p.lat, p.lng]],
+      ),
+    ],
+    [pedidosElegidosOrdenados],
+  );
+
+  const elegidosArr = useMemo(() => Array.from(seleccionadosIds), [seleccionadosIds]);
+
+  const mapa =
+    pestana === 'para_elegir'
+      ? { puntos: puntosSugeridos, ruta: rutaElegidos, resaltados: elegidosArr }
+      : { puntos: puntosMiRuta, ruta: rutaMiRuta, resaltados: SIN_RESALTADOS };
 
   // Acciones con modal Confirmar
   const pedirConfirmacion = (
@@ -259,7 +1103,7 @@ export function RepartidorView() {
         }
 
         setSeleccionadosIds(new Set());
-        setPestana('mi_ruta');
+        cambiarPestana('mi_ruta');
       },
     );
   };
@@ -286,10 +1130,9 @@ export function RepartidorView() {
   };
 
   const handleEntregar = (pedido: PedidoReparto) => {
-    const mensajeCobro =
-      pedido.pago_estado !== 'PAGADO' && pedido.pago_metodo === 'EFECTIVO'
-        ? `Recuerda cobrar S/ ${Number(pedido.total).toFixed(2)} en efectivo.`
-        : 'Pedido ya pagado previamente.';
+    const mensajeCobro = esEfectivoPendiente(pedido)
+      ? `Recuerda cobrar S/ ${Number(pedido.total).toFixed(2)} en efectivo.`
+      : 'Pedido ya pagado previamente.';
 
     pedirConfirmacion(
       '¿Confirmar entrega?',
@@ -300,259 +1143,55 @@ export function RepartidorView() {
     );
   };
 
+  const ejecutarEtapa = (pedido: PedidoReparto, etapa: EtapaId) => {
+    if (etapa === 'salir') handleSalir(pedido);
+    else if (etapa === 'llegue') handleLlegue(pedido);
+    else handleEntregar(pedido);
+  };
+
+  const cambiarPestana = (nueva: PestanaRepartidor) => {
+    setPestana(nueva);
+    setError(null);
+    setDestacadoId(null);
+  };
+
+  // Pin tocado en el mapa: en "Para elegir" marca o desmarca; en "Mi ruta" resalta la parada
+  const tocarPin = (id: string) => {
+    if (pestana === 'para_elegir') {
+      toggleSeleccion(id);
+    } else {
+      setDestacadoId((prev) => (prev === id ? null : id));
+    }
+  };
+
   const nombreUsuario = usuario?.nombres || 'Repartidor';
+  const contadores: Record<PestanaRepartidor, number> = {
+    mi_ruta: pedidosActivos.length,
+    para_elegir: disponibles.length,
+    hechos_hoy: hechosHoy.length,
+  };
+  const hayElegidos = seleccionadosIds.size > 0;
 
-  return (
-    <div
-      data-testid="vista-repartidor"
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        minHeight: '100%',
-        maxWidth: '680px',
-        margin: '0 auto',
-        width: '100%',
-        background: '#FFFDF9',
-        fontFamily: 'Montserrat, sans-serif',
-        color: '#0B2C3E',
-      }}
-    >
-      {/* Cabecera mobile-first */}
-      <header
-        data-testid="cabecera-repartidor"
-        style={{
-          background: '#0B2C3E',
-          color: '#FFFFFF',
-          padding: '16px 20px',
-          borderBottom: '3px solid #E67929',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '10px',
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '8px',
-          }}
-        >
-          <div>
-            <span
-              style={{
-                fontSize: '12px',
-                fontWeight: 700,
-                letterSpacing: '0.08em',
-                color: '#D99E39',
-                textTransform: 'uppercase',
-              }}
-            >
-              Panel Repartidor
-            </span>
-            <h1
-              style={{
-                margin: '2px 0 0 0',
-                fontSize: '18px',
-                fontWeight: 800,
-                color: '#FFFFFF',
-              }}
-            >
-              {nombreUsuario}
-            </h1>
-          </div>
+  /* ---------- Bloques de contenido ---------- */
 
-          <div
-            data-testid="badge-tope-pedidos"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              background: 'rgba(255, 255, 255, 0.12)',
-              border: '1.5px solid rgba(255, 255, 255, 0.25)',
-              borderRadius: '12px',
-              padding: '6px 12px',
-              fontSize: '13px',
-              fontWeight: 800,
-            }}
-          >
-            <span style={{ color: '#FBF4EC' }}>Llevas:</span>
-            <span
-              style={{
-                color: pedidosActivos.length >= maxPedidos ? '#E67929' : '#FFFFFF',
-                fontWeight: 900,
-              }}
-            >
-              {pedidosActivos.length} / {maxPedidos} pedidos
-            </span>
-          </div>
-        </div>
-      </header>
-
-      {/* Barra de pestañas mobile-first (botones grandes >= 48px) */}
-      <nav
-        role="tablist"
-        aria-label="Pestañas de reparto"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
-          background: '#FBF4EC',
-          borderBottom: '1.5px solid #E3D6C6',
-          padding: '6px 8px',
-          gap: '6px',
-        }}
-      >
-        <button
-          type="button"
-          role="tab"
-          aria-selected={pestana === 'mi_ruta'}
-          data-testid="tab-mi-ruta"
-          onClick={() => {
-            setPestana('mi_ruta');
-            setError(null);
-          }}
-          style={{
-            minHeight: '48px',
-            border: pestana === 'mi_ruta' ? '2px solid #0B2C3E' : '1px solid transparent',
-            borderRadius: '12px',
-            background: pestana === 'mi_ruta' ? '#FFFFFF' : 'transparent',
-            color: '#0B2C3E',
-            fontWeight: 800,
-            fontSize: '13px',
-            cursor: 'pointer',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '2px',
-            transition: 'all 0.15s ease',
-          }}
-        >
-          <span>Mi ruta</span>
-          {pedidosActivos.length > 0 && (
-            <span
-              style={{
-                fontSize: '11px',
-                fontWeight: 800,
-                background: '#E67929',
-                color: '#FFFFFF',
-                borderRadius: '8px',
-                padding: '1px 6px',
-              }}
-            >
-              {pedidosActivos.length}
-            </span>
-          )}
-        </button>
-
-        <button
-          type="button"
-          role="tab"
-          aria-selected={pestana === 'para_elegir'}
-          data-testid="tab-para-elegir"
-          onClick={() => {
-            setPestana('para_elegir');
-            setError(null);
-          }}
-          style={{
-            minHeight: '48px',
-            border: pestana === 'para_elegir' ? '2px solid #0B2C3E' : '1px solid transparent',
-            borderRadius: '12px',
-            background: pestana === 'para_elegir' ? '#FFFFFF' : 'transparent',
-            color: '#0B2C3E',
-            fontWeight: 800,
-            fontSize: '13px',
-            cursor: 'pointer',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '2px',
-            transition: 'all 0.15s ease',
-          }}
-        >
-          <span>Para elegir</span>
-          {disponibles.length > 0 && (
-            <span
-              style={{
-                fontSize: '11px',
-                fontWeight: 800,
-                background: '#D99E39',
-                color: '#0B2C3E',
-                borderRadius: '8px',
-                padding: '1px 6px',
-              }}
-            >
-              {disponibles.length}
-            </span>
-          )}
-        </button>
-
-        <button
-          type="button"
-          role="tab"
-          aria-selected={pestana === 'hechos_hoy'}
-          data-testid="tab-hechos-hoy"
-          onClick={() => {
-            setPestana('hechos_hoy');
-            setError(null);
-          }}
-          style={{
-            minHeight: '48px',
-            border: pestana === 'hechos_hoy' ? '2px solid #0B2C3E' : '1px solid transparent',
-            borderRadius: '12px',
-            background: pestana === 'hechos_hoy' ? '#FFFFFF' : 'transparent',
-            color: '#0B2C3E',
-            fontWeight: 800,
-            fontSize: '13px',
-            cursor: 'pointer',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '2px',
-            transition: 'all 0.15s ease',
-          }}
-        >
-          <span>Hechos hoy</span>
-          {hechosHoy.length > 0 && (
-            <span
-              style={{
-                fontSize: '11px',
-                fontWeight: 800,
-                background: '#2F7A45',
-                color: '#FFFFFF',
-                borderRadius: '8px',
-                padding: '1px 6px',
-              }}
-            >
-              {hechosHoy.length}
-            </span>
-          )}
-        </button>
-      </nav>
-
-      {/* Avisos de conflicto / pedidos perdidos por concurrencia */}
+  const avisos = (
+    <>
       {pedidosPerdidosAviso.length > 0 && (
         <div
           role="alert"
           data-testid="alerta-pedidos-perdidos"
           style={{
-            margin: '12px 16px 0 16px',
             padding: '12px 14px',
-            borderRadius: '12px',
+            borderRadius: 12,
             background: '#FDE8E8',
-            border: '1.5px solid #B2500F',
-            color: '#B2500F',
-            fontSize: '13px',
+            border: `1.5px solid ${C.rust}`,
+            color: C.rust,
+            fontSize: 13,
           }}
         >
-          <div style={{ fontWeight: 800, marginBottom: '4px' }}>
-            Aviso de asignación concurrente:
-          </div>
+          <div style={{ fontWeight: 800, marginBottom: 4 }}>Aviso de asignación concurrente:</div>
           {pedidosPerdidosAviso.map((p, idx) => (
-            <div key={idx} style={{ marginTop: '2px' }}>
+            <div key={idx} style={{ marginTop: 2 }}>
               • El pedido <strong>{p.codigo}</strong>{' '}
               {p.motivo === 'OTRO_REPARTIDOR'
                 ? `fue tomado por ${p.tomadoPor || 'otro repartidor'} un instante antes.`
@@ -564,855 +1203,271 @@ export function RepartidorView() {
           <button
             type="button"
             onClick={() => setPedidosPerdidosAviso([])}
-            style={{
-              marginTop: '8px',
-              minHeight: '48px',
-              width: '100%',
-              background: '#FFFFFF',
-              border: '1px solid #B2500F',
-              borderRadius: '8px',
-              color: '#B2500F',
-              fontWeight: 800,
-              fontSize: '13px',
-              cursor: 'pointer',
-            }}
+            style={{ ...botonBase, marginTop: 8, width: '100%', background: C.blanco, border: `1px solid ${C.rust}`, color: C.rust, fontSize: 13 }}
           >
             Entendido
           </button>
         </div>
       )}
-
-      {/* Mensaje de error general si ocurre */}
       {error && (
         <div
           role="alert"
           style={{
-            margin: '12px 16px 0 16px',
             padding: '10px 14px',
-            borderRadius: '12px',
+            borderRadius: 12,
             background: '#FDE8E8',
-            border: '1px solid #B2500F',
-            color: '#B2500F',
-            fontSize: '13px',
+            border: `1px solid ${C.rust}`,
+            color: C.rust,
+            fontSize: 13,
             fontWeight: 700,
           }}
         >
           {error}
         </div>
       )}
+    </>
+  );
 
-      {/* Cuerpo principal */}
-      <main style={{ padding: '16px', flex: 1 }}>
-        {cargando ? (
-          <div
-            role="status"
-            style={{
-              textAlign: 'center',
-              padding: '48px 16px',
-              color: '#5A6E78',
-              fontWeight: 700,
-            }}
-          >
-            Cargando información de reparto...
+  const vacioMiRuta = (
+    <div
+      data-testid="estado-vacio-mi-ruta"
+      style={{ ...tarjetaBase, textAlign: 'center', padding: '40px 20px', alignItems: 'center' }}
+    >
+      <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: C.navy }}>No tienes pedidos activos</h3>
+      <p style={{ margin: 0, fontSize: 14, color: C.gris }}>
+        Elige pedidos de la ruta sugerida para comenzar tus entregas.
+      </p>
+      <button
+        type="button"
+        data-testid="btn-ir-a-elegir"
+        onClick={() => cambiarPestana('para_elegir')}
+        style={{ ...botonBase, background: C.naranja, color: C.blanco, padding: '0 24px' }}
+      >
+        Ir a Para elegir
+      </button>
+    </div>
+  );
+
+  const botonVerMapa = (texto: string) => (
+    <button
+      type="button"
+      data-testid="btn-ver-mapa"
+      onClick={() => setHojaMapaAbierta(true)}
+      style={{ ...botonBase, width: '100%', background: C.blanco, color: C.navy, border: `1.5px solid ${C.navy}` }}
+    >
+      {texto}
+    </button>
+  );
+
+  const contenidoMiRuta = (
+    <div data-testid="contenido-mi-ruta" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {!escritorio && pedidosActivos.length > 0 && botonVerMapa('Ver mapa')}
+      {pedidosActivos.length === 0 ? (
+        vacioMiRuta
+      ) : (
+        <>
+          <TarjetaSiguiente
+            pedido={pedidosActivos[0]}
+            config={config}
+            destacado={destacadoId === pedidosActivos[0].id}
+            onAccion={ejecutarEtapa}
+            onReportar={setPedidoParaFalla}
+            onDestacar={setDestacadoId}
+          />
+          {pedidosActivos.length > 1 && (
+            <section style={{ display: 'flex', flexDirection: 'column', gap: 10 }} aria-label="Paradas siguientes">
+              <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: C.gris }}>
+                Luego ({pedidosActivos.length - 1})
+              </h3>
+              {pedidosActivos.slice(1).map((pedido, idx) => (
+                <FilaParada
+                  key={pedido.id}
+                  pedido={pedido}
+                  numero={idx + 2}
+                  config={config}
+                  destacado={destacadoId === pedido.id}
+                  onAccion={ejecutarEtapa}
+                  onReportar={setPedidoParaFalla}
+                  onDestacar={setDestacadoId}
+                />
+              ))}
+            </section>
+          )}
+        </>
+      )}
+    </div>
+  );
+
+  const contenidoParaElegir = (
+    <div data-testid="contenido-para-elegir" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {!escritorio && rutaSugeridaDisponibles.length > 0 && botonVerMapa('Ver en mapa')}
+      {rutaSugeridaDisponibles.length === 0 ? (
+        <div
+          data-testid="estado-vacio-para-elegir"
+          style={{ ...tarjetaBase, textAlign: 'center', padding: '40px 20px', alignItems: 'center' }}
+        >
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: C.navy }}>
+            No hay pedidos listos para reparto
+          </h3>
+          <p style={{ margin: 0, fontSize: 14, color: C.gris }}>
+            Los pedidos aparecerán aquí tan pronto cocina termine de prepararlos.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 800, color: C.gris }}>
+            <span>Ruta sugerida disponible</span>
+            <span>Cupo disponible: {Math.max(0, maxPedidos - pedidosActivos.length)}</span>
           </div>
-        ) : pestana === 'mi_ruta' ? (
-          /* ============================================================ */
-          /* PESTAÑA 1: MI RUTA (PEDIDOS TOMADOS DEL REPARTIDOR)          */
-          /* ============================================================ */
-          <div
-            data-testid="contenido-mi-ruta"
-            style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
+          {rutaSugeridaDisponibles.map((pedido, idx) => (
+            <CandidatoPedido
+              key={pedido.id}
+              pedido={pedido}
+              numero={idx + 1}
+              config={config}
+              seleccionado={seleccionadosIds.has(pedido.id)}
+              destacado={destacadoId === pedido.id}
+              onAlternar={toggleSeleccion}
+              onDestacar={setDestacadoId}
+            />
+          ))}
+        </>
+      )}
+    </div>
+  );
+
+  const contenidoHechos = (
+    <div data-testid="contenido-hechos-hoy" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div
+        data-testid="resumen-liquidacion"
+        style={{
+          background: C.crema,
+          border: `1.5px solid ${C.borde}`,
+          borderRadius: 16,
+          padding: 16,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+        }}
+      >
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.gris }}>Resumen del turno de hoy:</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+          <span style={{ fontSize: 14, color: C.navy, fontWeight: 700 }}>Entregas completadas:</span>
+          <span data-testid="conteo-hechos-hoy" style={{ fontSize: 18, color: C.navy, fontWeight: 900 }}>
+            {hechosHoy.length}
+          </span>
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'baseline',
+            gap: 8,
+            borderTop: `1px solid ${C.borde}`,
+            paddingTop: 8,
+          }}
+        >
+          <span style={{ fontSize: 14, color: C.rust, fontWeight: 800 }}>Total cobrado en efectivo para liquidar:</span>
+          <span data-testid="total-efectivo-liquidar" style={{ fontSize: 20, color: C.rust, fontWeight: 900 }}>
+            S/ {totalEfectivoHoy.toFixed(2)}
+          </span>
+        </div>
+      </div>
+
+      {hechosHoy.length === 0 ? (
+        <div
+          data-testid="estado-vacio-hechos-hoy"
+          style={{ ...tarjetaBase, textAlign: 'center', padding: '40px 20px', alignItems: 'center' }}
+        >
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: C.navy }}>
+            Aún no tienes entregas completadas hoy
+          </h3>
+          <p style={{ margin: 0, fontSize: 14, color: C.gris }}>
+            Tus pedidos entregados aparecerán aquí para tu control y rendición en caja.
+          </p>
+        </div>
+      ) : (
+        hechosHoy.map((pedido) => (
+          <article
+            key={pedido.id}
+            data-testid={`hecho-pedido-${pedido.id}`}
+            style={{ ...tarjetaBase, borderRadius: 14, padding: '12px 14px', gap: 6 }}
           >
-            {pedidosActivos.length === 0 ? (
-              <div
-                data-testid="estado-vacio-mi-ruta"
-                style={{
-                  textAlign: 'center',
-                  padding: '40px 20px',
-                  background: '#FFFFFF',
-                  borderRadius: '16px',
-                  border: '1.5px solid #E3D6C6',
-                }}
-              >
-                <h3
-                  style={{
-                    margin: '0 0 8px 0',
-                    fontSize: '16px',
-                    fontWeight: 800,
-                    color: '#0B2C3E',
-                  }}
-                >
-                  No tienes pedidos activos
-                </h3>
-                <p
-                  style={{
-                    margin: '0 0 20px 0',
-                    fontSize: '14px',
-                    color: '#5A6E78',
-                  }}
-                >
-                  Elige pedidos de la ruta sugerida para comenzar tus entregas.
-                </p>
-                <button
-                  type="button"
-                  data-testid="btn-ir-a-elegir"
-                  onClick={() => setPestana('para_elegir')}
-                  style={{
-                    minHeight: '48px',
-                    padding: '0 24px',
-                    background: '#E67929',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    borderRadius: '12px',
-                    fontWeight: 800,
-                    fontSize: '14px',
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(230, 121, 41, 0.25)',
-                  }}
-                >
-                  Ir a Para elegir
-                </button>
-              </div>
-            ) : (
-              pedidosActivos.map((pedido, idx) => {
-                const infoEspera = clasificarEspera(pedido.minutosEspera, config);
-                const esEnCamino = pedido.estado === 'EN_CAMINO';
-                const haLlegado = Boolean(pedido.llego_en);
-                const tieneCobroEfectivo =
-                  pedido.pago_estado !== 'PAGADO' &&
-                  (pedido.pago_metodo === 'EFECTIVO' || pedido.pago_metodo === 'efectivo');
-
-                return (
-                  <article
-                    key={pedido.id}
-                    data-testid={`tarjeta-pedido-${pedido.id}`}
-                    style={{
-                      background: '#FFFFFF',
-                      borderRadius: '16px',
-                      border: '1.5px solid #E3D6C6',
-                      padding: '16px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '12px',
-                      boxShadow: '0 2px 8px rgba(11, 44, 62, 0.05)',
-                    }}
-                  >
-                    {/* Encabezado de la tarjeta */}
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '8px',
-                        borderBottom: '1px solid #F4ECE1',
-                        paddingBottom: '10px',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span
-                          style={{
-                            background: '#0B2C3E',
-                            color: '#FFFFFF',
-                            fontSize: '12px',
-                            fontWeight: 800,
-                            borderRadius: '8px',
-                            padding: '4px 8px',
-                          }}
-                        >
-                          Parada #{idx + 1}
-                        </span>
-                        <strong style={{ fontSize: '16px', color: '#0B2C3E' }}>
-                          {pedido.codigo}
-                        </strong>
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span
-                          style={{
-                            fontSize: '12px',
-                            fontWeight: 800,
-                            background: esEnCamino ? '#D99E39' : '#FBF4EC',
-                            color: esEnCamino ? '#0B2C3E' : '#5A6E78',
-                            padding: '3px 8px',
-                            borderRadius: '6px',
-                          }}
-                        >
-                          {esEnCamino ? (haLlegado ? 'En destino' : 'En camino') : 'Listo en tienda'}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: '12px',
-                            fontWeight: 800,
-                            background: infoEspera.colorHex,
-                            color: '#FFFFFF',
-                            padding: '3px 8px',
-                            borderRadius: '6px',
-                          }}
-                        >
-                          {pedido.minutosEspera} min
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Dirección y Zona */}
-                    <div>
-                      <div style={{ fontSize: '14px', fontWeight: 700, color: '#0B2C3E' }}>
-                        {pedido.direccion || 'Dirección sin especificar'}
-                      </div>
-                      {pedido.referencia && (
-                        <div style={{ fontSize: '12px', color: '#5A6E78', marginTop: '2px' }}>
-                          Ref: {pedido.referencia}
-                        </div>
-                      )}
-                      <div
-                        style={{
-                          fontSize: '12px',
-                          fontWeight: 700,
-                          color: '#B2500F',
-                          marginTop: '4px',
-                        }}
-                      >
-                        Zona: {pedido.zona || 'Local / General'}
-                      </div>
-                    </div>
-
-                    {/* Teléfono del cliente y enlaces de comunicación (VISIBLE tras tomar) */}
-                    <div
-                      style={{
-                        background: '#FBF4EC',
-                        borderRadius: '12px',
-                        padding: '10px 12px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '6px',
-                      }}
-                    >
-                      <div style={{ fontSize: '13px', fontWeight: 800, color: '#0B2C3E' }}>
-                        Cliente: {pedido.cliente_nombre || 'Cliente'}
-                      </div>
-                      <div
-                        data-testid={`telefono-cliente-${pedido.id}`}
-                        style={{ fontSize: '13px', color: '#0B2C3E' }}
-                      >
-                        Teléfono:{' '}
-                        <strong>
-                          {pedido.cliente_telefono ? pedido.cliente_telefono : 'No registrado'}
-                        </strong>
-                      </div>
-
-                      {pedido.cliente_telefono && (
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '4px' }}>
-                          <a
-                            href={`tel:${pedido.cliente_telefono}`}
-                            style={{
-                              minHeight: '48px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              background: '#FFFFFF',
-                              border: '1.5px solid #0B2C3E',
-                              borderRadius: '10px',
-                              color: '#0B2C3E',
-                              fontWeight: 800,
-                              fontSize: '13px',
-                              textDecoration: 'none',
-                            }}
-                          >
-                            Llamar
-                          </a>
-                          <a
-                            href={`https://wa.me/51${pedido.cliente_telefono.replace(/\D/g, '')}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{
-                              minHeight: '48px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              background: '#2F7A45',
-                              border: 'none',
-                              borderRadius: '10px',
-                              color: '#FFFFFF',
-                              fontWeight: 800,
-                              fontSize: '13px',
-                              textDecoration: 'none',
-                            }}
-                          >
-                            WhatsApp
-                          </a>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Detalle de Cobro y Productos */}
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        fontSize: '13px',
-                        padding: '4px 0',
-                      }}
-                    >
-                      <div>
-                        <span>Productos: </span>
-                        <strong>{pedido.cantidad_productos ?? 1}</strong>
-                      </div>
-                      <div>
-                        <span>Total: </span>
-                        <strong style={{ fontSize: '15px' }}>
-                          S/ {Number(pedido.total || 0).toFixed(2)}
-                        </strong>
-                      </div>
-                    </div>
-
-                    <div
-                      style={{
-                        padding: '8px 12px',
-                        borderRadius: '10px',
-                        fontSize: '13px',
-                        fontWeight: 700,
-                        background: tieneCobroEfectivo ? '#FFF4E5' : '#E8F5E9',
-                        color: tieneCobroEfectivo ? '#B2500F' : '#2F7A45',
-                        border: `1px solid ${tieneCobroEfectivo ? '#E67929' : '#2F7A45'}`,
-                      }}
-                    >
-                      {tieneCobroEfectivo
-                        ? `Cobrar en efectivo: S/ ${Number(pedido.total).toFixed(2)}${
-                            pedido.paga_con ? ` (Paga con S/ ${Number(pedido.paga_con).toFixed(2)})` : ''
-                          }`
-                        : `Ya pagado con ${pedido.pago_metodo || 'digital'}`}
-                    </div>
-
-                    {/* Botones de navegación GPS */}
-                    {pedido.lat != null && pedido.lng != null && (
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                        <a
-                          href={`https://www.google.com/maps/dir/?api=1&destination=${pedido.lat},${pedido.lng}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            minHeight: '48px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            background: '#F4ECE1',
-                            border: '1px solid #E3D6C6',
-                            borderRadius: '10px',
-                            color: '#0B2C3E',
-                            fontWeight: 700,
-                            fontSize: '12px',
-                            textDecoration: 'none',
-                          }}
-                        >
-                          Google Maps
-                        </a>
-                        <a
-                          href={`https://waze.com/ul?ll=${pedido.lat},${pedido.lng}&navigate=yes`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            minHeight: '48px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            background: '#F4ECE1',
-                            border: '1px solid #E3D6C6',
-                            borderRadius: '10px',
-                            color: '#0B2C3E',
-                            fontWeight: 700,
-                            fontSize: '12px',
-                            textDecoration: 'none',
-                          }}
-                        >
-                          Waze
-                        </a>
-                      </div>
-                    )}
-
-                    {/* Botones de acción principales por etapa (Mínimo 48px de alto) */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
-                      {!esEnCamino ? (
-                        <button
-                          type="button"
-                          data-testid={`btn-salir-${pedido.id}`}
-                          onClick={() => handleSalir(pedido)}
-                          style={{
-                            minHeight: '48px',
-                            background: '#E67929',
-                            color: '#FFFFFF',
-                            border: 'none',
-                            borderRadius: '12px',
-                            fontSize: '15px',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Salir a reparto
-                        </button>
-                      ) : !haLlegado ? (
-                        <button
-                          type="button"
-                          data-testid={`btn-llegue-${pedido.id}`}
-                          onClick={() => handleLlegue(pedido)}
-                          style={{
-                            minHeight: '48px',
-                            background: '#D99E39',
-                            color: '#0B2C3E',
-                            border: 'none',
-                            borderRadius: '12px',
-                            fontSize: '15px',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Llegué a destino
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          data-testid={`btn-entregar-${pedido.id}`}
-                          onClick={() => handleEntregar(pedido)}
-                          style={{
-                            minHeight: '48px',
-                            background: '#2F7A45',
-                            color: '#FFFFFF',
-                            border: 'none',
-                            borderRadius: '12px',
-                            fontSize: '15px',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Entregar pedido
-                        </button>
-                      )}
-
-                      <button
-                        type="button"
-                        data-testid={`btn-reportar-${pedido.id}`}
-                        onClick={() => setPedidoParaFalla(pedido)}
-                        style={{
-                          minHeight: '48px',
-                          background: 'transparent',
-                          color: '#B2500F',
-                          border: '1.5px solid #B2500F',
-                          borderRadius: '12px',
-                          fontSize: '14px',
-                          fontWeight: 800,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Reportar problema
-                      </button>
-                    </div>
-                  </article>
-                );
-              })
-            )}
-          </div>
-        ) : pestana === 'para_elegir' ? (
-          /* ============================================================ */
-          /* PESTAÑA 2: PARA ELEGIR (RUTA SUGERIDA Y TOMA ATÓMICA)         */
-          /* ============================================================ */
-          <div
-            data-testid="contenido-para-elegir"
-            style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
-          >
-            {/* Resumen de ruta recalculada de los pedidos seleccionados */}
-            {seleccionadosIds.size > 0 && metricasElegidos && (
-              <div
-                data-testid="resumen-ruta-elegida"
-                style={{
-                  background: '#0B2C3E',
-                  color: '#FFFFFF',
-                  borderRadius: '16px',
-                  padding: '16px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '14px', fontWeight: 800 }}>
-                    Ruta recalculada ({seleccionadosIds.size} elegidos):
-                  </span>
-                  <span
-                    style={{
-                      fontSize: '12px',
-                      color: '#FBF4EC',
-                    }}
-                  >
-                    ~{metricasElegidos.tiempoAproxMin} min · {metricasElegidos.distanciaAproxKm} km
-                  </span>
-                </div>
-
-                <div style={{ fontSize: '12px', color: '#D99E39', fontWeight: 700 }}>
-                  Orden de paradas sugerido:{' '}
-                  {pedidosElegidosOrdenados.map((p, idx) => `${idx + 1}. ${p.codigo}`).join(' → ')}
-                </div>
-
-                <button
-                  type="button"
-                  data-testid="btn-tomar-elegidos"
-                  onClick={handleTomarElegidos}
-                  style={{
-                    minHeight: '48px',
-                    marginTop: '6px',
-                    background: '#E67929',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    borderRadius: '12px',
-                    fontSize: '15px',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(230, 121, 41, 0.3)',
-                  }}
-                >
-                  Tomar {seleccionadosIds.size} pedido(s) e Iniciar Ruta
-                </button>
-              </div>
-            )}
-
-            {rutaSugeridaDisponibles.length === 0 ? (
-              <div
-                data-testid="estado-vacio-para-elegir"
-                style={{
-                  textAlign: 'center',
-                  padding: '40px 20px',
-                  background: '#FFFFFF',
-                  borderRadius: '16px',
-                  border: '1.5px solid #E3D6C6',
-                }}
-              >
-                <h3
-                  style={{
-                    margin: '0 0 8px 0',
-                    fontSize: '16px',
-                    fontWeight: 800,
-                    color: '#0B2C3E',
-                  }}
-                >
-                  No hay pedidos listos para reparto
-                </h3>
-                <p
-                  style={{
-                    margin: '0',
-                    fontSize: '14px',
-                    color: '#5A6E78',
-                  }}
-                >
-                  Los pedidos aparecerán aquí tan pronto cocina termine de prepararlos.
-                </p>
-              </div>
-            ) : (
-              <div>
-                <div
-                  style={{
-                    fontSize: '13px',
-                    fontWeight: 800,
-                    color: '#5A6E78',
-                    marginBottom: '10px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <span>Ruta sugerida disponible:</span>
-                  <span>
-                    Cupo disponible: {maxPedidos - pedidosActivos.length}
-                  </span>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {rutaSugeridaDisponibles.map((pedido) => {
-                    const seleccionado = seleccionadosIds.has(pedido.id);
-                    const infoEspera = clasificarEspera(pedido.minutosEspera, config);
-                    const esEfectivo =
-                      pedido.pago_estado !== 'PAGADO' &&
-                      (pedido.pago_metodo === 'EFECTIVO' || pedido.pago_metodo === 'efectivo');
-
-                    return (
-                      <article
-                        key={pedido.id}
-                        data-testid={`candidato-pedido-${pedido.id}`}
-                        onClick={() => toggleSeleccion(pedido.id)}
-                        style={{
-                          background: seleccionado ? '#FBF4EC' : '#FFFFFF',
-                          borderRadius: '16px',
-                          border: seleccionado ? '2px solid #E67929' : '1.5px solid #E3D6C6',
-                          padding: '14px 16px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '10px',
-                          boxShadow: seleccionado
-                            ? '0 4px 14px rgba(230, 121, 41, 0.15)'
-                            : '0 2px 6px rgba(11, 44, 62, 0.04)',
-                          transition: 'all 0.15s ease',
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <input
-                              type="checkbox"
-                              checked={seleccionado}
-                              onChange={() => {}} // Manejado por onClick del contenedor
-                              style={{ width: '20px', height: '20px', accentColor: '#E67929' }}
-                            />
-                            <strong style={{ fontSize: '16px', color: '#0B2C3E' }}>
-                              {pedido.codigo}
-                            </strong>
-                          </div>
-
-                          <span
-                            style={{
-                              fontSize: '12px',
-                              fontWeight: 800,
-                              background: infoEspera.colorHex,
-                              color: '#FFFFFF',
-                              padding: '2px 8px',
-                              borderRadius: '6px',
-                            }}
-                          >
-                            {pedido.minutosEspera} min
-                          </span>
-                        </div>
-
-                        <div>
-                          <div style={{ fontSize: '14px', fontWeight: 700, color: '#0B2C3E' }}>
-                            {pedido.direccion || 'Dirección aproximada'}
-                          </div>
-                          {pedido.referencia && (
-                            <div style={{ fontSize: '12px', color: '#5A6E78', marginTop: '2px' }}>
-                              Ref: {pedido.referencia}
-                            </div>
-                          )}
-                          <div
-                            style={{
-                              fontSize: '12px',
-                              fontWeight: 700,
-                              color: '#B2500F',
-                              marginTop: '2px',
-                            }}
-                          >
-                            Zona: {pedido.zona || 'Local / General'}
-                          </div>
-                        </div>
-
-                        <div
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            fontSize: '13px',
-                            borderTop: '1px solid #F4ECE1',
-                            paddingTop: '8px',
-                          }}
-                        >
-                          <span>Productos: <strong>{pedido.cantidad_productos ?? 1}</strong></span>
-                          <span>
-                            Total:{' '}
-                            <strong style={{ fontSize: '14px' }}>
-                              S/ {Number(pedido.total || 0).toFixed(2)}
-                            </strong>
-                          </span>
-                        </div>
-
-                        <div
-                          style={{
-                            fontSize: '12px',
-                            fontWeight: 700,
-                            color: esEfectivo ? '#B2500F' : '#2F7A45',
-                          }}
-                        >
-                          {esEfectivo
-                            ? `Cobrar en efectivo al entregar: S/ ${Number(pedido.total).toFixed(2)}`
-                            : 'Ya pagado digitalmente'}
-                        </div>
-
-                        <div
-                          data-testid={`telefono-oculto-${pedido.id}`}
-                          style={{
-                            fontSize: '12px',
-                            color: '#5A6E78',
-                            fontStyle: 'italic',
-                          }}
-                        >
-                          Teléfono oculto hasta tomar
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        ) : (
-          /* ============================================================ */
-          /* PESTAÑA 3: HECHOS HOY (ENTREGAS COMPLETADAS Y LIQUIDACIÓN)    */
-          /* ============================================================ */
-          <div
-            data-testid="contenido-hechos-hoy"
-            style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
-          >
-            {/* Tarjeta de resumen de liquidación en efectivo */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <strong style={{ fontSize: 15, color: C.navy }}>{pedido.codigo}</strong>
+              <span style={chip('#E8F5E9', C.verde)}>Entregado</span>
+            </div>
+            <div style={{ fontSize: 13, color: C.navy }}>
+              {pedido.cliente_nombre && <div style={{ fontWeight: 700 }}>{pedido.cliente_nombre}</div>}
+              <div>{pedido.direccion || 'Dirección de entrega'}</div>
+            </div>
             <div
-              data-testid="resumen-liquidacion"
               style={{
-                background: '#FBF4EC',
-                border: '1.5px solid #E3D6C6',
-                borderRadius: '16px',
-                padding: '16px',
                 display: 'flex',
-                flexDirection: 'column',
-                gap: '8px',
+                justifyContent: 'space-between',
+                fontSize: 12,
+                color: C.gris,
+                borderTop: `1px solid ${C.suave}`,
+                paddingTop: 6,
               }}
             >
-              <div style={{ fontSize: '13px', fontWeight: 700, color: '#5A6E78' }}>
-                Resumen del turno de hoy:
-              </div>
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'baseline',
-                }}
-              >
-                <span style={{ fontSize: '14px', color: '#0B2C3E', fontWeight: 700 }}>
-                  Entregas completadas:
-                </span>
-                <span
-                  data-testid="conteo-hechos-hoy"
-                  style={{ fontSize: '18px', color: '#0B2C3E', fontWeight: 900 }}
-                >
-                  {hechosHoy.length}
-                </span>
-              </div>
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'baseline',
-                  borderTop: '1px solid #E3D6C6',
-                  paddingTop: '8px',
-                }}
-              >
-                <span style={{ fontSize: '14px', color: '#B2500F', fontWeight: 800 }}>
-                  Total cobrado en efectivo para liquidar:
-                </span>
-                <span
-                  data-testid="total-efectivo-liquidar"
-                  style={{ fontSize: '20px', color: '#B2500F', fontWeight: 900 }}
-                >
-                  S/ {totalEfectivoHoy.toFixed(2)}
-                </span>
-              </div>
+              <span>
+                Pago: <strong>{pedido.pago_metodo || 'EFECTIVO'}</strong>
+              </span>
+              <strong style={{ color: C.navy, fontSize: 14 }}>{soles(pedido.total)}</strong>
             </div>
+          </article>
+        ))
+      )}
+    </div>
+  );
 
-            {hechosHoy.length === 0 ? (
-              <div
-                data-testid="estado-vacio-hechos-hoy"
-                style={{
-                  textAlign: 'center',
-                  padding: '40px 20px',
-                  background: '#FFFFFF',
-                  borderRadius: '16px',
-                  border: '1.5px solid #E3D6C6',
-                }}
-              >
-                <h3
-                  style={{
-                    margin: '0 0 8px 0',
-                    fontSize: '16px',
-                    fontWeight: 800,
-                    color: '#0B2C3E',
-                  }}
-                >
-                  Aún no tienes entregas completadas hoy
-                </h3>
-                <p style={{ margin: '0', fontSize: '14px', color: '#5A6E78' }}>
-                  Tus pedidos entregados aparecerán aquí para tu control y rendición en caja.
-                </p>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {hechosHoy.map((pedido) => (
-                  <article
-                    key={pedido.id}
-                    data-testid={`hecho-pedido-${pedido.id}`}
-                    style={{
-                      background: '#FFFFFF',
-                      borderRadius: '14px',
-                      border: '1px solid #E3D6C6',
-                      padding: '12px 14px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '6px',
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                      }}
-                    >
-                      <strong style={{ fontSize: '15px', color: '#0B2C3E' }}>
-                        {pedido.codigo}
-                      </strong>
-                      <span
-                        style={{
-                          fontSize: '12px',
-                          fontWeight: 800,
-                          background: '#E8F5E9',
-                          color: '#2F7A45',
-                          borderRadius: '6px',
-                          padding: '2px 8px',
-                        }}
-                      >
-                        Entregado
-                      </span>
-                    </div>
+  const contenido =
+    pestana === 'mi_ruta' ? contenidoMiRuta : pestana === 'para_elegir' ? contenidoParaElegir : contenidoHechos;
 
-                    <div style={{ fontSize: '13px', color: '#0B2C3E' }}>
-                      {pedido.cliente_nombre && (
-                        <div style={{ fontWeight: 700 }}>{pedido.cliente_nombre}</div>
-                      )}
-                      <div>{pedido.direccion || 'Dirección de entrega'}</div>
-                    </div>
+  const cargandoBloque = (
+    <div role="status" style={{ textAlign: 'center', padding: '48px 16px', color: C.gris, fontWeight: 700 }}>
+      Cargando información de reparto...
+    </div>
+  );
 
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        fontSize: '12px',
-                        color: '#5A6E78',
-                        borderTop: '1px solid #F4ECE1',
-                        paddingTop: '6px',
-                      }}
-                    >
-                      <span>
-                        Pago: <strong>{pedido.pago_metodo || 'EFECTIVO'}</strong>
-                      </span>
-                      <strong style={{ color: '#0B2C3E', fontSize: '14px' }}>
-                        S/ {Number(pedido.total || 0).toFixed(2)}
-                      </strong>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </main>
+  const panel = (
+    <div
+      id="panel-repartidor"
+      role="tabpanel"
+      aria-labelledby={`pestana-${pestana}`}
+      style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
+    >
+      {avisos}
+      {cargando ? cargandoBloque : contenido}
+    </div>
+  );
 
-      {/* Modal de confirmación genérico Sí/No */}
+  const mapaEscritorio = (
+    <MapaRepartos
+      esPantallaCompleta
+      puntos={mapa.puntos}
+      rutaPuntos={mapa.ruta}
+      seleccionadoId={destacadoId}
+      resaltadosIds={mapa.resaltados}
+      onSeleccionarPunto={tocarPin}
+    />
+  );
+
+  const hojaMapa = hojaMapaAbierta && !escritorio && (
+    <HojaMapa
+      titulo={pestana === 'para_elegir' ? 'Pedidos sugeridos en el mapa' : 'Mi ruta en el mapa'}
+      puntos={mapa.puntos}
+      rutaPuntos={mapa.ruta}
+      seleccionadoId={destacadoId}
+      resaltadosIds={mapa.resaltados}
+      onSeleccionarPunto={tocarPin}
+      onCerrar={() => setHojaMapaAbierta(false)}
+    />
+  );
+
+  const modales = (
+    <>
       <Confirmar
         abierto={confirmacion.abierto}
         titulo={confirmacion.titulo}
@@ -1424,8 +1479,6 @@ export function RepartidorView() {
         alConfirmar={ejecutarAccionConfirmada}
         alCancelar={() => setConfirmacion((prev) => ({ ...prev, abierto: false }))}
       />
-
-      {/* Modal para reportar falla / incidente de entrega */}
       {pedidoParaFalla && (
         <ModalReportarFalla
           pedido={pedidoParaFalla}
@@ -1436,6 +1489,119 @@ export function RepartidorView() {
           }}
         />
       )}
+    </>
+  );
+
+  /* ---------- Escritorio: dos columnas ---------- */
+  if (escritorio) {
+    return (
+      <div
+        ref={raizRef}
+        data-testid="vista-repartidor"
+        style={{
+          flex: 1,
+          minHeight: 0,
+          width: '100%',
+          display: 'grid',
+          gridTemplateColumns: '420px minmax(0, 1fr)',
+          gridTemplateRows: 'minmax(0, 1fr)',
+          background: C.fondo,
+          fontFamily: FUENTE_TEXTO,
+          color: C.navy,
+        }}
+      >
+        <section
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            minHeight: 0,
+            background: C.blanco,
+            borderRight: `1px solid ${C.borde}`,
+          }}
+        >
+          <CabeceraRepartidor nombre={nombreUsuario} activos={pedidosActivos.length} tope={maxPedidos} compacta />
+          <BarraPestanas pestana={pestana} onCambiar={cambiarPestana} contadores={contadores} fija={false} />
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 16 }}>{panel}</div>
+          {pestana === 'para_elegir' && (
+            <div style={{ flexShrink: 0, padding: 12, borderTop: `1px solid ${C.borde}` }}>
+              <ResumenElegidos
+                cantidad={seleccionadosIds.size}
+                metricas={metricasElegidos}
+                onTomar={handleTomarElegidos}
+              />
+            </div>
+          )}
+        </section>
+
+        <section style={{ display: 'flex', flexDirection: 'column', minHeight: 0, padding: 16 }}>
+          {mapaEscritorio}
+        </section>
+
+        {modales}
+      </div>
+    );
+  }
+
+  /* ---------- Celular: una columna, barra inferior de pestañas ---------- */
+  const alturaInferior = desplazamientoBarra + ALTO_BARRA_PESTANAS;
+  const rellenoInferior =
+    alturaInferior + (pestana === 'para_elegir' && hayElegidos ? ALTO_RESUMEN_CELULAR : 0) + 16;
+
+  return (
+    <div
+      ref={raizRef}
+      data-testid="vista-repartidor"
+      style={{
+        flex: 1,
+        minHeight: 0,
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        background: C.fondo,
+        fontFamily: FUENTE_TEXTO,
+        color: C.navy,
+      }}
+    >
+      <CabeceraRepartidor nombre={nombreUsuario} activos={pedidosActivos.length} tope={maxPedidos} compacta />
+
+      <div style={{ padding: `14px 14px ${rellenoInferior}px` }}>{panel}</div>
+
+      {pestana === 'para_elegir' && (
+        <div
+          style={{
+            position: 'fixed',
+            left: 0,
+            right: 0,
+            bottom: alturaInferior,
+            zIndex: 940,
+            padding: '0 12px 8px',
+            pointerEvents: 'none',
+          }}
+        >
+          <div style={{ pointerEvents: 'auto' }}>
+            <ResumenElegidos
+              cantidad={seleccionadosIds.size}
+              metricas={metricasElegidos}
+              onTomar={handleTomarElegidos}
+            />
+          </div>
+        </div>
+      )}
+
+      <div
+        style={{
+          position: 'fixed',
+          left: 0,
+          right: 0,
+          bottom: desplazamientoBarra,
+          zIndex: 950,
+        }}
+      >
+        <BarraPestanas pestana={pestana} onCambiar={cambiarPestana} contadores={contadores} fija />
+      </div>
+
+      {hojaMapa}
+      {modales}
     </div>
   );
 }

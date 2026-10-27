@@ -47,6 +47,8 @@ export interface MapaRepartosProps {
   onSeleccionarRutaSugerida?: (ruta: RutaSugeridaSector) => void;
   mostrarRutasSugeridas?: boolean;
   onAlternarMostrarRutasSugeridas?: () => void;
+  // Pedidos resaltados en naranja (p. ej. los elegidos en la vista del repartidor)
+  resaltadosIds?: string[];
 }
 
 const CENTRO_LIMA: [number, number] = [
@@ -62,9 +64,10 @@ function crearIconoPin(
   orden?: number,
   elegido = false,
   enReparto = false,
+  resaltado = false,
 ): L.DivIcon {
   const numStr = orden ? String(orden) : '';
-  const clases = `cp-pin ${color} ${elegido ? 'elegido' : ''} ${enReparto ? 'en-reparto' : ''}`.trim();
+  const clases = `cp-pin ${color} ${elegido ? 'elegido' : ''} ${enReparto ? 'en-reparto' : ''} ${resaltado ? 'resaltado' : ''}`.trim();
 
   return L.divIcon({
     className: clases,
@@ -92,11 +95,13 @@ export function MapaRepartos({
   onSeleccionarRutaSugerida,
   mostrarRutasSugeridas = false,
   onAlternarMostrarRutasSugeridas,
+  resaltadosIds,
 }: MapaRepartosProps) {
   const contenedorRef = useRef<HTMLDivElement>(null);
   const mapaRef = useRef<L.Map | null>(null);
   const capaRutasSugeridasRef = useRef<L.LayerGroup | null>(null);
   const capaMarcadoresRef = useRef<L.LayerGroup | null>(null);
+  const puntosAjustadosRef = useRef<PuntoRepartoMapa[] | null>(null);
 
   const alSeleccionarPuntoRef = useRef(onSeleccionarPunto);
   alSeleccionarPuntoRef.current = onSeleccionarPunto;
@@ -249,7 +254,8 @@ export function MapaRepartos({
       todasCoords.push(pos);
 
       const esElegido = p.id === seleccionadoId;
-      const icono = crearIconoPin(p.color, p.orden, esElegido, !!p.enReparto);
+      const esResaltado = resaltadosIds?.includes(p.id) ?? false;
+      const icono = crearIconoPin(p.color, p.orden, esElegido, !!p.enReparto, esResaltado);
 
       const marker = L.marker(pos, {
         icon: icono,
@@ -342,15 +348,19 @@ export function MapaRepartos({
     recalcularEtiquetasRef.current = recalcularEtiquetas;
     recalcularEtiquetas();
 
-    if (todasCoords.length > 1) {
-      map.fitBounds(L.latLngBounds(todasCoords), {
-        padding: [45, 45],
-        maxZoom: 17,
-      });
-    } else {
-      map.setView(CENTRO_LIMA, 14);
+    // Solo se reajusta la vista cuando cambian los puntos, no al resaltar o seleccionar uno
+    if (puntos !== puntosAjustadosRef.current) {
+      puntosAjustadosRef.current = puntos;
+      if (todasCoords.length > 1) {
+        map.fitBounds(L.latLngBounds(todasCoords), {
+          padding: [45, 45],
+          maxZoom: 17,
+        });
+      } else {
+        map.setView(CENTRO_LIMA, 14);
+      }
     }
-  }, [puntos, seleccionadoId]);
+  }, [puntos, seleccionadoId, resaltadosIds]);
 
   return (
     <div
