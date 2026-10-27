@@ -600,6 +600,9 @@ export class WhatsappWebhookService {
           where: { id: conversacion.id },
           data: {
             estado: 'VALIDAR_PAGO',
+            // Con un voucher por revisar la conversación pasa a una persona de Caja: el bot ya no decide
+            duenio: 'PERSONA',
+            urgente: true,
             flujo: {
               ...flujoActual,
               pago: {

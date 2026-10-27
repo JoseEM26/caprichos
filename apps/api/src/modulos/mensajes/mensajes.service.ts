@@ -226,8 +226,14 @@ export class MensajesService {
     }
 
     const estado = estadoDe(c);
+    // El chat guarda 51XXXXXXXXX y el pedido puede traer solo los 9 dígitos: se compara por los últimos 9
+    const ultimos9 = String(c.telefono || '').replace(/\D/g, '').slice(-9);
     const condicion: any[] = [{ cliente_telefono: c.telefono }];
+    if (ultimos9.length === 9) condicion.push({ cliente_telefono: { endsWith: ultimos9 } });
     if (c.party_id) condicion.push({ party_id: c.party_id });
+    // El pedido cuyo voucher llegó por este chat tiene prioridad
+    const pedidoVoucherId = (c.flujo as any)?.pago?.pedidoId;
+    if (pedidoVoucherId && /^\d+$/.test(String(pedidoVoucherId))) condicion.push({ id: BigInt(pedidoVoucherId) });
     const pedido = await this.prisma.pedido.findFirst({
       where: { OR: condicion, estado: { notIn: ['ANULADO', 'ENTREGADO'] }, es_personal: false },
       orderBy: { creado_en: 'desc' },
