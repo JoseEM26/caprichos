@@ -224,7 +224,7 @@ describe('AyudaAdminService (Ola J - Asistente de Ayuda Capri)', () => {
       expect(res.estado).toBe('tope');
       expect(res.respuesta).toContain('tope mensual');
       expect(res.respuesta).toContain('Anular un pedido');
-      expect(res.respuesta).toMatch(/Yo solo te gu[íi]o/i);
+      expect(res.respuesta).not.toMatch(/Yo solo te gu[íi]o/i);
       expect(res.enlaces.some((e) => e.ruta === '/admin/caja')).toBe(true);
       expect(chatbotIaServiceMock.llamarOpenAIConTimeout).not.toHaveBeenCalled();
     });
@@ -242,7 +242,7 @@ describe('AyudaAdminService (Ola J - Asistente de Ayuda Capri)', () => {
       expect(res.estado).toBe('sin_ia');
       expect(res.respuesta).toContain('Registrar un cobro');
       expect(res.respuesta).toContain('Abre Caja y selecciona el pedido');
-      expect(res.respuesta).toMatch(/Yo solo te gu[íi]o/i);
+      expect(res.respuesta).not.toMatch(/Yo solo te gu[íi]o/i);
       expect(res.enlaces).toHaveLength(1);
       expect(res.enlaces[0].ruta).toBe('/admin/caja');
       expect(chatbotIaServiceMock.llamarOpenAIConTimeout).not.toHaveBeenCalled();

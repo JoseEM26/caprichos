@@ -35,6 +35,11 @@ Ver tambien: [[stock]]
 2. Pulsar sobre cualquiera de los enlaces de acceso directo para abrir el modulo correspondiente, como [[caja]] (Pedidos y caja), [[cocina]] o [[repartos]].
 Ver tambien: [[caja]], [[cocina]], [[repartos]]
 
+## Como se hace: Entender de donde salen las cifras
+1. Mirar el rango de fechas que aparece arriba de las tarjetas: por defecto son los ultimos 30 dias.
+2. Las cifras corresponden a ese periodo y al canal elegido (Todos, Salon, Delivery, Web o WhatsApp). Para cambiarlos, usar el boton Filtros.
+Ver tambien: [[informes]]
+
 ## Errores y dudas comunes
 - Si se ingresan fechas manuales y la fecha inicial es mayor a la final, aparece el mensaje: Las fechas van como 2026-10-15 y la inicial no puede ser despues de la final. Corrija las fechas para actualizar la informacion.
 - Si ingresa un usuario con rol operativo (cajero, cocina o repartidor), no vera los graficos de ventas globales, sino contadores especificos de su labor en el turno.
