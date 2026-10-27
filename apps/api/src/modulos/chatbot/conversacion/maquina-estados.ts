@@ -395,11 +395,30 @@ export function transicionarEstado(
   const codigoDetectado = matchCodigo ? matchCodigo[0].toUpperCase() : null;
 
   // 3. Detección de queja escrita o intención explícita de hablar con una persona
-  const esQueja = coincideAlgunaPalabra(texto, PALABRAS_QUEJA);
+  const esQueja = !(String(flujo.estado) === 'RESERVA_PREGUNTAR_NOTA') && coincideAlgunaPalabra(texto, PALABRAS_QUEJA);
+  // En pasos de texto libre de la reserva (nota, nombre, otra fecha, cambio) el cliente escribe frases
+  // como "mesa para 5 personas" o "pido atención por cumpleaños": solo cuenta como pedir persona la frase exacta.
+  const enTextoLibreReserva = [
+    'RESERVA_PREGUNTAR_NOTA',
+    'RESERVA_INGRESAR_NOMBRE',
+    'RESERVA_INGRESAR_TELEFONO',
+    'RESERVA_FECHA_OTRA',
+    'RESERVA_CAMBIAR_DETALLE',
+  ].includes(String(flujo.estado));
+  const FRASES_PERSONA_EXACTAS = [
+    'persona',
+    'asesor',
+    'hablar con alguien',
+    'hablar con una persona',
+    'hablar con persona',
+    'hablar con asesor',
+  ];
   const esPersona =
     idInteractivo === 'persona' ||
     idInteractivo === 'btn_persona' ||
-    coincideAlgunaPalabra(texto, PALABRAS_PERSONA);
+    (enTextoLibreReserva
+      ? FRASES_PERSONA_EXACTAS.includes(texto)
+      : coincideAlgunaPalabra(texto, PALABRAS_PERSONA));
 
   if (esQueja) {
     const nuevoEstado: EstadoConversacion = 'ATENCION_PERSONA';
