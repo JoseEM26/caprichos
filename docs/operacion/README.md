@@ -38,6 +38,7 @@ Esta carpeta guarda los documentos que **no describen qué hace el sistema**, si
 | RB-CAP-006 | [Código rotativo del supervisor (TOTP)](RB-CAP-006-codigo-del-supervisor.md) | listo |
 | RB-CAP-007 | [Configuración, conexión y operación del Chatbot de WhatsApp](RB-CAP-007-chatbot-whatsapp.md) | listo |
 | RB-CAP-008 | [Despliegue sin corte con docker-rollout y verificación continua con sonda](RB-CAP-008-despliegue-sin-corte-y-sonda.md) | draft |
+| CHK-CAP-001 | [Requisitos para subir a producción](CHK-CAP-001-requisitos-para-subir-a-produccion.md) | draft |
 | RB-CAP-009 | [Activación y operación de la lectura de vouchers Yape y Plin con IA](RB-CAP-009-activar-y-operar-vouchers-ia.md) | draft |
 | RB-CAP-010 | [Operación y mantenimiento del agente local de impresión de etiquetas TSPL2](RB-CAP-010-operar-agente-impresion-etiquetas.md) | draft |
 | RB-CAP-011 | [Activación y operación del Asistente de Ayuda Capri](RB-CAP-011-activar-ayuda-capri.md) | draft |
