@@ -530,4 +530,62 @@ describe('ChatbotConfiguracionService y Controller (Ola 4, Agente I)', () => {
       expect(service.darDeBajaCliente).toHaveBeenCalledWith('987654321', 'Baja solicitada', mockUsuario, '127.0.0.1');
     });
   });
+
+  describe('7. Prueba de contrato de API: GET /admin/chatbot/configuracion', () => {
+    it('fija la forma exacta del objeto devuelto por GET /admin/chatbot/configuracion (claves exactas)', async () => {
+      prisma.parametro.findMany.mockResolvedValue([]);
+
+      const respuesta = await controller.obtenerConfiguracion();
+
+      // 1. Claves de primer nivel exactas
+      const clavesPrimerNivel = Object.keys(respuesta).sort();
+      expect(clavesPrimerNivel).toEqual(
+        ['antiSpam', 'funciones', 'privacidad', 'textos', 'textosDefecto'].sort(),
+      );
+
+      // Verificación negativa contra divergencias pasadas
+      expect((respuesta as any).retencion).toBeUndefined();
+      expect((respuesta as any).consumoIa).toBeUndefined();
+      expect((respuesta as any).textosPorDefecto).toBeUndefined();
+
+      // 2. Claves de textos exactas (7 claves reales)
+      const clavesTextosEsperadas = [
+        'chatbot_texto_bienvenida',
+        'chatbot_texto_despedida',
+        'chatbot_texto_pase_persona',
+        'chatbot_texto_fuera_horario',
+        'chatbot_texto_no_entiendo',
+        'chatbot_texto_no_entiendo_derivacion',
+        'chatbot_texto_indicacion_pago',
+      ].sort();
+
+      expect(Object.keys(respuesta.textos).sort()).toEqual(clavesTextosEsperadas);
+      expect(Object.keys(respuesta.textosDefecto).sort()).toEqual(clavesTextosEsperadas);
+
+      // Verificación negativa contra claves cortas no integradas
+      expect((respuesta.textos as any).bienvenida).toBeUndefined();
+      expect((respuesta.textos as any).despedida).toBeUndefined();
+
+      // 3. Claves de funciones exactas (6 interruptores)
+      const clavesFuncionesEsperadas = [
+        'pedido',
+        'pago',
+        'reservas',
+        'cambios',
+        'ia',
+        'promociones',
+      ].sort();
+      expect(Object.keys(respuesta.funciones).sort()).toEqual(clavesFuncionesEsperadas);
+
+      // 4. Claves de antiSpam exactas
+      expect(Object.keys(respuesta.antiSpam).sort()).toEqual(
+        ['maxPorHora', 'maxPorMinuto'].sort(),
+      );
+      expect((respuesta.antiSpam as any).limiteMinuto).toBeUndefined();
+      expect((respuesta.antiSpam as any).limiteHora).toBeUndefined();
+
+      // 5. Claves de privacidad exactas
+      expect(Object.keys(respuesta.privacidad).sort()).toEqual(['diasRetencion']);
+    });
+  });
 });

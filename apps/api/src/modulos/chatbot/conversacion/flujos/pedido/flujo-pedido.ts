@@ -201,11 +201,12 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
 
     // 3. Inicio del flujo ("Hacer un pedido")
     const esInicioPedido =
-      flujo.estado === 'INICIO' ||
-      flujo.estado === 'MENU' ||
-      flujo.estado === 'PEDIDO' ||
-      entrada.id === 'pedir' ||
-      entrada.id === 'btn_pedido';
+      !entrada.id?.startsWith('ped_prod_') &&
+      (flujo.estado === 'INICIO' ||
+        flujo.estado === 'MENU' ||
+        flujo.estado === 'PEDIDO' ||
+        entrada.id === 'pedir' ||
+        entrada.id === 'btn_pedido');
 
     if (esInicioPedido && !flujo.estado.startsWith('PEDIDO_')) {
       // 3.1. Validar local cerrado o pausado
@@ -269,6 +270,55 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
           pedido: pedidoInicial,
         },
       };
+    }
+
+    // 3.b Pedido directo de un producto concreto (CTA comercial / Pedir este producto)
+    if (entrada.id?.startsWith('ped_prod_')) {
+      if (contexto.datosLocal?.pausaAltaDemanda) {
+        const extraMin = contexto.datosLocal.altaDemandaMinutosExtra || 20;
+        const motivo = contexto.datosLocal.motivoPausa || 'Muchos pedidos';
+        return {
+          nuevoEstado: 'MENU',
+          acciones: [
+            {
+              tipo: 'enviarBotones',
+              texto: `Por ahora pausamos los pedidos por alta demanda (${motivo}). La entrega tardará unos ${extraMin} min adicionales. Puedes volver al menú o consultar con un asesor.`,
+              botones: [BOTON_HABLAR_PERSONA, BOTON_VOLVER_MENU],
+            },
+          ],
+          nuevoFlujo: {
+            ...flujo,
+            estado: 'MENU',
+          },
+        };
+      }
+
+      if (contexto.datosLocal && !contexto.datosLocal.abierta) {
+        const horarioTexto = contexto.datosLocal.textoEstado || 'de 14:00 a 22:00';
+        return {
+          nuevoEstado: 'MENU',
+          acciones: [
+            {
+              tipo: 'enviarBotones',
+              texto: `Ahora estamos cerrados. Nuestro horario: ${horarioTexto}. No tomamos pedidos fuera de horario; escríbenos cuando abramos.`,
+              botones: [BOTON_VOLVER_MENU],
+            },
+          ],
+          nuevoFlujo: {
+            ...flujo,
+            estado: 'MENU',
+          },
+        };
+      }
+
+      const pedidoBase: EstadoCarritoPedido = flujo.pedido || {
+        estadoInterno: 'PEDIDO_PRODUCTOS',
+        items: [],
+        idempotenciaPaso: `step_${Date.now()}`,
+        timestampUltimaAccion: Date.now(),
+      };
+
+      return this.pasoProductos(flujo, pedidoBase, entrada, contexto);
     }
 
     // 4. Procesamiento según el estado interno del pedido
@@ -747,8 +797,21 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
     const categorias = contexto.categoriasCarta || [];
-    const catId = pedido.categoriaSeleccionadaId;
-    const categoria = categorias.find((c) => String(c.id) === String(catId));
+    const prodIdMatch = entrada.id?.startsWith('ped_prod_')
+      ? entrada.id.replace('ped_prod_', '')
+      : null;
+
+    let catId = pedido.categoriaSeleccionadaId;
+    let categoria = categorias.find((c) => String(c.id) === String(catId));
+
+    if (!categoria && prodIdMatch) {
+      categoria = categorias.find((c) =>
+        (c.productos || []).some((p: any) => String(p.id) === prodIdMatch),
+      );
+      if (categoria) {
+        pedido.categoriaSeleccionadaId = String(categoria.id);
+      }
+    }
 
     if (!categoria) {
       return this.mostrarCategorias(flujo, pedido, contexto);
@@ -767,10 +830,6 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     }
 
     // Selección de producto
-    const prodIdMatch = entrada.id?.startsWith('ped_prod_')
-      ? entrada.id.replace('ped_prod_', '')
-      : null;
-
     let producto = (categoria.productos || []).find((p: any) => String(p.id) === prodIdMatch);
     if (!producto) {
       producto = (categoria.productos || []).find(

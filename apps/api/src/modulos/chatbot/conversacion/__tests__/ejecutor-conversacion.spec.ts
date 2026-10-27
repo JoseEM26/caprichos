@@ -285,6 +285,27 @@ describe('EjecutorConversacionService (Integración de Conversación)', () => {
     });
   });
 
+  describe('3.b Chat soltado por una persona', () => {
+    it('rescata un chat del bot cuyo flujo quedó en ATENCION_PERSONA y responde al menú', async () => {
+      mockPrisma.conversacion.findUnique.mockResolvedValueOnce({
+        id: 10n,
+        telefono: '+51987654321',
+        duenio: 'BOT',
+        tomado_por: null,
+        nombre_contacto: 'Ana',
+        flujo: { version: 2, estado: 'ATENCION_PERSONA', repreguntasFallidas: 0 },
+      });
+
+      const ok = await service.procesarMensajeEntrante(10n, { texto: 'menu', waMessageId: 'wamid.menu.rescate' });
+
+      expect(ok).toBe(true);
+      expect(mockPrisma.conversacion.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ flujo: expect.objectContaining({ estado: 'MENU' }) }) }),
+      );
+      expect(mockMensajeria.enviarLista).toHaveBeenCalled();
+    });
+  });
+
   describe('4. Ejecución del menú interactivo de lista y almacenamiento en mensaje_chat', () => {
     it('responde saludo enviando lista con botón "Ver opciones" y registra en mensaje_chat con autor BOT', async () => {
       mockPrisma.conversacion.findUnique.mockResolvedValueOnce({

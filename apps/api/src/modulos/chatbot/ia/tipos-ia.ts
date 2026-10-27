@@ -59,6 +59,8 @@ export interface ResultadoConsultaIa {
   costoUsdEstimado: number;
   resultadoRegistro: 'EXITO' | 'TOPE_EXCEDIDO' | 'ERROR' | 'DERIVADO_PERSONA' | 'INYECCION_BLOQUEADA';
   motivoDerivacion?: string;
+  productoConcreto?: any;
+  productosConsultados?: any[];
 }
 
 export interface ResumenConsumoIaMes {

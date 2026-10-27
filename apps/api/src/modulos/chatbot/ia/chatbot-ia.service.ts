@@ -173,6 +173,7 @@ export class ChatbotIaService {
 
     const herramientasDefiniciones = this.herramientasService.obtenerDefinicionesHerramientas();
     const herramientasUsadas: string[] = [];
+    const productosObtenidos: any[] = [];
     let tokensEntradaTotal = 0;
     let tokensSalidaTotal = 0;
     let necesitaDerivar = false;
@@ -228,6 +229,14 @@ export class ChatbotIaService {
               necesitaDerivar = true;
             }
 
+            const prods =
+              resultadoHerramienta.resultado?.productos ||
+              resultadoHerramienta.resultado?.recomendaciones ||
+              resultadoHerramienta.resultado?.productosSugeridos;
+            if (Array.isArray(prods)) {
+              productosObtenidos.push(...prods);
+            }
+
             mensajes.push({
               role: 'tool',
               tool_call_id: llamada.id,
@@ -280,6 +289,11 @@ export class ChatbotIaService {
           resultado: necesitaDerivar ? 'DERIVADO_PERSONA' : 'EXITO',
         });
 
+        const productoConcreto =
+          productosObtenidos.length === 1 ? productosObtenidos[0] : undefined;
+        const productosConsultados =
+          productosObtenidos.length > 1 ? productosObtenidos : undefined;
+
         const resultadoFinal: ResultadoConsultaIa = {
           exito: true,
           respuestaTexto: textoFinal || TEXTOS_IA.errorConsulta(),
@@ -291,6 +305,8 @@ export class ChatbotIaService {
           tokensSalida: tokensSalidaTotal,
           costoUsdEstimado: costoUsd,
           resultadoRegistro: necesitaDerivar ? 'DERIVADO_PERSONA' : 'EXITO',
+          productoConcreto,
+          productosConsultados,
         };
 
         // Cachear respuesta para idempotencia si waMessageId está presente

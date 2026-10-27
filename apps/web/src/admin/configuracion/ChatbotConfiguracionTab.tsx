@@ -1,10 +1,31 @@
-import { useState, useEffect } from 'react';
+import { Component, ReactNode, ErrorInfo, useState, useEffect } from 'react';
 import { api, ErrorApi } from '../../comun/api';
 import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { Confirmar } from '../../comun/Confirmar';
 import { Insignia } from '../../comun/Insignia';
+
+export const LIMITE_WHATSAPP_CUERPO = 1024;
+
+export type ClaveTextoBot =
+  | 'chatbot_texto_bienvenida'
+  | 'chatbot_texto_despedida'
+  | 'chatbot_texto_pase_persona'
+  | 'chatbot_texto_fuera_horario'
+  | 'chatbot_texto_no_entiendo'
+  | 'chatbot_texto_no_entiendo_derivacion'
+  | 'chatbot_texto_indicacion_pago';
+
+export const CLAVES_TEXTOS_BOT: ClaveTextoBot[] = [
+  'chatbot_texto_bienvenida',
+  'chatbot_texto_despedida',
+  'chatbot_texto_pase_persona',
+  'chatbot_texto_fuera_horario',
+  'chatbot_texto_no_entiendo',
+  'chatbot_texto_no_entiendo_derivacion',
+  'chatbot_texto_indicacion_pago',
+];
 
 export interface FuncionesBotState {
   pedido: boolean;
@@ -15,20 +36,14 @@ export interface FuncionesBotState {
   promociones: boolean;
 }
 
-export interface TextosBotState {
-  bienvenida: string;
-  despedida: string;
-  pasarAPersona: string;
-  noEntiendoRepregunta: string;
-  noEntiendoDerivacion: string;
-}
+export type TextosBotState = Record<ClaveTextoBot, string>;
 
 export interface AntiSpamState {
-  limiteMinuto: number;
-  limiteHora: number;
+  maxPorMinuto: number;
+  maxPorHora: number;
 }
 
-export interface RetencionState {
+export interface PrivacidadState {
   diasRetencion: number;
 }
 
@@ -47,49 +62,43 @@ export interface ConsumoIaState {
 
 export interface ConfiguracionBotRespuesta {
   textos: TextosBotState;
-  textosPorDefecto: TextosBotState;
+  textosDefecto: TextosBotState;
   funciones: FuncionesBotState;
   antiSpam: AntiSpamState;
-  retencion: RetencionState;
-  consumoIa: ConsumoIaState | null;
+  privacidad: PrivacidadState;
+  // Compatibilidad defensiva
+  textosPorDefecto?: TextosBotState;
+  retencion?: PrivacidadState;
+  consumoIa?: ConsumoIaState | null;
 }
 
 export interface ExportacionClienteRespuesta {
-  solicitud: {
-    solicitante: string;
-    fecha: string;
-    motivo: string;
-  };
   identificadorEnmascarado: string;
-  consentimiento: {
-    existe: boolean;
-    acepta: boolean;
-    origen: string | null;
-    fechaRegistro: string | null;
+  nombreContacto?: string;
+  identificadorTipo?: string;
+  consentimiento?: {
+    acepta?: boolean;
+    aceptaComunicaciones?: boolean;
+    origen?: string | null;
+    actualizadoEn?: string | null;
+    fechaRegistro?: string | null;
   };
-  totalConversaciones: number;
-  totalMensajes: number;
-  totalPedidos: number;
-  conversaciones: Array<{
+  conversacion?: {
     id: string;
-    fechaInicio: string;
-    telefonoEnmascarado: string;
-    nombreCliente: string | null;
-    mensajes: Array<{
-      id: string;
-      direccion: string;
-      fechaEnvio: string;
-      contenido: string;
-      anonimizado: boolean;
-    }>;
-  }>;
-  pedidos: Array<{
-    id: string;
-    codigo: string;
     estado: string;
-    fecha: string;
-    total: number;
-  }>;
+    duenio: string;
+    ultimaActividad: string;
+  } | null;
+  totalConversaciones?: number;
+  totalMensajes?: number;
+  totalPedidos?: number;
+  mensajes?: Array<any>;
+  pedidos?: Array<any>;
+  solicitud?: {
+    solicitante?: string;
+    fecha?: string;
+    motivo?: string;
+  };
 }
 
 export interface ChatbotConfiguracionTabProps {
@@ -97,7 +106,7 @@ export interface ChatbotConfiguracionTabProps {
   puedeEditar: boolean;
 }
 
-const META_FUNCIONES: Record<
+export const META_FUNCIONES: Record<
   keyof FuncionesBotState,
   { titulo: string; descripcion: string }
 > = {
@@ -127,44 +136,107 @@ const META_FUNCIONES: Record<
   },
 };
 
-const META_TEXTOS: Record<
-  keyof TextosBotState,
+export const META_TEXTOS: Record<
+  ClaveTextoBot,
   { titulo: string; descripcion: string }
 > = {
-  bienvenida: {
+  chatbot_texto_bienvenida: {
     titulo: 'Mensaje de bienvenida',
     descripcion: 'Saludo inicial del bot con opciones de carta, delivery y atención.',
   },
-  despedida: {
+  chatbot_texto_despedida: {
     titulo: 'Mensaje de despedida',
     descripcion: 'Respuesta cordial cuando el cliente agradece o se despide.',
   },
-  pasarAPersona: {
+  chatbot_texto_pase_persona: {
     titulo: 'Pase a asesor humano',
     descripcion: 'Mensaje cuando el cliente solicita comunicarse directamente con una persona.',
   },
-  noEntiendoRepregunta: {
+  chatbot_texto_fuera_horario: {
+    titulo: 'Fuera de horario',
+    descripcion: 'Mensaje enviado cuando el cliente escribe fuera del horario de atención.',
+  },
+  chatbot_texto_no_entiendo: {
     titulo: 'Repregunta al no entender',
     descripcion: 'Primera respuesta cuando el bot no reconoce la intención del mensaje.',
   },
-  noEntiendoDerivacion: {
+  chatbot_texto_no_entiendo_derivacion: {
     titulo: 'Derivación al no entender',
     descripcion: 'Segunda repregunta consecutiva sin entender, transfiriendo al equipo humano.',
   },
+  chatbot_texto_indicacion_pago: {
+    titulo: 'Indicación de pago',
+    descripcion: 'Instrucciones para envío de comprobantes de pago por Yape, Plin o transferencia.',
+  },
 };
 
-const LIMITE_WHATSAPP_CUERPO = 1024;
+const TEXTOS_DEFECTO_BASE: TextosBotState = {
+  chatbot_texto_bienvenida: '',
+  chatbot_texto_despedida: '',
+  chatbot_texto_pase_persona: '',
+  chatbot_texto_fuera_horario: '',
+  chatbot_texto_no_entiendo: '',
+  chatbot_texto_no_entiendo_derivacion: '',
+  chatbot_texto_indicacion_pago: '',
+};
 
 type ModalAccion =
   | { tipo: 'toggle_funcion'; funcion: keyof FuncionesBotState; nuevoEstado: boolean }
-  | { tipo: 'guardar_texto'; clave: keyof TextosBotState }
-  | { tipo: 'restablecer_texto'; clave: keyof TextosBotState }
+  | { tipo: 'guardar_texto'; clave: ClaveTextoBot }
+  | { tipo: 'restablecer_texto'; clave: ClaveTextoBot }
   | { tipo: 'guardar_antispam' }
   | { tipo: 'guardar_retencion' }
   | { tipo: 'ejecutar_retencion' }
   | { tipo: 'baja_cliente' };
 
-export function ChatbotConfiguracionTab({
+interface LimiteErrorChatbotProps {
+  children: ReactNode;
+  alReintentar?: () => void;
+}
+
+interface LimiteErrorChatbotState {
+  tieneError: boolean;
+  error: Error | null;
+}
+
+export class LimiteErrorChatbot extends Component<
+  LimiteErrorChatbotProps,
+  LimiteErrorChatbotState
+> {
+  constructor(props: LimiteErrorChatbotProps) {
+    super(props);
+    this.state = { tieneError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): LimiteErrorChatbotState {
+    return { tieneError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('Error capturado en LimiteErrorChatbot:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.tieneError) {
+      return (
+        <EstadoError
+          titulo="Error al cargar la pantalla del chatbot"
+          mensaje={
+            this.state.error?.message ||
+            'Ocurrió un error inesperado al renderizar la configuración del chatbot.'
+          }
+          alReintentar={() => {
+            this.setState({ tieneError: false, error: null });
+            this.props.alReintentar?.();
+          }}
+        />
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function ChatbotConfiguracionVista({
   puedeVer = true,
   puedeEditar,
 }: ChatbotConfiguracionTabProps) {
@@ -174,34 +246,22 @@ export function ChatbotConfiguracionTab({
   const [errorOperacion, setErrorOperacion] = useState<string | null>(null);
   const [accionEnCurso, setAccionEnCurso] = useState(false);
 
-  // Estados de configuración
+  // Estados de configuración con fallbacks seguros
   const [funciones, setFunciones] = useState<FuncionesBotState>({
     pedido: true,
     pago: true,
     reservas: true,
     cambios: true,
-    ia: true,
+    ia: false,
     promociones: true,
   });
-  const [textos, setTextos] = useState<TextosBotState>({
-    bienvenida: '',
-    despedida: '',
-    pasarAPersona: '',
-    noEntiendoRepregunta: '',
-    noEntiendoDerivacion: '',
-  });
-  const [textosPorDefecto, setTextosPorDefecto] = useState<TextosBotState>({
-    bienvenida: '',
-    despedida: '',
-    pasarAPersona: '',
-    noEntiendoRepregunta: '',
-    noEntiendoDerivacion: '',
-  });
+  const [textos, setTextos] = useState<TextosBotState>(TEXTOS_DEFECTO_BASE);
+  const [textosDefecto, setTextosDefecto] = useState<TextosBotState>(TEXTOS_DEFECTO_BASE);
   const [antiSpam, setAntiSpam] = useState<AntiSpamState>({
-    limiteMinuto: 10,
-    limiteHora: 60,
+    maxPorMinuto: 10,
+    maxPorHora: 60,
   });
-  const [retencion, setRetencion] = useState<RetencionState>({
+  const [privacidad, setPrivacidad] = useState<PrivacidadState>({
     diasRetencion: 90,
   });
   const [consumoIa, setConsumoIa] = useState<ConsumoIaState | null>(null);
@@ -219,20 +279,57 @@ export function ChatbotConfiguracionTab({
     setCargando(true);
     setErrorCarga(null);
     try {
-      const data = await api.get<ConfiguracionBotRespuesta>('/admin/chatbot/configuracion');
-      if (data) {
-        setFunciones(data.funciones);
-        setTextos(data.textos);
-        setTextosPorDefecto(data.textosPorDefecto);
-        setAntiSpam(data.antiSpam);
-        setRetencion(data.retencion);
-        setConsumoIa(data.consumoIa);
+      const [dataConfigRes, dataIaRes] = await Promise.allSettled([
+        api.get<ConfiguracionBotRespuesta>('/admin/chatbot/configuracion'),
+        api.get<ConsumoIaState>('/admin/configuracion/ia-consumo'),
+      ]);
+
+      if (dataConfigRes.status === 'fulfilled' && dataConfigRes.value) {
+        const data = dataConfigRes.value;
+        if (data.funciones) {
+          setFunciones((prev) => ({ ...prev, ...data.funciones }));
+        }
+        if (data.textos) {
+          setTextos((prev) => ({ ...prev, ...data.textos }));
+        }
+        const textosPorDefectoOrig = data.textosDefecto || data.textosPorDefecto;
+        if (textosPorDefectoOrig) {
+          setTextosDefecto((prev) => ({ ...prev, ...textosPorDefectoOrig }));
+        }
+        if (data.antiSpam) {
+          setAntiSpam((prev) => ({
+            maxPorMinuto:
+              typeof data.antiSpam.maxPorMinuto === 'number'
+                ? data.antiSpam.maxPorMinuto
+                : typeof (data.antiSpam as any).limiteMinuto === 'number'
+                ? (data.antiSpam as any).limiteMinuto
+                : prev.maxPorMinuto,
+            maxPorHora:
+              typeof data.antiSpam.maxPorHora === 'number'
+                ? data.antiSpam.maxPorHora
+                : typeof (data.antiSpam as any).limiteHora === 'number'
+                ? (data.antiSpam as any).limiteHora
+                : prev.maxPorHora,
+          }));
+        }
+        const ret = data.privacidad || data.retencion;
+        if (ret && typeof ret.diasRetencion === 'number') {
+          setPrivacidad({ diasRetencion: ret.diasRetencion });
+        }
+      } else if (dataConfigRes.status === 'rejected') {
+        throw dataConfigRes.reason;
       }
-    } catch (err) {
+
+      if (dataIaRes.status === 'fulfilled' && dataIaRes.value) {
+        setConsumoIa(dataIaRes.value);
+      } else {
+        setConsumoIa(null);
+      }
+    } catch (err: any) {
       const msg =
         err instanceof ErrorApi
           ? err.message
-          : 'No se pudo cargar la configuración del chatbot';
+          : err?.message || 'No se pudo cargar la configuración del chatbot';
       setErrorCarga(msg);
     } finally {
       setCargando(false);
@@ -264,63 +361,71 @@ export function ChatbotConfiguracionTab({
           } correctamente.`,
         );
       } else if (modal.tipo === 'guardar_texto') {
-        const textoActual = textos[modal.clave];
+        const textoActual = (textos[modal.clave] ?? '').trim();
         if (textoActual.length > LIMITE_WHATSAPP_CUERPO) {
           throw new Error(
             `El texto supera el límite de WhatsApp de ${LIMITE_WHATSAPP_CUERPO} caracteres.`,
           );
         }
         await api.put('/admin/chatbot/configuracion/textos', {
-          clave: modal.clave,
-          texto: textoActual,
+          [modal.clave]: textoActual,
         });
         setMensajeExito(
           `Texto "${META_TEXTOS[modal.clave].titulo}" actualizado correctamente.`,
         );
       } else if (modal.tipo === 'restablecer_texto') {
-        const res = await api.post<{ clave: string; texto: string }>(
+        const res = await api.post<{ clave: string; valor?: string; texto?: string }>(
           '/admin/chatbot/configuracion/textos/restablecer',
           { clave: modal.clave },
         );
+        const valorRestablecido =
+          res.valor ?? res.texto ?? textosDefecto[modal.clave] ?? '';
         setTextos((prev) => ({
           ...prev,
-          [modal.clave]: res.texto,
+          [modal.clave]: valorRestablecido,
         }));
         setMensajeExito(
           `Texto "${META_TEXTOS[modal.clave].titulo}" restablecido a su valor por defecto.`,
         );
       } else if (modal.tipo === 'guardar_antispam') {
         await api.put('/admin/chatbot/configuracion/anti-spam', {
-          limiteMinuto: Number(antiSpam.limiteMinuto),
-          limiteHora: Number(antiSpam.limiteHora),
+          maxPorMinuto: Number(antiSpam.maxPorMinuto),
+          maxPorHora: Number(antiSpam.maxPorHora),
         });
         setMensajeExito('Parámetros de control anti-spam actualizados correctamente.');
       } else if (modal.tipo === 'guardar_retencion') {
         await api.put('/admin/chatbot/configuracion/retencion', {
-          diasRetencion: Number(retencion.diasRetencion),
+          diasRetencion: Number(privacidad.diasRetencion),
         });
         setMensajeExito('Plazo de retención de mensajes actualizado correctamente.');
       } else if (modal.tipo === 'ejecutar_retencion') {
         const res = await api.post<{
-          mensajesAnonimizados: number;
+          anonimizados?: number;
+          mensajesAnonimizados?: number;
           fechaCorte: string;
-          mensaje: string;
+          diasRetencion?: number;
+          mensaje?: string;
         }>('/admin/chatbot/configuracion/retencion/ejecutar', {});
+        const total = res.anonimizados ?? res.mensajesAnonimizados ?? 0;
         setMensajeExito(
-          `Anonimización completada: se anonimizaron ${res.mensajesAnonimizados} mensajes anteriores al ${res.fechaCorte}. Los registros se preservan sin datos personales.`,
+          `Anonimización completada: se anonimizaron ${total} mensajes anteriores al ${res.fechaCorte}. Los registros se preservan sin datos personales.`,
         );
       } else if (modal.tipo === 'baja_cliente') {
         const res = await api.post<{
-          identificadorEnmascarado: string;
-          conversacionesAnonimizadas: number;
-          mensajesAnonimizados: number;
-          mensaje: string;
+          exito?: boolean;
+          mensaje?: string;
+          identificador?: string;
+          identificadorEnmascarado?: string;
+          conversacionesAnonimizadas?: number;
+          mensajesAnonimizados?: number;
         }>('/admin/chatbot/configuracion/privacidad/baja', {
           identificador: identificadorArco.trim(),
           motivo: motivoArco.trim() || undefined,
         });
+        const idMask =
+          res.identificador ?? res.identificadorEnmascarado ?? identificadorArco.trim();
         setMensajeExito(
-          `Cliente con identificador ${res.identificadorEnmascarado} dado de baja exitosamente. Se anonimizaron ${res.conversacionesAnonimizadas} conversaciones y ${res.mensajesAnonimizados} mensajes.`,
+          `Cliente con identificador ${idMask} dado de baja exitosamente. Sus datos personales han sido anonimizados conforme a la Ley 29733.`,
         );
         setResultadoArco(null);
       }
@@ -343,9 +448,6 @@ export function ChatbotConfiguracionTab({
     try {
       const queryParams = new URLSearchParams();
       queryParams.set('identificador', identificadorArco.trim());
-      if (motivoArco.trim()) {
-        queryParams.set('motivo', motivoArco.trim());
-      }
       const data = await api.get<ExportacionClienteRespuesta>(
         `/admin/chatbot/configuracion/privacidad/exportar?${queryParams.toString()}`,
       );
@@ -503,7 +605,7 @@ export function ChatbotConfiguracionTab({
               Consumo y estado del motor de IA
             </div>
             <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-              Monitoreo del presupuesto mensual de tokens y cuota operativa (Claude).
+              Monitoreo del presupuesto mensual de tokens y cuota operativa.
             </div>
           </div>
 
@@ -621,7 +723,7 @@ export function ChatbotConfiguracionTab({
         >
           {(Object.keys(META_FUNCIONES) as Array<keyof FuncionesBotState>).map((key) => {
             const meta = META_FUNCIONES[key];
-            const activa = funciones[key];
+            const activa = Boolean(funciones[key]);
 
             return (
               <div
@@ -729,12 +831,12 @@ export function ChatbotConfiguracionTab({
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {(Object.keys(META_TEXTOS) as Array<keyof TextosBotState>).map((key) => {
+          {CLAVES_TEXTOS_BOT.map((key) => {
             const meta = META_TEXTOS[key];
             const valorActual = textos[key] ?? '';
             const caracteres = valorActual.length;
             const excedeLimite = caracteres > LIMITE_WHATSAPP_CUERPO;
-            const textoOriginal = textosPorDefecto[key] ?? '';
+            const textoOriginal = textosDefecto[key] ?? '';
             const esDiferenteDeDefecto = valorActual !== textoOriginal;
 
             return (
@@ -789,6 +891,7 @@ export function ChatbotConfiguracionTab({
 
                 <textarea
                   id={`texto-bot-${key}`}
+                  aria-label={meta.titulo}
                   rows={4}
                   value={valorActual}
                   disabled={!puedeEditar || accionEnCurso}
@@ -930,15 +1033,16 @@ export function ChatbotConfiguracionTab({
             </label>
             <input
               id="limite-minuto"
+              aria-label="Máximo mensajes por minuto"
               type="number"
               min="1"
               max="60"
-              value={antiSpam.limiteMinuto}
+              value={antiSpam.maxPorMinuto}
               disabled={!puedeEditar || accionEnCurso}
               onChange={(e) =>
                 setAntiSpam((prev) => ({
                   ...prev,
-                  limiteMinuto: Number(e.target.value) || 0,
+                  maxPorMinuto: Number(e.target.value) || 0,
                 }))
               }
               style={{
@@ -969,15 +1073,16 @@ export function ChatbotConfiguracionTab({
             </label>
             <input
               id="limite-hora"
+              aria-label="Máximo mensajes por hora"
               type="number"
-              min="1"
+              min="5"
               max="500"
-              value={antiSpam.limiteHora}
+              value={antiSpam.maxPorHora}
               disabled={!puedeEditar || accionEnCurso}
               onChange={(e) =>
                 setAntiSpam((prev) => ({
                   ...prev,
-                  limiteHora: Number(e.target.value) || 0,
+                  maxPorHora: Number(e.target.value) || 0,
                 }))
               }
               style={{
@@ -1039,7 +1144,7 @@ export function ChatbotConfiguracionTab({
               margin: '3px 0 0 0',
             }}
           >
-            Cumplimiento normativo para la retención, anonimización y ejercicio de derechos ARCO (Acceso, Rectificación, Cancelación y Oposición) sin exponer teléfonos completos.
+            Cumplimiento normativo para la retención, anonimización y ejercicio de derechos ARCO sin exponer teléfonos completos.
           </p>
         </div>
 
@@ -1090,13 +1195,14 @@ export function ChatbotConfiguracionTab({
               </label>
               <input
                 id="dias-retencion"
+                aria-label="Días de retención de mensajes"
                 type="number"
                 min="7"
-                max="365"
-                value={retencion.diasRetencion}
+                max="730"
+                value={privacidad.diasRetencion}
                 disabled={!puedeEditar || accionEnCurso}
                 onChange={(e) =>
-                  setRetencion({ diasRetencion: Number(e.target.value) || 0 })
+                  setPrivacidad({ diasRetencion: Number(e.target.value) || 0 })
                 }
                 style={{
                   width: '100%',
@@ -1181,6 +1287,7 @@ export function ChatbotConfiguracionTab({
               </label>
               <input
                 id="identificador-arco"
+                aria-label="Número de teléfono o identificador"
                 type="text"
                 placeholder="Ejemplo: 987654321"
                 value={identificadorArco}
@@ -1213,6 +1320,7 @@ export function ChatbotConfiguracionTab({
               </label>
               <input
                 id="motivo-arco"
+                aria-label="Motivo de la solicitud (para auditoría)"
                 type="text"
                 placeholder="Ejemplo: Solicitud ARCO de cancelación por titular"
                 value={motivoArco}
@@ -1303,32 +1411,48 @@ export function ChatbotConfiguracionTab({
                     Consentimiento Ley 29733
                   </span>
                   <b>
-                    {resultadoArco.consentimiento.acepta
+                    {(resultadoArco.consentimiento?.aceptaComunicaciones ??
+                    resultadoArco.consentimiento?.acepta ??
+                    true)
                       ? 'Activo y vigente'
                       : 'Revocado / Inactivo'}
                   </b>{' '}
-                  ({resultadoArco.consentimiento.origen || 'Sin registro'})
+                  ({resultadoArco.consentimiento?.origen || 'Sin registro'})
                 </div>
 
                 <div>
                   <span style={{ color: 'var(--cp-soft)', fontSize: '11px', display: 'block' }}>
                     Conversaciones asociadas
                   </span>
-                  <b>{resultadoArco.totalConversaciones} conversaciones</b>
+                  <b>
+                    {resultadoArco.totalConversaciones ??
+                      (resultadoArco.conversacion ? 1 : 0)}{' '}
+                    conversaciones
+                  </b>
                 </div>
 
                 <div>
                   <span style={{ color: 'var(--cp-soft)', fontSize: '11px', display: 'block' }}>
                     Mensajes registrados
                   </span>
-                  <b>{resultadoArco.totalMensajes} mensajes</b>
+                  <b>
+                    {resultadoArco.totalMensajes ??
+                      resultadoArco.mensajes?.length ??
+                      0}{' '}
+                    mensajes
+                  </b>
                 </div>
 
                 <div>
                   <span style={{ color: 'var(--cp-soft)', fontSize: '11px', display: 'block' }}>
                     Pedidos asociados
                   </span>
-                  <b>{resultadoArco.totalPedidos} pedidos</b>
+                  <b>
+                    {resultadoArco.totalPedidos ??
+                      resultadoArco.pedidos?.length ??
+                      0}{' '}
+                    pedidos
+                  </b>
                 </div>
               </div>
 
@@ -1377,9 +1501,9 @@ export function ChatbotConfiguracionTab({
             : modal?.tipo === 'guardar_antispam'
             ? '¿Deseas actualizar los límites de frecuencia anti-spam en Redis?'
             : modal?.tipo === 'guardar_retencion'
-            ? `¿Deseas establecer el plazo de retención en ${retencion.diasRetencion} días?`
+            ? `¿Deseas establecer el plazo de retención en ${privacidad.diasRetencion} días?`
             : modal?.tipo === 'ejecutar_retencion'
-            ? `¿Deseas anonimizar todos los mensajes anteriores a ${retencion.diasRetencion} días? Los registros se preservarán sin datos personales.`
+            ? `¿Deseas anonimizar todos los mensajes anteriores a ${privacidad.diasRetencion} días? Los registros se preservarán sin datos personales.`
             : modal?.tipo === 'baja_cliente'
             ? `¿Deseas dar de baja al cliente con identificador "${identificadorArco.trim()}"? Se revocará su consentimiento y sus datos sensibles serán anonimizados según la Ley 29733.`
             : '¿Deseas confirmar la acción seleccionada?'
@@ -1405,5 +1529,13 @@ export function ChatbotConfiguracionTab({
         }}
       />
     </div>
+  );
+}
+
+export function ChatbotConfiguracionTab(props: ChatbotConfiguracionTabProps) {
+  return (
+    <LimiteErrorChatbot>
+      <ChatbotConfiguracionVista {...props} />
+    </LimiteErrorChatbot>
   );
 }

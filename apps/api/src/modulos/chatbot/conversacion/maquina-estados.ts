@@ -37,6 +37,11 @@ import {
   TEXTOS_FUNCIONES_DESACTIVADAS,
   BOTONES_FUNCION_PAUSADA,
 } from '../configuracion/chatbot-configuracion.tipos';
+import {
+  buscarOfertaParaProducto,
+  generarCierreComercial,
+  adjuntarCierreComercial,
+} from './cierre-comercial.util';
 import './flujos/pedido/flujo-pedido';
 import './flujos/pago/flujo-pago';
 import './flujos/reserva/flujo-reserva';
@@ -1111,13 +1116,35 @@ export function transicionarEstado(
     }
 
     if (productoEncontrado) {
+      const ofertaEncajada = buscarOfertaParaProducto(
+        productoEncontrado,
+        contexto.ofertas || [],
+        contexto.categoriasCarta || [],
+      );
+
+      const yaEnPedido = Boolean(
+        flujo.pedido &&
+        (flujo.pedido as any).productoSeleccionadoId === String(prodId),
+      );
+
+      const cierre = generarCierreComercial({
+        producto: productoEncontrado,
+        oferta: ofertaEncajada,
+        funcionesActivas: contexto.funcionesActivas,
+        indiceVariante: Number(prodId || 0),
+        yaEnPedido,
+      });
+
+      const textoDetalle = TEXTOS_BOT.detalleProducto(productoEncontrado, contexto.cartaUrlPublica);
+      const textoFinal = adjuntarCierreComercial(textoDetalle, cierre);
+
       return {
         nuevoEstado: 'CARTA_PRODUCTO_DETALLE',
         acciones: [
           {
             tipo: 'enviarBotones',
-            texto: TEXTOS_BOT.detalleProducto(productoEncontrado, contexto.cartaUrlPublica),
-            botones: [BOTON_VOLVER_CATEGORIAS, BOTON_VOLVER_MENU],
+            texto: textoFinal,
+            botones: cierre.botones.length > 0 ? cierre.botones : [BOTON_VOLVER_CATEGORIAS, BOTON_VOLVER_MENU],
           },
         ],
         nuevoFlujo: {

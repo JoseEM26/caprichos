@@ -15,6 +15,13 @@ import { ChatbotConfiguracionService } from '../configuracion/chatbot-configurac
 import { BOTON_VOLVER_MENU, TEXTOS_BOT, TEXTO_ASISTIDO_FRASE_FIJA } from './textos-bot';
 import { TEXTOS_RESERVA } from './textos-reserva';
 import { TEXTOS_IA, BOTONES_IA_ESTANDAR, BOTONES_IA_CON_PEDIDO } from './textos-ia';
+import {
+  buscarOfertaParaProducto,
+  generarCierreComercial,
+  adjuntarCierreComercial,
+  validarYCorregirPreciosIa,
+  limpiarFrasesPasivasIa,
+} from './cierre-comercial.util';
 import { obtenerFechaLimaActual, resolverFechaEntradaReserva } from './flujos/reserva/flujo-reserva';
 import {
   WHATSAPP_MENSAJERIA_PUERTO,
@@ -288,6 +295,63 @@ export class EjecutorConversacionService {
   }
 
   /**
+   * Identifica si la consulta a la IA trata sobre un producto concreto o sobre varios productos,
+   * cruzando el resultado de las herramientas con el catálogo de productos disponibles.
+   */
+  private identificarProductosConsulta(
+    textoPregunta: string,
+    textoRespuesta: string,
+    categorias: any[],
+    resIa?: any,
+  ): { productoConcreto?: any; productosMultiples?: any[] } {
+    if (resIa?.productoConcreto) {
+      const pNombre = (resIa.productoConcreto.nombre || '').toLowerCase();
+      for (const cat of categorias) {
+        const encontrado = (cat.productos || []).find(
+          (p: any) =>
+            p.nombre.toLowerCase() === pNombre ||
+            String(p.id) === String(resIa.productoConcreto.id),
+        );
+        if (encontrado) {
+          return { productoConcreto: { ...encontrado, categoriaId: cat.id } };
+        }
+      }
+      return { productoConcreto: resIa.productoConcreto };
+    }
+
+    const textoCompleto = `${textoPregunta || ''} ${textoRespuesta || ''}`.toLowerCase();
+    const productosCoincidentes: any[] = [];
+
+    for (const cat of categorias) {
+      for (const prod of cat.productos || []) {
+        const nombreProd = (prod.nombre || '').toLowerCase();
+        if (
+          nombreProd &&
+          nombreProd.length >= 3 &&
+          (textoPregunta.toLowerCase().includes(nombreProd) ||
+            textoRespuesta.toLowerCase().includes(nombreProd))
+        ) {
+          productosCoincidentes.push({ ...prod, categoriaId: cat.id });
+        }
+      }
+    }
+
+    if (productosCoincidentes.length === 1) {
+      return { productoConcreto: productosCoincidentes[0] };
+    }
+
+    if (productosCoincidentes.length > 1) {
+      return { productosMultiples: productosCoincidentes };
+    }
+
+    if (resIa?.productosConsultados && resIa.productosConsultados.length > 1) {
+      return { productosMultiples: resIa.productosConsultados };
+    }
+
+    return {};
+  }
+
+  /**
    * Procesa un mensaje entrante coordinando el motor puro de conversación,
    * aplicando validaciones de estado, rate limit, idempotencia y despachando las acciones al puerto.
    */
@@ -309,7 +373,18 @@ export class EjecutorConversacionService {
 
     // 2. Control de atención y Modo Asistido (Contrato Modo Asistido 27/10/2026):
     const esValidarPago = conversacion.estado === 'VALIDAR_PAGO';
-    const flujoPrevio = (conversacion.flujo as any) as FlujoConversacion | null;
+    let flujoPrevio = (conversacion.flujo as any) as FlujoConversacion | null;
+    // Rescate: chat que una persona ya soltó (dueño BOT, sin tomar) pero cuyo flujo quedó en ATENCION_PERSONA
+    // por un error anterior: vuelve al menú para que el bot responda en vez de callar para siempre.
+    if (conversacion.duenio === 'BOT' && conversacion.tomado_por === null && flujoPrevio?.estado === 'ATENCION_PERSONA') {
+      flujoPrevio = { ...(flujoPrevio as any), estado: 'MENU', repreguntasFallidas: 0 } as FlujoConversacion;
+      (conversacion as any).flujo = flujoPrevio as any;
+      try {
+        await this.prisma.conversacion.update({ where: { id: conversacion.id }, data: { flujo: flujoPrevio as any } });
+      } catch (err: any) {
+        this.logger.warn(`No se pudo rescatar el flujo de la conversación ${conversacionId}: ${err.message}`);
+      }
+    }
     const enManosDePersona =
       conversacion.duenio !== 'BOT' ||
       conversacion.tomado_por !== null ||
@@ -348,7 +423,9 @@ export class EjecutorConversacionService {
           (Date.now() - new Date(ultimoMensajePersona.en).getTime()) / (60 * 1000);
       }
 
-      if (minutosDesdeUltimoHumano < asistidoEsperaMin) {
+      // Una acción directa del cliente (menú, carta, pedir) se atiende aunque la persona haya escrito hace poco;
+      // solo el chat tomado (arriba) mantiene al bot callado.
+      if (minutosDesdeUltimoHumano < asistidoEsperaMin && !this.esAccionInmediataAsistido(entradaRaw)) {
         this.logger.log(
           `Persona escribió hace ${minutosDesdeUltimoHumano.toFixed(1)} min (< ${asistidoEsperaMin} min). El bot calla.`,
         );
@@ -1528,8 +1605,59 @@ export class EjecutorConversacionService {
             esDerivacion = resIa.necesitaDerivar || !resIa.exito;
             motivoDeriv = resIa.motivoDerivacion || 'CONSULTA_IA_DERIVADA';
 
-            if (resIa.quierePedir) {
-              botonesEnvio = BOTONES_IA_CON_PEDIDO;
+            if (!esDerivacion) {
+              const { productoConcreto, productosMultiples } = this.identificarProductosConsulta(
+                accion.pregunta,
+                textoRespuesta,
+                contexto.categoriasCarta || [],
+                resIa,
+              );
+
+              if (productoConcreto) {
+                const validacion = validarYCorregirPreciosIa(
+                  textoRespuesta,
+                  productoConcreto,
+                  contexto.cartaUrlPublica,
+                );
+                textoRespuesta = validacion.texto;
+
+                const oferta = buscarOfertaParaProducto(
+                  productoConcreto,
+                  contexto.ofertas || [],
+                  contexto.categoriasCarta || [],
+                );
+
+                const yaEnPedido = Boolean(
+                  flujoPrevio?.pedido &&
+                  (flujoPrevio.pedido as any).productoSeleccionadoId === String(productoConcreto.id),
+                );
+
+                const cierre = generarCierreComercial({
+                  producto: productoConcreto,
+                  oferta,
+                  funcionesActivas: contexto.funcionesActivas,
+                  indiceVariante: Number(conversacion.id || 0),
+                  yaEnPedido,
+                });
+
+                if (!yaEnPedido) {
+                  textoRespuesta = adjuntarCierreComercial(textoRespuesta, cierre);
+                  botonesEnvio = cierre.botones;
+                }
+              } else if (productosMultiples && productosMultiples.length > 1) {
+                const cierre = generarCierreComercial({
+                  productosRecomendados: productosMultiples,
+                  funcionesActivas: contexto.funcionesActivas,
+                  indiceVariante: Number(conversacion.id || 0),
+                });
+                textoRespuesta = limpiarFrasesPasivasIa(textoRespuesta);
+                botonesEnvio = cierre.botones;
+              } else {
+                textoRespuesta = limpiarFrasesPasivasIa(textoRespuesta);
+                if (resIa.quierePedir) {
+                  botonesEnvio = BOTONES_IA_CON_PEDIDO;
+                }
+              }
             }
           } catch (err: any) {
             this.logger.error(`Error procesando consulta con ChatbotIaService: ${err.message}`, err.stack);

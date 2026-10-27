@@ -426,7 +426,11 @@ describe('Máquina de Estados del Bot Conversacional (transicionarEstado)', () =
         expect(resultado.acciones[0].texto).toContain('Grande 16 oz: s/ 16.50');
         expect(resultado.acciones[0].texto).toContain('Leche sin lactosa');
         expect(resultado.acciones[0].texto).toContain('Pídelo en nuestra carta virtual');
-        expect(resultado.acciones[0].botones).toEqual([BOTON_VOLVER_CATEGORIAS, BOTON_VOLVER_MENU]);
+        expect(resultado.acciones[0].botones).toEqual([
+          { id: 'ped_prod_p1', titulo: 'Pedir este producto' },
+          BOTON_VOLVER_MENU,
+          { id: 'btn_persona', titulo: 'Hablar con persona' },
+        ]);
       }
     });
 

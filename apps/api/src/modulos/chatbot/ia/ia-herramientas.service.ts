@@ -217,20 +217,31 @@ export class IaHerramientasService {
     }
 
     const carta = await this.catalogoService.obtenerCarta();
-    const textoBuscado = texto?.toLowerCase().trim() || '';
-    const catBuscada = categoria?.toLowerCase().trim() || '';
+    const normalizar = (s: string) =>
+      s
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim();
+
+    const textoBuscado = normalizar(texto || '');
+    const catBuscada = normalizar(categoria || '');
 
     const productosEncontrados: any[] = [];
 
     for (const cat of carta) {
-      if (catBuscada && !cat.nombre.toLowerCase().includes(catBuscada)) {
+      const catNorm = normalizar(cat.nombre);
+      if (catBuscada && !catNorm.includes(catBuscada)) {
         continue;
       }
 
       for (const prod of cat.productos || []) {
-        const coincideNombre = textoBuscado ? prod.nombre.toLowerCase().includes(textoBuscado) : true;
-        const coincideDesc = textoBuscado && prod.descripcion
-          ? prod.descripcion.toLowerCase().includes(textoBuscado)
+        const prodNombreNorm = normalizar(prod.nombre);
+        const prodDescNorm = normalizar(prod.descripcion || '');
+
+        const coincideNombre = textoBuscado ? prodNombreNorm.includes(textoBuscado) : true;
+        const coincideDesc = textoBuscado && prodDescNorm
+          ? prodDescNorm.includes(textoBuscado)
           : false;
 
         if (coincideNombre || coincideDesc || (!textoBuscado && catBuscada)) {
@@ -264,7 +275,7 @@ export class IaHerramientasService {
     return {
       total: productosEncontrados.length,
       productos: productosEncontrados,
-      nota: 'Todos los productos son de la carta real. Si el cliente desea pedir, debe hacerlo por el menú de botones.',
+      nota: 'Todos los productos son de la carta real. No escribas instrucciones de compra ni cierres.',
     };
   }
 

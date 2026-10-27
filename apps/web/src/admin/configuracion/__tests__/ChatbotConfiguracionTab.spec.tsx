@@ -4,32 +4,43 @@ import { api } from '../../../comun/api';
 import {
   ChatbotConfiguracionTab,
   ConfiguracionBotRespuesta,
+  ConsumoIaState,
+  ExportacionClienteRespuesta,
 } from '../ChatbotConfiguracionTab';
 
-const CONFIG_MOCK_INICIAL: ConfiguracionBotRespuesta = {
+// FIXTURE REAL DE LA API (GET /admin/chatbot/configuracion)
+const CONFIG_API_REAL_FIXTURE: ConfiguracionBotRespuesta = {
   textos: {
-    bienvenida:
-      '¡Hola! Te damos la bienvenida a Caprichos Café y Pasión. ¿En qué podemos ayudarte hoy?',
-    despedida:
-      '¡Muchas gracias por contactarnos! Que tengas un lindo día.',
-    pasarAPersona:
-      'Te transfiero con un asesor del equipo de Caprichos para que pueda atenderte.',
-    noEntiendoRepregunta:
-      'Disculpa, no logré entender tu mensaje. ¿Podrías indicarme qué necesitas?',
-    noEntiendoDerivacion:
-      'No logro comprender tu consulta. Te conecto de inmediato con nuestro personal.',
+    chatbot_texto_bienvenida:
+      'CAPRICHOS DEL MES · Frappe Maracuyá Tropical 🍓\n\n¡Hola! ☕ Soy Capri, la asistente de Caprichos. ¿En qué te puedo ayudar hoy? 🧁',
+    chatbot_texto_despedida:
+      'Gracias por comunicarte con Caprichos ☕. ¡Esperamos verte pronto! 🧁',
+    chatbot_texto_pase_persona:
+      'Te paso con alguien del equipo. Ya les avisé con tu nombre y tu número; en unos minutos te escriben.',
+    chatbot_texto_fuera_horario:
+      'Ahora estamos cerrados. Nuestro horario: {horario}. No tomamos pedidos fuera de horario; escríbenos cuando abramos.',
+    chatbot_texto_no_entiendo:
+      'No estoy seguro de haber entendido. ¿Qué necesitas? Puedes elegir una opción o escribirme de otra forma.',
+    chatbot_texto_no_entiendo_derivacion:
+      'No logro entender bien tu mensaje, mejor te paso con una persona del equipo para ayudarte.',
+    chatbot_texto_indicacion_pago:
+      'Si pagas por Yape, Plin o transferencia, envíanos aquí la captura de tu comprobante.',
   },
-  textosPorDefecto: {
-    bienvenida:
-      '¡Hola! Te damos la bienvenida a Caprichos Café y Pasión. ¿En qué podemos ayudarte hoy?',
-    despedida:
-      '¡Muchas gracias por contactarnos! Que tengas un lindo día.',
-    pasarAPersona:
-      'Te transfiero con un asesor del equipo de Caprichos para que pueda atenderte.',
-    noEntiendoRepregunta:
-      'Disculpa, no logré entender tu mensaje. ¿Podrías indicarme qué necesitas?',
-    noEntiendoDerivacion:
-      'No logro comprender tu consulta. Te conecto de inmediato con nuestro personal.',
+  textosDefecto: {
+    chatbot_texto_bienvenida:
+      'CAPRICHOS DEL MES · Frappe Maracuyá Tropical 🍓\n\n¡Hola! ☕ Soy Capri, la asistente de Caprichos. ¿En qué te puedo ayudar hoy? 🧁',
+    chatbot_texto_despedida:
+      'Gracias por comunicarte con Caprichos ☕. ¡Esperamos verte pronto! 🧁',
+    chatbot_texto_pase_persona:
+      'Te paso con alguien del equipo. Ya les avisé con tu nombre y tu número; en unos minutos te escriben.',
+    chatbot_texto_fuera_horario:
+      'Ahora estamos cerrados. Nuestro horario: {horario}. No tomamos pedidos fuera de horario; escríbenos cuando abramos.',
+    chatbot_texto_no_entiendo:
+      'No estoy seguro de haber entendido. ¿Qué necesitas? Puedes elegir una opción o escribirme de otra forma.',
+    chatbot_texto_no_entiendo_derivacion:
+      'No logro entender bien tu mensaje, mejor te paso con una persona del equipo para ayudarte.',
+    chatbot_texto_indicacion_pago:
+      'Si pagas por Yape, Plin o transferencia, envíanos aquí la captura de tu comprobante.',
   },
   funciones: {
     pedido: true,
@@ -40,22 +51,25 @@ const CONFIG_MOCK_INICIAL: ConfiguracionBotRespuesta = {
     promociones: true,
   },
   antiSpam: {
-    limiteMinuto: 10,
-    limiteHora: 60,
+    maxPorMinuto: 10,
+    maxPorHora: 60,
   },
-  retencion: {
+  privacidad: {
     diasRetencion: 90,
   },
-  consumoIa: {
-    periodo: '2026-10',
-    llamadasTotal: 48,
-    tokensTotal: 31200,
-    costoUsdEstimado: 4.125,
-    topeMensualUsd: 20.0,
-    porcentajeConsumido: 20.6,
-    topeAlcanzado: false,
-    iaActiva: true,
-  },
+};
+
+const CONSUMO_IA_FIXTURE: ConsumoIaState = {
+  periodo: '2026-10',
+  llamadasTotal: 48,
+  tokensEntrada: 18000,
+  tokensSalida: 13200,
+  tokensTotal: 31200,
+  costoUsdEstimado: 4.125,
+  topeMensualUsd: 20.0,
+  porcentajeConsumido: 20.6,
+  topeAlcanzado: false,
+  iaActiva: true,
 };
 
 describe('ChatbotConfiguracionTab (Ola 4, Agente I: Configuración y Seguridad del Bot)', () => {
@@ -63,8 +77,20 @@ describe('ChatbotConfiguracionTab (Ola 4, Agente I: Configuración y Seguridad d
     vi.restoreAllMocks();
   });
 
-  it('1. renderiza las 5 tarjetas principales con datos de configuración e IA', async () => {
-    vi.spyOn(api, 'get').mockResolvedValueOnce(CONFIG_MOCK_INICIAL);
+  const mockApiGetExitoso = () => {
+    return vi.spyOn(api, 'get').mockImplementation(async (ruta: string) => {
+      if (ruta === '/admin/chatbot/configuracion') {
+        return CONFIG_API_REAL_FIXTURE;
+      }
+      if (ruta === '/admin/configuracion/ia-consumo') {
+        return CONSUMO_IA_FIXTURE;
+      }
+      return {};
+    });
+  };
+
+  it('1. renderiza las 5 tarjetas principales con datos de configuración real de la API e IA', async () => {
+    mockApiGetExitoso();
 
     render(<ChatbotConfiguracionTab puedeVer={true} puedeEditar={true} />);
 
@@ -74,7 +100,7 @@ describe('ChatbotConfiguracionTab (Ola 4, Agente I: Configuración y Seguridad d
       ).toBeInTheDocument();
     });
 
-    // Tarjeta 1: Consumo IA
+    // Tarjeta 1: Consumo IA (vía /admin/configuracion/ia-consumo)
     expect(screen.getByTestId('tarjeta-consumo-ia')).toBeInTheDocument();
     expect(screen.getByText(/Consumo y estado del motor de IA/i)).toBeInTheDocument();
     expect(screen.getByText(/48 consultas/i)).toBeInTheDocument();
@@ -90,13 +116,15 @@ describe('ChatbotConfiguracionTab (Ola 4, Agente I: Configuración y Seguridad d
     expect(screen.getByText('Asistente de Inteligencia Artificial')).toBeInTheDocument();
     expect(screen.getByText('Promociones y cupones')).toBeInTheDocument();
 
-    // Tarjeta 3: Textos editables (5) con contadores
+    // Tarjeta 3: Textos editables (los 7 reales, incluyendo fuera de horario e indicación de pago)
     expect(screen.getByTestId('seccion-textos')).toBeInTheDocument();
     expect(screen.getByText('Mensaje de bienvenida')).toBeInTheDocument();
     expect(screen.getByText('Mensaje de despedida')).toBeInTheDocument();
     expect(screen.getByText('Pase a asesor humano')).toBeInTheDocument();
+    expect(screen.getByText('Fuera de horario')).toBeInTheDocument();
     expect(screen.getByText('Repregunta al no entender')).toBeInTheDocument();
     expect(screen.getByText('Derivación al no entender')).toBeInTheDocument();
+    expect(screen.getByText('Indicación de pago')).toBeInTheDocument();
 
     // Tarjeta 4: Anti-spam
     expect(screen.getByTestId('seccion-antispam')).toBeInTheDocument();
@@ -118,7 +146,7 @@ describe('ChatbotConfiguracionTab (Ola 4, Agente I: Configuración y Seguridad d
   });
 
   it('2. cambia el estado de un interruptor con confirmación Sí/No obligatoria', async () => {
-    vi.spyOn(api, 'get').mockResolvedValueOnce(CONFIG_MOCK_INICIAL);
+    mockApiGetExitoso();
     const spyPut = vi.spyOn(api, 'put').mockResolvedValueOnce({
       mensaje: 'Funciones actualizadas',
     });
@@ -167,9 +195,9 @@ describe('ChatbotConfiguracionTab (Ola 4, Agente I: Configuración y Seguridad d
   });
 
   it('3. edita un texto del bot, respeta límite de 1024 caracteres y guarda con confirmación', async () => {
-    vi.spyOn(api, 'get').mockResolvedValueOnce(CONFIG_MOCK_INICIAL);
+    mockApiGetExitoso();
     const spyPut = vi.spyOn(api, 'put').mockResolvedValueOnce({
-      mensaje: 'Texto actualizado',
+      chatbot_texto_bienvenida: '¡Bienvenido a Caprichos Café! ¿Deseas delivery o recoger en tienda?',
     });
 
     render(<ChatbotConfiguracionTab puedeVer={true} puedeEditar={true} />);
@@ -202,8 +230,7 @@ describe('ChatbotConfiguracionTab (Ola 4, Agente I: Configuración y Seguridad d
       expect(spyPut).toHaveBeenCalledWith(
         '/admin/chatbot/configuracion/textos',
         {
-          clave: 'bienvenida',
-          texto:
+          chatbot_texto_bienvenida:
             '¡Bienvenido a Caprichos Café! ¿Deseas delivery o recoger en tienda?',
         },
       );
@@ -217,7 +244,7 @@ describe('ChatbotConfiguracionTab (Ola 4, Agente I: Configuración y Seguridad d
   });
 
   it('4. valida e impide guardar textos que superan el límite de WhatsApp de 1024 caracteres', async () => {
-    vi.spyOn(api, 'get').mockResolvedValueOnce(CONFIG_MOCK_INICIAL);
+    mockApiGetExitoso();
 
     render(<ChatbotConfiguracionTab puedeVer={true} puedeEditar={true} />);
 
@@ -242,18 +269,22 @@ describe('ChatbotConfiguracionTab (Ola 4, Agente I: Configuración y Seguridad d
   });
 
   it('5. restablece un texto a su valor por defecto del mockup con confirmación', async () => {
-    const configModificada = {
-      ...CONFIG_MOCK_INICIAL,
+    const configModificada: ConfiguracionBotRespuesta = {
+      ...CONFIG_API_REAL_FIXTURE,
       textos: {
-        ...CONFIG_MOCK_INICIAL.textos,
-        bienvenida: 'Texto modificado previo',
+        ...CONFIG_API_REAL_FIXTURE.textos,
+        chatbot_texto_bienvenida: 'Texto modificado previo',
       },
     };
-    vi.spyOn(api, 'get').mockResolvedValueOnce(configModificada);
+    vi.spyOn(api, 'get').mockImplementation(async (ruta: string) => {
+      if (ruta === '/admin/chatbot/configuracion') return configModificada;
+      if (ruta === '/admin/configuracion/ia-consumo') return CONSUMO_IA_FIXTURE;
+      return {};
+    });
+
     const spyPost = vi.spyOn(api, 'post').mockResolvedValueOnce({
-      clave: 'bienvenida',
-      texto: CONFIG_MOCK_INICIAL.textosPorDefecto.bienvenida,
-      mensaje: 'Texto restablecido',
+      clave: 'chatbot_texto_bienvenida',
+      valor: CONFIG_API_REAL_FIXTURE.textosDefecto.chatbot_texto_bienvenida,
     });
 
     render(<ChatbotConfiguracionTab puedeVer={true} puedeEditar={true} />);
@@ -277,7 +308,7 @@ describe('ChatbotConfiguracionTab (Ola 4, Agente I: Configuración y Seguridad d
     await waitFor(() => {
       expect(spyPost).toHaveBeenCalledWith(
         '/admin/chatbot/configuracion/textos/restablecer',
-        { clave: 'bienvenida' },
+        { clave: 'chatbot_texto_bienvenida' },
       );
     });
 
@@ -288,10 +319,11 @@ describe('ChatbotConfiguracionTab (Ola 4, Agente I: Configuración y Seguridad d
     });
   });
 
-  it('6. actualiza parámetros de control anti-spam con confirmación', async () => {
-    vi.spyOn(api, 'get').mockResolvedValueOnce(CONFIG_MOCK_INICIAL);
+  it('6. actualiza parámetros de control anti-spam con confirmación y campos reales', async () => {
+    mockApiGetExitoso();
     const spyPut = vi.spyOn(api, 'put').mockResolvedValueOnce({
-      mensaje: 'Límites anti-spam guardados',
+      maxPorMinuto: 15,
+      maxPorHora: 80,
     });
 
     render(<ChatbotConfiguracionTab puedeVer={true} puedeEditar={true} />);
@@ -319,7 +351,7 @@ describe('ChatbotConfiguracionTab (Ola 4, Agente I: Configuración y Seguridad d
     await waitFor(() => {
       expect(spyPut).toHaveBeenCalledWith(
         '/admin/chatbot/configuracion/anti-spam',
-        { limiteMinuto: 15, limiteHora: 80 },
+        { maxPorMinuto: 15, maxPorHora: 80 },
       );
     });
 
@@ -330,12 +362,51 @@ describe('ChatbotConfiguracionTab (Ola 4, Agente I: Configuración y Seguridad d
     });
   });
 
-  it('7. ejecuta anonimización de mensajes antiguos por retención Ley 29733', async () => {
-    vi.spyOn(api, 'get').mockResolvedValueOnce(CONFIG_MOCK_INICIAL);
+  it('7. actualiza el plazo de retención en días con confirmación', async () => {
+    mockApiGetExitoso();
+    const spyPut = vi.spyOn(api, 'put').mockResolvedValueOnce({
+      diasRetencion: 60,
+    });
+
+    render(<ChatbotConfiguracionTab puedeVer={true} puedeEditar={true} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Días de retención de mensajes/i)).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText(/Días de retención de mensajes/i), {
+      target: { value: '60' },
+    });
+
+    const botonGuardar = screen.getByText('Guardar plazo');
+    fireEvent.click(botonGuardar);
+
+    expect(
+      screen.getByText(/¿Deseas establecer el plazo de retención en 60 días/i),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Sí, confirmar'));
+
+    await waitFor(() => {
+      expect(spyPut).toHaveBeenCalledWith(
+        '/admin/chatbot/configuracion/retencion',
+        { diasRetencion: 60 },
+      );
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Plazo de retención de mensajes actualizado correctamente/i),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('8. ejecuta anonimización de mensajes antiguos por retención Ley 29733 con campos reales de API', async () => {
+    mockApiGetExitoso();
     const spyPost = vi.spyOn(api, 'post').mockResolvedValueOnce({
-      mensajesAnonimizados: 35,
+      anonimizados: 35,
       fechaCorte: '2026-07-28',
-      mensaje: 'Anonimización ejecutada',
+      diasRetencion: 90,
     });
 
     render(<ChatbotConfiguracionTab puedeVer={true} puedeEditar={true} />);
@@ -366,31 +437,36 @@ describe('ChatbotConfiguracionTab (Ola 4, Agente I: Configuración y Seguridad d
     });
   });
 
-  it('8. busca y exporta datos de un cliente ARCO mostrando teléfono enmascarado (nunca completo)', async () => {
+  it('9. busca y exporta datos de un cliente ARCO mostrando teléfono enmascarado (nunca completo)', async () => {
     vi.spyOn(api, 'get').mockImplementation(async (ruta: string) => {
       if (ruta === '/admin/chatbot/configuracion') {
-        return CONFIG_MOCK_INICIAL;
+        return CONFIG_API_REAL_FIXTURE;
+      }
+      if (ruta === '/admin/configuracion/ia-consumo') {
+        return CONSUMO_IA_FIXTURE;
       }
       if (ruta.includes('/admin/chatbot/configuracion/privacidad/exportar')) {
-        return {
-          solicitud: {
-            solicitante: 'Admin Test',
-            fecha: '2026-10-26T12:00:00.000Z',
-            motivo: 'Solicitud ARCO de acceso',
-          },
+        const respuestaArco: ExportacionClienteRespuesta = {
           identificadorEnmascarado: '987***321',
+          nombreContacto: 'Cliente Test',
+          identificadorTipo: 'TELEFONO',
           consentimiento: {
-            existe: true,
-            acepta: true,
+            aceptaComunicaciones: true,
             origen: 'WHATSAPP_OPTIN',
-            fechaRegistro: '2026-10-01T10:00:00.000Z',
+            actualizadoEn: '2026-10-01T10:00:00.000Z',
           },
-          totalConversaciones: 3,
+          conversacion: {
+            id: '123',
+            estado: 'CERRADA',
+            duenio: 'BOT',
+            ultimaActividad: '2026-10-26T12:00:00.000Z',
+          },
           totalMensajes: 24,
+          mensajes: [],
           totalPedidos: 2,
-          conversaciones: [],
           pedidos: [],
         };
+        return respuestaArco;
       }
       return {};
     });
@@ -420,17 +496,17 @@ describe('ChatbotConfiguracionTab (Ola 4, Agente I: Configuración y Seguridad d
     // Verifica que el número original NO se expone en el bloque de datos resultante
     const bloqueArco = screen.getByTestId('resultado-arco');
     expect(bloqueArco.textContent).not.toContain('987654321');
-    expect(screen.getByText(/3 conversaciones/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 conversaciones/i)).toBeInTheDocument();
     expect(screen.getByText(/24 mensajes/i)).toBeInTheDocument();
+    expect(screen.getByText(/2 pedidos/i)).toBeInTheDocument();
   });
 
-  it('9. da de baja y anonimiza a un cliente con confirmación de peligro', async () => {
-    vi.spyOn(api, 'get').mockResolvedValueOnce(CONFIG_MOCK_INICIAL);
+  it('10. da de baja y anonimiza a un cliente con confirmación de peligro y respuesta real de API', async () => {
+    mockApiGetExitoso();
     const spyPost = vi.spyOn(api, 'post').mockResolvedValueOnce({
-      identificadorEnmascarado: '987***321',
-      conversacionesAnonimizadas: 2,
-      mensajesAnonimizados: 18,
-      mensaje: 'Cliente dado de baja',
+      exito: true,
+      mensaje: 'Cliente dado de baja y datos personales anonimizados conforme a la Ley 29733',
+      identificador: '987***321',
     });
 
     render(<ChatbotConfiguracionTab puedeVer={true} puedeEditar={true} />);
@@ -473,8 +549,8 @@ describe('ChatbotConfiguracionTab (Ola 4, Agente I: Configuración y Seguridad d
     });
   });
 
-  it('10. en modo solo lectura (puedeEditar=false) deshabilita controles de edición y muestra aviso', async () => {
-    vi.spyOn(api, 'get').mockResolvedValueOnce(CONFIG_MOCK_INICIAL);
+  it('11. en modo solo lectura (puedeEditar=false) deshabilita controles de edición y muestra aviso', async () => {
+    mockApiGetExitoso();
 
     render(<ChatbotConfiguracionTab puedeVer={true} puedeEditar={false} />);
 
@@ -504,8 +580,8 @@ describe('ChatbotConfiguracionTab (Ola 4, Agente I: Configuración y Seguridad d
     expect(screen.getByText('Dar de baja y anonimizar')).toBeDisabled();
   });
 
-  it('11. verifica que la UI administrativa tenga CERO emojis en sus textos, títulos y botones', async () => {
-    vi.spyOn(api, 'get').mockResolvedValueOnce(CONFIG_MOCK_INICIAL);
+  it('12. verifica que la UI administrativa tenga CERO emojis en sus textos, títulos y botones', async () => {
+    mockApiGetExitoso();
 
     const { container } = render(
       <ChatbotConfiguracionTab puedeVer={true} puedeEditar={true} />,
@@ -532,5 +608,16 @@ describe('ChatbotConfiguracionTab (Ola 4, Agente I: Configuración y Seguridad d
       const tieneEmoji = emojiRegex.test(el.textContent || '');
       expect(tieneEmoji).toBe(false);
     }
+  });
+
+  it('13. maneja error de carga sin dejar pantalla en blanco (muestra EstadoError)', async () => {
+    vi.spyOn(api, 'get').mockRejectedValueOnce(new Error('Fallo de red simulado'));
+
+    render(<ChatbotConfiguracionTab puedeVer={true} puedeEditar={true} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Error al cargar configuración del chatbot')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Fallo de red simulado')).toBeInTheDocument();
   });
 });

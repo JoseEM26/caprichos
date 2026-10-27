@@ -214,6 +214,30 @@ Cuando un chat entra en `ATENCION_PERSONA` (por demora, queja, solicitud de ases
    - El bot y la IA **NUNCA** cancelan ni reembolsan pedidos directamente.
    - El bot y la IA **NUNCA** alteran ítems ni estados de pedidos en progreso de forma autónoma.
 
+### F. Cierre comercial y promociones
+1. **Cierre comercial determinista:**
+   - Después de toda respuesta de IA o de la ficha de producto del catálogo (`CARTA_PRODUCTO_DETALLE`) que mencione un producto concreto, el **código** (nunca el modelo LLM) adjunta una frase corta, cálida y sobria animando a la compra (rotación entre *«¿Te animas a pedirlo?»*, *«¿Te gustaría pedirlo ahora?»*, *«¿Te provoca probarlo hoy?»*) sin presión ni falsas urgencias.
+   - El prompt de sistema de la IA prohíbe explícitamente al modelo emitir cierres comerciales, instrucciones de botones o frases pasivas del tipo *«Si deseas pedirlo, recuerda hacerlo a través del menú de botones»*.
+2. **Botones interactivos de respuesta (límite WhatsApp):**
+   - Cumplimiento estricto del límite de la API de WhatsApp Cloud: máximo **3 botones** por mensaje interactivo y títulos con longitud estricta **≤ 20 caracteres**.
+   - Prioridad de botones para producto concreto:
+     1. `[Pedir este producto]` (19 caracteres, ID `ped_prod_${id}`): Inicia directamente el flujo de pedido en dicho producto (selección de tamaño si tiene más de uno, o cantidad y opciones), sin volver a consultar modalidad genérica.
+     2. `[Ver la promo]` (12 caracteres, ID `btn_promo_${id}`): Si existe una promoción activa vinculada.
+     3. `[Volver al menú]` (15 caracteres, ID `btn_menu`) o `[Hablar con persona]` (18 caracteres, ID `btn_persona`).
+   - Si la respuesta recomienda múltiples productos: botones `[Hacer un pedido]` (15 caracteres) y `[Ver la carta]` (12 caracteres).
+3. **Promociones calculadas por código (Anti-Alucinación):**
+   - El bot consulta ofertas vigentes en el canal WhatsApp y horario actual (combos, lleva y paga, descuentos porcentuales o fijos).
+   - Si existe una oferta aplicable, adjunta **una sola línea** con el beneficio exacto calculado por código: nombre, precio regular, precio promocional y ahorro (ej. *«Con el Dúo Irresistible pagas S/ 37.00 en vez de S/ 41.00 (ahorras S/ 4.00)»*).
+   - Si no hay oferta vigente, no se inventa ninguna promoción.
+   - Todos los precios, montos y ahorros son calculados matemáticamente con centavos exactos (`redondearMonto`) y formateados como `S/ XX.XX`.
+4. **Validación y corrección de precios de la IA:**
+   - El modelo LLM recibe el catálogo únicamente como contexto de solo lectura.
+   - El código audita los montos mencionados en el texto de la IA contra los precios reales del catálogo (precio base y presentaciones). Si se detecta cualquier precio divergente o inventado, el código descarta la alucinación y la reemplaza por la ficha técnica determinista oficial.
+5. **Respeto a interruptores de negocio:**
+   - Si los pedidos están deshabilitados en el local (`funcionesActivas.pedido === false`), no se muestra `[Pedir este producto]` y se prioriza `[Hablar con persona]`.
+   - Si el local está cerrado, se respetan los avisos de horario fuera de atención.
+   - No se duplica el cierre si el cliente ya se encuentra en el flujo de pedido de ese producto.
+
 ---
 
 ## 7. Gestión de Quejas de WhatsApp vs Libro de Reclamaciones

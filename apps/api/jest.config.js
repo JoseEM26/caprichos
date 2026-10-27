@@ -7,6 +7,7 @@ module.exports = {
   },
   moduleNameMapper: {
     '^@caprichos/compartido$': '<rootDir>/../../../packages/compartido/src/index.ts',
+    '^(\\.{1,2}/.*)\\.js$': '$1',
   },
   collectCoverageFrom: ['**/*.(t|j)s'],
   coverageDirectory: '../coverage',
