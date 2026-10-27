@@ -255,7 +255,7 @@ jobs:
         run: |
           set -e
           SSH="ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes ${SSH_USER:-deploy}@${SSH_HOST}"
-          tar -czf - -C infra/compose scripts | $SSH 'mkdir -p /opt/caprichos && tar -xzf - -C /opt/caprichos && chmod +x /opt/caprichos/scripts/*.sh /opt/caprichos/scripts/docker-rollout 2>/dev/null || chmod +x /opt/caprichos/scripts/*'
+          tar -czf - -C infra/compose scripts | $SSH 'mkdir -p /opt/caprichos && tar -xzf - -C /opt/caprichos && chmod +x /opt/caprichos/scripts/* /opt/caprichos/scripts/docker-rollout'
           tar -czf - -C infra/compose docker-compose.base.yml docker-compose.demo.yml docker-compose.staging.yml docker-compose.prod.yml | $SSH 'mkdir -p /opt/caprichos/compose && tar -xzf - -C /opt/caprichos/compose'
 
       - name: Ejecutar despliegue sin corte (rolling rollout) en el VPS vía SSH

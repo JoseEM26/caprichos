@@ -56,6 +56,8 @@ if [[ "${1:-}" == "--remote" ]]; then
     "${SCRIPT_DIR}/estado.sh" \
     "${SCRIPT_DIR}/crear-usuarios-demo.sh" \
     "${SSH_USER}@${SSH_HOST}:${DIR_VPS}/"
+  ssh "${OPCIONES_SSH[@]}" "${SSH_USER}@${SSH_HOST}" \
+    "chmod +x ${DIR_VPS}/*.sh ${DIR_VPS}/docker-rollout 2>/dev/null || chmod +x ${DIR_VPS}/*"
 
   echo "==> Ejecutando despliegue en el VPS..."
   ssh "${OPCIONES_SSH[@]}" "${SSH_USER}@${SSH_HOST}" \

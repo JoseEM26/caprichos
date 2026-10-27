@@ -78,19 +78,23 @@ echo "========================================================================"
 sed -i "s|^TAG=.*|TAG=${TAG_DESTINO}|" "$ENV_FILE"
 export TAG="$TAG_DESTINO"
 
-# 2. Restaurar api y web con rolling rollout si está disponible
+# 2. Restaurar api y web con rolling rollout hacia la versión previa (sin cortar tráfico)
 rollout_restauracion() {
   local SERVICIO="$1"
   local TIMEOUT="${2:-60}"
-  echo "==> Restaurando '${SERVICIO}' a la versión ${TAG_DESTINO}..."
+  echo "==> Restaurando '${SERVICIO}' a la versión ${TAG_DESTINO} mediante rolling rollout..."
 
-  if docker rollout --version &>/dev/null; then
-    docker rollout -f "$COMPOSE_BASE" -f "$COMPOSE_ENV" --env-file "$ENV_FILE" -t "$TIMEOUT" "$SERVICIO" || compose up -d --no-deps "$SERVICIO"
-  elif [[ -x "${SCRIPT_DIR}/docker-rollout" ]]; then
-    "${SCRIPT_DIR}/docker-rollout" rollout -f "$COMPOSE_BASE" -f "$COMPOSE_ENV" --env-file "$ENV_FILE" -t "$TIMEOUT" "$SERVICIO" || compose up -d --no-deps "$SERVICIO"
+  chmod +x "${SCRIPT_DIR}/docker-rollout" 2>/dev/null || true
+  if [[ -x "${SCRIPT_DIR}/docker-rollout" ]]; then
+    if "${SCRIPT_DIR}/docker-rollout" rollout -f "$COMPOSE_BASE" -f "$COMPOSE_ENV" --env-file "$ENV_FILE" -t "$TIMEOUT" --wait-after-healthy 2 "$SERVICIO"; then
+      return 0
+    fi
+    echo "AVISO: Falló el rolling rollout de vuelta atrás para '${SERVICIO}'. Recreando como último recurso..." >&2
   else
-    compose up -d --no-deps "$SERVICIO"
+    echo "AVISO: ${SCRIPT_DIR}/docker-rollout no disponible. Recreando contenedor..." >&2
   fi
+
+  compose up -d --no-deps "$SERVICIO"
 }
 
 rollout_restauracion api 60

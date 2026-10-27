@@ -84,91 +84,19 @@ compose() {
   docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" -f "$COMPOSE_ENV" "$@"
 }
 
-# Asegurar que el plugin docker-rollout esté disponible en ~/.docker/cli-plugins
-asegurar_docker_rollout() {
-  if ! docker rollout --version &>/dev/null; then
-    mkdir -p "$HOME/.docker/cli-plugins"
-    if [[ -f "${SCRIPT_DIR}/docker-rollout" ]]; then
-      cp -f "${SCRIPT_DIR}/docker-rollout" "$HOME/.docker/cli-plugins/docker-rollout"
-      chmod +x "$HOME/.docker/cli-plugins/docker-rollout"
-    fi
-  fi
-}
-
-# Ejecutar despliegue rolling de un servicio
+# Ejecutar despliegue rolling de un servicio llamando directamente al script empaquetado
 rollout_servicio() {
   local SERVICIO="$1"
   local TIMEOUT="${2:-60}"
   echo "==> Rolling rollout de '${SERVICIO}' (timeout: ${TIMEOUT}s)..."
 
-  # 1. Intentar con docker rollout como plugin oficial de Docker CLI
-  if docker rollout --version &>/dev/null; then
-    docker rollout -f "$COMPOSE_BASE" -f "$COMPOSE_ENV" --env-file "$ENV_FILE" -t "$TIMEOUT" --wait-after-healthy 2 "$SERVICIO"
-    return $?
-  fi
-
-  # 2. Intentar ejecución directa del script empaquetado
-  if [[ -x "${SCRIPT_DIR}/docker-rollout" ]]; then
-    "${SCRIPT_DIR}/docker-rollout" rollout -f "$COMPOSE_BASE" -f "$COMPOSE_ENV" --env-file "$ENV_FILE" -t "$TIMEOUT" --wait-after-healthy 2 "$SERVICIO"
-    return $?
-  fi
-
-  # 3. Fallback nativo: escala temporal a 2, validación de salud y retiro de contenedor viejo
-  echo "    (Usando mecanismo nativo de escala y reemplazo ordenado para '${SERVICIO}')"
-  local OLD_IDS
-  OLD_IDS=$(compose ps -q "$SERVICIO" 2>/dev/null || true)
-
-  if [[ -z "$OLD_IDS" ]]; then
-    compose up -d --no-deps "$SERVICIO"
-    return 0
-  fi
-
-  compose up -d --scale "${SERVICIO}=2" --no-recreate "$SERVICIO"
-
-  local NEW_IDS
-  NEW_IDS=$(compose ps -q "$SERVICIO" | grep -v -F "$OLD_IDS" || true)
-
-  if [[ -z "$NEW_IDS" ]]; then
-    echo "ERROR: No se pudo identificar el nuevo contenedor de '${SERVICIO}'." >&2
+  chmod +x "${SCRIPT_DIR}/docker-rollout" 2>/dev/null || true
+  if [[ ! -x "${SCRIPT_DIR}/docker-rollout" ]]; then
+    echo "ERROR: No se encontró o no es ejecutable: ${SCRIPT_DIR}/docker-rollout" >&2
     return 1
   fi
 
-  local INTENTOS=0
-  local MAX_INTENTOS=$TIMEOUT
-  local SANO=0
-
-  while [[ $INTENTOS -lt $MAX_INTENTOS ]]; do
-    local ESTADO
-    ESTADO=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$NEW_IDS" 2>/dev/null || echo "ausente")
-    if [[ "$ESTADO" == "healthy" ]]; then
-      SANO=1
-      break
-    elif [[ "$ESTADO" == "unhealthy" ]]; then
-      echo "¡ALERTA! El nuevo contenedor de '${SERVICIO}' reportó estado unhealthy." >&2
-      break
-    fi
-    INTENTOS=$((INTENTOS + 1))
-    sleep 1
-  done
-
-  if [[ $SANO -ne 1 ]]; then
-    echo "ERROR: El nuevo contenedor de '${SERVICIO}' (${NEW_IDS}) no superó el healthcheck." >&2
-    echo "==> Logs del contenedor fallido:"
-    docker logs --tail=50 "$NEW_IDS" || true
-    echo "==> Limpiando contenedor fallido y manteniendo contenedor original..."
-    docker stop "$NEW_IDS" 2>/dev/null || true
-    docker rm "$NEW_IDS" 2>/dev/null || true
-    return 1
-  fi
-
-  # Margen de 2 segundos para sincronización de rutas en Traefik
-  sleep 2
-
-  echo "==> Deteniendo contenedor anterior de '${SERVICIO}' (${OLD_IDS}) respetando stop_grace_period..."
-  docker stop $OLD_IDS
-  docker rm $OLD_IDS
-  compose up -d --scale "${SERVICIO}=1" --no-recreate "$SERVICIO" >/dev/null 2>&1 || true
-  return 0
+  "${SCRIPT_DIR}/docker-rollout" rollout -f "$COMPOSE_BASE" -f "$COMPOSE_ENV" --env-file "$ENV_FILE" -t "$TIMEOUT" --wait-after-healthy 2 "$SERVICIO"
 }
 
 echo "========================================================================"
@@ -220,9 +148,6 @@ if ! compose run --rm api prisma migrate deploy --schema=prisma/schema.prisma; t
   exit 1
 fi
 echo "    ✓ Migraciones ejecutadas exitosamente (compatibilidad hacia atrás garantizada)."
-
-# Asegurar plugin docker-rollout
-asegurar_docker_rollout
 
 # 7. Actualizar TAG en el .env y ejecutar Rolling Rollout (api primero, luego web)
 echo "==> [4/5] Desplegando nuevos contenedores api y web mediante rolling rollout sin corte..."
