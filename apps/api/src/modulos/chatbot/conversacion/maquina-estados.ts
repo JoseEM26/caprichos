@@ -10,8 +10,10 @@ import {
   BOTON_VOLVER_MENU,
   BOTONES_MENU_PRINCIPAL,
   BOTONES_MI_PEDIDO,
+  BOTONES_MODO_ASISTIDO,
   FILAS_MENU_PRINCIPAL,
   FILAS_PREGUNTAS_FRECUENTES,
+  TEXTO_ASISTIDO_FRASE_FIJA,
   TEXTOS_BOT,
   TITULO_SECCION_CATEGORIAS,
   TITULO_SECCION_MENU,
@@ -351,11 +353,342 @@ export function transicionarEstado(
     };
   }
 
-  // 2. Si la conversación está en manos de una persona, el bot permanece en silencio
+  // 2. Modo asistido: cuando la conversación está en manos de una persona (ATENCION_PERSONA)
   if (flujo.estado === 'ATENCION_PERSONA') {
+    // Regla 5: Si la conversación está tomada por un asesor o un humano escribió hace menos de 3 minutos, el bot calla
+    if (contexto.chatTomado || contexto.humanoHabloReciente) {
+      return {
+        nuevoEstado: 'ATENCION_PERSONA',
+        acciones: [],
+        nuevoFlujo: flujo,
+      };
+    }
+
+    const textoEntrada = entrada.texto;
+    const textoOriginalEntrada = entrada.textoOriginal;
+    const idInteractivoEntrada = entrada.id;
+
+    // a) Verificar si algún subflujo activo en curso (pedido nuevo o solicitud de cambio) puede manejar la entrada
+    for (const subFlujo of RegistroSubFlujos.obtenerFlujos()) {
+      if (
+        (subFlujo.nombre === 'pedido' && (flujo.pedido || idInteractivoEntrada === 'pedir' || idInteractivoEntrada?.startsWith('ped_') || coincideAlgunaPalabra(textoEntrada, PALABRAS_PEDIDO))) ||
+        (subFlujo.nombre === 'cambios' && (flujo.cambios || idInteractivoEntrada === 'c_dir' || idInteractivoEntrada === 'c_ped' || idInteractivoEntrada?.startsWith('c_dir_') || idInteractivoEntrada?.startsWith('c_ped_')))
+      ) {
+        if (subFlujo.puedeManejar(flujo, entrada, contexto)) {
+          const res = subFlujo.transicionar(flujo, entrada, contexto);
+          if (res) return res;
+        }
+      }
+    }
+
+    // b) Cancelar o cambiar pedido (Regla 2: nunca cancela directamente, registra solicitud para Caja)
+    const esCancelarTexto =
+      coincideAlgunaPalabra(textoEntrada, ['cancelar', 'anular', 'ya no quiero', 'cancelar pedido', 'anular pedido']) ||
+      textoEntrada.includes('cancelar') ||
+      textoEntrada.includes('anular');
+
+    const esCambiarTexto =
+      coincideAlgunaPalabra(textoEntrada, PALABRAS_CAMBIO_DIR) ||
+      coincideAlgunaPalabra(textoEntrada, PALABRAS_CAMBIO_PED);
+
+    if (esCancelarTexto && contexto.pedidoActivo) {
+      const p = contexto.pedidoActivo;
+      const st = String(p.estado || 'COLA').toUpperCase();
+      const advertencia = ['PREPARANDO', 'LISTO', 'EN_CAMINO', 'RUTA'].includes(st)
+        ? ` (aviso: tu pedido ya está en ${st.toLowerCase()} y puede no ser posible)`
+        : '';
+      const textoRespuesta = `Registre tu solicitud de cancelacion${advertencia}; una persona de Caja la confirma.`;
+
+      return {
+        nuevoEstado: 'ATENCION_PERSONA',
+        acciones: [
+          {
+            tipo: 'crearSolicitudCambio',
+            pedidoId: String(p.id),
+            pedidoCodigo: p.codigo,
+            tipoCambio: 'CANCELAR',
+            detalle: textoOriginalEntrada || 'Solicitud de cancelación en modo asistido',
+          },
+          {
+            tipo: 'enviarBotones',
+            texto: textoRespuesta,
+            botones: [
+              { id: 'btn_asi_carta', titulo: 'Ver la carta' },
+              { id: 'btn_asi_pedido', titulo: 'Estado de mi pedido' },
+            ],
+          },
+        ],
+        nuevoFlujo: flujo,
+      };
+    }
+
+    if (esCambiarTexto && contexto.pedidoActivo) {
+      for (const subFlujo of RegistroSubFlujos.obtenerFlujos()) {
+        if (subFlujo.nombre === 'cambios' && subFlujo.puedeManejar(flujo, entrada, contexto)) {
+          const res = subFlujo.transicionar(flujo, entrada, contexto);
+          if (res) return res;
+        }
+      }
+    }
+
+    // c) Menú principal (Regla 1)
+    const esMenu =
+      idInteractivoEntrada === 'menu' ||
+      idInteractivoEntrada === 'btn_menu' ||
+      idInteractivoEntrada === 'volver_menu' ||
+      idInteractivoEntrada === 'inicio' ||
+      textoEntrada === 'menu' ||
+      textoEntrada === 'inicio' ||
+      textoEntrada === '0';
+
+    if (esMenu) {
+      return {
+        nuevoEstado: 'ATENCION_PERSONA',
+        acciones: [
+          {
+            tipo: 'enviarBotones',
+            texto: 'Claro. Mientras te atiende nuestro equipo, ¿en qué te puedo ayudar?',
+            botones: BOTONES_MODO_ASISTIDO,
+          },
+        ],
+        nuevoFlujo: {
+          ...flujo,
+          repreguntasFallidas: 0,
+        },
+      };
+    }
+
+    // d) Ver la carta (Regla 1)
+    const esCarta =
+      idInteractivoEntrada === 'carta' ||
+      idInteractivoEntrada === 'btn_carta' ||
+      idInteractivoEntrada === 'btn_asi_carta' ||
+      idInteractivoEntrada?.startsWith('cat_') ||
+      textoEntrada === 'carta' ||
+      textoEntrada.includes('ver la carta') ||
+      textoEntrada.includes('ver carta') ||
+      textoEntrada === 'la carta' ||
+      coincideAlgunaPalabra(textoEntrada, PALABRAS_CARTA);
+
+    if (esCarta) {
+      if (idInteractivoEntrada?.startsWith('cat_mas_')) {
+        const sigPag = parseInt(idInteractivoEntrada.replace('cat_mas_', ''), 10) || 0;
+        const accionLista = construirListaCategorias(
+          contexto.categoriasCarta || [],
+          sigPag,
+          contexto.datosLocal,
+        );
+        return {
+          nuevoEstado: 'ATENCION_PERSONA',
+          acciones: [accionLista],
+          nuevoFlujo: {
+            ...flujo,
+            estado: 'ATENCION_PERSONA',
+            paginaCategorias: sigPag,
+            repreguntasFallidas: 0,
+          },
+        };
+      }
+
+      if (idInteractivoEntrada?.startsWith('cat_')) {
+        const catId = idInteractivoEntrada.replace('cat_', '');
+        const cat = (contexto.categoriasCarta || []).find((c: any) => String(c.id) === String(catId));
+        if (cat) {
+          const accionLista = construirListaProductos(cat, 0);
+          return {
+            nuevoEstado: 'ATENCION_PERSONA',
+            acciones: [accionLista],
+            nuevoFlujo: {
+              ...flujo,
+              estado: 'ATENCION_PERSONA',
+              categoriaSeleccionadaId: catId,
+              paginaProductos: 0,
+              repreguntasFallidas: 0,
+            },
+          };
+        }
+      }
+
+      const accionLista = construirListaCategorias(
+        contexto.categoriasCarta || [],
+        0,
+        contexto.datosLocal,
+      );
+      return {
+        nuevoEstado: 'ATENCION_PERSONA',
+        acciones: [accionLista],
+        nuevoFlujo: {
+          ...flujo,
+          estado: 'ATENCION_PERSONA',
+          paginaCategorias: 0,
+          repreguntasFallidas: 0,
+        },
+      };
+    }
+
+    // e) Hacer un nuevo pedido (Regla 1 y 7: pedido aparte, no toca el pedido en curso)
+    const esNuevoPedido =
+      idInteractivoEntrada === 'pedir' ||
+      idInteractivoEntrada === 'btn_pedir' ||
+      idInteractivoEntrada === 'delivery' ||
+      idInteractivoEntrada === 'recojo' ||
+      textoEntrada === 'pedir' ||
+      textoEntrada.includes('nuevo pedido') ||
+      coincideAlgunaPalabra(textoEntrada, PALABRAS_PEDIDO);
+
+    if (esNuevoPedido) {
+      for (const subFlujo of RegistroSubFlujos.obtenerFlujos()) {
+        if (subFlujo.nombre === 'pedido' && subFlujo.puedeManejar(flujo, entrada, contexto)) {
+          const res = subFlujo.transicionar(flujo, entrada, contexto);
+          if (res) return res;
+        }
+      }
+    }
+
+    // f) Estado de mi pedido (Regla 1)
+    const matchCod =
+      textoOriginalEntrada.match(/CP-\d{4}/i) || textoEntrada.match(/CP-\d{4}/i);
+    const esEstadoPedido =
+      idInteractivoEntrada === 'mipedido' ||
+      idInteractivoEntrada === 'btn_mipedido' ||
+      idInteractivoEntrada === 'btn_asi_pedido' ||
+      idInteractivoEntrada?.startsWith('ord_') ||
+      textoEntrada.includes('mi pedido') ||
+      textoEntrada.includes('estado') ||
+      Boolean(matchCod);
+
+    if (esEstadoPedido) {
+      if (contexto.pedidoActivo) {
+        const p = contexto.pedidoActivo;
+        const textoInfo = `Tu pedido *${p.codigo}* está en estado: *${p.estado}* (Pago: *${p.pago_estado}*).\nSeguimos atendiendo tu solicitud con nuestro equipo.`;
+        return {
+          nuevoEstado: 'ATENCION_PERSONA',
+          acciones: [
+            {
+              tipo: 'enviarBotones',
+              texto: textoInfo,
+              botones: [
+                { id: 'btn_asi_carta', titulo: 'Ver la carta' },
+                { id: 'btn_asi_persona', titulo: 'Hablar con persona' },
+              ],
+            },
+          ],
+          nuevoFlujo: flujo,
+        };
+      } else {
+        return {
+          nuevoEstado: 'ATENCION_PERSONA',
+          acciones: [
+            {
+              tipo: 'enviarBotones',
+              texto: 'No encontramos un pedido activo asociado a tu número. ¿Deseas hacer un pedido nuevo o ver la carta?',
+              botones: [
+                { id: 'pedir', titulo: 'Hacer un pedido' },
+                { id: 'btn_asi_carta', titulo: 'Ver la carta' },
+              ],
+            },
+          ],
+          nuevoFlujo: flujo,
+        };
+      }
+    }
+
+    // g) Horario y ubicación / FAQ (Regla 1)
+    const esHorarioOUbicacion =
+      idInteractivoEntrada === 'horario' ||
+      idInteractivoEntrada === 'btn_horario' ||
+      idInteractivoEntrada === 'ubicacion' ||
+      idInteractivoEntrada === 'btn_ubicacion' ||
+      idInteractivoEntrada === 'faq_horario' ||
+      idInteractivoEntrada === 'faq_ubicacion' ||
+      textoEntrada.includes('horario') ||
+      textoEntrada.includes('ubicacion') ||
+      textoEntrada.includes('donde estan') ||
+      textoEntrada.includes('a que hora');
+
+    if (esHorarioOUbicacion) {
+      return {
+        nuevoEstado: 'ATENCION_PERSONA',
+        acciones: [
+          {
+            tipo: 'enviarBotones',
+            texto: TEXTOS_BOT.horarioYUbicacion(contexto.datosLocal),
+            botones: [
+              { id: 'btn_asi_carta', titulo: 'Ver la carta' },
+              { id: 'btn_asi_persona', titulo: 'Hablar con persona' },
+            ],
+          },
+        ],
+        nuevoFlujo: flujo,
+      };
+    }
+
+    // h) Hablar con una persona (Regla 1)
+    const esPersonaIntencion =
+      idInteractivoEntrada === 'persona' ||
+      idInteractivoEntrada === 'btn_persona' ||
+      idInteractivoEntrada === 'btn_asi_persona' ||
+      textoEntrada === 'asesor' ||
+      textoEntrada.includes('persona') ||
+      textoEntrada.includes('hablar con alguien') ||
+      textoEntrada.includes('hablar con persona') ||
+      textoEntrada.includes('hablar con asesor');
+
+    if (esPersonaIntencion) {
+      return {
+        nuevoEstado: 'ATENCION_PERSONA',
+        acciones: [
+          {
+            tipo: 'enviarTexto',
+            texto: 'Ya avisé a una persona de nuestro equipo; en unos minutos te escriben por aquí.',
+          },
+        ],
+        nuevoFlujo: flujo,
+      };
+    }
+
+    // i) Preguntas libres (Reglas 3 y 4)
+    // Si no han transcurrido los minutos para modo asistido, calla
+    if (!contexto.modoAsistido) {
+      return {
+        nuevoEstado: 'ATENCION_PERSONA',
+        acciones: [],
+        nuevoFlujo: flujo,
+      };
+    }
+
+    // Con modoAsistido activo: si IA encendida y disponible, consulta a la IA (Regla 3)
+    if (contexto.chatbotIaActivo) {
+      return {
+        nuevoEstado: 'ATENCION_PERSONA',
+        acciones: [
+          {
+            tipo: 'consultarIa',
+            pregunta: textoOriginalEntrada,
+          },
+        ],
+        nuevoFlujo: flujo,
+      };
+    }
+
+    // Con IA apagada: frase fija con límite de frecuencia (Reglas 3 y 4)
+    if (contexto.modoAsistidoFraseReciente) {
+      return {
+        nuevoEstado: 'ATENCION_PERSONA',
+        acciones: [],
+        nuevoFlujo: flujo,
+      };
+    }
+
     return {
       nuevoEstado: 'ATENCION_PERSONA',
-      acciones: [],
+      acciones: [
+        {
+          tipo: 'enviarBotones',
+          texto: TEXTO_ASISTIDO_FRASE_FIJA,
+          botones: BOTONES_MODO_ASISTIDO,
+        },
+      ],
       nuevoFlujo: flujo,
     };
   }

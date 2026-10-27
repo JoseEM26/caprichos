@@ -12,7 +12,7 @@ import { ZonasService } from '../../zonas/zonas.service';
 import { ReservasService } from '../../reservas/reservas.service';
 import { ChatbotIaService } from '../ia/chatbot-ia.service';
 import { ChatbotConfiguracionService } from '../configuracion/chatbot-configuracion.service';
-import { BOTON_VOLVER_MENU, TEXTOS_BOT } from './textos-bot';
+import { BOTON_VOLVER_MENU, TEXTOS_BOT, TEXTO_ASISTIDO_FRASE_FIJA } from './textos-bot';
 import { TEXTOS_RESERVA } from './textos-reserva';
 import { TEXTOS_IA, BOTONES_IA_ESTANDAR, BOTONES_IA_CON_PEDIDO } from './textos-ia';
 import { obtenerFechaLimaActual, resolverFechaEntradaReserva } from './flujos/reserva/flujo-reserva';
@@ -144,6 +144,150 @@ export class EjecutorConversacionService {
   }
 
   /**
+   * Obtiene el parámetro de espera antes de activar el Modo Asistido (defecto 3 min).
+   */
+  private async obtenerAsistidoEsperaMin(): Promise<number> {
+    try {
+      if (typeof this.prisma.parametro?.findUnique === 'function') {
+        const param = await this.prisma.parametro.findUnique({
+          where: { clave: 'asistido_espera_min' },
+        });
+        if (param && param.valor != null) {
+          const val = Number(param.valor);
+          if (!isNaN(val) && val > 0) return val;
+        }
+      }
+    } catch (err: any) {
+      this.logger.warn(`Error leyendo parametro asistido_espera_min: ${err.message}`);
+    }
+    return 3;
+  }
+
+  /**
+   * Verifica si la frase fija del modo asistido ya fue enviada en los últimos 3 minutos (Regla 4).
+   */
+  private async verificarFraseFijaReciente(
+    conversacionId: string | bigint,
+    flujo: any,
+  ): Promise<boolean> {
+    const clave = `rate:asistido:frase_fija:${conversacionId.toString()}`;
+    try {
+      const redis = this.redisService?.obtenerCliente();
+      if (redis && typeof redis.get === 'function') {
+        const val = await redis.get(clave);
+        if (val) return true;
+      }
+    } catch {}
+
+    if (flujo?.asistido_ultima_frase_fija_ts) {
+      const ms = Date.now() - Number(flujo.asistido_ultima_frase_fija_ts);
+      if (ms < 3 * 60 * 1000) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Registra en Redis el envío de la frase fija del modo asistido con TTL de 3 minutos (Regla 4).
+   */
+  private async registrarFraseFijaEnviada(
+    conversacionId: string | bigint,
+    asistidoEsperaMin = 3,
+  ): Promise<void> {
+    const clave = `rate:asistido:frase_fija:${conversacionId.toString()}`;
+    try {
+      const redis = this.redisService?.obtenerCliente();
+      if (redis && typeof redis.set === 'function') {
+        await redis.set(clave, '1', 'EX', asistidoEsperaMin * 60);
+      }
+    } catch {}
+  }
+
+  /**
+   * Determina si la entrada corresponde a una petición de acción inmediata permitida en Modo Asistido (Regla 1).
+   */
+  private esAccionInmediataAsistido(entrada: EntradaProcesarMensaje): boolean {
+    const id = String(
+      entrada.buttonPayload ||
+        entrada.listReplyId ||
+        entrada.listRowId ||
+        (entrada as any).id ||
+        '',
+    ).trim();
+    const textoNorm = (entrada.texto || entrada.textoOriginal || '').trim().toLowerCase();
+
+    // Menú
+    if (
+      ['menu', 'btn_menu', 'volver_menu', 'inicio', '0'].includes(id) ||
+      textoNorm === 'menu' ||
+      textoNorm === 'inicio' ||
+      textoNorm === '0'
+    )
+      return true;
+    // Carta
+    if (
+      id === 'carta' ||
+      id === 'btn_carta' ||
+      id === 'btn_asi_carta' ||
+      id.startsWith('cat_') ||
+      textoNorm === 'carta' ||
+      textoNorm.includes('ver la carta') ||
+      textoNorm.includes('ver carta') ||
+      textoNorm === 'la carta'
+    )
+      return true;
+    // Nuevo pedido
+    if (
+      ['pedir', 'btn_pedir', 'delivery', 'recojo'].includes(id) ||
+      id.startsWith('ped_') ||
+      textoNorm === 'pedir' ||
+      textoNorm.includes('nuevo pedido')
+    )
+      return true;
+    // Mi pedido / Estado
+    if (
+      ['mipedido', 'btn_mipedido', 'btn_asi_pedido'].includes(id) ||
+      id.startsWith('ord_') ||
+      textoNorm.includes('mi pedido') ||
+      textoNorm.includes('estado') ||
+      Boolean(textoNorm.match(/cp-\d{4}/i))
+    )
+      return true;
+    // Horario / Ubicación / FAQ
+    if (
+      ['horario', 'btn_horario', 'ubicacion', 'btn_ubicacion'].includes(id) ||
+      id.startsWith('faq_') ||
+      textoNorm.includes('horario') ||
+      textoNorm.includes('ubicacion') ||
+      textoNorm.includes('donde estan') ||
+      textoNorm.includes('a que hora')
+    )
+      return true;
+    // Hablar con persona
+    if (
+      ['persona', 'btn_persona', 'btn_asi_persona'].includes(id) ||
+      textoNorm === 'asesor' ||
+      textoNorm.includes('persona') ||
+      textoNorm.includes('hablar con persona') ||
+      textoNorm.includes('hablar con alguien') ||
+      textoNorm.includes('hablar con asesor')
+    )
+      return true;
+    // Cancelar o cambiar
+    if (
+      ['c_dir', 'c_ped', 'c_ped_si', 'c_dir_si'].includes(id) ||
+      id.startsWith('c_dir_') ||
+      id.startsWith('c_ped_') ||
+      textoNorm.includes('cancelar') ||
+      textoNorm.includes('anular') ||
+      textoNorm.includes('cambiar') ||
+      textoNorm.includes('ya no quiero')
+    )
+      return true;
+
+    return false;
+  }
+
+  /**
    * Procesa un mensaje entrante coordinando el motor puro de conversación,
    * aplicando validaciones de estado, rate limit, idempotencia y despachando las acciones al puerto.
    */
@@ -163,13 +307,72 @@ export class EjecutorConversacionService {
       return false;
     }
 
-    // 2. Solo responde si el dueño es estrictamente el BOT y no ha sido tomado por una persona.
-    // Regla de contrato (Sección 3): Mientras hay un pago pendiente de validar (VALIDAR_PAGO), el bot
-    // sigue atendiendo menú, carta, horario, estado del pedido y nuevos pedidos; solo no decide el pago.
+    // 2. Control de atención y Modo Asistido (Contrato Modo Asistido 27/10/2026):
     const esValidarPago = conversacion.estado === 'VALIDAR_PAGO';
-    if ((conversacion.duenio !== 'BOT' || conversacion.tomado_por !== null) && !esValidarPago) {
-      this.logger.log(`Conversación ${conversacionId} en manos de PERSONA (${conversacion.duenio}). El bot calla.`);
-      return false;
+    const flujoPrevio = (conversacion.flujo as any) as FlujoConversacion | null;
+    const enManosDePersona =
+      conversacion.duenio !== 'BOT' ||
+      conversacion.tomado_por !== null ||
+      flujoPrevio?.estado === 'ATENCION_PERSONA';
+
+    let esModoAsistido = false;
+    let asistidoEsperaMin = 3;
+    let minutosSinHumano = 0;
+    let esEsperaCumplida = false;
+
+    if (enManosDePersona && !esValidarPago) {
+      // Regla 5: Si la conversación está TOMADA (tomado_por) por alguien activo, el bot calla
+      if (conversacion.tomado_por !== null) {
+        this.logger.log(`Conversación ${conversacionId} tomada por persona (${conversacion.tomado_por}). El bot calla.`);
+        return false;
+      }
+
+      asistidoEsperaMin = await this.obtenerAsistidoEsperaMin();
+
+      // Regla 1 y 5: Si una persona envió un mensaje al cliente en los últimos N minutos, el bot calla
+      const ultimoMensajePersona =
+        typeof this.prisma.mensajeChat?.findFirst === 'function'
+          ? await this.prisma.mensajeChat.findFirst({
+              where: {
+                conversacion_id: conversacion.id,
+                direccion: 'SALE',
+                autor: 'PERSONA',
+              },
+              orderBy: { en: 'desc' },
+            })
+          : null;
+
+      let minutosDesdeUltimoHumano = Infinity;
+      if (ultimoMensajePersona) {
+        minutosDesdeUltimoHumano =
+          (Date.now() - new Date(ultimoMensajePersona.en).getTime()) / (60 * 1000);
+      }
+
+      if (minutosDesdeUltimoHumano < asistidoEsperaMin) {
+        this.logger.log(
+          `Persona escribió hace ${minutosDesdeUltimoHumano.toFixed(1)} min (< ${asistidoEsperaMin} min). El bot calla.`,
+        );
+        return false;
+      }
+
+      minutosSinHumano = ultimoMensajePersona
+        ? minutosDesdeUltimoHumano
+        : conversacion.ultima_actividad
+          ? (Date.now() - new Date(conversacion.ultima_actividad).getTime()) / (60 * 1000)
+          : 0;
+
+      esEsperaCumplida = minutosSinHumano >= asistidoEsperaMin;
+      const esAccionInmediata = this.esAccionInmediataAsistido(entradaRaw);
+
+      // Si no han pasado N minutos y no es una acción inmediata (menú, carta, pedir, etc.), el bot calla
+      if (!esEsperaCumplida && !esAccionInmediata) {
+        this.logger.log(
+          `Modo asistido en conversación ${conversacionId}: no han transcurrido ${asistidoEsperaMin} min (${minutosSinHumano.toFixed(1)} min) y no es acción directa. El bot calla.`,
+        );
+        return false;
+      }
+
+      esModoAsistido = true;
     }
 
     // 3. Verificar interruptor general chatbot_activo === 'si'
@@ -518,6 +721,12 @@ export class EjecutorConversacionService {
       chatbotIaActivo,
       funcionesActivas,
       textosPersonalizados,
+      modoAsistido: esModoAsistido && esEsperaCumplida,
+      asistidoEsperaMin,
+      minutosSinHumano,
+      modoAsistidoFraseReciente: esModoAsistido
+        ? await this.verificarFraseFijaReciente(conversacion.id, flujoPrevio)
+        : false,
     };
 
     // 7. Determinar destino (número E.164 normalizado o BSUID de Meta)
@@ -831,8 +1040,17 @@ export class EjecutorConversacionService {
 
     // 8. Normalizar entrada y ejecutar la máquina de estados pura
     const entradaNorm = normalizarEntrada(entradaRaw);
-    const flujoPrevio = (conversacion.flujo as any) as FlujoConversacion | null;
-    const resultado = transicionarEstado(flujoPrevio, entradaNorm, contexto);
+    const flujoEntrada: FlujoConversacion = {
+      ...(flujoPrevio || { version: 2, repreguntasFallidas: 0 }),
+      estado:
+        esModoAsistido &&
+        (!flujoPrevio?.estado ||
+          flujoPrevio.estado === 'INICIO' ||
+          flujoPrevio.estado === 'MENU')
+          ? 'ATENCION_PERSONA'
+          : flujoPrevio?.estado || 'INICIO',
+    };
+    const resultado = transicionarEstado(flujoEntrada, entradaNorm, contexto);
 
     // 9. Ejecutar las acciones devueltas por el motor
     for (const accion of resultado.acciones) {
@@ -885,6 +1103,11 @@ export class EjecutorConversacionService {
             meta_id: metaId,
           },
         });
+
+        if (accion.texto === TEXTO_ASISTIDO_FRASE_FIJA) {
+          await this.registrarFraseFijaEnviada(conversacion.id, asistidoEsperaMin);
+          (resultado.nuevoFlujo as any).asistido_ultima_frase_fija_ts = Date.now();
+        }
       } else if (accion.tipo === 'enviarLista') {
         let metaId: string | null = null;
         if (destinoEnvio) {
@@ -1323,7 +1546,7 @@ export class EjecutorConversacionService {
             where: { id: conversacion.id },
             data: {
               duenio: 'PERSONA',
-              urgente: false,
+              urgente: Boolean(conversacion.urgente),
               estado:
                 !conversacion.estado || conversacion.estado === 'ATENDIDA'
                   ? 'ABIERTA'
@@ -1396,6 +1619,13 @@ export class EjecutorConversacionService {
     if (esValidarPago) {
       dataUpdate.estado = 'VALIDAR_PAGO';
       dataUpdate.duenio = 'PERSONA';
+    } else if (esModoAsistido) {
+      // Regla 6: Al pasar a modo asistido NO se quita la urgencia ni se suelta el chat:
+      // sigue en la lista Por atender (duenio: PERSONA) y con las alertas a administradores.
+      dataUpdate.duenio = 'PERSONA';
+      if (conversacion.urgente) {
+        dataUpdate.urgente = true;
+      }
     }
 
     await this.prisma.conversacion.update({

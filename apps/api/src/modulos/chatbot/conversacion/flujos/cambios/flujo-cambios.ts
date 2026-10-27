@@ -170,8 +170,29 @@ export class FlujoCambiosSubFlujo implements SubFlujoConversacion {
       const st = String(pedido.estado || 'COLA').toUpperCase();
       const esEnRuta = st === 'EN_CAMINO' || st === 'RUTA';
 
-      // Regla de estado: Solo se puede pedir cambio si está en COLA o PREPARANDO
-      if (st !== 'COLA' && st !== 'PREPARANDO') {
+      // En modo asistido: un pedido ya en PREPARANDO/LISTO/EN_CAMINO se registra igual la solicitud (Regla 2).
+      // Solo pedidos ya ENTREGADOS o CANCELADOS se rechazan directamente.
+      if (contexto.modoAsistido && (st === 'ENTREGADO' || st === 'CANCELADO')) {
+        return {
+          nuevoEstado: 'ATENCION_PERSONA',
+          acciones: [
+            {
+              tipo: 'enviarBotones',
+              texto: TEXTOS_CAMBIOS.cambioNoPermitidoEstado(pedido.codigo, st, false),
+              botones: BOTONES_CAMBIO_NO_PERMITIDO,
+            },
+          ],
+          nuevoFlujo: {
+            ...flujo,
+            estado: 'ATENCION_PERSONA',
+            cambios: null,
+            repreguntasFallidas: 0,
+          },
+        };
+      }
+
+      // Regla de estado regular: Solo se puede pedir cambio si está en COLA o PREPARANDO
+      if (!contexto.modoAsistido && st !== 'COLA' && st !== 'PREPARANDO') {
         const motivo = esEnRuta
           ? (esCambioDir ? 'CAMBIO_DIRECCION_URGENTE' : 'CAMBIO_PEDIDO_EN_RUTA')
           : 'CAMBIO_ESTADO_NO_PERMITIDO';
@@ -628,7 +649,7 @@ export class FlujoCambiosSubFlujo implements SubFlujoConversacion {
       if (id === 'c_ped_si' || texto === 'si' || texto === 'confirmar' || texto === 'confirmar solicitud') {
         const textoRespuesta =
           datos.tipo === 'CANCELAR'
-            ? TEXTOS_CAMBIOS.solicitudCancelacionEnviada(datos.pedidoCodigo)
+            ? TEXTOS_CAMBIOS.solicitudCancelacionEnviada(datos.pedidoCodigo, datos.estadoPedido)
             : TEXTOS_CAMBIOS.solicitudPedidoEnviada(datos.pedidoCodigo);
 
         return {

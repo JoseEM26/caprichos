@@ -93,8 +93,13 @@ export const TEXTOS_CAMBIOS = {
   solicitudPedidoEnviada: (codigo: string): string =>
     `Tu pedido ${codigo} ya está en cocina y quitar productos no siempre se puede. Ya avisé a un asesor para revisarlo contigo ahora.`.slice(0, 1024),
 
-  solicitudCancelacionEnviada: (codigo: string): string =>
-    `Tu solicitud de cancelación para el pedido ${codigo} fue enviada a Caja. Un asesor la revisará y te responderá por aquí.`.slice(0, 1024),
+  solicitudCancelacionEnviada: (codigo?: string, estado?: string): string => {
+    const advertencia =
+      estado && ['PREPARANDO', 'LISTO', 'EN_CAMINO', 'RUTA'].includes(estado.toUpperCase())
+        ? ` (aviso: tu pedido ya está en ${estado.toLowerCase()} y puede no ser posible)`
+        : '';
+    return `Registre tu solicitud de cancelacion${advertencia}; una persona de Caja la confirma.`.slice(0, 1024);
+  },
 
   cambioNoPermitidoEstado: (codigo: string, estado: string, esEnRuta: boolean): string => {
     if (esEnRuta || estado === 'EN_CAMINO' || estado === 'RUTA') {

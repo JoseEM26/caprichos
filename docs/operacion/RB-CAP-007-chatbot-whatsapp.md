@@ -158,6 +158,7 @@ El administrador puede encender o apagar cualquier aviso y modificar los tiempos
 | `whatsapp_aviso_recojo_activo` | Sí/No | `false` | Envía aviso cuando el pedido para llevar está listo en barra. |
 | `whatsapp_aviso_pago_confirmado_activo` | Sí/No | `false` | Envía confirmación al cliente cuando Caja aprueba el voucher. |
 | `whatsapp_aviso_encuesta_activo` | Sí/No | `false` | Activa el envío automático de la encuesta de satisfacción. |
+| `asistido_espera_min` | Numérico | `3` | Minutos de espera sin respuesta humana en ATENCION_PERSONA antes de activar el modo asistido del bot. |
 | `reparto_insistencia_min` | Numérico | `3` | Minutos en la puerta antes del aviso 3 de insistencia. |
 | `reparto_espera_max_min` | Numérico | `10` | Tolerancia máxima en puerta antes de retirar al motorizado. |
 | `reparto_recargo_reprogramacion` | Numérico | `0.00` | Recargo en soles por segundo intento de entrega tras reprogramación. |
@@ -189,6 +190,29 @@ El administrador puede encender o apagar cualquier aviso y modificar los tiempos
 ### D. Modo Pruebas vs Modo Público
 - En desarrollo, el número de Meta tiene un **límite estricto de 5 destinatarios de prueba**.
 - Para conectar el número comercial real del negocio y abrir el bot al público, siga paso a paso la [Guía: Cómo hacer público el bot de WhatsApp](./GUIA-hacer-publico-el-bot-de-whatsapp.md).
+
+### E. Modo Asistido en ATENCION_PERSONA
+Cuando un chat entra en `ATENCION_PERSONA` (por demora, queja, solicitud de asesor o error), el cliente no queda silenciado ni desatendido:
+1. **Regla de activación temporal y acciones inmediatas:**
+   - Si no hay respuesta humana (`SALE`, `PERSONA`) en `asistido_espera_min` (por defecto 3 minutos), el bot reanuda respuestas con alcance acotado.
+   - Si el cliente pulsa botones o escribe intenciones directas (`menu`, `carta`, `pedir`, `estado`, `horario`, `persona`), el bot responde **de inmediato sin esperar los 3 minutos**.
+   - **Exclusiones:** No aplica si el chat está tomado por un asesor (`tomado_por !== null`), si un asesor humano escribió hace menos de 3 minutos, o si la conversación está en `VALIDAR_PAGO` (la decisión de pago se mantiene 100 % humana en Caja).
+2. **Preservación de propiedad y prioridad:**
+   - El modo asistido **NO** libera la conversación (`duenio` se mantiene como `PERSONA`).
+   - El indicador `urgente: true` se preserva para mantener visible el chat en la cola de Mensajes de Caja.
+3. **Nuevo pedido independiente:**
+   - El cliente puede registrar un nuevo pedido independiente sin interferir con el pedido en curso. El nuevo pedido ingresa normalmente al flujo operativo.
+4. **Solicitudes de cambio o cancelación de pedidos:**
+   - El bot **NUNCA** cancela ni modifica pedidos por su cuenta.
+   - En su lugar, registra formalmente una solicitud de cambio (`crearSolicitudCambio`) para Caja con el mensaje: *«Registre tu solicitud de cancelacion; una persona de Caja la confirma.»* (advirtiendo que si el pedido ya está en preparación, listo o en camino, podría no ser posible). Emite notificación prioritaria en campana y módulo de Mensajes.
+5. **Consultas libres e Inteligencia Artificial:**
+   - Si `chatbot_ia_activo` está encendido y tiene API key válida, resuelve dudas libres mediante el módulo de IA (`ia/`).
+   - Si la IA está apagada, responde con la frase fija: *«Ya avise a una persona; mientras tanto puedo ayudarte con esto:»* acompañada de botones interactivos (`[Ver la carta]`, `[Estado de mi pedido]`, `[Hablar con persona]`), todos con longitud estricta ≤ 20 caracteres.
+   - La frase fija cuenta con rate-limiting en Redis y contexto: como máximo se envía una vez cada 3 minutos por conversación para evitar spam.
+6. **Reglas de oro inviolables:**
+   - El bot y la IA **NUNCA** aprueban comprobantes ni pagos.
+   - El bot y la IA **NUNCA** cancelan ni reembolsan pedidos directamente.
+   - El bot y la IA **NUNCA** alteran ítems ni estados de pedidos en progreso de forma autónoma.
 
 ---
 

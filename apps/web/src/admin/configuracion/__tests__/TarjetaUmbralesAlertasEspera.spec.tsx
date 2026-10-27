@@ -34,7 +34,7 @@ describe('TarjetaUmbralesAlertasEspera (Panel esp-web)', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('renderiza la tarjeta para ADMIN con los 5 umbrales por defecto', async () => {
+  it('renderiza la tarjeta para ADMIN con los 6 umbrales por defecto', async () => {
     vi.mocked(api.get).mockResolvedValueOnce([]); // sin valores en BD, usa sembrados por defecto
 
     render(<TarjetaUmbralesAlertasEspera esAdmin={true} />);
@@ -47,12 +47,14 @@ describe('TarjetaUmbralesAlertasEspera (Panel esp-web)', () => {
     const inputCliente = screen.getByLabelText(/aviso de espera al cliente/i) as HTMLInputElement;
     const inputLiberar = screen.getByLabelText(/liberar chat tomado y abandonado/i) as HTMLInputElement;
     const inputPedido = screen.getByLabelText(/aviso pedido sin confirmar en caja/i) as HTMLInputElement;
+    const inputAsistido = screen.getByLabelText(/espera antes de modo asistido/i) as HTMLInputElement;
 
     expect(inputV1.value).toBe('5');
     expect(inputV2.value).toBe('15');
     expect(inputCliente.value).toBe('10');
     expect(inputLiberar.value).toBe('10');
     expect(inputPedido.value).toBe('5');
+    expect(inputAsistido.value).toBe('3');
   });
 
   it('carga valores existentes desde /admin/configuracion', async () => {
@@ -62,6 +64,7 @@ describe('TarjetaUmbralesAlertasEspera (Panel esp-web)', () => {
       { clave: 'espera_cliente_aviso_min', valor: 12 },
       { clave: 'chat_tomado_liberar_min', valor: 8 },
       { clave: 'alerta_pedido_sin_confirmar_min', valor: 7 },
+      { clave: 'asistido_espera_min', valor: 4 },
     ]);
 
     render(<TarjetaUmbralesAlertasEspera esAdmin={true} />);
@@ -73,6 +76,9 @@ describe('TarjetaUmbralesAlertasEspera (Panel esp-web)', () => {
 
     const inputV2 = screen.getByLabelText(/segundo aviso y urgente voucher/i) as HTMLInputElement;
     expect(inputV2.value).toBe('18');
+
+    const inputAsistido = screen.getByLabelText(/espera antes de modo asistido/i) as HTMLInputElement;
+    expect(inputAsistido.value).toBe('4');
   });
 
   it('valida que los umbrales no sean menores o iguales a 0', async () => {
@@ -94,7 +100,7 @@ describe('TarjetaUmbralesAlertasEspera (Panel esp-web)', () => {
     expect(api.put).not.toHaveBeenCalled();
   });
 
-  it('guarda los 5 parámetros vía PUT /admin/configuracion/:clave tras confirmar en modal', async () => {
+  it('guarda los 6 parámetros vía PUT /admin/configuracion/:clave tras confirmar en modal', async () => {
     vi.mocked(api.get).mockResolvedValueOnce([]);
 
     render(<TarjetaUmbralesAlertasEspera esAdmin={true} />);
@@ -121,6 +127,7 @@ describe('TarjetaUmbralesAlertasEspera (Panel esp-web)', () => {
       expect(api.put).toHaveBeenCalledWith('/admin/configuracion/espera_cliente_aviso_min', { valor: 10 });
       expect(api.put).toHaveBeenCalledWith('/admin/configuracion/chat_tomado_liberar_min', { valor: 10 });
       expect(api.put).toHaveBeenCalledWith('/admin/configuracion/alerta_pedido_sin_confirmar_min', { valor: 5 });
+      expect(api.put).toHaveBeenCalledWith('/admin/configuracion/asistido_espera_min', { valor: 3 });
     });
 
     expect(await screen.findByText(/guardado a las/i)).toBeInTheDocument();

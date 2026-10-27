@@ -534,10 +534,17 @@ export class WhatsappWebhookService {
       textoNorm === 'alta' ||
       textoNorm === 'start';
 
-    // El bot responde si la conversación le pertenece (duenio === 'BOT') o si está en estado VALIDAR_PAGO
-    // conforme a la regla de contrato: mientras hay un pago pendiente de validar el bot sigue atendiendo consultas operativas.
+    // El bot responde si la conversación le pertenece (duenio === 'BOT'), si está en estado VALIDAR_PAGO
+    // conforme a la regla de contrato (mientras hay un pago pendiente de validar el bot sigue atendiendo consultas),
+    // o si el flujo está en ATENCION_PERSONA para evaluar el Modo Asistido si aplica.
+    const flujoObj = (conversacion.flujo as Record<string, any>) || {};
+    const esAtencionPersona =
+      flujoObj.estado === 'ATENCION_PERSONA' && !conversacion.tomado_por;
+
     const puedeProcesarMotor =
-      conversacion.duenio === 'BOT' || conversacion.estado === 'VALIDAR_PAGO';
+      conversacion.duenio === 'BOT' ||
+      conversacion.estado === 'VALIDAR_PAGO' ||
+      esAtencionPersona;
 
     if (this.motorConversacion && !esComandoBajaOAlta && puedeProcesarMotor) {
       const consentimiento = await this.prisma.clienteWhatsappConsentimiento.findUnique({

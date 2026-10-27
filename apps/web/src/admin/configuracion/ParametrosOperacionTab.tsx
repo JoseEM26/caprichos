@@ -272,6 +272,12 @@ const META_PARAMETROS: Record<string, MetaParametro> = {
     tipo: 'numero',
     sufijo: 'minutos',
   },
+  asistido_espera_min: {
+    nombre: 'Espera antes de modo asistido',
+    descripcion: 'Minutos sin respuesta de asesor antes de activar el bot asistido en chats en espera.',
+    tipo: 'numero',
+    sufijo: 'minutos',
+  },
 };
 
 interface ParametrosOperacionTabProps {

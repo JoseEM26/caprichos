@@ -332,6 +332,18 @@ export interface ContextoConversacion {
   };
   /** Textos configurados/personalizados del bot de WhatsApp (Ola 4, Agente I) */
   textosPersonalizados?: Record<string, string>;
+  /** Modo asistido activo: conversación en ATENCION_PERSONA sin respuesta humana */
+  modoAsistido?: boolean;
+  /** Indica si un humano habló recientemente (< 3 min) en una conversación en ATENCION_PERSONA */
+  humanoHabloReciente?: boolean;
+  /** Indica si el chat está tomado por un asesor activo */
+  chatTomado?: boolean;
+  /** Minutos transcurridos sin respuesta de una persona */
+  minutosSinHumano?: number;
+  /** Umbral en minutos configurado para modo asistido (defecto 3) */
+  asistidoEsperaMin?: number;
+  /** Indica si la frase fija del modo asistido ya fue enviada recientemente (< 3 min) */
+  modoAsistidoFraseReciente?: boolean;
 }
 
 /**

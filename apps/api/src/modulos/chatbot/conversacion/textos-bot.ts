@@ -232,6 +232,15 @@ export const FILAS_PREGUNTAS_FRECUENTES: FilaLista[] = [
   },
 ];
 
+export const TEXTO_ASISTIDO_FRASE_FIJA =
+  'Ya avise a una persona; mientras tanto puedo ayudarte con esto:';
+
+export const BOTONES_MODO_ASISTIDO: BotonAccion[] = [
+  { id: 'btn_asi_carta', titulo: 'Ver la carta' },
+  { id: 'btn_asi_pedido', titulo: 'Estado de mi pedido' },
+  { id: 'btn_asi_persona', titulo: 'Hablar con persona' },
+];
+
 export interface InfoEstadoPedido {
   codigo: string;
   estado: string;
