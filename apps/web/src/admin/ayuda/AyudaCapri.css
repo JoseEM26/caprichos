@@ -1,9 +1,51 @@
 /* Estilos para el Asistente de Ayuda del Administrador (Capri) */
 
-.ayuda-fab {
+.ayuda-fab-wrap {
   position: fixed;
   right: 16px;
   bottom: 16px;
+  z-index: 999;
+}
+
+.ayuda-min {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  z-index: 1;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1.5px solid var(--cp-line, #E3D6C6);
+  background: var(--cp-white, #FFFFFF);
+  color: var(--cp-navy, #0B2C3E);
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(11, 44, 62, 0.2);
+}
+
+.ayuda-fab-mini {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 999;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid var(--cp-orange, #E67929);
+  background: var(--cp-white, #FFFFFF);
+  box-shadow: 0 6px 18px rgba(11, 44, 62, 0.25);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.ayuda-fab {
+  position: static;
   display: flex;
   align-items: flex-end;
   gap: 8px;

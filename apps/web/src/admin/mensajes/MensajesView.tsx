@@ -238,6 +238,15 @@ export function MensajesView() {
     }
   }, [chatSeleccionadoId, cargarDetalle]);
 
+  // Respaldo por si el canal en vivo se cae: refresca la lista cada 20 s
+  useEffect(() => {
+    const cada = setInterval(() => {
+      cargarLista(true);
+      if (chatSeleccionadoId) cargarDetalle(chatSeleccionadoId);
+    }, 20000);
+    return () => clearInterval(cada);
+  }, [cargarLista, cargarDetalle, chatSeleccionadoId]);
+
   // Escuchar eventos en vivo
   useEventos('mensajes:actualizado', () => {
     cargarLista(true);

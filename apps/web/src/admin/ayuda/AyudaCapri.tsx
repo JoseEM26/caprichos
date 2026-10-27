@@ -28,6 +28,25 @@ export function AyudaCapri({ ruta }: AyudaCapriProps) {
   } = useAyuda(rutaActual);
 
   const [pregunta, setPregunta] = useState('');
+
+  // Capri minimizada: no tapa botones de la pantalla (p. ej. Enviar en Mensajes). Se recuerda por navegador.
+  const [minimizada, setMinimizada] = useState<boolean>(() => {
+    try {
+      const guardado = localStorage.getItem('capri_minimizada');
+      if (guardado !== null) return guardado === '1';
+    } catch {
+      /* sin almacenamiento */
+    }
+    return location.pathname.startsWith('/admin/mensajes');
+  });
+  const cambiarMinimizada = (valor: boolean) => {
+    setMinimizada(valor);
+    try {
+      localStorage.setItem('capri_minimizada', valor ? '1' : '0');
+    } catch {
+      /* sin almacenamiento */
+    }
+  };
   const finMensajesRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -83,22 +102,49 @@ export function AyudaCapri({ ruta }: AyudaCapriProps) {
   return (
     <>
       {/* Botón flotante FAB (visible solo cuando el panel está cerrado) */}
-      {!abierto && (
+      {!abierto && !minimizada && (
+        <div className="ayuda-fab-wrap">
+          <button
+            type="button"
+            className="ayuda-min"
+            onClick={() => cambiarMinimizada(true)}
+            aria-label="Minimizar a Capri"
+            title="Minimizar"
+          >
+            −
+          </button>
+          <button
+            type="button"
+            className="ayuda-fab"
+            onClick={abrir}
+            aria-label="Abrir la ayuda de Capri"
+            aria-expanded={false}
+          >
+            <span className="tip">¿Necesitas ayuda? Pregúntame cómo se hace.</span>
+            <span className="av" aria-hidden="true">
+              <MascotaCapri
+                estado={estadoCapri}
+                tamano={esMovil ? 104 : 128}
+                forzarFallback2D={false}
+              />
+            </span>
+          </button>
+        </div>
+      )}
+
+      {/* Capri minimizada: botón redondo pequeño */}
+      {!abierto && minimizada && (
         <button
           type="button"
-          className="ayuda-fab"
-          onClick={abrir}
+          className="ayuda-fab-mini"
+          onClick={() => {
+            cambiarMinimizada(false);
+            abrir();
+          }}
           aria-label="Abrir la ayuda de Capri"
-          aria-expanded={false}
+          title="Ayuda de Capri"
         >
-          <span className="tip">¿Necesitas ayuda? Pregúntame cómo se hace.</span>
-          <span className="av" aria-hidden="true">
-            <MascotaCapri
-              estado={estadoCapri}
-              tamano={esMovil ? 104 : 128}
-              forzarFallback2D={false}
-            />
-          </span>
+          <MascotaCapri estado="reposo" tamano={44} forzarFallback2D />
         </button>
       )}
 
