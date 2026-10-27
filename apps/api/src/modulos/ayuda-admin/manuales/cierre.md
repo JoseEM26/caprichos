@@ -4,23 +4,32 @@ titulo: Caja y cierres
 ruta: /admin/cierre
 permiso: caja/ver
 roles: [ADMIN, CAJERO]
-relacionados: [caja, repartos, supervisor-codigo, comprobantes]
+relacionados: [caja, repartos, supervisor-codigo, comprobantes, mensajes]
 sugerencias:
   - Como realizo el arqueo ciego al terminar el turno
+  - Como audito los vouchers digitales de Yape y Plin antes del cierre
   - Que hago si el sistema me dice que la caja no cuadra
   - Como liquido el dinero que trajeron los repartidores
-  - Por que no me deja cerrar la caja si tengo pedidos pendientes
 ---
 # Caja y cierres
 
 ## Para que sirve
-Gestion del cierre formal de la caja diaria y cambio de turno. Implementa el protocolo de arqueo ciego donde el personal declara el dinero sin ver los montos del sistema, liquida el efectivo pendiente de [[repartos]], concilia las ventas de [[caja]] y emite el balance para [[comprobantes]] e [[informes]].
+Gestion del cierre formal de la caja diaria y cambio de turno. Implementa el protocolo de arqueo ciego donde el personal declara el dinero sin ver los montos del sistema, audita los comprobantes digitales de [[mensajes]], liquida el efectivo pendiente de [[repartos]], concilia las ventas de [[caja]] y emite el balance para [[comprobantes]] e [[informes]].
 
 ## Como se hace: Resolver pendientes de cobro antes de cerrar
 1. En la pestana Cierre actual, revisar la seccion 1: Pedidos pendientes de cobro.
 2. Si aparecen pedidos en la lista, la caja no podra cerrarse por regla del sistema.
 3. Para cada pedido pendiente, pulsar Ir a cobrar en [[caja]] o proceder a anularlo con autorizacion de [[supervisor-codigo]] si fue cancelado o desistido.
 Antes: [[caja]]
+Ver tambien: [[caja]]
+
+## Como se hace: Auditar la lista de vouchers de Yape y Plin del dia
+1. En la seccion Vouchers digitales del dia, revisar el consolidado de comprobantes registrados durante la jornada (tanto los recibidos por WhatsApp en [[mensajes]] como los capturados por mozos en [[plano]]).
+2. Comprobar el estado del semaforo asignado por la IA a cada comprobante: Confiable (verde), Observado (amarillo), Raro (naranja) o Ilegible (gris).
+3. Hacer clic sobre la miniatura para visualizar la imagen completa del voucher en alta resolucion y contrastar el titular, monto y numero de operacion con el extracto bancario o la aplicacion del negocio.
+4. Para cada comprobante verificado, pulsar el boton Marcar revisado y confirmar con Si, marcar revisado en el cuadro emergente.
+5. El contador de vouchers pendientes de revision disminuira en vivo hasta quedar en cero.
+Antes: [[mensajes]]
 Ver tambien: [[caja]]
 
 ## Como se hace: Liquidar a los repartidores
@@ -49,10 +58,12 @@ Requiere: [[supervisor-codigo]]
 Ver tambien: [[supervisor-codigo]]
 
 ## Errores y dudas comunes
+- La clasificacion del semaforo de IA en los vouchers es un apoyo para agilizar la deteccion de anomalias o duplicados, pero no reemplaza la auditoria del cajero o administrador al cerrar turno.
+- Los comprobantes en estado Ilegible o Raro exigen verificacion manual obligatoria contra los movimientos de la cuenta receptora antes de autorizar el cierre.
 - El cajero nunca puede ver los montos esperados por el sistema durante el arqueo; este mecanismo ciego protege la integridad de la recaudacion.
 - Un cierre no se puede revertir una vez emitido; queda registrado permanentemente en la pestana Historial de cierres.
 - No se puede omitir el arqueo de monedas pequenas; cada denominacion debe contarse fielmente.
 
 ## Quien puede hacerlo
-- Administrador y Cajero tienen acceso al modulo de cierres.
+- Administrador y Cajero tienen acceso al modulo de cierres y a la auditoria de vouchers digitales con el permiso vouchers/ver.
 - Cerrar una caja con descuadre o diferencia requiere obligatoriamente la intervencion del Administrador o supervisor con su codigo rotativo de 6 digitos.

@@ -4,17 +4,17 @@ titulo: Pedidos y caja
 ruta: /admin/caja
 permiso: caja/ver
 roles: [ADMIN, CAJERO]
-relacionados: [cierre, cocina, comprobantes, repartos, plano, supervisor-codigo]
+relacionados: [cierre, cocina, comprobantes, repartos, plano, supervisor-codigo, mensajes]
 sugerencias:
   - Como abro la caja al iniciar mi turno
   - Como cobro un pedido y registro el vuelto
+  - Por que un pedido con pago digital no aparece en cocina
   - Como anulo un pedido que el cliente cancelo
-  - Como paso un pedido a cocina cuando no esta pagado
 ---
 # Pedidos y caja
 
 ## Para que sirve
-Modulo central para la recepcion, seguimiento y cobro de pedidos en salon, para llevar y a domicilio. Conecta la preparacion en [[cocina]], la entrega por [[repartos]], la emision de [[comprobantes]] y el balance final en [[cierre]].
+Modulo central para la recepcion, seguimiento y cobro de pedidos en salon, para llevar y a domicilio. Conecta la preparacion en [[cocina]], la atencion de comprobantes en [[mensajes]], la entrega por [[repartos]], la emision de [[comprobantes]] y el balance final en [[cierre]].
 
 ## Como se hace: Abrir la caja del turno
 1. En la barra superior, pulsar el boton Abrir caja.
@@ -30,6 +30,16 @@ Despues: [[caja]]
 4. Pulsar el boton Confirmar cobro para finalizar.
 Antes: [[cocina]]
 Despues: [[comprobantes]]
+Ver tambien: [[cierre]]
+
+## Como se hace: Controlar pedidos con pago digital y pase a cocina
+1. Cuando un cliente solicita un pedido pagando con billetera digital (Yape o Plin) desde la carta web o el chatbot, el pedido entra con estado de pago pendiente de validacion.
+2. Por regla estricta del negocio, ningun pedido con pago digital sin validar aparece en las pantallas de [[cocina]], protegiendo la produccion contra pedidos no confirmados.
+3. En la pestana Por confirmar o desde la bandeja de [[mensajes]], revisar la tarjeta de lectura de IA del voucher y verificar los datos bancarios.
+4. Al pulsar Aprobar el pago en [[mensajes]] o al completarse el cobro del voucher en [[plano]], el pedido queda validado y se dispara automaticamente la comanda hacia [[cocina]].
+5. Si el pago es rechazado, el pedido no llega a cocina y se notifica al cliente para que subsane el pago.
+Antes: [[mensajes]]
+Despues: [[cocina]]
 Ver tambien: [[cierre]]
 
 ## Como se hace: Anular un pedido o un cobro
@@ -51,6 +61,7 @@ Antes: [[plano]]
 Despues: [[cocina]]
 
 ## Errores y dudas comunes
+- Un pedido con pago digital (Yape o Plin) no aparecera en cocina hasta que su comprobante sea aprobado; si la cocina reclama que no ve el pedido, verifique si el voucher sigue pendiente de aprobacion en el modulo de Mensajes.
 - Si al anular se ingresa un codigo de supervisor incorrecto o vencido, aparece el mensaje: Codigo del supervisor invalido. Pídelo nuevamente a la supervisora.
 - No se puede cerrar la caja al finalizar el dia si existen pedidos pendientes de cobro; deben cobrarse o anularse primero.
 - Si un pedido por delivery no tiene ubicacion GPS o referencia clara, debe ubicarse en el mapa antes de enviarse a despacho.

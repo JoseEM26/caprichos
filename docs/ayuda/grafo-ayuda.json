@@ -102,6 +102,12 @@
       "modulo": "caja"
     },
     {
+      "id": "caja#controlar-pedidos-con-pago-digital-y-pase-a-cocina",
+      "tipo": "tarea",
+      "etiqueta": "Controlar pedidos con pago digital y pase a cocina",
+      "modulo": "caja"
+    },
+    {
       "id": "caja#anular-un-pedido-o-un-cobro",
       "tipo": "tarea",
       "etiqueta": "Anular un pedido o un cobro",
@@ -124,6 +130,12 @@
       "id": "cierre#resolver-pendientes-de-cobro-antes-de-cerrar",
       "tipo": "tarea",
       "etiqueta": "Resolver pendientes de cobro antes de cerrar",
+      "modulo": "cierre"
+    },
+    {
+      "id": "cierre#auditar-la-lista-de-vouchers-de-yape-y-plin-del-dia",
+      "tipo": "tarea",
+      "etiqueta": "Auditar la lista de vouchers de Yape y Plin del dia",
       "modulo": "cierre"
     },
     {
@@ -411,6 +423,12 @@
       "modulo": "escritorio"
     },
     {
+      "id": "escritorio#entender-de-donde-salen-las-cifras",
+      "tipo": "tarea",
+      "etiqueta": "Entender de donde salen las cifras",
+      "modulo": "escritorio"
+    },
+    {
       "id": "historial",
       "tipo": "modulo",
       "etiqueta": "Historial de acciones (historial)",
@@ -618,9 +636,9 @@
       "modulo": "mensajes"
     },
     {
-      "id": "mensajes#validar-una-captura-de-pago",
+      "id": "mensajes#validar-una-captura-de-pago-con-lectura-de-ia",
       "tipo": "tarea",
-      "etiqueta": "Validar una captura de pago",
+      "etiqueta": "Validar una captura de pago con lectura de IA",
       "modulo": "mensajes"
     },
     {
@@ -834,6 +852,12 @@
       "id": "plano#consultar-mesas-y-abrir-un-pedido-mozos-y-cajeros",
       "tipo": "tarea",
       "etiqueta": "consultar mesas y abrir un pedido (Mozos y Cajeros)",
+      "modulo": "plano"
+    },
+    {
+      "id": "plano#cobrar-en-mesa-con-voucher-de-yape-o-plin-mozos",
+      "tipo": "tarea",
+      "etiqueta": "cobrar en mesa con voucher de Yape o Plin (Mozos)",
       "modulo": "plano"
     },
     {
@@ -1441,6 +1465,16 @@
     {
       "tipo": "relacionado_con",
       "origen": "caja",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mensajes",
+      "destino": "caja"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "caja",
       "destino": "historial"
     },
     {
@@ -1500,6 +1534,36 @@
     },
     {
       "tipo": "pertenece_a",
+      "origen": "caja#controlar-pedidos-con-pago-digital-y-pase-a-cocina",
+      "destino": "caja"
+    },
+    {
+      "tipo": "antes",
+      "origen": "caja#controlar-pedidos-con-pago-digital-y-pase-a-cocina",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "antes",
+      "origen": "caja",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "despues",
+      "origen": "caja#controlar-pedidos-con-pago-digital-y-pase-a-cocina",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "despues",
+      "origen": "caja",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "caja#controlar-pedidos-con-pago-digital-y-pase-a-cocina",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "pertenece_a",
       "origen": "caja#anular-un-pedido-o-un-cobro",
       "destino": "caja"
     },
@@ -1541,11 +1605,6 @@
     {
       "tipo": "despues",
       "origen": "caja#crear-un-pedido-directo-en-mesa-o-mostrador",
-      "destino": "cocina"
-    },
-    {
-      "tipo": "despues",
-      "origen": "caja",
       "destino": "cocina"
     },
     {
@@ -1596,7 +1655,22 @@
     {
       "tipo": "relacionado_con",
       "origen": "cierre",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mensajes",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "cierre",
       "destino": "informes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "cierre",
+      "destino": "plano"
     },
     {
       "tipo": "pertenece_a",
@@ -1621,6 +1695,26 @@
     {
       "tipo": "ver_tambien",
       "origen": "cierre",
+      "destino": "caja"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "cierre#auditar-la-lista-de-vouchers-de-yape-y-plin-del-dia",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "antes",
+      "origen": "cierre#auditar-la-lista-de-vouchers-de-yape-y-plin-del-dia",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "antes",
+      "origen": "cierre",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "cierre#auditar-la-lista-de-vouchers-de-yape-y-plin-del-dia",
       "destino": "caja"
     },
     {
@@ -2704,6 +2798,16 @@
       "destino": "repartos"
     },
     {
+      "tipo": "pertenece_a",
+      "origen": "escritorio#entender-de-donde-salen-las-cifras",
+      "destino": "escritorio"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "escritorio#entender-de-donde-salen-las-cifras",
+      "destino": "informes"
+    },
+    {
       "tipo": "requiere_permiso",
       "origen": "historial",
       "destino": "permiso:auditoria/ver"
@@ -3411,16 +3515,6 @@
     {
       "tipo": "relacionado_con",
       "origen": "mensajes",
-      "destino": "caja"
-    },
-    {
-      "tipo": "relacionado_con",
-      "origen": "caja",
-      "destino": "mensajes"
-    },
-    {
-      "tipo": "relacionado_con",
-      "origen": "mensajes",
       "destino": "reclamos"
     },
     {
@@ -3429,6 +3523,16 @@
       "destino": "mensajes"
     },
     {
+      "tipo": "relacionado_con",
+      "origen": "mensajes",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "cocina",
+      "destino": "mensajes"
+    },
+    {
       "tipo": "pertenece_a",
       "origen": "mensajes#atender-un-chat-que-requiere-ayuda-humana",
       "destino": "mensajes"
@@ -3455,17 +3559,22 @@
     },
     {
       "tipo": "pertenece_a",
-      "origen": "mensajes#validar-una-captura-de-pago",
+      "origen": "mensajes#validar-una-captura-de-pago-con-lectura-de-ia",
       "destino": "mensajes"
     },
     {
       "tipo": "despues",
-      "origen": "mensajes#validar-una-captura-de-pago",
-      "destino": "caja"
+      "origen": "mensajes#validar-una-captura-de-pago-con-lectura-de-ia",
+      "destino": "cocina"
     },
     {
       "tipo": "despues",
       "origen": "mensajes",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mensajes#validar-una-captura-de-pago-con-lectura-de-ia",
       "destino": "caja"
     },
     {
@@ -4216,6 +4325,11 @@
     {
       "tipo": "relacionado_con",
       "origen": "plano",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "plano",
       "destino": "historial"
     },
     {
@@ -4247,6 +4361,31 @@
       "tipo": "ver_tambien",
       "origen": "plano",
       "destino": "cocina"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "plano#cobrar-en-mesa-con-voucher-de-yape-o-plin-mozos",
+      "destino": "plano"
+    },
+    {
+      "tipo": "antes",
+      "origen": "plano#cobrar-en-mesa-con-voucher-de-yape-o-plin-mozos",
+      "destino": "plano"
+    },
+    {
+      "tipo": "despues",
+      "origen": "plano#cobrar-en-mesa-con-voucher-de-yape-o-plin-mozos",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "plano#cobrar-en-mesa-con-voucher-de-yape-o-plin-mozos",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "plano",
+      "destino": "cierre"
     },
     {
       "tipo": "pertenece_a",

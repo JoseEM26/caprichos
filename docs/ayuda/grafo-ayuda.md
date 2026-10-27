@@ -9,12 +9,12 @@ pnpm --filter @caprichos/api ayuda:grafo
 
 ## Métricas del Grafo
 
-- **Nodos totales**: 190
+- **Nodos totales**: 194
   - Módulos: 34
-  - Tareas (`## Como se hace`): 128
+  - Tareas (`## Como se hace`): 132
   - Roles del sistema: 7
   - Permisos requeridos: 21
-- **Aristas tipadas totales**: 829
+- **Aristas tipadas totales**: 852
 
 ## Diagrama Mermaid de Módulos y Relaciones
 
@@ -88,24 +88,31 @@ flowchart TD
   plano -->|relacionado_con| caja
   caja -->|relacionado_con| supervisor_codigo
   supervisor_codigo -->|relacionado_con| caja
+  caja -->|relacionado_con| mensajes
+  mensajes -->|relacionado_con| caja
   caja -->|relacionado_con| historial
   caja -->|antes| supervisor_codigo
   caja -->|antes| cocina
   caja -->|despues| comprobantes
   caja -->|ver_tambien| cierre
+  caja -->|antes| mensajes
+  caja -->|despues| cocina
   caja -->|requiere| supervisor_codigo
   caja -->|ver_tambien| historial
   caja -->|antes| plano
-  caja -->|despues| cocina
   cierre -->|relacionado_con| repartos
   repartos -->|relacionado_con| cierre
   cierre -->|relacionado_con| supervisor_codigo
   supervisor_codigo -->|relacionado_con| cierre
   cierre -->|relacionado_con| comprobantes
   comprobantes -->|relacionado_con| cierre
+  cierre -->|relacionado_con| mensajes
+  mensajes -->|relacionado_con| cierre
   cierre -->|relacionado_con| informes
+  cierre -->|relacionado_con| plano
   cierre -->|antes| caja
   cierre -->|ver_tambien| caja
+  cierre -->|antes| mensajes
   cierre -->|antes| repartos
   cierre -->|ver_tambien| repartos
   cierre -->|despues| informes
@@ -272,13 +279,13 @@ flowchart TD
   mapa -->|ver_tambien| repartos
   mapa -->|ver_tambien| informes
   mapa -->|despues| zonas
-  mensajes -->|relacionado_con| caja
-  caja -->|relacionado_con| mensajes
   mensajes -->|relacionado_con| reclamos
   reclamos -->|relacionado_con| mensajes
+  mensajes -->|relacionado_con| cocina
+  cocina -->|relacionado_con| mensajes
   mensajes -->|ver_tambien| caja
   mensajes -->|ver_tambien| clientes
-  mensajes -->|despues| caja
+  mensajes -->|despues| cocina
   mirest -->|relacionado_con| zonas
   zonas -->|relacionado_con| mirest
   mirest -->|relacionado_con| supervisor_codigo
@@ -349,9 +356,11 @@ flowchart TD
   cocina -->|relacionado_con| plano
   plano -->|relacionado_con| pantallas
   pantallas -->|relacionado_con| plano
+  plano -->|relacionado_con| cierre
   plano -->|relacionado_con| historial
   plano -->|despues| caja
   plano -->|ver_tambien| cocina
+  plano -->|ver_tambien| cierre
   plano -->|ver_tambien| reservas
   plano -->|ver_tambien| historial
   productos -->|relacionado_con| stock

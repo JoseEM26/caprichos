@@ -4,17 +4,17 @@ titulo: Plano del local
 ruta: /admin/plano
 permiso: plano/ver
 roles: [ADMIN, MOZO, CALLCENTER]
-relacionados: [caja, reservas, cocina, pantallas]
+relacionados: [caja, reservas, cocina, pantallas, cierre]
 sugerencias:
-  - ¿Cómo veo qué mesas están libres u ocupadas en cada piso?
-  - ¿Cómo abro un pedido en una mesa desde el plano?
-  - ¿Cómo agrego o muevo una mesa en el salón?
-  - ¿Quién puede cambiar el diseño del plano y mover elementos?
+  - Como veo que mesas estan libres u ocupadas en cada piso
+  - Como abro un pedido en una mesa desde el plano
+  - Como registro el cobro con voucher de Yape o Plin en la mesa
+  - Como agrego o muevo una mesa en el salon
 ---
 # Plano del local
 
 ## Para que sirve
-Representa el mapa interactivo en dos dimensiones del salón de Caprichos por pisos (Piso 1, Piso 2, Terraza). Permite a los mozos y personal de atención ver en tiempo real qué mesas están libres u ocupadas, abrir nuevos pedidos para [[caja]], coordinar comandas con [[cocina]], verificar disponibilidad para [[reservas]] y diseñar la distribución física de mesas y [[pantallas]].
+Representa el mapa interactivo en dos dimensiones del salón de Caprichos por pisos (Piso 1, Piso 2, Terraza). Permite a los mozos y personal de atención ver en tiempo real qué mesas están libres u ocupadas, abrir nuevos pedidos para [[caja]], coordinar comandas con [[cocina]], subir fotos de vouchers digitales para auditoria en [[cierre]], verificar disponibilidad para [[reservas]] y diseñar la distribución física de mesas y [[pantallas]].
 
 ## Como se hace: consultar mesas y abrir un pedido (Mozos y Cajeros)
 1. En la parte superior, pulsa en la pestaña del piso que deseas atender (por ejemplo "Piso 1" o "Piso 2").
@@ -25,6 +25,18 @@ Representa el mapa interactivo en dos dimensiones del salón de Caprichos por pi
 Antes: [[plano]]
 Despues: [[caja]]
 Ver tambien: [[cocina]]
+
+## Como se hace: cobrar en mesa con voucher de Yape o Plin (Mozos)
+1. Al momento de cobrar la mesa al comensal, pulsa sobre la mesa ocupada y selecciona "Ver precuenta".
+2. En la sección "Medio de cobro", selecciona "Yape" o "Plin".
+3. Aparecerá inmediatamente la sección "Foto del voucher". La carga de la fotografía es un paso obligatorio para el mozo.
+4. Pulsa el botón para seleccionar o capturar la fotografía del comprobante mostrado por el comensal. El sistema optimiza y reduce automáticamente la imagen en el dispositivo antes de transmitirla.
+5. La inteligencia artificial analizará la imagen y el mozo solo verá una respuesta clara: "Foto del voucher lista para confirmar" o aviso de imagen no legible ("No se pudo leer el voucher. Por favor toma otra foto más clara"). Por política de seguridad, el mozo no visualiza semáforos de riesgo ni datos bancarios internos.
+6. Mientras el comprobante no sea válido o legible, el botón de cobro permanece bloqueado con el texto "Sube el voucher para cobrar". Una vez validada la legibilidad de la imagen, se habilita "Confirmar cobro".
+7. Pulsa "Confirmar cobro" para asentar el pago. El comprobante quedará enlazado a la venta para la conciliación final en [[cierre]].
+Antes: [[plano]]
+Despues: [[caja]]
+Ver tambien: [[cierre]]
 
 ## Como se hace: agregar, mover y girar elementos en el plano (Administrador)
 1. Si cuentas con el permiso de edición (rol Administrador), verás la barra de herramientas con los elementos disponibles: "Mesa cuadrada", "Mesa redonda", "Barra", "Caja", "Puerta", "Baño", "Columna", "Escalera" y "Pared".
@@ -46,9 +58,11 @@ Ver tambien: [[reservas]]
 Ver tambien: [[historial]]
 
 ## Errores y dudas comunes
+- El botón de cobro en mesa no se activa al seleccionar Yape o Plin: es obligatorio subir una foto clara y legible del voucher mediante la cámara o galería; el sistema bloquea el cobro hasta comprobar la legibilidad.
+- El mozo no ve el semáforo de confianza: por diseño, la vista del mozo sólo comprueba que la imagen sea legible para no demorar la atención en sala; la auditoría financiera se realiza en el arqueo de Cierre de caja.
 - No me aparecen los botones para agregar o mover mesas: solo los administradores con el permiso plano/editar pueden modificar la estructura física del salón; los mozos y call center solo tienen acceso en modo consulta y toma de pedidos.
 - Una mesa sigue figurando ocupada cuando los clientes ya se fueron: la mesa se libera automáticamente al registrar el cobro final en caja, o manualmente si el cajero o mozo autorizado pulsa "Liberar mesa".
-- Código de supervisor: el diseño del plano no solicita código de supervisor; utiliza confirmaciones Sí/No.
 
 ## Quien puede hacerlo
-Pueden ver el plano y su estado en tiempo real los roles Administrador (ADMIN), Mozo (MOZO) y Call Center (CALLCENTER) mediante el permiso plano/ver. La edición de la cuadrícula, agregar o borrar mesas y cambiar pisos está reservada exclusivamente para el Administrador (ADMIN) mediante el permiso plano/editar.
+- Pueden ver el plano, tomar comandas y cobrar mesas los roles Administrador (ADMIN), Mozo (MOZO) y Call Center (CALLCENTER). El rol Mozo cuenta con el permiso vouchers/subir para registrar las fotografías de comprobantes en sala.
+- La edición de la cuadrícula, agregar o borrar mesas y cambiar pisos está reservada exclusivamente para el Administrador (ADMIN) mediante el permiso plano/editar.
