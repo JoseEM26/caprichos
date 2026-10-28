@@ -1,4 +1,6 @@
-import { IsIn, IsNotEmpty, IsString } from 'class-validator';
+import { IsIn, IsNotEmpty, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+import { SinVoucherDto } from '../../caja/dto/cobrar.dto';
 
 export class RegistrarPagoDto {
   @IsString()
@@ -10,4 +12,10 @@ export class RegistrarPagoDto {
     message: 'El estado del pago debe ser COORDINADO o PAGADO',
   })
   estado!: 'COORDINADO' | 'PAGADO';
+
+  /** Excepción a la foto del comprobante (Yape, Plin, transferencia): motivo y código del supervisor. */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SinVoucherDto)
+  sinVoucher?: SinVoucherDto;
 }

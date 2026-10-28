@@ -110,6 +110,21 @@ export function compararUltimos9Digitos(
 }
 
 /**
+ * Yape oculta los primeros dígitos del destino (solo muestra los 3 últimos): si lo leído es
+ * parcial, basta con que sea el final del número configurado. Si viene completo, se compara entero.
+ */
+export function coincideNumeroDestino(
+  leido?: string | null,
+  esperado?: string | null,
+): boolean {
+  const dl = (leido || '').replace(/\D/g, '');
+  const de = (esperado || '').replace(/\D/g, '');
+  if (!dl || !de) return false;
+  if (dl.length >= 9) return compararUltimos9Digitos(leido, esperado);
+  return dl.length >= 3 && de.endsWith(dl);
+}
+
+/**
  * Normaliza una fecha a formato YYYY-MM-DD.
  */
 export function normalizarFecha(fechaStr?: string | Date | null): string | null {
@@ -241,7 +256,7 @@ export function calcularSemaforo(
 
     if (
       numeroEsperado &&
-      !compararUltimos9Digitos(extraido.destinoNumero, numeroEsperado)
+      !coincideNumeroDestino(extraido.destinoNumero, numeroEsperado)
     ) {
       const numLeido9 = extraido.destinoNumero.replace(/\D/g, '').slice(-9);
       const numEsp9 = numeroEsperado.replace(/\D/g, '').slice(-9);

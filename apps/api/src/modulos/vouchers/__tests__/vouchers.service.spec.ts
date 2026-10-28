@@ -8,6 +8,7 @@ import { ArchivosService } from '../../archivos/archivos.service';
 import { AuditoriaService } from '../../auditoria/auditoria.service';
 import { EventosGateway } from '../../../comun/socket/eventos.gateway';
 import { UsuarioAutenticado } from '../../acceso/acceso.tipos';
+import { obtenerFechaHoraLima } from '../../local/local.util';
 
 describe('VouchersService', () => {
   let service: VouchersService;
@@ -85,7 +86,7 @@ describe('VouchersService', () => {
           monto: 35.0,
           moneda: 'PEN',
           operacion: '11223344',
-          fecha: '2026-10-27',
+          fecha: obtenerFechaHoraLima().fechaIso,
           hora: '12:00',
           titular: 'Maria Jose M.',
           destinoNumero: '977503006',

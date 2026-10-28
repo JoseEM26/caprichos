@@ -2,6 +2,7 @@ import {
   calcularSemaforo,
   titularesCoinciden,
   compararUltimos9Digitos,
+  coincideNumeroDestino,
   normalizarFecha,
   DatosVoucherExtraidos,
   ContextoSemaforo,
@@ -166,5 +167,31 @@ describe('SemaforoVoucher - semaforo.util', () => {
       expect(normalizarFecha('27-10-2026')).toBe('2026-10-27');
       expect(normalizarFecha(new Date('2026-10-27T12:00:00Z'))).toBe('2026-10-27');
     });
+  });
+});
+
+describe('coincideNumeroDestino', () => {
+  it('acepta el número parcial que muestra Yape si es el final del configurado', () => {
+    expect(coincideNumeroDestino('*** *** 006', '977503006')).toBe(true);
+    expect(coincideNumeroDestino('006', '977503006')).toBe(true);
+  });
+  it('rechaza un final distinto, uno demasiado corto o vacío', () => {
+    expect(coincideNumeroDestino('007', '977503006')).toBe(false);
+    expect(coincideNumeroDestino('06', '977503006')).toBe(false);
+    expect(coincideNumeroDestino(null, '977503006')).toBe(false);
+  });
+  it('si viene completo compara los 9 dígitos', () => {
+    expect(coincideNumeroDestino('+51 977 503 006', '977503006')).toBe(true);
+    expect(coincideNumeroDestino('999999999', '977503006')).toBe(false);
+  });
+});
+
+describe('titularesCoinciden con nombre abreviado de Yape', () => {
+  it('acepta "Maria Mor*" frente al titular completo', () => {
+    expect(titularesCoinciden('Maria Mor*', 'María José Morillo Ruiz')).toBe(true);
+    expect(titularesCoinciden('Mar* Mor*', 'María José Morillo Ruiz')).toBe(true);
+  });
+  it('rechaza un titular distinto', () => {
+    expect(titularesCoinciden('Pedro Gom*', 'María José Morillo Ruiz')).toBe(false);
   });
 });

@@ -61,6 +61,10 @@ describe('PedidosEstadoService', () => {
       cobro: {
         findFirst: jest.fn().mockResolvedValue(null),
       },
+      // Por defecto el pedido ya tiene un voucher útil; las pruebas del pago digital lo quitan
+      voucherPago: {
+        findFirst: jest.fn().mockResolvedValue({ id: 9n }),
+      },
       userAccount: {
         findMany: jest.fn(),
       },
@@ -775,6 +779,97 @@ describe('PedidosEstadoService', () => {
       await expect(
         service.registrarPago(10n, { metodo: 'BITCOIN', estado: 'PAGADO' }, cajeroAuth),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    describe('pago digital exige voucher (Yape, Plin, transferencia)', () => {
+      const pedidoSinPagar = { id: 10n, codigo: 'CP-W001', pago_metodo: null, pago_estado: 'PENDIENTE', estado: 'COLA' };
+
+      beforeEach(() => {
+        prismaMock.pedido.findUnique.mockResolvedValue(pedidoSinPagar);
+        prismaMock.pedido.update.mockResolvedValue({ ...pedidoSinPagar, pago_metodo: 'YAPE', pago_estado: 'PAGADO' });
+      });
+
+      it('YAPE sin ningún voucher -> 400 VOUCHER_REQUERIDO, no registra ni cambia el estado', async () => {
+        prismaMock.voucherPago.findFirst.mockResolvedValue(null);
+
+        await expect(
+          service.registrarPago(10n, { metodo: 'YAPE', estado: 'PAGADO' }, cajeroAuth),
+        ).rejects.toMatchObject({ response: { codigo: 'VOUCHER_REQUERIDO' } });
+        expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+        expect(auditoriaMock.registrar).not.toHaveBeenCalled();
+      });
+
+      it('busca solo vouchers no ILEGIBLE del pedido', async () => {
+        prismaMock.voucherPago.findFirst.mockResolvedValue(null);
+
+        await expect(service.registrarPago(10n, { metodo: 'PLIN', estado: 'PAGADO' }, cajeroAuth)).rejects.toThrow();
+        expect(prismaMock.voucherPago.findFirst).toHaveBeenCalledWith(
+          expect.objectContaining({ where: { pedido_id: 10n, semaforo: { not: 'ILEGIBLE' } } }),
+        );
+      });
+
+      it('con un voucher útil enlazado -> registra el pago normal', async () => {
+        const res = await service.registrarPago(10n, { metodo: 'YAPE', estado: 'PAGADO' }, cajeroAuth);
+
+        expect(res.pago_estado).toBe('PAGADO');
+        expect(auditoriaMock.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'REGISTRAR_PAGO' }));
+      });
+
+      it('solo un voucher ILEGIBLE -> 400 VOUCHER_REQUERIDO (no cuenta como comprobante)', async () => {
+        // La consulta excluye ILEGIBLE: sin voucher útil, vuelve el error
+        prismaMock.voucherPago.findFirst.mockResolvedValue(null);
+
+        await expect(
+          service.registrarPago(10n, { metodo: 'TRANSFERENCIA', estado: 'PAGADO' }, cajeroAuth),
+        ).rejects.toMatchObject({ response: { codigo: 'VOUCHER_REQUERIDO' } });
+        expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+      });
+
+      it('EFECTIVO y TARJETA no piden voucher', async () => {
+        prismaMock.voucherPago.findFirst.mockResolvedValue(null);
+
+        await service.registrarPago(10n, { metodo: 'EFECTIVO', estado: 'COORDINADO' }, cajeroAuth);
+        await service.registrarPago(10n, { metodo: 'tarjeta', estado: 'PAGADO' }, cajeroAuth);
+
+        expect(prismaMock.pedido.update).toHaveBeenCalledTimes(2);
+        expect(prismaMock.voucherPago.findFirst).not.toHaveBeenCalled();
+      });
+
+      it('excepción con código de supervisor válido -> registra y audita con el motivo', async () => {
+        prismaMock.voucherPago.findFirst.mockResolvedValue(null);
+
+        const res = await service.registrarPago(
+          10n,
+          { metodo: 'YAPE', estado: 'PAGADO', sinVoucher: { motivo: 'El cliente no tenía señal', pinSupervisor: '654321' } },
+          cajeroAuth,
+        );
+
+        expect(res.pago_estado).toBe('PAGADO');
+        expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+          expect.objectContaining({
+            accion: 'REGISTRAR_PAGO_SIN_VOUCHER',
+            conPinAdmin: true,
+            motivo: 'El cliente no tenía señal',
+            despues: expect.objectContaining({
+              sin_voucher: expect.objectContaining({ motivo: 'El cliente no tenía señal' }),
+            }),
+          }),
+        );
+      });
+
+      it('excepción con código de supervisor inválido -> error y no registra el pago', async () => {
+        prismaMock.voucherPago.findFirst.mockResolvedValue(null);
+
+        await expect(
+          service.registrarPago(
+            10n,
+            { metodo: 'YAPE', estado: 'PAGADO', sinVoucher: { motivo: 'Motivo válido', pinSupervisor: '000000' } },
+            cajeroAuth,
+          ),
+        ).rejects.toMatchObject({ response: { codigo: 'CODIGO_INVALIDO' } });
+        expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+      });
+
     });
   });
 

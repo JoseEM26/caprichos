@@ -7,6 +7,7 @@ import { ErrorApi } from '../../comun/api';
 import { SubirVoucherMozo } from '../vouchers/SubirVoucherMozo';
 import { TarjetaLecturaVoucher } from '../vouchers/TarjetaLecturaVoucher';
 import type { RespuestaSubirVoucherAdmin } from '../vouchers/tipos';
+import { medioDigitalVoucher, mismoMedio } from './mediosPago';
 
 const MEDIOS_PAGO = [
   'Efectivo',
@@ -15,10 +16,6 @@ const MEDIOS_PAGO = [
   'Tarjeta',
   'Transferencia',
 ] as const;
-
-/** Medios digitales: exigen la foto del comprobante (la IA solo informa). Igual que el servidor. */
-const MEDIOS_CON_COMPROBANTE = ['YAPE', 'PLIN', 'TRANSFERENCIA'];
-type MedioConComprobante = 'YAPE' | 'PLIN' | 'TRANSFERENCIA';
 
 const MOTIVO_MINIMO = 5;
 
@@ -67,9 +64,10 @@ export function ModalCobrar({
   // Normalizar medio de pago para la API (en mayúsculas: EFECTIVO, YAPE, etc.)
   const normalizarMedio = (m: string) => m.toUpperCase();
 
+  // Medio digital con foto obligatoria (YAPE, PLIN, TRANSFERENCIA); la IA solo informa
   const medioDigital = pagos
-    .map((p) => p.medio.toUpperCase())
-    .find((m) => MEDIOS_CON_COMPROBANTE.includes(m)) as MedioConComprobante | undefined;
+    .map((p) => medioDigitalVoucher(p.medio))
+    .find((m) => m !== null) ?? undefined;
   const hayDigital = medioDigital !== undefined;
   const excepcionLista =
     sinVoucher &&
@@ -129,7 +127,7 @@ export function ModalCobrar({
         return false;
       }
 
-      if (p.medio.toUpperCase() === 'EFECTIVO' && p.recibido.trim() !== '') {
+      if (mismoMedio(p.medio, 'Efectivo') && p.recibido.trim() !== '') {
         const r = parseFloat(p.recibido);
         if (isNaN(r) || r < m) {
           setErrorMensaje('El efectivo recibido es menor al monto en efectivo.');
@@ -173,7 +171,7 @@ export function ModalCobrar({
         medio: normalizarMedio(p.medio),
         monto: parseFloat(p.monto),
       };
-      if (p.medio.toUpperCase() === 'EFECTIVO' && p.recibido.trim() !== '') {
+      if (mismoMedio(p.medio, 'Efectivo') && p.recibido.trim() !== '') {
         item.recibido = parseFloat(p.recibido);
       }
       return item;
@@ -296,7 +294,7 @@ export function ModalCobrar({
 
         {/* Filas de pagos */}
         {pagos.map((fila, idx) => {
-          const esEfectivo = fila.medio.toUpperCase() === 'EFECTIVO';
+          const esEfectivo = mismoMedio(fila.medio, 'Efectivo');
           const recNum = parseFloat(fila.recibido);
           const montoNum = parseFloat(fila.monto);
           const vuelto =
@@ -349,8 +347,7 @@ export function ModalCobrar({
               {/* Botones de medio de pago */}
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {MEDIOS_PAGO.map((m) => {
-                  const seleccionado =
-                    fila.medio.toUpperCase() === m.toUpperCase();
+                  const seleccionado = mismoMedio(fila.medio, m);
                   return (
                     <button
                       key={m}

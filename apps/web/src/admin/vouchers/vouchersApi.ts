@@ -72,7 +72,10 @@ export const vouchersApi = {
 
     const qs = params.toString();
     const ruta = `/admin/vouchers${qs ? `?${qs}` : ''}`;
-    return api.get<VoucherPagoItem[]>(ruta);
+    // El servidor responde { vouchers, faltanRevisar, total }; aquí se devuelve solo la lista
+    const respuesta = await api.get<VoucherPagoItem[] | { vouchers?: VoucherPagoItem[] }>(ruta);
+    if (Array.isArray(respuesta)) return respuesta;
+    return Array.isArray(respuesta?.vouchers) ? respuesta.vouchers : [];
   },
 
   /**

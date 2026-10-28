@@ -46,7 +46,6 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
 
   // Estados locales para acciones
   const [tipoComp, setTipoComp] = useState<string>(pedido.comprobante_tipo || 'Nota de venta');
-  const [comprobanteSubido, setComprobanteSubido] = useState<string | null>(null);
   const [msgTicket, setMsgTicket] = useState('');
   const [msgComprobante, setMsgComprobante] = useState('');
   const [errorAccion, setErrorAccion] = useState<string | null>(null);
@@ -412,75 +411,6 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
                 </button>
               </div>
             )}
-
-            {/* Comprobante de pago subido (imagen) */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={{ fontSize: 13, fontWeight: 700 }}>Comprobante de pago digital</div>
-              {comprobanteSubido ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <img
-                    src={comprobanteSubido}
-                    alt="Comprobante de pago"
-                    style={{
-                      maxWidth: '100%',
-                      maxHeight: 200,
-                      objectFit: 'contain',
-                      border: '1px solid var(--cp-line, #E3D6C6)',
-                      borderRadius: 10,
-                      background: 'var(--cp-white, #FFFFFF)',
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setComprobanteSubido(null)}
-                    style={{
-                      alignSelf: 'flex-start',
-                      minHeight: 36,
-                      padding: '0 12px',
-                      borderRadius: 8,
-                      border: '1.5px solid var(--cp-rust, #B2500F)',
-                      background: 'transparent',
-                      color: 'var(--cp-rust, #B2500F)',
-                      fontWeight: 700,
-                      fontSize: 12,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Quitar comprobante
-                  </button>
-                </div>
-              ) : (
-                <label
-                  style={{
-                    minHeight: 44,
-                    border: '1.5px dashed var(--cp-navy, #0B2C3E)',
-                    borderRadius: 12,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'var(--cp-navy, #0B2C3E)',
-                    fontWeight: 800,
-                    fontSize: 13,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Subir comprobante de pago
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onload = () => setComprobanteSubido(reader.result as string);
-                        reader.readAsDataURL(file);
-                      }
-                    }}
-                    style={{ position: 'absolute', left: -9999 }}
-                  />
-                </label>
-              )}
-            </div>
 
             <div
               style={{
@@ -1078,10 +1008,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
         <ModalConfirmarPago
           pedido={pedido}
           alCerrar={() => setAbrirConfirmarPago(false)}
-          alConfirmarExitoso={(datos) => {
-            if (datos?.comprobanteImg) {
-              setComprobanteSubido(datos.comprobanteImg);
-            }
+          alConfirmarExitoso={() => {
             setAbrirConfirmarPago(false);
             alActualizar();
           }}

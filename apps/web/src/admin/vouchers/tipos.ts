@@ -7,7 +7,7 @@ export type SemaforoVoucher =
 
 export type MedioPagoVoucher = 'YAPE' | 'PLIN';
 
-export type OrigenVoucher = 'MOZO' | 'WHATSAPP' | 'CAJA';
+export type OrigenVoucher = 'MOZO' | 'WHATSAPP' | 'CAJA' | 'CARTA';
 
 export interface VoucherExtraido {
   legible: boolean;

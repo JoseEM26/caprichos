@@ -97,6 +97,21 @@ describe('vouchersApi (cliente tipado para lectura de vouchers con IA)', () => {
     });
   });
 
+  describe('listarVouchers con la forma real del servidor', () => {
+    it('desenvuelve { vouchers, faltanRevisar, total } y devuelve [] si la forma no es la esperada', async () => {
+      const lista = [{ id: '4', semaforo: 'SIN_LECTURA' as const, motivos: [], archivoId: '136', creadoEn: 'x' }];
+      const spyGet = vi
+        .spyOn(apiModulo.api, 'get')
+        .mockResolvedValueOnce({ vouchers: lista, faltanRevisar: 0, total: 1 } as any);
+
+      expect(await vouchersApi.listarVouchers({ pedidoId: '109', estado: 'todos' })).toEqual(lista);
+      expect(spyGet).toHaveBeenCalledWith('/admin/vouchers?pedidoId=109&estado=todos');
+
+      spyGet.mockResolvedValueOnce({ raro: true } as any);
+      expect(await vouchersApi.listarVouchers()).toEqual([]);
+    });
+  });
+
   describe('marcarRevisado', () => {
     it('llama a POST /admin/vouchers/:id/revisado', async () => {
       const spyPost = vi

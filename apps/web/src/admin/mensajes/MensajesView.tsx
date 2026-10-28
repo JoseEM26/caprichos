@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Confirmar } from '../../comun/Confirmar';
 import { useEventos } from '../../comun/socket';
-import { obtenerBlobAutenticado } from '../../comun/api';
 import {
   aplicarCambioChat,
   aprobarPagoChat,
@@ -24,6 +23,7 @@ import {
 import { ModalEditarNombre, IconoLapiz } from './ModalEditarNombre';
 import { useSesion } from '../../comun/sesion';
 import { TarjetaLecturaVoucher } from '../vouchers/TarjetaLecturaVoucher';
+import { FotoAmpliable } from '../vouchers/FotoAmpliable';
 import { VoucherResumenChat } from '../vouchers/tipos';
 import {
   ChatResumen,
@@ -77,7 +77,7 @@ const obtenerIniciales = (nombre: string) => {
   return (partes[0][0] + partes[1][0]).toUpperCase();
 };
 
-/** Foto del chat (voucher): se pide con la sesión porque el archivo es privado */
+/** Foto del chat (voucher): privada, con miniatura y pantalla completa */
 function FotoMensaje({
   archivoId,
   voucher,
@@ -87,43 +87,10 @@ function FotoMensaje({
   voucher?: VoucherResumenChat | null;
   puedeVer?: boolean;
 }) {
-  const [url, setUrl] = useState<string>('');
-  const [fallo, setFallo] = useState(false);
-
-  useEffect(() => {
-    if (!archivoId) return;
-    let vigente = true;
-    obtenerBlobAutenticado(`/admin/archivos/${archivoId}`)
-      .then((u) => {
-        if (vigente) setUrl(u);
-      })
-      .catch(() => {
-        if (vigente) setFallo(true);
-      });
-    return () => {
-      vigente = false;
-    };
-  }, [archivoId]);
-
-  if (!archivoId || fallo || !url) {
-    return (
-      <div className="cv-img">
-        <span>{fallo ? 'No se pudo cargar la foto' : archivoId ? 'Cargando foto…' : 'Foto'}</span>
-      </div>
-    );
-  }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-      <a href={url} target="_blank" rel="noreferrer" aria-label="Ver la foto completa" style={{ display: 'block' }}>
-        <img
-          src={url}
-          alt="Foto enviada por el cliente"
-          style={{ display: 'block', maxWidth: '100%', maxHeight: 280, borderRadius: 8, objectFit: 'contain' }}
-        />
-      </a>
-      {voucher && puedeVer && (
-        <TarjetaLecturaVoucher voucher={voucher} puedeVer={puedeVer} />
-      )}
+      <FotoAmpliable archivoId={archivoId} alt="Foto enviada por el cliente" />
+      {voucher && puedeVer && <TarjetaLecturaVoucher voucher={voucher} puedeVer={puedeVer} />}
     </div>
   );
 }
@@ -1250,6 +1217,9 @@ export function MensajesView() {
                   </div>
 
                   {/* Lectura del voucher con IA si existe voucher en la conversación */}
+                  {detalle.voucher?.archivoId && tieneVouchersVer && (
+                    <FotoAmpliable archivoId={detalle.voucher.archivoId} alt="Comprobante de pago" alturaMaxima={220} />
+                  )}
                   {detalle.voucher && (
                     <TarjetaLecturaVoucher
                       voucher={detalle.voucher}

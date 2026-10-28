@@ -23,6 +23,7 @@ import {
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { SupervisorCodigoService } from '../supervisor-codigo/supervisor-codigo.service';
+import { MEDIOS_CON_COMPROBANTE } from '../caja/cobros.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { enmascararDni } from '../usuarios/usuarios.util';
 import { FiltrarPedidosDto } from './dto/filtrar-pedidos.dto';
@@ -132,12 +133,13 @@ export class PedidosEstadoService {
     partyIdOperador?: bigint,
     ip?: string,
     pedidoId?: bigint,
-  ): Promise<{ party_id?: bigint; id?: bigint }> {
+    accion = 'pedidos/anular',
+  ): Promise<{ party_id?: bigint; id?: bigint; supervisorPartyId?: bigint }> {
     if (this.supervisorCodigoService) {
       return this.supervisorCodigoService.verificarYConsumirCodigo(
         pinSupervisor,
         partyIdOperador,
-        'pedidos/anular',
+        accion,
         ip,
         'pedido',
         pedidoId,
@@ -757,6 +759,36 @@ export class PedidosEstadoService {
       });
     }
 
+    // Pago digital (Yape, Plin, transferencia): exige un voucher útil enlazado al pedido.
+    // Un voucher ILEGIBLE no cuenta. Sin él, solo sigue con motivo y código del supervisor (como el cobro).
+    let sinVoucherAutorizado: { motivo: string; supervisorPartyId: string } | null = null;
+    if (MEDIOS_CON_COMPROBANTE.includes(metodoUpper)) {
+      const hayVoucherUtil = await this.prisma.voucherPago.findFirst({
+        where: { pedido_id: pedido.id, semaforo: { not: 'ILEGIBLE' } },
+        select: { id: true },
+      });
+      if (!hayVoucherUtil) {
+        if (!dto.sinVoucher) {
+          throw new BadRequestException({
+            codigo: 'VOUCHER_REQUERIDO',
+            mensaje:
+              'Falta la foto del comprobante del pago digital. Súbela, o registra el pago sin voucher con motivo y código del supervisor.',
+          });
+        }
+        const sup: any = await this.verificarPinSupervisor(
+          dto.sinVoucher.pinSupervisor,
+          usuarioActual.partyId,
+          ip,
+          pedido.id,
+          'pedidos/registrar_pago_sin_voucher',
+        );
+        sinVoucherAutorizado = {
+          motivo: dto.sinVoucher.motivo.trim(),
+          supervisorPartyId: String(sup?.supervisorPartyId ?? sup?.party_id ?? ''),
+        };
+      }
+    }
+
     const ahora = new Date();
     const pedidoActualizado = await this.prisma.pedido.update({
       where: { id: pedido.id },
@@ -771,13 +803,20 @@ export class PedidosEstadoService {
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
       modulo: 'pedidos',
-      accion: 'REGISTRAR_PAGO',
+      accion: sinVoucherAutorizado ? 'REGISTRAR_PAGO_SIN_VOUCHER' : 'REGISTRAR_PAGO',
       resultado: 'OK',
       entidad: 'pedido',
       entidadId: pedido.id,
       antes: { pago_metodo: pedido.pago_metodo, pago_estado: pedido.pago_estado },
-      despues: { pago_metodo: metodoUpper, pago_estado: dto.estado },
+      despues: {
+        pago_metodo: metodoUpper,
+        pago_estado: dto.estado,
+        sin_voucher: sinVoucherAutorizado
+          ? { motivo: sinVoucherAutorizado.motivo, aprobado_por: sinVoucherAutorizado.supervisorPartyId }
+          : null,
+      },
       partyId: usuarioActual.partyId,
+      ...(sinVoucherAutorizado ? { conPinAdmin: true, motivo: sinVoucherAutorizado.motivo } : {}),
       ip,
     });
 

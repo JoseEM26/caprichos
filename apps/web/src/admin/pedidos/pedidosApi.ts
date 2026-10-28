@@ -238,8 +238,13 @@ export const pedidosApi = {
     id: string | number,
     metodo: string,
     estado: 'COORDINADO' | 'PAGADO' = 'PAGADO',
+    sinVoucher?: { motivo: string; pinSupervisor: string },
   ): Promise<Pedido> {
-    return api.post<Pedido>(`/admin/pedidos/${id}/pago`, { metodo, estado });
+    return api.post<Pedido>(`/admin/pedidos/${id}/pago`, {
+      metodo,
+      estado,
+      ...(sinVoucher ? { sinVoucher } : {}),
+    });
   },
 
   async crearPedidoAdmin(

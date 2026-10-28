@@ -10,13 +10,15 @@ export interface SeccionVouchersPedidoProps {
   recargarClave?: string | number | null;
   total?: number | string | null;
   medio?: string | null;
+  /** Avisa a quien la usa (p. ej. ModalConfirmarPago) con los vouchers leídos del pedido. */
+  alCargar?: (vouchers: VoucherPagoItem[]) => void;
 }
 
 /**
  * Fotos de comprobante enlazadas a un pedido (cualquier origen: mozo, caja, WhatsApp, carta).
  * El servidor exige vouchers/ver (CAJERO, ADMIN): sin permiso responde 403 y la sección no se muestra.
  */
-export function SeccionVouchersPedido({ pedidoId, recargarClave, total, medio }: SeccionVouchersPedidoProps) {
+export function SeccionVouchersPedido({ pedidoId, recargarClave, total, medio, alCargar }: SeccionVouchersPedidoProps) {
   const [vouchers, setVouchers] = useState<VoucherPagoItem[]>([]);
 
   useEffect(() => {
@@ -24,14 +26,20 @@ export function SeccionVouchersPedido({ pedidoId, recargarClave, total, medio }:
     vouchersApi
       .listarVouchers({ pedidoId, estado: 'todos' })
       .then((items) => {
-        if (activo) setVouchers(Array.isArray(items) ? items : []);
+        if (!activo) return;
+        const lista = Array.isArray(items) ? items : [];
+        setVouchers(lista);
+        alCargar?.(lista);
       })
       .catch(() => {
-        if (activo) setVouchers([]);
+        if (!activo) return;
+        setVouchers([]);
+        alCargar?.([]);
       });
     return () => {
       activo = false;
     };
+    // alCargar no entra en las dependencias: cambia en cada render del padre y no debe re-leer.
   }, [pedidoId, recargarClave]);
 
   if (vouchers.length === 0) return null;

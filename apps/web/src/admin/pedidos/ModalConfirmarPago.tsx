@@ -1,33 +1,45 @@
 import { useState } from 'react';
 import { Confirmar } from '../../comun/Confirmar';
 import { pedidosApi, Pedido } from './pedidosApi';
+import { SubirVoucherMozo } from '../vouchers/SubirVoucherMozo';
+import { SeccionVouchersPedido } from './SeccionVouchersPedido';
+import { medioDigitalVoucher, mismoMedio } from './mediosPago';
+import type { VoucherPagoItem } from '../vouchers/tipos';
+import { CampoCodigoSupervisor } from '../../comun/CampoCodigoSupervisor';
 
 export interface ModalConfirmarPagoProps {
   pedido: Pedido;
   alCerrar: () => void;
-  alConfirmarExitoso: (datosPago?: {
-    medio: string;
-    comprobanteImg: string | null;
-    codigoOp: string;
-    montoPagaCon: string;
-  }) => void;
+  alConfirmarExitoso: () => void;
 }
 
 const MEDIOS_PC = ['Yape', 'Plin', 'Efectivo', 'Tarjeta', 'Transferencia'] as const;
+
+const MOTIVO_MINIMO = 5;
 
 export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: ModalConfirmarPagoProps) {
   const [contactado, setContactado] = useState(false);
   const [medio, setMedio] = useState<string>(pedido.pago_metodo || pedido.pago_preferido || 'Yape');
   const [montoPagaCon, setMontoPagaCon] = useState(pedido.paga_con ? String(pedido.paga_con) : '');
   const [codigoOp, setCodigoOp] = useState('');
-  const [comprobanteImg, setComprobanteImg] = useState<string | null>(null);
+  // Vouchers ya enlazados al pedido (cualquier origen) y la foto que acaba de subir esta ventana
+  const [vouchersPedido, setVouchersPedido] = useState<VoucherPagoItem[]>([]);
+  const [voucherSubido, setVoucherSubido] = useState<string | number | null>(null);
   const [msg, setMsg] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [confirmandoSiNo, setConfirmandoSiNo] = useState(false);
+  // Excepción «Confirmar sin comprobante»: motivo escrito + código rotativo del supervisor
+  const [sinVoucher, setSinVoucher] = useState(false);
+  const [motivoSinVoucher, setMotivoSinVoucher] = useState('');
+  const [pinSupervisor, setPinSupervisor] = useState('');
 
-  const esEfectivo = medio.toLowerCase() === 'efectivo';
-  const esTarjeta = medio.toLowerCase() === 'tarjeta';
+  const esEfectivo = mismoMedio(medio, 'Efectivo');
+  const esTarjeta = mismoMedio(medio, 'Tarjeta');
   const esDigital = !esEfectivo && !esTarjeta;
+  const medioVoucher = medioDigitalVoucher(medio);
+  // Un voucher ilegible no cuenta como comprobante; cualquier otro del pedido sí (la IA solo informa)
+  const comprobanteListo =
+    voucherSubido !== null || vouchersPedido.some((v) => v.semaforo !== 'ILEGIBLE');
   const esDelivery = (pedido.modalidad || '').toUpperCase() === 'DELIVERY';
   const tieneUbicacion =
     (pedido.entrega_lat != null && pedido.entrega_lng != null) || Boolean(pedido.zona);
@@ -38,18 +50,6 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
     ? `https://wa.me/51${cleanPhone}?text=${encodeURIComponent(`Hola ${pedido.cliente_nombre || ''}, te escribimos de Caprichos respecto a tu pedido ${pedido.codigo}.`)}`
     : '#';
 
-  const handleSubirArchivo = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        setComprobanteImg(reader.result as string);
-        setMsg('');
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const handleConfirmar = () => {
     if (!contactado) {
       setMsg('Marca la casilla confirmando que hablaste con el cliente.');
@@ -59,13 +59,29 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
       setMsg('Para delivery primero ubica la dirección en el mapa (calcula la zona y el envío).');
       return;
     }
-    if (esDigital && !comprobanteImg) {
-      setMsg('Sube el comprobante del pago para continuar.');
-      return;
+    if (esDigital && !comprobanteListo) {
+      if (!sinVoucher) {
+        setMsg('Sube el comprobante del pago para continuar.');
+        return;
+      }
+      if (motivoSinVoucher.trim().length < MOTIVO_MINIMO) {
+        setMsg(`El motivo debe tener al menos ${MOTIVO_MINIMO} caracteres`);
+        return;
+      }
+      if (pinSupervisor.length !== 6) {
+        setMsg('El código del supervisor son 6 dígitos');
+        return;
+      }
     }
     setMsg('');
     setConfirmandoSiNo(true);
   };
+
+  // Solo viaja la excepción si el pago digital sigue sin comprobante útil
+  const excepcionSinVoucher =
+    esDigital && !comprobanteListo && sinVoucher
+      ? { motivo: motivoSinVoucher.trim(), pinSupervisor }
+      : undefined;
 
   const ejecutarConfirmacion = async () => {
     setEnviando(true);
@@ -75,6 +91,7 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
         pedido.id,
         medio.toUpperCase(),
         esDigital ? 'PAGADO' : 'COORDINADO',
+        excepcionSinVoucher,
       );
       if (String(pedido.estado).toUpperCase() === 'NUEVO') {
         await pedidosApi.cambiarEstado(
@@ -84,12 +101,7 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
         );
       }
       setConfirmandoSiNo(false);
-      alConfirmarExitoso({
-        medio,
-        comprobanteImg,
-        codigoOp,
-        montoPagaCon,
-      });
+      alConfirmarExitoso();
     } catch (err: any) {
       setConfirmandoSiNo(false);
       setMsg(err?.message || 'Error al confirmar el pedido');
@@ -250,12 +262,21 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
           </button>
         </div>
 
+        {/* Comprobantes ya enlazados al pedido (carta, WhatsApp, mozo): con su lectura, no obligan a subir otra */}
+        <SeccionVouchersPedido
+          pedidoId={pedido.id}
+          recargarClave={voucherSubido}
+          total={pedido.total}
+          medio={medio}
+          alCargar={setVouchersPedido}
+        />
+
         {/* 2. Medio de pago */}
         <div style={{ border: '1.5px solid var(--cp-navy, #0B2C3E)', borderRadius: 12, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ fontWeight: 800 }}>2. Medio de pago</div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {MEDIOS_PC.map((m) => {
-              const activo = medio.toLowerCase() === m.toLowerCase();
+              const activo = mismoMedio(medio, m);
               return (
                 <button
                   key={m}
@@ -337,64 +358,95 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
                   fontSize: 14,
                 }}
               />
-              <div style={{ fontWeight: 700, fontSize: 13, marginTop: 8, marginBottom: 4 }}>
-                Comprobante del pago (obligatorio)
-              </div>
-              {comprobanteImg ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <img
-                    src={comprobanteImg}
-                    alt="Comprobante subido"
-                    style={{
-                      maxWidth: '100%',
-                      maxHeight: 220,
-                      objectFit: 'contain',
-                      border: '1px solid var(--cp-line, #E3D6C6)',
-                      borderRadius: 10,
-                      background: 'var(--cp-sand, #EDE1D1)',
+              {!comprobanteListo && medioVoucher && !sinVoucher && (
+                <>
+                  <div style={{ fontWeight: 700, fontSize: 13, marginTop: 8, marginBottom: 4 }}>
+                    Comprobante del pago (obligatorio)
+                  </div>
+                  {/* Mismo camino que el cobro en caja: la foto se guarda como voucher del pedido y la IA solo informa */}
+                  <SubirVoucherMozo
+                    key={medioVoucher}
+                    pedidoId={pedido.id}
+                    medio={medioVoucher}
+                    alVoucherValido={(info) => {
+                      if (info.legible) setVoucherSubido(info.id);
                     }}
                   />
                   <button
                     type="button"
-                    onClick={() => setComprobanteImg(null)}
+                    onClick={() => {
+                      setSinVoucher(true);
+                      setMsg('');
+                    }}
                     style={{
-                      alignSelf: 'flex-start',
-                      minHeight: 38,
-                      padding: '0 12px',
-                      border: '1.5px solid var(--cp-rust, #B2500F)',
+                      minHeight: 44,
+                      marginTop: 8,
+                      border: '1.5px solid var(--cp-navy, #0B2C3E)',
                       borderRadius: 10,
                       background: 'transparent',
-                      color: 'var(--cp-rust, #B2500F)',
+                      color: 'var(--cp-navy, #0B2C3E)',
                       fontWeight: 700,
-                      fontSize: 12,
+                      fontSize: 13,
                       cursor: 'pointer',
                     }}
                   >
-                    Quitar y subir otro
+                    Confirmar sin comprobante
+                  </button>
+                </>
+              )}
+              {!comprobanteListo && medioVoucher && sinVoucher && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-rust, #B2500F)' }}>
+                    Pago sin comprobante: solo con motivo escrito y el código del supervisor. Queda auditado.
+                  </div>
+                  <label htmlFor="motivo-sin-voucher-pago" style={{ fontWeight: 700, fontSize: 13 }}>
+                    Motivo (mínimo {MOTIVO_MINIMO} letras)
+                  </label>
+                  <textarea
+                    id="motivo-sin-voucher-pago"
+                    data-testid="motivo-sin-voucher"
+                    rows={2}
+                    value={motivoSinVoucher}
+                    onChange={(e) => setMotivoSinVoucher(e.target.value)}
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      borderRadius: 10,
+                      border: '1.5px solid var(--cp-line, #E3D6C6)',
+                      background: 'var(--cp-white, #FFFFFF)',
+                      padding: 10,
+                      fontSize: 14,
+                      fontFamily: 'inherit',
+                    }}
+                  />
+                  <CampoCodigoSupervisor valor={pinSupervisor} onChange={setPinSupervisor} />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSinVoucher(false);
+                      setMotivoSinVoucher('');
+                      setPinSupervisor('');
+                      setMsg('');
+                    }}
+                    style={{
+                      minHeight: 44,
+                      border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                      borderRadius: 10,
+                      background: 'transparent',
+                      color: 'var(--cp-navy, #0B2C3E)',
+                      fontWeight: 700,
+                      fontSize: 13,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Volver a pedir la foto
                   </button>
                 </div>
-              ) : (
-                <label
-                  style={{
-                    minHeight: 48,
-                    border: '1.5px dashed var(--cp-navy, #0B2C3E)',
-                    borderRadius: 12,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'var(--cp-navy, #0B2C3E)',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Subir comprobante
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleSubirArchivo}
-                    style={{ position: 'absolute', left: -9999 }}
-                  />
-                </label>
+              )}
+              {comprobanteListo && (
+                <div data-testid="voucher-listo-confirmar" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-green, #2F7A45)', marginTop: 8 }}>
+                  Comprobante del pedido listo para confirmar.
+                </div>
               )}
             </div>
           )}
@@ -448,7 +500,7 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
       <Confirmar
         abierto={confirmandoSiNo}
         titulo={`¿Confirmar el pedido ${pedido.codigo} y enviarlo a cocina?`}
-        mensaje={`Se registrará el medio de pago (${medio}) y el pedido pasará a las pantallas de cocina.`}
+        mensaje={`Se registrará el medio de pago (${medio}) y el pedido pasará a las pantallas de cocina.${excepcionSinVoucher ? ' Se registra sin comprobante, con el motivo y la autorización del supervisor.' : ''}`}
         textoConfirmar="Sí, confirmar"
         textoNo="No"
         cargando={enviando}
