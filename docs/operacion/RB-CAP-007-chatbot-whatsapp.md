@@ -164,7 +164,8 @@ Los avisos al cliente de delivery se registran una vez por pedido y etapa (tabla
 | `asistido_espera_min` | Numérico | `3` | Minutos de espera sin respuesta humana en ATENCION_PERSONA antes de activar el modo asistido del bot. |
 | `reparto_insistencia_min` | Numérico | `3` | Minutos en la puerta antes del aviso 3 de insistencia. Tras espera máxima + este valor, la movilidad se retira. |
 | `reparto_espera_max_min` | Numérico | `10` | Minutos en la puerta para avisar al cliente que la movilidad se retirará (espera agotada). |
-| `reparto_recargo_reprogramacion` | Numérico | `0.00` | Recargo en soles del segundo intento de entrega tras el retiro (incidente con motivo NO_CONTESTA). |
+| `reprog_recargo_modo` | Texto | `IGUAL_ENVIO` | Costo de volver a enviar tras el retiro: `IGUAL_ENVIO` (mismo costo del envío del pedido; si fue gratis, tarifa de la zona), `FIJO` (usa `reparto_recargo_reprogramacion`) o `SIN_COSTO`. |
+| `reparto_recargo_reprogramacion` | Numérico | `0.00` | Monto fijo del reenvío tras el retiro; solo se usa si `reprog_recargo_modo` es `FIJO`. |
 | `encuesta_espera_min` | Numérico | `30` | Minutos posteriores a la entrega antes de enviar la encuesta. |
 | `encuesta_puntaje_queja` | Numérico | `2` | Calificación (1 a 5) a partir de la cual se genera queja automática. |
 

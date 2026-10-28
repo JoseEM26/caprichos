@@ -1,4 +1,8 @@
 jest.mock('../../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {} }));
+// El monto del retiro lo calcula la función única de reparto; aquí se fija en 5 (IGUAL_ENVIO)
+jest.mock('../../repartos/recargo-reprogramacion', () => ({
+  calcularMontoReprogramacion: jest.fn().mockResolvedValue({ monto: 5, modo: 'IGUAL_ENVIO' }),
+}));
 import { ChatbotPlanificadorService } from '../servicios/chatbot-planificador.service';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { RedisService } from '../../../comun/redis/redis.service';
@@ -152,7 +156,7 @@ describe('ChatbotPlanificadorService (avisos por tiempo)', () => {
 
     const res = await planificador.ejecutarCiclo();
 
-    expect(mockAvisos.avisar).toHaveBeenCalledWith(BigInt(13), 'ESPERA_AGOTADA', { recargo: 5 });
+    expect(mockAvisos.avisar).toHaveBeenCalledWith(BigInt(13), 'ESPERA_AGOTADA');
     expect(res.avisosEspera).toBe(1);
     expect(mockPrisma.notificacion.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ tipo: 'ESPERA_AGOTADA', rol_destino: 'CAJERO' }) }),
@@ -185,7 +189,7 @@ describe('ChatbotPlanificadorService (avisos por tiempo)', () => {
     expect(mockPrisma.mensajeReparto.deleteMany).toHaveBeenCalledWith({
       where: { pedido_id: BigInt(13), numero: { in: [1, 2, 3, 4, 5, 10] } },
     });
-    expect(mockAvisos.avisar).toHaveBeenCalledWith(BigInt(13), 'RETIRO', { recargo: 5 });
+    expect(mockAvisos.avisar).toHaveBeenCalledWith(BigInt(13), 'RETIRO', { recargo: 5, recargoModo: 'IGUAL_ENVIO' });
     expect(mockEventos.emitirAdmin).toHaveBeenCalledWith('reparto:incidente', expect.anything());
   });
 

@@ -54,8 +54,10 @@ export interface ResultadoAviso {
 export interface DatosAviso {
   /** INSISTENCIA: minutos esperando en la puerta. */
   minutos?: number;
-  /** ESPERA_AGOTADA / RETIRO: recargo de reprogramación en soles. */
+  /** RETIRO: recargo de reprogramación en soles (el mismo que se cobra al reenviar). */
   recargo?: number;
+  /** RETIRO: modo del recargo, solo para explicar al cliente que es el costo del delivery. */
+  recargoModo?: 'IGUAL_ENVIO' | 'FIJO' | 'SIN_COSTO';
 }
 
 /**
@@ -195,7 +197,7 @@ export class AvisosPedidoService {
       case 'ESPERA_AGOTADA':
         return TEXTOS_REPARTO.esperaAgotada(nombre, codigo);
       case 'RETIRO':
-        return TEXTOS_REPARTO.retiro(nombre, codigo, this.condicionRecargo(datos.recargo));
+        return TEXTOS_REPARTO.retiro(nombre, codigo, this.costoReprogramacion(datos.recargo, datos.recargoModo));
       case 'REENVIADO':
         return TEXTOS_REPARTO.reenviado(nombre, codigo);
       case 'REPROG_RECIBIDA':
@@ -213,9 +215,11 @@ export class AvisosPedidoService {
     return `S/ ${(monto ?? 0).toFixed(2)}`;
   }
 
-  /** "con un recargo de S/ 5.00" o "sin recargo" (nunca "S/ 0.00"). */
-  private condicionRecargo(recargo?: number): string {
-    return (recargo ?? 0) > 0 ? `con un recargo de ${this.montoSoles(recargo)}` : 'sin recargo';
+  /** Frase exacta del costo que se le dice al cliente antes de su SÍ/NO (el mismo monto que se cobra). */
+  private costoReprogramacion(recargo?: number, modo?: DatosAviso['recargoModo']): string {
+    if ((recargo ?? 0) <= 0) return 'Volver a enviarlo no tiene costo adicional.';
+    const detalle = modo === 'IGUAL_ENVIO' ? ' (el mismo del delivery)' : '';
+    return `Volver a enviarlo tiene un costo de ${this.montoSoles(recargo)}${detalle}, que pagarías en la puerta o a Caja.`;
   }
 
   /** Copia el aviso en el hilo de chat del cliente (mensaje_chat), para que Caja lo vea junto a la conversación. */

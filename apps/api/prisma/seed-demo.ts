@@ -102,6 +102,7 @@ async function configurarParametrosDemo() {
     { clave: 'reparto_insistencia_min', valor: 3 },
     { clave: 'reparto_espera_max_min', valor: 10 },
     { clave: 'reparto_recargo_reprogramacion', valor: 0 },
+    { clave: 'reprog_recargo_modo', valor: 'IGUAL_ENVIO' },
   ];
 
   for (const p of params) {

@@ -54,6 +54,7 @@ Para el rol **REPARTIDOR**, el sistema activa automaticamente una interfaz **mob
 - Permite asignar o reasignar manualmente pedidos a cualquier repartidor activo.
 - Permite liberar pedidos asignados en caso de averia o demora del motorizado.
 - Permite resolver incidentes reportados (reprogramar, retornar al local o cobrar con recargo) y liquidar cuentas.
+- **Reenvío tras el retiro (Por reprogramar)**: si el cliente dijo SÍ, el pedido aparece como Por reprogramar con el botón «Reprogramar / Reenviar a reparto: S/ x». Ese monto es el mismo que el cliente vio antes de responder y se suma una vez al total y al envío. Si el pedido ya estaba pagado, el recargo se cobra aparte en Caja (Caja recibe un aviso). El costo se configura en Configuración > Parámetros de operación, en «Costo de volver a enviar un pedido».
 
 ## Como se hace: Reportar una falla en la entrega (no contesta o direccion erronea)
 1. Si transcurren varios minutos sin poder contactar al cliente, pulsar el boton Reportar problema.

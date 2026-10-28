@@ -17,11 +17,38 @@ export interface ParametroItem {
 interface MetaParametro {
   nombre: string;
   descripcion: string;
-  tipo: 'numero' | 'texto' | 'sino' | 'solo_lectura' | 'objeto';
+  tipo: 'numero' | 'texto' | 'sino' | 'solo_lectura' | 'objeto' | 'selector';
   sufijo?: string;
+  opciones?: { valor: string; etiqueta: string; ayuda: string }[];
 }
 
+/** Modos del recargo por reprogramar (mismos valores que el servidor). */
+const OPCIONES_RECARGO_REPROG = [
+  {
+    valor: 'IGUAL_ENVIO',
+    etiqueta: 'Igual al envío',
+    ayuda: 'Cobra al cliente lo mismo que el delivery (el costo de envío del pedido). Si el envío fue gratis, usa la tarifa de su zona.',
+  },
+  {
+    valor: 'FIJO',
+    etiqueta: 'Monto fijo',
+    ayuda: 'Cobra siempre el monto que escribas abajo, sin importar el pedido.',
+  },
+  {
+    valor: 'SIN_COSTO',
+    etiqueta: 'Sin costo',
+    ayuda: 'Volver a enviar el pedido no cobra nada adicional.',
+  },
+];
+
 const META_PARAMETROS: Record<string, MetaParametro> = {
+  reprog_recargo_modo: {
+    nombre: 'Costo de volver a enviar un pedido',
+    descripcion:
+      'Cuánto paga el cliente al reprogramar una entrega tras la espera agotada. Se le dice antes de que responda SÍ o NO y se cobra al reenviar el pedido.',
+    tipo: 'selector',
+    opciones: OPCIONES_RECARGO_REPROG,
+  },
   tiempo_prometido_min: {
     nombre: 'Tiempo prometido de entrega (base)',
     descripcion: 'Minutos base de entrega que se anuncian al cliente en la carta y chatbot.',
@@ -152,8 +179,8 @@ const META_PARAMETROS: Record<string, MetaParametro> = {
     sufijo: 'minutos',
   },
   reparto_recargo_reprogramacion: {
-    nombre: 'Recargo por reprogramación de delivery',
-    descripcion: 'Monto en soles a cobrar como recargo por segundo intento de envío tras espera agotada en la puerta.',
+    nombre: 'Monto fijo por reprogramar (si el costo es Monto fijo)',
+    descripcion: 'Solo aplica cuando el costo de volver a enviar un pedido es "Monto fijo". Con "Igual al envío" o "Sin costo" no se usa.',
     tipo: 'numero',
     sufijo: 'S/',
   },
@@ -323,6 +350,8 @@ export function ParametrosOperacionTab({
   // Parámetro en edición modal
   const [parametroEditando, setParametroEditando] = useState<ParametroItem | null>(null);
   const [nuevoValorInput, setNuevoValorInput] = useState<string>('');
+  // Solo para el selector del costo de reprogramar: monto fijo (se usa si el modo es FIJO)
+  const [montoFijoInput, setMontoFijoInput] = useState<string>('');
   const [errorValidacion, setErrorValidacion] = useState<string | null>(null);
 
   // Confirmación Sí/No antes de guardar
@@ -450,7 +479,11 @@ export function ParametrosOperacionTab({
     setParametroEditando(item);
     setErrorValidacion(null);
     setErrorServidor(null);
-    if (typeof item.valor === 'boolean') {
+    if (item.clave === 'reprog_recargo_modo') {
+      const fijo = parametros.find((p) => p.clave === 'reparto_recargo_reprogramacion');
+      setMontoFijoInput(String(fijo?.valor ?? 0));
+      setNuevoValorInput(String(item.valor || 'IGUAL_ENVIO'));
+    } else if (typeof item.valor === 'boolean') {
       setNuevoValorInput(item.valor ? 'true' : 'false');
     } else if (typeof item.valor === 'string' && (item.valor.toLowerCase() === 'si' || item.valor.toLowerCase() === 'no')) {
       setNuevoValorInput(item.valor.toLowerCase() === 'si' ? 'true' : 'false');
@@ -479,6 +512,12 @@ export function ParametrosOperacionTab({
         setErrorValidacion('El texto no puede estar vacío');
         return;
       }
+    } else if (tipo === 'selector' && nuevoValorInput === 'FIJO') {
+      const monto = Number(montoFijoInput.trim());
+      if (montoFijoInput.trim() === '' || isNaN(monto) || monto < 0) {
+        setErrorValidacion('El monto fijo debe ser un número mayor o igual a 0');
+        return;
+      }
     }
 
     setErrorValidacion(null);
@@ -504,9 +543,22 @@ export function ParametrosOperacionTab({
       const res = await api.put<ParametroItem>(`/admin/configuracion/${clave}`, {
         valor: valorFinal,
       });
+      const cambios: ParametroItem[] = [{ clave, valor: res.valor }];
+
+      // Modo "Monto fijo": el monto va en su propio parámetro; se guarda solo si cambió
+      if (tipo === 'selector' && valorFinal === 'FIJO') {
+        const monto = Number(montoFijoInput.trim());
+        const actual = parametros.find((p) => p.clave === 'reparto_recargo_reprogramacion');
+        if (Number(actual?.valor ?? 0) !== monto) {
+          const resMonto = await api.put<ParametroItem>('/admin/configuracion/reparto_recargo_reprogramacion', {
+            valor: monto,
+          });
+          cambios.push({ clave: 'reparto_recargo_reprogramacion', valor: resMonto.valor });
+        }
+      }
 
       setParametros((prev) =>
-        prev.map((p) => (p.clave === clave ? { ...p, valor: res.valor } : p)),
+        prev.map((p) => cambios.find((c) => c.clave === p.clave) ?? p),
       );
 
       const ahora = new Date();
@@ -541,10 +593,22 @@ export function ParametrosOperacionTab({
       return JSON.stringify(valor);
     }
     const meta = META_PARAMETROS[clave];
+    if (meta?.tipo === 'selector') {
+      const opcion = meta.opciones?.find((o) => o.valor === String(valor));
+      return opcion ? opcion.etiqueta : String(valor ?? '');
+    }
     if (meta?.sufijo) {
       return `${valor} ${meta.sufijo}`;
     }
     return String(valor ?? '');
+  };
+
+  const etiquetaNuevoValor = () => {
+    const meta = parametroEditando ? META_PARAMETROS[parametroEditando.clave] : undefined;
+    if (meta?.tipo === 'selector') {
+      return meta.opciones?.find((o) => o.valor === nuevoValorInput)?.etiqueta ?? nuevoValorInput;
+    }
+    return nuevoValorInput;
   };
 
   return (
@@ -971,6 +1035,47 @@ export function ParametrosOperacionTab({
                 );
               }
 
+              if (tipo === 'selector') {
+                const opcionActual = meta?.opciones?.find((o) => o.valor === nuevoValorInput);
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontWeight: 700, fontSize: '13px', color: 'var(--cp-navy)' }}>
+                      Cómo se cobra
+                      <select
+                        value={nuevoValorInput}
+                        onChange={(e) => {
+                          setNuevoValorInput(e.target.value);
+                          setErrorValidacion(null);
+                          setErrorServidor(null);
+                        }}
+                        style={{ minHeight: '44px', borderRadius: '10px', border: '1px solid var(--cp-line)', padding: '0 10px', fontSize: '14px' }}
+                      >
+                        {meta?.opciones?.map((o) => (
+                          <option key={o.valor} value={o.valor}>
+                            {o.etiqueta}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {opcionActual && (
+                      <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>{opcionActual.ayuda}</div>
+                    )}
+                    {nuevoValorInput === 'FIJO' && (
+                      <Campo
+                        etiqueta="Monto fijo (S/)"
+                        type="number"
+                        value={montoFijoInput}
+                        onChange={(e) => {
+                          setMontoFijoInput(e.target.value);
+                          setErrorValidacion(null);
+                          setErrorServidor(null);
+                        }}
+                      />
+                    )}
+                  </div>
+                );
+              }
+
               return (
                 <Campo
                   etiqueta={`Nuevo valor ${meta?.sufijo ? `(${meta.sufijo})` : ''}`}
@@ -1014,7 +1119,7 @@ export function ParametrosOperacionTab({
         titulo="¿Guardar parámetro de operación?"
         mensaje={`¿Confirmas cambiar el valor de "${
           parametroEditando ? META_PARAMETROS[parametroEditando.clave]?.nombre || parametroEditando.clave : ''
-        }" a "${nuevoValorInput}"? El cambio afectará los cálculos operativos del sistema.`}
+        }" a "${etiquetaNuevoValor()}"? El cambio afectará los cálculos operativos del sistema.`}
         textoSi="Sí, guardar"
         textoNo="No, cancelar"
         cargando={guardando}

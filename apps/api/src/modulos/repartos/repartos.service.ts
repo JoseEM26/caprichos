@@ -18,6 +18,7 @@ import {
   RutaService,
 } from './ruta.service';
 import { FiltrarRepartosDto } from './dto/filtrar-repartos.dto';
+import { montoPendienteReprogramacion } from './recargo-reprogramacion';
 
 /** Estados de pedido que siguen vivos en el reparto: los únicos que muestra la vista activa. */
 export const ESTADOS_ACTIVOS_REPARTO = ['LISTO', 'EN_CAMINO'] as const;
@@ -555,6 +556,12 @@ export class RepartosService {
           where: { numero: NUMERO_PREGUNTA_REPROG, estado: { in: [ESTADO_REPROG.REPROGRAMAR, ESTADO_REPROG.REPROGRAMADO] } },
           select: { estado: true },
         },
+        incidentes: {
+          where: { cierre: null, motivo: MOTIVO_RETIRO },
+          orderBy: { en: 'desc' },
+          take: 1,
+          select: { recargo: true },
+        },
       },
       orderBy: { creado_en: 'desc' },
     });
@@ -579,6 +586,11 @@ export class RepartosService {
             : p.mensajesReparto?.[0]?.estado === ESTADO_REPROG.REPROGRAMADO
               ? 'REPROGRAMADO'
               : null,
+        // Monto que cobra el reenvío (el mismo que vio el cliente); Caja lo ve junto al botón
+        recargoReprogramacion:
+          p.mensajesReparto?.[0]?.estado === ESTADO_REPROG.REPROGRAMAR && p.incidentes?.[0]?.recargo != null
+            ? Number(p.incidentes[0].recargo)
+            : null,
         repartidor: p.repartidor
           ? {
               id: String(p.repartidor.id),
@@ -1390,13 +1402,14 @@ export class RepartosService {
   /**
    * POST /admin/repartos/:id/reprogramar (repartos/liquidar): el admin reenvía a reparto un pedido cuyo
    * cliente dijo SÍ a reprogramar tras el retiro. Vuelve a "Para elegir" marcado como Reprogramado
-   * (con el recargo de los parámetros) y se avisa al cliente por WhatsApp. Respeta el tope de reprogramaciones.
+   * (con el recargo del incidente del retiro, el mismo que vio el cliente) y se avisa al cliente por WhatsApp.
+   * Respeta el tope de reprogramaciones.
    */
   async reprogramarPedido(id: string | bigint, usuario: UsuarioAutenticado, ip?: string) {
     const pedidoId = this.parsearId(id);
     const pedido = await this.prisma.pedido.findUnique({
       where: { id: pedidoId },
-      select: { id: true, estado: true, motivo_falla: true, repartidor_party_id: true },
+      select: { id: true, codigo: true, estado: true, motivo_falla: true, repartidor_party_id: true, pago_estado: true },
     });
     if (!pedido) {
       throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
@@ -1417,7 +1430,7 @@ export class RepartosService {
     }
 
     const params = await this.prisma.parametro.findMany({
-      where: { clave: { in: ['reparto_recargo_reprogramacion', 'reprog_max_intentos'] } },
+      where: { clave: { in: ['reprog_max_intentos'] } },
     });
     const mapa = new Map(params.map((p) => [p.clave, p.valor]));
     const tope = Number(mapa.get('reprog_max_intentos') ?? 1);
@@ -1429,7 +1442,7 @@ export class RepartosService {
       });
     }
 
-    const recargo = Number(mapa.get('reparto_recargo_reprogramacion') ?? 0);
+    const recargo = await montoPendienteReprogramacion(this.prisma, pedidoId);
     const resultado = await this.resolverFalla(
       id,
       { nota: 'Reprogramado tras confirmación del cliente', cierre: 'REPROGRAMADO', recargo },
@@ -1437,6 +1450,19 @@ export class RepartosService {
       ip,
     );
     await this.prisma.mensajeReparto.update({ where: clave, data: { estado: ESTADO_REPROG.REPROGRAMADO } });
+    if (recargo > 0 && pedido.pago_estado === 'PAGADO') {
+      // El pedido ya estaba pagado: el recargo no entra a la caja del repartidor, Caja lo cobra aparte.
+      const notif = await this.prisma.notificacion.create({
+        data: {
+          tipo: 'REPROG_COBRAR_RECARGO',
+          rol_destino: 'CAJERO',
+          titulo: 'Cobrar recargo de reprogramación',
+          mensaje: `El pedido ${pedido.codigo} ya estaba pagado. Cobra el recargo de S/ ${recargo.toFixed(2)} por reprogramar la entrega.`,
+          enlace: '/admin/caja',
+        },
+      });
+      this.eventosGateway?.emitirAdmin('notificaciones:nueva', { id: notif.id.toString(), titulo: notif.titulo });
+    }
     await this.avisos?.avisar(pedidoId, 'REENVIADO');
     return resultado;
   }

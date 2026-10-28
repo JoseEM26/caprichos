@@ -46,6 +46,8 @@ export interface PedidoReparto {
   espera_agotada?: boolean;
   /** POR_REPROGRAMAR: el cliente dijo SÍ y falta reenviar; REPROGRAMADO: ya volvió a reparto. */
   reprogramacion?: 'POR_REPROGRAMAR' | 'REPROGRAMADO' | null;
+  /** Recargo que cobra el reenvío (el mismo que vio el cliente). Solo en POR_REPROGRAMAR. */
+  recargoReprogramacion?: number | null;
   /** Pedido que volvió a Para elegir tras reprogramar (marca Reprogramado). */
   reprogramado?: boolean;
 }

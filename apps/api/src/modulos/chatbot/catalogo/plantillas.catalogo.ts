@@ -60,8 +60,8 @@ export const CATALOGO_PLANTILLAS: Record<string, DefinicionPlantilla> = {
     nombre: 'caprichos_delivery_retiro',
     categoria: 'UTILITY',
     idioma: 'es',
-    variables: ['nombre_cliente', 'codigo_pedido', 'condicion_recargo'],
-    texto: '¡Hola {{1}}! 😔 Nuestro repartidor tuvo que retirarse con tu pedido {{2}} porque se agotó el tiempo de espera. ¿Te gustaría reprogramar la entrega {{3}}? Responde SÍ para reprogramar o NO si prefieres cancelarlo. 🙏',
+    variables: ['nombre_cliente', 'codigo_pedido', 'costo_reprogramacion'],
+    texto: '¡Hola {{1}}! 😔 Nuestro repartidor tuvo que retirarse con tu pedido {{2}} porque se agotó el tiempo de espera. ¿Te gustaría reprogramar la entrega? {{3}} Responde SÍ para reprogramar o NO si prefieres cancelarlo. 🙏',
     descripcion: 'Pregunta al cliente tras el retiro del repartidor: reprogramar (SI) o cancelar (NO). Con ventana abierta lleva botones.',
   },
   DELIVERY_REPROG_RECIBIDA: {

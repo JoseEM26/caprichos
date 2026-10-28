@@ -257,9 +257,9 @@ Aviso interno de Caprichos: *{{1}}*
 - **Idioma:** Español (`es`)
 - **Texto del cuerpo (Body):**
 ```text
-¡Hola {{1}}! 😔 Nuestro repartidor tuvo que retirarse con tu pedido {{2}} porque se agotó el tiempo de espera. ¿Te gustaría reprogramar la entrega {{3}}? Responde SÍ para reprogramar o NO si prefieres cancelarlo. 🙏
+¡Hola {{1}}! 😔 Nuestro repartidor tuvo que retirarse con tu pedido {{2}} porque se agotó el tiempo de espera. ¿Te gustaría reprogramar la entrega? {{3}} Responde SÍ para reprogramar o NO si prefieres cancelarlo. 🙏
 ```
-- **Ejemplo de variables para Meta:** `{{1}}`: `María` · `{{2}}`: `CP-4102` · `{{3}}`: `con un recargo de S/ 5.00`
+- **Ejemplo de variables para Meta:** `{{1}}`: `María` · `{{2}}`: `CP-4102` · `{{3}}`: `Volver a enviarlo tiene un costo de S/ 5.00 (el mismo del delivery), que pagarías en la puerta o a Caja.` (si el costo es 0: `Volver a enviarlo no tiene costo adicional.`). La variable `{{3}}` es el monto exacto que luego se cobra al reenviar; la calcula el servidor con `reprog_recargo_modo`.
 - **Botones de respuesta rápida (Quick Reply):** 1. `Sí, reprogramar` 2. `No, cancelar`. Si la ventana de 24 h está abierta se envían como botones; si no, el cliente responde escribiendo SÍ o NO.
 - **Cuándo se envía:** cuando el planificador retira la movilidad tras `reparto_espera_max_min` más `reparto_insistencia_min` minutos en puerta. La respuesta SÍ pasa el pedido a «Por reprogramar»; NO o sin respuesta en `reprog_respuesta_min` minutos lo cancela.
 

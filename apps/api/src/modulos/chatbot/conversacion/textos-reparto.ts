@@ -70,13 +70,14 @@ export const TEXTOS_REPARTO = {
   }),
 
   /**
-   * Pregunta tras el retiro: ¿reprogramar? `condicionRecargo` es "con un recargo de S/ 5.00" o "sin recargo".
+   * Pregunta tras el retiro: ¿reprogramar? `costoReprogramacion` es la frase con el monto exacto
+   * ("Volver a enviarlo tiene un costo de S/ 7.00 ...") o "Volver a enviarlo no tiene costo adicional.".
    * Con ventana abierta lleva los botones; con ventana cerrada la plantilla se responde escribiendo SI o NO.
    */
-  retiro: (nombre: string, codigo: string, condicionRecargo: string): PayloadAvisoReparto => ({
-    textoLibre: `¡Hola ${nombre}! 😔 Nuestro repartidor tuvo que retirarse con tu pedido ${codigo} porque se agotó el tiempo de espera. ¿Te gustaría reprogramar la entrega ${condicionRecargo}? Responde SÍ para reprogramar o NO si prefieres cancelarlo. 🙏`,
+  retiro: (nombre: string, codigo: string, costoReprogramacion: string): PayloadAvisoReparto => ({
+    textoLibre: `¡Hola ${nombre}! 😔 Nuestro repartidor tuvo que retirarse con tu pedido ${codigo} porque se agotó el tiempo de espera. ¿Te gustaría reprogramar la entrega? ${costoReprogramacion} Responde SÍ para reprogramar o NO si prefieres cancelarlo. 🙏`,
     plantillaClave: 'DELIVERY_RETIRO',
-    variablesPlantilla: [nombre, codigo, condicionRecargo],
+    variablesPlantilla: [nombre, codigo, costoReprogramacion],
     botones: BOTONES_REPROGRAMACION,
   }),
 

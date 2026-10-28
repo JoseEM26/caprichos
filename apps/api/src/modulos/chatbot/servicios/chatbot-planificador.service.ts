@@ -6,6 +6,7 @@ import { Ventana24hService } from './ventana-24h.service';
 import { TareaRecordatorioPagoService } from './tarea-recordatorio-pago.service';
 import { AvisosPedidoService, NUMEROS_INTENTO } from './avisos-pedido.service';
 import { ReprogramacionService, MOTIVO_RETIRO } from './reprogramacion.service';
+import { calcularMontoReprogramacion } from '../../repartos/recargo-reprogramacion';
 import { normalizarTelefono } from '../utilidades/enmascarar.util';
 import { adquirirCandado, liberarCandado } from '../../../comun/redis/candado.util';
 
@@ -20,7 +21,6 @@ export interface ParametrosChatbot {
   avisoEncuestaActivo: boolean;
   repartoInsistenciaMin: number;
   repartoEsperaMaxMin: number;
-  repartoRecargoReprogramacion: number;
   /** Minutos que espera la pregunta de reprogramar antes de cancelar por falta de respuesta. */
   reprogRespuestaMin: number;
   /** Reprogramaciones máximas por pedido; al llegar al tope no se vuelve a preguntar. */
@@ -118,7 +118,6 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
       'whatsapp_aviso_encuesta_activo',
       'reparto_insistencia_min',
       'reparto_espera_max_min',
-      'reparto_recargo_reprogramacion',
       'reprog_respuesta_min',
       'reprog_max_intentos',
       'encuesta_espera_min',
@@ -148,7 +147,6 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
       avisoEncuestaActivo: esActivo(mapa.get('whatsapp_aviso_encuesta_activo')),
       repartoInsistenciaMin: Number(mapa.get('reparto_insistencia_min') ?? 3),
       repartoEsperaMaxMin: Number(mapa.get('reparto_espera_max_min') ?? 10),
-      repartoRecargoReprogramacion: Number(mapa.get('reparto_recargo_reprogramacion') ?? 0),
       reprogRespuestaMin: Number(mapa.get('reprog_respuesta_min') ?? 30),
       reprogMaxIntentos: Number(mapa.get('reprog_max_intentos') ?? 1),
       encuestaEsperaMin: Number(mapa.get('encuesta_espera_min') ?? 30),
@@ -226,9 +224,7 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
 
         // (2) ESPERA AGOTADA: aviso de que la movilidad se retirará, con reprogramación y recargo
         if (minutosEnPuerta >= params.repartoEsperaMaxMin) {
-          const r = await this.avisos?.avisar(p.id, 'ESPERA_AGOTADA', {
-            recargo: params.repartoRecargoReprogramacion,
-          });
+          const r = await this.avisos?.avisar(p.id, 'ESPERA_AGOTADA');
           if (r && r.estado !== 'OMITIDO' && r.estado !== 'YA_ENVIADO') {
             resumen.avisosEspera++;
             await this.notificarEquipo(
@@ -242,7 +238,9 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
         // (3) RETIRO: tras la espera máxima más reparto_insistencia_min de gracia, la movilidad se retira
         //     y el pedido vuelve a LISTO con motivo de falla y recargo de reprogramación.
         if (minutosEnPuerta >= params.repartoEsperaMaxMin + params.repartoInsistenciaMin) {
-          const retirado = await this.retirarMovilidad(p.id, p.repartidor_party_id, params.repartoRecargoReprogramacion, ahora);
+          // Mismo cálculo que luego cobra el reenvío (se guarda en el incidente y se le dice al cliente)
+          const { monto: recargo, modo: recargoModo } = await calcularMontoReprogramacion(this.prisma, p.id);
+          const retirado = await this.retirarMovilidad(p.id, p.repartidor_party_id, recargo, ahora);
           if (retirado) {
             resumen.retiros++;
             // Tope de reprogramaciones alcanzado: no se pregunta, el pedido se cancela directo
@@ -252,7 +250,7 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
             if (tope) {
               await this.reprogramacion?.cancelar(p.id, 'TOPE');
             } else {
-              await this.avisos?.avisar(p.id, 'RETIRO', { recargo: params.repartoRecargoReprogramacion });
+              await this.avisos?.avisar(p.id, 'RETIRO', { recargo, recargoModo });
             }
             await this.notificarEquipo(
               'RETIRO_MOVILIDAD',

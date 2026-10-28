@@ -10,6 +10,19 @@ import { ModalResolverFalla } from './ModalResolverFalla';
 import { ErrorApi } from '../../comun/api';
 import { clasificarEspera } from './calculoRuta';
 
+/** Texto del botón de reenvío: muestra el mismo monto que se cobra (0 = sin costo). */
+export function etiquetaReprogramar(recargo: number | null | undefined): string {
+  if (recargo == null) return 'Reprogramar / Reenviar a reparto';
+  if (recargo > 0) return `Reprogramar / Reenviar a reparto: S/ ${recargo.toFixed(2)}`;
+  return 'Reprogramar / Reenviar a reparto (sin costo)';
+}
+
+/** Frase para la confirmación de reenvío. */
+export function textoRecargoReprog(recargo: number | null | undefined): string {
+  if (recargo == null || recargo <= 0) return 'No tiene recargo.';
+  return `Se suma un recargo de S/ ${recargo.toFixed(2)} al total y al envío del pedido.`;
+}
+
 interface TarjetaRepartoProps {
   pedido: PedidoReparto;
   esMio?: boolean;
@@ -676,7 +689,7 @@ export function TarjetaReparto({
                     onClick={() =>
                       pedirConfirmacion(
                         '¿Reenviar este pedido a reparto?',
-                        `El pedido ${pedido.codigo} vuelve a Para elegir con marca Reprogramado y se avisa al cliente por WhatsApp. Se suma el recargo configurado.`,
+                        `El pedido ${pedido.codigo} vuelve a Para elegir con marca Reprogramado y se avisa al cliente por WhatsApp. ${textoRecargoReprog(pedido.recargoReprogramacion)}`,
                         async () => {
                           try {
                             setCargandoAccion(true);
@@ -705,7 +718,7 @@ export function TarjetaReparto({
                       cursor: 'pointer',
                     }}
                   >
-                    Reprogramar / Reenviar a reparto
+                    {etiquetaReprogramar(pedido.recargoReprogramacion)}
                   </button>
                 )}
               </div>

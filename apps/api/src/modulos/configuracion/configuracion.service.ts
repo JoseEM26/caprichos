@@ -47,6 +47,7 @@ export const CLAVES_NUMERICAS = [
 
 export const CLAVES_TEXTO = [
   'envio_gratis_modo',
+  'reprog_recargo_modo',
   'carta_aviso_entrada',
   'chatbot_activo',
   'chatbot_ia_activo',
@@ -168,6 +169,16 @@ export class ConfiguracionService {
           });
         }
         valor = valNorm;
+      } else if (clave === 'reprog_recargo_modo') {
+        // Mismos valores que MODOS_RECARGO_REPROG (repartos/recargo-reprogramacion.ts)
+        const modo = typeof valor === 'string' ? valor.trim().toUpperCase() : '';
+        if (!['IGUAL_ENVIO', 'FIJO', 'SIN_COSTO'].includes(modo)) {
+          throw new BadRequestException({
+            codigo: 'VALOR_INVALIDO',
+            mensaje: 'El modo debe ser IGUAL_ENVIO, FIJO o SIN_COSTO',
+          });
+        }
+        valor = modo;
       } else if (clave.startsWith('chatbot_texto_')) {
         if (typeof valor !== 'string' || valor.trim().length === 0) {
           throw new BadRequestException({

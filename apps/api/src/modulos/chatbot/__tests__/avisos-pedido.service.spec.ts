@@ -159,22 +159,31 @@ describe('AvisosPedidoService (avisos de reparto al cliente)', () => {
     expect(res.motivo).toBe('db caída');
   });
 
-  it('retiro: la plantilla lleva el recargo en texto ("con un recargo de S/ 5.00" o "sin recargo")', async () => {
-    await servicio.avisar(77, 'RETIRO', { recargo: 5 });
+  it('retiro: la plantilla dice el monto exacto antes del SÍ/NO (y "sin costo adicional" si es 0)', async () => {
+    await servicio.avisar(77, 'RETIRO', { recargo: 5, recargoModo: 'FIJO' });
     expect(mensajeria.enviarPlantilla).toHaveBeenLastCalledWith(
       '51987654321',
       'caprichos_delivery_retiro',
       'es',
-      ['Marta', 'CP-077', 'con un recargo de S/ 5.00'],
+      ['Marta', 'CP-077', 'Volver a enviarlo tiene un costo de S/ 5.00, que pagarías en la puerta o a Caja.'],
       { pedidoId: BigInt(77) },
     );
 
-    await servicio.avisar(77, 'RETIRO', { recargo: 0 });
+    await servicio.avisar(77, 'RETIRO', { recargo: 7, recargoModo: 'IGUAL_ENVIO' });
     expect(mensajeria.enviarPlantilla).toHaveBeenLastCalledWith(
       '51987654321',
       'caprichos_delivery_retiro',
       'es',
-      ['Marta', 'CP-077', 'sin recargo'],
+      ['Marta', 'CP-077', 'Volver a enviarlo tiene un costo de S/ 7.00 (el mismo del delivery), que pagarías en la puerta o a Caja.'],
+      { pedidoId: BigInt(77) },
+    );
+
+    await servicio.avisar(77, 'RETIRO', { recargo: 0, recargoModo: 'SIN_COSTO' });
+    expect(mensajeria.enviarPlantilla).toHaveBeenLastCalledWith(
+      '51987654321',
+      'caprichos_delivery_retiro',
+      'es',
+      ['Marta', 'CP-077', 'Volver a enviarlo no tiene costo adicional.'],
       { pedidoId: BigInt(77) },
     );
   });
