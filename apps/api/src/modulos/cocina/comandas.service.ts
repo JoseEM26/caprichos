@@ -25,6 +25,27 @@ export interface DescuentoPedidoHook {
   descontarPedido(pedidoId: bigint | string | number): Promise<any> | any;
 }
 
+/** Líneas del pedido que pertenecen a un área, con los campos que usa la pantalla de cocina. */
+function lineasDeArea(lineas: any[], areaId: bigint) {
+  return lineas
+    .filter((l) => (l.area_id ?? l.producto?.categoria?.area_id) === areaId)
+    .map((l) => {
+      const comboNombre = extraerNombreCombo(l);
+      return {
+        id: l.id.toString(),
+        nombre: l.nombre,
+        cantidad: l.cantidad,
+        tamano: l.tamano ?? null,
+        sabor: l.sabor ?? null,
+        combo: comboNombre,
+        combo_nombre: comboNombre,
+        opciones: extraerOpciones(l),
+        personas: l.nombres_persona ?? [],
+        nota: l.nota ?? null,
+      };
+    });
+}
+
 @Injectable()
 export class ComandasService {
   constructor(
@@ -277,6 +298,7 @@ export class ComandasService {
       const areas = await this.prisma.areaCocina.findMany({ where: { activo: true }, orderBy: { id: 'asc' } });
       const listas = await Promise.all(areas.map((a) => this.listarComandas(a.id.toString(), false)));
       return listas.flat().sort((x: any, y: any) => {
+        if (x.despejada !== y.despejada) return x.despejada ? 1 : -1;
         const tX = new Date(x.creado_en || x.llego_en).getTime();
         const tY = new Date(y.creado_en || y.llego_en).getTime();
         if (tX !== tY) return tX - tY;
@@ -289,18 +311,28 @@ export class ComandasService {
     const umbrales = await this.obtenerUmbrales();
     const ahora = new Date();
 
-    // 3. Consultar comandas pendientes del área
+    // 3. Comandas del área: pendientes (EN_COCINA) y, como seguimiento, las ya despejadas
+    // aquí mientras el pedido siga pendiente en otra área. Cuando todas despejan, el pedido
+    // sale a LISTO y deja de aparecer.
     const comandas = await this.prisma.comandaArea.findMany({
       where: {
         area_id: area.id,
-        estado: 'EN_COCINA',
         pedido: {
           estado: { in: ['COLA', 'PREPARANDO'] },
         },
+        OR: [
+          { estado: 'EN_COCINA' },
+          { estado: 'DESPEJADA', pedido: { comandas: { some: { estado: 'EN_COCINA' } } } },
+        ],
       },
       include: {
         pedido: {
           include: {
+            comandas: {
+              include: {
+                area: true,
+              },
+            },
             lineas: {
               include: {
                 area: true,
@@ -325,37 +357,25 @@ export class ComandasService {
       ],
     });
 
-    return comandas.map((c) => {
+    const lista = comandas.map((c) => {
       const p = c.pedido;
       const creadoEn = new Date(p.creado_en);
       const diffMs = ahora.getTime() - creadoEn.getTime();
       const minutos = Math.max(0, Math.floor(diffMs / 60000));
       const color: ColorEspera = calcularColor(minutos, umbrales.naranjaMin, umbrales.rojoMin);
 
-      // Filtrar sólo las líneas que pertenecen a esta área
-      const lineasArea = p.lineas
-        .filter((l) => {
-          const lineaAreaId = l.area_id ?? l.producto?.categoria?.area_id;
-          return lineaAreaId === area.id;
-        })
-        .map((l) => {
-          const comboNombre = extraerNombreCombo(l);
-          const opciones = extraerOpciones(l);
-          const personas = l.nombres_persona ?? [];
-
-          return {
-            id: l.id.toString(),
-            nombre: l.nombre,
-            cantidad: l.cantidad,
-            tamano: l.tamano ?? null,
-            sabor: l.sabor ?? null,
-            combo: comboNombre,
-            combo_nombre: comboNombre,
-            opciones,
-            personas,
-            nota: l.nota ?? null,
-          };
-        });
+      // Estado de todas las áreas del pedido (también la propia), con las líneas de cada una
+      const comandasPedido: Array<{ area_id: bigint; estado: string; area?: { nombre: string } | null }> =
+        [...(p.comandas ?? [])];
+      if (!comandasPedido.some((x) => x.area_id === c.area_id)) comandasPedido.push(c);
+      const areas = comandasPedido
+        .map((x) => ({
+          areaId: x.area_id.toString(),
+          areaNombre: x.area_id === area.id ? area.nombre : (x.area?.nombre ?? ''),
+          despejada: x.estado === 'DESPEJADA',
+          lineas: lineasDeArea(p.lineas, x.area_id),
+        }))
+        .sort((x, y) => Number(BigInt(x.areaId) - BigInt(y.areaId)));
 
       const mesa =
         (p as any).mesa ??
@@ -379,9 +399,15 @@ export class ComandasService {
         colorEspera: color,
         llego_en: c.llego_en,
         creado_en: p.creado_en,
-        lineas: lineasArea,
+        lineas: lineasDeArea(p.lineas, area.id),
+        // Aditivo: la propia área ya despejó (solo seguimiento) y el estado de las áreas del pedido
+        despejada: c.estado === 'DESPEJADA',
+        areas,
       };
     });
+
+    // Pendientes de mi área primero; las de solo seguimiento después (sort estable: conserva la hora de llegada)
+    return lista.sort((x, y) => Number(x.despejada) - Number(y.despejada));
   }
 
   /**

@@ -25,7 +25,7 @@ import {
   reproducirCampanaCocina,
   setSilenciado,
 } from './audioAlerta';
-import { ComandaTarjeta } from './ComandaTarjeta';
+import { ComandaTarjeta, LineasComanda, areasQueFaltan } from './ComandaTarjeta';
 import { ModalAgotados } from './ModalAgotados';
 import { ModalMerma } from './ModalMerma';
 import { ModalPedirAlmacen } from './ModalPedirAlmacen';
@@ -48,10 +48,12 @@ const AREAS_MOCKUP = [
 
 /**
  * Ordena las comandas por hora de llegada ascendente (FIFO estricto).
+ * Primero las pendientes de la propia área; después las de solo seguimiento (ya despejadas).
  * La comanda que llegó primero (menor fecha / mayor tiempo transcurrido) va primero.
  */
 export function ordenarComandasPorHoraLlegada(lista: Comanda[]): Comanda[] {
   return [...lista].sort((a, b) => {
+    if (!!a.despejada !== !!b.despejada) return a.despejada ? 1 : -1;
     const fechaA = a.llego_en || a.creado_en ? new Date(a.llego_en || a.creado_en!).getTime() : 0;
     const fechaB = b.llego_en || b.creado_en ? new Date(b.llego_en || b.creado_en!).getTime() : 0;
     if (fechaA > 0 && fechaB > 0 && fechaA !== fechaB) {
@@ -833,7 +835,7 @@ export function CocinaAdminView() {
               letterSpacing: '0.04em',
             }}
           >
-            EN COCINA · {comandas.length}
+            EN COCINA · {comandas.filter((c) => !c.despejada).length}
           </div>
 
           {comandas.length === 0 ? (
@@ -1043,7 +1045,7 @@ export function CocinaAdminView() {
                   fontSize: '18px',
                 }}
               >
-                EN COCINA · {comandas.length}
+                EN COCINA · {comandas.filter((c) => !c.despejada).length}
               </div>
 
               {comandas.length === 0 ? (
@@ -1126,34 +1128,25 @@ export function CocinaAdminView() {
                         {k.modalidad || 'Para llevar'}
                       </div>
 
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        {(k.lineas || []).map((it, idx) => {
-                          const opcStr = (it.opciones || [])
-                            .map((o: any) =>
-                              typeof o === 'string' ? o : o?.nombre || o?.texto || '',
-                            )
-                            .filter(Boolean)
-                            .join(' · ');
-                          return (
-                            <div
-                              key={it.id || idx}
-                              style={{ fontSize: '15px', lineHeight: '20px' }}
-                            >
-                              <b>{it.cantidad}×</b> {it.nombre}{' '}
-                              {opcStr && (
-                                <span
-                                  style={{
-                                    fontSize: '13px',
-                                    color: 'var(--cp-soft)',
-                                  }}
-                                >
-                                  ({opcStr})
-                                </span>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
+                      {k.despejada && (
+                        <div
+                          role="status"
+                          style={{
+                            border: '1.5px solid #2F7A45',
+                            borderRadius: '8px',
+                            padding: '6px 10px',
+                            fontSize: '13px',
+                            fontWeight: 700,
+                          }}
+                        >
+                          Tu área ya está lista
+                          {areasQueFaltan(k).length > 0
+                            ? `, falta: ${areasQueFaltan(k).join(', ')}`
+                            : ''}
+                        </div>
+                      )}
+
+                      <LineasComanda comanda={k} />
 
                       {k.nota && (
                         <div
@@ -1169,23 +1162,25 @@ export function CocinaAdminView() {
                         </div>
                       )}
 
-                      <button
-                        type="button"
-                        onClick={() => setComandaParaDespejar(k)}
-                        style={{
-                          minHeight: '48px',
-                          marginTop: 'auto',
-                          border: 0,
-                          borderRadius: '12px',
-                          background: 'var(--cp-orange)',
-                          color: 'var(--cp-navy)',
-                          fontWeight: 800,
-                          fontSize: '15px',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Despejar
-                      </button>
+                      {puedeDespejar && !k.despejada && (
+                        <button
+                          type="button"
+                          onClick={() => setComandaParaDespejar(k)}
+                          style={{
+                            minHeight: '48px',
+                            marginTop: 'auto',
+                            border: 0,
+                            borderRadius: '12px',
+                            background: 'var(--cp-orange)',
+                            color: 'var(--cp-navy)',
+                            fontWeight: 800,
+                            fontSize: '15px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Despejar
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1201,7 +1196,7 @@ export function CocinaAdminView() {
         titulo={`¿Despejar comanda ${
           comandaParaDespejar?.ticket || comandaParaDespejar?.codigo
         }?`}
-        mensaje="Saldrá de la vista de preparación y quedará en «Despejadas hoy»."
+        mensaje="Tu área quedará lista. El pedido sale de cocina cuando todas sus áreas estén listas."
         textoConfirmar="Sí, despejar"
         textoNo="No, cancelar"
         alConfirmar={ejecutarDespeje}

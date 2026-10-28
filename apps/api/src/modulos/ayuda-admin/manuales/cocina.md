@@ -18,9 +18,12 @@ Sistema de visualizacion y control de preparacion de comandas en tiempo real. Or
 
 ## Como se hace: Despejar una comanda preparada
 1. En la pestana Pantalla del area, seleccionar el area de trabajo: Todas, Bebidas, Postres o Salados.
-2. Las comandas aparecen ordenadas de mas antigua a mas reciente, mostrando primero la que mas tiempo lleva esperando.
-3. Al finalizar la elaboracion de los platos de esa comanda, pulsar el boton Despejar en la tarjeta del pedido.
-4. La comanda desaparecera de la pantalla del area y se enviara a la zona de despacho o entrega para [[repartos]].
+2. Las comandas pendientes aparecen primero, ordenadas de mas antigua a mas reciente, mostrando primero la que mas tiempo lleva esperando.
+3. Al finalizar la elaboracion de los platos de esa comanda, pulsar el boton Despejar en la tarjeta del pedido y confirmar con Si, despejar.
+4. La tarjeta sigue en la pantalla del area como seguimiento: el pedido no desaparece mientras otra area de ese mismo pedido siga pendiente.
+5. Cada tarjeta muestra todas las lineas del pedido agrupadas por area (el nombre del area va como subtitulo pequeno). Cada linea lleva un check: verde (listo) cuando su area ya despejo, y un circulo vacio (pendiente) cuando no.
+6. Si el area propia ya despejo, la tarjeta se marca como lista con el aviso "Tu area ya esta lista, falta: <areas pendientes>" y ya no tiene el boton Despejar.
+7. Cuando todas las areas del pedido han despejado, el pedido sale de las pantallas de cocina y pasa a listo para [[repartos]].
 Antes: [[caja]]
 Despues: [[repartos]]
 Ver tambien: [[pantallas]]
@@ -59,6 +62,7 @@ Ver tambien: [[stock]]
 - Las tarjetas cambian de color segun el tiempo de espera: verde (tiempo optimo), amarillo (alerta de preparacion) y rojo (pedido retrasado con mas de 13 minutos).
 - Para silenciar o activar la campana de alerta sonora de nuevos pedidos, pulsar el icono de campana junto a las pestanas.
 - Si una orden tiene platos de varias areas, cada area debe despejar su parte de forma independiente antes del despacho final.
+- Las comandas que ya despejo tu area no cuentan en el contador de pendientes ni disparan la alerta: solo se muestran para seguimiento hasta que las demas areas terminen.
 
 ## Quien puede hacerlo
 - Personal de Cocina y Administrador tienen control operativo total para despejar, agotar, activar alta demanda y registrar mermas.

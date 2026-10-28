@@ -6,6 +6,15 @@ Todos los cambios notables del proyecto Caprichos se documentan en este archivo.
 
 ## 2026-10-28
 
+### Cocina: el pedido sigue en todas sus areas hasta que todas despejan
+- **Regla**: un pedido con platos de varias areas (Barra, Cocina, Postres...) sigue apareciendo en cada pantalla de area mientras alguna otra area del mismo pedido siga pendiente, aunque la propia area ya haya despejado. Cuando todas despejan, el pedido pasa a LISTO como antes (sin cambios en estados, despacho ni avisos).
+- **Tarjeta**: muestra todas las lineas del pedido agrupadas por area (nombre del area como subtitulo pequeno), con un check por linea: verde (listo) si su area ya despejo, circulo vacio si no. Si la propia area ya despejo, la tarjeta se marca "Tu area ya esta lista, falta: <areas>" y no tiene el boton Despejar. Despejar sigue por area con Confirmar Si/No; Devolver sigue igual (desde Despejadas hoy).
+- **Orden y contador**: primero las pendientes de la propia area (por hora de llegada), despues las de solo seguimiento. El contador de pendientes y la alerta no cuentan las ya despejadas.
+- **Servidor**: `GET /admin/cocina/comandas` agrega en cada comanda `despejada` (boolean) y `areas` (areaId, areaNombre, despejada, lineas). Campos aditivos; la consulta sigue siendo una sola por area. Sigue sin telefono ni direccion.
+- **Pantalla TV de cocina**: sigue mostrando solo lo pendiente (no muestra las ya despejadas).
+- **Pruebas**: Jest en `comandas.service.spec.ts` (pedido de tres areas, una o tres despejadas, orden, contador, sin telefono ni direccion) y Vitest en `cocina-seguimiento.spec.tsx` (checks por area, aviso y sin Despejar, Confirmar Si/No).
+- **Manual**: `cocina.md` (flujo de Despejar y seguimiento).
+
 ### El mozo envía el cobro de mesa a Caja (no lo cobra)
 - **Flujo**: el mozo elige el medio en la mesa (Efectivo, Yape, Plin o Transferencia), toma la foto del voucher (se lee al instante) y pulsa Enviar a Caja con Sí/No. Caja revisa el voucher con su semáforo y es quien cobra y confirma. El mozo no marca el pedido como pagado.
 - **Mozo**: en el plano, al tocar una mesa ocupada con pedido aparece "Cobrar mesa (enviar a Caja)" (`PlanoView`), que abre la cuenta de la mesa (`ModalPrecuenta`). Se quitó la tarjeta muerta de precuenta que tenía `PlanoView` (nadie la abría). Solo ve si la foto se lee o no, sin montos ni semáforo. Se quitó del flujo del mozo "Cobrar sin comprobante" y el botón de cobro. El soporte de la excepción en el servidor (`cobros.service.ts`) se mantiene.

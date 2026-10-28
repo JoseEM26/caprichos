@@ -133,7 +133,8 @@ export function PantallaCocinaView() {
         }
 
         const res = await listarComandasArea(apiAreaParam);
-        setComandasApi(res);
+        // Solo pendientes: las ya despejadas (seguimiento) no se muestran en la pantalla
+        setComandasApi(res.filter((c) => !c.despejada));
         setUltimaActualizacion(obtenerHoraLima());
         setConectado(true);
       } catch (err: any) {

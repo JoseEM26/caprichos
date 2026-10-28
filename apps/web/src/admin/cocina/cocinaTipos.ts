@@ -22,6 +22,14 @@ export interface LineaComanda {
   area?: string;
 }
 
+/** Una de las áreas de un pedido: si ya despejó y sus líneas. */
+export interface AreaComandaPedido {
+  areaId: string;
+  areaNombre: string;
+  despejada: boolean;
+  lineas: LineaComanda[];
+}
+
 export interface Comanda {
   id: string;
   pedidoId: string;
@@ -42,6 +50,10 @@ export interface Comanda {
   llego_en?: string;
   creado_en: string;
   lineas: LineaComanda[];
+  /** La propia área ya despejó: la comanda es solo seguimiento (sin Despejar). */
+  despejada?: boolean;
+  /** Todas las áreas del pedido con su estado (la propia incluida). */
+  areas?: AreaComandaPedido[];
 }
 
 export interface HistorialComanda {

@@ -496,6 +496,147 @@ describe('ComandasService', () => {
     });
   });
 
+  describe('pedido de tres áreas: seguimiento de áreas despejadas', () => {
+    const AREAS = [
+      { id: 1n, nombre: 'Barra' },
+      { id: 2n, nombre: 'Cocina' },
+      { id: 3n, nombre: 'Postres' },
+    ];
+
+    // Pedido con una línea por área. Incluye teléfono y dirección para comprobar que no salen.
+    const pedidoTresAreas = (id: bigint, estadoPorArea: Record<string, string>) => ({
+      id,
+      codigo: 'CP-3A',
+      canal: 'CARTA',
+      modalidad: 'DELIVERY',
+      estado: 'COLA',
+      cliente_nombre: 'Ana',
+      cliente_telefono: '999000111',
+      entrega_direccion: 'Av. Secreta 123',
+      creado_en: new Date(Date.now() - 5 * 60000),
+      lineas: [
+        { id: 1n, nombre: 'Americano', cantidad: 1, area_id: 1n, opciones: [], nombres_persona: [] },
+        { id: 2n, nombre: 'Waffle', cantidad: 1, area_id: 2n, opciones: [], nombres_persona: [] },
+        { id: 3n, nombre: 'Cheesecake', cantidad: 1, area_id: 3n, opciones: [], nombres_persona: [] },
+      ],
+      comandas: AREAS.map((a) => ({
+        pedido_id: id,
+        area_id: a.id,
+        estado: estadoPorArea[a.nombre] ?? 'EN_COCINA',
+        area: { nombre: a.nombre },
+      })),
+    });
+
+    it('la pantalla de Barra sigue mostrando el pedido despejado por Barra, con el estado de cada área', async () => {
+      const pedido = pedidoTresAreas(7n, { Barra: 'DESPEJADA' });
+      prisma.pedido.findMany.mockResolvedValue([]);
+      prisma.areaCocina.findFirst.mockResolvedValue({ id: 1n, nombre: 'Barra' });
+      prisma.comandaArea.findMany.mockResolvedValue([
+        { pedido_id: 7n, area_id: 1n, estado: 'DESPEJADA', llego_en: new Date(), pedido },
+      ]);
+
+      const [comanda] = await service.listarComandas('Barra');
+
+      // La consulta incluye el seguimiento: despejada aquí, pero el pedido sigue en otra área
+      const where = prisma.comandaArea.findMany.mock.calls[0][0].where;
+      expect(where.OR).toEqual(
+        expect.arrayContaining([
+          { estado: 'EN_COCINA' },
+          { estado: 'DESPEJADA', pedido: { comandas: { some: { estado: 'EN_COCINA' } } } },
+        ]),
+      );
+      expect(comanda.despejada).toBe(true);
+      expect(comanda.lineas.map((l: any) => l.nombre)).toEqual(['Americano']);
+      expect(comanda.areas.map((a: any) => [a.areaNombre, a.despejada])).toEqual([
+        ['Barra', true],
+        ['Cocina', false],
+        ['Postres', false],
+      ]);
+      expect(comanda.areas[1].lineas.map((l: any) => l.nombre)).toEqual(['Waffle']);
+    });
+
+    it('en la pantalla de Cocina el pedido aparece pendiente, y Barra figura como despejada', async () => {
+      const pedido = pedidoTresAreas(7n, { Barra: 'DESPEJADA' });
+      prisma.pedido.findMany.mockResolvedValue([]);
+      prisma.areaCocina.findFirst.mockResolvedValue({ id: 2n, nombre: 'Cocina' });
+      prisma.comandaArea.findMany.mockResolvedValue([
+        { pedido_id: 7n, area_id: 2n, estado: 'EN_COCINA', llego_en: new Date(), pedido },
+      ]);
+
+      const [comanda] = await service.listarComandas('Cocina');
+
+      expect(comanda.despejada).toBe(false);
+      expect(comanda.areas.find((a: any) => a.areaNombre === 'Barra').despejada).toBe(true);
+    });
+
+    it('cuando las tres áreas despejan el pedido no sale de ninguna pantalla', async () => {
+      const pedido = pedidoTresAreas(7n, { Barra: 'DESPEJADA', Cocina: 'DESPEJADA', Postres: 'DESPEJADA' });
+      prisma.pedido.findMany.mockResolvedValue([]);
+      prisma.areaCocina.findFirst.mockResolvedValue({ id: 3n, nombre: 'Postres' });
+      // La consulta ya filtra por seguimiento: sin área pendiente en el pedido, no devuelve nada
+      prisma.comandaArea.findMany.mockResolvedValue([]);
+
+      const lista = await service.listarComandas('Postres');
+
+      expect(lista).toEqual([]);
+      const where = prisma.comandaArea.findMany.mock.calls[0][0].where;
+      expect(where.pedido.estado).toEqual({ in: ['COLA', 'PREPARANDO'] });
+      expect(pedido.comandas.every((c: any) => c.estado === 'DESPEJADA')).toBe(true);
+    });
+
+    it('en la vista general, las comandas pendientes van antes que las de solo seguimiento', async () => {
+      const ahora = Date.now();
+      const pedidoSeguimiento = pedidoTresAreas(8n, { Barra: 'DESPEJADA' });
+      pedidoSeguimiento.creado_en = new Date(ahora - 50 * 60000); // más antigua
+      const pedidoPendiente = pedidoTresAreas(9n, {});
+      pedidoPendiente.codigo = 'CP-PEND';
+      pedidoPendiente.creado_en = new Date(ahora - 2 * 60000);
+
+      prisma.pedido.findMany.mockResolvedValue([]);
+      prisma.areaCocina.findMany.mockResolvedValue([{ id: 1n, nombre: 'Barra' }]);
+      prisma.areaCocina.findFirst.mockResolvedValue({ id: 1n, nombre: 'Barra' });
+      prisma.comandaArea.findMany.mockResolvedValue([
+        { pedido_id: 8n, area_id: 1n, estado: 'DESPEJADA', llego_en: new Date(ahora - 50 * 60000), pedido: pedidoSeguimiento },
+        { pedido_id: 9n, area_id: 1n, estado: 'EN_COCINA', llego_en: new Date(ahora - 2 * 60000), pedido: pedidoPendiente },
+      ]);
+
+      const lista = await service.listarComandas();
+
+      expect(lista.map((c: any) => c.ticket)).toEqual(['CP-PEND', 'CP-3A']);
+      expect(lista.map((c: any) => c.despejada)).toEqual([false, true]);
+    });
+
+    it('el contador de pendientes de cada área no cuenta las comandas ya despejadas', async () => {
+      prisma.areaCocina.findMany.mockResolvedValue([{ id: 1n, nombre: 'Barra', propia: true }]);
+      prisma.comandaArea.count.mockResolvedValue(2);
+
+      const [area] = await service.listarAreas();
+
+      expect(area.comandasPendientes).toBe(2);
+      expect(prisma.comandaArea.count).toHaveBeenCalledWith({
+        where: expect.objectContaining({ area_id: 1n, estado: 'EN_COCINA' }),
+      });
+    });
+
+    it('la respuesta nunca trae teléfono ni dirección del cliente', async () => {
+      const pedido = pedidoTresAreas(7n, { Barra: 'DESPEJADA' });
+      prisma.pedido.findMany.mockResolvedValue([]);
+      prisma.areaCocina.findFirst.mockResolvedValue({ id: 1n, nombre: 'Barra' });
+      prisma.comandaArea.findMany.mockResolvedValue([
+        { pedido_id: 7n, area_id: 1n, estado: 'DESPEJADA', llego_en: new Date(), pedido },
+      ]);
+
+      const lista = await service.listarComandas('Barra');
+      const texto = JSON.stringify(lista);
+
+      expect(texto).not.toContain('999000111');
+      expect(texto).not.toContain('Av. Secreta');
+      expect(texto).not.toContain('cliente_telefono');
+      expect(texto).not.toContain('entrega_direccion');
+      expect(texto).toContain('Ana');
+    });
+  });
+
   describe('despacho', () => {
     it('devuelve pedidos del día con estado por área y marca Completo cuando todas despejaron', async () => {
       prisma.pedido.findMany.mockResolvedValue([
