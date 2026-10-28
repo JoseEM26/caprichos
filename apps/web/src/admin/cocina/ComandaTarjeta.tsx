@@ -124,6 +124,14 @@ export function ComandaTarjeta({
           }}
         >
           {comanda.ticket || comanda.codigo}
+          {comanda.cliente && (
+            <span
+              data-testid="comanda-cliente"
+              style={{ marginLeft: 8, fontSize: '11px', fontWeight: 600, color: 'var(--cp-soft)' }}
+            >
+              {comanda.cliente}
+            </span>
+          )}
         </span>
         <span
           data-testid="indicador-tiempo"

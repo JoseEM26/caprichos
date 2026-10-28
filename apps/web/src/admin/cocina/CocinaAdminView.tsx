@@ -1088,6 +1088,11 @@ export function CocinaAdminView() {
                           }}
                         >
                           {k.ticket || k.codigo}
+                          {k.cliente && (
+                            <span style={{ marginLeft: 8, fontSize: '12px', fontWeight: 600, color: 'var(--cp-soft)' }}>
+                              {k.cliente}
+                            </span>
+                          )}
                         </span>
                         <span
                           style={{

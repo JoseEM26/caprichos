@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { RepartosView } from '../RepartosView';
 import { repartosApi, PedidoReparto } from '../repartosApi';
@@ -467,5 +467,64 @@ describe('RepartidorView - Pantalla Mobile-First de Repartidor', () => {
     const hoja = await screen.findByRole('dialog', { name: 'Pedidos sugeridos en el mapa' });
     expect(hoja.querySelector('.leaflet-container')).not.toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Cerrar mapa' }));
+  });
+
+  it('11. En vivo: un pedido que pasa a LISTO aparece en Para elegir sin recargar la pantalla', async () => {
+    let alEstado: (() => void) | undefined;
+    vi.spyOn(socketModulo, 'useEventos').mockImplementation((evento: string, cb: any) => {
+      if (evento === 'pedido:estado') alEstado = cb;
+    });
+    const spyDisponibles = vi
+      .spyOn(repartosApi, 'listarDisponibles')
+      .mockResolvedValueOnce([pedidoDisponible1])
+      .mockResolvedValueOnce([pedidoDisponible1, pedidoDisponible2]);
+
+    render(
+      <MemoryRouter>
+        <RepartosView />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByTestId('tab-para-elegir')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('tab-para-elegir'));
+    await waitFor(() => expect(screen.getByTestId('candidato-pedido-201')).toBeInTheDocument());
+    expect(screen.queryByTestId('candidato-pedido-202')).not.toBeInTheDocument();
+
+    act(() => alEstado?.());
+
+    await waitFor(() => expect(screen.getByTestId('candidato-pedido-202')).toBeInTheDocument());
+    expect(spyDisponibles).toHaveBeenCalledTimes(2);
+  });
+
+  it('12. Si no carga Para elegir, avisa en pantalla en vez de mostrar una lista vacía en silencio', async () => {
+    vi.spyOn(repartosApi, 'listarDisponibles').mockRejectedValue(new Error('Sin conexión con el servidor'));
+
+    render(
+      <MemoryRouter>
+        <RepartosView />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByTestId('tab-para-elegir')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Sin conexión con el servidor')).toBeInTheDocument());
+  });
+
+  it('13. Tope: con 5 pedidos activos no se puede elegir otro y el aviso lo dice', async () => {
+    const cinco = ['c1', 'c2', 'c3', 'c4', 'c5'].map((id) =>
+      crearMockPedido({ id, codigo: `CP-${id}`, estado: 'EN_CAMINO', repartidor_party_id: '10', lat: -12.06, lng: -77.04 }),
+    );
+    vi.spyOn(repartosApi, 'listarMios').mockResolvedValue({ pedidos: cinco, orden: cinco.map((p) => p.id), paso: [], ruta: [] });
+
+    render(
+      <MemoryRouter>
+        <RepartosView />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByTestId('tab-para-elegir')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('tab-para-elegir'));
+    await waitFor(() => expect(screen.getByTestId('candidato-pedido-201')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('candidato-pedido-201'));
+
+    expect(screen.getByTestId('candidato-pedido-201')).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByText(/No puedes elegir más de 0 pedidos/)).toBeInTheDocument();
   });
 });

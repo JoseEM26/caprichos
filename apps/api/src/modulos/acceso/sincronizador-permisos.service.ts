@@ -1,11 +1,12 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
-import { PERMISOS } from './permisos';
+import { MATRIZ, PERMISOS } from './permisos';
 
 /**
- * Al arrancar, asegura que existan en la base TODOS los permisos del código y que el rol ADMIN los tenga todos.
- * Los despliegues no corren el seed, así que un permiso nuevo del código quedaba sin fila y hasta el
- * administrador recibía SIN_PERMISO. Solo agrega: nunca quita permisos ni toca los demás roles.
+ * Al arrancar, asegura que la base tenga TODOS los permisos del código y que cada rol tenga los que
+ * MATRIZ le asigna. Los despliegues no corren el seed, así que un permiso nuevo o un vínculo nuevo de
+ * rol (p. ej. REPARTIDOR con repartos/tomar) quedaba sin fila: el rol recibía SIN_PERMISO y la pantalla
+ * se veía vacía sin error. Solo agrega: nunca quita vínculos ni toca lo que la base ya tenga.
  */
 @Injectable()
 export class SincronizadorPermisosService implements OnModuleInit {
@@ -21,7 +22,7 @@ export class SincronizadorPermisosService implements OnModuleInit {
     }
   }
 
-  async sincronizar(): Promise<{ nuevos: number; vinculadosAdmin: number }> {
+  async sincronizar(): Promise<{ nuevos: number; vinculados: number }> {
     const existentes = await this.prisma.permiso.findMany({ select: { id: true, modulo: true, accion: true } });
     const claves = new Set(existentes.map((p) => `${p.modulo}/${p.accion}`));
     const faltantes = PERMISOS.filter((p) => !claves.has(`${p.modulo}/${p.accion}`));
@@ -33,23 +34,31 @@ export class SincronizadorPermisosService implements OnModuleInit {
       });
     }
 
-    const todos = await this.prisma.permiso.findMany({ select: { id: true } });
-    const admin = await this.prisma.rolPermiso.findMany({ where: { rol: 'ADMIN' }, select: { permiso_id: true } });
-    const conAdmin = new Set(admin.map((r) => r.permiso_id.toString()));
-    const sinVincular = todos.filter((p) => !conAdmin.has(p.id.toString()));
+    const todos = await this.prisma.permiso.findMany({ select: { id: true, modulo: true, accion: true } });
+    const idPorClave = new Map(todos.map((p) => [`${p.modulo}/${p.accion}`, p.id]));
+    const vinculos = await this.prisma.rolPermiso.findMany({ select: { rol: true, permiso_id: true } });
+    const yaVinculados = new Set(vinculos.map((v) => `${v.rol}|${v.permiso_id.toString()}`));
+
+    const sinVincular: Array<{ rol: string; permiso_id: bigint }> = [];
+    for (const [rol, clavesRol] of Object.entries(MATRIZ)) {
+      for (const clave of clavesRol) {
+        const permisoId = idPorClave.get(clave);
+        if (permisoId === undefined) continue;
+        if (!yaVinculados.has(`${rol}|${permisoId.toString()}`)) {
+          sinVincular.push({ rol, permiso_id: permisoId });
+        }
+      }
+    }
 
     if (sinVincular.length > 0) {
-      await this.prisma.rolPermiso.createMany({
-        data: sinVincular.map((p) => ({ rol: 'ADMIN', permiso_id: p.id })),
-        skipDuplicates: true,
-      });
+      await this.prisma.rolPermiso.createMany({ data: sinVincular, skipDuplicates: true });
     }
 
     if (faltantes.length > 0 || sinVincular.length > 0) {
       this.logger.log(
-        `Permisos sincronizados: ${faltantes.length} nuevos, ${sinVincular.length} vinculados al rol ADMIN.`,
+        `Permisos sincronizados: ${faltantes.length} nuevos, ${sinVincular.length} vínculos rol-permiso agregados.`,
       );
     }
-    return { nuevos: faltantes.length, vinculadosAdmin: sinVincular.length };
+    return { nuevos: faltantes.length, vinculados: sinVincular.length };
   }
 }

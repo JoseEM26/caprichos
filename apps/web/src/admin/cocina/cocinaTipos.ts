@@ -31,6 +31,7 @@ export interface Comanda {
   codigo: string;
   canal: string;
   modalidad: string;
+  cliente?: string | null;
   mesa?: string | null;
   mozo?: string | null;
   nota?: string | null;

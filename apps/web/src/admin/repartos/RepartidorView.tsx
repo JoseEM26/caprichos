@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { CSSProperties, KeyboardEvent, RefObject } from 'react';
 import { useSesion } from '../../comun/sesion';
+import { useEventos } from '../../comun/socket';
 import { Confirmar } from '../../comun/Confirmar';
 import { useEsMovil } from '../../carta/useEsMovil';
 import { ModalReportarFalla } from './ModalReportarFalla';
@@ -865,19 +866,26 @@ export function RepartidorView() {
 
   const maxPedidos = config.maxPedidosPorRepartidor || 5;
 
-  // Carga de datos centralizada
+  // Carga de datos centralizada. Un fallo de «Mi ruta» o «Para elegir» se avisa en pantalla
+  // (antes quedaba como lista vacía, sin decir nada).
   const cargarDatos = useCallback(async () => {
     setError(null);
     try {
       const [miosRes, dispRes, entregadosRes, cfgRes] = await Promise.all([
-        repartosApi.listarMios().catch(() => ({ pedidos: [], orden: [], paso: [], ruta: [] })),
-        repartosApi.listarDisponibles().catch(() => []),
+        repartosApi.listarMios().catch((err) => {
+          setError(err?.message || 'No se pudo cargar Mi ruta');
+          return null;
+        }),
+        repartosApi.listarDisponibles().catch((err) => {
+          setError(err?.message || 'No se pudieron cargar los pedidos para elegir');
+          return null;
+        }),
         repartosApi.listarTodos({ estado: 'ENTREGADO', historial: 'true' }).catch(() => []),
         repartosApi.obtenerConfig().catch(() => CONFIG_REPARTO_DEFECTO),
       ]);
 
-      setDatosMios(miosRes);
-      setDisponibles(dispRes);
+      if (miosRes) setDatosMios(miosRes);
+      if (dispRes) setDisponibles(dispRes);
       setHechosHoy(entregadosRes);
       if (cfgRes) setConfig(cfgRes);
     } catch (err: any) {
@@ -891,6 +899,14 @@ export function RepartidorView() {
     setCargando(true);
     cargarDatos();
   }, [cargarDatos]);
+
+  // En vivo, como la vista del administrador: un pedido que pasa a LISTO aparece sin recargar
+  useEventos('pedido:estado', () => {
+    cargarDatos();
+  });
+  useEventos('reparto:incidente', () => {
+    cargarDatos();
+  });
 
   // Pedidos activos del repartidor en orden de ruta sugerida
   const pedidosActivos = useMemo(() => {

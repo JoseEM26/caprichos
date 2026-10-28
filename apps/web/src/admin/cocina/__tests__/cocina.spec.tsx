@@ -132,7 +132,7 @@ describe('F5: Pantallas de Cocina', () => {
   });
 
   // 2. La tarjeta no muestra teléfono ni dirección aunque lleguen en los datos (DT-81)
-  it('2. La tarjeta no muestra teléfono ni dirección aunque lleguen en los datos', () => {
+  it('2. La tarjeta muestra el nombre del cliente pero no teléfono ni dirección aunque lleguen en los datos', () => {
     const comandaConDatosPrivados: any = {
       ...comandaEjemplo,
       telefono: '999888777',
@@ -151,7 +151,7 @@ describe('F5: Pantallas de Cocina', () => {
 
     expect(screen.queryByText(/999888777/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Primavera/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/María Perez/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('comanda-cliente')).toHaveTextContent('María Perez');
   });
 
   // 3. Despejar pide Confirmar Sí/No antes de llamar a la API

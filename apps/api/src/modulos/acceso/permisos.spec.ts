@@ -83,3 +83,17 @@ describe('permisos mascota (mas-api)', () => {
 });
 
 
+
+describe('matriz de permisos del REPARTIDOR (pantalla Para elegir y Mi ruta)', () => {
+  // Cada permiso que la pantalla del repartidor pide al servidor (ver/tomar/entregar/reportar)
+  it('tiene todo lo que su pantalla llama: listar, iniciar ruta, salir/llegar/entregar y reportar', () => {
+    expect(MATRIZ.REPARTIDOR).toEqual(
+      expect.arrayContaining(['repartos/ver', 'repartos/tomar', 'repartos/entregar', 'repartos/reportar']),
+    );
+  });
+
+  it('no tiene liquidar ni configurar reparto (eso es del administrador y de caja)', () => {
+    expect(MATRIZ.REPARTIDOR).not.toContain('repartos/liquidar');
+    expect(MATRIZ.REPARTIDOR).not.toContain('configuracion/editar');
+  });
+});
