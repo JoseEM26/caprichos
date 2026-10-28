@@ -3,12 +3,16 @@ import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { normalizarTelefono, enmascararTelefono } from '../utilidades/enmascarar.util';
 import { Ventana24hService } from './ventana-24h.service';
 import { EtapaAvisoReparto, TEXTOS_REPARTO, PayloadAvisoReparto } from '../conversacion/textos-reparto';
+import { marcarPagoParaPersona } from './pago-para-persona.util';
 
 /**
  * Número de etapa en `mensaje_reparto` (PK pedido_id + numero = idempotencia por pedido y etapa)
  * y el parámetro de activación que la habilita.
  */
-export const ETAPAS_AVISO: Record<EtapaAvisoReparto, { numero: number; parametro: string }> = {
+export const ETAPAS_AVISO: Record<
+  EtapaAvisoReparto,
+  { numero: number; parametro: string; cualquierModalidad?: boolean }
+> = {
   SALIDA: { numero: 1, parametro: 'whatsapp_aviso_salida_activo' },
   LLEGADA: { numero: 2, parametro: 'whatsapp_aviso_llegada_activo' },
   INSISTENCIA: { numero: 3, parametro: 'whatsapp_aviso_llegada_activo' },
@@ -17,6 +21,15 @@ export const ETAPAS_AVISO: Record<EtapaAvisoReparto, { numero: number; parametro
   ACEPTADO: { numero: 6, parametro: 'whatsapp_aviso_pago_confirmado_activo' },
   LISTO: { numero: 7, parametro: 'whatsapp_aviso_listo_activo' },
   ENTREGADO: { numero: 8, parametro: 'whatsapp_aviso_entregado_activo' },
+  // Pedido de la carta virtual recién creado: vale para cualquier modalidad
+  RECIBIDO: { numero: 9, parametro: 'whatsapp_aviso_recibido_activo', cualquierModalidad: true },
+};
+
+/** Medios digitales que llevan voucher y pasan la conversación a una persona. Nombre que se lee al cliente. */
+const MEDIOS_DIGITALES: Record<string, string> = {
+  YAPE: 'Yape',
+  PLIN: 'Plin',
+  TRANSFERENCIA: 'transferencia',
 };
 
 /** Etapas del intento de entrega: al reprogramar se borran para que el nuevo intento avise otra vez. */
@@ -73,10 +86,19 @@ export class AvisosPedidoService {
 
     const pedido = await this.prisma.pedido.findUnique({
       where: { id: pedidoId },
-      select: { id: true, codigo: true, cliente_nombre: true, cliente_telefono: true, modalidad: true },
+      select: {
+        id: true,
+        codigo: true,
+        cliente_nombre: true,
+        cliente_telefono: true,
+        modalidad: true,
+        total: true,
+        pago_metodo: true,
+        pago_preferido: true,
+      },
     });
     if (!pedido) return { estado: 'OMITIDO', motivo: 'PEDIDO_NO_ENCONTRADO' };
-    if (pedido.modalidad !== 'DELIVERY') return { estado: 'OMITIDO', motivo: 'NO_ES_DELIVERY' };
+    if (pedido.modalidad !== 'DELIVERY' && !cfg.cualquierModalidad) return { estado: 'OMITIDO', motivo: 'NO_ES_DELIVERY' };
 
     const telefono = normalizarTelefono(pedido.cliente_telefono || '');
     if (!telefono) return { estado: 'OMITIDO', motivo: 'SIN_TELEFONO' };
@@ -94,7 +116,14 @@ export class AvisosPedidoService {
       throw err;
     }
 
-    const payload = await this.construirPayload(etapa, pedido.cliente_nombre || 'Cliente', pedido.codigo, datos);
+    const nombre = pedido.cliente_nombre || 'Cliente';
+    const medio = etapa === 'RECIBIDO' ? MEDIOS_DIGITALES[String(pedido.pago_preferido || pedido.pago_metodo || '').toUpperCase()] ?? null : null;
+    if (etapa === 'RECIBIDO' && medio) {
+      // Pago digital: la conversación pasa a una persona de Caja (aunque el envío falle)
+      await this.marcarParaPersona(telefono, pedido, nombre);
+    }
+
+    const payload = await this.construirPayload(etapa, nombre, pedido.codigo, datos, medio);
     const resultado = await this.ventana24h.enviarMensajeNegocio(telefono, payload, { pedidoId });
 
     await this.prisma.mensajeReparto.update({
@@ -112,13 +141,37 @@ export class AvisosPedidoService {
     return { estado: resultado.estado === 'SIMULADO' ? 'SIMULADO' : 'ENVIADO' };
   }
 
+  /** Mismo efecto que un voucher recibido por WhatsApp: la conversación queda para una persona (VALIDAR_PAGO, urgente). */
+  private async marcarParaPersona(
+    telefono: string,
+    pedido: { id: bigint; codigo: string; total: unknown; pago_metodo: string | null; pago_preferido: string | null },
+    nombre: string,
+  ) {
+    try {
+      const conversacion = await this.prisma.conversacion.upsert({
+        where: { telefono },
+        update: { ultima_actividad: new Date() },
+        create: { telefono, nombre_contacto: nombre },
+        select: { id: true, flujo: true },
+      });
+      await marcarPagoParaPersona(this.prisma, conversacion, pedido);
+    } catch (err: any) {
+      this.logger.error(`No se pudo dejar el pedido ${pedido.codigo} para revisión de pago: ${err?.message}`, err?.stack);
+    }
+  }
+
   private async construirPayload(
     etapa: EtapaAvisoReparto,
     nombre: string,
     codigo: string,
     datos: DatosAviso,
+    medioDigital: string | null,
   ): Promise<PayloadAvisoReparto> {
     switch (etapa) {
+      case 'RECIBIDO':
+        return medioDigital
+          ? TEXTOS_REPARTO.recibidoDigital(nombre, codigo, medioDigital)
+          : TEXTOS_REPARTO.recibidoEfectivo(nombre, codigo);
       case 'ACEPTADO':
         return TEXTOS_REPARTO.aceptado(nombre, codigo);
       case 'LISTO':

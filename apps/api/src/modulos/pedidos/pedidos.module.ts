@@ -9,6 +9,7 @@ import { OfertasModule } from '../ofertas/ofertas.module';
 import { ClientesModule } from '../clientes/clientes.module';
 import { AvisosInternosModule } from '../chatbot/avisos-internos/avisos-internos.module';
 import { VouchersModule } from '../vouchers/vouchers.module';
+import { ChatbotModule } from '../chatbot/chatbot.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { VouchersModule } from '../vouchers/vouchers.module';
     ClientesModule,
     VouchersModule,
     forwardRef(() => AvisosInternosModule),
+    forwardRef(() => ChatbotModule),
   ],
   controllers: [PedidosController, SeguimientoController],
   providers: [PedidosService, SeguimientoService],

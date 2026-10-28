@@ -203,6 +203,11 @@ const META_PARAMETROS: Record<string, MetaParametro> = {
     descripcion: 'Avisa al cliente cuando cocina termina su pedido delivery y queda listo para salir con el repartidor.',
     tipo: 'sino',
   },
+  whatsapp_aviso_recibido_activo: {
+    nombre: 'Aviso WhatsApp: Pedido recibido desde la carta',
+    descripcion: 'Avisa al cliente que recibimos su pedido de la carta virtual. Con Yape, Plin o transferencia, avisa que un asesor gestiona el voucher por este chat.',
+    tipo: 'sino',
+  },
   whatsapp_aviso_entregado_activo: {
     nombre: 'Aviso WhatsApp: Pedido delivery entregado',
     descripcion: 'Envía al cliente un agradecimiento cuando su pedido delivery queda entregado.',

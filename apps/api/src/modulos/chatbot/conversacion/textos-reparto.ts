@@ -11,7 +11,8 @@ export type EtapaAvisoReparto =
   | 'INSISTENCIA'
   | 'ESPERA_AGOTADA'
   | 'RETIRO'
-  | 'ENTREGADO';
+  | 'ENTREGADO'
+  | 'RECIBIDO';
 
 export interface PayloadAvisoReparto {
   textoLibre: string;
@@ -66,6 +67,20 @@ export const TEXTOS_REPARTO = {
     textoLibre: `Hola ${nombre}, el repartidor se retiro de la puerta con tu pedido ${codigo} porque se agoto el tiempo de espera. Tu pedido queda reprogramado ${condicionRecargo}. Te contactaremos para coordinar la nueva entrega.`,
     plantillaClave: 'DELIVERY_RETIRO',
     variablesPlantilla: [nombre, codigo, condicionRecargo],
+  }),
+
+  /** Pedido de la carta virtual con pago digital: el asesor gestiona el voucher por este chat. `medio` es Yape, Plin o transferencia. */
+  recibidoDigital: (nombre: string, codigo: string, medio: string): PayloadAvisoReparto => ({
+    textoLibre: `Hola ${nombre}, recibimos tu pedido ${codigo} correctamente. En unos momentos un asesor se comunicara contigo por este chat para gestionar el voucher de tu pago por ${medio}.`,
+    plantillaClave: 'CARTA_RECIBIDO_DIGITAL',
+    variablesPlantilla: [nombre, codigo, medio],
+  }),
+
+  /** Pedido de la carta virtual pagado en efectivo u otro medio no digital. */
+  recibidoEfectivo: (nombre: string, codigo: string): PayloadAvisoReparto => ({
+    textoLibre: `Hola ${nombre}, recibimos tu pedido ${codigo}. Ya esta en proceso.`,
+    plantillaClave: 'CARTA_RECIBIDO_EFECTIVO',
+    variablesPlantilla: [nombre, codigo],
   }),
 
   entregado: (nombre: string, codigo: string): PayloadAvisoReparto => ({

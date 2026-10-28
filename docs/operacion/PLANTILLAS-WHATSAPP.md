@@ -25,6 +25,8 @@ Todas las plantillas pertenecen a la categoría **Utilidad (UTILITY)** y están 
 | `EQUIPO_NUEVO_PEDIDO` | `caprichos_equipo_nuevo_pedido` | Utilidad | Español (`es`) | 3 |
 | `EQUIPO_ALERTA_ALMACEN` | `caprichos_equipo_alerta_almacen` | Utilidad | Español (`es`) | 3 |
 | `AVISO_INTERNO` | `aviso_interno` | Utilidad | Español (`es`) | 2 |
+| `CARTA_RECIBIDO_DIGITAL` | `caprichos_pedido_recibido_digital` | Utilidad | Español (`es`) | 3 |
+| `CARTA_RECIBIDO_EFECTIVO` | `caprichos_pedido_recibido_efectivo` | Utilidad | Español (`es`) | 2 |
 
 ---
 
@@ -271,6 +273,38 @@ Hola {{1}}, tu pedido {{2}} fue entregado. Gracias por preferir Caprichos.
 ```
 - **Ejemplo de variables para Meta:** `{{1}}`: `María` · `{{2}}`: `CP-4102`
 - **Botones:** Ninguno. La encuesta posventa (sección 7) llega después, según `encuesta_espera_min`.
+
+---
+
+## 16. Pedido Recibido desde la Carta: pago digital (Yape, Plin o transferencia)
+
+- **Estado:** pendiente de enviar a Meta (no aprobada todavía).
+- **Nombre de plantilla:** `caprichos_pedido_recibido_digital`
+- **Categoría:** Utilidad (Utility)
+- **Idioma:** Español (`es`)
+- **Texto del cuerpo (Body):**
+```text
+Hola {{1}}, recibimos tu pedido {{2}} correctamente. En unos momentos un asesor se comunicara contigo por este chat para gestionar el voucher de tu pago por {{3}}.
+```
+- **Ejemplo de variables para Meta:** `{{1}}`: `María` · `{{2}}`: `CP-W012` · `{{3}}`: `Yape` (o `Plin` / `transferencia`)
+- **Botones:** Ninguno
+- **Cuándo se envía:** al crear un pedido desde la carta virtual con celular y pago Yape, Plin o transferencia, si la ventana de 24 horas está cerrada. Deja la conversación para una persona de Caja (VALIDAR_PAGO, urgente).
+
+---
+
+## 17. Pedido Recibido desde la Carta: pago en efectivo
+
+- **Estado:** pendiente de enviar a Meta (no aprobada todavía).
+- **Nombre de plantilla:** `caprichos_pedido_recibido_efectivo`
+- **Categoría:** Utilidad (Utility)
+- **Idioma:** Español (`es`)
+- **Texto del cuerpo (Body):**
+```text
+Hola {{1}}, recibimos tu pedido {{2}}. Ya esta en proceso.
+```
+- **Ejemplo de variables para Meta:** `{{1}}`: `María` · `{{2}}`: `CP-W012`
+- **Botones:** Ninguno
+- **Cuándo se envía:** al crear un pedido desde la carta virtual con celular y pago en efectivo, si la ventana de 24 horas está cerrada. No toca la conversación.
 
 ---
 

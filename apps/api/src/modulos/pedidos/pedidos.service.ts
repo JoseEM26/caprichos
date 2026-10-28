@@ -22,6 +22,7 @@ import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { CrearPedidoDto } from './dto/crear-pedido.dto';
 import { generarTokenSeguimiento } from './seguimiento.tokens';
 import { AvisosInternosService } from '../chatbot/avisos-internos/avisos-internos.service';
+import { AvisosPedidoService } from '../chatbot/servicios/avisos-pedido.service';
 
 export interface OrigenPedido {
   canal?: 'CARTA' | 'MOZO' | 'CAJA' | 'WHATSAPP' | 'BOT';
@@ -49,6 +50,9 @@ export class PedidosService {
     @Optional()
     @Inject(forwardRef(() => AvisosInternosService))
     private readonly avisosInternosService?: AvisosInternosService,
+    @Optional()
+    @Inject(forwardRef(() => AvisosPedidoService))
+    private readonly avisosPedidoService?: AvisosPedidoService,
   ) {}
 
   /**
@@ -735,6 +739,15 @@ export class PedidosService {
         this.avisosInternosService?.notificarNuevoPedido(pedidoCreado.id).catch((err) => {
           this.logger.warn(`No se pudo emitir aviso interno de nuevo pedido: ${err.message}`);
         });
+      });
+    }
+
+    // 10.6. Aviso al cliente que pidió desde la carta virtual (asíncrono, best-effort: nunca frena ni cambia el pedido)
+    if ((origen?.canal ?? 'CARTA') === 'CARTA' && this.avisosPedidoService) {
+      setImmediate(() => {
+        this.avisosPedidoService
+          ?.avisar(pedidoCreado.id, 'RECIBIDO')
+          .catch((err) => this.logger.warn(`No se pudo emitir aviso de pedido recibido: ${err?.message}`));
       });
     }
 

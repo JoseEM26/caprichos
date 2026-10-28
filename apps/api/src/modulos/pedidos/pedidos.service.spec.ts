@@ -587,4 +587,74 @@ describe('PedidosService', () => {
       });
     });
   });
+
+  describe('aviso de pedido recibido al cliente (carta)', () => {
+    let avisar: jest.Mock;
+
+    beforeEach(() => {
+      avisar = jest.fn().mockResolvedValue({ estado: 'SIMULADO' });
+      (service as any).avisosPedidoService = { avisar };
+      prismaMock.pedido.create.mockResolvedValue({
+        id: 100n,
+        codigo: 'CP-W001',
+        estado: 'COLA',
+        subtotal: 28.0,
+        envio: 5.0,
+        total: 33.0,
+      });
+    });
+
+    const esperarFondo = () => new Promise((r) => setImmediate(r));
+
+    it('pedido de la carta: dispara el aviso RECIBIDO después de crear, sin frenar la respuesta', async () => {
+      const res = await service.crear(pedidoBaseDto, 'idemp-recibido-1');
+
+      expect(res.id).toBe('100');
+      await esperarFondo();
+      expect(avisar).toHaveBeenCalledTimes(1);
+      expect(avisar).toHaveBeenCalledWith(100n, 'RECIBIDO');
+    });
+
+    it('pedido de mozo no dispara el aviso de la carta', async () => {
+      await service.crear(pedidoBaseDto, 'idemp-recibido-mozo', { canal: 'MOZO' });
+
+      await esperarFondo();
+      expect(avisar).not.toHaveBeenCalled();
+    });
+
+    it('pedido del chatbot (canal WHATSAPP) no dispara el aviso de la carta', async () => {
+      await service.crear(pedidoBaseDto, 'idemp-recibido-wa', { canal: 'WHATSAPP' });
+
+      await esperarFondo();
+      expect(avisar).not.toHaveBeenCalled();
+    });
+
+    it('si el aviso falla, el pedido sale igual y el error no se propaga', async () => {
+      avisar.mockRejectedValueOnce(new Error('meta caído'));
+
+      const res = await service.crear(pedidoBaseDto, 'idemp-recibido-fallo');
+
+      expect(res.codigo).toBe('CP-W001');
+      await esperarFondo();
+      expect(avisar).toHaveBeenCalledTimes(1);
+    });
+
+    it('repetir la misma Idempotency-Key no vuelve a avisar', async () => {
+      await service.crear(pedidoBaseDto, 'idemp-recibido-repetida');
+      prismaMock.pedido.findUnique.mockResolvedValueOnce({
+        id: 100n,
+        codigo: 'CP-W001',
+        estado: 'COLA',
+        subtotal: 28,
+        descuento: 0,
+        envio: 5,
+        total: 33,
+      });
+
+      await service.crear(pedidoBaseDto, 'idemp-recibido-repetida');
+
+      await esperarFondo();
+      expect(avisar).toHaveBeenCalledTimes(1);
+    });
+  });
 });

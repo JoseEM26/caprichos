@@ -64,6 +64,22 @@ export const CATALOGO_PLANTILLAS: Record<string, DefinicionPlantilla> = {
     texto: 'Hola {{1}}, el repartidor se retiro de la puerta con tu pedido {{2}} porque se agoto el tiempo de espera. Tu pedido queda reprogramado {{3}}. Te contactaremos para coordinar la nueva entrega.',
     descripcion: 'Aviso 5 al cliente cuando el repartidor se retira tras agotarse la espera en puerta y el pedido se reprograma.',
   },
+  CARTA_RECIBIDO_DIGITAL: {
+    nombre: 'caprichos_pedido_recibido_digital',
+    categoria: 'UTILITY',
+    idioma: 'es',
+    variables: ['nombre_cliente', 'codigo_pedido', 'medio_pago'],
+    texto: 'Hola {{1}}, recibimos tu pedido {{2}} correctamente. En unos momentos un asesor se comunicara contigo por este chat para gestionar el voucher de tu pago por {{3}}.',
+    descripcion: 'Aviso al cliente al crear un pedido de la carta con Yape, Plin o transferencia (ventana cerrada).',
+  },
+  CARTA_RECIBIDO_EFECTIVO: {
+    nombre: 'caprichos_pedido_recibido_efectivo',
+    categoria: 'UTILITY',
+    idioma: 'es',
+    variables: ['nombre_cliente', 'codigo_pedido'],
+    texto: 'Hola {{1}}, recibimos tu pedido {{2}}. Ya esta en proceso.',
+    descripcion: 'Aviso al cliente al crear un pedido de la carta pagado en efectivo (ventana cerrada).',
+  },
   DELIVERY_ENTREGADO: {
     nombre: 'caprichos_delivery_entregado',
     categoria: 'UTILITY',

@@ -31,6 +31,7 @@ import {
 import { VouchersService } from '../../vouchers/vouchers.service';
 import { EjecutorConversacionService } from '../conversacion/ejecutor-conversacion.service';
 import { AvisosInternosService } from '../avisos-internos/avisos-internos.service';
+import { marcarPagoParaPersona } from './pago-para-persona.util';
 
 export const MAX_MEDIA_BYTES = 5 * 1024 * 1024; // 5 MB
 export const TIPOS_MEDIA_PERMITIDOS = [
@@ -641,27 +642,10 @@ export class WhatsappWebhookService {
         const pagoPrev = flujoActual.pago || {};
         const capturasEnviadas = (pagoPrev.capturasEnviadas || 0) + 1;
 
-        await this.prisma.conversacion.update({
-          where: { id: conversacion.id },
-          data: {
-            estado: 'VALIDAR_PAGO',
-            // Con un voucher por revisar la conversación pasa a una persona de Caja: el bot ya no decide
-            duenio: 'PERSONA',
-            urgente: true,
-            flujo: {
-              ...flujoActual,
-              pago: {
-                ...pagoPrev,
-                pedidoId: pedido.id.toString(),
-                pedidoCodigo: pedido.codigo,
-                medio: pedido.pago_preferido || pedido.pago_metodo,
-                monto: Number(pedido.total || 0),
-                comprobanteArchivoId: archivoSubido.id,
-                capturasEnviadas,
-                timestampUltimoVoucher: Date.now(),
-              },
-            },
-          },
+        await marcarPagoParaPersona(this.prisma, conversacion, pedido, {
+          comprobanteArchivoId: archivoSubido.id,
+          capturasEnviadas,
+          timestampUltimoVoucher: Date.now(),
         });
       }
 

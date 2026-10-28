@@ -96,6 +96,7 @@ async function configurarParametrosDemo() {
     { clave: 'whatsapp_aviso_recojo_activo', valor: 'si' },
     { clave: 'whatsapp_aviso_pago_confirmado_activo', valor: 'si' },
     { clave: 'whatsapp_aviso_listo_activo', valor: 'si' },
+    { clave: 'whatsapp_aviso_recibido_activo', valor: 'si' },
     { clave: 'whatsapp_aviso_entregado_activo', valor: 'si' },
     { clave: 'whatsapp_aviso_encuesta_activo', valor: 'si' },
     { clave: 'reparto_insistencia_min', valor: 3 },

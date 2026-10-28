@@ -57,6 +57,7 @@ Ver tambien: [[mensajes]]
 - Si el mensaje muestra un icono rojo de error de envio, pulsar el boton Reintentar envio.
 - Si el bot esta interfiriendo en una conversacion delicada, pulsar Pausar bot para detener sus respuestas automaticas en ese chat; al finalizar la consulta, pulsar Reanudar bot.
 - El nombre del contacto se puede editar pulsando el icono del lapiz al costado del nombre en la cabecera.
+- Un pedido de la carta virtual con Yape, Plin o transferencia y celular deja su chat en Validar pago y urgente: el cliente recibe el aviso de que un asesor gestionara el voucher, y el chat aparece aqui para que lo atiendas.
 
 ## Quien puede hacerlo
 - Tienen acceso completo a los mensajes: Administrador y Call Center.

@@ -159,6 +159,7 @@ Los avisos al cliente de delivery se registran una vez por pedido y etapa (tabla
 | `whatsapp_aviso_pago_confirmado_activo` | Sí/No | `si` | Aviso 6 al cliente cuando Caja acepta el pedido delivery o se confirma su pago. |
 | `whatsapp_aviso_listo_activo` | Sí/No | `si` | Aviso 7 al cliente cuando el pedido delivery queda LISTO en cocina. |
 | `whatsapp_aviso_entregado_activo` | Sí/No | `si` | Aviso 8 de agradecimiento al cliente cuando el pedido delivery se entrega. |
+| `whatsapp_aviso_recibido_activo` | Sí/No | `si` | Aviso 9 al cliente cuando crea un pedido desde la carta virtual con celular (cualquier modalidad). Con Yape, Plin o transferencia también deja la conversación para una persona de Caja (VALIDAR_PAGO, urgente). |
 | `whatsapp_aviso_encuesta_activo` | Sí/No | `si` | Activa el envío automático de la encuesta de satisfacción. |
 | `asistido_espera_min` | Numérico | `3` | Minutos de espera sin respuesta humana en ATENCION_PERSONA antes de activar el modo asistido del bot. |
 | `reparto_insistencia_min` | Numérico | `3` | Minutos en la puerta antes del aviso 3 de insistencia. Tras espera máxima + este valor, la movilidad se retira. |
