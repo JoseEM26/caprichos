@@ -5,10 +5,13 @@ import { EstadoError } from '../../comun/EstadoError';
 import { Confirmar } from '../../comun/Confirmar';
 import { DecoracionAnimada } from '../../carta/contenido/DecoracionAnimada';
 import { PAL_DEFAULT, normalizarUrlArchivo } from './paletas-constantes';
-import { PortadaCarta } from '../../carta/PortadaCarta';
-import { TarjetaProducto } from '../../carta/TarjetaProducto';
-import { CarritoProvider } from '../../carta/CarritoContext';
-import { ProductoCarta } from '../../carta/tipos';
+import { CartaVistaPrevia } from '../../carta/CartaPublica';
+import type { VistaPreviaCarta, ContenidoCarta } from '../../carta/CartaPublica';
+import { DISPOSICION_DEFECTO, resolverDisposicion } from '../../carta/disposicion';
+import type { DisposicionCarta } from '../../carta/disposicion';
+import { DisposicionControles } from './DisposicionControles';
+import type { CategoriaCarta, DatosLocalCarta, EstadoLocalCarta } from '../../carta/tipos';
+import type { OfertaItem } from '../ofertas/ofertasApi';
 
 interface CategoriaAdmin {
   id: string;
@@ -80,6 +83,14 @@ export function DisenadorView() {
     sub: 'Con pulpa natural de maracuyá y crema batida.',
   });
   const [promos, setPromos] = useState<PromoData[]>([]);
+  const [disposicion, setDisposicion] = useState<DisposicionCarta>(DISPOSICION_DEFECTO);
+  // Datos publicados (novedades, momentos, ranking, franja) que la vista previa necesita del cliente
+  const [datosPublicos, setDatosPublicos] = useState<{
+    contenido: Partial<ContenidoCarta> | null;
+    ofertas: OfertaItem[];
+    estadoLocal: EstadoLocalCarta | null;
+    datosLocal: DatosLocalCarta | null;
+  } | null>(null);
 
   const [categorias, setCategorias] = useState<CategoriaAdmin[]>([]);
   const [productos, setProductos] = useState<ProductoAdmin[]>([]);
@@ -119,6 +130,7 @@ export function DisenadorView() {
       setTheme((data.decoracionActual || 'ninguno').toLowerCase());
 
       if (conf.banner) setBanner(conf.banner);
+      setDisposicion(resolverDisposicion(data.disposicionActual));
       if (conf.promos && conf.promos.length > 0) setPromos(conf.promos);
       if (conf.productosConfig) setProductosConfig(conf.productosConfig);
 
@@ -140,6 +152,18 @@ export function DisenadorView() {
     cargarDatos();
   }, []);
 
+  useEffect(() => {
+    if (modoVista !== 'previa' || datosPublicos) return;
+    Promise.all([
+      api.get<ContenidoCarta>('/carta/contenido').catch(() => null),
+      api.get<OfertaItem[]>('/carta/ofertas').catch(() => []),
+      api.get<EstadoLocalCarta>('/carta/estado').catch(() => null),
+      api.get<DatosLocalCarta>('/carta/local').catch(() => null),
+    ]).then(([contenido, ofertas, estadoLocal, datosLocal]) =>
+      setDatosPublicos({ contenido, ofertas: Array.isArray(ofertas) ? ofertas : [], estadoLocal, datosLocal }),
+    );
+  }, [modoVista]);
+
   const marcarModificado = (nuevosCampos?: {
     layout?: 'secciones' | 'lista' | 'grande';
     theme?: string;
@@ -147,6 +171,7 @@ export function DisenadorView() {
     promos?: any[];
     productosConfig?: any;
     categorias?: CategoriaAdmin[];
+    disposicion?: DisposicionCarta;
   }) => {
     setTieneBorrador(true);
     const l = nuevosCampos?.layout || layout;
@@ -156,6 +181,7 @@ export function DisenadorView() {
     const p = nuevosCampos?.promos || promos;
     const pc = nuevosCampos?.productosConfig || productosConfig;
     const cats = nuevosCampos?.categorias || categorias;
+    const dis = nuevosCampos?.disposicion || disposicion;
 
     api.put('/admin/contenido/disenador/borrador', {
       organizacion: orgBackend,
@@ -165,6 +191,7 @@ export function DisenadorView() {
         promos: p,
         productosConfig: pc,
         secciones: cats.map((c) => c.nombre),
+        disposicion: dis,
       },
     }).catch(() => {});
   };
@@ -362,27 +389,56 @@ export function DisenadorView() {
   const currentTemaInfo = TEMAS_INFO[theme] || TEMAS_INFO.ninguno;
   const esCelular = dispositivo === 'celular';
 
-  // Productos para modo solo lectura fiel
-  const productosCarta: ProductoCarta[] = useMemo(() => {
-    return productos.map((p) => ({
-      id: p.id,
-      nombre: p.nombre,
-      descripcion: p.descripcion,
-      precio: p.precio,
-      fotoUrl: p.fotoUrl,
-      tamanos: [],
-      grupos: [],
-      sabores: [],
-      noSumaBeneficios: false,
-      disponible: !p.oculto,
-      agotadoHasta: null,
-    }));
-  }, [productos]);
+  // Vista previa: misma carta que /, con el borrador (orden, tamaños, banner, categorías y productos)
+  const cambiarDisposicion = (nueva: DisposicionCarta) => {
+    setDisposicion(nueva);
+    marcarModificado({ disposicion: nueva });
+  };
 
-  const fotoDestacadaBanner = useMemo(() => {
-    const prod = productos.find((p) => /maracuy/i.test(p.nombre) && p.fotoUrl);
-    return prod?.fotoUrl ?? productos.find((p) => p.fotoUrl)?.fotoUrl ?? null;
-  }, [productos]);
+  const vistaPreviaDatos: VistaPreviaCarta | null = useMemo(() => {
+    if (!datosPublicos) return null;
+    const categoriasPrevia: CategoriaCarta[] = categorias
+      .filter((c) => !c.oculto)
+      .map((c) => ({
+        id: c.id,
+        nombre: c.nombre,
+        orden: c.orden,
+        productos: productos
+          .filter((p) => p.categoriaId === c.id && !p.oculto)
+          .map((p) => ({
+            id: p.id,
+            nombre: p.nombre,
+            descripcion: p.descripcion,
+            precio: p.precio,
+            fotoUrl: p.fotoUrl,
+            tamanos: [],
+            grupos: [],
+            sabores: [],
+            noSumaBeneficios: false,
+            disponible: true,
+            agotadoHasta: null,
+          })),
+      }))
+      .filter((c) => c.productos.length > 0);
+    return {
+      categorias: categoriasPrevia,
+      ofertas: datosPublicos.ofertas,
+      estadoLocal: datosPublicos.estadoLocal,
+      datosLocal: datosPublicos.datosLocal,
+      contenido: {
+        novedades: [],
+        destacadas: [],
+        rankingMes: [],
+        novedadesEncabezado: undefined,
+        ...(datosPublicos.contenido ?? {}),
+        decoracion: theme.toUpperCase(),
+        organizacion: layout === 'lista' ? 'LISTA' : layout === 'grande' ? 'TARJETAS' : 'SECCIONES',
+        paleta: paletaActiva as Record<string, string>,
+        banner,
+        disposicion,
+      } as ContenidoCarta,
+    };
+  }, [datosPublicos, categorias, productos, theme, layout, banner, disposicion, paletaActiva]);
 
   if (cargando) return <Cargando mensaje="Cargando diseñador de la carta..." />;
   if (error) return <EstadoError mensaje={error} alReintentar={cargarDatos} />;
@@ -734,111 +790,51 @@ export function DisenadorView() {
 
           <DecoracionAnimada tema={theme} />
 
-          {/* VISTA PREVIA FIEL DE LA CARTA */}
+          {/* VISTA PREVIA: la misma carta pública (mismos componentes) con el borrador */}
           {modoVista === 'previa' ? (
-            <CarritoProvider>
+            <div
+              style={{
+                padding: esCelular ? '24px 12px 64px' : '24px 24px 64px',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'flex-start',
+              }}
+            >
               <div
+                data-testid={`preview-disenador-${dispositivo}`}
                 style={{
-                  padding: esCelular ? '24px 12px 64px' : '24px 24px 64px',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'flex-start',
+                  width: esCelular ? '390px' : '100%',
+                  maxWidth: esCelular ? '390px' : '1200px',
+                  border: esCelular ? '8px solid var(--cp-navy)' : '1px solid var(--cp-line)',
+                  borderRadius: esCelular ? '28px' : '16px',
+                  background: paletaActiva.bg,
+                  boxShadow: esCelular ? '0 14px 40px rgba(11, 44, 62, 0.25)' : '0 6px 20px rgba(11, 44, 62, 0.08)',
+                  boxSizing: 'border-box',
+                  overflow: 'hidden',
                 }}
               >
+                {esCelular && (
+                  <div style={{ width: '120px', height: '14px', backgroundColor: 'var(--cp-navy)', borderRadius: '0 0 10px 10px', margin: '0 auto 8px' }} />
+                )}
+                {/* Marco con desplazamiento propio: la carta se comporta como en el sitio (cabecera pegajosa, decoración contenida) */}
                 <div
-                  data-testid={`preview-disenador-${dispositivo}`}
                   style={{
-                    width: esCelular ? '390px' : '100%',
-                    maxWidth: esCelular ? '390px' : '1200px',
-                    minHeight: esCelular ? '640px' : '400px',
-                    border: esCelular ? '8px solid var(--cp-navy)' : '1px solid var(--cp-line)',
-                    borderRadius: esCelular ? '28px' : '16px',
-                    background: paletaActiva.bg,
-                    color: paletaActiva.ink,
-                    boxShadow: esCelular
-                      ? '0 14px 40px rgba(11, 44, 62, 0.25)'
-                      : '0 6px 20px rgba(11, 44, 62, 0.08)',
-                    boxSizing: 'border-box',
-                    overflow: 'hidden',
+                    height: esCelular ? 720 : 760,
+                    overflowY: 'auto',
+                    overflowX: 'hidden',
                     position: 'relative',
+                    transform: 'translateZ(0)',
+                    background: paletaActiva.bg,
                   }}
                 >
-                  {/* Notch en celular */}
-                  {esCelular && (
-                    <div
-                      style={{
-                        width: '120px',
-                        height: '14px',
-                        backgroundColor: 'var(--cp-navy)',
-                        borderRadius: '0 0 10px 10px',
-                        margin: '0 auto 8px',
-                      }}
-                    />
+                  {vistaPreviaDatos ? (
+                    <CartaVistaPrevia datos={vistaPreviaDatos} movil={esCelular} />
+                  ) : (
+                    <Cargando mensaje="Preparando la vista previa..." />
                   )}
-
-                  {/* Cabecera fiel de la carta */}
-                  <div style={{ padding: esCelular ? '12px 14px' : '16px 24px', borderBottom: `1px solid ${paletaActiva.line}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <img src="/logo.webp" alt="Caprichos" style={{ width: 40, height: 40, borderRadius: 20, objectFit: 'cover' }} />
-                      <div>
-                        <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 17, lineHeight: '20px' }}>Caprichos</div>
-                        <div style={{ fontSize: 11, color: paletaActiva.soft }}>Cafetería artesanal en Campoy</div>
-                      </div>
-                    </div>
-                    <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 9999, padding: '4px 10px', background: paletaActiva.accent, color: paletaActiva.on }}>
-                      Vista previa cliente
-                    </span>
-                  </div>
-
-                  {/* Portada Carta Banner */}
-                  <PortadaCarta
-                    datosLocal={null}
-                    estadoLocal={null}
-                    fotoDestacada={fotoDestacadaBanner}
-                    banner={banner}
-                    onPedir={() => {}}
-                    onVerCarta={() => {}}
-                  />
-
-                  {/* Lista de Secciones y Productos */}
-                  <div style={{ padding: esCelular ? '16px 12px 48px' : '24px 24px 64px', display: 'flex', flexDirection: 'column', gap: 28 }}>
-                    {categorias.map((cat) => {
-                      const prods = productosCarta.filter(
-                        (p) => productos.find((x) => x.id === p.id)?.categoriaId === cat.id,
-                      );
-                      if (prods.length === 0) return null;
-                      return (
-                        <div key={cat.id} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                            <span style={{ flex: 1, height: 3, backgroundColor: paletaActiva.accent, borderRadius: 2 }} />
-                            <h2 style={{ margin: 0, fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: esCelular ? 20 : 26, color: paletaActiva.ink, textAlign: 'center' }}>
-                              {cat.nombre}
-                            </h2>
-                            <span style={{ flex: 1, height: 3, backgroundColor: paletaActiva.accent, borderRadius: 2 }} />
-                          </div>
-
-                          <div
-                            style={{
-                              display: 'grid',
-                              gridTemplateColumns: LAY_CONFIG.gridCols,
-                              gap: 14,
-                            }}
-                          >
-                            {prods.map((prod) => (
-                              <TarjetaProducto
-                                key={prod.id}
-                                producto={prod}
-                                organizacion={layout === 'lista' ? 'LISTA' : layout === 'grande' ? 'TARJETAS' : 'SECCIONES'}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
                 </div>
               </div>
-            </CarritoProvider>
+            </div>
           ) : (
             /* MODO EDICIÓN CON LIENZO INTERACTIVO */
             <div
@@ -903,6 +899,8 @@ export function DisenadorView() {
                     ))}
                   </div>
                 </div>
+
+                <DisposicionControles disposicion={disposicion} onCambiar={cambiarDisposicion} />
 
                 {/* Banner de portada editable (Fiel a PortadaCarta) */}
                 <div style={{ border: `1.5px solid ${paletaActiva.ink}`, borderRadius: 20, background: paletaActiva.card, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>

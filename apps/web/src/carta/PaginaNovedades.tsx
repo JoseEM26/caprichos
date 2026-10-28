@@ -849,10 +849,13 @@ export function FranjaNovedades({
   novedades,
   onVerTodas,
   onVerCarta,
+  anchoTarjeta,
 }: {
   novedades: NovedadCarta[];
   onVerTodas: () => void;
   onVerCarta: () => void;
+  /** Ancho de cada tarjeta (CSS). Sin valor, el tamaño normal de siempre. */
+  anchoTarjeta?: string;
 }) {
   const movil = useEsMovil();
   const pista = useRef<HTMLDivElement>(null);
@@ -944,7 +947,7 @@ export function FranjaNovedades({
                   if (!seArrastro.current) setAbierta(n);
                 }}
                 style={{
-                  flex: movil ? '0 0 66%' : '0 0 300px',
+                  flex: `0 0 ${anchoTarjeta ?? (movil ? '66%' : '300px')}`,
                   border: '1px solid var(--cp-line)',
                   padding: 0,
                   borderRadius: movil ? 14 : 20,

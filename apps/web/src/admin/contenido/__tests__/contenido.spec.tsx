@@ -10,7 +10,6 @@ import { DisenadorView } from '../DisenadorView';
 import { CartaPublica } from '../../../carta/CartaPublica';
 import { api } from '../../../comun/api';
 
-vi.mock('../../../carta/useEsMovil', () => ({ useEsMovil: () => false }));
 
 describe('Carta pública: contenido administrable', () => {
   beforeEach(() => {
@@ -406,8 +405,8 @@ describe('Administrativo: Diseñador de la carta', () => {
     // Cambiar a vista previa carta
     fireEvent.click(screen.getByText('Vista previa carta'));
     expect(screen.getByTestId('preview-disenador-celular')).toBeTruthy();
-    expect(screen.getByText('Vista previa cliente')).toBeTruthy();
-    expect(screen.getByText('BEBIDAS')).toBeTruthy();
+    await waitFor(() => expect(screen.getByRole('region', { name: 'Caprichos del mes' })).toBeTruthy());
+    expect(screen.getAllByText('BEBIDAS').length).toBeGreaterThan(0);
     expect(screen.getByText('Frappe Fresa')).toBeTruthy();
 
     // Conmutar a PC

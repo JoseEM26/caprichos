@@ -46,6 +46,18 @@ Ver tambien: [[disenador]]
 3. Para el banner publicitario superior, activa o desactiva la casilla "Activado" e ingresa la etiqueta, el título y el texto del anuncio en los campos correspondientes.
 Ver tambien: [[novedades]]
 
+## Como se hace: cambiar el orden, el tamaño y la posición de la carta
+1. En modo "Edición", arriba del lienzo aparece el bloque "ORDEN Y TAMAÑOS DE LA CARTA".
+2. "Orden de las secciones": cada fila es una parte de la carta pública (Caprichos del mes, Franja de datos, Momentos Caprichos, Novedades y Carta). Usa "Subir" y "Bajar" para cambiar el orden de arriba abajo, y quita la casilla para ocultar una sección sin borrarla. Volver a marcarla la muestra otra vez.
+3. "Alto del banner": elige "Compacto", "Normal (como hoy)" o "Grande", por separado para PC y para celular.
+4. "Foto del producto": "Llenar el círculo" recorta la foto para llenarlo; "Ver la foto completa" muestra la imagen entera. "Punto de enfoque" decide qué parte de la foto queda visible al recortar (arriba, centro o abajo).
+5. "Franja de datos": la franja de Abierto, Delivery gratis, Entrega en unos minutos y Medios de pago se puede ordenar con "Subir" y "Bajar", y cada dato se puede ocultar. Los textos salen de la configuración del local (horario, monto de delivery gratis, tiempo de entrega y medios de pago activos); no se escriben aquí.
+6. "Tamaño de Momentos Caprichos" y "Tamaño de las tarjetas de Novedades": chico, normal o grande.
+7. "Productos por fila en PC": automático (como hoy), 2, 3 o 4. En celular siempre se ve una columna.
+8. Revisa el resultado en "Vista previa carta": es la misma carta que ve el cliente, con los cambios de borrador. Para verla en tamaño celular usa el conmutador "Celular".
+9. Los cambios quedan como borrador hasta que pulses "Publicar cambios" y confirmes con "Sí, publicar".
+Ver tambien: [[novedades]] y [[destacadas]]
+
 ## Como se hace: publicar o descartar cambios
 1. Cada cambio realizado se guarda automáticamente como borrador y mostrará la etiqueta "Borrador sin publicar".
 2. Para que los clientes vean los cambios en la carta virtual, pulsa el botón "Publicar cambios" en la barra superior.

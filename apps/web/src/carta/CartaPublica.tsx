@@ -1,5 +1,9 @@
 import { PieLegal } from './legal';
-import { useEffect, useState, useMemo } from 'react';
+import { Fragment, useEffect, useState, useMemo } from 'react';
+import type { ReactNode } from 'react';
+import { DispositivoForzado } from './useEsMovil';
+import { resolverDisposicion, medidasMomento, anchoNovedad, gridColumnas } from './disposicion';
+import type { IdSeccionCarta } from './disposicion';
 import { api } from '../comun/api';
 import { Cargando } from '../comun/Cargando';
 import { EstadoError } from '../comun/EstadoError';
@@ -11,7 +15,7 @@ import {
 import { CarritoProvider, useCarrito } from './CarritoContext';
 import { CabeceraCarta } from './CabeceraCarta';
 import type { PaginaCarta } from './CabeceraCarta';
-import { PortadaCarta } from './PortadaCarta';
+import { BannerMesCarta, FranjaDatosCarta } from './PortadaCarta';
 import { PaginaConocenos } from './PaginaConocenos';
 import { PaginaNovedades } from './PaginaNovedades';
 import { CuentaProvider } from './cuenta/CuentaContext';
@@ -69,8 +73,9 @@ const FOTOS_RESPALDO_NOVEDADES: Record<string, { id: string; url: string; orden:
   ],
 };
 
-interface ContenidoCarta {
+export interface ContenidoCarta {
   decoracion: string;
+  disposicion?: unknown;
   organizacion: 'SECCIONES' | 'LISTA' | 'TARJETAS';
   paleta: Record<string, string>;
   novedades: NovedadCarta[];
@@ -99,14 +104,23 @@ function normalizarTexto(txt: string): string {
     .replace(/[\u0300-\u036f]/g, '');
 }
 
-function ContenidoCartaPublica() {
+/** Datos con los que la vista previa del diseñador pinta la misma carta, sin pedir nada al cliente. */
+export interface VistaPreviaCarta {
+  categorias: CategoriaCarta[];
+  ofertas: OfertaItem[];
+  estadoLocal: EstadoLocalCarta | null;
+  datosLocal: DatosLocalCarta | null;
+  contenido: ContenidoCarta;
+}
+
+function ContenidoCartaPublica({ vistaPrevia }: { vistaPrevia?: VistaPreviaCarta }) {
   const [categorias, setCategorias] = useState<CategoriaCarta[]>([]);
   const [ofertas, setOfertas] = useState<OfertaItem[]>([]);
   const [estadoLocal, setEstadoLocal] = useState<EstadoLocalCarta | null>(null);
   const [datosLocal, setDatosLocal] = useState<DatosLocalCarta | null>(null);
   const [contenido, setContenido] = useState<ContenidoCarta | null>(null);
   const [visor, setVisor] = useState<number | null>(null);
-  const [cargando, setCargando] = useState(true);
+  const [cargando, setCargando] = useState(!vistaPrevia);
   const [error, setError] = useState<string | null>(null);
 
   const [busqueda, setBusqueda] = useState('');
@@ -146,8 +160,19 @@ function ContenidoCartaPublica() {
   };
 
   useEffect(() => {
-    cargarDatos();
+    if (!vistaPrevia) cargarDatos();
   }, []);
+
+  // Vista previa: los datos llegan del diseñador (borrador) y se actualizan al cambiar cualquier control
+  useEffect(() => {
+    if (!vistaPrevia) return;
+    setCategorias(vistaPrevia.categorias);
+    setOfertas(vistaPrevia.ofertas);
+    setEstadoLocal(vistaPrevia.estadoLocal);
+    setDatosLocal(vistaPrevia.datosLocal);
+    setContenido(vistaPrevia.contenido);
+    setCargando(false);
+  }, [vistaPrevia]);
 
   // Todos los productos planos para vincular ofertas
   const todosLosProductos = useMemo(
@@ -228,6 +253,7 @@ function ContenidoCartaPublica() {
     [contenido],
   );
   const organizacion = contenido?.organizacion ?? 'SECCIONES';
+  const disp = useMemo(() => resolverDisposicion(contenido?.disposicion), [contenido]);
 
   const fotosDestacadas = useMemo(() => {
     return (contenido?.destacadas ?? []).flatMap((d) =>
@@ -261,7 +287,7 @@ function ContenidoCartaPublica() {
     setTimeout(() => {
       const el = document.getElementById('categoria-promociones');
       if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (!vistaPrevia) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       } else {
         setCategoriaActivaId('promociones');
       }
@@ -271,7 +297,7 @@ function ContenidoCartaPublica() {
   const irACarta = () => {
     setPagina('carta');
     setCategoriaActivaId('todo');
-    setTimeout(() => document.getElementById('carta-lista')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+    if (!vistaPrevia) setTimeout(() => document.getElementById('carta-lista')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   };
 
   const pedirDestacadoPortada = () => {
@@ -288,10 +314,11 @@ function ContenidoCartaPublica() {
 
   const cambiarPagina = (p: PaginaCarta) => {
     setPagina(p);
-    window.scrollTo({ top: 0 });
+    if (!vistaPrevia) window.scrollTo({ top: 0 });
   };
 
   const irArriba = () => {
+    if (vistaPrevia) return;
     try {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch {
@@ -299,121 +326,37 @@ function ContenidoCartaPublica() {
     }
   };
 
-  if (cargando) {
-    return (
-      <div
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: 'var(--cp-cream)',
-        }}
-      >
-        <Cargando mensaje="Cargando la carta..." />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '24px',
-          backgroundColor: 'var(--cp-cream)',
-        }}
-      >
-        <EstadoError
-          mensaje={error}
-          alReintentar={cargarDatos}
-        />
-      </div>
-    );
-  }
-
-  const nombreMarca = (datosLocal?.nombre || 'Caprichos').toUpperCase();
-  const descLocal =
-    'Creamos momentos para compartir con experiencias gastronómicas artesanales: ingredientes premium, procesos hechos a mano y sin químicos.';
-  const dirLocal = datosLocal?.direccion || 'Campoy, San Juan de Lurigancho, Lima';
-  const horarioTexto = 'Todos los días, de 2:00 pm a 10:00 pm';
-  const mapaUrl =
-    'https://www.google.com/maps/search/?api=1&query=Caprichos%20Campoy%20Lima';
-  const telLocal = datosLocal?.telefono || '9XX XXX XXX';
-  const waNum = String(datosLocal?.whatsapp || '51900000000').replace(/\D/g, '');
-  const waUrl = `https://wa.me/${waNum || '51900000000'}`;
-  const envioGratis = datosLocal?.envioGratisDesde ?? 70;
-  const pedidoMin = datosLocal?.pedidoMinimo ?? 14.5;
-  const fmtMonto = (m: number) => `s/ ${Number.isInteger(m) ? m : m.toFixed(2)}`;
-  const lineaPie = `Horario: ${horarioTexto} · Delivery gratis por compras de más de ${fmtMonto(envioGratis)} · Pedido mínimo de delivery ${fmtMonto(pedidoMin)}`;
-  const redes = [
-    { n: datosLocal?.redes?.instagramNombre || '@caprichos (ejemplo)', url: datosLocal?.redes?.instagram || 'https://www.instagram.com/' },
-    { n: 'Facebook', url: datosLocal?.redes?.facebook || 'https://www.facebook.com/' },
-    { n: 'TikTok', url: datosLocal?.redes?.tiktok || 'https://www.tiktok.com/' },
-  ].filter((r) => r.url);
-
-  return (
-    <div
-      style={{
-        // el mockup en celular maqueta a 476 px y reduce al 82 %: todo se ve más pequeño y cabe más
-        zoom: movil ? ZOOM_CELULAR : 1,
-        minHeight: movil ? `${100 / ZOOM_CELULAR}vh` : '100vh',
-        backgroundColor: 'var(--cp-cream)',
-        color: 'var(--cp-navy)',
-        display: 'flex',
-        flexDirection: 'column',
-        ...(estilosPaleta as React.CSSProperties),
-      }}
-    >
-      <DecoracionAnimada tema={contenido?.decoracion ?? 'NINGUNO'} />
-      {/* Cabecera pegajosa con las categorías dentro */}
-      <CabeceraCarta
-        busqueda={busqueda}
-        onCambioBusqueda={setBusqueda}
-        estadoLocal={estadoLocal}
-        datosLocal={datosLocal}
-        pagina={pagina}
-        onPagina={cambiarPagina}
-        categorias={categoriasChips}
-        categoriaActivaId={categoriaActivaId}
-        onCategoria={(id) => {
-          setCategoriaActivaId(id);
-          setBusqueda('');
-        }}
-      />
-
-      {/* Franja de aviso de promociones de hoy */}
-      <FranjaAvisoCarta
-        ofertas={ofertas}
-        categorias={categorias}
-        onVerPromociones={irAPromociones}
-      />
-
-      {pagina === 'conocenos' && <PaginaConocenos datosLocal={datosLocal} estadoLocal={estadoLocal} fotos={fotosDestacadas} />}
-      {pagina === 'novedades' && (
-        <PaginaNovedades
-          novedades={novedadesEnriquecidas}
-          datosLocal={datosLocal}
-          estadoLocal={estadoLocal}
-          onVerCarta={irACarta}
-          encabezado={contenido?.novedadesEncabezado}
-        />
-      )}
-
+  // Orden y visibilidad de las secciones de la carta (ajustes del diseñador)
+  const renderSeccion = (id: IdSeccionCarta): ReactNode => {
+    switch (id) {
+      case 'mes':
+        return (
+          <>
       {pagina === 'carta' && !busqueda.trim() && categoriaActivaId === 'todo' && (
-        <PortadaCarta
-          datosLocal={datosLocal}
-          estadoLocal={estadoLocal}
+        <BannerMesCarta
           fotoDestacada={fotoDestacada}
           banner={contenido?.banner}
           onPedir={pedirDestacadoPortada}
           onVerCarta={irACarta}
+          tamanoPc={disp.banner.tamanoPc}
+          tamanoCelular={disp.banner.tamanoCelular}
+          ajusteFoto={disp.banner.ajusteFoto}
+          focoFoto={disp.banner.focoFoto}
         />
       )}
-
+          </>
+        );
+      case 'franja':
+        return (
+          <>
+      {pagina === 'carta' && !busqueda.trim() && categoriaActivaId === 'todo' && (
+        <FranjaDatosCarta datosLocal={datosLocal} estadoLocal={estadoLocal} items={disp.franja.items} />
+      )}
+          </>
+        );
+      case 'momentos':
+        return (
+          <>
       {pagina === 'carta' && !busqueda.trim() && categoriaActivaId === 'todo' && destacadasVisibles.length > 0 && (
         <div style={{ maxWidth: 1200, width: '100%', boxSizing: 'border-box', margin: '0 auto', padding: movil ? '20px 16px 0' : '32px 24px 0' }}>
           <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: movil ? 17 : 22, marginBottom: 10 }}>Momentos Caprichos</div>
@@ -429,7 +372,7 @@ function ContenidoCartaPublica() {
                   border: 0,
                   background: 'transparent',
                   padding: 0,
-                  width: movil ? 68 : 96,
+                  width: medidasMomento(disp.momentos.tamano, movil).ancho,
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
@@ -438,7 +381,7 @@ function ContenidoCartaPublica() {
                   cursor: 'pointer',
                 }}
               >
-                <span style={{ width: movil ? 60 : 84, height: movil ? 60 : 84, borderRadius: '50%', padding: 3, boxSizing: 'border-box', background: 'linear-gradient(135deg, var(--cp-orange), var(--cp-rust))', display: 'block' }}>
+                <span style={{ width: medidasMomento(disp.momentos.tamano, movil).circulo, height: medidasMomento(disp.momentos.tamano, movil).circulo, borderRadius: '50%', padding: 3, boxSizing: 'border-box', background: 'linear-gradient(135deg, var(--cp-orange), var(--cp-rust))', display: 'block' }}>
                   <span style={{ width: '100%', height: '100%', borderRadius: '50%', border: '2px solid var(--cp-cream)', boxSizing: 'border-box', overflow: 'hidden', background: 'color-mix(in srgb, var(--cp-line) 55%, var(--cp-white))', color: 'var(--cp-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
                     {d.portada_url ? (
                       <img src={d.portada_url} alt="" style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -457,14 +400,27 @@ function ContenidoCartaPublica() {
         </div>
       )}
 
+
+          </>
+        );
+      case 'novedades':
+        return (
+          <>
       {pagina === 'carta' && !busqueda.trim() && novedadesEnriquecidas.length > 0 && (
         <FranjaNovedades
           novedades={novedadesEnriquecidas}
           onVerTodas={() => cambiarPagina('novedades')}
           onVerCarta={irACarta}
+          anchoTarjeta={anchoNovedad(disp.novedades.tamano, movil)}
         />
       )}
 
+
+          </>
+        );
+      case 'categorias':
+        return (
+          <>
       {/* Lista de productos por categoría */}
       {pagina === 'carta' && (
       <main
@@ -578,13 +534,7 @@ function ContenidoCartaPublica() {
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: movil
-                      ? '1fr'
-                      : organizacion === 'LISTA'
-                        ? '1fr'
-                        : organizacion === 'TARJETAS'
-                          ? 'repeat(auto-fill, minmax(320px, 1fr))'
-                          : 'repeat(auto-fill, minmax(230px, 1fr))',
+                    gridTemplateColumns: gridColumnas(movil, organizacion, disp.carta.columnasPc),
                     gap: '16px',
                   }}
                 >
@@ -667,13 +617,7 @@ function ContenidoCartaPublica() {
                     <div
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: movil
-                          ? '1fr'
-                          : organizacion === 'LISTA'
-                            ? '1fr'
-                            : organizacion === 'TARJETAS'
-                              ? 'repeat(auto-fill, minmax(320px, 1fr))'
-                              : 'repeat(auto-fill, minmax(230px, 1fr))',
+                        gridTemplateColumns: gridColumnas(movil, organizacion, disp.carta.columnasPc),
                         gap: '16px',
                       }}
                     >
@@ -695,7 +639,121 @@ function ContenidoCartaPublica() {
       </main>
       )}
 
-      {pagina === 'carta' && <FormularioComentarios />}
+
+          </>
+        );
+      default:
+        return null;
+    }
+  };
+
+  if (cargando) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: 'var(--cp-cream)',
+        }}
+      >
+        <Cargando mensaje="Cargando la carta..." />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '24px',
+          backgroundColor: 'var(--cp-cream)',
+        }}
+      >
+        <EstadoError
+          mensaje={error}
+          alReintentar={cargarDatos}
+        />
+      </div>
+    );
+  }
+
+  const nombreMarca = (datosLocal?.nombre || 'Caprichos').toUpperCase();
+  const descLocal =
+    'Creamos momentos para compartir con experiencias gastronómicas artesanales: ingredientes premium, procesos hechos a mano y sin químicos.';
+  const dirLocal = datosLocal?.direccion || 'Campoy, San Juan de Lurigancho, Lima';
+  const horarioTexto = 'Todos los días, de 2:00 pm a 10:00 pm';
+  const mapaUrl =
+    'https://www.google.com/maps/search/?api=1&query=Caprichos%20Campoy%20Lima';
+  const telLocal = datosLocal?.telefono || '9XX XXX XXX';
+  const waNum = String(datosLocal?.whatsapp || '51900000000').replace(/\D/g, '');
+  const waUrl = `https://wa.me/${waNum || '51900000000'}`;
+  const envioGratis = datosLocal?.envioGratisDesde ?? 70;
+  const pedidoMin = datosLocal?.pedidoMinimo ?? 14.5;
+  const fmtMonto = (m: number) => `s/ ${Number.isInteger(m) ? m : m.toFixed(2)}`;
+  const lineaPie = `Horario: ${horarioTexto} · Delivery gratis por compras de más de ${fmtMonto(envioGratis)} · Pedido mínimo de delivery ${fmtMonto(pedidoMin)}`;
+  const redes = [
+    { n: datosLocal?.redes?.instagramNombre || '@caprichos (ejemplo)', url: datosLocal?.redes?.instagram || 'https://www.instagram.com/' },
+    { n: 'Facebook', url: datosLocal?.redes?.facebook || 'https://www.facebook.com/' },
+    { n: 'TikTok', url: datosLocal?.redes?.tiktok || 'https://www.tiktok.com/' },
+  ].filter((r) => r.url);
+
+  return (
+    <div
+      style={{
+        // el mockup en celular maqueta a 476 px y reduce al 82 %: todo se ve más pequeño y cabe más
+        zoom: movil ? ZOOM_CELULAR : 1,
+        minHeight: vistaPrevia ? undefined : movil ? `${100 / ZOOM_CELULAR}vh` : '100vh',
+        backgroundColor: 'var(--cp-cream)',
+        color: 'var(--cp-navy)',
+        display: 'flex',
+        flexDirection: 'column',
+        ...(estilosPaleta as React.CSSProperties),
+      }}
+    >
+      <DecoracionAnimada tema={contenido?.decoracion ?? 'NINGUNO'} />
+      {/* Cabecera pegajosa con las categorías dentro */}
+      <CabeceraCarta
+        busqueda={busqueda}
+        onCambioBusqueda={setBusqueda}
+        estadoLocal={estadoLocal}
+        datosLocal={datosLocal}
+        pagina={pagina}
+        onPagina={cambiarPagina}
+        categorias={categoriasChips}
+        categoriaActivaId={categoriaActivaId}
+        onCategoria={(id) => {
+          setCategoriaActivaId(id);
+          setBusqueda('');
+        }}
+      />
+
+      {/* Franja de aviso de promociones de hoy */}
+      <FranjaAvisoCarta
+        ofertas={ofertas}
+        categorias={categorias}
+        onVerPromociones={irAPromociones}
+        storageKey={vistaPrevia ? 'caprichos_preview_franja_aviso' : undefined}
+      />
+
+      {pagina === 'conocenos' && <PaginaConocenos datosLocal={datosLocal} estadoLocal={estadoLocal} fotos={fotosDestacadas} />}
+      {pagina === 'novedades' && (
+        <PaginaNovedades
+          novedades={novedadesEnriquecidas}
+          datosLocal={datosLocal}
+          estadoLocal={estadoLocal}
+          onVerCarta={irACarta}
+          encabezado={contenido?.novedadesEncabezado}
+        />
+      )}
+
+      {pagina === 'carta' && disp.secciones.map((sec) => (sec.visible ? <Fragment key={sec.id}>{renderSeccion(sec.id)}</Fragment> : null))}
+      {pagina === 'carta' && !vistaPrevia && <FormularioComentarios />}
 
       {visor !== null && destacadasVisibles.length > 0 && (
         <VisorHistoriasModal historias={destacadasVisibles} destacadaIdxInicial={visor} onCerrar={() => setVisor(null)} />
@@ -839,8 +897,10 @@ function ContenidoCartaPublica() {
       )}
 
       {/* Pie con términos, privacidad y libro de reclamaciones */}
-      <PieLegal />
+      {!vistaPrevia && <PieLegal />}
 
+      {!vistaPrevia && (
+        <>
       {/* Cajón lateral del carrito */}
       <CajonCarrito
         estadoLocal={estadoLocal}
@@ -874,7 +934,22 @@ function ContenidoCartaPublica() {
 
       {/* Cuenta del cliente */}
       <PanelCuenta alVerPedidos={() => setListaPedidosAbierta(true)} />
+        </>
+      )}
     </div>
+  );
+}
+
+/** Vista previa del diseñador: la misma carta (mismos componentes), con datos del borrador y sin navegar ni pedir. */
+export function CartaVistaPrevia({ datos, movil }: { datos: VistaPreviaCarta; movil: boolean }) {
+  return (
+    <DispositivoForzado movil={movil}>
+      <CarritoProvider>
+        <CuentaProvider>
+          <ContenidoCartaPublica vistaPrevia={datos} />
+        </CuentaProvider>
+      </CarritoProvider>
+    </DispositivoForzado>
   );
 }
 

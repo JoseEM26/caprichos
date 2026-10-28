@@ -8,6 +8,7 @@ import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
+import { resolverDisposicionCarta } from './disposicion-carta';
 import {
   ActualizarBorradorDisenoDto,
   ActualizarDestacadaDto,
@@ -362,6 +363,7 @@ export class ContenidoService {
         sub: '',
       },
       promos: contenidoConfig.promos ?? [],
+      disposicion: resolverDisposicionCarta(contenidoConfig.disposicion),
     };
   }
 
@@ -483,6 +485,7 @@ export class ContenidoService {
       organizacionActual: versionActiva?.organizacion || 'SECCIONES',
       decoracionActual: versionActiva?.decoracion || 'NINGUNO',
       contenidoActual: (versionActiva?.contenido as any) || {},
+      disposicionActual: resolverDisposicionCarta((versionActiva?.contenido as any)?.disposicion),
       categorias,
       productos,
     };
@@ -499,11 +502,19 @@ export class ContenidoService {
       orderBy: { id: 'desc' },
     });
 
+    let contenido: any = dto.contenido || borradorExistente?.contenido || publicada?.contenido || {};
+    if (dto.contenido) {
+      // Disposición: si el cliente no la manda, se conserva la del borrador (o la publicada); si la manda, se valida estricta
+      const previa = (borradorExistente?.contenido as any)?.disposicion ?? (publicada?.contenido as any)?.disposicion;
+      const entrante = dto.contenido.disposicion !== undefined ? dto.contenido.disposicion : resolverDisposicionCarta(previa);
+      contenido = { ...dto.contenido, disposicion: resolverDisposicionCarta(entrante, true) };
+    }
+
     const data = {
       estado: 'BORRADOR',
       organizacion: dto.organizacion || borradorExistente?.organizacion || publicada?.organizacion || 'SECCIONES',
       decoracion: dto.decoracion || borradorExistente?.decoracion || publicada?.decoracion || 'NINGUNO',
-      contenido: dto.contenido || borradorExistente?.contenido || publicada?.contenido || {},
+      contenido,
     };
 
     let guardado;
