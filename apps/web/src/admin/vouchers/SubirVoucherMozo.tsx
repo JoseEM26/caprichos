@@ -17,7 +17,7 @@ export interface SubirVoucherMozoProps {
     voucherId?: string | number;
   }) => void;
   bloqueado?: boolean;
-  /** Caja/Admin puede confirmar sin comprobante con código del supervisor; el mozo no. */
+  /** Ofrece la salida sin foto (código del supervisor): Caja/Admin y el mozo en su cobro de mesa. */
   ofrecerExcepcion?: boolean;
 }
 
@@ -282,7 +282,7 @@ export function SubirVoucherMozo({
             }}
           >
             {ofrecerExcepcion
-              ? 'No se lee: sube otra foto o confirma sin comprobante con código del supervisor.'
+              ? 'No se lee o no hay foto: sube otra foto o pide el código al supervisor.'
               : 'Este voucher no se lee bien. Vuelve a tomar la foto, por favor.'}
           </div>
           <button

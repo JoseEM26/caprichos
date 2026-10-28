@@ -319,19 +319,18 @@ export class CobrosService {
       }
 
       // Comprobante del pago digital (Yape, Plin, transferencia): hace falta una foto útil (no ILEGIBLE) enlazada
-      // al pedido, para todos los roles. Sin ella, Caja/Admin puede seguir con motivo y código del supervisor;
-      // el mozo no tiene excepción (debe pedir otra foto o avisar a Caja).
+      // al pedido. Sin ella, cualquier rol que cobra (Caja, Admin o Mozo) puede seguir con motivo y código del
+      // supervisor, que le dicta el supervisor presente; el código lo verifica el mismo helper y queda auditado.
       if (dto.voucherId !== undefined && dto.voucherId !== null && dto.voucherId !== '') {
         await this.vincularVoucherAPedido(tx, dto.voucherId, pedido.id);
       }
 
-      const esMozo = (usuario?.rol || '').toUpperCase() === 'MOZO';
       const sinVoucherAutorizado = await exigirComprobanteDigital({
         db: tx,
         pedidoId: pedido.id,
         medios: dto.pagos.map((p) => p.medio),
-        sinVoucher: esMozo ? undefined : dto.sinVoucher,
-        permiteExcepcion: !esMozo,
+        sinVoucher: dto.sinVoucher,
+        permiteExcepcion: true,
         verificarPin: (pin) =>
           this.verificarPinSupervisor(pin, usuario?.partyId, ip, undefined, 'caja/cobrar_sin_voucher'),
       });

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Confirmar } from '../../../comun/Confirmar';
+import { CampoCodigoSupervisor } from '../../../comun/CampoCodigoSupervisor';
 import { SubirVoucherMozo } from '../../vouchers/SubirVoucherMozo';
 import { vouchersApi } from '../../vouchers/vouchersApi';
 
@@ -18,10 +19,15 @@ export interface ModalPrecuentaProps {
   copias?: number;
   alImprimir?: () => Promise<void> | void;
   pedidoId?: string | number;
-  alCobrar?: (medio: string, voucherId?: string | number) => Promise<void> | void;
+  alCobrar?: (
+    medio: string,
+    voucherId?: string | number,
+    sinVoucher?: { motivo: string; pinSupervisor: string },
+  ) => Promise<void> | void;
 }
 
 const MEDIOS_COBRO_SALON = ['Efectivo', 'Yape', 'Plin', 'Tarjeta'] as const;
+const MOTIVO_MINIMO = 5;
 
 export function ModalPrecuenta({
   abierto,
@@ -46,11 +52,18 @@ export function ModalPrecuenta({
   const [cobrando, setCobrando] = useState<boolean>(false);
   const [cobroExitoso, setCobroExitoso] = useState<boolean>(false);
   const [avisoEnviado, setAvisoEnviado] = useState<boolean>(false);
+  // Cobro digital sin foto legible: motivo escrito + código del supervisor (lo dicta, el mozo no lo genera)
+  const [sinVoucher, setSinVoucher] = useState<boolean>(false);
+  const [motivoSinVoucher, setMotivoSinVoucher] = useState<string>('');
+  const [pinSupervisor, setPinSupervisor] = useState<string>('');
 
   if (!abierto) return null;
 
   const esDigital = medioSeleccionado === 'Yape' || medioSeleccionado === 'Plin';
-  const puedeConfirmarCobro = !esDigital || voucherLegible;
+  const excepcionLista =
+    sinVoucher && motivoSinVoucher.trim().length >= MOTIVO_MINIMO && pinSupervisor.length === 6;
+  const conExcepcion = esDigital && !voucherLegible && sinVoucher;
+  const puedeConfirmarCobro = !esDigital || voucherLegible || excepcionLista;
 
   // El mozo no cobra (el cajero cobra). Sin «alCobrar» no hay botón de cobro: no se simula un cobro.
   const handleAvisarSinFoto = async () => {
@@ -80,7 +93,14 @@ export function ModalPrecuenta({
     try {
       setCobrando(true);
       if (alCobrar) {
-        await alCobrar(medioSeleccionado, voucherId);
+        if (conExcepcion && excepcionLista) {
+          await alCobrar(medioSeleccionado, undefined, {
+            motivo: motivoSinVoucher.trim(),
+            pinSupervisor,
+          });
+        } else {
+          await alCobrar(medioSeleccionado, voucherId);
+        }
       }
       setCobroExitoso(true);
     } finally {
@@ -217,6 +237,9 @@ export function ModalPrecuenta({
                     type="button"
                     onClick={() => {
                       setMedioSeleccionado(m);
+                      setSinVoucher(false);
+                      setMotivoSinVoucher('');
+                      setPinSupervisor('');
                       if (m !== 'Yape' && m !== 'Plin') {
                         setVoucherLegible(true);
                       } else {
@@ -247,8 +270,9 @@ export function ModalPrecuenta({
               <SubirVoucherMozo
                 pedidoId={pedidoId}
                 medio={medioSeleccionado.toUpperCase() as 'YAPE' | 'PLIN'}
+                ofrecerExcepcion
                 alVoucherValido={(info) => {
-                  // Un voucher ilegible no cuenta: el mozo debe subir otra foto
+                  // Un voucher ilegible no cuenta: el mozo debe subir otra foto o usar la excepción
                   setVoucherLegible(info.legible);
                   setVoucherId(info.legible ? info.id : undefined);
                 }}
@@ -286,6 +310,85 @@ export function ModalPrecuenta({
               </div>
             )}
 
+            {/* Excepción: cobro digital sin foto legible, con código que dicta el supervisor presente */}
+            {esDigital && !voucherLegible && pedidoId !== undefined && !sinVoucher && (
+              <button
+                type="button"
+                onClick={() => setSinVoucher(true)}
+                data-testid="btn-mozo-sin-comprobante"
+                style={{
+                  marginTop: '6px',
+                  width: '100%',
+                  minHeight: '40px',
+                  border: '1.5px dashed var(--cp-rust, #B2500F)',
+                  borderRadius: '10px',
+                  background: 'transparent',
+                  color: 'var(--cp-rust, #B2500F)',
+                  fontWeight: 700,
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                }}
+              >
+                Cobrar sin comprobante
+              </button>
+            )}
+
+            {conExcepcion && pedidoId !== undefined && (
+              <div
+                data-testid="panel-mozo-sin-comprobante"
+                style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}
+              >
+                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-rust, #B2500F)' }}>
+                  Sin comprobante: solo con motivo escrito y el código del supervisor. Queda auditado.
+                </div>
+                <label htmlFor="motivo-mozo-sin-voucher" style={{ fontWeight: 700, fontSize: '12px' }}>
+                  Motivo (mínimo {MOTIVO_MINIMO} letras)
+                </label>
+                <textarea
+                  id="motivo-mozo-sin-voucher"
+                  data-testid="motivo-mozo-sin-voucher"
+                  rows={2}
+                  value={motivoSinVoucher}
+                  onChange={(e) => setMotivoSinVoucher(e.target.value)}
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    borderRadius: '10px',
+                    border: '1.5px solid var(--cp-line, #E3D6C6)',
+                    background: 'var(--cp-white, #FFFFFF)',
+                    padding: '10px',
+                    fontSize: '14px',
+                    fontFamily: 'inherit',
+                  }}
+                />
+                <CampoCodigoSupervisor
+                  id="codigo-supervisor-mozo"
+                  valor={pinSupervisor}
+                  onChange={setPinSupervisor}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSinVoucher(false);
+                    setMotivoSinVoucher('');
+                    setPinSupervisor('');
+                  }}
+                  style={{
+                    minHeight: '40px',
+                    border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                    borderRadius: '10px',
+                    background: 'transparent',
+                    color: 'var(--cp-navy, #0B2C3E)',
+                    fontWeight: 700,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Volver a pedir la foto
+                </button>
+              </div>
+            )}
+
             {/* Botón de cobro: solo si el padre entrega «alCobrar» (hoy ninguna vista lo hace; el cajero cobra) */}
             {alCobrar && (
               <button
@@ -310,7 +413,7 @@ export function ModalPrecuenta({
               >
                 {cobroExitoso
                   ? 'Cobro registrado'
-                  : esDigital && !voucherLegible
+                  : !puedeConfirmarCobro
                   ? 'Sube el voucher para cobrar'
                   : `Confirmar cobro (${medioSeleccionado})`}
               </button>
@@ -368,7 +471,7 @@ export function ModalPrecuenta({
       <Confirmar
         abierto={confirmarCobrar}
         titulo={`¿Confirmar cobro de ${mesa}?`}
-        mensaje={`Queda registrado el cobro de S/ ${Number(total || 0).toFixed(2)} mediante ${medioSeleccionado}.`}
+        mensaje={`Queda registrado el cobro de S/ ${Number(total || 0).toFixed(2)} mediante ${medioSeleccionado}${conExcepcion && excepcionLista ? ' sin comprobante (con código del supervisor)' : ''}.`}
         textoConfirmar="Sí, registrar cobro"
         textoNo="No, cancelar"
         cargando={cobrando}

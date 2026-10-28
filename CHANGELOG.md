@@ -6,6 +6,9 @@ Todos los cambios notables del proyecto Caprichos se documentan en este archivo.
 
 ## 2026-10-28
 
+### Cobro sin comprobante también para el mozo (excepción con código del supervisor)
+- **Regla**: el mozo que cobra un pago digital (Yape o Plin) sin foto legible puede usar la excepción: motivo (mínimo 5 letras) y código de 6 dígitos que le dicta el supervisor presente. Misma regla `exigirComprobanteDigital` y misma auditoría `COBRAR_SIN_VOUCHER` con su usuario; un código inválido no cobra. No se le dieron permisos nuevos (ya tenía `mesas/abrir`, que habilita el cobro).
+
 ### Comprobante útil en todo pago digital: ILEGIBLE no cuenta, coordinado con foto y voucher obligatorio para todos
 - **Causa**: un voucher que la IA marcaba ILEGIBLE todavía valía como comprobante al cobrar y al confirmar el pago; el pago coordinado (`POST /admin/caja/pedidos/:id/coordinado`) se marcaba sin foto; y el parámetro `voucher_mozo_obligatorio` dejaba al mozo sin exigencia si estaba en `false`.
 - **Regla**: todo pago digital (Yape, Plin, transferencia) necesita una foto útil enlazada al pedido. Un voucher `ILEGIBLE` no cuenta. Sin foto útil, Caja y Administrador pueden seguir con motivo y código del supervisor (auditado). El mozo no tiene excepción: debe subir otra foto o avisar a Caja.

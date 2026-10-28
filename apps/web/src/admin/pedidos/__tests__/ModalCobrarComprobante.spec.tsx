@@ -103,7 +103,7 @@ describe('ModalCobrar: comprobante del pago digital', () => {
     fireEvent.change(input, { target: { files: [new File(['foto'], 'yape.jpg', { type: 'image/jpeg' })] } });
 
     expect(
-      await screen.findByText('No se lee: sube otra foto o confirma sin comprobante con código del supervisor.'),
+      await screen.findByText('No se lee o no hay foto: sube otra foto o pide el código al supervisor.'),
     ).toBeDefined();
     expect(screen.queryByTestId('voucher-guardado')).toBeNull();
     expect(screen.getByRole('button', { name: 'Registrar cobro' })).toBeDisabled();
@@ -117,7 +117,7 @@ describe('ModalCobrar: comprobante del pago digital', () => {
     fireEvent.change(screen.getByTestId('input-voucher-archivo'), {
       target: { files: [new File(['foto'], 'yape.jpg', { type: 'image/jpeg' })] },
     });
-    await screen.findByText(/No se lee: sube otra foto/);
+    await screen.findByText(/No se lee o no hay foto: sube otra foto/);
 
     fireEvent.click(screen.getByTestId('btn-sin-voucher'));
     fireEvent.change(screen.getByTestId('motivo-sin-voucher'), { target: { value: 'La foto salió borrosa' } });

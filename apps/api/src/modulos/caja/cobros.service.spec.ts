@@ -748,13 +748,35 @@ describe('CobrosService', () => {
       );
     });
 
-    it('MOZO siempre exigido: con voucher_mozo_obligatorio=false y sin foto -> 400 VOUCHER_REQUERIDO', async () => {
+    it('MOZO sin foto ni excepción -> 400 VOUCHER_REQUERIDO, sin consultar parámetros', async () => {
       sinFoto();
-      prismaMock.parametro.findUnique.mockResolvedValue({ clave: 'voucher_mozo_obligatorio', valor: false });
       await expect(service.cobrar({ pedidoId: '100', pagos: pagoYape }, mozoUsuario)).rejects.toMatchObject({
         response: { codigo: 'VOUCHER_REQUERIDO' },
       });
+      expect(prismaMock.parametro.findUnique).not.toHaveBeenCalled();
       expect(prismaMock.cobro.create).not.toHaveBeenCalled();
+    });
+
+    it('MOZO sin foto con motivo y código del supervisor válidos -> cobra y audita COBRAR_SIN_VOUCHER con su partyId', async () => {
+      sinFoto();
+      const res = await service.cobrar(
+        {
+          pedidoId: '100',
+          pagos: pagoYape,
+          sinVoucher: { motivo: 'El cliente no tenía señal', pinSupervisor: '123456' },
+        } as any,
+        mozoUsuario,
+      );
+
+      expect(res.id).toBe('77');
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accion: 'COBRAR_SIN_VOUCHER',
+          partyId: 3n,
+          motivo: 'El cliente no tenía señal',
+          conPinAdmin: true,
+        }),
+      );
     });
   });
 

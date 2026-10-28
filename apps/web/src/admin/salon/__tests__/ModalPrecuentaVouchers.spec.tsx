@@ -97,4 +97,54 @@ describe('ModalPrecuenta - Flujo de cobro del mozo con vouchers digitales', () =
       expect(alCobrar).toHaveBeenCalledWith('Efectivo', undefined);
     });
   });
+  describe('cobro sin comprobante del mozo (excepción con código del supervisor)', () => {
+    const abrirSinComprobante = () => {
+      render(<ModalPrecuenta {...propsBase} pedidoId="P-20" alCobrar={vi.fn()} />);
+      fireEvent.click(screen.getByText('Yape'));
+      fireEvent.click(screen.getByTestId('btn-mozo-sin-comprobante'));
+    };
+
+    it('motivo corto (4 letras, menos de 5) mantiene bloqueado el cobro', () => {
+      abrirSinComprobante();
+      fireEvent.change(screen.getByTestId('motivo-mozo-sin-voucher'), { target: { value: 'nope' } });
+      fireEvent.change(screen.getByTestId('input-codigo-supervisor'), { target: { value: '123456' } });
+
+      const btnCobro = screen.getByTestId('btn-confirmar-cobro-mozo');
+      expect(btnCobro.hasAttribute('disabled')).toBe(true);
+    });
+
+    it('código del supervisor vacío mantiene bloqueado el cobro', () => {
+      abrirSinComprobante();
+      fireEvent.change(screen.getByTestId('motivo-mozo-sin-voucher'), {
+        target: { value: 'La red del local falló' },
+      });
+
+      const btnCobro = screen.getByTestId('btn-confirmar-cobro-mozo');
+      expect(btnCobro.hasAttribute('disabled')).toBe(true);
+    });
+
+    it('motivo y código de 6 dígitos habilitan el cobro y envían sinVoucher tras el Sí', async () => {
+      const alCobrar = vi.fn();
+      render(<ModalPrecuenta {...propsBase} pedidoId="P-20" alCobrar={alCobrar} />);
+      fireEvent.click(screen.getByText('Yape'));
+      fireEvent.click(screen.getByTestId('btn-mozo-sin-comprobante'));
+
+      fireEvent.change(screen.getByTestId('motivo-mozo-sin-voucher'), {
+        target: { value: 'La red del local falló' },
+      });
+      fireEvent.change(screen.getByTestId('input-codigo-supervisor'), { target: { value: '123456' } });
+
+      const btnCobro = screen.getByTestId('btn-confirmar-cobro-mozo');
+      expect(btnCobro.hasAttribute('disabled')).toBe(false);
+      fireEvent.click(btnCobro);
+      fireEvent.click(screen.getByText('Sí, registrar cobro'));
+
+      await waitFor(() => {
+        expect(alCobrar).toHaveBeenCalledWith('Yape', undefined, {
+          motivo: 'La red del local falló',
+          pinSupervisor: '123456',
+        });
+      });
+    });
+  });
 });

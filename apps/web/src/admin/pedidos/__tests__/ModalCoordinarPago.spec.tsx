@@ -97,7 +97,7 @@ describe('ModalCoordinarPago', () => {
 
     subirFoto();
     expect(
-      await screen.findByText('No se lee: sube otra foto o confirma sin comprobante con código del supervisor.'),
+      await screen.findByText('No se lee o no hay foto: sube otra foto o pide el código al supervisor.'),
     ).toBeDefined();
     expect(screen.getByRole('button', { name: 'Marcar coordinado' })).toBeDisabled();
     expect(marcar).not.toHaveBeenCalled();
@@ -108,7 +108,7 @@ describe('ModalCoordinarPago', () => {
     render(<ModalCoordinarPago pedido={pedidoYape} alCerrar={alCerrar} alCoordinado={alCoordinado} />);
 
     subirFoto();
-    await screen.findByText(/No se lee: sube otra foto/);
+    await screen.findByText(/No se lee o no hay foto: sube otra foto/);
 
     fireEvent.click(screen.getByTestId('btn-coordinar-sin-voucher'));
     fireEvent.change(screen.getByLabelText(/Motivo/), { target: { value: 'El cliente no tiene la captura' } });
