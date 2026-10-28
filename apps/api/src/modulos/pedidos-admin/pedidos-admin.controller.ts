@@ -76,6 +76,12 @@ export class PedidosAdminController {
     return this.pedidosEstadoService.listarCocina(query.historial, req.usuario);
   }
 
+  @Get('no-entregados')
+  @Permiso('pedidos', 'ver')
+  async listarNoEntregados() {
+    return this.pedidosEstadoService.listarNoEntregados();
+  }
+
   @Get(':id')
   @Permiso('pedidos', 'ver')
   async obtenerPorId(@Param('id') id: string, @Req() req: any) {

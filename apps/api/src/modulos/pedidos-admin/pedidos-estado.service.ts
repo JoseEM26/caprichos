@@ -31,11 +31,25 @@ import { CambiarEstadoDto } from './dto/cambiar-estado.dto';
 import { RegistrarPagoDto } from './dto/registrar-pago.dto';
 import { AvisosPedidoService } from '../chatbot/servicios/avisos-pedido.service';
 import {
+  ESTADO_REPROG,
+  MOTIVO_RETIRO,
+  NUMERO_PREGUNTA_REPROG,
+} from '../chatbot/servicios/reprogramacion.service';
+import {
   calcularSiguienteMedianocheLima,
   obtenerInicioDiaLima,
 } from '../cocina/cocina.util';
 
 export type ColorEspera = 'verde' | 'naranja' | 'rojo';
+
+/** Estado de la pregunta de reprogramar (mensaje_reparto etapa 5), en la forma que ve el admin. */
+const PREGUNTA_REPROG_VISTA: Record<string, string> = {
+  [ESTADO_REPROG.ENVIADO]: 'ESPERANDO',
+  [ESTADO_REPROG.REPROGRAMAR]: 'SI',
+  [ESTADO_REPROG.NO_REPROGRAMAR]: 'NO',
+  [ESTADO_REPROG.SIN_RESPUESTA]: 'SIN_RESPUESTA',
+  [ESTADO_REPROG.TOPE_ALCANZADO]: 'TOPE',
+};
 
 export const METODOS_PAGO_PERMITIDOS = [
   'EFECTIVO',
@@ -252,6 +266,89 @@ export class PedidosEstadoService {
       pagina,
       limite,
       items,
+    };
+  }
+
+  /**
+   * "No entregados" (GET /admin/pedidos/no-entregados, pedidos/ver), solo lectura:
+   *  - reprogramar: delivery LISTO sin repartidor por NO_CONTESTA (retiro por espera agotada),
+   *    salvo los ya reenviados a reparto (REPROGRAMADO).
+   *  - cancelados: delivery ANULADO por esa misma causa (el cliente dijo no, sin respuesta o tope).
+   * La pregunta de reprogramar sale de mensaje_reparto (etapa 5).
+   */
+  async listarNoEntregados() {
+    const incluir = {
+      incidentes: {
+        where: { motivo: MOTIVO_RETIRO },
+        orderBy: { en: 'desc' as const },
+        take: 1,
+        select: { en: true },
+      },
+      mensajesReparto: {
+        where: { numero: NUMERO_PREGUNTA_REPROG },
+        take: 1,
+        select: { estado: true },
+      },
+    };
+    const [porReprogramar, cancelados] = await Promise.all([
+      this.prisma.pedido.findMany({
+        where: {
+          estado: 'LISTO',
+          motivo_falla: MOTIVO_RETIRO,
+          repartidor_party_id: null,
+          NOT: {
+            mensajesReparto: {
+              some: { numero: NUMERO_PREGUNTA_REPROG, estado: ESTADO_REPROG.REPROGRAMADO },
+            },
+          },
+        },
+        include: incluir,
+        orderBy: { creado_en: 'desc' },
+        take: 200,
+      }),
+      this.prisma.pedido.findMany({
+        where: {
+          estado: 'ANULADO',
+          mensajesReparto: {
+            some: {
+              numero: NUMERO_PREGUNTA_REPROG,
+              estado: {
+                in: [ESTADO_REPROG.NO_REPROGRAMAR, ESTADO_REPROG.SIN_RESPUESTA, ESTADO_REPROG.TOPE_ALCANZADO],
+              },
+            },
+          },
+        },
+        include: incluir,
+        orderBy: { anulado_en: 'desc' },
+        take: 200,
+      }),
+    ]);
+
+    const filas = (p: any, enLista: boolean) => {
+      const pago = String(p.pago_estado || '').toUpperCase();
+      const pregunta = p.mensajesReparto?.[0]?.estado as string | undefined;
+      return {
+        id: String(p.id),
+        codigo: p.codigo,
+        cliente_nombre: p.cliente_nombre ?? null,
+        cliente_telefono: p.cliente_telefono ?? null,
+        total: Number(p.total),
+        motivo: enLista
+          ? 'No contestó al repartidor (retiro por espera agotada)'
+          : p.motivo_anulacion || 'Sin motivo registrado',
+        retirado_en: p.incidentes?.[0]?.en ?? null,
+        pregunta: PREGUNTA_REPROG_VISTA[pregunta ?? ''] ?? 'SIN_PREGUNTA',
+        pago_estado: p.pago_estado ?? null,
+        revisar_devolucion: !enLista && (pago === 'PAGADO' || pago === 'COORDINADO'),
+      };
+    };
+
+    const reprogramar = porReprogramar.map((p) => filas(p, true));
+    const cancelacion = cancelados.map((p) => filas(p, false));
+    return {
+      reprogramar,
+      cancelados: cancelacion,
+      total: reprogramar.length + cancelacion.length,
     };
   }
 

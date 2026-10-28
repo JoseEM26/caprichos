@@ -10,6 +10,7 @@ sugerencias:
   - Como cobro un pedido y registro el vuelto
   - Por que un pedido con pago digital no aparece en cocina
   - Como anulo un pedido que el cliente cancelo
+  - Donde veo el pedido de delivery que no se entrego
 ---
 # Pedidos y caja
 
@@ -72,6 +73,14 @@ Ver tambien: [[historial]]
 5. Pulsar Enviar a cocina o Cobrar directamente.
 Antes: [[plano]]
 Despues: [[cocina]]
+
+## Como se hace: Revisar los pedidos no entregados (delivery)
+1. Pulsar la pestana No entregados en la barra de pestanas. El contador indica cuantos pedidos de delivery no llegaron al cliente.
+2. Por reprogramar: el repartidor se retiro por espera agotada y el pedido sigue sin repartidor. Cada fila muestra el codigo, el cliente, el telefono (pulsarlo llama), el total, el motivo, la hora del retiro y el estado de la pregunta: Esperando respuesta del cliente, Dijo que si quiere reprogramar, Dijo que no, Sin respuesta o Sin pregunta registrada.
+3. Cuando el cliente dijo que si, aparece el boton Reprogramar / Reenviar a reparto. Pulsarlo, revisar el aviso y confirmar con Si, confirmar. El pedido vuelve a Para elegir con la marca Reprogramado y se avisa al cliente por WhatsApp. Ese boton solo lo ve quien puede liquidar en Repartos.
+4. Cancelados por no recibir: pedidos anulados porque el cliente no quiso reprogramar, no respondio o llego al limite de reprogramaciones. El motivo queda visible. Si el pedido ya estaba pagado, aparece la marca Revisar devolucion: el sistema no devuelve dinero solo, hay que devolverlo al cliente desde caja.
+5. Cualquier cambio en estos pedidos (un SI, un NO o un reenvio) actualiza la pestana sin recargar la pagina.
+Ver tambien: [[repartos]]
 
 ## Errores y dudas comunes
 - Un pedido con pago digital (Yape o Plin) no aparecera en cocina hasta que su comprobante sea aprobado; si la cocina reclama que no ve el pedido, verifique si el voucher sigue pendiente de aprobacion en el modulo de Mensajes.

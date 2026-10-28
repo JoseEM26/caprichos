@@ -102,6 +102,28 @@ export interface FiltrosListarPedidos {
   hasta?: string;
 }
 
+/** Pregunta de reprogramar tras el retiro: esperando, dijo sí/no, sin respuesta, tope o sin pregunta. */
+export type PreguntaNoEntregado = 'ESPERANDO' | 'SI' | 'NO' | 'SIN_RESPUESTA' | 'TOPE' | 'SIN_PREGUNTA';
+
+export interface NoEntregado {
+  id: string;
+  codigo: string;
+  cliente_nombre: string | null;
+  cliente_telefono: string | null;
+  total: number;
+  motivo: string;
+  retirado_en: string | null;
+  pregunta: PreguntaNoEntregado;
+  pago_estado: string | null;
+  revisar_devolucion: boolean;
+}
+
+export interface RespuestaNoEntregados {
+  reprogramar: NoEntregado[];
+  cancelados: NoEntregado[];
+  total: number;
+}
+
 export interface RespuestaListarPedidos {
   total: number;
   pagina: number;
@@ -208,6 +230,11 @@ export const pedidosApi = {
 
   async obtenerPorId(id: string | number): Promise<Pedido> {
     return api.get<Pedido>(`/admin/pedidos/${id}`);
+  },
+
+  /** Delivery no entregados: por reprogramar (LISTO sin repartidor) y cancelados por no recibir. */
+  async listarNoEntregados(): Promise<RespuestaNoEntregados> {
+    return api.get<RespuestaNoEntregados>('/admin/pedidos/no-entregados');
   },
 
   async cambiarEstado(

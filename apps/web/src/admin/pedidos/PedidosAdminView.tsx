@@ -2,8 +2,10 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { useEventos } from '../../comun/socket';
-import { pedidosApi, Pedido } from './pedidosApi';
+import { pedidosApi, Pedido, RespuestaNoEntregados } from './pedidosApi';
 import { PedidoDetalle } from './PedidoDetalle';
+import { PanelNoEntregados } from './PanelNoEntregados';
+import { useSesion } from '../../comun/sesion';
 import { ModalNuevoPedidoMesa } from '../salon/componentes/ModalNuevoPedidoMesa';
 import { salonApi } from '../salon/api';
 import type { PisoSalon } from '../salon/tipos';
@@ -62,10 +64,10 @@ export function getBadge(p: Pedido) {
   }
 }
 
-export type ClaveTabCaja = 'nuevo' | 'coord' | 'curso' | 'cerrado';
+export type ClaveTabCaja = 'nuevo' | 'coord' | 'curso' | 'cerrado' | 'no_entregados';
 
 interface TabDef {
-  id: ClaveTabCaja;
+  id: Exclude<ClaveTabCaja, 'no_entregados'>;
   n: string;
   filtro: (p: Pedido) => boolean;
 }
@@ -179,6 +181,26 @@ export function PedidosAdminView() {
   // Alerta sonora y visual
   const [pedidosResaltados, setPedidosResaltados] = useState<Set<string>>(new Set());
 
+  // Delivery no entregados (pestaña propia, con su contador)
+  const { tiene } = useSesion();
+  const puedeLiquidar = tiene('repartos/liquidar');
+  const [noEntregados, setNoEntregados] = useState<RespuestaNoEntregados | null>(null);
+  const [cargandoNoEntregados, setCargandoNoEntregados] = useState<boolean>(false);
+  const [errorNoEntregados, setErrorNoEntregados] = useState<string>('');
+
+  const cargarNoEntregados = useCallback(async () => {
+    setCargandoNoEntregados(true);
+    try {
+      const datos = await pedidosApi.listarNoEntregados();
+      setNoEntregados(datos);
+      setErrorNoEntregados('');
+    } catch (err: any) {
+      setErrorNoEntregados(err?.message || 'No se pudieron cargar los pedidos no entregados');
+    } finally {
+      setCargandoNoEntregados(false);
+    }
+  }, []);
+
   // Carga inicial y refresco
   const cargarDatos = useCallback(async () => {
     setErrorCarga('');
@@ -194,11 +216,17 @@ export function PedidosAdminView() {
 
   useEffect(() => {
     cargarDatos();
-  }, [cargarDatos]);
+    void cargarNoEntregados();
+  }, [cargarDatos, cargarNoEntregados]);
 
   const cambiarTab = (nuevaTab: ClaveTabCaja) => {
     setTabActiva(nuevaTab);
     setPaginaActual(1);
+    if (nuevaTab === 'no_entregados') {
+      void cargarNoEntregados();
+      setPedidoSeleccionadoId(null);
+      return;
+    }
     const tabDef = TABS_CAJA.find((t) => t.id === nuevaTab);
     const filtro = tabDef ? tabDef.filtro : () => true;
     const q = busqueda.trim().toLowerCase();
@@ -275,8 +303,14 @@ export function PedidosAdminView() {
     });
   });
 
+  // Retiro por espera agotada o cambio de estado: refresca la pestaña No entregados
+  useEventos('reparto:incidente', () => {
+    void cargarNoEntregados();
+  });
+
   useEventos('pedido:estado', (datos: { id: string | number; estado?: string }) => {
     const idStr = String(datos.id);
+    void cargarNoEntregados();
     setPedidos((prev) =>
       prev.map((p) => (String(p.id) === idStr && datos.estado ? { ...p, estado: datos.estado } : p)),
     );
@@ -294,7 +328,7 @@ export function PedidosAdminView() {
 
   // Conteo de pestañas
   const conteosTabs = useMemo(() => {
-    const res: Record<ClaveTabCaja, number> = {
+    const res: Record<Exclude<ClaveTabCaja, 'no_entregados'>, number> = {
       nuevo: 0,
       coord: 0,
       curso: 0,
@@ -324,6 +358,8 @@ export function PedidosAdminView() {
 
   // Lista filtrada
   const pedidosFiltrados = useMemo(() => {
+    // La pestaña No entregados no usa esta lista: su panel lee la consulta propia
+    if (tabActiva === 'no_entregados') return [];
     const tabDef = TABS_CAJA.find((t) => t.id === tabActiva);
     const filtroTab = tabDef ? tabDef.filtro : () => true;
     const q = busqueda.trim().toLowerCase();
@@ -474,9 +510,30 @@ export function PedidosAdminView() {
                 </button>
               );
             })}
+            <button
+              key="no_entregados"
+              role="tab"
+              aria-selected={tabActiva === 'no_entregados'}
+              type="button"
+              onClick={() => cambiarTab('no_entregados')}
+              style={{
+                minHeight: 44,
+                padding: '0 14px',
+                borderRadius: 9999,
+                border: '1.5px solid var(--cp-rust, #B2500F)',
+                background: tabActiva === 'no_entregados' ? 'var(--cp-rust, #B2500F)' : 'transparent',
+                color: tabActiva === 'no_entregados' ? 'var(--cp-white, #FFFFFF)' : 'var(--cp-rust, #B2500F)',
+                fontWeight: 700,
+                fontSize: 14,
+                cursor: 'pointer',
+              }}
+            >
+              No entregados · {noEntregados?.total ?? 0}
+            </button>
           </div>
 
-          {/* Buscador y Filtros */}
+          {/* Buscador y Filtros (no aplican a No entregados) */}
+          {tabActiva !== 'no_entregados' && (
           <div
             style={{
               background: 'var(--cp-white, #FFFFFF)',
@@ -828,9 +885,20 @@ export function PedidosAdminView() {
               </div>
             )}
           </div>
+          )}
         </div>
 
-        {/* LISTA DE PEDIDOS */}
+        {tabActiva === 'no_entregados' ? (
+          <div className="cj-scroll" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <p style={{ margin: 0, fontSize: 14, lineHeight: '20px', color: 'var(--cp-navy, #0B2C3E)' }}>
+              Pedidos de delivery que no llegaron al cliente: el repartidor se retiró por espera agotada.
+            </p>
+            <p style={{ margin: 0, fontSize: 13, lineHeight: '18px', color: 'var(--cp-soft, #2C4C5D)' }}>
+              Revisa a la derecha los que el cliente acepta reprogramar y los que quedaron cancelados.
+            </p>
+          </div>
+        ) : (
+        /* LISTA DE PEDIDOS */
         <div className="cj-scroll" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
           {pedidosPaginados.length === 0 ? (
             <div style={{ padding: 24, textAlign: 'center', color: 'var(--cp-soft, #2C4C5D)', fontSize: 13 }}>
@@ -895,6 +963,7 @@ export function PedidosAdminView() {
             })
           )}
         </div>
+        )}
 
         {/* PIE CON PAGINACIÓN */}
         <div className="cj-foot">
@@ -963,7 +1032,18 @@ export function PedidosAdminView() {
 
       {/* PANEL DERECHO */}
       <div className="cj-right">
-        {!pedidoSeleccionado ? (
+        {tabActiva === 'no_entregados' ? (
+          <PanelNoEntregados
+            datos={noEntregados}
+            cargando={cargandoNoEntregados}
+            error={errorNoEntregados}
+            puedeLiquidar={puedeLiquidar}
+            alActualizar={() => {
+              void cargarNoEntregados();
+              void cargarDatos();
+            }}
+          />
+        ) : !pedidoSeleccionado ? (
           <div
             style={{
               flex: 1,

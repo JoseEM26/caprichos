@@ -25,6 +25,16 @@ export interface PedidoDetalleProps {
 
 type TabDetalle = 'pedido' | 'cobro' | 'ticket' | 'etiquetas' | 'comprobante';
 
+/** Fila etiqueta-valor de una tarjeta del detalle. */
+function FilaDato({ etiqueta, valor }: { etiqueta: string; valor: string }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, fontSize: 14 }}>
+      <span style={{ color: 'var(--cp-soft, #2C4C5D)' }}>{etiqueta}</span>
+      <span style={{ fontWeight: 700, textAlign: 'right' }}>{valor}</span>
+    </div>
+  );
+}
+
 export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalleProps) {
   const [tab, setTab] = useState<TabDetalle>('pedido');
 
@@ -271,14 +281,14 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
                 type="button"
                 onClick={() => setTab(t.id)}
                 style={{
-                  minHeight: 38,
-                  padding: '0 14px',
+                  minHeight: 44,
+                  padding: '0 18px',
                   borderRadius: 9999,
                   border: '1.5px solid var(--cp-navy, #0B2C3E)',
                   background: activo ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
                   color: activo ? 'var(--cp-cream, #FBF4EC)' : 'var(--cp-navy, #0B2C3E)',
                   fontWeight: 700,
-                  fontSize: 13,
+                  fontSize: 14,
                   cursor: 'pointer',
                 }}
               >
@@ -289,10 +299,12 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
         </div>
       </div>
 
-      <div className="cj-scroll" style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div className="cj-scroll cj-detalle-cuerpo" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {/* TAB: PEDIDO */}
         {tab === 'pedido' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div className="cj-dos">
+            <section className="cj-card" aria-label="Productos del pedido">
+              <div className="cj-card-titulo">Productos</div>
             {pedido.lineas && pedido.lineas.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {pedido.lineas.map((it, idx) => (
@@ -327,16 +339,31 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
             )}
 
             {pedido.nota && (
-              <div style={{ border: '1.5px dashed var(--cp-soft, #2C4C5D)', borderRadius: 12, padding: 10, fontSize: 13 }}>
+              <div style={{ border: '1.5px dashed var(--cp-soft, #2C4C5D)', borderRadius: 12, padding: 10, fontSize: 14 }}>
                 Nota para cocina: {pedido.nota}
               </div>
             )}
+            </section>
+            <section className="cj-card" aria-label="Resumen del pedido">
+              <div className="cj-card-titulo">Resumen y cobro</div>
+              <FilaDato etiqueta="Estado del pago" valor={estaPagado ? 'Pagado' : 'Pendiente'} />
+              <FilaDato etiqueta="Medio de pago" valor={pedido.pago_metodo || pedido.pago_preferido || 'Efectivo'} />
+              <FilaDato etiqueta="Subtotal" valor={`S/ ${Number(pedido.subtotal || 0).toFixed(2)}`} />
+              {Number(pedido.descuento || 0) > 0 && (
+                <FilaDato etiqueta="Descuento" valor={`- S/ ${Number(pedido.descuento || 0).toFixed(2)}`} />
+              )}
+              {Number(pedido.envio || 0) > 0 && (
+                <FilaDato etiqueta="Envío" valor={`S/ ${Number(pedido.envio || 0).toFixed(2)}`} />
+              )}
+            </section>
           </div>
         )}
 
         {/* TAB: COBRO */}
         {tab === 'cobro' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div className="cj-dos">
+            <section className="cj-card" aria-label="Estado del cobro">
+              <div className="cj-card-titulo">Cobro</div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>Estado del pago</span>
               <span
@@ -388,6 +415,8 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
               </span>
             </div>
 
+            </section>
+            <section className="cj-card" aria-label="Total a cobrar">
             {esMesa && (
               <div>
                 <div style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)', marginBottom: 6 }}>
@@ -426,12 +455,14 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
               <span>Total</span>
               <span>S/ {totalNum.toFixed(2)}</span>
             </div>
+            </section>
           </div>
         )}
 
         {/* TAB: TICKET DE COCINA */}
         {tab === 'ticket' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div className="cj-dos">
+            <section className="cj-card" aria-label="Ticket de cocina">
             <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 14 }}>
               Ticket impreso (comanda de cocina, papel de 80 mm)
             </div>
@@ -501,7 +532,9 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
               <div style={{ textAlign: 'center' }}>Imprime: Cocina caliente</div>
               <div style={{ textAlign: 'center' }}>Gracias por tu capricho</div>
             </div>
-            <div style={{ fontSize: 12, lineHeight: '17px', color: 'var(--cp-soft, #2C4C5D)' }}>
+            </section>
+            <section className="cj-card" aria-label="Reimprimir el ticket">
+            <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--cp-soft, #2C4C5D)' }}>
               Las etiquetas adhesivas (general, por área y por bebida) están en la pestaña Etiquetas.
             </div>
             <button
@@ -524,6 +557,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
                 {msgTicket}
               </div>
             )}
+            </section>
           </div>
         )}
 
@@ -534,8 +568,9 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
 
         {/* TAB: COMPROBANTE */}
         {tab === 'comprobante' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 14 }}>
+          <div className="cj-dos">
+            <section className="cj-card" aria-label="Vista del comprobante">
+            <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 15 }}>
               Comprobante del cliente ({tipoComp})
             </div>
             <div
@@ -589,6 +624,8 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
                 <span style={{ fontSize: 12, fontWeight: 700 }}>Código: FIDELIDAD-0102</span>
               </div>
             </div>
+            </section>
+            <section className="cj-card" aria-label="Imprimir el comprobante">
             <button
               type="button"
               onClick={() => setMsgComprobante('Comprobante enviado a la impresora.')}
@@ -609,12 +646,13 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
                 {msgComprobante}
               </div>
             )}
+            </section>
           </div>
         )}
       </div>
 
       {/* FOOTER (.cj-foot) */}
-      <div className="cj-foot" style={{ gap: 8, padding: '12px 16px' }}>
+      <div className="cj-foot cj-detalle-pie" style={{ gap: 8 }}>
         {errorAccion && (
           <div role="alert" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-rust, #B2500F)' }}>
             {errorAccion}

@@ -126,6 +126,12 @@
       "modulo": "caja"
     },
     {
+      "id": "caja#revisar-los-pedidos-no-entregados-delivery",
+      "tipo": "tarea",
+      "etiqueta": "Revisar los pedidos no entregados (delivery)",
+      "modulo": "caja"
+    },
+    {
       "id": "cierre",
       "tipo": "modulo",
       "etiqueta": "Caja y cierres (cierre)",
@@ -395,6 +401,12 @@
       "id": "disenador#configurar-promociones-y-banner",
       "tipo": "tarea",
       "etiqueta": "configurar promociones y banner",
+      "modulo": "disenador"
+    },
+    {
+      "id": "disenador#cambiar-el-orden-el-tamano-y-la-posicion-de-la-carta",
+      "tipo": "tarea",
+      "etiqueta": "cambiar el orden, el tamaño y la posición de la carta",
       "modulo": "disenador"
     },
     {
@@ -1640,6 +1652,21 @@
       "destino": "cocina"
     },
     {
+      "tipo": "pertenece_a",
+      "origen": "caja#revisar-los-pedidos-no-entregados-delivery",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "caja#revisar-los-pedidos-no-entregados-delivery",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "caja",
+      "destino": "repartos"
+    },
+    {
       "tipo": "requiere_permiso",
       "origen": "cierre",
       "destino": "permiso:caja/ver"
@@ -2643,6 +2670,26 @@
       "tipo": "ver_tambien",
       "origen": "disenador",
       "destino": "novedades"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "disenador#cambiar-el-orden-el-tamano-y-la-posicion-de-la-carta",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "disenador#cambiar-el-orden-el-tamano-y-la-posicion-de-la-carta",
+      "destino": "novedades"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "disenador#cambiar-el-orden-el-tamano-y-la-posicion-de-la-carta",
+      "destino": "destacadas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "disenador",
+      "destino": "destacadas"
     },
     {
       "tipo": "pertenece_a",
