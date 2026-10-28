@@ -5,6 +5,7 @@ import { Boton } from '../../comun/Boton';
 import { enlaceGoogleMaps } from '../../comun/mapa/leaflet';
 import { clasificarEspera } from './calculoRuta';
 import { ModalReportarFalla } from './ModalReportarFalla';
+import { BotonEtapa, etapaDe } from './RepartidorView';
 
 interface ResumenPedidoRepartoProps {
   pedido: PedidoReparto;
@@ -96,6 +97,12 @@ export function ResumenPedidoReparto({
     { label: 'Llegado', hora: horaLlego, activo: !!horaLlego },
     { label: 'Entregado', hora: horaEntregado, activo: !!horaEntregado },
   ].filter((p) => p.activo);
+
+  const ejecutarEtapa = (p: PedidoReparto, etapa: string) => {
+    if (etapa === 'salir') acciones.salir(p);
+    else if (etapa === 'llegue') acciones.llegue(p);
+    else acciones.entregar(p);
+  };
 
   return (
     <div
@@ -488,92 +495,12 @@ export function ResumenPedidoReparto({
       )}
 
       {esMio && (
-        pedido.estado === 'LISTO' ? (
-          <button
-            type="button"
-            onClick={() => acciones.salir(pedido)}
-            disabled={acciones.cargandoAccion}
-            style={{
-              minHeight: '56px',
-              border: 'none',
-              borderRadius: '14px',
-              background: 'var(--cp-orange, #E67929)',
-              color: 'var(--cp-navy, #0B2C3E)',
-              fontFamily: 'Montserrat, sans-serif',
-              fontWeight: 800,
-              fontSize: '18px',
-              width: '100%',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(230, 121, 41, 0.35)',
-            }}
-          >
-            {acciones.cargandoAccion ? 'Marcando salida...' : 'En camino'}
-          </button>
-        ) : pedido.estado === 'EN_CAMINO' ? (
-          !pedido.llego_en ? (
-            <button
-              type="button"
-              onClick={() => acciones.llegue(pedido)}
-              disabled={acciones.cargandoAccion}
-              style={{
-                minHeight: '56px',
-                border: 'none',
-                borderRadius: '14px',
-                background: 'var(--cp-orange, #E67929)',
-                color: 'var(--cp-navy, #0B2C3E)',
-                fontFamily: 'Montserrat, sans-serif',
-                fontWeight: 800,
-                fontSize: '18px',
-                width: '100%',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 4px 12px rgba(230, 121, 41, 0.35)',
-              }}
-            >
-              {acciones.cargandoAccion ? 'Marcando llegada...' : 'He llegado'}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => acciones.entregar(pedido)}
-              disabled={acciones.cargandoAccion}
-              style={{
-                minHeight: '56px',
-                border: 'none',
-                borderRadius: '14px',
-                background: 'var(--cp-green, #2E8B57)',
-                color: '#FFFFFF',
-                fontFamily: 'Montserrat, sans-serif',
-                fontWeight: 800,
-                fontSize: '18px',
-                width: '100%',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 4px 12px rgba(46, 139, 87, 0.35)',
-              }}
-            >
-              {acciones.cargandoAccion ? 'Entregando...' : 'Entregado'}
-            </button>
-          )
-        ) : (
-          <div
-            style={{
-              fontSize: '13px',
-              fontWeight: 700,
-              color: 'var(--cp-soft, #5A6E78)',
-              textAlign: 'center',
-            }}
-          >
-            Estado del pedido: {pedido.estado}
-          </div>
-        )
+        <BotonEtapa
+          pedido={pedido}
+          etapa={etapaDe(pedido)}
+          grande
+          onAccion={ejecutarEtapa}
+        />
       )}
 
       {/* Si fue tomado por otro repartidor */}

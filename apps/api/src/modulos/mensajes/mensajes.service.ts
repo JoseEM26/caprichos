@@ -714,6 +714,12 @@ export class MensajesService {
       },
     });
 
+    // La foto del chat queda como prueba del pedido aprobado (si aún no tenía pedido)
+    await this.prisma.voucherPago.updateMany({
+      where: { conversacion_id: c.id, pedido_id: null },
+      data: { pedido_id: pedidoId },
+    });
+
     // Notificar eventos por socket (cocina y pedidos)
     this.eventos?.emitirAdmin('cocina:comanda-actualizada', { pedidoId: d.pedido.id });
     this.eventos?.emitirAdmin('pedido:estado', {
@@ -800,7 +806,7 @@ export class MensajesService {
       const notif = await this.prisma.notificacion.create({
         data: {
           tipo: 'ATENCION_WHATSAPP',
-          rol_destino: 'CAJA',
+          rol_destino: 'CAJERO',
           titulo: `Pago rechazado (3 intentos) - chat #${c.id}`,
           mensaje: `El cliente superó los 3 intentos de comprobante${motivo ? '. Motivo: ' + motivo : ''}. Requiere atención de Caja.`,
           enlace: '/admin/mensajes',

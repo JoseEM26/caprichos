@@ -1,3 +1,4 @@
+import { comoLista } from '../../comun/comoLista';
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type {
@@ -124,7 +125,7 @@ export function CocinaAdminView() {
   const cargarAreas = useCallback(async () => {
     try {
       const res = await listarAreasCocina();
-      setAreasApi(res);
+      setAreasApi(comoLista<AreaCocina>(res));
       return res;
     } catch {
       return [];

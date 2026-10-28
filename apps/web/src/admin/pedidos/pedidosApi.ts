@@ -182,6 +182,10 @@ export interface PagoItem {
 export interface CobrarDto {
   pedidoId: string | number;
   pagos: PagoItem[];
+  /** Foto del comprobante ya subida (POST /admin/vouchers). Queda enlazada al pedido. */
+  voucherId?: string | number;
+  /** Cobro digital sin foto: motivo escrito y código rotativo del supervisor. */
+  sinVoucher?: { motivo: string; pinSupervisor: string };
 }
 
 export const pedidosApi = {

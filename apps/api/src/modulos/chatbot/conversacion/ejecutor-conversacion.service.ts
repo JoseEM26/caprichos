@@ -1041,7 +1041,7 @@ export class EjecutorConversacionService {
           const notif = await this.prisma.notificacion.create({
             data: {
               tipo: 'ATENCION_WHATSAPP',
-              rol_destino: 'CAJA',
+              rol_destino: 'CAJERO',
               titulo: `Cliente solicita asesor en chat con pago pendiente (${nombreMostrar})`,
               mensaje: `El cliente solicitó asesor humano mientras su comprobante está en revisión.`,
               enlace: '/admin/mensajes',
@@ -1076,7 +1076,7 @@ export class EjecutorConversacionService {
           const notif = await this.prisma.notificacion.create({
             data: {
               tipo: 'ATENCION_WHATSAPP',
-              rol_destino: 'CAJA',
+              rol_destino: 'CAJERO',
               titulo: `Mensaje de cliente en chat con pago pendiente (${nombreMostrar})`,
               mensaje: `Cliente escribió: "${(entradaRaw.texto || entradaRaw.textoOriginal || '').slice(0, 100)}". Ya se le indicó que una persona le responde en breve.`,
               enlace: '/admin/mensajes',

@@ -1,3 +1,4 @@
+import { comoLista } from '../../comun/comoLista';
 import { useState, useEffect, useCallback } from 'react';
 import { Boton } from '../../comun/Boton';
 import { Confirmar } from '../../comun/Confirmar';
@@ -59,7 +60,7 @@ export function ModalCaja({
     setCargandoMovs(true);
     try {
       const datos = await pedidosApi.listarMovimientos();
-      setMovimientos(datos);
+      setMovimientos(comoLista<MovimientoCaja>(datos));
     } catch {
       // Ignorar
     } finally {
@@ -71,7 +72,7 @@ export function ModalCaja({
     setCargandoPorCobrar(true);
     try {
       const datos = await pedidosApi.listarPorCobrar();
-      setPorCobrarList(datos);
+      setPorCobrarList(comoLista<PedidoPorCobrar>(datos));
     } catch {
       // Ignorar
     } finally {

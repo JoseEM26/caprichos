@@ -145,23 +145,25 @@ Consulte el documento [`docs/operacion/PLANTILLAS-WHATSAPP.md`](./PLANTILLAS-WHA
 
 ## 5. Parámetros Operativos del Chatbot en el Panel Web
 
-El administrador puede encender o apagar cualquier aviso y modificar los tiempos de espera desde **Configuración del local → Parámetros del sistema** (`/admin/mirest?tab=parametros`):
+Los avisos al cliente de delivery se registran una vez por pedido y etapa (tabla `mensaje_reparto`) y se copian en `mensaje_chat`. Si un aviso está apagado no se envía ni se registra. El administrador puede encender o apagar cualquier aviso y modificar los tiempos de espera desde **Configuración del local → Parámetros del sistema** (`/admin/mirest?tab=parametros`):
 
 | Clave | Tipo | Valor por Defecto | Efecto Operativo |
 |---|:---:|:---:|---|
 | `chatbot_activo` | Sí/No | `true` | Interruptor general del motor conversacional del chatbot. |
 | `chatbot_ia_activo` | Sí/No | `false` | Activa la IA de lenguaje (OpenAI) para preguntas libres y recomendaciones. |
 | `chatbot_ia_tope_mensual_usd` | Numérico | `20` | Tope máximo mensual en USD antes de desconectar automáticamente la IA. |
-| `whatsapp_aviso_salida_activo` | Sí/No | `false` | Envía aviso 1 al cliente al marcarse la salida del repartidor. |
-| `whatsapp_aviso_llegada_activo` | Sí/No | `false` | Envía aviso 2 al cliente al marcarse la llegada a la puerta. |
-| `whatsapp_aviso_espera_activo` | Sí/No | `false` | Envía aviso de espera agotada y ofrece reprogramación con recargo. |
-| `whatsapp_aviso_recojo_activo` | Sí/No | `false` | Envía aviso cuando el pedido para llevar está listo en barra. |
-| `whatsapp_aviso_pago_confirmado_activo` | Sí/No | `false` | Envía confirmación al cliente cuando Caja aprueba el voucher. |
-| `whatsapp_aviso_encuesta_activo` | Sí/No | `false` | Activa el envío automático de la encuesta de satisfacción. |
+| `whatsapp_aviso_salida_activo` | Sí/No | `si` | Aviso 1 al cliente cuando el pedido sale en camino (evento de salida). |
+| `whatsapp_aviso_llegada_activo` | Sí/No | `si` | Aviso 2 al cliente al llegar a la puerta; también activa la insistencia (aviso 3). |
+| `whatsapp_aviso_espera_activo` | Sí/No | `si` | Aviso de espera agotada con reprogramación (4), y retiro automático de la movilidad (5). |
+| `whatsapp_aviso_recojo_activo` | Sí/No | `si` | Aviso cuando el pedido para llevar o recojo está listo en barra. |
+| `whatsapp_aviso_pago_confirmado_activo` | Sí/No | `si` | Aviso 6 al cliente cuando Caja acepta el pedido delivery o se confirma su pago. |
+| `whatsapp_aviso_listo_activo` | Sí/No | `si` | Aviso 7 al cliente cuando el pedido delivery queda LISTO en cocina. |
+| `whatsapp_aviso_entregado_activo` | Sí/No | `si` | Aviso 8 de agradecimiento al cliente cuando el pedido delivery se entrega. |
+| `whatsapp_aviso_encuesta_activo` | Sí/No | `si` | Activa el envío automático de la encuesta de satisfacción. |
 | `asistido_espera_min` | Numérico | `3` | Minutos de espera sin respuesta humana en ATENCION_PERSONA antes de activar el modo asistido del bot. |
-| `reparto_insistencia_min` | Numérico | `3` | Minutos en la puerta antes del aviso 3 de insistencia. |
-| `reparto_espera_max_min` | Numérico | `10` | Tolerancia máxima en puerta antes de retirar al motorizado. |
-| `reparto_recargo_reprogramacion` | Numérico | `0.00` | Recargo en soles por segundo intento de entrega tras reprogramación. |
+| `reparto_insistencia_min` | Numérico | `3` | Minutos en la puerta antes del aviso 3 de insistencia. Tras espera máxima + este valor, la movilidad se retira. |
+| `reparto_espera_max_min` | Numérico | `10` | Minutos en la puerta para avisar al cliente que la movilidad se retirará (espera agotada). |
+| `reparto_recargo_reprogramacion` | Numérico | `0.00` | Recargo en soles del segundo intento de entrega tras el retiro (incidente con motivo NO_CONTESTA). |
 | `encuesta_espera_min` | Numérico | `30` | Minutos posteriores a la entrega antes de enviar la encuesta. |
 | `encuesta_puntaje_queja` | Numérico | `2` | Calificación (1 a 5) a partir de la cual se genera queja automática. |
 

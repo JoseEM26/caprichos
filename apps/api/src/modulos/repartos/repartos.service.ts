@@ -27,6 +27,7 @@ import { ActualizarConfigRepartoDto } from './dto/actualizar-config-reparto.dto'
 import { IniciarRutaDto } from './dto/iniciar-ruta.dto';
 import { LiberarPedidoDto } from './dto/liberar-pedido.dto';
 import { ReasignarPedidoDto } from './dto/reasignar-pedido.dto';
+import { AvisosPedidoService } from '../chatbot/servicios/avisos-pedido.service';
 
 export type ColorEsperaReparto = 'VERDE' | 'RETRASADO' | 'TARDE' | 'MUY_TARDE';
 export type ColorEspera = 'verde' | 'naranja' | 'rojo' | ColorEsperaReparto;
@@ -42,6 +43,8 @@ export interface ParametrosReparto {
   naranjaMin: number;
   rojoMin: number;
   tomadoSinSalirMin: number;
+  esperaMaxMin: number;
+  insistenciaMin: number;
 }
 
 @Injectable()
@@ -51,6 +54,7 @@ export class RepartosService {
     private readonly auditoria: AuditoriaService,
     private readonly rutaService: RutaService,
     @Optional() private readonly eventosGateway?: EventosGateway,
+    @Optional() private readonly avisos?: AvisosPedidoService,
   ) {}
 
   private parsearId(id: bigint | string | number): bigint {
@@ -81,6 +85,8 @@ export class RepartosService {
     let maxPedidos = 5;
     let msg3Seg = 90;
     let tomadoSinSalirMin = 10;
+    let esperaMaxMin = 10;
+    let insistenciaMin = 3;
     let localCoords = COORDENADAS_LOCAL_DEFAULT;
 
     try {
@@ -94,6 +100,8 @@ export class RepartosService {
               'reparto_velocidad_kmh',
               'reparto_max_pedidos',
               'reparto_tomado_sin_salir_min',
+              'reparto_espera_max_min',
+              'reparto_insistencia_min',
               'rep_naranja_min',
               'rep_rojo_min',
               'rep_max_pedidos',
@@ -137,6 +145,14 @@ export class RepartosService {
           const v = Number(p.valor);
           if (!isNaN(v) && v > 0) maxPedidos = v;
         }
+        if (p.clave === 'reparto_espera_max_min' && p.valor != null) {
+          const v = Number(p.valor);
+          if (!isNaN(v) && v > 0) esperaMaxMin = v;
+        }
+        if (p.clave === 'reparto_insistencia_min' && p.valor != null) {
+          const v = Number(p.valor);
+          if (!isNaN(v) && v >= 0) insistenciaMin = v;
+        }
         if (p.clave === 'rep_msg3_seg' && p.valor != null) {
           const v = Number(p.valor);
           if (!isNaN(v) && v >= 0) msg3Seg = v;
@@ -172,6 +188,8 @@ export class RepartosService {
       naranjaMin: tardeMin,
       rojoMin: muyTardeMin,
       tomadoSinSalirMin,
+      esperaMaxMin,
+      insistenciaMin,
     };
   }
 
@@ -259,7 +277,16 @@ export class RepartosService {
       clienteTelefono = null;
     }
 
+    // Espera en puerta: minutos desde la llegada y si ya superó la espera máxima (aviso en pantalla del repartidor)
+    const esperaMin =
+      p.estado === 'EN_CAMINO' && p.llego_en && p.entregado_en == null
+        ? Math.floor((ahora.getTime() - new Date(p.llego_en).getTime()) / 60000)
+        : null;
+    const esperaAgotada = esperaMin != null && esperaMin >= config.esperaMaxMin;
+
     return {
+      espera_min: esperaMin,
+      espera_agotada: esperaAgotada,
       id: String(p.id),
       codigo: p.codigo,
       modalidad: p.modalidad,
@@ -330,6 +357,30 @@ export class RepartosService {
    * Pedidos del repartidor logueado en LISTO/EN_CAMINO con la ruta sugerida.
    * Devuelve { pedidos, orden: [ids], paso: [ids], ruta: [[lat,lng]...] }
    */
+  /** Avisos para la pantalla del repartidor: movilidades retiradas por espera agotada (últimas 2 horas). */
+  private async avisosRetiro(partyId: bigint) {
+    try {
+      const filas = await this.prisma.pedidoEstadoHistorial.findMany({
+        where: {
+          por_party_id: partyId,
+          motivo: 'Retiro por espera agotada',
+          en: { gte: new Date(Date.now() - 2 * 60 * 60 * 1000) },
+        },
+        include: { pedido: { select: { codigo: true } } },
+        orderBy: { en: 'desc' },
+        take: 10,
+      });
+      return filas.map((f) => ({
+        pedido_id: String(f.pedido_id),
+        codigo: f.pedido.codigo,
+        mensaje: `Se retiró la movilidad del pedido ${f.pedido.codigo} por espera agotada. El pedido quedó reprogramado.`,
+        en: f.en,
+      }));
+    } catch {
+      return [];
+    }
+  }
+
   async listarMios(usuario: UsuarioAutenticado) {
     const config = await this.obtenerParametrosReparto();
     const partyId = BigInt(usuario.partyId);
@@ -439,6 +490,7 @@ export class RepartosService {
 
     return {
       pedidos: propiosFormateados,
+      avisos: await this.avisosRetiro(partyId),
       orden: ordenCompleto,
       paso: rutaCalculada.paso,
       ruta: rutaCalculada.ruta,
@@ -843,7 +895,7 @@ export class RepartosService {
       id: Number(pedido.id),
       codigo: pedido.codigo,
       estado: pedido.estado,
-      repartidor_party_id: Number(partyId),
+      repartidor_party_id: String(partyId),
     });
 
     return this.formatearPedidoReparto(pedido, config, ahora, usuario);
@@ -902,26 +954,6 @@ export class RepartosService {
       },
     });
 
-    // Registrar aviso 1 pendiente
-    await this.prisma.mensajeReparto.upsert({
-      where: {
-        pedido_id_numero: {
-          pedido_id: pedidoId,
-          numero: 1,
-        },
-      },
-      create: {
-        pedido_id: pedidoId,
-        numero: 1,
-        enviado_en: ahora,
-        estado: 'PENDIENTE',
-      },
-      update: {
-        enviado_en: ahora,
-        estado: 'PENDIENTE',
-      },
-    });
-
     // Historial
     await this.prisma.pedidoEstadoHistorial.create({
       data: {
@@ -952,6 +984,8 @@ export class RepartosService {
       codigo: pedido.codigo,
       estado: 'EN_CAMINO',
     });
+
+    await this.avisos?.avisar(pedidoId, 'SALIDA');
 
     return this.formatearPedidoReparto(pedidoActualizado, config, ahora, usuario);
   }
@@ -1008,26 +1042,6 @@ export class RepartosService {
       },
     });
 
-    // Registrar aviso 2 pendiente
-    await this.prisma.mensajeReparto.upsert({
-      where: {
-        pedido_id_numero: {
-          pedido_id: pedidoId,
-          numero: 2,
-        },
-      },
-      create: {
-        pedido_id: pedidoId,
-        numero: 2,
-        enviado_en: ahora,
-        estado: 'PENDIENTE',
-      },
-      update: {
-        enviado_en: ahora,
-        estado: 'PENDIENTE',
-      },
-    });
-
     // Historial
     await this.prisma.pedidoEstadoHistorial.create({
       data: {
@@ -1059,6 +1073,8 @@ export class RepartosService {
       estado: pedido.estado,
       llego_en: ahora,
     });
+
+    await this.avisos?.avisar(pedidoId, 'LLEGADA');
 
     return this.formatearPedidoReparto(pedidoActualizado, config, ahora, usuario);
   }
@@ -1163,6 +1179,8 @@ export class RepartosService {
       estado: 'ENTREGADO',
     });
 
+    await this.avisos?.avisar(pedidoId, 'ENTREGADO');
+
     const formateado = this.formatearPedidoReparto(
       pedidoActualizado,
       config,
@@ -1206,35 +1224,10 @@ export class RepartosService {
       }
     }
 
-    let mensajes = await this.prisma.mensajeReparto.findMany({
+    const mensajes = await this.prisma.mensajeReparto.findMany({
       where: { pedido_id: pedidoId },
       orderBy: { numero: 'asc' },
     });
-
-    const mensaje2 = mensajes.find((m) => m.numero === 2);
-    const mensaje3 = mensajes.find((m) => m.numero === 3);
-
-    if (mensaje2 && !mensaje2.respondido_en && !mensaje3) {
-      const ahora = new Date();
-      const diffSeg =
-        (ahora.getTime() - new Date(mensaje2.enviado_en).getTime()) / 1000;
-
-      if (diffSeg >= config.msg3Seg) {
-        await this.prisma.mensajeReparto.create({
-          data: {
-            pedido_id: pedidoId,
-            numero: 3,
-            enviado_en: ahora,
-            estado: 'PENDIENTE',
-          },
-        });
-
-        mensajes = await this.prisma.mensajeReparto.findMany({
-          where: { pedido_id: pedidoId },
-          orderBy: { numero: 'asc' },
-        });
-      }
-    }
 
     return mensajes.map((m) => ({
       pedido_id: String(m.pedido_id),
@@ -1647,25 +1640,6 @@ export class RepartosService {
                 },
               });
 
-              await tx.mensajeReparto.upsert({
-                where: {
-                  pedido_id_numero: {
-                    pedido_id: p.id,
-                    numero: 1,
-                  },
-                },
-                create: {
-                  pedido_id: p.id,
-                  numero: 1,
-                  enviado_en: ahora,
-                  estado: 'PENDIENTE',
-                },
-                update: {
-                  enviado_en: ahora,
-                  estado: 'PENDIENTE',
-                },
-              });
-
               await tx.pedidoEstadoHistorial.create({
                 data: {
                   pedido_id: p.id,
@@ -1764,25 +1738,6 @@ export class RepartosService {
             },
           });
 
-          await tx.mensajeReparto.upsert({
-            where: {
-              pedido_id_numero: {
-                pedido_id: p.id,
-                numero: 1,
-              },
-            },
-            create: {
-              pedido_id: p.id,
-              numero: 1,
-              enviado_en: ahora,
-              estado: 'PENDIENTE',
-            },
-            update: {
-              enviado_en: ahora,
-              estado: 'PENDIENTE',
-            },
-          });
-
           await tx.pedidoEstadoHistorial.create({
             data: {
               pedido_id: p.id,
@@ -1846,6 +1801,10 @@ export class RepartosService {
         estado: 'EN_CAMINO',
         repartidor_party_id: String(partyId),
       });
+    }
+
+    for (const id of resultadoTransaccion.tomadosIds) {
+      await this.avisos?.avisar(id, 'SALIDA');
     }
 
     return {

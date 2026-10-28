@@ -1,6 +1,8 @@
+import { comoLista } from '../../comun/comoLista';
 import { useState } from 'react';
 import { Boton } from '../../comun/Boton';
 import { Confirmar } from '../../comun/Confirmar';
+import { BotonEtapa, BotonReportar, etapaDe } from './RepartidorView';
 import { Insignia } from '../../comun/Insignia';
 import { PedidoReparto, repartosApi, MensajeReparto } from './repartosApi';
 import { ModalReportarFalla } from './ModalReportarFalla';
@@ -60,7 +62,7 @@ export function TarjetaReparto({
     setCargandoMensajes(true);
     try {
       const res = await repartosApi.consultarMensajes(pedido.id);
-      setMensajes(res);
+      setMensajes(comoLista<MensajeReparto>(res));
       setMostrarMensajes(true);
     } catch {
       // Si falla, simplemente mostrar vacío
@@ -136,8 +138,8 @@ export function TarjetaReparto({
     }
 
     pedirConfirmacion(
-      '¿Tomar este pedido?',
-      `El pedido ${pedido.codigo} se asignará a tu usuario y desaparecerá de disponibles para otros repartidores.`,
+      '¿Seguro que quieres tomar este pedido?',
+      `Quedará asignado a ti (pedido ${pedido.codigo}) y desaparecerá de disponibles para otros repartidores.`,
       async () => {
         try {
           setCargandoAccion(true);
@@ -168,6 +170,12 @@ export function TarjetaReparto({
         }
       },
     );
+  };
+
+  const ejecutarEtapa = (_p: unknown, etapa: string) => {
+    if (etapa === 'salir') handleSalir();
+    else if (etapa === 'llegue') handleLlegue();
+    else handleEntregar();
   };
 
   const handleSalir = () => {
@@ -799,52 +807,8 @@ export function TarjetaReparto({
 
         {esMio && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {pedido.estado === 'LISTO' && (
-              <Boton
-                variante="primario"
-                onClick={handleSalir}
-                cargando={cargandoAccion}
-                style={{
-                  minHeight: '52px',
-                  fontSize: '16px',
-                  fontWeight: 800,
-                  width: '100%',
-                }}
-              >
-                Salir (En camino)
-              </Boton>
-            )}
-
-            {pedido.estado === 'EN_CAMINO' && (
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                {!pedido.llego_en && (
-                  <Boton
-                    variante="secundario"
-                    onClick={handleLlegue}
-                    cargando={cargandoAccion}
-                    style={{
-                      flex: '1 1 120px',
-                      minHeight: '48px',
-                      fontWeight: 800,
-                    }}
-                  >
-                    Llegué
-                  </Boton>
-                )}
-                <Boton
-                  variante="primario"
-                  onClick={handleEntregar}
-                  cargando={cargandoAccion}
-                  style={{
-                    flex: '2 1 140px',
-                    minHeight: '48px',
-                    fontWeight: 800,
-                  }}
-                >
-                  Entregar
-                </Boton>
-              </div>
-            )}
+            {/* Mismas etapas que la vista del repartidor: salir, llegué, entregar y reportar */}
+            <BotonEtapa pedido={pedido} etapa={etapaDe(pedido)} grande onAccion={ejecutarEtapa} />
 
             {/* Efectivo a rendir en mis pedidos */}
             {esEfectivoPendiente && (
@@ -853,26 +817,7 @@ export function TarjetaReparto({
               </div>
             )}
 
-            {/* Opción de reportar falla */}
-            {pedido.estado === 'EN_CAMINO' && (
-              <button
-                type="button"
-                onClick={() => setModalFallaAbierto(true)}
-                style={{
-                  minHeight: '44px',
-                  borderRadius: '10px',
-                  border: '1.5px solid var(--cp-rust)',
-                  background: 'transparent',
-                  color: 'var(--cp-rust)',
-                  fontWeight: 700,
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                  width: '100%',
-                }}
-              >
-                Reportar entrega fallida
-              </button>
-            )}
+            <BotonReportar pedido={pedido} onReportar={() => setModalFallaAbierto(true)} />
           </div>
         )}
       </div>

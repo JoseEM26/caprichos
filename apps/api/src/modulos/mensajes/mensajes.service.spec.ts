@@ -199,6 +199,7 @@ describe('MensajesService', () => {
       },
       voucherPago: {
         findFirst: jest.fn().mockResolvedValue(null),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
       respuestaRapida: {
         findMany: jest.fn().mockResolvedValue([
@@ -350,6 +351,11 @@ describe('MensajesService', () => {
         data: expect.objectContaining({ pago_estado: 'COORDINADO' }),
       }),
     );
+    // La foto del chat (sin pedido) queda enlazada al pedido aprobado como prueba
+    expect(prisma.voucherPago.updateMany).toHaveBeenCalledWith({
+      where: { conversacion_id: 2n, pedido_id: null },
+      data: { pedido_id: 50n },
+    });
     expect(gateway.enviarTexto).toHaveBeenCalledWith(
       2n,
       '977666555',

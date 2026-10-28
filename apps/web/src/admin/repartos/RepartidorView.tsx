@@ -7,6 +7,7 @@ import { ModalReportarFalla } from './ModalReportarFalla';
 import { MapaRepartos, type PuntoRepartoMapa } from './MapaRepartos';
 import {
   repartosApi,
+  AvisoRepartidor,
   PedidoReparto,
   RespuestaMios,
   PedidoPerdido,
@@ -121,7 +122,7 @@ const soles = (monto: number | string | null | undefined) => `S/ ${Number(monto 
 const kmTexto = (km: number) => km.toFixed(1).replace('.', ',');
 const textoPedidos = (n: number) => (n === 1 ? '1 pedido' : `${n} pedidos`);
 
-function etapaDe(p: PedidoReparto): InfoEtapa {
+export function etapaDe(p: PedidoReparto): InfoEtapa {
   if (p.estado !== 'EN_CAMINO') {
     return { id: 'salir', texto: 'Salir a reparto', fondo: C.naranja, color: C.blanco };
   }
@@ -308,7 +309,27 @@ function BarraPestanas({
   );
 }
 
-function BotonEtapa({
+/** Avisos en pantalla del repartidor: espera agotada en puerta y movilidades retiradas. */
+export function BannerAvisosRepartidor({ pedidos, avisos }: { pedidos: PedidoReparto[]; avisos?: AvisoRepartidor[] }) {
+  const enEspera = pedidos.filter((p) => p.espera_agotada);
+  if (enEspera.length === 0 && (!avisos || avisos.length === 0)) return null;
+  return (
+    <div role="alert" style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: '8px 14px 0' }}>
+      {enEspera.map((p) => (
+        <div key={`espera-${p.id}`} style={{ background: '#FDE8E8', color: '#9B1C1C', borderRadius: 10, padding: '8px 12px', fontWeight: 700, fontSize: 14 }}>
+          Espera agotada en {p.codigo}: el cliente no sale. Si sigue sin salir, la movilidad se retirará y el pedido se reprogramará.
+        </div>
+      ))}
+      {(avisos || []).map((a) => (
+        <div key={`retiro-${a.pedido_id}-${a.en}`} style={{ background: '#FEF3C7', color: '#7C2D12', borderRadius: 10, padding: '8px 12px', fontWeight: 700, fontSize: 14 }}>
+          {a.mensaje}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function BotonEtapa({
   pedido,
   etapa,
   grande = false,
@@ -338,7 +359,7 @@ function BotonEtapa({
   );
 }
 
-function BotonReportar({ pedido, onReportar }: { pedido: PedidoReparto; onReportar: (p: PedidoReparto) => void }) {
+export function BotonReportar({ pedido, onReportar }: { pedido: PedidoReparto; onReportar: (p: PedidoReparto) => void }) {
   return (
     <button
       type="button"
@@ -1520,6 +1541,7 @@ export function RepartidorView() {
           }}
         >
           <CabeceraRepartidor nombre={nombreUsuario} activos={pedidosActivos.length} tope={maxPedidos} compacta />
+          <BannerAvisosRepartidor pedidos={datosMios.pedidos} avisos={datosMios.avisos} />
           <BarraPestanas pestana={pestana} onCambiar={cambiarPestana} contadores={contadores} fija={false} />
           <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 16 }}>{panel}</div>
           {pestana === 'para_elegir' && (
@@ -1563,6 +1585,7 @@ export function RepartidorView() {
       }}
     >
       <CabeceraRepartidor nombre={nombreUsuario} activos={pedidosActivos.length} tope={maxPedidos} compacta />
+      <BannerAvisosRepartidor pedidos={datosMios.pedidos} avisos={datosMios.avisos} />
 
       <div style={{ padding: `14px 14px ${rellenoInferior}px` }}>{panel}</div>
 

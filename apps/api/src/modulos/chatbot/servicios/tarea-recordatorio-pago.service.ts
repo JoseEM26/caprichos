@@ -216,7 +216,7 @@ export class TareaRecordatorioPagoService {
               const notif = await this.prisma.notificacion.create({
                 data: {
                   tipo: 'ATENCION_WHATSAPP',
-                  rol_destino: 'CAJA',
+                  rol_destino: 'CAJERO',
                   titulo: tituloNotif,
                   mensaje: mensajeNotif,
                   enlace: '/admin/mensajes',

@@ -198,6 +198,16 @@ const META_PARAMETROS: Record<string, MetaParametro> = {
     descripcion: 'Notifica al cliente que Caja confirmó su comprobante de pago y que el pedido está en preparación.',
     tipo: 'sino',
   },
+  whatsapp_aviso_listo_activo: {
+    nombre: 'Aviso WhatsApp: Pedido delivery listo',
+    descripcion: 'Avisa al cliente cuando cocina termina su pedido delivery y queda listo para salir con el repartidor.',
+    tipo: 'sino',
+  },
+  whatsapp_aviso_entregado_activo: {
+    nombre: 'Aviso WhatsApp: Pedido delivery entregado',
+    descripcion: 'Envía al cliente un agradecimiento cuando su pedido delivery queda entregado.',
+    tipo: 'sino',
+  },
   whatsapp_aviso_encuesta_activo: {
     nombre: 'Aviso WhatsApp: Encuesta de satisfacción posventa',
     descripcion: 'Envía encuesta interactiva de calificación del 1 al 5 al cliente tras la entrega de su pedido.',

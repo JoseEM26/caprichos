@@ -42,6 +42,15 @@ export interface PedidoReparto {
   } | null;
   por_rendir_efectivo?: number;
   efectivo_a_rendir?: number;
+  espera_min?: number | null;
+  espera_agotada?: boolean;
+}
+
+export interface AvisoRepartidor {
+  pedido_id: string;
+  codigo: string;
+  mensaje: string;
+  en: string;
 }
 
 export interface RespuestaMios {
@@ -49,6 +58,7 @@ export interface RespuestaMios {
   orden: string[];
   paso: string[];
   ruta: Array<[number, number]>;
+  avisos?: AvisoRepartidor[];
 }
 
 export interface ResumenRepartos {

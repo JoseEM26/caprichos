@@ -179,7 +179,7 @@ describe('Ola F5 y Siguiente: Repartos y Mapa (Decisiones del Dueño 1 a 8)', ()
     const botonTomar = screen.getByRole('button', { name: /tomar pedido/i });
     fireEvent.click(botonTomar);
 
-    expect(screen.getByText('¿Tomar este pedido?')).toBeInTheDocument();
+    expect(screen.getByText('¿Seguro que quieres tomar este pedido?')).toBeInTheDocument();
     const botonConfirmar = screen.getByRole('button', { name: /sí, confirmar/i });
     fireEvent.click(botonConfirmar);
 
@@ -440,7 +440,7 @@ describe('Ola F5 y Siguiente: Repartos y Mapa (Decisiones del Dueño 1 a 8)', ()
       // Botón reportar problema presente
       expect(screen.getByRole('button', { name: /reportar problema/i })).toBeInTheDocument();
       // Un solo botón grande de estado hacia el siguiente paso
-      expect(screen.getByRole('button', { name: /he llegado/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /llegué a destino/i })).toBeInTheDocument();
     });
   });
 

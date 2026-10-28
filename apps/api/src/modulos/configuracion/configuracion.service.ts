@@ -67,6 +67,8 @@ export const CLAVES_TEXTO = [
   'whatsapp_aviso_espera_activo',
   'whatsapp_aviso_recojo_activo',
   'whatsapp_aviso_pago_confirmado_activo',
+  'whatsapp_aviso_listo_activo',
+  'whatsapp_aviso_entregado_activo',
   'whatsapp_aviso_encuesta_activo',
 ] as const;
 

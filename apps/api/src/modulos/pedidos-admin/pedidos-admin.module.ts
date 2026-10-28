@@ -8,9 +8,10 @@ import { StockModule } from '../stock/stock.module';
 import { PedidosModule } from '../pedidos/pedidos.module';
 import { ImpresionModule } from '../impresion/impresion.module';
 import { UbicarPedidoService } from './ubicar-pedido.service';
+import { ChatbotModule } from '../chatbot/chatbot.module';
 
 @Module({
-  imports: [SalonModule, ZonasModule, ClientesModule, StockModule, PedidosModule, ImpresionModule],
+  imports: [SalonModule, ZonasModule, ClientesModule, StockModule, PedidosModule, ImpresionModule, ChatbotModule],
   controllers: [PedidosAdminController],
   providers: [
     PedidosEstadoService,

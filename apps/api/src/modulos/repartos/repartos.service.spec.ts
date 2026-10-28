@@ -17,6 +17,7 @@ import { RepartosService } from './repartos.service';
 import { COORDENADAS_LOCAL_DEFAULT, RutaService } from './ruta.service';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
+import { AvisosPedidoService } from '../chatbot/servicios/avisos-pedido.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 
@@ -26,6 +27,7 @@ describe('RepartosService', () => {
   let prismaMock: any;
   let auditoriaMock: any;
   let eventosGatewayMock: any;
+  let avisosMock: any;
 
   const repartidor1: UsuarioAutenticado = {
     partyId: 101n,
@@ -100,6 +102,10 @@ describe('RepartosService', () => {
       emitirAdmin: jest.fn(),
     };
 
+    avisosMock = {
+      avisar: jest.fn().mockResolvedValue({ estado: 'ENVIADO' }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RepartosService,
@@ -107,6 +113,7 @@ describe('RepartosService', () => {
         { provide: PrismaService, useValue: prismaMock },
         { provide: AuditoriaService, useValue: auditoriaMock },
         { provide: EventosGateway, useValue: eventosGatewayMock },
+        { provide: AvisosPedidoService, useValue: avisosMock },
       ],
     }).compile();
 
@@ -163,7 +170,7 @@ describe('RepartosService', () => {
       );
       expect(eventosGatewayMock.emitirAdmin).toHaveBeenCalledWith(
         'pedido:estado',
-        expect.objectContaining({ id: 10, estado: 'LISTO', repartidor_party_id: 101 }),
+        expect.objectContaining({ id: 10, estado: 'LISTO', repartidor_party_id: '101' }),
       );
     });
   });
@@ -241,12 +248,9 @@ describe('RepartosService', () => {
       const res = await service.salir('30', repartidor1);
 
       expect(res.estado).toBe('EN_CAMINO');
-      // Registra aviso 1 pendiente
-      expect(prismaMock.mensajeReparto.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          create: expect.objectContaining({ numero: 1, estado: 'PENDIENTE' }),
-        }),
-      );
+      // Ya no pre-registra el aviso (lo registra AvisosPedidoService al enviar); dispara el aviso de salida
+      expect(prismaMock.mensajeReparto.upsert).not.toHaveBeenCalled();
+      expect(avisosMock.avisar).toHaveBeenCalledWith(30n, 'SALIDA');
       expect(eventosGatewayMock.emitirAdmin).toHaveBeenCalledWith(
         'pedido:estado',
         expect.objectContaining({ id: 30, estado: 'EN_CAMINO' }),
@@ -267,7 +271,7 @@ describe('RepartosService', () => {
       );
     });
 
-    it('POST :id/llegue registra llego_en y aviso 2 pendiente', async () => {
+    it('POST :id/llegue registra llego_en y dispara el aviso de llegada', async () => {
       const pedidoMock = {
         id: 32n,
         codigo: 'CP-0104',
@@ -287,11 +291,8 @@ describe('RepartosService', () => {
       const res = await service.llegue('32', repartidor1);
 
       expect(res.estado).toBe('EN_CAMINO');
-      expect(prismaMock.mensajeReparto.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          create: expect.objectContaining({ numero: 2, estado: 'PENDIENTE' }),
-        }),
-      );
+      expect(prismaMock.mensajeReparto.upsert).not.toHaveBeenCalled();
+      expect(avisosMock.avisar).toHaveBeenCalledWith(32n, 'LLEGADA');
       expect(auditoriaMock.registrar).toHaveBeenCalledWith(
         expect.objectContaining({ accion: 'LLEGUE' }),
       );
@@ -352,7 +353,7 @@ describe('RepartosService', () => {
   });
 
   describe('4. Avisos de reparto 1-2-3 (DT-60 / DT-74)', () => {
-    it('genera aviso 3 pendiente tras 90 segundos sin respuesta del aviso 2', async () => {
+    it('consultar mensajes es solo lectura: no crea el aviso 3 (lo decide el planificador por tiempo)', async () => {
       prismaMock.pedido.findUnique.mockResolvedValue({ id: 40n });
 
       const ahora = Date.now();
@@ -372,12 +373,8 @@ describe('RepartosService', () => {
 
       const mensajes = await service.consultarMensajes('40');
 
-      expect(prismaMock.mensajeReparto.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ pedido_id: 40n, numero: 3, estado: 'PENDIENTE' }),
-        }),
-      );
-      expect(mensajes).toHaveLength(3);
+      expect(prismaMock.mensajeReparto.create).not.toHaveBeenCalled();
+      expect(mensajes).toHaveLength(2);
     });
 
     it('no genera aviso 3 si el cliente ya respondió al aviso 2', async () => {

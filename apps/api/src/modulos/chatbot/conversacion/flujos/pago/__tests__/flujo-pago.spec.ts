@@ -245,6 +245,9 @@ describe('Flujo de Pago por WhatsApp (FT-BOT-02, HU-CAP-130..132, 139)', () => {
         mensajeChat: {
           findMany: jest.fn().mockResolvedValue([]),
         },
+        voucherPago: {
+          updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+        },
         userAccount: {
           findUnique: jest.fn().mockResolvedValue({ id: 10n }),
         },
@@ -409,7 +412,7 @@ describe('Flujo de Pago por WhatsApp (FT-BOT-02, HU-CAP-130..132, 139)', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             tipo: 'ATENCION_WHATSAPP',
-            rol_destino: 'CAJA',
+            rol_destino: 'CAJERO',
           }),
         }),
       );
@@ -557,7 +560,7 @@ describe('Flujo de Pago por WhatsApp (FT-BOT-02, HU-CAP-130..132, 139)', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             tipo: 'ATENCION_WHATSAPP',
-            rol_destino: 'CAJA',
+            rol_destino: 'CAJERO',
             titulo: 'Pago pendiente por expirar: CP-0152',
           }),
         }),

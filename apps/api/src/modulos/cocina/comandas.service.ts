@@ -1,4 +1,5 @@
 import { SalonService } from '../salon/salon.service';
+import { AvisosPedidoService } from '../chatbot/servicios/avisos-pedido.service';
 import {
   BadRequestException,
   ConflictException,
@@ -34,6 +35,7 @@ export class ComandasService {
     @Inject('DESCUENTO_PEDIDO')
     private readonly descuentoService?: DescuentoPedidoHook,
     @Optional() private readonly salonService?: SalonService,
+    @Optional() private readonly avisos?: AvisosPedidoService,
   ) {}
 
   private parsearId(id: bigint | string | number, entidad = 'pedido'): bigint {
@@ -507,6 +509,9 @@ export class ComandasService {
         codigo: pedido.codigo,
         estado: 'LISTO',
       });
+
+      // el cliente delivery recibe el aviso de que su pedido está listo (idempotente)
+      await this.avisos?.avisar(pId, 'LISTO');
 
       // el mozo que tomó el pedido de mesa recibe el aviso de que está listo (RQ-SAL-02-10)
       if (pedido.modalidad === 'MESA') {

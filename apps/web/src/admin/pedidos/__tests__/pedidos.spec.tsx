@@ -405,6 +405,10 @@ describe('Ola F4: Pedidos y Caja', () => {
     // Si corregimos el segundo pago a 30.00 (20 + 30 = 50.00 cuadra)
     fireEvent.change(inputsMonto2[1], { target: { value: '30.00' } });
     expect(screen.getByText(/Cuadra con el total\./i)).toBeInTheDocument();
+    // El segundo medio por defecto es Yape (digital): sin foto ni excepción no se puede cobrar.
+    // Con Efectivo en el segundo pago (no digital) cuadra y se habilita.
+    expect(btnCobrar).toBeDisabled();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Efectivo' })[1]);
     expect(btnCobrar).not.toBeDisabled();
   });
 

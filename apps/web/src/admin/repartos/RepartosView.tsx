@@ -11,6 +11,7 @@ import { MapaRepartos, PuntoRepartoMapa } from './MapaRepartos';
 import { TarjetaReparto } from './TarjetaReparto';
 import { ResumenPedidoReparto } from './ResumenPedidoReparto';
 import { PanelRutaSugerida } from './PanelRutaSugerida';
+import { esMiPedido } from './esMiPedido';
 import { useAccionesReparto } from './useAccionesReparto';
 import {
   clasificarEspera,
@@ -198,7 +199,7 @@ function RepartosAdminView() {
       return todosLista.filter(
         (o) =>
           (o.estado === 'LISTO' && !o.repartidor_party_id) ||
-          o.repartidor_party_id === usuario?.partyId ||
+          esMiPedido(o, usuario?.partyId) ||
           datosMios.pedidos.some((m) => m.id === o.id),
       );
     }
@@ -950,10 +951,7 @@ function RepartosAdminView() {
           {pedidoSeleccionado && (
             <ResumenPedidoReparto
               pedido={pedidoSeleccionado}
-              esMio={
-                pedidoSeleccionado.repartidor_party_id === usuario?.partyId ||
-                pedidoSeleccionado.estado === 'EN_CAMINO'
-              }
+              esMio={esMiPedido(pedidoSeleccionado, usuario?.partyId)}
               esDisponible={
                 pedidoSeleccionado.estado === 'LISTO' &&
                 !pedidoSeleccionado.repartidor_party_id
@@ -1079,10 +1077,7 @@ function RepartosAdminView() {
                   key={pedido.id}
                   pedido={pedido}
                   esDisponible={pedido.estado === 'LISTO' && !pedido.repartidor_party_id}
-                  esMio={
-                    pedido.repartidor_party_id === usuario?.partyId ||
-                    pedido.estado === 'EN_CAMINO'
-                  }
+                  esMio={esMiPedido(pedido, usuario?.partyId)}
                   puedeLiquidar={puedeLiquidar}
                   alActualizar={cargarDatos}
                 />

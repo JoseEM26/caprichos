@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Confirmar } from '../../comun/Confirmar';
 import { Pedido, pedidosApi } from './pedidosApi';
 import { ModalCobrar } from './ModalCobrar';
+import { SeccionVouchersPedido } from './SeccionVouchersPedido';
 import { ModalAnular } from './ModalAnular';
 import { ModalUbicar } from './ModalUbicar';
 import { ModalPrecuenta } from '../salon/componentes/ModalPrecuenta';
@@ -859,6 +860,14 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
           </div>
         )}
 
+        {/* Comprobantes del pedido (foto del pago digital, cualquier origen) */}
+        <SeccionVouchersPedido
+          pedidoId={pedido.id}
+          recargarClave={pedido.pago_estado}
+          total={pedido.total}
+          medio={pedido.pago_metodo || pedido.pago_preferido || null}
+        />
+
         {/* 3. Botones de cobro si no está pagado y no es por confirmar */}
         {!esPorConfirmar && !estaPagado && est !== 'ANULADO' && (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -1035,6 +1044,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
       {abrirPrecuenta && (
         <ModalPrecuenta
           abierto={true}
+          pedidoId={pedido.id}
           alCerrar={() => setAbrirPrecuenta(false)}
           mesa={pedido.mesa_nombre || ''}
           lineas={(pedido.lineas || []).map((l) => ({

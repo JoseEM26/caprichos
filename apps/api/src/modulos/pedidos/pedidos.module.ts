@@ -8,6 +8,7 @@ import { ZonasModule } from '../zonas/zonas.module';
 import { OfertasModule } from '../ofertas/ofertas.module';
 import { ClientesModule } from '../clientes/clientes.module';
 import { AvisosInternosModule } from '../chatbot/avisos-internos/avisos-internos.module';
+import { VouchersModule } from '../vouchers/vouchers.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { AvisosInternosModule } from '../chatbot/avisos-internos/avisos-internos
     ZonasModule,
     OfertasModule,
     ClientesModule,
+    VouchersModule,
     forwardRef(() => AvisosInternosModule),
   ],
   controllers: [PedidosController, SeguimientoController],

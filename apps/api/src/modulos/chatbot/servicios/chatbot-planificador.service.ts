@@ -4,7 +4,8 @@ import { RedisService } from '../../../comun/redis/redis.service';
 import { EventosGateway } from '../../../comun/socket/eventos.gateway';
 import { Ventana24hService } from './ventana-24h.service';
 import { TareaRecordatorioPagoService } from './tarea-recordatorio-pago.service';
-import { enmascararTelefono, hashTelefono, normalizarTelefono } from '../utilidades/enmascarar.util';
+import { AvisosPedidoService, NUMEROS_INTENTO } from './avisos-pedido.service';
+import { normalizarTelefono } from '../utilidades/enmascarar.util';
 import { adquirirCandado, liberarCandado } from '../../../comun/redis/candado.util';
 
 export interface ParametrosChatbot {
@@ -13,6 +14,8 @@ export interface ParametrosChatbot {
   avisoEsperaActivo: boolean;
   avisoRecojoActivo: boolean;
   avisoPagoConfirmadoActivo: boolean;
+  avisoListoActivo: boolean;
+  avisoEntregadoActivo: boolean;
   avisoEncuestaActivo: boolean;
   repartoInsistenciaMin: number;
   repartoEsperaMaxMin: number;
@@ -22,6 +25,41 @@ export interface ParametrosChatbot {
   tiempoPrometidoMin: number;
 }
 
+/**
+ * Motivo de falla al retirar la movilidad. Debe ser un valor que admite la base (ck_incidente_entrega_motivo):
+ * el cliente no salió a la puerta equivale a NO_CONTESTA; así Caja lo resuelve con el flujo de fallas existente.
+ */
+const MOTIVO_RETIRO = 'NO_CONTESTA';
+
+/** Ventana de pedidos que el planificador revisa; más viejos ya no son parte de un reparto en curso. */
+const VENTANA_REVISION_MS = 24 * 60 * 60 * 1000;
+
+export interface ResumenCicloChatbot {
+  bloqueadoPorOtraInstancia: boolean;
+  avisosInsistencia: number;
+  avisosEspera: number;
+  retiros: number;
+  avisosAceptado: number;
+  avisosRecojo: number;
+  avisosEncuesta: number;
+}
+
+const resumenVacio = (bloqueado: boolean): ResumenCicloChatbot => ({
+  bloqueadoPorOtraInstancia: bloqueado,
+  avisosInsistencia: 0,
+  avisosEspera: 0,
+  retiros: 0,
+  avisosAceptado: 0,
+  avisosRecojo: 0,
+  avisosEncuesta: 0,
+});
+
+/**
+ * Planificador de avisos por tiempo. Corre cada 30 s con candado en Redis.
+ * - Por tiempo (aquí): insistencia en puerta, espera agotada, retiro de la movilidad y aceptación por cobro.
+ * - Por evento (los avisan los endpoints de reparto y cocina con AvisosPedidoService): salida, llegada,
+ *   listo y entregado. Cada aviso es idempotente por pedido y etapa.
+ */
 @Injectable()
 export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ChatbotPlanificadorService.name);
@@ -35,6 +73,7 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
     private readonly ventana24hService: Ventana24hService,
     @Optional() private readonly eventos?: EventosGateway,
     @Optional() private readonly tareaRecordatorioPago?: TareaRecordatorioPagoService,
+    @Optional() private readonly avisos?: AvisosPedidoService,
   ) {}
 
   onModuleInit() {
@@ -72,6 +111,8 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
       'whatsapp_aviso_espera_activo',
       'whatsapp_aviso_recojo_activo',
       'whatsapp_aviso_pago_confirmado_activo',
+      'whatsapp_aviso_listo_activo',
+      'whatsapp_aviso_entregado_activo',
       'whatsapp_aviso_encuesta_activo',
       'reparto_insistencia_min',
       'reparto_espera_max_min',
@@ -98,6 +139,8 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
       avisoEsperaActivo: esActivo(mapa.get('whatsapp_aviso_espera_activo')),
       avisoRecojoActivo: esActivo(mapa.get('whatsapp_aviso_recojo_activo')),
       avisoPagoConfirmadoActivo: esActivo(mapa.get('whatsapp_aviso_pago_confirmado_activo')),
+      avisoListoActivo: esActivo(mapa.get('whatsapp_aviso_listo_activo')),
+      avisoEntregadoActivo: esActivo(mapa.get('whatsapp_aviso_entregado_activo')),
       avisoEncuestaActivo: esActivo(mapa.get('whatsapp_aviso_encuesta_activo')),
       repartoInsistenciaMin: Number(mapa.get('reparto_insistencia_min') ?? 3),
       repartoEsperaMaxMin: Number(mapa.get('reparto_espera_max_min') ?? 10),
@@ -111,28 +154,8 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
   /**
    * Ejecuta un ciclo de evaluación de pedidos con bloqueo distribuido en Redis (ioredis).
    */
-  async ejecutarCiclo(): Promise<{
-    bloqueadoPorOtraInstancia: boolean;
-    avisosSalida: number;
-    avisosLlegada: number;
-    avisosInsistencia: number;
-    avisosEspera: number;
-    avisosPago: number;
-    avisosRecojo: number;
-    avisosEncuesta: number;
-  }> {
-    if (this.ejecutando) {
-      return {
-        bloqueadoPorOtraInstancia: true,
-        avisosSalida: 0,
-        avisosLlegada: 0,
-        avisosInsistencia: 0,
-        avisosEspera: 0,
-        avisosPago: 0,
-        avisosRecojo: 0,
-        avisosEncuesta: 0,
-      };
-    }
+  async ejecutarCiclo(): Promise<ResumenCicloChatbot> {
+    if (this.ejecutando) return resumenVacio(true);
 
     this.ejecutando = true;
     const lockKey = 'lock:chatbot:planificador';
@@ -148,43 +171,24 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
       lockFallback = candado.fallback;
       lockToken = candado.token;
 
-      if (!lockAdquirido) {
-        return {
-          bloqueadoPorOtraInstancia: true,
-          avisosSalida: 0,
-          avisosLlegada: 0,
-          avisosInsistencia: 0,
-          avisosEspera: 0,
-          avisosPago: 0,
-          avisosRecojo: 0,
-          avisosEncuesta: 0,
-        };
-      }
+      if (!lockAdquirido) return resumenVacio(true);
 
       const params = await this.obtenerParametros();
       const ahora = new Date();
+      const resumen = resumenVacio(false);
 
-      let avisosSalida = 0;
-      let avisosLlegada = 0;
-      let avisosInsistencia = 0;
-      let avisosEspera = 0;
-      let avisosPago = 0;
-      let avisosRecojo = 0;
-      let avisosEncuesta = 0;
-
-      // 1. Delivery: Salida, Llegada, Insistencia y Espera agotada
+      // 1. Delivery en puerta (tiempos) y aceptación por cobro
       const pedidosDelivery = await this.prisma.pedido.findMany({
         where: {
           modalidad: 'DELIVERY',
           estado: { notIn: ['ANULADO'] },
           cliente_telefono: { not: null },
-        },
-        include: {
-          mensajesReparto: true,
+          creado_en: { gte: new Date(ahora.getTime() - VENTANA_REVISION_MS) },
         },
       });
 
       for (const p of pedidosDelivery) {
+        try {
         const telefono = normalizarTelefono(p.cliente_telefono || '');
         if (!telefono) continue;
 
@@ -192,197 +196,71 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
         const acepta = await this.ventana24hService.tieneConsentimiento(telefono);
         if (!acepta) continue;
 
-        const nombreCliente = p.cliente_nombre || 'Cliente';
-
-        // (a) DELIVERY SALE (aviso 1)
-        if (params.avisoSalidaActivo && p.salio_en) {
-          const yaAviso1 = p.mensajesReparto.some((m) => m.numero === 1);
-          if (!yaAviso1) {
-            const tiempoEst = String(params.tiempoPrometidoMin);
-            const resultado = await this.ventana24hService.enviarMensajeNegocio(
-              telefono,
-              {
-                textoLibre: `Hola ${nombreCliente}, tu pedido ${p.codigo} ya salio de nuestro local y va en camino. Tiempo estimado: ${tiempoEst} minutos.`,
-                plantillaClave: 'DELIVERY_SALIDA',
-                variablesPlantilla: [nombreCliente, p.codigo, tiempoEst],
-              },
-              { pedidoId: p.id },
-            );
-
-            await this.prisma.mensajeReparto.create({
-              data: {
-                pedido_id: p.id,
-                numero: 1,
-                enviado_en: ahora,
-                estado: resultado.exito ? 'ENVIADO' : 'FALLIDO',
-              },
-            });
-            avisosSalida++;
-          }
+        // ACEPTADO: Caja pasó el pedido a preparación o el cobro quedó PAGADO con el pedido en COLA
+        const aceptado =
+          p.estado === 'PREPARANDO' || (p.pago_estado === 'PAGADO' && p.estado === 'COLA');
+        if (params.avisoPagoConfirmadoActivo && aceptado) {
+          const r = await this.avisos?.avisar(p.id, 'ACEPTADO');
+          if (r && r.estado !== 'OMITIDO' && r.estado !== 'YA_ENVIADO') resumen.avisosAceptado++;
         }
 
-        // (b) DELIVERY LLEGO (aviso 2)
-        if (params.avisoLlegadaActivo && p.llego_en) {
-          const yaAviso2 = p.mensajesReparto.some((m) => m.numero === 2);
-          if (!yaAviso2) {
-            const resultado = await this.ventana24hService.enviarMensajeNegocio(
-              telefono,
-              {
-                textoLibre: `Hola ${nombreCliente}, nuestro repartidor ya llego con tu pedido ${p.codigo} y esta esperando en la puerta. Por favor sal a recibirlo.`,
-                plantillaClave: 'DELIVERY_LLEGADA',
-                variablesPlantilla: [nombreCliente, p.codigo],
-              },
-              { pedidoId: p.id },
-            );
+        // Tiempos de espera en puerta: solo con el pedido EN_CAMINO y el repartidor ya llegó
+        const enPuerta = p.estado === 'EN_CAMINO' && p.llego_en != null && p.entregado_en == null && p.repartidor_party_id != null;
+        if (!enPuerta || !p.llego_en) continue;
 
-            await this.prisma.mensajeReparto.create({
-              data: {
-                pedido_id: p.id,
-                numero: 2,
-                enviado_en: ahora,
-                estado: resultado.exito ? 'ENVIADO' : 'FALLIDO',
-              },
-            });
-            avisosLlegada++;
-          }
+        const minutosEnPuerta = (ahora.getTime() - p.llego_en.getTime()) / 60000;
 
-          // (b2) INSISTENCIA (aviso 3) a los N minutos sin respuesta ni entrega
-          if (!p.entregado_en) {
-            const diffMinLlegada = (ahora.getTime() - p.llego_en.getTime()) / 60000;
-            const yaAviso3 = p.mensajesReparto.some((m) => m.numero === 3);
-
-            if (diffMinLlegada >= params.repartoInsistenciaMin && !yaAviso3) {
-              const minutosEsperando = Math.floor(diffMinLlegada);
-              const resultado = await this.ventana24hService.enviarMensajeNegocio(
-                telefono,
-                {
-                  textoLibre: `Hola ${nombreCliente}, nuestro repartidor sigue esperando en la puerta con tu pedido ${p.codigo} desde hace ${minutosEsperando} minutos. Por favor sal o comunicate con nosotros.`,
-                  plantillaClave: 'DELIVERY_INSISTENCIA',
-                  variablesPlantilla: [nombreCliente, p.codigo, String(minutosEsperando)],
-                },
-                { pedidoId: p.id },
-              );
-
-              await this.prisma.mensajeReparto.create({
-                data: {
-                  pedido_id: p.id,
-                  numero: 3,
-                  enviado_en: ahora,
-                  estado: resultado.exito ? 'ENVIADO' : 'FALLIDO',
-                },
-              });
-              avisosInsistencia++;
-            }
-
-            // (c) ESPERA AGOTADA / REPROGRAMACION tras reparto_espera_max_min
-            if (params.avisoEsperaActivo && diffMinLlegada >= params.repartoEsperaMaxMin) {
-              // Verificar si ya notificamos espera agotada para este pedido
-              const yaAvisoEspera = await this.prisma.whatsappMensaje.findFirst({
-                where: {
-                  pedido_id: p.id,
-                  direccion: 'SALIENTE',
-                  OR: [
-                    { tipo: 'BOTON' },
-                    { plantilla: 'caprichos_delivery_reprogramacion' },
-                  ],
-                },
-              });
-
-              if (!yaAvisoEspera) {
-                const montoRecargoStr = `S/ ${params.repartoRecargoReprogramacion.toFixed(2)}`;
-                await this.ventana24hService.enviarMensajeNegocio(
-                  telefono,
-                  {
-                    textoLibre: `Hola ${nombreCliente}, se agoto el tiempo de espera en la puerta para tu pedido ${p.codigo} y el repartidor debe retirarse. Puedes solicitar la reprogramacion del envio con un recargo adicional de ${montoRecargoStr}. ¿Deseas reprogramar la entrega?`,
-                    plantillaClave: 'DELIVERY_ESPERA_AGOTADA',
-                    variablesPlantilla: [nombreCliente, p.codigo, montoRecargoStr],
-                    botones: [
-                      { id: 'reprogramar_si', titulo: 'Si reprogramar' },
-                      { id: 'reprogramar_no', titulo: 'No gracias' },
-                    ],
-                  },
-                  { pedidoId: p.id },
-                );
-
-                // Avisar a Caja por la campana interna para coordinar
-                const tituloNotif = 'Espera agotada en entrega de pedido';
-                const detalleNotif = `Repartidor superó los ${params.repartoEsperaMaxMin} min de espera en la puerta para ${p.codigo}. Se envió aviso de reprogramación al cliente.`;
-
-                const notif = await this.prisma.notificacion.create({
-                  data: {
-                    tipo: 'ESPERA_AGOTADA',
-                    rol_destino: 'CAJA',
-                    titulo: tituloNotif,
-                    mensaje: detalleNotif,
-                    enlace: '/admin/caja',
-                  },
-                });
-
-                this.eventos?.emitirAdmin('notificaciones:nueva', {
-                  id: notif.id.toString(),
-                  titulo: tituloNotif,
-                });
-
-                avisosEspera++;
-              }
-            }
-          }
+        // (1) INSISTENCIA: recordatorio al cliente a los reparto_insistencia_min
+        if (params.avisoLlegadaActivo && minutosEnPuerta >= params.repartoInsistenciaMin) {
+          const r = await this.avisos?.avisar(p.id, 'INSISTENCIA', { minutos: Math.floor(minutosEnPuerta) });
+          if (r && r.estado !== 'OMITIDO' && r.estado !== 'YA_ENVIADO') resumen.avisosInsistencia++;
         }
-      }
 
-      // (d) VOUCHER / PAGO CONFIRMADO POR CAJA
-      if (params.avisoPagoConfirmadoActivo) {
-        const pedidosPagados = await this.prisma.pedido.findMany({
-          where: {
-            pago_estado: 'PAGADO',
-            confirmado_en: { not: null },
-            estado: { notIn: ['ANULADO'] },
-            cliente_telefono: { not: null },
-          },
-          select: { id: true, codigo: true, cliente_nombre: true, cliente_telefono: true },
-        });
+        if (!params.avisoEsperaActivo) continue;
 
-        for (const p of pedidosPagados) {
-          const telefono = normalizarTelefono(p.cliente_telefono || '');
-          if (!telefono) continue;
-
-          const yaEnviado = await this.prisma.whatsappMensaje.findFirst({
-            where: {
-              pedido_id: p.id,
-              direccion: 'SALIENTE',
-              OR: [
-                { plantilla: 'caprichos_pago_confirmado' },
-                { tipo: 'TEXTO' },
-              ],
-            },
+        // (2) ESPERA AGOTADA: aviso de que la movilidad se retirará, con reprogramación y recargo
+        if (minutosEnPuerta >= params.repartoEsperaMaxMin) {
+          const r = await this.avisos?.avisar(p.id, 'ESPERA_AGOTADA', {
+            recargo: params.repartoRecargoReprogramacion,
           });
-
-          if (!yaEnviado) {
-            const acepta = await this.ventana24hService.tieneConsentimiento(telefono);
-            if (!acepta) continue;
-
-            const nombre = p.cliente_nombre || 'Cliente';
-            await this.ventana24hService.enviarMensajeNegocio(
-              telefono,
-              {
-                textoLibre: `Recibimos tu pago, tu pedido ${p.codigo} esta en preparacion.`,
-                plantillaClave: 'PAGO_CONFIRMADO',
-                variablesPlantilla: [nombre, p.codigo],
-              },
-              { pedidoId: p.id },
+          if (r && r.estado !== 'OMITIDO' && r.estado !== 'YA_ENVIADO') {
+            resumen.avisosEspera++;
+            await this.notificarEquipo(
+              'ESPERA_AGOTADA',
+              'Espera agotada en entrega de pedido',
+              `Repartidor superó los ${params.repartoEsperaMaxMin} min de espera en la puerta para ${p.codigo}. Se avisó al cliente que la movilidad se retirará.`,
             );
-            avisosPago++;
           }
+        }
+
+        // (3) RETIRO: tras la espera máxima más reparto_insistencia_min de gracia, la movilidad se retira
+        //     y el pedido vuelve a LISTO con motivo de falla y recargo de reprogramación.
+        if (minutosEnPuerta >= params.repartoEsperaMaxMin + params.repartoInsistenciaMin) {
+          const retirado = await this.retirarMovilidad(p.id, p.repartidor_party_id, params.repartoRecargoReprogramacion, ahora);
+          if (retirado) {
+            resumen.retiros++;
+            await this.avisos?.avisar(p.id, 'RETIRO', { recargo: params.repartoRecargoReprogramacion });
+            await this.notificarEquipo(
+              'RETIRO_MOVILIDAD',
+              'Movilidad retirada por espera agotada',
+              `La movilidad se retiró de ${p.codigo} tras la espera máxima. El pedido quedó reprogramado en LISTO; Caja debe resolver la falla y coordinar con el cliente.`,
+              p.id,
+            );
+          }
+        }
+        } catch (err: any) {
+          // Un pedido con error no debe frenar el ciclo de los demás
+          this.logger.error(`Error en avisos del pedido ${p.codigo}: ${err?.message}`, err?.stack);
         }
       }
 
-      // (e) PEDIDO LISTO PARA RECOGER (modalidad RECOJO / LLEVAR)
+      // 2. Pedido para llevar / recojo listo en barra
       if (params.avisoRecojoActivo) {
         const pedidosRecojo = await this.prisma.pedido.findMany({
           where: {
             modalidad: { in: ['RECOJO', 'LLEVAR'] },
             estado: 'LISTO',
-            listo_en: { not: null },
+            listo_en: { gte: new Date(ahora.getTime() - VENTANA_REVISION_MS) },
             cliente_telefono: { not: null },
           },
           select: { id: true, codigo: true, cliente_nombre: true, cliente_telefono: true },
@@ -417,17 +295,18 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
               },
               { pedidoId: p.id },
             );
-            avisosRecojo++;
+            resumen.avisosRecojo++;
           }
         }
       }
 
-      // (f) ENCUESTA POSVENTA tras X minutos de ENTREGADO
+      // 3. Encuesta posventa tras X minutos de ENTREGADO
       if (params.avisoEncuestaActivo) {
         const limiteEntregado = new Date(ahora.getTime() - params.encuestaEsperaMin * 60000);
         const pedidosParaEncuesta = await this.prisma.pedido.findMany({
           where: {
-            entregado_en: { lte: limiteEntregado },
+            // Solo entregas recientes: sin ventana, activar la encuesta enviaría a todo el historial
+            entregado_en: { gte: new Date(ahora.getTime() - VENTANA_REVISION_MS), lte: limiteEntregado },
             estado: { notIn: ['ANULADO'] },
             cliente_telefono: { not: null },
             encuestaPosventa: null, // Que no tenga encuesta enviada
@@ -469,7 +348,7 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
             { pedidoId: p.id },
           );
 
-          avisosEncuesta++;
+          resumen.avisosEncuesta++;
         }
       }
 
@@ -479,16 +358,7 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
         });
       }
 
-      return {
-        bloqueadoPorOtraInstancia: false,
-        avisosSalida,
-        avisosLlegada,
-        avisosInsistencia,
-        avisosEspera,
-        avisosPago,
-        avisosRecojo,
-        avisosEncuesta,
-      };
+      return resumen;
     } finally {
       this.ejecutando = false;
       if (lockAdquirido && !lockFallback) {
@@ -498,5 +368,86 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
         } catch {}
       }
     }
+  }
+
+  /**
+   * Retira la movilidad de un pedido en puerta: solo si sigue EN_CAMINO con ese repartidor (una sola vez).
+   * El pedido vuelve a LISTO sin repartidor con motivo ESPERA_AGOTADA y se registra el incidente con recargo.
+   * Se borran los avisos del intento anterior (etapas 1 a 4) para que el nuevo intento vuelva a avisar.
+   */
+  private async retirarMovilidad(
+    pedidoId: bigint,
+    repartidorPartyId: bigint | null,
+    recargo: number,
+    ahora: Date,
+  ): Promise<boolean> {
+    return this.prisma.$transaction(async (tx) => {
+      const actualizados = await tx.pedido.updateMany({
+        where: {
+          id: pedidoId,
+          estado: 'EN_CAMINO',
+          llego_en: { not: null },
+          entregado_en: null,
+          repartidor_party_id: repartidorPartyId,
+        },
+        data: {
+          estado: 'LISTO',
+          repartidor_party_id: null,
+          motivo_falla: MOTIVO_RETIRO,
+          salio_en: null,
+          llego_en: null,
+        },
+      });
+      if (actualizados.count === 0) return false;
+
+      const intentos = await tx.incidenteEntrega.count({ where: { pedido_id: pedidoId } });
+      await tx.incidenteEntrega.create({
+        data: {
+          pedido_id: pedidoId,
+          motivo: MOTIVO_RETIRO,
+          intento: intentos + 1,
+          recargo,
+          contactos: [],
+          en: ahora,
+        },
+      });
+
+      await tx.pedidoEstadoHistorial.create({
+        data: {
+          pedido_id: pedidoId,
+          estado_anterior: 'EN_CAMINO',
+          estado_nuevo: 'LISTO',
+          motivo: 'Retiro por espera agotada',
+          por_party_id: repartidorPartyId,
+          en: ahora,
+        },
+      });
+
+      await tx.mensajeReparto.deleteMany({
+        where: { pedido_id: pedidoId, numero: { in: NUMEROS_INTENTO } },
+      });
+
+      return true;
+    }).then((ok) => {
+      if (ok) {
+        this.eventos?.emitirAdmin('pedido:estado', { id: Number(pedidoId), estado: 'LISTO', motivo_falla: MOTIVO_RETIRO });
+        this.eventos?.emitirAdmin('reparto:incidente', { pedidoId: Number(pedidoId), motivo: MOTIVO_RETIRO });
+      }
+      return ok;
+    });
+  }
+
+  /** Notifica a Caja por la campana interna (y en tiempo real) de un evento de reparto. */
+  private async notificarEquipo(tipo: string, titulo: string, mensaje: string, pedidoId?: bigint) {
+    const notif = await this.prisma.notificacion.create({
+      data: {
+        tipo,
+        rol_destino: 'CAJERO', // rol real en la tabla rol (no existe 'CAJA')
+        titulo,
+        mensaje,
+        enlace: '/admin/caja',
+      },
+    });
+    this.eventos?.emitirAdmin('notificaciones:nueva', { id: notif.id.toString(), titulo, pedidoId: pedidoId ? Number(pedidoId) : undefined });
   }
 }

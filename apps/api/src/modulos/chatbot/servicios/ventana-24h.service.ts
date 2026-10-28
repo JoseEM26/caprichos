@@ -91,7 +91,7 @@ export class Ventana24hService {
       const notif = await this.prisma.notificacion.create({
         data: {
           tipo: 'WHATSAPP_ALERTA',
-          rol_destino: 'CAJA',
+          rol_destino: 'CAJERO',
           titulo,
           mensaje: detalle,
           enlace: '/admin/caja',

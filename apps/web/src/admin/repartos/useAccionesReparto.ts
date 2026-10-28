@@ -45,8 +45,8 @@ export function useAccionesReparto({ alActualizar }: { alActualizar: () => void 
     }
 
     pedirConfirmacion(
-      '¿Tomar este pedido?',
-      `El pedido ${pedido.codigo} se asignará a tu usuario y desaparecerá de disponibles para otros repartidores.`,
+      '¿Seguro que quieres tomar este pedido?',
+      `Quedará asignado a ti (pedido ${pedido.codigo}) y desaparecerá de disponibles para otros repartidores.`,
       async () => {
         try {
           setCargandoAccion(true);

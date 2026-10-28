@@ -458,7 +458,8 @@ export class WhatsappWebhookService {
     if (imagenBuffer && pedidoReciente) {
       archivoMensajeId = await this.guardarVoucherPrivado(imagenBuffer, imagenMime, pedidoReciente, telMask, conversacion);
     } else if (imagenBuffer) {
-      // Imagen sin pedido asociado: igual se guarda en privado para que el equipo la vea en el chat
+      // Imagen sin pedido asociado (o cliente sin teléfono, BSUID): igual se guarda en privado y se analiza
+      // como voucher (sin pedido), para que Caja la vea en el chat y quede como prueba al aprobar.
       try {
         const sub = await this.archivosService.subirArchivo(
           {
@@ -476,8 +477,36 @@ export class WhatsappWebhookService {
           true,
         );
         archivoMensajeId = String(sub.id);
+
+        // Fila voucher_pago en segundo plano (no bloquea al bot; registrarDesdeWhatsapp nunca lanza)
+        if (this.vouchersService) {
+          void this.vouchersService.registrarDesdeWhatsapp(
+            imagenBuffer,
+            imagenMime,
+            sub.id,
+            null,
+            conversacion,
+          );
+        }
       } catch (err: any) {
         this.logger.warn(`No se pudo guardar la imagen del chat: ${err.message}`);
+      }
+    } else if (tipo === 'image') {
+      // Meta no devolvió los bytes (falla de descarga o más de 5 MB): no hay archivo que guardar.
+      // Caja lo ve como aviso y pide que lo reenvíen.
+      try {
+        const notif = await this.prisma.notificacion.create({
+          data: {
+            tipo: 'COMPROBANTE_NO_GUARDADO',
+            rol_destino: 'CAJERO',
+            titulo: 'Comprobante no recibido',
+            mensaje: `El cliente (${telMask}) envió una imagen que no se pudo guardar (más de 5 MB o falló la descarga). Pide que la reenvíe.`,
+            enlace: '/admin/mensajes',
+          },
+        });
+        this.eventos?.emitirAdmin('notificaciones:nueva', { id: notif.id.toString(), titulo: notif.titulo });
+      } catch (err: any) {
+        this.logger.warn(`No se pudo avisar a Caja de la imagen no guardada: ${err.message}`);
       }
     }
 
@@ -643,7 +672,7 @@ export class WhatsappWebhookService {
       const notif = await this.prisma.notificacion.create({
         data: {
           tipo: 'COMPROBANTE_RECIBIDO',
-          rol_destino: 'CAJA',
+          rol_destino: 'CAJERO',
           titulo: tituloNotif,
           mensaje: mensajeNotif,
           enlace: '/admin/mensajes',
@@ -825,7 +854,7 @@ export class WhatsappWebhookService {
       const notif = await this.prisma.notificacion.create({
         data: {
           tipo: 'REPROGRAMACION_DELIVERY',
-          rol_destino: 'CAJA',
+          rol_destino: 'CAJERO',
           titulo: tituloNotif,
           mensaje: mensajeNotif,
           enlace: '/admin/caja',

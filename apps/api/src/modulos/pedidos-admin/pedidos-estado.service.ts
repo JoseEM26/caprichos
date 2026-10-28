@@ -28,6 +28,7 @@ import { enmascararDni } from '../usuarios/usuarios.util';
 import { FiltrarPedidosDto } from './dto/filtrar-pedidos.dto';
 import { CambiarEstadoDto } from './dto/cambiar-estado.dto';
 import { RegistrarPagoDto } from './dto/registrar-pago.dto';
+import { AvisosPedidoService } from '../chatbot/servicios/avisos-pedido.service';
 import {
   calcularSiguienteMedianocheLima,
   obtenerInicioDiaLima,
@@ -55,6 +56,7 @@ export class PedidosEstadoService {
     @Optional() private readonly stockService?: StockService,
     @Optional() private readonly supervisorCodigoService?: SupervisorCodigoService,
     @Optional() private readonly impresionService?: ImpresionService,
+    @Optional() private readonly avisos?: AvisosPedidoService,
   ) {}
 
   private parsearId(id: bigint | string | number): bigint {
@@ -690,6 +692,11 @@ export class PedidosEstadoService {
       codigo: pedido.codigo,
       estado: nuevoEstado,
     });
+
+    // avisos al cliente delivery por etapa (idempotentes; un fallo de WhatsApp no frena el cambio)
+    const etapaAviso =
+      nuevoEstado === 'LISTO' ? 'LISTO' : nuevoEstado === 'EN_CAMINO' ? 'SALIDA' : nuevoEstado === 'ENTREGADO' ? 'ENTREGADO' : null;
+    if (etapaAviso) await this.avisos?.avisar(pedido.id, etapaAviso);
 
     // un pedido de mesa que pasa a LISTO a mano también avisa al mozo (RQ-SAL-02-10)
     if (nuevoEstado === 'LISTO' && pedido.modalidad === 'MESA') {

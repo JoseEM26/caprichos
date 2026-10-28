@@ -90,6 +90,17 @@ async function configurarParametrosDemo() {
     { clave: 'alta_demanda_min_base', valor: 0 },
     { clave: 'chatbot_activo', valor: 'no' },
     { clave: 'asistido_espera_min', valor: 3 },
+    { clave: 'whatsapp_aviso_salida_activo', valor: 'si' },
+    { clave: 'whatsapp_aviso_llegada_activo', valor: 'si' },
+    { clave: 'whatsapp_aviso_espera_activo', valor: 'si' },
+    { clave: 'whatsapp_aviso_recojo_activo', valor: 'si' },
+    { clave: 'whatsapp_aviso_pago_confirmado_activo', valor: 'si' },
+    { clave: 'whatsapp_aviso_listo_activo', valor: 'si' },
+    { clave: 'whatsapp_aviso_entregado_activo', valor: 'si' },
+    { clave: 'whatsapp_aviso_encuesta_activo', valor: 'si' },
+    { clave: 'reparto_insistencia_min', valor: 3 },
+    { clave: 'reparto_espera_max_min', valor: 10 },
+    { clave: 'reparto_recargo_reprogramacion', valor: 0 },
   ];
 
   for (const p of params) {

@@ -116,7 +116,7 @@ describe('Ventana24hService', () => {
     expect(mockPrisma.notificacion.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          rol_destino: 'CAJA',
+          rol_destino: 'CAJERO',
           titulo: expect.stringContaining('plantilla'),
         }),
       }),
