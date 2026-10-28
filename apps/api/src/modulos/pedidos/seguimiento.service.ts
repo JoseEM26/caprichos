@@ -2,6 +2,14 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { obtenerFechaHoraLima } from '../local/local.util';
 import { generarTokenSeguimiento, verificarTokenSeguimiento } from './seguimiento.tokens';
+import {
+  calcularEtaEntrega,
+  CONFIG_ETA_DEFECTO,
+  ConfigEta,
+  leerConfigEta,
+  RangoEta,
+  restanteEnCamino,
+} from '../repartos/eta-entrega';
 
 /** Medios que requieren captura del comprobante (mismo criterio que Caja). */
 const MEDIOS_DIGITALES = ['YAPE', 'PLIN', 'TRANSFERENCIA'];
@@ -115,6 +123,18 @@ export interface SeguimientoPedido {
   pasos: PasoSeguimiento[];
   /** Pago con Yape, Plin o transferencia: la pantalla pide adjuntar la captura. Solo en obtener(). */
   pagoDigital?: boolean;
+  /**
+   * Tiempo que falta (aditivo). Antes de salir: estimado de la zona. En camino: lo prometido al salir
+   * menos lo transcurrido. Null cuando el pedido ya está entregado o anulado.
+   */
+  tiempo?: TiempoSeguimiento | null;
+}
+
+export interface TiempoSeguimiento {
+  min: number;
+  max: number;
+  enCamino: boolean;
+  texto: string;
 }
 
 // Campos que necesita el seguimiento: nada personal (nombre, teléfono, dirección, coordenadas)
@@ -129,6 +149,12 @@ const SELECCION_SEGUIMIENTO = {
   listo_en: true,
   despachado_en: true,
   entregado_en: true,
+  eta_min: true,
+  eta_max: true,
+  entrega_lat: true,
+  entrega_lng: true,
+  zona: { select: { minutos_min: true, minutos_max: true } },
+  lineas: { where: { linea_combo_id: null }, select: { cantidad: true } },
   historial: {
     select: { estado_nuevo: true, en: true },
     orderBy: { en: 'asc' as const },
@@ -157,8 +183,23 @@ type PedidoSeguimiento = {
   listo_en: Date | null;
   despachado_en: Date | null;
   entregado_en: Date | null;
+  eta_min: number | null;
+  eta_max: number | null;
+  entrega_lat: unknown;
+  entrega_lng: unknown;
+  zona: { minutos_min: number | null; minutos_max: number | null } | null;
+  lineas: { cantidad: number }[];
   historial: { estado_nuevo: string; en: Date }[];
 };
+
+/** Contexto de cálculo del tiempo: configuración de parámetros y «ahora» (inyectable en pruebas). */
+interface ContextoTiempo {
+  cfg: ConfigEta;
+  ahora: Date;
+}
+
+const textoRango = (min: number, max: number) =>
+  min === max ? `unos ${min} minutos` : `unos ${min} a ${max} minutos`;
 
 @Injectable()
 export class SeguimientoService {
@@ -183,7 +224,7 @@ export class SeguimientoService {
     }
 
     const pagoDigital = MEDIOS_DIGITALES.includes(String(pedido.pago_preferido ?? '').toUpperCase());
-    return { ...this.construir(pedido as PedidoSeguimiento), pagoDigital };
+    return { ...this.construir(pedido as PedidoSeguimiento, await this.contexto()), pagoDigital };
   }
 
   /**
@@ -221,11 +262,12 @@ export class SeguimientoService {
       select: SELECCION_SEGUIMIENTO,
     });
     const porCodigo = new Map(encontrados.map((p) => [p.codigo, p]));
+    const ctx = await this.contexto();
 
     return pedidos.map(({ codigo, t }) => {
       const pedido = porCodigo.get(codigo);
       if (!pedido || !verificarTokenSeguimiento(pedido.id, t)) return { codigo, noEncontrado: true as const };
-      return this.construir(pedido as PedidoSeguimiento);
+      return this.construir(pedido as PedidoSeguimiento, ctx);
     });
   }
 
@@ -250,8 +292,9 @@ export class SeguimientoService {
     });
 
     const hayMas = filas.length > TAMANO_PAGINA_CUENTA;
+    const ctx = await this.contexto();
     const pedidos = filas.slice(0, TAMANO_PAGINA_CUENTA).map((fila) => ({
-      ...this.construir(fila as PedidoSeguimiento),
+      ...this.construir(fila as PedidoSeguimiento, ctx),
       creadoEn: fila.creado_en.toISOString(),
       resumen: resumenProductos(fila.lineas),
       seguimientoToken: generarTokenSeguimiento(fila.id),
@@ -260,7 +303,50 @@ export class SeguimientoService {
     return { pedidos, pagina, hayMas };
   }
 
-  private construir(pedido: PedidoSeguimiento): SeguimientoPedido {
+  /** Parámetros del tiempo y reloj de la consulta (una lectura por petición). */
+  private async contexto(): Promise<ContextoTiempo> {
+    // Un fallo leyendo parámetros no debe romper el seguimiento: rigen los valores por defecto
+    const cfg = await leerConfigEta(this.prisma).catch(() => ({ ...CONFIG_ETA_DEFECTO, respaldoMin: 30 }));
+    return { cfg, ahora: new Date() };
+  }
+
+  /**
+   * Tiempo que falta. Regla (documentada en el manual de Repartos):
+   * - Sin salir: rango de la zona con empaque (sin ruta). Sin zona ni coordenadas: tiempo_prometido_min.
+   * - En camino: lo prometido al salir (eta_min/eta_max) menos lo transcurrido desde la salida;
+   *   nunca baja de 5 minutos. Sin rango guardado (pedidos anteriores): tiempo_prometido_min menos lo transcurrido.
+   * - Entregado o anulado: sin tiempo.
+   */
+  private tiempoDe(pedido: PedidoSeguimiento, anulado: boolean, ctx: ContextoTiempo): TiempoSeguimiento | null {
+    // Solo delivery tiene tiempo de entrega; recoger en local y mesa no lo muestran
+    if (anulado || pedido.estado === 'ENTREGADO' || pedido.modalidad !== 'DELIVERY') return null;
+    const enCamino = pedido.estado === 'EN_CAMINO' || pedido.despachado_en !== null;
+    let rango: RangoEta | null;
+    if (enCamino) {
+      const prometido =
+        pedido.eta_min != null && pedido.eta_max != null ? { min: pedido.eta_min, max: pedido.eta_max } : null;
+      rango = restanteEnCamino(prometido, ctx.cfg.respaldoMin, pedido.despachado_en, ctx.ahora, ctx.cfg.pasoMin);
+    } else {
+      const unidades = (pedido.lineas ?? []).reduce((s, l) => s + Number(l.cantidad || 0), 0);
+      const lat = pedido.entrega_lat == null ? null : Number(pedido.entrega_lat);
+      const lng = pedido.entrega_lng == null ? null : Number(pedido.entrega_lng);
+      rango =
+        calcularEtaEntrega(
+          {
+            zonaMin: pedido.zona?.minutos_min ?? null,
+            zonaMax: pedido.zona?.minutos_max ?? null,
+            lat,
+            lng,
+            unidades,
+          },
+          ctx.cfg,
+        ) ?? { min: ctx.cfg.respaldoMin, max: ctx.cfg.respaldoMin };
+    }
+    if (!rango) return null;
+    return { min: rango.min, max: rango.max, enCamino, texto: textoRango(rango.min, rango.max) };
+  }
+
+  private construir(pedido: PedidoSeguimiento, ctx: ContextoTiempo): SeguimientoPedido {
     const modalidad = (pedido.modalidad in PASOS_POR_MODALIDAD ? pedido.modalidad : 'RECOGER') as Modalidad;
     const anulado = pedido.estado === 'ANULADO';
     const rangoEstado = anulado ? -1 : (RANGO_ESTADO[pedido.estado] ?? 0);
@@ -286,6 +372,7 @@ export class SeguimientoService {
       terminado: anulado || pedido.estado === 'ENTREGADO',
       anulado,
       pasos,
+      tiempo: this.tiempoDe(pedido, anulado, ctx),
     };
   }
 

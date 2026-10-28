@@ -15,6 +15,7 @@ import { ConsultarEnvioDto } from './dto/consultar-envio.dto';
 import { EditarTarifaDto } from './dto/editar-tarifa.dto';
 import { EditarActivaDto } from './dto/editar-activa.dto';
 import { EditarPoligonoDto } from './dto/editar-poligono.dto';
+import { EditarTiempoDto } from './dto/editar-tiempo.dto';
 
 // ===========================================================================
 // PÚBLICO (GET /carta/envio)
@@ -64,6 +65,17 @@ export class ZonasAdminController {
   ) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.zonasService.editarTarifa(codigo, dto, req.usuario, ip);
+  }
+
+  @Put(':codigo/tiempo')
+  @Permiso('zonas', 'editar')
+  async editarTiempo(
+    @Param('codigo') codigo: string,
+    @Body() dto: EditarTiempoDto,
+    @Req() req: any,
+  ) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.zonasService.editarTiempo(codigo, dto, req.usuario, ip);
   }
 
   @Put(':codigo/activa')

@@ -24,6 +24,12 @@ Modulo central para la recepcion, seguimiento y cobro de pedidos en salon, para 
 Antes: [[supervisor-codigo]]
 Despues: [[caja]]
 
+## Como se hace: mover un voucher al pedido correcto
+1. Si el comprobante de un cliente quedó ligado a otro de sus pedidos (la regla automática toma el pedido pendiente más reciente), abre el pedido en Confirmar pago o el chat en Mensajes.
+2. En la foto del comprobante, pulsa "Reasignar a otro pedido". Solo aparecen los pedidos del mismo cliente que esperan pago digital.
+3. Elige el pedido y pulsa "Mover voucher". Confirma con "Sí, mover voucher". Verás de qué pedido a cuál pasa.
+4. Solo se mueve la foto: el pago se aprueba aparte. Un voucher que ya aprobó un pago no se puede mover.
+
 ## Como se hace: Cobrar un pedido
 1. En la lista de pedidos o desde la pestana Por confirmar o Pago por coordinar, ubicar el pedido y pulsar el boton Cobrar.
 2. Seleccionar el medio de pago: Efectivo, Yape, Plin, Tarjeta o Transferencia.

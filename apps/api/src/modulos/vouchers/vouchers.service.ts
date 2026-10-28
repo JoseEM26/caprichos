@@ -11,6 +11,7 @@ import {
 import * as crypto from 'crypto';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
+import { mismoCliente, pedidoAceptaVoucher, ultimos9 } from './voucher-reasignacion.util';
 import { ArchivosService } from '../archivos/archivos.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
@@ -611,6 +612,166 @@ export class VouchersService {
       id: actualizado.id.toString(),
       revisado_en: actualizado.revisado_en?.toISOString() || null,
       revisado_por: actualizado.revisado_por?.toString() || null,
+    };
+  }
+
+  /**
+   * Pedidos del mismo cliente a los que Caja puede mover este voucher. El voucher ya usado para aprobar
+   * un pago no se mueve (bloqueado: true).
+   */
+  async destinosReasignacion(id: string) {
+    const voucherId = this.parsearId(id);
+    const voucher = await this.prisma.voucherPago.findUnique({ where: { id: voucherId } });
+    if (!voucher) {
+      throw new NotFoundException({ codigo: 'VOUCHER_NO_ENCONTRADO', mensaje: 'El voucher especificado no existe' });
+    }
+    const origen = voucher.pedido_id
+      ? await this.prisma.pedido.findUnique({ where: { id: voucher.pedido_id } })
+      : null;
+    const conversacion = voucher.conversacion_id
+      ? await this.prisma.conversacion.findUnique({ where: { id: voucher.conversacion_id }, select: { telefono: true } })
+      : null;
+    const telefonoBase = origen?.cliente_telefono ?? conversacion?.telefono ?? null;
+    const fin = ultimos9(telefonoBase);
+
+    const candidatos =
+      fin.length === 9
+        ? await this.prisma.pedido.findMany({
+            where: {
+              cliente_telefono: { endsWith: fin },
+              estado: { notIn: ['ANULADO', 'ENTREGADO'] },
+              pago_estado: 'PENDIENTE',
+              es_personal: false,
+              ...(origen ? { id: { not: origen.id } } : {}),
+            },
+            orderBy: { creado_en: 'desc' },
+            take: 20,
+            select: {
+              id: true,
+              codigo: true,
+              estado: true,
+              total: true,
+              pago_estado: true,
+              pago_preferido: true,
+              pago_metodo: true,
+              es_personal: true,
+              creado_en: true,
+            },
+          })
+        : [];
+
+    const bloqueado = origen ? ['COORDINADO', 'PAGADO'].includes(String(origen.pago_estado)) : false;
+    return {
+      voucherId: voucher.id.toString(),
+      pedidoActual: origen ? { id: origen.id.toString(), codigo: origen.codigo } : null,
+      bloqueado,
+      destinos: bloqueado
+        ? []
+        : candidatos
+            .filter((p) => pedidoAceptaVoucher(p))
+            .map((p) => ({
+              id: p.id.toString(),
+              codigo: p.codigo,
+              total: Number(p.total),
+              medio: String(p.pago_preferido || p.pago_metodo || '').toUpperCase(),
+              creadoEn: p.creado_en.toISOString(),
+            })),
+    };
+  }
+
+  /**
+   * Mueve el voucher a otro pedido del mismo cliente con pago digital pendiente. Solo cambia el comprobante
+   * (y el pedido de la conversación si apuntaba al anterior). No aprueba el pago. Con auditoría REASIGNAR_VOUCHER.
+   */
+  async reasignar(id: string, pedidoId: string, usuario: UsuarioAutenticado, ip?: string) {
+    const voucherId = this.parsearId(id);
+    const destinoId = this.parsearId(pedidoId);
+
+    const voucher = await this.prisma.voucherPago.findUnique({ where: { id: voucherId } });
+    if (!voucher) {
+      throw new NotFoundException({ codigo: 'VOUCHER_NO_ENCONTRADO', mensaje: 'El voucher especificado no existe' });
+    }
+    const destino = await this.prisma.pedido.findUnique({ where: { id: destinoId } });
+    if (!destino) {
+      throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'El pedido destino no existe' });
+    }
+    if (voucher.pedido_id !== null && voucher.pedido_id === destino.id) {
+      throw new BadRequestException({ codigo: 'MISMO_PEDIDO', mensaje: 'El voucher ya está en ese pedido' });
+    }
+
+    const origen = voucher.pedido_id ? await this.prisma.pedido.findUnique({ where: { id: voucher.pedido_id } }) : null;
+    if (origen && ['COORDINADO', 'PAGADO'].includes(String(origen.pago_estado))) {
+      throw new ConflictException({
+        codigo: 'VOUCHER_YA_USADO',
+        mensaje: `El pago de ${origen.codigo} ya fue aprobado con este voucher; no se puede mover`,
+      });
+    }
+    if (!pedidoAceptaVoucher(destino)) {
+      throw new ConflictException({
+        codigo: 'PEDIDO_DESTINO_NO_VALIDO',
+        mensaje: `${destino.codigo} no espera un pago digital (pago pendiente, no anulado)`,
+      });
+    }
+
+    const conversacion = voucher.conversacion_id
+      ? await this.prisma.conversacion.findUnique({ where: { id: voucher.conversacion_id } })
+      : null;
+    const telefonoBase = origen?.cliente_telefono ?? conversacion?.telefono ?? null;
+    const mismoTelefono = mismoCliente(destino.cliente_telefono, telefonoBase);
+    const otroParty =
+      origen?.party_id != null && destino.party_id != null && String(origen.party_id) !== String(destino.party_id);
+    if (!mismoTelefono || otroParty) {
+      throw new ConflictException({
+        codigo: 'CLIENTE_DISTINTO',
+        mensaje: 'Solo se puede mover un voucher a un pedido del mismo cliente',
+      });
+    }
+
+    const flujo = (conversacion?.flujo as any) || {};
+    const apuntaAOrigen = origen && String(flujo?.pago?.pedidoId ?? '') === origen.id.toString();
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.voucherPago.update({ where: { id: voucher.id }, data: { pedido_id: destino.id } });
+      if (conversacion && apuntaAOrigen) {
+        await tx.conversacion.update({
+          where: { id: conversacion.id },
+          data: {
+            flujo: {
+              ...flujo,
+              pago: {
+                ...(flujo.pago || {}),
+                pedidoId: destino.id.toString(),
+                pedidoCodigo: destino.codigo,
+                monto: Number(destino.total),
+              },
+            },
+          },
+        });
+      }
+    });
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'vouchers',
+      accion: 'REASIGNAR_VOUCHER',
+      resultado: 'OK',
+      entidad: 'voucher_pago',
+      entidadId: voucher.id,
+      partyId: usuario.partyId,
+      ip,
+      antes: { pedidoId: origen ? origen.id.toString() : null, pedidoCodigo: origen?.codigo ?? null },
+      despues: { pedidoId: destino.id.toString(), pedidoCodigo: destino.codigo },
+    });
+
+    const pedidoIds = [origen?.id, destino.id].filter((x): x is bigint => x != null).map((x) => x.toString());
+    this.eventos?.emitirAdmin('vouchers:actualizado', { pedidoIds });
+    if (conversacion) this.eventos?.emitirAdmin('mensajes:actualizado', { id: conversacion.id.toString() });
+
+    return {
+      ok: true,
+      voucherId: voucher.id.toString(),
+      pedidoAnterior: origen?.codigo ?? null,
+      pedidoNuevo: destino.codigo,
     };
   }
 

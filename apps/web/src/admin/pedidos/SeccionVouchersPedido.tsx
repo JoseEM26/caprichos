@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { useEventos } from '../../comun/socket';
+import { ReasignarVoucherBoton } from '../vouchers/ReasignarVoucherBoton';
 import { vouchersApi } from '../vouchers/vouchersApi';
 import { TarjetaLecturaVoucher } from '../vouchers/TarjetaLecturaVoucher';
 import { FotoAmpliable } from '../vouchers/FotoAmpliable';
@@ -20,6 +22,9 @@ export interface SeccionVouchersPedidoProps {
  */
 export function SeccionVouchersPedido({ pedidoId, recargarClave, total, medio, alCargar }: SeccionVouchersPedidoProps) {
   const [vouchers, setVouchers] = useState<VoucherPagoItem[]>([]);
+  // Sube cada vez que un voucher se mueve (aquí o desde Mensajes): vuelve a leer las fotos del pedido
+  const [recarga, setRecarga] = useState(0);
+  useEventos('vouchers:actualizado', () => setRecarga((n) => n + 1));
 
   useEffect(() => {
     let activo = true;
@@ -40,7 +45,7 @@ export function SeccionVouchersPedido({ pedidoId, recargarClave, total, medio, a
       activo = false;
     };
     // alCargar no entra en las dependencias: cambia en cada render del padre y no debe re-leer.
-  }, [pedidoId, recargarClave]);
+  }, [pedidoId, recargarClave, recarga]);
 
   if (vouchers.length === 0) return null;
 
@@ -74,6 +79,7 @@ export function SeccionVouchersPedido({ pedidoId, recargarClave, total, medio, a
             pedido={{ total: total ?? null, medio: medio ?? null }}
             puedeVer
           />
+          <ReasignarVoucherBoton voucherId={v.id} onReasignado={() => setRecarga((n) => n + 1)} />
         </div>
       ))}
     </div>

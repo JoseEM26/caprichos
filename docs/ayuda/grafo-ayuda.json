@@ -96,6 +96,12 @@
       "modulo": "caja"
     },
     {
+      "id": "caja#mover-un-voucher-al-pedido-correcto",
+      "tipo": "tarea",
+      "etiqueta": "mover un voucher al pedido correcto",
+      "modulo": "caja"
+    },
+    {
       "id": "caja#cobrar-un-pedido",
       "tipo": "tarea",
       "etiqueta": "Cobrar un pedido",
@@ -702,6 +708,12 @@
       "modulo": "mensajes"
     },
     {
+      "id": "mensajes#mover-un-voucher-desde-el-chat",
+      "tipo": "tarea",
+      "etiqueta": "mover un voucher desde el chat",
+      "modulo": "mensajes"
+    },
+    {
       "id": "mensajes#pulir-la-respuesta-con-ia-antes-de-enviarla",
       "tipo": "tarea",
       "etiqueta": "Pulir la respuesta con IA antes de enviarla",
@@ -1061,6 +1073,12 @@
       "modulo": "repartos"
     },
     {
+      "id": "repartos#entender-el-tiempo-estimado-que-se-le-dice-al-cliente",
+      "tipo": "tarea",
+      "etiqueta": "entender el tiempo estimado que se le dice al cliente",
+      "modulo": "repartos"
+    },
+    {
       "id": "reservas",
       "tipo": "modulo",
       "etiqueta": "Reservas (reservas)",
@@ -1210,6 +1228,12 @@
       "id": "zonas#modificar-la-tarifa-de-una-zona",
       "tipo": "tarea",
       "etiqueta": "modificar la tarifa de una zona",
+      "modulo": "zonas"
+    },
+    {
+      "id": "zonas#editar-los-minutos-de-entrega-de-una-zona",
+      "tipo": "tarea",
+      "etiqueta": "editar los minutos de entrega de una zona",
       "modulo": "zonas"
     },
     {
@@ -1549,6 +1573,11 @@
     {
       "tipo": "despues",
       "origen": "caja#abrir-la-caja-del-turno",
+      "destino": "caja"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "caja#mover-un-voucher-al-pedido-correcto",
       "destino": "caja"
     },
     {
@@ -3798,6 +3827,11 @@
     },
     {
       "tipo": "pertenece_a",
+      "origen": "mensajes#mover-un-voucher-desde-el-chat",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "pertenece_a",
       "origen": "mensajes#pulir-la-respuesta-con-ia-antes-de-enviarla",
       "destino": "mensajes"
     },
@@ -5077,6 +5111,11 @@
       "destino": "mensajes"
     },
     {
+      "tipo": "pertenece_a",
+      "origen": "repartos#entender-el-tiempo-estimado-que-se-le-dice-al-cliente",
+      "destino": "repartos"
+    },
+    {
       "tipo": "requiere_permiso",
       "origen": "reservas",
       "destino": "permiso:reservas/ver"
@@ -5535,6 +5574,11 @@
       "tipo": "despues",
       "origen": "zonas",
       "destino": "caja"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "zonas#editar-los-minutos-de-entrega-de-una-zona",
+      "destino": "zonas"
     },
     {
       "tipo": "pertenece_a",

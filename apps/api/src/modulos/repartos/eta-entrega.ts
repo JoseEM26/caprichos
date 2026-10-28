@@ -147,3 +147,64 @@ export async function leerConfigEta(db: {
     respaldoMin: num('tiempo_prometido_min', 30),
   };
 }
+
+/** Mínimo razonable de lo que falta: nunca se muestra 0 ni un número negativo. */
+export const MINIMO_RESTANTE_MIN = 5;
+
+/** Lo que falta de un pedido en camino: el rango prometido al salir menos lo transcurrido desde la salida. */
+export function restanteEnCamino(
+  prometido: RangoEta | null,
+  respaldoMin: number,
+  salioEn: Date | null,
+  ahora: Date,
+  paso = CONFIG_ETA_DEFECTO.pasoMin,
+): RangoEta | null {
+  if (!salioEn) return null;
+  const transcurrido = Math.max(0, (ahora.getTime() - salioEn.getTime()) / 60000);
+  const piso = (v: number) => Math.max(MINIMO_RESTANTE_MIN, Math.round(v / paso) * paso);
+  if (!prometido) {
+    const r = piso(respaldoMin - transcurrido);
+    return { min: r, max: r };
+  }
+  const min = piso(prometido.min - transcurrido);
+  const max = Math.max(min, piso(prometido.max - transcurrido));
+  return { min, max };
+}
+
+/**
+ * Tiempo estimado de un pedido antes de salir (sin ruta): rango de la zona con empaque, o el respaldo.
+ * Lo usan la aprobación del pago y el seguimiento. Nunca lanza: si no hay datos devuelve el respaldo.
+ */
+export async function textoTiempoPedido(
+  db: {
+    parametro: { findMany(args: any): Promise<Array<{ clave: string; valor: unknown }>> };
+    pedido: { findUnique(args: any): Promise<any> };
+  },
+  pedidoId: bigint,
+): Promise<string> {
+  const cfg = await leerConfigEta(db).catch(() => ({ ...CONFIG_ETA_DEFECTO, respaldoMin: 30 }));
+  const pedido = await db.pedido
+    .findUnique({
+      where: { id: pedidoId },
+      select: {
+        entrega_lat: true,
+        entrega_lng: true,
+        zona: { select: { minutos_min: true, minutos_max: true } },
+        lineas: { select: { cantidad: true } },
+      },
+    })
+    .catch(() => null);
+  const rango = pedido
+    ? calcularEtaEntrega(
+        {
+          zonaMin: pedido.zona?.minutos_min ?? null,
+          zonaMax: pedido.zona?.minutos_max ?? null,
+          lat: pedido.entrega_lat == null ? null : Number(pedido.entrega_lat),
+          lng: pedido.entrega_lng == null ? null : Number(pedido.entrega_lng),
+          unidades: (pedido.lineas ?? []).reduce((s: number, l: { cantidad: number }) => s + Number(l.cantidad || 0), 0),
+        },
+        cfg,
+      )
+    : null;
+  return formatearEta(rango, cfg.respaldoMin);
+}

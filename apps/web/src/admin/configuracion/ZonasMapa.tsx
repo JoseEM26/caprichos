@@ -42,6 +42,8 @@ export interface ZonasMapaProps {
   diagnostico: DiagnosticoZonas | null;
   versionHistorial: number;
   onEditarTarifa: (zona: ZonaRepartoItem) => void;
+  /** Abre el modal de minutos de entrega de la zona (opcional). */
+  onEditarTiempo?: (zona: ZonaRepartoItem) => void;
   onCambiarActiva: (zona: ZonaRepartoItem) => void;
   onEditarJson: (zona: ZonaRepartoItem) => void;
   /** Guarda el polígono con PUT /admin/zonas/:codigo/poligono. Si falla, lanza el error del servidor. */
@@ -74,7 +76,10 @@ function formatearArea(m2: number): string {
   return `${Math.round(m2).toLocaleString('es-PE')} m²`;
 }
 
-const etiquetaZona = (z: ZonaRepartoItem) => `${z.codigo} · S/ ${Number(z.tarifa).toFixed(2)}`;
+/** Etiqueta del mapa: «Z3 · S/ 3.00 · 15–20 min» (los minutos solo si la zona los tiene). */
+export const etiquetaZona = (z: ZonaRepartoItem) =>
+  `${z.codigo} · S/ ${Number(z.tarifa).toFixed(2)}` +
+  (z.minutosMin != null && z.minutosMax != null ? ` · ${z.minutosMin}–${z.minutosMax} min` : '');
 
 const iconoVertice = (activo: boolean) =>
   L.divIcon({
@@ -101,6 +106,7 @@ export function ZonasMapa({
   diagnostico,
   versionHistorial,
   onEditarTarifa,
+  onEditarTiempo,
   onCambiarActiva,
   onEditarJson,
   onGuardarPoligono,
@@ -459,6 +465,11 @@ export function ZonasMapa({
                 <Boton type="button" variante="secundario" disabled={edicion !== null} onClick={() => onEditarTarifa(zonaSel)}>
                   Editar tarifa
                 </Boton>
+                {onEditarTiempo && (
+                  <Boton type="button" variante="secundario" disabled={edicion !== null} onClick={() => onEditarTiempo(zonaSel)}>
+                    Editar minutos
+                  </Boton>
+                )}
                 <Boton type="button" variante="secundario" disabled={edicion !== null} onClick={() => onCambiarActiva(zonaSel)}>
                   {zonaSel.activa ? 'Desactivar zona' : 'Activar zona'}
                 </Boton>

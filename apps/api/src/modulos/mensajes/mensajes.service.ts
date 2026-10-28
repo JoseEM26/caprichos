@@ -1,3 +1,4 @@
+import { textoTiempoPedido } from '../repartos/eta-entrega';
 import { pedidoEsperandoVoucher } from '../chatbot/servicios/pedido-esperando-voucher.util';
 import { HttpException, HttpStatus, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
@@ -735,8 +736,11 @@ export class MensajesService {
       estado: nuevoEstado,
     });
 
-    const min = d.tiempoPrometidoMin ?? undefined;
-    const textoAprobado = TEXTOS_PAGO.pagoAprobadoCliente(d.pedido.codigo, min);
+    // Tiempo estimado de la zona del pedido (rango); si no hay datos, el respaldo tiempo_prometido_min
+    const tiempoTexto = await textoTiempoPedido(this.prisma as any, pedidoId).catch(() =>
+      d.tiempoPrometidoMin != null ? String(d.tiempoPrometidoMin) : undefined,
+    );
+    const textoAprobado = TEXTOS_PAGO.pagoAprobadoCliente(d.pedido.codigo, tiempoTexto);
     await this.gateway.enviarTexto(c.id, c.telefono, textoAprobado, 'BOT');
 
     const flujoActual = (c.flujo as any) || {};

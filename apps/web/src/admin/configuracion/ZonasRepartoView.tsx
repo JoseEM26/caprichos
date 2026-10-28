@@ -18,6 +18,9 @@ export interface ZonaRepartoItem {
   id: string;
   codigo: string;
   tarifa: number;
+  /** Minutos típicos de entrega de la zona (null si aún no los tiene). */
+  minutosMin?: number | null;
+  minutosMax?: number | null;
   activa: boolean;
   puntos: number;
   poligono: CoordenadaPunto[];
@@ -42,6 +45,13 @@ function ZonasRepartoContenido() {
   const [nuevaTarifaInput, setNuevaTarifaInput] = useState<string>('');
   const [errorTarifa, setErrorTarifa] = useState<string | null>(null);
   const [confirmarTarifaAbierto, setConfirmarTarifaAbierto] = useState(false);
+
+  // Estados de edición de minutos de entrega
+  const [zonaTiempoEditando, setZonaTiempoEditando] = useState<ZonaRepartoItem | null>(null);
+  const [minInput, setMinInput] = useState<string>('');
+  const [maxInput, setMaxInput] = useState<string>('');
+  const [errorTiempo, setErrorTiempo] = useState<string | null>(null);
+  const [confirmarTiempoAbierto, setConfirmarTiempoAbierto] = useState(false);
 
   // Estados de activación/desactivación
   const [zonaToggleActiva, setZonaToggleActiva] = useState<ZonaRepartoItem | null>(null);
@@ -213,6 +223,60 @@ function ZonasRepartoContenido() {
           : 'Error al actualizar la tarifa de la zona';
       setErrorServidor(msg);
       setConfirmarTarifaAbierto(false);
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  // --- Manejo de minutos de entrega ---
+  const abrirEditarTiempo = (zona: ZonaRepartoItem) => {
+    setZonaTiempoEditando(zona);
+    setMinInput(zona.minutosMin != null ? String(zona.minutosMin) : '');
+    setMaxInput(zona.minutosMax != null ? String(zona.minutosMax) : '');
+    setErrorTiempo(null);
+  };
+
+  const prepararGuardarTiempo = () => {
+    const min = Number(minInput.trim());
+    const max = Number(maxInput.trim());
+    const enteros = Number.isInteger(min) && Number.isInteger(max);
+    if (!enteros || min < 5 || max > 120) {
+      setErrorTiempo('Los minutos deben ser enteros entre 5 y 120');
+      return;
+    }
+    if (min > max) {
+      setErrorTiempo('El mínimo no puede ser mayor que el máximo');
+      return;
+    }
+    setErrorTiempo(null);
+    setConfirmarTiempoAbierto(true);
+  };
+
+  const handleGuardarTiempo = async () => {
+    if (!zonaTiempoEditando || !puedeEditar) return;
+    const min = Number(minInput.trim());
+    const max = Number(maxInput.trim());
+    setGuardando(true);
+    setErrorServidor(null);
+    try {
+      const res = await api.put<ZonaRepartoItem>(
+        `/admin/zonas/${zonaTiempoEditando.codigo}/tiempo`,
+        { minutosMin: min, minutosMax: max },
+      );
+      setZonas((prev) =>
+        prev.map((z) =>
+          z.codigo === res.codigo ? { ...z, minutosMin: res.minutosMin, minutosMax: res.minutosMax } : z,
+        ),
+      );
+      const horaStr = new Date().toLocaleTimeString('es-PE', { hour12: false });
+      setMensajeGuardado(`Guardado a las ${horaStr}`);
+      setVersionHistorial((v) => v + 1);
+      setConfirmarTiempoAbierto(false);
+      setZonaTiempoEditando(null);
+    } catch (err) {
+      const msg = err instanceof ErrorApi ? err.message : 'Error al actualizar los minutos de la zona';
+      setErrorServidor(msg);
+      setConfirmarTiempoAbierto(false);
     } finally {
       setGuardando(false);
     }
@@ -485,6 +549,7 @@ function ZonasRepartoContenido() {
           diagnostico={diagnostico}
           versionHistorial={versionHistorial}
           onEditarTarifa={abrirEditarTarifa}
+          onEditarTiempo={abrirEditarTiempo}
           onCambiarActiva={(z) => setZonaToggleActiva(z)}
           onEditarJson={abrirEditarPoligono}
           onGuardarPoligono={guardarPoligonoMapa}
@@ -578,17 +643,32 @@ function ZonasRepartoContenido() {
                   >
                     S/ {Number(z.tarifa).toFixed(2)}
                   </div>
+                  <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }} data-testid={`minutos-${z.codigo}`}>
+                    {z.minutosMin != null && z.minutosMax != null
+                      ? `${z.minutosMin}–${z.minutosMax} min`
+                      : 'Sin minutos de entrega'}
+                  </div>
                 </div>
 
                 {puedeEditar && (
-                  <Boton
-                    type="button"
-                    variante="secundario"
-                    tamano="pequeno"
-                    onClick={() => abrirEditarTarifa(z)}
-                  >
-                    Editar tarifa
-                  </Boton>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    <Boton
+                      type="button"
+                      variante="secundario"
+                      tamano="pequeno"
+                      onClick={() => abrirEditarTarifa(z)}
+                    >
+                      Editar tarifa
+                    </Boton>
+                    <Boton
+                      type="button"
+                      variante="secundario"
+                      tamano="pequeno"
+                      onClick={() => abrirEditarTiempo(z)}
+                    >
+                      Editar minutos
+                    </Boton>
+                  </div>
                 )}
               </div>
 
@@ -712,6 +792,105 @@ function ZonasRepartoContenido() {
           </div>
         </div>
       )}
+
+      {/* Modal Editar minutos de entrega */}
+      {zonaTiempoEditando && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 90,
+            background: 'rgba(11, 44, 62, 0.65)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+          }}
+          onClick={() => !guardando && setZonaTiempoEditando(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="editar-tiempo-titulo"
+            style={{
+              width: '100%',
+              maxWidth: '420px',
+              background: 'var(--cp-white)',
+              border: '1px solid var(--cp-line)',
+              borderRadius: '20px',
+              padding: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div>
+              <h3 id="editar-tiempo-titulo" style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: '17px', color: 'var(--cp-navy)' }}>
+                Minutos de entrega · Zona {zonaTiempoEditando.codigo}
+              </h3>
+              <p style={{ fontSize: '13px', color: 'var(--cp-soft)', margin: '4px 0 0 0' }}>
+                Rango típico de entrega en esta zona. El aviso de salida suma recorrido y empaque sobre este rango.
+              </p>
+            </div>
+
+            {errorTiempo && (
+              <div role="alert" style={{ background: '#FBEDE9', border: '1px solid var(--cp-rust)', borderRadius: '10px', padding: '8px 12px', fontSize: '13px', color: 'var(--cp-rust)', fontWeight: 600 }}>
+                {errorTiempo}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <Campo
+                etiqueta="Mínimo (min)"
+                type="number"
+                step="1"
+                min="5"
+                max="120"
+                value={minInput}
+                onChange={(e) => {
+                  setMinInput(e.target.value);
+                  setErrorTiempo(null);
+                }}
+                autoFocus
+              />
+              <Campo
+                etiqueta="Máximo (min)"
+                type="number"
+                step="1"
+                min="5"
+                max="120"
+                value={maxInput}
+                onChange={(e) => {
+                  setMaxInput(e.target.value);
+                  setErrorTiempo(null);
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
+              <Boton type="button" variante="secundario" disabled={guardando} onClick={() => setZonaTiempoEditando(null)}>
+                Cancelar
+              </Boton>
+              <Boton type="button" variante="primario" disabled={guardando} onClick={prepararGuardarTiempo}>
+                Continuar
+              </Boton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmar cambio de minutos */}
+      <Confirmar
+        abierto={confirmarTiempoAbierto}
+        titulo="¿Actualizar minutos de entrega?"
+        mensaje={`¿Confirmas cambiar la zona ${zonaTiempoEditando?.codigo} a ${minInput}–${maxInput} minutos? Rige para pedidos nuevos.`}
+        textoSi="Sí, actualizar minutos"
+        textoNo="No, cancelar"
+        cargando={guardando}
+        alConfirmar={handleGuardarTiempo}
+        alCancelar={() => setConfirmarTiempoAbierto(false)}
+      />
 
       {/* Confirmar Cambio de Tarifa */}
       <Confirmar

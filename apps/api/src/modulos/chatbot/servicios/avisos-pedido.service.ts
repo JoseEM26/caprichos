@@ -243,7 +243,10 @@ export class AvisosPedidoService {
       },
       cfg,
     );
-    return rango ? formatearEta(rango, cfg.respaldoMin) : null;
+    if (!rango) return null;
+    // Lo prometido queda guardado: el seguimiento cuenta desde la salida con este mismo rango
+    await db.pedido.update({ where: { id: pedidoId }, data: { eta_min: rango.min, eta_max: rango.max } });
+    return formatearEta(rango, cfg.respaldoMin);
   }
 
   /** Mismo efecto que un voucher recibido por WhatsApp: la conversación queda para una persona (VALIDAR_PAGO, urgente). */

@@ -453,6 +453,8 @@ model Pedido {
   motivo_anulacion       String?
   anulacion_aprobada_por BigInt?
   creado_en              DateTime                @default(now()) @db.Timestamptz
+  eta_min                Int?
+  eta_max                Int?
   // Reparto (Ola 4)
   repartidor_party_id    BigInt?
   tomado_en              DateTime?               @db.Timestamptz

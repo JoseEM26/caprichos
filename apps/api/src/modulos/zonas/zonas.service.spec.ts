@@ -307,6 +307,7 @@ describe('ZonasService', () => {
       expect(res).toEqual({
         cubierto: true,
         zona: 'Z4',
+        minutos: null,
         tarifa: 4.0,
         tarifaZona: 4.0,
         gratisDesde: 80,
@@ -340,6 +341,7 @@ describe('ZonasService', () => {
       expect(res).toEqual({
         cubierto: false,
         zona: null,
+        minutos: null,
         tarifa: null,
         tarifaZona: null,
         modoGratis: 'mas_de',

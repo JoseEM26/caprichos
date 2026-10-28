@@ -45,6 +45,7 @@ function construir(pedidos: Array<{ id: number; zona?: { minutos_min: number; mi
       create: jest.fn(async () => ({})),
     },
   };
+  prisma.pedido.update = jest.fn(async () => ({}));
   const outbox: any = { encolar: jest.fn(async () => true), despertar: jest.fn() };
   return { servicio: new AvisosPedidoService(prisma, outbox), outbox };
 }

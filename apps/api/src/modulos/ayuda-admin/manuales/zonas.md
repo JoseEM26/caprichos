@@ -38,6 +38,14 @@ Los cambios de tarifa, estado y área rigen solo para pedidos nuevos. Los pedido
 Antes: [[mirest]]
 Despues: [[caja]]
 
+## Como se hace: editar los minutos de entrega de una zona
+1. En la vista de zonas (mapa o lista), elige la zona. En la lista, cada tarjeta muestra su rango, por ejemplo "15–20 min"; en el mapa, la etiqueta muestra "Z3 · S/ 3.00 · 15–20 min".
+2. Pulsa "Editar minutos". Escribe el mínimo y el máximo: enteros entre 5 y 120, y el mínimo no puede ser mayor que el máximo.
+3. Pulsa "Continuar" y confirma con "Sí, actualizar minutos". Los minutos rigen para pedidos nuevos.
+4. El historial de la zona registra el cambio (EDITAR_TIEMPO) con el valor anterior y el nuevo.
+
+Cómo se calcula el tiempo estimado que ve el cliente: al salir el repartidor, el aviso dice "Tiempo estimado: 25 a 30 minutos". El rango sale de los minutos de la zona del pedido, más el recorrido extra si el repartidor lleva más pedidos en la ruta (una parada de 3 minutos por pedido anterior) y más un poco de empaque cuando el pedido tiene muchos productos. El ancho mínimo del rango es de 5 minutos. Si la zona no tiene minutos o el pedido no tiene coordenadas, se usa el tiempo base de Parámetros de operación (tiempo_prometido_min). Los parámetros eta_* de Parámetros de operación ajustan el factor de calles, el empaque, la parada y el redondeo.
+
 ## Como se hace: activar o desactivar una zona
 1. En la tabla de zonas, ubica la zona correspondiente y revisa su estado actual ("Activa" o "Inactiva").
 2. Si deseas suspender temporalmente los pedidos hacia ese sector (por ejemplo por lluvia, reparaciones viales o falta de cobertura), pulsa el botón "Desactivar".

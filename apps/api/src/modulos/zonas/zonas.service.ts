@@ -18,12 +18,19 @@ import { diagnosticarCobertura, DiagnosticoCobertura, puntoEnPoligono, validarPo
 import { EditarTarifaDto } from './dto/editar-tarifa.dto';
 import { EditarActivaDto } from './dto/editar-activa.dto';
 import { EditarPoligonoDto } from './dto/editar-poligono.dto';
+import { EditarTiempoDto } from './dto/editar-tiempo.dto';
 
 interface ZonaCache {
   id: bigint;
   codigo: string;
   tarifa: number;
+  minutos: { min: number; max: number } | null;
   poligono: Coordenada[];
+}
+
+/** Rango de minutos guardado en la zona; null si la zona aún no lo tiene. */
+function rangoMinutos(z: { minutos_min: number | null; minutos_max: number | null }) {
+  return z.minutos_min != null && z.minutos_max != null ? { min: z.minutos_min, max: z.minutos_max } : null;
 }
 
 @Injectable()
@@ -65,6 +72,7 @@ export class ZonasService {
       id: z.id,
       codigo: z.codigo,
       tarifa: Number(z.tarifa),
+      minutos: rangoMinutos(z),
       poligono: (z.poligono as unknown as Coordenada[]) || [],
     }));
 
@@ -86,6 +94,7 @@ export class ZonasService {
           zonaId: zona.id,
           codigo: zona.codigo,
           tarifa: zona.tarifa,
+          minutos: zona.minutos,
         };
       }
     }
@@ -152,6 +161,7 @@ export class ZonasService {
       return {
         cubierto: false,
         zona: null,
+        minutos: null,
         tarifa: null,
         tarifaZona: null,
         gratisDesde: regla.monto,
@@ -162,6 +172,7 @@ export class ZonasService {
     return {
       cubierto: true,
       zona: zona.codigo,
+      minutos: zona.minutos,
       tarifa: zona.tarifa,
       tarifaZona: zona.tarifa,
       gratisDesde: regla.monto,
@@ -185,10 +196,70 @@ export class ZonasService {
       id: z.id.toString(),
       codigo: z.codigo,
       tarifa: Number(z.tarifa),
+      minutosMin: z.minutos_min,
+      minutosMax: z.minutos_max,
       activa: z.activa,
       puntos: Array.isArray(z.poligono) ? z.poligono.length : 0,
       poligono: z.poligono as unknown as Coordenada[],
     }));
+  }
+
+  /**
+   * Edita los minutos típicos de entrega de una zona (enteros, 5 a 120, mínimo <= máximo).
+   * Invalida la caché y deja la auditoría EDITAR_TIEMPO con antes y después.
+   */
+  async editarTiempo(
+    codigo: string,
+    dto: EditarTiempoDto,
+    usuario?: UsuarioAutenticado,
+    ip?: string,
+  ): Promise<ZonaAdminItem> {
+    if (dto.minutosMin > dto.minutosMax) {
+      throw new BadRequestException({
+        codigo: 'TIEMPO_INVALIDO',
+        mensaje: 'El tiempo mínimo no puede ser mayor que el máximo',
+      });
+    }
+
+    const zona = await this.prisma.zonaReparto.findUnique({ where: { codigo } });
+    if (!zona) {
+      throw new NotFoundException({
+        codigo: 'ZONA_NO_ENCONTRADA',
+        mensaje: `No existe la zona de reparto con código ${codigo}`,
+      });
+    }
+
+    const antes = { codigo, minutosMin: zona.minutos_min, minutosMax: zona.minutos_max };
+    const updated = await this.prisma.zonaReparto.update({
+      where: { codigo },
+      data: { minutos_min: dto.minutosMin, minutos_max: dto.minutosMax },
+    });
+
+    this.invalidarCache();
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'zonas',
+      accion: 'EDITAR_TIEMPO',
+      resultado: 'OK',
+      entidad: 'zona_reparto',
+      entidadId: zona.id,
+      antes,
+      despues: { codigo, minutosMin: dto.minutosMin, minutosMax: dto.minutosMax },
+      partyId: usuario?.partyId,
+      ip,
+    });
+
+    return {
+      id: updated.id.toString(),
+      codigo: updated.codigo,
+      tarifa: Number(updated.tarifa),
+      minutosMin: updated.minutos_min,
+      minutosMax: updated.minutos_max,
+      activa: updated.activa,
+      puntos: Array.isArray(updated.poligono) ? updated.poligono.length : 0,
+      poligono: updated.poligono as unknown as Coordenada[],
+    };
   }
 
   /**

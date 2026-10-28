@@ -62,3 +62,28 @@ describe('calcularEtaEntrega', () => {
     expect(formatearEta({ min: 25, max: 30 }, 30)).toBe('25 a 30');
   });
 });
+
+import { restanteEnCamino, MINIMO_RESTANTE_MIN } from './eta-entrega';
+
+describe('restanteEnCamino (lo que falta desde la salida)', () => {
+  const salio = new Date('2026-10-28T12:00:00.000Z');
+  const minutosDespues = (m: number) => new Date(salio.getTime() + m * 60000);
+
+  it('resta lo transcurrido al rango prometido', () => {
+    expect(restanteEnCamino({ min: 25, max: 30 }, 30, salio, minutosDespues(10))).toEqual({ min: 15, max: 20 });
+  });
+
+  it('nunca baja del mínimo razonable ni es negativo cuando ya pasó el tiempo', () => {
+    const r = restanteEnCamino({ min: 25, max: 30 }, 30, salio, minutosDespues(60))!;
+    expect(r.min).toBe(MINIMO_RESTANTE_MIN);
+    expect(r.max).toBeGreaterThanOrEqual(r.min);
+  });
+
+  it('sin rango guardado usa el respaldo descontando lo transcurrido', () => {
+    expect(restanteEnCamino(null, 30, salio, minutosDespues(10))).toEqual({ min: 20, max: 20 });
+  });
+
+  it('sin salida registrada no hay tiempo en camino', () => {
+    expect(restanteEnCamino({ min: 25, max: 30 }, 30, null, minutosDespues(10))).toBeNull();
+  });
+});

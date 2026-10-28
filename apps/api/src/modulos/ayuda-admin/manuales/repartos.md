@@ -64,6 +64,12 @@ Para el rol **REPARTIDOR**, el sistema activa automaticamente una interfaz **mob
 5. Pulsar Reportar entrega fallida. El incidente se notificara a la central y a caja para coordinar la solucion.
 Ver tambien: [[mensajes]]
 
+## Como se hace: entender el tiempo estimado que se le dice al cliente
+- Al salir con el pedido, el cliente recibe un rango calculado para ese pedido (no un número fijo). Ese rango queda guardado.
+- En la carta, el seguimiento cuenta desde la salida: lo que falta es el rango guardado menos lo transcurrido, y nunca baja de 5 minutos.
+- Antes de salir, el seguimiento muestra el rango de la zona (con empaque). Sin zona ni coordenadas, muestra el tiempo base.
+- Para cambiar los minutos de una zona, ve a Zonas de reparto; para cambiar la forma de calcular, ve a Parámetros de operación (eta_*).
+
 ## Errores y dudas comunes
 - Si otro repartidor tomo antes un pedido de la ruta sugerida, el sistema avisa cual se perdio y conserva los demas que elegiste.
 - Si llegas al tope de pedidos simultaneos (5 por defecto, se cambia en Configuracion), debes entregar alguno antes de tomar otro.

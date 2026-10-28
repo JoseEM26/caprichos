@@ -14,6 +14,7 @@ import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
 import { VouchersService } from './vouchers.service';
+import { ReasignarVoucherDto } from './dto/reasignar-voucher.dto';
 
 const extraerIp = (req: any): string | undefined => {
   const raw = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
@@ -139,6 +140,30 @@ export class VouchersController {
    * Registra revisado_por/en y auditoría.
    * Permiso: vouchers/ver (CAJERO, ADMIN)
    */
+  /** Pedidos del mismo cliente a los que se puede mover este voucher (pago digital pendiente). */
+  @Get(':id/destinos')
+  @Permiso([
+    { modulo: 'vouchers', accion: 'ver' },
+    { modulo: 'caja', accion: 'ver' },
+  ])
+  async destinosReasignacion(@Param('id') id: string) {
+    return this.vouchersService.destinosReasignacion(id);
+  }
+
+  /**
+   * Caja mueve el comprobante a otro pedido del mismo cliente. La IA no aprueba nada: el pago se aprueba aparte.
+   * Permiso: vouchers/ver o caja/ver (CAJERO y ADMIN tienen ambos).
+   */
+  @Post(':id/reasignar')
+  @Permiso([
+    { modulo: 'vouchers', accion: 'ver' },
+    { modulo: 'caja', accion: 'ver' },
+  ])
+  async reasignar(@Param('id') id: string, @Body() dto: ReasignarVoucherDto, @Req() req: any) {
+    const ip = extraerIp(req);
+    return this.vouchersService.reasignar(id, dto.pedidoId, req.usuario, ip);
+  }
+
   @Post(':id/revisado')
   @Permiso('vouchers', 'ver')
   async marcarRevisado(@Param('id') id: string, @Req() req: any) {

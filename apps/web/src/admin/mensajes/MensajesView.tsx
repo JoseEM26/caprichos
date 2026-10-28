@@ -23,6 +23,7 @@ import {
 import { ModalEditarNombre, IconoLapiz } from './ModalEditarNombre';
 import { useSesion } from '../../comun/sesion';
 import { TarjetaLecturaVoucher } from '../vouchers/TarjetaLecturaVoucher';
+import { ReasignarVoucherBoton } from '../vouchers/ReasignarVoucherBoton';
 import { SalientesWhatsApp } from './SalientesWhatsApp';
 import { salientesApi } from './salientesApi';
 import { FotoAmpliable } from '../vouchers/FotoAmpliable';
@@ -1248,6 +1249,12 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
                       voucher={detalle.voucher}
                       pedido={detalle.pedido}
                       puedeVer={tieneVouchersVer}
+                    />
+                  )}
+                  {detalle.voucher && (
+                    <ReasignarVoucherBoton
+                      voucherId={detalle.voucher.id}
+                      onReasignado={() => cargarDetalle(detalle.id)}
                     />
                   )}
                   {!detalle.voucher && detalle.pedido && (

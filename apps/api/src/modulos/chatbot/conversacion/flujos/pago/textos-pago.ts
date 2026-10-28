@@ -115,7 +115,8 @@ export const TEXTOS_PAGO = {
     return 'Llegaste al límite de 5 capturas para este pedido. Te comunico con un asesor de nuestro equipo para ayudarte.';
   },
 
-  pagoAprobadoCliente: (codigo: string, minPrometido?: number): string => {
+  /** `minPrometido`: minutos, o el rango ya formateado («15 a 20») del tiempo estimado de la zona. */
+  pagoAprobadoCliente: (codigo: string, minPrometido?: number | string): string => {
     const tiempo = minPrometido ? ` y llega en unos ${minPrometido} minutos` : '';
     return `Pago verificado. Recibimos tu pago, tu pedido ${codigo} está en preparación 👩‍🍳${tiempo}. Te avisaremos cuando salga a reparto.`;
   },

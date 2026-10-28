@@ -36,6 +36,9 @@ Ver tambien: [[caja]], [[clientes]]
 Despues: [[cocina]]
 Ver tambien: [[caja]]
 
+## Como se hace: mover un voucher desde el chat
+En el panel de validar pago, debajo de la lectura del comprobante, pulsa "Reasignar a otro pedido" para pasarlo a otro pedido del mismo cliente con pago pendiente. Confirma con Sí. El chat se actualiza con el pedido nuevo; el pago se aprueba aparte con "Aprobar el pago".
+
 ## Como se hace: Pulir la respuesta con IA antes de enviarla
 1. Escribir el borrador del mensaje en el area de texto de respuesta.
 2. Pulsar el boton Pulir con IA.
