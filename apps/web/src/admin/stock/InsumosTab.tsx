@@ -1,3 +1,4 @@
+import { comoLista } from '../../comun/comoLista';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { InsumoItem, LugarStockItem } from './tipos';
 import { stockApi } from './stockApi';
@@ -38,7 +39,7 @@ export function InsumosTab({ lugares }: InsumosTabProps) {
     try {
       setError(null);
       const datos = await stockApi.listarInsumos();
-      setInsumos(datos);
+      setInsumos(comoLista<InsumoItem>(datos));
     } catch (err: any) {
       setError(err.message || 'Error al cargar insumos');
     } finally {

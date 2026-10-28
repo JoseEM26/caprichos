@@ -1,3 +1,4 @@
+import { comoLista } from '../../comun/comoLista';
 import { useState, useEffect, useMemo } from 'react';
 import { api, ErrorApi } from '../../comun/api';
 import { Boton } from '../../comun/Boton';
@@ -147,8 +148,9 @@ export function HorarioTab({ puedeEditar }: HorarioTabProps) {
       }));
 
       const res = await api.put<HorarioDiaItem[]>('/admin/local/horario', payload);
-      setHorarios(res);
-      setOriginal(JSON.parse(JSON.stringify(res)));
+      const listaHorarios = comoLista<HorarioDiaItem>(res);
+      setHorarios(listaHorarios);
+      setOriginal(JSON.parse(JSON.stringify(listaHorarios)));
       const ahora = new Date();
       const horaStr = ahora.toLocaleTimeString('es-PE', { hour12: false });
       setMensajeGuardado(`Guardado a las ${horaStr}`);

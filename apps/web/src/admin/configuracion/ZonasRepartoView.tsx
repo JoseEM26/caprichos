@@ -5,6 +5,8 @@ import { Boton } from '../../comun/Boton';
 import { Campo } from '../../comun/Campo';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
+import { LimiteError } from '../../comun/LimiteError';
+import { comoLista } from '../../comun/comoLista';
 import { EstadoVacio } from '../../comun/EstadoVacio';
 import { Confirmar } from '../../comun/Confirmar';
 import { Insignia } from '../../comun/Insignia';
@@ -21,6 +23,14 @@ export interface ZonaRepartoItem {
 }
 
 export function ZonasRepartoView() {
+  return (
+    <LimiteError>
+      <ZonasRepartoContenido />
+    </LimiteError>
+  );
+}
+
+function ZonasRepartoContenido() {
   const { tiene } = useSesion();
   const [zonas, setZonas] = useState<ZonaRepartoItem[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -59,7 +69,7 @@ export function ZonasRepartoView() {
     setErrorCarga(null);
     try {
       const res = await api.get<ZonaRepartoItem[]>('/admin/zonas');
-      setZonas(res);
+      setZonas(comoLista<ZonaRepartoItem>(res));
     } catch (err) {
       const msg =
         err instanceof ErrorApi

@@ -1,3 +1,4 @@
+import { comoLista } from '../../comun/comoLista';
 import { useState, useEffect } from 'react';
 import { api, ErrorApi } from '../../comun/api';
 import { Boton } from '../../comun/Boton';
@@ -57,7 +58,7 @@ export function FechasEspecialesTab({ puedeEditar }: FechasEspecialesTabProps) {
     setErrorCarga(null);
     try {
       const res = await api.get<FechaEspecialItem[]>('/admin/local/fechas-especiales');
-      setFechas(res);
+      setFechas(comoLista<FechaEspecialItem>(res));
     } catch (err) {
       const msg =
         err instanceof ErrorApi

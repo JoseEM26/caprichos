@@ -140,6 +140,9 @@ export async function clienteFetch<T = any>(
     ...resto,
     headers: cabeceras,
     credentials: 'include',
+    // No reusar el caché HTTP: una navegación a la misma URL (HTML del SPA) lo llenaría
+    // y el fetch volvería a leer esa página en lugar del JSON.
+    cache: 'no-store',
   });
 
   if (respuesta.status === 401) {
@@ -207,6 +210,15 @@ export async function clienteFetch<T = any>(
   const tipoContenido = respuesta.headers.get('content-type');
   if (tipoContenido && tipoContenido.includes('application/json')) {
     return (await respuesta.json()) as T;
+  }
+
+  if (tipoContenido && tipoContenido.includes('text/html')) {
+    // Un 200 con HTML nunca es un dato de la API: no devolver {} en silencio.
+    throw new ErrorApi(
+      'RESPUESTA_NO_JSON',
+      'El servidor respondió con una página en lugar de datos. Recarga la pantalla e inténtalo de nuevo.',
+      respuesta.status,
+    );
   }
 
   return {} as T;

@@ -1,3 +1,4 @@
+import { comoLista } from '../../comun/comoLista';
 import { useState, useEffect, useCallback } from 'react';
 import { Boton } from '../../comun/Boton';
 import { Confirmar } from '../../comun/Confirmar';
@@ -26,7 +27,7 @@ export function LiquidacionRepartidores() {
     setError(null);
     try {
       const res = await cierreApi.listarRepartidoresPorLiquidar();
-      setRepartidores(res);
+      setRepartidores(comoLista<RepartidorPorLiquidar>(res));
     } catch (err: any) {
       setError(err?.message || 'Error al cargar la lista de repartidores');
     } finally {

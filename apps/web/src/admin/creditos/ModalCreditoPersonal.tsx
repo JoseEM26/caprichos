@@ -1,3 +1,4 @@
+import { comoLista } from '../../comun/comoLista';
 import { useEffect, useState } from 'react';
 import { Confirmar } from '../../comun/Confirmar';
 import {
@@ -60,7 +61,7 @@ export function ModalCreditoPersonal({
       setColaboradorElegido(null);
       setError('');
       listarPersonalActivo()
-        .then((lista) => setPersonal(lista))
+        .then((lista) => setPersonal(comoLista<ColaboradorActivo>(lista)))
         .catch(() => {
           setError('No se pudo cargar la lista del personal');
         });

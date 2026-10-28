@@ -1,3 +1,4 @@
+import { comoLista } from '../../comun/comoLista';
 import React, { useState, useEffect } from 'react';
 import { almacenApi, RecetaProduccionItem, RegistrarProduccionDto } from './almacenApi';
 import { Confirmar } from '../../comun/Confirmar';
@@ -29,7 +30,7 @@ export const ModalRegistrarProduccion: React.FC<ModalRegistrarProduccionProps> =
       almacenApi
         .listarRecetasProduccion()
         .then((res) => {
-          setRecetas(res);
+          setRecetas(comoLista<RecetaProduccionItem>(res));
           if (res.length > 0) {
             setRecetaId(res[0].id);
           }

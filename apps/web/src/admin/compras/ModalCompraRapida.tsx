@@ -1,3 +1,4 @@
+import { comoLista } from '../../comun/comoLista';
 import React, { useState, useEffect } from 'react';
 import { comprasApi, CompraRapidaDto } from './comprasApi';
 import { Confirmar } from '../../comun/Confirmar';
@@ -54,7 +55,7 @@ export const ModalCompraRapida: React.FC<ModalCompraRapidaProps> = ({
       comprasApi
         .listarInsumos()
         .then((res) => {
-          const lista = Array.isArray(res) ? res : (res as any)?.items || [];
+          const lista = comoLista<any>(res);
           setInsumos(lista);
           if (lista.length > 0) {
             setInsumoId(String(lista[0].id));
