@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Confirmar } from '../../comun/Confirmar';
 import {
   ETIQUETA_CLASIFICACION,
@@ -22,7 +22,7 @@ type Accion = { tipo: 'reenviar' | 'descartar'; fila: SalienteAdmin } | null;
  * Pestaña Salientes de Mensajes: cola de WhatsApp que sale sola, con los fallidos (cola de muertos)
  * para reenviar o descartar con confirmación. Sin emojis; nada se borra desde aquí.
  */
-export function SalientesWhatsApp() {
+export function SalientesWhatsApp({ controles }: { controles?: ReactNode } = {}) {
   const [resumen, setResumen] = useState<ResumenSalientes | null>(null);
   const [estado, setEstado] = useState<EstadoSaliente>('FALLIDO');
   const [filas, setFilas] = useState<SalienteAdmin[]>([]);
@@ -94,7 +94,8 @@ export function SalientesWhatsApp() {
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }} aria-label="Indicadores">
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flex: '1 1 auto' }} aria-label="Indicadores">
         {[
           { k: 'Pendientes', v: resumen?.pendientes ?? '-' },
           { k: 'Enviando', v: resumen?.enviando ?? '-' },
@@ -109,6 +110,8 @@ export function SalientesWhatsApp() {
             <b data-testid={`indicador-${t.k.toLowerCase()}`} style={{ fontSize: 18 }}>{t.v}</b>
           </div>
         ))}
+      </div>
+        {controles}
       </div>
 
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>

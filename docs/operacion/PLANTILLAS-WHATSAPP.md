@@ -13,6 +13,8 @@ Todas las plantillas pertenecen a la categoría **Utilidad (UTILITY)** y están 
 | Clave en Sistema | Nombre en Meta | Categoría | Idioma | Variables |
 | :--- | :--- | :--- | :--- | :--- |
 | `DELIVERY_SALIDA` | `caprichos_delivery_en_camino` | Utilidad | Español (`es`) | 3 |
+
+> `caprichos_delivery_en_camino`: la variable 3 (`tiempo_estimado`) es un rango por pedido, por ejemplo «25 a 30», calculado con la zona, la ruta del repartidor y el empaque (ver `eta_*` en Parámetros de operación). Si no hay datos suficientes sale el valor de `tiempo_prometido_min`.
 | `DELIVERY_LLEGADA` | `caprichos_delivery_llegado` | Utilidad | Español (`es`) | 2 |
 | `DELIVERY_INSISTENCIA` | `caprichos_delivery_insistencia` | Utilidad | Español (`es`) | 3 |
 | `DELIVERY_ESPERA_AGOTADA` | `caprichos_delivery_espera_agotada` | Utilidad | Español (`es`) | 2 |
@@ -28,6 +30,7 @@ Todas las plantillas pertenecen a la categoría **Utilidad (UTILITY)** y están 
 | `EQUIPO_ALERTA_ALMACEN` | `caprichos_equipo_alerta_almacen` | Utilidad | Español (`es`) | 3 |
 | `AVISO_INTERNO` | `aviso_interno` | Utilidad | Español (`es`) | 2 |
 | `CARTA_RECIBIDO_DIGITAL` | `caprichos_pedido_recibido_digital` | Utilidad | Español (`es`) | 3 |
+| `CARTA_VOUCHER_RECORDATORIO` | `caprichos_pedido_voucher_recordatorio` | Utilidad | Español (`es`) | 2 |
 | `CARTA_RECIBIDO_EFECTIVO` | `caprichos_pedido_recibido_efectivo` | Utilidad | Español (`es`) | 2 |
 | `DELIVERY_REPROG_RECIBIDA` | `caprichos_delivery_reprog_recibida` | Utilidad | Español (`es`) | 2 |
 | `DELIVERY_REENVIADO` | `caprichos_delivery_reenviado` | Utilidad | Español (`es`) | 2 |

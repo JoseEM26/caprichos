@@ -805,7 +805,13 @@ export function AdminShell() {
             gap: esRepartidorMovil ? 0 : 16,
           }}
         >
-          {!esRepartidorMovil && (
+          {/* Mensajes: sin encabezado visible (ocupa espacio); el título queda solo para lectores de pantalla */}
+          {moduloActual?.clave === 'mensajes' && (
+            <h1 style={{ position: 'absolute', width: 1, height: 1, margin: -1, padding: 0, overflow: 'hidden', clip: 'rect(0 0 0 0)', border: 0, whiteSpace: 'nowrap' }}>
+              {titulo.titulo}
+            </h1>
+          )}
+          {!esRepartidorMovil && moduloActual?.clave !== 'mensajes' && (
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <div>
                 <h1 style={{ margin: 0, fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 26, lineHeight: '32px' }}>{titulo.titulo}</h1>

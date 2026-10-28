@@ -6,6 +6,7 @@ import { SeccionVouchersPedido } from './SeccionVouchersPedido';
 import { medioDigitalVoucher, mismoMedio } from './mediosPago';
 import type { VoucherPagoItem } from '../vouchers/tipos';
 import { CampoCodigoSupervisor } from '../../comun/CampoCodigoSupervisor';
+import { BotonAbrirChatCliente } from '../mensajes/BotonAbrirChatCliente';
 
 export interface ModalConfirmarPagoProps {
   pedido: Pedido;
@@ -43,12 +44,6 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
   const esDelivery = (pedido.modalidad || '').toUpperCase() === 'DELIVERY';
   const tieneUbicacion =
     (pedido.entrega_lat != null && pedido.entrega_lng != null) || Boolean(pedido.zona);
-
-  const phone = pedido.cliente_telefono || '';
-  const cleanPhone = phone.replace(/\D/g, '');
-  const waUrl = cleanPhone
-    ? `https://wa.me/51${cleanPhone}?text=${encodeURIComponent(`Hola ${pedido.cliente_nombre || ''}, te escribimos de Caprichos respecto a tu pedido ${pedido.codigo}.`)}`
-    : '#';
 
   const handleConfirmar = () => {
     if (!contactado) {
@@ -197,26 +192,7 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
               : `Total a cobrar: S/ ${Number(pedido.total).toFixed(2)}`}
           </div>
 
-          <a
-            href={waUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              minHeight: 48,
-              border: 0,
-              borderRadius: 12,
-              background: 'var(--cp-green, #2F7A45)',
-              color: 'var(--cp-white, #FFFFFF)',
-              fontWeight: 800,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              textDecoration: 'none',
-              cursor: 'pointer',
-            }}
-          >
-            Abrir WhatsApp con el cliente
-          </a>
+          <BotonAbrirChatCliente telefono={pedido.cliente_telefono} />
 
           <button
             type="button"

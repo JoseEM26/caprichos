@@ -34,6 +34,8 @@ export interface ParametrosChatbot {
 
 /** Ventana de pedidos que el planificador revisa; más viejos ya no son parte de un reparto en curso. */
 const VENTANA_REVISION_MS = 24 * 60 * 60 * 1000;
+/** El recordatorio de voucher solo tiene sentido poco después del aviso: pedidos más viejos ya los atiende una persona. */
+const VENTANA_RECORDATORIO_VOUCHER_MS = 60 * 60 * 1000;
 
 export interface ResumenCicloChatbot {
   bloqueadoPorOtraInstancia: boolean;
@@ -182,6 +184,13 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
       const params = await this.obtenerParametros();
       const ahora = new Date();
       const resumen = resumenVacio(false);
+
+      // Pedidos de carta con pago digital que siguen sin voucher: un recordatorio por pedido
+      if (this.avisos) {
+        await this.avisarFaltaVoucher(ahora).catch((err) => {
+          this.logger.error(`Error en recordatorio de voucher: ${err.message}`, err.stack);
+        });
+      }
 
       // Outbox de WhatsApp: envía lo encolado (avisos nuevos y reintentos vencidos) y borra lo enviado y viejo
       if (this.outbox) {
@@ -491,6 +500,70 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
       }
       return ok;
     });
+  }
+
+  /**
+   * Recordatorio del voucher: a los `voucher_recordatorio_min` minutos del aviso «pedido recibido»,
+   * si el pedido digital sigue sin pagar, sin voucher legible, no anulado, y el cliente no escribió
+   * nada desde el aviso. Una sola vez por pedido (la fila 14 de mensaje_reparto es la idempotencia).
+   */
+  async avisarFaltaVoucher(ahora: Date): Promise<number> {
+    const param = await this.prisma.parametro.findUnique({ where: { clave: 'voucher_recordatorio_min' } });
+    const minutos = Number(param?.valor ?? 3) || 3;
+    const corte = new Date(ahora.getTime() - minutos * 60 * 1000);
+
+    const avisos = await this.prisma.mensajeReparto.findMany({
+      where: { numero: 9, enviado_en: { lte: corte, gte: new Date(ahora.getTime() - VENTANA_RECORDATORIO_VOUCHER_MS) } },
+      select: { pedido_id: true, enviado_en: true },
+      orderBy: { enviado_en: 'asc' },
+      take: 50,
+    });
+
+    let enviados = 0;
+    for (const aviso of avisos) {
+      const yaRecordado = await this.prisma.mensajeReparto.findUnique({
+        where: { pedido_id_numero: { pedido_id: aviso.pedido_id, numero: 14 } },
+        select: { numero: true },
+      });
+      if (yaRecordado) continue;
+
+      const pedido = await this.prisma.pedido.findUnique({
+        where: { id: aviso.pedido_id },
+        select: {
+          id: true,
+          estado: true,
+          pago_estado: true,
+          pago_metodo: true,
+          pago_preferido: true,
+          cliente_telefono: true,
+        },
+      });
+      if (!pedido || pedido.estado === 'ANULADO' || pedido.pago_estado !== 'PENDIENTE') continue;
+      const medio = String(pedido.pago_preferido || pedido.pago_metodo || '').toUpperCase();
+      if (!['YAPE', 'PLIN', 'TRANSFERENCIA'].includes(medio)) continue;
+
+      const legible = await this.prisma.voucherPago.findFirst({
+        where: { pedido_id: pedido.id, semaforo: { not: 'ILEGIBLE' } },
+        select: { id: true },
+      });
+      if (legible) continue;
+
+      // Si el cliente escribió desde el aviso, la conversación ya tiene su atención: no se recuerda
+      const telefono = normalizarTelefono(pedido.cliente_telefono || '');
+      if (!telefono) continue;
+      const conversacion = await this.prisma.conversacion.findUnique({ where: { telefono }, select: { id: true } });
+      if (conversacion) {
+        const escribio = await this.prisma.mensajeChat.findFirst({
+          where: { conversacion_id: conversacion.id, direccion: 'ENTRA', en: { gt: aviso.enviado_en } },
+          select: { id: true },
+        });
+        if (escribio) continue;
+      }
+
+      const resultado = await this.avisos!.avisar(pedido.id, 'VOUCHER_RECORDATORIO');
+      if (resultado.estado === 'ENCOLADO') enviados++;
+    }
+    return enviados;
   }
 
   /** Notifica a Caja por la campana interna (y en tiempo real) de un evento de reparto. */

@@ -5,6 +5,7 @@ import { normalizarTelefono, enmascararTelefono } from '../utilidades/enmascarar
 import { CargaSaliente, OutboxWhatsappService } from './outbox-whatsapp.service';
 import { EtapaAvisoReparto, TEXTOS_REPARTO, PayloadAvisoReparto } from '../conversacion/textos-reparto';
 import { marcarPagoParaPersona } from './pago-para-persona.util';
+import { calcularEtaEntrega, formatearEta, leerConfigEta } from '../../repartos/eta-entrega';
 
 /**
  * Número de etapa en `mensaje_reparto` (PK pedido_id + numero = idempotencia por pedido y etapa)
@@ -29,6 +30,8 @@ export const ETAPAS_AVISO: Record<
   REPROG_RECIBIDA: { numero: 11, parametro: 'whatsapp_aviso_espera_activo' },
   REPROG_CANCELADA: { numero: 12, parametro: 'whatsapp_aviso_espera_activo' },
   REPROG_SIN_RESPUESTA: { numero: 13, parametro: 'whatsapp_aviso_espera_activo' },
+  // Recordatorio del voucher de un pedido digital de la carta que aún no lo envió (una vez por pedido)
+  VOUCHER_RECORDATORIO: { numero: 14, parametro: 'whatsapp_aviso_recibido_activo', cualquierModalidad: true },
 };
 
 /** Medios digitales que llevan voucher y pasan la conversación a una persona. Nombre que se lee al cliente. */
@@ -60,6 +63,8 @@ export interface DatosAviso {
   recargo?: number;
   /** RETIRO: modo del recargo, solo para explicar al cliente que es el costo del delivery. */
   recargoModo?: 'IGUAL_ENVIO' | 'FIJO' | 'SIN_COSTO';
+  /** SALIDA: rango del tiempo estimado («25 a 30»), calculado al avisar. */
+  tiempoTexto?: string | null;
 }
 
 /**
@@ -105,9 +110,10 @@ export class AvisosPedidoService {
   private async avisarSinProteger(
     pedidoId: bigint,
     etapa: EtapaAvisoReparto,
-    datos: DatosAviso,
+    datosEntrada: DatosAviso,
     tx?: Prisma.TransactionClient,
   ): Promise<ResultadoAviso> {
+    let datos = datosEntrada;
     const cfg = ETAPAS_AVISO[etapa];
     // Con `tx` las lecturas van en la misma transacción: el pedido puede estar recién creado y sin commit
     const db = tx ?? this.prisma;
@@ -135,6 +141,14 @@ export class AvisosPedidoService {
     if (!esParametroActivo(flag?.valor)) return { estado: 'OMITIDO', motivo: 'DESACTIVADO' };
 
     const nombre = pedido.cliente_nombre || 'Cliente';
+    // SALIDA: tiempo estimado propio del pedido (zona, recorrido de la ruta, empaque) en la misma transacción
+    if (etapa === 'SALIDA') {
+      datos = { ...datos, tiempoTexto: await this.tiempoEstimadoSalida(db, pedidoId).catch((err: any) => {
+        // Un fallo del cálculo no frena el aviso: sale el respaldo tiempo_prometido_min
+        this.logger.warn(`Tiempo estimado del pedido ${pedidoId} no calculado: ${err?.message}`);
+        return null;
+      }) };
+    }
     const medio = etapa === 'RECIBIDO' ? MEDIOS_DIGITALES[String(pedido.pago_preferido || pedido.pago_metodo || '').toUpperCase()] ?? null : null;
 
     const payload = await this.construirPayload(etapa, nombre, pedido.codigo, datos, medio);
@@ -189,6 +203,49 @@ export class AvisosPedidoService {
     return { estado: 'ENCOLADO' };
   }
 
+  /**
+   * Rango «25 a 30» del aviso SALIDA: zona del pedido, recorrido de la ruta del repartidor (pedidos EN_CAMINO)
+   * y empaque. Sin datos suficientes devuelve null y el aviso usa tiempo_prometido_min.
+   */
+  private async tiempoEstimadoSalida(db: Prisma.TransactionClient | PrismaService, pedidoId: bigint): Promise<string | null> {
+    const pedido = await db.pedido.findUnique({
+      where: { id: pedidoId },
+      select: {
+        id: true,
+        entrega_lat: true,
+        entrega_lng: true,
+        repartidor_party_id: true,
+        zona: { select: { minutos_min: true, minutos_max: true } },
+        lineas: { select: { cantidad: true } },
+      },
+    });
+    if (!pedido) return null;
+    const cfg = await leerConfigEta(db as PrismaService);
+    const ruta = pedido.repartidor_party_id
+      ? await db.pedido.findMany({
+          where: { repartidor_party_id: pedido.repartidor_party_id, estado: 'EN_CAMINO' },
+          select: { id: true, entrega_lat: true, entrega_lng: true },
+        })
+      : [];
+    const lat = pedido.entrega_lat == null ? null : Number(pedido.entrega_lat);
+    const lng = pedido.entrega_lng == null ? null : Number(pedido.entrega_lng);
+    const rango = calcularEtaEntrega(
+      {
+        id: pedido.id.toString(),
+        zonaMin: pedido.zona?.minutos_min ?? null,
+        zonaMax: pedido.zona?.minutos_max ?? null,
+        lat,
+        lng,
+        unidades: pedido.lineas.reduce((s, l) => s + Number(l.cantidad || 0), 0),
+        ruta: ruta
+          .filter((p) => p.entrega_lat != null && p.entrega_lng != null)
+          .map((p) => ({ id: p.id.toString(), lat: Number(p.entrega_lat), lng: Number(p.entrega_lng) })),
+      },
+      cfg,
+    );
+    return rango ? formatearEta(rango, cfg.respaldoMin) : null;
+  }
+
   /** Mismo efecto que un voucher recibido por WhatsApp: la conversación queda para una persona (VALIDAR_PAGO, urgente). */
   private async marcarParaPersona(
     telefono: string,
@@ -225,6 +282,7 @@ export class AvisosPedidoService {
       case 'LISTO':
         return TEXTOS_REPARTO.listo(nombre, codigo);
       case 'SALIDA': {
+        if (datos.tiempoTexto) return TEXTOS_REPARTO.salida(nombre, codigo, datos.tiempoTexto);
         const p = await this.prisma.parametro.findUnique({ where: { clave: 'tiempo_prometido_min' } });
         return TEXTOS_REPARTO.salida(nombre, codigo, String(Number(p?.valor ?? 30)));
       }
@@ -246,6 +304,8 @@ export class AvisosPedidoService {
         return TEXTOS_REPARTO.reprogramacionSinRespuesta(nombre, codigo);
       case 'ENTREGADO':
         return TEXTOS_REPARTO.entregado(nombre, codigo);
+      case 'VOUCHER_RECORDATORIO':
+        return TEXTOS_REPARTO.voucherRecordatorio(nombre, codigo);
     }
   }
 

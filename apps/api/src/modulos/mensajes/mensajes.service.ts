@@ -1,3 +1,4 @@
+import { pedidoEsperandoVoucher } from '../chatbot/servicios/pedido-esperando-voucher.util';
 import { HttpException, HttpStatus, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
@@ -236,11 +237,18 @@ export class MensajesService {
     // El pedido cuyo voucher llegó por este chat tiene prioridad
     const pedidoVoucherId = (c.flujo as any)?.pago?.pedidoId;
     if (pedidoVoucherId && /^\d+$/.test(String(pedidoVoucherId))) condicion.push({ id: BigInt(pedidoVoucherId) });
-    const pedido = await this.prisma.pedido.findFirst({
-      where: { OR: condicion, estado: { notIn: ['ANULADO', 'ENTREGADO'] }, es_personal: false },
-      orderBy: { creado_en: 'desc' },
-      include: { lineas: { orderBy: { id: 'asc' } } },
-    });
+    // El pedido que espera pago en este chat; si no hay, el más reciente como antes (para datos del chat)
+    const pedidoEnEspera = await pedidoEsperandoVoucher(this.prisma, c.flujo, c.telefono);
+    const pedido = pedidoEnEspera
+      ? await this.prisma.pedido.findFirst({
+          where: { id: pedidoEnEspera.id },
+          include: { lineas: { orderBy: { id: 'asc' } } },
+        })
+      : await this.prisma.pedido.findFirst({
+          where: { OR: condicion, estado: { notIn: ['ANULADO', 'ENTREGADO'] }, es_personal: false },
+          orderBy: { creado_en: 'desc' },
+          include: { lineas: { orderBy: { id: 'asc' } } },
+        });
     const solicitud = pedido
       ? await this.prisma.solicitudCambio.findFirst({ where: { pedido_id: pedido.id, estado: 'PENDIENTE' }, orderBy: { id: 'desc' } })
       : null;
@@ -270,19 +278,17 @@ export class MensajesService {
     const tienePermisoVerVouchers =
       rol === 'ADMIN' || (Boolean(MATRIZ[rol]) && MATRIZ[rol].includes('vouchers/ver'));
 
-    if (tienePermisoVerVouchers) {
-      const condicionesVoucher: any[] = [{ conversacion_id: c.id }];
-      if (pedido?.id) {
-        condicionesVoucher.push({ pedido_id: pedido.id });
-      }
+    if (tienePermisoVerVouchers && pedido?.id) {
+      // Solo vouchers del pedido en espera: nunca el último de la conversación ni de otro pedido
       const ultimoVoucher = await this.prisma.voucherPago.findFirst({
-        where: { OR: condicionesVoucher },
+        where: { pedido_id: pedido.id },
         orderBy: { creado_en: 'desc' },
       });
 
       if (ultimoVoucher) {
         voucherDetalle = {
           id: ultimoVoucher.id.toString(),
+          archivoId: ultimoVoucher.archivo_id?.toString() ?? null,
           semaforo: ultimoVoucher.semaforo,
           motivos: ultimoVoucher.motivos,
           extraido: ultimoVoucher.extraido,
@@ -693,7 +699,7 @@ export class MensajesService {
     const pedidoActual = this.prisma.pedido.findUnique
       ? await this.prisma.pedido.findUnique({
           where: { id: pedidoId },
-          select: { id: true, estado: true, pasa_cocina_en: true },
+          select: { id: true, estado: true, pasa_cocina_en: true, creado_en: true },
         })
       : null;
 
@@ -715,8 +721,9 @@ export class MensajesService {
     });
 
     // La foto del chat queda como prueba del pedido aprobado (si aún no tenía pedido)
+    // Solo fotos de esta conversación hechas después de abrir el pedido (no las de pedidos anteriores)
     await this.prisma.voucherPago.updateMany({
-      where: { conversacion_id: c.id, pedido_id: null },
+      where: { conversacion_id: c.id, pedido_id: null, creado_en: { gte: pedidoActual?.creado_en ?? new Date(0) } },
       data: { pedido_id: pedidoId },
     });
 

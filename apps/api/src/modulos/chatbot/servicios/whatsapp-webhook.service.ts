@@ -33,6 +33,7 @@ import { EjecutorConversacionService } from '../conversacion/ejecutor-conversaci
 import { ReprogramacionService } from './reprogramacion.service';
 import { AvisosInternosService } from '../avisos-internos/avisos-internos.service';
 import { marcarPagoParaPersona } from './pago-para-persona.util';
+import { pedidoEsperandoVoucher } from './pedido-esperando-voucher.util';
 
 export const MAX_MEDIA_BYTES = 5 * 1024 * 1024; // 5 MB
 export const TIPOS_MEDIA_PERMITIDOS = [
@@ -453,8 +454,12 @@ export class WhatsappWebhookService {
 
     // 5. Procesamiento de imagen de voucher
     let archivoMensajeId: string | null = null;
-    if (imagenBuffer && pedidoReciente) {
-      archivoMensajeId = await this.guardarVoucherPrivado(imagenBuffer, imagenMime, pedidoReciente, telMask, conversacion);
+    // El voucher se liga al pedido que espera pago (no al último pedido del cliente, que puede estar cerrado)
+    const pedidoVoucher = imagenBuffer && telefonoNorm
+      ? await pedidoEsperandoVoucher(this.prisma, conversacion?.flujo, telefonoNorm)
+      : null;
+    if (imagenBuffer && pedidoVoucher) {
+      archivoMensajeId = await this.guardarVoucherPrivado(imagenBuffer, imagenMime, pedidoVoucher, telMask, conversacion);
     } else if (imagenBuffer) {
       // Imagen sin pedido asociado (o cliente sin teléfono, BSUID): igual se guarda en privado y se analiza
       // como voucher (sin pedido), para que Caja la vea en el chat y quede como prueba al aprobar.

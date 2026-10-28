@@ -16,6 +16,7 @@ import {
   ColaboradorActivo,
 } from '../creditos/creditosApi';
 import { salonApi } from '../salon/api';
+import { BotonAbrirChatCliente } from '../mensajes/BotonAbrirChatCliente';
 
 export interface PedidoDetalleProps {
   pedido: Pedido;
@@ -129,11 +130,6 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
   const lat = pedido.entrega_lat;
   const lng = pedido.entrega_lng;
   const hasMapCoords = lat != null && lng != null && lat !== '' && lng !== '';
-
-  const phoneClean = (pedido.cliente_telefono || '').replace(/\D/g, '');
-  const waUrl = phoneClean
-    ? `https://wa.me/51${phoneClean}?text=${encodeURIComponent(`Hola ${pedido.cliente_nombre || ''}, te escribimos de Caprichos sobre tu pedido ${pedido.codigo}.`)}`
-    : '#';
 
   // Transiciones de estado con confirmación Sí/No
   const cambiarEstado = async (nuevoEstado: string, motivo?: string) => {
@@ -723,26 +719,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
             <div style={{ fontSize: 13, lineHeight: '18px' }}>
               El repartidor estuvo en la puerta y llamó 3 veces. Habla con el cliente antes de decidir.
             </div>
-            <a
-              href={waUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                minHeight: 48,
-                boxSizing: 'border-box',
-                border: 0,
-                borderRadius: 12,
-                background: 'var(--cp-green, #2F7A45)',
-                color: 'var(--cp-white, #FFFFFF)',
-                fontWeight: 800,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                textDecoration: 'none',
-              }}
-            >
-              Hablar con el cliente por WhatsApp
-            </a>
+            <BotonAbrirChatCliente telefono={pedido.cliente_telefono} />
             <div style={{ fontSize: 13, fontWeight: 700 }}>¿Qué se hace con lo preparado?</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {['Merma', 'Personal', 'Donación'].map((d) => (

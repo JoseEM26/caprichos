@@ -17,7 +17,8 @@ export type EtapaAvisoReparto =
   | 'REPROG_CANCELADA'
   | 'REPROG_SIN_RESPUESTA'
   | 'ENTREGADO'
-  | 'RECIBIDO';
+  | 'RECIBIDO'
+  | 'VOUCHER_RECORDATORIO';
 
 export interface PayloadAvisoReparto {
   textoLibre: string;
@@ -44,6 +45,7 @@ export const TEXTOS_REPARTO = {
     variablesPlantilla: [nombre, codigo],
   }),
 
+  /** `minutos` es el rango ya formateado: «25 a 30» (o un número si cae al respaldo). */
   salida: (nombre: string, codigo: string, minutos: string): PayloadAvisoReparto => ({
     textoLibre: `¡Hola ${nombre}! 🛵 Tu pedido ${codigo} ya salió de nuestro local y va en camino. Tiempo estimado: ${minutos} minutos. ¡Gracias por tu paciencia! 😊`,
     plantillaClave: 'DELIVERY_SALIDA',
@@ -111,7 +113,7 @@ export const TEXTOS_REPARTO = {
 
   /** Pedido de la carta virtual con pago digital: el asesor gestiona el voucher por este chat. `medio` es Yape, Plin o transferencia. */
   recibidoDigital: (nombre: string, codigo: string, medio: string): PayloadAvisoReparto => ({
-    textoLibre: `¡Hola ${nombre}! 😊 Recibimos tu pedido ${codigo}, ¡gracias! En unos momentos un asesor te escribirá por este chat para revisar el voucher de tu pago por ${medio}. 🙏`,
+    textoLibre: `¡Hola ${nombre}! 😊 Recibimos tu pedido ${codigo}, ¡muchas gracias! 🎉 En unos momentos un asesor te escribirá por este chat para revisar el voucher de tu pago por ${medio}. Mientras tanto, por favor envíanos la foto de tu voucher por aquí mismo 📸 🙏`,
     plantillaClave: 'CARTA_RECIBIDO_DIGITAL',
     variablesPlantilla: [nombre, codigo, medio],
   }),
@@ -120,6 +122,13 @@ export const TEXTOS_REPARTO = {
   recibidoEfectivo: (nombre: string, codigo: string): PayloadAvisoReparto => ({
     textoLibre: `¡Hola ${nombre}! 😊 Recibimos tu pedido ${codigo}, ¡gracias por tu compra! Ya está en proceso. 🙏`,
     plantillaClave: 'CARTA_RECIBIDO_EFECTIVO',
+    variablesPlantilla: [nombre, codigo],
+  }),
+
+  /** Recordatorio a los pocos minutos si el pedido digital sigue sin voucher (una sola vez por pedido). */
+  voucherRecordatorio: (nombre: string, codigo: string): PayloadAvisoReparto => ({
+    textoLibre: `¡Hola ${nombre}! 🙏 Seguimos en la espera de tu voucher del pedido ${codigo}. En cuanto lo recibamos, nuestro equipo lo revisa enseguida. Mientras tanto puedes ver la carta o escribir *asesor* si necesitas ayuda. 😊`,
+    plantillaClave: 'CARTA_VOUCHER_RECORDATORIO',
     variablesPlantilla: [nombre, codigo],
   }),
 

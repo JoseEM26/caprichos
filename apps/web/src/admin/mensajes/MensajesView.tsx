@@ -122,7 +122,17 @@ export function obtenerEstiloEspera(minutos: number) {
   };
 }
 
-function MensajesChats() {
+/** Teléfono de la URL (?telefono=...) reducido a sus últimos 9 dígitos; vacío si no viene. */
+function telefonoDeUrl(): string {
+  try {
+    const digitos = (new URLSearchParams(window.location.search).get('telefono') || '').replace(/\D/g, '');
+    return digitos.length >= 9 ? digitos.slice(-9) : '';
+  } catch {
+    return '';
+  }
+}
+
+function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
   let tieneVouchersVer = true;
   try {
     const sesion = useSesion();
@@ -149,7 +159,9 @@ function MensajesChats() {
     }
     return chats;
   }, [chats, filtro]);
-  const [busqueda, setBusqueda] = useState('');
+  // Desde Pedidos (?telefono=) el chat del cliente se busca y se abre solo al cargar la lista
+  const telefonoPendiente = React.useRef<string>(telefonoDeUrl());
+  const [busqueda, setBusqueda] = useState(() => telefonoPendiente.current);
   const [chatSeleccionadoId, setChatSeleccionadoId] = useState<string | null>(null);
   const [detalle, setDetalle] = useState<DetalleConversacion | null>(null);
   const [cargandoDetalle, setCargandoDetalle] = useState(false);
@@ -257,7 +269,15 @@ function MensajesChats() {
       setChats(res.chats);
       setConteos(res.conteos);
 
-      if (res.chats.length > 0) {
+      const pendiente = telefonoPendiente.current;
+      const delCliente = pendiente
+        ? res.chats.find((c) => c.telefono.replace(/\D/g, '').endsWith(pendiente))
+        : undefined;
+      if (pendiente) telefonoPendiente.current = '';
+
+      if (delCliente) {
+        setChatSeleccionadoId(delCliente.id);
+      } else if (res.chats.length > 0) {
         setChatSeleccionadoId((prev) => {
           if (mantenerSeleccion && prev && res.chats.some((c) => c.id === prev)) {
             return prev;
@@ -732,6 +752,7 @@ function MensajesChats() {
             <span className="cv-sub">
               {conteos.atender === 0 ? 'Todo al día' : `${conteos.atender} por atender`}
             </span>
+            {controles}
           </div>
 
           <div className="cv-search">
@@ -1229,6 +1250,11 @@ function MensajesChats() {
                       puedeVer={tieneVouchersVer}
                     />
                   )}
+                  {!detalle.voucher && detalle.pedido && (
+                    <div className="cv-paynote" data-testid="sin-voucher-pedido">
+                      Aún no envió el voucher de {detalle.pedido.codigo}.
+                    </div>
+                  )}
 
                   <div className="cv-payb">
                     <button className="cv-ok" onClick={handleAprobarPago}>
@@ -1549,8 +1575,9 @@ export function MensajesView() {
 
   if (!puedeSalientes) return <MensajesChats />;
 
+  // Control compacto Chats / Salientes: va dentro de la cabecera de la vista, sin una fila propia
   const estiloTab = (activa: boolean) => ({
-    minHeight: 36,
+    minHeight: 44,
     padding: '0 12px',
     borderRadius: 10,
     border: 'none',
@@ -1560,22 +1587,27 @@ export function MensajesView() {
     cursor: 'pointer',
   });
 
+  const controles = (
+    <div role="tablist" aria-label="Vista de Mensajes" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flexShrink: 0 }}>
+      <button role="tab" aria-selected={vista === 'chats'} style={estiloTab(vista === 'chats')} onClick={() => setVista('chats')}>
+        Chats
+      </button>
+      <button
+        role="tab"
+        aria-selected={vista === 'salientes'}
+        style={estiloTab(vista === 'salientes')}
+        onClick={() => setVista('salientes')}
+      >
+        Salientes {fallidos > 0 && <b>({fallidos} fallido{fallidos === 1 ? '' : 's'})</b>}
+      </button>
+    </div>
+  );
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
-      <div role="tablist" aria-label="Vista de Mensajes" style={{ display: 'flex', gap: 6, padding: '6px 8px' }}>
-        <button role="tab" aria-selected={vista === 'chats'} style={estiloTab(vista === 'chats')} onClick={() => setVista('chats')}>
-          Chats
-        </button>
-        <button
-          role="tab"
-          aria-selected={vista === 'salientes'}
-          style={estiloTab(vista === 'salientes')}
-          onClick={() => setVista('salientes')}
-        >
-          Salientes {fallidos > 0 && <b>({fallidos} fallido{fallidos === 1 ? '' : 's'})</b>}
-        </button>
+      <div style={{ flex: 1, minHeight: 0 }}>
+        {vista === 'chats' ? <MensajesChats controles={controles} /> : <SalientesWhatsApp controles={controles} />}
       </div>
-      <div style={{ flex: 1, minHeight: 0 }}>{vista === 'chats' ? <MensajesChats /> : <SalientesWhatsApp />}</div>
     </div>
   );
 }

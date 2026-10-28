@@ -55,6 +55,47 @@ const META_PARAMETROS: Record<string, MetaParametro> = {
     tipo: 'numero',
     sufijo: 'minutos',
   },
+  eta_factor_urbano: {
+    nombre: 'Factor de calles (tiempo estimado)',
+    descripcion: 'Cuánto más que la línea recta recorre el repartidor por calles. 1.3 = 30 % más. Solo aplica sin zona o con ruta de varios pedidos.',
+    tipo: 'numero',
+  },
+  eta_productos_desde: {
+    nombre: 'Empaque desde cuántas unidades',
+    descripcion: 'A partir de esta cantidad de productos en el pedido se suma tiempo de empaque al estimado.',
+    tipo: 'numero',
+    sufijo: 'unidades',
+  },
+  eta_extra_por_producto_min: {
+    nombre: 'Minutos de empaque por unidad',
+    descripcion: 'Minutos que se suman por cada unidad a partir de la cantidad anterior.',
+    tipo: 'numero',
+    sufijo: 'minutos',
+  },
+  eta_parada_min: {
+    nombre: 'Minutos por parada previa',
+    descripcion: 'Minutos que se suman por cada pedido anterior que el repartidor lleva en la misma ruta.',
+    tipo: 'numero',
+    sufijo: 'minutos',
+  },
+  eta_margen_min: {
+    nombre: 'Ancho mínimo del rango de tiempo',
+    descripcion: 'El tiempo máximo que se anuncia es el mínimo más este margen, por ejemplo «25 a 30».',
+    tipo: 'numero',
+    sufijo: 'minutos',
+  },
+  eta_paso_min: {
+    nombre: 'Redondeo del tiempo estimado',
+    descripcion: 'El tiempo estimado se redondea a múltiplos de este valor.',
+    tipo: 'numero',
+    sufijo: 'minutos',
+  },
+  eta_base_sin_zona_min: {
+    nombre: 'Minutos de puerta sin zona',
+    descripcion: 'Minutos que se suman al recorrido cuando el pedido tiene coordenadas pero no zona.',
+    tipo: 'numero',
+    sufijo: 'minutos',
+  },
   tiempo_max_min: {
     nombre: 'Tiempo máximo de entrega',
     descripcion: 'Límite superior del tiempo estimado de entrega para el cliente.',
