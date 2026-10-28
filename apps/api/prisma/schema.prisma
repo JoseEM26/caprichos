@@ -1766,7 +1766,7 @@ model PrintJob {
   clave_idempotencia  String?     @unique
   payload             Json        @default("{}")
   copia               Boolean     @default(false)
-  estado              String      @default("PENDIENTE") // PENDIENTE | IMPRIMIENDO | IMPRESO | FALLIDO
+  estado              String      @default("PENDIENTE") // PENDIENTE | IMPRIMIENDO | IMPRESO | FALLIDO | VENCIDO (sin CHECK en BD: no requiere migracion)
   intentos            Int         @default(0)
   impresora           String?
   error               String?

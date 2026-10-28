@@ -332,6 +332,18 @@ const META_PARAMETROS: Record<string, MetaParametro> = {
     tipo: 'numero',
     sufijo: 'minutos',
   },
+  impresion_alerta_min: {
+    nombre: 'Aviso de etiquetas sin imprimir (WhatsApp)',
+    descripcion: 'Minutos con etiquetas en cola y sin la impresora de Caja (PC apagada, sin sesión o sin conexión) antes de avisar por WhatsApp a los administradores.',
+    tipo: 'numero',
+    sufijo: 'minutos',
+  },
+  impresion_vence_min: {
+    nombre: 'Vencimiento de etiquetas no impresas',
+    descripcion: 'Minutos en cola a partir de los cuales una etiqueta ya no se imprime sola al reconectar la impresora; queda VENCIDA y se puede reimprimir a mano. Los pedidos anulados también vencen.',
+    tipo: 'numero',
+    sufijo: 'minutos',
+  },
 };
 
 interface ParametrosOperacionTabProps {

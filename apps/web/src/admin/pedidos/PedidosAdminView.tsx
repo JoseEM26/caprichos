@@ -10,6 +10,7 @@ import { ModalNuevoPedidoMesa } from '../salon/componentes/ModalNuevoPedidoMesa'
 import { salonApi } from '../salon/api';
 import type { PisoSalon } from '../salon/tipos';
 import { reproducirCampana } from './audioAlerta';
+import { FranjaImpresion } from './FranjaImpresion';
 import './pedidos.css';
 
 export function canalLabel(c?: string | null) {
@@ -160,6 +161,7 @@ export function PedidosAdminView() {
   const [pedidoRepetir, setPedidoRepetir] = useState<Pedido | null>(null);
   const [pisosSalon, setPisosSalon] = useState<PisoSalon[]>([]);
   const [pedidoSeleccionadoId, setPedidoSeleccionadoId] = useState<string | null>(null);
+  const pedidoDesdeUrl = useRef<string | null>(new URLSearchParams(window.location.search).get('pedido'));
 
   // Pestaña activa del mockup: Por confirmar | Pago por coordinar | En curso | Cerrados
   const [tabActiva, setTabActiva] = useState<ClaveTabCaja>('nuevo');
@@ -410,6 +412,14 @@ export function PedidosAdminView() {
       return;
     }
 
+    // Enlace desde una notificacion (/admin/caja?pedido=<id>): se selecciona ese pedido una vez
+    const pedidoDeEnlace = pedidoDesdeUrl.current;
+    if (pedidoDeEnlace && pedidosFiltrados.some((p) => String(p.id) === pedidoDeEnlace)) {
+      pedidoDesdeUrl.current = null;
+      setPedidoSeleccionadoId(pedidoDeEnlace);
+      return;
+    }
+
     const estaEnListaVisible = pedidosFiltrados.some(
       (p) => String(p.id) === String(pedidoSeleccionadoId),
     );
@@ -449,6 +459,8 @@ export function PedidosAdminView() {
   }
 
   return (
+    <div>
+    <FranjaImpresion />
     <div className="cj-grid">
       {/* PANEL IZQUIERDO */}
       <div className="cj-left">
@@ -1089,6 +1101,7 @@ export function PedidosAdminView() {
           alRefrescarMesas={async () => void cargarDatos()}
         />
       )}
+    </div>
     </div>
   );
 }

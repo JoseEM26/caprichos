@@ -1,11 +1,11 @@
-import { IsIn, IsNotEmpty, IsOptional } from 'class-validator';
+import { IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class ReimprimirDto {
   @IsNotEmpty({ message: 'El tipo de etiqueta es obligatorio' })
   @IsIn(
-    ['general', 'area', 'bebida', 'ETIQUETA_GENERAL', 'ETIQUETA_AREA', 'ETIQUETA_BEBIDA'],
+    ['TODAS', 'general', 'area', 'bebida', 'ETIQUETA_GENERAL', 'ETIQUETA_AREA', 'ETIQUETA_BEBIDA'],
     {
-      message: 'Tipo de etiqueta inválido (general, area o bebida)',
+      message: 'Tipo de etiqueta inválido (TODAS, general, area o bebida)',
     },
   )
   tipo!: string;
@@ -15,4 +15,9 @@ export class ReimprimirDto {
 
   @IsOptional()
   indice?: number;
+
+  /** Clave de una sola etiqueta del pedido: GENERAL, AREA:<nombre> o BEBIDA:<indice>. */
+  @IsOptional()
+  @IsString()
+  clave?: string;
 }

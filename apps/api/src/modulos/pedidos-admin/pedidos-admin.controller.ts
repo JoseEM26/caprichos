@@ -146,4 +146,14 @@ export class PedidosAdminController {
     }
     return this.impresionService.reimprimirEtiqueta(id, dto);
   }
+
+  /** Estado de impresión de cada etiqueta del pedido (cola, impresa, fallida, vencida). */
+  @Get(':id/etiquetas-estado')
+  @Permiso('pedidos', 'ver')
+  async estadoEtiquetas(@Param('id') id: string) {
+    if (!this.impresionService) {
+      return { pedidoId: id, codigo: '', etiquetas: [], resumen: { total: 0, impresas: 0, enCola: 0, fallidas: 0, vencidas: 0, sinTrabajo: 0 } };
+    }
+    return this.impresionService.estadoEtiquetasPedido(id);
+  }
 }

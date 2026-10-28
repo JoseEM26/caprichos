@@ -34,6 +34,7 @@ export const TIPOS_NOTIFICACION: Record<string, string> = {
   MENSAJE_INTERNO: 'Mensaje interno',
   PAGO_EFECTIVO_MOZO: 'Pago en efectivo del mozo',
   VOUCHER_PENDIENTE_MOZO: 'Voucher del mozo por revisar',
+  IMPRESORA_SIN_CONEXION: 'Impresora sin conexión',
 };
 
 export const COLORES_NOTIFICACION: Record<string, string> = {
@@ -45,6 +46,7 @@ export const COLORES_NOTIFICACION: Record<string, string> = {
   'Mensaje interno': '#6B7F8C',
   'Pago en efectivo del mozo': '#0B2C3E',
   'Voucher del mozo por revisar': '#0B2C3E',
+  'Impresora sin conexión': '#B5442E',
 };
 
 export const ACCIONES_NOTIFICACION: Record<string, [string, string]> = {
@@ -55,6 +57,7 @@ export const ACCIONES_NOTIFICACION: Record<string, [string, string]> = {
   'Stock bajo': ['stock', 'Ver stock'],
   'Error de impresora': ['mirest', 'Ver configuración'],
   'Comprobante pendiente': ['caja', 'Ir a Caja'],
+  'Impresora sin conexión': ['caja', 'Ir a Caja'],
 };
 
 const ORDEN: Record<Prioridad, number> = { ALTA: 0, MEDIA: 1, BAJA: 2 };

@@ -169,7 +169,8 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
     { id: 'pedido', label: 'Pedido' },
     { id: 'cobro', label: 'Cobro' },
     { id: 'ticket', label: 'Ticket de cocina' },
-    ...(est !== 'ANULADO' && est !== 'RECHAZADO' ? [{ id: 'etiquetas' as TabDetalle, label: 'Etiquetas' }] : []),
+    // Siempre visible: un pedido anulado o rechazado puede tener etiquetas VENCIDAS que se ven y reimprimen aqui
+    { id: 'etiquetas' as TabDetalle, label: 'Etiquetas' },
     ...(!esPorConfirmar && est !== 'ANULADO' && est !== 'RECHAZADO' ? [{ id: 'comprobante' as TabDetalle, label: 'Comprobante' }] : []),
   ];
 

@@ -82,6 +82,19 @@ Despues: [[cocina]]
 5. Cualquier cambio en estos pedidos (un SI, un NO o un reenvio) actualiza la pestana sin recargar la pagina.
 Ver tambien: [[repartos]]
 
+## Como se hace: Ver y reimprimir las etiquetas de un pedido
+1. Abrir el pedido y pulsar la pestana Etiquetas. Aparece una tarjeta por cada etiqueta: la general, una por area y una por cada vaso de bebida, con su vista previa.
+2. Cada tarjeta muestra su estado: En cola (esperando la impresora), Imprimiendo, Impresa con la hora, Fallida con el motivo o Vencida (no se imprimio a tiempo o el pedido fue anulado).
+3. Arriba se resume: cuantas etiquetas hay, cuantas estan impresas, en cola, fallidas o vencidas.
+4. Para volver a imprimir una sola etiqueta, pulsar Reimprimir en su tarjeta y confirmar con Si. Para todas, usar Reimprimir todas y confirmar. Una etiqueta que ya esta en cola no se duplica.
+
+## Como se hace: Revisar la impresora cuando no sale la etiqueta
+1. Si al aceptar un pedido aparece el aviso Impresora de Caja sin conexion (campana) o la franja roja arriba de Pedidos y caja, la PC de la etiquetera no esta respondiendo. Revisar que este encendida, con el programa de impresion abierto y con sesion iniciada.
+2. La franja desaparece sola cuando la impresora vuelve a conectarse. Al reconectar, las etiquetas en cola se imprimen en su orden.
+3. Si las etiquetas llevan mas tiempo del configurado sin salir, los administradores reciben un aviso por WhatsApp (una vez por cada grupo de etiquetas pendientes).
+4. Las etiquetas de pedidos anulados, o que llevaron demasiado tiempo en cola, quedan como Vencida y no salen solas. Si hacen falta, se reimprimen desde la pestana Etiquetas.
+Ver tambien: [[cocina]]
+
 ## Errores y dudas comunes
 - Un pedido con pago digital (Yape o Plin) no aparecera en cocina hasta que su comprobante sea aprobado; si la cocina reclama que no ve el pedido, verifique si el voucher sigue pendiente de aprobacion en el modulo de Mensajes.
 - Si al anular se ingresa un codigo de supervisor incorrecto o vencido, aparece el mensaje: Codigo del supervisor invalido. Pídelo nuevamente a la supervisora.
@@ -90,6 +103,7 @@ Ver tambien: [[repartos]]
 - Si un cliente escribe por WhatsApp con una imagen y no ves el comprobante en la ficha, revisa el chat en Mensajes: la foto queda guardada aunque aun no exista la cuenta.
 - No se puede cerrar la caja al finalizar el dia si existen pedidos pendientes de cobro; deben cobrarse o anularse primero.
 - Si un pedido por delivery no tiene ubicacion GPS o referencia clara, debe ubicarse en el mapa antes de enviarse a despacho.
+- Si la impresora de caja no responde, las etiquetas quedan en cola y no se pierden: la franja de Pedidos y caja lo indica. Al reconectar salen solas.
 
 ## Quien puede hacerlo
 - Pueden ingresar y operar en Pedidos y caja: Administrador y Cajero.

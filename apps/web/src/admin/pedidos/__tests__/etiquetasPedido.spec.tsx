@@ -301,7 +301,7 @@ describe('EtiquetasPedido (componente React)', () => {
     expect(screen.getByText('Este pedido no tiene bebidas.')).toBeInTheDocument();
   });
 
-  it('muestra "y N más del mismo estilo" cuando hay más de 6 bebidas', () => {
+  it('muestra una tarjeta por cada vaso (sin "y N más") cuando hay más de 6 bebidas', () => {
     const pedido = crearPedidoBase({
       lineas: Array.from({ length: 8 }, (_, i) => ({
         id: `l${i}`,
@@ -313,8 +313,9 @@ describe('EtiquetasPedido (componente React)', () => {
       })),
     });
 
-    render(<EtiquetasPedido pedido={pedido} />);
-    expect(screen.getByText('y 2 más del mismo estilo')).toBeInTheDocument();
+    const { container } = render(<EtiquetasPedido pedido={pedido} />);
+    expect(container.querySelectorAll('[data-clave^="BEBIDA:"]')).toHaveLength(8);
+    expect(screen.queryByText(/más del mismo estilo/)).not.toBeInTheDocument();
   });
 
   it('integra correctamente en PedidoDetalle al seleccionar la pestaña Etiquetas', () => {

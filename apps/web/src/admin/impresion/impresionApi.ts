@@ -17,6 +17,39 @@ export interface TrabajoImpresionAdmin {
   payload: any;
 }
 
+/** Estado visible de una etiqueta del pedido, derivado de su último print_job. */
+/** DESCONOCIDO solo en la vista: la consulta de estado aún no llegó o falló. */
+export type EstadoEtiqueta = 'EN_COLA' | 'IMPRIMIENDO' | 'IMPRESA' | 'FALLIDA' | 'VENCIDA' | 'SIN_TRABAJO' | 'DESCONOCIDO';
+
+export interface EtiquetaEstado {
+  /** GENERAL, AREA:<nombre> o BEBIDA:<indice>: identifica la etiqueta dentro del pedido */
+  clave: string;
+  tipo: 'ETIQUETA_GENERAL' | 'ETIQUETA_AREA' | 'ETIQUETA_BEBIDA';
+  titulo: string;
+  detalle: string;
+  estado: EstadoEtiqueta;
+  trabajoId: string | null;
+  intentos: number;
+  error: string | null;
+  copia: boolean;
+  en: string | null;
+  impresoEn: string | null;
+}
+
+export interface EstadoEtiquetasPedido {
+  pedidoId: string;
+  codigo: string;
+  etiquetas: EtiquetaEstado[];
+  resumen: {
+    total: number;
+    impresas: number;
+    enCola: number;
+    fallidas: number;
+    vencidas: number;
+    sinTrabajo: number;
+  };
+}
+
 export interface LlaveAgenteAdmin {
   id: string;
   nombre: string;
@@ -71,6 +104,26 @@ export const impresionApi = {
       area_id: areaId,
       indice,
     });
+  },
+
+  obtenerEtiquetasPedido: async (pedidoId: string): Promise<EstadoEtiquetasPedido> => {
+    return api.get<EstadoEtiquetasPedido>(`/admin/pedidos/${pedidoId}/etiquetas-estado`);
+  },
+
+  /** Reencola solo una etiqueta (clave GENERAL, AREA:<nombre> o BEBIDA:<indice>). */
+  reimprimirEtiqueta: async (
+    pedidoId: string,
+    clave: string,
+  ): Promise<{ ok: boolean; mensaje: string; cantidad?: number; omitidas?: number }> => {
+    const tipo = clave.startsWith('AREA:') ? 'area' : clave.startsWith('BEBIDA:') ? 'bebida' : 'general';
+    return api.post(`/admin/pedidos/${pedidoId}/etiquetas/reimprimir`, { tipo, clave });
+  },
+
+  /** Reencola todas las etiquetas del pedido que no estén ya en cola. */
+  reimprimirTodas: async (
+    pedidoId: string,
+  ): Promise<{ ok: boolean; mensaje: string; cantidad?: number; omitidas?: number }> => {
+    return api.post(`/admin/pedidos/${pedidoId}/etiquetas/reimprimir`, { tipo: 'TODAS' });
   },
 
   listarLlaves: async (): Promise<LlaveAgenteAdmin[]> => {

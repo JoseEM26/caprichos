@@ -2,6 +2,12 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { ImpresionService } from './impresion.service';
 
+jest.mock('../../comun/socket/eventos.gateway', () => ({
+  EventosGateway: class {
+    emitirAdmin = jest.fn();
+  },
+}));
+
 describe('ImpresionService', () => {
   let service: ImpresionService;
   let prismaMock: any;
@@ -318,6 +324,7 @@ describe('ImpresionService', () => {
     it('crea trabajo con copia=true para reimpresión general', async () => {
       prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);
       prismaMock.printJob.create.mockResolvedValue({ id: 100n });
+      prismaMock.printJob.findMany.mockResolvedValue([]);
 
       const res = await service.reimprimirEtiqueta('70', { tipo: 'general' });
 
@@ -381,6 +388,159 @@ describe('ImpresionService', () => {
         where: { id: 8n },
         data: { activo: false },
       });
+    });
+  });
+
+  describe('impresión sin agente, vencimiento y estado por etiqueta', () => {
+    const pedidoBase = {
+      id: 80n,
+      codigo: 'CP-080',
+      modalidad: 'LLEVAR',
+      cliente_nombre: 'Ana',
+      canal: 'CAJA',
+      creado_en: new Date(),
+      lineas: [
+        { id: 1n, cantidad: 1, nombre: 'Jugo de Fresa', area: { nombre: 'Barra' }, opciones: [] },
+      ],
+    };
+    let eventosMock: any;
+
+    beforeEach(() => {
+      eventosMock = { emitirAdmin: jest.fn() };
+      prismaMock.notificacion = { create: jest.fn().mockResolvedValue({}) };
+      prismaMock.printJob.count.mockResolvedValue(0);
+      prismaMock.printJob.upsert.mockResolvedValue({});
+      prismaMock.printJob.findMany.mockResolvedValue([]);
+      prismaMock.pedido.findUnique.mockResolvedValue(pedidoBase);
+      service = new ImpresionService(prismaMock, auditoriaMock, eventosMock);
+    });
+
+    it('al encolar un pedido nuevo sin agente avisa a CAJERO y ADMIN y en vivo', async () => {
+      prismaMock.deviceKey.findFirst.mockResolvedValue(null);
+
+      await service.encolarEtiquetasPedido(80n);
+
+      const llamadas = prismaMock.notificacion.create.mock.calls.map((c: any) => c[0].data);
+      expect(llamadas.map((d: any) => d.rol_destino)).toEqual(['CAJERO', 'ADMIN']);
+      expect(llamadas[0].tipo).toBe('IMPRESORA_SIN_CONEXION');
+      expect(llamadas[0].mensaje).toContain('CP-080');
+      expect(llamadas[0].mensaje).toContain('no está conectada');
+      expect(eventosMock.emitirAdmin).toHaveBeenCalledWith(
+        'impresion:sin_conexion',
+        expect.objectContaining({ pedidoId: '80', conectado: false }),
+      );
+    });
+
+    it('con agente conectado e impresora lista no avisa', async () => {
+      prismaMock.deviceKey.findFirst.mockResolvedValue({ ultimo_latido: new Date(), latido_impresora: 'lista' });
+
+      await service.encolarEtiquetasPedido(80n);
+
+      expect(prismaMock.notificacion.create).not.toHaveBeenCalled();
+    });
+
+    it('con agente conectado pero impresora sin papel sí avisa', async () => {
+      prismaMock.deviceKey.findFirst.mockResolvedValue({ ultimo_latido: new Date(), latido_impresora: 'sin_papel' });
+
+      await service.encolarEtiquetasPedido(80n);
+
+      expect(prismaMock.notificacion.create).toHaveBeenCalledTimes(2);
+    });
+
+    it('un nuevo encolado del mismo pedido no vuelve a avisar', async () => {
+      prismaMock.printJob.count.mockResolvedValue(3);
+      prismaMock.deviceKey.findFirst.mockResolvedValue(null);
+
+      await service.encolarEtiquetasPedido(80n);
+
+      expect(prismaMock.notificacion.create).not.toHaveBeenCalled();
+    });
+
+    it('reimprimir TODAS no duplica las etiquetas que ya están en cola', async () => {
+      prismaMock.printJob.findMany.mockResolvedValue([{ tipo: 'ETIQUETA_GENERAL', payload: {} }]);
+      prismaMock.printJob.create.mockResolvedValue({ id: 900n });
+
+      const res = await service.reimprimirEtiqueta('80', { tipo: 'TODAS' });
+
+      const tipos = prismaMock.printJob.create.mock.calls.map((c: any) => c[0].data.tipo);
+      expect(tipos).toEqual(['ETIQUETA_AREA', 'ETIQUETA_BEBIDA']);
+      expect(res.cantidad).toBe(2);
+      expect(res.omitidas).toBe(1);
+    });
+
+    it('reimprimir una sola etiqueta por clave solo encola esa', async () => {
+      prismaMock.printJob.create.mockResolvedValue({ id: 901n });
+
+      const res = await service.reimprimirEtiqueta('80', { tipo: 'general', clave: 'GENERAL' });
+
+      expect(prismaMock.printJob.create).toHaveBeenCalledTimes(1);
+      expect(prismaMock.printJob.create.mock.calls[0][0].data.tipo).toBe('ETIQUETA_GENERAL');
+      expect(res.cantidad).toBe(1);
+    });
+
+    it('reimprimir una etiqueta que ya está en cola devuelve aviso sin duplicar', async () => {
+      prismaMock.printJob.findMany.mockResolvedValue([{ tipo: 'ETIQUETA_GENERAL', payload: {} }]);
+
+      const res = await service.reimprimirEtiqueta('80', { tipo: 'general', clave: 'GENERAL' });
+
+      expect(prismaMock.printJob.create).not.toHaveBeenCalled();
+      expect(res.cantidad).toBe(0);
+      expect(res.mensaje).toContain('ya están en cola');
+    });
+
+    it('estadoEtiquetasPedido muestra el estado real de cada etiqueta y el resumen', async () => {
+      prismaMock.printJob.findMany.mockResolvedValue([
+        {
+          id: 12n, tipo: 'ETIQUETA_AREA', payload: { areaNombre: 'BARRA' }, estado: 'PENDIENTE',
+          intentos: 0, error: null, copia: false, en: new Date('2026-01-01T10:00:00Z'), impreso_en: null,
+        },
+        {
+          id: 11n, tipo: 'ETIQUETA_GENERAL', payload: {}, estado: 'IMPRESO',
+          intentos: 1, error: null, copia: false, en: new Date('2026-01-01T09:59:00Z'),
+          impreso_en: new Date('2026-01-01T10:01:00Z'),
+        },
+      ]);
+
+      const res = await service.estadoEtiquetasPedido('80');
+
+      const porClave = Object.fromEntries(res.etiquetas.map((e) => [e.clave, e.estado]));
+      expect(porClave).toEqual({
+        GENERAL: 'IMPRESA',
+        'AREA:BARRA': 'EN_COLA',
+        'BEBIDA:1': 'SIN_TRABAJO',
+      });
+      expect(res.resumen).toEqual({
+        total: 3, impresas: 1, enCola: 1, fallidas: 0, vencidas: 0, sinTrabajo: 1,
+      });
+      expect(res.etiquetas.find((e) => e.clave === 'GENERAL')?.impresoEn).toBe('2026-01-01T10:01:00.000Z');
+    });
+
+    it('vencerTrabajosObsoletos no toca las reimpresiones pedidas a mano (copia=true)', async () => {
+      prismaMock.parametro = { findUnique: jest.fn().mockResolvedValue(null) };
+      await service.vencerTrabajosObsoletos(Date.parse('2026-01-01T12:00:00Z'));
+      for (const llamada of prismaMock.printJob.updateMany.mock.calls) {
+        expect(llamada[0].where.copia).toBe(false);
+      }
+    });
+
+    it('vencerTrabajosObsoletos marca VENCIDO lo de pedidos anulados y lo viejo, con el umbral del parametro', async () => {
+      const ahora = Date.parse('2026-01-01T12:00:00Z');
+      prismaMock.parametro = {
+        findUnique: jest.fn().mockResolvedValue({ clave: 'impresion_vence_min', valor: 60 }),
+      };
+      prismaMock.printJob.updateMany
+        .mockResolvedValueOnce({ count: 2 })
+        .mockResolvedValueOnce({ count: 3 });
+
+      const total = await service.vencerTrabajosObsoletos(ahora);
+
+      expect(total).toBe(5);
+      const anulados = prismaMock.printJob.updateMany.mock.calls[0][0];
+      expect(anulados.where).toEqual({ estado: 'PENDIENTE', copia: false, pedido: { is: { estado: 'ANULADO' } } });
+      expect(anulados.data.estado).toBe('VENCIDO');
+      const viejos = prismaMock.printJob.updateMany.mock.calls[1][0];
+      expect(viejos.where.en.lt).toEqual(new Date(ahora - 60 * 60 * 1000));
+      expect(viejos.data.estado).toBe('VENCIDO');
     });
   });
 });

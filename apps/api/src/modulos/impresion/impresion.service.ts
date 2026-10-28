@@ -22,11 +22,46 @@ import {
   ResultadoTrabajoDto,
 } from './dto';
 import {
+  CLAVE_GENERAL,
+  claveDeTrabajo,
+  claveEtiquetaArea,
+  claveEtiquetaBebida,
   construirEtiquetaGeneral,
   construirEtiquetasArea,
   construirEtiquetasBebida,
   construirTodasLasEtiquetas,
 } from './constructor-etiquetas';
+import {
+  consultarEstadoAgente,
+  leerParametroNumerico,
+} from './estado-impresion';
+import { EventosGateway } from '../../comun/socket/eventos.gateway';
+
+/** Estados de print_job que cuentan como "en cola" para el admin y para no reencolar dos veces. */
+const ESTADOS_EN_COLA = ['PENDIENTE', 'IMPRIMIENDO'];
+
+/** Estado técnico de print_job -> estado que ve el cajero en cada etiqueta. */
+const ESTADO_ETIQUETA: Record<string, string> = {
+  PENDIENTE: 'EN_COLA',
+  IMPRIMIENDO: 'IMPRIMIENDO',
+  IMPRESO: 'IMPRESA',
+  FALLIDO: 'FALLIDA',
+  VENCIDO: 'VENCIDA',
+};
+
+const INCLUDE_LINEAS_PEDIDO = {
+  lineas: {
+    include: {
+      area: true,
+      producto: {
+        include: {
+          categoria: true,
+        },
+      },
+      opcionesElegidas: true,
+    },
+  },
+};
 
 @Injectable()
 export class ImpresionService {
@@ -35,17 +70,23 @@ export class ImpresionService {
   constructor(
     private readonly prisma: PrismaService,
     @Optional() private readonly auditoria?: AuditoriaService,
+    @Optional() private readonly eventos?: EventosGateway,
   ) {}
 
   /**
    * Toma de forma atómica (FOR UPDATE SKIP LOCKED) los trabajos PENDIENTE más antiguos.
    * Recupera además trabajos IMPRIMIENDO con más de 2 minutos sin resultado.
+   * Antes de tomar, vence lo que ya no debe salir (pedido anulado o demasiado viejo).
    */
   async tomarTrabajos(
     max = 10,
     deviceKeyId?: bigint,
   ): Promise<RespuestaTomarTrabajos> {
     const limite = Math.min(Math.max(1, max || 10), 10);
+
+    await this.vencerTrabajosObsoletos().catch((err: any) =>
+      this.logger.warn(`Error al vencer trabajos de impresión: ${err.message}`),
+    );
 
     // 1. Recuperar huérfanos (> 2 minutos en IMPRIMIENDO)
     const haceDosMinutos = new Date(Date.now() - 2 * 60 * 1000);
@@ -367,6 +408,8 @@ export class ImpresionService {
       }
 
       const { general, areas, bebidas } = construirTodasLasEtiquetas(pedido);
+      // Solo el primer encolado del pedido avisa a Caja (los reintentos de la misma aceptación no repiten el aviso)
+      const yaTenia = (await this.prisma.printJob.count({ where: { pedido_id: pedido.id } })) > 0;
 
       // 1. Encolar General
       const claveGeneral = `${pedido.id}-ETIQUETA_GENERAL`;
@@ -423,6 +466,10 @@ export class ImpresionService {
       }
 
       this.logger.log(`Encoladas etiquetas automáticas para pedido ${pedido.codigo} (id: ${pedido.id})`);
+
+      if (!yaTenia) {
+        await this.avisarSiNoHayImpresora(pedido, 1 + areas.length + bebidas.length);
+      }
     } catch (err: any) {
       // El encolado NUNCA bloquea ni hace fallar la aceptación del pedido
       this.logger.error(`Error en encolado de etiquetas para pedido ${pedidoIdInput}: ${err.message}`, err.stack);
@@ -471,81 +518,227 @@ export class ImpresionService {
     }
 
     const tipoReq = dto.tipo.toUpperCase();
-    const trabajosCreados: any[] = [];
-
-    if (tipoReq === 'GENERAL' || tipoReq === 'ETIQUETA_GENERAL') {
-      const general = construirEtiquetaGeneral(pedido);
-      const j = await this.prisma.printJob.create({
-        data: {
-          pedido_id: pedido.id,
-          tipo: 'ETIQUETA_GENERAL',
-          payload: general as any,
-          copia: true,
-          estado: 'PENDIENTE',
-        },
-      });
-      trabajosCreados.push(j);
-    } else if (tipoReq === 'AREA' || tipoReq === 'ETIQUETA_AREA') {
-      const areas = construirEtiquetasArea(pedido);
-      const filtradas = dto.area_id
-        ? areas.filter((a) => {
-            const areaIdNum = String(dto.area_id);
-            const line = pedido.lineas.find(
-              (l: any) => l.area_id?.toString() === areaIdNum || (l.area?.nombre || '').toUpperCase() === a.areaNombre,
-            );
-            return Boolean(line);
-          })
-        : areas;
-
-      for (const a of filtradas) {
-        const areaIdVal = pedido.lineas.find(
-          (l: any) => (l.area?.nombre || '').toUpperCase() === a.areaNombre,
-        )?.area_id;
-
-        const j = await this.prisma.printJob.create({
-          data: {
-            pedido_id: pedido.id,
-            area_id: areaIdVal || null,
-            tipo: 'ETIQUETA_AREA',
-            payload: a as any,
-            copia: true,
-            estado: 'PENDIENTE',
-          },
-        });
-        trabajosCreados.push(j);
-      }
-    } else if (tipoReq === 'BEBIDA' || tipoReq === 'ETIQUETA_BEBIDA') {
-      const bebidas = construirEtiquetasBebida(pedido);
-      const filtradas =
-        dto.indice && dto.indice > 0
-          ? bebidas.filter((b) => b.bebidaIndex === Number(dto.indice))
-          : bebidas;
-
-      for (const b of filtradas) {
-        const j = await this.prisma.printJob.create({
-          data: {
-            pedido_id: pedido.id,
-            tipo: 'ETIQUETA_BEBIDA',
-            payload: b as any,
-            copia: true,
-            estado: 'PENDIENTE',
-          },
-        });
-        trabajosCreados.push(j);
-      }
-    } else {
+    const quiereGeneral = ['TODAS', 'GENERAL', 'ETIQUETA_GENERAL'].includes(tipoReq);
+    const quiereAreas = ['TODAS', 'AREA', 'ETIQUETA_AREA'].includes(tipoReq);
+    const quiereBebidas = ['TODAS', 'BEBIDA', 'ETIQUETA_BEBIDA'].includes(tipoReq);
+    if (!quiereGeneral && !quiereAreas && !quiereBebidas) {
       throw new BadRequestException({
         codigo: 'TIPO_INVALIDO',
         mensaje: `Tipo de etiqueta desconocido: ${dto.tipo}`,
       });
     }
 
+    // Lista de etiquetas pedidas, cada una con su clave estable dentro del pedido
+    const seleccion: Array<{ tipo: string; clave: string; payload: any; areaId: bigint | null }> = [];
+    if (quiereGeneral) {
+      seleccion.push({
+        tipo: 'ETIQUETA_GENERAL',
+        clave: CLAVE_GENERAL,
+        payload: construirEtiquetaGeneral(pedido),
+        areaId: null,
+      });
+    }
+    if (quiereAreas) {
+      for (const a of construirEtiquetasArea(pedido)) {
+        const areaId = pedido.lineas.find(
+          (l: any) => (l.area?.nombre || '').toUpperCase() === a.areaNombre,
+        )?.area_id ?? null;
+        if (dto.area_id && String(areaId) !== String(dto.area_id)) continue;
+        seleccion.push({
+          tipo: 'ETIQUETA_AREA',
+          clave: claveEtiquetaArea(a.areaNombre),
+          payload: a,
+          areaId,
+        });
+      }
+    }
+    if (quiereBebidas) {
+      for (const b of construirEtiquetasBebida(pedido)) {
+        if (dto.indice && b.bebidaIndex !== Number(dto.indice)) continue;
+        seleccion.push({
+          tipo: 'ETIQUETA_BEBIDA',
+          clave: claveEtiquetaBebida(b.bebidaIndex),
+          payload: b,
+          areaId: null,
+        });
+      }
+    }
+    const pedidas = dto.clave ? seleccion.filter((s) => s.clave === dto.clave) : seleccion;
+
+    // Una etiqueta que ya está en cola no se duplica: el cajero no imprime dos veces lo mismo
+    const enCola = await this.prisma.printJob.findMany({
+      where: { pedido_id: pedido.id, estado: { in: ESTADOS_EN_COLA } },
+      select: { tipo: true, payload: true },
+    });
+    const claveEnCola = new Set(enCola.map((j) => claveDeTrabajo(j)));
+    const nuevas = pedidas.filter((s) => !claveEnCola.has(s.clave));
+
+    const trabajosCreados: any[] = [];
+    for (const s of nuevas) {
+      trabajosCreados.push(
+        await this.prisma.printJob.create({
+          data: {
+            pedido_id: pedido.id,
+            area_id: s.areaId,
+            tipo: s.tipo,
+            payload: s.payload as any,
+            copia: true,
+            estado: 'PENDIENTE',
+          },
+        }),
+      );
+    }
+
+    const omitidas = pedidas.length - nuevas.length;
     return {
       ok: true,
-      mensaje: `Se encolaron ${trabajosCreados.length} etiqueta(s) para reimpresión`,
+      mensaje: nuevas.length > 0
+        ? `Se encolaron ${trabajosCreados.length} etiqueta(s) para reimpresión`
+        : 'Esas etiquetas ya están en cola de impresión',
       cantidad: trabajosCreados.length,
+      omitidas,
       trabajoIds: trabajosCreados.map((t) => t.id.toString()),
     };
+  }
+
+  /**
+   * Marca como VENCIDO lo que no debe salir ya: trabajos de pedidos ANULADO y los que
+   * llevan más de impresion_vence_min (por defecto 180) esperando. Siguen visibles y
+   * se pueden reimprimir desde la pestaña Etiquetas. Solo aplica a las automáticas
+   * (copia=false): una reimpresión pedida a mano es una decisión explícita y sale igual.
+   */
+  async vencerTrabajosObsoletos(ahora = Date.now()): Promise<number> {
+    const minutos = await leerParametroNumerico(this.prisma, 'impresion_vence_min', 180);
+    const anulados = await this.prisma.printJob.updateMany({
+      where: { estado: 'PENDIENTE', copia: false, pedido: { is: { estado: 'ANULADO' } } },
+      data: { estado: 'VENCIDO', error: 'Pedido anulado: la etiqueta ya no se imprime' },
+    });
+    const viejos = await this.prisma.printJob.updateMany({
+      where: { estado: 'PENDIENTE', copia: false, en: { lt: new Date(ahora - minutos * 60 * 1000) } },
+      data: { estado: 'VENCIDO', error: `Vencida: esperó más de ${minutos} min sin imprimirse` },
+    });
+    return anulados.count + viejos.count;
+  }
+
+  /**
+   * Estado de cada etiqueta del pedido (general, una por área y una por vaso de bebida),
+   * tomado del último print_job de cada una. Las etiquetas sin trabajo salen SIN_TRABAJO.
+   */
+  async estadoEtiquetasPedido(pedidoIdInput: string | number) {
+    let pedidoId: bigint;
+    try {
+      pedidoId = BigInt(pedidoIdInput);
+    } catch {
+      throw new BadRequestException({ codigo: 'ID_INVALIDO', mensaje: 'Identificador de pedido no válido' });
+    }
+
+    const pedido: any = await this.prisma.pedido.findUnique({
+      where: { id: pedidoId },
+      include: INCLUDE_LINEAS_PEDIDO,
+    });
+    if (!pedido) {
+      throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
+    }
+
+    const { general, areas, bebidas } = construirTodasLasEtiquetas(pedido);
+    const esperadas = [
+      { clave: CLAVE_GENERAL, tipo: 'ETIQUETA_GENERAL', titulo: 'General del pedido', detalle: 'Bolsa o bandeja, etiquetera de caja' },
+      ...areas.map((a) => ({
+        clave: claveEtiquetaArea(a.areaNombre),
+        tipo: 'ETIQUETA_AREA',
+        titulo: `Área ${a.areaNombre}`,
+        detalle: 'Etiqueta de la cocina de esta área',
+      })),
+      ...bebidas.map((b) => ({
+        clave: claveEtiquetaBebida(b.bebidaIndex),
+        tipo: 'ETIQUETA_BEBIDA',
+        titulo: `Bebida ${b.bebidaIndex} de ${b.totalBebidas}`,
+        detalle: [b.bebidaNombre, b.tamano, b.persona ? `para ${b.persona}` : null]
+          .filter(Boolean)
+          .join(' · '),
+      })),
+    ];
+
+    const trabajos = await this.prisma.printJob.findMany({
+      where: { pedido_id: pedido.id },
+      orderBy: { id: 'desc' },
+    });
+    const ultimoPorClave = new Map<string, any>();
+    for (const t of trabajos) {
+      const clave = claveDeTrabajo(t);
+      if (clave && !ultimoPorClave.has(clave)) ultimoPorClave.set(clave, t);
+    }
+
+    const etiquetas = esperadas.map((e) => {
+      const t = ultimoPorClave.get(e.clave);
+      return {
+        clave: e.clave,
+        tipo: e.tipo,
+        titulo: e.titulo,
+        detalle: e.detalle,
+        estado: t ? ESTADO_ETIQUETA[t.estado] ?? t.estado : 'SIN_TRABAJO',
+        trabajoId: t ? t.id.toString() : null,
+        intentos: t?.intentos ?? 0,
+        error: t?.error ?? null,
+        copia: t?.copia ?? false,
+        en: t?.en ? t.en.toISOString() : null,
+        impresoEn: t?.impreso_en ? t.impreso_en.toISOString() : null,
+      };
+    });
+
+    const contar = (estados: string[]) => etiquetas.filter((e) => estados.includes(e.estado)).length;
+    return {
+      pedidoId: String(pedido.id),
+      codigo: pedido.codigo,
+      etiquetas,
+      resumen: {
+        total: etiquetas.length,
+        impresas: contar(['IMPRESA']),
+        enCola: contar(['EN_COLA', 'IMPRIMIENDO']),
+        fallidas: contar(['FALLIDA']),
+        vencidas: contar(['VENCIDA']),
+        sinTrabajo: contar(['SIN_TRABAJO']),
+      },
+    };
+  }
+
+  /**
+   * Al encolar las etiquetas de un pedido nuevo: si el agente no está o la impresora
+   * tiene problema, avisa a CAJERO y ADMIN en la campana y en vivo. Nunca lanza error.
+   */
+  private async avisarSiNoHayImpresora(pedido: any, cantidad: number): Promise<void> {
+    try {
+      const estado = await consultarEstadoAgente(this.prisma);
+      if (estado.sinProblema) return;
+
+      const motivo = estado.conectado
+        ? 'la impresora de Caja reporta un problema (sin papel, error o desconectada)'
+        : 'la impresora de Caja no está conectada';
+      const mensaje = `El pedido ${pedido.codigo} tiene ${cantidad} etiquetas esperando: ${motivo}`;
+      const enlace = `/admin/caja?pedido=${pedido.id}`;
+
+      for (const rol of ['CAJERO', 'ADMIN']) {
+        await this.prisma.notificacion.create({
+          data: {
+            tipo: 'IMPRESORA_SIN_CONEXION',
+            rol_destino: rol,
+            titulo: 'Impresora de Caja sin conexión',
+            mensaje,
+            enlace,
+          },
+        });
+      }
+
+      this.eventos?.emitirAdmin('impresion:sin_conexion', {
+        pedidoId: pedido.id.toString(),
+        codigo: pedido.codigo,
+        cantidad,
+        conectado: estado.conectado,
+        impresora: estado.impresora,
+      });
+    } catch (err: any) {
+      this.logger.warn(`No se pudo avisar que la impresora está sin conexión: ${err.message}`);
+    }
   }
 
   /**

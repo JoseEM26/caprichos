@@ -238,3 +238,17 @@ export function construirTodasLasEtiquetas(pedido: any) {
     bebidas: construirEtiquetasBebida(pedido),
   };
 }
+
+/** Clave estable de una etiqueta dentro del pedido (general, un área o un vaso). */
+export const CLAVE_GENERAL = 'GENERAL';
+export const claveEtiquetaArea = (areaNombre: string) => `AREA:${areaNombre}`;
+export const claveEtiquetaBebida = (bebidaIndex: number) => `BEBIDA:${bebidaIndex}`;
+
+/** Clave de la etiqueta a la que pertenece un print_job, leída de su payload. */
+export function claveDeTrabajo(job: { tipo: string; payload: any }): string | null {
+  const p = job.payload || {};
+  if (job.tipo === 'ETIQUETA_GENERAL') return CLAVE_GENERAL;
+  if (job.tipo === 'ETIQUETA_AREA') return claveEtiquetaArea(String(p.areaNombre ?? ''));
+  if (job.tipo === 'ETIQUETA_BEBIDA') return claveEtiquetaBebida(Number(p.bebidaIndex));
+  return null;
+}

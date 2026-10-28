@@ -43,6 +43,8 @@ export const CLAVES_NUMERICAS = [
   'chat_tomado_liberar_min',
   'alerta_pedido_sin_confirmar_min',
   'asistido_espera_min',
+  'impresion_alerta_min',
+  'impresion_vence_min',
 ] as const;
 
 export const CLAVES_TEXTO = [

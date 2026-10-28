@@ -428,4 +428,42 @@ describe('AlertasEsperaService (Contrato Secciones 2, 3 y 4)', () => {
       expect(res.bloqueadoPorOtraInstancia).toBe(true);
     });
   });
+
+  describe('2.e: etiquetas en cola sin agente de impresión', () => {
+    const ahora = new Date('2026-10-27T12:00:00Z');
+
+    it('avisa una sola vez por tanda cuando pasa el umbral y el agente no está', async () => {
+      prismaMock.parametro.findUnique = jest.fn().mockResolvedValue({ clave: 'impresion_alerta_min', valor: 1 });
+      prismaMock.printJob.findFirst = jest.fn().mockResolvedValue({ id: 55n });
+      prismaMock.printJob.count = jest.fn().mockResolvedValue(3);
+      prismaMock.deviceKey = { findFirst: jest.fn().mockResolvedValue(null) };
+      const setRedis = jest.fn().mockResolvedValueOnce('OK').mockResolvedValueOnce(null);
+      redisMock.obtenerCliente.mockReturnValue({ set: setRedis });
+
+      const primera = await (service as any).avisarEtiquetasSinAgente(ahora);
+      const segunda = await (service as any).avisarEtiquetasSinAgente(ahora);
+
+      expect(primera).toBe(1);
+      expect(segunda).toBe(0);
+      expect(avisosInternosMock.enviarAvisoAdmin).toHaveBeenCalledTimes(1);
+      const [titulo, detalle, enlace] = avisosInternosMock.enviarAvisoAdmin.mock.calls[0];
+      expect(titulo).toBe('Etiquetas sin imprimir');
+      expect(detalle).toContain('3 etiqueta(s)');
+      expect(enlace).toBe('/admin/caja');
+      expect(setRedis.mock.calls[0][0]).toBe('idemp:impresion:sin-agente:55');
+    });
+
+    it('no avisa si el agente está conectado con la impresora lista', async () => {
+      prismaMock.parametro.findUnique = jest.fn().mockResolvedValue({ clave: 'impresion_alerta_min', valor: 1 });
+      prismaMock.printJob.findFirst = jest.fn().mockResolvedValue({ id: 55n });
+      prismaMock.deviceKey = {
+        findFirst: jest.fn().mockResolvedValue({ ultimo_latido: ahora, latido_impresora: 'lista' }),
+      };
+
+      const res = await (service as any).avisarEtiquetasSinAgente(ahora);
+
+      expect(res).toBe(0);
+      expect(avisosInternosMock.enviarAvisoAdmin).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -132,6 +132,18 @@
       "modulo": "caja"
     },
     {
+      "id": "caja#ver-y-reimprimir-las-etiquetas-de-un-pedido",
+      "tipo": "tarea",
+      "etiqueta": "Ver y reimprimir las etiquetas de un pedido",
+      "modulo": "caja"
+    },
+    {
+      "id": "caja#revisar-la-impresora-cuando-no-sale-la-etiqueta",
+      "tipo": "tarea",
+      "etiqueta": "Revisar la impresora cuando no sale la etiqueta",
+      "modulo": "caja"
+    },
+    {
       "id": "cierre",
       "tipo": "modulo",
       "etiqueta": "Caja y cierres (cierre)",
@@ -1665,6 +1677,26 @@
       "tipo": "ver_tambien",
       "origen": "caja",
       "destino": "repartos"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "caja#ver-y-reimprimir-las-etiquetas-de-un-pedido",
+      "destino": "caja"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "caja#revisar-la-impresora-cuando-no-sale-la-etiqueta",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "caja#revisar-la-impresora-cuando-no-sale-la-etiqueta",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "caja",
+      "destino": "cocina"
     },
     {
       "tipo": "requiere_permiso",

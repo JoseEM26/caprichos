@@ -19,6 +19,7 @@ import {
 } from '../puerto/whatsapp-mensajeria.puerto';
 import { BOTONES_AVISO_PEDIDO } from './avisos-internos.textos';
 import { normalizarTelefono } from '../utilidades/enmascarar.util';
+import { consultarEstadoAgente, leerParametroNumerico } from '../../impresion/estado-impresion';
 
 export interface UmbralesAlertasEspera {
   alertaVoucherMin1: number;
@@ -509,6 +510,12 @@ export class AlertasEsperaService implements OnModuleInit, OnModuleDestroy {
         }
       }
 
+      // 6) SECCIÓN 2.e: etiquetas en cola sin agente de impresión (una alerta por tanda)
+      alertasImpresoraEnviadas += await this.avisarEtiquetasSinAgente(ahora).catch((err: any) => {
+        this.logger.warn(`Error en aviso de etiquetas sin agente: ${err.message}`);
+        return 0;
+      });
+
       return {
         alertasVoucherEnviadas,
         avisosEsperaClienteEnviados,
@@ -525,5 +532,42 @@ export class AlertasEsperaService implements OnModuleInit, OnModuleDestroy {
       }
       this.ejecutando = false;
     }
+  }
+
+  /**
+   * Etiquetas en cola más de impresion_alerta_min minutos sin agente o sin impresora lista:
+   * un solo aviso por WhatsApp (y campana) por tanda. La tanda se identifica por el trabajo
+   * más antiguo en cola: cuando se imprime o vence, la siguiente tanda vuelve a avisar.
+   */
+  private async avisarEtiquetasSinAgente(ahora: Date): Promise<number> {
+    const minutos = await leerParametroNumerico(this.prisma, 'impresion_alerta_min', 5);
+    const corte = new Date(ahora.getTime() - minutos * 60 * 1000);
+    const masViejo = await this.prisma.printJob.findFirst({
+      where: { estado: 'PENDIENTE', en: { lte: corte } },
+      orderBy: { id: 'asc' },
+      select: { id: true },
+    });
+    if (!masViejo) return 0;
+
+    const estado = await consultarEstadoAgente(this.prisma, ahora.getTime());
+    if (estado.sinProblema) return 0;
+
+    const primero = await this.adquirirIdempotencia(
+      `idemp:impresion:sin-agente:${masViejo.id}`,
+      7 * 86400,
+    );
+    if (!primero) return 0;
+
+    const pendientes = await this.prisma.printJob.count({ where: { estado: 'PENDIENTE' } });
+    const motivo = estado.conectado
+      ? 'la impresora de Caja reporta un problema'
+      : 'la PC de la etiquetera no está conectada';
+    await this.avisosInternosService.enviarAvisoAdmin(
+      'Etiquetas sin imprimir',
+      `Hay ${pendientes} etiqueta(s) en cola desde hace más de ${minutos} min y ${motivo}. ` +
+        'Revisa que la PC de la etiquetera esté encendida, con el programa de impresión abierto y con sesión iniciada.',
+      '/admin/caja',
+    );
+    return 1;
   }
 }
