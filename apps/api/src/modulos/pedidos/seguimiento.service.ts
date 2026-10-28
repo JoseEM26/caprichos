@@ -1,7 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { obtenerFechaHoraLima } from '../local/local.util';
 import { generarTokenSeguimiento, verificarTokenSeguimiento } from './seguimiento.tokens';
+
+/** Medios que requieren captura del comprobante (mismo criterio que Caja). */
+const MEDIOS_DIGITALES = ['YAPE', 'PLIN', 'TRANSFERENCIA'];
 
 type Modalidad = 'DELIVERY' | 'RECOGER' | 'MESA';
 
@@ -110,6 +113,8 @@ export interface SeguimientoPedido {
   terminado: boolean;
   anulado: boolean;
   pasos: PasoSeguimiento[];
+  /** Pago con Yape, Plin o transferencia: la pantalla pide adjuntar la captura. Solo en obtener(). */
+  pagoDigital?: boolean;
 }
 
 // Campos que necesita el seguimiento: nada personal (nombre, teléfono, dirección, coordenadas)
@@ -167,7 +172,7 @@ export class SeguimientoService {
   async obtener(codigo: string, token: string | undefined): Promise<SeguimientoPedido> {
     const pedido = await this.prisma.pedido.findUnique({
       where: { codigo },
-      select: SELECCION_SEGUIMIENTO,
+      select: { ...SELECCION_SEGUIMIENTO, pago_preferido: true },
     });
 
     if (!pedido || !verificarTokenSeguimiento(pedido.id, token)) {
@@ -177,7 +182,33 @@ export class SeguimientoService {
       });
     }
 
-    return this.construir(pedido as PedidoSeguimiento);
+    const pagoDigital = MEDIOS_DIGITALES.includes(String(pedido.pago_preferido ?? '').toUpperCase());
+    return { ...this.construir(pedido as PedidoSeguimiento), pagoDigital };
+  }
+
+  /**
+   * Pedido al que el invitado adjunta la captura de su pago (mismo token que el seguimiento).
+   * Token inválido o pedido inexistente responden igual.
+   */
+  async idParaComprobante(codigo: string, token: string | undefined): Promise<bigint> {
+    const pedido = await this.prisma.pedido.findUnique({
+      where: { codigo },
+      select: { id: true, estado: true },
+    });
+
+    if (!pedido || !verificarTokenSeguimiento(pedido.id, token)) {
+      throw new NotFoundException({
+        codigo: 'PEDIDO_NO_ENCONTRADO',
+        mensaje: 'Pedido no encontrado',
+      });
+    }
+    if (pedido.estado === 'ANULADO') {
+      throw new ConflictException({
+        codigo: 'PEDIDO_ANULADO',
+        mensaje: 'El pedido fue anulado; no se puede adjuntar el pago',
+      });
+    }
+    return pedido.id;
   }
 
   /**

@@ -1,3 +1,6 @@
+// El controlador importa VouchersService -> EventosGateway (@nestjs/jwt, ESM): en pruebas unitarias basta un mock
+jest.mock('../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {} }));
+
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { SeguimientoController } from './seguimiento.controller';
 import { SeguimientoService } from './seguimiento.service';
@@ -86,7 +89,7 @@ describe('SeguimientoController', () => {
     service = new SeguimientoService({ pedido: { findMany: jest.fn().mockResolvedValue([]) } } as any);
     obtenerLote = jest.spyOn(service, 'obtenerLote').mockResolvedValue([]);
     clientesMock = { clienteDesdeRequest: jest.fn() };
-    controller = new SeguimientoController(service, clientesMock as any);
+    controller = new SeguimientoController(service, clientesMock as any, {} as any);
   });
 
   const entradas = (n: number) => Array.from({ length: n }, (_, i) => ({ codigo: `CAP-${i}`, t: 'tok' }));

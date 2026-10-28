@@ -32,6 +32,16 @@ Antes: [[cocina]]
 Despues: [[comprobantes]]
 Ver tambien: [[cierre]]
 
+## Como se hace: Adjuntar la foto del comprobante al cobrar
+1. Al elegir Yape, Plin o Transferencia aparece la seccion Comprobante del pago digital. Tomar la foto del voucher con la camara o subir el archivo; la imagen se reduce en el navegador y se guarda como archivo privado, como prueba.
+2. Al terminar la subida, la pantalla muestra la lectura de la IA: semaforo, motivos y datos extraidos (monto, operacion, billetera, titular y fecha) comparados con el total. La lectura es solo informativa: no bloquea el cobro y la decision es de la persona de caja.
+3. Con la foto guardada, el boton Registrar cobro queda activo. Confirmar con Cobrar.
+4. Excepcion: si de verdad no hay foto, pulsar No hay foto: registrar sin voucher (con supervisor). Escribir el motivo (minimo 5 letras) e ingresar el codigo de 6 digitos del supervisor. La excepcion queda auditada con el motivo y quien la aprobo.
+5. La seccion Comprobantes muestra todas las fotos asociadas a la cuenta (de mozo, caja, WhatsApp o la carta), con su lectura.
+Antes: [[cocina]]
+Despues: [[comprobantes]]
+Ver tambien: [[cierre]]
+
 ## Como se hace: Controlar pedidos con pago digital y pase a cocina
 1. Cuando un cliente solicita un pedido pagando con billetera digital (Yape o Plin) desde la carta web o el chatbot, el pedido entra con estado de pago pendiente de validacion.
 2. Por regla estricta del negocio, ningun pedido con pago digital sin validar aparece en las pantallas de [[cocina]], protegiendo la produccion contra pedidos no confirmados.
@@ -63,6 +73,9 @@ Despues: [[cocina]]
 ## Errores y dudas comunes
 - Un pedido con pago digital (Yape o Plin) no aparecera en cocina hasta que su comprobante sea aprobado; si la cocina reclama que no ve el pedido, verifique si el voucher sigue pendiente de aprobacion en el modulo de Mensajes.
 - Si al anular se ingresa un codigo de supervisor incorrecto o vencido, aparece el mensaje: Codigo del supervisor invalido. Pídelo nuevamente a la supervisora.
+- Si el boton Registrar cobro no se activa con Yape o Plin, falta la foto del comprobante: subela, o usa la excepcion con motivo y codigo del supervisor.
+- El semaforo de la IA nunca impide cobrar. Una foto marcada como ilegible o raro se guarda igual; revisela con el cliente si hay dudas.
+- Si un cliente escribe por WhatsApp con una imagen y no ves el comprobante en la ficha, revisa el chat en Mensajes: la foto queda guardada aunque aun no exista la cuenta.
 - No se puede cerrar la caja al finalizar el dia si existen pedidos pendientes de cobro; deben cobrarse o anularse primero.
 - Si un pedido por delivery no tiene ubicacion GPS o referencia clara, debe ubicarse en el mapa antes de enviarse a despacho.
 

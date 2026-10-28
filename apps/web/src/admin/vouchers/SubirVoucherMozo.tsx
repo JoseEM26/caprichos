@@ -3,11 +3,14 @@ import { vouchersApi } from './vouchersApi';
 import { reducirImagenVoucher } from './reducirImagenVoucher';
 import { Cargando } from '../../comun/Cargando';
 import { ErrorApi } from '../../comun/api';
+import type { RespuestaSubirVoucher } from './tipos';
 
 export interface SubirVoucherMozoProps {
   pedidoId: string | number;
-  medio: 'YAPE' | 'PLIN';
+  medio: 'YAPE' | 'PLIN' | 'TRANSFERENCIA';
   alVoucherValido: (info: { id: string | number; legible: boolean }) => void;
+  /** Respuesta completa de la API (semáforo y datos). Lo usa Caja; el mozo nunca la ve. */
+  alRespuesta?: (respuesta: RespuestaSubirVoucher) => void;
   alCambiarEstado?: (estado: {
     subiendo: boolean;
     esValido: boolean;
@@ -20,6 +23,7 @@ export function SubirVoucherMozo({
   pedidoId,
   medio,
   alVoucherValido,
+  alRespuesta,
   alCambiarEstado,
   bloqueado = false,
 }: SubirVoucherMozoProps) {
@@ -58,6 +62,8 @@ export function SubirVoucherMozo({
         pedidoId,
         medio,
       );
+
+      alRespuesta?.(respuesta);
 
       // Regla de oro del mozo: SOLO ve legible / no legible. NUNCA semáforo ni datos extraídos.
       if (respuesta.legible) {

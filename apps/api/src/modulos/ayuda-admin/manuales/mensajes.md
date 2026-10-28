@@ -30,7 +30,8 @@ Ver tambien: [[caja]], [[clientes]]
 3. En el cuerpo del chat se visualizara la fotografia del comprobante como archivo privado seguro.
 4. Justo debajo de los datos del pedido se muestra la tarjeta de lectura de IA con el semaforo de confianza: Confiable (verde), Observado (amarillo), Raro (naranja), Ilegible o Sin lectura (gris).
 5. La tarjeta detalla los datos extraidos por la IA: monto, numero de operacion, billetera detectada (Yape o Plin), titular y fecha, contrastandolos contra el total del pedido. La IA solo extrae y clasifica; nunca aprueba el pago por si sola.
-6. Si los datos coinciden, pulsar el boton Aprobar el pago (disponible incluso si el telefono tiene prefijo internacional 51) y confirmar la accion. El pedido quedara confirmado y pasara inmediatamente a las comandas de [[cocina]].
+6. Si los datos coinciden, pulsar el boton Aprobar el pago (disponible incluso si el telefono tiene prefijo internacional 51) y confirmar la accion. El pedido quedara confirmado, pasara inmediatamente a las comandas de [[cocina]] y la foto del chat queda enlazada al pedido como prueba.
+6.1. Si el chat no tiene pedido todavia (por ejemplo, cliente sin telefono o pedido aun no creado), la foto igual queda guardada en el chat y en la lista de comprobantes; al aprobar el pago desde el pedido, queda como prueba.
 7. Si el comprobante no coincide, es ilegible o es fraudulento, pulsar Rechazar, indicar el motivo correspondiente y confirmar.
 Despues: [[cocina]]
 Ver tambien: [[caja]]
@@ -51,6 +52,8 @@ Ver tambien: [[mensajes]]
 ## Errores y dudas comunes
 - Un pedido con pago digital no validado no aparecera en cocina hasta que su voucher sea aprobado por una persona; esto evita que se preparen pedidos sin respaldo financiero.
 - La inteligencia artificial nunca aprueba ni rechaza pagos por su cuenta; el semaforo y los datos extraidos son una guia visual para que el operador decida.
+- Toda imagen de comprobante que llega por WhatsApp se guarda y se analiza, aunque el cliente no tenga pedido asociado o escriba sin telefono. Si la IA no puede leerla, queda como Sin lectura y la decide una persona.
+- Si Meta no entrega la imagen (mas de 5 MB o falla la descarga), Caja recibe el aviso Comprobante no recibido: pide al cliente que la reenvie.
 - Si el mensaje muestra un icono rojo de error de envio, pulsar el boton Reintentar envio.
 - Si el bot esta interfiriendo en una conversacion delicada, pulsar Pausar bot para detener sus respuestas automaticas en ese chat; al finalizar la consulta, pulsar Reanudar bot.
 - El nombre del contacto se puede editar pulsando el icono del lapiz al costado del nombre en la cabecera.

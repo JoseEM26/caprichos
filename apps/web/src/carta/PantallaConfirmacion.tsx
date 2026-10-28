@@ -2,6 +2,7 @@ import { useCarrito } from './CarritoContext';
 import { Icono } from '../comun/Icono';
 import { leerPedidosGuardados, useSeguimientoPedido } from './seguimiento';
 import type { PasoSeguimiento, PedidoGuardado } from './seguimiento';
+import { AdjuntarCapturaPago } from './AdjuntarCapturaPago';
 import type { PedidoConfirmado } from './tipos';
 
 export function PantallaConfirmacion() {
@@ -238,6 +239,10 @@ function TarjetaSeguimiento({ pedido, creacion, otros, onElegir, onCerrar }: Tar
             <PasoPedido key={p.clave} paso={p} numero={idx + 1} />
           ))}
         </div>
+      )}
+
+      {estado && !estado.anulado && !estado.terminado && (
+        <AdjuntarCapturaPago codigo={pedido.codigo} token={pedido.token ?? ''} pagoDigital={Boolean(estado.pagoDigital)} />
       )}
 
       {otros.length > 0 && (

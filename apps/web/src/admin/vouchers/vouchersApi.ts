@@ -34,7 +34,7 @@ export const vouchersApi = {
   async subirVoucher(
     archivo: File | Blob,
     pedidoId: string | number,
-    medio: 'YAPE' | 'PLIN',
+    medio: 'YAPE' | 'PLIN' | 'TRANSFERENCIA',
   ): Promise<RespuestaSubirVoucher> {
     const formData = new FormData();
     const nombreArchivo =
@@ -73,6 +73,13 @@ export const vouchersApi = {
     const qs = params.toString();
     const ruta = `/admin/vouchers${qs ? `?${qs}` : ''}`;
     return api.get<VoucherPagoItem[]>(ruta);
+  },
+
+  /**
+   * El mozo avisa a Caja que el pago digital del pedido aún no tiene foto (POST /admin/vouchers/aviso-sin-foto).
+   */
+  async avisarSinFoto(pedidoId: string | number): Promise<{ ok: boolean }> {
+    return api.post<{ ok: boolean }>('/admin/vouchers/aviso-sin-foto', { pedidoId: String(pedidoId) });
   },
 
   /**

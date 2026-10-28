@@ -24,7 +24,7 @@ describe('ModalPrecuenta - Flujo de cobro del mozo con vouchers digitales', () =
       async (archivo) => archivo,
     );
 
-    render(<ModalPrecuenta {...propsBase} />);
+    render(<ModalPrecuenta {...propsBase} pedidoId="P-20" alCobrar={vi.fn()} />);
 
     // Por defecto es Efectivo y el botón está habilitado
     const btnCobro = screen.getByTestId('btn-confirmar-cobro-mozo');
@@ -57,6 +57,27 @@ describe('ModalPrecuenta - Flujo de cobro del mozo con vouchers digitales', () =
     // Ahora el botón de confirmar cobro se habilita
     expect(btnCobro.hasAttribute('disabled')).toBe(false);
     expect(btnCobro.textContent).toContain('Confirmar cobro (Yape)');
+  });
+
+  it('sin alCobrar no hay botón de cobro (el cajero cobra): no simula un cobro en el servidor', () => {
+    render(<ModalPrecuenta {...propsBase} pedidoId="P-20" />);
+
+    expect(screen.queryByTestId('btn-confirmar-cobro-mozo')).toBeNull();
+    fireEvent.click(screen.getByText('Yape'));
+    expect(screen.getByTestId('aviso-cobro-digital-caja').textContent).toMatch(/lo registra Caja/i);
+  });
+
+  it('con Yape y sin foto, el mozo avisa a Caja (POST aviso-sin-foto con el pedido)', async () => {
+    const avisar = vi.spyOn(vouchersApi, 'avisarSinFoto').mockResolvedValue({ ok: true });
+    render(<ModalPrecuenta {...propsBase} pedidoId="P-20" />);
+
+    fireEvent.click(screen.getByText('Yape'));
+    fireEvent.click(screen.getByTestId('btn-avisar-caja-sin-foto'));
+
+    await waitFor(() => {
+      expect(avisar).toHaveBeenCalledWith('P-20');
+    });
+    expect(screen.getByText(/Caja avisada/i)).toBeDefined();
   });
 
   it('abre diálogo Confirmar Sí/No antes de registrar el cobro', async () => {

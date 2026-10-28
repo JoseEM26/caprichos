@@ -102,6 +102,12 @@
       "modulo": "caja"
     },
     {
+      "id": "caja#adjuntar-la-foto-del-comprobante-al-cobrar",
+      "tipo": "tarea",
+      "etiqueta": "Adjuntar la foto del comprobante al cobrar",
+      "modulo": "caja"
+    },
+    {
       "id": "caja#controlar-pedidos-con-pago-digital-y-pase-a-cocina",
       "tipo": "tarea",
       "etiqueta": "Controlar pedidos con pago digital y pase a cocina",
@@ -1554,6 +1560,26 @@
     {
       "tipo": "ver_tambien",
       "origen": "caja",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "caja#adjuntar-la-foto-del-comprobante-al-cobrar",
+      "destino": "caja"
+    },
+    {
+      "tipo": "antes",
+      "origen": "caja#adjuntar-la-foto-del-comprobante-al-cobrar",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "despues",
+      "origen": "caja#adjuntar-la-foto-del-comprobante-al-cobrar",
+      "destino": "comprobantes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "caja#adjuntar-la-foto-del-comprobante-al-cobrar",
       "destino": "cierre"
     },
     {

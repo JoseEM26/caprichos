@@ -1,8 +1,12 @@
 import { useState, useMemo } from 'react';
 import { Boton } from '../../comun/Boton';
 import { Confirmar } from '../../comun/Confirmar';
+import { CampoCodigoSupervisor } from '../../comun/CampoCodigoSupervisor';
 import { pedidosApi, Pedido, PagoItem, CobrarDto } from './pedidosApi';
 import { ErrorApi } from '../../comun/api';
+import { SubirVoucherMozo } from '../vouchers/SubirVoucherMozo';
+import { TarjetaLecturaVoucher } from '../vouchers/TarjetaLecturaVoucher';
+import type { RespuestaSubirVoucherAdmin } from '../vouchers/tipos';
 
 const MEDIOS_PAGO = [
   'Efectivo',
@@ -11,6 +15,12 @@ const MEDIOS_PAGO = [
   'Tarjeta',
   'Transferencia',
 ] as const;
+
+/** Medios digitales: exigen la foto del comprobante (la IA solo informa). Igual que el servidor. */
+const MEDIOS_CON_COMPROBANTE = ['YAPE', 'PLIN', 'TRANSFERENCIA'];
+type MedioConComprobante = 'YAPE' | 'PLIN' | 'TRANSFERENCIA';
+
+const MOTIVO_MINIMO = 5;
 
 export interface ModalCobrarProps {
   pedido: Pedido;
@@ -46,8 +56,26 @@ export function ModalCobrar({
   const [enviando, setEnviando] = useState<boolean>(false);
   const [mostrarConfirmar, setMostrarConfirmar] = useState<boolean>(false);
 
+  // Comprobante del pago digital: la foto subida (id) y su lectura informativa
+  const [voucher, setVoucher] = useState<{ id: string | number } | null>(null);
+  const [lectura, setLectura] = useState<RespuestaSubirVoucherAdmin | null>(null);
+  // Excepción «Registrar sin voucher»: motivo escrito + código rotativo del supervisor
+  const [sinVoucher, setSinVoucher] = useState<boolean>(false);
+  const [motivoSinVoucher, setMotivoSinVoucher] = useState<string>('');
+  const [pinSupervisor, setPinSupervisor] = useState<string>('');
+
   // Normalizar medio de pago para la API (en mayúsculas: EFECTIVO, YAPE, etc.)
   const normalizarMedio = (m: string) => m.toUpperCase();
+
+  const medioDigital = pagos
+    .map((p) => p.medio.toUpperCase())
+    .find((m) => MEDIOS_CON_COMPROBANTE.includes(m)) as MedioConComprobante | undefined;
+  const hayDigital = medioDigital !== undefined;
+  const excepcionLista =
+    sinVoucher &&
+    motivoSinVoucher.trim().length >= MOTIVO_MINIMO &&
+    pinSupervisor.length === 6;
+  const comprobanteListo = !hayDigital || voucher !== null || excepcionLista;
 
   // Calcular suma actual de los pagos
   const sumaPagos = useMemo(() => {
@@ -119,6 +147,13 @@ export function ModalCobrar({
       return false;
     }
 
+    if (!comprobanteListo) {
+      setErrorMensaje(
+        'Falta la foto del comprobante del pago digital. Súbela, o registra el cobro sin voucher con motivo y código del supervisor.',
+      );
+      return false;
+    }
+
     return true;
   };
 
@@ -144,10 +179,18 @@ export function ModalCobrar({
       return item;
     });
 
+    // Con foto, va el voucherId; sin foto (excepción), el motivo y el código del supervisor
+    const comprobante: Partial<CobrarDto> = voucher
+      ? { voucherId: voucher.id }
+      : hayDigital && sinVoucher
+        ? { sinVoucher: { motivo: motivoSinVoucher.trim(), pinSupervisor } }
+        : {};
+
     try {
       await cobrar({
         pedidoId: pedido.id,
         pagos: itemsDto,
+        ...comprobante,
       });
       alCobrarExitoso();
     } catch (err: any) {
@@ -440,6 +483,129 @@ export function ModalCobrar({
           </button>
         )}
 
+        {/* Comprobante del pago digital: la foto es obligatoria; la lectura de la IA solo informa */}
+        {hayDigital && medioDigital && (
+          <div
+            data-testid="seccion-comprobante-cobro"
+            style={{
+              border: '1.5px solid var(--cp-navy, #0B2C3E)',
+              borderRadius: 12,
+              padding: 12,
+              background: 'var(--cp-white, #FFFFFF)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 10,
+            }}
+          >
+            <div style={{ fontWeight: 800, fontSize: 14 }}>
+              Comprobante del pago digital ({medioDigital})
+            </div>
+
+            {!voucher && !sinVoucher && (
+              <>
+                <SubirVoucherMozo
+                  pedidoId={pedido.id}
+                  medio={medioDigital}
+                  alVoucherValido={(info) => setVoucher({ id: info.id })}
+                  alRespuesta={(r) => {
+                    if ('semaforo' in r) setLectura(r);
+                  }}
+                />
+                <button
+                  type="button"
+                  data-testid="btn-sin-voucher"
+                  onClick={() => setSinVoucher(true)}
+                  style={{
+                    minHeight: 44,
+                    border: '1.5px dashed var(--cp-rust, #B2500F)',
+                    borderRadius: 10,
+                    background: 'transparent',
+                    color: 'var(--cp-rust, #B2500F)',
+                    fontWeight: 700,
+                    fontSize: 13,
+                    cursor: 'pointer',
+                  }}
+                >
+                  No hay foto: registrar sin voucher (con supervisor)
+                </button>
+              </>
+            )}
+
+            {voucher && (
+              <>
+                <div
+                  data-testid="voucher-guardado"
+                  style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-green, #2F7A45)' }}
+                >
+                  Foto guardada y enlazada al pedido como prueba del cobro.
+                </div>
+                {lectura && (
+                  <TarjetaLecturaVoucher
+                    voucher={{
+                      id: lectura.id,
+                      semaforo: lectura.semaforo,
+                      motivos: lectura.motivos,
+                      extraido: lectura.extraido,
+                      medio: medioDigital,
+                    }}
+                    pedido={{ total: pedido.total, medio: medioDigital }}
+                    puedeVer
+                  />
+                )}
+              </>
+            )}
+
+            {sinVoucher && !voucher && (
+              <>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-rust, #B2500F)' }}>
+                  Cobro sin foto: solo con motivo escrito y el código del supervisor. Queda auditado.
+                </div>
+                <label htmlFor="motivo-sin-voucher" style={{ fontWeight: 700, fontSize: 13 }}>
+                  Motivo (mínimo {MOTIVO_MINIMO} letras)
+                </label>
+                <textarea
+                  id="motivo-sin-voucher"
+                  data-testid="motivo-sin-voucher"
+                  rows={2}
+                  value={motivoSinVoucher}
+                  onChange={(e) => setMotivoSinVoucher(e.target.value)}
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    borderRadius: 10,
+                    border: '1.5px solid var(--cp-line, #E3D6C6)',
+                    background: 'var(--cp-white, #FFFFFF)',
+                    padding: 10,
+                    fontSize: 14,
+                    fontFamily: 'inherit',
+                  }}
+                />
+                <CampoCodigoSupervisor valor={pinSupervisor} onChange={setPinSupervisor} />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSinVoucher(false);
+                    setMotivoSinVoucher('');
+                    setPinSupervisor('');
+                  }}
+                  style={{
+                    minHeight: 44,
+                    border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                    borderRadius: 10,
+                    background: 'transparent',
+                    color: 'var(--cp-navy, #0B2C3E)',
+                    fontWeight: 700,
+                    fontSize: 13,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Volver a pedir la foto
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
         {/* Indicador de cuadre */}
         <div
           style={{
@@ -480,7 +646,7 @@ export function ModalCobrar({
           <Boton
             variante="primario"
             cargando={enviando}
-            disabled={!cuadra || enviando}
+            disabled={!cuadra || enviando || !comprobanteListo}
             onClick={iniciarCobro}
             style={{
               flex: 1,

@@ -86,6 +86,15 @@ describe('CobrosService', () => {
       userAccount: {
         findMany: jest.fn(),
       },
+      // Por defecto el pedido ya tiene una foto enlazada; las pruebas del comprobante la quitan
+      voucherPago: {
+        findFirst: jest.fn().mockResolvedValue({ id: 9n, semaforo: 'CONFIABLE', extraido: { legible: true } }),
+        findUnique: jest.fn(),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      parametro: {
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
       $queryRaw: jest.fn().mockResolvedValue([]),
       $transaction: jest.fn().mockImplementation(async (cb) => {
         return cb(prismaMock);
@@ -591,6 +600,150 @@ describe('CobrosService', () => {
 
       expect(res.pago_metodo).toBe('PLIN');
       expect(res.pago_estado).toBe('PAGADO');
+    });
+  });
+
+  describe('comprobante del pago digital (foto obligatoria, IA solo informa)', () => {
+    const cajaAbiertaMock = { id: 10n, fecha: new Date('2026-10-21T00:00:00.000Z'), estado: 'ABIERTA' };
+    const pedidoMock = {
+      id: 100n,
+      codigo: 'CP-0100',
+      total: new Prisma.Decimal(50.0),
+      estado: 'ENTREGADO',
+      pago_estado: 'PENDIENTE',
+      pago_metodo: null,
+      es_personal: false,
+      cobros: [],
+    };
+    const mozoUsuario = { id: 3n, partyId: 3n, rol: 'MOZO', debeCambiar: false };
+    const cobroCreado = {
+      id: 77n,
+      pedido_id: 100n,
+      caja_id: 10n,
+      total: new Prisma.Decimal(50.0),
+      credito_personal: false,
+      cobrado_por: 2n,
+      en: new Date(),
+      pagos: [{ id: 5n, medio: 'YAPE', monto: new Prisma.Decimal(50.0), recibido: null, vuelto: null }],
+    };
+
+    beforeEach(() => {
+      prismaMock.caja.findUnique.mockResolvedValue(cajaAbiertaMock);
+      prismaMock.pedido.findUnique.mockResolvedValue({ ...pedidoMock });
+      prismaMock.cobro.create.mockResolvedValue(cobroCreado);
+      prismaMock.pedido.update.mockResolvedValue({ ...pedidoMock, pago_estado: 'PAGADO', pago_metodo: 'YAPE' });
+    });
+
+    const sinFoto = () => prismaMock.voucherPago.findFirst.mockResolvedValue(null);
+    const pagoYape = [{ medio: 'YAPE', monto: 50 }];
+
+    it('cobro digital sin foto ni excepción -> 400 VOUCHER_REQUERIDO y no cobra', async () => {
+      sinFoto();
+      await expect(service.cobrar({ pedidoId: '100', pagos: pagoYape }, cajeroUsuario)).rejects.toMatchObject({
+        response: { codigo: 'VOUCHER_REQUERIDO' },
+      });
+      expect(prismaMock.cobro.create).not.toHaveBeenCalled();
+    });
+
+    it('cobro en efectivo sin foto sigue permitido', async () => {
+      sinFoto();
+      const res = await service.cobrar({ pedidoId: '100', pagos: [{ medio: 'EFECTIVO', monto: 50 }] }, cajeroUsuario);
+      expect(res.id).toBe('77');
+    });
+
+    it('con foto ya subida (voucherId) la enlaza al pedido y cobra', async () => {
+      // La foto aún no tiene pedido: se enlaza dentro de la transacción y luego el pedido ya tiene prueba
+      prismaMock.voucherPago.findUnique.mockResolvedValue({ id: 9n, pedido_id: null });
+
+      const res = await service.cobrar({ pedidoId: '100', pagos: pagoYape, voucherId: '9' } as any, cajeroUsuario);
+
+      expect(prismaMock.voucherPago.update).toHaveBeenCalledWith({ where: { id: 9n }, data: { pedido_id: 100n } });
+      expect(res.id).toBe('77');
+    });
+
+    it('voucherId de otro pedido -> 409 VOUCHER_DE_OTRO_PEDIDO', async () => {
+      prismaMock.voucherPago.findUnique.mockResolvedValue({ id: 9n, pedido_id: 555n });
+      await expect(
+        service.cobrar({ pedidoId: '100', pagos: pagoYape, voucherId: '9' } as any, cajeroUsuario),
+      ).rejects.toMatchObject({ response: { codigo: 'VOUCHER_DE_OTRO_PEDIDO' } });
+      expect(prismaMock.cobro.create).not.toHaveBeenCalled();
+    });
+
+    it('voucherId inexistente -> 404 VOUCHER_NO_ENCONTRADO', async () => {
+      prismaMock.voucherPago.findUnique.mockResolvedValue(null);
+      await expect(
+        service.cobrar({ pedidoId: '100', pagos: pagoYape, voucherId: '9' } as any, cajeroUsuario),
+      ).rejects.toMatchObject({ response: { codigo: 'VOUCHER_NO_ENCONTRADO' } });
+    });
+
+    it('sin foto con motivo y PIN de supervisor correcto -> cobra y audita COBRAR_SIN_VOUCHER', async () => {
+      sinFoto();
+      const res = await service.cobrar(
+        {
+          pedidoId: '100',
+          pagos: pagoYape,
+          sinVoucher: { motivo: 'El cliente no tenía señal', pinSupervisor: '123456' },
+        } as any,
+        cajeroUsuario,
+        '10.0.0.1',
+      );
+
+      expect(res.id).toBe('77');
+      expect(supervisorCodigoMock.verificarYConsumirCodigo).toHaveBeenCalledWith(
+        '123456',
+        2n,
+        'caja/cobrar_sin_voucher',
+        '10.0.0.1',
+        'cobro',
+        undefined,
+      );
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accion: 'COBRAR_SIN_VOUCHER',
+          motivo: 'El cliente no tenía señal',
+          conPinAdmin: true,
+          despues: expect.objectContaining({
+            sin_voucher: expect.objectContaining({ motivo: 'El cliente no tenía señal' }),
+          }),
+        }),
+      );
+    });
+
+    it('sin foto con PIN de supervisor incorrecto -> 403 y no cobra', async () => {
+      sinFoto();
+      await expect(
+        service.cobrar(
+          { pedidoId: '100', pagos: pagoYape, sinVoucher: { motivo: 'Motivo válido', pinSupervisor: '000000' } } as any,
+          cajeroUsuario,
+        ),
+      ).rejects.toMatchObject({ status: HttpStatus.FORBIDDEN });
+      expect(prismaMock.cobro.create).not.toHaveBeenCalled();
+    });
+
+    it('con foto presente, la IA ILEGIBLE no bloquea el cobro (semáforo solo informativo)', async () => {
+      prismaMock.voucherPago.findFirst.mockResolvedValue({ id: 9n, semaforo: 'ILEGIBLE', extraido: { legible: false } });
+      const res = await service.cobrar({ pedidoId: '100', pagos: pagoYape }, cajeroUsuario);
+      expect(res.id).toBe('77');
+    });
+
+    it('MOZO con voucher_mozo_obligatorio=true y sin foto -> 400, sin excepción propia', async () => {
+      sinFoto();
+      prismaMock.parametro.findUnique.mockResolvedValue({ clave: 'voucher_mozo_obligatorio', valor: true });
+      await expect(
+        service.cobrar(
+          { pedidoId: '100', pagos: pagoYape, sinVoucher: { motivo: 'Motivo válido', pinSupervisor: '123456' } } as any,
+          mozoUsuario,
+        ),
+      ).rejects.toMatchObject({ response: { codigo: 'VOUCHER_REQUERIDO' } });
+      expect(supervisorCodigoMock.verificarYConsumirCodigo).not.toHaveBeenCalled();
+      expect(prismaMock.cobro.create).not.toHaveBeenCalled();
+    });
+
+    it('MOZO con voucher_mozo_obligatorio=false y sin foto -> cobra', async () => {
+      sinFoto();
+      prismaMock.parametro.findUnique.mockResolvedValue({ clave: 'voucher_mozo_obligatorio', valor: false });
+      const res = await service.cobrar({ pedidoId: '100', pagos: pagoYape }, mozoUsuario);
+      expect(res.id).toBe('77');
     });
   });
 

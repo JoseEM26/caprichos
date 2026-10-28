@@ -214,18 +214,14 @@ describe('VouchersIaService', () => {
       expire: jest.fn().mockResolvedValue(1),
     });
 
+    // Ponytail: no lanza. Sobre el límite devuelve SIN_LECTURA para que el voucher se guarde igual.
     const buffer = Buffer.from('fake-image');
-    try {
-      await service.analizarVoucher(buffer, 'image/jpeg', {
-        identificadorRateLimit: 'usuario_42',
-      });
-      fail('Debió lanzar excepción de rate limit');
-    } catch (err: any) {
-      expect(err.getStatus()).toBe(429);
-      expect((err.getResponse() as any).mensaje).toMatch(
-        /Límite de lecturas de vouchers por minuto excedido/i,
-      );
-    }
+    const res = await service.analizarVoucher(buffer, 'image/jpeg', {
+      identificadorRateLimit: 'usuario_42',
+    });
+    expect(res.sinLectura).toBe(true);
+    expect(res.extraido).toBeNull();
+    expect(res.motivo).toMatch(/Límite de lecturas de vouchers por minuto excedido/i);
   });
 
   it('retorna sinLectura=true ante error en OpenAI y no propaga error no controlado', async () => {

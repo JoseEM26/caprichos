@@ -138,8 +138,8 @@ describe('CobrosService - Exigencia de voucher para el MOZO (vch-api)', () => {
     });
   });
 
-  it('exige que el voucher sea legible cuando el MOZO cobra con Plin', async () => {
-    // Voucher con semáforo ILEGIBLE
+  it('un voucher ILEGIBLE no bloquea al MOZO: la IA solo informa (cobra con Plin)', async () => {
+    // Voucher con semáforo ILEGIBLE: existe la foto, así que se cumple la exigencia
     prismaMock.voucherPago.findFirst.mockResolvedValue({
       id: 1n,
       pedido_id: 100n,
@@ -147,12 +147,8 @@ describe('CobrosService - Exigencia de voucher para el MOZO (vch-api)', () => {
       extraido: { legible: false },
     });
 
-    await expect(service.cobrar(dtoCobroDigitalPlin, mozoUsuario)).rejects.toMatchObject({
-      response: {
-        codigo: 'VOUCHER_NO_LEGIBLE',
-        mensaje: 'Este voucher no se lee bien. Vuelve a tomar la foto, por favor.',
-      },
-    });
+    const res = await service.cobrar(dtoCobroDigitalPlin, mozoUsuario);
+    expect(res.id).toBe('500');
   });
 
   it('permite el cobro al MOZO si existe un voucher legible para el pedido', async () => {
@@ -176,12 +172,19 @@ describe('CobrosService - Exigencia de voucher para el MOZO (vch-api)', () => {
     expect(res.id).toBe('500');
   });
 
-  it('el CAJERO NO queda bloqueado: cobra con Yape sin exigir voucher', async () => {
-    // Sin voucher subido
+  it('el CAJERO también necesita la foto para cobrar con Yape (sin foto -> VOUCHER_REQUERIDO)', async () => {
+    // Sin voucher subido: Caja tampoco cobra un digital sin comprobante
     prismaMock.voucherPago.findFirst.mockResolvedValue(null);
 
+    await expect(service.cobrar(dtoCobroDigitalYape, cajeroUsuario)).rejects.toMatchObject({
+      response: { codigo: 'VOUCHER_REQUERIDO' },
+    });
+  });
+
+  it('el CAJERO cobra con Yape si ya hay foto del pedido', async () => {
+    prismaMock.voucherPago.findFirst.mockResolvedValue({ id: 1n, pedido_id: 100n, semaforo: 'SIN_LECTURA', extraido: null });
+
     const res = await service.cobrar(dtoCobroDigitalYape, cajeroUsuario);
-    expect(res).toBeDefined();
     expect(res.id).toBe('500');
   });
 

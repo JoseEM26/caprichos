@@ -38,6 +38,9 @@ import { AnularCobroDto } from './dto/anular-cobro.dto';
 
 /** Bloqueo de PIN de supervisor tras 3 fallos seguidos (FT-CAJ-02, RQ-CAJ-02-12). */
 
+/** Medios digitales: el cobro exige la foto del comprobante (la IA solo informa, nunca bloquea). */
+export const MEDIOS_CON_COMPROBANTE = ['YAPE', 'PLIN', 'TRANSFERENCIA'];
+
 @Injectable()
 export class CobrosService {
   constructor(
@@ -79,12 +82,13 @@ export class CobrosService {
     partyIdOperador?: bigint | string,
     ip?: string,
     cobroId?: bigint,
-  ): Promise<{ party_id?: bigint; id?: bigint }> {
+    accion = 'caja/anular_cobro',
+  ): Promise<{ party_id?: bigint; id?: bigint; supervisorPartyId?: bigint }> {
     if (this.supervisorCodigoService) {
       return this.supervisorCodigoService.verificarYConsumirCodigo(
         pinSupervisor,
         partyIdOperador,
-        'caja/anular_cobro',
+        accion,
         ip,
         'cobro',
         cobroId,
@@ -184,6 +188,35 @@ export class CobrosService {
     }
   }
 
+  /** Enlaza una foto ya subida al pedido que se cobra (prueba del cobro). Dentro de la transacción del cobro. */
+  private async vincularVoucherAPedido(
+    tx: Prisma.TransactionClient,
+    voucherId: string | number,
+    pedidoId: bigint,
+  ) {
+    const id = this.parsearId(voucherId);
+    const voucher = await tx.voucherPago.findUnique({
+      where: { id },
+      select: { id: true, pedido_id: true },
+    });
+
+    if (!voucher) {
+      throw new HttpException(
+        { codigo: 'VOUCHER_NO_ENCONTRADO', mensaje: 'El voucher especificado no existe' },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    if (voucher.pedido_id !== null && voucher.pedido_id !== pedidoId) {
+      throw new HttpException(
+        { codigo: 'VOUCHER_DE_OTRO_PEDIDO', mensaje: 'Ese voucher pertenece a otro pedido' },
+        HttpStatus.CONFLICT,
+      );
+    }
+    if (voucher.pedido_id === null) {
+      await tx.voucherPago.update({ where: { id }, data: { pedido_id: pedidoId } });
+    }
+  }
+
   private async registrarCobro(
     dto: CobrarDto,
     usuario: any,
@@ -192,7 +225,7 @@ export class CobrosService {
     enCierre: boolean,
   ) {
     // La caja se bloquea antes de leer el pedido: dos cobros no pasan a la vez y no se cobra en una caja que se cierra
-    const { cobro, pedidoActualizado, pedidoCodigo, pagoMetodo } = await this.prisma.$transaction(async (tx) => {
+    const { cobro, pedidoActualizado, pedidoCodigo, pagoMetodo, sinVoucherAutorizado } = await this.prisma.$transaction(async (tx) => {
       const caja = cajaId ? await bloquearCaja(tx, cajaId) : null;
 
       if (!caja) {
@@ -286,43 +319,63 @@ export class CobrosService {
         }
       }
 
-      // Exigencia para el mozo en el cobro digital (vch-api)
-      const esMozo = (usuario?.rol || '').toUpperCase() === 'MOZO';
+      // Comprobante del pago digital (Yape, Plin, transferencia): toda cobranza lo lleva enlazado al pedido.
+      // La IA solo informa (semáforo): nunca bloquea. Sin foto, Caja/Admin solo sigue con motivo y código de supervisor.
+      let sinVoucherAutorizado: { motivo: string; supervisorPartyId: string } | null = null;
+
+      if (dto.voucherId !== undefined && dto.voucherId !== null && dto.voucherId !== '') {
+        await this.vincularVoucherAPedido(tx, dto.voucherId, pedido.id);
+      }
+
       const tieneMedioDigital = dto.pagos.some((p) =>
-        ['YAPE', 'PLIN'].includes(p.medio.toUpperCase()),
+        MEDIOS_CON_COMPROBANTE.includes(p.medio.toUpperCase()),
       );
 
-      if (esMozo && tieneMedioDigital) {
-        const paramMozoObligatorio = await tx.parametro.findUnique({
-          where: { clave: 'voucher_mozo_obligatorio' },
+      if (tieneMedioDigital) {
+        const hayVoucher = await tx.voucherPago.findFirst({
+          where: { pedido_id: pedido.id },
+          select: { id: true },
         });
-        const obligatorio =
-          paramMozoObligatorio?.valor !== false &&
-          String(paramMozoObligatorio?.valor).toLowerCase().trim() !== 'false';
 
-        if (obligatorio) {
-          const voucher = await tx.voucherPago.findFirst({
-            where: { pedido_id: pedido.id },
-            orderBy: { creado_en: 'desc' },
-          });
+        if (!hayVoucher) {
+          const esMozo = (usuario?.rol || '').toUpperCase() === 'MOZO';
 
-          if (!voucher) {
+          if (esMozo) {
+            // Mozo: obligatoria según voucher_mozo_obligatorio, sin excepción propia (debe avisar a Caja)
+            const paramMozo = await tx.parametro.findUnique({
+              where: { clave: 'voucher_mozo_obligatorio' },
+            });
+            const obligatorio =
+              paramMozo?.valor !== false &&
+              String(paramMozo?.valor).toLowerCase().trim() !== 'false';
+            if (obligatorio) {
+              throw new HttpException(
+                {
+                  codigo: 'VOUCHER_REQUERIDO',
+                  mensaje:
+                    'Es obligatorio subir la foto del voucher para cobrar con Yape o Plin en mesa.',
+                },
+                HttpStatus.BAD_REQUEST,
+              );
+            }
+          } else if (dto.sinVoucher) {
+            const sup: any = await this.verificarPinSupervisor(
+              dto.sinVoucher.pinSupervisor,
+              usuario?.partyId,
+              ip,
+              undefined,
+              'caja/cobrar_sin_voucher',
+            );
+            sinVoucherAutorizado = {
+              motivo: dto.sinVoucher.motivo.trim(),
+              supervisorPartyId: String(sup?.supervisorPartyId ?? sup?.party_id ?? ''),
+            };
+          } else {
             throw new HttpException(
               {
                 codigo: 'VOUCHER_REQUERIDO',
                 mensaje:
-                  'Es obligatorio subir la foto del voucher para cobrar con Yape o Plin en mesa.',
-              },
-              HttpStatus.BAD_REQUEST,
-            );
-          }
-
-          const extraido = (voucher.extraido as any) || {};
-          if (voucher.semaforo === 'ILEGIBLE' || extraido.legible === false) {
-            throw new HttpException(
-              {
-                codigo: 'VOUCHER_NO_LEGIBLE',
-                mensaje: 'Este voucher no se lee bien. Vuelve a tomar la foto, por favor.',
+                  'Falta la foto del comprobante del pago digital. Súbela, o registra el cobro sin voucher con motivo y código del supervisor.',
               },
               HttpStatus.BAD_REQUEST,
             );
@@ -369,7 +422,13 @@ export class CobrosService {
         },
       });
 
-      return { cobro: nuevoCobro, pedidoActualizado: pedAct, pedidoCodigo: pedido.codigo, pagoMetodo };
+      return {
+        cobro: nuevoCobro,
+        pedidoActualizado: pedAct,
+        pedidoCodigo: pedido.codigo,
+        pagoMetodo,
+        sinVoucherAutorizado,
+      };
     });
 
     // el cobro genera la nota de venta con su correlativo (RQ-LEG-01-01); es idempotente y también se
@@ -406,11 +465,18 @@ export class CobrosService {
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
       modulo: 'caja',
-      accion: enCierre ? 'COBRAR_EN_CIERRE' : 'COBRAR',
+      accion: sinVoucherAutorizado
+        ? 'COBRAR_SIN_VOUCHER'
+        : enCierre
+          ? 'COBRAR_EN_CIERRE'
+          : 'COBRAR',
       resultado: 'OK',
       entidad: 'cobro',
       entidadId: cobro.id,
       partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
+      ...(sinVoucherAutorizado
+        ? { conPinAdmin: true, motivo: sinVoucherAutorizado.motivo }
+        : {}),
       despues: {
         cobro_id: cobro.id.toString(),
         pedido_id: cobro.pedido_id.toString(),
@@ -418,6 +484,9 @@ export class CobrosService {
         pago_estado: 'PAGADO',
         pago_metodo: pagoMetodo,
         cobrado_durante_cierre: enCierre,
+        sin_voucher: sinVoucherAutorizado
+          ? { motivo: sinVoucherAutorizado.motivo, aprobado_por: sinVoucherAutorizado.supervisorPartyId }
+          : null,
         pagos: cobro.pagos.map((p) => ({
           medio: p.medio,
           monto: Number(p.monto),

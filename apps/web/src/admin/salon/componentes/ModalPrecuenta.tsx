@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Confirmar } from '../../../comun/Confirmar';
 import { SubirVoucherMozo } from '../../vouchers/SubirVoucherMozo';
+import { vouchersApi } from '../../vouchers/vouchersApi';
 
 export interface LineaPrecuenta {
   cantidad: number;
@@ -44,11 +45,23 @@ export function ModalPrecuenta({
   const [confirmarCobrar, setConfirmarCobrar] = useState<boolean>(false);
   const [cobrando, setCobrando] = useState<boolean>(false);
   const [cobroExitoso, setCobroExitoso] = useState<boolean>(false);
+  const [avisoEnviado, setAvisoEnviado] = useState<boolean>(false);
 
   if (!abierto) return null;
 
   const esDigital = medioSeleccionado === 'Yape' || medioSeleccionado === 'Plin';
   const puedeConfirmarCobro = !esDigital || voucherLegible;
+
+  // El mozo no cobra (el cajero cobra). Sin «alCobrar» no hay botón de cobro: no se simula un cobro.
+  const handleAvisarSinFoto = async () => {
+    if (pedidoId === undefined) return;
+    try {
+      await vouchersApi.avisarSinFoto(pedidoId);
+      setAvisoEnviado(true);
+    } catch {
+      // se puede volver a tocar el botón
+    }
+  };
 
   const handleConfirmarImpresion = async () => {
     try {
@@ -229,49 +242,78 @@ export function ModalPrecuenta({
               })}
             </div>
 
-            {/* Subida de Voucher obligatorio para Yape o Plin */}
-            {esDigital && (
+            {/* Foto del voucher para Yape o Plin: queda enlazada al pedido como prueba para Caja */}
+            {esDigital && pedidoId !== undefined && (
               <SubirVoucherMozo
-                pedidoId={pedidoId || mesa}
+                pedidoId={pedidoId}
                 medio={medioSeleccionado.toUpperCase() as 'YAPE' | 'PLIN'}
                 alVoucherValido={(info) => {
-                  setVoucherLegible(info.legible);
-                  if (info.legible) {
-                    setVoucherId(info.id);
-                  } else {
-                    setVoucherId(undefined);
-                  }
+                  setVoucherLegible(true);
+                  setVoucherId(info.id);
                 }}
               />
             )}
 
-            {/* Botón para confirmar cobro */}
-            <button
-              type="button"
-              disabled={!puedeConfirmarCobro || cobrando || cobroExitoso}
-              onClick={() => setConfirmarCobrar(true)}
-              data-testid="btn-confirmar-cobro-mozo"
-              style={{
-                marginTop: '10px',
-                width: '100%',
-                minHeight: '44px',
-                border: 0,
-                borderRadius: '10px',
-                background: puedeConfirmarCobro && !cobroExitoso
-                  ? 'var(--cp-green, #2F7A45)'
-                  : '#B0BEC5',
-                color: '#FFFFFF',
-                fontFamily: 'Montserrat, sans-serif',
-                fontWeight: 800,
-                cursor: puedeConfirmarCobro && !cobroExitoso ? 'pointer' : 'not-allowed',
-              }}
-            >
-              {cobroExitoso
-                ? 'Cobro registrado'
-                : esDigital && !voucherLegible
-                ? 'Sube el voucher para cobrar'
-                : `Confirmar cobro (${medioSeleccionado})`}
-            </button>
+            {/* Cobro digital: la foto va con el pedido y Caja registra el cobro */}
+            {esDigital && (
+              <div
+                data-testid="aviso-cobro-digital-caja"
+                style={{ fontSize: '12px', lineHeight: '16px', color: '#2C4C5D' }}
+              >
+                El cobro digital lo registra Caja con la foto del voucher.
+                {!voucherLegible && pedidoId !== undefined && (
+                  <button
+                    type="button"
+                    onClick={handleAvisarSinFoto}
+                    disabled={avisoEnviado}
+                    data-testid="btn-avisar-caja-sin-foto"
+                    style={{
+                      marginTop: '6px',
+                      width: '100%',
+                      minHeight: '40px',
+                      border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                      borderRadius: '10px',
+                      background: 'transparent',
+                      color: 'var(--cp-navy, #0B2C3E)',
+                      fontWeight: 700,
+                      cursor: avisoEnviado ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {avisoEnviado ? 'Caja avisada: no hay foto todavía' : 'No hay foto: avisar a Caja'}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Botón de cobro: solo si el padre entrega «alCobrar» (hoy ninguna vista lo hace; el cajero cobra) */}
+            {alCobrar && (
+              <button
+                type="button"
+                disabled={!puedeConfirmarCobro || cobrando || cobroExitoso}
+                onClick={() => setConfirmarCobrar(true)}
+                data-testid="btn-confirmar-cobro-mozo"
+                style={{
+                  marginTop: '10px',
+                  width: '100%',
+                  minHeight: '44px',
+                  border: 0,
+                  borderRadius: '10px',
+                  background: puedeConfirmarCobro && !cobroExitoso
+                    ? 'var(--cp-green, #2F7A45)'
+                    : '#B0BEC5',
+                  color: '#FFFFFF',
+                  fontFamily: 'Montserrat, sans-serif',
+                  fontWeight: 800,
+                  cursor: puedeConfirmarCobro && !cobroExitoso ? 'pointer' : 'not-allowed',
+                }}
+              >
+                {cobroExitoso
+                  ? 'Cobro registrado'
+                  : esDigital && !voucherLegible
+                  ? 'Sube el voucher para cobrar'
+                  : `Confirmar cobro (${medioSeleccionado})`}
+              </button>
+            )}
           </div>
 
           <button

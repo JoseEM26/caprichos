@@ -73,6 +73,18 @@ export class VouchersController {
   }
 
   /**
+   * POST /admin/vouchers/aviso-sin-foto
+   * El mozo avisa a Caja que el pago digital del pedido no tiene foto todavía.
+   * Permiso: vouchers/subir (MOZO, CAJERO, ADMIN)
+   */
+  @Post('aviso-sin-foto')
+  @Permiso('vouchers', 'subir')
+  async avisarSinFoto(@Body('pedidoId') pedidoIdRaw: any, @Req() req: any) {
+    const pedidoId = pedidoIdRaw ? String(pedidoIdRaw).trim() : '';
+    return this.vouchersService.avisarFaltaVoucher(pedidoId, req.usuario, extraerIp(req));
+  }
+
+  /**
    * GET /admin/vouchers?pedidoId= | ?conversacionId= | ?fecha=YYYY-MM-DD&estado=pendientes|todos
    * Permiso: vouchers/ver (CAJERO, ADMIN)
    */

@@ -304,7 +304,7 @@ describe('VouchersService', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             tipo: 'VOUCHER_ILEGIBLE',
-            rol_destino: 'CAJA',
+            rol_destino: 'CAJERO',
             enlace: '/admin/mensajes',
           }),
         }),
@@ -368,6 +368,119 @@ describe('VouchersService', () => {
       expect(res.vouchers.length).toBe(1);
       expect(res.vouchers[0].id).toBe('1');
       expect(res.faltanRevisar).toBe(1);
+    });
+  });
+
+  describe('Todo voucher queda guardado (origen, sin pedido, IA sin lectura)', () => {
+    const fakeFile: Express.Multer.File = {
+      buffer: Buffer.from('foto-del-pago'),
+      size: 100,
+      mimetype: 'image/jpeg',
+      originalname: 'pago.jpg',
+      fieldname: 'archivo',
+      encoding: '7bit',
+      stream: null as any,
+      destination: '',
+      filename: '',
+      path: '',
+    };
+
+    it('WhatsApp sin pedido asociado (p. ej. BSUID sin teléfono): guarda la fila con pedido_id null y la analiza', async () => {
+      await service.registrarDesdeWhatsapp(
+        Buffer.from('bytes'),
+        'image/jpeg',
+        11n,
+        null,
+        { id: 300n, telefono: 'wa-user:abc' },
+      );
+
+      expect(vouchersIaMock.analizarVoucher).toHaveBeenCalled();
+      expect(prismaMock.voucherPago.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            pedido_id: null,
+            conversacion_id: 300n,
+            archivo_id: 11n,
+            origen: 'WHATSAPP',
+            semaforo: expect.any(String),
+          }),
+        }),
+      );
+    });
+
+    it('la IA no pudo leer (SIN_LECTURA) igual deja la fila guardada', async () => {
+      vouchersIaMock.analizarVoucher.mockResolvedValueOnce({ sinLectura: true, extraido: null, motivo: 'timeout' });
+
+      await service.registrarDesdeWhatsapp(Buffer.from('bytes'), 'image/jpeg', 12n, null, { id: 301n });
+
+      expect(prismaMock.voucherPago.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ semaforo: 'SIN_LECTURA', archivo_id: 12n, extraido: null }),
+        }),
+      );
+    });
+
+    it('chat que atiende una persona: el análisis corre igual', async () => {
+      await service.registrarDesdeWhatsapp(
+        Buffer.from('bytes'),
+        'image/jpeg',
+        13n,
+        { id: 50n, codigo: 'PED-50', total: 35.0, pago_preferido: 'YAPE' },
+        { id: 302n, telefono: '51987654321', duenio: 'PERSONA', tomado_por: 7n },
+      );
+
+      expect(vouchersIaMock.analizarVoucher).toHaveBeenCalled();
+      expect(prismaMock.voucherPago.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ pedido_id: 50n, conversacion_id: 302n }) }),
+      );
+    });
+
+    it('subida con pedidoId inexistente -> 404 PEDIDO_NO_ENCONTRADO y no guarda voucher huérfano', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValueOnce(null);
+
+      await expect(
+        service.subirYProcesar(fakeFile, { pedidoId: '999' }, cajeroUsuario, '10.0.0.1'),
+      ).rejects.toMatchObject({ response: { codigo: 'PEDIDO_NO_ENCONTRADO' } });
+      expect(prismaMock.voucherPago.create).not.toHaveBeenCalled();
+    });
+
+    it('carta (sin sesión): guarda con origen CARTA, sin subido_por, y responde solo { id, legible }', async () => {
+      const res: any = await service.subirYProcesar(fakeFile, { pedidoId: '50', origen: 'CARTA' }, null, '8.8.8.8');
+
+      expect(archivosMock.subirArchivo).toHaveBeenCalledWith(fakeFile, true, undefined, '8.8.8.8');
+      expect(prismaMock.voucherPago.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ origen: 'CARTA', pedido_id: 50n, subido_por: null }),
+        }),
+      );
+      expect(res).toEqual({ id: '1', legible: true });
+      expect(res.semaforo).toBeUndefined();
+    });
+
+    it('sobre el límite de lecturas la IA responde SIN_LECTURA y el voucher se guarda igual', async () => {
+      vouchersIaMock.analizarVoucher.mockResolvedValueOnce({
+        sinLectura: true,
+        extraido: null,
+        motivo: 'Límite de lecturas de vouchers por minuto excedido',
+      });
+
+      const res: any = await service.subirYProcesar(fakeFile, { pedidoId: '50' }, cajeroUsuario, '10.0.0.1');
+
+      expect(prismaMock.voucherPago.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ semaforo: 'SIN_LECTURA' }) }),
+      );
+      expect(res.semaforo).toBe('SIN_LECTURA');
+    });
+
+    it('el mozo avisa a Caja que falta la foto: notificación para CAJA y auditoría', async () => {
+      await service.avisarFaltaVoucher('50', mozoUsuario, '10.0.0.2');
+
+      expect(prismaMock.notificacion.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ tipo: 'VOUCHER_PENDIENTE_MOZO', rol_destino: 'CAJERO' }),
+      });
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({ accion: 'AVISO_SIN_FOTO', entidadId: 50n }),
+      );
     });
   });
 });

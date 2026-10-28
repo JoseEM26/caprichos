@@ -1,0 +1,107 @@
+import { useEffect, useState } from 'react';
+import { obtenerBlobAutenticado } from '../../comun/api';
+import { vouchersApi } from '../vouchers/vouchersApi';
+import { TarjetaLecturaVoucher } from '../vouchers/TarjetaLecturaVoucher';
+import type { VoucherPagoItem } from '../vouchers/tipos';
+
+export interface SeccionVouchersPedidoProps {
+  pedidoId: string | number;
+  /** Cambia cuando el pedido cambia (p. ej. tras cobrar) para volver a leer las fotos. */
+  recargarClave?: string | number | null;
+  total?: number | string | null;
+  medio?: string | null;
+}
+
+/**
+ * Fotos de comprobante enlazadas a un pedido (cualquier origen: mozo, caja, WhatsApp, carta).
+ * El servidor exige vouchers/ver (CAJERO, ADMIN): sin permiso responde 403 y la sección no se muestra.
+ */
+export function SeccionVouchersPedido({ pedidoId, recargarClave, total, medio }: SeccionVouchersPedidoProps) {
+  const [vouchers, setVouchers] = useState<VoucherPagoItem[]>([]);
+
+  useEffect(() => {
+    let activo = true;
+    vouchersApi
+      .listarVouchers({ pedidoId, estado: 'todos' })
+      .then((items) => {
+        if (activo) setVouchers(Array.isArray(items) ? items : []);
+      })
+      .catch(() => {
+        if (activo) setVouchers([]);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [pedidoId, recargarClave]);
+
+  if (vouchers.length === 0) return null;
+
+  return (
+    <div
+      data-testid="seccion-vouchers-pedido"
+      style={{
+        border: '1.5px solid var(--cp-line, #E3D6C6)',
+        borderRadius: 12,
+        padding: 12,
+        background: 'var(--cp-white, #FFFFFF)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+      }}
+    >
+      <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--cp-navy, #0B2C3E)' }}>
+        Comprobantes del pedido ({vouchers.length})
+      </div>
+      {vouchers.map((v) => (
+        <div key={String(v.id)} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <FotoComprobante archivoId={v.archivoId} />
+          <TarjetaLecturaVoucher
+            voucher={{
+              id: v.id,
+              semaforo: v.semaforo,
+              motivos: v.motivos,
+              extraido: v.extraido,
+              medio: v.medio ?? medio ?? null,
+            }}
+            pedido={{ total: total ?? null, medio: medio ?? null }}
+            puedeVer
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function FotoComprobante({ archivoId }: { archivoId: string | number }) {
+  const [url, setUrl] = useState<string>('');
+
+  useEffect(() => {
+    let activo = true;
+    obtenerBlobAutenticado(`/admin/archivos/${archivoId}`)
+      .then((blobUrl) => {
+        if (activo && blobUrl) setUrl(blobUrl);
+      })
+      .catch(() => undefined);
+    return () => {
+      activo = false;
+    };
+  }, [archivoId]);
+
+  if (!url) return null;
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" aria-label="Ver foto del comprobante">
+      <img
+        src={url}
+        alt="Foto del comprobante"
+        style={{
+          width: '100%',
+          maxHeight: 220,
+          objectFit: 'contain',
+          borderRadius: 8,
+          border: '1px solid var(--cp-line, #E3D6C6)',
+          background: 'var(--cp-cream, #FBF4EC)',
+        }}
+      />
+    </a>
+  );
+}

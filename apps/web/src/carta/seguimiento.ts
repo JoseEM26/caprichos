@@ -40,6 +40,8 @@ export interface EstadoSeguimiento {
   terminado: boolean;
   anulado: boolean;
   pasos: PasoSeguimiento[];
+  /** Yape, Plin o transferencia: la pantalla pide la captura del pago. */
+  pagoDigital?: boolean;
 }
 
 export type ResultadoLote = EstadoSeguimiento | { codigo: string; noEncontrado: true };

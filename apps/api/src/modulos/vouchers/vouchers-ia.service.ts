@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
@@ -119,16 +119,14 @@ export class VouchersIaService {
       };
     }
 
-    // 3. Rate limit anti-abuso
+    // 3. Rate limit anti-abuso: no lanza. El voucher se guarda igual (SIN_LECTURA) y el equipo lo revisa.
     const rateOk = await this.verificarRateLimit(opciones?.identificadorRateLimit);
     if (!rateOk) {
-      throw new HttpException(
-        {
-          codigo: 'RATE_LIMIT_VOUCHERS',
-          mensaje: 'Límite de lecturas de vouchers por minuto excedido (máximo 10 por minuto).',
-        },
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
+      return {
+        sinLectura: true,
+        extraido: null,
+        motivo: 'Límite de lecturas de vouchers por minuto excedido (máximo 10 por minuto)',
+      };
     }
 
     // 4. Validar tamaño máximo 5 MB

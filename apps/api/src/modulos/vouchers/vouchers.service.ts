@@ -25,7 +25,7 @@ import {
 export interface SubirVoucherOpciones {
   pedidoId?: string | number | bigint;
   medio?: 'YAPE' | 'PLIN';
-  origen?: 'MOZO' | 'WHATSAPP' | 'CAJA';
+  origen?: 'MOZO' | 'WHATSAPP' | 'CAJA' | 'CARTA';
 }
 
 @Injectable()
@@ -86,7 +86,7 @@ export class VouchersService {
   async subirYProcesar(
     file: Express.Multer.File | undefined,
     opciones: SubirVoucherOpciones,
-    usuario: UsuarioAutenticado,
+    usuario: UsuarioAutenticado | null,
     ip?: string,
   ) {
     if (!file || !file.buffer) {
@@ -97,13 +97,13 @@ export class VouchersService {
     }
 
     // 1. Guardar archivo en almacenamiento privado
-    const archivoSubido = await this.archivosService.subirArchivo(file, true, usuario, ip);
+    const archivoSubido = await this.archivosService.subirArchivo(file, true, usuario ?? undefined, ip);
     const archivoId = BigInt(archivoSubido.id);
 
     // 2. Calcular SHA256 del contenido de la imagen
     const hashImagen = crypto.createHash('sha256').update(file.buffer).digest('hex');
 
-    // 3. Obtener pedido si aplica
+    // 3. Obtener pedido si aplica (un pedido inexistente no deja un voucher huérfano)
     let pedido: any = null;
     let pedidoIdBigInt: bigint | null = null;
     if (opciones.pedidoId) {
@@ -112,18 +112,24 @@ export class VouchersService {
         where: { id: pedidoIdBigInt },
         select: { id: true, codigo: true, total: true, pago_preferido: true, pago_metodo: true },
       });
+      if (!pedido) {
+        throw new HttpException(
+          { codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'El pedido no existe' },
+          HttpStatus.NOT_FOUND,
+        );
+      }
     }
 
     // 4. Parámetros de validación y fecha de Lima
     const config = await this.obtenerParametrosConfiguracion();
     const { fechaIso } = obtenerFechaHoraLima();
 
-    // 5. Análisis con IA de Visión (reutilizando client / token / config)
+    // 5. Análisis con IA de Visión (reutilizando client / token / config). Sin usuario (carta) se limita por IP.
     const analisisIa = await this.vouchersIaService.analizarVoucher(
       file.buffer,
       file.mimetype,
       {
-        identificadorRateLimit: usuario.partyId.toString(),
+        identificadorRateLimit: usuario?.partyId?.toString() ?? ip ?? null,
       },
     );
 
@@ -169,16 +175,16 @@ export class VouchersService {
 
     const evaluacion: ResultadoSemaforo = calcularSemaforo(extraido, contexto);
 
-    const origen = opciones.origen || (usuario.rol === 'MOZO' ? 'MOZO' : 'CAJA');
+    const origen = opciones.origen || (usuario?.rol === 'MOZO' ? 'MOZO' : usuario ? 'CAJA' : 'CARTA');
 
-    // 8. Guardar registro en la tabla voucher_pago
+    // 8. Guardar registro en la tabla voucher_pago (siempre, sea cual sea la lectura de la IA)
     const voucher = await this.prisma.voucherPago.create({
       data: {
         pedido_id: pedidoIdBigInt,
         archivo_id: archivoId,
         origen,
         medio: opciones.medio || extraido?.medioDetectado || null,
-        subido_por: usuario.partyId,
+        subido_por: usuario?.partyId ?? null,
         hash_imagen: hashImagen,
         operacion: extraido?.operacion ? extraido.operacion.trim() : null,
         extraido: extraido as any,
@@ -195,7 +201,7 @@ export class VouchersService {
       resultado: 'OK',
       entidad: 'voucher_pago',
       entidadId: voucher.id,
-      partyId: usuario.partyId,
+      partyId: usuario?.partyId,
       ip,
       despues: {
         pedidoId: pedidoIdBigInt ? pedidoIdBigInt.toString() : null,
@@ -206,8 +212,8 @@ export class VouchersService {
     });
 
     // 10. Respuesta según el rol:
-    // Al mozo SOLO se le entrega legible y mensaje, NUNCA el semáforo ni los datos extraídos
-    if (usuario.rol === 'MOZO') {
+    // Al mozo y al cliente de la carta SOLO se entrega legible y mensaje, NUNCA el semáforo ni los datos extraídos
+    if (!usuario || usuario.rol === 'MOZO') {
       const legible = extraido ? extraido.legible : voucher.semaforo !== 'ILEGIBLE';
       return {
         id: voucher.id.toString(),
@@ -327,7 +333,7 @@ export class VouchersService {
         const notif = await this.prisma.notificacion.create({
           data: {
             tipo: 'VOUCHER_ILEGIBLE',
-            rol_destino: 'CAJA',
+            rol_destino: 'CAJERO',
             titulo: 'Voucher no legible recibido',
             mensaje: `El voucher enviado para el pedido ${pedido?.codigo || ''} no se lee bien. Pide al cliente que envíe otra foto.`,
             enlace: '/admin/mensajes',
@@ -440,6 +446,42 @@ export class VouchersService {
       faltanRevisar,
       total: items.length,
     };
+  }
+
+  /**
+   * El mozo no tiene la foto de un pago digital: avisa a Caja (no tiene excepción propia para cobrar sin foto).
+   */
+  async avisarFaltaVoucher(pedidoId: string, usuario: UsuarioAutenticado, ip?: string) {
+    const id = this.parsearId(pedidoId);
+    const pedido = await this.prisma.pedido.findUnique({ where: { id }, select: { id: true, codigo: true } });
+    if (!pedido) {
+      throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'El pedido no existe' });
+    }
+
+    const notif = await this.prisma.notificacion.create({
+      data: {
+        tipo: 'VOUCHER_PENDIENTE_MOZO',
+        rol_destino: 'CAJERO',
+        titulo: 'Pago digital sin foto del voucher',
+        mensaje: `El mozo avisa que el pedido ${pedido.codigo} se paga digital y aún no tiene la foto del voucher. Pide la foto antes de cobrar.`,
+        enlace: '/admin/caja',
+      },
+    });
+    this.eventos?.emitirAdmin('notificaciones:nueva', { id: notif.id.toString(), titulo: notif.titulo });
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'vouchers',
+      accion: 'AVISO_SIN_FOTO',
+      resultado: 'OK',
+      entidad: 'pedido',
+      entidadId: pedido.id,
+      partyId: usuario.partyId,
+      ip,
+      despues: { pedidoId: pedido.id.toString() },
+    });
+
+    return { ok: true };
   }
 
   /**
