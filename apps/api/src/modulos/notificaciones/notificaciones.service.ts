@@ -32,6 +32,8 @@ export const TIPOS_NOTIFICACION: Record<string, string> = {
   ERROR_IMPRESORA: 'Error de impresora',
   COMPROBANTE_PENDIENTE: 'Comprobante pendiente',
   MENSAJE_INTERNO: 'Mensaje interno',
+  PAGO_EFECTIVO_MOZO: 'Pago en efectivo del mozo',
+  VOUCHER_PENDIENTE_MOZO: 'Voucher del mozo por revisar',
 };
 
 export const COLORES_NOTIFICACION: Record<string, string> = {
@@ -41,11 +43,15 @@ export const COLORES_NOTIFICACION: Record<string, string> = {
   'Error de impresora': '#B5442E',
   'Comprobante pendiente': '#0B2C3E',
   'Mensaje interno': '#6B7F8C',
+  'Pago en efectivo del mozo': '#0B2C3E',
+  'Voucher del mozo por revisar': '#0B2C3E',
 };
 
 export const ACCIONES_NOTIFICACION: Record<string, [string, string]> = {
   'Pedido por confirmar': ['caja', 'Ir a Caja'],
   'Delivery por confirmar': ['repartos', 'Ir a Repartos'],
+  'Pago en efectivo del mozo': ['caja', 'Ir a Caja'],
+  'Voucher del mozo por revisar': ['caja', 'Ir a Caja'],
   'Stock bajo': ['stock', 'Ver stock'],
   'Error de impresora': ['mirest', 'Ver configuración'],
   'Comprobante pendiente': ['caja', 'Ir a Caja'],

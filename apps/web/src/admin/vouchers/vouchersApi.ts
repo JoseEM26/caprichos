@@ -86,6 +86,17 @@ export const vouchersApi = {
   },
 
   /**
+   * El mozo envía a Caja el cobro de la mesa (POST /admin/vouchers/enviar-a-caja).
+   * No cobra: Caja revisa el voucher y cobra. La respuesta es solo { ok }.
+   */
+  async enviarACaja(
+    pedidoId: string | number,
+    medio: 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TRANSFERENCIA',
+  ): Promise<{ ok: boolean }> {
+    return api.post<{ ok: boolean }>('/admin/vouchers/enviar-a-caja', { pedidoId: String(pedidoId), medio });
+  },
+
+  /**
    * Marca un voucher como revisado (POST /admin/vouchers/:id/revisado).
    * Requiere permiso vouchers/ver (CAJERO, ADMIN).
    */

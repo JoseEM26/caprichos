@@ -6,6 +6,16 @@ Todos los cambios notables del proyecto Caprichos se documentan en este archivo.
 
 ## 2026-10-28
 
+### El mozo envía el cobro de mesa a Caja (no lo cobra)
+- **Flujo**: el mozo elige el medio en la mesa (Efectivo, Yape, Plin o Transferencia), toma la foto del voucher (se lee al instante) y pulsa Enviar a Caja con Sí/No. Caja revisa el voucher con su semáforo y es quien cobra y confirma. El mozo no marca el pedido como pagado.
+- **Mozo**: en el plano, al tocar una mesa ocupada con pedido aparece "Cobrar mesa (enviar a Caja)" (`PlanoView`), que abre la cuenta de la mesa (`ModalPrecuenta`). Se quitó la tarjeta muerta de precuenta que tenía `PlanoView` (nadie la abría). Solo ve si la foto se lee o no, sin montos ni semáforo. Se quitó del flujo del mozo "Cobrar sin comprobante" y el botón de cobro. El soporte de la excepción en el servidor (`cobros.service.ts`) se mantiene.
+- **Servidor**: `POST /admin/vouchers/enviar-a-caja` (permiso `vouchers/subir`, ya lo tiene el mozo). Crea una notificación para CAJERO: `PAGO_EFECTIVO_MOZO` en efectivo, `VOUCHER_PENDIENTE_MOZO` en digital (con voucher legible o sin foto legible). El enlace abre `/admin/caja?pedido=<id>`. Audita `ENVIADO_CAJA`. Responde solo `{ ok }`. Pedido ya pagado: 409. Medio no válido: 400.
+- **Caja**: al abrir Registrar cobro de un pedido que ya tiene foto (del mozo, del cliente o de la carta), la foto (ampliable con `FotoAmpliable`) y su semáforo aparecen solos; se cobra con esa foto sin subir otra (`voucherId`). Botón Subir otra foto para reemplazarla. La sección Comprobantes del pedido también usa la foto ampliable.
+- **Campana**: las notificaciones de Caja del historial navegan a su enlace; `/admin/caja?pedido=` selecciona ese pedido en su pestaña.
+- **Pruebas**: Jest en `vouchers.service.spec.ts` (efectivo, digital legible, digital sin foto legible, pagado, medio inválido). Vitest en `ModalPrecuentaVouchers.spec.tsx` (reescrito: efectivo, Yape legible, Yape ilegible, No, error de API, sin pedido), `PlanoCuentaMozo.spec.tsx` (nuevo: botón de la mesa ocupada, envía con Sí/No, mesa libre sin botón) y `ModalCobrarComprobante.spec.tsx` (cobro con la foto ya subida por el mozo, y solo ilegible).
+- **Permisos**: ninguno nuevo para el mozo.
+- **Manuales**: `plano.md` (cobrar en mesa = enviar a Caja) y `caja.md` (foto ya subida, notificación del mozo).
+
 ### Cobro sin comprobante también para el mozo (excepción con código del supervisor)
 - **Regla**: el mozo que cobra un pago digital (Yape o Plin) sin foto legible puede usar la excepción: motivo (mínimo 5 letras) y código de 6 dígitos que le dicta el supervisor presente. Misma regla `exigirComprobanteDigital` y misma auditoría `COBRAR_SIN_VOUCHER` con su usuario; un código inválido no cobra. No se le dieron permisos nuevos (ya tenía `mesas/abrir`, que habilita el cobro).
 

@@ -725,7 +725,7 @@ export function NotificacionesView() {
                             fontSize: '12px',
                             cursor: 'pointer',
                           }}
-                          onClick={() => navigate(`/admin/${it.modulo}`)}
+                          onClick={() => navigate(it.enlace && it.enlace.startsWith('/admin/') ? it.enlace : `/admin/${it.modulo}`)}
                         >
                           {it.accion}
                         </button>

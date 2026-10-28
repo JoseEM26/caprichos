@@ -903,27 +903,9 @@
       "modulo": "plano"
     },
     {
-      "id": "plano#cobrar-en-mesa-con-voucher-de-yape-o-plin-mozos",
+      "id": "plano#enviar-a-caja-el-cobro-de-una-mesa-mozos",
       "tipo": "tarea",
-      "etiqueta": "cobrar en mesa con voucher de Yape o Plin (Mozos)",
-      "modulo": "plano"
-    },
-    {
-      "id": "plano#agregar-mover-y-girar-elementos-en-el-plano-administrador",
-      "tipo": "tarea",
-      "etiqueta": "agregar, mover y girar elementos en el plano (Administrador)",
-      "modulo": "plano"
-    },
-    {
-      "id": "plano#cambiar-de-piso-o-activar-y-desactivar-areas",
-      "tipo": "tarea",
-      "etiqueta": "cambiar de piso o activar y desactivar áreas",
-      "modulo": "plano"
-    },
-    {
-      "id": "plano#copiar-y-aplicar-un-diseno-de-plano",
-      "tipo": "tarea",
-      "etiqueta": "copiar y aplicar un diseño de plano",
+      "etiqueta": "enviar a Caja el cobro de una mesa (Mozos)",
       "modulo": "plano"
     },
     {
@@ -4488,11 +4470,6 @@
       "destino": "cierre"
     },
     {
-      "tipo": "relacionado_con",
-      "origen": "plano",
-      "destino": "historial"
-    },
-    {
       "tipo": "pertenece_a",
       "origen": "plano#consultar-mesas-y-abrir-un-pedido-mozos-y-cajeros",
       "destino": "plano"
@@ -4524,68 +4501,28 @@
     },
     {
       "tipo": "pertenece_a",
-      "origen": "plano#cobrar-en-mesa-con-voucher-de-yape-o-plin-mozos",
+      "origen": "plano#enviar-a-caja-el-cobro-de-una-mesa-mozos",
       "destino": "plano"
     },
     {
       "tipo": "antes",
-      "origen": "plano#cobrar-en-mesa-con-voucher-de-yape-o-plin-mozos",
+      "origen": "plano#enviar-a-caja-el-cobro-de-una-mesa-mozos",
       "destino": "plano"
     },
     {
       "tipo": "despues",
-      "origen": "plano#cobrar-en-mesa-con-voucher-de-yape-o-plin-mozos",
+      "origen": "plano#enviar-a-caja-el-cobro-de-una-mesa-mozos",
       "destino": "caja"
     },
     {
       "tipo": "ver_tambien",
-      "origen": "plano#cobrar-en-mesa-con-voucher-de-yape-o-plin-mozos",
+      "origen": "plano#enviar-a-caja-el-cobro-de-una-mesa-mozos",
       "destino": "cierre"
     },
     {
       "tipo": "ver_tambien",
       "origen": "plano",
       "destino": "cierre"
-    },
-    {
-      "tipo": "pertenece_a",
-      "origen": "plano#agregar-mover-y-girar-elementos-en-el-plano-administrador",
-      "destino": "plano"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "plano#agregar-mover-y-girar-elementos-en-el-plano-administrador",
-      "destino": "plano"
-    },
-    {
-      "tipo": "pertenece_a",
-      "origen": "plano#cambiar-de-piso-o-activar-y-desactivar-areas",
-      "destino": "plano"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "plano#cambiar-de-piso-o-activar-y-desactivar-areas",
-      "destino": "reservas"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "plano",
-      "destino": "reservas"
-    },
-    {
-      "tipo": "pertenece_a",
-      "origen": "plano#copiar-y-aplicar-un-diseno-de-plano",
-      "destino": "plano"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "plano#copiar-y-aplicar-un-diseno-de-plano",
-      "destino": "historial"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "plano",
-      "destino": "historial"
     },
     {
       "tipo": "requiere_permiso",

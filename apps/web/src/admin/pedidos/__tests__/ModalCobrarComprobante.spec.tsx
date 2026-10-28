@@ -95,6 +95,59 @@ describe('ModalCobrar: comprobante del pago digital', () => {
     expect(cobrar.mock.calls[0][0]).not.toHaveProperty('sinVoucher');
   });
 
+  it('la foto que ya subió el mozo: Caja la ve y cobra con ese voucher, sin subir otra', async () => {
+    const yaSubido = {
+      id: '55',
+      pedidoId: '77',
+      archivoId: '901',
+      origen: 'MOZO',
+      medio: 'YAPE',
+      semaforo: 'CONFIABLE',
+      motivos: [],
+      extraido: lecturaIlegible.extraido,
+      creadoEn: '2026-10-28T12:00:00.000Z',
+    };
+    const listar = vi.spyOn(vouchersApi, 'listarVouchers').mockResolvedValue([yaSubido] as any);
+    const subir = vi.spyOn(vouchersApi, 'subirVoucher');
+    render(<ModalCobrar pedido={pedido} alCerrar={vi.fn()} alCobrarExitoso={vi.fn()} cobrar={cobrar} />);
+
+    await waitFor(() => {
+      expect(listar).toHaveBeenCalledWith({ pedidoId: '77', estado: 'todos' });
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Yape' }));
+
+    expect(screen.getByTestId('voucher-guardado')).toBeDefined();
+    expect(screen.getByTestId('tarjeta-lectura-voucher')).toBeDefined();
+    expect(screen.queryByTestId('seccion-subir-voucher-mozo')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Registrar cobro' })).not.toBeDisabled();
+
+    await confirmarCobro();
+    await waitFor(() => {
+      expect(cobrar).toHaveBeenCalledWith(expect.objectContaining({ pedidoId: '77', voucherId: '55' }));
+    });
+    expect(subir).not.toHaveBeenCalled();
+  });
+
+  it('solo hay una foto ilegible del mozo: no se usa como comprobante y Caja debe subir otra', async () => {
+    vi.spyOn(vouchersApi, 'listarVouchers').mockResolvedValue([
+      {
+        id: '56',
+        archivoId: '902',
+        medio: 'YAPE',
+        semaforo: 'ILEGIBLE',
+        motivos: [],
+        extraido: lecturaIlegible.extraido,
+        creadoEn: '2026-10-28T12:00:00.000Z',
+      },
+    ] as any);
+    render(<ModalCobrar pedido={pedido} alCerrar={vi.fn()} alCobrarExitoso={vi.fn()} cobrar={cobrar} />);
+    await waitFor(() => expect(vouchersApi.listarVouchers).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole('button', { name: 'Yape' }));
+
+    expect(screen.queryByTestId('voucher-guardado')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Registrar cobro' })).toBeDisabled();
+  });
+
   it('con foto ILEGIBLE: no cuenta como comprobante, pide otra foto o la excepción y no deja cobrar', async () => {
     vi.spyOn(vouchersApi, 'subirVoucher').mockResolvedValue(lecturaIlegible as any);
     abrirYape();

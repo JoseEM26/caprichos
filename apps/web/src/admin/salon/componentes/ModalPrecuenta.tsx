@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Confirmar } from '../../../comun/Confirmar';
-import { CampoCodigoSupervisor } from '../../../comun/CampoCodigoSupervisor';
 import { SubirVoucherMozo } from '../../vouchers/SubirVoucherMozo';
 import { vouchersApi } from '../../vouchers/vouchersApi';
 
@@ -18,16 +17,18 @@ export interface ModalPrecuentaProps {
   total: number;
   copias?: number;
   alImprimir?: () => Promise<void> | void;
+  /** Con pedido, el mozo puede enviar el cobro a Caja (no lo cobra él). */
   pedidoId?: string | number;
-  alCobrar?: (
-    medio: string,
-    voucherId?: string | number,
-    sinVoucher?: { motivo: string; pinSupervisor: string },
-  ) => Promise<void> | void;
 }
 
-const MEDIOS_COBRO_SALON = ['Efectivo', 'Yape', 'Plin', 'Tarjeta'] as const;
-const MOTIVO_MINIMO = 5;
+type MedioEnvio = 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TRANSFERENCIA';
+
+const MEDIOS_ENVIO: ReadonlyArray<{ id: MedioEnvio; nombre: string }> = [
+  { id: 'EFECTIVO', nombre: 'Efectivo' },
+  { id: 'YAPE', nombre: 'Yape' },
+  { id: 'PLIN', nombre: 'Plin' },
+  { id: 'TRANSFERENCIA', nombre: 'Transferencia' },
+];
 
 export function ModalPrecuenta({
   abierto,
@@ -38,43 +39,23 @@ export function ModalPrecuenta({
   copias = 0,
   alImprimir,
   pedidoId,
-  alCobrar,
 }: ModalPrecuentaProps) {
   const [confirmarImprimir, setConfirmarImprimir] = useState(false);
   const [imprimiendo, setImprimiendo] = useState(false);
   const [copiasLocales, setCopiasLocales] = useState(copias);
 
-  // Cobro del mozo en mesa
-  const [medioSeleccionado, setMedioSeleccionado] = useState<string>('Efectivo');
-  const [voucherId, setVoucherId] = useState<string | number | undefined>(undefined);
+  // Envío del cobro a Caja: el mozo elige el medio y, si es digital, toma la foto del voucher
+  const [medio, setMedio] = useState<MedioEnvio>('EFECTIVO');
   const [voucherLegible, setVoucherLegible] = useState<boolean>(false);
-  const [confirmarCobrar, setConfirmarCobrar] = useState<boolean>(false);
-  const [cobrando, setCobrando] = useState<boolean>(false);
-  const [cobroExitoso, setCobroExitoso] = useState<boolean>(false);
-  const [avisoEnviado, setAvisoEnviado] = useState<boolean>(false);
-  // Cobro digital sin foto legible: motivo escrito + código del supervisor (lo dicta, el mozo no lo genera)
-  const [sinVoucher, setSinVoucher] = useState<boolean>(false);
-  const [motivoSinVoucher, setMotivoSinVoucher] = useState<string>('');
-  const [pinSupervisor, setPinSupervisor] = useState<string>('');
+  const [confirmarEnvio, setConfirmarEnvio] = useState<boolean>(false);
+  const [enviando, setEnviando] = useState<boolean>(false);
+  const [enviado, setEnviado] = useState<boolean>(false);
+  const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
 
   if (!abierto) return null;
 
-  const esDigital = medioSeleccionado === 'Yape' || medioSeleccionado === 'Plin';
-  const excepcionLista =
-    sinVoucher && motivoSinVoucher.trim().length >= MOTIVO_MINIMO && pinSupervisor.length === 6;
-  const conExcepcion = esDigital && !voucherLegible && sinVoucher;
-  const puedeConfirmarCobro = !esDigital || voucherLegible || excepcionLista;
-
-  // El mozo no cobra (el cajero cobra). Sin «alCobrar» no hay botón de cobro: no se simula un cobro.
-  const handleAvisarSinFoto = async () => {
-    if (pedidoId === undefined) return;
-    try {
-      await vouchersApi.avisarSinFoto(pedidoId);
-      setAvisoEnviado(true);
-    } catch {
-      // se puede volver a tocar el botón
-    }
-  };
+  const esDigital = medio !== 'EFECTIVO';
+  const nombreMedio = MEDIOS_ENVIO.find((m) => m.id === medio)?.nombre ?? medio;
 
   const handleConfirmarImpresion = async () => {
     try {
@@ -89,25 +70,27 @@ export function ModalPrecuenta({
     }
   };
 
-  const handleEjecutarCobro = async () => {
+  // El mozo no cierra el cobro: Caja revisa el voucher y es quien cobra
+  const handleEnviarCaja = async () => {
+    if (pedidoId === undefined) return;
     try {
-      setCobrando(true);
-      if (alCobrar) {
-        if (conExcepcion && excepcionLista) {
-          await alCobrar(medioSeleccionado, undefined, {
-            motivo: motivoSinVoucher.trim(),
-            pinSupervisor,
-          });
-        } else {
-          await alCobrar(medioSeleccionado, voucherId);
-        }
-      }
-      setCobroExitoso(true);
+      setEnviando(true);
+      setErrorEnvio(null);
+      await vouchersApi.enviarACaja(pedidoId, medio);
+      setEnviado(true);
+    } catch (err: any) {
+      setErrorEnvio(err?.message || 'No se pudo enviar a Caja. Intenta de nuevo.');
     } finally {
-      setCobrando(false);
-      setConfirmarCobrar(false);
+      setEnviando(false);
+      setConfirmarEnvio(false);
     }
   };
+
+  const mensajeEnvio = !esDigital
+    ? `Caja cobrará S/ ${Number(total || 0).toFixed(2)} en efectivo. Tú no cierras el cobro.`
+    : voucherLegible
+      ? `Caja revisará la foto del voucher de ${nombreMedio} y cobrará S/ ${Number(total || 0).toFixed(2)}. Tú no cierras el cobro.`
+      : `No hay foto legible de ${nombreMedio}: Caja pedirá la foto o resolverá el cobro.`;
 
   return (
     <>
@@ -209,216 +192,130 @@ export function ModalPrecuenta({
             </div>
           )}
 
-          {/* Sección de Cobro en Mesa por el Mozo */}
-          <div
-            style={{
-              borderTop: '1px dashed #111',
-              marginTop: '10px',
-              paddingTop: '10px',
-              fontFamily: 'Montserrat, sans-serif',
-            }}
-          >
+          {/* Envío del cobro a Caja: el mozo toma la foto y Caja revisa y cobra */}
+          {pedidoId !== undefined && (
             <div
+              data-testid="seccion-envio-caja-mozo"
               style={{
-                fontSize: '13px',
-                fontWeight: 800,
-                color: 'var(--cp-navy, #0B2C3E)',
-                marginBottom: '6px',
+                borderTop: '1px dashed #111',
+                marginTop: '10px',
+                paddingTop: '10px',
+                fontFamily: 'Montserrat, sans-serif',
               }}
             >
-              Medio de pago en mesa:
-            </div>
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-              {MEDIOS_COBRO_SALON.map((m) => {
-                const activo = medioSeleccionado === m;
-                return (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => {
-                      setMedioSeleccionado(m);
-                      setSinVoucher(false);
-                      setMotivoSinVoucher('');
-                      setPinSupervisor('');
-                      if (m !== 'Yape' && m !== 'Plin') {
-                        setVoucherLegible(true);
-                      } else {
-                        setVoucherLegible(false);
-                        setVoucherId(undefined);
-                      }
-                    }}
-                    style={{
-                      minHeight: '38px',
-                      padding: '0 12px',
-                      borderRadius: '9999px',
-                      border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                      background: activo ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
-                      color: activo ? 'var(--cp-cream, #FBF4EC)' : 'var(--cp-navy, #0B2C3E)',
-                      fontWeight: 700,
-                      fontSize: '12px',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {m}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Foto del voucher para Yape o Plin: queda enlazada al pedido como prueba para Caja */}
-            {esDigital && pedidoId !== undefined && (
-              <SubirVoucherMozo
-                pedidoId={pedidoId}
-                medio={medioSeleccionado.toUpperCase() as 'YAPE' | 'PLIN'}
-                ofrecerExcepcion
-                alVoucherValido={(info) => {
-                  // Un voucher ilegible no cuenta: el mozo debe subir otra foto o usar la excepción
-                  setVoucherLegible(info.legible);
-                  setVoucherId(info.legible ? info.id : undefined);
-                }}
-              />
-            )}
-
-            {/* Cobro digital: la foto va con el pedido y Caja registra el cobro */}
-            {esDigital && (
               <div
-                data-testid="aviso-cobro-digital-caja"
-                style={{ fontSize: '12px', lineHeight: '16px', color: '#2C4C5D' }}
-              >
-                El cobro digital lo registra Caja con la foto del voucher.
-                {!voucherLegible && pedidoId !== undefined && (
-                  <button
-                    type="button"
-                    onClick={handleAvisarSinFoto}
-                    disabled={avisoEnviado}
-                    data-testid="btn-avisar-caja-sin-foto"
-                    style={{
-                      marginTop: '6px',
-                      width: '100%',
-                      minHeight: '40px',
-                      border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                      borderRadius: '10px',
-                      background: 'transparent',
-                      color: 'var(--cp-navy, #0B2C3E)',
-                      fontWeight: 700,
-                      cursor: avisoEnviado ? 'not-allowed' : 'pointer',
-                    }}
-                  >
-                    {avisoEnviado ? 'Caja avisada: no hay foto todavía' : 'No hay foto: avisar a Caja'}
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* Excepción: cobro digital sin foto legible, con código que dicta el supervisor presente */}
-            {esDigital && !voucherLegible && pedidoId !== undefined && !sinVoucher && (
-              <button
-                type="button"
-                onClick={() => setSinVoucher(true)}
-                data-testid="btn-mozo-sin-comprobante"
                 style={{
-                  marginTop: '6px',
-                  width: '100%',
-                  minHeight: '40px',
-                  border: '1.5px dashed var(--cp-rust, #B2500F)',
-                  borderRadius: '10px',
-                  background: 'transparent',
-                  color: 'var(--cp-rust, #B2500F)',
-                  fontWeight: 700,
                   fontSize: '13px',
-                  cursor: 'pointer',
+                  fontWeight: 800,
+                  color: 'var(--cp-navy, #0B2C3E)',
+                  marginBottom: '6px',
                 }}
               >
-                Cobrar sin comprobante
-              </button>
-            )}
+                Medio de pago en mesa:
+              </div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {MEDIOS_ENVIO.map((m) => {
+                  const activo = medio === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      disabled={enviado}
+                      onClick={() => {
+                        setMedio(m.id);
+                        setVoucherLegible(false);
+                      }}
+                      style={{
+                        minHeight: '38px',
+                        padding: '0 12px',
+                        borderRadius: '9999px',
+                        border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                        background: activo ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
+                        color: activo ? 'var(--cp-cream, #FBF4EC)' : 'var(--cp-navy, #0B2C3E)',
+                        fontWeight: 700,
+                        fontSize: '12px',
+                        cursor: enviado ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      {m.nombre}
+                    </button>
+                  );
+                })}
+              </div>
 
-            {conExcepcion && pedidoId !== undefined && (
-              <div
-                data-testid="panel-mozo-sin-comprobante"
-                style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}
-              >
-                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-rust, #B2500F)' }}>
-                  Sin comprobante: solo con motivo escrito y el código del supervisor. Queda auditado.
+              {/* Digital: la foto se lee al instante; el mozo solo ve si se lee o no */}
+              {esDigital && (
+                <SubirVoucherMozo
+                  key={medio}
+                  pedidoId={pedidoId}
+                  medio={medio as 'YAPE' | 'PLIN' | 'TRANSFERENCIA'}
+                  bloqueado={enviado}
+                  alVoucherValido={(info) => setVoucherLegible(info.legible)}
+                />
+              )}
+
+              {!esDigital && (
+                <div data-testid="aviso-efectivo-caja" style={{ fontSize: '12px', lineHeight: '16px', color: '#2C4C5D', marginTop: '6px' }}>
+                  Efectivo: no hace falta foto. Caja cobra y da el vuelto.
                 </div>
-                <label htmlFor="motivo-mozo-sin-voucher" style={{ fontWeight: 700, fontSize: '12px' }}>
-                  Motivo (mínimo {MOTIVO_MINIMO} letras)
-                </label>
-                <textarea
-                  id="motivo-mozo-sin-voucher"
-                  data-testid="motivo-mozo-sin-voucher"
-                  rows={2}
-                  value={motivoSinVoucher}
-                  onChange={(e) => setMotivoSinVoucher(e.target.value)}
-                  style={{
-                    width: '100%',
-                    boxSizing: 'border-box',
-                    borderRadius: '10px',
-                    border: '1.5px solid var(--cp-line, #E3D6C6)',
-                    background: 'var(--cp-white, #FFFFFF)',
-                    padding: '10px',
-                    fontSize: '14px',
-                    fontFamily: 'inherit',
-                  }}
-                />
-                <CampoCodigoSupervisor
-                  id="codigo-supervisor-mozo"
-                  valor={pinSupervisor}
-                  onChange={setPinSupervisor}
-                />
+              )}
+
+              {esDigital && !voucherLegible && (
+                <div style={{ fontSize: '12px', lineHeight: '16px', color: '#2C4C5D', marginTop: '6px' }}>
+                  Si no hay foto o no se lee, Caja lo revisa y resuelve el cobro.
+                </div>
+              )}
+
+              {!enviado && (
                 <button
                   type="button"
-                  onClick={() => {
-                    setSinVoucher(false);
-                    setMotivoSinVoucher('');
-                    setPinSupervisor('');
-                  }}
+                  disabled={enviando}
+                  onClick={() => setConfirmarEnvio(true)}
+                  data-testid="btn-enviar-caja"
                   style={{
-                    minHeight: '40px',
-                    border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                    marginTop: '10px',
+                    width: '100%',
+                    minHeight: '44px',
+                    border: 0,
                     borderRadius: '10px',
-                    background: 'transparent',
-                    color: 'var(--cp-navy, #0B2C3E)',
-                    fontWeight: 700,
-                    fontSize: '13px',
-                    cursor: 'pointer',
+                    background: 'var(--cp-green, #2F7A45)',
+                    color: '#FFFFFF',
+                    fontFamily: 'Montserrat, sans-serif',
+                    fontWeight: 800,
+                    cursor: enviando ? 'not-allowed' : 'pointer',
                   }}
                 >
-                  Volver a pedir la foto
+                  Enviar a Caja
                 </button>
-              </div>
-            )}
+              )}
 
-            {/* Botón de cobro: solo si el padre entrega «alCobrar» (hoy ninguna vista lo hace; el cajero cobra) */}
-            {alCobrar && (
-              <button
-                type="button"
-                disabled={!puedeConfirmarCobro || cobrando || cobroExitoso}
-                onClick={() => setConfirmarCobrar(true)}
-                data-testid="btn-confirmar-cobro-mozo"
-                style={{
-                  marginTop: '10px',
-                  width: '100%',
-                  minHeight: '44px',
-                  border: 0,
-                  borderRadius: '10px',
-                  background: puedeConfirmarCobro && !cobroExitoso
-                    ? 'var(--cp-green, #2F7A45)'
-                    : '#B0BEC5',
-                  color: '#FFFFFF',
-                  fontFamily: 'Montserrat, sans-serif',
-                  fontWeight: 800,
-                  cursor: puedeConfirmarCobro && !cobroExitoso ? 'pointer' : 'not-allowed',
-                }}
-              >
-                {cobroExitoso
-                  ? 'Cobro registrado'
-                  : !puedeConfirmarCobro
-                  ? 'Sube el voucher para cobrar'
-                  : `Confirmar cobro (${medioSeleccionado})`}
-              </button>
-            )}
-          </div>
+              {enviado && (
+                <div
+                  role="status"
+                  data-testid="aviso-enviado-caja"
+                  style={{
+                    marginTop: '10px',
+                    padding: '10px 12px',
+                    borderRadius: '10px',
+                    background: '#E8F5E9',
+                    border: '1px solid var(--cp-green, #2F7A45)',
+                    color: 'var(--cp-green, #2F7A45)',
+                    fontFamily: 'Montserrat, sans-serif',
+                    fontWeight: 800,
+                    fontSize: '13px',
+                  }}
+                >
+                  Enviado a Caja, ellos lo revisan.
+                </div>
+              )}
+
+              {errorEnvio && (
+                <div role="alert" style={{ marginTop: '8px', color: 'var(--cp-rust, #B2500F)', fontWeight: 700, fontSize: '12px' }}>
+                  {errorEnvio}
+                </div>
+              )}
+            </div>
+          )}
 
           <button
             type="button"
@@ -469,14 +366,14 @@ export function ModalPrecuenta({
       />
 
       <Confirmar
-        abierto={confirmarCobrar}
-        titulo={`¿Confirmar cobro de ${mesa}?`}
-        mensaje={`Queda registrado el cobro de S/ ${Number(total || 0).toFixed(2)} mediante ${medioSeleccionado}${conExcepcion && excepcionLista ? ' sin comprobante (con código del supervisor)' : ''}.`}
-        textoConfirmar="Sí, registrar cobro"
+        abierto={confirmarEnvio}
+        titulo={`¿Enviar a Caja el cobro de ${mesa}?`}
+        mensaje={mensajeEnvio}
+        textoConfirmar="Sí, enviar a Caja"
         textoNo="No, cancelar"
-        cargando={cobrando}
-        alConfirmar={handleEjecutarCobro}
-        alCancelar={() => setConfirmarCobrar(false)}
+        cargando={enviando}
+        alConfirmar={handleEnviarCaja}
+        alCancelar={() => setConfirmarEnvio(false)}
       />
     </>
   );

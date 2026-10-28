@@ -1,5 +1,6 @@
 jest.mock('../../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {} }));
 
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { VouchersService } from '../vouchers.service';
 import { VouchersIaService } from '../vouchers-ia.service';
@@ -487,6 +488,66 @@ describe('VouchersService', () => {
       );
       expect(res.semaforo).toBe('SIN_LECTURA');
     });
+
+  describe('Mozo envía el cobro de mesa a Caja (no cobra)', () => {
+    it('efectivo: avisa a Caja con PAGO_EFECTIVO_MOZO, enlace al pedido, sin marcarlo pagado', async () => {
+      const res = await service.enviarACaja('50', 'efectivo', mozoUsuario, '10.0.0.3');
+
+      expect(res).toEqual({ ok: true });
+      expect(prismaMock.notificacion.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          tipo: 'PAGO_EFECTIVO_MOZO',
+          rol_destino: 'CAJERO',
+          enlace: '/admin/caja?pedido=50',
+        }),
+      });
+      expect(prismaMock.voucherPago.findFirst).not.toHaveBeenCalled();
+      expect(prismaMock.pedido.update).toBeUndefined();
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({ accion: 'ENVIADO_CAJA', entidadId: 50n }),
+      );
+    });
+
+    it('digital con foto legible: aviso VOUCHER_PENDIENTE_MOZO y la respuesta no trae semáforo', async () => {
+      prismaMock.voucherPago.findFirst.mockResolvedValue({ semaforo: 'CONFIABLE' });
+
+      const res: any = await service.enviarACaja('50', 'YAPE', mozoUsuario);
+
+      expect(prismaMock.notificacion.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          tipo: 'VOUCHER_PENDIENTE_MOZO',
+          titulo: 'Voucher listo para revisar',
+        }),
+      });
+      expect(res).toEqual({ ok: true });
+      expect(res.semaforo).toBeUndefined();
+    });
+
+    it('digital sin foto legible: aviso igual, con el texto de sin foto legible', async () => {
+      prismaMock.voucherPago.findFirst.mockResolvedValue({ semaforo: 'ILEGIBLE' });
+
+      await service.enviarACaja('50', 'PLIN', mozoUsuario);
+
+      expect(prismaMock.notificacion.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          tipo: 'VOUCHER_PENDIENTE_MOZO',
+          titulo: 'Pago digital sin foto legible',
+        }),
+      });
+    });
+
+    it('pedido ya cobrado: no avisa a Caja', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({ id: 50n, codigo: 'PED-50', pago_estado: 'PAGADO' });
+
+      await expect(service.enviarACaja('50', 'EFECTIVO', mozoUsuario)).rejects.toThrow(ConflictException);
+      expect(prismaMock.notificacion.create).not.toHaveBeenCalled();
+    });
+
+    it('medio no válido: 400 y no avisa', async () => {
+      await expect(service.enviarACaja('50', 'TARJETA', mozoUsuario)).rejects.toThrow(BadRequestException);
+      expect(prismaMock.notificacion.create).not.toHaveBeenCalled();
+    });
+  });
 
     it('el mozo avisa a Caja que falta la foto: notificación para CAJA y auditoría', async () => {
       await service.avisarFaltaVoucher('50', mozoUsuario, '10.0.0.2');

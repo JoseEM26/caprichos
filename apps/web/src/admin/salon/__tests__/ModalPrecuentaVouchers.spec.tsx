@@ -4,7 +4,7 @@ import { ModalPrecuenta } from '../componentes/ModalPrecuenta';
 import { vouchersApi } from '../../vouchers/vouchersApi';
 import * as reducirModulo from '../../vouchers/reducirImagenVoucher';
 
-describe('ModalPrecuenta - Flujo de cobro del mozo con vouchers digitales', () => {
+describe('ModalPrecuenta - el mozo envía el cobro a Caja (no lo cobra)', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -13,138 +13,115 @@ describe('ModalPrecuenta - Flujo de cobro del mozo con vouchers digitales', () =
     abierto: true,
     alCerrar: vi.fn(),
     mesa: 'Mesa 4',
-    lineas: [
-      { cantidad: 2, nombre: 'Frappé Moka', detalle: 'Grande · Chantilly' },
-    ],
+    lineas: [{ cantidad: 2, nombre: 'Frappé Moka', detalle: 'Grande · Chantilly' }],
     total: 32.0,
   };
 
-  it('permite elegir Yape o Plin y bloquea confirmar cobro hasta que el voucher sea legible', async () => {
-    vi.spyOn(reducirModulo, 'reducirImagenVoucher').mockImplementation(
-      async (archivo) => archivo,
-    );
+  const elegirYPedirConfirmacion = () => {
+    fireEvent.click(screen.getByTestId('btn-enviar-caja'));
+    fireEvent.click(screen.getByText('Sí, enviar a Caja'));
+  };
 
-    render(<ModalPrecuenta {...propsBase} pedidoId="P-20" alCobrar={vi.fn()} />);
+  it('no ofrece cobrar ni cobrar sin comprobante: solo enviar a Caja', () => {
+    render(<ModalPrecuenta {...propsBase} pedidoId="P-20" />);
 
-    // Por defecto es Efectivo y el botón está habilitado
-    const btnCobro = screen.getByTestId('btn-confirmar-cobro-mozo');
-    expect(btnCobro.textContent).toContain('Confirmar cobro (Efectivo)');
-    expect(btnCobro.hasAttribute('disabled')).toBe(false);
+    expect(screen.queryByTestId('btn-confirmar-cobro-mozo')).toBeNull();
+    expect(screen.queryByTestId('btn-mozo-sin-comprobante')).toBeNull();
+    expect(screen.getByTestId('btn-enviar-caja')).toBeDefined();
+  });
 
-    // Cambiar a Yape
-    const btnYape = screen.getByText('Yape');
-    fireEvent.click(btnYape);
+  it('efectivo: no pide foto y avisa a Caja con el medio EFECTIVO, sin marcar nada como pagado', async () => {
+    const enviar = vi.spyOn(vouchersApi, 'enviarACaja').mockResolvedValue({ ok: true });
+    render(<ModalPrecuenta {...propsBase} pedidoId="P-20" />);
 
-    // Al elegir Yape aparece la sección Foto del voucher y se deshabilita el cobro
-    expect(screen.getByText(/Foto del voucher \(YAPE\)/i)).toBeDefined();
-    expect(btnCobro.hasAttribute('disabled')).toBe(true);
-    expect(btnCobro.textContent).toContain('Sube el voucher para cobrar');
+    expect(screen.queryByTestId('seccion-subir-voucher-mozo')).toBeNull();
+    expect(screen.getByTestId('aviso-efectivo-caja')).toBeDefined();
 
-    // Subir un voucher que resulta legible
-    vi.spyOn(vouchersApi, 'subirVoucher').mockResolvedValue({
-      id: 'vch-1234',
-      legible: true,
+    fireEvent.click(screen.getByTestId('btn-enviar-caja'));
+    expect(screen.getByText('¿Enviar a Caja el cobro de Mesa 4?')).toBeDefined();
+    fireEvent.click(screen.getByText('Sí, enviar a Caja'));
+
+    await waitFor(() => {
+      expect(enviar).toHaveBeenCalledWith('P-20', 'EFECTIVO');
     });
+    expect(screen.getByTestId('aviso-enviado-caja').textContent).toContain('Enviado a Caja, ellos lo revisan.');
+    expect(screen.queryByTestId('btn-enviar-caja')).toBeNull();
+  });
+
+  it('Yape con foto legible: la sube, habilita el envío y envía con YAPE', async () => {
+    vi.spyOn(reducirModulo, 'reducirImagenVoucher').mockImplementation(async (archivo) => archivo);
+    vi.spyOn(vouchersApi, 'subirVoucher').mockResolvedValue({ id: 'vch-1', legible: true });
+    const enviar = vi.spyOn(vouchersApi, 'enviarACaja').mockResolvedValue({ ok: true });
+    render(<ModalPrecuenta {...propsBase} pedidoId="P-20" />);
+
+    fireEvent.click(screen.getByText('Yape'));
+    expect(screen.getByText(/Foto del voucher \(YAPE\)/i)).toBeDefined();
 
     const input = screen.getByTestId('input-voucher-archivo');
-    const fakeFile = new File(['voucher'], 'voucher.jpg', { type: 'image/jpeg' });
-    fireEvent.change(input, { target: { files: [fakeFile] } });
+    fireEvent.change(input, {
+      target: { files: [new File(['v'], 'voucher.jpg', { type: 'image/jpeg' })] },
+    });
 
     await waitFor(() => {
       expect(screen.getByText('Foto del voucher lista para confirmar')).toBeDefined();
     });
 
-    // Ahora el botón de confirmar cobro se habilita
-    expect(btnCobro.hasAttribute('disabled')).toBe(false);
-    expect(btnCobro.textContent).toContain('Confirmar cobro (Yape)');
-  });
-
-  it('sin alCobrar no hay botón de cobro (el cajero cobra): no simula un cobro en el servidor', () => {
-    render(<ModalPrecuenta {...propsBase} pedidoId="P-20" />);
-
-    expect(screen.queryByTestId('btn-confirmar-cobro-mozo')).toBeNull();
-    fireEvent.click(screen.getByText('Yape'));
-    expect(screen.getByTestId('aviso-cobro-digital-caja').textContent).toMatch(/lo registra Caja/i);
-  });
-
-  it('con Yape y sin foto, el mozo avisa a Caja (POST aviso-sin-foto con el pedido)', async () => {
-    const avisar = vi.spyOn(vouchersApi, 'avisarSinFoto').mockResolvedValue({ ok: true });
-    render(<ModalPrecuenta {...propsBase} pedidoId="P-20" />);
-
-    fireEvent.click(screen.getByText('Yape'));
-    fireEvent.click(screen.getByTestId('btn-avisar-caja-sin-foto'));
+    elegirYPedirConfirmacion();
 
     await waitFor(() => {
-      expect(avisar).toHaveBeenCalledWith('P-20');
+      expect(enviar).toHaveBeenCalledWith('P-20', 'YAPE');
     });
-    expect(screen.getByText(/Caja avisada/i)).toBeDefined();
+    expect(screen.getByTestId('aviso-enviado-caja')).toBeDefined();
   });
 
-  it('abre diálogo Confirmar Sí/No antes de registrar el cobro', async () => {
-    const alCobrar = vi.fn();
-    render(<ModalPrecuenta {...propsBase} alCobrar={alCobrar} />);
+  it('Yape con foto ilegible: el mozo ve que no se lee y puede tomar otra foto, sin datos ni semáforo', async () => {
+    vi.spyOn(reducirModulo, 'reducirImagenVoucher').mockImplementation(async (archivo) => archivo);
+    vi.spyOn(vouchersApi, 'subirVoucher').mockResolvedValue({
+      id: 'vch-2',
+      legible: false,
+      mensaje: 'Este voucher no se lee bien. Vuelve a tomar la foto, por favor.',
+    });
+    render(<ModalPrecuenta {...propsBase} pedidoId="P-20" />);
 
-    const btnCobro = screen.getByTestId('btn-confirmar-cobro-mozo');
-    fireEvent.click(btnCobro);
-
-    // Diálogo Confirmar Sí/No
-    expect(screen.getByText('¿Confirmar cobro de Mesa 4?')).toBeDefined();
-
-    const btnSi = screen.getByText('Sí, registrar cobro');
-    fireEvent.click(btnSi);
+    fireEvent.click(screen.getByText('Yape'));
+    fireEvent.change(screen.getByTestId('input-voucher-archivo'), {
+      target: { files: [new File(['v'], 'voucher.jpg', { type: 'image/jpeg' })] },
+    });
 
     await waitFor(() => {
-      expect(alCobrar).toHaveBeenCalledWith('Efectivo', undefined);
+      expect(screen.getByTestId('voucher-mozo-ilegible')).toBeDefined();
     });
+    expect(screen.getByText('Este voucher no se lee bien. Vuelve a tomar la foto, por favor.')).toBeDefined();
+    expect(screen.getByTestId('btn-tomar-otra-foto')).toBeDefined();
+    expect(screen.queryByText(/CONFIABLE|OBSERVADO|RARO|semáforo/i)).toBeNull();
   });
-  describe('cobro sin comprobante del mozo (excepción con código del supervisor)', () => {
-    const abrirSinComprobante = () => {
-      render(<ModalPrecuenta {...propsBase} pedidoId="P-20" alCobrar={vi.fn()} />);
-      fireEvent.click(screen.getByText('Yape'));
-      fireEvent.click(screen.getByTestId('btn-mozo-sin-comprobante'));
-    };
 
-    it('motivo corto (4 letras, menos de 5) mantiene bloqueado el cobro', () => {
-      abrirSinComprobante();
-      fireEvent.change(screen.getByTestId('motivo-mozo-sin-voucher'), { target: { value: 'nope' } });
-      fireEvent.change(screen.getByTestId('input-codigo-supervisor'), { target: { value: '123456' } });
+  it('confirmación No no envía nada a Caja', async () => {
+    const enviar = vi.spyOn(vouchersApi, 'enviarACaja').mockResolvedValue({ ok: true });
+    render(<ModalPrecuenta {...propsBase} pedidoId="P-20" />);
 
-      const btnCobro = screen.getByTestId('btn-confirmar-cobro-mozo');
-      expect(btnCobro.hasAttribute('disabled')).toBe(true);
+    fireEvent.click(screen.getByTestId('btn-enviar-caja'));
+    fireEvent.click(screen.getByText('No, cancelar'));
+
+    expect(enviar).not.toHaveBeenCalled();
+    expect(screen.getByTestId('btn-enviar-caja')).toBeDefined();
+  });
+
+  it('si la API falla, muestra el error y deja reintentar', async () => {
+    vi.spyOn(vouchersApi, 'enviarACaja').mockRejectedValue(new Error('Sin conexión con el servidor'));
+    render(<ModalPrecuenta {...propsBase} pedidoId="P-20" />);
+
+    elegirYPedirConfirmacion();
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert').textContent).toContain('Sin conexión con el servidor');
     });
+    expect(screen.getByTestId('btn-enviar-caja')).toBeDefined();
+  });
 
-    it('código del supervisor vacío mantiene bloqueado el cobro', () => {
-      abrirSinComprobante();
-      fireEvent.change(screen.getByTestId('motivo-mozo-sin-voucher'), {
-        target: { value: 'La red del local falló' },
-      });
-
-      const btnCobro = screen.getByTestId('btn-confirmar-cobro-mozo');
-      expect(btnCobro.hasAttribute('disabled')).toBe(true);
-    });
-
-    it('motivo y código de 6 dígitos habilitan el cobro y envían sinVoucher tras el Sí', async () => {
-      const alCobrar = vi.fn();
-      render(<ModalPrecuenta {...propsBase} pedidoId="P-20" alCobrar={alCobrar} />);
-      fireEvent.click(screen.getByText('Yape'));
-      fireEvent.click(screen.getByTestId('btn-mozo-sin-comprobante'));
-
-      fireEvent.change(screen.getByTestId('motivo-mozo-sin-voucher'), {
-        target: { value: 'La red del local falló' },
-      });
-      fireEvent.change(screen.getByTestId('input-codigo-supervisor'), { target: { value: '123456' } });
-
-      const btnCobro = screen.getByTestId('btn-confirmar-cobro-mozo');
-      expect(btnCobro.hasAttribute('disabled')).toBe(false);
-      fireEvent.click(btnCobro);
-      fireEvent.click(screen.getByText('Sí, registrar cobro'));
-
-      await waitFor(() => {
-        expect(alCobrar).toHaveBeenCalledWith('Yape', undefined, {
-          motivo: 'La red del local falló',
-          pinSupervisor: '123456',
-        });
-      });
-    });
+  it('sin pedido (sin pedidoId) no muestra el envío a Caja', () => {
+    render(<ModalPrecuenta {...propsBase} />);
+    expect(screen.queryByTestId('seccion-envio-caja-mozo')).toBeNull();
+    expect(screen.queryByTestId('btn-enviar-caja')).toBeNull();
   });
 });

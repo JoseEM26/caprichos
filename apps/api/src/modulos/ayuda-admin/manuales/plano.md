@@ -8,7 +8,7 @@ relacionados: [caja, reservas, cocina, pantallas, cierre]
 sugerencias:
   - Como veo que mesas estan libres u ocupadas en cada piso
   - Como abro un pedido en una mesa desde el plano
-  - Como registro el cobro con voucher de Yape o Plin en la mesa
+  - Como envio a Caja el cobro de una mesa con voucher de Yape o Plin
   - Como agrego o muevo una mesa en el salon
 ---
 # Plano del local
@@ -21,47 +21,29 @@ Representa el mapa interactivo en dos dimensiones del salón de Caprichos por pi
 2. En la cuadrícula observarás cada mesa identificada por su número y color: las mesas libres se muestran en verde claro ("LIBRE"), mientras que las mesas con clientes se indican en tono vino u oscuro ("OCUPADA").
 3. Para abrir una comanda en una mesa desocupada, haz clic sobre la mesa.
 4. Se abrirá la ventana "Nuevo pedido en mesa". Selecciona los productos de la carta que solicita el cliente, anota comentarios si es necesario y pulsa el botón "Confirmar pedido". La comanda viajará a las pantallas de cocina y la mesa pasará a estado ocupada.
-5. Para consultar el consumo acumulado de una mesa ocupada o imprimir su cuenta, pulsa sobre la mesa y selecciona "Ver precuenta".
+5. Para consultar el consumo acumulado de una mesa ocupada o imprimir su cuenta, toca la mesa y pulsa "Cobrar mesa (enviar a Caja)" (ver abajo). Imprimir la precuenta no la cobra.
 Antes: [[plano]]
 Despues: [[caja]]
 Ver tambien: [[cocina]]
 
-## Como se hace: cobrar en mesa con voucher de Yape o Plin (Mozos)
-1. Al momento de cobrar la mesa al comensal, pulsa sobre la mesa ocupada y selecciona "Ver precuenta".
-2. En la sección "Medio de cobro", selecciona "Yape" o "Plin".
-3. Aparecerá inmediatamente la sección "Foto del voucher". La carga de la fotografía es un paso obligatorio para el mozo.
-4. Pulsa el botón para seleccionar o capturar la fotografía del comprobante mostrado por el comensal. El sistema optimiza y reduce automáticamente la imagen en el dispositivo antes de transmitirla.
-5. La inteligencia artificial analizará la imagen y el mozo solo verá una respuesta clara: "Foto del voucher lista para confirmar" o aviso de imagen no legible ("No se pudo leer el voucher. Por favor toma otra foto más clara"). Por política de seguridad, el mozo no visualiza semáforos de riesgo ni datos bancarios internos.
-6. Mientras el comprobante no sea válido o legible, el botón de cobro permanece bloqueado con el texto "Sube el voucher para cobrar". Una vez validada la legibilidad de la imagen, se habilita "Confirmar cobro".
-7. Pulsa "Confirmar cobro" para asentar el pago. El comprobante quedará enlazado a la venta para la conciliación final en [[cierre]].
+## Como se hace: enviar a Caja el cobro de una mesa (Mozos)
+El mozo no cobra: cobra Caja. El mozo toma la foto del voucher en la mesa y envía el cobro a Caja, que lo revisa y lo cobra.
+1. Abre el plano y toca la mesa ocupada. En la tarjeta de la mesa pulsa "Cobrar mesa (enviar a Caja)": se abre su cuenta (precuenta).
+2. En "Medio de pago en mesa", elige Efectivo, Yape, Plin o Transferencia.
+3. Si es digital, aparece la foto del voucher. Toma la foto o sube el archivo. La imagen se lee al instante.
+4. Si dice "Este voucher no se lee bien. Vuelve a tomar la foto", toma otra foto. El mozo solo ve si se lee o no: no ve montos ni semáforos.
+5. Efectivo no necesita foto. Pulsa "Enviar a Caja" y confirma con Sí. Aparece "Enviado a Caja, ellos lo revisan."
+6. Caja recibe un aviso en la campana y el pedido aparece en Pedidos y caja con la foto ya enlazada. Si no hay foto legible, Caja pide la foto o resuelve el cobro con su excepción.
+7. El cobro no queda pagado por el mozo: el pedido sigue por cobrar hasta que Caja lo registra.
 Antes: [[plano]]
 Despues: [[caja]]
 Ver tambien: [[cierre]]
 
-## Como se hace: agregar, mover y girar elementos en el plano (Administrador)
-1. Si cuentas con el permiso de edición (rol Administrador), verás la barra de herramientas con los elementos disponibles: "Mesa cuadrada", "Mesa redonda", "Barra", "Caja", "Puerta", "Baño", "Columna", "Escalera" y "Pared".
-2. Selecciona la herramienta que deseas colocar y haz clic sobre la celda vacía de la cuadrícula donde irá el objeto.
-3. Para reubicar un elemento existente, arrástralo directamente a su nueva posición en la cuadrícula.
-4. Para inspeccionarlo, haz clic sobre el objeto. En el panel de propiedades podrás modificar su nombre o número (por ejemplo "Mesa 12"), cambiar sus dimensiones de ancho y alto, o pulsar el botón "Girar 90°" para rotar su orientación.
-5. Para retirar un mueble u objeto del plano, selecciónalo y pulsa "Eliminar elemento". En el cuadro de confirmación "¿Eliminar elemento?", confirma con "Sí, eliminar" o cancela con "No, conservar".
-Ver tambien: [[plano]]
-
-## Como se hace: cambiar de piso o activar y desactivar áreas
-1. Haz clic sobre la pestaña del piso deseado para cambiar la vista de la cuadrícula.
-2. Si un piso o terraza estará cerrado temporalmente, el administrador puede pulsar el botón "Desactivar piso". Se abrirá la ventana "¿Desactivar piso?", donde se confirma con "Sí, desactivar". El piso quedará oculto para el personal de salón hasta que se pulse "Activar piso".
-Ver tambien: [[reservas]]
-
-## Como se hace: copiar y aplicar un diseño de plano
-1. En la esquina superior derecha, pulsa en la sección "Guardar o cambiar el diseño".
-2. Para hacer un respaldo del diseño actual de mesas, pulsa el botón "Copiar diseño". El código de distribución en formato JSON se copiará a tu portapapeles.
-3. Para cargar una distribución preparada previamente, pega el texto JSON en el área correspondiente y pulsa "Aplicar diseño". Aparecerá la ventana de confirmación "¿Aplicar este nuevo diseño al plano?". Pulsa "Sí, aplicar" o "No, cancelar".
-Ver tambien: [[historial]]
-
 ## Errores y dudas comunes
-- El botón de cobro en mesa no se activa al seleccionar Yape o Plin: es obligatorio subir una foto clara y legible del voucher mediante la cámara o galería; el sistema bloquea el cobro hasta comprobar la legibilidad.
+- Si el voucher no se lee, el mozo toma otra foto. Si no hay foto, el mozo igual envía el cobro a Caja y Caja resuelve (foto o excepción con código del supervisor).
 - El mozo no ve el semáforo de confianza: por diseño, la vista del mozo sólo comprueba que la imagen sea legible para no demorar la atención en sala; la auditoría financiera se realiza en el arqueo de Cierre de caja.
 - No me aparecen los botones para agregar o mover mesas: solo los administradores con el permiso plano/editar pueden modificar la estructura física del salón; los mozos y call center solo tienen acceso en modo consulta y toma de pedidos.
-- Una mesa sigue figurando ocupada cuando los clientes ya se fueron: la mesa se libera automáticamente al registrar el cobro final en caja, o manualmente si el cajero o mozo autorizado pulsa "Liberar mesa".
+- Una mesa sigue figurando ocupada cuando los clientes ya se fueron: la mesa se libera automáticamente al registrar el cobro final en caja, o manualmente si el cajero o mozo autorizado pulsa "Liberar o marcar mesa".
 
 ## Quien puede hacerlo
 - Pueden ver el plano, tomar comandas y cobrar mesas los roles Administrador (ADMIN), Mozo (MOZO) y Call Center (CALLCENTER). El rol Mozo cuenta con el permiso vouchers/subir para registrar las fotografías de comprobantes en sala.

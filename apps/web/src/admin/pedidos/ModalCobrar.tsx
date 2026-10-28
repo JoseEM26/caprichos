@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Boton } from '../../comun/Boton';
 import { Confirmar } from '../../comun/Confirmar';
 import { CampoCodigoSupervisor } from '../../comun/CampoCodigoSupervisor';
@@ -6,7 +6,9 @@ import { pedidosApi, Pedido, PagoItem, CobrarDto } from './pedidosApi';
 import { ErrorApi } from '../../comun/api';
 import { SubirVoucherMozo } from '../vouchers/SubirVoucherMozo';
 import { TarjetaLecturaVoucher } from '../vouchers/TarjetaLecturaVoucher';
-import type { RespuestaSubirVoucherAdmin } from '../vouchers/tipos';
+import { FotoAmpliable } from '../vouchers/FotoAmpliable';
+import { vouchersApi } from '../vouchers/vouchersApi';
+import type { RespuestaSubirVoucherAdmin, VoucherExtraido } from '../vouchers/tipos';
 import { medioDigitalVoucher, mismoMedio } from './mediosPago';
 
 const MEDIOS_PAGO = [
@@ -56,12 +58,44 @@ export function ModalCobrar({
   // Comprobante del pago digital: la foto subida (id) y su lectura informativa
   const [voucher, setVoucher] = useState<{ id: string | number } | null>(null);
   const [lectura, setLectura] = useState<RespuestaSubirVoucherAdmin | null>(null);
+  const [fotoArchivoId, setFotoArchivoId] = useState<string | number | null>(null);
   // La última foto no se lee: no cuenta como comprobante (pide otra o la excepción)
   const [ilegible, setIlegible] = useState<boolean>(false);
   // Excepción «Registrar sin voucher»: motivo escrito + código rotativo del supervisor
   const [sinVoucher, setSinVoucher] = useState<boolean>(false);
   const [motivoSinVoucher, setMotivoSinVoucher] = useState<string>('');
   const [pinSupervisor, setPinSupervisor] = useState<string>('');
+
+  // Foto que ya subió el mozo, el cliente o la carta: Caja la ve y cobra con ella, sin subir otra
+  useEffect(() => {
+    let vigente = true;
+    vouchersApi
+      .listarVouchers({ pedidoId: pedido.id, estado: 'todos' })
+      .then((items) => {
+        if (!vigente || items.length === 0) return;
+        const recientes = [...items].sort((a, b) => b.creadoEn.localeCompare(a.creadoEn));
+        const legible = recientes.find((v) => v.semaforo !== 'ILEGIBLE');
+        if (!legible) {
+          // Solo hay fotos ilegibles: no cuentan como comprobante, Caja pide otra
+          setIlegible(true);
+          return;
+        }
+        setVoucher({ id: legible.id });
+        setFotoArchivoId(legible.archivoId);
+        setLectura({
+          id: legible.id,
+          legible: true,
+          semaforo: legible.semaforo,
+          motivos: legible.motivos,
+          extraido: legible.extraido as VoucherExtraido,
+          medio: legible.medio ?? undefined,
+        });
+      })
+      .catch(() => undefined);
+    return () => {
+      vigente = false;
+    };
+  }, [pedido.id]);
 
   // Normalizar medio de pago para la API (en mayúsculas: EFECTIVO, YAPE, etc.)
   const normalizarMedio = (m: string) => m.toUpperCase();
@@ -182,11 +216,13 @@ export function ModalCobrar({
     });
 
     // Con foto, va el voucherId; sin foto (excepción), el motivo y el código del supervisor
-    const comprobante: Partial<CobrarDto> = voucher
-      ? { voucherId: voucher.id }
-      : hayDigital && sinVoucher
-        ? { sinVoucher: { motivo: motivoSinVoucher.trim(), pinSupervisor } }
-        : {};
+    const comprobante: Partial<CobrarDto> = !hayDigital
+      ? {}
+      : voucher
+        ? { voucherId: voucher.id }
+        : sinVoucher
+          ? { sinVoucher: { motivo: motivoSinVoucher.trim(), pinSupervisor } }
+          : {};
 
     try {
       await cobrar({
@@ -543,8 +579,9 @@ export function ModalCobrar({
                   data-testid="voucher-guardado"
                   style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-green, #2F7A45)' }}
                 >
-                  Foto guardada y enlazada al pedido como prueba del cobro.
+                  Foto del comprobante enlazada al pedido como prueba del cobro.
                 </div>
+                {fotoArchivoId && <FotoAmpliable archivoId={fotoArchivoId} alt="Foto del voucher" />}
                 {lectura && (
                   <TarjetaLecturaVoucher
                     voucher={{
@@ -558,6 +595,28 @@ export function ModalCobrar({
                     puedeVer
                   />
                 )}
+                <button
+                  type="button"
+                  data-testid="btn-cambiar-foto-cobro"
+                  onClick={() => {
+                    setVoucher(null);
+                    setLectura(null);
+                    setFotoArchivoId(null);
+                    setIlegible(false);
+                  }}
+                  style={{
+                    minHeight: 44,
+                    border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                    borderRadius: 10,
+                    background: 'transparent',
+                    color: 'var(--cp-navy, #0B2C3E)',
+                    fontWeight: 700,
+                    fontSize: 13,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Subir otra foto
+                </button>
               </>
             )}
 

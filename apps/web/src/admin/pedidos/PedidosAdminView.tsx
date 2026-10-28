@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { useEventos } from '../../comun/socket';
@@ -234,6 +234,20 @@ export function PedidosAdminView() {
     });
     setPedidoSeleccionadoId(nuevosFiltrados[0]?.id || null);
   };
+
+  // Enlace de la campana (/admin/caja?pedido=ID): abre ese pedido en su pestaña, una sola vez
+  const deepLinkResuelto = useRef(false);
+  useEffect(() => {
+    if (cargando || deepLinkResuelto.current) return;
+    deepLinkResuelto.current = true;
+    const idUrl = new URLSearchParams(window.location.search).get('pedido');
+    const pedidoUrl = idUrl ? pedidos.find((p) => String(p.id) === idUrl) : undefined;
+    if (!pedidoUrl) return;
+    const tab = TABS_CAJA.find((t) => t.filtro(pedidoUrl));
+    if (tab) cambiarTab(tab.id);
+    setPedidoSeleccionadoId(String(pedidoUrl.id));
+    // El enlace se resuelve una sola vez (deepLinkResuelto), aunque cambien las dependencias
+  }, [cargando, pedidos]);
 
   // Socket events
   useEventos('pedido:nuevo', (datos: { id: string | number; codigo?: string }) => {

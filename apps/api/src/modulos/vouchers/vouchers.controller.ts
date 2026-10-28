@@ -85,6 +85,22 @@ export class VouchersController {
   }
 
   /**
+   * POST /admin/vouchers/enviar-a-caja
+   * El mozo envía a Caja el cobro de la mesa (medio: EFECTIVO | YAPE | PLIN | TRANSFERENCIA).
+   * No cobra: Caja revisa el voucher y cobra. Permiso: vouchers/subir (MOZO, CAJERO, ADMIN)
+   */
+  @Post('enviar-a-caja')
+  @Permiso('vouchers', 'subir')
+  async enviarACaja(
+    @Body('pedidoId') pedidoIdRaw: any,
+    @Body('medio') medioRaw: any,
+    @Req() req: any,
+  ) {
+    const pedidoId = pedidoIdRaw ? String(pedidoIdRaw).trim() : '';
+    return this.vouchersService.enviarACaja(pedidoId, String(medioRaw ?? ''), req.usuario, extraerIp(req));
+  }
+
+  /**
    * GET /admin/vouchers?pedidoId= | ?conversacionId= | ?fecha=YYYY-MM-DD&estado=pendientes|todos
    * Permiso: vouchers/ver (CAJERO, ADMIN)
    */

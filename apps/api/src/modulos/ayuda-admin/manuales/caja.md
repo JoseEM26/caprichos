@@ -36,9 +36,11 @@ Ver tambien: [[cierre]]
 1. Al elegir Yape, Plin o Transferencia aparece la seccion Comprobante del pago digital. Tomar la foto del voucher con la camara o subir el archivo; la imagen se reduce en el navegador y se guarda como archivo privado, como prueba.
 2. Al terminar la subida, la pantalla muestra la lectura de la IA: semaforo, motivos y datos extraidos (monto, operacion, billetera, titular y fecha) comparados con el total. La lectura es informativa y la decision es de la persona de caja, pero una foto que la IA marca como ILEGIBLE no cuenta como comprobante: la pantalla avisa "No se lee: sube otra foto o confirma sin comprobante con codigo del supervisor".
 3. Con la foto guardada, el boton Registrar cobro queda activo. Confirmar con Cobrar.
-4. Excepcion: si de verdad no hay foto, o la foto no se lee, pulsar No hay foto: registrar sin voucher (con supervisor). Escribir el motivo (minimo 5 letras) e ingresar el codigo de 6 digitos del supervisor. La excepcion queda auditada con el motivo y quien la aprobo. El mozo tambien puede usarla en su cobro de mesa (Precuenta): el codigo lo dicta el supervisor presente, el mozo no lo genera. Si no tiene foto, puede avisar a Caja.
+4. Excepcion: si de verdad no hay foto, o la foto no se lee, pulsar No hay foto: registrar sin voucher (con supervisor). Escribir el motivo (minimo 5 letras) e ingresar el codigo de 6 digitos del supervisor. La excepcion queda auditada con el motivo y quien la aprobo. El mozo no tiene esta excepcion: si no hay foto legible, la deja pendiente y Caja decide.
 5. Pago coordinado: en Pedidos por coordinar, Marcar coordinado con Yape, Plin o Transferencia pide la misma foto (o la excepcion con supervisor). Efectivo y tarjeta se marcan sin foto. Sí, marcar confirma la accion.
-6. La seccion Comprobantes muestra todas las fotos asociadas a la cuenta (de mozo, caja, WhatsApp o la carta), con su lectura.
+6. La seccion Comprobantes muestra todas las fotos asociadas a la cuenta (de mozo, caja, WhatsApp o la carta), con su lectura. Pulsa la foto para verla en grande.
+7. Si el mozo ya subio la foto del voucher de una mesa, el cobro la muestra al abrir Registrar cobro: se cobra con esa foto (con su semaforo) sin subir otra. Si no sirve, pulsa Subir otra foto.
+8. Cobro de mesa enviado por el mozo: la campana avisa "Voucher del mozo por revisar" o "Pago en efectivo del mozo" y el enlace abre el pedido directamente. El mozo no cobra: Caja revisa la foto y registra el cobro.
 Antes: [[cocina]]
 Despues: [[comprobantes]]
 Ver tambien: [[cierre]]

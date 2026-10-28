@@ -3,7 +3,7 @@ import { useSesion } from '../../comun/sesion';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { Confirmar } from '../../comun/Confirmar';
-import { ElementoPlano, PisoPlano, PisoSalon, MesaSalon } from './tipos';
+import { ElementoPlano, MesaSalon, PisoPlano, PisoSalon } from './tipos';
 import { ModalNuevoPedidoMesa } from './componentes/ModalNuevoPedidoMesa';
 import { ModalPrecuenta } from './componentes/ModalPrecuenta';
 import { useSalonSocket } from './useSalonSocket';
@@ -49,9 +49,9 @@ export function PlanoView() {
 
   // Modales adicionales
   const [modalNuevoPedidoAbierto, setModalNuevoPedidoAbierto] = useState(false);
+  // Cuenta de una mesa ocupada: el mozo la envía a Caja (no la cobra)
+  const [mesaParaCuenta, setMesaParaCuenta] = useState<MesaSalon | null>(null);
   const [mesasParaPedido, setMesasParaPedido] = useState<string[]>([]);
-  const [modalPrecuentaAbierto, setModalPrecuentaAbierto] = useState(false);
-  const [mesaParaPrecuenta, setMesaParaPrecuenta] = useState<MesaSalon | null>(null);
 
   // Confirmaciones obligatorias Sí/No
   const [confirmarEliminar, setConfirmarEliminar] = useState<ElementoPlano | null>(null);
@@ -120,6 +120,12 @@ export function PlanoView() {
 
   const ECOLS = pisoActual?.cuadriculaAncho || pisoActual?.cuadricula_ancho || 20;
   const EROWS = pisoActual?.cuadriculaAlto || pisoActual?.cuadricula_alto || 12;
+
+  // Datos del salón de la mesa seleccionada (estado, pedido abierto y su cuenta)
+  const mesaSalonSeleccionada = useMemo<MesaSalon | null>(() => {
+    if (!elementoSeleccionadoId) return null;
+    return pisosSalon.flatMap((p) => p.mesas || []).find((m) => String(m.id) === String(elementoSeleccionadoId)) || null;
+  }, [pisosSalon, elementoSeleccionadoId]);
 
   // Elemento seleccionado
   const elementoSeleccionado = useMemo(() => {
@@ -774,6 +780,7 @@ export function PlanoView() {
                 return (
                   <div
                     key={e.id}
+                    data-testid={`elemento-plano-${e.id}`}
                     draggable={puedeEditar}
                     onDragStart={(ev) => handleDragStart(ev, e)}
                     onClick={(ev) => {
@@ -1200,6 +1207,30 @@ export function PlanoView() {
                 </div>
               )}
 
+              {/* Mesa ocupada con pedido: el mozo ve la cuenta y la envía a Caja */}
+              {elementoSeleccionado.tipo.toLowerCase() === 'mesa' && mesaSalonSeleccionada?.pedido && (
+                <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                  <button
+                    type="button"
+                    data-testid="btn-cuenta-mesa"
+                    onClick={() => setMesaParaCuenta(mesaSalonSeleccionada)}
+                    style={{
+                      flex: 1,
+                      minHeight: '40px',
+                      borderRadius: '10px',
+                      border: 0,
+                      background: 'var(--cp-green, #2F7A45)',
+                      color: '#FFFFFF',
+                      fontWeight: 800,
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Cobrar mesa (enviar a Caja)
+                  </button>
+                </div>
+              )}
+
               {/* Botón rápido para tomar pedido si es mesa */}
               {elementoSeleccionado.tipo.toLowerCase() === 'mesa' && (
                 <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
@@ -1604,6 +1635,18 @@ export function PlanoView() {
         />
       )}
 
+      {/* Cuenta de la mesa ocupada: el mozo envía el cobro a Caja */}
+      {mesaParaCuenta?.pedido && (
+        <ModalPrecuenta
+          abierto={true}
+          alCerrar={() => setMesaParaCuenta(null)}
+          mesa={mesaParaCuenta.nombre || `Mesa ${mesaParaCuenta.numero}`}
+          lineas={mesaParaCuenta.pedido.lineas || []}
+          total={Number(mesaParaCuenta.pedido.total || 0)}
+          pedidoId={mesaParaCuenta.pedido.id}
+        />
+      )}
+
       {/* Modal Nuevo Pedido de Mesa */}
       {modalNuevoPedidoAbierto && (
         <ModalNuevoPedidoMesa
@@ -1615,20 +1658,6 @@ export function PlanoView() {
           pisos={pisosSalon}
           mesasPreseleccionadasIds={mesasParaPedido}
           alRefrescarMesas={cargarDatos}
-        />
-      )}
-
-      {/* Modal Precuenta */}
-      {modalPrecuentaAbierto && mesaParaPrecuenta && (
-        <ModalPrecuenta
-          abierto={true}
-          alCerrar={() => {
-            setModalPrecuentaAbierto(false);
-            setMesaParaPrecuenta(null);
-          }}
-          mesa={mesaParaPrecuenta.nombre || `Mesa ${mesaParaPrecuenta.numero}`}
-          lineas={(mesaParaPrecuenta.pedido as any)?.lineas || []}
-          total={Number((mesaParaPrecuenta.pedido as any)?.total || 0)}
         />
       )}
     </div>

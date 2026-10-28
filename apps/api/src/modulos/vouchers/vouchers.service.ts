@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   HttpException,
   HttpStatus,
   Injectable,
@@ -27,6 +28,9 @@ export interface SubirVoucherOpciones {
   medio?: 'YAPE' | 'PLIN';
   origen?: 'MOZO' | 'WHATSAPP' | 'CAJA' | 'CARTA';
 }
+
+/** Medios que el mozo puede enviar a Caja desde la mesa. */
+const MEDIOS_ENVIO_CAJA = ['EFECTIVO', 'YAPE', 'PLIN', 'TRANSFERENCIA'] as const;
 
 @Injectable()
 export class VouchersService {
@@ -480,6 +484,82 @@ export class VouchersService {
       partyId: usuario.partyId,
       ip,
       despues: { pedidoId: pedido.id.toString() },
+    });
+
+    return { ok: true };
+  }
+
+  /**
+   * El mozo envía a Caja el cobro de una mesa. No cobra ni marca el pedido como pagado:
+   * Caja revisa el voucher (con su semáforo) y es quien cobra. Efectivo: aviso de cobro en efectivo.
+   * Digital: aviso con el voucher ya enlazado, o sin foto legible (Caja resuelve con su excepción).
+   * Al mozo solo se le responde ok: nunca el semáforo ni los datos del voucher.
+   */
+  async enviarACaja(pedidoId: string, medio: string, usuario: UsuarioAutenticado, ip?: string) {
+    const medioNormalizado = String(medio || '').trim().toUpperCase();
+    if (!MEDIOS_ENVIO_CAJA.includes(medioNormalizado as (typeof MEDIOS_ENVIO_CAJA)[number])) {
+      throw new BadRequestException({ codigo: 'MEDIO_INVALIDO', mensaje: 'Elige Efectivo, Yape, Plin o Transferencia' });
+    }
+    const id = this.parsearId(pedidoId);
+    const pedido = await this.prisma.pedido.findUnique({
+      where: { id },
+      select: { id: true, codigo: true, pago_estado: true },
+    });
+    if (!pedido) {
+      throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'El pedido no existe' });
+    }
+    if (pedido.pago_estado === 'PAGADO') {
+      throw new ConflictException({ codigo: 'PEDIDO_YA_PAGADO', mensaje: 'El pedido ya está cobrado' });
+    }
+
+    let aviso: { tipo: string; titulo: string; mensaje: string };
+    if (medioNormalizado === 'EFECTIVO') {
+      aviso = {
+        tipo: 'PAGO_EFECTIVO_MOZO',
+        titulo: 'Mesa paga en efectivo',
+        mensaje: `El mozo avisa que el pedido ${pedido.codigo} se paga en efectivo en mesa. Cóbralo en Caja.`,
+      };
+    } else {
+      const ultimo = await this.prisma.voucherPago.findFirst({
+        where: { pedido_id: id },
+        orderBy: { creado_en: 'desc' },
+        select: { semaforo: true },
+      });
+      const legible = !!ultimo && ultimo.semaforo !== 'ILEGIBLE';
+      aviso = legible
+        ? {
+            tipo: 'VOUCHER_PENDIENTE_MOZO',
+            titulo: 'Voucher listo para revisar',
+            mensaje: `El mozo envía el pedido ${pedido.codigo} (${medioNormalizado}) con la foto del voucher. Revísala y cobra.`,
+          }
+        : {
+            tipo: 'VOUCHER_PENDIENTE_MOZO',
+            titulo: 'Pago digital sin foto legible',
+            mensaje: `El mozo envía el pedido ${pedido.codigo} (${medioNormalizado}) sin foto legible. Pide la foto o cobra con tu excepción.`,
+          };
+    }
+
+    const notif = await this.prisma.notificacion.create({
+      data: {
+        tipo: aviso.tipo,
+        rol_destino: 'CAJERO',
+        titulo: aviso.titulo,
+        mensaje: aviso.mensaje,
+        enlace: `/admin/caja?pedido=${pedido.id.toString()}`,
+      },
+    });
+    this.eventos?.emitirAdmin('notificaciones:nueva', { id: notif.id.toString(), titulo: notif.titulo });
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'vouchers',
+      accion: 'ENVIADO_CAJA',
+      resultado: 'OK',
+      entidad: 'pedido',
+      entidadId: pedido.id,
+      partyId: usuario.partyId,
+      ip,
+      despues: { pedidoId: pedido.id.toString(), medio: medioNormalizado },
     });
 
     return { ok: true };

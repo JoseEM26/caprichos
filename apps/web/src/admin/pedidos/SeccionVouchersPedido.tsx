@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { obtenerBlobAutenticado } from '../../comun/api';
 import { vouchersApi } from '../vouchers/vouchersApi';
 import { TarjetaLecturaVoucher } from '../vouchers/TarjetaLecturaVoucher';
+import { FotoAmpliable } from '../vouchers/FotoAmpliable';
 import type { VoucherPagoItem } from '../vouchers/tipos';
 
 export interface SeccionVouchersPedidoProps {
@@ -62,7 +62,7 @@ export function SeccionVouchersPedido({ pedidoId, recargarClave, total, medio, a
       </div>
       {vouchers.map((v) => (
         <div key={String(v.id)} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <FotoComprobante archivoId={v.archivoId} />
+          <FotoAmpliable archivoId={v.archivoId} />
           <TarjetaLecturaVoucher
             voucher={{
               id: v.id,
@@ -77,39 +77,5 @@ export function SeccionVouchersPedido({ pedidoId, recargarClave, total, medio, a
         </div>
       ))}
     </div>
-  );
-}
-
-function FotoComprobante({ archivoId }: { archivoId: string | number }) {
-  const [url, setUrl] = useState<string>('');
-
-  useEffect(() => {
-    let activo = true;
-    obtenerBlobAutenticado(`/admin/archivos/${archivoId}`)
-      .then((blobUrl) => {
-        if (activo && blobUrl) setUrl(blobUrl);
-      })
-      .catch(() => undefined);
-    return () => {
-      activo = false;
-    };
-  }, [archivoId]);
-
-  if (!url) return null;
-  return (
-    <a href={url} target="_blank" rel="noopener noreferrer" aria-label="Ver foto del comprobante">
-      <img
-        src={url}
-        alt="Foto del comprobante"
-        style={{
-          width: '100%',
-          maxHeight: 220,
-          objectFit: 'contain',
-          borderRadius: 8,
-          border: '1px solid var(--cp-line, #E3D6C6)',
-          background: 'var(--cp-cream, #FBF4EC)',
-        }}
-      />
-    </a>
   );
 }

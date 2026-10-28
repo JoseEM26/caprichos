@@ -62,6 +62,8 @@ export interface MesaSalon {
     id: string;
     codigo: string;
     mozo: string | null;
+    total?: number;
+    lineas?: Array<{ cantidad: number; nombre: string; detalle: string }>;
   } | null;
   pedidoCodigo?: string | null;
   mozo?: string | null;
