@@ -56,6 +56,8 @@ export function ModalCobrar({
   // Comprobante del pago digital: la foto subida (id) y su lectura informativa
   const [voucher, setVoucher] = useState<{ id: string | number } | null>(null);
   const [lectura, setLectura] = useState<RespuestaSubirVoucherAdmin | null>(null);
+  // La última foto no se lee: no cuenta como comprobante (pide otra o la excepción)
+  const [ilegible, setIlegible] = useState<boolean>(false);
   // Excepción «Registrar sin voucher»: motivo escrito + código rotativo del supervisor
   const [sinVoucher, setSinVoucher] = useState<boolean>(false);
   const [motivoSinVoucher, setMotivoSinVoucher] = useState<string>('');
@@ -147,7 +149,9 @@ export function ModalCobrar({
 
     if (!comprobanteListo) {
       setErrorMensaje(
-        'Falta la foto del comprobante del pago digital. Súbela, o registra el cobro sin voucher con motivo y código del supervisor.',
+        ilegible
+          ? 'No se lee: sube otra foto o confirma sin comprobante con código del supervisor.'
+          : 'Falta la foto del comprobante del pago digital. Súbela, o registra el cobro sin voucher con motivo y código del supervisor.',
       );
       return false;
     }
@@ -503,7 +507,12 @@ export function ModalCobrar({
                 <SubirVoucherMozo
                   pedidoId={pedido.id}
                   medio={medioDigital}
-                  alVoucherValido={(info) => setVoucher({ id: info.id })}
+                  ofrecerExcepcion
+                  alVoucherValido={(info) => {
+                    // Solo una foto legible queda como comprobante del cobro
+                    setIlegible(!info.legible);
+                    if (info.legible) setVoucher({ id: info.id });
+                  }}
                   alRespuesta={(r) => {
                     if ('semaforo' in r) setLectura(r);
                   }}

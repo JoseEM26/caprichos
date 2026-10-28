@@ -165,6 +165,21 @@ describe('VouchersService', () => {
       expect((res as any).semaforo).toBeUndefined();
     });
 
+    it('un voucher que la IA lee pero sin monto queda ILEGIBLE: el MOZO recibe legible=false (no cuenta como comprobante)', async () => {
+      vouchersIaMock.analizarVoucher.mockResolvedValueOnce({
+        sinLectura: false,
+        extraido: { legible: true, monto: null, confianza: 0.9 },
+      });
+
+      const res = await service.subirYProcesar(
+        fakeFile,
+        { pedidoId: '50', medio: 'YAPE' },
+        mozoUsuario,
+      );
+
+      expect(res.legible).toBe(false);
+    });
+
     it('al CAJERO y ADMIN les entrega la respuesta completa (id, legible, semaforo, motivos, extraido)', async () => {
       const resCajero = await service.subirYProcesar(
         fakeFile,

@@ -4,6 +4,19 @@ Todos los cambios notables del proyecto Caprichos se documentan en este archivo.
 
 ---
 
+## 2026-10-28
+
+### Comprobante útil en todo pago digital: ILEGIBLE no cuenta, coordinado con foto y voucher obligatorio para todos
+- **Causa**: un voucher que la IA marcaba ILEGIBLE todavía valía como comprobante al cobrar y al confirmar el pago; el pago coordinado (`POST /admin/caja/pedidos/:id/coordinado`) se marcaba sin foto; y el parámetro `voucher_mozo_obligatorio` dejaba al mozo sin exigencia si estaba en `false`.
+- **Regla**: todo pago digital (Yape, Plin, transferencia) necesita una foto útil enlazada al pedido. Un voucher `ILEGIBLE` no cuenta. Sin foto útil, Caja y Administrador pueden seguir con motivo y código del supervisor (auditado). El mozo no tiene excepción: debe subir otra foto o avisar a Caja.
+- **Servidor**: regla única en `apps/api/src/modulos/caja/comprobante-pago.util.ts` (`exigirComprobanteDigital`, `hayVoucherUtil`), usada por el cobro (`cobros.service.ts`), el registro de pago (`pedidos-estado.service.ts`) y el coordinado. El coordinado acepta `sinVoucher` en el cuerpo y audita `MARCAR_COORDINADO_SIN_VOUCHER` con el motivo.
+- **Respuesta de voucher**: `legible` sale del semáforo (`legible = semáforo distinto de ILEGIBLE`), para que el front nunca tome por válida una foto que el cobro rechaza.
+- **Parámetro `voucher_mozo_obligatorio`: obsoleto.** Ya no tiene efecto en el servidor ni en el front, y se quitó su control de Configuración. Nada se eliminó de la base de datos (no hace falta migración). Sigue en la tabla `parametro` sin uso.
+- **Front**: `ModalCobrar` (Caja, cierre) y `ModalConfirmarPago` no cuentan una foto ILEGIBLE; `SubirVoucherMozo` muestra «No se lee: sube otra foto o confirma sin comprobante con código del supervisor» (con `ofrecerExcepcion`, solo Caja); `TarjetaLecturaVoucher` muestra el mismo aviso; `ModalPrecuenta` del mozo ya no marca válida una foto ilegible.
+- **Pago coordinado en Caja**: «Marcar coordinado» abre `ModalCoordinarPago` con la foto del comprobante o la excepción con supervisor (solo medios digitales), y pide Sí/No antes de marcar. La lista de por coordinar devuelve `pago_preferido`.
+- **Manuales**: `caja.md` (flujo de foto, excepción y pago coordinado; ILEGIBLE). `docs/operacion/RB-CAP-009` (parámetro obsoleto, ILEGIBLE y flujo del mozo).
+- **Pruebas**: Jest en `cobros.service.spec.ts` (ILEGIBLE falla y con excepción ok y auditado; coordinado digital sin voucher falla, con voucher ok, con excepción ok y auditado, efectivo ok, PIN incorrecto), `cobros-mozo-voucher.spec.ts` (mozo siempre exigido, sin excepción propia, el parámetro no se lee) y `caja.controller.spec.ts`. Vitest en `ModalCobrarComprobante.spec.tsx`, `ModalCoordinarPago.spec.tsx` (nuevo), `TarjetaLecturaVoucher.spec.tsx` y `vouchersApi.spec.ts`.
+
 ## 2026-10-27
 
 ### Aviso de WhatsApp al crear un pedido desde la carta virtual (recibido)

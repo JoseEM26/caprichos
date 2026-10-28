@@ -18,6 +18,7 @@ import { CobrarDto } from './dto/cobrar.dto';
 import { AnularCobroDto } from './dto/anular-cobro.dto';
 import { CrearMovimientoDto } from './dto/movimiento.dto';
 import { AnularMovimientoDto } from './dto/anular-movimiento.dto';
+import { MarcarCoordinadoDto } from './dto/marcar-coordinado.dto';
 
 @Controller('admin/caja')
 @UseGuards(AccesoGuard)
@@ -110,8 +111,12 @@ export class CajaController {
 
   @Post('pedidos/:id/coordinado')
   @Permiso('caja', 'cobrar')
-  async marcarCoordinado(@Param('id') id: string, @Req() req: any) {
+  async marcarCoordinado(
+    @Param('id') id: string,
+    @Body() dto: MarcarCoordinadoDto,
+    @Req() req: any,
+  ) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
-    return this.cobrosService.marcarCoordinado(id, req.usuario, ip);
+    return this.cobrosService.marcarCoordinado(id, req.usuario, ip, dto);
   }
 }

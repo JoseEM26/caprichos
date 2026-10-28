@@ -17,6 +17,8 @@ export interface SubirVoucherMozoProps {
     voucherId?: string | number;
   }) => void;
   bloqueado?: boolean;
+  /** Caja/Admin puede confirmar sin comprobante con código del supervisor; el mozo no. */
+  ofrecerExcepcion?: boolean;
 }
 
 export function SubirVoucherMozo({
@@ -26,6 +28,7 @@ export function SubirVoucherMozo({
   alRespuesta,
   alCambiarEstado,
   bloqueado = false,
+  ofrecerExcepcion = false,
 }: SubirVoucherMozoProps) {
   const [archivo, setArchivo] = useState<File | null>(null);
   const [vistaPreviaUrl, setVistaPreviaUrl] = useState<string | null>(null);
@@ -278,7 +281,9 @@ export function SubirVoucherMozo({
               lineHeight: 1.4,
             }}
           >
-            Este voucher no se lee bien. Vuelve a tomar la foto, por favor.
+            {ofrecerExcepcion
+              ? 'No se lee: sube otra foto o confirma sin comprobante con código del supervisor.'
+              : 'Este voucher no se lee bien. Vuelve a tomar la foto, por favor.'}
           </div>
           <button
             type="button"

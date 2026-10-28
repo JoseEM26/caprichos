@@ -368,6 +368,7 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
                     key={medioVoucher}
                     pedidoId={pedido.id}
                     medio={medioVoucher}
+                    ofrecerExcepcion
                     alVoucherValido={(info) => {
                       if (info.legible) setVoucherSubido(info.id);
                     }}

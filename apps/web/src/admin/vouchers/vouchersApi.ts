@@ -106,7 +106,6 @@ export const vouchersApi = {
       voucher_titular_nombre: 'Kevin',
       voucher_yape_numero: '946388934',
       voucher_plin_numero: '946388934',
-      voucher_mozo_obligatorio: true,
     };
 
     try {
@@ -127,11 +126,6 @@ export const vouchersApi = {
           defaults.voucher_yape_numero = String(p.valor);
         } else if (p.clave === 'voucher_plin_numero' && p.valor != null) {
           defaults.voucher_plin_numero = String(p.valor);
-        } else if (p.clave === 'voucher_mozo_obligatorio') {
-          defaults.voucher_mozo_obligatorio =
-            p.valor === true ||
-            String(p.valor).toLowerCase() === 'true' ||
-            String(p.valor).toLowerCase() === 'si';
         }
       }
     } catch {

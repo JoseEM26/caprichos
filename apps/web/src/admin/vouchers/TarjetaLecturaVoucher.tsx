@@ -164,7 +164,7 @@ export function TarjetaLecturaVoucher({
             lineHeight: 1.4,
           }}
         >
-          Voucher no legible: pide al cliente que envie otra foto
+          No se lee: sube otra foto o confirma sin comprobante con código del supervisor.
         </div>
       )}
 

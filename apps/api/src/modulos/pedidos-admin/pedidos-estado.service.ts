@@ -23,7 +23,7 @@ import {
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { SupervisorCodigoService } from '../supervisor-codigo/supervisor-codigo.service';
-import { MEDIOS_CON_COMPROBANTE } from '../caja/cobros.service';
+import { exigirComprobanteDigital } from '../caja/comprobante-pago.util';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { enmascararDni } from '../usuarios/usuarios.util';
 import { FiltrarPedidosDto } from './dto/filtrar-pedidos.dto';
@@ -759,35 +759,17 @@ export class PedidosEstadoService {
       });
     }
 
-    // Pago digital (Yape, Plin, transferencia): exige un voucher útil enlazado al pedido.
-    // Un voucher ILEGIBLE no cuenta. Sin él, solo sigue con motivo y código del supervisor (como el cobro).
-    let sinVoucherAutorizado: { motivo: string; supervisorPartyId: string } | null = null;
-    if (MEDIOS_CON_COMPROBANTE.includes(metodoUpper)) {
-      const hayVoucherUtil = await this.prisma.voucherPago.findFirst({
-        where: { pedido_id: pedido.id, semaforo: { not: 'ILEGIBLE' } },
-        select: { id: true },
-      });
-      if (!hayVoucherUtil) {
-        if (!dto.sinVoucher) {
-          throw new BadRequestException({
-            codigo: 'VOUCHER_REQUERIDO',
-            mensaje:
-              'Falta la foto del comprobante del pago digital. Súbela, o registra el pago sin voucher con motivo y código del supervisor.',
-          });
-        }
-        const sup: any = await this.verificarPinSupervisor(
-          dto.sinVoucher.pinSupervisor,
-          usuarioActual.partyId,
-          ip,
-          pedido.id,
-          'pedidos/registrar_pago_sin_voucher',
-        );
-        sinVoucherAutorizado = {
-          motivo: dto.sinVoucher.motivo.trim(),
-          supervisorPartyId: String(sup?.supervisorPartyId ?? sup?.party_id ?? ''),
-        };
-      }
-    }
+    // Pago digital (Yape, Plin, transferencia): exige un voucher útil (un ILEGIBLE no cuenta) o la excepción
+    // con código del supervisor. Misma regla que el cobro y el pago coordinado (comprobante-pago.util).
+    const sinVoucherAutorizado = await exigirComprobanteDigital({
+      db: this.prisma,
+      pedidoId: pedido.id,
+      medios: [metodoUpper],
+      sinVoucher: dto.sinVoucher,
+      permiteExcepcion: true,
+      verificarPin: (pin) =>
+        this.verificarPinSupervisor(pin, usuarioActual.partyId, ip, pedido.id, 'pedidos/registrar_pago_sin_voucher'),
+    });
 
     const ahora = new Date();
     const pedidoActualizado = await this.prisma.pedido.update({

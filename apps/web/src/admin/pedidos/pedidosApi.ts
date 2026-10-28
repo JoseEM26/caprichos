@@ -162,6 +162,7 @@ export interface PedidoPorCobrar {
   modalidad: string;
   estado: string;
   pago_estado: string;
+  pago_preferido?: string | null;
   pago_metodo: string | null;
   total: number;
   cliente_nombre: string | null;
@@ -303,8 +304,15 @@ export const pedidosApi = {
     }
   },
 
-  async marcarPagoCoordinado(id: string | number): Promise<{ id: string; pago_estado: string }> {
-    return api.post<{ id: string; pago_estado: string }>(`/admin/caja/pedidos/${id}/coordinado`);
+  /** Pago digital sin foto útil: solo con motivo y código del supervisor (sinVoucher). */
+  async marcarPagoCoordinado(
+    id: string | number,
+    sinVoucher?: { motivo: string; pinSupervisor: string },
+  ): Promise<{ id: string; pago_estado: string }> {
+    return api.post<{ id: string; pago_estado: string }>(
+      `/admin/caja/pedidos/${id}/coordinado`,
+      sinVoucher ? { sinVoucher } : {},
+    );
   },
 
   async obtenerCajaActual(): Promise<CajaActualRespuesta> {

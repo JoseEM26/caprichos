@@ -109,7 +109,7 @@ describe('TarjetaLecturaVoucher (Módulo Mensajes)', () => {
     expect(screen.getByText('Ilegible')).toBeDefined();
     expect(
       screen.getByText(
-        'Voucher no legible: pide al cliente que envie otra foto',
+        'No se lee: sube otra foto o confirma sin comprobante con código del supervisor.',
       ),
     ).toBeDefined();
   });

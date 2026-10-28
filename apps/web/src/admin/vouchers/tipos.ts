@@ -77,5 +77,4 @@ export interface ParametrosVoucherConfig {
   voucher_titular_nombre: string;
   voucher_yape_numero: string;
   voucher_plin_numero: string;
-  voucher_mozo_obligatorio: boolean;
 }

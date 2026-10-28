@@ -21,9 +21,10 @@ const pedido: Pedido = {
   creado_en: '2026-10-27T18:00:00Z',
 };
 
+// El servidor marca legible=false cuando el semáforo es ILEGIBLE (un ILEGIBLE no cuenta como comprobante)
 const lecturaIlegible = {
   id: '9',
-  legible: true,
+  legible: false,
   semaforo: 'ILEGIBLE' as const,
   motivos: ['El monto no se distingue'],
   extraido: {
@@ -72,8 +73,9 @@ describe('ModalCobrar: comprobante del pago digital', () => {
     expect(cobrar).not.toHaveBeenCalled();
   });
 
-  it('con foto: la guarda, muestra la lectura y cobra con voucherId aunque la IA marque ILEGIBLE', async () => {
-    const subir = vi.spyOn(vouchersApi, 'subirVoucher').mockResolvedValue(lecturaIlegible as any);
+  it('con foto legible: la guarda, muestra la lectura y cobra con voucherId', async () => {
+    const legible = { ...lecturaIlegible, legible: true, semaforo: 'CONFIABLE' as const, motivos: [] };
+    const subir = vi.spyOn(vouchersApi, 'subirVoucher').mockResolvedValue(legible as any);
     abrirYape();
 
     const input = screen.getByTestId('input-voucher-archivo');
@@ -83,7 +85,6 @@ describe('ModalCobrar: comprobante del pago digital', () => {
       expect(screen.getByTestId('voucher-guardado')).toBeDefined();
     });
     expect(subir).toHaveBeenCalledWith(expect.anything(), '77', 'YAPE');
-    // La lectura informativa se muestra a Caja (semáforo, motivos)
     expect(screen.getByTestId('tarjeta-lectura-voucher')).toBeDefined();
     expect(screen.getByRole('button', { name: 'Registrar cobro' })).not.toBeDisabled();
 
@@ -92,6 +93,46 @@ describe('ModalCobrar: comprobante del pago digital', () => {
       expect(cobrar).toHaveBeenCalledWith(expect.objectContaining({ pedidoId: '77', voucherId: '9' }));
     });
     expect(cobrar.mock.calls[0][0]).not.toHaveProperty('sinVoucher');
+  });
+
+  it('con foto ILEGIBLE: no cuenta como comprobante, pide otra foto o la excepción y no deja cobrar', async () => {
+    vi.spyOn(vouchersApi, 'subirVoucher').mockResolvedValue(lecturaIlegible as any);
+    abrirYape();
+
+    const input = screen.getByTestId('input-voucher-archivo');
+    fireEvent.change(input, { target: { files: [new File(['foto'], 'yape.jpg', { type: 'image/jpeg' })] } });
+
+    expect(
+      await screen.findByText('No se lee: sube otra foto o confirma sin comprobante con código del supervisor.'),
+    ).toBeDefined();
+    expect(screen.queryByTestId('voucher-guardado')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Registrar cobro' })).toBeDisabled();
+    expect(cobrar).not.toHaveBeenCalled();
+  });
+
+  it('con foto ILEGIBLE y luego la excepción con supervisor: cobra con sinVoucher y sin voucherId', async () => {
+    vi.spyOn(vouchersApi, 'subirVoucher').mockResolvedValue(lecturaIlegible as any);
+    abrirYape();
+
+    fireEvent.change(screen.getByTestId('input-voucher-archivo'), {
+      target: { files: [new File(['foto'], 'yape.jpg', { type: 'image/jpeg' })] },
+    });
+    await screen.findByText(/No se lee: sube otra foto/);
+
+    fireEvent.click(screen.getByTestId('btn-sin-voucher'));
+    fireEvent.change(screen.getByTestId('motivo-sin-voucher'), { target: { value: 'La foto salió borrosa' } });
+    const pin = document.querySelector('#codigo-supervisor-input') as HTMLInputElement;
+    fireEvent.change(pin, { target: { value: '123456' } });
+    await confirmarCobro();
+
+    await waitFor(() => {
+      expect(cobrar).toHaveBeenCalledWith({
+        pedidoId: '77',
+        pagos: [{ medio: 'YAPE', monto: 35 }],
+        sinVoucher: { motivo: 'La foto salió borrosa', pinSupervisor: '123456' },
+      });
+    });
+    expect(cobrar.mock.calls[0][0]).not.toHaveProperty('voucherId');
   });
 
   it('sin foto con motivo y código del supervisor: cobra con sinVoucher y sin voucherId', async () => {

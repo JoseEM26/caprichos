@@ -35,14 +35,12 @@ export function TarjetaVouchersIaConfiguracion({
     voucher_titular_nombre: 'Kevin',
     voucher_yape_numero: '946388934',
     voucher_plin_numero: '946388934',
-    voucher_mozo_obligatorio: true,
   });
 
   // Campos de formulario editables
   const [titularNombre, setTitularNombre] = useState<string>('Kevin');
   const [yapeNumero, setYapeNumero] = useState<string>('946388934');
   const [plinNumero, setPlinNumero] = useState<string>('946388934');
-  const [mozoObligatorio, setMozoObligatorio] = useState<boolean>(true);
 
   const [consumoIa, setConsumoIa] = useState<ResumenConsumoVoucherIa | null>(null);
   const [cargando, setCargando] = useState<boolean>(true);
@@ -64,7 +62,6 @@ export function TarjetaVouchersIaConfiguracion({
       setTitularNombre(cfg.voucher_titular_nombre);
       setYapeNumero(cfg.voucher_yape_numero);
       setPlinNumero(cfg.voucher_plin_numero);
-      setMozoObligatorio(cfg.voucher_mozo_obligatorio);
 
       const consumo = await vouchersApi.obtenerConsumoIa();
       setConsumoIa(consumo);
@@ -140,17 +137,11 @@ export function TarjetaVouchersIaConfiguracion({
         'voucher_plin_numero',
         plinNumero.trim() || '946388934',
       );
-      await vouchersApi.guardarParametro(
-        'voucher_mozo_obligatorio',
-        mozoObligatorio,
-      );
-
       setConfig((prev) => ({
         ...prev,
         voucher_titular_nombre: titularNombre.trim() || 'Kevin',
         voucher_yape_numero: yapeNumero.trim() || '946388934',
         voucher_plin_numero: plinNumero.trim() || '946388934',
-        voucher_mozo_obligatorio: mozoObligatorio,
       }));
 
       setConfirmarGuardarCampos(false);
@@ -421,25 +412,6 @@ export function TarjetaVouchersIaConfiguracion({
           </div>
         </div>
 
-        {/* Checkbox Obligatorio para el mozo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-          <input
-            id="voucher-mozo-obligatorio"
-            data-testid="checkbox-voucher-mozo-obligatorio"
-            type="checkbox"
-            disabled={!esAdmin || guardando}
-            checked={mozoObligatorio}
-            onChange={(e) => setMozoObligatorio(e.target.checked)}
-            style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-          />
-          <label
-            htmlFor="voucher-mozo-obligatorio"
-            style={{ fontSize: '13px', fontWeight: 600, color: 'var(--cp-navy, #0B2C3E)', cursor: 'pointer' }}
-          >
-            Exigir foto del voucher al mozo al cobrar Yape o Plin en mesa
-          </label>
-        </div>
-
         {/* Botón Guardar cambios de campos */}
         {esAdmin && (
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
@@ -575,7 +547,7 @@ export function TarjetaVouchersIaConfiguracion({
       <Confirmar
         abierto={confirmarGuardarCampos}
         titulo="¿Guardar cambios de configuración de vouchers?"
-        mensaje={`Se actualizarán el titular (${titularNombre}), números Yape (${yapeNumero}) y Plin (${plinNumero}), y la exigencia de foto para el mozo.`}
+        mensaje={`Se actualizarán el titular (${titularNombre}), números Yape (${yapeNumero}) y Plin (${plinNumero}).`}
         textoSi="Sí, guardar cambios"
         textoNo="No, cancelar"
         cargando={guardando}

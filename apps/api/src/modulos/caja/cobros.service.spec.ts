@@ -720,30 +720,41 @@ describe('CobrosService', () => {
       expect(prismaMock.cobro.create).not.toHaveBeenCalled();
     });
 
-    it('con foto presente, la IA ILEGIBLE no bloquea el cobro (semáforo solo informativo)', async () => {
-      prismaMock.voucherPago.findFirst.mockResolvedValue({ id: 9n, semaforo: 'ILEGIBLE', extraido: { legible: false } });
-      const res = await service.cobrar({ pedidoId: '100', pagos: pagoYape }, cajeroUsuario);
-      expect(res.id).toBe('77');
-    });
-
-    it('MOZO con voucher_mozo_obligatorio=true y sin foto -> 400, sin excepción propia', async () => {
-      sinFoto();
-      prismaMock.parametro.findUnique.mockResolvedValue({ clave: 'voucher_mozo_obligatorio', valor: true });
-      await expect(
-        service.cobrar(
-          { pedidoId: '100', pagos: pagoYape, sinVoucher: { motivo: 'Motivo válido', pinSupervisor: '123456' } } as any,
-          mozoUsuario,
-        ),
-      ).rejects.toMatchObject({ response: { codigo: 'VOUCHER_REQUERIDO' } });
-      expect(supervisorCodigoMock.verificarYConsumirCodigo).not.toHaveBeenCalled();
+    it('un voucher ILEGIBLE no cuenta como comprobante: sin otra foto -> 400 VOUCHER_REQUERIDO', async () => {
+      // La búsqueda del comprobante excluye ILEGIBLE: lo que devuelve es null
+      prismaMock.voucherPago.findFirst.mockResolvedValue(null);
+      await expect(service.cobrar({ pedidoId: '100', pagos: pagoYape }, cajeroUsuario)).rejects.toMatchObject({
+        response: { codigo: 'VOUCHER_REQUERIDO' },
+      });
+      expect(prismaMock.voucherPago.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { pedido_id: 100n, semaforo: { not: 'ILEGIBLE' } } }),
+      );
       expect(prismaMock.cobro.create).not.toHaveBeenCalled();
     });
 
-    it('MOZO con voucher_mozo_obligatorio=false y sin foto -> cobra', async () => {
+    it('un voucher ILEGIBLE puede seguir con la excepción del supervisor (motivo y PIN) y queda auditado', async () => {
+      prismaMock.voucherPago.findFirst.mockResolvedValue(null);
+      const res = await service.cobrar(
+        {
+          pedidoId: '100',
+          pagos: pagoYape,
+          sinVoucher: { motivo: 'La foto salió borrosa', pinSupervisor: '123456' },
+        } as any,
+        cajeroUsuario,
+      );
+      expect(res.id).toBe('77');
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({ accion: 'COBRAR_SIN_VOUCHER', conPinAdmin: true }),
+      );
+    });
+
+    it('MOZO siempre exigido: con voucher_mozo_obligatorio=false y sin foto -> 400 VOUCHER_REQUERIDO', async () => {
       sinFoto();
       prismaMock.parametro.findUnique.mockResolvedValue({ clave: 'voucher_mozo_obligatorio', valor: false });
-      const res = await service.cobrar({ pedidoId: '100', pagos: pagoYape }, mozoUsuario);
-      expect(res.id).toBe('77');
+      await expect(service.cobrar({ pedidoId: '100', pagos: pagoYape }, mozoUsuario)).rejects.toMatchObject({
+        response: { codigo: 'VOUCHER_REQUERIDO' },
+      });
+      expect(prismaMock.cobro.create).not.toHaveBeenCalled();
     });
   });
 
@@ -1064,6 +1075,120 @@ describe('CobrosService', () => {
           status: HttpStatus.CONFLICT,
         }),
       );
+    });
+  });
+
+  describe('marcarCoordinado con comprobante del medio digital', () => {
+    const pedidoPendiente = (pago_preferido: string | null, pago_metodo: string | null = null) => ({
+      id: 20n,
+      codigo: 'CP-W020',
+      estado: 'COLA',
+      pago_estado: 'PENDIENTE',
+      pago_preferido,
+      pago_metodo,
+    });
+    const coordinado = { id: 20n, codigo: 'CP-W020', pago_estado: 'COORDINADO', pago_coordinado_en: new Date(), pago_coordinado_por: 2n };
+    const sinFoto = () => prismaMock.voucherPago.findFirst.mockResolvedValue(null);
+
+    beforeEach(() => {
+      prismaMock.pedido.update.mockResolvedValue(coordinado);
+    });
+
+    it('medio YAPE sin voucher útil -> 400 VOUCHER_REQUERIDO y no marca', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue(pedidoPendiente('YAPE'));
+      sinFoto();
+
+      await expect(service.marcarCoordinado('20', cajeroUsuario)).rejects.toMatchObject({
+        response: { codigo: 'VOUCHER_REQUERIDO' },
+      });
+      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+      expect(auditoriaMock.registrar).not.toHaveBeenCalled();
+    });
+
+    it('medio YAPE con voucher útil enlazado -> marca COORDINADO', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue(pedidoPendiente('YAPE'));
+
+      const res = await service.marcarCoordinado('20', cajeroUsuario);
+
+      expect(res.pago_estado).toBe('COORDINADO');
+      expect(prismaMock.voucherPago.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { pedido_id: 20n, semaforo: { not: 'ILEGIBLE' } } }),
+      );
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({ accion: 'MARCAR_COORDINADO' }),
+      );
+    });
+
+    it('voucher solo ILEGIBLE (excluido por la búsqueda) -> 400 VOUCHER_REQUERIDO', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue(pedidoPendiente('PLIN'));
+      sinFoto();
+
+      await expect(service.marcarCoordinado('20', cajeroUsuario, '10.0.0.1', {})).rejects.toMatchObject({
+        response: { codigo: 'VOUCHER_REQUERIDO' },
+      });
+      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+    });
+
+    it('sin voucher con motivo y PIN de supervisor correcto -> marca y audita con el motivo', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue(pedidoPendiente('TRANSFERENCIA'));
+      sinFoto();
+
+      const res = await service.marcarCoordinado('20', cajeroUsuario, '10.0.0.1', {
+        sinVoucher: { motivo: 'El cliente no tiene la foto', pinSupervisor: '123456' },
+      } as any);
+
+      expect(res.pago_estado).toBe('COORDINADO');
+      expect(supervisorCodigoMock.verificarYConsumirCodigo).toHaveBeenCalledWith(
+        '123456',
+        2n,
+        'caja/coordinado_sin_voucher',
+        '10.0.0.1',
+        'cobro',
+        undefined,
+      );
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accion: 'MARCAR_COORDINADO_SIN_VOUCHER',
+          conPinAdmin: true,
+          motivo: 'El cliente no tiene la foto',
+          despues: expect.objectContaining({
+            sin_voucher: expect.objectContaining({ motivo: 'El cliente no tiene la foto' }),
+          }),
+        }),
+      );
+    });
+
+    it('sin voucher con PIN de supervisor incorrecto -> 403 y no marca', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue(pedidoPendiente('YAPE'));
+      sinFoto();
+
+      await expect(
+        service.marcarCoordinado('20', cajeroUsuario, undefined, {
+          sinVoucher: { motivo: 'Motivo válido', pinSupervisor: '000000' },
+        } as any),
+      ).rejects.toMatchObject({ status: HttpStatus.FORBIDDEN });
+      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+    });
+
+    it('medio EFECTIVO o TARJETA no pide voucher', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue(pedidoPendiente('EFECTIVO'));
+      sinFoto();
+      await service.marcarCoordinado('20', cajeroUsuario);
+
+      prismaMock.pedido.findUnique.mockResolvedValue(pedidoPendiente('TARJETA'));
+      await service.marcarCoordinado('20', cajeroUsuario);
+
+      expect(prismaMock.voucherPago.findFirst).not.toHaveBeenCalled();
+      expect(prismaMock.pedido.update).toHaveBeenCalledTimes(2);
+    });
+
+    it('si no hay medio preferido usa pago_metodo para decidir si exige voucher', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue(pedidoPendiente(null, 'YAPE'));
+      sinFoto();
+
+      await expect(service.marcarCoordinado('20', cajeroUsuario)).rejects.toMatchObject({
+        response: { codigo: 'VOUCHER_REQUERIDO' },
+      });
     });
   });
 

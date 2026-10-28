@@ -35,11 +35,10 @@ import {
 } from './caja.calculo';
 import { CobrarDto } from './dto/cobrar.dto';
 import { AnularCobroDto } from './dto/anular-cobro.dto';
+import { MarcarCoordinadoDto } from './dto/marcar-coordinado.dto';
+import { exigirComprobanteDigital } from './comprobante-pago.util';
 
 /** Bloqueo de PIN de supervisor tras 3 fallos seguidos (FT-CAJ-02, RQ-CAJ-02-12). */
-
-/** Medios digitales: el cobro exige la foto del comprobante (la IA solo informa, nunca bloquea). */
-export const MEDIOS_CON_COMPROBANTE = ['YAPE', 'PLIN', 'TRANSFERENCIA'];
 
 @Injectable()
 export class CobrosService {
@@ -319,69 +318,23 @@ export class CobrosService {
         }
       }
 
-      // Comprobante del pago digital (Yape, Plin, transferencia): toda cobranza lo lleva enlazado al pedido.
-      // La IA solo informa (semáforo): nunca bloquea. Sin foto, Caja/Admin solo sigue con motivo y código de supervisor.
-      let sinVoucherAutorizado: { motivo: string; supervisorPartyId: string } | null = null;
-
+      // Comprobante del pago digital (Yape, Plin, transferencia): hace falta una foto útil (no ILEGIBLE) enlazada
+      // al pedido, para todos los roles. Sin ella, Caja/Admin puede seguir con motivo y código del supervisor;
+      // el mozo no tiene excepción (debe pedir otra foto o avisar a Caja).
       if (dto.voucherId !== undefined && dto.voucherId !== null && dto.voucherId !== '') {
         await this.vincularVoucherAPedido(tx, dto.voucherId, pedido.id);
       }
 
-      const tieneMedioDigital = dto.pagos.some((p) =>
-        MEDIOS_CON_COMPROBANTE.includes(p.medio.toUpperCase()),
-      );
-
-      if (tieneMedioDigital) {
-        const hayVoucher = await tx.voucherPago.findFirst({
-          where: { pedido_id: pedido.id },
-          select: { id: true },
-        });
-
-        if (!hayVoucher) {
-          const esMozo = (usuario?.rol || '').toUpperCase() === 'MOZO';
-
-          if (esMozo) {
-            // Mozo: obligatoria según voucher_mozo_obligatorio, sin excepción propia (debe avisar a Caja)
-            const paramMozo = await tx.parametro.findUnique({
-              where: { clave: 'voucher_mozo_obligatorio' },
-            });
-            const obligatorio =
-              paramMozo?.valor !== false &&
-              String(paramMozo?.valor).toLowerCase().trim() !== 'false';
-            if (obligatorio) {
-              throw new HttpException(
-                {
-                  codigo: 'VOUCHER_REQUERIDO',
-                  mensaje:
-                    'Es obligatorio subir la foto del voucher para cobrar con Yape o Plin en mesa.',
-                },
-                HttpStatus.BAD_REQUEST,
-              );
-            }
-          } else if (dto.sinVoucher) {
-            const sup: any = await this.verificarPinSupervisor(
-              dto.sinVoucher.pinSupervisor,
-              usuario?.partyId,
-              ip,
-              undefined,
-              'caja/cobrar_sin_voucher',
-            );
-            sinVoucherAutorizado = {
-              motivo: dto.sinVoucher.motivo.trim(),
-              supervisorPartyId: String(sup?.supervisorPartyId ?? sup?.party_id ?? ''),
-            };
-          } else {
-            throw new HttpException(
-              {
-                codigo: 'VOUCHER_REQUERIDO',
-                mensaje:
-                  'Falta la foto del comprobante del pago digital. Súbela, o registra el cobro sin voucher con motivo y código del supervisor.',
-              },
-              HttpStatus.BAD_REQUEST,
-            );
-          }
-        }
-      }
+      const esMozo = (usuario?.rol || '').toUpperCase() === 'MOZO';
+      const sinVoucherAutorizado = await exigirComprobanteDigital({
+        db: tx,
+        pedidoId: pedido.id,
+        medios: dto.pagos.map((p) => p.medio),
+        sinVoucher: esMozo ? undefined : dto.sinVoucher,
+        permiteExcepcion: !esMozo,
+        verificarPin: (pin) =>
+          this.verificarPinSupervisor(pin, usuario?.partyId, ip, undefined, 'caja/cobrar_sin_voucher'),
+      });
 
       // Determinar método de pago (el medio o MIXTO si hay más de uno)
       const distinctMedios = Array.from(new Set(dto.pagos.map((p) => p.medio.toUpperCase())));
@@ -726,6 +679,7 @@ export class CobrosService {
         modalidad: p.modalidad,
         estado: p.estado,
         pago_estado: p.pago_estado,
+        pago_preferido: p.pago_preferido,
         pago_metodo: p.pago_metodo,
         total: Number(p.total),
         cliente_nombre: p.cliente_nombre,
@@ -742,7 +696,12 @@ export class CobrosService {
   /**
    * Marca el pago del pedido como COORDINADO (pedidos de la carta, DT-57).
    */
-  async marcarCoordinado(id: bigint | string | number, usuario: any, ip?: string) {
+  async marcarCoordinado(
+    id: bigint | string | number,
+    usuario: any,
+    ip?: string,
+    dto?: MarcarCoordinadoDto,
+  ) {
     const pedidoId = this.parsearId(id);
 
     const pedido = await this.prisma.pedido.findUnique({
@@ -779,6 +738,17 @@ export class CobrosService {
       );
     }
 
+    // Medio digital del pedido: exige voucher útil (no ILEGIBLE) o excepción con código del supervisor.
+    const sinVoucherAutorizado = await exigirComprobanteDigital({
+      db: this.prisma,
+      pedidoId: pedido.id,
+      medios: [pedido.pago_preferido || pedido.pago_metodo],
+      sinVoucher: dto?.sinVoucher,
+      permiteExcepcion: true,
+      verificarPin: (pin) =>
+        this.verificarPinSupervisor(pin, usuario?.partyId, ip, undefined, 'caja/coordinado_sin_voucher'),
+    });
+
     const ahora = new Date();
 
     const actualizado = await this.prisma.pedido.update({
@@ -793,17 +763,21 @@ export class CobrosService {
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
       modulo: 'caja',
-      accion: 'MARCAR_COORDINADO',
+      accion: sinVoucherAutorizado ? 'MARCAR_COORDINADO_SIN_VOUCHER' : 'MARCAR_COORDINADO',
       resultado: 'OK',
       entidad: 'pedido',
       entidadId: pedido.id,
       partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
+      ...(sinVoucherAutorizado ? { conPinAdmin: true, motivo: sinVoucherAutorizado.motivo } : {}),
       antes: {
         pago_estado: pedido.pago_estado,
       },
       despues: {
         pago_estado: 'COORDINADO',
         pago_coordinado_en: ahora.toISOString(),
+        sin_voucher: sinVoucherAutorizado
+          ? { motivo: sinVoucherAutorizado.motivo, aprobado_por: sinVoucherAutorizado.supervisorPartyId }
+          : null,
       },
       ip,
     });

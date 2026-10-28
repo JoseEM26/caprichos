@@ -136,7 +136,6 @@ describe('vouchersApi (cliente tipado para lectura de vouchers con IA)', () => {
       expect(cfg.voucher_titular_nombre).toBe('Kevin R.');
       expect(cfg.voucher_yape_numero).toBe('946388934');
       expect(cfg.voucher_plin_numero).toBe('946388934');
-      expect(cfg.voucher_mozo_obligatorio).toBe(true);
     });
 
     it('guarda parámetro llamando a PUT /admin/configuracion/:clave', async () => {

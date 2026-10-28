@@ -213,8 +213,9 @@ export class VouchersService {
 
     // 10. Respuesta según el rol:
     // Al mozo y al cliente de la carta SOLO se entrega legible y mensaje, NUNCA el semáforo ni los datos extraídos
+    // legible sigue la misma regla que el cobro: un ILEGIBLE (aunque la IA lo lea) no cuenta como comprobante
     if (!usuario || usuario.rol === 'MOZO') {
-      const legible = extraido ? extraido.legible : voucher.semaforo !== 'ILEGIBLE';
+      const legible = voucher.semaforo !== 'ILEGIBLE';
       return {
         id: voucher.id.toString(),
         legible,
@@ -227,7 +228,7 @@ export class VouchersService {
     // Para Cajero y Administrador: respuesta completa
     return {
       id: voucher.id.toString(),
-      legible: extraido ? extraido.legible : true,
+      legible: voucher.semaforo !== 'ILEGIBLE',
       semaforo: voucher.semaforo,
       motivos: voucher.motivos,
       extraido: voucher.extraido,

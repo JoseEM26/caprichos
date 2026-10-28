@@ -12,6 +12,7 @@ import {
 } from './pedidosApi';
 import { ErrorApi } from '../../comun/api';
 import { TarjetaImpresionEtiquetas } from '../impresion/TarjetaImpresionEtiquetas';
+import { ModalCoordinarPago } from './ModalCoordinarPago';
 
 export interface ModalCajaProps {
   cajaInfo: CajaActualRespuesta | null;
@@ -52,6 +53,8 @@ export function ModalCaja({
   // Estado para pedidos por coordinar
   const [porCobrarList, setPorCobrarList] = useState<PedidoPorCobrar[]>([]);
   const [cargandoPorCobrar, setCargandoPorCobrar] = useState<boolean>(false);
+  // Pedido al que se le marca el pago coordinado (con foto o excepción)
+  const [pedidoPorCoordinar, setPedidoPorCoordinar] = useState<PedidoPorCobrar | null>(null);
 
   // Errores
   const [errorMensaje, setErrorMensaje] = useState<string>('');
@@ -154,16 +157,12 @@ export function ModalCaja({
     }
   };
 
-  // Manejador: Coordinar pago de un pedido por cobrar
-  const ejecutarCoordinar = async (pedidoId: string) => {
+  // Tras marcar coordinado (con la foto del comprobante o con la excepción del supervisor): refresca la cola
+  const alCoordinarPedido = async () => {
+    setPedidoPorCoordinar(null);
     setErrorMensaje('');
-    try {
-      await pedidosApi.marcarPagoCoordinado(pedidoId);
-      await cargarPorCobrar();
-      alActualizarCaja();
-    } catch (err: any) {
-      setErrorMensaje(err?.message || 'Error al registrar pago coordinado');
-    }
+    await cargarPorCobrar();
+    alActualizarCaja();
   };
 
   return (
@@ -752,7 +751,7 @@ export function ModalCaja({
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       {p.pago_estado !== 'COORDINADO' && (
                         <button
-                          onClick={() => ejecutarCoordinar(p.id)}
+                          onClick={() => setPedidoPorCoordinar(p)}
                           style={{
                             minHeight: 44,
                             padding: '0 12px',
@@ -848,6 +847,14 @@ export function ModalCaja({
             ejecutarAnularMovimiento();
           }}
           alCancelar={() => setMovParaAnular(null)}
+        />
+      )}
+
+      {pedidoPorCoordinar && (
+        <ModalCoordinarPago
+          pedido={pedidoPorCoordinar}
+          alCerrar={() => setPedidoPorCoordinar(null)}
+          alCoordinado={alCoordinarPedido}
         />
       )}
     </>

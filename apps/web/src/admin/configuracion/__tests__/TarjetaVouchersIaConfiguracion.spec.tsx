@@ -13,7 +13,6 @@ describe('TarjetaVouchersIaConfiguracion (Panel de Administración > Configuraci
     voucher_titular_nombre: 'Kevin',
     voucher_yape_numero: '946388934',
     voucher_plin_numero: '946388934',
-    voucher_mozo_obligatorio: true,
   };
 
   const consumoMock = {

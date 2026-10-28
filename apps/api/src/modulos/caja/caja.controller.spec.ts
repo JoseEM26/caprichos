@@ -148,10 +148,11 @@ describe('CajaController', () => {
     expect(cobrosServiceMock.listarPorCobrar).toHaveBeenCalledWith(mockUsuario);
   });
 
-  it('marcarCoordinado delega a cobrosService.marcarCoordinado', async () => {
+  it('marcarCoordinado delega a cobrosService.marcarCoordinado con la excepción del cuerpo', async () => {
     const req = { usuario: mockUsuario, ip: '127.0.0.1' };
-    await controller.marcarCoordinado('15', req);
+    const dto = { sinVoucher: { motivo: 'Cliente sin señal', pinSupervisor: '123456' } };
+    await controller.marcarCoordinado('15', dto as any, req);
 
-    expect(cobrosServiceMock.marcarCoordinado).toHaveBeenCalledWith('15', mockUsuario, '127.0.0.1');
+    expect(cobrosServiceMock.marcarCoordinado).toHaveBeenCalledWith('15', mockUsuario, '127.0.0.1', dto);
   });
 });

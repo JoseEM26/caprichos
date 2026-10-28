@@ -248,8 +248,9 @@ export function ModalPrecuenta({
                 pedidoId={pedidoId}
                 medio={medioSeleccionado.toUpperCase() as 'YAPE' | 'PLIN'}
                 alVoucherValido={(info) => {
-                  setVoucherLegible(true);
-                  setVoucherId(info.id);
+                  // Un voucher ilegible no cuenta: el mozo debe subir otra foto
+                  setVoucherLegible(info.legible);
+                  setVoucherId(info.legible ? info.id : undefined);
                 }}
               />
             )}
