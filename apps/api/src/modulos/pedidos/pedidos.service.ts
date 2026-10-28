@@ -700,6 +700,15 @@ export class PedidosService {
         });
       }
 
+      // Aviso al cliente de la carta virtual: se encola en la misma transacción que el pedido
+      if ((origen?.canal ?? 'CARTA') === 'CARTA' && this.avisosPedidoService) {
+        await this.avisosPedidoService.avisar(pedido.id, 'RECIBIDO', {}, tx);
+      }
+      // Aviso al equipo (nuevo pedido): también encolado en la transacción del pedido
+      if (this.avisosInternosService) {
+        await this.avisosInternosService.notificarNuevoPedido(pedido.id, tx);
+      }
+
       return pedido;
     });
 
@@ -733,22 +742,12 @@ export class PedidosService {
       // Ignorar si el servidor de websocket no está listo en pruebas
     }
 
-    // 10.5. Notificación interna por WhatsApp al equipo (asíncrono, best-effort)
-    if (this.avisosInternosService) {
-      setImmediate(() => {
-        this.avisosInternosService?.notificarNuevoPedido(pedidoCreado.id).catch((err) => {
-          this.logger.warn(`No se pudo emitir aviso interno de nuevo pedido: ${err.message}`);
-        });
-      });
-    }
+    // 10.5. Envío de los avisos encolados en la transacción del pedido (tras el commit)
+    this.avisosInternosService?.despertarOutbox();
 
-    // 10.6. Aviso al cliente que pidió desde la carta virtual (asíncrono, best-effort: nunca frena ni cambia el pedido)
+    // 10.6. Envío del aviso RECIBIDO encolado en la transacción del pedido (tras el commit)
     if ((origen?.canal ?? 'CARTA') === 'CARTA' && this.avisosPedidoService) {
-      setImmediate(() => {
-        this.avisosPedidoService
-          ?.avisar(pedidoCreado.id, 'RECIBIDO')
-          .catch((err) => this.logger.warn(`No se pudo emitir aviso de pedido recibido: ${err?.message}`));
-      });
+      this.avisosPedidoService.despertar();
     }
 
     // 11. Respuesta 201

@@ -1,5 +1,4 @@
 import {
-  Inject,
   Injectable,
   Logger,
   OnModuleDestroy,
@@ -12,11 +11,8 @@ import { RedisService } from '../../../comun/redis/redis.service';
 import { EventosGateway } from '../../../comun/socket/eventos.gateway';
 import { adquirirCandado, liberarCandado } from '../../../comun/redis/candado.util';
 import { AvisosInternosService } from './avisos-internos.service';
-import {
-  WHATSAPP_MENSAJERIA_PUERTO,
-  WhatsAppMensajeriaPuerto,
-  BotonAccion,
-} from '../puerto/whatsapp-mensajeria.puerto';
+import { OutboxWhatsappService } from '../servicios/outbox-whatsapp.service';
+import { BotonAccion } from '../puerto/whatsapp-mensajeria.puerto';
 import { BOTONES_AVISO_PEDIDO } from './avisos-internos.textos';
 import { normalizarTelefono } from '../utilidades/enmascarar.util';
 import { consultarEstadoAgente, leerParametroNumerico } from '../../impresion/estado-impresion';
@@ -41,6 +37,7 @@ export const TEXTO_ESPERA_CLIENTE =
 @Injectable()
 export class AlertasEsperaService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AlertasEsperaService.name);
+  private lagAvisadoEnMemoria = false;
   private timer: NodeJS.Timeout | null = null;
   private readonly intervaloMs = 20000; // 20 segundos
   private ejecutando = false;
@@ -49,8 +46,7 @@ export class AlertasEsperaService implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly redisService: RedisService,
     private readonly avisosInternosService: AvisosInternosService,
-    @Inject(WHATSAPP_MENSAJERIA_PUERTO)
-    private readonly mensajeria: WhatsAppMensajeriaPuerto,
+    private readonly outbox: OutboxWhatsappService,
     @Optional() private readonly eventosGateway?: EventosGateway,
   ) {}
 
@@ -249,32 +245,21 @@ export class AlertasEsperaService implements OnModuleInit, OnModuleDestroy {
           if (esPrimero) {
             const telCliente = normalizarTelefono(conv.telefono);
             if (telCliente) {
-              await this.mensajeria
-                .enviarBotones(telCliente, TEXTO_ESPERA_CLIENTE, BOTONES_ESPERA_CLIENTE, {
-                  conversacionId: conv.id,
-                })
-                .catch(async () => {
-                  // Fallback a texto libre si los botones interactivos no son soportados
-                  return this.mensajeria.enviarTexto(
-                    telCliente,
-                    `${TEXTO_ESPERA_CLIENTE}\n\n1. Ver la carta\n2. Seguir esperando\n3. Hablar con persona`,
-                    { conversacionId: conv.id },
-                  );
-                });
-
-              // Registrar mensaje en mensaje_chat para auditoría y visualización en el panel
-              await this.prisma.mensajeChat.create({
-                data: {
-                  conversacion_id: conv.id,
-                  direccion: 'SALE',
+              // Va por el outbox: sale con reintentos y queda en mensaje_chat al cerrar el envío
+              await this.outbox.encolar({
+                telefono: telCliente,
+                tipo: 'TEXTO',
+                clave: claveIdempEsperaCliente,
+                origen: 'ESPERA',
+                pedidoId: null,
+                carga: {
+                  textoLibre: TEXTO_ESPERA_CLIENTE,
+                  botones: BOTONES_ESPERA_CLIENTE,
                   autor: 'BOT',
-                  tipo: 'BOTON',
-                  contenido: {
-                    texto: TEXTO_ESPERA_CLIENTE,
-                    botones: BOTONES_ESPERA_CLIENTE,
-                  } as any,
+                  etapa: 'ESPERA_CLIENTE',
                 },
-              }).catch(() => {});
+              });
+              this.outbox.despertar();
 
               avisosEsperaClienteEnviados++;
             }
@@ -510,6 +495,11 @@ export class AlertasEsperaService implements OnModuleInit, OnModuleDestroy {
         }
       }
 
+      // 6.f) Retraso del outbox de WhatsApp (una alerta por episodio)
+      await this.avisarLagOutbox().catch((err: any) => {
+        this.logger.warn(`Error en aviso de lag del outbox: ${err.message}`);
+      });
+
       // 6) SECCIÓN 2.e: etiquetas en cola sin agente de impresión (una alerta por tanda)
       alertasImpresoraEnviadas += await this.avisarEtiquetasSinAgente(ahora).catch((err: any) => {
         this.logger.warn(`Error en aviso de etiquetas sin agente: ${err.message}`);
@@ -539,6 +529,45 @@ export class AlertasEsperaService implements OnModuleInit, OnModuleDestroy {
    * un solo aviso por WhatsApp (y campana) por tanda. La tanda se identifica por el trabajo
    * más antiguo en cola: cuando se imprime o vence, la siguiente tanda vuelve a avisar.
    */
+  /**
+   * Lag del outbox: si el PENDIENTE más viejo supera outbox_lag_alerta_min, avisa UNA vez por episodio a
+   * Admin y Caja. El episodio se marca en Redis (con respaldo en memoria si Redis cae) y se reinicia
+   * cuando el lag vuelve a bajar. El aviso de Admin pasa por el propio outbox.
+   */
+  private async avisarLagOutbox(): Promise<number> {
+    const resumen = await this.outbox.resumen();
+    const clave = 'idemp:outbox:lag:episodio';
+    if (!resumen.lagAlerta) {
+      this.lagAvisadoEnMemoria = false;
+      await this.borrarClaveRedis(clave);
+      return 0;
+    }
+    if (this.lagAvisadoEnMemoria) return 0;
+    if (!(await this.adquirirIdempotencia(clave, 7 * 86400))) return 0;
+    this.lagAvisadoEnMemoria = true;
+
+    const minutos = Math.floor(resumen.lagSegundos / 60);
+    const titulo = 'Cola de WhatsApp atrasada';
+    const detalle =
+      `Hay mensajes sin enviar desde hace ${minutos} min (pendientes: ${resumen.pendientes}, ` +
+      `fallidos: ${resumen.fallidos}). Revisa Mensajes, pestaña Salientes.`;
+    await this.prisma.notificacion.create({
+      data: { tipo: 'WHATSAPP_ALERTA', rol_destino: 'CAJERO', titulo, mensaje: detalle, enlace: '/admin/mensajes' },
+    });
+    await this.avisosInternosService.enviarAvisoAdmin(titulo, detalle, '/admin/mensajes');
+    this.logger.warn(JSON.stringify({ evento: 'outbox_lag_alerta', lagSegundos: resumen.lagSegundos, pendientes: resumen.pendientes }));
+    return 1;
+  }
+
+  private async borrarClaveRedis(clave: string): Promise<void> {
+    try {
+      const redis = this.redisService.obtenerCliente();
+      if (redis && typeof redis.del === 'function') await redis.del(clave);
+    } catch {
+      // sin Redis el respaldo en memoria ya cubre el episodio
+    }
+  }
+
   private async avisarEtiquetasSinAgente(ahora: Date): Promise<number> {
     const minutos = await leerParametroNumerico(this.prisma, 'impresion_alerta_min', 5);
     const corte = new Date(ahora.getTime() - minutos * 60 * 1000);

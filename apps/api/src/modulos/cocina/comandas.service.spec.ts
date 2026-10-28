@@ -31,6 +31,7 @@ describe('ComandasService', () => {
 
   beforeEach(async () => {
     prisma = {
+      $transaction: jest.fn(async (fn: any) => fn(prisma)),
       parametro: {
         findMany: jest.fn().mockResolvedValue([
           { clave: 'rep_naranja_min', valor: 35 },

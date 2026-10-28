@@ -15,6 +15,7 @@ import { TEXTOS_RESERVA } from '../conversacion/textos-reserva';
 import { obtenerFechaHoraLima } from '../../local/local.util';
 import { normalizarTelefono } from '../utilidades/enmascarar.util';
 import { adquirirCandado, liberarCandado } from '../../../comun/redis/candado.util';
+import { OutboxWhatsappService } from './outbox-whatsapp.service';
 
 @Injectable()
 export class RecordatorioReservasTarea implements OnModuleInit, OnModuleDestroy {
@@ -30,6 +31,7 @@ export class RecordatorioReservasTarea implements OnModuleInit, OnModuleDestroy 
     @Optional()
     @Inject(forwardRef(() => ReservasService))
     private readonly reservasService?: ReservasService,
+    @Optional() private readonly outbox?: OutboxWhatsappService,
   ) {}
 
   onModuleInit() {
@@ -141,18 +143,31 @@ export class RecordatorioReservasTarea implements OnModuleInit, OnModuleDestroy 
             toleranciaMin: r.tolerancia_min || 15,
           });
 
-          await this.ventana24hService.enviarMensajeNegocio(tel, {
-            textoLibre: mensajeTexto,
-            plantillaClave: 'RESERVA_RECORDATORIO',
-            variablesPlantilla: [r.nombre, horaMinutos],
+          // Marca de enviado y mensaje encolado en una sola transacción: el recordatorio no se repite
+          await this.prisma.$transaction(async (tx) => {
+            await tx.reserva.update({
+              where: { id: r.id },
+              data: { recordatorio_enviado: true },
+            });
+            await this.outbox!.encolar(
+              {
+                telefono: tel,
+                tipo: 'TEXTO',
+                clave: `reserva-recordatorio-${r.id}`,
+                origen: 'RECORDATORIO_RESERVA',
+                carga: {
+                  textoLibre: mensajeTexto,
+                  plantillaClave: 'RESERVA_RECORDATORIO',
+                  variablesPlantilla: [r.nombre, horaMinutos],
+                  autor: 'BOT',
+                  nombre: r.nombre,
+                  etapa: 'RECORDATORIO',
+                },
+              },
+              tx,
+            );
           }).catch((err) => {
-            this.logger.warn(`No se pudo enviar recordatorio de reserva a ${tel}: ${err.message}`);
-          });
-
-          // Marcar como enviado de forma idempotente para que no se repita
-          await this.prisma.reserva.update({
-            where: { id: r.id },
-            data: { recordatorio_enviado: true },
+            this.logger.warn(`No se pudo encolar recordatorio de reserva a ${tel}: ${err.message}`);
           });
 
           recordatoriosEnviados++;
@@ -185,18 +200,29 @@ export class RecordatorioReservasTarea implements OnModuleInit, OnModuleDestroy 
               hora: horaMinutos,
             });
 
-            await this.ventana24hService.enviarMensajeNegocio(tel, {
-              textoLibre: mensajeAviso,
-              plantillaClave: 'RESERVA_ACTUALIZACION',
-              variablesPlantilla: [r.nombre, `tolerancia vencida (${horaMinutos})`],
+            await this.outbox!.encolar({
+              telefono: tel,
+              tipo: 'TEXTO',
+              clave: `reserva-tolerancia-${r.id}`,
+              origen: 'RECORDATORIO_RESERVA',
+              carga: {
+                textoLibre: mensajeAviso,
+                plantillaClave: 'RESERVA_ACTUALIZACION',
+                variablesPlantilla: [r.nombre, `tolerancia vencida (${horaMinutos})`],
+                autor: 'BOT',
+                nombre: r.nombre,
+                etapa: 'TOLERANCIA_VENCIDA',
+              },
             }).catch((err) => {
-              this.logger.warn(`No se pudo enviar aviso de tolerancia vencida a ${tel}: ${err.message}`);
+              this.logger.warn(`No se pudo encolar aviso de tolerancia vencida a ${tel}: ${err.message}`);
             });
 
             vencidosNotificados++;
           }
         }
       }
+      // Lo encolado en esta corrida sale ya
+      this.outbox?.despertar();
     } finally {
       this.ejecutando = false;
       if (lockAdquirido && !lockFallback) {

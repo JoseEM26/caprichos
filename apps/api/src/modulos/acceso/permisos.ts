@@ -126,6 +126,10 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'mensajes', accion: 'tomar' },
   { modulo: 'mensajes', accion: 'enviar' },
   { modulo: 'mensajes', accion: 'cerrar' },
+  // Cola de WhatsApp saliente (outbox): ver el estado, reenviar o descartar un fallido
+  { modulo: 'whatsapp_salientes', accion: 'ver' },
+  { modulo: 'whatsapp_salientes', accion: 'reenviar' },
+  { modulo: 'whatsapp_salientes', accion: 'descartar' },
   { modulo: 'encuestas', accion: 'ver' },
   // Informes, indicadores y notificaciones (FT-INF-01..03)
   { modulo: 'informes', accion: 'ver' },
@@ -234,6 +238,9 @@ export const MATRIZ: Record<string, string[]> = {
     'mensajes/tomar',
     'mensajes/enviar',
     'mensajes/cerrar',
+    'whatsapp_salientes/ver',
+    'whatsapp_salientes/reenviar',
+    'whatsapp_salientes/descartar',
     'iniciativas/ver',
     'iniciativas/crear',
     'iniciativas/comentar',

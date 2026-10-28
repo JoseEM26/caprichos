@@ -103,7 +103,8 @@ describe('RepartosService', () => {
     };
 
     avisosMock = {
-      avisar: jest.fn().mockResolvedValue({ estado: 'ENVIADO' }),
+      avisar: jest.fn().mockResolvedValue({ estado: 'ENCOLADO' }),
+      despertar: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -250,7 +251,7 @@ describe('RepartosService', () => {
       expect(res.estado).toBe('EN_CAMINO');
       // Ya no pre-registra el aviso (lo registra AvisosPedidoService al enviar); dispara el aviso de salida
       expect(prismaMock.mensajeReparto.upsert).not.toHaveBeenCalled();
-      expect(avisosMock.avisar).toHaveBeenCalledWith(30n, 'SALIDA');
+      expect(avisosMock.avisar).toHaveBeenCalledWith(30n, 'SALIDA', {}, expect.anything());
       expect(eventosGatewayMock.emitirAdmin).toHaveBeenCalledWith(
         'pedido:estado',
         expect.objectContaining({ id: 30, estado: 'EN_CAMINO' }),
@@ -292,7 +293,7 @@ describe('RepartosService', () => {
 
       expect(res.estado).toBe('EN_CAMINO');
       expect(prismaMock.mensajeReparto.upsert).not.toHaveBeenCalled();
-      expect(avisosMock.avisar).toHaveBeenCalledWith(32n, 'LLEGADA');
+      expect(avisosMock.avisar).toHaveBeenCalledWith(32n, 'LLEGADA', {}, expect.anything());
       expect(auditoriaMock.registrar).toHaveBeenCalledWith(
         expect.objectContaining({ accion: 'LLEGUE' }),
       );

@@ -12,6 +12,10 @@ import { AvisosInternosService } from '../avisos-internos.service';
 import { WHATSAPP_MENSAJERIA_PUERTO } from '../../puerto/whatsapp-mensajeria.puerto';
 import { EventosGateway } from '../../../../comun/socket/eventos.gateway';
 import { adquirirCandado } from '../../../../comun/redis/candado.util';
+import { OutboxWhatsappService } from '../../servicios/outbox-whatsapp.service';
+
+
+const outboxMock = { encolar: jest.fn().mockResolvedValue(true), despertar: jest.fn(), limpiar: jest.fn(), resumen: jest.fn() };
 
 describe('AlertasEsperaService (Contrato Secciones 2, 3 y 4)', () => {
   let service: AlertasEsperaService;
@@ -81,6 +85,7 @@ describe('AlertasEsperaService (Contrato Secciones 2, 3 y 4)', () => {
         { provide: AvisosInternosService, useValue: avisosInternosMock },
         { provide: WHATSAPP_MENSAJERIA_PUERTO, useValue: mensajeriaMock },
         { provide: EventosGateway, useValue: eventosGatewayMock },
+        { provide: OutboxWhatsappService, useValue: outboxMock },
       ],
     }).compile();
 
@@ -217,26 +222,23 @@ describe('AlertasEsperaService (Contrato Secciones 2, 3 y 4)', () => {
       const res = await service.ejecutarCiclo(ahora);
       expect(res.avisosEsperaClienteEnviados).toBe(1);
 
-      // Envía mensaje interactivo con los 3 botones estipulados
-      expect(mensajeriaMock.enviarBotones).toHaveBeenCalledWith(
-        '51987654321',
-        expect.stringContaining('Seguimos revisando tu pago'),
-        [
-          { id: 'btn_esp_carta', titulo: 'Ver la carta' },
-          { id: 'btn_esp_esperar', titulo: 'Seguir esperando' },
-          { id: 'btn_esp_persona', titulo: 'Hablar con persona' },
-        ],
-        { conversacionId: 101n },
-      );
-
-      // Registra mensaje en base de datos
-      expect(prismaMock.mensajeChat.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          conversacion_id: 101n,
-          autor: 'BOT',
-          tipo: 'BOTON',
+      // El mensaje al cliente se encola en el outbox con sus 3 botones (el envío sale del lote)
+      expect(outboxMock.encolar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          telefono: '51987654321',
+          tipo: 'TEXTO',
+          origen: 'ESPERA',
+          carga: expect.objectContaining({
+            textoLibre: expect.stringContaining('Seguimos revisando tu pago'),
+            botones: [
+              { id: 'btn_esp_carta', titulo: 'Ver la carta' },
+              { id: 'btn_esp_esperar', titulo: 'Seguir esperando' },
+              { id: 'btn_esp_persona', titulo: 'Hablar con persona' },
+            ],
+          }),
         }),
-      });
+      );
+      expect(mensajeriaMock.enviarBotones).not.toHaveBeenCalled();
     });
   });
 

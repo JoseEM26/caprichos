@@ -5,6 +5,8 @@ import { TareaRecordatorioPagoService } from '../../../../servicios/tarea-record
 import { MensajesService } from '../../../../../mensajes/mensajes.service';
 import { ContextoConversacion, EntradaNormalizada, FlujoConversacion } from '../../../tipos-conversacion';
 
+const mockOutboxPago: any = { encolar: jest.fn().mockResolvedValue(true), despertar: jest.fn() };
+
 describe('Flujo de Pago por WhatsApp (FT-BOT-02, HU-CAP-130..132, 139)', () => {
   let subflujo: FlujoPagoSubFlujo;
 
@@ -498,6 +500,8 @@ describe('Flujo de Pago por WhatsApp (FT-BOT-02, HU-CAP-130..132, 139)', () => {
         mockRedis,
         mockVentana24h,
         mockEventos,
+        undefined,
+        mockOutboxPago,
       );
     });
 
@@ -525,12 +529,12 @@ describe('Flujo de Pago por WhatsApp (FT-BOT-02, HU-CAP-130..132, 139)', () => {
       // Primer ciclo: envía recordatorio
       const ciclo1 = await tareaService.ejecutarCiclo(ahora);
       expect(ciclo1.recordatoriosEnviados).toBe(1);
-      expect(mockVentana24h.enviarMensajeNegocio).toHaveBeenCalledTimes(1);
+      expect(mockOutboxPago.encolar).toHaveBeenCalledTimes(1);
 
       // Segundo ciclo inmediato: idempotente, no vuelve a enviar
       const ciclo2 = await tareaService.ejecutarCiclo(ahora);
       expect(ciclo2.recordatoriosEnviados).toBe(0);
-      expect(mockVentana24h.enviarMensajeNegocio).toHaveBeenCalledTimes(1);
+      expect(mockOutboxPago.encolar).toHaveBeenCalledTimes(1);
     });
 
     it('avisa a Caja por expiración sin anular automáticamente el pedido', async () => {

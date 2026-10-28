@@ -927,19 +927,29 @@ export class StockService {
       }
     }
 
-    // Avisos internos al equipo por WhatsApp cuando Almacén debe saber algo (asíncrono, best-effort)
+    // Avisos al equipo (Almacén). Con transacción externa se encolan dentro de ella (el llamador
+    // despierta el envío tras el commit); sin ella cada aviso se encola por su cuenta, en segundo plano.
     if (this.avisosInternosService) {
-      for (const insIdStr of insumosAgotadosDetectados) {
-        setImmediate(() => {
-          this.avisosInternosService?.notificarInsumoAgotado(insIdStr).catch(() => {});
-        });
-      }
-      for (const alerta of alertasBajo) {
-        if (alerta.insumoId) {
-          const insId = alerta.insumoId;
+      if (txExterno) {
+        for (const insIdStr of insumosAgotadosDetectados) {
+          await this.avisosInternosService.notificarInsumoAgotado(insIdStr, txExterno);
+        }
+        for (const alerta of alertasBajo) {
+          if (alerta.insumoId) await this.avisosInternosService.notificarInsumoBajoStock(alerta.insumoId, txExterno);
+        }
+      } else {
+        for (const insIdStr of insumosAgotadosDetectados) {
           setImmediate(() => {
-            this.avisosInternosService?.notificarInsumoBajoStock(insId).catch(() => {});
+            this.avisosInternosService?.notificarInsumoAgotado(insIdStr).catch(() => {});
           });
+        }
+        for (const alerta of alertasBajo) {
+          if (alerta.insumoId) {
+            const insId = alerta.insumoId;
+            setImmediate(() => {
+              this.avisosInternosService?.notificarInsumoBajoStock(insId).catch(() => {});
+            });
+          }
         }
       }
     }

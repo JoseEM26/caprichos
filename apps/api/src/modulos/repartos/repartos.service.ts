@@ -975,29 +975,32 @@ export class RepartosService {
 
     const ahora = new Date();
 
-    const pedidoActualizado = await this.prisma.pedido.update({
-      where: { id: pedidoId },
-      data: {
-        estado: 'EN_CAMINO',
-        salio_en: ahora,
-      },
-      include: {
-        zona: true,
-        lineas: { select: { cantidad: true } },
-      },
+    const pedidoActualizado = await this.prisma.$transaction(async (tx) => {
+      const actualizado = await tx.pedido.update({
+        where: { id: pedidoId },
+        data: {
+          estado: 'EN_CAMINO',
+          salio_en: ahora,
+        },
+        include: {
+          zona: true,
+          lineas: { select: { cantidad: true } },
+        },
+      });
+      await tx.pedidoEstadoHistorial.create({
+        data: {
+          pedido_id: pedidoId,
+          estado_anterior: 'LISTO',
+          estado_nuevo: 'EN_CAMINO',
+          motivo: 'En camino',
+          por_party_id: partyId,
+          en: ahora,
+        },
+      });
+      await this.avisos?.avisar(pedidoId, 'SALIDA', {}, tx);
+      return actualizado;
     });
-
-    // Historial
-    await this.prisma.pedidoEstadoHistorial.create({
-      data: {
-        pedido_id: pedidoId,
-        estado_anterior: 'LISTO',
-        estado_nuevo: 'EN_CAMINO',
-        motivo: 'En camino',
-        por_party_id: partyId,
-        en: ahora,
-      },
-    });
+    this.avisos?.despertar();
 
     // Auditoría
     await this.auditoria.registrar({
@@ -1018,7 +1021,6 @@ export class RepartosService {
       estado: 'EN_CAMINO',
     });
 
-    await this.avisos?.avisar(pedidoId, 'SALIDA');
 
     return this.formatearPedidoReparto(pedidoActualizado, config, ahora, usuario);
   }
@@ -1064,28 +1066,31 @@ export class RepartosService {
 
     const ahora = new Date();
 
-    const pedidoActualizado = await this.prisma.pedido.update({
-      where: { id: pedidoId },
-      data: {
-        llego_en: ahora,
-      },
-      include: {
-        zona: true,
-        lineas: { select: { cantidad: true } },
-      },
+    const pedidoActualizado = await this.prisma.$transaction(async (tx) => {
+      const actualizado = await tx.pedido.update({
+        where: { id: pedidoId },
+        data: {
+          llego_en: ahora,
+        },
+        include: {
+          zona: true,
+          lineas: { select: { cantidad: true } },
+        },
+      });
+      await tx.pedidoEstadoHistorial.create({
+        data: {
+          pedido_id: pedidoId,
+          estado_anterior: pedido.estado,
+          estado_nuevo: pedido.estado,
+          motivo: 'He llegado',
+          por_party_id: partyId,
+          en: ahora,
+        },
+      });
+      await this.avisos?.avisar(pedidoId, 'LLEGADA', {}, tx);
+      return actualizado;
     });
-
-    // Historial
-    await this.prisma.pedidoEstadoHistorial.create({
-      data: {
-        pedido_id: pedidoId,
-        estado_anterior: pedido.estado,
-        estado_nuevo: pedido.estado,
-        motivo: 'He llegado',
-        por_party_id: partyId,
-        en: ahora,
-      },
-    });
+    this.avisos?.despertar();
 
     // Auditoría
     await this.auditoria.registrar({
@@ -1107,7 +1112,6 @@ export class RepartosService {
       llego_en: ahora,
     });
 
-    await this.avisos?.avisar(pedidoId, 'LLEGADA');
 
     return this.formatearPedidoReparto(pedidoActualizado, config, ahora, usuario);
   }
@@ -1164,34 +1168,37 @@ export class RepartosService {
 
     const ahora = new Date();
 
-    const pedidoActualizado = await this.prisma.pedido.update({
-      where: { id: pedidoId },
-      data: {
-        estado: 'ENTREGADO',
-        entregado_en: ahora,
-      },
-      include: {
-        zona: true,
-        lineas: { select: { cantidad: true } },
-      },
-    });
-
     const porRendirEfectivo =
       pedido.pago_estado !== 'PAGADO' && pedido.pago_metodo === 'EFECTIVO'
         ? Number(pedido.total)
         : 0;
 
-    // Historial
-    await this.prisma.pedidoEstadoHistorial.create({
-      data: {
-        pedido_id: pedidoId,
-        estado_anterior: 'EN_CAMINO',
-        estado_nuevo: 'ENTREGADO',
-        motivo: 'Entregado',
-        por_party_id: partyId,
-        en: ahora,
-      },
+    const pedidoActualizado = await this.prisma.$transaction(async (tx) => {
+      const actualizado = await tx.pedido.update({
+        where: { id: pedidoId },
+        data: {
+          estado: 'ENTREGADO',
+          entregado_en: ahora,
+        },
+        include: {
+          zona: true,
+          lineas: { select: { cantidad: true } },
+        },
+      });
+      await tx.pedidoEstadoHistorial.create({
+        data: {
+          pedido_id: pedidoId,
+          estado_anterior: 'EN_CAMINO',
+          estado_nuevo: 'ENTREGADO',
+          motivo: 'Entregado',
+          por_party_id: partyId,
+          en: ahora,
+        },
+      });
+      await this.avisos?.avisar(pedidoId, 'ENTREGADO', {}, tx);
+      return actualizado;
     });
+    this.avisos?.despertar();
 
     // Auditoría
     await this.auditoria.registrar({
@@ -1212,7 +1219,6 @@ export class RepartosService {
       estado: 'ENTREGADO',
     });
 
-    await this.avisos?.avisar(pedidoId, 'ENTREGADO');
 
     const formateado = this.formatearPedidoReparto(
       pedidoActualizado,
@@ -1443,12 +1449,19 @@ export class RepartosService {
     }
 
     const recargo = await montoPendienteReprogramacion(this.prisma, pedidoId);
-    const resultado = await this.resolverFalla(
-      id,
-      { nota: 'Reprogramado tras confirmación del cliente', cierre: 'REPROGRAMADO', recargo },
-      usuario,
-      ip,
-    );
+    // Cambio de estado y aviso REENVIADO en una sola transacción (outbox)
+    const resultado = await this.prisma.$transaction(async (tx) => {
+      const r = await this.resolverFalla(
+        id,
+        { nota: 'Reprogramado tras confirmación del cliente', cierre: 'REPROGRAMADO', recargo },
+        usuario,
+        ip,
+        tx,
+      );
+      await this.avisos?.avisar(pedidoId, 'REENVIADO', {}, tx);
+      return r;
+    });
+    this.avisos?.despertar();
     await this.prisma.mensajeReparto.update({ where: clave, data: { estado: ESTADO_REPROG.REPROGRAMADO } });
     if (recargo > 0 && pedido.pago_estado === 'PAGADO') {
       // El pedido ya estaba pagado: el recargo no entra a la caja del repartidor, Caja lo cobra aparte.
@@ -1463,7 +1476,6 @@ export class RepartosService {
       });
       this.eventosGateway?.emitirAdmin('notificaciones:nueva', { id: notif.id.toString(), titulo: notif.titulo });
     }
-    await this.avisos?.avisar(pedidoId, 'REENVIADO');
     return resultado;
   }
 
@@ -1476,9 +1488,12 @@ export class RepartosService {
     dto: ResolverFallaDto,
     usuario: UsuarioAutenticado,
     ip?: string,
+    tx?: Prisma.TransactionClient,
   ) {
     const pedidoId = this.parsearId(id);
     const partyId = BigInt(usuario.partyId);
+    // Con `tx` (reprogramación) las escrituras del cambio de estado van en la transacción del llamador
+    const db = tx ?? this.prisma;
 
     const pedido = await this.prisma.pedido.findUnique({
       where: { id: pedidoId },
@@ -1510,7 +1525,7 @@ export class RepartosService {
     });
 
     if (ultimoIncidente) {
-      await this.prisma.incidenteEntrega.update({
+      await db.incidenteEntrega.update({
         where: { id: ultimoIncidente.id },
         data: {
           cierre,
@@ -1546,13 +1561,13 @@ export class RepartosService {
       dataActualizacion.repartidor_party_id = null;
     }
 
-    const pedidoActualizado = await this.prisma.pedido.update({
+    const pedidoActualizado = await db.pedido.update({
       where: { id: pedidoId },
       data: dataActualizacion,
     });
 
     // Historial
-    await this.prisma.pedidoEstadoHistorial.create({
+    await db.pedidoEstadoHistorial.create({
       data: {
         pedido_id: pedidoId,
         estado_anterior: pedido.estado,
@@ -1875,6 +1890,11 @@ export class RepartosService {
             })
           : [];
 
+        // Aviso SALIDA de cada pedido tomado, en la misma transacción (se despierta el envío tras el commit)
+        for (const id of tomadosIds) {
+          await this.avisos?.avisar(id, 'SALIDA', {}, tx);
+        }
+
         return {
           tomadosFilas,
           tomadosIds,
@@ -1904,9 +1924,7 @@ export class RepartosService {
       });
     }
 
-    for (const id of resultadoTransaccion.tomadosIds) {
-      await this.avisos?.avisar(id, 'SALIDA');
-    }
+    this.avisos?.despertar();
 
     return {
       tomados,

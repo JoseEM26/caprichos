@@ -49,6 +49,7 @@ describe('PedidosEstadoService', () => {
 
   beforeEach(async () => {
     prismaMock = {
+      $transaction: jest.fn(async (fn: any) => fn(prismaMock)),
       pedido: {
         findUnique: jest.fn(),
         findMany: jest.fn(),

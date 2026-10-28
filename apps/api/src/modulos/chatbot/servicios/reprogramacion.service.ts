@@ -115,19 +115,25 @@ export class ReprogramacionService {
 
   /** SI del cliente: queda "Por reprogramar" para que el admin lo reenvíe a reparto. Idempotente. */
   private async registrarSi(pedidoId: bigint, codigo: string) {
-    const r = await this.prisma.mensajeReparto.updateMany({
-      where: { pedido_id: pedidoId, numero: NUMERO_PREGUNTA_REPROG, estado: ESTADO_REPROG.ENVIADO },
-      data: { estado: ESTADO_REPROG.REPROGRAMAR, respondido_en: new Date() },
+    // El cambio de estado y el aviso al cliente van en la misma transacción (outbox)
+    const nuevo = await this.prisma.$transaction(async (tx) => {
+      const r = await tx.mensajeReparto.updateMany({
+        where: { pedido_id: pedidoId, numero: NUMERO_PREGUNTA_REPROG, estado: ESTADO_REPROG.ENVIADO },
+        data: { estado: ESTADO_REPROG.REPROGRAMAR, respondido_en: new Date() },
+      });
+      if (r.count === 0) return false;
+      await this.avisos.avisar(pedidoId, 'REPROG_RECIBIDA', {}, tx);
+      return true;
     });
-    if (r.count === 0) return;
+    if (!nuevo) return;
 
+    this.avisos.despertar();
     await this.notificarCaja(
       'Cliente pide reprogramar entrega',
       `El cliente del pedido ${codigo} confirmó reprogramar. Reenvíalo a reparto desde Repartos (Por reprogramar).`,
       'REPROGRAMACION_DELIVERY',
       '/admin/repartos',
     );
-    await this.avisos.avisar(pedidoId, 'REPROG_RECIBIDA');
   }
 
   /**
@@ -162,9 +168,12 @@ export class ReprogramacionService {
         where: { pedido_id: pedidoId, numero: NUMERO_PREGUNTA_REPROG },
         data: { estado: cfg.estado, respondido_en: ahora },
       });
+      // Aviso de cancelación dentro de la misma transacción: si el pedido no se anula, no hay aviso
+      await this.avisos.avisar(pedidoId, cfg.aviso, {}, tx);
       return true;
     });
     if (!ok) return false;
+    this.avisos.despertar();
 
     const pedido = await this.prisma.pedido.findUnique({
       where: { id: pedidoId },
@@ -183,7 +192,6 @@ export class ReprogramacionService {
       );
     }
 
-    await this.avisos.avisar(pedidoId, cfg.aviso);
     return true;
   }
 

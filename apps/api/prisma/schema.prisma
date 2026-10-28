@@ -486,6 +486,7 @@ model Pedido {
   solicitudesCambio      SolicitudCambio[]
   encuesta               Encuesta?
   printJobs              PrintJob[]
+  salientesWhatsapp      SalienteWhatsapp[]
   whatsappMensajes       WhatsappMensaje[]
   encuestaPosventa       EncuestaPosventa?
   quejasWhatsapp         QuejaWhatsapp[]
@@ -1781,6 +1782,36 @@ model PrintJob {
   deviceKey           DeviceKey?  @relation(fields: [device_key_id], references: [id])
 
   @@map("print_job")
+}
+
+model SalienteWhatsapp {
+  id                 BigInt    @id @default(autoincrement())
+  secuencia          BigInt    @unique @default(autoincrement())
+  telefono_destino   String
+  tipo               String    // TEXTO | PLANTILLA (CHECK en BD)
+  carga              Json      @default("{}")
+  clave_idempotencia String    @unique
+  estado             String    @default("PENDIENTE") // PENDIENTE | ENVIANDO | ENVIADO | FALLIDO | DESCARTADO (CHECK en BD)
+  intentos           Int       @default(0)
+  max_intentos       Int       @default(5)
+  proximo_intento_en DateTime  @default(now()) @db.Timestamptz
+  intento_token      String?
+  ultimo_error       String?
+  wa_message_id      String?
+  pedido_id          BigInt?
+  origen             String    // AVISO_PEDIDO | REPROGRAMACION | ALERTA_ADMIN | ESPERA | RECOJO | ENCUESTA | RECORDATORIO_*
+  creado_en          DateTime  @default(now()) @db.Timestamptz
+  enviado_en         DateTime? @db.Timestamptz
+  actualizado_en     DateTime  @default(now()) @updatedAt @db.Timestamptz
+  descartado_en      DateTime? @db.Timestamptz
+  descartado_por     String?
+  motivo_descarte    String?
+
+  pedido             Pedido?   @relation(fields: [pedido_id], references: [id])
+
+  @@index([estado, proximo_intento_en])
+  @@index([telefono_destino, pedido_id, secuencia])
+  @@map("saliente_whatsapp")
 }
 
 model DataRequest {

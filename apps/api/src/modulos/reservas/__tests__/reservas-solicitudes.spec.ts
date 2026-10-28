@@ -13,6 +13,10 @@ import { EventosGateway } from '../../../comun/socket/eventos.gateway';
 import { Ventana24hService } from '../../chatbot/servicios/ventana-24h.service';
 import { UsuarioAutenticado } from '../../acceso/acceso.tipos';
 import { horaToDate } from '../../local/local.util';
+import { OutboxWhatsappService } from '../../chatbot/servicios/outbox-whatsapp.service';
+
+
+const outboxMock = { encolar: jest.fn().mockResolvedValue(true), despertar: jest.fn(), limpiar: jest.fn(), resumen: jest.fn() };
 
 describe('ReservasService - Solicitudes y Disponibilidad WhatsApp', () => {
   let service: ReservasService;
@@ -83,6 +87,7 @@ describe('ReservasService - Solicitudes y Disponibilidad WhatsApp', () => {
         { provide: AuditoriaService, useValue: auditoria },
         { provide: EventosGateway, useValue: eventosGateway },
         { provide: Ventana24hService, useValue: ventana24hService },
+        { provide: OutboxWhatsappService, useValue: outboxMock },
       ],
     }).compile();
 
@@ -290,15 +295,12 @@ describe('ReservasService - Solicitudes y Disponibilidad WhatsApp', () => {
       );
 
       // Verifica mensaje enviado por WhatsApp
-      expect(ventana24hService.enviarMensajeNegocio).toHaveBeenCalledWith(
-        '912345678',
+      expect(outboxMock.encolar).toHaveBeenCalledWith(
         expect.objectContaining({
-          plantillaClave: 'RESERVA_CONFIRMADA',
-        }),
+          telefono: '912345678',
+          carga: expect.objectContaining({ plantillaClave: 'RESERVA_CONFIRMADA' }),
+        }), expect.anything(),
       );
-
-      // Verifica registro en chat de la conversación
-      expect(prisma.mensajeChat.create).toHaveBeenCalled();
     });
   });
 
@@ -379,11 +381,11 @@ describe('ReservasService - Solicitudes y Disponibilidad WhatsApp', () => {
       );
 
       // Verifica WhatsApp al cliente
-      expect(ventana24hService.enviarMensajeNegocio).toHaveBeenCalledWith(
-        '998877665',
+      expect(outboxMock.encolar).toHaveBeenCalledWith(
         expect.objectContaining({
-          plantillaClave: 'RESERVA_ACTUALIZACION',
-        }),
+          telefono: '998877665',
+          carga: expect.objectContaining({ plantillaClave: 'RESERVA_ACTUALIZACION' }),
+        }), expect.anything(),
       );
     });
   });

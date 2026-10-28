@@ -6,6 +6,7 @@ import { Ventana24hService } from './ventana-24h.service';
 import { TareaRecordatorioPagoService } from './tarea-recordatorio-pago.service';
 import { AvisosPedidoService, NUMEROS_INTENTO } from './avisos-pedido.service';
 import { ReprogramacionService, MOTIVO_RETIRO } from './reprogramacion.service';
+import { OutboxWhatsappService } from './outbox-whatsapp.service';
 import { calcularMontoReprogramacion } from '../../repartos/recargo-reprogramacion';
 import { normalizarTelefono } from '../utilidades/enmascarar.util';
 import { adquirirCandado, liberarCandado } from '../../../comun/redis/candado.util';
@@ -76,6 +77,7 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
     @Optional() private readonly tareaRecordatorioPago?: TareaRecordatorioPagoService,
     @Optional() private readonly avisos?: AvisosPedidoService,
     @Optional() private readonly reprogramacion?: ReprogramacionService,
+    @Optional() private readonly outbox?: OutboxWhatsappService,
   ) {}
 
   onModuleInit() {
@@ -180,6 +182,16 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
       const params = await this.obtenerParametros();
       const ahora = new Date();
       const resumen = resumenVacio(false);
+
+      // Outbox de WhatsApp: envía lo encolado (avisos nuevos y reintentos vencidos) y borra lo enviado y viejo
+      if (this.outbox) {
+        await this.outbox.procesarLote().catch((err) => {
+          this.logger.error(`Error al procesar el outbox de WhatsApp: ${err.message}`, err.stack);
+        });
+        await this.outbox.limpiar(ahora).catch((err) => {
+          this.logger.error(`Error al limpiar el outbox de WhatsApp: ${err.message}`, err.stack);
+        });
+      }
 
       // 1. Delivery en puerta (tiempos) y aceptación por cobro
       const pedidosDelivery = await this.prisma.pedido.findMany({
@@ -309,15 +321,22 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
             if (!acepta) continue;
 
             const nombre = p.cliente_nombre || 'Cliente';
-            await this.ventana24hService.enviarMensajeNegocio(
+            await this.outbox!.encolar({
               telefono,
-              {
+              tipo: 'TEXTO',
+              clave: `recojo-${p.id}`,
+              origen: 'RECOJO',
+              pedidoId: p.id,
+              carga: {
                 textoLibre: `¡Hola ${nombre}! 🥳 Tu pedido ${p.codigo} ya está listo para recoger en nuestro local. ¡Te esperamos con gusto! 😊`,
                 plantillaClave: 'PEDIDO_LISTO_RECOJO',
                 variablesPlantilla: [nombre, p.codigo],
+                autor: 'BOT',
+                nombre,
+                pedidoCodigo: p.codigo,
+                etapa: 'RECOJO',
               },
-              { pedidoId: p.id },
-            );
+            });
             resumen.avisosRecojo++;
           }
         }
@@ -346,30 +365,41 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
 
           const nombre = p.cliente_nombre || 'Cliente';
 
-          // Registrar encuesta como ENVIADA
-          await this.prisma.encuestaPosventa.create({
-            data: {
-              pedido_id: p.id,
-              estado: 'ENVIADA',
-              enviada_en: ahora,
-            },
+          // Encuesta ENVIADA y mensaje encolado en una sola transacción: si se cae, no queda una a medias
+          await this.prisma.$transaction(async (tx) => {
+            await tx.encuestaPosventa.create({
+              data: {
+                pedido_id: p.id,
+                estado: 'ENVIADA',
+                enviada_en: ahora,
+              },
+            });
+            // Botones si la ventana está abierta, o plantilla si está cerrada (se decide al enviar)
+            await this.outbox!.encolar(
+              {
+                telefono,
+                tipo: 'TEXTO',
+                clave: `encuesta-${p.id}`,
+                origen: 'ENCUESTA',
+                pedidoId: p.id,
+                carga: {
+                  textoLibre: `Hola ${nombre}, gracias por tu compra en Caprichos (pedido ${p.codigo}). ¿Como calificarias tu atencion del 1 al 5?`,
+                  plantillaClave: 'ENCUESTA_POSVENTA',
+                  variablesPlantilla: [nombre, p.codigo],
+                  botones: [
+                    { id: 'encuesta:1', titulo: '1 Malo' },
+                    { id: 'encuesta:3', titulo: '3 Regular' },
+                    { id: 'encuesta:5', titulo: '5 Excelente' },
+                  ],
+                  autor: 'BOT',
+                  nombre,
+                  pedidoCodigo: p.codigo,
+                  etapa: 'ENCUESTA',
+                },
+              },
+              tx,
+            );
           });
-
-          // Enviar con botones si ventana abierta, o plantilla si cerrada
-          await this.ventana24hService.enviarMensajeNegocio(
-            telefono,
-            {
-              textoLibre: `Hola ${nombre}, gracias por tu compra en Caprichos (pedido ${p.codigo}). ¿Como calificarias tu atencion del 1 al 5?`,
-              plantillaClave: 'ENCUESTA_POSVENTA',
-              variablesPlantilla: [nombre, p.codigo],
-              botones: [
-                { id: 'encuesta:1', titulo: '1 Malo' },
-                { id: 'encuesta:3', titulo: '3 Regular' },
-                { id: 'encuesta:5', titulo: '5 Excelente' },
-              ],
-            },
-            { pedidoId: p.id },
-          );
 
           resumen.avisosEncuesta++;
         }
@@ -380,6 +410,9 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
           this.logger.error(`Error en ciclo de tareaRecordatorioPago: ${err.message}`, err.stack);
         });
       }
+
+      // Lo encolado en este ciclo sale ya, sin esperar los 30 s del próximo
+      this.outbox?.despertar();
 
       return resumen;
     } finally {

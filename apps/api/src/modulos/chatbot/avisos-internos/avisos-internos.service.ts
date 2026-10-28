@@ -1,4 +1,6 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { randomUUID } from 'crypto';
+import type { Prisma } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { RedisService } from '../../../comun/redis/redis.service';
@@ -11,6 +13,7 @@ import {
   WhatsAppMensajeriaPuerto,
 } from '../puerto/whatsapp-mensajeria.puerto';
 import { Ventana24hService } from '../servicios/ventana-24h.service';
+import { OutboxWhatsappService } from '../servicios/outbox-whatsapp.service';
 import { CATALOGO_PLANTILLAS } from '../catalogo/plantillas.catalogo';
 import { enmascararTelefono, hashTelefono, normalizarTelefono } from '../utilidades/enmascarar.util';
 import {
@@ -44,6 +47,7 @@ export class AvisosInternosService {
     private readonly ventana24hService: Ventana24hService,
     @Inject(WHATSAPP_MENSAJERIA_PUERTO)
     private readonly mensajeria: WhatsAppMensajeriaPuerto,
+    private readonly outbox: OutboxWhatsappService,
     @Optional() private readonly eventosGateway?: EventosGateway,
   ) {}
 
@@ -248,7 +252,17 @@ export class AvisosInternosService {
    * Notifica al equipo por WhatsApp al crearse un pedido nuevo (cualquier canal).
    * No bloquea ni retrasa el pedido.
    */
-  async notificarNuevoPedido(pedidoId: bigint | string): Promise<ResultadoNotificacionEquipo> {
+  /** Despierta el envío del outbox tras un commit que encoló avisos con `tx`. */
+  despertarOutbox(): void {
+    this.outbox.despertar();
+  }
+
+  /**
+   * Avisa al equipo del pedido nuevo: un mensaje por número, encolado en el outbox.
+   * Con `tx` (creación del pedido) el encolado va en esa transacción; sin `tx`, cada número se encola sola.
+   */
+  async notificarNuevoPedido(pedidoId: bigint | string, tx?: Prisma.TransactionClient): Promise<ResultadoNotificacionEquipo> {
+    const db = tx ?? this.prisma;
     const activo = await this.estanAvisosActivos();
     if (!activo) {
       this.logger.log('Avisos internos al equipo desactivados en configuración (chatbot_avisos_equipo_activo).');
@@ -273,7 +287,7 @@ export class AvisosInternosService {
       };
     }
 
-    const pedido = await this.prisma.pedido.findUnique({
+    const pedido = await db.pedido.findUnique({
       where: { id: BigInt(pedidoId) },
       include: {
         lineas: {
@@ -325,98 +339,46 @@ export class AvisosInternosService {
     for (const telefono of numerosEquipo) {
       const telMask = enmascararTelefono(telefono);
       const telHash = hashTelefono(telefono);
-      const claveIdemp = `idemp:aviso:pedido:${pedido.id}:${telHash}`;
-
-      const esPrimerEnvio = await this.adquirirIdempotencia(claveIdemp);
-      if (!esPrimerEnvio) {
-        this.logger.log(`Aviso de pedido ${pedido.codigo} a ${telMask} omitido por idempotencia.`);
-        detalles.push({
-          telefonoEnmascarado: telMask,
-          exito: true,
-          modo: 'OMITIDO_IDEMPOTENTE',
-        });
-        continue;
-      }
-
-      // Evaluar si el número del equipo se encuentra dentro de la ventana de 24 horas
-      const ventanaAbierta = await this.ventana24hService.esVentanaAbierta(telefono);
-      let resultado: ResultadoEnvioWhatsApp;
-      let modoEnvio: 'VENTANA_24H' | 'PLANTILLA';
-
-      if (ventanaAbierta) {
-        modoEnvio = 'VENTANA_24H';
-        resultado = await this.enviarConReintentos(() =>
-          this.mensajeria.enviarBotones(telefono, textoCuerpo, botones, {
-            pedidoId: pedido.id,
-          }),
-        );
-      } else {
-        modoEnvio = 'PLANTILLA';
-        const definicion = CATALOGO_PLANTILLAS.EQUIPO_NUEVO_PEDIDO;
-        const modalidadCliente = `${pedido.modalidad} - ${pedido.cliente_nombre || 'Cliente'}`;
-        resultado = await this.enviarConReintentos(() =>
-          this.mensajeria.enviarPlantilla(
-            telefono,
-            definicion.nombre,
-            definicion.idioma,
-            [pedido.codigo, modalidadCliente, Number(pedido.total).toFixed(2)],
-            { pedidoId: pedido.id },
-          ),
-        );
-      }
-
-      if (resultado.exito) {
-        exitosos++;
-        this.logger.log(`Aviso interno de pedido ${pedido.codigo} enviado a ${telMask} (${modoEnvio}).`);
-      } else {
-        this.logger.warn(
-          `Fallo al enviar aviso interno de pedido ${pedido.codigo} a ${telMask}: ${resultado.errorDetalle}`,
-        );
-      }
-
+      // Un aviso por pedido y número: la clave del outbox evita el duplicado (sin Redis)
+      const nuevo = await this.outbox.encolar(
+        {
+          telefono,
+          tipo: 'TEXTO',
+          clave: `equipo-nuevo-pedido:${pedido.id}:${telHash}`,
+          origen: 'EQUIPO_NUEVO_PEDIDO',
+          pedidoId: pedido.id,
+          carga: {
+            textoLibre: textoCuerpo,
+            botones,
+            plantillaClave: 'EQUIPO_NUEVO_PEDIDO',
+            variablesPlantilla: [
+              pedido.codigo,
+              `${pedido.modalidad} - ${pedido.cliente_nombre || 'Cliente'}`,
+              Number(pedido.total).toFixed(2),
+            ],
+            autor: 'BOT',
+            etapa: 'EQUIPO_NUEVO_PEDIDO',
+          },
+        },
+        tx,
+      );
+      if (nuevo) exitosos++;
       detalles.push({
         telefonoEnmascarado: telMask,
-        exito: resultado.exito,
-        modo: resultado.exito ? modoEnvio : 'ERROR',
-        waMessageId: resultado.waMessageId,
-        error: resultado.errorDetalle,
+        exito: true,
+        modo: nuevo ? 'ENCOLADO' : 'OMITIDO_IDEMPOTENTE',
       });
-
-      // Registro en tabla whatsapp_mensaje para trazabilidad
-      await this.prisma.whatsappMensaje.create({
-        data: {
-          direccion: 'SALIENTE',
-          wa_message_id: resultado.waMessageId || null,
-          telefono_enmascarado: telMask,
-          telefono_hash: telHash,
-          tipo: modoEnvio === 'PLANTILLA' ? 'PLANTILLA' : 'BOTON',
-          plantilla: modoEnvio === 'PLANTILLA' ? 'caprichos_equipo_nuevo_pedido' : null,
-          estado: resultado.exito ? (resultado.estado || 'ENVIADO') : 'FALLIDO',
-          error_codigo: resultado.errorCodigo || null,
-          error_detalle: resultado.errorDetalle || null,
-          pedido_id: pedido.id,
-        },
-      }).catch((e) => {
-        this.logger.warn(`No se pudo persistir registro de whatsapp_mensaje: ${e.message}`);
-      });
-
-      // Auditoría de envío
       await this.auditoriaService.registrar({
         categoria: 'CAMBIO',
         modulo: 'chatbot',
         accion: 'WHATSAPP_AVISO_EQUIPO_PEDIDO',
-        resultado: resultado.exito ? 'OK' : 'RECHAZADO',
+        resultado: 'OK',
         entidad: 'pedido',
         entidadId: pedido.id,
-        despues: {
-          pedidoCodigo: pedido.codigo,
-          canal: pedido.canal,
-          destino: telMask,
-          modoEnvio,
-          exito: resultado.exito,
-        },
+        despues: { pedidoCodigo: pedido.codigo, canal: pedido.canal, destino: telMask, encolado: nuevo },
       }).catch(() => {});
     }
+    if (!tx) this.outbox.despertar();
 
     return {
       omitido: false,
@@ -430,7 +392,7 @@ export class AvisosInternosService {
   /**
    * Notifica al equipo cuando Almacén debe saber algo (insumo agotado o por pedir).
    */
-  async notificarAlmacen(datos: DatosAvisoAlmacen): Promise<ResultadoNotificacionEquipo> {
+  async notificarAlmacen(datos: DatosAvisoAlmacen, tx?: Prisma.TransactionClient): Promise<ResultadoNotificacionEquipo> {
     const activo = await this.estanAvisosActivos();
     if (!activo) {
       return {
@@ -467,76 +429,45 @@ export class AvisosInternosService {
     for (const telefono of numerosEquipo) {
       const telMask = enmascararTelefono(telefono);
       const telHash = hashTelefono(telefono);
-      const claveIdemp = `idemp:aviso:almacen:${datos.insumoId}:${datos.tipoAlerta}:${fechaHoy}:${telHash}`;
-
-      const esPrimerEnvio = await this.adquirirIdempotencia(claveIdemp);
-      if (!esPrimerEnvio) {
-        this.logger.log(`Aviso de almacén (${datos.nombreInsumo}) a ${telMask} omitido por idempotencia diaria.`);
-        detalles.push({
-          telefonoEnmascarado: telMask,
-          exito: true,
-          modo: 'OMITIDO_IDEMPOTENTE',
-        });
-        continue;
-      }
-
-      const ventanaAbierta = await this.ventana24hService.esVentanaAbierta(telefono);
-      let resultado: ResultadoEnvioWhatsApp;
-      let modoEnvio: 'VENTANA_24H' | 'PLANTILLA';
-
-      if (ventanaAbierta) {
-        modoEnvio = 'VENTANA_24H';
-        resultado = await this.enviarConReintentos(() =>
-          this.mensajeria.enviarBotones(telefono, textoCuerpo, botones),
-        );
-      } else {
-        modoEnvio = 'PLANTILLA';
-        const definicion = CATALOGO_PLANTILLAS.EQUIPO_ALERTA_ALMACEN;
-        const estadoEtiqueta = esAgotado ? 'Agotado' : 'Por pedir';
-        const stockStr = `${Number(datos.stockActual).toFixed(2)} ${datos.unidadMedida || 'UND'}`;
-        resultado = await this.enviarConReintentos(() =>
-          this.mensajeria.enviarPlantilla(
-            telefono,
-            definicion.nombre,
-            definicion.idioma,
-            [datos.nombreInsumo, estadoEtiqueta, stockStr],
-          ),
-        );
-      }
-
-      if (resultado.exito) {
-        exitosos++;
-        this.logger.log(`Aviso de almacén (${datos.nombreInsumo}) enviado a ${telMask} (${modoEnvio}).`);
-      } else {
-        this.logger.warn(`Fallo al enviar aviso de almacén a ${telMask}: ${resultado.errorDetalle}`);
-      }
-
+      // Una alerta por insumo, tipo y día por número: la clave del outbox lo garantiza (sin Redis)
+      const nuevo = await this.outbox.encolar(
+        {
+          telefono,
+          tipo: 'TEXTO',
+          clave: `almacen:${datos.insumoId}:${datos.tipoAlerta}:${fechaHoy}:${telHash}`,
+          origen: 'EQUIPO_ALERTA_ALMACEN',
+          carga: {
+            textoLibre: textoCuerpo,
+            botones,
+            plantillaClave: 'EQUIPO_ALERTA_ALMACEN',
+            variablesPlantilla: [
+              datos.nombreInsumo,
+              esAgotado ? 'Agotado' : 'Por pedir',
+              `${Number(datos.stockActual).toFixed(2)} ${datos.unidadMedida || 'UND'}`,
+            ],
+            autor: 'BOT',
+            etapa: 'ALMACEN',
+          },
+        },
+        tx,
+      );
+      if (nuevo) exitosos++;
       detalles.push({
         telefonoEnmascarado: telMask,
-        exito: resultado.exito,
-        modo: resultado.exito ? modoEnvio : 'ERROR',
-        waMessageId: resultado.waMessageId,
-        error: resultado.errorDetalle,
+        exito: true,
+        modo: nuevo ? 'ENCOLADO' : 'OMITIDO_IDEMPOTENTE',
       });
-
-      // Registro en auditoría
       await this.auditoriaService.registrar({
         categoria: 'CAMBIO',
         modulo: 'chatbot',
         accion: 'WHATSAPP_AVISO_EQUIPO_ALMACEN',
-        resultado: resultado.exito ? 'OK' : 'RECHAZADO',
+        resultado: 'OK',
         entidad: 'insumo',
         entidadId: BigInt(datos.insumoId),
-        despues: {
-          insumo: datos.nombreInsumo,
-          tipoAlerta: datos.tipoAlerta,
-          stockActual: datos.stockActual,
-          destino: telMask,
-          modoEnvio,
-          exito: resultado.exito,
-        },
+        despues: { insumo: datos.nombreInsumo, tipoAlerta: datos.tipoAlerta, destino: telMask, encolado: nuevo },
       }).catch(() => {});
     }
+    if (!tx) this.outbox.despertar();
 
     return {
       omitido: false,
@@ -550,7 +481,7 @@ export class AvisosInternosService {
   /**
    * Helper conveniente para notificar cuando un insumo ha llegado a stock 0 o negativo.
    */
-  async notificarInsumoAgotado(insumoId: bigint | string): Promise<ResultadoNotificacionEquipo> {
+  async notificarInsumoAgotado(insumoId: bigint | string, tx?: Prisma.TransactionClient): Promise<ResultadoNotificacionEquipo> {
     const insumo = await this.prisma.insumo.findUnique({
       where: { id: BigInt(insumoId) },
       include: {
@@ -579,13 +510,13 @@ export class AvisosInternosService {
       stockMinimo: Number(insumo.minimo),
       unidadMedida: insumo.unidad_almacen,
       lugarNombre: insumo.lugarConsumo?.nombre ?? null,
-    });
+    }, tx);
   }
 
   /**
    * Helper conveniente para notificar cuando un insumo se encuentra por debajo de su stock mínimo.
    */
-  async notificarInsumoBajoStock(insumoId: bigint | string): Promise<ResultadoNotificacionEquipo> {
+  async notificarInsumoBajoStock(insumoId: bigint | string, tx?: Prisma.TransactionClient): Promise<ResultadoNotificacionEquipo> {
     const insumo = await this.prisma.insumo.findUnique({
       where: { id: BigInt(insumoId) },
       include: {
@@ -614,7 +545,7 @@ export class AvisosInternosService {
       stockMinimo: Number(insumo.minimo),
       unidadMedida: insumo.unidad_almacen,
       lugarNombre: insumo.lugarConsumo?.nombre ?? null,
-    });
+    }, tx);
   }
 
   /**
@@ -623,6 +554,7 @@ export class AvisosInternosService {
   async notificarElementoAgotado(
     tipo: 'PRODUCTO' | 'SABOR' | 'OPCION',
     id: bigint | string,
+    tx?: Prisma.TransactionClient,
   ): Promise<ResultadoNotificacionEquipo> {
     let nombre = `${tipo} #${id}`;
     if (tipo === 'PRODUCTO') {
@@ -646,7 +578,7 @@ export class AvisosInternosService {
       stockActual: 0,
       stockMinimo: 0,
       unidadMedida: 'UND',
-    });
+    }, tx);
   }
 
   /**
@@ -856,71 +788,43 @@ export class AvisosInternosService {
 
     const textoCuerpo = `🔔 *[ALERTA CAPRICHOS]*\n\n*${titulo}*\n\n${detalle}\n\n👉 Ver en panel: ${enlace}`;
     const detalles: ResultadoEnvioEquipo[] = [];
-    let exitosos = 0;
+    let encolados = 0;
 
+    // Cada destinatario se encola en el outbox: el envío sale del lote (con reintentos) y no bloquea el emisor.
+    // Con clave de idempotencia, un mismo evento no crea dos filas por número.
     for (const telefono of destinatarios) {
       const telMask = enmascararTelefono(telefono);
       const telHash = hashTelefono(telefono);
+      const clave = claveIdempotencia ? `${claveIdempotencia}:${telHash}` : `alerta:${randomUUID()}`;
 
-      if (claveIdempotencia) {
-        const claveIdempCompleta = `${claveIdempotencia}:${telHash}`;
-        const esPrimerEnvio = await this.adquirirIdempotencia(claveIdempCompleta);
-        if (!esPrimerEnvio) {
-          detalles.push({
-            telefonoEnmascarado: telMask,
-            exito: true,
-            modo: 'OMITIDO_IDEMPOTENTE',
-          });
-          continue;
-        }
-      }
-
-      const ventanaAbierta = await this.ventana24hService.esVentanaAbierta(telefono);
-      let resultado: ResultadoEnvioWhatsApp;
-      let modoEnvio: 'VENTANA_24H' | 'PLANTILLA';
-
-      if (ventanaAbierta) {
-        modoEnvio = 'VENTANA_24H';
-        if (botones && botones.length > 0) {
-          resultado = await this.enviarConReintentos(() =>
-            this.mensajeria.enviarBotones(telefono, textoCuerpo, botones),
-          );
-        } else {
-          resultado = await this.enviarConReintentos(() =>
-            this.mensajeria.enviarTexto(telefono, textoCuerpo),
-          );
-        }
-      } else {
-        modoEnvio = 'PLANTILLA';
-        const definicion = CATALOGO_PLANTILLAS.AVISO_INTERNO;
-        resultado = await this.enviarConReintentos(() =>
-          this.mensajeria.enviarPlantilla(
-            telefono,
-            definicion.nombre,
-            definicion.idioma,
-            [titulo, `${detalle}\n${enlace}`],
-          ),
-        );
-      }
-
-      if (resultado.exito) {
-        exitosos++;
-      }
-
+      const nuevo = await this.outbox.encolar({
+        telefono,
+        tipo: 'TEXTO',
+        clave,
+        origen: 'ALERTA_ADMIN',
+        carga: {
+          textoLibre: textoCuerpo,
+          plantillaClave: 'AVISO_INTERNO',
+          variablesPlantilla: [titulo, `${detalle}\n${enlace}`],
+          botones: botones && botones.length > 0 ? botones : undefined,
+          autor: 'BOT',
+          etapa: 'ALERTA_ADMIN',
+        },
+      });
+      if (nuevo) encolados++;
       detalles.push({
         telefonoEnmascarado: telMask,
-        exito: resultado.exito,
-        modo: resultado.exito ? modoEnvio : 'ERROR',
-        waMessageId: resultado.waMessageId,
-        error: resultado.errorDetalle,
+        exito: true,
+        modo: nuevo ? 'ENCOLADO' : 'OMITIDO_IDEMPOTENTE',
       });
     }
+    this.outbox.despertar();
 
     return {
       omitido: false,
       motivo: 'PROCESADO',
       destinatariosTotal: destinatarios.length,
-      enviosExitosos: exitosos,
+      enviosExitosos: encolados,
       detalles,
     };
   }

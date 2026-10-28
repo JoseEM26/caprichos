@@ -9,6 +9,7 @@ import {
 } from '../puerto/whatsapp-mensajeria.puerto';
 import { TEXTOS_PAGO } from '../conversacion/flujos/pago/textos-pago';
 import { enmascararTelefono, hashTelefono, normalizarTelefono } from '../utilidades/enmascarar.util';
+import { OutboxWhatsappService } from './outbox-whatsapp.service';
 
 export interface ParametrosRecordatorioPago {
   recordatorioActivo: boolean;
@@ -29,6 +30,7 @@ export class TareaRecordatorioPagoService {
     @Optional()
     @Inject(WHATSAPP_MENSAJERIA_PUERTO)
     private readonly mensajeria?: WhatsAppMensajeriaPuerto,
+    @Optional() private readonly outbox?: OutboxWhatsappService,
   ) {}
 
   /**
@@ -178,8 +180,20 @@ export class TareaRecordatorioPagoService {
               );
 
               try {
-                await this.ventana24hService.enviarMensajeNegocio(telNorm, {
-                  textoLibre: textoMensaje,
+                // Una vez por pedido (la clave del outbox lo garantiza, como el candado Redis de arriba)
+                await this.outbox!.encolar({
+                  telefono: telNorm,
+                  tipo: 'TEXTO',
+                  clave: `pago-recordatorio-${p.id}`,
+                  origen: 'RECORDATORIO_PAGO',
+                  pedidoId: p.id,
+                  carga: {
+                    textoLibre: textoMensaje,
+                    autor: 'BOT',
+                    nombre: p.cliente_nombre ?? null,
+                    pedidoCodigo: p.codigo,
+                    etapa: 'RECORDATORIO_PAGO',
+                  },
                 });
                 recordatoriosEnviados++;
                 this.logger.log(

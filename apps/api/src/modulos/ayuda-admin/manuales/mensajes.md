@@ -49,6 +49,20 @@ Ver tambien: [[mensajes]]
 3. Se enviara un mensaje de plantilla oficial aprobado por WhatsApp para reiniciar la ventana de conversacion.
 Ver tambien: [[mensajes]]
 
+## Como se hace: Revisar y reenviar mensajes que no salieron
+1. En la parte superior de Mensajes, pulsar la pestana Salientes. Muestra los mensajes automaticos del negocio (avisos de pedido, recordatorios y alertas al equipo) que estan en cola, enviados, fallidos o descartados.
+2. Los indicadores muestran pendientes, enviando, fallidos y el retraso del mensaje mas viejo en cola. Si el retraso supera 5 minutos, aparece una franja de aviso fija arriba.
+3. Por defecto se listan los fallidos. Cada tarjeta indica el destino enmascarado, el origen, el pedido, los intentos y el motivo del error.
+4. Pulsar Reenviar y confirmar con Si, reenviar: el mensaje vuelve a la cola con los intentos en cero y sale en el siguiente lote.
+5. Si el mensaje ya no debe salir (por ejemplo, el cliente ya fue atendido por llamada), pulsar Descartar, escribir el motivo y confirmar con Si, descartar. El mensaje no se borra: queda como Descartado con el motivo y quien lo hizo.
+Ver tambien: [[caja]]
+
+## Como se hace: Entender por que un mensaje quedo fallido
+1. Un error permanente (por ejemplo, un numero invalido o una plantilla no aprobada) no se reintenta solo: queda fallido y hay que corregir el dato o descartarlo.
+2. Un error temporal (falla de conexion, limite de Meta) se reintenta solo con esperas de 30 segundos, 2 minutos, 10 minutos y 1 hora. Si tras 5 intentos sigue fallando, queda fallido con la leyenda Intentos agotados.
+3. Un cliente en BAJA no recibe mensajes y no genera aviso: es lo esperado.
+4. Cada mensaje fallido avisa a Caja y Admin en la campana de notificaciones.
+
 ## Errores y dudas comunes
 - Un pedido con pago digital no validado no aparecera en cocina hasta que su voucher sea aprobado por una persona; esto evita que se preparen pedidos sin respaldo financiero.
 - La inteligencia artificial nunca aprueba ni rechaza pagos por su cuenta; el semaforo y los datos extraidos son una guia visual para que el operador decida.
@@ -63,3 +77,4 @@ Ver tambien: [[mensajes]]
 - Tienen acceso completo a los mensajes: Administrador y Call Center.
 - Los roles de Administrador y Cajero cuentan con el permiso vouchers/ver para visualizar la tarjeta de analisis del voucher y confirmar la aprobacion o rechazo.
 - Mozos, Cocina y Repartidores no tienen acceso a esta bandeja de mensajes.
+- Los avisos del pedido salen en orden (aceptado, listo, salida, llegada, entregado): si uno falla temporalmente, los siguientes del mismo pedido esperan a que se resuelva y no llegan antes.

@@ -6,6 +6,8 @@ import { RedisService } from '../../../comun/redis/redis.service';
 import { Ventana24hService } from '../servicios/ventana-24h.service';
 import { ReservasService } from '../../reservas/reservas.service';
 
+const mockOutbox: any = { encolar: jest.fn().mockResolvedValue(true), despertar: jest.fn(), procesarLote: jest.fn().mockResolvedValue({}), limpiar: jest.fn().mockResolvedValue({}) };
+
 describe('RecordatorioReservasTarea', () => {
   let tarea: RecordatorioReservasTarea;
   let mockPrisma: any;
@@ -15,6 +17,7 @@ describe('RecordatorioReservasTarea', () => {
 
   beforeEach(() => {
     mockPrisma = {
+      $transaction: jest.fn(async (fn: any) => fn(mockPrisma)),
       parametro: {
         findUnique: jest.fn(),
       },
@@ -44,6 +47,7 @@ describe('RecordatorioReservasTarea', () => {
       mockRedisService as RedisService,
       mockVentana24h as Ventana24hService,
       mockReservasService as ReservasService,
+      mockOutbox,
     );
   });
 
@@ -111,12 +115,7 @@ describe('RecordatorioReservasTarea', () => {
       const resultado = await tarea.ejecutarCiclo(ahora);
 
       expect(resultado.recordatoriosEnviados).toBe(1);
-      expect(mockVentana24h.enviarMensajeNegocio).toHaveBeenCalledWith(
-        '51987654321',
-        expect.objectContaining({
-          plantillaClave: 'RESERVA_RECORDATORIO',
-        }),
-      );
+      expect(mockOutbox.encolar).toHaveBeenCalledWith(expect.objectContaining({ telefono: '51987654321', carga: expect.objectContaining({ plantillaClave: 'RESERVA_RECORDATORIO' }) }), expect.anything());
       expect(mockPrisma.reserva.update).toHaveBeenCalledWith({
         where: { id: 101n },
         data: { recordatorio_enviado: true },
@@ -150,12 +149,7 @@ describe('RecordatorioReservasTarea', () => {
 
       expect(resultado.vencidosNotificados).toBe(1);
       expect(mockReservasService.pasarNoAsistioVencidas).toHaveBeenCalledWith(ahora);
-      expect(mockVentana24h.enviarMensajeNegocio).toHaveBeenCalledWith(
-        '51911223344',
-        expect.objectContaining({
-          plantillaClave: 'RESERVA_ACTUALIZACION',
-        }),
-      );
+      expect(mockOutbox.encolar).toHaveBeenCalledWith(expect.objectContaining({ telefono: '51911223344', carga: expect.objectContaining({ plantillaClave: 'RESERVA_ACTUALIZACION' }) }));
     });
 
     it('no ejecuta ciclos simultáneos si uno ya está en progreso', async () => {

@@ -33,7 +33,8 @@ function crearPrisma(opts: { pendiente?: boolean; pago?: string; actualizados?: 
 }
 
 function crear(prisma: any) {
-  const avisos = { avisar: jest.fn().mockResolvedValue({ estado: 'ENVIADO' }) };
+  // El aviso se encola en la misma transacción del cambio de estado; despertar() corre tras el commit
+  const avisos = { avisar: jest.fn().mockResolvedValue({ estado: 'ENCOLADO' }), despertar: jest.fn() };
   const servicio = new ReprogramacionService(prisma, avisos as any);
   return { servicio, avisos };
 }
@@ -63,7 +64,7 @@ describe('ReprogramacionService (retiro -> SI / NO / sin respuesta)', () => {
     expect(prisma.notificacion.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ rol_destino: 'CAJERO', tipo: 'REPROGRAMACION_DELIVERY' }) }),
     );
-    expect(avisos.avisar).toHaveBeenCalledWith(PEDIDO, 'REPROG_RECIBIDA');
+    expect(avisos.avisar).toHaveBeenCalledWith(PEDIDO, 'REPROG_RECIBIDA', {}, expect.anything());
     // El pedido NO se anula ni sale de la falla: lo reenvía el admin
     expect(prisma.pedido.updateMany).not.toHaveBeenCalled();
   });
@@ -95,7 +96,7 @@ describe('ReprogramacionService (retiro -> SI / NO / sin respuesta)', () => {
     expect(prisma.mensajeReparto.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ estado: 'NO_REPROGRAMAR' }) }),
     );
-    expect(avisos.avisar).toHaveBeenCalledWith(PEDIDO, 'REPROG_CANCELADA');
+    expect(avisos.avisar).toHaveBeenCalledWith(PEDIDO, 'REPROG_CANCELADA', {}, expect.anything());
   });
 
   it('pedido pagado que se cancela: avisa a Caja para revisar devolución', async () => {
@@ -135,7 +136,7 @@ describe('ReprogramacionService (retiro -> SI / NO / sin respuesta)', () => {
     expect(prisma.mensajeReparto.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ estado: 'SIN_RESPUESTA' }) }),
     );
-    expect(avisos.avisar).toHaveBeenCalledWith(PEDIDO, 'REPROG_SIN_RESPUESTA');
+    expect(avisos.avisar).toHaveBeenCalledWith(PEDIDO, 'REPROG_SIN_RESPUESTA', {}, expect.anything());
   });
 
   it('idempotente: si el pedido ya no está retirado en LISTO no cancela ni avisa de nuevo', async () => {

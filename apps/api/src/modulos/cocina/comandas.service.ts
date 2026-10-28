@@ -497,25 +497,29 @@ export class ComandasService {
 
     if (completo) {
       // Transición del pedido a LISTO (con historial, auditoría y evento socket)
-      await this.prisma.pedido.update({
-        where: { id: pId },
-        data: {
-          estado: 'LISTO',
-          listo_en: ahora,
-          pasa_cocina_en: pedido.pasa_cocina_en ?? ahora,
-        },
+      await this.prisma.$transaction(async (tx) => {
+        await tx.pedido.update({
+          where: { id: pId },
+          data: {
+            estado: 'LISTO',
+            listo_en: ahora,
+            pasa_cocina_en: pedido.pasa_cocina_en ?? ahora,
+          },
+        });
+        await tx.pedidoEstadoHistorial.create({
+          data: {
+            pedido_id: pId,
+            estado_anterior: pedido.estado,
+            estado_nuevo: 'LISTO',
+            motivo: 'Todas las áreas de cocina despejadas',
+            por_party_id: usuarioActual.partyId,
+            en: ahora,
+          },
+        });
+        // el cliente delivery recibe el aviso de que su pedido está listo (idempotente, misma transacción)
+        await this.avisos?.avisar(pId, 'LISTO', {}, tx);
       });
-
-      await this.prisma.pedidoEstadoHistorial.create({
-        data: {
-          pedido_id: pId,
-          estado_anterior: pedido.estado,
-          estado_nuevo: 'LISTO',
-          motivo: 'Todas las áreas de cocina despejadas',
-          por_party_id: usuarioActual.partyId,
-          en: ahora,
-        },
-      });
+      this.avisos?.despertar();
 
       await this.auditoria.registrar({
         categoria: 'CAMBIO',
@@ -537,8 +541,6 @@ export class ComandasService {
         estado: 'LISTO',
       });
 
-      // el cliente delivery recibe el aviso de que su pedido está listo (idempotente)
-      await this.avisos?.avisar(pId, 'LISTO');
 
       // el mozo que tomó el pedido de mesa recibe el aviso de que está listo (RQ-SAL-02-10)
       if (pedido.modalidad === 'MESA') {

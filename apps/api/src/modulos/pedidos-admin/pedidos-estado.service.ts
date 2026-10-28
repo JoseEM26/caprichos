@@ -753,22 +753,29 @@ export class PedidosEstadoService {
       datosActualizacion.entregado_en = ahora;
     }
 
-    const pedidoActualizado = await this.prisma.pedido.update({
-      where: { id: pedido.id },
-      data: datosActualizacion,
+    // avisos al cliente delivery por etapa: se encolan en la misma transacción del cambio de estado
+    const etapaAviso =
+      nuevoEstado === 'LISTO' ? 'LISTO' : nuevoEstado === 'EN_CAMINO' ? 'SALIDA' : nuevoEstado === 'ENTREGADO' ? 'ENTREGADO' : null;
+    const pedidoActualizado = await this.prisma.$transaction(async (tx) => {
+      const actualizado = await tx.pedido.update({
+        where: { id: pedido.id },
+        data: datosActualizacion,
+      });
+      // Registrar en historial de estados
+      await tx.pedidoEstadoHistorial.create({
+        data: {
+          pedido_id: pedido.id,
+          estado_anterior: estadoAnterior,
+          estado_nuevo: nuevoEstado,
+          motivo: dto.motivo?.trim() || null,
+          por_party_id: usuarioActual.partyId,
+          en: ahora,
+        },
+      });
+      if (etapaAviso) await this.avisos?.avisar(pedido.id, etapaAviso, {}, tx);
+      return actualizado;
     });
-
-    // Registrar en historial de estados
-    await this.prisma.pedidoEstadoHistorial.create({
-      data: {
-        pedido_id: pedido.id,
-        estado_anterior: estadoAnterior,
-        estado_nuevo: nuevoEstado,
-        motivo: dto.motivo?.trim() || null,
-        por_party_id: usuarioActual.partyId,
-        en: ahora,
-      },
-    });
+    this.avisos?.despertar();
 
     // Auditoría
     await this.auditoria.registrar({
@@ -792,10 +799,6 @@ export class PedidosEstadoService {
       estado: nuevoEstado,
     });
 
-    // avisos al cliente delivery por etapa (idempotentes; un fallo de WhatsApp no frena el cambio)
-    const etapaAviso =
-      nuevoEstado === 'LISTO' ? 'LISTO' : nuevoEstado === 'EN_CAMINO' ? 'SALIDA' : nuevoEstado === 'ENTREGADO' ? 'ENTREGADO' : null;
-    if (etapaAviso) await this.avisos?.avisar(pedido.id, etapaAviso);
 
     // un pedido de mesa que pasa a LISTO a mano también avisa al mozo (RQ-SAL-02-10)
     if (nuevoEstado === 'LISTO' && pedido.modalidad === 'MESA') {

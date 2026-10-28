@@ -17,6 +17,7 @@ import { CancelarReservaDto } from './dto/cancelar-reserva.dto';
 import { Ventana24hService } from '../chatbot/servicios/ventana-24h.service';
 import { TEXTOS_RESERVA } from '../chatbot/conversacion/textos-reserva';
 import { generarFranjasPorDefecto } from '../chatbot/conversacion/flujos/reserva/flujo-reserva';
+import { OutboxWhatsappService } from '../chatbot/servicios/outbox-whatsapp.service';
 
 @Injectable()
 export class ReservasService {
@@ -27,6 +28,7 @@ export class ReservasService {
     @Optional()
     @Inject(forwardRef(() => Ventana24hService))
     private readonly ventana24hService?: Ventana24hService,
+    @Optional() private readonly outbox?: OutboxWhatsappService,
   ) {}
 
   /**
@@ -1014,14 +1016,43 @@ export class ReservasService {
     );
 
     // 2. Actualizar solicitud
-    const solicitudActualizada = await this.prisma.solicitudReserva.update({
-      where: { id: sId },
-      data: {
-        estado: 'APROBADA',
-        reserva_id: BigInt(reserva.id),
-      },
-      include: { conversacion: true },
+    const solicitudActualizada = await this.prisma.$transaction(async (tx) => {
+      const actualizada = await tx.solicitudReserva.update({
+        where: { id: sId },
+        data: {
+          estado: 'APROBADA',
+          reserva_id: BigInt(reserva.id),
+        },
+        include: { conversacion: true },
+      });
+      // Mensaje al cliente: se encola en la misma transacción que la solicitud (outbox)
+      const { fechaIso: fechaLima, horaMinutos: horaLima } = obtenerFechaHoraLima(new Date(horaIso));
+      const msgConfirmacion = TEXTOS_RESERVA.reservaConfirmadaCliente({
+        personas,
+        fechaTexto: fechaLima,
+        hora: horaLima,
+        toleranciaMin: reserva.tolerancia_min || 15,
+      });
+
+      if (this.outbox && telefono) {
+        await this.outbox.encolar({
+          telefono,
+          tipo: 'TEXTO',
+          clave: `reserva-confirmada-${solicitud.id}`,
+          origen: 'RESERVA',
+          carga: {
+            textoLibre: msgConfirmacion,
+            plantillaClave: 'RESERVA_CONFIRMADA',
+            variablesPlantilla: [nombre, `${fechaLima} ${horaLima}`, String(personas)],
+            autor: 'PERSONA',
+            nombre,
+            etapa: 'SOLICITUD_APROBADA',
+          },
+        }, tx);
+      }
+      return actualizada;
     });
+    this.outbox?.despertar();
 
     // 3. Auditoría
     await this.auditoria.registrar({
@@ -1047,34 +1078,6 @@ export class ReservasService {
       reservaId: reserva.id,
     });
 
-    // 5. Enviar mensaje de WhatsApp al cliente
-    const { fechaIso: fechaLima, horaMinutos: horaLima } = obtenerFechaHoraLima(new Date(horaIso));
-    const msgConfirmacion = TEXTOS_RESERVA.reservaConfirmadaCliente({
-      personas,
-      fechaTexto: fechaLima,
-      hora: horaLima,
-      toleranciaMin: reserva.tolerancia_min || 15,
-    });
-
-    if (this.ventana24hService && telefono) {
-      await this.ventana24hService.enviarMensajeNegocio(telefono, {
-        textoLibre: msgConfirmacion,
-        plantillaClave: 'RESERVA_CONFIRMADA',
-        variablesPlantilla: [nombre, `${fechaLima} ${horaLima}`, String(personas)],
-      }).catch(() => {});
-    }
-
-    if (solicitud.conversacion_id) {
-      await this.prisma.mensajeChat.create({
-        data: {
-          conversacion_id: solicitud.conversacion_id,
-          direccion: 'SALE',
-          autor: 'PERSONA',
-          tipo: 'TEXTO',
-          contenido: { texto: msgConfirmacion },
-        },
-      }).catch(() => {});
-    }
 
     return {
       solicitud: this.serializarSolicitud(solicitudActualizada),
@@ -1119,14 +1122,48 @@ export class ReservasService {
       });
     }
 
-    const solicitudActualizada = await this.prisma.solicitudReserva.update({
-      where: { id: sId },
-      data: {
-        estado: 'RECHAZADA',
-        motivo_rechazo: dto.motivo.trim(),
-      },
-      include: { conversacion: true },
+    const nombre = solicitud.nombre || solicitud.conversacion?.nombre_contacto || 'Cliente';
+    const telefono = solicitud.telefono || solicitud.conversacion?.telefono || '';
+    const solicitudActualizada = await this.prisma.$transaction(async (tx) => {
+      const actualizada = await tx.solicitudReserva.update({
+        where: { id: sId },
+        data: {
+          estado: 'RECHAZADA',
+          motivo_rechazo: dto.motivo.trim(),
+        },
+        include: { conversacion: true },
+      });
+      const { fechaIso: fechaLima, horaMinutos: horaLima } = solicitud.hora
+        ? obtenerFechaHoraLima(solicitud.hora)
+        : { fechaIso: '', horaMinutos: '' };
+
+      const msgRechazo = TEXTOS_RESERVA.reservaRechazadaCliente({
+        nombre,
+        fechaTexto: fechaLima,
+        hora: horaLima,
+        motivo: dto.motivo.trim(),
+        alternativas: dto.alternativas,
+      });
+
+      if (this.outbox && telefono) {
+        await this.outbox.encolar({
+          telefono,
+          tipo: 'TEXTO',
+          clave: `reserva-rechazada-${solicitud.id}`,
+          origen: 'RESERVA',
+          carga: {
+            textoLibre: msgRechazo,
+            plantillaClave: 'RESERVA_ACTUALIZACION',
+            variablesPlantilla: [nombre, `Solicitud no confirmada: ${dto.motivo.trim()}`],
+            autor: 'PERSONA',
+            nombre,
+            etapa: 'SOLICITUD_RECHAZADA',
+          },
+        }, tx);
+      }
+      return actualizada;
     });
+    this.outbox?.despertar();
 
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
@@ -1151,39 +1188,6 @@ export class ReservasService {
     });
 
     // Enviar WhatsApp al cliente
-    const nombre = solicitud.nombre || solicitud.conversacion?.nombre_contacto || 'Cliente';
-    const telefono = solicitud.telefono || solicitud.conversacion?.telefono || '';
-    const { fechaIso: fechaLima, horaMinutos: horaLima } = solicitud.hora
-      ? obtenerFechaHoraLima(solicitud.hora)
-      : { fechaIso: '', horaMinutos: '' };
-
-    const msgRechazo = TEXTOS_RESERVA.reservaRechazadaCliente({
-      nombre,
-      fechaTexto: fechaLima,
-      hora: horaLima,
-      motivo: dto.motivo.trim(),
-      alternativas: dto.alternativas,
-    });
-
-    if (this.ventana24hService && telefono) {
-      await this.ventana24hService.enviarMensajeNegocio(telefono, {
-        textoLibre: msgRechazo,
-        plantillaClave: 'RESERVA_ACTUALIZACION',
-        variablesPlantilla: [nombre, `Solicitud no confirmada: ${dto.motivo.trim()}`],
-      }).catch(() => {});
-    }
-
-    if (solicitud.conversacion_id) {
-      await this.prisma.mensajeChat.create({
-        data: {
-          conversacion_id: solicitud.conversacion_id,
-          direccion: 'SALE',
-          autor: 'PERSONA',
-          tipo: 'TEXTO',
-          contenido: { texto: msgRechazo },
-        },
-      }).catch(() => {});
-    }
 
     return this.serializarSolicitud(solicitudActualizada);
   }

@@ -714,6 +714,18 @@
       "modulo": "mensajes"
     },
     {
+      "id": "mensajes#revisar-y-reenviar-mensajes-que-no-salieron",
+      "tipo": "tarea",
+      "etiqueta": "Revisar y reenviar mensajes que no salieron",
+      "modulo": "mensajes"
+    },
+    {
+      "id": "mensajes#entender-por-que-un-mensaje-quedo-fallido",
+      "tipo": "tarea",
+      "etiqueta": "Entender por que un mensaje quedo fallido",
+      "modulo": "mensajes"
+    },
+    {
       "id": "mirest",
       "tipo": "modulo",
       "etiqueta": "Configuración del local (mirest)",
@@ -3796,6 +3808,21 @@
     {
       "tipo": "ver_tambien",
       "origen": "mensajes#reabrir-una-conversacion-fuera-de-la-ventana-de-24-horas",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mensajes#revisar-y-reenviar-mensajes-que-no-salieron",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mensajes#revisar-y-reenviar-mensajes-que-no-salieron",
+      "destino": "caja"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mensajes#entender-por-que-un-mensaje-quedo-fallido",
       "destino": "mensajes"
     },
     {

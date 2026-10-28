@@ -22,6 +22,9 @@ import { Ventana24hService } from './servicios/ventana-24h.service';
 import { ChatbotPlanificadorService } from './servicios/chatbot-planificador.service';
 import { AvisosPedidoService } from './servicios/avisos-pedido.service';
 import { ReprogramacionService } from './servicios/reprogramacion.service';
+import { OutboxWhatsappService } from './servicios/outbox-whatsapp.service';
+import { AdminWhatsappSalientesController } from './controladores/admin-whatsapp-salientes.controller';
+import { AccesoModule } from '../acceso/acceso.module';
 import { RecordatorioReservasTarea } from './servicios/recordatorio-reservas.tarea';
 import { TareaRecordatorioPagoService } from './servicios/tarea-recordatorio-pago.service';
 import { QuejasWhatsappService } from './servicios/quejas-whatsapp.service';
@@ -44,8 +47,9 @@ import { ColaWebhookService } from './servicios/cola-webhook.service';
     ChatbotConfiguracionModule,
     forwardRef(() => AvisosInternosModule),
     forwardRef(() => VouchersModule),
+    AccesoModule,
   ],
-  controllers: [WhatsappWebhookController, QuejasWhatsappController],
+  controllers: [WhatsappWebhookController, QuejasWhatsappController, AdminWhatsappSalientesController],
   providers: [
     WhatsAppMetaAdaptador,
     WhatsAppSimuladoAdaptador,
@@ -54,6 +58,7 @@ import { ColaWebhookService } from './servicios/cola-webhook.service';
     Ventana24hService,
     AvisosPedidoService,
     ReprogramacionService,
+    OutboxWhatsappService,
     ChatbotPlanificadorService,
     RecordatorioReservasTarea,
     TareaRecordatorioPagoService,
@@ -67,6 +72,7 @@ import { ColaWebhookService } from './servicios/cola-webhook.service';
     WhatsAppSimuladoAdaptador,
     Ventana24hService,
     AvisosPedidoService,
+    OutboxWhatsappService,
     ChatbotPlanificadorService,
     RecordatorioReservasTarea,
     TareaRecordatorioPagoService,

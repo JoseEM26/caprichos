@@ -23,6 +23,8 @@ import {
 import { ModalEditarNombre, IconoLapiz } from './ModalEditarNombre';
 import { useSesion } from '../../comun/sesion';
 import { TarjetaLecturaVoucher } from '../vouchers/TarjetaLecturaVoucher';
+import { SalientesWhatsApp } from './SalientesWhatsApp';
+import { salientesApi } from './salientesApi';
 import { FotoAmpliable } from '../vouchers/FotoAmpliable';
 import { VoucherResumenChat } from '../vouchers/tipos';
 import {
@@ -120,7 +122,7 @@ export function obtenerEstiloEspera(minutos: number) {
   };
 }
 
-export function MensajesView() {
+function MensajesChats() {
   let tieneVouchersVer = true;
   try {
     const sesion = useSesion();
@@ -1500,6 +1502,80 @@ export function MensajesView() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Mensajes: pestaña Chats (conversaciones con el cliente) y pestaña Salientes (cola de WhatsApp que sale
+ * sola, con los fallidos para reenviar o descartar). La pestaña solo aparece con el permiso de ver salientes.
+ */
+export function MensajesView() {
+  let puedeSalientes = false;
+  try {
+    const sesion = useSesion();
+    puedeSalientes =
+      Boolean(sesion?.tiene?.('whatsapp_salientes/ver')) ||
+      sesion?.usuario?.rol === 'ADMIN' ||
+      sesion?.usuario?.rol === 'CAJERO';
+  } catch {
+    puedeSalientes = false;
+  }
+
+  const [vista, setVista] = useState<'chats' | 'salientes'>(() =>
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('vista') === 'salientes'
+      ? 'salientes'
+      : 'chats',
+  );
+  const [fallidos, setFallidos] = useState(0);
+
+  useEffect(() => {
+    if (!puedeSalientes) return;
+    let activo = true;
+    const cargar = () =>
+      salientesApi
+        .resumen()
+        .then((r) => {
+          if (activo) setFallidos(r.fallidos);
+        })
+        .catch(() => {});
+    void cargar();
+    const cada = setInterval(() => void cargar(), 20000);
+    return () => {
+      activo = false;
+      clearInterval(cada);
+    };
+  }, [puedeSalientes]);
+
+  if (!puedeSalientes) return <MensajesChats />;
+
+  const estiloTab = (activa: boolean) => ({
+    minHeight: 36,
+    padding: '0 12px',
+    borderRadius: 10,
+    border: 'none',
+    background: activa ? '#D9FDD3' : '#F0F2F5',
+    color: activa ? '#005C4B' : '#54656F',
+    fontWeight: 700,
+    cursor: 'pointer',
+  });
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+      <div role="tablist" aria-label="Vista de Mensajes" style={{ display: 'flex', gap: 6, padding: '6px 8px' }}>
+        <button role="tab" aria-selected={vista === 'chats'} style={estiloTab(vista === 'chats')} onClick={() => setVista('chats')}>
+          Chats
+        </button>
+        <button
+          role="tab"
+          aria-selected={vista === 'salientes'}
+          style={estiloTab(vista === 'salientes')}
+          onClick={() => setVista('salientes')}
+        >
+          Salientes {fallidos > 0 && <b>({fallidos} fallido{fallidos === 1 ? '' : 's'})</b>}
+        </button>
+      </div>
+      <div style={{ flex: 1, minHeight: 0 }}>{vista === 'chats' ? <MensajesChats /> : <SalientesWhatsApp />}</div>
     </div>
   );
 }

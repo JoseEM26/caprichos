@@ -593,7 +593,7 @@ describe('PedidosService', () => {
 
     beforeEach(() => {
       avisar = jest.fn().mockResolvedValue({ estado: 'SIMULADO' });
-      (service as any).avisosPedidoService = { avisar };
+      (service as any).avisosPedidoService = { avisar, despertar: jest.fn() };
       prismaMock.pedido.create.mockResolvedValue({
         id: 100n,
         codigo: 'CP-W001',
@@ -612,7 +612,7 @@ describe('PedidosService', () => {
       expect(res.id).toBe('100');
       await esperarFondo();
       expect(avisar).toHaveBeenCalledTimes(1);
-      expect(avisar).toHaveBeenCalledWith(100n, 'RECIBIDO');
+      expect(avisar).toHaveBeenCalledWith(100n, 'RECIBIDO', {}, expect.anything());
     });
 
     it('pedido de mozo no dispara el aviso de la carta', async () => {
@@ -629,14 +629,11 @@ describe('PedidosService', () => {
       expect(avisar).not.toHaveBeenCalled();
     });
 
-    it('si el aviso falla, el pedido sale igual y el error no se propaga', async () => {
-      avisar.mockRejectedValueOnce(new Error('meta caído'));
+    it('el aviso va dentro de la transacción del pedido: si no se puede encolar, el pedido no se crea', async () => {
+      avisar.mockRejectedValueOnce(new Error('BD caída al encolar'));
 
-      const res = await service.crear(pedidoBaseDto, 'idemp-recibido-fallo');
-
-      expect(res.codigo).toBe('CP-W001');
-      await esperarFondo();
-      expect(avisar).toHaveBeenCalledTimes(1);
+      await expect(service.crear(pedidoBaseDto, 'idemp-recibido-fallo')).rejects.toThrow('BD caída al encolar');
+      expect(avisar).toHaveBeenCalledWith(expect.anything(), 'RECIBIDO', {}, expect.anything());
     });
 
     it('repetir la misma Idempotency-Key no vuelve a avisar', async () => {

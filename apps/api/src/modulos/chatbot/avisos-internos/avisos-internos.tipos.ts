@@ -34,7 +34,7 @@ export interface DatosAvisoAlmacen {
 export interface ResultadoEnvioEquipo {
   telefonoEnmascarado: string;
   exito: boolean;
-  modo: 'VENTANA_24H' | 'PLANTILLA' | 'OMITIDO_IDEMPOTENTE' | 'ERROR';
+  modo: 'VENTANA_24H' | 'PLANTILLA' | 'ENCOLADO' | 'OMITIDO_IDEMPOTENTE' | 'ERROR';
   waMessageId?: string;
   error?: string;
 }

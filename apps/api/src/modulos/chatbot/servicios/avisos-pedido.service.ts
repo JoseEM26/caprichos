@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { normalizarTelefono, enmascararTelefono } from '../utilidades/enmascarar.util';
-import { Ventana24hService } from './ventana-24h.service';
+import { CargaSaliente, OutboxWhatsappService } from './outbox-whatsapp.service';
 import { EtapaAvisoReparto, TEXTOS_REPARTO, PayloadAvisoReparto } from '../conversacion/textos-reparto';
 import { marcarPagoParaPersona } from './pago-para-persona.util';
 
@@ -47,7 +48,8 @@ export const esParametroActivo = (valor: unknown) =>
   valor === true || String(valor).toLowerCase() === 'si';
 
 export interface ResultadoAviso {
-  estado: 'ENVIADO' | 'SIMULADO' | 'FALLIDO' | 'OMITIDO' | 'YA_ENVIADO';
+  /** ENCOLADO: queda en el outbox y sale al enviarse el lote (o al reintentarse). */
+  estado: 'ENCOLADO' | 'FALLIDO' | 'OMITIDO' | 'YA_ENVIADO';
   motivo?: string;
 }
 
@@ -71,30 +73,46 @@ export class AvisosPedidoService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly ventana24h: Ventana24hService,
+    private readonly outbox: OutboxWhatsappService,
   ) {}
 
+  /**
+   * Encola el aviso de una etapa del reparto. Sin `tx` abre su propia transacción y despierta el envío
+   * al confirmarla. Con `tx` (el emisor ya tiene una transacción de cambio de estado) el encolado va en
+   * esa misma transacción y el emisor debe llamar a `outbox.despertar()` después del commit.
+   */
   async avisar(
     pedidoId: bigint | string | number,
     etapa: EtapaAvisoReparto,
     datos: DatosAviso = {},
+    tx?: Prisma.TransactionClient,
   ): Promise<ResultadoAviso> {
     try {
-      return await this.avisarSinProteger(BigInt(pedidoId), etapa, datos);
+      return await this.avisarSinProteger(BigInt(pedidoId), etapa, datos, tx);
     } catch (err: any) {
       this.logger.error(`Aviso ${etapa} del pedido ${pedidoId} falló: ${err?.message}`, err?.stack);
+      // Dentro de una transacción ajena el error debe propagarse para que esa transacción se deshaga
+      if (tx) throw err;
       return { estado: 'FALLIDO', motivo: err?.message };
     }
+  }
+
+  /** Despierta el envío del outbox después de un commit que encoló avisos con `tx`. */
+  despertar(): void {
+    this.outbox.despertar();
   }
 
   private async avisarSinProteger(
     pedidoId: bigint,
     etapa: EtapaAvisoReparto,
     datos: DatosAviso,
+    tx?: Prisma.TransactionClient,
   ): Promise<ResultadoAviso> {
     const cfg = ETAPAS_AVISO[etapa];
+    // Con `tx` las lecturas van en la misma transacción: el pedido puede estar recién creado y sin commit
+    const db = tx ?? this.prisma;
 
-    const pedido = await this.prisma.pedido.findUnique({
+    const pedido = await db.pedido.findUnique({
       where: { id: pedidoId },
       select: {
         id: true,
@@ -113,42 +131,62 @@ export class AvisosPedidoService {
     const telefono = normalizarTelefono(pedido.cliente_telefono || '');
     if (!telefono) return { estado: 'OMITIDO', motivo: 'SIN_TELEFONO' };
 
-    const flag = await this.prisma.parametro.findUnique({ where: { clave: cfg.parametro } });
+    const flag = await db.parametro.findUnique({ where: { clave: cfg.parametro } });
     if (!esParametroActivo(flag?.valor)) return { estado: 'OMITIDO', motivo: 'DESACTIVADO' };
 
-    // Idempotencia: la fila (pedido, etapa) se crea una sola vez; si ya existe, el aviso ya salió
-    try {
-      await this.prisma.mensajeReparto.create({
+    const nombre = pedido.cliente_nombre || 'Cliente';
+    const medio = etapa === 'RECIBIDO' ? MEDIOS_DIGITALES[String(pedido.pago_preferido || pedido.pago_metodo || '').toUpperCase()] ?? null : null;
+
+    const payload = await this.construirPayload(etapa, nombre, pedido.codigo, datos, medio);
+    const carga: CargaSaliente = {
+      ...payload,
+      autor: 'BOT',
+      nombre,
+      repartoNumero: cfg.numero,
+      pedidoCodigo: pedido.codigo,
+      etapa,
+    };
+
+    // Idempotencia: la fila (pedido, etapa) se crea una sola vez; si ya existe, el aviso ya se encoló
+    const encolar = async (t: Prisma.TransactionClient): Promise<boolean> => {
+      const previa = await t.mensajeReparto.findUnique({
+        where: { pedido_id_numero: { pedido_id: pedidoId, numero: cfg.numero } },
+        select: { numero: true },
+      });
+      if (previa) return false;
+      await t.mensajeReparto.create({
         data: { pedido_id: pedidoId, numero: cfg.numero, enviado_en: new Date(), estado: 'PENDIENTE' },
       });
+      return this.outbox.encolar(
+        {
+          telefono,
+          tipo: 'TEXTO',
+          clave: `pedido-${pedidoId}-${etapa}`,
+          origen: 'AVISO_PEDIDO',
+          pedidoId,
+          carga,
+        },
+        t,
+      );
+    };
+
+    let nuevo: boolean;
+    try {
+      nuevo = tx ? await encolar(tx) : await this.prisma.$transaction((t) => encolar(t));
     } catch (err: any) {
       if (err?.code === 'P2002') return { estado: 'YA_ENVIADO' };
       throw err;
     }
+    if (!nuevo) return { estado: 'YA_ENVIADO' };
 
-    const nombre = pedido.cliente_nombre || 'Cliente';
-    const medio = etapa === 'RECIBIDO' ? MEDIOS_DIGITALES[String(pedido.pago_preferido || pedido.pago_metodo || '').toUpperCase()] ?? null : null;
-    if (etapa === 'RECIBIDO' && medio) {
+    if (medio) {
       // Pago digital: la conversación pasa a una persona de Caja (aunque el envío falle)
       await this.marcarParaPersona(telefono, pedido, nombre);
     }
 
-    const payload = await this.construirPayload(etapa, nombre, pedido.codigo, datos, medio);
-    const resultado = await this.ventana24h.enviarMensajeNegocio(telefono, payload, { pedidoId });
-
-    await this.prisma.mensajeReparto.update({
-      where: { pedido_id_numero: { pedido_id: pedidoId, numero: cfg.numero } },
-      data: { estado: resultado.exito ? 'ENVIADO' : 'FALLIDO' },
-    });
-
-    await this.registrarEnChat(telefono, pedido.cliente_nombre, etapa, pedido.codigo, payload, resultado);
-
-    this.logger.log(`Aviso ${etapa} del pedido ${pedido.codigo} a ${enmascararTelefono(telefono)}: ${resultado.estado}`);
-
-    if (!resultado.exito) {
-      return { estado: 'FALLIDO', motivo: resultado.errorCodigo };
-    }
-    return { estado: resultado.estado === 'SIMULADO' ? 'SIMULADO' : 'ENVIADO' };
+    if (!tx) this.outbox.despertar();
+    this.logger.log(`Aviso ${etapa} del pedido ${pedido.codigo} encolado a ${enmascararTelefono(telefono)}`);
+    return { estado: 'ENCOLADO' };
   }
 
   /** Mismo efecto que un voucher recibido por WhatsApp: la conversación queda para una persona (VALIDAR_PAGO, urgente). */
@@ -220,44 +258,5 @@ export class AvisosPedidoService {
     if ((recargo ?? 0) <= 0) return 'Volver a enviarlo no tiene costo adicional.';
     const detalle = modo === 'IGUAL_ENVIO' ? ' (el mismo del delivery)' : '';
     return `Volver a enviarlo tiene un costo de ${this.montoSoles(recargo)}${detalle}, que pagarías en la puerta o a Caja.`;
-  }
-
-  /** Copia el aviso en el hilo de chat del cliente (mensaje_chat), para que Caja lo vea junto a la conversación. */
-  /** Copia un aviso al chat del cliente (mensaje_chat). Público: lo usa ReprogramacionService. */
-  async registrarEnChat(
-    telefono: string,
-    nombre: string | null,
-    etapa: EtapaAvisoReparto,
-    codigo: string,
-    payload: PayloadAvisoReparto,
-    resultado: { exito: boolean; id?: string; estado: string; errorCodigo?: string },
-  ) {
-    const conversacion = await this.prisma.conversacion.upsert({
-      where: { telefono },
-      update: { ultima_actividad: new Date() },
-      create: { telefono, nombre_contacto: nombre },
-      select: { id: true },
-    });
-
-    let whatsappMensajeId: bigint | null = null;
-    if (resultado.id && /^\d+$/.test(resultado.id)) whatsappMensajeId = BigInt(resultado.id);
-
-    await this.prisma.mensajeChat.create({
-      data: {
-        conversacion_id: conversacion.id,
-        direccion: 'SALE',
-        autor: 'BOT',
-        tipo: resultado.exito ? 'TEXTO' : 'SISTEMA',
-        contenido: {
-          etapa,
-          pedido: codigo,
-          texto: payload.textoLibre,
-          plantilla: payload.plantillaClave,
-          estado: resultado.estado,
-          errorCodigo: resultado.errorCodigo ?? null,
-        },
-        whatsapp_mensaje_id: whatsappMensajeId,
-      },
-    });
   }
 }

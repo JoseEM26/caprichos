@@ -10,6 +10,10 @@ import { ConfiguracionService } from '../../../configuracion/configuracion.servi
 import { Ventana24hService } from '../../servicios/ventana-24h.service';
 import { WHATSAPP_MENSAJERIA_PUERTO } from '../../puerto/whatsapp-mensajeria.puerto';
 import { EventosGateway } from '../../../../comun/socket/eventos.gateway';
+import { OutboxWhatsappService } from '../../servicios/outbox-whatsapp.service';
+
+
+const outboxMock = { encolar: jest.fn().mockResolvedValue(true), despertar: jest.fn(), limpiar: jest.fn(), resumen: jest.fn() };
 
 describe('AvisosInternosService - Fuente de Destinatarios y Autorización Dinámica (Contrato Sección 1)', () => {
   let service: AvisosInternosService;
@@ -83,6 +87,7 @@ describe('AvisosInternosService - Fuente de Destinatarios y Autorización Dinám
         { provide: Ventana24hService, useValue: ventana24hServiceMock },
         { provide: WHATSAPP_MENSAJERIA_PUERTO, useValue: mensajeriaMock },
         { provide: EventosGateway, useValue: eventosGatewayMock },
+        { provide: OutboxWhatsappService, useValue: outboxMock },
       ],
     }).compile();
 
@@ -275,11 +280,16 @@ describe('AvisosInternosService - Fuente de Destinatarios y Autorización Dinám
         '/admin/stock',
       );
 
-      expect(mensajeriaMock.enviarPlantilla).toHaveBeenCalledWith(
-        '51977503006',
-        'aviso_interno',
-        'es',
-        expect.arrayContaining(['Alerta de Stock: Harina (AGOTADO)']),
+      // Se encola con la plantilla AVISO_INTERNO; ventana y plantilla las decide el outbox al enviar
+      expect(outboxMock.encolar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          telefono: '51977503006',
+          origen: 'ALERTA_ADMIN',
+          carga: expect.objectContaining({
+            plantillaClave: 'AVISO_INTERNO',
+            variablesPlantilla: expect.arrayContaining(['Alerta de Stock: Harina (AGOTADO)']),
+          }),
+        }),
       );
     });
   });

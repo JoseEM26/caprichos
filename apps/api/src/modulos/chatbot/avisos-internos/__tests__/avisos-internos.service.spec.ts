@@ -10,6 +10,10 @@ import { ConfiguracionService } from '../../../configuracion/configuracion.servi
 import { Ventana24hService } from '../../servicios/ventana-24h.service';
 import { WHATSAPP_MENSAJERIA_PUERTO } from '../../puerto/whatsapp-mensajeria.puerto';
 import { EventosGateway } from '../../../../comun/socket/eventos.gateway';
+import { OutboxWhatsappService } from '../../servicios/outbox-whatsapp.service';
+
+
+const outboxMock = { encolar: jest.fn().mockResolvedValue(true), despertar: jest.fn(), limpiar: jest.fn(), resumen: jest.fn() };
 
 describe('AvisosInternosService (Ola 4, Agente H: Avisos Internos al Equipo)', () => {
   let service: AvisosInternosService;
@@ -138,6 +142,7 @@ describe('AvisosInternosService (Ola 4, Agente H: Avisos Internos al Equipo)', (
         { provide: Ventana24hService, useValue: ventana24hServiceMock },
         { provide: WHATSAPP_MENSAJERIA_PUERTO, useValue: mensajeriaMock },
         { provide: EventosGateway, useValue: eventosGatewayMock },
+        { provide: OutboxWhatsappService, useValue: outboxMock },
       ],
     }).compile();
 
@@ -186,101 +191,81 @@ describe('AvisosInternosService (Ola 4, Agente H: Avisos Internos al Equipo)', (
       expect(mensajeriaMock.enviarBotones).not.toHaveBeenCalled();
     });
 
-    it('envía mensaje interactivo con botones cuando la ventana de 24h está abierta', async () => {
-      ventana24hServiceMock.esVentanaAbierta.mockResolvedValue(true);
-
+    it('encola un aviso con botones por número del equipo (ventana y plantilla se deciden al enviar)', async () => {
+      outboxMock.encolar.mockClear();
       const resultado = await service.notificarNuevoPedido(101n);
 
       expect(resultado.omitido).toBe(false);
       expect(resultado.enviosExitosos).toBe(2);
-      expect(resultado.detalles[0].modo).toBe('VENTANA_24H');
-      expect(mensajeriaMock.enviarBotones).toHaveBeenCalledTimes(2);
-
-      // Verifica que no se envió por plantilla
-      expect(mensajeriaMock.enviarPlantilla).not.toHaveBeenCalled();
-
-      // Verifica auditoría registrada
-      expect(auditoriaServiceMock.registrar).toHaveBeenCalledWith(
+      expect(resultado.detalles[0].modo).toBe('ENCOLADO');
+      expect(outboxMock.encolar).toHaveBeenCalledWith(
         expect.objectContaining({
-          accion: 'WHATSAPP_AVISO_EQUIPO_PEDIDO',
-          entidad: 'pedido',
-          entidadId: 101n,
+          tipo: 'TEXTO',
+          origen: 'EQUIPO_NUEVO_PEDIDO',
+          clave: expect.stringMatching(/^equipo-nuevo-pedido:101:/),
+          carga: expect.objectContaining({ plantillaClave: 'EQUIPO_NUEVO_PEDIDO', botones: expect.any(Array) }),
         }),
+        undefined,
       );
-
-      // Verifica registro en tabla whatsapp_mensaje
-      expect(prismaMock.whatsappMensaje.create).toHaveBeenCalled();
+      // Ningún envío directo: el outbox envía después
+      expect(mensajeriaMock.enviarBotones).not.toHaveBeenCalled();
     });
 
-    it('envía plantilla aprobada caprichos_equipo_nuevo_pedido cuando la ventana de 24h está cerrada', async () => {
-      ventana24hServiceMock.esVentanaAbierta.mockResolvedValue(false);
-
-      const resultado = await service.notificarNuevoPedido(101n);
-
-      expect(resultado.omitido).toBe(false);
-      expect(resultado.enviosExitosos).toBe(2);
-      expect(resultado.detalles[0].modo).toBe('PLANTILLA');
-      expect(mensajeriaMock.enviarPlantilla).toHaveBeenCalledWith(
-        expect.any(String),
-        'caprichos_equipo_nuevo_pedido',
-        'es',
-        ['CP-W001', 'DELIVERY - Ana Pérez', '45.50'],
-        expect.objectContaining({ pedidoId: 101n }),
+    it('la plantilla del equipo lleva código, modalidad y total (el envío elige la plantilla si la ventana está cerrada)', async () => {
+      outboxMock.encolar.mockClear();
+      await service.notificarNuevoPedido(101n);
+      expect(outboxMock.encolar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          carga: expect.objectContaining({
+            plantillaClave: 'EQUIPO_NUEVO_PEDIDO',
+            variablesPlantilla: ['CP-W001', 'DELIVERY - Ana Pérez', '45.50'],
+          }),
+        }),
+        undefined,
       );
     });
 
-    it('garantiza idempotencia estricta: un aviso por pedido y destino', async () => {
-      // Primer envío: exitoso
+    it('garantiza idempotencia estricta: la clave por pedido y número evita el segundo aviso', async () => {
+      outboxMock.encolar
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(false)
+        .mockResolvedValueOnce(false);
+
       const res1 = await service.notificarNuevoPedido(101n);
       expect(res1.enviosExitosos).toBe(2);
 
-      // Segundo envío: debe omitirse por clave existente en Redis
       const res2 = await service.notificarNuevoPedido(101n);
       expect(res2.detalles[0].modo).toBe('OMITIDO_IDEMPOTENTE');
       expect(res2.detalles[1].modo).toBe('OMITIDO_IDEMPOTENTE');
-
-      // Solo se llamó al adaptador de WhatsApp en el primer intento (2 destinatarios = 2 llamadas)
-      expect(mensajeriaMock.enviarBotones).toHaveBeenCalledTimes(2);
-    });
-
-    it('maneja fallos temporales de conexión con reintentos acotados sin bloquear el pedido', async () => {
-      mensajeriaMock.enviarBotones
-        .mockRejectedValueOnce(new Error('Network timeout'))
-        .mockResolvedValueOnce({ exito: true, estado: 'ENVIADO', waMessageId: 'wamid.retry.ok' });
-
-      const resultado = await service.notificarNuevoPedido(101n);
-
-      expect(resultado.omitido).toBe(false);
-      // El primer destinatario reintentó y tuvo éxito
-      expect(resultado.detalles[0].exito).toBe(true);
     });
   });
 
   describe('Avisos de Almacén (Insumos Agotados y Por Pedir)', () => {
-    it('notifica insumo agotado a los números del equipo con botones si la ventana está abierta', async () => {
-      ventana24hServiceMock.esVentanaAbierta.mockResolvedValue(true);
-
+    it('encola la alerta de insumo agotado con botones para cada número del equipo', async () => {
+      outboxMock.encolar.mockClear();
       const resultado = await service.notificarInsumoAgotado(55n);
 
       expect(resultado.omitido).toBe(false);
       expect(resultado.enviosExitosos).toBe(2);
-      expect(resultado.detalles[0].modo).toBe('VENTANA_24H');
-      expect(mensajeriaMock.enviarBotones).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.stringContaining('Insumo Agotado'),
-        expect.arrayContaining([expect.objectContaining({ id: 'alm_ok_55' })]),
-      );
-
-      expect(auditoriaServiceMock.registrar).toHaveBeenCalledWith(
+      expect(outboxMock.encolar).toHaveBeenCalledWith(
         expect.objectContaining({
-          accion: 'WHATSAPP_AVISO_EQUIPO_ALMACEN',
-          entidad: 'insumo',
+          origen: 'EQUIPO_ALERTA_ALMACEN',
+          clave: expect.stringMatching(/^almacen:55:AGOTADO:\d{4}-\d{2}-\d{2}:/),
+          carga: expect.objectContaining({
+            textoLibre: expect.stringContaining('Insumo Agotado'),
+            botones: expect.arrayContaining([expect.objectContaining({ id: 'alm_ok_55' })]),
+          }),
         }),
+        undefined,
+      );
+      expect(auditoriaServiceMock.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({ accion: 'WHATSAPP_AVISO_EQUIPO_ALMACEN', entidad: 'insumo' }),
       );
     });
 
-    it('notifica insumo por pedir (bajo stock) fuera de ventana usando plantilla caprichos_equipo_alerta_almacen', async () => {
-      ventana24hServiceMock.esVentanaAbierta.mockResolvedValue(false);
+    it('encola la alerta de bajo stock con la plantilla de almacén como respaldo', async () => {
+      outboxMock.encolar.mockClear();
       prismaMock.insumo.findUnique.mockResolvedValueOnce({
         id: 55n,
         nombre: 'Café Grano',
@@ -292,16 +277,23 @@ describe('AvisosInternosService (Ola 4, Agente H: Avisos Internos al Equipo)', (
       const resultado = await service.notificarInsumoBajoStock(55n);
 
       expect(resultado.omitido).toBe(false);
-      expect(resultado.detalles[0].modo).toBe('PLANTILLA');
-      expect(mensajeriaMock.enviarPlantilla).toHaveBeenCalledWith(
-        expect.any(String),
-        'caprichos_equipo_alerta_almacen',
-        'es',
-        ['Café Grano', 'Por pedir', '3.50 KG'],
+      expect(outboxMock.encolar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          carga: expect.objectContaining({
+            plantillaClave: 'EQUIPO_ALERTA_ALMACEN',
+            variablesPlantilla: ['Café Grano', 'Por pedir', '3.50 KG'],
+          }),
+        }),
+        undefined,
       );
     });
 
     it('aplica idempotencia diaria en alertas de almacén para no saturar al equipo', async () => {
+      outboxMock.encolar
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(false)
+        .mockResolvedValueOnce(false);
       await service.notificarInsumoAgotado(55n);
       const res2 = await service.notificarInsumoAgotado(55n);
 
@@ -309,14 +301,16 @@ describe('AvisosInternosService (Ola 4, Agente H: Avisos Internos al Equipo)', (
       expect(res2.detalles[1].modo).toBe('OMITIDO_IDEMPOTENTE');
     });
 
-    it('notifica cuando un producto de carta se agota manualmente', async () => {
+    it('encola la alerta cuando un producto de carta se agota manualmente', async () => {
+      outboxMock.encolar.mockClear();
       const resultado = await service.notificarElementoAgotado('PRODUCTO', 10n);
       expect(resultado.omitido).toBe(false);
       expect(resultado.enviosExitosos).toBe(2);
-      expect(mensajeriaMock.enviarBotones).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.stringContaining('Torta de Chocolate'),
-        expect.any(Array),
+      expect(outboxMock.encolar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          carga: expect.objectContaining({ textoLibre: expect.stringContaining('Torta de Chocolate') }),
+        }),
+        undefined,
       );
     });
   });

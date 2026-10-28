@@ -22,6 +22,7 @@ function crear(opts: { pagoEstado?: string; recargo?: number | null; envio?: num
     envio: new Prisma.Decimal(opts.envio ?? 7),
   };
   const prisma: any = {
+      $transaction: jest.fn(async (fn: any) => fn(prisma)),
     pedido: {
       findUnique: jest.fn().mockImplementation(async () => ({ ...pedido })),
       update: jest.fn().mockImplementation(async ({ data }: any) => ({
@@ -50,7 +51,7 @@ function crear(opts: { pagoEstado?: string; recargo?: number | null; envio?: num
   };
   const auditoria = { registrar: jest.fn().mockResolvedValue(undefined) };
   const eventos = { emitirAdmin: jest.fn() };
-  const avisos = { avisar: jest.fn().mockResolvedValue({ estado: 'ENVIADO' }) };
+  const avisos = { avisar: jest.fn().mockResolvedValue({ estado: 'ENCOLADO' }), despertar: jest.fn() };
   const servicio = new RepartosService(prisma, auditoria as any, {} as any, eventos as any, avisos as any);
   return { servicio, prisma, eventos, avisos };
 }
@@ -69,7 +70,7 @@ describe('Reenvío tras confirmación del cliente (reprogramarPedido)', () => {
     expect(prisma.incidenteEntrega.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ cierre: 'REPROGRAMADO' }) }),
     );
-    expect(avisos.avisar).toHaveBeenCalledWith(BigInt(77), 'REENVIADO');
+    expect(avisos.avisar).toHaveBeenCalledWith(BigInt(77), 'REENVIADO', {}, expect.anything());
   });
 
   it('idempotente: un segundo reenvío no vuelve a sumar (la pregunta ya quedó REPROGRAMADO)', async () => {

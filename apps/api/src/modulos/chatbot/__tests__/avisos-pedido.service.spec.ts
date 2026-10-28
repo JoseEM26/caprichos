@@ -1,12 +1,16 @@
 jest.mock('../../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {} }));
 import { AvisosPedidoService } from '../servicios/avisos-pedido.service';
-import { Ventana24hService } from '../servicios/ventana-24h.service';
 
-describe('AvisosPedidoService (avisos de reparto al cliente)', () => {
+/**
+ * Los avisos ya no llaman a Meta: se encolan en el outbox dentro de la transacción del cambio de estado.
+ * El envío (texto libre o plantilla según la ventana de 24 h) lo prueba outbox-whatsapp.service.spec.ts.
+ */
+describe('AvisosPedidoService (avisos de reparto al cliente, encolados en el outbox)', () => {
   let servicio: AvisosPedidoService;
   let prisma: any;
-  let mensajeria: any;
+  let outbox: any;
   let pedido: any;
+  let parametros: Record<string, unknown>;
 
   beforeEach(() => {
     pedido = {
@@ -19,304 +23,130 @@ describe('AvisosPedidoService (avisos de reparto al cliente)', () => {
       pago_metodo: 'EFECTIVO',
       pago_preferido: 'EFECTIVO',
     };
+    parametros = { tiempo_prometido_min: 25 };
 
     prisma = {
+      $transaction: jest.fn(async (fn: any) => fn(prisma)),
       pedido: { findUnique: jest.fn(async () => pedido) },
       parametro: {
-        findUnique: jest.fn(async ({ where }: any) => {
-          if (where.clave === 'tiempo_prometido_min') return { valor: 25 };
-          return { valor: 'si' };
-        }),
+        findUnique: jest.fn(async ({ where }: any) => ({ valor: parametros[where.clave] ?? 'si' })),
       },
       mensajeReparto: {
+        findUnique: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockResolvedValue({}),
-        update: jest.fn().mockResolvedValue({}),
       },
-      whatsappMensaje: { findFirst: jest.fn().mockResolvedValue(null) },
-      clienteWhatsappConsentimiento: { findUnique: jest.fn().mockResolvedValue(null) },
       conversacion: {
         upsert: jest.fn().mockResolvedValue({ id: BigInt(5), flujo: null }),
         update: jest.fn().mockResolvedValue({}),
       },
-      mensajeChat: { create: jest.fn().mockResolvedValue({}) },
     };
-
-    mensajeria = {
-      enviarTexto: jest.fn().mockResolvedValue({ exito: true, estado: 'SIMULADO', id: '900' }),
-      enviarBotones: jest.fn(),
-      enviarPlantilla: jest.fn().mockResolvedValue({ exito: true, estado: 'SIMULADO', id: '901' }),
+    outbox = {
+      encolar: jest.fn().mockResolvedValue(true),
+      despertar: jest.fn(),
     };
-
-    const ventana = new Ventana24hService(prisma, mensajeria, undefined);
-    servicio = new AvisosPedidoService(prisma, ventana);
+    servicio = new AvisosPedidoService(prisma, outbox);
   });
 
-  it('envía el aviso, registra la etapa en mensaje_reparto y lo copia en mensaje_chat', async () => {
-    // Ventana cerrada: se usa la plantilla aprobada
+  it('encola el aviso con clave pedido-<id>-<ETAPA> y marca la etapa PENDIENTE, en la misma transacción', async () => {
     const res = await servicio.avisar(77, 'LLEGADA');
 
-    expect(res.estado).toBe('SIMULADO');
+    expect(res.estado).toBe('ENCOLADO');
     expect(prisma.mensajeReparto.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ pedido_id: BigInt(77), numero: 2, estado: 'PENDIENTE' }),
     });
-    expect(prisma.mensajeReparto.update).toHaveBeenCalledWith({
-      where: { pedido_id_numero: { pedido_id: BigInt(77), numero: 2 } },
-      data: { estado: 'ENVIADO' },
-    });
-    expect(prisma.mensajeChat.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        conversacion_id: BigInt(5),
-        direccion: 'SALE',
-        autor: 'BOT',
+    expect(outbox.encolar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        telefono: '51987654321',
         tipo: 'TEXTO',
-        whatsapp_mensaje_id: BigInt(901),
-        contenido: expect.objectContaining({ etapa: 'LLEGADA', pedido: 'CP-077', estado: 'SIMULADO' }),
-      }),
-    });
-  });
-
-  it('no duplica: si la etapa ya existe en mensaje_reparto (P2002) no envía nada', async () => {
-    prisma.mensajeReparto.create.mockRejectedValueOnce(Object.assign(new Error('unique'), { code: 'P2002' }));
-
-    const res = await servicio.avisar(77, 'SALIDA');
-
-    expect(res.estado).toBe('YA_ENVIADO');
-    expect(mensajeria.enviarTexto).not.toHaveBeenCalled();
-    expect(mensajeria.enviarPlantilla).not.toHaveBeenCalled();
-    expect(prisma.mensajeChat.create).not.toHaveBeenCalled();
-  });
-
-  it('parámetro apagado: no envía y no registra la etapa', async () => {
-    prisma.parametro.findUnique.mockResolvedValueOnce({ valor: 'no' });
-
-    const res = await servicio.avisar(77, 'LLEGADA');
-
-    expect(res).toEqual({ estado: 'OMITIDO', motivo: 'DESACTIVADO' });
-    expect(prisma.mensajeReparto.create).not.toHaveBeenCalled();
-    expect(mensajeria.enviarPlantilla).not.toHaveBeenCalled();
-  });
-
-  it('parámetro en true (booleano) también activa el aviso', async () => {
-    prisma.parametro.findUnique.mockResolvedValueOnce({ valor: true });
-    prisma.whatsappMensaje.findFirst.mockResolvedValueOnce({ id: BigInt(1) }); // ventana abierta
-
-    const res = await servicio.avisar(77, 'ACEPTADO');
-
-    expect(res.estado).toBe('SIMULADO');
-    expect(mensajeria.enviarTexto).toHaveBeenCalledWith('51987654321', expect.stringContaining('CP-077'), expect.anything());
-  });
-
-  it('ventana cerrada: usa la plantilla aprobada con el teléfono normalizado a 51XXXXXXXXX', async () => {
-    await servicio.avisar(77, 'ENTREGADO');
-
-    expect(mensajeria.enviarTexto).not.toHaveBeenCalled();
-    expect(mensajeria.enviarPlantilla).toHaveBeenCalledWith(
-      '51987654321',
-      'caprichos_delivery_entregado',
-      'es',
-      ['Marta', 'CP-077'],
-      { pedidoId: BigInt(77) },
-    );
-  });
-
-  it('ventana abierta (ENTRANTE reciente): envía texto libre', async () => {
-    prisma.whatsappMensaje.findFirst.mockResolvedValueOnce({ id: BigInt(1) });
-
-    await servicio.avisar(77, 'LISTO');
-
-    expect(mensajeria.enviarPlantilla).not.toHaveBeenCalled();
-    expect(mensajeria.enviarTexto).toHaveBeenCalledWith('51987654321', expect.stringContaining('ya está listo'), { pedidoId: BigInt(77) });
-  });
-
-  it('cliente con BAJA: no envía, deja el registro FALLIDO y no lanza error', async () => {
-    prisma.clienteWhatsappConsentimiento.findUnique.mockResolvedValue({ acepta: false });
-
-    const res = await servicio.avisar(77, 'SALIDA');
-
-    expect(res.estado).toBe('FALLIDO');
-    expect(mensajeria.enviarTexto).not.toHaveBeenCalled();
-    expect(mensajeria.enviarPlantilla).not.toHaveBeenCalled();
-    expect(prisma.mensajeReparto.update).toHaveBeenCalledWith(expect.objectContaining({ data: { estado: 'FALLIDO' } }));
-  });
-
-  it('pedidos que no son delivery o sin teléfono: se omiten sin registrar', async () => {
-    pedido.modalidad = 'RECOJO';
-    expect(await servicio.avisar(77, 'LISTO')).toEqual({ estado: 'OMITIDO', motivo: 'NO_ES_DELIVERY' });
-
-    pedido.modalidad = 'DELIVERY';
-    pedido.cliente_telefono = null;
-    expect(await servicio.avisar(77, 'LISTO')).toEqual({ estado: 'OMITIDO', motivo: 'SIN_TELEFONO' });
-
-    expect(prisma.mensajeReparto.create).not.toHaveBeenCalled();
-  });
-
-  it('un error inesperado no se propaga: el reparto sigue y el resultado es FALLIDO', async () => {
-    prisma.pedido.findUnique.mockRejectedValueOnce(new Error('db caída'));
-
-    const res = await servicio.avisar(77, 'LLEGADA');
-
-    expect(res.estado).toBe('FALLIDO');
-    expect(res.motivo).toBe('db caída');
-  });
-
-  it('retiro: la plantilla dice el monto exacto antes del SÍ/NO (y "sin costo adicional" si es 0)', async () => {
-    await servicio.avisar(77, 'RETIRO', { recargo: 5, recargoModo: 'FIJO' });
-    expect(mensajeria.enviarPlantilla).toHaveBeenLastCalledWith(
-      '51987654321',
-      'caprichos_delivery_retiro',
-      'es',
-      ['Marta', 'CP-077', 'Volver a enviarlo tiene un costo de S/ 5.00, que pagarías en la puerta o a Caja.'],
-      { pedidoId: BigInt(77) },
-    );
-
-    await servicio.avisar(77, 'RETIRO', { recargo: 7, recargoModo: 'IGUAL_ENVIO' });
-    expect(mensajeria.enviarPlantilla).toHaveBeenLastCalledWith(
-      '51987654321',
-      'caprichos_delivery_retiro',
-      'es',
-      ['Marta', 'CP-077', 'Volver a enviarlo tiene un costo de S/ 7.00 (el mismo del delivery), que pagarías en la puerta o a Caja.'],
-      { pedidoId: BigInt(77) },
-    );
-
-    await servicio.avisar(77, 'RETIRO', { recargo: 0, recargoModo: 'SIN_COSTO' });
-    expect(mensajeria.enviarPlantilla).toHaveBeenLastCalledWith(
-      '51987654321',
-      'caprichos_delivery_retiro',
-      'es',
-      ['Marta', 'CP-077', 'Volver a enviarlo no tiene costo adicional.'],
-      { pedidoId: BigInt(77) },
-    );
-  });
-
-  describe('pedido recibido desde la carta (RECIBIDO)', () => {
-    it('pago digital: avisa con la plantilla de voucher, pasa la conversación a una persona y la deja en VALIDAR_PAGO', async () => {
-      pedido.pago_metodo = 'YAPE';
-      pedido.pago_preferido = 'YAPE';
-
-      const res = await servicio.avisar(77, 'RECIBIDO');
-
-      expect(res.estado).toBe('SIMULADO');
-      expect(mensajeria.enviarPlantilla).toHaveBeenCalledWith(
-        '51987654321',
-        'caprichos_pedido_recibido_digital',
-        'es',
-        ['Marta', 'CP-077', 'Yape'],
-        { pedidoId: BigInt(77) },
-      );
-      expect(prisma.mensajeReparto.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({ pedido_id: BigInt(77), numero: 9 }),
-      });
-      expect(prisma.conversacion.update).toHaveBeenCalledWith({
-        where: { id: BigInt(5) },
-        data: expect.objectContaining({
-          estado: 'VALIDAR_PAGO',
-          duenio: 'PERSONA',
-          urgente: true,
-          flujo: expect.objectContaining({
-            pago: expect.objectContaining({ pedidoId: '77', pedidoCodigo: 'CP-077', medio: 'YAPE', monto: 30 }),
-          }),
+        clave: 'pedido-77-LLEGADA',
+        origen: 'AVISO_PEDIDO',
+        carga: expect.objectContaining({
+          plantillaClave: expect.any(String),
+          repartoNumero: 2,
+          pedidoCodigo: 'CP-077',
+          etapa: 'LLEGADA',
+          autor: 'BOT',
         }),
-      });
-    });
+      }),
+      expect.anything(),
+    );
+  });
 
-    it.each([
-      ['PLIN', 'Plin'],
-      ['TRANSFERENCIA', 'transferencia'],
-    ])('pago %s: el texto nombra el medio como "%s"', async (metodo, medioTexto) => {
-      pedido.pago_metodo = metodo;
-      pedido.pago_preferido = metodo;
+  it('sin transacción propia: abre una y despierta el envío al confirmarla', async () => {
+    await servicio.avisar(77, 'LLEGADA');
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(outbox.despertar).toHaveBeenCalledTimes(1);
+  });
 
-      await servicio.avisar(77, 'RECIBIDO');
+  it('con transacción ajena: encola dentro de ella y no despierta (lo hace el emisor tras el commit)', async () => {
+    const tx = { ...prisma, mensajeReparto: prisma.mensajeReparto };
+    await servicio.avisar(77, 'LLEGADA', {}, tx as any);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(outbox.encolar).toHaveBeenCalledWith(expect.any(Object), tx);
+    expect(outbox.despertar).not.toHaveBeenCalled();
+  });
 
-      expect(mensajeria.enviarPlantilla).toHaveBeenCalledWith(
-        '51987654321',
-        'caprichos_pedido_recibido_digital',
-        'es',
-        ['Marta', 'CP-077', medioTexto],
-        expect.anything(),
-      );
-    });
+  it('idempotente: si la etapa ya existe en mensaje_reparto no encola nada', async () => {
+    prisma.mensajeReparto.findUnique.mockResolvedValueOnce({ numero: 2 });
+    const res = await servicio.avisar(77, 'LLEGADA');
+    expect(res.estado).toBe('YA_ENVIADO');
+    expect(outbox.encolar).not.toHaveBeenCalled();
+    expect(prisma.mensajeReparto.create).not.toHaveBeenCalled();
+  });
 
-    it('efectivo: aviso corto "ya esta en proceso" sin mencionar voucher y la conversación no se toca', async () => {
-      const res = await servicio.avisar(77, 'RECIBIDO');
+  it('carrera (P2002 al crear la etapa): se trata como ya encolado', async () => {
+    prisma.$transaction.mockRejectedValueOnce(Object.assign(new Error('unique'), { code: 'P2002' }));
+    const res = await servicio.avisar(77, 'LLEGADA');
+    expect(res.estado).toBe('YA_ENVIADO');
+  });
 
-      expect(res.estado).toBe('SIMULADO');
-      expect(mensajeria.enviarPlantilla).toHaveBeenCalledWith(
-        '51987654321',
-        'caprichos_pedido_recibido_efectivo',
-        'es',
-        ['Marta', 'CP-077'],
-        expect.anything(),
-      );
-      expect(prisma.conversacion.update).not.toHaveBeenCalled();
-    });
+  it('parámetro apagado: no encola ni registra la etapa', async () => {
+    parametros.whatsapp_aviso_llegada_activo = 'no';
+    prisma.parametro.findUnique.mockImplementation(async ({ where }: any) =>
+      where.clave === 'whatsapp_aviso_llegada_activo' ? { valor: 'no' } : { valor: 'si' },
+    );
+    const res = await servicio.avisar(77, 'LLEGADA');
+    expect(res).toEqual({ estado: 'OMITIDO', motivo: 'DESACTIVADO' });
+    expect(outbox.encolar).not.toHaveBeenCalled();
+    expect(prisma.mensajeReparto.create).not.toHaveBeenCalled();
+  });
 
-    it('vale para cualquier modalidad (no solo delivery)', async () => {
-      pedido.modalidad = 'RECOGER';
+  it('pedido que no es delivery o sin teléfono: se omite sin encolar', async () => {
+    pedido.modalidad = 'RECOJO';
+    expect((await servicio.avisar(77, 'LLEGADA')).motivo).toBe('NO_ES_DELIVERY');
+    pedido.modalidad = 'DELIVERY';
+    pedido.cliente_telefono = '';
+    expect((await servicio.avisar(77, 'LLEGADA')).motivo).toBe('SIN_TELEFONO');
+    expect(outbox.encolar).not.toHaveBeenCalled();
+  });
 
-      const res = await servicio.avisar(77, 'RECIBIDO');
+  it('pago digital en RECIBIDO: pasa la conversación a una persona y encola el aviso de voucher', async () => {
+    pedido.pago_metodo = 'YAPE';
+    pedido.pago_preferido = 'YAPE';
+    const res = await servicio.avisar(77, 'RECIBIDO');
+    expect(res.estado).toBe('ENCOLADO');
+    expect(prisma.conversacion.upsert).toHaveBeenCalled();
+    expect(outbox.encolar).toHaveBeenCalledWith(
+      expect.objectContaining({ carga: expect.objectContaining({ etapa: 'RECIBIDO' }) }),
+      expect.anything(),
+    );
+  });
 
-      expect(res.estado).toBe('SIMULADO');
-      expect(mensajeria.enviarPlantilla).toHaveBeenCalled();
-    });
+  it('retiro: el texto dice el monto exacto antes del SÍ/NO', async () => {
+    await servicio.avisar(77, 'RETIRO', { recargo: 5, recargoModo: 'FIJO' });
+    const carga = outbox.encolar.mock.calls[0][0].carga;
+    expect(carga.textoLibre).toContain('S/ 5.00');
+    expect(carga.repartoNumero).toBe(5);
+  });
 
-    it('sin teléfono válido: no envía, no registra la etapa y no toca la conversación', async () => {
-      pedido.cliente_telefono = '';
-      pedido.pago_metodo = 'YAPE';
+  it('un error al encolar fuera de transacción no se propaga: el resultado es FALLIDO', async () => {
+    prisma.$transaction.mockRejectedValueOnce(new Error('BD caída'));
+    const res = await servicio.avisar(77, 'LLEGADA');
+    expect(res.estado).toBe('FALLIDO');
+  });
 
-      expect(await servicio.avisar(77, 'RECIBIDO')).toEqual({ estado: 'OMITIDO', motivo: 'SIN_TELEFONO' });
-      expect(mensajeria.enviarPlantilla).not.toHaveBeenCalled();
-      expect(prisma.mensajeReparto.create).not.toHaveBeenCalled();
-      expect(prisma.conversacion.update).not.toHaveBeenCalled();
-    });
-
-    it('parámetro apagado: no envía ni deja la conversación marcada', async () => {
-      pedido.pago_metodo = 'YAPE';
-      prisma.parametro.findUnique.mockResolvedValueOnce({ valor: 'no' });
-
-      expect(await servicio.avisar(77, 'RECIBIDO')).toEqual({ estado: 'OMITIDO', motivo: 'DESACTIVADO' });
-      expect(mensajeria.enviarPlantilla).not.toHaveBeenCalled();
-      expect(prisma.conversacion.update).not.toHaveBeenCalled();
-    });
-
-    it('idempotencia: si ya se avisó (P2002) no envía ni vuelve a marcar la conversación', async () => {
-      pedido.pago_metodo = 'YAPE';
-      prisma.mensajeReparto.create.mockRejectedValueOnce(Object.assign(new Error('unique'), { code: 'P2002' }));
-
-      expect(await servicio.avisar(77, 'RECIBIDO')).toEqual({ estado: 'YA_ENVIADO' });
-      expect(mensajeria.enviarPlantilla).not.toHaveBeenCalled();
-      expect(prisma.conversacion.update).not.toHaveBeenCalled();
-    });
-
-    it('fallo del envío no se propaga: el resultado es FALLIDO y la conversación igual queda para la persona', async () => {
-      pedido.pago_metodo = 'PLIN';
-      pedido.pago_preferido = 'PLIN';
-      mensajeria.enviarPlantilla.mockResolvedValueOnce({ exito: false, estado: 'FALLIDO', errorCodigo: 'META_500' });
-
-      const res = await servicio.avisar(77, 'RECIBIDO');
-
-      expect(res.estado).toBe('FALLIDO');
-      expect(prisma.mensajeReparto.update).toHaveBeenCalledWith(expect.objectContaining({ data: { estado: 'FALLIDO' } }));
-      expect(prisma.conversacion.update).toHaveBeenCalled();
-    });
-
-    it('si falla dejar la conversación para la persona, el aviso igual se envía', async () => {
-      pedido.pago_metodo = 'YAPE';
-      prisma.conversacion.update.mockRejectedValueOnce(new Error('db caída'));
-
-      const res = await servicio.avisar(77, 'RECIBIDO');
-
-      expect(res.estado).toBe('SIMULADO');
-      expect(mensajeria.enviarPlantilla).toHaveBeenCalled();
-    });
-
-    it('un error del envío (excepción) no se propaga', async () => {
-      pedido.pago_metodo = 'EFECTIVO';
-      mensajeria.enviarPlantilla.mockRejectedValueOnce(new Error('red caída'));
-
-      const res = await servicio.avisar(77, 'RECIBIDO');
-
-      expect(res).toEqual({ estado: 'FALLIDO', motivo: 'red caída' });
-    });
+  it('dentro de una transacción ajena el error se propaga para que esa transacción se deshaga', async () => {
+    outbox.encolar.mockRejectedValueOnce(new Error('BD caída'));
+    await expect(servicio.avisar(77, 'LLEGADA', {}, prisma as any)).rejects.toThrow('BD caída');
   });
 });

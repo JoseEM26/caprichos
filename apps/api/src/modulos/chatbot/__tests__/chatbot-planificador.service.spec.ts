@@ -10,6 +10,8 @@ import { Ventana24hService } from '../servicios/ventana-24h.service';
 import { AvisosPedidoService } from '../servicios/avisos-pedido.service';
 import { EventosGateway } from '../../../comun/socket/eventos.gateway';
 
+const mockOutbox: any = { encolar: jest.fn().mockResolvedValue(true), despertar: jest.fn(), procesarLote: jest.fn().mockResolvedValue({}), limpiar: jest.fn().mockResolvedValue({}) };
+
 describe('ChatbotPlanificadorService (avisos por tiempo)', () => {
   let planificador: ChatbotPlanificadorService;
   let mockPrisma: any;
@@ -79,6 +81,8 @@ describe('ChatbotPlanificadorService (avisos por tiempo)', () => {
       mockEventos as EventosGateway,
       undefined,
       mockAvisos as AvisosPedidoService,
+      undefined,
+      mockOutbox,
     );
   });
 
@@ -247,10 +251,13 @@ describe('ChatbotPlanificadorService (avisos por tiempo)', () => {
     const res = await planificador.ejecutarCiclo();
 
     expect(res.avisosRecojo).toBe(1);
-    expect(mockVentana24h.enviarMensajeNegocio).toHaveBeenCalledWith(
-      '51987654321',
-      expect.objectContaining({ plantillaClave: 'PEDIDO_LISTO_RECOJO' }),
-      { pedidoId: BigInt(30) },
+    expect(mockOutbox.encolar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        telefono: '51987654321',
+        clave: 'recojo-30',
+        origen: 'RECOJO',
+        carga: expect.objectContaining({ plantillaClave: 'PEDIDO_LISTO_RECOJO' }),
+      }),
     );
   });
 });
