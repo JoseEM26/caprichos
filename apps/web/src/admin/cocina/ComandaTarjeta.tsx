@@ -7,6 +7,8 @@ export interface ComandaTarjetaProps {
   despejando?: boolean;
   soloLectura?: boolean;
   mostrarArea?: boolean;
+  /** Vista de un área: la boleta muestra solo las líneas de esa área y resalta su casilla. */
+  soloArea?: boolean;
 }
 
 export function obtenerColorMinutos(minutos: number): ColorComanda {
@@ -121,18 +123,94 @@ function LineaFila({
 }
 
 /**
- * Líneas del pedido. Si el servidor trae las áreas del pedido, se agrupan por área
- * (subtítulo pequeño) con un check por línea: listo cuando su área ya despejó.
- * Sin áreas (respuesta anterior), muestra la lista plana de siempre.
+ * Casilla de estado de un área: marcada con check si ya despejó, en blanco si falta.
+ */
+function CasillaArea({ listo }: { listo: boolean }) {
+  return (
+    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" style={{ flexShrink: 0 }}>
+      <rect
+        x="1.5"
+        y="1.5"
+        width="13"
+        height="13"
+        rx="3"
+        fill={listo ? VERDE_LISTO : 'none'}
+        stroke={listo ? VERDE_LISTO : 'var(--cp-soft)'}
+        strokeWidth="1.8"
+      />
+      {listo && (
+        <path
+          d="M4 8.5l2.6 2.6 5.4-5.4"
+          fill="none"
+          stroke="#FFFFFF"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      )}
+    </svg>
+  );
+}
+
+/**
+ * Franja con una casilla por área del pedido. El área de la pantalla (vista de área) va resaltada.
+ */
+function EstadoAreas({ comanda, areaActual }: { comanda: Comanda; areaActual?: string }) {
+  if (!comanda.areas || comanda.areas.length === 0) return null;
+  return (
+    <div
+      aria-label="Estado por área"
+      style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}
+    >
+      {comanda.areas.map((area) => {
+        const esActual = area.areaId === areaActual;
+        return (
+          <span
+            key={area.areaId}
+            role="img"
+            aria-label={`${area.areaNombre}: ${area.despejada ? 'lista' : 'falta'}`}
+            data-testid={`estado-area-${area.areaId}`}
+            data-despejada={area.despejada ? 'true' : 'false'}
+            data-actual={esActual ? 'true' : 'false'}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              fontSize: '12px',
+              fontWeight: esActual ? 800 : 600,
+              color: 'var(--cp-navy)',
+              border: esActual ? '1.5px solid var(--cp-navy)' : '1px solid var(--cp-line)',
+              borderRadius: '9999px',
+              padding: '2px 8px',
+              background: esActual ? 'var(--cp-cream)' : 'transparent',
+            }}
+          >
+            <CasillaArea listo={area.despejada} />
+            {area.areaNombre}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * Líneas del pedido. En la vista de un área (soloArea) muestra solo sus líneas, con el check
+ * de listo de esa área. Si el servidor trae las áreas del pedido, en la vista Todas se agrupan
+ * por área (subtítulo pequeño) con un check por línea. Sin áreas (respuesta anterior), lista plana.
  */
 export function LineasComanda({
   comanda,
   mostrarArea = true,
+  soloArea = false,
 }: {
   comanda: Comanda;
   mostrarArea?: boolean;
+  soloArea?: boolean;
 }) {
-  if (!comanda.areas || comanda.areas.length === 0) {
+  const areas = comanda.areas || [];
+  const conAreas = areas.length > 0;
+  if (soloArea || !conAreas) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
         {(comanda.lineas || []).map((it, idx) => (
@@ -140,6 +218,7 @@ export function LineasComanda({
             key={it.id || idx}
             it={it}
             etiquetaArea={mostrarArea ? it.area || comanda.areaNombre || undefined : undefined}
+            listo={soloArea && conAreas ? comanda.despejada === true : undefined}
           />
         ))}
       </div>
@@ -148,7 +227,7 @@ export function LineasComanda({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-      {comanda.areas.map((area) => (
+      {areas.map((area) => (
         <div
           key={area.areaId}
           data-testid={`area-pedido-${area.areaId}`}
@@ -180,6 +259,7 @@ export function ComandaTarjeta({
   despejando = false,
   soloLectura = false,
   mostrarArea = true,
+  soloArea = false,
 }: ComandaTarjetaProps) {
   const [minutosEnVivo, setMinutosEnVivo] = useState<number>(() => {
     if (comanda.creado_en) {
@@ -326,7 +406,9 @@ export function ComandaTarjeta({
         </div>
       )}
 
-      <LineasComanda comanda={comanda} mostrarArea={mostrarArea} />
+      <EstadoAreas comanda={comanda} areaActual={soloArea ? comanda.areaId : undefined} />
+
+      <LineasComanda comanda={comanda} mostrarArea={mostrarArea} soloArea={soloArea} />
 
       {comanda.nota && (
         <div

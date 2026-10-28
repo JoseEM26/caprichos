@@ -46,6 +46,15 @@ const AREAS_MOCKUP = [
   { id: 'salados', n: 'Salados' },
 ] as const;
 
+/** Botón del selector de áreas que corresponde a un área de cocina por su nombre. */
+function idMockupDeArea(nombre: string): string {
+  const nom = nombre.toLowerCase();
+  if (nom.includes('bebida') || nom.includes('barra')) return 'bebidas';
+  if (nom.includes('salado') || nom.includes('cocina')) return 'salados';
+  if (nom.includes('postre')) return 'postres';
+  return 'todas';
+}
+
 /**
  * Ordena las comandas por hora de llegada ascendente (FIFO estricto).
  * Primero las pendientes de la propia área; después las de solo seguimiento (ya despejadas).
@@ -71,6 +80,20 @@ export function ordenarComandasPorHoraLlegada(lista: Comanda[]): Comanda[] {
     }
     return (a.codigo || a.ticket || '').localeCompare(b.codigo || b.ticket || '');
   });
+}
+
+/**
+ * Vista Todas: el servidor devuelve una fila por área del pedido (la pantalla TV las cuenta así),
+ * pero aquí cada pedido es una sola boleta con el estado de todas sus áreas.
+ * La fila que se muestra es una pendiente (si la hay), porque la boleta lleva las áreas completas.
+ */
+export function agruparPorPedido(lista: Comanda[]): Comanda[] {
+  const porPedido = new Map<string, Comanda>();
+  for (const c of lista) {
+    const previa = porPedido.get(c.pedidoId);
+    if (!previa || (previa.despejada && !c.despejada)) porPedido.set(c.pedidoId, c);
+  }
+  return [...porPedido.values()];
 }
 
 export function CocinaAdminView() {
@@ -187,6 +210,8 @@ export function CocinaAdminView() {
         setAreasApi(listaAreas);
         const areaDefault = listaAreas.length > 0 ? listaAreas[0].id : '';
         setAreaSeleccionada(areaDefault);
+        // El botón marcado debe ser el de los datos que se muestran (antes quedaba «Todas» con el área cargada)
+        setAreaActiva(idMockupDeArea(listaAreas[0]?.nombre ?? ''));
         await cargarAltaDemanda();
       } catch (err: any) {
         setError(err?.message || 'Error al iniciar módulo de cocina');
@@ -325,6 +350,10 @@ export function CocinaAdminView() {
 
   const nombreAreaActual =
     AREAS_MOCKUP.find((a) => a.id === areaActiva)?.n || 'Todas';
+
+  // En Todas: una boleta por pedido, sin Despejar (no hay un área actual que despeje)
+  const enTodas = areaActiva === 'todas';
+  const tarjetas = enTodas ? agruparPorPedido(comandas) : comandas;
 
   if (!puedeVer) {
     return (
@@ -835,10 +864,10 @@ export function CocinaAdminView() {
               letterSpacing: '0.04em',
             }}
           >
-            EN COCINA · {comandas.filter((c) => !c.despejada).length}
+            EN COCINA · {tarjetas.filter((c) => !c.despejada).length}
           </div>
 
-          {comandas.length === 0 ? (
+          {tarjetas.length === 0 ? (
             <div style={{ color: 'var(--cp-soft)', fontSize: '13px', padding: '16px 0' }}>
               Sin pedidos para esta área.
             </div>
@@ -853,12 +882,14 @@ export function CocinaAdminView() {
                 boxSizing: 'border-box',
               }}
             >
-              {comandas.map((c) => (
+              {tarjetas.map((c) => (
                 <ComandaTarjeta
-                  key={c.id}
+                  key={enTodas ? c.pedidoId : c.id}
                   comanda={c}
-                  mostrarArea={areaActiva === 'todas'}
-                  onDespejar={puedeDespejar ? (com) => setComandaParaDespejar(com) : undefined}
+                  mostrarArea={enTodas}
+                  soloArea={!enTodas}
+                  soloLectura={enTodas}
+                  onDespejar={puedeDespejar && !enTodas ? (com) => setComandaParaDespejar(com) : undefined}
                   despejando={despejando}
                 />
               ))}

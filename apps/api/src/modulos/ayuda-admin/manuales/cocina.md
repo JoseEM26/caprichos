@@ -21,9 +21,11 @@ Sistema de visualizacion y control de preparacion de comandas en tiempo real. Or
 2. Las comandas pendientes aparecen primero, ordenadas de mas antigua a mas reciente, mostrando primero la que mas tiempo lleva esperando.
 3. Al finalizar la elaboracion de los platos de esa comanda, pulsar el boton Despejar en la tarjeta del pedido y confirmar con Si, despejar.
 4. La tarjeta sigue en la pantalla del area como seguimiento: el pedido no desaparece mientras otra area de ese mismo pedido siga pendiente.
-5. Cada tarjeta muestra todas las lineas del pedido agrupadas por area (el nombre del area va como subtitulo pequeno). Cada linea lleva un check: verde (listo) cuando su area ya despejo, y un circulo vacio (pendiente) cuando no.
-6. Si el area propia ya despejo, la tarjeta se marca como lista con el aviso "Tu area ya esta lista, falta: <areas pendientes>" y ya no tiene el boton Despejar.
-7. Cuando todas las areas del pedido han despejado, el pedido sale de las pantallas de cocina y pasa a listo para [[repartos]].
+5. En la pantalla de un area, cada tarjeta muestra solo las lineas de esa area. Los productos de las demas areas no aparecen ahi.
+6. Cada tarjeta lleva una franja con una casilla por area del pedido: marcada cuando esa area ya despejo, en blanco cuando falta. El area de la pantalla va resaltada.
+7. En la pestana Todas, cada pedido aparece una sola vez, con sus productos agrupados por area. Desde Todas no se despeja: despejar se hace en la pantalla de cada area.
+8. Si el area propia ya despejo, la tarjeta se marca como lista con el aviso "Tu area ya esta lista, falta: <areas pendientes>" y ya no tiene el boton Despejar.
+9. Cuando todas las areas del pedido han despejado, el pedido sale de las pantallas de cocina y pasa a listo para [[repartos]].
 Antes: [[caja]]
 Despues: [[repartos]]
 Ver tambien: [[pantallas]]

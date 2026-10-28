@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { ComandaTarjeta } from '../ComandaTarjeta';
-import { CocinaAdminView, ordenarComandasPorHoraLlegada } from '../CocinaAdminView';
+import { CocinaAdminView, agruparPorPedido, ordenarComandasPorHoraLlegada } from '../CocinaAdminView';
 import type { Comanda, LineaComanda } from '../cocinaTipos';
 import * as cocinaApi from '../cocinaApi';
 import * as sesionModulo from '../../../comun/sesion';
@@ -110,6 +110,44 @@ describe('Cocina: seguimiento de áreas por pedido', () => {
       expect(screen.queryByRole('img', { name: 'listo' })).toBeNull();
       expect(screen.queryByRole('img', { name: 'pendiente' })).toBeNull();
     });
+
+    it('en la vista de un área muestra solo sus líneas, sin productos de otras áreas', () => {
+      render(<ComandaTarjeta comanda={comandaBase()} onDespejar={() => {}} soloArea mostrarArea={false} />);
+
+      expect(screen.getByText('Americano')).toBeInTheDocument();
+      expect(screen.queryByText('Waffle')).toBeNull();
+      expect(screen.queryByText('Cheesecake')).toBeNull();
+      expect(screen.queryByTestId('area-pedido-2')).toBeNull();
+    });
+
+    it('la franja de áreas marca las despejadas y resalta el área de la pantalla', () => {
+      render(
+        <ComandaTarjeta
+          comanda={comandaBase({ areas: pedidoAreas({ '1': true }) })}
+          onDespejar={() => {}}
+          soloArea
+        />,
+      );
+
+      expect(screen.getByTestId('estado-area-1')).toHaveAttribute('data-despejada', 'true');
+      expect(screen.getByTestId('estado-area-1')).toHaveAttribute('data-actual', 'true');
+      expect(screen.getByTestId('estado-area-2')).toHaveAttribute('data-despejada', 'false');
+      expect(screen.getByTestId('estado-area-2')).toHaveAttribute('data-actual', 'false');
+      expect(screen.getByRole('img', { name: 'Cocina: falta' })).toBeInTheDocument();
+      expect(screen.getByRole('img', { name: 'Barra: lista' })).toBeInTheDocument();
+    });
+  });
+
+  describe('una boleta por pedido', () => {
+    it('agruparPorPedido deja una fila por pedido, prefiriendo la pendiente', () => {
+      const filas = agruparPorPedido([
+        comandaBase({ id: '301-1', areaId: '1', despejada: true }),
+        comandaBase({ id: '301-2', areaId: '2', despejada: false }),
+        comandaBase({ id: '302-1', pedidoId: '302', ticket: 'CP-302', codigo: 'CP-302' }),
+      ]);
+
+      expect(filas.map((f) => f.id)).toEqual(['301-2', '302-1']);
+    });
   });
 
   describe('orden de la lista', () => {
@@ -175,6 +213,29 @@ describe('Cocina: seguimiento de áreas por pedido', () => {
       expect(screen.getByTestId('aviso-area-lista')).toBeInTheDocument();
       // Solo la pendiente tiene Despejar
       expect(screen.getAllByRole('button', { name: /^Despejar$/i })).toHaveLength(1);
+    });
+
+    it('en la vista Todas el pedido es una sola boleta con sus áreas, sin Despejar', async () => {
+      const filaBarra = comandaBase({ id: '301-1', areaId: '1', areaNombre: 'Barra', lineas: [linea('l1', 'Americano')] });
+      const filaCocina = comandaBase({ id: '301-2', areaId: '2', areaNombre: 'Cocina', lineas: [linea('l2', 'Waffle')] });
+      vi.spyOn(cocinaApi, 'listarComandasArea').mockImplementation(async (area) =>
+        area === '' ? [filaBarra, filaCocina] : [filaBarra],
+      );
+
+      render(<CocinaAdminView />);
+      await waitFor(() => {
+        expect(screen.getByTestId('comanda-CP-301')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Todas' }));
+
+      await waitFor(() => {
+        expect(screen.getAllByTestId('comanda-CP-301')).toHaveLength(1);
+      });
+      expect(screen.getByText('EN COCINA · 1')).toBeInTheDocument();
+      expect(screen.getByText('Americano')).toBeInTheDocument();
+      expect(screen.getByText('Waffle')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^Despejar$/i })).toBeNull();
     });
 
     it('Despejar sigue pidiendo Confirmar Sí/No antes de llamar a la API', async () => {

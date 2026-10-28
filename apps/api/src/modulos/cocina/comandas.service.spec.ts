@@ -619,6 +619,26 @@ describe('ComandasService', () => {
       });
     });
 
+    it('la vista general trae una fila por área pendiente del pedido, todas con el mismo estado de áreas', async () => {
+      const pedido = pedidoTresAreas(7n, { Barra: 'DESPEJADA' });
+      prisma.pedido.findMany.mockResolvedValue([]);
+      prisma.areaCocina.findMany.mockResolvedValue(AREAS);
+      prisma.areaCocina.findFirst.mockImplementation(async ({ where }: any) =>
+        AREAS.find((a) => a.id === BigInt(where.OR[0].id)),
+      );
+      prisma.comandaArea.findMany.mockImplementation(async ({ where }: any) => {
+        const fila = pedido.comandas.find((c: any) => c.area_id === where.area_id);
+        return [{ pedido_id: 7n, area_id: where.area_id, estado: fila!.estado, llego_en: new Date(), pedido }];
+      });
+
+      const lista = await service.listarComandas();
+
+      // La pantalla TV cuenta las filas por área; la boleta única por pedido se arma en el admin
+      expect(lista.map((c: any) => c.areaNombre)).toEqual(['Cocina', 'Postres', 'Barra']);
+      expect(lista.every((c: any) => c.pedidoId === '7')).toBe(true);
+      expect(lista.every((c: any) => c.areas.map((a: any) => a.areaNombre).join() === 'Barra,Cocina,Postres')).toBe(true);
+    });
+
     it('la respuesta nunca trae teléfono ni dirección del cliente', async () => {
       const pedido = pedidoTresAreas(7n, { Barra: 'DESPEJADA' });
       prisma.pedido.findMany.mockResolvedValue([]);
