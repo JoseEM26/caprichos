@@ -1,6 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import type { FormEvent } from 'react';
-import { calcularTotalPedido } from '@caprichos/compartido';
+import {
+  aplicaEnvioGratis,
+  calcularEnvioFinal,
+  calcularTotalPedido,
+  reglaEnvioGratis,
+  type ReglaEnvioGratis,
+} from '@caprichos/compartido';
 import { api, ErrorApi } from '../comun/api';
 import { MapaUbicacion } from '../comun/mapa/MapaUbicacion';
 import { BuscadorDireccion } from '../comun/mapa/BuscadorDireccion';
@@ -21,6 +27,13 @@ import {
 interface FormularioCheckoutProps {
   estadoLocal: EstadoLocalCarta | null;
   datosLocal: DatosLocalCarta | null;
+}
+
+/** Línea de envío con zona y tarifa; si el monto la deja en gratis, lo dice y cuánto sería sin la promo. */
+function textoResumenEnvio(zona: string, tarifa: number, subtotal: number, regla: ReglaEnvioGratis): string {
+  const base = `Zona ${zona} · envío S/ ${tarifa.toFixed(2)}`;
+  if (!aplicaEnvioGratis(subtotal, regla)) return base;
+  return `${base} (gratis por tu compra ${regla.modo === 'desde' ? 'desde' : 'sobre'} S/ ${regla.monto})`;
 }
 
 export function FormularioCheckout({
@@ -57,8 +70,11 @@ export function FormularioCheckout({
   const [direccion, setDireccion] = useState('');
   const [referencia, setReferencia] = useState('');
   const [coordenadas, setCoordenadas] = useState<{ lat: number; lng: number } | null>(null);
-  const [, setZonaEnvio] = useState<string | null>(null);
-  const [costoEnvio, setCostoEnvio] = useState<number | null>(null);
+  const [zonaEnvio, setZonaEnvio] = useState<string | null>(null);
+  const [tarifaZona, setTarifaZona] = useState<number | null>(null);
+  const [reglaEnvio, setReglaEnvio] = useState<ReglaEnvioGratis>(() => reglaEnvioGratis(undefined, undefined));
+  // El costo sale del subtotal actual del carrito: si cambian los productos no hace falta volver a consultar la zona
+  const costoEnvio = zonaEnvio && tarifaZona !== null ? calcularEnvioFinal(subtotal, tarifaZona, reglaEnvio) : null;
   const [cargandoGps, setCargandoGps] = useState(false);
   const [mensajeGps, setMensajeGps] = useState<string | null>(null);
   const [origenPunto, setOrigenPunto] = useState<'GPS' | 'MAPA'>('GPS');
@@ -147,6 +163,10 @@ export function FormularioCheckout({
 
   // Cálculo del total
   const costoEnvioEfectivo = modalidad === 'DELIVERY' ? costoEnvio : 0;
+  const resumenEnvio =
+    modalidad === 'DELIVERY' && zonaEnvio && tarifaZona !== null
+      ? textoResumenEnvio(zonaEnvio, tarifaZona, subtotal, reglaEnvio)
+      : null;
   const descuentoCupon = cuponAplicado ? cuponAplicado.descuentoCalculado : 0;
   const totalCalculado = Math.max(
     0,
@@ -222,21 +242,18 @@ export function FormularioCheckout({
 
       if (!res.cubierto) {
         setZonaEnvio(null);
-        setCostoEnvio(null);
+        setTarifaZona(null);
         setMensajeGps(`FUERA_DE_COBERTURA: Tu ubicación está fuera de la zona de reparto.${avisoPrecision}`);
       } else {
         setZonaEnvio(res.zona);
-        const tarifaFinal = subtotal > res.gratisDesde ? 0 : res.tarifa;
-        setCostoEnvio(tarifaFinal);
-        setMensajeGps(
-          `Ubicación encontrada (Envío: ${
-            tarifaFinal === 0 ? 'GRATIS' : `S/ ${tarifaFinal?.toFixed(2)}`
-          }).${avisoPrecision}`,
-        );
+        setTarifaZona(res.tarifaZona);
+        setReglaEnvio(reglaEnvioGratis(res.gratisDesde, res.modoGratis));
+        setMensajeGps(`Ubicación encontrada.${avisoPrecision}`);
       }
     } catch {
       setMensajeGps('No se pudo verificar la zona de envío. Se coordinará por WhatsApp.');
-      setCostoEnvio(null);
+      setZonaEnvio(null);
+      setTarifaZona(null);
     }
   };
 
@@ -1232,6 +1249,12 @@ export function FormularioCheckout({
                           </div>
                         )}
 
+                        {resumenEnvio && (
+                          <div role="status" style={{ fontSize: '12px', lineHeight: '16px', fontWeight: 600, color: 'var(--cp-green)' }}>
+                            {resumenEnvio}
+                          </div>
+                        )}
+
                         {!coordenadas && (
                           <div
                             style={{
@@ -2095,6 +2118,11 @@ export function FormularioCheckout({
               boxShadow: '0 -2px 8px rgba(11,44,62,0.06)',
             }}
           >
+            {resumenEnvio && (
+              <div role="status" style={{ fontSize: '13px', lineHeight: '18px', fontWeight: 600, color: 'var(--cp-green)' }}>
+                {resumenEnvio}
+              </div>
+            )}
             {mensajeGps ? (
               <div
                 role="status"

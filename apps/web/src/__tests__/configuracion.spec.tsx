@@ -171,6 +171,8 @@ describe('Módulo de Configuración y Zonas de reparto', () => {
       await waitFor(() => {
         expect(screen.getByText(/Zona Z2/i)).toBeInTheDocument();
       });
+      // Las tarjetas y el botón de tarifa están en la vista Lista (la vista por defecto es el mapa)
+      fireEvent.click(screen.getByRole('button', { name: 'Lista' }));
 
       expect(screen.getByText(/Modo sólo lectura/i)).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /Editar tarifa/i })).not.toBeInTheDocument();
@@ -312,6 +314,8 @@ describe('Módulo de Configuración y Zonas de reparto', () => {
       await waitFor(() => {
         expect(screen.getByText(/Zona Z2/i)).toBeInTheDocument();
       });
+      // Las tarjetas y el botón de tarifa están en la vista Lista (la vista por defecto es el mapa)
+      fireEvent.click(screen.getByRole('button', { name: 'Lista' }));
 
       // Abrir edición de tarifa
       fireEvent.click(screen.getByRole('button', { name: /Editar tarifa/i }));

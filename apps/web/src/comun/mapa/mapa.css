@@ -24,3 +24,7 @@
 @keyframes cp-palpita { from { transform: rotate(-45deg) scale(1); } to { transform: rotate(-45deg) scale(1.25); } }
 .cp-etiqueta { background: #fff; border: 1px solid var(--cp-line, #E3D6C6); border-radius: 8px; padding: 2px 6px; font-size: 11px; line-height: 13px; color: var(--cp-navy, #0B2C3E); box-shadow: 0 1px 3px rgba(0,0,0,.2); }
 .cp-etiqueta small { display: block; font-size: 10px; opacity: .7; }
+
+/* Mapa de zonas de reparto: mapa y panel lado a lado; en celular, uno debajo del otro */
+.zonas-mapa-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 340px); gap: 16px; align-items: start; }
+@media (max-width: 860px) { .zonas-mapa-layout { grid-template-columns: minmax(0, 1fr); } }

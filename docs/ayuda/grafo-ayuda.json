@@ -1201,6 +1201,12 @@
       "ruta": "/admin/zonas"
     },
     {
+      "id": "zonas#ver-y-configurar-las-zonas-en-el-mapa",
+      "tipo": "tarea",
+      "etiqueta": "ver y configurar las zonas en el mapa",
+      "modulo": "zonas"
+    },
+    {
       "id": "zonas#modificar-la-tarifa-de-una-zona",
       "tipo": "tarea",
       "etiqueta": "modificar la tarifa de una zona",
@@ -5498,6 +5504,11 @@
     {
       "tipo": "relacionado_con",
       "origen": "caja",
+      "destino": "zonas"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "zonas#ver-y-configurar-las-zonas-en-el-mapa",
       "destino": "zonas"
     },
     {

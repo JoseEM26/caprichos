@@ -12,8 +12,14 @@ export {
   calcularPrecioLinea,
   calcularSubtotalPedido,
   calcularTotalPedido,
+  ENVIO_GRATIS_MONTO_POR_DEFECTO,
+  reglaEnvioGratis,
+  aplicaEnvioGratis,
+  calcularEnvioFinal,
 } from './utilidades/index.js';
 export type {
   OpcionParaPrecio,
   LineaParaPrecio,
+  ModoEnvioGratis,
+  ReglaEnvioGratis,
 } from './utilidades/index.js';

@@ -1,3 +1,5 @@
+import { reglaEnvioGratis } from '@caprichos/compartido';
+import { leerReglaEnvioGratis } from './envio-gratis';
 import {
   BadRequestException,
   Injectable,
@@ -12,7 +14,7 @@ import {
   ZonaAdminItem,
   ZonaDetectada,
 } from './zonas.tipos';
-import { puntoEnPoligono, validarPoligono } from './zonas.util';
+import { diagnosticarCobertura, DiagnosticoCobertura, puntoEnPoligono, validarPoligono } from './zonas.util';
 import { EditarTarifaDto } from './dto/editar-tarifa.dto';
 import { EditarActivaDto } from './dto/editar-activa.dto';
 import { EditarPoligonoDto } from './dto/editar-poligono.dto';
@@ -28,6 +30,7 @@ interface ZonaCache {
 export class ZonasService {
   private cacheZonasActivas: ZonaCache[] | null = null;
   private cacheExpiracion: number = 0;
+  private diagnosticoCache: { clave: string; valor: DiagnosticoCobertura } | null = null;
   private readonly TTL_CACHE_MS = 60 * 1000; // 60 segundos
 
   constructor(
@@ -138,19 +141,11 @@ export class ZonasService {
 
     const zona = await this.detectar(lat, lng);
 
-    let gratisDesde = 70;
+    let regla = reglaEnvioGratis(undefined, undefined);
     try {
-      const parametroEnvio = await this.prisma.parametro.findUnique({
-        where: { clave: 'envio_gratis_monto' },
-      });
-      if (parametroEnvio && parametroEnvio.valor !== undefined && parametroEnvio.valor !== null) {
-        const parsed = Number(parametroEnvio.valor);
-        if (!isNaN(parsed) && parsed >= 0) {
-          gratisDesde = parsed;
-        }
-      }
+      regla = await leerReglaEnvioGratis(this.prisma);
     } catch {
-      gratisDesde = 70;
+      // Sin parámetros legibles rige el valor por defecto (70, mas_de)
     }
 
     if (!zona) {
@@ -158,7 +153,9 @@ export class ZonasService {
         cubierto: false,
         zona: null,
         tarifa: null,
-        gratisDesde,
+        tarifaZona: null,
+        gratisDesde: regla.monto,
+        modoGratis: regla.modo,
       };
     }
 
@@ -166,7 +163,9 @@ export class ZonasService {
       cubierto: true,
       zona: zona.codigo,
       tarifa: zona.tarifa,
-      gratisDesde,
+      tarifaZona: zona.tarifa,
+      gratisDesde: regla.monto,
+      modoGratis: regla.modo,
     };
   }
 
@@ -360,5 +359,53 @@ export class ZonasService {
       poligono: updated.poligono as unknown as Coordenada[],
       avisos: [],
     };
+  }
+
+  /**
+   * Diagnóstico de cobertura: solapes entre zonas activas (gana la de menor código) y polígonos inválidos.
+   */
+  async diagnosticoCobertura(): Promise<DiagnosticoCobertura> {
+    const zonas = await this.prisma.zonaReparto.findMany({ orderBy: { codigo: 'asc' } });
+    const entrada = zonas.map((z) => ({
+      codigo: z.codigo,
+      activa: z.activa,
+      poligono: (Array.isArray(z.poligono) ? z.poligono : []) as unknown as Coordenada[],
+    }));
+    // ponytail: el cálculo de solapes es costoso (malla de 3 m por par). Se recalcula solo si cambia
+    // algún polígono o estado; si crecen las zonas, pasar a recorte de polígonos.
+    const clave = JSON.stringify(entrada);
+    if (this.diagnosticoCache?.clave === clave) return this.diagnosticoCache.valor;
+    const valor = diagnosticarCobertura(entrada);
+    this.diagnosticoCache = { clave, valor };
+    return valor;
+  }
+
+  /**
+   * Cambios de una zona (tarifa, estado y polígono) leídos de la auditoría, del más reciente al más antiguo.
+   */
+  async historialZona(codigo: string) {
+    const zona = await this.prisma.zonaReparto.findUnique({ where: { codigo } });
+    if (!zona) {
+      throw new NotFoundException({
+        codigo: 'ZONA_NO_ENCONTRADA',
+        mensaje: `No existe la zona de reparto con código ${codigo}`,
+      });
+    }
+
+    const filas = await this.prisma.auditoria.findMany({
+      where: { modulo: 'zonas', entidad: 'zona_reparto', entidad_id: zona.id },
+      orderBy: { en: 'desc' },
+      take: 50,
+      select: { id: true, accion: true, en: true, party_id: true, antes: true, despues: true },
+    });
+
+    return filas.map((f) => ({
+      id: f.id.toString(),
+      accion: f.accion,
+      en: f.en.toISOString(),
+      partyId: f.party_id !== null ? f.party_id.toString() : null,
+      antes: f.antes,
+      despues: f.despues,
+    }));
   }
 }

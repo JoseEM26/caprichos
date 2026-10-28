@@ -308,8 +308,27 @@ describe('ZonasService', () => {
         cubierto: true,
         zona: 'Z4',
         tarifa: 4.0,
+        tarifaZona: 4.0,
         gratisDesde: 80,
+        modoGratis: 'mas_de',
       });
+    });
+
+    it('GET /carta/envio lee envio_gratis_modo "desde" y acepta el monto como texto', async () => {
+      prisma.zonaReparto.findMany.mockResolvedValue([
+        { id: 4n, codigo: 'Z4', tarifa: 4, activa: true, poligono: poligonoZ4 },
+      ]);
+      prisma.parametro.findUnique.mockImplementation(({ where }: any) =>
+        Promise.resolve(
+          where.clave === 'envio_gratis_monto'
+            ? { clave: where.clave, valor: '70' }
+            : { clave: where.clave, valor: 'desde' },
+        ),
+      );
+
+      const res = await service.consultarEnvio(-12.05, -77.00);
+
+      expect(res).toMatchObject({ cubierto: true, gratisDesde: 70, modoGratis: 'desde', tarifaZona: 4 });
     });
 
     it('GET /carta/envio fuera de cobertura devuelve cubierto: false y gratisDesde por defecto 70', async () => {
@@ -322,6 +341,8 @@ describe('ZonasService', () => {
         cubierto: false,
         zona: null,
         tarifa: null,
+        tarifaZona: null,
+        modoGratis: 'mas_de',
         gratisDesde: 70,
       });
     });

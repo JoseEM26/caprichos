@@ -13,10 +13,12 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { calcularEnvioFinal } from '@caprichos/compartido';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { LocalService } from '../local/local.service';
 import { ZonasService } from '../zonas/zonas.service';
+import { leerReglaEnvioGratis } from '../zonas/envio-gratis';
 import { OfertasService } from '../ofertas/ofertas.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { CrearPedidoDto } from './dto/crear-pedido.dto';
@@ -445,21 +447,8 @@ export class PedidosService {
 
         zonaId = zonaDetectada.zonaId;
 
-        // Comprobar envío gratis si subtotal > envio_gratis_monto
-        const paramEnvioGratis = await this.prisma.parametro.findUnique({
-          where: { clave: 'envio_gratis_monto' },
-        });
-        const envioGratisMonto =
-          typeof paramEnvioGratis?.valor === 'number'
-            ? paramEnvioGratis.valor
-            : 70;
-
-        // Modo 'mas': estrictamente mayor a envioGratisMonto
-        if (subtotalCalculado > envioGratisMonto) {
-          envio = 0;
-        } else {
-          envio = Number(zonaDetectada.tarifa);
-        }
+        const reglaEnvio = await leerReglaEnvioGratis(this.prisma);
+        envio = calcularEnvioFinal(subtotalCalculado, zonaDetectada.tarifa, reglaEnvio);
 
         entregaOrigen = dto.entrega?.origen || 'GPS';
       } else if (

@@ -98,7 +98,9 @@ export interface ConsultaEnvioRespuesta {
   cubierto: boolean;
   zona: string | null;
   tarifa: number | null;
+  tarifaZona: number | null;
   gratisDesde: number;
+  modoGratis: 'desde' | 'mas_de';
 }
 
 export interface OpcionElegida {

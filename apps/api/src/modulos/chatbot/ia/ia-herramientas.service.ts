@@ -1,3 +1,4 @@
+import { ENVIO_GRATIS_MONTO_POR_DEFECTO } from '@caprichos/compartido';
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { CatalogoService } from '../../catalogo/catalogo.service';
@@ -383,7 +384,7 @@ export class IaHerramientasService {
         return {
           zonas: match,
           pedidoMinimo: paramPedidoMin?.valor ?? 15,
-          envioGratisDesde: paramEnvioGratis?.valor ?? 50,
+          envioGratisDesde: paramEnvioGratis?.valor ?? ENVIO_GRATIS_MONTO_POR_DEFECTO,
           mensaje: 'Tarifa para la zona consultada.',
         };
       }
@@ -392,7 +393,7 @@ export class IaHerramientasService {
     return {
       zonas: zonasResumen,
       pedidoMinimo: paramPedidoMin?.valor ?? 15,
-      envioGratisDesde: paramEnvioGratis?.valor ?? 50,
+      envioGratisDesde: paramEnvioGratis?.valor ?? ENVIO_GRATIS_MONTO_POR_DEFECTO,
       mensaje: 'Zonas de cobertura en Campoy y alrededores.',
     };
   }

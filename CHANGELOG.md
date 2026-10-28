@@ -6,6 +6,23 @@ Todos los cambios notables del proyecto Caprichos se documentan en este archivo.
 
 ## 2026-10-28
 
+### Mapa de zonas de reparto: vista de mapa, editor de área en borrador, diagnóstico e historial
+- **Configuración, Zonas de reparto** ahora abre en mapa (conmutador Mapa / Lista; la lista de tarjetas y el editor JSON siguen como respaldo). Cada zona tiene color, etiqueta con código y tarifa, y las inactivas van en gris punteado. Leyenda lateral con código, tarifa, estado y puntos; tocar una tarjeta o una zona selecciona la otra.
+- **Editor de área** (solo con `zonas/editar`): vértices arrastrables, puntos intermedios para agregar vértice, quitar vértice (mínimo 3). Los cambios quedan en borrador; «Guardar cambios» abre confirmación Sí/No con vértices y área antes y después. Guarda con `PUT /admin/zonas/:codigo/poligono`, con la validación y la invalidación de caché de siempre.
+- **Probar un punto**: toca el mapa y muestra la zona, su tarifa de zona (sin el envío gratis por monto) o «Fuera de cobertura», con `GET /carta/envio`.
+- **Diagnóstico de cobertura**: `GET /admin/zonas/diagnostico` (`zonas/ver`) avisa zonas activas que se solapan, indicando la que gana (menor código), y polígonos inválidos. Los huecos entre zonas no son error.
+- **Historial por zona**: `GET /admin/zonas/:codigo/historial` (`zonas/ver`) lee la auditoría del módulo zonas (tarifa, estado y polígono) con fecha, usuario, antes y después. No hay tabla nueva; `EDITAR_POLIGONO` ya se auditaba.
+- **Pedidos nuevos**: los cambios de tarifa, estado y área rigen para pedidos nuevos. El envío y la zona de un pedido se guardan al crearlo y la edición de una zona no los modifica (prueba en `zonas-cobertura.spec.ts`). Ubicar un pedido, el reenvío con recargo y el cambio de pedido sí usan la tarifa vigente; se dejó igual.
+- **Manual** `zonas.md` actualizado y grafo de ayuda regenerado.
+- **Pruebas**: Jest `zonas-cobertura.spec.ts` (solape, borde compartido, contención, ganador por código, inválidas, historial, edición sin tocar pedidos); Vitest `ZonasMapa.spec.tsx` (selección, solo lectura, borrador, descartar, confirmación Sí/No, error del servidor, diagnóstico).
+
+### Envío gratis: una sola regla, con zona y tarifa a la vista
+- **Regla compartida** en `@caprichos/compartido` (`reglaEnvioGratis`, `aplicaEnvioGratis`, `calcularEnvioFinal`): la usan la consulta de envío, la creación de pedidos, Ubicar pedido, el modal del salón y la carta. Antes había cuatro copias y solo una leía `envio_gratis_modo`; ahora `mas_de` (por defecto, estrictamente mayor) y `desde` (desde el monto exacto) se respetan en todas.
+- **Parámetro como texto**: `envio_gratis_monto` guardado como texto ya no cae en silencio al valor por defecto de 70. El respaldo del chatbot de IA pasa de 50 a 70.
+- **`GET /carta/envio`** (aditivo): `tarifaZona` (tarifa pura de la zona) y `modoGratis`.
+- **Carta**: el mensaje muestra «Zona Z3 · envío S/ 3.00», y si el monto lo hace gratis, «(gratis por tu compra sobre S/ 70)». El costo sale del carrito actual: si cambian los productos después de elegir el punto, el envío y el total se recalculan sin volver a consultar la zona (antes quedaba la foto del subtotal del momento).
+- **Pruebas**: Vitest `envio-gratis.spec.ts` (compartido), `carta.spec.tsx` (zona y tarifa, recálculo al agregar productos, fuera de cobertura); Jest de `zonas.service`, `pedidos.service` y `ubicar-pedido` (modo desde en el borde, mas_de en el borde, texto como monto).
+
 ### WhatsApp saliente con outbox: los avisos ya no se pierden si Meta falla
 - **Outbox** (`saliente_whatsapp`, migración `20261103100000_saliente_whatsapp`): los avisos automáticos se encolan en la misma transacción que su cambio de estado y se envían con reintentos (30 s, 2 min, 10 min, 1 h). Estados PENDIENTE, ENVIANDO, ENVIADO, FALLIDO y DESCARTADO. Orden por destino y pedido (un mensaje espera al anterior). Token de intento y recuperación de huérfanos sin reenviar lo ya aceptado por Meta. La delivery es at-least-once: un duplicado raro es posible y se acepta (runbook RB-CAP-013).
 - **Migrados**: avisos de reparto (todas las etapas y reprogramación), alertas al equipo (`enviarAvisoAdmin`), alerta de espera al cliente, recordatorios de reserva y de pago, recojo listo, encuesta de posventa, y confirmación o rechazo de solicitudes de reserva. Quedan fuera las respuestas del bot en conversación, las confirmaciones BAJA y ALTA y las pruebas de alertas desde el panel.

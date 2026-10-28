@@ -43,6 +43,18 @@ export class ZonasAdminController {
     return this.zonasService.listarZonasAdmin();
   }
 
+  @Get('diagnostico')
+  @Permiso('zonas', 'ver')
+  async diagnostico() {
+    return this.zonasService.diagnosticoCobertura();
+  }
+
+  @Get(':codigo/historial')
+  @Permiso('zonas', 'ver')
+  async historial(@Param('codigo') codigo: string) {
+    return this.zonasService.historialZona(codigo);
+  }
+
   @Put(':codigo/tarifa')
   @Permiso('zonas', 'editar')
   async editarTarifa(

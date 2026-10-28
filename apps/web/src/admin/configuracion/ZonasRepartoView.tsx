@@ -10,6 +10,7 @@ import { comoLista } from '../../comun/comoLista';
 import { EstadoVacio } from '../../comun/EstadoVacio';
 import { Confirmar } from '../../comun/Confirmar';
 import { Insignia } from '../../comun/Insignia';
+import { ZonasMapa, DiagnosticoZonas } from './ZonasMapa';
 
 export type CoordenadaPunto = [number, number];
 
@@ -56,6 +57,10 @@ function ZonasRepartoContenido() {
   const [guardando, setGuardando] = useState(false);
   const [errorServidor, setErrorServidor] = useState<string | null>(null);
   const [mensajeGuardado, setMensajeGuardado] = useState<string | null>(null);
+  const [vista, setVista] = useState<'mapa' | 'lista'>('mapa');
+  const [seleccionado, setSeleccionado] = useState<string | null>(null);
+  const [diagnostico, setDiagnostico] = useState<DiagnosticoZonas | null>(null);
+  const [versionHistorial, setVersionHistorial] = useState(0);
 
   const puedeVer = tiene('zonas/ver');
   const puedeEditar = tiene('zonas/editar');
@@ -81,9 +86,30 @@ function ZonasRepartoContenido() {
     }
   };
 
+  const cargarDiagnostico = async () => {
+    if (!puedeVer) return;
+    try {
+      setDiagnostico(await api.get<DiagnosticoZonas>('/admin/zonas/diagnostico'));
+    } catch {
+      setDiagnostico(null);
+    }
+  };
+
   useEffect(() => {
     cargarZonas();
+    void cargarDiagnostico();
   }, [puedeVer]);
+
+  // Guardado del área desde el mapa: lanza el error del servidor para que el mapa lo muestre
+  const guardarPoligonoMapa = async (codigo: string, puntos: CoordenadaPunto[]) => {
+    const res = await api.put<ZonaRepartoItem>(`/admin/zonas/${codigo}/poligono`, { poligono: puntos });
+    setZonas((prev) =>
+      prev.map((z) => (z.codigo === res.codigo ? { ...z, poligono: res.poligono, puntos: res.puntos } : z)),
+    );
+    setMensajeGuardado(`Guardado a las ${new Date().toLocaleTimeString('es-PE', { hour12: false })}`);
+    setVersionHistorial((v) => v + 1);
+    void cargarDiagnostico();
+  };
 
   if (!puedeVer) {
     return (
@@ -177,6 +203,7 @@ function ZonasRepartoContenido() {
       const ahora = new Date();
       const horaStr = ahora.toLocaleTimeString('es-PE', { hour12: false });
       setMensajeGuardado(`Guardado a las ${horaStr}`);
+      setVersionHistorial((v) => v + 1);
       setConfirmarTarifaAbierto(false);
       setZonaTarifaEditando(null);
     } catch (err) {
@@ -210,6 +237,7 @@ function ZonasRepartoContenido() {
       const ahora = new Date();
       const horaStr = ahora.toLocaleTimeString('es-PE', { hour12: false });
       setMensajeGuardado(`Guardado a las ${horaStr}`);
+      setVersionHistorial((v) => v + 1);
       setZonaToggleActiva(null);
     } catch (err) {
       const msg =
@@ -305,6 +333,7 @@ function ZonasRepartoContenido() {
       const ahora = new Date();
       const horaStr = ahora.toLocaleTimeString('es-PE', { hour12: false });
       setMensajeGuardado(`Guardado a las ${horaStr}`);
+      setVersionHistorial((v) => v + 1);
       setConfirmarPoligonoAbierto(false);
       setZonaPoligonoEditando(null);
       setPuntosValidados(null);
@@ -363,6 +392,20 @@ function ZonasRepartoContenido() {
           </p>
         </div>
 
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div role="group" aria-label="Vista de zonas" style={{ display: 'inline-flex', border: '1px solid var(--cp-line)', borderRadius: '10px', overflow: 'hidden' }}>
+            {(['mapa', 'lista'] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                aria-pressed={vista === v}
+                onClick={() => setVista(v)}
+                style={{ minHeight: '44px', padding: '0 14px', border: 0, background: vista === v ? 'var(--cp-navy)' : 'var(--cp-white)', color: vista === v ? 'var(--cp-white)' : 'var(--cp-navy)', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}
+              >
+                {v === 'mapa' ? 'Mapa' : 'Lista'}
+              </button>
+            ))}
+          </div>
         {mensajeGuardado && (
           <span
             style={{
@@ -377,9 +420,10 @@ function ZonasRepartoContenido() {
             {mensajeGuardado}
           </span>
         )}
+        </div>
       </div>
 
-      {/* Aviso informativo de sin mapa en esta ola */}
+      {/* Nota: rige para pedidos nuevos */}
       <div
         style={{
           background: 'var(--cp-sand)',
@@ -391,7 +435,7 @@ function ZonasRepartoContenido() {
           color: 'var(--cp-soft)',
         }}
       >
-        <b>Nota de entrega:</b> Los polígonos de las zonas se visualizan y editan en formato JSON con coordenadas <code>[latitud, longitud]</code>. La vista con mapa interactivo no está disponible en esta ola y se integrará en una fase posterior.
+        <b>Nota de entrega:</b> Los cambios de tarifa, estado y área rigen solo para pedidos nuevos. Los pedidos ya creados conservan su envío y su zona. El mapa usa coordenadas <code>[latitud, longitud]</code>; el editor JSON queda como respaldo avanzado.
       </div>
 
       {!puedeEditar && (
@@ -431,6 +475,19 @@ function ZonasRepartoContenido() {
         <EstadoVacio
           titulo="No hay zonas registradas"
           descripcion="No se encontraron zonas de reparto en la base de datos."
+        />
+      ) : vista === 'mapa' ? (
+        <ZonasMapa
+          zonas={zonas}
+          seleccionado={seleccionado}
+          onSeleccionar={setSeleccionado}
+          puedeEditar={puedeEditar}
+          diagnostico={diagnostico}
+          versionHistorial={versionHistorial}
+          onEditarTarifa={abrirEditarTarifa}
+          onCambiarActiva={(z) => setZonaToggleActiva(z)}
+          onEditarJson={abrirEditarPoligono}
+          onGuardarPoligono={guardarPoligonoMapa}
         />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>

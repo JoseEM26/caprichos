@@ -52,6 +52,24 @@ describe('UbicarPedidoService', () => {
     expect(r).toMatchObject({ envio: 0, total: 80 });
   });
 
+  it('modo desde: el subtotal exacto ya es gratis; mas_de no', async () => {
+    prisma.parametro.findUnique.mockImplementation(({ where }: any) =>
+      Promise.resolve(
+        where.clave === 'envio_gratis_monto'
+          ? { valor: 70 }
+          : where.clave === 'envio_gratis_modo'
+            ? { valor: 'desde' }
+            : null,
+      ),
+    );
+    prisma.pedido.findUnique.mockResolvedValue(pedido({ subtotal: 70, total: 70 }));
+    await expect(service.ubicar('7', { lat: -12.05, lng: -76.97 }, usuario)).resolves.toMatchObject({ envio: 0, total: 70 });
+
+    prisma.parametro.findUnique.mockResolvedValue({ valor: 70 });
+    prisma.pedido.findUnique.mockResolvedValue(pedido({ subtotal: 70, total: 70 }));
+    await expect(service.ubicar('7', { lat: -12.05, lng: -76.97 }, usuario)).resolves.toMatchObject({ envio: 6, total: 76 });
+  });
+
   it('fuera de cobertura no guarda nada', async () => {
     zonas.detectar.mockResolvedValue(null);
     await expect(service.ubicar('7', { lat: 0, lng: 0 }, usuario)).rejects.toMatchObject({ response: { codigo: 'FUERA_DE_COBERTURA' } });

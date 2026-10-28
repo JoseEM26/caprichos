@@ -10,6 +10,7 @@ import { ElementoPlano, MesaSalon, PisoPlano, PisoSalon } from '../tipos';
 import { CuadriculaPlano } from './CuadriculaPlano';
 import { VentanaOpcionesProducto, ProductoConfigurado } from './VentanaOpcionesProducto';
 import { ModalLiberarMesa } from './ModalLiberarMesa';
+import { calcularEnvioFinal, reglaEnvioGratis } from '@caprichos/compartido';
 import { salonApi } from '../api';
 import { pedidosApi } from '../../pedidos/pedidosApi';
 import { listarPersonalActivo, ColaboradorActivo as PersonalItem } from '../../creditos/creditosApi';
@@ -131,6 +132,7 @@ export function ModalNuevoPedidoMesa({
     zona: string | null;
     tarifa: number | null;
     gratisDesde: number;
+    modoGratis?: 'desde' | 'mas_de';
   } | null>(null);
 
   // Consultar zona cuando cambia cliPuntoMapa
@@ -141,7 +143,7 @@ export function ModalNuevoPedidoMesa({
     }
     let cancel = false;
     api
-      .get<{ cubierto: boolean; zona: string | null; tarifa: number | null; gratisDesde: number }>(
+      .get<{ cubierto: boolean; zona: string | null; tarifa: number | null; gratisDesde: number; modoGratis?: 'desde' | 'mas_de' }>(
         `/carta/envio?lat=${cliPuntoMapa.lat}&lng=${cliPuntoMapa.lng}`,
       )
       .then((res) => {
@@ -421,8 +423,11 @@ export function ModalNuevoPedidoMesa({
   const envioCalculado = useMemo(() => {
     if (modalidad !== 'delivery') return 0;
     if (!zonaInfo || !zonaInfo.cubierto || zonaInfo.tarifa == null) return 0;
-    if (subtotal > (zonaInfo.gratisDesde || 70)) return 0;
-    return Number(zonaInfo.tarifa);
+    return calcularEnvioFinal(
+      subtotal,
+      Number(zonaInfo.tarifa),
+      reglaEnvioGratis(zonaInfo.gratisDesde, zonaInfo.modoGratis),
+    );
   }, [modalidad, zonaInfo, subtotal]);
 
   const total = Math.max(0, subtotal - descuento + envioCalculado);
@@ -1629,7 +1634,7 @@ export function ModalNuevoPedidoMesa({
                       {!cliPuntoMapa
                         ? 'Haz clic en el mapa para fijar el punto exacto de entrega.'
                         : zonaInfo?.cubierto
-                        ? `Pin en el mapa (${cliPuntoMapa.lat.toFixed(4)}, ${cliPuntoMapa.lng.toFixed(4)}) · Zona ${zonaInfo.zona} · Envío S/ ${Number(zonaInfo.tarifa || 0).toFixed(2)} (gratis desde S/ ${Number(zonaInfo.gratisDesde || 70).toFixed(2)})`
+                        ? `Pin en el mapa (${cliPuntoMapa.lat.toFixed(4)}, ${cliPuntoMapa.lng.toFixed(4)}) · Zona ${zonaInfo.zona} · Envío S/ ${Number(zonaInfo.tarifa || 0).toFixed(2)} (gratis ${zonaInfo.modoGratis === 'desde' ? 'desde' : 'sobre'} S/ ${Number(zonaInfo.gratisDesde || 70).toFixed(2)})`
                         : 'Fuera de cobertura de reparto.'}
                     </div>
                   </div>

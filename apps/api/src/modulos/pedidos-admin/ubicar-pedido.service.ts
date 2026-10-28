@@ -11,6 +11,8 @@ import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { ZonasService } from '../zonas/zonas.service';
+import { leerReglaEnvioGratis } from '../zonas/envio-gratis';
+import { calcularEnvioFinal } from '@caprichos/compartido';
 import { UbicarPedidoDto } from './dto/ubicar-pedido.dto';
 
 const ESTADOS_CERRADOS = ['ENTREGADO', 'ANULADO'];
@@ -58,10 +60,9 @@ export class UbicarPedidoService {
       });
     }
 
-    const param = await this.prisma.parametro.findUnique({ where: { clave: 'envio_gratis_monto' } });
-    const gratisDesde = typeof param?.valor === 'number' ? param.valor : 70;
+    const regla = await leerReglaEnvioGratis(this.prisma);
     const subtotal = Number(pedido.subtotal);
-    const envio = subtotal > gratisDesde ? 0 : Number(zona.tarifa);
+    const envio = calcularEnvioFinal(subtotal, Number(zona.tarifa), regla);
     const total = Number((subtotal - Number(pedido.descuento) + envio).toFixed(2));
 
     // Con el pago ya cobrado el total no puede moverse: hay que anular y rehacer

@@ -10,7 +10,10 @@ export interface RespuestaConsultaEnvio {
   cubierto: boolean;
   zona: string | null;
   tarifa: number | null;
+  /** Tarifa pura de la zona, sin aplicar el envío gratis por monto */
+  tarifaZona: number | null;
   gratisDesde: number;
+  modoGratis: 'desde' | 'mas_de';
 }
 
 export interface ZonaAdminItem {

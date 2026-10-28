@@ -264,6 +264,47 @@ describe('PedidosService', () => {
       expect(res.total).toBe(84.0);
     });
 
+    it('4. modo desde: el monto exacto ya da envío gratis', async () => {
+      prismaMock.parametro.findUnique.mockImplementation(({ where }: any) =>
+        Promise.resolve(
+          where.clave === 'envio_gratis_monto'
+            ? { clave: where.clave, valor: 70 }
+            : where.clave === 'envio_gratis_modo'
+              ? { clave: where.clave, valor: 'desde' }
+              : null,
+        ),
+      );
+      // 5 unidades de 14 = 70 (exacto)
+      const pedidoDto: CrearPedidoDto = {
+        ...pedidoBaseDto,
+        lineas: [{ ...pedidoBaseDto.lineas[0], cantidad: 5 }],
+      };
+      prismaMock.pedido.create.mockImplementation(({ data }: any) =>
+        Promise.resolve({ id: 102n, codigo: 'CP-W004', estado: 'COLA', subtotal: Number(data.subtotal), envio: Number(data.envio), total: Number(data.total) }),
+      );
+
+      const res = await service.crear(pedidoDto, 'idemp-key-desde');
+
+      expect(res.subtotal).toBe(70);
+      expect(res.envio).toBe(0);
+    });
+
+    it('5. modo mas_de (por defecto): el monto exacto NO es gratis y paga la tarifa de zona', async () => {
+      // 5 unidades de 14 = 70 (exacto); la zona Z3 cobra 5.00
+      const pedidoDto: CrearPedidoDto = {
+        ...pedidoBaseDto,
+        lineas: [{ ...pedidoBaseDto.lineas[0], cantidad: 5 }],
+      };
+      prismaMock.pedido.create.mockImplementation(({ data }: any) =>
+        Promise.resolve({ id: 103n, codigo: 'CP-W005', estado: 'COLA', subtotal: Number(data.subtotal), envio: Number(data.envio), total: Number(data.total) }),
+      );
+
+      const res = await service.crear(pedidoDto, 'idemp-key-masde');
+
+      expect(res.envio).toBe(5);
+      expect(res.total).toBe(75);
+    });
+
     it('3. fuera de cobertura -> 409 FUERA_DE_COBERTURA', async () => {
       zonasServiceMock.detectar.mockResolvedValue(null);
 
