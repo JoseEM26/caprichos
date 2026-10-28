@@ -8,12 +8,14 @@ Todas las plantillas pertenecen a la categoría **Utilidad (UTILITY)** y están 
 
 ## Resumen del Catálogo
 
+> Pendiente de enviar a Meta: `DELIVERY_ESPERA_AGOTADA` (ahora sin botones), `DELIVERY_RETIRO` (ahora es la pregunta SÍ/NO), `DELIVERY_REPROG_RECIBIDA`, `DELIVERY_REENVIADO`, `DELIVERY_REPROG_CANCELADA` y `DELIVERY_REPROG_SIN_RESPUESTA`. Los textos de todas las plantillas de reparto se reescribieron con tono cálido y emojis; lo que está aquí es igual a `plantillas.catalogo.ts`.
+
 | Clave en Sistema | Nombre en Meta | Categoría | Idioma | Variables |
 | :--- | :--- | :--- | :--- | :--- |
 | `DELIVERY_SALIDA` | `caprichos_delivery_en_camino` | Utilidad | Español (`es`) | 3 |
 | `DELIVERY_LLEGADA` | `caprichos_delivery_llegado` | Utilidad | Español (`es`) | 2 |
 | `DELIVERY_INSISTENCIA` | `caprichos_delivery_insistencia` | Utilidad | Español (`es`) | 3 |
-| `DELIVERY_ESPERA_AGOTADA` | `caprichos_delivery_reprogramacion` | Utilidad | Español (`es`) | 3 |
+| `DELIVERY_ESPERA_AGOTADA` | `caprichos_delivery_espera_agotada` | Utilidad | Español (`es`) | 2 |
 | `DELIVERY_ACEPTADO` | `caprichos_delivery_aceptado` | Utilidad | Español (`es`) | 2 |
 | `DELIVERY_LISTO` | `caprichos_delivery_listo` | Utilidad | Español (`es`) | 2 |
 | `DELIVERY_RETIRO` | `caprichos_delivery_retiro` | Utilidad | Español (`es`) | 3 |
@@ -27,6 +29,10 @@ Todas las plantillas pertenecen a la categoría **Utilidad (UTILITY)** y están 
 | `AVISO_INTERNO` | `aviso_interno` | Utilidad | Español (`es`) | 2 |
 | `CARTA_RECIBIDO_DIGITAL` | `caprichos_pedido_recibido_digital` | Utilidad | Español (`es`) | 3 |
 | `CARTA_RECIBIDO_EFECTIVO` | `caprichos_pedido_recibido_efectivo` | Utilidad | Español (`es`) | 2 |
+| `DELIVERY_REPROG_RECIBIDA` | `caprichos_delivery_reprog_recibida` | Utilidad | Español (`es`) | 2 |
+| `DELIVERY_REENVIADO` | `caprichos_delivery_reenviado` | Utilidad | Español (`es`) | 2 |
+| `DELIVERY_REPROG_CANCELADA` | `caprichos_delivery_reprog_cancelada` | Utilidad | Español (`es`) | 2 |
+| `DELIVERY_REPROG_SIN_RESPUESTA` | `caprichos_delivery_reprog_sin_respuesta` | Utilidad | Español (`es`) | 2 |
 
 ---
 
@@ -37,7 +43,7 @@ Todas las plantillas pertenecen a la categoría **Utilidad (UTILITY)** y están 
 - **Idioma:** Español (`es` o `es_PE`)
 - **Texto del cuerpo (Body):**
 ```text
-Hola {{1}}, tu pedido {{2}} de Caprichos ya salio de nuestro local y va en camino. Tiempo estimado de entrega: {{3}} minutos.
+¡Hola {{1}}! 🛵 Tu pedido {{2}} ya salió de nuestro local y va en camino. Tiempo estimado: {{3}} minutos. ¡Gracias por tu paciencia! 😊
 ```
 - **Ejemplo de variables para Meta:**
   - `{{1}}`: `María`
@@ -54,7 +60,7 @@ Hola {{1}}, tu pedido {{2}} de Caprichos ya salio de nuestro local y va en camin
 - **Idioma:** Español (`es` o `es_PE`)
 - **Texto del cuerpo (Body):**
 ```text
-Hola {{1}}, nuestro repartidor ya llego con tu pedido {{2}} y esta en la puerta. Por favor sal a recibirlo.
+¡Hola {{1}}! 🛵 Nuestro repartidor ya llegó con tu pedido {{2}} y te espera en la puerta. ¿Podrías salir a recibirlo? 😊
 ```
 - **Ejemplo de variables para Meta:**
   - `{{1}}`: `Carlos`
@@ -70,7 +76,7 @@ Hola {{1}}, nuestro repartidor ya llego con tu pedido {{2}} y esta en la puerta.
 - **Idioma:** Español (`es` o `es_PE`)
 - **Texto del cuerpo (Body):**
 ```text
-Hola {{1}}, nuestro repartidor sigue esperando en la puerta con tu pedido {{2}} desde hace {{3}} minutos. Por favor sal o comunicate con nosotros.
+¡Hola {{1}}! 😊 Nuestro repartidor sigue en la puerta con tu pedido {{2}} desde hace {{3}} minutos. Cuando puedas, sal a recibirlo o escríbenos por aquí, con gusto te ayudamos. 🙏
 ```
 - **Ejemplo de variables para Meta:**
   - `{{1}}`: `Carlos`
@@ -82,20 +88,17 @@ Hola {{1}}, nuestro repartidor sigue esperando en la puerta con tu pedido {{2}} 
 
 ## 4. Espera Agotada y Reprogramación
 
-- **Nombre de plantilla:** `caprichos_delivery_reprogramacion`
+- **Nombre de plantilla:** `caprichos_delivery_espera_agotada`
 - **Categoría:** Utilidad (Utility)
 - **Idioma:** Español (`es` o `es_PE`)
 - **Texto del cuerpo (Body):**
 ```text
-Hola {{1}}, se agoto el tiempo maximo de espera para tu pedido {{2}} y el repartidor debe retirarse. Puedes solicitar la reprogramacion del envio con un recargo adicional de {{3}}. Responde SI para reprogramar o NO si prefieres cancelarlo.
+¡Hola {{1}}! 😊 Ya llevamos un buen rato en la puerta con tu pedido {{2}}. Si no logramos encontrarte, nuestro repartidor tendrá que retirarse en unos minutos. ¿Podrías salir a recibirlo? 🙏
 ```
 - **Ejemplo de variables para Meta:**
   - `{{1}}`: `Ana`
   - `{{2}}`: `CP-4099`
-  - `{{3}}`: `S/ 0.00`
-- **Botones de respuesta rápida (Quick Reply):**
-  1. `Si reprogramar`
-  2. `No gracias`
+- **Botones:** Ninguno. El aviso solo informa; la pregunta de reprogramar llega al retirarse el repartidor (ver sección 14).
 
 ---
 
@@ -122,7 +125,7 @@ Hola {{1}}, recibimos tu pago. Tu pedido {{2}} esta en preparacion.
 - **Idioma:** Español (`es` o `es_PE`)
 - **Texto del cuerpo (Body):**
 ```text
-Hola {{1}}, tu pedido {{2}} ya esta listo para recoger en nuestro local. Te esperamos.
+¡Hola {{1}}! 🥳 Tu pedido {{2}} ya está listo para recoger en nuestro local. ¡Te esperamos con gusto! 😊
 ```
 - **Ejemplo de variables para Meta:**
   - `{{1}}`: `Jorge`
@@ -224,7 +227,7 @@ Aviso interno de Caprichos: *{{1}}*
 - **Idioma:** Español (`es`)
 - **Texto del cuerpo (Body):**
 ```text
-Hola {{1}}, recibimos tu pedido {{2}} de Caprichos. Ya lo estamos preparando.
+¡Hola {{1}}! 😊 Gracias por tu pedido {{2}}. Ya lo estamos preparando con mucho cariño.
 ```
 - **Ejemplo de variables para Meta:** `{{1}}`: `María` · `{{2}}`: `CP-4102`
 - **Botones:** Ninguno
@@ -239,7 +242,7 @@ Hola {{1}}, recibimos tu pedido {{2}} de Caprichos. Ya lo estamos preparando.
 - **Idioma:** Español (`es`)
 - **Texto del cuerpo (Body):**
 ```text
-Hola {{1}}, tu pedido {{2}} ya esta listo. Pronto sale con nuestro repartidor.
+¡Hola {{1}}! 🎉 Tu pedido {{2}} ya está listo. Pronto sale con nuestro repartidor. 🛵
 ```
 - **Ejemplo de variables para Meta:** `{{1}}`: `María` · `{{2}}`: `CP-4102`
 - **Botones:** Ninguno
@@ -254,11 +257,11 @@ Hola {{1}}, tu pedido {{2}} ya esta listo. Pronto sale con nuestro repartidor.
 - **Idioma:** Español (`es`)
 - **Texto del cuerpo (Body):**
 ```text
-Hola {{1}}, el repartidor se retiro de la puerta con tu pedido {{2}} porque se agoto el tiempo de espera. Tu pedido queda reprogramado {{3}}. Te contactaremos para coordinar la nueva entrega.
+¡Hola {{1}}! 😔 Nuestro repartidor tuvo que retirarse con tu pedido {{2}} porque se agotó el tiempo de espera. ¿Te gustaría reprogramar la entrega {{3}}? Responde SÍ para reprogramar o NO si prefieres cancelarlo. 🙏
 ```
 - **Ejemplo de variables para Meta:** `{{1}}`: `María` · `{{2}}`: `CP-4102` · `{{3}}`: `con un recargo de S/ 5.00`
-- **Botones:** Ninguno. `{{3}}` es `con un recargo de S/ 5.00` si `reparto_recargo_reprogramacion` es mayor que 0, o `sin recargo` si es 0.
-- **Cuándo se envía:** cuando el planificador retira la movilidad tras `reparto_espera_max_min` más `reparto_insistencia_min` minutos en puerta.
+- **Botones de respuesta rápida (Quick Reply):** 1. `Sí, reprogramar` 2. `No, cancelar`. Si la ventana de 24 h está abierta se envían como botones; si no, el cliente responde escribiendo SÍ o NO.
+- **Cuándo se envía:** cuando el planificador retira la movilidad tras `reparto_espera_max_min` más `reparto_insistencia_min` minutos en puerta. La respuesta SÍ pasa el pedido a «Por reprogramar»; NO o sin respuesta en `reprog_respuesta_min` minutos lo cancela.
 
 ---
 
@@ -269,7 +272,7 @@ Hola {{1}}, el repartidor se retiro de la puerta con tu pedido {{2}} porque se a
 - **Idioma:** Español (`es`)
 - **Texto del cuerpo (Body):**
 ```text
-Hola {{1}}, tu pedido {{2}} fue entregado. Gracias por preferir Caprichos.
+¡Hola {{1}}! 🎉 Tu pedido {{2}} fue entregado. ¡Gracias por preferir Caprichos, esperamos verte pronto! 💛
 ```
 - **Ejemplo de variables para Meta:** `{{1}}`: `María` · `{{2}}`: `CP-4102`
 - **Botones:** Ninguno. La encuesta posventa (sección 7) llega después, según `encuesta_espera_min`.
@@ -284,7 +287,7 @@ Hola {{1}}, tu pedido {{2}} fue entregado. Gracias por preferir Caprichos.
 - **Idioma:** Español (`es`)
 - **Texto del cuerpo (Body):**
 ```text
-Hola {{1}}, recibimos tu pedido {{2}} correctamente. En unos momentos un asesor se comunicara contigo por este chat para gestionar el voucher de tu pago por {{3}}.
+¡Hola {{1}}! 😊 Recibimos tu pedido {{2}}, ¡gracias! En unos momentos un asesor te escribirá por este chat para revisar el voucher de tu pago por {{3}}. 🙏
 ```
 - **Ejemplo de variables para Meta:** `{{1}}`: `María` · `{{2}}`: `CP-W012` · `{{3}}`: `Yape` (o `Plin` / `transferencia`)
 - **Botones:** Ninguno
@@ -300,11 +303,75 @@ Hola {{1}}, recibimos tu pedido {{2}} correctamente. En unos momentos un asesor 
 - **Idioma:** Español (`es`)
 - **Texto del cuerpo (Body):**
 ```text
-Hola {{1}}, recibimos tu pedido {{2}}. Ya esta en proceso.
+¡Hola {{1}}! 😊 Recibimos tu pedido {{2}}, ¡gracias por tu compra! Ya está en proceso. 🙏
 ```
 - **Ejemplo de variables para Meta:** `{{1}}`: `María` · `{{2}}`: `CP-W012`
 - **Botones:** Ninguno
 - **Cuándo se envía:** al crear un pedido desde la carta virtual con celular y pago en efectivo, si la ventana de 24 horas está cerrada. No toca la conversación.
+
+---
+
+## 18. Reprogramación: solicitud recibida
+
+- **Nombre de plantilla:** `caprichos_delivery_reprog_recibida`
+- **Categoría:** Utilidad (Utility)
+- **Idioma:** Español (`es`)
+- **Estado:** pendiente de enviar a Meta (no enviada todavía)
+- **Texto del cuerpo (Body):**
+```text
+¡Gracias, {{1}}! 😊 Recibimos tu solicitud para reprogramar tu pedido {{2}}. Te escribiremos por aquí para confirmarte la nueva entrega. 🛵
+```
+- **Ejemplo de variables para Meta:** `{{1}}`: `María` · `{{2}}`: `CP-4102`
+- **Botones:** Ninguno.
+- **Cuándo se envía:** Confirma al cliente que su SÍ quedó registrado (ventana abierta: texto libre; si está cerrada, usa esta plantilla).
+
+---
+
+## 19. Pedido Reprogramado y Reenviado a Reparto
+
+- **Nombre de plantilla:** `caprichos_delivery_reenviado`
+- **Categoría:** Utilidad (Utility)
+- **Idioma:** Español (`es`)
+- **Estado:** pendiente de enviar a Meta (no enviada todavía)
+- **Texto del cuerpo (Body):**
+```text
+¡Buenas noticias, {{1}}! 🎉 Tu pedido {{2}} fue reprogramado y ya lo volvemos a enviar. Te avisaremos cuando salga. 🛵
+```
+- **Ejemplo de variables para Meta:** `{{1}}`: `María` · `{{2}}`: `CP-4102`
+- **Botones:** Ninguno.
+- **Cuándo se envía:** Avisa que el pedido volvió a salir a reparto tras confirmación del admin.
+
+---
+
+## 20. Reprogramación: pedido cancelado (el cliente dijo NO)
+
+- **Nombre de plantilla:** `caprichos_delivery_reprog_cancelada`
+- **Categoría:** Utilidad (Utility)
+- **Idioma:** Español (`es`)
+- **Estado:** pendiente de enviar a Meta (no enviada todavía)
+- **Texto del cuerpo (Body):**
+```text
+Hola {{1}}, entendemos. 💛 Tu pedido {{2}} queda cancelado. Gracias por preferir Caprichos; cuando quieras pedir de nuevo, aquí estaremos. 😊
+```
+- **Ejemplo de variables para Meta:** `{{1}}`: `María` · `{{2}}`: `CP-4102`
+- **Botones:** Ninguno.
+- **Cuándo se envía:** Cierre cuando el cliente no quiere reprogramar.
+
+---
+
+## 21. Reprogramación: cancelado por falta de respuesta
+
+- **Nombre de plantilla:** `caprichos_delivery_reprog_sin_respuesta`
+- **Categoría:** Utilidad (Utility)
+- **Idioma:** Español (`es`)
+- **Estado:** pendiente de enviar a Meta (no enviada todavía)
+- **Texto del cuerpo (Body):**
+```text
+Hola {{1}}, no recibimos tu respuesta sobre el pedido {{2}}, así que lo dejamos cancelado por ahora. 💛 Si quieres, escríbenos y con gusto te ayudamos a hacer uno nuevo. 😊
+```
+- **Ejemplo de variables para Meta:** `{{1}}`: `María` · `{{2}}`: `CP-4102`
+- **Botones:** Ninguno.
+- **Cuándo se envía:** Cierre cuando el cliente no responde en `reprog_respuesta_min` minutos.
 
 ---
 

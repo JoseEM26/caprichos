@@ -631,6 +631,24 @@ export function TarjetaReparto({
           </button>
         )}
 
+        {/* Reprogramado: volvió a Para elegir tras confirmación del cliente */}
+        {(pedido.reprogramado || pedido.reprogramacion === 'REPROGRAMADO') && (
+          <div
+            role="status"
+            style={{
+              alignSelf: 'flex-start',
+              background: 'var(--cp-dorado, #F4C542)',
+              color: 'var(--cp-navy, #0B2C3E)',
+              borderRadius: '999px',
+              padding: '4px 10px',
+              fontSize: '12px',
+              fontWeight: 800,
+            }}
+          >
+            Reprogramado
+          </div>
+        )}
+
         {/* Falla reportada */}
         {pedido.motivo_falla && (
           <div
@@ -649,6 +667,49 @@ export function TarjetaReparto({
             }}
           >
             <div>Falla reportada: {pedido.motivo_falla}. En coordinación con caja/administrador.</div>
+            {pedido.reprogramacion === 'POR_REPROGRAMAR' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div>Por reprogramar: el cliente confirmó que quiere reprogramar la entrega.</div>
+                {puedeLiquidar && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      pedirConfirmacion(
+                        '¿Reenviar este pedido a reparto?',
+                        `El pedido ${pedido.codigo} vuelve a Para elegir con marca Reprogramado y se avisa al cliente por WhatsApp. Se suma el recargo configurado.`,
+                        async () => {
+                          try {
+                            setCargandoAccion(true);
+                            await repartosApi.reprogramarPedido(pedido.id);
+                            setConfirmarAccion((prev) => ({ ...prev, abierto: false }));
+                            alActualizar();
+                          } catch (err: any) {
+                            setConfirmarAccion((prev) => ({ ...prev, abierto: false }));
+                            setErrorAccion(err?.message || 'No se pudo reenviar el pedido');
+                          } finally {
+                            setCargandoAccion(false);
+                          }
+                        },
+                      )
+                    }
+                    style={{
+                      alignSelf: 'flex-start',
+                      minHeight: '44px',
+                      padding: '0 14px',
+                      borderRadius: '10px',
+                      border: 'none',
+                      background: 'var(--cp-navy, #0B2C3E)',
+                      color: 'var(--cp-white, #fff)',
+                      fontWeight: 800,
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Reprogramar / Reenviar a reparto
+                  </button>
+                )}
+              </div>
+            )}
             {puedeLiquidar && (
               <button
                 type="button"

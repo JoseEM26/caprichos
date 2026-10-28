@@ -157,6 +157,18 @@ const META_PARAMETROS: Record<string, MetaParametro> = {
     tipo: 'numero',
     sufijo: 'S/',
   },
+  reprog_respuesta_min: {
+    nombre: 'Tiempo para responder si reprograma',
+    descripcion: 'Minutos que tiene el cliente para responder SÍ o NO a reprogramar tras el retiro del repartidor. Si no responde, el pedido se cancela por falta de respuesta.',
+    tipo: 'numero',
+    sufijo: 'minutos',
+  },
+  reprog_max_intentos: {
+    nombre: 'Reprogramaciones máximas por pedido',
+    descripcion: 'Cuántas veces se puede reprogramar un mismo pedido tras la espera agotada. Al llegar al tope no se vuelve a preguntar y el pedido se cancela.',
+    tipo: 'numero',
+    sufijo: 'veces',
+  },
   encuesta_espera_min: {
     nombre: 'Espera para encuesta posventa',
     descripcion: 'Minutos transcurridos tras la entrega del pedido antes de enviar automáticamente la encuesta de satisfacción por WhatsApp.',

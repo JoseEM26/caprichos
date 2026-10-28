@@ -30,6 +30,7 @@ import {
 } from '../../mensajes/utilidades/nombre-contacto.util';
 import { VouchersService } from '../../vouchers/vouchers.service';
 import { EjecutorConversacionService } from '../conversacion/ejecutor-conversacion.service';
+import { ReprogramacionService } from './reprogramacion.service';
 import { AvisosInternosService } from '../avisos-internos/avisos-internos.service';
 import { marcarPagoParaPersona } from './pago-para-persona.util';
 
@@ -63,6 +64,7 @@ export class WhatsappWebhookService {
     @Optional()
     @Inject(forwardRef(() => VouchersService))
     private readonly vouchersService?: VouchersService,
+    @Optional() private readonly reprogramacion?: ReprogramacionService,
   ) {
     this.verifyToken = this.configService.get<string>('WHATSAPP_VERIFY_TOKEN', '').trim();
     this.appSecret = this.configService.get<string>('WHATSAPP_APP_SECRET', '').trim();
@@ -449,11 +451,6 @@ export class WhatsappWebhookService {
     // 3. Procesamiento de encuesta posventa
     await this.procesarPosibleEncuesta(telHash, telMask, texto, buttonPayload, pedidoReciente, conversacion);
 
-    // 4. Procesamiento de respuesta a reprogramación (solo con teléfono)
-    if (telefonoNorm) {
-      await this.procesarPosibleReprogramacion(texto, buttonPayload, pedidoReciente, telMask, telefonoNorm);
-    }
-
     // 5. Procesamiento de imagen de voucher
     let archivoMensajeId: string | null = null;
     if (imagenBuffer && pedidoReciente) {
@@ -555,6 +552,17 @@ export class WhatsappWebhookService {
       }
     }
 
+    // 5.7. Respuesta SI/NO a la pregunta de reprogramar (después de registrar el mensaje en el chat)
+    // Respuesta SI/NO a la pregunta de reprogramar tras el retiro (solo si hay una pregunta pendiente)
+    let reprogramacionAtendida = false;
+    if (telefonoNorm && this.reprogramacion) {
+      try {
+        reprogramacionAtendida = await this.reprogramacion.procesarRespuesta(telefonoNorm, texto, buttonPayload);
+      } catch (err: any) {
+        this.logger.error(`Error al procesar respuesta de reprogramación: ${err.message}`, err.stack);
+      }
+    }
+
     // 6. Invocación segura del motor de conversación (Ola 1 Agente B)
     // El bot responde únicamente si la conversación le pertenece y el cliente no solicitó baja/alta
     const esComandoBajaOAlta =
@@ -576,7 +584,7 @@ export class WhatsappWebhookService {
       conversacion.estado === 'VALIDAR_PAGO' ||
       esAtencionPersona;
 
-    if (this.motorConversacion && !esComandoBajaOAlta && puedeProcesarMotor) {
+    if (this.motorConversacion && !esComandoBajaOAlta && puedeProcesarMotor && !reprogramacionAtendida) {
       const consentimiento = await this.prisma.clienteWhatsappConsentimiento.findUnique({
         where: { telefono_hash: telHash },
       });
@@ -809,56 +817,6 @@ export class WhatsappWebhookService {
       if (pedido.cliente_telefono) {
         await this.mensajeria.enviarTexto(pedido.cliente_telefono, agradecimiento);
       }
-    }
-  }
-
-  /**
-   * Procesa posibles respuestas de confirmación de reprogramación tras espera agotada.
-   */
-  private async procesarPosibleReprogramacion(
-    texto: string,
-    buttonPayload: string | null,
-    pedido: any,
-    telMask: string,
-    telefono: string,
-  ) {
-    if (!pedido) return;
-    const candidato = (buttonPayload || texto).toLowerCase().trim();
-
-    if (
-      candidato === 'reprogramar_si' ||
-      candidato === 'si' ||
-      candidato === 'sí' ||
-      candidato.includes('reprogramar')
-    ) {
-      // Registrar que el cliente desea reprogramar y notificar a Caja
-      const tituloNotif = 'Cliente solicita reprogramar entrega';
-      const mensajeNotif = `El cliente de ${pedido.codigo} solicita reprogramacion con recargo tras espera agotada. Coordinar por telefono.`;
-
-      const notif = await this.prisma.notificacion.create({
-        data: {
-          tipo: 'REPROGRAMACION_DELIVERY',
-          rol_destino: 'CAJERO',
-          titulo: tituloNotif,
-          mensaje: mensajeNotif,
-          enlace: '/admin/caja',
-        },
-      });
-
-      this.eventos?.emitirAdmin('notificaciones:nueva', {
-        id: notif.id.toString(),
-        titulo: tituloNotif,
-      });
-
-      await this.mensajeria.enviarTexto(
-        telefono,
-        'Recibimos tu solicitud de reprogramacion. El equipo de Caja se comunicara contigo a la brevedad para coordinar la entrega.',
-      );
-    } else if (candidato === 'reprogramar_no' || candidato === 'no gracias' || candidato === 'no') {
-      await this.mensajeria.enviarTexto(
-        telefono,
-        'Entendido. Tu pedido no sera reprogramado. Si deseas alguna asistencia comunicate con nuestro local. Gracias.',
-      );
     }
   }
 

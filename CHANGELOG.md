@@ -6,6 +6,15 @@ Todos los cambios notables del proyecto Caprichos se documentan en este archivo.
 
 ## 2026-10-28
 
+### Reparto: reprogramación tras el retiro por espera agotada (cliente SI / NO / sin respuesta)
+- **Causa del mensaje fantasma**: la respuesta a la pregunta de reprogramar se enviaba desde `whatsapp-webhook.service.ts` con `enviarTexto` directo, sin copiarla a `mensaje_chat`, y se disparaba con cualquier «si», «no» o «no gracias» del último pedido del teléfono, aunque no hubiera pregunta pendiente. Ahora la respuesta solo se atiende si hay una pregunta pendiente (`ReprogramacionService.procesarRespuesta`) y todo aviso sale por `AvisosPedidoService` (queda en `mensaje_chat`).
+- **Flujo**: al retirarse el repartidor llega la pregunta con botones «Sí, reprogramar» / «No, cancelar». SÍ: el pedido queda «Por reprogramar» y Caja recibe aviso; el admin pulsa «Reprogramar / Reenviar a reparto» (con Confirmar Sí/No) y el pedido vuelve a «Para elegir» con marca «Reprogramado» y se avisa al cliente. NO o sin respuesta en `reprog_respuesta_min` (30 min por defecto): pedido ANULADO con motivo distinto, incidente con cierre DEVUELTO, aviso a Caja y cierre al cliente; si hay pago registrado, aviso «Revisar devolución».
+- **Tope**: `reprog_max_intentos` (1 por defecto): al llegar al tope no se vuelve a preguntar y el pedido se cancela.
+- **Espera agotada**: el aviso de espera ya no lleva botones; solo avisa. La pregunta llega con el retiro.
+- **Recargo**: se toma de `reparto_recargo_reprogramacion`; con 0 el texto dice «sin recargo».
+- **Parámetros nuevos** (ParametrosOperacionTab): `reprog_respuesta_min`, `reprog_max_intentos`. Migración `20261101000000_reprogramacion_retiro`.
+- **Textos cálidos**: todos los avisos de reparto y de recojo se reescribieron con tono cercano y emojis (solo WhatsApp; el admin sigue sin emojis). Plantillas Meta pendientes de enviar: `caprichos_delivery_espera_agotada`, `caprichos_delivery_retiro`, `caprichos_delivery_reprog_recibida`, `caprichos_delivery_reenviado`, `caprichos_delivery_reprog_cancelada`, `caprichos_delivery_reprog_sin_respuesta`.
+
 ### Cocina: el pedido sigue en todas sus areas hasta que todas despejan
 - **Regla**: un pedido con platos de varias areas (Barra, Cocina, Postres...) sigue apareciendo en cada pantalla de area mientras alguna otra area del mismo pedido siga pendiente, aunque la propia area ya haya despejado. Cuando todas despejan, el pedido pasa a LISTO como antes (sin cambios en estados, despacho ni avisos).
 - **Tarjeta**: muestra todas las lineas del pedido agrupadas por area (nombre del area como subtitulo pequeno), con un check por linea: verde (listo) si su area ya despejo, circulo vacio si no. Si la propia area ya despejo, la tarjeta se marca "Tu area ya esta lista, falta: <areas>" y no tiene el boton Despejar. Despejar sigue por area con Confirmar Si/No; Devolver sigue igual (desde Despejadas hoy).

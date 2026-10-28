@@ -125,7 +125,7 @@ describe('AvisosPedidoService (avisos de reparto al cliente)', () => {
     await servicio.avisar(77, 'LISTO');
 
     expect(mensajeria.enviarPlantilla).not.toHaveBeenCalled();
-    expect(mensajeria.enviarTexto).toHaveBeenCalledWith('51987654321', expect.stringContaining('ya esta listo'), { pedidoId: BigInt(77) });
+    expect(mensajeria.enviarTexto).toHaveBeenCalledWith('51987654321', expect.stringContaining('ya está listo'), { pedidoId: BigInt(77) });
   });
 
   it('cliente con BAJA: no envía, deja el registro FALLIDO y no lanza error', async () => {

@@ -26,6 +26,8 @@ export const CLAVES_NUMERICAS = [
   'reparto_insistencia_min',
   'reparto_espera_max_min',
   'reparto_recargo_reprogramacion',
+  'reprog_respuesta_min',
+  'reprog_max_intentos',
   'encuesta_espera_min',
   'encuesta_puntaje_queja',
   'chatbot_pago_recordatorio_min',

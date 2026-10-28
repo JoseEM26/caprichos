@@ -640,6 +640,9 @@ function CandidatoPedido({ pedido, numero, config, seleccionado, destacado, onAl
           </span>
           <strong style={{ fontSize: 16, color: C.navy }}>{pedido.codigo}</strong>
           <span style={chip(C.suave, C.gris)}>Sugerida #{numero}</span>
+          {(pedido as { reprogramado?: boolean }).reprogramado && (
+            <span style={chip(C.dorado, C.navy)}>Reprogramado</span>
+          )}
         </div>
         <span style={chip(espera.colorHex, C.blanco)}>{pedido.minutosEspera} min</span>
       </div>

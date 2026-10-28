@@ -26,7 +26,7 @@ Lista única de todo lo que debe estar hecho **antes** de abrir el sistema a cli
   - [ ] `caprichos_delivery_en_camino`
   - [ ] `caprichos_delivery_llegado`
   - [ ] `caprichos_delivery_insistencia`
-  - [ ] `caprichos_delivery_reprogramacion`
+  - [ ] `caprichos_delivery_espera_agotada`
   - [ ] `caprichos_pago_confirmado`
   - [ ] `caprichos_pedido_listo_recojo`
   - [ ] `caprichos_encuesta_posventa`

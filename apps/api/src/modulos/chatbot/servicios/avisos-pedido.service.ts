@@ -23,6 +23,11 @@ export const ETAPAS_AVISO: Record<
   ENTREGADO: { numero: 8, parametro: 'whatsapp_aviso_entregado_activo' },
   // Pedido de la carta virtual recién creado: vale para cualquier modalidad
   RECIBIDO: { numero: 9, parametro: 'whatsapp_aviso_recibido_activo', cualquierModalidad: true },
+  // Reprogramación tras el retiro: el reenvío y los cierres comparten la activación de espera/retiro
+  REENVIADO: { numero: 10, parametro: 'whatsapp_aviso_espera_activo' },
+  REPROG_RECIBIDA: { numero: 11, parametro: 'whatsapp_aviso_espera_activo' },
+  REPROG_CANCELADA: { numero: 12, parametro: 'whatsapp_aviso_espera_activo' },
+  REPROG_SIN_RESPUESTA: { numero: 13, parametro: 'whatsapp_aviso_espera_activo' },
 };
 
 /** Medios digitales que llevan voucher y pasan la conversación a una persona. Nombre que se lee al cliente. */
@@ -32,8 +37,11 @@ const MEDIOS_DIGITALES: Record<string, string> = {
   TRANSFERENCIA: 'transferencia',
 };
 
-/** Etapas del intento de entrega: al reprogramar se borran para que el nuevo intento avise otra vez. */
-export const NUMEROS_INTENTO = [1, 2, 3, 4];
+/**
+ * Etapas del intento de entrega: al retirar la movilidad se borran para que el nuevo intento avise otra vez.
+ * La 5 (pregunta RETIRO) guarda la respuesta del cliente; la 10 (REENVIADO) es el aviso de reenvío.
+ */
+export const NUMEROS_INTENTO = [1, 2, 3, 4, 5, 10];
 
 export const esParametroActivo = (valor: unknown) =>
   valor === true || String(valor).toLowerCase() === 'si';
@@ -185,12 +193,17 @@ export class AvisosPedidoService {
       case 'INSISTENCIA':
         return TEXTOS_REPARTO.insistencia(nombre, codigo, String(Math.floor(datos.minutos ?? 0)));
       case 'ESPERA_AGOTADA':
-        return TEXTOS_REPARTO.esperaAgotada(nombre, codigo, this.montoSoles(datos.recargo));
-      case 'RETIRO': {
-        const recargo = datos.recargo ?? 0;
-        const condicion = recargo > 0 ? `con un recargo de ${this.montoSoles(recargo)}` : 'sin recargo';
-        return TEXTOS_REPARTO.retiro(nombre, codigo, condicion);
-      }
+        return TEXTOS_REPARTO.esperaAgotada(nombre, codigo);
+      case 'RETIRO':
+        return TEXTOS_REPARTO.retiro(nombre, codigo, this.condicionRecargo(datos.recargo));
+      case 'REENVIADO':
+        return TEXTOS_REPARTO.reenviado(nombre, codigo);
+      case 'REPROG_RECIBIDA':
+        return TEXTOS_REPARTO.reprogramacionRecibida(nombre, codigo);
+      case 'REPROG_CANCELADA':
+        return TEXTOS_REPARTO.reprogramacionCancelada(nombre, codigo);
+      case 'REPROG_SIN_RESPUESTA':
+        return TEXTOS_REPARTO.reprogramacionSinRespuesta(nombre, codigo);
       case 'ENTREGADO':
         return TEXTOS_REPARTO.entregado(nombre, codigo);
     }
@@ -200,8 +213,14 @@ export class AvisosPedidoService {
     return `S/ ${(monto ?? 0).toFixed(2)}`;
   }
 
+  /** "con un recargo de S/ 5.00" o "sin recargo" (nunca "S/ 0.00"). */
+  private condicionRecargo(recargo?: number): string {
+    return (recargo ?? 0) > 0 ? `con un recargo de ${this.montoSoles(recargo)}` : 'sin recargo';
+  }
+
   /** Copia el aviso en el hilo de chat del cliente (mensaje_chat), para que Caja lo vea junto a la conversación. */
-  private async registrarEnChat(
+  /** Copia un aviso al chat del cliente (mensaje_chat). Público: lo usa ReprogramacionService. */
+  async registrarEnChat(
     telefono: string,
     nombre: string | null,
     etapa: EtapaAvisoReparto,

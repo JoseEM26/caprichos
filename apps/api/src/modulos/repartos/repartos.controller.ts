@@ -151,6 +151,13 @@ export class RepartosController {
     return this.repartosService.reportarFalla(id, dto, req.usuario, ip);
   }
 
+  @Post(':id/reprogramar')
+  @Permiso('repartos', 'liquidar')
+  async reprogramarPedido(@Param('id') id: string, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.repartosService.reprogramarPedido(id, req.usuario, ip);
+  }
+
   @Post(':id/resolver')
   @Permiso('repartos', 'liquidar')
   async resolverFalla(

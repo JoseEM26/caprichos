@@ -183,7 +183,7 @@ describe('ChatbotPlanificadorService (avisos por tiempo)', () => {
       }),
     );
     expect(mockPrisma.mensajeReparto.deleteMany).toHaveBeenCalledWith({
-      where: { pedido_id: BigInt(13), numero: { in: [1, 2, 3, 4] } },
+      where: { pedido_id: BigInt(13), numero: { in: [1, 2, 3, 4, 5, 10] } },
     });
     expect(mockAvisos.avisar).toHaveBeenCalledWith(BigInt(13), 'RETIRO', { recargo: 5 });
     expect(mockEventos.emitirAdmin).toHaveBeenCalledWith('reparto:incidente', expect.anything());

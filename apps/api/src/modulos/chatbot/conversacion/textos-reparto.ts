@@ -1,7 +1,8 @@
 /**
  * Textos de los avisos de WhatsApp al cliente en cada etapa de un pedido delivery.
- * Cada etapa tiene el texto libre (ventana de 24h abierta) y la plantilla aprobada (ventana cerrada).
+ * Cada etapa tiene el texto libre (ventana de 24h abierta) y la plantilla (ventana cerrada).
  * Las variables de la plantilla deben coincidir, en orden, con `variables` de CATALOGO_PLANTILLAS.
+ * Tono cálido y con emojis: esto se lee en WhatsApp, no en el admin.
  */
 export type EtapaAvisoReparto =
   | 'ACEPTADO'
@@ -11,6 +12,10 @@ export type EtapaAvisoReparto =
   | 'INSISTENCIA'
   | 'ESPERA_AGOTADA'
   | 'RETIRO'
+  | 'REENVIADO'
+  | 'REPROG_RECIBIDA'
+  | 'REPROG_CANCELADA'
+  | 'REPROG_SIN_RESPUESTA'
   | 'ENTREGADO'
   | 'RECIBIDO';
 
@@ -21,70 +26,104 @@ export interface PayloadAvisoReparto {
   botones?: { id: string; titulo: string }[];
 }
 
+export const BOTONES_REPROGRAMACION = [
+  { id: 'reprogramar_si', titulo: 'Sí, reprogramar' },
+  { id: 'reprogramar_no', titulo: 'No, cancelar' },
+];
+
 export const TEXTOS_REPARTO = {
   aceptado: (nombre: string, codigo: string): PayloadAvisoReparto => ({
-    textoLibre: `Hola ${nombre}, recibimos tu pedido ${codigo} de Caprichos. Ya lo estamos preparando.`,
+    textoLibre: `¡Hola ${nombre}! 😊 Gracias por tu pedido ${codigo}. Ya lo estamos preparando con mucho cariño.`,
     plantillaClave: 'DELIVERY_ACEPTADO',
     variablesPlantilla: [nombre, codigo],
   }),
 
   listo: (nombre: string, codigo: string): PayloadAvisoReparto => ({
-    textoLibre: `Hola ${nombre}, tu pedido ${codigo} ya esta listo. Pronto sale con nuestro repartidor. 🛵`,
+    textoLibre: `¡Hola ${nombre}! 🎉 Tu pedido ${codigo} ya está listo. Pronto sale con nuestro repartidor. 🛵`,
     plantillaClave: 'DELIVERY_LISTO',
     variablesPlantilla: [nombre, codigo],
   }),
 
   salida: (nombre: string, codigo: string, minutos: string): PayloadAvisoReparto => ({
-    textoLibre: `Hola ${nombre}, tu pedido ${codigo} ya salio de nuestro local y va en camino. Tiempo estimado: ${minutos} minutos.`,
+    textoLibre: `¡Hola ${nombre}! 🛵 Tu pedido ${codigo} ya salió de nuestro local y va en camino. Tiempo estimado: ${minutos} minutos. ¡Gracias por tu paciencia! 😊`,
     plantillaClave: 'DELIVERY_SALIDA',
     variablesPlantilla: [nombre, codigo, minutos],
   }),
 
   llegada: (nombre: string, codigo: string): PayloadAvisoReparto => ({
-    textoLibre: `Hola ${nombre}, nuestro repartidor ya llego con tu pedido ${codigo} y esta en la puerta. Por favor sal a recibirlo.`,
+    textoLibre: `¡Hola ${nombre}! 🛵 Nuestro repartidor ya llegó con tu pedido ${codigo} y te espera en la puerta. ¿Podrías salir a recibirlo? 😊`,
     plantillaClave: 'DELIVERY_LLEGADA',
     variablesPlantilla: [nombre, codigo],
   }),
 
   insistencia: (nombre: string, codigo: string, minutos: string): PayloadAvisoReparto => ({
-    textoLibre: `Hola ${nombre}, nuestro repartidor sigue esperando en la puerta con tu pedido ${codigo} desde hace ${minutos} minutos. Por favor sal o comunicate con nosotros.`,
+    textoLibre: `¡Hola ${nombre}! 😊 Nuestro repartidor sigue en la puerta con tu pedido ${codigo} desde hace ${minutos} minutos. Cuando puedas, sal a recibirlo o escríbenos por aquí, con gusto te ayudamos. 🙏`,
     plantillaClave: 'DELIVERY_INSISTENCIA',
     variablesPlantilla: [nombre, codigo, minutos],
   }),
 
-  esperaAgotada: (nombre: string, codigo: string, montoRecargo: string): PayloadAvisoReparto => ({
-    textoLibre: `Hola ${nombre}, se agoto el tiempo de espera en la puerta para tu pedido ${codigo} y el repartidor debe retirarse. Puedes solicitar la reprogramacion con un recargo de ${montoRecargo}. ¿Deseas reprogramar la entrega?`,
+  /** Aviso de espera agotada: solo avisa; la pregunta de reprogramar llega cuando el repartidor se retira. */
+  esperaAgotada: (nombre: string, codigo: string): PayloadAvisoReparto => ({
+    textoLibre: `¡Hola ${nombre}! 😊 Ya llevamos un buen rato en la puerta con tu pedido ${codigo}. Si no logramos encontrarte, nuestro repartidor tendrá que retirarse en unos minutos. ¿Podrías salir a recibirlo? 🙏`,
     plantillaClave: 'DELIVERY_ESPERA_AGOTADA',
-    variablesPlantilla: [nombre, codigo, montoRecargo],
-    botones: [
-      { id: 'reprogramar_si', titulo: 'Si reprogramar' },
-      { id: 'reprogramar_no', titulo: 'No gracias' },
-    ],
+    variablesPlantilla: [nombre, codigo],
   }),
 
-  /** `condicionRecargo` es "con un recargo de S/ 5.00" o "sin recargo". */
+  /**
+   * Pregunta tras el retiro: ¿reprogramar? `condicionRecargo` es "con un recargo de S/ 5.00" o "sin recargo".
+   * Con ventana abierta lleva los botones; con ventana cerrada la plantilla se responde escribiendo SI o NO.
+   */
   retiro: (nombre: string, codigo: string, condicionRecargo: string): PayloadAvisoReparto => ({
-    textoLibre: `Hola ${nombre}, el repartidor se retiro de la puerta con tu pedido ${codigo} porque se agoto el tiempo de espera. Tu pedido queda reprogramado ${condicionRecargo}. Te contactaremos para coordinar la nueva entrega.`,
+    textoLibre: `¡Hola ${nombre}! 😔 Nuestro repartidor tuvo que retirarse con tu pedido ${codigo} porque se agotó el tiempo de espera. ¿Te gustaría reprogramar la entrega ${condicionRecargo}? Responde SÍ para reprogramar o NO si prefieres cancelarlo. 🙏`,
     plantillaClave: 'DELIVERY_RETIRO',
     variablesPlantilla: [nombre, codigo, condicionRecargo],
+    botones: BOTONES_REPROGRAMACION,
+  }),
+
+  /** Confirma al cliente que su SI quedó registrado; Caja/admin coordinan el reenvío. */
+  reprogramacionRecibida: (nombre: string, codigo: string): PayloadAvisoReparto => ({
+    textoLibre: `¡Gracias, ${nombre}! 😊 Recibimos tu solicitud para reprogramar tu pedido ${codigo}. Te escribiremos por aquí para confirmarte la nueva entrega. 🛵`,
+    plantillaClave: 'DELIVERY_REPROG_RECIBIDA',
+    variablesPlantilla: [nombre, codigo],
+  }),
+
+  /** El pedido fue reenviado a reparto tras una reprogramación confirmada por el admin. */
+  reenviado: (nombre: string, codigo: string): PayloadAvisoReparto => ({
+    textoLibre: `¡Buenas noticias, ${nombre}! 🎉 Tu pedido ${codigo} fue reprogramado y ya lo volvemos a enviar. Te avisaremos cuando salga. 🛵`,
+    plantillaClave: 'DELIVERY_REENVIADO',
+    variablesPlantilla: [nombre, codigo],
+  }),
+
+  /** El cliente dijo NO a reprogramar: el pedido queda cancelado. */
+  reprogramacionCancelada: (nombre: string, codigo: string): PayloadAvisoReparto => ({
+    textoLibre: `Hola ${nombre}, entendemos. 💛 Tu pedido ${codigo} queda cancelado. Gracias por preferir Caprichos; cuando quieras pedir de nuevo, aquí estaremos. 😊`,
+    plantillaClave: 'DELIVERY_REPROG_CANCELADA',
+    variablesPlantilla: [nombre, codigo],
+  }),
+
+  /** No hubo respuesta a la pregunta a tiempo: el pedido queda cancelado por falta de respuesta. */
+  reprogramacionSinRespuesta: (nombre: string, codigo: string): PayloadAvisoReparto => ({
+    textoLibre: `Hola ${nombre}, no recibimos tu respuesta sobre el pedido ${codigo}, así que lo dejamos cancelado por ahora. 💛 Si quieres, escríbenos y con gusto te ayudamos a hacer uno nuevo. 😊`,
+    plantillaClave: 'DELIVERY_REPROG_SIN_RESPUESTA',
+    variablesPlantilla: [nombre, codigo],
   }),
 
   /** Pedido de la carta virtual con pago digital: el asesor gestiona el voucher por este chat. `medio` es Yape, Plin o transferencia. */
   recibidoDigital: (nombre: string, codigo: string, medio: string): PayloadAvisoReparto => ({
-    textoLibre: `Hola ${nombre}, recibimos tu pedido ${codigo} correctamente. En unos momentos un asesor se comunicara contigo por este chat para gestionar el voucher de tu pago por ${medio}.`,
+    textoLibre: `¡Hola ${nombre}! 😊 Recibimos tu pedido ${codigo}, ¡gracias! En unos momentos un asesor te escribirá por este chat para revisar el voucher de tu pago por ${medio}. 🙏`,
     plantillaClave: 'CARTA_RECIBIDO_DIGITAL',
     variablesPlantilla: [nombre, codigo, medio],
   }),
 
   /** Pedido de la carta virtual pagado en efectivo u otro medio no digital. */
   recibidoEfectivo: (nombre: string, codigo: string): PayloadAvisoReparto => ({
-    textoLibre: `Hola ${nombre}, recibimos tu pedido ${codigo}. Ya esta en proceso.`,
+    textoLibre: `¡Hola ${nombre}! 😊 Recibimos tu pedido ${codigo}, ¡gracias por tu compra! Ya está en proceso. 🙏`,
     plantillaClave: 'CARTA_RECIBIDO_EFECTIVO',
     variablesPlantilla: [nombre, codigo],
   }),
 
   entregado: (nombre: string, codigo: string): PayloadAvisoReparto => ({
-    textoLibre: `Hola ${nombre}, tu pedido ${codigo} fue entregado. Gracias por preferir Caprichos.`,
+    textoLibre: `¡Hola ${nombre}! 🎉 Tu pedido ${codigo} fue entregado. ¡Gracias por preferir Caprichos, esperamos verte pronto! 💛`,
     plantillaClave: 'DELIVERY_ENTREGADO',
     variablesPlantilla: [nombre, codigo],
   }),

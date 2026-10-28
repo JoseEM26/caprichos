@@ -5,6 +5,7 @@ import { EventosGateway } from '../../../comun/socket/eventos.gateway';
 import { Ventana24hService } from './ventana-24h.service';
 import { TareaRecordatorioPagoService } from './tarea-recordatorio-pago.service';
 import { AvisosPedidoService, NUMEROS_INTENTO } from './avisos-pedido.service';
+import { ReprogramacionService, MOTIVO_RETIRO } from './reprogramacion.service';
 import { normalizarTelefono } from '../utilidades/enmascarar.util';
 import { adquirirCandado, liberarCandado } from '../../../comun/redis/candado.util';
 
@@ -20,16 +21,15 @@ export interface ParametrosChatbot {
   repartoInsistenciaMin: number;
   repartoEsperaMaxMin: number;
   repartoRecargoReprogramacion: number;
+  /** Minutos que espera la pregunta de reprogramar antes de cancelar por falta de respuesta. */
+  reprogRespuestaMin: number;
+  /** Reprogramaciones máximas por pedido; al llegar al tope no se vuelve a preguntar. */
+  reprogMaxIntentos: number;
   encuestaEsperaMin: number;
   encuestaPuntajeQueja: number;
   tiempoPrometidoMin: number;
 }
 
-/**
- * Motivo de falla al retirar la movilidad. Debe ser un valor que admite la base (ck_incidente_entrega_motivo):
- * el cliente no salió a la puerta equivale a NO_CONTESTA; así Caja lo resuelve con el flujo de fallas existente.
- */
-const MOTIVO_RETIRO = 'NO_CONTESTA';
 
 /** Ventana de pedidos que el planificador revisa; más viejos ya no son parte de un reparto en curso. */
 const VENTANA_REVISION_MS = 24 * 60 * 60 * 1000;
@@ -42,6 +42,7 @@ export interface ResumenCicloChatbot {
   avisosAceptado: number;
   avisosRecojo: number;
   avisosEncuesta: number;
+  reprogVencidas?: number;
 }
 
 const resumenVacio = (bloqueado: boolean): ResumenCicloChatbot => ({
@@ -74,6 +75,7 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
     @Optional() private readonly eventos?: EventosGateway,
     @Optional() private readonly tareaRecordatorioPago?: TareaRecordatorioPagoService,
     @Optional() private readonly avisos?: AvisosPedidoService,
+    @Optional() private readonly reprogramacion?: ReprogramacionService,
   ) {}
 
   onModuleInit() {
@@ -117,6 +119,8 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
       'reparto_insistencia_min',
       'reparto_espera_max_min',
       'reparto_recargo_reprogramacion',
+      'reprog_respuesta_min',
+      'reprog_max_intentos',
       'encuesta_espera_min',
       'encuesta_puntaje_queja',
       'tiempo_prometido_min',
@@ -145,6 +149,8 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
       repartoInsistenciaMin: Number(mapa.get('reparto_insistencia_min') ?? 3),
       repartoEsperaMaxMin: Number(mapa.get('reparto_espera_max_min') ?? 10),
       repartoRecargoReprogramacion: Number(mapa.get('reparto_recargo_reprogramacion') ?? 0),
+      reprogRespuestaMin: Number(mapa.get('reprog_respuesta_min') ?? 30),
+      reprogMaxIntentos: Number(mapa.get('reprog_max_intentos') ?? 1),
       encuestaEsperaMin: Number(mapa.get('encuesta_espera_min') ?? 30),
       encuestaPuntajeQueja: Number(mapa.get('encuesta_puntaje_queja') ?? 2),
       tiempoPrometidoMin: Number(mapa.get('tiempo_prometido_min') ?? 30),
@@ -239,11 +245,21 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
           const retirado = await this.retirarMovilidad(p.id, p.repartidor_party_id, params.repartoRecargoReprogramacion, ahora);
           if (retirado) {
             resumen.retiros++;
-            await this.avisos?.avisar(p.id, 'RETIRO', { recargo: params.repartoRecargoReprogramacion });
+            // Tope de reprogramaciones alcanzado: no se pregunta, el pedido se cancela directo
+            const tope = this.reprogramacion
+              ? await this.reprogramacion.topeAlcanzado(p.id, params.reprogMaxIntentos)
+              : false;
+            if (tope) {
+              await this.reprogramacion?.cancelar(p.id, 'TOPE');
+            } else {
+              await this.avisos?.avisar(p.id, 'RETIRO', { recargo: params.repartoRecargoReprogramacion });
+            }
             await this.notificarEquipo(
               'RETIRO_MOVILIDAD',
               'Movilidad retirada por espera agotada',
-              `La movilidad se retiró de ${p.codigo} tras la espera máxima. El pedido quedó reprogramado en LISTO; Caja debe resolver la falla y coordinar con el cliente.`,
+              tope
+                ? `La movilidad se retiró de ${p.codigo} y se alcanzó el límite de reprogramaciones: el pedido se canceló.`
+                : `La movilidad se retiró de ${p.codigo} tras la espera máxima. Se preguntó al cliente si reprograma; si no responde en ${params.reprogRespuestaMin} min el pedido se cancela.`,
               p.id,
             );
           }
@@ -251,6 +267,15 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
         } catch (err: any) {
           // Un pedido con error no debe frenar el ciclo de los demás
           this.logger.error(`Error en avisos del pedido ${p.codigo}: ${err?.message}`, err?.stack);
+        }
+      }
+
+      // 1b. Pregunta de reprogramar sin respuesta a tiempo: cancelado por falta de respuesta
+      if (this.reprogramacion) {
+        try {
+          resumen.reprogVencidas = await this.reprogramacion.vencerSinRespuesta(params.reprogRespuestaMin, ahora);
+        } catch (err: any) {
+          this.logger.error(`Error al vencer reprogramaciones: ${err?.message}`, err?.stack);
         }
       }
 
@@ -289,7 +314,7 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
             await this.ventana24hService.enviarMensajeNegocio(
               telefono,
               {
-                textoLibre: `Hola ${nombre}, tu pedido ${p.codigo} ya esta listo para recoger en nuestro local. ¡Te esperamos!`,
+                textoLibre: `¡Hola ${nombre}! 🥳 Tu pedido ${p.codigo} ya está listo para recoger en nuestro local. ¡Te esperamos con gusto! 😊`,
                 plantillaClave: 'PEDIDO_LISTO_RECOJO',
                 variablesPlantilla: [nombre, p.codigo],
               },

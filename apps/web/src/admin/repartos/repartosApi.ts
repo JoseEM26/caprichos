@@ -44,6 +44,10 @@ export interface PedidoReparto {
   efectivo_a_rendir?: number;
   espera_min?: number | null;
   espera_agotada?: boolean;
+  /** POR_REPROGRAMAR: el cliente dijo SÍ y falta reenviar; REPROGRAMADO: ya volvió a reparto. */
+  reprogramacion?: 'POR_REPROGRAMAR' | 'REPROGRAMADO' | null;
+  /** Pedido que volvió a Para elegir tras reprogramar (marca Reprogramado). */
+  reprogramado?: boolean;
 }
 
 export interface AvisoRepartidor {
@@ -163,6 +167,9 @@ export const repartosApi = {
       `/admin/repartos/${id}/reportar`,
       dto,
     ),
+
+  reprogramarPedido: (id: string) =>
+    api.post<{ ok: boolean; pedido: any }>(`/admin/repartos/${id}/reprogramar`, {}),
 
   resolverFalla: (id: string, dto: ResolverFallaDto) =>
     api.post<{ ok: boolean; pedido: any }>(

@@ -28,6 +28,11 @@ import { IniciarRutaDto } from './dto/iniciar-ruta.dto';
 import { LiberarPedidoDto } from './dto/liberar-pedido.dto';
 import { ReasignarPedidoDto } from './dto/reasignar-pedido.dto';
 import { AvisosPedidoService } from '../chatbot/servicios/avisos-pedido.service';
+import {
+  ESTADO_REPROG,
+  MOTIVO_RETIRO,
+  NUMERO_PREGUNTA_REPROG,
+} from '../chatbot/servicios/reprogramacion.service';
 
 export type ColorEsperaReparto = 'VERDE' | 'RETRASADO' | 'TARDE' | 'MUY_TARDE';
 export type ColorEspera = 'verde' | 'naranja' | 'rojo' | ColorEsperaReparto;
@@ -344,12 +349,17 @@ export class RepartosService {
       include: {
         zona: true,
         lineas: { select: { cantidad: true } },
+        mensajesReparto: { where: { numero: NUMERO_PREGUNTA_REPROG, estado: ESTADO_REPROG.REPROGRAMADO }, select: { numero: true } },
       },
       orderBy: { creado_en: 'asc' },
     });
 
     const ahora = new Date();
-    return pedidos.map((p) => this.formatearPedidoReparto(p, config, ahora, usuario));
+    // Marca "Reprogramado": el pedido volvió a reparto tras la confirmación del cliente
+    return pedidos.map((p) => ({
+      ...this.formatearPedidoReparto(p, config, ahora, usuario),
+      reprogramado: (p.mensajesReparto?.length ?? 0) > 0,
+    }));
   }
 
   /**
@@ -541,6 +551,10 @@ export class RepartosService {
             persona: true,
           },
         },
+        mensajesReparto: {
+          where: { numero: NUMERO_PREGUNTA_REPROG, estado: { in: [ESTADO_REPROG.REPROGRAMAR, ESTADO_REPROG.REPROGRAMADO] } },
+          select: { estado: true },
+        },
       },
       orderBy: { creado_en: 'desc' },
     });
@@ -558,6 +572,13 @@ export class RepartosService {
 
       return {
         ...this.formatearPedidoReparto(p, config, ahora, usuario),
+        // POR_REPROGRAMAR: el cliente dijo SÍ y falta reenviar; REPROGRAMADO: ya volvió a reparto
+        reprogramacion:
+          p.mensajesReparto?.[0]?.estado === ESTADO_REPROG.REPROGRAMAR
+            ? 'POR_REPROGRAMAR'
+            : p.mensajesReparto?.[0]?.estado === ESTADO_REPROG.REPROGRAMADO
+              ? 'REPROGRAMADO'
+              : null,
         repartidor: p.repartidor
           ? {
               id: String(p.repartidor.id),
@@ -1364,6 +1385,60 @@ export class RepartosService {
         motivo_falla: pedidoActualizado.motivo_falla,
       },
     };
+  }
+
+  /**
+   * POST /admin/repartos/:id/reprogramar (repartos/liquidar): el admin reenvía a reparto un pedido cuyo
+   * cliente dijo SÍ a reprogramar tras el retiro. Vuelve a "Para elegir" marcado como Reprogramado
+   * (con el recargo de los parámetros) y se avisa al cliente por WhatsApp. Respeta el tope de reprogramaciones.
+   */
+  async reprogramarPedido(id: string | bigint, usuario: UsuarioAutenticado, ip?: string) {
+    const pedidoId = this.parsearId(id);
+    const pedido = await this.prisma.pedido.findUnique({
+      where: { id: pedidoId },
+      select: { id: true, estado: true, motivo_falla: true, repartidor_party_id: true },
+    });
+    if (!pedido) {
+      throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
+    }
+
+    const clave = { pedido_id_numero: { pedido_id: pedidoId, numero: NUMERO_PREGUNTA_REPROG } };
+    const solicitud = await this.prisma.mensajeReparto.findUnique({ where: clave });
+    const pendiente =
+      solicitud?.estado === ESTADO_REPROG.REPROGRAMAR &&
+      pedido.estado === 'LISTO' &&
+      pedido.motivo_falla === MOTIVO_RETIRO &&
+      pedido.repartidor_party_id == null;
+    if (!pendiente) {
+      throw new ConflictException({
+        codigo: 'SIN_SOLICITUD_REPROGRAMAR',
+        mensaje: 'El cliente no pidió reprogramar este pedido o ya fue reenviado',
+      });
+    }
+
+    const params = await this.prisma.parametro.findMany({
+      where: { clave: { in: ['reparto_recargo_reprogramacion', 'reprog_max_intentos'] } },
+    });
+    const mapa = new Map(params.map((p) => [p.clave, p.valor]));
+    const tope = Number(mapa.get('reprog_max_intentos') ?? 1);
+    const usados = await this.prisma.incidenteEntrega.count({ where: { pedido_id: pedidoId, cierre: 'REPROGRAMADO' } });
+    if (usados >= tope) {
+      throw new ConflictException({
+        codigo: 'TOPE_REPROGRAMACIONES',
+        mensaje: 'Este pedido ya alcanzó el límite de reprogramaciones',
+      });
+    }
+
+    const recargo = Number(mapa.get('reparto_recargo_reprogramacion') ?? 0);
+    const resultado = await this.resolverFalla(
+      id,
+      { nota: 'Reprogramado tras confirmación del cliente', cierre: 'REPROGRAMADO', recargo },
+      usuario,
+      ip,
+    );
+    await this.prisma.mensajeReparto.update({ where: clave, data: { estado: ESTADO_REPROG.REPROGRAMADO } });
+    await this.avisos?.avisar(pedidoId, 'REENVIADO');
+    return resultado;
   }
 
   /**
