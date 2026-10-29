@@ -6,14 +6,12 @@ import type {
   AreaCocina,
   Comanda,
   HistorialComanda,
-  PedidoDespacho,
 } from './cocinaTipos';
 import {
   despejarComanda,
   devolverComanda,
   listarAreasCocina,
   listarComandasArea,
-  listarDespacho,
   listarHistorialCocina,
   obtenerAltaDemanda,
   pedirInsumosAlmacen,
@@ -30,14 +28,13 @@ import { ModalAgotados } from './ModalAgotados';
 import { ModalMerma } from './ModalMerma';
 import { ModalPedirAlmacen } from './ModalPedirAlmacen';
 import { HistorialView } from './HistorialView';
-import { DespachoView } from './DespachoView';
 import { Confirmar } from '../../comun/Confirmar';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { useEventos } from '../../comun/socket';
 import { useSesion } from '../../comun/sesion';
 
-export type ModoCocina = 'area' | 'hist' | 'desp';
+export type ModoCocina = 'area' | 'hist';
 
 const AREAS_MOCKUP = [
   { id: 'todas', n: 'Todas' },
@@ -102,7 +99,7 @@ export function CocinaAdminView() {
   const puedeVer = tiene('cocina/ver');
   const puedeDespejar = tiene('cocina/despejar');
 
-  // Modo de pestañas: 'area' (Pantalla del área), 'hist' (Despejadas hoy), 'desp' (Despacho)
+  // Modo de pestañas: 'area' (Pantalla del área), 'hist' (Despejadas hoy)
   const [modo, setModo] = useState<ModoCocina>('area');
   const [areaActiva, setAreaActiva] = useState<string>('todas');
   const [areaSeleccionada, setAreaSeleccionada] = useState<string>('');
@@ -111,7 +108,6 @@ export function CocinaAdminView() {
   // Datos
   const [comandas, setComandas] = useState<Comanda[]>([]);
   const [historial, setHistorial] = useState<HistorialComanda[]>([]);
-  const [despacho, setDespacho] = useState<PedidoDespacho[]>([]);
   const [altaDemanda, setAltaDemanda] = useState<AltaDemandaEstado>({
     activa: false,
     minutos: 0,
@@ -177,16 +173,6 @@ export function CocinaAdminView() {
     }
   }, []);
 
-  const cargarDespacho = useCallback(async () => {
-    try {
-      setError(null);
-      const res = await listarDespacho();
-      setDespacho(res);
-    } catch (err: any) {
-      setError(err?.message || 'Error al cargar vista de despacho');
-    }
-  }, []);
-
   const cargarAltaDemanda = useCallback(async () => {
     try {
       const res = await obtenerAltaDemanda();
@@ -231,18 +217,8 @@ export function CocinaAdminView() {
       cargarComandas(areaSeleccionada);
     } else if (modo === 'hist') {
       cargarHistorial(areaSeleccionada);
-    } else if (modo === 'desp') {
-      cargarDespacho();
     }
-  }, [
-    modo,
-    areaSeleccionada,
-    cargandoInicial,
-    puedeVer,
-    cargarComandas,
-    cargarHistorial,
-    cargarDespacho,
-  ]);
+  }, [modo, areaSeleccionada, cargandoInicial, puedeVer, cargarComandas, cargarHistorial]);
 
   // Auto-cierre de mensaje de retroalimentación
   useEffect(() => {
@@ -263,20 +239,17 @@ export function CocinaAdminView() {
     reproducirCampanaCocina();
     cargarAreas();
     if (modo === 'area') cargarComandas(areaSeleccionada);
-    if (modo === 'desp') cargarDespacho();
   });
 
   useEventos('cocina:comanda', () => {
     cargarAreas();
     if (modo === 'area') cargarComandas(areaSeleccionada);
     if (modo === 'hist') cargarHistorial(areaSeleccionada);
-    if (modo === 'desp') cargarDespacho();
   });
 
   useEventos('pedido:estado', () => {
     cargarAreas();
     if (modo === 'area') cargarComandas(areaSeleccionada);
-    if (modo === 'desp') cargarDespacho();
   });
 
   useEventos('cocina:alta-demanda', (datos: AltaDemandaEstado) => {
@@ -785,7 +758,7 @@ export function CocinaAdminView() {
         </button>
       </div>
 
-      {/* 6. Selector de Pestañas: Pantalla del área / Despejadas hoy / Despacho */}
+      {/* 6. Selector de Pestañas: Pantalla del área / Despejadas hoy */}
       <div
         role="tablist"
         aria-label="Vista de cocina"
@@ -828,25 +801,6 @@ export function CocinaAdminView() {
           }}
         >
           Despejadas hoy
-        </button>
-        <button
-          role="tab"
-          aria-selected={modo === 'desp'}
-          type="button"
-          onClick={() => setModo('desp')}
-          style={{
-            minHeight: '44px',
-            padding: '0 18px',
-            borderRadius: '12px',
-            border: '1.5px solid var(--cp-navy)',
-            background: modo === 'desp' ? 'var(--cp-navy)' : 'transparent',
-            color: modo === 'desp' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-            fontWeight: 800,
-            fontSize: '13px',
-            cursor: 'pointer',
-          }}
-        >
-          Despacho
         </button>
       </div>
 
@@ -908,8 +862,6 @@ export function CocinaAdminView() {
           }}
         />
       )}
-
-      {modo === 'desp' && <DespachoView pedidos={despacho} />}
 
       {/* Floating Undo Toast (Deshacer) */}
       {undoInfo && (

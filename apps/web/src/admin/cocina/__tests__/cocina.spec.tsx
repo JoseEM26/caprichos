@@ -5,13 +5,11 @@ import { CocinaAdminView } from '../CocinaAdminView';
 import { ModalAgotados } from '../ModalAgotados';
 import { PanelAltaDemanda } from '../PanelAltaDemanda';
 import { HistorialView } from '../HistorialView';
-import { DespachoView } from '../DespachoView';
 import { PantallaCocinaView } from '../../../pantalla/PantallaCocinaView';
 import type {
   Comanda,
   AltaDemandaEstado,
   HistorialComanda,
-  PedidoDespacho,
 } from '../cocinaTipos';
 import * as cocinaApi from '../cocinaApi';
 import * as sesionModulo from '../../../comun/sesion';
@@ -405,54 +403,7 @@ describe('F5: Pantallas de Cocina', () => {
     });
   });
 
-  // 8. Vista de despacho muestra nombre del cliente y áreas
-  it('8. Despacho muestra el nombre del cliente (solo el nombre) y estado por área', () => {
-    const despachoPrueba: PedidoDespacho[] = [
-      {
-        id: '1',
-        codigo: 'CP-200',
-        ticket: 'CP-200',
-        cliente: 'Rosa Díaz',
-        cliente_nombre: 'Rosa Díaz',
-        estado: 'PREPARANDO',
-        canal: 'WEB',
-        modalidad: 'DELIVERY',
-        mesa: null,
-        creado_en: '2026-10-21T18:00:00Z',
-        listo_en: null,
-        areas: [
-          {
-            areaId: '1',
-            areaNombre: 'Bebidas',
-            despejado: true,
-            estado: 'DESPEJADA',
-            despejada_en: '2026-10-21T18:15:00Z',
-          },
-          {
-            areaId: '2',
-            areaNombre: 'Cocina',
-            despejado: false,
-            estado: 'EN_COCINA',
-            despejada_en: null,
-          },
-        ],
-        completo: false,
-        estadoDespacho: 'Pendiente',
-      },
-    ];
-
-    render(<DespachoView pedidos={despachoPrueba} />);
-
-    expect(screen.getByText('Rosa Díaz')).toBeInTheDocument();
-    expect(screen.getByText(/CP-200/)).toBeInTheDocument();
-    expect(screen.getByText('Bebidas')).toBeInTheDocument();
-    expect(screen.getByText('Despejado')).toBeInTheDocument();
-    expect(screen.getByText('Cocina')).toBeInTheDocument();
-    expect(screen.getByText('Falta despejar')).toBeInTheDocument();
-    expect(screen.getByText('Pendiente')).toBeInTheDocument();
-  });
-
-  // 9. Modo pantalla TV (/pantalla/cocina) es de solo lectura y sin datos personales
+  // 8. Modo pantalla TV (/pantalla/cocina) es de solo lectura y sin datos personales
   it('9. Pantalla TV (/pantalla/cocina) renderiza en solo lectura sin botones de acción', async () => {
     vi.spyOn(cocinaApi, 'listarAreasCocina').mockResolvedValue([
       { id: '1', nombre: 'Barra' },

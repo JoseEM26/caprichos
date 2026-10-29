@@ -6,7 +6,7 @@ permiso: cocina/ver
 roles: [ADMIN, CAJERO, COCINA]
 relacionados: [caja, almacen, stock, pantallas, supervisor-codigo]
 sugerencias:
-  - Como despacho una comanda que ya prepare
+  - Como despejo una comanda que ya prepare
   - Como pongo en pausa la cocina por alta demanda
   - Como marco un plato o ingrediente como agotado
   - Como devuelvo una comanda que despeje por error
@@ -25,14 +25,14 @@ Sistema de visualizacion y control de preparacion de comandas en tiempo real. Or
 6. Cada tarjeta lleva una franja con una casilla por area del pedido: marcada cuando esa area ya despejo, en blanco cuando falta. El area de la pantalla va resaltada.
 7. En la pestana Todas, cada pedido aparece una sola vez, con sus productos agrupados por area. Desde Todas no se despeja: despejar se hace en la pantalla de cada area.
 8. Si el area propia ya despejo, la tarjeta se marca como lista con el aviso "Tu area ya esta lista, falta: <areas pendientes>" y ya no tiene el boton Despejar.
-9. Cuando todas las areas del pedido han despejado, el pedido sale de las pantallas de cocina y pasa a listo para [[repartos]].
+9. Cuando todas las areas del pedido han despejado, el pedido pasa a LISTO y sale de las pantallas de cocina. Cocina no tiene mas pasos: el mozo recibe el aviso y lleva el pedido a la mesa; en delivery o para llevar sigue el flujo de [[repartos]].
 Antes: [[caja]]
 Despues: [[repartos]]
 Ver tambien: [[pantallas]]
 
 ## Como se hace: Devolver una comanda despejada por error
 1. Ir a la pestana Despejadas hoy en la barra superior.
-2. Ubicar la comanda en la lista de despachos recientes.
+2. Ubicar la comanda en la lista de despejadas de hoy.
 3. Pulsar el boton Devolver a cocina.
 4. La comanda volvera de inmediato a la pantalla activa conservando su tiempo transcurrido original.
 Ver tambien: [[caja]]
@@ -63,7 +63,7 @@ Ver tambien: [[stock]]
 ## Errores y dudas comunes
 - Las tarjetas cambian de color segun el tiempo de espera: verde (tiempo optimo), amarillo (alerta de preparacion) y rojo (pedido retrasado con mas de 13 minutos).
 - Para silenciar o activar la campana de alerta sonora de nuevos pedidos, pulsar el icono de campana junto a las pestanas.
-- Si una orden tiene platos de varias areas, cada area debe despejar su parte de forma independiente antes del despacho final.
+- Si una orden tiene platos de varias areas, cada area debe despejar su parte de forma independiente antes de que el pedido pase a LISTO.
 - Las comandas que ya despejo tu area no cuentan en el contador de pendientes ni disparan la alerta: solo se muestran para seguimiento hasta que las demas areas terminen.
 
 ## Quien puede hacerlo

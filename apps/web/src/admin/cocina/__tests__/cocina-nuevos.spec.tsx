@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import {
   CocinaAdminView,
@@ -204,6 +204,33 @@ describe('coc-pantalla: Nuevos requerimientos de pantalla de cocina', () => {
     expect(
       screen.getByText(/Marca un producto, sabor u opción que se acabó hoy/i),
     ).toBeInTheDocument();
+  });
+
+  // Sin pestaña Despacho: cocina solo muestra lo suyo (Pantalla del área y Despejadas hoy)
+  it('g) La vista de cocina tiene solo las pestañas Pantalla del área y Despejadas hoy', async () => {
+    vi.spyOn(cocinaApi, 'listarAreasCocina').mockResolvedValue([
+      { id: '1', nombre: 'Bebidas', comandasPendientes: 0 },
+    ]);
+    vi.spyOn(cocinaApi, 'listarComandasArea').mockResolvedValue([]);
+    vi.spyOn(cocinaApi, 'obtenerAltaDemanda').mockResolvedValue({
+      activa: false,
+      minutos: 0,
+      pausa: false,
+    });
+
+    render(
+      <BrowserRouter>
+        <CocinaAdminView />
+      </BrowserRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByText(/Cargando pantalla/i)).not.toBeInTheDocument();
+    });
+
+    const pestanas = within(screen.getByRole('tablist', { name: 'Vista de cocina' })).getAllByRole('tab');
+    expect(pestanas.map((t) => t.textContent)).toEqual(['Pantalla del área', 'Despejadas hoy']);
+    expect(screen.queryByRole('tab', { name: /Despacho/i })).not.toBeInTheDocument();
   });
 
   // 5. Pestaña «Despejadas hoy» y reordenamiento al devolver

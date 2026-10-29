@@ -8,7 +8,6 @@ import type {
   HistorialComanda,
   InsumoExistenciaCocina,
   ItemCartaBuscable,
-  PedidoDespacho,
   PedidoInternoItem,
   TipoAgotado,
   TrasladoItem,
@@ -46,10 +45,6 @@ export async function devolverComanda(
   return api.post<{ ok: boolean }>(
     `/admin/cocina/comandas/${encodeURIComponent(pedidoId)}/${encodeURIComponent(areaId)}/devolver`,
   );
-}
-
-export async function listarDespacho(): Promise<PedidoDespacho[]> {
-  return api.get<PedidoDespacho[]>('/admin/cocina/despacho');
 }
 
 export async function listarAgotados(): Promise<AgotadoItem[]> {

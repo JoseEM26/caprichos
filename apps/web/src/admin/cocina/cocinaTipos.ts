@@ -73,31 +73,6 @@ export interface HistorialComanda {
   lineas: LineaComanda[];
 }
 
-export interface AreaDespacho {
-  areaId: string;
-  areaNombre: string;
-  despejado: boolean;
-  estado: string;
-  despejada_en: string | null;
-}
-
-export interface PedidoDespacho {
-  id: string;
-  codigo: string;
-  ticket: string;
-  cliente: string | null;
-  cliente_nombre?: string | null;
-  estado: string;
-  canal: string;
-  modalidad: string;
-  mesa?: string | null;
-  creado_en: string;
-  listo_en: string | null;
-  areas: AreaDespacho[];
-  completo: boolean;
-  estadoDespacho: string;
-}
-
 export type TipoAgotado = 'PRODUCTO' | 'SABOR' | 'OPCION';
 export type DuracionAgotado = 'HOY' | 'HASTA_REACTIVAR';
 

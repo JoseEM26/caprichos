@@ -69,12 +69,6 @@ export class CocinaController {
     return this.comandasService.devolver(pedidoId, areaId, req.usuario, ip);
   }
 
-  @Get('despacho')
-  @Permiso('cocina', 'ver')
-  async despacho() {
-    return this.comandasService.despacho();
-  }
-
   @Get('agotados')
   @Permiso('cocina', 'ver')
   async listarAgotados() {

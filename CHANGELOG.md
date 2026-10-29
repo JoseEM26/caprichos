@@ -4,6 +4,11 @@ Todos los cambios notables del proyecto Caprichos se documentan en este archivo.
 
 ---
 
+## 2026-10-29
+
+### Cocina: se quita la pestaña Despacho
+- Cuando cocina despeja, el pedido pasa a LISTO y el mozo lo recibe por su aviso; no hay aceptación ni paso de despacho. Se quitan la pestaña «Despacho», `GET /admin/cocina/despacho` y su servicio. «Despejadas hoy» queda como la vista de lo terminado.
+
 ## 2026-10-28
 
 ### Mi perfil: el usuario edita su nombre, correo y foto con confirmación

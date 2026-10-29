@@ -69,9 +69,10 @@ export function HistorialView({
       }}
     >
       <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
-        Lo despejado hoy en {nombreAreaActual || 'esta área'}, con la hora en que
-        llegó y en que se despejó. Si se despejó por error, devuélvelo a la
-        pantalla.
+        Lo que cocina ya despejó hoy en {nombreAreaActual || 'esta área'}, con la
+        hora en que llegó y en que se despejó. Aquí no hay nada que aceptar: el
+        pedido pasa a listo cuando todas sus áreas despejan y el mozo o reparto
+        lo recoge. Si se despejó por error, devuélvelo a la pantalla.
       </div>
 
       {error && <EstadoError mensaje={error} alReintentar={alReintentar} />}

@@ -34,7 +34,6 @@ describe('CocinaController', () => {
       despejar: jest.fn().mockResolvedValue({ ok: true }),
       historial: jest.fn().mockResolvedValue([]),
       devolver: jest.fn().mockResolvedValue({ ok: true }),
-      despacho: jest.fn().mockResolvedValue([]),
     };
 
     agotadosService = {
@@ -94,11 +93,6 @@ describe('CocinaController', () => {
     const req = { usuario: { partyId: 1n, rol: 'COCINA' } };
     await controller.devolverComanda('10', '1', req);
     expect(comandasService.devolver).toHaveBeenCalledWith('10', '1', req.usuario, undefined);
-  });
-
-  it('GET /admin/cocina/despacho delega a comandasService.despacho', async () => {
-    await controller.despacho();
-    expect(comandasService.despacho).toHaveBeenCalled();
   });
 
   it('GET /admin/cocina/agotados delega a agotadosService.listar', async () => {
