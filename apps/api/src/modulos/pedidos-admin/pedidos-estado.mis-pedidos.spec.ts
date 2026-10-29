@@ -36,6 +36,21 @@ describe('PedidosEstadoService.misPedidos', () => {
     jest.useRealTimers();
   });
 
+  it('vouchersPorMedio: pedido sin plan con pago YAPE y voucher sin medio (Caja/WhatsApp) cuenta como subido', async () => {
+    prisma.pedido.findMany.mockResolvedValueOnce([
+      pedido({
+        pago_metodo: 'YAPE',
+        total: '25.00',
+        planPago: [],
+        vouchers: [{ id: 5n, semaforo: 'CONFIABLE', medio: null, reemplazado_en: null }],
+      }),
+      pedido({ id: 2n, pago_metodo: 'YAPE', total: '25.00', planPago: [], vouchers: [] }),
+    ]);
+    const res = await service.misPedidos(mozo);
+    expect(res.pedidos[0].vouchersPorMedio).toEqual([{ medio: 'YAPE', monto: 25, subido: true, voucherId: '5' }]);
+    expect(res.pedidos[1].vouchersPorMedio).toEqual([{ medio: 'YAPE', monto: 25, subido: false, voucherId: null }]);
+  });
+
   it('solo consulta pedidos del mozo: canal MOZO y su party_id', async () => {
     await service.misPedidos(mozo);
 

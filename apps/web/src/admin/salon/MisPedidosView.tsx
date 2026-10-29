@@ -414,6 +414,9 @@ export function MisPedidosView() {
           total={cuentaPedido.total}
           plan={cuentaPedido.plan}
           pedidoId={cuentaPedido.id}
+          pagoMetodo={cuentaPedido.pagoMetodo}
+          vouchersPorMedio={cuentaPedido.vouchersPorMedio}
+          puedeCambiarVoucher={cuentaPedido.puedeCambiarVoucher}
         />
       )}
 

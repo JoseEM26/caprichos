@@ -655,7 +655,8 @@ export class VouchersService {
     } else {
       const etiqueta = desglose ?? medioNormalizado;
       const ultimo = await this.prisma.voucherPago.findFirst({
-        where: { pedido_id: id, reemplazado_en: null },
+        // Un voucher vigente y legible (subido por el mozo, Caja o WhatsApp) ya cubre el aviso
+        where: { pedido_id: id, reemplazado_en: null, semaforo: { not: 'ILEGIBLE' } },
         orderBy: { creado_en: 'desc' },
         select: { semaforo: true },
       });

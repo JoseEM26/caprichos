@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import '../salon.css';
 import '../precuenta.css';
 import { Confirmar } from '../../../comun/Confirmar';
@@ -42,14 +42,24 @@ export interface ModalPrecuentaProps {
   alImprimir?: () => Promise<void> | void;
   /** Con pedido, el mozo puede enviar el cobro a Caja (no lo cobra él). */
   pedidoId?: string | number;
+  /** Medio con el que se creó el pedido: sin plan guardado, la precuenta arranca con este medio. */
+  pagoMetodo?: string | null;
+  /** Vouchers ya subidos por medio (mozo, Caja o WhatsApp): no se vuelven a pedir. */
+  vouchersPorMedio?: Array<{ medio: string; monto: number; subido: boolean; voucherId?: string | null }>;
+  /** Si el mozo aún puede reemplazar un voucher ya subido. */
+  puedeCambiarVoucher?: boolean;
 }
 
-/** Filas iniciales: el plan que ya tiene el pedido, o todo en efectivo por el total. */
-const filasIniciales = (plan: ModalPrecuentaProps['plan'], total: number): FilaPlan[] => {
+const DIGITALES = ['YAPE', 'PLIN', 'TRANSFERENCIA'];
+
+/** Filas iniciales: el plan guardado; sin plan, el medio del pedido (si es digital) o efectivo, por el total. */
+const filasIniciales = (plan: ModalPrecuentaProps['plan'], total: number, pagoMetodo?: string | null): FilaPlan[] => {
   const guardadas = (plan ?? [])
     .filter((f) => Number(f.monto) > 0 && MEDIOS_PLAN.some((m) => m.id === f.medio))
     .map((f) => ({ medio: f.medio as MedioPlan, monto: Number(f.monto).toFixed(2) }));
-  return guardadas.length > 0 ? guardadas : planInicial('EFECTIVO', total);
+  if (guardadas.length > 0) return guardadas;
+  const m = String(pagoMetodo ?? '').toUpperCase();
+  return planInicial(DIGITALES.includes(m) ? (m as MedioPlan) : 'EFECTIVO', total);
 };
 
 const soles = (n: number | string | null | undefined) => `S/ ${Number(n || 0).toFixed(2)}`;
@@ -70,16 +80,43 @@ export function ModalPrecuenta({
   copias = 0,
   alImprimir,
   pedidoId,
+  pagoMetodo,
+  vouchersPorMedio,
+  puedeCambiarVoucher = false,
 }: ModalPrecuentaProps) {
   const [confirmarImprimir, setConfirmarImprimir] = useState(false);
   const [imprimiendo, setImprimiendo] = useState(false);
   const [copiasLocales, setCopiasLocales] = useState(copias);
 
   // Envío del cobro a Caja: el mozo reparte el pago (uno o varios medios) y, si hay parte digital, puede subir el voucher
-  const [filas, setFilas] = useState<FilaPlan[]>(() => filasIniciales(plan, total));
+  const [filas, setFilas] = useState<FilaPlan[]>(() => filasIniciales(plan, total, pagoMetodo));
   const [pagaCon, setPagaCon] = useState<string>('');
   // Una captura por medio digital del plan: si cada una se lee
-  const [legibles, setLegibles] = useState<Record<string, boolean>>({});
+  const [legibles, setLegibles] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries((vouchersPorMedio ?? []).filter((v) => v.subido).map((v) => [v.medio, true])),
+  );
+  // Vouchers ya subidos: de la prop o, si el llamador no los informa, del historial del pedido
+  const [vpm, setVpm] = useState(vouchersPorMedio);
+  useEffect(() => {
+    if (vouchersPorMedio !== undefined || pedidoId === undefined || !abierto) return;
+    let vivo = true;
+    Promise.resolve()
+      .then(() => vouchersApi.historialPedido(pedidoId))
+      .then((r) => {
+        const vigentes = (r?.items ?? []).filter((v) => v.estado === 'VIGENTE' && v.legible);
+        // Un voucher sin medio (Caja o WhatsApp) cubre cualquier medio digital
+        const medios = vigentes.some((v) => !v.medio) ? DIGITALES : vigentes.map((v) => v.medio as string);
+        if (!vivo || medios.length === 0) return;
+        setVpm(medios.map((medio) => ({ medio, monto: 0, subido: true })));
+        setLegibles((prev) => ({ ...prev, ...Object.fromEntries(medios.map((m) => [m, true])) }));
+      })
+      .catch(() => undefined);
+    return () => {
+      vivo = false;
+    };
+  }, [abierto, pedidoId, vouchersPorMedio]);
+  // Medios cuyo voucher el mozo decidió reemplazar (muestra el selector en vez de la línea verde)
+  const [cambiando, setCambiando] = useState<Record<string, boolean>>({});
   const [confirmarEnvio, setConfirmarEnvio] = useState<boolean>(false);
   const [enviando, setEnviando] = useState<boolean>(false);
   const [enviado, setEnviado] = useState<boolean>(false);
@@ -100,6 +137,7 @@ export function ModalPrecuenta({
   const digitalesPlan = planEnvio.filter((f) => ['YAPE', 'PLIN', 'TRANSFERENCIA'].includes(f.medio) && f.monto > 0);
   const faltanVouchers = digitalesPlan.filter((f) => legibles[f.medio] !== true).map((f) => nombreMedio(f.medio));
   const voucherOk = hayDigital && faltanVouchers.length === 0;
+  const subidoAntes = (medio: string) => (vpm ?? []).some((v) => v.medio === medio && v.subido);
   // El plan se guarda antes de cada captura: el servidor compara contra el monto de ese medio
   const guardarPlan = async () => {
     if (pedidoId !== undefined) await vouchersApi.guardarPlanPago(pedidoId, planEnvio as PlanPagoItem[]);
@@ -139,7 +177,7 @@ export function ModalPrecuenta({
     `Caja cobrará S/ ${Number(total || 0).toFixed(2)} (${desgloseEnvio}).`,
     hayDigital
       ? voucherOk
-        ? `Caja revisará las fotos de los vouchers (${digitalesPlan.map((f) => nombreMedio(f.medio)).join(', ')}).`
+        ? `Caja revisará los vouchers ya subidos (${digitalesPlan.map((f) => nombreMedio(f.medio)).join(', ')}).`
         : `Falta foto legible de ${faltanVouchers.join(', ')}: Caja pedirá la foto o resolverá el cobro.`
       : null,
     'Tú no cierras el cobro.',
@@ -230,23 +268,49 @@ export function ModalPrecuenta({
                 )}
 
                 {/* Digital: la foto se lee al instante; el mozo solo ve si se lee o no. Opcional: se puede subir después */}
-                {digitalesPlan.map((f) => (
-                  <div key={f.medio} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <div className="pc-nota-envio">
-                      Voucher {nombreMedio(f.medio)} por S/ {f.monto.toFixed(2)}
+                {digitalesPlan.map((f) => {
+                  const yaSubido = subidoAntes(f.medio) && legibles[f.medio] === true && !cambiando[f.medio];
+                  return (
+                    <div key={f.medio} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div className="pc-nota-envio">
+                        Voucher {nombreMedio(f.medio)} por S/ {f.monto.toFixed(2)}
+                      </div>
+                      {yaSubido ? (
+                        <>
+                          <div
+                            role="status"
+                            data-testid={`voucher-ya-subido-${f.medio}`}
+                            style={{ color: 'var(--cp-ok, #1b7f3b)', fontWeight: 600 }}
+                          >
+                            Voucher de {nombreMedio(f.medio)} ya subido
+                          </div>
+                          {puedeCambiarVoucher && !enviado && (
+                            <button
+                              type="button"
+                              data-testid={`btn-cambiar-voucher-${f.medio}`}
+                              className="pc-btn pc-btn-secundario"
+                              style={{ minHeight: 44 }}
+                              onClick={() => setCambiando((prev) => ({ ...prev, [f.medio]: true }))}
+                            >
+                              Cambiar voucher
+                            </button>
+                          )}
+                        </>
+                      ) : (
+                        <SubirVoucherMozo
+                          pedidoId={pedidoId}
+                          medio={f.medio as 'YAPE' | 'PLIN' | 'TRANSFERENCIA'}
+                          bloqueado={enviado}
+                          opcional
+                          antesDeSubir={guardarPlan}
+                          quitable
+                          alQuitado={() => setLegibles((prev) => ({ ...prev, [f.medio]: false }))}
+                          alVoucherValido={(info) => setLegibles((prev) => ({ ...prev, [f.medio]: info.legible }))}
+                        />
+                      )}
                     </div>
-                    <SubirVoucherMozo
-                      pedidoId={pedidoId}
-                      medio={f.medio as 'YAPE' | 'PLIN' | 'TRANSFERENCIA'}
-                      bloqueado={enviado}
-                      opcional
-                      antesDeSubir={guardarPlan}
-                      quitable
-                      alQuitado={() => setLegibles((prev) => ({ ...prev, [f.medio]: false }))}
-                      alVoucherValido={(info) => setLegibles((prev) => ({ ...prev, [f.medio]: info.legible }))}
-                    />
-                  </div>
-                ))}
+                  );
+                })}
 
                 {!hayDigital && (
                   <div data-testid="aviso-efectivo-caja" className="pc-nota-envio">
@@ -256,6 +320,9 @@ export function ModalPrecuenta({
 
                 {hayDigital && !voucherOk && (
                   <div className="pc-nota-envio">Si no hay foto o no se lee, Caja lo revisa y resuelve el cobro.</div>
+                )}
+                {voucherOk && digitalesPlan.every((f) => subidoAntes(f.medio)) && (
+                  <div className="pc-nota-envio">Caja revisará los vouchers ya subidos.</div>
                 )}
 
                 {!enviado && (
