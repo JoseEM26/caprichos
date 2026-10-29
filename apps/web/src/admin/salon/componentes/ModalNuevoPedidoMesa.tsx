@@ -12,6 +12,7 @@ import { VentanaOpcionesProducto, ProductoConfigurado } from './VentanaOpcionesP
 import { ModalLiberarMesa } from './ModalLiberarMesa';
 import { calcularEnvioFinal, reglaEnvioGratis } from '@caprichos/compartido';
 import { salonApi } from '../api';
+import '../salon.css';
 import { pedidosApi } from '../../pedidos/pedidosApi';
 import { listarPersonalActivo, ColaboradorActivo as PersonalItem } from '../../creditos/creditosApi';
 
@@ -641,6 +642,7 @@ export function ModalNuevoPedidoMesa({
         role="dialog"
         aria-modal="true"
         aria-label="Nuevo pedido de mesa"
+        className="salon-overlay salon-pantalla"
         style={{
           position: 'fixed',
           inset: 0,
@@ -666,6 +668,7 @@ export function ModalNuevoPedidoMesa({
 
         {/* Contenedor Modal */}
         <div
+          className="salon-panel"
           style={{
             position: 'relative',
             zIndex: 60,
@@ -1203,7 +1206,7 @@ export function ModalNuevoPedidoMesa({
 
               {/* Selector de piso si hay más de 1 */}
               {pisosActivos.length > 1 && (
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <div className="salon-pisos" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   {pisosActivos.map((f) => (
                     <button
                       key={f.id}
@@ -2456,6 +2459,7 @@ export function ModalNuevoPedidoMesa({
                     (modalidad === 'local' && mesasSeleccionadas.length === 0)
                   }
                   onClick={() => setConfirmarEnviar(true)}
+                  className="salon-pie-fijo"
                   aria-label={
                     modalidad === 'local' ? 'Enviar directo a cocina' : 'Registrar pedido'
                   }

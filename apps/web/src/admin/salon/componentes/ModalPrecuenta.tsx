@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import '../salon.css';
 import { Confirmar } from '../../../comun/Confirmar';
 import { SubirVoucherMozo } from '../../vouchers/SubirVoucherMozo';
 import { vouchersApi } from '../../vouchers/vouchersApi';
@@ -98,6 +99,7 @@ export function ModalPrecuenta({
         role="dialog"
         aria-modal="true"
         aria-label="Precuenta"
+        className="salon-overlay"
         style={{
           position: 'fixed',
           inset: 0,
@@ -120,6 +122,7 @@ export function ModalPrecuenta({
           }}
         />
         <div
+          className="salon-panel"
           style={{
             position: 'relative',
             zIndex: 60,

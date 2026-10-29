@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import '../salon.css';
 import {
   ProductoCarta,
   TamanoCarta as TamanoProducto,
@@ -223,6 +224,7 @@ export function VentanaOpcionesProducto({
       role="dialog"
       aria-modal="true"
       aria-label="Opciones del producto"
+      className="salon-overlay"
       style={{
         position: 'fixed',
         inset: 0,
@@ -245,6 +247,7 @@ export function VentanaOpcionesProducto({
 
       {/* Modal */}
       <div
+        className="salon-panel"
         style={{
           position: 'relative',
           zIndex: 70,
@@ -784,6 +787,7 @@ export function VentanaOpcionesProducto({
 
         {/* Pie: Stepper de cantidad y Botón Agregar */}
         <div
+          className="salon-pie-fijo"
           style={{
             display: 'flex',
             alignItems: 'center',

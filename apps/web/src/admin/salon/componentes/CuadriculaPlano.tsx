@@ -1,5 +1,6 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ElementoPlano, MesaSalon } from '../tipos';
+import '../salon.css';
 
 export interface CuadriculaPlanoProps {
   columnas: number;
@@ -125,8 +126,30 @@ export function CuadriculaPlano({
     activo: boolean;
   } | null>(null);
 
+  // Zoom: por defecto la cuadrícula cabe en el ancho disponible (celular);
+  // con los botones - y + se acerca o aleja, y el lienzo se desplaza con el dedo.
+  const [escalaManual, setEscalaManual] = useState<number | null>(null);
+  const [anchoDisponible, setAnchoDisponible] = useState(0);
+  const envolturaRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = envolturaRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const observador = new ResizeObserver(([entrada]) =>
+      setAnchoDisponible(entrada.contentRect.width),
+    );
+    observador.observe(el);
+    return () => observador.disconnect();
+  }, []);
+
+  const escalaAjustada =
+    anchoDisponible > 0
+      ? Math.min(1, Math.max(0.4, (anchoDisponible - 28) / (columnas * 38)))
+      : 1;
+  const escala = escalaManual ?? escalaAjustada;
+
   // Tamaño de celda en píxeles (base para renderizar cuadrícula)
-  const celdaTamanoPx = 38;
+  const celdaTamanoPx = Math.round(38 * escala);
 
   const anchoTotal = columnas * celdaTamanoPx;
   const altoTotal = filas * celdaTamanoPx;
@@ -239,7 +262,69 @@ export function CuadriculaPlano({
   };
 
   return (
+    <div ref={envolturaRef} style={{ width: '100%', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      <div className="salon-zoom" style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          aria-label="Alejar plano"
+          disabled={escala <= 0.5}
+          onClick={() => setEscalaManual(Math.max(0.5, Math.round((escala - 0.25) * 100) / 100))}
+          style={{
+            minHeight: '34px',
+            minWidth: '34px',
+            borderRadius: '9999px',
+            border: '1.5px solid var(--cp-navy)',
+            background: 'transparent',
+            color: 'var(--cp-navy)',
+            fontWeight: 800,
+            cursor: escala <= 0.5 ? 'default' : 'pointer',
+          }}
+        >
+          −
+        </button>
+        <span style={{ minWidth: '44px', textAlign: 'center', fontWeight: 800, fontSize: '12px', color: 'var(--cp-navy)' }}>
+          {Math.round(escala * 100)}%
+        </span>
+        <button
+          type="button"
+          aria-label="Acercar plano"
+          disabled={escala >= 2}
+          onClick={() => setEscalaManual(Math.min(2, Math.round((escala + 0.25) * 100) / 100))}
+          style={{
+            minHeight: '34px',
+            minWidth: '34px',
+            borderRadius: '9999px',
+            border: '1.5px solid var(--cp-navy)',
+            background: 'transparent',
+            color: 'var(--cp-navy)',
+            fontWeight: 800,
+            cursor: escala >= 2 ? 'default' : 'pointer',
+          }}
+        >
+          +
+        </button>
+        {escalaManual !== null && (
+          <button
+            type="button"
+            onClick={() => setEscalaManual(null)}
+            style={{
+              minHeight: '34px',
+              padding: '0 12px',
+              borderRadius: '9999px',
+              border: '1.5px solid var(--cp-navy)',
+              background: 'transparent',
+              color: 'var(--cp-navy)',
+              fontWeight: 700,
+              fontSize: '12px',
+              cursor: 'pointer',
+            }}
+          >
+            Ajustar al ancho
+          </button>
+        )}
+      </div>
     <div
+      className="salon-lienzo"
       style={{
         width: '100%',
         overflow: 'auto',
@@ -249,7 +334,8 @@ export function CuadriculaPlano({
         background: 'var(--cp-cream)',
         borderRadius: '16px',
         border: '1px solid var(--cp-line)',
-        touchAction: 'none',
+        // Tocar el fondo desplaza el lienzo; cada elemento mantiene el arrastre (ver abajo)
+        touchAction: 'pan-x pan-y',
         userSelect: 'none',
       }}
     >
@@ -270,6 +356,9 @@ export function CuadriculaPlano({
           border: '1.5px solid var(--cp-line)',
           borderRadius: '8px',
           boxShadow: '0 4px 12px rgba(11, 44, 62, 0.05)',
+          // margen automático: si la cuadrícula es más ancha, se puede desplazar hasta el borde izquierdo
+          margin: 'auto',
+          flex: '0 0 auto',
           cursor: herramientaActiva ? 'crosshair' : 'default',
         }}
       >
@@ -317,6 +406,7 @@ export function CuadriculaPlano({
             <div
               key={elem.id}
               data-testid={`elemento-plano-${elem.id}`}
+              className="salon-celda"
               onPointerDown={(e) => handlePointerDown(e, elem)}
               onClick={(e) => {
                 e.stopPropagation();
@@ -345,6 +435,8 @@ export function CuadriculaPlano({
                 fontSize: '11px',
                 fontWeight: 700,
                 textAlign: 'center',
+                // En modo edición el elemento se arrastra con el dedo (no desplaza el lienzo)
+                touchAction: modoSalon ? undefined : 'none',
                 cursor: modoSalon
                   ? esMesa
                     ? 'pointer'
@@ -455,6 +547,7 @@ export function CuadriculaPlano({
           );
         })}
       </div>
+    </div>
     </div>
   );
 }

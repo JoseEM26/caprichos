@@ -8,6 +8,7 @@ import { ModalNuevoPedidoMesa } from './componentes/ModalNuevoPedidoMesa';
 import { ModalPrecuenta } from './componentes/ModalPrecuenta';
 import { useSalonSocket } from './useSalonSocket';
 import { salonApi } from './api';
+import './salon.css';
 
 export const EL_CONFIG: Record<
   string,
@@ -69,6 +70,9 @@ export function PlanoView() {
   const [cargando, setCargando] = useState(true);
   const [errorGlobal, setErrorGlobal] = useState<string | null>(null);
   const [dimNote, setDimNote] = useState<string | null>(null);
+
+  // Zoom del plano (1 = ancho de la pantalla); el lienzo se desplaza con el dedo
+  const [zoomPlano, setZoomPlano] = useState(1);
 
   // Cargar datos
   const cargarDatos = useCallback(async () => {
@@ -416,11 +420,14 @@ export function PlanoView() {
 
   return (
     <div
+      className={`salon-raiz${elementoSeleccionado ? ' salon-con-hoja' : ''}`}
       style={{
         display: 'flex',
         flexDirection: 'column',
         gap: '14px',
         width: '100%',
+        minWidth: 0,
+        maxWidth: '100%',
       }}
     >
       {/* Toast de aviso en vivo de Socket.IO (salon:listo) */}
@@ -655,7 +662,7 @@ export function PlanoView() {
               justifyContent: 'space-between',
             }}
           >
-            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div className="salon-pisos" style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
               <span
                 style={{
                   fontSize: '12px',
@@ -742,8 +749,74 @@ export function PlanoView() {
             </div>
           )}
 
+          {/* Zoom del plano: en celular se desplaza el lienzo con el dedo */}
+          <div className="salon-zoom" style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>Zoom</span>
+            <button
+              type="button"
+              aria-label="Alejar plano"
+              disabled={zoomPlano <= 1}
+              onClick={() => setZoomPlano((z) => Math.max(1, Math.round((z - 0.25) * 100) / 100))}
+              style={{
+                minHeight: '34px',
+                minWidth: '34px',
+                borderRadius: '9999px',
+                border: '1.5px solid var(--cp-navy)',
+                background: 'transparent',
+                color: 'var(--cp-navy)',
+                fontWeight: 800,
+                cursor: zoomPlano <= 1 ? 'default' : 'pointer',
+                opacity: zoomPlano <= 1 ? 0.5 : 1,
+              }}
+            >
+              −
+            </button>
+            <span style={{ minWidth: '44px', textAlign: 'center', fontWeight: 800, fontSize: '12px' }}>
+              {Math.round(zoomPlano * 100)}%
+            </span>
+            <button
+              type="button"
+              aria-label="Acercar plano"
+              disabled={zoomPlano >= 3}
+              onClick={() => setZoomPlano((z) => Math.min(3, Math.round((z + 0.25) * 100) / 100))}
+              style={{
+                minHeight: '34px',
+                minWidth: '34px',
+                borderRadius: '9999px',
+                border: '1.5px solid var(--cp-navy)',
+                background: 'transparent',
+                color: 'var(--cp-navy)',
+                fontWeight: 800,
+                cursor: zoomPlano >= 3 ? 'default' : 'pointer',
+                opacity: zoomPlano >= 3 ? 0.5 : 1,
+              }}
+            >
+              +
+            </button>
+            {zoomPlano !== 1 && (
+              <button
+                type="button"
+                onClick={() => setZoomPlano(1)}
+                style={{
+                  minHeight: '34px',
+                  padding: '0 12px',
+                  borderRadius: '9999px',
+                  border: '1.5px solid var(--cp-navy)',
+                  background: 'transparent',
+                  color: 'var(--cp-navy)',
+                  fontWeight: 700,
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+              >
+                Ajustar al ancho
+              </button>
+            )}
+          </div>
+
           {/* Contenedor del plano con aspecto exacto del mockup */}
           <div
+            className="salon-lienzo"
             style={{
               background: 'var(--cp-cream)',
               border: '1px solid var(--cp-line)',
@@ -758,7 +831,8 @@ export function PlanoView() {
               onDrop={handleDrop}
               style={{
                 position: 'relative',
-                width: '100%',
+                width: `${zoomPlano * 100}%`,
+                minWidth: '100%',
                 aspectRatio: `${ECOLS} / ${EROWS}`,
                 boxSizing: 'border-box',
                 border: '2px solid var(--cp-navy)',
@@ -781,6 +855,7 @@ export function PlanoView() {
                   <div
                     key={e.id}
                     data-testid={`elemento-plano-${e.id}`}
+                    className="salon-celda"
                     draggable={puedeEditar}
                     onDragStart={(ev) => handleDragStart(ev, e)}
                     onClick={(ev) => {
@@ -847,7 +922,8 @@ export function PlanoView() {
             gap: '12px',
           }}
         >
-          {/* Card 1: AGREGAR AL PLANO */}
+          {/* Card 1: AGREGAR AL PLANO (solo con plano/editar) */}
+          {puedeEditar && (
           <div
             style={{
               background: 'var(--cp-white)',
@@ -923,10 +999,12 @@ export function PlanoView() {
               </div>
             ))}
           </div>
+          )}
 
-          {/* Card 2: INSPECTOR DE ELEMENTO SELECCIONADO */}
+          {/* Card 2: INSPECTOR DE ELEMENTO SELECCIONADO (en celular, hoja inferior) */}
           {elementoSeleccionado ? (
             <div
+              className="salon-inspector"
               style={{
                 background: 'var(--cp-white)',
                 border: '2px solid var(--cp-orange)',
@@ -937,18 +1015,45 @@ export function PlanoView() {
                 gap: '10px',
               }}
             >
-              <div
-                style={{
-                  fontFamily: 'Montserrat, sans-serif',
-                  fontWeight: 800,
-                  fontSize: '15px',
-                  color: 'var(--cp-rust)',
-                }}
-              >
-                {EL_CONFIG[elementoSeleccionado.tipo.toLowerCase()]?.n || elementoSeleccionado.tipo}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                <div
+                  style={{
+                    fontFamily: 'Montserrat, sans-serif',
+                    fontWeight: 800,
+                    fontSize: '15px',
+                    color: 'var(--cp-rust)',
+                  }}
+                >
+                  {EL_CONFIG[elementoSeleccionado.tipo.toLowerCase()]?.n || elementoSeleccionado.tipo}
+                </div>
+                <button
+                  type="button"
+                  className="salon-solo-movil"
+                  aria-label="Cerrar panel del elemento"
+                  onClick={() => setElementoSeleccionadoId(null)}
+                  style={{
+                    width: '44px',
+                    height: '44px',
+                    borderRadius: '22px',
+                    border: '1.5px solid var(--cp-navy)',
+                    background: 'transparent',
+                    color: 'var(--cp-navy)',
+                    fontWeight: 800,
+                    fontSize: '16px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  ×
+                </button>
               </div>
 
-              {elementoSeleccionado.tipo.toLowerCase() !== 'pared' && (
+              {!puedeEditar && (
+                <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
+                  {elementoSeleccionado.nombre || 'Sin nombre'}
+                </div>
+              )}
+
+              {puedeEditar && elementoSeleccionado.tipo.toLowerCase() !== 'pared' && (
                 <input
                   id="pl-name"
                   type="text"
@@ -974,7 +1079,7 @@ export function PlanoView() {
                 />
               )}
 
-              {elementoSeleccionado.tipo.toLowerCase() === 'mesa' && (
+              {puedeEditar && elementoSeleccionado.tipo.toLowerCase() === 'mesa' && (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                   <span style={{ fontSize: '12px', fontWeight: 700 }}>Personas</span>
                   <button
@@ -1033,6 +1138,7 @@ export function PlanoView() {
                 </span>
               )}
 
+              {puedeEditar && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                   <span style={{ fontSize: '12px', fontWeight: 700 }}>Ancho</span>
@@ -1144,7 +1250,9 @@ export function PlanoView() {
                   </button>
                 </span>
               </div>
+              )}
 
+              {puedeEditar && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
                 <button
                   type="button"
@@ -1200,6 +1308,7 @@ export function PlanoView() {
                   Eliminar
                 </button>
               </div>
+              )}
 
               {!elementoSeleccionado.activo && (
                 <div style={{ fontSize: '12px', color: 'var(--cp-rust)', fontWeight: 700 }}>
@@ -1272,7 +1381,8 @@ export function PlanoView() {
             </div>
           )}
 
-          {/* Card 3: GUARDAR O CAMBIAR EL DISEÑO */}
+          {/* Card 3: GUARDAR O CAMBIAR EL DISEÑO (solo con plano/editar) */}
+          {puedeEditar && (
           <div
             style={{
               background: 'var(--cp-white)',
@@ -1426,8 +1536,10 @@ export function PlanoView() {
               </div>
             )}
           </div>
+          )}
 
-          {/* Card 4: TAMAÑO DEL PLANO */}
+          {/* Card 4: TAMAÑO DEL PLANO (solo con plano/editar) */}
+          {puedeEditar && (
           <div
             style={{
               background: 'var(--cp-white)',
@@ -1539,6 +1651,7 @@ export function PlanoView() {
               </span>
             </div>
           </div>
+          )}
         </div>
       </div>
 

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import '../salon.css';
 import { Boton } from '../../../comun/Boton';
 import { Confirmar } from '../../../comun/Confirmar';
 import { MesaSalon } from '../tipos';
@@ -54,6 +55,7 @@ export function ModalLiberarMesa({
   return (
     <>
       <div
+        className="salon-overlay"
         style={{
           position: 'fixed',
           inset: 0,
@@ -71,6 +73,7 @@ export function ModalLiberarMesa({
           role="dialog"
           aria-modal="true"
           aria-label={`Liberar ${mesa.nombre || `Mesa ${mesa.numero}`}`}
+          className="salon-panel"
           style={{
             width: '100%',
             maxWidth: '460px',
@@ -223,6 +226,7 @@ export function ModalLiberarMesa({
 
           {/* Pie */}
           <div
+            className="salon-pie-fijo"
             style={{
               padding: '14px 24px',
               borderTop: '1px solid var(--cp-line)',
