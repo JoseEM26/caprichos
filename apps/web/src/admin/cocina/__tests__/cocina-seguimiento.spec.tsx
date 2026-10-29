@@ -34,6 +34,12 @@ const pedidoAreas = (despejadas: Record<string, boolean>) => [
   { areaId: '3', areaNombre: 'Postres', despejada: !!despejadas['3'], lineas: [linea('l3', 'Cheesecake')] },
 ];
 
+// Pedido CP-301 de dos áreas: Barra (Americano) y Cocina (Waffle), ninguna despejada
+const pedidoDosAreas = () => [
+  { areaId: '1', areaNombre: 'Barra', despejada: false, lineas: [linea('l1', 'Americano')] },
+  { areaId: '2', areaNombre: 'Cocina', despejada: false, lineas: [linea('l2', 'Waffle')] },
+];
+
 const comandaBase = (over: Partial<Comanda> = {}): Comanda => ({
   id: '301-1',
   pedidoId: '301',
@@ -256,6 +262,62 @@ describe('Cocina: seguimiento de áreas por pedido', () => {
       await waitFor(() => {
         expect(spyDespejar).toHaveBeenCalledWith('301', '1');
       });
+    });
+
+    it('pantalla completa en Todas: una boleta por pedido con sus áreas, sin Despejar', async () => {
+      const filaBarra = comandaBase({ id: '301-1', areaId: '1', areaNombre: 'Barra', lineas: [linea('l1', 'Americano')], areas: pedidoDosAreas() });
+      const filaCocina = comandaBase({ id: '301-2', areaId: '2', areaNombre: 'Cocina', lineas: [linea('l2', 'Waffle')], areas: pedidoDosAreas() });
+      vi.spyOn(cocinaApi, 'listarComandasArea').mockImplementation(async (area) =>
+        area === '' ? [filaBarra, filaCocina] : [filaBarra],
+      );
+
+      render(<CocinaAdminView />);
+      await waitFor(() => {
+        expect(screen.getByTestId('comanda-CP-301')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Todas' }));
+      fireEvent.click(screen.getByRole('button', { name: /Pantalla completa/i }));
+
+      const fs = await screen.findByTestId('pantalla-completa-cocina');
+      expect(within(fs).getAllByTestId('comanda-CP-301')).toHaveLength(1);
+      expect(within(fs).getByText('EN COCINA · 1')).toBeInTheDocument();
+      expect(within(fs).getByTestId('estado-area-1')).toBeInTheDocument();
+      expect(within(fs).getByTestId('estado-area-2')).toBeInTheDocument();
+      expect(within(fs).queryByRole('button', { name: /^Despejar$/i })).toBeNull();
+    });
+
+    it('pantalla completa en Barra y Salados: cada área ve solo sus líneas y su Despejar', async () => {
+      vi.spyOn(cocinaApi, 'listarAreasCocina').mockResolvedValue([
+        { id: '1', nombre: 'Barra', comandasPendientes: 1 },
+        { id: '2', nombre: 'Cocina', comandasPendientes: 1 },
+      ]);
+      const filaBarra = comandaBase({ id: '301-1', areaId: '1', areaNombre: 'Barra', lineas: [linea('l1', 'Americano')], areas: pedidoDosAreas() });
+      const filaCocina = comandaBase({ id: '301-2', areaId: '2', areaNombre: 'Cocina', lineas: [linea('l2', 'Waffle')], areas: pedidoDosAreas() });
+      vi.spyOn(cocinaApi, 'listarComandasArea').mockImplementation(async (area) => {
+        if (area === '2') return [filaCocina];
+        if (area === '') return [filaBarra, filaCocina];
+        return [filaBarra];
+      });
+
+      render(<CocinaAdminView />);
+      await waitFor(() => {
+        expect(screen.getByTestId('comanda-CP-301')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByRole('button', { name: /Pantalla completa/i }));
+
+      const fs = await screen.findByTestId('pantalla-completa-cocina');
+      // Barra (area inicial): solo su línea y su Despejar
+      expect(within(fs).getByText('Americano')).toBeInTheDocument();
+      expect(within(fs).queryByText('Waffle')).toBeNull();
+      expect(within(fs).getAllByRole('button', { name: /^Despejar$/i })).toHaveLength(1);
+
+      // Salados (Cocina): solo el waffle, con su propio Despejar
+      fireEvent.click(within(fs).getByRole('button', { name: 'Salados' }));
+      await waitFor(() => {
+        expect(within(fs).getByText('Waffle')).toBeInTheDocument();
+      });
+      expect(within(fs).queryByText('Americano')).toBeNull();
+      expect(within(fs).getAllByRole('button', { name: /^Despejar$/i })).toHaveLength(1);
     });
   });
 });

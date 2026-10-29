@@ -25,7 +25,7 @@ import {
   reproducirCampanaCocina,
   setSilenciado,
 } from './audioAlerta';
-import { ComandaTarjeta, LineasComanda, areasQueFaltan } from './ComandaTarjeta';
+import { ComandaTarjeta } from './ComandaTarjeta';
 import { ModalAgotados } from './ModalAgotados';
 import { ModalMerma } from './ModalMerma';
 import { ModalPedirAlmacen } from './ModalPedirAlmacen';
@@ -975,6 +975,7 @@ export function CocinaAdminView() {
       {/* Modal Pantalla Completa (kFullAbierto) */}
       {kFullAbierto && (
         <div
+          data-testid="pantalla-completa-cocina"
           style={{
             position: 'fixed',
             inset: 0,
@@ -1076,10 +1077,10 @@ export function CocinaAdminView() {
                   fontSize: '18px',
                 }}
               >
-                EN COCINA · {comandas.filter((c) => !c.despejada).length}
+                EN COCINA · {tarjetas.filter((c) => !c.despejada).length}
               </div>
 
-              {comandas.length === 0 ? (
+              {tarjetas.length === 0 ? (
                 <div style={{ fontSize: '16px', opacity: 0.8, padding: '24px 0' }}>
                   Sin pedidos para esta área.
                 </div>
@@ -1090,129 +1091,19 @@ export function CocinaAdminView() {
                     gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))',
                     gap: '16px',
                     width: '100%',
+                    alignItems: 'stretch',
                   }}
                 >
-                  {comandas.map((k) => (
-                    <div
-                      key={k.id}
-                      style={{
-                        background: 'var(--cp-cream)',
-                        color: 'var(--cp-navy)',
-                        borderRadius: '14px',
-                        padding: '16px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '10px',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontFamily: 'Montserrat, sans-serif',
-                            fontWeight: 800,
-                            fontSize: '22px',
-                          }}
-                        >
-                          {k.ticket || k.codigo}
-                          {k.cliente && (
-                            <span style={{ marginLeft: 8, fontSize: '12px', fontWeight: 600, color: 'var(--cp-soft)' }}>
-                              {k.cliente}
-                            </span>
-                          )}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: '15px',
-                            fontWeight: 800,
-                            borderRadius: '9999px',
-                            padding: '3px 12px',
-                            background:
-                              (k.minutos ?? 0) >= 50
-                                ? 'var(--cp-rust)'
-                                : (k.minutos ?? 0) >= 35
-                                ? 'var(--cp-orange)'
-                                : 'var(--cp-line)',
-                            color:
-                              (k.minutos ?? 0) >= 50
-                                ? 'var(--cp-white)'
-                                : 'var(--cp-navy)',
-                          }}
-                        >
-                          {k.minutos ?? 0} min
-                        </span>
-                      </div>
-
-                      <div
-                        style={{
-                          fontSize: '14px',
-                          fontWeight: 800,
-                          color: 'var(--cp-rust)',
-                        }}
-                      >
-                        {k.modalidad || 'Para llevar'}
-                      </div>
-
-                      {k.despejada && (
-                        <div
-                          role="status"
-                          style={{
-                            border: '1.5px solid #2F7A45',
-                            borderRadius: '8px',
-                            padding: '6px 10px',
-                            fontSize: '13px',
-                            fontWeight: 700,
-                          }}
-                        >
-                          Tu área ya está lista
-                          {areasQueFaltan(k).length > 0
-                            ? `, falta: ${areasQueFaltan(k).join(', ')}`
-                            : ''}
-                        </div>
-                      )}
-
-                      <LineasComanda comanda={k} />
-
-                      {k.nota && (
-                        <div
-                          style={{
-                            border: '1.5px dashed var(--cp-rust)',
-                            borderRadius: '8px',
-                            padding: '6px 10px',
-                            fontSize: '13px',
-                            fontWeight: 700,
-                          }}
-                        >
-                          Nota: {k.nota}
-                        </div>
-                      )}
-
-                      {puedeDespejar && !k.despejada && (
-                        <button
-                          type="button"
-                          onClick={() => setComandaParaDespejar(k)}
-                          style={{
-                            minHeight: '48px',
-                            marginTop: 'auto',
-                            border: 0,
-                            borderRadius: '12px',
-                            background: 'var(--cp-orange)',
-                            color: 'var(--cp-navy)',
-                            fontWeight: 800,
-                            fontSize: '15px',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Despejar
-                        </button>
-                      )}
-                    </div>
+                  {tarjetas.map((c) => (
+                    <ComandaTarjeta
+                      key={enTodas ? c.pedidoId : c.id}
+                      comanda={c}
+                      mostrarArea={enTodas}
+                      soloArea={!enTodas}
+                      soloLectura={enTodas}
+                      onDespejar={puedeDespejar && !enTodas ? (com) => setComandaParaDespejar(com) : undefined}
+                      despejando={despejando}
+                    />
                   ))}
                 </div>
               )}
