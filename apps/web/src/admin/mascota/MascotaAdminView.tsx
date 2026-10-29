@@ -169,8 +169,8 @@ export function MascotaAdminView() {
   const nombreTemaHoy =
     config.temas.find((t) => t.clave === aspectoHoy.tema)?.nombre ?? aspectoHoy.tema;
 
-  // Aspecto actual en la vista previa. Sin tema elegido se ve la base (lo que se edita):
-  // un tema de temporada activo pisa el gorro y haría parecer que el cambio no funciona.
+  // Aspecto actual en la vista previa. Sin tema elegido se ve la base (lo que se edita);
+  // el gorro base manda siempre, los temas solo cambian el resto.
   const aspectoPrevia = useMemo(() => {
     if (temaPreviaSeleccionado && temaPreviaSeleccionado !== 'normal') {
       const tema = config.temas.find((t) => t.clave === temaPreviaSeleccionado);

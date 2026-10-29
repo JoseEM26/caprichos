@@ -70,7 +70,7 @@ describe('MascotaService', () => {
 
       const res = await service.obtenerAspectoPublico('06-15');
       expect(res.tema).toBe('halloween');
-      expect(res.aspecto.gorro.tipo).toBe('bruja');
+      expect(res.aspecto.gorro.tipo).toBe('chef');
       expect(res.aspecto.accesorios).toEqual(['calabaza']);
     });
   });

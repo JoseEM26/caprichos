@@ -125,8 +125,8 @@ describe('Mascota Capri - resolverAspecto (función pura)', () => {
   it('aplica tema normal dentro del mismo año (Halloween)', () => {
     const resuelto = resolverAspecto(configPrueba, '10-31');
     expect(resuelto.tema).toBe('halloween');
-    expect(resuelto.aspecto.gorro.tipo).toBe('bruja');
-    expect(resuelto.aspecto.gorro.color).toBe('#4A154B');
+    expect(resuelto.aspecto.gorro.tipo).toBe('chef');
+    expect(resuelto.aspecto.gorro.color).toBe('#FBF4EC');
     expect(resuelto.aspecto.accesorios).toEqual(['calabaza']);
     // Conserva los valores base no sobreescritos
     expect(resuelto.aspecto.piel).toBe('#FFE0C2');
@@ -137,14 +137,14 @@ describe('Mascota Capri - resolverAspecto (función pura)', () => {
   it('aplica tema con rango que cruza fin de año (Año Nuevo en diciembre)', () => {
     const resuelto = resolverAspecto(configPrueba, '12-31');
     expect(resuelto.tema).toBe('ano_nuevo');
-    expect(resuelto.aspecto.gorro.tipo).toBe('sombrero');
+    expect(resuelto.aspecto.gorro.tipo).toBe('chef');
     expect(resuelto.aspecto.accesorios).toEqual(['confeti']);
   });
 
   it('aplica tema con rango que cruza fin de año (Año Nuevo en enero)', () => {
     const resuelto = resolverAspecto(configPrueba, '01-01');
     expect(resuelto.tema).toBe('ano_nuevo');
-    expect(resuelto.aspecto.gorro.tipo).toBe('sombrero');
+    expect(resuelto.aspecto.gorro.tipo).toBe('chef');
   });
 
   it('ignora temas desactivados (activo: false)', () => {
@@ -180,7 +180,7 @@ describe('Mascota Capri - resolverAspecto (función pura)', () => {
     const resuelto = resolverAspecto(configConSolapamiento, '10-31');
     // Coinciden ambos, pero 'halloween_corto' dura 6 días frente a 46 días
     expect(resuelto.tema).toBe('halloween_corto');
-    expect(resuelto.aspecto.gorro.tipo).toBe('bruja');
+    expect(resuelto.aspecto.gorro.tipo).toBe('chef');
   });
 
   it('desempata de forma determinista (primer tema en la lista) cuando la duración es idéntica', () => {
@@ -208,7 +208,7 @@ describe('Mascota Capri - resolverAspecto (función pura)', () => {
 
     const resuelto = resolverAspecto(configEmpateExacto, '10-27');
     expect(resuelto.tema).toBe('tema_a');
-    expect(resuelto.aspecto.gorro.tipo).toBe('corona');
+    expect(resuelto.aspecto.gorro.tipo).toBe('chef');
   });
 
   describe('Modo MANUAL', () => {
@@ -222,7 +222,7 @@ describe('Mascota Capri - resolverAspecto (función pura)', () => {
       // Fecha en junio (fuera de Halloween)
       const resuelto = resolverAspecto(configManual, '06-10');
       expect(resuelto.tema).toBe('halloween');
-      expect(resuelto.aspecto.gorro.tipo).toBe('bruja');
+      expect(resuelto.aspecto.gorro.tipo).toBe('chef');
     });
 
     it('retorna aspecto base si temaManual es "normal"', () => {

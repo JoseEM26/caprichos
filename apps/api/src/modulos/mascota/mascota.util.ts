@@ -118,10 +118,8 @@ export function fusionarAspecto(
       ribete: parcial.uniforme?.ribete ?? base.uniforme.ribete,
       prenda: parcial.uniforme?.prenda ?? base.uniforme.prenda,
     },
-    gorro: {
-      tipo: parcial.gorro?.tipo ?? base.gorro.tipo,
-      color: parcial.gorro?.color ?? base.gorro.color,
-    },
+    // el gorro elegido por el negocio manda siempre; los temas no lo pisan
+    gorro: { ...base.gorro },
     accesorios:
       parcial.accesorios !== undefined
         ? [...parcial.accesorios]

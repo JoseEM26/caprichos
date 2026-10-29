@@ -63,8 +63,8 @@ describe('aspectoUtils.ts', () => {
         accesorios: ['calabaza'],
       });
 
-      expect(fusionado.gorro.tipo).toBe('bruja');
-      expect(fusionado.gorro.color).toBe('#2B1B3F');
+      expect(fusionado.gorro.tipo).toBe('chef');
+      expect(fusionado.gorro.color).toBe('#FBF4EC');
       expect(fusionado.accesorios).toEqual(['calabaza']);
       expect(fusionado.piel).toBe(ASPECTO_BASE_DEFECTO.piel);
       expect(fusionado.cabello).toEqual(ASPECTO_BASE_DEFECTO.cabello);
@@ -106,8 +106,8 @@ describe('aspectoUtils.ts', () => {
     it('en modo AUTOMATICO aplica Halloween el 27 de octubre', () => {
       const res = resolverAspecto(CONFIGURACION_DEFECTO, '10-27');
       expect(res.tema).toBe('halloween');
-      expect(res.aspecto.gorro.tipo).toBe('bruja');
-      expect(res.aspecto.gorro.color).toBe('#2B1B3F');
+      expect(res.aspecto.gorro.tipo).toBe('chef');
+      expect(res.aspecto.gorro.color).toBe('#FBF4EC');
       expect(res.aspecto.uniforme.delantal).toBe('#2B1B3F');
       expect(res.aspecto.accesorios).toContain('calabaza');
       // Mantiene la piel base
@@ -117,14 +117,14 @@ describe('aspectoUtils.ts', () => {
     it('en modo AUTOMATICO aplica Navidad el 25 de diciembre', () => {
       const res = resolverAspecto(CONFIGURACION_DEFECTO, '12-25');
       expect(res.tema).toBe('navidad');
-      expect(res.aspecto.gorro.tipo).toBe('navideno');
+      expect(res.aspecto.gorro.tipo).toBe('chef');
       expect(res.aspecto.accesorios).toContain('bufanda');
     });
 
     it('en modo AUTOMATICO aplica Año Nuevo el 1 de enero', () => {
       const res = resolverAspecto(CONFIGURACION_DEFECTO, '01-01');
       expect(res.tema).toBe('ano_nuevo');
-      expect(res.aspecto.gorro.tipo).toBe('sombrero');
+      expect(res.aspecto.gorro.tipo).toBe('chef');
       expect(res.aspecto.accesorios).toContain('estrellas');
     });
 
@@ -160,7 +160,7 @@ describe('aspectoUtils.ts', () => {
 
       const res = resolverAspecto(config, '10-27');
       expect(res.tema).toBe('corto');
-      expect(res.aspecto.gorro.tipo).toBe('bruja');
+      expect(res.aspecto.gorro.tipo).toBe('chef');
     });
 
     it('en modo MANUAL respeta temaManual y tema normal', () => {
@@ -174,7 +174,7 @@ describe('aspectoUtils.ts', () => {
       // Aunque la fecha sea 10-27, en manual debe mostrar navidad
       const resNavidad = resolverAspecto(configManual, '10-27');
       expect(resNavidad.tema).toBe('navidad');
-      expect(resNavidad.aspecto.gorro.tipo).toBe('navideno');
+      expect(resNavidad.aspecto.gorro.tipo).toBe('chef');
 
       // Si temaManual es normal, devuelve base
       const resNormal = resolverAspecto({ ...configManual, temaManual: 'normal' }, '10-27');

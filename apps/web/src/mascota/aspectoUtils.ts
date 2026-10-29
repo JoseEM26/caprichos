@@ -178,15 +178,8 @@ export function fusionarAspecto(
         : base.uniforme.prenda,
   };
 
-  const gorro = {
-    tipo:
-      parcial.gorro?.tipo && TIPOS_GORRO.includes(parcial.gorro.tipo)
-        ? parcial.gorro.tipo
-        : base.gorro.tipo,
-    color: parcial.gorro?.color
-      ? sanitizarColorHex(parcial.gorro.color, base.gorro.color)
-      : base.gorro.color,
-  };
+  // el gorro elegido por el negocio manda siempre; los temas no lo pisan
+  const gorro = { ...base.gorro };
 
   // (uniforme.prenda se hereda del base si el tema no la define)
 
