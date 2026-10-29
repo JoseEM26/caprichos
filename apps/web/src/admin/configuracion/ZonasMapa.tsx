@@ -18,9 +18,37 @@ export interface DiagnosticoZonas {
   huecos?: { zonaA: string; zonaB: string; metros: number; fino: boolean }[];
 }
 
+/** Par de zonas que ya se solapan: el dueño decide cuál se queda el área compartida. */
+interface ConflictoNormalizar {
+  zonaAId: string;
+  zonaBId: string;
+  nombreA: string;
+  nombreB: string;
+  areaM2: number;
+  tarifaA: number;
+  tarifaB: number;
+  /** GeoJSON MultiPolygon del solape, en [lng, lat]. */
+  poligonoSolape: { type: 'MultiPolygon'; coordinates: number[][][][] };
+}
+
 interface ResumenNormalizar {
   aplicado: boolean;
-  zonas: { codigo: string; cambia: boolean; resumen: ResultadoAjuste['resumen']; puntosAntes: number; puntosDespues: number }[];
+  zonas: {
+    codigo: string;
+    cambia: boolean;
+    resumen: ResultadoAjuste['resumen'];
+    puntosAntes: number;
+    puntosDespues: number;
+    areaAntesM2: number;
+    areaDespuesM2: number;
+  }[];
+  conflictos?: ConflictoNormalizar[];
+}
+
+interface DecisionNormalizar {
+  zonaAId: string;
+  zonaBId: string;
+  conserva: string;
 }
 
 /** Punto de imán: vértice vecino o su lado más cercano a menos de `tol` metros, o null. */
@@ -171,6 +199,10 @@ export function ZonasMapa({
   const [errorHistorial, setErrorHistorial] = useState(false);
   const [resaltadas, setResaltadas] = useState<string[]>([]);
   const [normalizar, setNormalizar] = useState<ResumenNormalizar | null>(null);
+  /** Paso del flujo «Normalizar»: decidir conflictos (si los hay) y luego confirmar Sí/No. */
+  const [pasoNormalizar, setPasoNormalizar] = useState<'conflictos' | 'confirmar' | null>(null);
+  /** Decisión por par de conflicto (clave «zonaAId|zonaBId» -> id de la zona que se queda). */
+  const [decisiones, setDecisiones] = useState<Record<string, string>>({});
   const [arreglo, setArreglo] = useState<{ codigo: string; previa: ResultadoAjuste } | null>(null);
   const [trabajando, setTrabajando] = useState(false);
   const tol = diagnostico?.toleranciaM;
@@ -454,12 +486,38 @@ export function ZonasMapa({
     }
   };
 
+  const cerrarNormalizar = () => {
+    setPasoNormalizar(null);
+    setNormalizar(null);
+  };
+
   const verNormalizar = async () => {
     setTrabajando(true);
     try {
-      setNormalizar(await api.post<ResumenNormalizar>('/admin/zonas/normalizar', { confirmar: false }));
+      const r = await api.post<ResumenNormalizar>('/admin/zonas/normalizar', { confirmar: false });
+      setNormalizar(r);
+      setDecisiones({});
+      setPasoNormalizar((r.conflictos ?? []).length > 0 ? 'conflictos' : 'confirmar');
     } catch (err) {
       setErrorEdicion(err instanceof ErrorApi ? err.message : 'No se pudo calcular el pegado de las zonas');
+    } finally {
+      setTrabajando(false);
+    }
+  };
+
+  /** Con todas las decisiones tomadas, pide otra vez la vista previa para mostrar el cambio final por zona. */
+  const aplicarDecisiones = async () => {
+    setTrabajando(true);
+    try {
+      const r = await api.post<ResumenNormalizar>('/admin/zonas/normalizar', {
+        confirmar: false,
+        decisiones: decisionesDe(normalizar, decisiones),
+      });
+      setNormalizar(r);
+      setPasoNormalizar('confirmar');
+    } catch (err) {
+      setErrorEdicion(err instanceof ErrorApi ? err.message : 'No se pudo calcular el pegado de las zonas');
+      cerrarNormalizar();
     } finally {
       setTrabajando(false);
     }
@@ -468,12 +526,16 @@ export function ZonasMapa({
   const confirmarNormalizar = async () => {
     setTrabajando(true);
     try {
-      await api.post('/admin/zonas/normalizar', { confirmar: true });
-      setNormalizar(null);
+      const conflictos = normalizar?.conflictos ?? [];
+      await api.post(
+        '/admin/zonas/normalizar',
+        conflictos.length > 0 ? { confirmar: true, decisiones: decisionesDe(normalizar, decisiones) } : { confirmar: true },
+      );
+      cerrarNormalizar();
       onZonasCambiadas?.();
     } catch (err) {
       setErrorEdicion(err instanceof ErrorApi ? err.message : 'No se pudo normalizar las zonas');
-      setNormalizar(null);
+      cerrarNormalizar();
     } finally {
       setTrabajando(false);
     }
@@ -725,20 +787,42 @@ export function ZonasMapa({
         </div>
       </Confirmar>
 
+      {pasoNormalizar === 'conflictos' && normalizar && (
+        <DialogoConflictos
+          conflictos={normalizar.conflictos ?? []}
+          zonas={zonas}
+          decisiones={decisiones}
+          cargando={trabajando}
+          onDecidir={(clave, conserva) => setDecisiones((d) => ({ ...d, [clave]: conserva }))}
+          onAplicar={aplicarDecisiones}
+          onCancelar={cerrarNormalizar}
+        />
+      )}
+
       <Confirmar
-        abierto={normalizar !== null}
+        abierto={pasoNormalizar === 'confirmar' && normalizar !== null}
         titulo="¿Normalizar todas las zonas activas?"
         textoSi="Sí, normalizar"
         textoNo="No"
         cargando={trabajando}
         alConfirmar={confirmarNormalizar}
-        alCancelar={() => setNormalizar(null)}
+        alCancelar={cerrarNormalizar}
       >
         <div style={{ fontSize: '13px', color: 'var(--cp-navy)', lineHeight: '20px' }}>
+          {(normalizar?.conflictos ?? []).map((c) => {
+            const se = decisiones[claveConflicto(c)];
+            const gana = se === c.zonaAId ? c.nombreA : c.nombreB;
+            const pierde = se === c.zonaAId ? c.nombreB : c.nombreA;
+            return (
+              <div key={claveConflicto(c)} style={{ marginBottom: '4px' }}>
+                {gana} se queda con el área compartida con {pierde}; {pierde} la pierde.
+              </div>
+            );
+          })}
           {normalizar?.zonas.filter((z) => z.cambia).length === 0 && <div>Ninguna zona necesita ajuste.</div>}
           {normalizar?.zonas.filter((z) => z.cambia).map((z) => (
             <div key={z.codigo}>
-              <b>{z.codigo}</b>: {resumenAjusteTexto(z.resumen)}
+              <b>{z.codigo}</b>: {descripcionArea(z)}. {resumenAjusteTexto(z.resumen)}
             </div>
           ))}
           <div style={{ marginTop: '6px', color: 'var(--cp-soft)' }}>
@@ -787,3 +871,196 @@ function descripcionCambio(h: EntradaHistorial): string {
   }
   return h.accion;
 }
+
+const claveConflicto = (c: { zonaAId: string; zonaBId: string }) => `${c.zonaAId}|${c.zonaBId}`;
+
+/** Decisiones ya tomadas, en el formato que espera el servidor. */
+function decisionesDe(r: ResumenNormalizar | null, decisiones: Record<string, string>): DecisionNormalizar[] {
+  return (r?.conflictos ?? [])
+    .filter((c) => decisiones[claveConflicto(c)])
+    .map((c) => ({ zonaAId: c.zonaAId, zonaBId: c.zonaBId, conserva: decisiones[claveConflicto(c)] }));
+}
+
+/** Metros cuadrados con espacio como separador de miles: «1 240». */
+const m2 = (n: number) => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+
+/** Área que la zona pierde o gana con el pegado (para el resumen final). */
+function descripcionArea(z: ResumenNormalizar['zonas'][number]): string {
+  const delta = Math.round(((z.areaDespuesM2 ?? 0) - (z.areaAntesM2 ?? 0)) * 10) / 10;
+  if (delta <= -0.5) return `pierde ${m2(-delta)} m² (de ${m2(z.areaAntesM2)} a ${m2(z.areaDespuesM2)} m²)`;
+  if (delta >= 0.5) return `gana ${m2(delta)} m²`;
+  return 'ajusta sus bordes, sin cambiar el área';
+}
+
+const COLOR_A = '#1565C0';
+const COLOR_B = '#FFB300';
+const COLOR_SOLAPE = '#D32F2F';
+
+/** Mini mapa de un conflicto: las dos zonas en colores distintos y la parte compartida resaltada. */
+function MiniMapaConflicto({
+  a,
+  b,
+  solape,
+}: {
+  a: CoordenadaPunto[] | undefined;
+  b: CoordenadaPunto[] | undefined;
+  solape: ConflictoNormalizar['poligonoSolape'];
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!ref.current) return;
+    const m = L.map(ref.current, {
+      zoomControl: false,
+      attributionControl: false,
+      dragging: false,
+      scrollWheelZoom: false,
+      doubleClickZoom: false,
+      touchZoom: false,
+      boxZoom: false,
+      keyboard: false,
+    });
+    const grupo = L.featureGroup().addTo(m);
+    const dibujar = (puntos: CoordenadaPunto[] | undefined, color: string) => {
+      if (puntos && puntos.length >= 3)
+        L.polygon(puntos as L.LatLngTuple[], { color, weight: 2, fillColor: color, fillOpacity: 0.25, interactive: false }).addTo(grupo);
+    };
+    dibujar(a, COLOR_A);
+    dibujar(b, COLOR_B);
+    for (const poligono of solape.coordinates) {
+      const anillo = poligono[0];
+      if (anillo?.length >= 3)
+        L.polygon(
+          anillo.map(([lng, lat]) => [lat, lng] as L.LatLngTuple),
+          { color: COLOR_SOLAPE, weight: 2, fillColor: COLOR_SOLAPE, fillOpacity: 0.6, interactive: false },
+        ).addTo(grupo);
+    }
+    const limites = grupo.getBounds();
+    if (limites.isValid()) m.fitBounds(limites, { padding: [10, 10] });
+    const timer = setTimeout(() => m.invalidateSize(), 80);
+    return () => {
+      clearTimeout(timer);
+      m.remove();
+    };
+  }, [a, b, solape]);
+  return (
+    <div
+      ref={ref}
+      role="img"
+      aria-label="Mapa del solape entre las dos zonas"
+      style={{ height: '160px', borderRadius: '10px', border: '1px solid var(--cp-line)', overflow: 'hidden', background: '#F3F6F8' }}
+    />
+  );
+}
+
+/** Paso 1 de «Normalizar»: una tarjeta por par solapado con dos botones de decisión. Aplicar espera a que decidas todo. */
+function DialogoConflictos({
+  conflictos,
+  zonas,
+  decisiones,
+  cargando,
+  onDecidir,
+  onAplicar,
+  onCancelar,
+}: {
+  conflictos: ConflictoNormalizar[];
+  zonas: ZonaRepartoItem[];
+  decisiones: Record<string, string>;
+  cargando: boolean;
+  onDecidir: (clave: string, conserva: string) => void;
+  onAplicar: () => void;
+  onCancelar: () => void;
+}) {
+  const pendientes = conflictos.filter((c) => !decisiones[claveConflicto(c)]).length;
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 5000,
+        background: 'rgba(11, 44, 62, 0.65)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '16px',
+      }}
+      onClick={cargando ? undefined : onCancelar}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Zonas que ya se solapan"
+        style={{
+          width: '100%',
+          maxWidth: '520px',
+          maxHeight: '90vh',
+          overflowY: 'auto',
+          background: 'var(--cp-white)',
+          border: '1px solid var(--cp-line)',
+          borderRadius: '20px',
+          padding: '24px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '14px',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: '18px', color: 'var(--cp-navy)', margin: 0 }}>
+          Zonas que ya se solapan
+        </h2>
+        <p style={{ margin: 0, fontSize: '14px', lineHeight: '20px', color: 'var(--cp-soft)' }}>
+          Elige qué zona se queda con el área compartida. La otra pierde esa parte.
+        </p>
+
+        {conflictos.map((c) => {
+          const clave = claveConflicto(c);
+          const eleccion = decisiones[clave];
+          const zonaA = zonas.find((z) => z.codigo === c.nombreA);
+          const zonaB = zonas.find((z) => z.codigo === c.nombreB);
+          return (
+            <div
+              key={clave}
+              role="group"
+              aria-label={`Conflicto entre ${c.nombreA} y ${c.nombreB}`}
+              style={{ border: '1px solid var(--cp-line)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}
+            >
+              <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--cp-navy)' }}>
+                {c.nombreA} (S/ {Number(c.tarifaA).toFixed(2)}) y {c.nombreB} (S/ {Number(c.tarifaB).toFixed(2)}) se solapan {m2(c.areaM2)} m²
+              </div>
+              <MiniMapaConflicto a={zonaA?.poligono} b={zonaB?.poligono} solape={c.poligonoSolape} />
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <Boton
+                  type="button"
+                  variante={eleccion === c.zonaAId ? 'primario' : 'secundario'}
+                  aria-pressed={eleccion === c.zonaAId}
+                  disabled={cargando}
+                  onClick={() => onDecidir(clave, c.zonaAId)}
+                >
+                  Se queda {c.nombreA}
+                </Boton>
+                <Boton
+                  type="button"
+                  variante={eleccion === c.zonaBId ? 'primario' : 'secundario'}
+                  aria-pressed={eleccion === c.zonaBId}
+                  disabled={cargando}
+                  onClick={() => onDecidir(clave, c.zonaBId)}
+                >
+                  Se queda {c.nombreB}
+                </Boton>
+              </div>
+            </div>
+          );
+        })}
+
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+          <Boton type="button" variante="secundario" disabled={cargando} onClick={onCancelar}>
+            No, cancelar
+          </Boton>
+          <Boton type="button" variante="primario" disabled={pendientes > 0 || cargando} cargando={cargando} onClick={onAplicar}>
+            {pendientes > 0 ? `Faltan ${pendientes} ${pendientes === 1 ? 'decisión' : 'decisiones'}` : 'Aplicar'}
+          </Boton>
+        </div>
+      </div>
+    </div>
+  );
+}
+

@@ -94,3 +94,67 @@ describe('ZonasMapa: pegado automático', () => {
     expect((p.onGuardarPoligono as any).mock.calls[0][2]).toBe('Pegado automático');
   });
 });
+
+describe('ZonasMapa: normalizar con conflictos de solape', () => {
+  // Z2 (id 1) y Z3 (id 2) se solapan 1 000 m²; el dueño decide cuál se queda el área
+  const conflicto = {
+    zonaAId: '1', zonaBId: '2', nombreA: 'Z2', nombreB: 'Z3', areaM2: 1000, tarifaA: 2, tarifaB: 3,
+    poligonoSolape: {
+      type: 'MultiPolygon' as const,
+      coordinates: [[[[-76.97, -12.02], [-76.96, -12.02], [-76.96, -12.01], [-76.97, -12.02]]]],
+    },
+  };
+  const resumenSinDecidir = {
+    aplicado: false,
+    zonas: [{ codigo: 'Z3', cambia: true, resumen: { verticesAjustados: 0, verticesInsertados: 0, huecosCerrados: 0, huecoMaxM: 0, areaRecortadaM2: 1000 }, puntosAntes: 4, puntosDespues: 4, areaAntesM2: 11000, areaDespuesM2: 10000 }],
+    conflictos: [conflicto],
+  };
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.spyOn(api, 'get').mockResolvedValue([] as any);
+  });
+
+  it('muestra una tarjeta por conflicto con los dos botones de decisión', async () => {
+    vi.spyOn(api, 'post').mockResolvedValue(resumenSinDecidir as any);
+    renderMapa({ seleccionado: null });
+    fireEvent.click(screen.getByRole('button', { name: 'Normalizar todas las zonas' }));
+    const tarjeta = await screen.findByRole('group', { name: 'Conflicto entre Z2 y Z3' });
+    expect(within(tarjeta).getByText('Z2 (S/ 2.00) y Z3 (S/ 3.00) se solapan 1 000 m²')).toBeInTheDocument();
+    expect(within(tarjeta).getByRole('img', { name: 'Mapa del solape entre las dos zonas' })).toBeInTheDocument();
+    expect(within(tarjeta).getByRole('button', { name: 'Se queda Z2' })).toHaveAttribute('aria-pressed', 'false');
+    expect(within(tarjeta).getByRole('button', { name: 'Se queda Z3' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('Aplicar queda bloqueado hasta decidir todos los conflictos', async () => {
+    vi.spyOn(api, 'post').mockResolvedValue(resumenSinDecidir as any);
+    renderMapa({ seleccionado: null });
+    fireEvent.click(screen.getByRole('button', { name: 'Normalizar todas las zonas' }));
+    await screen.findByRole('group', { name: 'Conflicto entre Z2 y Z3' });
+    expect(screen.getByRole('button', { name: 'Faltan 1 decisión' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Se queda Z3' }));
+    expect(screen.getByRole('button', { name: 'Aplicar' })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Se queda Z3' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Se queda Z2' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('envía las decisiones en la vista previa final y en la confirmación', async () => {
+    const resumenFinal = { ...resumenSinDecidir, aplicado: false };
+    const post = vi.spyOn(api, 'post').mockImplementation(async (_r: string, b: any) =>
+      b.confirmar ? ({ aplicado: true, zonas: [] } as any) : (b.decisiones ? resumenFinal : resumenSinDecidir) as any,
+    );
+    const p = renderMapa({ seleccionado: null });
+    fireEvent.click(screen.getByRole('button', { name: 'Normalizar todas las zonas' }));
+    await screen.findByRole('group', { name: 'Conflicto entre Z2 y Z3' });
+    fireEvent.click(screen.getByRole('button', { name: 'Se queda Z2' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar' }));
+    expect(await screen.findByText('Z2 se queda con el área compartida con Z3; Z3 la pierde.')).toBeInTheDocument();
+    const decisiones = [{ zonaAId: '1', zonaBId: '2', conserva: '1' }];
+    expect(post.mock.calls[1][1]).toEqual({ confirmar: false, decisiones });
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, normalizar' }));
+    await waitFor(() => expect(post).toHaveBeenCalledTimes(3));
+    expect(post.mock.calls[2][1]).toEqual({ confirmar: true, decisiones });
+    await waitFor(() => expect(p.onZonasCambiadas).toHaveBeenCalled());
+  });
+});
+

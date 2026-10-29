@@ -54,7 +54,7 @@ interface ZonaNormalizar {
   resumen: ResumenAjuste;
 }
 
-interface ResultadoNormalizarZona {
+export interface ResultadoNormalizarZona {
   codigo: string;
   cambia: boolean;
   resumen: ResumenAjuste;

@@ -17,6 +17,7 @@ import { EditarTarifaDto } from './dto/editar-tarifa.dto';
 import { EditarActivaDto } from './dto/editar-activa.dto';
 import { EditarPoligonoDto } from './dto/editar-poligono.dto';
 import { EditarTiempoDto } from './dto/editar-tiempo.dto';
+import { DecisionConflictoZona } from './zonas.tipos';
 
 // ===========================================================================
 // PÚBLICO (GET /carta/envio)
@@ -51,12 +52,19 @@ export class ZonasAdminController {
     return this.zonasService.diagnosticoCobertura();
   }
 
-  /** Vista previa (confirmar=false) o aplicación del pegado automático a todas las zonas activas. */
+  /**
+   * Vista previa (confirmar=false) o aplicación del pegado automático a todas las zonas activas. `decisiones`
+   * resuelve los conflictos de solape (qué zona se queda el área compartida); con confirmar, cada conflicto la necesita.
+   */
   @Post('normalizar')
   @Permiso('zonas', 'editar')
-  async normalizar(@Body() body: { confirmar?: boolean }, @Req() req: any) {
+  async normalizar(
+    @Body() body: { confirmar?: boolean; decisiones?: DecisionConflictoZona[] },
+    @Req() req: any,
+  ) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
-    return this.zonasService.normalizarZonas(body?.confirmar === true, req.usuario, ip);
+    const decisiones = Array.isArray(body?.decisiones) ? body.decisiones : [];
+    return this.zonasService.normalizarZonas(body?.confirmar === true, req.usuario, ip, decisiones);
   }
 
   @Get(':codigo/historial')
