@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ElementoPlano, MesaSalon } from '../tipos';
+import { useMantenerPresionado } from '../useMantenerPresionado';
 import '../salon.css';
 
 export interface CuadriculaPlanoProps {
@@ -16,6 +17,9 @@ export interface CuadriculaPlanoProps {
   mesasSeleccionadasIds?: string[];
   onSeleccionarMesaSalon?: (mesa: MesaSalon) => void;
   modoSalon?: boolean;
+  // Mantener presionada una mesa ocupada (3 s) abre Forzar liberación; solo con permiso mesas/liberar
+  alMantenerMesaSalon?: (mesa: MesaSalon) => void;
+  puedeForzarLiberacion?: boolean;
 }
 
 export const ESTILOS_ELEMENTOS: Record<
@@ -109,8 +113,11 @@ export function CuadriculaPlano({
   mesasSeleccionadasIds = [],
   onSeleccionarMesaSalon,
   modoSalon = false,
+  alMantenerMesaSalon,
+  puedeForzarLiberacion = false,
 }: CuadriculaPlanoProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const mantener = useMantenerPresionado<MesaSalon>((mesa) => alMantenerMesaSalon?.(mesa));
 
   // Estado para arrastre suave con puntero táctil o ratón
   const [arrastre, setArrastre] = useState<{
@@ -401,13 +408,25 @@ export function CuadriculaPlano({
           }
 
           const tieneReserva = esMesa && mesaSalon?.reserva;
+          const forzable =
+            puedeForzarLiberacion && modoSalon && esMesa && mesaSalon?.estado === 'OCUPADA' && !!alMantenerMesaSalon;
+          const pulsa = forzable && mesaSalon ? mantener.manejadores(mesaSalon) : null;
 
           return (
             <div
               key={elem.id}
               data-testid={`elemento-plano-${elem.id}`}
               className="salon-celda"
-              onPointerDown={(e) => handlePointerDown(e, elem)}
+              onPointerDown={(e) => {
+                handlePointerDown(e, elem);
+                pulsa?.onPointerDown(e);
+              }}
+              onPointerUp={pulsa?.onPointerUp}
+              onPointerLeave={pulsa?.onPointerLeave}
+              onPointerCancel={pulsa?.onPointerCancel}
+              onPointerMove={pulsa?.onPointerMove}
+              onClickCapture={pulsa?.onClickCapture}
+              onContextMenu={pulsa?.onContextMenu}
               onClick={(e) => {
                 e.stopPropagation();
                 if (modoSalon && esMesa && mesaSalon && onSeleccionarMesaSalon) {
@@ -436,7 +455,10 @@ export function CuadriculaPlano({
                 fontWeight: 700,
                 textAlign: 'center',
                 // En modo edición el elemento se arrastra con el dedo (no desplaza el lienzo)
-                touchAction: modoSalon ? undefined : 'none',
+                touchAction: modoSalon ? (forzable ? 'manipulation' : undefined) : 'none',
+                userSelect: 'none',
+                WebkitUserSelect: 'none',
+                WebkitTouchCallout: 'none',
                 cursor: modoSalon
                   ? esMesa
                     ? 'pointer'
@@ -456,6 +478,23 @@ export function CuadriculaPlano({
                   : 'left 0.1s ease, top 0.1s ease, box-shadow 0.15s ease',
               }}
             >
+              {/* Progreso de la pulsación prolongada */}
+              {pulsa && mantener.objetivo?.id === elem.id && (
+                <span
+                  aria-hidden="true"
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    bottom: 0,
+                    height: '4px',
+                    width: `${Math.round(mantener.progreso * 100)}%`,
+                    background: 'var(--cp-orange)',
+                    borderRadius: '0 0 10px 10px',
+                    pointerEvents: 'none',
+                  }}
+                />
+              )}
+
               {/* Marca de reserva visual "R" */}
               {tieneReserva && (
                 <div

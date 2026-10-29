@@ -292,6 +292,29 @@ describe('SalonService', () => {
       }
     });
 
+    it('pedido de mesa con pago dividido reenvía el plan a la creación compartida (pedidosService.crear)', async () => {
+      prismaMock.elementoPlano.findMany.mockResolvedValue([
+        { id: 6n, numero: 6, tipo: 'MESA', activo: true },
+      ]);
+      prismaMock.pedidoMesa.findMany.mockResolvedValue([]);
+      prismaMock.reservaMesa.findMany.mockResolvedValue([]);
+      pedidosServiceMock.crear.mockResolvedValue({ id: '77', codigo: 'CP-M077', total: 30 });
+
+      const plan = [
+        { medio: 'EFECTIVO', monto: 10 },
+        { medio: 'YAPE', monto: 20 },
+      ];
+      await service.abrirPedido({
+        mesas: [6],
+        lineas: [{ productoId: 1, cantidad: 1 }],
+        pago: { metodo: 'YAPE', plan } as any,
+      });
+
+      const [dtoEnviado] = pedidosServiceMock.crear.mock.calls[0];
+      expect(dtoEnviado.pago.plan).toEqual(plan);
+      expect(dtoEnviado.modalidad).toBe('MESA');
+    });
+
     it('varias mesas en un pedido (RN-CAP-108) crea pedidos_mesa y emite salon:mesa para todas', async () => {
       prismaMock.elementoPlano.findMany.mockResolvedValue([
         { id: 4n, numero: 4, tipo: 'MESA', activo: true },
@@ -482,6 +505,71 @@ describe('SalonService', () => {
         mesaId: '7',
         estado: 'LIBRE',
       });
+    });
+    it('forzar=true libera aunque el pedido esté en COLA/PREPARANDO, cierra todas las filas abiertas y audita LIBERAR_FORZADO', async () => {
+      prismaMock.elementoPlano.findUnique.mockResolvedValue({ id: 7n, tipo: 'MESA' });
+      prismaMock.pedidoMesa.findMany.mockResolvedValue([
+        { id: 20n, pedido_id: 50n, abierta: true, pedido: { id: 50n, estado: 'PREPARANDO' } },
+        { id: 21n, pedido_id: 51n, abierta: true, pedido: { id: 51n, estado: 'COLA' } },
+      ]);
+
+      const res = await service.liberarMesaManual(
+        7,
+        { motivo: 'Cliente se fue, mesa trabada', forzar: true },
+        { partyId: 10n } as any,
+        '192.168.1.1',
+      );
+
+      expect(res.ok).toBe(true);
+      expect(prismaMock.pedidoMesa.updateMany).toHaveBeenCalledWith({
+        where: { mesa_id: 7n, abierta: true },
+        data: { abierta: false },
+      });
+      expect(prismaMock.pedidoMesa.update).not.toHaveBeenCalled();
+      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          modulo: 'mesas',
+          accion: 'LIBERAR_FORZADO',
+          motivo: 'Cliente se fue, mesa trabada',
+          ip: '192.168.1.1',
+          despues: expect.objectContaining({
+            pedidos: [
+              { pedidoId: '50', estado: 'PREPARANDO' },
+              { pedidoId: '51', estado: 'COLA' },
+            ],
+          }),
+        }),
+      );
+      expect(eventosGatewayMock.emitirAdmin).toHaveBeenCalledWith('salon:mesa', {
+        mesaId: '7',
+        estado: 'LIBRE',
+      });
+    });
+
+    it('forzar=true con motivo corto sigue rechazando con 400 MOTIVO_INVALIDO', async () => {
+      prismaMock.elementoPlano.findUnique.mockResolvedValue({ id: 7n, tipo: 'MESA' });
+
+      await expect(
+        service.liberarMesaManual(7, { motivo: 'abc', forzar: true }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prismaMock.pedidoMesa.updateMany).not.toHaveBeenCalled();
+      expect(auditoriaMock.registrar).not.toHaveBeenCalled();
+    });
+
+    it('sin forzar, un pedido en cocina sigue dando 409 y no libera ni audita', async () => {
+      prismaMock.elementoPlano.findUnique.mockResolvedValue({ id: 7n, tipo: 'MESA' });
+      prismaMock.pedidoMesa.findFirst.mockResolvedValue({
+        id: 20n,
+        abierta: true,
+        pedido: { id: 50n, estado: 'COLA' },
+      });
+
+      await expect(
+        service.liberarMesaManual(7, { motivo: 'Cliente se fue', forzar: false }),
+      ).rejects.toThrow(ConflictException);
+      expect(prismaMock.pedidoMesa.updateMany).not.toHaveBeenCalled();
+      expect(auditoriaMock.registrar).not.toHaveBeenCalled();
     });
   });
 

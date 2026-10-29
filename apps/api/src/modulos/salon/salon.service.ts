@@ -81,6 +81,7 @@ export class SalonService {
             let pedidoInfo: {
               id: string;
               codigo: string;
+              estado?: string;
               mozo: string | null;
               total?: number;
               lineas?: Array<{ cantidad: number; nombre: string; detalle: string }>;
@@ -108,6 +109,7 @@ export class SalonService {
               pedidoInfo = {
                 id: ped.id.toString(),
                 codigo: ped.codigo,
+                estado: ped.estado,
                 mozo: mozoNombre || null,
                 total: ped.total ? Number(ped.total) : (ped.subtotal ? Number(ped.subtotal) : 0),
                 lineas: ((ped as any).lineas || []).map((l: any) => ({
@@ -386,6 +388,10 @@ export class SalonService {
       });
     }
 
+    if (dto.forzar === true) {
+      return this.forzarLiberacionMesa(mesaId, dto.motivo.trim(), usuario, ip);
+    }
+
     const pedidoMesa = await this.prisma.pedidoMesa.findFirst({
       where: { mesa_id: mesaId, abierta: true },
       include: { pedido: true },
@@ -431,6 +437,56 @@ export class SalonService {
     return {
       ok: true,
       mensaje: 'Mesa liberada correctamente',
+    };
+  }
+
+  /**
+   * Liberación forzada: cierra TODAS las filas abiertas de la mesa sin mirar la cocina.
+   * No anula ni modifica el pedido; solo deja la mesa libre. Audita LIBERAR_FORZADO.
+   */
+  private async forzarLiberacionMesa(
+    mesaId: bigint,
+    motivo: string,
+    usuario?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const abiertas = await this.prisma.pedidoMesa.findMany({
+      where: { mesa_id: mesaId, abierta: true },
+      include: { pedido: true },
+    });
+
+    await this.prisma.pedidoMesa.updateMany({
+      where: { mesa_id: mesaId, abierta: true },
+      data: { abierta: false },
+    });
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'mesas',
+      accion: 'LIBERAR_FORZADO',
+      resultado: 'OK',
+      entidad: 'elemento_plano',
+      entidadId: mesaId,
+      motivo,
+      partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
+      ip,
+      despues: {
+        mesaId: mesaId.toString(),
+        pedidos: abiertas.map((pm) => ({
+          pedidoId: pm.pedido_id?.toString() || null,
+          estado: pm.pedido?.estado ?? null,
+        })),
+      },
+    });
+
+    this.eventosGateway.emitirAdmin('salon:mesa', {
+      mesaId: mesaId.toString(),
+      estado: 'LIBRE',
+    });
+
+    return {
+      ok: true,
+      mensaje: 'Mesa liberada a la fuerza. El pedido no se anuló ni se cobró.',
     };
   }
 

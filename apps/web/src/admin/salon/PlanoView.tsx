@@ -7,6 +7,8 @@ import { ElementoPlano, MesaSalon, PisoPlano, PisoSalon } from './tipos';
 import { ModalNuevoPedidoMesa } from './componentes/ModalNuevoPedidoMesa';
 import { ModalPrecuenta } from './componentes/ModalPrecuenta';
 import { useSalonSocket } from './useSalonSocket';
+import { useMantenerPresionado } from './useMantenerPresionado';
+import { ModalForzarLiberarMesa } from './componentes/ModalForzarLiberarMesa';
 import { salonApi } from './api';
 import './salon.css';
 
@@ -28,6 +30,7 @@ export function PlanoView() {
   const { tiene } = useSesion();
   const puedeVer = tiene('plano/ver');
   const puedeEditar = tiene('plano/editar');
+  const puedeForzar = tiene('mesas/liberar');
 
   // Pisos del plano
   const [pisos, setPisos] = useState<PisoPlano[]>([]);
@@ -52,6 +55,9 @@ export function PlanoView() {
   const [modalNuevoPedidoAbierto, setModalNuevoPedidoAbierto] = useState(false);
   // Cuenta de una mesa ocupada: el mozo la envía a Caja (no la cobra)
   const [mesaParaCuenta, setMesaParaCuenta] = useState<MesaSalon | null>(null);
+  const [mesaParaForzar, setMesaParaForzar] = useState<MesaSalon | null>(null);
+  // Mesa ocupada mantenida presionada 3 s -> Forzar liberación (solo con permiso mesas/liberar, fuera de edición)
+  const mantenerMesa = useMantenerPresionado<MesaSalon>((mesa) => setMesaParaForzar(mesa));
   const [mesasParaPedido, setMesasParaPedido] = useState<string[]>([]);
 
   // Confirmaciones obligatorias Sí/No
@@ -130,6 +136,11 @@ export function PlanoView() {
     if (!elementoSeleccionadoId) return null;
     return pisosSalon.flatMap((p) => p.mesas || []).find((m) => String(m.id) === String(elementoSeleccionadoId)) || null;
   }, [pisosSalon, elementoSeleccionadoId]);
+
+  const mesasSalonPorId = useMemo(
+    () => new Map(pisosSalon.flatMap((p) => p.mesas || []).map((m) => [String(m.id), m] as const)),
+    [pisosSalon],
+  );
 
   // Elemento seleccionado
   const elementoSeleccionado = useMemo(() => {
@@ -814,6 +825,18 @@ export function PlanoView() {
             )}
           </div>
 
+          {/* Leyenda del estado de las mesas (lo que dice el servidor) */}
+          <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <span aria-hidden="true" style={{ width: '12px', height: '12px', borderRadius: '3px', background: 'var(--cp-greenbg)', border: '1.5px solid var(--cp-ok)' }} />
+              Libre
+            </span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <span aria-hidden="true" style={{ width: '12px', height: '12px', borderRadius: '3px', background: '#F6C9A5', border: '1.5px solid var(--cp-orange)' }} />
+              Ocupada
+            </span>
+          </div>
+
           {/* Contenedor del plano con aspecto exacto del mockup */}
           <div
             className="salon-lienzo"
@@ -850,6 +873,14 @@ export function PlanoView() {
                 const sel = e.id === elementoSeleccionadoId;
                 const esMesa = e.tipo.toLowerCase() === 'mesa';
                 const numMesa = parseInt(String(e.nombre || '').replace(/\D/g, ''), 10) || e.numero || 0;
+                const mesaSalonElem = esMesa ? mesasSalonPorId.get(String(e.id)) : undefined;
+                // Estado real del servidor (LIBRE / OCUPADA) para pintar la mesa
+                const ocupadaSalon = mesaSalonElem?.estado === 'OCUPADA';
+                const libreSalon = mesaSalonElem?.estado === 'LIBRE';
+                const pulsaMesa =
+                  puedeForzar && !puedeEditar && mesaSalonElem?.estado === 'OCUPADA'
+                    ? mantenerMesa.manejadores(mesaSalonElem)
+                    : null;
 
                 return (
                   <div
@@ -858,6 +889,7 @@ export function PlanoView() {
                     className="salon-celda"
                     draggable={puedeEditar}
                     onDragStart={(ev) => handleDragStart(ev, e)}
+                    {...(pulsaMesa ?? {})}
                     onClick={(ev) => {
                       ev.stopPropagation();
                       setElementoSeleccionadoId(e.id);
@@ -880,20 +912,46 @@ export function PlanoView() {
                       fontWeight: 800,
                       fontSize: 'clamp(8px, 1.1vw, 13px)',
                       borderRadius: esMesa ? '10px' : '3px',
-                      background: t.bg,
+                      background: ocupadaSalon ? '#F6C9A5' : libreSalon ? 'var(--cp-greenbg)' : t.bg,
                       color: t.fg,
                       border: sel
                         ? '3px solid var(--cp-orange)'
                         : e.activo
-                        ? `1.5px solid ${t.bd}`
+                        ? `1.5px solid ${ocupadaSalon ? 'var(--cp-orange)' : libreSalon ? 'var(--cp-ok)' : t.bd}`
                         : `1.5px dashed ${t.bd}`,
                       opacity: e.activo ? 1 : 0.35,
                       cursor: 'grab',
+                      userSelect: 'none',
+                      WebkitUserSelect: 'none',
+                      WebkitTouchCallout: 'none',
+                      touchAction: pulsaMesa ? 'manipulation' : undefined,
                       zIndex: sel ? 4 : e.tipo.toLowerCase() === 'pared' ? 1 : 2,
                     }}
                   >
+                    {pulsaMesa && mantenerMesa.objetivo?.id === e.id && (
+                      <span
+                        aria-hidden="true"
+                        style={{
+                          position: 'absolute',
+                          left: 0,
+                          bottom: 0,
+                          height: '4px',
+                          width: `${Math.round(mantenerMesa.progreso * 100)}%`,
+                          background: 'var(--cp-orange)',
+                          pointerEvents: 'none',
+                        }}
+                      />
+                    )}
                     <span>{e.tipo.toLowerCase() === 'pared' ? '' : esMesa ? (numMesa ? String(numMesa) : e.nombre || 'M') : e.nombre || t.n}</span>
-                    {esMesa && ECOLS <= 30 && (
+                    {ocupadaSalon && (
+                      <span style={{ fontSize: '9px', fontWeight: 800 }}>ocupada</span>
+                    )}
+                    {ocupadaSalon && mesaSalonElem?.pedido?.codigo && (
+                      <span style={{ fontSize: '8px', fontWeight: 600, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {mesaSalonElem.pedido.codigo}
+                      </span>
+                    )}
+                    {esMesa && ECOLS <= 30 && !ocupadaSalon && (
                       <span style={{ fontSize: '9px', fontWeight: 600 }}>
                         {e.asientos || 4} pers.
                       </span>
@@ -1046,6 +1104,27 @@ export function PlanoView() {
                   ×
                 </button>
               </div>
+
+              {/* Estado de la mesa según el servidor */}
+              {elementoSeleccionado.tipo.toLowerCase() === 'mesa' && mesaSalonSeleccionada && (
+                <div
+                  data-testid="estado-mesa"
+                  style={{
+                    alignSelf: 'flex-start',
+                    padding: '4px 10px',
+                    borderRadius: '9999px',
+                    fontSize: '12px',
+                    fontWeight: 800,
+                    background: mesaSalonSeleccionada.estado === 'OCUPADA' ? '#F6C9A5' : 'var(--cp-greenbg)',
+                    border: `1.5px solid ${mesaSalonSeleccionada.estado === 'OCUPADA' ? 'var(--cp-orange)' : 'var(--cp-ok)'}`,
+                    color: 'var(--cp-navy)',
+                  }}
+                >
+                  {mesaSalonSeleccionada.estado === 'OCUPADA'
+                    ? `Ocupada${mesaSalonSeleccionada.pedido?.codigo ? ` · pedido ${mesaSalonSeleccionada.pedido.codigo}` : ''}${mesaSalonSeleccionada.pedido?.estado ? ` (${mesaSalonSeleccionada.pedido.estado})` : ''}`
+                    : 'Libre'}
+                </div>
+              )}
 
               {!puedeEditar && (
                 <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
@@ -1317,7 +1396,7 @@ export function PlanoView() {
               )}
 
               {/* Mesa ocupada con pedido: el mozo ve la cuenta y la envía a Caja */}
-              {elementoSeleccionado.tipo.toLowerCase() === 'mesa' && mesaSalonSeleccionada?.pedido && (
+              {elementoSeleccionado.tipo.toLowerCase() === 'mesa' && mesaSalonSeleccionada?.estado === 'OCUPADA' && mesaSalonSeleccionada?.pedido && (
                 <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
                   <button
                     type="button"
@@ -1752,10 +1831,14 @@ export function PlanoView() {
       {mesaParaCuenta?.pedido && (
         <ModalPrecuenta
           abierto={true}
-          alCerrar={() => setMesaParaCuenta(null)}
+          alCerrar={() => {
+            setMesaParaCuenta(null);
+            cargarDatos();
+          }}
           mesa={mesaParaCuenta.nombre || `Mesa ${mesaParaCuenta.numero}`}
           lineas={mesaParaCuenta.pedido.lineas || []}
           total={Number(mesaParaCuenta.pedido.total || 0)}
+          mozo={mesaParaCuenta.pedido.mozo}
           pedidoId={mesaParaCuenta.pedido.id}
         />
       )}
@@ -1771,6 +1854,19 @@ export function PlanoView() {
           pisos={pisosSalon}
           mesasPreseleccionadasIds={mesasParaPedido}
           alRefrescarMesas={cargarDatos}
+          puedeForzarLiberacion={puedeForzar}
+        />
+      )}
+
+      {mesaParaForzar && (
+        <ModalForzarLiberarMesa
+          mesa={mesaParaForzar}
+          alCerrar={() => setMesaParaForzar(null)}
+          alForzar={async (mesaId, motivo) => {
+            await salonApi.liberarMesaManual(mesaId, motivo, true);
+            setMesaParaForzar(null);
+            await cargarDatos();
+          }}
         />
       )}
     </div>
