@@ -319,3 +319,65 @@ export function calcularSemaforo(
     motivos: ['Datos conformes y verificados con el pedido'],
   };
 }
+
+const nombreMedioAviso = (medio: string | null | undefined): string =>
+  medio === 'PLIN' ? 'Plin' : medio === 'YAPE' ? 'Yape' : 'Yape o Plin';
+
+/**
+ * Avisos para el MOZO: solo texto de lo que no cuadra, sin semáforo, sin número de operación,
+ * sin datos completos del destinatario ni JSON. Usa los mismos matchers que calcularSemaforo.
+ * Sin lectura de IA o sin datos: [] (el mozo solo ve que el voucher quedó guardado).
+ */
+// ponytail: matchers duplicados de calcularSemaforo a propósito; si crece, extraer predicados compartidos
+export function avisosMozo(
+  extraido: DatosVoucherExtraidos | null,
+  contexto: ContextoSemaforo = {},
+): string[] {
+  if (contexto.sinLectura || !extraido) return [];
+  const avisos: string[] = [];
+
+  if (contexto.pedidoTotal != null && extraido.monto != null) {
+    const diff = Math.round((extraido.monto - contexto.pedidoTotal) * 100) / 100;
+    if (Math.abs(diff) > 0.01) {
+      avisos.push(
+        `El monto del voucher (S/ ${extraido.monto.toFixed(2)}) no coincide con lo que debe pagar por ${nombreMedioAviso(contexto.medioEsperado)} (S/ ${contexto.pedidoTotal.toFixed(2)})`,
+      );
+    }
+  }
+
+  if (extraido.confianza < 0.8) {
+    avisos.push('La foto está borrosa o cortada; sube otra');
+  }
+
+  if (extraido.titular && contexto.titularEsperado && !titularesCoinciden(extraido.titular, contexto.titularEsperado)) {
+    avisos.push('El destinatario no coincide con la cuenta del negocio');
+  } else if (extraido.destinoNumero) {
+    const medioNumero = contexto.medioEsperado || extraido.medioDetectado || 'YAPE';
+    const numeroEsperado = medioNumero === 'PLIN' ? contexto.plinNumeroEsperado : contexto.yapeNumeroEsperado;
+    if (numeroEsperado && !coincideNumeroDestino(extraido.destinoNumero, numeroEsperado)) {
+      avisos.push('El destinatario no coincide con la cuenta del negocio');
+    }
+  }
+
+  if (extraido.fecha && contexto.fechaActual) {
+    const fLeida = normalizarFecha(extraido.fecha);
+    const fActual = normalizarFecha(contexto.fechaActual);
+    if (fLeida && fActual && fLeida !== fActual) {
+      avisos.push('La fecha del voucher no es de hoy');
+    }
+  }
+
+  if (contexto.operacionDuplicada || contexto.hashDuplicado) {
+    avisos.push('Este voucher parece ya usado en otro pedido');
+  }
+
+  if (extraido.medioDetectado === 'OTRO' || !extraido.medioDetectado) {
+    avisos.push('No se reconoce como comprobante de Yape ni Plin; revisa la foto');
+  } else if (contexto.medioEsperado && extraido.medioDetectado !== contexto.medioEsperado) {
+    avisos.push(
+      `El medio del voucher (${nombreMedioAviso(extraido.medioDetectado)}) no coincide con el elegido (${nombreMedioAviso(contexto.medioEsperado)})`,
+    );
+  }
+
+  return avisos;
+}

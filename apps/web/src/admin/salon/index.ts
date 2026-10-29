@@ -1,5 +1,5 @@
 export { PlanoView } from './PlanoView';
-export { TomarPedidoView } from './TomarPedidoView';
+export { MisPedidosView } from './MisPedidosView';
 export { ReservasView } from './ReservasView';
 export * from './tipos';
 export * from './api';

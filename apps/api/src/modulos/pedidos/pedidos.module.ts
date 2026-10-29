@@ -3,6 +3,7 @@ import { PedidosController } from './pedidos.controller';
 import { PedidosService } from './pedidos.service';
 import { SeguimientoController } from './seguimiento.controller';
 import { SeguimientoService } from './seguimiento.service';
+import { PagoPlanService } from './pago-plan.service';
 import { LocalModule } from '../local/local.module';
 import { ZonasModule } from '../zonas/zonas.module';
 import { OfertasModule } from '../ofertas/ofertas.module';
@@ -22,7 +23,7 @@ import { ChatbotModule } from '../chatbot/chatbot.module';
     forwardRef(() => ChatbotModule),
   ],
   controllers: [PedidosController, SeguimientoController],
-  providers: [PedidosService, SeguimientoService],
-  exports: [PedidosService, SeguimientoService],
+  providers: [PedidosService, SeguimientoService, PagoPlanService],
+  exports: [PedidosService, SeguimientoService, PagoPlanService],
 })
 export class PedidosModule {}

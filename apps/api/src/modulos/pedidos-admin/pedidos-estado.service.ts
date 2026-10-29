@@ -1,4 +1,5 @@
 import { PuntosService } from '../clientes/puntos.service';
+import { montoDigitalDePlan } from '../pedidos/pago-plan.service';
 import { StockService } from '../stock/stock.service';
 import { ImpresionService } from '../impresion/impresion.service';
 import { SalonService } from '../salon/salon.service';
@@ -28,6 +29,7 @@ import { exigirCajaAbiertaHoy } from '../caja/caja.calculo';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { enmascararDni } from '../usuarios/usuarios.util';
 import { FiltrarPedidosDto } from './dto/filtrar-pedidos.dto';
+import { RangoMisPedidos } from './dto/mis-pedidos-query.dto';
 import { CambiarEstadoDto } from './dto/cambiar-estado.dto';
 import { RegistrarPagoDto } from './dto/registrar-pago.dto';
 import { AvisosPedidoService } from '../chatbot/servicios/avisos-pedido.service';
@@ -42,6 +44,9 @@ import {
 } from '../cocina/cocina.util';
 
 export type ColorEspera = 'verde' | 'naranja' | 'rojo';
+
+/** Estados todavía no entregados ni anulados (para el resumen de "Mis pedidos"). */
+const ESTADOS_EN_CURSO = ['COLA', 'PREPARANDO', 'LISTO', 'EN_CAMINO'];
 
 /** Estado de la pregunta de reprogramar (mensaje_reparto etapa 5), en la forma que ve el admin. */
 const PREGUNTA_REPROG_VISTA: Record<string, string> = {
@@ -354,6 +359,71 @@ export class PedidosEstadoService {
   }
 
   /**
+   * "Mis pedidos" del mozo (GET /admin/pedidos/mis-pedidos, pedidos/crear): solo los que él tomó
+   * (canal MOZO y party_id propio) en el rango pedido, por día de Lima. El resumen no cuenta los anulados.
+   */
+  async misPedidos(usuario: UsuarioAutenticado, rango: RangoMisPedidos = 'hoy') {
+    const inicioHoy = obtenerInicioDiaLima();
+    const DIA = 24 * 60 * 60 * 1000;
+    const creado_en =
+      rango === 'ayer'
+        ? { gte: new Date(inicioHoy.getTime() - DIA), lt: inicioHoy }
+        : rango === '7dias'
+          ? { gte: new Date(inicioHoy.getTime() - 6 * DIA) }
+          : { gte: inicioHoy };
+
+    const pedidos = await this.prisma.pedido.findMany({
+      where: { canal: 'MOZO', party_id: BigInt(usuario.partyId), creado_en },
+      orderBy: { creado_en: 'desc' },
+      select: {
+        id: true,
+        codigo: true,
+        estado: true,
+        modalidad: true,
+        mesa_nombre: true,
+        total: true,
+        pago_estado: true,
+        pago_metodo: true,
+        creado_en: true,
+        lineas: { select: { nombre: true, cantidad: true }, orderBy: { id: 'asc' } },
+        // Solo el semáforo: sirve para contar y para «legible»; nunca se devuelve al mozo
+        vouchers: { select: { semaforo: true } },
+        planPago: { select: { medio: true, monto: true }, orderBy: { orden: 'asc' } },
+      },
+    });
+
+    const validos = pedidos.filter((p) => p.estado !== 'ANULADO');
+    const total = validos.reduce((suma, p) => suma + Number(p.total), 0);
+
+    return {
+      pedidos: pedidos.map((p) => ({
+        id: String(p.id),
+        codigo: p.codigo,
+        estado: p.estado,
+        modalidad: p.modalidad,
+        mesaNombre: p.mesa_nombre,
+        total: Number(p.total),
+        pagoEstado: p.pago_estado,
+        pagoMetodo: p.pago_metodo,
+        // Pago dividido: plan por medio y la parte digital (lo que lleva voucher)
+        plan: p.planPago.map((f) => ({ medio: f.medio, monto: Number(f.monto) })),
+        montoDigital: montoDigitalDePlan(p.planPago.map((f) => ({ medio: f.medio, monto: Number(f.monto) }))),
+        vouchers: p.vouchers.length,
+        // Misma regla que el cobro: un voucher ILEGIBLE no cuenta como comprobante
+        tieneVoucherLegible: p.vouchers.some((v) => v.semaforo !== 'ILEGIBLE'),
+        creadoEn: p.creado_en,
+        lineas: p.lineas.map((l) => ({ nombre: l.nombre, cantidad: l.cantidad })),
+      })),
+      resumen: {
+        cantidad: validos.length,
+        total: Math.round(total * 100) / 100,
+        enCurso: validos.filter((p) => ESTADOS_EN_CURSO.includes(p.estado)).length,
+        entregados: validos.filter((p) => p.estado === 'ENTREGADO').length,
+      },
+    };
+  }
+
+  /**
    * Vista de cocina: solo COLA y PREPARANDO, más viejos primero (DT-58).
    * Si historial=true, muestra los pedidos preparados hoy.
    */
@@ -462,6 +532,7 @@ export class PedidosEstadoService {
           orderBy: { en: 'asc' },
         },
         zona: true,
+        planPago: { orderBy: { orden: 'asc' } },
         cobros: {
           where: { anulado_en: null },
           select: { id: true },

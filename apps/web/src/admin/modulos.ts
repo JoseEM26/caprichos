@@ -9,7 +9,7 @@ import { CocinaAdminView } from './cocina';
 import { RepartosView } from './repartos';
 import { CierreView } from './cierre';
 import { ComprobantesView, ReclamosAdminView } from './comprobantes';
-import { PlanoView, ReservasView, TomarPedidoView } from './salon';
+import { PlanoView, ReservasView, MisPedidosView } from './salon';
 import { StockView } from './stock';
 import { RecetasView } from './recetas';
 import { ProductosView, ListasCategoriasView } from './catalogo';
@@ -137,12 +137,12 @@ export const MODULOS: DefinicionModulo[] = [
     icono: 'reservas',
   },
   {
-    clave: 'tomar-pedido',
-    nombre: 'Tomar pedido',
+    clave: 'mis-pedidos',
+    nombre: 'Mis pedidos',
     grupo: 'Operación',
-    ruta: '/admin/tomar-pedido',
+    ruta: '/admin/mis-pedidos',
     permisoMinimo: 'pedidos/crear',
-    componente: TomarPedidoView,
+    componente: MisPedidosView,
     icono: 'pedidos',
   },
 

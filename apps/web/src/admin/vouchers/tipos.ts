@@ -27,6 +27,10 @@ export interface RespuestaSubirVoucherMozo {
   id: string | number;
   legible: boolean;
   mensaje?: string;
+  /** true si la lectura automática no estuvo disponible: Caja revisa el voucher a mano. */
+  revisionManual?: boolean;
+  /** Avisos en texto de lo que no cuadra (monto, medio, destinatario, fecha, duplicado). Nunca semáforo ni datos. */
+  avisos?: string[];
 }
 
 export interface RespuestaSubirVoucherAdmin {

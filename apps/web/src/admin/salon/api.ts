@@ -1,3 +1,4 @@
+import type { PlanPagoItem } from '../pedidos/planPago';
 import { api } from '../../comun/api';
 import { CategoriaCarta } from '../../carta/tipos';
 import {
@@ -5,7 +6,9 @@ import {
   DisenoCompletoJson,
   PisoPlano,
   PisoSalon,
+  RangoMisPedidos,
   Reserva,
+  RespuestaMisPedidos,
 } from './tipos';
 
 export interface CrearElementoPayload {
@@ -55,6 +58,12 @@ export interface AbrirPedidoMesaPayload {
   cliente?: {
     nombre: string;
     telefono: string;
+  };
+  /** Cómo paga: un medio o pago dividido (plan). */
+  pago?: {
+    metodo: 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TRANSFERENCIA';
+    pagaCon?: number;
+    plan?: PlanPagoItem[];
   };
 }
 
@@ -107,6 +116,9 @@ export const salonApi = {
   // =========================================================================
   obtenerMesas: () => api.get<{ pisos: PisoSalon[] }>('/admin/salon/mesas'),
 
+  misPedidos: (rango: RangoMisPedidos) =>
+    api.get<RespuestaMisPedidos>(`/admin/pedidos/mis-pedidos?rango=${rango}`),
+
   abrirPedidoMesa: (payload: AbrirPedidoMesaPayload, idempotencyKey: string) =>
     api.post('/admin/salon/pedidos', payload, {
       headers: {
@@ -114,10 +126,10 @@ export const salonApi = {
       },
     }),
 
-  liberarMesaManual: (mesaId: string, motivo: string) =>
+  liberarMesaManual: (mesaId: string, motivo: string, forzar?: boolean) =>
     api.post<{ ok: boolean; mensaje: string }>(
       `/admin/salon/mesas/${mesaId}/liberar`,
-      { motivo },
+      { motivo, ...(forzar ? { forzar: true } : {}) },
     ),
 
   marcarEntregadoMesa: (pedidoId: string) =>

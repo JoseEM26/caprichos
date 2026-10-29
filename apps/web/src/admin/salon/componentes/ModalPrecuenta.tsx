@@ -1,13 +1,17 @@
 import { useState } from 'react';
 import '../salon.css';
+import '../precuenta.css';
 import { Confirmar } from '../../../comun/Confirmar';
 import { SubirVoucherMozo } from '../../vouchers/SubirVoucherMozo';
 import { vouchersApi } from '../../vouchers/vouchersApi';
+import { nombreMedio } from '../../pedidos/planPago';
 
 export interface LineaPrecuenta {
   cantidad: number;
   nombre: string;
   detalle: string;
+  /** Subtotal de la línea en soles. Si falta, la fila no muestra precio. */
+  precio?: number;
 }
 
 export interface ModalPrecuentaProps {
@@ -16,6 +20,11 @@ export interface ModalPrecuentaProps {
   mesa: string;
   lineas: LineaPrecuenta[];
   total: number;
+  subtotal?: number;
+  descuento?: number;
+  /** Pago dividido: monto por medio. Sin plan se muestra solo el total. */
+  plan?: Array<{ medio: string; monto: number | string }>;
+  mozo?: string | null;
   copias?: number;
   alImprimir?: () => Promise<void> | void;
   /** Con pedido, el mozo puede enviar el cobro a Caja (no lo cobra él). */
@@ -31,12 +40,21 @@ const MEDIOS_ENVIO: ReadonlyArray<{ id: MedioEnvio; nombre: string }> = [
   { id: 'TRANSFERENCIA', nombre: 'Transferencia' },
 ];
 
+const soles = (n: number | string | null | undefined) => `S/ ${Number(n || 0).toFixed(2)}`;
+
+const horaAhora = () =>
+  new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima' });
+
 export function ModalPrecuenta({
   abierto,
   alCerrar,
   mesa,
   lineas,
   total,
+  subtotal,
+  descuento = 0,
+  plan,
+  mozo,
   copias = 0,
   alImprimir,
   pedidoId,
@@ -56,7 +74,8 @@ export function ModalPrecuenta({
   if (!abierto) return null;
 
   const esDigital = medio !== 'EFECTIVO';
-  const nombreMedio = MEDIOS_ENVIO.find((m) => m.id === medio)?.nombre ?? medio;
+  const nombreMedioEnvio = MEDIOS_ENVIO.find((m) => m.id === medio)?.nombre ?? medio;
+  const planConMonto = (plan ?? []).filter((f) => Number(f.monto) > 0);
 
   const handleConfirmarImpresion = async () => {
     try {
@@ -90,270 +109,157 @@ export function ModalPrecuenta({
   const mensajeEnvio = !esDigital
     ? `Caja cobrará S/ ${Number(total || 0).toFixed(2)} en efectivo. Tú no cierras el cobro.`
     : voucherLegible
-      ? `Caja revisará la foto del voucher de ${nombreMedio} y cobrará S/ ${Number(total || 0).toFixed(2)}. Tú no cierras el cobro.`
-      : `No hay foto legible de ${nombreMedio}: Caja pedirá la foto o resolverá el cobro.`;
+      ? `Caja revisará la foto del voucher de ${nombreMedioEnvio} y cobrará S/ ${Number(total || 0).toFixed(2)}. Tú no cierras el cobro.`
+      : `No hay foto legible de ${nombreMedioEnvio}: Caja pedirá la foto o resolverá el cobro.`;
 
   return (
     <>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Precuenta"
-        className="salon-overlay"
-        style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 80,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <div
-          onClick={alCerrar}
-          style={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            top: 0,
-            bottom: 0,
-            zIndex: 50,
-            background: 'rgba(11, 44, 62, 0.55)',
-          }}
-        />
-        <div
-          className="salon-panel"
-          style={{
-            position: 'relative',
-            zIndex: 60,
-            width: 'min(420px, calc(100% - 24px))',
-            maxHeight: 'calc(100% - 24px)',
-            overflowY: 'auto',
-            background: 'var(--cp-white)',
-            borderRadius: '10px',
-            boxShadow: '0 20px 50px rgba(11, 44, 62, 0.4)',
-            padding: '18px',
-            fontFamily: "'Courier New', monospace",
-            fontSize: '13px',
-            lineHeight: '18px',
-            color: '#111',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '6px',
-          }}
-        >
-          <div style={{ textAlign: 'center', fontWeight: 700, fontSize: '16px' }}>
-            PRECUENTA
-          </div>
-          <div style={{ textAlign: 'center' }}>{mesa || 'Mesa'}</div>
-          <div style={{ textAlign: 'center' }}>------------------------------</div>
-          {lineas.map((l, i) => (
-            <div key={i}>
-              <b>
-                {l.cantidad} x {l.nombre}
-              </b>
-              <br />
-              <span style={{ paddingLeft: '14px' }}>{l.detalle}</span>
+      <div role="dialog" aria-modal="true" aria-label="Precuenta" className="salon-overlay pc-overlay">
+        <div onClick={alCerrar} className="pc-fondo" />
+        <div className="salon-panel pc-panel">
+          <header className="pc-cabecera">
+            <div className="pc-titulo">Precuenta</div>
+            <div className="pc-meta">
+              <span>{mesa || 'Mesa'}</span>
+              <span>{horaAhora()}</span>
+              {mozo && <span>Mozo: {mozo}</span>}
             </div>
-          ))}
-          <div style={{ textAlign: 'center' }}>------------------------------</div>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              fontWeight: 700,
-              fontSize: '15px',
-            }}
-          >
-            <span>TOTAL</span>
-            <span>S/ {Number(total || 0).toFixed(2)}</span>
-          </div>
-          <div
-            style={{
-              margin: '8px auto',
-              width: '96px',
-              height: '96px',
-              border: '2px solid #111',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 700,
-            }}
-          >
-            QR
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            Paga con Yape o Plin al 9XX XXX XXX o entrega el efectivo al mozo;
-            el cajero cobra y emite el comprobante.
-          </div>
-          <div style={{ textAlign: 'center', fontSize: '12px' }}>
-            La precuenta no es un comprobante de pago.
-          </div>
-          {copiasLocales > 0 && (
-            <div style={{ textAlign: 'center', fontSize: '12px' }}>
-              Copias impresas: {copiasLocales}
-            </div>
-          )}
+          </header>
 
-          {/* Envío del cobro a Caja: el mozo toma la foto y Caja revisa y cobra */}
-          {pedidoId !== undefined && (
-            <div
-              data-testid="seccion-envio-caja-mozo"
-              style={{
-                borderTop: '1px dashed #111',
-                marginTop: '10px',
-                paddingTop: '10px',
-                fontFamily: 'Montserrat, sans-serif',
-              }}
-            >
-              <div
-                style={{
-                  fontSize: '13px',
-                  fontWeight: 800,
-                  color: 'var(--cp-navy, #0B2C3E)',
-                  marginBottom: '6px',
-                }}
-              >
-                Medio de pago en mesa:
+          <div className="pc-cuerpo">
+            <ul className="pc-lineas" aria-label="Productos">
+              {lineas.map((l, i) => (
+                <li key={i} className="pc-linea">
+                  <span className="pc-cant">{l.cantidad}</span>
+                  <span className="pc-nombre">
+                    <span>{l.nombre}</span>
+                    {l.detalle && <span className="pc-detalle">{l.detalle}</span>}
+                  </span>
+                  {l.precio !== undefined && <span className="pc-precio">{soles(l.precio)}</span>}
+                </li>
+              ))}
+            </ul>
+
+            <div className="pc-totales">
+              {subtotal !== undefined && (
+                <div className="pc-fila">
+                  <span>Subtotal</span>
+                  <span>{soles(subtotal)}</span>
+                </div>
+              )}
+              {Number(descuento) > 0 && (
+                <div className="pc-fila">
+                  <span>Descuento</span>
+                  <span>- {soles(descuento)}</span>
+                </div>
+              )}
+              <div className="pc-total">
+                <span>TOTAL</span>
+                <span>{soles(total)}</span>
               </div>
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                {MEDIOS_ENVIO.map((m) => {
-                  const activo = medio === m.id;
-                  return (
+              {planConMonto.length > 0 && (
+                <div className="pc-plan">
+                  {planConMonto.map((f) => `${nombreMedio(f.medio)} ${soles(Number(f.monto))}`).join(' · ')}
+                </div>
+              )}
+            </div>
+
+            <section className="pc-como-pagar" aria-label="Cómo pagar">
+              <h3>Cómo pagar</h3>
+              <div className="pc-tarjetas">
+                <div className="pc-tarjeta">
+                  <div className="pc-tarjeta-titulo">Yape o Plin</div>
+                  <div className="pc-tarjeta-texto">Paga al 9XX XXX XXX. Caja cobra y emite el comprobante.</div>
+                </div>
+                <div className="pc-tarjeta">
+                  <div className="pc-tarjeta-titulo">Efectivo</div>
+                  <div className="pc-tarjeta-texto">Entrega el efectivo al mozo. Caja cobra y da el vuelto.</div>
+                </div>
+              </div>
+            </section>
+
+            {copiasLocales > 0 && <div className="pc-copias">Copias impresas: {copiasLocales}</div>}
+
+            {/* Envío del cobro a Caja: el mozo toma la foto y Caja revisa y cobra */}
+            {pedidoId !== undefined && (
+              <div data-testid="seccion-envio-caja-mozo" className="pc-envio">
+                <div className="pc-envio-titulo">Medio de pago en mesa:</div>
+                <div className="pc-medios">
+                  {MEDIOS_ENVIO.map((m) => (
                     <button
                       key={m.id}
                       type="button"
+                      aria-pressed={medio === m.id}
                       disabled={enviado}
                       onClick={() => {
                         setMedio(m.id);
                         setVoucherLegible(false);
                       }}
-                      style={{
-                        minHeight: '38px',
-                        padding: '0 12px',
-                        borderRadius: '9999px',
-                        border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                        background: activo ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
-                        color: activo ? 'var(--cp-cream, #FBF4EC)' : 'var(--cp-navy, #0B2C3E)',
-                        fontWeight: 700,
-                        fontSize: '12px',
-                        cursor: enviado ? 'not-allowed' : 'pointer',
-                      }}
+                      className="pc-medio"
                     >
                       {m.nombre}
                     </button>
-                  );
-                })}
+                  ))}
+                </div>
+
+                {/* Digital: la foto se lee al instante; el mozo solo ve si se lee o no */}
+                {esDigital && (
+                  <SubirVoucherMozo
+                    key={medio}
+                    pedidoId={pedidoId}
+                    medio={medio as 'YAPE' | 'PLIN' | 'TRANSFERENCIA'}
+                    bloqueado={enviado}
+                    alVoucherValido={(info) => setVoucherLegible(info.legible)}
+                  />
+                )}
+
+                {!esDigital && (
+                  <div data-testid="aviso-efectivo-caja" className="pc-nota-envio">
+                    Efectivo: no hace falta foto. Caja cobra y da el vuelto.
+                  </div>
+                )}
+
+                {esDigital && !voucherLegible && (
+                  <div className="pc-nota-envio">Si no hay foto o no se lee, Caja lo revisa y resuelve el cobro.</div>
+                )}
+
+                {!enviado && (
+                  <button
+                    type="button"
+                    disabled={enviando}
+                    onClick={() => setConfirmarEnvio(true)}
+                    data-testid="btn-enviar-caja"
+                    className="pc-btn-enviar"
+                  >
+                    Enviar a Caja
+                  </button>
+                )}
+
+                {enviado && (
+                  <div role="status" data-testid="aviso-enviado-caja" className="pc-enviado">
+                    Enviado a Caja, ellos lo revisan.
+                  </div>
+                )}
+
+                {errorEnvio && (
+                  <div role="alert" className="pc-error">
+                    {errorEnvio}
+                  </div>
+                )}
               </div>
+            )}
 
-              {/* Digital: la foto se lee al instante; el mozo solo ve si se lee o no */}
-              {esDigital && (
-                <SubirVoucherMozo
-                  key={medio}
-                  pedidoId={pedidoId}
-                  medio={medio as 'YAPE' | 'PLIN' | 'TRANSFERENCIA'}
-                  bloqueado={enviado}
-                  alVoucherValido={(info) => setVoucherLegible(info.legible)}
-                />
-              )}
+            <p className="pc-aviso">La precuenta no es un comprobante de pago.</p>
+          </div>
 
-              {!esDigital && (
-                <div data-testid="aviso-efectivo-caja" style={{ fontSize: '12px', lineHeight: '16px', color: '#2C4C5D', marginTop: '6px' }}>
-                  Efectivo: no hace falta foto. Caja cobra y da el vuelto.
-                </div>
-              )}
-
-              {esDigital && !voucherLegible && (
-                <div style={{ fontSize: '12px', lineHeight: '16px', color: '#2C4C5D', marginTop: '6px' }}>
-                  Si no hay foto o no se lee, Caja lo revisa y resuelve el cobro.
-                </div>
-              )}
-
-              {!enviado && (
-                <button
-                  type="button"
-                  disabled={enviando}
-                  onClick={() => setConfirmarEnvio(true)}
-                  data-testid="btn-enviar-caja"
-                  style={{
-                    marginTop: '10px',
-                    width: '100%',
-                    minHeight: '44px',
-                    border: 0,
-                    borderRadius: '10px',
-                    background: 'var(--cp-green, #2F7A45)',
-                    color: '#FFFFFF',
-                    fontFamily: 'Montserrat, sans-serif',
-                    fontWeight: 800,
-                    cursor: enviando ? 'not-allowed' : 'pointer',
-                  }}
-                >
-                  Enviar a Caja
-                </button>
-              )}
-
-              {enviado && (
-                <div
-                  role="status"
-                  data-testid="aviso-enviado-caja"
-                  style={{
-                    marginTop: '10px',
-                    padding: '10px 12px',
-                    borderRadius: '10px',
-                    background: '#E8F5E9',
-                    border: '1px solid var(--cp-green, #2F7A45)',
-                    color: 'var(--cp-green, #2F7A45)',
-                    fontFamily: 'Montserrat, sans-serif',
-                    fontWeight: 800,
-                    fontSize: '13px',
-                  }}
-                >
-                  Enviado a Caja, ellos lo revisan.
-                </div>
-              )}
-
-              {errorEnvio && (
-                <div role="alert" style={{ marginTop: '8px', color: 'var(--cp-rust, #B2500F)', fontWeight: 700, fontSize: '12px' }}>
-                  {errorEnvio}
-                </div>
-              )}
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={() => setConfirmarImprimir(true)}
-            style={{
-              marginTop: '6px',
-              minHeight: '44px',
-              border: 0,
-              borderRadius: '10px',
-              background: 'var(--cp-orange)',
-              color: 'var(--cp-navy)',
-              fontFamily: 'Montserrat, sans-serif',
-              fontWeight: 800,
-              cursor: 'pointer',
-            }}
-          >
-            Imprimir precuenta
-          </button>
-          <button
-            type="button"
-            onClick={alCerrar}
-            style={{
-              marginTop: '4px',
-              minHeight: '44px',
-              border: '1.5px solid var(--cp-navy)',
-              borderRadius: '10px',
-              background: 'transparent',
-              color: 'var(--cp-navy)',
-              fontFamily: 'Montserrat, sans-serif',
-              fontWeight: 800,
-              cursor: 'pointer',
-            }}
-          >
-            Cerrar
-          </button>
+          <footer className="pc-pie">
+            <button type="button" onClick={() => setConfirmarImprimir(true)} className="pc-btn pc-btn-primario">
+              Imprimir precuenta
+            </button>
+            <button type="button" onClick={alCerrar} className="pc-btn pc-btn-secundario">
+              Cerrar
+            </button>
+          </footer>
         </div>
       </div>
 

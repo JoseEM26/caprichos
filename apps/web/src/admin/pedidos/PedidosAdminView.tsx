@@ -1091,6 +1091,7 @@ export function PedidosAdminView() {
       {nuevoPedidoAbierto && (
         <ModalNuevoPedidoMesa
           abierto={true}
+          puedeForzarLiberacion={tiene('mesas/liberar')}
           pasoInicial="modal"
           pisos={pisosSalon}
           pedidoRepetir={pedidoRepetir}

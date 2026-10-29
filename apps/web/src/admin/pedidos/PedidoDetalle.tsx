@@ -1003,8 +1003,12 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: 
             detalle: [l.tamano, ...(l.opciones || l.opcionesElegidas || []).map((o) => o.opcion_nombre || o.nombre)]
               .filter(Boolean)
               .join(' · '),
+            precio: Number(l.subtotal),
           }))}
           total={Number(pedido.total)}
+          subtotal={Number(pedido.subtotal)}
+          descuento={Number(pedido.descuento || 0)}
+          plan={pedido.planPago}
         />
       )}
 

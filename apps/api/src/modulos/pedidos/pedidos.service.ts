@@ -25,6 +25,7 @@ import { CrearPedidoDto } from './dto/crear-pedido.dto';
 import { generarTokenSeguimiento } from './seguimiento.tokens';
 import { AvisosInternosService } from '../chatbot/avisos-internos/avisos-internos.service';
 import { AvisosPedidoService } from '../chatbot/servicios/avisos-pedido.service';
+import { PagoPlanService } from './pago-plan.service';
 
 export interface OrigenPedido {
   canal?: 'CARTA' | 'MOZO' | 'CAJA' | 'WHATSAPP' | 'BOT';
@@ -48,6 +49,7 @@ export class PedidosService {
     private readonly zonasService: ZonasService,
     private readonly eventosGateway: EventosGateway,
     private readonly ofertasService: OfertasService,
+    private readonly pagoPlan: PagoPlanService,
     @Optional() private readonly puntosService?: PuntosService,
     @Optional()
     @Inject(forwardRef(() => AvisosInternosService))
@@ -507,14 +509,18 @@ export class PedidosService {
 
     const totalCalculado = Number(Math.max(0, subtotalCalculado - descuentoAplicado + (envio ?? 0)).toFixed(2));
 
-    // 8. Validación de pago
-    if (dto.pago.metodo === 'EFECTIVO' && dto.pago.pagaCon !== undefined) {
-      if (Number(dto.pago.pagaCon) < totalCalculado) {
-        throw new BadRequestException({
-          codigo: 'PAGO_INSUFICIENTE',
-          mensaje: `El monto con el que paga (S/ ${dto.pago.pagaCon}) no puede ser menor al total (S/ ${totalCalculado})`,
-        });
-      }
+    // 8. Validación de pago (con plan: el efectivo se compara contra su parte, no contra el total)
+    const planPago = this.pagoPlan.validar(dto.pago.plan, totalCalculado);
+    const montoEfectivo = planPago
+      ? this.pagoPlan.montoEfectivo(planPago)
+      : dto.pago.metodo === 'EFECTIVO'
+        ? totalCalculado
+        : 0;
+    if (dto.pago.pagaCon !== undefined && montoEfectivo > 0 && Number(dto.pago.pagaCon) < montoEfectivo) {
+      throw new BadRequestException({
+        codigo: 'PAGO_INSUFICIENTE',
+        mensaje: `El monto con el que paga (S/ ${dto.pago.pagaCon}) no puede ser menor a ${planPago ? 'la parte en efectivo' : 'el total'} (S/ ${montoEfectivo})`,
+      });
     }
 
     // 9. Creación en transacción
@@ -563,10 +569,11 @@ export class PedidosService {
           entrega_lng: dto.entrega?.lng != null ? new Prisma.Decimal(dto.entrega.lng) : null,
           entrega_origen: entregaOrigen,
           zona_id: zonaId,
-          pago_metodo: dto.pago.metodo,
+          pago_metodo: planPago ? this.pagoPlan.pagoPrincipal(planPago) : dto.pago.metodo,
           pago_estado: 'PENDIENTE',
-          pago_preferido: dto.pago.metodo,
-          paga_con: dto.pago.pagaCon != null ? new Prisma.Decimal(dto.pago.pagaCon) : null,
+          pago_preferido: planPago ? this.pagoPlan.pagoPrincipal(planPago) : dto.pago.metodo,
+          paga_con:
+            dto.pago.pagaCon != null && montoEfectivo > 0 ? new Prisma.Decimal(dto.pago.pagaCon) : null,
           subtotal: new Prisma.Decimal(subtotalCalculado),
           descuento: new Prisma.Decimal(descuentoAplicado),
           envio: envio !== null ? new Prisma.Decimal(envio) : null,
@@ -586,6 +593,10 @@ export class PedidosService {
           pasa_cocina_en: new Date(),
         },
       });
+
+      if (planPago) {
+        await this.pagoPlan.guardar(tx, pedido.id, planPago);
+      }
 
       // Crear líneas y opciones
       for (const lin of lineasCalculadas) {

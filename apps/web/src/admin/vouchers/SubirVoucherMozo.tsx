@@ -3,7 +3,7 @@ import { vouchersApi } from './vouchersApi';
 import { reducirImagenVoucher } from './reducirImagenVoucher';
 import { Cargando } from '../../comun/Cargando';
 import { ErrorApi } from '../../comun/api';
-import type { RespuestaSubirVoucher } from './tipos';
+import type { RespuestaSubirVoucher, RespuestaSubirVoucherMozo } from './tipos';
 
 export interface SubirVoucherMozoProps {
   pedidoId: string | number;
@@ -19,6 +19,8 @@ export interface SubirVoucherMozoProps {
   bloqueado?: boolean;
   /** Ofrece la salida sin foto (código del supervisor): Caja/Admin y el mozo en su cobro de mesa. */
   ofrecerExcepcion?: boolean;
+  /** Pedido nuevo del mozo: el voucher se puede subir después (texto «Opcional ahora»). */
+  opcional?: boolean;
 }
 
 export function SubirVoucherMozo({
@@ -29,6 +31,7 @@ export function SubirVoucherMozo({
   alCambiarEstado,
   bloqueado = false,
   ofrecerExcepcion = false,
+  opcional = false,
 }: SubirVoucherMozoProps) {
   const [archivo, setArchivo] = useState<File | null>(null);
   const [vistaPreviaUrl, setVistaPreviaUrl] = useState<string | null>(null);
@@ -36,8 +39,15 @@ export function SubirVoucherMozo({
   const [errorSubida, setErrorSubida] = useState<string | null>(null);
   const [esIlegible, setEsIlegible] = useState<boolean>(false);
   const [voucherValidoId, setVoucherValidoId] = useState<string | number | null>(null);
+  // Lectura automática no disponible: el voucher queda guardado y Caja lo revisa a mano
+  const [revisionManual, setRevisionManual] = useState<boolean>(false);
+  // Avisos de lo que no cuadra (texto): el voucher cuenta como subido igual; Caja decide
+  const [avisos, setAvisos] = useState<string[]>([]);
+
+  const textoGuardadoManual = 'Voucher guardado. La lectura automática no está disponible; Caja lo revisará.';
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const inputGaleriaRef = useRef<HTMLInputElement>(null);
 
   // Limpiar vista previa previa al desmontar
   useEffect(() => {
@@ -60,17 +70,20 @@ export function SubirVoucherMozo({
       const blobReducido = await reducirImagenVoucher(file, 1600, 0.85);
 
       // 2. Subida a la API
-      const respuesta = await vouchersApi.subirVoucher(
+      // El mozo recibe la forma reducida (legible, revisionManual, avisos): nunca semáforo
+      const respuesta = (await vouchersApi.subirVoucher(
         blobReducido,
         pedidoId,
         medio,
-      );
+      )) as RespuestaSubirVoucherMozo;
 
       alRespuesta?.(respuesta);
 
       // Regla de oro del mozo: SOLO ve legible / no legible. NUNCA semáforo ni datos extraídos.
       if (respuesta.legible) {
         setVoucherValidoId(respuesta.id);
+        setRevisionManual(respuesta.revisionManual === true);
+        setAvisos(respuesta.avisos ?? []);
         setEsIlegible(false);
         alVoucherValido({ id: respuesta.id, legible: true });
         alCambiarEstado?.({
@@ -158,10 +171,12 @@ export function SubirVoucherMozo({
       </div>
 
       <div style={{ fontSize: '12px', color: 'var(--cp-soft, #2C4C5D)', lineHeight: 1.4 }}>
-        Obligatorio para pagos digitales en mesa. La foto se analiza al instante.
+        {opcional
+          ? 'Opcional ahora: puedes subirlo después. La foto se analiza al instante.'
+          : 'Obligatorio para pagos digitales en caja. La foto se analiza al instante.'}
       </div>
 
-      {/* Input de archivo oculto */}
+      {/* Inputs ocultos: cámara (capture) y galería/archivo (sin capture) */}
       <input
         ref={inputRef}
         type="file"
@@ -172,15 +187,25 @@ export function SubirVoucherMozo({
         data-testid="input-voucher-archivo"
         style={{ display: 'none' }}
       />
+      <input
+        ref={inputGaleriaRef}
+        type="file"
+        accept="image/*"
+        disabled={bloqueado || subiendo}
+        onChange={handleSeleccionarArchivo}
+        data-testid="input-voucher-galeria"
+        style={{ display: 'none' }}
+      />
 
-      {/* Botón para tomar/subir foto si no hay archivo aún */}
+      {/* Dos caminos: foto con la cámara o captura desde la galería/archivo */}
       {!archivo && (
-        <button
-          type="button"
-          disabled={bloqueado || subiendo}
-          onClick={() => inputRef.current?.click()}
-          data-testid="btn-tomar-voucher"
-          style={{
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+          <button
+            type="button"
+            disabled={bloqueado || subiendo}
+            onClick={() => inputRef.current?.click()}
+            data-testid="btn-tomar-voucher"
+            style={{
             minHeight: '44px',
             border: '1.5px solid var(--cp-navy, #0B2C3E)',
             borderRadius: '10px',
@@ -192,9 +217,30 @@ export function SubirVoucherMozo({
             cursor: bloqueado || subiendo ? 'not-allowed' : 'pointer',
             padding: '8px 14px',
           }}
-        >
-          Tomar foto o subir voucher
-        </button>
+          >
+            Tomar foto
+          </button>
+          <button
+            type="button"
+            disabled={bloqueado || subiendo}
+            onClick={() => inputGaleriaRef.current?.click()}
+            data-testid="btn-subir-captura"
+            style={{
+            minHeight: '44px',
+            border: '1.5px solid var(--cp-navy, #0B2C3E)',
+            borderRadius: '10px',
+            background: 'var(--cp-white, #FFFFFF)',
+            color: 'var(--cp-navy, #0B2C3E)',
+            fontFamily: 'Montserrat, sans-serif',
+            fontWeight: 700,
+            fontSize: '13px',
+            cursor: bloqueado || subiendo ? 'not-allowed' : 'pointer',
+            padding: '8px 14px',
+          }}
+          >
+            Subir captura
+          </button>
+        </div>
       )}
 
       {/* Vista previa y estado */}
@@ -238,7 +284,11 @@ export function SubirVoucherMozo({
               {subiendo
                 ? 'Analizando voucher...'
                 : voucherValidoId
-                ? 'Voucher legible'
+                ? avisos.length > 0
+                  ? 'Voucher recibido'
+                  : revisionManual
+                    ? 'Voucher guardado'
+                    : 'Voucher legible'
                 : esIlegible
                 ? 'No legible'
                 : 'Pendiente'}
@@ -309,7 +359,54 @@ export function SubirVoucherMozo({
       )}
 
       {/* Éxito: voucher legible */}
-      {voucherValidoId && !subiendo && (
+      {/* Avisos: color de advertencia (no de error). Cuenta como subido; Caja decide. */}
+      {voucherValidoId && !subiendo && avisos.length > 0 && (
+        <div
+          data-testid="voucher-mozo-avisos"
+          role="status"
+          style={{
+            background: '#FFF7E0',
+            border: '1.5px solid #B7791F',
+            borderRadius: '10px',
+            padding: '10px 12px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+          }}
+        >
+          <div style={{ color: '#7A4E0B', fontWeight: 800, fontSize: '12.5px' }}>
+            Voucher recibido, pero revisa esto:
+          </div>
+          <ul style={{ margin: 0, paddingLeft: '18px', color: '#7A4E0B', fontSize: '12.5px', lineHeight: 1.4 }}>
+            {avisos.map((aviso, i) => (
+              <li key={i}>{aviso}</li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            onClick={handleTomarOtraFoto}
+            data-testid="btn-subir-otra-foto"
+            style={{
+              alignSelf: 'flex-start',
+              minHeight: '44px',
+              padding: '0 14px',
+              background: 'transparent',
+              color: '#7A4E0B',
+              border: '1.5px solid #B7791F',
+              borderRadius: '8px',
+              fontFamily: 'Montserrat, sans-serif',
+              fontWeight: 700,
+              fontSize: '12.5px',
+              cursor: 'pointer',
+            }}
+          >
+            Subir otra foto
+          </button>
+        </div>
+      )}
+
+      {/* Éxito: voucher legible (sin avisos) */}
+      {voucherValidoId && !subiendo && avisos.length === 0 && (
         <div
           data-testid="voucher-mozo-valido"
           style={{
@@ -330,7 +427,7 @@ export function SubirVoucherMozo({
               fontSize: '12.5px',
             }}
           >
-            Foto del voucher lista para confirmar
+            {revisionManual ? textoGuardadoManual : 'Foto del voucher lista para confirmar'}
           </div>
           <button
             type="button"

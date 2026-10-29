@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMinSize,
   IsArray,
   IsBoolean,
   IsIn,
@@ -77,6 +78,17 @@ export class LineaPedidoDto {
   precio?: any;
 }
 
+export class PlanPagoItemDto {
+  @IsIn(['EFECTIVO', 'YAPE', 'PLIN', 'TRANSFERENCIA'], {
+    message: 'Medio de pago del plan no válido',
+  })
+  medio!: 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TRANSFERENCIA';
+
+  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'El monto del plan debe ser un número' })
+  @Min(0.01, { message: 'Cada monto del plan debe ser mayor a 0' })
+  monto!: number;
+}
+
 export class PagoPedidoDto {
   @IsIn(['EFECTIVO', 'YAPE', 'PLIN', 'TARJETA', 'TRANSFERENCIA'], {
     message: 'Método de pago no válido',
@@ -87,6 +99,14 @@ export class PagoPedidoDto {
   @IsNumber({}, { message: 'pagaCon debe ser un número' })
   @Min(0)
   pagaCon?: number;
+
+  /** Pago dividido: monto por medio. Si viene, manda sobre metodo (que queda como medio principal). */
+  @IsOptional()
+  @IsArray({ message: 'El plan de pago debe ser una lista' })
+  @ArrayMinSize(1, { message: 'El plan de pago necesita al menos un medio' })
+  @ValidateNested({ each: true })
+  @Type(() => PlanPagoItemDto)
+  plan?: PlanPagoItemDto[];
 }
 
 export class ComprobantePedidoDto {

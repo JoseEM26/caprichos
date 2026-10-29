@@ -17,7 +17,9 @@ import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { obtenerFechaHoraLima } from '../local/local.util';
 import { VouchersIaService } from './vouchers-ia.service';
+import { montoEsperadoVoucher } from '../pedidos/pago-plan.service';
 import {
+  avisosMozo,
   calcularSemaforo,
   ContextoSemaforo,
   DatosVoucherExtraidos,
@@ -115,7 +117,14 @@ export class VouchersService {
       pedidoIdBigInt = this.parsearId(opciones.pedidoId);
       pedido = await this.prisma.pedido.findUnique({
         where: { id: pedidoIdBigInt },
-        select: { id: true, codigo: true, total: true, pago_preferido: true, pago_metodo: true },
+        select: {
+          id: true,
+          codigo: true,
+          total: true,
+          pago_preferido: true,
+          pago_metodo: true,
+          planPago: { select: { medio: true, monto: true } },
+        },
       });
       if (!pedido) {
         throw new HttpException(
@@ -167,7 +176,7 @@ export class VouchersService {
 
     // 7. Evaluar semáforo con función pura
     const contexto: ContextoSemaforo = {
-      pedidoTotal: pedido?.total != null ? Number(pedido.total) : null,
+      pedidoTotal: pedido ? montoEsperadoVoucher(pedido.planPago, pedido.total != null ? Number(pedido.total) : null) : null,
       medioEsperado: opciones.medio || (pedido?.pago_preferido as any) || (pedido?.pago_metodo as any) || null,
       titularEsperado: config.titularEsperado,
       yapeNumeroEsperado: config.yapeNumeroEsperado,
@@ -227,6 +236,10 @@ export class VouchersService {
         ...(voucher.semaforo === 'ILEGIBLE'
           ? { mensaje: 'Este voucher no se lee bien. Vuelve a tomar la foto, por favor.' }
           : {}),
+        // Solo al mozo (la carta no lo recibe): lectura automática no disponible, Caja lo revisa a mano
+        ...(usuario ? { revisionManual: voucher.semaforo === 'SIN_LECTURA' } : {}),
+        // Avisos en texto de lo que no cuadra; sin lectura de IA no hay avisos
+        ...(usuario ? { avisos: legible ? avisosMozo(extraido, contexto) : [] } : {}),
       };
     }
 
@@ -301,7 +314,7 @@ export class VouchersService {
       const medioEsperado = (pedido?.pago_preferido as any) || (pedido?.pago_metodo as any) || null;
 
       const contexto: ContextoSemaforo = {
-        pedidoTotal: pedido?.total != null ? Number(pedido.total) : null,
+        pedidoTotal: pedido ? montoEsperadoVoucher(pedido.planPago, pedido.total != null ? Number(pedido.total) : null) : null,
         medioEsperado,
         titularEsperado: config.titularEsperado,
         yapeNumeroEsperado: config.yapeNumeroEsperado,

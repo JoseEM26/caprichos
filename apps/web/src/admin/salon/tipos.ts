@@ -61,6 +61,7 @@ export interface MesaSalon {
   pedido?: {
     id: string;
     codigo: string;
+    estado?: string;
     mozo: string | null;
     total?: number;
     lineas?: Array<{ cantidad: number; nombre: string; detalle: string }>;
@@ -145,4 +146,34 @@ export interface AvisoPedidoListo {
   mesas: string[];
   mozoPartyId?: string;
   recibidoEn: string;
+}
+
+export type RangoMisPedidos = 'hoy' | 'ayer' | '7dias';
+
+/** Pedido que tomó el mozo (GET /admin/pedidos/mis-pedidos). */
+export interface MiPedido {
+  id: string;
+  codigo: string;
+  estado: string;
+  modalidad: string;
+  mesaNombre: string | null;
+  total: number;
+  pagoEstado: string | null;
+  /** YAPE | PLIN | TRANSFERENCIA | EFECTIVO | … (null si no se eligió) */
+  pagoMetodo: string | null;
+  /** Pago dividido: monto por medio (vacío si el pedido no tiene plan) */
+  plan?: Array<{ medio: string; monto: number }>;
+  /** Parte del plan que lleva voucher (YAPE, PLIN, TRANSFERENCIA) */
+  montoDigital?: number;
+  /** Cantidad de fotos de voucher ligadas al pedido */
+  vouchers: number;
+  /** Alguna foto se lee. El mozo nunca ve semáforo ni datos extraídos. */
+  tieneVoucherLegible: boolean;
+  creadoEn: string;
+  lineas: Array<{ nombre: string; cantidad: number }>;
+}
+
+export interface RespuestaMisPedidos {
+  pedidos: MiPedido[];
+  resumen: { cantidad: number; total: number; enCurso: number; entregados: number };
 }

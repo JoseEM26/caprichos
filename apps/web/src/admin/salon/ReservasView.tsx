@@ -1790,6 +1790,7 @@ export function ReservasView() {
       {modalNuevoPedidoAbierto && (
         <ModalNuevoPedidoMesa
           abierto={true}
+          puedeForzarLiberacion={tiene('mesas/liberar')}
           alCerrar={() => {
             setModalNuevoPedidoAbierto(false);
             setMesasParaPedido([]);

@@ -18,6 +18,7 @@ import { FiltrarPedidosDto } from './dto/filtrar-pedidos.dto';
 import { CambiarEstadoDto } from './dto/cambiar-estado.dto';
 import { RegistrarPagoDto } from './dto/registrar-pago.dto';
 import { CocinaQueryDto } from './dto/cocina-query.dto';
+import { MisPedidosQueryDto } from './dto/mis-pedidos-query.dto';
 import { UbicarPedidoDto } from './dto/ubicar-pedido.dto';
 import { UbicarPedidoService } from './ubicar-pedido.service';
 import { PedidosService } from '../pedidos/pedidos.service';
@@ -80,6 +81,12 @@ export class PedidosAdminController {
   @Permiso('pedidos', 'ver')
   async listarNoEntregados() {
     return this.pedidosEstadoService.listarNoEntregados();
+  }
+
+  @Get('mis-pedidos')
+  @Permiso('pedidos', 'crear')
+  async misPedidos(@Query() query: MisPedidosQueryDto, @Req() req: any) {
+    return this.pedidosEstadoService.misPedidos(req.usuario, query.rango ?? 'hoy');
   }
 
   @Get(':id')

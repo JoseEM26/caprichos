@@ -14,6 +14,7 @@ import { LocalService } from '../local/local.service';
 import { ZonasService } from '../zonas/zonas.service';
 import { OfertasService } from '../ofertas/ofertas.service';
 import { PuntosService } from '../clientes/puntos.service';
+import { PagoPlanService } from './pago-plan.service';
 import { CrearPedidoDto } from './dto/crear-pedido.dto';
 import { generarTokenSeguimiento } from './seguimiento.tokens';
 
@@ -116,6 +117,9 @@ describe('PedidosService', () => {
       pedidoLinea: {
         create: jest.fn().mockResolvedValue({ id: 50n }),
       },
+      pedidoPagoPlan: {
+        createMany: jest.fn().mockResolvedValue({ count: 2 }),
+      },
       pedidoLineaOpcion: {
         create: jest.fn().mockResolvedValue({ id: 500n }),
       },
@@ -188,6 +192,7 @@ describe('PedidosService', () => {
         { provide: EventosGateway, useValue: eventosGatewayMock },
         { provide: OfertasService, useValue: ofertasServiceMock },
         { provide: PuntosService, useValue: puntosServiceMock },
+        PagoPlanService,
       ],
     }).compile();
 
@@ -232,6 +237,82 @@ describe('PedidosService', () => {
           estado: 'COLA',
         }),
       );
+    });
+
+    describe('pago dividido (plan)', () => {
+      // Delivery con total 33.0 (subtotal 28 + envío 5)
+      const conPlan = (plan: any, extraPago: Record<string, unknown> = {}): CrearPedidoDto => ({
+        ...pedidoBaseDto,
+        pago: { metodo: 'EFECTIVO', plan, ...extraPago } as any,
+      });
+
+      beforeEach(() => {
+        prismaMock.pedido.create.mockResolvedValue({
+          id: 100n,
+          codigo: 'CP-W001',
+          estado: 'COLA',
+          subtotal: 28.0,
+          envio: 5.0,
+          total: 33.0,
+        });
+      });
+
+      it('guarda un renglón por medio y el digital queda como pago_metodo', async () => {
+        await service.crear(
+          conPlan([
+            { medio: 'EFECTIVO', monto: 13 },
+            { medio: 'YAPE', monto: 20 },
+          ], { pagaCon: 20 }),
+          'idemp-plan-1',
+        );
+
+        expect(prismaMock.pedidoPagoPlan.createMany).toHaveBeenCalledWith({
+          data: [
+            expect.objectContaining({ pedido_id: 100n, medio: 'EFECTIVO', orden: 0 }),
+            expect.objectContaining({ pedido_id: 100n, medio: 'YAPE', orden: 1 }),
+          ],
+        });
+        const data = prismaMock.pedido.create.mock.calls[0][0].data;
+        expect(data.pago_metodo).toBe('YAPE');
+        expect(data.pago_preferido).toBe('YAPE');
+        expect(Number(data.paga_con)).toBe(20);
+      });
+
+      it('rechaza un plan cuya suma no iguala el total y no crea el pedido', async () => {
+        await expect(
+          service.crear(
+            conPlan([
+              { medio: 'EFECTIVO', monto: 10 },
+              { medio: 'YAPE', monto: 20 },
+            ]),
+            'idemp-plan-2',
+          ),
+        ).rejects.toMatchObject({ response: { codigo: 'PLAN_PAGO_NO_CUADRA' } });
+        expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+      });
+
+      it('compara el pagaCon contra la parte en efectivo, no contra el total', async () => {
+        await expect(
+          service.crear(
+            conPlan([
+              { medio: 'EFECTIVO', monto: 13 },
+              { medio: 'YAPE', monto: 20 },
+            ], { pagaCon: 10 }),
+            'idemp-plan-3',
+          ),
+        ).rejects.toMatchObject({ response: { codigo: 'PAGO_INSUFICIENTE' } });
+      });
+
+      it('sin plan se comporta como antes: no crea renglones y usa pago.metodo', async () => {
+        await service.crear(
+          { ...pedidoBaseDto, pago: { metodo: 'YAPE' } },
+          'idemp-plan-4',
+        );
+
+        expect(prismaMock.pedidoPagoPlan.createMany).not.toHaveBeenCalled();
+        const data = prismaMock.pedido.create.mock.calls[0][0].data;
+        expect(data.pago_metodo).toBe('YAPE');
+      });
     });
 
     it('2. envío gratis cuando subtotal supera envio_gratis_monto (modo estrictamente mayor)', async () => {
@@ -625,6 +706,34 @@ describe('PedidosService', () => {
         expect(pedidoCreadoData.mesa_nombre).toBe('Mesa 3');
         expect(pedidoCreadoData.cliente_nombre).toBe('Mesa 3');
         expect(pedidoCreadoData.cliente_telefono).toBeNull();
+      });
+
+      it('acepta un medio digital (YAPE, PLIN, TRANSFERENCIA) para llevar desde el canal MOZO', async () => {
+        for (const metodo of ['YAPE', 'PLIN', 'TRANSFERENCIA'] as const) {
+          let pedidoCreadoData: any = null;
+          prismaMock.pedido.create.mockImplementation(({ data }: any) => {
+            pedidoCreadoData = data;
+            return Promise.resolve({
+              id: 300n,
+              codigo: 'CP-W300',
+              estado: 'COLA',
+              subtotal: Number(data.subtotal),
+              envio: null,
+              total: Number(data.total),
+            });
+          });
+
+          const res = await service.crear(
+            { ...pedidoBaseDto, modalidad: 'RECOGER', pago: { metodo } } as any,
+            `idemp-mozo-${metodo}`,
+            { canal: 'MOZO', usuarioPartyId: 55n },
+          );
+
+          expect(res.codigo).toBe('CP-W300');
+          expect(pedidoCreadoData.canal).toBe('MOZO');
+          expect(pedidoCreadoData.pago_metodo).toBe(metodo);
+          expect(pedidoCreadoData.pago_estado).toBe('PENDIENTE');
+        }
       });
     });
   });

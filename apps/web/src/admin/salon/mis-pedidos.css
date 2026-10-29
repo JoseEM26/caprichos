@@ -1,0 +1,466 @@
+/* Mis pedidos del mozo. Celular primero (390 px); tablet desde 600 px; PC desde 900 px.
+   Los nombres de clase son los del TSX. Los estados de color llegan como estilo en línea
+   en .mp-estado, por eso el borde de cada tarjeta se elige con selectores de atributo. */
+
+.mp {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px 16px 32px;
+  box-sizing: border-box;
+  min-width: 0;
+  color: var(--cp-navy);
+}
+
+.mp *,
+.mp *::before,
+.mp *::after {
+  box-sizing: border-box;
+}
+
+/* Botón principal: grande y pegado arriba al desplazarse en celular */
+.mp-nuevo {
+  position: sticky;
+  top: 8px;
+  z-index: 5;
+  min-height: 56px;
+  width: 100%;
+  border: 0;
+  border-radius: 16px;
+  background: var(--cp-orange);
+  color: var(--cp-navy);
+  font-family: var(--fuente-titulos);
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(230, 121, 41, 0.32);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.mp-nuevo:hover {
+  background: #d96d22;
+}
+
+.mp-nuevo:active {
+  transform: scale(0.98);
+}
+
+.mp-nuevo:focus-visible,
+.mp-chip:focus-visible,
+.mp-card-cabeza:focus-visible {
+  outline: 3px solid var(--cp-gold);
+  outline-offset: 2px;
+}
+
+/* Resumen: cuadrícula 2x2 en celular, 4 columnas desde 600 px */
+.mp-resumen {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mp-stat {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 14px 14px 13px;
+  background: var(--cp-white);
+  border: 1px solid var(--cp-line);
+  border-radius: 18px;
+  box-shadow: 0 1px 2px rgba(11, 44, 62, 0.05);
+}
+
+.mp-stat-valor {
+  font-family: var(--fuente-titulos);
+  font-weight: 800;
+  font-size: 22px;
+  line-height: 1.15;
+  color: var(--cp-navy);
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.mp-stat-etiq {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--cp-soft);
+}
+
+/* Chips: una sola fila que se desliza en celular, sin barra visible */
+.mp-chips {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 -16px;
+  padding: 2px 16px;
+  scroll-padding: 0 16px;
+  scroll-snap-type: x proximity;
+}
+
+.mp-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.mp-chip {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1.5px solid var(--cp-line);
+  background: var(--cp-white);
+  color: var(--cp-navy);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.mp-chip:hover {
+  border-color: var(--cp-soft);
+}
+
+.mp-chip[aria-pressed='true'] {
+  background: var(--cp-navy);
+  border-color: var(--cp-navy);
+  color: var(--cp-cream);
+}
+
+/* Lista de pedidos: una columna en celular, dos desde 600 px */
+.mp-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+/* Tarjeta: el color del borde izquierdo sale del estado (naranja por defecto = en curso) */
+.mp-card {
+  --estado: var(--cp-orange);
+  min-width: 0;
+  background: var(--cp-white);
+  border: 1px solid var(--cp-line);
+  border-left: 6px solid var(--estado);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(11, 44, 62, 0.05), 0 6px 14px rgba(11, 44, 62, 0.04);
+  transition: box-shadow 0.2s ease;
+}
+
+.mp-card:has(.mp-estado[style*='--cp-greenbg']) {
+  --estado: var(--cp-ok);
+}
+
+.mp-card:has(.mp-estado[style*='FBEDE9' i]) {
+  --estado: #9AA5AB;
+}
+
+.mp-card:hover {
+  box-shadow: 0 2px 4px rgba(11, 44, 62, 0.06), 0 10px 22px rgba(11, 44, 62, 0.08);
+}
+
+.mp-card-cabeza {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 14px 16px 12px 14px;
+  border: 0;
+  background: none;
+  color: var(--cp-navy);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.mp-card-fila {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.mp-codigo {
+  font-family: var(--fuente-titulos);
+  font-weight: 800;
+  font-size: 17px;
+  letter-spacing: 0.02em;
+  overflow-wrap: anywhere;
+}
+
+/* Insignia de estado: píldora con el color que pone el TSX */
+.mp-estado {
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.mp-card-sub {
+  width: 100%;
+  font-size: 13px;
+  color: var(--cp-soft);
+  overflow-wrap: anywhere;
+}
+
+.mp-total {
+  font-family: var(--fuente-titulos);
+  font-weight: 800;
+  font-size: 17px;
+  color: var(--cp-navy);
+  white-space: nowrap;
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.mp-resumen-lineas {
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--cp-navy);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* "Ver detalle" con chevron que gira al abrir */
+.mp-mas {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--cp-rust);
+}
+
+.mp-mas::after {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 0.25s ease;
+}
+
+.mp-card-cabeza[aria-expanded='true'] .mp-mas::after {
+  transform: translateY(2px) rotate(-135deg);
+}
+
+/* Zona de acciones extra (p. ej. voucher): botones táctiles de 44 px */
+.mp-card > :not(.mp-card-cabeza):not(.mp-detalle) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px 14px 14px;
+  min-width: 0;
+}
+
+.mp-card button:not(.mp-card-cabeza) {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 12px;
+  border: 1.5px solid var(--cp-line);
+  background: var(--cp-white);
+  color: var(--cp-navy);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mp-card button:not(.mp-card-cabeza):hover {
+  border-color: var(--cp-soft);
+}
+
+.mp-card button:not(.mp-card-cabeza):focus-visible {
+  outline: 3px solid var(--cp-gold);
+  outline-offset: 2px;
+}
+
+/* Detalle expandible: aparece con una transición suave */
+.mp-detalle {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px 16px 14px;
+  border-top: 1px dashed var(--cp-line);
+  background: var(--cp-cream);
+  animation: mp-abrir 0.25s ease both;
+}
+
+.mp-detalle ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.mp-detalle dl {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px 14px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.mp-detalle dt {
+  color: var(--cp-soft);
+}
+
+.mp-detalle dd {
+  margin: 0;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+@keyframes mp-abrir {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Estados vacío, cargando y error (componentes comunes con estilo en línea) */
+.mp > [role='status'] {
+  padding: 40px 16px !important;
+}
+
+.mp > [style*='dashed'] {
+  padding: 40px 20px !important;
+  background: linear-gradient(180deg, var(--cp-white), var(--cp-cream)) !important;
+}
+
+/* Tablet: 600 px en adelante */
+@media (min-width: 600px) {
+  .mp {
+    padding: 20px 20px 36px;
+  }
+
+  .mp-resumen {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .mp-stat-valor {
+    font-size: 24px;
+  }
+
+  .mp-lista {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* PC: 900 px en adelante */
+@media (min-width: 900px) {
+  .mp {
+    gap: 20px;
+    padding: 28px 32px 48px;
+  }
+
+  .mp-nuevo {
+    position: static;
+    align-self: flex-end;
+    width: auto;
+    min-width: 240px;
+    min-height: 52px;
+    padding: 0 28px;
+    font-size: 17px;
+  }
+
+  .mp-stat {
+    padding: 20px 22px;
+    gap: 6px;
+  }
+
+  .mp-stat-valor {
+    font-size: 30px;
+  }
+
+  .mp-stat-etiq {
+    font-size: 13px;
+  }
+
+  .mp-chips {
+    flex-wrap: wrap;
+    overflow: visible;
+    margin: 0;
+    padding: 0;
+  }
+
+  .mp-lista {
+    gap: 16px;
+  }
+
+  .mp-card-cabeza {
+    gap: 10px;
+    padding: 20px 22px 18px 20px;
+  }
+
+  .mp-codigo {
+    font-size: 18px;
+  }
+
+  .mp-card-sub {
+    font-size: 14px;
+  }
+
+  .mp-total {
+    font-size: 19px;
+  }
+
+  .mp-resumen-lineas {
+    font-size: 15px;
+  }
+
+  .mp-detalle {
+    padding: 18px 22px 22px 20px;
+  }
+
+  .mp-card > :not(.mp-card-cabeza):not(.mp-detalle) {
+    padding: 0 22px 18px 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mp-detalle,
+  .mp-nuevo,
+  .mp-chip,
+  .mp-mas::after,
+  .mp-card {
+    animation: none !important;
+    transition: none !important;
+  }
+}

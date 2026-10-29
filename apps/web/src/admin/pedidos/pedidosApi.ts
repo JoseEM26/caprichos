@@ -1,4 +1,5 @@
 import { api } from '../../comun/api';
+import type { PlanPagoItem } from './planPago';
 
 export type EstadoPedido =
   | 'COLA'
@@ -66,6 +67,8 @@ export interface Pedido {
   pago_preferido?: string | null;
   cobro_vigente_id?: string | number | null;
   paga_con?: string | number | null;
+  /** Pago dividido: monto por medio (vacío si el pedido no tiene plan) */
+  planPago?: Array<{ medio: string; monto: string | number }>;
   subtotal: string | number;
   descuento: string | number;
   envio?: string | number | null;
@@ -290,6 +293,8 @@ export const pedidosApi = {
       pago: {
         metodo: 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TARJETA' | 'TRANSFERENCIA';
         pagaCon?: number;
+        /** Pago dividido: monto por medio (el API lo valida contra el total) */
+        plan?: PlanPagoItem[];
       };
       entrega?: {
         direccion?: string;

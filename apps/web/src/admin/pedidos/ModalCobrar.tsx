@@ -43,13 +43,22 @@ export function ModalCobrar({
 }: ModalCobrarProps) {
   const totalPedido = Number(pedido.total) || 0;
 
-  const [pagos, setPagos] = useState<FilaPago[]>([
-    {
-      medio: (pedido.pago_metodo || pedido.pago_preferido || 'Efectivo'),
-      monto: totalPedido.toFixed(2),
-      recibido: pedido.paga_con ? String(pedido.paga_con) : '',
-    },
-  ]);
+  // Con plan de pago (pago dividido) se precargan sus filas por medio; sin plan, una fila como antes
+  const [pagos, setPagos] = useState<FilaPago[]>(() =>
+    pedido.planPago && pedido.planPago.length > 0
+      ? pedido.planPago.map((f) => ({
+          medio: f.medio,
+          monto: Number(f.monto).toFixed(2),
+          recibido: f.medio === 'EFECTIVO' && pedido.paga_con ? String(pedido.paga_con) : '',
+        }))
+      : [
+          {
+            medio: (pedido.pago_metodo || pedido.pago_preferido || 'Efectivo'),
+            monto: totalPedido.toFixed(2),
+            recibido: pedido.paga_con ? String(pedido.paga_con) : '',
+          },
+        ],
+  );
 
   const [errorMensaje, setErrorMensaje] = useState<string>('');
   const [enviando, setEnviando] = useState<boolean>(false);

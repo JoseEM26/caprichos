@@ -144,6 +144,72 @@ describe('VouchersService', () => {
       expect((res as any).motivos).toBeUndefined();
     });
 
+    it('al MOZO marca revisionManual=true si la lectura automática no estuvo disponible (SIN_LECTURA), sin semáforo', async () => {
+      vouchersIaMock.analizarVoucher.mockResolvedValueOnce({ sinLectura: true, extraido: null, motivo: 'IA apagada' });
+
+      const res: any = await service.subirYProcesar(fakeFile, { pedidoId: '50', medio: 'YAPE' }, mozoUsuario);
+
+      expect(res.legible).toBe(true);
+      expect(res.revisionManual).toBe(true);
+      expect(res.semaforo).toBeUndefined();
+      expect(res.extraido).toBeUndefined();
+    });
+
+    it('al MOZO revisionManual=false cuando la IA sí leyó el voucher', async () => {
+      const res: any = await service.subirYProcesar(fakeFile, { pedidoId: '50', medio: 'YAPE' }, mozoUsuario);
+
+      expect(res.revisionManual).toBe(false);
+    });
+
+    it('al MOZO con IA apagada: sin avisos y revisionManual=true', async () => {
+      vouchersIaMock.analizarVoucher.mockResolvedValueOnce({ sinLectura: true, extraido: null, motivo: 'IA apagada' });
+
+      const res: any = await service.subirYProcesar(fakeFile, { pedidoId: '50', medio: 'YAPE' }, mozoUsuario);
+
+      expect(res.avisos).toEqual([]);
+      expect(res.revisionManual).toBe(true);
+    });
+
+    it('al MOZO avisa si el monto leído no coincide con lo que debe pagar, sin revelar el semáforo', async () => {
+      vouchersIaMock.analizarVoucher.mockResolvedValueOnce({
+        sinLectura: false,
+        extraido: { legible: true, monto: 999.0, operacion: '55555555', medioDetectado: 'YAPE', confianza: 0.95 },
+      });
+
+      const res: any = await service.subirYProcesar(fakeFile, { pedidoId: '50', medio: 'YAPE' }, mozoUsuario);
+
+      expect(res.avisos).toContainEqual(expect.stringMatching(/^El monto del voucher \(S\/ 999\.00\) no coincide con lo que debe pagar por Yape/));
+      expect(res.legible).toBe(true);
+    });
+
+    it('al MOZO avisa si el medio del voucher no es el elegido', async () => {
+      vouchersIaMock.analizarVoucher.mockResolvedValueOnce({
+        sinLectura: false,
+        extraido: { legible: true, monto: 35.0, operacion: '66666666', medioDetectado: 'PLIN', confianza: 0.95 },
+      });
+
+      const res: any = await service.subirYProcesar(fakeFile, { pedidoId: '50', medio: 'YAPE' }, mozoUsuario);
+
+      expect(res.avisos).toContain('El medio del voucher (Plin) no coincide con el elegido (Yape)');
+    });
+
+    it('la respuesta del MOZO jamás trae semáforo, extraído, operación ni motivos', async () => {
+      vouchersIaMock.analizarVoucher.mockResolvedValueOnce({
+        sinLectura: false,
+        extraido: { legible: true, monto: 999.0, operacion: '77777777', medioDetectado: 'PLIN', titular: 'Otra Persona', confianza: 0.6 },
+      });
+
+      const res: any = await service.subirYProcesar(fakeFile, { pedidoId: '50', medio: 'YAPE' }, mozoUsuario);
+
+      expect(Object.keys(res).sort()).toEqual(expect.arrayContaining(['avisos', 'id', 'legible', 'revisionManual']));
+      expect(res.semaforo).toBeUndefined();
+      expect(res.extraido).toBeUndefined();
+      expect(res.operacion).toBeUndefined();
+      expect(res.motivos).toBeUndefined();
+      expect(JSON.stringify(res)).not.toContain('77777777');
+      expect(JSON.stringify(res)).not.toContain('Otra Persona');
+    });
+
     it('al MOZO le retorna legible=false con mensaje explicativo si el voucher resulta ILEGIBLE', async () => {
       vouchersIaMock.analizarVoucher.mockResolvedValueOnce({
         sinLectura: false,

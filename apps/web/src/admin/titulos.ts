@@ -28,7 +28,7 @@ export const TITULOS_VISTA: Record<string, { titulo: string; subtitulo: string }
   usuarios: { titulo: "Usuarios", subtitulo: "Cuentas del personal, su cargo, perfil y local." },
   historial: { titulo: "Historial de acciones", subtitulo: "Quién cambió, anuló, entró o vio algo sensible, y cuándo. No se puede editar ni borrar (solo administrador)." },
   pantallas: { titulo: "Pantallas", subtitulo: "Televisores de cocina y barra que solo muestran pedidos. No piden usuario: cada una tiene su propia llave." },
-  "tomar-pedido": { titulo: "Tomar pedido", subtitulo: "Registra el pedido de una mesa o un pedido para llevar." },
+  "mis-pedidos": { titulo: "Mis pedidos", subtitulo: "Los pedidos que tomaste y cómo van" },
   plano: { titulo: "Plano del local", subtitulo: "Dibuja las mesas, la cocina, los baños, las paredes y la entrada de cada piso." },
   notificaciones: { titulo: "Notificaciones", subtitulo: "Alertas del sistema y mensajes internos." },
   // vistas que el mockup no tiene (agregadas por las HU de obligaciones legales y reparto)

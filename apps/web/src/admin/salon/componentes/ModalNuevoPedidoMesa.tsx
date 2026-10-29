@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { Confirmar } from '../../../comun/Confirmar';
 import { Cargando } from '../../../comun/Cargando';
 import { api } from '../../../comun/api';
@@ -10,10 +10,24 @@ import { ElementoPlano, MesaSalon, PisoPlano, PisoSalon } from '../tipos';
 import { CuadriculaPlano } from './CuadriculaPlano';
 import { VentanaOpcionesProducto, ProductoConfigurado } from './VentanaOpcionesProducto';
 import { ModalLiberarMesa } from './ModalLiberarMesa';
+import { ModalForzarLiberarMesa } from './ModalForzarLiberarMesa';
 import { calcularEnvioFinal, reglaEnvioGratis } from '@caprichos/compartido';
 import { salonApi } from '../api';
 import '../salon.css';
+import '../nuevo-pedido-mozo.css';
 import { pedidosApi } from '../../pedidos/pedidosApi';
+import { ModalVoucherPedido } from '../ModalVoucherPedido';
+import { PlanPagoEditor } from './PlanPagoEditor';
+import {
+  aPlan,
+  errorPlan,
+  medioDigitalDelPlan,
+  medioPrincipalPlan,
+  montoDigitalPlan,
+  montoEfectivoPlan,
+  planInicial,
+  type FilaPlan,
+} from '../../pedidos/planPago';
 import { listarPersonalActivo, ColaboradorActivo as PersonalItem } from '../../creditos/creditosApi';
 
 export interface ModalNuevoPedidoMesaProps {
@@ -24,11 +38,15 @@ export interface ModalNuevoPedidoMesaProps {
   mesasPreseleccionadasIds?: string[];
   /** Desde Pedidos y caja se abre en «¿Qué vas a hacer?» (local, para llevar o delivery) */
   pasoInicial?: 'modal';
+  /** Canal del pedido; sin valor, desde Pedidos y caja es CAJA y desde el plano es MOZO */
+  canal?: 'MOZO' | 'CAJA';
   reservaIdPreseleccionada?: string;
   /** Si viene desde «Repetir este pedido», precarga modalidad, cliente y líneas en el paso items */
   pedidoRepetir?: any | null;
   alExitoPedido?: (pedido: any) => void;
   alRefrescarMesas?: () => Promise<void>;
+  /** Permiso mesas/liberar: habilita mantener presionada una mesa ocupada para forzar su liberación */
+  puedeForzarLiberacion?: boolean;
 }
 
 export interface LineaPedidoMesa {
@@ -46,6 +64,31 @@ export interface LineaPedidoMesa {
   personas?: string[];
 }
 
+/** Medio con el que paga el cliente de llevar o delivery (lo elige el mozo al registrar). */
+type MedioPagoMozo = 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TRANSFERENCIA';
+
+/** Cliente que devuelve GET /admin/clientes?q= (el DNI llega enmascarado para no admin) */
+interface ClienteBuscado {
+  nombre: string;
+  dni: string;
+  puntos: number;
+}
+
+/** Marca la primera coincidencia de `q` (ya en minúsculas) dentro de `texto` */
+function resaltarCoincidencia(texto: string, q: string) {
+  const i = q ? texto.toLowerCase().indexOf(q) : -1;
+  if (i < 0) return texto;
+  return (
+    <>
+      {texto.slice(0, i)}
+      <mark style={{ background: '#FFE08A', color: 'inherit', padding: 0 }}>
+        {texto.slice(i, i + q.length)}
+      </mark>
+      {texto.slice(i + q.length)}
+    </>
+  );
+}
+
 export function ModalNuevoPedidoMesa({
   abierto,
   alCerrar,
@@ -53,10 +96,12 @@ export function ModalNuevoPedidoMesa({
   mesaPreseleccionadaId,
   mesasPreseleccionadasIds = [],
   pasoInicial,
+  canal: canalProp,
   reservaIdPreseleccionada,
   pedidoRepetir = null,
   alExitoPedido,
   alRefrescarMesas,
+  puedeForzarLiberacion = false,
 }: ModalNuevoPedidoMesaProps) {
   const todasLasMesasIniciales = useMemo(() => {
     const list: string[] = [];
@@ -93,6 +138,10 @@ export function ModalNuevoPedidoMesa({
 
   // Modo en plano: 'one' (Tomar pedido) | 'join' (Juntar mesas) | 'free' (Liberar)
   const [modoPlano, setModoPlano] = useState<'one' | 'join' | 'free'>('one');
+
+  // Paso productos: cupón plegado y barra del pedido (celular) expandida o no
+  const [cuponAbierto, setCuponAbierto] = useState(false);
+  const [carritoAbierto, setCarritoAbierto] = useState(false);
 
   // Mesas seleccionadas
   const [mesasSeleccionadas, setMesasSeleccionadas] = useState<string[]>(todasLasMesasIniciales);
@@ -170,13 +219,21 @@ export function ModalNuevoPedidoMesa({
     pedidoRepetir?.es_personal ? 'personal' : 'anon',
   );
   const [pideOpen, setPideOpen] = useState(false);
-  const [pideDni, setPideDni] = useState('');
+  const [pideQ, setPideQ] = useState('');
   const [clienteEncontrado, setClienteEncontrado] = useState<{
     nombre: string;
     dni: string;
     puntos: number;
   } | null>(null);
-  const [clienteNoHallado, setClienteNoHallado] = useState(false);
+  const [resultadosCliente, setResultadosCliente] = useState<ClienteBuscado[]>([]);
+  const [buscandoCliente, setBuscandoCliente] = useState(false);
+  const [errorBuscarCliente, setErrorBuscarCliente] = useState(false);
+  // Último texto que ya tiene respuesta (evita mostrar «no hay cuenta» mientras se escribe)
+  const [consultaResuelta, setConsultaResuelta] = useState('');
+  // Enter o «Buscar» fuerzan la búsqueda sin esperar el debounce
+  const [tickBuscarCliente, setTickBuscarCliente] = useState(0);
+  const buscarYaRef = useRef(false);
+  const reqClienteRef = useRef(0);
 
   // Personal activo
   const [listaPersonal, setListaPersonal] = useState<PersonalItem[]>([]);
@@ -190,6 +247,61 @@ export function ModalNuevoPedidoMesa({
         .catch(() => setListaPersonal([]));
     }
   }, [paso, pideMode, pideOpen]);
+
+  const personalFiltrado = useMemo(() => {
+    const q = busquedaPersonal.toLowerCase().trim();
+    if (!q) return listaPersonal;
+    return listaPersonal.filter(
+      (u) =>
+        u.nombre.toLowerCase().includes(q) ||
+        String((u as any).dni || '').toLowerCase().includes(q) ||
+        (u.rol || '').toLowerCase().includes(q),
+    );
+  }, [listaPersonal, busquedaPersonal]);
+
+  // Cliente con cuenta: busca mientras escribe (desde 2 caracteres, 300 ms). Solo vale la última respuesta.
+  useEffect(() => {
+    const q = pideQ.trim();
+    const reqId = ++reqClienteRef.current;
+    if (pideMode !== 'cliente' || !pideOpen || q.length < 2) {
+      buscarYaRef.current = false;
+      setResultadosCliente([]);
+      setBuscandoCliente(false);
+      setErrorBuscarCliente(false);
+      return;
+    }
+    setBuscandoCliente(true);
+    setErrorBuscarCliente(false);
+    const timer = setTimeout(async () => {
+      try {
+        const res: any = await api.get(`/admin/clientes?q=${encodeURIComponent(q)}`);
+        if (reqId !== reqClienteRef.current) return;
+        const list: any[] = Array.isArray(res) ? res : res?.items || [];
+        setResultadosCliente(
+          list.slice(0, 6).map((c) => ({
+            nombre: c.nombre || `${c.nombres || ''} ${c.apellidos || ''}`.trim(),
+            dni: c.dni || '',
+            puntos: Number(c.puntos || 0),
+          })),
+        );
+        setConsultaResuelta(q);
+      } catch {
+        if (reqId !== reqClienteRef.current) return;
+        setResultadosCliente([]);
+        setErrorBuscarCliente(true);
+        setConsultaResuelta(q);
+      } finally {
+        if (reqId === reqClienteRef.current) setBuscandoCliente(false);
+      }
+    }, buscarYaRef.current ? 0 : 300);
+    buscarYaRef.current = false;
+    return () => clearTimeout(timer);
+  }, [pideQ, pideMode, pideOpen, tickBuscarCliente]);
+
+  const forzarBusquedaCliente = () => {
+    buscarYaRef.current = true;
+    setTickBuscarCliente((n) => n + 1);
+  };
 
   // Carta y productos
   const [categorias, setCategorias] = useState<CategoriaCarta[]>([]);
@@ -261,8 +373,16 @@ export function ModalNuevoPedidoMesa({
   const [enviando, setEnviando] = useState(false);
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
 
+  // Cómo paga (mesa, llevar y delivery): un medio o pago dividido. La parte digital pide voucher opcional.
+  const [filasPlan, setFilasPlan] = useState<FilaPlan[]>(() => planInicial('EFECTIVO', 0));
+  const [pedidoVoucher, setPedidoVoucher] = useState<{
+    pedido: { id: string; codigo: string; pagoMetodo: MedioPagoMozo; montoDigital: number };
+    res: any;
+  } | null>(null);
+
   // Modal Liberar mesa
   const [mesaParaLiberar, setMesaParaLiberar] = useState<MesaSalon | null>(null);
+  const [mesaParaForzar, setMesaParaForzar] = useState<MesaSalon | null>(null);
 
   // Aviso al tocar una mesa que no se puede elegir
   const [avisoMesa, setAvisoMesa] = useState<string | null>(null);
@@ -433,6 +553,19 @@ export function ModalNuevoPedidoMesa({
 
   const total = Math.max(0, subtotal - descuento + envioCalculado);
 
+  // Plan de pago: se valida contra el total; la parte digital (si hay) pide voucher opcional
+  const errorPlanAhora = total > 0 ? errorPlan(total, filasPlan) : 'Agrega productos al pedido';
+  const planAhora = aPlan(filasPlan);
+  const montoEfectivoAhora = montoEfectivoPlan(planAhora);
+  const metodoPrincipalAhora: MedioPagoMozo = planAhora.length
+    ? medioPrincipalPlan(planAhora)
+    : 'EFECTIVO';
+  // «Con cuánto paga» solo cuenta sobre la parte en efectivo (vuelto)
+  const pagaConValido = (): number | undefined => {
+    const n = Number(cliPagaCon);
+    return montoEfectivoAhora > 0 && cliPagaCon !== '' && !isNaN(n) && n >= montoEfectivoAhora ? n : undefined;
+  };
+
   // Aplicar cupón
   const handleAplicarCupon = async () => {
     const cod = cuponInput.trim().toUpperCase();
@@ -495,7 +628,7 @@ export function ModalNuevoPedidoMesa({
       });
 
       // desde Pedidos y caja el canal es CAJA; el mozo desde el salón sigue siendo MOZO
-      const canalEnvio: 'MOZO' | 'CAJA' = pasoInicial === 'modal' ? 'CAJA' : 'MOZO';
+      const canalEnvio: 'MOZO' | 'CAJA' = canalProp ?? (pasoInicial === 'modal' ? 'CAJA' : 'MOZO');
       let res: any;
 
       if (modalidad === 'local') {
@@ -509,6 +642,11 @@ export function ModalNuevoPedidoMesa({
             canal: canalEnvio,
             esPersonal: pideMode === 'personal',
             colaboradorPartyId: staffElegido?.partyId,
+            pago: {
+              metodo: metodoPrincipalAhora,
+              pagaCon: pagaConValido(),
+              plan: planAhora,
+            },
             cliente: cliNombre.trim()
               ? {
                   nombre: cliNombre.trim(),
@@ -524,7 +662,6 @@ export function ModalNuevoPedidoMesa({
       } else {
         const telDigitos = cliTelefono.replace(/\D/g, '');
         const telefonoFinal = /^9\d{8}$/.test(telDigitos) ? telDigitos : '999999999';
-        const pagaConNum = Number(cliPagaCon);
         res = await pedidosApi.crearPedidoAdmin(
           {
             modalidad: modalidad === 'delivery' ? 'DELIVERY' : 'RECOGER',
@@ -536,9 +673,9 @@ export function ModalNuevoPedidoMesa({
             },
             lineas: payloadLineas,
             pago: {
-              metodo: 'EFECTIVO',
-              pagaCon:
-                !isNaN(pagaConNum) && pagaConNum >= total ? pagaConNum : undefined,
+              metodo: metodoPrincipalAhora,
+              pagaCon: pagaConValido(),
+              plan: planAhora,
             },
             entrega:
               modalidad === 'delivery'
@@ -561,6 +698,20 @@ export function ModalNuevoPedidoMesa({
       }
 
       setConfirmarEnviar(false);
+      // Parte digital del plan: el voucher es opcional; «Subir después» lo deja pendiente en Mis pedidos
+      const medioDigital = medioDigitalDelPlan(planAhora);
+      if (medioDigital && res?.id != null) {
+        setPedidoVoucher({
+          pedido: {
+            id: String(res.id),
+            codigo: String(res.codigo ?? ''),
+            pagoMetodo: medioDigital,
+            montoDigital: montoDigitalPlan(planAhora),
+          },
+          res,
+        });
+        return;
+      }
       alExitoPedido?.(res);
       await alRefrescarMesas?.();
       alCerrar();
@@ -580,6 +731,15 @@ export function ModalNuevoPedidoMesa({
     } finally {
       setEnviando(false);
     }
+  };
+
+  // Cierra el flujo de un pedido digital (con voucher subido o dejado para después)
+  const terminarPedidoDigital = async () => {
+    const res = pedidoVoucher?.res;
+    setPedidoVoucher(null);
+    alExitoPedido?.(res);
+    await alRefrescarMesas?.();
+    alCerrar();
   };
 
   // Productos filtrados para la carta
@@ -1329,6 +1489,8 @@ export function ModalNuevoPedidoMesa({
                   mesasSalon={mesasPiso}
                   mesasSeleccionadasIds={mesasSeleccionadas}
                   onSeleccionarMesaSalon={handleClicMesa}
+                  alMantenerMesaSalon={setMesaParaForzar}
+                  puedeForzarLiberacion={puedeForzarLiberacion}
                 />
               </div>
               {avisoMesa && (
@@ -1523,29 +1685,6 @@ export function ModalNuevoPedidoMesa({
                         }}
                       />
                     </div>
-
-                    <div>
-                      <label style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>
-                        ¿Paga en efectivo? ¿con cuánto?
-                      </label>
-                      <input
-                        type="number"
-                        step="0.50"
-                        value={cliPagaCon}
-                        onChange={(e) => setCliPagaCon(e.target.value)}
-                        placeholder="Opcional: ej. 50"
-                        style={{
-                          width: '100%',
-                          boxSizing: 'border-box',
-                          minHeight: '46px',
-                          borderRadius: '10px',
-                          border: '1.5px solid var(--cp-line)',
-                          background: 'var(--cp-white)',
-                          padding: '0 12px',
-                          fontSize: '14px',
-                        }}
-                      />
-                    </div>
                   </div>
 
                   {/* Ubicación en el mapa */}
@@ -1682,48 +1821,21 @@ export function ModalNuevoPedidoMesa({
           {/* PASO 5: ITEMS Y CARTA PÚBLICA                                 */}
           {/* ============================================================= */}
           {paso === 'items' && (
-            <div
-              style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: '16px',
-                alignItems: 'flex-start',
-              }}
-            >
+            <div className="np-items">
               {/* IZQUIERDA: Catálogo de productos */}
-              <div
-                style={{
-                  flex: '3 1 520px',
-                  minWidth: 0,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '10px',
-                }}
-              >
+              <div className="np-catalogo">
                 {/* Categorías en tira horizontal */}
-                <div
-                  style={{
-                    display: 'flex',
-                    gap: '6px',
-                    overflowX: 'auto',
-                    paddingBottom: '4px',
-                  }}
-                >
+                <div className="np-categorias">
                   <button
                     type="button"
                     onClick={() => setCategoriaActivaId('todas')}
                     style={{
-                      flex: 'none',
-                      minHeight: '40px',
-                      padding: '0 14px',
                       borderRadius: '9999px',
                       border: '1.5px solid var(--cp-navy)',
                       background:
                         categoriaActivaId === 'todas' ? 'var(--cp-navy)' : 'transparent',
                       color:
                         categoriaActivaId === 'todas' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                      fontWeight: 700,
-                      fontSize: '12px',
                       cursor: 'pointer',
                     }}
                   >
@@ -1735,17 +1847,12 @@ export function ModalNuevoPedidoMesa({
                       type="button"
                       onClick={() => setCategoriaActivaId(c.id)}
                       style={{
-                        flex: 'none',
-                        minHeight: '40px',
-                        padding: '0 14px',
                         borderRadius: '9999px',
                         border: '1.5px solid var(--cp-navy)',
                         background:
                           categoriaActivaId === c.id ? 'var(--cp-navy)' : 'transparent',
                         color:
                           categoriaActivaId === c.id ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                        fontWeight: 700,
-                        fontSize: '12px',
                         cursor: 'pointer',
                       }}
                     >
@@ -1799,46 +1906,16 @@ export function ModalNuevoPedidoMesa({
                     {errorCarta}
                   </div>
                 ) : (
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: conImagenes
-                        ? 'repeat(auto-fill, minmax(160px, 1fr))'
-                        : 'repeat(auto-fill, minmax(180px, 1fr))',
-                      gap: '14px',
-                      maxHeight: '52vh',
-                      overflowY: 'auto',
-                      padding: '4px',
-                    }}
-                  >
+                  <div className="np-grilla">
                     {productosFiltrados.map((p) => (
                       <button
                         key={p.id}
                         type="button"
                         onClick={() => setProductoSeleccionado(p)}
-                        style={{
-                          background: 'var(--cp-white)',
-                          border: '1px solid var(--cp-line)',
-                          borderRadius: '12px',
-                          padding: 0,
-                          overflow: 'hidden',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          textAlign: 'left',
-                          cursor: 'pointer',
-                          color: 'var(--cp-navy)',
-                        }}
+                        className="np-producto"
                       >
                         {conImagenes && (
-                          <span
-                            style={{
-                              display: 'block',
-                              width: '100%',
-                              aspectRatio: '4 / 3',
-                              background: 'var(--cp-gold)',
-                              flex: 'none',
-                            }}
-                          >
+                          <span className="np-producto-foto">
                             {p.fotoUrl ? (
                               <img
                                 src={p.fotoUrl}
@@ -1875,18 +1952,11 @@ export function ModalNuevoPedidoMesa({
                             )}
                           </span>
                         )}
-                        <span style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '10px 12px 12px' }}>
-                          <span
-                            style={{
-                              fontFamily: 'Montserrat, sans-serif',
-                              fontWeight: 800,
-                              fontSize: '14px',
-                              lineHeight: '18px',
-                            }}
-                          >
+                        <span className="np-producto-texto">
+                          <span className="np-producto-nombre">
                             {p.nombre}
                           </span>
-                          <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-soft)' }}>
+                          <span className="np-producto-precio">
                             {(p.tamanos || []).length > 0 ? 'Desde ' : ''}S/{' '}
                             {Number(p.precio || 0).toFixed(2)}
                           </span>
@@ -1899,28 +1969,26 @@ export function ModalNuevoPedidoMesa({
 
               {/* DERECHA: Carrito del pedido */}
               <div
-                style={{
-                  flex: '2 1 340px',
-                  minWidth: 0,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px',
-                  background: 'var(--cp-white)',
-                  border: '1.5px solid var(--cp-line)',
-                  borderRadius: '14px',
-                  padding: '14px',
-                }}
+                className={carritoAbierto ? 'np-carrito np-carrito--abierto' : 'np-carrito'}
               >
-                {/* Cabecera del carrito: Mesa / Cambiar */}
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    borderBottom: '1px solid var(--cp-line)',
-                    paddingBottom: '8px',
-                  }}
+                {/* Celular: barra inferior con el resumen; al tocarla se expande el pedido */}
+                <button
+                  type="button"
+                  className="np-barra-carrito"
+                  aria-expanded={carritoAbierto}
+                  onClick={() => setCarritoAbierto(!carritoAbierto)}
                 >
+                  <span>
+                    {lineas.reduce((suma, l) => suma + l.cantidad, 0)} productos · S/{' '}
+                    {total.toFixed(2)}
+                  </span>
+                  <span>{carritoAbierto ? 'Cerrar' : 'Ver pedido'}</span>
+                </button>
+
+                {/* Mesa y «Pide» en una fila de chips */}
+                <div className="np-chips">
+                {/* Cabecera del carrito: Mesa / Cambiar */}
+                <div className="np-chip-mesa">
                   <div style={{ fontWeight: 800, fontSize: '15px', color: 'var(--cp-navy)' }}>
                     {modalidad === 'local'
                       ? `Mesa: ${textoMesas}`
@@ -1944,19 +2012,7 @@ export function ModalNuevoPedidoMesa({
 
                 {/* ¿Quién pide? (Sin cuenta / Cliente con cuenta / Personal) */}
                 {!pideOpen ? (
-                  <div
-                    style={{
-                      background: 'var(--cp-cream)',
-                      border: '1px solid var(--cp-line)',
-                      borderRadius: '10px',
-                      padding: '8px 10px',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      gap: '8px',
-                      fontSize: '12px',
-                    }}
-                  >
+                  <div className="np-chip-pide">
                     <span>
                       <b>Pide:</b>{' '}
                       {pideMode === 'personal' && staffElegido
@@ -1985,6 +2041,7 @@ export function ModalNuevoPedidoMesa({
                   </div>
                 ) : (
                   <div
+                    className="np-pide-abierto"
                     style={{
                       background: 'var(--cp-cream)',
                       border: '1px solid var(--cp-line)',
@@ -2076,14 +2133,23 @@ export function ModalNuevoPedidoMesa({
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                         <div style={{ display: 'flex', gap: '6px' }}>
                           <input
-                            type="text"
-                            inputMode="numeric"
-                            value={pideDni}
-                            onChange={(e) => setPideDni(e.target.value)}
-                            placeholder="DNI de 8 dígitos"
+                            type="search"
+                            autoFocus
+                            inputMode={/^\d*$/.test(pideQ.trim()) ? 'numeric' : 'search'}
+                            value={pideQ}
+                            onChange={(e) => setPideQ(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                forzarBusquedaCliente();
+                              }
+                            }}
+                            placeholder="DNI o nombre del cliente"
+                            aria-label="Buscar cliente por DNI o nombre"
                             style={{
                               flex: 1,
-                              minHeight: '36px',
+                              boxSizing: 'border-box',
+                              minHeight: '44px',
                               borderRadius: '8px',
                               border: '1.5px solid var(--cp-line)',
                               background: 'var(--cp-white)',
@@ -2093,31 +2159,9 @@ export function ModalNuevoPedidoMesa({
                           />
                           <button
                             type="button"
-                            onClick={async () => {
-                              const d = pideDni.replace(/\D/g, '');
-                              try {
-                                const res: any = await api.get(`/admin/clientes?buscar=${d}`);
-                                const list = Array.isArray(res) ? res : res?.items || [];
-                                const c = list.find((x: any) => String(x.dni) === d) || list[0];
-                                if (c) {
-                                  setClienteEncontrado({
-                                    nombre: c.nombre || `${c.nombres || ''} ${c.apellidos || ''}`.trim(),
-                                    dni: c.dni || d,
-                                    puntos: Number(c.puntos || 0),
-                                  });
-                                  setClienteNoHallado(false);
-                                  setPideOpen(false);
-                                } else {
-                                  setClienteEncontrado(null);
-                                  setClienteNoHallado(true);
-                                }
-                              } catch {
-                                setClienteEncontrado(null);
-                                setClienteNoHallado(true);
-                              }
-                            }}
+                            onClick={forzarBusquedaCliente}
                             style={{
-                              minHeight: '36px',
+                              minHeight: '44px',
                               padding: '0 10px',
                               borderRadius: '8px',
                               border: '1.5px solid var(--cp-navy)',
@@ -2130,9 +2174,59 @@ export function ModalNuevoPedidoMesa({
                             Buscar
                           </button>
                         </div>
-                        {clienteNoHallado && (
+                        {buscandoCliente && (
+                          <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>Buscando…</div>
+                        )}
+                        {errorBuscarCliente && (
                           <div style={{ fontSize: '11px', color: 'var(--cp-rust)', fontWeight: 700 }}>
-                            No hay cuenta con ese DNI.
+                            No se pudo buscar. Intenta de nuevo.
+                          </div>
+                        )}
+                        {!buscandoCliente && !errorBuscarCliente && consultaResuelta === pideQ.trim() && resultadosCliente.length === 0 && (
+                          <div style={{ fontSize: '11px', color: 'var(--cp-rust)', fontWeight: 700 }}>
+                            No hay cuenta con ese DNI o nombre.
+                          </div>
+                        )}
+                        {!buscandoCliente && resultadosCliente.length > 0 && (
+                          <div
+                            style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '4px',
+                              maxHeight: '180px',
+                              overflowY: 'auto',
+                            }}
+                          >
+                            {resultadosCliente.map((c, idx) => (
+                              <button
+                                key={`${c.dni}-${idx}`}
+                                type="button"
+                                onClick={() => {
+                                  setClienteEncontrado({ nombre: c.nombre, dni: c.dni, puntos: c.puntos });
+                                  setPideQ('');
+                                  setPideOpen(false);
+                                }}
+                                style={{
+                                  minHeight: '44px',
+                                  padding: '6px 8px',
+                                  borderRadius: '8px',
+                                  border: '1px solid var(--cp-line)',
+                                  background: 'var(--cp-white)',
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  fontSize: '12px',
+                                  cursor: 'pointer',
+                                  textAlign: 'left',
+                                }}
+                              >
+                                <b>{c.nombre}</b>
+                                <span style={{ color: 'var(--cp-soft)', whiteSpace: 'nowrap' }}>
+                                  {c.dni ? `${c.dni} · ` : ''}{c.puntos} pts
+                                </span>
+                              </button>
+                            ))}
                           </div>
                         )}
                       </div>
@@ -2142,13 +2236,15 @@ export function ModalNuevoPedidoMesa({
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                         <input
                           type="search"
+                          autoFocus
                           value={busquedaPersonal}
                           onChange={(e) => setBusquedaPersonal(e.target.value)}
                           placeholder="Buscar por usuario o nombre"
+                          aria-label="Buscar personal"
                           style={{
                             width: '100%',
                             boxSizing: 'border-box',
-                            minHeight: '36px',
+                            minHeight: '44px',
                             borderRadius: '8px',
                             border: '1.5px solid var(--cp-line)',
                             background: 'var(--cp-white)',
@@ -2156,6 +2252,14 @@ export function ModalNuevoPedidoMesa({
                             fontSize: '12px',
                           }}
                         />
+                        <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
+                          {personalFiltrado.length} {personalFiltrado.length === 1 ? 'resultado' : 'resultados'}
+                        </div>
+                        {personalFiltrado.length === 0 && (
+                          <div style={{ fontSize: '11px', color: 'var(--cp-rust)', fontWeight: 700 }}>
+                            Sin resultados
+                          </div>
+                        )}
                         <div
                           style={{
                             display: 'flex',
@@ -2165,17 +2269,9 @@ export function ModalNuevoPedidoMesa({
                             overflowY: 'auto',
                           }}
                         >
-                          {listaPersonal
-                            .filter((u) => {
-                              const q = busquedaPersonal.toLowerCase().trim();
-                              if (!q) return true;
-                              return (
-                                u.nombre.toLowerCase().includes(q) ||
-                                String((u as any).dni || '').toLowerCase().includes(q) ||
-                                (u.rol || '').toLowerCase().includes(q)
-                              );
-                            })
+                          {personalFiltrado
                             .map((u) => {
+                              const qPersonal = busquedaPersonal.toLowerCase().trim();
                               const on = String(staffElegido?.partyId) === String(u.partyId);
                               return (
                                 <button
@@ -2198,9 +2294,9 @@ export function ModalNuevoPedidoMesa({
                                     cursor: 'pointer',
                                   }}
                                 >
-                                  <b>{u.nombre}</b>
+                                  <b>{resaltarCoincidencia(u.nombre, qPersonal)}</b>
                                   <span style={{ color: 'var(--cp-soft)' }}>
-                                    {(u as any).dni ? `@${(u as any).dni} · ` : ''}{u.rol}
+                                    {(u as any).dni ? `@${(u as any).dni} · ` : ''}{resaltarCoincidencia(u.rol || '', qPersonal)}
                                   </span>
                                 </button>
                               );
@@ -2213,17 +2309,10 @@ export function ModalNuevoPedidoMesa({
                     )}
                   </div>
                 )}
+                </div>
 
                 {/* Lista de líneas */}
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px',
-                    maxHeight: '260px',
-                    overflowY: 'auto',
-                  }}
-                >
+                <div className="np-lineas">
                   {lineas.length === 0 ? (
                     <div
                       style={{
@@ -2237,36 +2326,36 @@ export function ModalNuevoPedidoMesa({
                     </div>
                   ) : (
                     lineas.map((lin) => (
-                      <div
-                        key={lin.id}
-                        style={{
-                          border: '1px solid var(--cp-line)',
-                          borderRadius: '10px',
-                          padding: '8px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '4px',
-                          background: 'var(--cp-cream)',
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            fontWeight: 800,
-                            fontSize: '14px',
-                          }}
-                        >
-                          <span>
-                            {lin.cantidad} x {lin.nombre}
+                      <div key={lin.id} className="np-linea">
+                        <div className="np-linea-fila">
+                          <span className="np-qty">
+                            <button
+                              type="button"
+                              onClick={() => actualizarCantidadLinea(lin.id, -1)}
+                            >
+                              −
+                            </button>
+                            <span>{lin.cantidad}</span>
+                            <button
+                              type="button"
+                              onClick={() => actualizarCantidadLinea(lin.id, 1)}
+                            >
+                              +
+                            </button>
                           </span>
-                          <span>S/ {lin.precioTotal.toFixed(2)}</span>
+                          <span className="np-linea-nombre" title={lin.nombre}>
+                            {lin.cantidad} x {lin.nombre}
+                            {lin.tamanoNombre && <small> · {lin.tamanoNombre}</small>}
+                          </span>
+                          <span className="np-linea-precio">S/ {lin.precioTotal.toFixed(2)}</span>
+                          <button
+                            type="button"
+                            className="np-quitar"
+                            onClick={() => quitarLinea(lin.id)}
+                          >
+                            Quitar
+                          </button>
                         </div>
-                        {lin.tamanoNombre && (
-                          <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-                            {lin.tamanoNombre}
-                          </div>
-                        )}
                         {(lin.personas || []).length > 0 && (
                           <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
                             Para: {lin.personas?.join(', ')}
@@ -2277,72 +2366,22 @@ export function ModalNuevoPedidoMesa({
                             Nota: {lin.nota}
                           </div>
                         )}
-                        <div
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            marginTop: '4px',
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <button
-                              type="button"
-                              onClick={() => actualizarCantidadLinea(lin.id, -1)}
-                              style={{
-                                width: '28px',
-                                height: '28px',
-                                borderRadius: '14px',
-                                border: '1.5px solid var(--cp-navy)',
-                                background: 'transparent',
-                                fontWeight: 800,
-                                cursor: 'pointer',
-                              }}
-                            >
-                              −
-                            </button>
-                            <span style={{ fontWeight: 800, fontSize: '13px' }}>
-                              {lin.cantidad}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => actualizarCantidadLinea(lin.id, 1)}
-                              style={{
-                                width: '28px',
-                                height: '28px',
-                                borderRadius: '14px',
-                                border: '1.5px solid var(--cp-navy)',
-                                background: 'transparent',
-                                fontWeight: 800,
-                                cursor: 'pointer',
-                              }}
-                            >
-                              +
-                            </button>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => quitarLinea(lin.id)}
-                            style={{
-                              border: 0,
-                              background: 'transparent',
-                              color: 'var(--cp-rust)',
-                              fontSize: '12px',
-                              fontWeight: 700,
-                              textDecoration: 'underline',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            Quitar
-                          </button>
-                        </div>
                       </div>
                     ))
                   )}
                 </div>
 
-                {/* Cupón */}
-                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                {/* Cupón: plegado detrás de un botón; se despliega al tocarlo */}
+                <button
+                  type="button"
+                  className="np-cupon-toggle"
+                  aria-expanded={cuponAbierto || !!cuponAplicado}
+                  onClick={() => setCuponAbierto(!cuponAbierto)}
+                >
+                  Cupón
+                </button>
+                {(cuponAbierto || cuponAplicado) && (
+                <div className="np-cupon-fila">
                   <input
                     type="text"
                     value={cuponInput}
@@ -2384,6 +2423,7 @@ export function ModalNuevoPedidoMesa({
                     {cuponAplicado ? 'Quitar' : 'Aplicar'}
                   </button>
                 </div>
+                )}
                 {cuponError && (
                   <div style={{ fontSize: '11px', color: 'var(--cp-rust)', fontWeight: 700 }}>
                     {cuponError}
@@ -2397,16 +2437,7 @@ export function ModalNuevoPedidoMesa({
                 )}
 
                 {/* Totales */}
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '4px',
-                    borderTop: '1px solid var(--cp-line)',
-                    paddingTop: '8px',
-                    fontSize: '13px',
-                  }}
-                >
+                <div className="np-totales">
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span>Subtotal</span>
                     <span>S/ {subtotal.toFixed(2)}</span>
@@ -2437,13 +2468,12 @@ export function ModalNuevoPedidoMesa({
                     </div>
                   )}
                   <div
+                    className="np-total-final"
                     style={{
                       display: 'flex',
                       justifyContent: 'space-between',
                       fontWeight: 800,
                       fontSize: '16px',
-                      borderTop: '1px dashed var(--cp-line)',
-                      paddingTop: '6px',
                     }}
                   >
                     <span>Total</span>
@@ -2451,15 +2481,24 @@ export function ModalNuevoPedidoMesa({
                   </div>
                 </div>
 
+                <PlanPagoEditor
+                  total={total}
+                  filas={filasPlan}
+                  onChange={setFilasPlan}
+                  pagaCon={cliPagaCon}
+                  onPagaCon={setCliPagaCon}
+                />
+
                 {/* Botón Enviar a cocina / Registrar pedido */}
                 <button
                   type="button"
                   disabled={
                     lineas.length === 0 ||
-                    (modalidad === 'local' && mesasSeleccionadas.length === 0)
+                    (modalidad === 'local' && mesasSeleccionadas.length === 0) ||
+                    errorPlanAhora !== null
                   }
                   onClick={() => setConfirmarEnviar(true)}
-                  className="salon-pie-fijo"
+                  className="salon-pie-fijo np-enviar"
                   aria-label={
                     modalidad === 'local' ? 'Enviar directo a cocina' : 'Registrar pedido'
                   }
@@ -2527,6 +2566,15 @@ export function ModalNuevoPedidoMesa({
         alCancelar={() => setConfirmarEnviar(false)}
       />
 
+      {/* Voucher del pedido digital recién creado */}
+      {pedidoVoucher && (
+        <ModalVoucherPedido
+          pedido={pedidoVoucher.pedido}
+          alCerrar={terminarPedidoDigital}
+          alSubirDespues={terminarPedidoDigital}
+        />
+      )}
+
       {/* Modal Liberar Mesa si se activa en modo free */}
       {mesaParaLiberar && (
         <ModalLiberarMesa
@@ -2536,6 +2584,19 @@ export function ModalNuevoPedidoMesa({
           alLiberar={async (_mesaId: string, motivo: string) => {
             await salonApi.liberarMesaManual(mesaParaLiberar.id, motivo);
             setMesaParaLiberar(null);
+            await alRefrescarMesas?.();
+          }}
+        />
+      )}
+
+      {/* Forzar liberación: mesa ocupada mantenida presionada 3 s (solo con permiso mesas/liberar) */}
+      {mesaParaForzar && (
+        <ModalForzarLiberarMesa
+          mesa={mesaParaForzar}
+          alCerrar={() => setMesaParaForzar(null)}
+          alForzar={async (mesaId: string, motivo: string) => {
+            await salonApi.liberarMesaManual(mesaId, motivo, true);
+            setMesaParaForzar(null);
             await alRefrescarMesas?.();
           }}
         />
