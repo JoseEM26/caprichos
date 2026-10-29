@@ -34,6 +34,9 @@ import {
   ActualizarTextosBotDto,
 } from './dto/chatbot-configuracion.dto';
 
+/** Motivo en conversacion.motivo_derivacion mientras el contacto está bloqueado por spam. */
+export const MOTIVO_BLOQUEO_SPAM = 'BLOQUEADO_SPAM';
+
 @Injectable()
 export class ChatbotConfiguracionService {
   private readonly logger = new Logger(ChatbotConfiguracionService.name);
@@ -662,6 +665,7 @@ export class ChatbotConfiguracionService {
     permitido: boolean;
     enviarAvisoSpam: boolean;
     mensajeAviso?: string;
+    bloqueado?: boolean;
   }> {
     if (!telefonoOId) return { permitido: true, enviarAvisoSpam: false };
 
@@ -674,6 +678,12 @@ export class ChatbotConfiguracionService {
       const claveMin = `chatbot:antispam:min:${idLimpio}`;
       const claveHora = `chatbot:antispam:hora:${idLimpio}`;
       const claveAviso = `chatbot:antispam:aviso:${idLimpio}`;
+      const claveBloqueo = `chatbot:spam:bloqueo:${idLimpio}`;
+
+      // Bloqueo temporal vigente: silencio total (el mensaje ya quedó registrado en el chat)
+      if (await redis.exists(claveBloqueo)) {
+        return { permitido: false, enviarAvisoSpam: false, bloqueado: true };
+      }
 
       const conteoMin = await redis.incr(claveMin);
       if (conteoMin === 1) {
@@ -686,6 +696,16 @@ export class ChatbotConfiguracionService {
       }
 
       if (conteoMin > maxPorMinuto || conteoHora > maxPorHora) {
+        // Reincidencia: cada exceso cuenta en la hora; al llegar al límite se bloquea
+        const claveExcesos = `chatbot:spam:excesos:${idLimpio}`;
+        const excesos = await redis.incr(claveExcesos);
+        if (excesos === 1) await redis.expire(claveExcesos, 3600);
+        const limiteExcesos = await this.parametroNumero('spam_bloqueo_excesos', 3);
+        if (excesos >= limiteExcesos) {
+          await this.activarBloqueoSpam(telefonoOId, idLimpio);
+          return { permitido: false, enviarAvisoSpam: false, bloqueado: true };
+        }
+
         const yaAvisado = await redis.get(claveAviso);
         if (!yaAvisado) {
           // Enviar respuesta amable UNA SOLA VEZ y registrar aviso en Redis por 60 segundos
@@ -709,6 +729,129 @@ export class ChatbotConfiguracionService {
       this.logger.warn(`Redis no disponible para verificación anti-spam: ${err.message}`);
       return { permitido: true, enviarAvisoSpam: false };
     }
+  }
+
+  /** Lee un parámetro numérico positivo; si falta o es inválido, usa el valor por defecto. */
+  private async parametroNumero(clave: string, porDefecto: number): Promise<number> {
+    try {
+      const p = await this.prisma.parametro.findUnique({ where: { clave } });
+      const n = Number(p?.valor);
+      return Number.isFinite(n) && n > 0 ? n : porDefecto;
+    } catch {
+      return porDefecto;
+    }
+  }
+
+  /**
+   * Bloqueo temporal por reincidencia: 1 hora; si el contacto vuelve a bloquearse dentro de las 24 h
+   * siguientes al bloqueo anterior, 24 horas. Solo se llama si no había bloqueo vigente: una notificación por episodio.
+   * La marca en la conversación (motivo_derivacion) es informativa; la fuente de verdad es la clave Redis con TTL.
+   */
+  private async activarBloqueoSpam(telefono: string, idLimpio: string): Promise<void> {
+    const redis = this.redisService.obtenerCliente();
+    const claveReinc = `chatbot:spam:reinc:${idLimpio}`;
+    const reincidente = (await redis.exists(claveReinc)) === 1;
+    const minutos = reincidente
+      ? await this.parametroNumero('spam_bloqueo_reincidente_min', 1440)
+      : await this.parametroNumero('spam_bloqueo_min', 60);
+
+    await redis.set(`chatbot:spam:bloqueo:${idLimpio}`, '1', 'EX', minutos * 60);
+    await redis.set(claveReinc, '1', 'EX', 1440 * 60);
+    await redis.del(
+      `chatbot:spam:excesos:${idLimpio}`,
+      `chatbot:antispam:min:${idLimpio}`,
+      `chatbot:antispam:hora:${idLimpio}`,
+      `chatbot:antispam:aviso:${idLimpio}`,
+    );
+
+    try {
+      await this.prisma.conversacion.updateMany({
+        where: { telefono },
+        data: { motivo_derivacion: MOTIVO_BLOQUEO_SPAM },
+      });
+
+      // Clientes con pedidos recientes también se silencian (el límite es por número); el aviso al equipo lo dice
+      const ultimos9 = telefono.replace(/\D/g, '').slice(-9);
+      const pedidosRecientes =
+        ultimos9.length === 9
+          ? await this.prisma.pedido.count({
+              where: {
+                cliente_telefono: { endsWith: ultimos9 },
+                creado_en: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+              },
+            })
+          : 0;
+      const conv = await this.prisma.conversacion.findUnique({
+        where: { telefono },
+        select: { id: true, nombre_contacto: true },
+      });
+      const titulo = `Chat bloqueado por spam (${conv?.nombre_contacto || 'cliente'})`;
+      await this.prisma.notificacion.create({
+        data: {
+          tipo: 'CHAT_BLOQUEADO_SPAM',
+          rol_destino: null,
+          titulo,
+          mensaje:
+            `Superó el límite de mensajes ${reincidente ? 'otra vez (reincidencia)' : ''}. ` +
+            `El bot no le responde por ${minutos >= 60 ? `${Math.round(minutos / 60)} h` : `${minutos} min`}. ` +
+            (pedidosRecientes > 0 ? 'Tiene pedidos recientes. ' : '') +
+            'Un administrador puede desbloquearlo desde Mensajes.',
+          enlace: `/admin/mensajes?telefono=${telefono.replace(/\D/g, '')}`,
+        },
+      });
+    } catch (err: any) {
+      this.logger.warn(`No se pudo registrar el bloqueo por spam en el chat: ${err.message}`);
+    }
+  }
+
+  /**
+   * Desbloqueo manual de un administrador: quita el bloqueo vigente y los contadores (la reincidencia se conserva 24 h).
+   * Motivo obligatorio (mínimo 5 caracteres). Queda auditado. No borra ningún mensaje.
+   */
+  async desbloquearSpam(
+    conversacionId: bigint,
+    motivo: unknown,
+    usuario: UsuarioAutenticado,
+    ip?: string,
+  ): Promise<{ ok: true }> {
+    const motivoTexto = typeof motivo === 'string' ? motivo.trim() : '';
+    if (motivoTexto.length < 5) {
+      throw new BadRequestException({ codigo: 'MOTIVO_REQUERIDO', mensaje: 'Escribe el motivo (mínimo 5 caracteres)' });
+    }
+    const conv = await this.prisma.conversacion.findUnique({
+      where: { id: conversacionId },
+      select: { id: true, telefono: true, motivo_derivacion: true },
+    });
+    if (!conv) {
+      throw new NotFoundException({ codigo: 'CONVERSACION_NO_ENCONTRADA', mensaje: 'La conversación no existe' });
+    }
+
+    const idLimpio = encodeURIComponent(conv.telefono.trim());
+    const redis = this.redisService.obtenerCliente();
+    await redis.del(
+      `chatbot:spam:bloqueo:${idLimpio}`,
+      `chatbot:spam:excesos:${idLimpio}`,
+      `chatbot:antispam:min:${idLimpio}`,
+      `chatbot:antispam:hora:${idLimpio}`,
+      `chatbot:antispam:aviso:${idLimpio}`,
+    );
+    if (conv.motivo_derivacion === MOTIVO_BLOQUEO_SPAM) {
+      await this.prisma.conversacion.update({ where: { id: conv.id }, data: { motivo_derivacion: null } });
+    }
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'mensajes',
+      accion: 'DESBLOQUEAR_SPAM',
+      resultado: 'OK',
+      entidad: 'conversacion',
+      entidadId: conv.id,
+      partyId: usuario.partyId,
+      ip,
+      antes: { bloqueadoSpam: conv.motivo_derivacion === MOTIVO_BLOQUEO_SPAM },
+      despues: { bloqueadoSpam: false, motivo: motivoTexto },
+    });
+    return { ok: true };
   }
 
   /**

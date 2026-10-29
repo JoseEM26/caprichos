@@ -32,6 +32,7 @@ describe('ChatbotConfiguracionService y Controller (Ola 4, Agente I)', () => {
     expire: jest.fn(),
     get: jest.fn(),
     set: jest.fn(),
+    exists: jest.fn().mockResolvedValue(0), // bloqueo por spam: sin bloqueo vigente
   };
 
   const mockUsuario = {

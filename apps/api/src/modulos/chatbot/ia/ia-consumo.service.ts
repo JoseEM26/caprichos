@@ -107,6 +107,14 @@ export class IaConsumoService {
       };
     }
 
+    // Sin Redis no hay control de consumo ni de límites: la IA se apaga y el bot usa respuestas fijas y botones
+    if (!(await this.redisDisponible())) {
+      return {
+        permitido: false,
+        motivo: 'Redis no responde: la IA está apagada temporalmente y el bot usa respuestas fijas.',
+      };
+    }
+
     const topeAlcanzado = await this.verificarTopeMensualAlcanzado();
     if (topeAlcanzado) {
       return {
@@ -116,6 +124,65 @@ export class IaConsumoService {
     }
 
     return { permitido: true };
+  }
+
+  private redisCache: { ok: boolean; hastaMs: number } | null = null;
+  private redisCaidoEpisodio = false;
+
+  /**
+   * Redis responde (PING con tope de 1,5 s). El resultado se cachea 10 s para no sumar latencia a cada consulta.
+   * Nunca lanza. Avisa a administradores una vez al caer y otra al recuperarse.
+   */
+  async redisDisponible(): Promise<boolean> {
+    if (this.redisCache && Date.now() < this.redisCache.hastaMs) return this.redisCache.ok;
+
+    let ok = false;
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      const tope = new Promise<never>((_, rechazar) => {
+        timer = setTimeout(() => rechazar(new Error('Redis sin respuesta')), 1500);
+      });
+      ok = (await Promise.race([this.redisService.obtenerCliente().ping(), tope])) === 'PONG';
+    } catch {
+      ok = false;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+
+    this.redisCache = { ok, hastaMs: Date.now() + 10_000 };
+    await this.registrarEpisodioRedis(ok);
+    return ok;
+  }
+
+  private async registrarEpisodioRedis(ok: boolean): Promise<void> {
+    if (!ok && !this.redisCaidoEpisodio) {
+      this.redisCaidoEpisodio = true;
+      this.logger.error('Redis no responde: la IA del bot queda apagada hasta que vuelva.');
+      await this.avisarAdminsRedis(
+        'REDIS_CAIDO',
+        'IA del bot apagada: Redis no responde',
+        'Mientras Redis no responda, el bot usa respuestas fijas y botones. La IA vuelve sola cuando Redis se recupere.',
+      );
+    } else if (ok && this.redisCaidoEpisodio) {
+      this.redisCaidoEpisodio = false;
+      this.logger.log('Redis recuperado: la IA del bot vuelve a estar disponible.');
+      await this.avisarAdminsRedis(
+        'REDIS_RECUPERADO',
+        'Redis recuperado: IA del bot reactivada',
+        'Redis responde otra vez. La IA del bot vuelve a estar disponible.',
+      );
+    }
+  }
+
+  private async avisarAdminsRedis(tipo: string, titulo: string, mensaje: string): Promise<void> {
+    try {
+      const notif = await this.prisma.notificacion.create({
+        data: { tipo, rol_destino: 'ADMIN', titulo, mensaje, enlace: '/admin/configuracion' },
+      });
+      this.eventos?.emitirAdmin('notificaciones:nueva', { id: notif.id.toString(), titulo });
+    } catch (err: any) {
+      this.logger.warn(`No se pudo avisar a administradores del estado de Redis: ${err.message}`);
+    }
   }
 
   /**

@@ -13,6 +13,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
+import { RedisService } from '../../../comun/redis/redis.service';
 import { EventosGateway } from '../../../comun/socket/eventos.gateway';
 import { ArchivosService } from '../../archivos/archivos.service';
 import {
@@ -84,6 +85,7 @@ export class WhatsappWebhookService {
     private readonly vouchersService?: VouchersService,
     @Optional() private readonly reprogramacion?: ReprogramacionService,
     @Optional() private readonly outbox?: OutboxWhatsappService,
+    @Optional() private readonly redis?: RedisService,
   ) {
     this.verifyToken = this.configService.get<string>('WHATSAPP_VERIFY_TOKEN', '').trim();
     this.appSecret = this.configService.get<string>('WHATSAPP_APP_SECRET', '').trim();
@@ -730,6 +732,9 @@ export class WhatsappWebhookService {
       });
       if (consentimiento && !consentimiento.acepta) return;
 
+      // Bloqueo temporal por spam vigente (Redis): silencio, el mensaje ya quedó en el chat
+      if (await this.spamBloqueado(p.identificador)) return;
+
       // El bot solo responde si el chat es suyo: sin persona tomándolo, sin modo asistido y no derivado a una persona.
       // En VALIDAR_PAGO sigue atendiendo (como el motor), salvo que ya lo derivamos por este motivo.
       const flujo = (p.conversacion.flujo as Record<string, any>) || {};
@@ -785,6 +790,19 @@ export class WhatsappWebhookService {
       this.outbox.despertar();
     } catch (err: any) {
       this.logger.warn(`No se pudo atender un mensaje no compatible: ${err.message}`);
+    }
+  }
+
+  /** true si el contacto tiene un bloqueo temporal por spam vigente. Si Redis no responde, no bloquea (fail-open). */
+  private async spamBloqueado(identificador: string): Promise<boolean> {
+    if (!this.redis) return false;
+    try {
+      const existe = await this.redis.obtenerCliente().exists(
+        `chatbot:spam:bloqueo:${encodeURIComponent(identificador.trim())}`,
+      );
+      return existe === 1;
+    } catch {
+      return false;
     }
   }
 

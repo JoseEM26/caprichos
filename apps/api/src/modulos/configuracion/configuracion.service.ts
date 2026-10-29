@@ -49,6 +49,10 @@ export const CLAVES_NUMERICAS = [
   'caja_aviso_apertura_min',
   'voucher_ia_corte_min',
   'zonas_snap_m',
+  'spam_bloqueo_excesos',
+  'spam_bloqueo_min',
+  'spam_bloqueo_reincidente_min',
+  'whatsapp_max_pedidos_sin_pagar',
 ] as const;
 
 export const CLAVES_TEXTO = [

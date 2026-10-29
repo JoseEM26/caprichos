@@ -45,6 +45,7 @@ import {
 } from './tipos-conversacion';
 import { obtenerFechaHoraLima } from '../../local/local.util';
 import { DireccionesClienteService } from '../../clientes/direcciones-cliente.service';
+import { topePedidosSinPagarAlcanzado, textoTopePedidosSinPagar } from '../servicios/tope-pedidos-sin-pagar.util';
 
 export interface EntradaProcesarMensaje extends EntradaRawInput {
   waMessageId?: string;
@@ -1379,6 +1380,54 @@ export class EjecutorConversacionService {
 
         this.logger.log(`Conversación ${conversacion.id} derivada a PERSONA. Notificación campana id ${notif.id}.`);
       } else if (accion.tipo === 'crearPedido') {
+        // Tope: no más de N pedidos por WhatsApp sin pagar por número. No se crea el pedido.
+        const tope = await topePedidosSinPagarAlcanzado(this.prisma, conversacion.telefono);
+        if (tope.alcanzado) {
+          const textoTope = textoTopePedidosSinPagar(tope.max);
+          const botonesTope = [
+            { id: 'mipedido', titulo: 'Ver mis pedidos' },
+            { id: 'btn_persona', titulo: 'Hablar con una persona' },
+          ];
+          let metaTope: string | null = null;
+          if (destinoEnvio) {
+            const res = await this.mensajeria.enviarBotones(destinoEnvio, textoTope, botonesTope, {
+              conversacionId: conversacion.id,
+              replyToWaMessageId: entradaRaw.waMessageId,
+            });
+            metaTope = res.waMessageId || null;
+          }
+          await this.prisma.mensajeChat.create({
+            data: {
+              conversacion_id: conversacion.id,
+              direccion: 'SALE',
+              autor: 'BOT',
+              tipo: 'BOTON',
+              contenido: { texto: textoTope, botones: botonesTope } as any,
+              meta_id: metaTope,
+            },
+          });
+          // Equipo: una notificación por número cada 24 h
+          const hace24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+          const yaAvisado = await this.prisma.notificacion.findFirst({
+            where: { tipo: 'PEDIDOS_SIN_PAGAR_TOPE', en: { gte: hace24h }, mensaje: { contains: `(conv ${conversacion.id})` } },
+            select: { id: true },
+          });
+          if (!yaAvisado) {
+            const tituloTope = `Pedidos sin pagar al tope (${nombreMostrar})`;
+            const notifTope = await this.prisma.notificacion.create({
+              data: {
+                tipo: 'PEDIDOS_SIN_PAGAR_TOPE',
+                rol_destino: null,
+                titulo: tituloTope,
+                mensaje: `Este número ya tiene ${tope.max} pedidos por WhatsApp sin pagar. No se creó otro pedido (conv ${conversacion.id}).`,
+                enlace: '/admin/mensajes',
+              },
+            });
+            this.eventos?.emitirAdmin('notificaciones:nueva', { id: notifTope.id.toString(), titulo: tituloTope });
+          }
+          continue;
+        }
+
         let codigoFinal = 'CP-0000';
         try {
           if (this.pedidosService) {

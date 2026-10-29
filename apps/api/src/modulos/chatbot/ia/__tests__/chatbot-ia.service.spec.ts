@@ -38,6 +38,7 @@ describe('ChatbotIaService (Ola 3, Agente G - IA para dudas con OpenAI)', () => 
           return Promise.resolve(current);
         }),
         expire: jest.fn().mockResolvedValue(1),
+        ping: jest.fn().mockResolvedValue('PONG'), // Redis disponible: la IA sigue activa
       }),
     };
 
