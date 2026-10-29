@@ -2,6 +2,7 @@ import {
   IsBoolean,
   IsInt,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   IsString,
   Min,
@@ -74,6 +75,32 @@ export class ActualizarGrupoOpcionesDto {
   @Min(0, { message: 'El máximo debe ser mayor o igual a 0' })
   @Validate(EsMayorOIgualQueMinimoConstraint)
   maximo?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  activo?: boolean;
+}
+
+export class CrearOpcionDto {
+  @IsString({ message: 'El nombre de la opción debe ser texto' })
+  @IsNotEmpty({ message: 'El nombre de la opción es requerido' })
+  nombre!: string;
+
+  @IsOptional()
+  @IsNumber({}, { message: 'El precio extra debe ser un número' })
+  @Min(0, { message: 'El precio extra debe ser mayor o igual a 0' })
+  precioExtra?: number;
+}
+
+export class ActualizarOpcionDto {
+  @IsOptional()
+  @IsString({ message: 'El nombre de la opción debe ser texto' })
+  nombre?: string;
+
+  @IsOptional()
+  @IsNumber({}, { message: 'El precio extra debe ser un número' })
+  @Min(0, { message: 'El precio extra debe ser mayor o igual a 0' })
+  precioExtra?: number;
 
   @IsOptional()
   @IsBoolean()

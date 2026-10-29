@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
+import { estaVigente, formatearFecha, obtenerAhoraLima } from '../ofertas/ofertas.util';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import {
   CategoriaCarta,
@@ -18,7 +19,12 @@ import { EditarProductoDto } from './dto/editar-producto.dto';
 import { AgotarDto } from './dto/agotar.dto';
 import { ActualizarCategoriaDto, CrearCategoriaDto } from './dto/categoria.dto';
 import { FiltrarProductosDto } from './dto/filtrar-productos.dto';
-import { ActualizarGrupoOpcionesDto, CrearGrupoOpcionesDto } from './dto/grupo-opciones.dto';
+import {
+  ActualizarGrupoOpcionesDto,
+  ActualizarOpcionDto,
+  CrearGrupoOpcionesDto,
+  CrearOpcionDto,
+} from './dto/grupo-opciones.dto';
 import {
   ActualizarListaDto,
   ActualizarValorDto,
@@ -258,6 +264,36 @@ export class CatalogoService {
       },
     });
 
+    // Promociones activas sobre el precio (DESCUENTO / LLEVA_PAGA): una sola consulta para todo el listado.
+    // Se excluyen COMBO (el producto suelto sí suma) y cupones (otra tabla). Una promoción sin alcance
+    // (toda la carta) va aparte en `promocionesGenerales` para no esconder el botón en todos los productos.
+    const ofertas = productos.length
+      ? await this.prisma.oferta.findMany({
+          where: { activo: true, tipo: { in: ['DESCUENTO', 'LLEVA_PAGA'] } },
+          select: {
+            id: true, nombre: true, tipo: true, activo: true, alcance_producto_id: true,
+            alcance_categoria_id: true, dias: true, hora_desde: true, hora_hasta: true,
+            fecha_desde: true, fecha_hasta: true, canales: true, limite_usos: true, usos_actuales: true,
+          },
+        })
+      : [];
+    const hoy = obtenerAhoraLima().fechaIso;
+    const aItem = (o: any) => {
+      const desde = formatearFecha(o.fecha_desde);
+      const hasta = formatearFecha(o.fecha_hasta);
+      return {
+        id: o.id.toString(),
+        nombre: o.nombre,
+        tipo: o.tipo as string,
+        vigenteAhora: estaVigente(o),
+        estado: (desde && hoy < desde ? 'PROGRAMADA' : hasta && hoy > hasta ? 'VENCIDA' : 'EN_CURSO') as
+          | 'PROGRAMADA'
+          | 'VENCIDA'
+          | 'EN_CURSO',
+      };
+    };
+    const generales = ofertas.filter((o) => !o.alcance_producto_id && !o.alcance_categoria_id).map(aItem);
+
     return productos.map((p) => ({
       id: p.id.toString(),
       categoriaId: p.categoria_id.toString(),
@@ -273,6 +309,10 @@ export class CatalogoService {
       disponible: estaDisponible(p.agotado_hasta),
       agotadoHasta: p.agotado_hasta ? p.agotado_hasta.toISOString() : null,
       noSumaBeneficios: p.no_suma_beneficios,
+      promociones: ofertas
+        .filter((o) => o.alcance_producto_id === p.id || (!o.alcance_producto_id && o.alcance_categoria_id === p.categoria_id))
+        .map(aItem),
+      promocionesGenerales: generales,
       fotoUrl: obtenerFotoUrl(p.foto_archivo),
       tamanos: (p.tamanos || []).map((t) => ({
         id: t.id.toString(),
@@ -636,6 +676,15 @@ export class CatalogoService {
             },
           });
         }
+      }
+
+      if (dto.sincronizarGrupos && dto.grupos) {
+        await tx.productoGrupo.deleteMany({
+          where: {
+            producto_id: pId,
+            grupo_id: { notIn: dto.grupos.map((g) => this.parsearId(g.grupoId)) },
+          },
+        });
       }
 
       if (dto.sabores) {
@@ -1774,6 +1823,177 @@ export class CatalogoService {
       activo: nuevo.activo,
       opciones: [],
       categoriaIds: [],
+    };
+  }
+
+  /** Crea una opción nueva (o reactiva una existente) dentro de un grupo, con su precio extra. */
+  async crearOpcionGrupo(
+    grupoId: bigint | string | number,
+    dto: CrearOpcionDto,
+    usuario?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const gId = this.parsearId(grupoId);
+    const grupo = await this.prisma.grupoOpciones.findUnique({ where: { id: gId } });
+    if (!grupo) {
+      throw new NotFoundException({
+        codigo: 'GRUPO_NO_ENCONTRADO',
+        mensaje: 'El grupo de opciones no existe',
+      });
+    }
+    const nombre = (dto.nombre ?? '').trim();
+    if (!nombre) {
+      throw new BadRequestException({
+        codigo: 'NOMBRE_VACIO',
+        mensaje: 'Escribe el nombre de la opción',
+      });
+    }
+    const precioExtra = dto.precioExtra ?? 0;
+    if (precioExtra < 0) {
+      throw new BadRequestException({
+        codigo: 'PRECIO_INVALIDO',
+        mensaje: 'El precio extra debe ser mayor o igual a 0',
+      });
+    }
+
+    let listaId = grupo.lista_id;
+    if (!listaId) {
+      const lista = await this.prisma.lista.create({
+        data: { nombre: grupo.nombre, codigo: `GRP_${grupo.id.toString()}_${Date.now().toString(36).toUpperCase()}` },
+      });
+      listaId = lista.id;
+      await this.prisma.grupoOpciones.update({ where: { id: gId }, data: { lista_id: listaId } });
+    }
+
+    const existente = await this.prisma.listaValor.findFirst({
+      where: { lista_id: listaId, nombre: { equals: nombre, mode: 'insensitive' } },
+    });
+    let valor: any = existente;
+    if (!valor) {
+      const maxOrden = await this.prisma.listaValor.aggregate({
+        where: { lista_id: listaId },
+        _max: { orden: true },
+      });
+      valor = await this.prisma.listaValor.create({
+        data: { lista_id: listaId, nombre, orden: (maxOrden._max.orden || 0) + 1, activo: true },
+      });
+    } else if (!valor.activo) {
+      valor = await this.prisma.listaValor.update({ where: { id: valor.id }, data: { activo: true } });
+    }
+
+    const yaEnGrupo = await this.prisma.opcion.findUnique({
+      where: { grupo_id_valor_id: { grupo_id: gId, valor_id: valor.id } },
+    });
+    if (yaEnGrupo && yaEnGrupo.activo) {
+      throw new ConflictException({
+        codigo: 'OPCION_DUPLICADA',
+        mensaje: `«${valor.nombre}» ya es una opción de este grupo`,
+      });
+    }
+    const opcion = await this.prisma.opcion.upsert({
+      where: { grupo_id_valor_id: { grupo_id: gId, valor_id: valor.id } },
+      update: { activo: true, precio_extra: precioExtra },
+      create: { grupo_id: gId, valor_id: valor.id, precio_extra: precioExtra, activo: true },
+    });
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'catalogo',
+      accion: 'CREAR_OPCION',
+      resultado: 'OK',
+      entidad: 'opcion',
+      entidadId: opcion.id,
+      despues: { grupoId: gId.toString(), nombre: valor.nombre, precioExtra },
+      partyId: usuario?.partyId,
+      ip,
+    });
+
+    return {
+      id: opcion.id.toString(),
+      valorId: valor.id.toString(),
+      nombre: valor.nombre,
+      precioExtra: Number(Number(opcion.precio_extra).toFixed(2)),
+      activo: opcion.activo,
+      disponible: estaDisponible(opcion.agotado_hasta),
+    };
+  }
+
+  /** Edita nombre, precio extra y/o estado (activo/oculto) de una opción. Nada se elimina. */
+  async editarOpcion(
+    id: bigint | string | number,
+    dto: ActualizarOpcionDto,
+    usuario?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const oId = this.parsearId(id);
+    const actual = await this.prisma.opcion.findUnique({ where: { id: oId }, include: { valor: true } });
+    if (!actual) {
+      throw new NotFoundException({
+        codigo: 'OPCION_NO_ENCONTRADA',
+        mensaje: 'La opción no existe',
+      });
+    }
+    if (dto.precioExtra !== undefined && dto.precioExtra < 0) {
+      throw new BadRequestException({
+        codigo: 'PRECIO_INVALIDO',
+        mensaje: 'El precio extra debe ser mayor o igual a 0',
+      });
+    }
+    const nuevoNombre = dto.nombre?.trim();
+    if (dto.nombre !== undefined && !nuevoNombre) {
+      throw new BadRequestException({
+        codigo: 'NOMBRE_VACIO',
+        mensaje: 'Escribe el nombre de la opción',
+      });
+    }
+    if (nuevoNombre && actual.valor && nuevoNombre !== actual.valor.nombre) {
+      const dup = await this.prisma.listaValor.findFirst({
+        where: {
+          lista_id: actual.valor.lista_id,
+          id: { not: actual.valor_id },
+          nombre: { equals: nuevoNombre, mode: 'insensitive' },
+        },
+      });
+      if (dup) {
+        throw new ConflictException({
+          codigo: 'VALOR_DUPLICADO',
+          mensaje: `«${nuevoNombre}» ya existe en esta lista`,
+        });
+      }
+      await this.prisma.listaValor.update({ where: { id: actual.valor_id }, data: { nombre: nuevoNombre } });
+    }
+    const updated = await this.prisma.opcion.update({
+      where: { id: oId },
+      data: {
+        precio_extra: dto.precioExtra !== undefined ? dto.precioExtra : undefined,
+        activo: dto.activo !== undefined ? dto.activo : undefined,
+      },
+    });
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'catalogo',
+      accion: 'EDITAR_OPCION',
+      resultado: 'OK',
+      entidad: 'opcion',
+      entidadId: oId,
+      antes: { nombre: actual.valor?.nombre, precioExtra: Number(actual.precio_extra), activo: actual.activo },
+      despues: {
+        nombre: nuevoNombre || actual.valor?.nombre,
+        precioExtra: Number(updated.precio_extra),
+        activo: updated.activo,
+      },
+      partyId: usuario?.partyId,
+      ip,
+    });
+
+    return {
+      id: updated.id.toString(),
+      valorId: updated.valor_id.toString(),
+      nombre: nuevoNombre || actual.valor?.nombre || '',
+      precioExtra: Number(Number(updated.precio_extra).toFixed(2)),
+      activo: updated.activo,
+      disponible: estaDisponible(updated.agotado_hasta),
     };
   }
 

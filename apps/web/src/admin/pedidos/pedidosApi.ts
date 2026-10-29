@@ -69,6 +69,8 @@ export interface Pedido {
   paga_con?: string | number | null;
   /** Pago dividido: monto por medio (vacío si el pedido no tiene plan) */
   planPago?: Array<{ medio: string; monto: string | number }>;
+  /** Puntos del pedido (ganados, por ganar o motivo por el que no suma) */
+  puntos?: { estado: 'SUMADO' | 'PENDIENTE_DE_COBRO' | 'NO_SUMA'; puntos?: number; estimado?: number; motivo?: string; texto: string } | null;
   subtotal: string | number;
   descuento: string | number;
   envio?: string | number | null;

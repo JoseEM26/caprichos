@@ -8,6 +8,7 @@ jest.mock('@nestjs/jwt', () => ({
   },
 }));
 
+import { PuntosService } from './puntos.service';
 import { Test, TestingModule } from '@nestjs/testing';
 import { UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -40,6 +41,7 @@ describe('CuentaClienteController', () => {
       controllers: [CuentaClienteController],
       providers: [
         { provide: ClientesService, useValue: clientesServiceMock },
+        { provide: PuntosService, useValue: { movimientosCuenta: jest.fn().mockResolvedValue({ porcentaje: 5, movimientos: [], pagina: 1, hayMas: false }) } },
         { provide: ConfigService, useValue: configServiceMock },
         { provide: DireccionesClienteService, useValue: { listar: jest.fn(), desactivar: jest.fn() } },
       ],
@@ -165,6 +167,23 @@ describe('CuentaClienteController', () => {
 
       clientesServiceMock.clienteDesdeRequest.mockResolvedValue(null);
       await expect(controller.desactivarDireccion('7', {} as any)).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+  });
+
+  describe('puntos/movimientos', () => {
+    it('devuelve el historial paginado de la sesión; sin sesión responde 401', async () => {
+      const puntos = (controller as any).puntos;
+      clientesServiceMock.clienteDesdeRequest.mockResolvedValue({ partyId: '100', nombre: 'Ana' });
+
+      const r = await controller.movimientosPuntos({} as any, '2');
+      expect(puntos.movimientosCuenta).toHaveBeenCalledWith(100n, 2);
+      expect(r.porcentaje).toBe(5);
+
+      await controller.movimientosPuntos({} as any, 'x');
+      expect(puntos.movimientosCuenta).toHaveBeenLastCalledWith(100n, 1);
+
+      clientesServiceMock.clienteDesdeRequest.mockResolvedValue(null);
+      await expect(controller.movimientosPuntos({} as any)).rejects.toBeInstanceOf(UnauthorizedException);
     });
   });
 });

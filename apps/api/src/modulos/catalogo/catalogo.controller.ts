@@ -18,7 +18,12 @@ import { EditarProductoDto } from './dto/editar-producto.dto';
 import { AgotarDto } from './dto/agotar.dto';
 import { ActualizarCategoriaDto, CrearCategoriaDto } from './dto/categoria.dto';
 import { FiltrarProductosDto } from './dto/filtrar-productos.dto';
-import { ActualizarGrupoOpcionesDto, CrearGrupoOpcionesDto } from './dto/grupo-opciones.dto';
+import {
+  ActualizarGrupoOpcionesDto,
+  ActualizarOpcionDto,
+  CrearGrupoOpcionesDto,
+  CrearOpcionDto,
+} from './dto/grupo-opciones.dto';
 import {
   ActualizarListaDto,
   ActualizarValorDto,
@@ -157,6 +162,13 @@ export class CatalogoController {
     return this.catalogoService.mostrarOpcion(id, req.usuario, ip);
   }
 
+  @Patch('opciones/:id')
+  @Permiso('catalogo', 'editar')
+  async editarOpcion(@Param('id') id: string, @Body() dto: ActualizarOpcionDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.catalogoService.editarOpcion(id, dto, req.usuario, ip);
+  }
+
   // --- Categorías ---
 
   @Get('categorias')
@@ -287,5 +299,12 @@ export class CatalogoController {
   ) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.catalogoService.asignarGrupoCategorias(id, dto.categoriaIds, req.usuario, ip);
+  }
+
+  @Post('grupos/:id/opciones')
+  @Permiso('catalogo', 'crear')
+  async crearOpcion(@Param('id') id: string, @Body() dto: CrearOpcionDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.catalogoService.crearOpcionGrupo(id, dto, req.usuario, ip);
   }
 }

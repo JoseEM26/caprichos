@@ -202,12 +202,13 @@ describe('Máquina de Estados del Bot Conversacional (transicionarEstado)', () =
         expect(resultado.acciones[0].texto).toContain('Soy Capri');
         expect(resultado.acciones[0].botonTexto).toBe('Ver opciones');
         expect(resultado.acciones[0].tituloSeccion).toBe('Menú');
-        expect(resultado.acciones[0].filas).toHaveLength(6);
+        expect(resultado.acciones[0].filas).toHaveLength(7);
         expect(resultado.acciones[0].filas.map((f) => f.id)).toEqual([
           'pedir',
           'reservar',
           'carta',
           'mipedido',
+          'mispuntos',
           'preguntar',
           'persona',
         ]);

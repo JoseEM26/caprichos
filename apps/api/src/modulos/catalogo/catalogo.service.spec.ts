@@ -24,9 +24,11 @@ describe('CatalogoService', () => {
         create: jest.fn(),
         update: jest.fn(),
       },
+      oferta: { findMany: jest.fn().mockResolvedValue([]) },
       opcion: {
         findUnique: jest.fn(),
         update: jest.fn(),
+        upsert: jest.fn(),
       },
       areaCocina: {
         findUnique: jest.fn(),
@@ -64,6 +66,7 @@ describe('CatalogoService', () => {
         create: jest.fn(),
         delete: jest.fn(),
         upsert: jest.fn(),
+        deleteMany: jest.fn(),
       },
       $transaction: jest.fn((cb) => cb(prisma)),
     };
@@ -498,6 +501,52 @@ describe('CatalogoService', () => {
     });
   });
 
+  describe('Promociones por producto en el listado admin', () => {
+    const base = (id: number, cat: number) => ({
+      id: BigInt(id), categoria_id: BigInt(cat), categoria: { id: BigInt(cat), nombre: 'C' }, nombre: 'P' + id,
+      descripcion: null, precio: 10, orden: 0, oculto: false, agotado_hasta: null, no_suma_beneficios: false,
+      foto_archivo: null, tamanos: [], grupos: [], sabores: [],
+    });
+    const oferta = (id: number, tipo: string, extra: any = {}) => ({
+      id: BigInt(id), nombre: 'O' + id, tipo, activo: true, alcance_producto_id: null, alcance_categoria_id: null,
+      dias: [], hora_desde: null, hora_hasta: null, fecha_desde: null, fecha_hasta: null, canales: [],
+      limite_usos: null, usos_actuales: 0, ...extra,
+    });
+
+    it('asigna por producto y categoria, separa las de toda la carta y consulta ofertas una sola vez', async () => {
+      prisma.producto.findMany.mockResolvedValue([base(1, 5), base(2, 5), base(3, 6)]);
+      prisma.oferta.findMany.mockResolvedValue([
+        oferta(10, 'DESCUENTO', { alcance_producto_id: BigInt(1) }),
+        oferta(11, 'LLEVA_PAGA', { alcance_categoria_id: BigInt(6) }),
+        oferta(12, 'DESCUENTO'),
+      ]);
+      const r = await service.listarProductosAdmin({} as any);
+      expect(prisma.oferta.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.oferta.findMany.mock.calls[0][0].where).toEqual({
+        activo: true,
+        tipo: { in: ['DESCUENTO', 'LLEVA_PAGA'] },
+      });
+      expect(r[0].promociones.map((x) => x.id)).toEqual(['10']);
+      expect(r[1].promociones).toEqual([]);
+      expect(r[2].promociones.map((x) => x.id)).toEqual(['11']);
+      expect(r[0].promocionesGenerales.map((x) => x.id)).toEqual(['12']);
+      expect(r[0].promociones[0].vigenteAhora).toBe(true);
+    });
+
+    it('marca programada y vencida segun fechas', async () => {
+      prisma.producto.findMany.mockResolvedValue([base(1, 5)]);
+      prisma.oferta.findMany.mockResolvedValue([
+        oferta(10, 'DESCUENTO', { alcance_producto_id: BigInt(1), fecha_desde: new Date('2999-01-01') }),
+        oferta(11, 'DESCUENTO', { alcance_producto_id: BigInt(1), fecha_hasta: new Date('2000-01-01') }),
+      ]);
+      const [p] = await service.listarProductosAdmin({} as any);
+      expect(p.promociones.map((x) => [x.estado, x.vigenteAhora])).toEqual([
+        ['PROGRAMADA', false],
+        ['VENCIDA', false],
+      ]);
+    });
+  });
+
   describe('Listas y grupos de opciones', () => {
     it('crea una categoría nueva correctamente', async () => {
       prisma.categoria.findFirst = jest.fn().mockResolvedValue(null);
@@ -582,6 +631,50 @@ describe('CatalogoService', () => {
       expect(auditoria.registrar).toHaveBeenCalledWith(
         expect.objectContaining({ accion: 'DESACTIVAR_VALOR_LISTA' }),
       );
+    });
+  });
+
+  describe('Opciones de grupo y vínculo producto-grupo', () => {
+    it('crea una opción nueva con precio extra y la audita', async () => {
+      prisma.grupoOpciones.findUnique.mockResolvedValue({ id: BigInt(5), nombre: 'Leche', lista_id: BigInt(9) });
+      prisma.listaValor.findFirst.mockResolvedValue(null);
+      prisma.listaValor.aggregate.mockResolvedValue({ _max: { orden: 2 } });
+      prisma.listaValor.create.mockResolvedValue({ id: BigInt(70), nombre: 'Almendra', activo: true });
+      prisma.opcion.findUnique.mockResolvedValue(null);
+      prisma.opcion.upsert.mockResolvedValue({ id: BigInt(80), valor_id: BigInt(70), precio_extra: 2, activo: true, agotado_hasta: null });
+
+      const res = await service.crearOpcionGrupo(5, { nombre: ' Almendra ', precioExtra: 2 });
+      expect(res).toMatchObject({ id: '80', nombre: 'Almendra', precioExtra: 2 });
+      expect(auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'CREAR_OPCION' }));
+    });
+
+    it('rechaza una opción repetida y un precio extra negativo', async () => {
+      prisma.grupoOpciones.findUnique.mockResolvedValue({ id: BigInt(5), nombre: 'Leche', lista_id: BigInt(9) });
+      prisma.listaValor.findFirst.mockResolvedValue({ id: BigInt(70), nombre: 'Entera', activo: true });
+      prisma.opcion.findUnique.mockResolvedValue({ id: BigInt(80), activo: true });
+      await expect(service.crearOpcionGrupo(5, { nombre: 'Entera' })).rejects.toThrow(ConflictException);
+      await expect(service.crearOpcionGrupo(5, { nombre: 'X', precioExtra: -1 })).rejects.toThrow(BadRequestException);
+    });
+
+    it('edita el precio extra de una opción y lo audita', async () => {
+      prisma.opcion.findUnique.mockResolvedValue({
+        id: BigInt(80), valor_id: BigInt(70), precio_extra: 1, activo: true,
+        valor: { id: BigInt(70), lista_id: BigInt(9), nombre: 'Entera' },
+      });
+      prisma.opcion.update.mockResolvedValue({ id: BigInt(80), valor_id: BigInt(70), precio_extra: 3, activo: true, agotado_hasta: null });
+      const res = await service.editarOpcion(80, { precioExtra: 3 });
+      expect(res.precioExtra).toBe(3);
+      expect(auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'EDITAR_OPCION' }));
+      await expect(service.editarOpcion(80, { precioExtra: -2 })).rejects.toThrow(BadRequestException);
+    });
+
+    it('editarProducto con sincronizarGrupos desliga los grupos que no vienen', async () => {
+      prisma.producto.findUnique.mockResolvedValue({ id: BigInt(1), nombre: 'A', precio: 5, oculto: false, categoria_id: BigInt(1), tamanos: [], grupos: [], sabores: [] });
+      jest.spyOn(service, 'obtenerProductoPorId').mockResolvedValue({} as any);
+      await service.editarProducto(1, { grupos: [{ grupoId: 4 }], sincronizarGrupos: true } as any);
+      expect(prisma.productoGrupo.deleteMany).toHaveBeenCalledWith({
+        where: { producto_id: BigInt(1), grupo_id: { notIn: [BigInt(4)] } },
+      });
     });
   });
 });

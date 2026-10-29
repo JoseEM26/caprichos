@@ -21,6 +21,8 @@ export interface PedidoCliente {
   total: string;
   pago: string;
   fecha: string;
+  /** Puntos del pedido: ganados, por ganar o el motivo por el que no suma */
+  puntos?: { estado: 'SUMADO' | 'PENDIENTE_DE_COBRO' | 'NO_SUMA'; puntos?: number; estimado?: number; motivo?: string; texto: string } | null;
 }
 
 export interface MovimientoPuntosItem {

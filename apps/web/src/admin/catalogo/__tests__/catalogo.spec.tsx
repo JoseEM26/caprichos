@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { ProductosView } from '../ProductosView';
 import { ListasCategoriasView } from '../ListasCategoriasView';
@@ -219,6 +219,27 @@ describe('Módulo Catálogo - ProductosView', () => {
     await waitFor(() => {
       expect(screen.getByText('Agregar a la carta')).toBeInTheDocument();
     });
+  });
+
+  it('muestra el botón de vista previa en la tarjeta, en Nuevo producto y en Editar', async () => {
+    render(
+      <MemoryRouter>
+        <ProductosView />
+      </MemoryRouter>,
+    );
+    await screen.findByText('Frappe Oreo');
+    expect(screen.getByRole('button', { name: 'Ver cómo se ve en la carta: Frappe Oreo' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Editar' })[0]);
+    const enEditar = await screen.findByRole('dialog', { name: /Editar:/ });
+    fireEvent.click(within(enEditar).getByRole('button', { name: 'Ver cómo se ve en la carta' }));
+    expect(screen.getByText('Vista previa de tus cambios sin guardar')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar vista previa' }));
+    fireEvent.click(within(enEditar).getByRole('button', { name: 'Cancelar' }));
+
+    fireEvent.click(screen.getByRole('button', { name: /\+ Nuevo producto/i }));
+    const enNuevo = await screen.findByRole('dialog', { name: 'Nuevo producto' });
+    expect(within(enNuevo).getByRole('button', { name: 'Ver cómo se ve en la carta' })).toBeInTheDocument();
   });
 });
 

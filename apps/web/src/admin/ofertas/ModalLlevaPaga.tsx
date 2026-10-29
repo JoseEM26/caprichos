@@ -691,6 +691,7 @@ export function ModalLlevaPaga({
               <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: '8px' }}>
                 ¿Qué productos o categorías entran en la promoción?
               </div>
+              <div style={{ fontSize: '12px', color: 'var(--cp-soft)', marginBottom: '8px' }}>Los productos con descuento no suman puntos ni se pagan con puntos mientras la promoción esté activa</div>
 
               <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
                 <button

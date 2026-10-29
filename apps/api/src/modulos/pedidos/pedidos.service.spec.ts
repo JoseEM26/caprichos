@@ -111,6 +111,7 @@ describe('PedidosService', () => {
 
   beforeEach(async () => {
     prismaMock = {
+      partyRole: { findFirst: jest.fn().mockResolvedValue({ id: 1n }) },
       pedido: {
         findUnique: jest.fn().mockResolvedValue(null),
         create: jest.fn(),
@@ -983,6 +984,37 @@ describe('PedidosService', () => {
       expect(direccionesMock.resolverPartyPorTelefono).toHaveBeenCalledWith('987654321');
       expect(capturado.data.cliente_party_id).toBe(99n);
       expect(direccionesMock.registrarUso).toHaveBeenCalledWith(99n, expect.any(Object), 'WHATSAPP', prismaMock);
+    });
+
+    it('WhatsApp: la cuenta elegida por el cliente gana sobre la del teléfono', async () => {
+      const capturado = crearPedidoCapturado();
+      direccionesMock.resolverPartyPorTelefono.mockResolvedValue(99n);
+      direccionesMock.datosCuentaActiva.mockResolvedValue({ nombre: 'Ana', telefono: null });
+
+      await service.crear(pedidoBaseDto, 'idemp-wa-2', { canal: 'WHATSAPP', clientePartyId: '123', telefonoRemitente: '987654321' });
+
+      expect(capturado.data.cliente_party_id).toBe(123n);
+      expect(direccionesMock.resolverPartyPorTelefono).not.toHaveBeenCalled();
+    });
+
+    it('WhatsApp: una cuenta sin rol CLIENTE vigente se ignora y el pedido queda como invitado', async () => {
+      const capturado = crearPedidoCapturado();
+      direccionesMock.datosCuentaActiva.mockResolvedValue({ nombre: 'Ana', telefono: null });
+      prismaMock.partyRole.findFirst.mockResolvedValue(null);
+
+      await service.crear(pedidoBaseDto, 'idemp-wa-3', { canal: 'WHATSAPP', clientePartyId: '123' });
+
+      expect(capturado.data.cliente_party_id ?? null).toBeNull();
+    });
+
+    it('WhatsApp: «No, gracias» es invitado de verdad: no busca ninguna cuenta por teléfono', async () => {
+      const capturado = crearPedidoCapturado();
+      direccionesMock.resolverPartyPorTelefono.mockResolvedValue(99n);
+
+      await service.crear(pedidoBaseDto, 'idemp-wa-4', { canal: 'WHATSAPP', telefonoRemitente: '987654321', sinCuentaCliente: true });
+
+      expect(direccionesMock.resolverPartyPorTelefono).not.toHaveBeenCalled();
+      expect(capturado.data.cliente_party_id ?? null).toBeNull();
     });
   });
 });

@@ -349,6 +349,18 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: 
               <div className="cj-card-titulo">Resumen y cobro</div>
               <FilaDato etiqueta="Estado del pago" valor={estaPagado ? 'Pagado' : 'Pendiente'} />
               <FilaDato etiqueta="Medio de pago" valor={pedido.pago_metodo || pedido.pago_preferido || 'Efectivo'} />
+              {pedido.puntos?.texto && (
+                <FilaDato
+                  etiqueta="Puntos"
+                  valor={
+                    pedido.puntos.estado === 'SUMADO'
+                      ? `+${(pedido.puntos.puntos ?? 0).toFixed(2)}`
+                      : pedido.puntos.estado === 'PENDIENTE_DE_COBRO'
+                        ? `Se sumarán ${(pedido.puntos.estimado ?? 0).toFixed(2)}`
+                        : `No suma: ${pedido.puntos.texto}`
+                  }
+                />
+              )}
               <FilaDato etiqueta="Subtotal" valor={`S/ ${Number(pedido.subtotal || 0).toFixed(2)}`} />
               {Number(pedido.descuento || 0) > 0 && (
                 <FilaDato etiqueta="Descuento" valor={`- S/ ${Number(pedido.descuento || 0).toFixed(2)}`} />

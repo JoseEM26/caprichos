@@ -3,6 +3,7 @@ import { OfertaItem } from './ofertasApi';
 import { TarjetaOferta } from '../../carta/TarjetaOferta';
 import { VentanaProductoCarta } from '../../carta/VentanaProductoCarta';
 import { CarritoProvider } from '../../carta/CarritoContext';
+import { ConmutadorDispositivo, MarcoDispositivo } from '../../comun/MarcoDispositivo';
 import { ProductoCarta, CategoriaCarta, GrupoOpcionesCarta } from '../../carta/tipos';
 
 export interface PrevisualizacionCartaProps {
@@ -273,179 +274,27 @@ export function PrevisualizacionCarta({
           boxSizing: 'border-box',
         }}
       >
-        {/* Barra superior de controles del Preview */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: '10px',
-            flexWrap: 'wrap',
-            padding: '8px 12px',
-            borderRadius: '12px',
-            backgroundColor: 'var(--cp-sand)',
-            border: '1px solid var(--cp-line)',
-          }}
-        >
-          {/* Conmutador de vista: Tarjeta vs Al abrirla */}
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-            <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-navy)', marginRight: '4px' }}>
-              Vista:
-            </span>
-            <button
-              type="button"
-              onClick={() => setVista('tarjeta')}
-              aria-pressed={vista === 'tarjeta'}
-              data-testid="btn-vista-tarjeta"
-              style={{
-                minHeight: '34px',
-                padding: '0 12px',
-                borderRadius: '8px',
-                border: '1.5px solid var(--cp-navy)',
-                backgroundColor: vista === 'tarjeta' ? 'var(--cp-navy)' : 'var(--cp-white)',
-                color: vista === 'tarjeta' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                fontWeight: 700,
-                fontSize: '12px',
-                cursor: 'pointer',
-              }}
-            >
+        <div className="mdv-barra" style={{ justifyContent: 'space-between' }}>
+          <ConmutadorDispositivo celular={esCelular} onCambiar={(c) => setDispositivo(c ? 'celular' : 'pc')} />
+          <div className="mdv-conmutador" role="group" aria-label="Vista">
+            <button type="button" className="mdv-btn" aria-pressed={vista === 'tarjeta'} data-testid="btn-vista-tarjeta" onClick={() => setVista('tarjeta')}>
               Tarjeta en la lista
             </button>
-            <button
-              type="button"
-              onClick={() => setVista('abierta')}
-              aria-pressed={vista === 'abierta'}
-              data-testid="btn-vista-abierta"
-              style={{
-                minHeight: '34px',
-                padding: '0 12px',
-                borderRadius: '8px',
-                border: '1.5px solid var(--cp-navy)',
-                backgroundColor: vista === 'abierta' ? 'var(--cp-navy)' : 'var(--cp-white)',
-                color: vista === 'abierta' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                fontWeight: 700,
-                fontSize: '12px',
-                cursor: 'pointer',
-              }}
-            >
+            <button type="button" className="mdv-btn" aria-pressed={vista === 'abierta'} data-testid="btn-vista-abierta" onClick={() => setVista('abierta')}>
               Al abrirla (personalizar)
             </button>
           </div>
-
-          {/* Selector de dispositivo: Celular vs PC */}
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-            <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-navy)', marginRight: '4px' }}>
-              Dispositivo:
-            </span>
-            <button
-              type="button"
-              onClick={() => setDispositivo('celular')}
-              aria-pressed={esCelular}
-              data-testid="btn-disp-celular"
-              style={{
-                minHeight: '34px',
-                padding: '0 12px',
-                borderRadius: '8px',
-                border: '1.5px solid var(--cp-navy)',
-                backgroundColor: esCelular ? 'var(--cp-navy)' : 'var(--cp-white)',
-                color: esCelular ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                fontWeight: 700,
-                fontSize: '12px',
-                cursor: 'pointer',
-              }}
-            >
-              Celular (390px)
-            </button>
-            <button
-              type="button"
-              onClick={() => setDispositivo('pc')}
-              aria-pressed={!esCelular}
-              data-testid="btn-disp-pc"
-              style={{
-                minHeight: '34px',
-                padding: '0 12px',
-                borderRadius: '8px',
-                border: '1.5px solid var(--cp-navy)',
-                backgroundColor: !esCelular ? 'var(--cp-navy)' : 'var(--cp-white)',
-                color: !esCelular ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                fontWeight: 700,
-                fontSize: '12px',
-                cursor: 'pointer',
-              }}
-            >
-              PC (escritorio)
-            </button>
-          </div>
         </div>
 
-        {/* Marco de previsualización (simulador de celular o PC) */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'flex-start',
-            padding: '12px 0',
-            backgroundColor: 'color-mix(in srgb, var(--cp-sand) 30%, transparent)',
-            borderRadius: '16px',
-            overflow: 'hidden',
-          }}
-        >
-          <div
-            data-testid={`preview-container-${dispositivo}`}
-            style={{
-              width: esCelular ? '390px' : '100%',
-              maxWidth: esCelular ? '390px' : '720px',
-              minHeight: esCelular ? '480px' : '360px',
-              maxHeight: '620px',
-              border: esCelular ? '8px solid var(--cp-navy)' : '2px solid var(--cp-line)',
-              borderRadius: esCelular ? '28px' : '16px',
-              backgroundColor: 'var(--cp-cream)',
-              boxShadow: esCelular
-                ? '0 14px 40px rgba(11, 44, 62, 0.25)'
-                : '0 6px 20px rgba(11, 44, 62, 0.08)',
-              padding: esCelular ? '12px' : '18px',
-              boxSizing: 'border-box',
-              overflowY: 'auto',
-              position: 'relative',
-              transform: 'translate3d(0, 0, 0)',
-              contain: 'paint',
-            }}
-          >
-            {/* Header decorativo de celular (notch) */}
-            {esCelular && (
-              <div
-                style={{
-                  width: '120px',
-                  height: '14px',
-                  backgroundColor: 'var(--cp-navy)',
-                  borderRadius: '0 0 10px 10px',
-                  margin: '-12px auto 10px',
-                }}
-              />
-            )}
-
-            {vista === 'tarjeta' ? (
-              <div style={{ maxWidth: esCelular ? '100%' : '320px', margin: '0 auto' }}>
-                <TarjetaOferta
-                  oferta={ofertaNormalizada}
-                  productos={productosCarta}
-                  categorias={categoriasCarta}
-                  esMovilPreview={esCelular}
-                />
-              </div>
-            ) : (
-              <div style={{ width: '100%', minHeight: '400px' }}>
-                <VentanaProductoCarta
-                  producto={productoSimulado}
-                  esBebida={false}
-                  onCerrar={() => {}}
-                  soloLectura={true}
-                  esMovilPreview={esCelular}
-                />
-              </div>
-            )}
-          </div>
-        </div>
+        <MarcoDispositivo celular={esCelular}>
+          {vista === 'tarjeta' ? (
+            <div style={{ maxWidth: esCelular ? '100%' : '320px', margin: '0 auto' }}>
+              <TarjetaOferta oferta={ofertaNormalizada} productos={productosCarta} categorias={categoriasCarta} esMovilPreview={esCelular} />
+            </div>
+          ) : (
+            <VentanaProductoCarta producto={productoSimulado} esBebida={false} onCerrar={() => setVista('tarjeta')} soloLectura={true} esMovilPreview={esCelular} />
+          )}
+        </MarcoDispositivo>
       </div>
     </CarritoProvider>
   );

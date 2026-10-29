@@ -6,6 +6,7 @@ import {
   Param,
   Post,
   Put,
+  Query,
   Req,
   Res,
   UnauthorizedException,
@@ -15,6 +16,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Request, Response } from 'express';
+import { PuntosService } from './puntos.service';
 import { ClientesService } from './clientes.service';
 import { DireccionesClienteService } from './direcciones-cliente.service';
 import { IngresoClienteDto, PerfilClienteDto, RegistroClienteDto } from './clientes.tipos';
@@ -25,6 +27,7 @@ export class CuentaClienteController {
     private readonly clientesService: ClientesService,
     private readonly configService: ConfigService,
     private readonly direcciones: DireccionesClienteService,
+    private readonly puntos: PuntosService,
   ) {}
 
   @Post('registro')
@@ -148,6 +151,15 @@ export class CuentaClienteController {
       });
     }
     return this.direcciones.desactivar(cliente.partyId, id);
+  }
+
+  @Get('puntos/movimientos')
+  async movimientosPuntos(@Req() req: Request, @Query('pagina') pagina?: string) {
+    const cliente = await this.clientesService.clienteDesdeRequest(req);
+    if (!cliente) {
+      throw new UnauthorizedException({ codigo: 'SESION_REQUERIDA', mensaje: 'Ingresa con tu DNI para ver tus puntos.' });
+    }
+    return this.puntos.movimientosCuenta(BigInt(cliente.partyId), Math.max(1, parseInt(pagina ?? '1', 10) || 1));
   }
 
   @Get('notificaciones')

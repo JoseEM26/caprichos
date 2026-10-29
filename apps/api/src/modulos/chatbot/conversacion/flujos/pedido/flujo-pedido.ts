@@ -6,6 +6,7 @@ import {
   AccionMensaje,
   BotonAccion,
   FilaLista,
+  MemoriaPuntosBot,
 } from '../../tipos-conversacion';
 import { SubFlujoConversacion, RegistroSubFlujos } from '../registro-flujos';
 import {
@@ -19,6 +20,11 @@ import {
   BOTON_VOLVER_MENU,
   BOTON_HABLAR_PERSONA,
   BOTONES_PEDIDO_MODALIDAD,
+  BOTONES_PUNTOS_PROPIA,
+  BOTONES_PUNTOS_RECORDATORIO,
+  BOTONES_PUNTOS_DICTADO,
+  BOTONES_PUNTOS_NO_ENCONTRADO,
+  BOTONES_PUNTOS_NUMERO,
   BOTONES_PEDIDO_UBICACION,
   BOTONES_PEDIDO_UBICACION_FALLIDA,
   BOTONES_PEDIDO_ACCION_CARRITO,
@@ -57,6 +63,9 @@ const PALABRAS_CANCELAR = [
   'cancelar pedido',
   'descartar',
 ];
+
+const VIGENCIA_PUNTOS_MS = 30 * 24 * 60 * 60 * 1000;
+const MAX_INTENTOS_NUMERO_PUNTOS = 3;
 
 export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
   readonly nombre = 'pedido';
@@ -426,6 +435,12 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
 
       case 'PEDIDO_COMPROBANTE_RAZON':
         return this.pasoComprobanteRazon(flujo, pedido, entrada, contexto);
+
+      case 'PEDIDO_PUNTOS_PREGUNTA':
+        return this.pasoPuntosPregunta(flujo, pedido, entrada, contexto);
+
+      case 'PEDIDO_PUNTOS_NUMERO':
+        return this.pasoPuntosNumero(flujo, pedido, entrada, contexto);
 
       case 'PEDIDO_RESUMEN_CONFIRMAR':
         return this.pasoResumenConfirmar(flujo, pedido, entrada, contexto);
@@ -2299,6 +2314,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
           tiempoEstimadoMin: tiempoMin,
           tiempoEstimadoMax: tiempoMax,
           esPagoDigital,
+          puntos: this.puntosParaPedido(flujo, contexto),
           datosPagoTexto: this.formatearDatosPago(contexto.datosLocalPublicos?.mediosPagoVisibles, total),
         },
       ],
@@ -2550,8 +2566,217 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       };
     }
 
+    // 8.b A qué cuenta suman los puntos (solo si el servidor los puede consultar)
+    if (!pedido.puntosResuelto && contexto.puntos) {
+      const paso = this.preguntarPuntos(flujo, pedido, contexto);
+      if (paso) return paso;
+    }
+
     // 9. Resumen final completo
     return this.mostrarResumenFinal(flujo, pedido, contexto);
+  }
+
+  // -------------------------------------------------------------------------
+  // Puntos: sin clave ni login; el cliente elige a qué cuenta suman (RQ-CLI-02)
+  // -------------------------------------------------------------------------
+  private memoriaPuntosVigente(flujo: FlujoConversacion): MemoriaPuntosBot | null {
+    const m = flujo.puntos;
+    return m && Date.now() - m.en < VIGENCIA_PUNTOS_MS ? m : null;
+  }
+
+  private urlCarta(contexto: ContextoConversacion): string {
+    return contexto.cartaUrlPublica || 'https://caprichos.pe/carta';
+  }
+
+  private resolverPuntos(
+    flujo: FlujoConversacion,
+    pedido: EstadoCarritoPedido,
+    memoria: MemoriaPuntosBot,
+    extra: Partial<EstadoCarritoPedido> = {},
+  ): FlujoConversacion {
+    return {
+      ...flujo,
+      puntos: memoria,
+      pedido: { ...pedido, ...extra, puntosResuelto: true, puntosModo: undefined, puntosPendiente: undefined },
+    };
+  }
+
+  /** Devuelve la pregunta de puntos que toca, o null si no hay nada que preguntar. */
+  private preguntarPuntos(
+    flujo: FlujoConversacion,
+    pedido: EstadoCarritoPedido,
+    contexto: ContextoConversacion,
+  ): ResultadoTransicion | null {
+    const memoria = this.memoriaPuntosVigente(flujo);
+    const propia = contexto.puntos?.cuentaTelefono;
+    if (memoria?.modo === 'NINGUNO') return null;
+    // tope por conversación: tres números dictados y no se vuelve a preguntar
+    if ((flujo.puntosIntentos ?? 0) >= MAX_INTENTOS_NUMERO_PUNTOS && !memoria?.partyId && !propia) return null;
+
+    const preguntar = (
+      estado: 'PEDIDO_PUNTOS_PREGUNTA' | 'PEDIDO_PUNTOS_NUMERO',
+      modo: EstadoCarritoPedido['puntosModo'],
+      texto: string,
+      botones: BotonAccion[],
+    ): ResultadoTransicion => ({
+      nuevoEstado: estado,
+      acciones: [{ tipo: 'enviarBotones', texto, botones }],
+      nuevoFlujo: { ...flujo, estado, pedido: { ...pedido, estadoInterno: estado, puntosModo: modo } },
+    });
+
+    if (memoria?.partyId) {
+      const destino =
+        memoria.modo === 'TELEFONO_PROPIO'
+          ? `la cuenta de ${memoria.primerNombre ?? 'tu cuenta'}`
+          : `la cuenta que termina en ***${memoria.terminacion ?? '***'}`;
+      return preguntar('PEDIDO_PUNTOS_PREGUNTA', 'RECORDATORIO', TEXTOS_BOT.puntosRecordatorio(destino), BOTONES_PUNTOS_RECORDATORIO);
+    }
+    if (propia) {
+      return preguntar('PEDIDO_PUNTOS_PREGUNTA', 'PROPIA', TEXTOS_BOT.puntosCuentaPropia(propia.primerNombre), BOTONES_PUNTOS_PROPIA);
+    }
+    return preguntar('PEDIDO_PUNTOS_NUMERO', undefined, TEXTOS_BOT.puntosPedirNumero(), BOTONES_PUNTOS_NUMERO);
+  }
+
+  private pasoPuntosPregunta(
+    flujo: FlujoConversacion,
+    pedido: EstadoCarritoPedido,
+    entrada: EntradaNormalizada,
+    contexto: ContextoConversacion,
+  ): ResultadoTransicion {
+    const ahora = Date.now();
+    const siguiente = (f: FlujoConversacion) =>
+      this.avanzarHaciaCheckout({ ...f, estado: 'PEDIDO_RESUMEN_CONFIRMAR' as any }, f.pedido as EstadoCarritoPedido, contexto);
+
+    if (entrada.id === 'puntos_no' || entrada.id === 'puntos_sin') {
+      return siguiente(this.resolverPuntos(flujo, pedido, { modo: 'NINGUNO', en: ahora }));
+    }
+    if (entrada.id === 'puntos_otro') {
+      return {
+        nuevoEstado: 'PEDIDO_PUNTOS_NUMERO',
+        acciones: [{ tipo: 'enviarBotones', texto: TEXTOS_BOT.puntosPedirNumero(), botones: BOTONES_PUNTOS_NUMERO }],
+        nuevoFlujo: {
+          ...flujo,
+          estado: 'PEDIDO_PUNTOS_NUMERO',
+          puntos: undefined,
+          pedido: { ...pedido, estadoInterno: 'PEDIDO_PUNTOS_NUMERO', puntosModo: undefined, puntosPendiente: undefined },
+        },
+      };
+    }
+    if (entrada.id === 'puntos_si') {
+      const propia = contexto.puntos?.cuentaTelefono;
+      if (pedido.puntosModo === 'PROPIA' && propia) {
+        return siguiente(this.resolverPuntos(flujo, pedido, { modo: 'TELEFONO_PROPIO', partyId: propia.partyId, primerNombre: propia.primerNombre, en: ahora }));
+      }
+      if (pedido.puntosModo === 'DICTADO_CONFIRMAR' && pedido.puntosPendiente) {
+        return siguiente(
+          this.resolverPuntos(flujo, pedido, { modo: 'TELEFONO_DICTADO', partyId: pedido.puntosPendiente.partyId, terminacion: pedido.puntosPendiente.terminacion, en: ahora }),
+        );
+      }
+      const mem = this.memoriaPuntosVigente(flujo);
+      if (pedido.puntosModo === 'RECORDATORIO' && mem) {
+        return siguiente(this.resolverPuntos(flujo, pedido, mem));
+      }
+    }
+    // Cualquier otra cosa: se repite la pregunta
+    if (pedido.puntosModo === 'DICTADO_CONFIRMAR' && pedido.puntosPendiente) {
+      return {
+        nuevoEstado: 'PEDIDO_PUNTOS_PREGUNTA',
+        acciones: [{ tipo: 'enviarBotones', texto: TEXTOS_BOT.puntosEncontrado(pedido.puntosPendiente.terminacion), botones: BOTONES_PUNTOS_DICTADO }],
+        nuevoFlujo: flujo,
+      };
+    }
+    const pregunta = this.preguntarPuntos({ ...flujo, puntos: pedido.puntosModo === 'DICTADO_CONFIRMAR' ? undefined : flujo.puntos }, { ...pedido, puntosResuelto: false }, contexto);
+    return pregunta ?? siguiente(this.resolverPuntos(flujo, pedido, { modo: 'NINGUNO', en: ahora }));
+  }
+
+  private pasoPuntosNumero(
+    flujo: FlujoConversacion,
+    pedido: EstadoCarritoPedido,
+    entrada: EntradaNormalizada,
+    contexto: ContextoConversacion,
+  ): ResultadoTransicion {
+    const ahora = Date.now();
+    const terminar = (texto?: string) => {
+      const f = this.resolverPuntos(flujo, pedido, { modo: 'NINGUNO', en: ahora });
+      const r = this.avanzarHaciaCheckout({ ...f, estado: 'PEDIDO_RESUMEN_CONFIRMAR' as any }, f.pedido as EstadoCarritoPedido, contexto);
+      if (!texto) return r;
+      return { ...r, acciones: [{ tipo: 'enviarTexto' as const, texto }, ...r.acciones] };
+    };
+
+    if (entrada.id === 'puntos_sin' || entrada.id === 'puntos_no') return terminar();
+    if (entrada.id === 'puntos_otro') {
+      return this.reintentoNumero(flujo, pedido, TEXTOS_BOT.puntosPedirNumero());
+    }
+
+    const digitos = entrada.textoOriginal.replace(/\D/g, '');
+    const celular = digitos.length === 11 && digitos.startsWith('51') ? digitos.slice(2) : digitos;
+    if (!/^9\d{8}$/.test(celular)) {
+      return this.reintentoNumero(flujo, pedido, TEXTOS_BOT.puntosNumeroInvalido());
+    }
+
+    // Cada número dictado cuenta, exista o no la cuenta (3 por conversación)
+    const intentos = (flujo.puntosIntentos ?? 0) + 1;
+    flujo = { ...flujo, puntosIntentos: intentos };
+    const hallazgo = contexto.puntos?.busqueda;
+    const encontrado = hallazgo && hallazgo.telefono === celular && hallazgo.partyId ? hallazgo : null;
+
+    if (encontrado) {
+      return {
+        nuevoEstado: 'PEDIDO_PUNTOS_PREGUNTA',
+        acciones: [{ tipo: 'enviarBotones', texto: TEXTOS_BOT.puntosEncontrado(encontrado.terminacion), botones: BOTONES_PUNTOS_DICTADO }],
+        nuevoFlujo: {
+          ...flujo,
+          estado: 'PEDIDO_PUNTOS_PREGUNTA',
+          pedido: {
+            ...pedido,
+            estadoInterno: 'PEDIDO_PUNTOS_PREGUNTA',
+            puntosModo: 'DICTADO_CONFIRMAR',
+            puntosPendiente: { partyId: encontrado.partyId as string, terminacion: encontrado.terminacion },
+          },
+        },
+      };
+    }
+    if (intentos >= MAX_INTENTOS_NUMERO_PUNTOS) {
+      return terminar(TEXTOS_BOT.puntosTopeIntentos(this.urlCarta(contexto)));
+    }
+    return {
+      nuevoEstado: 'PEDIDO_PUNTOS_NUMERO',
+      acciones: [
+        { tipo: 'enviarBotones', texto: TEXTOS_BOT.puntosNoEncontrado(this.urlCarta(contexto)), botones: BOTONES_PUNTOS_NO_ENCONTRADO },
+      ],
+      nuevoFlujo: {
+        ...flujo,
+        estado: 'PEDIDO_PUNTOS_NUMERO',
+        pedido: { ...pedido, estadoInterno: 'PEDIDO_PUNTOS_NUMERO' },
+      },
+    };
+  }
+
+  private reintentoNumero(flujo: FlujoConversacion, pedido: EstadoCarritoPedido, texto: string): ResultadoTransicion {
+    return {
+      nuevoEstado: 'PEDIDO_PUNTOS_NUMERO',
+      acciones: [{ tipo: 'enviarBotones', texto, botones: BOTONES_PUNTOS_NUMERO }],
+      nuevoFlujo: { ...flujo, estado: 'PEDIDO_PUNTOS_NUMERO', pedido: { ...pedido, estadoInterno: 'PEDIDO_PUNTOS_NUMERO' } },
+    };
+  }
+
+  private puntosParaPedido(flujo: FlujoConversacion, contexto: ContextoConversacion): { modo: 'TELEFONO_PROPIO' | 'TELEFONO_DICTADO' | 'NINGUNO'; partyId?: string } | undefined {
+    if (!contexto.puntos) return undefined; // sin consulta de puntos: rige la resolución automática por teléfono
+    const mem = this.memoriaPuntosVigente(flujo);
+    return mem ? { modo: mem.modo, partyId: mem.partyId } : { modo: 'NINGUNO' };
+  }
+
+  /** Línea del resumen: lo que sumará el pedido y, solo con el teléfono propio, el saldo. Misma base que el servidor. */
+  private lineaPuntosResumen(flujo: FlujoConversacion, pedido: EstadoCarritoPedido, contexto: ContextoConversacion): string | undefined {
+    if (!contexto.puntos) return undefined;
+    const mem = this.memoriaPuntosVigente(flujo);
+    if (!mem || mem.modo === 'NINGUNO' || !mem.partyId) return undefined;
+    if (pedido.cuponCodigo) return TEXTOS_BOT.puntosLineaResumen({ estimado: null, sinPuntos: true });
+    const elegible = pedido.items.filter((i) => !i.noSumaBeneficios).reduce((a, i) => a + i.subtotal, 0);
+    const estimado = pedido.descuentoAplicado ? null : Math.round(elegible * ((contexto.puntos.porcentaje ?? 5) / 100) * 100) / 100;
+    if (estimado === 0) return TEXTOS_BOT.puntosLineaResumen({ estimado: null, sinPuntos: true });
+    const saldo = mem.modo === 'TELEFONO_PROPIO' ? contexto.puntos.cuentaTelefono?.saldo ?? null : null;
+    return TEXTOS_BOT.puntosLineaResumen({ estimado, saldo });
   }
 
   // -------------------------------------------------------------------------
@@ -2638,6 +2863,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
             tiempoMin,
             tiempoMax,
             avisoDemanda,
+            puntosTexto: this.lineaPuntosResumen(flujo, pedido, contexto),
           }),
           botones: BOTONES_PEDIDO_CONFIRMAR_FINAL,
         },

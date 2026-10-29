@@ -481,9 +481,11 @@ export class PuntosService {
   /**
    * Historial inmutable de movimientos de puntos de un cliente.
    */
-  async listarMovimientos(partyId: bigint | string) {
+  async listarMovimientos(partyId: bigint | string, pagina?: number, tamano = 10) {
     const id = BigInt(partyId);
+    const paginar = pagina !== undefined;
     const movs = await this.prisma.movimientoPuntos.findMany({
+      ...(paginar ? { skip: (Math.max(1, pagina!) - 1) * tamano, take: tamano + 1 } : {}),
       where: { party_id: id },
       include: {
         pedido: {
@@ -496,10 +498,10 @@ export class PuntosService {
           },
         },
       },
-      orderBy: { en: 'desc' },
+      orderBy: [{ en: 'desc' }, { id: 'desc' }],
     });
 
-    return movs.map((m) => ({
+    return (paginar ? movs.slice(0, tamano) : movs).map((m) => ({
       id: m.id.toString(),
       tipo: m.tipo,
       puntos: Number(m.puntos),
@@ -515,5 +517,21 @@ export class PuntosService {
           }
         : null,
     }));
+  }
+
+  /** Historial paginado (10 por página) de la cuenta del cliente, con el porcentaje vigente para «Cómo funcionan». */
+  async movimientosCuenta(partyId: bigint, pagina: number) {
+    const tamano = 10;
+    const [movimientos, total, param] = await Promise.all([
+      this.listarMovimientos(partyId, pagina, tamano),
+      this.prisma.movimientoPuntos.count({ where: { party_id: partyId } }),
+      this.prisma.parametro.findUnique({ where: { clave: 'puntos_porcentaje' } }).catch(() => null),
+    ]);
+    return {
+      porcentaje: param && param.valor !== null && param.valor !== undefined ? Number(param.valor) : 5,
+      movimientos,
+      pagina,
+      hayMas: total > pagina * tamano,
+    };
   }
 }

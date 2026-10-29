@@ -1,3 +1,4 @@
+import { PuntosService } from '../../clientes/puntos.service';
 import { Inject, Injectable, Logger, Optional, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
@@ -79,7 +80,54 @@ export class EjecutorConversacionService {
     @Optional() private readonly chatbotConfiguracionService?: ChatbotConfiguracionService,
     @Optional() private readonly direccionesService?: DireccionesClienteService,
     @Optional() private readonly outbox?: OutboxWhatsappService,
+    @Optional() private readonly puntosService?: PuntosService,
   ) {}
+
+  /**
+   * Origen del pedido de WhatsApp. TELEFONO_PROPIO se vuelve a resolver aquí por el número de quien escribe (no se
+   * confía en lo guardado); TELEFONO_DICTADO lleva la cuenta elegida, que el servidor valida; NINGUNO = invitado de verdad.
+   */
+  private async origenPedidoWhatsapp(
+    puntos: { modo: string; partyId?: string } | undefined,
+    conversacion: { telefono: string },
+  ): Promise<any> {
+    const base = { canal: 'WHATSAPP' as const, telefonoRemitente: conversacion.telefono };
+    if (!puntos) return base;
+    if (puntos.modo === 'NINGUNO') return { ...base, telefonoRemitente: undefined, sinCuentaCliente: true };
+    if (puntos.modo === 'TELEFONO_PROPIO') {
+      const propia = await this.direccionesService?.cuentaPorTelefono(conversacion.telefono);
+      return propia ? { ...base, clientePartyId: propia.partyId } : { ...base, telefonoRemitente: undefined, sinCuentaCliente: true };
+    }
+    return puntos.partyId ? { ...base, telefonoRemitente: undefined, clientePartyId: puntos.partyId } : { ...base, telefonoRemitente: undefined, sinCuentaCliente: true };
+  }
+
+  /** Deja en el chat qué cuenta se eligió y cómo (TELEFONO_PROPIO | TELEFONO_DICTADO | invitado). */
+  private async registrarEleccionPuntos(
+    conversacionId: bigint | string,
+    puntos: { modo: string; partyId?: string } | undefined,
+    codigoPedido: string,
+  ): Promise<void> {
+    if (!puntos) return;
+    try {
+      await this.prisma.mensajeChat.create({
+        data: {
+          conversacion_id: BigInt(conversacionId),
+          direccion: 'SALE',
+          autor: 'BOT',
+          tipo: 'SISTEMA',
+          contenido: {
+            texto:
+              puntos.modo === 'NINGUNO'
+                ? `Pedido ${codigoPedido}: el cliente eligió no sumar puntos (invitado).`
+                : `Pedido ${codigoPedido}: puntos a la cuenta #${puntos.partyId ?? 'del teléfono'} elegida por ${puntos.modo}.`,
+            puntos: { modo: puntos.modo, partyId: puntos.partyId ?? null, pedido: codigoPedido },
+          } as any,
+        },
+      });
+    } catch (err: any) {
+      this.logger.warn(`No se pudo registrar la elección de puntos: ${err.message}`);
+    }
+  }
 
   /**
    * Consulta si el chatbot está habilitado mediante el parámetro operativo `chatbot_activo = 'si'`.
@@ -697,6 +745,46 @@ export class EjecutorConversacionService {
       }
     }
 
+    // Puntos: la cuenta del propio número (con saldo) y, si dictó otro número, solo si existe (sin nombre ni datos)
+    let puntosCtx: ContextoConversacion['puntos'] = undefined;
+    const estadoPrevio = String(flujoPrevio?.estado ?? '');
+    const textoEntradaPuntos = normalizarEntrada(entradaRaw);
+    const tocaPuntos =
+      estadoPrevio.startsWith('PEDIDO_') ||
+      textoEntradaPuntos.id === 'mispuntos' ||
+      textoEntradaPuntos.id === 'pedir' ||
+      /punto/.test(textoEntradaPuntos.texto ?? '');
+    if (this.direccionesService && this.puntosService && tocaPuntos) {
+      try {
+        const [propia, param] = await Promise.all([
+          this.direccionesService.cuentaPorTelefono(conversacion.telefono),
+          this.prisma.parametro.findUnique({ where: { clave: 'puntos_porcentaje' } }).catch(() => null),
+        ]);
+        puntosCtx = {
+          porcentaje: param && param.valor !== null && param.valor !== undefined ? Number(param.valor) : 5,
+          cuentaTelefono: propia
+            ? { partyId: propia.partyId.toString(), primerNombre: propia.primerNombre, saldo: await this.puntosService.obtenerSaldo(propia.partyId) }
+            : null,
+          busqueda: null,
+        };
+        // Número dictado: tope de 3 por conversación y respeta el límite general de consultas
+        const dig = (entradaRaw.texto ?? '').replace(/\D/g, '');
+        const celular = dig.length === 11 && dig.startsWith('51') ? dig.slice(2) : dig;
+        if (
+          estadoPrevio === 'PEDIDO_PUNTOS_NUMERO' &&
+          /^9\d{8}$/.test(celular) &&
+          Number((flujoPrevio as any)?.puntosIntentos ?? 0) < 3 &&
+          !limiteConsultasExcedido
+        ) {
+          const hallada = await this.direccionesService.cuentaPorTelefono(celular);
+          puntosCtx.busqueda = { telefono: celular, partyId: hallada ? hallada.partyId.toString() : null, terminacion: celular.slice(-3) };
+        }
+      } catch (err: any) {
+        this.logger.warn(`Error consultando puntos del cliente: ${err.message}`);
+        puntosCtx = undefined;
+      }
+    }
+
     // Cobertura de la dirección anterior elegida: misma consulta que una ubicación compartida
     if (!resultadoEnvio && estadoPedidoPrevio === 'PEDIDO_DIRECCION_ELEGIR' && this.zonasService) {
       const idElegido = normalizarEntrada(entradaRaw).id ?? '';
@@ -835,6 +923,7 @@ export class EjecutorConversacionService {
       inactividadExpirada,
       resultadoEnvio,
       direccionesCliente,
+      puntos: puntosCtx,
       franjasDisponiblesReserva,
       solicitudesPendientesTelefono,
       solicitudesCambioPendientesTelefono,
@@ -1453,9 +1542,10 @@ export class EjecutorConversacionService {
             const pedidoCreado = await this.pedidosService.crear(
               accion.dto,
               accion.claveIdempotencia,
-              { canal: 'WHATSAPP', telefonoRemitente: conversacion.telefono },
+              await this.origenPedidoWhatsapp(accion.puntos, conversacion),
             );
             codigoFinal = pedidoCreado.codigo;
+            await this.registrarEleccionPuntos(conversacion.id, accion.puntos, pedidoCreado.codigo);
 
             // Notificación campana a Caja/Admin
             const tituloNotif = `Nuevo pedido WhatsApp: ${pedidoCreado.codigo}`;

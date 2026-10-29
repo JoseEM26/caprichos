@@ -34,11 +34,18 @@ describe('PuntosCanje (puntos en números enteros)', () => {
     vi.restoreAllMocks();
   });
 
-  it('con saldo 0 no renderiza nada', () => {
+  it('con saldo 0 muestra la tarjeta informativa con el porcentaje del servidor, sin canje', () => {
     mockCuenta(0);
-    const { container } = render(<PuntosCanje totalPedido={50} puntosAplicados={0} alAplicar={vi.fn()} />);
+    render(<PuntosCanje totalPedido={50} puntosAplicados={0} alAplicar={vi.fn()} porcentaje={7} />);
 
-    expect(container).toBeEmptyDOMElement();
+    expect(texto()).toContain('Tienes 0 puntos. Ganas 7 % de lo que pagas en productos sin promoción; se suman cuando Caja cobra tu pedido.');
+    expect(screen.queryByRole('button', { name: 'Aplicar' })).toBeNull();
+  });
+
+  it('con saldo mayor a 0 sigue mostrando el canje', () => {
+    mockCuenta(12);
+    render(<PuntosCanje totalPedido={50} puntosAplicados={0} alAplicar={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'Aplicar' })).toBeInTheDocument();
   });
 
   it('con saldo menor a 1 solo muestra la línea informativa, sin campo ni botón', () => {

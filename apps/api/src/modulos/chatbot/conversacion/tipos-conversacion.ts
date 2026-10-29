@@ -146,6 +146,8 @@ export interface AccionCrearPedido {
   tiempoEstimadoMax: number;
   esPagoDigital: boolean;
   datosPagoTexto?: string;
+  /** A qué cuenta suma el pedido; NINGUNO = invitado de verdad (no se resuelve por teléfono) */
+  puntos?: { modo: 'TELEFONO_PROPIO' | 'TELEFONO_DICTADO' | 'NINGUNO'; partyId?: string };
 }
 
 /**
@@ -255,7 +257,30 @@ export interface FlujoConversacion {
   duda_ia?: {
     historial?: any[];
   } | null;
+  /** Cuenta a la que suman los puntos de los pedidos de esta conversación (se recuerda 30 días) */
+  puntos?: MemoriaPuntosBot | null;
   [key: string]: any;
+}
+
+/** Decisión del cliente sobre sus puntos; el nombre completo, el DNI y el saldo nunca se guardan aquí. */
+export interface MemoriaPuntosBot {
+  modo: 'TELEFONO_PROPIO' | 'TELEFONO_DICTADO' | 'NINGUNO';
+  partyId?: string;
+  /** Solo con TELEFONO_PROPIO: el nombre coincide con el número de quien escribe */
+  primerNombre?: string;
+  /** Últimos 3 dígitos del número dictado */
+  terminacion?: string;
+  /** Epoch ms de la decisión */
+  en: number;
+}
+
+/** Lo que el servidor averiguó sobre puntos para este mensaje (sin él, el bot no pregunta nada de puntos). */
+export interface ContextoPuntosBot {
+  porcentaje: number;
+  /** Cuenta del propio teléfono de quien escribe, con su saldo */
+  cuentaTelefono?: { partyId: string; primerNombre: string; saldo: number } | null;
+  /** Resultado de buscar el número dictado: sin nombre ni datos */
+  busqueda?: { telefono: string; partyId: string | null; terminacion: string } | null;
 }
 
 /**
@@ -322,6 +347,8 @@ export interface ContextoConversacion {
   solicitudesCambioPendientesTelefono?: number;
   /** Habilita derivación a la IA para dudas (Ola 3, Agente G) */
   chatbotIaActivo?: boolean;
+  /** Puntos del cliente de WhatsApp; ausente = no preguntar por puntos */
+  puntos?: ContextoPuntosBot | null;
   /** Reservas activas del cliente para consulta / cambio / cancelación */
   reservasActivasCliente?: Array<{
     id: string;

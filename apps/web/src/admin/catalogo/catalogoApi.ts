@@ -39,6 +39,14 @@ export interface SaborItem {
   disponible?: boolean;
 }
 
+export interface PromocionProducto {
+  id: string;
+  nombre: string;
+  tipo: string;
+  vigenteAhora: boolean;
+  estado: 'PROGRAMADA' | 'EN_CURSO' | 'VENCIDA';
+}
+
 export interface ProductoAdmin {
   id: string;
   categoriaId: string;
@@ -54,6 +62,10 @@ export interface ProductoAdmin {
   disponible: boolean;
   agotadoHasta?: string | null;
   noSumaBeneficios: boolean;
+  /** Promociones activas (descuento / lleva-paga) que alcanzan al producto; los combos no cuentan. */
+  promociones?: PromocionProducto[];
+  /** Promociones activas de toda la carta (no esconden el botón). */
+  promocionesGenerales?: PromocionProducto[];
   fotoUrl?: string | null;
   tamanos: TamanoItem[];
   grupos: GrupoOpcionItem[];
@@ -137,6 +149,8 @@ export const catalogoApi = {
       tamanos?: Array<{ tamanoValorId: string | number; precio: number; activo?: boolean }>;
       grupos?: Array<{ grupoId: string | number; orden?: number }>;
       sabores?: Array<{ id?: string | number; nombre: string; activo?: boolean }>;
+      /** true: los grupos que no vengan en `grupos` se desligan de este producto. */
+      sincronizarGrupos?: boolean;
     },
   ): Promise<ProductoAdmin> {
     return api.patch<ProductoAdmin>(`/admin/catalogo/productos/${id}`, data);
@@ -272,6 +286,20 @@ export const catalogoApi = {
     },
   ): Promise<GrupoOpcionItem> {
     return api.patch<GrupoOpcionItem>(`/admin/catalogo/grupos/${id}`, data);
+  },
+
+  async crearOpcion(
+    grupoId: string,
+    data: { nombre: string; precioExtra?: number },
+  ): Promise<OpcionItem> {
+    return api.post<OpcionItem>(`/admin/catalogo/grupos/${grupoId}/opciones`, data);
+  },
+
+  async editarOpcion(
+    id: string,
+    data: { nombre?: string; precioExtra?: number; activo?: boolean },
+  ): Promise<OpcionItem> {
+    return api.patch<OpcionItem>(`/admin/catalogo/opciones/${id}`, data);
   },
 
   async asignarGrupoCategorias(

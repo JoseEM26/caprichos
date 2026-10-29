@@ -1,0 +1,23 @@
+/* Marco de dispositivo simulado: contiene la ventana real de la carta (position: fixed) dentro de sí. */
+.mdv-pista { width: 100%; min-width: 0; display: flex; justify-content: center; overflow: hidden; }
+.mdv-marco {
+  position: relative; flex: none; box-sizing: border-box; overflow: hidden;
+  /* el transform ancla los elementos position: fixed de la carta al marco, no al viewport */
+  transform: translateZ(0); contain: layout paint;
+  background: var(--cp-cream); border: 2px solid var(--cp-line); border-radius: 16px;
+  box-shadow: 0 6px 20px rgba(11,44,62,0.12);
+  width: 1000px; height: min(640px, 78vh);
+}
+.mdv-marco--celular {
+  width: 390px; height: min(780px, 78vh);
+  border: 8px solid var(--cp-navy); border-radius: 32px; box-shadow: 0 14px 40px rgba(11,44,62,0.25);
+}
+.mdv-contenido { position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden; padding: 12px; box-sizing: border-box; }
+.mdv-conmutador { display: inline-flex; gap: 6px; }
+.mdv-btn {
+  min-height: 44px; min-width: 44px; padding: 0 14px; border-radius: 12px; border: 1.5px solid var(--cp-navy);
+  background: var(--cp-white); color: var(--cp-navy); font-weight: 700; font-size: 13px; cursor: pointer;
+}
+.mdv-btn[aria-pressed='true'] { background: var(--cp-navy); color: var(--cp-white); }
+.mdv-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.mdv-nota { font-size: 12px; color: var(--cp-soft); }

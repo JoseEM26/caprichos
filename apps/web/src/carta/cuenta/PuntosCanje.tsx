@@ -6,6 +6,8 @@ interface PropsPuntosCanje {
   totalPedido: number;
   puntosAplicados: number;
   alAplicar: (puntos: number) => void;
+  /** puntos_porcentaje del servidor (5 por defecto) */
+  porcentaje?: number;
 }
 
 const contenedor: CSSProperties = {
@@ -58,9 +60,19 @@ const botonIngresar: CSSProperties = {
 };
 
 /**
+ * Puntos que ganará el pedido: misma base que el servidor (productos sin promoción menos lo pagado con puntos),
+ * 0 con cupón. `delServidor` es el estimado de la vista previa cuando no hay canje.
+ */
+export function estimarPuntos(p: { canjeable: number | null; porcentaje: number; puntosAplicados: number; conCupon: boolean; delServidor?: number | null }): number {
+  if (p.conCupon) return 0;
+  if (p.puntosAplicados <= 0 && typeof p.delServidor === 'number') return p.delServidor;
+  return Math.round(Math.max(0, (p.canjeable ?? 0) - p.puntosAplicados) * (p.porcentaje / 100) * 100) / 100;
+}
+
+/**
  * Componente de canje de puntos en el paso de pago (DT-55, RQ-CLI-02-11, mockup Main.dc.html).
  */
-export function PuntosCanje({ totalPedido, puntosAplicados, alAplicar }: PropsPuntosCanje) {
+export function PuntosCanje({ totalPedido, puntosAplicados, alAplicar, porcentaje = 5 }: PropsPuntosCanje) {
   const { cliente, abrirPanel } = useCuenta();
   const [valorInput, setValorInput] = useState(puntosAplicados > 0 ? String(puntosAplicados) : '');
   const [mensaje, setMensaje] = useState<{ texto: string; tipo: 'error' | 'ok' } | null>(null);
@@ -85,8 +97,16 @@ export function PuntosCanje({ totalPedido, puntosAplicados, alAplicar }: PropsPu
   const numInput = parseInt(valorInput, 10) || 0;
   const saldoRestante = Math.max(0, Math.round((saldoDisponible - numInput) * 100) / 100);
 
-  // sin puntos no hay nada que ofrecer: el bloque no se muestra
-  if (saldoDisponible <= 0 && puntosAplicados <= 0) return null;
+  // sin puntos no hay nada que canjear, pero se explica cómo ganarlos
+  if (saldoDisponible <= 0 && puntosAplicados <= 0) {
+    return (
+      <div style={contenedor}>
+        <div style={{ fontSize: 13, lineHeight: '18px' }}>
+          Tienes <b>0 puntos</b>. Ganas {porcentaje} % de lo que pagas en productos sin promoción; se suman cuando Caja cobra tu pedido.
+        </div>
+      </div>
+    );
+  }
 
   if (maximoUsable < 1 && puntosAplicados <= 0) {
     return (

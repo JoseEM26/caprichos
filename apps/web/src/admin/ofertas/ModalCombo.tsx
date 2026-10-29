@@ -925,7 +925,7 @@ export function ModalCombo({
               Paso 2 de 4: ¿Qué lleva el combo?
             </div>
             <div style={{ fontSize: '13px', color: 'var(--cp-soft)', marginTop: '-8px' }}>
-              Arma las partes del combo con lenguaje claro. Al venderse, cada producto se descuenta individualmente de stock.
+              Arma las partes del combo con lenguaje claro. Al venderse, cada producto se descuenta individualmente de stock. Del combo se puede comprar cada producto suelto; vendido suelto sí suma puntos.
             </div>
 
             {/* Guía didáctica con ejemplos escritos */}

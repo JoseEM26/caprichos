@@ -16,6 +16,8 @@ import { RedisService } from '../../comun/redis/redis.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { ArchivosService } from '../archivos/archivos.service';
 import { PuntosService } from './puntos.service';
+import { explicarPedidosPorId } from './explicar-puntos-pedidos';
+import type { ExplicacionPuntos } from './explicar-puntos-pedido';
 import {
   AjustarPuntosDto,
   ClienteAdminListItem,
@@ -974,6 +976,7 @@ export class ClientesService {
     }
 
     const puntos = await this.puntosService.obtenerSaldo(id);
+    const puntosPedidos = await explicarPedidosPorId(this.prisma, pedidos.map((p) => p.id)).catch(() => new Map<string, ExplicacionPuntos>());
     const tel = party.contactos.find((c) => c.tipo === 'TELEFONO' || c.tipo === 'WHATSAPP')?.valor || '—';
     const correo = party.persona?.correo || party.contactos.find((c) => c.tipo === 'CORREO')?.valor || 'sin correo';
 
@@ -992,6 +995,7 @@ export class ClientesService {
       pedidosPagados: pagados._count._all,
       totalGastado: Math.round(Number(pagados._sum.total ?? 0) * 100) / 100,
       pedidos: pedidos.map((p) => ({
+        puntos: puntosPedidos.get(String(p.id)) ?? null,
         id: p.codigo || p.id.toString(),
         modalidad: p.modalidad === 'DELIVERY' ? 'Delivery' : p.modalidad === 'LLEVAR' ? 'Para llevar' : 'En el local',
         estado: p.estado,

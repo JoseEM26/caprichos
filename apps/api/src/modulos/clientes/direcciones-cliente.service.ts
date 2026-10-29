@@ -203,6 +203,21 @@ export class DireccionesClienteService {
   }
 
   /**
+   * Cuenta de cliente (con rol CLIENTE activo) cuyo celular es ese teléfono, con solo lo que puede decir el bot:
+   * primer nombre y últimos 3 dígitos del número. Sin DNI ni nombre completo.
+   */
+  async cuentaPorTelefono(telefono: string | null | undefined): Promise<{ partyId: bigint; primerNombre: string; terminacion: string } | null> {
+    const partyId = await this.resolverPartyPorTelefono(telefono);
+    if (!partyId) return null;
+    const rol = await this.prisma.partyRole.findFirst({ where: { party_id: partyId, rol: 'CLIENTE', hasta: null }, select: { id: true } });
+    if (!rol) return null;
+    const datos = await this.datosCuentaActiva(partyId);
+    if (!datos) return null;
+    const dig = normalizarTelefono(telefono ?? '').replace(/\D/g, '');
+    return { partyId, primerNombre: datos.nombre.trim().split(/\s+/)[0] || 'Cliente', terminacion: dig.slice(-3) };
+  }
+
+  /**
    * Búsqueda de cliente por DNI para el mozo (GET /admin/clientes/por-dni/:dni).
    * Sin datos extra: nombre, teléfono, puntos y direcciones. El DNI enmascarado lo pone el controlador.
    */

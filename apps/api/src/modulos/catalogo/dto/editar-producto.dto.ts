@@ -66,6 +66,14 @@ export class EditarProductoDto {
   @Type(() => GrupoProductoInputDto)
   grupos?: GrupoProductoInputDto[];
 
+  /**
+   * Si es true, los grupos que NO vengan en `grupos` se desligan de este producto
+   * (solo el vínculo producto-grupo; el grupo y sus opciones no se tocan).
+   */
+  @IsOptional()
+  @IsBoolean()
+  sincronizarGrupos?: boolean;
+
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })

@@ -159,6 +159,12 @@ export function ModalFichaCliente({
                 <span>{o.modalidad} · {o.estado}</span>
                 <span>{o.total}</span>
                 <span style={{ color: 'var(--cp-soft)' }}>{o.pago}</span>
+                {o.puntos && (
+                  <span data-testid="puntos-pedido" style={{ gridColumn: '1 / -1', fontSize: 12, color: o.puntos.estado === 'NO_SUMA' ? 'var(--cp-rust)' : 'var(--cp-green)' }}>
+                    Puntos: {o.puntos.estado === 'SUMADO' ? `+${(o.puntos.puntos ?? 0).toFixed(2)} · ` : ''}
+                    {o.puntos.texto}
+                  </span>
+                )}
               </div>
             ))}
           </div>

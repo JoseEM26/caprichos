@@ -32,6 +32,8 @@ export type EstadoPedidoFlujo =
   | 'PEDIDO_COMPROBANTE_DNI'
   | 'PEDIDO_COMPROBANTE_RUC'
   | 'PEDIDO_COMPROBANTE_RAZON'
+  | 'PEDIDO_PUNTOS_PREGUNTA'
+  | 'PEDIDO_PUNTOS_NUMERO'
   | 'PEDIDO_RESUMEN_CONFIRMAR'
   | 'PEDIDO_CANCELAR_CONFIRMAR';
 
@@ -147,4 +149,10 @@ export interface EstadoCarritoPedido {
   idempotenciaPaso?: string;
   timestampUltimaAccion?: number;
   estadoPrevioCancelacion?: EstadoPedidoFlujo;
+  /** Ya se resolvió a qué cuenta suman los puntos de este pedido */
+  puntosResuelto?: boolean;
+  /** Qué se le está preguntando al cliente en PEDIDO_PUNTOS_PREGUNTA */
+  puntosModo?: 'PROPIA' | 'RECORDATORIO' | 'DICTADO_CONFIRMAR';
+  /** Cuenta encontrada con el número dictado, a la espera del Sí del cliente */
+  puntosPendiente?: { partyId: string; terminacion: string };
 }

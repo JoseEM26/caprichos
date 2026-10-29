@@ -184,6 +184,8 @@ const MAX_PRODUCTOS_RESUMEN = 3;
 export const MAX_PEDIDOS_LOTE = 20;
 
 export interface PedidoCuenta extends SeguimientoPedido {
+  /** Puntos del pedido: ganados, estimados o el motivo por el que no suma */
+  puntos: ExplicacionPuntos;
   creadoEn: string;
   resumen: string;
   seguimientoToken: string;
@@ -217,6 +219,9 @@ type ContextoTiempo = ContextoProgreso;
 
 const textoRango = (min: number, max: number) =>
   min === max ? `unos ${min} minutos` : `unos ${min} a ${max} minutos`;
+
+import { explicarPedidosPorId } from '../clientes/explicar-puntos-pedidos';
+import type { ExplicacionPuntos } from '../clientes/explicar-puntos-pedido';
 
 @Injectable()
 export class SeguimientoService {
@@ -315,8 +320,11 @@ export class SeguimientoService {
 
     const hayMas = filas.length > TAMANO_PAGINA_CUENTA;
     const ctx = await this.contexto();
-    const pedidos = filas.slice(0, TAMANO_PAGINA_CUENTA).map((fila) => ({
+    const pagina_ = filas.slice(0, TAMANO_PAGINA_CUENTA);
+    const puntos = await explicarPedidosPorId(this.prisma, pagina_.map((f) => f.id)).catch(() => new Map<string, ExplicacionPuntos>());
+    const pedidos = pagina_.map((fila) => ({
       ...this.construir(fila as PedidoSeguimiento, ctx),
+      puntos: puntos.get(String(fila.id)) ?? { estado: 'NO_SUMA' as const, texto: '' },
       creadoEn: fila.creado_en.toISOString(),
       resumen: resumenProductos(fila.lineas),
       seguimientoToken: generarTokenSeguimiento(fila.id),

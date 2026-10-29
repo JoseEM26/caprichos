@@ -55,6 +55,8 @@ describe('CatalogoControllers', () => {
       listarGruposAdmin: jest.fn(),
       crearGrupo: jest.fn(),
       actualizarGrupo: jest.fn(),
+      editarOpcion: jest.fn(),
+      crearOpcionGrupo: jest.fn(),
       asignarGrupoCategorias: jest.fn(),
     };
 

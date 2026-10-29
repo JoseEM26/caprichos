@@ -11,8 +11,56 @@ import {
   ListaAdmin,
   GrupoOpcionItem,
 } from './catalogoApi';
+import { EditorOpcionesTamanos } from './EditorOpcionesTamanos';
+import { BotonVistaPrevia } from './VistaPreviaProducto';
+import { ESTADO_VACIO, EstadoOpciones, validarTamanos } from './editorOpcionesTipos';
 
 const PPAGE = 24;
+
+
+/** Aviso de producto en promoción: reemplaza al botón «no suma puntos». */
+function AvisoPromocion({ p }: { p: ProductoAdmin }) {
+  const promos = p.promociones ?? [];
+  const enCurso = promos.filter((x) => x.estado === 'EN_CURSO');
+  const vencidas = promos.filter((x) => x.estado === 'VENCIDA');
+  const lista = enCurso.length ? enCurso : vencidas.length ? vencidas : promos;
+  const titulo = enCurso.length
+    ? 'En promoción: no suma puntos'
+    : vencidas.length
+      ? 'Promoción vencida: desactívala para volver a sumar'
+      : 'Promoción programada';
+  const nombre = lista.length === 1 ? lista[0].nombre : `En ${lista.length} promociones`;
+  return (
+    <div
+      data-testid="aviso-promocion"
+      style={{
+        border: '1.5px solid var(--cp-rust)',
+        borderRadius: 10,
+        padding: '8px 10px',
+        fontSize: 12,
+        color: 'var(--cp-navy)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 2,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between' }}>
+        <strong>{titulo}</strong>
+        <span
+          role="img"
+          aria-label="Ayuda"
+          tabIndex={0}
+          title="Mientras esté en una promoción, lo que se vende con descuento no suma puntos ni se paga con puntos. Cuando termine o se desactive la promoción, vuelve a sumar."
+          style={{ minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'help', fontWeight: 800 }}
+        >
+          ?
+        </span>
+      </div>
+      <span>{nombre}</span>
+      {p.noSumaBeneficios && <span>También marcado como no suma puntos</span>}
+    </div>
+  );
+}
 
 export function ProductosView() {
   const navigate = useNavigate();
@@ -28,7 +76,7 @@ export function ProductosView() {
   // Estados de datos
   const [productos, setProductos] = useState<ProductoAdmin[]>([]);
   const [categorias, setCategorias] = useState<CategoriaAdmin[]>([]);
-  const [listas, setListas] = useState<ListaAdmin[]>([]);
+  const [, setListas] = useState<ListaAdmin[]>([]);
   const [gruposGenerales, setGruposGenerales] = useState<GrupoOpcionItem[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +105,14 @@ export function ProductosView() {
   const [npCategoriaId, setNpCategoriaId] = useState<string>('');
   const [npPrecio, setNpPrecio] = useState('');
   const [npDesc, setNpDesc] = useState('');
+  // «¿Cómo se vende?»: null = lo decide la categoría (llevaOpciones); al tocar una tarjeta queda la elección
+  const [npModoElegido, setNpModoElegido] = useState<'unico' | 'opciones' | null>(null);
+  const [npOpc, setNpOpc] = useState<EstadoOpciones>(ESTADO_VACIO);
+  const [npFoto, setNpFoto] = useState<File | null>(null);
+  const npFotoUrl = useMemo(() => (npFoto ? URL.createObjectURL(npFoto) : null), [npFoto]);
+  useEffect(() => () => { if (npFotoUrl) URL.revokeObjectURL(npFotoUrl); }, [npFotoUrl]);
+  const npModo: 'unico' | 'opciones' =
+    npModoElegido ?? (categorias.find((c) => c.id === npCategoriaId)?.llevaOpciones ? 'opciones' : 'unico');
   const [npError, setNpError] = useState('');
   const [npNuevaCatAbierta, setNpNuevaCatAbierta] = useState(false);
   const [npNuevaCatNombre, setNpNuevaCatNombre] = useState('');
@@ -72,22 +128,6 @@ export function ProductosView() {
   const [edNuevoSabor, setEdNuevoSabor] = useState('');
   const [edError, setEdError] = useState('');
   const [guardandoEdicion, setGuardandoEdicion] = useState(false);
-
-  // Formulario Opciones y Tamaños
-  const [opdTamanos, setOpdTamanos] = useState<Array<{ id?: string; tamanoValorId: string; nombre: string; precio: number; activo: boolean }>>([]);
-  const [opdGrupos, setOpdGrupos] = useState<Array<{
-    id: string;
-    nombre: string;
-    activoEnProducto: boolean;
-    listaId?: string | null;
-    obligatorio: boolean;
-    minimo: number;
-    maximo: number;
-    opciones: Array<{ id: string; nombre: string; precioExtra: number; activo: boolean }>;
-  }>>([]);
-  const [opdGrupoAbierto, setOpdGrupoAbierto] = useState<string | null>(null);
-  const [opdError, setOpdError] = useState('');
-  const [guardandoOpciones, setGuardandoOpciones] = useState(false);
 
   // Confirmación
   const [confirmarProps, setConfirmarProps] = useState<{
@@ -354,93 +394,15 @@ export function ProductosView() {
     });
   };
 
-  // Abrir modal Opciones y Tamaños
-  const abrirOpciones = (p: ProductoAdmin) => {
-    setProductoEnOpciones(p);
-    setOpdError('');
-    // Tamaños
-    const listaTamano = listas.find((l) => l.codigo === 'TAMANO');
-    const valoresTamano = listaTamano ? listaTamano.valores : [];
-    const tamanosDelProducto = (p.tamanos || []).map((t) => ({
-      id: t.id,
-      tamanoValorId: t.tamanoValorId,
-      nombre: t.nombre,
-      precio: t.precio,
-      activo: t.activo !== false,
-    }));
-    // Si no tiene tamaños específicos, ponemos los valores de la lista
-    if (tamanosDelProducto.length === 0 && valoresTamano.length > 0) {
-      setOpdTamanos(
-        valoresTamano.map((v) => ({
-          tamanoValorId: v.id,
-          nombre: v.nombre,
-          precio: p.precio,
-          activo: true,
-        })),
-      );
-    } else {
-      setOpdTamanos(tamanosDelProducto);
-    }
+  // Abrir modal Tamaños y opciones (el contenido vive en EditorOpcionesTamanos)
+  const abrirOpciones = (p: ProductoAdmin) => setProductoEnOpciones(p);
 
-    // Grupos
-    const gruposAsociadosIds = new Set(p.grupos.map((g) => g.id));
-    const todosGrupos = gruposGenerales.map((g) => {
-      const enProd = gruposAsociadosIds.has(g.id);
-      const prodGrupo = p.grupos.find((pg) => pg.id === g.id);
-      return {
-        id: g.id,
-        nombre: g.nombre,
-        activoEnProducto: enProd,
-        listaId: g.listaId,
-        obligatorio: g.obligatorio ?? false,
-        minimo: g.minimo ?? 0,
-        maximo: g.maximo ?? 1,
-        opciones: (prodGrupo?.opciones || g.opciones || []).map((o) => ({
-          id: o.id,
-          nombre: o.nombre,
-          precioExtra: o.precioExtra || 0,
-          activo: o.activo !== false,
-        })),
-      };
-    });
-    setOpdGrupos(todosGrupos);
-    setOpdGrupoAbierto(todosGrupos[0]?.id || null);
-  };
-
-  // Guardar Opciones y Tamaños
-  const guardarOpciones = async () => {
-    if (!productoEnOpciones) return;
-    setConfirmarProps({
-      abierto: true,
-      titulo: '¿Guardar los cambios?',
-      mensaje: `Se actualizarán las opciones y tamaños de "${productoEnOpciones.nombre}".`,
-      accion: async () => {
-        try {
-          setGuardandoOpciones(true);
-          const gruposActivos = opdGrupos
-            .filter((g) => g.activoEnProducto)
-            .map((g, idx) => ({
-              grupoId: g.id,
-              orden: idx,
-            }));
-
-          await catalogoApi.editarProducto(productoEnOpciones.id, {
-            tamanos: opdTamanos.map((t) => ({
-              tamanoValorId: t.tamanoValorId,
-              precio: Number(t.precio) || 0,
-              activo: t.activo,
-            })),
-            grupos: gruposActivos,
-          });
-          setProductoEnOpciones(null);
-          await cargarDatos();
-        } catch (err: any) {
-          setOpdError(err?.message || 'Error al guardar opciones y tamaños');
-        } finally {
-          setGuardandoOpciones(false);
-        }
-      },
-    });
+  // Resumen para la insignia del botón: «3 tamaños · 2 grupos»
+  const resumenOpciones = (p: ProductoAdmin) => {
+    const t = p.tamanos.length;
+    const g = p.grupos.length;
+    if (t === 0 && g === 0) return 'Sin tamaños ni opciones';
+    return `${t} ${t === 1 ? 'tamaño' : 'tamaños'} · ${g} ${g === 1 ? 'grupo' : 'grupos'}`;
   };
 
   // Guardar Nuevo Producto
@@ -449,8 +411,21 @@ export function ProductosView() {
       setNpError('Escribe el nombre del producto');
       return;
     }
-    const precioNum = parseFloat(npPrecio);
-    if (isNaN(precioNum) || precioNum < 0) {
+    const conOpciones = npModo === 'opciones';
+    let precioNum = parseFloat(npPrecio);
+    if (conOpciones) {
+      if (!npOpc.tamanos.some((t) => t.activo)) {
+        setNpError('Agrega al menos un tamaño activo, o elige «Un solo precio».');
+        return;
+      }
+      const errT = validarTamanos(npOpc.tamanos);
+      if (errT) {
+        setNpError(errT);
+        return;
+      }
+      // el precio base del producto es el del primer tamaño activo
+      precioNum = npOpc.tamanos.find((t) => t.activo)!.precio;
+    } else if (isNaN(precioNum) || precioNum < 0) {
       setNpError('Ingresa un precio válido');
       return;
     }
@@ -463,19 +438,30 @@ export function ProductosView() {
       abierto: true,
       titulo: `¿Agregar "${npNombre.trim().toUpperCase()}" a la carta?`,
       mensaje:
-        'Aparece en la carta virtual, en Nuevo pedido y en Productos. Después le puedes poner imagen y opciones. No se elimina: se puede marcar agotado.',
+        'Aparece en la carta virtual, en Nuevo pedido y en Productos. No se elimina: se puede marcar agotado.',
       accion: async () => {
         try {
+          const foto = npFoto ? await catalogoApi.subirFoto(npFoto) : null;
           await catalogoApi.crearProducto({
             nombre: npNombre.trim().toUpperCase(),
             categoriaId: npCategoriaId,
             precio: precioNum,
             descripcion: npDesc.trim() || undefined,
+            ...(foto ? { fotoArchivoId: foto.id } : {}),
+            ...(conOpciones
+              ? {
+                  tamanos: npOpc.tamanos.map((t) => ({ tamanoValorId: t.tamanoValorId, precio: t.precio, activo: t.activo })),
+                  grupos: npOpc.grupos.map((g, orden) => ({ grupoId: g.grupoId, orden })),
+                }
+              : {}),
           });
           setModalNuevoAbierto(false);
           setNpNombre('');
           setNpPrecio('');
           setNpDesc('');
+          setNpModoElegido(null);
+          setNpOpc(ESTADO_VACIO);
+          setNpFoto(null);
           setNpError('');
           await cargarDatos();
         } catch (err: any) {
@@ -1086,7 +1072,6 @@ export function ProductosView() {
       >
         {productosVisibles.map((p) => {
           const off = !p.disponible;
-          const tieneOpciones = p.tamanos.length > 0 || p.grupos.length > 0;
           const minTamPrecio =
             p.tamanos.length > 0
               ? Math.min(...p.tamanos.map((t) => Number(t.precio) || 0))
@@ -1197,9 +1182,15 @@ export function ProductosView() {
                 </div>
               </div>
 
+              {/* Producto en promoción: sin botón, con aviso (los combos no cuentan: suelto sí suma) */}
+              {(p.promociones?.length ?? 0) > 0 && (
+                <AvisoPromocion p={p} />
+              )}
+
               {/* Botón no suma puntos ni aplica cupones (solo Admin) */}
-              {esAdmin && (
+              {esAdmin && !(p.promociones?.length) && (
                 <button
+                  title="En combos no suma puntos, pero vendido suelto sí"
                   onClick={() => toggleNoSuma(p)}
                   style={{
                     minHeight: 40,
@@ -1220,7 +1211,7 @@ export function ProductosView() {
 
               {/* Fila de acciones */}
               <div style={{ display: 'flex', gap: 8, marginTop: 'auto' }}>
-                {tieneOpciones && (
+                {puedeEditar && (
                   <button
                     onClick={() => abrirOpciones(p)}
                     style={{
@@ -1233,9 +1224,16 @@ export function ProductosView() {
                       fontWeight: 800,
                       fontSize: 13,
                       cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      lineHeight: '15px',
+                      padding: '4px 8px',
                     }}
                   >
-                    Opciones y tamaños
+                    Tamaños y opciones
+                    <span style={{ fontSize: 11, fontWeight: 600 }}>{resumenOpciones(p)}</span>
                   </button>
                 )}
                 {puedeEditar && (
@@ -1273,6 +1271,12 @@ export function ProductosView() {
                   {off ? 'Marcar disponible' : 'Marcar agotado'}
                 </button>
               </div>
+              <BotonVistaPrevia
+                bloque
+                borrador={p}
+                gruposGenerales={gruposGenerales}
+                nombreProducto={p.nombre}
+              />
             </div>
           );
         })}
@@ -1472,7 +1476,10 @@ export function ProductosView() {
                 return (
                   <button
                     key={cat.id}
-                    onClick={() => setNpCategoriaId(cat.id)}
+                    onClick={() => {
+                      setNpCategoriaId(cat.id);
+                      setNpModoElegido(null);
+                    }}
                     style={{
                       minHeight: 44,
                       padding: '0 12px',
@@ -1593,8 +1600,62 @@ export function ProductosView() {
               </div>
             )}
 
+            {/* ¿Cómo se vende? */}
+            <div style={{ fontWeight: 700, fontSize: 13 }}>¿Cómo se vende?</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  aria-pressed={npModo === 'unico'}
+                  onClick={() => setNpModoElegido('unico')}
+                  style={{
+                    flex: '1 1 220px',
+                    minHeight: 44,
+                    padding: '10px 12px',
+                    borderRadius: 12,
+                    textAlign: 'left',
+                    border: '1.5px solid var(--cp-navy)',
+                    background: npModo === 'unico' ? 'var(--cp-navy)' : 'transparent',
+                    color: npModo === 'unico' ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ fontWeight: 800, fontSize: 14 }}>Un solo precio</div>
+                  <div style={{ fontWeight: 500, fontSize: 12, marginTop: 2 }}>Sirve para productos que se venden siempre igual. Ej.: Brownie S/ 8.</div>
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={npModo === 'opciones'}
+                  onClick={() => setNpModoElegido('opciones')}
+                  style={{
+                    flex: '1 1 220px',
+                    minHeight: 44,
+                    padding: '10px 12px',
+                    borderRadius: 12,
+                    textAlign: 'left',
+                    border: '1.5px solid var(--cp-navy)',
+                    background: npModo === 'opciones' ? 'var(--cp-navy)' : 'transparent',
+                    color: npModo === 'opciones' ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ fontWeight: 800, fontSize: 14 }}>Con tamaños y opciones</div>
+                  <div style={{ fontWeight: 500, fontSize: 12, marginTop: 2 }}>Sirve cuando el cliente elige. Ej.: Café Regular 12 oz S/ 6, Grande 16 oz S/ 7; pregunta tipo de leche.</div>
+                </button>
+            </div>
+
+            {npModo === 'opciones' && (
+              <EditorOpcionesTamanos
+                modo="borrador"
+                valor={npOpc}
+                onChange={setNpOpc}
+                precioBase={parseFloat(npPrecio) || 0}
+                puedeEditar
+              />
+            )}
+
             {/* Precio y descripción */}
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              {npModo === 'unico' && (
               <div style={{ flex: '1 1 140px', minWidth: 0 }}>
                 <label style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>
                   Precio (s/)
@@ -1619,6 +1680,7 @@ export function ProductosView() {
                   }}
                 />
               </div>
+              )}
               <div style={{ flex: '2 1 260px', minWidth: 0 }}>
                 <label style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>
                   Descripción corta (opcional)
@@ -1644,11 +1706,89 @@ export function ProductosView() {
               </div>
             </div>
 
+
+            {/* Foto */}
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div
+                style={{
+                  width: 96,
+                  height: 96,
+                  borderRadius: 12,
+                  background: 'var(--cp-sand)',
+                  border: '1.5px dashed var(--cp-soft)',
+                  overflow: 'hidden',
+                }}
+              >
+                {npFotoUrl && <img src={npFotoUrl} alt="Foto del producto nuevo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />}
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <label
+                  style={{
+                    minHeight: 44,
+                    padding: '0 16px',
+                    border: '1.5px solid var(--cp-navy)',
+                    borderRadius: 12,
+                    display: 'flex',
+                    alignItems: 'center',
+                    color: 'var(--cp-navy)',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {npFoto ? 'Cambiar imagen' : 'Subir imagen'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    aria-label="Imagen del producto nuevo"
+                    onChange={(e) => setNpFoto(e.target.files?.[0] ?? null)}
+                    style={{ position: 'absolute', left: -9999 }}
+                  />
+                </label>
+                {npFoto && (
+                  <button
+                    type="button"
+                    onClick={() => setNpFoto(null)}
+                    style={{
+                      minHeight: 44,
+                      padding: '0 16px',
+                      border: '1.5px solid var(--cp-rust)',
+                      borderRadius: 12,
+                      background: 'transparent',
+                      color: 'var(--cp-rust)',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Quitar imagen
+                  </button>
+                )}
+              </div>
+            </div>
+
             {npError && (
               <div role="alert" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-rust)' }}>
                 {npError}
               </div>
             )}
+
+            <BotonVistaPrevia
+              bloque
+              sinGuardar
+              gruposGenerales={gruposGenerales}
+              borrador={() => ({
+                nombre: npNombre.trim().toUpperCase(),
+                descripcion: npDesc,
+                precio: npModo === 'opciones' ? (npOpc.tamanos.find((t) => t.activo)?.precio ?? 0) : npPrecio,
+                categoriaNombre: categorias.find((c) => c.id === npCategoriaId)?.nombre,
+                fotoArchivo: npFoto,
+                ...(npModo === 'opciones'
+                  ? {
+                      tamanos: npOpc.tamanos.map((t) => ({ id: t.tamanoValorId, nombre: t.nombre, precio: t.precio, activo: t.activo })),
+                      grupos: npOpc.grupos.map((g) => ({ id: g.grupoId, nombre: g.nombre, minimo: g.minimo, maximo: g.maximo, obligatorio: g.requerido })),
+                    }
+                  : {}),
+              })}
+            />
 
             <div style={{ display: 'flex', gap: 8 }}>
               <button
@@ -1982,6 +2122,38 @@ export function ProductosView() {
               </div>
             )}
 
+            {puedeEditar && (
+              <button
+                type="button"
+                onClick={() => abrirOpciones(productoEnEdicion!)}
+                style={{
+                  minHeight: 44,
+                  border: '1.5px solid var(--cp-navy)',
+                  borderRadius: 12,
+                  background: 'transparent',
+                  color: 'var(--cp-navy)',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                }}
+              >
+                Tamaños y opciones · {resumenOpciones(productoEnEdicion!)}
+              </button>
+            )}
+
+            <BotonVistaPrevia
+              bloque
+              sinGuardar
+              gruposGenerales={gruposGenerales}
+              borrador={() => ({
+                ...productoEnEdicion,
+                nombre: edNombre,
+                precio: edPrecio,
+                fotoUrl: edFotoUrl,
+                categoriaNombre: categorias.find((c) => c.id === edCategoriaId)?.nombre,
+                sabores: edSabores,
+              })}
+            />
+
             <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
               <button
                 onClick={guardarEdicion}
@@ -2038,7 +2210,7 @@ export function ProductosView() {
           <div
             role="dialog"
             aria-modal="true"
-            aria-label="Opciones y tamaños"
+            aria-label="Tamaños y opciones"
             style={{
               position: 'fixed',
               zIndex: 60,
@@ -2074,10 +2246,10 @@ export function ProductosView() {
                     lineHeight: '27px',
                   }}
                 >
-                  Opciones y tamaños: {productoEnOpciones.nombre}
+                  Tamaños y opciones: {productoEnOpciones.nombre}
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
-                  Los cambios en los grupos valen para todos los productos que los usan.
+                  Tamaños y opciones de este producto.
                 </div>
               </div>
               <button
@@ -2100,325 +2272,18 @@ export function ProductosView() {
               </button>
             </div>
 
-            <div
-              style={{
-                fontSize: 13,
-                lineHeight: '19px',
-                background: 'var(--cp-white)',
-                border: '1px dashed var(--cp-navy)',
-                borderRadius: 12,
-                padding: '10px 12px',
+            <EditorOpcionesTamanos
+              key={productoEnOpciones.id}
+              modo="guardado"
+              producto={productoEnOpciones}
+              precioBase={productoEnOpciones.precio}
+              puedeEditar={puedeEditar}
+              alGuardar={async () => {
+                setProductoEnOpciones(null);
+                await cargarDatos();
               }}
-            >
-              Los tamaños, las opciones y los tipos de grupo se <b>eligen de una lista</b> para no
-              equivocarse al escribir. Si falta uno (por ejemplo, un cuarto tipo de leche), escríbelo en
-              el mismo buscador de la lista y toca <b>«+ Crear»</b>. Con el lápiz de cada nombre lo
-              corriges al instante.
-            </div>
-
-            {/* 1. Tamaños y precios */}
-            <div
-              style={{
-                background: 'var(--cp-white)',
-                border: '1px solid var(--cp-line)',
-                borderRadius: 14,
-                padding: 14,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 8,
-              }}
-            >
-              <div style={{ fontWeight: 800 }}>Tamaños y precios</div>
-              {opdTamanos.map((z, zIdx) => {
-                const activo = z.activo !== false;
-                return (
-                  <div
-                    key={zIdx}
-                    style={{
-                      display: 'flex',
-                      gap: 8,
-                      alignItems: 'center',
-                      flexWrap: 'wrap',
-                    }}
-                  >
-                    <div style={{ flex: '2 1 170px', minWidth: 0 }}>
-                      <input
-                        type="text"
-                        readOnly
-                        value={z.nombre}
-                        style={{
-                          width: '100%',
-                          boxSizing: 'border-box',
-                          minHeight: 44,
-                          padding: '0 12px',
-                          borderRadius: 10,
-                          border: '1.5px solid var(--cp-navy)',
-                          background: 'var(--cp-white)',
-                          fontWeight: 700,
-                          fontSize: 13,
-                        }}
-                      />
-                    </div>
-                    <input
-                      type="number"
-                      step="0.50"
-                      value={z.precio}
-                      onChange={(e) => {
-                        const clon = [...opdTamanos];
-                        clon[zIdx].precio = parseFloat(e.target.value) || 0;
-                        setOpdTamanos(clon);
-                      }}
-                      placeholder="s/"
-                      aria-label="Precio"
-                      style={{
-                        flex: '1 1 90px',
-                        minWidth: 0,
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        minHeight: 42,
-                        borderRadius: 10,
-                        border: '1.5px solid var(--cp-line)',
-                        background: 'var(--cp-white)',
-                        padding: '0 12px',
-                        fontSize: 14,
-                      }}
-                    />
-                    <button
-                      onClick={() => {
-                        const clon = [...opdTamanos];
-                        clon[zIdx].activo = !activo;
-                        setOpdTamanos(clon);
-                      }}
-                      style={{
-                        minHeight: 44,
-                        padding: '0 12px',
-                        borderRadius: 9999,
-                        border: '1.5px solid var(--cp-navy)',
-                        fontWeight: 700,
-                        fontSize: 12,
-                        background: activo ? 'var(--cp-navy)' : 'transparent',
-                        color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {activo ? 'Activo' : 'Oculto'}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* 2. Opciones que se le preguntan al cliente */}
-            <div
-              style={{
-                background: 'var(--cp-white)',
-                border: '1px solid var(--cp-line)',
-                borderRadius: 14,
-                padding: 14,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 10,
-              }}
-            >
-              <div style={{ fontWeight: 800 }}>Opciones que se le preguntan al cliente</div>
-              <div style={{ fontSize: 12, color: 'var(--cp-soft)' }}>
-                Cada grupo (tipo de leche, endulzante, shots, extras...) se crea y se edita aquí. Elige en cuáles productos se pregunta. Los cambios del grupo valen para todos los que lo usan.
-              </div>
-
-              {opdGrupos.map((g, gIdx) => {
-                const abierto = opdGrupoAbierto === g.id;
-                return (
-                  <div
-                    key={g.id}
-                    style={{
-                      border: '1.5px solid var(--cp-navy)',
-                      borderRadius: 12,
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 8,
-                        padding: '8px 10px',
-                        background: 'var(--cp-sand)',
-                        flexWrap: 'wrap',
-                      }}
-                    >
-                      <button
-                        onClick={() => setOpdGrupoAbierto(abierto ? null : g.id)}
-                        style={{
-                          flex: '1 1 220px',
-                          minWidth: 0,
-                          textAlign: 'left',
-                          border: 0,
-                          background: 'transparent',
-                          color: 'var(--cp-navy)',
-                          padding: 0,
-                          fontFamily: 'inherit',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <div style={{ fontWeight: 800, fontSize: 14 }}>
-                          {g.nombre} {abierto ? '▴' : '▾'}
-                        </div>
-                        <div style={{ fontSize: 12, color: 'var(--cp-soft)', lineHeight: '16px' }}>
-                          {g.obligatorio ? 'Obligatorio' : 'Opcional'} · {g.opciones.length} opciones
-                        </div>
-                      </button>
-                      <button
-                        onClick={() => {
-                          const clon = [...opdGrupos];
-                          clon[gIdx].activoEnProducto = !g.activoEnProducto;
-                          setOpdGrupos(clon);
-                        }}
-                        style={{
-                          minHeight: 44,
-                          padding: '0 12px',
-                          borderRadius: 9999,
-                          border: '1.5px solid var(--cp-navy)',
-                          fontWeight: 700,
-                          fontSize: 12,
-                          background: g.activoEnProducto ? 'var(--cp-navy)' : 'transparent',
-                          color: g.activoEnProducto ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {g.activoEnProducto ? 'Se pregunta aquí' : 'No se pregunta aquí'}
-                      </button>
-                    </div>
-
-                    {abierto && (
-                      <div
-                        style={{
-                          padding: 12,
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 10,
-                        }}
-                      >
-                        <div style={{ fontWeight: 700, fontSize: 13 }}>Opciones y su precio extra</div>
-                        {g.opciones.map((opt, oIdx) => (
-                          <div
-                            key={opt.id || oIdx}
-                            style={{
-                              display: 'flex',
-                              gap: 8,
-                              alignItems: 'center',
-                              flexWrap: 'wrap',
-                            }}
-                          >
-                            <input
-                              type="text"
-                              readOnly
-                              value={opt.nombre}
-                              style={{
-                                flex: '2 1 170px',
-                                minWidth: 0,
-                                minHeight: 44,
-                                padding: '0 12px',
-                                borderRadius: 10,
-                                border: '1.5px solid var(--cp-navy)',
-                                background: 'var(--cp-white)',
-                                fontWeight: 700,
-                                fontSize: 13,
-                              }}
-                            />
-                            <div
-                              style={{
-                                flex: '1 1 80px',
-                                minWidth: 0,
-                                minHeight: 42,
-                                display: 'flex',
-                                alignItems: 'center',
-                                padding: '0 12px',
-                                background: 'var(--cp-white)',
-                                borderRadius: 10,
-                                border: '1.5px solid var(--cp-line)',
-                                fontSize: 14,
-                              }}
-                            >
-                              + s/ {opt.precioExtra.toFixed(2)}
-                            </div>
-                            <span
-                              style={{
-                                minHeight: 44,
-                                padding: '0 12px',
-                                borderRadius: 9999,
-                                border: '1.5px solid var(--cp-navy)',
-                                fontWeight: 700,
-                                fontSize: 12,
-                                background: opt.activo !== false ? 'var(--cp-navy)' : 'transparent',
-                                color: opt.activo !== false ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                              }}
-                            >
-                              {opt.activo !== false ? 'Activo' : 'Oculto'}
-                            </span>
-                          </div>
-                        ))}
-                        <div
-                          style={{
-                            fontSize: 12,
-                            lineHeight: '17px',
-                            color: 'var(--cp-soft)',
-                            border: '1px dashed var(--cp-line)',
-                            borderRadius: 10,
-                            padding: '8px 10px',
-                          }}
-                        >
-                          Para cambiar en qué categorías enteras se pregunta, usa Listas y categorías ▸ Dónde se pregunta cada grupo.
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {opdError && (
-              <div role="alert" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-rust)' }}>
-                {opdError}
-              </div>
-            )}
-
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                onClick={guardarOpciones}
-                disabled={guardandoOpciones}
-                style={{
-                  flex: 1,
-                  minHeight: 52,
-                  border: 0,
-                  borderRadius: 12,
-                  background: 'var(--cp-orange)',
-                  color: 'var(--cp-navy)',
-                  fontFamily: 'Montserrat, sans-serif',
-                  fontWeight: 800,
-                  fontSize: 15,
-                  cursor: 'pointer',
-                }}
-              >
-                Guardar cambios
-              </button>
-              <button
-                onClick={() => setProductoEnOpciones(null)}
-                style={{
-                  flex: 1,
-                  minHeight: 52,
-                  border: '1.5px solid var(--cp-navy)',
-                  borderRadius: 12,
-                  background: 'transparent',
-                  color: 'var(--cp-navy)',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                }}
-              >
-                Cancelar
-              </button>
-            </div>
+              alCancelar={() => setProductoEnOpciones(null)}
+            />
           </div>
         </>
       )}

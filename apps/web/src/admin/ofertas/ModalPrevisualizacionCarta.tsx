@@ -118,16 +118,15 @@ export function ModalPrevisualizacionCarta({
               style={{
                 fontFamily: 'Montserrat, sans-serif',
                 fontWeight: 800,
-                fontSize: '20px',
-                lineHeight: '26px',
+                fontSize: '17px',
+                lineHeight: '22px',
                 color: 'var(--cp-navy)',
               }}
             >
               Cómo se ve en la carta
             </div>
-            <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
-              {oferta.nombre} · Vista previa de solo lectura
-            </div>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-navy)' }}>{oferta.nombre}</div>
+            <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>Vista previa de solo lectura</div>
           </div>
           <button
             ref={btnCerrarRef}

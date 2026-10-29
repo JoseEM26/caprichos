@@ -1396,9 +1396,11 @@ export class OfertasService {
   async vistaPreviaDescuentos(
     lineas: { productoId: string; cantidad: number; subtotal: number; precioUnitario: number }[],
     cuponCodigo?: string,
-  ): Promise<{ descuentoTotal: number; montoCanjeable: number; detalles: { tipo: string; nombre: string; monto: number }[] }> {
+  ): Promise<{ descuentoTotal: number; montoCanjeable: number; puntosEstimados: number; puntosPorcentaje: number; detalles: { tipo: string; nombre: string; monto: number }[] }> {
+    const param = await Promise.resolve().then(() => this.prisma.parametro.findUnique({ where: { clave: 'puntos_porcentaje' } })).catch(() => null);
+    const puntosPorcentaje = param && param.valor !== null && param.valor !== undefined ? Number(param.valor) : 5;
     const validas = (lineas || []).filter((l) => /^\d+$/.test(String(l.productoId)) && Number(l.cantidad) > 0);
-    if (validas.length === 0) return { descuentoTotal: 0, montoCanjeable: 0, detalles: [] };
+    if (validas.length === 0) return { descuentoTotal: 0, montoCanjeable: 0, puntosEstimados: 0, puntosPorcentaje, detalles: [] };
     const productos = await this.prisma.producto.findMany({
       where: { id: { in: validas.map((l) => BigInt(l.productoId)) } },
       select: { id: true, categoria_id: true, no_suma_beneficios: true },
@@ -1417,9 +1419,14 @@ export class OfertasService {
     });
     const subtotal = Number(lineasCalc.reduce((a, l) => a + l.subtotal, 0).toFixed(2));
     const desglose = await this.calcularDescuentosParaPedido({ subtotal, lineas: lineasCalc, canal: 'CARTA', cuponCodigo: cuponCodigo || null });
+    const conCupon = !!(desglose.cuponId || desglose.cuponEmitidoId);
+    const montoCanjeable = montoElegiblePuntos(lineasCalc, conCupon ? [] : desglose.detalles);
     return {
       descuentoTotal: desglose.descuentoTotal,
-      montoCanjeable: montoElegiblePuntos(lineasCalc, desglose.cuponId || desglose.cuponEmitidoId ? [] : desglose.detalles),
+      montoCanjeable,
+      // con cupón no se suman puntos (DT-56); misma base y porcentaje que PuntosService.acumularPorPedido
+      puntosEstimados: conCupon ? 0 : Math.round(montoCanjeable * (puntosPorcentaje / 100) * 100) / 100,
+      puntosPorcentaje,
       detalles: (desglose.detalles || []).map((d: any) => ({ tipo: String(d.tipo ?? ''), nombre: String(d.nombre ?? ''), monto: Number(d.montoDescontado ?? 0) })),
     };
   }

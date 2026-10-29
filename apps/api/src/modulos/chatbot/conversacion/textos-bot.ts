@@ -49,6 +49,11 @@ export const FILAS_MENU_PRINCIPAL: FilaLista[] = [
     descripcion: 'Consulta el estado y tiempo estimado',
   },
   {
+    id: 'mispuntos',
+    titulo: '⭐ Mis puntos',
+    descripcion: 'Consulta tu saldo de puntos',
+  },
+  {
     id: 'preguntar',
     titulo: '💬 Preguntar algo',
     descripcion: 'Horario, dirección, carta y dudas frecuentes',
@@ -161,6 +166,27 @@ export const BOTONES_PEDIDO_COMPROBANTE: BotonAccion[] = [
   { id: 'ped_comp_boleta', titulo: 'Boleta' },
   { id: 'ped_comp_factura', titulo: 'Factura' },
 ];
+
+export const BOTONES_PUNTOS_PROPIA: BotonAccion[] = [
+  { id: 'puntos_si', titulo: 'Sí, sumar puntos' },
+  { id: 'puntos_otro', titulo: 'Usar otro número' },
+  { id: 'puntos_no', titulo: 'No, gracias' },
+];
+export const BOTONES_PUNTOS_RECORDATORIO: BotonAccion[] = [
+  { id: 'puntos_si', titulo: 'Sí' },
+  { id: 'puntos_otro', titulo: 'Cambiar' },
+  { id: 'puntos_sin', titulo: 'Sin puntos' },
+];
+export const BOTONES_PUNTOS_DICTADO: BotonAccion[] = [
+  { id: 'puntos_si', titulo: 'Sí, sumar' },
+  { id: 'puntos_otro', titulo: 'No, otro número' },
+  { id: 'puntos_sin', titulo: 'Sin puntos' },
+];
+export const BOTONES_PUNTOS_NO_ENCONTRADO: BotonAccion[] = [
+  { id: 'puntos_otro', titulo: 'Probar otro número' },
+  { id: 'puntos_sin', titulo: 'Seguir sin puntos' },
+];
+export const BOTONES_PUNTOS_NUMERO: BotonAccion[] = [{ id: 'puntos_sin', titulo: 'Sin puntos' }];
 
 export const BOTONES_PEDIDO_CONFIRMAR_FINAL: BotonAccion[] = [
   { id: 'ped_confirmar', titulo: 'Confirmar pedido' },
@@ -879,6 +905,33 @@ export const TEXTOS_BOT = {
     return 'Por favor escribe la Razón Social de tu empresa:';
   },
 
+  // --- Puntos (cliente con cuenta, sin clave: se reconoce por el número de WhatsApp) ---
+  puntosCuentaPropia: (primerNombre: string): string =>
+    `Tu número está vinculado a la cuenta de ${primerNombre} 😊\n¿Quieres que los puntos de este pedido se sumen a esa cuenta?`,
+  puntosPedirNumero: (): string =>
+    `No encontré una cuenta con este número.\nSi quieres sumar puntos, escríbeme el número de celular (9 dígitos) asociado a tu cuenta, o toca "Sin puntos".`,
+  puntosEncontrado: (terminacion: string): string =>
+    `Encontré una cuenta con ese número (termina en ***${terminacion}).\n¿Sumo los puntos de este pedido ahí?`,
+  puntosNoEncontrado: (urlCarta: string): string =>
+    `No encontré una cuenta con ese número.\nPuedes crear la tuya con tu DNI en ${urlCarta} y sumar en tu próximo pedido.`,
+  puntosNumeroInvalido: (): string =>
+    `Necesito un celular de 9 dígitos que empiece con 9 (por ejemplo 987654321), o toca "Sin puntos".`,
+  puntosTopeIntentos: (urlCarta: string): string =>
+    `Ya probamos tres números, así que sigo con tu pedido sin puntos.\nPuedes crear tu cuenta con tu DNI en ${urlCarta} y sumar desde el próximo.`,
+  puntosRecordatorio: (destino: string): string => `Sumo tus puntos a ${destino} como antes, ¿ok?`,
+  puntosLineaResumen: (p: { estimado: number | null; saldo?: number | null; sinPuntos?: boolean }): string => {
+    if (p.sinPuntos) return `⭐ Este pedido no suma puntos.`;
+    const saldo = p.saldo != null ? ` (tienes ${p.saldo.toFixed(2)})` : '';
+    return p.estimado != null
+      ? `⭐ Este pedido sumará ~${p.estimado.toFixed(2)} puntos cuando Caja lo cobre${saldo}.`
+      : `⭐ Sumarás puntos por los productos sin promoción cuando Caja cobre el pedido${saldo}.`;
+  },
+  puntosMiSaldo: (primerNombre: string, saldo: number, porcentaje: number): string =>
+    `⭐ ${primerNombre}, tienes ${saldo.toFixed(2)} puntos.\nGanas ${porcentaje} % de lo que pagas en productos sin promoción, y cada punto vale S/ 1 en tu próximo pedido por la carta.`,
+  puntosSinCuenta: (urlCarta: string): string =>
+    `No encontré una cuenta con este número de WhatsApp.\nCrea la tuya con tu DNI en ${urlCarta}, usando este mismo número, y empieza a sumar puntos.`,
+  puntosNoDisponible: (): string => `Ahora no puedo consultar tus puntos. Inténtalo en unos minutos.`,
+
   pedidoResumenFinal: (params: {
     lineasTexto: string;
     descuentoTexto?: string;
@@ -890,6 +943,7 @@ export const TEXTOS_BOT = {
     tiempoMin: number;
     tiempoMax: number;
     avisoDemanda?: string;
+    puntosTexto?: string;
   }): string => {
     const {
       lineasTexto,
@@ -902,6 +956,7 @@ export const TEXTOS_BOT = {
       tiempoMin,
       tiempoMax,
       avisoDemanda,
+      puntosTexto,
     } = params;
 
     const descBloque = descuentoTexto ? `\n${descuentoTexto}` : '';
@@ -916,6 +971,7 @@ export const TEXTOS_BOT = {
       `Modalidad: ${modalidad}${dirBloque}\n` +
       `Pago: ${pagoTexto}\n` +
       `Tiempo estimado: ${tiempoMin} a ${tiempoMax} minutos${demandaBloque}\n\n` +
+      (puntosTexto ? `${puntosTexto}\n\n` : '') +
       `¿Confirmo tu pedido?`
     );
   },

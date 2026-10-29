@@ -73,6 +73,16 @@ describe('Admin ▸ Clientes UI', () => {
           total: 's/ 45.00',
           pago: 'Cobrado',
           fecha: '2026-10-15',
+          puntos: { estado: 'SUMADO', puntos: 2.25, texto: 'Sumó 2.25 puntos al cobrarse el pedido' },
+        },
+        {
+          id: 'PED-02',
+          modalidad: 'Para llevar',
+          estado: 'Entregado',
+          total: 's/ 33.00',
+          pago: 'Cobrado',
+          fecha: '2026-10-16',
+          puntos: { estado: 'NO_SUMA', motivo: 'SOLO_PROMOCION', texto: 'Los combos y promociones no suman puntos' },
         },
       ],
     });
@@ -210,6 +220,9 @@ describe('Admin ▸ Clientes UI', () => {
       expect(screen.getByText('PED-01')).toBeInTheDocument();
       expect(screen.getByText(/Delivery · Entregado/i)).toBeInTheDocument();
       expect(screen.getByText('+20 pts')).toBeInTheDocument();
+      // por qué cada pedido sumó o no sumó
+      expect(screen.getByText(/Puntos: \+2\.25 · Sumó 2\.25 puntos/)).toBeInTheDocument();
+      expect(screen.getByText(/Puntos: Los combos y promociones no suman puntos/)).toBeInTheDocument();
     });
   });
 

@@ -768,6 +768,9 @@ describe('OfertasService', () => {
 
       expect(res.descuentoTotal).toBe(2.0);
       expect(res.montoCanjeable).toBe(25.0);
+      // 5 % por defecto de lo elegible
+      expect(res.puntosEstimados).toBe(1.25);
+      expect(res.puntosPorcentaje).toBe(5);
     });
   });
 });

@@ -36,6 +36,8 @@ export interface OrigenPedido {
   clientePartyId?: bigint | string | number;
   /** Teléfono de quien escribe por WhatsApp: si tiene cuenta, el pedido queda a su nombre */
   telefonoRemitente?: string;
+  /** WhatsApp: el cliente eligió no sumar puntos; no se busca ninguna cuenta por teléfono */
+  sinCuentaCliente?: boolean;
   esPersonal?: boolean;
   mesasIds?: (bigint | string | number)[];
   mesaNombre?: string;
@@ -89,7 +91,17 @@ export class PedidosService {
       }
       return null;
     }
-    if (origen?.clientePartyId) return BigInt(origen.clientePartyId);
+    if (origen?.sinCuentaCliente) return null;
+    if (origen?.clientePartyId) {
+      const partyId = BigInt(origen.clientePartyId);
+      // Elegida en WhatsApp: debe ser un cliente con cuenta activa y rol CLIENTE vigente; si no, queda como invitado
+      if (canal === 'WHATSAPP' || canal === 'BOT') {
+        const rol = await this.prisma.partyRole.findFirst({ where: { party_id: partyId, rol: 'CLIENTE', hasta: null }, select: { id: true } });
+        const cuenta = this.direcciones ? await this.direcciones.datosCuentaActiva(partyId) : null;
+        return rol && cuenta ? partyId : null;
+      }
+      return partyId;
+    }
     if (origen?.telefonoRemitente && this.direcciones) {
       return this.direcciones.resolverPartyPorTelefono(origen.telefonoRemitente);
     }

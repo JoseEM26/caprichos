@@ -99,6 +99,16 @@ const PALABRAS_CARTA = [
   'la carta',
 ];
 
+/** Palabras clave para consultar el saldo de puntos del propio número */
+const PALABRAS_MIS_PUNTOS = [
+  'mis puntos',
+  'cuantos puntos',
+  'puntos tengo',
+  'saldo de puntos',
+  'consultar puntos',
+  'puntos acumulados',
+];
+
 /** Palabras clave para intención de promociones */
 const PALABRAS_PROMOS = [
   'promocion',
@@ -970,6 +980,22 @@ export function transicionarEstado(
         estado: nuevoEstado,
         repreguntasFallidas: 0,
       },
+    };
+  }
+
+  // 5.b Intención: "¿Cuántos puntos tengo?" (solo el saldo del propio número de WhatsApp; nunca el de otro)
+  if (idInteractivo === 'mispuntos' || coincideAlgunaPalabra(texto, PALABRAS_MIS_PUNTOS)) {
+    const url = contexto.cartaUrlPublica || 'https://caprichos.pe/carta';
+    const cuenta = contexto.puntos?.cuentaTelefono;
+    const textoPuntos = !contexto.puntos
+      ? TEXTOS_BOT.puntosNoDisponible()
+      : cuenta
+        ? TEXTOS_BOT.puntosMiSaldo(cuenta.primerNombre, cuenta.saldo, contexto.puntos.porcentaje ?? 5)
+        : TEXTOS_BOT.puntosSinCuenta(url);
+    return {
+      nuevoEstado: 'MENU',
+      acciones: [{ tipo: 'enviarBotones', texto: textoPuntos, botones: [{ id: 'btn_pedido', titulo: 'Hacer un pedido' }, BOTON_VOLVER_MENU] }],
+      nuevoFlujo: { ...flujo, estado: 'MENU', repreguntasFallidas: 0 },
     };
   }
 

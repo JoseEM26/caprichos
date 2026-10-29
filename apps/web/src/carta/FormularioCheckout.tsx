@@ -13,7 +13,7 @@ import { SEDE_DEFECTO } from '../comun/mapa/sedeDefecto';
 import { BuscadorDireccion } from '../comun/mapa/BuscadorDireccion';
 import { enlaceGoogleMaps } from '../comun/mapa/leaflet';
 import { useCarrito } from './CarritoContext';
-import { PuntosCanje } from './cuenta/PuntosCanje';
+import { PuntosCanje, estimarPuntos } from './cuenta/PuntosCanje';
 import { useCuentaOpcional } from './cuenta/CuentaContext';
 import { guardarPedido } from './seguimiento';
 import { SelectorDireccionesCliente } from './SelectorDireccionesCliente';
@@ -115,7 +115,7 @@ export function FormularioCheckout({
   } | null>(null);
   const [cargandoCupon, setCargandoCupon] = useState(false);
   const [puntosAplicados, setPuntosAplicados] = useState(0);
-  const [promos, setPromos] = useState<{ total: number; canjeable: number | null; detalles: { nombre: string; monto: number }[] }>({ total: 0, canjeable: null, detalles: [] });
+  const [promos, setPromos] = useState<{ total: number; canjeable: number | null; puntosEstimados: number | null; porcentaje: number | null; detalles: { nombre: string; monto: number }[] }>({ total: 0, canjeable: null, puntosEstimados: null, porcentaje: null, detalles: [] });
   const cuentaCtx = useCuentaOpcional();
   const clienteCuenta = cuentaCtx?.cliente ?? null;
   // Acceso: con sesión se usa la cuenta; sin ella el cliente elige ingresar o seguir como invitado
@@ -156,12 +156,12 @@ export function FormularioCheckout({
     if (!checkoutAbierto || lineas.length === 0) return;
     let vigente = true;
     api
-      .post<{ descuentoTotal: number; montoCanjeable?: number; detalles: { nombre: string; monto: number }[] }>('/carta/descuentos/vista-previa', {
+      .post<{ descuentoTotal: number; montoCanjeable?: number; puntosEstimados?: number; puntosPorcentaje?: number; detalles: { nombre: string; monto: number }[] }>('/carta/descuentos/vista-previa', {
         lineas: lineas.map((l) => ({ productoId: l.productoId, cantidad: l.cantidad, subtotal: l.subtotal, precioUnitario: l.precioUnitario })),
         cuponCodigo: cuponAplicado?.codigo,
       })
-      .then((r) => vigente && setPromos({ total: Number(r?.descuentoTotal) || 0, canjeable: typeof r?.montoCanjeable === 'number' ? r.montoCanjeable : null, detalles: Array.isArray(r?.detalles) ? r.detalles : [] }))
-      .catch(() => vigente && setPromos({ total: 0, canjeable: null, detalles: [] }));
+      .then((r) => vigente && setPromos({ total: Number(r?.descuentoTotal) || 0, canjeable: typeof r?.montoCanjeable === 'number' ? r.montoCanjeable : null, puntosEstimados: typeof r?.puntosEstimados === 'number' ? r.puntosEstimados : null, porcentaje: typeof r?.puntosPorcentaje === 'number' ? r.puntosPorcentaje : null, detalles: Array.isArray(r?.detalles) ? r.detalles : [] }))
+      .catch(() => vigente && setPromos({ total: 0, canjeable: null, puntosEstimados: null, porcentaje: null, detalles: [] }));
     return () => {
       vigente = false;
     };
@@ -625,7 +625,9 @@ export function FormularioCheckout({
     }
   };
 
-  const pctPuntos = datosLocal?.puntosPorcentaje ?? 5;
+  const pctPuntos = promos.porcentaje ?? datosLocal?.puntosPorcentaje ?? 5;
+  // misma base que el servidor: productos sin promoción, menos lo pagado con puntos; con cupón no suma
+  const puntosEstimados = estimarPuntos({ canjeable: promos.canjeable, porcentaje: pctPuntos, puntosAplicados, conCupon: !!cuponAplicado, delServidor: promos.puntosEstimados });
   const textoPuntos = `Con tu cuenta ganas el ${pctPuntos} % de lo que pagas en puntos, y no vencen. Los usas como descuento en tus próximos pedidos, solo en productos sin promoción ni descuento.`;
 
   const mediosPagoDisponibles = datosLocal?.mediosPago || {
@@ -1796,6 +1798,7 @@ export function FormularioCheckout({
                       totalPedido={Math.max(0, promos.canjeable ?? 0)}
                       puntosAplicados={puntosAplicados}
                       alAplicar={setPuntosAplicados}
+                      porcentaje={pctPuntos}
                     />
                   )}
 
@@ -1967,6 +1970,12 @@ export function FormularioCheckout({
                       <span>Total a pagar</span>
                       <span style={{ color: 'var(--cp-rust)' }}>S/ {totalCalculado.toFixed(2)}</span>
                     </div>
+
+                    {clienteCuenta && (
+                      <div data-testid="puntos-estimados" style={{ fontSize: '12px', lineHeight: '16px', color: 'var(--cp-soft)' }}>
+                        <b>Con este pedido ganarás ~{puntosEstimados.toFixed(2)} pts</b> (0 si usas cupón o es solo promoción).
+                      </div>
+                    )}
                   </div>
                 </>
               )}

@@ -797,6 +797,7 @@ export function ModalDescuento({
             {/* A qué aplica */}
             <div style={{ borderTop: '1px solid var(--cp-line)', paddingTop: '12px' }}>
               <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: '8px' }}>Aplica a</div>
+              <div style={{ fontSize: '12px', color: 'var(--cp-soft)', marginBottom: '8px' }}>Los productos con descuento no suman puntos ni se pagan con puntos mientras la promoción esté activa</div>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                 <button
                   type="button"

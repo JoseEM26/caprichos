@@ -1,3 +1,4 @@
+import { explicarPedidosPorId } from '../clientes/explicar-puntos-pedidos';
 import { PuntosService } from '../clientes/puntos.service';
 import { mediosDigitalesDelPedido, montoDigitalDePlan } from '../pedidos/pago-plan.service';
 import { progresoDelPedido } from '../pedidos/progreso-pedido';
@@ -657,8 +658,11 @@ export class PedidosEstadoService {
 
     const cobroVigenteId = pedido.cobros?.[0]?.id ? String(pedido.cobros[0].id) : null;
 
+    const puntos = (await explicarPedidosPorId(this.prisma, [pedido.id]).catch(() => null))?.get(String(pedido.id)) ?? null;
+
     return {
       ...pedido,
+      puntos,
       cobro_vigente_id: cobroVigenteId,
       comprobante_doc: esAdmin
         ? pedido.comprobante_doc

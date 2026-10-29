@@ -23,6 +23,8 @@ import type { ModalidadEntrega } from './tipos';
 interface PedidoCuenta extends EstadoSeguimiento {
   creadoEn: string;
   resumen: string;
+  /** Puntos del pedido: ganados, por ganar o el motivo por el que no suma */
+  puntos?: { estado: 'SUMADO' | 'PENDIENTE_DE_COBRO' | 'NO_SUMA'; puntos?: number; estimado?: number; texto: string };
   seguimientoToken: string;
 }
 
@@ -44,6 +46,7 @@ interface Fila {
   anulado: boolean;
   total?: number;
   resumen?: string;
+  puntos?: PedidoCuenta['puntos'];
 }
 
 const RANGO_ESTADO: Record<string, number> = { COLA: 0, PREPARANDO: 1, LISTO: 2, EN_CAMINO: 3, ENTREGADO: 4 };
@@ -200,6 +203,16 @@ function TarjetaPedido({ fila, onElegir }: { fila: Fila; onElegir: () => void })
         ))}
       </div>
       {fila.resumen && <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>{fila.resumen}</div>}
+      {fila.puntos?.texto && !fila.anulado && (
+        <div data-testid="puntos-pedido" style={{ fontSize: 12, fontWeight: 700, color: fila.puntos.estado === 'NO_SUMA' ? 'var(--cp-soft)' : 'var(--cp-green)' }}>
+          {fila.puntos.estado === 'SUMADO'
+            ? `+${(fila.puntos.puntos ?? 0).toFixed(2)} pts`
+            : fila.puntos.estado === 'PENDIENTE_DE_COBRO'
+              ? `+${(fila.puntos.estimado ?? 0).toFixed(2)} pts al cobrarse`
+              : 'No suma puntos'}
+          <span style={{ fontWeight: 400 }}> · {fila.puntos.texto}</span>
+        </div>
+      )}
     </button>
   );
 }
@@ -327,6 +340,7 @@ function combinarFilas(cuenta: PedidoCuenta[], guardados: PedidoGuardado[], conS
     anulado: p.anulado,
     total: p.total,
     resumen: p.resumen,
+    puntos: p.puntos,
   }));
   const codigos = new Set(cuenta.map((p) => p.codigo));
   const deNavegador: Fila[] = guardados
