@@ -4,6 +4,7 @@ import { useSesion } from '../../comun/sesion';
 import { api } from '../../comun/api';
 import { Confirmar } from '../../comun/Confirmar';
 import { HorarioTab } from './HorarioTab';
+import { PagosTab } from './PagosTab';
 import { FechasEspecialesTab } from './FechasEspecialesTab';
 import { ZonasRepartoView } from './ZonasRepartoView';
 import { SeccionAltaDemanda } from './SeccionAltaDemanda';
@@ -14,6 +15,12 @@ import { TarjetaImpresionEtiquetas } from '../impresion/TarjetaImpresionEtiqueta
 import { TarjetaAyudaIaConfiguracion } from './TarjetaAyudaIaConfiguracion';
 import { TarjetaVouchersIaConfiguracion } from './TarjetaVouchersIaConfiguracion';
 import { TarjetaPantallaIngresoConfiguracion } from './TarjetaPantallaIngresoConfiguracion';
+import { BuscadorConfiguracion } from './BuscadorConfiguracion';
+import { NavegacionConfiguracion, useEsMovil, grupoDe } from './NavegacionConfiguracion';
+import { useResaltarCampo, CampoConfig } from './CampoConfig';
+import { CampoAyuda } from './AyudaCampo';
+import { propsAyuda } from './catalogo/propsAyuda';
+import type { EntradaConfig } from './catalogo';
 
 export interface InfoLocalState {
   // local
@@ -55,12 +62,6 @@ export interface InfoLocalState {
   credPct: string;
   wifiNombre: string;
   wifiClave: string;
-  // zonas
-  zpoly_Z2: string;
-  zpoly_Z3: string;
-  zpoly_Z4: string;
-  zpoly_Z5: string;
-  zpoly_Z7: string;
   // fallas
   fallaEsperaMin: string;
   fallaMaxIntentos: string;
@@ -155,11 +156,6 @@ const INFO_DEFAULT: InfoLocalState = {
   credPct: '25',
   wifiNombre: '',
   wifiClave: '',
-  zpoly_Z2: '-12.0150,-76.9680\n-12.0120,-76.9640\n-12.0180,-76.9620',
-  zpoly_Z3: '-12.0190,-76.9700\n-12.0100,-76.9610\n-12.0220,-76.9600',
-  zpoly_Z4: '-12.0250,-76.9750\n-12.0080,-76.9580\n-12.0280,-76.9550',
-  zpoly_Z5: '-12.0300,-76.9800\n-12.0050,-76.9520\n-12.0350,-76.9500',
-  zpoly_Z7: '-12.0350,-76.9900\n-12.0000,-76.9450\n-12.0420,-76.9400',
   fallaEsperaMin: '10',
   fallaMaxIntentos: '2',
   fallaPlazoMin: '120',
@@ -228,7 +224,7 @@ interface CategoriaConfig {
   }>;
 }
 
-const CATEGORIAS_CONFIG: CategoriaConfig[] = [
+export const CATEGORIAS_CONFIG: CategoriaConfig[] = [
   {
     id: 'local',
     n: 'Datos del local',
@@ -487,6 +483,33 @@ const VALORES_MOCK_PROHIBIDOS = new Set([
   'Av. Principal 123, SJL',
 ]);
 
+/** Id de catálogo de un campo del formulario genérico: `<tab>-<clave en kebab>` (ej. operacion-tiempo-base). */
+export const idCampoGenerico = (tab: string, k: string) =>
+  `${tab}-${k.replace(/([a-z0-9])([A-Z])/g, '$1-$2').replace(/_/g, '-').toLowerCase()}`;
+
+/** Secciones plegables de las pestañas largas del formulario genérico (se abren solas al saltar desde el buscador). */
+const GRUPOS_CAMPOS: Record<string, Array<[string, string[]]>> = {
+  textos: [
+    ['Términos y privacidad', ['terminos', 'privacidad']],
+    ['Novedades', ['novTit', 'novSub']],
+    ['Mensajes de WhatsApp', ['msgListo', 'msgRecojo', 'msgUbic', 'msgPago']],
+    ['Encuesta posventa', ['encMin', 'encPregunta', 'encDesc', 'encLink']],
+  ],
+  entrega: [
+    ['Envío gratis y pedido mínimo', ['envioGratis', 'envioGratisMas', 'pedidoMin']],
+    ['Zonas y tarifas (copia local)', ['zon_Z2', 'zon_Z3', 'zon_Z4', 'zon_Z5', 'zon_Z7', 'tarZ2', 'tarZ3', 'tarZ4', 'tarZ5', 'tarZ7']],
+    ['Anulación de pedidos', ['pinAnular']],
+  ],
+};
+
+function gruposDe(tab: string, fields: CategoriaConfig['fields']): Array<{ titulo: string | null; campos: CategoriaConfig['fields'] }> {
+  const def = GRUPOS_CAMPOS[tab];
+  if (!def) return [{ titulo: null, campos: fields }];
+  return def
+    .map(([titulo, claves]) => ({ titulo, campos: fields.filter((f) => claves.includes(String(f.k))) }))
+    .filter((g) => g.campos.length > 0);
+}
+
 export function ConfiguracionLocalView() {
   const { tiene, usuario } = useSesion();
   const esAdmin = usuario?.rol === 'ADMIN' || tiene('ADMIN');
@@ -520,11 +543,16 @@ export function ConfiguracionLocalView() {
   }, [location.search]);
 
   const [tabId, setTabId] = useState<string>(() => tabParam || 'local');
+  const esMovil = useEsMovil();
+  // En celular, sin ?tab= se muestra primero la lista de categorías (estilo ajustes del teléfono).
+  const [verDetalle, setVerDetalle] = useState<boolean>(() => !!tabParam);
+  useResaltarCampo();
 
   useEffect(() => {
     if (tabParam && tabParam !== tabId) {
       setTabId(tabParam);
     }
+    if (tabParam) setVerDetalle(true);
   }, [tabParam, tabId]);
   const [info, setInfo] = useState<InfoLocalState>(() => {
     try {
@@ -600,6 +628,24 @@ export function ConfiguracionLocalView() {
   const categoriaActual = useMemo(() => {
     return CATEGORIAS_CONFIG.find((c) => c.id === tabId) || CATEGORIAS_CONFIG[0];
   }, [tabId]);
+
+  const irACategoria = (id: string, campo?: string) => {
+    setTabId(id);
+    setVerDetalle(true);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('tab', id);
+        if (campo) next.set('campo', campo);
+        else next.delete('campo');
+        return next;
+      },
+      { replace: true },
+    );
+    setMensaje('');
+  };
+
+  const categoriasVisibles = CATEGORIAS_CONFIG.filter((c) => c.id !== 'ingreso' || puedeEditarIngreso);
 
   const handleChange = (key: keyof InfoLocalState, value: string) => {
     setInfo((prev) => ({ ...prev, [key]: value }));
@@ -709,65 +755,30 @@ export function ConfiguracionLocalView() {
         )}
       </div>
 
-      {/* Contenedor: Pestañas a la izquierda + Panel de edición a la derecha */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'flex-start' }}>
-        {/* Pestañas laterales */}
-        <div
-          role="tablist"
-          aria-label="Categorías de configuración"
-          style={{
-            flex: '1 1 240px',
-            minWidth: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px',
-          }}
-        >
-          {CATEGORIAS_CONFIG.filter((c) => c.id !== 'ingreso' || puedeEditarIngreso).map((c) => {
-            const activo = tabId === c.id;
-            return (
-              <button
-                key={c.id}
-                role="tab"
-                aria-selected={activo}
-                onClick={() => {
-                  setTabId(c.id);
-                  setSearchParams(
-                    (prev) => {
-                      const next = new URLSearchParams(prev);
-                      next.set('tab', c.id);
-                      return next;
-                    },
-                    { replace: true },
-                  );
-                  setMensaje('');
-                }}
-                style={{
-                  textAlign: 'left',
-                  background: 'var(--cp-white)',
-                  border: `1.5px solid ${activo ? 'var(--cp-orange)' : 'var(--cp-line)'}`,
-                  borderRadius: '12px',
-                  padding: '12px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '2px',
-                  color: 'var(--cp-navy)',
-                  cursor: 'pointer',
-                  boxShadow: activo ? '0 2px 8px rgba(230, 121, 41, 0.15)' : 'none',
-                }}
-              >
-                <span style={{ fontWeight: 800 }}>{c.n}</span>
-                <span style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>{c.d}</span>
-              </button>
-            );
-          })}
-        </div>
+      <BuscadorConfiguracion
+        categorias={categoriasVisibles}
+        onElegir={(e: EntradaConfig) => irACategoria(e.tab, e.id)}
+      />
+
+      {/* Contenedor: navegación por grupos (PC) o lista a pantalla completa (celular) + panel de edición */}
+      <div className="cfg-contenedor">
+        {(!esMovil || !verDetalle) && (
+          <div className="cfg-lateral">
+            <NavegacionConfiguracion
+              categorias={categoriasVisibles}
+              activo={tabId}
+              movil={esMovil}
+              onElegir={(id) => irACategoria(id)}
+            />
+          </div>
+        )}
 
         {/* Panel de edición */}
+        {(!esMovil || verDetalle) && (
         <div
           role="tabpanel"
+          className="cfg-panel"
           style={{
-            flex: '2 1 420px',
             minWidth: 0,
             background: 'var(--cp-white)',
             border: '1px solid var(--cp-line)',
@@ -779,6 +790,12 @@ export function ConfiguracionLocalView() {
           }}
         >
           <div>
+            {esMovil && (
+              <button type="button" className="cfg-volver" onClick={() => setVerDetalle(false)}>
+                ‹ Configuración
+              </button>
+            )}
+            <div className="cfg-migas">Configuración › {grupoDe(categoriaActual.id)}</div>
             <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '18px' }}>
               {categoriaActual.n}
             </div>
@@ -892,13 +909,10 @@ export function ConfiguracionLocalView() {
                 </button>
               </div>
 
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'flex-end' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'flex-start' }}>
                 <div style={{ flex: '1 1 140px' }}>
-                  <label htmlFor="loc-lat" style={{ fontSize: '12px', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
-                    Latitud
-                  </label>
+                  <CampoAyuda id="loc-lat" etiqueta="Latitud" cfgId="ubicacion-lat" {...propsAyuda('ubicacion-lat')}>
                   <input
-                    id="loc-lat"
                     type="text"
                     inputMode="decimal"
                     value={info.lat}
@@ -915,13 +929,11 @@ export function ConfiguracionLocalView() {
                       fontSize: '14px',
                     }}
                   />
+                  </CampoAyuda>
                 </div>
                 <div style={{ flex: '1 1 140px' }}>
-                  <label htmlFor="loc-lng" style={{ fontSize: '12px', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
-                    Longitud
-                  </label>
+                  <CampoAyuda id="loc-lng" etiqueta="Longitud" cfgId="ubicacion-lng" {...propsAyuda('ubicacion-lng')}>
                   <input
-                    id="loc-lng"
                     type="text"
                     inputMode="decimal"
                     value={info.lng}
@@ -938,6 +950,7 @@ export function ConfiguracionLocalView() {
                       fontSize: '14px',
                     }}
                   />
+                  </CampoAyuda>
                 </div>
               </div>
             </div>
@@ -956,41 +969,11 @@ export function ConfiguracionLocalView() {
             </div>
           )}
 
-          {/* Subcaso: ZONAS DE REPARTO (MAPA) */}
-          {tabId === 'zonas' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <ZonasRepartoView />
-              <div style={{ borderTop: '1px solid var(--cp-line)', paddingTop: '12px' }}>
-                <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '15px', marginBottom: '4px' }}>
-                  Polígonos de zonas (un punto por línea: "latitud, longitud")
-                </div>
-                {(['Z2', 'Z3', 'Z4', 'Z5', 'Z7'] as const).map((z) => {
-                  const key = `zpoly_${z}` as keyof InfoLocalState;
-                  return (
-                    <div key={z} style={{ marginTop: '8px' }}>
-                      <label style={{ fontSize: '12px', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
-                        Zona {z.slice(1)}: Coordenadas del polígono
-                      </label>
-                      <textarea
-                        rows={3}
-                        value={info[key]}
-                        onChange={(e) => handleChange(key, e.target.value)}
-                        style={{
-                          width: '100%',
-                          boxSizing: 'border-box',
-                          borderRadius: '10px',
-                          border: '1.5px solid var(--cp-line)',
-                          padding: '8px',
-                          fontFamily: 'monospace',
-                          fontSize: '12px',
-                        }}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          {/* Subcaso: ZONAS DE REPARTO (MAPA). Los polígonos viven en /admin/zonas (zona_reparto); el formulario legado zpoly_* ya no se usa. */}
+          {tabId === 'zonas' && <ZonasRepartoView />}
+
+          {/* Subcaso: MEDIOS DE PAGO (parámetro local_pagos en el servidor; lo leen carta y bot) */}
+          {tabId === 'pagos' && <PagosTab puedeEditar={puedeEditar} />}
 
           {/* Subcaso: ALTA DEMANDA Y PAUSA DE PEDIDOS */}
           {tabId === 'demanda' && (
@@ -1033,7 +1016,7 @@ export function ConfiguracionLocalView() {
           )}
 
           {/* Subcaso: CAMPOS REGULARES DE OTRAS CATEGORÍAS */}
-          {tabId !== 'horario' && tabId !== 'zonas' && tabId !== 'demanda' && tabId !== 'reparto' && tabId !== 'parametros' && tabId !== 'chatbot' && tabId !== 'impresion' && tabId !== 'ayuda' && tabId !== 'vouchers' && tabId !== 'ingreso' && (
+          {tabId !== 'horario' && tabId !== 'pagos' && tabId !== 'zonas' && tabId !== 'demanda' && tabId !== 'reparto' && tabId !== 'parametros' && tabId !== 'chatbot' && tabId !== 'impresion' && tabId !== 'ayuda' && tabId !== 'vouchers' && tabId !== 'ingreso' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {tabId === 'operacion' && (
                 <div
@@ -1099,43 +1082,34 @@ export function ConfiguracionLocalView() {
                   Modo sólo lectura. No tienes el permiso <b>local/editar</b> para modificar estos datos.
                 </div>
               )}
-              {categoriaActual.fields.map((f) => {
+              {gruposDe(tabId, categoriaActual.fields).map((g, gi) => {
+                const campos = g.campos.map((f) => <CampoConfig key={String(f.k)} id={idCampoGenerico(tabId, String(f.k))}>{(() => {
+                const ay = propsAyuda(idCampoGenerico(tabId, String(f.k)));
                 if (f.tog) {
                   const isChecked = info[f.k] === '1';
                   return (
-                    <div
-                      key={String(f.k)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '10px 12px',
-                        border: '1.5px solid var(--cp-line)',
-                        borderRadius: '10px',
-                        background: 'var(--cp-cream)',
-                      }}
-                    >
-                      <span style={{ fontWeight: 700, fontSize: '14px' }}>{f.l}</span>
+                    <CampoAyuda key={String(f.k)} id={`cfg-${String(f.k)}`} etiqueta={f.l} {...ay}>
                       <button
                         type="button"
                         disabled={!puedeEditar}
                         onClick={() => handleChange(f.k, isChecked ? '0' : '1')}
                         style={{
-                          minHeight: '36px',
-                          padding: '0 16px',
+                          minHeight: '44px',
+                          alignSelf: 'flex-start',
+                          padding: '0 20px',
                           borderRadius: '9999px',
                           border: '1.5px solid var(--cp-navy)',
                           background: isChecked ? 'var(--cp-navy)' : 'transparent',
                           color: isChecked ? 'var(--cp-cream)' : 'var(--cp-navy)',
                           fontWeight: 800,
-                          fontSize: '12px',
+                          fontSize: '13px',
                           cursor: !puedeEditar ? 'not-allowed' : 'pointer',
                           opacity: !puedeEditar ? 0.6 : 1,
                         }}
                       >
                         {isChecked ? 'Sí' : 'No'}
                       </button>
-                    </div>
+                    </CampoAyuda>
                   );
                 }
 
@@ -1200,18 +1174,15 @@ export function ConfiguracionLocalView() {
                           />
                         </label>
                       </div>
+                      <div className="cfg-ayuda-texto">{ay.ayuda}</div>
                     </div>
                   );
                 }
 
                 if (f.multi) {
                   return (
-                    <div key={String(f.k)}>
-                      <label htmlFor={`cfg-${String(f.k)}`} style={{ fontWeight: 700, fontSize: '13px', display: 'block', marginBottom: '4px' }}>
-                        {f.l}
-                      </label>
+                    <CampoAyuda key={String(f.k)} id={`cfg-${String(f.k)}`} etiqueta={f.l} {...ay}>
                       <textarea
-                        id={`cfg-${String(f.k)}`}
                         rows={3}
                         disabled={!puedeEditar}
                         placeholder={f.ph || ''}
@@ -1230,17 +1201,13 @@ export function ConfiguracionLocalView() {
                           cursor: !puedeEditar ? 'not-allowed' : 'text',
                         }}
                       />
-                    </div>
+                    </CampoAyuda>
                   );
                 }
 
                 return (
-                  <div key={String(f.k)}>
-                    <label htmlFor={`cfg-${String(f.k)}`} style={{ fontWeight: 700, fontSize: '13px', display: 'block', marginBottom: '4px' }}>
-                      {f.l}
-                    </label>
+                  <CampoAyuda key={String(f.k)} id={`cfg-${String(f.k)}`} etiqueta={f.l} {...ay}>
                     <input
-                      id={`cfg-${String(f.k)}`}
                       type="text"
                       disabled={!puedeEditar}
                       placeholder={f.ph || ''}
@@ -1259,14 +1226,22 @@ export function ConfiguracionLocalView() {
                         cursor: !puedeEditar ? 'not-allowed' : 'text',
                       }}
                     />
-                  </div>
+                  </CampoAyuda>
+                );
+              })()}</CampoConfig>);
+                if (!g.titulo) return <React.Fragment key={gi}>{campos}</React.Fragment>;
+                return (
+                  <details key={g.titulo} open={gi === 0} className="cfg-grupo-detalle">
+                    <summary className="cfg-grupo-resumen">{g.titulo}</summary>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingTop: '10px' }}>{campos}</div>
+                  </details>
                 );
               })}
             </div>
           )}
 
           {/* Botones de acción inferiores */}
-          {tabId !== 'horario' && tabId !== 'zonas' && tabId !== 'demanda' && tabId !== 'impresion' && tabId !== 'ayuda' && tabId !== 'ingreso' && (
+          {tabId !== 'horario' && tabId !== 'pagos' && tabId !== 'zonas' && tabId !== 'demanda' && tabId !== 'impresion' && tabId !== 'ayuda' && tabId !== 'ingreso' && (
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px' }}>
               <button
                 type="button"
@@ -1307,9 +1282,11 @@ export function ConfiguracionLocalView() {
             </div>
           )}
         </div>
+        )}
       </div>
 
       {/* Tarjeta Fotos del Local (a todo el ancho) */}
+      {(!esMovil || verDetalle) && (
       <div
         style={{
           background: 'var(--cp-white)',
@@ -1422,6 +1399,7 @@ export function ConfiguracionLocalView() {
           })}
         </div>
       </div>
+      )}
 
       {/* Modales Confirmar */}
       <Confirmar

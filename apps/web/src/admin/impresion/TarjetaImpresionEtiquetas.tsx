@@ -162,15 +162,17 @@ export function TarjetaImpresionEtiquetas() {
             Impresión de etiquetas
           </h2>
           <div style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)', marginTop: 2 }}>
-            Agente local de caja (4BARCODE 4B-2054TH · 63.5 x 101.6 mm)
+            Agente local de caja (4BARCODE 4B-2054TH · 63.5 x 101.6 mm). Imprime las etiquetas de los pedidos; aquí ves si está conectado, el estado de la impresora y la cola de trabajos.
           </div>
         </div>
 
         <button
           type="button"
+          data-cfg-id="impresion-actualizar"
+          title="Vuelve a consultar el estado del agente, la impresora y la cola. No cambia ninguna configuración."
           onClick={cargarDatos}
           style={{
-            minHeight: 36,
+            minHeight: 44,
             padding: '0 12px',
             border: '1px solid var(--cp-line, #E3D6C6)',
             borderRadius: 8,
@@ -227,6 +229,8 @@ export function TarjetaImpresionEtiquetas() {
       >
         {/* Agente */}
         <div
+          data-cfg-id="impresion-agente"
+          tabIndex={-1}
           style={{
             border: '1px solid var(--cp-line, #E3D6C6)',
             borderRadius: 12,
@@ -286,12 +290,14 @@ export function TarjetaImpresionEtiquetas() {
               (estado?.impresora || 'Desconocido')}
           </div>
           <div style={{ fontSize: 11, color: 'var(--cp-soft, #2C4C5D)', marginTop: 4 }}>
-            Sensor de rollo y cabezal
+            Sensor de rollo y cabezal. Si el agente no está conectado, las etiquetas esperan en la cola.
           </div>
         </div>
 
         {/* Cola de trabajos */}
         <div
+          data-cfg-id="impresion-cola"
+          tabIndex={-1}
           style={{
             border: '1px solid var(--cp-line, #E3D6C6)',
             borderRadius: 12,
@@ -412,6 +418,8 @@ export function TarjetaImpresionEtiquetas() {
 
       {/* Sección Gestión de llaves del agente (solo ADMIN) */}
       <div
+        data-cfg-id="impresion-llaves"
+        tabIndex={-1}
         style={{
           borderTop: '1px solid var(--cp-line, #E3D6C6)',
           paddingTop: 16,
@@ -451,6 +459,9 @@ export function TarjetaImpresionEtiquetas() {
             >
               <input
                 type="text"
+                data-cfg-id="impresion-llave-nombre"
+                aria-label="Nombre de la nueva llave"
+                aria-describedby="impresion-llave-nombre-ayuda"
                 value={nombreNuevaLlave}
                 onChange={(e) => setNombreNuevaLlave(e.target.value)}
                 placeholder="Nombre (ej: Agente PC Caja 1)"
@@ -465,10 +476,12 @@ export function TarjetaImpresionEtiquetas() {
               />
               <button
                 type="button"
+                data-cfg-id="impresion-llave-crear"
+                title="Genera una llave nueva; se muestra una sola vez."
                 disabled={creandoLlave}
                 onClick={handleCrearLlave}
                 style={{
-                  minHeight: 40,
+                  minHeight: 44,
                   padding: '0 16px',
                   borderRadius: 8,
                   border: 0,
@@ -481,6 +494,10 @@ export function TarjetaImpresionEtiquetas() {
               >
                 {creandoLlave ? 'Generando...' : 'Crear llave de agente'}
               </button>
+            </div>
+
+            <div id="impresion-llave-nombre-ayuda" style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)' }}>
+              El nombre solo sirve para reconocer a qué PC pertenece la llave (por ejemplo, Agente PC Caja 1). Al crearla se muestra una sola vez: cópiala antes de cerrar el aviso. Desactivar una llave deja a esa PC sin imprimir hasta darle una nueva.
             </div>
 
             {/* Lista de llaves */}

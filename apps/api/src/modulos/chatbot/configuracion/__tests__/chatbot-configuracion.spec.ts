@@ -18,6 +18,9 @@ import { ChatbotConfiguracionController } from '../chatbot-configuracion.control
 import { PrismaService } from '../../../../comun/prisma/prisma.service';
 import { RedisService } from '../../../../comun/redis/redis.service';
 import { AuditoriaService } from '../../../auditoria/auditoria.service';
+import 'reflect-metadata';
+import { validateSync } from 'class-validator';
+import { ActualizarAntiSpamDto } from '../dto/chatbot-configuracion.dto';
 import { TEXTOS_BOT_DEFECTO, LIMITE_CUERPO_TEXTO } from '../chatbot-configuracion.tipos';
 
 describe('ChatbotConfiguracionService y Controller (Ola 4, Agente I)', () => {
@@ -587,6 +590,21 @@ describe('ChatbotConfiguracionService y Controller (Ola 4, Agente I)', () => {
 
       // 5. Claves de privacidad exactas
       expect(Object.keys(respuesta.privacidad).sort()).toEqual(['diasRetencion']);
+    });
+  });
+  describe('DTO anti-spam (compatibilidad con rangos de Protección contra spam)', () => {
+    const errores = (minuto: number, hora: number) => {
+      const d = Object.assign(new ActualizarAntiSpamDto(), { maxPorMinuto: minuto, maxPorHora: hora });
+      return validateSync(d).map((e) => e.property);
+    };
+    it('acepta los rangos 3-60 y 10-600', () => {
+      expect(errores(3, 10)).toEqual([]);
+      expect(errores(60, 600)).toEqual([]);
+    });
+    it('rechaza fuera de rango', () => {
+      expect(errores(2, 100)).toEqual(['maxPorMinuto']);
+      expect(errores(10, 9)).toEqual(['maxPorHora']);
+      expect(errores(10, 601)).toEqual(['maxPorHora']);
     });
   });
 });

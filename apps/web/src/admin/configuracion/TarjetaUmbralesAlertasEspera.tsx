@@ -5,6 +5,9 @@ import { Boton } from '../../comun/Boton';
 import { Confirmar } from '../../comun/Confirmar';
 import { Insignia } from '../../comun/Insignia';
 import { ParametroItem } from './ParametrosOperacionTab';
+import { AyudaDetalle } from './AyudaDetalle';
+import { AYUDA_PARAMETROS, idParametro } from './catalogo/parametros';
+import './configuracion-nav.css';
 
 export interface UmbralesAlertasEspera {
   alerta_voucher_min_1: number;
@@ -268,6 +271,9 @@ export function TarjetaUmbralesAlertasEspera({
             {CAMPOS_UMBRALES.map((c) => (
               <div
                 key={c.clave}
+                data-cfg-id={idParametro(c.clave)}
+                tabIndex={-1}
+                className="cfg-campo"
                 style={{
                   display: 'flex',
                   flexDirection: 'column',
@@ -296,6 +302,7 @@ export function TarjetaUmbralesAlertasEspera({
                     min={1}
                     max={180}
                     value={umbrales[c.clave]}
+                    aria-describedby={`ayuda-umbral-${c.clave}-ayuda`}
                     onChange={(e) => handleInputChange(c.clave, e.target.value)}
                     disabled={guardando}
                     style={{
@@ -318,6 +325,17 @@ export function TarjetaUmbralesAlertasEspera({
                 <span style={{ fontSize: '11px', color: 'var(--cp-soft)', marginTop: '2px' }}>
                   {c.descripcion}
                 </span>
+                <AyudaDetalle
+                  id={`ayuda-umbral-${c.clave}`}
+                  etiqueta={c.etiqueta}
+                  nombreBoton={c.clave}
+                  ayuda={AYUDA_PARAMETROS[c.clave].descripcion}
+                  unidad="minutos"
+                  rango="1 a 180"
+                  porDefecto={String(c.defecto)}
+                  efecto={AYUDA_PARAMETROS[c.clave].efecto}
+                  ejemplo={AYUDA_PARAMETROS[c.clave].ejemplo}
+                />
               </div>
             ))}
           </div>

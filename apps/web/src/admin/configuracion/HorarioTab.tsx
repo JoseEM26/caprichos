@@ -6,6 +6,7 @@ import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { Confirmar } from '../../comun/Confirmar';
 import { Insignia } from '../../comun/Insignia';
+import { AyudaBloque } from './AyudaBloque';
 
 export interface HorarioDiaItem {
   dia_semana: number;
@@ -27,6 +28,12 @@ const NOMBRES_DIAS: Record<number, string> = {
   5: 'Viernes',
   6: 'Sábado',
   7: 'Domingo',
+};
+
+/** Id del catálogo de cada fila de día (1 = lunes ... 7 = domingo); el buscador salta a la fila. */
+const ID_DIA: Record<number, string> = {
+  1: 'horario-dia-lunes', 2: 'horario-dia-martes', 3: 'horario-dia-miercoles', 4: 'horario-dia-jueves',
+  5: 'horario-dia-viernes', 6: 'horario-dia-sabado', 7: 'horario-dia-domingo',
 };
 
 export function HorarioTab({ puedeEditar }: HorarioTabProps) {
@@ -291,12 +298,20 @@ export function HorarioTab({ puedeEditar }: HorarioTabProps) {
         </div>
       )}
 
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <AyudaBloque id="horario-semanal" />
+        <AyudaBloque id="horario-dia-cerrado" />
+      </div>
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {horarios.map((h) => {
           const estaAbierto = !h.cerrado;
           return (
             <div
               key={h.dia_semana}
+              data-cfg-id={ID_DIA[h.dia_semana]}
+              tabIndex={-1}
+              className="cfg-campo"
               style={{
                 display: 'flex',
                 flexWrap: 'wrap',
@@ -422,6 +437,7 @@ export function HorarioTab({ puedeEditar }: HorarioTabProps) {
         })}
       </div>
 
+      <AyudaBloque id="horario-guardar" />
       <div
         style={{
           display: 'flex',

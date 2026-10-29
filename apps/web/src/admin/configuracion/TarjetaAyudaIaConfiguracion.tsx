@@ -5,6 +5,7 @@ import { Confirmar } from '../../comun/Confirmar';
 import { Insignia } from '../../comun/Insignia';
 import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
+import { CampoConfig } from './CampoConfig';
 
 export interface ResumenConsumoIa {
   periodo: string;
@@ -198,13 +199,13 @@ export function TarjetaAyudaIaConfiguracion({ esAdmin: esAdminProp }: TarjetaAyu
               Asistente de ayuda con IA
             </div>
             <div style={{ fontSize: '12.5px', color: 'var(--cp-soft)', marginTop: '2px' }}>
-              Capri orienta a los usuarios nuevos paso a paso sobre el funcionamiento del panel.
+              Capri orienta al personal paso a paso con los manuales del sistema. Con la IA activada responde con un modelo de OpenAI (gasta tokens); desactivada responde solo con los manuales, sin costo de IA.
             </div>
           </div>
         </div>
 
         {/* Interruptor para ADMIN */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <CampoConfig id="ayuda-capri-interruptor" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Insignia variante={activo ? 'exito' : 'neutro'}>
             {activo ? 'Activado' : 'Desactivado'}
           </Insignia>
@@ -231,7 +232,7 @@ export function TarjetaAyudaIaConfiguracion({ esAdmin: esAdminProp }: TarjetaAyu
               Solo ADMIN
             </span>
           )}
-        </div>
+        </CampoConfig>
       </div>
 
       {/* Alerta de solo lectura si no es ADMIN */}
@@ -254,6 +255,8 @@ export function TarjetaAyudaIaConfiguracion({ esAdmin: esAdminProp }: TarjetaAyu
       {/* Métricas de consumo de IA del mes */}
       {consumoIa && (
         <div
+          data-cfg-id="ayuda-capri-consumo"
+          tabIndex={-1}
           style={{
             background: 'var(--cp-cream)',
             border: '1px solid var(--cp-line)',
@@ -301,7 +304,7 @@ export function TarjetaAyudaIaConfiguracion({ esAdmin: esAdminProp }: TarjetaAyu
           </div>
 
           <div style={{ fontSize: '12px', color: 'var(--cp-soft)', lineHeight: 1.45 }}>
-            {consumoIa.llamadasTotal} consultas · {consumoIa.tokensTotal.toLocaleString()} tokens · Costo estimado: ${consumoIa.costoUsdEstimado.toFixed(4)} USD / Tope: ${consumoIa.topeMensualUsd.toFixed(2)} USD ({consumoIa.porcentajeConsumido}% consumido)
+            {consumoIa.llamadasTotal} consultas · {consumoIa.tokensTotal.toLocaleString()} tokens · Costo estimado: ${consumoIa.costoUsdEstimado.toFixed(4)} USD / Tope: ${consumoIa.topeMensualUsd.toFixed(2)} USD ({consumoIa.porcentajeConsumido}% consumido). Con el tope alcanzado Capri responde solo con los manuales; el tope se cambia en Parámetros (chatbot_ia_tope_mensual_usd).
           </div>
         </div>
       )}

@@ -11,6 +11,7 @@ import { EstadoVacio } from '../../comun/EstadoVacio';
 import { Confirmar } from '../../comun/Confirmar';
 import { Insignia } from '../../comun/Insignia';
 import { ZonasMapa, DiagnosticoZonas } from './ZonasMapa';
+import { AyudaBloque } from './AyudaBloque';
 
 export type CoordenadaPunto = [number, number];
 
@@ -478,6 +479,21 @@ function ZonasRepartoContenido() {
       >
         <b>Nota de entrega:</b> Los cambios de tarifa, estado y área rigen solo para pedidos nuevos. Los pedidos ya creados conservan su envío y su zona. El mapa usa coordenadas <code>[latitud, longitud]</code>; el editor JSON queda como respaldo avanzado.
       </div>
+
+      <details className="cfg-grupo-detalle">
+        <summary className="cfg-grupo-resumen">Ayuda: tarifas, tiempos, envío gratis y edición del mapa</summary>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <AyudaBloque id="zonas-mapa" />
+          <AyudaBloque id="zonas-tarifa" />
+          <AyudaBloque id="zonas-minutos" />
+          <AyudaBloque id="zonas-activa" />
+          <AyudaBloque id="zonas-envio-gratis" />
+          <AyudaBloque id="zonas-snap-m" />
+          <AyudaBloque id="zonas-editar-area" />
+          <AyudaBloque id="zonas-normalizar" />
+          <AyudaBloque id="zonas-poligonos" />
+        </div>
+      </details>
 
       {!puedeEditar && (
         <div

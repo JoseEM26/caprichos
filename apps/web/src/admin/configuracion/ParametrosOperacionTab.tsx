@@ -8,6 +8,9 @@ import { EstadoVacio } from '../../comun/EstadoVacio';
 import { Confirmar } from '../../comun/Confirmar';
 import { Insignia } from '../../comun/Insignia';
 import { TarjetaUmbralesAlertasEspera } from './TarjetaUmbralesAlertasEspera';
+import { AyudaDetalle } from './AyudaDetalle';
+import { AYUDA_PARAMETROS, GRUPOS_PARAMETROS, CLAVES_EN_TARJETA_UMBRALES, idParametro } from './catalogo/parametros';
+import './configuracion-nav.css';
 
 export interface ParametroItem {
   clave: string;
@@ -41,7 +44,7 @@ const OPCIONES_RECARGO_REPROG = [
   },
 ];
 
-const META_PARAMETROS: Record<string, MetaParametro> = {
+export const META_PARAMETROS: Record<string, MetaParametro> = {
   reprog_recargo_modo: {
     nombre: 'Costo de volver a enviar un pedido',
     descripcion:
@@ -670,6 +673,17 @@ export function ParametrosOperacionTab({
     return nuevoValorInput;
   };
 
+  // Secciones plegables: las claves conocidas por grupo; el resto cae en «Otros parámetros»
+  const conocidas = new Set(GRUPOS_PARAMETROS.flatMap((g) => g.claves));
+  const gruposVisibles = [
+    ...GRUPOS_PARAMETROS.map((g) => ({
+      id: g.id,
+      titulo: g.titulo,
+      items: g.claves.map((c) => parametros.find((p) => p.clave === c)).filter((p): p is ParametroItem => !!p),
+    })),
+    { id: 'otros', titulo: 'Otros parámetros', items: parametros.filter((p) => !conocidas.has(p.clave)) },
+  ].filter((g) => g.items.length > 0);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <div
@@ -718,6 +732,8 @@ export function ParametrosOperacionTab({
 
       {/* Indicador solo-lectura de estado de conexión con WhatsApp (sin exponer secretos) */}
       <div
+        data-cfg-id="parametros-estado-whatsapp"
+        tabIndex={-1}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -779,6 +795,8 @@ export function ParametrosOperacionTab({
       {consumoIa && typeof (consumoIa as any).tokensTotal === 'number' && (
         <div
           data-testid="tarjeta-consumo-ia"
+          data-cfg-id="parametros-consumo-ia"
+          tabIndex={-1}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -870,8 +888,14 @@ export function ParametrosOperacionTab({
           descripcion="No se encontraron parámetros registrados en la base de datos."
         />
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {parametros.map((p) => {
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {gruposVisibles.map((g, idx) => (
+          <details key={g.id} open={idx === 0} data-testid={`grupo-parametros-${g.id}`} style={{ border: '1px solid var(--cp-line)', borderRadius: '14px', background: 'var(--cp-cream)' }}>
+            <summary style={{ minHeight: '44px', display: 'flex', alignItems: 'center', gap: '8px', padding: '0 18px', cursor: 'pointer', fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: '15px', color: 'var(--cp-navy)' }}>
+              {g.titulo} ({g.items.length})
+            </summary>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '0 12px 12px' }}>
+          {g.items.map((p) => {
             const meta = META_PARAMETROS[p.clave] || {
               nombre: p.clave.replace(/_/g, ' '),
               descripcion: `Parámetro de configuración del sistema (${p.clave}).`,
@@ -882,6 +906,9 @@ export function ParametrosOperacionTab({
             return (
               <div
                 key={p.clave}
+                data-cfg-id={puedeEditar && CLAVES_EN_TARJETA_UMBRALES.includes(p.clave) ? undefined : idParametro(p.clave)}
+                tabIndex={-1}
+                className="cfg-campo"
                 style={{
                   display: 'flex',
                   justifyContent: 'space-between',
@@ -922,9 +949,24 @@ export function ParametrosOperacionTab({
                       <Insignia variante="aviso">Solo lectura (Cocina)</Insignia>
                     )}
                   </div>
-                  <div style={{ fontSize: '13px', color: 'var(--cp-soft)', lineHeight: '18px' }}>
-                    {meta.descripcion}
-                  </div>
+                  {AYUDA_PARAMETROS[p.clave] ? (
+                    <AyudaDetalle
+                      id={`ayuda-${idParametro(p.clave)}`}
+                      etiqueta={meta.nombre}
+                      ayuda={AYUDA_PARAMETROS[p.clave].descripcion}
+                      unidad={AYUDA_PARAMETROS[p.clave].unidad}
+                      rango={AYUDA_PARAMETROS[p.clave].rango}
+                      porDefecto={AYUDA_PARAMETROS[p.clave].porDefecto}
+                      efecto={AYUDA_PARAMETROS[p.clave].efecto}
+                      ejemplo={AYUDA_PARAMETROS[p.clave].ejemplo}
+                      nota={AYUDA_PARAMETROS[p.clave].nota}
+                      nombreBoton={p.clave}
+                    />
+                  ) : (
+                    <div style={{ fontSize: '13px', color: 'var(--cp-soft)', lineHeight: '18px' }}>
+                      {meta.descripcion}
+                    </div>
+                  )}
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
@@ -958,6 +1000,9 @@ export function ParametrosOperacionTab({
               </div>
             );
           })}
+            </div>
+          </details>
+          ))}
         </div>
       )}
 
@@ -1058,7 +1103,9 @@ export function ParametrosOperacionTab({
 
               if (tipo === 'sino') {
                 const esTrue = nuevoValorInput === 'true';
+                const ayudaSino = AYUDA_PARAMETROS[parametroEditando.clave];
                 return (
+                  <>
                   <div style={{ display: 'flex', gap: '10px' }}>
                     <button
                       type="button"
@@ -1091,6 +1138,17 @@ export function ParametrosOperacionTab({
                       No / Inactivo
                     </button>
                   </div>
+                  {ayudaSino && (
+                    <AyudaDetalle
+                      id="ayuda-edicion-parametro"
+                      etiqueta={meta?.nombre || parametroEditando.clave}
+                      nombreBoton={parametroEditando.clave}
+                      ayuda={ayudaSino.ejemplo}
+                      porDefecto={ayudaSino.porDefecto}
+                      efecto={ayudaSino.efecto}
+                    />
+                  )}
+                  </>
                 );
               }
 
@@ -1135,7 +1193,9 @@ export function ParametrosOperacionTab({
                 );
               }
 
+              const ayudaEdicion = AYUDA_PARAMETROS[parametroEditando.clave];
               return (
+                <>
                 <Campo
                   etiqueta={`Nuevo valor ${meta?.sufijo ? `(${meta.sufijo})` : ''}`}
                   type={tipo === 'numero' ? 'number' : 'text'}
@@ -1145,8 +1205,22 @@ export function ParametrosOperacionTab({
                     setErrorValidacion(null);
                     setErrorServidor(null);
                   }}
+                  aria-describedby={ayudaEdicion ? 'ayuda-edicion-parametro-ayuda' : undefined}
                   autoFocus
                 />
+                {ayudaEdicion && (
+                  <AyudaDetalle
+                    id="ayuda-edicion-parametro"
+                    etiqueta={meta?.nombre || parametroEditando.clave}
+                    nombreBoton={parametroEditando.clave}
+                    ayuda={ayudaEdicion.ejemplo}
+                    unidad={ayudaEdicion.unidad}
+                    rango={ayudaEdicion.rango}
+                    porDefecto={ayudaEdicion.porDefecto}
+                    efecto={ayudaEdicion.efecto}
+                  />
+                )}
+                </>
               );
             })()}
 

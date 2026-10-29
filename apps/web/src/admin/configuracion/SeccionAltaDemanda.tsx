@@ -4,6 +4,8 @@ import { obtenerAltaDemanda, configurarAltaDemanda } from '../cocina/cocinaApi';
 import type { AltaDemandaEstado } from '../cocina/cocinaTipos';
 import { useEventos } from '../../comun/socket';
 import { useSesion } from '../../comun/sesion';
+import { AyudaDetalle } from './AyudaDetalle';
+import './configuracion-nav.css';
 
 export const ATAJOS_MINUTOS = [5, 10, 15, 20, 30, 45, 60] as const;
 
@@ -323,6 +325,9 @@ export function SeccionAltaDemanda({
 
       {/* TARJETA 1: ESTADO ACTUAL Y AUDITORÍA */}
       <div
+        data-cfg-id="demanda-estado-actual"
+        tabIndex={-1}
+        className="cfg-campo"
         style={{
           background: 'var(--cp-white)',
           border: '1px solid var(--cp-line)',
@@ -360,8 +365,9 @@ export function SeccionAltaDemanda({
               aria-label="Ayuda sobre qué es el estado de alta demanda"
               aria-expanded={Boolean(ayudaAbierta.estado)}
               style={{
-                width: '24px',
-                height: '24px',
+                width: '44px',
+                height: '44px',
+                margin: '-10px',
                 borderRadius: '50%',
                 border: '1.5px solid var(--cp-navy)',
                 background: ayudaAbierta.estado ? 'var(--cp-navy)' : 'transparent',
@@ -447,8 +453,9 @@ export function SeccionAltaDemanda({
             aria-label="Ayuda sobre el registro de auditoría de alta demanda"
             aria-expanded={Boolean(ayudaAbierta.auditoria)}
             style={{
-              width: '20px',
-              height: '20px',
+              width: '44px',
+              height: '44px',
+              margin: '-12px',
               borderRadius: '50%',
               border: '1px solid var(--cp-soft)',
               background: 'transparent',
@@ -485,9 +492,17 @@ export function SeccionAltaDemanda({
           </div>
         )}
 
+          <AyudaDetalle
+          id="demanda-estado-actual"
+          etiqueta="Estado de la alta demanda"
+          ayuda="Resume si la alta demanda está encendida, cuántos minutos extra se anuncian y si hay pausa. Solo informa: se cambia en los pasos de abajo."
+          efecto="Cada cambio queda registrado con quién y cuándo (hora de Lima). Lo ven cocina, barra, caja y despacho al instante."
+          ejemplo="ACTIVADA (+30 min, pedidos en pausa) · Activó Ana · 29/10/2026 20:15."
+        />
+
         {/* Botón rápido para apagar si está activa */}
         {estado.activa && (
-          <div style={{ marginTop: '4px' }}>
+          <div data-cfg-id="demanda-apagar" tabIndex={-1} className="cfg-campo" style={{ marginTop: '4px' }}>
             <button
               type="button"
               disabled={!tienePermisoEditar || guardando}
@@ -513,6 +528,9 @@ export function SeccionAltaDemanda({
 
       {/* TARJETA 2: PASO 1 - TIEMPO ADICIONAL (ATAJOS Y OTRO MINUTO) */}
       <div
+        data-cfg-id="demanda-minutos-extra"
+        tabIndex={-1}
+        className="cfg-campo"
         style={{
           background: 'var(--cp-white)',
           border: '1px solid var(--cp-line)',
@@ -533,8 +551,9 @@ export function SeccionAltaDemanda({
             aria-label="Ayuda sobre los minutos adicionales de espera"
             aria-expanded={Boolean(ayudaAbierta.minutos)}
             style={{
-              width: '24px',
-              height: '24px',
+              width: '44px',
+              height: '44px',
+              margin: '-10px',
               borderRadius: '50%',
               border: '1.5px solid var(--cp-navy)',
               background: ayudaAbierta.minutos ? 'var(--cp-navy)' : 'transparent',
@@ -556,6 +575,17 @@ export function SeccionAltaDemanda({
           Elige los minutos extra que se sumarán al tiempo base de entrega. Puedes
           elegir un atajo rápido o escribir entre 5 y 180 minutos.
         </div>
+
+        <AyudaDetalle
+          id="demanda-minutos-extra"
+          etiqueta="Minutos adicionales de espera"
+          ayuda="Minutos que se suman al «Tiempo prometido de entrega» (Parámetros) en la carta virtual y el chatbot mientras la cocina está saturada. Los pedidos nuevos ven el tiempo mayor; los que ya salieron no cambian."
+          unidad="minutos"
+          rango="5 a 180"
+          porDefecto="30 al activar (0 con la alta demanda apagada)"
+          efecto="Más minutos prometen más espera al cliente y pueden hacer que algunos desistan; muy pocos minutos y se incumple lo prometido."
+          ejemplo="Con tiempo base 30 y +15, la carta anuncia 45 minutos."
+        />
 
         {ayudaAbierta.minutos && (
           <div
@@ -614,7 +644,7 @@ export function SeccionAltaDemanda({
           })}
 
           {/* Campo Otro (min) de 5 a 180 */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '4px' }}>
+          <div data-cfg-id="demanda-otro-minutos" tabIndex={-1} className="cfg-campo" style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '4px' }}>
             <label
               htmlFor="input-otro-minutos"
               style={{
@@ -635,6 +665,7 @@ export function SeccionAltaDemanda({
               value={minutosInput}
               onChange={handleCambioInput}
               aria-label="Otro (min)"
+              aria-describedby="demanda-minutos-extra-ayuda"
               style={{
                 width: '84px',
                 boxSizing: 'border-box',
@@ -674,6 +705,9 @@ export function SeccionAltaDemanda({
 
       {/* TARJETA 3: PASO 2 - MODO DE RECEPCIÓN (PAUSAR PEDIDOS) */}
       <div
+        data-cfg-id="demanda-pausa-pedidos"
+        tabIndex={-1}
+        className="cfg-campo"
         style={{
           background: 'var(--cp-white)',
           border: '1px solid var(--cp-line)',
@@ -694,8 +728,9 @@ export function SeccionAltaDemanda({
             aria-label="Ayuda sobre la pausa de pedidos"
             aria-expanded={Boolean(ayudaAbierta.pausa)}
             style={{
-              width: '24px',
-              height: '24px',
+              width: '44px',
+              height: '44px',
+              margin: '-10px',
               borderRadius: '50%',
               border: '1.5px solid var(--cp-navy)',
               background: ayudaAbierta.pausa ? 'var(--cp-navy)' : 'transparent',
@@ -717,6 +752,16 @@ export function SeccionAltaDemanda({
           La pausa detiene temporalmente la entrada de pedidos en la carta y el chatbot.
           Solo puede activarse cuando la alta demanda está activa.
         </div>
+
+        <AyudaDetalle
+          id="demanda-pausa-pedidos"
+          etiqueta="Recepción de pedidos"
+          ayuda="«Pausar pedidos» cierra la carta («Por ahora no estamos recibiendo pedidos») y el chatbot deja de tomar pedidos nuevos. «Seguir recibiendo» solo suma los minutos extra."
+          rango="Seguir recibiendo o Pausar pedidos"
+          porDefecto="Seguir recibiendo"
+          efecto="Con la pausa nadie puede pedir por carta ni WhatsApp hasta que reanudes o apagues la alta demanda; es dinero que dejas de vender. Los pedidos ya hechos siguen su curso."
+          ejemplo="Cocina desbordada: activas +30 con pausa durante 20 minutos y luego pasas a «Seguir recibiendo»."
+        />
 
         {ayudaAbierta.pausa && (
           <div
@@ -795,6 +840,9 @@ export function SeccionAltaDemanda({
 
       {/* TARJETA 4: PASO 3 - APLICAR CONFIGURACIÓN */}
       <div
+        data-cfg-id="demanda-confirmar-guardar"
+        tabIndex={-1}
+        className="cfg-campo"
         style={{
           background: 'var(--cp-white)',
           border: '1px solid var(--cp-line)',
@@ -815,8 +863,9 @@ export function SeccionAltaDemanda({
             aria-label="Ayuda sobre la confirmación de cambios"
             aria-expanded={Boolean(ayudaAbierta.confirmar)}
             style={{
-              width: '24px',
-              height: '24px',
+              width: '44px',
+              height: '44px',
+              margin: '-10px',
               borderRadius: '50%',
               border: '1.5px solid var(--cp-navy)',
               background: ayudaAbierta.confirmar ? 'var(--cp-navy)' : 'transparent',
@@ -852,6 +901,14 @@ export function SeccionAltaDemanda({
             estaba sin enviar nada a la API.
           </div>
         )}
+
+        <AyudaDetalle
+          id="demanda-confirmar-guardar"
+          etiqueta="Confirmar y guardar"
+          ayuda="Aplica los minutos extra y la pausa elegidos y avisa en vivo a carta, chatbot y áreas de trabajo. Pide confirmación Sí/No; con «No» no se envía nada. «Apagar alta demanda» quita minutos y pausa."
+          efecto="El cambio se aplica al instante a los clientes que están pidiendo."
+          ejemplo="Activar alta demanda (+30 min), confirmar «Sí, activar»."
+        />
 
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           <button

@@ -8,6 +8,9 @@ import { EstadoError } from '../../comun/EstadoError';
 import { EstadoVacio } from '../../comun/EstadoVacio';
 import { Confirmar } from '../../comun/Confirmar';
 import { Insignia } from '../../comun/Insignia';
+import { CampoAyuda } from './AyudaCampo';
+import { AyudaBloque } from './AyudaBloque';
+import { propsAyuda } from './catalogo/propsAyuda';
 
 export interface FechaEspecialItem {
   fecha: string; // YYYY-MM-DD
@@ -209,6 +212,8 @@ export function FechasEspecialesTab({ puedeEditar }: FechasEspecialesTabProps) {
         )}
       </div>
 
+      <AyudaBloque id="fechas-especiales" />
+
       {!puedeEditar && (
         <div
           role="status"
@@ -273,15 +278,8 @@ export function FechasEspecialesTab({ puedeEditar }: FechasEspecialesTabProps) {
               gap: '14px',
             }}
           >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <label
-                htmlFor="input-fecha-especial"
-                style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-navy)' }}
-              >
-                Fecha (solo futuras) *
-              </label>
+            <CampoAyuda id="input-fecha-especial" etiqueta="Fecha (solo futuras) *" cfgId="fechas-fecha" {...propsAyuda('fechas-fecha')}>
               <input
-                id="input-fecha-especial"
                 type="date"
                 min={mananaIso}
                 value={nuevaFecha}
@@ -300,10 +298,10 @@ export function FechasEspecialesTab({ puedeEditar }: FechasEspecialesTabProps) {
                   fontSize: '14px',
                 }}
               />
-            </div>
+            </CampoAyuda>
 
+            <CampoAyuda id="input-motivo-fecha" etiqueta="Motivo (se muestra al cliente)" cfgId="fechas-motivo" {...propsAyuda('fechas-motivo')}>
             <Campo
-              etiqueta="Motivo (se muestra al cliente)"
               placeholder="Ej: Feriado de Navidad, Mantenimiento..."
               value={nuevoMotivo}
               disabled={guardando}
@@ -312,12 +310,14 @@ export function FechasEspecialesTab({ puedeEditar }: FechasEspecialesTabProps) {
                 setMensajeExito(null);
               }}
             />
+            </CampoAyuda>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-navy)' }}>
               Condición de atención
             </span>
+            <AyudaBloque id="fechas-condicion" />
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
               <button
                 type="button"
@@ -354,12 +354,9 @@ export function FechasEspecialesTab({ puedeEditar }: FechasEspecialesTabProps) {
               </button>
 
               {!nuevoCerrado && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '6px' }}>
-                  <label htmlFor="nuevo-abre" style={{ fontSize: '13px', fontWeight: 700 }}>
-                    Abre
-                  </label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: '8px', marginLeft: '6px' }}>
+                  <CampoAyuda id="nuevo-abre" etiqueta="Abre" cfgId="fechas-abre" {...propsAyuda('fechas-abre')}>
                   <input
-                    id="nuevo-abre"
                     type="time"
                     value={nuevoAbre}
                     onChange={(e) => setNuevoAbre(e.target.value)}
@@ -372,12 +369,10 @@ export function FechasEspecialesTab({ puedeEditar }: FechasEspecialesTabProps) {
                       color: 'var(--cp-navy)',
                     }}
                   />
+                  </CampoAyuda>
 
-                  <label htmlFor="nuevo-cierra" style={{ fontSize: '13px', fontWeight: 700 }}>
-                    Cierra
-                  </label>
+                  <CampoAyuda id="nuevo-cierra" etiqueta="Cierra" cfgId="fechas-cierra" {...propsAyuda('fechas-cierra')}>
                   <input
-                    id="nuevo-cierra"
                     type="time"
                     value={nuevoCierra}
                     onChange={(e) => setNuevoCierra(e.target.value)}
@@ -390,6 +385,7 @@ export function FechasEspecialesTab({ puedeEditar }: FechasEspecialesTabProps) {
                       color: 'var(--cp-navy)',
                     }}
                   />
+                  </CampoAyuda>
                 </div>
               )}
             </div>
@@ -427,6 +423,7 @@ export function FechasEspecialesTab({ puedeEditar }: FechasEspecialesTabProps) {
         >
           Fechas registradas
         </h3>
+        <AyudaBloque id="fechas-quitar" />
 
         {fechas.length === 0 ? (
           <EstadoVacio

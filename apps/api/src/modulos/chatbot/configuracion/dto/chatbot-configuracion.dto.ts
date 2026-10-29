@@ -96,14 +96,14 @@ export class ActualizarFuncionesBotDto {
 export class ActualizarAntiSpamDto {
   @IsNotEmpty({ message: 'El límite máximo por minuto es obligatorio' })
   @IsNumber({}, { message: 'El límite máximo por minuto debe ser un número' })
-  @Min(1, { message: 'El límite por minuto debe ser al menos 1' })
-  @Max(60, { message: 'El límite por minuto no puede exceder 60' })
+  @Min(3, { message: 'El límite por minuto debe estar entre 3 y 60' })
+  @Max(60, { message: 'El límite por minuto debe estar entre 3 y 60' })
   maxPorMinuto!: number;
 
   @IsNotEmpty({ message: 'El límite máximo por hora es obligatorio' })
   @IsNumber({}, { message: 'El límite máximo por hora debe ser un número' })
-  @Min(5, { message: 'El límite por hora debe ser al menos 5' })
-  @Max(500, { message: 'El límite por hora no puede exceder 500' })
+  @Min(10, { message: 'El límite por hora debe estar entre 10 y 600' })
+  @Max(600, { message: 'El límite por hora debe estar entre 10 y 600' })
   maxPorHora!: number;
 }
 

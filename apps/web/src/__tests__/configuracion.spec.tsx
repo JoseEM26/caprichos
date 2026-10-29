@@ -106,7 +106,7 @@ describe('Módulo de Configuración y Zonas de reparto', () => {
       });
 
       // Inputs deshabilitados
-      const inputNombre = screen.getByLabelText(/Nombre del local/i);
+      const inputNombre = screen.getByRole('textbox', { name: /^Nombre del local$/i });
       expect(inputNombre).toBeDisabled();
 
       // Botón guardar deshabilitado

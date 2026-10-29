@@ -25,7 +25,7 @@ describe('TarjetaPantallaIngresoConfiguracion', () => {
     expect(screen.getByText(/Imágenes elegidas \(1 de 5/)).toBeInTheDocument();
     expect((screen.getByLabelText('Fantasma con café') as HTMLInputElement).checked).toBe(true);
     expect((screen.getByLabelText('Donuts de Halloween') as HTMLInputElement).checked).toBe(false);
-    expect((screen.getByLabelText(/Frase de la pantalla/i) as HTMLInputElement).value).toBe(
+    expect((screen.getByLabelText('Frase de la pantalla') as HTMLInputElement).value).toBe(
       'Hecho a mano, servido con cariño',
     );
   });
@@ -88,7 +88,7 @@ describe('TarjetaPantallaIngresoConfiguracion', () => {
     render(<TarjetaPantallaIngresoConfiguracion />);
     await waitFor(() => expect(screen.getByLabelText('Donuts de Halloween')).toBeInTheDocument());
 
-    fireEvent.change(screen.getByLabelText(/Frase de la pantalla/i), { target: { value: '  Bienvenida  ' } });
+    fireEvent.change(screen.getByLabelText('Frase de la pantalla'), { target: { value: '  Bienvenida  ' } });
     fireEvent.click(screen.getByRole('button', { name: /Guardar pantalla de ingreso/i }));
 
     expect(guardar).not.toHaveBeenCalled();
@@ -121,9 +121,9 @@ describe('TarjetaPantallaIngresoConfiguracion', () => {
     vi.spyOn(pantallaIngresoApi, 'obtenerAdmin').mockResolvedValue(configDefecto);
 
     render(<TarjetaPantallaIngresoConfiguracion />);
-    await waitFor(() => expect(screen.getByLabelText(/Frase de la pantalla/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByLabelText('Frase de la pantalla')).toBeInTheDocument());
 
-    const campo = screen.getByLabelText(/Frase de la pantalla/i);
+    const campo = screen.getByLabelText('Frase de la pantalla');
     expect(campo).toHaveAttribute('maxLength', '80');
   });
 });

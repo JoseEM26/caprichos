@@ -3,6 +3,8 @@ import { Confirmar } from '../../comun/Confirmar';
 import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
 import { ErrorApi } from '../../comun/api';
+import { CampoAyuda } from './AyudaCampo';
+import { CampoConfig } from './CampoConfig';
 import { reducirImagenVoucher } from '../vouchers/reducirImagenVoucher';
 import {
   FRASE_INGRESO_DEFECTO,
@@ -235,9 +237,12 @@ export function TarjetaPantallaIngresoConfiguracion() {
       </div>
 
       {/* Imágenes elegidas, en orden */}
-      <div style={estiloSeccion}>
+      <CampoConfig id="ingreso-carrusel" style={estiloSeccion}>
         <div style={estiloTituloSeccion}>
           Imágenes elegidas ({seleccion.length} de {MAX_IMAGENES_INGRESO}, en este orden)
+        </div>
+        <div style={{ fontSize: '12px', color: 'var(--cp-soft, #2C4C5D)' }}>
+          Estas fotos rotan en la pantalla de ingreso del personal, en este orden. Subir y Bajar cambian el orden; Quitar la saca del carrusel sin borrarla del sistema.
         </div>
         {seleccion.length === 0 && (
           <div style={{ fontSize: '12.5px', color: 'var(--cp-soft, #2C4C5D)' }}>
@@ -296,10 +301,10 @@ export function TarjetaPantallaIngresoConfiguracion() {
             </div>
           </div>
         ))}
-      </div>
+      </CampoConfig>
 
       {/* Biblioteca: fábrica y propias */}
-      <div style={estiloSeccion}>
+      <CampoConfig id="ingreso-biblioteca" style={estiloSeccion}>
         <div style={estiloTituloSeccion}>Biblioteca de imágenes</div>
         <div style={{ fontSize: '12px', color: 'var(--cp-soft, #2C4C5D)' }}>
           Marca o desmarca para usar o quitar una imagen. Quitarla no la borra del sistema.
@@ -350,7 +355,7 @@ export function TarjetaPantallaIngresoConfiguracion() {
           })}
         </div>
 
-        <div>
+        <CampoConfig id="ingreso-subir-foto">
           <label
             htmlFor="pantalla-ingreso-subir"
             style={{
@@ -382,41 +387,46 @@ export function TarjetaPantallaIngresoConfiguracion() {
             }}
           />
           <div style={{ fontSize: '11.5px', color: 'var(--cp-soft, #2C4C5D)', marginTop: '6px' }}>
-            La foto se reduce en el navegador antes de subirla.
+            Sube una foto JPG, PNG o WebP; se reduce en el navegador antes de subirla, queda en la biblioteca y se agrega al carrusel si hay lugar (máximo {MAX_IMAGENES_INGRESO}).
           </div>
-        </div>
-      </div>
+        </CampoConfig>
+      </CampoConfig>
 
       {/* Frase */}
       <div style={estiloSeccion}>
-        <label htmlFor="pantalla-ingreso-frase" style={estiloTituloSeccion}>
-          Frase de la pantalla
-        </label>
-        <input
+        <CampoAyuda
           id="pantalla-ingreso-frase"
-          type="text"
-          maxLength={MAX_FRASE_INGRESO}
-          value={frase}
-          disabled={guardando}
-          onChange={(e) => setFrase(e.target.value)}
-          placeholder={FRASE_INGRESO_DEFECTO}
-          style={{
-            width: '100%',
-            boxSizing: 'border-box',
-            minHeight: '44px',
-            borderRadius: '8px',
-            border: '1.5px solid var(--cp-line, #E3D6C6)',
-            background: 'var(--cp-white, #FFFFFF)',
-            padding: '0 10px',
-            fontSize: '13px',
-          }}
-        />
-        <div style={{ fontSize: '11.5px', color: 'var(--cp-soft, #2C4C5D)' }}>
-          {frase.length} de {MAX_FRASE_INGRESO}. Si la dejas vacía se usa la frase por defecto.
-        </div>
+          etiqueta="Frase de la pantalla"
+          ayuda={`Texto de bienvenida que ve el personal al ingresar. ${frase.length} de ${MAX_FRASE_INGRESO} caracteres. Si la dejas vacía se usa la frase por defecto.`}
+          efecto="Cambia el texto que ven todos los usuarios en la pantalla de ingreso desde su siguiente visita. No afecta el inicio de sesión."
+          ejemplo={FRASE_INGRESO_DEFECTO}
+          unidad="caracteres"
+          rango={`hasta ${MAX_FRASE_INGRESO}`}
+          porDefecto={FRASE_INGRESO_DEFECTO}
+          cfgId="ingreso-frase"
+        >
+          <input
+            type="text"
+            maxLength={MAX_FRASE_INGRESO}
+            value={frase}
+            disabled={guardando}
+            onChange={(e) => setFrase(e.target.value)}
+            placeholder={FRASE_INGRESO_DEFECTO}
+            style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              minHeight: '44px',
+              borderRadius: '8px',
+              border: '1.5px solid var(--cp-line, #E3D6C6)',
+              background: 'var(--cp-white, #FFFFFF)',
+              padding: '0 10px',
+              fontSize: '13px',
+            }}
+          />
+        </CampoAyuda>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      <CampoConfig id="ingreso-guardar" style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <Boton
           variante="primario"
           cargando={guardando}
@@ -426,7 +436,7 @@ export function TarjetaPantallaIngresoConfiguracion() {
         >
           Guardar pantalla de ingreso
         </Boton>
-      </div>
+      </CampoConfig>
 
       {mensajeExito && (
         <div role="status" style={{ color: 'var(--cp-green, #2F7A45)', fontSize: '12.5px', fontWeight: 700 }}>

@@ -6,6 +6,9 @@ import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { Confirmar } from '../../comun/Confirmar';
 import { Insignia } from '../../comun/Insignia';
+import { AyudaBloque } from './AyudaBloque';
+import { CampoAyuda } from './AyudaCampo';
+import { propsAyuda } from './catalogo/propsAyuda';
 
 export interface PagosLocal {
   efectivo: { activo: boolean };
@@ -236,9 +239,7 @@ export function PagosTab({ puedeEditar }: PagosTabProps) {
             <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: '15px' }}>
               Efectivo
             </div>
-            <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
-              Cobro en soles al momento de la entrega o en caja física.
-            </div>
+            <AyudaBloque id="pagos-pg-efe" />
           </div>
           <button
             type="button"
@@ -286,9 +287,7 @@ export function PagosTab({ puedeEditar }: PagosTabProps) {
             <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: '15px' }}>
               Tarjeta (POS inalámbrico)
             </div>
-            <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
-              El repartidor o cajero lleva el POS al cliente (sin comisiones extras).
-            </div>
+            <AyudaBloque id="pagos-pg-tarj" />
           </div>
           <button
             type="button"
@@ -343,9 +342,7 @@ export function PagosTab({ puedeEditar }: PagosTabProps) {
               <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: '15px' }}>
                 Yape
               </div>
-              <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
-                Billetera digital BCP. Se muestra el número telefónico al cliente.
-              </div>
+              <AyudaBloque id="pagos-pg-yape" />
             </div>
             <button
               type="button"
@@ -377,8 +374,8 @@ export function PagosTab({ puedeEditar }: PagosTabProps) {
 
           {pagos.yape.activo && (
             <div style={{ maxWidth: '320px', marginTop: '4px' }}>
+              <CampoAyuda id="pagos-yape-numero" etiqueta="Número de celular para Yape" cfgId="pagos-yape" {...propsAyuda('pagos-yape')}>
               <Campo
-                etiqueta="Número de celular para Yape"
                 value={pagos.yape.numero || ''}
                 placeholder="Ej: 999999999"
                 disabled={!puedeEditar || guardando}
@@ -390,6 +387,7 @@ export function PagosTab({ puedeEditar }: PagosTabProps) {
                   setMensajeGuardado(null);
                 }}
               />
+              </CampoAyuda>
             </div>
           )}
         </div>
@@ -419,9 +417,7 @@ export function PagosTab({ puedeEditar }: PagosTabProps) {
               <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: '15px' }}>
                 Plin
               </div>
-              <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
-                Billetera digital BBVA / Interbank / Scotiabank.
-              </div>
+              <AyudaBloque id="pagos-pg-plin" />
             </div>
             <button
               type="button"
@@ -453,8 +449,8 @@ export function PagosTab({ puedeEditar }: PagosTabProps) {
 
           {pagos.plin.activo && (
             <div style={{ maxWidth: '320px', marginTop: '4px' }}>
+              <CampoAyuda id="pagos-plin-numero" etiqueta="Número de celular para Plin" cfgId="pagos-plin" {...propsAyuda('pagos-plin')}>
               <Campo
-                etiqueta="Número de celular para Plin"
                 value={pagos.plin.numero || ''}
                 placeholder="Ej: 999999999"
                 disabled={!puedeEditar || guardando}
@@ -466,6 +462,7 @@ export function PagosTab({ puedeEditar }: PagosTabProps) {
                   setMensajeGuardado(null);
                 }}
               />
+              </CampoAyuda>
             </div>
           )}
         </div>
@@ -495,9 +492,7 @@ export function PagosTab({ puedeEditar }: PagosTabProps) {
               <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: '15px' }}>
                 Transferencia bancaria
               </div>
-              <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
-                Cuenta bancaria del negocio para transferencias directas.
-              </div>
+              <AyudaBloque id="pagos-pg-transf" />
             </div>
             <button
               type="button"
@@ -539,8 +534,8 @@ export function PagosTab({ puedeEditar }: PagosTabProps) {
                 marginTop: '4px',
               }}
             >
+              <CampoAyuda id="pagos-banco-nombre" etiqueta="Banco" cfgId="pagos-banco" {...propsAyuda('pagos-banco')}>
               <Campo
-                etiqueta="Banco"
                 value={pagos.transferencia.banco || ''}
                 placeholder="Ej: BCP, Interbank..."
                 disabled={!puedeEditar || guardando}
@@ -555,9 +550,10 @@ export function PagosTab({ puedeEditar }: PagosTabProps) {
                   setMensajeGuardado(null);
                 }}
               />
+              </CampoAyuda>
 
+              <CampoAyuda id="pagos-cuenta-numero" etiqueta="Número de cuenta o CCI" cfgId="pagos-cuenta" {...propsAyuda('pagos-cuenta')}>
               <Campo
-                etiqueta="Número de cuenta o CCI"
                 value={pagos.transferencia.cuenta || ''}
                 placeholder="Ej: 191-12345678-0-12"
                 disabled={!puedeEditar || guardando}
@@ -572,11 +568,13 @@ export function PagosTab({ puedeEditar }: PagosTabProps) {
                   setMensajeGuardado(null);
                 }}
               />
+              </CampoAyuda>
             </div>
           )}
         </div>
       </div>
 
+      <AyudaBloque id="pagos-guardar" />
       <div
         style={{
           display: 'flex',

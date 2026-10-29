@@ -7,6 +7,8 @@ import { Cargando } from '../../comun/Cargando';
 import { ErrorApi } from '../../comun/api';
 import { vouchersApi, ResumenConsumoVoucherIa } from '../vouchers/vouchersApi';
 import { ParametrosVoucherConfig } from '../vouchers/tipos';
+import { CampoAyuda } from './AyudaCampo';
+import { CampoConfig } from './CampoConfig';
 
 export interface TarjetaVouchersIaConfiguracionProps {
   esAdmin?: boolean;
@@ -229,13 +231,13 @@ export function TarjetaVouchersIaConfiguracion({
               Lectura de vouchers con IA
             </div>
             <div style={{ fontSize: '12.5px', color: 'var(--cp-soft, #2C4C5D)', marginTop: '2px' }}>
-              Extracción automática de montos y operaciones de Yape y Plin mediante visión.
+              La IA lee la foto del voucher de Yape o Plin y propone monto, titular y número destino con un semáforo. Apagada, Caja revisa todos los vouchers a mano. La persona siempre decide.
             </div>
           </div>
         </div>
 
         {/* Interruptor para ADMIN */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <CampoConfig id="vouchers-ia-interruptor" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Insignia variante={activo ? 'exito' : 'neutro'}>
             {activo ? 'Activado' : 'Desactivado'}
           </Insignia>
@@ -263,7 +265,7 @@ export function TarjetaVouchersIaConfiguracion({
               Solo ADMIN
             </span>
           )}
-        </div>
+        </CampoConfig>
       </div>
 
       {/* Alerta de solo lectura si no es ADMIN */}
@@ -308,113 +310,101 @@ export function TarjetaVouchersIaConfiguracion({
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
           {/* Titular */}
           <div>
-            <label
-              htmlFor="voucher-titular"
-              style={{
-                display: 'block',
-                fontSize: '12px',
-                fontWeight: 700,
-                color: 'var(--cp-navy, #0B2C3E)',
-                marginBottom: '4px',
-              }}
-            >
-              Titular de la cuenta
-            </label>
-            <input
+            <CampoAyuda
               id="voucher-titular"
-              data-testid="input-voucher-titular"
-              type="text"
-              disabled={!esAdmin || guardando}
-              value={titularNombre}
-              onChange={(e) => setTitularNombre(e.target.value)}
-              placeholder="Ejemplo: Kevin"
-              style={{
-                width: '100%',
-                boxSizing: 'border-box',
-                minHeight: '40px',
-                borderRadius: '8px',
-                border: '1.5px solid var(--cp-line, #E3D6C6)',
-                background: 'var(--cp-white, #FFFFFF)',
-                padding: '0 10px',
-                fontSize: '13px',
-              }}
-            />
+              etiqueta="Titular de la cuenta"
+              ayuda="Nombre de quien recibe los pagos. Se compara con el nombre que la IA lee en el voucher."
+              efecto="Si no coincide con el voucher, este se marca como dudoso y Caja lo revisa con más cuidado. Cambia desde la siguiente lectura; los vouchers ya leídos no se recalculan."
+              ejemplo="Maria Morillo"
+              cfgId="vouchers-titular"
+            >
+              <input
+                data-testid="input-voucher-titular"
+                type="text"
+                disabled={!esAdmin || guardando}
+                value={titularNombre}
+                onChange={(e) => setTitularNombre(e.target.value)}
+                placeholder="Ejemplo: Kevin"
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  minHeight: '44px',
+                  borderRadius: '8px',
+                  border: '1.5px solid var(--cp-line, #E3D6C6)',
+                  background: 'var(--cp-white, #FFFFFF)',
+                  padding: '0 10px',
+                  fontSize: '13px',
+                }}
+              />
+            </CampoAyuda>
           </div>
 
           {/* Número Yape */}
           <div>
-            <label
-              htmlFor="voucher-yape"
-              style={{
-                display: 'block',
-                fontSize: '12px',
-                fontWeight: 700,
-                color: 'var(--cp-navy, #0B2C3E)',
-                marginBottom: '4px',
-              }}
-            >
-              Número Yape (destino)
-            </label>
-            <input
+            <CampoAyuda
               id="voucher-yape"
-              data-testid="input-voucher-yape"
-              type="text"
-              disabled={!esAdmin || guardando}
-              value={yapeNumero}
-              onChange={(e) => setYapeNumero(e.target.value)}
-              placeholder="946388934"
-              style={{
-                width: '100%',
-                boxSizing: 'border-box',
-                minHeight: '40px',
-                borderRadius: '8px',
-                border: '1.5px solid var(--cp-line, #E3D6C6)',
-                background: 'var(--cp-white, #FFFFFF)',
-                padding: '0 10px',
-                fontSize: '13px',
-              }}
-            />
+              etiqueta="Número Yape (destino)"
+              ayuda="Celular al que los clientes deben yapear. Se compara con el número destino que la IA lee en el voucher."
+              efecto="Un voucher hecho a otro número se marca como dudoso. Si lo cambias, los clientes deben yapear al número nuevo. Aplica desde la siguiente lectura."
+              ejemplo="946388934"
+              cfgId="vouchers-yape-numero"
+            >
+              <input
+                data-testid="input-voucher-yape"
+                type="text"
+                disabled={!esAdmin || guardando}
+                value={yapeNumero}
+                onChange={(e) => setYapeNumero(e.target.value)}
+                placeholder="946388934"
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  minHeight: '44px',
+                  borderRadius: '8px',
+                  border: '1.5px solid var(--cp-line, #E3D6C6)',
+                  background: 'var(--cp-white, #FFFFFF)',
+                  padding: '0 10px',
+                  fontSize: '13px',
+                }}
+              />
+            </CampoAyuda>
           </div>
 
           {/* Número Plin */}
           <div>
-            <label
-              htmlFor="voucher-plin"
-              style={{
-                display: 'block',
-                fontSize: '12px',
-                fontWeight: 700,
-                color: 'var(--cp-navy, #0B2C3E)',
-                marginBottom: '4px',
-              }}
-            >
-              Número Plin (destino)
-            </label>
-            <input
+            <CampoAyuda
               id="voucher-plin"
-              data-testid="input-voucher-plin"
-              type="text"
-              disabled={!esAdmin || guardando}
-              value={plinNumero}
-              onChange={(e) => setPlinNumero(e.target.value)}
-              placeholder="946388934"
-              style={{
-                width: '100%',
-                boxSizing: 'border-box',
-                minHeight: '40px',
-                borderRadius: '8px',
-                border: '1.5px solid var(--cp-line, #E3D6C6)',
-                background: 'var(--cp-white, #FFFFFF)',
-                padding: '0 10px',
-                fontSize: '13px',
-              }}
-            />
+              etiqueta="Número Plin (destino)"
+              ayuda="Celular al que los clientes deben hacer plin. Se compara con el número destino que la IA lee en el voucher."
+              efecto="Un voucher hecho a otro número se marca como dudoso. Si lo cambias, los clientes deben hacer plin al número nuevo. Aplica desde la siguiente lectura."
+              ejemplo="946388934"
+              cfgId="vouchers-plin-numero"
+            >
+              <input
+                data-testid="input-voucher-plin"
+                type="text"
+                disabled={!esAdmin || guardando}
+                value={plinNumero}
+                onChange={(e) => setPlinNumero(e.target.value)}
+                placeholder="946388934"
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  minHeight: '44px',
+                  borderRadius: '8px',
+                  border: '1.5px solid var(--cp-line, #E3D6C6)',
+                  background: 'var(--cp-white, #FFFFFF)',
+                  padding: '0 10px',
+                  fontSize: '13px',
+                }}
+              />
+            </CampoAyuda>
           </div>
         </div>
 
         {/* Botón Guardar cambios de campos */}
         {esAdmin && (
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
+          <CampoConfig id="vouchers-guardar-datos" style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
             <Boton
               variante="primario"
               cargando={guardando}
@@ -423,7 +413,7 @@ export function TarjetaVouchersIaConfiguracion({
             >
               Guardar datos de cuentas
             </Boton>
-          </div>
+          </CampoConfig>
         )}
       </div>
 
@@ -431,6 +421,8 @@ export function TarjetaVouchersIaConfiguracion({
       {consumoIa && (
         <div
           data-testid="consumo-ia-mes-vouchers"
+          data-cfg-id="vouchers-ia-consumo"
+          tabIndex={-1}
           style={{
             background: 'var(--cp-cream, #FBF4EC)',
             border: '1px solid var(--cp-line, #E3D6C6)',
@@ -479,6 +471,21 @@ export function TarjetaVouchersIaConfiguracion({
           </div>
         </div>
       )}
+
+      <CampoConfig
+        id="vouchers-ia-corte"
+        style={{
+          fontSize: '12px',
+          color: 'var(--cp-soft, #2C4C5D)',
+          background: 'var(--cp-white, #FFFFFF)',
+          padding: '8px 12px',
+          borderRadius: '8px',
+          border: '1px dashed var(--cp-line, #E3D6C6)',
+          lineHeight: 1.4,
+        }}
+      >
+        <b>Corte automático:</b> si la IA falla tres veces seguidas por saldo o clave (o cinco errores), se corta unos minutos y los vouchers se guardan sin lectura para que Caja los revise a mano; luego una lectura de prueba decide si se reanuda. Los minutos se cambian en Parámetros (voucher_ia_corte_min, por defecto 10).
+      </CampoConfig>
 
       {/* Regla de oro visual */}
       <div

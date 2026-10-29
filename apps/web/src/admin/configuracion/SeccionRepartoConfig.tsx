@@ -4,6 +4,10 @@ import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { Confirmar } from '../../comun/Confirmar';
+import { CampoConfig } from './CampoConfig';
+import { AyudaDetalle } from './AyudaDetalle';
+import { AYUDA_REPARTO } from './catalogo/reparto';
+import './configuracion-nav.css';
 
 export interface ConfigRepartoData {
   retrasadoMin: number;
@@ -76,7 +80,7 @@ const CAMPOS_REPARTO: CampoConfigItem[] = [
     key: 'maxPedidos',
     label: 'Máximo de pedidos por repartidor',
     ayuda:
-      'Cantidad máxima de órdenes de entrega simultáneas que puede trasladar un repartidor (hasta 3 por defecto).',
+      'Cantidad máxima de órdenes de entrega simultáneas que puede trasladar un repartidor (5 por defecto).',
     min: 1,
     max: 20,
     sufijo: 'pedidos',
@@ -282,7 +286,7 @@ export function SeccionRepartoConfig({ puedeEditar }: SeccionRepartoConfigProps)
           gap: '14px',
         }}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <CampoConfig id="reparto-alertas-color" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <div
             style={{
               fontFamily: 'Montserrat, sans-serif',
@@ -304,16 +308,21 @@ export function SeccionRepartoConfig({ puedeEditar }: SeccionRepartoConfigProps)
             palpitando), velocidad promedio para estimación de ruta y límite de pedidos
             por repartidor.
           </div>
-        </div>
+        </CampoConfig>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {CAMPOS_REPARTO.map((campo) => {
             const valor = config[campo.key] as number;
             const ayudaAbierta = Boolean(ayudasAbiertas[campo.key]);
 
+            const info = AYUDA_REPARTO[campo.key];
+
             return (
               <div
                 key={campo.key}
+                data-cfg-id={info.id}
+                tabIndex={-1}
+                className="cfg-campo"
                 style={{
                   background: 'var(--cp-white, #FFFFFF)',
                   border: '1px solid var(--cp-line, #E2D7C3)',
@@ -371,8 +380,9 @@ export function SeccionRepartoConfig({ puedeEditar }: SeccionRepartoConfigProps)
                       aria-label={`Explicación de ${campo.label}`}
                       aria-expanded={ayudaAbierta}
                       style={{
-                        width: '22px',
-                        height: '22px',
+                        width: '44px',
+                        height: '44px',
+                        margin: '-11px 0',
                         borderRadius: '50%',
                         border: '1px solid var(--cp-line, #E2D7C3)',
                         background: ayudaAbierta
@@ -405,6 +415,7 @@ export function SeccionRepartoConfig({ puedeEditar }: SeccionRepartoConfigProps)
                   >
                     <input
                       id={`campo-${campo.key}`}
+                      aria-describedby={`${info.id}-ayuda`}
                       type="number"
                       min={campo.min}
                       max={campo.max}
@@ -413,7 +424,7 @@ export function SeccionRepartoConfig({ puedeEditar }: SeccionRepartoConfigProps)
                       onChange={(e) => handleNumeroChange(campo.key, e.target.value)}
                       style={{
                         width: '90px',
-                        height: '38px',
+                        height: '44px',
                         padding: '0 10px',
                         borderRadius: '8px',
                         border: '1.5px solid var(--cp-line, #E2D7C3)',
@@ -440,6 +451,17 @@ export function SeccionRepartoConfig({ puedeEditar }: SeccionRepartoConfigProps)
                   </div>
                 </div>
 
+                <AyudaDetalle
+                  id={info.id}
+                  etiqueta={campo.label}
+                  ayuda={info.descripcion}
+                  porDefecto={info.porDefecto}
+                  unidad={info.unidad}
+                  rango={info.rango}
+                  efecto={info.efecto}
+                  ejemplo={info.ejemplo}
+                />
+
                 {ayudaAbierta && (
                   <div
                     style={{
@@ -459,6 +481,12 @@ export function SeccionRepartoConfig({ puedeEditar }: SeccionRepartoConfigProps)
             );
           })}
         </div>
+
+        <CampoConfig id="reparto-mensajes-whatsapp" className="cfg-ayuda-texto">
+          Los mensajes de WhatsApp de «En camino», «He llegado» y espera agotada se encienden o apagan en la pestaña
+          Parámetros de operación (Avisos automáticos por WhatsApp), y los minutos de espera en la puerta en
+          «Entrega fallida y reprogramación». Aquí no se editan.
+        </CampoConfig>
 
         {errorValidacion && (
           <div

@@ -126,19 +126,15 @@ describe('ChatbotConfiguracionTab (Ola 4, Agente I: Configuración y Seguridad d
     expect(screen.getByText('Derivación al no entender')).toBeInTheDocument();
     expect(screen.getByText('Indicación de pago')).toBeInTheDocument();
 
-    // Tarjeta 4: Anti-spam
-    expect(screen.getByTestId('seccion-antispam')).toBeInTheDocument();
-    expect(
-      screen.getByLabelText(/Máximo mensajes por minuto/i),
-    ).toHaveValue(10);
-    expect(
-      screen.getByLabelText(/Máximo mensajes por hora/i),
-    ).toHaveValue(60);
+    // Tarjeta 4: los límites por minuto/hora ya NO se editan aquí (solo en Protección contra spam)
+    expect(screen.queryByTestId('seccion-antispam')).not.toBeInTheDocument();
+    expect(screen.queryByText('Guardar límites anti-spam')).not.toBeInTheDocument();
+    expect(screen.getByTestId('tarjeta-proteccion-spam')).toBeInTheDocument();
 
     // Tarjeta 5: Privacidad Ley 29733
     expect(screen.getByTestId('seccion-privacidad')).toBeInTheDocument();
     expect(
-      screen.getByLabelText(/Días de retención de mensajes/i),
+      screen.getByLabelText('Días de retención de mensajes'),
     ).toHaveValue(90);
     expect(
       screen.getByText(/Gestión ARCO: Exportación y baja de cliente/i),
@@ -319,47 +315,21 @@ describe('ChatbotConfiguracionTab (Ola 4, Agente I: Configuración y Seguridad d
     });
   });
 
-  it('6. actualiza parámetros de control anti-spam con confirmación y campos reales', async () => {
+  it('6. el anti-spam por minuto y hora se edita solo en Protección contra spam (una única tarjeta)', async () => {
     mockApiGetExitoso();
-    const spyPut = vi.spyOn(api, 'put').mockResolvedValueOnce({
-      maxPorMinuto: 15,
-      maxPorHora: 80,
-    });
+    const spyPut = vi.spyOn(api, 'put');
 
     render(<ChatbotConfiguracionTab puedeVer={true} puedeEditar={true} />);
 
     await waitFor(() => {
-      expect(screen.getByLabelText(/Máximo mensajes por minuto/i)).toBeInTheDocument();
+      expect(screen.getByTestId('tarjeta-proteccion-spam')).toBeInTheDocument();
     });
-
-    fireEvent.change(screen.getByLabelText(/Máximo mensajes por minuto/i), {
-      target: { value: '15' },
-    });
-    fireEvent.change(screen.getByLabelText(/Máximo mensajes por hora/i), {
-      target: { value: '80' },
-    });
-
-    const botonGuardar = screen.getByText('Guardar límites anti-spam');
-    fireEvent.click(botonGuardar);
-
-    expect(
-      screen.getByText(/¿Deseas actualizar los límites de frecuencia anti-spam en Redis/i),
-    ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByText('Sí, confirmar'));
-
-    await waitFor(() => {
-      expect(spyPut).toHaveBeenCalledWith(
-        '/admin/chatbot/configuracion/anti-spam',
-        { maxPorMinuto: 15, maxPorHora: 80 },
-      );
-    });
-
-    await waitFor(() => {
-      expect(
-        screen.getByText(/Parámetros de control anti-spam actualizados correctamente/i),
-      ).toBeInTheDocument();
-    });
+    // no hay campos duplicados de la tarjeta vieja
+    expect(screen.queryByLabelText('Máximo mensajes por minuto')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Máximo mensajes por hora')).not.toBeInTheDocument();
+    expect(screen.getAllByLabelText('Mensajes por minuto')).toHaveLength(1);
+    expect(screen.getAllByLabelText('Mensajes por hora')).toHaveLength(1);
+    expect(spyPut).not.toHaveBeenCalled();
   });
 
   it('7. actualiza el plazo de retención en días con confirmación', async () => {
@@ -371,10 +341,10 @@ describe('ChatbotConfiguracionTab (Ola 4, Agente I: Configuración y Seguridad d
     render(<ChatbotConfiguracionTab puedeVer={true} puedeEditar={true} />);
 
     await waitFor(() => {
-      expect(screen.getByLabelText(/Días de retención de mensajes/i)).toBeInTheDocument();
+      expect(screen.getByLabelText('Días de retención de mensajes')).toBeInTheDocument();
     });
 
-    fireEvent.change(screen.getByLabelText(/Días de retención de mensajes/i), {
+    fireEvent.change(screen.getByLabelText('Días de retención de mensajes'), {
       target: { value: '60' },
     });
 
@@ -475,12 +445,12 @@ describe('ChatbotConfiguracionTab (Ola 4, Agente I: Configuración y Seguridad d
 
     await waitFor(() => {
       expect(
-        screen.getByLabelText(/Número de teléfono o identificador/i),
+        screen.getByLabelText('Número de teléfono o identificador'),
       ).toBeInTheDocument();
     });
 
     fireEvent.change(
-      screen.getByLabelText(/Número de teléfono o identificador/i),
+      screen.getByLabelText('Número de teléfono o identificador'),
       { target: { value: '987654321' } },
     );
 
@@ -513,12 +483,12 @@ describe('ChatbotConfiguracionTab (Ola 4, Agente I: Configuración y Seguridad d
 
     await waitFor(() => {
       expect(
-        screen.getByLabelText(/Número de teléfono o identificador/i),
+        screen.getByLabelText('Número de teléfono o identificador'),
       ).toBeInTheDocument();
     });
 
     fireEvent.change(
-      screen.getByLabelText(/Número de teléfono o identificador/i),
+      screen.getByLabelText('Número de teléfono o identificador'),
       { target: { value: '987654321' } },
     );
 
@@ -574,7 +544,6 @@ describe('ChatbotConfiguracionTab (Ola 4, Agente I: Configuración y Seguridad d
     const botonesGuardarTexto = screen.getAllByText('Guardar texto');
     expect(botonesGuardarTexto[0]).toBeDisabled();
 
-    expect(screen.getByText('Guardar límites anti-spam')).toBeDisabled();
     expect(screen.getByText('Guardar plazo')).toBeDisabled();
     expect(screen.getByText('Ejecutar anonimización ahora')).toBeDisabled();
     expect(screen.getByText('Dar de baja y anonimizar')).toBeDisabled();
