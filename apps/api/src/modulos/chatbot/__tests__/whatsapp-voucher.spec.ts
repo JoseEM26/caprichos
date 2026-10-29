@@ -184,6 +184,21 @@ describe('Comprobante de WhatsApp: siempre se guarda y se analiza', () => {
     expect(motor.procesarMensajeEntrante).not.toHaveBeenCalled();
   });
 
+  it('una reaccion (emoji) se registra en el chat pero no llega al motor', async () => {
+    const payload: any = payloadImagen('51987654321');
+    payload.entry[0].changes[0].value.messages[0] = {
+      id: 'wamid.REACC', from: '51987654321', type: 'reaction', reaction: { emoji: '👍', message_id: 'wamid.X' },
+    };
+
+    await webhook.procesarPayload(payload);
+    await flush();
+
+    expect(motor.procesarMensajeEntrante).not.toHaveBeenCalled();
+    expect(prisma.mensajeChat.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ contenido: { texto: 'Reaccionó con 👍' } }) }),
+    );
+  });
+
   it('imagen sin pedido asociado: se guarda igual (pedido_id null) y se analiza', async () => {
     pedidoPorTelefono = null;
 

@@ -343,6 +343,11 @@ export class WhatsappWebhookService {
       if (msg.image?.id) {
         imagenBuffer = await this.descargarMediaSegura(msg.image.id, imagenMime);
       }
+    } else if (tipo === 'reaction') {
+      // Un emoji sobre un mensaje no es una respuesta: se muestra en el chat pero no avanza el flujo.
+      tipoRegistro = 'OTRO';
+      const emoji = String(msg.reaction?.emoji || '').trim();
+      texto = emoji ? `Reaccionó con ${emoji}` : 'Quitó su reacción';
     } else {
       tipoRegistro = 'OTRO';
       texto = `[Mensaje de tipo ${tipo}]`;
@@ -546,6 +551,8 @@ export class WhatsappWebhookService {
 
     // Notificar por websocket a la consola de mensajes
     this.eventos?.emitirAdmin('mensajes:actualizado', { id: conversacion.id.toString() });
+
+    if (tipo === 'reaction') return true;
 
     // Acuse del voucher por el outbox (registrado en el chat). No aprueba nada: Caja revisa el pago.
     if (voucherAtendido && pedidoVoucher && telefonoNorm && this.outbox) {
