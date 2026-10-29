@@ -130,6 +130,48 @@ describe('ClientesService', () => {
     service = module.get<ClientesService>(ClientesService);
   });
 
+  describe('listarAdmin: búsqueda por DNI parcial y nombre', () => {
+    const rol = (id: number, nombres: string, dni: string) => ({
+      id: BigInt(id),
+      rol: 'CLIENTE',
+      hasta: null,
+      customer_detail: { puntos: 5, envio_tipo: null, envio_valor: null },
+      party: {
+        id: BigInt(id),
+        estado: 'ACTIVO',
+        tipo: 'PERSONA',
+        usuario: null,
+        persona: { nombres, apellidos: 'Test', correo: null, cumple_dia: null, cumple_mes: null },
+        documentos: [{ tipo: 'DNI', numero: dni }],
+        contactos: [],
+        pedidos: [],
+      },
+    });
+
+    beforeEach(() => {
+      prismaMock.partyRole.findMany = jest.fn().mockResolvedValue([
+        rol(1, 'Ana', '45217890'),
+        rol(2, 'Luis', '71234567'),
+      ]);
+    });
+
+    it('busca por DNI parcial aunque la respuesta lo enmascare para un no admin', async () => {
+      const res = await service.listarAdmin({ q: '4521' }, { rol: 'MOZO' });
+      expect(res.items.map((i) => i.nombre)).toEqual(['Ana']);
+      expect(res.items[0].dni).toBe('4521****');
+    });
+
+    it('busca por nombre sin distinguir mayusculas', async () => {
+      const res = await service.listarAdmin({ q: 'LUIS' }, { rol: 'MOZO' });
+      expect(res.items.map((i) => i.nombre)).toEqual(['Luis']);
+    });
+
+    it('sin coincidencias devuelve lista vacía', async () => {
+      const res = await service.listarAdmin({ q: '99999999' }, { rol: 'MOZO' });
+      expect(res.items).toEqual([]);
+    });
+  });
+
   describe('utilidades', () => {
     it('enmascararDoc enmascara DNI mostrando primeros 4 dígitos y ****', () => {
       expect(enmascararDoc('45217890')).toBe('4521****');

@@ -818,10 +818,13 @@ export class ClientesService {
       orderBy: { id: 'desc' },
     });
 
+    // DNI sin enmascarar, solo para buscar; no sale en la respuesta a menos que sea admin
+    const docPorId = new Map<string, string>();
     let items: ClienteAdminListItem[] = roles.map((r) => {
       const p = r.party;
       const dniDoc = p.documentos.find((d: any) => d.tipo === 'DNI' || d.tipo === 'RUC');
       const docNum = dniDoc?.numero || '';
+      docPorId.set(p.id.toString(), docNum);
 
       // Tipo de cliente
       let tipo: 'Persona' | 'Empresa' | 'Personal' = 'Persona';
@@ -873,7 +876,7 @@ export class ClientesService {
       items = items.filter(
         (it) =>
           it.nombre.toLowerCase().includes(q) ||
-          it.dni.toLowerCase().includes(q) ||
+          (docPorId.get(it.id) ?? '').includes(q) ||
           it.telefono.includes(q) ||
           it.correo.toLowerCase().includes(q),
       );
