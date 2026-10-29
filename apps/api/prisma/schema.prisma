@@ -1822,7 +1822,7 @@ model SalienteWhatsapp {
   id                 BigInt    @id @default(autoincrement())
   secuencia          BigInt    @unique @default(autoincrement())
   telefono_destino   String
-  tipo               String    // TEXTO | PLANTILLA (CHECK en BD)
+  tipo               String    // TEXTO | PLANTILLA | INTERACTIVO (CHECK en BD)
   carga              Json      @default("{}")
   clave_idempotencia String    @unique
   estado             String    @default("PENDIENTE") // PENDIENTE | ENVIANDO | ENVIADO | FALLIDO | DESCARTADO (CHECK en BD)

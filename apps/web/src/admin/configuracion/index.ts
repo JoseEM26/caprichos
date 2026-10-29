@@ -10,3 +10,4 @@ export * from './SeccionAltaDemanda';
 export * from './ChatbotConfiguracionTab';
 export * from './TarjetaAyudaIaConfiguracion';
 export * from './TarjetaUmbralesAlertasEspera';
+export * from './TarjetaProteccionSpam';

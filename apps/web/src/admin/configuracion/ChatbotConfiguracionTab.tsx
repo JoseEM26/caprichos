@@ -5,6 +5,7 @@ import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { Confirmar } from '../../comun/Confirmar';
 import { Insignia } from '../../comun/Insignia';
+import { TarjetaProteccionSpam } from './TarjetaProteccionSpam';
 
 export const LIMITE_WHATSAPP_CUERPO = 1024;
 
@@ -1111,6 +1112,8 @@ function ChatbotConfiguracionVista({
           </Boton>
         </div>
       </div>
+
+      <TarjetaProteccionSpam esAdmin={puedeEditar} />
 
       {/* TARJETA 5: Privacidad Ley 29733 */}
       <div

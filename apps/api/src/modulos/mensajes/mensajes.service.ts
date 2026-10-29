@@ -21,6 +21,8 @@ import { MATRIZ } from '../acceso/permisos';
 import { BOTONES_PAGO_RECHAZADO, TEXTOS_PAGO } from '../chatbot/conversacion/flujos/pago/textos-pago';
 import { TEXTOS_CAMBIOS } from '../chatbot/conversacion/flujos/cambios/textos-cambios';
 import { exigirCajaAbiertaHoy } from '../caja/caja.calculo';
+import { leerBloqueosSpam } from '../chatbot/configuracion/bloqueo-spam.util';
+import { MOTIVO_BLOQUEO_SPAM } from '../chatbot/configuracion/chatbot-configuracion.service';
 
 export type EstadoChat = 'bot' | 'atencion' | 'validar' | 'atendido' | 'pausado';
 export type FiltroChat = 'todos' | 'atender' | 'bot' | 'atendidos';
@@ -152,11 +154,29 @@ export class MensajesService {
     return true;
   }
 
+  /**
+   * Estado real del bloqueo por spam: el que dice Redis (caduca solo por TTL). null si Redis no responde.
+   * La marca motivo_derivacion=BLOQUEADO_SPAM es solo informativa: si el bloqueo caducó, se limpia aquí.
+   */
+  private async bloqueosSpam(convs: { id: bigint; telefono: string; motivo_derivacion?: string | null }[]) {
+    const mapa = await leerBloqueosSpam(this.redisService?.obtenerCliente(), convs.map((c) => c.telefono));
+    if (mapa) {
+      const caducados = convs.filter((c) => c.motivo_derivacion === MOTIVO_BLOQUEO_SPAM && !mapa.get(c.telefono)?.activo);
+      if (caducados.length) {
+        void this.prisma.conversacion
+          .updateMany({ where: { id: { in: caducados.map((c) => c.id) }, motivo_derivacion: MOTIVO_BLOQUEO_SPAM }, data: { motivo_derivacion: null } })
+          .catch(() => undefined);
+      }
+    }
+    return mapa;
+  }
+
   async listar(filtro: FiltroChat = 'todos', q = '') {
     const todas = await this.prisma.conversacion.findMany({
       orderBy: { ultima_actividad: 'desc' },
       include: { ...this.incluir, mensajes: { orderBy: { en: 'desc' }, take: 20 } },
     });
+    const bloqueos = await this.bloqueosSpam(todas);
     const filas = todas.map((c) => {
       const estado = estadoDe(c);
       const ult = c.mensajes[0];
@@ -178,6 +198,7 @@ export class MensajesService {
         hora: ult ? hora(ult.en) : hora(c.ultima_actividad),
         ultimaActividadDate: c.ultima_actividad,
         sinLeer,
+        bloqueoSpam: bloqueos?.get(c.telefono) ?? null,
       };
     });
     const cuenta = (g: Exclude<FiltroChat, 'todos'>) => filas.filter((f) => GRUPOS[g].includes(f.estado)).length;
@@ -200,7 +221,13 @@ export class MensajesService {
       });
     }
     return {
-      conteos: { todos: filas.length, atender: cuenta('atender'), bot: cuenta('bot'), atendidos: cuenta('atendidos') },
+      conteos: {
+        todos: filas.length,
+        atender: cuenta('atender'),
+        bot: cuenta('bot'),
+        atendidos: cuenta('atendidos'),
+        bloqueadosSpam: filas.filter((f) => f.bloqueoSpam?.activo).length,
+      },
       chats,
     };
   }
@@ -375,7 +402,9 @@ export class MensajesService {
             hora: hora(solicitud.creado_en),
           }
         : null,
-      motivoDerivacion: c.motivo_derivacion || (c.flujo as any)?.motivoDerivacion || null,
+      motivoDerivacion:
+        (c.motivo_derivacion !== MOTIVO_BLOQUEO_SPAM ? c.motivo_derivacion : null) || (c.flujo as any)?.motivoDerivacion || null,
+      bloqueoSpam: (await this.bloqueosSpam([c]))?.get(c.telefono) ?? null,
       solicitudReserva: solicitudReserva
         ? {
             id: solicitudReserva.id.toString(),

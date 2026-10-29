@@ -1,3 +1,4 @@
+import { interactivoDesdeContenido } from './interactivo.util';
 import {
   BadRequestException,
   ForbiddenException,
@@ -772,16 +773,20 @@ export class WhatsappWebhookService {
         p.clasificacion.subtipo === 'document' &&
         (estado === 'VALIDAR_PAGO' ||
           Boolean(await pedidoEsperandoVoucher(this.prisma, p.conversacion.flujo, p.telefonoNorm)));
-      const repeticion = armarTextoRepeticion(await this.ultimoPromptDelBot(p.conversacion.id));
+      const prompt = await this.ultimoPromptDelBot(p.conversacion.id);
+      const repeticion = armarTextoRepeticion(prompt);
       const aviso = textoAvisoNoCompatible(p.clasificacion.subtipo, esperaVoucher);
+      // Si el último mensaje del bot tenía botones o lista, se repite con ellos reales; si no, texto con viñetas
+      const interactivo = interactivoDesdeContenido(prompt, aviso);
 
       await this.outbox.encolar({
         telefono: p.identificador,
-        tipo: 'TEXTO',
+        tipo: interactivo ? 'INTERACTIVO' : 'TEXTO',
         clave: `no-compatible-${p.waMessageId || `${p.identificador}-${Date.now()}`}`,
         origen: ORIGEN_NO_COMPATIBLE,
         carga: {
           textoLibre: repeticion ? `${aviso}\n\n${repeticion}` : aviso,
+          ...(interactivo ? { interactivo } : {}),
           autor: 'BOT',
           nombre: obtenerNombreMostrar(p.conversacion),
           etapa: 'NO_COMPATIBLE',

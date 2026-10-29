@@ -15,6 +15,12 @@ export interface MensajeItem {
   motivoFallo?: string | null;
 }
 
+export interface BloqueoSpam {
+  activo: boolean;
+  hastaEn: string | null;
+  reincidente: boolean;
+}
+
 export interface ChatResumen {
   id: string;
   nombre: string;
@@ -28,6 +34,7 @@ export interface ChatResumen {
   hora: string;
   sinLeer: number;
   esperaMin?: number | null;
+  bloqueoSpam?: BloqueoSpam | null;
 }
 
 export interface DetallePedidoChat {
@@ -88,6 +95,7 @@ export interface DetalleConversacion {
   tiempoPrometidoMin: number | null;
   altaDemanda: boolean;
   motivoDerivacion?: string | null;
+  bloqueoSpam?: BloqueoSpam | null;
   voucher?: import('../vouchers/tipos').VoucherResumenChat | null;
 }
 
@@ -103,6 +111,7 @@ export interface RespuestaListarChats {
     atender: number;
     bot: number;
     atendidos: number;
+    bloqueadosSpam?: number;
   };
   chats: ChatResumen[];
 }

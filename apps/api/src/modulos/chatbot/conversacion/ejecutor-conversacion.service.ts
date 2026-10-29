@@ -45,6 +45,7 @@ import {
 } from './tipos-conversacion';
 import { obtenerFechaHoraLima } from '../../local/local.util';
 import { DireccionesClienteService } from '../../clientes/direcciones-cliente.service';
+import { OutboxWhatsappService } from '../servicios/outbox-whatsapp.service';
 import { topePedidosSinPagarAlcanzado, textoTopePedidosSinPagar } from '../servicios/tope-pedidos-sin-pagar.util';
 
 export interface EntradaProcesarMensaje extends EntradaRawInput {
@@ -77,6 +78,7 @@ export class EjecutorConversacionService {
     @Optional() private readonly chatbotIaService?: ChatbotIaService,
     @Optional() private readonly chatbotConfiguracionService?: ChatbotConfiguracionService,
     @Optional() private readonly direccionesService?: DireccionesClienteService,
+    @Optional() private readonly outbox?: OutboxWhatsappService,
   ) {}
 
   /**
@@ -1389,23 +1391,40 @@ export class EjecutorConversacionService {
             { id: 'btn_persona', titulo: 'Hablar con una persona' },
           ];
           let metaTope: string | null = null;
-          if (destinoEnvio) {
-            const res = await this.mensajeria.enviarBotones(destinoEnvio, textoTope, botonesTope, {
-              conversacionId: conversacion.id,
-              replyToWaMessageId: entradaRaw.waMessageId,
+          if (destinoEnvio && this.outbox) {
+            // Por el outbox interactivo: reintentos, ventana de 24 h y registro en el chat
+            await this.outbox.encolar({
+              telefono: destinoEnvio,
+              tipo: 'INTERACTIVO',
+              clave: `tope-sin-pagar-${conversacion.id}-${entradaRaw.waMessageId || Date.now()}`,
+              origen: 'TOPE_SIN_PAGAR',
+              carga: {
+                textoLibre: textoTope,
+                autor: 'BOT',
+                etapa: 'TOPE_SIN_PAGAR',
+                interactivo: { cuerpo: textoTope, botones: botonesTope },
+              },
             });
-            metaTope = res.waMessageId || null;
+            this.outbox.despertar();
+          } else {
+            if (destinoEnvio) {
+              const res = await this.mensajeria.enviarBotones(destinoEnvio, textoTope, botonesTope, {
+                conversacionId: conversacion.id,
+                replyToWaMessageId: entradaRaw.waMessageId,
+              });
+              metaTope = res.waMessageId || null;
+            }
+            await this.prisma.mensajeChat.create({
+              data: {
+                conversacion_id: conversacion.id,
+                direccion: 'SALE',
+                autor: 'BOT',
+                tipo: 'BOTON',
+                contenido: { texto: textoTope, botones: botonesTope } as any,
+                meta_id: metaTope,
+              },
+            });
           }
-          await this.prisma.mensajeChat.create({
-            data: {
-              conversacion_id: conversacion.id,
-              direccion: 'SALE',
-              autor: 'BOT',
-              tipo: 'BOTON',
-              contenido: { texto: textoTope, botones: botonesTope } as any,
-              meta_id: metaTope,
-            },
-          });
           // Equipo: una notificación por número cada 24 h
           const hace24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
           const yaAvisado = await this.prisma.notificacion.findFirst({

@@ -238,6 +238,55 @@ describe('MensajesService', () => {
     expect(filtrado.chats[0].nombre).toBe('Ana Pérez');
   });
 
+  describe('bloqueo por spam (fuente: Redis con TTL)', () => {
+    const redisCon = (valores: Record<string, [string | null, number]>) => ({
+      obtenerCliente: () => ({
+        pipeline: () => {
+          const cmds: Array<() => [null, unknown]> = [];
+          const p: any = {
+            get: (k: string) => cmds.push(() => [null, valores[k]?.[0] ?? null]),
+            pttl: (k: string) => cmds.push(() => [null, valores[k]?.[1] ?? -2]),
+            exec: async () => cmds.map((c) => c()),
+          };
+          return p;
+        },
+      }),
+    });
+
+    it('listar expone bloqueoSpam activo con hastaEn y reincidente, y lo cuenta', async () => {
+      const redis: any = redisCon({ 'chatbot:spam:bloqueo:999888777': ['R', 600_000] });
+      service = new MensajesService(prisma, auditoria, gateway, eventos, undefined, redis);
+      const r = await service.listar('todos', '');
+      const bloqueado = r.chats.find((c) => c.id === '1')!;
+      expect(bloqueado.bloqueoSpam).toMatchObject({ activo: true, reincidente: true });
+      expect(new Date(bloqueado.bloqueoSpam!.hastaEn!).getTime()).toBeGreaterThan(Date.now() + 500_000);
+      expect(r.chats.find((c) => c.id === '2')!.bloqueoSpam).toEqual({ activo: false, hastaEn: null, reincidente: false });
+      expect(r.conteos.bloqueadosSpam).toBe(1);
+    });
+
+    it('si Redis falla, bloqueoSpam es null y no se limpia ninguna marca', async () => {
+      const redis: any = { obtenerCliente: () => ({ pipeline: () => { throw new Error('ECONNREFUSED'); } }) };
+      prisma.conversacion.updateMany = jest.fn();
+      service = new MensajesService(prisma, auditoria, gateway, eventos, undefined, redis);
+      const r = await service.listar('todos', '');
+      expect(r.chats.every((c) => c.bloqueoSpam === null)).toBe(true);
+      expect(prisma.conversacion.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('si el bloqueo caducó, limpia la marca motivo_derivacion y ya no manda', async () => {
+      prisma.conversacion.updateMany = jest.fn().mockResolvedValue({ count: 1 });
+      prisma.conversacion.findMany.mockResolvedValueOnce([
+        { id: 7n, telefono: '955444333', duenio: 'BOT', urgente: false, estado: 'ABIERTA', tomado_por: null, motivo_derivacion: 'BLOQUEADO_SPAM', ultima_actividad: new Date(), party: null, mensajes: [] },
+      ]);
+      service = new MensajesService(prisma, auditoria, gateway, eventos, undefined, redisCon({}) as any);
+      const r = await service.listar('todos', '');
+      expect(r.chats[0].bloqueoSpam?.activo).toBe(false);
+      expect(prisma.conversacion.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { motivo_derivacion: null } }),
+      );
+    });
+  });
+
   it('detalle retorna la información de la conversación y pedido asociado', async () => {
     const d = await service.detalle('1', usuarioAdmin);
     expect(d.id).toBe('1');

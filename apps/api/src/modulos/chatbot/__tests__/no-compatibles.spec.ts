@@ -129,6 +129,20 @@ describe('Mensajes no compatibles en el webhook', () => {
     });
   });
 
+  it('si el último mensaje del bot tenía botones o lista, el aviso sale INTERACTIVO con las opciones reales', async () => {
+    mensajesSalientes = [{ contenido: { texto: '¿Qué hacemos?', botones: [{ id: 'ped_x', titulo: 'Elegir' }] } }];
+    await webhook.procesarPayload(payload(audio));
+    expect(encolados()[0].tipo).toBe('INTERACTIVO');
+    expect(encolados()[0].carga.interactivo.botones).toEqual([{ id: 'ped_x', titulo: 'Elegir' }]);
+    expect(encolados()[0].carga.interactivo.cuerpo).toContain(AVISO_AUDIO);
+
+    outbox.encolar.mockClear();
+    ultimoAviso = null;
+    mensajesSalientes = [{ contenido: { texto: 'Menú', botonTexto: 'Ver', filas: [{ id: 'f1', titulo: 'Pollo' }] } }];
+    await webhook.procesarPayload({ ...payload(audio), entry: [{ changes: [{ value: { contacts: [{ wa_id: TEL }], messages: [{ id: 'wamid.X2', from: TEL, ...audio }] } }] }] });
+    expect(encolados()[0].carga.interactivo.lista.secciones[0].filas).toEqual([{ id: 'f1', titulo: 'Pollo' }]);
+  });
+
   it('registra el audio en mensaje_chat con su tipo y el id de WhatsApp', async () => {
     await webhook.procesarPayload(payload(audio));
     expect(prisma.mensajeChat.create).toHaveBeenCalledWith({

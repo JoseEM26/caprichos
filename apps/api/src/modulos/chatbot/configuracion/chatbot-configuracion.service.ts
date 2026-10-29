@@ -3,8 +3,11 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
+import { EventosGateway } from '../../../comun/socket/eventos.gateway';
+import { VALOR_BLOQUEO_REINCIDENTE } from './bloqueo-spam.util';
 import { RedisService } from '../../../comun/redis/redis.service';
 import { AuditoriaService } from '../../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../../acceso/acceso.tipos';
@@ -45,6 +48,7 @@ export class ChatbotConfiguracionService {
     private readonly prisma: PrismaService,
     private readonly redisService: RedisService,
     private readonly auditoria: AuditoriaService,
+    @Optional() private readonly eventos?: EventosGateway,
   ) {}
 
   /**
@@ -755,7 +759,7 @@ export class ChatbotConfiguracionService {
       ? await this.parametroNumero('spam_bloqueo_reincidente_min', 1440)
       : await this.parametroNumero('spam_bloqueo_min', 60);
 
-    await redis.set(`chatbot:spam:bloqueo:${idLimpio}`, '1', 'EX', minutos * 60);
+    await redis.set(`chatbot:spam:bloqueo:${idLimpio}`, reincidente ? VALOR_BLOQUEO_REINCIDENTE : '1', 'EX', minutos * 60);
     await redis.set(claveReinc, '1', 'EX', 1440 * 60);
     await redis.del(
       `chatbot:spam:excesos:${idLimpio}`,
@@ -769,6 +773,8 @@ export class ChatbotConfiguracionService {
         where: { telefono },
         data: { motivo_derivacion: MOTIVO_BLOQUEO_SPAM },
       });
+      const cb = await this.prisma.conversacion.findUnique({ where: { telefono }, select: { id: true } });
+      if (cb) this.eventos?.emitirAdmin('mensajes:actualizado', { id: cb.id.toString() });
 
       // Clientes con pedidos recientes también se silencian (el límite es por número); el aviso al equipo lo dice
       const ultimos9 = telefono.replace(/\D/g, '').slice(-9);
@@ -828,6 +834,7 @@ export class ChatbotConfiguracionService {
 
     const idLimpio = encodeURIComponent(conv.telefono.trim());
     const redis = this.redisService.obtenerCliente();
+    const habiaBloqueo = (await redis.exists(`chatbot:spam:bloqueo:${idLimpio}`)) === 1;
     await redis.del(
       `chatbot:spam:bloqueo:${idLimpio}`,
       `chatbot:spam:excesos:${idLimpio}`,
@@ -838,6 +845,7 @@ export class ChatbotConfiguracionService {
     if (conv.motivo_derivacion === MOTIVO_BLOQUEO_SPAM) {
       await this.prisma.conversacion.update({ where: { id: conv.id }, data: { motivo_derivacion: null } });
     }
+    this.eventos?.emitirAdmin('mensajes:actualizado', { id: conv.id.toString() });
 
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
@@ -848,7 +856,7 @@ export class ChatbotConfiguracionService {
       entidadId: conv.id,
       partyId: usuario.partyId,
       ip,
-      antes: { bloqueadoSpam: conv.motivo_derivacion === MOTIVO_BLOQUEO_SPAM },
+      antes: { bloqueadoSpam: habiaBloqueo },
       despues: { bloqueadoSpam: false, motivo: motivoTexto },
     });
     return { ok: true };

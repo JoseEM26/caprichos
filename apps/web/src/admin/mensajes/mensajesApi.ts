@@ -17,6 +17,10 @@ export async function listarConversaciones(
   return api.get<RespuestaListarChats>(`/admin/mensajes/conversaciones${qs ? `?${qs}` : ''}`);
 }
 
+export async function desbloquearSpam(id: string, motivo: string): Promise<{ ok: boolean }> {
+  return api.post<{ ok: boolean }>(`/admin/mensajes/${id}/desbloquear-spam`, { motivo });
+}
+
 export async function obtenerDetalleConversacion(id: string): Promise<DetalleConversacion> {
   return api.get<DetalleConversacion>(`/admin/mensajes/conversaciones/${id}`);
 }

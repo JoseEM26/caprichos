@@ -197,6 +197,28 @@ describe('ConfiguracionService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
+    it('protección contra spam: acepta valores en rango y rechaza con 400 los de fuera', async () => {
+      prismaMock.parametro.findUnique.mockResolvedValue(null);
+      prismaMock.parametro.upsert.mockImplementation(async ({ create }: any) => create);
+      const casos: Array<[string, number, number, number]> = [
+        ['spam_bloqueo_excesos', 1, 20, 3],
+        ['spam_bloqueo_min', 5, 1440, 60],
+        ['spam_bloqueo_reincidente_min', 60, 10080, 1440],
+        ['whatsapp_max_pedidos_sin_pagar', 1, 10, 3],
+        ['chatbot_antispam_max_minuto', 3, 60, 10],
+        ['chatbot_antispam_max_hora', 10, 600, 60],
+      ];
+      for (const [clave, min, max, ok] of casos) {
+        await expect(service.actualizar(clave, ok, adminAuth)).resolves.toMatchObject({ clave });
+        await expect(service.actualizar(clave, min, adminAuth)).resolves.toMatchObject({ clave });
+        await expect(service.actualizar(clave, max, adminAuth)).resolves.toMatchObject({ clave });
+        await expect(service.actualizar(clave, min - 1, adminAuth)).rejects.toMatchObject({ response: { codigo: 'RANGO_INVALIDO' } });
+        await expect(service.actualizar(clave, max + 1, adminAuth)).rejects.toThrow(BadRequestException);
+        await expect(service.actualizar(clave, ok + 0.5, adminAuth)).rejects.toThrow(BadRequestException);
+      }
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'PARAMETRO' }));
+    });
+
     it('valida rangos y orden ascendente en parámetros de reparto', async () => {
       prismaMock.parametro.findMany.mockResolvedValue([
         { clave: 'reparto_retrasado_min', valor: 20 },

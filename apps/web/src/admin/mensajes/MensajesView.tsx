@@ -4,6 +4,7 @@ import { useEventos } from '../../comun/socket';
 import {
   aplicarCambioChat,
   aprobarPagoChat,
+  desbloquearSpam,
   editarNombreContacto,
   enviarMensaje,
   listarConversaciones,
@@ -25,6 +26,7 @@ import { useSesion } from '../../comun/sesion';
 import { TarjetaLecturaVoucher } from '../vouchers/TarjetaLecturaVoucher';
 import { ReasignarVoucherBoton } from '../vouchers/ReasignarVoucherBoton';
 import { SalientesWhatsApp } from './SalientesWhatsApp';
+import { InsigniaBloqueoSpam, ModalDesbloquearSpam } from './BloqueoSpam';
 import { salientesApi } from './salientesApi';
 import { FotoAmpliable } from '../vouchers/FotoAmpliable';
 import { VoucherResumenChat } from '../vouchers/tipos';
@@ -136,8 +138,10 @@ function telefonoDeUrl(): string {
 
 function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
   let tieneVouchersVer = true;
+  let puedeDesbloquear = false;
   try {
     const sesion = useSesion();
+    puedeDesbloquear = Boolean(sesion?.tiene?.('mensajes/enviar'));
     tieneVouchersVer =
       Boolean(sesion?.tiene?.('vouchers/ver')) ||
       sesion?.usuario?.rol === 'ADMIN' ||
@@ -148,19 +152,22 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
 
   const [cargando, setCargando] = useState(true);
   const [chats, setChats] = useState<ChatResumen[]>([]);
-  const [conteos, setConteos] = useState({ todos: 0, atender: 0, bot: 0, atendidos: 0 });
+  const [conteos, setConteos] = useState({ todos: 0, atender: 0, bot: 0, atendidos: 0, bloqueadosSpam: 0 });
   const [filtro, setFiltro] = useState<FiltroChat>('todos');
+  const [soloBloqueados, setSoloBloqueados] = useState(false);
+  const [modalDesbloqueo, setModalDesbloqueo] = useState(false);
 
   const chatsOrdenados = useMemo(() => {
+    const base = soloBloqueados ? chats.filter((c) => c.bloqueoSpam?.activo) : chats;
     if (filtro === 'atender') {
-      return [...chats].sort((a, b) => {
+      return [...base].sort((a, b) => {
         const esperaA = typeof a.esperaMin === 'number' ? a.esperaMin : -1;
         const esperaB = typeof b.esperaMin === 'number' ? b.esperaMin : -1;
         return esperaB - esperaA;
       });
     }
-    return chats;
-  }, [chats, filtro]);
+    return base;
+  }, [chats, filtro, soloBloqueados]);
   // Desde Pedidos (?telefono=) el chat del cliente se busca y se abre solo al cargar la lista
   const telefonoPendiente = React.useRef<string>(telefonoDeUrl());
   const [busqueda, setBusqueda] = useState(() => telefonoPendiente.current);
@@ -269,7 +276,7 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
     try {
       const res = await listarConversaciones(filtro, busqueda);
       setChats(res.chats);
-      setConteos(res.conteos);
+      setConteos({ bloqueadosSpam: 0, ...res.conteos });
 
       const pendiente = telefonoPendiente.current;
       const delCliente = pendiente
@@ -347,6 +354,30 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
       cargarDetalle(chatSeleccionadoId);
     }
   });
+
+  // El bloqueo por spam caduca solo: al llegar su hora se vuelve a leer, sin esperar un evento
+  const vencimientosSpam = [...chats.map((c) => c.bloqueoSpam), detalle?.bloqueoSpam]
+    .filter((b) => b?.activo && b.hastaEn)
+    .map((b) => b!.hastaEn as string)
+    .join('|');
+  useEffect(() => {
+    if (!vencimientosSpam) return;
+    const proximo = Math.min(...vencimientosSpam.split('|').map((h) => new Date(h).getTime()));
+    const espera = Math.min(Math.max(proximo - Date.now() + 1000, 1000), 2_000_000_000);
+    const t = setTimeout(() => {
+      void cargarLista(true);
+      if (chatSeleccionadoId) void cargarDetalle(chatSeleccionadoId);
+    }, espera);
+    return () => clearTimeout(t);
+  }, [vencimientosSpam, cargarLista, cargarDetalle, chatSeleccionadoId]);
+
+  const handleDesbloquearSpam = async (motivo: string) => {
+    if (!chatSeleccionadoId) return;
+    await desbloquearSpam(chatSeleccionadoId, motivo);
+    setModalDesbloqueo(false);
+    await cargarDetalle(chatSeleccionadoId);
+    await cargarLista(true);
+  };
 
   // Acciones sobre el chat
   const handleReabrirPlantilla = () => {
@@ -789,6 +820,20 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
                 {tab.label} <b>{tab.count}</b>
               </button>
             ))}
+            {((conteos.bloqueadosSpam ?? 0) > 0 || soloBloqueados) && (
+              <button
+                className="cv-tab"
+                aria-pressed={soloBloqueados}
+                data-testid="filtro-bloqueados-spam"
+                style={{
+                  background: soloBloqueados ? '#FFE0A3' : '#F0F2F5',
+                  color: soloBloqueados ? '#7A4A00' : '#54656F',
+                }}
+                onClick={() => setSoloBloqueados((v) => !v)}
+              >
+                Bloqueados por spam ({conteos.bloqueadosSpam})
+              </button>
+            )}
           </div>
 
           <div className="cv-rows">
@@ -857,6 +902,7 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
                         >
                           {c.urgente ? `URGENTE · ${ESTADOS_LABEL[c.estado]}` : ESTADOS_LABEL[c.estado]}
                         </span>
+                        <InsigniaBloqueoSpam bloqueo={c.bloqueoSpam} id={c.id} />
                         {c.esperaMin !== undefined && c.esperaMin !== null && (
                           <span
                             data-testid={`espera-badge-${c.id}`}
@@ -965,6 +1011,17 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
                 >
                   {detalle.urgente ? `URGENTE · ${ESTADOS_LABEL[detalle.estado]}` : ESTADOS_LABEL[detalle.estado]}
                 </span>
+                <InsigniaBloqueoSpam bloqueo={detalle.bloqueoSpam} id={`detalle-${detalle.id}`} />
+                {detalle.bloqueoSpam?.activo && puedeDesbloquear && (
+                  <button
+                    type="button"
+                    data-testid="btn-desbloquear-spam"
+                    onClick={() => setModalDesbloqueo(true)}
+                    style={{ minHeight: 44, padding: '0 14px', borderRadius: 8, border: '1px solid #B45309', background: '#FFFFFF', color: '#B45309', fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    Desbloquear
+                  </button>
+                )}
               </div>
 
               {/* Modo Simulado Banner */}
@@ -1435,6 +1492,14 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
             await acc();
           }}
           alCancelar={() => setConfirmarAccion(null)}
+        />
+      )}
+
+      {modalDesbloqueo && detalle && (
+        <ModalDesbloquearSpam
+          nombre={detalle.nombre}
+          alConfirmar={handleDesbloquearSpam}
+          alCancelar={() => setModalDesbloqueo(false)}
         />
       )}
 

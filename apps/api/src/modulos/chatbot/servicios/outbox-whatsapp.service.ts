@@ -13,8 +13,9 @@ import {
 import { CATALOGO_PLANTILLAS } from '../catalogo/plantillas.catalogo';
 import { enmascararTelefono } from '../utilidades/enmascarar.util';
 import { PayloadMensajeNegocio, Ventana24hService } from './ventana-24h.service';
+import { CargaInteractivo, normalizarInteractivo, textoConVinetas } from './interactivo.util';
 
-export type TipoSaliente = 'TEXTO' | 'PLANTILLA';
+export type TipoSaliente = 'TEXTO' | 'PLANTILLA' | 'INTERACTIVO';
 export type EstadoSaliente = 'PENDIENTE' | 'ENVIANDO' | 'ENVIADO' | 'FALLIDO' | 'DESCARTADO';
 
 /** Lo que el emisor quiere decir. Texto libre o plantilla se decide al enviar, según la ventana de 24 h. */
@@ -26,6 +27,8 @@ export interface CargaSaliente extends PayloadMensajeNegocio {
   /** Código del pedido y etapa, solo para el registro en el chat. */
   pedidoCodigo?: string;
   etapa?: string;
+  /** Solo tipo INTERACTIVO: botones (máx. 3) o lista (máx. 10 filas). textoLibre lleva el mismo cuerpo. */
+  interactivo?: CargaInteractivo;
 }
 
 export interface DatosEncolar {
@@ -126,6 +129,14 @@ export class OutboxWhatsappService {
    */
   async encolar(datos: DatosEncolar, tx?: Prisma.TransactionClient): Promise<boolean> {
     const db = tx ?? this.prisma;
+    if (datos.tipo === 'INTERACTIVO') {
+      const i = datos.carga.interactivo && normalizarInteractivo(datos.carga.interactivo);
+      const filas = i?.lista?.secciones.reduce((n, s) => n + s.filas.length, 0) ?? 0;
+      if (!i || !i.cuerpo || (!i.botones?.length && !filas)) {
+        throw new Error('Un mensaje interactivo necesita cuerpo y botones o filas');
+      }
+      datos = { ...datos, carga: { ...datos.carga, interactivo: i, textoLibre: i.cuerpo } };
+    }
     const maxIntentos = await leerParametroNumerico(this.prisma, 'outbox_max_intentos', 5);
     const r = await db.salienteWhatsapp.createMany({
       data: [
@@ -310,6 +321,7 @@ export class OutboxWhatsappService {
   /** Decide texto libre o plantilla al enviar: la ventana de 24 h la mira Ventana24hService. */
   private async enviarAlPuerto(fila: FilaSaliente, carga: CargaSaliente): Promise<ResultadoEnvioWhatsApp> {
     const opciones = { pedidoId: fila.pedido_id ?? undefined };
+    if (fila.tipo === 'INTERACTIVO' && carga.interactivo) return this.enviarInteractivo(fila, carga, opciones);
     if (fila.tipo !== 'PLANTILLA') {
       return this.ventana24h.enviarMensajeNegocio(fila.telefono_destino, carga, opciones);
     }
@@ -334,6 +346,37 @@ export class OutboxWhatsappService {
       carga.variablesPlantilla,
       opciones,
     );
+  }
+
+  /**
+   * Interactivo: botones o lista solo con la ventana de 24 h abierta. Fuera de ella no sale como interactivo:
+   * degrada igual que el TEXTO (texto con viñetas o plantilla, según Ventana24hService) y queda registrado.
+   * ponytail: la lista se manda en una sola sección (la del primer grupo); el puerto no admite varias.
+   */
+  private async enviarInteractivo(
+    fila: FilaSaliente,
+    carga: CargaSaliente,
+    opciones: { pedidoId?: bigint },
+  ): Promise<ResultadoEnvioWhatsApp & { degradado?: boolean }> {
+    const i = normalizarInteractivo(carga.interactivo!);
+    const tel = fila.telefono_destino;
+    if (!(await this.ventana24h.tieneConsentimiento(tel))) {
+      return { exito: false, estado: 'FALLIDO', errorCodigo: 'CLIENTE_BAJA', errorDetalle: 'Cliente en estado BAJA' };
+    }
+    if (await this.ventana24h.esVentanaAbierta(tel)) {
+      if (i.botones?.length) return this.mensajeria.enviarBotones(tel, i.cuerpo, i.botones, opciones);
+      const secciones = i.lista?.secciones ?? [];
+      return this.mensajeria.enviarLista(
+        tel,
+        i.cuerpo,
+        i.lista?.boton ?? 'Ver opciones',
+        secciones.flatMap((s) => s.filas),
+        { ...opciones, tituloSeccion: secciones[0]?.titulo },
+      );
+    }
+    this.logger.warn(JSON.stringify({ evento: 'outbox_interactivo_degradado', id: fila.id.toString(), origen: fila.origen }));
+    const r = await this.ventana24h.enviarMensajeNegocio(tel, { ...carga, textoLibre: textoConVinetas(i), botones: undefined }, opciones);
+    return { ...r, degradado: true };
   }
 
   private async cerrarFallido(
@@ -384,8 +427,9 @@ export class OutboxWhatsappService {
   private async registrarEnChat(
     fila: FilaSaliente,
     carga: CargaSaliente,
-    resultado: ResultadoEnvioWhatsApp,
+    resultado: ResultadoEnvioWhatsApp & { degradado?: boolean },
   ): Promise<void> {
+    const i = fila.tipo === 'INTERACTIVO' ? carga.interactivo : undefined;
     const conversacion = await this.prisma.conversacion.upsert({
       where: { telefono: fila.telefono_destino },
       update: { ultima_actividad: new Date() },
@@ -401,16 +445,24 @@ export class OutboxWhatsappService {
         conversacion_id: conversacion.id,
         direccion: 'SALE',
         autor: carga.autor ?? 'BOT',
-        tipo: resultado.exito ? 'TEXTO' : 'SISTEMA',
+        tipo: !resultado.exito ? 'SISTEMA' : i && !resultado.degradado ? (i.botones?.length ? 'BOTON' : 'LISTA') : 'TEXTO',
         contenido: {
           origen: fila.origen,
           etapa: carga.etapa ?? null,
           pedido: carga.pedidoCodigo ?? null,
           texto: carga.textoLibre ?? null,
           plantilla: carga.plantillaClave ?? null,
+          ...(i
+            ? {
+                botones: i.botones ?? undefined,
+                botonTexto: i.lista?.boton,
+                filas: i.lista ? i.lista.secciones.flatMap((s) => s.filas) : undefined,
+                degradado: resultado.degradado ?? undefined,
+              }
+            : {}),
           estado: resultado.estado,
           errorCodigo: resultado.errorCodigo ?? null,
-        },
+        } as unknown as Prisma.InputJsonValue,
         whatsapp_mensaje_id: whatsappMensajeId,
       },
     });

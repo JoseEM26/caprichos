@@ -1,3 +1,4 @@
+jest.mock('../../../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {} }));
 import { BadRequestException } from '@nestjs/common';
 import { ChatbotConfiguracionService, MOTIVO_BLOQUEO_SPAM } from '../chatbot-configuracion.service';
 
@@ -91,7 +92,7 @@ describe('Anti-spam: bloqueo por reincidencia y desbloqueo', () => {
     redis.datos.set(CLAVE_REINC, '1'); // bloqueo previo vigente
     await enviarExcesos(13);
 
-    expect(redis.set).toHaveBeenCalledWith(CLAVE_BLOQUEO, '1', 'EX', 86400);
+    expect(redis.set).toHaveBeenCalledWith(CLAVE_BLOQUEO, 'R', 'EX', 86400);
     expect(prisma.notificacion.create.mock.calls[0][0].data.mensaje).toContain('reincidencia');
   });
 

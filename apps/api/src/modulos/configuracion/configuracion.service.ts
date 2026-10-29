@@ -55,6 +55,16 @@ export const CLAVES_NUMERICAS = [
   'whatsapp_max_pedidos_sin_pagar',
 ] as const;
 
+/** Rangos válidos (enteros) de los parámetros de protección contra spam y pedidos falsos. */
+export const RANGOS_PROTECCION_SPAM: Record<string, [number, number, string]> = {
+  spam_bloqueo_excesos: [1, 20, 'Los excesos para bloquear deben estar entre 1 y 20'],
+  spam_bloqueo_min: [5, 1440, 'El bloqueo debe durar entre 5 y 1440 minutos'],
+  spam_bloqueo_reincidente_min: [60, 10080, 'El bloqueo por reincidencia debe durar entre 60 y 10080 minutos'],
+  whatsapp_max_pedidos_sin_pagar: [1, 10, 'El tope de pedidos sin pagar debe estar entre 1 y 10'],
+  chatbot_antispam_max_minuto: [3, 60, 'El límite por minuto debe estar entre 3 y 60'],
+  chatbot_antispam_max_hora: [10, 600, 'El límite por hora debe estar entre 10 y 600'],
+};
+
 export const CLAVES_TEXTO = [
   'envio_gratis_modo',
   'reprog_recargo_modo',
@@ -216,6 +226,11 @@ export class ConfiguracionService {
           mensaje: 'El valor debe ser un objeto o estructura válida',
         });
       }
+    }
+
+    const rangoSpam = RANGOS_PROTECCION_SPAM[clave];
+    if (rangoSpam && (!Number.isInteger(valor) || valor < rangoSpam[0] || valor > rangoSpam[1])) {
+      throw new BadRequestException({ codigo: 'RANGO_INVALIDO', mensaje: rangoSpam[2] });
     }
 
     // Validaciones específicas para parámetros de reparto
