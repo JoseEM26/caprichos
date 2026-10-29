@@ -59,19 +59,19 @@ describe('Configuración: buscador, grupos y salto al ajuste', () => {
 
   it('flechas y Enter abren el ajuste: cambia de pestaña y lo resalta', async () => {
     montar();
-    fireEvent.change(buscador(), { target: { value: 'wifi' } });
+    fireEvent.change(buscador(), { target: { value: 'razon social' } });
     const opciones = screen.getAllByRole('option');
-    expect(opciones[0]).toHaveTextContent(/Wi-Fi para clientes/);
+    expect(opciones[0]).toHaveTextContent(/Razón social/);
     fireEvent.keyDown(buscador(), { key: 'ArrowDown' });
     fireEvent.keyDown(buscador(), { key: 'ArrowUp' });
     fireEvent.keyDown(buscador(), { key: 'Enter' });
-    await waitFor(() => expect(screen.getByRole('tab', { name: /Operación/i })).toHaveAttribute('aria-selected', 'true'));
+    await waitFor(() => expect(screen.getByRole('tab', { name: /Empresa/i })).toHaveAttribute('aria-selected', 'true'));
     await waitFor(() => {
-      const el = document.querySelector('[data-cfg-id="operacion-wifi-nombre"]')!;
+      const el = document.querySelector('[data-cfg-id="empresa-razon-social"]')!;
       expect(el).toHaveClass('cfg-resaltado');
     });
     // lo elegido queda en recientes
-    expect(JSON.parse(localStorage.getItem('cfg_busq_recientes')!)).toEqual(['operacion-wifi-nombre']);
+    expect(JSON.parse(localStorage.getItem('cfg_busq_recientes')!)).toEqual(['empresa-razon-social']);
   });
 
   it('?tab=&campo= en la URL salta al campo y lo resalta', async () => {

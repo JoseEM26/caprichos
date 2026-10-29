@@ -34,6 +34,9 @@ export const DATOS_LOCAL_DEFAULT = {
   redes: { instagram: '', facebook: '', tiktok: '' },
 };
 
+/** Lema que muestra la carta bajo el nombre mientras el dueño no ponga uno. */
+export const LEMA_DEFECTO = 'Cafetería artesanal';
+
 /** Coordenadas por defecto de Caprichos Campoy */
 export const COORDENADAS_LOCAL_DEFAULT = {
   lat: -12.0196436,
@@ -327,6 +330,7 @@ export class LocalService {
       telefono: datos.telefono ?? DATOS_LOCAL_DEFAULT.telefono,
       whatsapp: datos.whatsapp ?? DATOS_LOCAL_DEFAULT.whatsapp,
       redes: datos.redes ?? DATOS_LOCAL_DEFAULT.redes,
+      lema: typeof datos.lema === 'string' && datos.lema.trim() ? datos.lema.trim() : LEMA_DEFECTO,
       lat,
       lng,
       horario: horarioFormateado,
@@ -670,7 +674,10 @@ export class LocalService {
       where: { clave },
     });
 
-    const valorJson = { ...dto };
+    // Se combina con lo guardado: un guardado que no envía un campo (lat, lng, RUC...) no lo borra.
+    const previo = (anterior?.valor && typeof anterior.valor === 'object' ? anterior.valor : {}) as Record<string, unknown>;
+    const entrante = Object.fromEntries(Object.entries(dto).filter(([, v]) => v !== undefined));
+    const valorJson = { ...previo, ...entrante };
     const parametro = await this.prisma.parametro.upsert({
       where: { clave },
       update: { valor: valorJson },
@@ -684,7 +691,7 @@ export class LocalService {
       resultado: 'OK',
       entidad: 'parametro',
       antes: anterior?.valor ?? null,
-      despues: dto,
+      despues: valorJson,
       partyId: usuarioActual?.partyId,
       ip,
     });

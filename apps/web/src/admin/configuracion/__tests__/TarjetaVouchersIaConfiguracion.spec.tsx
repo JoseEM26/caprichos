@@ -10,9 +10,19 @@ describe('TarjetaVouchersIaConfiguracion (Panel de Administración > Configuraci
 
   const configMock = {
     voucher_ia_activo: false,
-    voucher_titular_nombre: 'Kevin',
-    voucher_yape_numero: '946388934',
-    voucher_plin_numero: '946388934',
+    voucher_titular_nombre: 'Maria Jose Morillo Ruiz',
+    voucher_yape_numero: '977503006',
+    voucher_plin_numero: '977503006',
+    chatbot_ia_tope_mensual_usd: 20,
+    voucher_ia_corte_min: 10,
+  };
+
+  const estadoMock = {
+    activa: true,
+    enPausa: false,
+    causa: null,
+    hastaEn: null,
+    topeMensual: { usadoUsd: 5, topeUsd: 20, superado: false },
   };
 
   const consumoMock = {
@@ -31,6 +41,7 @@ describe('TarjetaVouchersIaConfiguracion (Panel de Administración > Configuraci
   it('1. renderiza la tarjeta con estado Desactivado, titular y números para ADMIN', async () => {
     vi.spyOn(vouchersApi, 'obtenerConfiguracion').mockResolvedValue(configMock);
     vi.spyOn(vouchersApi, 'obtenerConsumoIa').mockResolvedValue(consumoMock);
+    vi.spyOn(vouchersApi, 'obtenerEstadoIa').mockResolvedValue(estadoMock);
 
     render(<TarjetaVouchersIaConfiguracion esAdmin={true} />);
 
@@ -43,22 +54,56 @@ describe('TarjetaVouchersIaConfiguracion (Panel de Administración > Configuraci
 
     // Valores en inputs
     const inputTitular = screen.getByTestId('input-voucher-titular') as HTMLInputElement;
-    expect(inputTitular.value).toBe('Kevin');
+    expect(inputTitular.value).toBe('Maria Jose Morillo Ruiz');
 
     const inputYape = screen.getByTestId('input-voucher-yape') as HTMLInputElement;
-    expect(inputYape.value).toBe('946388934');
+    expect(inputYape.value).toBe('977503006');
 
     const inputPlin = screen.getByTestId('input-voucher-plin') as HTMLInputElement;
-    expect(inputPlin.value).toBe('946388934');
+    expect(inputPlin.value).toBe('977503006');
 
-    // Consumo del mes y sin tope
-    expect(screen.getByText('Sin tope mensual')).toBeDefined();
+    // Consumo del mes frente al tope
+    await waitFor(() => {
+      expect(screen.getByText('Tope mensual: 20 USD')).toBeDefined();
+    });
+    expect(screen.queryByText(/Sin tope mensual/i)).toBeNull();
     expect(screen.getByText(/42 lecturas/i)).toBeDefined();
+    expect(screen.getByTestId('barra-tope-vouchers').getAttribute('aria-valuenow')).toBe('25');
+    expect(screen.getByText(/Se avisa una sola vez a los administradores/i)).toBeDefined();
+    expect((screen.getByTestId('input-voucher-tope') as HTMLInputElement).value).toBe('20');
+    expect((screen.getByTestId('input-voucher-corte') as HTMLInputElement).value).toBe('10');
+  });
+
+  it('1b. guarda tope y corte con Confirmar Sí/No y rechaza valores fuera de rango', async () => {
+    vi.spyOn(vouchersApi, 'obtenerConfiguracion').mockResolvedValue(configMock);
+    vi.spyOn(vouchersApi, 'obtenerConsumoIa').mockResolvedValue(consumoMock);
+    vi.spyOn(vouchersApi, 'obtenerEstadoIa').mockResolvedValue(estadoMock);
+    const spyGuardar = vi.spyOn(vouchersApi, 'guardarParametro').mockResolvedValue({ ok: true });
+
+    render(<TarjetaVouchersIaConfiguracion esAdmin={true} />);
+    await waitFor(() => expect(screen.getByTestId('input-voucher-tope')).toBeDefined());
+
+    fireEvent.change(screen.getByTestId('input-voucher-tope'), { target: { value: '900' } });
+    fireEvent.click(screen.getByTestId('btn-guardar-limites-vouchers'));
+    expect(screen.getByRole('alert').textContent).toMatch(/entre 1 y 500/);
+    expect(spyGuardar).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByTestId('input-voucher-tope'), { target: { value: '35,5' } });
+    fireEvent.change(screen.getByTestId('input-voucher-corte'), { target: { value: '30' } });
+    fireEvent.click(screen.getByTestId('btn-guardar-limites-vouchers'));
+    expect(screen.getByText('¿Guardar los límites de la lectura con IA?')).toBeDefined();
+    fireEvent.click(screen.getByText('Sí, guardar límites'));
+
+    await waitFor(() => {
+      expect(spyGuardar).toHaveBeenCalledWith('chatbot_ia_tope_mensual_usd', 35.5);
+      expect(spyGuardar).toHaveBeenCalledWith('voucher_ia_corte_min', 30);
+    });
   });
 
   it('2. abre diálogo de confirmación Sí/No antes de alternar el interruptor con IA', async () => {
     vi.spyOn(vouchersApi, 'obtenerConfiguracion').mockResolvedValue(configMock);
     vi.spyOn(vouchersApi, 'obtenerConsumoIa').mockResolvedValue(consumoMock);
+    vi.spyOn(vouchersApi, 'obtenerEstadoIa').mockResolvedValue(estadoMock);
 
     render(<TarjetaVouchersIaConfiguracion esAdmin={true} />);
 
@@ -78,6 +123,7 @@ describe('TarjetaVouchersIaConfiguracion (Panel de Administración > Configuraci
   it('3. al confirmar Sí, envía PUT para activar y actualiza el estado a Activado', async () => {
     vi.spyOn(vouchersApi, 'obtenerConfiguracion').mockResolvedValue(configMock);
     vi.spyOn(vouchersApi, 'obtenerConsumoIa').mockResolvedValue(consumoMock);
+    vi.spyOn(vouchersApi, 'obtenerEstadoIa').mockResolvedValue(estadoMock);
     const spyGuardar = vi
       .spyOn(vouchersApi, 'guardarParametro')
       .mockResolvedValue({ ok: true });
@@ -105,6 +151,7 @@ describe('TarjetaVouchersIaConfiguracion (Panel de Administración > Configuraci
   it('4. permite editar titular y números y exige Confirmar Sí/No al guardar', async () => {
     vi.spyOn(vouchersApi, 'obtenerConfiguracion').mockResolvedValue(configMock);
     vi.spyOn(vouchersApi, 'obtenerConsumoIa').mockResolvedValue(consumoMock);
+    vi.spyOn(vouchersApi, 'obtenerEstadoIa').mockResolvedValue(estadoMock);
     const spyGuardar = vi
       .spyOn(vouchersApi, 'guardarParametro')
       .mockResolvedValue({ ok: true });
@@ -116,7 +163,7 @@ describe('TarjetaVouchersIaConfiguracion (Panel de Administración > Configuraci
     });
 
     const inputTitular = screen.getByTestId('input-voucher-titular');
-    fireEvent.change(inputTitular, { target: { value: 'Kevin Ramos' } });
+    fireEvent.change(inputTitular, { target: { value: 'Maria Jose Morillo R.' } });
 
     const btnGuardar = screen.getByTestId('btn-guardar-campos-vouchers');
     fireEvent.click(btnGuardar);
@@ -132,7 +179,7 @@ describe('TarjetaVouchersIaConfiguracion (Panel de Administración > Configuraci
     await waitFor(() => {
       expect(spyGuardar).toHaveBeenCalledWith(
         'voucher_titular_nombre',
-        'Kevin Ramos',
+        'Maria Jose Morillo R.',
       );
     });
 
@@ -146,6 +193,7 @@ describe('TarjetaVouchersIaConfiguracion (Panel de Administración > Configuraci
   it('5. un usuario sin rol ADMIN ve advertencia y los controles quedan deshabilitados', async () => {
     vi.spyOn(vouchersApi, 'obtenerConfiguracion').mockResolvedValue(configMock);
     vi.spyOn(vouchersApi, 'obtenerConsumoIa').mockResolvedValue(consumoMock);
+    vi.spyOn(vouchersApi, 'obtenerEstadoIa').mockResolvedValue(estadoMock);
 
     render(<TarjetaVouchersIaConfiguracion esAdmin={false} />);
 

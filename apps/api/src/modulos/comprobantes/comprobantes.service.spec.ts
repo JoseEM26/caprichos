@@ -352,6 +352,46 @@ describe('ComprobantesService', () => {
     });
   });
 
+  describe('6b. nunca se imprimen datos de ejemplo del local', () => {
+    it('sin razón social ni RUC en el local: salen vacíos y el comprobante avisa qué falta', async () => {
+      localServiceMock.obtenerDatosLocal.mockResolvedValue({ nombre: 'Caprichos', direccion: 'Jr. Real 45' });
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 109n,
+        codigo: 'CP-0109',
+        canal: 'CARTA',
+        modalidad: 'LOCAL',
+        cliente_nombre: 'Ana',
+        subtotal: 10,
+        envio: 0,
+        total: 10,
+        pago_estado: 'PAGADO',
+        pago_metodo: 'EFECTIVO',
+        cobros: [{ id: 2n, en: fechaFija, anulado_en: null, pagos: [{ id: 2n, medio: 'EFECTIVO', monto: 10, recibido: 10, vuelto: 0 }] }],
+        lineas: [],
+        comprobante: {
+          id: 2n,
+          pedido_id: 109n,
+          tipo: 'NOTA_VENTA',
+          serie: 'NV01',
+          numero: 11,
+          numero_texto: 'NV01-000011',
+          documento: null,
+          razon_social: null,
+          emision: 'POR_EMITIR',
+          copias_impresas: 0,
+          creado_en: fechaFija,
+        },
+      });
+      const res = await service.obtenerPorPedido(109n, cajeroUsuario);
+      expect(res.local.razon_social).toBeNull();
+      expect(res.local.ruc).toBeNull();
+      expect(res.local.datos_fiscales_completos).toBe(false);
+      expect(res.local.aviso_datos_fiscales).toMatch(/Falta razón social y RUC/);
+      expect(JSON.stringify(res)).not.toContain('20123456789');
+      expect(JSON.stringify(res)).not.toContain('Caprichos S.A.C.');
+    });
+  });
+
   describe('7. reimpresión suma copias y audita', () => {
     it('suma 1 a copias_impresas, marca «COPIA» y audita REIMPRIMIR', async () => {
       const pedidoMock = {

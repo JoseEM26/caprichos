@@ -53,7 +53,29 @@ export const CLAVES_NUMERICAS = [
   'spam_bloqueo_min',
   'spam_bloqueo_reincidente_min',
   'whatsapp_max_pedidos_sin_pagar',
+  'eta_factor_urbano',
+  'eta_productos_desde',
+  'eta_extra_por_producto_min',
+  'eta_parada_min',
+  'eta_margen_min',
+  'eta_paso_min',
+  'eta_base_sin_zona_min',
+  'reserva_tolerancia_min',
 ] as const;
+
+/** Rangos de parámetros con lectura acotada: [mínimo, máximo, solo enteros, mensaje]. */
+export const RANGOS_NUMERICOS: Record<string, [number, number, boolean, string]> = {
+  eta_factor_urbano: [1, 3, false, 'El factor de calles debe estar entre 1 y 3'],
+  eta_productos_desde: [1, 50, true, 'La cantidad de unidades debe ser un entero entre 1 y 50'],
+  eta_extra_por_producto_min: [0.5, 30, false, 'Los minutos de empaque por unidad deben estar entre 0.5 y 30'],
+  eta_parada_min: [0.5, 30, false, 'Los minutos por parada previa deben estar entre 0.5 y 30'],
+  eta_margen_min: [1, 60, true, 'El ancho mínimo del rango debe ser un entero entre 1 y 60 minutos'],
+  eta_paso_min: [1, 30, true, 'El redondeo debe ser un entero entre 1 y 30 minutos'],
+  eta_base_sin_zona_min: [0.5, 60, false, 'Los minutos de puerta sin zona deben estar entre 0.5 y 60'],
+  reserva_tolerancia_min: [1, 180, true, 'La tolerancia de reserva debe ser un entero entre 1 y 180 minutos'],
+  chatbot_ia_tope_mensual_usd: [1, 500, false, 'El tope mensual debe estar entre 1 y 500 USD'],
+  voucher_ia_corte_min: [1, 120, true, 'La pausa del corte automático debe ser un entero entre 1 y 120 minutos'],
+};
 
 /** Rangos válidos (enteros) de los parámetros de protección contra spam y pedidos falsos. */
 export const RANGOS_PROTECCION_SPAM: Record<string, [number, number, string]> = {
@@ -69,6 +91,9 @@ export const CLAVES_TEXTO = [
   'envio_gratis_modo',
   'reprog_recargo_modo',
   'carta_aviso_entrada',
+  'ayuda_ia_activo',
+  'terminos_texto',
+  'privacidad_texto',
   'chatbot_activo',
   'chatbot_ia_activo',
   'chatbot_pago_recordatorio_activo',
@@ -168,6 +193,7 @@ export class ConfiguracionService {
     } else if ((CLAVES_TEXTO as readonly string[]).includes(clave)) {
       if (
         clave === 'carta_aviso_entrada' ||
+        clave === 'ayuda_ia_activo' ||
         clave === 'chatbot_activo' ||
         clave === 'chatbot_ia_activo' ||
         clave === 'chatbot_avisos_equipo_activo' ||
@@ -218,6 +244,14 @@ export class ConfiguracionService {
           codigo: 'VALOR_INVALIDO',
           mensaje: 'El valor debe ser una cadena de texto no vacía',
         });
+      } else if (clave === 'terminos_texto' || clave === 'privacidad_texto') {
+        if (valor.trim().length > 20000) {
+          throw new BadRequestException({
+            codigo: 'RANGO_INVALIDO',
+            mensaje: 'El texto no puede pasar de 20000 caracteres',
+          });
+        }
+        valor = valor.trim();
       }
     } else if ((CLAVES_OBJETO as readonly string[]).includes(clave)) {
       if (typeof valor !== 'object' || valor === null) {
@@ -231,6 +265,11 @@ export class ConfiguracionService {
     const rangoSpam = RANGOS_PROTECCION_SPAM[clave];
     if (rangoSpam && (!Number.isInteger(valor) || valor < rangoSpam[0] || valor > rangoSpam[1])) {
       throw new BadRequestException({ codigo: 'RANGO_INVALIDO', mensaje: rangoSpam[2] });
+    }
+
+    const rango = RANGOS_NUMERICOS[clave];
+    if (rango && (valor < rango[0] || valor > rango[1] || (rango[2] && !Number.isInteger(valor)))) {
+      throw new BadRequestException({ codigo: 'RANGO_INVALIDO', mensaje: rango[3] });
     }
 
     // Validaciones específicas para parámetros de reparto

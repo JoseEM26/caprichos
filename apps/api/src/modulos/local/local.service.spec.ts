@@ -495,6 +495,24 @@ describe('LocalService', () => {
       );
     });
 
+    it('actualizarDatosLocal conserva lo ya guardado (lat, RUC) y audita el valor final', async () => {
+      prismaMock.parametro.findUnique.mockResolvedValue({
+        clave: 'local_datos',
+        valor: { nombre: 'Caprichos', direccion: 'Dir', telefono: '1', lat: -12.01, lng: -76.97, ruc: '20601234567' },
+      });
+      prismaMock.parametro.upsert.mockImplementation(async ({ update }: any) => ({ clave: 'local_datos', valor: update.valor }));
+
+      const res: any = await service.actualizarDatosLocal(
+        { nombre: 'Caprichos', direccion: 'Dir 2', telefono: '1', lema: 'Café de barrio', razon_social: 'Caprichos SAC' },
+        adminAuth,
+      );
+
+      expect(res).toMatchObject({ direccion: 'Dir 2', lat: -12.01, lng: -76.97, ruc: '20601234567', lema: 'Café de barrio', razon_social: 'Caprichos SAC' });
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({ accion: 'ACTUALIZAR_DATOS', despues: expect.objectContaining({ lat: -12.01, lema: 'Café de barrio' }) }),
+      );
+    });
+
     it('actualizarPagosLocal combina y preserva valores por defecto', async () => {
       prismaMock.parametro.findUnique.mockResolvedValue({
         clave: 'local_pagos',

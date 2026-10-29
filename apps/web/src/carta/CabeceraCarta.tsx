@@ -69,7 +69,7 @@ export function CabeceraCarta({
   const arrastre = useRef<{ x: number; scroll: number } | null>(null);
 
   const nombre = datosLocal?.nombre || 'Caprichos';
-  const lema = ['Cafetería artesanal', estadoLocal?.texto].filter(Boolean).join(' · ');
+  const lema = [datosLocal?.lema || 'Cafetería artesanal', estadoLocal?.texto].filter(Boolean).join(' · ');
   const esCarta = pagina === 'carta';
   const cerrado = estadoLocal && (!estadoLocal.abierta || estadoLocal.pausaAltaDemanda);
   const alto = movil ? 40 : 44;

@@ -182,10 +182,12 @@ export function TarjetaAyudaIaConfiguracion({ esAdmin: esAdminProp }: TarjetaAyu
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '24px',
+              fontSize: '14px',
+              fontWeight: 800,
+              color: 'var(--cp-navy)',
             }}
           >
-            🦉
+            IA
           </div>
           <div>
             <div
@@ -334,7 +336,7 @@ export function TarjetaAyudaIaConfiguracion({ esAdmin: esAdminProp }: TarjetaAyu
             fontWeight: 700,
           }}
         >
-          ✓ {mensajeExito}
+          {mensajeExito}
         </div>
       )}
 
@@ -348,7 +350,7 @@ export function TarjetaAyudaIaConfiguracion({ esAdmin: esAdminProp }: TarjetaAyu
             fontWeight: 700,
           }}
         >
-          ⚠ {error}
+          {error}
         </div>
       )}
 

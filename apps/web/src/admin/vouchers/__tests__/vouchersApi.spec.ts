@@ -51,8 +51,8 @@ describe('vouchersApi (cliente tipado para lectura de vouchers con IA)', () => {
           operacion: '12345678',
           fecha: '2026-10-27',
           hora: '14:30',
-          titular: 'Kevin',
-          destinoNumero: '946388934',
+          titular: 'Maria Jose Morillo Ruiz',
+          destinoNumero: '977503006',
           medioDetectado: 'YAPE' as const,
           confianza: 0.95,
         },
@@ -128,14 +128,14 @@ describe('vouchersApi (cliente tipado para lectura de vouchers con IA)', () => {
     it('obtiene parámetros y aplica defaults', async () => {
       vi.spyOn(apiModulo.api, 'get').mockResolvedValue([
         { clave: 'voucher_ia_activo', valor: true },
-        { clave: 'voucher_titular_nombre', valor: 'Kevin R.' },
+        { clave: 'voucher_titular_nombre', valor: 'Maria Jose M.' },
       ]);
 
       const cfg = await vouchersApi.obtenerConfiguracion();
       expect(cfg.voucher_ia_activo).toBe(true);
-      expect(cfg.voucher_titular_nombre).toBe('Kevin R.');
-      expect(cfg.voucher_yape_numero).toBe('946388934');
-      expect(cfg.voucher_plin_numero).toBe('946388934');
+      expect(cfg.voucher_titular_nombre).toBe('Maria Jose M.');
+      expect(cfg.voucher_yape_numero).toBe('977503006');
+      expect(cfg.voucher_plin_numero).toBe('977503006');
     });
 
     it('guarda parámetro llamando a PUT /admin/configuracion/:clave', async () => {

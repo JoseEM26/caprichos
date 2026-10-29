@@ -219,18 +219,18 @@ export function NotaVentaVista({ pedidoIdInicial, alCerrar }: NotaVentaVistaProp
               <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '16px', letterSpacing: '0.04em' }}>
                 {nota.local?.nombre || 'CAPRICHOS'}
               </div>
-              <div style={{ fontWeight: 700, fontSize: '12px' }}>
-                {nota.local?.razon_social || 'Caprichos S.A.C.'}
-              </div>
-              <div style={{ fontSize: '11px' }}>
-                RUC: {nota.local?.ruc || '20123456789'}
-              </div>
-              <div style={{ fontSize: '11px' }}>
-                {nota.local?.direccion || 'Av. Principal 123'}
-              </div>
-              <div style={{ fontSize: '11px' }}>
-                Teléf: {nota.local?.telefono || '999999999'}
-              </div>
+              {nota.local?.razon_social && (
+                <div style={{ fontWeight: 700, fontSize: '12px' }}>{nota.local.razon_social}</div>
+              )}
+              {nota.local?.ruc && <div style={{ fontSize: '11px' }}>RUC: {nota.local.ruc}</div>}
+              {nota.local?.aviso_datos_fiscales && (
+                <div role="alert" style={{ fontSize: '11px', fontWeight: 700 }}>
+                  {nota.local.aviso_datos_fiscales}
+                </div>
+              )}
+              {nota.local?.direccion_fiscal && <div style={{ fontSize: '11px' }}>Dir. fiscal: {nota.local.direccion_fiscal}</div>}
+              {nota.local?.direccion && <div style={{ fontSize: '11px' }}>{nota.local.direccion}</div>}
+              {nota.local?.telefono && <div style={{ fontSize: '11px' }}>Teléf: {nota.local.telefono}</div>}
             </div>
 
             <div className="ticket-separador-doble" />

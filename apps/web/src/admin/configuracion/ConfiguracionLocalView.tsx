@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { useSesion } from '../../comun/sesion';
-import { api } from '../../comun/api';
+import { api, ErrorApi } from '../../comun/api';
 import { Confirmar } from '../../comun/Confirmar';
 import { HorarioTab } from './HorarioTab';
 import { PagosTab } from './PagosTab';
@@ -19,6 +19,9 @@ import { BuscadorConfiguracion } from './BuscadorConfiguracion';
 import { NavegacionConfiguracion, useEsMovil, grupoDe } from './NavegacionConfiguracion';
 import { useResaltarCampo, CampoConfig } from './CampoConfig';
 import { CampoAyuda } from './AyudaCampo';
+import { MapaUbicacion } from '../../comun/mapa/MapaUbicacion';
+import { BuscadorDireccion } from '../../comun/mapa/BuscadorDireccion';
+import { SEDE_DEFECTO } from '../../comun/mapa/sedeDefecto';
 import { propsAyuda } from './catalogo/propsAyuda';
 import type { EntradaConfig } from './catalogo';
 
@@ -26,13 +29,8 @@ export interface InfoLocalState {
   // local
   nombre: string;
   lema: string;
-  zona: string;
-  barrio: string;
-  descripcion: string;
   // ubicacion
   direccion: string;
-  referencia: string;
-  mapa: string;
   lat: string;
   lng: string;
   // contacto
@@ -43,184 +41,53 @@ export interface InfoLocalState {
   instagram: string;
   facebook: string;
   tiktok: string;
-  // pagos
-  pg_efe: string;
-  pg_yape: string;
-  pg_plin: string;
-  pg_tarj: string;
-  pg_transf: string;
-  yape: string;
-  plin: string;
-  cuenta: string;
-  // marca
-  logo: string;
-  // operacion
-  tiempoBase: string;
-  tiempoMax: string;
-  resTol: string;
-  ptsPct: string;
-  credPct: string;
-  wifiNombre: string;
-  wifiClave: string;
-  // fallas
-  fallaEsperaMin: string;
-  fallaMaxIntentos: string;
-  fallaPlazoMin: string;
-  fallaRecargo: string;
-  fallaDevuelve: string;
-  // reparto
-  repMax: string;
-  repNaranja: string;
-  repRojo: string;
-  repMsgMin: string;
-  repMsg1: string;
-  repMsg2: string;
-  repMsg3: string;
-  // areas
-  areasExtra: string;
-  area_frappes: string;
-  area_iced: string;
-  area_frozen: string;
-  area_calientes: string;
-  area_waffles: string;
-  area_salados: string;
-  area_croissants: string;
-  area_complementos: string;
-  // textos
-  terminos: string;
-  privacidad: string;
-  novTit: string;
-  novSub: string;
-  msgListo: string;
-  msgRecojo: string;
-  msgUbic: string;
-  msgPago: string;
-  encMin: string;
-  encPregunta: string;
-  encDesc: string;
-  encLink: string;
-  // entrega
-  envioGratis: string;
-  envioGratisMas: string;
-  pedidoMin: string;
-  zon_Z2: string;
-  zon_Z3: string;
-  zon_Z4: string;
-  zon_Z5: string;
-  zon_Z7: string;
-  pinAnular: string;
-  tarZ2: string;
-  tarZ3: string;
-  tarZ4: string;
-  tarZ5: string;
-  tarZ7: string;
-  // avisos
-  correoDueno: string;
-  grupoWhatsapp: string;
-  // empresa
+  // empresa (comprobantes)
   razonSocial: string;
   ruc: string;
   direccionFiscal: string;
+  // textos legales de la carta
+  terminos: string;
+  privacidad: string;
 }
 
 const INFO_DEFAULT: InfoLocalState = {
   nombre: 'Caprichos',
   lema: '',
-  zona: '',
-  barrio: '',
-  descripcion: '',
   direccion: '',
-  referencia: '',
-  mapa: '',
-  lat: '-12.0147',
-  lng: '-76.966',
+  lat: String(SEDE_DEFECTO.lat),
+  lng: String(SEDE_DEFECTO.lng),
   telefono: '',
   whatsapp: '',
   instagramNombre: '',
   instagram: '',
   facebook: '',
   tiktok: '',
-  pg_efe: '1',
-  pg_yape: '1',
-  pg_plin: '1',
-  pg_tarj: '1',
-  pg_transf: '1',
-  yape: '',
-  plin: '',
-  cuenta: '',
-  logo: '',
-  tiempoBase: '25',
-  tiempoMax: '35',
-  resTol: '15',
-  ptsPct: '5',
-  credPct: '25',
-  wifiNombre: '',
-  wifiClave: '',
-  fallaEsperaMin: '10',
-  fallaMaxIntentos: '2',
-  fallaPlazoMin: '120',
-  fallaRecargo: '0',
-  fallaDevuelve: '1',
-  repMax: '3',
-  repNaranja: '35',
-  repRojo: '50',
-  repMsgMin: '1.5',
-  repMsg1: '',
-  repMsg2: '',
-  repMsg3: '',
-  areasExtra: '',
-  area_frappes: 'Barra',
-  area_iced: 'Barra',
-  area_frozen: 'Barra',
-  area_calientes: 'Barra',
-  area_waffles: 'Cocina',
-  area_salados: 'Cocina',
-  area_croissants: 'Cocina',
-  area_complementos: 'Cocina',
-  terminos: '',
-  privacidad: '',
-  novTit: '',
-  novSub: '',
-  msgListo: '',
-  msgRecojo: '',
-  msgUbic: '',
-  msgPago: '',
-  encMin: '120',
-  encPregunta: '',
-  encDesc: '25',
-  encLink: '',
-  envioGratis: '70',
-  envioGratisMas: '1',
-  pedidoMin: '14.50',
-  zon_Z2: '1',
-  zon_Z3: '1',
-  zon_Z4: '1',
-  zon_Z5: '1',
-  zon_Z7: '1',
-  pinAnular: '000000',
-  tarZ2: '2',
-  tarZ3: '3',
-  tarZ4: '4',
-  tarZ5: '5',
-  tarZ7: '7',
-  correoDueno: '',
-  grupoWhatsapp: '',
   razonSocial: '',
   ruc: '',
   direccionFiscal: '',
+  terminos: '',
+  privacidad: '',
 };
+
+/** Ajuste que no se edita en el formulario: remite al parámetro real en Parámetros del sistema. */
+interface EnlaceParametro {
+  /** id del catálogo de la fila en la pestaña Parámetros (data-cfg-id) */
+  id: string;
+  /** Nombre del parámetro, como se ve en Parámetros */
+  nombre: string;
+}
 
 interface CategoriaConfig {
   id: string;
   n: string;
   d: string;
   fields: Array<{
-    k: keyof InfoLocalState;
+    k: keyof InfoLocalState | string;
     l: string;
     ph?: string;
     multi?: boolean;
-    tog?: boolean;
-    img?: boolean;
+    /** Si existe, el campo no se edita aquí: se muestra «Se edita en Parámetros → …» con un enlace. */
+    par?: EnlaceParametro;
   }>;
 }
 
@@ -228,24 +95,17 @@ export const CATEGORIAS_CONFIG: CategoriaConfig[] = [
   {
     id: 'local',
     n: 'Datos del local',
-    d: 'Nombre, lema y descripción',
+    d: 'Nombre y lema de la carta',
     fields: [
       { k: 'nombre', l: 'Nombre del local', ph: 'Nombre del local' },
       { k: 'lema', l: 'Lema (debajo del nombre)', ph: 'Ejemplo: Cafetería artesanal' },
-      { k: 'zona', l: 'Distrito', ph: 'Ejemplo: San Juan de Lurigancho' },
-      { k: 'barrio', l: 'Zona o barrio', ph: 'Ejemplo: Campoy' },
-      { k: 'descripcion', l: 'Descripción para "Conócenos"', multi: true, ph: 'Describe tu propuesta gastronómica y experiencia...' },
     ],
   },
   {
     id: 'ubicacion',
     n: 'Ubicación',
-    d: 'Dirección y mapa',
-    fields: [
-      { k: 'direccion', l: 'Dirección', ph: 'Dirección física del local' },
-      { k: 'referencia', l: 'Referencia (cómo llegar)', multi: true, ph: 'Indicaciones o puntos de referencia para llegar' },
-      { k: 'mapa', l: 'Enlace de Google Maps', ph: 'https://maps.google.com/...' },
-    ],
+    d: 'Dirección y punto en el mapa',
+    fields: [{ k: 'direccion', l: 'Dirección', ph: 'Dirección física del local' }],
   },
   {
     id: 'contacto',
@@ -277,35 +137,17 @@ export const CATEGORIAS_CONFIG: CategoriaConfig[] = [
     id: 'pagos',
     n: 'Pagos',
     d: 'Medios que se aceptan y datos de cobro',
-    fields: [
-      { k: 'pg_efe', l: 'Aceptar efectivo', tog: true },
-      { k: 'pg_yape', l: 'Aceptar Yape', tog: true },
-      { k: 'pg_plin', l: 'Aceptar Plin', tog: true },
-      { k: 'pg_tarj', l: 'Aceptar tarjeta (POS al entregar)', tog: true },
-      { k: 'pg_transf', l: 'Aceptar transferencia bancaria', tog: true },
-      { k: 'yape', l: 'Número de Yape', ph: 'Número y titular de Yape' },
-      { k: 'plin', l: 'Número de Plin', ph: 'Número y titular de Plin' },
-      { k: 'cuenta', l: 'Cuenta para transferir', ph: 'Banco, número de cuenta y CCI' },
-    ],
-  },
-  {
-    id: 'marca',
-    n: 'Logo',
-    d: 'Imagen del negocio en la carta',
-    fields: [{ k: 'logo', l: 'Logo (se usa en la cabecera de la carta)', img: true }],
+    fields: [],
   },
   {
     id: 'operacion',
     n: 'Operación',
-    d: 'Tiempos, puntos y Wi-Fi',
+    d: 'Tiempo prometido, reservas, puntos y descuento del personal',
     fields: [
-      { k: 'tiempoBase', l: 'Entrega que se le dice al cliente: desde (minutos)' },
-      { k: 'tiempoMax', l: 'Entrega que se le dice al cliente: hasta (minutos)' },
-      { k: 'resTol', l: 'Tolerancia de reservas (minutos)' },
-      { k: 'ptsPct', l: 'Puntos: % del total que gana el cliente con cuenta' },
-      { k: 'credPct', l: 'Descuento del personal al pagar a crédito (% sobre el pedido)' },
-      { k: 'wifiNombre', l: 'Wi-Fi para clientes: nombre de la red', ph: 'Nombre de la red Wi-Fi' },
-      { k: 'wifiClave', l: 'Wi-Fi para clientes: clave (sale en la precuenta)', ph: 'Clave de acceso' },
+      { k: 'tiempoBase', l: 'Tiempo prometido de entrega (minutos)', par: { id: 'parametros-tiempo-prometido-min', nombre: 'Tiempo prometido de entrega (base)' } },
+      { k: 'resTol', l: 'Tolerancia de reservas (minutos)', par: { id: 'parametros-reserva-tolerancia-min', nombre: 'Tolerancia de reservas' } },
+      { k: 'ptsPct', l: 'Puntos: % del total que gana el cliente con cuenta', par: { id: 'parametros-puntos-porcentaje', nombre: 'Porcentaje de puntos para el cliente' } },
+      { k: 'credPct', l: 'Descuento del personal al pagar a crédito (%)', par: { id: 'parametros-descuento-personal-pct', nombre: 'Descuento para el personal a crédito' } },
     ],
   },
   {
@@ -325,56 +167,26 @@ export const CATEGORIAS_CONFIG: CategoriaConfig[] = [
     n: 'Entregas fallidas',
     d: 'Espera, intentos y qué se hace si el cliente no recibe',
     fields: [
-      { k: 'fallaEsperaMin', l: 'Tiempo que espera el repartidor en la dirección (minutos)' },
-      { k: 'fallaMaxIntentos', l: 'Intentos de entrega antes de devolver el pedido a la tienda' },
-      { k: 'fallaPlazoMin', l: 'Plazo para coordinar con el cliente por WhatsApp (minutos)' },
-      { k: 'fallaRecargo', l: 'Recargo por reprogramar una entrega (s/)' },
-      { k: 'fallaDevuelve', l: 'Si el cliente no recibe: recomendar devolver dinero (Sí) o cobrar (No)', tog: true },
+      { k: 'fallaEsperaMin', l: 'Espera del repartidor en la dirección (minutos)', par: { id: 'parametros-reparto-espera-max-min', nombre: 'Espera máxima en la puerta' } },
+      { k: 'fallaMaxIntentos', l: 'Intentos de entrega antes de devolver el pedido a la tienda', par: { id: 'parametros-reprog-max-intentos', nombre: 'Reprogramaciones máximas por pedido' } },
+      { k: 'fallaPlazoMin', l: 'Plazo para coordinar con el cliente por WhatsApp (minutos)', par: { id: 'parametros-reprog-respuesta-min', nombre: 'Tiempo del cliente para responder si reprograma' } },
+      { k: 'fallaRecargo', l: 'Recargo por reprogramar una entrega (S/)', par: { id: 'parametros-reparto-recargo-reprogramacion', nombre: 'Monto fijo por reprogramar' } },
     ],
   },
   {
     id: 'reparto',
     n: 'Reparto y avisos al cliente',
     d: 'Colores del mapa y mensajes de WhatsApp al salir y al llegar',
-    fields: [
-      { k: 'repMax', l: 'Pedidos que puede llevar a la vez cada repartidor' },
-      { k: 'repNaranja', l: 'Naranja (retraso) desde los … minutos, en el mapa y en cocina' },
-      { k: 'repRojo', l: 'Rojo (crítico, palpita) desde los … minutos, en el mapa y en cocina' },
-      { k: 'repMsgMin', l: 'Minutos sin respuesta antes del mensaje 3' },
-      { k: 'repMsg1', l: 'Mensaje 1, al pulsar «En camino» ({nombre} y {codigo})', multi: true, ph: '¡Hola, {nombre}! Tu pedido #{codigo} va en camino...' },
-      { k: 'repMsg2', l: 'Mensaje 2, al pulsar «He llegado»', multi: true, ph: '¡Hola, {nombre}! Ya estamos en tu puerta...' },
-      { k: 'repMsg3', l: 'Mensaje 3, si el cliente no responde', multi: true, ph: 'Hola, {nombre}. No logramos contactarte...' },
-    ],
-  },
-  {
-    id: 'areas',
-    n: 'Áreas de cocina',
-    d: 'A qué pantalla de cocina va cada categoría',
-    fields: [
-      { k: 'areasExtra', l: 'Áreas nuevas (hasta 4, separadas por coma). Ejemplo: Barra fría, Parrilla', ph: 'Ejemplo: Barra fría, Parrilla' },
-      { k: 'area_frappes', l: 'Frappes (pantalla asignada)' },
-      { k: 'area_calientes', l: 'Bebidas calientes (pantalla asignada)' },
-      { k: 'area_waffles', l: 'Waffles (pantalla asignada)' },
-      { k: 'area_salados', l: 'Salados (pantalla asignada)' },
-    ],
+    fields: [],
   },
   {
     id: 'textos',
     n: 'Textos y mensajes',
-    d: 'Términos, privacidad y mensajes de WhatsApp',
+    d: 'Términos y privacidad de la carta, y encuesta posventa',
     fields: [
       { k: 'terminos', l: 'Términos y condiciones (se ven en la carta)', multi: true, ph: 'Términos de servicio y políticas de pedidos...' },
       { k: 'privacidad', l: 'Política de privacidad (se ve en la carta)', multi: true, ph: 'Política de tratamiento de datos personales...' },
-      { k: 'novTit', l: 'Novedades: título de la sección', ph: 'Título para novedades' },
-      { k: 'novSub', l: 'Novedades: subtítulo (texto editable, no es un banner)', multi: true, ph: 'Subtítulo o texto descriptivo' },
-      { k: 'msgListo', l: 'Mensaje: pedido listo / en camino', multi: true, ph: 'Mensaje de pedido listo' },
-      { k: 'msgRecojo', l: 'Mensaje: listo para recoger', multi: true, ph: 'Mensaje para recoger en tienda' },
-      { k: 'msgUbic', l: 'Mensaje: pedir ubicación', multi: true, ph: 'Indicaciones para compartir ubicación' },
-      { k: 'msgPago', l: 'Mensaje: indicaciones de pago', multi: true, ph: 'Instrucciones para enviar comprobante de pago' },
-      { k: 'encMin', l: 'Encuesta posventa: minutos después de la entrega' },
-      { k: 'encPregunta', l: 'Encuesta posventa: pregunta', multi: true, ph: 'Pregunta de satisfacción' },
-      { k: 'encDesc', l: 'Encuesta posventa: % de descuento de agradecimiento' },
-      { k: 'encLink', l: 'Encuesta posventa: enlace de reseña (Google Maps)', ph: 'https://maps.google.com/...' },
+      { k: 'encMin', l: 'Encuesta posventa: minutos después de la entrega', par: { id: 'parametros-encuesta-espera-min', nombre: 'Espera antes de enviar la encuesta' } },
     ],
   },
   {
@@ -382,35 +194,15 @@ export const CATEGORIAS_CONFIG: CategoriaConfig[] = [
     n: 'Entrega',
     d: 'Envío gratis y pedido mínimo',
     fields: [
-      { k: 'envioGratis', l: 'Envío gratis: monto (s/)' },
-      { k: 'envioGratisMas', l: 'Envío gratis solo si se pasa del monto (Sí) o desde el monto exacto (No)', tog: true },
-      { k: 'pedidoMin', l: 'Pedido mínimo de delivery (s/)' },
-      { k: 'zon_Z2', l: 'Atender zona 2', tog: true },
-      { k: 'zon_Z3', l: 'Atender zona 3', tog: true },
-      { k: 'zon_Z4', l: 'Atender zona 4', tog: true },
-      { k: 'zon_Z5', l: 'Atender zona 5', tog: true },
-      { k: 'zon_Z7', l: 'Atender zona 7', tog: true },
-      { k: 'pinAnular', l: 'PIN de 6 dígitos de la supervisora para anular (ejemplo; en el sistema real cada administradora tiene el suyo y se guarda como huella)' },
-      { k: 'tarZ2', l: 'Envío zona 2 (s/)' },
-      { k: 'tarZ3', l: 'Envío zona 3 (s/)' },
-      { k: 'tarZ4', l: 'Envío zona 4 (s/)' },
-      { k: 'tarZ5', l: 'Envío zona 5 (s/)' },
-      { k: 'tarZ7', l: 'Envío zona 7 (s/)' },
-    ],
-  },
-  {
-    id: 'avisos',
-    n: 'Avisos',
-    d: 'Correo y grupo de WhatsApp para alertas y quejas',
-    fields: [
-      { k: 'correoDueno', l: 'Correo de Kevin (alertas de stock y quejas)', ph: 'correo@ejemplo.com' },
-      { k: 'grupoWhatsapp', l: 'Grupo de WhatsApp del equipo (nombre o enlace)', ph: 'Nombre o enlace del grupo de WhatsApp' },
+      { k: 'envioGratis', l: 'Envío gratis: monto (S/)', par: { id: 'parametros-envio-gratis-monto', nombre: 'Monto de compra para envío gratis' } },
+      { k: 'envioGratisMas', l: 'Envío gratis solo si se pasa del monto (Sí) o desde el monto exacto (No)', par: { id: 'parametros-envio-gratis-modo', nombre: 'Cómo se compara el monto de envío gratis' } },
+      { k: 'pedidoMin', l: 'Pedido mínimo de delivery (S/)', par: { id: 'parametros-pedido-minimo', nombre: 'Pedido mínimo' } },
     ],
   },
   {
     id: 'empresa',
     n: 'Empresa',
-    d: 'Uso interno: no se muestra al cliente',
+    d: 'Datos fiscales que imprimen los comprobantes',
     fields: [
       { k: 'razonSocial', l: 'Razón social', ph: 'Razón social de la empresa' },
       { k: 'ruc', l: 'RUC', ph: 'Número de RUC (11 dígitos)' },
@@ -444,7 +236,7 @@ export const CATEGORIAS_CONFIG: CategoriaConfig[] = [
   {
     id: 'vouchers',
     n: 'Lectura de vouchers con IA',
-    d: 'Yape y Plin, interruptor con IA, titular y números',
+    d: 'Yape y Plin, interruptor con IA, tope mensual, titular y números',
     fields: [],
   },
   {
@@ -464,24 +256,30 @@ const SLOTS_FOTOS = [
   'Ambiente de noche',
 ];
 
-const VALORES_MOCK_PROHIBIDOS = new Set([
-  '987 654 321',
-  '51987654321',
-  '987654321',
-  '987 654 321 (Caprichos)',
-  '0011-0123-0200123456 (BCP)',
-  'correo@caprichos.pe',
-  'admin@caprichos.pe',
-  'https://instagram.com/caprichos',
-  'https://facebook.com/caprichos',
-  'https://tiktok.com/@caprichos',
-  '@caprichos',
-  'Caprichos_Clientes',
-  'cafeyfrappes',
-  'Caprichos S.A.C.',
-  '20601234567',
-  'Av. Principal 123, SJL',
-]);
+/** Valores de ejemplo que el servidor devuelve mientras el dueño no guarda sus datos: no se muestran como si fueran reales. */
+const EJEMPLOS_DEL_SERVIDOR = new Set(['Av. Principal 123', '999999999']);
+
+/** Campos que viajan a PUT /admin/local/datos (local_datos). Términos y privacidad van a /admin/configuracion/<clave>. */
+const CLAVES_DATOS_LOCAL: Array<keyof InfoLocalState> = [
+  'nombre', 'lema', 'direccion', 'lat', 'lng', 'telefono', 'whatsapp',
+  'instagramNombre', 'instagram', 'facebook', 'tiktok', 'razonSocial', 'ruc', 'direccionFiscal',
+];
+const RUC_VALIDO = /^(10|15|17|20)\d{9}$/;
+
+/** Pestañas con componente propio: no usan el formulario genérico. */
+const TABS_PROPIAS = ['horario', 'pagos', 'zonas', 'demanda', 'reparto', 'parametros', 'chatbot', 'impresion', 'ayuda', 'vouchers', 'ingreso'];
+
+const estiloInputCoord = {
+  width: '100%',
+  boxSizing: 'border-box',
+  minHeight: '44px',
+  borderRadius: '10px',
+  border: '1.5px solid var(--cp-line)',
+  background: 'var(--cp-white)',
+  color: 'var(--cp-navy)',
+  padding: '0 10px',
+  fontSize: '14px',
+} as const;
 
 /** Id de catálogo de un campo del formulario genérico: `<tab>-<clave en kebab>` (ej. operacion-tiempo-base). */
 export const idCampoGenerico = (tab: string, k: string) =>
@@ -491,14 +289,7 @@ export const idCampoGenerico = (tab: string, k: string) =>
 const GRUPOS_CAMPOS: Record<string, Array<[string, string[]]>> = {
   textos: [
     ['Términos y privacidad', ['terminos', 'privacidad']],
-    ['Novedades', ['novTit', 'novSub']],
-    ['Mensajes de WhatsApp', ['msgListo', 'msgRecojo', 'msgUbic', 'msgPago']],
-    ['Encuesta posventa', ['encMin', 'encPregunta', 'encDesc', 'encLink']],
-  ],
-  entrega: [
-    ['Envío gratis y pedido mínimo', ['envioGratis', 'envioGratisMas', 'pedidoMin']],
-    ['Zonas y tarifas (copia local)', ['zon_Z2', 'zon_Z3', 'zon_Z4', 'zon_Z5', 'zon_Z7', 'tarZ2', 'tarZ3', 'tarZ4', 'tarZ5', 'tarZ7']],
-    ['Anulación de pedidos', ['pinAnular']],
+    ['Encuesta posventa', ['encMin']],
   ],
 };
 
@@ -523,19 +314,6 @@ export function ConfiguracionLocalView() {
     tiene('local/editar') ||
     tiene('configuracion/editar');
 
-  const sanitizar = (obj: any): InfoLocalState => {
-    const res = { ...INFO_DEFAULT, ...obj };
-    for (const k of Object.keys(res) as Array<keyof InfoLocalState>) {
-      if (typeof res[k] === 'string' && VALORES_MOCK_PROHIBIDOS.has(res[k].trim())) {
-        res[k] = '';
-      }
-    }
-    if (!res.descripcion || res.descripcion === '[object Object]' || typeof res.descripcion !== 'string') {
-      res.descripcion = INFO_DEFAULT.descripcion;
-    }
-    return res;
-  };
-
   const location = useLocation();
   const [, setSearchParams] = useSearchParams();
   const tabParam = useMemo(() => {
@@ -554,22 +332,10 @@ export function ConfiguracionLocalView() {
     }
     if (tabParam) setVerDetalle(true);
   }, [tabParam, tabId]);
-  const [info, setInfo] = useState<InfoLocalState>(() => {
-    try {
-      const saved = localStorage.getItem('caprichos_local_info');
-      return saved ? sanitizar(JSON.parse(saved)) : INFO_DEFAULT;
-    } catch {
-      return INFO_DEFAULT;
-    }
-  });
-  const [infoGuardada, setInfoGuardada] = useState<InfoLocalState>(() => {
-    try {
-      const saved = localStorage.getItem('caprichos_local_info');
-      return saved ? sanitizar(JSON.parse(saved)) : INFO_DEFAULT;
-    } catch {
-      return INFO_DEFAULT;
-    }
-  });
+  const [info, setInfo] = useState<InfoLocalState>(INFO_DEFAULT);
+  const [infoGuardada, setInfoGuardada] = useState<InfoLocalState>(INFO_DEFAULT);
+  /** Ya respondió el servidor: antes de eso no se avisa «Falta razón social/RUC». */
+  const [datosCargados, setDatosCargados] = useState(false);
 
   const [mensaje, setMensaje] = useState<string>('');
   const [fotosLocales, setFotosLocales] = useState<Record<string, string>>(() => {
@@ -589,40 +355,53 @@ export function ConfiguracionLocalView() {
     return JSON.stringify(info) !== JSON.stringify(infoGuardada);
   }, [info, infoGuardada]);
 
-  // Cargar desde API inicial
+  // Cargar desde el servidor: datos del local (local_datos) y textos legales (terminos_texto, privacidad_texto)
   useEffect(() => {
-    api.get<any>('/admin/local/datos')
-      .then((data) => {
-        if (data && (data.nombre || data.direccion)) {
-          const descRaw = data.descripcion;
-          const descVal =
-            typeof descRaw === 'string' && descRaw !== '[object Object]' && descRaw.trim()
-              ? descRaw
-              : typeof descRaw === 'object' &&
-                descRaw !== null &&
-                typeof descRaw.texto === 'string' &&
-                descRaw.texto !== '[object Object]' &&
-                descRaw.texto.trim()
-              ? descRaw.texto
-              : undefined;
-
-          const nuevoActualizador = (prev: InfoLocalState): InfoLocalState => ({
-            ...prev,
-            nombre: typeof data.nombre === 'string' && data.nombre ? data.nombre : prev.nombre,
-            direccion: typeof data.direccion === 'string' && data.direccion ? data.direccion : prev.direccion,
-            telefono: typeof data.telefono === 'string' && data.telefono ? data.telefono : prev.telefono,
-            whatsapp: typeof data.whatsapp === 'string' && data.whatsapp ? data.whatsapp : prev.whatsapp,
-            instagram: typeof data.redes?.instagram === 'string' && data.redes.instagram ? data.redes.instagram : prev.instagram,
-            facebook: typeof data.redes?.facebook === 'string' && data.redes.facebook ? data.redes.facebook : prev.facebook,
-            tiktok: typeof data.redes?.tiktok === 'string' && data.redes.tiktok ? data.redes.tiktok : prev.tiktok,
-            descripcion: descVal ?? prev.descripcion,
-          });
-
-          setInfo(nuevoActualizador);
-          setInfoGuardada(nuevoActualizador);
+    let vigente = true;
+    const texto = (v: unknown) => (typeof v === 'string' && !EJEMPLOS_DEL_SERVIDOR.has(v.trim()) ? v : '');
+    const num = (v: unknown, defecto: string) => (typeof v === 'number' && Number.isFinite(v) ? String(v) : defecto);
+    (async () => {
+      const cambios: Partial<InfoLocalState> = {};
+      try {
+        const data = await api.get<any>('/admin/local/datos');
+        if (data && typeof data === 'object') {
+          cambios.nombre = texto(data.nombre) || INFO_DEFAULT.nombre;
+          cambios.direccion = texto(data.direccion);
+          cambios.telefono = texto(data.telefono);
+          cambios.whatsapp = texto(data.whatsapp);
+          cambios.lema = texto(data.lema);
+          cambios.lat = num(data.lat, INFO_DEFAULT.lat);
+          cambios.lng = num(data.lng, INFO_DEFAULT.lng);
+          cambios.razonSocial = texto(data.razon_social);
+          cambios.ruc = texto(data.ruc);
+          cambios.direccionFiscal = texto(data.direccion_fiscal);
+          cambios.instagram = texto(data.redes?.instagram);
+          cambios.facebook = texto(data.redes?.facebook);
+          cambios.tiktok = texto(data.redes?.tiktok);
+          cambios.instagramNombre = texto(data.redes?.instagramNombre);
+          if (vigente) setDatosCargados(true);
         }
-      })
-      .catch(() => {});
+      } catch {
+        // sin datos del servidor: se muestran los campos vacíos
+      }
+      try {
+        const lista = await api.get<Array<{ clave: string; valor: unknown }>>('/admin/configuracion');
+        if (Array.isArray(lista)) {
+          const t = lista.find((p) => p.clave === 'terminos_texto')?.valor;
+          const pv = lista.find((p) => p.clave === 'privacidad_texto')?.valor;
+          if (typeof t === 'string') cambios.terminos = t;
+          if (typeof pv === 'string') cambios.privacidad = pv;
+        }
+      } catch {
+        // sin permiso para leer parámetros: los textos legales quedan vacíos
+      }
+      if (!vigente) return;
+      setInfo((prev) => ({ ...prev, ...cambios }));
+      setInfoGuardada((prev) => ({ ...prev, ...cambios }));
+    })();
+    return () => {
+      vigente = false;
+    };
   }, []);
 
   const categoriaActual = useMemo(() => {
@@ -651,29 +430,71 @@ export function ConfiguracionLocalView() {
     setInfo((prev) => ({ ...prev, [key]: value }));
   };
 
+  /** Mensaje del primer dato inválido, o null. El servidor vuelve a validar. */
+  const validar = (): string | null => {
+    const datosCambiaron = CLAVES_DATOS_LOCAL.some((k) => info[k] !== infoGuardada[k]);
+    if (datosCambiaron) {
+      if (!info.nombre.trim()) return 'El nombre del local es obligatorio.';
+      if (!info.direccion.trim()) return 'La dirección es obligatoria.';
+      if (!info.telefono.trim()) return 'El teléfono es obligatorio.';
+      if (info.ruc.trim() && !RUC_VALIDO.test(info.ruc.trim())) return 'El RUC debe tener 11 dígitos y empezar con 10, 15, 17 o 20.';
+      const lat = Number(info.lat);
+      const lng = Number(info.lng);
+      if (!Number.isFinite(lat) || lat < -90 || lat > 90) return 'La latitud debe ser un número entre -90 y 90.';
+      if (!Number.isFinite(lng) || lng < -180 || lng > 180) return 'La longitud debe ser un número entre -180 y 180.';
+      if (info.lema.trim().length > 80) return 'El lema no puede pasar de 80 caracteres.';
+    }
+    if (info.terminos !== infoGuardada.terminos && !info.terminos.trim()) return 'Los términos y condiciones no pueden quedar vacíos.';
+    if (info.privacidad !== infoGuardada.privacidad && !info.privacidad.trim()) return 'La política de privacidad no puede quedar vacía.';
+    return null;
+  };
+
   const handleGuardar = async () => {
     setConfirmarGuardar(false);
+    const problema = validar();
+    if (problema) {
+      setMensaje(problema);
+      return;
+    }
+    // Se guarda por partes; cada parte confirmada pasa a «guardada» aunque la siguiente falle.
+    let guardado = infoGuardada;
     try {
-      // 1. Guardar en API local si es posible
-      await api.put('/admin/local/datos', {
-        nombre: info.nombre,
-        direccion: info.direccion,
-        telefono: info.telefono,
-        whatsapp: info.whatsapp,
-        redes: {
-          instagram: info.instagram,
-          facebook: info.facebook,
-          tiktok: info.tiktok,
-        },
-      }).catch(() => {});
-
-      // 2. Persistir localmente
-      localStorage.setItem('caprichos_local_info', JSON.stringify(info));
-      setInfoGuardada(info);
+      if (CLAVES_DATOS_LOCAL.some((k) => info[k] !== infoGuardada[k])) {
+        await api.put('/admin/local/datos', {
+          nombre: info.nombre.trim(),
+          direccion: info.direccion.trim(),
+          telefono: info.telefono.trim(),
+          whatsapp: info.whatsapp.trim(),
+          redes: {
+            instagram: info.instagram.trim(),
+            facebook: info.facebook.trim(),
+            tiktok: info.tiktok.trim(),
+            instagramNombre: info.instagramNombre.trim(),
+          },
+          lema: info.lema.trim(),
+          razon_social: info.razonSocial.trim(),
+          ruc: info.ruc.trim(),
+          direccion_fiscal: info.direccionFiscal.trim(),
+          lat: Number(info.lat),
+          lng: Number(info.lng),
+        });
+        guardado = { ...guardado };
+        for (const k of CLAVES_DATOS_LOCAL) guardado[k] = info[k];
+      }
+      if (info.terminos !== infoGuardada.terminos) {
+        await api.put('/admin/configuracion/terminos_texto', { valor: info.terminos.trim() });
+        guardado = { ...guardado, terminos: info.terminos };
+      }
+      if (info.privacidad !== infoGuardada.privacidad) {
+        await api.put('/admin/configuracion/privacidad_texto', { valor: info.privacidad.trim() });
+        guardado = { ...guardado, privacidad: info.privacidad };
+      }
+      setInfoGuardada(guardado);
       setMensaje('Guardado. La carta virtual y el sistema usan estos datos.');
       setTimeout(() => setMensaje(''), 4000);
-    } catch (e: any) {
-      setMensaje('Error al guardar cambios.');
+    } catch (e) {
+      setInfoGuardada(guardado);
+      setMensaje(e instanceof ErrorApi ? `No se guardó: ${e.message}` : 'No se pudo guardar. Revisa tu conexión e inténtalo de nuevo.');
     }
   };
 
@@ -711,6 +532,112 @@ export function ConfiguracionLocalView() {
       localStorage.setItem('caprichos_fotos_local', JSON.stringify(nuevas));
     } catch {}
   };
+
+  const renderCampo = (f: CategoriaConfig['fields'][number]) => {
+    const idCfg = idCampoGenerico(tabId, String(f.k));
+    const ay = propsAyuda(idCfg);
+
+    if (f.par) {
+      const par = f.par;
+      return (
+        <CampoConfig key={String(f.k)} id={idCfg}>
+          <div className="cfg-ayuda-campo" data-testid={`enlace-${idCfg}`}>
+            <div className="cfg-ayuda-etiqueta">{f.l}</div>
+            <div className="cfg-ayuda-texto">{ay.ayuda}</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', marginTop: '6px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 700 }}>Se edita en Parámetros → {par.nombre}</span>
+              <button
+                type="button"
+                aria-label={`Ir a Parámetros: ${par.nombre}`}
+                onClick={() => irACategoria('parametros', par.id)}
+                style={{ minHeight: '44px', padding: '0 16px', borderRadius: '10px', border: '1.5px solid var(--cp-navy)', background: 'transparent', color: 'var(--cp-navy)', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}
+              >
+                Ir a Parámetros
+              </button>
+            </div>
+          </div>
+        </CampoConfig>
+      );
+    }
+
+    const k = f.k as keyof InfoLocalState;
+    if (f.multi) {
+      const esLegal = k === 'terminos' || k === 'privacidad';
+      return (
+        <CampoConfig key={String(f.k)} id={idCfg}>
+          <CampoAyuda id={`cfg-${String(f.k)}`} etiqueta={f.l} {...ay}>
+            <textarea
+              rows={esLegal ? 8 : 3}
+              disabled={!puedeEditar}
+              placeholder={f.ph || ''}
+              value={info[k]}
+              onChange={(e) => handleChange(k, e.target.value)}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                borderRadius: '12px',
+                border: '1.5px solid var(--cp-line)',
+                padding: '10px 12px',
+                fontSize: '14px',
+                fontFamily: 'inherit',
+                color: 'var(--cp-navy)',
+                background: !puedeEditar ? 'var(--cp-bg)' : 'var(--cp-white)',
+                cursor: !puedeEditar ? 'not-allowed' : 'text',
+              }}
+            />
+          </CampoAyuda>
+          {esLegal && (
+            <div
+              data-testid={`vista-previa-${k}`}
+              style={{ marginTop: '8px', border: '1px dashed var(--cp-line)', borderRadius: '12px', padding: '10px 12px', background: 'var(--cp-cream)' }}
+            >
+              <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--cp-soft)', marginBottom: '4px' }}>VISTA PREVIA EN LA CARTA</div>
+              <div style={{ fontSize: '13px', lineHeight: '19px', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+                {info[k].trim() || 'Sin texto: la carta muestra un texto provisional.'}
+              </div>
+            </div>
+          )}
+        </CampoConfig>
+      );
+    }
+
+    return (
+      <CampoConfig key={String(f.k)} id={idCfg}>
+        <CampoAyuda id={`cfg-${String(f.k)}`} etiqueta={f.l} {...ay}>
+          <input
+            type="text"
+            disabled={!puedeEditar}
+            placeholder={f.ph || ''}
+            value={info[k]}
+            onChange={(e) => handleChange(k, e.target.value)}
+            style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              minHeight: '44px',
+              borderRadius: '12px',
+              border: '1.5px solid var(--cp-line)',
+              padding: '0 12px',
+              fontSize: '14px',
+              color: 'var(--cp-navy)',
+              background: !puedeEditar ? 'var(--cp-bg)' : 'var(--cp-white)',
+              cursor: !puedeEditar ? 'not-allowed' : 'text',
+            }}
+          />
+        </CampoAyuda>
+      </CampoConfig>
+    );
+  };
+
+  const coordValida = (v: string, max: number) => v.trim() !== '' && Number.isFinite(Number(v)) && Math.abs(Number(v)) <= max;
+  const puntoSede = {
+    lat: coordValida(info.lat, 90) ? Number(info.lat) : SEDE_DEFECTO.lat,
+    lng: coordValida(info.lng, 180) ? Number(info.lng) : SEDE_DEFECTO.lng,
+  };
+  const sedeGuardada = {
+    lat: coordValida(infoGuardada.lat, 90) ? Number(infoGuardada.lat) : SEDE_DEFECTO.lat,
+    lng: coordValida(infoGuardada.lng, 180) ? Number(infoGuardada.lng) : SEDE_DEFECTO.lng,
+  };
+  const faltaFiscal = [!infoGuardada.razonSocial.trim() && 'razón social', !infoGuardada.ruc.trim() && 'RUC'].filter(Boolean) as string[];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -754,6 +681,36 @@ export function ConfiguracionLocalView() {
           </span>
         )}
       </div>
+
+      {datosCargados && faltaFiscal.length > 0 && (
+        <div
+          role="status"
+          data-testid="aviso-falta-fiscal"
+          style={{
+            background: 'var(--cp-cream)',
+            border: '1.5px solid var(--cp-orange)',
+            borderRadius: '12px',
+            padding: '10px 14px',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '10px',
+            alignItems: 'center',
+            fontSize: '13px',
+            color: 'var(--cp-navy)',
+          }}
+        >
+          <span style={{ flex: '1 1 260px', fontWeight: 700 }}>
+            Falta {faltaFiscal.join(' y ')}: los comprobantes saldrán sin esos datos del local.
+          </span>
+          <button
+            type="button"
+            onClick={() => irACategoria('empresa')}
+            style={{ minHeight: '44px', padding: '0 16px', borderRadius: '10px', border: '1.5px solid var(--cp-navy)', background: 'transparent', color: 'var(--cp-navy)', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}
+          >
+            Completar en Empresa
+          </button>
+        </div>
+      )}
 
       <BuscadorConfiguracion
         categorias={categoriasVisibles}
@@ -822,14 +779,31 @@ export function ConfiguracionLocalView() {
                   Ubicación actual de la tienda
                 </div>
                 <div style={{ fontSize: '12px', lineHeight: '17px', color: 'var(--cp-soft)' }}>
-                  Es el punto desde donde se miden los radios de entrega y el centro de los mapas. Cámbiala si la tienda se muda o si estás en el local y quieres marcarlo.
+                  Es el punto desde donde se miden los radios de entrega y el centro de los mapas. Busca la dirección o toca el mapa y arrastra el pin hasta la puerta del local. Se guarda con «Guardar cambios».
                 </div>
+              </div>
+
+              <BuscadorDireccion
+                onElegir={(p) => setInfo((prev) => ({ ...prev, lat: p.lat.toFixed(6), lng: p.lng.toFixed(6) }))}
+              />
+
+              <MapaUbicacion
+                punto={puntoSede}
+                onCambiar={(p) => setInfo((prev) => ({ ...prev, lat: p.lat.toFixed(6), lng: p.lng.toFixed(6) }))}
+                altura={300}
+                etiqueta="Mapa para marcar la ubicación de la tienda"
+                local={{ ...sedeGuardada, nombre: info.nombre }}
+                ajustarA="punto"
+                soloLectura={!puedeEditar}
+              />
+              <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
+                El icono de la tienda es la sede guardada; el pin es la nueva ubicación.
               </div>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                 <div style={{ flex: '1 1 220px', background: 'var(--cp-white)', borderRadius: '10px', padding: '8px 12px' }}>
                   <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--cp-soft)' }}>DIRECCIÓN</div>
-                  <div style={{ fontWeight: 700, overflowWrap: 'anywhere' }}>{info.direccion}</div>
+                  <div style={{ fontWeight: 700, overflowWrap: 'anywhere' }}>{info.direccion || 'Sin dirección'}</div>
                 </div>
                 <div style={{ flex: '1 1 180px', background: 'var(--cp-white)', borderRadius: '10px', padding: '8px 12px' }}>
                   <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--cp-soft)' }}>COORDENADAS EN USO</div>
@@ -840,6 +814,7 @@ export function ConfiguracionLocalView() {
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                 <button
                   type="button"
+                  disabled={!puedeEditar}
                   onClick={() => {
                     if (navigator.geolocation) {
                       navigator.geolocation.getCurrentPosition(
@@ -864,48 +839,11 @@ export function ConfiguracionLocalView() {
                     color: 'var(--cp-navy)',
                     fontWeight: 800,
                     fontSize: '14px',
-                    cursor: 'pointer',
+                    cursor: puedeEditar ? 'pointer' : 'not-allowed',
+                    opacity: puedeEditar ? 1 : 0.6,
                   }}
                 >
                   Usar la ubicación de este equipo
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMensaje(`Buscando dirección: ${info.direccion}`);
-                  }}
-                  style={{
-                    flex: '1 1 180px',
-                    minHeight: '52px',
-                    border: '1.5px solid var(--cp-navy)',
-                    borderRadius: '12px',
-                    background: 'transparent',
-                    color: 'var(--cp-navy)',
-                    fontWeight: 700,
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Buscar la dirección escrita
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMensaje('Coordenadas sincronizadas con el enlace de Google Maps.');
-                  }}
-                  style={{
-                    flex: '1 1 180px',
-                    minHeight: '52px',
-                    border: '1.5px solid var(--cp-navy)',
-                    borderRadius: '12px',
-                    background: 'transparent',
-                    color: 'var(--cp-navy)',
-                    fontWeight: 700,
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Tomar del enlace de Google Maps
                 </button>
               </div>
 
@@ -915,19 +853,10 @@ export function ConfiguracionLocalView() {
                   <input
                     type="text"
                     inputMode="decimal"
+                    disabled={!puedeEditar}
                     value={info.lat}
                     onChange={(e) => handleChange('lat', e.target.value)}
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      minHeight: '44px',
-                      borderRadius: '10px',
-                      border: '1.5px solid var(--cp-line)',
-                      background: 'var(--cp-white)',
-                      color: 'var(--cp-navy)',
-                      padding: '0 10px',
-                      fontSize: '14px',
-                    }}
+                    style={estiloInputCoord}
                   />
                   </CampoAyuda>
                 </div>
@@ -936,19 +865,10 @@ export function ConfiguracionLocalView() {
                   <input
                     type="text"
                     inputMode="decimal"
+                    disabled={!puedeEditar}
                     value={info.lng}
                     onChange={(e) => handleChange('lng', e.target.value)}
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      minHeight: '44px',
-                      borderRadius: '10px',
-                      border: '1.5px solid var(--cp-line)',
-                      background: 'var(--cp-white)',
-                      color: 'var(--cp-navy)',
-                      padding: '0 10px',
-                      fontSize: '14px',
-                    }}
+                    style={estiloInputCoord}
                   />
                   </CampoAyuda>
                 </div>
@@ -1016,7 +936,7 @@ export function ConfiguracionLocalView() {
           )}
 
           {/* Subcaso: CAMPOS REGULARES DE OTRAS CATEGORÍAS */}
-          {tabId !== 'horario' && tabId !== 'pagos' && tabId !== 'zonas' && tabId !== 'demanda' && tabId !== 'reparto' && tabId !== 'parametros' && tabId !== 'chatbot' && tabId !== 'impresion' && tabId !== 'ayuda' && tabId !== 'vouchers' && tabId !== 'ingreso' && (
+          {!TABS_PROPIAS.includes(tabId) && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {tabId === 'operacion' && (
                 <div
@@ -1083,152 +1003,7 @@ export function ConfiguracionLocalView() {
                 </div>
               )}
               {gruposDe(tabId, categoriaActual.fields).map((g, gi) => {
-                const campos = g.campos.map((f) => <CampoConfig key={String(f.k)} id={idCampoGenerico(tabId, String(f.k))}>{(() => {
-                const ay = propsAyuda(idCampoGenerico(tabId, String(f.k)));
-                if (f.tog) {
-                  const isChecked = info[f.k] === '1';
-                  return (
-                    <CampoAyuda key={String(f.k)} id={`cfg-${String(f.k)}`} etiqueta={f.l} {...ay}>
-                      <button
-                        type="button"
-                        disabled={!puedeEditar}
-                        onClick={() => handleChange(f.k, isChecked ? '0' : '1')}
-                        style={{
-                          minHeight: '44px',
-                          alignSelf: 'flex-start',
-                          padding: '0 20px',
-                          borderRadius: '9999px',
-                          border: '1.5px solid var(--cp-navy)',
-                          background: isChecked ? 'var(--cp-navy)' : 'transparent',
-                          color: isChecked ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                          fontWeight: 800,
-                          fontSize: '13px',
-                          cursor: !puedeEditar ? 'not-allowed' : 'pointer',
-                          opacity: !puedeEditar ? 0.6 : 1,
-                        }}
-                      >
-                        {isChecked ? 'Sí' : 'No'}
-                      </button>
-                    </CampoAyuda>
-                  );
-                }
-
-                if (f.img) {
-                  return (
-                    <div key={String(f.k)} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <label style={{ fontWeight: 700, fontSize: '13px' }}>{f.l}</label>
-                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                        <div
-                          style={{
-                            width: '72px',
-                            height: '72px',
-                            borderRadius: '36px',
-                            border: '1.5px solid var(--cp-line)',
-                            background: 'var(--cp-sand)',
-                            backgroundImage: info[f.k] ? `url('${info[f.k]}')` : 'none',
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontWeight: 800,
-                            color: 'var(--cp-navy)',
-                          }}
-                        >
-                          {!info[f.k] && 'Logo'}
-                        </div>
-                        <label
-                          style={{
-                            position: 'relative',
-                            minHeight: '44px',
-                            padding: '0 16px',
-                            borderRadius: '10px',
-                            background: 'var(--cp-orange)',
-                            color: 'var(--cp-navy)',
-                            fontWeight: 800,
-                            fontSize: '13px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            cursor: !puedeEditar ? 'not-allowed' : 'pointer',
-                            opacity: !puedeEditar ? 0.6 : 1,
-                          }}
-                        >
-                          Subir logo
-                          <input
-                            type="file"
-                            accept="image/*"
-                            disabled={!puedeEditar}
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                const rd = new FileReader();
-                                rd.onload = () => {
-                                  if (typeof rd.result === 'string') {
-                                    handleChange(f.k, rd.result);
-                                  }
-                                };
-                                rd.readAsDataURL(file);
-                              }
-                            }}
-                            style={{ position: 'absolute', inset: 0, opacity: 0, cursor: !puedeEditar ? 'not-allowed' : 'pointer', width: '100%', height: '100%' }}
-                          />
-                        </label>
-                      </div>
-                      <div className="cfg-ayuda-texto">{ay.ayuda}</div>
-                    </div>
-                  );
-                }
-
-                if (f.multi) {
-                  return (
-                    <CampoAyuda key={String(f.k)} id={`cfg-${String(f.k)}`} etiqueta={f.l} {...ay}>
-                      <textarea
-                        rows={3}
-                        disabled={!puedeEditar}
-                        placeholder={f.ph || ''}
-                        value={info[f.k]}
-                        onChange={(e) => handleChange(f.k, e.target.value)}
-                        style={{
-                          width: '100%',
-                          boxSizing: 'border-box',
-                          borderRadius: '12px',
-                          border: '1.5px solid var(--cp-line)',
-                          padding: '10px 12px',
-                          fontSize: '14px',
-                          fontFamily: 'inherit',
-                          color: 'var(--cp-navy)',
-                          background: !puedeEditar ? 'var(--cp-bg)' : 'var(--cp-white)',
-                          cursor: !puedeEditar ? 'not-allowed' : 'text',
-                        }}
-                      />
-                    </CampoAyuda>
-                  );
-                }
-
-                return (
-                  <CampoAyuda key={String(f.k)} id={`cfg-${String(f.k)}`} etiqueta={f.l} {...ay}>
-                    <input
-                      type="text"
-                      disabled={!puedeEditar}
-                      placeholder={f.ph || ''}
-                      value={info[f.k]}
-                      onChange={(e) => handleChange(f.k, e.target.value)}
-                      style={{
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        minHeight: '44px',
-                        borderRadius: '12px',
-                        border: '1.5px solid var(--cp-line)',
-                        padding: '0 12px',
-                        fontSize: '14px',
-                        color: 'var(--cp-navy)',
-                        background: !puedeEditar ? 'var(--cp-bg)' : 'var(--cp-white)',
-                        cursor: !puedeEditar ? 'not-allowed' : 'text',
-                      }}
-                    />
-                  </CampoAyuda>
-                );
-              })()}</CampoConfig>);
+                const campos = g.campos.map(renderCampo);
                 if (!g.titulo) return <React.Fragment key={gi}>{campos}</React.Fragment>;
                 return (
                   <details key={g.titulo} open={gi === 0} className="cfg-grupo-detalle">
@@ -1241,7 +1016,7 @@ export function ConfiguracionLocalView() {
           )}
 
           {/* Botones de acción inferiores */}
-          {tabId !== 'horario' && tabId !== 'pagos' && tabId !== 'zonas' && tabId !== 'demanda' && tabId !== 'impresion' && tabId !== 'ayuda' && tabId !== 'ingreso' && (
+          {!TABS_PROPIAS.includes(tabId) && categoriaActual.fields.some((f) => !f.par) && (
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px' }}>
               <button
                 type="button"

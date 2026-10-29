@@ -115,6 +115,7 @@ export async function leerConfigEta(db: {
   const claves = [
     'local_lat',
     'local_lng',
+    'local_datos',
     'reparto_velocidad_kmh',
     'eta_factor_urbano',
     'eta_productos_desde',
@@ -131,10 +132,14 @@ export async function leerConfigEta(db: {
     const v = mapa.get(clave);
     return v !== undefined && Number.isFinite(v) && v > 0 ? v : defecto;
   };
+  // La sede que se edita en Configuración > Ubicación vive en local_datos y manda sobre local_lat/local_lng.
+  const sede = filas.find((f) => f.clave === 'local_datos')?.valor as { lat?: unknown; lng?: unknown } | undefined;
+  const latSede = typeof sede?.lat === 'number' && Number.isFinite(sede.lat) ? sede.lat : undefined;
+  const lngSede = typeof sede?.lng === 'number' && Number.isFinite(sede.lng) ? sede.lng : undefined;
   return {
     local: {
-      lat: num('local_lat', CONFIG_ETA_DEFECTO.local.lat),
-      lng: num('local_lng', CONFIG_ETA_DEFECTO.local.lng),
+      lat: latSede ?? num('local_lat', CONFIG_ETA_DEFECTO.local.lat),
+      lng: lngSede ?? num('local_lng', CONFIG_ETA_DEFECTO.local.lng),
     },
     velocidadKmh: num('reparto_velocidad_kmh', CONFIG_ETA_DEFECTO.velocidadKmh),
     factorUrbano: num('eta_factor_urbano', CONFIG_ETA_DEFECTO.factorUrbano),

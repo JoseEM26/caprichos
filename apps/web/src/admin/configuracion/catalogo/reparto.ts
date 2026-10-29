@@ -2,7 +2,7 @@ import type { EntradaConfig, PeligroConfig } from './tipos';
 
 /**
  * Pestaña «Reparto» (SeccionRepartoConfig). La tarjeta de espera/intentos/recargo de entregas fallidas
- * (id fallas-falla-espera-min) la referencia operacion.ts. Textos verificados contra repartos.service.ts.
+ * (ids fallas-*) está en operacion.ts. Textos verificados contra repartos.service.ts.
  */
 export interface AyudaReparto {
   titulo: string;
@@ -75,5 +75,4 @@ export const REPARTO: EntradaConfig[] = [
     clave: a.clave, palabras: [...a.palabras, a.clave.replace(/_/g, ' ')], peligro: a.peligro,
   })),
   { id: 'reparto-mensajes-whatsapp', tab: 'reparto', seccion: 'Reparto y avisos al cliente', titulo: 'Dónde se cambian los mensajes de WhatsApp al salir y llegar', descripcion: 'Los avisos «En camino», «He llegado» y espera agotada se encienden o apagan en Parámetros (Avisos automáticos por WhatsApp) y sus tiempos en Parámetros (entrega fallida). Aquí no se editan.', ejemplo: 'Para apagar el aviso «Repartidor en la puerta» ve a Parámetros.', palabras: ['en camino', 'he llegado', 'aviso', 'mensaje', 'whatsapp', 'plantilla'] },
-  { id: 'fallas-falla-espera-min', tab: 'fallas', seccion: 'Entregas fallidas', titulo: 'Espera, intentos y recargo de entregas fallidas', descripcion: 'Cuánto espera el repartidor, cuántos intentos hace y cuánto se cobra por reprogramar si el cliente no recibe.', palabras: ['fallida', 'no recibe', 'reprogramar', 'recargo', 'devolver', 'intentos'], peligro: 'alto' },
 ];

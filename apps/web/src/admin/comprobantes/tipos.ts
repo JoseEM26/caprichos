@@ -29,10 +29,13 @@ export interface RespuestaListarPorEmitir {
 
 export interface LocalEncabezado {
   nombre: string;
-  razon_social: string;
-  ruc: string;
-  direccion: string;
-  telefono: string;
+  razon_social: string | null;
+  ruc: string | null;
+  direccion: string | null;
+  telefono: string | null;
+  direccion_fiscal?: string | null;
+  datos_fiscales_completos?: boolean;
+  aviso_datos_fiscales?: string | null;
 }
 
 export interface DetalleLineaNotaVenta {

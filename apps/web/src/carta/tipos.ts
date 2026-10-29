@@ -84,6 +84,8 @@ export interface DatosLocalCarta {
   telefono: string;
   whatsapp: string;
   redes: Record<string, string>;
+  /** Frase bajo el nombre; el servidor manda «Cafetería artesanal» si el dueño no puso otra. */
+  lema?: string;
   horario: HorarioDiaCarta[];
   mediosPago: Record<string, MedioPagoInfo>;
   envioGratisDesde: number | null;

@@ -28,8 +28,8 @@ describe('Búsqueda de configuración', () => {
   });
 
   it('ordena: título > palabras clave > descripción', () => {
-    const r = ids('wifi');
-    expect(r[0]).toBe('operacion-wifi-nombre');
+    const r = ids('razon social');
+    expect(r[0]).toBe('empresa-razon-social');
     const lista = [
       { id: 'a', tab: 't', seccion: 's', titulo: 'Otra cosa', descripcion: 'menciona zebra aquí', palabras: [] },
       { id: 'b', tab: 't', seccion: 's', titulo: 'Otra cosa 2', descripcion: 'nada', palabras: ['zebra'] },

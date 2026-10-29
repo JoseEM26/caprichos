@@ -5,7 +5,7 @@ import { Insignia } from '../../comun/Insignia';
 import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
 import { ErrorApi } from '../../comun/api';
-import { vouchersApi, ResumenConsumoVoucherIa } from '../vouchers/vouchersApi';
+import { vouchersApi, ResumenConsumoVoucherIa, EstadoIaVouchers } from '../vouchers/vouchersApi';
 import { ParametrosVoucherConfig } from '../vouchers/tipos';
 import { CampoAyuda } from './AyudaCampo';
 import { CampoConfig } from './CampoConfig';
@@ -34,15 +34,19 @@ export function TarjetaVouchersIaConfiguracion({
 
   const [config, setConfig] = useState<ParametrosVoucherConfig>({
     voucher_ia_activo: false,
-    voucher_titular_nombre: 'Kevin',
-    voucher_yape_numero: '946388934',
-    voucher_plin_numero: '946388934',
+    voucher_titular_nombre: 'Maria Jose Morillo Ruiz',
+    voucher_yape_numero: '977503006',
+    voucher_plin_numero: '977503006',
   });
+  const [topeTexto, setTopeTexto] = useState<string>('20');
+  const [corteTexto, setCorteTexto] = useState<string>('10');
+  const [estadoIa, setEstadoIa] = useState<EstadoIaVouchers | null>(null);
+  const [confirmarLimites, setConfirmarLimites] = useState<boolean>(false);
 
   // Campos de formulario editables
-  const [titularNombre, setTitularNombre] = useState<string>('Kevin');
-  const [yapeNumero, setYapeNumero] = useState<string>('946388934');
-  const [plinNumero, setPlinNumero] = useState<string>('946388934');
+  const [titularNombre, setTitularNombre] = useState<string>('Maria Jose Morillo Ruiz');
+  const [yapeNumero, setYapeNumero] = useState<string>('977503006');
+  const [plinNumero, setPlinNumero] = useState<string>('977503006');
 
   const [consumoIa, setConsumoIa] = useState<ResumenConsumoVoucherIa | null>(null);
   const [cargando, setCargando] = useState<boolean>(true);
@@ -65,8 +69,16 @@ export function TarjetaVouchersIaConfiguracion({
       setYapeNumero(cfg.voucher_yape_numero);
       setPlinNumero(cfg.voucher_plin_numero);
 
+      setTopeTexto(String(cfg.chatbot_ia_tope_mensual_usd ?? 20));
+      setCorteTexto(String(cfg.voucher_ia_corte_min ?? 10));
+
       const consumo = await vouchersApi.obtenerConsumoIa();
       setConsumoIa(consumo);
+      try {
+        setEstadoIa(await vouchersApi.obtenerEstadoIa());
+      } catch {
+        setEstadoIa(null);
+      }
     } catch (err) {
       const msg =
         err instanceof ErrorApi
@@ -129,21 +141,21 @@ export function TarjetaVouchersIaConfiguracion({
     try {
       await vouchersApi.guardarParametro(
         'voucher_titular_nombre',
-        titularNombre.trim() || 'Kevin',
+        titularNombre.trim() || 'Maria Jose Morillo Ruiz',
       );
       await vouchersApi.guardarParametro(
         'voucher_yape_numero',
-        yapeNumero.trim() || '946388934',
+        yapeNumero.trim() || '977503006',
       );
       await vouchersApi.guardarParametro(
         'voucher_plin_numero',
-        plinNumero.trim() || '946388934',
+        plinNumero.trim() || '977503006',
       );
       setConfig((prev) => ({
         ...prev,
-        voucher_titular_nombre: titularNombre.trim() || 'Kevin',
-        voucher_yape_numero: yapeNumero.trim() || '946388934',
-        voucher_plin_numero: plinNumero.trim() || '946388934',
+        voucher_titular_nombre: titularNombre.trim() || 'Maria Jose Morillo Ruiz',
+        voucher_yape_numero: yapeNumero.trim() || '977503006',
+        voucher_plin_numero: plinNumero.trim() || '977503006',
       }));
 
       setConfirmarGuardarCampos(false);
@@ -155,6 +167,46 @@ export function TarjetaVouchersIaConfiguracion({
           : 'No se pudieron guardar los parámetros de vouchers';
       setError(msg);
       setConfirmarGuardarCampos(false);
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const topeNum = Number(topeTexto.trim().replace(',', '.'));
+  const corteNum = Number(corteTexto.trim());
+  const topeValido = topeTexto.trim() !== '' && Number.isFinite(topeNum) && topeNum >= 1 && topeNum <= 500;
+  const corteValido = corteTexto.trim() !== '' && Number.isInteger(corteNum) && corteNum >= 1 && corteNum <= 120;
+
+  const handleSolicitarGuardarLimites = () => {
+    if (!esAdmin) return;
+    setMensajeExito(null);
+    if (!topeValido) {
+      setError('El tope mensual debe estar entre 1 y 500 USD.');
+      return;
+    }
+    if (!corteValido) {
+      setError('La pausa del corte automático debe ser un número entero entre 1 y 120 minutos.');
+      return;
+    }
+    setError(null);
+    setConfirmarLimites(true);
+  };
+
+  const handleConfirmarGuardarLimites = async () => {
+    setGuardando(true);
+    setError(null);
+    try {
+      await vouchersApi.guardarParametro('chatbot_ia_tope_mensual_usd', topeNum);
+      await vouchersApi.guardarParametro('voucher_ia_corte_min', corteNum);
+      setConfig((prev) => ({ ...prev, chatbot_ia_tope_mensual_usd: topeNum, voucher_ia_corte_min: corteNum }));
+      setEstadoIa((prev) =>
+        prev ? { ...prev, topeMensual: { ...prev.topeMensual, topeUsd: topeNum, superado: prev.topeMensual.usadoUsd >= topeNum } } : prev,
+      );
+      setConfirmarLimites(false);
+      setMensajeExito('Límites de la lectura con IA actualizados correctamente');
+    } catch (err) {
+      setError(err instanceof ErrorApi ? err.message : 'No se pudieron guardar los límites de la lectura con IA');
+      setConfirmarLimites(false);
     } finally {
       setGuardando(false);
     }
@@ -324,7 +376,7 @@ export function TarjetaVouchersIaConfiguracion({
                 disabled={!esAdmin || guardando}
                 value={titularNombre}
                 onChange={(e) => setTitularNombre(e.target.value)}
-                placeholder="Ejemplo: Kevin"
+                placeholder="Ejemplo: Maria Jose Morillo Ruiz"
                 style={{
                   width: '100%',
                   boxSizing: 'border-box',
@@ -346,7 +398,7 @@ export function TarjetaVouchersIaConfiguracion({
               etiqueta="Número Yape (destino)"
               ayuda="Celular al que los clientes deben yapear. Se compara con el número destino que la IA lee en el voucher."
               efecto="Un voucher hecho a otro número se marca como dudoso. Si lo cambias, los clientes deben yapear al número nuevo. Aplica desde la siguiente lectura."
-              ejemplo="946388934"
+              ejemplo="977503006"
               cfgId="vouchers-yape-numero"
             >
               <input
@@ -355,7 +407,7 @@ export function TarjetaVouchersIaConfiguracion({
                 disabled={!esAdmin || guardando}
                 value={yapeNumero}
                 onChange={(e) => setYapeNumero(e.target.value)}
-                placeholder="946388934"
+                placeholder="977503006"
                 style={{
                   width: '100%',
                   boxSizing: 'border-box',
@@ -377,7 +429,7 @@ export function TarjetaVouchersIaConfiguracion({
               etiqueta="Número Plin (destino)"
               ayuda="Celular al que los clientes deben hacer plin. Se compara con el número destino que la IA lee en el voucher."
               efecto="Un voucher hecho a otro número se marca como dudoso. Si lo cambias, los clientes deben hacer plin al número nuevo. Aplica desde la siguiente lectura."
-              ejemplo="946388934"
+              ejemplo="977503006"
               cfgId="vouchers-plin-numero"
             >
               <input
@@ -386,7 +438,7 @@ export function TarjetaVouchersIaConfiguracion({
                 disabled={!esAdmin || guardando}
                 value={plinNumero}
                 onChange={(e) => setPlinNumero(e.target.value)}
-                placeholder="946388934"
+                placeholder="977503006"
                 style={{
                   width: '100%',
                   boxSizing: 'border-box',
@@ -417,75 +469,153 @@ export function TarjetaVouchersIaConfiguracion({
         )}
       </div>
 
-      {/* Métricas de consumo de IA del mes */}
-      {consumoIa && (
-        <div
-          data-testid="consumo-ia-mes-vouchers"
-          data-cfg-id="vouchers-ia-consumo"
-          tabIndex={-1}
-          style={{
-            background: 'var(--cp-cream, #FBF4EC)',
-            border: '1px solid var(--cp-line, #E3D6C6)',
-            borderRadius: '12px',
-            padding: '12px 14px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '6px',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: '8px',
-            }}
-          >
-            <span
-              style={{
-                fontSize: '13px',
-                fontWeight: 700,
-                color: 'var(--cp-navy, #0B2C3E)',
-              }}
-            >
-              Consumo de IA este mes ({consumoIa.periodo})
-            </span>
-            <span
-              style={{
-                fontSize: '11px',
-                fontWeight: 700,
-                color: 'var(--cp-green, #2F7A45)',
-                background: '#E8F5E9',
-                padding: '2px 8px',
-                borderRadius: '6px',
-                border: '1px solid var(--cp-green, #2F7A45)',
-              }}
-            >
-              Sin tope mensual
-            </span>
-          </div>
-
-          <div style={{ fontSize: '12px', color: 'var(--cp-soft, #2C4C5D)', lineHeight: 1.45 }}>
-            {consumoIa.llamadasTotal} lecturas · {consumoIa.tokensTotal.toLocaleString()} tokens · Costo estimado: ${consumoIa.costoUsdEstimado.toFixed(4)} USD. Decisión del dueño: este uso no se corta por tope mensual.
-          </div>
-        </div>
-      )}
-
-      <CampoConfig
-        id="vouchers-ia-corte"
+      {/* Consumo del mes frente al tope, y límites editables */}
+      <div
+        data-testid="consumo-ia-mes-vouchers"
+        data-cfg-id="vouchers-ia-consumo"
+        tabIndex={-1}
         style={{
-          fontSize: '12px',
-          color: 'var(--cp-soft, #2C4C5D)',
-          background: 'var(--cp-white, #FFFFFF)',
-          padding: '8px 12px',
-          borderRadius: '8px',
-          border: '1px dashed var(--cp-line, #E3D6C6)',
-          lineHeight: 1.4,
+          background: 'var(--cp-cream, #FBF4EC)',
+          border: '1px solid var(--cp-line, #E3D6C6)',
+          borderRadius: '12px',
+          padding: '12px 14px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
         }}
       >
-        <b>Corte automático:</b> si la IA falla tres veces seguidas por saldo o clave (o cinco errores), se corta unos minutos y los vouchers se guardan sin lectura para que Caja los revise a mano; luego una lectura de prueba decide si se reanuda. Los minutos se cambian en Parámetros (voucher_ia_corte_min, por defecto 10).
-      </CampoConfig>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+          <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-navy, #0B2C3E)' }}>
+            Consumo de IA este mes{consumoIa ? ` (${consumoIa.periodo})` : ''}
+          </span>
+          <span
+            data-testid="etiqueta-tope-mensual"
+            style={{
+              fontSize: '11px',
+              fontWeight: 700,
+              color: estadoIa?.topeMensual.superado ? 'var(--cp-rust, #B2500F)' : 'var(--cp-green, #2F7A45)',
+              background: estadoIa?.topeMensual.superado ? '#FDECEA' : '#E8F5E9',
+              padding: '2px 8px',
+              borderRadius: '6px',
+              border: `1px solid ${estadoIa?.topeMensual.superado ? 'var(--cp-rust, #B2500F)' : 'var(--cp-green, #2F7A45)'}`,
+            }}
+          >
+            Tope mensual: {(estadoIa?.topeMensual.topeUsd ?? config.chatbot_ia_tope_mensual_usd ?? 20).toLocaleString('es-PE')} USD
+          </span>
+        </div>
+
+        {estadoIa && (
+          <div>
+            <div
+              role="progressbar"
+              aria-label="Consumo de IA de vouchers frente al tope mensual"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.min(100, Math.round((estadoIa.topeMensual.usadoUsd / Math.max(estadoIa.topeMensual.topeUsd, 0.01)) * 100))}
+              data-testid="barra-tope-vouchers"
+              style={{ height: '10px', borderRadius: '9999px', background: 'var(--cp-sand, #E3D6C6)', overflow: 'hidden' }}
+            >
+              <div
+                style={{
+                  height: '100%',
+                  width: `${Math.min(100, (estadoIa.topeMensual.usadoUsd / Math.max(estadoIa.topeMensual.topeUsd, 0.01)) * 100)}%`,
+                  background: estadoIa.topeMensual.superado ? 'var(--cp-rust, #B2500F)' : 'var(--cp-green, #2F7A45)',
+                }}
+              />
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--cp-soft, #2C4C5D)', marginTop: '4px' }}>
+              Usado por vouchers: ${estadoIa.topeMensual.usadoUsd.toFixed(2)} de ${estadoIa.topeMensual.topeUsd.toFixed(2)} USD
+              {estadoIa.topeMensual.superado ? '. Tope alcanzado: la lectura automática está detenida hasta el próximo mes.' : '.'}
+            </div>
+          </div>
+        )}
+
+        {consumoIa && (
+          <div style={{ fontSize: '12px', color: 'var(--cp-soft, #2C4C5D)', lineHeight: 1.45 }}>
+            {consumoIa.llamadasTotal} lecturas · {consumoIa.tokensTotal.toLocaleString()} tokens · Costo estimado: ${consumoIa.costoUsdEstimado.toFixed(4)} USD (todas las funciones con IA).
+          </div>
+        )}
+
+        <div style={{ fontSize: '12px', color: 'var(--cp-soft, #2C4C5D)', lineHeight: 1.45 }}>
+          Al llegar al tope, la lectura automática se detiene, los vouchers se guardan igual y Caja los revisa a ojo. Se avisa una sola vez a los administradores.
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
+          <CampoAyuda
+            id="voucher-tope-mensual"
+            etiqueta="Tope mensual de IA (USD)"
+            ayuda="Gasto máximo del mes en la lectura de vouchers con IA. Al alcanzarlo, la lectura automática se detiene hasta el próximo mes."
+            efecto="Los vouchers se guardan igual y Caja los revisa a ojo. Se avisa una sola vez a los administradores."
+            ejemplo="20"
+            porDefecto="20"
+            unidad="USD"
+            rango="1 a 500"
+            cfgId="vouchers-ia-tope"
+          >
+            <input
+              data-testid="input-voucher-tope"
+              type="text"
+              inputMode="decimal"
+              disabled={!esAdmin || guardando}
+              value={topeTexto}
+              onChange={(e) => setTopeTexto(e.target.value)}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                minHeight: '44px',
+                borderRadius: '8px',
+                border: '1.5px solid var(--cp-line, #E3D6C6)',
+                background: 'var(--cp-white, #FFFFFF)',
+                padding: '0 10px',
+                fontSize: '13px',
+              }}
+            />
+          </CampoAyuda>
+          <CampoAyuda
+            id="voucher-corte-min"
+            etiqueta="Pausa del corte automático (minutos)"
+            ayuda="Si la IA falla tres veces seguidas por saldo o clave (o cinco errores), se corta este tiempo y los vouchers se guardan sin lectura para que Caja los revise a mano."
+            efecto="Pasado el tiempo, una lectura de prueba decide si se reanuda. Aplica desde el próximo corte."
+            ejemplo="10"
+            porDefecto="10"
+            unidad="minutos"
+            rango="1 a 120"
+            cfgId="vouchers-ia-corte"
+          >
+            <input
+              data-testid="input-voucher-corte"
+              type="text"
+              inputMode="numeric"
+              disabled={!esAdmin || guardando}
+              value={corteTexto}
+              onChange={(e) => setCorteTexto(e.target.value)}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                minHeight: '44px',
+                borderRadius: '8px',
+                border: '1.5px solid var(--cp-line, #E3D6C6)',
+                background: 'var(--cp-white, #FFFFFF)',
+                padding: '0 10px',
+                fontSize: '13px',
+              }}
+            />
+          </CampoAyuda>
+        </div>
+
+        {esAdmin && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <Boton
+              variante="primario"
+              cargando={guardando}
+              onClick={handleSolicitarGuardarLimites}
+              data-testid="btn-guardar-limites-vouchers"
+            >
+              Guardar límites
+            </Boton>
+          </div>
+        )}
+      </div>
 
       {/* Regla de oro visual */}
       <div
@@ -548,6 +678,18 @@ export function TarjetaVouchersIaConfiguracion({
         cargando={guardando}
         alConfirmar={handleConfirmarSwitch}
         alCancelar={() => setConfirmarSwitchAbierto(false)}
+      />
+
+      {/* Modal Confirmar Sí/No: Guardar límites */}
+      <Confirmar
+        abierto={confirmarLimites}
+        titulo="¿Guardar los límites de la lectura con IA?"
+        mensaje={`Tope mensual: ${topeTexto} USD. Pausa del corte automático: ${corteTexto} minutos.`}
+        textoSi="Sí, guardar límites"
+        textoNo="No, cancelar"
+        cargando={guardando}
+        alConfirmar={handleConfirmarGuardarLimites}
+        alCancelar={() => setConfirmarLimites(false)}
       />
 
       {/* Modal Confirmar Sí/No: Guardar Campos */}

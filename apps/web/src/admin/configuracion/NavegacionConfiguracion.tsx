@@ -4,9 +4,9 @@ import './configuracion-nav.css';
 export interface CategoriaNav { id: string; n: string; d: string; }
 
 export const GRUPOS_CONFIG: Array<{ id: string; titulo: string; tabs: string[] }> = [
-  { id: 'local', titulo: 'Mi local', tabs: ['local', 'ubicacion', 'contacto', 'horario', 'redes', 'marca', 'empresa'] },
-  { id: 'ventas', titulo: 'Ventas y reparto', tabs: ['pagos', 'entrega', 'zonas', 'reparto', 'fallas', 'demanda', 'operacion', 'areas'] },
-  { id: 'clientes', titulo: 'Comunicación con clientes', tabs: ['textos', 'avisos', 'chatbot', 'vouchers', 'ayuda'] },
+  { id: 'local', titulo: 'Mi local', tabs: ['local', 'ubicacion', 'contacto', 'horario', 'redes', 'empresa'] },
+  { id: 'ventas', titulo: 'Ventas y reparto', tabs: ['pagos', 'entrega', 'zonas', 'reparto', 'fallas', 'demanda', 'operacion'] },
+  { id: 'clientes', titulo: 'Comunicación con clientes', tabs: ['textos', 'chatbot', 'vouchers', 'ayuda'] },
   { id: 'equipos', titulo: 'Equipos y dispositivos', tabs: ['impresion', 'ingreso'] },
   { id: 'sistema', titulo: 'Sistema', tabs: ['parametros'] },
 ];

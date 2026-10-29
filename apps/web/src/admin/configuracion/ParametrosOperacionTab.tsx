@@ -44,6 +44,9 @@ const OPCIONES_RECARGO_REPROG = [
   },
 ];
 
+/** Claves que ya no se muestran: duplicado muerto (las reservas leen reserva_tolerancia_min). El valor sigue en el servidor. */
+const CLAVES_OCULTAS = ['tolerancia_reserva_min'];
+
 export const META_PARAMETROS: Record<string, MetaParametro> = {
   reprog_recargo_modo: {
     nombre: 'Costo de volver a enviar un pedido',
@@ -102,7 +105,7 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
   tiempo_max_min: {
     nombre: 'Tiempo máximo de entrega',
     descripcion: 'Límite superior del tiempo estimado de entrega para el cliente.',
-    tipo: 'numero',
+    tipo: 'solo_lectura',
     sufijo: 'minutos',
   },
   envio_gratis_monto: {
@@ -121,12 +124,6 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
     descripcion: 'Monto mínimo en compras requerido para poder solicitar envío a domicilio.',
     tipo: 'numero',
     sufijo: 'S/',
-  },
-  tolerancia_reserva_min: {
-    nombre: 'Tolerancia de reserva',
-    descripcion: 'Minutos de espera de cortesía antes de liberar una mesa reservada.',
-    tipo: 'numero',
-    sufijo: 'minutos',
   },
   reserva_tolerancia_min: {
     nombre: 'Tolerancia de reserva',
@@ -202,7 +199,7 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
   alta_demanda_min_base: {
     nombre: 'Minutos base por alta demanda',
     descripcion: 'Tiempo adicional que se suma a las órdenes cuando alta demanda está encendida.',
-    tipo: 'numero',
+    tipo: 'solo_lectura',
     sufijo: 'minutos',
   },
   carta_aviso_entrada: {
@@ -674,7 +671,7 @@ export function ParametrosOperacionTab({
   };
 
   // Secciones plegables: las claves conocidas por grupo; el resto cae en «Otros parámetros»
-  const conocidas = new Set(GRUPOS_PARAMETROS.flatMap((g) => g.claves));
+  const conocidas = new Set([...GRUPOS_PARAMETROS.flatMap((g) => g.claves), ...CLAVES_OCULTAS]);
   const gruposVisibles = [
     ...GRUPOS_PARAMETROS.map((g) => ({
       id: g.id,
@@ -810,7 +807,7 @@ export function ParametrosOperacionTab({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '24px' }}>🤖</span>
+            <span style={{ fontSize: '14px', fontWeight: 800 }}>IA</span>
             <div>
               <div
                 style={{
@@ -946,7 +943,7 @@ export function ParametrosOperacionTab({
                       {p.clave}
                     </span>
                     {esSoloLectura && (
-                      <Insignia variante="aviso">Solo lectura (Cocina)</Insignia>
+                      <Insignia variante="aviso">{p.clave === 'pausa_alta_demanda' ? 'Solo lectura (Cocina)' : 'Solo lectura'}</Insignia>
                     )}
                   </div>
                   {AYUDA_PARAMETROS[p.clave] ? (

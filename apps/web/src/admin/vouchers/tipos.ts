@@ -81,4 +81,8 @@ export interface ParametrosVoucherConfig {
   voucher_titular_nombre: string;
   voucher_yape_numero: string;
   voucher_plin_numero: string;
+  /** Tope mensual de gasto en IA (USD). Defecto 20. */
+  chatbot_ia_tope_mensual_usd?: number;
+  /** Minutos de pausa del corte automático. Defecto 10. */
+  voucher_ia_corte_min?: number;
 }

@@ -213,12 +213,22 @@ export class ComprobantesService {
     }
 
     const localParam = datosLocal || {};
+    // Nunca se imprimen datos de ejemplo: si falta razón social o RUC, el comprobante lo dice.
+    const texto = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+    const razonSocial = texto(localParam.razon_social) || texto(localParam.razonSocial);
+    const rucLocal = texto(localParam.ruc);
+    const faltan = [!razonSocial && 'razón social', !rucLocal && 'RUC'].filter(Boolean) as string[];
     const local = {
       nombre: localParam.nombre || 'Caprichos',
-      razon_social: localParam.razon_social || localParam.razonSocial || 'Caprichos S.A.C.',
-      ruc: localParam.ruc || '20123456789',
-      direccion: localParam.direccion || 'Av. Principal 123',
-      telefono: localParam.telefono || '999999999',
+      razon_social: razonSocial || null,
+      ruc: rucLocal || null,
+      direccion: texto(localParam.direccion) || null,
+      telefono: texto(localParam.telefono) || null,
+      direccion_fiscal: texto(localParam.direccion_fiscal) || null,
+      datos_fiscales_completos: faltan.length === 0,
+      aviso_datos_fiscales: faltan.length
+        ? `Falta ${faltan.join(' y ')} del local: complétalo en Configuración > Empresa`
+        : null,
     };
 
     const fechaCobro = cobroVigente<any>(pedido.cobros)?.en ?? comprobante.creado_en ?? pedido.creado_en;

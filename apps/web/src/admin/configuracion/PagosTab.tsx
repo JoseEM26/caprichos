@@ -377,7 +377,7 @@ export function PagosTab({ puedeEditar }: PagosTabProps) {
               <CampoAyuda id="pagos-yape-numero" etiqueta="Número de celular para Yape" cfgId="pagos-yape" {...propsAyuda('pagos-yape')}>
               <Campo
                 value={pagos.yape.numero || ''}
-                placeholder="Ej: 999999999"
+                placeholder="Ej: 9XX XXX XXX"
                 disabled={!puedeEditar || guardando}
                 onChange={(e) => {
                   setPagos({
@@ -452,7 +452,7 @@ export function PagosTab({ puedeEditar }: PagosTabProps) {
               <CampoAyuda id="pagos-plin-numero" etiqueta="Número de celular para Plin" cfgId="pagos-plin" {...propsAyuda('pagos-plin')}>
               <Campo
                 value={pagos.plin.numero || ''}
-                placeholder="Ej: 999999999"
+                placeholder="Ej: 9XX XXX XXX"
                 disabled={!puedeEditar || guardando}
                 onChange={(e) => {
                   setPagos({

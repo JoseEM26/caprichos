@@ -7,7 +7,7 @@ describe('TarjetaLecturaVoucher (Módulo Mensajes)', () => {
   const voucherBase: VoucherResumenChat = {
     id: 'vch-1',
     semaforo: 'CONFIABLE',
-    motivos: ['Monto coincide con el total del pedido', 'Titular coincide con Kevin'],
+    motivos: ['Monto coincide con el total del pedido', 'Titular coincide con Maria Jose'],
     extraido: {
       legible: true,
       monto: 45.0,
@@ -15,8 +15,8 @@ describe('TarjetaLecturaVoucher (Módulo Mensajes)', () => {
       operacion: '98765432',
       fecha: '2026-10-27',
       hora: '15:20',
-      titular: 'Kevin R.',
-      destinoNumero: '946388934',
+      titular: 'Maria Jose M.',
+      destinoNumero: '977503006',
       medioDetectado: 'YAPE',
       confianza: 0.95,
     },
@@ -45,8 +45,8 @@ describe('TarjetaLecturaVoucher (Módulo Mensajes)', () => {
     expect(screen.getByText(/S\/ 45.00/i)).toBeDefined();
     expect(screen.getAllByText('(coincide)').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('98765432')).toBeDefined();
-    expect(screen.getByText('Kevin R.')).toBeDefined();
-    expect(screen.getByText('946388934')).toBeDefined();
+    expect(screen.getByText('Maria Jose M.')).toBeDefined();
+    expect(screen.getByText('977503006')).toBeDefined();
 
     // Regla de oro fija obligatoria
     expect(

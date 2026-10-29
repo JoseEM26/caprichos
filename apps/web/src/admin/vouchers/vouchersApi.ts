@@ -166,9 +166,11 @@ export const vouchersApi = {
   async obtenerConfiguracion(): Promise<ParametrosVoucherConfig> {
     const defaults: ParametrosVoucherConfig = {
       voucher_ia_activo: false,
-      voucher_titular_nombre: 'Kevin',
-      voucher_yape_numero: '946388934',
-      voucher_plin_numero: '946388934',
+      voucher_titular_nombre: 'Maria Jose Morillo Ruiz',
+      voucher_yape_numero: '977503006',
+      voucher_plin_numero: '977503006',
+      chatbot_ia_tope_mensual_usd: 20,
+      voucher_ia_corte_min: 10,
     };
 
     try {
@@ -189,6 +191,10 @@ export const vouchersApi = {
           defaults.voucher_yape_numero = String(p.valor);
         } else if (p.clave === 'voucher_plin_numero' && p.valor != null) {
           defaults.voucher_plin_numero = String(p.valor);
+        } else if (p.clave === 'chatbot_ia_tope_mensual_usd' && Number(p.valor) > 0) {
+          defaults.chatbot_ia_tope_mensual_usd = Number(p.valor);
+        } else if (p.clave === 'voucher_ia_corte_min' && Number(p.valor) > 0) {
+          defaults.voucher_ia_corte_min = Number(p.valor);
         }
       }
     } catch {

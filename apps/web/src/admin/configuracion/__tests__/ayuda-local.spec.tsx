@@ -42,17 +42,16 @@ describe('Ayuda por campo: pestañas del local, horario, pagos y zonas', () => {
     for (const i of ['pagos-pg-tarj', 'pagos-pg-yape', 'pagos-pg-plin', 'pagos-pg-transf', 'pagos-banco', 'fechas-fecha', 'fechas-quitar', 'zonas-snap-m', 'zonas-tarifa', 'zonas-minutos']) expect(ids.has(i), i).toBe(true);
   });
 
-  it('un campo genérico muestra su ayuda visible con unidad y aviso de copia local', async () => {
+  it('un campo genérico muestra su ayuda visible y remite a Parámetros', async () => {
     montar('/admin/configuracion?tab=operacion');
-    await waitFor(() => expect(screen.getByRole('textbox', { name: /^Entrega que se le dice al cliente: desde \(minutos\)$/ })).toBeInTheDocument());
-    expect(screen.getAllByText(/Es una copia: hoy solo se guarda en este navegador/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Unidad: minutos/).length).toBeGreaterThan(0);
+    await waitFor(() => expect(screen.getAllByText(/Se edita en Parámetros/).length).toBeGreaterThan(0));
+    expect(screen.queryByText(/hoy solo se guarda en este navegador/)).not.toBeInTheDocument();
   });
 
   it('?tab=textos&campo=… abre la sección plegada y resalta el campo genérico', async () => {
-    montar('/admin/configuracion?tab=textos&campo=textos-enc-link');
+    montar('/admin/configuracion?tab=textos&campo=textos-terminos');
     await waitFor(() => {
-      const el = document.querySelector('[data-cfg-id="textos-enc-link"]')!;
+      const el = document.querySelector('[data-cfg-id="textos-terminos"]')!;
       expect(el).toHaveClass('cfg-resaltado');
       expect(el.closest('details')!.open).toBe(true);
     });

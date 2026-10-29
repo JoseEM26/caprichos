@@ -276,4 +276,68 @@ describe('ConfiguracionService', () => {
       );
     });
   });
+
+  describe('parámetros nuevos con rango', () => {
+    beforeEach(() => {
+      prismaMock.parametro.findUnique.mockResolvedValue(null);
+      prismaMock.parametro.upsert.mockImplementation(async ({ create }: any) => create);
+    });
+
+    it.each([
+      ['eta_factor_urbano', 1.3],
+      ['eta_productos_desde', 3],
+      ['eta_extra_por_producto_min', 1],
+      ['eta_parada_min', 3],
+      ['eta_margen_min', 5],
+      ['eta_paso_min', 5],
+      ['eta_base_sin_zona_min', 5],
+      ['reserva_tolerancia_min', 15],
+      ['chatbot_ia_tope_mensual_usd', 20.5],
+      ['voucher_ia_corte_min', 10],
+    ])('guarda %s=%s y audita', async (clave, valor) => {
+      const res = await service.actualizar(clave, valor as number, adminAuth, '1.1.1.1');
+      expect(res).toEqual({ clave, valor });
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({ accion: 'PARAMETRO', despues: { clave, valor } }),
+      );
+    });
+
+    it.each([
+      ['eta_factor_urbano', 0.5],
+      ['eta_factor_urbano', 4],
+      ['eta_productos_desde', 2.5],
+      ['eta_paso_min', 0],
+      ['eta_margen_min', 61],
+      ['reserva_tolerancia_min', 0],
+      ['reserva_tolerancia_min', 181],
+      ['chatbot_ia_tope_mensual_usd', 0.5],
+      ['chatbot_ia_tope_mensual_usd', 501],
+      ['voucher_ia_corte_min', 0],
+      ['voucher_ia_corte_min', 121],
+      ['voucher_ia_corte_min', 10.5],
+    ])('%s=%s fuera de rango → 400 RANGO_INVALIDO', async (clave, valor) => {
+      await expect(service.actualizar(clave, valor as number, adminAuth)).rejects.toMatchObject({
+        response: expect.objectContaining({ codigo: 'RANGO_INVALIDO' }),
+      });
+      expect(prismaMock.parametro.upsert).not.toHaveBeenCalled();
+    });
+
+    it('ayuda_ia_activo acepta booleano y lo guarda como si/no', async () => {
+      const res = await service.actualizar('ayuda_ia_activo', true, adminAuth);
+      expect(res).toEqual({ clave: 'ayuda_ia_activo', valor: 'si' });
+      await expect(service.actualizar('ayuda_ia_activo', 'quizas', adminAuth)).rejects.toThrow(BadRequestException);
+    });
+
+    it('terminos_texto y privacidad_texto se guardan recortados y no admiten vacío', async () => {
+      const res = await service.actualizar('terminos_texto', '  Texto  ', adminAuth);
+      expect(res.valor).toBe('Texto');
+      await expect(service.actualizar('privacidad_texto', '   ', adminAuth)).rejects.toThrow(BadRequestException);
+    });
+
+    it('otras claves siguen sin permitirse', async () => {
+      await expect(service.actualizar('eta_inventada_min', 5, adminAuth)).rejects.toMatchObject({
+        response: expect.objectContaining({ codigo: 'CLAVE_DESCONOCIDA' }),
+      });
+    });
+  });
 });
