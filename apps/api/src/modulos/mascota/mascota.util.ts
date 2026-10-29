@@ -1,7 +1,14 @@
 import {
+  ACCESORIOS_VALIDOS,
   DEFAULT_ASPECTO_BASE,
   DEFAULT_MASCOTA_CONFIG,
   DEFAULT_TEMAS,
+  ESCALA_DEFECTO,
+  ESCALA_MAXIMA,
+  ESCALA_MINIMA,
+  ESTILOS_CABELLO,
+  PRENDAS_UNIFORME,
+  TIPOS_GORRO,
 } from './mascota.constantes';
 import {
   AspectoBase,
@@ -109,6 +116,7 @@ export function fusionarAspecto(
       principal: parcial.uniforme?.principal ?? base.uniforme.principal,
       delantal: parcial.uniforme?.delantal ?? base.uniforme.delantal,
       ribete: parcial.uniforme?.ribete ?? base.uniforme.ribete,
+      prenda: parcial.uniforme?.prenda ?? base.uniforme.prenda,
     },
     gorro: {
       tipo: parcial.gorro?.tipo ?? base.gorro.tipo,
@@ -119,6 +127,13 @@ export function fusionarAspecto(
         ? [...parcial.accesorios]
         : [...base.accesorios],
   };
+}
+
+/** Escala de Capri limitada a [ESCALA_MINIMA, ESCALA_MAXIMA]; lo no numérico vale ESCALA_DEFECTO. */
+export function sanitizarEscala(valor: unknown): number {
+  const n = typeof valor === 'number' ? valor : Number(valor);
+  if (!Number.isFinite(n)) return ESCALA_DEFECTO;
+  return Math.min(ESCALA_MAXIMA, Math.max(ESCALA_MINIMA, n));
 }
 
 /**
@@ -149,15 +164,28 @@ export function normalizarMascotaConfig(
         DEFAULT_ASPECTO_BASE.uniforme.delantal,
       ribete:
         config.base?.uniforme?.ribete || DEFAULT_ASPECTO_BASE.uniforme.ribete,
+      prenda: (PRENDAS_UNIFORME as readonly string[]).includes(
+        config.base?.uniforme?.prenda as string,
+      )
+        ? config.base!.uniforme!.prenda
+        : DEFAULT_ASPECTO_BASE.uniforme.prenda,
     },
     gorro: {
-      tipo: config.base?.gorro?.tipo || DEFAULT_ASPECTO_BASE.gorro.tipo,
+      tipo: (TIPOS_GORRO as readonly string[]).includes(config.base?.gorro?.tipo as string)
+        ? config.base!.gorro!.tipo
+        : DEFAULT_ASPECTO_BASE.gorro.tipo,
       color: config.base?.gorro?.color || DEFAULT_ASPECTO_BASE.gorro.color,
     },
     accesorios: Array.isArray(config.base?.accesorios)
-      ? [...config.base.accesorios]
+      ? config.base.accesorios.filter((a) =>
+          (ACCESORIOS_VALIDOS as readonly string[]).includes(a),
+        )
       : [...DEFAULT_ASPECTO_BASE.accesorios],
   };
+
+  if (!(ESTILOS_CABELLO as readonly string[]).includes(base.cabello.estilo)) {
+    base.cabello.estilo = DEFAULT_ASPECTO_BASE.cabello.estilo;
+  }
 
   const temas: TemaMascota[] = Array.isArray(config.temas) && config.temas.length > 0
     ? config.temas
@@ -171,6 +199,7 @@ export function normalizarMascotaConfig(
     temas,
     modo,
     temaManual,
+    escala: sanitizarEscala(config.escala),
   };
 }
 

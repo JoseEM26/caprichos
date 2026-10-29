@@ -9,11 +9,17 @@ import {
   type TemaMascota,
   type EstiloCabello,
   type TipoGorro,
+  type TipoPrenda,
   type TipoAccesorio,
   ASPECTO_BASE_DEFECTO,
   CONFIGURACION_DEFECTO,
+  ESCALA_DEFECTO,
+  ESCALA_MAXIMA,
+  ESCALA_MINIMA,
   ESTILOS_CABELLO,
+  TEMAS_PREDETERMINADOS,
   TIPOS_GORRO,
+  TIPOS_PRENDA,
   TIPOS_ACCESORIOS,
 } from './tiposAspecto';
 
@@ -60,6 +66,9 @@ export function sanitizarAspecto(aspecto?: unknown): AspectoCapri {
   const tipoGorro: TipoGorro = TIPOS_GORRO.includes(rawGorro.tipo) ? rawGorro.tipo : def.gorro.tipo;
   const colorGorro = sanitizarColorHex(rawGorro.color, def.gorro.color);
 
+  const rawPrenda = rawUniforme.prenda;
+  const prenda: TipoPrenda = TIPOS_PRENDA.includes(rawPrenda) ? rawPrenda : def.uniforme.prenda!;
+
   let accesorios: TipoAccesorio[] = [];
   if (Array.isArray(raw.accesorios)) {
     accesorios = raw.accesorios.filter((acc: any): acc is TipoAccesorio =>
@@ -78,6 +87,7 @@ export function sanitizarAspecto(aspecto?: unknown): AspectoCapri {
       principal: uniformePrincipal,
       delantal: uniformeDelantal,
       ribete: uniformeRibete,
+      prenda,
     },
     gorro: {
       tipo: tipoGorro,
@@ -85,6 +95,41 @@ export function sanitizarAspecto(aspecto?: unknown): AspectoCapri {
     },
     accesorios,
   };
+}
+
+/**
+ * Escala de Capri limitada a [ESCALA_MINIMA, ESCALA_MAXIMA]; lo no numérico vale ESCALA_DEFECTO.
+ */
+export function sanitizarEscala(valor: unknown): number {
+  const n = typeof valor === 'number' ? valor : Number(valor);
+  if (!Number.isFinite(n)) return ESCALA_DEFECTO;
+  return Math.min(ESCALA_MAXIMA, Math.max(ESCALA_MINIMA, n));
+}
+
+/**
+ * Sanea una configuración completa (la de la API o una guardada antes de estas opciones).
+ * Todo campo ausente o desconocido cae al valor por defecto; nunca lanza.
+ */
+export function sanitizarConfiguracion(raw: unknown): ConfiguracionMascota {
+  const r = raw && typeof raw === 'object' ? (raw as Record<string, any>) : {};
+  const temas: TemaMascota[] =
+    Array.isArray(r.temas) && r.temas.length > 0 ? r.temas : TEMAS_PREDETERMINADOS;
+  return {
+    base: sanitizarAspecto(r.base),
+    temas,
+    modo: r.modo === 'MANUAL' ? 'MANUAL' : 'AUTOMATICO',
+    temaManual: typeof r.temaManual === 'string' ? r.temaManual : 'normal',
+    escala: sanitizarEscala(r.escala),
+  };
+}
+
+/**
+ * Extrae la configuración de la respuesta de GET /admin/mascota. El API la devuelve plana
+ * (base, temas, modo...); se acepta también la forma envuelta { config }.
+ */
+export function extraerConfiguracion(respuesta: unknown): ConfiguracionMascota {
+  const r = respuesta && typeof respuesta === 'object' ? (respuesta as Record<string, any>) : {};
+  return sanitizarConfiguracion(r.config && typeof r.config === 'object' ? r.config : r);
 }
 
 /**
@@ -96,7 +141,7 @@ export function fusionarAspecto(
     piel: string;
     cabello: Partial<{ color: string; estilo: EstiloCabello }>;
     ojos: string;
-    uniforme: Partial<{ principal: string; delantal: string; ribete: string }>;
+    uniforme: Partial<{ principal: string; delantal: string; ribete: string; prenda: TipoPrenda }>;
     gorro: Partial<{ tipo: TipoGorro; color: string }>;
     accesorios: TipoAccesorio[];
   }>
@@ -127,6 +172,10 @@ export function fusionarAspecto(
     ribete: parcial.uniforme?.ribete
       ? sanitizarColorHex(parcial.uniforme.ribete, base.uniforme.ribete)
       : base.uniforme.ribete,
+    prenda:
+      parcial.uniforme?.prenda && TIPOS_PRENDA.includes(parcial.uniforme.prenda)
+        ? parcial.uniforme.prenda
+        : base.uniforme.prenda,
   };
 
   const gorro = {
@@ -138,6 +187,8 @@ export function fusionarAspecto(
       ? sanitizarColorHex(parcial.gorro.color, base.gorro.color)
       : base.gorro.color,
   };
+
+  // (uniforme.prenda se hereda del base si el tema no la define)
 
   const accesorios = Array.isArray(parcial.accesorios)
     ? parcial.accesorios.filter((acc): acc is TipoAccesorio => TIPOS_ACCESORIOS.includes(acc))

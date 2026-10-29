@@ -3,6 +3,7 @@ import {
   IsArray,
   IsBoolean,
   IsIn,
+  IsNumber,
   IsOptional,
   IsString,
   Matches,
@@ -14,6 +15,7 @@ import {
   ESTILOS_CABELLO,
   HEX_COLOR_REGEX,
   MM_DD_REGEX,
+  PRENDAS_UNIFORME,
   TIPOS_GORRO,
 } from '../mascota.constantes';
 import {
@@ -25,6 +27,7 @@ import {
   ModoMascota,
   TemaMascota,
   TipoGorro,
+  TipoPrenda,
   UniformeConfig,
 } from '../mascota.tipos';
 
@@ -55,6 +58,12 @@ export class UniformeDto implements UniformeConfig {
     message: 'El color del ribete debe tener formato #RRGGBB',
   })
   ribete!: string;
+
+  @IsOptional()
+  @IsIn(PRENDAS_UNIFORME, {
+    message: `La prenda debe ser una de: ${PRENDAS_UNIFORME.join(', ')}`,
+  })
+  prenda?: TipoPrenda;
 }
 
 export class GorroDto implements GorroConfig {
@@ -132,6 +141,12 @@ export class UniformeParcialDto implements Partial<UniformeConfig> {
     message: 'El color del ribete debe tener formato #RRGGBB',
   })
   ribete?: string;
+
+  @IsOptional()
+  @IsIn(PRENDAS_UNIFORME, {
+    message: `La prenda debe ser una de: ${PRENDAS_UNIFORME.join(', ')}`,
+  })
+  prenda?: TipoPrenda;
 }
 
 export class GorroParcialDto implements Partial<GorroConfig> {
@@ -232,6 +247,11 @@ export class ActualizarMascotaConfigDto {
     message: 'El modo debe ser "AUTOMATICO" o "MANUAL"',
   })
   modo!: ModoMascota;
+
+  // El rango se corrige en normalizarMascotaConfig (no se rechaza).
+  @IsOptional()
+  @IsNumber()
+  escala?: number;
 
   @IsOptional()
   @IsString()

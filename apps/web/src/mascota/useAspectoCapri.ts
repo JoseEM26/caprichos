@@ -10,18 +10,21 @@ import {
   type AspectoCapri,
   type RespuestaPublicaMascota,
   ASPECTO_BASE_DEFECTO,
+  ESCALA_DEFECTO,
 } from './tiposAspecto';
-import { sanitizarAspecto } from './aspectoUtils';
+import { sanitizarAspecto, sanitizarEscala } from './aspectoUtils';
 
 export interface AspectoHeredado {
   aspecto: AspectoCapri;
   tema: string;
+  escala: number;
   cargando: boolean;
 }
 
 interface CacheAspecto {
   tema: string;
   aspecto: AspectoCapri;
+  escala: number;
 }
 
 let cacheGlobal: CacheAspecto | null = null;
@@ -69,6 +72,7 @@ export async function cargarAspectoPublico(): Promise<CacheAspecto> {
       const resuelto: CacheAspecto = {
         tema: respuesta?.tema || 'normal',
         aspecto: sanitizarAspecto(respuesta?.aspecto),
+        escala: sanitizarEscala(respuesta?.escala),
       };
 
       cacheGlobal = resuelto;
@@ -79,6 +83,7 @@ export async function cargarAspectoPublico(): Promise<CacheAspecto> {
       const fallback: CacheAspecto = {
         tema: 'normal',
         aspecto: { ...ASPECTO_BASE_DEFECTO },
+        escala: ESCALA_DEFECTO,
       };
       cacheGlobal = fallback;
       notificarSuscriptores(fallback);
@@ -102,6 +107,7 @@ export function useAspectoCapri(): AspectoHeredado {
       cacheGlobal || {
         tema: 'normal',
         aspecto: { ...ASPECTO_BASE_DEFECTO },
+        escala: ESCALA_DEFECTO,
       }
     );
   });
@@ -139,6 +145,7 @@ export function useAspectoCapri(): AspectoHeredado {
   return {
     aspecto: datos.aspecto,
     tema: datos.tema,
+    escala: datos.escala,
     cargando,
   };
 }
@@ -154,10 +161,11 @@ export function limpiarCacheAspecto(): void {
 /**
  * Función para forzar o pre-establecer el aspecto en caché (útil para pruebas unitarias).
  */
-export function preestablecerAspectoCache(datos: CacheAspecto): void {
+export function preestablecerAspectoCache(datos: { tema: string; aspecto: AspectoCapri; escala?: number }): void {
   cacheGlobal = {
     tema: datos.tema,
     aspecto: sanitizarAspecto(datos.aspecto),
+    escala: sanitizarEscala(datos.escala),
   };
   notificarSuscriptores(cacheGlobal);
 }

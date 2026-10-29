@@ -6,6 +6,9 @@ import {
   estaEnRango,
   calcularDuracionRango,
   resolverAspecto,
+  sanitizarConfiguracion,
+  sanitizarEscala,
+  extraerConfiguracion,
 } from '../aspectoUtils';
 import {
   ASPECTO_BASE_DEFECTO,
@@ -177,6 +180,67 @@ describe('aspectoUtils.ts', () => {
       const resNormal = resolverAspecto({ ...configManual, temaManual: 'normal' }, '10-27');
       expect(resNormal.tema).toBe('normal');
       expect(resNormal.aspecto).toEqual(ASPECTO_BASE_DEFECTO);
+    });
+  });
+  describe('opciones nuevas, retrocompatibilidad y escala', () => {
+    it('acepta los gorros, estilos, prendas y accesorios nuevos', () => {
+      for (const tipo of ['gorra', 'boina', 'beanie', 'diadema']) {
+        expect(sanitizarAspecto({ gorro: { tipo, color: '#112233' } }).gorro.tipo).toBe(tipo);
+      }
+      expect(sanitizarAspecto({ cabello: { estilo: 'rizado' } }).cabello.estilo).toBe('rizado');
+      expect(sanitizarAspecto({ uniforme: { prenda: 'polo' } }).uniforme.prenda).toBe('polo');
+      const acc = ['lentes', 'aretes', 'mochila', 'flor', 'medalla', 'banda', 'confeti'];
+      expect(sanitizarAspecto({ accesorios: acc }).accesorios).toEqual(acc);
+    });
+
+    it('una configuracion guardada antes de estas opciones sigue siendo valida', () => {
+      const antigua = {
+        base: {
+          piel: '#FFD9B5',
+          cabello: { color: '#4A2C1D', estilo: 'colitas' },
+          ojos: '#14141A',
+          uniforme: { principal: '#E67929', delantal: '#1C1C22', ribete: '#D99E39' },
+          gorro: { tipo: 'chef', color: '#FBF4EC' },
+          accesorios: ['bufanda'],
+        },
+        temas: [],
+        modo: 'AUTOMATICO',
+      };
+      const cfg = sanitizarConfiguracion(antigua);
+      expect(cfg.base.uniforme.prenda).toBe('chaqueta');
+      expect(cfg.base.gorro.tipo).toBe('chef');
+      expect(cfg.base.accesorios).toEqual(['bufanda']);
+      expect(cfg.escala).toBe(1);
+      expect(cfg.temaManual).toBe('normal');
+    });
+
+    it('todo valor desconocido cae al valor por defecto', () => {
+      const a = sanitizarAspecto({
+        gorro: { tipo: 'casco' },
+        cabello: { estilo: 'mohawk' },
+        uniforme: { prenda: 'smoking' },
+        accesorios: ['nave', 'lentes'],
+      });
+      expect(a.gorro.tipo).toBe('chef');
+      expect(a.cabello.estilo).toBe('colitas');
+      expect(a.uniforme.prenda).toBe('chaqueta');
+      expect(a.accesorios).toEqual(['lentes']);
+    });
+
+    it('la escala fuera de rango se corrige a 0.7 - 1.5 y los valores no numericos a 1', () => {
+      expect(sanitizarEscala(3)).toBe(1.5);
+      expect(sanitizarEscala(0.1)).toBe(0.7);
+      expect(sanitizarEscala(1.2)).toBe(1.2);
+      expect(sanitizarEscala('x')).toBe(1);
+      expect(sanitizarEscala(NaN)).toBe(1);
+      const cfg = sanitizarConfiguracion({ ...CONFIGURACION_DEFECTO, escala: 9 });
+      expect(cfg.escala).toBe(1.5);
+    });
+
+    it('extraerConfiguracion acepta la respuesta plana del API y la envuelta en config', () => {
+      const plana = { ...CONFIGURACION_DEFECTO, modo: 'MANUAL', resuelto: { tema: null, aspecto: ASPECTO_BASE_DEFECTO } };
+      expect(extraerConfiguracion(plana).modo).toBe('MANUAL');
+      expect(extraerConfiguracion({ config: plana }).modo).toBe('MANUAL');
     });
   });
 });

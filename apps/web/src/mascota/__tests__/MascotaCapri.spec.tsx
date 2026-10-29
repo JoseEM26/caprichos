@@ -109,4 +109,17 @@ describe('MascotaCapri.tsx', () => {
       expect(onErrorMock).toHaveBeenCalledWith(errorSimulado);
     });
   });
+  it('aplica la escala configurada al tamano de Capri', () => {
+    vi.spyOn(soporteWebGL, 'tieneSoporteWebGL').mockReturnValue(false);
+    const { container } = render(<MascotaCapri tamano={100} escala={1.5} />);
+    const raiz = container.querySelector('.capri-fallback') as HTMLElement;
+    expect(raiz.style.width).toBe('150px');
+  });
+
+  it('hereda la escala publica cuando no se pasa la prop escala', () => {
+    vi.spyOn(soporteWebGL, 'tieneSoporteWebGL').mockReturnValue(false);
+    const { container } = render(<MascotaCapri tamano={100} />);
+    const raiz = container.querySelector('.capri-fallback') as HTMLElement;
+    expect(raiz.style.width).toBe('100px');
+  });
 });

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, type CSSProperties } from 'react';
 import { api } from '../../comun/api';
 import { useSesion } from '../../comun/sesion';
 import { Cargando } from '../../comun/Cargando';
@@ -15,23 +15,66 @@ import {
   type EstiloCabello,
   type TipoGorro,
   type TipoAccesorio,
+  type TipoPrenda,
   type RespuestaAdminMascota,
   CONFIGURACION_DEFECTO,
   PALETA_PIEL_SUGERIDA,
+  PALETA_OJOS_SUGERIDA,
+  ESCALA_MINIMA,
+  ESCALA_MAXIMA,
   ESTILOS_CABELLO,
   TIPOS_GORRO,
+  TIPOS_PRENDA,
   TIPOS_ACCESORIOS,
   resolverAspecto,
   fusionarAspecto,
   limpiarCacheAspecto,
   preestablecerAspectoCache,
+  extraerConfiguracion,
+  sanitizarConfiguracion,
+  sanitizarEscala,
 } from '../../mascota';
+
+/** Tamaños rápidos de Capri en la carta. */
+const ESCALAS_RAPIDAS: [string, number][] = [
+  ['Chico', 0.8],
+  ['Mediano', 1],
+  ['Grande', 1.2],
+  ['Extra grande', 1.5],
+];
+
+const NOMBRES_PRENDAS: Record<TipoPrenda, string> = {
+  chaqueta: 'Chaqueta de chef',
+  polo: 'Polo',
+  mandil: 'Mandil largo',
+  pechera: 'Pechera corta',
+};
+
+/** Estilo de chip táctil (mínimo 44 px de alto) para las opciones de selección. */
+function estiloChip(seleccionado: boolean, colorActivo: string): CSSProperties {
+  return {
+    minHeight: 44,
+    padding: '10px 14px',
+    borderRadius: 8,
+    fontSize: '0.82rem',
+    fontWeight: 700,
+    cursor: 'pointer',
+    border: '1px solid',
+    borderColor: seleccionado ? colorActivo : '#D7DFE3',
+    background: seleccionado ? colorActivo : '#FFFFFF',
+    color: seleccionado ? '#FFFFFF' : 'var(--cp-navy, #0B2C3E)',
+  };
+}
 
 const NOMBRES_ESTILOS_CABELLO: Record<EstiloCabello, string> = {
   colitas: 'Colitas',
   suelto: 'Suelto',
   trenza: 'Trenza',
   mono: 'Moño',
+  corto: 'Corto',
+  rizado: 'Rizado',
+  melena: 'Melena',
+  coleta: 'Coleta',
 };
 
 const NOMBRES_TIPOS_GORRO: Record<TipoGorro, string> = {
@@ -41,6 +84,10 @@ const NOMBRES_TIPOS_GORRO: Record<TipoGorro, string> = {
   corona: 'Corona Real',
   sombrero: 'Sombrero Veraniego',
   ninguno: 'Sin Gorro',
+  gorra: 'Gorra',
+  boina: 'Boina',
+  beanie: 'Gorro de lana',
+  diadema: 'Diadema',
 };
 
 const NOMBRES_ACCESORIOS: Record<TipoAccesorio, string> = {
@@ -51,8 +98,15 @@ const NOMBRES_ACCESORIOS: Record<TipoAccesorio, string> = {
   lazo: 'Lazo',
   estrellas: 'Estrellas',
   guirnalda: 'Guirnalda floral',
-  antifaz: 'Antifaz / Lentes',
+  antifaz: 'Antifaz',
   bigote: 'Bigote elegante',
+  lentes: 'Lentes',
+  confeti: 'Confeti',
+  flor: 'Flor',
+  banda: 'Banda de honor',
+  aretes: 'Aretes',
+  mochila: 'Mochila',
+  medalla: 'Medalla',
 };
 
 export function MascotaAdminView() {
@@ -63,6 +117,7 @@ export function MascotaAdminView() {
   const [cargando, setCargando] = useState<boolean>(true);
   const [guardando, setGuardando] = useState<boolean>(false);
   const [mensajeExito, setMensajeExito] = useState<string | null>(null);
+  const [mensajeError, setMensajeError] = useState<string | null>(null);
 
   // Configuración completa y editable
   const [config, setConfig] = useState<ConfiguracionMascota>(CONFIGURACION_DEFECTO);
@@ -87,8 +142,8 @@ export function MascotaAdminView() {
     api
       .get<RespuestaAdminMascota>('/admin/mascota')
       .then((data) => {
-        if (!cancelado && data?.config) {
-          setConfig(data.config);
+        if (!cancelado && data) {
+          setConfig(extraerConfiguracion(data));
         }
       })
       .catch(() => {
@@ -111,7 +166,11 @@ export function MascotaAdminView() {
     return resolverAspecto(config);
   }, [config]);
 
-  // Aspecto actual en la vista previa
+  const nombreTemaHoy =
+    config.temas.find((t) => t.clave === aspectoHoy.tema)?.nombre ?? aspectoHoy.tema;
+
+  // Aspecto actual en la vista previa. Sin tema elegido se ve la base (lo que se edita):
+  // un tema de temporada activo pisa el gorro y haría parecer que el cambio no funciona.
   const aspectoPrevia = useMemo(() => {
     if (temaPreviaSeleccionado && temaPreviaSeleccionado !== 'normal') {
       const tema = config.temas.find((t) => t.clave === temaPreviaSeleccionado);
@@ -119,12 +178,10 @@ export function MascotaAdminView() {
         return fusionarAspecto(config.base, tema.aspecto);
       }
     }
-    if (temaPreviaSeleccionado === 'normal') {
-      return config.base;
-    }
-    // Si no hay tema previo forzado, muestra el resuelto para hoy
-    return aspectoHoy.aspecto;
-  }, [config, temaPreviaSeleccionado, aspectoHoy]);
+    return config.base;
+  }, [config, temaPreviaSeleccionado]);
+
+  const escalaActual = sanitizarEscala(config.escala);
 
   // Manejadores para editar el aspecto base
   const actualizarBase = (cambios: Partial<AspectoCapri>) => {
@@ -208,6 +265,17 @@ export function MascotaAdminView() {
     }));
   };
 
+  const actualizarEscala = (valor: number) => {
+    setConfig((prev) => ({ ...prev, escala: sanitizarEscala(valor) }));
+  };
+
+  const actualizarPrenda = (prenda: TipoPrenda) => {
+    setConfig((prev) => ({
+      ...prev,
+      base: { ...prev.base, uniforme: { ...prev.base.uniforme, prenda } },
+    }));
+  };
+
   const actualizarTema = (indice: number, cambios: Partial<TemaMascota>) => {
     setConfig((prev) => {
       const nuevaLista = [...prev.temas];
@@ -222,26 +290,25 @@ export function MascotaAdminView() {
     });
   };
 
-  // Guardar en el servidor
+  // Guardar en el servidor: se envía la configuración saneada y solo se confirma si el API responde.
   const ejecutarGuardado = async () => {
     setGuardando(true);
     setMensajeExito(null);
+    setMensajeError(null);
+    const limpia = sanitizarConfiguracion(config);
     try {
-      await api.put('/admin/mascota', config);
+      await api.put('/admin/mascota', limpia);
       limpiarCacheAspecto();
       preestablecerAspectoCache({
         tema: aspectoHoy.tema,
         aspecto: aspectoHoy.aspecto,
+        escala: limpia.escala,
       });
       setMensajeExito('Configuración de la mascota Capri guardada correctamente.');
     } catch {
-      // Si el endpoint no responde aún (ej. prueba local sin backend levantado), mantenemos estado local
-      limpiarCacheAspecto();
-      preestablecerAspectoCache({
-        tema: aspectoHoy.tema,
-        aspecto: aspectoHoy.aspecto,
-      });
-      setMensajeExito('Configuración actualizada en memoria local.');
+      setMensajeError(
+        'No se pudo guardar la configuración de Capri. Tus cambios siguen en pantalla; inténtalo de nuevo.'
+      );
     } finally {
       setGuardando(false);
       setModalGuardarAbierto(false);
@@ -252,6 +319,7 @@ export function MascotaAdminView() {
   const ejecutarRestablecer = async () => {
     setGuardando(true);
     setMensajeExito(null);
+    setMensajeError(null);
     try {
       await api.post('/admin/mascota/restablecer', {});
       setConfig(CONFIGURACION_DEFECTO);
@@ -259,10 +327,7 @@ export function MascotaAdminView() {
       setTemaPreviaSeleccionado(null);
       setMensajeExito('Valores de fábrica restablecidos correctamente.');
     } catch {
-      setConfig(CONFIGURACION_DEFECTO);
-      limpiarCacheAspecto();
-      setTemaPreviaSeleccionado(null);
-      setMensajeExito('Valores de fábrica restablecidos en memoria local.');
+      setMensajeError('No se pudo restablecer Capri. Inténtalo de nuevo.');
     } finally {
       setGuardando(false);
       setModalRestablecerAbierto(false);
@@ -371,6 +436,24 @@ export function MascotaAdminView() {
         </div>
       )}
 
+      {mensajeError && (
+        <div
+          role="alert"
+          style={{
+            padding: '12px 16px',
+            marginBottom: 20,
+            background: '#FDECEA',
+            border: '1px solid #C5221F',
+            borderRadius: 8,
+            color: '#8E1B17',
+            fontWeight: 600,
+            fontSize: '0.88rem',
+          }}
+        >
+          {mensajeError}
+        </div>
+      )}
+
       {/* 4. Contenedor de dos columnas: Vista previa (izq) y Editor (der) */}
       <div
         style={{
@@ -474,7 +557,8 @@ export function MascotaAdminView() {
           >
             <MascotaCapri
               estado={estadoMascota}
-              tamano={230}
+              tamano={180}
+              escala={escalaActual}
               forzarFallback2D={forzar2D}
               aspecto={aspectoPrevia}
             />
@@ -516,9 +600,48 @@ export function MascotaAdminView() {
                   cursor: 'pointer',
                 }}
               >
-                Volver a hoy
+                Volver a la base
               </button>
             )}
+          </div>
+
+          {/* Tamaño de Capri en la carta (escala 70% - 150%) */}
+          <div style={{ marginBottom: 16 }}>
+            <label
+              htmlFor="admin-mascota-escala"
+              style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, marginBottom: 6 }}
+            >
+              Tamaño en la carta: {Math.round(escalaActual * 100)}%
+            </label>
+            <input
+              id="admin-mascota-escala"
+              type="range"
+              aria-label="Tamaño de Capri"
+              min={ESCALA_MINIMA}
+              max={ESCALA_MAXIMA}
+              step={0.05}
+              value={escalaActual}
+              disabled={!puedeEditar}
+              onChange={(e) => actualizarEscala(Number(e.target.value))}
+              style={{ width: '100%', minHeight: 44, cursor: 'pointer' }}
+            />
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
+              {ESCALAS_RAPIDAS.map(([nombre, valor]) => {
+                const seleccionado = Math.abs(escalaActual - valor) < 0.001;
+                return (
+                  <button
+                    key={nombre}
+                    type="button"
+                    aria-pressed={seleccionado}
+                    disabled={!puedeEditar}
+                    onClick={() => actualizarEscala(valor)}
+                    style={estiloChip(seleccionado, 'var(--cp-navy, #0B2C3E)')}
+                  >
+                    {nombre}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Botones de estados */}
@@ -647,8 +770,8 @@ export function MascotaAdminView() {
                         aria-label={`Tono de piel ${tono}`}
                         onClick={() => actualizarBase({ piel: tono })}
                         style={{
-                          width: 32,
-                          height: 32,
+                          width: 44,
+                          height: 44,
                           borderRadius: '50%',
                           background: tono,
                           border: esSeleccionado ? '3px solid var(--cp-navy, #0B2C3E)' : '1px solid #CFD8DC',
@@ -734,8 +857,10 @@ export function MascotaAdminView() {
                             key={est}
                             type="button"
                             onClick={() => actualizarCabello(undefined, est)}
+                            aria-pressed={seleccionado}
                             style={{
-                              padding: '7px 14px',
+                              minHeight: 44,
+                              padding: '10px 14px',
                               borderRadius: 8,
                               fontSize: '0.82rem',
                               fontWeight: 700,
@@ -767,7 +892,28 @@ export function MascotaAdminView() {
                 >
                   Color de Ojos
                 </label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  {PALETA_OJOS_SUGERIDA.map((tono) => {
+                    const seleccionado = config.base.ojos.toUpperCase() === tono.toUpperCase();
+                    return (
+                      <button
+                        key={tono}
+                        type="button"
+                        aria-label={`Color de ojos ${tono}`}
+                        aria-pressed={seleccionado}
+                        onClick={() => actualizarBase({ ojos: tono })}
+                        style={{
+                          width: 44,
+                          height: 44,
+                          borderRadius: '50%',
+                          background: tono,
+                          border: seleccionado ? '3px solid var(--cp-navy, #0B2C3E)' : '1px solid #CFD8DC',
+                          boxShadow: seleccionado ? '0 0 0 2px var(--cp-gold, #D99E39)' : 'none',
+                          cursor: 'pointer',
+                        }}
+                      />
+                    );
+                  })}
                   <input
                     type="color"
                     aria-label="Selector de color de ojos"
@@ -880,6 +1026,29 @@ export function MascotaAdminView() {
                 </div>
               </div>
 
+              {/* 4b. PRENDA */}
+              <div>
+                <span style={{ display: 'block', fontSize: '0.88rem', fontWeight: 700, marginBottom: 8 }}>
+                  Prenda
+                </span>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {TIPOS_PRENDA.map((pr) => {
+                    const seleccionado = (config.base.uniforme.prenda ?? 'chaqueta') === pr;
+                    return (
+                      <button
+                        key={pr}
+                        type="button"
+                        aria-pressed={seleccionado}
+                        onClick={() => actualizarPrenda(pr)}
+                        style={estiloChip(seleccionado, 'var(--cp-navy, #0B2C3E)')}
+                      >
+                        {NOMBRES_PRENDAS[pr]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* 5. GORRO */}
               <div>
                 <label
@@ -901,8 +1070,10 @@ export function MascotaAdminView() {
                           key={tg}
                           type="button"
                           onClick={() => actualizarGorro(tg, undefined)}
+                          aria-pressed={sel}
                           style={{
-                            padding: '6px 12px',
+                            minHeight: 44,
+                            padding: '10px 14px',
                             borderRadius: 8,
                             fontSize: '0.8rem',
                             fontWeight: 700,
@@ -941,6 +1112,25 @@ export function MascotaAdminView() {
                 </div>
               </div>
 
+              {aspectoHoy.tema !== 'normal' &&
+                aspectoHoy.aspecto.gorro.tipo !== config.base.gorro.tipo && (
+                  <p
+                    role="note"
+                    style={{
+                      margin: 0,
+                      padding: '10px 12px',
+                      borderRadius: 8,
+                      background: '#FEF8F3',
+                      border: '1px solid #E9C9A8',
+                      fontSize: '0.82rem',
+                      color: '#6A4A2A',
+                    }}
+                  >
+                    Hoy aplica el tema {nombreTemaHoy}, que usa {NOMBRES_TIPOS_GORRO[aspectoHoy.aspecto.gorro.tipo]}.
+                    En la carta de hoy se ve ese gorro; el que eliges aquí rige fuera de ese tema.
+                  </p>
+                )}
+
               {/* 6. ACCESORIOS */}
               <div>
                 <label
@@ -961,8 +1151,10 @@ export function MascotaAdminView() {
                         key={acc}
                         type="button"
                         onClick={() => toggleAccesorio(acc)}
+                        aria-pressed={activo}
                         style={{
-                          padding: '6px 12px',
+                          minHeight: 44,
+                          padding: '10px 14px',
                           borderRadius: 20,
                           fontSize: '0.8rem',
                           fontWeight: 700,
@@ -974,7 +1166,6 @@ export function MascotaAdminView() {
                           transition: 'all 0.15s ease',
                         }}
                       >
-                        {activo ? '✓ ' : '+ '}
                         {NOMBRES_ACCESORIOS[acc]}
                       </button>
                     );

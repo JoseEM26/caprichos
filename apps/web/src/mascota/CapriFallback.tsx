@@ -42,6 +42,7 @@ export function CapriFallback({
   const colorPrincipal = asp.uniforme.principal;
   const colorDelantal = asp.uniforme.delantal;
   const colorRibete = asp.uniforme.ribete;
+  const prenda = asp.uniforme.prenda ?? 'chaqueta';
   const tipoGorro = asp.gorro.tipo;
   const colorGorro = asp.gorro.color;
   const accesorios = asp.accesorios;
@@ -65,6 +66,7 @@ export function CapriFallback({
         position: 'relative',
         userSelect: 'none',
         cursor: alHacerClic ? 'pointer' : 'default',
+        maxWidth: '100%',
       }}
       onClick={alHacerClic}
     >
@@ -200,17 +202,48 @@ export function CapriFallback({
           <ellipse cx="102" cy="214" rx="14" ry="8" fill="#1C1C22" />
           <ellipse cx="138" cy="214" rx="14" ry="8" fill="#1C1C22" />
 
+          {/* Mochila: va detrás del cuerpo, solo asoma por los costados */}
+          {accesorios.includes('mochila') && (
+            <g id="capri-acc-mochila">
+              <rect x="62" y="134" width="116" height="68" rx="18" fill="#2F7A45" stroke="#1F5230" strokeWidth="1.5" />
+              <path d="M 88 150 L 152 150" stroke="#1F5230" strokeWidth="2" strokeLinecap="round" />
+            </g>
+          )}
+
           {/* 4. Cuerpo: Cono / Campana del uniforme */}
           <path
             d="M 88 126 L 68 200 C 68 214, 172 214, 172 200 L 152 126 Z"
             fill={`url(#${gradCuerpoId})`}
           />
 
-          {/* Delantal del uniforme */}
-          <path
-            d="M 96 128 L 84 196 C 94 204, 146 204, 156 196 L 144 128 Z"
-            fill={colorDelantal}
-          />
+          {/* Prenda del uniforme (delantal de chef, mandil, pechera o polo) */}
+          {prenda === 'chaqueta' && (
+            <g id="capri-prenda-chaqueta">
+              <path d="M 96 128 L 84 196 C 94 204, 146 204, 156 196 L 144 128 Z" fill={colorDelantal} />
+              <circle cx="120" cy="155" r="4.5" fill={colorRibete} />
+              <circle cx="120" cy="175" r="4.5" fill={colorRibete} />
+            </g>
+          )}
+          {prenda === 'mandil' && (
+            <g id="capri-prenda-mandil">
+              <path d="M 96 128 L 80 206 C 94 212, 146 212, 160 206 L 144 128 Z" fill={colorDelantal} />
+              <path d="M 80 206 C 94 212, 146 212, 160 206" stroke={colorRibete} strokeWidth="3" fill="none" />
+              <path d="M 96 150 L 144 150" stroke={colorRibete} strokeWidth="2" />
+            </g>
+          )}
+          {prenda === 'pechera' && (
+            <g id="capri-prenda-pechera">
+              <path d="M 104 128 L 102 160 L 138 160 L 136 128 Z" fill={colorDelantal} />
+              <path d="M 104 128 L 98 120 M 136 128 L 142 120" stroke={colorDelantal} strokeWidth="3" strokeLinecap="round" />
+              <circle cx="120" cy="150" r="3.5" fill={colorRibete} />
+            </g>
+          )}
+          {prenda === 'polo' && (
+            <g id="capri-prenda-polo">
+              <path d="M 100 126 Q 120 146 140 126" stroke={colorRibete} strokeWidth="5" fill="none" strokeLinecap="round" />
+              <rect x="134" y="146" width="12" height="9" rx="2" fill={colorRibete} opacity="0.7" />
+            </g>
+          )}
 
           {/* Ribete del delantal y cuello */}
           <path
@@ -295,6 +328,19 @@ export function CapriFallback({
             </g>
           )}
 
+          {accesorios.includes('banda') && (
+            <g id="capri-acc-banda">
+              <path d="M 92 126 L 150 200 L 160 192 L 102 120 Z" fill="#C5221F" stroke="#901515" strokeWidth="1" />
+            </g>
+          )}
+
+          {accesorios.includes('medalla') && (
+            <g id="capri-acc-medalla">
+              <path d="M 108 126 L 118 152 M 132 126 L 122 152" stroke="#C5221F" strokeWidth="3" />
+              <circle cx="120" cy="158" r="7" fill={colorRibete} stroke="#B2500F" strokeWidth="1.2" />
+            </g>
+          )}
+
           {/* 5. Cabeza: Cabello, Carita, Gorro y Accesorios faciales */}
           <g
             id="capri-cabeza-grupo"
@@ -361,6 +407,41 @@ export function CapriFallback({
               <g id="capri-pelo-mono">
                 <circle cx="120" cy="56" r="22" fill={colorPelo} />
                 <ellipse cx="120" cy="74" rx="14" ry="4" fill={colorRibete} />
+              </g>
+            )}
+
+            {estiloPelo === 'corto' && (
+              <g id="capri-pelo-corto" fill={colorPelo}>
+                <ellipse cx="74" cy="100" rx="7" ry="9" />
+                <ellipse cx="166" cy="100" rx="7" ry="9" />
+              </g>
+            )}
+
+            {estiloPelo === 'rizado' && (
+              <g id="capri-pelo-rizado" fill={colorPelo}>
+                <circle cx="72" cy="92" r="10" />
+                <circle cx="64" cy="114" r="9" />
+                <circle cx="72" cy="136" r="8" />
+                <circle cx="168" cy="92" r="10" />
+                <circle cx="176" cy="114" r="9" />
+                <circle cx="168" cy="136" r="8" />
+                <circle cx="96" cy="58" r="9" />
+                <circle cx="120" cy="52" r="9" />
+                <circle cx="144" cy="58" r="9" />
+              </g>
+            )}
+
+            {estiloPelo === 'melena' && (
+              <g id="capri-pelo-melena" fill={colorPelo}>
+                <path d="M 80 92 C 60 110, 56 140, 66 158 L 84 154 C 78 132, 80 112, 84 96 Z" />
+                <path d="M 160 92 C 180 110, 184 140, 174 158 L 156 154 C 162 132, 160 112, 156 96 Z" />
+              </g>
+            )}
+
+            {estiloPelo === 'coleta' && (
+              <g id="capri-pelo-coleta">
+                <ellipse cx="172" cy="112" rx="11" ry="24" fill={colorPelo} transform="rotate(18 172 112)" />
+                <circle cx="164" cy="90" r="4" fill={colorRibete} />
               </g>
             )}
 
@@ -444,6 +525,38 @@ export function CapriFallback({
               </g>
             )}
 
+            {tipoGorro === 'gorra' && (
+              <g id="capri-gorro-gorra">
+                <path d="M 84 66 C 84 40, 96 32, 120 32 C 144 32, 156 40, 156 66 Z" fill={colorGorro} stroke="#1C1C22" strokeWidth="1" />
+                <ellipse cx="140" cy="66" rx="26" ry="6" fill={colorGorro} stroke="#1C1C22" strokeWidth="1" />
+                <rect x="84" y="60" width="72" height="5" fill={colorDelantal} />
+                <circle cx="120" cy="32" r="3" fill={colorRibete} />
+              </g>
+            )}
+
+            {tipoGorro === 'boina' && (
+              <g id="capri-gorro-boina">
+                <ellipse cx="120" cy="50" rx="44" ry="17" fill={colorGorro} stroke="#1C1C22" strokeWidth="1" transform="rotate(-8 120 50)" />
+                <circle cx="116" cy="34" r="3" fill={colorDelantal} />
+              </g>
+            )}
+
+            {tipoGorro === 'beanie' && (
+              <g id="capri-gorro-beanie">
+                <path d="M 80 70 C 78 34, 98 22, 120 22 C 142 22, 162 34, 160 70 Z" fill={colorGorro} stroke="#E3D6C6" strokeWidth="1" />
+                <rect x="78" y="60" width="84" height="14" rx="6" fill={colorPrincipal} />
+                <circle cx="120" cy="22" r="7" fill={colorPrincipal} />
+              </g>
+            )}
+
+            {tipoGorro === 'diadema' && (
+              <g id="capri-gorro-diadema">
+                <path d="M 76 80 Q 120 40 164 80" stroke={colorRibete} strokeWidth="6" fill="none" strokeLinecap="round" />
+                <circle cx="76" cy="80" r="4" fill={colorGorro} />
+                <circle cx="164" cy="80" r="4" fill={colorGorro} />
+              </g>
+            )}
+
             {/* OJOS */}
             {esDormido ? (
               <g stroke="#1C1C22" strokeWidth="3.5" strokeLinecap="round">
@@ -494,6 +607,21 @@ export function CapriFallback({
               </g>
             )}
 
+            {accesorios.includes('lentes') && (
+              <g id="capri-acc-lentes" fill="none" stroke="#1C1C22" strokeWidth="2.5">
+                <circle cx="101" cy="103" r="15" />
+                <circle cx="139" cy="103" r="15" />
+                <path d="M 116 102 Q 120 99 124 102" />
+              </g>
+            )}
+
+            {accesorios.includes('aretes') && (
+              <g id="capri-acc-aretes" fill={colorRibete}>
+                <circle cx="77" cy="118" r="3.5" />
+                <circle cx="163" cy="118" r="3.5" />
+              </g>
+            )}
+
             {/* MEJILLAS (Rubor suave rosado) */}
             <ellipse cx="88" cy="112" rx="9" ry="5.5" fill="#F78D74" opacity="0.9" />
             <ellipse cx="152" cy="112" rx="9" ry="5.5" fill="#F78D74" opacity="0.9" />
@@ -533,6 +661,27 @@ export function CapriFallback({
               <g id="capri-acc-estrellas" fill={colorRibete} className="capri-brillo-flotante">
                 <path d="M 64 68 Q 64 74 58 74 Q 64 74 64 80 Q 64 74 70 74 Q 64 74 64 68 Z" />
                 <path d="M 176 68 Q 176 74 170 74 Q 176 74 176 80 Q 176 74 182 74 Q 176 74 176 68 Z" />
+              </g>
+            )}
+
+            {accesorios.includes('flor') && (
+              <g id="capri-acc-flor" transform="translate(158, 66)">
+                <circle cx="0" cy="-5" r="4" fill="#E84A7F" />
+                <circle cx="5" cy="-1" r="4" fill="#E84A7F" />
+                <circle cx="3" cy="4" r="4" fill="#E84A7F" />
+                <circle cx="-3" cy="4" r="4" fill="#E84A7F" />
+                <circle cx="-5" cy="-1" r="4" fill="#E84A7F" />
+                <circle cx="0" cy="0" r="2.5" fill={colorRibete} />
+              </g>
+            )}
+
+            {accesorios.includes('confeti') && (
+              <g id="capri-acc-confeti" className="capri-brillo-flotante">
+                <circle cx="56" cy="50" r="3" fill="#3BB4E7" />
+                <circle cx="186" cy="56" r="3" fill="#E84A7F" />
+                <circle cx="60" cy="150" r="2.5" fill={colorRibete} />
+                <circle cx="182" cy="140" r="3" fill="#2F7A45" />
+                <circle cx="120" cy="16" r="2.5" fill="#F78D74" />
               </g>
             )}
 

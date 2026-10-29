@@ -2,7 +2,16 @@ import { AspectoBase, MascotaConfig, TemaMascota } from './mascota.tipos';
 
 export const CLAVE_PARAMETRO_MASCOTA = 'mascota_config';
 
-export const ESTILOS_CABELLO = ['colitas', 'suelto', 'trenza', 'mono'] as const;
+export const ESTILOS_CABELLO = [
+  'colitas',
+  'suelto',
+  'trenza',
+  'mono',
+  'corto',
+  'rizado',
+  'melena',
+  'coleta',
+] as const;
 
 export const TIPOS_GORRO = [
   'chef',
@@ -11,7 +20,17 @@ export const TIPOS_GORRO = [
   'ninguno',
   'corona',
   'sombrero',
+  'gorra',
+  'boina',
+  'beanie',
+  'diadema',
 ] as const;
+
+export const PRENDAS_UNIFORME = ['chaqueta', 'polo', 'mandil', 'pechera'] as const;
+
+export const ESCALA_MINIMA = 0.7;
+export const ESCALA_MAXIMA = 1.5;
+export const ESCALA_DEFECTO = 1;
 
 export const ACCESORIOS_VALIDOS = [
   'calabaza',
@@ -27,6 +46,9 @@ export const ACCESORIOS_VALIDOS = [
   'lentes',
   'confeti',
   'flor',
+  'aretes',
+  'mochila',
+  'medalla',
 ] as const;
 
 export const TONOS_PIEL_SUGERIDOS = [
@@ -53,6 +75,7 @@ export const DEFAULT_ASPECTO_BASE: AspectoBase = {
     principal: '#E67929',
     delantal: '#1C1C22',
     ribete: '#D99E39',
+    prenda: 'chaqueta',
   },
   gorro: {
     tipo: 'chef',
@@ -202,4 +225,5 @@ export const DEFAULT_MASCOTA_CONFIG: MascotaConfig = {
   temas: DEFAULT_TEMAS,
   modo: 'AUTOMATICO',
   temaManual: 'normal',
+  escala: ESCALA_DEFECTO,
 };

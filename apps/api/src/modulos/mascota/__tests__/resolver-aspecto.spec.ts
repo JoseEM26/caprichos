@@ -2,6 +2,7 @@ import {
   calcularDuracionDias,
   estaEnRango,
   fusionarAspecto,
+  normalizarMascotaConfig,
   obtenerFechaLima,
   resolverAspecto,
 } from '../mascota.util';
@@ -266,4 +267,55 @@ describe('Mascota Capri - resolverAspecto (función pura)', () => {
     expect(resuelto.aspecto.piel).toBe(DEFAULT_ASPECTO_BASE.piel);
     expect(resuelto.aspecto.uniforme.principal).toBe(DEFAULT_ASPECTO_BASE.uniforme.principal);
   });
+describe('normalizarMascotaConfig: opciones nuevas y retrocompatibilidad', () => {
+  it('una configuración antigua (sin prenda ni escala) sigue siendo válida', () => {
+    const antigua = {
+      base: {
+        ...DEFAULT_ASPECTO_BASE,
+        uniforme: { principal: '#E67929', delantal: '#1C1C22', ribete: '#D99E39' },
+      },
+      temas: DEFAULT_MASCOTA_CONFIG.temas,
+      modo: 'AUTOMATICO',
+    } as any;
+    const norm = normalizarMascotaConfig(antigua);
+    expect(norm.base.uniforme.prenda).toBe('chaqueta');
+    expect(norm.escala).toBe(1);
+  });
+
+  it('la escala fuera de rango se corrige a 0.7 - 1.5', () => {
+    expect(normalizarMascotaConfig({ ...DEFAULT_MASCOTA_CONFIG, escala: 9 }).escala).toBe(1.5);
+    expect(normalizarMascotaConfig({ ...DEFAULT_MASCOTA_CONFIG, escala: 0.2 }).escala).toBe(0.7);
+    expect(normalizarMascotaConfig({ ...DEFAULT_MASCOTA_CONFIG, escala: 1.2 }).escala).toBe(1.2);
+  });
+
+  it('valores desconocidos caen al por defecto y se conservan las opciones nuevas válidas', () => {
+    const norm = normalizarMascotaConfig({
+      ...DEFAULT_MASCOTA_CONFIG,
+      base: {
+        ...DEFAULT_ASPECTO_BASE,
+        gorro: { tipo: 'casco' as any, color: '#112233' },
+        cabello: { color: '#112233', estilo: 'mohawk' as any },
+        uniforme: { ...DEFAULT_ASPECTO_BASE.uniforme, prenda: 'smoking' as any },
+        accesorios: ['nave' as any, 'lentes', 'medalla'],
+      },
+    });
+    expect(norm.base.gorro.tipo).toBe('chef');
+    expect(norm.base.cabello.estilo).toBe('colitas');
+    expect(norm.base.uniforme.prenda).toBe('chaqueta');
+    expect(norm.base.accesorios).toEqual(['lentes', 'medalla']);
+
+    const nuevo = normalizarMascotaConfig({
+      ...DEFAULT_MASCOTA_CONFIG,
+      base: {
+        ...DEFAULT_ASPECTO_BASE,
+        gorro: { tipo: 'boina', color: '#112233' },
+        cabello: { color: '#112233', estilo: 'rizado' },
+        uniforme: { ...DEFAULT_ASPECTO_BASE.uniforme, prenda: 'polo' },
+      },
+    });
+    expect(nuevo.base.gorro.tipo).toBe('boina');
+    expect(nuevo.base.cabello.estilo).toBe('rizado');
+    expect(nuevo.base.uniforme.prenda).toBe('polo');
+  });
+});
 });

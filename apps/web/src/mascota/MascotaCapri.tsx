@@ -3,6 +3,7 @@ import { CapriFallback } from './CapriFallback';
 import { tieneSoporteWebGL, prefiereMovimientoReducido } from './soporteWebGL';
 import type { EstadoCapri } from './animaciones';
 import type { AspectoCapri } from './tiposAspecto';
+import { sanitizarEscala } from './aspectoUtils';
 import { useAspectoCapri } from './useAspectoCapri';
 
 // Carga diferida obligatoria para que Three.js NO entre al bundle principal de la aplicación
@@ -15,6 +16,8 @@ export interface MascotaCapriProps {
   forzarFallback2D?: boolean;
   alHacerClic?: () => void;
   aspecto?: AspectoCapri;
+  /** Escala 0.7 - 1.5 sobre tamano. Si no se pasa, usa la escala publica configurada. */
+  escala?: number;
 }
 
 /**
@@ -22,15 +25,16 @@ export interface MascotaCapriProps {
  * Conmuta automáticamente entre el modelo 3D con Three.js y el fallback accesible 2D
  * según la compatibilidad de WebGL, preferencias de accesibilidad y modo forzado.
  * Si no se proporciona la prop 'aspecto', hereda automáticamente el aspecto público
- * configurado para el día mediante useAspectoCapri().
+ * configurado para el día mediante useAspectoCapri(). La escala se aplica al tamaño en pantalla.
  */
 export function MascotaCapri({
   estado = 'reposo',
-  tamano = 160,
+  tamano: tamanoBase = 160,
   className = '',
   forzarFallback2D = false,
   alHacerClic,
   aspecto: aspectoProp,
+  escala: escalaProp,
 }: MascotaCapriProps) {
   const [soportaWebGL, setSoportaWebGL] = useState<boolean>(() => tieneSoporteWebGL());
   const [movimientoReducido, setMovimientoReducido] = useState<boolean>(() =>
@@ -39,8 +43,9 @@ export function MascotaCapri({
   const [huboFallo3D, setHuboFallo3D] = useState<boolean>(false);
 
   // Hereda el aspecto público si no se pasa explícito
-  const { aspecto: aspectoHeredado } = useAspectoCapri();
+  const { aspecto: aspectoHeredado, escala: escalaHeredada } = useAspectoCapri();
   const aspectoFinal = aspectoProp ?? aspectoHeredado;
+  const tamano = Math.round(tamanoBase * sanitizarEscala(escalaProp ?? escalaHeredada));
 
   useEffect(() => {
     // Re-evaluar en el cliente

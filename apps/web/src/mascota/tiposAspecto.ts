@@ -3,8 +3,19 @@
  * Definición de tipos, esquemas, presets y utilidades de aspecto para Capri.
  */
 
-export type EstiloCabello = 'colitas' | 'suelto' | 'trenza' | 'mono';
-export type TipoGorro = 'chef' | 'bruja' | 'navideno' | 'ninguno' | 'corona' | 'sombrero';
+export type EstiloCabello = 'colitas' | 'suelto' | 'trenza' | 'mono' | 'corto' | 'rizado' | 'melena' | 'coleta';
+export type TipoGorro =
+  | 'chef'
+  | 'bruja'
+  | 'navideno'
+  | 'ninguno'
+  | 'corona'
+  | 'sombrero'
+  | 'gorra'
+  | 'boina'
+  | 'beanie'
+  | 'diadema';
+export type TipoPrenda = 'chaqueta' | 'polo' | 'mandil' | 'pechera';
 export type TipoAccesorio =
   | 'calabaza'
   | 'bufanda'
@@ -14,13 +25,24 @@ export type TipoAccesorio =
   | 'estrellas'
   | 'guirnalda'
   | 'antifaz'
-  | 'bigote';
+  | 'bigote'
+  | 'lentes'
+  | 'confeti'
+  | 'flor'
+  | 'banda'
+  | 'aretes'
+  | 'mochila'
+  | 'medalla';
 
 export const ESTILOS_CABELLO: readonly EstiloCabello[] = [
   'colitas',
   'suelto',
   'trenza',
   'mono',
+  'corto',
+  'rizado',
+  'melena',
+  'coleta',
 ] as const;
 
 export const TIPOS_GORRO: readonly TipoGorro[] = [
@@ -29,8 +51,14 @@ export const TIPOS_GORRO: readonly TipoGorro[] = [
   'navideno',
   'corona',
   'sombrero',
+  'gorra',
+  'boina',
+  'beanie',
+  'diadema',
   'ninguno',
 ] as const;
+
+export const TIPOS_PRENDA: readonly TipoPrenda[] = ['chaqueta', 'polo', 'mandil', 'pechera'] as const;
 
 export const TIPOS_ACCESORIOS: readonly TipoAccesorio[] = [
   'calabaza',
@@ -42,7 +70,19 @@ export const TIPOS_ACCESORIOS: readonly TipoAccesorio[] = [
   'guirnalda',
   'antifaz',
   'bigote',
+  'lentes',
+  'confeti',
+  'flor',
+  'banda',
+  'aretes',
+  'mochila',
+  'medalla',
 ] as const;
+
+/** Escala de Capri en pantalla (1 = tamaño normal). */
+export const ESCALA_MINIMA = 0.7;
+export const ESCALA_MAXIMA = 1.5;
+export const ESCALA_DEFECTO = 1;
 
 export interface CabelloConfig {
   color: string;
@@ -53,6 +93,8 @@ export interface UniformeConfig {
   principal: string;
   delantal: string;
   ribete: string;
+  /** Opcional en configuraciones antiguas; sanitizarAspecto siempre lo entrega. */
+  prenda?: TipoPrenda;
 }
 
 export interface GorroConfig {
@@ -92,11 +134,13 @@ export interface ConfiguracionMascota {
   temas: TemaMascota[];
   modo: ModoMascota;
   temaManual?: string; // clave o 'normal'
+  escala?: number; // ESCALA_MINIMA..ESCALA_MAXIMA
 }
 
 export interface RespuestaPublicaMascota {
   tema: string;
   aspecto: AspectoCapri;
+  escala?: number;
 }
 
 export interface RespuestaAdminMascota {
@@ -106,7 +150,7 @@ export interface RespuestaAdminMascota {
   temaActivo: string;
 }
 
-/** 6 tonos sugeridos para la paleta de piel */
+/** Tonos sugeridos para la paleta de piel */
 export const PALETA_PIEL_SUGERIDA = [
   '#FFD9B5', // Melocotón claro (por defecto)
   '#FCD0A1', // Trigueño claro
@@ -114,6 +158,20 @@ export const PALETA_PIEL_SUGERIDA = [
   '#B77742', // Moreno cálido
   '#7D4723', // Cacao profundo
   '#FFE6D5', // Porcelana suave
+  '#F1C27D', // Dorado suave
+  '#C68642', // Caramelo
+  '#8D5524', // Café medio
+  '#3D2314', // Ébano cálido
+] as const;
+
+/** Colores sugeridos para los ojos */
+export const PALETA_OJOS_SUGERIDA = [
+  '#14141A', // Negro (por defecto)
+  '#3B6E8F', // Azul
+  '#4E7D3A', // Verde
+  '#7A4A21', // Café
+  '#6B4FA0', // Violeta
+  '#8A8F94', // Gris
 ] as const;
 
 /** Aspecto base de fábrica (el diseño clásico de Capri) */
@@ -128,6 +186,7 @@ export const ASPECTO_BASE_DEFECTO: AspectoCapri = {
     principal: '#E67929', // Naranja corporativo
     delantal: '#1C1C22',  // Negro suave / marino oscuro
     ribete: '#D99E39',    // Dorado corporativo
+    prenda: 'chaqueta',
   },
   gorro: {
     tipo: 'chef',
@@ -229,4 +288,5 @@ export const CONFIGURACION_DEFECTO: ConfiguracionMascota = {
   temas: TEMAS_PREDETERMINADOS,
   modo: 'AUTOMATICO',
   temaManual: 'normal',
+  escala: ESCALA_DEFECTO,
 };

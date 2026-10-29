@@ -1,4 +1,14 @@
-export type EstiloCabello = 'colitas' | 'suelto' | 'trenza' | 'mono';
+export type EstiloCabello =
+  | 'colitas'
+  | 'suelto'
+  | 'trenza'
+  | 'mono'
+  | 'corto'
+  | 'rizado'
+  | 'melena'
+  | 'coleta';
+
+export type TipoPrenda = 'chaqueta' | 'polo' | 'mandil' | 'pechera';
 
 export type TipoGorro =
   | 'chef'
@@ -6,7 +16,11 @@ export type TipoGorro =
   | 'navideno'
   | 'ninguno'
   | 'corona'
-  | 'sombrero';
+  | 'sombrero'
+  | 'gorra'
+  | 'boina'
+  | 'beanie'
+  | 'diadema';
 
 export type ModoMascota = 'AUTOMATICO' | 'MANUAL';
 
@@ -19,6 +33,7 @@ export interface UniformeConfig {
   principal: string;
   delantal: string;
   ribete: string;
+  prenda?: TipoPrenda;
 }
 
 export interface GorroConfig {
@@ -58,6 +73,7 @@ export interface MascotaConfig {
   temas: TemaMascota[];
   modo: ModoMascota;
   temaManual?: string;
+  escala?: number;
 }
 
 export interface AspectoResuelto {

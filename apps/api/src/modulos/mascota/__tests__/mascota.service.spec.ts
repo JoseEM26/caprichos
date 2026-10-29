@@ -120,10 +120,12 @@ describe('MascotaService', () => {
 
       const resultado = await service.actualizarConfig(dto, usuario, '192.168.1.1');
 
+      // Se guarda la versión normalizada: el DTO sin escala queda con escala 1.
+      const guardado = expect.objectContaining({ modo: 'MANUAL', escala: 1 });
       expect(prismaMock.parametro.upsert).toHaveBeenCalledWith({
         where: { clave: CLAVE_PARAMETRO_MASCOTA },
-        update: { valor: dto },
-        create: { clave: CLAVE_PARAMETRO_MASCOTA, valor: dto },
+        update: { valor: guardado },
+        create: { clave: CLAVE_PARAMETRO_MASCOTA, valor: guardado },
       });
 
       expect(auditoriaMock.registrar).toHaveBeenCalledWith(
@@ -134,7 +136,7 @@ describe('MascotaService', () => {
           resultado: 'OK',
           entidad: 'mascota_config',
           antes: anterior.valor,
-          despues: dto,
+          despues: guardado,
           partyId: BigInt(10),
           ip: '192.168.1.1',
         }),

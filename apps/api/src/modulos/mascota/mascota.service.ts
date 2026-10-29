@@ -12,6 +12,7 @@ import {
   MascotaConfig,
 } from './mascota.tipos';
 import { normalizarMascotaConfig, resolverAspecto } from './mascota.util';
+import { AspectoResuelto as AspectoPublico } from './mascota.tipos';
 import { ActualizarMascotaConfigDto } from './dto/actualizar-mascota.dto';
 
 @Injectable()
@@ -56,9 +57,11 @@ export class MascotaService {
    * Endpoint público (GET /carta/mascota):
    * Retorna el aspecto RESUELTO de hoy {tema, aspecto} ya fusionado base+tema.
    */
-  async obtenerAspectoPublico(fecha?: Date | string): Promise<AspectoResuelto> {
+  async obtenerAspectoPublico(
+    fecha?: Date | string,
+  ): Promise<AspectoResuelto & { escala: number }> {
     const config = await this.obtenerConfig();
-    return resolverAspecto(config, fecha || new Date());
+    return { ...resolverAspecto(config, fecha || new Date()), escala: config.escala ?? 1 };
   }
 
   /**
@@ -87,10 +90,12 @@ export class MascotaService {
       where: { clave: CLAVE_PARAMETRO_MASCOTA },
     });
 
+    // Se guarda normalizado: escala dentro de rango y opciones desconocidas ya corregidas.
+    const normalizada = normalizarMascotaConfig(dto as any);
     const guardado = await this.prisma.parametro.upsert({
       where: { clave: CLAVE_PARAMETRO_MASCOTA },
-      update: { valor: dto as any },
-      create: { clave: CLAVE_PARAMETRO_MASCOTA, valor: dto as any },
+      update: { valor: normalizada as any },
+      create: { clave: CLAVE_PARAMETRO_MASCOTA, valor: normalizada as any },
     });
 
     const valorNormalizado = normalizarMascotaConfig(guardado.valor as any);
@@ -103,7 +108,7 @@ export class MascotaService {
       resultado: 'OK',
       entidad: 'mascota_config',
       antes: anterior?.valor ?? null,
-      despues: dto,
+      despues: normalizada,
       partyId: usuario?.partyId,
       ip,
     });

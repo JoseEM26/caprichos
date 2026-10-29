@@ -250,64 +250,94 @@ export function construirCapri(aspectoProp?: AspectoCapri): PiezasCapri {
   const mallaCuerpo = new THREE.Mesh(geoCuerpo, matPrincipal);
   cuerpo.add(mallaCuerpo);
 
-  // Delantal
-  const perfilDelantal = perfilCuerpo
-    .filter((p) => p.y <= -0.14 && p.y >= -0.9)
-    .map((p) => new THREE.Vector2(p.x + 0.014, p.y));
-  const geoDelantal = registrarGeo(
-    new THREE.LatheGeometry(perfilDelantal, 32, -0.62, 1.24),
-    geometrias
-  );
-  const mallaDelantal = new THREE.Mesh(geoDelantal, matDelantal);
-  cuerpo.add(mallaDelantal);
-
-  // Ribete superior del delantal
-  const geoRibeteDelantal = registrarGeo(
-    new THREE.TorusGeometry(0.455, 0.016, 12, 32, 1.24),
-    geometrias
-  );
-  const ribeteDelantal = new THREE.Mesh(geoRibeteDelantal, matRibete);
-  ribeteDelantal.rotation.x = Math.PI / 2;
-  ribeteDelantal.rotation.z = Math.PI / 2 - 0.62;
-  ribeteDelantal.position.y = -0.14;
-  cuerpo.add(ribeteDelantal);
-
-  // Ribete inferior del delantal (dobladillo)
-  const geoDobladillo = registrarGeo(new THREE.TorusGeometry(0.735, 0.017, 12, 32, 1.24), geometrias);
-  const dobladillo = new THREE.Mesh(geoDobladillo, matRibete);
-  dobladillo.rotation.x = Math.PI / 2;
-  dobladillo.rotation.z = Math.PI / 2 - 0.62;
-  dobladillo.position.y = -0.9;
-  cuerpo.add(dobladillo);
-
-  // Botones
+  // Prenda del uniforme: chaqueta (delantal con bolsillo), mandil, pechera o polo
+  const prenda = asp.uniforme.prenda ?? 'chaqueta';
   const geoBoton = registrarGeo(new THREE.SphereGeometry(0.04, 16, 16), geometrias);
-  const boton1 = new THREE.Mesh(geoBoton, matRibete);
-  boton1.position.set(0, -0.3, 0.5);
-  cuerpo.add(boton1);
 
-  const boton2 = new THREE.Mesh(geoBoton, matRibete);
-  boton2.position.set(0, -0.5, 0.57);
-  cuerpo.add(boton2);
+  if (prenda === 'chaqueta' || prenda === 'mandil') {
+    // Delantal
+    const perfilDelantal = perfilCuerpo
+      .filter((p) => p.y <= -0.14 && p.y >= -0.9)
+      .map((p) => new THREE.Vector2(p.x + 0.014, p.y));
+    const geoDelantal = registrarGeo(
+      new THREE.LatheGeometry(perfilDelantal, 32, -0.62, 1.24),
+      geometrias
+    );
+    const mallaDelantal = new THREE.Mesh(geoDelantal, matDelantal);
+    cuerpo.add(mallaDelantal);
 
-  // Bolsillo con cucharita
-  const geoBolsillo = registrarGeo(new THREE.CapsuleGeometry(0.1, 0.1, 6, 16), geometrias);
-  const bolsillo = new THREE.Mesh(geoBolsillo, matPrincipal);
-  bolsillo.rotation.z = Math.PI / 2;
-  bolsillo.scale.set(1, 1, 0.35);
-  bolsillo.position.set(0.17, -0.68, 0.64);
-  cuerpo.add(bolsillo);
+    // Ribete superior del delantal
+    const geoRibeteDelantal = registrarGeo(
+      new THREE.TorusGeometry(0.455, 0.016, 12, 32, 1.24),
+      geometrias
+    );
+    const ribeteDelantal = new THREE.Mesh(geoRibeteDelantal, matRibete);
+    ribeteDelantal.rotation.x = Math.PI / 2;
+    ribeteDelantal.rotation.z = Math.PI / 2 - 0.62;
+    ribeteDelantal.position.y = -0.14;
+    cuerpo.add(ribeteDelantal);
 
-  const geoCuchara = registrarGeo(new THREE.CapsuleGeometry(0.014, 0.12, 4, 10), geometrias);
-  const cuchara = new THREE.Mesh(geoCuchara, matRibete);
-  cuchara.position.set(0.2, -0.56, 0.62);
-  cuchara.rotation.z = -0.25;
-  cuerpo.add(cuchara);
-  const geoCucharaPunta = registrarGeo(new THREE.SphereGeometry(0.032, 12, 12), geometrias);
-  const cucharaPunta = new THREE.Mesh(geoCucharaPunta, matRibete);
-  cucharaPunta.scale.set(1, 1.3, 0.5);
-  cucharaPunta.position.set(0.212, -0.485, 0.62);
-  cuerpo.add(cucharaPunta);
+    // Ribete inferior del delantal (dobladillo)
+    const geoDobladillo = registrarGeo(new THREE.TorusGeometry(0.735, 0.017, 12, 32, 1.24), geometrias);
+    const dobladillo = new THREE.Mesh(geoDobladillo, matRibete);
+    dobladillo.rotation.x = Math.PI / 2;
+    dobladillo.rotation.z = Math.PI / 2 - 0.62;
+    dobladillo.position.y = -0.9;
+    cuerpo.add(dobladillo);
+  }
+
+  if (prenda === 'chaqueta') {
+    // Botones
+    const boton1 = new THREE.Mesh(geoBoton, matRibete);
+    boton1.position.set(0, -0.3, 0.5);
+    cuerpo.add(boton1);
+
+    const boton2 = new THREE.Mesh(geoBoton, matRibete);
+    boton2.position.set(0, -0.5, 0.57);
+    cuerpo.add(boton2);
+
+    // Bolsillo con cucharita
+    const geoBolsillo = registrarGeo(new THREE.CapsuleGeometry(0.1, 0.1, 6, 16), geometrias);
+    const bolsillo = new THREE.Mesh(geoBolsillo, matPrincipal);
+    bolsillo.rotation.z = Math.PI / 2;
+    bolsillo.scale.set(1, 1, 0.35);
+    bolsillo.position.set(0.17, -0.68, 0.64);
+    cuerpo.add(bolsillo);
+
+    const geoCuchara = registrarGeo(new THREE.CapsuleGeometry(0.014, 0.12, 4, 10), geometrias);
+    const cuchara = new THREE.Mesh(geoCuchara, matRibete);
+    cuchara.position.set(0.2, -0.56, 0.62);
+    cuchara.rotation.z = -0.25;
+    cuerpo.add(cuchara);
+    const geoCucharaPunta = registrarGeo(new THREE.SphereGeometry(0.032, 12, 12), geometrias);
+    const cucharaPunta = new THREE.Mesh(geoCucharaPunta, matRibete);
+    cucharaPunta.scale.set(1, 1.3, 0.5);
+    cucharaPunta.position.set(0.212, -0.485, 0.62);
+    cuerpo.add(cucharaPunta);
+  }
+
+  if (prenda === 'pechera') {
+    const geoPechera = registrarGeo(new THREE.BoxGeometry(0.34, 0.3, 0.03), geometrias);
+    const pechera = new THREE.Mesh(geoPechera, matDelantal);
+    pechera.position.set(0, -0.32, 0.5);
+    cuerpo.add(pechera);
+
+    const geoTirante = registrarGeo(new THREE.BoxGeometry(0.03, 0.22, 0.03), geometrias);
+    for (const lado of [-1, 1]) {
+      const tirante = new THREE.Mesh(geoTirante, matDelantal);
+      tirante.position.set(lado * 0.12, -0.02, 0.46);
+      tirante.rotation.z = lado * -0.25;
+      cuerpo.add(tirante);
+    }
+  }
+
+  if (prenda === 'polo') {
+    // Polo: sin delantal, con bolsillo del pecho en color de ribete
+    const geoBolsilloPolo = registrarGeo(new THREE.BoxGeometry(0.12, 0.1, 0.03), geometrias);
+    const bolsilloPolo = new THREE.Mesh(geoBolsilloPolo, matRibete);
+    bolsilloPolo.position.set(0.2, -0.28, 0.5);
+    cuerpo.add(bolsilloPolo);
+  }
 
   // Cuello que une cabeza con cuerpo
   const geoRibete = registrarGeo(new THREE.TorusGeometry(0.31, 0.055, 16, 36), geometrias);
@@ -331,6 +361,40 @@ export function construirCapri(aspectoProp?: AspectoCapri): PiezasCapri {
   // ==========================================
   // ACCESORIOS EN EL CUERPO (3D)
   // ==========================================
+  if (asp.accesorios.includes('mochila')) {
+    const matMochila = registrarMat(new THREE.MeshStandardMaterial({ color: 0x2F7A45, roughness: 0.6 }), materiales);
+    const geoMochila = registrarGeo(new THREE.BoxGeometry(0.86, 0.7, 0.2), geometrias);
+    const mochila = new THREE.Mesh(geoMochila, matMochila);
+    mochila.position.set(0, -0.5, -0.74);
+    mochila.name = 'capri-acc-mochila';
+    cuerpo.add(mochila);
+  }
+
+  if (asp.accesorios.includes('banda')) {
+    const geoBanda = registrarGeo(new THREE.BoxGeometry(0.1, 1.05, 0.03), geometrias);
+    const banda = new THREE.Mesh(geoBanda, matRojo);
+    banda.position.set(0.02, -0.5, 0.56);
+    banda.rotation.z = -0.8;
+    banda.name = 'capri-acc-banda';
+    cuerpo.add(banda);
+  }
+
+  if (asp.accesorios.includes('medalla')) {
+    const geoCintaMedalla = registrarGeo(new THREE.BoxGeometry(0.03, 0.2, 0.01), geometrias);
+    for (const lado of [-1, 1]) {
+      const cinta = new THREE.Mesh(geoCintaMedalla, matRojo);
+      cinta.position.set(lado * 0.05, 0.0, 0.42);
+      cinta.rotation.z = lado * -0.25;
+      cuerpo.add(cinta);
+    }
+    const geoMedalla = registrarGeo(new THREE.CylinderGeometry(0.07, 0.07, 0.02, 24), geometrias);
+    const medalla = new THREE.Mesh(geoMedalla, matRibete);
+    medalla.rotation.x = Math.PI / 2;
+    medalla.position.set(0, -0.12, 0.46);
+    medalla.name = 'capri-acc-medalla';
+    cuerpo.add(medalla);
+  }
+
   if (asp.accesorios.includes('bufanda')) {
     const geoBufandaCuello = registrarGeo(new THREE.TorusGeometry(0.35, 0.08, 16, 36), geometrias);
     const bufandaCuello = new THREE.Mesh(geoBufandaCuello, matRojo);
@@ -494,6 +558,42 @@ export function construirCapri(aspectoProp?: AspectoCapri): PiezasCapri {
     cintaMono.rotation.x = Math.PI / 2;
     cintaMono.position.set(0, 0.44, -0.12);
     cabeza.add(cintaMono);
+  } else if (asp.cabello.estilo === 'corto') {
+    for (const lado of [-1, 1]) {
+      const patilla = new THREE.Mesh(geoMechon, matPelo);
+      patilla.scale.set(0.7, 0.8, 0.7);
+      patilla.position.set(lado * 0.5, 0.12, 0.1);
+      cabeza.add(patilla);
+    }
+  } else if (asp.cabello.estilo === 'rizado') {
+    const geoRizo = registrarGeo(new THREE.SphereGeometry(0.1, 14, 14), geometrias);
+    const posRizos: [number, number, number][] = [
+      [-0.5, 0.28, 0.02], [-0.56, 0.1, 0.05], [-0.5, -0.08, 0.1],
+      [0.5, 0.28, 0.02], [0.56, 0.1, 0.05], [0.5, -0.08, 0.1],
+      [-0.25, 0.5, 0.0], [0.0, 0.54, -0.02], [0.25, 0.5, 0.0],
+    ];
+    for (const [x, y, z] of posRizos) {
+      const rizo = new THREE.Mesh(geoRizo, matPelo);
+      rizo.position.set(x, y, z);
+      cabeza.add(rizo);
+    }
+  } else if (asp.cabello.estilo === 'melena') {
+    const geoMelena = registrarGeo(new THREE.CapsuleGeometry(0.12, 0.42, 8, 16), geometrias);
+    for (const lado of [-1, 1]) {
+      const melena = new THREE.Mesh(geoMelena, matPelo);
+      melena.position.set(lado * 0.5, -0.2, -0.02);
+      melena.rotation.z = lado * 0.1;
+      cabeza.add(melena);
+    }
+  } else if (asp.cabello.estilo === 'coleta') {
+    const geoColeta = registrarGeo(new THREE.CapsuleGeometry(0.09, 0.36, 8, 16), geometrias);
+    const coleta = new THREE.Mesh(geoColeta, matPelo);
+    coleta.position.set(0.56, 0.12, -0.15);
+    coleta.rotation.z = -0.5;
+    cabeza.add(coleta);
+    const cintaColeta = new THREE.Mesh(geoBoton, matRibete);
+    cintaColeta.position.set(0.5, 0.26, 0.0);
+    cabeza.add(cintaColeta);
   }
 
   // ==========================================
@@ -593,6 +693,62 @@ export function construirCapri(aspectoProp?: AspectoCapri): PiezasCapri {
     cintaSomb.rotation.x = Math.PI / 2;
     cintaSomb.position.y = 0.0;
     gorro.add(cintaSomb);
+  } else if (asp.gorro.tipo === 'gorra') {
+    const geoDomoGorra = registrarGeo(
+      new THREE.SphereGeometry(0.5, 32, 20, 0, Math.PI * 2, 0, Math.PI / 2),
+      geometrias
+    );
+    const domoGorra = new THREE.Mesh(geoDomoGorra, matGorro);
+    domoGorra.scale.set(1, 0.7, 1);
+    domoGorra.position.y = 0.04;
+    gorro.add(domoGorra);
+
+    const geoVisera = registrarGeo(new THREE.BoxGeometry(0.5, 0.03, 0.3), geometrias);
+    const visera = new THREE.Mesh(geoVisera, matGorro);
+    visera.position.set(0, 0.02, 0.38);
+    visera.rotation.x = -0.12;
+    gorro.add(visera);
+
+    const botonGorra = new THREE.Mesh(geoBoton, matRibete);
+    botonGorra.position.set(0, 0.3, 0);
+    gorro.add(botonGorra);
+  } else if (asp.gorro.tipo === 'boina') {
+    const geoBoina = registrarGeo(new THREE.SphereGeometry(0.5, 32, 16), geometrias);
+    const boina = new THREE.Mesh(geoBoina, matGorro);
+    boina.scale.set(1.1, 0.22, 1.05);
+    boina.position.set(0.04, 0.1, -0.02);
+    boina.rotation.z = -0.12;
+    gorro.add(boina);
+
+    const tallo = new THREE.Mesh(geoBoton, matDelantal);
+    tallo.scale.setScalar(0.7);
+    tallo.position.set(0.08, 0.26, 0.0);
+    gorro.add(tallo);
+  } else if (asp.gorro.tipo === 'beanie') {
+    const geoBeanie = registrarGeo(
+      new THREE.SphereGeometry(0.5, 32, 24, 0, Math.PI * 2, 0, Math.PI / 2),
+      geometrias
+    );
+    const beanie = new THREE.Mesh(geoBeanie, matGorro);
+    beanie.scale.set(1, 0.85, 1);
+    gorro.add(beanie);
+
+    const geoPuno = registrarGeo(new THREE.TorusGeometry(0.47, 0.06, 12, 36), geometrias);
+    const puno = new THREE.Mesh(geoPuno, matPrincipal);
+    puno.rotation.x = Math.PI / 2;
+    puno.position.y = 0.0;
+    gorro.add(puno);
+
+    const pomponBeanie = new THREE.Mesh(geoBoton, matPrincipal);
+    pomponBeanie.scale.setScalar(2.2);
+    pomponBeanie.position.set(0, 0.44, 0);
+    gorro.add(pomponBeanie);
+  } else if (asp.gorro.tipo === 'diadema') {
+    const geoDiadema = registrarGeo(new THREE.TorusGeometry(0.6, 0.03, 10, 48), geometrias);
+    const diadema = new THREE.Mesh(geoDiadema, matRibete);
+    diadema.rotation.x = Math.PI / 2;
+    diadema.position.y = -0.31;
+    gorro.add(diadema);
   }
 
   // Pestañas
@@ -680,6 +836,65 @@ export function construirCapri(aspectoProp?: AspectoCapri): PiezasCapri {
     const antifaz = new THREE.Mesh(geoAntifaz, matNegro);
     antifaz.position.set(0, 0.03, 0.54);
     cabeza.add(antifaz);
+  }
+
+  if (asp.accesorios.includes('lentes')) {
+    const geoLente = registrarGeo(new THREE.TorusGeometry(0.17, 0.02, 10, 32), geometrias);
+    for (const lado of [-1, 1]) {
+      const lente = new THREE.Mesh(geoLente, matNegro);
+      lente.position.set(lado * 0.2, 0.03, 0.52);
+      cabeza.add(lente);
+    }
+    const geoPuente = registrarGeo(new THREE.CapsuleGeometry(0.012, 0.1, 4, 8), geometrias);
+    const puente = new THREE.Mesh(geoPuente, matNegro);
+    puente.rotation.z = Math.PI / 2;
+    puente.position.set(0, 0.05, 0.52);
+    cabeza.add(puente);
+  }
+
+  if (asp.accesorios.includes('aretes')) {
+    const geoArete = registrarGeo(new THREE.SphereGeometry(0.035, 12, 12), geometrias);
+    for (const lado of [-1, 1]) {
+      const arete = new THREE.Mesh(geoArete, matRibete);
+      arete.position.set(lado * 0.56, -0.12, 0.02);
+      cabeza.add(arete);
+    }
+  }
+
+  if (asp.accesorios.includes('flor')) {
+    const geoPetalo = registrarGeo(new THREE.SphereGeometry(0.06, 12, 12), geometrias);
+    const matFlor = registrarMat(new THREE.MeshStandardMaterial({ color: 0xE84A7F, roughness: 0.4 }), materiales);
+    const flor = new THREE.Group();
+    flor.name = 'capri-acc-flor';
+    flor.position.set(-0.46, 0.4, 0.2);
+    cabeza.add(flor);
+    for (let i = 0; i < 5; i++) {
+      const angulo = (i / 5) * Math.PI * 2;
+      const petalo = new THREE.Mesh(geoPetalo, matFlor);
+      petalo.position.set(Math.cos(angulo) * 0.07, Math.sin(angulo) * 0.07, 0);
+      flor.add(petalo);
+    }
+    const centroFlor = new THREE.Mesh(geoBoton, matRibete);
+    centroFlor.scale.setScalar(1.2);
+    flor.add(centroFlor);
+  }
+
+  if (asp.accesorios.includes('confeti')) {
+    const geoConfeti = registrarGeo(new THREE.BoxGeometry(0.04, 0.04, 0.01), geometrias);
+    const coloresConfeti = [0x3BB4E7, 0xE84A7F, 0xD99E39, 0x2F7A45];
+    const puntos: [number, number, number][] = [
+      [-0.85, 0.5, 0.1], [0.85, 0.6, -0.1], [-0.8, -0.2, 0.3], [0.8, 0.0, 0.2], [0.0, 0.95, 0.1],
+    ];
+    puntos.forEach(([x, y, z], i) => {
+      const matConfeti = registrarMat(
+        new THREE.MeshStandardMaterial({ color: coloresConfeti[i % coloresConfeti.length] }),
+        materiales
+      );
+      const pieza = new THREE.Mesh(geoConfeti, matConfeti);
+      pieza.position.set(x, y, z);
+      pieza.rotation.set(0.4 * i, 0.3 * i, 0.2 * i);
+      personaje.add(pieza);
+    });
   }
 
   if (asp.accesorios.includes('bigote')) {

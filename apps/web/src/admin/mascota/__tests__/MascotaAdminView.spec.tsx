@@ -99,10 +99,10 @@ describe('MascotaAdminView.tsx', () => {
 
     // Debe aparecer la insignia indicativa en la vista previa
     expect(screen.getByText(/Viendo:/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Volver a hoy' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Volver a la base' })).toBeInTheDocument();
 
     // Clic en volver a hoy
-    fireEvent.click(screen.getByRole('button', { name: 'Volver a hoy' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Volver a la base' }));
     expect(screen.queryByText(/Viendo:/i)).toBeNull();
   });
 
@@ -178,5 +178,84 @@ describe('MascotaAdminView.tsx', () => {
 
     expect(botonGuardar).toBeDisabled();
     expect(botonRestablecer).toBeDisabled();
+  });
+  describe('gorro, vista previa y guardado', () => {
+    // El API responde la configuracion en forma plana (GET /admin/mascota), no envuelta en config.
+    const respuestaPlana = (extra: Record<string, unknown> = {}) => ({
+      ...CONFIGURACION_DEFECTO,
+      resuelto: { tema: null, aspecto: CONFIGURACION_DEFECTO.base },
+      ...extra,
+    });
+
+    it('carga el gorro guardado en el API (respuesta plana) y lo marca como elegido', async () => {
+      vi.spyOn(api, 'get').mockResolvedValue(
+        respuestaPlana({
+          base: {
+            ...CONFIGURACION_DEFECTO.base,
+            gorro: { tipo: 'sombrero', color: '#0B2C3E' },
+          },
+        })
+      );
+
+      render(<MascotaAdminView />);
+
+      const botonSombrero = await screen.findByRole('button', { name: 'Sombrero Veraniego' });
+      expect(botonSombrero).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('button', { name: 'Gorro de Chef' })).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    it('la vista previa muestra el gorro elegido aunque un tema de temporada esté activo', async () => {
+      vi.spyOn(api, 'get').mockResolvedValue(respuestaPlana({ modo: 'MANUAL', temaManual: 'halloween' }));
+
+      const { container } = render(<MascotaAdminView />);
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Sombrero Veraniego' }));
+
+      expect(container.querySelector('#capri-gorro-sombrero')).not.toBeNull();
+      expect(container.querySelector('#capri-gorro-bruja')).toBeNull();
+    });
+
+    it('guardar envía el gorro elegido al API', async () => {
+      const putSpy = vi.spyOn(api, 'put').mockResolvedValue({ ok: true });
+      render(<MascotaAdminView />);
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Sombrero Veraniego' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Sí, guardar' }));
+
+      await waitFor(() => {
+        expect(putSpy).toHaveBeenCalledWith(
+          '/admin/mascota',
+          expect.objectContaining({
+            base: expect.objectContaining({ gorro: expect.objectContaining({ tipo: 'sombrero' }) }),
+          })
+        );
+      });
+    });
+
+    it('si el guardado falla, avisa que no se guardó (no dice que quedó en memoria)', async () => {
+      vi.spyOn(api, 'put').mockRejectedValue(new Error('400'));
+      render(<MascotaAdminView />);
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Guardar cambios' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Sí, guardar' }));
+
+      expect(await screen.findByText(/no se pudo guardar/i)).toBeInTheDocument();
+      expect(screen.queryByText(/memoria local/i)).toBeNull();
+    });
+
+    it('el control de tamano envía la escala elegida (limitada a 0.7 - 1.5)', async () => {
+      const putSpy = vi.spyOn(api, 'put').mockResolvedValue({ ok: true });
+      render(<MascotaAdminView />);
+
+      const control = await screen.findByLabelText('Tamaño de Capri');
+      fireEvent.change(control, { target: { value: '9' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Sí, guardar' }));
+
+      await waitFor(() => {
+        expect(putSpy).toHaveBeenCalledWith('/admin/mascota', expect.objectContaining({ escala: 1.5 }));
+      });
+    });
   });
 });

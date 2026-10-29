@@ -224,6 +224,7 @@ export default function MascotaCapri3D({
       style={{
         width: tamano,
         height: tamano,
+        maxWidth: '100%',
         display: 'inline-block',
         position: 'relative',
         userSelect: 'none',
