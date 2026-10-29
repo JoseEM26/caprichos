@@ -233,6 +233,7 @@ describe('Flujo de Pago por WhatsApp (FT-BOT-02, HU-CAP-130..132, 139)', () => {
 
     beforeEach(() => {
       mockPrisma = {
+        caja: { findUnique: jest.fn().mockResolvedValue({ estado: 'ABIERTA' }) },
         conversacion: {
           findUnique: jest.fn(),
           update: jest.fn(),

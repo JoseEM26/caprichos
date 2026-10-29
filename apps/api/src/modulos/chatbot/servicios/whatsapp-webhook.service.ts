@@ -460,8 +460,11 @@ export class WhatsappWebhookService {
     const pedidoVoucher = imagenBuffer && telefonoNorm
       ? await pedidoEsperandoVoucher(this.prisma, conversacion?.flujo, telefonoNorm)
       : null;
+    // El voucher quedó ligado a un pedido: el cliente recibe un acuse y el motor no vuelve a contestar esa foto.
+    let voucherAtendido = false;
     if (imagenBuffer && pedidoVoucher) {
       archivoMensajeId = await this.guardarVoucherPrivado(imagenBuffer, imagenMime, pedidoVoucher, telMask, conversacion);
+      voucherAtendido = Boolean(archivoMensajeId);
     } else if (imagenBuffer) {
       // Imagen sin pedido asociado (o cliente sin teléfono, BSUID): igual se guarda en privado y se analiza
       // como voucher (sin pedido), para que Caja la vea en el chat y quede como prueba al aprobar.
@@ -544,6 +547,30 @@ export class WhatsappWebhookService {
     // Notificar por websocket a la consola de mensajes
     this.eventos?.emitirAdmin('mensajes:actualizado', { id: conversacion.id.toString() });
 
+    // Acuse del voucher por el outbox (registrado en el chat). No aprueba nada: Caja revisa el pago.
+    if (voucherAtendido && pedidoVoucher && telefonoNorm && this.outbox) {
+      try {
+        const nombre = obtenerNombreMostrar(conversacion);
+        await this.outbox.encolar({
+          telefono: telefonoNorm,
+          tipo: 'TEXTO',
+          clave: `voucher-recibido-${archivoMensajeId}`,
+          origen: 'VOUCHER',
+          pedidoId: pedidoVoucher.id,
+          carga: {
+            textoLibre: `¡Recibimos tu voucher, ${nombre}! 🙌 Es del pedido ${pedidoVoucher.codigo}. Una persona de Caja lo está revisando y te avisamos por aquí apenas confirme tu pago. Gracias por tu paciencia 💛`,
+            autor: 'BOT',
+            nombre,
+            pedidoCodigo: pedidoVoucher.codigo,
+            etapa: 'VOUCHER_RECIBIDO',
+          },
+        });
+        this.outbox.despertar();
+      } catch (err: any) {
+        this.logger.error(`No se pudo encolar el acuse del voucher: ${err.message}`);
+      }
+    }
+
     // 5.5. Interceptar acciones de botones del equipo si el remitente es un miembro del equipo
     if (this.avisosInternosService && buttonPayload) {
       try {
@@ -607,7 +634,8 @@ export class WhatsappWebhookService {
       !esComandoBajaOAlta &&
       puedeProcesarMotor &&
       !reprogramacionAtendida &&
-      !encuestaAtendida
+      !encuestaAtendida &&
+      !voucherAtendido
     ) {
       const consentimiento = await this.prisma.clienteWhatsappConsentimiento.findUnique({
         where: { telefono_hash: telHash },

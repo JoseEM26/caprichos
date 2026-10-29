@@ -29,6 +29,9 @@ describe('Comprobante de WhatsApp: siempre se guarda y se analiza', () => {
   let conversacionExistente: any;
   let pedidoPorTelefono: any;
   let openAiRespuesta: () => Promise<any>;
+  let config: ConfigService;
+  let motor: any;
+  let vouchers: VouchersService;
 
   const payloadImagen = (from: string, extra: Record<string, unknown> = {}) => ({
     object: 'whatsapp_business_account',
@@ -113,7 +116,7 @@ describe('Comprobante de WhatsApp: siempre se guarda y se analiza', () => {
       subirArchivo: jest.fn().mockResolvedValue({ id: '900', url: '/admin/archivos/900' }),
     };
 
-    const config = {
+    config = {
       get: (clave: string, def?: any) => {
         if (clave === 'OPENAI_API_KEY') return 'sk-test-no-real';
         if (clave === 'WHATSAPP_TOKEN') return 'token-wa-test';
@@ -128,10 +131,10 @@ describe('Comprobante de WhatsApp: siempre se guarda y se analiza', () => {
       { obtenerCliente: () => ({ incr: async () => 1, expire: async () => 1 }) } as any,
       { registrarConsumo: jest.fn().mockResolvedValue(undefined) } as any,
     );
-    const vouchers = new VouchersService(prisma, archivos, { registrar: jest.fn() } as any, iaIa);
+    vouchers = new VouchersService(prisma, archivos, { registrar: jest.fn() } as any, iaIa);
 
     const mensajeria = { enviarTexto: jest.fn().mockResolvedValue({ exito: true, estado: 'ENVIADO' }) };
-    const motor = { procesarMensajeEntrante: jest.fn().mockResolvedValue(true) };
+    motor = { procesarMensajeEntrante: jest.fn().mockResolvedValue(true) };
 
     webhook = new WhatsappWebhookService(
       config,
@@ -156,6 +159,29 @@ describe('Comprobante de WhatsApp: siempre se guarda y se analiza', () => {
     expect(archivos.subirArchivo).toHaveBeenCalledWith(expect.objectContaining({ mimetype: 'image/jpeg' }), true);
     expect(prisma.$voucherRows).toHaveLength(1);
     expect(prisma.$voucherRows[0]).toMatchObject({ pedido_id: 50n, archivo_id: 900n, origen: 'WHATSAPP', semaforo: expect.any(String) });
+  });
+
+  it('voucher ligado a un pedido: acuse por el outbox al cliente y el motor no contesta esa foto', async () => {
+    pedidoPorTelefono = { id: 50n, codigo: 'CP-50', total: 35, pago_preferido: 'YAPE', pago_metodo: null, estado: 'COLA' };
+    const outbox = { encolar: jest.fn().mockResolvedValue({}), despertar: jest.fn() };
+    const conOutbox = new WhatsappWebhookService(
+      config, prisma, { enviarTexto: jest.fn() } as any, archivos, undefined, motor, undefined, vouchers, undefined, outbox as any,
+    );
+
+    await conOutbox.procesarPayload(payloadImagen('51987654321'));
+    await flush();
+
+    expect(outbox.encolar).toHaveBeenCalledTimes(1);
+    expect(outbox.encolar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        telefono: '51987654321',
+        clave: 'voucher-recibido-900',
+        pedidoId: 50n,
+        carga: expect.objectContaining({ textoLibre: expect.stringContaining('CP-50'), autor: 'BOT' }),
+      }),
+    );
+    expect(outbox.despertar).toHaveBeenCalled();
+    expect(motor.procesarMensajeEntrante).not.toHaveBeenCalled();
   });
 
   it('imagen sin pedido asociado: se guarda igual (pedido_id null) y se analiza', async () => {
