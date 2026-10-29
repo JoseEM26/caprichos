@@ -13,6 +13,7 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "prisma:generate": "prisma generate",
+    "sanear:clientes-dni": "ts-node prisma/reset/saneamiento-clientes-dni.ts",
     "seed:carta": "ts-node prisma/seed-carta.ts",
     "seed:zonas": "ts-node prisma/seed-zonas.ts",
     "seed:caja": "ts-node prisma/seed-caja.ts",

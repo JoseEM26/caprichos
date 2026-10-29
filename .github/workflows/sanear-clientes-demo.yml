@@ -1,0 +1,101 @@
+# ==============================================================================
+# Sanear clientes y DNI de la DEMO — IRREVERSIBLE
+# ==============================================================================
+# Borra las cuentas de clientes de la demo (party sin cuenta de sistema, DNI, direcciones, puntos,
+# sesiones), anonimiza los DNI que quedan en pedidos/comprobantes/reclamos y desvincula pedidos y
+# conversaciones del cliente borrado. Conserva todo lo demás (recetas, almacén, carta, bot, caja,
+# personal). Ver docs/operacion/sanear-clientes-dni.md.
+#
+# Cómo lanzarlo: Actions > "Sanear clientes de la demo" > Run workflow, rama ola-1.
+#   confirmacion: escribir exactamente  SANEAR CLIENTES DE LA DEMO
+#   simulacro   : true (por defecto) solo informa; false sanea de verdad, con respaldo previo
+#                 en el VPS (/opt/caprichos/respaldos/demo).
+# Siempre se corre primero el simulacro. Esto jamás toca producción: no existe ruta a ella.
+# ==============================================================================
+name: Sanear clientes de la demo
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmacion:
+        description: 'Escriba literalmente: SANEAR CLIENTES DE LA DEMO'
+        required: true
+        type: string
+      simulacro:
+        description: 'Simulacro (no escribe, solo informa). Desmarque para sanear de verdad.'
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  sanear-demo:
+    name: Sanear clientes de la demo
+    if: github.ref == 'refs/heads/ola-1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: demo
+    concurrency:
+      group: sanear-clientes-demo
+      cancel-in-progress: false
+    steps:
+      - name: Validar confirmación
+        env:
+          IN_CONFIRMACION: ${{ github.event.inputs.confirmacion }}
+        run: |
+          if [ "$IN_CONFIRMACION" != "SANEAR CLIENTES DE LA DEMO" ]; then
+            echo "::error::Escriba exactamente 'SANEAR CLIENTES DE LA DEMO' en confirmacion."
+            exit 1
+          fi
+
+      - name: Checkout (scripts de esta versión)
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: infra/compose
+
+      - name: Configurar llave y huella SSH (sin StrictHostKeyChecking=no)
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          for v in SSH_KEY SSH_HOST SSH_KNOWN_HOSTS; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Falta el secreto $v en GitHub (Settings > Secrets and variables > Actions)."
+              exit 1
+            fi
+          done
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Sincronizar scripts en el VPS
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -e
+          SSH="ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes ${SSH_USER:-deploy}@${SSH_HOST}"
+          tar -czf - -C infra/compose scripts | $SSH 'mkdir -p /opt/caprichos && tar -xzf - -C /opt/caprichos && chmod +x /opt/caprichos/scripts/*'
+
+      - name: Sanear clientes de la demo (simulacro primero; real solo si se desmarcó)
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SIMULACRO: ${{ github.event.inputs.simulacro }}
+        run: |
+          if [ "$SIMULACRO" = "false" ]; then MODO=real; else MODO=simulacro; fi
+          echo "==> Modo: ${MODO}"
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "${SSH_USER:-deploy}@${SSH_HOST}" \
+            "/opt/caprichos/scripts/sanear-clientes-demo.sh '${MODO}'"
+
+      - name: Borrar la llave del ejecutor
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
