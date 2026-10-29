@@ -1034,6 +1034,10 @@ describe('CobrosService', () => {
   });
 
   describe('marcarCoordinado', () => {
+    beforeEach(() => {
+      prismaMock.caja.findUnique.mockResolvedValue({ estado: 'ABIERTA' });
+    });
+
     it('marca pago como COORDINADO y audita', async () => {
       prismaMock.pedido.findUnique.mockResolvedValue({
         id: 20n,
@@ -1101,6 +1105,10 @@ describe('CobrosService', () => {
   });
 
   describe('marcarCoordinado con comprobante del medio digital', () => {
+    beforeEach(() => {
+      prismaMock.caja.findUnique.mockResolvedValue({ estado: 'ABIERTA' });
+    });
+
     const pedidoPendiente = (pago_preferido: string | null, pago_metodo: string | null = null) => ({
       id: 20n,
       codigo: 'CP-W020',

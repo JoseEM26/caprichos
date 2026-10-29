@@ -46,6 +46,7 @@ export const CLAVES_NUMERICAS = [
   'asistido_espera_min',
   'impresion_alerta_min',
   'impresion_vence_min',
+  'caja_aviso_apertura_min',
 ] as const;
 
 export const CLAVES_TEXTO = [

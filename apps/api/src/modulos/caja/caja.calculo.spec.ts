@@ -5,6 +5,7 @@ import {
   efectivoDelRepartidor,
   errorCajaAnteriorAbierta,
   esCentimosValidos,
+  exigirCajaAbiertaHoy,
 } from './caja.calculo';
 import { calcularTotalConteo } from '../cierre/cierre.util';
 
@@ -124,5 +125,36 @@ describe('caja.calculo', () => {
     );
     expect(montos.esperadoEfectivo).toBe(80);
     expect(montos.ventasEfectivo).toBe(30);
+  });
+
+  describe('exigirCajaAbiertaHoy (aprobar y cobrar pagos)', () => {
+    const cajaDb = (hoy: any, otraAbierta: any = null) => ({
+      caja: {
+        findUnique: jest.fn().mockResolvedValue(hoy),
+        findFirst: jest.fn().mockResolvedValue(otraAbierta),
+      },
+    });
+
+    it('caja de hoy abierta -> pasa', async () => {
+      await expect(exigirCajaAbiertaHoy(cajaDb({ estado: 'ABIERTA' }) as any)).resolves.toBeUndefined();
+    });
+
+    it('sin caja de hoy -> CAJA_CERRADA con el mensaje de pagos', async () => {
+      await expect(exigirCajaAbiertaHoy(cajaDb(null) as any)).rejects.toMatchObject({
+        response: { codigo: 'CAJA_CERRADA', mensaje: expect.stringContaining('Abre caja para cobrar y aprobar pagos') },
+      });
+    });
+
+    it('caja de hoy ya cerrada -> CAJA_CERRADA', async () => {
+      await expect(exigirCajaAbiertaHoy(cajaDb({ estado: 'CERRADA' }) as any)).rejects.toMatchObject({
+        response: { codigo: 'CAJA_CERRADA' },
+      });
+    });
+
+    it('una caja de otro día sigue abierta -> CAJA_ANTERIOR_SIN_CERRAR (mismo criterio que cobrar)', async () => {
+      await expect(
+        exigirCajaAbiertaHoy(cajaDb(null, { fecha: new Date('2026-10-22T00:00:00.000Z') }) as any),
+      ).rejects.toMatchObject({ response: { codigo: 'CAJA_ANTERIOR_SIN_CERRAR' } });
+    });
   });
 });

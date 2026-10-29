@@ -35,6 +35,7 @@ import {
   FiltroChat,
   RespuestaRapida,
 } from './mensajesTipos';
+import { BannerCajaCerrada } from '../pedidos/BannerCajaCerrada';
 
 function esUsuarioWhatsApp(c?: { identificador_tipo?: string; telefono?: string } | null): boolean {
   if (!c) return false;
@@ -651,7 +652,10 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
         .cv-badge{flex:none;min-width:20px;height:20px;border-radius:10px;background:#25D366;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 6px;box-sizing:border-box}
         .cv-pill{align-self:flex-start;padding:1px 10px;border-radius:9999px;font-size:12px;font-weight:700;color:#111B21;white-space:nowrap}
         .cv-empty{padding:24px 16px;text-align:center;font-size:13px;color:#667781}
-        .cv-chat{display:flex;flex-direction:column;min-width:0;min-height:0;background:#EFEAE2}
+        .cv-chat{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;background:#EFEAE2}
+        .cv-panels{flex:0 1 auto;max-height:34%;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-top:6px}
+        .cv-chat>*{flex-shrink:0}
+        .cv-chat>.cv-msgs,.cv-chat>.cv-panels{flex-shrink:1}
         .cv-chead{display:flex;align-items:center;gap:8px;padding:5px 12px;background:#F0F2F5;border-bottom:1px solid #D1D7DB}
         .cv-hb{flex:1;min-width:0;display:flex;flex-direction:column}
         .cv-hn{font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -661,7 +665,7 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
         .cv-bbtn{min-height:44px;padding:0 14px;border:1.5px solid #00A884;border-radius:9999px;background:#fff;color:#008069;font-weight:700;font-size:13px;cursor:pointer}
         .cv-owner{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:4px 12px;font-size:12px;font-weight:700;border-bottom:1px solid #E9EDEF}
         .cv-owner button{min-height:44px;padding:0 14px;border:1.5px solid #54656F;border-radius:9999px;background:#fff;color:#111B21;font-weight:700;font-size:12px;cursor:pointer}
-        .cv-msgs{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column-reverse;gap:3px;padding:8px 4%}
+        .cv-msgs{flex:1 1 0;min-height:140px;overflow-y:auto;overscroll-behavior:contain;display:flex;flex-direction:column-reverse;gap:3px;padding:8px 4%}
         .cv-bub{max-width:78%;border-radius:8px;padding:6px 9px 4px;box-shadow:0 1px 0.5px rgba(11,20,26,.13);font-size:14px;line-height:19px;color:#111B21}
         .cv-who{font-size:12px;font-weight:700;margin-bottom:1px}
         .cv-txt{white-space:pre-wrap;word-break:break-word}
@@ -683,7 +687,7 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
         .cv-comp input{flex:1;min-width:0;box-sizing:border-box;min-height:46px;border-radius:24px;border:0;background:#fff;padding:0 16px;font-size:15px;color:#111B21}
         .cv-polbtn{flex:none;min-height:46px;padding:0 14px;border:1.5px solid #00A884;border-radius:24px;background:#fff;color:#008069;font-weight:700;font-size:13px;cursor:pointer}
         .cv-send{flex:none;width:46px;height:46px;border:0;border-radius:50%;background:#00A884;display:flex;align-items:center;justify-content:center;cursor:pointer}
-        .cv-more{background:#F0F2F5;border-top:1px solid #E9EDEF;font-size:13px}
+        .cv-more{max-height:40%;overflow-y:auto;background:#F0F2F5;border-top:1px solid #E9EDEF;font-size:13px}
         .cv-more summary{min-height:44px;display:flex;align-items:center;padding:0 14px;cursor:pointer;color:#54656F;font-weight:600}
         .cv-moreb{display:flex;gap:6px;flex-wrap:wrap;padding:0 12px 8px}
         .cv-moreb button,.cv-moreb a{min-height:44px;padding:0 14px;border:1px solid #D1D7DB;border-radius:10px;background:#fff;color:#111B21;font-weight:600;font-size:13px;display:flex;align-items:center;text-decoration:none;cursor:pointer;box-sizing:border-box}
@@ -1127,6 +1131,8 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
                 </div>
               </div>
 
+              {/* Cambio, reserva, pedido y pago: zona propia con su scroll para no aplastar la conversación */}
+              <div className="cv-panels">
               {/* Solicitud de cambio si existe */}
               {detalle.solicitud && (
                 <div className="cv-order" style={{ borderLeftColor: '#E67929' }} data-testid="seccion-solicitud-cambio">
@@ -1273,6 +1279,8 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
                   </div>
                 </div>
               )}
+
+              </div>
 
               {/* Respuestas rápidas */}
               <div className="cv-quick">
@@ -1612,6 +1620,7 @@ export function MensajesView() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+      <BannerCajaCerrada />
       <div style={{ flex: 1, minHeight: 0 }}>
         {vista === 'chats' ? <MensajesChats controles={controles} /> : <SalientesWhatsApp controles={controles} />}
       </div>

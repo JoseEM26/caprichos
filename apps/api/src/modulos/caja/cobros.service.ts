@@ -28,6 +28,7 @@ import {
   MEDIOS_COBRO,
   aCentimos,
   bloquearCaja,
+  exigirCajaAbiertaHoy,
   cobroVigente,
   enPesos,
   errorCajaAnteriorAbierta,
@@ -736,6 +737,9 @@ export class CobrosService {
         HttpStatus.CONFLICT,
       );
     }
+
+    // Coordinar (aprobar) el pago digital exige caja abierta
+    await exigirCajaAbiertaHoy(this.prisma);
 
     // Medio digital del pedido: exige voucher útil (no ILEGIBLE) o excepción con código del supervisor.
     const sinVoucherAutorizado = await exigirComprobanteDigital({

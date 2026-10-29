@@ -1,5 +1,6 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { obtenerFechaHoraLima } from '../local/local.util';
 
 /** Medios de pago que admite un cobro (RN-CAP-011). */
 export const MEDIOS_COBRO = ['EFECTIVO', 'YAPE', 'PLIN', 'TRANSFERENCIA', 'TARJETA'];
@@ -64,6 +65,24 @@ export async function errorCajaAnteriorAbierta(tx: Prisma.TransactionClient) {
       mensaje: `La caja del ${dia} sigue abierta: ciérrala en «Caja y cierres» antes de cobrar, registrar movimientos o abrir la de hoy`,
     },
     HttpStatus.CONFLICT,
+  );
+}
+
+/** Mensaje que ve el admin cuando se intenta cobrar o aprobar un pago con la caja cerrada. */
+export const MENSAJE_CAJA_CERRADA_PAGOS = 'La caja está cerrada. Abre caja para cobrar y aprobar pagos.';
+
+/**
+ * Exige que la caja de hoy (día de Lima) esté abierta para cobrar o aprobar un pago. Si no lo está,
+ * lanza el 409 que corresponde: CAJA_ANTERIOR_SIN_CERRAR si una caja de otro día sigue abierta, o
+ * CAJA_CERRADA. Es la única verificación de «caja abierta» para aprobaciones; los pedidos no la usan.
+ */
+export async function exigirCajaAbiertaHoy(db: Prisma.TransactionClient): Promise<void> {
+  const { fechaIso } = obtenerFechaHoraLima();
+  const caja = await db.caja.findUnique({ where: { fecha: new Date(`${fechaIso}T00:00:00.000Z`) } });
+  if (caja?.estado === 'ABIERTA') return;
+  throw (
+    (await errorCajaAnteriorAbierta(db)) ??
+    new HttpException({ codigo: 'CAJA_CERRADA', mensaje: MENSAJE_CAJA_CERRADA_PAGOS }, HttpStatus.CONFLICT)
   );
 }
 

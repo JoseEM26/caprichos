@@ -50,6 +50,7 @@ describe('PedidosEstadoService', () => {
   beforeEach(async () => {
     prismaMock = {
       $transaction: jest.fn(async (fn: any) => fn(prismaMock)),
+      caja: { findUnique: jest.fn().mockResolvedValue({ estado: 'ABIERTA' }) },
       pedido: {
         findUnique: jest.fn(),
         findMany: jest.fn(),

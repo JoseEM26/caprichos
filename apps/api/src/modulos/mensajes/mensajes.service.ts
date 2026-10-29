@@ -20,6 +20,7 @@ import { EditarNombreContactoDto } from './dto/mensajes.dto';
 import { MATRIZ } from '../acceso/permisos';
 import { BOTONES_PAGO_RECHAZADO, TEXTOS_PAGO } from '../chatbot/conversacion/flujos/pago/textos-pago';
 import { TEXTOS_CAMBIOS } from '../chatbot/conversacion/flujos/cambios/textos-cambios';
+import { exigirCajaAbiertaHoy } from '../caja/caja.calculo';
 
 export type EstadoChat = 'bot' | 'atencion' | 'validar' | 'atendido' | 'pausado';
 export type FiltroChat = 'todos' | 'atender' | 'bot' | 'atendidos';
@@ -692,6 +693,7 @@ export class MensajesService {
     const c = await this.cargar(id);
     if (c.estado !== 'VALIDAR_PAGO') throw error(HttpStatus.CONFLICT, 'SIN_PAGO_POR_REVISAR', 'Este chat no tiene un pago por revisar');
     await this.exigirLibreOMio(c, usuario, 'Toca «Tomar el chat» para decidir tú.');
+    await exigirCajaAbiertaHoy(this.prisma);
     const d = await this.pedidoDelChat(c);
     if (!d.pedido) throw error(HttpStatus.CONFLICT, 'SIN_PEDIDO', 'No hay un pedido abierto para este chat');
 

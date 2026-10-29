@@ -24,6 +24,7 @@ import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { SupervisorCodigoService } from '../supervisor-codigo/supervisor-codigo.service';
 import { exigirComprobanteDigital } from '../caja/comprobante-pago.util';
+import { exigirCajaAbiertaHoy } from '../caja/caja.calculo';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { enmascararDni } from '../usuarios/usuarios.util';
 import { FiltrarPedidosDto } from './dto/filtrar-pedidos.dto';
@@ -858,6 +859,9 @@ export class PedidosEstadoService {
         mensaje: `El método de pago '${dto.metodo}' no es válido`,
       });
     }
+
+    // Confirmar un pago (COORDINADO o PAGADO) exige caja abierta; el pedido en sí no depende de la caja
+    await exigirCajaAbiertaHoy(this.prisma);
 
     // Pago digital (Yape, Plin, transferencia): exige un voucher útil (un ILEGIBLE no cuenta) o la excepción
     // con código del supervisor. Misma regla que el cobro y el pago coordinado (comprobante-pago.util).

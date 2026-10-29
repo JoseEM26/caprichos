@@ -39,6 +39,7 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'archivos', accion: 'ver' },
   // Zonas y Pedidos (Ola 3)
   { modulo: 'pedidos', accion: 'ver' },
+  { modulo: 'pedidos', accion: 'crear' },
   { modulo: 'pedidos', accion: 'cambiar_estado' },
   { modulo: 'pedidos', accion: 'anular' },
   { modulo: 'zonas', accion: 'ver' },
@@ -171,6 +172,7 @@ export const MATRIZ: Record<string, string[]> = {
   // de supervisor), cocina y carta en solo lectura. Escritorio no tiene permiso propio.
   CAJERO: [
     'pedidos/ver',
+    'pedidos/crear',
     'pedidos/cambiar_estado',
     'caja/abrir',
     'caja/cobrar',
@@ -212,6 +214,7 @@ export const MATRIZ: Record<string, string[]> = {
     'notificaciones/marcar',
   ],
   MOZO: [
+    'pedidos/crear',
     'plano/ver',
     'mesas/ver',
     'mesas/abrir',

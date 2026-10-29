@@ -36,7 +36,7 @@ export class PedidosAdminController {
   ) {}
 
   @Post()
-  @Permiso('pedidos', 'ver')
+  @Permiso('pedidos', 'crear')
   async crear(
     @Body() dto: CrearPedidoDto,
     @Headers('idempotency-key') idempotencyKey: string | undefined,

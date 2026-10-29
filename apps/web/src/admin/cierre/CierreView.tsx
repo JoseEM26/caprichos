@@ -9,6 +9,7 @@ import { PendientesCobroCierre } from './PendientesCobroCierre';
 import { pedidosApi, MovimientoCaja, CobroTurno } from '../pedidos/pedidosApi';
 import { ErrorApi } from '../../comun/api';
 import { SeccionVouchersCierre } from '../vouchers/SeccionVouchersCierre';
+import { BannerCajaCerrada } from '../pedidos/BannerCajaCerrada';
 
 type TabCierre = 'turno' | 'historial';
 
@@ -512,6 +513,7 @@ export function CierreView() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <BannerCajaCerrada />
       {dialogo}
       {/* 1. SELECTOR DE PESTAÑAS (Turno actual | Historial de cierres) */}
       <div role="tablist" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>

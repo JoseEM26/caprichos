@@ -14,6 +14,7 @@ describe('MensajesService', () => {
 
   beforeEach(() => {
     prisma = {
+      caja: { findUnique: jest.fn().mockResolvedValue({ estado: 'ABIERTA' }), findFirst: jest.fn().mockResolvedValue(null) },
       userAccount: {
         findUnique: jest.fn().mockImplementation(({ where }) => {
           if (where.party_id === 10n) return Promise.resolve({ id: 100n });
@@ -341,6 +342,14 @@ describe('MensajesService', () => {
         data: expect.objectContaining({ duenio: 'BOT', urgente: false, tomado_por: null }),
       }),
     );
+  });
+
+  it('aprobar pago con la caja cerrada -> CAJA_CERRADA y no cambia el pedido', async () => {
+    prisma.caja.findUnique.mockResolvedValueOnce(null);
+    await expect(service.aprobarPago('2', usuarioAdmin)).rejects.toMatchObject({
+      response: { codigo: 'CAJA_CERRADA' },
+    });
+    expect(prisma.pedido.update).not.toHaveBeenCalled();
   });
 
   it('aprobar pago cambia pedido a COORDINADO y avisa por WhatsAppGateway', async () => {

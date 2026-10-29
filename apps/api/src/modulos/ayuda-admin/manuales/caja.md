@@ -24,6 +24,12 @@ Modulo central para la recepcion, seguimiento y cobro de pedidos en salon, para 
 Antes: [[supervisor-codigo]]
 Despues: [[caja]]
 
+## Como se hace: Regla de caja abierta
+1. Los pedidos entran siempre, por la carta, WhatsApp o el mozo. Aceptar un pedido y mandarlo a cocina no necesitan la caja abierta.
+2. Cobrar un pedido y aprobar un pago (Aprobar el pago en Mensajes, confirmar el pago en Pedidos y Marcar coordinado) solo se pueden con la caja de hoy abierta. Con la caja cerrada, el sistema muestra "La caja está cerrada. Abre caja para cobrar y aprobar pagos.".
+3. Mientras la caja este cerrada, una franja roja arriba de Pedidos y caja, Caja y cierres y Mensajes lo recuerda, con el boton Abrir caja (lleva a Caja y cierres). Los pedidos sin cobrar muestran la etiqueta Caja cerrada; el estado del pedido no cambia.
+4. Cada dia, si el local ya abrio hace 15 minutos y la caja no se ha abierto, la campana avisa "Caja sin abrir" una sola vez para Caja. Los dias cerrados o feriados no avisan. Los minutos se cambian con el parametro caja_aviso_apertura_min.
+
 ## Como se hace: mover un voucher al pedido correcto
 1. Si el comprobante de un cliente quedó ligado a otro de sus pedidos (la regla automática toma el pedido pendiente más reciente), abre el pedido en Confirmar pago o el chat en Mensajes.
 2. En la foto del comprobante, pulsa "Reasignar a otro pedido". Solo aparecen los pedidos del mismo cliente que esperan pago digital.
@@ -108,6 +114,7 @@ Ver tambien: [[cocina]]
 - Una foto que la IA marca como ilegible no cuenta como comprobante: pide otra foto al cliente o usa la excepcion con supervisor. Una foto marcada como raro se guarda y se cobra; revisela con el cliente si hay dudas.
 - Si un cliente escribe por WhatsApp con una imagen y no ves el comprobante en la ficha, revisa el chat en Mensajes: la foto queda guardada aunque aun no exista la cuenta.
 - No se puede cerrar la caja al finalizar el dia si existen pedidos pendientes de cobro; deben cobrarse o anularse primero.
+- Si no puedes cobrar o aprobar un pago y aparece "La caja está cerrada", abre la caja del dia en Caja y cierres.
 - Si un pedido por delivery no tiene ubicacion GPS o referencia clara, debe ubicarse en el mapa antes de enviarse a despacho.
 - Si la impresora de caja no responde, las etiquetas quedan en cola y no se pierden: la franja de Pedidos y caja lo indica. Al reconectar salen solas.
 

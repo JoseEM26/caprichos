@@ -10,6 +10,7 @@ import { ModalPrecuenta } from '../salon/componentes/ModalPrecuenta';
 import { ModalConfirmarPago } from './ModalConfirmarPago';
 import { EtiquetasPedido } from './EtiquetasPedido';
 import { canalLabel, modLabel, getBadge } from './PedidosAdminView';
+import { EtiquetaCajaCerrada, esperaCajaCerrada } from './BannerCajaCerrada';
 import {
   listarPersonalActivo,
   registrarConsumoCredito,
@@ -22,6 +23,8 @@ export interface PedidoDetalleProps {
   pedido: Pedido;
   alActualizar: () => void;
   alRepetir?: (pedido: Pedido) => void;
+  /** Estado de la caja de hoy (lo pasa la lista). Con caja cerrada, un pedido sin cobrar lleva «Caja cerrada». */
+  cajaAbierta?: boolean | null;
 }
 
 type TabDetalle = 'pedido' | 'cobro' | 'ticket' | 'etiquetas' | 'comprobante';
@@ -36,7 +39,7 @@ function FilaDato({ etiqueta, valor }: { etiqueta: string; valor: string }) {
   );
 }
 
-export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalleProps) {
+export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: PedidoDetalleProps) {
   const [tab, setTab] = useState<TabDetalle>('pedido');
 
   // Modales
@@ -191,6 +194,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir }: PedidoDetalle
           >
             {stBadge.l}
           </span>
+          {esperaCajaCerrada(pedido, cajaAbierta ?? null) && <EtiquetaCajaCerrada />}
         </div>
 
         <div style={{ fontSize: 13, lineHeight: '19px', color: 'var(--cp-soft, #2C4C5D)' }}>

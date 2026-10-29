@@ -6,6 +6,12 @@ Todos los cambios notables del proyecto Caprichos se documentan en este archivo.
 
 ## 2026-10-28
 
+### Mi perfil: el usuario edita su nombre, correo y foto con confirmación
+- `/admin/perfil` rediseñado en tarjetas (Mis datos, Mi foto, Seguridad, Sesión). Rol, usuario (DNI enmascarado), estado y accesos son solo lectura. Nuevo `GET/PATCH /auth/perfil` y `PUT/DELETE /auth/perfil/foto` con identidad solo por sesión, sin permiso de usuarios; campos fuera de nombres, apellidos y correo se rechazan. Auditoría `perfil` sin valores. El avatar del menú cambia sin recargar.
+
+### Regla de caja abierta: cobrar y aprobar pagos exigen caja de hoy abierta
+- Pedidos entran y pasan a cocina siempre; cobrar, aprobar pagos (Mensajes, confirmar pago en Pedidos, marcar coordinado) exigen la caja de hoy abierta (`CAJA_CERRADA`, helper `exigirCajaAbiertaHoy`). Franja roja con «Abrir caja», etiqueta «Caja cerrada» en pedidos sin cobrar y aviso «Caja sin abrir» una vez por día (`caja_aviso_apertura_min`, por defecto 15; migración `20261106100000_caja_aviso_apertura_parametro`).
+
 ### Calificación de la encuesta posventa: se reconoce, queda registrada y avisa
 - **Reconocimiento estricto del puntaje**: solo cuentan el botón `encuesta:N`, un dígito 1-5 solo, «N Palabra» con la palabra que corresponde a ese N («1 Malo», «3 Regular», «5 Excelente») o la palabra de la escala («malo», «regular», «bueno», «muy bueno», «excelente»). «tengo 1 pregunta», un número de teléfono o «2 Regular» ya no se toman como calificación. Util `servicios/encuesta-posventa.util.ts`.
 - **Encuesta correcta**: se busca la encuesta ENVIADA más reciente del teléfono dentro de `encuesta_ventana_dias` (por defecto 7), no el pedido más reciente. Así una calificación no se pierde porque el cliente hizo otro pedido después.

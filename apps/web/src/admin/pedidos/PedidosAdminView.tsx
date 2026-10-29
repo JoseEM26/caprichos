@@ -11,6 +11,7 @@ import { salonApi } from '../salon/api';
 import type { PisoSalon } from '../salon/tipos';
 import { reproducirCampana } from './audioAlerta';
 import { FranjaImpresion } from './FranjaImpresion';
+import { BannerCajaCerrada, EtiquetaCajaCerrada, esperaCajaCerrada, useEstadoCajaHoy } from './BannerCajaCerrada';
 import './pedidos.css';
 
 export function canalLabel(c?: string | null) {
@@ -186,6 +187,7 @@ export function PedidosAdminView() {
   // Delivery no entregados (pestaña propia, con su contador)
   const { tiene } = useSesion();
   const puedeLiquidar = tiene('repartos/liquidar');
+  const { abierta: cajaAbierta } = useEstadoCajaHoy();
   const [noEntregados, setNoEntregados] = useState<RespuestaNoEntregados | null>(null);
   const [cargandoNoEntregados, setCargandoNoEntregados] = useState<boolean>(false);
   const [errorNoEntregados, setErrorNoEntregados] = useState<string>('');
@@ -460,6 +462,7 @@ export function PedidosAdminView() {
 
   return (
     <div>
+    <BannerCajaCerrada />
     <FranjaImpresion />
     <div className="cj-grid">
       {/* PANEL IZQUIERDO */}
@@ -922,6 +925,7 @@ export function PedidosAdminView() {
               const resaltado = pedidosResaltados.has(String(o.id));
               const itemsTexto = (o.lineas || []).map((l) => `${l.cantidad}× ${l.nombre}`).join(', ');
               const badge = getBadge(o);
+              const cajaCerradaEspera = esperaCajaCerrada(o, cajaAbierta);
 
               return (
                 <button
@@ -958,6 +962,7 @@ export function PedidosAdminView() {
                     >
                       {badge.l}
                     </span>
+                    {cajaCerradaEspera && <EtiquetaCajaCerrada />}
                   </div>
                   <div style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)' }}>
                     {canalLabel(o.canal)} · {modLabel(o.modalidad)} · {o.cliente_nombre || 'Cliente'}
@@ -1074,6 +1079,7 @@ export function PedidosAdminView() {
         ) : (
           <PedidoDetalle
             pedido={pedidoSeleccionado}
+            cajaAbierta={cajaAbierta}
             alActualizar={cargarDatos}
             alRepetir={(p) => {
               setPedidoRepetir(p);
