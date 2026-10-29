@@ -143,7 +143,7 @@ export const PAL_DEFAULT: Record<string, Record<string, string>> = {
 /** Ruta pública de un archivo guardado (misma regla que el catálogo: /archivos/<ruta>). */
 function urlArchivo(ruta: string): string {
   if (/^(https?:|data:)/.test(ruta)) return ruta;
-  if (ruta.startsWith('/archivos/')) return ruta;
+  if (ruta.startsWith('/archivos/') || ruta.startsWith('/imagenes/')) return ruta;
   return `/archivos/${ruta.replace(/^\/+/, '')}`;
 }
 
