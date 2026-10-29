@@ -13,6 +13,7 @@ export interface UsuarioSesion {
   partyId: string;
   nombres: string;
   rol: string;
+  fotoUrl?: string | null;
 }
 
 export interface ContextoSesion {
@@ -73,6 +74,7 @@ export function SesionProvider({ children }: SesionProviderProps) {
       const yo = await api.get<{
         partyId: string;
         nombres: string;
+        fotoUrl: string | null;
         rol: string;
         debeCambiar: boolean;
         permisos: string[];
@@ -82,6 +84,7 @@ export function SesionProvider({ children }: SesionProviderProps) {
         partyId: yo.partyId,
         nombres: yo.nombres,
         rol: yo.rol,
+        fotoUrl: yo.fotoUrl ?? null,
       });
       setPermisos(yo.permisos || []);
       setDebeCambiar(Boolean(yo.debeCambiar));

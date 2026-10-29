@@ -558,6 +558,7 @@ describe('AuthService', () => {
       expect(r).toEqual({
         partyId: '7',
         nombres: 'Luis',
+        fotoUrl: null,
         rol: 'COCINA',
         debeCambiar: false,
         permisos: ['cocina/despejar', 'cocina/ver'],

@@ -5,11 +5,15 @@ import { AccesoGuard } from './acceso.guard';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { SincronizadorPermisosService } from './sincronizador-permisos.service';
+import { ArchivosModule } from '../archivos/archivos.module';
+import { MiPerfilController } from './mi-perfil.controller';
+import { MiPerfilService } from './mi-perfil.service';
 
 @Global()
 @Module({
   imports: [
     ConfigModule,
+    ArchivosModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -26,11 +30,12 @@ import { SincronizadorPermisosService } from './sincronizador-permisos.service';
       },
     }),
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, MiPerfilController],
   providers: [
     AccesoGuard,
     AuthService,
     SincronizadorPermisosService,
+    MiPerfilService,
   ],
   exports: [AccesoGuard, JwtModule, AuthService],
 })

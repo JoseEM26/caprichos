@@ -222,13 +222,22 @@ export function AdminShell() {
       </div>
     ));
 
-  const avatar = (tam: number) => (
-    <span
-      style={{ width: tam, height: tam, borderRadius: tam / 2, background: colorRol, color: 'var(--cp-navy)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--fuente-titulos)', fontWeight: 800, flex: 'none' }}
-    >
-      {iniciales}
-    </span>
-  );
+  const avatar = (tam: number) =>
+    usuario?.fotoUrl ? (
+      <img
+        src={usuario.fotoUrl}
+        alt=""
+        width={tam}
+        height={tam}
+        style={{ width: tam, height: tam, borderRadius: tam / 2, objectFit: 'cover', display: 'block', flex: 'none' }}
+      />
+    ) : (
+      <span
+        style={{ width: tam, height: tam, borderRadius: tam / 2, background: colorRol, color: 'var(--cp-navy)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--fuente-titulos)', fontWeight: 800, flex: 'none' }}
+      >
+        {iniciales}
+      </span>
+    );
 
   const logo = (tam: number) => <img src="/logo.webp" alt="Caprichos" width={tam} height={tam} style={{ borderRadius: tam / 2, display: 'block', flex: 'none' }} />;
 

@@ -53,6 +53,7 @@ export class AuthService {
   async yo(partyId: bigint): Promise<{
     partyId: string;
     nombres: string;
+    fotoUrl: string | null;
     rol: string;
     debeCambiar: boolean;
     permisos: string[];
@@ -67,6 +68,8 @@ export class AuthService {
         HttpStatus.UNAUTHORIZED,
       );
     }
+    const fotoId = cuenta.party.persona?.foto_archivo_id;
+    const foto = fotoId ? await this.prisma.archivo.findUnique({ where: { id: fotoId } }) : null;
     const filas = await this.prisma.rolPermiso.findMany({
       where: { rol: cuenta.rol },
       include: { permiso: true },
@@ -74,6 +77,7 @@ export class AuthService {
     return {
       partyId: cuenta.party_id.toString(),
       nombres: cuenta.party.persona?.nombres || '',
+      fotoUrl: foto ? `/archivos/${foto.ruta}` : null,
       rol: cuenta.rol,
       debeCambiar: cuenta.debe_cambiar,
       permisos: filas.map((f) => `${f.permiso.modulo}/${f.permiso.accion}`).sort(),
