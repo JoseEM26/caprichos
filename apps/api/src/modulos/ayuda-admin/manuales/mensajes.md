@@ -24,6 +24,14 @@ Bandeja de atencion para las conversaciones de WhatsApp del negocio. Permite al 
 5. Al terminar la atencion, pulsar el boton Marcar como atendido o Soltar chat para devolverlo al flujo normal.
 Ver tambien: [[caja]], [[clientes]]
 
+## Como se hace: Responder a una calificacion baja de la encuesta
+1. Cuando un cliente califica la encuesta posventa con 1 o 2, llega una notificacion en la campana con el titulo Calificacion baja, el puntaje, el codigo del pedido y el nombre del cliente. Caja y administracion la ven.
+2. Los administradores con alertas por WhatsApp reciben un mensaje individual con el mismo aviso (WhatsApp no envia a grupos, por eso llega uno por persona).
+3. Pulsar la notificacion: abre el chat de ese cliente en esta bandeja. El chat queda para atencion de una persona y el bot ya no contesta en ese chat.
+4. Leer lo que escribio el cliente y responder desde el campo inferior con Enter o el boton Enviar. Si el cliente aun no explica que paso, el chat queda esperando su mensaje.
+5. Si el caso necesita seguimiento formal, registrarlo en [[reclamos]], pestana Quejas de WhatsApp.
+Ver tambien: [[reclamos]], [[notificaciones]]
+
 ## Como se hace: Validar una captura de pago con lectura de IA
 1. Cuando un cliente envia una foto de voucher por WhatsApp, la conversacion pasa de forma automatica a la cola Por atender para atencion humana.
 2. Seleccionar el chat en estado Validar pago (fondo amarillo suave).

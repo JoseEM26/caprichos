@@ -202,7 +202,7 @@ export function BloqueAlertasWhatsApp({
             Alertas por WhatsApp
           </h3>
           <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: 'var(--cp-soft)' }}>
-            Recepción de avisos críticos las 24 horas (vouchers, chats en espera y pedidos demorados).
+            Recepción de avisos críticos las 24 horas (vouchers, chats en espera, pedidos demorados y calificaciones bajas de la encuesta).
           </p>
         </div>
 

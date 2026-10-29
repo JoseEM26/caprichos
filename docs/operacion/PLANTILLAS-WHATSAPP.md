@@ -8,7 +8,7 @@ Todas las plantillas pertenecen a la categoría **Utilidad (UTILITY)** y están 
 
 ## Resumen del Catálogo
 
-> Pendiente de enviar a Meta: `DELIVERY_ESPERA_AGOTADA` (ahora sin botones), `DELIVERY_RETIRO` (ahora es la pregunta SÍ/NO), `DELIVERY_REPROG_RECIBIDA`, `DELIVERY_REENVIADO`, `DELIVERY_REPROG_CANCELADA` y `DELIVERY_REPROG_SIN_RESPUESTA`. Los textos de todas las plantillas de reparto se reescribieron con tono cálido y emojis; lo que está aquí es igual a `plantillas.catalogo.ts`.
+> Pendiente de enviar a Meta: `ENCUESTA_GRACIAS` (respaldo del agradecimiento de la encuesta; solo se usa si la ventana de 24 h ya está cerrada al enviar). `DELIVERY_ESPERA_AGOTADA` (ahora sin botones), `DELIVERY_RETIRO` (ahora es la pregunta SÍ/NO), `DELIVERY_REPROG_RECIBIDA`, `DELIVERY_REENVIADO`, `DELIVERY_REPROG_CANCELADA` y `DELIVERY_REPROG_SIN_RESPUESTA`. Los textos de todas las plantillas de reparto se reescribieron con tono cálido y emojis; lo que está aquí es igual a `plantillas.catalogo.ts`.
 
 | Clave en Sistema | Nombre en Meta | Categoría | Idioma | Variables |
 | :--- | :--- | :--- | :--- | :--- |
@@ -25,6 +25,7 @@ Todas las plantillas pertenecen a la categoría **Utilidad (UTILITY)** y están 
 | `PAGO_CONFIRMADO` | `caprichos_pago_confirmado` | Utilidad | Español (`es`) | 2 |
 | `PEDIDO_LISTO_RECOJO` | `caprichos_pedido_listo_recojo` | Utilidad | Español (`es`) | 2 |
 | `ENCUESTA_POSVENTA` | `caprichos_encuesta_posventa` | Utilidad | Español (`es`) | 2 |
+| `ENCUESTA_GRACIAS` | `caprichos_encuesta_gracias` | Utilidad | Español (`es`) | 2 |
 | `REABRIR_CONVERSACION` | `caprichos_reabrir_conversacion` | Utilidad | Español (`es`) | 1 |
 | `EQUIPO_NUEVO_PEDIDO` | `caprichos_equipo_nuevo_pedido` | Utilidad | Español (`es`) | 3 |
 | `EQUIPO_ALERTA_ALMACEN` | `caprichos_equipo_alerta_almacen` | Utilidad | Español (`es`) | 3 |

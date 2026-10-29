@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within, cleanup } from '@testing-library/react';
 import { PedidosAdminView } from '../PedidosAdminView';
 import { pedidosApi, Pedido, RespuestaNoEntregados } from '../pedidosApi';
 import * as sesionModulo from '../../../comun/sesion';
@@ -94,6 +94,8 @@ describe('Pedidos y caja: pestaña No entregados', () => {
   });
 
   afterEach(() => {
+    // Se desmonta antes de restaurar el mock de useEventos: si no, un re-render tardío cambia el orden de hooks
+    cleanup();
     vi.restoreAllMocks();
   });
 

@@ -293,4 +293,113 @@ describe('AvisosInternosService - Fuente de Destinatarios y Autorización Dinám
       );
     });
   });
+
+  describe('5. Calificación baja de la encuesta posventa', () => {
+    const dosAdmins = () =>
+      prismaMock.userAccount.findMany.mockResolvedValueOnce([
+        {
+          id: 1n,
+          rol: 'ADMIN',
+          activo: true,
+          alertas_whatsapp: true,
+          alertas_whatsapp_confirmado_en: new Date(),
+          party: { contactos: [{ tipo: 'WHATSAPP', valor: '977503006', principal: true, activo: true }] },
+        },
+        {
+          id: 2n,
+          rol: 'ADMIN',
+          activo: true,
+          alertas_whatsapp: true,
+          alertas_whatsapp_confirmado_en: new Date(),
+          party: { contactos: [{ tipo: 'WHATSAPP', valor: '988888888', principal: true, activo: true }] },
+        },
+      ]);
+
+    beforeEach(() => {
+      outboxMock.encolar.mockClear();
+      prismaMock.notificacion.create.mockClear();
+    });
+
+    it('avisa a cada administrador por separado (nunca a un grupo), con clave idempotente por encuesta', async () => {
+      dosAdmins();
+
+      const res = await service.avisarCalificacionBaja({
+        encuestaId: 7n,
+        codigo: 'CP-W114',
+        cliente: 'José Ángel',
+        puntaje: 1,
+        telefono: '51987654321',
+      });
+
+      expect(res.enviosExitosos).toBe(2);
+      expect(outboxMock.encolar).toHaveBeenCalledTimes(2);
+      const telefonos = outboxMock.encolar.mock.calls.map((c: any[]) => c[0].telefono).sort();
+      expect(telefonos).toEqual(['51977503006', '51988888888']);
+      const claves = outboxMock.encolar.mock.calls.map((c: any[]) => c[0].clave);
+      expect(claves.every((c: string) => c.startsWith('calificacion-baja-7:'))).toBe(true);
+    });
+
+    it('el texto lleva cliente, código, puntaje, la instrucción de Mensajes y el enlace al chat', async () => {
+      dosAdmins();
+
+      await service.avisarCalificacionBaja({
+        encuestaId: 7n,
+        codigo: 'CP-W114',
+        cliente: 'José Ángel',
+        puntaje: 1,
+        telefono: '51987654321',
+      });
+
+      const carga = outboxMock.encolar.mock.calls[0][0].carga;
+      expect(carga.textoLibre).toContain('Calificación baja: 1/5 · CP-W114 · José Ángel');
+      expect(carga.textoLibre).toContain('José Ángel calificó con 1/5 su pedido CP-W114');
+      expect(carga.textoLibre).toContain('Abre Mensajes');
+      expect(carga.textoLibre).toContain('/admin/mensajes?telefono=987654321');
+    });
+
+    it('no duplica la campana: el aviso a administradores no crea otra fila de notificación', async () => {
+      dosAdmins();
+
+      await service.avisarCalificacionBaja({
+        encuestaId: 7n,
+        codigo: 'CP-W114',
+        cliente: 'José Ángel',
+        puntaje: 1,
+        telefono: '51987654321',
+      });
+
+      expect(prismaMock.notificacion.create).not.toHaveBeenCalled();
+    });
+
+    it('sin teléfono del cliente, el enlace va a Reclamos', async () => {
+      dosAdmins();
+
+      await service.avisarCalificacionBaja({
+        encuestaId: 8n,
+        codigo: 'CP-W115',
+        cliente: 'Cliente',
+        puntaje: 2,
+        telefono: null,
+      });
+
+      expect(outboxMock.encolar.mock.calls[0][0].carga.textoLibre).toContain('/admin/reclamos');
+    });
+
+    it('sin administradores con alertas, no encola nada y lo informa', async () => {
+      prismaMock.userAccount.findMany.mockResolvedValueOnce([]);
+      configServiceMock.get.mockReturnValueOnce('');
+
+      const res = await service.avisarCalificacionBaja({
+        encuestaId: 9n,
+        codigo: 'CP-W116',
+        cliente: 'Cliente',
+        puntaje: 1,
+        telefono: '51987654321',
+      });
+
+      expect(res.omitido).toBe(true);
+      expect(res.motivo).toBe('SIN_NUMEROS');
+      expect(outboxMock.encolar).not.toHaveBeenCalled();
+    });
+  });
 });

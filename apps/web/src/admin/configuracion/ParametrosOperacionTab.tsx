@@ -245,8 +245,14 @@ const META_PARAMETROS: Record<string, MetaParametro> = {
   },
   encuesta_puntaje_queja: {
     nombre: 'Umbral de queja en encuesta',
-    descripcion: 'Puntajes iguales o menores a este valor (1 a 5) son derivados automáticamente como quejas al módulo de Reclamos.',
+    descripcion: 'Puntajes iguales o menores a este valor (1 a 5) son derivados automáticamente como quejas al módulo de Reclamos, avisan en la campana y por WhatsApp a los administradores.',
     tipo: 'numero',
+  },
+  encuesta_ventana_dias: {
+    nombre: 'Días para calificar la encuesta',
+    descripcion: 'Días después del envío durante los que el cliente puede responder la encuesta posventa por WhatsApp. Pasado ese plazo, su respuesta vuelve al bot.',
+    tipo: 'numero',
+    sufijo: 'días',
   },
   chatbot_activo: {
     nombre: 'Chatbot de WhatsApp activo',

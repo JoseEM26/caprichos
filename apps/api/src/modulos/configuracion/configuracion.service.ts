@@ -30,6 +30,7 @@ export const CLAVES_NUMERICAS = [
   'reprog_max_intentos',
   'encuesta_espera_min',
   'encuesta_puntaje_queja',
+  'encuesta_ventana_dias',
   'chatbot_pago_recordatorio_min',
   'chatbot_pago_expira_min',
   'chatbot_ia_tope_mensual_usd',

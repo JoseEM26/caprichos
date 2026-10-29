@@ -6,6 +6,17 @@ Todos los cambios notables del proyecto Caprichos se documentan en este archivo.
 
 ## 2026-10-28
 
+### Calificación de la encuesta posventa: se reconoce, queda registrada y avisa
+- **Reconocimiento estricto del puntaje**: solo cuentan el botón `encuesta:N`, un dígito 1-5 solo, «N Palabra» con la palabra que corresponde a ese N («1 Malo», «3 Regular», «5 Excelente») o la palabra de la escala («malo», «regular», «bueno», «muy bueno», «excelente»). «tengo 1 pregunta», un número de teléfono o «2 Regular» ya no se toman como calificación. Util `servicios/encuesta-posventa.util.ts`.
+- **Encuesta correcta**: se busca la encuesta ENVIADA más reciente del teléfono dentro de `encuesta_ventana_dias` (por defecto 7), no el pedido más reciente. Así una calificación no se pierde porque el cliente hizo otro pedido después.
+- **Calificación consumida**: si el mensaje es una calificación, el bot no contesta nada (ni el menú ni «Ya avisé a una persona»), también en VALIDAR_PAGO. Una calificación ya aplicada no se repite.
+- **Agradecimiento**: va por el outbox con clave `encuesta-<id>-GRACIAS`, en la misma transacción que la calificación, y queda en el chat. Tres textos (baja, media y alta) en `conversacion/textos-encuesta.ts`. Plantilla de respaldo `ENCUESTA_GRACIAS`.
+- **Calificación baja** (≤ `encuesta_puntaje_queja`, por defecto 2): crea la queja en Reclamos, una notificación para CAJERO (que también ve ADMIN) con «Calificación baja: 1/5 · CP-W114 · nombre» y enlace a `/admin/mensajes?telefono=…`, y pasa el chat a atención de persona (`duenio` PERSONA, urgente, motivo CALIFICACION_BAJA).
+- **Aviso a administradores por WhatsApp**: `AvisosInternosService.avisarCalificacionBaja` manda un mensaje individual a cada administrador con alertas activas y confirmadas, por el outbox, con clave `calificacion-baja-<encuesta>`. WhatsApp no envía a grupos. Usa `enviarAvisoAdmin` con `sinCampana`, para no duplicar la campana.
+- **Usuarios → Alertas por WhatsApp**: el texto del bloque incluye las calificaciones bajas. No hay interruptor por tipo: el sistema tiene un solo interruptor por administrador.
+- Migración aditiva `20261105100000_encuesta_calificacion` (solo parámetros `encuesta_ventana_dias` y `encuesta_puntaje_queja`). Sin cambios de esquema.
+- Manuales de ayuda: Mensajes (responder a una calificación baja), Reclamos (quejas de la encuesta) y Usuarios (alertas por WhatsApp).
+
 ### Minutos por zona, tiempo que falta en el seguimiento y reasignar un voucher
 - **Minutos de entrega por zona**: en Zonas de reparto (lista y mapa) se editan con «Editar minutos» (enteros de 5 a 120, mínimo ≤ máximo), con confirmación Sí/No y auditoría EDITAR_TIEMPO (antes y después). `PUT /admin/zonas/:codigo/tiempo` (`zonas/editar`) invalida la caché. `GET /admin/zonas` devuelve `minutosMin`/`minutosMax`; `GET /carta/envio` agrega `minutos: {min, max}` (aditivo, null si la zona no los tiene). El mapa muestra «Z3 · S/ 3.00 · 15–20 min».
 - **Seguimiento de la carta** (`/carta/seguimiento`): agrega `tiempo: {min, max, enCamino, texto}` (aditivo). Antes de salir, el rango de la zona con empaque; sin zona ni coordenadas, `tiempo_prometido_min`. En camino, lo prometido al salir (`pedido.eta_min`/`eta_max`, guardados en la salida) menos lo transcurrido, nunca bajo 5 minutos. Entregado o anulado: sin tiempo. La aprobación del pago y el texto de «en camino» usan el mismo rango.

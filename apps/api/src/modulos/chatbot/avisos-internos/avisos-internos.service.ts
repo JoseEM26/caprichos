@@ -18,6 +18,7 @@ import { CATALOGO_PLANTILLAS } from '../catalogo/plantillas.catalogo';
 import { enmascararTelefono, hashTelefono, normalizarTelefono } from '../utilidades/enmascarar.util';
 import {
   DatosAvisoAlmacen,
+  DatosAvisoCalificacionBaja,
   DatosAvisoNuevoPedido,
   ResultadoEnvioEquipo,
   ResultadoNotificacionEquipo,
@@ -760,9 +761,12 @@ export class AvisosInternosService {
     enlace: string,
     botones?: BotonAccion[],
     claveIdempotencia?: string,
+    opciones?: { sinCampana?: boolean },
   ): Promise<ResultadoNotificacionEquipo> {
-    // Alerta va SIEMPRE a la campana del panel (respaldo y registro)
-    await this.emitirAvisoCampana(titulo, detalle, enlace);
+    // Alerta va SIEMPRE a la campana del panel (respaldo y registro), salvo que quien avisa ya la haya puesto
+    if (!opciones?.sinCampana) {
+      await this.emitirAvisoCampana(titulo, detalle, enlace);
+    }
 
     const activo = await this.estanAvisosActivos();
     if (!activo) {
@@ -827,6 +831,31 @@ export class AvisosInternosService {
       enviosExitosos: encolados,
       detalles,
     };
+  }
+
+  /**
+   * Calificación baja de la encuesta posventa: un WhatsApp individual a cada administrador con alertas activas.
+   * La API oficial de WhatsApp no envía a grupos, por eso no hay un solo mensaje para todo el equipo.
+   * Una sola vez por encuesta (la clave es la encuesta). La campana la pone quien llama: sale con rol CAJERO.
+   */
+  async avisarCalificacionBaja(datos: DatosAvisoCalificacionBaja): Promise<ResultadoNotificacionEquipo> {
+    const titulo = `Calificación baja: ${datos.puntaje}/5 · ${datos.codigo} · ${datos.cliente}`;
+    const enlace = datos.telefono ? `/admin/mensajes?telefono=${datos.telefono.slice(-9)}` : '/admin/reclamos';
+    const comentario = datos.comentario?.trim()
+      ? `Comentario: ${datos.comentario.trim()}`
+      : 'Comentario: ninguno todavía; el cliente solo envió la calificación.';
+    const detalle =
+      `${datos.cliente} calificó con ${datos.puntaje}/5 su pedido ${datos.codigo}. ` +
+      `${comentario} Ya se le avisó que una persona le escribirá por el chat. ` +
+      'Abre Mensajes y responde desde ahí.';
+    return this.enviarAvisoAdmin(
+      titulo,
+      detalle,
+      enlace,
+      undefined,
+      `calificacion-baja-${datos.encuestaId.toString()}`,
+      { sinCampana: true },
+    );
   }
 
   /**

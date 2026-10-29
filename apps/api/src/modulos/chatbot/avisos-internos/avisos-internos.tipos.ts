@@ -46,3 +46,15 @@ export interface ResultadoNotificacionEquipo {
   enviosExitosos: number;
   detalles: ResultadoEnvioEquipo[];
 }
+
+/** Datos de la alerta a administradores por calificación baja de la encuesta posventa. */
+export interface DatosAvisoCalificacionBaja {
+  encuestaId: bigint | string;
+  codigo: string;
+  cliente: string;
+  puntaje: number;
+  /** Teléfono del cliente (51XXXXXXXXX) o null si el chat no tiene número (BSUID). */
+  telefono: string | null;
+  /** Comentario escrito por el cliente; hoy la calificación llega sola, así que casi siempre es null. */
+  comentario?: string | null;
+}

@@ -702,6 +702,12 @@
       "modulo": "mensajes"
     },
     {
+      "id": "mensajes#responder-a-una-calificacion-baja-de-la-encuesta",
+      "tipo": "tarea",
+      "etiqueta": "Responder a una calificacion baja de la encuesta",
+      "modulo": "mensajes"
+    },
+    {
       "id": "mensajes#validar-una-captura-de-pago-con-lectura-de-ia",
       "tipo": "tarea",
       "etiqueta": "Validar una captura de pago con lectura de IA",
@@ -1203,6 +1209,12 @@
       "id": "usuarios#desactivar-o-reactivar-un-usuario",
       "tipo": "tarea",
       "etiqueta": "desactivar o reactivar un usuario",
+      "modulo": "usuarios"
+    },
+    {
+      "id": "usuarios#recibir-alertas-por-whatsapp",
+      "tipo": "tarea",
+      "etiqueta": "recibir alertas por WhatsApp",
       "modulo": "usuarios"
     },
     {
@@ -3781,6 +3793,11 @@
       "destino": "mensajes"
     },
     {
+      "tipo": "relacionado_con",
+      "origen": "mensajes",
+      "destino": "notificaciones"
+    },
+    {
       "tipo": "pertenece_a",
       "origen": "mensajes#atender-un-chat-que-requiere-ayuda-humana",
       "destino": "mensajes"
@@ -3804,6 +3821,31 @@
       "tipo": "ver_tambien",
       "origen": "mensajes",
       "destino": "clientes"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mensajes#responder-a-una-calificacion-baja-de-la-encuesta",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mensajes#responder-a-una-calificacion-baja-de-la-encuesta",
+      "destino": "reclamos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mensajes",
+      "destino": "reclamos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mensajes#responder-a-una-calificacion-baja-de-la-encuesta",
+      "destino": "notificaciones"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mensajes",
+      "destino": "notificaciones"
     },
     {
       "tipo": "pertenece_a",
@@ -4074,11 +4116,6 @@
       "tipo": "relacionado_con",
       "origen": "notificaciones",
       "destino": "mensajes"
-    },
-    {
-      "tipo": "relacionado_con",
-      "origen": "mensajes",
-      "destino": "notificaciones"
     },
     {
       "tipo": "relacionado_con",
@@ -5461,6 +5498,16 @@
       "destino": "usuarios"
     },
     {
+      "tipo": "relacionado_con",
+      "origen": "usuarios",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "usuarios",
+      "destino": "reclamos"
+    },
+    {
       "tipo": "pertenece_a",
       "origen": "usuarios#registrar-un-nuevo-usuario-del-personal",
       "destino": "usuarios"
@@ -5514,6 +5561,31 @@
       "tipo": "ver_tambien",
       "origen": "usuarios#desactivar-o-reactivar-un-usuario",
       "destino": "historial"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "usuarios#recibir-alertas-por-whatsapp",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "usuarios#recibir-alertas-por-whatsapp",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "usuarios",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "usuarios#recibir-alertas-por-whatsapp",
+      "destino": "reclamos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "usuarios",
+      "destino": "reclamos"
     },
     {
       "tipo": "pertenece_a",

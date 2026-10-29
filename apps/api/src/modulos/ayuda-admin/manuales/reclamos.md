@@ -42,6 +42,7 @@ Ver tambien: [[mensajes]]
 1. Ir a la pestana Quejas de WhatsApp en la parte superior.
 2. Revisar los reportes de inconformidad detectados durante la interaccion en [[mensajes]] con el chatbot.
 3. Pulsar en cada queja para consultar el chat asociado o contactar al cliente para resolver su problema.
+4. Las calificaciones de 1 o 2 en la encuesta posventa llegan aqui con origen Encuesta. Cada una tambien avisa en la campana y por WhatsApp a los administradores; la conversacion se responde desde [[mensajes]].
 Ver tambien: [[mensajes]]
 
 ## Errores y dudas comunes

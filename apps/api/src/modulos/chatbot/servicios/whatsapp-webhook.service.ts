@@ -34,6 +34,10 @@ import { ReprogramacionService } from './reprogramacion.service';
 import { AvisosInternosService } from '../avisos-internos/avisos-internos.service';
 import { marcarPagoParaPersona } from './pago-para-persona.util';
 import { pedidoEsperandoVoucher } from './pedido-esperando-voucher.util';
+import { OutboxWhatsappService } from './outbox-whatsapp.service';
+import { interpretarPuntajeEncuesta } from './encuesta-posventa.util';
+import { textoGraciasEncuesta } from '../conversacion/textos-encuesta';
+import { leerParametroNumerico } from '../../impresion/estado-impresion';
 
 export const MAX_MEDIA_BYTES = 5 * 1024 * 1024; // 5 MB
 export const TIPOS_MEDIA_PERMITIDOS = [
@@ -66,6 +70,7 @@ export class WhatsappWebhookService {
     @Inject(forwardRef(() => VouchersService))
     private readonly vouchersService?: VouchersService,
     @Optional() private readonly reprogramacion?: ReprogramacionService,
+    @Optional() private readonly outbox?: OutboxWhatsappService,
   ) {
     this.verifyToken = this.configService.get<string>('WHATSAPP_VERIFY_TOKEN', '').trim();
     this.appSecret = this.configService.get<string>('WHATSAPP_APP_SECRET', '').trim();
@@ -449,9 +454,6 @@ export class WhatsappWebhookService {
         })
       : null;
 
-    // 3. Procesamiento de encuesta posventa
-    await this.procesarPosibleEncuesta(telHash, telMask, texto, buttonPayload, pedidoReciente, conversacion);
-
     // 5. Procesamiento de imagen de voucher
     let archivoMensajeId: string | null = null;
     // El voucher se liga al pedido que espera pago (no al último pedido del cliente, que puede estar cerrado)
@@ -557,6 +559,17 @@ export class WhatsappWebhookService {
       }
     }
 
+    // 5.6. Calificación de la encuesta posventa (después de registrar el mensaje en el chat).
+    // Si el mensaje es la calificación, queda consumido: el bot no contesta nada más.
+    const encuestaAtendida = await this.procesarPosibleEncuesta(
+      telHash,
+      telMask,
+      texto,
+      buttonPayload,
+      telefonoNorm,
+      conversacion,
+    );
+
     // 5.7. Respuesta SI/NO a la pregunta de reprogramar (después de registrar el mensaje en el chat)
     // Respuesta SI/NO a la pregunta de reprogramar tras el retiro (solo si hay una pregunta pendiente)
     let reprogramacionAtendida = false;
@@ -589,7 +602,13 @@ export class WhatsappWebhookService {
       conversacion.estado === 'VALIDAR_PAGO' ||
       esAtencionPersona;
 
-    if (this.motorConversacion && !esComandoBajaOAlta && puedeProcesarMotor && !reprogramacionAtendida) {
+    if (
+      this.motorConversacion &&
+      !esComandoBajaOAlta &&
+      puedeProcesarMotor &&
+      !reprogramacionAtendida &&
+      !encuestaAtendida
+    ) {
       const consentimiento = await this.prisma.clienteWhatsappConsentimiento.findUnique({
         where: { telefono_hash: telHash },
       });
@@ -716,113 +735,138 @@ export class WhatsappWebhookService {
   }
 
   /**
-   * Verifica si el mensaje entrante corresponde a la respuesta de una encuesta posventa.
+   * Calificación de la encuesta posventa. Solo cuenta una calificación explícita (ver interpretarPuntajeEncuesta)
+   * y solo contra la encuesta ENVIADA más reciente de ese teléfono dentro de encuesta_ventana_dias.
+   * Devuelve true si el mensaje fue la calificación: queda consumido y el bot no contesta.
    */
   private async procesarPosibleEncuesta(
     telHash: string,
     telMask: string,
     texto: string,
     buttonPayload: string | null,
-    pedido: any,
-    conversacion?: any,
-  ) {
-    if (!pedido) return;
+    telefonoNorm: string | null,
+    conversacion: any,
+  ): Promise<boolean> {
+    const puntaje = interpretarPuntajeEncuesta(buttonPayload) ?? interpretarPuntajeEncuesta(texto);
+    if (puntaje === null || !telefonoNorm) return false;
 
-    // Buscar encuesta pendiente de respuesta para este pedido
-    const encuesta = await this.prisma.encuestaPosventa.findUnique({
-      where: { pedido_id: pedido.id },
+    const ventanaDias = await leerParametroNumerico(this.prisma, 'encuesta_ventana_dias', 7);
+    const encuesta = await this.prisma.encuestaPosventa.findFirst({
+      where: {
+        estado: 'ENVIADA',
+        enviada_en: { gte: new Date(Date.now() - ventanaDias * 24 * 3600 * 1000) },
+        pedido: { cliente_telefono: { contains: telefonoNorm.slice(-8) } },
+      },
+      orderBy: { enviada_en: 'desc' },
+      include: { pedido: { select: { id: true, codigo: true, cliente_nombre: true, cliente_telefono: true } } },
     });
+    if (!encuesta) return false;
 
-    if (!encuesta || encuesta.estado === 'RESPONDIDA') {
-      return;
-    }
+    const umbralQueja = await leerParametroNumerico(this.prisma, 'encuesta_puntaje_queja', 2);
+    const esBaja = puntaje <= umbralQueja;
+    const { pedido } = encuesta;
+    const nombreCliente =
+      (conversacion ? obtenerNombreMostrar(conversacion) : null) || pedido.cliente_nombre || telMask;
+    const tituloNotif = `Calificación baja: ${puntaje}/5 · ${pedido.codigo} · ${nombreCliente}`;
+    const enlaceMensajes = `/admin/mensajes?telefono=${telefonoNorm.slice(-9)}`;
 
-    let puntaje: number | null = null;
-    const candidato = (buttonPayload || texto).trim();
-
-    // Comprobar formato de botón "encuesta:X" o dígito directo 1..5 o textos
-    if (/^encuesta:([1-5])$/.test(candidato)) {
-      puntaje = parseInt(candidato.replace('encuesta:', ''), 10);
-    } else if (/^[1-5]$/.test(candidato)) {
-      puntaje = parseInt(candidato, 10);
-    } else if (candidato.includes('1') || candidato.toLowerCase().includes('malo')) {
-      puntaje = 1;
-    } else if (candidato.includes('5') || candidato.toLowerCase().includes('excelente')) {
-      puntaje = 5;
-    } else if (candidato.includes('3') || candidato.toLowerCase().includes('regular')) {
-      puntaje = 3;
-    }
-
-    if (puntaje !== null) {
-      // Actualizar encuesta
-      await this.prisma.encuestaPosventa.update({
-        where: { id: encuesta.id },
-        data: {
-          puntaje,
-          respondida_en: new Date(),
-          estado: 'RESPONDIDA',
-          comentario: texto !== String(puntaje) ? texto : null,
-        },
+    // Todo en una transacción. El UPDATE condicionado a ENVIADA hace que la misma calificación se aplique una sola vez.
+    const aplicada = await this.prisma.$transaction(async (tx) => {
+      const r = await tx.encuestaPosventa.updateMany({
+        where: { id: encuesta.id, estado: 'ENVIADA' },
+        data: { puntaje, respondida_en: new Date(), estado: 'RESPONDIDA' },
       });
+      if (r.count === 0) return null;
 
-      // Leer parámetro de umbral de queja (por defecto 2)
-      const paramQueja = await this.prisma.parametro.findUnique({
-        where: { clave: 'encuesta_puntaje_queja' },
-      });
-      const umbralQueja = typeof paramQueja?.valor === 'number' ? paramQueja.valor : 2;
-
-      if (puntaje <= umbralQueja) {
-        const nombreCliente =
-          (conversacion ? obtenerNombreMostrar(conversacion) : null) ||
-          pedido.cliente_nombre ||
-          telMask;
-
-        // Registrar queja en queja_whatsapp
-        const queja = await this.prisma.quejaWhatsapp.create({
+      let notifId: bigint | null = null;
+      let quejaId: bigint | null = null;
+      if (esBaja) {
+        const queja = await tx.quejaWhatsapp.create({
           data: {
             origen: 'ENCUESTA',
             pedido_id: pedido.id,
             cliente: nombreCliente,
             telefono_hash: telHash,
             puntaje,
-            texto: texto || `Calificación baja en encuesta posventa (${puntaje}/5)`,
+            texto: `Calificación baja en encuesta posventa (${puntaje}/5)`,
             estado: 'NUEVA',
           },
         });
+        quejaId = queja.id;
 
-        // Notificar por campana a ADMIN y CAJA
-        const tituloNotif = 'Queja de WhatsApp recibida';
-        const detalleNotif = `El cliente de pedido ${pedido.codigo} califico con puntaje ${puntaje}/5. Requiere atencion.`;
-
-        const notif = await this.prisma.notificacion.create({
+        // ADMIN ve todas las notificaciones; CAJERO ve las dirigidas a su rol. Una sola fila, sin duplicar.
+        const notif = await tx.notificacion.create({
           data: {
             tipo: 'QUEJA_WHATSAPP',
-            rol_destino: null, // visible para ADMIN y CAJA
+            rol_destino: 'CAJERO',
             titulo: tituloNotif,
-            mensaje: detalleNotif,
-            enlace: '/admin/reclamos',
+            mensaje: `El cliente de pedido ${pedido.codigo} calificó con ${puntaje}/5. Una persona le escribirá por el chat.`,
+            enlace: enlaceMensajes,
           },
         });
+        notifId = notif.id;
 
-        this.eventos?.emitirAdmin('notificaciones:nueva', {
-          id: notif.id.toString(),
-          titulo: tituloNotif,
+        // El chat pasa a una persona: el bot deja de contestar hasta que alguien de Caja o admin responda.
+        await tx.conversacion.update({
+          where: { id: conversacion.id },
+          data: {
+            duenio: 'PERSONA',
+            urgente: true,
+            motivo_derivacion: 'CALIFICACION_BAJA',
+            ultima_actividad: new Date(),
+            ...(conversacion.estado === 'VALIDAR_PAGO' ? {} : { estado: 'ABIERTA' }),
+          },
         });
-
-        this.logger.log(`Queja de WhatsApp creada id ${queja.id} para pedido ${pedido.codigo}`);
       }
 
-      // Agradecer al cliente
-      const agradecimiento =
-        puntaje <= umbralQueja
-          ? 'Gracias por tu respuesta. Lamentamos que tu experiencia no haya sido optima; nuestro equipo revisara tu caso para contactarte y mejorar.'
-          : 'Muchas gracias por calificar nuestro servicio. Esperamos atenderte nuevamente pronto.';
+      if (this.outbox) {
+        await this.outbox.encolar(
+          {
+            telefono: telefonoNorm,
+            tipo: 'TEXTO',
+            clave: `encuesta-${encuesta.id}-GRACIAS`,
+            origen: 'ENCUESTA',
+            pedidoId: pedido.id,
+            carga: {
+              ...textoGraciasEncuesta(puntaje, umbralQueja, nombreCliente, pedido.codigo),
+              autor: 'BOT',
+              nombre: nombreCliente,
+              pedidoCodigo: pedido.codigo,
+              etapa: 'ENCUESTA',
+            },
+          },
+          tx,
+        );
+      }
 
-      // Enviar agradecimiento si el cliente tiene teléfono
-      if (pedido.cliente_telefono) {
-        await this.mensajeria.enviarTexto(pedido.cliente_telefono, agradecimiento);
+      return { notifId, quejaId };
+    });
+
+    // Ya estaba contestada: el mensaje sigue siendo una calificación, pero no se repite nada.
+    if (!aplicada) return true;
+
+    this.outbox?.despertar();
+
+    if (aplicada.notifId) {
+      this.eventos?.emitirAdmin('notificaciones:nueva', { id: aplicada.notifId.toString(), titulo: tituloNotif });
+    }
+
+    if (esBaja) {
+      this.logger.log(`Queja de WhatsApp creada id ${aplicada.quejaId} para pedido ${pedido.codigo}`);
+      try {
+        await this.avisosInternosService?.avisarCalificacionBaja({
+          encuestaId: encuesta.id,
+          codigo: pedido.codigo,
+          cliente: nombreCliente,
+          puntaje,
+          telefono: telefonoNorm,
+        });
+      } catch (err: any) {
+        this.logger.error(`No se pudo avisar a administradores de la calificación baja: ${err.message}`);
       }
     }
+
+    return true;
   }
 
   /**

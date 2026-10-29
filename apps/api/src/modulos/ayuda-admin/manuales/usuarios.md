@@ -42,6 +42,13 @@ Ver tambien: [[historial]]
 Requiere: [[supervisor-codigo]]
 Ver tambien: [[historial]]
 
+## Como se hace: recibir alertas por WhatsApp
+1. En la ficha de un administrador, marcar la casilla Recibir alertas por WhatsApp e ingresar su celular de 9 digitos que empiece con 9.
+2. Pulsar Guardar alertas y confirmar con Si, guardar.
+3. Pulsar Enviar prueba de nuevo y confirmar. El administrador recibe un mensaje con el boton Si, soy yo; al pulsarlo, la cuenta queda confirmada y empieza a recibir alertas.
+4. Las alertas son vouchers sin revisar, chats en espera, pedidos demorados y calificaciones bajas de la encuesta posventa. Cada administrador recibe su propio mensaje: WhatsApp no envia a grupos.
+Ver tambien: [[mensajes]], [[reclamos]]
+
 ## Como se hace: restablecer contraseña o asignar PIN
 1. Si un colaborador olvidó su contraseña, pulsa "Restablecer contraseña" en su fila. Aparecerá la ventana de confirmación "¿Restablecer contraseña de este usuario?". Confirma con "Sí, restablecer". El sistema generará una nueva clave provisoria para que pueda ingresar.
 2. Si el cajero o mozo requiere un PIN numérico rápido para autorizaciones en salón o caja, pulsa "Asignar PIN", escribe el código de 4 o 6 dígitos y confirma el guardado.

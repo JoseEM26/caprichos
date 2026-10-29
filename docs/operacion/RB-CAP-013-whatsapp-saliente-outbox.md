@@ -65,6 +65,7 @@ Migrados con transacción compartida (encolado dentro del cambio de estado):
 - **Reservas**: aprobar y rechazar solicitud (mensaje al cliente y cambio de la solicitud en la misma transacción).
 - **Stock y almacén**: insumo agotado y bajo stock, dentro de la transacción de descuento cuando se pasa una (`txExterno`).
 - **Reprogramación**: SI del cliente, cancelación y sin respuesta (REPROG_RECIBIDA, REPROG_CANCELADA, REPROG_SIN_RESPUESTA).
+- **Encuesta posventa**: agradecimiento al cliente por su calificación (origen ENCUESTA, clave `encuesta-<id>-GRACIAS`), en la misma transacción que la calificación, la queja y el paso del chat a persona en calificación baja. El aviso de calificación baja a los administradores va por `enviarAvisoAdmin` con clave `calificacion-baja-<id>`: un mensaje por administrador con alertas activas, nunca a un grupo (la API oficial no envía a grupos).
 
 Migrados sin transacción propia (justificado): el resto de emisores que no tienen un cambio de estado de pedido en transacción. Son recordatorios de reserva y de pago, recojo, encuesta (en su propia transacción con la encuesta), alerta de espera al cliente, alertas al equipo (`enviarAvisoAdmin`), y el aviso de agotado de un producto de carta (`agotar`, que hoy no usa transacción; el encolado va solo, en su propia escritura). En ese último caso el riesgo es que el cambio de disponibilidad se guarde y el aviso no; se acepta por ser un aviso interno y se corrige cuando el producto se vuelva a agotar.
 

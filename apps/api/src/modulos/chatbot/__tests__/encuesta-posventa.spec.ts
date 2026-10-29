@@ -1,0 +1,387 @@
+jest.mock('../../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {} }));
+
+// Calificación de la encuesta posventa que llega por WhatsApp:
+// webhook real -> procesarPosibleEncuesta -> (encuesta, queja, campana, outbox, chat) -> bot o no.
+// Simulados: la base de datos (en memoria), el puerto de mensajería, el outbox y el aviso a administradores.
+
+import { ConfigService } from '@nestjs/config';
+import { WhatsappWebhookService } from '../servicios/whatsapp-webhook.service';
+
+const TEL = '51987654321';
+const DIA = 24 * 60 * 60 * 1000;
+
+type EncuestaFila = {
+  id: bigint;
+  pedido_id: bigint;
+  estado: string;
+  enviada_en: Date;
+  puntaje: number | null;
+  pedido: { id: bigint; codigo: string; cliente_nombre: string; cliente_telefono: string };
+};
+
+const payloadTexto = (texto: string, from = TEL) => ({
+  object: 'whatsapp_business_account',
+  entry: [
+    {
+      changes: [
+        {
+          value: {
+            contacts: [{ wa_id: from, profile: { name: 'José Ángel' } }],
+            messages: [{ id: `wamid.${Math.random().toString(36).slice(2)}`, from, type: 'text', text: { body: texto } }],
+          },
+        },
+      ],
+    },
+  ],
+});
+
+const payloadBoton = (payload: string, titulo: string, from = TEL) => ({
+  object: 'whatsapp_business_account',
+  entry: [
+    {
+      changes: [
+        {
+          value: {
+            contacts: [{ wa_id: from, profile: { name: 'José Ángel' } }],
+            messages: [
+              {
+                id: `wamid.${Math.random().toString(36).slice(2)}`,
+                from,
+                type: 'interactive',
+                interactive: { type: 'button_reply', button_reply: { id: payload, title: titulo } },
+              },
+            ],
+          },
+        },
+      ],
+    },
+  ],
+});
+
+const flush = () => new Promise((r) => setTimeout(r, 10));
+
+describe('Calificación de la encuesta posventa por WhatsApp', () => {
+  let webhook: WhatsappWebhookService;
+  let encuestas: EncuestaFila[];
+  let pedidos: { id: bigint; codigo: string; cliente_telefono: string; cliente_nombre: string; creado_en: Date }[];
+  let quejas: any[];
+  let notificaciones: any[];
+  let conversacion: any;
+  let parametros: Record<string, unknown>;
+  let mensajeria: any;
+  let motor: any;
+  let outbox: any;
+  let avisos: any;
+  let eventos: any;
+  let prisma: any;
+
+  const coincide = (valor: string | null | undefined, filtro: any) =>
+    !filtro || (valor ?? '').includes(String(filtro.contains));
+
+  const encuestaQueCumple = (e: EncuestaFila, where: any) => {
+    if (!where) return true;
+    if (where.estado && e.estado !== where.estado) return false;
+    if (where.enviada_en?.gte && e.enviada_en < where.enviada_en.gte) return false;
+    if (where.pedido?.cliente_telefono && !coincide(e.pedido.cliente_telefono, where.pedido.cliente_telefono)) return false;
+    return true;
+  };
+
+  beforeEach(() => {
+    const ahora = Date.now();
+    pedidos = [
+      { id: 10n, codigo: 'CP-W100', cliente_telefono: TEL, cliente_nombre: 'José Ángel', creado_en: new Date(ahora - 3 * DIA) },
+      // Pedido más reciente del mismo teléfono, sin encuesta (el caso que rompía la búsqueda)
+      { id: 20n, codigo: 'CP-W114', cliente_telefono: TEL, cliente_nombre: 'José Ángel', creado_en: new Date(ahora - 1 * 3600_000) },
+    ];
+    encuestas = [
+      {
+        id: 1n,
+        pedido_id: 10n,
+        estado: 'ENVIADA',
+        enviada_en: new Date(ahora - 2 * DIA),
+        puntaje: null,
+        pedido: { id: 10n, codigo: 'CP-W100', cliente_nombre: 'José Ángel', cliente_telefono: TEL },
+      },
+    ];
+    quejas = [];
+    notificaciones = [];
+    parametros = {};
+    conversacion = {
+      id: 42n,
+      telefono: TEL,
+      duenio: 'BOT',
+      tomado_por: null,
+      estado: 'ABIERTA',
+      flujo: null,
+      nombre_contacto: 'José Ángel',
+      nombre_editado: false,
+    };
+
+    prisma = {
+      whatsappMensaje: { findUnique: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({}) },
+      clienteWhatsappConsentimiento: { findUnique: jest.fn().mockResolvedValue(null), upsert: jest.fn() },
+      pedido: {
+        findFirst: jest.fn(async ({ where }: any) => {
+          const lista = pedidos
+            .filter((p) => coincide(p.cliente_telefono, where?.OR?.[0]?.cliente_telefono))
+            .sort((a, b) => b.creado_en.getTime() - a.creado_en.getTime());
+          return lista[0] ?? null;
+        }),
+        findUnique: jest.fn(async ({ where }: any) => pedidos.find((p) => p.id === where.id) ?? null),
+      },
+      conversacion: {
+        findUnique: jest.fn(async () => conversacion),
+        create: jest.fn(async ({ data }: any) => ({ id: 42n, ...data })),
+        update: jest.fn(async ({ data }: any) => {
+          conversacion = { ...conversacion, ...data };
+          return conversacion;
+        }),
+      },
+      mensajeChat: { create: jest.fn().mockResolvedValue({ id: 99n }) },
+      encuestaPosventa: {
+        findUnique: jest.fn(async ({ where }: any) => encuestas.find((e) => e.pedido_id === where.pedido_id) ?? null),
+        findFirst: jest.fn(async ({ where }: any) => {
+          const lista = encuestas
+            .filter((e) => encuestaQueCumple(e, where))
+            .sort((a, b) => b.enviada_en.getTime() - a.enviada_en.getTime());
+          return lista[0] ?? null;
+        }),
+        updateMany: jest.fn(async ({ where, data }: any) => {
+          const e = encuestas.find((x) => x.id === where.id && (!where.estado || x.estado === where.estado));
+          if (!e) return { count: 0 };
+          Object.assign(e, data);
+          return { count: 1 };
+        }),
+        update: jest.fn(async ({ where, data }: any) => {
+          const e = encuestas.find((x) => x.id === where.id);
+          Object.assign(e!, data);
+          return e;
+        }),
+      },
+      quejaWhatsapp: {
+        create: jest.fn(async ({ data }: any) => {
+          const fila = { id: BigInt(quejas.length + 1), ...data };
+          quejas.push(fila);
+          return fila;
+        }),
+      },
+      notificacion: {
+        create: jest.fn(async ({ data }: any) => {
+          const fila = { id: BigInt(notificaciones.length + 1), en: new Date(), ...data };
+          notificaciones.push(fila);
+          return fila;
+        }),
+      },
+      parametro: {
+        findUnique: jest.fn(async ({ where }: any) =>
+          where.clave in parametros ? { clave: where.clave, valor: parametros[where.clave] } : null,
+        ),
+      },
+    };
+    prisma.$transaction = jest.fn(async (fn: any) => fn(prisma));
+
+    mensajeria = {
+      enviarTexto: jest.fn().mockResolvedValue({ exito: true, estado: 'ENVIADO' }),
+      enviarBotones: jest.fn().mockResolvedValue({ exito: true, estado: 'ENVIADO' }),
+    };
+    motor = { procesarMensajeEntrante: jest.fn().mockResolvedValue(true) };
+    outbox = { encolar: jest.fn().mockResolvedValue(true), despertar: jest.fn() };
+    avisos = {
+      avisarCalificacionBaja: jest.fn().mockResolvedValue(undefined),
+      procesarAccionEquipo: jest.fn().mockResolvedValue({ procesado: false }),
+    };
+    eventos = { emitirAdmin: jest.fn() };
+
+    const config = { get: (_c: string, def?: any) => def } as unknown as ConfigService;
+
+    webhook = new WhatsappWebhookService(
+      config,
+      prisma,
+      mensajeria as any,
+      {} as any,
+      eventos as any,
+      motor as any,
+      avisos as any,
+      undefined,
+      undefined,
+      outbox as any,
+    );
+  });
+
+  const recibir = async (payload: any) => {
+    await webhook.procesarPayload(payload);
+    await flush();
+  };
+
+  it('"1 Malo" con la encuesta del pedido anterior aunque haya un pedido más reciente: queda RESPONDIDA con puntaje 1', async () => {
+    await recibir(payloadTexto('1 Malo'));
+
+    expect(encuestas[0]).toMatchObject({ estado: 'RESPONDIDA', puntaje: 1 });
+    expect(quejas).toHaveLength(1);
+    expect(quejas[0]).toMatchObject({ pedido_id: 10n, puntaje: 1, origen: 'ENCUESTA' });
+  });
+
+  it('calificación baja: notifica a ADMIN y CAJERO con título, código, puntaje y enlace a Mensajes', async () => {
+    await recibir(payloadTexto('1 Malo'));
+
+    expect(notificaciones).toHaveLength(1);
+    expect(notificaciones[0]).toMatchObject({
+      tipo: 'QUEJA_WHATSAPP',
+      rol_destino: 'CAJERO',
+      titulo: 'Calificación baja: 1/5 · CP-W100 · José Ángel',
+      enlace: `/admin/mensajes?telefono=${TEL.slice(-9)}`,
+    });
+    expect(eventos.emitirAdmin).toHaveBeenCalledWith('notificaciones:nueva', expect.objectContaining({ titulo: notificaciones[0].titulo }));
+  });
+
+  it('calificación baja: el chat pasa a una persona y el bot no contesta "Ya avisé a una persona"', async () => {
+    await recibir(payloadTexto('1 Malo'));
+
+    expect(conversacion).toMatchObject({ duenio: 'PERSONA', urgente: true, motivo_derivacion: 'CALIFICACION_BAJA' });
+    expect(motor.procesarMensajeEntrante).not.toHaveBeenCalled();
+    expect(mensajeria.enviarTexto).not.toHaveBeenCalled();
+  });
+
+  it('calificación baja: el agradecimiento va por el outbox con clave idempotente, con nombre y código', async () => {
+    await recibir(payloadTexto('1 Malo'));
+
+    expect(outbox.encolar).toHaveBeenCalledTimes(1);
+    const [datos] = outbox.encolar.mock.calls[0];
+    expect(datos).toMatchObject({
+      telefono: TEL,
+      tipo: 'TEXTO',
+      clave: 'encuesta-1-GRACIAS',
+      origen: 'ENCUESTA',
+      pedidoId: 10n,
+    });
+    expect(datos.carga.textoLibre).toContain('José Ángel');
+    expect(datos.carga.textoLibre).toContain('CP-W100');
+    expect(datos.carga.textoLibre).toMatch(/persona/);
+    expect(outbox.despertar).toHaveBeenCalled();
+  });
+
+  it('calificación baja: avisa a administradores una sola vez por calificación', async () => {
+    await recibir(payloadTexto('1 Malo'));
+
+    expect(avisos.avisarCalificacionBaja).toHaveBeenCalledTimes(1);
+    expect(avisos.avisarCalificacionBaja).toHaveBeenCalledWith(
+      expect.objectContaining({ encuestaId: 1n, codigo: 'CP-W100', puntaje: 1, cliente: 'José Ángel' }),
+    );
+  });
+
+  it('la respuesta consumida no dispara el bot ni se repite si llega otra vez', async () => {
+    await recibir(payloadTexto('1 Malo'));
+    await recibir(payloadTexto('1 Malo'));
+
+    expect(motor.procesarMensajeEntrante).not.toHaveBeenCalled();
+    expect(quejas).toHaveLength(1);
+    expect(notificaciones).toHaveLength(1);
+    expect(avisos.avisarCalificacionBaja).toHaveBeenCalledTimes(1);
+  });
+
+  it('"encuesta:1" del botón se reconoce igual que el texto', async () => {
+    await recibir(payloadBoton('encuesta:1', '1 Malo'));
+
+    expect(encuestas[0]).toMatchObject({ estado: 'RESPONDIDA', puntaje: 1 });
+    expect(motor.procesarMensajeEntrante).not.toHaveBeenCalled();
+  });
+
+  it('"5 Excelente" es calificación 5: agradecimiento sin queja ni alerta a administradores', async () => {
+    await recibir(payloadTexto('5 Excelente'));
+
+    expect(encuestas[0]).toMatchObject({ estado: 'RESPONDIDA', puntaje: 5 });
+    expect(quejas).toHaveLength(0);
+    expect(notificaciones).toHaveLength(0);
+    expect(avisos.avisarCalificacionBaja).not.toHaveBeenCalled();
+    expect(outbox.encolar.mock.calls[0][0].clave).toBe('encuesta-1-GRACIAS');
+    expect(outbox.encolar.mock.calls[0][0].carga.textoLibre).not.toMatch(/persona te escribir/);
+    expect(motor.procesarMensajeEntrante).not.toHaveBeenCalled();
+  });
+
+  it('"3" y "3 Regular" son calificación media, con un agradecimiento distinto', async () => {
+    await recibir(payloadTexto('3'));
+    expect(encuestas[0]).toMatchObject({ estado: 'RESPONDIDA', puntaje: 3 });
+    expect(quejas).toHaveLength(0);
+    const medio = outbox.encolar.mock.calls[0][0].carga.textoLibre;
+    expect(medio).not.toMatch(/persona te escribir/);
+    expect(medio).toContain('CP-W100');
+  });
+
+  // La encuesta pendiente es del pedido más reciente: así el reconocimiento laxo se ve en acción
+  const encuestaEnPedidoReciente = () => {
+    encuestas[0].pedido_id = 20n;
+    encuestas[0].pedido = { id: 20n, codigo: 'CP-W114', cliente_nombre: 'José Ángel', cliente_telefono: TEL };
+  };
+
+  it('"tengo 1 pregunta" con encuesta pendiente NO es una calificación: el bot responde y la encuesta sigue ENVIADA', async () => {
+    encuestaEnPedidoReciente();
+    await recibir(payloadTexto('tengo 1 pregunta'));
+
+    expect(encuestas[0]).toMatchObject({ estado: 'ENVIADA', puntaje: null });
+    expect(quejas).toHaveLength(0);
+    expect(motor.procesarMensajeEntrante).toHaveBeenCalledTimes(1);
+  });
+
+  it('un número de teléfono no es una calificación', async () => {
+    encuestaEnPedidoReciente();
+    await recibir(payloadTexto('987654321 quiero mi pedido'));
+
+    expect(encuestas[0].estado).toBe('ENVIADA');
+    expect(motor.procesarMensajeEntrante).toHaveBeenCalledTimes(1);
+  });
+
+  it('"2 Regular" (número y palabra que no coinciden) no se acepta como calificación', async () => {
+    encuestaEnPedidoReciente();
+    await recibir(payloadTexto('2 Regular'));
+
+    expect(encuestas[0].estado).toBe('ENVIADA');
+    expect(motor.procesarMensajeEntrante).toHaveBeenCalledTimes(1);
+  });
+
+  it('"Muy bueno" y "bueno" con encuesta pendiente son calificación 4', async () => {
+    encuestaEnPedidoReciente();
+    await recibir(payloadTexto('Muy bueno'));
+
+    expect(encuestas[0]).toMatchObject({ estado: 'RESPONDIDA', puntaje: 4 });
+    expect(motor.procesarMensajeEntrante).not.toHaveBeenCalled();
+  });
+
+  it('sin encuesta pendiente (la más reciente ya fue respondida o caducó) el mensaje va al bot', async () => {
+    encuestas[0].enviada_en = new Date(Date.now() - 30 * DIA);
+
+    await recibir(payloadTexto('1 Malo'));
+
+    expect(encuestas[0].estado).toBe('ENVIADA');
+    expect(quejas).toHaveLength(0);
+    expect(motor.procesarMensajeEntrante).toHaveBeenCalledTimes(1);
+  });
+
+  it('con la ventana configurada en encuesta_ventana_dias se respeta el parámetro', async () => {
+    parametros.encuesta_ventana_dias = 1;
+    encuestas[0].enviada_en = new Date(Date.now() - 2 * DIA);
+
+    await recibir(payloadTexto('1 Malo'));
+
+    expect(encuestas[0].estado).toBe('ENVIADA');
+    expect(motor.procesarMensajeEntrante).toHaveBeenCalledTimes(1);
+  });
+
+  it('chat en VALIDAR_PAGO con un pedido distinto: la calificación pendiente se registra y no se contesta "Ya avisé a una persona"', async () => {
+    conversacion = { ...conversacion, estado: 'VALIDAR_PAGO', duenio: 'PERSONA', flujo: { pago: { pedidoCodigo: 'CP-W114' } } };
+    encuestaEnPedidoReciente();
+    await recibir(payloadTexto('1 Malo'));
+
+    expect(encuestas[0]).toMatchObject({ estado: 'RESPONDIDA', puntaje: 1 });
+    expect(motor.procesarMensajeEntrante).not.toHaveBeenCalled();
+    expect(mensajeria.enviarTexto).not.toHaveBeenCalled();
+    expect(conversacion.estado).toBe('VALIDAR_PAGO');
+  });
+
+  it('el mensaje de calificación queda en mensaje_chat del cliente', async () => {
+    await recibir(payloadTexto('1 Malo'));
+
+    expect(prisma.mensajeChat.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ direccion: 'ENTRA', autor: 'CLIENTE' }) }),
+    );
+  });
+});

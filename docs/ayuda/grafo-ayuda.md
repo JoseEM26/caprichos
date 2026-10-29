@@ -9,12 +9,12 @@ pnpm --filter @caprichos/api ayuda:grafo
 
 ## Métricas del Grafo
 
-- **Nodos totales**: 207
+- **Nodos totales**: 209
   - Módulos: 35
-  - Tareas (`## Como se hace`): 143
+  - Tareas (`## Como se hace`): 145
   - Roles del sistema: 7
   - Permisos requeridos: 22
-- **Aristas tipadas totales**: 872
+- **Aristas tipadas totales**: 884
 
 ## Diagrama Mermaid de Módulos y Relaciones
 
@@ -296,8 +296,11 @@ flowchart TD
   reclamos -->|relacionado_con| mensajes
   mensajes -->|relacionado_con| cocina
   cocina -->|relacionado_con| mensajes
+  mensajes -->|relacionado_con| notificaciones
   mensajes -->|ver_tambien| caja
   mensajes -->|ver_tambien| clientes
+  mensajes -->|ver_tambien| reclamos
+  mensajes -->|ver_tambien| notificaciones
   mensajes -->|despues| cocina
   mirest -->|relacionado_con| zonas
   zonas -->|relacionado_con| mirest
@@ -320,7 +323,6 @@ flowchart TD
   notificaciones -->|relacionado_con| stock
   stock -->|relacionado_con| notificaciones
   notificaciones -->|relacionado_con| mensajes
-  mensajes -->|relacionado_con| notificaciones
   notificaciones -->|relacionado_con| repartos
   repartos -->|relacionado_con| notificaciones
   notificaciones -->|relacionado_con| historial
@@ -440,8 +442,12 @@ flowchart TD
   supervisor_codigo -->|despues| caja
   supervisor_codigo -->|ver_tambien| usuarios
   supervisor_codigo -->|ver_tambien| historial
+  usuarios -->|relacionado_con| mensajes
+  usuarios -->|relacionado_con| reclamos
   usuarios -->|ver_tambien| historial
   usuarios -->|requiere| supervisor_codigo
+  usuarios -->|ver_tambien| mensajes
+  usuarios -->|ver_tambien| reclamos
   zonas -->|relacionado_con| caja
   caja -->|relacionado_con| zonas
   zonas -->|antes| mirest
