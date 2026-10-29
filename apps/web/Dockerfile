@@ -19,6 +19,8 @@ RUN pnpm build
 
 FROM node:24-alpine AS runner
 WORKDIR /app
+# parche de seguridad (CVE-2026-111497) hasta que la imagen base lo traiga
+RUN apk upgrade --no-cache brotli-libs
 RUN corepack enable && corepack prepare pnpm@12.6.0 --activate
 COPY --from=base /app/apps/web/dist ./dist
 RUN npm install -g serve

@@ -21,6 +21,8 @@ RUN pnpm build
 
 FROM node:24-alpine AS runner
 WORKDIR /app
+# parche de seguridad (CVE-2026-111497) hasta que la imagen base lo traiga
+RUN apk upgrade --no-cache brotli-libs
 RUN corepack enable && corepack prepare pnpm@12.6.0 --activate
 ENV NODE_ENV=production
 
