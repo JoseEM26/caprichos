@@ -21,8 +21,6 @@ RUN pnpm build
 
 FROM node:24-alpine AS runner
 WORKDIR /app
-# parche de seguridad (CVE-2026-111497): la 1.2.1 solo esta en edge; se quita cuando la rama estable la traiga
-RUN apk add --no-cache --upgrade --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main brotli-libs
 RUN corepack enable && corepack prepare pnpm@12.6.0 --activate
 ENV NODE_ENV=production
 

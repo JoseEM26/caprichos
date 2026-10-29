@@ -38,6 +38,8 @@ RUN pnpm --filter @caprichos/web build || pnpm run build
 # ==============================================================================
 FROM nginx:alpine AS runner
 WORKDIR /usr/share/nginx/html
+# parche de seguridad (CVE-2026-111497): la 1.2.1 solo esta en edge; se quita cuando la rama estable la traiga
+RUN apk add --no-cache --upgrade --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main brotli-libs
 
 # Limpiar configuración por defecto
 RUN rm -rf /etc/nginx/conf.d/* /usr/share/nginx/html/*
