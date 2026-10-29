@@ -878,7 +878,7 @@ export function PlanoView() {
                 const ocupadaSalon = mesaSalonElem?.estado === 'OCUPADA';
                 const libreSalon = mesaSalonElem?.estado === 'LIBRE';
                 const pulsaMesa =
-                  puedeForzar && !puedeEditar && mesaSalonElem?.estado === 'OCUPADA'
+                  puedeForzar && mesaSalonElem?.estado === 'OCUPADA'
                     ? mantenerMesa.manejadores(mesaSalonElem)
                     : null;
 

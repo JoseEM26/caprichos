@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   HttpException,
   HttpStatus,
   Injectable,
@@ -12,12 +13,19 @@ import * as crypto from 'crypto';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { mismoCliente, pedidoAceptaVoucher, ultimos9 } from './voucher-reasignacion.util';
+import { puedeCambiarVoucher, puedeSubirVoucher } from './regla-cambio-voucher';
 import { ArchivosService } from '../archivos/archivos.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { obtenerFechaHoraLima } from '../local/local.util';
 import { VouchersIaService } from './vouchers-ia.service';
-import { montoEsperadoVoucher } from '../pedidos/pago-plan.service';
+import {
+  montoDeMedioDigital,
+  montoDigitalDePlan,
+  montoEsperadoVoucher,
+  PagoPlanService,
+  PlanPagoItem,
+} from '../pedidos/pago-plan.service';
 import {
   avisosMozo,
   calcularSemaforo,
@@ -28,12 +36,20 @@ import {
 
 export interface SubirVoucherOpciones {
   pedidoId?: string | number | bigint;
-  medio?: 'YAPE' | 'PLIN';
+  medio?: 'YAPE' | 'PLIN' | 'TRANSFERENCIA';
   origen?: 'MOZO' | 'WHATSAPP' | 'CAJA' | 'CARTA';
+  /** Obligatorio (≥5 caracteres) para CAJERO/ADMIN cuando reemplaza un voucher vigente. */
+  motivoCambio?: string;
 }
 
 /** Medios que el mozo puede enviar a Caja desde la mesa. */
 const MEDIOS_ENVIO_CAJA = ['EFECTIVO', 'YAPE', 'PLIN', 'TRANSFERENCIA'] as const;
+const NOMBRE_MEDIO_CAJA: Record<string, string> = {
+  EFECTIVO: 'Efectivo',
+  YAPE: 'Yape',
+  PLIN: 'Plin',
+  TRANSFERENCIA: 'Transferencia',
+};
 
 @Injectable()
 export class VouchersService {
@@ -44,6 +60,7 @@ export class VouchersService {
     private readonly archivosService: ArchivosService,
     private readonly auditoria: AuditoriaService,
     private readonly vouchersIaService: VouchersIaService,
+    private readonly pagoPlan: PagoPlanService,
     @Optional() private readonly eventos?: EventosGateway,
   ) {}
 
@@ -103,14 +120,7 @@ export class VouchersService {
       );
     }
 
-    // 1. Guardar archivo en almacenamiento privado
-    const archivoSubido = await this.archivosService.subirArchivo(file, true, usuario ?? undefined, ip);
-    const archivoId = BigInt(archivoSubido.id);
-
-    // 2. Calcular SHA256 del contenido de la imagen
-    const hashImagen = crypto.createHash('sha256').update(file.buffer).digest('hex');
-
-    // 3. Obtener pedido si aplica (un pedido inexistente no deja un voucher huérfano)
+    // 1. Obtener pedido si aplica (antes de guardar nada: un pedido inexistente o un cambio bloqueado no deja archivos huérfanos)
     let pedido: any = null;
     let pedidoIdBigInt: bigint | null = null;
     if (opciones.pedidoId) {
@@ -123,6 +133,10 @@ export class VouchersService {
           total: true,
           pago_preferido: true,
           pago_metodo: true,
+          estado: true,
+          modalidad: true,
+          pago_estado: true,
+          pago_coordinado_en: true,
           planPago: { select: { medio: true, monto: true } },
         },
       });
@@ -133,6 +147,54 @@ export class VouchersService {
         );
       }
     }
+
+    // 2. Cambio de voucher: si el pedido ya tiene uno vigente, subir otro lo reemplaza (el anterior se marca, no se borra).
+    // Solo aplica a subidas con usuario; la carta y WhatsApp siguen agregando como antes.
+    const motivoCambio = opciones.motivoCambio?.trim() || null;
+    // Un voucher por medio digital: la captura de Plin no reemplaza la de Yape
+    const vigentesReemplazados: { id: bigint }[] =
+      pedidoIdBigInt && usuario
+        ? (await this.prisma.voucherPago.findMany({
+            where: { pedido_id: pedidoIdBigInt, reemplazado_en: null, ...(opciones.medio ? { medio: opciones.medio } : {}) },
+            orderBy: { creado_en: 'desc' },
+            select: { id: true },
+          })) ?? []
+        : [];
+    if (usuario && pedido) {
+      // Primer voucher: puedeSubirVoucher. Reemplazo: puedeCambiarVoucher. Mismo criterio que quitar.
+      const esReemplazo = vigentesReemplazados.length > 0;
+      const permitido = esReemplazo
+        ? puedeCambiarVoucher(pedido, usuario.rol)
+        : puedeSubirVoucher(pedido, usuario.rol);
+      if (!permitido) {
+        throw new HttpException(
+          {
+            codigo: 'VOUCHER_CAMBIO_BLOQUEADO',
+            mensaje:
+              usuario.rol === 'MOZO'
+                ? 'Caja ya aprobó el pago de este pedido; pide a Caja que cambie el voucher'
+                : 'El pago ya está cobrado; no se puede cambiar el voucher',
+          },
+          HttpStatus.CONFLICT,
+        );
+      }
+    }
+    if (usuario && pedido && vigentesReemplazados.length > 0) {
+      const faltaMotivo = usuario.rol !== 'MOZO' && !motivoCambio;
+      if (faltaMotivo || (motivoCambio && motivoCambio.length < 5)) {
+        throw new HttpException(
+          { codigo: 'MOTIVO_CAMBIO_REQUERIDO', mensaje: 'Escribe el motivo del cambio (mínimo 5 caracteres)' },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+    }
+
+    // 3. Guardar archivo en almacenamiento privado
+    const archivoSubido = await this.archivosService.subirArchivo(file, true, usuario ?? undefined, ip);
+    const archivoId = BigInt(archivoSubido.id);
+
+    // 4. Calcular SHA256 del contenido de la imagen
+    const hashImagen = crypto.createHash('sha256').update(file.buffer).digest('hex');
 
     // 4. Parámetros de validación y fecha de Lima
     const config = await this.obtenerParametrosConfiguracion();
@@ -176,7 +238,12 @@ export class VouchersService {
 
     // 7. Evaluar semáforo con función pura
     const contexto: ContextoSemaforo = {
-      pedidoTotal: pedido ? montoEsperadoVoucher(pedido.planPago, pedido.total != null ? Number(pedido.total) : null) : null,
+      // Con medio: se compara contra el renglón de ESE medio del plan; sin medio, contra la parte digital total
+      pedidoTotal: pedido
+        ? opciones.medio && pedido.planPago?.length
+          ? montoDeMedioDigital(pedido.planPago, opciones.medio) || null
+          : montoEsperadoVoucher(pedido.planPago, pedido.total != null ? Number(pedido.total) : null)
+        : null,
       medioEsperado: opciones.medio || (pedido?.pago_preferido as any) || (pedido?.pago_metodo as any) || null,
       titularEsperado: config.titularEsperado,
       yapeNumeroEsperado: config.yapeNumeroEsperado,
@@ -204,10 +271,40 @@ export class VouchersService {
         extraido: extraido as any,
         semaforo: evaluacion.semaforo,
         motivos: evaluacion.motivos,
+        reemplaza_a: vigentesReemplazados[0]?.id ?? null,
+        motivo_cambio: vigentesReemplazados.length > 0 ? motivoCambio : null,
       },
     });
 
-    // 9. Registrar auditoría
+    // 9. Marcar los anteriores como reemplazados (no se borran: quedan en el historial)
+    if (usuario && vigentesReemplazados.length > 0) {
+      const ahora = new Date();
+      const idsReemplazados = vigentesReemplazados.map((v) => v.id);
+      await this.prisma.voucherPago.updateMany({
+        where: { id: { in: idsReemplazados }, reemplazado_en: null },
+        data: { reemplazado_en: ahora, reemplazado_por: usuario.partyId },
+      });
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'vouchers',
+        accion: 'REEMPLAZAR_VOUCHER',
+        resultado: 'OK',
+        entidad: 'voucher_pago',
+        entidadId: voucher.id,
+        partyId: usuario.partyId,
+        ip,
+        antes: { vouchersReemplazados: idsReemplazados.map((v) => v.toString()) },
+        despues: {
+          pedidoId: pedidoIdBigInt ? pedidoIdBigInt.toString() : null,
+          medio: opciones.medio ?? null,
+          motivo: motivoCambio,
+          rol: usuario.rol,
+          reemplazaA: vigentesReemplazados[0]?.id.toString() ?? null,
+        },
+      });
+    }
+
+    // 10. Registrar auditoría
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
       modulo: 'vouchers',
@@ -225,7 +322,7 @@ export class VouchersService {
       },
     });
 
-    // 10. Respuesta según el rol:
+    // 11. Respuesta según el rol:
     // Al mozo y al cliente de la carta SOLO se entrega legible y mensaje, NUNCA el semáforo ni los datos extraídos
     // legible sigue la misma regla que el cobro: un ILEGIBLE (aunque la IA lo lea) no cuenta como comprobante
     if (!usuario || usuario.rol === 'MOZO') {
@@ -385,7 +482,8 @@ export class VouchersService {
     fecha?: string;
     estado?: 'pendientes' | 'todos' | string;
   }) {
-    const where: any = {};
+    // Solo vouchers vigentes: los reemplazados quedan en el historial del pedido, no en las listas de decisión
+    const where: any = { reemplazado_en: null };
 
     if (filtros.pedidoId) {
       where.pedido_id = this.parsearId(filtros.pedidoId);
@@ -428,6 +526,7 @@ export class VouchersService {
       const f = filtros.fecha.trim();
       faltanRevisar = await this.prisma.voucherPago.count({
         where: {
+          reemplazado_en: null,
           creado_en: {
             gte: new Date(`${f}T00:00:00.000Z`),
             lte: new Date(`${f}T23:59:59.999Z`),
@@ -504,20 +603,32 @@ export class VouchersService {
   }
 
   /**
-   * El mozo envía a Caja el cobro de una mesa. No cobra ni marca el pedido como pagado:
+   * El mozo envía a Caja el cobro de una mesa. No cobra ni marca el pedido como pagado (ni libera la mesa):
    * Caja revisa el voucher (con su semáforo) y es quien cobra. Efectivo: aviso de cobro en efectivo.
    * Digital: aviso con el voucher ya enlazado, o sin foto legible (Caja resuelve con su excepción).
+   * Con `plan` (pago dividido) reemplaza el plan guardado del pedido; el medio principal sale del plan.
+   * Sin `plan` se usa solo `medio` (forma anterior) y no se toca el plan guardado.
    * Al mozo solo se le responde ok: nunca el semáforo ni los datos del voucher.
    */
-  async enviarACaja(pedidoId: string, medio: string, usuario: UsuarioAutenticado, ip?: string) {
-    const medioNormalizado = String(medio || '').trim().toUpperCase();
-    if (!MEDIOS_ENVIO_CAJA.includes(medioNormalizado as (typeof MEDIOS_ENVIO_CAJA)[number])) {
+  async enviarACaja(
+    pedidoId: string,
+    medio: string,
+    usuario: UsuarioAutenticado,
+    ip?: string,
+    plan?: unknown,
+  ) {
+    if (plan != null && !Array.isArray(plan)) {
+      throw new BadRequestException({ codigo: 'PLAN_PAGO_INVALIDO', mensaje: 'El plan de pago debe ser una lista de medios y montos' });
+    }
+    const conPlan = Array.isArray(plan) && plan.length > 0;
+    let medioNormalizado = String(medio || '').trim().toUpperCase();
+    if (!conPlan && !MEDIOS_ENVIO_CAJA.includes(medioNormalizado as (typeof MEDIOS_ENVIO_CAJA)[number])) {
       throw new BadRequestException({ codigo: 'MEDIO_INVALIDO', mensaje: 'Elige Efectivo, Yape, Plin o Transferencia' });
     }
     const id = this.parsearId(pedidoId);
     const pedido = await this.prisma.pedido.findUnique({
       where: { id },
-      select: { id: true, codigo: true, pago_estado: true },
+      select: { id: true, codigo: true, total: true, pago_estado: true },
     });
     if (!pedido) {
       throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'El pedido no existe' });
@@ -526,16 +637,25 @@ export class VouchersService {
       throw new ConflictException({ codigo: 'PEDIDO_YA_PAGADO', mensaje: 'El pedido ya está cobrado' });
     }
 
+    // Pago dividido: el plan debe sumar el total del pedido (lo valida PagoPlanService)
+    const planValidado = conPlan ? this.pagoPlan.validar(plan as PlanPagoItem[], Number(pedido.total)) : null;
+    const desglose = planValidado
+      ? planValidado.map((f) => `${NOMBRE_MEDIO_CAJA[f.medio]} S/ ${f.monto.toFixed(2)}`).join(' · ')
+      : null;
+    if (planValidado) medioNormalizado = this.pagoPlan.pagoPrincipal(planValidado);
+    const soloEfectivo = planValidado ? montoDigitalDePlan(planValidado) === 0 : medioNormalizado === 'EFECTIVO';
+
     let aviso: { tipo: string; titulo: string; mensaje: string };
-    if (medioNormalizado === 'EFECTIVO') {
+    if (soloEfectivo) {
       aviso = {
         tipo: 'PAGO_EFECTIVO_MOZO',
         titulo: 'Mesa paga en efectivo',
         mensaje: `El mozo avisa que el pedido ${pedido.codigo} se paga en efectivo en mesa. Cóbralo en Caja.`,
       };
     } else {
+      const etiqueta = desglose ?? medioNormalizado;
       const ultimo = await this.prisma.voucherPago.findFirst({
-        where: { pedido_id: id },
+        where: { pedido_id: id, reemplazado_en: null },
         orderBy: { creado_en: 'desc' },
         select: { semaforo: true },
       });
@@ -544,13 +664,27 @@ export class VouchersService {
         ? {
             tipo: 'VOUCHER_PENDIENTE_MOZO',
             titulo: 'Voucher listo para revisar',
-            mensaje: `El mozo envía el pedido ${pedido.codigo} (${medioNormalizado}) con la foto del voucher. Revísala y cobra.`,
+            mensaje: `El mozo envía el pedido ${pedido.codigo} (${etiqueta}) con la foto del voucher. Revísala y cobra.`,
           }
         : {
             tipo: 'VOUCHER_PENDIENTE_MOZO',
             titulo: 'Pago digital sin foto legible',
-            mensaje: `El mozo envía el pedido ${pedido.codigo} (${medioNormalizado}) sin foto legible. Pide la foto o cobra con tu excepción.`,
+            mensaje: `El mozo envía el pedido ${pedido.codigo} (${etiqueta}) sin foto legible. Pide la foto o cobra con tu excepción.`,
           };
+    }
+    if (planValidado && soloEfectivo) {
+      aviso.mensaje = `${aviso.mensaje} Desglose: ${desglose}.`;
+    }
+
+    if (planValidado) {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.pedidoPagoPlan.deleteMany({ where: { pedido_id: id } });
+        await this.pagoPlan.guardar(tx, id, planValidado);
+        await tx.pedido.update({
+          where: { id },
+          data: { pago_preferido: medioNormalizado, pago_metodo: medioNormalizado },
+        });
+      });
     }
 
     const notif = await this.prisma.notificacion.create({
@@ -573,7 +707,7 @@ export class VouchersService {
       entidadId: pedido.id,
       partyId: usuario.partyId,
       ip,
-      despues: { pedidoId: pedido.id.toString(), medio: medioNormalizado },
+      despues: { pedidoId: pedido.id.toString(), medio: medioNormalizado, ...(desglose ? { plan: desglose } : {}) },
     });
 
     return { ok: true };
@@ -712,6 +846,12 @@ export class VouchersService {
       throw new BadRequestException({ codigo: 'MISMO_PEDIDO', mensaje: 'El voucher ya está en ese pedido' });
     }
 
+    if (voucher.reemplazado_en != null) {
+      throw new ConflictException({
+        codigo: 'VOUCHER_REEMPLAZADO',
+        mensaje: 'Ese voucher fue reemplazado por otro; solo se pueden mover los vigentes',
+      });
+    }
     const origen = voucher.pedido_id ? await this.prisma.pedido.findUnique({ where: { id: voucher.pedido_id } }) : null;
     if (origen && ['COORDINADO', 'PAGADO'].includes(String(origen.pago_estado))) {
       throw new ConflictException({
@@ -792,38 +932,192 @@ export class VouchersService {
    * Resumen de consumo de OpenAI exclusivo para origen VOUCHER del mes en curso.
    */
   async obtenerConsumoMesVoucher(fecha = new Date()) {
-    const inicioMes = new Date(fecha.getFullYear(), fecha.getMonth(), 1, 0, 0, 0, 0);
-    const periodo = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
+    return this.vouchersIaService.obtenerConsumoMesVoucher(fecha);
+  }
 
-    const agregados = await this.prisma.iaConsumo.aggregate({
-      where: {
-        fecha: { gte: inicioMes },
-        origen: 'VOUCHER',
+  /**
+   * Guarda el plan de pago que armó el mozo ANTES de subir la captura, para que el servidor compare
+   * cada captura contra el monto de su medio. Solo mientras el pago no esté aprobado (puedeSubirVoucher).
+   * El mozo solo toca sus pedidos. Audita GUARDAR_PLAN_PAGO.
+   */
+  async guardarPlanMozo(pedidoId: string, plan: unknown, usuario: UsuarioAutenticado, ip?: string) {
+    if (!Array.isArray(plan) || plan.length === 0) {
+      throw new BadRequestException({ codigo: 'PLAN_PAGO_INVALIDO', mensaje: 'El plan de pago debe ser una lista de medios y montos' });
+    }
+    const id = this.parsearId(pedidoId);
+    const pedido = await this.prisma.pedido.findUnique({
+      where: { id },
+      select: { id: true, codigo: true, party_id: true, total: true, estado: true, modalidad: true, pago_metodo: true, pago_estado: true, pago_coordinado_en: true },
+    });
+    if (!pedido) {
+      throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'El pedido no existe' });
+    }
+    if (usuario.rol === 'MOZO' && (pedido.party_id == null || BigInt(pedido.party_id) !== BigInt(usuario.partyId))) {
+      throw new ForbiddenException({ codigo: 'PEDIDO_AJENO', mensaje: 'Solo puedes cambiar el plan de tus pedidos' });
+    }
+    if (usuario.rol === 'MOZO' && !puedeSubirVoucher(pedido, 'MOZO')) {
+      throw new ConflictException({ codigo: 'PLAN_BLOQUEADO', mensaje: 'El pago ya fue aprobado; pide a Caja cualquier cambio del plan' });
+    }
+    const planValidado = this.pagoPlan.validar(plan as PlanPagoItem[], Number(pedido.total));
+    if (!planValidado) {
+      throw new BadRequestException({ codigo: 'PLAN_PAGO_INVALIDO', mensaje: 'El plan de pago no es válido' });
+    }
+    const medioPrincipal = this.pagoPlan.pagoPrincipal(planValidado);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.pedidoPagoPlan.deleteMany({ where: { pedido_id: id } });
+      await this.pagoPlan.guardar(tx, id, planValidado);
+      await tx.pedido.update({
+        where: { id },
+        data: { pago_preferido: medioPrincipal, pago_metodo: medioPrincipal },
+      });
+    });
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'vouchers',
+      accion: 'GUARDAR_PLAN_PAGO',
+      resultado: 'OK',
+      entidad: 'pedido',
+      entidadId: pedido.id,
+      partyId: usuario.partyId,
+      ip,
+      despues: { pedidoId: pedido.id.toString(), plan: planValidado.map((f) => `${f.medio} ${f.monto.toFixed(2)}`).join(' · ') },
+    });
+    return { ok: true, plan: planValidado.map((f) => ({ medio: f.medio, monto: f.monto })) };
+  }
+
+  /**
+   * Quita un voucher del pedido sin borrarlo: queda retirado en el historial y deja de contar como vigente.
+   * Mozo: solo sus pedidos y mientras el pago esté pendiente. Caja/Admin: con motivo ≥5 mientras no esté PAGADO.
+   * Audita QUITAR_VOUCHER.
+   */
+  async quitarVoucher(id: string, motivo: unknown, usuario: UsuarioAutenticado, ip?: string) {
+    const voucherId = this.parsearId(id);
+    const voucher = await this.prisma.voucherPago.findUnique({
+      where: { id: voucherId },
+      select: { id: true, pedido_id: true, reemplazado_en: true },
+    });
+    if (!voucher) {
+      throw new NotFoundException({ codigo: 'VOUCHER_NO_ENCONTRADO', mensaje: 'El voucher especificado no existe' });
+    }
+    if (voucher.reemplazado_en != null) {
+      throw new ConflictException({ codigo: 'VOUCHER_YA_RETIRADO', mensaje: 'Ese voucher ya no está vigente' });
+    }
+    const pedido = voucher.pedido_id
+      ? await this.prisma.pedido.findUnique({
+          where: { id: voucher.pedido_id },
+          select: { id: true, party_id: true, estado: true, modalidad: true, pago_metodo: true, pago_estado: true, pago_coordinado_en: true, total: true },
+        })
+      : null;
+    if (usuario.rol === 'MOZO' && (!pedido || pedido.party_id == null || BigInt(pedido.party_id) !== BigInt(usuario.partyId))) {
+      throw new ForbiddenException({ codigo: 'PEDIDO_AJENO', mensaje: 'Solo puedes quitar vouchers de tus pedidos' });
+    }
+    if (pedido && !puedeCambiarVoucher(pedido, usuario.rol)) {
+      throw new ConflictException({
+        codigo: 'VOUCHER_CAMBIO_BLOQUEADO',
+        mensaje:
+          usuario.rol === 'MOZO'
+            ? 'Caja ya aprobó el pago de este pedido; pide a Caja que cambie el voucher'
+            : 'El pago ya está cobrado; no se puede quitar el voucher',
+      });
+    }
+    const motivoTexto = typeof motivo === 'string' ? motivo.trim() : '';
+    if (usuario.rol !== 'MOZO' && motivoTexto.length < 5) {
+      throw new BadRequestException({ codigo: 'MOTIVO_CAMBIO_REQUERIDO', mensaje: 'Escribe el motivo (mínimo 5 caracteres)' });
+    }
+    const ahora = new Date();
+    await this.prisma.voucherPago.updateMany({
+      where: { id: voucherId, reemplazado_en: null },
+      data: {
+        retirado: true,
+        reemplazado_en: ahora,
+        reemplazado_por: usuario.partyId,
+        motivo_cambio: motivoTexto || null,
       },
-      _count: { id: true },
-      _sum: {
-        tokens_entrada: true,
-        tokens_salida: true,
-        costo_usd_estimado: true,
+    });
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'vouchers',
+      accion: 'QUITAR_VOUCHER',
+      resultado: 'OK',
+      entidad: 'voucher_pago',
+      entidadId: voucherId,
+      partyId: usuario.partyId,
+      ip,
+      antes: { pedidoId: pedido?.id.toString() ?? null },
+      despues: { rol: usuario.rol, motivo: motivoTexto || null },
+    });
+    if (pedido) this.eventos?.emitirAdmin('vouchers:actualizado', { pedidoIds: [pedido.id.toString()] });
+    return { ok: true, id: voucherId.toString() };
+  }
+
+  /**
+   * Historial de vouchers de un pedido (vigentes y reemplazados), más reciente primero. Nada se borra.
+   * El mozo solo ve sus pedidos y, de cada voucher, si es legible: nunca semáforo ni datos extraídos.
+   */
+  async historialPedido(pedidoId: string, usuario: UsuarioAutenticado) {
+    const id = this.parsearId(pedidoId);
+    const pedido = await this.prisma.pedido.findUnique({ where: { id }, select: { id: true, party_id: true } });
+    if (!pedido) {
+      throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'El pedido no existe' });
+    }
+    const esMozo = usuario.rol === 'MOZO';
+    if (esMozo && (pedido.party_id == null || BigInt(pedido.party_id) !== BigInt(usuario.partyId))) {
+      throw new ForbiddenException({ codigo: 'PEDIDO_AJENO', mensaje: 'Solo puedes ver los vouchers de tus pedidos' });
+    }
+
+    const vouchers = await this.prisma.voucherPago.findMany({
+      where: { pedido_id: id },
+      orderBy: { creado_en: 'desc' },
+      select: {
+        id: true,
+        archivo_id: true,
+        subido_por: true,
+        semaforo: true,
+        medio: true,
+        creado_en: true,
+        reemplazado_en: true,
+        retirado: true,
+        motivo_cambio: true,
       },
     });
 
-    const llamadasTotal = agregados._count.id || 0;
-    const tokensEntrada = agregados._sum.tokens_entrada || 0;
-    const tokensSalida = agregados._sum.tokens_salida || 0;
-    const tokensTotal = tokensEntrada + tokensSalida;
-    const costoUsdEstimado = Number(agregados._sum.costo_usd_estimado || 0);
-
-    const activo = await this.vouchersIaService.estaParametroVoucherIaActivo();
-
+    const nombres = await this.nombresCortos(vouchers.map((v) => v.subido_por).filter((x): x is bigint => x != null));
     return {
-      periodo,
-      llamadasTotal,
-      tokensEntrada,
-      tokensSalida,
-      tokensTotal,
-      costoUsdEstimado: Math.round(costoUsdEstimado * 10000) / 10000,
-      iaActiva: activo,
+      items: vouchers.map((v) => {
+        const base = {
+          id: v.id.toString(),
+          subidoEn: v.creado_en.toISOString(),
+          subidoPor: v.subido_por != null ? (nombres.get(v.subido_por.toString()) ?? null) : null,
+          medio: v.medio ?? null,
+          estado: v.retirado ? 'RETIRADO' : v.reemplazado_en ? 'REEMPLAZADO' : 'VIGENTE',
+          reemplazadoEn: v.reemplazado_en ? v.reemplazado_en.toISOString() : null,
+          motivoCambio: v.motivo_cambio ?? null,
+          legible: v.semaforo !== 'ILEGIBLE',
+        };
+        return esMozo ? base : { ...base, semaforo: v.semaforo, archivoId: v.archivo_id.toString() };
+      }),
     };
+  }
+
+  /** «Nombre I.» de cada party (para el historial). Sin datos de identidad más allá del nombre corto. */
+  private async nombresCortos(partyIds: bigint[]): Promise<Map<string, string>> {
+    const unicos = [...new Set(partyIds.map((x) => x.toString()))].map((x) => BigInt(x));
+    if (unicos.length === 0) return new Map();
+    const personas = await this.prisma.person.findMany({
+      where: { party_id: { in: unicos } },
+      select: { party_id: true, nombres: true, apellidos: true },
+    });
+    return new Map(
+      personas.map((p) => {
+        const nombre = p.nombres.trim().split(/\s+/)[0] ?? '';
+        const inicial = p.apellidos?.trim() ? `${p.apellidos.trim()[0]}.` : '';
+        return [p.party_id.toString(), `${nombre} ${inicial}`.trim()];
+      }),
+    );
+  }
+
+  /** Estado de la lectura con IA para la franja de Caja (pausa por saldo/clave y tope mensual). */
+  async estadoIa() {
+    return this.vouchersIaService.estadoIa();
   }
 }

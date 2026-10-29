@@ -197,13 +197,20 @@ export class CobrosService {
     const id = this.parsearId(voucherId);
     const voucher = await tx.voucherPago.findUnique({
       where: { id },
-      select: { id: true, pedido_id: true },
+      select: { id: true, pedido_id: true, reemplazado_en: true },
     });
 
     if (!voucher) {
       throw new HttpException(
         { codigo: 'VOUCHER_NO_ENCONTRADO', mensaje: 'El voucher especificado no existe' },
         HttpStatus.NOT_FOUND,
+      );
+    }
+    // Un voucher reemplazado ya no es el comprobante: el cobro usa solo los vigentes
+    if (voucher.reemplazado_en != null) {
+      throw new HttpException(
+        { codigo: 'VOUCHER_REEMPLAZADO', mensaje: 'Ese voucher fue reemplazado por otro; usa el vigente' },
+        HttpStatus.CONFLICT,
       );
     }
     if (voucher.pedido_id !== null && voucher.pedido_id !== pedidoId) {
@@ -255,7 +262,7 @@ export class CobrosService {
       const pedidoId = this.parsearId(dto.pedidoId);
       const pedido = await tx.pedido.findUnique({
         where: { id: pedidoId },
-        include: { cobros: true },
+        include: { cobros: true, planPago: true },
       });
 
       if (!pedido) {
@@ -330,6 +337,7 @@ export class CobrosService {
         db: tx,
         pedidoId: pedido.id,
         medios: dto.pagos.map((p) => p.medio),
+        planPago: pedido.planPago,
         sinVoucher: dto.sinVoucher,
         permiteExcepcion: true,
         verificarPin: (pin) =>
@@ -706,6 +714,7 @@ export class CobrosService {
 
     const pedido = await this.prisma.pedido.findUnique({
       where: { id: pedidoId },
+      include: { planPago: true },
     });
 
     if (!pedido) {
@@ -746,6 +755,7 @@ export class CobrosService {
       db: this.prisma,
       pedidoId: pedido.id,
       medios: [pedido.pago_preferido || pedido.pago_metodo],
+      planPago: pedido.planPago,
       sinVoucher: dto?.sinVoucher,
       permiteExcepcion: true,
       verificarPin: (pin) =>

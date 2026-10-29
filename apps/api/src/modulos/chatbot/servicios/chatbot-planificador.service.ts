@@ -8,7 +8,7 @@ import { AvisosPedidoService, NUMEROS_INTENTO } from './avisos-pedido.service';
 import { ReprogramacionService, MOTIVO_RETIRO } from './reprogramacion.service';
 import { OutboxWhatsappService } from './outbox-whatsapp.service';
 import { calcularMontoReprogramacion } from '../../repartos/recargo-reprogramacion';
-import { normalizarTelefono } from '../utilidades/enmascarar.util';
+import { telefonoEnviable } from '../utilidades/enmascarar.util';
 import { adquirirCandado, liberarCandado } from '../../../comun/redis/candado.util';
 
 export interface ParametrosChatbot {
@@ -214,7 +214,7 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
 
       for (const p of pedidosDelivery) {
         try {
-        const telefono = normalizarTelefono(p.cliente_telefono || '');
+        const telefono = telefonoEnviable(p.cliente_telefono);
         if (!telefono) continue;
 
         // Consentimiento Ley 29733: no enviar si dijo BAJA
@@ -311,7 +311,7 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
         });
 
         for (const p of pedidosRecojo) {
-          const telefono = normalizarTelefono(p.cliente_telefono || '');
+          const telefono = telefonoEnviable(p.cliente_telefono);
           if (!telefono) continue;
 
           const yaEnviado = await this.prisma.whatsappMensaje.findFirst({
@@ -351,22 +351,28 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
         }
       }
 
-      // 3. Encuesta posventa tras X minutos de ENTREGADO
+      // 3. Encuesta posventa tras X minutos de ENTREGADO (o, en mesa, de la entrega en mesa o del cobro)
       if (params.avisoEncuestaActivo) {
         const limiteEntregado = new Date(ahora.getTime() - params.encuestaEsperaMin * 60000);
+        // Solo entregas recientes: sin ventana, activar la encuesta enviaría a todo el historial
+        const desde = new Date(ahora.getTime() - VENTANA_REVISION_MS);
         const pedidosParaEncuesta = await this.prisma.pedido.findMany({
           where: {
-            // Solo entregas recientes: sin ventana, activar la encuesta enviaría a todo el historial
-            entregado_en: { gte: new Date(ahora.getTime() - VENTANA_REVISION_MS), lte: limiteEntregado },
             estado: { notIn: ['ANULADO'] },
             cliente_telefono: { not: null },
             encuestaPosventa: null, // Que no tenga encuesta enviada
+            OR: [
+              { entregado_en: { gte: desde, lte: limiteEntregado } },
+              { modalidad: 'MESA', entregado_mesa_en: { gte: desde, lte: limiteEntregado } },
+              { modalidad: 'MESA', cobros: { some: { anulado_en: null, en: { gte: desde, lte: limiteEntregado } } } },
+            ],
           },
           select: { id: true, codigo: true, cliente_nombre: true, cliente_telefono: true },
         });
 
         for (const p of pedidosParaEncuesta) {
-          const telefono = normalizarTelefono(p.cliente_telefono || '');
+          // Sin teléfono real (vacío o el relleno 999999999) no hay a quién encuestar: se omite sin error
+          const telefono = telefonoEnviable(p.cliente_telefono);
           if (!telefono) continue;
 
           const acepta = await this.ventana24hService.tieneConsentimiento(telefono);
@@ -543,13 +549,13 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
       if (!['YAPE', 'PLIN', 'TRANSFERENCIA'].includes(medio)) continue;
 
       const legible = await this.prisma.voucherPago.findFirst({
-        where: { pedido_id: pedido.id, semaforo: { not: 'ILEGIBLE' } },
+        where: { pedido_id: pedido.id, reemplazado_en: null, semaforo: { not: 'ILEGIBLE' } },
         select: { id: true },
       });
       if (legible) continue;
 
       // Si el cliente escribió desde el aviso, la conversación ya tiene su atención: no se recuerda
-      const telefono = normalizarTelefono(pedido.cliente_telefono || '');
+      const telefono = telefonoEnviable(pedido.cliente_telefono);
       if (!telefono) continue;
       const conversacion = await this.prisma.conversacion.findUnique({ where: { telefono }, select: { id: true } });
       if (conversacion) {

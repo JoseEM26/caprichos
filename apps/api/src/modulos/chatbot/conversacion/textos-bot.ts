@@ -705,6 +705,31 @@ export const TEXTOS_BOT = {
     return 'Por favor indícanos una referencia para el repartidor (por ejemplo: frente al parque, portón blanco, timbre 2):';
   },
 
+  /** Cliente con cuenta y direcciones guardadas: elegir una anterior o pedir ubicación nueva. */
+  pedidoDireccionesAnteriores: (): string => {
+    return '¡Qué gusto verte de nuevo! 😊 ¿Lo enviamos a una dirección anterior o a una nueva?';
+  },
+
+  pedidoDireccionAnteriorElegida: (
+    direccion: string,
+    tarifa: number,
+    esGratis: boolean,
+    gratisDesde?: number,
+  ): string => {
+    const envio = esGratis
+      ? `El envío es gratis${gratisDesde ? ` por compras mayores a S/ ${gratisDesde.toFixed(2)}` : ''}.`
+      : `El envío cuesta S/ ${tarifa.toFixed(2)}.`;
+    return `Perfecto, lo enviamos a ${direccion}. ${envio} Elige una categoría:`;
+  },
+
+  pedidoDireccionAnteriorSinCoordenadas: (direccion: string): string => {
+    return `Anotado: lo enviamos a ${direccion}. Un asesor te confirmará el costo del envío. Elige una categoría:`;
+  },
+
+  pedidoDireccionAnteriorFueraCobertura: (): string => {
+    return 'Esa dirección quedó fuera de nuestra zona de reparto. Comparte una nueva ubicación o escribe otra dirección.';
+  },
+
   pedidoRecojoConfirmado: (): string => {
     return 'Anotado: Para recoger. Elige una categoría.';
   },

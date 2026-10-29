@@ -13,6 +13,7 @@ import { UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CuentaClienteController } from './cuenta-cliente.controller';
 import { ClientesService } from './clientes.service';
+import { DireccionesClienteService } from './direcciones-cliente.service';
 
 describe('CuentaClienteController', () => {
   let controller: CuentaClienteController;
@@ -40,6 +41,7 @@ describe('CuentaClienteController', () => {
       providers: [
         { provide: ClientesService, useValue: clientesServiceMock },
         { provide: ConfigService, useValue: configServiceMock },
+        { provide: DireccionesClienteService, useValue: { listar: jest.fn(), desactivar: jest.fn() } },
       ],
     }).compile();
 
@@ -136,5 +138,33 @@ describe('CuentaClienteController', () => {
 
     expect(r).toEqual({ ok: true });
     expect(res.clearCookie).toHaveBeenCalledWith('cp_cliente', expect.objectContaining({ path: '/' }));
+  });
+
+  describe('direcciones guardadas de la cuenta', () => {
+    const direccionesDe = () => (controller as any).direcciones;
+
+    it('GET direcciones: lista las de la sesión; sin sesión, lista vacía', async () => {
+      clientesServiceMock.clienteDesdeRequest.mockResolvedValue({ partyId: '100', nombre: 'Ana' });
+      direccionesDe().listar.mockResolvedValue([{ id: '1', direccion: 'Av. X 123' }]);
+
+      const r = await controller.listarDirecciones({} as any);
+
+      expect(direccionesDe().listar).toHaveBeenCalledWith('100');
+      expect(r).toEqual({ direcciones: [{ id: '1', direccion: 'Av. X 123' }] });
+
+      clientesServiceMock.clienteDesdeRequest.mockResolvedValue(null);
+      expect(await controller.listarDirecciones({} as any)).toEqual({ direcciones: [] });
+    });
+
+    it('DELETE direcciones/:id desactiva solo de la sesión; sin sesión responde 401', async () => {
+      clientesServiceMock.clienteDesdeRequest.mockResolvedValue({ partyId: '100', nombre: 'Ana' });
+      direccionesDe().desactivar.mockResolvedValue({ ok: true });
+
+      expect(await controller.desactivarDireccion('7', {} as any)).toEqual({ ok: true });
+      expect(direccionesDe().desactivar).toHaveBeenCalledWith('100', '7');
+
+      clientesServiceMock.clienteDesdeRequest.mockResolvedValue(null);
+      await expect(controller.desactivarDireccion('7', {} as any)).rejects.toBeInstanceOf(UnauthorizedException);
+    });
   });
 });

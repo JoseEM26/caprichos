@@ -14,6 +14,7 @@ import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { AbrirPedidoMesaDto } from './dto/abrir-pedido-mesa.dto';
 import { LiberarMesaDto } from './dto/liberar-mesa.dto';
 import { CrearPedidoDto } from '../pedidos/dto/crear-pedido.dto';
+import { tieneTelefonoReal } from '../chatbot/utilidades/enmascarar.util';
 
 @Injectable()
 export class SalonService {
@@ -233,11 +234,29 @@ export class SalonService {
       .map((m) => (m.numero ? `Mesa ${m.numero}` : m.nombre || `Mesa ${m.id}`))
       .join(', ');
 
+    // Sin cuenta, el nombre lo escribe el mozo (obligatorio). Con cuenta, nombre y teléfono salen de la cuenta
+    // (pedidos.service). El teléfono es opcional: sin él el pedido se guarda sin teléfono real.
+    const identificado = Boolean(dto.clienteDni || dto.clientePartyId);
+    const nombreEnviado = dto.cliente?.nombre?.trim() ?? '';
+    if (!identificado && nombreEnviado.length < 2) {
+      throw new BadRequestException({
+        codigo: 'CLIENTE_NOMBRE_REQUERIDO',
+        mensaje: 'Escribe el nombre del cliente (mínimo 2 caracteres) para la boleta y la lista',
+      });
+    }
+    const telefonoDigitos = (dto.cliente?.telefono ?? '').replace(/\D/g, '').replace(/^51(?=9\d{8}$)/, '');
+    if (telefonoDigitos && !/^9\d{8}$/.test(telefonoDigitos)) {
+      throw new BadRequestException({
+        codigo: 'TELEFONO_INVALIDO',
+        mensaje: 'El teléfono debe tener 9 dígitos y empezar con 9',
+      });
+    }
     const pedidoDto: CrearPedidoDto = {
       modalidad: 'MESA',
-      cliente: dto.cliente || {
-        nombre: mesaNombre,
-        telefono: '999999999',
+      cliente: {
+        nombre: nombreEnviado.length >= 2 ? nombreEnviado : '',
+        // el relleno 999999999 de versiones anteriores no es un teléfono real
+        telefono: tieneTelefonoReal(telefonoDigitos) ? telefonoDigitos : '',
       },
       lineas: dto.lineas,
       pago: dto.pago || { metodo: 'EFECTIVO' },
@@ -245,6 +264,8 @@ export class SalonService {
       nota: dto.nota,
       mesa: mesaNombre,
       cuponCodigo: dto.cuponCodigo,
+      clienteDni: dto.clienteDni,
+      clientePartyId: dto.clientePartyId,
     };
 
     const idempotencyKey =
@@ -582,6 +603,12 @@ export class SalonService {
       despues: {
         entregado_mesa_en: ahora.toISOString(),
       },
+    });
+
+    // «Mis pedidos» del mozo refresca el progreso en vivo
+    this.eventosGateway.emitirAdmin('pedido:progreso', {
+      id: Number(pedidoId),
+      codigo: actualizado.codigo,
     });
 
     return {

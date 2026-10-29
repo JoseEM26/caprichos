@@ -1,12 +1,17 @@
 import { useEffect, useState } from 'react';
 import { SubirVoucherMozo } from '../vouchers/SubirVoucherMozo';
 import { medioDigitalVoucher } from '../pedidos/mediosPago';
+import type { PlanPagoItem } from '../pedidos/planPago';
+import { vouchersApi } from '../vouchers/vouchersApi';
 import type { MiPedido } from './tipos';
 import './mis-pedidos-voucher.css';
 
 export interface ModalVoucherPedidoProps {
   /** montoDigital: la parte del plan que lleva voucher (sin él, se muestra el total del medio). */
-  pedido: Pick<MiPedido, 'id' | 'codigo' | 'pagoMetodo'> & { montoDigital?: number };
+  pedido: Pick<MiPedido, 'id' | 'codigo' | 'pagoMetodo' | 'puedeCambiarVoucher'> & { montoDigital?: number; plan?: Array<{ medio: string; monto: number }> };
+  /** Un voucher por medio digital del plan: este es el medio de esta captura y su monto. */
+  medioVoucher?: 'YAPE' | 'PLIN' | 'TRANSFERENCIA';
+  montoMedio?: number;
   alCerrar: () => void;
   /** Deja el pedido sin voucher por ahora (botón «Subir después»). Solo se muestra si se pasa. */
   alSubirDespues?: () => void;
@@ -15,8 +20,20 @@ export interface ModalVoucherPedidoProps {
 }
 
 /** Ventana para subir la foto del voucher de un pedido digital del mozo. */
-export function ModalVoucherPedido({ pedido, alCerrar, alSubirDespues, alGuardado }: ModalVoucherPedidoProps) {
-  const medio = medioDigitalVoucher(pedido.pagoMetodo);
+export function ModalVoucherPedido({
+  pedido,
+  medioVoucher,
+  montoMedio,
+  alCerrar,
+  alSubirDespues,
+  alGuardado,
+}: ModalVoucherPedidoProps) {
+  const medio = medioVoucher ?? medioDigitalVoucher(pedido.pagoMetodo);
+  const monto = montoMedio ?? pedido.montoDigital;
+  // Antes de la foto se guarda el plan: el servidor compara la captura contra el monto de SU medio
+  const guardarPlan = async () => {
+    if (pedido.plan && pedido.plan.length > 0) await vouchersApi.guardarPlanPago(pedido.id, pedido.plan as PlanPagoItem[]);
+  };
   const nombreMedio = medio === 'YAPE' ? 'Yape' : medio === 'PLIN' ? 'Plin' : 'Transferencia';
   const [guardado, setGuardado] = useState(false);
 
@@ -46,14 +63,20 @@ export function ModalVoucherPedido({ pedido, alCerrar, alSubirDespues, alGuardad
         </header>
 
         <div className="mpv-cuerpo">
-          {pedido.montoDigital != null && (
+          {monto != null && (
             <p className="mpv-ayuda">
-              Voucher de {nombreMedio} por S/ {pedido.montoDigital.toFixed(2)}
+              Voucher de {nombreMedio} por S/ {monto.toFixed(2)}
             </p>
           )}
           <SubirVoucherMozo
             pedidoId={pedido.id}
             medio={medio}
+            antesDeSubir={guardarPlan}
+            quitable={pedido.puedeCambiarVoucher !== false}
+            alQuitado={() => {
+              setGuardado(false);
+              alGuardado?.();
+            }}
             opcional
             alVoucherValido={(info) => {
               if (!info.legible) return;

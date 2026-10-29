@@ -111,7 +111,7 @@ describe('ModalNuevoPedidoMesa: medio de pago del mozo en llevar y delivery', ()
     expect(opciones.map((b) => b.textContent)).toEqual(['Efectivo', 'Yape', 'Plin', 'Transferencia']);
     expect(within(grupo).getByRole('button', { name: 'Efectivo' })).toHaveAttribute('aria-pressed', 'true');
     // El campo «con cuánto paga» aparece con efectivo en llevar también (para el vuelto)
-    expect(screen.getByText('¿Con cuánto paga en efectivo?')).toBeInTheDocument();
+    expect(screen.getByText('¿Con cuánto paga?')).toBeInTheDocument();
   });
 
   it('en efectivo registra con metodo EFECTIVO y cierra como antes, sin voucher', async () => {
@@ -187,10 +187,10 @@ describe('ModalNuevoPedidoMesa: medio de pago del mozo en llevar y delivery', ()
   it('en delivery con efectivo muestra el campo «paga con»; con Yape lo oculta', async () => {
     await llegarAResumen('Delivery');
     const grupo = await screen.findByRole('group', { name: '¿Cómo paga?' });
-    expect(screen.getByText('¿Con cuánto paga en efectivo?')).toBeInTheDocument();
+    expect(screen.getByText('¿Con cuánto paga?')).toBeInTheDocument();
 
     fireEvent.click(within(grupo).getByRole('button', { name: 'Yape' }));
-    expect(screen.queryByText('¿Con cuánto paga en efectivo?')).toBeNull();
+    expect(screen.queryByText('¿Con cuánto paga?')).toBeNull();
   });
 
   it('pago dividido: efectivo + Yape envía pago.plan con los montos y el voucher es solo de la parte digital', async () => {
@@ -198,13 +198,10 @@ describe('ModalNuevoPedidoMesa: medio de pago del mozo en llevar y delivery', ()
     const { alExitoPedido, alCerrar } = await llegarAResumen('Para llevar');
     const grupo = await screen.findByRole('group', { name: '¿Cómo paga?' });
     fireEvent.click(within(grupo).getByRole('button', { name: 'Yape' }));
-    // Total 8.50: 3.50 en efectivo y 5.00 por Yape
-    fireEvent.click(screen.getByRole('button', { name: 'Agregar medio' }));
-    const monto1 = screen.getByLabelText('Monto en Yape');
-    fireEvent.change(monto1, { target: { value: '5' } });
-    const grupo2 = screen.getByRole('group', { name: 'Medio 2 del pago' });
-    fireEvent.click(within(grupo2).getByRole('button', { name: 'Efectivo' }));
+    // Total 8.50: se agrega otro medio (Efectivo, el primero libre); escribir 3.50 deja Yape en 5.00 solo
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar otro medio de pago' }));
     fireEvent.change(screen.getByLabelText('Monto en Efectivo'), { target: { value: '3.5' } });
+    expect(screen.getByLabelText('Monto en Yape')).toHaveTextContent('S/ 5.00');
 
     await confirmarRegistro();
 
@@ -231,11 +228,11 @@ describe('ModalNuevoPedidoMesa: medio de pago del mozo en llevar y delivery', ()
     await llegarAResumen('Para llevar');
     const grupo = await screen.findByRole('group', { name: '¿Cómo paga?' });
     fireEvent.click(within(grupo).getByRole('button', { name: 'Yape' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Agregar medio' }));
-    fireEvent.change(screen.getByLabelText('Monto en Yape'), { target: { value: '2' } });
-    fireEvent.change(screen.getByLabelText('Monto en Efectivo'), { target: { value: '3' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar otro medio de pago' }));
+    // Efectivo por encima del total (8.50): Yape quedaría en negativo
+    fireEvent.change(screen.getByLabelText('Monto en Efectivo'), { target: { value: '9' } });
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Falta S/ 3.50 por asignar');
+    expect(screen.getByRole('alert')).toHaveTextContent('Sobra S/ 0.50');
     expect(screen.getByRole('button', { name: 'Registrar pedido' })).toBeDisabled();
   });
 });

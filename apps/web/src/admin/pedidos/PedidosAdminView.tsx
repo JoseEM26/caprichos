@@ -13,6 +13,8 @@ import { reproducirCampana } from './audioAlerta';
 import { FranjaImpresion } from './FranjaImpresion';
 import { BannerCajaCerrada, EtiquetaCajaCerrada, esperaCajaCerrada, useEstadoCajaHoy } from './BannerCajaCerrada';
 import './pedidos.css';
+import { FiltroDiasPedidos } from './FiltroDiasPedidos';
+import { RangoPedidos, parametrosDeRango, rangoHoy } from './filtroDias';
 
 export function canalLabel(c?: string | null) {
   if (!c) return 'Web';
@@ -153,11 +155,24 @@ const COBRO_OPCIONES = [
   { id: 'unpaid', n: 'Pendiente' },
 ];
 
+/** Conteo ligero de pendientes de días anteriores; si falla no tumba la carga de la lista. */
+async function contarPendientesAnteriores(): Promise<number | null> {
+  try {
+    const r = await pedidosApi.listar({ pendientes: true, limite: 1 });
+    return r.total;
+  } catch {
+    return null;
+  }
+}
+
 export function PedidosAdminView() {
   const [cargando, setCargando] = useState<boolean>(true);
   const [errorCarga, setErrorCarga] = useState<string>('');
 
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
+  // Día o rango que muestra la lista (por defecto hoy en Lima; no se recuerda entre visitas)
+  const [rango, setRango] = useState<RangoPedidos>(() => rangoHoy());
+  const [pendientesAnteriores, setPendientesAnteriores] = useState<number>(0);
   const [nuevoPedidoAbierto, setNuevoPedidoAbierto] = useState(false);
   const [pedidoRepetir, setPedidoRepetir] = useState<Pedido | null>(null);
   const [pisosSalon, setPisosSalon] = useState<PisoSalon[]>([]);
@@ -205,23 +220,35 @@ export function PedidosAdminView() {
     }
   }, []);
 
-  // Carga inicial y refresco
+  // Carga inicial y refresco (se vuelve a cargar al cambiar el día o rango)
   const cargarDatos = useCallback(async () => {
     setErrorCarga('');
     try {
-      const resPedidos = await pedidosApi.listar({ limite: 100 });
+      const [resPedidos, pendientes] = await Promise.all([
+        pedidosApi.listar({ ...parametrosDeRango(rango), limite: 100 }),
+        contarPendientesAnteriores(),
+      ]);
       setPedidos(resPedidos.items || []);
+      if (pendientes !== null) setPendientesAnteriores(pendientes);
     } catch (err: any) {
       setErrorCarga(err?.message || 'Error al cargar los pedidos');
     } finally {
       setCargando(false);
     }
-  }, []);
+  }, [rango]);
 
   useEffect(() => {
     cargarDatos();
+  }, [cargarDatos]);
+
+  useEffect(() => {
     void cargarNoEntregados();
-  }, [cargarDatos, cargarNoEntregados]);
+  }, [cargarNoEntregados]);
+
+  const cambiarRango = (nuevo: RangoPedidos) => {
+    setRango(nuevo);
+    setPaginaActual(1);
+  };
 
   const cambiarTab = (nuevaTab: ClaveTabCaja) => {
     setTabActiva(nuevaTab);
@@ -497,6 +524,9 @@ export function PedidosAdminView() {
               Nuevo pedido
             </button>
           </div>
+
+          {/* Día o rango de la lista (hoy por defecto); no cambia la caja del día */}
+          <FiltroDiasPedidos rango={rango} pendientesAnteriores={pendientesAnteriores} alCambiar={cambiarRango} />
 
           {/* 4 Pestañas principales */}
           <div role="tablist" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -917,7 +947,13 @@ export function PedidosAdminView() {
         <div className="cj-scroll" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
           {pedidosPaginados.length === 0 ? (
             <div style={{ padding: 24, textAlign: 'center', color: 'var(--cp-soft, #2C4C5D)', fontSize: 13 }}>
-              No hay pedidos en esta pestaña.
+              {pedidos.length > 0
+                ? 'No hay pedidos en esta pestaña.'
+                : rango.modo === 'hoy'
+                  ? 'No hay pedidos hoy.'
+                  : rango.modo === 'pendientes'
+                    ? 'No hay pedidos pendientes de días anteriores.'
+                    : 'No hay pedidos en ese rango.'}
             </div>
           ) : (
             pedidosPaginados.map((o) => {

@@ -111,8 +111,8 @@ function ZonasRepartoContenido() {
   }, [puedeVer]);
 
   // Guardado del área desde el mapa: lanza el error del servidor para que el mapa lo muestre
-  const guardarPoligonoMapa = async (codigo: string, puntos: CoordenadaPunto[]) => {
-    const res = await api.put<ZonaRepartoItem>(`/admin/zonas/${codigo}/poligono`, { poligono: puntos });
+  const guardarPoligonoMapa = async (codigo: string, puntos: CoordenadaPunto[], motivo?: string) => {
+    const res = await api.put<ZonaRepartoItem>(`/admin/zonas/${codigo}/poligono`, { poligono: puntos, ...(motivo ? { motivo } : {}) });
     setZonas((prev) =>
       prev.map((z) => (z.codigo === res.codigo ? { ...z, poligono: res.poligono, puntos: res.puntos } : z)),
     );
@@ -427,35 +427,12 @@ function ZonasRepartoContenido() {
       <div
         style={{
           display: 'flex',
-          justifyContent: 'space-between',
+          justifyContent: 'flex-end',
           alignItems: 'flex-start',
           flexWrap: 'wrap',
           gap: '12px',
         }}
       >
-        <div>
-          <h1
-            style={{
-              fontFamily: 'var(--fuente-titulos)',
-              fontWeight: 800,
-              fontSize: '22px',
-              color: 'var(--cp-navy)',
-            }}
-          >
-            Zonas de reparto
-          </h1>
-          <p
-            style={{
-              fontSize: '13px',
-              lineHeight: '19px',
-              color: 'var(--cp-soft)',
-              margin: '4px 0 0 0',
-            }}
-          >
-            Zonas de cobertura de delivery, tarifas asociadas y polígonos de delimitación (Z2, Z3, Z4, Z5 y Z7).
-          </p>
-        </div>
-
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
           <div role="group" aria-label="Vista de zonas" style={{ display: 'inline-flex', border: '1px solid var(--cp-line)', borderRadius: '10px', overflow: 'hidden' }}>
             {(['mapa', 'lista'] as const).map((v) => (
@@ -553,6 +530,11 @@ function ZonasRepartoContenido() {
           onCambiarActiva={(z) => setZonaToggleActiva(z)}
           onEditarJson={abrirEditarPoligono}
           onGuardarPoligono={guardarPoligonoMapa}
+          onZonasCambiadas={() => {
+            void cargarZonas();
+            void cargarDiagnostico();
+            setVersionHistorial((v) => v + 1);
+          }}
         />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>

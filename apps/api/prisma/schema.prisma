@@ -28,6 +28,7 @@ model Party {
   documentos               PartyIdentifier[]
   usuario                  UserAccount?
   sesiones                 Sesion[]
+  vouchersReemplazadosPor  VoucherPago[]          @relation("VoucherReemplazadoPor")
   pedidos                  Pedido[]               @relation("ClientePedido")
   pedidosRepartidos        Pedido[]               @relation("RepartidorPedido")
   liquidaciones            Liquidacion[]          @relation("LiquidacionesRepartidor")
@@ -50,6 +51,8 @@ model Party {
   conversaciones           Conversacion[]
   notificaciones           Notificacion[]
   dataRequests             DataRequest[]
+  pedidosComoCliente       Pedido[]              @relation("ClienteIdentificadoPedido")
+  direccionesCliente       ClienteDireccion[]
 
   @@map("party")
 }
@@ -400,6 +403,7 @@ model ZonaReparto {
   minutos_max Int?
   pedidos   Pedido[]
   contactos ContactMechanism[]
+  direcciones ClienteDireccion[]
 
   @@map("zona_reparto")
 }
@@ -455,6 +459,8 @@ model Pedido {
   creado_en              DateTime                @default(now()) @db.Timestamptz
   eta_min                Int?
   eta_max                Int?
+  // Cliente con cuenta identificado (carta, WhatsApp o DNI del mozo); null = invitado
+  cliente_party_id       BigInt?
   // Reparto (Ola 4)
   repartidor_party_id    BigInt?
   tomado_en              DateTime?               @db.Timestamptz
@@ -496,8 +502,31 @@ model Pedido {
   quejasWhatsapp         QuejaWhatsapp[]
   vouchers               VoucherPago[]
   planPago               PedidoPagoPlan[]
+  clienteIdentificado    Party?                 @relation("ClienteIdentificadoPedido", fields: [cliente_party_id], references: [id])
 
+  @@index([cliente_party_id], map: "pedido_cliente_party_id_idx")
   @@map("pedido")
+}
+
+model ClienteDireccion {
+  id            BigInt      @id @default(autoincrement())
+  party_id      BigInt
+  direccion     String
+  referencia    String?
+  lat           Decimal?    @db.Decimal(10, 7)
+  lng           Decimal?    @db.Decimal(10, 7)
+  zona_id       BigInt?
+  origen        String // CARTA | MOZO | WHATSAPP | MAPA | ESCRITA
+  alias         String?
+  usos          Int         @default(1)
+  ultimo_uso_en DateTime    @db.Timestamptz
+  activo        Boolean     @default(true)
+  creado_en     DateTime    @default(now()) @db.Timestamptz
+  party         Party       @relation(fields: [party_id], references: [id])
+  zona          ZonaReparto? @relation(fields: [zona_id], references: [id])
+
+  @@index([party_id, activo, ultimo_uso_en(sort: Desc)], map: "cliente_direccion_party_activo_uso_idx")
+  @@map("cliente_direccion")
 }
 
 model PedidoLinea {
@@ -1966,16 +1995,27 @@ model VoucherPago {
   revisado_en     DateTime?     @db.Timestamptz
   revisado_por    BigInt?
   creado_en       DateTime      @default(now()) @db.Timestamptz
+  // Reemplazo sin borrar: reemplazado_en NULL = vigente. reemplaza_a apunta al voucher que sustituye.
+  reemplazado_en  DateTime?     @db.Timestamptz
+  reemplazado_por BigInt?
+  motivo_cambio   String?
+  reemplaza_a     BigInt?
+  // Retirado: quitado por el mozo o Caja (reemplazado_en también queda marcado, así no es vigente)
+  retirado        Boolean       @default(false)
 
   pedido          Pedido?       @relation(fields: [pedido_id], references: [id], onDelete: SetNull)
   archivo         Archivo       @relation(fields: [archivo_id], references: [id])
   conversacion    Conversacion? @relation(fields: [conversacion_id], references: [id], onDelete: SetNull)
+  reemplazadoPor  Party?        @relation("VoucherReemplazadoPor", fields: [reemplazado_por], references: [id], onDelete: SetNull)
+  reemplazaA      VoucherPago?  @relation("VoucherReemplazo", fields: [reemplaza_a], references: [id], onDelete: SetNull)
+  reemplazos      VoucherPago[] @relation("VoucherReemplazo")
 
   @@index([pedido_id])
   @@index([conversacion_id])
   @@index([operacion])
   @@index([creado_en])
   @@index([hash_imagen])
+  @@index([reemplazado_en])
   @@map("voucher_pago")
 }
 

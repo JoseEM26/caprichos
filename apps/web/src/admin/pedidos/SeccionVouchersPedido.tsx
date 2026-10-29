@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useEventos } from '../../comun/socket';
+import { Confirmar } from '../../comun/Confirmar';
+import { HistorialVoucher } from '../salon/HistorialVoucher';
+import { SubirVoucherMozo } from '../vouchers/SubirVoucherMozo';
 import { ReasignarVoucherBoton } from '../vouchers/ReasignarVoucherBoton';
 import { vouchersApi } from '../vouchers/vouchersApi';
 import { TarjetaLecturaVoucher } from '../vouchers/TarjetaLecturaVoucher';
 import { FotoAmpliable } from '../vouchers/FotoAmpliable';
+import { BannerVouchersIaPausa } from '../vouchers/BannerVouchersIaPausa';
 import type { VoucherPagoItem } from '../vouchers/tipos';
 
 export interface SeccionVouchersPedidoProps {
@@ -25,6 +29,12 @@ export function SeccionVouchersPedido({ pedidoId, recargarClave, total, medio, a
   // Sube cada vez que un voucher se mueve (aquí o desde Mensajes): vuelve a leer las fotos del pedido
   const [recarga, setRecarga] = useState(0);
   useEventos('vouchers:actualizado', () => setRecarga((n) => n + 1));
+  // Reemplazo tardío (Caja/Admin): motivo obligatorio y confirmación; el anterior queda en el historial
+  const [reemplazando, setReemplazando] = useState(false);
+  const [motivo, setMotivo] = useState('');
+  const [medioCambio, setMedioCambio] = useState<'YAPE' | 'PLIN' | 'TRANSFERENCIA'>('YAPE');
+  const [confirmando, setConfirmando] = useState(false);
+  const [subiendoCambio, setSubiendoCambio] = useState(false);
 
   useEffect(() => {
     let activo = true;
@@ -62,9 +72,11 @@ export function SeccionVouchersPedido({ pedidoId, recargarClave, total, medio, a
         gap: 8,
       }}
     >
+      <BannerVouchersIaPausa />
       <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--cp-navy, #0B2C3E)' }}>
         Comprobantes del pedido ({vouchers.length})
       </div>
+      <HistorialVoucher pedidoId={pedidoId} />
       {vouchers.map((v) => (
         <div key={String(v.id)} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <FotoAmpliable archivoId={v.archivoId} />
@@ -82,6 +94,62 @@ export function SeccionVouchersPedido({ pedidoId, recargarClave, total, medio, a
           <ReasignarVoucherBoton voucherId={v.id} onReasignado={() => setRecarga((n) => n + 1)} />
         </div>
       ))}
+      {!reemplazando ? (
+        <button type="button" onClick={() => setReemplazando(true)} style={{ alignSelf: 'flex-start', fontSize: 12, fontWeight: 700 }}>
+          Reemplazar voucher
+        </button>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <label style={{ fontSize: 12 }}>
+            Medio{' '}
+            <select value={medioCambio} onChange={(e) => setMedioCambio(e.target.value as typeof medioCambio)}>
+              <option value="YAPE">Yape</option>
+              <option value="PLIN">Plin</option>
+              <option value="TRANSFERENCIA">Transferencia</option>
+            </select>
+          </label>
+          <label style={{ fontSize: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
+            Motivo del cambio (mínimo 5 caracteres)
+            <textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} rows={2} />
+          </label>
+          {!subiendoCambio && (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="button" disabled={motivo.trim().length < 5} onClick={() => setConfirmando(true)}>
+                Continuar
+              </button>
+              <button type="button" onClick={() => { setReemplazando(false); setMotivo(''); }}>
+                Cancelar
+              </button>
+            </div>
+          )}
+          {subiendoCambio && (
+            <SubirVoucherMozo
+              pedidoId={pedidoId}
+              medio={medioCambio}
+              motivoCambio={motivo.trim()}
+              alVoucherValido={() => undefined}
+              alRespuesta={() => {
+                setSubiendoCambio(false);
+                setReemplazando(false);
+                setMotivo('');
+                setRecarga((n) => n + 1);
+              }}
+            />
+          )}
+        </div>
+      )}
+      <Confirmar
+        abierto={confirmando}
+        titulo="Reemplazar el voucher"
+        mensaje="El voucher vigente queda en el historial como reemplazado. Después elige la nueva foto."
+        textoSi="Sí, reemplazar"
+        textoNo="No"
+        alConfirmar={() => {
+          setConfirmando(false);
+          setSubiendoCambio(true);
+        }}
+        alCancelar={() => setConfirmando(false)}
+      />
     </div>
   );
 }

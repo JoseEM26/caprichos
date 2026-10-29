@@ -7,6 +7,8 @@ import * as reducirModulo from '../../vouchers/reducirImagenVoucher';
 describe('ModalPrecuenta - el mozo envía el cobro a Caja (no lo cobra)', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    // El plan se guarda antes de cada captura (ver ModalPrecuenta.guardarPlan)
+    vi.spyOn(vouchersApi, 'guardarPlanPago').mockResolvedValue({ ok: true } as any);
   });
 
   const propsBase = {
@@ -42,7 +44,7 @@ describe('ModalPrecuenta - el mozo envía el cobro a Caja (no lo cobra)', () => 
     fireEvent.click(screen.getByText('Sí, enviar a Caja'));
 
     await waitFor(() => {
-      expect(enviar).toHaveBeenCalledWith('P-20', 'EFECTIVO');
+      expect(enviar).toHaveBeenCalledWith('P-20', 'EFECTIVO', [{ medio: 'EFECTIVO', monto: 32 }]);
     });
     expect(screen.getByTestId('aviso-enviado-caja').textContent).toContain('Enviado a Caja, ellos lo revisan.');
     expect(screen.queryByTestId('btn-enviar-caja')).toBeNull();
@@ -69,7 +71,7 @@ describe('ModalPrecuenta - el mozo envía el cobro a Caja (no lo cobra)', () => 
     elegirYPedirConfirmacion();
 
     await waitFor(() => {
-      expect(enviar).toHaveBeenCalledWith('P-20', 'YAPE');
+      expect(enviar).toHaveBeenCalledWith('P-20', 'YAPE', [{ medio: 'YAPE', monto: 32 }]);
     });
     expect(screen.getByTestId('aviso-enviado-caja')).toBeDefined();
   });

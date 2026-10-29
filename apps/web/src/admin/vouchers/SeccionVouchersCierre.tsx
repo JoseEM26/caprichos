@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { vouchersApi } from './vouchersApi';
+import { BannerVouchersIaPausa } from './BannerVouchersIaPausa';
 import { VoucherPagoItem, SemaforoVoucher } from './tipos';
 import { obtenerBlobAutenticado, ErrorApi } from '../../comun/api';
 import { Confirmar } from '../../comun/Confirmar';
@@ -207,6 +208,7 @@ export function SeccionVouchersCierre({
         fontFamily: 'Montserrat, sans-serif',
       }}
     >
+      <BannerVouchersIaPausa />
       {/* Cabecera de la sección */}
       <div
         style={{

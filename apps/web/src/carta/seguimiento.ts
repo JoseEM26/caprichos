@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, ErrorApi } from '../comun/api';
 import type { ModalidadEntrega } from './tipos';
+import type { ProgresoPedido } from '../admin/salon/tipos';
 
 const CLAVE = 'caprichos_pedidos';
 const MAXIMO = 20;
@@ -40,6 +41,8 @@ export interface EstadoSeguimiento {
   terminado: boolean;
   anulado: boolean;
   pasos: PasoSeguimiento[];
+  /** Cocina y entrega: etiqueta, áreas y avance (misma función que el mozo). */
+  progreso?: ProgresoPedido;
   /** Yape, Plin o transferencia: la pantalla pide la captura del pago. */
   pagoDigital?: boolean;
 }

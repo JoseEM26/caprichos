@@ -10,6 +10,8 @@ import { LocalService } from '../../../local/local.service';
 import { CatalogoService } from '../../../catalogo/catalogo.service';
 import { OfertasService } from '../../../ofertas/ofertas.service';
 import { SeguimientoService } from '../../../pedidos/seguimiento.service';
+import { DireccionesClienteService } from '../../../clientes/direcciones-cliente.service';
+import { ZonasService } from '../../../zonas/zonas.service';
 import {
   WHATSAPP_MENSAJERIA_PUERTO,
   WhatsAppMensajeriaPuerto,
@@ -27,6 +29,8 @@ describe('EjecutorConversacionService (Integración de Conversación)', () => {
   let mockMensajeria: any;
   let mockEventos: any;
   let redisMemory: Map<string, string>;
+  let mockDirecciones: any;
+  let mockZonas: any;
 
   beforeEach(async () => {
     redisMemory = new Map();
@@ -155,6 +159,20 @@ describe('EjecutorConversacionService (Integración de Conversación)', () => {
       emitirAdmin: jest.fn(),
     };
 
+    mockDirecciones = {
+      resolverPartyPorTelefono: jest.fn().mockResolvedValue(null),
+      listar: jest.fn().mockResolvedValue([]),
+    };
+
+    mockZonas = {
+      consultarEnvio: jest.fn().mockResolvedValue({
+        cubierto: true,
+        tarifa: 5,
+        gratisDesde: 70,
+        zona: { id: 3, nombre: 'San Juan' },
+      }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EjecutorConversacionService,
@@ -167,6 +185,8 @@ describe('EjecutorConversacionService (Integración de Conversación)', () => {
         { provide: RedisService, useValue: mockRedisService },
         { provide: WHATSAPP_MENSAJERIA_PUERTO, useValue: mockMensajeria },
         { provide: EventosGateway, useValue: mockEventos },
+        { provide: DireccionesClienteService, useValue: mockDirecciones },
+        { provide: ZonasService, useValue: mockZonas },
       ],
     }).compile();
 
@@ -471,6 +491,104 @@ describe('EjecutorConversacionService (Integración de Conversación)', () => {
           conversacionId: 13n,
           replyToWaMessageId: 'wamid.bsuid.1',
         }),
+      );
+    });
+  });
+
+  describe('6. Direcciones anteriores del cliente con cuenta (WhatsApp)', () => {
+    const direccionAna = {
+      id: '7',
+      direccion: 'Av. Las Palmeras 123',
+      referencia: 'Portón azul',
+      lat: -12.046374,
+      lng: -77.042793,
+      alias: null,
+      usos: 2,
+      ultimoUsoEn: '2026-10-20T15:04:00.000Z',
+      origen: 'WHATSAPP',
+    };
+
+    const conversacionEn = (id: bigint, estado: string, pedidoEstado = 'PEDIDO_MODALIDAD') => ({
+      id,
+      telefono: '+51987654321',
+      duenio: 'BOT',
+      tomado_por: null,
+      flujo: {
+        version: 2,
+        repreguntasFallidas: 0,
+        estado,
+        pedido: { estadoInterno: pedidoEstado, items: [] },
+      },
+    });
+
+    it('cliente con cuenta que pide delivery recibe la lista de sus direcciones, buscada por su teléfono', async () => {
+      mockDirecciones.resolverPartyPorTelefono.mockResolvedValueOnce(100n);
+      mockDirecciones.listar.mockResolvedValueOnce([direccionAna]);
+      mockPrisma.conversacion.findUnique.mockResolvedValueOnce(conversacionEn(40n, 'PEDIDO_MODALIDAD'));
+
+      await service.procesarMensajeEntrante(40n, { buttonPayload: 'ped_mod_delivery' });
+
+      expect(mockDirecciones.resolverPartyPorTelefono).toHaveBeenCalledWith('+51987654321');
+      expect(mockDirecciones.listar).toHaveBeenCalledWith(100n, { limite: 5 });
+      expect(mockMensajeria.enviarLista).toHaveBeenCalledWith(
+        '51987654321',
+        '¡Qué gusto verte de nuevo! 😊 ¿Lo enviamos a una dirección anterior o a una nueva?',
+        'Ver direcciones',
+        expect.arrayContaining([
+          expect.objectContaining({ id: 'ped_dir_7' }),
+          expect.objectContaining({ id: 'ped_dir_nueva' }),
+        ]),
+        expect.any(Object),
+      );
+      expect(mockPrisma.mensajeChat.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ tipo: 'LISTA', autor: 'BOT' }) }),
+      );
+    });
+
+    it('elegir una dirección anterior calcula su cobertura con sus coordenadas y avanza a categorías', async () => {
+      mockDirecciones.resolverPartyPorTelefono.mockResolvedValueOnce(100n);
+      mockDirecciones.listar.mockResolvedValueOnce([direccionAna]);
+      mockPrisma.conversacion.findUnique.mockResolvedValueOnce(
+        conversacionEn(41n, 'PEDIDO_DIRECCION_ELEGIR', 'PEDIDO_DIRECCION_ELEGIR'),
+      );
+
+      await service.procesarMensajeEntrante(41n, { listReplyId: 'ped_dir_7' });
+
+      expect(mockZonas.consultarEnvio).toHaveBeenCalledWith(-12.046374, -77.042793);
+      expect(mockPrisma.conversacion.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            flujo: expect.objectContaining({
+              estado: 'PEDIDO_CATEGORIAS',
+              pedido: expect.objectContaining({
+                entrega: expect.objectContaining({
+                  direccion: 'Av. Las Palmeras 123',
+                  referencia: 'Portón azul',
+                  lat: -12.046374,
+                  lng: -77.042793,
+                  zonaId: '3',
+                  tarifaEnvio: 5,
+                }),
+              }),
+            }),
+          }),
+        }),
+      );
+    });
+
+    it('sin cuenta (teléfono sin party) no consulta direcciones y pide ubicación como hasta ahora', async () => {
+      mockDirecciones.resolverPartyPorTelefono.mockResolvedValueOnce(null);
+      mockPrisma.conversacion.findUnique.mockResolvedValueOnce(conversacionEn(42n, 'PEDIDO_MODALIDAD'));
+
+      await service.procesarMensajeEntrante(42n, { buttonPayload: 'ped_mod_delivery' });
+
+      expect(mockDirecciones.listar).not.toHaveBeenCalled();
+      expect(mockMensajeria.enviarLista).not.toHaveBeenCalled();
+      expect(mockMensajeria.enviarBotones).toHaveBeenCalledWith(
+        '51987654321',
+        expect.stringContaining('¿Dónde te lo llevamos?'),
+        expect.any(Array),
+        expect.any(Object),
       );
     });
   });

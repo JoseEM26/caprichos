@@ -5,14 +5,30 @@ import {
   IsBoolean,
   IsOptional,
   IsString,
+  Matches,
   ValidateNested,
 } from 'class-validator';
 import {
-  ClienteDto,
   ComprobantePedidoDto,
   LineaPedidoDto,
   PagoPedidoDto,
 } from '../../pedidos/dto/crear-pedido.dto';
+
+/**
+ * Cliente de un pedido de mesa: el nombre es obligatorio (sin cuenta) y el teléfono es opcional.
+ * La regla «nombre o cuenta» la valida SalonService.abrirPedido.
+ */
+export class ClienteMesaDto {
+  /** Mínimo 2 caracteres: lo valida SalonService.abrirPedido (CLIENTE_NOMBRE_REQUERIDO). */
+  @IsOptional()
+  @IsString({ message: 'El nombre del cliente debe ser un texto' })
+  nombre?: string;
+
+  /** Opcional. SalonService lo normaliza a dígitos y exige 9 dígitos que empiezan en 9 si viene. */
+  @IsOptional()
+  @IsString({ message: 'El teléfono debe ser un texto' })
+  telefono?: string;
+}
 
 export class AbrirPedidoMesaDto {
   @IsArray({ message: 'mesas debe ser una lista de IDs de mesas' })
@@ -43,14 +59,24 @@ export class AbrirPedidoMesaDto {
   @IsOptional()
   colaboradorPartyId?: number | string;
 
+  /** DNI de un cliente con cuenta: el pedido queda a su nombre y suma puntos al cobrar. Sin él: invitado. */
+  @IsOptional()
+  @Matches(/^\d{8}$/, { message: 'El DNI debe tener 8 dígitos numéricos' })
+  clienteDni?: string;
+
+  /** Id del party de un cliente con cuenta (buscador de clientes). Con clienteDni gana el DNI. */
+  @IsOptional()
+  @Matches(/^\d+$/, { message: 'clientePartyId debe ser un id numérico' })
+  clientePartyId?: string;
+
   // reserva que se sienta con este pedido (viene de POST /admin/reservas/:id/sentar)
   @IsOptional()
   reservaId?: number | string;
 
   @IsOptional()
   @ValidateNested()
-  @Type(() => ClienteDto)
-  cliente?: ClienteDto;
+  @Type(() => ClienteMesaDto)
+  cliente?: ClienteMesaDto;
 
   @IsOptional()
   @ValidateNested()

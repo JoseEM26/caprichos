@@ -38,6 +38,19 @@ import { OutboxWhatsappService } from './outbox-whatsapp.service';
 import { interpretarPuntajeEncuesta } from './encuesta-posventa.util';
 import { textoGraciasEncuesta } from '../conversacion/textos-encuesta';
 import { leerParametroNumerico } from '../../impresion/estado-impresion';
+import {
+  ClasificacionMensajeEntrante,
+  clasificarMensajeEntrante,
+} from '../utilidades/clasificar-mensaje-entrante.util';
+import {
+  ORIGEN_NO_COMPATIBLE,
+  LIMITE_NO_COMPATIBLES_SEGUIDOS,
+  MOTIVO_DERIVACION_NO_COMPATIBLES,
+  VENTANA_AVISO_NO_COMPATIBLE_MS,
+  armarTextoRepeticion,
+  tipoChatNoCompatible,
+  textoAvisoNoCompatible,
+} from '../utilidades/no-compatibles.util';
 
 export const MAX_MEDIA_BYTES = 5 * 1024 * 1024; // 5 MB
 export const TIPOS_MEDIA_PERMITIDOS = [
@@ -306,15 +319,17 @@ export class WhatsappWebhookService {
     let imagenBuffer: Buffer | null = null;
     let imagenMime = '';
     let ubicacion: { latitud: number; longitud: number; nombre?: string; direccion?: string } | undefined;
+    const clasificacion: ClasificacionMensajeEntrante = clasificarMensajeEntrante(msg);
+    const esNoCompatible = clasificacion.clase === 'NO_COMPATIBLE';
 
-    if (tipo === 'text') {
+    if (clasificacion.clase === 'TEXTO') {
       texto = String(msg.text?.body || '').trim();
       tipoRegistro = 'TEXTO';
-    } else if (tipo === 'button') {
+    } else if (clasificacion.clase === 'BOTON' && tipo === 'button') {
       texto = String(msg.button?.text || '').trim();
       buttonPayload = String(msg.button?.payload || texto).trim();
       tipoRegistro = 'BOTON';
-    } else if (tipo === 'interactive') {
+    } else if (clasificacion.clase === 'BOTON') {
       tipoRegistro = 'BOTON';
       if (msg.interactive?.type === 'button_reply') {
         buttonPayload = String(msg.interactive.button_reply.id || '').trim();
@@ -323,7 +338,7 @@ export class WhatsappWebhookService {
         buttonPayload = String(msg.interactive.list_reply.id || '').trim();
         texto = String(msg.interactive.list_reply.title || '').trim();
       }
-    } else if (tipo === 'location') {
+    } else if (clasificacion.clase === 'UBICACION') {
       tipoRegistro = 'UBICACION';
       const lat = Number(msg.location?.latitude);
       const lng = Number(msg.location?.longitude);
@@ -336,21 +351,22 @@ export class WhatsappWebhookService {
         direccion: locDir,
       };
       texto = locDir || locNombre || `Ubicación compartida: ${lat}, ${lng}`;
-    } else if (tipo === 'image') {
+    } else if (clasificacion.clase === 'IMAGEN') {
       tipoRegistro = 'IMAGEN';
       texto = String(msg.image?.caption || '[Imagen de comprobante adjunta]').trim();
       imagenMime = msg.image?.mime_type || 'image/jpeg';
       if (msg.image?.id) {
         imagenBuffer = await this.descargarMediaSegura(msg.image.id, imagenMime);
       }
-    } else if (tipo === 'reaction') {
+    } else if (clasificacion.clase === 'REACCION') {
       // Un emoji sobre un mensaje no es una respuesta: se muestra en el chat pero no avanza el flujo.
       tipoRegistro = 'OTRO';
       const emoji = String(msg.reaction?.emoji || '').trim();
       texto = emoji ? `Reaccionó con ${emoji}` : 'Quitó su reacción';
     } else {
+      // NO_COMPATIBLE (audio, video, sticker, documento...): no se descarga ni se pasa al motor.
       tipoRegistro = 'OTRO';
-      texto = `[Mensaje de tipo ${tipo}]`;
+      texto = clasificacion.etiqueta;
     }
 
     // Asociar a conversación existente o crearla de forma defensiva
@@ -529,8 +545,16 @@ export class WhatsappWebhookService {
         conversacion_id: conversacion.id,
         direccion: 'ENTRA',
         autor: 'CLIENTE',
-        tipo: tipoRegistro === 'IMAGEN' ? 'IMAGEN' : 'TEXTO',
-        contenido: archivoMensajeId ? { texto, archivoId: archivoMensajeId } : { texto },
+        tipo: esNoCompatible
+          ? tipoChatNoCompatible(clasificacion.subtipo)
+          : tipoRegistro === 'IMAGEN'
+            ? 'IMAGEN'
+            : 'TEXTO',
+        contenido: archivoMensajeId
+          ? { texto, archivoId: archivoMensajeId }
+          : esNoCompatible
+            ? { texto, clase: clasificacion.clase, subtipo: clasificacion.subtipo, etiqueta: clasificacion.etiqueta, waMessageId: waMessageId || null }
+            : { texto },
         meta_id: waMessageId || null,
       },
     });
@@ -553,6 +577,20 @@ export class WhatsappWebhookService {
     this.eventos?.emitirAdmin('mensajes:actualizado', { id: conversacion.id.toString() });
 
     if (tipo === 'reaction') return true;
+
+    // Audio, video, sticker, documento, etc.: no avanzan el flujo ni cuentan como calificación, reprogramación o voucher.
+    // El bot avisa y repite el paso (ver atenderNoCompatible).
+    if (esNoCompatible) {
+      await this.atenderNoCompatible({
+        conversacion,
+        clasificacion,
+        identificador,
+        telefonoNorm,
+        telHash,
+        waMessageId,
+      });
+      return true;
+    }
 
     // Acuse del voucher por el outbox (registrado en el chat). No aprueba nada: Caja revisa el pago.
     if (voucherAtendido && pedidoVoucher && telefonoNorm && this.outbox) {
@@ -670,6 +708,122 @@ export class WhatsappWebhookService {
     }
 
     return true;
+  }
+
+  /**
+   * Audio, video, sticker, documento, etc. (no compatibles). No avanzan el flujo, no se descargan ni se guardan como dato,
+   * y no cuentan como calificación, reprogramación ni voucher. Si el chat lo atiende el bot (no tomado, sin modo asistido,
+   * consentimiento vigente): avisa como mucho una vez cada 2 minutos y repite el último mensaje del bot (el paso pendiente).
+   * Tres seguidos sin texto ni botón válido derivan a una persona. Nunca lanza.
+   */
+  private async atenderNoCompatible(p: {
+    conversacion: any;
+    clasificacion: ClasificacionMensajeEntrante;
+    identificador: string;
+    telefonoNorm: string | null;
+    telHash: string;
+    waMessageId?: string;
+  }): Promise<void> {
+    try {
+      const consentimiento = await this.prisma.clienteWhatsappConsentimiento.findUnique({
+        where: { telefono_hash: p.telHash },
+      });
+      if (consentimiento && !consentimiento.acepta) return;
+
+      // El bot solo responde si el chat es suyo: sin persona tomándolo, sin modo asistido y no derivado a una persona.
+      // En VALIDAR_PAGO sigue atendiendo (como el motor), salvo que ya lo derivamos por este motivo.
+      const flujo = (p.conversacion.flujo as Record<string, any>) || {};
+      const { duenio, estado, tomado_por, motivo_derivacion } = p.conversacion;
+      const atiendeBot =
+        tomado_por == null &&
+        flujo.estado !== 'ATENCION_PERSONA' &&
+        (duenio === 'BOT' ||
+          (estado === 'VALIDAR_PAGO' && motivo_derivacion !== MOTIVO_DERIVACION_NO_COMPATIBLES));
+      if (!atiendeBot) return;
+
+      const ultimos = await this.prisma.mensajeChat.findMany({
+        where: { conversacion_id: p.conversacion.id, direccion: 'ENTRA' },
+        orderBy: { id: 'desc' },
+        take: LIMITE_NO_COMPATIBLES_SEGUIDOS,
+        select: { contenido: true },
+      });
+      const seguidos =
+        ultimos.length === LIMITE_NO_COMPATIBLES_SEGUIDOS &&
+        ultimos.every((m) => (m.contenido as any)?.clase === 'NO_COMPATIBLE');
+      if (seguidos) await this.derivarNoCompatibles(p.conversacion, p.telefonoNorm);
+
+      // Como mucho un aviso cada 2 minutos por conversación (cuenta también lo que sigue pendiente en la cola)
+      const avisoReciente = await this.prisma.salienteWhatsapp.findFirst({
+        where: {
+          telefono_destino: p.identificador,
+          origen: ORIGEN_NO_COMPATIBLE,
+          creado_en: { gte: new Date(Date.now() - VENTANA_AVISO_NO_COMPATIBLE_MS) },
+        },
+        select: { id: true },
+      });
+      if (avisoReciente || !this.outbox) return;
+
+      const esperaVoucher =
+        p.clasificacion.subtipo === 'document' &&
+        (estado === 'VALIDAR_PAGO' ||
+          Boolean(await pedidoEsperandoVoucher(this.prisma, p.conversacion.flujo, p.telefonoNorm)));
+      const repeticion = armarTextoRepeticion(await this.ultimoPromptDelBot(p.conversacion.id));
+      const aviso = textoAvisoNoCompatible(p.clasificacion.subtipo, esperaVoucher);
+
+      await this.outbox.encolar({
+        telefono: p.identificador,
+        tipo: 'TEXTO',
+        clave: `no-compatible-${p.waMessageId || `${p.identificador}-${Date.now()}`}`,
+        origen: ORIGEN_NO_COMPATIBLE,
+        carga: {
+          textoLibre: repeticion ? `${aviso}\n\n${repeticion}` : aviso,
+          autor: 'BOT',
+          nombre: obtenerNombreMostrar(p.conversacion),
+          etapa: 'NO_COMPATIBLE',
+        },
+      });
+      this.outbox.despertar();
+    } catch (err: any) {
+      this.logger.warn(`No se pudo atender un mensaje no compatible: ${err.message}`);
+    }
+  }
+
+  /** Último mensaje que el bot envió a la conversación (sin contar los avisos por tipos no compatibles). */
+  private async ultimoPromptDelBot(conversacionId: bigint): Promise<any | null> {
+    const mensajes = await this.prisma.mensajeChat.findMany({
+      where: { conversacion_id: conversacionId, direccion: 'SALE', autor: 'BOT' },
+      orderBy: { id: 'desc' },
+      take: 5,
+      select: { contenido: true },
+    });
+    const candidato = mensajes.find((m) => (m.contenido as any)?.origen !== ORIGEN_NO_COMPATIBLE);
+    return candidato ? candidato.contenido : null;
+  }
+
+  /** Deriva a una persona (mismo patrón que la acción pasarAPersona del motor): dueño PERSONA, campana al equipo. */
+  private async derivarNoCompatibles(conversacion: any, telefonoNorm: string | null): Promise<void> {
+    await this.prisma.conversacion.update({
+      where: { id: conversacion.id },
+      data: {
+        duenio: 'PERSONA',
+        urgente: false,
+        estado: !conversacion.estado || conversacion.estado === 'ATENDIDA' ? 'ABIERTA' : conversacion.estado,
+        motivo_derivacion: MOTIVO_DERIVACION_NO_COMPATIBLES,
+        ultima_actividad: new Date(),
+      },
+    });
+
+    const titulo = `Atención requerida en WhatsApp (${obtenerNombreMostrar(conversacion)})`;
+    const notif = await this.prisma.notificacion.create({
+      data: {
+        tipo: 'ATENCION_WHATSAPP',
+        rol_destino: null,
+        titulo,
+        mensaje: `El cliente envió ${LIMITE_NO_COMPATIBLES_SEGUIDOS} mensajes seguidos que el bot no puede leer (audios, videos u otros). Conviene atenderlo por el chat.`,
+        enlace: telefonoNorm ? `/admin/mensajes?telefono=${telefonoNorm.replace(/\D/g, '')}` : '/admin/mensajes',
+      },
+    });
+    this.eventos?.emitirAdmin('notificaciones:nueva', { id: notif.id.toString(), titulo });
   }
 
   /**

@@ -129,3 +129,89 @@
   font-size: 13px;
   cursor: pointer;
 }
+
+/* Falta voucher: color de alerta propio (ámbar/naranja), distinto del chip activo normal */
+.mpv-chip-falta {
+  border: 2px solid #b45309;
+  background: #fff4e0;
+  color: #7c2d12;
+  font-weight: 800;
+}
+
+.mpv-chip-falta[aria-pressed='true'] {
+  background: #b45309;
+  color: #ffffff;
+  border-color: #7c2d12;
+}
+
+.mpv-card--falta {
+  border-top: 4px solid #b45309;
+}
+
+.mpv-insignia-falta {
+  background: #b45309;
+  color: #ffffff;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.mpv-cliente {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+/* Buscador de Mis pedidos: filtra en el cliente por nombre, código o mesa */
+.mpv-buscar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.mpv-buscar-caja {
+  flex: 1 1 220px;
+  min-width: 0;
+  min-height: 44px;
+  box-sizing: border-box;
+  border: 1.5px solid var(--cp-line, #e3d6c6);
+  border-radius: 12px;
+  background: var(--cp-white, #ffffff);
+  color: var(--cp-navy, #0b2c3e);
+  padding: 0 14px;
+  font-size: 15px;
+  font-family: inherit;
+}
+
+.mpv-buscar-caja:focus-visible {
+  outline: 3px solid var(--cp-gold, #d4a72c);
+  outline-offset: 2px;
+}
+
+.mpv-buscar-cuenta {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--cp-soft, #2c4c5d);
+  white-space: nowrap;
+}
+
+.mpv-vacio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 24px 12px;
+  text-align: center;
+}
+
+.mpv-vacio-texto {
+  margin: 0;
+  font-weight: 700;
+  color: var(--cp-navy, #0b2c3e);
+}

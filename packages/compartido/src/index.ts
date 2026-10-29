@@ -23,3 +23,18 @@ export type {
   ModoEnvioGratis,
   ReglaEnvioGratis,
 } from './utilidades/index.js';
+export {
+  SNAP_M_DEFECTO,
+  ajustarAVecinas,
+  areaM2,
+  areaSolapeM2,
+  solapeEntre,
+  recortarSolape,
+  separacionM,
+  autoIntersecta,
+  resumenAjusteTexto,
+  insertarVertice,
+  ladoMasLargo,
+  quitarVerticeDe,
+} from './utilidades/geometria-zonas.js';
+export type { Punto, ResumenAjuste, ResultadoAjuste, SolapeZonas } from './utilidades/geometria-zonas.js';

@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Post,
   Put,
   Query,
   Req,
@@ -48,6 +49,14 @@ export class ZonasAdminController {
   @Permiso('zonas', 'ver')
   async diagnostico() {
     return this.zonasService.diagnosticoCobertura();
+  }
+
+  /** Vista previa (confirmar=false) o aplicación del pegado automático a todas las zonas activas. */
+  @Post('normalizar')
+  @Permiso('zonas', 'editar')
+  async normalizar(@Body() body: { confirmar?: boolean }, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.zonasService.normalizarZonas(body?.confirmar === true, req.usuario, ip);
   }
 
   @Get(':codigo/historial')

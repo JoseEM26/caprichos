@@ -15,25 +15,36 @@ vi.mock('../componentes/ModalNuevoPedidoMesa', () => ({
   ModalNuevoPedidoMesa: () => null,
 }));
 vi.mock('../../vouchers/vouchersApi', () => ({
-  vouchersApi: { subirVoucher: vi.fn() },
+  vouchersApi: { subirVoucher: vi.fn(), guardarPlanPago: vi.fn().mockResolvedValue({ ok: true }) },
 }));
 vi.mock('../../vouchers/reducirImagenVoucher', () => ({
   reducirImagenVoucher: vi.fn(async (archivo: File) => archivo),
 }));
 
-const pedido = (extra: Record<string, unknown>) => ({
-  estado: 'ENTREGADO',
-  modalidad: 'MESA',
-  mesaNombre: 'Mesa 3',
-  total: 24.5,
-  pagoEstado: 'PENDIENTE',
-  creadoEn: '2026-10-29T15:10:00Z',
-  lineas: [{ nombre: 'Café', cantidad: 2 }],
-  pagoMetodo: null,
-  vouchers: 0,
-  tieneVoucherLegible: false,
-  ...extra,
-});
+// Mismos campos que devuelve misPedidos: un voucher por medio digital y la regla del servidor
+const pedido = (extra: Record<string, unknown>) => {
+  const base = {
+    estado: 'ENTREGADO',
+    modalidad: 'MESA',
+    mesaNombre: 'Mesa 3',
+    total: 24.5,
+    pagoEstado: 'PENDIENTE',
+    creadoEn: '2026-10-29T15:10:00Z',
+    lineas: [{ nombre: 'Café', cantidad: 2 }],
+    pagoMetodo: null as string | null,
+    vouchers: 0,
+    tieneVoucherLegible: false,
+    historialVouchers: 0,
+    puedeSubirVoucher: true,
+    puedeCambiarVoucher: true,
+    ...extra,
+  };
+  const digital = ['YAPE', 'PLIN', 'TRANSFERENCIA'].includes(String(base.pagoMetodo));
+  return {
+    ...base,
+    vouchersPorMedio: digital ? [{ medio: base.pagoMetodo, monto: base.total, subido: base.tieneVoucherLegible }] : [],
+  };
+};
 
 const respuesta = {
   pedidos: [
@@ -61,9 +72,9 @@ describe('MisPedidosView: voucher de pedidos digitales', () => {
     const botones = screen.getAllByRole('button', { name: 'Subir voucher' });
     expect(botones).toHaveLength(1);
     expect(within(tarjetaDe('CP-M012')).getByRole('button', { name: 'Subir voucher' })).toBeInTheDocument();
-    expect(within(tarjetaDe('CP-M012')).getByText('Voucher: falta')).toBeInTheDocument();
-    expect(within(tarjetaDe('CP-M011')).queryByText(/Voucher:/)).not.toBeInTheDocument();
-    expect(within(tarjetaDe('CP-M010')).queryByText(/Voucher:/)).not.toBeInTheDocument();
+    expect(within(tarjetaDe('CP-M012')).getByText('Voucher Yape: falta')).toBeInTheDocument();
+    expect(within(tarjetaDe('CP-M011')).queryByText(/Voucher (Yape|Plin|Transferencia):/)).not.toBeInTheDocument();
+    expect(within(tarjetaDe('CP-M010')).queryByText(/Voucher (Yape|Plin|Transferencia):/)).not.toBeInTheDocument();
   });
 
   it('abre la ventana del voucher con el medio del pedido', async () => {

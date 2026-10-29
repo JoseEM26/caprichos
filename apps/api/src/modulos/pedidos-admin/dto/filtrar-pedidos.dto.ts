@@ -1,4 +1,4 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsIn, IsOptional, IsString } from 'class-validator';
 
 export class FiltrarPedidosDto {
   @IsOptional()
@@ -24,6 +24,11 @@ export class FiltrarPedidosDto {
   @IsOptional()
   @IsString()
   buscar?: string;
+
+  /** '1': pedidos de días anteriores aún en curso o con pago pendiente (ignora desde/hasta). */
+  @IsOptional()
+  @IsIn(['1'])
+  pendientes?: string;
 
   @IsOptional()
   pagina?: number | string;

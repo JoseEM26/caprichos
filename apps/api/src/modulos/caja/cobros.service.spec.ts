@@ -727,7 +727,7 @@ describe('CobrosService', () => {
         response: { codigo: 'VOUCHER_REQUERIDO' },
       });
       expect(prismaMock.voucherPago.findFirst).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { pedido_id: 100n, semaforo: { not: 'ILEGIBLE' } } }),
+        expect.objectContaining({ where: { pedido_id: 100n, reemplazado_en: null, semaforo: { not: 'ILEGIBLE' } } }),
       );
       expect(prismaMock.cobro.create).not.toHaveBeenCalled();
     });
@@ -1142,7 +1142,7 @@ describe('CobrosService', () => {
 
       expect(res.pago_estado).toBe('COORDINADO');
       expect(prismaMock.voucherPago.findFirst).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { pedido_id: 20n, semaforo: { not: 'ILEGIBLE' } } }),
+        expect.objectContaining({ where: { pedido_id: 20n, reemplazado_en: null, semaforo: { not: 'ILEGIBLE' } } }),
       );
       expect(auditoriaMock.registrar).toHaveBeenCalledWith(
         expect.objectContaining({ accion: 'MARCAR_COORDINADO' }),

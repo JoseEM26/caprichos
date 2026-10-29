@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Boton } from '../../comun/Boton';
 import { Confirmar } from '../../comun/Confirmar';
 import { ErrorApi } from '../../comun/api';
 import { MapaUbicacion } from '../../comun/mapa/MapaUbicacion';
 import type { Punto } from '../../comun/mapa/MapaUbicacion';
+import { SEDE_DEFECTO, cargarSede } from '../../comun/mapa/sedeDefecto';
 import { BuscadorDireccion } from '../../comun/mapa/BuscadorDireccion';
 import { pedidosApi } from './pedidosApi';
 
@@ -23,6 +24,14 @@ export function ModalUbicar({ pedidoId, codigoPedido, direccionInicial, puntoIni
   const [confirmando, setConfirmando] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState('');
+  const [sedeLocal, setSedeLocal] = useState(SEDE_DEFECTO);
+  useEffect(() => {
+    let vigente = true;
+    cargarSede().then((s) => vigente && setSedeLocal(s));
+    return () => {
+      vigente = false;
+    };
+  }, []);
 
   const guardar = async () => {
     if (!punto) return;
@@ -84,7 +93,16 @@ export function ModalUbicar({ pedidoId, codigoPedido, direccionInicial, puntoIni
             setDireccion(texto.split(',').slice(0, 2).join(',').trim());
           }}
         />
-        <MapaUbicacion punto={punto} onCambiar={setPunto} altura={300} />
+        <MapaUbicacion
+          punto={punto}
+          onCambiar={setPunto}
+          altura={300}
+          local={sedeLocal}
+          ajustarA={punto ? 'ambos' : 'local'}
+        />
+        <div style={{ fontSize: 11, color: 'var(--cp-soft, #2C4C5D)' }}>
+          El icono de la tienda es la sede (Caprichos).
+        </div>
 
         <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-soft, #2C4C5D)' }}>
           Dirección

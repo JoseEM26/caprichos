@@ -13,6 +13,30 @@ export function normalizarTelefono(telefono: string): string {
 }
 
 /**
+ * Relleno histórico que el pedido de mesa guardaba cuando no había teléfono. NO es un número real.
+ */
+export const TELEFONO_PLACEHOLDER = '999999999';
+
+/**
+ * ¿Hay un teléfono real? Vacío, nulo y el relleno 999999999 no cuentan. No exige formato: en cliente_telefono
+ * también puede venir un BSUID de WhatsApp («wa-user:PE.…»), que sí se contesta.
+ */
+export function tieneTelefonoReal(telefono: string | null | undefined): boolean {
+  const limpio = String(telefono ?? '').trim().replace(/^wa-user:/i, '').trim();
+  if (!limpio) return false;
+  const digitos = limpio.replace(/\D/g, '');
+  const nacional = digitos.length === 11 && digitos.startsWith('51') ? digitos.slice(2) : digitos;
+  return nacional !== TELEFONO_PLACEHOLDER;
+}
+
+/**
+ * Número para mandar WhatsApp, o '' si el pedido no tiene teléfono real (no se envía nada).
+ */
+export function telefonoEnviable(telefono: string | null | undefined): string {
+  return tieneTelefonoReal(telefono) ? normalizarTelefono(String(telefono)) : '';
+}
+
+/**
  * Enmascara un teléfono para proteger datos personales (Ley 29733).
  * NUNCA se registra ni expone el número completo.
  * Ejemplo: "51987654321" -> "+51 9*** ***21"

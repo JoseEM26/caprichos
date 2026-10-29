@@ -4,12 +4,21 @@ import {
   RespuestaSubirVoucher,
   VoucherPagoItem,
 } from './tipos';
+import type { PlanPagoItem } from '../pedidos/planPago';
 
 export interface FiltrosListarVouchers {
   pedidoId?: string | number;
   conversacionId?: string | number;
   fecha?: string;
   estado?: 'pendientes' | 'todos';
+}
+
+export interface EstadoIaVouchers {
+  activa: boolean;
+  enPausa: boolean;
+  causa: 'SALDO' | 'CLAVE' | 'ERRORES' | null;
+  hastaEn: string | null;
+  topeMensual: { usadoUsd: number; topeUsd: number; superado: boolean };
 }
 
 export interface ResumenConsumoVoucherIa {
@@ -25,7 +34,33 @@ export interface ResumenConsumoVoucherIa {
   iaActiva: boolean;
 }
 
+/** Un voucher del historial del pedido. El mozo no recibe semaforo ni archivoId. */
+export interface ItemHistorialVoucher {
+  id: string;
+  subidoEn: string;
+  subidoPor: string | null;
+  medio: string | null;
+  estado: 'VIGENTE' | 'REEMPLAZADO' | 'RETIRADO';
+  reemplazadoEn: string | null;
+  motivoCambio: string | null;
+  legible: boolean;
+  semaforo?: string;
+  archivoId?: string;
+}
+
 export const vouchersApi = {
+  /** Historial de vouchers del pedido (vigentes y reemplazados), más reciente primero. */
+  historialPedido: (pedidoId: string | number) =>
+    api.get<{ items: ItemHistorialVoucher[] }>(`/admin/pedidos/${pedidoId}/vouchers/historial`),
+
+  /** Quita un voucher sin borrarlo (queda Retirado en el historial). El servidor aplica la regla de cambio. */
+  quitarVoucher: (id: string | number, motivo?: string) =>
+    api.post(`/admin/vouchers/${id}/quitar`, motivo ? { motivo } : {}),
+
+  /** Plan de pago que arma el mozo antes de subir cada captura (el servidor deriva el monto por medio). */
+  guardarPlanPago: (pedidoId: string | number, plan: PlanPagoItem[]) =>
+    api.post(`/admin/pedidos/${pedidoId}/plan-pago`, { plan }),
+
   /**
    * Sube una foto de voucher para análisis con IA (POST /admin/vouchers).
    * Para MOZO: responde { id, legible: boolean, mensaje?: string }
@@ -35,6 +70,8 @@ export const vouchersApi = {
     archivo: File | Blob,
     pedidoId: string | number,
     medio: 'YAPE' | 'PLIN' | 'TRANSFERENCIA',
+    /** Solo al reemplazar un voucher vigente: obligatorio (≥5) para Caja y Admin. */
+    motivoCambio?: string,
   ): Promise<RespuestaSubirVoucher> {
     const formData = new FormData();
     const nombreArchivo =
@@ -42,6 +79,7 @@ export const vouchersApi = {
     formData.append('archivo', archivo, nombreArchivo);
     formData.append('pedidoId', String(pedidoId));
     formData.append('medio', medio);
+    if (motivoCambio) formData.append('motivoCambio', motivoCambio);
 
     return clienteFetch<RespuestaSubirVoucher>('/admin/vouchers', {
       method: 'POST',
@@ -87,13 +125,19 @@ export const vouchersApi = {
 
   /**
    * El mozo envía a Caja el cobro de la mesa (POST /admin/vouchers/enviar-a-caja).
+   * Con plan (pago dividido) reemplaza el plan guardado del pedido; `medio` es el principal.
    * No cobra: Caja revisa el voucher y cobra. La respuesta es solo { ok }.
    */
   async enviarACaja(
     pedidoId: string | number,
     medio: 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TRANSFERENCIA',
+    plan?: PlanPagoItem[],
   ): Promise<{ ok: boolean }> {
-    return api.post<{ ok: boolean }>('/admin/vouchers/enviar-a-caja', { pedidoId: String(pedidoId), medio });
+    return api.post<{ ok: boolean }>('/admin/vouchers/enviar-a-caja', {
+      pedidoId: String(pedidoId),
+      medio,
+      ...(plan ? { plan } : {}),
+    });
   },
 
   /**
@@ -106,6 +150,14 @@ export const vouchersApi = {
     return api.post<{ ok: boolean; id: string | number; revisadoEn: string }>(
       `/admin/vouchers/${id}/revisado`,
     );
+  },
+
+  /**
+   * Pausa de la lectura con IA (saldo, clave o errores) y tope mensual (GET /admin/vouchers/estado-ia).
+   * Requiere vouchers/ver o configuracion/ver.
+   */
+  async obtenerEstadoIa(): Promise<EstadoIaVouchers> {
+    return api.get<EstadoIaVouchers>('/admin/vouchers/estado-ia');
   },
 
   /**

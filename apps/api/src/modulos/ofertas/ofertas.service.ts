@@ -22,6 +22,7 @@ import { CrearCuponDto } from './dto/crear-cupon.dto';
 import { ActualizarCuponDto } from './dto/actualizar-cupon.dto';
 import { AnularCuponEmitidoDto } from './dto/anular-cupon-emitido.dto';
 import { CanjearCuponDto } from './dto/canjear-cupon.dto';
+import { partyClienteDelPedido } from '../clientes/cliente-del-pedido';
 import { ValidarCuponDto } from './dto/validar-cupon.dto';
 import {
   CuponEmitidoItem,
@@ -1217,7 +1218,7 @@ export class OfertasService {
     const validacion = await this.validarCuponParaCarta({
       codigo: dto.codigo,
       subtotal: Number(pedido.subtotal),
-      clientePartyId: pedido.party_id,
+      clientePartyId: partyClienteDelPedido(pedido),
     });
 
     const descuento = validacion.cupon.descuentoCalculado;
@@ -1243,7 +1244,7 @@ export class OfertasService {
           data: {
             cupon_id: BigInt(validacion.cupon.id),
             pedido_id: pedido.id,
-            party_id: pedido.party_id,
+            party_id: partyClienteDelPedido(pedido),
           },
         });
       }

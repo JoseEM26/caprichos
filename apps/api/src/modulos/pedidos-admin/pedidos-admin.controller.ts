@@ -25,6 +25,7 @@ import { PedidosService } from '../pedidos/pedidos.service';
 import { CrearPedidoDto } from '../pedidos/dto/crear-pedido.dto';
 import { ImpresionService } from '../impresion/impresion.service';
 import { ReimprimirDto } from '../impresion/dto/reimprimir.dto';
+import { VouchersService } from '../vouchers/vouchers.service';
 
 @Controller('admin/pedidos')
 @UseGuards(AccesoGuard)
@@ -34,6 +35,7 @@ export class PedidosAdminController {
     private readonly ubicarPedidoService: UbicarPedidoService,
     @Optional() private readonly pedidosService?: PedidosService,
     @Optional() private readonly impresionService?: ImpresionService,
+    @Optional() private readonly vouchersService?: VouchersService,
   ) {}
 
   @Post()
@@ -89,6 +91,17 @@ export class PedidosAdminController {
     return this.pedidosEstadoService.misPedidos(req.usuario, query.rango ?? 'hoy');
   }
 
+  /** Historial de vouchers del pedido (vigentes y reemplazados). Declarada antes de GET ':id'. */
+  @Get(':id/vouchers/historial')
+  @Permiso([
+    { modulo: 'pedidos', accion: 'crear' },
+    { modulo: 'vouchers', accion: 'ver' },
+    { modulo: 'pedidos', accion: 'ver' },
+  ])
+  async historialVouchers(@Param('id') id: string, @Req() req: any) {
+    return this.vouchersService?.historialPedido(id, req.usuario);
+  }
+
   @Get(':id')
   @Permiso('pedidos', 'ver')
   async obtenerPorId(@Param('id') id: string, @Req() req: any) {
@@ -122,6 +135,14 @@ export class PedidosAdminController {
       ip,
       ...(req.codigoSupervisorVerificado ? [true] : []),
     );
+  }
+
+  /** Plan de pago que arma el mozo antes de subir cada captura (el servidor deriva el monto por medio). */
+  @Post(':id/plan-pago')
+  @Permiso('pedidos', 'crear')
+  async guardarPlanPago(@Param('id') id: string, @Body('plan') plan: unknown, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.vouchersService?.guardarPlanMozo(id, plan, req.usuario, ip);
   }
 
   @Post(':id/pago')

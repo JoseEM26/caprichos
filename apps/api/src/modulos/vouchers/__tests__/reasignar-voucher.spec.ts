@@ -1,6 +1,7 @@
 jest.mock('../../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {} }));
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { VouchersService } from '../vouchers.service';
+import { PagoPlanService } from '../../pedidos/pago-plan.service';
 import { pedidoAceptaVoucher, mismoCliente } from '../voucher-reasignacion.util';
 
 const TEL = '977000111';
@@ -49,7 +50,7 @@ function construir(opts: {
   };
   const auditoria: any = { registrar: jest.fn(async () => undefined) };
   const eventos: any = { emitirAdmin: jest.fn() };
-  const servicio = new VouchersService(prisma, {} as any, auditoria, {} as any, eventos);
+  const servicio = new VouchersService(prisma, {} as any, auditoria, {} as any, new PagoPlanService(), eventos);
   return { servicio, prisma, auditoria, eventos };
 }
 

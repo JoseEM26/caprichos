@@ -15,7 +15,7 @@ import {
 import { Ventana24hService } from '../servicios/ventana-24h.service';
 import { OutboxWhatsappService } from '../servicios/outbox-whatsapp.service';
 import { CATALOGO_PLANTILLAS } from '../catalogo/plantillas.catalogo';
-import { enmascararTelefono, hashTelefono, normalizarTelefono } from '../utilidades/enmascarar.util';
+import { enmascararTelefono, hashTelefono, normalizarTelefono, tieneTelefonoReal } from '../utilidades/enmascarar.util';
 import {
   DatosAvisoAlmacen,
   DatosAvisoCalificacionBaja,
@@ -313,8 +313,8 @@ export class AvisosInternosService {
       };
     }
 
-    const clienteMask = pedido.cliente_telefono
-      ? enmascararTelefono(pedido.cliente_telefono)
+    const clienteMask = tieneTelefonoReal(pedido.cliente_telefono)
+      ? enmascararTelefono(pedido.cliente_telefono!)
       : 'No registrado';
 
     const datosPedido: DatosAvisoNuevoPedido = {

@@ -3,9 +3,9 @@ import { Confirmar } from '../../comun/Confirmar';
 import { pedidosApi, Pedido } from './pedidosApi';
 import { SubirVoucherMozo } from '../vouchers/SubirVoucherMozo';
 import { SeccionVouchersPedido } from './SeccionVouchersPedido';
-import { medioDigitalVoucher, mismoMedio } from './mediosPago';
+import { digitalesDelPlan, medioDigitalVoucher, mismoMedio } from './mediosPago';
+import { CapturasPlanDigital, ExcepcionSinVoucher } from './CapturasPlanDigital';
 import type { VoucherPagoItem } from '../vouchers/tipos';
-import { CampoCodigoSupervisor } from '../../comun/CampoCodigoSupervisor';
 import { BotonAbrirChatCliente } from '../mensajes/BotonAbrirChatCliente';
 
 export interface ModalConfirmarPagoProps {
@@ -38,9 +38,15 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
   const esTarjeta = mismoMedio(medio, 'Tarjeta');
   const esDigital = !esEfectivo && !esTarjeta;
   const medioVoucher = medioDigitalVoucher(medio);
+  // Pago dividido con 2 o más medios digitales: una captura por medio (igual que el servidor)
+  const mediosPlanDigital = digitalesDelPlan(pedido.planPago);
+  const multiples = mediosPlanDigital.length >= 2;
+  // Medios digitales del plan sin captura; hasta que cargue, todos cuentan como faltantes
+  const [faltanCapturas, setFaltanCapturas] = useState<string[]>(mediosPlanDigital);
   // Un voucher ilegible no cuenta como comprobante; cualquier otro del pedido sí (la IA solo informa)
-  const comprobanteListo =
-    voucherSubido !== null || vouchersPedido.some((v) => v.semaforo !== 'ILEGIBLE');
+  const comprobanteListo = multiples
+    ? faltanCapturas.length === 0
+    : voucherSubido !== null || vouchersPedido.some((v) => v.semaforo !== 'ILEGIBLE');
   const esDelivery = (pedido.modalidad || '').toUpperCase() === 'DELIVERY';
   const tieneUbicacion =
     (pedido.entrega_lat != null && pedido.entrega_lng != null) || Boolean(pedido.zona);
@@ -54,7 +60,7 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
       setMsg('Para delivery primero ubica la dirección en el mapa (calcula la zona y el envío).');
       return;
     }
-    if (esDigital && !comprobanteListo) {
+    if ((esDigital || multiples) && !comprobanteListo) {
       if (!sinVoucher) {
         setMsg('Sube el comprobante del pago para continuar.');
         return;
@@ -74,7 +80,7 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
 
   // Solo viaja la excepción si el pago digital sigue sin comprobante útil
   const excepcionSinVoucher =
-    esDigital && !comprobanteListo && sinVoucher
+    (esDigital || multiples) && !comprobanteListo && sinVoucher
       ? { motivo: motivoSinVoucher.trim(), pinSupervisor }
       : undefined;
 
@@ -334,7 +340,7 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
                   fontSize: 14,
                 }}
               />
-              {!comprobanteListo && medioVoucher && !sinVoucher && (
+              {!multiples && !comprobanteListo && medioVoucher && !sinVoucher && (
                 <>
                   <div style={{ fontWeight: 700, fontSize: 13, marginTop: 8, marginBottom: 4 }}>
                     Comprobante del pago (obligatorio)
@@ -371,53 +377,20 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
                   </button>
                 </>
               )}
-              {!comprobanteListo && medioVoucher && sinVoucher && (
+              {!multiples && !comprobanteListo && medioVoucher && sinVoucher && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-rust, #B2500F)' }}>
-                    Pago sin comprobante: solo con motivo escrito y el código del supervisor. Queda auditado.
-                  </div>
-                  <label htmlFor="motivo-sin-voucher-pago" style={{ fontWeight: 700, fontSize: 13 }}>
-                    Motivo (mínimo {MOTIVO_MINIMO} letras)
-                  </label>
-                  <textarea
-                    id="motivo-sin-voucher-pago"
-                    data-testid="motivo-sin-voucher"
-                    rows={2}
-                    value={motivoSinVoucher}
-                    onChange={(e) => setMotivoSinVoucher(e.target.value)}
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      borderRadius: 10,
-                      border: '1.5px solid var(--cp-line, #E3D6C6)',
-                      background: 'var(--cp-white, #FFFFFF)',
-                      padding: 10,
-                      fontSize: 14,
-                      fontFamily: 'inherit',
-                    }}
-                  />
-                  <CampoCodigoSupervisor valor={pinSupervisor} onChange={setPinSupervisor} />
-                  <button
-                    type="button"
-                    onClick={() => {
+                  <ExcepcionSinVoucher
+                    motivo={motivoSinVoucher}
+                    onMotivo={setMotivoSinVoucher}
+                    pin={pinSupervisor}
+                    onPin={setPinSupervisor}
+                    alVolver={() => {
                       setSinVoucher(false);
                       setMotivoSinVoucher('');
                       setPinSupervisor('');
                       setMsg('');
                     }}
-                    style={{
-                      minHeight: 44,
-                      border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                      borderRadius: 10,
-                      background: 'transparent',
-                      color: 'var(--cp-navy, #0B2C3E)',
-                      fontWeight: 700,
-                      fontSize: 13,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Volver a pedir la foto
-                  </button>
+                  />
                 </div>
               )}
               {comprobanteListo && (
@@ -428,6 +401,54 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
             </div>
           )}
         </div>
+
+        {/* Pago dividido con 2 o más medios digitales: una captura por cada uno (el servidor exige cada una) */}
+        {multiples && (
+          <div style={{ border: '1.5px solid var(--cp-navy, #0B2C3E)', borderRadius: 12, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ fontWeight: 800 }}>Comprobantes de los pagos digitales</div>
+            <CapturasPlanDigital pedidoId={pedido.id} planPago={pedido.planPago ?? []} alCambiar={setFaltanCapturas} />
+            {!comprobanteListo && !sinVoucher && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSinVoucher(true);
+                  setMsg('');
+                }}
+                style={{
+                  minHeight: 44,
+                  border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                  borderRadius: 10,
+                  background: 'transparent',
+                  color: 'var(--cp-navy, #0B2C3E)',
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                }}
+              >
+                Confirmar sin comprobante
+              </button>
+            )}
+            {!comprobanteListo && sinVoucher && (
+              <ExcepcionSinVoucher
+                motivo={motivoSinVoucher}
+                onMotivo={setMotivoSinVoucher}
+                pin={pinSupervisor}
+                onPin={setPinSupervisor}
+                alVolver={() => {
+                  setSinVoucher(false);
+                  setMotivoSinVoucher('');
+                  setPinSupervisor('');
+                  setMsg('');
+                }}
+              />
+            )}
+            {comprobanteListo && (
+              <div data-testid="voucher-listo-confirmar" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-green, #2F7A45)' }}>
+                Todas las capturas están subidas. Listo para confirmar.
+              </div>
+            )}
+          </div>
+        )}
 
         {msg && (
           <div role="alert" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-rust, #B2500F)' }}>

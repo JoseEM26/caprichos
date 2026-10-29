@@ -10,6 +10,7 @@ import { AuditoriaService } from '../../auditoria/auditoria.service';
 import { EventosGateway } from '../../../comun/socket/eventos.gateway';
 import { UsuarioAutenticado } from '../../acceso/acceso.tipos';
 import { obtenerFechaHoraLima } from '../../local/local.util';
+import { PagoPlanService } from '../../pedidos/pago-plan.service';
 
 describe('VouchersService', () => {
   let service: VouchersService;
@@ -53,7 +54,13 @@ describe('VouchersService', () => {
           total: 35.0,
           pago_preferido: 'YAPE',
         }),
+        update: jest.fn().mockResolvedValue({}),
       },
+      pedidoPagoPlan: {
+        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+        createMany: jest.fn().mockResolvedValue({ count: 2 }),
+      },
+      $transaction: jest.fn(async (fn: any) => fn(prismaMock)),
       voucherPago: {
         create: jest.fn().mockImplementation(({ data }) => ({
           id: 1n,
@@ -109,6 +116,7 @@ describe('VouchersService', () => {
         { provide: ArchivosService, useValue: archivosMock },
         { provide: AuditoriaService, useValue: auditoriaMock },
         { provide: VouchersIaService, useValue: vouchersIaMock },
+        { provide: PagoPlanService, useValue: new PagoPlanService() },
         { provide: EventosGateway, useValue: eventosMock },
       ],
     }).compile();
@@ -568,7 +576,8 @@ describe('VouchersService', () => {
         }),
       });
       expect(prismaMock.voucherPago.findFirst).not.toHaveBeenCalled();
-      expect(prismaMock.pedido.update).toBeUndefined();
+      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+      expect(prismaMock.$transaction).not.toHaveBeenCalled();
       expect(auditoriaMock.registrar).toHaveBeenCalledWith(
         expect.objectContaining({ accion: 'ENVIADO_CAJA', entidadId: 50n }),
       );
@@ -612,6 +621,103 @@ describe('VouchersService', () => {
     it('medio no válido: 400 y no avisa', async () => {
       await expect(service.enviarACaja('50', 'TARJETA', mozoUsuario)).rejects.toThrow(BadRequestException);
       expect(prismaMock.notificacion.create).not.toHaveBeenCalled();
+    });
+
+    describe('pago dividido (plan)', () => {
+      const planValido = [
+        { medio: 'EFECTIVO', monto: 20 },
+        { medio: 'YAPE', monto: 15 },
+      ];
+
+      it('plan que suma el total: reemplaza el plan guardado, fija el medio principal y avisa con el desglose', async () => {
+        const res = await service.enviarACaja('50', '', mozoUsuario, '10.0.0.3', planValido);
+
+        expect(res).toEqual({ ok: true });
+        expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+        expect(prismaMock.pedidoPagoPlan.deleteMany).toHaveBeenCalledWith({ where: { pedido_id: 50n } });
+        expect(prismaMock.pedidoPagoPlan.createMany).toHaveBeenCalledWith({
+          data: [
+            expect.objectContaining({ pedido_id: 50n, medio: 'EFECTIVO', orden: 0 }),
+            expect.objectContaining({ pedido_id: 50n, medio: 'YAPE', orden: 1 }),
+          ],
+        });
+        expect(prismaMock.pedido.update).toHaveBeenCalledWith({
+          where: { id: 50n },
+          data: { pago_preferido: 'YAPE', pago_metodo: 'YAPE' },
+        });
+        expect(prismaMock.notificacion.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({
+            tipo: 'VOUCHER_PENDIENTE_MOZO',
+            mensaje: expect.stringContaining('(Efectivo S/ 20.00 · Yape S/ 15.00)'),
+          }),
+        });
+        expect(prismaMock.voucherPago.create).not.toHaveBeenCalled();
+        expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+          expect.objectContaining({ accion: 'ENVIADO_CAJA', entidadId: 50n }),
+        );
+      });
+
+      it('no cobra ni aprueba: solo toca el plan y el medio preferido, nunca el estado de pago', async () => {
+        await service.enviarACaja('50', '', mozoUsuario, undefined, planValido);
+
+        for (const [args] of prismaMock.pedido.update.mock.calls) {
+          expect(Object.keys(args.data).sort()).toEqual(['pago_metodo', 'pago_preferido']);
+        }
+      });
+
+      it('plan solo en efectivo: aviso de efectivo con el desglose, sin voucher', async () => {
+        await service.enviarACaja('50', '', mozoUsuario, undefined, [{ medio: 'EFECTIVO', monto: 35 }]);
+
+        expect(prismaMock.notificacion.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({
+            tipo: 'PAGO_EFECTIVO_MOZO',
+            mensaje: expect.stringContaining('Desglose: Efectivo S/ 35.00.'),
+          }),
+        });
+        expect(prismaMock.voucherPago.findFirst).not.toHaveBeenCalled();
+        expect(prismaMock.pedido.update).toHaveBeenCalledWith({
+          where: { id: 50n },
+          data: { pago_preferido: 'EFECTIVO', pago_metodo: 'EFECTIVO' },
+        });
+      });
+
+      it('plan que no suma el total: 400 PLAN_PAGO_NO_CUADRA, no toca el plan ni avisa', async () => {
+        const error = await service
+          .enviarACaja('50', '', mozoUsuario, undefined, [
+            { medio: 'EFECTIVO', monto: 20 },
+            { medio: 'YAPE', monto: 10 },
+          ])
+          .catch((e) => e);
+
+        expect(error).toBeInstanceOf(BadRequestException);
+        expect(error.getResponse()).toMatchObject({ codigo: 'PLAN_PAGO_NO_CUADRA' });
+        expect(prismaMock.$transaction).not.toHaveBeenCalled();
+        expect(prismaMock.pedidoPagoPlan.deleteMany).not.toHaveBeenCalled();
+        expect(prismaMock.notificacion.create).not.toHaveBeenCalled();
+      });
+
+      it('plan con un medio repetido o monto cero: 400 y no avisa', async () => {
+        await expect(
+          service.enviarACaja('50', '', mozoUsuario, undefined, [
+            { medio: 'YAPE', monto: 20 },
+            { medio: 'YAPE', monto: 15 },
+          ]),
+        ).rejects.toThrow(BadRequestException);
+        await expect(
+          service.enviarACaja('50', '', mozoUsuario, undefined, [
+            { medio: 'YAPE', monto: 35 },
+            { medio: 'EFECTIVO', monto: 0 },
+          ]),
+        ).rejects.toThrow(BadRequestException);
+        expect(prismaMock.notificacion.create).not.toHaveBeenCalled();
+      });
+
+      it('plan que no es una lista: 400 PLAN_PAGO_INVALIDO', async () => {
+        await expect(service.enviarACaja('50', 'YAPE', mozoUsuario, undefined, 'YAPE')).rejects.toThrow(
+          BadRequestException,
+        );
+        expect(prismaMock.notificacion.create).not.toHaveBeenCalled();
+      });
     });
   });
 

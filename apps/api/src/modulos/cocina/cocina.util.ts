@@ -49,6 +49,21 @@ export function obtenerInicioDiaLima(ahora: Date = new Date()): Date {
 }
 
 /**
+ * Inicio (00:00 Lima) de una fecha YYYY-MM-DD dada en calendario de Lima.
+ */
+export function inicioDiaLimaDeFecha(fechaIso: string): Date {
+  return new Date(`${fechaIso}T00:00:00.000-05:00`);
+}
+
+/**
+ * Suma días a una fecha YYYY-MM-DD (aritmética de calendario, sin zona horaria).
+ */
+export function sumarDiasFechaIso(fechaIso: string, dias: number): string {
+  const [y, m, d] = fechaIso.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + dias)).toISOString().slice(0, 10);
+}
+
+/**
  * Fecha fija para agotar hasta reactivar (9999-12-31T23:59:59Z).
  */
 export const FECHA_HASTA_REACTIVAR = new Date('9999-12-31T23:59:59Z');

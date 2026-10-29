@@ -7,6 +7,7 @@ import { CatalogoModule } from '../catalogo/catalogo.module';
 import { OfertasModule } from '../ofertas/ofertas.module';
 import { PedidosModule } from '../pedidos/pedidos.module';
 import { ZonasModule } from '../zonas/zonas.module';
+import { ClientesModule } from '../clientes/clientes.module';
 import { ReservasModule } from '../reservas/reservas.module';
 import { ChatbotIaModule } from './ia/chatbot-ia.module';
 import { ChatbotConfiguracionModule } from './configuracion/chatbot-configuracion.module';
@@ -42,6 +43,7 @@ import { ColaWebhookService } from './servicios/cola-webhook.service';
     OfertasModule,
     forwardRef(() => PedidosModule),
     ZonasModule,
+    ClientesModule,
     forwardRef(() => ReservasModule),
     ChatbotIaModule,
     ChatbotConfiguracionModule,

@@ -37,3 +37,23 @@ export interface ZonaAdminItem {
   puntos: number;
   poligono?: Coordenada[];
 }
+
+/** Par de zonas activas cuyo solape supera la tolerancia; lo decide el dueño al normalizar. */
+export interface ConflictoZona {
+  zonaAId: string;
+  zonaBId: string;
+  nombreA: string;
+  nombreB: string;
+  areaM2: number;
+  tarifaA: number;
+  tarifaB: number;
+  /** Área compartida en GeoJSON MultiPolygon ([lng, lat]). */
+  poligonoSolape: { type: 'MultiPolygon'; coordinates: number[][][][] };
+}
+
+/** Decisión del dueño sobre un conflicto: `conserva` es el id de la zona que se queda el área compartida. */
+export interface DecisionConflictoZona {
+  zonaAId: string;
+  zonaBId: string;
+  conserva: string;
+}

@@ -9,15 +9,18 @@ import {
 } from '@caprichos/compartido';
 import { api, ErrorApi } from '../comun/api';
 import { MapaUbicacion } from '../comun/mapa/MapaUbicacion';
+import { SEDE_DEFECTO } from '../comun/mapa/sedeDefecto';
 import { BuscadorDireccion } from '../comun/mapa/BuscadorDireccion';
 import { enlaceGoogleMaps } from '../comun/mapa/leaflet';
 import { useCarrito } from './CarritoContext';
 import { PuntosCanje } from './cuenta/PuntosCanje';
 import { useCuentaOpcional } from './cuenta/CuentaContext';
 import { guardarPedido } from './seguimiento';
+import { SelectorDireccionesCliente } from './SelectorDireccionesCliente';
 import {
   ConsultaEnvioRespuesta,
   DatosLocalCarta,
+  DireccionCliente,
   EstadoLocalCarta,
   MetodoPago,
   ModalidadEntrega,
@@ -79,6 +82,12 @@ export function FormularioCheckout({
   const [mensajeGps, setMensajeGps] = useState<string | null>(null);
   const [origenPunto, setOrigenPunto] = useState<'GPS' | 'MAPA'>('GPS');
   const [ubicacionConfirmada, setUbicacionConfirmada] = useState(false);
+  // Libreta del cliente con cuenta: direcciones anteriores (solo se usa en delivery)
+  const [direccionesAnteriores, setDireccionesAnteriores] = useState<DireccionCliente[] | null>(null);
+  // null = aún no elige; 'nueva' = otra dirección; id = una de la libreta
+  const [opcionDireccion, setOpcionDireccion] = useState<string | 'nueva' | null>(null);
+  const [eligiendoDireccion, setEligiendoDireccion] = useState(false);
+  const [avisoDireccion, setAvisoDireccion] = useState<string | null>(null);
 
   // Comprobante (Boleta o Factura)
   const [tipoComprobante, setTipoComprobante] = useState<TipoComprobante>('BOLETA');
@@ -135,10 +144,10 @@ export function FormularioCheckout({
 
   // Datos y coordenadas de la tienda física
   const tiendaCoords = {
-    lat: datosLocal?.lat ?? -12.0196436,
-    lng: datosLocal?.lng ?? -76.963255,
-    nombre: datosLocal?.nombre ?? 'Caprichos',
-    direccion: datosLocal?.direccion ?? 'Av. Principal 123',
+    lat: datosLocal?.lat ?? SEDE_DEFECTO.lat,
+    lng: datosLocal?.lng ?? SEDE_DEFECTO.lng,
+    nombre: datosLocal?.nombre ?? SEDE_DEFECTO.nombre,
+    direccion: datosLocal?.direccion ?? SEDE_DEFECTO.direccion,
   };
 
   // lo que descontará el servidor (promociones automáticas y cupón), para mostrar el mismo total que se cobra
@@ -159,7 +168,25 @@ export function FormularioCheckout({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkoutAbierto, clavePromos]);
 
+  // Direcciones guardadas del cliente con cuenta; si falla, se sigue como sin libreta
+  const clientePartyId = clienteCuenta?.partyId ?? null;
+  useEffect(() => {
+    if (!checkoutAbierto || !clientePartyId) return;
+    let vigente = true;
+    api
+      .get<{ direcciones: DireccionCliente[] }>('/carta/cuenta/direcciones')
+      .then((r) => vigente && setDireccionesAnteriores(Array.isArray(r?.direcciones) ? r.direcciones : []))
+      .catch(() => vigente && setDireccionesAnteriores([]));
+    return () => {
+      vigente = false;
+    };
+  }, [checkoutAbierto, clientePartyId]);
+
   if (!checkoutAbierto) return null;
+
+  // Con cuenta y direcciones guardadas (o cargando) hay que elegir a dónde se envía antes de ver el formulario
+  const pideEleccionDireccion =
+    Boolean(clienteCuenta) && opcionDireccion === null && (direccionesAnteriores === null || direccionesAnteriores.length > 0);
 
   // Cálculo del total
   const costoEnvioEfectivo = modalidad === 'DELIVERY' ? costoEnvio : 0;
@@ -227,8 +254,9 @@ export function FormularioCheckout({
     }
   };
 
-  // Fija el punto de entrega (GPS, búsqueda o toque en el mapa) y consulta la zona y el envío
-  const fijarPunto = async (lat: number, lng: number, origen: 'GPS' | 'MAPA', precisionM?: number) => {
+  // Fija el punto de entrega (GPS, búsqueda o toque en el mapa) y consulta la zona y el envío.
+  // Devuelve false solo si el punto quedó fuera de la zona de reparto.
+  const fijarPunto = async (lat: number, lng: number, origen: 'GPS' | 'MAPA', precisionM?: number): Promise<boolean> => {
     const avisoPrecision =
       precisionM && precisionM > 150
         ? ` Tu equipo la calculó de forma aproximada (±${precisionM >= 1000 ? `${(precisionM / 1000).toFixed(1)} km` : `${Math.round(precisionM)} m`}): mueve el punto rojo hasta tu puerta.`
@@ -244,6 +272,7 @@ export function FormularioCheckout({
         setZonaEnvio(null);
         setTarifaZona(null);
         setMensajeGps(`FUERA_DE_COBERTURA: Tu ubicación está fuera de la zona de reparto.${avisoPrecision}`);
+        return false;
       } else {
         setZonaEnvio(res.zona);
         setTarifaZona(res.tarifaZona);
@@ -255,6 +284,53 @@ export function FormularioCheckout({
       setZonaEnvio(null);
       setTarifaZona(null);
     }
+    return true;
+  };
+
+  // Elige una dirección de la libreta: rellena los campos y consulta zona y envío como si se hubiera marcado en el mapa
+  const elegirDireccionAnterior = async (d: DireccionCliente) => {
+    setAvisoDireccion(null);
+    setErrorPaso(null);
+    setEligiendoDireccion(true);
+    setOpcionDireccion(d.id);
+    setDireccion(d.direccion);
+    setReferencia(d.referencia ?? '');
+    setUbicacionConfirmada(false);
+    setMensajeGps(null);
+    const lat = d.lat == null ? Number.NaN : Number(d.lat);
+    const lng = d.lng == null ? Number.NaN : Number(d.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      setCoordenadas(null);
+      setZonaEnvio(null);
+      setTarifaZona(null);
+    } else {
+      const cubierto = await fijarPunto(lat, lng, 'MAPA');
+      if (!cubierto) {
+        // Fuera de zona: se vuelve a preguntar y no queda nada de esa dirección
+        setOpcionDireccion(null);
+        setDireccion('');
+        setReferencia('');
+        setCoordenadas(null);
+        setZonaEnvio(null);
+        setTarifaZona(null);
+        setMensajeGps(null);
+        setAvisoDireccion('Esa dirección quedó fuera de nuestra zona de reparto. Elige otra o indica una nueva.');
+      }
+    }
+    setEligiendoDireccion(false);
+  };
+
+  // Dirección nueva: limpia lo que hubiera de una anterior
+  const elegirDireccionNueva = () => {
+    setAvisoDireccion(null);
+    setOpcionDireccion('nueva');
+    setDireccion('');
+    setReferencia('');
+    setCoordenadas(null);
+    setZonaEnvio(null);
+    setTarifaZona(null);
+    setUbicacionConfirmada(false);
+    setMensajeGps(null);
   };
 
   // Geolocalización
@@ -297,6 +373,9 @@ export function FormularioCheckout({
 
   const validarPaso2 = (): string | null => {
     if (modalidad === 'DELIVERY') {
+      if (pideEleccionDireccion) {
+        return 'Elige a dónde lo enviamos: una de tus direcciones anteriores o una nueva';
+      }
       if (!coordenadas && direccion.trim().length < 5) {
         return 'Para delivery debes indicar una dirección de al menos 5 caracteres o usar tu ubicación';
       }
@@ -1069,6 +1148,17 @@ export function FormularioCheckout({
               {paso === 2 && (
                 <>
                   {modalidad === 'DELIVERY' ? (
+                    <>
+                    {pideEleccionDireccion && (
+                      <SelectorDireccionesCliente
+                        direcciones={direccionesAnteriores}
+                        ocupado={eligiendoDireccion}
+                        aviso={avisoDireccion}
+                        alElegir={(d) => void elegirDireccionAnterior(d)}
+                        alNueva={elegirDireccionNueva}
+                      />
+                    )}
+                    {!pideEleccionDireccion && (
                     <div
                       style={{
                         backgroundColor: 'var(--cp-white)',
@@ -1089,6 +1179,16 @@ export function FormularioCheckout({
                       >
                         Ubicación para delivery
                       </div>
+
+                      {clienteCuenta && direccionesAnteriores && direccionesAnteriores.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setOpcionDireccion(null)}
+                          style={{ alignSelf: 'flex-start', minHeight: '44px', background: 'none', border: 'none', padding: '0 4px', fontSize: '13px', fontWeight: 700, color: 'var(--cp-navy)', textDecoration: 'underline', cursor: 'pointer' }}
+                        >
+                          Elegir otra dirección guardada
+                        </button>
+                      )}
 
                       {!(coordenadas && origenPunto === 'GPS') && (
                         <div>
@@ -1268,6 +1368,8 @@ export function FormularioCheckout({
                         )}
                       </div>
                     </div>
+                    )}
+                    </>
                   ) : (
                     /* Modalidad RECOGER: tienda en mapa pequeño de solo lectura con su dirección */
                     <div

@@ -79,6 +79,8 @@ describe('MisPedidosView: Enviar a Caja (solo pedidos de mesa abiertos)', () => 
     fireEvent.click(within(precuenta).getByTestId('btn-enviar-caja'));
     fireEvent.click(await screen.findByRole('button', { name: 'Sí, enviar a Caja' }));
 
-    await waitFor(() => expect(vouchersApi.enviarACaja).toHaveBeenCalledWith('12', 'YAPE'));
+    await waitFor(() =>
+      expect(vouchersApi.enviarACaja).toHaveBeenCalledWith('12', 'YAPE', [{ medio: 'YAPE', monto: 24.5 }]),
+    );
   });
 });

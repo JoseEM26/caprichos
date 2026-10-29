@@ -363,7 +363,7 @@ describe('MensajesService', () => {
     // La foto del chat (sin pedido) queda enlazada al pedido aprobado como prueba
     // Solo las fotos de este chat hechas desde que se abrió el pedido (no las de pedidos anteriores)
     expect(prisma.voucherPago.updateMany).toHaveBeenCalledWith({
-      where: { conversacion_id: 2n, pedido_id: null, creado_en: { gte: expect.any(Date) } },
+      where: { conversacion_id: 2n, pedido_id: null, reemplazado_en: null, creado_en: { gte: expect.any(Date) } },
       data: { pedido_id: 50n },
     });
     expect(gateway.enviarTexto).toHaveBeenCalledWith(

@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { Boton } from '../../comun/Boton';
 import { Confirmar } from '../../comun/Confirmar';
 import { CampoCodigoSupervisor } from '../../comun/CampoCodigoSupervisor';
-import { pedidosApi } from './pedidosApi';
+import { pedidosApi, Pedido } from './pedidosApi';
 import { ErrorApi } from '../../comun/api';
+import '../cierre/pendientes-cierre.css';
 
 const MOTIVOS_COMUNES = [
   'Cliente no recibió',
@@ -19,15 +20,29 @@ export interface ModalAnularProps {
   codigoPedido: string;
   esCobro?: boolean;
   cobroId?: string | number;
+  /** Detalle del pedido para el encabezado (cliente, modalidad, estado, total, líneas). Opcional. */
+  pedido?: Pedido | null;
   alCerrar: () => void;
   alAnularExitoso: () => void;
 }
+
+const ETIQUETA_ESTADO: Record<string, string> = {
+  COLA: 'En cola',
+  PREPARANDO: 'Preparando',
+  LISTO: 'Listo',
+  EN_CAMINO: 'En camino',
+  ENTREGADO: 'Entregado',
+  ANULADO: 'Anulado',
+};
+
+const soles = (v: string | number | null | undefined) => `S/ ${Number(v || 0).toFixed(2)}`;
 
 export function ModalAnular({
   pedidoId,
   codigoPedido,
   esCobro = false,
   cobroId,
+  pedido,
   alCerrar,
   alAnularExitoso,
 }: ModalAnularProps) {
@@ -118,6 +133,11 @@ export function ModalAnular({
     alCerrar();
   };
 
+  // Pedido con cobro: el servidor reversa puntos y stock al anularlo; si está entregado con cobro vigente lo rechaza
+  const tieneCobro = !!pedido && (!!pedido.cobro_vigente_id || pedido.pago_estado === 'PAGADO');
+  const lineas = pedido?.lineas ?? [];
+  const nombreCliente = pedido?.cliente_nombre?.trim() || (pedido?.modalidad === 'MESA' && pedido?.mesa_nombre) || 'Sin nombre';
+
   return (
     <>
       <div
@@ -129,203 +149,167 @@ export function ModalAnular({
           background: 'rgba(11, 44, 62, 0.55)',
         }}
       />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={esCobro ? 'Anular cobro' : 'Anular pedido'}
-        style={{
-          position: 'fixed',
-          zIndex: 60,
-          left: '50%',
-          top: '50%',
-          transform: 'translate(-50%, -50%)',
-          width: 'min(540px, calc(100% - 24px))',
-          maxHeight: 'calc(100% - 24px)',
-          overflowY: 'auto',
-          background: 'var(--cp-cream, #FBF4EC)',
-          borderRadius: 20,
-          boxShadow: '0 20px 50px rgba(11, 44, 62, 0.4)',
-          padding: 20,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 14,
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <div
-            style={{
-              fontFamily: 'Montserrat, sans-serif',
-              fontWeight: 800,
-              fontSize: 20,
-              color: 'var(--cp-navy, #0B2C3E)',
-            }}
-          >
+      <div role="dialog" aria-modal="true" aria-label={esCobro ? 'Anular cobro' : 'Anular pedido'} className="ad-dialogo">
+        <div className="ad-cabecera">
+          <div className="ad-titulo">
             {esCobro
               ? `Anular cobro del pedido ${codigoPedido}`
               : `Anular pedido ${codigoPedido}`}
           </div>
-          <button
-            onClick={manejarCerrar}
-            aria-label="Cerrar"
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 22,
-              border: '1.5px solid var(--cp-navy, #0B2C3E)',
-              background: 'transparent',
-              color: 'var(--cp-navy, #0B2C3E)',
-              fontSize: 20,
-              fontWeight: 800,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
+          <button type="button" className="ad-cerrar" onClick={manejarCerrar} aria-label="Cerrar">
             X
           </button>
         </div>
 
-        <div style={{ fontSize: 13, lineHeight: '18px', color: 'var(--cp-soft, #2C4C5D)' }}>
-          {esCobro
-            ? 'La anulación del cobro revierte el estado de pago del pedido a PENDIENTE y queda registrada en auditoría con el PIN del supervisor.'
-            : 'Un pedido anulado sale de cocina y reparto, y libera sus mesas. Requiere motivo de 5 o más caracteres y el PIN de 6 dígitos de la supervisora.'}
-        </div>
+        <div className="ad-cuerpo">
+          {pedido && (
+            <dl className="ad-resumen" aria-label="Resumen del pedido">
+              <div>
+                <dt>Cliente</dt>
+                <dd>{nombreCliente}</dd>
+              </div>
+              <div>
+                <dt>Modalidad</dt>
+                <dd>{pedido.modalidad}</dd>
+              </div>
+              <div>
+                <dt>Estado</dt>
+                <dd>{ETIQUETA_ESTADO[pedido.estado] ?? pedido.estado}</dd>
+              </div>
+              <div>
+                <dt>Total</dt>
+                <dd>{soles(pedido.total)}</dd>
+              </div>
+            </dl>
+          )}
 
-        {/* Motivos comunes */}
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>
-            Elige o escribe el motivo
-          </div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-            {MOTIVOS_COMUNES.map((m) => {
-              const seleccionado = motivo === m;
-              return (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => {
-                    setMotivo(m);
-                    setErrorMensaje('');
-                  }}
-                  style={{
-                    minHeight: 38,
-                    padding: '0 12px',
-                    borderRadius: 9999,
-                    border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                    background: seleccionado
-                      ? 'var(--cp-navy, #0B2C3E)'
-                      : 'transparent',
-                    color: seleccionado
-                      ? 'var(--cp-cream, #FBF4EC)'
-                      : 'var(--cp-navy, #0B2C3E)',
-                    fontWeight: 700,
-                    fontSize: 12,
-                  }}
-                >
-                  {m}
-                </button>
-              );
-            })}
+          {pedido && (
+            <details className="ad-lineas">
+              <summary>
+                Líneas del pedido ({lineas.length})
+              </summary>
+              <ul>
+                {lineas.map((l) => (
+                  <li key={l.id}>
+                    <span>
+                      {l.cantidad} × {l.nombre}
+                    </span>
+                    <span>{soles(l.subtotal)}</span>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+
+          <div className="ad-aviso" role="note">
+            {esCobro
+              ? 'La anulación del cobro revierte el estado de pago del pedido a PENDIENTE y queda registrada en auditoría con el PIN del supervisor.'
+              : 'Un pedido anulado sale de cocina y reparto, y libera sus mesas. Requiere motivo de 5 o más caracteres y el PIN de 6 dígitos de la supervisora.'}
+            {tieneCobro && !esCobro && (
+              <div style={{ marginTop: 6 }}>
+                Este pedido tiene un cobro registrado: al anularlo se devuelve su stock y se reversan sus puntos. Si ya está entregado con cobro vigente, el sistema no lo anula: primero hay que anular el cobro.
+              </div>
+            )}
           </div>
 
-          <label
-            htmlFor="anular-motivo"
-            style={{
-              fontWeight: 700,
-              fontSize: 13,
-              display: 'block',
-              marginBottom: 4,
-            }}
-          >
-            Motivo detallado (al menos 5 caracteres)
-          </label>
-          <input
-            id="anular-motivo"
-            type="text"
-            value={motivo}
-            onChange={(e) => {
-              setMotivo(e.target.value);
+          {/* Motivos comunes */}
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>
+              Elige o escribe el motivo
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+              {MOTIVOS_COMUNES.map((m) => {
+                const seleccionado = motivo === m;
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    aria-pressed={seleccionado}
+                    onClick={() => {
+                      setMotivo(m);
+                      setErrorMensaje('');
+                    }}
+                    style={{
+                      minHeight: 44,
+                      padding: '0 12px',
+                      borderRadius: 9999,
+                      border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                      background: seleccionado ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
+                      color: seleccionado ? 'var(--cp-cream, #FBF4EC)' : 'var(--cp-navy, #0B2C3E)',
+                      fontWeight: 700,
+                      fontSize: 12,
+                    }}
+                  >
+                    {m}
+                  </button>
+                );
+              })}
+            </div>
+
+            <label
+              htmlFor="anular-motivo"
+              style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}
+            >
+              Motivo detallado (al menos 5 caracteres)
+            </label>
+            <input
+              id="anular-motivo"
+              type="text"
+              value={motivo}
+              onChange={(e) => {
+                setMotivo(e.target.value);
+                setErrorMensaje('');
+              }}
+              placeholder="Escribe el motivo de anulación..."
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                minHeight: 44,
+                borderRadius: 10,
+                border: '1.5px solid var(--cp-line, #E3D6C6)',
+                background: 'var(--cp-white, #FFFFFF)',
+                padding: '0 12px',
+                fontSize: 14,
+              }}
+            />
+          </div>
+
+          {/* Código de supervisor (6 dígitos) */}
+          <CampoCodigoSupervisor
+            id="anular-pin"
+            valor={codigo}
+            onChange={(v) => {
+              setCodigo(v);
               setErrorMensaje('');
             }}
-            placeholder="Escribe el motivo de anulación..."
-            style={{
-              width: '100%',
-              boxSizing: 'border-box',
-              minHeight: 44,
-              borderRadius: 10,
-              border: '1.5px solid var(--cp-line, #E3D6C6)',
-              background: 'var(--cp-white, #FFFFFF)',
-              padding: '0 12px',
-              fontSize: 14,
-            }}
+            etiqueta="Código del supervisor (6 dígitos)"
+            ayuda="Pídelo a la supervisora: lo ve en su pantalla y cambia cada 30 segundos"
           />
+
+          {errorMensaje && (
+            <div role="alert" className="ad-error">
+              {errorMensaje}
+            </div>
+          )}
         </div>
 
-        {/* Código de supervisor (6 dígitos) */}
-        <CampoCodigoSupervisor
-          id="anular-pin"
-          valor={codigo}
-          onChange={(v) => {
-            setCodigo(v);
-            setErrorMensaje('');
-          }}
-          etiqueta="Código del supervisor (6 dígitos)"
-          ayuda="Pídelo a la supervisora: lo ve en su pantalla y cambia cada 30 segundos"
-        />
-
-        {/* Mensaje de error */}
-        {errorMensaje && (
-          <div
-            role="alert"
-            style={{
-              fontSize: 13,
-              fontWeight: 700,
-              color: 'var(--cp-rust, #B2500F)',
-              background: '#FFF0E6',
-              padding: '8px 12px',
-              borderRadius: 8,
-              border: '1px solid var(--cp-rust, #B2500F)',
-            }}
+        <div className="ad-pie">
+          <Boton
+            variante="secundario"
+            disabled={enviando}
+            onClick={manejarCerrar}
+            style={{ minHeight: 44, borderRadius: 12, fontWeight: 800 }}
           >
-            {errorMensaje}
-          </div>
-        )}
-
-        {/* Acciones */}
-        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+            Cancelar
+          </Boton>
           <Boton
             variante="peligro"
             cargando={enviando}
             disabled={enviando || motivo.trim().length < 5 || codigo.length !== 6}
             onClick={iniciarAnulacion}
-            style={{
-              flex: 1,
-              minHeight: 52,
-              borderRadius: 12,
-              fontWeight: 800,
-              fontSize: 15,
-            }}
+            style={{ minHeight: 44, borderRadius: 12, fontWeight: 800 }}
           >
             Confirmar anulación
-          </Boton>
-          <Boton
-            variante="secundario"
-            disabled={enviando}
-            onClick={manejarCerrar}
-            style={{
-              flex: 1,
-              minHeight: 52,
-              borderRadius: 12,
-              fontWeight: 800,
-            }}
-          >
-            Cancelar
           </Boton>
         </div>
       </div>

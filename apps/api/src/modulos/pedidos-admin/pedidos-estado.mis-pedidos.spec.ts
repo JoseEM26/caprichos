@@ -21,6 +21,7 @@ describe('PedidosEstadoService.misPedidos', () => {
     lineas: [{ nombre: 'Café', cantidad: 2 }],
     vouchers: [],
     planPago: [],
+    cliente_nombre: null,
     ...extra,
   });
 
@@ -79,16 +80,75 @@ describe('PedidosEstadoService.misPedidos', () => {
       estado: 'EN_CAMINO',
       modalidad: 'MESA',
       mesaNombre: 'Mesa 3',
+      clienteNombre: 'Mesa 3',
       total: 5,
       pagoEstado: 'PENDIENTE',
       pagoMetodo: null,
       plan: [],
       montoDigital: 0,
       vouchers: 0,
+      historialVouchers: 0,
       tieneVoucherLegible: false,
+      puedeCambiarVoucher: true,
+      puedeSubirVoucher: true,
+      vouchersPorMedio: [],
       creadoEn: new Date('2026-10-29T14:00:00Z'),
       lineas: [{ nombre: 'Café', cantidad: 2 }],
+      progreso: {
+        etapa: 'EN_CAMINO',
+        etiqueta: 'En camino',
+        areas: [],
+        listasDe: 0,
+        totalAreas: 0,
+        porcentaje: 100,
+        enCamino: true,
+      },
     });
+  });
+
+  it('progreso: áreas de cocina con su estado y líneas, sin datos de cocina internos', async () => {
+    prisma.pedido.findMany.mockResolvedValueOnce([
+      pedido({
+        id: 6n,
+        estado: 'PREPARANDO',
+        modalidad: 'MESA',
+        lineas: [
+          { nombre: 'Limonada', cantidad: 1, area_id: 1n, producto: null },
+          { nombre: 'Lomo', cantidad: 1, area_id: null, producto: { categoria: { area_id: 2n } } },
+        ],
+        comandas: [
+          { area_id: 1n, estado: 'DESPEJADA', llego_en: new Date(), despejada_en: new Date(), area: { nombre: 'Bebidas' } },
+          { area_id: 2n, estado: 'EN_COCINA', llego_en: new Date(), despejada_en: null, area: { nombre: 'Salados' } },
+        ],
+      }),
+    ]);
+
+    const res = await service.misPedidos(mozo);
+
+    expect(res.pedidos[0].progreso).toEqual({
+      etapa: 'PARCIAL',
+      etiqueta: 'Cocina: listas Bebidas, faltan Salados',
+      areas: [
+        { nombre: 'Bebidas', estado: 'LISTA', lineas: 1 },
+        { nombre: 'Salados', estado: 'PREPARANDO', lineas: 1 },
+      ],
+      listasDe: 1,
+      totalAreas: 2,
+      porcentaje: 50,
+      enCamino: false,
+    });
+    const json = JSON.stringify(res);
+    expect(json).not.toContain('llego_en');
+    expect(json).not.toContain('despejada');
+  });
+
+  it('pide las áreas de cocina y las líneas por área en la misma consulta', async () => {
+    await service.misPedidos(mozo);
+
+    const select = prisma.pedido.findMany.mock.calls[0][0].select;
+    expect(select.comandas).toEqual({ select: { area_id: true, estado: true, area: { select: { nombre: true } } } });
+    expect(select.lineas.select.producto).toEqual({ select: { categoria: { select: { area_id: true } } } });
+    expect(prisma.pedido.findMany).toHaveBeenCalledTimes(1);
   });
 
   it('por pedido: pago digital, cantidad de vouchers y si alguno es legible, sin semáforo ni datos extraídos', async () => {
@@ -110,12 +170,23 @@ describe('PedidosEstadoService.misPedidos', () => {
     expect(json).not.toContain('extraido');
   });
 
+  it('clienteNombre: el nombre del cliente; en mesa sin nombre, la mesa; nunca teléfono ni DNI', async () => {
+    prisma.pedido.findMany.mockResolvedValue([
+      pedido({ id: 1n, codigo: 'CP-W021', modalidad: 'LLEVAR', mesa_nombre: null, cliente_nombre: 'Ana López', cliente_telefono: '999888777' }),
+      pedido({ id: 2n, codigo: 'CP-M002', modalidad: 'MESA', mesa_nombre: 'Mesa 3', cliente_nombre: null, cliente_telefono: '999000111' }),
+      pedido({ id: 3n, codigo: 'CP-W003', modalidad: 'LLEVAR', mesa_nombre: null, cliente_nombre: null, cliente_telefono: '988777666' }),
+    ]);
+    const res = await service.misPedidos(mozo, 'hoy');
+    expect(res.pedidos.map((p) => p.clienteNombre)).toEqual(['Ana López', 'Mesa 3', null]);
+    expect(JSON.stringify(res)).not.toMatch(/999888777|999000111|988777666/);
+  });
+
   it('pide los vouchers del pedido solo con su semáforo', async () => {
     await service.misPedidos(mozo);
 
     const select = prisma.pedido.findMany.mock.calls[0][0].select;
     expect(select.pago_metodo).toBe(true);
-    expect(select.vouchers).toEqual({ select: { semaforo: true } });
+    expect(select.vouchers).toEqual({ select: { id: true, semaforo: true, medio: true, reemplazado_en: true } });
   });
 
   it('sin pedidos en el rango devuelve lista vacía y resumen en cero', async () => {

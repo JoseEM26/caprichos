@@ -394,6 +394,9 @@ describe('Módulo Salón (Ola F5: Plano, Pedido del mozo y Reservas)', () => {
 
     fireEvent.click(screen.getByText('Agregar al pedido'));
 
+    // La mesa sin cuenta pide el nombre del cliente
+    fireEvent.change(screen.getByLabelText('Nombre del cliente *'), { target: { value: 'Lucía Pérez' } });
+
     // Enviar directo a cocina
     const botonEnviar = screen.getByRole('button', {
       name: 'Enviar directo a cocina',
@@ -762,6 +765,7 @@ describe('Módulo Salón (Ola F5: Plano, Pedido del mozo y Reservas)', () => {
     });
     fireEvent.change(screen.getByPlaceholderText('Ej.: Lucía o Mesa 4'), { target: { value: 'Lucía' } });
     fireEvent.click(screen.getByText('Agregar al pedido'));
+    fireEvent.change(screen.getByLabelText('Nombre del cliente *'), { target: { value: 'Lucía Pérez' } });
     fireEvent.click(screen.getByRole('button', { name: 'Enviar directo a cocina' }));
     fireEvent.click(screen.getByRole('button', { name: 'Sí, enviar comanda' }));
 

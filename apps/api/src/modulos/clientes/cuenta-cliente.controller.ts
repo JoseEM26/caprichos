@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Param,
   Post,
   Put,
   Req,
@@ -15,6 +16,7 @@ import { ConfigService } from '@nestjs/config';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Request, Response } from 'express';
 import { ClientesService } from './clientes.service';
+import { DireccionesClienteService } from './direcciones-cliente.service';
 import { IngresoClienteDto, PerfilClienteDto, RegistroClienteDto } from './clientes.tipos';
 
 @Controller('carta/cuenta')
@@ -22,6 +24,7 @@ export class CuentaClienteController {
   constructor(
     private readonly clientesService: ClientesService,
     private readonly configService: ConfigService,
+    private readonly direcciones: DireccionesClienteService,
   ) {}
 
   @Post('registro')
@@ -124,6 +127,27 @@ export class CuentaClienteController {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     const actualizado = await this.clientesService.quitarFoto(cliente.partyId, ip);
     return { cliente: actualizado };
+  }
+
+  @Get('direcciones')
+  async listarDirecciones(@Req() req: Request) {
+    const cliente = await this.clientesService.clienteDesdeRequest(req);
+    if (!cliente) {
+      return { direcciones: [] };
+    }
+    return { direcciones: await this.direcciones.listar(cliente.partyId) };
+  }
+
+  @Delete('direcciones/:id')
+  async desactivarDireccion(@Param('id') id: string, @Req() req: Request) {
+    const cliente = await this.clientesService.clienteDesdeRequest(req);
+    if (!cliente) {
+      throw new UnauthorizedException({
+        codigo: 'SESION_REQUERIDA',
+        mensaje: 'Inicia sesión para quitar una dirección.',
+      });
+    }
+    return this.direcciones.desactivar(cliente.partyId, id);
   }
 
   @Get('notificaciones')

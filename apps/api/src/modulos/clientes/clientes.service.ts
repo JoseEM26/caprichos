@@ -8,6 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Prisma } from '@prisma/client';
+import { CANALES_CLIENTE_EN_PARTY } from './cliente-del-pedido';
 import * as argon2 from 'argon2';
 import { Request } from 'express';
 import { PrismaService } from '../../comun/prisma/prisma.service';
@@ -804,8 +805,14 @@ export class ClientesService {
             persona: true,
             documentos: true,
             contactos: true,
+            // Pedidos pagados del cliente: los que lo tienen en cliente_party_id, y los de carta/WhatsApp/bot
+            // sin ese campo (su party_id es el cliente). En MOZO/CAJA party_id es el personal: no cuenta.
+            pedidosComoCliente: {
+              where: { pago_estado: 'PAGADO' },
+              select: { id: true },
+            },
             pedidos: {
-              where: { pago_estado: 'COBRADO' },
+              where: { pago_estado: 'PAGADO', canal: { in: CANALES_CLIENTE_EN_PARTY }, cliente_party_id: null },
               select: { id: true },
             },
             usuario: {
@@ -855,7 +862,7 @@ export class ClientesService {
         telefono: tel,
         correo,
         cumpleanos: cumple,
-        pedidos: p.pedidos.length,
+        pedidos: p.pedidosComoCliente.length + p.pedidos.length,
         puntos,
         creditoPersonal: tipo === 'Personal',
         envioFijo,
@@ -909,19 +916,6 @@ export class ClientesService {
         documentos: true,
         contactos: true,
         roles: { where: { rol: 'CLIENTE' }, include: { customer_detail: true } },
-        pedidos: {
-          orderBy: { creado_en: 'desc' },
-          take: 20,
-          select: {
-            id: true,
-            codigo: true,
-            modalidad: true,
-            estado: true,
-            total: true,
-            pago_estado: true,
-            creado_en: true,
-          },
-        },
       },
     });
 
@@ -931,6 +925,36 @@ export class ClientesService {
         mensaje: `No se encontró el cliente con ID ${partyId}`,
       });
     }
+
+    // Pedidos del cliente con la misma regla que el listado: cliente_party_id, o carta/WhatsApp/bot sin ese campo.
+    // En MOZO/CAJA party_id es el personal que tomó el pedido, nunca el cliente.
+    const delCliente = {
+      OR: [
+        { cliente_party_id: id },
+        { party_id: id, canal: { in: CANALES_CLIENTE_EN_PARTY }, cliente_party_id: null },
+      ],
+    };
+    const [pedidos, pagados] = await Promise.all([
+      this.prisma.pedido.findMany({
+        where: delCliente,
+        orderBy: { creado_en: 'desc' },
+        take: 20,
+        select: {
+          id: true,
+          codigo: true,
+          modalidad: true,
+          estado: true,
+          total: true,
+          pago_estado: true,
+          creado_en: true,
+        },
+      }),
+      this.prisma.pedido.aggregate({
+        where: { ...delCliente, pago_estado: 'PAGADO' },
+        _count: { _all: true },
+        _sum: { total: true },
+      }),
+    ]);
 
     const esAdmin = usuarioAutenticado?.rol === 'ADMIN' || usuarioAutenticado?.rol === 'admin';
     const doc = party.documentos[0]?.numero || '';
@@ -964,12 +988,15 @@ export class ClientesService {
       cumpleDia: party.persona?.cumple_dia,
       cumpleMes: party.persona?.cumple_mes,
       puntos,
-      pedidos: party.pedidos.map((p) => ({
+      // Cuenta y total gastado: solo pedidos pagados (todos, no solo los 20 de la lista)
+      pedidosPagados: pagados._count._all,
+      totalGastado: Math.round(Number(pagados._sum.total ?? 0) * 100) / 100,
+      pedidos: pedidos.map((p) => ({
         id: p.codigo || p.id.toString(),
         modalidad: p.modalidad === 'DELIVERY' ? 'Delivery' : p.modalidad === 'LLEVAR' ? 'Para llevar' : 'En el local',
         estado: p.estado,
         total: `s/ ${Number(p.total).toFixed(2)}`,
-        pago: p.pago_estado === 'COBRADO' ? 'Cobrado' : 'Sin cobrar',
+        pago: p.pago_estado === 'PAGADO' ? 'Cobrado' : 'Sin cobrar',
         fecha: p.creado_en.toISOString(),
       })),
     };

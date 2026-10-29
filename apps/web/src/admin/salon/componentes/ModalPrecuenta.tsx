@@ -4,7 +4,20 @@ import '../precuenta.css';
 import { Confirmar } from '../../../comun/Confirmar';
 import { SubirVoucherMozo } from '../../vouchers/SubirVoucherMozo';
 import { vouchersApi } from '../../vouchers/vouchersApi';
-import { nombreMedio } from '../../pedidos/planPago';
+import type { PlanPagoItem } from '../../pedidos/planPago';
+import {
+  MEDIOS_PLAN,
+  ajustarPlan,
+  aPlan,
+  errorPlan,
+  medioPrincipalPlan,
+  montoDigitalPlan,
+  nombreMedio,
+  planInicial,
+  type FilaPlan,
+  type MedioPlan,
+} from '../../pedidos/planPago';
+import { PlanPagoEditor } from './PlanPagoEditor';
 
 export interface LineaPrecuenta {
   cantidad: number;
@@ -22,7 +35,7 @@ export interface ModalPrecuentaProps {
   total: number;
   subtotal?: number;
   descuento?: number;
-  /** Pago dividido: monto por medio. Sin plan se muestra solo el total. */
+  /** Pago dividido ya guardado: se precarga en el editor de Enviar a Caja y se muestra en el desglose. */
   plan?: Array<{ medio: string; monto: number | string }>;
   mozo?: string | null;
   copias?: number;
@@ -31,14 +44,13 @@ export interface ModalPrecuentaProps {
   pedidoId?: string | number;
 }
 
-type MedioEnvio = 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TRANSFERENCIA';
-
-const MEDIOS_ENVIO: ReadonlyArray<{ id: MedioEnvio; nombre: string }> = [
-  { id: 'EFECTIVO', nombre: 'Efectivo' },
-  { id: 'YAPE', nombre: 'Yape' },
-  { id: 'PLIN', nombre: 'Plin' },
-  { id: 'TRANSFERENCIA', nombre: 'Transferencia' },
-];
+/** Filas iniciales: el plan que ya tiene el pedido, o todo en efectivo por el total. */
+const filasIniciales = (plan: ModalPrecuentaProps['plan'], total: number): FilaPlan[] => {
+  const guardadas = (plan ?? [])
+    .filter((f) => Number(f.monto) > 0 && MEDIOS_PLAN.some((m) => m.id === f.medio))
+    .map((f) => ({ medio: f.medio as MedioPlan, monto: Number(f.monto).toFixed(2) }));
+  return guardadas.length > 0 ? guardadas : planInicial('EFECTIVO', total);
+};
 
 const soles = (n: number | string | null | undefined) => `S/ ${Number(n || 0).toFixed(2)}`;
 
@@ -63,9 +75,11 @@ export function ModalPrecuenta({
   const [imprimiendo, setImprimiendo] = useState(false);
   const [copiasLocales, setCopiasLocales] = useState(copias);
 
-  // Envío del cobro a Caja: el mozo elige el medio y, si es digital, toma la foto del voucher
-  const [medio, setMedio] = useState<MedioEnvio>('EFECTIVO');
-  const [voucherLegible, setVoucherLegible] = useState<boolean>(false);
+  // Envío del cobro a Caja: el mozo reparte el pago (uno o varios medios) y, si hay parte digital, puede subir el voucher
+  const [filas, setFilas] = useState<FilaPlan[]>(() => filasIniciales(plan, total));
+  const [pagaCon, setPagaCon] = useState<string>('');
+  // Una captura por medio digital del plan: si cada una se lee
+  const [legibles, setLegibles] = useState<Record<string, boolean>>({});
   const [confirmarEnvio, setConfirmarEnvio] = useState<boolean>(false);
   const [enviando, setEnviando] = useState<boolean>(false);
   const [enviado, setEnviado] = useState<boolean>(false);
@@ -73,9 +87,24 @@ export function ModalPrecuenta({
 
   if (!abierto) return null;
 
-  const esDigital = medio !== 'EFECTIVO';
-  const nombreMedioEnvio = MEDIOS_ENVIO.find((m) => m.id === medio)?.nombre ?? medio;
   const planConMonto = (plan ?? []).filter((f) => Number(f.monto) > 0);
+  const filasVigentes = ajustarPlan(total, filas);
+  const planEnvio = aPlan(filasVigentes);
+  const errorPlanEnvio = total > 0 ? errorPlan(total, filasVigentes) : 'El pedido no tiene total';
+  const planListo = errorPlanEnvio === null;
+  const medioPrincipal = planEnvio.length > 0 ? medioPrincipalPlan(planEnvio) : 'EFECTIVO';
+  // Voucher: solo por la parte digital del plan (el de mayor monto digital), y compara contra ese monto
+  const montoDigital = montoDigitalPlan(planEnvio);
+  const hayDigital = montoDigital > 0;
+  // Un voucher por medio digital del plan, cada uno comparado contra el monto de su medio
+  const digitalesPlan = planEnvio.filter((f) => ['YAPE', 'PLIN', 'TRANSFERENCIA'].includes(f.medio) && f.monto > 0);
+  const faltanVouchers = digitalesPlan.filter((f) => legibles[f.medio] !== true).map((f) => nombreMedio(f.medio));
+  const voucherOk = hayDigital && faltanVouchers.length === 0;
+  // El plan se guarda antes de cada captura: el servidor compara contra el monto de ese medio
+  const guardarPlan = async () => {
+    if (pedidoId !== undefined) await vouchersApi.guardarPlanPago(pedidoId, planEnvio as PlanPagoItem[]);
+  };
+  const desgloseEnvio = planEnvio.map((f) => `${nombreMedio(f.medio)} S/ ${f.monto.toFixed(2)}`).join(' · ');
 
   const handleConfirmarImpresion = async () => {
     try {
@@ -92,11 +121,11 @@ export function ModalPrecuenta({
 
   // El mozo no cierra el cobro: Caja revisa el voucher y es quien cobra
   const handleEnviarCaja = async () => {
-    if (pedidoId === undefined) return;
+    if (pedidoId === undefined || !planListo) return;
     try {
       setEnviando(true);
       setErrorEnvio(null);
-      await vouchersApi.enviarACaja(pedidoId, medio);
+      await vouchersApi.enviarACaja(pedidoId, medioPrincipal, planEnvio);
       setEnviado(true);
     } catch (err: any) {
       setErrorEnvio(err?.message || 'No se pudo enviar a Caja. Intenta de nuevo.');
@@ -106,11 +135,17 @@ export function ModalPrecuenta({
     }
   };
 
-  const mensajeEnvio = !esDigital
-    ? `Caja cobrará S/ ${Number(total || 0).toFixed(2)} en efectivo. Tú no cierras el cobro.`
-    : voucherLegible
-      ? `Caja revisará la foto del voucher de ${nombreMedioEnvio} y cobrará S/ ${Number(total || 0).toFixed(2)}. Tú no cierras el cobro.`
-      : `No hay foto legible de ${nombreMedioEnvio}: Caja pedirá la foto o resolverá el cobro.`;
+  const mensajeEnvio = [
+    `Caja cobrará S/ ${Number(total || 0).toFixed(2)} (${desgloseEnvio}).`,
+    hayDigital
+      ? voucherOk
+        ? `Caja revisará las fotos de los vouchers (${digitalesPlan.map((f) => nombreMedio(f.medio)).join(', ')}).`
+        : `Falta foto legible de ${faltanVouchers.join(', ')}: Caja pedirá la foto o resolverá el cobro.`
+      : null,
+    'Tú no cierras el cobro.',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <>
@@ -183,50 +218,50 @@ export function ModalPrecuenta({
             {/* Envío del cobro a Caja: el mozo toma la foto y Caja revisa y cobra */}
             {pedidoId !== undefined && (
               <div data-testid="seccion-envio-caja-mozo" className="pc-envio">
-                <div className="pc-envio-titulo">Medio de pago en mesa:</div>
-                <div className="pc-medios">
-                  {MEDIOS_ENVIO.map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      aria-pressed={medio === m.id}
-                      disabled={enviado}
-                      onClick={() => {
-                        setMedio(m.id);
-                        setVoucherLegible(false);
-                      }}
-                      className="pc-medio"
-                    >
-                      {m.nombre}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Digital: la foto se lee al instante; el mozo solo ve si se lee o no */}
-                {esDigital && (
-                  <SubirVoucherMozo
-                    key={medio}
-                    pedidoId={pedidoId}
-                    medio={medio as 'YAPE' | 'PLIN' | 'TRANSFERENCIA'}
-                    bloqueado={enviado}
-                    alVoucherValido={(info) => setVoucherLegible(info.legible)}
+                {/* Un medio = caso simple; «Agregar medio» = pago dividido. Mismo editor que el alta de mesa */}
+                {!enviado && (
+                  <PlanPagoEditor
+                    total={total}
+                    filas={filas}
+                    onChange={setFilas}
+                    pagaCon={pagaCon}
+                    onPagaCon={setPagaCon}
                   />
                 )}
 
-                {!esDigital && (
+                {/* Digital: la foto se lee al instante; el mozo solo ve si se lee o no. Opcional: se puede subir después */}
+                {digitalesPlan.map((f) => (
+                  <div key={f.medio} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div className="pc-nota-envio">
+                      Voucher {nombreMedio(f.medio)} por S/ {f.monto.toFixed(2)}
+                    </div>
+                    <SubirVoucherMozo
+                      pedidoId={pedidoId}
+                      medio={f.medio as 'YAPE' | 'PLIN' | 'TRANSFERENCIA'}
+                      bloqueado={enviado}
+                      opcional
+                      antesDeSubir={guardarPlan}
+                      quitable
+                      alQuitado={() => setLegibles((prev) => ({ ...prev, [f.medio]: false }))}
+                      alVoucherValido={(info) => setLegibles((prev) => ({ ...prev, [f.medio]: info.legible }))}
+                    />
+                  </div>
+                ))}
+
+                {!hayDigital && (
                   <div data-testid="aviso-efectivo-caja" className="pc-nota-envio">
                     Efectivo: no hace falta foto. Caja cobra y da el vuelto.
                   </div>
                 )}
 
-                {esDigital && !voucherLegible && (
+                {hayDigital && !voucherOk && (
                   <div className="pc-nota-envio">Si no hay foto o no se lee, Caja lo revisa y resuelve el cobro.</div>
                 )}
 
                 {!enviado && (
                   <button
                     type="button"
-                    disabled={enviando}
+                    disabled={enviando || !planListo}
                     onClick={() => setConfirmarEnvio(true)}
                     data-testid="btn-enviar-caja"
                     className="pc-btn-enviar"

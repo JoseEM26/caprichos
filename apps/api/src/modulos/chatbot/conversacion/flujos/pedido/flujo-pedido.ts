@@ -342,6 +342,9 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       case 'PEDIDO_MODALIDAD':
         return this.pasoModalidad(flujo, pedido, entrada, contexto);
 
+      case 'PEDIDO_DIRECCION_ELEGIR':
+        return this.pasoDireccionElegir(flujo, pedido, entrada, contexto);
+
       case 'PEDIDO_UBICACION':
         return this.pasoUbicacion(flujo, pedido, entrada, contexto);
 
@@ -454,6 +457,9 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       entrada.texto.includes('retiro');
 
     if (esDelivery) {
+      if (contexto.direccionesCliente?.length) {
+        return this.mostrarDireccionesAnteriores(flujo, { ...pedido, modalidad: 'DELIVERY' }, contexto);
+      }
       const nuevoPedido: EstadoCarritoPedido = {
         ...pedido,
         modalidad: 'DELIVERY',
@@ -578,27 +584,15 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       (entrada.ubicacion && Number.isFinite(entrada.ubicacion.latitud));
 
     if (tieneUbicacionGps) {
-      const lat = entrada.ubicacion!.latitud;
-      const lng = entrada.ubicacion!.longitud;
-      const resEnvio = contexto.resultadoEnvio;
-
-      const tarifa = Number(resEnvio?.tarifa ?? 5);
-      const gratisDesde = Number(resEnvio?.gratisDesde ?? 70);
-      const subtotalActual = pedido.items.reduce((s, i) => s + i.subtotal, 0);
-      const esGratis = subtotalActual > gratisDesde;
+      const { entrega, tarifa, esGratis, gratisDesde } = this.entregaDesdePunto(pedido, contexto, {
+        lat: entrada.ubicacion!.latitud,
+        lng: entrada.ubicacion!.longitud,
+        direccion: entrada.ubicacion?.direccion || entrada.ubicacion?.nombre,
+      });
 
       const nuevoPedido: EstadoCarritoPedido = {
         ...pedido,
-        entrega: {
-          modalidad: 'DELIVERY',
-          lat,
-          lng,
-          origen: 'WHATSAPP',
-          zonaId: resEnvio?.zona?.id ? String(resEnvio.zona.id) : undefined,
-          zonaNombre: resEnvio?.zona?.nombre,
-          tarifaEnvio: esGratis ? 0 : tarifa,
-          direccion: entrada.ubicacion?.direccion || entrada.ubicacion?.nombre,
-        },
+        entrega,
         estadoInterno: 'PEDIDO_REFERENCIA',
       };
 
@@ -665,6 +659,148 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       ],
       nuevoFlujo: flujo,
     };
+  }
+
+  /** Entrega DELIVERY con zona, tarifa y envío gratis según la cobertura resuelta para el punto. */
+  private entregaDesdePunto(
+    pedido: EstadoCarritoPedido,
+    contexto: ContextoConversacion,
+    punto: { lat: number; lng: number; direccion?: string; referencia?: string },
+  ): { entrega: NonNullable<EstadoCarritoPedido['entrega']>; tarifa: number; esGratis: boolean; gratisDesde: number } {
+    const resEnvio = contexto.resultadoEnvio;
+    const tarifa = Number(resEnvio?.tarifa ?? 5);
+    const gratisDesde = Number(resEnvio?.gratisDesde ?? 70);
+    const subtotalActual = pedido.items.reduce((s, i) => s + i.subtotal, 0);
+    const esGratis = subtotalActual > gratisDesde;
+
+    const entrega: NonNullable<EstadoCarritoPedido['entrega']> = {
+      modalidad: 'DELIVERY',
+      lat: punto.lat,
+      lng: punto.lng,
+      origen: 'WHATSAPP',
+      zonaId: resEnvio?.zona?.id ? String(resEnvio.zona.id) : undefined,
+      zonaNombre: resEnvio?.zona?.nombre,
+      tarifaEnvio: esGratis ? 0 : tarifa,
+      direccion: punto.direccion,
+      referencia: punto.referencia,
+    };
+    return { entrega, tarifa, esGratis, gratisDesde };
+  }
+
+  /** Lista de direcciones anteriores del cliente con cuenta, más «Otra dirección». */
+  private mostrarDireccionesAnteriores(
+    flujo: FlujoConversacion,
+    pedido: EstadoCarritoPedido,
+    contexto: ContextoConversacion,
+  ): ResultadoTransicion {
+    const direcciones = contexto.direccionesCliente || [];
+    if (!direcciones.length) {
+      return this.renderizarEstado('PEDIDO_UBICACION', flujo, pedido, contexto);
+    }
+
+    const filas: FilaLista[] = direcciones.map((d) => ({
+      id: `ped_dir_${d.id}`,
+      titulo: (d.alias || d.direccion).slice(0, 24),
+      descripcion: (d.referencia ? `${d.direccion} (ref: ${d.referencia})` : d.direccion).slice(0, 72),
+    }));
+    filas.push({
+      id: 'ped_dir_nueva',
+      titulo: 'Otra dirección',
+      descripcion: 'Comparte una ubicación nueva o escríbela',
+    });
+
+    return {
+      nuevoEstado: 'PEDIDO_DIRECCION_ELEGIR',
+      acciones: [
+        {
+          tipo: 'enviarLista',
+          texto: TEXTOS_BOT.pedidoDireccionesAnteriores(),
+          botonTexto: 'Ver direcciones',
+          filas: filas.slice(0, 10),
+        },
+      ],
+      nuevoFlujo: {
+        ...flujo,
+        estado: 'PEDIDO_DIRECCION_ELEGIR',
+        pedido: { ...pedido, modalidad: 'DELIVERY', estadoInterno: 'PEDIDO_DIRECCION_ELEGIR' },
+      },
+    };
+  }
+
+  // -------------------------------------------------------------------------
+  // PASO 2.0: Elegir una dirección anterior o pedir una nueva (cliente con cuenta)
+  // -------------------------------------------------------------------------
+  private pasoDireccionElegir(
+    flujo: FlujoConversacion,
+    pedido: EstadoCarritoPedido,
+    entrada: EntradaNormalizada,
+    contexto: ContextoConversacion,
+  ): ResultadoTransicion {
+    if (entrada.id === 'ped_dir_nueva') {
+      return this.renderizarEstado('PEDIDO_UBICACION', flujo, pedido, contexto);
+    }
+
+    const dir = entrada.id?.startsWith('ped_dir_')
+      ? contexto.direccionesCliente?.find((d) => `ped_dir_${d.id}` === entrada.id)
+      : undefined;
+    if (!dir) {
+      return this.mostrarDireccionesAnteriores(flujo, pedido, contexto);
+    }
+
+    const referencia = dir.referencia ?? undefined;
+
+    // Sin coordenadas no hay zona que calcular: igual que una dirección escrita
+    if (dir.lat == null || dir.lng == null) {
+      const nuevoPedido: EstadoCarritoPedido = {
+        ...pedido,
+        entrega: {
+          modalidad: 'DELIVERY',
+          direccion: dir.direccion,
+          referencia,
+          origen: 'ESCRITA',
+          tarifaEnvio: null,
+        },
+        estadoInterno: 'PEDIDO_CATEGORIAS',
+      };
+      return this.mostrarCategorias(
+        flujo,
+        nuevoPedido,
+        contexto,
+        TEXTOS_BOT.pedidoDireccionAnteriorSinCoordenadas(dir.direccion),
+      );
+    }
+
+    if (contexto.resultadoEnvio && !contexto.resultadoEnvio.cubierto) {
+      return {
+        nuevoEstado: 'PEDIDO_UBICACION',
+        acciones: [
+          {
+            tipo: 'enviarBotones',
+            texto: TEXTOS_BOT.pedidoDireccionAnteriorFueraCobertura(),
+            botones: BOTONES_PEDIDO_UBICACION_FALLIDA,
+          },
+        ],
+        nuevoFlujo: {
+          ...flujo,
+          estado: 'PEDIDO_UBICACION',
+          pedido: { ...pedido, estadoInterno: 'PEDIDO_UBICACION' },
+        },
+      };
+    }
+
+    const { entrega, tarifa, esGratis, gratisDesde } = this.entregaDesdePunto(pedido, contexto, {
+      lat: dir.lat,
+      lng: dir.lng,
+      direccion: dir.direccion,
+      referencia,
+    });
+    const nuevoPedido: EstadoCarritoPedido = { ...pedido, entrega, estadoInterno: 'PEDIDO_CATEGORIAS' };
+    return this.mostrarCategorias(
+      flujo,
+      nuevoPedido,
+      contexto,
+      TEXTOS_BOT.pedidoDireccionAnteriorElegida(dir.direccion, tarifa, esGratis, gratisDesde),
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -2859,6 +2995,8 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
   ): ResultadoTransicion {
     pedido.estadoInterno = estado;
     switch (estado) {
+      case 'PEDIDO_DIRECCION_ELEGIR':
+        return this.mostrarDireccionesAnteriores(flujo, pedido, contexto);
       case 'PEDIDO_MODALIDAD':
         return {
           nuevoEstado: 'PEDIDO_MODALIDAD',

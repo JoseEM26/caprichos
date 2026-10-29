@@ -283,7 +283,7 @@ export class MensajesService {
     if (tienePermisoVerVouchers && pedido?.id) {
       // Solo vouchers del pedido en espera: nunca el último de la conversación ni de otro pedido
       const ultimoVoucher = await this.prisma.voucherPago.findFirst({
-        where: { pedido_id: pedido.id },
+        where: { pedido_id: pedido.id, reemplazado_en: null },
         orderBy: { creado_en: 'desc' },
       });
 
@@ -726,7 +726,7 @@ export class MensajesService {
     // La foto del chat queda como prueba del pedido aprobado (si aún no tenía pedido)
     // Solo fotos de esta conversación hechas después de abrir el pedido (no las de pedidos anteriores)
     await this.prisma.voucherPago.updateMany({
-      where: { conversacion_id: c.id, pedido_id: null, creado_en: { gte: pedidoActual?.creado_en ?? new Date(0) } },
+      where: { conversacion_id: c.id, pedido_id: null, reemplazado_en: null, creado_en: { gte: pedidoActual?.creado_en ?? new Date(0) } },
       data: { pedido_id: pedidoId },
     });
 

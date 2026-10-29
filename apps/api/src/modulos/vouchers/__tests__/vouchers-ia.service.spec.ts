@@ -6,6 +6,7 @@ import { VouchersIaService } from '../vouchers-ia.service';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { RedisService } from '../../../comun/redis/redis.service';
 import { IaConsumoService } from '../../chatbot/ia/ia-consumo.service';
+import { AvisosInternosService } from '../../chatbot/avisos-internos/avisos-internos.service';
 
 describe('VouchersIaService', () => {
   let service: VouchersIaService;
@@ -13,6 +14,7 @@ describe('VouchersIaService', () => {
   let redisMock: any;
   let iaConsumoMock: any;
   let configMock: any;
+  let avisosMock: any;
   let fetchOriginal: any;
 
   beforeAll(() => {
@@ -28,6 +30,15 @@ describe('VouchersIaService', () => {
       parametro: {
         findUnique: jest.fn(),
       },
+      iaConsumo: {
+        aggregate: jest.fn().mockResolvedValue({
+          _count: { id: 0 },
+          _sum: { tokens_entrada: 0, tokens_salida: 0, costo_usd_estimado: 0 },
+        }),
+      },
+      notificacion: {
+        create: jest.fn().mockResolvedValue({ id: 1n }),
+      },
     };
 
     redisMock = {
@@ -39,7 +50,12 @@ describe('VouchersIaService', () => {
 
     iaConsumoMock = {
       registrarConsumo: jest.fn().mockResolvedValue(0.001),
-      verificarTopeMensualAlcanzado: jest.fn().mockResolvedValue(true), // simulamos que el tope está excedido para probar que NO bloquea
+      verificarTopeMensualAlcanzado: jest.fn().mockResolvedValue(true), // tope del chat: NO aplica a vouchers
+      obtenerTopeMensualUsd: jest.fn().mockResolvedValue(20),
+    };
+
+    avisosMock = {
+      enviarAvisoAdmin: jest.fn().mockResolvedValue({ omitido: true }),
     };
 
     configMock = {
@@ -56,6 +72,7 @@ describe('VouchersIaService', () => {
         { provide: PrismaService, useValue: prismaMock },
         { provide: RedisService, useValue: redisMock },
         { provide: IaConsumoService, useValue: iaConsumoMock },
+        { provide: AvisosInternosService, useValue: avisosMock },
         { provide: ConfigService, useValue: configMock },
       ],
     }).compile();
@@ -84,6 +101,7 @@ describe('VouchersIaService', () => {
         { provide: PrismaService, useValue: prismaMock },
         { provide: RedisService, useValue: redisMock },
         { provide: IaConsumoService, useValue: iaConsumoMock },
+        { provide: AvisosInternosService, useValue: avisosMock },
         { provide: ConfigService, useValue: configMock },
       ],
     }).compile();
@@ -174,7 +192,7 @@ describe('VouchersIaService', () => {
     );
   });
 
-  it('no es bloqueado por tope mensual de IA (este uso no se corta por tope)', async () => {
+  it('el tope mensual del chat no bloquea la lectura de vouchers (solo cuenta el gasto VOUCHER)', async () => {
     prismaMock.parametro.findUnique.mockResolvedValue({ clave: 'voucher_ia_activo', valor: true });
 
     global.fetch = jest.fn().mockResolvedValue({

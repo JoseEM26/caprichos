@@ -150,6 +150,35 @@ export interface AvisoPedidoListo {
 
 export type RangoMisPedidos = 'hoy' | 'ayer' | '7dias';
 
+/** Progreso en cocina y entrega (mismo contrato que la API: progresoDelPedido). */
+export type EtapaProgreso =
+  | 'RECIBIDO'
+  | 'EN_COCINA'
+  | 'PARCIAL'
+  | 'LISTO'
+  | 'EN_CAMINO'
+  | 'ESPERANDO_CLIENTE'
+  | 'ENTREGADO'
+  | 'ANULADO';
+
+export interface AreaProgreso {
+  nombre: string;
+  estado: 'PENDIENTE' | 'PREPARANDO' | 'LISTA';
+  lineas: number;
+}
+
+export interface ProgresoPedido {
+  etapa: EtapaProgreso;
+  etiqueta: string;
+  areas: AreaProgreso[];
+  listasDe: number;
+  totalAreas: number;
+  porcentaje: number;
+  enCamino: boolean;
+  etaMin?: number;
+  etaMax?: number;
+}
+
 /** Pedido que tomó el mozo (GET /admin/pedidos/mis-pedidos). */
 export interface MiPedido {
   id: string;
@@ -157,6 +186,8 @@ export interface MiPedido {
   estado: string;
   modalidad: string;
   mesaNombre: string | null;
+  /** Nombre del cliente (o la mesa si no hay nombre). Nunca teléfono ni DNI. */
+  clienteNombre?: string | null;
   total: number;
   pagoEstado: string | null;
   /** YAPE | PLIN | TRANSFERENCIA | EFECTIVO | … (null si no se eligió) */
@@ -167,10 +198,19 @@ export interface MiPedido {
   montoDigital?: number;
   /** Cantidad de fotos de voucher ligadas al pedido */
   vouchers: number;
-  /** Alguna foto se lee. El mozo nunca ve semáforo ni datos extraídos. */
+  /** Alguna foto vigente se lee. El mozo nunca ve semáforo ni datos extraídos. */
   tieneVoucherLegible: boolean;
+  /** Vigentes (no reemplazados) y total con reemplazados (historial) */
+  historialVouchers?: number;
+  /** Un voucher por medio digital del plan: subido o falta, con su monto */
+  vouchersPorMedio?: Array<{ medio: string; monto: number; subido: boolean; voucherId?: string | null }>;
+  /** Regla del servidor (regla-cambio-voucher.ts): la web no la duplica */
+  puedeCambiarVoucher?: boolean;
+  puedeSubirVoucher?: boolean;
   creadoEn: string;
   lineas: Array<{ nombre: string; cantidad: number }>;
+  /** Cocina y entrega en vivo. Puede faltar en respuestas anteriores. */
+  progreso?: ProgresoPedido;
 }
 
 export interface RespuestaMisPedidos {

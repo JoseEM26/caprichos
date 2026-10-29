@@ -184,4 +184,14 @@ export class CrearPedidoDto {
   @IsOptional()
   @IsString()
   canal?: 'MOZO' | 'CAJA';
+
+  /** DNI de un cliente con cuenta (solo lo usa el mozo/caja; en carta y WhatsApp se ignora). Sin cuenta: invitado. */
+  @IsOptional()
+  @Matches(/^\d{8}$/, { message: 'El DNI debe tener 8 dígitos numéricos' })
+  clienteDni?: string;
+
+  /** Id del party de un cliente con cuenta (lo da el buscador de clientes). Solo MOZO/CAJA; con clienteDni gana el DNI. */
+  @IsOptional()
+  @Matches(/^\d+$/, { message: 'clientePartyId debe ser un id numérico' })
+  clientePartyId?: string;
 }

@@ -1,0 +1,456 @@
+/* Panel de pedidos pendientes del cierre y diálogo «Anular pedido» (ModalAnular). */
+
+.pc-panel {
+  border: 1.5px dashed var(--cp-rust, #B2500F);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--cp-white, #FFFFFF);
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.pc-titulo {
+  font-weight: 800;
+  color: var(--cp-rust, #B2500F);
+  font-size: 13px;
+}
+
+.pc-resumen {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.pc-tarjeta {
+  border: 1px solid var(--cp-sand, #EDE1D1);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: var(--cp-cream, #FBF4EC);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: var(--cp-soft, #2C4C5D);
+}
+
+.pc-tarjeta b {
+  font-size: 18px;
+  color: var(--cp-navy, #0B2C3E);
+}
+
+.pc-tarjeta.pc-tarjeta-total {
+  border-color: var(--cp-rust, #B2500F);
+}
+
+.pc-barra {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.pc-buscador {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.pc-buscador input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1.5px solid var(--cp-line, #E3D6C6);
+  background: var(--cp-white, #FFFFFF);
+  padding: 0 12px;
+  font-size: 14px;
+}
+
+.pc-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.pc-chip {
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 9999px;
+  border: 1.5px solid var(--cp-navy, #0B2C3E);
+  background: transparent;
+  color: var(--cp-navy, #0B2C3E);
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.pc-chip[aria-pressed='true'] {
+  background: var(--cp-navy, #0B2C3E);
+  color: var(--cp-cream, #FBF4EC);
+}
+
+.pc-lista {
+  max-height: min(60vh, 520px);
+  overflow-y: auto;
+  border: 1px solid var(--cp-sand, #EDE1D1);
+  border-radius: 10px;
+  min-width: 0;
+}
+
+.pc-grupo {
+  border-bottom: 1px solid var(--cp-sand, #EDE1D1);
+}
+
+.pc-grupo-cab {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  width: 100%;
+  min-height: 44px;
+  box-sizing: border-box;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 0;
+  background: var(--cp-navy, #0B2C3E);
+  color: var(--cp-cream, #FBF4EC);
+  font-weight: 800;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pc-grupo-cab:focus-visible {
+  outline: 3px solid var(--cp-orange, #E67929);
+  outline-offset: -3px;
+}
+
+.pc-cabecera,
+.pc-fila {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1.4fr) 92px 104px 150px 96px minmax(0, auto);
+  gap: 8px;
+  align-items: center;
+  padding: 6px 10px;
+  font-size: 13px;
+  min-width: 0;
+}
+
+.pc-cabecera {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--cp-soft, #2C4C5D);
+  text-transform: uppercase;
+  background: var(--cp-cream, #FBF4EC);
+}
+
+.pc-fila {
+  border-top: 1px solid var(--cp-sand, #EDE1D1);
+  background: var(--cp-white, #FFFFFF);
+}
+
+.pc-fila > * {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pc-codigo {
+  font-weight: 800;
+  color: var(--cp-navy, #0B2C3E);
+}
+
+.pc-cliente {
+  color: var(--cp-navy, #0B2C3E);
+  font-weight: 700;
+}
+
+.pc-cliente.pc-sin-nombre {
+  color: var(--cp-soft, #6B7B86);
+  font-style: italic;
+  font-weight: 500;
+}
+
+.pc-antiguo {
+  color: #B26A00;
+  font-weight: 800;
+}
+
+.pc-meta {
+  display: contents;
+}
+
+.pc-total {
+  font-weight: 800;
+  text-align: right;
+}
+
+.pc-acciones {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.pc-boton {
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.pc-boton-primario {
+  border: 0;
+  background: var(--cp-orange, #E67929);
+  color: var(--cp-navy, #0B2C3E);
+}
+
+.pc-boton-peligro {
+  border: 1.5px solid var(--cp-rust, #B2500F);
+  background: transparent;
+  color: var(--cp-rust, #B2500F);
+}
+
+.pc-boton-secundario {
+  border: 1.5px solid var(--cp-navy, #0B2C3E);
+  background: transparent;
+  color: var(--cp-navy, #0B2C3E);
+}
+
+.pc-boton-oscuro {
+  border: 0;
+  background: var(--cp-navy, #0B2C3E);
+  color: #fff;
+}
+
+.pc-boton-bloque {
+  width: 100%;
+}
+
+.pc-ver-mas {
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  background: var(--cp-cream, #FBF4EC);
+  color: var(--cp-navy, #0B2C3E);
+  font-weight: 800;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.pc-vacio {
+  font-size: 13px;
+  color: var(--cp-soft, #2C4C5D);
+  padding: 8px 2px;
+}
+
+.pc-foco {
+  scroll-margin-top: 12px;
+}
+
+/* Celular: cada fila en dos líneas y las acciones a ancho completo */
+@media (max-width: 720px) {
+  .pc-cabecera {
+    display: none;
+  }
+
+  .pc-fila {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'codigo total'
+      'cliente cliente'
+      'meta meta'
+      'acciones acciones';
+    row-gap: 4px;
+  }
+
+  .pc-fila > .pc-codigo { grid-area: codigo; }
+  .pc-fila > .pc-cliente { grid-area: cliente; white-space: normal; }
+  .pc-fila > .pc-meta { grid-area: meta; display: flex; flex-wrap: wrap; gap: 4px 10px; color: var(--cp-soft, #2C4C5D); font-size: 12px; }
+  .pc-fila > .pc-total { grid-area: total; }
+  .pc-fila > .pc-acciones { grid-area: acciones; }
+
+  .pc-acciones .pc-boton {
+    flex: 1 1 140px;
+  }
+}
+
+/* ---- Diálogo «Anular pedido» (ModalAnular) ---- */
+
+.ad-dialogo {
+  position: fixed;
+  z-index: 60;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(560px, calc(100% - 24px));
+  max-height: calc(100dvh - 24px);
+  display: flex;
+  flex-direction: column;
+  background: var(--cp-cream, #FBF4EC);
+  border-radius: 20px;
+  box-shadow: 0 20px 50px rgba(11, 44, 62, 0.4);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.ad-cabecera {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 16px 16px 8px;
+}
+
+.ad-titulo {
+  font-family: Montserrat, sans-serif;
+  font-weight: 800;
+  font-size: 19px;
+  color: var(--cp-navy, #0B2C3E);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ad-cuerpo {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ad-pie {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--cp-line, #E3D6C6);
+  background: var(--cp-cream, #FBF4EC);
+}
+
+.ad-pie > * {
+  flex: 1 1 0;
+  min-height: 44px;
+}
+
+.ad-resumen {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 12px;
+  font-size: 13px;
+  background: var(--cp-white, #FFFFFF);
+  border: 1px solid var(--cp-line, #E3D6C6);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.ad-resumen dt {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--cp-soft, #2C4C5D);
+  text-transform: uppercase;
+}
+
+.ad-resumen dd {
+  margin: 0;
+  font-weight: 700;
+  color: var(--cp-navy, #0B2C3E);
+  overflow-wrap: anywhere;
+}
+
+.ad-lineas summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--cp-navy, #0B2C3E);
+}
+
+.ad-lineas ul {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 4px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.ad-lineas li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  padding: 4px 0;
+  border-top: 1px solid var(--cp-sand, #EDE1D1);
+}
+
+.ad-aviso {
+  font-size: 13px;
+  line-height: 18px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #FFF4E5;
+  border: 1px solid #B26A00;
+  color: #5C3600;
+}
+
+.ad-error {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--cp-rust, #B2500F);
+  background: #FFF0E6;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--cp-rust, #B2500F);
+}
+
+.ad-cerrar {
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  border: 1.5px solid var(--cp-navy, #0B2C3E);
+  background: transparent;
+  color: var(--cp-navy, #0B2C3E);
+  font-size: 18px;
+  font-weight: 800;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 480px) {
+  .ad-dialogo {
+    width: calc(100% - 16px);
+    max-height: calc(100dvh - 16px);
+  }
+
+  .ad-resumen {
+    grid-template-columns: 1fr;
+  }
+
+  .ad-pie {
+    flex-direction: column;
+  }
+}
+
+/* Botones del aviso «pedidos que bloquean el cierre» */
+.pc-avisos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pc-avisos .pc-boton {
+  flex: 1 1 180px;
+}

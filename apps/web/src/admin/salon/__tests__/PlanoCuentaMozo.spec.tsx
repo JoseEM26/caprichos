@@ -85,7 +85,7 @@ describe('Plano del mozo: cuenta de la mesa ocupada', () => {
     fireEvent.click(screen.getByText('Sí, enviar a Caja'));
 
     await waitFor(() => {
-      expect(enviar).toHaveBeenCalledWith('121', 'EFECTIVO');
+      expect(enviar).toHaveBeenCalledWith('121', 'EFECTIVO', [{ medio: 'EFECTIVO', monto: 24 }]);
     });
     expect(await screen.findByTestId('aviso-enviado-caja')).toBeDefined();
   });

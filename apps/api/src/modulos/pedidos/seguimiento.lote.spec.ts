@@ -150,7 +150,12 @@ describe('SeguimientoService.pedidosDeCuenta', () => {
     await service.pedidosDeCuenta(77n, 2);
 
     const args = prismaMock.pedido.findMany.mock.calls[0][0];
-    expect(args.where).toEqual({ party_id: 77n });
+    expect(args.where).toEqual({
+      OR: [
+        { cliente_party_id: 77n },
+        { party_id: 77n, canal: { in: ['CARTA', 'WHATSAPP', 'BOT'] } },
+      ],
+    });
     expect(args.orderBy).toEqual([{ creado_en: 'desc' }, { id: 'desc' }]);
     expect(args.skip).toBe(10);
     expect(args.take).toBe(11);

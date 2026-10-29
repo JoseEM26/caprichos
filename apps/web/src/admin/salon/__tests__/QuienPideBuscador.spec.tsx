@@ -1,10 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { ModalNuevoPedidoMesa } from '../componentes/ModalNuevoPedidoMesa';
 import { salonApi } from '../api';
 import { api } from '../../../comun/api';
 import { listarPersonalActivo } from '../../creditos/creditosApi';
 
+vi.mock('../useSalonSocket', () => ({
+  useSalonSocket: () => ({ avisoListo: null, cerrarAvisoListo: () => {} }),
+}));
 vi.mock('../api', () => ({
   salonApi: { obtenerCarta: vi.fn(), obtenerPlano: vi.fn(), abrirPedidoMesa: vi.fn() },
 }));
@@ -225,3 +228,82 @@ describe('¿Quién pide?: buscador de cliente y de personal', () => {
     });
   });
 });
+
+describe('¿Quién pide? con cliente de cuenta en el pedido enviado', () => {
+  const cartaConCafe = {
+    categorias: [
+      {
+        id: 'cat-1',
+        nombre: 'Bebidas',
+        orden: 1,
+        productos: [
+          { id: 'prod-1', nombre: 'Café Americano', descripcion: 'Café tostado', fotoUrl: null, precio: 8.5, tamanos: [], grupos: [], sabores: [], noSumaBeneficios: false, disponible: true, agotadoHasta: null },
+        ],
+      },
+    ],
+  };
+  const pisoConMesa = [
+    {
+      id: '1',
+      nombre: 'Piso 1',
+      activo: true,
+      mesas: [
+        { id: 'm1', pisoId: '1', tipo: 'MESA', numero: 1, nombre: 'Mesa 1', asientos: 4, x: 2, y: 5, ancho: 2, alto: 2, activo: true, estado: 'LIBRE' as const },
+      ],
+    },
+  ];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(salonApi.obtenerCarta).mockResolvedValue(cartaConCafe as any);
+    vi.mocked(salonApi.obtenerPlano).mockResolvedValue([] as any);
+    vi.mocked(salonApi.abrirPedidoMesa).mockResolvedValue({ id: 'ped-1' } as any);
+    vi.mocked(listarPersonalActivo).mockResolvedValue([]);
+    vi.mocked(api.get).mockResolvedValue({ items: [] } as any);
+  });
+
+  it('pedido de mesa con el cliente elegido en ¿Quién pide? envía clientePartyId con el id de su cuenta', async () => {
+    render(
+      <ModalNuevoPedidoMesa abierto={true} alCerrar={vi.fn()} pisos={pisoConMesa} pasoInicial="modal" mesasPreseleccionadasIds={['m1']} />,
+    );
+    fireEvent.click(await screen.findByText('Café Americano'));
+    fireEvent.change(await screen.findByPlaceholderText('Ej.: Lucía o Mesa 4'), { target: { value: 'Lucía' } });
+    fireEvent.click(screen.getByText('Agregar al pedido'));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Cambiar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (DNI)' }));
+    vi.mocked(api.get).mockResolvedValue({
+      items: [{ id: 77, nombre: 'Ana Pérez', dni: '4521****', puntos: 12 }],
+    } as any);
+    const input = screen.getByPlaceholderText('DNI o nombre del cliente');
+    fireEvent.change(input, { target: { value: 'Ana' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    fireEvent.click(await screen.findByRole('button', { name: /Ana Pérez/ }));
+    expect(screen.getByText('Cliente: Ana Pérez (12 pts)')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar directo a cocina' }));
+    expect(screen.getByText(/Pide Ana Pérez: el pedido suma sus puntos al cobrar/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, enviar comanda' }));
+
+    await waitFor(() => expect(salonApi.abrirPedidoMesa).toHaveBeenCalledTimes(1));
+    const [payload] = vi.mocked(salonApi.abrirPedidoMesa).mock.calls[0];
+    expect(payload.clientePartyId).toBe('77');
+  });
+
+  it('pedido de mesa sin cliente elegido no envía clientePartyId', async () => {
+    render(
+      <ModalNuevoPedidoMesa abierto={true} alCerrar={vi.fn()} pisos={pisoConMesa} pasoInicial="modal" mesasPreseleccionadasIds={['m1']} />,
+    );
+    fireEvent.click(await screen.findByText('Café Americano'));
+    fireEvent.change(await screen.findByPlaceholderText('Ej.: Lucía o Mesa 4'), { target: { value: 'Lucía' } });
+    fireEvent.click(screen.getByText('Agregar al pedido'));
+    fireEvent.change(screen.getByLabelText('Nombre del cliente *'), { target: { value: 'Lucía Pérez' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar directo a cocina' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, enviar comanda' }));
+
+    await waitFor(() => expect(salonApi.abrirPedidoMesa).toHaveBeenCalledTimes(1));
+    const [payload] = vi.mocked(salonApi.abrirPedidoMesa).mock.calls[0];
+    expect(payload.clientePartyId).toBeUndefined();
+  });
+});
+

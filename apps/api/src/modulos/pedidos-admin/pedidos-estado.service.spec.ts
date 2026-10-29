@@ -774,6 +774,19 @@ describe('PedidosEstadoService', () => {
       });
     });
 
+    it('pago PAGADO suma los puntos del cliente (no pasa por Caja → cobrar); COORDINADO no', async () => {
+      const acumular = jest.fn().mockResolvedValue({ puntos: 1, sumados: true });
+      (service as any).puntosService = { acumularPorPedido: acumular };
+      const pedidoMock = { id: 10n, codigo: 'CP-W001', pago_metodo: null, pago_estado: 'PENDIENTE', estado: 'EN_CAMINO' };
+      prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);
+      prismaMock.pedido.update.mockResolvedValue({ ...pedidoMock, pago_metodo: 'EFECTIVO', pago_estado: 'PAGADO' });
+
+      await service.registrarPago(10n, { metodo: 'EFECTIVO', estado: 'COORDINADO' }, cajeroAuth);
+      expect(acumular).not.toHaveBeenCalled();
+      await service.registrarPago(10n, { metodo: 'EFECTIVO', estado: 'PAGADO' }, cajeroAuth);
+      expect(acumular).toHaveBeenCalledWith(10n);
+    });
+
     it('debe rechazar método de pago inválido', async () => {
       const pedidoMock = { id: 10n };
       prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);
@@ -806,7 +819,7 @@ describe('PedidosEstadoService', () => {
 
         await expect(service.registrarPago(10n, { metodo: 'PLIN', estado: 'PAGADO' }, cajeroAuth)).rejects.toThrow();
         expect(prismaMock.voucherPago.findFirst).toHaveBeenCalledWith(
-          expect.objectContaining({ where: { pedido_id: 10n, semaforo: { not: 'ILEGIBLE' } } }),
+          expect.objectContaining({ where: { pedido_id: 10n, reemplazado_en: null, semaforo: { not: 'ILEGIBLE' } } }),
         );
       });
 

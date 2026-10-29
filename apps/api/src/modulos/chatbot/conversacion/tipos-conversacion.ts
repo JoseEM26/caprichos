@@ -299,6 +299,15 @@ export interface ContextoConversacion {
     tarifa?: number | null;
     gratisDesde?: number;
   } | null;
+  /** Libreta del cliente con cuenta (party resuelto por el teléfono de quien escribe). Sin cuenta: vacío. */
+  direccionesCliente?: Array<{
+    id: string;
+    direccion: string;
+    referencia: string | null;
+    lat: number | null;
+    lng: number | null;
+    alias: string | null;
+  }> | null;
   resultadoCupon?: {
     valido: boolean;
     descuento?: number;

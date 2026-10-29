@@ -54,12 +54,64 @@ describe('PuntosService', () => {
   });
 
   describe('acumularPorPedido (DT-55, RN-CAP-072)', () => {
+    it('pedido de MOZO con cliente identificado por DNI: suma al cliente, no al mozo', async () => {
+      prismaMock.movimientoPuntos.findFirst.mockResolvedValue(null);
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 110n,
+        codigo: 'CP-W110',
+        canal: 'MOZO',
+        party_id: 55n,
+        cliente_party_id: 200n,
+        total: '70.00',
+        envio: '0.00',
+        cupon_id: null,
+        cupon_emitido_id: null,
+        puntos_canjeados: '0',
+      });
+      prismaMock.partyRole.findFirst.mockImplementation(({ where }: any) =>
+        Promise.resolve(where.party_id === 200n ? { id: 50n, party_id: 200n, customer_detail: { party_role_id: 50n, puntos: '0' } } : null),
+      );
+      prismaMock.parametro.findUnique.mockResolvedValue({ clave: 'puntos_porcentaje', valor: 5 });
+      prismaMock.pedidoLinea.findMany.mockResolvedValue([
+        { id: 1n, producto_id: 7n, oferta_id: null, linea_combo_id: null, cantidad: 2, precio_unit: '35.00', subtotal: '70.00', producto: { no_suma_beneficios: false } },
+      ]);
+
+      const res = await service.acumularPorPedido(110n);
+
+      expect(res.sumados).toBe(true);
+      expect(prismaMock.partyRole.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ party_id: 200n }) }));
+      expect(prismaMock.movimientoPuntos.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ party_id: 200n, tipo: 'SUMA' }) }),
+      );
+    });
+
+    it('pedido de MOZO sin DNI (invitado) no suma puntos aunque party_id sea el mozo', async () => {
+      prismaMock.movimientoPuntos.findFirst.mockResolvedValue(null);
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 111n,
+        canal: 'MOZO',
+        party_id: 55n,
+        cliente_party_id: null,
+        total: '70.00',
+        envio: '0.00',
+        cupon_id: null,
+        cupon_emitido_id: null,
+      });
+
+      const res = await service.acumularPorPedido(111n);
+
+      expect(res.sumados).toBe(false);
+      expect(prismaMock.partyRole.findFirst).not.toHaveBeenCalled();
+      expect(prismaMock.movimientoPuntos.create).not.toHaveBeenCalled();
+    });
+
     it('debe acumular 5% de lo pagado en productos para cliente con cuenta', async () => {
       // Pedido de S/ 70 sin envío ni cupón -> 5% = 3.50 puntos
       prismaMock.movimientoPuntos.findFirst.mockResolvedValue(null);
       prismaMock.pedido.findUnique.mockResolvedValue({
         id: 101n,
         codigo: 'CP-0101',
+        canal: 'CARTA',
         party_id: 200n,
         total: '70.00',
         envio: '0.00',
@@ -98,6 +150,7 @@ describe('PuntosService', () => {
       prismaMock.pedido.findUnique.mockResolvedValue({
         id: 102n,
         codigo: 'CP-0102',
+        canal: 'CARTA',
         party_id: 200n,
         total: '90.00',
         envio: '0.00',
@@ -173,6 +226,7 @@ describe('PuntosService', () => {
       prismaMock.pedido.findUnique.mockResolvedValue({
         id: 104n,
         codigo: 'CP-0104',
+        canal: 'CARTA',
         party_id: 300n,
         total: '70.00',
         envio: '0.00',
@@ -212,6 +266,7 @@ describe('PuntosService', () => {
       prismaMock.pedido.findUnique.mockResolvedValue({
         id: 101n,
         codigo: 'CP-0101',
+        canal: 'CARTA',
         party_id: 200n,
       });
       prismaMock.partyRole.findFirst.mockResolvedValue({
@@ -247,6 +302,7 @@ describe('PuntosService', () => {
       prismaMock.pedido.findUnique.mockResolvedValue({
         id: 101n,
         codigo: 'CP-0101',
+        canal: 'CARTA',
         party_id: 200n,
       });
       prismaMock.partyRole.findFirst.mockResolvedValue({

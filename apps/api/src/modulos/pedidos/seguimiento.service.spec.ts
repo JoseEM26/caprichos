@@ -224,4 +224,34 @@ describe('SeguimientoService', () => {
       });
     });
   });
+
+  describe('progreso en cocina', () => {
+    it('obtener devuelve el progreso por área sin datos personales ni de cocina internos', async () => {
+      conPedido(
+        pedidoBase({
+          estado: 'PREPARANDO',
+          modalidad: 'RECOGER',
+          lineas: [{ cantidad: 1, area_id: 1n, producto: null }],
+          comandas: [
+            { area_id: 1n, estado: 'DESPEJADA', llego_en: CREADO, area: { nombre: 'Bebidas' } },
+            { area_id: 2n, estado: 'EN_COCINA', llego_en: CREADO, area: { nombre: 'Salados' } },
+          ],
+        }),
+      );
+
+      const res = await service.obtener('CAP-0007', tokenValido());
+
+      expect(res.progreso).toMatchObject({
+        etapa: 'PARCIAL',
+        etiqueta: 'Cocina: listas Bebidas, faltan Salados',
+        listasDe: 1,
+        totalAreas: 2,
+        porcentaje: 50,
+      });
+      const json = JSON.stringify(res);
+      expect(json).not.toContain('Nombre Privado');
+      expect(json).not.toContain('Calle Secreta');
+      expect(json).not.toContain('llego_en');
+    });
+  });
 });

@@ -1,5 +1,6 @@
 import { montoElegiblePuntos } from '../ofertas/puntos-elegibles.util';
 import { PuntosService } from '../clientes/puntos.service';
+import { DireccionesClienteService } from '../clientes/direcciones-cliente.service';
 import {
   BadRequestException,
   ConflictException,
@@ -25,6 +26,7 @@ import { CrearPedidoDto } from './dto/crear-pedido.dto';
 import { generarTokenSeguimiento } from './seguimiento.tokens';
 import { AvisosInternosService } from '../chatbot/avisos-internos/avisos-internos.service';
 import { AvisosPedidoService } from '../chatbot/servicios/avisos-pedido.service';
+import { tieneTelefonoReal } from '../chatbot/utilidades/enmascarar.util';
 import { PagoPlanService } from './pago-plan.service';
 
 export interface OrigenPedido {
@@ -32,6 +34,8 @@ export interface OrigenPedido {
   usuarioPartyId?: bigint | string | number;
   /** Cliente con cuenta que hace el pedido en la carta (suma puntos) */
   clientePartyId?: bigint | string | number;
+  /** Teléfono de quien escribe por WhatsApp: si tiene cuenta, el pedido queda a su nombre */
+  telefonoRemitente?: string;
   esPersonal?: boolean;
   mesasIds?: (bigint | string | number)[];
   mesaNombre?: string;
@@ -57,7 +61,40 @@ export class PedidosService {
     @Optional()
     @Inject(forwardRef(() => AvisosPedidoService))
     private readonly avisosPedidoService?: AvisosPedidoService,
+    @Optional() private readonly direcciones?: DireccionesClienteService,
   ) {}
+
+  /**
+   * Cliente con cuenta del pedido: DNI (solo MOZO/CAJA), cuenta de la carta o teléfono de WhatsApp.
+   * Null = invitado. Un clienteDni de carta o WhatsApp se ignora.
+   */
+  private async clienteIdentificado(dto: CrearPedidoDto, origen?: OrigenPedido): Promise<bigint | null> {
+    const canal = origen?.canal ?? 'CARTA';
+    if (canal === 'MOZO' || canal === 'CAJA') {
+      if (!this.direcciones) return null;
+      const noEncontrado = () =>
+        new NotFoundException({
+          codigo: 'CLIENTE_NO_ENCONTRADO',
+          mensaje: 'No hay una cuenta de cliente con ese DNI. Puedes atender como invitado.',
+        });
+      if (dto.clienteDni) {
+        const partyId = await this.direcciones.buscarPartyPorDni(dto.clienteDni);
+        if (!partyId) throw noEncontrado();
+        return partyId;
+      }
+      if (dto.clientePartyId) {
+        const partyId = BigInt(dto.clientePartyId);
+        if (!(await this.direcciones.datosCuentaActiva(partyId))) throw noEncontrado();
+        return partyId;
+      }
+      return null;
+    }
+    if (origen?.clientePartyId) return BigInt(origen.clientePartyId);
+    if (origen?.telefonoRemitente && this.direcciones) {
+      return this.direcciones.resolverPartyPorTelefono(origen.telefonoRemitente);
+    }
+    return null;
+  }
 
   /**
    * Crea un nuevo pedido desde la carta virtual con validaciones completas y cálculo en el servidor.
@@ -388,6 +425,17 @@ export class PedidosService {
 
     subtotalCalculado = Number(subtotalCalculado.toFixed(2));
 
+    // 5.0. Cliente con cuenta identificado (suma puntos, historial y direcciones)
+    const clienteFinal = await this.clienteIdentificado(dto, origen);
+    // Cliente con cuenta de mozo/caja: si el pedido no trae nombre o teléfono propios, se toman de su cuenta
+    if (esMozo && clienteFinal && this.direcciones) {
+      const cuenta = await this.direcciones.datosCuentaActiva(clienteFinal);
+      if (cuenta) {
+        if (!dto.cliente?.nombre?.trim()) clienteNombre = cuenta.nombre;
+        telefonoLimpio = telefonoLimpio || cuenta.telefono;
+      }
+    }
+
     // 5.1. Calcular descuento (oferta/cupón según reglas de acumulación) en el servidor
     const canalPedido = origen?.canal || 'CARTA';
     const desgloseDescuento = await this.ofertasService.calcularDescuentosParaPedido({
@@ -402,7 +450,7 @@ export class PedidosService {
       })),
       canal: canalPedido,
       cuponCodigo: dto.cuponCodigo,
-      clientePartyId: origen?.usuarioPartyId,
+      clientePartyId: clienteFinal,
     });
 
     const descuentoAplicado = desgloseDescuento.descuentoTotal;
@@ -560,8 +608,10 @@ export class PedidosService {
           modalidad: dto.modalidad,
           estado: 'COLA',
           party_id: mozoPartyId ?? (origen?.clientePartyId ? BigInt(origen.clientePartyId) : null),
+          cliente_party_id: clienteFinal,
           cliente_nombre: clienteNombre,
-          cliente_telefono: telefonoLimpio,
+          // el relleno 999999999 no es un teléfono: el pedido queda sin teléfono (no recibe WhatsApp)
+          cliente_telefono: tieneTelefonoReal(telefonoLimpio) ? telefonoLimpio : null,
           mesa_nombre: mesaNombreFinal,
           entrega_direccion: dto.entrega?.direccion?.trim() || null,
           entrega_referencia: dto.entrega?.referencia?.trim() || null,
@@ -596,6 +646,23 @@ export class PedidosService {
 
       if (planPago) {
         await this.pagoPlan.guardar(tx, pedido.id, planPago);
+      }
+
+      // Dirección de delivery del cliente con cuenta: se guarda o se suma un uso (misma transacción)
+      if (dto.modalidad === 'DELIVERY' && clienteFinal && this.direcciones) {
+        const origenDireccion = canalPedido === 'CARTA' ? 'CARTA' : canalPedido === 'WHATSAPP' || canalPedido === 'BOT' ? 'WHATSAPP' : 'MOZO';
+        await this.direcciones.registrarUso(
+          clienteFinal,
+          {
+            direccion: dto.entrega?.direccion,
+            referencia: dto.entrega?.referencia,
+            lat: dto.entrega?.lat,
+            lng: dto.entrega?.lng,
+            zonaId,
+          },
+          origenDireccion,
+          tx,
+        );
       }
 
       // Crear líneas y opciones
@@ -688,7 +755,7 @@ export class PedidosService {
           data: {
             cupon_id: BigInt(desgloseDescuento.cuponId),
             pedido_id: pedido.id,
-            party_id: pedido.party_id,
+            party_id: clienteFinal,
           },
         });
       }

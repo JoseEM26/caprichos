@@ -29,6 +29,29 @@ export function montoDigitalDePlan(plan: PlanPagoItem[]): number {
   return Math.round(suma * 100) / 100;
 }
 
+/** Monto del renglón del plan para un medio digital (lo que se compara contra SU captura). */
+export function montoDeMedioDigital(plan: PlanPagoItem[], medio: string): number {
+  return Math.round(plan.filter((f) => f.medio === medio).reduce((acc, f) => acc + Number(f.monto), 0) * 100) / 100;
+}
+
+/**
+ * Medios digitales que llevan captura, uno por medio. Con plan: sus renglones digitales. Sin plan:
+ * el medio del pedido (pago_metodo) por el total, si es digital. Función pura.
+ */
+export function mediosDigitalesDelPedido(
+  plan: PlanPagoItem[] | null | undefined,
+  pagoMetodo: string | null | undefined,
+  total: number,
+): PlanPagoItem[] {
+  if (plan && plan.length > 0) {
+    return plan
+      .filter((f) => (MEDIOS_DIGITALES_PLAN as readonly string[]).includes(f.medio))
+      .map((f) => ({ medio: f.medio, monto: Math.round(Number(f.monto) * 100) / 100 }));
+  }
+  const m = String(pagoMetodo ?? '').toUpperCase();
+  return (MEDIOS_DIGITALES_PLAN as readonly string[]).includes(m) ? [{ medio: m, monto: total }] : [];
+}
+
 /**
  * Pago dividido: plan de pago declarado al hacer el pedido (un renglón por medio).
  * Reutilizable por carta virtual, WhatsApp y el mozo. Sin dependencias.

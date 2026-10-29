@@ -8,7 +8,7 @@ import {
   WhatsAppMensajeriaPuerto,
 } from '../puerto/whatsapp-mensajeria.puerto';
 import { TEXTOS_PAGO } from '../conversacion/flujos/pago/textos-pago';
-import { enmascararTelefono, hashTelefono, normalizarTelefono } from '../utilidades/enmascarar.util';
+import { enmascararTelefono, hashTelefono, telefonoEnviable } from '../utilidades/enmascarar.util';
 import { OutboxWhatsappService } from './outbox-whatsapp.service';
 
 export interface ParametrosRecordatorioPago {
@@ -136,7 +136,7 @@ export class TareaRecordatorioPagoService {
         );
 
         // Teléfono del cliente
-        const telNorm = p.cliente_telefono ? normalizarTelefono(p.cliente_telefono) : null;
+        const telNorm = telefonoEnviable(p.cliente_telefono) || null;
         if (!telNorm) continue;
 
         // 1. EVALUAR RECORDATORIO AL CLIENTE

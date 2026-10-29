@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { WhatsappWebhookService } from '../servicios/whatsapp-webhook.service';
 import { VouchersService } from '../../vouchers/vouchers.service';
 import { VouchersIaService } from '../../vouchers/vouchers-ia.service';
+import { PagoPlanService } from '../../pedidos/pago-plan.service';
 
 const flush = () => new Promise((r) => setTimeout(r, 30));
 
@@ -130,8 +131,9 @@ describe('Comprobante de WhatsApp: siempre se guarda y se analiza', () => {
       prisma,
       { obtenerCliente: () => ({ incr: async () => 1, expire: async () => 1 }) } as any,
       { registrarConsumo: jest.fn().mockResolvedValue(undefined) } as any,
+      { enviarAvisoAdmin: jest.fn().mockResolvedValue({ omitido: true }) } as any,
     );
-    vouchers = new VouchersService(prisma, archivos, { registrar: jest.fn() } as any, iaIa);
+    vouchers = new VouchersService(prisma, archivos, { registrar: jest.fn() } as any, iaIa, new PagoPlanService());
 
     const mensajeria = { enviarTexto: jest.fn().mockResolvedValue({ exito: true, estado: 'ENVIADO' }) };
     motor = { procesarMensajeEntrante: jest.fn().mockResolvedValue(true) };

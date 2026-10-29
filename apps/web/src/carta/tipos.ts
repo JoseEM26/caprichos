@@ -103,6 +103,19 @@ export interface ConsultaEnvioRespuesta {
   modoGratis: 'desde' | 'mas_de';
 }
 
+/** Dirección de la libreta del cliente con cuenta (GET /carta/cuenta/direcciones). */
+export interface DireccionCliente {
+  id: string;
+  direccion: string;
+  referencia: string | null;
+  lat: number | null;
+  lng: number | null;
+  alias: string | null;
+  usos: number;
+  ultimoUsoEn: string;
+  origen: string;
+}
+
 export interface OpcionElegida {
   id: string;
   nombre: string;

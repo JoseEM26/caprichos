@@ -55,9 +55,12 @@ export interface AbrirPedidoMesaPayload {
   canal?: 'MOZO' | 'CAJA';
   esPersonal?: boolean;
   colaboradorPartyId?: string | number;
+  /** Cliente con cuenta elegido en «¿Quién pide?» (id del party); suma puntos al cobrar */
+  clientePartyId?: string;
+  /** Mesa sin cuenta: el nombre es obligatorio; el teléfono es opcional (si va, recibe la encuesta). */
   cliente?: {
     nombre: string;
-    telefono: string;
+    telefono?: string;
   };
   /** Cómo paga: un medio o pago dividido (plan). */
   pago?: {

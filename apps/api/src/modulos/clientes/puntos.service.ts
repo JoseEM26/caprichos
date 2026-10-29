@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
+import { partyClienteDelPedido } from './cliente-del-pedido';
 
 @Injectable()
 export class PuntosService {
@@ -98,8 +99,9 @@ export class PuntosService {
       });
     }
 
-    // Si el pedido no está asociado a una cuenta/party, no acumula (pedido invitado - RQ-CLI-02-03)
-    if (!pedido.party_id) {
+    // Cliente con cuenta del pedido; invitado (o pedido de mozo sin DNI) no acumula (RQ-CLI-02-03)
+    const partyCliente = partyClienteDelPedido(pedido);
+    if (!partyCliente) {
       return { puntos: 0, sumados: false };
     }
 
@@ -111,7 +113,7 @@ export class PuntosService {
     // Verificar si el cliente tiene cuenta o rol CLIENTE
     const rolCliente = await this.prisma.partyRole.findFirst({
       where: {
-        party_id: pedido.party_id,
+        party_id: partyCliente,
         rol: 'CLIENTE',
         hasta: null,
       },
@@ -150,7 +152,7 @@ export class PuntosService {
       // Movimiento inmutable
       await tx.movimientoPuntos.create({
         data: {
-          party_id: pedido.party_id!,
+          party_id: partyCliente,
           pedido_id: pId,
           tipo: 'SUMA',
           puntos: puntosCalculados,
@@ -198,13 +200,14 @@ export class PuntosService {
       where: { id: pId },
     });
 
-    if (!pedido || !pedido.party_id) {
+    const partyCliente = pedido ? partyClienteDelPedido(pedido) : null;
+    if (!pedido || !partyCliente) {
       return { puntosReversados: 0, puntosDevueltos: 0 };
     }
 
     const rolCliente = await this.prisma.partyRole.findFirst({
       where: {
-        party_id: pedido.party_id,
+        party_id: partyCliente,
         rol: 'CLIENTE',
         hasta: null,
       },
@@ -227,7 +230,7 @@ export class PuntosService {
         puntosReversados = Number(movSuma.puntos);
         await tx.movimientoPuntos.create({
           data: {
-            party_id: pedido.party_id!,
+            party_id: partyCliente,
             pedido_id: pId,
             tipo: 'REVERSA',
             puntos: puntosReversados,
@@ -256,7 +259,7 @@ export class PuntosService {
         puntosDevueltos = Number(movCanje.puntos);
         await tx.movimientoPuntos.create({
           data: {
-            party_id: pedido.party_id!,
+            party_id: partyCliente,
             pedido_id: pId,
             tipo: 'DEVOLUCION_CANJE',
             puntos: puntosDevueltos,

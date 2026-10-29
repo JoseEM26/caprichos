@@ -2,6 +2,7 @@ import { useCarrito } from './CarritoContext';
 import { Icono } from '../comun/Icono';
 import { leerPedidosGuardados, useSeguimientoPedido } from './seguimiento';
 import type { PasoSeguimiento, PedidoGuardado } from './seguimiento';
+import { ProgresoPedido } from '../admin/salon/ProgresoPedido';
 import { AdjuntarCapturaPago } from './AdjuntarCapturaPago';
 import type { PedidoConfirmado } from './tipos';
 
@@ -77,7 +78,7 @@ function TarjetaSeguimiento({ pedido, creacion, otros, onElegir, onCerrar }: Tar
   if (error === 'NO_ENCONTRADO') mensaje = 'No encontramos este pedido. Puede que ya no esté disponible.';
   else if (anulado) mensaje = 'Tu pedido fue anulado';
   else if (creacion) mensaje = creacion.mensaje || 'Un asesor te escribirá para coordinar el pago';
-  else if (estado) mensaje = estado.estadoEtiqueta;
+  else if (estado) mensaje = estado.progreso?.etiqueta ?? estado.estadoEtiqueta;
   else if (error === 'RED') mensaje = 'No pudimos consultar el estado. Reintentaremos en unos segundos.';
   else mensaje = 'Consultando el estado de tu pedido...';
 
@@ -238,6 +239,7 @@ function TarjetaSeguimiento({ pedido, creacion, otros, onElegir, onCerrar }: Tar
           {estado.pasos.map((p, idx) => (
             <PasoPedido key={p.clave} paso={p} numero={idx + 1} />
           ))}
+          <ProgresoPedido progreso={estado.progreso} modalidad={estado.modalidad} variante="completo" sinLinea />
         </div>
       )}
 

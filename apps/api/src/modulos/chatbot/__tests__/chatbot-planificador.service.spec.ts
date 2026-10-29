@@ -260,4 +260,48 @@ describe('ChatbotPlanificadorService (avisos por tiempo)', () => {
       }),
     );
   });
+
+  describe('encuesta posventa en mesa (sin teléfono real no se programa)', () => {
+    const pedidoMesa = (extra: Record<string, unknown> = {}) => ({
+      id: BigInt(55),
+      codigo: 'CP-M055',
+      modalidad: 'MESA',
+      estado: 'LISTO',
+      cliente_nombre: 'Lucía Pérez',
+      cliente_telefono: '987654321',
+      entregado_en: null,
+      entregado_mesa_en: new Date(Date.now() - 40 * 60000),
+      ...extra,
+    });
+
+    // La consulta de encuestas es la que lleva OR (entregado, entregado en mesa o cobro)
+    const conEncuestas = (filas: unknown[]) => {
+      mockPrisma.pedido.findMany.mockImplementation(async (args: any) => (args?.where?.OR ? filas : []));
+    };
+
+    it('mesa con teléfono real: se programa la encuesta por el outbox, registrada como ENVIADA', async () => {
+      conEncuestas([pedidoMesa()]);
+
+      const res = await planificador.ejecutarCiclo();
+
+      expect(res.avisosEncuesta).toBe(1);
+      expect(mockPrisma.encuestaPosventa.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ pedido_id: BigInt(55), estado: 'ENVIADA' }) }),
+      );
+      expect(mockOutbox.encolar).toHaveBeenCalledWith(
+        expect.objectContaining({ telefono: '51987654321', clave: 'encuesta-55', origen: 'ENCUESTA' }),
+        expect.anything(),
+      );
+    });
+
+    it('mesa sin teléfono real (relleno 999999999 o vacío): no se programa ni se encola nada', async () => {
+      conEncuestas([pedidoMesa({ cliente_telefono: '999999999' }), pedidoMesa({ id: BigInt(56), cliente_telefono: '' })]);
+
+      const res = await planificador.ejecutarCiclo();
+
+      expect(res.avisosEncuesta).toBe(0);
+      expect(mockPrisma.encuestaPosventa.create).not.toHaveBeenCalled();
+      expect(mockOutbox.encolar).not.toHaveBeenCalled();
+    });
+  });
 });

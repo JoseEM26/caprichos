@@ -652,6 +652,27 @@ describe('CierreService', () => {
       });
     });
 
+    it('al liquidar, suma los puntos de los pedidos contra entrega del repartidor', async () => {
+      const acumular = jest.fn().mockResolvedValue({ puntos: 1, sumados: true });
+      (service as any).puntosService = { acumularPorPedido: acumular };
+      jest.spyOn(service as any, 'repartidoresConEfectivo').mockResolvedValue([
+        {
+          repartidorPartyId: '55',
+          nombre: 'Marcos Ruta',
+          pedidos: [{ id: 901 }, { id: 902 }],
+          cobradoCentimos: 7000,
+          liquidadoCentimos: 0,
+          pendienteCentimos: 7000,
+        },
+      ]);
+
+      await service.liquidarRepartidor({ repartidorPartyId: 55, entregado: 70.0 }, mockUsuarioCajero);
+
+      expect(acumular).toHaveBeenCalledTimes(2);
+      expect(acumular).toHaveBeenCalledWith(901n);
+      expect(acumular).toHaveBeenCalledWith(902n);
+    });
+
     it('registra entrega de efectivo, calcula diferencia y audita liquidación', async () => {
       // Mock de listado con saldo pendiente de 70.00
       jest.spyOn(service as any, 'repartidoresConEfectivo').mockResolvedValue([
@@ -1008,14 +1029,17 @@ describe('CierreService', () => {
 
     it('pedidos sin cobrar: el admin los ve de cualquier día, sin anulados ni cobrados', async () => {
       prismaMock.pedido.findMany.mockResolvedValue([
-        { id: 74n, codigo: 'CP-W062', canal: 'CARTA', modalidad: 'RECOGER', estado: 'ENTREGADO', total: 42, creado_en: new Date('2026-10-23T20:21:00Z') },
+        { id: 74n, codigo: 'CP-W062', canal: 'CARTA', modalidad: 'RECOGER', estado: 'ENTREGADO', total: 42, creado_en: new Date('2026-10-23T20:21:00Z'), pago_estado: 'COORDINADO', cliente_nombre: '  Rosa Pérez ', cliente_telefono: '999888777' },
       ]);
 
       const lista = await service.listarPendientesDeCobro(mockUsuarioAdmin);
 
       expect(lista).toEqual([
-        expect.objectContaining({ id: 74, codigo: 'CP-W062', total: 42, estado: 'ENTREGADO' }),
+        expect.objectContaining({ id: 74, codigo: 'CP-W062', total: 42, estado: 'ENTREGADO', pagoEstado: 'COORDINADO', clienteNombre: 'Rosa Pérez' }),
       ]);
+      // Nunca teléfono ni DNI en la respuesta
+      expect(lista[0]).not.toHaveProperty('cliente_telefono');
+      expect(JSON.stringify(lista)).not.toContain('999888777');
       expect(prismaMock.pedido.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({

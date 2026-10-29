@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
-import { normalizarTelefono, enmascararTelefono } from '../utilidades/enmascarar.util';
+import { enmascararTelefono, telefonoEnviable } from '../utilidades/enmascarar.util';
 import { CargaSaliente, OutboxWhatsappService } from './outbox-whatsapp.service';
 import { EtapaAvisoReparto, TEXTOS_REPARTO, PayloadAvisoReparto } from '../conversacion/textos-reparto';
 import { marcarPagoParaPersona } from './pago-para-persona.util';
@@ -134,7 +134,7 @@ export class AvisosPedidoService {
     if (!pedido) return { estado: 'OMITIDO', motivo: 'PEDIDO_NO_ENCONTRADO' };
     if (pedido.modalidad !== 'DELIVERY' && !cfg.cualquierModalidad) return { estado: 'OMITIDO', motivo: 'NO_ES_DELIVERY' };
 
-    const telefono = normalizarTelefono(pedido.cliente_telefono || '');
+    const telefono = telefonoEnviable(pedido.cliente_telefono);
     if (!telefono) return { estado: 'OMITIDO', motivo: 'SIN_TELEFONO' };
 
     const flag = await db.parametro.findUnique({ where: { clave: cfg.parametro } });

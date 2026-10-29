@@ -10,6 +10,10 @@ export interface PendienteCobro {
   estado: string;
   total: number;
   fecha: string;
+  /** PENDIENTE = por cobrar; COORDINADO = por confirmar (el repartidor/voucher ya lo coordinó) */
+  pagoEstado?: string | null;
+  /** Solo el nombre del cliente; nunca teléfono ni DNI. Null si no hay nombre. */
+  clienteNombre?: string | null;
 }
 
 export interface ConteoDenominaciones {

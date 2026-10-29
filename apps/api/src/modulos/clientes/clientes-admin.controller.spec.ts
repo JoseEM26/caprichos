@@ -13,6 +13,7 @@ import { Reflector } from '@nestjs/core';
 import { ClientesAdminController } from './clientes-admin.controller';
 import { ClientesService } from './clientes.service';
 import { PuntosService } from './puntos.service';
+import { DireccionesClienteService } from './direcciones-cliente.service';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 
@@ -40,6 +41,7 @@ describe('ClientesAdminController', () => {
       providers: [
         { provide: ClientesService, useValue: clientesServiceMock },
         { provide: PuntosService, useValue: puntosServiceMock },
+        { provide: DireccionesClienteService, useValue: { buscarPorDni: jest.fn() } },
         { provide: PrismaService, useValue: {} },
         { provide: Reflector, useValue: {} },
       ],
@@ -72,5 +74,53 @@ describe('ClientesAdminController', () => {
       1n,
       '127.0.0.1',
     );
+  });
+
+  describe('GET por-dni/:dni', () => {
+    const direccionesDe = () => (controller as any).direcciones;
+
+    it('DNI que no tiene 8 dígitos exactos: 400 DNI_INVALIDO y no busca', async () => {
+      await expect(controller.buscarPorDni('4521789', { usuario: { partyId: 55n } } as any)).rejects.toMatchObject({
+        response: { codigo: 'DNI_INVALIDO' },
+      });
+      await expect(controller.buscarPorDni('4521789a', { usuario: { partyId: 55n } } as any)).rejects.toMatchObject({
+        response: { codigo: 'DNI_INVALIDO' },
+      });
+      expect(direccionesDe().buscarPorDni).not.toHaveBeenCalled();
+    });
+
+    it('encontrado: devuelve el DNI enmascarado y los datos del contrato', async () => {
+      direccionesDe().buscarPorDni.mockResolvedValue({
+        encontrado: true,
+        party: '100',
+        nombre: 'Ana',
+        telefono: '987654321',
+        puntos: 12,
+        direcciones: [],
+      });
+
+      const r: any = await controller.buscarPorDni('45217890', { usuario: { partyId: 55n } } as any);
+
+      expect(direccionesDe().buscarPorDni).toHaveBeenCalledWith('45217890', 55n);
+      expect(r).toEqual({
+        encontrado: true,
+        party: '100',
+        nombre: 'Ana',
+        telefono: '987654321',
+        puntos: 12,
+        direcciones: [],
+        dniMascara: '4521****',
+      });
+      expect(r).not.toHaveProperty('correo');
+      expect(r).not.toHaveProperty('cumpleanos');
+    });
+
+    it('no encontrado: { encontrado: false } sin datos', async () => {
+      direccionesDe().buscarPorDni.mockResolvedValue({ encontrado: false });
+
+      const r = await controller.buscarPorDni('45217890', { usuario: { partyId: 55n } } as any);
+
+      expect(r).toEqual({ encontrado: false });
+    });
   });
 });

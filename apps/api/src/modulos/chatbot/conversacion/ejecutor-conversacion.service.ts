@@ -44,6 +44,7 @@ import {
   FlujoConversacion,
 } from './tipos-conversacion';
 import { obtenerFechaHoraLima } from '../../local/local.util';
+import { DireccionesClienteService } from '../../clientes/direcciones-cliente.service';
 
 export interface EntradaProcesarMensaje extends EntradaRawInput {
   waMessageId?: string;
@@ -74,6 +75,7 @@ export class EjecutorConversacionService {
     private readonly reservasService?: ReservasService,
     @Optional() private readonly chatbotIaService?: ChatbotIaService,
     @Optional() private readonly chatbotConfiguracionService?: ChatbotConfiguracionService,
+    @Optional() private readonly direccionesService?: DireccionesClienteService,
   ) {}
 
   /**
@@ -669,6 +671,44 @@ export class EjecutorConversacionService {
       }
     }
 
+    // Libreta del cliente con cuenta (party por el teléfono de quien escribe): solo en el paso de delivery
+    // y cuando elige una dirección anterior. Sin cuenta o sin direcciones queda null.
+    let direccionesCliente: Array<{
+      id: string;
+      direccion: string;
+      referencia: string | null;
+      lat: number | null;
+      lng: number | null;
+      alias: string | null;
+    }> | null = null;
+    const estadoPedidoPrevio = String(flujoPrevio?.estado ?? '');
+    if (
+      this.direccionesService &&
+      (estadoPedidoPrevio === 'PEDIDO_MODALIDAD' || estadoPedidoPrevio === 'PEDIDO_DIRECCION_ELEGIR')
+    ) {
+      try {
+        const partyId = await this.direccionesService.resolverPartyPorTelefono(conversacion.telefono);
+        if (partyId) direccionesCliente = await this.direccionesService.listar(partyId, { limite: 5 });
+      } catch (err: any) {
+        this.logger.warn(`Error consultando direcciones del cliente: ${err.message}`);
+      }
+    }
+
+    // Cobertura de la dirección anterior elegida: misma consulta que una ubicación compartida
+    if (!resultadoEnvio && estadoPedidoPrevio === 'PEDIDO_DIRECCION_ELEGIR' && this.zonasService) {
+      const idElegido = normalizarEntrada(entradaRaw).id ?? '';
+      const dirElegida = idElegido.startsWith('ped_dir_')
+        ? direccionesCliente?.find((d) => `ped_dir_${d.id}` === idElegido)
+        : undefined;
+      if (dirElegida && dirElegida.lat != null && dirElegida.lng != null) {
+        try {
+          resultadoEnvio = await this.zonasService.consultarEnvio(dirElegida.lat, dirElegida.lng);
+        } catch (err: any) {
+          this.logger.warn(`Error consultando cobertura de dirección anterior: ${err.message}`);
+        }
+      }
+    }
+
     // 6.b Consultar franjas de reserva si el flujo está en reserva o es intención de reserva
     let franjasDisponiblesReserva: string[] | undefined;
     let solicitudesPendientesTelefono: number | undefined;
@@ -791,6 +831,7 @@ export class EjecutorConversacionService {
       minutosInactividad,
       inactividadExpirada,
       resultadoEnvio,
+      direccionesCliente,
       franjasDisponiblesReserva,
       solicitudesPendientesTelefono,
       solicitudesCambioPendientesTelefono,
@@ -1344,7 +1385,7 @@ export class EjecutorConversacionService {
             const pedidoCreado = await this.pedidosService.crear(
               accion.dto,
               accion.claveIdempotencia,
-              { canal: 'WHATSAPP' },
+              { canal: 'WHATSAPP', telefonoRemitente: conversacion.telefono },
             );
             codigoFinal = pedidoCreado.codigo;
 

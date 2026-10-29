@@ -242,6 +242,7 @@ describe('SalonService', () => {
         service.abrirPedido({
           mesas: [3],
           lineas: [{ productoId: 1, cantidad: 1 }],
+          cliente: { nombre: 'Lucía Pérez' },
         }),
       ).rejects.toThrow(ConflictException);
 
@@ -249,6 +250,7 @@ describe('SalonService', () => {
         await service.abrirPedido({
           mesas: [3],
           lineas: [{ productoId: 1, cantidad: 1 }],
+          cliente: { nombre: 'Lucía Pérez' },
         });
       } catch (err: any) {
         expect(err.getResponse()).toEqual({
@@ -276,6 +278,7 @@ describe('SalonService', () => {
         service.abrirPedido({
           mesas: [3],
           lineas: [{ productoId: 1, cantidad: 1 }],
+          cliente: { nombre: 'Lucía Pérez' },
         }),
       ).rejects.toThrow(ConflictException);
 
@@ -283,6 +286,7 @@ describe('SalonService', () => {
         await service.abrirPedido({
           mesas: [3],
           lineas: [{ productoId: 1, cantidad: 1 }],
+          cliente: { nombre: 'Lucía Pérez' },
         });
       } catch (err: any) {
         expect(err.getResponse()).toEqual({
@@ -307,12 +311,97 @@ describe('SalonService', () => {
       await service.abrirPedido({
         mesas: [6],
         lineas: [{ productoId: 1, cantidad: 1 }],
+        cliente: { nombre: 'Lucía Pérez' },
         pago: { metodo: 'YAPE', plan } as any,
       });
 
       const [dtoEnviado] = pedidosServiceMock.crear.mock.calls[0];
       expect(dtoEnviado.pago.plan).toEqual(plan);
       expect(dtoEnviado.modalidad).toBe('MESA');
+    });
+
+    it('pedido de mesa con clienteDni lo reenvía a la creación compartida (suma puntos al cobrar)', async () => {
+      prismaMock.elementoPlano.findMany.mockResolvedValue([{ id: 6n, numero: 6, tipo: 'MESA', activo: true }]);
+      prismaMock.pedidoMesa.findMany.mockResolvedValue([]);
+      prismaMock.reservaMesa.findMany.mockResolvedValue([]);
+      pedidosServiceMock.crear.mockResolvedValue({ id: '78', codigo: 'CP-M078', total: 10 });
+
+      await service.abrirPedido({ mesas: [6], lineas: [{ productoId: 1, cantidad: 1 }], clienteDni: '70123401' });
+
+      expect(pedidosServiceMock.crear.mock.calls[0][0].clienteDni).toBe('70123401');
+    });
+
+    it('pedido de mesa con clientePartyId lo reenvía a la creación compartida sin nombre ni teléfono de relleno', async () => {
+      prismaMock.elementoPlano.findMany.mockResolvedValue([{ id: 6n, numero: 6, tipo: 'MESA', activo: true }]);
+      prismaMock.pedidoMesa.findMany.mockResolvedValue([]);
+      prismaMock.reservaMesa.findMany.mockResolvedValue([]);
+      pedidosServiceMock.crear.mockResolvedValue({ id: '79', codigo: 'CP-M079', total: 10 });
+
+      await service.abrirPedido({ mesas: [6], lineas: [{ productoId: 1, cantidad: 1 }], clientePartyId: '77' });
+
+      const [dtoEnviado] = pedidosServiceMock.crear.mock.calls[0];
+      expect(dtoEnviado.clientePartyId).toBe('77');
+      expect(dtoEnviado.cliente).toEqual({ nombre: '', telefono: '' });
+    });
+
+    it('mesa sin cuenta y sin nombre (o de 1 letra) -> 400 CLIENTE_NOMBRE_REQUERIDO', async () => {
+      prismaMock.elementoPlano.findMany.mockResolvedValue([{ id: 6n, numero: 6, tipo: 'MESA', activo: true }]);
+      prismaMock.pedidoMesa.findMany.mockResolvedValue([]);
+
+      await expect(
+        service.abrirPedido({ mesas: [6], lineas: [{ productoId: 1, cantidad: 1 }] }),
+      ).rejects.toMatchObject({ response: { codigo: 'CLIENTE_NOMBRE_REQUERIDO' } });
+      await expect(
+        service.abrirPedido({ mesas: [6], lineas: [{ productoId: 1, cantidad: 1 }], cliente: { nombre: 'A' } }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(pedidosServiceMock.crear).not.toHaveBeenCalled();
+    });
+
+    it('mesa con nombre y sin teléfono guarda sin teléfono real (no usa el relleno 999999999)', async () => {
+      prismaMock.elementoPlano.findMany.mockResolvedValue([{ id: 6n, numero: 6, tipo: 'MESA', activo: true }]);
+      prismaMock.pedidoMesa.findMany.mockResolvedValue([]);
+      prismaMock.reservaMesa.findMany.mockResolvedValue([]);
+      pedidosServiceMock.crear.mockResolvedValue({ id: '81', codigo: 'CP-M081', total: 10 });
+
+      await service.abrirPedido({ mesas: [6], lineas: [{ productoId: 1, cantidad: 1 }], cliente: { nombre: 'Lucía Pérez' } });
+
+      const [dtoEnviado] = pedidosServiceMock.crear.mock.calls[0];
+      expect(dtoEnviado.cliente).toEqual({ nombre: 'Lucía Pérez', telefono: '' });
+    });
+
+    it('mesa con nombre y teléfono válido lo pasa normalizado; el relleno 999999999 cuenta como sin teléfono', async () => {
+      prismaMock.elementoPlano.findMany.mockResolvedValue([{ id: 6n, numero: 6, tipo: 'MESA', activo: true }]);
+      prismaMock.pedidoMesa.findMany.mockResolvedValue([]);
+      prismaMock.reservaMesa.findMany.mockResolvedValue([]);
+      pedidosServiceMock.crear.mockResolvedValue({ id: '82', codigo: 'CP-M082', total: 10 });
+
+      await service.abrirPedido({
+        mesas: [6],
+        lineas: [{ productoId: 1, cantidad: 1 }],
+        cliente: { nombre: 'Lucía Pérez', telefono: '+51 987 654 321' },
+      });
+      expect(pedidosServiceMock.crear.mock.calls[0][0].cliente).toEqual({ nombre: 'Lucía Pérez', telefono: '987654321' });
+
+      await service.abrirPedido({
+        mesas: [6],
+        lineas: [{ productoId: 1, cantidad: 1 }],
+        cliente: { nombre: 'Lucía Pérez', telefono: '999999999' },
+      });
+      expect(pedidosServiceMock.crear.mock.calls[1][0].cliente).toEqual({ nombre: 'Lucía Pérez', telefono: '' });
+    });
+
+    it('mesa con teléfono que no es de 9 dígitos que empiezan en 9 -> 400 TELEFONO_INVALIDO', async () => {
+      prismaMock.elementoPlano.findMany.mockResolvedValue([{ id: 6n, numero: 6, tipo: 'MESA', activo: true }]);
+      prismaMock.pedidoMesa.findMany.mockResolvedValue([]);
+
+      await expect(
+        service.abrirPedido({
+          mesas: [6],
+          lineas: [{ productoId: 1, cantidad: 1 }],
+          cliente: { nombre: 'Lucía Pérez', telefono: '12345' },
+        }),
+      ).rejects.toMatchObject({ response: { codigo: 'TELEFONO_INVALIDO' } });
+      expect(pedidosServiceMock.crear).not.toHaveBeenCalled();
     });
 
     it('varias mesas en un pedido (RN-CAP-108) crea pedidos_mesa y emite salon:mesa para todas', async () => {
@@ -340,6 +429,7 @@ describe('SalonService', () => {
         {
           mesas: [4, 5],
           lineas: [{ productoId: 1, cantidad: 2 }],
+          cliente: { nombre: 'Lucía Pérez' },
         },
         { partyId: 12n, rol: 'MOZO' } as any,
       );
@@ -369,7 +459,7 @@ describe('SalonService', () => {
       });
 
       const res = await service.abrirPedido(
-        { mesas: [4], lineas: [{ productoId: 1, cantidad: 1 }], reservaId: 55 },
+        { mesas: [4], lineas: [{ productoId: 1, cantidad: 1 }], cliente: { nombre: 'Lucía Pérez' }, reservaId: 55 },
         { partyId: 12n, rol: 'MOZO' } as any,
       );
       expect(res.codigo).toBe('CP-W009');
@@ -377,7 +467,7 @@ describe('SalonService', () => {
 
       reservasMock.marcarPedidoDeReserva.mockRejectedValue(new Error('reserva ya no existe'));
       const res2 = await service.abrirPedido(
-        { mesas: [4], lineas: [{ productoId: 1, cantidad: 1 }], reservaId: 56 },
+        { mesas: [4], lineas: [{ productoId: 1, cantidad: 1 }], cliente: { nombre: 'Lucía Pérez' }, reservaId: 56 },
         { partyId: 12n, rol: 'MOZO' } as any,
       );
       expect(res2.codigo).toBe('CP-W009');
@@ -412,6 +502,7 @@ describe('SalonService', () => {
       const res = await service.abrirPedido({
         mesas: [6],
         lineas: [{ productoId: 1, cantidad: 1 }],
+        cliente: { nombre: 'Lucía Pérez' },
       });
 
       expect(res.codigo).toBe('CP-W009');

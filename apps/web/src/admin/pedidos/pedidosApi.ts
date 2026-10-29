@@ -103,6 +103,8 @@ export interface FiltrosListarPedidos {
   limite?: number;
   desde?: string;
   hasta?: string;
+  /** Solo días anteriores en curso o con pago pendiente (ignora desde/hasta) */
+  pendientes?: boolean;
 }
 
 /** Pregunta de reprogramar tras el retiro: esperando, dijo sí/no, sin respuesta, tope o sin pregunta. */
@@ -225,6 +227,7 @@ export const pedidosApi = {
     if (filtros.limite) params.append('limite', String(filtros.limite));
     if (filtros.desde) params.append('desde', filtros.desde);
     if (filtros.hasta) params.append('hasta', filtros.hasta);
+    if (filtros.pendientes) params.append('pendientes', '1');
 
     const query = params.toString();
     const ruta = query ? `/admin/pedidos?${query}` : '/admin/pedidos';
@@ -311,6 +314,10 @@ export const pedidosApi = {
       };
       nota?: string;
       cuponCodigo?: string;
+      /** Cliente con cuenta (8 dígitos): el pedido suma puntos y guarda la dirección en su libreta */
+      clienteDni?: string;
+      /** Cliente con cuenta elegido en «¿Quién pide?» (id del party), si no va clienteDni */
+      clientePartyId?: string;
       esPersonal?: boolean;
       colaboradorPartyId?: string | number;
       canal?: 'MOZO' | 'CAJA';

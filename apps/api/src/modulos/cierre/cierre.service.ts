@@ -17,6 +17,7 @@ import {
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { CobrosService } from '../caja/cobros.service';
+import { PuntosService } from '../clientes/puntos.service';
 import { SupervisorCodigoService } from '../supervisor-codigo/supervisor-codigo.service';
 import { CobrarDto } from '../caja/dto/cobrar.dto';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
@@ -82,6 +83,7 @@ export class CierreService {
     private readonly eventosGateway: EventosGateway,
     private readonly cobrosService: CobrosService,
     @Optional() private readonly supervisorCodigoService?: SupervisorCodigoService,
+    @Optional() private readonly puntosService?: PuntosService,
   ) {}
 
   /** Nombre de la persona de cada party (quién cerró la caja): el historial muestra nombres, no IDs. */
@@ -709,7 +711,7 @@ export class CierreService {
       );
     }
 
-    const { liquidacion, esperado, entregado } = await this.prisma.$transaction(async (tx) => {
+    const { liquidacion, esperado, entregado, pedidosIds } = await this.prisma.$transaction(async (tx) => {
       const caja = await this.bloquearCajaAbierta(tx, cajaAbierta.id);
 
       const repartidores = await this.repartidoresConEfectivo(tx, caja);
@@ -738,13 +740,24 @@ export class CierreService {
 
       // Ese efectivo ya entró a caja por la liquidación: sus pedidos dejan de estar pendientes de cobro.
       // Si siguieran PENDIENTE bloquearían el cierre, y cobrarlos después contaría el efectivo dos veces.
+      const pedidosIds = (info?.pedidos ?? []).map((p) => BigInt(p.id));
       await tx.pedido.updateMany({
-        where: { id: { in: (info?.pedidos ?? []).map((p) => BigInt(p.id)) }, pago_estado: 'PENDIENTE' },
+        where: { id: { in: pedidosIds }, pago_estado: 'PENDIENTE' },
         data: { pago_estado: 'PAGADO' },
       });
 
-      return { liquidacion: liq, esperado: pendiente, entregado: entregadoCentimos };
+      return { liquidacion: liq, esperado: pendiente, entregado: entregadoCentimos, pedidosIds };
     });
+
+    // el contra entrega se cobra aquí y no pasa por Caja → cobrar: suma los puntos del cliente
+    // (idempotente; si falla no deshace la liquidación)
+    for (const id of pedidosIds) {
+      try {
+        await this.puntosService?.acumularPorPedido(id);
+      } catch {
+        // sin puntos no se detiene la liquidación
+      }
+    }
 
     const diferencia = enPesos(entregado - esperado);
 
@@ -802,6 +815,8 @@ export class CierreService {
         estado: true,
         total: true,
         creado_en: true,
+        pago_estado: true,
+        cliente_nombre: true,
       },
     });
 
@@ -811,6 +826,9 @@ export class CierreService {
       canal: p.canal,
       modalidad: p.modalidad,
       estado: p.estado,
+      pagoEstado: p.pago_estado,
+      // Solo el nombre para reconocer el pedido; nunca teléfono ni DNI
+      clienteNombre: p.cliente_nombre?.trim() || null,
       total: enPesos(aCentimos(p.total)),
       fecha: p.creado_en,
     }));

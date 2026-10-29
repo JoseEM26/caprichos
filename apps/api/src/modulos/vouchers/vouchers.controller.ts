@@ -53,12 +53,16 @@ export class VouchersController {
   ) {
     const file = files?.archivo?.[0] || files?.file?.[0];
     const pedidoId = pedidoIdRaw ? String(pedidoIdRaw).trim() : undefined;
-    const medioNormalizado =
-      medioRaw && String(medioRaw).toUpperCase().includes('PLIN')
-        ? 'PLIN'
-        : medioRaw && String(medioRaw).toUpperCase().includes('YAPE')
-        ? 'YAPE'
-        : undefined;
+    // Motivo del cambio (solo cuando reemplaza un voucher vigente), viene en el cuerpo multipart
+    const motivoCambio = req.body?.motivoCambio != null ? String(req.body.motivoCambio) : undefined;
+    const medioTexto = String(medioRaw ?? '').toUpperCase();
+    const medioNormalizado = medioTexto.includes('PLIN')
+      ? 'PLIN'
+      : medioTexto.includes('YAPE')
+      ? 'YAPE'
+      : medioTexto.includes('TRANSF')
+      ? 'TRANSFERENCIA'
+      : undefined;
 
     const ip = extraerIp(req);
 
@@ -67,6 +71,7 @@ export class VouchersController {
       {
         pedidoId,
         medio: medioNormalizado,
+        motivoCambio,
       },
       req.usuario,
       ip,
@@ -87,7 +92,8 @@ export class VouchersController {
 
   /**
    * POST /admin/vouchers/enviar-a-caja
-   * El mozo envía a Caja el cobro de la mesa (medio: EFECTIVO | YAPE | PLIN | TRANSFERENCIA).
+   * El mozo envía a Caja el cobro de la mesa. Forma nueva: plan [{medio, monto}] (pago dividido).
+   * Forma anterior: medio (EFECTIVO | YAPE | PLIN | TRANSFERENCIA).
    * No cobra: Caja revisa el voucher y cobra. Permiso: vouchers/subir (MOZO, CAJERO, ADMIN)
    */
   @Post('enviar-a-caja')
@@ -95,10 +101,17 @@ export class VouchersController {
   async enviarACaja(
     @Body('pedidoId') pedidoIdRaw: any,
     @Body('medio') medioRaw: any,
+    @Body('plan') planRaw: any,
     @Req() req: any,
   ) {
     const pedidoId = pedidoIdRaw ? String(pedidoIdRaw).trim() : '';
-    return this.vouchersService.enviarACaja(pedidoId, String(medioRaw ?? ''), req.usuario, extraerIp(req));
+    return this.vouchersService.enviarACaja(
+      pedidoId,
+      String(medioRaw ?? ''),
+      req.usuario,
+      extraerIp(req),
+      planRaw ?? undefined,
+    );
   }
 
   /**
@@ -136,6 +149,20 @@ export class VouchersController {
   }
 
   /**
+   * GET /admin/vouchers/estado-ia
+   * Pausa de la lectura con IA (saldo, clave o errores) y tope mensual. Lo usa la franja de Caja.
+   * Permiso: vouchers/ver o configuracion/ver
+   */
+  @Get('estado-ia')
+  @Permiso([
+    { modulo: 'vouchers', accion: 'ver' },
+    { modulo: 'configuracion', accion: 'ver' },
+  ])
+  async estadoIa() {
+    return this.vouchersService.estadoIa();
+  }
+
+  /**
    * POST /admin/vouchers/:id/revisado
    * Registra revisado_por/en y auditoría.
    * Permiso: vouchers/ver (CAJERO, ADMIN)
@@ -162,6 +189,16 @@ export class VouchersController {
   async reasignar(@Param('id') id: string, @Body() dto: ReasignarVoucherDto, @Req() req: any) {
     const ip = extraerIp(req);
     return this.vouchersService.reasignar(id, dto.pedidoId, req.usuario, ip);
+  }
+
+  /**
+   * POST /admin/vouchers/:id/quitar: retira el voucher sin borrarlo (queda en el historial como Retirado).
+   * Mozo: solo sus pedidos, mientras Caja no apruebe el pago. Caja/Admin: motivo ≥5.
+   */
+  @Post(':id/quitar')
+  @Permiso('vouchers', 'subir')
+  async quitarVoucher(@Param('id') id: string, @Body('motivo') motivo: unknown, @Req() req: any) {
+    return this.vouchersService.quitarVoucher(id, motivo, req.usuario, extraerIp(req));
   }
 
   @Post(':id/revisado')

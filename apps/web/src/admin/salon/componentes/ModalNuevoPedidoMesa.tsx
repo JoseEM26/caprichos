@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
+import { useSalonSocket } from '../useSalonSocket';
 import { Confirmar } from '../../../comun/Confirmar';
 import { Cargando } from '../../../comun/Cargando';
 import { api } from '../../../comun/api';
 import { MapaUbicacion } from '../../../comun/mapa/MapaUbicacion';
 import type { Punto as CoordenadaMapa } from '../../../comun/mapa/MapaUbicacion';
 import { BuscadorDireccion } from '../../../comun/mapa/BuscadorDireccion';
+import { SEDE_DEFECTO, cargarSede } from '../../../comun/mapa/sedeDefecto';
 import { CategoriaCarta, ProductoCarta, OpcionCarta as OpcionProducto } from '../../../carta/tipos';
 import { ElementoPlano, MesaSalon, PisoPlano, PisoSalon } from '../tipos';
 import { CuadriculaPlano } from './CuadriculaPlano';
@@ -29,6 +31,13 @@ import {
   type FilaPlan,
 } from '../../pedidos/planPago';
 import { listarPersonalActivo, ColaboradorActivo as PersonalItem } from '../../creditos/creditosApi';
+import {
+  buscarCuentaPorDni,
+  fechaCortaDireccion,
+  mensajeErrorCuentaDni,
+  type CuentaCliente,
+  type DireccionCliente,
+} from './clienteCuentaDni';
 
 export interface ModalNuevoPedidoMesaProps {
   abierto: boolean;
@@ -72,6 +81,8 @@ interface ClienteBuscado {
   nombre: string;
   dni: string;
   puntos: number;
+  /** Id del party de la cuenta (lo manda el pedido como clientePartyId) */
+  partyId: string;
 }
 
 /** Marca la primera coincidencia de `q` (ya en minúsculas) dentro de `texto` */
@@ -89,10 +100,12 @@ function resaltarCoincidencia(texto: string, q: string) {
   );
 }
 
+const PISOS_VACIOS: PisoSalon[] = [];
+
 export function ModalNuevoPedidoMesa({
   abierto,
   alCerrar,
-  pisos = [],
+  pisos: pisosProp = PISOS_VACIOS,
   mesaPreseleccionadaId,
   mesasPreseleccionadasIds = [],
   pasoInicial,
@@ -146,6 +159,26 @@ export function ModalNuevoPedidoMesa({
   // Mesas seleccionadas
   const [mesasSeleccionadas, setMesasSeleccionadas] = useState<string[]>(todasLasMesasIniciales);
 
+  // Copia local de las mesas: el padre la pasa, pero no siempre la refresca. El modal la actualiza
+  // con el socket (salon:mesa) y tras liberar o forzar, así el plano de adentro no queda con la mesa ocupada.
+  const [pisos, setPisos] = useState<PisoSalon[]>(pisosProp);
+  useEffect(() => {
+    setPisos(pisosProp);
+  }, [pisosProp]);
+  const refrescarMesas = async () => {
+    try {
+      const r = await salonApi.obtenerMesas();
+      setPisos(r?.pisos ?? []);
+    } catch {
+      // sin conexión: queda la última copia
+    }
+  };
+  useSalonSocket({
+    onMesaCambio: () => {
+      if (abierto && modalidad === 'local') void refrescarMesas();
+    },
+  });
+
   // Pisos activos
   const pisosActivos = useMemo(() => pisos.filter((p) => p.activo !== false), [pisos]);
   const [pisoActivoId, setPisoActivoId] = useState<string>(
@@ -185,6 +218,16 @@ export function ModalNuevoPedidoMesa({
     modoGratis?: 'desde' | 'mas_de';
   } | null>(null);
 
+  // Sede de Caprichos para el mapa de delivery: se carga una sola vez (por defecto si falla)
+  const [sedeLocal, setSedeLocal] = useState(SEDE_DEFECTO);
+  useEffect(() => {
+    let vigente = true;
+    cargarSede().then((s) => vigente && setSedeLocal(s));
+    return () => {
+      vigente = false;
+    };
+  }, []);
+
   // Consultar zona cuando cambia cliPuntoMapa
   useEffect(() => {
     if (!cliPuntoMapa) {
@@ -214,6 +257,97 @@ export function ModalNuevoPedidoMesa({
     };
   }, [cliPuntoMapa]);
 
+  // Para llevar / delivery: 'invitado' pide nombre y teléfono; 'cuenta' toma los datos de la cuenta por DNI
+  const [modoCli, setModoCli] = useState<'invitado' | 'cuenta'>('invitado');
+  const [dniCli, setDniCli] = useState('');
+  const [cuenta, setCuenta] = useState<CuentaCliente | null>(null);
+  const [buscandoCuenta, setBuscandoCuenta] = useState(false);
+  const [errorCuenta, setErrorCuenta] = useState<string | null>(null);
+  const [sinCuenta, setSinCuenta] = useState(false);
+  // Dirección de la libreta elegida: id de la dirección, 'nueva' o null (todavía no eligió)
+  const [direccionElegida, setDireccionElegida] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (modoCli !== 'cuenta') return;
+    // Cambiar o borrar el DNI quita los datos de la cuenta anterior (no deben colarse al pedido)
+    setCuenta(null);
+    setSinCuenta(false);
+    setErrorCuenta(null);
+    setCliNombre('');
+    setCliTelefono('');
+    setCliDireccion('');
+    setCliReferencia('');
+    setCliPuntoMapa(null);
+    setDireccionElegida(null);
+    if (dniCli.length !== 8) {
+      setBuscandoCuenta(false);
+      return;
+    }
+    let vigente = true;
+    setBuscandoCuenta(true);
+    buscarCuentaPorDni(dniCli)
+      .then((c) => {
+        if (!vigente) return;
+        if (!c) {
+          setSinCuenta(true);
+          return;
+        }
+        setCuenta(c);
+        setCliNombre(c.nombre);
+        setCliTelefono(c.telefono ?? '');
+        setDireccionElegida(c.direcciones.length === 0 ? 'nueva' : null);
+      })
+      .catch((err) => {
+        if (vigente) setErrorCuenta(mensajeErrorCuentaDni(err));
+      })
+      .finally(() => {
+        if (vigente) setBuscandoCuenta(false);
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [dniCli, modoCli]);
+
+  const cambiarModoCli = (m: 'invitado' | 'cuenta') => {
+    if (m === modoCli) return;
+    setModoCli(m);
+    setDniCli('');
+    setCuenta(null);
+    setSinCuenta(false);
+    setErrorCuenta(null);
+    setDireccionElegida(null);
+    setCliNombre('');
+    setCliTelefono('');
+    setCliDireccion('');
+    setCliReferencia('');
+    setCliPuntoMapa(null);
+  };
+
+  const elegirDireccionAnterior = (d: DireccionCliente) => {
+    setDireccionElegida(d.id);
+    setCliDireccion(d.direccion);
+    setCliReferencia(d.referencia ?? '');
+    setCliPuntoMapa(d.lat != null && d.lng != null ? { lat: d.lat, lng: d.lng } : null);
+  };
+
+  const elegirDireccionNueva = () => {
+    setDireccionElegida('nueva');
+    setCliDireccion('');
+    setCliReferencia('');
+    setCliPuntoMapa(null);
+  };
+
+  // Con cuenta basta con la cuenta encontrada (nombre y teléfono vienen de ella); si no, nombre obligatorio
+  const datosCliListos = modoCli === 'cuenta' ? cuenta !== null : cliNombre.trim().length > 0;
+  // Delivery: hace falta dirección (escrita o en el mapa), venga de la libreta o sea nueva
+  const cliListo =
+    datosCliListos &&
+    (modalidad !== 'delivery' || cliDireccion.trim().length > 0 || cliPuntoMapa !== null);
+  // Con cuenta y direcciones guardadas, el formulario de dirección aparece solo si elige «Dirección nueva»
+  const mostrarFormDireccion =
+    modoCli === 'invitado' ||
+    (cuenta !== null && (cuenta.direcciones.length === 0 || direccionElegida === 'nueva'));
+
   // ¿Quién pide? ('anon' | 'cliente' | 'personal')
   const [pideMode, setPideMode] = useState<'anon' | 'cliente' | 'personal'>(
     pedidoRepetir?.es_personal ? 'personal' : 'anon',
@@ -224,7 +358,16 @@ export function ModalNuevoPedidoMesa({
     nombre: string;
     dni: string;
     puntos: number;
+    partyId: string;
   } | null>(null);
+  // Cliente con cuenta de «¿Quién pide?» que viaja como clientePartyId. Si el paso de datos ya identificó
+  // a una cuenta por DNI (delivery/recoger), esa gana y no se envía este.
+  const clientePideId =
+    pideMode === 'cliente' &&
+    clienteEncontrado?.partyId &&
+    !(modalidad !== 'local' && modoCli === 'cuenta' && cuenta !== null)
+      ? clienteEncontrado.partyId
+      : undefined;
   const [resultadosCliente, setResultadosCliente] = useState<ClienteBuscado[]>([]);
   const [buscandoCliente, setBuscandoCliente] = useState(false);
   const [errorBuscarCliente, setErrorBuscarCliente] = useState(false);
@@ -282,6 +425,7 @@ export function ModalNuevoPedidoMesa({
             nombre: c.nombre || `${c.nombres || ''} ${c.apellidos || ''}`.trim(),
             dni: c.dni || '',
             puntos: Number(c.puntos || 0),
+            partyId: c.id != null ? String(c.id) : '',
           })),
         );
         setConsultaResuelta(q);
@@ -597,6 +741,17 @@ export function ModalNuevoPedidoMesa({
     }
   };
 
+  // Mesa: el nombre es obligatorio (boleta, etiqueta y lista). Con cuenta sale de la cuenta; con personal,
+  // del colaborador; sin cuenta se escribe. El teléfono es opcional y solo se pide sin cuenta.
+  const nombreMesaDeCuenta = pideMode === 'cliente' && clienteEncontrado ? clienteEncontrado.nombre : null;
+  const nombreMesaDeStaff = pideMode === 'personal' && staffElegido ? staffElegido.nombre : null;
+  const nombreMesaFijo = nombreMesaDeCuenta ?? nombreMesaDeStaff;
+  const nombreMesa = (nombreMesaFijo ?? cliNombre).trim();
+  const nombreMesaListo =
+    modalidad !== 'local' || (pideMode === 'cliente' ? clienteEncontrado !== null : nombreMesa.length >= 2);
+  const telefonoMesa = cliTelefono.replace(/\D/g, '');
+  const telefonoMesaValido = telefonoMesa === '' || /^9\d{8}$/.test(telefonoMesa);
+
   // Enviar pedido a cocina o registrar pedido (Para llevar / Delivery)
   const handleEnviarPedido = async () => {
     if (lineas.length === 0 || (modalidad === 'local' && mesasSeleccionadas.length === 0)) {
@@ -642,20 +797,20 @@ export function ModalNuevoPedidoMesa({
             canal: canalEnvio,
             esPersonal: pideMode === 'personal',
             colaboradorPartyId: staffElegido?.partyId,
+            clientePartyId: clientePideId,
             pago: {
               metodo: metodoPrincipalAhora,
               pagaCon: pagaConValido(),
               plan: planAhora,
             },
-            cliente: cliNombre.trim()
-              ? {
-                  nombre: cliNombre.trim(),
-                  telefono:
-                    cliTelefono.replace(/\D/g, '').length === 9
-                      ? cliTelefono.replace(/\D/g, '')
-                      : '999999999',
-                }
-              : undefined,
+            // Con cuenta el nombre y el teléfono salen de la cuenta; sin cuenta va el nombre que escribe el mozo
+            cliente:
+              pideMode === 'cliente'
+                ? undefined
+                : {
+                    nombre: nombreMesa,
+                    telefono: telefonoMesaValido && telefonoMesa ? telefonoMesa : undefined,
+                  },
           },
           idempotencyKey,
         );
@@ -692,6 +847,9 @@ export function ModalNuevoPedidoMesa({
             esPersonal: pideMode === 'personal',
             colaboradorPartyId: staffElegido?.partyId,
             canal: canalEnvio,
+            // Solo con cuenta: el pedido suma puntos y guarda la dirección en su libreta
+            clienteDni: modoCli === 'cuenta' && cuenta ? dniCli : undefined,
+            clientePartyId: clientePideId,
           },
           idempotencyKey,
         );
@@ -1580,6 +1738,134 @@ export function ModalNuevoPedidoMesa({
           {/* ============================================================= */}
           {paso === 'cli' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {/* Quién es el cliente: con cuenta (DNI) o invitado */}
+              <div role="group" aria-label="Tipo de cliente" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {(
+                  [
+                    ['cuenta', 'Cliente con cuenta (DNI)'],
+                    ['invitado', 'Invitado'],
+                  ] as const
+                ).map(([valor, texto]) => (
+                  <button
+                    key={valor}
+                    type="button"
+                    aria-pressed={modoCli === valor}
+                    onClick={() => cambiarModoCli(valor)}
+                    style={{
+                      minHeight: '44px',
+                      padding: '0 16px',
+                      borderRadius: '9999px',
+                      border: `1.5px solid ${modoCli === valor ? 'var(--cp-navy)' : 'var(--cp-line)'}`,
+                      background: modoCli === valor ? 'var(--cp-navy)' : 'var(--cp-white)',
+                      color: modoCli === valor ? 'var(--cp-white)' : 'var(--cp-navy)',
+                      fontWeight: 800,
+                      fontSize: '14px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {texto}
+                  </button>
+                ))}
+              </div>
+
+              {modoCli === 'cuenta' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div>
+                    <label
+                      htmlFor="cli-dni"
+                      style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}
+                    >
+                      DNI del cliente (8 dígitos) *
+                    </label>
+                    <input
+                      id="cli-dni"
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      value={dniCli}
+                      onChange={(e) => setDniCli(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                      placeholder="Ej.: 45213678"
+                      style={{
+                        width: '100%',
+                        maxWidth: '260px',
+                        boxSizing: 'border-box',
+                        minHeight: '46px',
+                        borderRadius: '10px',
+                        border: '1.5px solid var(--cp-line)',
+                        background: 'var(--cp-white)',
+                        padding: '0 12px',
+                        fontSize: '14px',
+                      }}
+                    />
+                  </div>
+
+                  {buscandoCuenta && (
+                    <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>Buscando cuenta…</div>
+                  )}
+
+                  {errorCuenta && (
+                    <div role="alert" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-rust)' }}>
+                      {errorCuenta}
+                    </div>
+                  )}
+
+                  {sinCuenta && !buscandoCuenta && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        flexWrap: 'wrap',
+                        fontSize: '14px',
+                        fontWeight: 700,
+                        color: 'var(--cp-navy)',
+                      }}
+                    >
+                      <span>No hay cuenta con ese DNI.</span>
+                      <button
+                        type="button"
+                        onClick={() => cambiarModoCli('invitado')}
+                        style={{
+                          minHeight: '44px',
+                          padding: '0 14px',
+                          borderRadius: '10px',
+                          border: '1.5px solid var(--cp-navy)',
+                          background: 'transparent',
+                          color: 'var(--cp-navy)',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Seguir como invitado
+                      </button>
+                    </div>
+                  )}
+
+                  {cuenta && (
+                    <div
+                      role="status"
+                      style={{
+                        background: 'var(--cp-white)',
+                        border: '1.5px solid var(--cp-ok)',
+                        borderRadius: '14px',
+                        padding: '12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px',
+                        fontSize: '14px',
+                        color: 'var(--cp-navy)',
+                      }}
+                    >
+                      <b style={{ fontSize: '15px' }}>{cuenta.nombre}</b>
+                      <span>DNI {cuenta.dniMascara}</span>
+                      <span>Teléfono: {cuenta.telefono || 'sin teléfono'}</span>
+                      <span>Puntos: {Number(cuenta.puntos).toFixed(2)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {modoCli === 'invitado' && (
               <div
                 style={{
                   display: 'grid',
@@ -1632,8 +1918,73 @@ export function ModalNuevoPedidoMesa({
                   />
                 </div>
               </div>
+              )}
 
-              {modalidad === 'delivery' && (
+              {/* Libreta del cliente con cuenta: direcciones anteriores o una nueva */}
+              {modalidad === 'delivery' && cuenta && cuenta.direcciones.length > 0 && (
+                <div
+                  role="group"
+                  aria-label="Dirección de entrega"
+                  style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
+                >
+                  <b style={{ color: 'var(--cp-navy)', fontSize: '14px' }}>
+                    ¿Lo enviamos a una dirección anterior o es una nueva?
+                  </b>
+                  {cuenta.direcciones.map((d) => {
+                    const elegida = direccionElegida === d.id;
+                    return (
+                      <button
+                        key={d.id}
+                        type="button"
+                        aria-pressed={elegida}
+                        onClick={() => elegirDireccionAnterior(d)}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'flex-start',
+                          gap: '2px',
+                          minHeight: '44px',
+                          textAlign: 'left',
+                          padding: '10px 12px',
+                          borderRadius: '12px',
+                          border: `1.5px solid ${elegida ? 'var(--cp-ok)' : 'var(--cp-line)'}`,
+                          background: 'var(--cp-white)',
+                          color: 'var(--cp-navy)',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                        }}
+                      >
+                        <span style={{ fontWeight: 800 }}>{d.direccion}</span>
+                        {d.referencia && (
+                          <span style={{ fontSize: '12px' }}>Referencia: {d.referencia}</span>
+                        )}
+                        <span style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
+                          Usada {d.usos} {d.usos === 1 ? 'vez' : 'veces'} · última vez{' '}
+                          {fechaCortaDireccion(d.ultimoUsoEn)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    aria-pressed={direccionElegida === 'nueva'}
+                    onClick={elegirDireccionNueva}
+                    style={{
+                      minHeight: '44px',
+                      borderRadius: '12px',
+                      border: `1.5px dashed ${direccionElegida === 'nueva' ? 'var(--cp-ok)' : 'var(--cp-navy)'}`,
+                      background: 'transparent',
+                      color: 'var(--cp-navy)',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Dirección nueva
+                  </button>
+                </div>
+              )}
+
+              {modalidad === 'delivery' && mostrarFormDireccion && (
                 <>
                   <div
                     style={{
@@ -1760,7 +2111,12 @@ export function ModalNuevoPedidoMesa({
                       punto={cliPuntoMapa}
                       onCambiar={(coord) => setCliPuntoMapa(coord)}
                       altura={220}
+                      local={sedeLocal}
+                      ajustarA={cliPuntoMapa ? 'ambos' : 'local'}
                     />
+                    <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
+                      El icono de la tienda es la sede (Caprichos).
+                    </div>
 
                     <div
                       style={{
@@ -1785,10 +2141,7 @@ export function ModalNuevoPedidoMesa({
 
               <button
                 type="button"
-                disabled={
-                  !cliNombre.trim() ||
-                  (modalidad === 'delivery' && !cliDireccion.trim() && !cliPuntoMapa)
-                }
+                disabled={!cliListo}
                 onClick={() => setPaso('items')}
                 style={{
                   minHeight: '48px',
@@ -1800,16 +2153,8 @@ export function ModalNuevoPedidoMesa({
                   fontFamily: 'Montserrat, sans-serif',
                   fontSize: '15px',
                   marginTop: '8px',
-                  opacity:
-                    cliNombre.trim() &&
-                    (modalidad !== 'delivery' || cliDireccion.trim() || cliPuntoMapa)
-                      ? 1
-                      : 0.5,
-                  cursor:
-                    cliNombre.trim() &&
-                    (modalidad !== 'delivery' || cliDireccion.trim() || cliPuntoMapa)
-                      ? 'pointer'
-                      : 'not-allowed',
+                  opacity: cliListo ? 1 : 0.5,
+                  cursor: cliListo ? 'pointer' : 'not-allowed',
                 }}
               >
                 Continuar a productos →
@@ -2010,6 +2355,76 @@ export function ModalNuevoPedidoMesa({
                   </button>
                 </div>
 
+                {/* Mesa: nombre obligatorio para la boleta, la etiqueta y la lista; teléfono opcional */}
+                {modalidad === 'local' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label htmlFor="np-nombre-mesa" style={{ fontWeight: 700, fontSize: '12px', color: 'var(--cp-navy)' }}>
+                      Nombre del cliente *
+                    </label>
+                    {nombreMesaFijo !== null ? (
+                      <div
+                        id="np-nombre-mesa"
+                        style={{ fontWeight: 800, fontSize: '14px', color: 'var(--cp-navy)' }}
+                      >
+                        {nombreMesa || 'Elige la cuenta del cliente'}
+                      </div>
+                    ) : (
+                      <input
+                        id="np-nombre-mesa"
+                        type="text"
+                        value={cliNombre}
+                        onChange={(e) => setCliNombre(e.target.value)}
+                        placeholder="Ej.: María López"
+                        style={{
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          minHeight: '40px',
+                          borderRadius: '10px',
+                          border: '1.5px solid var(--cp-line)',
+                          background: 'var(--cp-white)',
+                          padding: '0 12px',
+                          fontSize: '14px',
+                        }}
+                      />
+                    )}
+                    {pideMode !== 'cliente' && (
+                      <>
+                        <label htmlFor="np-telefono-mesa" style={{ fontWeight: 700, fontSize: '12px', color: 'var(--cp-navy)' }}>
+                          Teléfono (opcional)
+                        </label>
+                        <input
+                          id="np-telefono-mesa"
+                          type="tel"
+                          inputMode="numeric"
+                          value={cliTelefono}
+                          onChange={(e) => setCliTelefono(e.target.value)}
+                          placeholder="9 dígitos"
+                          aria-invalid={!telefonoMesaValido}
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            minHeight: '40px',
+                            borderRadius: '10px',
+                            border: `1.5px solid ${telefonoMesaValido ? 'var(--cp-line)' : 'var(--cp-rust)'}`,
+                            background: 'var(--cp-white)',
+                            padding: '0 12px',
+                            fontSize: '14px',
+                          }}
+                        />
+                        {telefonoMesaValido ? (
+                          <span style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
+                            Si lo escribes le enviamos una encuesta por WhatsApp al terminar
+                          </span>
+                        ) : (
+                          <span role="alert" style={{ fontSize: '11px', color: 'var(--cp-rust)', fontWeight: 700 }}>
+                            El teléfono debe tener 9 dígitos y empezar con 9
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+
                 {/* ¿Quién pide? (Sin cuenta / Cliente con cuenta / Personal) */}
                 {!pideOpen ? (
                   <div className="np-chip-pide">
@@ -2202,7 +2617,7 @@ export function ModalNuevoPedidoMesa({
                                 key={`${c.dni}-${idx}`}
                                 type="button"
                                 onClick={() => {
-                                  setClienteEncontrado({ nombre: c.nombre, dni: c.dni, puntos: c.puntos });
+                                  setClienteEncontrado({ nombre: c.nombre, dni: c.dni, puntos: c.puntos, partyId: c.partyId });
                                   setPideQ('');
                                   setPideOpen(false);
                                 }}
@@ -2487,6 +2902,7 @@ export function ModalNuevoPedidoMesa({
                   onChange={setFilasPlan}
                   pagaCon={cliPagaCon}
                   onPagaCon={setCliPagaCon}
+                  pagaConObligatorio={modalidad === 'delivery'}
                 />
 
                 {/* Botón Enviar a cocina / Registrar pedido */}
@@ -2495,7 +2911,9 @@ export function ModalNuevoPedidoMesa({
                   disabled={
                     lineas.length === 0 ||
                     (modalidad === 'local' && mesasSeleccionadas.length === 0) ||
-                    errorPlanAhora !== null
+                    (modalidad === 'local' && (!nombreMesaListo || !telefonoMesaValido)) ||
+                    errorPlanAhora !== null ||
+                    (modalidad === 'delivery' && montoEfectivoAhora > 0 && pagaConValido() === undefined)
                   }
                   onClick={() => setConfirmarEnviar(true)}
                   className="salon-pie-fijo np-enviar"
@@ -2556,8 +2974,8 @@ export function ModalNuevoPedidoMesa({
         }
         mensaje={
           modalidad === 'local'
-            ? `Se enviarán los productos para la mesa ${textoMesas}. Comenzará su preparación en cocina y se descontará el stock.`
-            : `Se registrará el pedido (${modalidad === 'delivery' ? 'Delivery' : 'Para llevar'}) a nombre de ${cliNombre || 'Cliente'} por S/ ${total.toFixed(2)}.`
+            ? `Se enviarán los productos para la mesa ${textoMesas}. Comenzará su preparación en cocina y se descontará el stock.${clientePideId && clienteEncontrado ? ` Pide ${clienteEncontrado.nombre}: el pedido suma sus puntos al cobrar.` : ''}`
+            : `Se registrará el pedido (${modalidad === 'delivery' ? 'Delivery' : 'Para llevar'}) a nombre de ${cliNombre || (clientePideId && clienteEncontrado ? clienteEncontrado.nombre : 'Cliente')} por S/ ${total.toFixed(2)}.`
         }
         textoConfirmar={modalidad === 'local' ? 'Sí, enviar comanda' : 'Sí, registrar'}
         textoNo="No, revisar"
@@ -2584,6 +3002,7 @@ export function ModalNuevoPedidoMesa({
           alLiberar={async (_mesaId: string, motivo: string) => {
             await salonApi.liberarMesaManual(mesaParaLiberar.id, motivo);
             setMesaParaLiberar(null);
+            await refrescarMesas();
             await alRefrescarMesas?.();
           }}
         />
@@ -2597,6 +3016,7 @@ export function ModalNuevoPedidoMesa({
           alForzar={async (mesaId: string, motivo: string) => {
             await salonApi.liberarMesaManual(mesaId, motivo, true);
             setMesaParaForzar(null);
+            await refrescarMesas();
             await alRefrescarMesas?.();
           }}
         />

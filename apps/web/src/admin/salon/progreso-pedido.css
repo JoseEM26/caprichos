@@ -1,0 +1,156 @@
+/* Progreso del pedido: línea de tiempo, áreas de cocina y barra de avance (mozo y carta). */
+
+.pp {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.pp--completo {
+  gap: 10px;
+}
+
+.pp-etiqueta {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--cp-navy);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+/* Línea de tiempo: una fila que cabe en el celular; el texto de cada paso se corta si no entra */
+.pp-linea {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+}
+
+.pp-paso {
+  flex: 1 1 0;
+  min-width: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--cp-soft);
+  text-align: center;
+}
+
+/* Segmento que une cada paso con el siguiente */
+.pp-paso:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  right: -50%;
+  height: 2px;
+  background: var(--cp-line);
+}
+
+.pp-paso--hecho:not(:last-child)::after {
+  background: var(--cp-green, #2F7A45);
+}
+
+.pp-punto {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid var(--cp-line);
+  background: var(--cp-cream);
+  position: relative;
+  z-index: 1;
+}
+
+.pp-paso--hecho .pp-punto {
+  background: var(--cp-green, #2F7A45);
+  border-color: var(--cp-green, #2F7A45);
+}
+
+.pp-paso--actual .pp-punto {
+  background: var(--cp-gold);
+  border-color: var(--cp-navy);
+  box-shadow: 0 0 0 3px var(--cp-greenbg, #DFF3E3);
+}
+
+.pp-paso--actual .pp-paso-etiq,
+.pp-paso--hecho .pp-paso-etiq {
+  color: var(--cp-navy);
+}
+
+.pp-paso--actual .pp-paso-etiq {
+  font-weight: 800;
+}
+
+.pp-paso-etiq {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Barra de avance de las áreas de cocina */
+.pp-barra {
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--cp-sand, #EFE7D6);
+  overflow: hidden;
+}
+
+.pp-barra-relleno {
+  display: block;
+  height: 100%;
+  border-radius: 9999px;
+  background: var(--cp-green, #2F7A45);
+  transition: width 0.4s ease;
+}
+
+/* Chips por área: estado en texto (no solo color) */
+.pp-areas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pp-area {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 9999px;
+  padding: 2px 9px;
+  border: 1px solid var(--cp-line);
+  color: var(--cp-navy);
+  background: transparent;
+}
+
+.pp-area--lista {
+  background: var(--cp-greenbg, #DFF3E3);
+  color: var(--cp-green, #2F7A45);
+  border-color: transparent;
+}
+
+.pp-area--preparando {
+  background: var(--cp-gold);
+  color: var(--cp-navy);
+  border-color: transparent;
+}
+
+.pp-area--pendiente {
+  color: var(--cp-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pp-barra-relleno {
+    transition: none;
+  }
+}

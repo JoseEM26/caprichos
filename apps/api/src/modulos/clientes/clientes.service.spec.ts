@@ -145,6 +145,7 @@ describe('ClientesService', () => {
         documentos: [{ tipo: 'DNI', numero: dni }],
         contactos: [],
         pedidos: [],
+        pedidosComoCliente: [],
       },
     });
 
@@ -166,9 +167,71 @@ describe('ClientesService', () => {
       expect(res.items.map((i) => i.nombre)).toEqual(['Luis']);
     });
 
+    it('cuenta los pedidos pagados por cliente_party_id y los de carta sin ese campo, no los de mozo ni los no pagados', async () => {
+      prismaMock.partyRole.findMany = jest.fn().mockResolvedValue([
+        {
+          ...rol(1, 'Ana', '45217890'),
+          party: {
+            ...rol(1, 'Ana', '45217890').party,
+            pedidosComoCliente: [{ id: 10n }, { id: 11n }],
+            pedidos: [{ id: 12n }],
+          },
+        },
+      ]);
+
+      const res = await service.listarAdmin({}, { rol: 'ADMIN' });
+
+      expect(res.items[0].pedidos).toBe(3);
+      const where = prismaMock.partyRole.findMany.mock.calls[0][0].include.party.include;
+      expect(where.pedidosComoCliente.where).toEqual({ pago_estado: 'PAGADO' });
+      expect(where.pedidos.where).toEqual({
+        pago_estado: 'PAGADO',
+        canal: { in: ['CARTA', 'WHATSAPP', 'BOT'] },
+        cliente_party_id: null,
+      });
+    });
+
     it('sin coincidencias devuelve lista vacía', async () => {
       const res = await service.listarAdmin({ q: '99999999' }, { rol: 'MOZO' });
       expect(res.items).toEqual([]);
+    });
+  });
+
+  describe('obtenerFichaAdmin: pedidos del cliente', () => {
+    it('lee los pedidos con la regla del listado (cliente_party_id, o carta/WhatsApp/bot sin ese campo) y suma solo los pagados', async () => {
+      prismaMock.party.findUnique = jest.fn().mockResolvedValue({
+        id: 5n,
+        persona: { nombres: 'Ana', correo: null, cumple_dia: null, cumple_mes: null },
+        documentos: [],
+        contactos: [],
+        roles: [],
+      });
+      prismaMock.pedido = {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 77n,
+            codigo: 'CP-077',
+            modalidad: 'MESA',
+            estado: 'ENTREGADO',
+            total: '25.50',
+            pago_estado: 'PAGADO',
+            creado_en: new Date('2026-10-29T15:00:00Z'),
+          },
+        ]),
+        aggregate: jest.fn().mockResolvedValue({ _count: { _all: 2 }, _sum: { total: '45.50' } }),
+      };
+
+      const ficha = await service.obtenerFichaAdmin('5', { rol: 'MOZO' });
+
+      const where = prismaMock.pedido.findMany.mock.calls[0][0].where;
+      expect(where.OR).toEqual([
+        { cliente_party_id: 5n },
+        { party_id: 5n, canal: { in: ['CARTA', 'WHATSAPP', 'BOT'] }, cliente_party_id: null },
+      ]);
+      expect(prismaMock.pedido.aggregate.mock.calls[0][0].where).toMatchObject({ pago_estado: 'PAGADO' });
+      expect(ficha.pedidosPagados).toBe(2);
+      expect(ficha.totalGastado).toBe(45.5);
+      expect(ficha.pedidos[0]).toMatchObject({ id: 'CP-077', pago: 'Cobrado', total: 's/ 25.50' });
     });
   });
 

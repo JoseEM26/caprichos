@@ -5,7 +5,7 @@ import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { HistorialCierres } from './HistorialCierres';
 import { cierreApi, calcularTotalEfectivo, PendienteCobro, RepartidorPorLiquidar } from './cierreApi';
-import { PendientesCobroCierre } from './PendientesCobroCierre';
+import { PendientesCobroCierre, AvisoBloqueoCierre, FocoPendientes, GrupoFoco } from './PendientesCobroCierre';
 import { pedidosApi, MovimientoCaja, CobroTurno } from '../pedidos/pedidosApi';
 import { ErrorApi } from '../../comun/api';
 import { SeccionVouchersCierre } from '../vouchers/SeccionVouchersCierre';
@@ -41,6 +41,9 @@ export function CierreView() {
   const [esperado, setEsperado] = useState<any>(null);
   const [repartidores, setRepartidores] = useState<RepartidorPorLiquidar[]>([]);
   const [pedidosAbiertos, setPedidosAbiertos] = useState<PendienteCobro[]>([]);
+  const [errorPendientes, setErrorPendientes] = useState(false);
+  // Enfoque pedido desde un aviso del cierre hacia el panel de pendientes
+  const [foco, setFoco] = useState<FocoPendientes | null>(null);
   const [pedidosCobrados, setPedidosCobrados] = useState<CobroTurno[]>([]);
 
   // Mensaje de éxito/notificación y error de la pantalla
@@ -163,8 +166,10 @@ export function CierreView() {
       if (esAdmin) {
         try {
           setPedidosAbiertos(await cierreApi.listarPendientesDeCobro());
+          setErrorPendientes(false);
         } catch {
           setPedidosAbiertos([]);
+          setErrorPendientes(true);
         }
       }
     } catch (err: any) {
@@ -255,6 +260,13 @@ export function CierreView() {
     setRequierePin(false);
     setMsgCierreError('');
     setAbrirModalCierre(true);
+  };
+
+  // Lleva al panel de pendientes (abre el cierre si hace falta) y abre el grupo pedido
+  const enfocarPendientes = (grupo: GrupoFoco) => {
+    setFaseCierre('verificar');
+    if (!abrirModalCierre) abrirCierre();
+    setFoco({ grupo, n: Date.now() });
   };
 
   // Acciones
@@ -1559,6 +1571,9 @@ export function CierreView() {
                   pendientes={pedidosAbiertos}
                   setPendientes={setPedidosAbiertos}
                   alCambiarTurno={cargarTurno}
+                  errorLista={errorPendientes}
+                  alReintentar={cargarTurno}
+                  foco={foco}
                 />
 
                 <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
@@ -1885,6 +1900,10 @@ export function CierreView() {
                   <div role="alert" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-rust, #B2500F)' }}>
                     {msgCierreError}
                   </div>
+                )}
+
+                {msgCierreError && pedidosAbiertos.length > 0 && (
+                  <AvisoBloqueoCierre pedidos={pedidosAbiertos} alVerGrupo={enfocarPendientes} />
                 )}
 
                 <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>

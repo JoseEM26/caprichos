@@ -7,6 +7,7 @@ import { Icono } from '../comun/Icono';
 import { useCarrito } from './CarritoContext';
 import { useCuentaOpcional } from './cuenta/CuentaContext';
 import { PasoPedido } from './PantallaConfirmacion';
+import { ProgresoPedido } from '../admin/salon/ProgresoPedido';
 import {
   consultarLote,
   EstadoSeguimiento,
@@ -228,6 +229,7 @@ function DetallePedido({ fila, onVolver }: { fila: Fila; onVolver: () => void })
           {estado.pasos.map((p, idx) => (
             <PasoPedido key={p.clave} paso={p} numero={idx + 1} />
           ))}
+          <ProgresoPedido progreso={estado.progreso} modalidad={estado.modalidad} variante="completo" sinLinea />
         </div>
       ) : (
         <p style={{ margin: 0, fontSize: 13, color: 'var(--cp-soft)' }}>

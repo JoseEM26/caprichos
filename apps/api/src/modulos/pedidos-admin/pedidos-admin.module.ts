@@ -9,9 +9,10 @@ import { PedidosModule } from '../pedidos/pedidos.module';
 import { ImpresionModule } from '../impresion/impresion.module';
 import { UbicarPedidoService } from './ubicar-pedido.service';
 import { ChatbotModule } from '../chatbot/chatbot.module';
+import { VouchersModule } from '../vouchers/vouchers.module';
 
 @Module({
-  imports: [SalonModule, ZonasModule, ClientesModule, StockModule, PedidosModule, ImpresionModule, ChatbotModule],
+  imports: [SalonModule, ZonasModule, ClientesModule, StockModule, PedidosModule, ImpresionModule, ChatbotModule, VouchersModule],
   controllers: [PedidosAdminController],
   providers: [
     PedidosEstadoService,

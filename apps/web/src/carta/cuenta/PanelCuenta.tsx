@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { Confirmar } from '../../comun/Confirmar';
 import { useCuenta } from './CuentaContext';
+import { MisDirecciones } from './MisDirecciones';
 
 const campo: CSSProperties = {
   width: '100%',
@@ -377,6 +378,9 @@ export function PanelCuenta({ alVerPedidos }: { alVerPedidos?: () => void } = {}
               <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 34 }}>{cliente.puntos}</span>
               <span style={{ fontSize: 12, opacity: 0.85 }}>Los acumulas con cada pedido que haces con tu cuenta y los usas en tus siguientes pedidos.</span>
             </div>
+
+            <MisDirecciones />
+
             <button
               onClick={() => {
                 cerrarPanel();

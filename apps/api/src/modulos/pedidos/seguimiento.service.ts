@@ -2,6 +2,7 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { obtenerFechaHoraLima } from '../local/local.util';
 import { generarTokenSeguimiento, verificarTokenSeguimiento } from './seguimiento.tokens';
+import { ContextoProgreso, progresoDelPedido, ProgresoPedido } from './progreso-pedido';
 import {
   calcularEtaEntrega,
   CONFIG_ETA_DEFECTO,
@@ -121,6 +122,8 @@ export interface SeguimientoPedido {
   terminado: boolean;
   anulado: boolean;
   pasos: PasoSeguimiento[];
+  /** Progreso en cocina y entrega (mismo cálculo que «Mis pedidos» del mozo). */
+  progreso: ProgresoPedido;
   /** Pago con Yape, Plin o transferencia: la pantalla pide adjuntar la captura. Solo en obtener(). */
   pagoDigital?: boolean;
   /**
@@ -137,6 +140,17 @@ export interface TiempoSeguimiento {
   texto: string;
 }
 
+// Área de cada línea (para contar las líneas por área en el progreso): solo ids, nunca nombres de cliente
+const SELECCION_AREA_LINEA = {
+  area_id: true,
+  producto: { select: { categoria: { select: { area_id: true } } } },
+};
+
+// Áreas de cocina del pedido y su estado (despejada o no)
+const SELECCION_COMANDAS = {
+  select: { area_id: true, estado: true, area: { select: { nombre: true } } },
+};
+
 // Campos que necesita el seguimiento: nada personal (nombre, teléfono, dirección, coordenadas)
 const SELECCION_SEGUIMIENTO = {
   id: true,
@@ -149,12 +163,15 @@ const SELECCION_SEGUIMIENTO = {
   listo_en: true,
   despachado_en: true,
   entregado_en: true,
+  entregado_mesa_en: true,
+  repartidor_party_id: true,
   eta_min: true,
   eta_max: true,
   entrega_lat: true,
   entrega_lng: true,
   zona: { select: { minutos_min: true, minutos_max: true } },
-  lineas: { where: { linea_combo_id: null }, select: { cantidad: true } },
+  lineas: { where: { linea_combo_id: null }, select: { cantidad: true, ...SELECCION_AREA_LINEA } },
+  comandas: SELECCION_COMANDAS,
   historial: {
     select: { estado_nuevo: true, en: true },
     orderBy: { en: 'asc' as const },
@@ -188,15 +205,15 @@ type PedidoSeguimiento = {
   entrega_lat: unknown;
   entrega_lng: unknown;
   zona: { minutos_min: number | null; minutos_max: number | null } | null;
-  lineas: { cantidad: number }[];
+  entregado_mesa_en: Date | null;
+  repartidor_party_id: unknown;
+  lineas: { cantidad: number; area_id?: bigint | null; producto?: { categoria?: { area_id: bigint | null } | null } | null }[];
+  comandas: { area_id: bigint; estado: string; area: { nombre: string } }[];
   historial: { estado_nuevo: string; en: Date }[];
 };
 
 /** Contexto de cálculo del tiempo: configuración de parámetros y «ahora» (inyectable en pruebas). */
-interface ContextoTiempo {
-  cfg: ConfigEta;
-  ahora: Date;
-}
+type ContextoTiempo = ContextoProgreso;
 
 const textoRango = (min: number, max: number) =>
   min === max ? `unos ${min} minutos` : `unos ${min} a ${max} minutos`;
@@ -273,11 +290,16 @@ export class SeguimientoService {
 
   /**
    * Historial de pedidos de la cuenta del cliente, del más nuevo al más viejo (10 por página).
-   * Solo los pedidos cuyo party_id es el de la sesión.
+   * Pedidos donde el cliente de la sesión es el identificado (cliente_party_id), o su party en carta/WhatsApp.
    */
   async pedidosDeCuenta(partyId: bigint, pagina: number): Promise<{ pedidos: PedidoCuenta[]; pagina: number; hayMas: boolean }> {
     const filas = await this.prisma.pedido.findMany({
-      where: { party_id: partyId },
+      where: {
+        OR: [
+          { cliente_party_id: partyId },
+          { party_id: partyId, canal: { in: ['CARTA', 'WHATSAPP', 'BOT'] } },
+        ],
+      },
       orderBy: [{ creado_en: 'desc' }, { id: 'desc' }],
       skip: (pagina - 1) * TAMANO_PAGINA_CUENTA,
       take: TAMANO_PAGINA_CUENTA + 1,
@@ -286,7 +308,7 @@ export class SeguimientoService {
         lineas: {
           where: { linea_combo_id: null },
           orderBy: { id: 'asc' },
-          select: { nombre: true, cantidad: true },
+          select: { nombre: true, cantidad: true, ...SELECCION_AREA_LINEA },
         },
       },
     });
@@ -372,6 +394,7 @@ export class SeguimientoService {
       terminado: anulado || pedido.estado === 'ENTREGADO',
       anulado,
       pasos,
+      progreso: progresoDelPedido(pedido, ctx),
       tiempo: this.tiempoDe(pedido, anulado, ctx),
     };
   }

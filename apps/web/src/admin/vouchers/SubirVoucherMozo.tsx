@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { Confirmar } from '../../comun/Confirmar';
 import { vouchersApi } from './vouchersApi';
 import { reducirImagenVoucher } from './reducirImagenVoucher';
 import { Cargando } from '../../comun/Cargando';
@@ -21,6 +22,14 @@ export interface SubirVoucherMozoProps {
   ofrecerExcepcion?: boolean;
   /** Pedido nuevo del mozo: el voucher se puede subir después (texto «Opcional ahora»). */
   opcional?: boolean;
+  /** Se ejecuta antes de subir la foto (p. ej. guardar el plan de pago para comparar el monto del medio). */
+  antesDeSubir?: () => Promise<void>;
+  /** Motivo del cambio al reemplazar un voucher vigente (Caja y Admin). */
+  motivoCambio?: string;
+  /** Muestra «Quitar voucher» tras subir la foto (la regla del servidor decide si se permite). */
+  quitable?: boolean;
+  /** Se llama tras quitar el voucher: la ventana vuelve a estar sin foto. */
+  alQuitado?: () => void;
 }
 
 export function SubirVoucherMozo({
@@ -32,7 +41,15 @@ export function SubirVoucherMozo({
   bloqueado = false,
   ofrecerExcepcion = false,
   opcional = false,
+  antesDeSubir,
+  motivoCambio,
+  quitable = false,
+  alQuitado,
 }: SubirVoucherMozoProps) {
+  // Id del voucher que acaba de subir: «Quitar voucher» lo retira (queda en el historial)
+  const [ultimoVoucherId, setUltimoVoucherId] = useState<string | number | null>(null);
+  const [confirmandoQuitar, setConfirmandoQuitar] = useState(false);
+  const [quitando, setQuitando] = useState(false);
   const [archivo, setArchivo] = useState<File | null>(null);
   const [vistaPreviaUrl, setVistaPreviaUrl] = useState<string | null>(null);
   const [subiendo, setSubiendo] = useState<boolean>(false);
@@ -66,6 +83,9 @@ export function SubirVoucherMozo({
     alCambiarEstado?.({ subiendo: true, esValido: false });
 
     try {
+      // 0. Plan de pago guardado antes de la foto (el monto que compara el servidor es el de este medio)
+      await antesDeSubir?.();
+
       // 1. Reducción en cliente a max 1600px JPEG 0.85
       const blobReducido = await reducirImagenVoucher(file, 1600, 0.85);
 
@@ -75,9 +95,11 @@ export function SubirVoucherMozo({
         blobReducido,
         pedidoId,
         medio,
+        ...(motivoCambio ? [motivoCambio] : []),
       )) as RespuestaSubirVoucherMozo;
 
       alRespuesta?.(respuesta);
+      setUltimoVoucherId(respuesta.id);
 
       // Regla de oro del mozo: SOLO ve legible / no legible. NUNCA semáforo ni datos extraídos.
       if (respuesta.legible) {
@@ -296,6 +318,84 @@ export function SubirVoucherMozo({
           </div>
         </div>
       )}
+
+      {/* Tras subir: cambiar la foto o quitar el voucher (44 px). La regla del servidor decide si se permite */}
+      {archivo && !subiendo && ultimoVoucherId != null && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+          <button
+            type="button"
+            disabled={bloqueado || quitando}
+            onClick={handleTomarOtraFoto}
+            data-testid="btn-cambiar-foto"
+            style={{
+              minHeight: '44px',
+              minWidth: '44px',
+              border: '1.5px solid var(--cp-navy, #0B2C3E)',
+              borderRadius: '10px',
+              background: 'var(--cp-white, #FFFFFF)',
+              color: 'var(--cp-navy, #0B2C3E)',
+              fontFamily: 'Montserrat, sans-serif',
+              fontWeight: 700,
+              fontSize: '13px',
+              padding: '8px 14px',
+            }}
+          >
+            Cambiar foto
+          </button>
+          {quitable && (
+            <button
+              type="button"
+              disabled={bloqueado || quitando}
+              onClick={() => setConfirmandoQuitar(true)}
+              data-testid="btn-quitar-voucher"
+              style={{
+                minHeight: '44px',
+                minWidth: '44px',
+                border: '1.5px solid var(--cp-rust, #B2500F)',
+                borderRadius: '10px',
+                background: 'var(--cp-white, #FFFFFF)',
+                color: 'var(--cp-rust, #B2500F)',
+                fontFamily: 'Montserrat, sans-serif',
+                fontWeight: 700,
+                fontSize: '13px',
+                padding: '8px 14px',
+              }}
+            >
+              Quitar voucher
+            </button>
+          )}
+        </div>
+      )}
+      <Confirmar
+        abierto={confirmandoQuitar}
+        titulo="Quitar el voucher"
+        mensaje="El voucher se retira del pedido. Queda en el historial como retirado; no se borra."
+        textoSi="Sí, quitar"
+        textoNo="No"
+        cargando={quitando}
+        alConfirmar={async () => {
+          if (ultimoVoucherId == null) return;
+          setQuitando(true);
+          try {
+            await vouchersApi.quitarVoucher(ultimoVoucherId);
+            setConfirmandoQuitar(false);
+            setArchivo(null);
+            setVistaPreviaUrl(null);
+            setVoucherValidoId(null);
+            setUltimoVoucherId(null);
+            setEsIlegible(false);
+            setAvisos([]);
+            alCambiarEstado?.({ subiendo: false, esValido: false });
+            alQuitado?.();
+          } catch (err) {
+            setConfirmandoQuitar(false);
+            setErrorSubida(err instanceof ErrorApi ? err.message : 'No se pudo quitar el voucher. Intenta de nuevo.');
+          } finally {
+            setQuitando(false);
+          }
+        }}
+        alCancelar={() => setConfirmandoQuitar(false)}
+      />
 
       {/* Estado: subiendo / analizando */}
       {subiendo && (

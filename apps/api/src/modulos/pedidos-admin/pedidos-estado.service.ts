@@ -1,5 +1,7 @@
 import { PuntosService } from '../clientes/puntos.service';
-import { montoDigitalDePlan } from '../pedidos/pago-plan.service';
+import { mediosDigitalesDelPedido, montoDigitalDePlan } from '../pedidos/pago-plan.service';
+import { progresoDelPedido } from '../pedidos/progreso-pedido';
+import { CONFIG_ETA_DEFECTO, leerConfigEta } from '../repartos/eta-entrega';
 import { StockService } from '../stock/stock.service';
 import { ImpresionService } from '../impresion/impresion.service';
 import { SalonService } from '../salon/salon.service';
@@ -24,7 +26,8 @@ import {
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { SupervisorCodigoService } from '../supervisor-codigo/supervisor-codigo.service';
-import { exigirComprobanteDigital } from '../caja/comprobante-pago.util';
+import { exigirComprobanteDigital, voucherCubreMedio } from '../caja/comprobante-pago.util';
+import { puedeCambiarVoucher, puedeSubirVoucher } from '../vouchers/regla-cambio-voucher';
 import { exigirCajaAbiertaHoy } from '../caja/caja.calculo';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { enmascararDni } from '../usuarios/usuarios.util';
@@ -40,10 +43,17 @@ import {
 } from '../chatbot/servicios/reprogramacion.service';
 import {
   calcularSiguienteMedianocheLima,
+  inicioDiaLimaDeFecha,
   obtenerInicioDiaLima,
+  sumarDiasFechaIso,
 } from '../cocina/cocina.util';
 
 export type ColorEspera = 'verde' | 'naranja' | 'rojo';
+
+/** Estados en curso que el filtro «Pendientes anteriores» de Caja rescata de días previos. */
+const ESTADOS_EN_CURSO_PENDIENTES = ['COLA', 'NUEVO', 'PREPARANDO', 'PREP', 'LISTO', 'EN_CAMINO', 'RUTA'];
+/** Fecha sola YYYY-MM-DD (día de Lima). */
+const ES_FECHA_SOLA = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Estados todavía no entregados ni anulados (para el resumen de "Mis pedidos"). */
 const ESTADOS_EN_CURSO = ['COLA', 'PREPARANDO', 'LISTO', 'EN_CAMINO'];
@@ -194,13 +204,32 @@ export class PedidosEstadoService {
     if (filtros.modalidad) {
       where.modalidad = filtros.modalidad;
     }
-    if (filtros.desde || filtros.hasta) {
+    if (filtros.pendientes === '1') {
+      // Días anteriores (hoy en Lima excluido) que siguen en curso o con pago pendiente
+      where.creado_en = { lt: obtenerInicioDiaLima() };
+      where.estado = { notIn: ['ANULADO', 'RECHAZADO'] };
+      where.AND = [
+        {
+          OR: [
+            { estado: { in: ESTADOS_EN_CURSO_PENDIENTES } },
+            { pago_estado: { in: ['PENDIENTE', 'COORDINADO'] } },
+          ],
+        },
+      ];
+    } else if (filtros.desde || filtros.hasta) {
+      // Fechas YYYY-MM-DD = día calendario de Lima, hasta inclusivo; con hora se usa tal cual
       where.creado_en = {};
       if (filtros.desde) {
-        where.creado_en.gte = new Date(filtros.desde);
+        where.creado_en.gte = ES_FECHA_SOLA.test(filtros.desde)
+          ? inicioDiaLimaDeFecha(filtros.desde)
+          : new Date(filtros.desde);
       }
       if (filtros.hasta) {
-        where.creado_en.lte = new Date(filtros.hasta);
+        if (ES_FECHA_SOLA.test(filtros.hasta)) {
+          where.creado_en.lt = inicioDiaLimaDeFecha(sumarDiasFechaIso(filtros.hasta, 1));
+        } else {
+          where.creado_en.lte = new Date(filtros.hasta);
+        }
       }
     }
     if (filtros.buscar) {
@@ -384,16 +413,38 @@ export class PedidosEstadoService {
         total: true,
         pago_estado: true,
         pago_metodo: true,
+        pago_coordinado_en: true,
+        cliente_nombre: true,
         creado_en: true,
-        lineas: { select: { nombre: true, cantidad: true }, orderBy: { id: 'asc' } },
-        // Solo el semáforo: sirve para contar y para «legible»; nunca se devuelve al mozo
-        vouchers: { select: { semaforo: true } },
+        entregado_mesa_en: true,
+        repartidor_party_id: true,
+        despachado_en: true,
+        eta_min: true,
+        eta_max: true,
+        lineas: {
+          select: {
+            nombre: true,
+            cantidad: true,
+            // Solo para contar líneas por área del progreso; no se devuelven
+            area_id: true,
+            producto: { select: { categoria: { select: { area_id: true } } } },
+          },
+          orderBy: { id: 'asc' },
+        },
+        // Áreas de cocina del pedido y si cada una ya despejó (una sola consulta, sin N+1)
+        comandas: { select: { area_id: true, estado: true, area: { select: { nombre: true } } } },
+        // Solo el semáforo: sirve para contar y para «legible»; nunca se devuelve al mozo.
+        // Incluye los reemplazados (reemplazado_en) para contar el historial; lo vigente decide.
+        vouchers: { select: { id: true, semaforo: true, medio: true, reemplazado_en: true } },
         planPago: { select: { medio: true, monto: true }, orderBy: { orden: 'asc' } },
       },
     });
 
     const validos = pedidos.filter((p) => p.estado !== 'ANULADO');
     const total = validos.reduce((suma, p) => suma + Number(p.total), 0);
+    // Parámetros del tiempo (una lectura) para el «llega en» de los pedidos en camino
+    const cfg = await leerConfigEta(this.prisma).catch(() => ({ ...CONFIG_ETA_DEFECTO, respaldoMin: 30 }));
+    const ahora = new Date();
 
     return {
       pedidos: pedidos.map((p) => ({
@@ -402,17 +453,41 @@ export class PedidosEstadoService {
         estado: p.estado,
         modalidad: p.modalidad,
         mesaNombre: p.mesa_nombre,
+        // Nombre del cliente para reconocer el pedido; nunca teléfono ni DNI. Mesa sin nombre: la mesa.
+        clienteNombre: p.cliente_nombre?.trim() || (p.modalidad === 'MESA' ? p.mesa_nombre : null) || null,
         total: Number(p.total),
         pagoEstado: p.pago_estado,
         pagoMetodo: p.pago_metodo,
         // Pago dividido: plan por medio y la parte digital (lo que lleva voucher)
         plan: p.planPago.map((f) => ({ medio: f.medio, monto: Number(f.monto) })),
         montoDigital: montoDigitalDePlan(p.planPago.map((f) => ({ medio: f.medio, monto: Number(f.monto) }))),
-        vouchers: p.vouchers.length,
+        // Solo vigentes deciden; historialVouchers cuenta también los reemplazados (se pliega en la web)
+        vouchers: p.vouchers.filter((v) => v.reemplazado_en == null).length,
+        historialVouchers: p.vouchers.length,
         // Misma regla que el cobro: un voucher ILEGIBLE no cuenta como comprobante
-        tieneVoucherLegible: p.vouchers.some((v) => v.semaforo !== 'ILEGIBLE'),
+        tieneVoucherLegible: p.vouchers.some((v) => v.reemplazado_en == null && v.semaforo !== 'ILEGIBLE'),
+        // Regla de cambio de voucher (regla-cambio-voucher.ts): la web no la duplica
+        puedeCambiarVoucher: puedeCambiarVoucher(p, 'MOZO'),
+        puedeSubirVoucher: puedeSubirVoucher(p, 'MOZO'),
+        // Un voucher por medio digital del plan: cada uno subido o falta, con su monto
+        vouchersPorMedio: mediosDigitalesDelPedido(
+          p.planPago.map((f) => ({ medio: f.medio, monto: Number(f.monto) })),
+          p.pago_metodo,
+          Number(p.total),
+        ).map((m) => ({
+          medio: m.medio,
+          monto: m.monto,
+          subido: p.vouchers.some(
+            (v) => v.reemplazado_en == null && v.semaforo !== 'ILEGIBLE' && voucherCubreMedio(v.medio, m.medio),
+          ),
+          // Voucher vigente de ese medio (para «Quitar voucher» desde la tarjeta)
+          voucherId:
+            p.vouchers.find((v) => v.reemplazado_en == null && voucherCubreMedio(v.medio, m.medio))?.id?.toString() ?? null,
+        })),
         creadoEn: p.creado_en,
         lineas: p.lineas.map((l) => ({ nombre: l.nombre, cantidad: l.cantidad })),
+        // Estado de cocina y entrega (misma función que el seguimiento de la carta)
+        progreso: progresoDelPedido(p, { cfg, ahora }),
       })),
       resumen: {
         cantidad: validos.length,
@@ -905,6 +980,7 @@ export class PedidosEstadoService {
     const pedidoId = this.parsearId(id);
     const pedido = await this.prisma.pedido.findUnique({
       where: { id: pedidoId },
+      include: { planPago: true },
     });
 
     if (!pedido) {
@@ -940,6 +1016,7 @@ export class PedidosEstadoService {
       db: this.prisma,
       pedidoId: pedido.id,
       medios: [metodoUpper],
+      planPago: pedido.planPago,
       sinVoucher: dto.sinVoucher,
       permiteExcepcion: true,
       verificarPin: (pin) =>
@@ -976,6 +1053,16 @@ export class PedidosEstadoService {
       ...(sinVoucherAutorizado ? { conPinAdmin: true, motivo: sinVoucherAutorizado.motivo } : {}),
       ip,
     });
+
+    // PAGADO por aquí (p. ej. el repartidor cobra) nunca pasa por Caja → cobrar, así que suma aquí
+    // los puntos del cliente; es idempotente y, si falla, no deshace el pago
+    if (dto.estado === 'PAGADO') {
+      try {
+        await this.puntosService?.acumularPorPedido(pedido.id);
+      } catch {
+        // se reintenta al volver a registrar
+      }
+    }
 
     this.eventosGateway?.emitirAdmin('pedido:estado', {
       id: Number(pedido.id),

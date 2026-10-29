@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useEventos } from '../../comun/socket';
 import { AvisoPedidoListo } from './tipos';
 import { reproducirAvisoListo } from './audioAlerta';
@@ -12,6 +12,9 @@ interface UseSalonSocketOpciones {
 
 export function useSalonSocket(opciones: UseSalonSocketOpciones = {}) {
   const [avisoListo, setAvisoListo] = useState<AvisoPedidoListo | null>(null);
+  // las funciones de quien llama cambian en cada render: se leen desde una ref para no volver a suscribirse
+  const refOpciones = useRef(opciones);
+  refOpciones.current = opciones;
 
   const manejarListo = useCallback(
     (datos: any) => {
@@ -29,32 +32,32 @@ export function useSalonSocket(opciones: UseSalonSocketOpciones = {}) {
 
       reproducirAvisoListo();
       setAvisoListo(aviso);
-      opciones.onPedidoListo?.(aviso);
+      refOpciones.current.onPedidoListo?.(aviso);
     },
-    [opciones],
+    [],
   );
 
   const manejarMesa = useCallback(
     (datos: any) => {
       if (datos && datos.mesaId && datos.estado) {
-        opciones.onMesaCambio?.(datos);
+        refOpciones.current.onMesaCambio?.(datos);
       }
     },
-    [opciones],
+    [],
   );
 
   const manejarPlano = useCallback(
     (datos: any) => {
-      opciones.onPlanoCambio?.(datos);
+      refOpciones.current.onPlanoCambio?.(datos);
     },
-    [opciones],
+    [],
   );
 
   const manejarReserva = useCallback(
     (datos: any) => {
-      opciones.onReservaCambio?.(datos);
+      refOpciones.current.onReservaCambio?.(datos);
     },
-    [opciones],
+    [],
   );
 
   useEventos('salon:listo', manejarListo);

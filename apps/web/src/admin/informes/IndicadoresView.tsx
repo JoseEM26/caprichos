@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../comun/api';
 import { Confirmar } from '../../comun/Confirmar';
+import { SeccionEncuestas } from './encuestas/SeccionEncuestas';
 
 interface IndicadorMeta {
   n: string;
@@ -252,6 +253,9 @@ export function IndicadoresView() {
           )}
         </div>
       </div>
+
+      {/* Encuestas posventa por WhatsApp */}
+      <SeccionEncuestas />
 
       {/* Confirmación Sí/No */}
       <Confirmar

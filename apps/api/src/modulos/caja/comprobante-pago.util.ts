@@ -1,8 +1,15 @@
 import { BadRequestException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { MEDIOS_DIGITALES_PLAN } from '../pedidos/pago-plan.service';
 
 /** Medios digitales: siempre llevan la foto del comprobante (la IA solo informa, nunca aprueba). */
 export const MEDIOS_CON_COMPROBANTE = ['YAPE', 'PLIN', 'TRANSFERENCIA'];
+
+const NOMBRE_MEDIO_DIGITAL: Record<string, string> = {
+  YAPE: 'Yape',
+  PLIN: 'Plin',
+  TRANSFERENCIA: 'Transferencia',
+};
 
 export interface SinVoucherEntrada {
   motivo: string;
@@ -12,44 +19,86 @@ export interface SinVoucherEntrada {
 export interface SinVoucherAutorizado {
   motivo: string;
   supervisorPartyId: string;
+  /** Medios digitales que se cobraron sin captura (vacío si no hizo falta la excepción). */
+  faltan: string[];
 }
 
 type ClienteVouchers = Pick<Prisma.TransactionClient, 'voucherPago'>;
 
-/** Voucher útil del pedido: enlazado y no ILEGIBLE. Un voucher ILEGIBLE no cuenta como comprobante. */
+/** Voucher útil del pedido: vigente (no reemplazado), enlazado y no ILEGIBLE. Un ILEGIBLE no cuenta como comprobante. */
 export async function hayVoucherUtil(db: ClienteVouchers, pedidoId: bigint): Promise<boolean> {
   const voucher = await db.voucherPago.findFirst({
-    where: { pedido_id: pedidoId, semaforo: { not: 'ILEGIBLE' } },
+    where: { pedido_id: pedidoId, reemplazado_en: null, semaforo: { not: 'ILEGIBLE' } },
     select: { id: true },
   });
   return voucher !== null;
 }
 
 /**
- * Regla del comprobante para los pagos digitales. Si ninguno de los medios exige foto, o el pedido ya
- * tiene un voucher útil, no hace nada (null). Si falta, lanza VOUCHER_REQUERIDO, salvo que el rol pueda
- * usar la excepción: entonces verifica el código del supervisor y devuelve la autorización para auditar.
+ * Un voucher cubre un medio si es de ese medio o no tiene medio (vouchers antiguos: cubren cualquiera).
+ * Compartido por el cobro y por "Mis pedidos" para que la web vea lo mismo que exige el servidor.
+ */
+export function voucherCubreMedio(medioVoucher: string | null | undefined, medio: string): boolean {
+  return medioVoucher == null || medioVoucher === medio;
+}
+
+/** Medios digitales del plan que todavía no tienen captura vigente y legible. */
+export async function mediosSinCaptura(
+  db: ClienteVouchers,
+  pedidoId: bigint,
+  medios: string[],
+): Promise<string[]> {
+  const vouchers = await db.voucherPago.findMany({
+    where: { pedido_id: pedidoId, reemplazado_en: null, semaforo: { not: 'ILEGIBLE' } },
+    select: { medio: true },
+  });
+  return medios.filter((m) => !vouchers.some((v) => voucherCubreMedio(v.medio, m)));
+}
+
+/**
+ * Regla del comprobante para los pagos digitales.
+ * - Pedido con plan de 2 o más medios digitales: hace falta una captura útil por CADA uno (planPago).
+ * - Si no, la regla de siempre: un voucher útil del pedido basta si alguno de los medios es digital.
+ * Si falta, lanza VOUCHER_REQUERIDO con `faltan`, salvo que el rol pueda usar la excepción: entonces
+ * verifica el código del supervisor y devuelve la autorización (con los medios que faltaron) para auditar.
  */
 export async function exigirComprobanteDigital(args: {
   db: ClienteVouchers;
   pedidoId: bigint;
   medios: Array<string | null | undefined>;
+  /** Plan de pago del pedido (solo se lee el medio). */
+  planPago?: ReadonlyArray<{ medio: string }> | null;
   sinVoucher?: SinVoucherEntrada;
   permiteExcepcion: boolean;
   verificarPin: (pin: string) => Promise<{ party_id?: bigint; supervisorPartyId?: bigint }>;
 }): Promise<SinVoucherAutorizado | null> {
-  const exige = args.medios.some((m) =>
-    MEDIOS_CON_COMPROBANTE.includes(String(m ?? '').toUpperCase().trim()),
-  );
-  if (!exige) return null;
-  if (await hayVoucherUtil(args.db, args.pedidoId)) return null;
+  const digitalesPlan = [
+    ...new Set((args.planPago ?? []).map((f) => f.medio).filter((m) => (MEDIOS_DIGITALES_PLAN as readonly string[]).includes(m))),
+  ];
+
+  let faltan: string[];
+  if (digitalesPlan.length >= 2) {
+    faltan = await mediosSinCaptura(args.db, args.pedidoId, digitalesPlan);
+  } else {
+    const digitales = args.medios
+      .map((m) => String(m ?? '').toUpperCase().trim())
+      .filter((m) => MEDIOS_CON_COMPROBANTE.includes(m));
+    if (digitales.length === 0) return null;
+    if (await hayVoucherUtil(args.db, args.pedidoId)) return null;
+    faltan = [...new Set(digitales)];
+  }
+  if (faltan.length === 0) return null;
 
   if (!args.permiteExcepcion || !args.sinVoucher) {
+    const nombres = faltan.map((m) => NOMBRE_MEDIO_DIGITAL[m] ?? m).join(', ');
+    const cabecera =
+      faltan.length === 1 ? `Falta la captura de ${nombres}` : `Faltan las capturas de ${nombres}`;
     throw new BadRequestException({
       codigo: 'VOUCHER_REQUERIDO',
+      faltan,
       mensaje: args.permiteExcepcion
-        ? 'Falta una foto legible del comprobante del pago digital. Sube otra foto, o registra el pago sin voucher con motivo y código del supervisor.'
-        : 'Falta una foto legible del comprobante del pago digital. Sube otra foto del voucher para cobrar.',
+        ? `${cabecera}. Sube la foto, o registra el pago sin voucher con motivo y código del supervisor.`
+        : `${cabecera}. Sube la foto del voucher para cobrar.`,
     });
   }
 
@@ -57,5 +106,6 @@ export async function exigirComprobanteDigital(args: {
   return {
     motivo: args.sinVoucher.motivo.trim(),
     supervisorPartyId: String(sup?.supervisorPartyId ?? sup?.party_id ?? ''),
+    faltan,
   };
 }

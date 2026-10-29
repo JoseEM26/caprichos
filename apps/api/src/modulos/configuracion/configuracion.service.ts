@@ -47,6 +47,8 @@ export const CLAVES_NUMERICAS = [
   'impresion_alerta_min',
   'impresion_vence_min',
   'caja_aviso_apertura_min',
+  'voucher_ia_corte_min',
+  'zonas_snap_m',
 ] as const;
 
 export const CLAVES_TEXTO = [

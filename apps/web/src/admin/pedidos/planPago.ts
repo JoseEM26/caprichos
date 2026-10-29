@@ -58,6 +58,23 @@ export function errorPlan(total: number, filas: FilaPlan[]): string | null {
   return null;
 }
 
+/**
+ * Un medio: esa fila paga todo el total (sin monto a la vista). Varios medios: la primera fila
+ * se queda con lo que falta del total (total menos las demás). Devuelve la misma lista si no cambia.
+ */
+export function ajustarPlan(total: number, filas: FilaPlan[]): FilaPlan[] {
+  if (filas.length === 0) return filas;
+  const resto = filas.slice(1).reduce((acc, f) => acc + (centimos(f.monto) || 0), 0);
+  const esperado =
+    filas.length === 1
+      ? total > 0
+        ? total.toFixed(2)
+        : ''
+      : ((Math.round(total * 100) - resto) / 100).toFixed(2);
+  if (filas[0].monto === esperado) return filas;
+  return [{ ...filas[0], monto: esperado }, ...filas.slice(1)];
+}
+
 /** Filas válidas convertidas a números para el API. */
 export function aPlan(filas: FilaPlan[]): PlanPagoItem[] {
   return filas

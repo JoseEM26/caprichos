@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -11,7 +12,8 @@ import {
 } from '@nestjs/common';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
-import { ClientesService } from './clientes.service';
+import { ClientesService, enmascararDoc } from './clientes.service';
+import { DireccionesClienteService } from './direcciones-cliente.service';
 import { PuntosService } from './puntos.service';
 import {
   AjustarPuntosDto,
@@ -25,7 +27,22 @@ export class ClientesAdminController {
   constructor(
     private readonly clientesService: ClientesService,
     private readonly puntosService: PuntosService,
+    private readonly direcciones: DireccionesClienteService,
   ) {}
+
+  /** Cliente con cuenta por DNI exacto (8 dígitos) para atender un pedido de delivery. */
+  @Get('por-dni/:dni')
+  @Permiso([
+    { modulo: 'pedidos', accion: 'crear' },
+    { modulo: 'clientes', accion: 'ver' },
+  ])
+  async buscarPorDni(@Param('dni') dni: string, @Req() req: any) {
+    if (!/^\d{8}$/.test(dni ?? '')) {
+      throw new BadRequestException({ codigo: 'DNI_INVALIDO', mensaje: 'El DNI debe tener 8 dígitos.' });
+    }
+    const resultado = await this.direcciones.buscarPorDni(dni, req.usuario?.partyId);
+    return resultado.encontrado ? { ...resultado, dniMascara: enmascararDoc(dni) } : resultado;
+  }
 
   @Get()
   @Permiso('clientes', 'ver')
