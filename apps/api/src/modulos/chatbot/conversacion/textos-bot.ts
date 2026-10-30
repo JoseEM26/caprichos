@@ -927,7 +927,7 @@ export const TEXTOS_BOT = {
       : `⭐ Sumarás puntos por los productos sin promoción cuando Caja cobre el pedido${saldo}.`;
   },
   puntosMiSaldo: (primerNombre: string, saldo: number, porcentaje: number): string =>
-    `⭐ ${primerNombre}, tienes ${saldo.toFixed(2)} puntos.\nGanas ${porcentaje} % de lo que pagas en productos sin promoción, y cada punto vale S/ 1 en tu próximo pedido por la carta.`,
+    `⭐ ${primerNombre}, tienes ${saldo.toFixed(2)} puntos.\nGanas ${porcentaje} % de lo que pagas en productos sin promoción.`,
   puntosSinCuenta: (urlCarta: string): string =>
     `No encontré una cuenta con este número de WhatsApp.\nCrea la tuya con tu DNI en ${urlCarta}, usando este mismo número, y empieza a sumar puntos.`,
   puntosNoDisponible: (): string => `Ahora no puedo consultar tus puntos. Inténtalo en unos minutos.`,

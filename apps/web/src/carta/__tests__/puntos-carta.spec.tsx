@@ -43,7 +43,7 @@ describe('Carta ▸ puntos siempre visibles', () => {
     expect(estimarPuntos({ canjeable: 15, porcentaje: 5, puntosAplicados: 0, conCupon: false, delServidor: 0.7 })).toBe(0.7);
   });
 
-  it('TusPuntos explica cómo funcionan (3 líneas) y lista los movimientos', async () => {
+  it('TusPuntos explica cómo funcionan (2 líneas) y lista los movimientos', async () => {
     vi.spyOn(api, 'get').mockResolvedValue({
       porcentaje: 5,
       pagina: 1,
@@ -55,7 +55,7 @@ describe('Carta ▸ puntos siempre visibles', () => {
     });
     render(<TusPuntos puntos={3.5} />);
     fireEvent.click(screen.getByRole('button', { name: 'Cómo funcionan' }));
-    await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(3));
+    await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(2));
     expect(screen.getByText(/Ganas 5 %/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Ver mis movimientos' }));
     expect(await screen.findByText('+0.73')).toBeInTheDocument();

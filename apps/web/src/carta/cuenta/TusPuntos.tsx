@@ -71,7 +71,6 @@ export function TusPuntos({ puntos }: { puntos: number }) {
         <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, lineHeight: '18px' }}>
           <li>Ganas {porcentaje} % de lo que pagas en productos sin promoción ni cupón.</li>
           <li>Se suman cuando Caja cobra tu pedido; los combos y promociones no suman.</li>
-          <li>Cada punto vale S/ 1 y lo canjeas en el pago, de a puntos enteros.</li>
         </ul>
       )}
 
