@@ -22,6 +22,7 @@ import { WhatsAppSimuladoAdaptador } from './adaptadores/whatsapp-simulado.adapt
 import { WhatsAppMensajeriaProvider } from './proveedor/whatsapp-mensajeria.proveedor';
 import { WhatsappWebhookService } from './servicios/whatsapp-webhook.service';
 import { Ventana24hService } from './servicios/ventana-24h.service';
+import { VigilanteSinRespuestaService } from './servicios/vigilante-sin-respuesta.service';
 import { ChatbotPlanificadorService } from './servicios/chatbot-planificador.service';
 import { AvisosPedidoService } from './servicios/avisos-pedido.service';
 import { ReprogramacionService } from './servicios/reprogramacion.service';
@@ -65,6 +66,7 @@ import { ColaWebhookService } from './servicios/cola-webhook.service';
     ReprogramacionService,
     OutboxWhatsappService,
     ChatbotPlanificadorService,
+    VigilanteSinRespuestaService,
     RecordatorioReservasTarea,
     TareaRecordatorioPagoService,
     QuejasWhatsappService,

@@ -684,6 +684,8 @@ export class WhatsappWebhookService {
     const puedeProcesarMotor =
       conversacion.duenio === 'BOT' ||
       conversacion.estado === 'VALIDAR_PAGO' ||
+      // Derivado por calificación baja y sin persona: el motor aplica el modo asistido (responde si nadie lo tomó)
+      (conversacion.motivo_derivacion === 'CALIFICACION_BAJA' && !conversacion.tomado_por) ||
       esAtencionPersona;
 
     if (

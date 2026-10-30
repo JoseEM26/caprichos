@@ -43,6 +43,7 @@ import {
   generarCierreComercial,
   adjuntarCierreComercial,
 } from './cierre-comercial.util';
+import { esSaludo as esSaludoPuro } from './normalizador-entrada.util';
 import './flujos/pedido/flujo-pedido';
 import './flujos/pago/flujo-pago';
 import './flujos/reserva/flujo-reserva';
@@ -453,6 +454,7 @@ export function transicionarEstado(
       idInteractivoEntrada === 'btn_menu' ||
       idInteractivoEntrada === 'volver_menu' ||
       idInteractivoEntrada === 'inicio' ||
+      esSaludoPuro(textoEntrada) ||
       textoEntrada === 'menu' ||
       textoEntrada === 'inicio' ||
       textoEntrada === '0';

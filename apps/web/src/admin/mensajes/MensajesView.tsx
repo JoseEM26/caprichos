@@ -101,6 +101,9 @@ function FotoMensaje({
   );
 }
 
+/** Desde cuántos minutos sin respuesta se destaca el chat en la lista. */
+export const SIN_RESPUESTA_MIN_VISIBLE = 3;
+
 export function obtenerEstiloEspera(minutos: number) {
   if (minutos > 15) {
     return {
@@ -903,6 +906,22 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
                           {c.urgente ? `URGENTE · ${ESTADOS_LABEL[c.estado]}` : ESTADOS_LABEL[c.estado]}
                         </span>
                         <InsigniaBloqueoSpam bloqueo={c.bloqueoSpam} id={c.id} />
+                        {typeof c.sinRespuestaMin === 'number' && c.sinRespuestaMin >= SIN_RESPUESTA_MIN_VISIBLE && (
+                          <span
+                            data-testid={`sin-respuesta-${c.id}`}
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              padding: '2px 8px',
+                              borderRadius: '10px',
+                              background: '#C0392B',
+                              color: '#fff',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            Sin respuesta hace {c.sinRespuestaMin} min
+                          </span>
+                        )}
                         {c.esperaMin !== undefined && c.esperaMin !== null && (
                           <span
                             data-testid={`espera-badge-${c.id}`}

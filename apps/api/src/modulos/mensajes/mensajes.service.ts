@@ -198,6 +198,11 @@ export class MensajesService {
         hora: ult ? hora(ult.en) : hora(c.ultima_actividad),
         ultimaActividadDate: c.ultima_actividad,
         sinLeer,
+        // El último mensaje es del cliente y nadie lo tomó: minutos que lleva sin respuesta (null si no aplica)
+        sinRespuestaMin:
+          ult && ult.direccion === 'ENTRA' && !c.tomado_por
+            ? Math.max(0, Math.floor((Date.now() - new Date(ult.en).getTime()) / 60000))
+            : null,
         bloqueoSpam: bloqueos?.get(c.telefono) ?? null,
       };
     });

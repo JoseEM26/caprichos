@@ -34,6 +34,8 @@ export interface ChatResumen {
   hora: string;
   sinLeer: number;
   esperaMin?: number | null;
+  /** Minutos que el último mensaje del cliente lleva sin respuesta (sin persona que lo tomó); null si ya se respondió. */
+  sinRespuestaMin?: number | null;
   bloqueoSpam?: BloqueoSpam | null;
 }
 

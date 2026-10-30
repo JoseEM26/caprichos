@@ -236,7 +236,7 @@ describe('EjecutorConversacionService (Integración de Conversación)', () => {
         tomado_por: null,
       });
 
-      const procesado = await service.procesarMensajeEntrante(3n, { texto: 'hola' });
+      const procesado = await service.procesarMensajeEntrante(3n, { texto: 'gracias' });
       expect(procesado).toBe(false);
       expect(mockMensajeria.enviarLista).not.toHaveBeenCalled();
     });

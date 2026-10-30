@@ -271,9 +271,11 @@ describe('Calificación de la encuesta posventa por WhatsApp', () => {
 
   it('la respuesta consumida no dispara el bot ni se repite si llega otra vez', async () => {
     await recibir(payloadTexto('1 Malo'));
-    await recibir(payloadTexto('1 Malo'));
-
+    // La respuesta de la encuesta no pasa por el bot
     expect(motor.procesarMensajeEntrante).not.toHaveBeenCalled();
+    // Si llega otra vez, ya es un mensaje normal: el chat derivado sin persona lo evalúa el modo asistido del motor
+    // (responde o deja el silencio registrado), pero no repite la queja ni el aviso.
+    await recibir(payloadTexto('1 Malo'));
     expect(quejas).toHaveLength(1);
     expect(notificaciones).toHaveLength(1);
     expect(avisos.avisarCalificacionBaja).toHaveBeenCalledTimes(1);

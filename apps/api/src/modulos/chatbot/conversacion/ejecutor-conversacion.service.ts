@@ -39,7 +39,7 @@ import {
   esRemitenteSinTelefono,
   obtenerNombreMostrar,
 } from '../../mensajes/utilidades/nombre-contacto.util';
-import { EntradaRawInput, normalizarEntrada } from './normalizador-entrada.util';
+import { EntradaRawInput, normalizarEntrada, esSaludo } from './normalizador-entrada.util';
 import { transicionarEstado } from './maquina-estados';
 import {
   ContextoConversacion,
@@ -224,6 +224,145 @@ export class EjecutorConversacionService {
     }
   }
 
+  /** Lee un parámetro numérico (minutos) con valor por defecto. */
+  private async leerParametroNumero(clave: string, defecto: number): Promise<number> {
+    try {
+      if (typeof this.prisma.parametro?.findUnique === 'function') {
+        const param = await this.prisma.parametro.findUnique({ where: { clave } });
+        const val = Number(param?.valor);
+        if (param && param.valor != null && !isNaN(val) && val >= 0) return val;
+      }
+    } catch (err: any) {
+      this.logger.warn(`Error leyendo parametro ${clave}: ${err.message}`);
+    }
+    return defecto;
+  }
+
+  /** Minutos desde el mensaje anterior al que acaba de llegar (la actividad ya se actualizó con el entrante). */
+  private async minutosDesdeActividadPrevia(conversacion: any): Promise<number> {
+    let ref: Date | null = conversacion.ultima_actividad ? new Date(conversacion.ultima_actividad) : null;
+    try {
+      if (typeof this.prisma.mensajeChat?.findMany === 'function') {
+        const ult = await this.prisma.mensajeChat.findMany({
+          where: { conversacion_id: conversacion.id },
+          orderBy: { en: 'desc' },
+          take: 2,
+          select: { en: true },
+        });
+        if (Array.isArray(ult)) ref = ult.length >= 2 ? new Date(ult[1].en) : null;
+      }
+    } catch {
+      // sin historial se usa ultima_actividad
+    }
+    return ref ? (Date.now() - ref.getTime()) / 60000 : 0;
+  }
+
+  /**
+   * Estados atascados: una conversación a medias (pedido, reserva, atención de persona sin persona...) con más de
+   * `chatbot_estado_vencido_horas` (12) sin actividad vuelve a MENU. Con carrito saluda y absorbe el mensaje.
+   */
+  private async reiniciarFlujoAtascado(
+    conversacion: any,
+    flujo: FlujoConversacion | null,
+  ): Promise<{ flujo: FlujoConversacion | null; saludoEnviado: boolean }> {
+    const estado = String((flujo as any)?.estado || 'INICIO');
+    if (['INICIO', 'MENU'].includes(estado) || conversacion.tomado_por != null) return { flujo, saludoEnviado: false };
+    try {
+      const horas = await this.leerParametroNumero('chatbot_estado_vencido_horas', 12);
+      if (horas <= 0 || (await this.minutosDesdeActividadPrevia(conversacion)) < horas * 60) return { flujo, saludoEnviado: false };
+
+      const conCarrito = Boolean((flujo as any)?.pedido?.items?.length);
+      const nuevo: any = { ...(flujo as any), estado: 'MENU', pedido: null, repreguntasFallidas: 0 };
+      const data: any = { flujo: nuevo };
+      if (conversacion.motivo_derivacion !== 'CALIFICACION_BAJA') {
+        data.duenio = 'BOT';
+        data.urgente = false;
+        data.motivo_derivacion = null;
+      }
+      await this.prisma.conversacion.update({ where: { id: conversacion.id }, data });
+      Object.assign(conversacion, data);
+      await this.prisma.mensajeChat.create({
+        data: {
+          conversacion_id: conversacion.id,
+          direccion: 'SALE',
+          autor: 'BOT',
+          tipo: 'SISTEMA',
+          contenido: { texto: `La conversación estaba en «${estado}» desde hace más de ${horas} h: volvió al menú.` } as any,
+        },
+      });
+      let saludoEnviado = false;
+      const destino = normalizarTelefono(conversacion.telefono) || null;
+      if (conCarrito && destino) {
+        const texto = '¡Hola de nuevo! Tu pedido anterior quedó sin terminar. ¿Empezamos uno nuevo?';
+        const botones = [
+          { id: 'pedir', titulo: 'Empezar pedido' },
+          { id: 'btn_menu', titulo: 'Ver menú' },
+        ];
+        await this.mensajeria.enviarBotones(destino, texto, botones, { conversacionId: conversacion.id });
+        await this.prisma.mensajeChat.create({
+          data: { conversacion_id: conversacion.id, direccion: 'SALE', autor: 'BOT', tipo: 'BOTON', contenido: { texto, botones } as any },
+        });
+        saludoEnviado = true;
+      }
+      this.eventos?.emitirAdmin('mensajes:actualizado', { id: conversacion.id.toString() });
+      return { flujo: nuevo, saludoEnviado };
+    } catch (err: any) {
+      this.logger.warn(`No se pudo reiniciar el flujo atascado: ${err.message}`);
+      return { flujo, saludoEnviado: false };
+    }
+  }
+
+  /**
+   * VALIDAR_PAGO que no se cierra: si el pedido que motivó la espera ya no espera validación
+   * (pagado/rechazado, anulado, entregado, cancelado, inexistente o vencido) la conversación vuelve a MENU.
+   * Devuelve el flujo vigente. Sin pedidoId en el flujo no se puede saber: se deja como está.
+   */
+  private async salirDeValidarPagoSiVencido(conversacion: any, flujo: FlujoConversacion | null): Promise<FlujoConversacion | null> {
+    const pago = (flujo as any)?.pago;
+    const pedidoId = pago?.pedidoId;
+    if (!pedidoId || !/^\d+$/.test(String(pedidoId)) || typeof this.prisma.pedido?.findUnique !== 'function') return flujo;
+    try {
+      const pedido: any = await this.prisma.pedido.findUnique({ where: { id: BigInt(pedidoId) } });
+      let motivo: string | null = null;
+      if (!pedido) motivo = 'el pedido ya no existe';
+      else if (['ANULADO', 'ENTREGADO', 'CANCELADO'].includes(String(pedido.estado))) motivo = `el pedido está ${pedido.estado}`;
+      else if (pedido.pago_estado && pedido.pago_estado !== 'PENDIENTE') motivo = `el pago está ${pedido.pago_estado}`;
+      else if (!Number(pago.timestampUltimoVoucher)) {
+        // Con un comprobante enviado el chat sigue en Validar pago hasta que Caja decida (nunca se oculta un voucher sin revisar);
+        // solo vence la espera de un comprobante que nunca llegó.
+        const expiraMin = await this.leerParametroNumero('chatbot_pago_expira_min', 30);
+        const ref = pedido.creado_en ? new Date(pedido.creado_en).getTime() : 0;
+        if (expiraMin > 0 && ref && Date.now() - ref > expiraMin * 60000) motivo = `venció la espera de pago (${expiraMin} min)`;
+      }
+      if (!motivo) return flujo;
+
+      const nuevoFlujo: any = { ...(flujo as any) };
+      if (nuevoFlujo.estado === 'VALIDAR_PAGO') nuevoFlujo.estado = 'MENU';
+      const data: any = { estado: 'MENU', flujo: nuevoFlujo };
+      if (conversacion.tomado_por == null && conversacion.motivo_derivacion !== 'CALIFICACION_BAJA') {
+        data.duenio = 'BOT';
+        data.urgente = false;
+        data.motivo_derivacion = null;
+      }
+      await this.prisma.conversacion.update({ where: { id: conversacion.id }, data });
+      Object.assign(conversacion, data);
+      await this.prisma.mensajeChat.create({
+        data: {
+          conversacion_id: conversacion.id,
+          direccion: 'SALE',
+          autor: 'BOT',
+          tipo: 'SISTEMA',
+          contenido: { texto: `La conversación salió de «Validar pago»: ${motivo}.` } as any,
+        },
+      });
+      this.eventos?.emitirAdmin('mensajes:actualizado', { id: conversacion.id.toString() });
+      return nuevoFlujo;
+    } catch (err: any) {
+      this.logger.warn(`No se pudo revisar el pedido de VALIDAR_PAGO: ${err.message}`);
+      return flujo;
+    }
+  }
+
   /**
    * Toque viejo: un botón/lista `ped_*` que el último mensaje interactivo del bot ya no ofrece.
    * Devuelve ese último mensaje (para re-mostrar el paso actual) o null si el toque corresponde.
@@ -321,6 +460,7 @@ export class EjecutorConversacionService {
     // Menú
     if (
       ['menu', 'btn_menu', 'volver_menu', 'inicio', '0'].includes(id) ||
+      esSaludo(textoNorm) ||
       textoNorm === 'menu' ||
       textoNorm === 'inicio' ||
       textoNorm === '0'
@@ -468,7 +608,6 @@ export class EjecutorConversacionService {
     }
 
     // 2. Control de atención y Modo Asistido (Contrato Modo Asistido 27/10/2026):
-    const esValidarPago = conversacion.estado === 'VALIDAR_PAGO';
     let flujoPrevio = (conversacion.flujo as any) as FlujoConversacion | null;
     // Rescate: chat que una persona ya soltó (dueño BOT, sin tomar) pero cuyo flujo quedó en ATENCION_PERSONA
     // por un error anterior: vuelve al menú para que el bot responda en vez de callar para siempre.
@@ -480,6 +619,15 @@ export class EjecutorConversacionService {
       } catch (err: any) {
         this.logger.warn(`No se pudo rescatar el flujo de la conversación ${conversacionId}: ${err.message}`);
       }
+    }
+    if (conversacion.estado === 'VALIDAR_PAGO') {
+      flujoPrevio = await this.salirDeValidarPagoSiVencido(conversacion, flujoPrevio);
+    }
+    const esValidarPago = conversacion.estado === 'VALIDAR_PAGO';
+    if (!esValidarPago) {
+      const res = await this.reiniciarFlujoAtascado(conversacion, flujoPrevio);
+      flujoPrevio = res.flujo;
+      if (res.saludoEnviado) return true;
     }
     const enManosDePersona =
       conversacion.duenio !== 'BOT' ||
@@ -1031,6 +1179,7 @@ export class EjecutorConversacionService {
         payload === 'btn_menu' ||
         payload === 'volver_menu' ||
         payload === 'inicio' ||
+        esSaludo(textoNorm) ||
         textoNorm === 'menu' ||
         textoNorm === 'inicio' ||
         textoNorm === '0';
@@ -1044,6 +1193,7 @@ export class EjecutorConversacionService {
         textoNorm.includes('a que hora');
 
       const esEstadoPedido =
+        payload === 'mipedido' ||
         Boolean(textoNorm.match(/cp-\d{4}/i)) ||
         payload.startsWith('ord_') ||
         textoNorm.includes('mi pedido') ||
@@ -1248,58 +1398,79 @@ export class EjecutorConversacionService {
           return true;
         }
 
-        // Texto libre fuera de eso: el bot responde una sola vez
-        if (!pago.avisoPersonaEnviado) {
-          const respuesta = 'Ya avisé a una persona, te responde en breve.';
-          if (destinoEnvio) {
+        // Texto libre fuera de eso: avisa a Caja; si ya avisó hace poco calla pero deja el motivo en el chat.
+        const reavisoMin = await this.leerParametroNumero('chatbot_pago_reaviso_min', 15);
+        let ultimoAviso = pago.avisoPersonaEn ? Date.parse(pago.avisoPersonaEn) : NaN;
+        const primera = !pago.avisoPersonaEnviado && isNaN(ultimoAviso);
+        if (!primera && isNaN(ultimoAviso)) ultimoAviso = Date.now(); // booleano viejo: el reloj arranca ahora
+        const vencido = !primera && Date.now() - ultimoAviso >= reavisoMin * 60000;
+
+        if (!primera && !vencido) {
+          this.logger.log(`Texto libre en VALIDAR_PAGO para conversación ${conversacion.id} ya tuvo aviso reciente. El bot guarda silencio.`);
+          if (!pago.avisoPersonaEn) {
+            await this.prisma.conversacion.update({
+              where: { id: conversacion.id },
+              data: { flujo: { ...flujo, pago: { ...pago, avisoPersonaEn: new Date(ultimoAviso).toISOString() } } },
+            });
+          }
+          await this.registrarSilencio(conversacion.id, 'Pago en revisión, ya se avisó a Caja.');
+          return true;
+        }
+
+        const respuesta = primera
+          ? 'Ya avisé a una persona, te responde en breve.'
+          : 'Seguimos revisando tu pago; una persona te responde en breve. Si quieres, puedes ver la carta o tu pedido.';
+        const botones = primera
+          ? null
+          : [
+              { id: 'btn_esp_carta', titulo: 'Ver la carta' },
+              { id: 'mipedido', titulo: 'Mi pedido' },
+              { id: 'btn_esp_persona', titulo: 'Hablar con persona' },
+            ];
+        if (destinoEnvio) {
+          if (botones) {
+            await this.mensajeria.enviarBotones(destinoEnvio, respuesta, botones, {
+              conversacionId: conversacion.id,
+              replyToWaMessageId: entradaRaw.waMessageId,
+            });
+          } else {
             await this.mensajeria.enviarTexto(destinoEnvio, respuesta, {
               conversacionId: conversacion.id,
               replyToWaMessageId: entradaRaw.waMessageId,
             });
           }
-          await this.prisma.mensajeChat.create({
-            data: {
-              conversacion_id: conversacion.id,
-              direccion: 'SALE',
-              autor: 'BOT',
-              tipo: 'TEXTO',
-              contenido: { texto: respuesta },
-            },
-          });
-
-          const notif = await this.prisma.notificacion.create({
-            data: {
-              tipo: 'ATENCION_WHATSAPP',
-              rol_destino: 'CAJERO',
-              titulo: `Mensaje de cliente en chat con pago pendiente (${nombreMostrar})`,
-              mensaje: `Cliente escribió: "${(entradaRaw.texto || entradaRaw.textoOriginal || '').slice(0, 100)}". Ya se le indicó que una persona le responde en breve.`,
-              enlace: '/admin/mensajes',
-            },
-          });
-          this.eventos?.emitirAdmin('notificaciones:nueva', {
-            id: notif.id.toString(),
-            titulo: notif.titulo,
-          });
-
-          await this.prisma.conversacion.update({
-            where: { id: conversacion.id },
-            data: {
-              flujo: {
-                ...flujo,
-                pago: {
-                  ...pago,
-                  avisoPersonaEnviado: true,
-                },
-              },
-            },
-          });
-          return true;
-        } else {
-          this.logger.log(
-            `Texto libre en VALIDAR_PAGO para conversación ${conversacion.id} ya tuvo aviso previo. El bot guarda silencio.`,
-          );
-          return true;
         }
+        await this.prisma.mensajeChat.create({
+          data: {
+            conversacion_id: conversacion.id,
+            direccion: 'SALE',
+            autor: 'BOT',
+            tipo: botones ? 'BOTON' : 'TEXTO',
+            contenido: (botones ? { texto: respuesta, botones } : { texto: respuesta }) as any,
+          },
+        });
+
+        const notif = await this.prisma.notificacion.create({
+          data: {
+            tipo: 'ATENCION_WHATSAPP',
+            rol_destino: 'CAJERO',
+            titulo: `Mensaje de cliente en chat con pago pendiente (${nombreMostrar})`,
+            mensaje: `Cliente escribió: "${(entradaRaw.texto || entradaRaw.textoOriginal || '').slice(0, 100)}". Ya se le indicó que una persona le responde en breve.`,
+            enlace: '/admin/mensajes',
+          },
+        });
+        this.eventos?.emitirAdmin('notificaciones:nueva', { id: notif.id.toString(), titulo: notif.titulo });
+
+        await this.prisma.conversacion.update({
+          where: { id: conversacion.id },
+          data: {
+            flujo: {
+              ...flujo,
+              pago: { ...pago, avisoPersonaEnviado: true, avisoPersonaEn: new Date().toISOString() },
+            },
+          },
+        });
+        return true;
       }
 
       if (payload === 'btn_esp_carta') {
@@ -2107,6 +2278,11 @@ export class EjecutorConversacionService {
           },
         });
       }
+    }
+
+    // Nunca silencio mudo: si la máquina no produjo ninguna acción, queda el evento con su motivo
+    if (resultado.acciones.length === 0) {
+      await this.registrarSilencio(conversacion.id, `Chat en manos de una persona (estado ${flujoEntrada.estado}); el bot esperó.`);
     }
 
     // 11. Notificar por WebSocket a la consola de Mensajes

@@ -18,6 +18,13 @@ export function normalizarTexto(texto?: string | null): string {
     .trim();
 }
 
+/** Saludo puro (hola, ola, buenas tardes, hi, hello, menu...), con o sin tildes y signos; no cuenta si trae más pedido. */
+const RE_SALUDO =
+  /^(?:(?:h?ola+|holi+|hi|hello|hey|buenas tardes|buenas noches|buenas|buen dia|buenos dias|menu|inicio)(?: |$))+$/;
+export function esSaludo(texto?: string | null): boolean {
+  return RE_SALUDO.test(normalizarTexto(texto));
+}
+
 export interface EntradaRawInput {
   texto?: string | null;
   buttonPayload?: string | null;
