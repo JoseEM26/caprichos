@@ -185,7 +185,6 @@ export function PendientesCobroCierre({
       el.focus();
     }
     // Solo reacciona a una nueva solicitud de enfoque
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [foco?.n]);
 
   const verConCodigo = async () => {

@@ -10,7 +10,7 @@ import {
 import { Prisma } from '@prisma/client';
 
 async function asegurarProveedorPrueba(prisma: any) {
-  let role = await prisma.partyRole.findFirst({
+  const role = await prisma.partyRole.findFirst({
     where: {
       rol: 'PROVEEDOR',
       party: {

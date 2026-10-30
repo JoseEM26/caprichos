@@ -419,7 +419,7 @@ export class EjecutorConversacionService {
         const val = await redis.get(clave);
         if (val) return true;
       }
-    } catch {}
+    } catch { /* si Redis falla, el bot sigue sin el candado de asistido */ }
 
     if (flujo?.asistido_ultima_frase_fija_ts) {
       const ms = Date.now() - Number(flujo.asistido_ultima_frase_fija_ts);
@@ -441,7 +441,7 @@ export class EjecutorConversacionService {
       if (redis && typeof redis.set === 'function') {
         await redis.set(clave, '1', 'EX', asistidoEsperaMin * 60);
       }
-    } catch {}
+    } catch { /* si Redis falla, el bot sigue sin marcar la espera */ }
   }
 
   /**

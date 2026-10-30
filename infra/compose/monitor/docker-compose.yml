@@ -1,0 +1,26 @@
+# ==============================================================================
+# Uptime Kuma — monitor de disponibilidad de Caprichos
+# ==============================================================================
+# Escucha SOLO en 127.0.0.1 del servidor (no se publica en internet): se abre con un túnel SSH
+#   ssh -L 3001:127.0.0.1:3001 <usuario>@<servidor>   y luego   http://localhost:3001
+# La primera persona que entra crea la cuenta de administrador, por eso no se expone. Sin socket de Docker.
+# ==============================================================================
+name: caprichos-monitor
+
+services:
+  kuma:
+    image: louislam/uptime-kuma:1.23.16
+    container_name: caprichos-monitor-kuma
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3001"
+    volumes:
+      - kuma_data:/app/data
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+
+volumes:
+  kuma_data:
+    name: caprichos_monitor_data

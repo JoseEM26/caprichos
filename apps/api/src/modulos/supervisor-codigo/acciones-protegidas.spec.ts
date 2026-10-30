@@ -18,7 +18,7 @@ describe('Acciones Protegidas por Código de Supervisor (DT-61 / RFC 6238)', () 
   let supervisorServiceMock: any;
   let guard: SupervisorCodigoGuard;
 
-  const mockContext = (handler: Function, req: any) => ({
+  const mockContext = (handler: (...args: any[]) => any, req: any) => ({
     getHandler: () => handler,
     switchToHttp: () => ({
       getRequest: () => req,

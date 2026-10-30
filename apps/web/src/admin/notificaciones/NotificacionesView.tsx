@@ -131,7 +131,7 @@ export function NotificacionesView() {
     try {
       await marcarNotificacionLeida(item.id, !item.leida);
       await cargar();
-    } catch {}
+    } catch { /* best-effort: el refresco es opcional, la vista ya cargo */ }
   };
 
   const handleMarcarTodasLeidas = async () => {
@@ -139,7 +139,7 @@ export function NotificacionesView() {
       await marcarTodasNotificacionesLeidas();
       setConfirmarMarcarTodas(false);
       await cargar();
-    } catch {}
+    } catch { /* best-effort: el refresco es opcional, la vista ya cargo */ }
   };
 
   // Agrupar items por día

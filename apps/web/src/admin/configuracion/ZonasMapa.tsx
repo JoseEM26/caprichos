@@ -224,7 +224,6 @@ export function ZonasMapa({
     if (!edicion || !tol || !zonaEditada?.activa || edicion.puntos.length < 3) return null;
     const r = ajustarAVecinas(edicion.puntos, vecinasDe(edicion.codigo), tol);
     return r.cambio ? r : null;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [edicion, tol, zonas]);
 
   // El mapa se crea una sola vez
@@ -372,7 +371,6 @@ export function ZonasMapa({
     const m = mapa.current;
     if (!m || !zonaSel || zonaSel.poligono.length < 3) return;
     m.fitBounds(L.latLngBounds(zonaSel.poligono as L.LatLngTuple[]), { padding: [40, 40], maxZoom: 17 });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seleccionado]);
 
   // Historial de cambios de la zona seleccionada

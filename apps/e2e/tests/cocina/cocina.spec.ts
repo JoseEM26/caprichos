@@ -435,7 +435,7 @@ test.describe('Suite E2E - Pantalla de Cocina Simple e Intuitiva', () => {
       try {
         localStorage.clear();
         sessionStorage.clear();
-      } catch {}
+      } catch { /* limpieza del navegador de prueba; si falla, la prueba sigue */ }
     });
     await page.context().clearCookies();
     await loginPorUi(page, 'ALMACEN');
@@ -462,7 +462,7 @@ test.describe('Suite E2E - Pantalla de Cocina Simple e Intuitiva', () => {
       try {
         localStorage.clear();
         sessionStorage.clear();
-      } catch {}
+      } catch { /* limpieza del navegador de prueba; si falla, la prueba sigue */ }
     });
     await page.context().clearCookies();
     await loginPorUi(page, 'COCINA');

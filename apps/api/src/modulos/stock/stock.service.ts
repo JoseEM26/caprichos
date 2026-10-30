@@ -17,6 +17,7 @@ import { MovimientosQueryDto } from './dto/movimientos-query.dto';
 import { convertirAUnidadAlmacen, insumosDeLinea } from './receta.util';
 import { FECHA_HASTA_REACTIVAR } from '../cocina/cocina.util';
 import { AvisosInternosService } from '../chatbot/avisos-internos/avisos-internos.service';
+import { controlAlmacenActivo } from './control-almacen';
 
 @Injectable()
 export class StockService {
@@ -523,13 +524,7 @@ export class StockService {
 
   /** ¿Está encendido el control de almacén? Parámetro `stock_control_activo` («si»/«no»); sin parámetro, apagado. */
   async controlActivo(db: any = this.prisma): Promise<boolean> {
-    try {
-      const p = await db.parametro?.findUnique?.({ where: { clave: 'stock_control_activo' } });
-      const v = p?.valor;
-      return v === true || String(v ?? '').toLowerCase().trim() === 'si';
-    } catch {
-      return false;
-    }
+    return controlAlmacenActivo(db);
   }
 
   /**
@@ -1057,7 +1052,7 @@ export class StockService {
         if (mov.insumo_id) {
           insumosRevertidos.push(mov.insumo_id);
           // Reponer stock insumo de forma atómica
-          let st = await db.stock.findFirst({
+          const st = await db.stock.findFirst({
             where: { insumo_id: mov.insumo_id, lugar_id: mov.lugar_id },
           });
 
@@ -1080,7 +1075,7 @@ export class StockService {
         } else if (mov.producto_id) {
           productosRevertidos.push(mov.producto_id);
           // Reponer stock producto terminado de forma atómica
-          let st = await db.stock.findFirst({
+          const st = await db.stock.findFirst({
             where: { producto_id: mov.producto_id, lugar_id: mov.lugar_id },
           });
 

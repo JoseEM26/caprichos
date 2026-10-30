@@ -117,7 +117,13 @@ describe('InformesService', () => {
         count: jest.fn().mockResolvedValue(2),
         findMany: jest.fn().mockResolvedValue([]),
       },
-      parametro: { findUnique: jest.fn().mockResolvedValue({ valor: { lat: -12.02, lng: -76.96, nombre: 'Sede X' } }) },
+      parametro: {
+        findUnique: jest.fn(async ({ where }: any) =>
+          where.clave === 'stock_control_activo'
+            ? { valor: 'si' }
+            : { valor: { lat: -12.02, lng: -76.96, nombre: 'Sede X' } },
+        ),
+      },
       zonaReparto: {
         count: jest.fn().mockResolvedValue(5),
         findMany: jest.fn().mockResolvedValue([

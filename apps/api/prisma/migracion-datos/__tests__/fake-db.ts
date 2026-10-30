@@ -87,13 +87,12 @@ export class FakeDb {
 
   /** Cliente tipo Prisma: delegados como propiedades + $queryRawUnsafe/$transaction. */
   proxy(): any {
-    const self = this;
     return new Proxy({}, {
-      get(_o, nombre: string | symbol) {
-        if (nombre === '$queryRawUnsafe') return (sql: string) => self.$queryRawUnsafe(sql);
-        if (nombre === '$transaction') return (fn: (tx: any) => Promise<any>) => self.$transaction(fn);
+      get: (_o, nombre: string | symbol) => {
+        if (nombre === '$queryRawUnsafe') return (sql: string) => this.$queryRawUnsafe(sql);
+        if (nombre === '$transaction') return (fn: (tx: any) => Promise<any>) => this.$transaction(fn);
         if (typeof nombre !== 'string') return undefined;
-        return self.delegado(nombre);
+        return this.delegado(nombre);
       },
     });
   }

@@ -225,6 +225,7 @@ export async function main(argv: string[], env: NodeJS.ProcessEnv, deps: Deps = 
 
 if (require.main === module) {
   // Igual que las semillas: toma apps/api/.env si existe; las variables ya definidas mandan.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- dotenv es opcional: se carga solo si esta instalado
   try { require('dotenv').config({ path: path.resolve(__dirname, '../../.env') }); } catch { /* sin dotenv */ }
   main(process.argv.slice(2), process.env).catch((e) => {
     console.error(`ABORTADO: ${e instanceof Error ? e.message : e}`);

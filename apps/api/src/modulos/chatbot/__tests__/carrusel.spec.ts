@@ -95,9 +95,13 @@ describe('fotos: URL pública e imagen de iniciales', () => {
 });
 
 describe('imagen-wa.jpg y URL pública', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- require dentro del describe/it, local a esa prueba
   const sharp = require('sharp');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- require dentro del describe/it, local a esa prueba
   const fs = require('fs');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- require dentro del describe/it, local a esa prueba
   const os = require('os');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- require dentro del describe/it, local a esa prueba
   const path = require('path');
   it('devuelve JPEG 5:3 (1200x720) desde webp, desde iniciales y 404 si está oculto', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wa-'));
@@ -351,6 +355,7 @@ describe('un solo camino para productos de una categoría', () => {
 });
 
 describe('fallo asíncrono de Meta (statuses[].failed)', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- require dentro del describe/it, local a esa prueba
   const { WhatsappWebhookService } = require('../servicios/whatsapp-webhook.service');
   const montar = (contenido: any, previo: any = { id: 7n, estado: 'ENVIADO', direccion: 'SALIENTE', conversacion_id: 5n }) => {
     const prisma: any = {
@@ -394,6 +399,7 @@ describe('fallo asíncrono de Meta (statuses[].failed)', () => {
 
 describe('carrusel: simulado no sube nada y resumen informa la vía', () => {
   it('simulado no llama a fetch', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- require dentro del describe/it, local a esa prueba
     const { WhatsAppSimuladoAdaptador } = require('../adaptadores/whatsapp-simulado.adaptador');
     const f = jest.fn();
     const orig = global.fetch;
@@ -413,6 +419,7 @@ describe('carrusel: simulado no sube nada y resumen informa la vía', () => {
 
 describe('botón común en todas las tarjetas', () => {
   it('cada tarjeta lleva «Pedir este» y el segundo botón igual (mismos tipos y cantidad)', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- require dentro del describe/it, local a esa prueba
     const { payloadInteractivoCarrusel: armar } = require('../servicios/carrusel.util');
     const t = (id: string) => ({ nombre: id, imagenUrl: 'https://x.pe/a.jpg', cuerpo: id, boton: { id: `ped_prod_${id}`, titulo: 'Pedir este' } });
     const p = armar({ cuerpo: 'Hola', tarjetas: [t('1'), t('2')], botonComun: { id: 'btn_categorias', titulo: 'Otra categoría' } });

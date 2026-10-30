@@ -79,7 +79,6 @@ export function MapaUbicacion({
       localPin.current = null;
     };
     // El mapa se crea una sola vez; el punto y el local se sincronizan en los efectos siguientes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Observador de cambio de tamaño e invalidación de tamaño de Leaflet

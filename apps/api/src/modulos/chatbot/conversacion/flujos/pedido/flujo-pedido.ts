@@ -981,7 +981,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       ? entrada.id.replace('ped_prod_', '')
       : null;
 
-    let catId = pedido.categoriaSeleccionadaId;
+    const catId = pedido.categoriaSeleccionadaId;
     let categoria = categorias.find((c) => String(c.id) === String(catId));
 
     if (!categoria && prodIdMatch) {

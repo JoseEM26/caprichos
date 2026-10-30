@@ -224,7 +224,7 @@ export class AyudaAdminService {
         origen: 'AYUDA_ADMIN',
       });
 
-      let textoRespuesta =
+      const textoRespuesta =
         respuestaOpenAI.choices?.[0]?.message?.content?.trim() ||
         'No pude obtener una respuesta completa. Puedes consultar los manuales del sistema o pedir asistencia a tu Administrador.';
 

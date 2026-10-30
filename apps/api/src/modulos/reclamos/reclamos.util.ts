@@ -37,7 +37,7 @@ export function formatearFechaIso(fecha: Date | string): string {
  */
 export function sumarDiasHabiles(fechaInicioIso: string, diasHabiles: number): string {
   const [y, m, d] = fechaInicioIso.split('-').map(Number);
-  let cur = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  const cur = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
   let agregados = 0;
 
   while (agregados < diasHabiles) {
@@ -75,7 +75,7 @@ export function calcularDiasHabilesRestantes(
   const tLim = Date.UTC(y2, m2 - 1, d2, 12, 0, 0);
 
   if (tHoy < tLim) {
-    let cur = new Date(tHoy);
+    const cur = new Date(tHoy);
     let habiles = 0;
     while (cur.getTime() < tLim) {
       cur.setUTCDate(cur.getUTCDate() + 1);
@@ -86,7 +86,7 @@ export function calcularDiasHabilesRestantes(
     }
     return habiles;
   } else {
-    let cur = new Date(tLim);
+    const cur = new Date(tLim);
     let habiles = 0;
     while (cur.getTime() < tHoy) {
       cur.setUTCDate(cur.getUTCDate() + 1);

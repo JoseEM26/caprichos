@@ -56,6 +56,7 @@ describe('RedisIoAdapter', () => {
   });
 
   it('cae a adaptador en memoria sin crashear si Redis falla en conectar', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- se toma el mock de ioredis dentro del test, despues de jest.mock
     const RedisMock = require('ioredis');
     RedisMock.mockImplementationOnce(() => ({
       connect: jest.fn().mockRejectedValue(new Error('Connection refused')),

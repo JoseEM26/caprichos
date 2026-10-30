@@ -1,6 +1,7 @@
 import { FullConfig } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
+import { execSync } from 'child_process';
 
 const STACK_STATE_FILE = path.resolve(__dirname, process.env.E2E_SLOT ? `../.stack-pids-${process.env.E2E_SLOT}.json` : '../.stack-pids.json');
 
@@ -12,23 +13,23 @@ export default async function globalTeardown(config: FullConfig) {
       if (data.apiPid) {
         try {
           process.kill(data.apiPid, 'SIGTERM');
-        } catch {}
+        } catch { /* el proceso pudo terminar antes; se ignora */ }
       }
       if (data.webPid) {
         try {
           process.kill(data.webPid, 'SIGTERM');
-        } catch {}
+        } catch { /* el proceso pudo terminar antes; se ignora */ }
       }
       try {
         const slot = Number(process.env.E2E_SLOT || 0);
         const pApi = 3100 + slot;
         const pFront = 5273 + slot;
-        require('child_process').execSync(`fuser -k ${pApi}/tcp ${pFront}/tcp || true`, { stdio: 'ignore' });
-      } catch {}
-    } catch {}
+        execSync(`fuser -k ${pApi}/tcp ${pFront}/tcp || true`, { stdio: 'ignore' });
+      } catch { /* fuser falla si no hay procesos en el puerto; se ignora */ }
+    } catch { /* limpieza best-effort del entorno e2e; no debe cortar el apagado */ }
     try {
       fs.unlinkSync(STACK_STATE_FILE);
-    } catch {}
+    } catch { /* el archivo de estado puede no existir */ }
   }
   console.log('[E2E TEARDOWN] Stack apagado correctamente.');
 }

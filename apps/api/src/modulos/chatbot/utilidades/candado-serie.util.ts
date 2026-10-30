@@ -48,7 +48,7 @@ async function conCandadoRedis<T>(clave: string, redis: any, fn: () => Promise<T
           "if redis.call('get',KEYS[1])==ARGV[1] then return redis.call('del',KEYS[1]) end return 0",
           1, llave, token,
         );
-      } catch {}
+      } catch { /* liberar el candado es best-effort; expira solo por TTL */ }
     }
   }
 }

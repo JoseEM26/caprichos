@@ -229,7 +229,7 @@ export class RecordatorioReservasTarea implements OnModuleInit, OnModuleDestroy 
         try {
           const redis = this.redisService.obtenerCliente();
           await liberarCandado(redis, lockKey, lockToken);
-        } catch {}
+        } catch { /* liberar el candado es best-effort; expira solo por TTL */ }
       }
     }
 

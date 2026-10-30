@@ -34,6 +34,13 @@ for _ in $(seq 1 40); do
   sleep 1
 done
 
+# El volcado asigna dueños (OWNER TO <usuario>); en la base temporal esos usuarios no existen y la restauración
+# se detendría. Se crean vacíos, solo dentro del contenedor temporal.
+for ROL in $(gzip -dc "$DUMP" | grep -oE 'OWNER TO [A-Za-z0-9_]+' | awk '{print $3}' | sort -u); do
+  [[ "$ROL" == "restore_test" ]] && continue
+  docker exec "$C" psql -U restore_test -d restore_test -c "CREATE ROLE \"${ROL}\" SUPERUSER" >/dev/null 2>&1 || true
+done
+
 echo "==> Restaurando en la base temporal..."
 if ! gzip -dc "$DUMP" | docker exec -i "$C" psql -v ON_ERROR_STOP=1 -U restore_test -d restore_test >/dev/null 2>"/tmp/restore-err-$$.txt"; then
   echo "FALLA: la restauración dio errores. Primeras líneas:" >&2

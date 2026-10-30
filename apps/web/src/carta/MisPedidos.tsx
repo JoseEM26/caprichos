@@ -305,7 +305,6 @@ function useHistorialCuenta(activa: boolean) {
   useEffect(() => {
     if (activa && pagina === 0) void cargarPagina(1);
     // Solo al abrir con sesión; el resto del estado lo maneja cada acción
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activa]);
 
   useEffect(() => {
@@ -314,7 +313,6 @@ function useHistorialCuenta(activa: boolean) {
       if (document.visibilityState !== 'hidden') void refrescarPrimera();
     }, INTERVALO_SEGUIMIENTO_MS);
     return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activa, hayActivos]);
 
   return {

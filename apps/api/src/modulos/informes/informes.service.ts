@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { controlAlmacenActivo } from '../stock/control-almacen';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { COORDENADAS_LOCAL_DEFAULT, DATOS_LOCAL_DEFAULT } from '../local/local.service';
 import { cobroVigente } from '../caja/caja.calculo';
@@ -310,7 +311,10 @@ export class InformesService {
       { n: 'Por confirmar', v: porConfirmarCount, view: '/admin/caja' },
       { n: 'En cocina', v: enCocinaCount, view: '/admin/cocina' },
       { n: 'Repartos activos', v: repartosActivosCount, view: '/admin/repartos' },
-      { n: 'Insumos con stock bajo', v: insumosBajoMinimo, view: '/admin/stock' },
+      // Con el «Control de almacén» apagado no se muestran avisos de insumos
+      ...((await controlAlmacenActivo(this.prisma))
+        ? [{ n: 'Insumos con stock bajo', v: insumosBajoMinimo, view: '/admin/stock' }]
+        : []),
     ];
 
     // Agrupación por días para el gráfico de línea de ventas y entregas en hora de Lima

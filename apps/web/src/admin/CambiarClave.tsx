@@ -99,7 +99,7 @@ export function CambiarClave() {
       if (!clavePrevia) {
         try {
           clavePrevia = sessionStorage.getItem('caprichos_temp_clave') || '';
-        } catch {}
+        } catch { /* sessionStorage puede no estar disponible (modo privado): se ignora */ }
       }
       await api.post('/auth/cambiar-contrasena', {
         contrasenaActual: clavePrevia,
@@ -108,7 +108,7 @@ export function CambiarClave() {
 
       try {
         sessionStorage.removeItem('caprichos_temp_clave');
-      } catch {}
+      } catch { /* sessionStorage puede no estar disponible (modo privado): se ignora */ }
 
       marcarClaveCambiada();
       navigate('/admin', { replace: true });

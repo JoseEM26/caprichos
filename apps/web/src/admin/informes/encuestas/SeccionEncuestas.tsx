@@ -196,7 +196,6 @@ export function SeccionEncuestas() {
       vigente = false;
     };
     // rango se deriva de preset; reintento fuerza nueva consulta
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preset, puntaje, modalidad, pagina, reintento]);
 
   const descargarCsv = async () => {

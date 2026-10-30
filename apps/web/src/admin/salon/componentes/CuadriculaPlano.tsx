@@ -552,23 +552,6 @@ export function CuadriculaPlano({
                 </span>
               )}
 
-              {/* Mozo si está ocupada en salón */}
-              {false && modoSalon && mesaSalon?.estado === 'OCUPADA' && mesaSalon?.mozo && (
-                <span
-                  style={{
-                    fontSize: '8px',
-                    opacity: 0.75,
-                    lineHeight: '9px',
-                    maxWidth: '100%',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {mesaSalon?.mozo?.split(' ')[0]}
-                </span>
-              )}
-
               {/* Indicador de desactivado */}
               {!elem.activo && (
                 <span

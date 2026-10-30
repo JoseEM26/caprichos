@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 import { ejecutarComandoProbar, ejecutarComandoVolcar, listarImpresorasLinux, crearDispositivo, interpretarIeee1284, describirImpresora, ejecutarAsistente } from '../cli';
 import { rutaArchivoConfiguracion, obtenerConfiguracion } from '../config';
 import { ImpresoraMemoria } from '../impresora/impresoraMemoria';
@@ -8,7 +9,7 @@ import { ImpresoraUsb } from '../impresora/impresoraUsb';
 import { ErrorImpresora } from '../impresora/dispositivo.interface';
 
 // Que los comandos no lean la configuracion real del equipo
-process.env.AGENTE_CONFIG = path.join(require('os').tmpdir(), 'caprichos-sin-config.json');
+process.env.AGENTE_CONFIG = path.join(os.tmpdir(), 'caprichos-sin-config.json');
 
 describe('CLI - Comandos de prueba y volcado', () => {
   it('ejecutarComandoProbar envia 3 etiquetas de muestra a la impresora (general, area, bebida)', async () => {
@@ -69,8 +70,8 @@ describe('CLI - Comandos de prueba y volcado', () => {
 
 describe('Linux: dos impresoras por rol', () => {
   it('lista los /dev/usb/lpN con modelo y lenguaje de ieee1284, y marca sin permiso', () => {
-    const d = fs.mkdtempSync(path.join(require('os').tmpdir(), 'usb-'));
-    const sys = fs.mkdtempSync(path.join(require('os').tmpdir(), 'sys-'));
+    const d = fs.mkdtempSync(path.join(os.tmpdir(), 'usb-'));
+    const sys = fs.mkdtempSync(path.join(os.tmpdir(), 'sys-'));
     ['lp1', 'lp0', 'hiddev0'].forEach((n) => fs.writeFileSync(path.join(d, n), ''));
     fs.mkdirSync(`${sys}/lp0/device`, { recursive: true });
     fs.writeFileSync(`${sys}/lp0/device/ieee1284_id`, 'MFG:4BARCODE;CMD:TSPL2;MDL:4B-2054TH;CLS:PRINTER;');
@@ -92,7 +93,7 @@ describe('Linux: dos impresoras por rol', () => {
   });
 
   it('asistente: valida la entrada y vuelve a preguntar; acepta número o ruta existente', async () => {
-    const home = fs.mkdtempSync(path.join(require('os').tmpdir(), 'home-'));
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'home-'));
     const prev = process.env.HOME;
     process.env.HOME = home;
     const ruta = rutaArchivoConfiguracion();
@@ -116,8 +117,8 @@ describe('Linux: dos impresoras por rol', () => {
   });
 
   it('si lp0 y lp1 se intercambian, cada rol sigue a su impresora', async () => {
-    const d = fs.mkdtempSync(path.join(require('os').tmpdir(), 'usb-'));
-    const sys = fs.mkdtempSync(path.join(require('os').tmpdir(), 'sys-'));
+    const d = fs.mkdtempSync(path.join(os.tmpdir(), 'usb-'));
+    const sys = fs.mkdtempSync(path.join(os.tmpdir(), 'sys-'));
     const poner = (n: string, id: string) => {
       fs.writeFileSync(path.join(d, n), '');
       fs.mkdirSync(`${sys}/${n}/device`, { recursive: true });

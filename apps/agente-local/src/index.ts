@@ -1,3 +1,5 @@
+import { main } from './cli';
+
 export {
   obtenerConfiguracion,
   VERSION_AGENTE,
@@ -56,7 +58,6 @@ export {
 
 // Si se ejecuta directamente dist/index.js, corre el agente
 if (require.main === module) {
-  const { main } = require('./cli');
   main().catch((err: any) => {
     console.error('Error fatal:', err);
     process.exit(1);

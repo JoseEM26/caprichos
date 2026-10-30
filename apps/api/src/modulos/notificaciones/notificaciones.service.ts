@@ -1,4 +1,5 @@
 import { HttpException, HttpStatus, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { controlAlmacenActivo } from '../stock/control-almacen';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
@@ -275,7 +276,8 @@ export class NotificacionesService {
       }
     }
 
-    if (puede('compras/ver') || puede('stock/ver')) {
+    // Los avisos de stock bajo solo existen con el «Control de almacén» encendido (Configuración › Operación)
+    if ((puede('compras/ver') || puede('stock/ver')) && (await controlAlmacenActivo(this.prisma))) {
       const insumos = await this.prisma.insumo.findMany({
         where: { activo: true },
         include: { stocks: true },

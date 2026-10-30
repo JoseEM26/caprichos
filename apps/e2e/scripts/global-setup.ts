@@ -65,7 +65,7 @@ export default async function globalSetup(config: FullConfig) {
   console.log(`[E2E SETUP] 3. Levantando API compilada en puerto ${PUERTO_API}...`);
   try {
     execSync(`fuser -k ${PUERTO_API}/tcp ${PUERTO_FRONT}/tcp || true`, { stdio: 'ignore' });
-  } catch {}
+  } catch { /* fuser falla si no hay procesos en el puerto; se ignora */ }
   const apiProcess = spawn('node', ['apps/api/dist/main.js'], {
     cwd: rootDir,
     env: {

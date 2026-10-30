@@ -51,7 +51,7 @@ export async function main() {
 
     await prisma.$transaction(async (tx) => {
       // 1. Buscar identificador existente o crearlo
-      let idRegistro = await tx.partyIdentifier.findUnique({
+      const idRegistro = await tx.partyIdentifier.findUnique({
         where: {
           tipo_numero: {
             tipo: 'DNI',

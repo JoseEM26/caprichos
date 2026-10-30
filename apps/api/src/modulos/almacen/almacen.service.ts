@@ -1297,7 +1297,7 @@ export class AlmacenService {
             insumo = await tx.insumo.findUnique({
               where: { id: BigInt(item.insumoId) },
             });
-          } catch {}
+          } catch { /* busqueda de insumo opcional; si falla se sigue sin el dato */ }
         }
         if (!insumo && item.insumo) {
           insumo = await tx.insumo.findFirst({

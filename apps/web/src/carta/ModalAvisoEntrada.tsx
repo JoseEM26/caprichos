@@ -30,7 +30,7 @@ export function marcarVistoHoyStorage(storageKey: string): void {
       const hoy = new Date().toISOString().slice(0, 10);
       window.localStorage.setItem(storageKey, hoy);
     }
-  } catch {}
+  } catch { /* localStorage puede estar bloqueado (modo privado): se ignora */ }
 }
 
 export function ModalAvisoEntrada({

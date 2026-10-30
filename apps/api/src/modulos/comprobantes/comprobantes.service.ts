@@ -118,8 +118,8 @@ export class ComprobantesService {
 
     let tipoFinal = tipoSolicitado;
     let emisionFinal: 'INTERNA' | 'POR_EMITIR' | 'EMITIDO' = 'INTERNA';
-    let docFinal = docSolicitado;
-    let razonFinal = razonSolicitada;
+    const docFinal = docSolicitado;
+    const razonFinal = razonSolicitada;
     let advertencia: string | null = null;
 
     if (!validacion.valido) {
