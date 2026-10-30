@@ -1,3 +1,4 @@
+import { CargaCarrusel, resumenCarrusel } from '../servicios/carrusel.util';
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import {
@@ -222,6 +223,30 @@ export class WhatsAppSimuladoAdaptador implements WhatsAppMensajeriaPuerto {
         errorCodigo: 'ERROR_BD_SIMULADO',
         errorDetalle: error.message,
       };
+    }
+  }
+
+  async enviarCarrusel(telefono: string, carga: CargaCarrusel, opciones?: OpcionesEnvio): Promise<ResultadoEnvioWhatsApp> {
+    const waMessageId = this.generarWaMessageId();
+    const telMask = enmascararTelefono(telefono);
+    this.logger.log(`[SIMULADO] Enviar ${resumenCarrusel(carga)} a ${telMask}`);
+    try {
+      const registro = await this.prisma.whatsappMensaje.create({
+        data: {
+          direccion: 'SALIENTE',
+          wa_message_id: waMessageId,
+          telefono_enmascarado: telMask,
+          telefono_hash: hashTelefono(telefono),
+          tipo: 'BOTON',
+          plantilla: null,
+          estado: 'SIMULADO',
+          pedido_id: this.parsearId(opciones?.pedidoId),
+          conversacion_id: this.parsearId(opciones?.conversacionId),
+        },
+      });
+      return { exito: true, id: registro.id.toString(), waMessageId, estado: 'SIMULADO' };
+    } catch (error: any) {
+      return { exito: false, estado: 'FALLIDO', errorCodigo: 'ERROR_BD_SIMULADO', errorDetalle: error.message };
     }
   }
 

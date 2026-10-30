@@ -1,3 +1,4 @@
+import { CargaCarrusel, carruselEnviable, payloadInteractivoCarrusel } from '../servicios/carrusel.util';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
@@ -622,6 +623,63 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
         telefono_enmascarado: telMask,
         telefono_hash: telHash,
         tipo: 'LISTA',
+        plantilla: null,
+        estado,
+        error_codigo: resultado.error?.codigo || null,
+        error_detalle: resultado.error?.mensaje || null,
+        pedido_id: this.parsearId(opciones?.pedidoId),
+        conversacion_id: this.parsearId(opciones?.conversacionId),
+      },
+    });
+
+    return {
+      exito: resultado.exito,
+      id: registro.id.toString(),
+      waMessageId,
+      estado,
+      errorCodigo: resultado.error?.codigo,
+      errorDetalle: resultado.error?.mensaje,
+      reintentos: resultado.intentos,
+    };
+  }
+
+  async enviarCarrusel(telefono: string, carga: CargaCarrusel, opciones?: OpcionesEnvio): Promise<ResultadoEnvioWhatsApp> {
+    const destinatario = construirDestinatario(telefono);
+    const telMask = enmascararTelefono(telefono);
+
+    if (!this.token || !this.phoneId) {
+      return {
+        exito: false,
+        estado: 'FALLIDO',
+        errorCodigo: 'SIN_CREDENCIALES_META',
+        errorDetalle: 'Faltan WHATSAPP_TOKEN o WHATSAPP_PHONE_ID en la configuración',
+      };
+    }
+    // Meta baja las imágenes desde su servidor: sin URL HTTPS pública no hay carrusel (el llamador cae a la lista)
+    if (!carruselEnviable(carga)) {
+      return { exito: false, estado: 'FALLIDO', errorCodigo: 'CARRUSEL_SIN_URL_PUBLICA', errorDetalle: 'Las tarjetas necesitan imagen HTTPS pública' };
+    }
+
+    const url = `https://graph.facebook.com/${this.apiVersion}/${this.phoneId}/messages`;
+    const payload: any = {
+      messaging_product: 'whatsapp',
+      ...destinatario,
+      type: 'interactive',
+      interactive: payloadInteractivoCarrusel(carga),
+    };
+    if (opciones?.replyToWaMessageId) payload.context = { message_id: opciones.replyToWaMessageId };
+
+    const resultado = await this.ejecutarConReintentos(url, payload, telMask);
+    const waMessageId = resultado.data?.messages?.[0]?.id;
+    const estado = resultado.exito ? 'ENVIADO' : 'FALLIDO';
+
+    const registro = await this.prisma.whatsappMensaje.create({
+      data: {
+        direccion: 'SALIENTE',
+        wa_message_id: waMessageId || null,
+        telefono_enmascarado: telMask,
+        telefono_hash: hashTelefono(telefono),
+        tipo: 'BOTON',
         plantilla: null,
         estado,
         error_codigo: resultado.error?.codigo || null,

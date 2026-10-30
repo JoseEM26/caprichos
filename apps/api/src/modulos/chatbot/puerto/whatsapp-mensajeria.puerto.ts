@@ -1,3 +1,5 @@
+import type { CargaCarrusel } from '../servicios/carrusel.util';
+
 export interface BotonAccion {
   id: string;
   titulo: string;
@@ -62,6 +64,9 @@ export interface WhatsAppMensajeriaPuerto {
     filas: FilaLista[],
     opciones?: OpcionesEnvio,
   ): Promise<ResultadoEnvioWhatsApp>;
+
+  /** Carrusel interactivo (2 a 10 tarjetas con imagen). Solo dentro de la ventana de 24 h. */
+  enviarCarrusel(telefono: string, carga: CargaCarrusel, opciones?: OpcionesEnvio): Promise<ResultadoEnvioWhatsApp>;
 
   enviarImagen(
     telefono: string,

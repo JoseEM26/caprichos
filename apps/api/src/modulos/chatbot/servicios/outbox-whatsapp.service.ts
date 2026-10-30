@@ -13,6 +13,7 @@ import {
 import { CATALOGO_PLANTILLAS } from '../catalogo/plantillas.catalogo';
 import { enmascararTelefono } from '../utilidades/enmascarar.util';
 import { PayloadMensajeNegocio, Ventana24hService } from './ventana-24h.service';
+import { enviarCarruselConRespaldo, resumenCarrusel } from './carrusel.util';
 import { CargaInteractivo, normalizarInteractivo, textoConVinetas } from './interactivo.util';
 
 export type TipoSaliente = 'TEXTO' | 'PLANTILLA' | 'INTERACTIVO';
@@ -132,7 +133,7 @@ export class OutboxWhatsappService {
     if (datos.tipo === 'INTERACTIVO') {
       const i = datos.carga.interactivo && normalizarInteractivo(datos.carga.interactivo);
       const filas = i?.lista?.secciones.reduce((n, s) => n + s.filas.length, 0) ?? 0;
-      if (!i || !i.cuerpo || (!i.botones?.length && !filas)) {
+      if (!i || !i.cuerpo || (!i.botones?.length && !filas && !i.carrusel)) {
         throw new Error('Un mensaje interactivo necesita cuerpo y botones o filas');
       }
       datos = { ...datos, carga: { ...datos.carga, interactivo: i, textoLibre: i.cuerpo } };
@@ -364,6 +365,8 @@ export class OutboxWhatsappService {
       return { exito: false, estado: 'FALLIDO', errorCodigo: 'CLIENTE_BAJA', errorDetalle: 'Cliente en estado BAJA' };
     }
     if (await this.ventana24h.esVentanaAbierta(tel)) {
+      // Carrusel (no plantilla): si Meta lo rechaza o no hay URL pública, sale el respaldo (lista o botones)
+      if (i.carrusel) return enviarCarruselConRespaldo(this.mensajeria, tel, i.carrusel, opciones);
       if (i.botones?.length) return this.mensajeria.enviarBotones(tel, i.cuerpo, i.botones, opciones);
       const secciones = i.lista?.secciones ?? [];
       return this.mensajeria.enviarLista(
@@ -427,7 +430,7 @@ export class OutboxWhatsappService {
   private async registrarEnChat(
     fila: FilaSaliente,
     carga: CargaSaliente,
-    resultado: ResultadoEnvioWhatsApp & { degradado?: boolean },
+    resultado: ResultadoEnvioWhatsApp & { degradado?: boolean; respaldo?: boolean },
   ): Promise<void> {
     const i = fila.tipo === 'INTERACTIVO' ? carga.interactivo : undefined;
     const conversacion = await this.prisma.conversacion.upsert({
@@ -445,18 +448,19 @@ export class OutboxWhatsappService {
         conversacion_id: conversacion.id,
         direccion: 'SALE',
         autor: carga.autor ?? 'BOT',
-        tipo: !resultado.exito ? 'SISTEMA' : i && !resultado.degradado ? (i.botones?.length ? 'BOTON' : 'LISTA') : 'TEXTO',
+        tipo: !resultado.exito ? 'SISTEMA' : i && !resultado.degradado ? (i.botones?.length || (i.carrusel && !resultado.respaldo) ? 'BOTON' : 'LISTA') : 'TEXTO',
         contenido: {
           origen: fila.origen,
           etapa: carga.etapa ?? null,
           pedido: carga.pedidoCodigo ?? null,
-          texto: carga.textoLibre ?? null,
+          texto: i?.carrusel ? resumenCarrusel(i.carrusel) : (carga.textoLibre ?? null),
           plantilla: carga.plantillaClave ?? null,
           ...(i
             ? {
-                botones: i.botones ?? undefined,
+                botones: i.botones ?? i.carrusel?.tarjetas.map((t) => ({ id: t.boton.id, titulo: t.nombre })),
+                carrusel: i.carrusel ? !resultado.respaldo : undefined,
                 botonTexto: i.lista?.boton,
-                filas: i.lista ? i.lista.secciones.flatMap((s) => s.filas) : undefined,
+                filas: i.lista ? i.lista.secciones.flatMap((s) => s.filas) : i.carrusel?.respaldo?.filas,
                 degradado: resultado.degradado ?? undefined,
               }
             : {}),

@@ -1,3 +1,4 @@
+import { ordenarPorVentas, tarjetaProducto, urlPublicaFoto } from '../servicios/carrusel.util';
 import {
   BOTON_HABLAR_PERSONA,
   BOTON_LISTA_CATEGORIAS,
@@ -1026,15 +1027,18 @@ export function transicionarEstado(
     }
 
     const nuevoEstado: EstadoConversacion = 'CARTA_PROMOS';
+    const textoPromos = TEXTOS_BOT.promocionesHoy(contexto.ofertas || []);
+    const botonesPromos = [BOTON_VER_CARTA, BOTON_VOLVER_MENU];
+    // Carrusel si hay 2 o más promociones vigentes de un producto concreto (más vendidos primero)
+    const tarjetasPromos = tarjetasDePromociones(contexto);
     return {
       nuevoEstado,
-      acciones: [
-        {
-          tipo: 'enviarBotones',
-          texto: TEXTOS_BOT.promocionesHoy(contexto.ofertas || []),
-          botones: [BOTON_VER_CARTA, BOTON_VOLVER_MENU],
-        },
-      ],
+      acciones: tarjetasPromos.length >= 2
+        ? [
+            { tipo: 'enviarCarrusel', carga: { cuerpo: textoPromos, tarjetas: tarjetasPromos, respaldo: { texto: textoPromos, botones: botonesPromos } } },
+            { tipo: 'enviarBotones', texto: '¿Qué más te provoca? 💛', botones: botonesPromos, soloSiCarruselSalio: true },
+          ]
+        : [{ tipo: 'enviarBotones', texto: textoPromos, botones: botonesPromos }],
       nuevoFlujo: {
         ...flujo,
         estado: nuevoEstado,
@@ -1799,4 +1803,19 @@ export function transicionarEstado(
       repreguntasFallidas: flujo.repreguntasFallidas + 1,
     },
   };
+}
+
+/** Tarjetas de las promociones vigentes que apuntan a un producto de la carta, ordenadas por ventas. */
+function tarjetasDePromociones(contexto: ContextoConversacion) {
+  const productos = new Map<string, any>();
+  for (const c of contexto.categoriasCarta || []) for (const p of c.productos || []) productos.set(String(p.id), p);
+  const candidatas = (contexto.ofertas || [])
+    .filter((o: any) => o.vigenteAhora && o.alcanceProductoId && productos.get(String(o.alcanceProductoId))?.disponible !== false && productos.has(String(o.alcanceProductoId)))
+    .map((o: any) => ({ o, id: String(o.alcanceProductoId) }));
+  return ordenarPorVentas(candidatas, contexto.ventasProductos).map(({ o, id }) => {
+    const prod = productos.get(id);
+    const t = tarjetaProducto(prod, contexto.cartaUrlPublica);
+    const propia = urlPublicaFoto(contexto.cartaUrlPublica, o.imagenUrl);
+    return { ...t, nombre: o.nombre, imagenUrl: propia ?? t.imagenUrl, cuerpo: `${o.nombre}\n${o.descripcion ?? t.cuerpo.split('\n')[1]}` };
+  });
 }

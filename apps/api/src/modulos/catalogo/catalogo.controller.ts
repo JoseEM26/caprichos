@@ -2,6 +2,9 @@ import {
   Body,
   Controller,
   Get,
+  Header,
+  NotFoundException,
+  StreamableFile,
   Param,
   Patch,
   Post,
@@ -12,6 +15,7 @@ import {
 } from '@nestjs/common';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
+import { pngImagenInicial } from './imagen-inicial';
 import { CatalogoService } from './catalogo.service';
 import { CrearProductoDto } from './dto/crear-producto.dto';
 import { EditarProductoDto } from './dto/editar-producto.dto';
@@ -42,6 +46,16 @@ export class CartaController {
   @Get()
   async obtenerCarta(@Query('q') q?: string) {
     return this.catalogoService.obtenerCarta(q);
+  }
+
+  /** Imagen pública (PNG) con las iniciales del producto, para tarjetas de WhatsApp sin foto. 404 si no existe u oculto. */
+  @Get('productos/:id/imagen-inicial.png')
+  @Header('Content-Type', 'image/png')
+  @Header('Cache-Control', 'public, max-age=86400')
+  async imagenInicial(@Param('id') id: string) {
+    const nombre = /^\d+$/.test(id) ? await this.catalogoService.nombreProductoVisible(id) : null;
+    if (!nombre) throw new NotFoundException('Producto no encontrado');
+    return new StreamableFile(await pngImagenInicial(nombre));
   }
 }
 

@@ -7,6 +7,7 @@ import { RedisService } from '../../../comun/redis/redis.service';
 import { EventosGateway } from '../../../comun/socket/eventos.gateway';
 import { LocalService } from '../../local/local.service';
 import { CatalogoService } from '../../catalogo/catalogo.service';
+import { enviarCarruselConRespaldo, resumenCarrusel } from '../servicios/carrusel.util';
 import { OfertasService } from '../../ofertas/ofertas.service';
 import { SeguimientoService } from '../../pedidos/seguimiento.service';
 import { PedidosService } from '../../pedidos/pedidos.service';
@@ -233,11 +234,11 @@ export class EjecutorConversacionService {
       const ult = await this.prisma.mensajeChat.findMany({
         where: { conversacion_id: conversacionId, direccion: 'SALE', autor: 'BOT', tipo: { in: ['BOTON', 'LISTA'] } },
         orderBy: { id: 'desc' },
-        take: 1,
+        take: 3, // un carrusel puede ir en 2 mensajes: los toques de cualquiera de los últimos valen
       });
       const c: any = ult?.[0]?.contenido;
       if (!c) return null;
-      const ids = [...(c.botones ?? []), ...(c.filas ?? [])].map((x: any) => x?.id);
+      const ids = ult.flatMap((m: any) => [...(m.contenido?.botones ?? []), ...(m.contenido?.filas ?? [])]).map((x: any) => x?.id);
       if (!ids.length || ids.includes(idToque)) return null;
       return c;
     } catch {
@@ -624,6 +625,7 @@ export class EjecutorConversacionService {
     let datosLocalPublicos: any = null;
     let categoriasCarta: any[] = [];
     let ofertas: any[] = [];
+    let ventasProductos: Record<string, number> = {};
     let pedidoActivo: any = null;
     let limiteConsultasExcedido = false;
 
@@ -639,6 +641,12 @@ export class EjecutorConversacionService {
 
       datosLocalPublicos = datosPublicos;
       categoriasCarta = carta || [];
+
+      try {
+        ventasProductos = (await this.catalogoService?.ventasPorProducto?.()) ?? {};
+      } catch (err: any) {
+        this.logger.warn(`Sin ranking de ventas para ordenar el carrusel: ${err.message}`);
+      }
 
       if (this.ofertasService) {
         ofertas = await this.ofertasService.listarOfertas(undefined, true, 'WHATSAPP');
@@ -967,6 +975,7 @@ export class EjecutorConversacionService {
       datosLocalPublicos,
       categoriasCarta,
       ofertas,
+      ventasProductos,
       pedidoActivo,
       errorServicio,
       limiteConsultasExcedido,
@@ -1376,7 +1385,37 @@ export class EjecutorConversacionService {
     });
 
     // 9. Ejecutar las acciones devueltas por el motor
+    let carruselSalio = false;
     for (const accion of resultado.acciones) {
+      if ((accion as any).soloSiCarruselSalio && !carruselSalio) continue;
+      if (accion.tipo === 'enviarCarrusel') {
+        let metaId: string | null = null;
+        let r: Awaited<ReturnType<typeof enviarCarruselConRespaldo>> | null = null;
+        if (destinoEnvio) {
+          r = await enviarCarruselConRespaldo(this.mensajeria, destinoEnvio, accion.carga, {
+            conversacionId: conversacion.id,
+            replyToWaMessageId: entradaRaw.waMessageId,
+          });
+          metaId = r.waMessageId || null;
+        }
+        const comoCarrusel = !r?.respaldo;
+        carruselSalio = carruselSalio || comoCarrusel;
+        const rp = accion.carga.respaldo;
+        // Registro legible para el admin; los ids de «Pedir este» quedan en botones para detectar toques viejos
+        await this.prisma.mensajeChat.create({
+          data: {
+            conversacion_id: conversacion.id,
+            direccion: 'SALE',
+            autor: 'BOT',
+            tipo: comoCarrusel ? 'BOTON' : rp?.filas?.length ? 'LISTA' : 'BOTON',
+            contenido: (comoCarrusel
+              ? { texto: resumenCarrusel(accion.carga), carrusel: true, botones: accion.carga.tarjetas.map((t) => ({ id: t.boton.id, titulo: t.nombre })) }
+              : { texto: rp?.texto, botonTexto: rp?.botonTexto, filas: rp?.filas, botones: rp?.botones, carruselRespaldo: true }) as any,
+            meta_id: metaId,
+          },
+        });
+        continue;
+      }
       if (accion.tipo === 'enviarTexto') {
         let metaId: string | null = null;
         if (destinoEnvio) {

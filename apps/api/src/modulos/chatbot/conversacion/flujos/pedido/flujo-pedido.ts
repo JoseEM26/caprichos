@@ -15,6 +15,7 @@ import {
   LineaCarritoBot,
   ItemEnConfiguracionBot,
 } from './tipos-pedido';
+import { ordenarPorVentas, tarjetaProducto } from '../../../servicios/carrusel.util';
 import {
   TEXTOS_BOT,
   BOTON_VOLVER_MENU,
@@ -999,11 +1000,14 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       return this.mostrarCategorias(flujo, pedido, contexto);
     }
 
-    // Paginación de productos
+    // Paginación de productos (lista) y «Ver lista completa» del carrusel
     if (entrada.id?.startsWith('ped_prod_pag_')) {
       const nuevaPagina = parseInt(entrada.id.replace('ped_prod_pag_', ''), 10) || 1;
       const nuevoPedido = { ...pedido, paginaProductos: nuevaPagina };
-      return this.mostrarProductosDeCategoria(flujo, nuevoPedido, categoria, contexto);
+      return this.mostrarProductosDeCategoria(flujo, nuevoPedido, categoria, contexto, undefined, true);
+    }
+    if (entrada.id === 'ped_prod_lista') {
+      return this.mostrarProductosDeCategoria(flujo, { ...pedido, paginaProductos: 1 }, categoria, contexto, undefined, true);
     }
 
     // Selección de producto
@@ -1021,6 +1025,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         categoria,
         contexto,
         'Por favor elige un producto de la lista:',
+        true,
       );
     }
 
@@ -3376,11 +3381,14 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     flujo: FlujoConversacion,
     pedido: EstadoCarritoPedido,
     categoria: any,
-    _contexto: ContextoConversacion,
+    contexto: ContextoConversacion,
     mensajeEncabezado?: string,
+    forzarLista = false,
   ): ResultadoTransicion {
-    const productos = (categoria.productos || []).filter(
-      (p: any) => p.disponible !== false,
+    // Más vendidos primero (los sin ventas siguen el orden de la carta)
+    const productos = ordenarPorVentas(
+      (categoria.productos || []).filter((p: any) => p.disponible !== false),
+      contexto.ventasProductos,
     );
 
     if (productos.length === 0) {
@@ -3433,12 +3441,45 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       acciones.push({ tipo: 'enviarTexto', texto: mensajeEncabezado });
     }
 
-    acciones.push({
+    const lista: AccionMensaje = {
       tipo: 'enviarLista',
       texto: TEXTOS_BOT.pedidoCategoriaSeleccionada(categoria.nombre),
       botonTexto: 'Ver productos',
       filas: filas.slice(0, 10),
-    });
+    };
+
+    // Carrusel con foto: 10 más vendidos, luego los 10 siguientes; con 1 solo producto va directo a la lista
+    if (!forzarLista && productos.length >= 2) {
+      const sig = productos.slice(10);
+      const tarjetas = (ps: any[]) => ps.map((p) => tarjetaProducto(p, contexto.cartaUrlPublica));
+      acciones.push({
+        tipo: 'enviarCarrusel',
+        carga: {
+          cuerpo: TEXTOS_BOT.carruselFavoritos(categoria.nombre),
+          tarjetas: tarjetas(productos.slice(0, 10)),
+          respaldo: { texto: lista.texto, botonTexto: lista.botonTexto, filas: lista.filas },
+        },
+      });
+      if (sig.length >= 2) {
+        acciones.push({
+          tipo: 'enviarCarrusel',
+          soloSiCarruselSalio: true,
+          carga: {
+            cuerpo: TEXTOS_BOT.carruselMasOpciones(),
+            tarjetas: tarjetas(sig.slice(0, 10)),
+          },
+        });
+      }
+      if (productos.length > 20 || sig.length === 1) {
+        acciones.push({
+          tipo: 'enviarBotones',
+          texto: TEXTOS_BOT.carruselVerListaCompleta(),
+          botones: [{ id: 'ped_prod_lista', titulo: 'Ver lista completa' }, { id: 'btn_categorias', titulo: 'Ver categorías' }],
+        });
+      }
+    } else {
+      acciones.push(lista);
+    }
 
     return {
       nuevoEstado: 'PEDIDO_PRODUCTOS',

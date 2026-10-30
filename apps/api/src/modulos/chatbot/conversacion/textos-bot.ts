@@ -778,6 +778,14 @@ export const TEXTOS_BOT = {
     return `Estos son nuestros ${catNombre.toLowerCase()}. ¿Cuál te provoca?`;
   },
 
+  carruselFavoritos: (catNombre: string): string => {
+    return `Los favoritos de nuestros clientes ⭐\nDesliza para ver ${catNombre.toLowerCase()} y toca «Pedir este» en el que te provoque.`;
+  },
+
+  carruselMasOpciones: (): string => 'Más opciones para ti 💛\nDesliza y toca «Pedir este» en el que quieras.',
+
+  carruselVerListaCompleta: (): string => '¿Quieres ver todo lo que tenemos en esta categoría?',
+
   pedidoProductoAgotado: (nombre: string, alternativas: string[] = []): string => {
     const altTexto = alternativas.length > 0 ? ` Te sugiero ${alternativas.join(' o ')}.` : '';
     return `Por ahora no hay stock de ${nombre}.${altTexto}`;

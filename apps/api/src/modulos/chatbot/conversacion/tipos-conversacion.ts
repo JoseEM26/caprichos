@@ -1,3 +1,4 @@
+import type { CargaCarrusel } from '../servicios/carrusel.util';
 import { BotonAccion, FilaLista } from '../puerto/whatsapp-mensajeria.puerto';
 import { EstadoCarritoPedido, EstadoPedidoFlujo } from './flujos/pedido/tipos-pedido';
 import { EstadoPagoFlujo, EstadoPagoConversacion } from './flujos/pago/tipos-pago';
@@ -110,6 +111,8 @@ export interface AccionEnviarBotones {
   tipo: 'enviarBotones';
   texto: string;
   botones: BotonAccion[];
+  /** Solo sale si un carrusel anterior de la misma respuesta salió como carrusel (no cayó al respaldo). */
+  soloSiCarruselSalio?: boolean;
 }
 
 /**
@@ -121,6 +124,17 @@ export interface AccionEnviarLista {
   botonTexto: string;
   filas: FilaLista[];
   tituloSeccion?: string;
+}
+
+/**
+ * Acción de respuesta: carrusel interactivo (2 a 10 tarjetas con imagen y «Pedir este»). Si no puede salir,
+ * el ejecutor manda `carga.respaldo` (la lista o botones de siempre).
+ */
+export interface AccionEnviarCarrusel {
+  tipo: 'enviarCarrusel';
+  carga: CargaCarrusel;
+  /** Esta acción solo sale si un carrusel anterior de la misma respuesta sí salió como carrusel. */
+  soloSiCarruselSalio?: boolean;
 }
 
 /**
@@ -232,6 +246,7 @@ export type AccionMensaje =
   | AccionEnviarTexto
   | AccionEnviarBotones
   | AccionEnviarLista
+  | AccionEnviarCarrusel
   | AccionEnviarImagen
   | AccionPasarAPersona
   | AccionCrearPedido
@@ -322,6 +337,8 @@ export interface ContextoConversacion {
   datosLocalPublicos?: any;
   categoriasCarta?: any[];
   ofertas?: any[];
+  /** Unidades vendidas por productoId (últimos 90 días), para ordenar los carruseles. */
+  ventasProductos?: Record<string, number>;
   pedidoActivo?: any;
   errorServicio?: boolean;
   limiteConsultasExcedido?: boolean;

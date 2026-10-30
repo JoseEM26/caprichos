@@ -1,3 +1,4 @@
+import { CargaCarrusel, normalizarCarrusel } from './carrusel.util';
 import { BotonAccion, FilaLista } from '../puerto/whatsapp-mensajeria.puerto';
 
 export interface SeccionLista {
@@ -10,6 +11,8 @@ export interface CargaInteractivo {
   cuerpo: string;
   botones?: BotonAccion[];
   lista?: { boton: string; secciones: SeccionLista[] };
+  /** Carrusel de 2 a 10 tarjetas con imagen; `cuerpo` va en el cuerpo del carrusel. */
+  carrusel?: CargaCarrusel;
 }
 
 export const LIMITES_INTERACTIVO = { cuerpo: 1024, boton: 20, fila: 24, descripcion: 72, botones: 3, filas: 10 };
@@ -20,6 +23,7 @@ const cortar = (t: unknown, n: number) => String(t ?? '').trim().slice(0, n);
 export function normalizarInteractivo(i: CargaInteractivo): CargaInteractivo {
   const L = LIMITES_INTERACTIVO;
   const cuerpo = cortar(i.cuerpo, L.cuerpo);
+  if (i.carrusel) return { cuerpo, carrusel: normalizarCarrusel({ ...i.carrusel, cuerpo }) };
   if (i.botones?.length) {
     return {
       cuerpo,
@@ -42,7 +46,9 @@ export function normalizarInteractivo(i: CargaInteractivo): CargaInteractivo {
 
 /** Opciones en líneas con viñeta: es lo que sale cuando el interactivo cae a texto fuera de la ventana. */
 export function textoConVinetas(i: CargaInteractivo): string {
-  const titulos = i.botones?.length
+  const titulos = i.carrusel
+    ? i.carrusel.tarjetas.map((t) => t.nombre)
+    : i.botones?.length
     ? i.botones.map((b) => b.titulo)
     : (i.lista?.secciones ?? []).flatMap((s) => s.filas.map((f) => f.titulo));
   return titulos.length ? `${i.cuerpo}\n\n${titulos.map((t) => `• ${t}`).join('\n')}`.slice(0, 3500) : i.cuerpo;

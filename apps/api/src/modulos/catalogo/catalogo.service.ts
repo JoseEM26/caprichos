@@ -83,6 +83,37 @@ export class CatalogoService {
   // 1. CARTA PÚBLICA (GET /carta)
   // =========================================================================
 
+  private ventasCache: { en: number; datos: Record<string, number> } | null = null;
+
+  /**
+   * Unidades vendidas por producto en los últimos 90 días (pedidos no rechazados ni anulados), con caché de 15 min.
+   * Sirve para ordenar el carrusel del bot; los productos sin ventas no aparecen (cuentan 0).
+   */
+  async ventasPorProducto(ahora = Date.now()): Promise<Record<string, number>> {
+    if (this.ventasCache && ahora - this.ventasCache.en < 15 * 60_000) return this.ventasCache.datos;
+    const filas = await this.prisma.pedidoLinea.groupBy({
+      by: ['producto_id'],
+      where: {
+        producto_id: { not: null },
+        pedido: { estado: { notIn: ['RECHAZADO', 'ANULADO'] }, creado_en: { gte: new Date(ahora - 90 * 86_400_000) } },
+      },
+      _sum: { cantidad: true },
+    });
+    const datos: Record<string, number> = {};
+    for (const f of filas) datos[String(f.producto_id)] = f._sum.cantidad ?? 0;
+    this.ventasCache = { en: ahora, datos };
+    return datos;
+  }
+
+  /** Nombre de un producto visible en la carta (ni él ni su categoría ocultos), o null. */
+  async nombreProductoVisible(id: string): Promise<string | null> {
+    const p = await this.prisma.producto.findFirst({
+      where: { id: BigInt(id), oculto: false, categoria: { oculta: false } },
+      select: { nombre: true },
+    });
+    return p?.nombre ?? null;
+  }
+
   async obtenerCarta(q?: string): Promise<CategoriaCarta[]> {
     const categorias = await this.prisma.categoria.findMany({
       where: { oculta: false },
