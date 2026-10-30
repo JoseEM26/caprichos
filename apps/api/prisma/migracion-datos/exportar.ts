@@ -59,6 +59,11 @@ const LIMITE_LISTA = 300;
 /** Tablas de personas y cuentas: sus filas no vigentes no se listan (pueden ser clientes). */
 const SIN_DETALLE = new Set(['party', 'person', 'party_role', 'user_account', 'organization', 'employee_detail', 'supplier_detail', 'horario_trabajo', 'reemplazo_dia', 'cobertura_turno']);
 
+/** Algunas fotos guardan en la ruta un sufijo «#idx=…&pie=…» (orden y pie de foto): el archivo real va sin él. */
+function rutaFisica(ruta: string): string {
+  return ruta.split('#')[0];
+}
+
 /** Hoy en hora de Lima (UTC-5), a medianoche UTC, para comparar con campos @db.Date. */
 function inicioHoyLima(ahora: Date): Date {
   const lima = new Date(ahora.getTime() - 5 * 3600 * 1000);
@@ -78,7 +83,7 @@ export async function exportar(db: Cliente, o: Opciones): Promise<ResultadoExpor
     if (cacheSha.has(id)) return cacheSha.get(id)!;
     const a = filas.archivo.get(id);
     let s: string | null = null;
-    if (a && !a.privado) s = shaDeArchivo(String(a.ruta), path.join(o.uploadsDir, String(a.ruta)));
+    if (a && !a.privado) s = shaDeArchivo(String(a.ruta), path.join(o.uploadsDir, rutaFisica(String(a.ruta))));
     cacheSha.set(id, s);
     return s;
   };
@@ -205,7 +210,7 @@ export async function exportar(db: Cliente, o: Opciones): Promise<ResultadoExpor
   const listaArchivos: ManifiestoArchivo[] = [...archivos.values()]
     .map((a): ManifiestoArchivo => estaticos(a.ruta)
       ? { sha256: a.sha, ext: '', tipo_mime: a.tipo_mime, bytes: a.bytes, estatico: true, ruta: a.ruta }
-      : { sha256: a.sha, ext: extension(a.ruta), tipo_mime: a.tipo_mime, bytes: a.bytes, ruta: a.ruta })
+      : { sha256: a.sha, ext: extension(rutaFisica(a.ruta)), tipo_mime: a.tipo_mime, bytes: a.bytes, ruta: a.ruta })
     .sort((x, y) => x.sha256.localeCompare(y.sha256));
   const conteos: Record<string, number> = {};
   for (const t of Object.keys(salida)) conteos[t] = salida[t].length;
@@ -233,8 +238,8 @@ export async function exportar(db: Cliente, o: Opciones): Promise<ResultadoExpor
     fs.writeFileSync(path.join(o.salida, 'manifiesto.json'), JSON.stringify(manifiesto, null, 2), { mode: 0o600 });
     fs.mkdirSync(path.join(o.salida, 'archivos'), { recursive: true, mode: 0o700 });
     for (const a of [...archivos.values()].filter((x) => !estaticos(x.ruta))) {
-      const destino = path.join(o.salida, 'archivos', `${a.sha}${extension(a.ruta)}`);
-      fs.copyFileSync(path.join(o.uploadsDir, a.ruta), destino);
+      const destino = path.join(o.salida, 'archivos', `${a.sha}${extension(rutaFisica(a.ruta))}`);
+      fs.copyFileSync(path.join(o.uploadsDir, rutaFisica(a.ruta)), destino);
       fs.chmodSync(destino, 0o600);
     }
     tarball = `${o.salida}.tar.gz`;
