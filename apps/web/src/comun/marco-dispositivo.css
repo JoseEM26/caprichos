@@ -6,13 +6,24 @@
   transform: translateZ(0); contain: layout paint;
   background: var(--cp-cream); border: 2px solid var(--cp-line); border-radius: 16px;
   box-shadow: 0 6px 20px rgba(11,44,62,0.12);
-  width: 1000px; height: min(640px, 78vh);
+  width: 100%; min-width: 700px; height: min(640px, 78vh);
 }
 .mdv-marco--celular {
-  width: 390px; height: min(780px, 78vh);
+  /* 390 px de contenido exactos (el borde queda fuera): la carta ve el ancho de un celular real */
+  box-sizing: content-box; width: 390px; min-width: 0; height: min(780px, 78vh);
   border: 8px solid var(--cp-navy); border-radius: 32px; box-shadow: 0 14px 40px rgba(11,44,62,0.25);
 }
 .mdv-contenido { position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden; padding: 12px; box-sizing: border-box; }
+/* editores en sitio: la carta ocupa el marco sin margen, como en la ventana real */
+.mdv-marco--fiel .mdv-contenido { padding: 0; }
+/* en celular no hay barra de desplazamiento que reste ancho, como en un teléfono */
+.mdv-marco--celular .mdv-contenido { scrollbar-width: none; }
+.mdv-marco--celular .mdv-contenido::-webkit-scrollbar { display: none; }
+/* pantalla completa: ancho real, sin escalado, ocupa todo lo que deja la barra */
+.mdv-pista--completa { flex: 1 1 auto; min-height: 0; background: var(--cp-sand); overflow: hidden; }
+.mdv-marco--completa { height: 100%; min-width: 0; border: 0; border-radius: 0; box-shadow: none; }
+.mdv-marco--completa:not(.mdv-marco--celular) { width: 100%; }
+.mdv-marco--celular.mdv-marco--completa { width: 390px; max-width: 100%; box-shadow: 0 0 0 1px var(--cp-line), 0 10px 40px rgba(11,44,62,0.25); }
 .mdv-conmutador { display: inline-flex; gap: 6px; }
 .mdv-btn {
   min-height: 44px; min-width: 44px; padding: 0 14px; border-radius: 12px; border: 1.5px solid var(--cp-navy);

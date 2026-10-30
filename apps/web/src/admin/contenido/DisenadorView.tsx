@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { api } from '../../comun/api';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
+import { EditorPantalla } from '../../comun/PantallaCompleta';
 import { MarcoDispositivo } from '../../comun/MarcoDispositivo';
 import { PAL_DEFAULT, normalizarUrlArchivo } from './paletas-constantes';
 import { CartaVistaPrevia } from '../../carta/CartaPublica';
@@ -12,7 +13,7 @@ import type { DisposicionCarta, IdSeccionCarta, TamanoBanner, TamanoTarjeta } fr
 import type { BannerCarta } from '../../carta/PortadaCarta';
 import type { HistoriaCírculo } from '../../carta/contenido/VisorHistoriasModal';
 import type { ModoEdicion } from '../../carta/edicion';
-import type { CategoriaCarta, DatosLocalCarta, EstadoLocalCarta } from '../../carta/tipos';
+import type { CategoriaCarta, DatosLocalCarta, EstadoLocalCarta, ProductoCarta } from '../../carta/tipos';
 import type { OfertaItem } from '../ofertas/ofertasApi';
 import { BarraSuperior } from './edicion/BarraSuperior';
 import { BloqueEditable, BotonBarra } from './edicion/BloqueEditable';
@@ -164,6 +165,8 @@ export function DisenadorView() {
     ofertas: OfertaItem[];
     estadoLocal: EstadoLocalCarta | null;
     datosLocal: DatosLocalCarta | null;
+    /** Producto público por id: trae tamaños, opciones y disponibilidad para que la tarjeta sea idéntica a la de la carta. */
+    publicos: Map<string, ProductoCarta>;
   } | null>(null);
   const entradaMomento = useRef<HTMLInputElement>(null);
 
@@ -222,8 +225,11 @@ export function DisenadorView() {
       api.get<EstadoLocalCarta>('/carta/estado').catch(() => null),
       api.get<DatosLocalCarta>('/carta/local').catch(() => null),
       api.get<DestacadaAdmin[]>('/admin/contenido/destacadas').catch(() => []),
-    ]).then(([contenido, ofertas, estadoLocal, datosLocal, destacadas]) => {
-      setDatosPublicos({ contenido, ofertas: Array.isArray(ofertas) ? ofertas : [], estadoLocal, datosLocal });
+      api.get<CategoriaCarta[]>('/carta').catch(() => []),
+    ]).then(([contenido, ofertas, estadoLocal, datosLocal, destacadas, publica]) => {
+      const publicos = new Map<string, ProductoCarta>();
+      (Array.isArray(publica) ? publica : []).forEach((c) => c.productos.forEach((p) => publicos.set(String(p.id), p)));
+      setDatosPublicos({ contenido, ofertas: Array.isArray(ofertas) ? ofertas : [], estadoLocal, datosLocal, publicos });
       setMomentosBase(Array.isArray(destacadas) ? destacadas : []);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -248,19 +254,23 @@ export function DisenadorView() {
         // en edición también se ven los productos ocultos (atenuados) para poder mostrarlos de nuevo
         productos: e.productos
           .filter((p) => p.categoriaId === c.id)
-          .map((p) => ({
-            id: p.id,
-            nombre: p.nombre,
-            descripcion: p.descripcion,
-            precio: p.precio,
-            fotoUrl: p.fotoUrl,
-            tamanos: [],
-            grupos: [],
-            sabores: [],
-            noSumaBeneficios: false,
-            disponible: true,
-            agotadoHasta: null,
-          })),
+          .map((p) => {
+            const pub = datosPublicos.publicos.get(String(p.id));
+            return {
+              tamanos: [],
+              grupos: [],
+              sabores: [],
+              noSumaBeneficios: false,
+              disponible: true,
+              agotadoHasta: null,
+              ...pub,
+              id: p.id,
+              nombre: p.nombre,
+              descripcion: p.descripcion,
+              precio: p.precio,
+              fotoUrl: p.fotoUrl,
+            };
+          }),
       }))
       .filter((c) => c.productos.length > 0);
     return {
@@ -537,7 +547,7 @@ export function DisenadorView() {
   const selector = { minHeight: 44, borderRadius: 10, border: '1.5px solid var(--cp-cream)', background: 'var(--cp-navy)', color: 'var(--cp-cream)', padding: '0 8px', fontWeight: 700, fontSize: 12 } as const;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 12 }}>
+    <EditorPantalla>
       <BarraSuperior
         titulo="DISEÑADOR DE LA CARTA"
         celular={celular}
@@ -566,10 +576,10 @@ export function DisenadorView() {
           </>
         }
       />
-      <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
+      <div className="ep-nota" style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
         Esta es la carta tal como la ve el cliente. Toca un bloque para moverlo, ocultarlo o cambiar su foto; toca un texto para escribir encima. Todo se guarda solo como borrador y la carta cambia al Publicar.
       </div>
-      <MarcoDispositivo celular={celular} etiqueta="Carta en edición">
+      <MarcoDispositivo fiel celular={celular} etiqueta="Carta en edición">
         <LienzoEdicion ed={ed} sel={sel} setSel={seleccionar}>
           {vistaPrevia ? <CartaVistaPrevia datos={vistaPrevia} movil={celular} /> : <Cargando mensaje="Preparando la carta..." />}
         </LienzoEdicion>
@@ -590,7 +600,7 @@ export function DisenadorView() {
           });
         }}
       />
-    </div>
+    </EditorPantalla>
   );
 }
 

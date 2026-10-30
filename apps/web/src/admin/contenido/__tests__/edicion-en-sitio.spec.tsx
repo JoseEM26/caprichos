@@ -76,6 +76,28 @@ describe('Diseñador: la carta real en edición', () => {
     expect(screen.queryByText('Abrir el diseñador en pantalla completa')).toBeNull();
   });
 
+  it('pantalla completa: entra y sale con el botón y con Esc, la barra sigue visible y el marco no se escala', async () => {
+    await abrir();
+    const barra = () => screen.getByRole('toolbar', { name: 'Barra del editor' });
+    const marco = () => screen.getByTestId('preview-container-pc');
+    expect(screen.getByTestId('editor-pantalla').dataset.completa).toBeUndefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Pantalla completa' }));
+    expect(screen.getByTestId('editor-pantalla').dataset.completa).toBe('1');
+    expect(screen.getByTestId('editor-pantalla').parentElement).toBe(document.body);
+    expect(barra()).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Publicar' })).toBeTruthy();
+    expect(marco().dataset.completa).toBe('1');
+    expect(marco().dataset.escala).toBe('1.000');
+    expect(marco().style.zoom).toBe('');
+    expect(screen.getByText('Frappe Fresa')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Salir de pantalla completa' }));
+    expect(screen.getByTestId('editor-pantalla').dataset.completa).toBeUndefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Pantalla completa' }));
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.getByTestId('editor-pantalla').dataset.completa).toBeUndefined();
+    expect(screen.getByRole('button', { name: 'Pantalla completa' }).getAttribute('aria-pressed')).toBe('false');
+  });
+
   it('sin modo edición la misma carta se pinta igual y sin barras', () => {
     const datos: VistaPreviaCarta = {
       categorias: [], ofertas: [], estadoLocal: null, datosLocal: null,

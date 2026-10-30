@@ -13,7 +13,9 @@ interface Seleccion {
 const ContextoSeleccion = createContext<Seleccion | null>(null);
 export const useSeleccionEd = () => useContext(ContextoSeleccion);
 
-const PERMITIDOS = '[data-edicion="barra"],[data-edicion="texto"],[data-edicion="pop"],[data-edicion="fantasma"]';
+// Lo que solo desplaza (flechas del carrusel y las categorías) funciona igual que en la carta; lo demás se bloquea.
+const SOLO_DESPLAZA = '[aria-label="Ver categorías anteriores"],[aria-label="Ver más categorías"],[aria-label="Novedad anterior"],[aria-label="Novedad siguiente"],nav[aria-label="Categorías de la carta"] button';
+const PERMITIDOS = `[data-edicion="barra"],[data-edicion="texto"],[data-edicion="pop"],[data-edicion="fantasma"],${SOLO_DESPLAZA}`;
 
 /**
  * Envuelve la carta real en modo edición. Un toque sobre cualquier cosa de la carta selecciona su bloque

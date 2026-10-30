@@ -4,6 +4,7 @@ import { api } from '../../comun/api';
 import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
+import { EditorPantalla } from '../../comun/PantallaCompleta';
 import { MarcoDispositivo } from '../../comun/MarcoDispositivo';
 import { CartaVistaPrevia } from '../../carta/CartaPublica';
 import type { ContenidoCarta, VistaPreviaCarta } from '../../carta/CartaPublica';
@@ -184,7 +185,7 @@ export function ConocenosView() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 12 }}>
+    <EditorPantalla>
       <BarraSuperior
         titulo="CONÓCENOS"
         celular={celular}
@@ -199,14 +200,14 @@ export function ConocenosView() {
         mensaje={mensaje}
         mensajePublicar="Los clientes verán estos textos y este orden en la página Conócenos de la carta virtual."
       />
-      <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
+      <div className="ep-nota" style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
         Esta es la página Conócenos tal como la ve el cliente. Toca un texto para escribir encima o un bloque para moverlo u ocultarlo. Los datos del local se editan en Configuración del local.
       </div>
-      <MarcoDispositivo celular={celular} etiqueta="Conócenos en edición">
+      <MarcoDispositivo fiel celular={celular} etiqueta="Conócenos en edición">
         <LienzoEdicion ed={ed} sel={sel} setSel={seleccionar}>
           {vistaPrevia ? <CartaVistaPrevia datos={vistaPrevia} movil={celular} pagina="conocenos" /> : <Cargando mensaje="Preparando la página..." />}
         </LienzoEdicion>
       </MarcoDispositivo>
-    </div>
+    </EditorPantalla>
   );
 }

@@ -3,6 +3,7 @@ import { api } from '../../comun/api';
 import { Cargando } from '../../comun/Cargando';
 import { Confirmar } from '../../comun/Confirmar';
 import { EstadoError } from '../../comun/EstadoError';
+import { EditorPantalla } from '../../comun/PantallaCompleta';
 import { MarcoDispositivo } from '../../comun/MarcoDispositivo';
 import { CartaVistaPrevia } from '../../carta/CartaPublica';
 import type { ContenidoCarta, VistaPreviaCarta } from '../../carta/CartaPublica';
@@ -340,7 +341,7 @@ export function NovedadesView() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 12 }}>
+    <EditorPantalla>
       <BarraSuperior
         titulo="NOVEDADES"
         celular={celular}
@@ -355,10 +356,10 @@ export function NovedadesView() {
         mensaje={mensaje}
         mensajePublicar="La página Novedades de la carta usará este encabezado, estas tarjetas, su orden y lo que ocultaste. Lo que quitaste se elimina."
       />
-      <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
+      <div className="ep-nota" style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
         Esta es la página Novedades tal como la ve el cliente. Toca un texto para escribir encima o una tarjeta para moverla, cambiarle la foto o el tamaño. Todo se guarda solo como borrador.
       </div>
-      <MarcoDispositivo celular={celular} etiqueta="Novedades en edición">
+      <MarcoDispositivo fiel celular={celular} etiqueta="Novedades en edición">
         <LienzoEdicion ed={ed} sel={sel} setSel={seleccionar}>
           {vistaPrevia ? <CartaVistaPrevia datos={vistaPrevia} movil={celular} pagina="novedades" /> : <Cargando mensaje="Preparando la página..." />}
         </LienzoEdicion>
@@ -380,7 +381,7 @@ export function NovedadesView() {
         }}
         alCancelar={() => setAEliminar(null)}
       />
-    </div>
+    </EditorPantalla>
   );
 }
 

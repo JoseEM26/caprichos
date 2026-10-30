@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Confirmar } from '../../../comun/Confirmar';
 import { ConmutadorDispositivo } from '../../../comun/MarcoDispositivo';
+import { usePantallaCompleta } from '../../../comun/PantallaCompleta';
 import type { EstadoGuardado } from './useBorrador';
 
 const TEXTO_ESTADO: Record<EstadoGuardado, string> = {
@@ -32,6 +33,7 @@ interface Props {
 export function BarraSuperior(p: Props) {
   const [pedido, setPedido] = useState<null | 'publicar' | 'descartar'>(null);
   const [trabajando, setTrabajando] = useState(false);
+  const { completa, alternar } = usePantallaCompleta();
   const hay = p.cambios > 0 || p.hayBorrador;
 
   const ejecutar = async () => {
@@ -51,10 +53,12 @@ export function BarraSuperior(p: Props) {
     <>
       <div
         role="toolbar"
+        className="ep-barra"
         aria-label="Barra del editor"
-        style={{ position: 'sticky', top: 0, zIndex: 60, background: 'var(--cp-navy)', color: 'var(--cp-cream)', padding: '6px 12px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px 12px', borderRadius: 12 }}
+        style={{ position: 'sticky', top: 0, zIndex: 60, background: 'var(--cp-navy)', color: 'var(--cp-cream)', padding: '4px 12px', flex: 'none', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 12px', borderRadius: completa ? 0 : 12 }}
       >
-        <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 13, letterSpacing: '0.06em' }}>{p.titulo}</span>
+        <style>{'.ep-barra .mdv-btn[aria-pressed="true"]{background:var(--cp-orange);border-color:var(--cp-orange);color:var(--cp-navy)}[data-completa="1"] .ep-barra{flex-wrap:nowrap !important;overflow-x:auto}[data-completa="1"] .ep-barra>*{flex:none}'}</style>
+        {!completa && <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 13, letterSpacing: '0.06em' }}>{p.titulo}</span>}
         <ConmutadorDispositivo celular={p.celular} onCambiar={p.onCelular} />
         {p.extra}
         <span style={{ flex: 1 }} />
@@ -62,6 +66,9 @@ export function BarraSuperior(p: Props) {
         <span style={{ fontSize: 12, fontWeight: 800, borderRadius: 9999, padding: '4px 12px', background: hay ? 'var(--cp-gold)' : 'transparent', color: hay ? 'var(--cp-navy)' : 'var(--cp-cream)', border: hay ? 0 : '1.5px solid var(--cp-cream)' }}>
           Cambios sin publicar: {p.cambios > 0 ? p.cambios : p.hayBorrador ? 'borrador guardado' : 0}
         </span>
+        <button type="button" style={{ ...boton, border: '1.5px solid var(--cp-cream)', background: 'transparent', color: 'var(--cp-cream)' }} aria-pressed={completa} onClick={alternar}>
+          {completa ? 'Salir de pantalla completa' : 'Pantalla completa'}
+        </button>
         <button type="button" style={{ ...boton, border: '1.5px solid var(--cp-cream)', background: 'transparent', color: 'var(--cp-cream)', opacity: p.puedeDeshacer ? 1 : 0.45 }} disabled={!p.puedeDeshacer} onClick={p.onDeshacer}>
           Deshacer
         </button>
