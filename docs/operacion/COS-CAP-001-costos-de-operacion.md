@@ -21,15 +21,16 @@ tags: [costos, operacion, devops]
 | | Bajo | Medio | Alto |
 |---|---|---|---|
 | Pedidos de la carta o del bot al día | 10 | 30 | 80 |
-| Dudas al bot de IA al día | 30 | 100 | 300 |
+| Vouchers digitales Yape/Plin leídos al día | 5 | 15 | 40 |
+| Dudas al bot de WhatsApp y Ayuda Capri al día | 30 | 100 | 300 |
 | **Costo fijo mensual** (VPS y copias; el dominio ya está pagado) | US$ 9.70 | US$ 9.70 | US$ 9.70 |
-| Costo variable mensual (WhatsApp + IA) | US$ 6.90 | US$ 21.00 | US$ 57.00 |
-| **Total mensual** | **US$ 16.60** | **US$ 30.70** | **US$ 66.70** |
-| En soles (S/ 3.70 por US$) | S/ 61 | S/ 114 | S/ 247 |
-| **Total anual** | US$ 176.04 | US$ 345.24 | US$ 777.24 |
-| Costo por pedido de la carta o del bot | S/ 0.18 | S/ 0.12 | S/ 0.10 |
+| Costo variable mensual (WhatsApp + OpenAI) | US$ 7.38 | US$ 22.13 | US$ 60.00 |
+| **Total mensual** | **US$ 17.08** | **US$ 31.83** | **US$ 69.70** |
+| En soles (S/ 3.70 por US$) | S/ 63 | S/ 118 | S/ 258 |
+| **Total anual** | US$ 204.96 | US$ 381.96 | US$ 836.40 |
+| Costo por pedido de la carta o del bot | S/ 0.21 | S/ 0.13 | S/ 0.11 |
 
-**Lectura:** lo más probable para el piloto es el escenario **Bajo a Medio**: entre **S/ 61 y S/ 114 al mes**. El costo fijo no cambia aunque haya más pedidos; lo que sube es WhatsApp.
+**Lectura:** lo más probable para el piloto es el escenario **Bajo a Medio**: entre **S/ 63 y S/ 118 al mes**. El costo fijo no cambia aunque haya más pedidos; lo que sube es WhatsApp y las lecturas de vouchers con IA.
 
 ## 2. Supuestos
 
@@ -38,7 +39,8 @@ tags: [costos, operacion, devops]
 | Tipo de cambio | S/ 3.70 por US$ (supuesto) | Esta tabla |
 | Plantilla de WhatsApp iniciada por el negocio | ~US$ 0.02 cada una (por confirmar con la calculadora de Meta, D-08) | D-08 |
 | Mensajes por pedido de la carta | 1 plantilla: el primer mensaje del bot (RN-CAP-100). Lo demás ocurre dentro de las 24 h de respuesta del cliente y es gratis | RN-CAP-100 |
-| Costo de IA por consulta | ~US$ 0.001 (modelo pequeño; por confirmar con el modelo elegido) | ADR-009 |
+| Costo de IA por consulta de texto (Chatbot / Ayuda) | ~US$ 0.0008 a 0.001 (gpt-4o-mini) | ADR-009, ADR-014 |
+| Costo de IA por lectura de voucher con visión | ~US$ 0.0025 por imagen analizada (gpt-4o-mini) | RB-CAP-009 |
 | Dominio `caprichos.pe` | **Ya pagado por 2 años.** Renovación después: ~US$ 36 al año (supuesto; confirmar en punto.pe) | INV-CAP-001 |
 | Copias fuera del VPS | ~US$ 0.50 al mes pasados los 10 GB gratis (confirmar con B2 o R2) | ADR-012 |
 
@@ -58,10 +60,12 @@ Cuando se cumplan los 2 años, el dominio vuelve a costar alrededor de **US$ 36 
 | Servicio | Qué cobra | Fórmula | Bajo | Medio | Alto |
 |---|---|---|---|---|---|
 | **WhatsApp Cloud API** (Meta) | Una plantilla por cada pedido de la carta que el bot inicia | pedidos al día × 30 × US$ 0.02 | US$ 6.00 | US$ 18.00 | US$ 48.00 |
-| **OpenAI** (modelo pequeño) | Cada duda o «Pulir mensaje» | dudas al día × 30 × US$ 0.001 | US$ 0.90 | US$ 3.00 | US$ 9.00 |
+| **OpenAI: Chatbot y Ayuda Capri** (texto `gpt-4o-mini`) | Consultas libres al bot de WhatsApp y dudas al asistente Capri del admin | consultas al día × 30 × US$ 0.001 | US$ 0.90 | US$ 3.00 | US$ 9.00 |
+| **OpenAI: Lectura de Vouchers** (visión `gpt-4o-mini`) | Extracción de datos y semáforo de comprobantes Yape/Plin (**sin tope de gasto**) | vouchers al día × 30 × US$ 0.0025 | US$ 0.38 | US$ 1.13 | US$ 3.00 |
 | **Google Maps** (búsqueda de direcciones) | Solo si se pasa el cupo gratis | Cupo mensual gratis; tope diario configurado | US$ 0 | US$ 0 | US$ 0 |
 
 Un pedido que **empieza el cliente** escribiendo al bot no paga plantilla: se responde dentro de las 24 horas y es gratis. Pagan los pedidos de la **carta**, donde el bot escribe primero.
+La lectura de vouchers con visión no tiene tope mensual para garantizar que los cobros en horas pico nunca se detengan; el gasto se visualiza en tiempo real en la tarjeta de configuración y en la tabla `ia_consumo`.
 
 ## 5. Lo que es gratis
 
@@ -86,7 +90,9 @@ NestJS, React, Vite, TypeScript, pnpm, PostgreSQL, Prisma, Redis (o Valkey) con 
 
 | Servicio | Tope o alerta recomendado | Dónde se configura |
 |---|---|---|
-| OpenAI | Tope mensual de US$ 10; aviso al 80 % | Panel de OpenAI y `uso_externo` (ADR-009) |
+| OpenAI (Chatbot de WhatsApp) | Tope mensual de US$ 20; auto-apagado al alcanzar el límite y alerta en campana | `chatbot_ia_tope_mensual_usd` en BD y panel de OpenAI |
+| OpenAI (Ayuda Capri del Admin) | Límite de 20 consultas/min y 200/h por usuario en Redis; respaldo estructurado sin IA si se desactiva | Parámetros del sistema y `ayuda_ia_activo` |
+| OpenAI (Vouchers Yape/Plin) | **Sin tope mensual de corte** (decisión de negocio para no frenar la caja); alerta si el costo acumulado supera US$ 10 al mes | `ia_consumo` (`origen: 'VOUCHER'`) y pantalla de configuración |
 | Google Maps | Tope diario de consultas y alerta de presupuesto de US$ 1 | Google Cloud (ADR-010) |
 | WhatsApp (Meta) | Aviso interno si el gasto del mes pasa de US$ 30 | Administrativo (`uso_externo`) y panel de Meta |
 | VPS | Sin variable: precio fijo | — |

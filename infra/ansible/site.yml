@@ -53,7 +53,15 @@
         - docker
         - containers
 
-    - role: dokploy
+    - role: compose
       tags:
-        - dokploy
+        - compose
+        - docker-compose
         - platform
+
+    # Dokploy sustituido por Docker Compose (ADR-015, cd-tarea.txt).
+    # Se conserva comentado únicamente para referencia histórica o desmantelamiento.
+    # - role: dokploy
+    #   tags:
+    #     - dokploy
+    #     - platform

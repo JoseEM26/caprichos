@@ -1,0 +1,60 @@
+import type { TicketPagoDatos } from '../tipos/etiquetas.js';
+
+/** Una linea del ticket de pago ya maquetada al ancho del papel (58 mm = 32 columnas, 80 mm = 48). */
+export interface LineaTicket {
+  texto: string;
+  centrado?: boolean;
+  negrita?: boolean;
+}
+
+const soles = (n: number) => `S/ ${n.toFixed(2)}`;
+
+/** Texto a la izquierda y monto a la derecha en `cols` columnas. */
+function fila(izq: string, der: string, cols: number): string {
+  const max = Math.max(1, cols - der.length - 1);
+  return `${izq.length > max ? izq.slice(0, max) : izq.padEnd(max)} ${der}`;
+}
+
+const centrar = (t: string, cols: number) =>
+  t.length >= cols ? t.slice(0, cols) : ' '.repeat(Math.floor((cols - t.length) / 2)) + t;
+
+/** Lineas del ticket de pago (una por renglon impreso); las usan el agente (ESC/POS) y la vista previa del panel. */
+export function lineasTicketPago(t: TicketPagoDatos, columnas: number = 48): LineaTicket[] {
+  const c = columnas;
+  const linea = '-'.repeat(c);
+  const o: LineaTicket[] = [];
+  const p = (texto: string, extra: Partial<LineaTicket> = {}) => o.push({ texto, ...extra });
+  p(t.local.nombre, { centrado: true, negrita: true });
+  if (t.local.razonSocial) p(t.local.razonSocial, { centrado: true });
+  if (t.local.ruc) p(`RUC ${t.local.ruc}`, { centrado: true });
+  if (t.local.direccion) p(t.local.direccion, { centrado: true });
+  p(linea);
+  p(`Pedido ${t.codigo}`);
+  p(`${t.fecha} ${t.hora}`);
+  if (t.who) p(`Cliente: ${t.who}`);
+  if (t.modalidad) p(`Modalidad: ${t.modalidad}`);
+  p(linea);
+  for (const l of t.lineas) {
+    p(fila(`${l.cantidad} x ${l.nombre}${l.tamano ? ` (${l.tamano})` : ''}`, soles(l.subtotal), c));
+  }
+  p(linea);
+  p(fila('TOTAL', soles(t.total), c), { negrita: true });
+  if (t.pagos.length) {
+    p('Pago:');
+    for (const x of t.pagos) {
+      p(fila(`  ${x.medio}`, soles(x.monto), c));
+      if (x.recibido != null) p(fila('  Recibido', soles(x.recibido), c));
+      if (x.vuelto != null) p(fila('  Vuelto', soles(x.vuelto), c));
+    }
+  } else if (t.plan?.length) {
+    p('Pago dividido:');
+    for (const x of t.plan) p(fila(`  ${x.medio}`, soles(x.monto), c));
+  }
+  if (t.comprobante) {
+    p(linea);
+    p(`${t.comprobante.tipo.replace('_', ' ')} ${t.comprobante.numero}`);
+  }
+  p(linea);
+  p(centrar('Gracias por tu visita', c));
+  return o;
+}

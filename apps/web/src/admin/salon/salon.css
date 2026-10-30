@@ -1,0 +1,127 @@
+/* Plano del local: diseño responsive.
+   Celular <= 600px, tablet 601-1024px. Las vistas usan estilos en línea,
+   por eso las reglas de aquí usan !important donde deben ganar a esos estilos. */
+
+.salon-solo-movil {
+  display: none;
+}
+
+.salon-pisos {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.salon-lienzo {
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+@media (max-width: 1024px) {
+  /* Tocar sin apuntar: 44 px mínimo en botones y campos del plano */
+  .salon-raiz button,
+  .salon-overlay button,
+  .salon-raiz input:not([type='checkbox']),
+  .salon-overlay input:not([type='checkbox']) {
+    min-height: 44px !important;
+  }
+
+  .salon-raiz button[aria-label^='Menos'],
+  .salon-raiz button[aria-label^='Más'],
+  .salon-raiz button[aria-label^='Alejar'],
+  .salon-raiz button[aria-label^='Acercar'] {
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+  }
+
+  /* Textos del sistema: nada por debajo de 12 px (las celdas del plano son la excepción) */
+  :is(.salon-raiz, .salon-overlay) [style*='font-size: 11px']:not(.salon-celda *),
+  :is(.salon-raiz, .salon-overlay) [style*='font-size: 10px']:not(.salon-celda *),
+  :is(.salon-raiz, .salon-overlay) [style*='font-size: 9px']:not(.salon-celda *) {
+    font-size: 12px !important;
+  }
+
+  /* Pisos: una franja de pestañas que se desliza, sin barra visible */
+  .salon-pisos {
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+  }
+
+  .salon-pisos::-webkit-scrollbar {
+    display: none;
+  }
+
+  .salon-pisos > * {
+    flex: 0 0 auto !important;
+  }
+
+  /* El inspector del elemento seleccionado sube como hoja inferior */
+  .salon-raiz.salon-con-hoja {
+    padding-bottom: 72vh;
+  }
+
+  .salon-inspector.salon-hoja {
+    position: fixed !important;
+    top: auto !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: auto !important;
+    max-height: 66vh;
+    max-height: 66dvh;
+    overflow-y: auto;
+    z-index: 70;
+    border: 2px solid var(--cp-orange) !important;
+    border-bottom: 0 !important;
+    border-radius: 18px 18px 0 0 !important;
+    box-shadow: 0 -12px 32px rgba(11, 44, 62, 0.25);
+    padding: 16px !important;
+  }
+
+  .salon-solo-movil {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 600px) {
+  /* Ventanas: hoja inferior que ocupa casi toda la pantalla, con scroll interno */
+  .salon-overlay {
+    align-items: flex-end !important;
+    justify-content: center !important;
+    padding: 0 !important;
+  }
+
+  .salon-panel {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 92vh !important;
+    max-height: 92dvh !important;
+    border-radius: 18px 18px 0 0 !important;
+  }
+
+  /* Plano del mozo a pantalla completa */
+  .salon-overlay.salon-pantalla {
+    align-items: stretch !important;
+  }
+
+  .salon-pantalla .salon-panel {
+    height: 100% !important;
+    max-height: 100% !important;
+    border-radius: 0 !important;
+    padding: 14px !important;
+  }
+
+  /* Botón de acción que queda fijo abajo mientras se desplaza la ventana */
+  .salon-pie-fijo {
+    position: sticky !important;
+    bottom: 0;
+    z-index: 2;
+    background: var(--cp-white);
+    padding-top: 8px;
+  }
+}

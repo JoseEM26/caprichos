@@ -1,0 +1,238 @@
+/* Estilos del módulo Stock y recetas */
+
+.stock-contenedor {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.stock-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stock-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-bottom: 2px solid var(--cp-line);
+  padding-bottom: 8px;
+}
+
+.stock-tab-btn {
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 12px;
+  font-family: Montserrat, sans-serif;
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+  border: 1.5px solid var(--cp-navy);
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stock-tab-btn.activo {
+  background-color: var(--cp-navy);
+  color: var(--cp-cream);
+}
+
+.stock-tab-btn:not(.activo) {
+  background-color: transparent;
+  color: var(--cp-navy);
+}
+
+.stock-tab-btn:hover:not(.activo) {
+  background-color: var(--cp-sand);
+}
+
+/* Chips de filtros */
+.stock-filtros-fila {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.stock-chips-grupo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.stock-chip-btn {
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 9999px;
+  border: 1.5px solid var(--cp-navy);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  background: transparent;
+  color: var(--cp-navy);
+  transition: all 0.15s ease;
+}
+
+.stock-chip-btn.activo {
+  background: var(--cp-navy);
+  color: var(--cp-cream);
+}
+
+/* Grilla de insumos */
+.stock-grid-insumos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+}
+
+.stock-insumo-card {
+  background: var(--cp-white);
+  border: 1px solid var(--cp-line);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 2px 6px rgba(11, 44, 62, 0.04);
+}
+
+.stock-insumo-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.stock-insumo-nombre {
+  font-family: Montserrat, sans-serif;
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--cp-navy);
+}
+
+/* Barra de llenado y semáforo */
+.stock-barra-contenedor {
+  position: relative;
+  height: 16px;
+  border-radius: 8px;
+  background: var(--cp-sand);
+  overflow: hidden;
+}
+
+.stock-barra-progreso {
+  height: 16px;
+  border-radius: 8px;
+  transition: width 0.3s ease;
+}
+
+.stock-barra-progreso.rojo {
+  background: var(--cp-rust);
+}
+
+.stock-barra-progreso.naranja {
+  background: var(--cp-orange);
+}
+
+.stock-barra-progreso.verde {
+  background: var(--cp-green);
+}
+
+.stock-tick-min {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgba(11, 44, 62, 0.6);
+  z-index: 2;
+}
+
+.stock-tick-mid {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgba(11, 44, 62, 0.35);
+  z-index: 2;
+}
+
+/* Badges de estado */
+.stock-badge-estado {
+  padding: 3px 12px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.stock-badge-estado.rojo {
+  background: #fbe9df;
+  color: var(--cp-rust);
+  border: 1px solid var(--cp-rust);
+}
+
+.stock-badge-estado.naranja {
+  background: #fef3e2;
+  color: #b86200;
+  border: 1px solid var(--cp-orange);
+}
+
+.stock-badge-estado.verde {
+  background: #e6f6ee;
+  color: var(--cp-green);
+  border: 1px solid var(--cp-green);
+}
+
+/* Modales */
+.stock-modal-fondo {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(11, 44, 62, 0.6);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.stock-modal-caja {
+  width: 100%;
+  max-width: 640px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--cp-cream);
+  border-radius: 20px;
+  box-shadow: 0 20px 50px rgba(11, 44, 62, 0.35);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Panel de costo y margen */
+.stock-margen-caja {
+  background: var(--cp-white);
+  border: 1.5px solid var(--cp-line);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stock-margen-destacado {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: Montserrat, sans-serif;
+  font-weight: 800;
+  font-size: 18px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--cp-line);
+}

@@ -1,0 +1,1 @@
+export { RecetasView } from './RecetasView';

@@ -1,0 +1,11 @@
+-- AlterTable
+ALTER TABLE "solicitud_reserva" ADD COLUMN IF NOT EXISTS "nombre" TEXT;
+ALTER TABLE "solicitud_reserva" ADD COLUMN IF NOT EXISTS "telefono" TEXT;
+ALTER TABLE "solicitud_reserva" ADD COLUMN IF NOT EXISTS "nota" TEXT;
+ALTER TABLE "solicitud_reserva" ADD COLUMN IF NOT EXISTS "motivo_rechazo" TEXT;
+ALTER TABLE "solicitud_reserva" ADD COLUMN IF NOT EXISTS "creado_en" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+
+-- AlterTable
+ALTER TABLE "reserva" ADD COLUMN IF NOT EXISTS "recordatorio_enviado" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "reserva" ADD COLUMN IF NOT EXISTS "origen" TEXT NOT NULL DEFAULT 'LOCAL';
+ALTER TABLE "reserva" ADD COLUMN IF NOT EXISTS "nota" TEXT;

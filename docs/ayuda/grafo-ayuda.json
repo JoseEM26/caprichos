@@ -1,0 +1,5686 @@
+{
+  "nodos": [
+    {
+      "id": "rol:ADMIN",
+      "tipo": "rol",
+      "etiqueta": "Rol: ADMIN"
+    },
+    {
+      "id": "rol:CAJERO",
+      "tipo": "rol",
+      "etiqueta": "Rol: CAJERO"
+    },
+    {
+      "id": "rol:COCINA",
+      "tipo": "rol",
+      "etiqueta": "Rol: COCINA"
+    },
+    {
+      "id": "rol:MOZO",
+      "tipo": "rol",
+      "etiqueta": "Rol: MOZO"
+    },
+    {
+      "id": "rol:CALLCENTER",
+      "tipo": "rol",
+      "etiqueta": "Rol: CALLCENTER"
+    },
+    {
+      "id": "rol:ALMACEN",
+      "tipo": "rol",
+      "etiqueta": "Rol: ALMACEN"
+    },
+    {
+      "id": "rol:REPARTIDOR",
+      "tipo": "rol",
+      "etiqueta": "Rol: REPARTIDOR"
+    },
+    {
+      "id": "almacen",
+      "tipo": "modulo",
+      "etiqueta": "Almacén (almacen)",
+      "modulo": "almacen",
+      "ruta": "/admin/almacen"
+    },
+    {
+      "id": "permiso:stock/ver",
+      "tipo": "permiso",
+      "etiqueta": "Permiso: stock/ver"
+    },
+    {
+      "id": "almacen#registrar-un-traslado-a-cocina-o-barra",
+      "tipo": "tarea",
+      "etiqueta": "Registrar un traslado a cocina o barra",
+      "modulo": "almacen"
+    },
+    {
+      "id": "almacen#registrar-una-merma-o-desperdicio-de-insumos",
+      "tipo": "tarea",
+      "etiqueta": "Registrar una merma o desperdicio de insumos",
+      "modulo": "almacen"
+    },
+    {
+      "id": "almacen#registrar-produccion-elaborada-hoy-prepare",
+      "tipo": "tarea",
+      "etiqueta": "Registrar produccion elaborada (Hoy preparé)",
+      "modulo": "almacen"
+    },
+    {
+      "id": "almacen#anular-un-movimiento-registrado-por-error",
+      "tipo": "tarea",
+      "etiqueta": "Anular un movimiento registrado por error",
+      "modulo": "almacen"
+    },
+    {
+      "id": "almacen#realizar-el-cierre-del-dia-de-almacen",
+      "tipo": "tarea",
+      "etiqueta": "Realizar el cierre del dia de almacen",
+      "modulo": "almacen"
+    },
+    {
+      "id": "caja",
+      "tipo": "modulo",
+      "etiqueta": "Pedidos y caja (caja)",
+      "modulo": "caja",
+      "ruta": "/admin/caja"
+    },
+    {
+      "id": "permiso:caja/ver",
+      "tipo": "permiso",
+      "etiqueta": "Permiso: caja/ver"
+    },
+    {
+      "id": "caja#abrir-la-caja-del-turno",
+      "tipo": "tarea",
+      "etiqueta": "Abrir la caja del turno",
+      "modulo": "caja"
+    },
+    {
+      "id": "caja#mover-un-voucher-al-pedido-correcto",
+      "tipo": "tarea",
+      "etiqueta": "mover un voucher al pedido correcto",
+      "modulo": "caja"
+    },
+    {
+      "id": "caja#cobrar-un-pedido",
+      "tipo": "tarea",
+      "etiqueta": "Cobrar un pedido",
+      "modulo": "caja"
+    },
+    {
+      "id": "caja#adjuntar-la-foto-del-comprobante-al-cobrar",
+      "tipo": "tarea",
+      "etiqueta": "Adjuntar la foto del comprobante al cobrar",
+      "modulo": "caja"
+    },
+    {
+      "id": "caja#controlar-pedidos-con-pago-digital-y-pase-a-cocina",
+      "tipo": "tarea",
+      "etiqueta": "Controlar pedidos con pago digital y pase a cocina",
+      "modulo": "caja"
+    },
+    {
+      "id": "caja#anular-un-pedido-o-un-cobro",
+      "tipo": "tarea",
+      "etiqueta": "Anular un pedido o un cobro",
+      "modulo": "caja"
+    },
+    {
+      "id": "caja#crear-un-pedido-directo-en-mesa-o-mostrador",
+      "tipo": "tarea",
+      "etiqueta": "Crear un pedido directo en mesa o mostrador",
+      "modulo": "caja"
+    },
+    {
+      "id": "caja#revisar-los-pedidos-no-entregados-delivery",
+      "tipo": "tarea",
+      "etiqueta": "Revisar los pedidos no entregados (delivery)",
+      "modulo": "caja"
+    },
+    {
+      "id": "caja#ver-y-reimprimir-las-etiquetas-de-un-pedido",
+      "tipo": "tarea",
+      "etiqueta": "Ver y reimprimir las etiquetas de un pedido",
+      "modulo": "caja"
+    },
+    {
+      "id": "caja#revisar-la-impresora-cuando-no-sale-la-etiqueta",
+      "tipo": "tarea",
+      "etiqueta": "Revisar la impresora cuando no sale la etiqueta",
+      "modulo": "caja"
+    },
+    {
+      "id": "cierre",
+      "tipo": "modulo",
+      "etiqueta": "Caja y cierres (cierre)",
+      "modulo": "cierre",
+      "ruta": "/admin/cierre"
+    },
+    {
+      "id": "cierre#resolver-pendientes-de-cobro-antes-de-cerrar",
+      "tipo": "tarea",
+      "etiqueta": "Resolver pendientes de cobro antes de cerrar",
+      "modulo": "cierre"
+    },
+    {
+      "id": "cierre#auditar-la-lista-de-vouchers-de-yape-y-plin-del-dia",
+      "tipo": "tarea",
+      "etiqueta": "Auditar la lista de vouchers de Yape y Plin del dia",
+      "modulo": "cierre"
+    },
+    {
+      "id": "cierre#liquidar-a-los-repartidores",
+      "tipo": "tarea",
+      "etiqueta": "Liquidar a los repartidores",
+      "modulo": "cierre"
+    },
+    {
+      "id": "cierre#realizar-el-arqueo-ciego-y-cerrar-caja",
+      "tipo": "tarea",
+      "etiqueta": "Realizar el arqueo ciego y cerrar caja",
+      "modulo": "cierre"
+    },
+    {
+      "id": "cierre#proceder-cuando-la-caja-no-cuadra",
+      "tipo": "tarea",
+      "etiqueta": "Proceder cuando la caja no cuadra",
+      "modulo": "cierre"
+    },
+    {
+      "id": "clientes",
+      "tipo": "modulo",
+      "etiqueta": "Clientes (clientes)",
+      "modulo": "clientes",
+      "ruta": "/admin/clientes"
+    },
+    {
+      "id": "permiso:clientes/ver",
+      "tipo": "permiso",
+      "etiqueta": "Permiso: clientes/ver"
+    },
+    {
+      "id": "clientes#registrar-un-cliente-nuevo-desde-mostrador-o-telefono",
+      "tipo": "tarea",
+      "etiqueta": "Registrar un cliente nuevo desde mostrador o telefono",
+      "modulo": "clientes"
+    },
+    {
+      "id": "clientes#consultar-la-ficha-y-compras-de-un-cliente",
+      "tipo": "tarea",
+      "etiqueta": "Consultar la ficha y compras de un cliente",
+      "modulo": "clientes"
+    },
+    {
+      "id": "clientes#ajustar-puntos-de-fidelidad",
+      "tipo": "tarea",
+      "etiqueta": "Ajustar puntos de fidelidad",
+      "modulo": "clientes"
+    },
+    {
+      "id": "clientes#editar-datos-y-descuentos-de-un-cliente",
+      "tipo": "tarea",
+      "etiqueta": "Editar datos y descuentos de un cliente",
+      "modulo": "clientes"
+    },
+    {
+      "id": "cocina",
+      "tipo": "modulo",
+      "etiqueta": "Cocina (cocina)",
+      "modulo": "cocina",
+      "ruta": "/admin/cocina"
+    },
+    {
+      "id": "permiso:cocina/ver",
+      "tipo": "permiso",
+      "etiqueta": "Permiso: cocina/ver"
+    },
+    {
+      "id": "cocina#despejar-una-comanda-preparada",
+      "tipo": "tarea",
+      "etiqueta": "Despejar una comanda preparada",
+      "modulo": "cocina"
+    },
+    {
+      "id": "cocina#devolver-una-comanda-despejada-por-error",
+      "tipo": "tarea",
+      "etiqueta": "Devolver una comanda despejada por error",
+      "modulo": "cocina"
+    },
+    {
+      "id": "cocina#activar-el-modo-de-alta-demanda",
+      "tipo": "tarea",
+      "etiqueta": "Activar el modo de alta demanda",
+      "modulo": "cocina"
+    },
+    {
+      "id": "cocina#marcar-un-producto-como-agotado",
+      "tipo": "tarea",
+      "etiqueta": "Marcar un producto como agotado",
+      "modulo": "cocina"
+    },
+    {
+      "id": "cocina#registrar-una-merma-de-cocina",
+      "tipo": "tarea",
+      "etiqueta": "Registrar una merma de cocina",
+      "modulo": "cocina"
+    },
+    {
+      "id": "compras",
+      "tipo": "modulo",
+      "etiqueta": "Compras (compras)",
+      "modulo": "compras",
+      "ruta": "/admin/compras"
+    },
+    {
+      "id": "compras#registrar-una-compra-de-insumos",
+      "tipo": "tarea",
+      "etiqueta": "Registrar una compra de insumos",
+      "modulo": "compras"
+    },
+    {
+      "id": "compras#consultar-faltantes-y-pedir-por-whatsapp",
+      "tipo": "tarea",
+      "etiqueta": "Consultar faltantes y pedir por WhatsApp",
+      "modulo": "compras"
+    },
+    {
+      "id": "compras#registrar-un-proveedor-nuevo",
+      "tipo": "tarea",
+      "etiqueta": "Registrar un proveedor nuevo",
+      "modulo": "compras"
+    },
+    {
+      "id": "compras#realizar-una-compra-rapida-menor",
+      "tipo": "tarea",
+      "etiqueta": "Realizar una compra rapida menor",
+      "modulo": "compras"
+    },
+    {
+      "id": "comprobantes",
+      "tipo": "modulo",
+      "etiqueta": "Comprobantes (comprobantes)",
+      "modulo": "comprobantes",
+      "ruta": "/admin/comprobantes"
+    },
+    {
+      "id": "permiso:comprobantes/ver",
+      "tipo": "permiso",
+      "etiqueta": "Permiso: comprobantes/ver"
+    },
+    {
+      "id": "comprobantes#reimprimir-una-nota-de-venta",
+      "tipo": "tarea",
+      "etiqueta": "Reimprimir una nota de venta",
+      "modulo": "comprobantes"
+    },
+    {
+      "id": "comprobantes#gestionar-comprobantes-electronicos-por-emitir",
+      "tipo": "tarea",
+      "etiqueta": "Gestionar comprobantes electronicos por emitir",
+      "modulo": "comprobantes"
+    },
+    {
+      "id": "creditos",
+      "tipo": "modulo",
+      "etiqueta": "Créditos del personal (creditos)",
+      "modulo": "creditos",
+      "ruta": "/admin/creditos"
+    },
+    {
+      "id": "permiso:creditos/ver",
+      "tipo": "permiso",
+      "etiqueta": "Permiso: creditos/ver"
+    },
+    {
+      "id": "creditos#consultar-los-consumos-por-semana-o-por-mes",
+      "tipo": "tarea",
+      "etiqueta": "Consultar los consumos por semana o por mes",
+      "modulo": "creditos"
+    },
+    {
+      "id": "creditos#ver-el-desglose-de-consumos-de-un-colaborador",
+      "tipo": "tarea",
+      "etiqueta": "Ver el desglose de consumos de un colaborador",
+      "modulo": "creditos"
+    },
+    {
+      "id": "creditos#exportar-el-reporte-a-excel-para-recursos-humanos-o-contabilidad",
+      "tipo": "tarea",
+      "etiqueta": "Exportar el reporte a Excel para recursos humanos o contabilidad",
+      "modulo": "creditos"
+    },
+    {
+      "id": "destacadas",
+      "tipo": "modulo",
+      "etiqueta": "Destacadas de la carta (destacadas)",
+      "modulo": "destacadas",
+      "ruta": "/admin/destacadas"
+    },
+    {
+      "id": "permiso:catalogo/ver",
+      "tipo": "permiso",
+      "etiqueta": "Permiso: catalogo/ver"
+    },
+    {
+      "id": "destacadas#crear-un-circulo-y-agregar-fotos",
+      "tipo": "tarea",
+      "etiqueta": "crear un círculo y agregar fotos",
+      "modulo": "destacadas"
+    },
+    {
+      "id": "destacadas#cambiar-portada-orden-y-pies-de-foto",
+      "tipo": "tarea",
+      "etiqueta": "cambiar portada, orden y pies de foto",
+      "modulo": "destacadas"
+    },
+    {
+      "id": "destacadas#activar-archivar-o-eliminar-circulos",
+      "tipo": "tarea",
+      "etiqueta": "activar, archivar o eliminar círculos",
+      "modulo": "destacadas"
+    },
+    {
+      "id": "destacadas#publicar-cambios-en-la-carta",
+      "tipo": "tarea",
+      "etiqueta": "publicar cambios en la carta",
+      "modulo": "destacadas"
+    },
+    {
+      "id": "disenador",
+      "tipo": "modulo",
+      "etiqueta": "Diseño de la carta (disenador)",
+      "modulo": "disenador",
+      "ruta": "/admin/disenador"
+    },
+    {
+      "id": "permiso:local/ver",
+      "tipo": "permiso",
+      "etiqueta": "Permiso: local/ver"
+    },
+    {
+      "id": "disenador#abrir-el-disenador-y-cambiar-la-vista",
+      "tipo": "tarea",
+      "etiqueta": "abrir el diseñador y cambiar la vista",
+      "modulo": "disenador"
+    },
+    {
+      "id": "disenador#ordenar-categorias-y-productos",
+      "tipo": "tarea",
+      "etiqueta": "ordenar categorías y productos",
+      "modulo": "disenador"
+    },
+    {
+      "id": "disenador#editar-o-esconder-un-producto",
+      "tipo": "tarea",
+      "etiqueta": "editar o esconder un producto",
+      "modulo": "disenador"
+    },
+    {
+      "id": "disenador#configurar-promociones-y-banner",
+      "tipo": "tarea",
+      "etiqueta": "configurar promociones y banner",
+      "modulo": "disenador"
+    },
+    {
+      "id": "disenador#cambiar-el-orden-el-tamano-y-la-posicion-de-la-carta",
+      "tipo": "tarea",
+      "etiqueta": "cambiar el orden, el tamaño y la posición de la carta",
+      "modulo": "disenador"
+    },
+    {
+      "id": "disenador#publicar-o-descartar-cambios",
+      "tipo": "tarea",
+      "etiqueta": "publicar o descartar cambios",
+      "modulo": "disenador"
+    },
+    {
+      "id": "escritorio",
+      "tipo": "modulo",
+      "etiqueta": "Escritorio (escritorio)",
+      "modulo": "escritorio",
+      "ruta": "/admin"
+    },
+    {
+      "id": "escritorio#filtrar-las-ventas-por-fecha-o-canal",
+      "tipo": "tarea",
+      "etiqueta": "Filtrar las ventas por fecha o canal",
+      "modulo": "escritorio"
+    },
+    {
+      "id": "escritorio#atender-la-alerta-de-stock-bajo",
+      "tipo": "tarea",
+      "etiqueta": "Atender la alerta de stock bajo",
+      "modulo": "escritorio"
+    },
+    {
+      "id": "escritorio#revisar-pendientes-y-tareas-del-turno",
+      "tipo": "tarea",
+      "etiqueta": "Revisar pendientes y tareas del turno",
+      "modulo": "escritorio"
+    },
+    {
+      "id": "escritorio#entender-de-donde-salen-las-cifras",
+      "tipo": "tarea",
+      "etiqueta": "Entender de donde salen las cifras",
+      "modulo": "escritorio"
+    },
+    {
+      "id": "historial",
+      "tipo": "modulo",
+      "etiqueta": "Historial de acciones (historial)",
+      "modulo": "historial",
+      "ruta": "/admin/historial"
+    },
+    {
+      "id": "permiso:auditoria/ver",
+      "tipo": "permiso",
+      "etiqueta": "Permiso: auditoria/ver"
+    },
+    {
+      "id": "historial#buscar-y-filtrar-registros-de-auditoria",
+      "tipo": "tarea",
+      "etiqueta": "buscar y filtrar registros de auditoría",
+      "modulo": "historial"
+    },
+    {
+      "id": "historial#inspeccionar-los-detalles-de-una-accion",
+      "tipo": "tarea",
+      "etiqueta": "inspeccionar los detalles de una acción",
+      "modulo": "historial"
+    },
+    {
+      "id": "historial#verificar-la-integridad-de-la-cadena-y-exportar-a-csv",
+      "tipo": "tarea",
+      "etiqueta": "verificar la integridad de la cadena y exportar a CSV",
+      "modulo": "historial"
+    },
+    {
+      "id": "indicadores",
+      "tipo": "modulo",
+      "etiqueta": "Indicadores (indicadores)",
+      "modulo": "indicadores",
+      "ruta": "/admin/indicadores"
+    },
+    {
+      "id": "indicadores#supervisar-el-estado-de-metas-operativas",
+      "tipo": "tarea",
+      "etiqueta": "Supervisar el estado de metas operativas",
+      "modulo": "indicadores"
+    },
+    {
+      "id": "indicadores#revisar-los-productos-lideres-del-mes-por-categoria",
+      "tipo": "tarea",
+      "etiqueta": "Revisar los productos lideres del mes por categoria",
+      "modulo": "indicadores"
+    },
+    {
+      "id": "indicadores#conmutar-la-visualizacion-de-estrellas-en-la-carta",
+      "tipo": "tarea",
+      "etiqueta": "Conmutar la visualizacion de estrellas en la carta",
+      "modulo": "indicadores"
+    },
+    {
+      "id": "indicadores#consultar-el-historico-y-efectividad-de-promociones",
+      "tipo": "tarea",
+      "etiqueta": "Consultar el historico y efectividad de promociones",
+      "modulo": "indicadores"
+    },
+    {
+      "id": "informes",
+      "tipo": "modulo",
+      "etiqueta": "Informes (informes)",
+      "modulo": "informes",
+      "ruta": "/admin/informes"
+    },
+    {
+      "id": "informes#abrir-y-consultar-un-informe-del-catalogo",
+      "tipo": "tarea",
+      "etiqueta": "Abrir y consultar un informe del catalogo",
+      "modulo": "informes"
+    },
+    {
+      "id": "informes#filtrar-por-fechas-o-rangos-personalizados",
+      "tipo": "tarea",
+      "etiqueta": "Filtrar por fechas o rangos personalizados",
+      "modulo": "informes"
+    },
+    {
+      "id": "informes#exportar-un-informe-a-excel",
+      "tipo": "tarea",
+      "etiqueta": "Exportar un informe a Excel",
+      "modulo": "informes"
+    },
+    {
+      "id": "informes#imprimir-o-generar-un-archivo-pdf",
+      "tipo": "tarea",
+      "etiqueta": "Imprimir o generar un archivo PDF",
+      "modulo": "informes"
+    },
+    {
+      "id": "iniciativas",
+      "tipo": "modulo",
+      "etiqueta": "Iniciativas (iniciativas)",
+      "modulo": "iniciativas",
+      "ruta": "/admin/iniciativas"
+    },
+    {
+      "id": "permiso:iniciativas/ver",
+      "tipo": "permiso",
+      "etiqueta": "Permiso: iniciativas/ver"
+    },
+    {
+      "id": "iniciativas#registrar-una-nueva-iniciativa",
+      "tipo": "tarea",
+      "etiqueta": "Registrar una nueva iniciativa",
+      "modulo": "iniciativas"
+    },
+    {
+      "id": "iniciativas#comentar-una-iniciativa",
+      "tipo": "tarea",
+      "etiqueta": "Comentar una iniciativa",
+      "modulo": "iniciativas"
+    },
+    {
+      "id": "iniciativas#cambiar-el-estado-de-una-iniciativa-solo-administrador",
+      "tipo": "tarea",
+      "etiqueta": "Cambiar el estado de una iniciativa (Solo Administrador)",
+      "modulo": "iniciativas"
+    },
+    {
+      "id": "listas",
+      "tipo": "modulo",
+      "etiqueta": "Listas y categorías (listas)",
+      "modulo": "listas",
+      "ruta": "/admin/listas"
+    },
+    {
+      "id": "listas#crear-una-nueva-categoria-de-opciones",
+      "tipo": "tarea",
+      "etiqueta": "Crear una nueva categoria de opciones",
+      "modulo": "listas"
+    },
+    {
+      "id": "listas#agregar-elementos-a-una-lista",
+      "tipo": "tarea",
+      "etiqueta": "Agregar elementos a una lista",
+      "modulo": "listas"
+    },
+    {
+      "id": "listas#modificar-o-reordenar-elementos",
+      "tipo": "tarea",
+      "etiqueta": "Modificar o reordenar elementos",
+      "modulo": "listas"
+    },
+    {
+      "id": "listas#ocultar-o-reactivar-un-elemento-de-una-lista",
+      "tipo": "tarea",
+      "etiqueta": "Ocultar o reactivar un elemento de una lista",
+      "modulo": "listas"
+    },
+    {
+      "id": "mapa",
+      "tipo": "modulo",
+      "etiqueta": "Mapa de entregas (mapa)",
+      "modulo": "mapa",
+      "ruta": "/admin/mapa"
+    },
+    {
+      "id": "permiso:zonas/ver",
+      "tipo": "permiso",
+      "etiqueta": "Permiso: zonas/ver"
+    },
+    {
+      "id": "mapa#visualizar-y-navegar-en-el-mapa-interactivo",
+      "tipo": "tarea",
+      "etiqueta": "Visualizar y navegar en el mapa interactivo",
+      "modulo": "mapa"
+    },
+    {
+      "id": "mapa#activar-y-alternar-capas-de-informacion",
+      "tipo": "tarea",
+      "etiqueta": "Activar y alternar capas de informacion",
+      "modulo": "mapa"
+    },
+    {
+      "id": "mapa#filtrar-por-fechas-y-canal-de-pedido",
+      "tipo": "tarea",
+      "etiqueta": "Filtrar por fechas y canal de pedido",
+      "modulo": "mapa"
+    },
+    {
+      "id": "mapa#analizar-pedidos-por-zona-y-distancia",
+      "tipo": "tarea",
+      "etiqueta": "Analizar pedidos por zona y distancia",
+      "modulo": "mapa"
+    },
+    {
+      "id": "mascota",
+      "tipo": "modulo",
+      "etiqueta": "Mascota Capri (mascota)",
+      "modulo": "mascota",
+      "ruta": "/admin/mascota"
+    },
+    {
+      "id": "permiso:mascota/ver",
+      "tipo": "permiso",
+      "etiqueta": "Permiso: mascota/ver"
+    },
+    {
+      "id": "mascota#cambiar-la-apariencia-base-de-capri",
+      "tipo": "tarea",
+      "etiqueta": "cambiar la apariencia base de Capri",
+      "modulo": "mascota"
+    },
+    {
+      "id": "mascota#configurar-temas-y-temporadas",
+      "tipo": "tarea",
+      "etiqueta": "configurar temas y temporadas",
+      "modulo": "mascota"
+    },
+    {
+      "id": "mascota#restablecer-a-valores-de-fabrica",
+      "tipo": "tarea",
+      "etiqueta": "restablecer a valores de fabrica",
+      "modulo": "mascota"
+    },
+    {
+      "id": "mensajes",
+      "tipo": "modulo",
+      "etiqueta": "Mensajes de WhatsApp (mensajes)",
+      "modulo": "mensajes",
+      "ruta": "/admin/mensajes"
+    },
+    {
+      "id": "permiso:mensajes/ver",
+      "tipo": "permiso",
+      "etiqueta": "Permiso: mensajes/ver"
+    },
+    {
+      "id": "mensajes#atender-un-chat-que-requiere-ayuda-humana",
+      "tipo": "tarea",
+      "etiqueta": "Atender un chat que requiere ayuda humana",
+      "modulo": "mensajes"
+    },
+    {
+      "id": "mensajes#responder-a-una-calificacion-baja-de-la-encuesta",
+      "tipo": "tarea",
+      "etiqueta": "Responder a una calificacion baja de la encuesta",
+      "modulo": "mensajes"
+    },
+    {
+      "id": "mensajes#validar-una-captura-de-pago-con-lectura-de-ia",
+      "tipo": "tarea",
+      "etiqueta": "Validar una captura de pago con lectura de IA",
+      "modulo": "mensajes"
+    },
+    {
+      "id": "mensajes#mover-un-voucher-desde-el-chat",
+      "tipo": "tarea",
+      "etiqueta": "mover un voucher desde el chat",
+      "modulo": "mensajes"
+    },
+    {
+      "id": "mensajes#pulir-la-respuesta-con-ia-antes-de-enviarla",
+      "tipo": "tarea",
+      "etiqueta": "Pulir la respuesta con IA antes de enviarla",
+      "modulo": "mensajes"
+    },
+    {
+      "id": "mensajes#reabrir-una-conversacion-fuera-de-la-ventana-de-24-horas",
+      "tipo": "tarea",
+      "etiqueta": "Reabrir una conversacion fuera de la ventana de 24 horas",
+      "modulo": "mensajes"
+    },
+    {
+      "id": "mensajes#revisar-y-reenviar-mensajes-que-no-salieron",
+      "tipo": "tarea",
+      "etiqueta": "Revisar y reenviar mensajes que no salieron",
+      "modulo": "mensajes"
+    },
+    {
+      "id": "mensajes#entender-por-que-un-mensaje-quedo-fallido",
+      "tipo": "tarea",
+      "etiqueta": "Entender por que un mensaje quedo fallido",
+      "modulo": "mensajes"
+    },
+    {
+      "id": "mirest",
+      "tipo": "modulo",
+      "etiqueta": "Configuración del local (mirest)",
+      "modulo": "mirest",
+      "ruta": "/admin/mirest"
+    },
+    {
+      "id": "mirest#actualizar-datos-basicos-y-de-contacto",
+      "tipo": "tarea",
+      "etiqueta": "actualizar datos básicos y de contacto",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#configurar-horario-y-fechas-especiales",
+      "tipo": "tarea",
+      "etiqueta": "configurar horario y fechas especiales",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#configurar-pagos-y-entregas",
+      "tipo": "tarea",
+      "etiqueta": "configurar pagos y entregas",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#activar-alta-demanda-o-pausar-pedidos",
+      "tipo": "tarea",
+      "etiqueta": "activar alta demanda o pausar pedidos",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#cambiar-las-imagenes-de-la-pantalla-de-ingreso",
+      "tipo": "tarea",
+      "etiqueta": "cambiar las imágenes de la pantalla de ingreso",
+      "modulo": "mirest"
+    },
+    {
+      "id": "notificaciones",
+      "tipo": "modulo",
+      "etiqueta": "Notificaciones (notificaciones)",
+      "modulo": "notificaciones",
+      "ruta": "/admin/notificaciones"
+    },
+    {
+      "id": "permiso:notificaciones/ver",
+      "tipo": "permiso",
+      "etiqueta": "Permiso: notificaciones/ver"
+    },
+    {
+      "id": "notificaciones#revisar-pendientes-y-resolver-alertas-urgentes",
+      "tipo": "tarea",
+      "etiqueta": "revisar pendientes y resolver alertas urgentes",
+      "modulo": "notificaciones"
+    },
+    {
+      "id": "notificaciones#marcar-avisos-como-leidos-y-filtrar-el-historial",
+      "tipo": "tarea",
+      "etiqueta": "marcar avisos como leídos y filtrar el historial",
+      "modulo": "notificaciones"
+    },
+    {
+      "id": "notificaciones#crear-un-nuevo-aviso-interno-para-el-equipo",
+      "tipo": "tarea",
+      "etiqueta": "crear un nuevo aviso interno para el equipo",
+      "modulo": "notificaciones"
+    },
+    {
+      "id": "novedades",
+      "tipo": "modulo",
+      "etiqueta": "Novedades y publicidad (novedades)",
+      "modulo": "novedades",
+      "ruta": "/admin/novedades"
+    },
+    {
+      "id": "novedades#crear-una-nueva-novedad-o-anuncio",
+      "tipo": "tarea",
+      "etiqueta": "crear una nueva novedad o anuncio",
+      "modulo": "novedades"
+    },
+    {
+      "id": "novedades#programar-fechas-de-vigencia",
+      "tipo": "tarea",
+      "etiqueta": "programar fechas de vigencia",
+      "modulo": "novedades"
+    },
+    {
+      "id": "novedades#organizar-y-destacar-novedades",
+      "tipo": "tarea",
+      "etiqueta": "organizar y destacar novedades",
+      "modulo": "novedades"
+    },
+    {
+      "id": "novedades#personalizar-el-encabezado-y-previsualizar-en-pc-o-celular",
+      "tipo": "tarea",
+      "etiqueta": "personalizar el encabezado y previsualizar en PC o celular",
+      "modulo": "novedades"
+    },
+    {
+      "id": "novedades#publicar-o-descartar-cambios",
+      "tipo": "tarea",
+      "etiqueta": "publicar o descartar cambios",
+      "modulo": "novedades"
+    },
+    {
+      "id": "ofertas",
+      "tipo": "modulo",
+      "etiqueta": "Ofertas y descuentos (ofertas)",
+      "modulo": "ofertas",
+      "ruta": "/admin/ofertas"
+    },
+    {
+      "id": "permiso:ofertas/ver",
+      "tipo": "permiso",
+      "etiqueta": "Permiso: ofertas/ver"
+    },
+    {
+      "id": "ofertas#armar-un-combo-o-promocion-2x1",
+      "tipo": "tarea",
+      "etiqueta": "Armar un combo o promocion 2x1",
+      "modulo": "ofertas"
+    },
+    {
+      "id": "ofertas#crear-un-descuento-directo",
+      "tipo": "tarea",
+      "etiqueta": "Crear un descuento directo",
+      "modulo": "ofertas"
+    },
+    {
+      "id": "ofertas#crear-un-cupon-de-descuento",
+      "tipo": "tarea",
+      "etiqueta": "Crear un cupon de descuento",
+      "modulo": "ofertas"
+    },
+    {
+      "id": "ofertas#pausar-o-desactivar-una-oferta-activa",
+      "tipo": "tarea",
+      "etiqueta": "Pausar o desactivar una oferta activa",
+      "modulo": "ofertas"
+    },
+    {
+      "id": "paleta",
+      "tipo": "modulo",
+      "etiqueta": "Paleta de colores (paleta)",
+      "modulo": "paleta",
+      "ruta": "/admin/paleta"
+    },
+    {
+      "id": "paleta#seleccionar-un-tema-festivo-y-cambiar-colores",
+      "tipo": "tarea",
+      "etiqueta": "seleccionar un tema festivo y cambiar colores",
+      "modulo": "paleta"
+    },
+    {
+      "id": "paleta#comprobar-el-contraste-y-la-vista-previa",
+      "tipo": "tarea",
+      "etiqueta": "comprobar el contraste y la vista previa",
+      "modulo": "paleta"
+    },
+    {
+      "id": "paleta#restablecer-publicar-o-descartar-cambios",
+      "tipo": "tarea",
+      "etiqueta": "restablecer, publicar o descartar cambios",
+      "modulo": "paleta"
+    },
+    {
+      "id": "pantallas",
+      "tipo": "modulo",
+      "etiqueta": "Pantallas (pantallas)",
+      "modulo": "pantallas",
+      "ruta": "/admin/pantallas"
+    },
+    {
+      "id": "permiso:pantallas/ver",
+      "tipo": "permiso",
+      "etiqueta": "Permiso: pantallas/ver"
+    },
+    {
+      "id": "pantallas#vincular-una-nueva-pantalla-de-tv",
+      "tipo": "tarea",
+      "etiqueta": "vincular una nueva pantalla de TV",
+      "modulo": "pantallas"
+    },
+    {
+      "id": "pantallas#editar-el-nombre-o-la-estacion-asignada",
+      "tipo": "tarea",
+      "etiqueta": "editar el nombre o la estación asignada",
+      "modulo": "pantallas"
+    },
+    {
+      "id": "pantallas#activar-o-desactivar-una-pantalla",
+      "tipo": "tarea",
+      "etiqueta": "activar o desactivar una pantalla",
+      "modulo": "pantallas"
+    },
+    {
+      "id": "plano",
+      "tipo": "modulo",
+      "etiqueta": "Plano del local (plano)",
+      "modulo": "plano",
+      "ruta": "/admin/plano"
+    },
+    {
+      "id": "permiso:plano/ver",
+      "tipo": "permiso",
+      "etiqueta": "Permiso: plano/ver"
+    },
+    {
+      "id": "plano#consultar-mesas-y-abrir-un-pedido-mozos-y-cajeros",
+      "tipo": "tarea",
+      "etiqueta": "consultar mesas y abrir un pedido (Mozos y Cajeros)",
+      "modulo": "plano"
+    },
+    {
+      "id": "plano#enviar-a-caja-el-cobro-de-una-mesa-mozos",
+      "tipo": "tarea",
+      "etiqueta": "enviar a Caja el cobro de una mesa (Mozos)",
+      "modulo": "plano"
+    },
+    {
+      "id": "productos",
+      "tipo": "modulo",
+      "etiqueta": "Productos (productos)",
+      "modulo": "productos",
+      "ruta": "/admin/productos"
+    },
+    {
+      "id": "productos#crear-un-producto-nuevo",
+      "tipo": "tarea",
+      "etiqueta": "Crear un producto nuevo",
+      "modulo": "productos"
+    },
+    {
+      "id": "productos#marcar-un-producto-como-agotado-o-disponible",
+      "tipo": "tarea",
+      "etiqueta": "Marcar un producto como agotado o disponible",
+      "modulo": "productos"
+    },
+    {
+      "id": "productos#editar-precio-foto-o-sabores-de-un-producto",
+      "tipo": "tarea",
+      "etiqueta": "Editar precio, foto o sabores de un producto",
+      "modulo": "productos"
+    },
+    {
+      "id": "productos#configurar-tamanos-y-grupos-de-opciones",
+      "tipo": "tarea",
+      "etiqueta": "Configurar tamanos y grupos de opciones",
+      "modulo": "productos"
+    },
+    {
+      "id": "recetas",
+      "tipo": "modulo",
+      "etiqueta": "Recetas (recetas)",
+      "modulo": "recetas",
+      "ruta": "/admin/recetas"
+    },
+    {
+      "id": "recetas#configurar-o-editar-la-receta-de-un-producto",
+      "tipo": "tarea",
+      "etiqueta": "Configurar o editar la receta de un producto",
+      "modulo": "recetas"
+    },
+    {
+      "id": "recetas#configurar-recetas-independientes-por-tamano",
+      "tipo": "tarea",
+      "etiqueta": "Configurar recetas independientes por tamano",
+      "modulo": "recetas"
+    },
+    {
+      "id": "recetas#eliminar-o-corregir-un-ingrediente-en-la-receta",
+      "tipo": "tarea",
+      "etiqueta": "Eliminar o corregir un ingrediente en la receta",
+      "modulo": "recetas"
+    },
+    {
+      "id": "recetas#evaluar-el-costo-de-materia-prima-y-margen",
+      "tipo": "tarea",
+      "etiqueta": "Evaluar el costo de materia prima y margen",
+      "modulo": "recetas"
+    },
+    {
+      "id": "reclamos",
+      "tipo": "modulo",
+      "etiqueta": "Libro de reclamaciones (reclamos)",
+      "modulo": "reclamos",
+      "ruta": "/admin/reclamos"
+    },
+    {
+      "id": "permiso:reclamos/ver",
+      "tipo": "permiso",
+      "etiqueta": "Permiso: reclamos/ver"
+    },
+    {
+      "id": "reclamos#revisar-el-detalle-de-un-reclamo",
+      "tipo": "tarea",
+      "etiqueta": "Revisar el detalle de un reclamo",
+      "modulo": "reclamos"
+    },
+    {
+      "id": "reclamos#marcar-un-reclamo-en-revision",
+      "tipo": "tarea",
+      "etiqueta": "Marcar un reclamo en revision",
+      "modulo": "reclamos"
+    },
+    {
+      "id": "reclamos#responder-formalmente-al-consumidor",
+      "tipo": "tarea",
+      "etiqueta": "Responder formalmente al consumidor",
+      "modulo": "reclamos"
+    },
+    {
+      "id": "reclamos#revisar-quejas-de-whatsapp",
+      "tipo": "tarea",
+      "etiqueta": "Revisar quejas de WhatsApp",
+      "modulo": "reclamos"
+    },
+    {
+      "id": "repartos",
+      "tipo": "modulo",
+      "etiqueta": "Repartos (repartos)",
+      "modulo": "repartos",
+      "ruta": "/admin/repartos"
+    },
+    {
+      "id": "permiso:repartos/ver",
+      "tipo": "permiso",
+      "etiqueta": "Permiso: repartos/ver"
+    },
+    {
+      "id": "repartos#reportar-una-falla-en-la-entrega-no-contesta-o-direccion-erronea",
+      "tipo": "tarea",
+      "etiqueta": "Reportar una falla en la entrega (no contesta o direccion erronea)",
+      "modulo": "repartos"
+    },
+    {
+      "id": "repartos#entender-el-tiempo-estimado-que-se-le-dice-al-cliente",
+      "tipo": "tarea",
+      "etiqueta": "entender el tiempo estimado que se le dice al cliente",
+      "modulo": "repartos"
+    },
+    {
+      "id": "reservas",
+      "tipo": "modulo",
+      "etiqueta": "Reservas (reservas)",
+      "modulo": "reservas",
+      "ruta": "/admin/reservas"
+    },
+    {
+      "id": "permiso:reservas/ver",
+      "tipo": "permiso",
+      "etiqueta": "Permiso: reservas/ver"
+    },
+    {
+      "id": "reservas#crear-una-nueva-reserva",
+      "tipo": "tarea",
+      "etiqueta": "Crear una nueva reserva",
+      "modulo": "reservas"
+    },
+    {
+      "id": "reservas#aprobar-o-rechazar-solicitudes-de-whatsapp",
+      "tipo": "tarea",
+      "etiqueta": "Aprobar o rechazar solicitudes de WhatsApp",
+      "modulo": "reservas"
+    },
+    {
+      "id": "reservas#sentar-a-los-clientes-al-llegar-al-local",
+      "tipo": "tarea",
+      "etiqueta": "Sentar a los clientes al llegar al local",
+      "modulo": "reservas"
+    },
+    {
+      "id": "reservas#cancelar-una-reserva",
+      "tipo": "tarea",
+      "etiqueta": "Cancelar una reserva",
+      "modulo": "reservas"
+    },
+    {
+      "id": "stock",
+      "tipo": "modulo",
+      "etiqueta": "Stock y recetas (stock)",
+      "modulo": "stock",
+      "ruta": "/admin/stock"
+    },
+    {
+      "id": "stock#supervisar-insumos-con-stock-bajo-o-critico",
+      "tipo": "tarea",
+      "etiqueta": "Supervisar insumos con stock bajo o critico",
+      "modulo": "stock"
+    },
+    {
+      "id": "stock#dar-de-alta-un-insumo-nuevo",
+      "tipo": "tarea",
+      "etiqueta": "Dar de alta un insumo nuevo",
+      "modulo": "stock"
+    },
+    {
+      "id": "stock#editar-umbrales-o-datos-de-un-insumo-existente",
+      "tipo": "tarea",
+      "etiqueta": "Editar umbrales o datos de un insumo existente",
+      "modulo": "stock"
+    },
+    {
+      "id": "stock#registrar-un-ajuste-de-inventario-por-conteo",
+      "tipo": "tarea",
+      "etiqueta": "Registrar un ajuste de inventario por conteo",
+      "modulo": "stock"
+    },
+    {
+      "id": "supervisor-codigo",
+      "tipo": "modulo",
+      "etiqueta": "Código del supervisor (supervisor-codigo)",
+      "modulo": "supervisor-codigo",
+      "ruta": "/admin/supervisor-codigo"
+    },
+    {
+      "id": "permiso:supervisor/ver_codigo",
+      "tipo": "permiso",
+      "etiqueta": "Permiso: supervisor/ver_codigo"
+    },
+    {
+      "id": "supervisor-codigo#consultar-y-dictar-el-codigo-al-personal",
+      "tipo": "tarea",
+      "etiqueta": "consultar y dictar el código al personal",
+      "modulo": "supervisor-codigo"
+    },
+    {
+      "id": "supervisor-codigo#generar-el-secreto-inicial-si-no-esta-configurado",
+      "tipo": "tarea",
+      "etiqueta": "generar el secreto inicial si no está configurado",
+      "modulo": "supervisor-codigo"
+    },
+    {
+      "id": "supervisor-codigo#rotar-el-secreto-del-local-por-seguridad",
+      "tipo": "tarea",
+      "etiqueta": "rotar el secreto del local por seguridad",
+      "modulo": "supervisor-codigo"
+    },
+    {
+      "id": "usuarios",
+      "tipo": "modulo",
+      "etiqueta": "Usuarios (usuarios)",
+      "modulo": "usuarios",
+      "ruta": "/admin/usuarios"
+    },
+    {
+      "id": "permiso:usuarios/ver",
+      "tipo": "permiso",
+      "etiqueta": "Permiso: usuarios/ver"
+    },
+    {
+      "id": "usuarios#registrar-un-nuevo-usuario-del-personal",
+      "tipo": "tarea",
+      "etiqueta": "registrar un nuevo usuario del personal",
+      "modulo": "usuarios"
+    },
+    {
+      "id": "usuarios#editar-datos-y-cambiar-el-rol-de-un-usuario",
+      "tipo": "tarea",
+      "etiqueta": "editar datos y cambiar el rol de un usuario",
+      "modulo": "usuarios"
+    },
+    {
+      "id": "usuarios#desactivar-o-reactivar-un-usuario",
+      "tipo": "tarea",
+      "etiqueta": "desactivar o reactivar un usuario",
+      "modulo": "usuarios"
+    },
+    {
+      "id": "usuarios#recibir-alertas-por-whatsapp",
+      "tipo": "tarea",
+      "etiqueta": "recibir alertas por WhatsApp",
+      "modulo": "usuarios"
+    },
+    {
+      "id": "usuarios#restablecer-contrasena-o-asignar-pin",
+      "tipo": "tarea",
+      "etiqueta": "restablecer contraseña o asignar PIN",
+      "modulo": "usuarios"
+    },
+    {
+      "id": "zonas",
+      "tipo": "modulo",
+      "etiqueta": "Zonas de reparto (zonas)",
+      "modulo": "zonas",
+      "ruta": "/admin/zonas"
+    },
+    {
+      "id": "zonas#ver-y-configurar-las-zonas-en-el-mapa",
+      "tipo": "tarea",
+      "etiqueta": "ver y configurar las zonas en el mapa",
+      "modulo": "zonas"
+    },
+    {
+      "id": "zonas#modificar-la-tarifa-de-una-zona",
+      "tipo": "tarea",
+      "etiqueta": "modificar la tarifa de una zona",
+      "modulo": "zonas"
+    },
+    {
+      "id": "zonas#editar-los-minutos-de-entrega-de-una-zona",
+      "tipo": "tarea",
+      "etiqueta": "editar los minutos de entrega de una zona",
+      "modulo": "zonas"
+    },
+    {
+      "id": "zonas#activar-o-desactivar-una-zona",
+      "tipo": "tarea",
+      "etiqueta": "activar o desactivar una zona",
+      "modulo": "zonas"
+    },
+    {
+      "id": "zonas#editar-el-poligono-de-coordenadas-de-una-zona",
+      "tipo": "tarea",
+      "etiqueta": "editar el polígono de coordenadas de una zona",
+      "modulo": "zonas"
+    }
+  ],
+  "aristas": [
+    {
+      "tipo": "requiere_permiso",
+      "origen": "almacen",
+      "destino": "permiso:stock/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "almacen"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:COCINA",
+      "destino": "almacen"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ALMACEN",
+      "destino": "almacen"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "almacen",
+      "destino": "stock"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "stock",
+      "destino": "almacen"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "almacen",
+      "destino": "compras"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "compras",
+      "destino": "almacen"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "almacen",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "cocina",
+      "destino": "almacen"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "almacen",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "supervisor-codigo",
+      "destino": "almacen"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "almacen",
+      "destino": "recetas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "almacen",
+      "destino": "informes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "almacen",
+      "destino": "historial"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "almacen",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "almacen#registrar-un-traslado-a-cocina-o-barra",
+      "destino": "almacen"
+    },
+    {
+      "tipo": "antes",
+      "origen": "almacen#registrar-un-traslado-a-cocina-o-barra",
+      "destino": "stock"
+    },
+    {
+      "tipo": "antes",
+      "origen": "almacen",
+      "destino": "stock"
+    },
+    {
+      "tipo": "despues",
+      "origen": "almacen#registrar-un-traslado-a-cocina-o-barra",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "despues",
+      "origen": "almacen",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "almacen#registrar-un-traslado-a-cocina-o-barra",
+      "destino": "almacen"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "almacen#registrar-una-merma-o-desperdicio-de-insumos",
+      "destino": "almacen"
+    },
+    {
+      "tipo": "requiere",
+      "origen": "almacen#registrar-una-merma-o-desperdicio-de-insumos",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "requiere",
+      "origen": "almacen",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "almacen#registrar-una-merma-o-desperdicio-de-insumos",
+      "destino": "informes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "almacen",
+      "destino": "informes"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "almacen#registrar-produccion-elaborada-hoy-prepare",
+      "destino": "almacen"
+    },
+    {
+      "tipo": "antes",
+      "origen": "almacen#registrar-produccion-elaborada-hoy-prepare",
+      "destino": "recetas"
+    },
+    {
+      "tipo": "antes",
+      "origen": "almacen",
+      "destino": "recetas"
+    },
+    {
+      "tipo": "despues",
+      "origen": "almacen#registrar-produccion-elaborada-hoy-prepare",
+      "destino": "stock"
+    },
+    {
+      "tipo": "despues",
+      "origen": "almacen",
+      "destino": "stock"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "almacen#registrar-produccion-elaborada-hoy-prepare",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "almacen",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "almacen#anular-un-movimiento-registrado-por-error",
+      "destino": "almacen"
+    },
+    {
+      "tipo": "requiere",
+      "origen": "almacen#anular-un-movimiento-registrado-por-error",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "almacen#anular-un-movimiento-registrado-por-error",
+      "destino": "historial"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "almacen",
+      "destino": "historial"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "almacen#realizar-el-cierre-del-dia-de-almacen",
+      "destino": "almacen"
+    },
+    {
+      "tipo": "despues",
+      "origen": "almacen#realizar-el-cierre-del-dia-de-almacen",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "despues",
+      "origen": "almacen",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "almacen#realizar-el-cierre-del-dia-de-almacen",
+      "destino": "stock"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "almacen",
+      "destino": "stock"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "caja",
+      "destino": "permiso:caja/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "caja"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:CAJERO",
+      "destino": "caja"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "caja",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "cierre",
+      "destino": "caja"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "caja",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "cocina",
+      "destino": "caja"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "caja",
+      "destino": "comprobantes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "comprobantes",
+      "destino": "caja"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "caja",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "repartos",
+      "destino": "caja"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "caja",
+      "destino": "plano"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "plano",
+      "destino": "caja"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "caja",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "supervisor-codigo",
+      "destino": "caja"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "caja",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mensajes",
+      "destino": "caja"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "caja",
+      "destino": "historial"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "caja#abrir-la-caja-del-turno",
+      "destino": "caja"
+    },
+    {
+      "tipo": "antes",
+      "origen": "caja#abrir-la-caja-del-turno",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "antes",
+      "origen": "caja",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "despues",
+      "origen": "caja#abrir-la-caja-del-turno",
+      "destino": "caja"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "caja#mover-un-voucher-al-pedido-correcto",
+      "destino": "caja"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "caja#cobrar-un-pedido",
+      "destino": "caja"
+    },
+    {
+      "tipo": "antes",
+      "origen": "caja#cobrar-un-pedido",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "antes",
+      "origen": "caja",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "despues",
+      "origen": "caja#cobrar-un-pedido",
+      "destino": "comprobantes"
+    },
+    {
+      "tipo": "despues",
+      "origen": "caja",
+      "destino": "comprobantes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "caja#cobrar-un-pedido",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "caja",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "caja#adjuntar-la-foto-del-comprobante-al-cobrar",
+      "destino": "caja"
+    },
+    {
+      "tipo": "antes",
+      "origen": "caja#adjuntar-la-foto-del-comprobante-al-cobrar",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "despues",
+      "origen": "caja#adjuntar-la-foto-del-comprobante-al-cobrar",
+      "destino": "comprobantes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "caja#adjuntar-la-foto-del-comprobante-al-cobrar",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "caja#controlar-pedidos-con-pago-digital-y-pase-a-cocina",
+      "destino": "caja"
+    },
+    {
+      "tipo": "antes",
+      "origen": "caja#controlar-pedidos-con-pago-digital-y-pase-a-cocina",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "antes",
+      "origen": "caja",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "despues",
+      "origen": "caja#controlar-pedidos-con-pago-digital-y-pase-a-cocina",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "despues",
+      "origen": "caja",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "caja#controlar-pedidos-con-pago-digital-y-pase-a-cocina",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "caja#anular-un-pedido-o-un-cobro",
+      "destino": "caja"
+    },
+    {
+      "tipo": "requiere",
+      "origen": "caja#anular-un-pedido-o-un-cobro",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "requiere",
+      "origen": "caja",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "caja#anular-un-pedido-o-un-cobro",
+      "destino": "historial"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "caja",
+      "destino": "historial"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "caja#crear-un-pedido-directo-en-mesa-o-mostrador",
+      "destino": "caja"
+    },
+    {
+      "tipo": "antes",
+      "origen": "caja#crear-un-pedido-directo-en-mesa-o-mostrador",
+      "destino": "plano"
+    },
+    {
+      "tipo": "antes",
+      "origen": "caja",
+      "destino": "plano"
+    },
+    {
+      "tipo": "despues",
+      "origen": "caja#crear-un-pedido-directo-en-mesa-o-mostrador",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "caja#revisar-los-pedidos-no-entregados-delivery",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "caja#revisar-los-pedidos-no-entregados-delivery",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "caja",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "caja#ver-y-reimprimir-las-etiquetas-de-un-pedido",
+      "destino": "caja"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "caja#revisar-la-impresora-cuando-no-sale-la-etiqueta",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "caja#revisar-la-impresora-cuando-no-sale-la-etiqueta",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "caja",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "cierre",
+      "destino": "permiso:caja/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:CAJERO",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "cierre",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "repartos",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "cierre",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "supervisor-codigo",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "cierre",
+      "destino": "comprobantes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "comprobantes",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "cierre",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mensajes",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "cierre",
+      "destino": "informes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "cierre",
+      "destino": "plano"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "cierre#resolver-pendientes-de-cobro-antes-de-cerrar",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "antes",
+      "origen": "cierre#resolver-pendientes-de-cobro-antes-de-cerrar",
+      "destino": "caja"
+    },
+    {
+      "tipo": "antes",
+      "origen": "cierre",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "cierre#resolver-pendientes-de-cobro-antes-de-cerrar",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "cierre",
+      "destino": "caja"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "cierre#auditar-la-lista-de-vouchers-de-yape-y-plin-del-dia",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "antes",
+      "origen": "cierre#auditar-la-lista-de-vouchers-de-yape-y-plin-del-dia",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "antes",
+      "origen": "cierre",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "cierre#auditar-la-lista-de-vouchers-de-yape-y-plin-del-dia",
+      "destino": "caja"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "cierre#liquidar-a-los-repartidores",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "antes",
+      "origen": "cierre#liquidar-a-los-repartidores",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "antes",
+      "origen": "cierre",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "cierre#liquidar-a-los-repartidores",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "cierre",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "cierre#realizar-el-arqueo-ciego-y-cerrar-caja",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "antes",
+      "origen": "cierre#realizar-el-arqueo-ciego-y-cerrar-caja",
+      "destino": "caja"
+    },
+    {
+      "tipo": "despues",
+      "origen": "cierre#realizar-el-arqueo-ciego-y-cerrar-caja",
+      "destino": "informes"
+    },
+    {
+      "tipo": "despues",
+      "origen": "cierre",
+      "destino": "informes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "cierre#realizar-el-arqueo-ciego-y-cerrar-caja",
+      "destino": "comprobantes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "cierre",
+      "destino": "comprobantes"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "cierre#proceder-cuando-la-caja-no-cuadra",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "requiere",
+      "origen": "cierre#proceder-cuando-la-caja-no-cuadra",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "requiere",
+      "origen": "cierre",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "cierre#proceder-cuando-la-caja-no-cuadra",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "cierre",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "clientes",
+      "destino": "permiso:clientes/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "clientes"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:CALLCENTER",
+      "destino": "clientes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "clientes",
+      "destino": "caja"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "caja",
+      "destino": "clientes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "clientes",
+      "destino": "ofertas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "ofertas",
+      "destino": "clientes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "clientes",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mensajes",
+      "destino": "clientes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "clientes",
+      "destino": "zonas"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "clientes#registrar-un-cliente-nuevo-desde-mostrador-o-telefono",
+      "destino": "clientes"
+    },
+    {
+      "tipo": "despues",
+      "origen": "clientes#registrar-un-cliente-nuevo-desde-mostrador-o-telefono",
+      "destino": "caja"
+    },
+    {
+      "tipo": "despues",
+      "origen": "clientes",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "clientes#registrar-un-cliente-nuevo-desde-mostrador-o-telefono",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "clientes",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "clientes#consultar-la-ficha-y-compras-de-un-cliente",
+      "destino": "clientes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "clientes#consultar-la-ficha-y-compras-de-un-cliente",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "clientes",
+      "destino": "caja"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "clientes#ajustar-puntos-de-fidelidad",
+      "destino": "clientes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "clientes#ajustar-puntos-de-fidelidad",
+      "destino": "ofertas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "clientes",
+      "destino": "ofertas"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "clientes#editar-datos-y-descuentos-de-un-cliente",
+      "destino": "clientes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "clientes#editar-datos-y-descuentos-de-un-cliente",
+      "destino": "zonas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "clientes",
+      "destino": "zonas"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "cocina",
+      "destino": "permiso:cocina/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:CAJERO",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:COCINA",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "cocina",
+      "destino": "stock"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "stock",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "cocina",
+      "destino": "pantallas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "pantallas",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "cocina",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "supervisor-codigo",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "cocina",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "cocina",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "cocina",
+      "destino": "productos"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "cocina#despejar-una-comanda-preparada",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "antes",
+      "origen": "cocina#despejar-una-comanda-preparada",
+      "destino": "caja"
+    },
+    {
+      "tipo": "antes",
+      "origen": "cocina",
+      "destino": "caja"
+    },
+    {
+      "tipo": "despues",
+      "origen": "cocina#despejar-una-comanda-preparada",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "despues",
+      "origen": "cocina",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "cocina#despejar-una-comanda-preparada",
+      "destino": "pantallas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "cocina",
+      "destino": "pantallas"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "cocina#devolver-una-comanda-despejada-por-error",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "cocina#devolver-una-comanda-despejada-por-error",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "cocina",
+      "destino": "caja"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "cocina#activar-el-modo-de-alta-demanda",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "cocina#activar-el-modo-de-alta-demanda",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "cocina",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "cocina#marcar-un-producto-como-agotado",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "despues",
+      "origen": "cocina#marcar-un-producto-como-agotado",
+      "destino": "productos"
+    },
+    {
+      "tipo": "despues",
+      "origen": "cocina",
+      "destino": "productos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "cocina#marcar-un-producto-como-agotado",
+      "destino": "stock"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "cocina",
+      "destino": "stock"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "cocina#registrar-una-merma-de-cocina",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "requiere",
+      "origen": "cocina#registrar-una-merma-de-cocina",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "requiere",
+      "origen": "cocina",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "despues",
+      "origen": "cocina#registrar-una-merma-de-cocina",
+      "destino": "almacen"
+    },
+    {
+      "tipo": "despues",
+      "origen": "cocina",
+      "destino": "almacen"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "cocina#registrar-una-merma-de-cocina",
+      "destino": "stock"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "compras",
+      "destino": "permiso:stock/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "compras"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ALMACEN",
+      "destino": "compras"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "compras",
+      "destino": "stock"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "stock",
+      "destino": "compras"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "compras",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "cierre",
+      "destino": "compras"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "compras",
+      "destino": "comprobantes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "comprobantes",
+      "destino": "compras"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "compras#registrar-una-compra-de-insumos",
+      "destino": "compras"
+    },
+    {
+      "tipo": "antes",
+      "origen": "compras#registrar-una-compra-de-insumos",
+      "destino": "stock"
+    },
+    {
+      "tipo": "antes",
+      "origen": "compras",
+      "destino": "stock"
+    },
+    {
+      "tipo": "despues",
+      "origen": "compras#registrar-una-compra-de-insumos",
+      "destino": "almacen"
+    },
+    {
+      "tipo": "despues",
+      "origen": "compras",
+      "destino": "almacen"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "compras#registrar-una-compra-de-insumos",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "compras",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "compras#consultar-faltantes-y-pedir-por-whatsapp",
+      "destino": "compras"
+    },
+    {
+      "tipo": "antes",
+      "origen": "compras#consultar-faltantes-y-pedir-por-whatsapp",
+      "destino": "stock"
+    },
+    {
+      "tipo": "despues",
+      "origen": "compras#consultar-faltantes-y-pedir-por-whatsapp",
+      "destino": "compras"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "compras#registrar-un-proveedor-nuevo",
+      "destino": "compras"
+    },
+    {
+      "tipo": "despues",
+      "origen": "compras#registrar-un-proveedor-nuevo",
+      "destino": "compras"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "compras#realizar-una-compra-rapida-menor",
+      "destino": "compras"
+    },
+    {
+      "tipo": "despues",
+      "origen": "compras#realizar-una-compra-rapida-menor",
+      "destino": "almacen"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "compras#realizar-una-compra-rapida-menor",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "comprobantes",
+      "destino": "permiso:comprobantes/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "comprobantes"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:CAJERO",
+      "destino": "comprobantes"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "comprobantes#reimprimir-una-nota-de-venta",
+      "destino": "comprobantes"
+    },
+    {
+      "tipo": "antes",
+      "origen": "comprobantes#reimprimir-una-nota-de-venta",
+      "destino": "caja"
+    },
+    {
+      "tipo": "antes",
+      "origen": "comprobantes",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "comprobantes#reimprimir-una-nota-de-venta",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "comprobantes",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "comprobantes#gestionar-comprobantes-electronicos-por-emitir",
+      "destino": "comprobantes"
+    },
+    {
+      "tipo": "antes",
+      "origen": "comprobantes#gestionar-comprobantes-electronicos-por-emitir",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "comprobantes#gestionar-comprobantes-electronicos-por-emitir",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "creditos",
+      "destino": "permiso:creditos/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "creditos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "creditos",
+      "destino": "caja"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "caja",
+      "destino": "creditos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "creditos",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "usuarios",
+      "destino": "creditos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "creditos",
+      "destino": "informes"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "creditos#consultar-los-consumos-por-semana-o-por-mes",
+      "destino": "creditos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "creditos#consultar-los-consumos-por-semana-o-por-mes",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "creditos",
+      "destino": "caja"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "creditos#ver-el-desglose-de-consumos-de-un-colaborador",
+      "destino": "creditos"
+    },
+    {
+      "tipo": "antes",
+      "origen": "creditos#ver-el-desglose-de-consumos-de-un-colaborador",
+      "destino": "caja"
+    },
+    {
+      "tipo": "antes",
+      "origen": "creditos",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "creditos#ver-el-desglose-de-consumos-de-un-colaborador",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "creditos",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "creditos#exportar-el-reporte-a-excel-para-recursos-humanos-o-contabilidad",
+      "destino": "creditos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "creditos#exportar-el-reporte-a-excel-para-recursos-humanos-o-contabilidad",
+      "destino": "informes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "creditos",
+      "destino": "informes"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "destacadas",
+      "destino": "permiso:catalogo/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "destacadas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "destacadas",
+      "destino": "novedades"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "novedades",
+      "destino": "destacadas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "destacadas",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "disenador",
+      "destino": "destacadas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "destacadas",
+      "destino": "productos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "productos",
+      "destino": "destacadas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "destacadas",
+      "destino": "historial"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "destacadas#crear-un-circulo-y-agregar-fotos",
+      "destino": "destacadas"
+    },
+    {
+      "tipo": "antes",
+      "origen": "destacadas#crear-un-circulo-y-agregar-fotos",
+      "destino": "productos"
+    },
+    {
+      "tipo": "antes",
+      "origen": "destacadas",
+      "destino": "productos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "destacadas#crear-un-circulo-y-agregar-fotos",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "destacadas",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "destacadas#cambiar-portada-orden-y-pies-de-foto",
+      "destino": "destacadas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "destacadas#cambiar-portada-orden-y-pies-de-foto",
+      "destino": "destacadas"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "destacadas#activar-archivar-o-eliminar-circulos",
+      "destino": "destacadas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "destacadas#activar-archivar-o-eliminar-circulos",
+      "destino": "novedades"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "destacadas",
+      "destino": "novedades"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "destacadas#publicar-cambios-en-la-carta",
+      "destino": "destacadas"
+    },
+    {
+      "tipo": "despues",
+      "origen": "destacadas#publicar-cambios-en-la-carta",
+      "destino": "destacadas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "destacadas#publicar-cambios-en-la-carta",
+      "destino": "historial"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "destacadas",
+      "destino": "historial"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "disenador",
+      "destino": "permiso:local/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "disenador",
+      "destino": "paleta"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "paleta",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "disenador",
+      "destino": "productos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "productos",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "disenador",
+      "destino": "listas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "listas",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "disenador",
+      "destino": "novedades"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "novedades",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "disenador",
+      "destino": "historial"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "disenador#abrir-el-disenador-y-cambiar-la-vista",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "disenador#abrir-el-disenador-y-cambiar-la-vista",
+      "destino": "paleta"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "disenador",
+      "destino": "paleta"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "disenador#ordenar-categorias-y-productos",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "antes",
+      "origen": "disenador#ordenar-categorias-y-productos",
+      "destino": "listas"
+    },
+    {
+      "tipo": "antes",
+      "origen": "disenador",
+      "destino": "listas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "disenador#ordenar-categorias-y-productos",
+      "destino": "productos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "disenador",
+      "destino": "productos"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "disenador#editar-o-esconder-un-producto",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "antes",
+      "origen": "disenador#editar-o-esconder-un-producto",
+      "destino": "productos"
+    },
+    {
+      "tipo": "antes",
+      "origen": "disenador",
+      "destino": "productos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "disenador#editar-o-esconder-un-producto",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "disenador#configurar-promociones-y-banner",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "disenador#configurar-promociones-y-banner",
+      "destino": "novedades"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "disenador",
+      "destino": "novedades"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "disenador#cambiar-el-orden-el-tamano-y-la-posicion-de-la-carta",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "disenador#cambiar-el-orden-el-tamano-y-la-posicion-de-la-carta",
+      "destino": "novedades"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "disenador#cambiar-el-orden-el-tamano-y-la-posicion-de-la-carta",
+      "destino": "destacadas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "disenador",
+      "destino": "destacadas"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "disenador#publicar-o-descartar-cambios",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "despues",
+      "origen": "disenador#publicar-o-descartar-cambios",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "disenador#publicar-o-descartar-cambios",
+      "destino": "historial"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "disenador",
+      "destino": "historial"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "escritorio"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:CAJERO",
+      "destino": "escritorio"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:COCINA",
+      "destino": "escritorio"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:MOZO",
+      "destino": "escritorio"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:CALLCENTER",
+      "destino": "escritorio"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ALMACEN",
+      "destino": "escritorio"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:REPARTIDOR",
+      "destino": "escritorio"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "escritorio",
+      "destino": "caja"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "caja",
+      "destino": "escritorio"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "escritorio",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "cocina",
+      "destino": "escritorio"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "escritorio",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "repartos",
+      "destino": "escritorio"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "escritorio",
+      "destino": "compras"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "compras",
+      "destino": "escritorio"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "escritorio",
+      "destino": "informes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "informes",
+      "destino": "escritorio"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "escritorio",
+      "destino": "stock"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "escritorio#filtrar-las-ventas-por-fecha-o-canal",
+      "destino": "escritorio"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "escritorio#filtrar-las-ventas-por-fecha-o-canal",
+      "destino": "informes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "escritorio",
+      "destino": "informes"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "escritorio#atender-la-alerta-de-stock-bajo",
+      "destino": "escritorio"
+    },
+    {
+      "tipo": "despues",
+      "origen": "escritorio#atender-la-alerta-de-stock-bajo",
+      "destino": "compras"
+    },
+    {
+      "tipo": "despues",
+      "origen": "escritorio",
+      "destino": "compras"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "escritorio#atender-la-alerta-de-stock-bajo",
+      "destino": "stock"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "escritorio",
+      "destino": "stock"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "escritorio#revisar-pendientes-y-tareas-del-turno",
+      "destino": "escritorio"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "escritorio#revisar-pendientes-y-tareas-del-turno",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "escritorio",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "escritorio#revisar-pendientes-y-tareas-del-turno",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "escritorio",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "escritorio#revisar-pendientes-y-tareas-del-turno",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "escritorio",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "escritorio#entender-de-donde-salen-las-cifras",
+      "destino": "escritorio"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "escritorio#entender-de-donde-salen-las-cifras",
+      "destino": "informes"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "historial",
+      "destino": "permiso:auditoria/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "historial"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "historial",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "usuarios",
+      "destino": "historial"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "historial",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "supervisor-codigo",
+      "destino": "historial"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "historial",
+      "destino": "caja"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "historial",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "cierre",
+      "destino": "historial"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "historial",
+      "destino": "informes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "informes",
+      "destino": "historial"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "historial#buscar-y-filtrar-registros-de-auditoria",
+      "destino": "historial"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "historial#buscar-y-filtrar-registros-de-auditoria",
+      "destino": "informes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "historial",
+      "destino": "informes"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "historial#inspeccionar-los-detalles-de-una-accion",
+      "destino": "historial"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "historial#inspeccionar-los-detalles-de-una-accion",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "historial",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "historial#verificar-la-integridad-de-la-cadena-y-exportar-a-csv",
+      "destino": "historial"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "historial#verificar-la-integridad-de-la-cadena-y-exportar-a-csv",
+      "destino": "historial"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "indicadores",
+      "destino": "permiso:auditoria/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "indicadores"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "indicadores",
+      "destino": "informes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "informes",
+      "destino": "indicadores"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "indicadores",
+      "destino": "caja"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "caja",
+      "destino": "indicadores"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "indicadores",
+      "destino": "productos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "productos",
+      "destino": "indicadores"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "indicadores",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "cocina",
+      "destino": "indicadores"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "indicadores",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "repartos",
+      "destino": "indicadores"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "indicadores",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "indicadores",
+      "destino": "ofertas"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "indicadores#supervisar-el-estado-de-metas-operativas",
+      "destino": "indicadores"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "indicadores#supervisar-el-estado-de-metas-operativas",
+      "destino": "informes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "indicadores",
+      "destino": "informes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "indicadores#supervisar-el-estado-de-metas-operativas",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "indicadores",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "indicadores#supervisar-el-estado-de-metas-operativas",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "indicadores",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "indicadores#revisar-los-productos-lideres-del-mes-por-categoria",
+      "destino": "indicadores"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "indicadores#revisar-los-productos-lideres-del-mes-por-categoria",
+      "destino": "productos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "indicadores",
+      "destino": "productos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "indicadores#revisar-los-productos-lideres-del-mes-por-categoria",
+      "destino": "informes"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "indicadores#conmutar-la-visualizacion-de-estrellas-en-la-carta",
+      "destino": "indicadores"
+    },
+    {
+      "tipo": "despues",
+      "origen": "indicadores#conmutar-la-visualizacion-de-estrellas-en-la-carta",
+      "destino": "productos"
+    },
+    {
+      "tipo": "despues",
+      "origen": "indicadores",
+      "destino": "productos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "indicadores#conmutar-la-visualizacion-de-estrellas-en-la-carta",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "indicadores",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "indicadores#consultar-el-historico-y-efectividad-de-promociones",
+      "destino": "indicadores"
+    },
+    {
+      "tipo": "antes",
+      "origen": "indicadores#consultar-el-historico-y-efectividad-de-promociones",
+      "destino": "ofertas"
+    },
+    {
+      "tipo": "antes",
+      "origen": "indicadores",
+      "destino": "ofertas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "indicadores#consultar-el-historico-y-efectividad-de-promociones",
+      "destino": "informes"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "informes",
+      "destino": "permiso:auditoria/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "informes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "informes",
+      "destino": "caja"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "caja",
+      "destino": "informes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "informes",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "informes",
+      "destino": "comprobantes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "comprobantes",
+      "destino": "informes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "informes",
+      "destino": "mapa"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mapa",
+      "destino": "informes"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "informes#abrir-y-consultar-un-informe-del-catalogo",
+      "destino": "informes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "informes#abrir-y-consultar-un-informe-del-catalogo",
+      "destino": "indicadores"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "informes",
+      "destino": "indicadores"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "informes#filtrar-por-fechas-o-rangos-personalizados",
+      "destino": "informes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "informes#filtrar-por-fechas-o-rangos-personalizados",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "informes",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "informes#exportar-un-informe-a-excel",
+      "destino": "informes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "informes#exportar-un-informe-a-excel",
+      "destino": "historial"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "informes",
+      "destino": "historial"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "informes#imprimir-o-generar-un-archivo-pdf",
+      "destino": "informes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "informes#imprimir-o-generar-un-archivo-pdf",
+      "destino": "comprobantes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "informes",
+      "destino": "comprobantes"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "iniciativas",
+      "destino": "permiso:iniciativas/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "iniciativas"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:COCINA",
+      "destino": "iniciativas"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:MOZO",
+      "destino": "iniciativas"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:CALLCENTER",
+      "destino": "iniciativas"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ALMACEN",
+      "destino": "iniciativas"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:REPARTIDOR",
+      "destino": "iniciativas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "iniciativas",
+      "destino": "historial"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "historial",
+      "destino": "iniciativas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "iniciativas",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "usuarios",
+      "destino": "iniciativas"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "iniciativas#registrar-una-nueva-iniciativa",
+      "destino": "iniciativas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "iniciativas#registrar-una-nueva-iniciativa",
+      "destino": "historial"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "iniciativas",
+      "destino": "historial"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "iniciativas#comentar-una-iniciativa",
+      "destino": "iniciativas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "iniciativas#comentar-una-iniciativa",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "iniciativas",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "iniciativas#cambiar-el-estado-de-una-iniciativa-solo-administrador",
+      "destino": "iniciativas"
+    },
+    {
+      "tipo": "despues",
+      "origen": "iniciativas#cambiar-el-estado-de-una-iniciativa-solo-administrador",
+      "destino": "historial"
+    },
+    {
+      "tipo": "despues",
+      "origen": "iniciativas",
+      "destino": "historial"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "listas",
+      "destino": "permiso:catalogo/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "listas"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:CAJERO",
+      "destino": "listas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "listas",
+      "destino": "productos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "productos",
+      "destino": "listas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "listas",
+      "destino": "recetas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "recetas",
+      "destino": "listas"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "listas#crear-una-nueva-categoria-de-opciones",
+      "destino": "listas"
+    },
+    {
+      "tipo": "despues",
+      "origen": "listas#crear-una-nueva-categoria-de-opciones",
+      "destino": "productos"
+    },
+    {
+      "tipo": "despues",
+      "origen": "listas",
+      "destino": "productos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "listas#crear-una-nueva-categoria-de-opciones",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "listas",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "listas#agregar-elementos-a-una-lista",
+      "destino": "listas"
+    },
+    {
+      "tipo": "despues",
+      "origen": "listas#agregar-elementos-a-una-lista",
+      "destino": "productos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "listas#agregar-elementos-a-una-lista",
+      "destino": "recetas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "listas",
+      "destino": "recetas"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "listas#modificar-o-reordenar-elementos",
+      "destino": "listas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "listas#modificar-o-reordenar-elementos",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "listas#ocultar-o-reactivar-un-elemento-de-una-lista",
+      "destino": "listas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "listas#ocultar-o-reactivar-un-elemento-de-una-lista",
+      "destino": "productos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "listas",
+      "destino": "productos"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "mapa",
+      "destino": "permiso:zonas/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "mapa"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mapa",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "repartos",
+      "destino": "mapa"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mapa",
+      "destino": "zonas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "zonas",
+      "destino": "mapa"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mapa",
+      "destino": "caja"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "caja",
+      "destino": "mapa"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mapa#visualizar-y-navegar-en-el-mapa-interactivo",
+      "destino": "mapa"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mapa#visualizar-y-navegar-en-el-mapa-interactivo",
+      "destino": "zonas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mapa",
+      "destino": "zonas"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mapa#activar-y-alternar-capas-de-informacion",
+      "destino": "mapa"
+    },
+    {
+      "tipo": "antes",
+      "origen": "mapa#activar-y-alternar-capas-de-informacion",
+      "destino": "zonas"
+    },
+    {
+      "tipo": "antes",
+      "origen": "mapa",
+      "destino": "zonas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mapa#activar-y-alternar-capas-de-informacion",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mapa",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mapa#filtrar-por-fechas-y-canal-de-pedido",
+      "destino": "mapa"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mapa#filtrar-por-fechas-y-canal-de-pedido",
+      "destino": "informes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mapa",
+      "destino": "informes"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mapa#analizar-pedidos-por-zona-y-distancia",
+      "destino": "mapa"
+    },
+    {
+      "tipo": "despues",
+      "origen": "mapa#analizar-pedidos-por-zona-y-distancia",
+      "destino": "zonas"
+    },
+    {
+      "tipo": "despues",
+      "origen": "mapa",
+      "destino": "zonas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mapa#analizar-pedidos-por-zona-y-distancia",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "mascota",
+      "destino": "permiso:mascota/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "mascota"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mascota",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "disenador",
+      "destino": "mascota"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mascota",
+      "destino": "novedades"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "novedades",
+      "destino": "mascota"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mascota",
+      "destino": "paleta"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "paleta",
+      "destino": "mascota"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mascota#cambiar-la-apariencia-base-de-capri",
+      "destino": "mascota"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mascota#cambiar-la-apariencia-base-de-capri",
+      "destino": "paleta"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mascota",
+      "destino": "paleta"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mascota#configurar-temas-y-temporadas",
+      "destino": "mascota"
+    },
+    {
+      "tipo": "antes",
+      "origen": "mascota#configurar-temas-y-temporadas",
+      "destino": "novedades"
+    },
+    {
+      "tipo": "antes",
+      "origen": "mascota",
+      "destino": "novedades"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mascota#configurar-temas-y-temporadas",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mascota",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mascota#restablecer-a-valores-de-fabrica",
+      "destino": "mascota"
+    },
+    {
+      "tipo": "despues",
+      "origen": "mascota#restablecer-a-valores-de-fabrica",
+      "destino": "mascota"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "mensajes",
+      "destino": "permiso:mensajes/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:CALLCENTER",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mensajes",
+      "destino": "reclamos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "reclamos",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mensajes",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "cocina",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mensajes",
+      "destino": "notificaciones"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mensajes#atender-un-chat-que-requiere-ayuda-humana",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mensajes#atender-un-chat-que-requiere-ayuda-humana",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mensajes",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mensajes#atender-un-chat-que-requiere-ayuda-humana",
+      "destino": "clientes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mensajes",
+      "destino": "clientes"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mensajes#responder-a-una-calificacion-baja-de-la-encuesta",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mensajes#responder-a-una-calificacion-baja-de-la-encuesta",
+      "destino": "reclamos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mensajes",
+      "destino": "reclamos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mensajes#responder-a-una-calificacion-baja-de-la-encuesta",
+      "destino": "notificaciones"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mensajes",
+      "destino": "notificaciones"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mensajes#validar-una-captura-de-pago-con-lectura-de-ia",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "despues",
+      "origen": "mensajes#validar-una-captura-de-pago-con-lectura-de-ia",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "despues",
+      "origen": "mensajes",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mensajes#validar-una-captura-de-pago-con-lectura-de-ia",
+      "destino": "caja"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mensajes#mover-un-voucher-desde-el-chat",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mensajes#pulir-la-respuesta-con-ia-antes-de-enviarla",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mensajes#pulir-la-respuesta-con-ia-antes-de-enviarla",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mensajes#reabrir-una-conversacion-fuera-de-la-ventana-de-24-horas",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mensajes#reabrir-una-conversacion-fuera-de-la-ventana-de-24-horas",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mensajes#revisar-y-reenviar-mensajes-que-no-salieron",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mensajes#revisar-y-reenviar-mensajes-que-no-salieron",
+      "destino": "caja"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mensajes#entender-por-que-un-mensaje-quedo-fallido",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "mirest",
+      "destino": "permiso:local/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mirest",
+      "destino": "zonas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "zonas",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mirest",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "supervisor-codigo",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mirest",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mirest",
+      "destino": "historial"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "historial",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mirest",
+      "destino": "caja"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "caja",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#actualizar-datos-basicos-y-de-contacto",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mirest#actualizar-datos-basicos-y-de-contacto",
+      "destino": "zonas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mirest",
+      "destino": "zonas"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#configurar-horario-y-fechas-especiales",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mirest#configurar-horario-y-fechas-especiales",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#configurar-pagos-y-entregas",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mirest#configurar-pagos-y-entregas",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mirest",
+      "destino": "caja"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#activar-alta-demanda-o-pausar-pedidos",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "requiere",
+      "origen": "mirest#activar-alta-demanda-o-pausar-pedidos",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "requiere",
+      "origen": "mirest",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "antes",
+      "origen": "mirest#activar-alta-demanda-o-pausar-pedidos",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "antes",
+      "origen": "mirest",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mirest#activar-alta-demanda-o-pausar-pedidos",
+      "destino": "historial"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mirest",
+      "destino": "historial"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#cambiar-las-imagenes-de-la-pantalla-de-ingreso",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mirest#cambiar-las-imagenes-de-la-pantalla-de-ingreso",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "notificaciones",
+      "destino": "permiso:notificaciones/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "notificaciones"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:COCINA",
+      "destino": "notificaciones"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:MOZO",
+      "destino": "notificaciones"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:CALLCENTER",
+      "destino": "notificaciones"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ALMACEN",
+      "destino": "notificaciones"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:REPARTIDOR",
+      "destino": "notificaciones"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "notificaciones",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "cocina",
+      "destino": "notificaciones"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "notificaciones",
+      "destino": "caja"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "caja",
+      "destino": "notificaciones"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "notificaciones",
+      "destino": "stock"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "stock",
+      "destino": "notificaciones"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "notificaciones",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "notificaciones",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "repartos",
+      "destino": "notificaciones"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "notificaciones",
+      "destino": "historial"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "notificaciones#revisar-pendientes-y-resolver-alertas-urgentes",
+      "destino": "notificaciones"
+    },
+    {
+      "tipo": "despues",
+      "origen": "notificaciones#revisar-pendientes-y-resolver-alertas-urgentes",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "despues",
+      "origen": "notificaciones",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "notificaciones#revisar-pendientes-y-resolver-alertas-urgentes",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "notificaciones",
+      "destino": "caja"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "notificaciones#marcar-avisos-como-leidos-y-filtrar-el-historial",
+      "destino": "notificaciones"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "notificaciones#marcar-avisos-como-leidos-y-filtrar-el-historial",
+      "destino": "historial"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "notificaciones",
+      "destino": "historial"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "notificaciones#crear-un-nuevo-aviso-interno-para-el-equipo",
+      "destino": "notificaciones"
+    },
+    {
+      "tipo": "despues",
+      "origen": "notificaciones#crear-un-nuevo-aviso-interno-para-el-equipo",
+      "destino": "notificaciones"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "novedades",
+      "destino": "permiso:catalogo/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "novedades"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "novedades",
+      "destino": "ofertas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "ofertas",
+      "destino": "novedades"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "novedades",
+      "destino": "productos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "productos",
+      "destino": "novedades"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "novedades",
+      "destino": "historial"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "novedades#crear-una-nueva-novedad-o-anuncio",
+      "destino": "novedades"
+    },
+    {
+      "tipo": "antes",
+      "origen": "novedades#crear-una-nueva-novedad-o-anuncio",
+      "destino": "productos"
+    },
+    {
+      "tipo": "antes",
+      "origen": "novedades",
+      "destino": "productos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "novedades#crear-una-nueva-novedad-o-anuncio",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "novedades",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "novedades#programar-fechas-de-vigencia",
+      "destino": "novedades"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "novedades#programar-fechas-de-vigencia",
+      "destino": "ofertas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "novedades",
+      "destino": "ofertas"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "novedades#organizar-y-destacar-novedades",
+      "destino": "novedades"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "novedades#organizar-y-destacar-novedades",
+      "destino": "destacadas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "novedades",
+      "destino": "destacadas"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "novedades#personalizar-el-encabezado-y-previsualizar-en-pc-o-celular",
+      "destino": "novedades"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "novedades#personalizar-el-encabezado-y-previsualizar-en-pc-o-celular",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "novedades#publicar-o-descartar-cambios",
+      "destino": "novedades"
+    },
+    {
+      "tipo": "despues",
+      "origen": "novedades#publicar-o-descartar-cambios",
+      "destino": "novedades"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "novedades#publicar-o-descartar-cambios",
+      "destino": "historial"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "novedades",
+      "destino": "historial"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "ofertas",
+      "destino": "permiso:ofertas/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "ofertas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "ofertas",
+      "destino": "productos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "productos",
+      "destino": "ofertas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "ofertas",
+      "destino": "caja"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "caja",
+      "destino": "ofertas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "ofertas",
+      "destino": "comprobantes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "comprobantes",
+      "destino": "ofertas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "ofertas",
+      "destino": "indicadores"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "ofertas#armar-un-combo-o-promocion-2x1",
+      "destino": "ofertas"
+    },
+    {
+      "tipo": "antes",
+      "origen": "ofertas#armar-un-combo-o-promocion-2x1",
+      "destino": "productos"
+    },
+    {
+      "tipo": "antes",
+      "origen": "ofertas",
+      "destino": "productos"
+    },
+    {
+      "tipo": "despues",
+      "origen": "ofertas#armar-un-combo-o-promocion-2x1",
+      "destino": "caja"
+    },
+    {
+      "tipo": "despues",
+      "origen": "ofertas",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "ofertas#armar-un-combo-o-promocion-2x1",
+      "destino": "novedades"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "ofertas",
+      "destino": "novedades"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "ofertas#crear-un-descuento-directo",
+      "destino": "ofertas"
+    },
+    {
+      "tipo": "antes",
+      "origen": "ofertas#crear-un-descuento-directo",
+      "destino": "productos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "ofertas#crear-un-descuento-directo",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "ofertas",
+      "destino": "caja"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "ofertas#crear-un-cupon-de-descuento",
+      "destino": "ofertas"
+    },
+    {
+      "tipo": "despues",
+      "origen": "ofertas#crear-un-cupon-de-descuento",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "ofertas#crear-un-cupon-de-descuento",
+      "destino": "clientes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "ofertas",
+      "destino": "clientes"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "ofertas#pausar-o-desactivar-una-oferta-activa",
+      "destino": "ofertas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "ofertas#pausar-o-desactivar-una-oferta-activa",
+      "destino": "indicadores"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "ofertas",
+      "destino": "indicadores"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "paleta",
+      "destino": "permiso:local/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "paleta"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "paleta",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mirest",
+      "destino": "paleta"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "paleta#seleccionar-un-tema-festivo-y-cambiar-colores",
+      "destino": "paleta"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "paleta#seleccionar-un-tema-festivo-y-cambiar-colores",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "paleta",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "paleta#comprobar-el-contraste-y-la-vista-previa",
+      "destino": "paleta"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "paleta#comprobar-el-contraste-y-la-vista-previa",
+      "destino": "paleta"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "paleta#restablecer-publicar-o-descartar-cambios",
+      "destino": "paleta"
+    },
+    {
+      "tipo": "despues",
+      "origen": "paleta#restablecer-publicar-o-descartar-cambios",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "despues",
+      "origen": "paleta",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "paleta#restablecer-publicar-o-descartar-cambios",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "paleta",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "pantallas",
+      "destino": "permiso:pantallas/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "pantallas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "pantallas",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mirest",
+      "destino": "pantallas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "pantallas",
+      "destino": "notificaciones"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "notificaciones",
+      "destino": "pantallas"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "pantallas#vincular-una-nueva-pantalla-de-tv",
+      "destino": "pantallas"
+    },
+    {
+      "tipo": "despues",
+      "origen": "pantallas#vincular-una-nueva-pantalla-de-tv",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "despues",
+      "origen": "pantallas",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "pantallas#vincular-una-nueva-pantalla-de-tv",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "pantallas",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "pantallas#editar-el-nombre-o-la-estacion-asignada",
+      "destino": "pantallas"
+    },
+    {
+      "tipo": "antes",
+      "origen": "pantallas#editar-el-nombre-o-la-estacion-asignada",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "antes",
+      "origen": "pantallas",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "pantallas#editar-el-nombre-o-la-estacion-asignada",
+      "destino": "pantallas"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "pantallas#activar-o-desactivar-una-pantalla",
+      "destino": "pantallas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "pantallas#activar-o-desactivar-una-pantalla",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "pantallas",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "plano",
+      "destino": "permiso:plano/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "plano"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:MOZO",
+      "destino": "plano"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:CALLCENTER",
+      "destino": "plano"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "plano",
+      "destino": "reservas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "reservas",
+      "destino": "plano"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "plano",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "cocina",
+      "destino": "plano"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "plano",
+      "destino": "pantallas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "pantallas",
+      "destino": "plano"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "plano",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "plano#consultar-mesas-y-abrir-un-pedido-mozos-y-cajeros",
+      "destino": "plano"
+    },
+    {
+      "tipo": "antes",
+      "origen": "plano#consultar-mesas-y-abrir-un-pedido-mozos-y-cajeros",
+      "destino": "plano"
+    },
+    {
+      "tipo": "despues",
+      "origen": "plano#consultar-mesas-y-abrir-un-pedido-mozos-y-cajeros",
+      "destino": "caja"
+    },
+    {
+      "tipo": "despues",
+      "origen": "plano",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "plano#consultar-mesas-y-abrir-un-pedido-mozos-y-cajeros",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "plano",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "plano#enviar-a-caja-el-cobro-de-una-mesa-mozos",
+      "destino": "plano"
+    },
+    {
+      "tipo": "antes",
+      "origen": "plano#enviar-a-caja-el-cobro-de-una-mesa-mozos",
+      "destino": "plano"
+    },
+    {
+      "tipo": "despues",
+      "origen": "plano#enviar-a-caja-el-cobro-de-una-mesa-mozos",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "plano#enviar-a-caja-el-cobro-de-una-mesa-mozos",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "plano",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "productos",
+      "destino": "permiso:catalogo/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "productos"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:CAJERO",
+      "destino": "productos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "productos",
+      "destino": "stock"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "stock",
+      "destino": "productos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "productos",
+      "destino": "recetas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "recetas",
+      "destino": "productos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "productos",
+      "destino": "caja"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "productos",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "productos#crear-un-producto-nuevo",
+      "destino": "productos"
+    },
+    {
+      "tipo": "antes",
+      "origen": "productos#crear-un-producto-nuevo",
+      "destino": "listas"
+    },
+    {
+      "tipo": "antes",
+      "origen": "productos",
+      "destino": "listas"
+    },
+    {
+      "tipo": "despues",
+      "origen": "productos#crear-un-producto-nuevo",
+      "destino": "recetas"
+    },
+    {
+      "tipo": "despues",
+      "origen": "productos",
+      "destino": "recetas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "productos#crear-un-producto-nuevo",
+      "destino": "stock"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "productos",
+      "destino": "stock"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "productos#marcar-un-producto-como-agotado-o-disponible",
+      "destino": "productos"
+    },
+    {
+      "tipo": "antes",
+      "origen": "productos#marcar-un-producto-como-agotado-o-disponible",
+      "destino": "stock"
+    },
+    {
+      "tipo": "antes",
+      "origen": "productos",
+      "destino": "stock"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "productos#marcar-un-producto-como-agotado-o-disponible",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "productos",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "productos#editar-precio-foto-o-sabores-de-un-producto",
+      "destino": "productos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "productos#editar-precio-foto-o-sabores-de-un-producto",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "productos",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "productos#configurar-tamanos-y-grupos-de-opciones",
+      "destino": "productos"
+    },
+    {
+      "tipo": "antes",
+      "origen": "productos#configurar-tamanos-y-grupos-de-opciones",
+      "destino": "listas"
+    },
+    {
+      "tipo": "despues",
+      "origen": "productos#configurar-tamanos-y-grupos-de-opciones",
+      "destino": "recetas"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "recetas",
+      "destino": "permiso:stock/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "recetas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "recetas",
+      "destino": "stock"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "stock",
+      "destino": "recetas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "recetas",
+      "destino": "almacen"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "recetas",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "cocina",
+      "destino": "recetas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "recetas",
+      "destino": "caja"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "recetas",
+      "destino": "indicadores"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "recetas#configurar-o-editar-la-receta-de-un-producto",
+      "destino": "recetas"
+    },
+    {
+      "tipo": "antes",
+      "origen": "recetas#configurar-o-editar-la-receta-de-un-producto",
+      "destino": "productos"
+    },
+    {
+      "tipo": "antes",
+      "origen": "recetas",
+      "destino": "productos"
+    },
+    {
+      "tipo": "antes",
+      "origen": "recetas#configurar-o-editar-la-receta-de-un-producto",
+      "destino": "stock"
+    },
+    {
+      "tipo": "antes",
+      "origen": "recetas",
+      "destino": "stock"
+    },
+    {
+      "tipo": "despues",
+      "origen": "recetas#configurar-o-editar-la-receta-de-un-producto",
+      "destino": "caja"
+    },
+    {
+      "tipo": "despues",
+      "origen": "recetas",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "recetas#configurar-o-editar-la-receta-de-un-producto",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "recetas",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "recetas#configurar-recetas-independientes-por-tamano",
+      "destino": "recetas"
+    },
+    {
+      "tipo": "antes",
+      "origen": "recetas#configurar-recetas-independientes-por-tamano",
+      "destino": "listas"
+    },
+    {
+      "tipo": "antes",
+      "origen": "recetas",
+      "destino": "listas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "recetas#configurar-recetas-independientes-por-tamano",
+      "destino": "productos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "recetas",
+      "destino": "productos"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "recetas#eliminar-o-corregir-un-ingrediente-en-la-receta",
+      "destino": "recetas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "recetas#eliminar-o-corregir-un-ingrediente-en-la-receta",
+      "destino": "stock"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "recetas",
+      "destino": "stock"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "recetas#evaluar-el-costo-de-materia-prima-y-margen",
+      "destino": "recetas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "recetas#evaluar-el-costo-de-materia-prima-y-margen",
+      "destino": "indicadores"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "recetas",
+      "destino": "indicadores"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "reclamos",
+      "destino": "permiso:reclamos/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "reclamos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "reclamos",
+      "destino": "caja"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "caja",
+      "destino": "reclamos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "reclamos",
+      "destino": "clientes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "clientes",
+      "destino": "reclamos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "reclamos",
+      "destino": "historial"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "reclamos#revisar-el-detalle-de-un-reclamo",
+      "destino": "reclamos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "reclamos#revisar-el-detalle-de-un-reclamo",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "reclamos",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "reclamos#revisar-el-detalle-de-un-reclamo",
+      "destino": "clientes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "reclamos",
+      "destino": "clientes"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "reclamos#marcar-un-reclamo-en-revision",
+      "destino": "reclamos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "reclamos#marcar-un-reclamo-en-revision",
+      "destino": "reclamos"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "reclamos#responder-formalmente-al-consumidor",
+      "destino": "reclamos"
+    },
+    {
+      "tipo": "despues",
+      "origen": "reclamos#responder-formalmente-al-consumidor",
+      "destino": "historial"
+    },
+    {
+      "tipo": "despues",
+      "origen": "reclamos",
+      "destino": "historial"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "reclamos#responder-formalmente-al-consumidor",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "reclamos",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "reclamos#revisar-quejas-de-whatsapp",
+      "destino": "reclamos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "reclamos#revisar-quejas-de-whatsapp",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "repartos",
+      "destino": "permiso:repartos/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:CAJERO",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:REPARTIDOR",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "repartos",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "repartos",
+      "destino": "zonas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "zonas",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "repartos",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "repartos#reportar-una-falla-en-la-entrega-no-contesta-o-direccion-erronea",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "repartos#reportar-una-falla-en-la-entrega-no-contesta-o-direccion-erronea",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "repartos",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "repartos#entender-el-tiempo-estimado-que-se-le-dice-al-cliente",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "reservas",
+      "destino": "permiso:reservas/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "reservas"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:MOZO",
+      "destino": "reservas"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:CALLCENTER",
+      "destino": "reservas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "reservas",
+      "destino": "caja"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "caja",
+      "destino": "reservas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "reservas",
+      "destino": "clientes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "clientes",
+      "destino": "reservas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "reservas",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mensajes",
+      "destino": "reservas"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "reservas#crear-una-nueva-reserva",
+      "destino": "reservas"
+    },
+    {
+      "tipo": "antes",
+      "origen": "reservas#crear-una-nueva-reserva",
+      "destino": "plano"
+    },
+    {
+      "tipo": "antes",
+      "origen": "reservas",
+      "destino": "plano"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "reservas#crear-una-nueva-reserva",
+      "destino": "clientes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "reservas",
+      "destino": "clientes"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "reservas#aprobar-o-rechazar-solicitudes-de-whatsapp",
+      "destino": "reservas"
+    },
+    {
+      "tipo": "antes",
+      "origen": "reservas#aprobar-o-rechazar-solicitudes-de-whatsapp",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "antes",
+      "origen": "reservas",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "reservas#aprobar-o-rechazar-solicitudes-de-whatsapp",
+      "destino": "plano"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "reservas",
+      "destino": "plano"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "reservas#sentar-a-los-clientes-al-llegar-al-local",
+      "destino": "reservas"
+    },
+    {
+      "tipo": "antes",
+      "origen": "reservas#sentar-a-los-clientes-al-llegar-al-local",
+      "destino": "reservas"
+    },
+    {
+      "tipo": "despues",
+      "origen": "reservas#sentar-a-los-clientes-al-llegar-al-local",
+      "destino": "caja"
+    },
+    {
+      "tipo": "despues",
+      "origen": "reservas",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "reservas#sentar-a-los-clientes-al-llegar-al-local",
+      "destino": "plano"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "reservas#cancelar-una-reserva",
+      "destino": "reservas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "reservas#cancelar-una-reserva",
+      "destino": "plano"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "stock",
+      "destino": "permiso:stock/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "stock"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:COCINA",
+      "destino": "stock"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ALMACEN",
+      "destino": "stock"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "stock",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "stock#supervisar-insumos-con-stock-bajo-o-critico",
+      "destino": "stock"
+    },
+    {
+      "tipo": "despues",
+      "origen": "stock#supervisar-insumos-con-stock-bajo-o-critico",
+      "destino": "compras"
+    },
+    {
+      "tipo": "despues",
+      "origen": "stock",
+      "destino": "compras"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "stock#supervisar-insumos-con-stock-bajo-o-critico",
+      "destino": "productos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "stock",
+      "destino": "productos"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "stock#dar-de-alta-un-insumo-nuevo",
+      "destino": "stock"
+    },
+    {
+      "tipo": "despues",
+      "origen": "stock#dar-de-alta-un-insumo-nuevo",
+      "destino": "recetas"
+    },
+    {
+      "tipo": "despues",
+      "origen": "stock",
+      "destino": "recetas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "stock#dar-de-alta-un-insumo-nuevo",
+      "destino": "compras"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "stock",
+      "destino": "compras"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "stock#editar-umbrales-o-datos-de-un-insumo-existente",
+      "destino": "stock"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "stock#editar-umbrales-o-datos-de-un-insumo-existente",
+      "destino": "almacen"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "stock",
+      "destino": "almacen"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "stock#registrar-un-ajuste-de-inventario-por-conteo",
+      "destino": "stock"
+    },
+    {
+      "tipo": "despues",
+      "origen": "stock#registrar-un-ajuste-de-inventario-por-conteo",
+      "destino": "almacen"
+    },
+    {
+      "tipo": "despues",
+      "origen": "stock",
+      "destino": "almacen"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "stock#registrar-un-ajuste-de-inventario-por-conteo",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "stock",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "supervisor-codigo",
+      "destino": "permiso:supervisor/ver_codigo"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "supervisor-codigo",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "usuarios",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "supervisor-codigo",
+      "destino": "compras"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "compras",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "supervisor-codigo#consultar-y-dictar-el-codigo-al-personal",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "despues",
+      "origen": "supervisor-codigo#consultar-y-dictar-el-codigo-al-personal",
+      "destino": "caja"
+    },
+    {
+      "tipo": "despues",
+      "origen": "supervisor-codigo",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "supervisor-codigo#consultar-y-dictar-el-codigo-al-personal",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "supervisor-codigo",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "supervisor-codigo#generar-el-secreto-inicial-si-no-esta-configurado",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "despues",
+      "origen": "supervisor-codigo#generar-el-secreto-inicial-si-no-esta-configurado",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "supervisor-codigo#generar-el-secreto-inicial-si-no-esta-configurado",
+      "destino": "historial"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "supervisor-codigo",
+      "destino": "historial"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "supervisor-codigo#rotar-el-secreto-del-local-por-seguridad",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "supervisor-codigo#rotar-el-secreto-del-local-por-seguridad",
+      "destino": "historial"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "usuarios",
+      "destino": "permiso:usuarios/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "usuarios",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "usuarios",
+      "destino": "reclamos"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "usuarios#registrar-un-nuevo-usuario-del-personal",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "despues",
+      "origen": "usuarios#registrar-un-nuevo-usuario-del-personal",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "usuarios#registrar-un-nuevo-usuario-del-personal",
+      "destino": "historial"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "usuarios",
+      "destino": "historial"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "usuarios#editar-datos-y-cambiar-el-rol-de-un-usuario",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "requiere",
+      "origen": "usuarios#editar-datos-y-cambiar-el-rol-de-un-usuario",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "requiere",
+      "origen": "usuarios",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "usuarios#editar-datos-y-cambiar-el-rol-de-un-usuario",
+      "destino": "historial"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "usuarios#desactivar-o-reactivar-un-usuario",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "requiere",
+      "origen": "usuarios#desactivar-o-reactivar-un-usuario",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "usuarios#desactivar-o-reactivar-un-usuario",
+      "destino": "historial"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "usuarios#recibir-alertas-por-whatsapp",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "usuarios#recibir-alertas-por-whatsapp",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "usuarios",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "usuarios#recibir-alertas-por-whatsapp",
+      "destino": "reclamos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "usuarios",
+      "destino": "reclamos"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "usuarios#restablecer-contrasena-o-asignar-pin",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "usuarios#restablecer-contrasena-o-asignar-pin",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "zonas",
+      "destino": "permiso:zonas/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "zonas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "zonas",
+      "destino": "caja"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "caja",
+      "destino": "zonas"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "zonas#ver-y-configurar-las-zonas-en-el-mapa",
+      "destino": "zonas"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "zonas#modificar-la-tarifa-de-una-zona",
+      "destino": "zonas"
+    },
+    {
+      "tipo": "antes",
+      "origen": "zonas#modificar-la-tarifa-de-una-zona",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "antes",
+      "origen": "zonas",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "despues",
+      "origen": "zonas#modificar-la-tarifa-de-una-zona",
+      "destino": "caja"
+    },
+    {
+      "tipo": "despues",
+      "origen": "zonas",
+      "destino": "caja"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "zonas#editar-los-minutos-de-entrega-de-una-zona",
+      "destino": "zonas"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "zonas#activar-o-desactivar-una-zona",
+      "destino": "zonas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "zonas#activar-o-desactivar-una-zona",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "zonas",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "zonas#editar-el-poligono-de-coordenadas-de-una-zona",
+      "destino": "zonas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "zonas#editar-el-poligono-de-coordenadas-de-una-zona",
+      "destino": "mapa"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "zonas",
+      "destino": "mapa"
+    }
+  ]
+}

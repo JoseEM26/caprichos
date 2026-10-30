@@ -1,0 +1,13 @@
+import type { EntradaConfig } from './tipos';
+
+// Pestaña «Impresión» (agente local de la PC de Caja). Verificado contra apps/api/src/modulos/impresion.
+const S = 'Impresión de etiquetas';
+
+export const IMPRESION: EntradaConfig[] = [
+  { id: 'impresion-agente', tab: 'impresion', seccion: S, titulo: 'Estado del agente de impresión de la PC de Caja', descripcion: 'Dice si el programa de la PC de Caja está conectado (último latido) y si la impresora está lista, sin papel, desconectada o con error. Si está sin conexión, las etiquetas se acumulan como pendientes.', palabras: ['impresora', 'imprimir', 'etiquetas', 'agente', 'caja', 'ticket', 'termica', 'conexion', 'latido', 'sin papel'] },
+  { id: 'impresion-actualizar', tab: 'impresion', seccion: S, titulo: 'Actualizar estado del agente y la cola', descripcion: 'Vuelve a consultar el estado del agente, de la impresora y de la cola de trabajos. No cambia ninguna configuración.', palabras: ['actualizar', 'refrescar', 'estado', 'impresora'] },
+  { id: 'impresion-cola', tab: 'impresion', seccion: S, titulo: 'Cola de trabajos pendientes y fallidos', descripcion: 'Etiquetas esperando imprimirse y trabajos que fallaron tras 5 intentos. Desde aquí se reintentan los fallidos para que el agente los imprima de nuevo. Los avisos por demora se ajustan en Parámetros (impresion_alerta_min, impresion_vence_min).', ejemplo: '3 pendientes y 1 fallido: reintenta el fallido cuando haya papel.', palabras: ['cola', 'pendientes', 'fallidos', 'reintentar', 'etiquetas', 'trabajos', 'imprimir otra vez'], peligro: 'bajo' },
+  { id: 'impresion-llaves', tab: 'impresion', seccion: S, titulo: 'Llaves de acceso del agente de impresión', descripcion: 'Claves que autorizan a una PC a imprimir las etiquetas del local. Solo el Administrador las crea o desactiva. Desactivar una llave deja a esa PC sin imprimir hasta darle una nueva.', palabras: ['llave', 'clave', 'token', 'revocar', 'autorizar equipo', 'impresora', 'desactivar llave'], peligro: 'medio', permiso: 'ADMIN' },
+  { id: 'impresion-llave-nombre', tab: 'impresion', seccion: S, titulo: 'Nombre de la nueva llave del agente', descripcion: 'Nombre para reconocer en la lista a qué PC pertenece la llave que vas a crear. No afecta la impresión.', ejemplo: 'Agente PC Caja 1', palabras: ['nombre', 'llave', 'pc caja', 'equipo'], permiso: 'ADMIN', peligro: 'bajo' },
+  { id: 'impresion-llave-crear', tab: 'impresion', seccion: S, titulo: 'Crear llave de agente', descripcion: 'Genera una llave nueva para conectar una PC de Caja. Se muestra una sola vez: cópiala antes de cerrar el aviso, porque no se puede volver a ver.', palabras: ['crear llave', 'generar llave', 'nueva llave', 'token', 'conectar pc'], permiso: 'ADMIN', peligro: 'medio' },
+];

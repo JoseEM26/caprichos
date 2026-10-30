@@ -1,0 +1,26 @@
+---
+# ==============================================================================
+# Variables por defecto para el rol compose
+# ==============================================================================
+
+# Ruta base de despliegue en el VPS
+caprichos_base_dir: "/opt/caprichos"
+
+# Subdirectorios a inicializar con permisos
+caprichos_subdirs:
+  - "{{ caprichos_base_dir }}"
+  - "{{ caprichos_base_dir }}/compose"
+  - "{{ caprichos_base_dir }}/proxy"
+  - "{{ caprichos_base_dir }}/proxy/dynamic"
+  - "{{ caprichos_base_dir }}/proxy/certs"
+  - "{{ caprichos_base_dir }}/scripts"
+  - "{{ caprichos_base_dir }}/demo"
+  - "{{ caprichos_base_dir }}/staging"
+  - "{{ caprichos_base_dir }}/prod"
+  - "{{ caprichos_base_dir }}/respaldos"
+  - "{{ caprichos_base_dir }}/respaldos/demo"
+  - "{{ caprichos_base_dir }}/respaldos/staging"
+  - "{{ caprichos_base_dir }}/respaldos/prod"
+
+# Desactivar Swarm si está activo (por defecto false para no destruir servicios sin confirmación explícita)
+docker_swarm_leave: false

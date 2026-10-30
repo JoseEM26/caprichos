@@ -48,3 +48,26 @@ packages/*/src/**/*.d.ts
 packages/*/src/**/*.map
 apps/*/src/**/*.js
 apps/*/src/**/*.map
+
+# fotos subidas en desarrollo
+apps/api/data/uploads/
+
+# índice de CodeGraph (se regenera con codegraph init -i)
+.codegraph/
+
+# Respaldos de la demo (datos personales de clientes): nunca al repositorio
+infra/demo/respaldos/
+
+apps/e2e/playwright-report/
+apps/e2e/test-results/
+apps/e2e/playwright-report*/
+apps/e2e/test-results*/
+apps/e2e/.stack-pids*.json
+
+/data/
+apps/e2e/.api-*.log
+apps/e2e/.web-*.log
+apps/e2e/capturas/
+docs/capturas-reparto/
+dist-exe/
+dist-bundle/

@@ -1,0 +1,189 @@
+# ==============================================================================
+# Demo de Caprichos sin dominio propio, detrás del Traefik de Dokploy
+# ==============================================================================
+# El VPS ya tiene Dokploy: su contenedor dokploy-traefik ocupa 80 y 443 y enruta
+# por la red overlay «dokploy-network». Esta demo NO publica puertos ni trae su
+# propio proxy: web y api se unen a esa red y Traefik las enruta por el host
+# DOMINIO_BASE (sslip.io), con certificado Let's Encrypt (resolver «letsencrypt»).
+#
+# Traefik del VPS: entrypoints web (:80) y websecure (:443), provider docker con
+# exposedByDefault=false, por eso cada servicio lleva traefik.enable=true.
+#
+# PostgreSQL y Redis viven solo en red_demo (interna): nunca se alcanzan desde fuera.
+# ==============================================================================
+
+services:
+  web:
+    image: caprichos-web:${TAG:-demo}
+    # Sin container_name fijo para permitir rolling rollout (coexistencia de 2 instancias)
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1/salud || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=dokploy-network
+      # Redirección de HTTP a HTTPS (el desafío ACME lo atiende Traefik antes que esta regla)
+      - "traefik.http.routers.demo-web-http.rule=Host(`${DOMINIO_BASE:-localhost}`)"
+      - traefik.http.routers.demo-web-http.entrypoints=web
+      - traefik.http.routers.demo-web-http.middlewares=demo-https
+      - traefik.http.middlewares.demo-https.redirectscheme.scheme=https
+      - traefik.http.middlewares.demo-https.redirectscheme.permanent=true
+      # Admin en HTML (navegación del navegador): la SPA. Las llamadas JSON van a la API (prioridad menor).
+      - "traefik.http.routers.demo-admin-html.rule=Host(`${DOMINIO_BASE:-localhost}`) && PathPrefix(`/admin`) && HeaderRegexp(`Accept`, `text/html`)"
+      - traefik.http.routers.demo-admin-html.entrypoints=websecure
+      - traefik.http.routers.demo-admin-html.tls=true
+      - traefik.http.routers.demo-admin-html.tls.certresolver=letsencrypt
+      - traefik.http.routers.demo-admin-html.priority=300
+      - traefik.http.routers.demo-admin-html.service=demo-web
+      # Resto del sitio: carta, admin de la SPA, /robots.txt y /demo
+      - "traefik.http.routers.demo-web.rule=Host(`${DOMINIO_BASE:-localhost}`)"
+      - traefik.http.routers.demo-web.entrypoints=websecure
+      - traefik.http.routers.demo-web.tls=true
+      - traefik.http.routers.demo-web.tls.certresolver=letsencrypt
+      - traefik.http.routers.demo-web.priority=1
+      - traefik.http.services.demo-web.loadbalancer.server.port=80
+    networks:
+      - red_demo
+      - dokploy-network
+
+  api:
+    image: caprichos-api:${TAG:-demo}
+    # Sin container_name fijo para permitir rolling rollout (coexistencia de 2 instancias)
+    restart: unless-stopped
+    stop_grace_period: 30s
+    environment:
+      PORT: 3000
+      NODE_ENV: production
+      DATABASE_URL: ${DB_ESQUEMA:-postgresql}://${POSTGRES_USER:-caprichos_demo}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-caprichos_demo}?schema=public
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      UPLOADS_DIR: /data/uploads
+      APP_VERSION: ${APP_VERSION:-0.1.0}
+      GIT_COMMIT: ${TAG:-demo}
+      DOMINIO_BASE: ${DOMINIO_BASE:-localhost}
+      CORS_ORIGIN: https://${DOMINIO_BASE:-localhost}
+      # Un solo salto de confianza: Traefik (cabeceras X-Forwarded-*)
+      TRUST_PROXY: "1"
+    volumes:
+      - uploads_data:/data/uploads
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/salud || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=dokploy-network
+      # Rutas que la web usa en la raíz (mismas que el proxy de Vite en desarrollo)
+      - "traefik.http.routers.demo-api.rule=Host(`${DOMINIO_BASE:-localhost}`) && (PathPrefix(`/auth`) || PathPrefix(`/carta`) || PathPrefix(`/pedidos`) || PathPrefix(`/archivos`) || PathPrefix(`/uploads`) || PathPrefix(`/socket.io`) || PathPrefix(`/salud`) || PathPrefix(`/version`) || PathPrefix(`/reclamos/constancia`) || (Path(`/reclamos`) && Method(`POST`)))"
+      - traefik.http.routers.demo-api.entrypoints=websecure
+      - traefik.http.routers.demo-api.tls=true
+      - traefik.http.routers.demo-api.tls.certresolver=letsencrypt
+      - traefik.http.routers.demo-api.priority=200
+      - traefik.http.routers.demo-api.service=demo-api
+      # Límite de intentos de ingreso (Traefik, sin plugins): 10 por segundo en ráfaga de 20
+      - "traefik.http.routers.demo-login.rule=Host(`${DOMINIO_BASE:-localhost}`) && Path(`/auth/ingresar`) && Method(`POST`)"
+      - traefik.http.routers.demo-login.entrypoints=websecure
+      - traefik.http.routers.demo-login.tls=true
+      - traefik.http.routers.demo-login.tls.certresolver=letsencrypt
+      - traefik.http.routers.demo-login.priority=400
+      - traefik.http.routers.demo-login.service=demo-api
+      - traefik.http.routers.demo-login.middlewares=demo-login-limite
+      - traefik.http.middlewares.demo-login-limite.ratelimit.average=10
+      - traefik.http.middlewares.demo-login-limite.ratelimit.burst=20
+      # Admin con JSON (llamadas de la SPA): la API. El HTML de /admin lo sirve la web (prioridad mayor).
+      - "traefik.http.routers.demo-admin-api.rule=Host(`${DOMINIO_BASE:-localhost}`) && PathPrefix(`/admin`)"
+      - traefik.http.routers.demo-admin-api.entrypoints=websecure
+      - traefik.http.routers.demo-admin-api.tls=true
+      - traefik.http.routers.demo-admin-api.tls.certresolver=letsencrypt
+      - traefik.http.routers.demo-admin-api.priority=200
+      - traefik.http.routers.demo-admin-api.service=demo-api
+      # Prefijo /api (compatibilidad): se quita antes de llegar a la API (/api/salud -> /salud)
+      - "traefik.http.routers.demo-api-prefijo.rule=Host(`${DOMINIO_BASE:-localhost}`) && PathPrefix(`/api`)"
+      - traefik.http.routers.demo-api-prefijo.entrypoints=websecure
+      - traefik.http.routers.demo-api-prefijo.tls=true
+      - traefik.http.routers.demo-api-prefijo.tls.certresolver=letsencrypt
+      - traefik.http.routers.demo-api-prefijo.priority=200
+      - traefik.http.routers.demo-api-prefijo.service=demo-api
+      - traefik.http.routers.demo-api-prefijo.middlewares=demo-api-sin-prefijo
+      - traefik.http.middlewares.demo-api-sin-prefijo.stripprefix.prefixes=/api
+      - traefik.http.services.demo-api.loadbalancer.server.port=3000
+    networks:
+      - red_demo
+      - dokploy-network
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: caprichos-demo-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-caprichos_demo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-caprichos_demo}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-caprichos_demo} -d ${POSTGRES_DB:-caprichos_demo}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - red_demo
+
+  redis:
+    image: redis:7-alpine
+    container_name: caprichos-demo-redis
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
+    volumes:
+      - redis_data:/data
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - red_demo
+
+volumes:
+  postgres_data:
+    name: caprichos_demo_postgres_data
+  redis_data:
+    name: caprichos_demo_redis_data
+  uploads_data:
+    name: caprichos_demo_uploads_data
+
+networks:
+  red_demo:
+    name: caprichos_demo_net
+    driver: bridge
+  dokploy-network:
+    external: true

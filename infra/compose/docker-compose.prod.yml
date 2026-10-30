@@ -1,0 +1,138 @@
+# ==============================================================================
+# Caprichos — Sobrescritura para Ambiente PRODUCCIÓN
+# ==============================================================================
+# Uso:
+#   TAG=v0.3.0 docker compose -f docker-compose.base.yml -f docker-compose.prod.yml [comandos]
+#
+# Regla: En producción se exige una etiqueta inmutable (ej. v0.3.0 o commit sha).
+#        NUNCA se despliega :latest en producción.
+# ==============================================================================
+
+name: caprichos-prod
+
+services:
+  postgres:
+    container_name: caprichos-prod-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-caprichos_prod}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-caprichos_prod}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    container_name: caprichos-prod-redis
+    volumes:
+      - redis_data:/data
+
+  api:
+    image: ${GHCR_REPO:-ghcr.io/joseem26}/caprichos-api:${TAG:?Defina TAG de version inmutable (ej. v0.3.0 o sha corto)}
+    # Sin container_name fijo para permitir rolling rollout (coexistencia de 2 instancias)
+    environment:
+      PORT: 3000
+      NODE_ENV: production
+      DATABASE_URL: ${DB_ESQUEMA:-postgresql}://${POSTGRES_USER:-caprichos_prod}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-caprichos_prod}?schema=public
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Defina REDIS_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET}
+      UPLOADS_DIR: /data/uploads
+      APP_VERSION: ${APP_VERSION:-${TAG}}
+      GIT_COMMIT: ${TAG}
+      DOMINIO_BASE: ${DOMINIO_PROD:-caprichos.pe}
+      CORS_ORIGIN: https://${DOMINIO_PROD:-caprichos.pe},https://${DOMINIO_ADMIN:-admin.caprichos.pe}
+      TRUST_PROXY: "1"
+      # Chatbot de WhatsApp: los valores viven solo en el .env del servidor (nunca en Git)
+      WHATSAPP_TOKEN: ${WHATSAPP_TOKEN:-}
+      WHATSAPP_PHONE_ID: ${WHATSAPP_PHONE_ID:-}
+      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
+      WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}
+      WHATSAPP_API_VERSION: ${WHATSAPP_API_VERSION:-v25.0}
+      ADMIN_WHATSAPP_NUMBERS: ${ADMIN_WHATSAPP_NUMBERS:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
+      CARTA_URL_PUBLICA: ${CARTA_URL_PUBLICA:-}
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=caprichos-proxy-net
+      # Subdominio directo api.caprichos.pe
+      - "traefik.http.routers.prod-api-subdomain.rule=Host(`${DOMINIO_API:-api.caprichos.pe}`)"
+      - traefik.http.routers.prod-api-subdomain.entrypoints=websecure
+      - traefik.http.routers.prod-api-subdomain.tls=true
+      - traefik.http.routers.prod-api-subdomain.tls.certresolver=letsencrypt
+      - traefik.http.routers.prod-api-subdomain.priority=250
+      - traefik.http.routers.prod-api-subdomain.service=prod-api
+      - traefik.http.routers.prod-api-subdomain.middlewares=sec-headers-prod@file,rate-limit-public@file
+      # Rutas API bajo dominio principal y admin
+      - "traefik.http.routers.prod-api.rule=(Host(`${DOMINIO_PROD:-caprichos.pe}`) || Host(`${DOMINIO_ADMIN:-admin.caprichos.pe}`)) && (PathPrefix(`/auth`) || PathPrefix(`/carta`) || PathPrefix(`/pedidos`) || PathPrefix(`/archivos`) || PathPrefix(`/uploads`) || PathPrefix(`/socket.io`) || PathPrefix(`/salud`) || PathPrefix(`/whatsapp`) || PathPrefix(`/version`) || PathPrefix(`/reclamos/constancia`) || (Path(`/reclamos`) && Method(`POST`)))"
+      - traefik.http.routers.prod-api.entrypoints=websecure
+      - traefik.http.routers.prod-api.tls=true
+      - traefik.http.routers.prod-api.tls.certresolver=letsencrypt
+      - traefik.http.routers.prod-api.priority=200
+      - traefik.http.routers.prod-api.service=prod-api
+      - traefik.http.routers.prod-api.middlewares=sec-headers-prod@file
+      # Rate limit estricto en login de producción
+      - "traefik.http.routers.prod-login.rule=(Host(`${DOMINIO_PROD:-caprichos.pe}`) || Host(`${DOMINIO_ADMIN:-admin.caprichos.pe}`) || Host(`${DOMINIO_API:-api.caprichos.pe}`)) && Path(`/auth/ingresar`) && Method(`POST`)"
+      - traefik.http.routers.prod-login.entrypoints=websecure
+      - traefik.http.routers.prod-login.tls=true
+      - traefik.http.routers.prod-login.tls.certresolver=letsencrypt
+      - traefik.http.routers.prod-login.priority=400
+      - traefik.http.routers.prod-login.service=prod-api
+      - traefik.http.routers.prod-login.middlewares=rate-limit-login@file,sec-headers-prod@file
+      # Admin API bajo dominio principal y admin
+      - "traefik.http.routers.prod-admin-api.rule=(Host(`${DOMINIO_PROD:-caprichos.pe}`) || Host(`${DOMINIO_ADMIN:-admin.caprichos.pe}`)) && PathPrefix(`/admin`)"
+      - traefik.http.routers.prod-admin-api.entrypoints=websecure
+      - traefik.http.routers.prod-admin-api.tls=true
+      - traefik.http.routers.prod-admin-api.tls.certresolver=letsencrypt
+      - traefik.http.routers.prod-admin-api.priority=200
+      - traefik.http.routers.prod-admin-api.service=prod-api
+      - traefik.http.routers.prod-admin-api.middlewares=sec-headers-prod@file
+      # Prefijo /api
+      - "traefik.http.routers.prod-api-prefijo.rule=(Host(`${DOMINIO_PROD:-caprichos.pe}`) || Host(`${DOMINIO_ADMIN:-admin.caprichos.pe}`)) && PathPrefix(`/api`)"
+      - traefik.http.routers.prod-api-prefijo.entrypoints=websecure
+      - traefik.http.routers.prod-api-prefijo.tls=true
+      - traefik.http.routers.prod-api-prefijo.tls.certresolver=letsencrypt
+      - traefik.http.routers.prod-api-prefijo.priority=200
+      - traefik.http.routers.prod-api-prefijo.service=prod-api
+      - traefik.http.routers.prod-api-prefijo.middlewares=strip-api-prefix@file,sec-headers-prod@file
+      - traefik.http.services.prod-api.loadbalancer.server.port=3000
+
+  web:
+    image: ${GHCR_REPO:-ghcr.io/joseem26}/caprichos-web:${TAG:?Defina TAG de version inmutable (ej. v0.3.0 o sha corto)}
+    # Sin container_name fijo para permitir rolling rollout (coexistencia de 2 instancias)
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=caprichos-proxy-net
+      # Subdominio admin.caprichos.pe (sirve la SPA de administración)
+      - "traefik.http.routers.prod-admin-subdomain.rule=Host(`${DOMINIO_ADMIN:-admin.caprichos.pe}`)"
+      - traefik.http.routers.prod-admin-subdomain.entrypoints=websecure
+      - traefik.http.routers.prod-admin-subdomain.tls=true
+      - traefik.http.routers.prod-admin-subdomain.tls.certresolver=letsencrypt
+      - traefik.http.routers.prod-admin-subdomain.priority=220
+      - traefik.http.routers.prod-admin-subdomain.service=prod-web
+      - traefik.http.routers.prod-admin-subdomain.middlewares=sec-headers-prod@file
+      # Admin en HTML bajo dominio principal (/admin navegación)
+      - "traefik.http.routers.prod-admin-html.rule=Host(`${DOMINIO_PROD:-caprichos.pe}`) && PathPrefix(`/admin`) && HeaderRegexp(`Accept`, `text/html`)"
+      - traefik.http.routers.prod-admin-html.entrypoints=websecure
+      - traefik.http.routers.prod-admin-html.tls=true
+      - traefik.http.routers.prod-admin-html.tls.certresolver=letsencrypt
+      - traefik.http.routers.prod-admin-html.priority=300
+      - traefik.http.routers.prod-admin-html.service=prod-web
+      - traefik.http.routers.prod-admin-html.middlewares=sec-headers-prod@file
+      # Carta pública principal (indexable, SEO optimizado con sec-headers-prod)
+      - "traefik.http.routers.prod-web.rule=Host(`${DOMINIO_PROD:-caprichos.pe}`)"
+      - traefik.http.routers.prod-web.entrypoints=websecure
+      - traefik.http.routers.prod-web.tls=true
+      - traefik.http.routers.prod-web.tls.certresolver=letsencrypt
+      - traefik.http.routers.prod-web.priority=1
+      - traefik.http.routers.prod-web.middlewares=sec-headers-prod@file
+      - traefik.http.services.prod-web.loadbalancer.server.port=80
+
+volumes:
+  postgres_data:
+    name: caprichos_prod_postgres_data
+  redis_data:
+    name: caprichos_prod_redis_data
+  uploads_data:
+    name: caprichos_prod_uploads_data

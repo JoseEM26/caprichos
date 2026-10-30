@@ -1,0 +1,430 @@
+/* Panel de pedidos pendientes del cierre y diálogo «Anular pedido» (ModalAnular). */
+
+.pdc-panel {
+  border: 1.5px dashed var(--cp-rust, #B2500F);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--cp-white, #FFFFFF);
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.pdc-titulo {
+  font-weight: 800;
+  color: var(--cp-rust, #B2500F);
+  font-size: 13px;
+}
+
+.pdc-resumen {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.pdc-tarjeta {
+  border: 1px solid var(--cp-sand, #EDE1D1);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: var(--cp-cream, #FBF4EC);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: var(--cp-soft, #2C4C5D);
+}
+
+.pdc-tarjeta b {
+  font-size: 18px;
+  color: var(--cp-navy, #0B2C3E);
+}
+
+.pdc-tarjeta.pdc-tarjeta-total {
+  border-color: var(--cp-rust, #B2500F);
+}
+
+.pdc-barra {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.pdc-buscador {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.pdc-buscador input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1.5px solid var(--cp-line, #E3D6C6);
+  background: var(--cp-white, #FFFFFF);
+  padding: 0 12px;
+  font-size: 14px;
+}
+
+.pdc-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.pdc-chip {
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 9999px;
+  border: 1.5px solid var(--cp-navy, #0B2C3E);
+  background: transparent;
+  color: var(--cp-navy, #0B2C3E);
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.pdc-chip[aria-pressed='true'] {
+  background: var(--cp-navy, #0B2C3E);
+  color: var(--cp-cream, #FBF4EC);
+}
+
+.pdc-lista {
+  max-height: min(55vh, 520px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  border: 1px solid var(--cp-sand, #EDE1D1);
+  border-radius: 10px;
+  min-width: 0;
+}
+
+.pdc-grupo {
+  border-bottom: 1px solid var(--cp-sand, #EDE1D1);
+}
+
+.pdc-grupo-cab {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  width: 100%;
+  min-height: 44px;
+  box-sizing: border-box;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 0;
+  background: var(--cp-navy, #0B2C3E);
+  color: var(--cp-cream, #FBF4EC);
+  font-weight: 800;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pdc-grupo-cab:focus-visible {
+  outline: 3px solid var(--cp-orange, #E67929);
+  outline-offset: -3px;
+}
+
+.pdc-fila {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'codigo total'
+    'cliente cliente'
+    'meta meta'
+    'acciones acciones';
+  gap: 4px 12px;
+  align-items: center;
+  padding: 10px 12px;
+  font-size: 13px;
+  min-width: 0;
+  border-top: 1px solid var(--cp-sand, #EDE1D1);
+  background: var(--cp-white, #FFFFFF);
+  overflow-wrap: anywhere;
+}
+
+.pdc-fila > * { min-width: 0; }
+.pdc-fila > .pdc-codigo { grid-area: codigo; font-size: 14px; }
+.pdc-fila > .pdc-cliente { grid-area: cliente; }
+.pdc-fila > .pdc-total { grid-area: total; font-size: 15px; white-space: nowrap; }
+.pdc-fila > .pdc-acciones { grid-area: acciones; margin-top: 4px; }
+.pdc-fila > .pdc-meta {
+  grid-area: meta;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  color: var(--cp-soft, #2C4C5D);
+  font-size: 12px;
+}
+
+.pdc-codigo {
+  font-weight: 800;
+  color: var(--cp-navy, #0B2C3E);
+}
+
+.pdc-cliente {
+  color: var(--cp-navy, #0B2C3E);
+  font-weight: 700;
+}
+
+.pdc-cliente.pdc-sin-nombre {
+  color: var(--cp-soft, #6B7B86);
+  font-style: italic;
+  font-weight: 500;
+}
+
+.pdc-antiguo {
+  color: #B26A00;
+  font-weight: 800;
+}
+
+.pdc-total {
+  font-weight: 800;
+  text-align: right;
+}
+
+.pdc-acciones {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.pdc-acciones .pdc-boton {
+  flex: 1 1 140px;
+}
+
+.pdc-boton {
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  max-width: 100%;
+}
+
+.pdc-boton-primario {
+  border: 0;
+  background: var(--cp-orange, #E67929);
+  color: var(--cp-navy, #0B2C3E);
+}
+
+.pdc-boton-peligro {
+  border: 1.5px solid var(--cp-rust, #B2500F);
+  background: transparent;
+  color: var(--cp-rust, #B2500F);
+}
+
+.pdc-boton-secundario {
+  border: 1.5px solid var(--cp-navy, #0B2C3E);
+  background: transparent;
+  color: var(--cp-navy, #0B2C3E);
+}
+
+.pdc-boton-oscuro {
+  border: 0;
+  background: var(--cp-navy, #0B2C3E);
+  color: #fff;
+}
+
+.pdc-boton-bloque {
+  width: 100%;
+}
+
+.pdc-ver-mas {
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  background: var(--cp-cream, #FBF4EC);
+  color: var(--cp-navy, #0B2C3E);
+  font-weight: 800;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.pdc-vacio {
+  font-size: 13px;
+  color: var(--cp-soft, #2C4C5D);
+  padding: 8px 2px;
+}
+
+.pdc-foco {
+  scroll-margin-top: 12px;
+}
+
+/* ---- Diálogo «Anular pedido» (ModalAnular) ---- */
+
+.ad-dialogo {
+  position: fixed;
+  z-index: 60;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(560px, calc(100% - 24px));
+  max-height: calc(100dvh - 24px);
+  display: flex;
+  flex-direction: column;
+  background: var(--cp-cream, #FBF4EC);
+  border-radius: 20px;
+  box-shadow: 0 20px 50px rgba(11, 44, 62, 0.4);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.ad-cabecera {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 16px 16px 8px;
+}
+
+.ad-titulo {
+  font-family: Montserrat, sans-serif;
+  font-weight: 800;
+  font-size: 19px;
+  color: var(--cp-navy, #0B2C3E);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ad-cuerpo {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ad-pie {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--cp-line, #E3D6C6);
+  background: var(--cp-cream, #FBF4EC);
+}
+
+.ad-pie > * {
+  flex: 1 1 0;
+  min-height: 44px;
+}
+
+.ad-resumen {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 12px;
+  font-size: 13px;
+  background: var(--cp-white, #FFFFFF);
+  border: 1px solid var(--cp-line, #E3D6C6);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.ad-resumen dt {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--cp-soft, #2C4C5D);
+  text-transform: uppercase;
+}
+
+.ad-resumen dd {
+  margin: 0;
+  font-weight: 700;
+  color: var(--cp-navy, #0B2C3E);
+  overflow-wrap: anywhere;
+}
+
+.ad-lineas summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--cp-navy, #0B2C3E);
+}
+
+.ad-lineas ul {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 4px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.ad-lineas li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  padding: 4px 0;
+  border-top: 1px solid var(--cp-sand, #EDE1D1);
+}
+
+.ad-aviso {
+  font-size: 13px;
+  line-height: 18px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #FFF4E5;
+  border: 1px solid #B26A00;
+  color: #5C3600;
+}
+
+.ad-error {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--cp-rust, #B2500F);
+  background: #FFF0E6;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--cp-rust, #B2500F);
+}
+
+.ad-cerrar {
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  border: 1.5px solid var(--cp-navy, #0B2C3E);
+  background: transparent;
+  color: var(--cp-navy, #0B2C3E);
+  font-size: 18px;
+  font-weight: 800;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 480px) {
+  .ad-dialogo {
+    width: calc(100% - 16px);
+    max-height: calc(100dvh - 16px);
+  }
+
+  .ad-resumen {
+    grid-template-columns: 1fr;
+  }
+
+  .ad-pie {
+    flex-direction: column;
+  }
+}
+
+/* Botones del aviso «pedidos que bloquean el cierre» */
+.pdc-avisos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pdc-avisos .pdc-boton {
+  flex: 1 1 180px;
+}

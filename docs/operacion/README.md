@@ -34,6 +34,19 @@ Esta carpeta guarda los documentos que **no describen qué hace el sistema**, si
 | RB-CAP-003 | [Un servicio se cayó](RB-CAP-003-un-servicio-se-cayo.md) | draft |
 | RB-CAP-004 | [Preparar un servidor nuevo](RB-CAP-004-preparar-un-servidor-nuevo.md) | draft |
 | RB-CAP-005 | [Rotar claves y responder a una filtración](RB-CAP-005-rotar-claves-y-responder-a-una-filtracion.md) | draft |
+| RB-CAP-005B | [Desplegar, actualizar y volver atrás con Docker Compose](RB-CAP-005-desplegar-actualizar-y-volver-atras-con-compose.md) | listo |
+| RB-CAP-006 | [Código rotativo del supervisor (TOTP)](RB-CAP-006-codigo-del-supervisor.md) | listo |
+| RB-CAP-007 | [Configuración, conexión y operación del Chatbot de WhatsApp](RB-CAP-007-chatbot-whatsapp.md) | listo |
+| RB-CAP-008 | [Despliegue sin corte con docker-rollout y verificación continua con sonda](RB-CAP-008-despliegue-sin-corte-y-sonda.md) | draft |
+| CHK-CAP-001 | [Requisitos para subir a producción](CHK-CAP-001-requisitos-para-subir-a-produccion.md) | draft |
+| RB-CAP-009 | [Activación y operación de la lectura de vouchers Yape y Plin con IA](RB-CAP-009-activar-y-operar-vouchers-ia.md) | draft |
+| RB-CAP-010 | [Operación y mantenimiento del agente local de impresión de etiquetas TSPL2](RB-CAP-010-operar-agente-impresion-etiquetas.md) | draft |
+| RB-CAP-011 | [Activación y operación del Asistente de Ayuda Capri](RB-CAP-011-activar-ayuda-capri.md) | draft |
+| RB-CAP-012 | [Guía paso a paso: cómo hacer público el bot de WhatsApp](GUIA-hacer-publico-el-bot-de-whatsapp.md) | draft |
+| RB-CAP-DEMO | [Desplegar la demo sin dominio](RB-CAP-DEMO-desplegar-la-demo-sin-dominio.md) | listo |
+| PLAN-CAP-BOT | [Plan por olas del chatbot de WhatsApp](PLAN-CHATBOT-OLAS.md) | actualizado |
+| PLA-CAP-WSP | [Catálogo de plantillas oficiales de WhatsApp](PLANTILLAS-WHATSAPP.md) | listo |
+| GUIA-CD | [Guía: Secretos, entornos y llaves SSH de GitHub](GUIA-CD-secretos-de-github.md) | listo |
 | REL-CAP-001 | [Plan de release del piloto (H1)](REL-CAP-001-plan-de-release-del-piloto.md) | draft |
 | SEC-CAP-001 | [Revisión de seguridad antes del piloto](SEC-CAP-001-revision-de-seguridad.md) | draft |
 | INV-CAP-001 | [Inventario de infraestructura](INV-CAP-001-inventario-de-infraestructura.md) | draft |

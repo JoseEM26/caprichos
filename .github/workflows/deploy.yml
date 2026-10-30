@@ -1,0 +1,891 @@
+name: Deploy Caprichos por SSH
+
+on:
+  push:
+    branches:
+      - main
+      - preprod
+  workflow_dispatch:
+    inputs:
+      ambiente:
+        description: 'Ambiente a desplegar (demo o prod)'
+        required: true
+        default: 'demo'
+        type: choice
+        options:
+          - demo
+          - prod
+      tag:
+        description: 'Tag de versión (obligatorio para prod, ej. v0.3.0)'
+        required: false
+        type: string
+      confirmacion:
+        description: 'Producción: escriba PRODUCCION. Sanear: SANEAR CLIENTES DE LA DEMO. Respaldo: RESPALDAR DEMO. Exportar: EXPORTAR DATOS DE LA DEMO. Dominios: CONFIGURAR DOMINIOS DE LA DEMO'
+        required: false
+        type: string
+      accion:
+        description: 'Acción: desplegar (normal), sanear-demo (borra cuentas de clientes, SOLO demo), respaldar-demo (copia manual de la demo), exportar-datos-demo (paquete de configuración y contenido de la demo), importar-datos-produccion (importa el paquete a PRODUCCIÓN), configurar-dominios-demo (la demo pasa a demo.caprichos.pe y conserva el dominio adicional), preparar-produccion (crea el .env de PRODUCCIÓN con claves aleatorias; no despliega)'
+        required: false
+        default: 'desplegar'
+        type: choice
+        options:
+          - desplegar
+          - sanear-demo
+          - respaldar-demo
+          - exportar-datos-demo
+          - configurar-dominios-demo
+          - preparar-produccion
+          - importar-datos-produccion
+      paquete:
+        description: 'Solo importar-datos-produccion: carpeta del paquete exportado (fecha, p. ej. 20261030_120000, o ruta dentro de /opt/caprichos/respaldos/datos-empresa)'
+        required: false
+        type: string
+      frase_datos:
+        description: 'Solo importar-datos-produccion: escriba IMPORTAR DATOS DE LA EMPRESA'
+        required: false
+        type: string
+      dominio_adicional:
+        description: 'Solo configurar-dominios-demo: segundo dominio que atiende la demo (por defecto caprichos.pe; déjelo vacío para quitarlo cuando producción lo use)'
+        required: false
+        default: 'caprichos.pe'
+        type: string
+      simulacro:
+        description: 'Solo para sanear-demo, configurar-dominios-demo, preparar-produccion e importar-datos-produccion: true = simulacro (no escribe); false = real (con respaldo previo)'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  validar-y-determinar:
+    name: Validar autorización y parámetros
+    runs-on: ubuntu-latest
+    outputs:
+      ambiente: ${{ steps.evaluar.outputs.ambiente }}
+      tag: ${{ steps.evaluar.outputs.tag }}
+      ref: ${{ steps.evaluar.outputs.ref }}
+      short_sha: ${{ steps.evaluar.outputs.short_sha }}
+      accion: ${{ steps.evaluar.outputs.accion }}
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validar condiciones de despliegue
+        id: evaluar
+        env:
+          EVENTO: ${{ github.event_name }}
+          IN_AMBIENTE: ${{ github.event.inputs.ambiente }}
+          IN_TAG: ${{ github.event.inputs.tag }}
+          IN_CONFIRMACION: ${{ github.event.inputs.confirmacion }}
+          IN_ACCION: ${{ github.event.inputs.accion }}
+          REF_NAME: ${{ github.ref_name }}
+          IN_FRASE: ${{ github.event.inputs.frase_datos }}
+          IN_PAQUETE: ${{ github.event.inputs.paquete }}
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+
+          ACCION="desplegar"
+          if [ "$EVENTO" = "workflow_dispatch" ] && [ "$IN_ACCION" = "sanear-demo" ]; then
+            ACCION="sanear-demo"
+            echo "==> Saneamiento de clientes de la DEMO (jamás producción)..."
+            if [ "$IN_AMBIENTE" != "demo" ]; then
+              echo "::error::El saneamiento solo existe para el ambiente demo."
+              exit 1
+            fi
+            if [ "$REF_NAME" != "preprod" ]; then
+              echo "::error::El saneamiento de la demo solo se lanza desde la rama preprod."
+              exit 1
+            fi
+            if [ "$IN_CONFIRMACION" != "SANEAR CLIENTES DE LA DEMO" ]; then
+              echo "::error::Escriba exactamente 'SANEAR CLIENTES DE LA DEMO' en confirmacion."
+              exit 1
+            fi
+          fi
+          # Respaldo y exportación de la DEMO: manuales, solo demo y solo rama preprod
+          if [ "$EVENTO" = "workflow_dispatch" ] && { [ "$IN_ACCION" = "respaldar-demo" ] || [ "$IN_ACCION" = "exportar-datos-demo" ] || [ "$IN_ACCION" = "configurar-dominios-demo" ]; }; then
+            ACCION="$IN_ACCION"
+            echo "==> Acción ${ACCION} (solo demo, solo rama preprod)..."
+            if [ "$IN_AMBIENTE" != "demo" ]; then
+              echo "::error::Esta acción solo existe para el ambiente demo."
+              exit 1
+            fi
+            if [ "$REF_NAME" != "preprod" ]; then
+              echo "::error::Esta acción solo se lanza desde la rama preprod."
+              exit 1
+            fi
+            if [ "$ACCION" = "respaldar-demo" ] && [ "$IN_CONFIRMACION" != "RESPALDAR DEMO" ]; then
+              echo "::error::Escriba exactamente 'RESPALDAR DEMO' en confirmacion."
+              exit 1
+            fi
+            if [ "$ACCION" = "exportar-datos-demo" ] && [ "$IN_CONFIRMACION" != "EXPORTAR DATOS DE LA DEMO" ]; then
+              echo "::error::Escriba exactamente 'EXPORTAR DATOS DE LA DEMO' en confirmacion."
+              exit 1
+            fi
+            if [ "$ACCION" = "configurar-dominios-demo" ] && [ "$IN_CONFIRMACION" != "CONFIGURAR DOMINIOS DE LA DEMO" ]; then
+              echo "::error::Escriba exactamente 'CONFIGURAR DOMINIOS DE LA DEMO' en confirmacion."
+              exit 1
+            fi
+          fi
+
+          # Preparar PRODUCCIÓN (crea su .env): manual; la validación de prod (PRODUCCION + tag en main) va abajo
+          if [ "$EVENTO" = "workflow_dispatch" ] && [ "$IN_ACCION" = "preparar-produccion" ]; then
+            ACCION="preparar-produccion"
+            if [ "$IN_AMBIENTE" != "prod" ]; then
+              echo "::error::Preparar producción solo existe para el ambiente prod."
+              exit 1
+            fi
+          fi
+
+          # Importación a PRODUCCIÓN de los datos de la empresa: manual, con paquete y frase; la validación de prod va abajo
+          if [ "$EVENTO" = "workflow_dispatch" ] && [ "$IN_ACCION" = "importar-datos-produccion" ]; then
+            ACCION="importar-datos-produccion"
+            echo "==> Importación de datos de la empresa a PRODUCCIÓN (manual, con respaldo previo)..."
+            if [ "$IN_AMBIENTE" != "prod" ]; then
+              echo "::error::La importación de datos solo existe para el ambiente prod."
+              exit 1
+            fi
+            if [ "$IN_FRASE" != "IMPORTAR DATOS DE LA EMPRESA" ]; then
+              echo "::error::Escriba exactamente 'IMPORTAR DATOS DE LA EMPRESA' en frase_datos."
+              exit 1
+            fi
+            if [ -z "$IN_PAQUETE" ] || [[ ! "$IN_PAQUETE" =~ ^[A-Za-z0-9_./-]+$ ]] || [[ "$IN_PAQUETE" == *".."* ]]; then
+              echo "::error::El paquete debe ser una fecha o una ruta simple (sin espacios, comillas ni '..')."
+              exit 1
+            fi
+          fi
+
+          echo "accion=${ACCION}" >> "$GITHUB_OUTPUT"
+
+          if [ "$EVENTO" = "workflow_dispatch" ]; then
+            ENV_DEST="$IN_AMBIENTE"
+            TAG_DEST="$IN_TAG"
+            CONFIRMACION="$IN_CONFIRMACION"
+
+            if [ "$ENV_DEST" = "prod" ]; then
+              echo "==> Validando despliegue deliberado a PRODUCCIÓN..."
+
+              # 1. Validación de confirmación explícita
+              if [ "$CONFIRMACION" != "PRODUCCION" ]; then
+                echo "::error::Para desplegar a producción debe escribir exactamente 'PRODUCCION' en el campo de confirmación."
+                exit 1
+              fi
+
+              # 2. Validación de formato de tag
+              if [[ -z "$TAG_DEST" || ! "$TAG_DEST" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                echo "::error::En producción es obligatorio indicar un tag semántico válido (ej. v0.3.0). Recibido: '$TAG_DEST'."
+                exit 1
+              fi
+
+              # 3. Validación de existencia del tag en el repositorio
+              if ! git rev-parse "refs/tags/${TAG_DEST}" >/dev/null 2>&1; then
+                echo "::error::El tag '${TAG_DEST}' no existe en el repositorio."
+                exit 1
+              fi
+
+              TAG_COMMIT=$(git rev-list -n 1 "refs/tags/${TAG_DEST}")
+              echo "    ✓ Tag ${TAG_DEST} localizado en commit ${TAG_COMMIT}."
+
+              # 4. Validación de que el commit del tag esté integrado en main
+              git fetch origin main:refs/remotes/origin/main
+              if ! git merge-base --is-ancestor "$TAG_COMMIT" origin/main; then
+                echo "::error::El commit ${TAG_COMMIT} correspondiente al tag ${TAG_DEST} NO está integrado en la rama 'main'."
+                exit 1
+              fi
+              echo "    ✓ El commit del tag está verificado y presente en la rama main."
+
+            else
+              # Modo manual para demo
+              if [ -z "$TAG_DEST" ]; then
+                TAG_DEST="$SHORT_SHA"
+              fi
+            fi
+
+          else
+            # Disparado por push a ramas (preprod o main)
+            ENV_DEST="demo"
+            TAG_DEST="$SHORT_SHA"
+          fi
+
+          echo "ambiente=${ENV_DEST}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG_DEST}" >> "$GITHUB_OUTPUT"
+          if [ "$ENV_DEST" = "prod" ]; then echo "ref=refs/tags/${TAG_DEST}" >> "$GITHUB_OUTPUT"; else echo "ref=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"; fi
+
+  # Decide qué imágenes hay que construir. Push a demo: solo las que cambiaron respecto del
+  # commit anterior (la otra se re-etiqueta en GHCR con el tag nuevo). Manual/producción: todo.
+  detectar-cambios:
+    name: Detectar imágenes a reconstruir
+    needs: validar-y-determinar
+    if: needs.validar-y-determinar.outputs.accion == 'desplegar'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      cambios: ${{ steps.dif.outputs.cambios }}
+      owner: ${{ steps.dif.outputs.owner }}
+      base7: ${{ steps.dif.outputs.base7 }}
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Iniciar sesión en GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Comparar con el commit anterior desplegado
+        id: dif
+        env:
+          EVENTO: ${{ github.event_name }}
+          AMBIENTE: ${{ needs.validar-y-determinar.outputs.ambiente }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "owner=${OWNER}" >> "$GITHUB_OUTPUT"
+          API=true; WEB=true; BASE7=""
+          # Solo en push a demo; manual y producción construyen todo siempre.
+          if [ "$EVENTO" = "push" ] && [ "$AMBIENTE" = "demo" ] \
+             && [ -n "$BEFORE" ] && [ "${BEFORE//0/}" != "" ] \
+             && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            BASE7="${BEFORE::7}"
+            CAMBIOS=$(git diff --name-only "$BEFORE" "$GITHUB_SHA")
+            echo "$CAMBIOS"
+            COMUN='^(packages/compartido/|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|package\.json$|tsconfig\.base\.json$|\.dockerignore$)'
+            echo "$CAMBIOS" | grep -Eq "${COMUN}|^(apps/api/|mockup/|docs/analisis/|infra/docker/Dockerfile\.api$)" || API=false
+            echo "$CAMBIOS" | grep -Eq "${COMUN}|^(apps/web/|infra/docker/(Dockerfile\.web|nginx-caprichos\.conf|demo-aviso\.html)$)" || WEB=false
+            # Una imagen sin cambios solo se re-etiqueta si la del commit anterior existe en GHCR
+            if [ "$API" = false ] && ! docker buildx imagetools inspect "ghcr.io/${OWNER}/caprichos-api:${BASE7}" >/dev/null 2>&1; then
+              echo "No hay imagen API del commit anterior: se construye."; API=true
+            fi
+            if [ "$WEB" = false ] && ! docker buildx imagetools inspect "ghcr.io/${OWNER}/caprichos-web:${BASE7}" >/dev/null 2>&1; then
+              echo "No hay imagen Web del commit anterior: se construye."; WEB=true
+            fi
+          fi
+          echo "base7=${BASE7}" >> "$GITHUB_OUTPUT"
+          echo "cambios={\"api\":${API},\"web\":${WEB}}" >> "$GITHUB_OUTPUT"
+          echo "Reconstruir -> api=${API} web=${WEB}"
+
+  # API y Web se construyen a la vez (matriz). Sin Trivy: build y push en un solo paso.
+  imagenes:
+    name: Imagen ${{ matrix.imagen }}
+    needs: [validar-y-determinar, detectar-cambios]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # TRIVY APAGADO por ahora. Reactivar ('true') antes de salir a producción real.
+      ESCANEAR_IMAGENES: 'false'
+      CAMBIO: ${{ fromJSON(needs.detectar-cambios.outputs.cambios)[matrix.imagen] }}
+      IMAGE: ghcr.io/${{ needs.detectar-cambios.outputs.owner }}/caprichos-${{ matrix.imagen }}
+      TAG: ${{ needs.validar-y-determinar.outputs.tag }}
+      SHORT_SHA: ${{ needs.validar-y-determinar.outputs.short_sha }}
+    strategy:
+      fail-fast: true
+      matrix:
+        imagen: [api, web]
+    steps:
+      - name: Checkout del repositorio (el commit exacto a desplegar)
+        if: env.CAMBIO == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validar-y-determinar.outputs.ref }}
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Iniciar sesión en GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Sin cambios en esta imagen: se re-etiqueta la del commit anterior (sin construir)
+      - name: Re-etiquetar la imagen del commit anterior
+        if: env.CAMBIO != 'true'
+        env:
+          BASE7: ${{ needs.detectar-cambios.outputs.base7 }}
+        run: |
+          docker buildx imagetools create -t "${IMAGE}:${TAG}" -t "${IMAGE}:${SHORT_SHA}" "${IMAGE}:${BASE7}"
+
+      # Camino rápido (Trivy apagado): construir y publicar en un solo paso
+      - name: Construir y publicar
+        if: env.CAMBIO == 'true' && env.ESCANEAR_IMAGENES != 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/Dockerfile.${{ matrix.imagen }}
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ env.TAG }}
+            ${{ env.IMAGE }}:${{ env.SHORT_SHA }}
+          cache-from: type=gha,scope=${{ matrix.imagen }}
+          cache-to: type=gha,scope=${{ matrix.imagen }},mode=max
+
+      # Camino con escaneo (ESCANEAR_IMAGENES='true'): construir, escanear y publicar lo escaneado
+      - name: Construir imagen para escaneo
+        if: env.CAMBIO == 'true' && env.ESCANEAR_IMAGENES == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/Dockerfile.${{ matrix.imagen }}
+          push: false
+          load: true
+          tags: |
+            caprichos-${{ matrix.imagen }}:test
+            ${{ env.IMAGE }}:${{ env.TAG }}
+            ${{ env.IMAGE }}:${{ env.SHORT_SHA }}
+          cache-from: type=gha,scope=${{ matrix.imagen }}
+          cache-to: type=gha,scope=${{ matrix.imagen }},mode=max
+
+      - name: Escanear imagen con Trivy
+        if: env.CAMBIO == 'true' && env.ESCANEAR_IMAGENES == 'true'
+        uses: aquasecurity/trivy-action@v0.33.1
+        with:
+          version: 'v0.75.0'
+          image-ref: caprichos-${{ matrix.imagen }}:test
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: CRITICAL
+
+      - name: Publicar la imagen escaneada
+        if: env.CAMBIO == 'true' && env.ESCANEAR_IMAGENES == 'true'
+        run: |
+          docker push "${IMAGE}:${TAG}"
+          docker push "${IMAGE}:${SHORT_SHA}" || true
+
+  deploy-ssh:
+    name: Despliegue por SSH en VPS
+    needs: [validar-y-determinar, detectar-cambios, imagenes]
+    if: needs.validar-y-determinar.outputs.accion == 'desplegar'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: ${{ needs.validar-y-determinar.outputs.ambiente }}
+    concurrency:
+      group: deploy-${{ needs.validar-y-determinar.outputs.ambiente }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout (scripts y archivos compose de esta versión)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validar-y-determinar.outputs.ref }}
+          sparse-checkout: infra/compose
+
+      - name: Configurar llave y huella SSH (sin StrictHostKeyChecking=no)
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          for v in SSH_KEY SSH_HOST SSH_KNOWN_HOSTS; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Falta el secreto $v en GitHub (Settings > Secrets and variables > Actions)."
+              exit 1
+            fi
+          done
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Sincronizar scripts y compose en el VPS
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -e
+          SSH="ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes ${SSH_USER:-deploy}@${SSH_HOST}"
+          tar -czf - -C infra/compose scripts | $SSH 'mkdir -p /opt/caprichos && tar -xzf - -C /opt/caprichos && chmod +x /opt/caprichos/scripts/* /opt/caprichos/scripts/docker-rollout'
+          tar -czf - -C infra/compose docker-compose.base.yml docker-compose.demo.yml docker-compose.staging.yml docker-compose.prod.yml | $SSH 'mkdir -p /opt/caprichos/compose && tar -xzf - -C /opt/caprichos/compose'
+
+      - name: Ejecutar despliegue sin corte (rolling rollout) en el VPS vía SSH
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          AMBIENTE: ${{ needs.validar-y-determinar.outputs.ambiente }}
+          TAG: ${{ needs.validar-y-determinar.outputs.tag }}
+          GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
+        run: |
+          echo "==> Desplegando [${AMBIENTE}] con la versión ${TAG} mediante rolling rollout (sin corte)..."
+          # El token viaja por la entrada estándar: no queda en la línea de comandos ni en los procesos del servidor
+          printf '%s' "$GHCR_READ_TOKEN" | ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "${SSH_USER:-deploy}@${SSH_HOST}" \
+            "IFS= read -r GHCR_READ_TOKEN; export GHCR_READ_TOKEN; /opt/caprichos/scripts/desplegar.sh '${AMBIENTE}' '${TAG}'"
+
+      - name: Borrar la llave del ejecutor
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+      - name: Registrar resumen del despliegue en Job Summary
+        if: always()
+        run: |
+          cat << 'EOF' >> "$GITHUB_STEP_SUMMARY"
+          ## 🚀 Resumen de Despliegue por SSH — Caprichos
+
+          | Parámetro | Detalle |
+          |---|---|
+          | **Ambiente** | `${{ needs.validar-y-determinar.outputs.ambiente }}` |
+          | **Versión (Tag)** | `${{ needs.validar-y-determinar.outputs.tag }}` |
+          | **Commit SHA** | `${{ github.sha }}` |
+          | **Disparado por** | `@${{ github.actor }}` (`${{ github.event_name }}`) |
+          | **Entorno GitHub** | `${{ needs.validar-y-determinar.outputs.ambiente }}` |
+          | **Imágenes GHCR** | `ghcr.io/${{ needs.detectar-cambios.outputs.owner }}/caprichos-api:${{ needs.validar-y-determinar.outputs.tag }}` <br> `ghcr.io/${{ needs.detectar-cambios.outputs.owner }}/caprichos-web:${{ needs.validar-y-determinar.outputs.tag }}` |
+
+          ### 🔒 Seguridad y Garantías del Proceso
+          - **Aprobación deliberada de Producción:** Ejecución manual exclusiva por `workflow_dispatch` con confirmación literal y verificación de tag y commit en `main`.
+          - **Despliegue sin corte (Rolling Rollout):** Despliegue con docker-rollout para api y web; el nuevo contenedor arranca junto al viejo, espera a estar sano antes de recibir tráfico de Traefik y se mantiene la versión previa si el nuevo falla.
+          - **Migraciones aditivas (Expand/Contract):** Migraciones de base de datos ejecutadas en contenedor efímero antes del cambio, compatibles hacia atrás durante la convivencia de versiones.
+          - **Arranque seguro:** Verificación de healthcheck posterior y vuelta atrás automática ante anomalías.
+          - **SSH endurecido:** Autenticación por llave ed25519 dedicada y verificación de host fingerprint.
+          EOF
+
+  # Saneamiento manual de clientes/DNI de la DEMO (jamás producción). Solo con workflow_dispatch,
+  # accion=sanear-demo, ambiente=demo, rama preprod y la confirmación literal (validada arriba).
+  sanear-demo:
+    name: Sanear clientes de la demo (manual)
+    needs: validar-y-determinar
+    if: needs.validar-y-determinar.outputs.accion == 'sanear-demo'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: demo
+    concurrency:
+      group: sanear-clientes-demo
+      cancel-in-progress: false
+    steps:
+      - name: Checkout (scripts de esta versión)
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: infra/compose
+
+      - name: Configurar llave y huella SSH (sin StrictHostKeyChecking=no)
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          for v in SSH_KEY SSH_HOST SSH_KNOWN_HOSTS; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Falta el secreto $v en GitHub (Settings > Secrets and variables > Actions)."
+              exit 1
+            fi
+          done
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Sincronizar scripts en el VPS
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -e
+          SSH="ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes ${SSH_USER:-deploy}@${SSH_HOST}"
+          tar -czf - -C infra/compose scripts | $SSH 'mkdir -p /opt/caprichos && tar -xzf - -C /opt/caprichos && chmod +x /opt/caprichos/scripts/*'
+
+      - name: Sanear clientes de la demo (simulacro primero; real solo si se desmarcó simulacro)
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SIMULACRO: ${{ github.event.inputs.simulacro }}
+        run: |
+          if [ "$SIMULACRO" = "false" ]; then MODO=real; else MODO=simulacro; fi
+          echo "==> Modo: ${MODO}"
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "${SSH_USER:-deploy}@${SSH_HOST}" \
+            "/opt/caprichos/scripts/sanear-clientes-demo.sh '${MODO}'"
+
+      - name: Borrar la llave del ejecutor
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+  # Copia manual de la demo (sin programación). Solo demo, rama preprod y confirmación RESPALDAR DEMO.
+  respaldar-demo:
+    name: Respaldo manual de la demo
+    needs: validar-y-determinar
+    if: needs.validar-y-determinar.outputs.accion == 'respaldar-demo'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: demo
+    concurrency:
+      group: respaldo-demo
+      cancel-in-progress: false
+    steps:
+      - name: Checkout (scripts de esta versión)
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: infra/compose
+
+      - name: Configurar llave y huella SSH (sin StrictHostKeyChecking=no)
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          for v in SSH_KEY SSH_HOST SSH_KNOWN_HOSTS; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Falta el secreto $v en GitHub (Settings > Secrets and variables > Actions)."
+              exit 1
+            fi
+          done
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Sincronizar scripts en el VPS
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -e
+          SSH="ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes ${SSH_USER:-deploy}@${SSH_HOST}"
+          tar -czf - -C infra/compose scripts | $SSH 'mkdir -p /opt/caprichos && tar -xzf - -C /opt/caprichos && chmod +x /opt/caprichos/scripts/*'
+
+      - name: Respaldo de la demo (pg_dump + uploads, respaldar.sh demo)
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -o pipefail
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "${SSH_USER:-deploy}@${SSH_HOST}" \
+            "/opt/caprichos/scripts/respaldar.sh demo" 2>&1 | tee respaldo.log
+
+      - name: Resumen del respaldo (ruta y tamaño, sin secretos)
+        if: always()
+        run: |
+          {
+            echo "## Respaldo manual de la demo"
+            echo ""
+            echo "Carpeta en el VPS: \`/opt/caprichos/respaldos/demo\`"
+            echo ""
+            echo '```'
+            grep -E "respaldada|Volumen uploads|Directorio de almacenamiento|Se eliminaron|No hay archivos antiguos" respaldo.log || echo "(sin datos del respaldo: revise el log del paso anterior)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Borrar la llave del ejecutor
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+  # Cambia los dominios de la demo a demo.caprichos.pe (conservando caprichos.pe). Simulacro por defecto.
+  configurar-dominios-demo:
+    name: Configurar dominios de la demo
+    needs: validar-y-determinar
+    if: needs.validar-y-determinar.outputs.accion == 'configurar-dominios-demo'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: demo
+    concurrency:
+      group: configurar-dominios-demo
+      cancel-in-progress: false
+    steps:
+      - name: Checkout (scripts de esta versión)
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: infra/compose
+
+      - name: Configurar llave y huella SSH (sin StrictHostKeyChecking=no)
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          for v in SSH_KEY SSH_HOST SSH_KNOWN_HOSTS; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Falta el secreto $v en GitHub (Settings > Secrets and variables > Actions)."
+              exit 1
+            fi
+          done
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Sincronizar scripts en el VPS
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -e
+          SSH="ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes ${SSH_USER:-deploy}@${SSH_HOST}"
+          tar -czf - -C infra/compose scripts | $SSH 'mkdir -p /opt/caprichos && tar -xzf - -C /opt/caprichos && chmod +x /opt/caprichos/scripts/*'
+
+      - name: Configurar dominios (simulacro primero; real solo si se desmarcó simulacro)
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SIMULACRO: ${{ github.event.inputs.simulacro }}
+          ADICIONAL: ${{ github.event.inputs.dominio_adicional }}
+        run: |
+          set -o pipefail
+          if [ "$SIMULACRO" = "false" ]; then MODO=real; else MODO=simulacro; fi
+          if [ -n "$ADICIONAL" ] && [[ ! "$ADICIONAL" =~ ^[a-z0-9.-]+$ ]]; then
+            echo "::error::dominio_adicional no válido."
+            exit 1
+          fi
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "${SSH_USER:-deploy}@${SSH_HOST}" \
+            "/opt/caprichos/scripts/configurar-dominios-demo.sh $MODO demo.caprichos.pe '$ADICIONAL'" 2>&1 | tee dominios.log
+
+      - name: Resumen (sin secretos)
+        if: always()
+        run: |
+          {
+            echo "## Dominios de la demo"
+            echo ""
+            echo "Simulacro: \`${{ github.event.inputs.simulacro }}\`"
+            echo ""
+            echo '```'
+            grep -E "^(Hoy|Quedaría|DNS|AVISO|OK|ERROR|Sin cambios|Simulacro|Copia)" dominios.log || echo "(sin datos: revise el log del paso anterior)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Borrar la llave del ejecutor
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+  # Exporta configuración y contenido de la demo a un paquete (solo lectura). Confirmación EXPORTAR DATOS DE LA DEMO.
+  exportar-datos-demo:
+    name: Exportar datos de la empresa (demo)
+    needs: validar-y-determinar
+    if: needs.validar-y-determinar.outputs.accion == 'exportar-datos-demo'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: demo
+    concurrency:
+      group: exportar-datos-demo
+      cancel-in-progress: false
+    steps:
+      - name: Checkout (scripts de esta versión)
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: infra/compose
+
+      - name: Configurar llave y huella SSH (sin StrictHostKeyChecking=no)
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          for v in SSH_KEY SSH_HOST SSH_KNOWN_HOSTS; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Falta el secreto $v en GitHub (Settings > Secrets and variables > Actions)."
+              exit 1
+            fi
+          done
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Sincronizar scripts en el VPS
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -e
+          SSH="ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes ${SSH_USER:-deploy}@${SSH_HOST}"
+          tar -czf - -C infra/compose scripts | $SSH 'mkdir -p /opt/caprichos && tar -xzf - -C /opt/caprichos && chmod +x /opt/caprichos/scripts/*'
+
+      - name: Exportar el paquete de la demo (solo lectura) en el VPS
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -o pipefail
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "${SSH_USER:-deploy}@${SSH_HOST}" \
+            "/opt/caprichos/scripts/exportar-datos-empresa.sh completo" 2>&1 | tee exportar.log
+
+      - name: Resumen del paquete y su reporte (DNI enmascarados)
+        if: always()
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set +e
+          REPORTE=$(ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "${SSH_USER:-deploy}@${SSH_HOST}" \
+            'R=$(ls -1dt /opt/caprichos/respaldos/datos-empresa/*/ 2>/dev/null | head -1); if [ -n "$R" ]; then echo "$R"; cat "$R"paquete/reporte.md; fi' 2>/dev/null)
+          {
+            echo "## Exportación de datos de la empresa (demo)"
+            echo ""
+            echo "El paquete queda en el VPS, con permisos 0600, en \`/opt/caprichos/respaldos/datos-empresa/<fecha>/paquete\`."
+            echo ""
+            echo "Revise el reporte antes de importar. Los DNI salen enmascarados."
+            echo ""
+            echo "$REPORTE" | head -c 900000
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Borrar la llave del ejecutor
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+  # Crea /opt/caprichos/prod/.env con claves aleatorias (solo si no existe). No despliega. Exige PRODUCCION + tag en main (validado arriba).
+  preparar-produccion:
+    name: Preparar PRODUCCIÓN (crear su .env)
+    needs: validar-y-determinar
+    if: needs.validar-y-determinar.outputs.accion == 'preparar-produccion'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: prod
+    concurrency:
+      group: preparar-produccion
+      cancel-in-progress: false
+    steps:
+      - name: Checkout (scripts del tag validado)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validar-y-determinar.outputs.ref }}
+          sparse-checkout: infra/compose
+
+      - name: Configurar llave y huella SSH (sin StrictHostKeyChecking=no)
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          for v in SSH_KEY SSH_HOST SSH_KNOWN_HOSTS; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Falta el secreto $v en GitHub (Settings > Secrets and variables > Actions)."
+              exit 1
+            fi
+          done
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Sincronizar scripts en el VPS
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -e
+          SSH="ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes ${SSH_USER:-deploy}@${SSH_HOST}"
+          tar -czf - -C infra/compose scripts | $SSH 'mkdir -p /opt/caprichos && tar -xzf - -C /opt/caprichos && chmod +x /opt/caprichos/scripts/*'
+
+      - name: Preparar producción (simulacro por defecto)
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SIMULACRO: ${{ github.event.inputs.simulacro }}
+        run: |
+          set -o pipefail
+          if [ "$SIMULACRO" = "false" ]; then MODO=real; else MODO=simulacro; fi
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "${SSH_USER:-deploy}@${SSH_HOST}" \
+            "/opt/caprichos/scripts/preparar-produccion.sh $MODO" 2>&1 | tee preparar.log
+
+      - name: Borrar la llave del ejecutor
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+  # Importa un paquete a PRODUCCIÓN. Solo workflow_dispatch; ambiente prod (aprobación del entorno);
+  # tag en main y confirmación PRODUCCION (validado arriba) + frase IMPORTAR DATOS DE LA EMPRESA.
+  # simulacro=true por defecto: no escribe. Con simulacro=false: respaldo completo de prod y luego importa.
+  importar-datos-produccion:
+    name: Importar datos de la empresa a PRODUCCIÓN
+    needs: validar-y-determinar
+    if: needs.validar-y-determinar.outputs.accion == 'importar-datos-produccion'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: prod
+    concurrency:
+      group: importar-datos-produccion
+      cancel-in-progress: false
+    steps:
+      - name: Checkout (scripts del tag validado)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validar-y-determinar.outputs.ref }}
+          sparse-checkout: infra/compose
+
+      - name: Configurar llave y huella SSH (sin StrictHostKeyChecking=no)
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          for v in SSH_KEY SSH_HOST SSH_KNOWN_HOSTS; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Falta el secreto $v en GitHub (Settings > Secrets and variables > Actions)."
+              exit 1
+            fi
+          done
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Sincronizar scripts en el VPS
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -e
+          SSH="ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes ${SSH_USER:-deploy}@${SSH_HOST}"
+          tar -czf - -C infra/compose scripts | $SSH 'mkdir -p /opt/caprichos && tar -xzf - -C /opt/caprichos && chmod +x /opt/caprichos/scripts/*'
+
+      - name: Importar el paquete a producción (simulacro por defecto)
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SIMULACRO: ${{ github.event.inputs.simulacro }}
+          PAQUETE: ${{ github.event.inputs.paquete }}
+        run: |
+          set -o pipefail
+          if [ "$SIMULACRO" = "false" ]; then MODO=real; else MODO=simulacro; fi
+          echo "==> Modo: ${MODO} (paquete: ${PAQUETE})"
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "${SSH_USER:-deploy}@${SSH_HOST}" \
+            "/opt/caprichos/scripts/importar-datos-empresa.sh prod '${PAQUETE}' ${MODO}" 2>&1 | tee importar.log
+
+      - name: Resumen de la importación (sin secretos)
+        if: always()
+        run: |
+          {
+            echo "## Importación de datos de la empresa a PRODUCCIÓN"
+            echo ""
+            echo "Paquete: \`${{ github.event.inputs.paquete }}\` · simulacro: \`${{ github.event.inputs.simulacro }}\` · tag: \`${{ needs.validar-y-determinar.outputs.tag }}\`"
+            echo ""
+            echo '```'
+            tail -n 120 importar.log 2>/dev/null || echo "(sin log)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Borrar la llave del ejecutor
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

@@ -1,0 +1,361 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { DisenadorView } from '../DisenadorView';
+import { NovedadesView } from '../NovedadesView';
+import { ConocenosView } from '../ConocenosView';
+import { CartaVistaPrevia } from '../../../carta/CartaPublica';
+import type { VistaPreviaCarta } from '../../../carta/CartaPublica';
+import { CONOCENOS_DEFAULT } from '../../../carta/conocenosContenido';
+import { api } from '../../../comun/api';
+
+function rutas(mapa: Record<string, unknown>) {
+  vi.spyOn(api, 'get').mockImplementation(async (url: string) => (url in mapa ? mapa[url] : null) as any);
+  vi.spyOn(api, 'put').mockResolvedValue({ ok: true } as any);
+  vi.spyOn(api, 'post').mockResolvedValue({ ok: true } as any);
+}
+
+const ultimaPut = (url: string) => {
+  const llamadas = (api.put as any).mock.calls.filter((c: any[]) => c[0] === url);
+  return llamadas.at(-1)?.[1];
+};
+
+/** Escribe encima de un texto editable y confirma (clic fuera). */
+function escribir(nombre: string, texto: string) {
+  const caja = screen.getAllByRole('textbox', { name: nombre })[0];
+  caja.textContent = texto;
+  fireEvent.blur(caja);
+}
+
+const categorias = [
+  { id: 'c1', nombre: 'BEBIDAS', orden: 1, productos: [] },
+];
+
+describe('Diseñador: la carta real en edición', () => {
+  const disenador = {
+    tieneBorrador: false,
+    organizacionActual: 'SECCIONES',
+    decoracionActual: 'NINGUNO',
+    contenidoActual: { banner: { activo: true, tag: 'NOVEDAD', title: 'Frappe Frutas', sub: 'Refrescante' } },
+    disposicionActual: undefined,
+    categorias: [{ id: 'c1', nombre: 'BEBIDAS', orden: 1, oculto: false }],
+    productos: [
+      { id: 'pr1', categoriaId: 'c1', nombre: 'Frappe Fresa', descripcion: 'Fresa', precio: 15, orden: 1, oculto: false, fotoUrl: null },
+      { id: 'pr2', categoriaId: 'c1', nombre: 'Frappe Moka', descripcion: 'Moka', precio: 16, orden: 2, oculto: false, fotoUrl: null },
+    ],
+  };
+  const destacadas = [
+    { id: '4', titulo: 'Clientes felices', activo: true, archivada: false, portada_url: '/a.webp', fotos: [{ id: 'f1', url: '/a.webp' }] },
+    { id: '5', titulo: 'Nuestro local', activo: true, archivada: false, portada_url: '/b.webp', fotos: [{ id: 'f2', url: '/b.webp' }] },
+  ];
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    rutas({ '/admin/contenido/disenador': disenador, '/admin/contenido/destacadas': destacadas });
+  });
+
+  const abrir = async () => {
+    render(<MemoryRouter><DisenadorView /></MemoryRouter>);
+    // la carta primero se pinta con los datos base y enseguida con los del borrador
+    await waitFor(() => {
+      expect(screen.getByRole('region', { name: 'Caprichos del mes' }).textContent).toContain('Frappe Frutas');
+      expect(screen.getByText('Clientes felices')).toBeTruthy();
+    }, { timeout: 5000 });
+  };
+  const posicion = (a: HTMLElement, b: HTMLElement) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+  it('muestra la carta con los mismos componentes: banner, franja, momentos y productos, sin formularios', async () => {
+    await abrir();
+    expect(screen.getByLabelText('Datos útiles')).toBeTruthy();
+    expect(screen.getByText('Momentos Caprichos')).toBeTruthy();
+    expect(screen.getByText('Clientes felices')).toBeTruthy();
+    expect(screen.getByText('Frappe Fresa')).toBeTruthy();
+    // el banner es el mismo componente de la carta (misma región y texto)
+    expect(within(screen.getByRole('region', { name: 'Caprichos del mes' })).getByText('Frappe Frutas')).toBeTruthy();
+    expect(screen.queryByPlaceholderText(/Etiqueta \(ej/)).toBeNull();
+    expect(screen.queryByText('Abrir el diseñador en pantalla completa')).toBeNull();
+  });
+
+  it('pantalla completa: entra y sale con el botón y con Esc, la barra sigue visible y el marco no se escala', async () => {
+    await abrir();
+    const barra = () => screen.getByRole('toolbar', { name: 'Barra del editor' });
+    const marco = () => screen.getByTestId('preview-container-pc');
+    expect(screen.getByTestId('editor-pantalla').dataset.completa).toBeUndefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Pantalla completa' }));
+    expect(screen.getByTestId('editor-pantalla').dataset.completa).toBe('1');
+    expect(screen.getByTestId('editor-pantalla').parentElement).toBe(document.body);
+    expect(barra()).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Publicar' })).toBeTruthy();
+    expect(marco().dataset.completa).toBe('1');
+    expect(marco().dataset.escala).toBe('1.000');
+    expect(marco().style.zoom).toBe('');
+    expect(screen.getByText('Frappe Fresa')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Salir de pantalla completa' }));
+    expect(screen.getByTestId('editor-pantalla').dataset.completa).toBeUndefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Pantalla completa' }));
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.getByTestId('editor-pantalla').dataset.completa).toBeUndefined();
+    expect(screen.getByRole('button', { name: 'Pantalla completa' }).getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('sin modo edición la misma carta se pinta igual y sin barras', () => {
+    const datos: VistaPreviaCarta = {
+      categorias: [], ofertas: [], estadoLocal: null, datosLocal: null,
+      contenido: { decoracion: 'NINGUNO', organizacion: 'SECCIONES', paleta: {}, novedades: [], destacadas: [], rankingMes: [], banner: { activo: true, title: 'Hola banner' } },
+    };
+    render(<CartaVistaPrevia datos={datos} movil={false} />);
+    expect(screen.getByRole('region', { name: 'Caprichos del mes' })).toBeTruthy();
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Banner del mes' })).toBeNull();
+  });
+
+  it('editar el título del banner en el lugar actualiza el borrador', async () => {
+    await abrir();
+    escribir('Título del banner', 'Frappe de Temporada');
+    await waitFor(() => expect(ultimaPut('/admin/contenido/disenador/borrador')?.contenido.banner.title).toBe('Frappe de Temporada'), { timeout: 3000 });
+    await waitFor(() => expect(screen.getByText('Guardado')).toBeTruthy());
+    expect(screen.getByText(/Cambios sin publicar: 1/)).toBeTruthy();
+  });
+
+  it('Escape cancela lo escrito y Enter confirma', async () => {
+    await abrir();
+    const caja = screen.getByRole('textbox', { name: 'Título del banner' });
+    caja.focus();
+    caja.textContent = 'No debe quedar';
+    fireEvent.keyDown(caja, { key: 'Escape' });
+    expect(caja.textContent).toBe('Frappe Frutas');
+    caja.textContent = 'Con Enter';
+    fireEvent.keyDown(caja, { key: 'Enter' });
+    fireEvent.blur(caja);
+    await waitFor(() => expect(ultimaPut('/admin/contenido/disenador/borrador')?.contenido.banner.title).toBe('Con Enter'), { timeout: 3000 });
+  });
+
+  it('Momentos Caprichos puede ir primero y el banner después: Subir cambia el orden y se guarda', async () => {
+    await abrir();
+    const banner = screen.getByRole('region', { name: 'Caprichos del mes' });
+    const momentos = screen.getByRole('group', { name: 'Momentos Caprichos' });
+    expect(posicion(banner, momentos)).toBe(true);
+
+    fireEvent.click(screen.getByText('Momentos Caprichos'));
+    fireEvent.click(screen.getByLabelText('Subir Momentos Caprichos'));
+    fireEvent.click(screen.getByLabelText('Subir Momentos Caprichos'));
+    expect(posicion(screen.getByRole('group', { name: 'Momentos Caprichos' }), screen.getByRole('region', { name: 'Caprichos del mes' }))).toBe(true);
+
+    await waitFor(() => expect(ultimaPut('/admin/contenido/disenador/borrador')?.contenido.disposicion.secciones[0].id).toBe('momentos'), { timeout: 3000 });
+    expect(ultimaPut('/admin/contenido/disenador/borrador').contenido.disposicion.secciones[1].id).toBe('mes');
+  });
+
+  it('arrastrar el banner sobre Momentos los intercambia de lugar (arrastre simulado)', async () => {
+    await abrir();
+    fireEvent.click(screen.getByRole('region', { name: 'Caprichos del mes' }));
+    fireEvent.dragStart(screen.getByLabelText('Arrastrar Banner del mes'));
+    const destino = screen.getByRole('group', { name: 'Momentos Caprichos' });
+    fireEvent.dragOver(destino);
+    fireEvent.drop(destino);
+    await waitFor(() => {
+      const orden = ultimaPut('/admin/contenido/disenador/borrador')?.contenido.disposicion.secciones.map((s: any) => s.id);
+      expect(orden.indexOf('mes')).toBeGreaterThan(orden.indexOf('momentos'));
+    }, { timeout: 3000 });
+  });
+
+  it('ocultar una sección la deja atenuada con la etiqueta «Oculta» y se guarda', async () => {
+    await abrir();
+    fireEvent.click(screen.getByLabelText('Datos útiles'));
+    fireEvent.click(screen.getByLabelText('Ocultar Franja de datos'));
+    expect(screen.getByText('Oculta')).toBeTruthy();
+    expect(screen.getByLabelText('Datos útiles')).toBeTruthy(); // sigue en su lugar
+    expect(screen.getByLabelText('Mostrar Franja de datos')).toBeTruthy();
+    await waitFor(() => expect(ultimaPut('/admin/contenido/disenador/borrador')?.contenido.disposicion.secciones.find((s: any) => s.id === 'franja').visible).toBe(false), { timeout: 3000 });
+  });
+
+  it('cambiar el producto del banner: clic en su foto abre la lista anclada', async () => {
+    await abrir();
+    fireEvent.click(screen.getByRole('button', { name: 'Cambiar producto y foto del banner' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Frappe Moka' }));
+    await waitFor(() => expect(ultimaPut('/admin/contenido/disenador/borrador')?.contenido.banner.target).toBe('FRAPPE MOKA'), { timeout: 3000 });
+  });
+
+  it('los textos de los productos (combos y frappés) se editan en la tarjeta y se reordenan', async () => {
+    await abrir();
+    escribir('Nombre del producto', 'Frappe Fresa Premium');
+    await waitFor(() => expect(ultimaPut('/admin/contenido/disenador/borrador')?.contenido.productosConfig.pr1.nombre).toBe('Frappe Fresa Premium'), { timeout: 3000 });
+    fireEvent.click(screen.getAllByRole('group', { name: 'Frappe Fresa Premium' })[0]);
+    fireEvent.click(screen.getByLabelText('Bajar Frappe Fresa Premium'));
+    await waitFor(() => expect(ultimaPut('/admin/contenido/disenador/borrador')?.contenido.productosConfig.pr1.orden).toBe(2), { timeout: 3000 });
+  });
+
+  it('Deshacer vuelve el último cambio', async () => {
+    await abrir();
+    escribir('Título del banner', 'Otro');
+    await waitFor(() => expect(screen.getByRole('region', { name: 'Caprichos del mes' }).textContent).toContain('Otro'));
+    fireEvent.click(screen.getByText('Deshacer'));
+    await waitFor(() => expect(screen.getByRole('region', { name: 'Caprichos del mes' }).textContent).toContain('Frappe Frutas'));
+  });
+
+  it('Publicar pide Sí/No: No no envía nada; Sí publica', async () => {
+    await abrir();
+    escribir('Título del banner', 'Nuevo');
+    await waitFor(() => expect(screen.getByText(/Cambios sin publicar: 1/)).toBeTruthy());
+    fireEvent.click(screen.getByText('Publicar'));
+    fireEvent.click(screen.getByText('No, seguir editando'));
+    expect(api.post).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText('Publicar'));
+    fireEvent.click(screen.getByText('Sí, publicar'));
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/admin/contenido/disenador/publicar', {}), { timeout: 3000 });
+  });
+
+  it('la edición no ejecuta la carta: pedir desde el banner no envía nada', async () => {
+    await abrir();
+    fireEvent.click(screen.getByText('Pedir ahora'));
+    expect(api.post).not.toHaveBeenCalled();
+  });
+});
+
+describe('Novedades: la página real en edición', () => {
+  const lista = [
+    { id: '1', tipo: 'PROMOCION', titulo: 'Martes de 2x1', texto: 'Solo martes', tema: null, video_url: null, evento_fecha: null, evento_lugar: null, desde: null, hasta: null, orden: 1, activo: true, tamano: 'GRANDE', fotos: [] },
+    { id: '2', tipo: 'AVISO', titulo: 'Nuevo: Waffle', texto: 'Con helado', tema: null, video_url: null, evento_fecha: null, evento_lugar: null, desde: null, hasta: null, orden: 2, activo: true, tamano: 'MEDIANO', fotos: [] },
+    { id: '3', tipo: 'FOTOS', titulo: 'Clientes', texto: null, tema: null, video_url: null, evento_fecha: null, evento_lugar: null, desde: null, hasta: null, orden: 3, activo: true, tamano: 'CHICO', fotos: [] },
+  ];
+  const enc = { encabezado: { etiqueta: 'NOVEDADES', titulo: 'Lo nuevo', subtitulo: 'Subtítulo' }, publicado: {}, tieneBorrador: false };
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    rutas({
+      '/admin/contenido/novedades': lista,
+      '/admin/contenido/novedades/borrador': { items: null, tieneBorrador: false },
+      '/admin/contenido/novedades/encabezado': enc,
+      '/carta': categorias,
+    });
+  });
+
+  const abrir = async () => {
+    render(<MemoryRouter><NovedadesView /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByText('Lo nuevo')).toBeTruthy());
+  };
+
+  it('es la página de la carta: encabezado y mosaico juntos, sin pestañas ni listas', async () => {
+    await abrir();
+    expect(screen.getByTestId('encabezado-titulo')).toBeTruthy();
+    expect(document.querySelector('article[data-tamano="MEDIANO"]')).toBeTruthy();
+    expect(screen.queryByText('+ Nueva novedad')).toBeNull();
+    expect(screen.queryByRole('tab')).toBeNull();
+  });
+
+  it('el título del encabezado y el de una tarjeta se editan en el lugar', async () => {
+    await abrir();
+    escribir('Título del encabezado', 'Lo último');
+    await waitFor(() => expect(ultimaPut('/admin/contenido/novedades/encabezado')?.titulo).toBe('Lo último'), { timeout: 3000 });
+    escribir('Título de la novedad', 'Clientes felices');
+    await waitFor(() => expect(ultimaPut('/admin/contenido/novedades/borrador')?.items.some((n: any) => n.titulo === 'Clientes felices')).toBe(true), { timeout: 3000 });
+  });
+
+  it('«+ Agregar novedad» es una tarjeta fantasma que crea la tarjeta en el borrador', async () => {
+    await abrir();
+    fireEvent.click(screen.getByText('+ Agregar novedad'));
+    await waitFor(() => expect(ultimaPut('/admin/contenido/novedades/borrador')?.items).toHaveLength(4), { timeout: 3000 });
+    expect(ultimaPut('/admin/contenido/novedades/borrador').items[3]).toMatchObject({ titulo: 'Nueva novedad', tamano: 'MEDIANO', activo: true });
+  });
+
+  it('eliminar pide Sí/No: No conserva la tarjeta y Sí la quita del borrador', async () => {
+    await abrir();
+    fireEvent.click(screen.getByLabelText('Ver detalle de Clientes'));
+    fireEvent.click(screen.getByText('Eliminar'));
+    fireEvent.click(screen.getByText('No, conservarla'));
+    expect(api.put).not.toHaveBeenCalledWith('/admin/contenido/novedades/borrador', expect.anything());
+    fireEvent.click(screen.getByLabelText('Ver detalle de Clientes'));
+    fireEvent.click(screen.getByText('Eliminar'));
+    fireEvent.click(screen.getByText('Sí, eliminar'));
+    await waitFor(() => expect(ultimaPut('/admin/contenido/novedades/borrador')?.items.map((n: any) => n.id)).toEqual(['1', '2']), { timeout: 3000 });
+  });
+
+  it('el botón de tamaño cicla los tamaños y Ocultar deja la tarjeta atenuada con «Oculta»', async () => {
+    await abrir();
+    fireEvent.click(screen.getByLabelText('Ver detalle de Nuevo: Waffle'));
+    fireEvent.click(screen.getByText(/Tamaño: Mediano/));
+    await waitFor(() => expect(ultimaPut('/admin/contenido/novedades/borrador')?.items.find((n: any) => n.id === '2').tamano).toBe('GRANDE'), { timeout: 3000 });
+    fireEvent.click(screen.getByLabelText('Ocultar Nuevo: Waffle'));
+    expect(screen.getByText('Oculta')).toBeTruthy();
+  });
+
+  it('las fechas y el enlace del video salen en una ventana anclada', async () => {
+    await abrir();
+    fireEvent.click(screen.getByLabelText('Ver detalle de Nuevo: Waffle'));
+    fireEvent.click(screen.getByText('Más opciones'));
+    expect(screen.getByLabelText('Se muestra desde')).toBeTruthy();
+    expect(screen.getByLabelText(/Enlace del video/)).toBeTruthy();
+  });
+
+  it('Publicar pide Sí/No y publica las novedades', async () => {
+    await abrir();
+    fireEvent.click(screen.getByText('+ Agregar novedad'));
+    await waitFor(() => expect(screen.getByText(/Cambios sin publicar: 1/)).toBeTruthy());
+    fireEvent.click(screen.getByText('Publicar'));
+    fireEvent.click(screen.getByText('No, seguir editando'));
+    expect(api.post).not.toHaveBeenCalledWith('/admin/contenido/novedades/publicar', {});
+    fireEvent.click(screen.getByText('Publicar'));
+    fireEvent.click(screen.getByText('Sí, publicar'));
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/admin/contenido/novedades/publicar', {}), { timeout: 3000 });
+  });
+});
+
+describe('Conócenos: la página real en edición', () => {
+  const respuesta = { contenido: CONOCENOS_DEFAULT, publicado: CONOCENOS_DEFAULT, tieneBorrador: false };
+  const local = { nombre: 'Caprichos', direccion: 'Av. Campoy 123', telefono: '999 111 222', whatsapp: '999111222', horario: [], redes: {} };
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    rutas({ '/admin/contenido/conocenos': respuesta, '/carta': categorias, '/carta/local': local });
+  });
+
+  const abrir = async () => {
+    render(<MemoryRouter><ConocenosView /></MemoryRouter>);
+    await waitFor(() => expect(screen.getAllByText('Av. Campoy 123').length).toBeGreaterThan(0));
+  };
+
+  it('escribir sobre el título cambia el borrador', async () => {
+    await abrir();
+    escribir('Título', 'Nuestra historia');
+    await waitFor(() => expect(ultimaPut('/admin/contenido/conocenos')?.titulo).toBe('Nuestra historia'), { timeout: 3000 });
+  });
+
+  it('un bloque se baja con la barra y se oculta marcando «Oculta»', async () => {
+    await abrir();
+    fireEvent.click(screen.getAllByRole('textbox', { name: 'Título del bloque' })[0].parentElement!);
+    fireEvent.click(screen.getByLabelText('Bajar Dónde estamos'));
+    await waitFor(() => expect(ultimaPut('/admin/contenido/conocenos')?.bloques.map((b: any) => b.id).slice(0, 2)).toEqual(['horario', 'donde']), { timeout: 3000 });
+    fireEvent.click(screen.getByLabelText('Ocultar Dónde estamos'));
+    expect(screen.getByText('Oculta')).toBeTruthy();
+    await waitFor(() => expect(ultimaPut('/admin/contenido/conocenos')?.bloques.find((b: any) => b.id === 'donde').visible).toBe(false), { timeout: 3000 });
+  });
+
+  it('+ y − cambian la cantidad de fotos del mosaico', async () => {
+    await abrir();
+    fireEvent.click(screen.getByRole('group', { name: 'Mosaico de momentos' }));
+    fireEvent.click(screen.getByLabelText('Más fotos'));
+    await waitFor(() => expect(ultimaPut('/admin/contenido/conocenos')?.momentosCantidad).toBe(9), { timeout: 3000 });
+    fireEvent.click(screen.getByLabelText('Menos fotos'));
+    await waitFor(() => expect(ultimaPut('/admin/contenido/conocenos')?.momentosCantidad).toBe(8), { timeout: 3000 });
+  });
+
+  it('tocar la dirección avisa «Se edita en Configuración del local» y no deja editarla', async () => {
+    await abrir();
+    fireEvent.click(within(screen.getByRole('group', { name: 'Dónde estamos' })).getByText('Av. Campoy 123'));
+    expect(await screen.findByText('Se edita en Configuración del local')).toBeTruthy();
+    expect(screen.getByText('Ir a Configuración del local')).toBeTruthy();
+    expect(screen.queryByRole('textbox', { name: /direcci/i })).toBeNull();
+  });
+
+  it('Publicar pide Sí/No: No no llama; Sí guarda y publica', async () => {
+    await abrir();
+    escribir('Etiqueta', 'NOSOTROS');
+    await waitFor(() => expect(screen.getByText(/Cambios sin publicar: 1/)).toBeTruthy());
+    fireEvent.click(screen.getByText('Publicar'));
+    fireEvent.click(screen.getByText('No, seguir editando'));
+    expect(api.post).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText('Publicar'));
+    fireEvent.click(screen.getByText('Sí, publicar'));
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/admin/contenido/conocenos/publicar', {}), { timeout: 3000 });
+    expect(ultimaPut('/admin/contenido/conocenos')?.etiqueta).toBe('NOSOTROS');
+  });
+});

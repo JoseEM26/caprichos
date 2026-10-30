@@ -21,7 +21,9 @@ COPY apps/web/package.json ./apps/web/
 COPY packages/compartido/package.json ./packages/compartido/
 
 # Instalar dependencias completas para construcción
-RUN pnpm install --frozen-lockfile
+# Cache de BuildKit del store de pnpm: reinstalar solo descarga lo que cambió
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm install --frozen-lockfile --store-dir /pnpm/store
 
 # ==============================================================================
 # Etapa 3: Builder - Generación de Prisma y compilación NestJS + TypeScript
@@ -48,7 +50,8 @@ RUN pnpm --filter @caprichos/api build || pnpm run build
 # copiado dentro. Así la imagen final es pequeña y no arrastra herramientas de desarrollo
 # (que Trivy reporta con vulnerabilidades críticas) ni enlaces rotos de pnpm.
 FROM builder AS prod
-RUN pnpm --filter @caprichos/api deploy --prod --legacy /out
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    npm_config_store_dir=/pnpm/store pnpm --filter @caprichos/api deploy --prod --legacy /out
 # «deploy» reinstala las dependencias y pierde el cliente de Prisma generado en el builder:
 # se vuelve a generar aquí, con la misma versión que declara la API.
 RUN cd /out && PRISMA_V=$(node -p "require('@prisma/client/package.json').version") \
@@ -61,15 +64,25 @@ FROM node:24-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production \
-    PORT=3000
+    PORT=3000 \
+    UPLOADS_DIR=/data/uploads
 
-RUN apk add --no-cache openssl dumb-init curl \
+RUN apk add --no-cache openssl dumb-init curl fontconfig ttf-dejavu \
+    && npm install -g prisma@6.19.3 tsx \
     && addgroup -g 1001 -S nodejs \
-    && adduser -S nestjs -u 1001
+    && adduser -S nestjs -u 1001 \
+    && mkdir -p /data/uploads && chown -R nestjs:nodejs /data
 
 COPY --from=prod --chown=nestjs:nodejs /out/ ./
+COPY --chown=nestjs:nodejs mockup/ /app/mockup/
+COPY --chown=nestjs:nodejs docs/analisis/ /app/docs/analisis/
+# Las semillas de demostración (prisma/seed-*.ts) importan los permisos del código fuente
+COPY --chown=nestjs:nodejs apps/api/src/modulos/acceso/permisos.ts /app/src/modulos/acceso/permisos.ts
 
 USER nestjs
+
+# Fotos y comprobantes (ADR-012): en producción /data/uploads es un volumen del VPS
+VOLUME ["/data/uploads"]
 
 EXPOSE 3000
 

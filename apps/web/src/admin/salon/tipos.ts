@@ -1,0 +1,219 @@
+export type TipoElemento =
+  | 'MESA'
+  | 'PARED'
+  | 'COCINA'
+  | 'BARRA'
+  | 'BANO'
+  | 'ENTRADA'
+  | 'ESCALERA'
+  | 'CAJA'
+  | 'OTRO';
+
+export interface ElementoPlano {
+  id: string;
+  pisoId: string;
+  tipo: TipoElemento | string;
+  nombre: string | null;
+  x: number;
+  y: number;
+  ancho: number;
+  alto: number;
+  numero: number | null;
+  asientos: number | null;
+  activo: boolean;
+}
+
+export interface TotalesPiso {
+  mesas: number;
+  asientosTotales: number;
+  mesasActivas: number;
+}
+
+export interface PisoPlano {
+  id: string;
+  nombre: string;
+  activo: boolean;
+  cuadriculaAncho: number;
+  cuadriculaAlto: number;
+  cuadricula_ancho?: number;
+  cuadricula_alto?: number;
+  mesas: number;
+  asientosTotales: number;
+  mesasActivas: number;
+  totales: TotalesPiso;
+  elementos: ElementoPlano[];
+}
+
+export interface MesaSalon {
+  id: string;
+  pisoId: string;
+  pisoNombre?: string;
+  tipo: string;
+  numero: number | null;
+  nombre: string | null;
+  asientos: number | null;
+  x: number;
+  y: number;
+  ancho: number;
+  alto: number;
+  activo: boolean;
+  estado: 'LIBRE' | 'OCUPADA';
+  pedido?: {
+    id: string;
+    codigo: string;
+    estado?: string;
+    mozo: string | null;
+    total?: number;
+    lineas?: Array<{ cantidad: number; nombre: string; detalle: string }>;
+  } | null;
+  pedidoCodigo?: string | null;
+  mozo?: string | null;
+  reserva?: {
+    id: string;
+    hora: string;
+    nombre: string;
+    personas: number;
+  } | null;
+}
+
+export interface PisoSalon {
+  id: string;
+  nombre: string;
+  activo: boolean;
+  cuadricula_ancho?: number;
+  cuadricula_alto?: number;
+  cuadriculaAncho?: number;
+  cuadriculaAlto?: number;
+  mesas: MesaSalon[];
+  elementos?: ElementoPlano[];
+}
+
+export interface ReservaMesaItem {
+  id?: string;
+  mesa_id: string | null;
+  numero: number | null;
+  nombre: string | null;
+  asientos: number | null;
+}
+
+export type EstadoReserva = 'ACTIVA' | 'SENTADA' | 'CANCELADA' | 'NO_ASISTIO';
+
+export interface Reserva {
+  id: string;
+  nombre: string;
+  telefono: string;
+  personas: number;
+  hora: string;
+  tolerancia_min: number;
+  estado: EstadoReserva;
+  motivo_cancelacion: string | null;
+  pedido_id: string | null;
+  mesas: ReservaMesaItem[];
+}
+
+export interface DiaCalendarioReserva {
+  fecha: string; // YYYY-MM-DD
+  cantidad: number;
+}
+
+export interface ElementoDisenoJson {
+  id: string;
+  t: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  label?: string;
+  seats?: number;
+  on?: boolean;
+}
+
+export interface PisoDisenoJson {
+  id: string;
+  n: string;
+  on: boolean;
+}
+
+export interface DisenoCompletoJson {
+  floors: PisoDisenoJson[];
+  dims?: Record<string, { c?: number; r?: number }>;
+  plan: Record<string, ElementoDisenoJson[]>;
+}
+
+export interface AvisoPedidoListo {
+  pedidoId: string;
+  codigo: string;
+  mesas: string[];
+  mozoPartyId?: string;
+  recibidoEn: string;
+}
+
+export type RangoMisPedidos = 'hoy' | 'ayer' | '7dias';
+
+/** Progreso en cocina y entrega (mismo contrato que la API: progresoDelPedido). */
+export type EtapaProgreso =
+  | 'RECIBIDO'
+  | 'EN_COCINA'
+  | 'PARCIAL'
+  | 'LISTO'
+  | 'EN_CAMINO'
+  | 'ESPERANDO_CLIENTE'
+  | 'ENTREGADO'
+  | 'ANULADO';
+
+export interface AreaProgreso {
+  nombre: string;
+  estado: 'PENDIENTE' | 'PREPARANDO' | 'LISTA';
+  lineas: number;
+}
+
+export interface ProgresoPedido {
+  etapa: EtapaProgreso;
+  etiqueta: string;
+  areas: AreaProgreso[];
+  listasDe: number;
+  totalAreas: number;
+  porcentaje: number;
+  enCamino: boolean;
+  etaMin?: number;
+  etaMax?: number;
+}
+
+/** Pedido que tomó el mozo (GET /admin/pedidos/mis-pedidos). */
+export interface MiPedido {
+  id: string;
+  codigo: string;
+  estado: string;
+  modalidad: string;
+  mesaNombre: string | null;
+  /** Nombre del cliente (o la mesa si no hay nombre). Nunca teléfono ni DNI. */
+  clienteNombre?: string | null;
+  total: number;
+  pagoEstado: string | null;
+  /** YAPE | PLIN | TRANSFERENCIA | EFECTIVO | … (null si no se eligió) */
+  pagoMetodo: string | null;
+  /** Pago dividido: monto por medio (vacío si el pedido no tiene plan) */
+  plan?: Array<{ medio: string; monto: number }>;
+  /** Parte del plan que lleva voucher (YAPE, PLIN, TRANSFERENCIA) */
+  montoDigital?: number;
+  /** Cantidad de fotos de voucher ligadas al pedido */
+  vouchers: number;
+  /** Alguna foto vigente se lee. El mozo nunca ve semáforo ni datos extraídos. */
+  tieneVoucherLegible: boolean;
+  /** Vigentes (no reemplazados) y total con reemplazados (historial) */
+  historialVouchers?: number;
+  /** Un voucher por medio digital del plan: subido o falta, con su monto */
+  vouchersPorMedio?: Array<{ medio: string; monto: number; subido: boolean; voucherId?: string | null }>;
+  /** Regla del servidor (regla-cambio-voucher.ts): la web no la duplica */
+  puedeCambiarVoucher?: boolean;
+  puedeSubirVoucher?: boolean;
+  creadoEn: string;
+  lineas: Array<{ nombre: string; cantidad: number }>;
+  /** Cocina y entrega en vivo. Puede faltar en respuestas anteriores. */
+  progreso?: ProgresoPedido;
+}
+
+export interface RespuestaMisPedidos {
+  pedidos: MiPedido[];
+  resumen: { cantidad: number; total: number; enCurso: number; entregados: number };
+}

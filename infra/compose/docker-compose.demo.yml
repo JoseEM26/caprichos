@@ -1,0 +1,119 @@
+# ==============================================================================
+# Caprichos — Sobrescritura para Ambiente DEMO
+# ==============================================================================
+# Uso:
+#   docker compose -f docker-compose.base.yml -f docker-compose.demo.yml [comandos]
+# ==============================================================================
+
+name: caprichos-demo
+
+services:
+  postgres:
+    container_name: caprichos-demo-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-caprichos_demo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-caprichos_demo}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    container_name: caprichos-demo-redis
+    volumes:
+      - redis_data:/data
+
+  api:
+    image: ${GHCR_REPO:-ghcr.io/joseem26}/caprichos-api:${TAG:-demo}
+    # Sin container_name fijo para permitir rolling rollout (coexistencia de 2 instancias)
+    environment:
+      PORT: 3000
+      NODE_ENV: production
+      DATABASE_URL: ${DB_ESQUEMA:-postgresql}://${POSTGRES_USER:-caprichos_demo}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-caprichos_demo}?schema=public
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      UPLOADS_DIR: /data/uploads
+      APP_VERSION: ${APP_VERSION:-0.1.0}
+      GIT_COMMIT: ${TAG:-demo}
+      DOMINIO_BASE: ${DOMINIO_DEMO:-207-244-232-127.sslip.io}
+      CORS_ORIGIN: https://${DOMINIO_DEMO:-207-244-232-127.sslip.io},https://${DOMINIO_ALT:-alt1.invalid},https://${DOMINIO_ALT2:-alt2.invalid}
+      TRUST_PROXY: "1"
+      # Chatbot de WhatsApp: los valores viven solo en el .env del servidor (nunca en Git)
+      WHATSAPP_TOKEN: ${WHATSAPP_TOKEN:-}
+      WHATSAPP_PHONE_ID: ${WHATSAPP_PHONE_ID:-}
+      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
+      WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}
+      WHATSAPP_API_VERSION: ${WHATSAPP_API_VERSION:-v25.0}
+      ADMIN_WHATSAPP_NUMBERS: ${ADMIN_WHATSAPP_NUMBERS:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
+      CARTA_URL_PUBLICA: ${CARTA_URL_PUBLICA:-}
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=caprichos-proxy-net
+      # Rutas API
+      - "traefik.http.routers.demo-api.rule=(Host(`${DOMINIO_DEMO:-localhost}`) || Host(`${DOMINIO_ALT:-alt1.invalid}`) || Host(`${DOMINIO_ALT2:-alt2.invalid}`)) && (PathPrefix(`/auth`) || PathPrefix(`/carta`) || PathPrefix(`/pedidos`) || PathPrefix(`/archivos`) || PathPrefix(`/uploads`) || PathPrefix(`/socket.io`) || PathPrefix(`/salud`) || PathPrefix(`/whatsapp`) || PathPrefix(`/version`) || PathPrefix(`/reclamos/constancia`) || (Path(`/reclamos`) && Method(`POST`)))"
+      - traefik.http.routers.demo-api.entrypoints=websecure
+      - traefik.http.routers.demo-api.tls=true
+      - traefik.http.routers.demo-api.tls.certresolver=letsencrypt
+      - traefik.http.routers.demo-api.priority=200
+      - traefik.http.routers.demo-api.service=demo-api
+      - traefik.http.routers.demo-api.middlewares=sec-headers-demo@file
+      # Rate limit en login
+      - "traefik.http.routers.demo-login.rule=(Host(`${DOMINIO_DEMO:-localhost}`) || Host(`${DOMINIO_ALT:-alt1.invalid}`) || Host(`${DOMINIO_ALT2:-alt2.invalid}`)) && Path(`/auth/ingresar`) && Method(`POST`)"
+      - traefik.http.routers.demo-login.entrypoints=websecure
+      - traefik.http.routers.demo-login.tls=true
+      - traefik.http.routers.demo-login.tls.certresolver=letsencrypt
+      - traefik.http.routers.demo-login.priority=400
+      - traefik.http.routers.demo-login.service=demo-api
+      - traefik.http.routers.demo-login.middlewares=rate-limit-login@file,sec-headers-demo@file
+      # Admin API (JSON)
+      - "traefik.http.routers.demo-admin-api.rule=(Host(`${DOMINIO_DEMO:-localhost}`) || Host(`${DOMINIO_ALT:-alt1.invalid}`) || Host(`${DOMINIO_ALT2:-alt2.invalid}`)) && PathPrefix(`/admin`)"
+      - traefik.http.routers.demo-admin-api.entrypoints=websecure
+      - traefik.http.routers.demo-admin-api.tls=true
+      - traefik.http.routers.demo-admin-api.tls.certresolver=letsencrypt
+      - traefik.http.routers.demo-admin-api.priority=200
+      - traefik.http.routers.demo-admin-api.service=demo-api
+      - traefik.http.routers.demo-admin-api.middlewares=sec-headers-demo@file
+      # Prefijo /api
+      - "traefik.http.routers.demo-api-prefijo.rule=(Host(`${DOMINIO_DEMO:-localhost}`) || Host(`${DOMINIO_ALT:-alt1.invalid}`) || Host(`${DOMINIO_ALT2:-alt2.invalid}`)) && PathPrefix(`/api`)"
+      - traefik.http.routers.demo-api-prefijo.entrypoints=websecure
+      - traefik.http.routers.demo-api-prefijo.tls=true
+      - traefik.http.routers.demo-api-prefijo.tls.certresolver=letsencrypt
+      - traefik.http.routers.demo-api-prefijo.priority=200
+      - traefik.http.routers.demo-api-prefijo.service=demo-api
+      - traefik.http.routers.demo-api-prefijo.middlewares=strip-api-prefix@file,sec-headers-demo@file
+      - traefik.http.services.demo-api.loadbalancer.server.port=3000
+
+  web:
+    image: ${GHCR_REPO:-ghcr.io/joseem26}/caprichos-web:${TAG:-demo}
+    # Sin container_name fijo para permitir rolling rollout (coexistencia de 2 instancias)
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=caprichos-proxy-net
+      # Admin SPA (HTML)
+      - "traefik.http.routers.demo-admin-html.rule=(Host(`${DOMINIO_DEMO:-localhost}`) || Host(`${DOMINIO_ALT:-alt1.invalid}`) || Host(`${DOMINIO_ALT2:-alt2.invalid}`)) && PathPrefix(`/admin`) && HeaderRegexp(`Accept`, `text/html`)"
+      - traefik.http.routers.demo-admin-html.entrypoints=websecure
+      - traefik.http.routers.demo-admin-html.tls=true
+      - traefik.http.routers.demo-admin-html.tls.certresolver=letsencrypt
+      - traefik.http.routers.demo-admin-html.priority=300
+      - traefik.http.routers.demo-admin-html.service=demo-web
+      - traefik.http.routers.demo-admin-html.middlewares=sec-headers-demo@file
+      # Carta y resto del sitio
+      - "traefik.http.routers.demo-web.rule=(Host(`${DOMINIO_DEMO:-localhost}`) || Host(`${DOMINIO_ALT:-alt1.invalid}`) || Host(`${DOMINIO_ALT2:-alt2.invalid}`))"
+      - traefik.http.routers.demo-web.entrypoints=websecure
+      - traefik.http.routers.demo-web.tls=true
+      - traefik.http.routers.demo-web.tls.certresolver=letsencrypt
+      - traefik.http.routers.demo-web.priority=1
+      - traefik.http.routers.demo-web.middlewares=sec-headers-demo@file
+      - traefik.http.services.demo-web.loadbalancer.server.port=80
+
+volumes:
+  postgres_data:
+    name: caprichos_demo_postgres_data
+  redis_data:
+    name: caprichos_demo_redis_data
+  uploads_data:
+    name: caprichos_demo_uploads_data

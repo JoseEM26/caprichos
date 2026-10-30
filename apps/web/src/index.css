@@ -1,5 +1,1 @@
-body {
-  margin: 0;
-  color: #212529;
-  background-color: #fafafa;
-}
+@import './estilos/tema.css';

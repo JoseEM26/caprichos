@@ -601,6 +601,8 @@ Convención: un caso `TC-CAP-<HU>-<NN>` por cada criterio `CA-NN` de la historia
 | TC-CAP-126-02 | HU-CAP-126 · CA-2: dado un frappé con leche obligatoria, cuando el cliente intenta seguir sin elegir → el bot vuelve a mostrar las leches (RQ-BOT-01-02) | func |  |  |
 | TC-CAP-127-01 | HU-CAP-127 · CA-1: dado dos productos agregados, cuando el cliente pide «Ver carrito» → ve los dos con su total y botones «Agregar más», «Quitar» y «Terminar» (RQ-BOT-01-03) | func |  |  |
 | TC-CAP-127-02 | HU-CAP-127 · CA-2: dado un delivery, cuando el cliente comparte su ubicación de WhatsApp → el bot calcula el envío; si escribe solo la dirección, el envío queda por calcular para el asesor (RQ-BOT-01-04) | integ |  |  |
+| TC-CAP-127-03 | HU-CAP-127 · CA-3: dado un enlace de Google Maps con coordenadas, cuando el cliente lo manda por WhatsApp → el pedido guarda el punto y la zona, y el bot responde con el costo de envío (RQ-BOT-01-09) | func |  |  |
+| TC-CAP-127-04 | HU-CAP-127 · CA-4: dado un enlace sin coordenadas o solo texto, cuando el cliente lo manda → el bot pide la ubicación con el clip de WhatsApp y no calcula el envío; si no la manda, el asesor ubica el pedido (RQ-BOT-01-10) | func |  |  |
 | TC-CAP-128-01 | HU-CAP-128 · CA-1: dado un producto agotado, cuando el cliente abre su categoría → no aparece; con la pausa activa, el bot ofrece hablar con una persona (RQ-BOT-01-05) | func |  |  |
 | TC-CAP-128-02 | HU-CAP-128 · CA-2: dado un descuento de 20 % en frappés, cuando el cliente agrega uno → el resumen muestra el descuento (RQ-BOT-01-06) | func |  |  |
 | TC-CAP-128-03 | HU-CAP-128 · CA-3: dado un carrito terminado sin alta demanda, cuando el cliente confirma → cada parte aparece en la pantalla de su área, el pedido figura en caja con el pago por coordinar y el bot responde «Tu pedido ya está en cocina: te llega de 25 a 35 minutos» (RQ-BOT-01-07) | func |  |  |
@@ -1068,7 +1070,7 @@ Ejecutado por IA: (nada ejecutado; plan generado por IA) - Consolidado y aprobad
 | HU-CAP-176 | H1 | 10 | TC-CAP-176-01 a 10 | 0 |
 | HU-CAP-177 | H1 | 5 | TC-CAP-177-01 a 05 | 0 |
 | HU-CAP-126 | H2 | 2 | TC-CAP-126-01 a 02 | 0 |
-| HU-CAP-127 | H2 | 2 | TC-CAP-127-01 a 02 | 0 |
+| HU-CAP-127 | H2 | 4 | TC-CAP-127-01 a 04 | 0 |
 | HU-CAP-128 | H2 | 3 | TC-CAP-128-01 a 03 | 0 |
 | HU-CAP-129 | H2 | 1 | TC-CAP-129-01 a 01 | 0 |
 | HU-CAP-130 | H2 | 3 | TC-CAP-130-01 a 03 | 0 |

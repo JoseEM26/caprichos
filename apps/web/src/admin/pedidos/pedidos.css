@@ -1,0 +1,199 @@
+.cj-grid {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+  height: clamp(560px, calc(100vh - 230px), 900px);
+}
+
+.cj-left,
+.cj-right {
+  background: var(--cp-white, #FFFFFF);
+  border: 1px solid var(--cp-line, #E3D6C6);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.cj-left {
+  flex: 0 0 clamp(340px, 38%, 460px);
+}
+
+.cj-right {
+  flex: 1 1 0;
+  box-shadow: 0 6px 18px rgba(11, 44, 62, 0.10);
+}
+
+.cj-head {
+  padding: 12px;
+  border-bottom: 1px solid var(--cp-line, #E3D6C6);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: none;
+  max-height: 55%;
+  overflow-y: auto;
+}
+
+.cj-scroll {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.cj-foot {
+  padding: 10px 12px;
+  border-top: 1px solid var(--cp-line, #E3D6C6);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: none;
+  background: var(--cp-cream, #FBF4EC);
+}
+
+.cj-pedido-card {
+  text-align: left;
+  background: var(--cp-white, #FFFFFF);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  flex: none; /* en una lista con scroll no se encogen ni se superponen */
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.cj-pedido-card:hover {
+  background: #F6EBDD;
+}
+
+.cj-resaltado {
+  animation: cj-pulse 1.2s ease-in-out infinite alternate;
+  background: #FFF7ED !important;
+  border-color: var(--cp-orange, #E67929) !important;
+}
+
+@keyframes cj-pulse {
+  from {
+    box-shadow: 0 0 0 0 rgba(230, 121, 41, 0.4);
+  }
+  to {
+    box-shadow: 0 0 0 6px rgba(230, 121, 41, 0);
+  }
+}
+
+@media (max-width: 900px) {
+  .cj-grid {
+    flex-direction: column;
+    height: auto;
+  }
+  .cj-left {
+    flex: none;
+  }
+  .cj-left .cj-scroll {
+    max-height: 60vh;
+  }
+  .cj-right {
+    flex: none;
+  }
+  .cj-right .cj-scroll {
+    overflow: visible;
+    flex: 1 1 auto;
+    min-height: auto;
+  }
+}
+
+/* Detalle y No entregados: bases para todos los tamaños (en celular, una columna) */
+.cj-detalle-cuerpo {
+  padding: 14px 16px;
+}
+
+.cj-detalle-pie {
+  padding: 12px 16px;
+}
+
+.cj-dos {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.cj-card {
+  background: var(--cp-white, #FFFFFF);
+  border: 1px solid var(--cp-line, #E3D6C6);
+  border-radius: 14px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.cj-card-titulo {
+  font-family: Montserrat, sans-serif;
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--cp-navy, #0B2C3E);
+}
+
+.cj-ne-grupos {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+}
+
+/* Escritorio: lista a la izquierda y detalle ancho a la derecha; productos y resumen lado a lado */
+@media (min-width: 1100px) {
+  .cj-grid {
+    gap: 20px;
+    height: clamp(600px, calc(100vh - 210px), 980px);
+  }
+
+  .cj-left {
+    flex: 0 0 clamp(340px, 33%, 420px);
+  }
+
+  .cj-head {
+    padding: 16px;
+    gap: 12px;
+  }
+
+  .cj-detalle-cuerpo {
+    padding: 20px 24px;
+  }
+
+  .cj-detalle-pie {
+    padding: 14px 24px;
+  }
+
+  /* El detalle entero (productos, cobro, comprobantes) se desplaza como un bloque, sin recortes internos */
+  .cj-right {
+    overflow-y: auto;
+  }
+
+  .cj-right > .cj-scroll,
+  .cj-right > .cj-foot {
+    flex: none;
+    overflow: visible;
+    max-height: none;
+  }
+}
+
+@media (min-width: 1280px) {
+  .cj-dos {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+  }
+
+  .cj-ne-grupos {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px;
+  }
+}

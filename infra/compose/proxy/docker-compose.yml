@@ -1,0 +1,55 @@
+# ==============================================================================
+# Caprichos — Proxy Traefik Autónomo (Sin Dokploy)
+# ==============================================================================
+# Proxy inverso perimetral para Caprichos (demo, staging y producción).
+# Reemplaza completamente a dokploy-traefik.
+#
+# Características:
+# - Termina HTTPS con Let's Encrypt (ACME httpChallenge) para sslip.io y caprichos.pe.
+# - Soporta Cloudflare proxy (Full / Full Strict) con cabeceras de IP confiables.
+# - Middlewares globales compartidos: Rate Limit, Headers de seguridad, Noindex.
+# - Red externa compartida: caprichos-proxy-net.
+# ==============================================================================
+
+services:
+  proxy:
+    image: traefik:v3.6
+    container_name: caprichos-proxy-traefik
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "${PROXY_HTTP_PORT:-80}:80"
+      - "${PROXY_HTTPS_PORT:-443}:443"
+    environment:
+      - TZ=America/Lima
+      - ACME_EMAIL=${ACME_EMAIL:-jose@caprichos.pe}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./dynamic:/etc/traefik/dynamic:ro
+      - proxy_acme:/etc/traefik/acme
+      - ./certs:/etc/traefik/certs:ro
+    networks:
+      - caprichos-proxy-net
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    healthcheck:
+      test: ["CMD-SHELL", "traefik healthcheck --ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    labels:
+      - traefik.enable=true
+      - "traefik.http.services.ping.loadbalancer.server.port=8080"
+
+volumes:
+  proxy_acme:
+    name: caprichos_proxy_acme
+
+networks:
+  caprichos-proxy-net:
+    name: caprichos-proxy-net
+    external: true

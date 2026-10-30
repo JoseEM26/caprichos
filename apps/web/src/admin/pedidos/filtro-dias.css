@@ -1,0 +1,150 @@
+/* Filtro de días de Pedidos y caja: móvil primero, botones de 44 px, sin desplazamiento horizontal */
+
+.fd {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.fd-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fd-chip {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 9999px;
+  border: 1.5px solid var(--cp-navy, #0B2C3E);
+  background: transparent;
+  color: var(--cp-navy, #0B2C3E);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.fd-chip--activo {
+  background: var(--cp-navy, #0B2C3E);
+  color: var(--cp-cream, #FBF4EC);
+}
+
+/* Pendientes de días anteriores: ámbar propio para que no se confunda con los días */
+.fd-chip--pendientes {
+  border-color: var(--cp-amber, #B7791F);
+  color: var(--cp-amber, #8A5A12);
+  background: var(--cp-amber-soft, #FDF3DC);
+}
+
+.fd-chip--pendientes.fd-chip--activo {
+  background: var(--cp-amber, #B7791F);
+  color: var(--cp-white, #FFFFFF);
+}
+
+.fd-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--cp-line, #E3D6C6);
+  border-radius: 12px;
+  background: var(--cp-white, #FFFFFF);
+}
+
+.fd-campos {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.fd-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cp-soft, #2C4C5D);
+  min-width: 0;
+}
+
+.fd-campo input {
+  min-height: 44px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0 10px;
+  border: 1.5px solid var(--cp-line, #E3D6C6);
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 15px;
+  background: var(--cp-white, #FFFFFF);
+  color: var(--cp-navy, #0B2C3E);
+}
+
+.fd-ayuda {
+  margin: 0;
+  font-size: 12px;
+  color: var(--cp-soft, #2C4C5D);
+}
+
+.fd-error {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--cp-rust, #B2500F);
+}
+
+.fd-aplicar {
+  min-height: 44px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--cp-orange, #E67929);
+  color: var(--cp-navy, #0B2C3E);
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.fd-aplicar:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.fd-estado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--cp-navy, #0B2C3E);
+}
+
+.fd-volver {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1.5px solid var(--cp-navy, #0B2C3E);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--cp-navy, #0B2C3E);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+@media (min-width: 640px) {
+  .fd-campos {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .fd-aplicar {
+    align-self: flex-start;
+    padding: 0 18px;
+  }
+}

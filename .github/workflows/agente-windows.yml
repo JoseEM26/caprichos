@@ -1,0 +1,59 @@
+name: Programa de impresión (Windows y Linux)
+
+# Job aparte: solo corre si cambia el agente local; no alarga el despliegue normal.
+on:
+  push:
+    branches: [main, preprod]
+    paths:
+      - 'apps/agente-local/**'
+      - 'packages/compartido/**'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  exe:
+    name: Construir programa de impresión (Windows y Linux)
+    runs-on: ubuntu-latest
+    # Los secretos SSH viven en el ambiente demo (igual que el despliegue); producción se publica aparte
+    environment:
+      name: demo
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @caprichos/compartido build
+      - run: pnpm --filter @caprichos/agente-local empaquetar:win
+      - run: pnpm --filter @caprichos/agente-local empaquetar:linux
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agente-impresion
+          path: |
+            apps/agente-local/dist-exe/agente-impresion-windows.exe
+            apps/agente-local/dist-exe/agente-impresion-linux
+          retention-days: 30
+
+      # Publica el .exe donde la API lo sirve (/api/agente-impresion/descargar/{windows,linux}).
+      - name: Subir al servidor
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          if [ -z "$SSH_KEY" ] || [ -z "$SSH_HOST" ]; then echo "Sin acceso SSH: solo queda el artefacto."; exit 0; fi
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes "${SSH_USER:-deploy}@${SSH_HOST}" 'mkdir -p ~/caprichos-descargas'
+          scp -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            apps/agente-local/dist-exe/agente-impresion-windows.exe \
+            apps/agente-local/dist-exe/agente-impresion-linux \
+            "${SSH_USER:-deploy}@${SSH_HOST}:caprichos-descargas/"
