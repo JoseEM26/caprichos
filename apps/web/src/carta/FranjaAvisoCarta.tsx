@@ -158,7 +158,7 @@ export function FranjaAvisoCarta({
         fontSize: '13px',
         lineHeight: '18px',
         fontFamily: 'Montserrat, sans-serif',
-        zIndex: 25,
+        zIndex: 1, // por debajo de la cabecera fija (zIndex 20) al hacer scroll
         position: 'relative',
         display: 'flex',
         alignItems: 'center',
