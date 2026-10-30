@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ROLES_SISTEMA } from '@caprichos/compartido';
 import { api, ErrorApi } from '../../comun/api';
 import { Boton } from '../../comun/Boton';
@@ -6,6 +7,7 @@ import { Campo } from '../../comun/Campo';
 import { Combo } from '../../comun/Combo';
 import { Confirmar } from '../../comun/Confirmar';
 import { Icono } from '../../comun/Icono';
+import { useSesion } from '../../comun/sesion';
 import type { UsuarioItem } from './tipos';
 import { ETIQUETAS_ROLES } from './CrearUsuarioModal';
 import { EditorHorario } from './EditorHorario';
@@ -22,6 +24,9 @@ import {
 } from './horario';
 import { BloqueAlertasWhatsApp } from './BloqueAlertasWhatsApp';
 import { puedeRecibirAlertasWhatsApp } from './alertasWhatsappApi';
+import { AUTOCOMPLETAR_CLAVE, AVISO_REINGRESO, FORMATO_CORREO_ADMIN } from './claves';
+import { CambiarClaveModal } from './CambiarClaveModal';
+import { FotoUsuarioAdmin } from './FotoUsuarioAdmin';
 
 export interface EditarUsuarioModalProps {
   usuario: UsuarioItem | null;
@@ -41,11 +46,22 @@ export function EditarUsuarioModal({
   alCerrar,
   alUsuarioEditado,
 }: EditarUsuarioModalProps) {
+  const { usuario: yo, salir } = useSesion();
+  const navigate = useNavigate();
+  const esAdmin = yo?.rol === 'ADMIN';
+
   const [nombres, setNombres] = useState('');
   const [apellidos, setApellidos] = useState('');
   const [rol, setRol] = useState('');
   const [errores, setErrores] = useState<Record<string, string>>({});
   const [errorServidor, setErrorServidor] = useState<string | null>(null);
+
+  // Solo ADMIN: DNI nuevo (vacío = no cambia), correo y contraseña del administrador para el DNI.
+  const [dniNuevo, setDniNuevo] = useState('');
+  const [claveAdminDni, setClaveAdminDni] = useState('');
+  const [correoNuevo, setCorreoNuevo] = useState('');
+  const [quitarCorreo, setQuitarCorreo] = useState(false);
+  const [cambiarClaveAbierto, setCambiarClaveAbierto] = useState(false);
 
   const [confirmarAbierto, setConfirmarAbierto] = useState(false);
   const [guardando, setGuardando] = useState(false);
@@ -100,6 +116,10 @@ export function EditarUsuarioModal({
       setRol(usuario.rol);
       setErrores({});
       setErrorServidor(null);
+      setDniNuevo('');
+      setClaveAdminDni('');
+      setCorreoNuevo('');
+      setQuitarCorreo(false);
     }
   }, [usuario]);
 
@@ -120,6 +140,17 @@ export function EditarUsuarioModal({
       nuevosErrores.rol = 'El rol es requerido';
     }
 
+    if (esAdmin) {
+      if (dniNuevo.trim() && !/^\d{8}$/.test(dniNuevo.trim())) {
+        nuevosErrores.dni = 'El DNI debe tener exactamente 8 dígitos';
+      } else if (dniNuevo.trim() && !claveAdminDni) {
+        nuevosErrores.claveAdmin = 'Escribe tu contraseña de administrador para cambiar el DNI';
+      }
+      if (!quitarCorreo && correoNuevo.trim() && !FORMATO_CORREO_ADMIN.test(correoNuevo.trim())) {
+        nuevosErrores.correo = 'El correo no tiene un formato válido';
+      }
+    }
+
     setErrores(nuevosErrores);
     return Object.keys(nuevosErrores).length === 0;
   }
@@ -131,17 +162,37 @@ export function EditarUsuarioModal({
     setConfirmarAbierto(true);
   }
 
+  /** El servidor pide volver a entrar (se cambió el DNI o la clave propia): cierra la sesión y avisa. */
+  async function volverAIngresar() {
+    await salir();
+    navigate('/admin/ingresar', { replace: true, state: { aviso: AVISO_REINGRESO } });
+  }
+
   async function handleConfirmarGuardar() {
     if (!usuario) return;
     setGuardando(true);
     try {
-      const resp = await api.patch<UsuarioItem>(`/admin/usuarios/${usuario.id}`, {
+      const cuerpo: Record<string, string> = {
         nombres: nombres.trim(),
         apellidos: apellidos.trim(),
         rol,
-      });
+      };
+      if (esAdmin) {
+        if (dniNuevo.trim()) {
+          cuerpo.dni = dniNuevo.trim();
+          cuerpo.claveAdmin = claveAdminDni;
+        }
+        if (quitarCorreo) cuerpo.correo = '';
+        else if (correoNuevo.trim()) cuerpo.correo = correoNuevo.trim();
+      }
+
+      const resp = await api.patch<UsuarioItem & { reingresar?: boolean }>(`/admin/usuarios/${usuario.id}`, cuerpo);
 
       setConfirmarAbierto(false);
+      if (resp.reingresar) {
+        await volverAIngresar();
+        return;
+      }
       alUsuarioEditado(resp);
     } catch (err) {
       setConfirmarAbierto(false);
@@ -214,9 +265,9 @@ export function EditarUsuarioModal({
               disabled={guardando}
               aria-label="Cerrar modal"
               style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '20px',
+                width: '44px',
+                height: '44px',
+                borderRadius: '22px',
                 border: '1.5px solid var(--cp-line)',
                 background: 'transparent',
                 color: 'var(--cp-navy)',
@@ -292,12 +343,47 @@ export function EditarUsuarioModal({
           <form hidden={seccion !== 'datos'} onSubmit={handleSolicitarGuardar} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <Campo
               id="editar-dni"
-              etiqueta="DNI (Documento de identidad)"
+              etiqueta="DNI actual (Documento de identidad)"
               type="text"
               value={usuario.dni}
               disabled={true}
-              ayuda="El DNI está asociado a la persona y no es editable."
+              ayuda={esAdmin ? undefined : 'El DNI está asociado a la persona y no es editable.'}
             />
+
+            {esAdmin && (
+              <Campo
+                id="editar-dni-nuevo"
+                etiqueta="Nuevo DNI (deja vacío para no cambiarlo)"
+                type="text"
+                inputMode="numeric"
+                maxLength={8}
+                value={dniNuevo}
+                onChange={(e) => {
+                  setDniNuevo(e.target.value.replace(/\D/g, ''));
+                  if (errores.dni) setErrores((prev) => ({ ...prev, dni: '' }));
+                }}
+                error={errores.dni}
+                ayuda="Es el usuario con el que la persona entra. Debe tener 8 dígitos."
+                disabled={guardando}
+              />
+            )}
+
+            {esAdmin && dniNuevo.trim() && (
+              <Campo
+                id="editar-clave-admin-dni"
+                etiqueta="Tu contraseña de administrador"
+                type="password"
+                permiteAlternarClave
+                autoComplete={AUTOCOMPLETAR_CLAVE.actual}
+                value={claveAdminDni}
+                onChange={(e) => {
+                  setClaveAdminDni(e.target.value);
+                  if (errores.claveAdmin) setErrores((prev) => ({ ...prev, claveAdmin: '' }));
+                }}
+                error={errores.claveAdmin}
+                disabled={guardando}
+              />
+            )}
 
             <Campo
               id="editar-nombres"
@@ -324,6 +410,48 @@ export function EditarUsuarioModal({
               error={errores.apellidos}
               disabled={guardando}
             />
+
+            {esAdmin && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <Campo
+                  id="editar-correo"
+                  etiqueta="Correo (deja vacío para no cambiarlo)"
+                  type="email"
+                  autoComplete="off"
+                  value={correoNuevo}
+                  onChange={(e) => {
+                    setCorreoNuevo(e.target.value);
+                    setQuitarCorreo(false);
+                    if (errores.correo) setErrores((prev) => ({ ...prev, correo: '' }));
+                  }}
+                  error={errores.correo}
+                  disabled={guardando || quitarCorreo}
+                />
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', minHeight: '44px', fontSize: '14px', color: 'var(--cp-navy)' }}>
+                  <input
+                    type="checkbox"
+                    checked={quitarCorreo}
+                    onChange={(e) => {
+                      setQuitarCorreo(e.target.checked);
+                      if (e.target.checked) setCorreoNuevo('');
+                    }}
+                    disabled={guardando}
+                  />
+                  Quitar el correo actual
+                </label>
+              </div>
+            )}
+
+            {esAdmin && (
+              <>
+                <FotoUsuarioAdmin usuario={usuario} deshabilitado={guardando} />
+                <div>
+                  <Boton type="button" variante="secundario" onClick={() => setCambiarClaveAbierto(true)} disabled={guardando}>
+                    Cambiar contraseña
+                  </Boton>
+                </div>
+              </>
+            )}
 
             <Combo
               etiqueta="Rol o cargo en el sistema"
@@ -369,6 +497,15 @@ export function EditarUsuarioModal({
         </div>
       </div>
 
+      {esAdmin && (
+        <CambiarClaveModal
+          usuario={usuario}
+          abierto={cambiarClaveAbierto}
+          alCerrar={() => setCambiarClaveAbierto(false)}
+          alReingresar={volverAIngresar}
+        />
+      )}
+
       <Confirmar
         abierto={confirmarHorario}
         titulo="¿Guardar horario?"
@@ -383,7 +520,11 @@ export function EditarUsuarioModal({
       <Confirmar
         abierto={confirmarAbierto}
         titulo="¿Guardar cambios?"
-        mensaje={`¿Estás seguro de modificar los datos de ${usuario.nombres} ${usuario.apellidos}?`}
+        mensaje={
+          esAdmin && dniNuevo.trim()
+            ? `¿Cambiar el DNI de ${usuario.nombres} ${usuario.apellidos}? Si es tu propia cuenta, se cerrará tu sesión.`
+            : `¿Estás seguro de modificar los datos de ${usuario.nombres} ${usuario.apellidos}?`
+        }
         textoSi="Sí, guardar"
         textoNo="No, cancelar"
         cargando={guardando}

@@ -49,6 +49,16 @@ on:
         description: 'Solo crear-admin-produccion: DNI (8 dígitos) del administrador inicial'
         required: false
         type: string
+      excluir_productos:
+        description: 'Solo exportar-datos-demo: nombres de productos que NO viajan, separados por coma (p. ej. ASDSADASD)'
+        required: false
+        default: 'ASDSADASD'
+        type: string
+      sin_personal:
+        description: 'Solo exportar-datos-demo: true = no exporta las cuentas del personal (se crean a mano en producción)'
+        required: false
+        default: true
+        type: boolean
       dominio_adicional:
         description: 'Solo configurar-dominios-demo: segundo dominio que atiende la demo (por defecto caprichos.pe; escriba ninguno para quitarlo cuando producción lo use)'
         required: false
@@ -737,11 +747,18 @@ jobs:
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
+          EXCLUIR: ${{ github.event.inputs.excluir_productos }}
+          SIN_PERSONAL_IN: ${{ github.event.inputs.sin_personal }}
         run: |
           set -o pipefail
+          if [[ ! "$EXCLUIR" =~ ^[A-Za-z0-9ÁÉÍÓÚÑáéíóúñ\ ,._-]*$ ]]; then
+            echo "::error::excluir_productos tiene caracteres no válidos."
+            exit 1
+          fi
+          if [ "$SIN_PERSONAL_IN" = "false" ]; then SIN_PERSONAL=NO; else SIN_PERSONAL=SI; fi
           ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
             "${SSH_USER:-deploy}@${SSH_HOST}" \
-            "/opt/caprichos/scripts/exportar-datos-empresa.sh completo" 2>&1 | tee exportar.log
+            "EXCLUIR_PRODUCTOS='${EXCLUIR}' SIN_PERSONAL=${SIN_PERSONAL} /opt/caprichos/scripts/exportar-datos-empresa.sh completo" 2>&1 | tee exportar.log
 
       - name: Resumen del paquete y su reporte (DNI enmascarados)
         if: always()

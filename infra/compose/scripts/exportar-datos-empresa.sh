@@ -7,7 +7,8 @@
 #   completo    : datos.json + archivos/ + manifiesto.json + reporte.md (+ .tar.gz)  [defecto]
 #   solo-reporte: solo reporte.md (simulacro: qué saldría, sin datos ni archivos)
 # El paquete queda en /opt/caprichos/respaldos/datos-empresa/<fecha>/ con permisos 0600.
-# El reporte se imprime (los DNI salen enmascarados). Nunca imprime secretos.
+# Variables opcionales: EXCLUIR_PRODUCTOS="NOMBRE1,NOMBRE2" (productos que no viajan) y SIN_PERSONAL=SI
+# (no exporta cuentas del personal). El reporte se imprime (los DNI salen enmascarados). Nunca imprime secretos.
 # Lo invoca el job exportar-datos-demo de .github/workflows/deploy.yml.
 # ==============================================================================
 set -euo pipefail
@@ -50,6 +51,8 @@ compose run --rm -T \
   --user "$(id -u):$(id -g)" \
   -e ENTORNO_DATOS=demo \
   -e HOME=/tmp \
+  -e EXCLUIR_PRODUCTOS="${EXCLUIR_PRODUCTOS:-}" \
+  -e SIN_PERSONAL="${SIN_PERSONAL:-}" \
   -v "${DESTINO}:/salida" \
   api tsx prisma/migracion-datos/exportar.ts --salida=/salida/paquete ${ARG_MODO}
 

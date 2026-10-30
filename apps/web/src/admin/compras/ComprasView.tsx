@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { AvisoControlAlmacen } from '../stock/AvisoControlAlmacen';
 import {
   comprasApi,
   ComprasResumen,
@@ -153,6 +154,7 @@ export const ComprasView: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <AvisoControlAlmacen />
       {/* Mensaje explicativo */}
       <div style={{ fontSize: 13, lineHeight: '19px', color: 'var(--cp-soft)' }}>
         El camino de una compra: <b>1.</b> pedir a los proveedores lo que falta, <b>2.</b> cuando

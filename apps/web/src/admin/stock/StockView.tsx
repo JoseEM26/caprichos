@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { AvisoControlAlmacen } from './AvisoControlAlmacen';
 import { useSearchParams } from 'react-router-dom';
 import { InsumosTab } from './InsumosTab';
 import { ProduccionAlmacenTab } from './ProduccionAlmacenTab';
@@ -61,6 +62,7 @@ export function StockView() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <AvisoControlAlmacen />
       {/* Exactamente 3 pestañas de Stock y recetas idénticas al mockup */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }} role="tablist" aria-label="Stock y recetas">
         {/* Pestaña 1: Insumos */}

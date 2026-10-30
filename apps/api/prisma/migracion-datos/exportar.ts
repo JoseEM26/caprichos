@@ -33,6 +33,10 @@ interface Opciones {
   entorno: string;
   soloReporte?: boolean;
   ahora?: Date;
+  /** Nombres de productos que no viajan (comparación sin mayúsculas). */
+  excluirProductos?: string[];
+  /** No exporta cuentas ni horarios del personal (los proveedores sí). */
+  sinPersonal?: boolean;
 }
 
 const TITULOS: Record<string, string> = {
@@ -55,6 +59,11 @@ const LIMITE_LISTA = 300;
 /** Tablas de personas y cuentas: sus filas no vigentes no se listan (pueden ser clientes). */
 const SIN_DETALLE = new Set(['party', 'person', 'party_role', 'user_account', 'organization', 'employee_detail', 'supplier_detail', 'horario_trabajo', 'reemplazo_dia', 'cobertura_turno']);
 
+/** Algunas fotos guardan en la ruta un sufijo «#idx=…&pie=…» (orden y pie de foto): el archivo real va sin él. */
+function rutaFisica(ruta: string): string {
+  return ruta.split('#')[0];
+}
+
 /** Hoy en hora de Lima (UTC-5), a medianoche UTC, para comparar con campos @db.Date. */
 function inicioHoyLima(ahora: Date): Date {
   const lima = new Date(ahora.getTime() - 5 * 3600 * 1000);
@@ -74,11 +83,12 @@ export async function exportar(db: Cliente, o: Opciones): Promise<ResultadoExpor
     if (cacheSha.has(id)) return cacheSha.get(id)!;
     const a = filas.archivo.get(id);
     let s: string | null = null;
-    if (a && !a.privado) s = shaDeArchivo(String(a.ruta), path.join(o.uploadsDir, String(a.ruta)));
+    if (a && !a.privado) s = shaDeArchivo(String(a.ruta), path.join(o.uploadsDir, rutaFisica(String(a.ruta))));
     cacheSha.set(id, s);
     return s;
   };
 
+  const excluidos = new Set((o.excluirProductos ?? []).map((x) => x.trim().toUpperCase()).filter(Boolean));
   const inicioHoy = inicioHoyLima(ahora);
   const ctx: Contexto = { filas, vigentes: new Set(), docs, sha, inicioHoy, ahora, ultimaPublicada: null };
 
@@ -88,11 +98,11 @@ export async function exportar(db: Cliente, o: Opciones): Promise<ResultadoExpor
   for (const s of filas.supplier_detail.values()) if (s.activo) proveedoresActivos.add(String(s.party_role_id));
   for (const r of roles) {
     const vigente = !r.hasta || new Date(r.hasta) >= inicioHoy;
-    if ((r.rol === 'TRABAJADOR' && vigente) || (r.rol === 'PROVEEDOR' && proveedoresActivos.has(String(r.id)))) {
+    if ((r.rol === 'TRABAJADOR' && vigente && !o.sinPersonal) || (r.rol === 'PROVEEDOR' && proveedoresActivos.has(String(r.id)))) {
       ctx.vigentes.add(String(r.party_id));
     }
   }
-  for (const u of filas.user_account.values()) if (u.activo) ctx.vigentes.add(String(u.party_id));
+  if (!o.sinPersonal) for (const u of filas.user_account.values()) if (u.activo) ctx.vigentes.add(String(u.party_id));
   // sin documento no hay clave natural: esa persona no puede viajar
   for (const id of [...ctx.vigentes]) if (!docs.has(id)) ctx.vigentes.delete(id);
 
@@ -113,11 +123,13 @@ export async function exportar(db: Cliente, o: Opciones): Promise<ResultadoExpor
   const archivos = new Map<string, { id: string; ruta: string; tipo_mime: string; bytes: number; sha: string }>();
   const estaticos = (ruta: string) => esEstatica(ruta);
 
+  const motivoArchivo = new Map<string, string>();
   const archivoSale = (id: string): boolean => {
     const a = filas.archivo.get(id);
-    if (!a || a.privado) return false;
+    if (!a) { motivoArchivo.set(id, 'no existe en la tabla archivo'); return false; }
+    if (a.privado) { motivoArchivo.set(id, `archivo privado (${a.ruta})`); return false; }
     const s = sha(id);
-    if (!s) return false;
+    if (!s) { motivoArchivo.set(id, `el archivo ${a.ruta} no está en el disco del servidor`); return false; }
     if (!archivos.has(s)) archivos.set(s, { id, ruta: String(a.ruta), tipo_mime: String(a.tipo_mime), bytes: Number(a.bytes), sha: s });
     return true;
   };
@@ -145,6 +157,10 @@ export async function exportar(db: Cliente, o: Opciones): Promise<ResultadoExpor
       }
 
       let motivo: string | null = null;
+      if (t === 'producto' && excluidos.has(String(row.nombre).trim().toUpperCase())) {
+        omitidos[t].push(`${etiqueta()}: excluido a pedido`);
+        continue;
+      }
       const nulos = new Set<string>();
       for (const [p, r] of Object.entries(e.refs ?? {})) {
         const v = row[r.col];
@@ -152,9 +168,9 @@ export async function exportar(db: Cliente, o: Opciones): Promise<ResultadoExpor
         if (!sale(r.tabla, String(v))) {
           if (r.opcional) {
             nulos.add(p);
-            avisos.push(`${t} "${etiqueta()}": ${p} queda vacío (${r.tabla} no sale del paquete)`);
+            avisos.push(`${t} "${etiqueta()}": ${p} queda vacío (${r.tabla} no sale del paquete${r.tabla === 'archivo' ? `: ${motivoArchivo.get(String(v)) ?? 'sin detalle'}` : ''})`);
           } else {
-            motivo = `depende de ${r.tabla} que no sale (${p})`;
+            motivo = `depende de ${r.tabla} que no sale (${p}${r.tabla === 'archivo' ? `: ${motivoArchivo.get(String(v)) ?? 'sin detalle'}` : ''})`;
             break;
           }
         }
@@ -194,7 +210,7 @@ export async function exportar(db: Cliente, o: Opciones): Promise<ResultadoExpor
   const listaArchivos: ManifiestoArchivo[] = [...archivos.values()]
     .map((a): ManifiestoArchivo => estaticos(a.ruta)
       ? { sha256: a.sha, ext: '', tipo_mime: a.tipo_mime, bytes: a.bytes, estatico: true, ruta: a.ruta }
-      : { sha256: a.sha, ext: extension(a.ruta), tipo_mime: a.tipo_mime, bytes: a.bytes, ruta: a.ruta })
+      : { sha256: a.sha, ext: extension(rutaFisica(a.ruta)), tipo_mime: a.tipo_mime, bytes: a.bytes, ruta: a.ruta })
     .sort((x, y) => x.sha256.localeCompare(y.sha256));
   const conteos: Record<string, number> = {};
   for (const t of Object.keys(salida)) conteos[t] = salida[t].length;
@@ -222,8 +238,8 @@ export async function exportar(db: Cliente, o: Opciones): Promise<ResultadoExpor
     fs.writeFileSync(path.join(o.salida, 'manifiesto.json'), JSON.stringify(manifiesto, null, 2), { mode: 0o600 });
     fs.mkdirSync(path.join(o.salida, 'archivos'), { recursive: true, mode: 0o700 });
     for (const a of [...archivos.values()].filter((x) => !estaticos(x.ruta))) {
-      const destino = path.join(o.salida, 'archivos', `${a.sha}${extension(a.ruta)}`);
-      fs.copyFileSync(path.join(o.uploadsDir, a.ruta), destino);
+      const destino = path.join(o.salida, 'archivos', `${a.sha}${extension(rutaFisica(a.ruta))}`);
+      fs.copyFileSync(path.join(o.uploadsDir, rutaFisica(a.ruta)), destino);
       fs.chmodSync(destino, 0o600);
     }
     tarball = `${o.salida}.tar.gz`;
@@ -325,6 +341,8 @@ async function main(argv: string[], env: NodeJS.ProcessEnv): Promise<void> {
       uploadsDir: path.resolve(env.UPLOADS_DIR ?? './data/uploads'),
       entorno,
       soloReporte: o.soloReporte,
+      excluirProductos: (env.EXCLUIR_PRODUCTOS ?? '').split(',').map((x) => x.trim()).filter(Boolean),
+      sinPersonal: env.SIN_PERSONAL === 'SI',
     });
     console.log(`Exportado en ${r.carpeta}${r.tarball ? ` y ${r.tarball}` : ''}`);
     console.log(`Conteos: ${JSON.stringify(r.conteos)}`);

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSesion } from '../comun/sesion';
 import { api, clienteFetch, ErrorApi } from '../comun/api';
 import { IndicadorSubida } from '../comun/IndicadorSubida';
+import { Confirmar } from '../comun/Confirmar';
 import { useSubidaArchivo } from '../comun/useSubidaArchivo';
 
 export function CambiarClave() {
@@ -23,6 +24,8 @@ export function CambiarClave() {
   const [cargando, setCargando] = useState(false);
   const [errorApi, setErrorApi] = useState('');
   const [foto, setFoto] = useState<string>('');
+  const [confirmarQuitar, setConfirmarQuitar] = useState(false);
+  const [quitandoFoto, setQuitandoFoto] = useState(false);
   const subidaFoto = useSubidaArchivo();
 
   // Reglas de validación
@@ -59,12 +62,16 @@ export function CambiarClave() {
     });
   };
 
-  const handleQuitarFoto = async () => {
+  const quitarFoto = async () => {
+    setQuitandoFoto(true);
     try {
       const actualizado = await api.delete<{ fotoUrl: string | null }>('/auth/perfil/foto');
       setFoto(actualizado.fotoUrl ?? '');
     } catch (err) {
       setErrorApi(err instanceof ErrorApi ? err.message : 'No se pudo quitar la foto. Inténtalo de nuevo.');
+    } finally {
+      setQuitandoFoto(false);
+      setConfirmarQuitar(false);
     }
   };
 
@@ -366,7 +373,7 @@ export function CambiarClave() {
                   {foto && (
                     <button
                       type="button"
-                      onClick={handleQuitarFoto}
+                      onClick={() => setConfirmarQuitar(true)}
                       style={{
                         minHeight: '44px',
                         padding: '0 12px',
@@ -423,6 +430,17 @@ export function CambiarClave() {
             >
               {cargando ? 'Guardando...' : 'Guardar y entrar'}
             </button>
+
+            <Confirmar
+              abierto={confirmarQuitar}
+              titulo="Quitar tu foto"
+              mensaje="¿Quitar tu foto? Se volverá a ver tu inicial."
+              textoSi="Sí, quitar"
+              textoNo="No, dejarla"
+              cargando={quitandoFoto}
+              alConfirmar={quitarFoto}
+              alCancelar={() => setConfirmarQuitar(false)}
+            />
 
             <button
               type="button"

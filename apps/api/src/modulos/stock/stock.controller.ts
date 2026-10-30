@@ -31,6 +31,12 @@ export class StockController {
     private readonly recetasService: RecetasService,
   ) {}
 
+  @Get('control')
+  @Permiso('stock', 'ver')
+  async estadoControl() {
+    return this.stockService.estadoControl();
+  }
+
   @Get('lugares')
   @Permiso('stock', 'ver')
   async listarLugares() {

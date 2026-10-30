@@ -11,6 +11,7 @@ import * as argon2 from 'argon2';
 import { UsuariosService } from './usuarios.service';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
+import { ArchivosService } from '../archivos/archivos.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 
 describe('UsuariosService', () => {
@@ -56,6 +57,7 @@ describe('UsuariosService', () => {
         UsuariosService,
         { provide: PrismaService, useValue: prismaMock },
         { provide: AuditoriaService, useValue: auditoriaMock },
+        { provide: ArchivosService, useValue: { subirArchivo: jest.fn() } },
       ],
     }).compile();
 
