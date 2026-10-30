@@ -1057,7 +1057,7 @@ export class StockService {
         if (mov.insumo_id) {
           insumosRevertidos.push(mov.insumo_id);
           // Reponer stock insumo de forma atómica
-          let st = await db.stock.findFirst({
+          const st = await db.stock.findFirst({
             where: { insumo_id: mov.insumo_id, lugar_id: mov.lugar_id },
           });
 
@@ -1080,7 +1080,7 @@ export class StockService {
         } else if (mov.producto_id) {
           productosRevertidos.push(mov.producto_id);
           // Reponer stock producto terminado de forma atómica
-          let st = await db.stock.findFirst({
+          const st = await db.stock.findFirst({
             where: { producto_id: mov.producto_id, lugar_id: mov.lugar_id },
           });
 

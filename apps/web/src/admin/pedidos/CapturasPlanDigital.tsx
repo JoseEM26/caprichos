@@ -47,7 +47,6 @@ export function CapturasPlanDigital({ pedidoId, planPago, alCambiar }: CapturasP
   useEffect(() => {
     alCambiar(faltan);
     // alCambiar cambia en cada render del padre: solo se avisa cuando cambia la lista
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [faltanClave]);
 
   if (vouchers === null) {

@@ -83,7 +83,7 @@ export function SubirVoucherMozo({
       })
       .catch(() => undefined); // sin historial se sube como siempre; el servidor igual pide el motivo
   };
-  useEffect(cargarActual, [pedidoId, medio]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(cargarActual, [pedidoId, medio]);
 
   const fechaHora = (iso: string) =>
     new Date(iso).toLocaleString('es-PE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Lima' });

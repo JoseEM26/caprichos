@@ -66,7 +66,7 @@ describe('Bienvenida y cuenta por celular en el bot', () => {
     });
     it('una sola bienvenida: con la decisión recordada solo hay recordatorio breve', () => {
       const c = ctx(true);
-      let r = transicionarEstado(inicio(c).nuevoFlujo, btn('puntos_si'), c);
+      const r = transicionarEstado(inicio(c).nuevoFlujo, btn('puntos_si'), c);
       const segundo = transicionarEstado({ ...flujoAlCierre(), puntos: r.nuevoFlujo.puntos }, txt('omitir'), c);
       expect(texto(segundo)).toContain('como antes');
       expect(texto(segundo)).not.toContain('Qué bueno verte');

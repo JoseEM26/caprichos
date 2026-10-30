@@ -143,7 +143,7 @@ export class RecuperarClaveService {
     });
     try {
       await redis.del(claveCod, claveInt, `bloqueo:cliente:${tel}`);
-    } catch {}
+    } catch { /* limpiar bloqueos en Redis es best-effort; expiran por TTL */ }
 
     await this.auditoria.registrar({
       categoria: 'ACCESO',

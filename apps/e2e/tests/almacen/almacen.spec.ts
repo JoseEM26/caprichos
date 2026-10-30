@@ -659,7 +659,7 @@ test.describe('Suite E2E - Módulo de Almacén y Stock', () => {
       try {
         localStorage.clear();
         sessionStorage.clear();
-      } catch {}
+      } catch { /* limpieza del navegador de prueba; si falla, la prueba sigue */ }
     });
 
     await loginPorUi(page, 'MOZO');

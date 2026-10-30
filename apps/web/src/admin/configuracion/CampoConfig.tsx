@@ -54,5 +54,5 @@ export function useResaltarCampo(): void {
     t = setTimeout(intentar, 0);
     return () => clearTimeout(t);
     // setParams es estable; se re-dispara si cambia solo `campo` aunque la pestaña sea la misma
-  }, [campo, tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [campo, tab]);
 }

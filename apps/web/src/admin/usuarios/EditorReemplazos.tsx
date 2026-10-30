@@ -33,7 +33,6 @@ export function EditorReemplazos({ valor, alCambiar, horario, rol, partyIdPropio
         alCargarPersonal?.(lista);
       })
       .catch(() => setError('No se pudo cargar la lista de personal.'));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const candidatos = useMemo(

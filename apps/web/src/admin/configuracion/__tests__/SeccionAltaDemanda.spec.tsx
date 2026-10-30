@@ -9,7 +9,7 @@ import { ConfiguracionLocalView } from '../ConfiguracionLocalView';
 import { api } from '../../../comun/api';
 
 describe('Sección Alta Demanda y Pausa de Pedidos en Configuración', () => {
-  let callbacksSocket: Record<string, Function[]> = {};
+  let callbacksSocket: Record<string, ((...args: any[]) => any)[]> = {};
 
   beforeEach(() => {
     vi.restoreAllMocks();

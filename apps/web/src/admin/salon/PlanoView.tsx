@@ -1142,7 +1142,7 @@ export function PlanoView() {
                     try {
                       await salonApi.actualizarElemento(elementoSeleccionado.id, { nombre: val });
                       await cargarDatos();
-                    } catch {}
+                    } catch { /* best-effort: si falla, el valor anterior se mantiene */ }
                   }}
                   aria-label="Nombre"
                   style={{

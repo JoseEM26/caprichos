@@ -14,7 +14,7 @@ import {
 import { derivarClaveCifrado } from '../src/supervisor-totp';
 
 // Importar roles y permisos oficiales del backend compilado
-// @ts-ignore
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- ruta dinamica al dist compilado del backend
 const { ROLES, PERMISOS, MATRIZ } = require(
   path.resolve(__dirname, '../../api/dist/modulos/acceso/permisos.js'),
 );
@@ -545,7 +545,7 @@ export async function sembrarDatosPrueba(dbUrlTest?: string): Promise<ResultadoS
       const rolEnBd = rol === 'REPARTIDOR_2' ? 'REPARTIDOR' : rol;
 
       await prisma.$transaction(async (tx) => {
-        let ident = await tx.partyIdentifier.findUnique({
+        const ident = await tx.partyIdentifier.findUnique({
           where: { tipo_numero: { tipo: 'DNI', numero: dni } },
         });
 

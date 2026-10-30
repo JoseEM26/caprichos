@@ -76,7 +76,7 @@ export function FranjaAvisoCarta({
       if (typeof window !== 'undefined' && window.sessionStorage) {
         return window.sessionStorage.getItem(storageKey) === 'true';
       }
-    } catch {}
+    } catch { /* sessionStorage puede no estar disponible (modo privado): se ignora */ }
     return false;
   });
 
@@ -136,7 +136,7 @@ export function FranjaAvisoCarta({
       if (typeof window !== 'undefined' && window.sessionStorage) {
         window.sessionStorage.setItem(storageKey, 'true');
       }
-    } catch {}
+    } catch { /* sessionStorage puede no estar disponible (modo privado): se ignora */ }
   };
 
   return (

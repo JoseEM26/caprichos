@@ -196,7 +196,7 @@ export function Ingresar() {
     try {
       try {
         sessionStorage.setItem('caprichos_temp_clave', contrasena);
-      } catch {}
+      } catch { /* sessionStorage puede no estar disponible (modo privado): se ignora */ }
       const resultado = await ingresar(limpio, contrasena);
       if (resultado.debeCambiar) {
         navigate('/admin/cambiar-clave', { replace: true });

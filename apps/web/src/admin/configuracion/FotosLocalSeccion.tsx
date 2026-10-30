@@ -201,7 +201,6 @@ export function FotosLocalSeccion({ puedeEditar }: { puedeEditar: boolean }) {
       vivo = false;
     };
     // Se carga una vez al abrir la pantalla.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const alSubir = (nueva: FotoLocal) =>

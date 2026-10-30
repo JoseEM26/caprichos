@@ -667,7 +667,7 @@ export class ContenidoService {
         id: publicada.id.toString(),
         decoracion: publicada.decoracion,
       });
-    } catch {}
+    } catch { /* el aviso en tiempo real es opcional; el cambio ya se guardo */ }
 
     return {
       ok: true,
@@ -1159,7 +1159,7 @@ export class ContenidoService {
 
     try {
       this.eventosGateway.emitirAdmin('novedades:actualizadas', { timestamp: new Date() });
-    } catch {}
+    } catch { /* el aviso en tiempo real es opcional; el cambio ya se guardo */ }
 
     return {
       ok: true,
@@ -1543,7 +1543,7 @@ export class ContenidoService {
 
     try {
       this.eventosGateway.emitirAdmin('destacadas:actualizadas', { timestamp: new Date() });
-    } catch {}
+    } catch { /* el aviso en tiempo real es opcional; el cambio ya se guardo */ }
 
     return {
       ok: true,
@@ -1662,7 +1662,7 @@ export class ContenidoService {
 
     try {
       this.eventosGateway.emitirAdmin('paleta:actualizada', { timestamp: new Date() });
-    } catch {}
+    } catch { /* el aviso en tiempo real es opcional; el cambio ya se guardo */ }
 
     return {
       ok: true,

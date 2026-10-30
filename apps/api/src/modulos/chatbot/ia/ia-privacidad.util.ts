@@ -12,7 +12,7 @@ const REGEX_BSUID = /\b(?:PE|WA)\.\d{6,}\b/gi;
 const REGEX_DNI = /\b\d{8}\b/g;
 const REGEX_TELEFONO_PERU = /(?:\+?51[\s-]?)?\b9\d{2}[\s.-]?\d{3}[\s.-]?\d{3}\b/g;
 const REGEX_NUMEROS_LARGOS = /\b\d{10,}\b/g; // Cuentas bancarias, tarjetas, CCI
-const REGEX_DIRECCION = /\b(?:av(?:enida)?|jr|jir[oó]n|calle|pasaje|pje|mz(?:a)?|manzana|lote|lt|urb(?:anizaci[oó]n)?)\.?\s+[A-Za-z0-9\s#°\.\-]+?(?=(?:\s+(?:y\s+mi|y|mi)\b|[,;\.\n]|$))/gi;
+const REGEX_DIRECCION = /\b(?:av(?:enida)?|jr|jir[oó]n|calle|pasaje|pje|mz(?:a)?|manzana|lote|lt|urb(?:anizaci[oó]n)?)\.?\s+[A-Za-z0-9\s#°.-]+?(?=(?:\s+(?:y\s+mi|y|mi)\b|[,;.\n]|$))/gi;
 
 /**
  * Enmascara información sensible en cualquier cadena de texto destinada a proveedores externos.

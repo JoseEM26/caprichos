@@ -52,7 +52,6 @@ export function BuscadorConfiguracion({ categorias, onElegir, catalogo = CATALOG
 
   const encontrados = useMemo(
     () => buscar(catalogo, q, { visible, nombreTab }).map((r) => r.entrada),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [q, catalogo, categorias, esAdmin, tiene],
   );
   const porId = (id: string) => catalogo.find((e) => e.id === id && visible(e));
@@ -61,7 +60,6 @@ export function BuscadorConfiguracion({ categorias, onElegir, catalogo = CATALOG
     const rec = recientes.map(porId).filter(Boolean) as EntradaConfig[];
     const mas = Object.entries(usos).sort((a, b) => b[1] - a[1]).map(([id]) => porId(id)).filter((e): e is EntradaConfig => !!e && !rec.includes(e)).slice(0, 5);
     return [...rec.map((e) => ({ e, tipo: 'Reciente' })), ...mas.map((e) => ({ e, tipo: 'Más usado' }))];
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, recientes, usos, catalogo, categorias, esAdmin, tiene]);
 
   const lista = q.trim() ? (todos ? encontrados : encontrados.slice(0, MAX_VISIBLES)) : sugeridos.map((s) => s.e);

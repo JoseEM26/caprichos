@@ -492,7 +492,7 @@ export class ComprasService {
     const listaCompras = compras.map((c) => {
       const fechaCorta = c.fecha_compra.toISOString().split('T')[0].slice(5).replace('-', '/');
       const insumosNombres = c.lineas.map((l) => l.insumo.nombre).join(', ');
-      let estadoTexto = c.anulada_en
+      const estadoTexto = c.anulada_en
         ? 'Anulada'
         : c.pagada_en
           ? 'Pagada'

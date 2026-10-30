@@ -428,7 +428,7 @@ export class ClientesService {
             ip,
           });
         }
-      } catch {}
+      } catch { /* aviso de auditoria opcional; no debe cortar el flujo */ }
       throw generico();
     };
 
@@ -439,7 +439,7 @@ export class ClientesService {
 
     try {
       await redis.del(claveRedis);
-    } catch {}
+    } catch { /* limpiar el codigo en Redis es best-effort; expira por TTL */ }
     const token = await this.generarTokenCliente(cuenta.party_id);
     const cliente = await this.yo(cuenta.party_id);
     return { cliente: cliente!, token };

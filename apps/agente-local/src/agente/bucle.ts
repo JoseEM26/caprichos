@@ -186,7 +186,7 @@ export class AgenteLocalServicio {
       await this.clienteApi.reportarResultado(trabajo.id, true);
       this.logger('info', `Trabajo ${trabajo.id} impreso y confirmado con éxito`);
     } catch (err: any) {
-      let mensajeError = err.message || 'Error desconocido al imprimir';
+      const mensajeError = err.message || 'Error desconocido al imprimir';
 
       // Una máquina que falla deja de tomar trabajos hasta que el próximo latido la vea lista
       const rolFallido: RolImpresora = trabajo.tipo === 'TICKET_PAGO' ? 'TICKETERA' : 'ETIQUETERA';

@@ -53,7 +53,6 @@ export function TusPuntos({ puntos }: { puntos: number }) {
   useEffect(() => {
     if ((verHistorial || verComoFunciona) && pagina === 0) void cargar(1);
     // solo la primera vez que se abre una de las dos secciones
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [verHistorial, verComoFunciona]);
 
   const enlace = { minHeight: 44, background: 'transparent', border: 0, color: 'var(--cp-cream)', textDecoration: 'underline', fontWeight: 700, fontSize: 13, textAlign: 'left' as const, padding: 0, cursor: 'pointer' };

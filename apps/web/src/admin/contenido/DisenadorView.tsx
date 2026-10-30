@@ -235,7 +235,6 @@ export function DisenadorView() {
       setDatosPublicos({ contenido, ofertas: Array.isArray(ofertas) ? ofertas : [], estadoLocal, datosLocal, publicos });
       setMomentosBase(Array.isArray(destacadas) ? destacadas : []);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const seleccionar = (clave: string | null) => {

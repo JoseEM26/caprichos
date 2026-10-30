@@ -509,7 +509,7 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
       await soltarChat(chatSeleccionadoId);
       await cargarDetalle(chatSeleccionadoId);
       await cargarLista(true);
-    } catch {}
+    } catch { /* best-effort: el refresco es opcional, la vista ya cargo */ }
   };
 
   const handleTogglePausaBot = () => {

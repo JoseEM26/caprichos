@@ -127,7 +127,6 @@ export function FormularioCheckout({
     if (!clienteCuenta) return;
     setNombre(clienteCuenta.nombre);
     if (clienteCuenta.telefono && !otroTelefono) setTelefono(clienteCuenta.telefono);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clienteCuenta, otroTelefono]);
   const [mensajeCupon, setMensajeCupon] = useState<string | null>(null);
 
@@ -164,7 +163,6 @@ export function FormularioCheckout({
     return () => {
       vigente = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkoutAbierto, clavePromos]);
 
   // Direcciones guardadas del cliente con cuenta; si falla, se sigue como sin libreta

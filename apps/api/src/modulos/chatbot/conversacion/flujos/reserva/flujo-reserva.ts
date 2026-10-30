@@ -167,7 +167,7 @@ export function generarFranjasPorDefecto(abre = '14:00', cierra = '23:00'): stri
   const [hAbre, mAbre] = abre.split(':').map((x) => parseInt(x, 10));
   const [hCierra, mCierra] = cierra.split(':').map((x) => parseInt(x, 10));
 
-  let tInicio = (hAbre * 60 + (mAbre || 0)) + 60; // 1 hora después de abrir
+  const tInicio = (hAbre * 60 + (mAbre || 0)) + 60; // 1 hora después de abrir
   let tFin = (hCierra * 60 + (mCierra || 0)) - 60; // 1 hora antes de cerrar
 
   if (tFin <= tInicio) {
