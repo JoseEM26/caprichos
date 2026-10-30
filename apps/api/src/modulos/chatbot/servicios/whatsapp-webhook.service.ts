@@ -428,7 +428,7 @@ export class WhatsappWebhookService {
         nombre: locNombre,
         direccion: locDir,
       };
-      texto = locDir || locNombre || `Ubicación compartida: ${lat}, ${lng}`;
+      texto = locDir || locNombre || 'Ubicación compartida por WhatsApp';
     } else if (clasificacion.clase === 'IMAGEN') {
       tipoRegistro = 'IMAGEN';
       texto = String(msg.image?.caption || '[Imagen de comprobante adjunta]').trim();

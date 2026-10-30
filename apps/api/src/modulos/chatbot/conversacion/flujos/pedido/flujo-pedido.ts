@@ -1349,7 +1349,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     config.cantidad = cantidad;
 
     // Bebidas: cada envase lleva un nombre distinto en su etiqueta; se piden uno por uno
-    if (this.esBebidaConNombres(config.categoriaNombre)) {
+    if (this.esBebidaConNombres(config.categoriaNombre) || this.bebidasDeCombo(config).length > 0) {
       config.nombresEnvase = [];
       return this.preguntarNombreEnvase(flujo, pedido, config);
     }
@@ -1360,6 +1360,23 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
   private esBebidaConNombres(categoriaNombre: string): boolean {
     const n = normalizarTexto(categoriaNombre || '').toUpperCase();
     return ['FRAPPES', 'ICED', 'FROZEN', 'CALIENTES'].includes(n);
+  }
+
+  /** Bebidas elegidas de un combo (grupos «Bebida 1 · Bebida»): cada una lleva su propio envase. */
+  private bebidasDeCombo(config: ItemEnConfiguracionBot) {
+    return config.opciones.filter((o) => {
+      const g = o.grupoNombre || '';
+      return g.includes(' · ') && /^bebida/i.test(g.split(' · ')[1].trim());
+    });
+  }
+
+  private nombreEnvase(config: ItemEnConfiguracionBot, indice: number): string {
+    const bebidas = this.bebidasDeCombo(config);
+    return bebidas.length > 0 ? bebidas[indice % bebidas.length].nombre : config.productoNombre;
+  }
+
+  private totalEnvases(config: ItemEnConfiguracionBot): number {
+    return config.cantidad * (this.bebidasDeCombo(config).length || 1);
   }
 
   private preguntarNombreEnvase(
@@ -1374,7 +1391,11 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       acciones: [
         {
           tipo: 'enviarTexto',
-          texto: TEXTOS_BOT.pedidoPedirNombreEnvase(config.productoNombre, hechos + 1, config.cantidad),
+          texto: TEXTOS_BOT.pedidoPedirNombreEnvase(
+            this.nombreEnvase(config, hechos),
+            hechos + 1,
+            this.totalEnvases(config),
+          ),
         },
       ],
       nuevoFlujo: { ...flujo, estado: 'PEDIDO_NOMBRES_ENVASE', pedido },
@@ -1417,13 +1438,14 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     const nombres = config.nombresEnvase || [];
     // Si escribe todos los nombres juntos separados por coma ("Ana, Luis, Rosa") y coinciden con los envases
     const separados = texto.split(',').map((n) => n.trim()).filter(Boolean);
-    if (nombres.length === 0 && config.cantidad > 1 && separados.length === config.cantidad) {
+    const total = this.totalEnvases(config);
+    if (nombres.length === 0 && total > 1 && separados.length === total) {
       config.nombresEnvase = separados.map((n) => n.slice(0, 30));
     } else {
       config.nombresEnvase = [...nombres, texto.slice(0, 30)];
     }
 
-    if ((config.nombresEnvase?.length || 0) < config.cantidad) {
+    if ((config.nombresEnvase?.length || 0) < total) {
       return this.preguntarNombreEnvase(flujo, pedido, config);
     }
     return this.confirmarNombresEnvase(flujo, pedido, config);

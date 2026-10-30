@@ -33,6 +33,17 @@ function claveDireccion(texto: string): string {
   return texto.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
+/** ¿El texto es solo coordenadas («-12.01, -76.95», «Punto en el mapa …», «Ubicación compartida: …»)? */
+export function textoParecePunto(texto: string | null | undefined): boolean {
+  return /^\s*(punto en el mapa|ubicaci[oó]n compartida)?\s*:?\s*-?\d{1,3}(\.\d+)?\s*,\s*-?\d{1,3}(\.\d+)?\s*$/i.test(texto ?? '');
+}
+
+/** Texto legible para una dirección que solo tiene coordenadas. */
+export function textoAlternativo(origen: string, zona?: string | null): string {
+  if (origen === 'WHATSAPP') return 'Ubicación compartida por WhatsApp';
+  return zona ? `Punto marcado en el mapa (zona ${zona})` : 'Punto marcado en el mapa';
+}
+
 function aDto(fila: {
   id: bigint;
   direccion: string;
@@ -43,10 +54,11 @@ function aDto(fila: {
   usos: number;
   ultimo_uso_en: Date;
   origen: string;
+  zona?: { codigo: string } | null;
 }): DireccionClienteDto {
   return {
     id: fila.id.toString(),
-    direccion: fila.direccion,
+    direccion: textoParecePunto(fila.direccion) ? textoAlternativo(fila.origen, fila.zona?.codigo) : fila.direccion,
     referencia: fila.referencia,
     lat: fila.lat != null ? Number(fila.lat) : null,
     lng: fila.lng != null ? Number(fila.lng) : null,
@@ -75,6 +87,7 @@ export class DireccionesClienteService {
       where: { party_id: BigInt(partyId), activo: true },
       orderBy: [{ ultimo_uso_en: 'desc' }, { id: 'desc' }],
       take: opciones.limite ?? 5,
+      include: { zona: { select: { codigo: true } } },
     });
     return filas.map(aDto);
   }
@@ -95,10 +108,10 @@ export class DireccionesClienteService {
     const lat = typeof entrega.lat === 'number' && Number.isFinite(entrega.lat) ? entrega.lat : null;
     const lng = typeof entrega.lng === 'number' && Number.isFinite(entrega.lng) ? entrega.lng : null;
     const coordenadas = lat !== null && lng !== null;
-    const texto =
-      entrega.direccion?.trim() ||
-      (coordenadas ? `Punto en el mapa ${lat!.toFixed(5)}, ${lng!.toFixed(5)}` : '');
-    if (!texto) return null;
+    const escrito = entrega.direccion?.trim() || '';
+    const sinTexto = !escrito || textoParecePunto(escrito);
+    if (sinTexto && !coordenadas) return null;
+    const texto = sinTexto ? textoAlternativo(origen) : escrito;
 
     const referencia = entrega.referencia?.trim() || null;
     const ahora = new Date();
@@ -107,7 +120,7 @@ export class DireccionesClienteService {
     });
     const existente = candidatas.find(
       (c) =>
-        claveDireccion(c.direccion) === claveDireccion(texto) ||
+        (!sinTexto && claveDireccion(c.direccion) === claveDireccion(texto)) ||
         (coordenadas &&
           c.lat != null &&
           c.lng != null &&

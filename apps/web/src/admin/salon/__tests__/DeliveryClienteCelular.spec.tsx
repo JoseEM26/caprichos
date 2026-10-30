@@ -186,7 +186,7 @@ describe('ModalNuevoPedidoMesa: cliente con cuenta por celular en delivery y par
     await screen.findByRole('status');
 
     expect(
-      screen.getByText('¿Lo enviamos a una dirección anterior o es una nueva?'),
+      screen.getByText('¿Usar una ubicación anterior?'),
     ).toBeInTheDocument();
     // El formulario de dirección nueva no aparece mientras elige una anterior
     expect(screen.queryByPlaceholderText('Jr. / Av. / Calle y número')).toBeNull();
@@ -199,6 +199,10 @@ describe('ModalNuevoPedidoMesa: cliente con cuenta por celular en delivery y par
       'true',
     );
     expect(screen.getByRole('button', { name: 'Continuar a productos →' })).toBeEnabled();
+    // Mini mapa en la lista y, al elegir, el pin queda en el mapa del pedido sin mostrar coordenadas
+    expect(screen.getAllByTestId('mini-mapa-direccion').length).toBeGreaterThan(0);
+    expect(document.querySelector('.leaflet-marker-icon')).not.toBeNull();
+    expect(document.body.textContent).not.toMatch(/-12\.046|-77\.042/);
 
     const pedido = await registrarCafe();
     expect(pedido.modalidad).toBe('DELIVERY');
@@ -221,7 +225,7 @@ describe('ModalNuevoPedidoMesa: cliente con cuenta por celular en delivery y par
     await screen.findByRole('status');
 
     expect(
-      screen.queryByText('¿Lo enviamos a una dirección anterior o es una nueva?'),
+      screen.queryByText('¿Usar una ubicación anterior?'),
     ).toBeNull();
     expect(screen.getByPlaceholderText('Jr. / Av. / Calle y número')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Continuar a productos →' })).toBeDisabled();

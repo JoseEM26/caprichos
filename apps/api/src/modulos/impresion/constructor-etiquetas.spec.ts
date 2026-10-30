@@ -99,4 +99,50 @@ describe('Constructor server-side de etiquetas', () => {
     expect(resumen.areas).toHaveLength(2);
     expect(resumen.bebidas).toHaveLength(2);
   });
+
+  const comboBase = (extra: any): any => ({
+    codigo: 'CP-7',
+    modalidad: 'RECOGER',
+    cliente_nombre: 'Ana',
+    canal: 'CARTA',
+    creado_en: new Date('2026-10-27T17:30:00.000Z'),
+    lineas: [{ cantidad: 1, tamano: null, area: { nombre: 'Cocina' }, categoria: { nombre: 'COMBOS' }, ...extra }],
+  });
+
+  it('combo con 2 bebidas: una etiqueta de bebida por bebida elegida, con su nombre', () => {
+    const pedido = comboBase({
+      nombre: 'Dúo Irresistible',
+      nombres_persona: ['Lucía', 'Pedro'],
+      opcionesElegidas: [
+        { grupo_nombre: 'Bebida 1 · Bebida', opcion_nombre: 'Frappe Moca' },
+        { grupo_nombre: 'Bebida 2 · Bebida', opcion_nombre: 'Café Latte' },
+        { grupo_nombre: 'Postre · Postre', opcion_nombre: 'Brownie' },
+      ],
+    });
+    const b = construirEtiquetasBebida(pedido);
+    expect(b.map((x) => [x.bebidaNombre, x.persona, x.totalBebidas])).toEqual([
+      ['Frappe Moca', 'Lucía', 2],
+      ['Café Latte', 'Pedro', 2],
+    ]);
+    expect(construirEtiquetasArea(pedido)).toHaveLength(1);
+  });
+
+  it('combo sin bebidas (donas): solo general y área, nunca bebida', () => {
+    const pedido = comboBase({
+      nombre: '1/2 docena donuts',
+      area: { nombre: 'Barra' },
+      opcionesElegidas: [{ grupo_nombre: 'Dona 1 · Dona', opcion_nombre: 'Glaseada' }],
+    });
+    const r = construirTodasLasEtiquetas(pedido);
+    expect(r.bebidas).toHaveLength(0);
+    expect(r.general.codigo).toBe('CP-7');
+    expect(r.areas).toHaveLength(1);
+  });
+
+  it('bebida suelta x2 usa el nombre de cada envase', () => {
+    const b = construirEtiquetasBebida(
+      comboBase({ nombre: 'Frappe Moca', cantidad: 2, categoria: { nombre: 'Frappes' }, nombres_persona: ['Ana', 'Luis'] }),
+    );
+    expect(b.map((x) => x.persona)).toEqual(['Ana', 'Luis']);
+  });
 });

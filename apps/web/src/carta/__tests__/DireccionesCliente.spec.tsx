@@ -170,6 +170,26 @@ describe('Carta ▸ direcciones anteriores en el checkout', () => {
     expect(document.getElementById('f-referencia')).toHaveValue('Portón azul');
   });
 
+  it('ubicación anterior sin texto: muestra mini mapa y texto legible (no coordenadas) y al elegirla coloca el pin', async () => {
+    mockApi({
+      direcciones: [
+        { id: '9', direccion: 'Punto marcado en el mapa', referencia: null, lat: -12.0186, lng: -76.958, alias: null, usos: 1, ultimoUsoEn: '2026-10-20T15:04:00.000Z', origen: 'WHATSAPP' },
+      ],
+    });
+    vi.spyOn(cuentaModulo, 'useCuentaOpcional').mockReturnValue(cuentaCon());
+    await irAUbicacion();
+
+    expect(await screen.findByTestId('mini-mapa-direccion')).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/-12\.0186|-76\.958/);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Punto marcado en el mapa/ }));
+
+    expect(await screen.findByText('Zona Z1 · envío S/ 5.00')).toBeInTheDocument();
+    expect(api.get).toHaveBeenCalledWith('/carta/envio?lat=-12.0186&lng=-76.958');
+    expect(document.querySelector('.leaflet-marker-icon')).not.toBeNull();
+    expect(document.body.textContent).not.toMatch(/-12\.0186|-76\.958/);
+  });
+
   it('si la anterior quedó fuera de zona avisa y vuelve a preguntar', async () => {
     mockApi({ envio: { cubierto: false, zona: null, tarifa: null, tarifaZona: null, gratisDesde: 70, modoGratis: 'mas_de' } });
     vi.spyOn(cuentaModulo, 'useCuentaOpcional').mockReturnValue(cuentaCon());

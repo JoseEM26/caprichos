@@ -66,6 +66,9 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
   const [zoom, setZoom] = useState(false);
 
   const esCombo = producto.grupos.some((g) => g.nombre.includes(' · '));
+  // bebidas del combo (grupos «Bebida 1 · Bebida»): cada una lleva su nombre para el envase
+  const gruposBebida = esCombo ? producto.grupos.filter((g) => g.nombre.includes(' · ') && /^bebida/i.test(nombreCorto(g))) : [];
+  const nB = gruposBebida.length;
   const secciones = useMemo(() => {
     const claves: string[] = [];
     const mapa: Record<string, GrupoOpcionesCarta[]> = {};
@@ -123,7 +126,10 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
         return;
       }
     }
-    const personas = Array.from({ length: cantidad }, (_, i) => (esBebida ? (nombres[i] ?? '').trim() : ''));
+    const personas =
+      nB > 0
+        ? Array.from({ length: cantidad * nB }, (_, i) => (nombres[i] ?? '').trim())
+        : Array.from({ length: cantidad }, (_, i) => (esBebida ? (nombres[i] ?? '').trim() : ''));
     agregarLinea({
       productoId: producto.id,
       nombre: producto.nombre,
@@ -134,7 +140,8 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
       cantidad,
       opciones: elegidas,
       personas,
-      unidades: Array.from({ length: cantidad }, (_, i) => ({ persona: personas[i], opciones: elegidas })),
+      // combo con bebidas: sin «unidades», la línea viaja entera con los nombres en orden de bebida
+      ...(nB > 0 ? {} : { unidades: Array.from({ length: cantidad }, (_, i) => ({ persona: personas[i], opciones: elegidas })) }),
       nota: [notaReemplazos(partesRe, reemplazos), nota.trim()].filter(Boolean).join(' · ') || undefined,
       ...(oferta && elecciones.length > 0 ? { ofertaId: String(oferta.id), comboElecciones: elecciones } : {}),
       precioUnitario: unitario,
@@ -389,6 +396,36 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                   </div>
                 );
               })
+            )}
+
+            {nB > 0 && (
+              <div style={{ border: '1.5px solid var(--cp-line)', borderRadius: 14, padding: '10px 12px', background: 'var(--cp-white)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ ...titulo, fontWeight: 800, fontSize: 14 }}>Nombre para el envase</div>
+                {Array.from({ length: cantidad * nB }, (_, i) => {
+                  const g = gruposBebida[i % nB];
+                  const bebida = g.opciones.find((o) => o.id === (sel[g.id] ?? [])[0])?.nombre ?? nombreCorto(g);
+                  return (
+                    <label key={i} style={{ fontSize: 11, fontWeight: 700, display: 'block', color: 'var(--cp-soft)' }}>
+                      {`${bebida} · Nombre para el envase (opcional, máx. 14 letras se ven completas)`}
+                      <input
+                        type="text"
+                        value={nombres[i] ?? ''}
+                        onChange={(e) =>
+                          setNombres((prev) => {
+                            const a = [...prev];
+                            a[i] = e.target.value;
+                            return a;
+                          })
+                        }
+                        placeholder="Ej.: Lucía"
+                        maxLength={30}
+                        id={`nombre-bebida-${i}`}
+                        style={{ display: 'block', width: '100%', boxSizing: 'border-box', minHeight: 40, marginTop: 2, borderRadius: 10, border: '1.5px solid var(--cp-line)', background: 'var(--cp-cream)', color: 'var(--cp-navy)', padding: '0 10px', fontSize: 14 }}
+                      />
+                    </label>
+                  );
+                })}
+              </div>
             )}
 
             {esBebida && !esCombo && (

@@ -31,6 +31,8 @@ export interface ProductoConfigurado {
   comboElecciones?: { parteId: string; productoId: string }[];
   opcionesGlobales: OpcionProducto[];
   unidades: ConfiguracionUnidad[];
+  /** Combo con bebidas: un nombre de envase por bebida (unidad 1: bebida 1, bebida 2...; vacío si no se escribe) */
+  nombresBebidas?: string[];
   precioUnitario: number;
   precioTotal: number;
 }
@@ -88,8 +90,17 @@ export function VentanaOpcionesProducto({
   // Búsqueda en grupos
   const [busquedaGrupo, setBusquedaGrupo] = useState<Record<string, string>>({});
 
+  // Bebidas del combo (grupos «Bebida 1 · Bebida»): cada una lleva su nombre de envase, opcional
+  const gruposBebida = useMemo(
+    () => (producto.grupos || []).filter((g) => g.nombre.includes(' · ') && /^bebida/i.test(g.nombre.split(' · ')[1].trim())),
+    [producto],
+  );
+  const nB = gruposBebida.length;
+  const [nombresCombo, setNombresCombo] = useState<Record<number, string>>({});
+
   // Categorías de bebidas
   const esBebida = useMemo(() => {
+    if (gruposBebida.length > 0) return false;
     const cat = [
       (producto as any).categoria?.nombre,
       (producto as any).categoriaNombre,
@@ -111,7 +122,7 @@ export function VentanaOpcionesProducto({
       cat.includes('infusi') ||
       cat.includes('chocolate')
     );
-  }, [producto]);
+  }, [producto, gruposBebida]);
 
   const precioBase = tamanoSeleccionado ? tamanoSeleccionado.precio : producto.precio || 0;
 
@@ -235,6 +246,7 @@ export function VentanaOpcionesProducto({
       nota: [notaReemplazos(partesRe, reemplazos), notaCocina.trim()].filter(Boolean).join(' · '),
       opcionesGlobales: opcionesPorUnidad[0] || [],
       unidades,
+      ...(nB > 0 ? { nombresBebidas: Array.from({ length: cantidad * nB }, (_, i) => (nombresCombo[i] ?? '').trim()) } : {}),
       precioUnitario: precioTotal / cantidad,
       precioTotal,
     });
@@ -545,6 +557,30 @@ export function VentanaOpcionesProducto({
             </div>
           );
         })}
+
+        {nB > 0 && (
+          <div style={{ border: '1.5px solid var(--cp-line)', borderRadius: '12px', padding: '10px', display: 'flex', flexDirection: 'column', gap: '10px', background: 'var(--cp-white)' }}>
+            <div style={{ fontWeight: 800, color: 'var(--cp-navy)' }}>Nombre para el envase</div>
+            {Array.from({ length: cantidad * nB }, (_, i) => {
+              const g = gruposBebida[i % nB];
+              const elegidas = opcionesPorUnidad[personalizarPorUnidad ? Math.floor(i / nB) : 0] || [];
+              const bebida = g.opciones.find((o) => elegidas.some((e) => e.id === o.id))?.nombre ?? g.nombre.split(' · ')[1];
+              return (
+                <label key={i} style={{ fontSize: '12px', fontWeight: 700, display: 'block', color: 'var(--cp-soft)' }}>
+                  {`${bebida} · Nombre para el envase (opcional, máx. 14 letras se ven completas)`}
+                  <input
+                    type="text"
+                    value={nombresCombo[i] ?? ''}
+                    onChange={(e) => setNombresCombo((prev) => ({ ...prev, [i]: e.target.value }))}
+                    placeholder="Ej.: Lucía o Mesa 4"
+                    maxLength={30}
+                    style={{ display: 'block', width: '100%', boxSizing: 'border-box', minHeight: '42px', marginTop: '4px', borderRadius: '10px', border: '1.5px solid var(--cp-line)', background: 'var(--cp-cream)', color: 'var(--cp-navy)', padding: '0 10px', fontSize: '14px' }}
+                  />
+                </label>
+              );
+            })}
+          </div>
+        )}
 
         {/* ¿Para quién es?: una etiqueta simulada por cada bebida, como en la carta (el nombre es obligatorio) */}
         {esBebida && (

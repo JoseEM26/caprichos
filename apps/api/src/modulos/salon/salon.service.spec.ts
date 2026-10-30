@@ -9,10 +9,12 @@ import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { PedidosService } from '../pedidos/pedidos.service';
 import { ReservasService } from '../reservas/reservas.service';
+import { ImpresionService } from '../impresion/impresion.service';
 
 describe('SalonService', () => {
   let service: SalonService;
   let reservasMock: any;
+  let impresionMock: any;
   let prismaMock: any;
   let pedidosServiceMock: any;
   let auditoriaMock: any;
@@ -56,6 +58,7 @@ describe('SalonService', () => {
     };
 
     reservasMock = { marcarPedidoDeReserva: jest.fn().mockResolvedValue(undefined) };
+    impresionMock = { encolarEtiquetasPedido: jest.fn().mockResolvedValue(undefined) };
     eventosGatewayMock = {
       emitirAdmin: jest.fn(),
     };
@@ -68,6 +71,7 @@ describe('SalonService', () => {
         { provide: AuditoriaService, useValue: auditoriaMock },
         { provide: EventosGateway, useValue: eventosGatewayMock },
         { provide: ReservasService, useValue: reservasMock },
+        { provide: ImpresionService, useValue: impresionMock },
       ],
     }).compile();
 
@@ -318,6 +322,29 @@ describe('SalonService', () => {
       const [dtoEnviado] = pedidosServiceMock.crear.mock.calls[0];
       expect(dtoEnviado.pago.plan).toEqual(plan);
       expect(dtoEnviado.modalidad).toBe('MESA');
+    });
+
+    it('al abrir un pedido de mesa encola sus etiquetas (la mesa entra directo a cocina)', async () => {
+      prismaMock.elementoPlano.findMany.mockResolvedValue([{ id: 6n, numero: 6, tipo: 'MESA', activo: true }]);
+      prismaMock.pedidoMesa.findMany.mockResolvedValue([]);
+      prismaMock.reservaMesa.findMany.mockResolvedValue([]);
+      pedidosServiceMock.crear.mockResolvedValue({ id: '79', codigo: 'CP-M079', total: 10 });
+
+      await service.abrirPedido({ mesas: [6], lineas: [{ productoId: 1, cantidad: 1 }], cliente: { nombre: 'Ana' } });
+
+      expect(impresionMock.encolarEtiquetasPedido).toHaveBeenCalledWith('79');
+    });
+
+    it('si encolar las etiquetas falla, la mesa igual queda abierta', async () => {
+      prismaMock.elementoPlano.findMany.mockResolvedValue([{ id: 6n, numero: 6, tipo: 'MESA', activo: true }]);
+      prismaMock.pedidoMesa.findMany.mockResolvedValue([]);
+      prismaMock.reservaMesa.findMany.mockResolvedValue([]);
+      pedidosServiceMock.crear.mockResolvedValue({ id: '80', codigo: 'CP-M080', total: 10 });
+      impresionMock.encolarEtiquetasPedido.mockRejectedValueOnce(new Error('sin cola'));
+
+      await expect(
+        service.abrirPedido({ mesas: [6], lineas: [{ productoId: 1, cantidad: 1 }], cliente: { nombre: 'Ana' } }),
+      ).resolves.toMatchObject({ codigo: 'CP-M080' });
     });
 
     it('pedido de mesa con clienteTelefono lo reenvía a la creación compartida (suma puntos al cobrar)', async () => {

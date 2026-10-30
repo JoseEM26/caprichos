@@ -10,6 +10,7 @@ import { PrismaService } from '../../comun/prisma/prisma.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { PedidosService } from '../pedidos/pedidos.service';
+import { ImpresionService } from '../impresion/impresion.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { AbrirPedidoMesaDto } from './dto/abrir-pedido-mesa.dto';
 import { LiberarMesaDto } from './dto/liberar-mesa.dto';
@@ -24,6 +25,7 @@ export class SalonService {
     private readonly auditoria: AuditoriaService,
     private readonly eventosGateway: EventosGateway,
     @Optional() private readonly reservasService?: ReservasService,
+    @Optional() private readonly impresionService?: ImpresionService,
   ) {}
 
   /**
@@ -331,6 +333,15 @@ export class SalonService {
         await this.reservasService.marcarPedidoDeReserva(dto.reservaId, resultadoPedido.id);
       } catch {
         // el pedido ya está abierto: la reserva se puede marcar a mano
+      }
+    }
+
+    // El pedido de mesa entra directo a cocina: sus etiquetas se imprimen ya (igual que el pedido del mozo)
+    if (resultadoPedido?.id && this.impresionService) {
+      try {
+        await this.impresionService.encolarEtiquetasPedido(resultadoPedido.id);
+      } catch {
+        // Encolado no bloqueante: la mesa queda abierta y las etiquetas se reimprimen desde la cola
       }
     }
 

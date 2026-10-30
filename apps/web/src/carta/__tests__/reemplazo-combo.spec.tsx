@@ -71,3 +71,25 @@ describe('Combo con plan B en la carta', () => {
     expect(screen.getByRole('button', { name: /^Agotado/ })).toBeDisabled();
   });
 });
+
+describe('Combo con bebidas pide nombre por envase', () => {
+  it('un campo por bebida y los nombres viajan en personas, en orden', () => {
+    agregarLinea.mockClear();
+    const opc = (id: string, nombre: string) => ({ id, nombre, precioExtra: 0 });
+    const duo = {
+      ...producto,
+      grupos: [
+        { id: 'g1', nombre: 'Bebida 1 · Bebida', obligatorio: true, minimo: 1, maximo: 1, opciones: [opc('a', 'Frappe Moca')] },
+        { id: 'g2', nombre: 'Bebida 2 · Bebida', obligatorio: true, minimo: 1, maximo: 1, opciones: [opc('b', 'Café Latte')] },
+      ],
+    } as unknown as ProductoCarta;
+    render(<VentanaProductoCarta producto={duo} esBebida={false} onCerrar={() => {}} />);
+    const campos = screen.getAllByLabelText(/Nombre para el envase \(opcional/i);
+    expect(campos).toHaveLength(2);
+    expect(screen.getByText(/Frappe Moca · Nombre para el envase/)).toBeInTheDocument();
+    fireEvent.change(campos[0], { target: { value: 'Lucía' } });
+    fireEvent.change(campos[1], { target: { value: 'Pedro' } });
+    fireEvent.click(screen.getByRole('button', { name: /Agregar al pedido/i }));
+    expect(agregarLinea.mock.calls[0][0].personas).toEqual(['Lucía', 'Pedro']);
+  });
+});

@@ -1,4 +1,5 @@
 import type { DireccionCliente } from './tipos';
+import { MapaUbicacion } from '../comun/mapa/MapaUbicacion';
 
 interface SelectorDireccionesClienteProps {
   /** null mientras carga la libreta */
@@ -51,6 +52,17 @@ export function SelectorDireccionesCliente({ direcciones, ocupado, aviso, alEleg
                 cursor: ocupado ? 'wait' : 'pointer',
               }}
             >
+              {d.lat != null && d.lng != null && (
+                <div style={{ width: '100%', pointerEvents: 'none' }} data-testid="mini-mapa-direccion">
+                  <MapaUbicacion
+                    punto={{ lat: Number(d.lat), lng: Number(d.lng) }}
+                    altura={96}
+                    soloLectura
+                    ajustarA="punto"
+                    etiqueta={`Mapa de ${d.direccion}`}
+                  />
+                </div>
+              )}
               <span style={{ fontWeight: 800, fontSize: '14px' }}>{d.direccion}</span>
               {d.referencia && <span style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>{d.referencia}</span>}
               <span style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>{textoUsos(d.usos)}</span>

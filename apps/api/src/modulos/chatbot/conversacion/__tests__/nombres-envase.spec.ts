@@ -41,4 +41,20 @@ describe('nombres por envase en bebidas', () => {
     const r = paso(flujoCantidad('Hamburguesas'), { buttonPayload: 'ped_cant_2' });
     expect(r.nuevoEstado).toBe('PEDIDO_ACCION_CARRITO');
   });
+
+  it('un combo con 2 bebidas pide un nombre por bebida y los guarda en orden', () => {
+    const f = flujoCantidad('COMBOS');
+    f.pedido.itemEnConfiguracion.opciones = [
+      { id: '1', nombre: 'Frappe Moca', precioExtra: 0, grupoNombre: 'Bebida 1 · Bebida' },
+      { id: '2', nombre: 'Café Latte', precioExtra: 0, grupoNombre: 'Bebida 2 · Bebida' },
+    ];
+    let r = paso(f, { buttonPayload: 'ped_cant_1' });
+    expect(r.nuevoEstado).toBe('PEDIDO_NOMBRES_ENVASE');
+    expect((r.acciones[0] as any).texto).toContain('Tu Frappe Moca: escribe el nombre para el envase 1 de 2');
+    r = paso(r.nuevoFlujo, { texto: 'Ana', textoOriginal: 'Ana' });
+    expect((r.acciones[0] as any).texto).toContain('Tu Café Latte: escribe el nombre para el envase 2 de 2');
+    r = paso(r.nuevoFlujo, { texto: 'Luis', textoOriginal: 'Luis' });
+    r = paso(r.nuevoFlujo, { buttonPayload: 'ped_nom_si' });
+    expect(r.nuevoFlujo.pedido?.items[0].personas).toEqual(['Ana', 'Luis']);
+  });
 });

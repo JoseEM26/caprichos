@@ -350,7 +350,7 @@ export function ModalNuevoPedidoMesa({
   // Con cuenta y direcciones guardadas, el formulario de dirección aparece solo si elige «Dirección nueva»
   const mostrarFormDireccion =
     modoCli === 'invitado' ||
-    (cuenta !== null && (cuenta.direcciones.length === 0 || direccionElegida === 'nueva'));
+    (cuenta !== null && direccionElegida !== null);
 
   // ¿Quién pide? ('anon' | 'cliente' | 'personal')
   const [pideMode, setPideMode] = useState<'anon' | 'cliente' | 'personal'>(
@@ -662,7 +662,7 @@ export function ModalNuevoPedidoMesa({
       nota: config.nota,
       ofertaId: config.ofertaId,
       comboElecciones: config.comboElecciones,
-      personas: config.unidades.map((u) => u.nombreVaso).filter(Boolean),
+      personas: config.nombresBebidas ?? config.unidades.map((u) => u.nombreVaso).filter(Boolean),
     };
 
     setLineas((prev) => [...prev, nuevaLinea]);
@@ -1956,7 +1956,7 @@ export function ModalNuevoPedidoMesa({
                   style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
                 >
                   <b style={{ color: 'var(--cp-navy)', fontSize: '14px' }}>
-                    ¿Lo enviamos a una dirección anterior o es una nueva?
+                    ¿Usar una ubicación anterior?
                   </b>
                   {cuenta.direcciones.map((d) => {
                     const elegida = direccionElegida === d.id;
@@ -1982,6 +1982,17 @@ export function ModalNuevoPedidoMesa({
                           fontSize: '14px',
                         }}
                       >
+                        {d.lat != null && d.lng != null && (
+                          <div style={{ width: '100%', pointerEvents: 'none' }} data-testid="mini-mapa-direccion">
+                            <MapaUbicacion
+                              punto={{ lat: d.lat, lng: d.lng }}
+                              altura={90}
+                              soloLectura
+                              ajustarA="punto"
+                              etiqueta={`Mapa de ${d.direccion}`}
+                            />
+                          </div>
+                        )}
                         <span style={{ fontWeight: 800 }}>{d.direccion}</span>
                         {d.referencia && (
                           <span style={{ fontSize: '12px' }}>Referencia: {d.referencia}</span>
@@ -2160,7 +2171,7 @@ export function ModalNuevoPedidoMesa({
                       {!cliPuntoMapa
                         ? 'Haz clic en el mapa para fijar el punto exacto de entrega.'
                         : zonaInfo?.cubierto
-                        ? `Pin en el mapa (${cliPuntoMapa.lat.toFixed(4)}, ${cliPuntoMapa.lng.toFixed(4)}) · Zona ${zonaInfo.zona} · Envío S/ ${Number(zonaInfo.tarifa || 0).toFixed(2)} (gratis ${zonaInfo.modoGratis === 'desde' ? 'desde' : 'sobre'} S/ ${Number(zonaInfo.gratisDesde || 70).toFixed(2)})`
+                        ? `Pin en el mapa · Zona ${zonaInfo.zona} · Envío S/ ${Number(zonaInfo.tarifa || 0).toFixed(2)} (gratis ${zonaInfo.modoGratis === 'desde' ? 'desde' : 'sobre'} S/ ${Number(zonaInfo.gratisDesde || 70).toFixed(2)})`
                         : 'Fuera de cobertura de reparto.'}
                     </div>
                   </div>

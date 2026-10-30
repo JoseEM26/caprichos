@@ -1303,6 +1303,14 @@ export function FormularioCheckout({
                                 Ver en Google Maps
                               </a>
                             </div>
+                            <MapaUbicacion
+                              punto={coordenadas}
+                              local={tiendaCoords}
+                              onCambiar={(p) => void fijarPunto(p.lat, p.lng, 'MAPA')}
+                              altura={220}
+                              ajustarA="punto"
+                              etiqueta="Mapa con el punto de entrega: puedes arrastrar el pin para corregirlo"
+                            />
                             {ubicacionConfirmada ? (
                               <div
                                 role="status"

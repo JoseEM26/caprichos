@@ -10,7 +10,22 @@ import { canalLabel, modLabel } from './PedidosAdminView';
 export const CRITERIO_BEBIDA_AREAS = ['BARRA', 'BEBIDAS', 'CAFETERIA', 'BAR'];
 export const CRITERIO_BEBIDA_CATEGORIAS = ['BEBIDAS', 'CAFES', 'FRAPPES', 'INFUSIONES', 'JUGOS', 'BEBIDA'];
 
+const grupoDe = (o: any): string => String(o.grupo_nombre || '');
+
+/** Opciones elegidas que son una bebida del combo (grupos «Bebida 1 · Bebida»), en orden. */
+export function bebidasDeCombo(linea: LineaPedido): any[] {
+  return (linea.opcionesElegidas || linea.opciones || []).filter((o: any) => {
+    const g = grupoDe(o);
+    return g.includes(' · ') && /^bebida/i.test(g.split(' · ')[1].trim());
+  });
+}
+
 export function esLineaBebida(linea: LineaPedido): boolean {
+  // un combo no es una bebida: sus bebidas salen una por una (bebidasDeCombo)
+  const cat = String((linea as any).categoria || (linea as any).categoria_nombre || '').toUpperCase();
+  if (cat.includes('COMBO') || (linea.opcionesElegidas || linea.opciones || []).some((o: any) => grupoDe(o).includes(' · '))) {
+    return false;
+  }
   const areaNombre = (linea.area?.nombre || '').trim().toUpperCase();
   if (CRITERIO_BEBIDA_AREAS.some((a) => areaNombre.includes(a))) {
     return true;
@@ -205,11 +220,32 @@ export function armarEtiquetas(pedido: Pedido): ResumenEtiquetas {
 
   // 3. Por Bebida
   // Una por cada vaso: si linea tiene cantidad 2, son 2 etiquetas
-  const lineasBebida = lineas.filter(esLineaBebida);
   const bebidas: EtiquetaBebidaDatos[] = [];
 
-  lineasBebida.forEach((linea) => {
+  lineas.forEach((linea) => {
     const cant = Math.max(1, linea.cantidad || 1);
+    const enCombo = bebidasDeCombo(linea);
+    if (enCombo.length > 0) {
+      const todos = linea.nombres_persona || [];
+      for (let u = 0; u < cant; u++) {
+        enCombo.forEach((o: any, k: number) => {
+          bebidas.push({
+            bebidaIndex: bebidas.length + 1,
+            totalBebidas: 0,
+            codigo: pedido.codigo,
+            persona: (todos[u * enCombo.length + k] || '').trim() || clienteNombre,
+            bebidaNombre: o.opcion_nombre || o.nombre || '',
+            tamano: linea.tamano || null,
+            opciones: [],
+            contiene: null,
+            who: `Para: ${clienteNombre}`,
+            hora,
+          });
+        });
+      }
+      return;
+    }
+    if (!esLineaBebida(linea)) return;
     const nombres = (linea.nombres_persona || []).filter(Boolean);
     const opciones = (linea.opcionesElegidas || linea.opciones || [])
       .map((o) => o.opcion_nombre || o.nombre || '')

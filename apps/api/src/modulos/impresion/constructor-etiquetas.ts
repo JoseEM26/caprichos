@@ -19,7 +19,29 @@ export const CRITERIO_BEBIDA_CATEGORIAS = [
   'BEBIDA',
 ];
 
+const nombreOpcion = (o: any): string => o.opcion_nombre || o.nombre || '';
+const grupoOpcion = (o: any): string => String(o.grupo_nombre || o.grupo || '');
+
+/** Opciones elegidas de la línea que son una bebida del combo (grupos «Bebida 1 · Bebida»), en orden. */
+export function bebidasDeCombo(linea: any): any[] {
+  return (linea.opcionesElegidas || linea.opciones || []).filter((o: any) => {
+    const g = grupoOpcion(o);
+    return g.includes(' · ') && /^bebida/i.test(g.split(' · ')[1].trim());
+  });
+}
+
+/** Un combo se reconoce por sus grupos «paso · tipo» o por su categoría, nunca por el nombre. */
+function esLineaCombo(linea: any): boolean {
+  const categoria = String(linea.categoria?.nombre || linea.categoria_nombre || linea.categoria || '').toUpperCase();
+  return (
+    categoria.includes('COMBO') ||
+    (linea.opcionesElegidas || linea.opciones || []).some((o: any) => grupoOpcion(o).includes(' · '))
+  );
+}
+
 export function esLineaBebida(linea: any): boolean {
+  // un combo no es una bebida: sus bebidas salen una por una (bebidasDeCombo)
+  if (esLineaCombo(linea)) return false;
   const areaNombre = (linea.area?.nombre || '').trim().toUpperCase();
   if (CRITERIO_BEBIDA_AREAS.some((a) => areaNombre.includes(a))) {
     return true;
@@ -188,7 +210,7 @@ export function construirEtiquetasArea(pedido: any): EtiquetaAreaDatos[] {
 }
 
 export function construirEtiquetasBebida(pedido: any): EtiquetaBebidaDatos[] {
-  const lineas: any[] = (pedido.lineas || []).filter(esLineaBebida);
+  const lineas: any[] = pedido.lineas || [];
   const hora = formatearHora(pedido.creado_en);
   const clienteNombre = obtenerNombreCliente(pedido);
   const bebidas: EtiquetaBebidaDatos[] = [];
@@ -196,6 +218,35 @@ export function construirEtiquetasBebida(pedido: any): EtiquetaBebidaDatos[] {
   lineas.forEach((linea) => {
     const cant = Math.max(1, Number(linea.cantidad) || 1);
     const nombres = (linea.nombres_persona || []).filter(Boolean);
+    const enCombo = bebidasDeCombo(linea);
+    if (enCombo.length > 0) {
+      // nombres en orden: unidad 1 (bebida 1, bebida 2), unidad 2 (...)
+      const todos: any[] = linea.nombres_persona || [];
+      for (let u = 0; u < cant; u++) {
+        enCombo.forEach((o, k) => {
+          const paso = grupoOpcion(o).split(' · ')[0].trim();
+          const extras = (linea.opcionesElegidas || linea.opciones || [])
+            .filter((x: any) => x !== o && grupoOpcion(x).startsWith(`${paso} · `))
+            .map(nombreOpcion)
+            .filter(Boolean);
+          bebidas.push({
+            tipo: 'ETIQUETA_BEBIDA',
+            bebidaIndex: 0,
+            totalBebidas: 0,
+            codigo: pedido.codigo,
+            persona: (todos[u * enCombo.length + k] && String(todos[u * enCombo.length + k]).trim()) || clienteNombre,
+            bebidaNombre: nombreOpcion(o),
+            tamano: linea.tamano || null,
+            opciones: extras,
+            contiene: extras.length > 0 ? extras.join(', ') : null,
+            who: `Para: ${clienteNombre}`,
+            hora,
+          });
+        });
+      }
+      return;
+    }
+    if (!esLineaBebida(linea)) return;
     const opciones = (linea.opcionesElegidas || linea.opciones || [])
       .map((o: any) => o.opcion_nombre || o.nombre || '')
       .filter(Boolean);

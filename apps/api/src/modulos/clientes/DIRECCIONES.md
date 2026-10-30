@@ -53,6 +53,6 @@ Forma de cada dirección: `id`, `direccion`, `referencia`, `lat`, `lng`, `alias`
 
 - Se guarda una dirección por pedido delivery con cliente identificado (carta, WhatsApp o DNI del mozo). Es parte de la misma transacción del pedido.
 - Duplicado: mismo texto normalizado (minúsculas, espacios simples) o mismo punto con lat/lng a 5 decimales. Si existe, suma `usos`, actualiza `ultimoUsoEn` y `referencia`.
-- Sin texto ni coordenadas no se guarda nada. Si solo hay coordenadas, el texto es `Punto en el mapa <lat>, <lng>`.
+- Sin texto ni coordenadas no se guarda nada. Si solo hay coordenadas (o el texto es solo coordenadas), el texto es «Punto marcado en el mapa» («Ubicación compartida por WhatsApp» si viene del bot); nunca se guardan ni muestran coordenadas como texto.
 - `origen` es el canal de captura: `CARTA`, `MOZO` (incluye CAJA) o `WHATSAPP` (incluye BOT). Los valores `MAPA` y `ESCRITA` están permitidos en la base pero hoy no se escriben.
 - Nada se borra. Desactivar pone `activo = false`.

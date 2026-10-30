@@ -3,7 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
 import { PuntosService } from './puntos.service';
-import { DireccionesClienteService } from './direcciones-cliente.service';
+import { DireccionesClienteService, textoParecePunto, textoAlternativo } from './direcciones-cliente.service';
 import { partyClienteDelPedido } from './cliente-del-pedido';
 
 describe('DireccionesClienteService', () => {
@@ -133,6 +133,7 @@ describe('DireccionesClienteService', () => {
         where: { party_id: 77n, activo: true },
         orderBy: [{ ultimo_uso_en: 'desc' }, { id: 'desc' }],
         take: 5,
+        include: { zona: { select: { codigo: true } } },
       });
     });
 
@@ -251,6 +252,18 @@ describe('DireccionesClienteService', () => {
       prismaMock.contactMechanism.findFirst.mockResolvedValue(null);
       expect(await service.buscarPorTelefono('987654321', 55n)).toEqual({ encontrado: false });
     });
+  });
+});
+
+describe('texto legible de direcciones', () => {
+  it('reconoce textos que son solo coordenadas', () => {
+    for (const t of ['-12.0186, -76.9580', 'Ubicación compartida: -12.0186, -76.958', 'Punto en el mapa -12.01860, -76.95800'])
+      expect(textoParecePunto(t)).toBe(true);
+    expect(textoParecePunto('Av. Las Palmeras 123')).toBe(false);
+  });
+  it('el texto alternativo nunca lleva coordenadas', () => {
+    expect(textoAlternativo('WHATSAPP')).toBe('Ubicación compartida por WhatsApp');
+    expect(textoAlternativo('CARTA', 'Z1')).toBe('Punto marcado en el mapa (zona Z1)');
   });
 });
 
