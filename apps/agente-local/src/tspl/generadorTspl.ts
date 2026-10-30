@@ -18,6 +18,7 @@ import { generarSeparadorRombos } from './rombos';
 import { resolverFormato, comandosInicio, comandoLogo, aBytesTspl } from './formato';
 import type { FormatoEtiqueta } from './formato';
 import { generarGeneralH, generarAreaH, generarBebidaH } from './horizontal';
+import { generarGeneralG, generarAreaG, generarBebidaG } from './girado';
 
 export interface OpcionesGeneradorTspl {
   copias?: number;
@@ -171,6 +172,7 @@ export function generarEtiquetaGeneral(
   const copias = opciones?.copias ?? 1;
   const f = resolverFormato(opciones?.formato);
   if (f.orientacion === 'horizontal') return generarGeneralH(datos, copias, f);
+  if (f.orientacion === 'vertical-girado') return generarGeneralG(datos, copias, f);
   const partes: string[] = [];
 
   partes.push(generarInicioTspl(f));
@@ -249,6 +251,7 @@ export function generarEtiquetaArea(
   const copias = opciones?.copias ?? 1;
   const f = resolverFormato(opciones?.formato);
   if (f.orientacion === 'horizontal') return generarAreaH(datos, copias, f);
+  if (f.orientacion === 'vertical-girado') return generarAreaG(datos, copias, f);
   const partes: string[] = [];
 
   partes.push(generarInicioTspl(f));
@@ -341,6 +344,7 @@ export function generarEtiquetaBebida(
   const copias = opcionesGen?.copias ?? 1;
   const f = resolverFormato(opcionesGen?.formato);
   if (f.orientacion === 'horizontal') return generarBebidaH(datos, copias, f);
+  if (f.orientacion === 'vertical-girado') return generarBebidaG(datos, copias, f);
   const partes: string[] = [];
 
   partes.push(generarInicioTspl(f));

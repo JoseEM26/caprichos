@@ -237,7 +237,7 @@ describe('generadorTspl', () => {
   });
 
   describe('formato apaisado (defecto) y logo', () => {
-    it('por defecto sale apaisado 101.6 x 63.5 mm, DIRECTION 1, con el logo en BITMAP OVERWRITE', () => {
+    it('por defecto sale vertical-girado sobre rollo 101.6 x 63.5 mm, DIRECTION 1, con el logo en BITMAP OVERWRITE', () => {
       for (const t of [
         generarEtiquetaGeneral(datosGeneral),
         generarEtiquetaArea(datosArea),
@@ -246,7 +246,8 @@ describe('generadorTspl', () => {
         expect(t).toContain('SIZE 101.6 mm,63.5 mm\r\n');
         expect(t).toContain('DIRECTION 1\r\n');
         expect(t).toMatch(/BITMAP \d+,\d+,8,64,0,/);
-        expect(t).toMatch(/REVERSE 28,28,75\d,76/);
+        expect(t).toMatch(/REVERSE \d+,28,84,452/);
+        expect(t).toMatch(/TEXT \d+,\d+,"\d",90,/);
         expect(t).toContain('PRINT 1,1\r\n');
       }
     });
@@ -270,7 +271,7 @@ describe('generadorTspl', () => {
     });
 
     it('los bytes llevan el bitmap del logo crudo (512 bytes) y el texto en Windows-1252', () => {
-      const bytes = generarBytesTrabajo('ETIQUETA_GENERAL', datosGeneral);
+      const bytes = generarBytesTrabajo('ETIQUETA_GENERAL', datosGeneral, false, { orientacion: 'horizontal' });
       const i = bytes.indexOf(Buffer.from('BITMAP 34,34,8,64,0,'));
       expect(i).toBeGreaterThan(0);
       const logo = Buffer.from(LOGO_BASE64, 'base64');

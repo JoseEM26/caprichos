@@ -1,4 +1,4 @@
-import { LOGO_BASE64, LOGO_LADO } from './logoBitmap';
+import { LOGO_BASE64, LOGO_BASE64_90, LOGO_BASE64_270, LOGO_LADO } from './logoBitmap';
 
 /**
  * Formato fisico del sticker. Todo se ajusta en la configuracion del agente sin recompilar
@@ -6,11 +6,15 @@ import { LOGO_BASE64, LOGO_LADO } from './logoBitmap';
  * o la clave "etiqueta" de config.json).
  *
  * Medidas siempre como las ve el rollo en la 4B-2054TH (cabezal de 4"): el ANCHO va a lo ancho del
- * cabezal y el ALTO es el sentido de avance. El rollo de 2.5" x 4" se carga apaisado (101.6 ancho x 63.5 alto),
- * por eso el defecto es horizontal: el contenido se lee de lado a lado sin girar el sticker.
+ * cabezal y el ALTO es el sentido de avance. El rollo de 2.5" x 4" se carga apaisado (101.6 ancho x 63.5 alto).
+ * Orientaciones: 'vertical-girado' (defecto: rollo apaisado, contenido en retrato girado 90 grados para que
+ * el sticker se pegue "parado"), 'horizontal' (contenido apaisado) y 'vertical' (rollo cargado de canto).
+ * ETIQUETA_GIRO=90|270 elige el sentido del giro; si la cabecera sale abajo al pegarlo, probar el otro.
  */
 export interface FormatoEtiqueta {
-  orientacion: 'horizontal' | 'vertical';
+  orientacion: 'horizontal' | 'vertical' | 'vertical-girado';
+  /** Solo 'vertical-girado': 90 = cabecera hacia el borde derecho del rollo, 270 = hacia el izquierdo. */
+  giro: 90 | 270;
   anchoMm: number;
   altoMm: number;
   /** DIRECTION de TSPL: 1 = normal (sale derecho), 0 = girado 180 grados. */
@@ -22,11 +26,12 @@ const LARGO = 101.6;
 const CORTO = 63.5;
 
 export function resolverFormato(p: Partial<FormatoEtiqueta> = {}): FormatoEtiqueta {
-  const orientacion = p.orientacion === 'vertical' ? 'vertical' : 'horizontal';
-  const [aw, al] = orientacion === 'horizontal' ? [LARGO, CORTO] : [CORTO, LARGO];
+  const orientacion = p.orientacion === 'vertical' || p.orientacion === 'horizontal' ? p.orientacion : 'vertical-girado';
+  const [aw, al] = orientacion === 'vertical' ? [CORTO, LARGO] : [LARGO, CORTO];
   const pos = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) && v > 10 ? v : d);
   return {
     orientacion,
+    giro: p.giro === 270 ? 270 : 90,
     anchoMm: pos(p.anchoMm, aw),
     altoMm: pos(p.altoMm, al),
     direccion: p.direccion === 0 ? 0 : 1,
@@ -42,7 +47,8 @@ export function formatoDesdeConfig(
   const num = (v: string | undefined) => (v === undefined || v === '' ? undefined : Number(v));
   const o = (env.ETIQUETA_ORIENTACION || archivo.orientacion || '').toString().toLowerCase();
   return resolverFormato({
-    orientacion: o === 'vertical' ? 'vertical' : 'horizontal',
+    orientacion: o === 'vertical' || o === 'horizontal' ? o : 'vertical-girado',
+    giro: (num(env.ETIQUETA_GIRO) ?? archivo.giro) === 270 ? 270 : 90,
     anchoMm: num(env.ETIQUETA_ANCHO_MM) ?? archivo.anchoMm,
     altoMm: num(env.ETIQUETA_ALTO_MM) ?? archivo.altoMm,
     direccion: (num(env.ETIQUETA_DIRECCION) ?? archivo.direccion) === 0 ? 0 : 1,
@@ -66,8 +72,9 @@ export function comandosInicio(f: FormatoEtiqueta): string {
  * Logo de Caprichos como BITMAP TSPL en modo OVERWRITE (0). Los datos binarios viajan como
  * caracteres latin1 dentro del texto; `aBytesTspl` los vuelve a bytes sin pasar por Windows-1252.
  */
-export function comandoLogo(x: number, y: number): string {
-  const datos = Buffer.from(LOGO_BASE64, 'base64').toString('latin1');
+export function comandoLogo(x: number, y: number, giro: 0 | 90 | 270 = 0): string {
+  const b64 = giro === 90 ? LOGO_BASE64_90 : giro === 270 ? LOGO_BASE64_270 : LOGO_BASE64;
+  const datos = Buffer.from(b64, 'base64').toString('latin1');
   return `BITMAP ${x},${y},${LOGO_LADO / 8},${LOGO_LADO},0,${datos}\r\n`;
 }
 

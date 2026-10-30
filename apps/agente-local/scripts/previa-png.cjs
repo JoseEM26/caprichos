@@ -1,5 +1,5 @@
 // Vista previa PNG de cada sticker a partir del TSPL real que genera el agente (sin impresora).
-// Uso: pnpm build && node scripts/previa-png.cjs <carpeta-salida> [horizontal|vertical]
+// Uso: pnpm build && node scripts/previa-png.cjs <carpeta-salida> [vertical-girado|horizontal|vertical] [90|270] [largos]
 // Interpreta SIZE, BOX, BAR, REVERSE, BITMAP (0 = negro) y TEXT; las fuentes 1-5 de la impresora se
 // aproximan con una tipografia del sistema ajustada al ancho exacto de cada celda.
 const fs = require('fs');
@@ -50,33 +50,57 @@ async function render(script, escala = 2) {
     } else if ((m = /^REVERSE (\d+),(\d+),(\d+),(\d+)/.exec(linea))) {
       const [x, y, w, h] = m.slice(1).map(Number);
       for (let j = y; j < y + h; j++) for (let k = x; k < x + w; k++) if (k < W && j < H) px[j * W + k] = 255 - px[j * W + k];
-    } else if ((m = /^TEXT (\d+),(\d+),"(\d)",0,(\d+),(\d+),"(.*)"$/.exec(linea))) {
-      const [x, y] = [+m[1], +m[2]]; const [cw, ch] = FUENTE[m[3]]; const xm = +m[4], ym = +m[5];
-      const txt = m[6];
+    } else if ((m = /^TEXT (\d+),(\d+),"(\d)",(\d+),(\d+),(\d+),"(.*)"$/.exec(linea))) {
+      const [x, y] = [+m[1], +m[2]]; const [cw, ch] = FUENTE[m[3]]; const rot = +m[4], xm = +m[5], ym = +m[6];
+      const txt = m[7];
       const w = Math.max(1, txt.length * cw), h = ch;
       const fs_ = Math.min(cw / 0.6, ch * 0.95);
       const xs = [...txt].map((_, n) => n * cw).join(' ');
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="#fff"/>` +
         `<text x="${xs}" y="${h * 0.78}" font-family="DejaVu Sans Mono, monospace" font-weight="bold" font-size="${fs_}">${esc(txt)}</text></svg>`;
       const t = await sharp(Buffer.from(svg)).greyscale().raw().toBuffer();
-      for (let j = 0; j < h * ym; j++) for (let k = 0; k < w * xm; k++) if (t[((j / ym) | 0) * w + ((k / xm) | 0)] < 140) set(x + k, y + j, 0);
+      for (let j = 0; j < h * ym; j++) for (let k = 0; k < w * xm; k++) if (t[((j / ym) | 0) * w + ((k / xm) | 0)] < 140) {
+        const a = k, b = j; // coordenadas locales del texto sin girar
+        if (rot === 90) set(x - b, y + a, 0); else if (rot === 270) set(x + b, y - a, 0); else set(x + a, y + b, 0);
+      }
     }
   }
-  return sharp(px, { raw: { width: W, height: H, channels: 1 } }).resize(W * escala / 2, H * escala / 2).png().toBuffer();
+  const base = sharp(px, { raw: { width: W, height: H, channels: 1 } });
+  const giro = (/",(90|270),\d+,\d+,"/.exec(script) || [])[1];
+  // "pegado": el sticker se gira para leerse parado (90 -> antihorario, 270 -> horario)
+  const pegado = giro ? await sharp(await base.clone().png().toBuffer()).rotate(giro === '90' ? 270 : 90).resize(H * escala / 2, W * escala / 2).png().toBuffer() : null;
+  return { fisico: await base.resize(W * escala / 2, H * escala / 2).png().toBuffer(), pegado };
 }
 
+const larga = 'ADMINISTRACION INTERNACIONAL DE EMPRESAS';
+const L = {
+  general: { ...muestras.muestraEtiquetaGeneral, who: 'MARIA ELENA GUADALUPE DEL CARMEN', cantidadProductos: 9, nota: larga + ' ' + larga,
+    productos: Array.from({ length: 9 }, (_, i) => ({ cantidad: i + 1, nombre: `Producto ${i + 1} con nombre largo ${larga}`, tamano: '12oz' })) },
+  area: { ...muestras.muestraEtiquetaArea, who: 'MARIA ELENA GUADALUPE DEL CARMEN', esCompacta: false, nota: larga + ' ' + larga,
+    lineas: Array.from({ length: 6 }, (_, i) => ({ cantidad: 2, nombre: `Sandwich especial ${i} ${larga}`, tamano: 'Grande', opciones: ['Sin cebolla ni tomate', 'Con extra queso fundido', 'Salsa aparte'] })) },
+  bebida: { ...muestras.muestraEtiquetaBebida, persona: 'MARIA ELENA GUADALUPE DEL CARMEN', bebidaNombre: 'CAPPUCCINO VAINILLA CARAMELO SALADO CON CREMA BATIDA Y CHISPAS',
+    opciones: ['Leche de avena sin lactosa', 'Sin azucar', 'Extra canela en polvo', 'Doble shot espresso', 'Temperatura muy caliente', 'Vaso reutilizable grande'],
+    contiene: 'Avena, canela, espresso doble, vainilla natural, caramelo salado, crema batida, chispas de chocolate, jarabe de arce, leche vegetal', who: 'Para: Juan Alberto Perez de la Cruz Quispe' },
+};
 (async () => {
   const salida = process.argv[2] || '.';
-  const orientacion = process.argv[3] || 'horizontal';
+  const orientacion = process.argv[3] || 'vertical-girado';
+  const giro = Number(process.argv[4]) === 270 ? 270 : 90;
+  const largos = process.argv[5] === 'largos';
   fs.mkdirSync(salida, { recursive: true });
   for (const [tipo, datos, nombre] of [
-    ['ETIQUETA_GENERAL', muestras.muestraEtiquetaGeneral, 'general'],
-    ['ETIQUETA_AREA', muestras.muestraEtiquetaArea, 'area'],
-    ['ETIQUETA_BEBIDA', muestras.muestraEtiquetaBebida, 'bebida'],
+    ['ETIQUETA_GENERAL', largos ? L.general : muestras.muestraEtiquetaGeneral, 'general'],
+    ['ETIQUETA_AREA', largos ? L.area : muestras.muestraEtiquetaArea, 'area'],
+    ['ETIQUETA_BEBIDA', largos ? L.bebida : muestras.muestraEtiquetaBebida, 'bebida'],
   ]) {
-    const tspl = generarTsplTrabajo(tipo, datos, false, { orientacion });
+    const tspl = generarTsplTrabajo(tipo, datos, false, { orientacion, giro });
+    const r = await render(tspl, 2);
     const ruta = path.join(salida, `previa-${orientacion}-${nombre}.png`);
-    fs.writeFileSync(ruta, await render(tspl, 2));
+    fs.writeFileSync(ruta, r.fisico);
     console.log(ruta);
+    if (r.pegado) {
+      fs.writeFileSync(path.join(salida, `pegado-${orientacion}-${nombre}.png`), r.pegado);
+      console.log(path.join(salida, `pegado-${orientacion}-${nombre}.png`));
+    }
   }
 })();
