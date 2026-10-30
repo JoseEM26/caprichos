@@ -97,6 +97,7 @@ export const CLAVES_TEXTO = [
   'reprog_recargo_modo',
   'carta_aviso_entrada',
   'ayuda_ia_activo',
+  'stock_control_activo',
   'terminos_texto',
   'privacidad_texto',
   'chatbot_activo',
@@ -199,6 +200,7 @@ export class ConfiguracionService {
       if (
         clave === 'carta_aviso_entrada' ||
         clave === 'ayuda_ia_activo' ||
+        clave === 'stock_control_activo' ||
         clave === 'chatbot_activo' ||
         clave === 'chatbot_ia_activo' ||
         clave === 'chatbot_avisos_equipo_activo' ||

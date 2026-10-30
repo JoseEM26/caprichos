@@ -37,6 +37,7 @@ describe('StockService', () => {
 
     prisma = {
       $transaction: jest.fn(async (cb) => cb(prisma)),
+      parametro: { findUnique: jest.fn().mockResolvedValue({ valor: 'si' }) },
       insumo: {
         findUnique: jest.fn(),
         findMany: jest.fn(),
@@ -219,6 +220,45 @@ describe('StockService', () => {
         insumoId: '1',
         lugarId: '20',
         nuevoStock: 8,
+      });
+    });
+  });
+
+  describe('interruptor «Control de almacén»', () => {
+    it('apagado (o sin parámetro) cobrar no descuenta, no apaga productos ni avisa', async () => {
+      prisma.parametro.findUnique.mockResolvedValueOnce(null);
+
+      const res = await service.descontarPorPedido('90');
+
+      expect(res).toEqual({ ok: true, motivo: 'Control de almacén apagado' });
+      expect(prisma.pedido.findUnique).not.toHaveBeenCalled();
+      expect(prisma.stock.update).not.toHaveBeenCalled();
+      expect(prisma.movimientoStock.create).not.toHaveBeenCalled();
+    });
+
+    it('«no» también lo deja apagado y un error al leer el parámetro cuenta como apagado', async () => {
+      prisma.parametro.findUnique.mockResolvedValueOnce({ valor: 'no' });
+      expect(await service.controlActivo()).toBe(false);
+      prisma.parametro.findUnique.mockRejectedValueOnce(new Error('bd caida'));
+      expect(await service.controlActivo()).toBe(false);
+      prisma.parametro.findUnique.mockResolvedValueOnce({ valor: 'si' });
+      expect(await service.controlActivo()).toBe(true);
+    });
+
+    it('estadoControl cuenta insumos con receta sin stock y los productos que se agotarían', async () => {
+      prisma.parametro.findUnique.mockResolvedValueOnce({ valor: 'no' });
+      prisma.recetaLinea.findMany.mockResolvedValueOnce([
+        { insumo_id: 1n, receta: { producto_id: 10n } },
+        { insumo_id: 2n, receta: { producto_id: 10n } },
+        { insumo_id: 2n, receta: { producto_id: 11n } },
+      ]);
+      prisma.stock.findMany.mockResolvedValueOnce([{ insumo_id: 1n, cantidad: 5 }]);
+
+      expect(await service.estadoControl()).toEqual({
+        activo: false,
+        insumosConReceta: 2,
+        insumosSinStock: 1,
+        productosEnRiesgo: 2,
       });
     });
   });

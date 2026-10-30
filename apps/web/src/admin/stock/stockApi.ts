@@ -9,7 +9,17 @@ import {
   AjusteOpcionItem,
 } from './tipos';
 
+export interface EstadoControlAlmacen {
+  activo: boolean;
+  insumosConReceta: number;
+  insumosSinStock: number;
+  productosEnRiesgo: number;
+}
+
 export const stockApi = {
+  /** Interruptor «Control de almacén»: si está encendido y cuántos productos se agotarían al primer cobro. */
+  estadoControl: (): Promise<EstadoControlAlmacen> => api.get<EstadoControlAlmacen>('/admin/stock/control'),
+
   // Lugares
   listarLugares: async (): Promise<LugarStockItem[]> => {
     try {

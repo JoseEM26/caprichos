@@ -521,6 +521,51 @@ export class StockService {
     };
   }
 
+  /** ¿Está encendido el control de almacén? Parámetro `stock_control_activo` («si»/«no»); sin parámetro, apagado. */
+  async controlActivo(db: any = this.prisma): Promise<boolean> {
+    try {
+      const p = await db.parametro?.findUnique?.({ where: { clave: 'stock_control_activo' } });
+      const v = p?.valor;
+      return v === true || String(v ?? '').toLowerCase().trim() === 'si';
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Estado del control para la pantalla de Configuración: si está encendido y cuántos insumos con receta
+   * no tienen stock cargado (esos productos se agotarían al primer cobro al encenderlo).
+   */
+  async estadoControl() {
+    const activo = await this.controlActivo();
+    const lineas = await this.prisma.recetaLinea.findMany({
+      where: { receta: { es_produccion: false } },
+      select: { insumo_id: true, receta: { select: { producto_id: true } } },
+    });
+    const insumosConReceta = new Set<string>(lineas.map((l: any) => l.insumo_id.toString()));
+    const stocks = insumosConReceta.size
+      ? await this.prisma.stock.findMany({
+          where: { insumo_id: { in: [...insumosConReceta].map((x) => BigInt(x)) } },
+          select: { insumo_id: true, cantidad: true },
+        })
+      : [];
+    const saldo = new Map<string, number>();
+    for (const st of stocks as any[]) {
+      const k = st.insumo_id.toString();
+      saldo.set(k, (saldo.get(k) ?? 0) + Number(st.cantidad));
+    }
+    const sinStock = new Set<string>([...insumosConReceta].filter((k) => (saldo.get(k) ?? 0) <= 0));
+    const productosEnRiesgo = new Set<string>(
+      (lineas as any[]).filter((l) => sinStock.has(l.insumo_id.toString())).map((l) => l.receta.producto_id.toString()),
+    );
+    return {
+      activo,
+      insumosConReceta: insumosConReceta.size,
+      insumosSinStock: sinStock.size,
+      productosEnRiesgo: productosEnRiesgo.size,
+    };
+  }
+
   /**
    * FT-STK-03: Método público idempotent que descuenta por receta al COBRAR.
    * Si ya existen movimientos de tipo 'VENTA' para ese pedido, devuelve sin duplicar.
@@ -532,6 +577,12 @@ export class StockService {
   async descontarPorPedido(pedidoId: bigint | string | number, txExterno?: any) {
     const id = this.parsearId(pedidoId, 'pedido');
     const runner = txExterno || this.prisma;
+
+    // Interruptor «Control de almacén» (Configuración): apagado, vender no toca el stock, no apaga productos
+    // ni avisa de insumos. Las entradas y movimientos manuales siguen registrándose.
+    if (!(await this.controlActivo(runner))) {
+      return { ok: true, motivo: 'Control de almacén apagado' };
+    }
 
     // 1. Idempotencia: Verificar si ya hay movimientos de venta de este pedido
     const ventasPrevias = await runner.movimientoStock.findFirst({

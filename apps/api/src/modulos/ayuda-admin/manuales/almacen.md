@@ -59,6 +59,16 @@ Ver tambien: [[historial]]
 Despues: [[cierre]]
 Ver tambien: [[stock]]
 
+## Como se hace: Encender o apagar el control de almacen
+El control de almacen decide si vender toca el stock. Apagado, al cobrar un pedido no se descuenta ningun insumo, no se agotan productos por falta de insumos y no llegan avisos de insumos; las compras, movimientos, mermas y producciones se siguen guardando para ir armando el almacen. Encendido, cada cobro descuenta insumos segun la receta y agota solos los productos que se quedan sin insumos.
+1. Entra a Configuracion y abre la pestana "Operacion".
+2. En la tarjeta "Control de almacen" pulsa "Encender" (o "Apagar").
+3. Si hay insumos de recetas sin stock cargado, el aviso te dice cuantos productos se agotarian al primer cobro. Si todavia falta cargar stock, elige "No, cancelar" y termina de cargar los insumos, compras y proveedores primero.
+4. Pulsa "Si, confirmar". El cambio queda registrado en la auditoria.
+Nota: solo el administrador puede encender o apagar el control. Mientras este apagado, las pantallas de almacen, stock y compras muestran una franja de aviso.
+Antes: [[stock]]
+Ver tambien: [[compras]]
+
 ## Errores y dudas comunes
 - Cuando se requiere el codigo del supervisor: el codigo de 6 digitos se exige siempre para anular cualquier movimiento previo, para anular tandas de produccion y para registrar mermas o ajustes grandes de 10 o mas unidades. El administrador no necesita codigo en ninguno de estos casos.
 - Como atender pedidos de insumos enviados por cocina: en la seccion de pedidos internos, localiza el pedido pendiente y pulsa el boton "Marcar entregado" luego de despachar fisicamente los productos.
