@@ -6,7 +6,7 @@
 # Solo existe el ambiente demo: este script no acepta otro y nunca lee el de producción.
 #   simulacro: informa lo que borraría/anonimizaría; no escribe nada.
 #   real     : primero respaldo completo con respaldar.sh demo, luego sanea.
-# Lo invoca .github/workflows/sanear-clientes-demo.yml.
+# Lo invoca el job sanear-demo de .github/workflows/deploy.yml (workflow_dispatch, accion=sanear-demo).
 # ==============================================================================
 set -euo pipefail
 

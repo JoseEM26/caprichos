@@ -20,9 +20,22 @@ on:
         required: false
         type: string
       confirmacion:
-        description: 'Para producción escriba literalmente: PRODUCCION'
+        description: 'Producción: escriba PRODUCCION. Sanear clientes de la demo: escriba SANEAR CLIENTES DE LA DEMO'
         required: false
         type: string
+      accion:
+        description: 'Acción: desplegar (normal) o sanear-demo (borra cuentas de clientes y anonimiza DNI, SOLO demo)'
+        required: false
+        default: 'desplegar'
+        type: choice
+        options:
+          - desplegar
+          - sanear-demo
+      simulacro:
+        description: 'Solo para sanear-demo: true = simulacro (no escribe); false = sanea de verdad con respaldo'
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -37,6 +50,7 @@ jobs:
       tag: ${{ steps.evaluar.outputs.tag }}
       ref: ${{ steps.evaluar.outputs.ref }}
       short_sha: ${{ steps.evaluar.outputs.short_sha }}
+      accion: ${{ steps.evaluar.outputs.accion }}
     steps:
       - name: Checkout del repositorio
         uses: actions/checkout@v4
@@ -50,9 +64,30 @@ jobs:
           IN_AMBIENTE: ${{ github.event.inputs.ambiente }}
           IN_TAG: ${{ github.event.inputs.tag }}
           IN_CONFIRMACION: ${{ github.event.inputs.confirmacion }}
+          IN_ACCION: ${{ github.event.inputs.accion }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
           SHORT_SHA="${GITHUB_SHA::7}"
           echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+
+          ACCION="desplegar"
+          if [ "$EVENTO" = "workflow_dispatch" ] && [ "$IN_ACCION" = "sanear-demo" ]; then
+            ACCION="sanear-demo"
+            echo "==> Saneamiento de clientes de la DEMO (jamás producción)..."
+            if [ "$IN_AMBIENTE" != "demo" ]; then
+              echo "::error::El saneamiento solo existe para el ambiente demo."
+              exit 1
+            fi
+            if [ "$REF_NAME" != "ola-1" ]; then
+              echo "::error::El saneamiento de la demo solo se lanza desde la rama ola-1."
+              exit 1
+            fi
+            if [ "$IN_CONFIRMACION" != "SANEAR CLIENTES DE LA DEMO" ]; then
+              echo "::error::Escriba exactamente 'SANEAR CLIENTES DE LA DEMO' en confirmacion."
+              exit 1
+            fi
+          fi
+          echo "accion=${ACCION}" >> "$GITHUB_OUTPUT"
 
           if [ "$EVENTO" = "workflow_dispatch" ]; then
             ENV_DEST="$IN_AMBIENTE"
@@ -111,6 +146,7 @@ jobs:
   build-and-push:
     name: Construcción, escaneo y publicación en GHCR
     needs: validar-y-determinar
+    if: needs.validar-y-determinar.outputs.accion == 'desplegar'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     outputs:
@@ -215,6 +251,7 @@ jobs:
   deploy-ssh:
     name: Despliegue por SSH en VPS
     needs: [validar-y-determinar, build-and-push]
+    if: needs.validar-y-determinar.outputs.accion == 'desplegar'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment:
@@ -298,3 +335,66 @@ jobs:
           - **Arranque seguro:** Verificación de healthcheck posterior y vuelta atrás automática ante anomalías.
           - **SSH endurecido:** Autenticación por llave ed25519 dedicada y verificación de host fingerprint.
           EOF
+
+  # Saneamiento manual de clientes/DNI de la DEMO (jamás producción). Solo con workflow_dispatch,
+  # accion=sanear-demo, ambiente=demo, rama ola-1 y la confirmación literal (validada arriba).
+  sanear-demo:
+    name: Sanear clientes de la demo (manual)
+    needs: validar-y-determinar
+    if: needs.validar-y-determinar.outputs.accion == 'sanear-demo'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: demo
+    concurrency:
+      group: sanear-clientes-demo
+      cancel-in-progress: false
+    steps:
+      - name: Checkout (scripts de esta versión)
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: infra/compose
+
+      - name: Configurar llave y huella SSH (sin StrictHostKeyChecking=no)
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          for v in SSH_KEY SSH_HOST SSH_KNOWN_HOSTS; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Falta el secreto $v en GitHub (Settings > Secrets and variables > Actions)."
+              exit 1
+            fi
+          done
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Sincronizar scripts en el VPS
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -e
+          SSH="ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes ${SSH_USER:-deploy}@${SSH_HOST}"
+          tar -czf - -C infra/compose scripts | $SSH 'mkdir -p /opt/caprichos && tar -xzf - -C /opt/caprichos && chmod +x /opt/caprichos/scripts/*'
+
+      - name: Sanear clientes de la demo (simulacro primero; real solo si se desmarcó simulacro)
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SIMULACRO: ${{ github.event.inputs.simulacro }}
+        run: |
+          if [ "$SIMULACRO" = "false" ]; then MODO=real; else MODO=simulacro; fi
+          echo "==> Modo: ${MODO}"
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "${SSH_USER:-deploy}@${SSH_HOST}" \
+            "/opt/caprichos/scripts/sanear-clientes-demo.sh '${MODO}'"
+
+      - name: Borrar la llave del ejecutor
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

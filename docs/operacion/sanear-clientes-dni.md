@@ -36,7 +36,7 @@ Se niega si falta la confirmación literal, si `ENTORNO_DATOS` no es `local` o `
 
 ## Demo
 
-GitHub > Actions > **Sanear clientes de la demo** > Run workflow en la rama `ola-1`. Escribir `SANEAR CLIENTES DE LA DEMO` y dejar `simulacro` marcado para ver el informe. Para sanear, repetir con `simulacro` desmarcado: antes se hace un respaldo completo en el VPS (`/opt/caprichos/respaldos/demo`).
+GitHub > Actions > **Deploy Caprichos por SSH** > Run workflow en la rama `ola-1`: ambiente `demo`, acción `sanear-demo`, confirmación `SANEAR CLIENTES DE LA DEMO` y `simulacro` marcado para ver el informe. (Un flujo aparte no se puede lanzar a mano desde `ola-1`: GitHub solo lista los que están en la rama principal, por eso el saneamiento vive en el flujo de despliegue ya registrado.) Para sanear, repetir con `simulacro` desmarcado: antes se hace un respaldo completo en el VPS (`/opt/caprichos/respaldos/demo`).
 
 ## Después
 
