@@ -24,7 +24,7 @@ on:
         required: false
         type: string
       accion:
-        description: 'Acción: desplegar (normal), sanear-demo (borra cuentas de clientes, SOLO demo), respaldar-demo (copia manual de la demo), exportar-datos-demo (paquete de configuración y contenido de la demo), importar-datos-produccion (importa el paquete a PRODUCCIÓN), configurar-dominios-demo (la demo pasa a demo.caprichos.pe y conserva el dominio adicional), preparar-produccion (crea el .env de PRODUCCIÓN con claves aleatorias; no despliega)'
+        description: 'Acción: desplegar (normal), sanear-demo (borra cuentas de clientes, SOLO demo), respaldar-demo (copia manual de la demo), exportar-datos-demo (paquete de configuración y contenido de la demo), importar-datos-produccion (importa el paquete a PRODUCCIÓN), configurar-dominios-demo (la demo pasa a demo.caprichos.pe y conserva el dominio adicional), preparar-produccion (crea el .env de PRODUCCIÓN con claves aleatorias; no despliega), crear-admin-produccion (roles y primer administrador de PRODUCCIÓN; la clave queda en un archivo del servidor)'
         required: false
         default: 'desplegar'
         type: choice
@@ -35,6 +35,7 @@ on:
           - exportar-datos-demo
           - configurar-dominios-demo
           - preparar-produccion
+          - crear-admin-produccion
           - importar-datos-produccion
       paquete:
         description: 'Solo importar-datos-produccion: carpeta del paquete exportado (fecha, p. ej. 20261030_120000, o ruta dentro de /opt/caprichos/respaldos/datos-empresa)'
@@ -42,6 +43,10 @@ on:
         type: string
       frase_datos:
         description: 'Solo importar-datos-produccion: escriba IMPORTAR DATOS DE LA EMPRESA'
+        required: false
+        type: string
+      dni_admin:
+        description: 'Solo crear-admin-produccion: DNI (8 dígitos) del administrador inicial'
         required: false
         type: string
       dominio_adicional:
@@ -86,6 +91,7 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
           IN_FRASE: ${{ github.event.inputs.frase_datos }}
           IN_PAQUETE: ${{ github.event.inputs.paquete }}
+          IN_DNI: ${{ github.event.inputs.dni_admin }}
         run: |
           SHORT_SHA="${GITHUB_SHA::7}"
           echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
@@ -138,6 +144,19 @@ jobs:
             ACCION="preparar-produccion"
             if [ "$IN_AMBIENTE" != "prod" ]; then
               echo "::error::Preparar producción solo existe para el ambiente prod."
+              exit 1
+            fi
+          fi
+
+          # Crear el primer administrador de PRODUCCIÓN: manual; la validación de prod (PRODUCCION + tag en main) va abajo
+          if [ "$EVENTO" = "workflow_dispatch" ] && [ "$IN_ACCION" = "crear-admin-produccion" ]; then
+            ACCION="crear-admin-produccion"
+            if [ "$IN_AMBIENTE" != "prod" ]; then
+              echo "::error::Esta acción solo existe para el ambiente prod."
+              exit 1
+            fi
+            if [[ ! "$IN_DNI" =~ ^[0-9]{8}$ ]]; then
+              echo "::error::dni_admin debe tener exactamente 8 dígitos."
               exit 1
             fi
           fi
@@ -806,6 +825,68 @@ jobs:
           ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
             "${SSH_USER:-deploy}@${SSH_HOST}" \
             "/opt/caprichos/scripts/preparar-produccion.sh $MODO" 2>&1 | tee preparar.log
+
+      - name: Borrar la llave del ejecutor
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+  # Roles y primer ADMIN de producción (seed.ts). La clave queda en un archivo 600 del servidor, nunca en el log.
+  crear-admin-produccion:
+    name: Crear administrador inicial de PRODUCCIÓN
+    needs: validar-y-determinar
+    if: needs.validar-y-determinar.outputs.accion == 'crear-admin-produccion'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: prod
+    concurrency:
+      group: crear-admin-produccion
+      cancel-in-progress: false
+    steps:
+      - name: Checkout (scripts del tag validado)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validar-y-determinar.outputs.ref }}
+          sparse-checkout: infra/compose
+
+      - name: Configurar llave y huella SSH (sin StrictHostKeyChecking=no)
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          for v in SSH_KEY SSH_HOST SSH_KNOWN_HOSTS; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Falta el secreto $v en GitHub (Settings > Secrets and variables > Actions)."
+              exit 1
+            fi
+          done
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Sincronizar scripts en el VPS
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -e
+          SSH="ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes ${SSH_USER:-deploy}@${SSH_HOST}"
+          tar -czf - -C infra/compose scripts | $SSH 'mkdir -p /opt/caprichos && tar -xzf - -C /opt/caprichos && chmod +x /opt/caprichos/scripts/*'
+
+      - name: Crear administrador inicial
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          DNI: ${{ github.event.inputs.dni_admin }}
+        run: |
+          set -o pipefail
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "${SSH_USER:-deploy}@${SSH_HOST}" \
+            "/opt/caprichos/scripts/crear-admin-produccion.sh '${DNI}'" 2>&1 | tee admin.log
 
       - name: Borrar la llave del ejecutor
         if: always()
