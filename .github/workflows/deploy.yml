@@ -20,11 +20,11 @@ on:
         required: false
         type: string
       confirmacion:
-        description: 'Producción: escriba PRODUCCION. Sanear: SANEAR CLIENTES DE LA DEMO. Respaldo: RESPALDAR DEMO. Exportar: EXPORTAR DATOS DE LA DEMO. Dominios: CONFIGURAR DOMINIOS DE LA DEMO. Proxy: ACTUALIZAR PROXY'
+        description: 'Producción: escriba PRODUCCION. Sanear: SANEAR CLIENTES DE LA DEMO. Respaldo: RESPALDAR DEMO. Exportar: EXPORTAR DATOS DE LA DEMO. Dominios: CONFIGURAR DOMINIOS DE LA DEMO. Proxy: ACTUALIZAR PROXY. Monitor: INSTALAR MONITOR'
         required: false
         type: string
       accion:
-        description: 'Acción: desplegar (normal), sanear-demo (borra cuentas de clientes, SOLO demo), respaldar-demo (copia manual de la demo), exportar-datos-demo (paquete de configuración y contenido de la demo), importar-datos-produccion (importa el paquete a PRODUCCIÓN), configurar-dominios-demo (la demo pasa a demo.caprichos.pe y conserva el dominio adicional), preparar-produccion (crea el .env de PRODUCCIÓN con claves aleatorias; no despliega), crear-admin-produccion (roles y primer administrador de PRODUCCIÓN; la clave queda en un archivo del servidor), sincronizar-proxy (actualiza los middlewares de Traefik; simulacro por defecto), probar-restauracion (restaura el último respaldo en una base temporal; demo o prod)'
+        description: 'Acción: desplegar (normal), sanear-demo (borra cuentas de clientes, SOLO demo), respaldar-demo (copia manual de la demo), exportar-datos-demo (paquete de configuración y contenido de la demo), importar-datos-produccion (importa el paquete a PRODUCCIÓN), configurar-dominios-demo (la demo pasa a demo.caprichos.pe y conserva el dominio adicional), preparar-produccion (crea el .env de PRODUCCIÓN con claves aleatorias; no despliega), crear-admin-produccion (roles y primer administrador de PRODUCCIÓN; la clave queda en un archivo del servidor), sincronizar-proxy (actualiza los middlewares de Traefik; simulacro por defecto), probar-restauracion (restaura el último respaldo en una base temporal; demo o prod), instalar-monitor (Uptime Kuma solo local en el servidor)'
         required: false
         default: 'desplegar'
         type: choice
@@ -38,6 +38,7 @@ on:
           - crear-admin-produccion
           - sincronizar-proxy
           - probar-restauracion
+          - instalar-monitor
           - importar-datos-produccion
       paquete:
         description: 'Solo importar-datos-produccion: carpeta del paquete exportado (fecha, p. ej. 20261030_120000, o ruta dentro de /opt/caprichos/respaldos/datos-empresa)'
@@ -161,6 +162,17 @@ jobs:
             fi
             if [ "$IN_CONFIRMACION" != "ACTUALIZAR PROXY" ]; then
               echo "::error::Escriba exactamente 'ACTUALIZAR PROXY' en confirmacion."
+              exit 1
+            fi
+          fi
+          if [ "$EVENTO" = "workflow_dispatch" ] && [ "$IN_ACCION" = "instalar-monitor" ]; then
+            ACCION="instalar-monitor"
+            if [ "$IN_AMBIENTE" != "demo" ] || [ "$REF_NAME" != "preprod" ]; then
+              echo "::error::instalar-monitor se lanza con ambiente demo desde la rama preprod."
+              exit 1
+            fi
+            if [ "$IN_CONFIRMACION" != "INSTALAR MONITOR" ]; then
+              echo "::error::Escriba exactamente 'INSTALAR MONITOR' en confirmacion."
               exit 1
             fi
           fi
@@ -782,6 +794,67 @@ jobs:
           ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
             "${SSH_USER:-deploy}@${SSH_HOST}" \
             "/opt/caprichos/scripts/sincronizar-proxy.sh $MODO" 2>&1 | tee proxy.log
+
+      - name: Borrar la llave del ejecutor
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+  # Instala Uptime Kuma (solo escucha en 127.0.0.1 del servidor; se abre por túnel SSH).
+  instalar-monitor:
+    name: Instalar monitor (Uptime Kuma)
+    needs: validar-y-determinar
+    if: needs.validar-y-determinar.outputs.accion == 'instalar-monitor'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: demo
+    concurrency:
+      group: instalar-monitor
+      cancel-in-progress: false
+    steps:
+      - name: Checkout (configuración de esta versión)
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: infra/compose
+
+      - name: Configurar llave y huella SSH (sin StrictHostKeyChecking=no)
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          for v in SSH_KEY SSH_HOST SSH_KNOWN_HOSTS; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Falta el secreto $v en GitHub (Settings > Secrets and variables > Actions)."
+              exit 1
+            fi
+          done
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Subir scripts y el compose del monitor
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -e
+          SSH="ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes ${SSH_USER:-deploy}@${SSH_HOST}"
+          tar -czf - -C infra/compose scripts | $SSH 'mkdir -p /opt/caprichos && tar -xzf - -C /opt/caprichos && chmod +x /opt/caprichos/scripts/*'
+          tar -czf - -C infra/compose/monitor docker-compose.yml | $SSH 'rm -rf /opt/caprichos/monitor-nuevo && mkdir -p /opt/caprichos/monitor-nuevo && tar -xzf - -C /opt/caprichos/monitor-nuevo'
+
+      - name: Instalar o actualizar Uptime Kuma
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -o pipefail
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "${SSH_USER:-deploy}@${SSH_HOST}" \
+            "/opt/caprichos/scripts/instalar-monitor.sh" 2>&1 | tee monitor.log
 
       - name: Borrar la llave del ejecutor
         if: always()
