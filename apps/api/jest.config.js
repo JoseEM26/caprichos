@@ -1,8 +1,8 @@
 module.exports = {
   moduleFileExtensions: ['js', 'json', 'ts'],
   rootDir: 'src',
-  // Las pruebas del reinicio de datos viven junto a su script, en prisma/reset
-  roots: ['<rootDir>', '<rootDir>/../prisma/reset'],
+  // Las pruebas del reinicio de datos (prisma/reset) y de la migración de datos (prisma/migracion-datos) viven junto a su script
+  roots: ['<rootDir>', '<rootDir>/../prisma/reset', '<rootDir>/../prisma/migracion-datos'],
   testRegex: '.*\\.spec\\.ts$',
   transform: {
     '^.+\\.(t|j)s$': 'ts-jest',

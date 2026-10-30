@@ -9,7 +9,8 @@ ON CONFLICT ("modulo", "accion") DO NOTHING;
 INSERT INTO "rol_permiso" ("rol", "permiso_id")
 SELECT 'ADMIN', p."id"
 FROM "permiso" p
-WHERE (p."modulo" || '/' || p."accion") IN (
+WHERE EXISTS (SELECT 1 FROM "rol" r WHERE r."codigo" = 'ADMIN')
+  AND (p."modulo" || '/' || p."accion") IN (
     'mascota/ver',
     'mascota/editar'
 )

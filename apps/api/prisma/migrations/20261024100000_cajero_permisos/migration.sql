@@ -25,7 +25,8 @@ WHERE rp."permiso_id" = p."id"
 INSERT INTO "rol_permiso" ("rol", "permiso_id")
 SELECT 'CAJERO', p."id"
 FROM "permiso" p
-WHERE (p."modulo" || '/' || p."accion") IN (
+WHERE EXISTS (SELECT 1 FROM "rol" r WHERE r."codigo" = 'CAJERO')
+  AND (p."modulo" || '/' || p."accion") IN (
     'pedidos/ver',
     'pedidos/cambiar_estado',
     'caja/abrir',
