@@ -1,9 +1,10 @@
-import { useRef, useState, type CSSProperties, type ReactNode, type KeyboardEvent as RKeyboardEvent, type PointerEvent as RPointerEvent } from 'react';
+import { useRef, useState, type CSSProperties, type KeyboardEvent as RKeyboardEvent, type PointerEvent as RPointerEvent } from 'react';
 import { DatosLocalCarta, EstadoLocalCarta } from './tipos';
 import { useEsMovil } from './useEsMovil';
 import { NovedadDetalle } from './NovedadDetalle';
 import { EstadoError } from '../comun/EstadoError';
 import { MosaicoMomentos } from './MosaicoMomentos';
+import { TextoEd, useEdicion } from './edicion';
 
 export interface FotoNovedad {
   id: string;
@@ -34,8 +35,6 @@ interface PaginaNovedadesProps {
   cargando?: boolean;
   error?: string | null;
   alReintentar?: () => void;
-  /** Solo el admin: controles y marcas encima de cada tarjeta (también oculta «Momentos»). */
-  adminItem?: (n: NovedadCarta) => AdminTarjetaNovedad;
   encabezado?: {
     etiqueta?: string;
     titulo?: string;
@@ -179,40 +178,11 @@ export function estiloMosaico(movil: boolean): CSSProperties {
   };
 }
 
-/** Datos que el admin añade a cada tarjeta (controles y marcas); en la carta pública no existe. */
-export interface AdminTarjetaNovedad {
-  acciones: ReactNode;
-  borrador: boolean;
-}
-
-const MARCA_ADMIN: CSSProperties = {
-  fontFamily: 'Montserrat, sans-serif',
-  fontWeight: 800,
-  fontSize: 11,
-  borderRadius: 9999,
-  padding: '4px 10px',
-  background: 'var(--cp-white)',
-  color: 'var(--cp-navy)',
-};
-
-/** Marcas «Borrador» / «Desactivada» y barra de controles del admin, encima de la tarjeta. */
-function CapaAdmin({ novedad, admin }: { novedad: NovedadCarta; admin: AdminTarjetaNovedad }) {
-  return (
-    <>
-      {!novedad.activo && (
-        <span aria-hidden="true" style={{ position: 'absolute', inset: 0, zIndex: 3, background: 'rgba(255,255,255,0.5)', pointerEvents: 'none' }} />
-      )}
-      <span style={{ position: 'absolute', right: 10, top: 10, zIndex: 4, display: 'flex', gap: 6 }}>
-        {admin.borrador && <span style={{ ...MARCA_ADMIN, background: 'var(--cp-gold)' }}>Borrador</span>}
-        {!novedad.activo && <span style={MARCA_ADMIN}>Desactivada</span>}
-      </span>
-      <div
-        style={{ position: 'absolute', right: 8, top: 40, left: 8, zIndex: 4, display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 4 }}
-      >
-        {admin.acciones}
-      </div>
-    </>
-  );
+/** Hero (destacadas y banners, hasta 5) y resto del mosaico, como los reparte la página con el filtro «Todo». */
+export function agruparNovedades(lista: NovedadCarta[]): { hero: NovedadCarta[]; resto: NovedadCarta[] } {
+  const todas = ordenarNovedadesCarta(lista);
+  const hero = todas.filter((n) => esNovedadDestacada(n) || (n.tipo || '').toUpperCase() === 'BANNER').slice(0, 5);
+  return { hero, resto: todas.filter((n) => !hero.includes(n)) };
 }
 
 /** Tarjeta del mosaico de Novedades: la misma en la carta y en la vista de admin. */
@@ -221,14 +191,13 @@ export function TarjetaMosaicoNovedad({
   indice: i,
   movil,
   onAbrir,
-  admin,
 }: {
   item: NovedadCarta;
   indice: number;
   movil: boolean;
   onAbrir: (n: NovedadCarta) => void;
-  admin?: AdminTarjetaNovedad;
 }) {
+  const ed = useEdicion();
   const radio = movil ? 12 : 16;
   const tamano = tamanoDeNovedad(item);
   const foto = item.fotos[0]?.url;
@@ -236,13 +205,13 @@ export function TarjetaMosaicoNovedad({
   const esVideo = tipoUp === 'VIDEO' || !!item.video_url;
   const esAviso = tipoUp === 'AVISO' && !/nuevo:/i.test(item.titulo || '');
   const compacta = tamano === 'CHICO';
-  return (
+  const tarjeta = (
     <article
       key={item.id}
       data-tamano={tamano}
       className="cp-nov-card"
       style={{
-        ...posicionMosaico(tamano, movil),
+        ...(ed ? { flex: 1, minWidth: 0 } : posicionMosaico(tamano, movil)),
         position: 'relative',
         overflow: 'hidden',
         borderRadius: radio,
@@ -291,7 +260,7 @@ export function TarjetaMosaicoNovedad({
         }}
       />
       <span style={{ ...INSIGNIA, position: 'absolute', left: 10, top: 10, zIndex: 1 }}>
-        {obtenerEtiquetaNovedad(item)}
+        <TextoEd clave={`novedad:${item.id}:tema`} valor={obtenerEtiquetaNovedad(item)} ayuda="Etiqueta de la novedad" />
       </span>
       {esVideo && foto && (
         <span
@@ -327,7 +296,7 @@ export function TarjetaMosaicoNovedad({
           display: 'flex',
           flexDirection: 'column',
           gap: 6,
-          pointerEvents: 'none',
+          pointerEvents: ed ? 'auto' : 'none',
         }}
       >
         <span
@@ -342,9 +311,9 @@ export function TarjetaMosaicoNovedad({
             overflow: 'hidden',
           }}
         >
-          {item.titulo}
+          <TextoEd clave={`novedad:${item.id}:titulo`} valor={item.titulo} ayuda="Título de la novedad" />
         </span>
-        {!compacta && item.texto && (
+        {!compacta && (item.texto || ed) && (
           <span
             style={{
               fontSize: 13,
@@ -356,13 +325,13 @@ export function TarjetaMosaicoNovedad({
               overflow: 'hidden',
             }}
           >
-            {item.texto}
+            <TextoEd clave={`novedad:${item.id}:texto`} valor={item.texto ?? ''} ayuda="Texto de la novedad" />
           </span>
         )}
       </div>
-      {admin && <CapaAdmin novedad={item} admin={admin} />}
     </article>
   );
+  return ed ? ed.bloque(`novedad:${item.id}`, tarjeta, { estilo: posicionMosaico(tamano, movil) }) : tarjeta;
 }
 
 export function PaginaNovedades({
@@ -374,9 +343,9 @@ export function PaginaNovedades({
   error = null,
   alReintentar,
   encabezado,
-  adminItem,
 }: PaginaNovedadesProps) {
   const movil = useEsMovil();
+  const ed = useEdicion();
   const [filtroActivo, setFiltroActivo] = useState('todo');
   const [abierta, setAbierta] = useState<NovedadCarta | null>(null);
 
@@ -490,7 +459,7 @@ export function PaginaNovedades({
             color: 'var(--cp-orange)',
           }}
         >
-          {encabezado?.etiqueta?.trim() || 'NOVEDADES'}
+          <TextoEd clave="enc.etiqueta" valor={encabezado?.etiqueta?.trim() || 'NOVEDADES'} ayuda="Etiqueta del encabezado" />
         </span>
         <span
           data-testid="encabezado-titulo"
@@ -502,7 +471,7 @@ export function PaginaNovedades({
             lineHeight: abTitleLh,
           }}
         >
-          {encabezado?.titulo?.trim() || 'Lo nuevo en Caprichos'}
+          <TextoEd clave="enc.titulo" valor={encabezado?.titulo?.trim() || 'Lo nuevo en Caprichos'} ayuda="Título del encabezado" />
         </span>
         <span
           data-testid="encabezado-subtitulo"
@@ -513,7 +482,7 @@ export function PaginaNovedades({
             maxWidth: 720,
           }}
         >
-          {encabezado?.subtitulo?.trim() || 'Promociones, lanzamientos, datos útiles y lo que pasa en nuestras redes.'}
+          <TextoEd clave="enc.subtitulo" valor={encabezado?.subtitulo?.trim() || 'Promociones, lanzamientos, datos útiles y lo que pasa en nuestras redes.'} ayuda="Subtítulo del encabezado" />
         </span>
       </div>
 
@@ -540,13 +509,12 @@ export function PaginaNovedades({
                     ? 'Ver waffles'
                     : 'Ver la carta'
                   : 'Aprovechar';
-              return (
+              const tarjetaHero = (
                 <article
                   key={`dest-${item.id}`}
                   style={{
                     position: 'relative',
-                    flex: `0 0 ${heroW}`,
-                    scrollSnapAlign: 'start',
+                    ...(ed ? { flex: 1, minWidth: 0 } : { flex: `0 0 ${heroW}`, scrollSnapAlign: 'start' }),
                     aspectRatio: heroAr,
                     borderRadius: abRad,
                     overflow: 'hidden',
@@ -580,7 +548,6 @@ export function PaginaNovedades({
                         'linear-gradient(to top, rgba(11, 44, 62, 0.92), rgba(11, 44, 62, 0))',
                     }}
                   />
-                  {adminItem && <CapaAdmin novedad={item} admin={adminItem(item)} />}
                   <button
                     type="button"
                     className="cp-nov-abrir"
@@ -598,10 +565,12 @@ export function PaginaNovedades({
                       display: 'flex',
                       flexDirection: 'column',
                       gap: 6,
-                      pointerEvents: 'none',
+                      pointerEvents: ed ? 'auto' : 'none',
                     }}
                   >
-                    <span style={{ ...INSIGNIA, alignSelf: 'flex-start', fontSize: 11 }}>{badge}</span>
+                    <span style={{ ...INSIGNIA, alignSelf: 'flex-start', fontSize: 11 }}>
+                      <TextoEd clave={`novedad:${item.id}:tema`} valor={badge} ayuda="Etiqueta de la novedad" />
+                    </span>
                     <span
                       style={{
                         fontFamily: 'Montserrat, sans-serif',
@@ -610,11 +579,11 @@ export function PaginaNovedades({
                         lineHeight: 1.15,
                       }}
                     >
-                      {item.titulo}
+                      <TextoEd clave={`novedad:${item.id}:titulo`} valor={item.titulo} ayuda="Título de la novedad" />
                     </span>
-                    {item.texto && (
+                    {(item.texto || ed) && (
                       <span style={{ fontSize: abTxt, lineHeight: abLh, opacity: 0.95 }}>
-                        {item.texto}
+                        <TextoEd clave={`novedad:${item.id}:texto`} valor={item.texto ?? ''} ayuda="Texto de la novedad" />
                       </span>
                     )}
                     {item.video_url ? (
@@ -665,6 +634,7 @@ export function PaginaNovedades({
                   </div>
                 </article>
               );
+              return ed ? ed.bloque(`novedad:${item.id}`, tarjetaHero, { estilo: { flex: `0 0 ${heroW}`, scrollSnapAlign: 'start' } }) : tarjetaHero;
             })}
           </div>
           <div
@@ -744,7 +714,7 @@ export function PaginaNovedades({
           mensaje={error}
           alReintentar={alReintentar}
         />
-      ) : novedadesFiltradas.length === 0 ? (
+      ) : novedadesFiltradas.length === 0 && !ed ? (
         <div
           style={{
             textAlign: 'center',
@@ -783,8 +753,9 @@ export function PaginaNovedades({
       ) : (
         <div style={estiloMosaico(movil)}>
           {novedadesFiltradas.map((item, i) => (
-            <TarjetaMosaicoNovedad key={item.id} item={item} indice={i} movil={movil} onAbrir={setAbierta} admin={adminItem?.(item)} />
+            <TarjetaMosaicoNovedad key={item.id} item={item} indice={i} movil={movil} onAbrir={setAbierta} />
           ))}
+          {ed && ed.agregar('novedad', 'Agregar novedad', posicionMosaico('MEDIANO', movil))}
         </div>
       )}
 
@@ -838,7 +809,7 @@ export function PaginaNovedades({
         </div>
       )}
 
-      {!cargando && !error && !adminItem && (
+      {!cargando && !error && (
         <MosaicoMomentos titulo="Momentos Caprichos" fotos={fotosDeNovedades} cantidad={8} />
       )}
 

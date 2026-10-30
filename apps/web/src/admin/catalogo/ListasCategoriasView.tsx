@@ -51,6 +51,7 @@ export function ListasCategoriasView() {
 
   // Mensaje de validación / error local
   const [mensajeLocal, setMensajeLocal] = useState('');
+  const [filtroGrupos, setFiltroGrupos] = useState<'activos' | 'desactivados' | 'todos'>('activos');
 
   // Cuadro de confirmación
   const [confirmarProps, setConfirmarProps] = useState<{
@@ -429,6 +430,28 @@ export function ListasCategoriasView() {
             };
           }),
         );
+      },
+    );
+  };
+
+  const gruposVisibles = grupos.filter((g) =>
+    filtroGrupos === 'todos' ? true : filtroGrupos === 'activos' ? g.activo !== false : g.activo === false,
+  );
+
+  const pedirAlternarGrupo = (grp: GrupoOpcionItem, n: number) => {
+    const activar = grp.activo === false;
+    pedirConfirmacion(
+      activar ? `Activar «${grp.nombre}»` : `Desactivar «${grp.nombre}»`,
+      activar
+        ? `Volverá a mostrarse en ${n} ${n === 1 ? 'producto' : 'productos'} de la carta, el bot y el mozo.`
+        : `Dejará de mostrarse en ${n} ${n === 1 ? 'producto' : 'productos'} de la carta, el bot y el mozo.`,
+      async () => {
+        try {
+          const r = await catalogoApi.actualizarGrupo(grp.id, { activo: activar });
+          setGrupos((prev) => prev.map((g) => (g.id === grp.id ? { ...g, activo: r.activo ?? activar } : g)));
+        } catch (err: any) {
+          setMensajeLocal(err?.message || 'No se pudo cambiar el grupo');
+        }
       },
     );
   };
@@ -987,7 +1010,30 @@ export function ListasCategoriasView() {
           {/* CASO 2: Dónde se pregunta cada grupo */}
           {itemIzquierdaActual.id === 'preg' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {grupos.length === 0 ? (
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} role="group" aria-label="Filtrar grupos">
+                {(['activos', 'desactivados', 'todos'] as const).map((f) => (
+                  <button
+                    key={f}
+                    type="button"
+                    aria-pressed={filtroGrupos === f}
+                    onClick={() => setFiltroGrupos(f)}
+                    style={{
+                      minHeight: 44,
+                      padding: '0 14px',
+                      borderRadius: 9999,
+                      border: '1.5px solid var(--cp-navy)',
+                      fontWeight: 700,
+                      fontSize: 12,
+                      background: filtroGrupos === f ? 'var(--cp-navy)' : 'transparent',
+                      color: filtroGrupos === f ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {f === 'activos' ? 'Activos' : f === 'desactivados' ? 'Desactivados' : 'Todos'}
+                  </button>
+                ))}
+              </div>
+              {gruposVisibles.length === 0 ? (
                 <div
                   style={{
                     border: '1.5px dashed var(--cp-line)',
@@ -997,13 +1043,14 @@ export function ListasCategoriasView() {
                     color: 'var(--cp-soft)',
                   }}
                 >
-                  No hay grupos de opciones configurados.
+                  No hay grupos de opciones en esta vista.
                 </div>
               ) : (
-                grupos.map((grp) => {
-                  const cantProds = productos.filter((p) =>
-                    p.grupos?.some((g) => g.id === grp.id),
-                  ).length;
+                gruposVisibles.map((grp) => {
+                  const desactivado = grp.activo === false;
+                  const cantProds =
+                    grp.productosCount ??
+                    productos.filter((p) => p.grupos?.some((g) => g.id === grp.id)).length;
                   const optsActivas = grp.opciones?.filter((o) => o.activo !== false).length ?? 0;
                   const usesTexto = `Se pregunta en ${cantProds} ${
                     cantProds === 1 ? 'producto' : 'productos'
@@ -1019,10 +1066,18 @@ export function ListasCategoriasView() {
                         border: '1px solid var(--cp-line)',
                         borderRadius: 12,
                         padding: '10px 12px',
+                        opacity: desactivado ? 0.55 : 1,
                       }}
                     >
                       <div>
-                        <div style={{ fontWeight: 700, fontSize: 14 }}>{grp.nombre}</div>
+                        <div style={{ fontWeight: 700, fontSize: 14 }}>
+                          {grp.nombre}
+                          {desactivado && (
+                            <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: 'var(--cp-soft)' }}>
+                              Desactivado
+                            </span>
+                          )}
+                        </div>
                         <div style={{ fontSize: 12, color: 'var(--cp-soft)' }}>
                           {usesTexto}
                         </div>
@@ -1053,6 +1108,24 @@ export function ListasCategoriasView() {
                           );
                         })}
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => pedirAlternarGrupo(grp, cantProds)}
+                        style={{
+                          minHeight: 44,
+                          alignSelf: 'flex-start',
+                          padding: '0 14px',
+                          borderRadius: 9999,
+                          border: '1.5px solid var(--cp-navy)',
+                          background: 'transparent',
+                          color: 'var(--cp-navy)',
+                          fontWeight: 700,
+                          fontSize: 12,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {desactivado ? 'Activar grupo' : 'Desactivar grupo'}
+                      </button>
                     </div>
                   );
                 })
@@ -1250,8 +1323,8 @@ export function ListasCategoriasView() {
         abierto={confirmarProps.abierto}
         titulo={confirmarProps.titulo}
         mensaje={confirmarProps.mensaje}
-        textoConfirmar="Sí, continuar"
-        textoNo="Cancelar"
+        textoConfirmar="Sí"
+        textoNo="No"
         alConfirmar={confirmarProps.accion}
         alCancelar={() => setConfirmarProps((prev) => ({ ...prev, abierto: false }))}
       />

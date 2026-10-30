@@ -892,7 +892,7 @@ export const TEXTOS_BOT = {
   },
 
   pedidoMontoEfectivo: (): string => {
-    return '¿Con cuánto pagas? Te preparamos el vuelto 💵';
+    return '¿Con cuánto pagas? Escribe el monto o selecciona una opción.\nTe preparamos el vuelto 💵';
   },
 
   pedidoPagaConMenorQueTotal: (total: number): string => {
@@ -1007,9 +1007,22 @@ export const TEXTOS_BOT = {
     tiempoMax: number;
     esPagoDigital: boolean;
     datosPago?: string;
+    /** Pago dividido: una captura por medio digital, con su monto */
+    capturas?: Array<{ medio: string; monto: number }>;
   }): string => {
-    const { codigo, tiempoMin, tiempoMax, esPagoDigital, datosPago } = params;
+    const { codigo, tiempoMin, tiempoMax, esPagoDigital, datosPago, capturas } = params;
     const datosBloque = datosPago ? `\n\n${datosPago}` : '';
+
+    if (esPagoDigital && capturas && capturas.length >= 1) {
+      const nombre = (m: string) => ({ YAPE: 'Yape', PLIN: 'Plin', TRANSFERENCIA: 'Transferencia' } as Record<string, string>)[m] ?? m;
+      const lista = capturas.map((c) => `• ${nombre(c.medio)}: S/ ${c.monto.toFixed(2)}`).join('\n');
+      return (
+        `Listo. Recibimos tu pedido ${codigo}. Pasa a cocina apenas validemos tu pago.\n` +
+        `Envíanos una captura por cada medio digital, indicando de cuál es:\n${lista}\n` +
+        `Una persona del equipo las revisa y te avisa por este chat.` +
+        datosBloque
+      );
+    }
 
     if (esPagoDigital) {
       return (

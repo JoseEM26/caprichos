@@ -112,6 +112,25 @@ describe('CatalogoService', () => {
   });
 
   describe('1. Carta oculta lo oculto', () => {
+    it('omite grupos de opciones desactivados en GET /carta (carta, bot y mozo)', async () => {
+      const grupo = (id: number, activo: boolean) => ({
+        orden: id,
+        grupo: { id: BigInt(id), nombre: `G${id}`, activo, obligatorio: false, minimo: 0, maximo: 1, opciones: [] },
+      });
+      prisma.categoria.findMany.mockResolvedValue([
+        {
+          id: BigInt(1), nombre: 'Bebidas', orden: 1, oculta: false,
+          productos: [{
+            id: BigInt(10), nombre: 'Latte', descripcion: null, precio: 8, oculto: false,
+            agotado_hasta: null, no_suma_beneficios: false, foto_archivo: null,
+            tamanos: [], sabores: [], grupos: [grupo(1, true), grupo(2, false)],
+          }],
+        },
+      ]);
+      const carta = await service.obtenerCarta();
+      expect(carta[0].productos[0].grupos.map((g) => g.nombre)).toEqual(['G1']);
+    });
+
     it('debe omitir categorías ocultas y productos ocultos en GET /carta', async () => {
       prisma.categoria.findMany.mockResolvedValue([
         {

@@ -31,6 +31,7 @@ export async function pedidoEsperandoVoucher(
     modalidad: true,
     cliente_telefono: true,
     creado_en: true,
+    planPago: { select: { medio: true, monto: true } },
   } as const;
   const noCerrado = { estado: { notIn: ['ANULADO', 'ENTREGADO'] }, pago_estado: 'PENDIENTE', es_personal: false };
 

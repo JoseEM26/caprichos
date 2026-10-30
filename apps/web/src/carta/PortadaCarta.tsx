@@ -2,6 +2,7 @@ import { DatosLocalCarta, EstadoLocalCarta } from './tipos';
 import { useEsMovil } from './useEsMovil';
 import { DISPOSICION_DEFECTO, medidasBanner } from './disposicion';
 import type { IdItemFranja, TamanoBanner } from './disposicion';
+import { TextoEd, useEdicion } from './edicion';
 
 export interface BannerCarta {
   activo?: boolean;
@@ -9,6 +10,8 @@ export interface BannerCarta {
   title?: string;
   sub?: string;
   target?: string;
+  /** Foto propia del banner; si falta se usa la del producto destacado. */
+  foto?: string;
 }
 
 interface AjusteBannerProps {
@@ -41,9 +44,11 @@ export function BannerMesCarta({
   focoFoto = DISPOSICION_DEFECTO.banner.focoFoto,
 }: BannerMesProps) {
   const movil = useEsMovil();
+  const ed = useEdicion();
   const medidas = medidasBanner(movil ? tamanoCelular : tamanoPc, movil);
 
-  const mostrarBanner = !banner || banner.activo !== false;
+  // En edición el banner oculto se sigue viendo (la barra lo marca «Oculta»)
+  const mostrarBanner = !!ed || !banner || banner.activo !== false;
   const tagBanner = banner?.tag || 'NOVEDAD DEL MES';
   const titleBanner = banner?.title || 'Frappe Maracuyá Tropical';
   const subBanner = banner?.sub || 'Con pulpa natural de maracuyá y crema batida.';
@@ -68,13 +73,24 @@ export function BannerMesCarta({
         <div style={{ position: 'relative', display: 'flex', gap: movil ? 12 : 32, alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: movil ? 8 : 12 }}>
             <span style={{ alignSelf: 'flex-start', fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: movil ? 10 : 12, letterSpacing: '0.1em', color: 'var(--cp-navy)', background: 'var(--cp-orange)', borderRadius: 9999, padding: '4px 10px' }}>
-              {tagBanner}
+              <TextoEd clave="banner.tag" valor={tagBanner} ayuda="Etiqueta del banner" />
             </span>
-            <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: medidas.titulo, lineHeight: medidas.tituloLinea, overflowWrap: 'anywhere' }}>{titleBanner}</span>
-            <span style={{ fontSize: movil ? 12 : 14, lineHeight: movil ? '16px' : '20px', opacity: 0.9 }}>{subBanner}</span>
+            <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: medidas.titulo, lineHeight: medidas.tituloLinea, overflowWrap: 'anywhere' }}><TextoEd clave="banner.title" valor={titleBanner} ayuda="Título del banner" /></span>
+            <span style={{ fontSize: movil ? 12 : 14, lineHeight: movil ? '16px' : '20px', opacity: 0.9 }}><TextoEd clave="banner.sub" valor={subBanner} ayuda="Texto del banner" /></span>
           </div>
           <span
+            {...(ed
+              ? {
+                  role: 'button',
+                  tabIndex: 0,
+                  'aria-label': 'Cambiar producto y foto del banner',
+                  'data-edicion': 'accion',
+                  onClick: () => ed.accion('banner.producto'),
+                  onKeyDown: (e: React.KeyboardEvent) => e.key === 'Enter' && ed.accion('banner.producto'),
+                }
+              : {})}
             style={{
+              cursor: ed ? 'pointer' : undefined,
               flex: 'none',
               width: medidas.foto,
               height: medidas.foto,

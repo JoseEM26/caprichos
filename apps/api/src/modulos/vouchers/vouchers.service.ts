@@ -21,6 +21,7 @@ import { obtenerFechaHoraLima } from '../local/local.util';
 import { VouchersIaService } from './vouchers-ia.service';
 import {
   montoDeMedioDigital,
+  mediosDigitalesDelPedido,
   montoDigitalDePlan,
   montoEsperadoVoucher,
   PagoPlanService,
@@ -408,10 +409,25 @@ export class VouchersService {
         if (existenteOp) operacionDuplicada = true;
       }
 
-      const medioEsperado = (pedido?.pago_preferido as any) || (pedido?.pago_metodo as any) || null;
+      // Pago dividido: cada captura va a un medio digital del plan que aún no tenga voucher vigente
+      let medioDelPlan: string | null = null;
+      const digitales = mediosDigitalesDelPedido(pedido?.planPago, null, 0);
+      if (pedidoIdBigInt && digitales.length > 1) {
+        const vigentes = await this.prisma.voucherPago.findMany({
+          where: { pedido_id: pedidoIdBigInt, reemplazado_en: null },
+          select: { medio: true },
+        });
+        const usados = new Set(vigentes.map((v) => v.medio));
+        medioDelPlan = (digitales.find((d) => !usados.has(d.medio)) ?? digitales[0]).medio;
+      }
+      const medioEsperado = medioDelPlan || (pedido?.pago_preferido as any) || (pedido?.pago_metodo as any) || null;
 
       const contexto: ContextoSemaforo = {
-        pedidoTotal: pedido ? montoEsperadoVoucher(pedido.planPago, pedido.total != null ? Number(pedido.total) : null) : null,
+        pedidoTotal: pedido
+          ? medioDelPlan
+            ? montoDeMedioDigital(pedido.planPago, medioDelPlan) || null
+            : montoEsperadoVoucher(pedido.planPago, pedido.total != null ? Number(pedido.total) : null)
+          : null,
         medioEsperado,
         titularEsperado: config.titularEsperado,
         yapeNumeroEsperado: config.yapeNumeroEsperado,

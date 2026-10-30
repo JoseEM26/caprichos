@@ -2063,7 +2063,7 @@ model VoucherPago {
 model PedidoPagoPlan {
   id        BigInt  @id @default(autoincrement())
   pedido_id BigInt
-  medio     String  // EFECTIVO | YAPE | PLIN | TRANSFERENCIA (CHECK en la BD)
+  medio     String  // EFECTIVO | YAPE | PLIN | TARJETA | TRANSFERENCIA (CHECK en la BD)
   monto     Decimal @db.Decimal(12, 2)
   orden     Int     @default(0)
 

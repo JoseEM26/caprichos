@@ -205,6 +205,46 @@ export class EjecutorConversacionService {
     }
   }
 
+  /** Deja en el chat del admin un evento interno visible con el motivo por el que el bot no respondió. */
+  private async registrarSilencio(conversacionId: bigint, motivo: string): Promise<void> {
+    try {
+      await this.prisma.mensajeChat.create({
+        data: {
+          conversacion_id: conversacionId,
+          direccion: 'SALE',
+          autor: 'BOT',
+          tipo: 'SISTEMA',
+          contenido: { texto: `El bot no respondió. ${motivo}`, silencio: true } as any,
+        },
+      });
+      this.eventos?.emitirAdmin('mensajes:actualizado', { id: conversacionId.toString() });
+    } catch (err: any) {
+      this.logger.warn(`No se pudo registrar el silencio del bot: ${err.message}`);
+    }
+  }
+
+  /**
+   * Toque viejo: un botón/lista `ped_*` que el último mensaje interactivo del bot ya no ofrece.
+   * Devuelve ese último mensaje (para re-mostrar el paso actual) o null si el toque corresponde.
+   */
+  private async ultimoPasoSiToqueViejo(conversacionId: bigint, idToque?: string | null): Promise<any | null> {
+    if (!idToque || !idToque.startsWith('ped_') || typeof this.prisma.mensajeChat?.findMany !== 'function') return null;
+    try {
+      const ult = await this.prisma.mensajeChat.findMany({
+        where: { conversacion_id: conversacionId, direccion: 'SALE', autor: 'BOT', tipo: { in: ['BOTON', 'LISTA'] } },
+        orderBy: { id: 'desc' },
+        take: 1,
+      });
+      const c: any = ult?.[0]?.contenido;
+      if (!c) return null;
+      const ids = [...(c.botones ?? []), ...(c.filas ?? [])].map((x: any) => x?.id);
+      if (!ids.length || ids.includes(idToque)) return null;
+      return c;
+    } catch {
+      return null;
+    }
+  }
+
   /**
    * Obtiene el parámetro de espera antes de activar el Modo Asistido (defecto 3 min).
    */
@@ -454,7 +494,7 @@ export class EjecutorConversacionService {
       // Regla 5: Si la conversación está TOMADA (tomado_por) por alguien activo, el bot calla
       if (conversacion.tomado_por !== null) {
         this.logger.log(`Conversación ${conversacionId} tomada por persona (${conversacion.tomado_por}). El bot calla.`);
-        return false;
+        return false; // la persona ve el mensaje en su chat: no hace falta evento
       }
 
       asistidoEsperaMin = await this.obtenerAsistidoEsperaMin();
@@ -484,6 +524,7 @@ export class EjecutorConversacionService {
         this.logger.log(
           `Persona escribió hace ${minutosDesdeUltimoHumano.toFixed(1)} min (< ${asistidoEsperaMin} min). El bot calla.`,
         );
+        await this.registrarSilencio(conversacion.id, `Modo asistido: una persona escribió hace ${minutosDesdeUltimoHumano.toFixed(1)} min (espera ${asistidoEsperaMin} min).`);
         return false;
       }
 
@@ -501,6 +542,7 @@ export class EjecutorConversacionService {
         this.logger.log(
           `Modo asistido en conversación ${conversacionId}: no han transcurrido ${asistidoEsperaMin} min (${minutosSinHumano.toFixed(1)} min) y no es acción directa. El bot calla.`,
         );
+        await this.registrarSilencio(conversacion.id, `Modo asistido: aún no pasan ${asistidoEsperaMin} min sin respuesta de una persona.`);
         return false;
       }
 
@@ -511,6 +553,7 @@ export class EjecutorConversacionService {
     const activo = await this.estaChatbotActivo();
     if (!activo) {
       this.logger.log(`Chatbot apagado por configuración (chatbot_activo != 'si').`);
+      await this.registrarSilencio(conversacion.id, 'El chatbot está apagado (chatbot_activo).');
       return false;
     }
 
@@ -551,16 +594,23 @@ export class EjecutorConversacionService {
             `Límite anti-spam activo para ${entradaRaw.telMask || 'cliente'}. Silenciando respuesta.`,
           );
         }
+        await this.registrarSilencio(
+          conversacion.id,
+          antiSpamCheck.bloqueado ? 'Anti-spam: el contacto está bloqueado temporalmente.' : 'Anti-spam: demasiados mensajes por minuto/hora; el bot no respondió.',
+        );
         return false;
       }
     }
 
     // 5. Rate limit general: máximo 5 respuestas por minuto
-    const permitidoRateLimit = await this.verificarRateLimit(conversacion.id);
+    // Los toques de botón/lista (avanzar el flujo) no cuentan: un pedido normal supera 5 toques por minuto.
+    const esToqueInteractivo = Boolean(entradaRaw.buttonPayload || entradaRaw.listReplyId || entradaRaw.listRowId);
+    const permitidoRateLimit = esToqueInteractivo ? true : await this.verificarRateLimit(conversacion.id);
     if (!permitidoRateLimit) {
       this.logger.warn(
         `Límite de 5 respuestas por minuto excedido para la conversación ${conversacion.id}. Silenciando respuesta temporalmente.`,
       );
+      await this.registrarSilencio(conversacion.id, 'Límite de 5 mensajes de texto por minuto: el bot no respondió.');
       return false;
     }
 
@@ -1250,6 +1300,36 @@ export class EjecutorConversacionService {
       }
     }
 
+    // 7.c Toque viejo de un paso que ya pasó: respuesta amable re-mostrando el paso actual, sin tocar el flujo.
+    const idToque = entradaRaw.buttonPayload || entradaRaw.listReplyId || entradaRaw.listRowId;
+    const pasoActual = destinoEnvio ? await this.ultimoPasoSiToqueViejo(conversacion.id, idToque) : null;
+    if (pasoActual && destinoEnvio) {
+      const aviso = 'Ese botón es de un paso anterior. Seguimos aquí:';
+      const texto = `${aviso}\n\n${pasoActual.texto ?? ''}`.trim();
+      let res: any;
+      if (pasoActual.filas?.length) {
+        res = await this.mensajeria.enviarLista(destinoEnvio, texto, pasoActual.botonTexto || 'Elegir', pasoActual.filas.slice(0, 10), {
+          conversacionId: conversacion.id, replyToWaMessageId: entradaRaw.waMessageId,
+        });
+      } else {
+        res = await this.mensajeria.enviarBotones(destinoEnvio, texto, pasoActual.botones.slice(0, 3), {
+          conversacionId: conversacion.id, replyToWaMessageId: entradaRaw.waMessageId,
+        });
+      }
+      await this.prisma.mensajeChat.create({
+        data: {
+          conversacion_id: conversacion.id, direccion: 'SALE', autor: 'BOT',
+          tipo: pasoActual.filas?.length ? 'LISTA' : 'BOTON',
+          contenido: { ...pasoActual, texto } as any, meta_id: res?.waMessageId || null,
+        },
+      });
+      await this.prisma.conversacion.update({
+        where: { id: conversacion.id },
+        data: { flujo: { ...(flujoPrevio || {}), ultimo_wa_message_id: entradaRaw.waMessageId || undefined } as any, ultima_actividad: new Date() },
+      });
+      return true;
+    }
+
     // 8. Normalizar entrada y ejecutar la máquina de estados pura
     const entradaNorm = normalizarEntrada(entradaRaw);
     const flujoEntrada: FlujoConversacion = {
@@ -1263,6 +1343,37 @@ export class EjecutorConversacionService {
           : flujoPrevio?.estado || 'INICIO',
     };
     const resultado = transicionarEstado(flujoEntrada, entradaNorm, contexto);
+
+    // 9.a Persistir el nuevo flujo ANTES de despachar los mensajes (un toque rápido siempre lee el estado correcto)
+    // La marca de frase fija del modo asistido se decide antes de guardar
+    if (resultado.acciones.some((a: any) => a.tipo === 'enviarBotones' && a.texto === TEXTO_ASISTIDO_FRASE_FIJA)) {
+      (resultado.nuevoFlujo as any).asistido_ultima_frase_fija_ts = Date.now();
+    }
+    const flujoPersistir: FlujoConversacion = {
+      ...resultado.nuevoFlujo,
+      ultimo_wa_message_id: entradaRaw.waMessageId || undefined,
+    };
+
+    const dataUpdate: any = {
+      flujo: flujoPersistir,
+      ultima_actividad: new Date(),
+    };
+    if (esValidarPago) {
+      dataUpdate.estado = 'VALIDAR_PAGO';
+      dataUpdate.duenio = 'PERSONA';
+    } else if (esModoAsistido) {
+      // Regla 6: Al pasar a modo asistido NO se quita la urgencia ni se suelta el chat:
+      // sigue en la lista Por atender (duenio: PERSONA) y con las alertas a administradores.
+      dataUpdate.duenio = 'PERSONA';
+      if (conversacion.urgente) {
+        dataUpdate.urgente = true;
+      }
+    }
+
+    await this.prisma.conversacion.update({
+      where: { id: conversacion.id },
+      data: dataUpdate,
+    });
 
     // 9. Ejecutar las acciones devueltas por el motor
     for (const accion of resultado.acciones) {
@@ -1340,7 +1451,6 @@ export class EjecutorConversacionService {
 
         if (accion.texto === TEXTO_ASISTIDO_FRASE_FIJA) {
           await this.registrarFraseFijaEnviada(conversacion.id, asistidoEsperaMin);
-          (resultado.nuevoFlujo as any).asistido_ultima_frase_fija_ts = Date.now();
         }
       } else if (accion.tipo === 'enviarLista') {
         let metaId: string | null = null;
@@ -1635,6 +1745,9 @@ export class EjecutorConversacionService {
           tiempoMin: accion.tiempoEstimadoMin,
           tiempoMax: accion.tiempoEstimadoMax,
           esPagoDigital: accion.esPagoDigital,
+          capturas: ((accion.dto?.pago?.plan ?? []) as Array<{ medio: string; monto: number }>).filter((f) =>
+            ['YAPE', 'PLIN', 'TRANSFERENCIA'].includes(f.medio),
+          ),
           datosPago: accion.datosPagoTexto,
         });
 
@@ -1956,33 +2069,6 @@ export class EjecutorConversacionService {
         });
       }
     }
-
-    // 10. Persistir el nuevo flujo en la conversación
-    const flujoPersistir: FlujoConversacion = {
-      ...resultado.nuevoFlujo,
-      ultimo_wa_message_id: entradaRaw.waMessageId || undefined,
-    };
-
-    const dataUpdate: any = {
-      flujo: flujoPersistir,
-      ultima_actividad: new Date(),
-    };
-    if (esValidarPago) {
-      dataUpdate.estado = 'VALIDAR_PAGO';
-      dataUpdate.duenio = 'PERSONA';
-    } else if (esModoAsistido) {
-      // Regla 6: Al pasar a modo asistido NO se quita la urgencia ni se suelta el chat:
-      // sigue en la lista Por atender (duenio: PERSONA) y con las alertas a administradores.
-      dataUpdate.duenio = 'PERSONA';
-      if (conversacion.urgente) {
-        dataUpdate.urgente = true;
-      }
-    }
-
-    await this.prisma.conversacion.update({
-      where: { id: conversacion.id },
-      data: dataUpdate,
-    });
 
     // 11. Notificar por WebSocket a la consola de Mensajes
     this.eventos?.emitirAdmin('mensajes:actualizado', { id: conversacion.id.toString() });

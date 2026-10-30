@@ -92,6 +92,18 @@ export class ContenidoAdminController {
     return this.contenidoService.guardarBorradorNovedadesEncabezado(dto, req.usuario);
   }
 
+  @Get('novedades/borrador')
+  @Permiso('novedades', 'ver')
+  async obtenerNovedadesBorrador() {
+    return this.contenidoService.obtenerNovedadesBorrador();
+  }
+
+  @Put('novedades/borrador')
+  @Permiso('novedades', 'editar')
+  async guardarNovedadesBorrador(@Body() dto: { items?: unknown }, @Req() req: any) {
+    return this.contenidoService.guardarNovedadesBorrador(dto?.items, req.usuario);
+  }
+
   @Post('novedades/descartar')
   @Permiso('novedades', 'editar')
   async descartarNovedadesBorrador(@Req() req: any) {

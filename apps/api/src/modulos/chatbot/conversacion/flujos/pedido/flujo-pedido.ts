@@ -44,6 +44,17 @@ import {
   BOTONES_PEDIDO_TELEFONO,
 } from '../../textos-bot';
 import { evaluarOfertasParaCarrito } from './aviso-te-falta-poco.util';
+import {
+  NOMBRE_MEDIO,
+  botonesEfectivo,
+  calcularTotales,
+  mediosActivos,
+  medioPrincipal,
+  opcionesMedios,
+  parsearMonto,
+  textoPago,
+} from './pago-bot.util';
+import { MedioPagoBot } from './tipos-pedido';
 
 const PALABRAS_PEDIDO = [
   'pedir',
@@ -425,6 +436,13 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
 
       case 'PEDIDO_MONTO_EFECTIVO':
         return this.pasoMontoEfectivo(flujo, pedido, entrada, contexto);
+
+      case 'PEDIDO_PAGO_DIV_MEDIO1':
+      case 'PEDIDO_PAGO_DIV_MEDIO2':
+        return this.pasoDivMedio(estado, flujo, pedido, entrada, contexto);
+
+      case 'PEDIDO_PAGO_DIV_MONTO':
+        return this.pasoDivMonto(flujo, pedido, entrada, contexto);
 
       case 'PEDIDO_COMPROBANTE_TIPO':
         return this.pasoComprobanteTipo(flujo, pedido, entrada, contexto);
@@ -1947,62 +1965,75 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
   // -------------------------------------------------------------------------
   // PASO 9: Medio de Pago
   // -------------------------------------------------------------------------
+  /** Medio elegido por id o por texto; null si no reconoce nada. */
+  private medioDesdeEntrada(entrada: EntradaNormalizada): MedioPagoBot | null {
+    const id = entrada.id || '';
+    const txt = entrada.texto;
+    if (id === 'ped_pago_efectivo' || txt.includes('efectivo')) return 'EFECTIVO';
+    if (id === 'ped_pago_yape' || txt.includes('yape')) return 'YAPE';
+    if (id === 'ped_pago_plin' || txt.includes('plin')) return 'PLIN';
+    if (id === 'ped_pago_tarjeta' || txt.includes('tarjeta') || txt.includes('pos')) return 'TARJETA';
+    if (id === 'ped_pago_transf' || txt.includes('transferencia')) return 'TRANSFERENCIA';
+    return null;
+  }
+
   private pasoMedioPago(
     flujo: FlujoConversacion,
     pedido: EstadoCarritoPedido,
     entrada: EntradaNormalizada,
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
-    const id = entrada.id || '';
-    const txt = entrada.texto;
-
-    let metodo: 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TARJETA' | 'TRANSFERENCIA' | null = null;
-
-    if (id === 'ped_pago_efectivo' || txt.includes('efectivo')) metodo = 'EFECTIVO';
-    else if (id === 'ped_pago_yape' || txt.includes('yape')) metodo = 'YAPE';
-    else if (id === 'ped_pago_plin' || txt.includes('plin')) metodo = 'PLIN';
-    else if (id === 'ped_pago_tarjeta' || txt.includes('tarjeta') || txt.includes('pos')) metodo = 'TARJETA';
-    else if (id === 'ped_pago_transf' || txt.includes('transferencia')) metodo = 'TRANSFERENCIA';
-
+    if (entrada.id === 'ped_pago_dividir' || entrada.texto.includes('2 medios')) {
+      return this.mostrarMediosDivididos('PEDIDO_PAGO_DIV_MEDIO1', flujo, { ...pedido, pago: undefined }, contexto);
+    }
+    const metodo = this.medioDesdeEntrada(entrada);
     if (!metodo) {
-      return this.mostrarOpcionesPago(flujo, pedido, contexto);
+      return this.mostrarOpcionesPago(flujo, pedido, contexto, false);
     }
+    return this.aplicarMedioUnico(flujo, pedido, metodo, contexto);
+  }
 
+  /** Un solo medio para todo el total. */
+  private aplicarMedioUnico(
+    flujo: FlujoConversacion,
+    pedido: EstadoCarritoPedido,
+    metodo: MedioPagoBot,
+    contexto: ContextoConversacion,
+  ): ResultadoTransicion {
     if (metodo === 'EFECTIVO') {
-      const nuevoPedido: EstadoCarritoPedido = {
-        ...pedido,
-        pago: { metodo: 'EFECTIVO' },
-        estadoInterno: 'PEDIDO_MONTO_EFECTIVO',
-      };
-
-      return {
-        nuevoEstado: 'PEDIDO_MONTO_EFECTIVO',
-        acciones: [
-          {
-            tipo: 'enviarBotones',
-            texto: TEXTOS_BOT.pedidoMontoEfectivo(),
-            botones: [
-              { id: 'ped_paga_50', titulo: 'S/ 50' },
-              { id: 'ped_paga_100', titulo: 'S/ 100' },
-              { id: 'ped_paga_exacto', titulo: 'Monto exacto' },
-            ],
-          },
-        ],
-        nuevoFlujo: {
-          ...flujo,
-          estado: 'PEDIDO_MONTO_EFECTIVO',
-          pedido: nuevoPedido,
-        },
-      };
+      return this.pedirMontoEfectivo(flujo, { ...pedido, pago: { metodo: 'EFECTIVO' } }, calcularTotales(pedido).total);
     }
+    const nuevoPedido: EstadoCarritoPedido = { ...pedido, pago: { metodo } };
+    const res = this.avanzarHaciaCheckout(flujo, nuevoPedido, contexto);
+    if (metodo === 'TARJETA') {
+      const aviso =
+        pedido.modalidad === 'DELIVERY'
+          ? 'Pagas con tarjeta al recibir; el repartidor lleva el POS. No necesitas enviar voucher ni vuelto.'
+          : 'Pagas con tarjeta en caja al recoger. No necesitas enviar voucher ni vuelto.';
+      res.acciones = [{ tipo: 'enviarTexto', texto: aviso }, ...res.acciones];
+    }
+    return res;
+  }
 
-    // Yape, Plin, Tarjeta o Transferencia
-    const nuevoPedido: EstadoCarritoPedido = {
-      ...pedido,
-      pago: { metodo },
+  /** «¿Con cuánto pagas?» para `parte` soles en efectivo (el total, o la parte en efectivo del pago dividido). */
+  private pedirMontoEfectivo(
+    flujo: FlujoConversacion,
+    pedido: EstadoCarritoPedido,
+    parte: number,
+    textoAntes?: string,
+  ): ResultadoTransicion {
+    const nuevoPedido: EstadoCarritoPedido = { ...pedido, estadoInterno: 'PEDIDO_MONTO_EFECTIVO' };
+    return {
+      nuevoEstado: 'PEDIDO_MONTO_EFECTIVO',
+      acciones: [
+        {
+          tipo: 'enviarBotones',
+          texto: `${textoAntes ? textoAntes + '\n\n' : ''}${TEXTOS_BOT.pedidoMontoEfectivo()}`,
+          botones: botonesEfectivo(parte),
+        },
+      ],
+      nuevoFlujo: { ...flujo, estado: 'PEDIDO_MONTO_EFECTIVO', pedido: nuevoPedido },
     };
-
-    return this.avanzarHaciaCheckout(flujo, nuevoPedido, contexto);
   }
 
   private pasoMontoEfectivo(
@@ -2011,34 +2042,25 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     entrada: EntradaNormalizada,
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
-    const subtotal = pedido.items.reduce((s, i) => s + i.subtotal, 0);
-    const desc = pedido.descuentoAplicado || 0;
-    const envio = pedido.modalidad === 'DELIVERY' ? (pedido.entrega?.tarifaEnvio ?? 0) : 0;
-    const total = Math.max(0, subtotal - desc + envio);
+    const totalPedido = calcularTotales(pedido).total;
+    const plan = pedido.pago?.plan;
+    // Con pago dividido el efectivo cubre solo su parte
+    const parte = plan?.find((f) => f.medio === 'EFECTIVO')?.monto ?? totalPedido;
 
-    let monto = total;
-    if (entrada.id === 'ped_paga_50') monto = 50;
-    else if (entrada.id === 'ped_paga_100') monto = 100;
-    else if (entrada.id === 'ped_paga_exacto') monto = total;
-    else {
-      const num = parseFloat(entrada.textoOriginal.replace(/[^\d.]/g, ''));
-      if (!isNaN(num) && num > 0) {
-        monto = num;
-      }
-    }
+    let monto: number | null;
+    const m = /^ped_paga_(\d+)$/.exec(entrada.id || '');
+    if (entrada.id === 'ped_paga_exacto') monto = parte;
+    else if (m) monto = Number(m[1]);
+    else monto = parsearMonto(entrada.textoOriginal);
 
-    if (monto < total) {
+    if (monto === null || monto < parte) {
       return {
         nuevoEstado: 'PEDIDO_MONTO_EFECTIVO',
         acciones: [
           {
             tipo: 'enviarBotones',
-            texto: TEXTOS_BOT.pedidoPagaConMenorQueTotal(total),
-            botones: [
-              { id: 'ped_paga_50', titulo: 'S/ 50' },
-              { id: 'ped_paga_100', titulo: 'S/ 100' },
-              { id: 'ped_paga_exacto', titulo: 'Monto exacto' },
-            ],
+            texto: TEXTOS_BOT.pedidoPagaConMenorQueTotal(parte),
+            botones: botonesEfectivo(parte),
           },
         ],
         nuevoFlujo: flujo,
@@ -2048,12 +2070,134 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     const nuevoPedido: EstadoCarritoPedido = {
       ...pedido,
       pago: {
-        metodo: 'EFECTIVO',
+        ...(plan ? { metodo: pedido.pago!.metodo, plan } : { metodo: 'EFECTIVO' as const }),
         pagaCon: Number(monto.toFixed(2)),
       },
     };
 
     return this.avanzarHaciaCheckout(flujo, nuevoPedido, contexto);
+  }
+
+  // -------------------------------------------------------------------------
+  // Pago dividido (2 medios): mismo plan que carta y mozo (pago.plan)
+  // -------------------------------------------------------------------------
+  private mostrarMediosDivididos(
+    estado: 'PEDIDO_PAGO_DIV_MEDIO1' | 'PEDIDO_PAGO_DIV_MEDIO2',
+    flujo: FlujoConversacion,
+    pedido: EstadoCarritoPedido,
+    contexto: ContextoConversacion,
+  ): ResultadoTransicion {
+    const primero = pedido.pagoDiv?.medio1;
+    const { total } = calcularTotales(pedido);
+    const resto = Number((total - (pedido.pagoDiv?.monto1 ?? 0)).toFixed(2));
+    const medios = mediosActivos(contexto.datosLocalPublicos)
+      .filter((m) => m !== primero)
+      .map((m) => ({ id: m === 'TRANSFERENCIA' ? 'ped_pago_transf' : `ped_pago_${m.toLowerCase()}`, titulo: NOMBRE_MEDIO[m] }));
+    const texto =
+      estado === 'PEDIDO_PAGO_DIV_MEDIO1'
+        ? `Vas a pagar con 2 medios. El total es S/ ${total.toFixed(2)}. ¿Con qué medio pagas la primera parte?`
+        : `Te quedan S/ ${resto.toFixed(2)} por pagar. ¿Con qué medio pagas el resto?`;
+    const op = opcionesMedios(medios);
+    const nuevoPedido: EstadoCarritoPedido = { ...pedido, estadoInterno: estado };
+    return {
+      nuevoEstado: estado,
+      acciones: [
+        op.filas
+          ? { tipo: 'enviarLista', texto, botonTexto: 'Elegir medio de pago', filas: op.filas }
+          : { tipo: 'enviarBotones', texto, botones: op.botones! },
+      ],
+      nuevoFlujo: { ...flujo, estado, pedido: nuevoPedido },
+    };
+  }
+
+  private pasoDivMedio(
+    estado: 'PEDIDO_PAGO_DIV_MEDIO1' | 'PEDIDO_PAGO_DIV_MEDIO2',
+    flujo: FlujoConversacion,
+    pedido: EstadoCarritoPedido,
+    entrada: EntradaNormalizada,
+    contexto: ContextoConversacion,
+  ): ResultadoTransicion {
+    const medio = this.medioDesdeEntrada(entrada);
+    const activos = mediosActivos(contexto.datosLocalPublicos);
+    if (!medio || !activos.includes(medio) || (estado === 'PEDIDO_PAGO_DIV_MEDIO2' && medio === pedido.pagoDiv?.medio1)) {
+      return this.mostrarMediosDivididos(estado, flujo, pedido, contexto);
+    }
+    const { total } = calcularTotales(pedido);
+
+    if (estado === 'PEDIDO_PAGO_DIV_MEDIO1') {
+      const nuevoPedido: EstadoCarritoPedido = {
+        ...pedido,
+        estadoInterno: 'PEDIDO_PAGO_DIV_MONTO',
+        pagoDiv: { medio1: medio },
+      };
+      return {
+        nuevoEstado: 'PEDIDO_PAGO_DIV_MONTO',
+        acciones: [
+          {
+            tipo: 'enviarBotones',
+            texto: `¿Cuánto pagas con ${NOMBRE_MEDIO[medio]}? Escribe un monto menor a S/ ${total.toFixed(2)}.`,
+            botones: [{ id: 'ped_div_mitad', titulo: `Mitad (S/ ${(Math.floor((total / 2) * 100) / 100).toFixed(2)})` }],
+          },
+        ],
+        nuevoFlujo: { ...flujo, estado: 'PEDIDO_PAGO_DIV_MONTO', pedido: nuevoPedido },
+      };
+    }
+
+    // Segundo medio: el resto se calcula solo
+    const monto1 = pedido.pagoDiv!.monto1!;
+    const plan = [
+      { medio: pedido.pagoDiv!.medio1!, monto: monto1 },
+      { medio, monto: Number((total - monto1).toFixed(2)) },
+    ];
+    const nuevoPedido: EstadoCarritoPedido = {
+      ...pedido,
+      pagoDiv: undefined,
+      pago: { metodo: medioPrincipal(plan), plan },
+    };
+    const ef = plan.find((f) => f.medio === 'EFECTIVO');
+    if (ef) {
+      return this.pedirMontoEfectivo(flujo, nuevoPedido, ef.monto, `Parte en efectivo: S/ ${ef.monto.toFixed(2)}.`);
+    }
+    const res = this.avanzarHaciaCheckout(flujo, nuevoPedido, contexto);
+    if (plan.some((f) => f.medio === 'TARJETA')) {
+      const aviso =
+        pedido.modalidad === 'DELIVERY'
+          ? 'La parte con tarjeta la pagas al recibir; el repartidor lleva el POS.'
+          : 'La parte con tarjeta la pagas en caja al recoger.';
+      res.acciones = [{ tipo: 'enviarTexto', texto: aviso }, ...res.acciones];
+    }
+    return res;
+  }
+
+  private pasoDivMonto(
+    flujo: FlujoConversacion,
+    pedido: EstadoCarritoPedido,
+    entrada: EntradaNormalizada,
+    contexto: ContextoConversacion,
+  ): ResultadoTransicion {
+    const { total } = calcularTotales(pedido);
+    const medio1 = pedido.pagoDiv?.medio1;
+    if (!medio1) return this.mostrarMediosDivididos('PEDIDO_PAGO_DIV_MEDIO1', flujo, pedido, contexto);
+    const monto =
+      entrada.id === 'ped_div_mitad' ? Math.floor((total / 2) * 100) / 100 : parsearMonto(entrada.textoOriginal);
+    if (monto === null || monto <= 0 || monto >= total) {
+      return {
+        nuevoEstado: 'PEDIDO_PAGO_DIV_MONTO',
+        acciones: [
+          {
+            tipo: 'enviarTexto',
+            texto: `El monto con ${NOMBRE_MEDIO[medio1]} debe ser mayor a 0 y menor a S/ ${total.toFixed(2)}. ¿Cuánto pagas con ${NOMBRE_MEDIO[medio1]}?`,
+          },
+        ],
+        nuevoFlujo: flujo,
+      };
+    }
+    return this.mostrarMediosDivididos(
+      'PEDIDO_PAGO_DIV_MEDIO2',
+      flujo,
+      { ...pedido, pagoDiv: { medio1, monto1: Number(monto.toFixed(2)) } },
+      contexto,
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -2286,6 +2430,8 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       pago: {
         metodo: pedido.pago?.metodo || 'EFECTIVO',
         pagaCon: pedido.pago?.pagaCon,
+        // Pago dividido: mismo formato que la carta y el mozo (pago.plan = [{ medio, monto }])
+        ...(pedido.pago?.plan?.length ? { plan: pedido.pago.plan.map((f) => ({ medio: f.medio, monto: f.monto })) } : {}),
       },
       comprobante:
         pedido.comprobante?.tipo && pedido.comprobante.tipo !== 'NINGUNO'
@@ -2309,7 +2455,10 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     const tiempoMin = tBase + minExtra;
     const tiempoMax = tMax + minExtra;
 
-    const esPagoDigital = ['YAPE', 'PLIN', 'TRANSFERENCIA'].includes(pedido.pago?.metodo || '');
+    const planPago = pedido.pago?.plan;
+    const esPagoDigital = planPago?.length
+      ? planPago.some((f) => ['YAPE', 'PLIN', 'TRANSFERENCIA'].includes(f.medio))
+      : ['YAPE', 'PLIN', 'TRANSFERENCIA'].includes(pedido.pago?.metodo || '');
 
     // Despachar acción transaccional para PedidosService
     return {
@@ -2888,17 +3037,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     const envio = pedido.modalidad === 'DELIVERY' ? (pedido.entrega?.tarifaEnvio ?? null) : 0;
     const total = Math.max(0, subtotal - desc + (envio || 0));
 
-    const lineasTexto = pedido.items
-      .map((i) => {
-        const detalles = [
-          i.tamanoNombre,
-          ...i.opciones.map((o) => o.nombre),
-          i.sabor,
-        ].filter(Boolean);
-        const detTxt = detalles.length > 0 ? ` · ${detalles.join(' · ')}` : '';
-        return `• ${i.productoNombre}${detTxt} — S/ ${i.subtotal.toFixed(2)}`;
-      })
-      .join('\n');
+    const lineasTexto = this.lineasResumen(pedido);
 
     const descTexto = desc > 0 ? `Descuento ${pedido.descuentoNombre || 'aplicado'} — −S/ ${desc.toFixed(2)}` : undefined;
 
@@ -2922,10 +3061,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       direccionTexto = `Dirección: ${dir}${ref}`;
     }
 
-    let pagoTexto = pedido.pago?.metodo || 'Efectivo';
-    if (pedido.pago?.metodo === 'EFECTIVO' && pedido.pago.pagaCon) {
-      pagoTexto = `Efectivo (Pagas con S/ ${pedido.pago.pagaCon.toFixed(2)})`;
-    }
+    const pagoTexto = textoPago(pedido.pago);
 
     const tBase = Number(contexto.datosLocalPublicos?.tiempo_base || 25);
     const tMax = Number(contexto.datosLocalPublicos?.tiempo_maximo || 35);
@@ -2979,37 +3115,72 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     flujo: FlujoConversacion,
     pedido: EstadoCarritoPedido,
     contexto: ContextoConversacion,
+    conResumen = true,
   ): ResultadoTransicion {
-    const pagosCfg = contexto.datosLocalPublicos?.mediosPagoVisibles || {};
-    const opciones: BotonAccion[] = [];
+    const activos = mediosActivos(contexto.datosLocalPublicos);
+    const opciones = activos.map((m) => ({
+      id: m === 'TRANSFERENCIA' ? 'ped_pago_transf' : `ped_pago_${m.toLowerCase()}`,
+      titulo: m === 'TARJETA' ? 'Tarjeta (POS)' : NOMBRE_MEDIO[m],
+    }));
+    if (opciones.length === 0) opciones.push({ id: 'ped_pago_efectivo', titulo: 'Efectivo' });
+    if (opciones.length >= 2) opciones.push({ id: 'ped_pago_dividir', titulo: 'Pagar con 2 medios' });
 
-    if (pagosCfg.efectivo?.activo !== false) opciones.push({ id: 'ped_pago_efectivo', titulo: 'Efectivo' });
-    if (pagosCfg.yape?.activo !== false) opciones.push({ id: 'ped_pago_yape', titulo: 'Yape' });
-    if (pagosCfg.plin?.activo !== false) opciones.push({ id: 'ped_pago_plin', titulo: 'Plin' });
-    if (pagosCfg.tarjeta?.activo !== false) opciones.push({ id: 'ped_pago_tarjeta', titulo: 'Tarjeta (POS)' });
-    if (pagosCfg.transferencia?.activo !== false) opciones.push({ id: 'ped_pago_transf', titulo: 'Transferencia' });
-
-    const botonesPago = opciones.slice(0, 3);
+    const op = opcionesMedios(opciones);
     const nuevoPedido: EstadoCarritoPedido = {
       ...pedido,
       estadoInterno: 'PEDIDO_MEDIO_PAGO',
     };
+    const texto = TEXTOS_BOT.pedidoMedioPago();
+    const acciones: AccionMensaje[] = [];
+    if (conResumen) acciones.push({ tipo: 'enviarTexto', texto: this.resumenAntesDePagar(pedido) });
+    acciones.push(
+      op.filas
+        ? { tipo: 'enviarLista', texto, botonTexto: 'Elegir medio de pago', filas: op.filas }
+        : { tipo: 'enviarBotones', texto, botones: op.botones! },
+    );
 
     return {
       nuevoEstado: 'PEDIDO_MEDIO_PAGO',
-      acciones: [
-        {
-          tipo: 'enviarBotones',
-          texto: TEXTOS_BOT.pedidoMedioPago(),
-          botones: botonesPago.length > 0 ? botonesPago : [{ id: 'ped_pago_efectivo', titulo: 'Efectivo' }],
-        },
-      ],
+      acciones,
       nuevoFlujo: {
         ...flujo,
         estado: 'PEDIDO_MEDIO_PAGO',
         pedido: nuevoPedido,
       },
     };
+  }
+
+  /** Resumen con total justo antes de «¿Cómo pagarás?». Usa las mismas líneas y totales que el resumen final. */
+  private resumenAntesDePagar(pedido: EstadoCarritoPedido): string {
+    const { subtotal, descuento, envio, total } = calcularTotales(pedido);
+    const lineas = this.lineasResumen(pedido);
+    const envioTxt =
+      pedido.modalidad !== 'DELIVERY'
+        ? 'Recojo en tienda'
+        : envio === null
+          ? 'Delivery: lo confirma un asesor al ubicarte'
+          : envio > 0
+            ? `Delivery: S/ ${envio.toFixed(2)}`
+            : 'Delivery gratis';
+    return (
+      `🧾 *Resumen de tu pedido*\n${lineas}\n\n` +
+      `Subtotal: S/ ${subtotal.toFixed(2)}\n` +
+      (descuento > 0 ? `${pedido.descuentoNombre || 'Descuento'}: −S/ ${descuento.toFixed(2)}\n` : '') +
+      `${envioTxt}\n` +
+      `*TOTAL: S/ ${total.toFixed(2)}*`
+    );
+  }
+
+  /** Líneas del carrito: cantidad, tamaño/opciones y precio (compartido por el resumen previo y el final). */
+  private lineasResumen(pedido: EstadoCarritoPedido): string {
+    return pedido.items
+      .map((i) => {
+        const detalles = [i.tamanoNombre, ...i.opciones.map((o) => o.nombre), i.sabor].filter(Boolean);
+        const detTxt = detalles.length > 0 ? ` · ${detalles.join(' · ')}` : '';
+        const cant = i.cantidad > 1 ? `${i.cantidad}× ` : '';
+        return `• ${cant}${i.productoNombre}${detTxt} — S/ ${i.subtotal.toFixed(2)}`;
+      })
+      .join('\n');
   }
 
   // -------------------------------------------------------------------------

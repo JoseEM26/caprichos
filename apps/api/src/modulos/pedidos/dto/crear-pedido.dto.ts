@@ -84,10 +84,10 @@ export class LineaPedidoDto {
 }
 
 export class PlanPagoItemDto {
-  @IsIn(['EFECTIVO', 'YAPE', 'PLIN', 'TRANSFERENCIA'], {
+  @IsIn(['EFECTIVO', 'YAPE', 'PLIN', 'TARJETA', 'TRANSFERENCIA'], {
     message: 'Medio de pago del plan no válido',
   })
-  medio!: 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TRANSFERENCIA';
+  medio!: 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TARJETA' | 'TRANSFERENCIA';
 
   @IsNumber({ maxDecimalPlaces: 2 }, { message: 'El monto del plan debe ser un número' })
   @Min(0.01, { message: 'Cada monto del plan debe ser mayor a 0' })

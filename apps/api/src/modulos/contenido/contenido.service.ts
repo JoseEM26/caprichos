@@ -23,6 +23,7 @@ import {
 } from './contenido.dto';
 
 const CLAVE_CONOCENOS = 'contenido_conocenos';
+const CLAVE_NOVEDADES_BORRADOR = 'contenido_novedades_borrador';
 
 export const NOVEDADES_ENCABEZADO_DEFAULT = {
   etiqueta: 'NOVEDADES',
@@ -593,6 +594,9 @@ export class ContenidoService {
               ...(conf.precio != null ? { precio: conf.precio } : {}),
               ...(conf.nombre ? { nombre: conf.nombre } : {}),
               ...(conf.descripcion ? { descripcion: conf.descripcion } : {}),
+              ...(typeof conf.fotoUrl === 'string' && conf.fotoUrl
+                ? { foto_archivo_id: await this.archivoDeRuta(conf.fotoUrl) }
+                : {}),
             },
           });
         } catch {
@@ -600,6 +604,20 @@ export class ContenidoService {
         }
       }
     }
+
+    // Orden de las categorías (el diseñador guarda sus nombres en el orden elegido)
+    if (Array.isArray(contenido.secciones)) {
+      for (const [i, nombre] of (contenido.secciones as unknown[]).entries()) {
+        if (typeof nombre !== 'string') continue;
+        try {
+          await this.prisma.categoria.update({ where: { nombre }, data: { orden: i + 1 } });
+        } catch {
+          // categoría que ya no existe
+        }
+      }
+    }
+
+    await this.aplicarMomentosDelBorrador(publicada.id, contenido, usuario);
 
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
@@ -622,6 +640,65 @@ export class ContenidoService {
       id: publicada.id.toString(),
       mensaje: 'Cambios de la carta publicados exitosamente',
     };
+  }
+
+  private async archivoDeRuta(ruta: string): Promise<bigint> {
+    const existente = await this.prisma.archivo.findFirst({ where: { ruta } });
+    if (existente) return existente.id;
+    const creado = await this.prisma.archivo.create({
+      data: { ruta, tipo_mime: 'image/webp', bytes: 1024, privado: false },
+    });
+    return creado.id;
+  }
+
+  /**
+   * «Momentos Caprichos» se edita en el diseñador como borrador (orden, títulos, portadas, activos y nuevos);
+   * al publicar se aplica sobre las destacadas con los mismos métodos (y auditoría) del módulo de destacadas.
+   */
+  private async aplicarMomentosDelBorrador(versionId: bigint, contenido: any, usuario?: UsuarioAutenticado) {
+    const m = contenido?.momentos;
+    if (!m || typeof m !== 'object') return;
+    const orden: string[] = Array.isArray(m.orden) ? m.orden.filter((x: unknown) => typeof x === 'string') : [];
+    const items: Record<string, any> = m.items && typeof m.items === 'object' ? m.items : {};
+    const nuevos: any[] = Array.isArray(m.nuevos) ? m.nuevos : [];
+    const reales = new Map<string, string>();
+    for (const n of nuevos) {
+      if (!n || typeof n.id !== 'string' || typeof n.foto !== 'string' || !n.foto) continue;
+      try {
+        const r = await this.crearDestacada(
+          { titulo: String(n.titulo || 'Nuevo momento').slice(0, 80), portada_url: n.foto, activo: n.activo !== false },
+          usuario,
+        );
+        await this.actualizarDestacada(r.id, { fotos: [{ url: n.foto }] }, usuario);
+        reales.set(n.id, r.id);
+      } catch (err) {
+        this.logger.warn(`No se pudo crear el momento ${n.id}: ${err}`);
+      }
+    }
+    let posicion = 0;
+    for (const idBorrador of orden) {
+      const id = reales.get(idBorrador) ?? idBorrador;
+      if (!/^\d+$/.test(id)) continue;
+      posicion++;
+      const it = items[idBorrador] ?? {};
+      try {
+        await this.actualizarDestacada(
+          id,
+          {
+            orden: posicion,
+            ...(typeof it.titulo === 'string' && it.titulo.trim() ? { titulo: it.titulo.trim().slice(0, 80) } : {}),
+            ...(typeof it.portada === 'string' && it.portada ? { portada_url: it.portada } : {}),
+            ...(typeof it.activo === 'boolean' ? { activo: it.activo } : {}),
+          },
+          usuario,
+        );
+      } catch (err) {
+        this.logger.warn(`No se pudo actualizar el momento ${id}: ${err}`);
+      }
+    }
+    // Ya aplicado: la versión publicada no lo vuelve a arrastrar al siguiente borrador
+    const { momentos: _aplicado, ...resto } = contenido;
+    await this.prisma.versionCarta.update({ where: { id: versionId }, data: { contenido: resto } });
   }
 
   async descartarDiseno(usuario?: UsuarioAutenticado) {
@@ -861,6 +938,7 @@ export class ContenidoService {
     await this.prisma.parametro.deleteMany({
       where: { clave: 'contenido_novedades_encabezado_borrador' },
     });
+    await this.prisma.parametro.deleteMany({ where: { clave: CLAVE_NOVEDADES_BORRADOR } });
 
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
@@ -940,7 +1018,86 @@ export class ContenidoService {
     return { ok: true, ...(await this.obtenerConocenosAdmin()), mensaje: 'Borrador de Conócenos descartado' };
   }
 
+  // --- Novedades: borrador de todas las tarjetas (texto, foto, tamaño, orden, activa, nuevas y quitadas) ---
+
+  async obtenerNovedadesBorrador() {
+    const p = await this.prisma.parametro.findUnique({ where: { clave: CLAVE_NOVEDADES_BORRADOR } });
+    const items = (p?.valor as any)?.items;
+    return { items: Array.isArray(items) ? items : null, tieneBorrador: Array.isArray(items) };
+  }
+
+  async guardarNovedadesBorrador(items: unknown, usuario?: UsuarioAutenticado) {
+    if (!Array.isArray(items)) throw new BadRequestException('Las novedades del borrador deben ser una lista');
+    const txt = (v: unknown, max: number) => (typeof v === 'string' ? v.slice(0, max) : undefined);
+    const limpias = items
+      .filter((n: any) => n && typeof n.id === 'string' && n.id)
+      .slice(0, 100)
+      .map((n: any) => ({
+        id: n.id,
+        tipo: txt(n.tipo, 30) || 'AVISO',
+        titulo: txt(n.titulo, 200) ?? '',
+        texto: txt(n.texto, 1000) ?? null,
+        tema: txt(n.tema, 60) ?? null,
+        video_url: txt(n.video_url, 500) ?? null,
+        evento_fecha: txt(n.evento_fecha, 40) ?? null,
+        evento_lugar: txt(n.evento_lugar, 200) ?? null,
+        desde: txt(n.desde, 40) ?? null,
+        hasta: txt(n.hasta, 40) ?? null,
+        activo: n.activo !== false,
+        tamano: tamanoNovedad(n.tamano),
+        fotos: (Array.isArray(n.fotos) ? n.fotos : []).filter((f: unknown) => typeof f === 'string' && f).slice(0, 12),
+      }));
+    await this.prisma.parametro.upsert({
+      where: { clave: CLAVE_NOVEDADES_BORRADOR },
+      update: { valor: { items: limpias } as any },
+      create: { clave: CLAVE_NOVEDADES_BORRADOR, valor: { items: limpias } as any },
+    });
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'novedades',
+      accion: 'GUARDAR_BORRADOR_NOVEDADES',
+      resultado: 'OK',
+      partyId: usuario?.partyId,
+      despues: { cantidad: limpias.length },
+    });
+    return { ok: true, items: limpias, tieneBorrador: true };
+  }
+
+  /** Aplica el borrador de tarjetas: las que ya no están se eliminan, las «nueva-…» se crean y el orden es el de la lista. */
+  private async aplicarNovedadesBorrador(usuario?: UsuarioAutenticado) {
+    const { items } = await this.obtenerNovedadesBorrador();
+    if (!items) return;
+    const existentes = await this.prisma.novedad.findMany({ select: { id: true } });
+    const idsBorrador = new Set(items.map((n: any) => n.id));
+    for (const e of existentes) {
+      if (!idsBorrador.has(e.id.toString())) await this.eliminarNovedad(e.id.toString(), usuario);
+    }
+    const idsActuales = new Set(existentes.map((e: any) => e.id.toString()));
+    for (const [i, n] of (items as any[]).entries()) {
+      const datos = {
+        tipo: n.tipo,
+        titulo: n.titulo || 'Novedad',
+        texto: n.texto ?? undefined,
+        tema: n.tema ?? undefined,
+        video_url: n.video_url ?? undefined,
+        evento_fecha: n.evento_fecha || undefined,
+        evento_lugar: n.evento_lugar ?? undefined,
+        desde: n.desde || undefined,
+        hasta: n.hasta || undefined,
+        activo: n.activo,
+        tamano: n.tamano,
+        orden: i + 1,
+        fotos: n.fotos,
+      };
+      if (idsActuales.has(n.id)) await this.actualizarNovedad(n.id, datos, usuario);
+      else await this.crearNovedad(datos, usuario);
+    }
+    await this.prisma.parametro.deleteMany({ where: { clave: CLAVE_NOVEDADES_BORRADOR } });
+  }
+
   async publicarNovedades(usuario?: UsuarioAutenticado) {
+    await this.aplicarNovedadesBorrador(usuario);
+
     // Si hay borrador de encabezado de novedades, promoverlo a publicado
     const borradorEncabezado = await this.prisma.parametro.findUnique({
       where: { clave: 'contenido_novedades_encabezado_borrador' },

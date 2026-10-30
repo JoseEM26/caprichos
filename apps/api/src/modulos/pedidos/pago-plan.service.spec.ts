@@ -36,8 +36,14 @@ describe('PagoPlanService', () => {
     expect(codigoDe(() => servicio.validar([{ medio: 'YAPE', monto: 9 }], 10))).toBe('PLAN_PAGO_NO_CUADRA');
   });
 
-  it('rechaza un medio fuera de la lista (TARJETA no entra al plan)', () => {
-    expect(codigoDe(() => servicio.validar([{ medio: 'TARJETA', monto: 10 }], 10))).toBe('PLAN_PAGO_MEDIO_INVALIDO');
+  it('rechaza un medio fuera de la lista', () => {
+    expect(codigoDe(() => servicio.validar([{ medio: 'CHEQUE', monto: 10 }], 10))).toBe('PLAN_PAGO_MEDIO_INVALIDO');
+  });
+
+  it('TARJETA entra al plan (no lleva voucher) y puede ir con otro medio', () => {
+    const plan = servicio.validar([{ medio: 'YAPE', monto: 6 }, { medio: 'TARJETA', monto: 4 }], 10)!;
+    expect(plan.map((f) => f.medio)).toEqual(['YAPE', 'TARJETA']);
+    expect(servicio.montoDigital(plan)).toBe(6);
   });
 
   it('rechaza el mismo medio dos veces y montos no positivos', () => {

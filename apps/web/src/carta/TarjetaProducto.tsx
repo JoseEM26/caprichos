@@ -1,5 +1,6 @@
 import { ProductoCarta } from './tipos';
 import { useCarrito } from './CarritoContext';
+import { TextoEd } from './edicion';
 import { useEsMovil } from './useEsMovil';
 
 export interface InfoRankingProducto {
@@ -219,7 +220,7 @@ export function TarjetaProducto({
             color: 'var(--cp-navy)',
           }}
         >
-          {producto.nombre}
+          <TextoEd clave={`producto:${producto.id}:nombre`} valor={producto.nombre} ayuda="Nombre del producto" />
         </div>
 
         {producto.descripcion && (
@@ -239,7 +240,7 @@ export function TarjetaProducto({
                 : {}),
             }}
           >
-            {producto.descripcion}
+            <TextoEd clave={`producto:${producto.id}:descripcion`} valor={producto.descripcion} ayuda="Descripción del producto" />
           </div>
         )}
 

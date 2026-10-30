@@ -41,6 +41,7 @@ import type { NovedadCarta } from './PaginaNovedades';
 import type { BannerCarta } from './PortadaCarta';
 import { FranjaAvisoCarta } from './FranjaAvisoCarta';
 import { useBeneficiosCarta } from './useBeneficiosCarta';
+import { TextoEd, useEdicion } from './edicion';
 import { ModalAvisoEntrada } from './ModalAvisoEntrada';
 
 const INFO_CATEGORIA: Record<string, { title: string; note: string }> = {
@@ -97,7 +98,7 @@ export interface VistaPreviaCarta {
   contenido: ContenidoCarta;
 }
 
-function ContenidoCartaPublica({ vistaPrevia }: { vistaPrevia?: VistaPreviaCarta }) {
+function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: VistaPreviaCarta; paginaInicial?: PaginaCarta }) {
   const [categorias, setCategorias] = useState<CategoriaCarta[]>([]);
   const [ofertas, setOfertas] = useState<OfertaItem[]>([]);
   const [estadoLocal, setEstadoLocal] = useState<EstadoLocalCarta | null>(null);
@@ -109,8 +110,9 @@ function ContenidoCartaPublica({ vistaPrevia }: { vistaPrevia?: VistaPreviaCarta
 
   const [busqueda, setBusqueda] = useState('');
   const [categoriaActivaId, setCategoriaActivaId] = useState<string>('todo');
-  const [pagina, setPagina] = useState<PaginaCarta>('carta');
+  const [pagina, setPagina] = useState<PaginaCarta>(paginaInicial ?? 'carta');
   const movil = useEsMovil();
+  const ed = useEdicion();
 
   const { productoEnModal, cerrarModalProducto, abrirModalProducto, setListaPedidosAbierta } = useCarrito();
 
@@ -223,9 +225,13 @@ function ContenidoCartaPublica({ vistaPrevia }: { vistaPrevia?: VistaPreviaCarta
   const sinResultados = !mostrarPromociones && secciones.length === 0;
 
   const fotoDestacada = useMemo(() => {
-    const prod = categorias.flatMap((c) => c.productos).find((p) => p.nombre === 'FRAPPE MARACUYÁ' && p.fotoUrl);
-    return prod?.fotoUrl ?? categorias.flatMap((c) => c.productos).find((p) => p.fotoUrl)?.fotoUrl ?? null;
-  }, [categorias]);
+    if (contenido?.banner?.foto) return contenido.banner.foto;
+    const productos = categorias.flatMap((c) => c.productos);
+    const objetivo = (contenido?.banner?.target || '').toUpperCase();
+    const elegido = objetivo ? productos.find((p) => p.nombre.toUpperCase() === objetivo && p.fotoUrl) : undefined;
+    const prod = elegido ?? productos.find((p) => p.nombre === 'FRAPPE MARACUYÁ' && p.fotoUrl);
+    return prod?.fotoUrl ?? productos.find((p) => p.fotoUrl)?.fotoUrl ?? null;
+  }, [categorias, contenido]);
 
   const estilosPaleta = useMemo(() => {
     const o: Record<string, string> = {};
@@ -291,6 +297,7 @@ function ContenidoCartaPublica({ vistaPrevia }: { vistaPrevia?: VistaPreviaCarta
   };
 
   const cambiarPagina = (p: PaginaCarta) => {
+    if (ed) return; // el editor en sitio muestra una sola página
     setPagina(p);
     if (!vistaPrevia) window.scrollTo({ top: 0 });
   };
@@ -332,55 +339,72 @@ function ContenidoCartaPublica({ vistaPrevia }: { vistaPrevia?: VistaPreviaCarta
       )}
           </>
         );
-      case 'momentos':
+      case 'momentos': {
+        // En edición se ven todos los momentos (también los ocultos o sin fotos) y se puede agregar uno
+        const lista = ed
+          ? (contenido?.destacadas ?? []).map((d) => ({ ...d, portada_url: limpiarUrlFoto(d.portada_url || d.fotos?.[0]?.url || '') }))
+          : destacadasVisibles;
+        const m = medidasMomento(disp.momentos.tamano, movil);
+        const circulo = (d: (typeof lista)[number], i: number) => {
+          const Etiqueta = ed ? 'div' : 'button';
+          const cuerpo = (
+            <Etiqueta
+              key={d.id}
+              {...(ed ? {} : { 'aria-label': `Ver fotos: ${d.titulo}`, onClick: () => setVisor(i) })}
+              style={{
+                flex: 'none',
+                scrollSnapAlign: 'start',
+                border: 0,
+                background: 'transparent',
+                padding: 0,
+                width: m.ancho,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 6,
+                color: 'var(--cp-navy)',
+                cursor: ed ? 'default' : 'pointer',
+              }}
+            >
+              <span style={{ width: m.circulo, height: m.circulo, borderRadius: '50%', padding: 3, boxSizing: 'border-box', background: 'linear-gradient(135deg, var(--cp-orange), var(--cp-rust))', display: 'block' }}>
+                <span style={{ width: '100%', height: '100%', borderRadius: '50%', border: '2px solid var(--cp-cream)', boxSizing: 'border-box', overflow: 'hidden', background: 'color-mix(in srgb, var(--cp-line) 55%, var(--cp-white))', color: 'var(--cp-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                  {d.portada_url ? (
+                    <img src={d.portada_url} alt="" style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M3 8h4l2-3h6l2 3h4v11H3z" />
+                      <circle cx="12" cy="13.5" r="3.5" />
+                    </svg>
+                  )}
+                </span>
+              </span>
+              <span style={{ fontSize: 11, fontWeight: 700, lineHeight: '14px', textAlign: 'center' }}>
+                <TextoEd clave={`momento:${d.id}:titulo`} valor={d.titulo} ayuda="Título del momento" />
+              </span>
+            </Etiqueta>
+          );
+          return ed ? ed.bloque(`momento:${d.id}`, cuerpo, { debajo: true, estilo: { flex: 'none' } }) : cuerpo;
+        };
         return (
           <>
-      {pagina === 'carta' && !busqueda.trim() && categoriaActivaId === 'todo' && destacadasVisibles.length > 0 && (
+      {pagina === 'carta' && !busqueda.trim() && categoriaActivaId === 'todo' && (lista.length > 0 || ed) && (
         <div style={{ maxWidth: 1200, width: '100%', boxSizing: 'border-box', margin: '0 auto', padding: movil ? '20px 16px 0' : '32px 24px 0' }}>
           <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: movil ? 17 : 22, marginBottom: 10 }}>Momentos Caprichos</div>
-          <div style={{ display: 'flex', gap: movil ? 10 : 18, overflowX: 'auto', scrollSnapType: 'x proximity', paddingBottom: 4, scrollbarWidth: 'none' }}>
-            {destacadasVisibles.map((d, i) => (
-              <button
-                key={d.id}
-                aria-label={`Ver fotos: ${d.titulo}`}
-                onClick={() => setVisor(i)}
-                style={{
-                  flex: 'none',
-                  scrollSnapAlign: 'start',
-                  border: 0,
-                  background: 'transparent',
-                  padding: 0,
-                  width: medidasMomento(disp.momentos.tamano, movil).ancho,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: 6,
-                  color: 'var(--cp-navy)',
-                  cursor: 'pointer',
-                }}
-              >
-                <span style={{ width: medidasMomento(disp.momentos.tamano, movil).circulo, height: medidasMomento(disp.momentos.tamano, movil).circulo, borderRadius: '50%', padding: 3, boxSizing: 'border-box', background: 'linear-gradient(135deg, var(--cp-orange), var(--cp-rust))', display: 'block' }}>
-                  <span style={{ width: '100%', height: '100%', borderRadius: '50%', border: '2px solid var(--cp-cream)', boxSizing: 'border-box', overflow: 'hidden', background: 'color-mix(in srgb, var(--cp-line) 55%, var(--cp-white))', color: 'var(--cp-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-                    {d.portada_url ? (
-                      <img src={d.portada_url} alt="" style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <path d="M3 8h4l2-3h6l2 3h4v11H3z" />
-                        <circle cx="12" cy="13.5" r="3.5" />
-                      </svg>
-                    )}
-                  </span>
-                </span>
-                <span style={{ fontSize: 11, fontWeight: 700, lineHeight: '14px', textAlign: 'center' }}>{d.titulo}</span>
-              </button>
-            ))}
+          <div
+            style={{
+              display: 'flex',
+              gap: movil ? 10 : 18,
+              ...(ed ? { flexWrap: 'wrap', paddingBottom: 56 } : { overflowX: 'auto', scrollSnapType: 'x proximity', paddingBottom: 4, scrollbarWidth: 'none' }),
+            }}
+          >
+            {lista.map((d, i) => circulo(d, i))}
+            {ed && ed.agregar('momento', 'Agregar un momento', { width: m.ancho, height: m.circulo })}
           </div>
         </div>
       )}
-
-
           </>
         );
+      }
       case 'novedades':
         return (
           <>
@@ -536,7 +560,7 @@ function ContenidoCartaPublica({ vistaPrevia }: { vistaPrevia?: VistaPreviaCarta
               secciones.map((cat) => {
                 const clave = cat.nombre.trim().toUpperCase();
                 const infoCat = INFO_CATEGORIA[clave] ?? { title: cat.nombre, note: '' };
-                return (
+                const seccionCategoria = (
                   <section
                     key={cat.id}
                     id={`categoria-${cat.id}`}
@@ -599,18 +623,22 @@ function ContenidoCartaPublica({ vistaPrevia }: { vistaPrevia?: VistaPreviaCarta
                         gap: '16px',
                       }}
                     >
-                      {cat.productos.map((prod) => (
-                        <TarjetaProducto
-                          key={prod.id}
-                          producto={prod}
-                          rankingInfo={rankingPorProducto.get(String(prod.id))}
-                          organizacion={organizacion}
-                          insigniaBeneficio={mapaBeneficios.get(String(prod.id))}
-                        />
-                      ))}
+                      {cat.productos.map((prod) => {
+                        const tarjeta = (
+                          <TarjetaProducto
+                            key={prod.id}
+                            producto={prod}
+                            rankingInfo={rankingPorProducto.get(String(prod.id))}
+                            organizacion={organizacion}
+                            insigniaBeneficio={mapaBeneficios.get(String(prod.id))}
+                          />
+                        );
+                        return ed ? ed.bloque(`producto:${prod.id}`, tarjeta) : tarjeta;
+                      })}
                     </div>
                   </section>
                 );
+                return ed ? ed.bloque(`categoria:${cat.id}`, seccionCategoria) : seccionCategoria;
               })}
           </>
         )}
@@ -730,7 +758,10 @@ function ContenidoCartaPublica({ vistaPrevia }: { vistaPrevia?: VistaPreviaCarta
         />
       )}
 
-      {pagina === 'carta' && disp.secciones.map((sec) => (sec.visible ? <Fragment key={sec.id}>{renderSeccion(sec.id)}</Fragment> : null))}
+      {pagina === 'carta' &&
+        disp.secciones.map((sec) =>
+          ed ? ed.bloque(`seccion:${sec.id}`, renderSeccion(sec.id)) : sec.visible ? <Fragment key={sec.id}>{renderSeccion(sec.id)}</Fragment> : null,
+        )}
       {pagina === 'carta' && !vistaPrevia && <FormularioComentarios />}
 
       {visor !== null && destacadasVisibles.length > 0 && (
@@ -920,12 +951,12 @@ function ContenidoCartaPublica({ vistaPrevia }: { vistaPrevia?: VistaPreviaCarta
 }
 
 /** Vista previa del diseñador: la misma carta (mismos componentes), con datos del borrador y sin navegar ni pedir. */
-export function CartaVistaPrevia({ datos, movil }: { datos: VistaPreviaCarta; movil: boolean }) {
+export function CartaVistaPrevia({ datos, movil, pagina }: { datos: VistaPreviaCarta; movil: boolean; pagina?: PaginaCarta }) {
   return (
     <DispositivoForzado movil={movil}>
       <CarritoProvider>
         <CuentaProvider>
-          <ContenidoCartaPublica vistaPrevia={datos} />
+          <ContenidoCartaPublica vistaPrevia={datos} paginaInicial={pagina} />
         </CuentaProvider>
       </CarritoProvider>
     </DispositivoForzado>

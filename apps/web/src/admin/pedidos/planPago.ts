@@ -23,7 +23,7 @@ export interface PlanPagoItem {
 }
 
 export function nombreMedio(medio: string): string {
-  return MEDIOS_PLAN.find((m) => m.id === medio)?.nombre ?? medio;
+  return MEDIOS_PLAN.find((m) => m.id === medio)?.nombre ?? (medio === 'TARJETA' ? 'Tarjeta' : medio);
 }
 
 /** Plan inicial de un solo medio por el total. */

@@ -1,24 +1,25 @@
-import { useState, useEffect, type ChangeEvent, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../../comun/api';
 import { Cargando } from '../../comun/Cargando';
-import { EstadoError } from '../../comun/EstadoError';
 import { Confirmar } from '../../comun/Confirmar';
+import { EstadoError } from '../../comun/EstadoError';
+import { MarcoDispositivo } from '../../comun/MarcoDispositivo';
+import { CartaVistaPrevia } from '../../carta/CartaPublica';
+import type { ContenidoCarta, VistaPreviaCarta } from '../../carta/CartaPublica';
+import { agruparNovedades } from '../../carta/PaginaNovedades';
+import type { NovedadCarta } from '../../carta/PaginaNovedades';
+import type { ModoEdicion } from '../../carta/edicion';
 import { normalizarUrlArchivo } from './paletas-constantes';
-import {
-  PaginaNovedades,
-  TarjetaMosaicoNovedad,
-  estiloMosaico,
-  type AdminTarjetaNovedad,
-  type NovedadCarta,
-} from '../../carta/PaginaNovedades';
-import { ConmutadorDispositivo, MarcoDispositivo } from '../../comun/MarcoDispositivo';
+import { BarraSuperior } from './edicion/BarraSuperior';
+import { BloqueEditable, BotonBarra } from './edicion/BloqueEditable';
+import { Fantasma, LienzoEdicion } from './edicion/LienzoEdicion';
+import { reubicar, siguiente } from './edicion/mover';
+import { subirFotoEdicion } from './edicion/subirFoto';
+import { useBorrador } from './edicion/useBorrador';
+import { usePublicoCarta } from './edicion/usePublicoCarta';
 
-interface FotoNovedad {
-  id: string;
-  url: string;
-}
-
-interface NovedadAdmin {
+/** Tarjeta de novedad tal como se guarda en el borrador (las fotos son solo sus direcciones). */
+interface NovedadEd {
   id: string;
   tipo: string;
   titulo: string;
@@ -29,165 +30,140 @@ interface NovedadAdmin {
   evento_lugar: string | null;
   desde: string | null;
   hasta: string | null;
-  orden: number;
   activo: boolean;
   tamano: string;
-  fotos: FotoNovedad[];
+  fotos: string[];
 }
 
-interface EncabezadoNovedades {
+interface Encabezado {
   etiqueta: string;
   titulo: string;
   subtitulo: string;
 }
 
-const ENCABEZADO_DEFAULT: EncabezadoNovedades = {
+interface EstadoNov {
+  encabezado: Encabezado;
+  items: NovedadEd[];
+}
+
+const ENCABEZADO_DEFAULT: Encabezado = {
   etiqueta: 'NOVEDADES',
   titulo: 'Lo nuevo en Caprichos',
   subtitulo: 'Promociones, lanzamientos, datos útiles y lo que pasa en nuestras redes.',
 };
 
-const TIPOS_NOVEDAD = [
+const TIPOS = [
   { id: 'PROMOCION', n: 'Promoción' },
-  { id: 'BANNER', n: 'Banner' },
+  { id: 'BANNER', n: 'Banner (en portada)' },
   { id: 'VIDEO', n: 'Video' },
   { id: 'FOTOS', n: 'Fotos' },
   { id: 'EVENTO', n: 'Evento' },
   { id: 'AVISO', n: 'Aviso' },
 ];
 
-const CHIPS_AGREGAR = [
-  { id: 'PROMOCION', n: 'Promoción' },
-  { id: 'BANNER', n: 'Banner' },
-  { id: 'FOTOS', n: 'Novedad con imagen' },
-  { id: 'FOTOS', n: 'Fotos de clientes o evento' },
-  { id: 'EVENTO', n: 'Evento' },
-  { id: 'VIDEO', n: 'Video (TikTok o Instagram)' },
-  { id: 'AVISO', n: 'Aviso' },
-];
+const TAMANOS = ['CHICO', 'MEDIANO', 'GRANDE', 'ANCHO'] as const;
+const NOMBRE_TAMANO: Record<string, string> = { CHICO: 'Chico', MEDIANO: 'Mediano', GRANDE: 'Grande', ANCHO: 'Ancho' };
 
-/** Tamaño del cuadro en la cuadrícula de 4 columnas de la carta (PC). En celular: ver contrato nov. */
-const TAMANOS_CUADRO = [
-  { id: 'CHICO', n: 'Chico', cols: 1, rows: 1 },
-  { id: 'MEDIANO', n: 'Mediano', cols: 2, rows: 1 },
-  { id: 'GRANDE', n: 'Grande', cols: 2, rows: 2 },
-  { id: 'ANCHO', n: 'Ancho', cols: 4, rows: 1 },
-];
+const aCarta = (items: NovedadEd[]): NovedadCarta[] =>
+  items.map((n, i) => ({
+    id: n.id,
+    tipo: n.tipo,
+    titulo: n.titulo,
+    texto: n.texto ?? undefined,
+    tema: n.tema ?? undefined,
+    video_url: n.video_url ?? undefined,
+    evento_fecha: n.evento_fecha ?? undefined,
+    evento_lugar: n.evento_lugar ?? undefined,
+    tamano: n.tamano,
+    orden: i + 1,
+    activo: n.activo,
+    fotos: n.fotos.map((url, k) => ({ id: `${n.id}-${k}`, url })),
+  }));
 
-/** Dibujo pequeño de la proporción: cuadrícula de 4 x 2 con el cuadro marcado. */
-function DibujoTamano({ cols, rows, activo }: { cols: number; rows: number; activo: boolean }) {
+function CampoPop({ etiqueta, valor, tipo = 'text', alCambiar }: { etiqueta: string; valor: string; tipo?: string; alCambiar: (v: string) => void }) {
+  const [txt, setTxt] = useState(valor);
+  const confirmar = () => txt !== valor && alCambiar(txt);
   return (
-    <svg viewBox="0 0 28 14" width="28" height="14" aria-hidden="true" focusable="false">
-      <rect x="0.5" y="0.5" width="27" height="13" rx="2" fill="none" stroke="currentColor" strokeOpacity="0.35" />
-      <rect
-        x="0.5"
-        y="0.5"
-        width={cols * 6.75 - 0.5}
-        height={rows * 6.5 - 0.5}
-        rx="1.5"
-        fill={activo ? 'var(--cp-orange)' : 'currentColor'}
-        fillOpacity={activo ? 1 : 0.55}
-      />
-    </svg>
+    <label>
+      {etiqueta}
+      <input type={tipo} value={txt} onChange={(e) => setTxt(e.target.value)} onBlur={confirmar} onKeyDown={(e) => e.key === 'Enter' && confirmar()} />
+    </label>
   );
 }
 
-/** Vista previa en vivo de la tarjeta: el MISMO componente del mosaico de la carta, en PC o celular. */
-function VistaTarjeta({ novedad }: { novedad: NovedadCarta }) {
-  const [celular, setCelular] = useState(false);
+/** Ventana pequeña con lo que la tarjeta no muestra: tipo, fechas en que se ve, enlace del video y datos del evento. */
+function OpcionesNovedad({ n, alCambiar }: { n: NovedadEd; alCambiar: (p: Partial<NovedadEd>) => void }) {
+  const dia = (v: string | null) => (v ? v.slice(0, 10) : '');
   return (
-    <div style={{ flex: '1 1 100%', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-soft)' }}>Vista previa en la carta</span>
-      <ConmutadorDispositivo celular={celular} onCambiar={setCelular} />
-      <MarcoDispositivo celular={celular} etiqueta="Vista previa de la tarjeta">
-        <div data-testid="vista-tarjeta" style={estiloMosaico(celular)}>
-          <TarjetaMosaicoNovedad item={novedad} indice={0} movil={celular} onAbrir={() => {}} />
-        </div>
-      </MarcoDispositivo>
-    </div>
+    <>
+      <label>
+        Tipo
+        <select value={n.tipo} onChange={(e) => alCambiar({ tipo: e.target.value })}>
+          {TIPOS.map((t) => (
+            <option key={t.id} value={t.id}>{t.n}</option>
+          ))}
+        </select>
+      </label>
+      <CampoPop etiqueta="Se muestra desde" tipo="date" valor={dia(n.desde)} alCambiar={(v) => alCambiar({ desde: v || null })} />
+      <CampoPop etiqueta="Se muestra hasta" tipo="date" valor={dia(n.hasta)} alCambiar={(v) => alCambiar({ hasta: v || null })} />
+      <CampoPop etiqueta="Enlace del video (TikTok o Instagram)" valor={n.video_url ?? ''} alCambiar={(v) => alCambiar({ video_url: v.trim() || null })} />
+      {n.tipo === 'EVENTO' && (
+        <>
+          <CampoPop etiqueta="Fecha del evento" tipo="date" valor={dia(n.evento_fecha)} alCambiar={(v) => alCambiar({ evento_fecha: v || null })} />
+          <CampoPop etiqueta="Lugar del evento" valor={n.evento_lugar ?? ''} alCambiar={(v) => alCambiar({ evento_lugar: v.trim() || null })} />
+        </>
+      )}
+    </>
   );
 }
 
 export function NovedadesView() {
-  const [novedades, setNovedades] = useState<NovedadAdmin[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const [nsFull, setNsFull] = useState(false);
-  const [filtroEstado, setFiltroEstado] = useState<string>('todas');
-  // Estado de cada novedad al cargar: lo que difiere queda como «Borrador» hasta publicar.
-  const [original, setOriginal] = useState<Record<string, string>>({});
-  const [dirty, setDirty] = useState(false);
+  const [celular, setCelular] = useState(false);
+  const [hayBorrador, setHayBorrador] = useState(false);
   const [mensaje, setMensaje] = useState<string | null>(null);
+  const [sel, setSelRaw] = useState<string | null>(null);
+  const [pop, setPop] = useState<string | null>(null);
+  const [aEliminar, setAEliminar] = useState<string | null>(null);
+  const publico = usePublicoCarta();
+  const secuencia = useRef(0);
 
-  // Conmutador PC / Celular y Modo de Vista
-  const [dispositivo, setDispositivo] = useState<'pc' | 'celular'>('pc');
-  const [modoVista, setModoVista] = useState<'edicion' | 'previa'>('edicion');
-
-  // Encabezado editable
-  const [encabezado, setEncabezado] = useState<EncabezadoNovedades>(ENCABEZADO_DEFAULT);
-  const [editandoEncabezado, setEditandoEncabezado] = useState(false);
-  const [etiquetaEdit, setEtiquetaEdit] = useState(ENCABEZADO_DEFAULT.etiqueta);
-  const [tituloEncEdit, setTituloEncEdit] = useState(ENCABEZADO_DEFAULT.titulo);
-  const [subtituloEncEdit, setSubtituloEncEdit] = useState(ENCABEZADO_DEFAULT.subtitulo);
-  const [confirmarGuardarEncabezado, setConfirmarGuardarEncabezado] = useState(false);
-  const [confirmarRestablecerEncabezado, setConfirmarRestablecerEncabezado] = useState(false);
-
-  // Modal de edición de novedad
-  const [editando, setEditando] = useState<NovedadAdmin | null>(null);
-  const [tipoEdit, setTipoEdit] = useState('PROMOCION');
-  const [tituloEdit, setTituloEdit] = useState('');
-  const [temaEdit, setTemaEdit] = useState('');
-  const [textoEdit, setTextoEdit] = useState('');
-  const [videoUrlEdit, setVideoUrlEdit] = useState('');
-  const [fechaEventoEdit, setFechaEventoEdit] = useState('');
-  const [lugarEventoEdit, setLugarEventoEdit] = useState('');
-  const [desdeEdit, setDesdeEdit] = useState('');
-  const [hastaEdit, setHastaEdit] = useState('');
-  const [activoEdit, setActivoEdit] = useState(true);
-  const [fotosEdit, setFotosEdit] = useState<string[]>([]);
-  const [tamanoEdit, setTamanoEdit] = useState('MEDIANO');
-  const [errorEdicionNovedad, setErrorEdicionNovedad] = useState<string | null>(null);
-
-  // Confirmaciones
-  const [confirmarPublicar, setConfirmarPublicar] = useState(false);
-  const [confirmarDescartar, setConfirmarDescartar] = useState(false);
-  const [guardandoAccion, setGuardandoAccion] = useState(false);
-  const [novedadAEliminar, setNovedadAEliminar] = useState<NovedadAdmin | null>(null);
+  const b = useBorrador<EstadoNov>(async (e) => {
+    await api.put('/admin/contenido/novedades/encabezado', e.encabezado);
+    await api.put('/admin/contenido/novedades/borrador', { items: e.items });
+    setHayBorrador(true);
+  });
+  const { valor: e, cambiar, cargar } = b;
 
   const cargarDatos = async () => {
     setCargando(true);
     setError(null);
     try {
-      const [data, dataEnc] = await Promise.all([
-        api.get<NovedadAdmin[]>('/admin/contenido/novedades'),
-        api.get<{
-          encabezado: EncabezadoNovedades;
-          publicado: EncabezadoNovedades;
-          tieneBorrador: boolean;
-        }>('/admin/contenido/novedades/encabezado').catch(() => null),
+      const [lista, borrador, enc] = await Promise.all([
+        api.get<any[]>('/admin/contenido/novedades'),
+        api.get<{ items: NovedadEd[] | null; tieneBorrador: boolean }>('/admin/contenido/novedades/borrador').catch(() => ({ items: null, tieneBorrador: false })),
+        api.get<{ encabezado: Encabezado; tieneBorrador: boolean }>('/admin/contenido/novedades/encabezado').catch(() => null),
       ]);
-      setNovedades(
-        data.map((n) => ({
-          ...n,
-          fotos: (n.fotos || []).map((f) => ({
-            ...f,
-            url: normalizarUrlArchivo(f.url) || f.url,
-          })),
-        })),
-      );
-      setOriginal(Object.fromEntries(data.map((n) => [n.id, `${n.activo}|${n.orden}|${n.tipo}`])));
-      if (dataEnc?.encabezado) {
-        setEncabezado(dataEnc.encabezado);
-        setEtiquetaEdit(dataEnc.encabezado.etiqueta || ENCABEZADO_DEFAULT.etiqueta);
-        setTituloEncEdit(dataEnc.encabezado.titulo || ENCABEZADO_DEFAULT.titulo);
-        setSubtituloEncEdit(dataEnc.encabezado.subtitulo || ENCABEZADO_DEFAULT.subtitulo);
-        if (dataEnc.tieneBorrador) {
-          setDirty(true);
-        }
-      }
+      const publicadas: NovedadEd[] = (lista || []).map((n) => ({
+        id: String(n.id),
+        tipo: n.tipo,
+        titulo: n.titulo,
+        texto: n.texto ?? null,
+        tema: n.tema ?? null,
+        video_url: n.video_url ?? null,
+        evento_fecha: n.evento_fecha ?? null,
+        evento_lugar: n.evento_lugar ?? null,
+        desde: n.desde ?? null,
+        hasta: n.hasta ?? null,
+        activo: n.activo !== false,
+        tamano: n.tamano || 'MEDIANO',
+        fotos: (n.fotos || []).map((f: { url: string }) => normalizarUrlArchivo(f.url) || f.url),
+      }));
+      cargar({ encabezado: enc?.encabezado ?? ENCABEZADO_DEFAULT, items: borrador?.items ?? publicadas });
+      setHayBorrador(!!borrador?.tieneBorrador || !!enc?.tieneBorrador);
     } catch (err: any) {
-      setError(err?.message || 'Error al cargar las novedades y publicidad');
+      setError(err?.message || 'Error al cargar las novedades');
     } finally {
       setCargando(false);
     }
@@ -195,1155 +171,216 @@ export function NovedadesView() {
 
   useEffect(() => {
     cargarDatos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const marcarModificado = () => setDirty(true);
-
-  // Mover de orden
-  const moverNovedad = (id: string, dir: -1 | 1) => {
-    const idx = novedades.findIndex((n) => n.id === id);
-    const targetIdx = idx + dir;
-    if (targetIdx < 0 || targetIdx >= novedades.length) return;
-    const copia = [...novedades];
-    const temp = copia[idx];
-    copia[idx] = { ...copia[targetIdx], orden: temp.orden };
-    copia[targetIdx] = { ...temp, orden: copia[targetIdx].orden };
-    setNovedades(copia);
-    marcarModificado();
-  };
-
-  const toggleActivo = (id: string) => {
-    setNovedades(
-      novedades.map((n) => (n.id === id ? { ...n, activo: !n.activo } : n)),
-    );
-    marcarModificado();
-  };
-
-  const duplicar = async (n: NovedadAdmin) => {
-    try {
-      await api.post('/admin/contenido/novedades', {
-        tipo: n.tipo,
-        titulo: `${n.titulo} (copia)`,
-        texto: n.texto || undefined,
-        tema: n.tema || undefined,
-        video_url: n.video_url || undefined,
-        evento_fecha: n.evento_fecha || undefined,
-        evento_lugar: n.evento_lugar || undefined,
-        desde: n.desde || undefined,
-        hasta: n.hasta || undefined,
-        activo: false, // duplicada inactiva por defecto
-        tamano: n.tamano,
-        fotos: n.fotos.map((f) => f.url),
-      });
-      await cargarDatos();
-      setMensaje('Novedad duplicada (creada como inactiva)');
-      setTimeout(() => setMensaje(null), 3000);
-    } catch (err: any) {
-      setMensaje(err?.message || 'Error al duplicar novedad');
-    }
-  };
-
-  const abrirCrear = (tipoInicial: string) => {
-    const nuevaTemp: NovedadAdmin = {
-      id: 'nueva',
-      tipo: tipoInicial,
-      titulo: '',
-      texto: '',
-      tema: '',
-      video_url: '',
-      evento_fecha: null,
-      evento_lugar: '',
-      desde: null,
-      hasta: null,
-      orden: novedades.length + 1,
-      activo: true,
-      tamano: 'MEDIANO',
-      fotos: [],
-    };
-    setEditando(nuevaTemp);
-    setTipoEdit(tipoInicial);
-    setTituloEdit('');
-    setTemaEdit('');
-    setTextoEdit('');
-    setVideoUrlEdit('');
-    setFechaEventoEdit('');
-    setLugarEventoEdit('');
-    setDesdeEdit('');
-    setHastaEdit('');
-    setActivoEdit(true);
-    setTamanoEdit('MEDIANO');
-    setFotosEdit([]);
-    setErrorEdicionNovedad(null);
-  };
-
-  const abrirEditar = (n: NovedadAdmin) => {
-    setEditando(n);
-    setTipoEdit(n.tipo);
-    setTituloEdit(n.titulo);
-    setTemaEdit(n.tema || '');
-    setTextoEdit(n.texto || '');
-    setVideoUrlEdit(n.video_url || '');
-    setFechaEventoEdit(n.evento_fecha ? n.evento_fecha.slice(0, 10) : '');
-    setLugarEventoEdit(n.evento_lugar || '');
-    setDesdeEdit(n.desde ? n.desde.slice(0, 10) : '');
-    setHastaEdit(n.hasta ? n.hasta.slice(0, 10) : '');
-    setActivoEdit(n.activo);
-    setTamanoEdit(n.tamano || 'MEDIANO');
-    setFotosEdit(n.fotos.map((f) => f.url));
-    setErrorEdicionNovedad(null);
-  };
-
-  const subirFoto = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const url = ev.target?.result as string;
-      setFotosEdit([...fotosEdit, url]);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const quitarFotoEdit = (idx: number) => {
-    setFotosEdit(fotosEdit.filter((_, i) => i !== idx));
-  };
-
-  const guardarModalEdicion = async () => {
-    if (!tituloEdit.trim()) {
-      setErrorEdicionNovedad('El título es obligatorio');
-      return;
-    }
-    setErrorEdicionNovedad(null);
-    const payload = {
-      tipo: tipoEdit,
-      titulo: tituloEdit.trim(),
-      tema: temaEdit.trim() || undefined,
-      texto: textoEdit.trim() || undefined,
-      video_url: videoUrlEdit.trim() || undefined,
-      evento_fecha: fechaEventoEdit || undefined,
-      evento_lugar: lugarEventoEdit.trim() || undefined,
-      desde: desdeEdit || undefined,
-      hasta: hastaEdit || undefined,
-      activo: activoEdit,
-      tamano: tamanoEdit,
-      fotos: fotosEdit,
-    };
-
-    try {
-      if (editando?.id === 'nueva') {
-        await api.post('/admin/contenido/novedades', payload);
-      } else if (editando) {
-        await api.put(`/admin/contenido/novedades/${editando.id}`, payload);
-      }
-      setEditando(null);
-      await cargarDatos();
-      marcarModificado();
-    } catch (err: any) {
-      setErrorEdicionNovedad(err?.message || 'Error al guardar la novedad');
-    }
-  };
-
-  const pedirEliminar = (n: NovedadAdmin) => {
-    setEditando(null);
-    setNovedadAEliminar(n);
-  };
-
-  const ejecutarEliminar = async () => {
-    if (!novedadAEliminar) return;
-    setGuardandoAccion(true);
-    try {
-      await api.delete(`/admin/contenido/novedades/${novedadAEliminar.id}`);
-      setNovedadAEliminar(null);
-      await cargarDatos();
-      setMensaje('Novedad eliminada');
-      setTimeout(() => setMensaje(null), 3000);
-    } catch (err: any) {
-      setMensaje(err?.message || 'Error al eliminar la novedad');
-    } finally {
-      setGuardandoAccion(false);
-    }
-  };
-
-  // Manejo del encabezado de novedades
-  const abrirEditorEncabezado = () => {
-    setEtiquetaEdit(encabezado.etiqueta);
-    setTituloEncEdit(encabezado.titulo);
-    setSubtituloEncEdit(encabezado.subtitulo);
-    setEditandoEncabezado(true);
-  };
-
-  const ejecutarGuardarEncabezado = async () => {
-    setGuardandoAccion(true);
-    try {
-      const payload: EncabezadoNovedades = {
-        etiqueta: etiquetaEdit.trim() || ENCABEZADO_DEFAULT.etiqueta,
-        titulo: tituloEncEdit.trim() || ENCABEZADO_DEFAULT.titulo,
-        subtitulo: subtituloEncEdit.trim() || ENCABEZADO_DEFAULT.subtitulo,
-      };
-      await api.put('/admin/contenido/novedades/encabezado', payload);
-      setEncabezado(payload);
-      setEditandoEncabezado(false);
-      setConfirmarGuardarEncabezado(false);
-      marcarModificado();
-      setMensaje('Borrador del encabezado guardado');
-      setTimeout(() => setMensaje(null), 3000);
-    } catch (err: any) {
-      setMensaje(err?.message || 'Error al guardar el encabezado');
-    } finally {
-      setGuardandoAccion(false);
-    }
-  };
-
-  const ejecutarRestablecerEncabezado = async () => {
-    setGuardandoAccion(true);
-    try {
-      await api.put('/admin/contenido/novedades/encabezado', ENCABEZADO_DEFAULT);
-      setEncabezado(ENCABEZADO_DEFAULT);
-      setEtiquetaEdit(ENCABEZADO_DEFAULT.etiqueta);
-      setTituloEncEdit(ENCABEZADO_DEFAULT.titulo);
-      setSubtituloEncEdit(ENCABEZADO_DEFAULT.subtitulo);
-      setEditandoEncabezado(false);
-      setConfirmarRestablecerEncabezado(false);
-      marcarModificado();
-      setMensaje('Encabezado restablecido a valores por defecto');
-      setTimeout(() => setMensaje(null), 3000);
-    } catch (err: any) {
-      setMensaje(err?.message || 'Error al restablecer encabezado');
-    } finally {
-      setGuardandoAccion(false);
-    }
-  };
-
-  // Atajos de fecha
-  const aplicarAtajoFecha = (tipo: 'finde' | 'semana' | 'mes' | 'anio') => {
-    const hoy = new Date();
-    const formato = (d: Date) => d.toISOString().slice(0, 10);
-    setDesdeEdit(formato(hoy));
-
-    if (tipo === 'finde') {
-      const domingo = new Date(hoy);
-      domingo.setDate(hoy.getDate() + (7 - hoy.getDay()));
-      setHastaEdit(formato(domingo));
-    } else if (tipo === 'semana') {
-      const finSem = new Date(hoy);
-      finSem.setDate(hoy.getDate() + 7);
-      setHastaEdit(formato(finSem));
-    } else if (tipo === 'mes') {
-      const finMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
-      setHastaEdit(formato(finMes));
-    } else if (tipo === 'anio') {
-      const finAnio = new Date(hoy.getFullYear(), 11, 31);
-      setHastaEdit(formato(finAnio));
-    }
-  };
-
-  const ejecutarPublicar = async () => {
-    setGuardandoAccion(true);
-    try {
-      for (const n of novedades) {
-        await api.put(`/admin/contenido/novedades/${n.id}`, {
-          tipo: n.tipo,
-          orden: n.orden,
-          activo: n.activo,
-        });
-      }
-      await api.post('/admin/contenido/novedades/publicar', {});
-      setDirty(false);
-      setConfirmarPublicar(false);
-      setMensaje('¡Novedades y encabezado publicados en la carta!');
-      setTimeout(() => setMensaje(null), 4000);
-    } catch (err: any) {
-      setMensaje(err?.message || 'Error al publicar novedades');
-    } finally {
-      setGuardandoAccion(false);
-    }
-  };
-
-  const ejecutarDescartar = async () => {
-    setGuardandoAccion(true);
-    try {
-      await api.post('/admin/contenido/novedades/descartar', {}).catch(() => null);
-      await cargarDatos();
-      setDirty(false);
-      setConfirmarDescartar(false);
-      setMensaje('Cambios descartados');
-      setTimeout(() => setMensaje(null), 3000);
-    } catch (err: any) {
-      setMensaje(err?.message || 'Error al descartar');
-    } finally {
-      setGuardandoAccion(false);
-    }
-  };
-
-  // Novedades para previsualización fiel (formato NovedadCarta)
-  const novedadesParaPrevia: NovedadCarta[] = useMemo(() => {
-    return novedades.map((n) => ({
-      id: n.id,
-      tipo: n.tipo,
-      titulo: n.titulo,
-      texto: n.texto || undefined,
-      tema: n.tema || undefined,
-      video_url: n.video_url || undefined,
-      evento_fecha: n.evento_fecha || undefined,
-      evento_lugar: n.evento_lugar || undefined,
-      tamano: n.tamano,
-      orden: n.orden,
-      activo: n.activo,
-      fotos: n.fotos.map((f) => ({ id: f.id, url: f.url })),
-    }));
-  }, [novedades]);
-
-  if (cargando) return <Cargando mensaje="Cargando novedades y publicidad..." />;
-  if (error) return <EstadoError mensaje={error} alReintentar={cargarDatos} />;
-
-  const hoyIso = new Date().toISOString().slice(0, 10);
-  const estadoClave = (n: NovedadAdmin): 'act' | 'prog' | 'venc' | 'off' => {
-    if (!n.activo) return 'off';
-    const d = n.desde ? n.desde.slice(0, 10) : '';
-    const h = n.hasta ? n.hasta.slice(0, 10) : '';
-    if (d && hoyIso < d) return 'prog';
-    if (h && hoyIso > h) return 'venc';
-    return 'act';
-  };
-
-  const countByEstado = { todas: novedades.length, act: 0, prog: 0, venc: 0, off: 0 };
-  novedades.forEach((n) => {
-    countByEstado[estadoClave(n)] += 1;
-  });
-
-  const visiblesPorEstado = novedades.filter((n) => filtroEstado === 'todas' || estadoClave(n) === filtroEstado);
-
-  const estadoPagina = (n: NovedadAdmin) => `${n.activo}|${n.orden}|${n.tipo}`;
-  const idsVisibles = new Set(
-    (modoVista === 'previa' ? novedades.filter((n) => estadoClave(n) === 'act') : visiblesPorEstado).map((n) => n.id),
-  );
-  const listaPagina = novedadesParaPrevia.filter((n) => idsVisibles.has(n.id));
-
-  const botonAdmin = (principal = false): React.CSSProperties => ({
-    minWidth: 44,
-    minHeight: 44,
-    padding: '0 10px',
-    borderRadius: 10,
-    border: principal ? 0 : '1.5px solid var(--cp-navy)',
-    background: principal ? 'var(--cp-orange)' : 'var(--cp-white)',
-    color: 'var(--cp-navy)',
-    fontWeight: 800,
-    fontSize: 12,
-    cursor: 'pointer',
-  });
-
-  const adminItem = (c: NovedadCarta): AdminTarjetaNovedad => {
-    const n = novedades.find((x) => x.id === c.id);
-    if (!n) return { acciones: null, borrador: false };
+  const vistaPrevia: VistaPreviaCarta | null = useMemo(() => {
+    if (!e || !publico) return null;
     return {
-      borrador: original[n.id] !== undefined && original[n.id] !== estadoPagina(n),
-      acciones: (
-        <>
-          <button type="button" aria-label={`Subir ${n.titulo}`} onClick={() => moverNovedad(n.id, -1)} style={botonAdmin()}>↑</button>
-          <button type="button" aria-label={`Bajar ${n.titulo}`} onClick={() => moverNovedad(n.id, 1)} style={botonAdmin()}>↓</button>
-          <button type="button" onClick={() => abrirEditar(n)} style={botonAdmin(true)}>Editar</button>
-          <button type="button" onClick={() => toggleActivo(n.id)} style={botonAdmin()}>{n.activo ? 'Desactivar' : 'Activar'}</button>
-        </>
-      ),
+      ...publico,
+      contenido: {
+        destacadas: [],
+        rankingMes: [],
+        decoracion: 'NINGUNO',
+        organizacion: 'SECCIONES',
+        paleta: {},
+        banner: { activo: false },
+        ...(publico.contenido ?? {}),
+        novedades: aCarta(e.items),
+        novedadesEncabezado: e.encabezado,
+      } as ContenidoCarta,
     };
+  }, [e, publico]);
+
+  if (cargando) return <Cargando mensaje="Cargando novedades..." />;
+  if (error || !e) return <EstadoError mensaje={error || 'No se pudieron cargar las novedades'} alReintentar={cargarDatos} />;
+
+  const seleccionar = (clave: string | null) => {
+    setSelRaw(clave);
+    setPop(null);
+  };
+  const cambiarItem = (id: string, parche: Partial<NovedadEd>) =>
+    cambiar((s) => ({ ...s, items: s.items.map((n) => (n.id === id ? { ...n, ...parche } : n)) }));
+
+  const nuevaNovedad = (foto?: string): NovedadEd => ({
+    id: `nueva-${Date.now()}-${secuencia.current++}`,
+    tipo: 'PROMOCION',
+    titulo: 'Nueva novedad',
+    texto: null,
+    tema: null,
+    video_url: null,
+    evento_fecha: null,
+    evento_lugar: null,
+    desde: null,
+    hasta: null,
+    activo: true,
+    tamano: 'MEDIANO',
+    fotos: foto ? [foto] : [],
+  });
+
+  /** Reparte las tarjetas como la página: las destacadas arriba y el resto en el mosaico; se mueve dentro de su grupo. */
+  const grupoDe = (id: string) => {
+    const { hero, resto } = agruparNovedades(aCarta(e.items));
+    return hero.some((n) => n.id === id) ? hero : resto;
+  };
+  const moverNovedad = (id: string, dir: -1 | 1) => {
+    const grupo = grupoDe(id);
+    const vecino = grupo[grupo.findIndex((n) => n.id === id) + dir];
+    if (!vecino) return;
+    cambiar((s) => {
+      const a = s.items.findIndex((n) => n.id === id);
+      const c = s.items.findIndex((n) => n.id === vecino.id);
+      const copia = [...s.items];
+      [copia[a], copia[c]] = [copia[c], copia[a]];
+      return { ...s, items: copia };
+    });
   };
 
-  const textoResumen =
-    `${novedades.length} ${novedades.length === 1 ? 'novedad' : 'novedades'} · ${countByEstado.act} activas` +
-    (countByEstado.prog ? ` · ${countByEstado.prog} programadas` : '') +
-    (countByEstado.venc ? ` · ${countByEstado.venc} vencidas` : '') +
-    (countByEstado.off ? ` · ${countByEstado.off} desactivadas` : '');
+  const bloque: ModoEdicion['bloque'] = (clave, hijo, o) => {
+    const id = clave.split(':')[1];
+    const n = e.items.find((x) => x.id === id);
+    if (!n) return hijo;
+    const grupo = grupoDe(id);
+    const i = grupo.findIndex((x) => x.id === id);
+    return (
+      <BloqueEditable
+        key={clave}
+        clave={clave}
+        etiqueta={n.titulo || 'Novedad'}
+        estilo={o?.estilo}
+        oculto={!n.activo}
+        puedeSubir={i > 0}
+        puedeBajar={i < grupo.length - 1}
+        onSubir={() => moverNovedad(id, -1)}
+        onBajar={() => moverNovedad(id, 1)}
+        puedeSoltar={(desde) => grupo.some((x) => `novedad:${x.id}` === desde)}
+        onSoltar={(desde) =>
+          cambiar((s) => ({ ...s, items: reubicar(s.items, s.items.findIndex((x) => `novedad:${x.id}` === desde), s.items.findIndex((x) => x.id === id)) }))
+        }
+        onOcultar={() => cambiarItem(id, { activo: !n.activo })}
+        onFoto={async (f) => {
+          try {
+            const url = await subirFotoEdicion(f);
+            cambiarItem(id, { fotos: [url, ...n.fotos.slice(1)] });
+          } catch {
+            setMensaje('No se pudo cargar la foto');
+          }
+        }}
+        acciones={
+          <>
+            <BotonBarra onClick={() => cambiarItem(id, { tamano: siguiente(TAMANOS, (n.tamano as (typeof TAMANOS)[number]) || 'MEDIANO') })}>
+              Tamaño: {NOMBRE_TAMANO[n.tamano] ?? 'Mediano'}
+            </BotonBarra>
+            <BotonBarra pulsado={pop === clave} onClick={() => setPop(pop === clave ? null : clave)}>Más opciones</BotonBarra>
+            <BotonBarra
+              onClick={() =>
+                cambiar((s) => {
+                  const k = s.items.findIndex((x) => x.id === id);
+                  const copia: NovedadEd = { ...n, id: `nueva-${Date.now()}-${secuencia.current++}`, titulo: `${n.titulo} (copia)`, activo: false };
+                  return { ...s, items: [...s.items.slice(0, k + 1), copia, ...s.items.slice(k + 1)] };
+                })
+              }
+            >
+              Duplicar
+            </BotonBarra>
+            <BotonBarra peligro onClick={() => setAEliminar(id)}>Eliminar</BotonBarra>
+          </>
+        }
+        popover={pop === clave ? <OpcionesNovedad n={n} alCambiar={(p) => cambiarItem(id, p)} /> : undefined}
+      >
+        {hijo}
+      </BloqueEditable>
+    );
+  };
 
-  const esCelular = dispositivo === 'celular';
+  const ed: ModoEdicion = {
+    bloque,
+    cambiarTexto(clave, valor) {
+      const [tipo, id, campo] = clave.split(':');
+      if (clave.startsWith('enc.')) {
+        const k = clave.slice(4) as keyof Encabezado;
+        if (valor) cambiar((s) => ({ ...s, encabezado: { ...s.encabezado, [k]: valor } }));
+      } else if (tipo === 'novedad' && campo === 'titulo') {
+        if (valor) cambiarItem(id, { titulo: valor });
+      } else if (tipo === 'novedad' && campo === 'texto') {
+        cambiarItem(id, { texto: valor || null });
+      } else if (tipo === 'novedad' && campo === 'tema') {
+        cambiarItem(id, { tema: valor || null });
+      }
+    },
+    agregar: (_clave, etiqueta, estilo) => (
+      <Fantasma
+        key="agregar-novedad"
+        etiqueta={etiqueta}
+        estilo={estilo}
+        onClick={() => {
+          const nueva = nuevaNovedad();
+          cambiar((s) => ({ ...s, items: [...s.items, nueva] }));
+          setSelRaw(`novedad:${nueva.id}`);
+        }}
+      />
+    ),
+    accion: () => {},
+  };
+
+  const publicar = async () => {
+    await b.guardarYa();
+    await api.post('/admin/contenido/novedades/publicar', {});
+    setMensaje('Novedades publicadas en la carta');
+    seleccionar(null);
+    await cargarDatos();
+    setTimeout(() => setMensaje(null), 4000);
+  };
+  const descartar = async () => {
+    await api.post('/admin/contenido/novedades/descartar', {}).catch(() => null);
+    seleccionar(null);
+    await cargarDatos();
+    setMensaje('Borrador descartado: se restauró lo publicado');
+    setTimeout(() => setMensaje(null), 4000);
+  };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Caja resumen en el administrativo */}
-      <div
-        style={{
-          background: 'var(--cp-white)',
-          border: '1px solid var(--cp-line)',
-          borderRadius: 16,
-          boxShadow: '0 6px 18px rgba(11,44,62,0.12)',
-          padding: 24,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 14,
-          alignItems: 'flex-start',
-        }}
-      >
-        <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 20, lineHeight: '26px' }}>
-          Diseñador de Novedades y publicidad
-        </div>
-        <div style={{ fontSize: 14, lineHeight: '21px', color: 'var(--cp-soft)', maxWidth: 640 }}>
-          Se abre en pantalla completa y muestra la página <b>Novedades</b> exactamente como la ve el cliente. Permite personalizar el encabezado de la sección, agregar promociones, banners, fotos, eventos, videos y avisos con conmutador PC y celular fiel a la carta pública.
-        </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
-          {dirty ? (
-            <span style={{ fontSize: 12, fontWeight: 700, borderRadius: 9999, padding: '4px 12px', background: 'var(--cp-gold)', color: 'var(--cp-navy)' }}>
-              Borrador sin publicar
-            </span>
-          ) : (
-            <span style={{ fontSize: 12, fontWeight: 700, borderRadius: 9999, padding: '4px 12px', background: 'var(--cp-navy)', color: 'var(--cp-cream)' }}>
-              Todo publicado
-            </span>
-          )}
-          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--cp-soft)' }}>
-            {textoResumen}
-          </span>
-          {mensaje && <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--cp-rust)' }}>{mensaje}</span>}
-        </div>
-        <button
-          onClick={() => setNsFull(true)}
-          style={{
-            minHeight: 56,
-            padding: '0 28px',
-            border: 0,
-            borderRadius: 12,
-            background: 'var(--cp-orange)',
-            color: 'var(--cp-navy)',
-            fontFamily: 'var(--fuente-titulos)',
-            fontWeight: 800,
-            fontSize: 16,
-            cursor: 'pointer',
-          }}
-        >
-          Abrir el diseñador en pantalla completa
-        </button>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 12 }}>
+      <BarraSuperior
+        titulo="NOVEDADES"
+        celular={celular}
+        onCelular={setCelular}
+        cambios={b.cambios}
+        hayBorrador={hayBorrador}
+        estado={b.estado}
+        puedeDeshacer={b.puedeDeshacer}
+        onDeshacer={b.deshacer}
+        onPublicar={publicar}
+        onDescartar={descartar}
+        mensaje={mensaje}
+        mensajePublicar="La página Novedades de la carta usará este encabezado, estas tarjetas, su orden y lo que ocultaste. Lo que quitaste se elimina."
+      />
+      <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
+        Esta es la página Novedades tal como la ve el cliente. Toca un texto para escribir encima o una tarjeta para moverla, cambiarle la foto o el tamaño. Todo se guarda solo como borrador.
       </div>
-
-      {/* Pantalla completa del diseñador de novedades */}
-      {nsFull && (
-        <div
-          style={{
-            position: 'fixed',
-            left: 0,
-            top: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 90,
-            overflowY: 'auto',
-            background: 'var(--cp-cream)',
-            color: 'var(--cp-navy)',
-            fontSize: 15,
-            lineHeight: '22px',
-          }}
-        >
-          {/* Barra superior de controles */}
-          <div
-            style={{
-              position: 'sticky',
-              top: 0,
-              zIndex: 100,
-              background: 'var(--cp-navy)',
-              color: 'var(--cp-cream)',
-              padding: '10px 16px',
-              display: 'flex',
-              flexWrap: 'wrap',
-              alignItems: 'center',
-              gap: '8px 12px',
-            }}
-          >
-            <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 13, letterSpacing: '0.06em' }}>
-              DISEÑADOR DE NOVEDADES
-            </span>
-
-            {/* Conmutador Modo Vista */}
-            <div style={{ display: 'flex', gap: 4, alignItems: 'center', border: '1.5px solid var(--cp-cream)', borderRadius: 9999, padding: 2 }}>
-              <button
-                type="button"
-                onClick={() => setModoVista('edicion')}
-                style={{
-                  minHeight: 34,
-                  padding: '0 12px',
-                  borderRadius: 9999,
-                  border: 0,
-                  background: modoVista === 'edicion' ? 'var(--cp-orange)' : 'transparent',
-                  color: modoVista === 'edicion' ? 'var(--cp-navy)' : 'var(--cp-cream)',
-                  fontWeight: 700,
-                  fontSize: 12,
-                  cursor: 'pointer',
-                }}
-              >
-                Edición
-              </button>
-              <button
-                type="button"
-                onClick={() => setModoVista('previa')}
-                style={{
-                  minHeight: 34,
-                  padding: '0 12px',
-                  borderRadius: 9999,
-                  border: 0,
-                  background: modoVista === 'previa' ? 'var(--cp-orange)' : 'transparent',
-                  color: modoVista === 'previa' ? 'var(--cp-navy)' : 'var(--cp-cream)',
-                  fontWeight: 700,
-                  fontSize: 12,
-                  cursor: 'pointer',
-                }}
-              >
-                Vista previa carta
-              </button>
-            </div>
-
-            {/* Conmutador Dispositivo PC / Celular */}
-            <div style={{ display: 'flex', gap: 4, alignItems: 'center', border: '1.5px solid var(--cp-cream)', borderRadius: 9999, padding: 2 }}>
-              <button
-                type="button"
-                data-testid="btn-novedades-disp-pc"
-                onClick={() => setDispositivo('pc')}
-                style={{
-                  minHeight: 34,
-                  padding: '0 12px',
-                  borderRadius: 9999,
-                  border: 0,
-                  background: !esCelular ? 'var(--cp-orange)' : 'transparent',
-                  color: !esCelular ? 'var(--cp-navy)' : 'var(--cp-cream)',
-                  fontWeight: 700,
-                  fontSize: 12,
-                  cursor: 'pointer',
-                }}
-              >
-                PC
-              </button>
-              <button
-                type="button"
-                data-testid="btn-novedades-disp-celular"
-                onClick={() => setDispositivo('celular')}
-                style={{
-                  minHeight: 34,
-                  padding: '0 12px',
-                  borderRadius: 9999,
-                  border: 0,
-                  background: esCelular ? 'var(--cp-orange)' : 'transparent',
-                  color: esCelular ? 'var(--cp-navy)' : 'var(--cp-cream)',
-                  fontWeight: 700,
-                  fontSize: 12,
-                  cursor: 'pointer',
-                }}
-              >
-                Celular
-              </button>
-            </div>
-
-            {modoVista === 'edicion' && (
-              <>
-                <button
-                  onClick={() => abrirCrear('PROMOCION')}
-                  style={{
-                    minHeight: 38,
-                    padding: '0 14px',
-                    border: 0,
-                    borderRadius: 10,
-                    background: 'var(--cp-orange)',
-                    color: 'var(--cp-navy)',
-                    fontWeight: 800,
-                    fontSize: 13,
-                    cursor: 'pointer',
-                  }}
-                >
-                  + Nueva novedad
-                </button>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-                  {CHIPS_AGREGAR.map((t, idx) => (
-                    <button
-                      key={`${t.id}-${idx}`}
-                      type="button"
-                      onClick={() => abrirCrear(t.id)}
-                      style={{
-                        minHeight: 32,
-                        padding: '0 10px',
-                        borderRadius: 9999,
-                        border: '1.5px dashed var(--cp-cream)',
-                        background: 'transparent',
-                        color: 'var(--cp-cream)',
-                        fontWeight: 700,
-                        fontSize: 11,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      + {t.n}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  data-testid="btn-editar-encabezado"
-                  onClick={abrirEditorEncabezado}
-                  style={{
-                    minHeight: 38,
-                    padding: '0 14px',
-                    borderRadius: 10,
-                    border: '1.5px solid var(--cp-cream)',
-                    background: 'transparent',
-                    color: 'var(--cp-cream)',
-                    fontWeight: 700,
-                    fontSize: 13,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Editar encabezado
-                </button>
-              </>
-            )}
-
-            <span style={{ flex: 1 }} />
-            {dirty && (
-              <span style={{ fontSize: 12, fontWeight: 700, borderRadius: 9999, padding: '3px 10px', background: 'var(--cp-gold)', color: 'var(--cp-navy)' }}>
-                Borrador sin publicar
-              </span>
-            )}
-            <button
-              onClick={() => setConfirmarPublicar(true)}
-              disabled={!dirty}
-              style={{
-                minHeight: 38,
-                padding: '0 16px',
-                border: 0,
-                borderRadius: 10,
-                background: dirty ? 'var(--cp-orange)' : 'var(--cp-line)',
-                color: 'var(--cp-navy)',
-                fontWeight: 800,
-                opacity: dirty ? 1 : 0.5,
-                cursor: dirty ? 'pointer' : 'default',
-              }}
-            >
-              Publicar cambios
-            </button>
-            <button
-              onClick={() => setConfirmarDescartar(true)}
-              disabled={!dirty}
-              style={{
-                minHeight: 38,
-                padding: '0 16px',
-                border: '1.5px solid var(--cp-cream)',
-                borderRadius: 10,
-                background: 'transparent',
-                color: 'var(--cp-cream)',
-                fontWeight: 700,
-                opacity: dirty ? 1 : 0.5,
-                cursor: dirty ? 'pointer' : 'default',
-              }}
-            >
-              Descartar
-            </button>
-            <button
-              onClick={() => setNsFull(false)}
-              style={{
-                minHeight: 38,
-                padding: '0 16px',
-                border: '1.5px solid var(--cp-cream)',
-                borderRadius: 10,
-                background: 'transparent',
-                color: 'var(--cp-cream)',
-                fontWeight: 700,
-                cursor: 'pointer',
-              }}
-            >
-              Salir
-            </button>
-          </div>
-
-          {/* La misma página Novedades de la carta (componente compartido), con los controles del admin encima de cada tarjeta */}
-          <div style={{ padding: '16px 24px 60px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {modoVista === 'edicion' && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-                <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', color: 'var(--cp-soft)' }}>MOSTRAR:</span>
-                {[
-                  { id: 'todas', n: `Todas (${countByEstado.todas})` },
-                  { id: 'act', n: `Activas (${countByEstado.act})` },
-                  { id: 'prog', n: `Programadas (${countByEstado.prog})` },
-                  { id: 'venc', n: `Vencidas (${countByEstado.venc})` },
-                  { id: 'off', n: `Desactivadas (${countByEstado.off})` },
-                ].map((f) => {
-                  const activo = filtroEstado === f.id;
-                  return (
-                    <button
-                      key={f.id}
-                      onClick={() => setFiltroEstado(f.id)}
-                      style={{
-                        minHeight: 44,
-                        padding: '0 14px',
-                        borderRadius: 9999,
-                        border: '1.5px solid var(--cp-navy)',
-                        background: activo ? 'var(--cp-navy)' : 'transparent',
-                        color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                        fontWeight: 700,
-                        fontSize: 12,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {f.n}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-            <MarcoDispositivo celular={esCelular} etiqueta="Página Novedades como la ve el cliente">
-              <div data-testid={`preview-novedades-${dispositivo}`}>
-                <PaginaNovedades
-                  novedades={listaPagina}
-                  encabezado={encabezado}
-                  onVerCarta={() => {}}
-                  adminItem={modoVista === 'edicion' ? adminItem : undefined}
-                />
-              </div>
-            </MarcoDispositivo>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Editar Novedad */}
-      {editando && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(11,44,62,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div role="dialog" aria-modal="true" aria-label="Editar novedad" style={{ width: 'min(760px, calc(100% - 24px))', maxHeight: 'calc(100vh - 48px)', overflowY: 'auto', background: 'var(--cp-cream)', color: 'var(--cp-navy)', borderRadius: 20, boxShadow: '0 20px 50px rgba(11,44,62,0.4)', padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-              <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 22, lineHeight: '27px' }}>
-                {editando.id === 'nueva' ? 'Nueva novedad' : `Editar: ${editando.titulo}`}
-              </div>
-              <button onClick={() => setEditando(null)} aria-label="Cerrar" style={{ flex: 'none', width: 44, height: 44, borderRadius: 22, border: '1.5px solid var(--cp-navy)', background: 'transparent', color: 'var(--cp-navy)', fontSize: 20, fontWeight: 800, cursor: 'pointer' }}>
-                ×
-              </button>
-            </div>
-
-            {errorEdicionNovedad && (
-              <div style={{ background: '#FDE8E8', color: 'var(--cp-rust)', padding: '10px 14px', borderRadius: 8, fontSize: 13, fontWeight: 700 }}>
-                {errorEdicionNovedad}
-              </div>
-            )}
-
-            {/* Tipo */}
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>Tipo</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {TIPOS_NOVEDAD.map((t) => {
-                  const activo = tipoEdit === t.id;
-                  return (
-                    <button
-                      key={t.id}
-                      onClick={() => setTipoEdit(t.id)}
-                      style={{
-                        minHeight: 44,
-                        padding: '0 12px',
-                        borderRadius: 9999,
-                        border: '1.5px solid var(--cp-navy)',
-                        background: activo ? 'var(--cp-navy)' : 'transparent',
-                        color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                        fontWeight: 700,
-                        fontSize: 12,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {t.n}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Título */}
-            <div>
-              <label htmlFor="n-t" style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>Título</label>
-              <input id="n-t" type="text" value={tituloEdit} onChange={(e) => setTituloEdit(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, borderRadius: 10, border: '1.5px solid var(--cp-line)', background: 'var(--cp-white)', color: 'var(--cp-navy)', padding: '0 10px', fontSize: 14 }} />
-            </div>
-
-            {/* Etiqueta o tema */}
-            <div>
-              <label htmlFor="n-e" style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>Etiqueta o tema (opcional)</label>
-              <input id="n-e" type="text" value={temaEdit} onChange={(e) => setTemaEdit(e.target.value)} placeholder="Ejemplo: Promoción, Menú, Aniversario" style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, borderRadius: 10, border: '1.5px solid var(--cp-line)', background: 'var(--cp-white)', color: 'var(--cp-navy)', padding: '0 10px', fontSize: 14 }} />
-            </div>
-
-            {/* Si es evento */}
-            {tipoEdit === 'EVENTO' && (
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <div style={{ flex: '1 1 140px' }}>
-                  <label htmlFor="n-f" style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>Fecha del evento</label>
-                  <input id="n-f" type="date" value={fechaEventoEdit} onChange={(e) => setFechaEventoEdit(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, borderRadius: 10, border: '1.5px solid var(--cp-line)', background: 'var(--cp-white)', color: 'var(--cp-navy)', padding: '0 10px', fontSize: 14 }} />
-                </div>
-                <div style={{ flex: '2 1 180px' }}>
-                  <label htmlFor="n-lu" style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>Lugar</label>
-                  <input id="n-lu" type="text" value={lugarEventoEdit} onChange={(e) => setLugarEventoEdit(e.target.value)} placeholder="Ejemplo: En el local" style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, borderRadius: 10, border: '1.5px solid var(--cp-line)', background: 'var(--cp-white)', color: 'var(--cp-navy)', padding: '0 10px', fontSize: 14 }} />
-                </div>
-              </div>
-            )}
-
-            {/* Texto */}
-            <div>
-              <label htmlFor="n-x" style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>Texto</label>
-              <textarea id="n-x" rows={3} value={textoEdit} onChange={(e) => setTextoEdit(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', borderRadius: 10, border: '1.5px solid var(--cp-line)', background: 'var(--cp-white)', color: 'var(--cp-navy)', padding: 10, fontSize: 14, fontFamily: 'inherit' }} />
-            </div>
-
-            {/* Video URL */}
-            {tipoEdit === 'VIDEO' && (
-              <div>
-                <label htmlFor="n-l" style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>Enlace del video</label>
-                <input id="n-l" type="text" value={videoUrlEdit} onChange={(e) => setVideoUrlEdit(e.target.value)} placeholder="https://www.tiktok.com/@caprichos" style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, borderRadius: 10, border: '1.5px solid var(--cp-line)', background: 'var(--cp-white)', color: 'var(--cp-navy)', padding: '0 10px', fontSize: 14 }} />
-              </div>
-            )}
-
-            {/* Fotos */}
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                <span style={{ fontWeight: 700, fontSize: 13 }}>Fotos ({fotosEdit.length})</span>
-                <label style={{ position: 'relative', minHeight: 44, padding: '0 12px', boxSizing: 'border-box', borderRadius: 10, background: 'var(--cp-orange)', color: 'var(--cp-navy)', fontWeight: 800, fontSize: 12, display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-                  + Subir foto
-                  <input type="file" accept="image/*" onChange={subirFoto} style={{ position: 'absolute', left: -9999 }} />
-                </label>
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {fotosEdit.map((src, i) => (
-                  <span key={i} style={{ position: 'relative', width: 64, height: 64, display: 'block' }}>
-                    <img src={src} alt="" style={{ width: 64, height: 64, borderRadius: 10, objectFit: 'cover' }} />
-                    <button onClick={() => quitarFotoEdit(i)} aria-label="Quitar foto" style={{ position: 'absolute', right: -6, top: -6, width: 28, height: 28, borderRadius: 14, border: 0, background: 'var(--cp-rust)', color: '#FFFFFF', fontWeight: 800, cursor: 'pointer' }}>×</button>
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Tamaño del cuadro */}
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>Tamaño del cuadro</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'flex-start' }}>
-                <div role="radiogroup" aria-label="Tamaño del cuadro" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, flex: '1 1 260px', minWidth: 0 }}>
-                  {TAMANOS_CUADRO.map((t) => {
-                    const activo = tamanoEdit === t.id;
-                    return (
-                      <button
-                        key={t.id}
-                        role="radio"
-                        aria-checked={activo}
-                        onClick={() => setTamanoEdit(t.id)}
-                        style={{
-                          minHeight: 44,
-                          padding: '0 14px 0 10px',
-                          borderRadius: 9999,
-                          border: '1.5px solid var(--cp-navy)',
-                          background: activo ? 'var(--cp-navy)' : 'transparent',
-                          color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                          fontWeight: 700,
-                          fontSize: 13,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 8,
-                        }}
-                      >
-                        <DibujoTamano cols={t.cols} rows={t.rows} activo={activo} />
-                        {t.n}
-                      </button>
-                    );
-                  })}
-                </div>
-                <VistaTarjeta
-                  novedad={{
-                    id: 'vista',
-                    tipo: tipoEdit,
-                    titulo: tituloEdit.trim() || 'Título de la novedad',
-                    texto: textoEdit.trim() || undefined,
-                    tema: temaEdit.trim() || undefined,
-                    video_url: videoUrlEdit.trim() || undefined,
-                    tamano: tamanoEdit,
-                    orden: 0,
-                    activo: true,
-                    fotos: fotosEdit.map((url, i) => ({ id: `f${i}`, url })),
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Atajos de fecha */}
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>Atajos de fecha</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                <button onClick={() => aplicarAtajoFecha('finde')} style={{ minHeight: 44, padding: '0 12px', borderRadius: 9999, border: '1.5px solid var(--cp-navy)', background: 'transparent', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Solo este fin de semana</button>
-                <button onClick={() => aplicarAtajoFecha('semana')} style={{ minHeight: 44, padding: '0 12px', borderRadius: 9999, border: '1.5px solid var(--cp-navy)', background: 'transparent', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Toda la semana</button>
-                <button onClick={() => aplicarAtajoFecha('mes')} style={{ minHeight: 44, padding: '0 12px', borderRadius: 9999, border: '1.5px solid var(--cp-navy)', background: 'transparent', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Todo el mes</button>
-                <button onClick={() => aplicarAtajoFecha('anio')} style={{ minHeight: 44, padding: '0 12px', borderRadius: 9999, border: '1.5px solid var(--cp-navy)', background: 'transparent', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Hasta fin de año</button>
-              </div>
-            </div>
-
-            {/* Rango de fechas */}
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <div style={{ flex: '1 1 140px' }}>
-                <label htmlFor="n-d" style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>Se muestra desde</label>
-                <input id="n-d" type="date" value={desdeEdit} onChange={(e) => setDesdeEdit(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, borderRadius: 10, border: '1.5px solid var(--cp-line)', background: 'var(--cp-white)', color: 'var(--cp-navy)', padding: '0 10px', fontSize: 14 }} />
-              </div>
-              <div style={{ flex: '1 1 140px' }}>
-                <label htmlFor="n-h" style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>Hasta</label>
-                <input id="n-h" type="date" value={hastaEdit} onChange={(e) => setHastaEdit(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, borderRadius: 10, border: '1.5px solid var(--cp-line)', background: 'var(--cp-white)', color: 'var(--cp-navy)', padding: '0 10px', fontSize: 14 }} />
-              </div>
-            </div>
-
-            {/* Toggle de activo */}
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                onClick={() => setActivoEdit(!activoEdit)}
-                style={{
-                  minHeight: 44,
-                  padding: '0 16px',
-                  borderRadius: 10,
-                  border: '1.5px solid var(--cp-navy)',
-                  background: activoEdit ? 'var(--cp-navy)' : 'transparent',
-                  color: activoEdit ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                  fontWeight: 700,
-                  fontSize: 12,
-                  cursor: 'pointer',
-                }}
-              >
-                {activoEdit ? 'Activa en la carta' : 'Inactiva (oculta)'}
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-              {editando.id !== 'nueva' && (
-                <button
-                  onClick={() => pedirEliminar(editando)}
-                  style={{
-                    minHeight: 52,
-                    padding: '0 18px',
-                    borderRadius: 12,
-                    border: '1.5px solid var(--cp-rust)',
-                    background: 'transparent',
-                    color: 'var(--cp-rust)',
-                    fontWeight: 800,
-                    fontSize: 15,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Eliminar
-                </button>
-              )}
-              {editando.id !== 'nueva' && (
-                <button
-                  onClick={() => {
-                    const n = editando;
-                    setEditando(null);
-                    duplicar(n);
-                  }}
-                  style={{ minHeight: 52, padding: '0 18px', borderRadius: 12, border: '1.5px solid var(--cp-navy)', background: 'transparent', color: 'var(--cp-navy)', fontWeight: 800, fontSize: 15, cursor: 'pointer' }}
-                >
-                  Duplicar
-                </button>
-              )}
-              <button
-                onClick={guardarModalEdicion}
-                style={{
-                  flex: '1 1 160px',
-                  minHeight: 52,
-                  borderRadius: 12,
-                  fontFamily: 'var(--fuente-titulos)',
-                  fontWeight: 800,
-                  fontSize: 15,
-                  border: 0,
-                  background: 'var(--cp-orange)',
-                  color: 'var(--cp-navy)',
-                  cursor: 'pointer',
-                }}
-              >
-                Listo
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Editar Encabezado de Novedades */}
-      {editandoEncabezado && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 125, background: 'rgba(11,44,62,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div role="dialog" aria-modal="true" aria-label="Editar encabezado de Novedades" style={{ width: 'min(580px, calc(100% - 24px))', background: 'var(--cp-white)', color: 'var(--cp-navy)', borderRadius: 20, boxShadow: '0 20px 50px rgba(11,44,62,0.4)', padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 20 }}>
-                Editar encabezado de Novedades
-              </div>
-              <button
-                type="button"
-                onClick={() => setEditandoEncabezado(false)}
-                aria-label="Cerrar"
-                style={{ width: 36, height: 36, borderRadius: 18, border: '1.5px solid var(--cp-line)', background: 'transparent', fontWeight: 800, cursor: 'pointer' }}
-              >
-                ×
-              </button>
-            </div>
-
-            <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
-              Personaliza los tres textos que encabezan la sección Novedades de la carta virtual. Si dejas un campo vacío, se utilizará su valor por defecto.
-            </div>
-
-            {/* Campo Etiqueta */}
-            <div>
-              <label htmlFor="enc-etiqueta" style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>
-                Etiqueta pequeña (máx. 40 letras)
-              </label>
-              <input
-                id="enc-etiqueta"
-                data-testid="input-encabezado-etiqueta"
-                type="text"
-                maxLength={40}
-                value={etiquetaEdit}
-                onChange={(e) => setEtiquetaEdit(e.target.value)}
-                placeholder={ENCABEZADO_DEFAULT.etiqueta}
-                style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, borderRadius: 10, border: '1.5px solid var(--cp-line)', padding: '0 12px', fontSize: 14 }}
-              />
-            </div>
-
-            {/* Campo Título */}
-            <div>
-              <label htmlFor="enc-titulo" style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>
-                Título principal (máx. 100 letras)
-              </label>
-              <input
-                id="enc-titulo"
-                data-testid="input-encabezado-titulo"
-                type="text"
-                maxLength={100}
-                value={tituloEncEdit}
-                onChange={(e) => setTituloEncEdit(e.target.value)}
-                placeholder={ENCABEZADO_DEFAULT.titulo}
-                style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, borderRadius: 10, border: '1.5px solid var(--cp-line)', padding: '0 12px', fontSize: 14 }}
-              />
-            </div>
-
-            {/* Campo Subtítulo */}
-            <div>
-              <label htmlFor="enc-subtitulo" style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>
-                Subtítulo explicativo (máx. 250 letras)
-              </label>
-              <textarea
-                id="enc-subtitulo"
-                data-testid="input-encabezado-subtitulo"
-                rows={3}
-                maxLength={250}
-                value={subtituloEncEdit}
-                onChange={(e) => setSubtituloEncEdit(e.target.value)}
-                placeholder={ENCABEZADO_DEFAULT.subtitulo}
-                style={{ width: '100%', boxSizing: 'border-box', borderRadius: 10, border: '1.5px solid var(--cp-line)', padding: 10, fontSize: 14, fontFamily: 'inherit' }}
-              />
-            </div>
-
-            {/* Botones de acción */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'space-between', marginTop: 8 }}>
-              <button
-                type="button"
-                data-testid="btn-restablecer-encabezado"
-                onClick={() => setConfirmarRestablecerEncabezado(true)}
-                style={{
-                  minHeight: 44,
-                  padding: '0 14px',
-                  borderRadius: 10,
-                  border: '1.5px solid var(--cp-line)',
-                  background: 'transparent',
-                  color: 'var(--cp-rust)',
-                  fontWeight: 700,
-                  fontSize: 13,
-                  cursor: 'pointer',
-                }}
-              >
-                Restablecer por defecto
-              </button>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  type="button"
-                  onClick={() => setEditandoEncabezado(false)}
-                  style={{
-                    minHeight: 44,
-                    padding: '0 16px',
-                    borderRadius: 10,
-                    border: '1.5px solid var(--cp-line)',
-                    background: 'transparent',
-                    fontWeight: 700,
-                    fontSize: 13,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  data-testid="btn-guardar-encabezado"
-                  onClick={() => setConfirmarGuardarEncabezado(true)}
-                  style={{
-                    minHeight: 44,
-                    padding: '0 20px',
-                    borderRadius: 10,
-                    border: 0,
-                    background: 'var(--cp-orange)',
-                    color: 'var(--cp-navy)',
-                    fontFamily: 'var(--fuente-titulos)',
-                    fontWeight: 800,
-                    fontSize: 14,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Guardar borrador
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Confirmar Guardar Encabezado */}
+      <MarcoDispositivo celular={celular} etiqueta="Novedades en edición">
+        <LienzoEdicion ed={ed} sel={sel} setSel={seleccionar}>
+          {vistaPrevia ? <CartaVistaPrevia datos={vistaPrevia} movil={celular} pagina="novedades" /> : <Cargando mensaje="Preparando la página..." />}
+        </LienzoEdicion>
+      </MarcoDispositivo>
       <Confirmar
-        abierto={confirmarGuardarEncabezado}
-        titulo="¿Guardar cambios en el encabezado?"
-        mensaje="Se actualizará el borrador con los nuevos textos. Los clientes los verán al pulsar Publicar cambios."
-        textoConfirmar="Sí, guardar"
-        textoNo="No, seguir editando"
-        cargando={guardandoAccion}
-        alConfirmar={ejecutarGuardarEncabezado}
-        alCancelar={() => setConfirmarGuardarEncabezado(false)}
-      />
-
-      {/* Confirmar Restablecer Encabezado */}
-      <Confirmar
-        abierto={confirmarRestablecerEncabezado}
-        titulo="¿Restablecer encabezado por defecto?"
-        mensaje="Los tres textos volverán a sus valores de fábrica originales."
-        textoConfirmar="Sí, restablecer"
-        textoNo="No, mantener actuales"
-        peligro
-        cargando={guardandoAccion}
-        alConfirmar={ejecutarRestablecerEncabezado}
-        alCancelar={() => setConfirmarRestablecerEncabezado(false)}
-      />
-
-      {/* Confirmar publicar */}
-      <Confirmar
-        abierto={confirmarPublicar}
-        titulo="¿Publicar los cambios de novedades?"
-        mensaje="Los clientes verán las novedades activas y el encabezado actualizado en la carta virtual."
-        textoConfirmar="Sí, publicar"
-        textoNo="No, seguir editando"
-        cargando={guardandoAccion}
-        alConfirmar={ejecutarPublicar}
-        alCancelar={() => setConfirmarPublicar(false)}
-      />
-
-      {/* Confirmar eliminar */}
-      <Confirmar
-        abierto={novedadAEliminar !== null}
+        abierto={aEliminar !== null}
         titulo="¿Eliminar esta novedad?"
-        mensaje="Se quita de la carta y no se puede deshacer."
+        mensaje="Desaparece del borrador y, al publicar, de la carta."
         textoConfirmar="Sí, eliminar"
         textoNo="No, conservarla"
         peligro
-        cargando={guardandoAccion}
-        alConfirmar={ejecutarEliminar}
-        alCancelar={() => setNovedadAEliminar(null)}
-      />
-
-      {/* Confirmar descartar */}
-      <Confirmar
-        abierto={confirmarDescartar}
-        titulo="¿Descartar los cambios sin publicar?"
-        mensaje="Volverán los últimos cambios publicados de novedades y del encabezado."
-        textoConfirmar="Sí, descartar"
-        textoNo="No, mantener cambios"
-        peligro
-        cargando={guardandoAccion}
-        alConfirmar={ejecutarDescartar}
-        alCancelar={() => setConfirmarDescartar(false)}
+        alConfirmar={() => {
+          const id = aEliminar;
+          setAEliminar(null);
+          if (id) {
+            setSelRaw(null);
+            cambiar((s) => ({ ...s, items: s.items.filter((n) => n.id !== id) }));
+          }
+        }}
+        alCancelar={() => setAEliminar(null)}
       />
     </div>
   );
 }
+

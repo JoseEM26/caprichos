@@ -2030,6 +2030,7 @@ export class CatalogoService {
 
     const updated = await this.prisma.grupoOpciones.update({
       where: { id: gId },
+      include: { _count: { select: { productos: true } } },
       data: {
         nombre: nuevoNombre || undefined,
         lista_id: dto.listaId ? this.parsearId(dto.listaId) : undefined,
@@ -2061,6 +2062,7 @@ export class CatalogoService {
       minimo: updated.minimo,
       maximo: updated.maximo,
       activo: updated.activo,
+      productosCount: updated._count.productos,
     };
   }
 

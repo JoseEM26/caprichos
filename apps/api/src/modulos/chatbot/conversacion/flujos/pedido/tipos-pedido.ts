@@ -28,6 +28,9 @@ export type EstadoPedidoFlujo =
   | 'PEDIDO_INGRESAR_TELEFONO'
   | 'PEDIDO_MEDIO_PAGO'
   | 'PEDIDO_MONTO_EFECTIVO'
+  | 'PEDIDO_PAGO_DIV_MEDIO1'
+  | 'PEDIDO_PAGO_DIV_MONTO'
+  | 'PEDIDO_PAGO_DIV_MEDIO2'
   | 'PEDIDO_COMPROBANTE_TIPO'
   | 'PEDIDO_COMPROBANTE_DNI'
   | 'PEDIDO_COMPROBANTE_RUC'
@@ -101,9 +104,13 @@ export interface DatosClienteBot {
   telefono?: string;
 }
 
+export type MedioPagoBot = 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TARJETA' | 'TRANSFERENCIA';
+
 export interface DatosPagoBot {
-  metodo?: 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TARJETA' | 'TRANSFERENCIA';
+  metodo?: MedioPagoBot;
   pagaCon?: number;
+  /** Pago dividido: monto por medio (mismo formato que pago.plan de PedidosService). */
+  plan?: Array<{ medio: MedioPagoBot; monto: number }>;
 }
 
 export interface DatosComprobanteBot {
@@ -118,6 +125,8 @@ export interface DatosComprobanteBot {
  */
 export interface EstadoCarritoPedido {
   estadoInterno: EstadoPedidoFlujo;
+  /** Pago dividido en curso: primer medio y su monto mientras se elige el segundo. */
+  pagoDiv?: { medio1?: MedioPagoBot; monto1?: number };
   modalidad?: 'DELIVERY' | 'RECOGER';
   entrega?: DatosEntregaBot;
   cliente?: DatosClienteBot;

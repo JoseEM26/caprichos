@@ -645,4 +645,104 @@ describe('ContenidoService', () => {
       expect(prisma.parametro.deleteMany).toHaveBeenCalledWith({ where: { clave: BOR } });
     });
   });
+
+  describe('EDITOR EN SITIO: borrador de novedades y momentos', () => {
+    const BORN = 'contenido_novedades_borrador';
+
+    it('guarda el borrador de tarjetas saneado y lo audita', async () => {
+      prisma.parametro.upsert.mockResolvedValue({});
+      const res = await service.guardarNovedadesBorrador(
+        [
+          { id: '5', tipo: 'PROMOCION', titulo: 'Martes', tamano: 'XXL', fotos: ['/a.webp', 7] },
+          { id: '', titulo: 'sin id' },
+          { id: 'nueva-1', titulo: 'Nueva', activo: false },
+        ],
+        mockUsuario as any,
+      );
+      expect(res.items).toHaveLength(2);
+      expect(res.items[0]).toMatchObject({ id: '5', tamano: 'MEDIANO', fotos: ['/a.webp'], activo: true });
+      expect(res.items[1].activo).toBe(false);
+      expect(prisma.parametro.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { clave: BORN } }));
+      expect(auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'GUARDAR_BORRADOR_NOVEDADES' }));
+    });
+
+    it('rechaza un borrador que no es lista', async () => {
+      await expect(service.guardarNovedadesBorrador({}, mockUsuario as any)).rejects.toThrow(BadRequestException);
+    });
+
+    it('publicar aplica el borrador: actualiza, crea, elimina las quitadas, ordena y borra el borrador', async () => {
+      prisma.parametro.findUnique.mockImplementation(async ({ where }: any) =>
+        where.clave === BORN
+          ? { valor: { items: [
+              { id: '2', tipo: 'AVISO', titulo: 'Dos', activo: true, tamano: 'GRANDE', fotos: [] },
+              { id: 'nueva-1', tipo: 'FOTOS', titulo: 'Nueva', activo: true, tamano: 'CHICO', fotos: ['/f.webp'] },
+            ] } }
+          : null,
+      );
+      prisma.novedad.findMany.mockResolvedValue([{ id: BigInt(1) }, { id: BigInt(2) }]);
+      prisma.novedad.findUnique.mockImplementation(async ({ where }: any) => ({ id: where.id, titulo: 'x', tipo: 'AVISO' }));
+      prisma.novedad.update.mockResolvedValue({});
+      prisma.novedad.delete.mockResolvedValue({});
+      prisma.novedad.aggregate.mockResolvedValue({ _max: { orden: 2 } });
+      prisma.novedad.create.mockResolvedValue({ id: BigInt(9), titulo: 'Nueva' });
+      prisma.archivo.findFirst.mockResolvedValue({ id: BigInt(3) });
+      prisma.novedadFoto.upsert.mockResolvedValue({});
+      prisma.parametro.deleteMany.mockResolvedValue({});
+
+      const res = await service.publicarNovedades(mockUsuario as any);
+
+      expect(res.ok).toBe(true);
+      expect(prisma.novedad.delete).toHaveBeenCalledWith({ where: { id: BigInt(1) } });
+      expect(prisma.novedad.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: BigInt(2) }, data: expect.objectContaining({ orden: 1, tamano: 'GRANDE' }) }),
+      );
+      expect(prisma.novedad.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ titulo: 'Nueva', orden: 2, tamano: 'CHICO' }) }),
+      );
+      expect(prisma.parametro.deleteMany).toHaveBeenCalledWith({ where: { clave: BORN } });
+    });
+
+    it('descartar quita también el borrador de tarjetas', async () => {
+      prisma.parametro.deleteMany.mockResolvedValue({});
+      prisma.parametro.findUnique.mockResolvedValue(null);
+      await service.descartarNovedadesEncabezado(mockUsuario as any);
+      expect(prisma.parametro.deleteMany).toHaveBeenCalledWith({ where: { clave: BORN } });
+    });
+
+    it('publicar el diseño aplica el orden de categorías y los momentos del borrador, sin arrastrarlos después', async () => {
+      prisma.versionCarta.findFirst.mockResolvedValue({
+        id: BigInt(7),
+        estado: 'BORRADOR',
+        contenido: {
+          secciones: ['POSTRES', 'FRAPPES'],
+          momentos: {
+            orden: ['4', 'nuevo-1', '3'],
+            items: { '4': { titulo: 'Primero', activo: false } },
+            nuevos: [{ id: 'nuevo-1', titulo: 'Recién', foto: '/archivos/publico/x.webp' }],
+          },
+        },
+      });
+      prisma.versionCarta.updateMany.mockResolvedValue({});
+      prisma.versionCarta.update.mockResolvedValue({ id: BigInt(7), estado: 'PUBLICADA', decoracion: 'NINGUNO' });
+      prisma.categoria.update = jest.fn().mockResolvedValue({});
+      prisma.destacada.aggregate.mockResolvedValue({ _max: { orden: 5 } });
+      prisma.destacada.create.mockResolvedValue({ id: BigInt(11), titulo: 'Recién' });
+      prisma.destacada.findUnique.mockImplementation(async ({ where }: any) => ({ id: where.id }));
+      prisma.destacada.update.mockResolvedValue({});
+      prisma.archivo.findFirst.mockResolvedValue({ id: BigInt(2) });
+      prisma.destacadaFoto.deleteMany.mockResolvedValue({});
+      prisma.destacadaFoto.create.mockResolvedValue({});
+      prisma.parametro.findUnique.mockResolvedValue(null);
+      prisma.parametro.upsert.mockResolvedValue({});
+
+      await service.publicarDiseno(mockUsuario as any);
+
+      expect(prisma.categoria.update).toHaveBeenCalledWith({ where: { nombre: 'POSTRES' }, data: { orden: 1 } });
+      expect(prisma.categoria.update).toHaveBeenCalledWith({ where: { nombre: 'FRAPPES' }, data: { orden: 2 } });
+      const llamadas = prisma.destacada.update.mock.calls.map((c: any) => [c[0].where.id, c[0].data.orden, c[0].data.titulo]);
+      expect(llamadas).toEqual(expect.arrayContaining([[BigInt(4), 1, 'Primero'], [BigInt(11), 2, undefined], [BigInt(3), 3, undefined]]));
+      const ultima = prisma.versionCarta.update.mock.calls.at(-1)[0];
+      expect(ultima.data.contenido.momentos).toBeUndefined();
+    });
+  });
 });

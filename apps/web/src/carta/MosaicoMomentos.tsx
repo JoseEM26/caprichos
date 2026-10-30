@@ -1,5 +1,6 @@
 import { IMAGENES_MARCA_FABRICA } from '../comun/imagenesMarca';
 import { useEsMovil } from './useEsMovil';
+import { TextoEd } from './edicion';
 
 /** Paso de la secuencia de relleno. Con 5 fotos y paso 2, dos vecinas nunca son la misma. */
 const PASO_RELLENO = 2;
@@ -43,6 +44,8 @@ export interface MosaicoMomentosProps {
   columnas?: number;
   /** Encabezado opcional, por ejemplo "Momentos Caprichos". */
   titulo?: string;
+  /** Si el título se puede editar en sitio, su clave. */
+  claveTitulo?: string;
   /** Primera pantalla: carga inmediata de las primeras imágenes. */
   prioritaria?: boolean;
 }
@@ -53,6 +56,7 @@ export function MosaicoMomentos({
   cantidad = CANTIDAD_MOMENTOS_POR_DEFECTO,
   columnas,
   titulo,
+  claveTitulo,
   prioritaria = false,
 }: MosaicoMomentosProps) {
   const movil = useEsMovil();
@@ -68,7 +72,7 @@ export function MosaicoMomentos({
     <section aria-label={titulo || 'Momentos Caprichos'} style={{ width: '100%', boxSizing: 'border-box' }}>
       {titulo && (
         <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: movil ? 17 : 22, marginBottom: 10 }}>
-          {titulo}
+          {claveTitulo ? <TextoEd clave={claveTitulo} valor={titulo} ayuda="Título del mosaico" /> : titulo}
         </div>
       )}
       <div

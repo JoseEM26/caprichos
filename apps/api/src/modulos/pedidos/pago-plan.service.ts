@@ -1,7 +1,8 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
-export const MEDIOS_PLAN = ['EFECTIVO', 'YAPE', 'PLIN', 'TRANSFERENCIA'] as const;
+/** TARJETA (POS al recibir o en caja) no lleva voucher: va en el plan pero no en MEDIOS_DIGITALES_PLAN. */
+export const MEDIOS_PLAN = ['EFECTIVO', 'YAPE', 'PLIN', 'TARJETA', 'TRANSFERENCIA'] as const;
 export const MEDIOS_DIGITALES_PLAN = ['YAPE', 'PLIN', 'TRANSFERENCIA'] as const;
 
 export interface PlanPagoItem {

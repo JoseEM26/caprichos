@@ -1,3 +1,4 @@
+import { ejecutarEnSerie } from '../utilidades/candado-serie.util';
 import { interactivoDesdeContenido } from './interactivo.util';
 import {
   BadRequestException,
@@ -256,6 +257,14 @@ export class WhatsappWebhookService {
    * Procesa un mensaje entrante de un cliente (texto, interactivo/botón o imagen).
    */
   private async procesarMensajeEntrante(msg: any, contacts: any[] = []) {
+    // Un solo mensaje por conversación a la vez: el toque rápido espera al anterior y lee el estado ya guardado.
+    const de = String(msg?.from || msg?.from_user_id || contacts?.[0]?.wa_id || msg?.id || '').replace(/\D/g, '') || String(msg?.from_user_id || msg?.id || 'anon');
+    let redisCliente: any = null;
+    try { redisCliente = this.redis?.obtenerCliente() ?? null; } catch { redisCliente = null; }
+    return ejecutarEnSerie(`wa:${de}`, redisCliente, () => this.procesarMensajeEntranteSerie(msg, contacts));
+  }
+
+  private async procesarMensajeEntranteSerie(msg: any, contacts: any[] = []) {
     const waMessageId = msg.id;
 
     // Contacto y nombre de perfil defensivo (contacts[].profile.name)
