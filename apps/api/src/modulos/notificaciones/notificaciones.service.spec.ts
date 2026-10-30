@@ -11,6 +11,7 @@ describe('NotificacionesService', () => {
 
   beforeEach(() => {
     prisma = {
+      parametro: { findUnique: jest.fn().mockResolvedValue({ valor: 'si' }) },
       rolPermiso: { findMany: jest.fn().mockResolvedValue([]) },
       pedido: {
         findMany: jest
@@ -132,6 +133,20 @@ describe('NotificacionesService', () => {
     expect(notifStock).toBeDefined();
     expect(notifStock?.titulo).toBe('2 insumos con stock bajo');
     expect(notifStock?.ruta).toBe('/admin/compras?tab=pedir');
+  });
+
+  it('con el control de almacén apagado no muestra el aviso de stock bajo', async () => {
+    prisma.parametro.findUnique.mockResolvedValue(null);
+    prisma.insumo.findMany.mockResolvedValue([{ id: 10n, nombre: 'Harina', minimo: 10, stocks: [{ cantidad: 0 }] }]);
+    prisma.pedido.findMany.mockReset().mockResolvedValue([]);
+    prisma.comprobante.count.mockReset().mockResolvedValue(0);
+    prisma.reclamo.findMany.mockReset().mockResolvedValue([]);
+
+    const r = await service.resumen({ partyId: 1n, rol: 'ADMIN', debeCambiar: false });
+
+    expect(r.notificaciones.find((n: any) => n.id === 'stock-bajo')).toBeUndefined();
+    expect(r.conteos.compras ?? 0).toBe(0);
+    expect(prisma.insumo.findMany).not.toHaveBeenCalled();
   });
 
   it('crea un mensaje interno y lo audita', async () => {

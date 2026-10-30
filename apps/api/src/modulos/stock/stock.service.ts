@@ -17,6 +17,7 @@ import { MovimientosQueryDto } from './dto/movimientos-query.dto';
 import { convertirAUnidadAlmacen, insumosDeLinea } from './receta.util';
 import { FECHA_HASTA_REACTIVAR } from '../cocina/cocina.util';
 import { AvisosInternosService } from '../chatbot/avisos-internos/avisos-internos.service';
+import { controlAlmacenActivo } from './control-almacen';
 
 @Injectable()
 export class StockService {
@@ -523,13 +524,7 @@ export class StockService {
 
   /** ¿Está encendido el control de almacén? Parámetro `stock_control_activo` («si»/«no»); sin parámetro, apagado. */
   async controlActivo(db: any = this.prisma): Promise<boolean> {
-    try {
-      const p = await db.parametro?.findUnique?.({ where: { clave: 'stock_control_activo' } });
-      const v = p?.valor;
-      return v === true || String(v ?? '').toLowerCase().trim() === 'si';
-    } catch {
-      return false;
-    }
+    return controlAlmacenActivo(db);
   }
 
   /**
