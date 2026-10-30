@@ -1,6 +1,6 @@
 // Convierte el logo de la marca a bitmap monocromo para TSPL (BITMAP, 1 bit por punto, 0 = negro).
 // Uso (una sola vez, o si cambia el logo): node scripts/generar-logo.cjs
-// Usa sharp solo aqui; el agente lleva el resultado ya convertido en src/tspl/logoBitmap.ts.
+// Usa sharp solo aqui; el agente lleva el resultado ya convertido en packages/compartido/src/etiquetas/logoBitmap.ts.
 const fs = require('fs');
 const path = require('path');
 const raiz = path.join(__dirname, '..', '..', '..');
@@ -43,6 +43,6 @@ sharp(path.join(raiz, 'apps/web/public/logo.webp'))
       `export const LOGO_BASE64_90 = '${rotar(true).toString('base64')}';\n` +
       `/** Mismo logo girado 90 grados en sentido antihorario (giro 270). */\n` +
       `export const LOGO_BASE64_270 = '${rotar(false).toString('base64')}';\n`;
-    fs.writeFileSync(path.join(__dirname, '..', 'src/tspl/logoBitmap.ts'), ts);
+    fs.writeFileSync(path.join(__dirname, '..', '..', '..', 'packages/compartido/src/etiquetas/logoBitmap.ts'), ts);
     console.log('logoBitmap.ts escrito', out.length, 'bytes');
   });

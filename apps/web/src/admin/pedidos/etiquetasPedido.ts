@@ -1,3 +1,4 @@
+import type { TicketPagoDatos } from '@caprichos/compartido';
 import { Pedido, LineaPedido } from './pedidosApi';
 import { canalLabel, modLabel } from './PedidosAdminView';
 
@@ -294,5 +295,34 @@ export function armarEtiquetas(pedido: Pedido): ResumenEtiquetas {
     totalProductos: cantidadProductos,
     esPedidoNuevo,
     notaEstado,
+  };
+}
+
+/**
+ * Datos del ticket de pago para la vista previa (la misma maqueta que imprime la ticketera).
+ * Antes de cobrar no hay cobro registrado: el pago sale del medio elegido o del plan de pago del pedido.
+ */
+export function armarTicketPago(pedido: Pedido): TicketPagoDatos {
+  const num = (v: unknown) => Math.round(Number(v ?? 0) * 100) / 100;
+  const total = num(pedido.total);
+  const plan = (pedido.planPago || []).map((p) => ({ medio: String(p.medio), monto: num(p.monto) }));
+  return {
+    tipo: 'TICKET_PAGO',
+    local: { nombre: 'Caprichos' },
+    codigo: pedido.codigo,
+    fecha: formatearFecha(pedido.creado_en),
+    hora: formatearHora(pedido.creado_en),
+    who: pedido.cliente_nombre || '',
+    modalidad: pedido.modalidad || '',
+    lineas: (pedido.lineas || []).map((l) => ({
+      cantidad: l.cantidad,
+      nombre: l.nombre,
+      tamano: l.tamano || null,
+      subtotal: num(l.subtotal ?? Number(l.precio_unit) * l.cantidad),
+    })),
+    total,
+    pagos: !plan.length && pedido.pago_metodo ? [{ medio: String(pedido.pago_metodo), monto: total }] : [],
+    plan,
+    comprobante: null,
   };
 }

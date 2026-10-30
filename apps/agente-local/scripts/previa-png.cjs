@@ -55,9 +55,9 @@ async function render(script, escala = 2) {
       const txt = m[7];
       const w = Math.max(1, txt.length * cw), h = ch;
       const fs_ = Math.min(cw / 0.6, ch * 0.95);
-      const xs = [...txt].map((_, n) => n * cw).join(' ');
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="#fff"/>` +
-        `<text x="${xs}" y="${h * 0.78}" font-family="DejaVu Sans Mono, monospace" font-weight="bold" font-size="${fs_}">${esc(txt)}</text></svg>`;
+      // un <text> por caracter: asi cada uno cae en su celda de la fuente (librsvg ignora la lista x de un solo <text>)
+      const letras = [...txt].map((c, n) => `<text x="${n * cw}" y="${h * 0.78}" font-family="DejaVu Sans Mono, monospace" font-weight="bold" font-size="${fs_}">${esc(c)}</text>`).join('');
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="#fff"/>${letras}</svg>`;
       const t = await sharp(Buffer.from(svg)).greyscale().raw().toBuffer();
       for (let j = 0; j < h * ym; j++) for (let k = 0; k < w * xm; k++) if (t[((j / ym) | 0) * w + ((k / xm) | 0)] < 140) {
         const a = k, b = j; // coordenadas locales del texto sin girar
@@ -88,10 +88,12 @@ const L = {
   const giro = Number(process.argv[4]) === 270 ? 270 : 90;
   const largos = process.argv[5] === 'largos';
   fs.mkdirSync(salida, { recursive: true });
+  // DATOS_JSON=<archivo> {general, area, bebida}: usa esos datos (p. ej. los del panel) en vez de las muestras
+  const D = process.env.DATOS_JSON ? JSON.parse(fs.readFileSync(process.env.DATOS_JSON, 'utf8')) : null;
   for (const [tipo, datos, nombre] of [
-    ['ETIQUETA_GENERAL', largos ? L.general : muestras.muestraEtiquetaGeneral, 'general'],
-    ['ETIQUETA_AREA', largos ? L.area : muestras.muestraEtiquetaArea, 'area'],
-    ['ETIQUETA_BEBIDA', largos ? L.bebida : muestras.muestraEtiquetaBebida, 'bebida'],
+    ['ETIQUETA_GENERAL', D ? D.general : largos ? L.general : muestras.muestraEtiquetaGeneral, 'general'],
+    ['ETIQUETA_AREA', D ? D.area : largos ? L.area : muestras.muestraEtiquetaArea, 'area'],
+    ['ETIQUETA_BEBIDA', D ? D.bebida : largos ? L.bebida : muestras.muestraEtiquetaBebida, 'bebida'],
   ]) {
     const tspl = generarTsplTrabajo(tipo, datos, false, { orientacion, giro });
     const r = await render(tspl, 2);

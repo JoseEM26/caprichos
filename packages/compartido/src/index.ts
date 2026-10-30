@@ -38,3 +38,19 @@ export {
   quitarVerticeDe,
 } from './utilidades/geometria-zonas.js';
 export type { Punto, ResumenAjuste, ResultadoAjuste, SolapeZonas } from './utilidades/geometria-zonas.js';
+export {
+  FUENTES_TSPL,
+  MM_A_DOTS,
+  MEDIDAS_ROLLO_MM,
+  medirAnchoTexto,
+  truncar,
+  ajustarLineas,
+  maquetarGeneral,
+  maquetarArea,
+  maquetarBebida,
+  maquetarEtiqueta,
+} from './etiquetas/maquetaEtiquetas.js';
+export type { FuenteTspl, Primitiva, Maqueta, FormatoMaqueta } from './etiquetas/maquetaEtiquetas.js';
+export { lineasTicketPago } from './etiquetas/ticketPago.js';
+export type { LineaTicket } from './etiquetas/ticketPago.js';
+export { LOGO_BASE64, LOGO_BASE64_90, LOGO_BASE64_270, LOGO_LADO } from './etiquetas/logoBitmap.js';

@@ -252,10 +252,12 @@ describe('EtiquetasPedido (componente React)', () => {
       ),
     ).toBeInTheDocument();
 
-    // 3. Nombre en grande (protagonista)
-    const protagonistas = screen.getAllByTestId('nombre-protagonista');
-    expect(protagonistas.length).toBeGreaterThan(0);
-    expect(protagonistas[0]).toHaveTextContent('JOSE ESPINOZA');
+    // 3. Vista previa = las primitivas de la maqueta compartida, dibujadas en SVG (con el nombre en grande y el logo)
+    const svgs = screen.getAllByRole('img', { name: /Vista previa de la etiqueta/ });
+    expect(svgs.length).toBeGreaterThan(0);
+    expect(svgs[0]).toHaveAttribute('data-maqueta', '508x813');
+    expect(svgs[0]).toHaveTextContent('JOSE ESPINOZA');
+    expect(svgs[0].querySelector('path[data-logo]')).not.toBeNull();
 
     // 4. "Sale en" correcto para Caja, Barra y Cocina
     expect(screen.getByText(/Sale en: Etiquetera de caja/i)).toBeInTheDocument();
