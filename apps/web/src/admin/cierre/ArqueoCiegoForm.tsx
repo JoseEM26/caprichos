@@ -117,7 +117,7 @@ export function ArqueoCiegoForm({ alCerrarCajaExitoso }: ArqueoCiegoFormProps) {
         } else if (err.codigo === 'CODIGO_INVALIDO' || err.codigo === 'PIN_INVALIDO') {
           setErrorArqueo('Código de supervisor inválido. Pídelo a la supervisora.');
         } else if (err.codigo === 'CODIGO_BLOQUEADO' || err.codigo === 'PIN_BLOQUEADO') {
-          setErrorArqueo('Demasiados intentos fallidos. Bloqueado temporalmente por 5 minutos.');
+          setErrorArqueo(err.message || 'Demasiados intentos con el código del supervisor. Espera 1 min o pide al administrador que lo desbloquee.');
         } else if (err.codigo === 'SUPERVISOR_SIN_CONFIGURAR') {
           setErrorArqueo('El local aún no tiene configurado el código de supervisor. El administrador debe generarlo desde su pantalla.');
         } else {

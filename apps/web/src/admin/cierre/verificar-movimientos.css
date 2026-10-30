@@ -43,8 +43,12 @@
 .vm-ing { color: var(--cp-green, #2F7A45); }
 .vm-egr { color: var(--cp-rust, #B2500F); }
 
+/* El shell del celular (hasta 699 px) se dibuja con zoom 0.82: el modal compensa para llenar la pantalla */
+@media (max-width: 699px) {
+  .vm-modal, .vm-modal.vm-ancho { width: calc(100vw / 0.82); height: calc(100dvh / 0.82); max-height: calc(100dvh / 0.82); border-radius: 0; top: 0; left: 0; transform: none; }
+}
+
 @media (max-width: 600px) {
-  .vm-modal, .vm-modal.vm-ancho { width: 100vw; height: 100dvh; max-height: 100dvh; border-radius: 0; top: 0; left: 0; transform: none; }
   .vm-enc, .vm-cuerpo, .vm-pie { padding-left: 14px; padding-right: 14px; }
   .vm-resumen { grid-template-columns: 1fr 1fr; }
   .vm-fila, .vm-fila-3, .vm-fila-4 { display: flex; flex-wrap: wrap; gap: 2px 8px; }

@@ -70,6 +70,7 @@ describe('SupervisorCodigoService & TOTP Utils', () => {
     let redisMock: any;
     let auditoriaMock: any;
     let almacenamientoRedis: Map<string, string>;
+    let expiraEn: Map<string, number>;
 
     const secretoFijo20Bytes = Buffer.from('12345678901234567890', 'ascii');
     const claveDerivada = derivarClaveCifrado();
@@ -83,16 +84,24 @@ describe('SupervisorCodigoService & TOTP Utils', () => {
 
     beforeEach(() => {
       almacenamientoRedis = new Map();
+      expiraEn = new Map();
 
       redisMock = {
-        get: jest.fn(async (key: string) => almacenamientoRedis.get(key) || null),
+        get: jest.fn(async (key: string) => {
+          const vence = expiraEn.get(key);
+          if (vence !== undefined && Date.now() >= vence) almacenamientoRedis.delete(key);
+          return almacenamientoRedis.get(key) || null;
+        }),
         set: jest.fn(async (key: string, val: string, ...args: any[]) => {
-          if (args.includes('NX') && almacenamientoRedis.has(key)) {
+          if (args.includes('NX') && (await redisMock.get(key)) !== null) {
             return null; // SET NX falla si la clave ya existe
           }
           almacenamientoRedis.set(key, val);
+          if (args[0] === 'EX') expiraEn.set(key, Date.now() + args[1] * 1000);
           return 'OK';
         }),
+        ttl: jest.fn(async () => 40),
+        scan: jest.fn(async () => ['0', [...almacenamientoRedis.keys()].filter((k) => k.startsWith('pin:supervisor:intentos:'))]),
         del: jest.fn(async (key: string) => {
           almacenamientoRedis.delete(key);
           return 1;
@@ -110,6 +119,7 @@ describe('SupervisorCodigoService & TOTP Utils', () => {
           findUnique: jest.fn(),
           upsert: jest.fn(),
         },
+        person: { findUnique: jest.fn().mockResolvedValue(null) },
         userAccount: {
           findFirst: jest.fn().mockResolvedValue({ party_id: 1n, id: 10n }),
         },
@@ -244,9 +254,9 @@ describe('SupervisorCodigoService & TOTP Utils', () => {
       // Primer uso: éxito
       await service.verificarYConsumirCodigo(codigoValido, 2n, 'caja/anular_cobro');
 
-      // Segundo uso: rechazado por anti-repetición
+      // Otro operador con el mismo código: rechazado por anti-repetición
       await expect(
-        service.verificarYConsumirCodigo(codigoValido, 2n, 'caja/anular_cobro'),
+        service.verificarYConsumirCodigo(codigoValido, 3n, 'caja/anular_cobro'),
       ).rejects.toMatchObject({
         status: HttpStatus.FORBIDDEN,
         response: { codigo: 'CODIGO_INVALIDO' },
@@ -279,6 +289,77 @@ describe('SupervisorCodigoService & TOTP Utils', () => {
       ).rejects.toMatchObject({
         status: 403,
         response: { codigo: 'CODIGO_BLOQUEADO' },
+      });
+    });
+
+    describe('autorización temporal del operador', () => {
+      const codigoDeAhora = () => generarTotp(secretoFijo20Bytes, Math.floor(Date.now() / 1000));
+
+      beforeEach(() => prismaMock.supervisorSecreto.findUnique.mockResolvedValue(mockDbRow));
+
+      it('el mismo código dos veces del mismo operador: la 2.ª pasa y no suma fallo', async () => {
+        const c = codigoDeAhora();
+        await service.verificarYConsumirCodigo(c, 2n, 'pedidos/anular');
+        await service.verificarYConsumirCodigo(c, 2n, 'pedidos/anular');
+        await service.verificarYConsumirCodigo(undefined, 2n, 'cierre');
+        expect(almacenamientoRedis.get('pin:supervisor:intentos:2')).toBeUndefined();
+        expect(auditoriaMock.registrar.mock.calls.filter(([a]: any) => a.accion === 'AUTORIZACION_SUPERVISOR')).toHaveLength(3);
+      });
+
+      it('acepta ventana -1 y +1, rechaza ±2 y audita el desfase', async () => {
+        const paso = Math.floor(Date.now() / 1000 / 30);
+        await service.verificarYConsumirCodigo(generarTotp(secretoFijo20Bytes, (paso + 1) * 30), 4n, 'cierre');
+        expect(auditoriaMock.registrar).toHaveBeenCalledWith(expect.objectContaining({ motivo: expect.stringContaining('+1 paso') }));
+        await service.verificarYConsumirCodigo(generarTotp(secretoFijo20Bytes, (paso - 1) * 30), 5n, 'cierre');
+        await expect(
+          service.verificarYConsumirCodigo(generarTotp(secretoFijo20Bytes, (paso + 2) * 30), 6n, 'cierre'),
+        ).rejects.toMatchObject({ response: { codigo: 'CODIGO_INVALIDO', mensaje: expect.stringContaining('incorrecto') } });
+      });
+
+      it('normaliza espacios, guiones y dígitos de ancho completo', async () => {
+        const c = codigoDeAhora();
+        const ancho = c.replace(/\d/g, (d) => String.fromCharCode(0xff10 + Number(d)));
+        await service.verificarYConsumirCodigo(` ${c.slice(0, 3)} - ${c.slice(3)} `, 7n, 'cierre');
+        await service.verificarYConsumirCodigo(ancho, 8n, 'cierre').catch((e) => {
+          // mismo código de otro operador: debe ser "ya usado", no "incorrecto"
+          expect(e.response.mensaje).toContain('ya fue usado');
+        });
+      });
+
+      it('la autorización de otro operador no sirve', async () => {
+        await service.verificarYConsumirCodigo(codigoDeAhora(), 2n, 'cierre');
+        await expect(service.verificarYConsumirCodigo(undefined, 3n, 'cierre')).rejects.toMatchObject({
+          response: { codigo: 'CODIGO_INVALIDO' },
+        });
+      });
+
+      it('vence a los 5 minutos', async () => {
+        const t0 = Date.now();
+        await service.verificarYConsumirCodigo(codigoDeAhora(), 2n, 'cierre');
+        const spy = jest.spyOn(Date, 'now').mockReturnValue(t0 + 5 * 60 * 1000 + 1000);
+        await expect(service.verificarYConsumirCodigo(undefined, 2n, 'cierre')).rejects.toMatchObject({
+          response: { codigo: 'CODIGO_INVALIDO' },
+        });
+        spy.mockRestore();
+      });
+
+      it('3 códigos incorrectos bloquean con el tiempo restante y el ADMIN desbloquea', async () => {
+        for (let i = 0; i < 3; i++) {
+          await expect(service.verificarYConsumirCodigo('999999', 2n, 'cierre')).rejects.toMatchObject({ status: 403 });
+        }
+        await expect(service.verificarYConsumirCodigo('999999', 2n, 'cierre')).rejects.toMatchObject({
+          response: {
+            codigo: 'CODIGO_BLOQUEADO',
+            segundosRestantes: 40,
+            mensaje: expect.stringContaining('Espera 1 min'),
+          },
+        });
+        expect(await service.listarBloqueados()).toEqual([
+          { partyId: '2', nombre: 'Usuario 2', segundosRestantes: 40 },
+        ]);
+        await service.desbloquearOperador('2', 1n, '127.0.0.1');
+        expect(auditoriaMock.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'CODIGO_DESBLOQUEADO' }));
+        await service.verificarYConsumirCodigo(codigoDeAhora(), 2n, 'cierre');
       });
     });
   });

@@ -7,9 +7,30 @@ import { Icono } from '../../comun/Icono';
 interface CodigoRespuesta {
   codigo: string;
   segundosRestantes: number;
+  bloqueados?: Bloqueado[];
+}
+
+interface Bloqueado {
+  partyId: string;
+  nombre: string;
+  segundosRestantes: number;
 }
 
 export function CodigoSupervisorView() {
+  const [bloqueados, setBloqueados] = useState<Bloqueado[]>([]);
+  const [aDesbloquear, setADesbloquear] = useState<Bloqueado | null>(null);
+  const handleDesbloquear = async () => {
+    if (!aDesbloquear) return;
+    try {
+      await api.post('/admin/supervisor/desbloquear', { operadorPartyId: aDesbloquear.partyId });
+      setADesbloquear(null);
+      await cargarCodigo();
+    } catch (err: any) {
+      setError(err?.message || 'No se pudo desbloquear');
+      setADesbloquear(null);
+    }
+  };
+
   const [codigo, setCodigo] = useState<string | null>(null);
   const [segundosRestantes, setSegundosRestantes] = useState<number>(30);
   const [sinConfigurar, setSinConfigurar] = useState<boolean>(false);
@@ -30,6 +51,7 @@ export function CodigoSupervisorView() {
       setError(null);
       const res = await api.get<CodigoRespuesta>('/admin/supervisor/codigo');
       setCodigo(res.codigo);
+      setBloqueados(res.bloqueados ?? []);
       setSegundosRestantes(Math.max(1, res.segundosRestantes));
       setSinConfigurar(false);
     } catch (err: any) {
@@ -367,6 +389,28 @@ export function CodigoSupervisorView() {
           </div>
         </div>
       )}
+
+      {bloqueados.length > 0 && (
+        <div data-testid="panel-bloqueados" style={{ marginTop: 24 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 800, color: 'var(--cp-navy, #1B2541)' }}>Usuarios con el código bloqueado</h2>
+          {bloqueados.map((b) => (
+            <div key={b.partyId} style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between', padding: '8px 0' }}>
+              <span>{b.nombre} ({b.segundosRestantes} s)</span>
+              <Boton variante="secundario" onClick={() => setADesbloquear(b)}>Desbloquear</Boton>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Confirmar
+        abierto={!!aDesbloquear}
+        titulo="¿Desbloquear el código del supervisor?"
+        mensaje={`Se borrarán los intentos fallidos de ${aDesbloquear?.nombre ?? ''}. Queda registrado en auditoría.`}
+        textoSi="Sí, desbloquear"
+        textoNo="No, cancelar"
+        alConfirmar={handleDesbloquear}
+        alCancelar={() => setADesbloquear(null)}
+      />
 
       {/* Modal Confirmar: Generar secreto */}
       <Confirmar

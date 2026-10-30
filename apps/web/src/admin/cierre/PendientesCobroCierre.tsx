@@ -104,21 +104,21 @@ export function AvisoBloqueoCierre({
 }) {
   const r = resumenPendientes(pedidos);
   return (
-    <div className="pc-avisos" aria-label="Pedidos que bloquean el cierre">
+    <div className="pdc-avisos" aria-label="Pedidos que bloquean el cierre">
       <button
         type="button"
-        className="pc-boton pc-boton-oscuro"
+        className="pdc-boton pdc-boton-oscuro"
         onClick={() => alVerGrupo(r.cobrar.n > 0 ? 'cobrar' : 'coordinados')}
       >
         Ver {r.total.n} pedidos sin resolver
       </button>
       {r.cobrar.n > 0 && (
-        <button type="button" className="pc-boton pc-boton-secundario" onClick={() => alVerGrupo('cobrar')}>
+        <button type="button" className="pdc-boton pdc-boton-secundario" onClick={() => alVerGrupo('cobrar')}>
           Por cobrar: {r.cobrar.n}
         </button>
       )}
       {r.coordinados.n > 0 && (
-        <button type="button" className="pc-boton pc-boton-secundario" onClick={() => alVerGrupo('coordinados')}>
+        <button type="button" className="pdc-boton pdc-boton-secundario" onClick={() => alVerGrupo('coordinados')}>
           Coordinados por confirmar: {r.coordinados.n}
         </button>
       )}
@@ -204,7 +204,7 @@ export function PendientesCobroCierre({
         if (err.codigo === 'CODIGO_INVALIDO' || err.codigo === 'PIN_INVALIDO') {
           setError('Código del supervisor inválido. Pídelo nuevamente a la supervisora.');
         } else if (err.codigo === 'CODIGO_BLOQUEADO' || err.codigo === 'PIN_BLOQUEADO') {
-          setError(err.message || 'Demasiados intentos fallidos de código de supervisor. Espera 5 minutos.');
+          setError(err.message || 'Demasiados intentos con el código del supervisor. Espera 1 min o pide al administrador que lo desbloquee.');
         } else if (err.codigo === 'SUPERVISOR_SIN_CONFIGURAR') {
           setError('El local aún no tiene configurado el código de supervisor. El administrador debe generarlo desde su pantalla.');
         } else {
@@ -248,7 +248,7 @@ export function PendientesCobroCierre({
 
   // Función (no componente): así el input de búsqueda no se desmonta al escribir
   const envolver = (children: ReactNode) => (
-    <section id="pendientes-cierre" ref={seccionRef} tabIndex={-1} className="pc-panel pc-foco" aria-label="Pedidos pendientes del cierre">
+    <section id="pendientes-cierre" ref={seccionRef} tabIndex={-1} className="pdc-panel pdc-foco" aria-label="Pedidos pendientes del cierre">
       {children}
       {pedidoCobrar && (
         <ModalCobrar
@@ -281,7 +281,7 @@ export function PendientesCobroCierre({
   if (!mostrarLista) {
     return envolver(
       <>
-        <div className="pc-titulo">Pedidos sin cobrar: impiden cerrar la caja</div>
+        <div className="pdc-titulo">Pedidos sin cobrar: impiden cerrar la caja</div>
         <div style={{ fontSize: 13 }}>
           Ingresa el código del supervisor para ver los pedidos sin cobrar de cualquier día.
         </div>
@@ -301,7 +301,7 @@ export function PendientesCobroCierre({
           </div>
           <button
             type="button"
-            className="pc-boton pc-boton-oscuro"
+            className="pdc-boton pdc-boton-oscuro"
             onClick={verConCodigo}
             disabled={cargando}
             style={{ marginTop: 24 }}
@@ -328,29 +328,29 @@ export function PendientesCobroCierre({
   if (pendientes.length === 0) {
     return envolver(
       <>
-        <div className="pc-vacio" role="status">Todo al día: no hay pedidos pendientes.</div>
+        <div className="pdc-vacio" role="status">Todo al día: no hay pedidos pendientes.</div>
       </>
     );
   }
 
   return envolver(
     <>
-      <div className="pc-titulo">Pedidos sin cobrar: impiden cerrar la caja</div>
+      <div className="pdc-titulo">Pedidos sin cobrar: impiden cerrar la caja</div>
 
-      <div className="pc-resumen">
-        <div className="pc-tarjeta">
+      <div className="pdc-resumen">
+        <div className="pdc-tarjeta">
           <span>Por cobrar: <b>{resumen.cobrar.n}</b></span>
           <span>{soles(resumen.cobrar.monto)}</span>
         </div>
-        <div className="pc-tarjeta">
+        <div className="pdc-tarjeta">
           <span>En cocina/cola: <b>{resumen.cola.n}</b></span>
           <span>Pedidos sin entregar</span>
         </div>
-        <div className="pc-tarjeta">
+        <div className="pdc-tarjeta">
           <span>Coordinados sin liquidar: <b>{resumen.coordinados.n}</b></span>
           <span>{soles(resumen.coordinados.monto)}</span>
         </div>
-        <div className="pc-tarjeta pc-tarjeta-total">
+        <div className="pdc-tarjeta pdc-tarjeta-total">
           <span>Total que bloquea el cierre: <b>{resumen.total.n}</b></span>
           <span>{soles(resumen.total.monto)}</span>
         </div>
@@ -362,8 +362,8 @@ export function PendientesCobroCierre({
         </div>
       )}
 
-      <div className="pc-barra">
-        <div className="pc-buscador">
+      <div className="pdc-barra">
+        <div className="pdc-buscador">
           <input
             type="search"
             aria-label="Buscar pedido por código o nombre del cliente"
@@ -372,7 +372,7 @@ export function PendientesCobroCierre({
             onChange={(e) => setTexto(e.target.value)}
           />
         </div>
-        <div className="pc-chips" role="group" aria-label="Filtrar pedidos">
+        <div className="pdc-chips" role="group" aria-label="Filtrar pedidos">
           {(
             [
               ['todos', 'Todos', pendientes.length],
@@ -385,7 +385,7 @@ export function PendientesCobroCierre({
             <button
               key={valor}
               type="button"
-              className="pc-chip"
+              className="pdc-chip"
               aria-pressed={chip === valor}
               onClick={() => setChip(valor)}
             >
@@ -395,20 +395,20 @@ export function PendientesCobroCierre({
         </div>
       </div>
 
-      <div className="pc-lista">
-        {grupos.length === 0 && <div className="pc-vacio">Ningún pedido coincide con el filtro o la búsqueda.</div>}
+      <div className="pdc-lista">
+        {grupos.length === 0 && <div className="pdc-vacio">Ningún pedido coincide con el filtro o la búsqueda.</div>}
         {grupos.map((g) => {
           const abierto = estaAbierto(g.clave);
           const visiblesGrupo = g.items.slice(0, visibles[g.clave]);
           const restantes = g.items.length - visiblesGrupo.length;
           return (
-            <div className="pc-grupo" key={g.clave}>
+            <div className="pdc-grupo" key={g.clave}>
               <button
                 type="button"
-                id={`pc-grupo-${g.clave}`}
-                className="pc-grupo-cab"
+                id={`pdc-grupo-${g.clave}`}
+                className="pdc-grupo-cab"
                 aria-expanded={abierto}
-                aria-controls={`pc-panel-${g.clave}`}
+                aria-controls={`pdc-panel-${g.clave}`}
                 onClick={() => setAbiertos((a) => ({ ...a, [g.clave]: !abierto }))}
               >
                 <span>
@@ -417,39 +417,30 @@ export function PendientesCobroCierre({
                 <span aria-hidden="true">{abierto ? '▾' : '▸'}</span>
               </button>
               {abierto && (
-                <div id={`pc-panel-${g.clave}`} role="region" aria-label={TITULO_GRUPO[g.clave]}>
-                  <div className="pc-cabecera" aria-hidden="true">
-                    <span>Código</span>
-                    <span>Cliente</span>
-                    <span>Modalidad</span>
-                    <span>Estado</span>
-                    <span>Hora</span>
-                    <span className="pc-total">Total</span>
-                    <span className="pc-acciones">Acciones</span>
-                  </div>
+                <div id={`pdc-panel-${g.clave}`} role="region" aria-label={TITULO_GRUPO[g.clave]}>
                   {visiblesGrupo.map((p) => {
                     const antiguo = diaLima(p.fecha) < hoy;
                     const sinNombre = !p.clienteNombre;
                     return (
-                      <div className="pc-fila" key={p.id}>
-                        <span className="pc-codigo">{p.codigo}</span>
-                        <span className={sinNombre ? 'pc-cliente pc-sin-nombre' : 'pc-cliente'}>
+                      <div className="pdc-fila" key={p.id}>
+                        <span className="pdc-codigo">{p.codigo}</span>
+                        <span className={sinNombre ? 'pdc-cliente pdc-sin-nombre' : 'pdc-cliente'}>
                           {p.clienteNombre || 'Sin nombre'}
                         </span>
-                        <span className="pc-meta">
+                        <span className="pdc-meta">
                           <span>{p.modalidad}</span>
                           <span>{ETIQUETA_ESTADO[p.estado] ?? p.estado}</span>
-                          <span className={antiguo ? 'pc-antiguo' : undefined}>
+                          <span className={antiguo ? 'pdc-antiguo' : undefined}>
                             {fechaCorta(p.fecha)}
                             {antiguo ? ' · día anterior' : ''}
                           </span>
                         </span>
-                        <span className="pc-total">{soles(Number(p.total || 0))}</span>
-                        <span className="pc-acciones">
-                          <button type="button" className="pc-boton pc-boton-primario" onClick={() => cobrarAhora(p)}>
+                        <span className="pdc-total">{soles(Number(p.total || 0))}</span>
+                        <span className="pdc-acciones">
+                          <button type="button" className="pdc-boton pdc-boton-primario" onClick={() => cobrarAhora(p)}>
                             Cobrar ahora
                           </button>
-                          <button type="button" className="pc-boton pc-boton-peligro" onClick={() => abrirAnular(p)}>
+                          <button type="button" className="pdc-boton pdc-boton-peligro" onClick={() => abrirAnular(p)}>
                             Anular con motivo
                           </button>
                         </span>
@@ -459,7 +450,7 @@ export function PendientesCobroCierre({
                   {restantes > 0 && (
                     <button
                       type="button"
-                      className="pc-ver-mas"
+                      className="pdc-ver-mas"
                       onClick={() => setVisibles((v) => ({ ...v, [g.clave]: v[g.clave] + PAGINA }))}
                     >
                       Ver más ({restantes} restantes)

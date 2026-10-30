@@ -1,6 +1,6 @@
 /* Panel de pedidos pendientes del cierre y diálogo «Anular pedido» (ModalAnular). */
 
-.pc-panel {
+.pdc-panel {
   border: 1.5px dashed var(--cp-rust, #B2500F);
   border-radius: 12px;
   padding: 12px;
@@ -13,19 +13,19 @@
   box-sizing: border-box;
 }
 
-.pc-titulo {
+.pdc-titulo {
   font-weight: 800;
   color: var(--cp-rust, #B2500F);
   font-size: 13px;
 }
 
-.pc-resumen {
+.pdc-resumen {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 8px;
 }
 
-.pc-tarjeta {
+.pdc-tarjeta {
   border: 1px solid var(--cp-sand, #EDE1D1);
   border-radius: 10px;
   padding: 8px 10px;
@@ -37,28 +37,28 @@
   color: var(--cp-soft, #2C4C5D);
 }
 
-.pc-tarjeta b {
+.pdc-tarjeta b {
   font-size: 18px;
   color: var(--cp-navy, #0B2C3E);
 }
 
-.pc-tarjeta.pc-tarjeta-total {
+.pdc-tarjeta.pdc-tarjeta-total {
   border-color: var(--cp-rust, #B2500F);
 }
 
-.pc-barra {
+.pdc-barra {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
   align-items: center;
 }
 
-.pc-buscador {
+.pdc-buscador {
   flex: 1 1 200px;
   min-width: 0;
 }
 
-.pc-buscador input {
+.pdc-buscador input {
   width: 100%;
   box-sizing: border-box;
   min-height: 44px;
@@ -69,13 +69,13 @@
   font-size: 14px;
 }
 
-.pc-chips {
+.pdc-chips {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
 }
 
-.pc-chip {
+.pdc-chip {
   min-height: 44px;
   padding: 0 12px;
   border-radius: 9999px;
@@ -87,24 +87,25 @@
   cursor: pointer;
 }
 
-.pc-chip[aria-pressed='true'] {
+.pdc-chip[aria-pressed='true'] {
   background: var(--cp-navy, #0B2C3E);
   color: var(--cp-cream, #FBF4EC);
 }
 
-.pc-lista {
-  max-height: min(60vh, 520px);
+.pdc-lista {
+  max-height: min(55vh, 520px);
   overflow-y: auto;
+  overflow-x: hidden;
   border: 1px solid var(--cp-sand, #EDE1D1);
   border-radius: 10px;
   min-width: 0;
 }
 
-.pc-grupo {
+.pdc-grupo {
   border-bottom: 1px solid var(--cp-sand, #EDE1D1);
 }
 
-.pc-grupo-cab {
+.pdc-grupo-cab {
   position: sticky;
   top: 0;
   z-index: 1;
@@ -125,118 +126,118 @@
   cursor: pointer;
 }
 
-.pc-grupo-cab:focus-visible {
+.pdc-grupo-cab:focus-visible {
   outline: 3px solid var(--cp-orange, #E67929);
   outline-offset: -3px;
 }
 
-.pc-cabecera,
-.pc-fila {
+.pdc-fila {
   display: grid;
-  grid-template-columns: 100px minmax(0, 1.4fr) 92px 104px 150px 96px minmax(0, auto);
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'codigo total'
+    'cliente cliente'
+    'meta meta'
+    'acciones acciones';
+  gap: 4px 12px;
   align-items: center;
-  padding: 6px 10px;
+  padding: 10px 12px;
   font-size: 13px;
   min-width: 0;
-}
-
-.pc-cabecera {
-  font-size: 11px;
-  font-weight: 800;
-  color: var(--cp-soft, #2C4C5D);
-  text-transform: uppercase;
-  background: var(--cp-cream, #FBF4EC);
-}
-
-.pc-fila {
   border-top: 1px solid var(--cp-sand, #EDE1D1);
   background: var(--cp-white, #FFFFFF);
+  overflow-wrap: anywhere;
 }
 
-.pc-fila > * {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.pdc-fila > * { min-width: 0; }
+.pdc-fila > .pdc-codigo { grid-area: codigo; font-size: 14px; }
+.pdc-fila > .pdc-cliente { grid-area: cliente; }
+.pdc-fila > .pdc-total { grid-area: total; font-size: 15px; white-space: nowrap; }
+.pdc-fila > .pdc-acciones { grid-area: acciones; margin-top: 4px; }
+.pdc-fila > .pdc-meta {
+  grid-area: meta;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  color: var(--cp-soft, #2C4C5D);
+  font-size: 12px;
 }
 
-.pc-codigo {
+.pdc-codigo {
   font-weight: 800;
   color: var(--cp-navy, #0B2C3E);
 }
 
-.pc-cliente {
+.pdc-cliente {
   color: var(--cp-navy, #0B2C3E);
   font-weight: 700;
 }
 
-.pc-cliente.pc-sin-nombre {
+.pdc-cliente.pdc-sin-nombre {
   color: var(--cp-soft, #6B7B86);
   font-style: italic;
   font-weight: 500;
 }
 
-.pc-antiguo {
+.pdc-antiguo {
   color: #B26A00;
   font-weight: 800;
 }
 
-.pc-meta {
-  display: contents;
-}
-
-.pc-total {
+.pdc-total {
   font-weight: 800;
   text-align: right;
 }
 
-.pc-acciones {
+.pdc-acciones {
   display: flex;
   gap: 6px;
-  justify-content: flex-end;
   flex-wrap: wrap;
 }
 
-.pc-boton {
+.pdc-acciones .pdc-boton {
+  flex: 1 1 140px;
+}
+
+.pdc-boton {
   min-height: 44px;
   padding: 0 12px;
   border-radius: 10px;
   font-weight: 800;
   font-size: 13px;
   cursor: pointer;
-  white-space: nowrap;
+  max-width: 100%;
 }
 
-.pc-boton-primario {
+.pdc-boton-primario {
   border: 0;
   background: var(--cp-orange, #E67929);
   color: var(--cp-navy, #0B2C3E);
 }
 
-.pc-boton-peligro {
+.pdc-boton-peligro {
   border: 1.5px solid var(--cp-rust, #B2500F);
   background: transparent;
   color: var(--cp-rust, #B2500F);
 }
 
-.pc-boton-secundario {
+.pdc-boton-secundario {
   border: 1.5px solid var(--cp-navy, #0B2C3E);
   background: transparent;
   color: var(--cp-navy, #0B2C3E);
 }
 
-.pc-boton-oscuro {
+.pdc-boton-oscuro {
   border: 0;
   background: var(--cp-navy, #0B2C3E);
   color: #fff;
 }
 
-.pc-boton-bloque {
+.pdc-boton-bloque {
   width: 100%;
 }
 
-.pc-ver-mas {
+.pdc-ver-mas {
   width: 100%;
   padding: 8px;
   border: 0;
@@ -247,41 +248,14 @@
   cursor: pointer;
 }
 
-.pc-vacio {
+.pdc-vacio {
   font-size: 13px;
   color: var(--cp-soft, #2C4C5D);
   padding: 8px 2px;
 }
 
-.pc-foco {
+.pdc-foco {
   scroll-margin-top: 12px;
-}
-
-/* Celular: cada fila en dos líneas y las acciones a ancho completo */
-@media (max-width: 720px) {
-  .pc-cabecera {
-    display: none;
-  }
-
-  .pc-fila {
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas:
-      'codigo total'
-      'cliente cliente'
-      'meta meta'
-      'acciones acciones';
-    row-gap: 4px;
-  }
-
-  .pc-fila > .pc-codigo { grid-area: codigo; }
-  .pc-fila > .pc-cliente { grid-area: cliente; white-space: normal; }
-  .pc-fila > .pc-meta { grid-area: meta; display: flex; flex-wrap: wrap; gap: 4px 10px; color: var(--cp-soft, #2C4C5D); font-size: 12px; }
-  .pc-fila > .pc-total { grid-area: total; }
-  .pc-fila > .pc-acciones { grid-area: acciones; }
-
-  .pc-acciones .pc-boton {
-    flex: 1 1 140px;
-  }
 }
 
 /* ---- Diálogo «Anular pedido» (ModalAnular) ---- */
@@ -445,12 +419,12 @@
 }
 
 /* Botones del aviso «pedidos que bloquean el cierre» */
-.pc-avisos {
+.pdc-avisos {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.pc-avisos .pc-boton {
+.pdc-avisos .pdc-boton {
   flex: 1 1 180px;
 }

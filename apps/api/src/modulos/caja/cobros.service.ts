@@ -75,7 +75,7 @@ export class CobrosService {
 
   /**
    * Verifica el código rotativo de 6 dígitos del supervisor (RFC 6238 TOTP).
-   * 3 intentos fallidos consecutivos bloquean 5 minutos en Redis.
+   * 3 intentos fallidos consecutivos bloquean 1 minuto en Redis.
    */
   async verificarPinSupervisor(
     pinSupervisor?: string,

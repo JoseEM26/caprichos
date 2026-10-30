@@ -425,7 +425,7 @@ export function CierreView() {
         if (err.codigo === 'CODIGO_INVALIDO' || err.codigo === 'PIN_INVALIDO') {
           setMsgCierreError('Código de supervisor inválido o no proporcionado');
         } else if (err.codigo === 'CODIGO_BLOQUEADO' || err.codigo === 'PIN_BLOQUEADO') {
-          setMsgCierreError('Demasiados intentos fallidos. Bloqueado temporalmente por 5 minutos.');
+          setMsgCierreError(err.message || 'Demasiados intentos con el código del supervisor. Espera 1 min o pide al administrador que lo desbloquee.');
         } else if (err.codigo === 'SUPERVISOR_SIN_CONFIGURAR') {
           setMsgCierreError('El local aún no tiene configurado el código de supervisor. El administrador debe generarlo desde su pantalla.');
         } else {

@@ -60,6 +60,9 @@ export function SubirVoucherMozo({
   const [revisionManual, setRevisionManual] = useState<boolean>(false);
   // Avisos de lo que no cuadra (texto): el voucher cuenta como subido igual; Caja decide
   const [avisos, setAvisos] = useState<string[]>([]);
+  // Reemplazo de un voucher vigente: el servidor pide motivo (Caja y Admin); se escribe aquí y se reintenta
+  const [pideMotivo, setPideMotivo] = useState(false);
+  const [motivoLocal, setMotivoLocal] = useState('');
 
   const textoGuardadoManual = 'Voucher guardado. La lectura automática no está disponible; Caja lo revisará.';
 
@@ -91,13 +94,15 @@ export function SubirVoucherMozo({
 
       // 2. Subida a la API
       // El mozo recibe la forma reducida (legible, revisionManual, avisos): nunca semáforo
+      const motivo = motivoLocal.trim() || motivoCambio;
       const respuesta = (await vouchersApi.subirVoucher(
         blobReducido,
         pedidoId,
         medio,
-        ...(motivoCambio ? [motivoCambio] : []),
+        ...(motivo ? [motivo] : []),
       )) as RespuestaSubirVoucherMozo;
 
+      setPideMotivo(false);
       alRespuesta?.(respuesta);
       setUltimoVoucherId(respuesta.id);
 
@@ -120,6 +125,13 @@ export function SubirVoucherMozo({
         alCambiarEstado?.({ subiendo: false, esValido: false });
       }
     } catch (err) {
+      if (err instanceof ErrorApi && err.codigo === 'MOTIVO_CAMBIO_REQUERIDO') {
+        setPideMotivo(true);
+        setErrorSubida(null);
+        setVoucherValidoId(null);
+        alCambiarEstado?.({ subiendo: false, esValido: false });
+        return;
+      }
       const msg =
         err instanceof ErrorApi
           ? err.message
@@ -544,6 +556,35 @@ export function SubirVoucherMozo({
             }}
           >
             Cambiar
+          </button>
+        </div>
+      )}
+
+      {/* Cambio de un voucher que ya estaba: motivo obligatorio (queda en el historial) */}
+      {pideMotivo && archivo && !subiendo && (
+        <div
+          data-testid="motivo-cambio-voucher"
+          style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: 'var(--cp-white, #FFFFFF)', border: '1.5px solid var(--cp-orange, #E67929)', borderRadius: '10px', padding: '10px 12px' }}
+        >
+          <label htmlFor={`motivo-cambio-${pedidoId}-${medio}`} style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-navy, #0B2C3E)' }}>
+            Este pedido ya tenía un voucher. ¿Por qué lo cambias?
+          </label>
+          <textarea
+            id={`motivo-cambio-${pedidoId}-${medio}`}
+            rows={2}
+            value={motivoLocal}
+            onChange={(e) => setMotivoLocal(e.target.value)}
+            placeholder="Ej.: el cliente envió la captura correcta"
+            style={{ width: '100%', boxSizing: 'border-box', minHeight: '44px', border: '1.5px solid var(--cp-line, #E3D6C6)', borderRadius: '8px', padding: '8px 10px', fontSize: '14px', fontFamily: 'inherit', resize: 'vertical' }}
+          />
+          <div style={{ fontSize: '12px', color: 'var(--cp-soft, #2C4C5D)' }}>Mínimo 5 caracteres. El voucher anterior no se borra: queda en el historial.</div>
+          <button
+            type="button"
+            disabled={motivoLocal.trim().length < 5}
+            onClick={() => archivo && procesarYSubir(archivo)}
+            style={{ minHeight: '44px', border: 'none', borderRadius: '10px', background: 'var(--cp-orange, #E67929)', color: 'var(--cp-navy, #0B2C3E)', fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '13px', cursor: motivoLocal.trim().length < 5 ? 'not-allowed' : 'pointer', opacity: motivoLocal.trim().length < 5 ? 0.6 : 1 }}
+          >
+            Guardar cambio de voucher
           </button>
         </div>
       )}

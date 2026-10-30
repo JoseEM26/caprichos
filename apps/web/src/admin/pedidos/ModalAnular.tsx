@@ -4,6 +4,7 @@ import { Confirmar } from '../../comun/Confirmar';
 import { CampoCodigoSupervisor } from '../../comun/CampoCodigoSupervisor';
 import { pedidosApi, Pedido } from './pedidosApi';
 import { ErrorApi } from '../../comun/api';
+import { hayAutorizacionSupervisor, limpiarAutorizacionSupervisor } from '../../comun/autorizacionSupervisor';
 import '../cierre/pendientes-cierre.css';
 
 const MOTIVOS_COMUNES = [
@@ -51,6 +52,8 @@ export function ModalAnular({
   const [errorMensaje, setErrorMensaje] = useState<string>('');
   const [enviando, setEnviando] = useState<boolean>(false);
   const [mostrarConfirmar, setMostrarConfirmar] = useState<boolean>(false);
+  // Con un código aceptado hace menos de 5 min no se vuelve a pedir
+  const [autorizado, setAutorizado] = useState<boolean>(() => hayAutorizacionSupervisor());
 
   const validarCampos = (): boolean => {
     setErrorMensaje('');
@@ -61,7 +64,7 @@ export function ModalAnular({
     }
 
     const codigoTrim = codigo.trim();
-    if (!/^\d{6}$/.test(codigoTrim)) {
+    if (!autorizado && !/^\d{6}$/.test(codigoTrim)) {
       setErrorMensaje('El código del supervisor debe ser de exactamente 6 dígitos numéricos.');
       return false;
     }
@@ -76,7 +79,7 @@ export function ModalAnular({
   };
 
   const ejecutarAnulacion = async () => {
-    const codigoParaEnviar = codigo.trim();
+    const codigoParaEnviar = autorizado ? '' : codigo.trim();
     const motivoParaEnviar = motivo.trim();
 
     // Regla de seguridad: el código no queda en el estado tras enviar
@@ -111,10 +114,14 @@ export function ModalAnular({
       alAnularExitoso();
     } catch (err: any) {
       if (err instanceof ErrorApi) {
-        if (err.codigo === 'CODIGO_INVALIDO' || err.codigo === 'PIN_INVALIDO') {
-          setErrorMensaje('Código del supervisor inválido. Pídelo nuevamente a la supervisora.');
+        if (autorizado && (err.codigo === 'CODIGO_INVALIDO' || err.codigo === 'PIN_INVALIDO')) {
+          limpiarAutorizacionSupervisor();
+          setAutorizado(false);
+          setErrorMensaje('La autorización del supervisor venció. Escribe el código del supervisor otra vez.');
+        } else if (err.codigo === 'CODIGO_INVALIDO' || err.codigo === 'PIN_INVALIDO') {
+          setErrorMensaje(err.message || 'Código del supervisor inválido. Pídelo nuevamente a la supervisora.');
         } else if (err.codigo === 'CODIGO_BLOQUEADO' || err.codigo === 'PIN_BLOQUEADO') {
-          setErrorMensaje('Demasiados intentos fallidos. Bloqueado temporalmente por 5 minutos.');
+          setErrorMensaje(err.message || 'Demasiados intentos con el código del supervisor. Espera 1 min o pide al administrador que lo desbloquee.');
         } else if (err.codigo === 'SUPERVISOR_SIN_CONFIGURAR') {
           setErrorMensaje('El local aún no tiene configurado el código de supervisor. El administrador debe generarlo desde su pantalla.');
         } else {
@@ -275,16 +282,22 @@ export function ModalAnular({
           </div>
 
           {/* Código de supervisor (6 dígitos) */}
-          <CampoCodigoSupervisor
-            id="anular-pin"
-            valor={codigo}
-            onChange={(v) => {
-              setCodigo(v);
-              setErrorMensaje('');
-            }}
-            etiqueta="Código del supervisor (6 dígitos)"
-            ayuda="Pídelo a la supervisora: lo ve en su pantalla y cambia cada 30 segundos"
-          />
+          {autorizado ? (
+            <div className="ad-aviso" role="note" data-testid="autorizacion-vigente">
+              Supervisor autorizado: no hace falta escribir el código otra vez (vale 5 minutos).
+            </div>
+          ) : (
+            <CampoCodigoSupervisor
+              id="anular-pin"
+              valor={codigo}
+              onChange={(v) => {
+                setCodigo(v);
+                setErrorMensaje('');
+              }}
+              etiqueta="Código del supervisor (6 dígitos)"
+              ayuda="Pídelo a la supervisora: lo ve en su pantalla y cambia cada 30 segundos"
+            />
+          )}
 
           {errorMensaje && (
             <div role="alert" className="ad-error">
@@ -305,7 +318,7 @@ export function ModalAnular({
           <Boton
             variante="peligro"
             cargando={enviando}
-            disabled={enviando || motivo.trim().length < 5 || codigo.length !== 6}
+            disabled={enviando || motivo.trim().length < 5 || (!autorizado && codigo.length !== 6)}
             onClick={iniciarAnulacion}
             style={{ minHeight: 44, borderRadius: 12, fontWeight: 800 }}
           >

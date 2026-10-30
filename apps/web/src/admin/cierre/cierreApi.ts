@@ -1,5 +1,13 @@
 import { api } from '../../comun/api';
 import type { CobrarDto } from '../pedidos/pedidosApi';
+import { marcarAutorizacionSupervisor } from '../../comun/autorizacionSupervisor';
+
+/** Si el servidor aceptó un código, la autorización queda vigente 5 min. */
+const conAutorizacion = async <T>(p: Promise<T>, huboCodigo?: string): Promise<T> => {
+  const r = await p;
+  if (huboCodigo?.trim()) marcarAutorizacionSupervisor();
+  return r;
+};
 
 /** Pedido sin cobrar de cualquier día: bloquea el cierre hasta cobrarlo o anularlo (RN-CAP-079). */
 export interface PendienteCobro {
@@ -191,7 +199,7 @@ export const cierreApi = {
       headers['x-codigo-supervisor'] = pinSupervisor.trim();
       headers['x-pin-supervisor'] = pinSupervisor.trim();
     }
-    return api.post<ArqueoRespuesta>('/admin/cierre/arqueo', dto, { headers });
+    return conAutorizacion(api.post<ArqueoRespuesta>('/admin/cierre/arqueo', dto, { headers }), pinSupervisor);
   },
 
   cerrarCaja: (dto: CerrarCajaDto, pinSupervisor?: string) => {
@@ -200,17 +208,20 @@ export const cierreApi = {
       headers['x-codigo-supervisor'] = pinSupervisor.trim();
       headers['x-pin-supervisor'] = pinSupervisor.trim();
     }
-    return api.post<CierreCajaRespuesta>('/admin/cierre/cerrar', dto, { headers });
+    return conAutorizacion(api.post<CierreCajaRespuesta>('/admin/cierre/cerrar', dto, { headers }), pinSupervisor);
   },
 
   // El servidor valida el código/PIN de supervisora y solo entonces entrega el esperado.
   verificarPinSupervisor: (pinSupervisor: string) =>
-    api.get<MontosEsperados>('/admin/cierre/esperado', {
-      headers: {
-        'x-codigo-supervisor': pinSupervisor.trim(),
-        'x-pin-supervisor': pinSupervisor.trim(),
-      },
-    }),
+    conAutorizacion(
+      api.get<MontosEsperados>('/admin/cierre/esperado', {
+        headers: {
+          'x-codigo-supervisor': pinSupervisor.trim(),
+          'x-pin-supervisor': pinSupervisor.trim(),
+        },
+      }),
+      pinSupervisor,
+    ),
 
   // Solo admin o con el código de supervisor (el servidor lo exige).
   listarPendientesDeCobro: (pinSupervisor?: string) => {
@@ -219,7 +230,7 @@ export const cierreApi = {
       headers['x-codigo-supervisor'] = pinSupervisor.trim();
       headers['x-pin-supervisor'] = pinSupervisor.trim();
     }
-    return api.get<PendienteCobro[]>('/admin/cierre/pendientes', { headers });
+    return conAutorizacion(api.get<PendienteCobro[]>('/admin/cierre/pendientes', { headers }), pinSupervisor);
   },
 
   cobrarPendiente: (id: string | number, dto: CobrarDto) =>

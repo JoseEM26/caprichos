@@ -130,17 +130,25 @@ describe('Cierre: panel de pedidos pendientes escalable', () => {
   it('marca en ámbar los pedidos de días anteriores', () => {
     render(<Host inicial={[pendiente(1, { fecha: hace2Dias() }), pendiente(2)]} />);
     expect(screen.getAllByText(/día anterior/)).toHaveLength(1);
-    expect(screen.getByText(/día anterior/)).toHaveClass('pc-antiguo');
+    expect(screen.getByText(/día anterior/)).toHaveClass('pdc-antiguo');
+  });
+
+  it('cada pedido es una tarjeta con sus acciones y el panel no usa clases de la precuenta', () => {
+    render(<Host inicial={[pendiente(1), pendiente(2), pendiente(3)]} />);
+    expect(document.querySelectorAll('.pdc-fila')).toHaveLength(3);
+    expect(screen.getAllByRole('button', { name: 'Cobrar ahora' })).toHaveLength(3);
+    expect(screen.getAllByRole('button', { name: 'Anular con motivo' })).toHaveLength(3);
+    expect(document.querySelector('[class~="pc-panel"], [class~="pc-fila"]')).toBeNull();
   });
 
   it('por tandas: muestra 30 y «Ver más» trae el resto', () => {
     const muchos = Array.from({ length: 45 }, (_, i) => pendiente(i + 1));
     render(<Host inicial={muchos} />);
-    const filas = document.querySelectorAll('.pc-fila');
+    const filas = document.querySelectorAll('.pdc-fila');
     expect(filas).toHaveLength(30);
 
     fireEvent.click(screen.getByRole('button', { name: /Ver más \(15 restantes\)/ }));
-    expect(document.querySelectorAll('.pc-fila')).toHaveLength(45);
+    expect(document.querySelectorAll('.pdc-fila')).toHaveLength(45);
     expect(screen.queryByRole('button', { name: /Ver más/ })).not.toBeInTheDocument();
   });
 

@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   Post,
@@ -29,7 +30,8 @@ export class SupervisorCodigoController {
     res.setHeader('Expires', '0');
 
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
-    return this.supervisorCodigoService.obtenerCodigoActual(req.usuario.partyId, ip);
+    const actual = await this.supervisorCodigoService.obtenerCodigoActual(req.usuario.partyId, ip);
+    return { ...actual, bloqueados: await this.supervisorCodigoService.listarBloqueados().catch(() => []) };
   }
 
   /**
@@ -60,5 +62,20 @@ export class SupervisorCodigoController {
   async estadoConfiguracion() {
     const configurado = await this.supervisorCodigoService.tieneSecretoConfigurado();
     return { configurado };
+  }
+
+  /** Operadores con el código bloqueado por intentos fallidos. */
+  @Get('bloqueados')
+  @Permiso('supervisor', 'ver_codigo')
+  async bloqueados() {
+    return this.supervisorCodigoService.listarBloqueados();
+  }
+
+  /** Desbloquea el contador de intentos de un operador. */
+  @Post('desbloquear')
+  @Permiso('supervisor', 'ver_codigo')
+  async desbloquear(@Body('operadorPartyId') operadorPartyId: string, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.supervisorCodigoService.desbloquearOperador(operadorPartyId, req.usuario.partyId, ip);
   }
 }

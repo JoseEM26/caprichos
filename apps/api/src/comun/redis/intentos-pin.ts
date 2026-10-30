@@ -3,8 +3,8 @@ import type Redis from 'ioredis';
 
 /** Fallos seguidos del PIN de supervisor que bloquean (FT-CAJ-02 RQ-CAJ-02-12). */
 export const MAX_INTENTOS_PIN = 3;
-/** Bloqueo del PIN de supervisor: 5 minutos (FT-CAJ-02 RQ-CAJ-02-12). */
-export const SEGUNDOS_BLOQUEO_PIN = 5 * 60;
+/** Bloqueo del PIN de supervisor: 1 minuto (decisión del dueño 30/10/2026; antes 5, FT-CAJ-02 RQ-CAJ-02-12). */
+export const SEGUNDOS_BLOQUEO_PIN = 60;
 
 /**
  * Contador de intentos del PIN de supervisor. Falla CERRADO: si Redis no responde no se
@@ -29,10 +29,19 @@ export async function exigirPinNoBloqueado(redis: Redis, clave: string): Promise
     throw redisNoDisponible();
   }
   if (actuales && parseInt(actuales, 10) >= MAX_INTENTOS_PIN) {
+    let segundos = SEGUNDOS_BLOQUEO_PIN;
+    try {
+      const ttl = await redis.ttl(clave);
+      if (typeof ttl === 'number' && ttl > 0) segundos = ttl;
+    } catch {
+      // sin TTL se muestra el bloqueo completo
+    }
+    const minutos = Math.max(1, Math.ceil(segundos / 60));
     throw new HttpException(
       {
         codigo: 'CODIGO_BLOQUEADO',
-        mensaje: 'Demasiados intentos fallidos de código de supervisor. Espera 5 minutos.',
+        mensaje: `Demasiados intentos con el código del supervisor. Espera ${minutos} min o pide al administrador que lo desbloquee.`,
+        segundosRestantes: segundos,
       },
       HttpStatus.FORBIDDEN,
     );
@@ -44,7 +53,7 @@ export const registrarFalloCodigo = registrarFalloPin;
 export const limpiarIntentosCodigo = limpiarIntentosPin;
 
 
-/** Suma un fallo y fija el bloqueo de 5 minutos en el primero. */
+/** Suma un fallo y fija el bloqueo de 1 minuto en el primero. */
 export async function registrarFalloPin(redis: Redis, clave: string): Promise<void> {
   try {
     const fallos = await redis.incr(clave);

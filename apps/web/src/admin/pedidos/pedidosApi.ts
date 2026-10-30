@@ -1,3 +1,4 @@
+import { marcarAutorizacionSupervisor } from '../../comun/autorizacionSupervisor';
 import { api } from '../../comun/api';
 import type { PlanPagoItem } from './planPago';
 
@@ -256,11 +257,13 @@ export const pedidosApi = {
       headers['X-Codigo-Supervisor'] = pinSupervisor.trim();
       headers['X-Pin-Supervisor'] = pinSupervisor.trim();
     }
-    return api.post<Pedido>(
+    const r = await api.post<Pedido>(
       `/admin/pedidos/${id}/estado`,
       { estado, motivo },
       { headers },
     );
+    if (pinSupervisor) marcarAutorizacionSupervisor();
+    return r;
   },
 
   async ubicarPedido(
