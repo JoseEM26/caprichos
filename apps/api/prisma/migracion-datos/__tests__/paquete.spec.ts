@@ -101,6 +101,18 @@ describe('exportar e importar el paquete de la empresa (base en memoria)', () =>
     expect(r.reporte).toContain('Escondida');
   });
 
+  it('excluye productos por nombre y no exporta las cuentas del personal cuando se pide', async () => {
+    const salida = path.join(tmp, 'sin-personal');
+    const r = await exportar(origen().proxy(), {
+      salida, uploadsDir: uploadsOrigen, entorno: 'demo', ahora: FECHA, excluirProductos: ['chicha'], sinPersonal: true,
+    });
+    const d = JSON.parse(fs.readFileSync(path.join(salida, 'datos.json'), 'utf8')).tablas;
+    expect(d.producto).toEqual([]);
+    expect(d.user_account).toEqual([]);
+    expect(d.party).toEqual([]);
+    expect(r.reporte).toContain('excluido a pedido');
+  });
+
   it('enmascara DNI en el reporte y lista lo que no sale con su motivo', async () => {
     const { r } = await exportarDesde(origen());
     expect(r.reporte).toContain('DNI:12345***');
