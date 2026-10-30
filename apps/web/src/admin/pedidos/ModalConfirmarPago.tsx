@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { usePideCodigo } from '../../comun/usePideCodigo';
 import { Confirmar } from '../../comun/Confirmar';
 import { pedidosApi, Pedido } from './pedidosApi';
 import { SubirVoucherMozo } from '../vouchers/SubirVoucherMozo';
@@ -35,6 +36,7 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
   const [sinVoucher, setSinVoucher] = useState(false);
   const [motivoSinVoucher, setMotivoSinVoucher] = useState('');
   const [pinSupervisor, setPinSupervisor] = useState('');
+  const pideCodigo = usePideCodigo();
 
   const esEfectivo = mismoMedio(medio, 'Efectivo');
   const esTarjeta = mismoMedio(medio, 'Tarjeta');
@@ -71,7 +73,7 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
         setMsg(`El motivo debe tener al menos ${MOTIVO_MINIMO} caracteres`);
         return;
       }
-      if (pinSupervisor.length !== 6) {
+      if (pideCodigo && pinSupervisor.length !== 6) {
         setMsg('El código del supervisor son 6 dígitos');
         return;
       }
@@ -83,7 +85,7 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
   // Solo viaja la excepción si el pago digital sigue sin comprobante útil
   const excepcionSinVoucher =
     (esDigital || multiples) && !comprobanteListo && sinVoucher
-      ? { motivo: motivoSinVoucher.trim(), pinSupervisor }
+      ? { motivo: motivoSinVoucher.trim(), pinSupervisor: pideCodigo ? pinSupervisor : undefined }
       : undefined;
 
   const ejecutarConfirmacion = async () => {
@@ -500,7 +502,7 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
       <Confirmar
         abierto={confirmandoSiNo}
         titulo={`¿Confirmar el pedido ${pedido.codigo} y enviarlo a cocina?`}
-        mensaje={`Se registrará el medio de pago (${medio}) y el pedido pasará a las pantallas de cocina.${excepcionSinVoucher ? ' Se registra sin comprobante, con el motivo y la autorización del supervisor.' : ''}`}
+        mensaje={`Se registrará el medio de pago (${medio}) y el pedido pasará a las pantallas de cocina.${excepcionSinVoucher ? (pideCodigo ? ' Se registra sin comprobante, con el motivo y la autorización del supervisor.' : ' Se registra sin comprobante, con el motivo.') : ''}`}
         textoConfirmar="Sí, confirmar"
         textoNo="No"
         cargando={enviando}

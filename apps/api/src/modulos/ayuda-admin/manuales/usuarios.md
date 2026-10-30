@@ -29,8 +29,7 @@ Ver tambien: [[historial]]
 1. En la tabla de usuarios, busca al empleado y pulsa el botón "Editar" en su fila.
 2. Puedes modificar sus nombres, apellidos, teléfono o correo.
 3. Si cambias el campo "Rol" para otorgarle mayores o distintos accesos en el sistema, esta acción se considera crítica.
-4. Al pulsar "Guardar cambios", el sistema abrirá la ventana de autorización solicitando el código rotativo de 6 dígitos del supervisor.
-5. Pide el código actual al supervisor (visible en el módulo [[supervisor-codigo]]) o digítalo si eres la persona autorizada, y pulsa "Sí, confirmar".
+4. Al pulsar "Guardar cambios", si entras como administrador solo confirmas con "Sí, confirmar". Otros roles deben pedir el código rotativo de 6 dígitos del supervisor (visible en el módulo [[supervisor-codigo]]) y luego pulsar "Sí, confirmar".
 Requiere: [[supervisor-codigo]]
 Ver tambien: [[historial]]
 
@@ -55,7 +54,7 @@ Ver tambien: [[mensajes]], [[reclamos]]
 Ver tambien: [[usuarios]]
 
 ## Errores y dudas comunes
-- ¿Por qué el sistema me pide código de supervisor al cambiar de rol o desactivar?: cambiar privilegios o revocar el acceso a un empleado son operaciones críticas. El sistema exige validar el código rotativo TOTP para prevenir accesos no autorizados.
+- ¿Por qué el sistema me pide código de supervisor al cambiar de rol o desactivar?: si entras como administrador no lo pide, porque tú eres quien autoriza. Para los demás roles, cambiar privilegios o revocar el acceso a un empleado son operaciones críticas y se exige el código rotativo TOTP para prevenir accesos no autorizados.
 - Ver DNI completo: los números de documento se muestran enmascarados por privacidad. Al pulsar "Ver DNI", el sistema registra una entrada de auditoría con la fecha, hora y usuario que consultó el dato personal.
 - No puedo iniciar sesión con la contraseña temporal: asegúrate de no copiar espacios en blanco antes o después de los caracteres generados.
 

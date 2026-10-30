@@ -60,10 +60,10 @@ Despues: [[cierre]]
 Ver tambien: [[stock]]
 
 ## Errores y dudas comunes
-- Cuando se requiere el codigo del supervisor: el codigo de 6 digitos se exige siempre para anular cualquier movimiento previo, para anular tandas de produccion y para registrar mermas o ajustes grandes de 10 o mas unidades.
+- Cuando se requiere el codigo del supervisor: el codigo de 6 digitos se exige siempre para anular cualquier movimiento previo, para anular tandas de produccion y para registrar mermas o ajustes grandes de 10 o mas unidades. El administrador no necesita codigo en ninguno de estos casos.
 - Como atender pedidos de insumos enviados por cocina: en la seccion de pedidos internos, localiza el pedido pendiente y pulsa el boton "Marcar entregado" luego de despachar fisicamente los productos.
 
 ## Quien puede hacerlo
 - Administrador, Almacen y Cocina: tienen permisos para consultar movimientos, registrar traslados, elaborar pedidos internos y registrar producciones del dia.
-- Para anular movimientos, producciones o registrar mermas de 10 o mas unidades, se requiere validar adicionalmente el codigo de supervisor rotativo de 6 digitos.
+- Para anular movimientos, producciones o registrar mermas de 10 o mas unidades, se requiere validar adicionalmente el codigo de supervisor rotativo de 6 digitos (salvo para el administrador).
 - Cajero, Mozo y Repartidor: no tienen acceso al modulo de almacen.

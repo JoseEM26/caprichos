@@ -55,7 +55,7 @@ Ver tambien: [[stock]]
 1. Pulsar el boton Mermas en la barra superior.
 2. Seleccionar el insumo afectado registrado en [[stock]], ingresar la cantidad y unidad de medida.
 3. Elegir el motivo: Se cayo, Vencido, Mal preparado u Otro (especificando detalle).
-4. Pulsar Registrar merma. Si el insumo o cantidad requiere autorizacion, el sistema solicitara el Codigo del supervisor de 6 digitos obtenido en [[supervisor-codigo]] antes de confirmar.
+4. Pulsar Registrar merma. Si el insumo o cantidad requiere autorizacion, el sistema solicitara el Codigo del supervisor de 6 digitos obtenido en [[supervisor-codigo]] antes de confirmar (el administrador no lo necesita).
 Requiere: [[supervisor-codigo]]
 Despues: [[almacen]]
 Ver tambien: [[stock]]

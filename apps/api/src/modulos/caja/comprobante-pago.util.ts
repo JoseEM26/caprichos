@@ -13,7 +13,7 @@ const NOMBRE_MEDIO_DIGITAL: Record<string, string> = {
 
 export interface SinVoucherEntrada {
   motivo: string;
-  pinSupervisor: string;
+  pinSupervisor?: string;
 }
 
 export interface SinVoucherAutorizado {
@@ -70,7 +70,7 @@ export async function exigirComprobanteDigital(args: {
   planPago?: ReadonlyArray<{ medio: string }> | null;
   sinVoucher?: SinVoucherEntrada;
   permiteExcepcion: boolean;
-  verificarPin: (pin: string) => Promise<{ party_id?: bigint; supervisorPartyId?: bigint }>;
+  verificarPin: (pin: string | undefined) => Promise<{ party_id?: bigint; supervisorPartyId?: bigint }>;
 }): Promise<SinVoucherAutorizado | null> {
   const digitalesPlan = [
     ...new Set((args.planPago ?? []).map((f) => f.medio).filter((m) => (MEDIOS_DIGITALES_PLAN as readonly string[]).includes(m))),

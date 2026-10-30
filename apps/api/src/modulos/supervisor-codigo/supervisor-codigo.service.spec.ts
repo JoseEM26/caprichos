@@ -120,8 +120,11 @@ describe('SupervisorCodigoService & TOTP Utils', () => {
           upsert: jest.fn(),
         },
         person: { findUnique: jest.fn().mockResolvedValue(null) },
+        // party 1 es el ADMIN del local; sin party_id es la búsqueda del supervisor de auditoría
         userAccount: {
-          findFirst: jest.fn().mockResolvedValue({ party_id: 1n, id: 10n }),
+          findFirst: jest.fn(async ({ where }: any) =>
+            where.party_id === undefined || where.party_id === 1n ? { party_id: 1n, id: 10n } : null,
+          ),
         },
       };
 

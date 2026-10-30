@@ -26,7 +26,10 @@ import {
 } from '../../comun/redis/intentos-pin';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
-import { SupervisorCodigoService } from '../supervisor-codigo/supervisor-codigo.service';
+import {
+  SupervisorCodigoService,
+  autorizarAdminSinCodigo,
+} from '../supervisor-codigo/supervisor-codigo.service';
 import { exigirComprobanteDigital, voucherCubreMedio } from '../caja/comprobante-pago.util';
 import { puedeCambiarVoucher, puedeSubirVoucher } from '../vouchers/regla-cambio-voucher';
 import { exigirCajaAbiertaHoy } from '../caja/caja.calculo';
@@ -176,6 +179,10 @@ export class PedidosEstadoService {
         pedidoId,
       );
     }
+
+    // Mismo criterio que el servicio: el ADMIN no da código.
+    const admin = await autorizarAdminSinCodigo(this.prisma, this.auditoria, partyIdOperador, accion, ip, 'pedido', pedidoId);
+    if (admin) return { party_id: admin.party_id, id: admin.id, supervisorPartyId: admin.party_id };
 
     const claveIntentos = `pin:supervisor:intentos:${partyIdOperador ?? 'general'}`;
     const redis = this.redisService.obtenerCliente();

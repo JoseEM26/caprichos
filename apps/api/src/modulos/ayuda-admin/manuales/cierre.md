@@ -52,7 +52,7 @@ Ver tambien: [[comprobantes]]
 ## Como se hace: Proceder cuando la caja no cuadra
 1. Si los montos declarados difieren de las ventas registradas, la pantalla muestra el aviso No cuadra y solicita un segundo conteo fisico.
 2. Volver a contar el dinero y corregir las cantidades ingresadas.
-3. Si la diferencia persiste tras el reconteo, la pantalla exigira el Codigo del supervisor de 6 digitos generado en [[supervisor-codigo]] y una Nota explicativa obligatoria.
+3. Si la diferencia persiste tras el reconteo, la pantalla exigira el Codigo del supervisor de 6 digitos generado en [[supervisor-codigo]] y una Nota explicativa obligatoria. Si entras como administrador no pide el codigo, solo la nota.
 4. Ingresar el codigo del supervisor, redactar el motivo de la diferencia y pulsar Cerrar con aprobacion de supervisor.
 Requiere: [[supervisor-codigo]]
 Ver tambien: [[supervisor-codigo]]
@@ -66,4 +66,4 @@ Ver tambien: [[supervisor-codigo]]
 
 ## Quien puede hacerlo
 - Administrador y Cajero tienen acceso al modulo de cierres y a la auditoria de vouchers digitales con el permiso vouchers/ver.
-- Cerrar una caja con descuadre o diferencia requiere obligatoriamente la intervencion del Administrador o supervisor con su codigo rotativo de 6 digitos.
+- Cerrar una caja con descuadre o diferencia requiere la intervencion de un supervisor con su codigo rotativo de 6 digitos. El administrador cierra sin codigo (solo escribe la nota).

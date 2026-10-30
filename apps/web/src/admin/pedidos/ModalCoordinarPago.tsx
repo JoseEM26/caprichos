@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Confirmar } from '../../comun/Confirmar';
 import { CampoCodigoSupervisor } from '../../comun/CampoCodigoSupervisor';
+import { usePideCodigo } from '../../comun/usePideCodigo';
 import { SubirVoucherMozo } from '../vouchers/SubirVoucherMozo';
 import { pedidosApi, PedidoPorCobrar } from './pedidosApi';
 import { medioDigitalVoucher } from './mediosPago';
@@ -26,12 +27,13 @@ export function ModalCoordinarPago({ pedido, alCerrar, alCoordinado }: ModalCoor
   const [sinVoucher, setSinVoucher] = useState<boolean>(false);
   const [motivo, setMotivo] = useState<string>('');
   const [pinSupervisor, setPinSupervisor] = useState<string>('');
+  const pideCodigo = usePideCodigo();
   const [confirmando, setConfirmando] = useState<boolean>(false);
   const [enviando, setEnviando] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
 
   const excepcionLista =
-    sinVoucher && motivo.trim().length >= MOTIVO_MINIMO && pinSupervisor.length === 6;
+    sinVoucher && motivo.trim().length >= MOTIVO_MINIMO && (!pideCodigo || pinSupervisor.length === 6);
   const usaExcepcion = Boolean(medioVoucher) && !voucherListo && sinVoucher;
   const listo = !medioVoucher || voucherListo || excepcionLista;
 
@@ -42,7 +44,7 @@ export function ModalCoordinarPago({ pedido, alCerrar, alCoordinado }: ModalCoor
     try {
       await pedidosApi.marcarPagoCoordinado(
         pedido.id,
-        usaExcepcion ? { motivo: motivo.trim(), pinSupervisor } : undefined,
+        usaExcepcion ? { motivo: motivo.trim(), pinSupervisor: pideCodigo ? pinSupervisor : undefined } : undefined,
       );
       alCoordinado();
     } catch (err: any) {
@@ -161,7 +163,7 @@ export function ModalCoordinarPago({ pedido, alCerrar, alCoordinado }: ModalCoor
                     fontFamily: 'inherit',
                   }}
                 />
-                <CampoCodigoSupervisor valor={pinSupervisor} onChange={setPinSupervisor} />
+                {pideCodigo && <CampoCodigoSupervisor valor={pinSupervisor} onChange={setPinSupervisor} />}
                 <button
                   type="button"
                   onClick={() => {
@@ -243,7 +245,9 @@ export function ModalCoordinarPago({ pedido, alCerrar, alCoordinado }: ModalCoor
         titulo={`¿Marcar coordinado el pago de ${pedido.codigo}?`}
         mensaje={
           usaExcepcion
-            ? 'Se marca sin comprobante, con el motivo y la autorización del supervisor.'
+            ? pideCodigo
+              ? 'Se marca sin comprobante, con el motivo y la autorización del supervisor.'
+              : 'Se marca sin comprobante, con el motivo.'
             : 'El pago queda coordinado con el cliente.'
         }
         textoSi="Sí, marcar"

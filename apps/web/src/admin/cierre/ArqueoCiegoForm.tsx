@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Boton } from '../../comun/Boton';
 import { Confirmar } from '../../comun/Confirmar';
 import { CampoCodigoSupervisor } from '../../comun/CampoCodigoSupervisor';
+import { usePideCodigo } from '../../comun/usePideCodigo';
 import {
   cierreApi,
   DENOMINACIONES_LISTA,
@@ -43,6 +44,7 @@ export function ArqueoCiegoForm({ alCerrarCajaExitoso }: ArqueoCiegoFormProps) {
 
   // PIN del supervisor (NUNCA guardado persistentemente, limpiado tras uso)
   const [pinSupervisor, setPinSupervisor] = useState<string>('');
+  const pideCodigo = usePideCodigo();
 
   // Observación/nota de cierre
   const [nota, setNota] = useState<string>('');
@@ -139,7 +141,7 @@ export function ArqueoCiegoForm({ alCerrarCajaExitoso }: ArqueoCiegoFormProps) {
     // Si ya van 3 arqueos que no cuadraron o la API exige código, validar que el supervisor haya puesto código y nota >= 3
     const exigePinSupervisor = intentosFallidos >= 3 || requierePin;
     if (exigePinSupervisor) {
-      if (!pinSupervisor.trim()) {
+      if (pideCodigo && !pinSupervisor.trim()) {
         setErrorCierre('Se alcanzó el límite de intentos: se requiere el código de 6 dígitos del supervisor.');
         return;
       }
@@ -585,7 +587,7 @@ export function ArqueoCiegoForm({ alCerrarCajaExitoso }: ArqueoCiegoFormProps) {
         </div>
 
         {/* Sección de Código de Supervisor (se muestra si van 3 arqueos que no cuadraron o si la API lo pide) */}
-        {(requierePin || intentosFallidos >= 3) && (
+        {pideCodigo && (requierePin || intentosFallidos >= 3) && (
           <div
             data-testid="seccion-pin-supervisor"
             style={{

@@ -28,7 +28,7 @@ Ver tambien: [[zonas]]
 1. Pulsa la pestaña "Horario y fechas".
 2. En la subpestaña "Horario de atención", define la hora de apertura y de cierre para cada día de la semana, o marca "Cerrado" en los días que no haya atención.
 3. En la subpestaña "Fechas especiales", puedes registrar feriados o días festivos específicos indicando si el local estará cerrado todo el día o si atenderá con un horario extraordinario.
-4. Pulsa el botón "Guardar cambios" y confirma con "Sí, guardar".
+4. Pulsa el botón "Guardar cambios" y confirma con "Sí, guardar". Como administrador no te pide código del supervisor.
 Ver tambien: [[mirest]]
 
 ## Como se hace: configurar pagos y entregas

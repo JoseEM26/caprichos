@@ -35,9 +35,11 @@ export class SinVoucherDto {
   @MinLength(5, { message: 'El motivo debe tener al menos 5 caracteres' })
   motivo!: string;
 
+  /** El ADMIN no lo envía; el servicio lo exige a los demás roles. */
+  @IsOptional()
   @IsString({ message: 'El código del supervisor es requerido' })
   @Matches(/^\d{6}$/, { message: 'El código del supervisor son 6 dígitos' })
-  pinSupervisor!: string;
+  pinSupervisor?: string;
 }
 
 export class CobrarDto {

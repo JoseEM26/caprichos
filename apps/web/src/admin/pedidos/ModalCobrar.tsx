@@ -12,6 +12,7 @@ import type { RespuestaSubirVoucherAdmin, VoucherExtraido } from '../vouchers/ti
 import { digitalesDelPlan, medioDigitalVoucher, mismoMedio } from './mediosPago';
 import { CapturasPlanDigital, ExcepcionSinVoucher } from './CapturasPlanDigital';
 import { nombreMedio } from './planPago';
+import { usePideCodigo } from '../../comun/usePideCodigo';
 
 const MEDIOS_PAGO = [
   'Efectivo',
@@ -78,6 +79,7 @@ export function ModalCobrar({
   const [sinVoucher, setSinVoucher] = useState<boolean>(false);
   const [motivoSinVoucher, setMotivoSinVoucher] = useState<string>('');
   const [pinSupervisor, setPinSupervisor] = useState<string>('');
+  const pideCodigo = usePideCodigo();
 
   // Pago dividido con 2 o más medios digitales: una captura por medio (CapturasPlanDigital), como el servidor
   const mediosPlanDigital = digitalesDelPlan(pedido.planPago);
@@ -128,7 +130,7 @@ export function ModalCobrar({
   const excepcionLista =
     sinVoucher &&
     motivoSinVoucher.trim().length >= MOTIVO_MINIMO &&
-    pinSupervisor.length === 6;
+    (!pideCodigo || pinSupervisor.length === 6);
   const comprobanteListo = multiples
     ? faltanCapturas.length === 0 || excepcionLista
     : !hayDigital || voucher !== null || excepcionLista;
@@ -206,10 +208,10 @@ export function ModalCobrar({
     if (!comprobanteListo) {
       setErrorMensaje(
         multiples
-          ? `Falta la captura de ${faltanCapturas.map(nombreMedio).join(', ')}. Súbela, o registra el cobro sin voucher con motivo y código del supervisor.`
+          ? `Falta la captura de ${faltanCapturas.map(nombreMedio).join(', ')}. Súbela, o registra el cobro sin voucher con motivo${pideCodigo ? ' y código del supervisor' : ''}.`
           : ilegible
-            ? 'No se lee: sube otra foto o confirma sin comprobante con código del supervisor.'
-            : 'Falta la foto del comprobante del pago digital. Súbela, o registra el cobro sin voucher con motivo y código del supervisor.',
+            ? `No se lee: sube otra foto o confirma sin comprobante${pideCodigo ? ' con código del supervisor' : ''}.`
+            : `Falta la foto del comprobante del pago digital. Súbela, o registra el cobro sin voucher con motivo${pideCodigo ? ' y código del supervisor' : ''}.`,
       );
       return false;
     }
@@ -243,14 +245,14 @@ export function ModalCobrar({
     // Pago dividido: las capturas ya van enlazadas al pedido; solo la excepción viaja en el cobro
     const comprobante: Partial<CobrarDto> = multiples
       ? faltanCapturas.length > 0 && sinVoucher
-        ? { sinVoucher: { motivo: motivoSinVoucher.trim(), pinSupervisor } }
+        ? { sinVoucher: { motivo: motivoSinVoucher.trim(), pinSupervisor: pideCodigo ? pinSupervisor : undefined } }
         : {}
       : !hayDigital
         ? {}
         : voucher
           ? { voucherId: voucher.id }
           : sinVoucher
-            ? { sinVoucher: { motivo: motivoSinVoucher.trim(), pinSupervisor } }
+            ? { sinVoucher: { motivo: motivoSinVoucher.trim(), pinSupervisor: pideCodigo ? pinSupervisor : undefined } }
             : {};
 
     try {

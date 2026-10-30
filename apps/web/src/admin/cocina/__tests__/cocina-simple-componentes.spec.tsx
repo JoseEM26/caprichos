@@ -11,6 +11,13 @@ import * as sesionModulo from '../../../comun/sesion';
 import * as socketModulo from '../../../comun/socket';
 import type { InsumoExistenciaCocina } from '../cocinaTipos';
 
+
+// El ADMIN no ve el código del supervisor: estas pruebas de código se hacen como CAJERO.
+const comoCajero = () => {
+  const actual = vi.mocked(sesionModulo.useSesion)();
+  vi.spyOn(sesionModulo, 'useSesion').mockReturnValue({ ...actual, usuario: { partyId: '3', nombres: 'Cajera', rol: 'CAJERO' } } as any);
+};
+
 describe('Pantalla de Cocina Simple e Intuitiva - Componentes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -284,6 +291,7 @@ describe('Pantalla de Cocina Simple e Intuitiva - Componentes', () => {
     });
 
     it('muestra error claro si la API responde que requiere autorización del supervisor', async () => {
+      comoCajero();
       const insumosMock = [
         { id: '1', nombre: 'Leche entera', unidad: 'lt', stockActual: 10 },
       ];

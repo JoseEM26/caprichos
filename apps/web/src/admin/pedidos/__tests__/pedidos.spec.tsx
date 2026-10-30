@@ -12,6 +12,13 @@ vi.mock('../audioAlerta', () => ({
   reproducirCampana: vi.fn(),
 }));
 
+
+// El ADMIN no ve el código del supervisor: estas pruebas de código se hacen como CAJERO.
+const comoCajero = () => {
+  const actual = vi.mocked(sesionModulo.useSesion)();
+  vi.spyOn(sesionModulo, 'useSesion').mockReturnValue({ ...actual, usuario: { partyId: '3', nombres: 'Cajera', rol: 'CAJERO' } } as any);
+};
+
 describe('Ola F4: Pedidos y Caja', () => {
   const socketCallbacks: Record<string, ((datos: any) => void)[]> = {};
 
@@ -245,6 +252,7 @@ describe('Ola F4: Pedidos y Caja', () => {
   });
 
   it('3. Confirmar antes de cobrar y antes de anular', async () => {
+    comoCajero();
     const pedidoCobro: Pedido = {
       id: '10',
       codigo: 'CP-010',
@@ -330,6 +338,7 @@ describe('Ola F4: Pedidos y Caja', () => {
   });
 
   it('4. El código no queda en el estado tras enviar la anulación', async () => {
+    comoCajero();
     vi.spyOn(pedidosApi, 'cambiarEstado').mockResolvedValue({} as any);
 
     render(

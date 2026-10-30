@@ -9,3 +9,8 @@ export const marcarAutorizacionSupervisor = () => {
 export const limpiarAutorizacionSupervisor = () => {
   hasta = 0;
 };
+
+/** El ADMIN nunca pide el código del supervisor: sería él mismo aprobándose (el servidor lo deja pasar igual). */
+export function requiereCodigo(usuario?: { rol?: string } | null): boolean {
+  return (usuario?.rol ?? '').toUpperCase() !== 'ADMIN';
+}

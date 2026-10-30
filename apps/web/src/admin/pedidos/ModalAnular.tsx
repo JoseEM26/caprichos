@@ -5,6 +5,7 @@ import { CampoCodigoSupervisor } from '../../comun/CampoCodigoSupervisor';
 import { pedidosApi, Pedido } from './pedidosApi';
 import { ErrorApi } from '../../comun/api';
 import { hayAutorizacionSupervisor, limpiarAutorizacionSupervisor } from '../../comun/autorizacionSupervisor';
+import { usePideCodigo } from '../../comun/usePideCodigo';
 import '../cierre/pendientes-cierre.css';
 
 const MOTIVOS_COMUNES = [
@@ -54,6 +55,7 @@ export function ModalAnular({
   const [mostrarConfirmar, setMostrarConfirmar] = useState<boolean>(false);
   // Con un código aceptado hace menos de 5 min no se vuelve a pedir
   const [autorizado, setAutorizado] = useState<boolean>(() => hayAutorizacionSupervisor());
+  const pideCodigo = usePideCodigo();
 
   const validarCampos = (): boolean => {
     setErrorMensaje('');
@@ -64,7 +66,7 @@ export function ModalAnular({
     }
 
     const codigoTrim = codigo.trim();
-    if (!autorizado && !/^\d{6}$/.test(codigoTrim)) {
+    if (pideCodigo && !autorizado && !/^\d{6}$/.test(codigoTrim)) {
       setErrorMensaje('El código del supervisor debe ser de exactamente 6 dígitos numéricos.');
       return false;
     }
@@ -210,8 +212,8 @@ export function ModalAnular({
 
           <div className="ad-aviso" role="note">
             {esCobro
-              ? 'La anulación del cobro revierte el estado de pago del pedido a PENDIENTE y queda registrada en auditoría con el PIN del supervisor.'
-              : 'Un pedido anulado sale de cocina y reparto, y libera sus mesas. Requiere motivo de 5 o más caracteres y el PIN de 6 dígitos de la supervisora.'}
+              ? `La anulación del cobro revierte el estado de pago del pedido a PENDIENTE y queda registrada en auditoría${pideCodigo ? ' con el PIN del supervisor' : ''}.`
+              : `Un pedido anulado sale de cocina y reparto, y libera sus mesas. Requiere motivo de 5 o más caracteres${pideCodigo ? ' y el PIN de 6 dígitos de la supervisora' : ''}.`}
             {tieneCobro && !esCobro && (
               <div style={{ marginTop: 6 }}>
                 Este pedido tiene un cobro registrado: al anularlo se devuelve su stock y se reversan sus puntos. Si ya está entregado con cobro vigente, el sistema no lo anula: primero hay que anular el cobro.
@@ -282,7 +284,7 @@ export function ModalAnular({
           </div>
 
           {/* Código de supervisor (6 dígitos) */}
-          {autorizado ? (
+          {!pideCodigo ? null : autorizado ? (
             <div className="ad-aviso" role="note" data-testid="autorizacion-vigente">
               Supervisor autorizado: no hace falta escribir el código otra vez (vale 5 minutos).
             </div>

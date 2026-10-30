@@ -28,6 +28,40 @@ export const SEGUNDOS_AUTORIZACION = 5 * 60;
 const claveAutorizacion = (operador: bigint | string) => `supervisor:autorizacion:${operador}`;
 const claveIntentosOperador = (operador: bigint | string) => `pin:supervisor:intentos:${operador}`;
 
+/**
+ * Regla única: el usuario ADMIN activo no necesita código de supervisor (sería él mismo aprobándose).
+ * Audita la acción como AUTORIZACION_SUPERVISOR y devuelve su identidad; null si no es ADMIN.
+ * La usan verificarYConsumirCodigo y los servicios que verifican el PIN por su cuenta.
+ */
+export async function autorizarAdminSinCodigo(
+  prisma: PrismaService,
+  auditoria: AuditoriaService,
+  operadorPartyId: bigint | string | undefined,
+  accion: string,
+  ip?: string,
+  entidad?: string,
+  entidadId?: bigint,
+): Promise<{ party_id: bigint; id: bigint } | null> {
+  if (operadorPartyId === undefined) return null;
+  const admin = await prisma.userAccount.findFirst({
+    where: { party_id: BigInt(operadorPartyId), rol: 'ADMIN', activo: true },
+    select: { party_id: true, id: true },
+  });
+  if (!admin) return null;
+  await auditoria.registrar({
+    categoria: 'ACCESO',
+    modulo: 'supervisor',
+    accion: 'AUTORIZACION_SUPERVISOR',
+    resultado: 'OK',
+    entidad: entidad ?? 'supervisor_codigo',
+    entidadId,
+    motivo: `Acción ${accion}: autorizado por rol ADMIN (sin código)`,
+    partyId: admin.party_id,
+    ip,
+  });
+  return admin;
+}
+
 @Injectable()
 export class SupervisorCodigoService {
   constructor(
@@ -214,6 +248,20 @@ export class SupervisorCodigoService {
     entidadId?: bigint,
     localCodigo = LOCAL_CODIGO_DEFECTO,
   ): Promise<{ party_id: bigint; id: bigint; supervisorPartyId: bigint; supervisorId: bigint }> {
+    // 0. El ADMIN nunca da código (sería él mismo aprobándose): queda auditado y no cuenta intentos.
+    const admin = await autorizarAdminSinCodigo(
+      this.prisma,
+      this.auditoria,
+      operadorPartyId,
+      accion,
+      ip,
+      entidad,
+      entidadId,
+    );
+    if (admin) {
+      return { ...admin, supervisorPartyId: admin.party_id, supervisorId: admin.id };
+    }
+
     const redis = this.redisService.obtenerCliente();
     const claveIntentos = `pin:supervisor:intentos:${operadorPartyId ?? 'general'}`;
 

@@ -216,7 +216,7 @@ export interface CobrarDto {
   /** Foto del comprobante ya subida (POST /admin/vouchers). Queda enlazada al pedido. */
   voucherId?: string | number;
   /** Cobro digital sin foto: motivo escrito y código rotativo del supervisor. */
-  sinVoucher?: { motivo: string; pinSupervisor: string };
+  sinVoucher?: { motivo: string; pinSupervisor?: string };
 }
 
 export const pedidosApi = {
@@ -277,7 +277,7 @@ export const pedidosApi = {
     id: string | number,
     metodo: string,
     estado: 'COORDINADO' | 'PAGADO' = 'PAGADO',
-    sinVoucher?: { motivo: string; pinSupervisor: string },
+    sinVoucher?: { motivo: string; pinSupervisor?: string },
   ): Promise<Pedido> {
     return api.post<Pedido>(`/admin/pedidos/${id}/pago`, {
       metodo,
@@ -353,7 +353,7 @@ export const pedidosApi = {
   /** Pago digital sin foto útil: solo con motivo y código del supervisor (sinVoucher). */
   async marcarPagoCoordinado(
     id: string | number,
-    sinVoucher?: { motivo: string; pinSupervisor: string },
+    sinVoucher?: { motivo: string; pinSupervisor?: string },
   ): Promise<{ id: string; pago_estado: string }> {
     return api.post<{ id: string; pago_estado: string }>(
       `/admin/caja/pedidos/${id}/coordinado`,

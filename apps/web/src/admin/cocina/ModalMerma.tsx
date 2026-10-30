@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Confirmar } from '../../comun/Confirmar';
 import { api } from '../../comun/api';
 import { CampoCodigoSupervisor } from '../../comun/CampoCodigoSupervisor';
+import { usePideCodigo } from '../../comun/usePideCodigo';
 
 export interface LineaMermaForm {
   id: string;
@@ -61,6 +62,7 @@ export function ModalMerma({ abierto, alCerrar, alGuardar }: ModalMermaProps) {
   const [mensajeError, setMensajeError] = useState('');
   const [codigoSupervisor, setCodigoSupervisor] = useState('');
   const [requiereSupervisor, setRequiereSupervisor] = useState(false);
+  const pideCodigo = usePideCodigo();
 
   useEffect(() => {
     if (!abierto) return;
@@ -287,11 +289,12 @@ export function ModalMerma({ abierto, alCerrar, alGuardar }: ModalMermaProps) {
       const codigo = err?.response?.data?.codigo || err?.codigo;
       const status = err?.response?.status || err?.status;
       if (
-        status === 403 ||
+        pideCodigo &&
+        (status === 403 ||
         status === 409 ||
         codigo === 'REQUIERE_CODIGO_SUPERVISOR' ||
         codigo === 'REQUIERE_SUPERVISOR' ||
-        err?.message?.toLowerCase().includes('supervisor')
+        err?.message?.toLowerCase().includes('supervisor'))
       ) {
         setRequiereSupervisor(true);
         setMensajeError('Se requiere autorización del supervisor para registrar esta merma.');

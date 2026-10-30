@@ -44,8 +44,11 @@ Ver tambien: [[historial]]
 
 ## Errores y dudas comunes
 - El cajero dice que el código es incorrecto o expiró: los códigos tienen una validez estricta de 30 segundos. Si el reloj está en los últimos 5 segundos (se colorea en tono vino), es preferible esperar al siguiente ciclo antes de dictarlo para evitar que expire mientras el colaborador lo escribe.
-- ¿Dónde se pide este código?: en acciones como anular un pedido entregado, pausar la carta por alta demanda, modificar roles de empleados o desactivar usuarios.
+- ¿Dónde se pide este código?: a los roles que no son administrador, en acciones como anular un pedido entregado, pausar la carta por alta demanda, modificar roles de empleados o desactivar usuarios. Si entras como administrador no te lo pide: eres tú quien autoriza.
+- Si como administrador ves el mensaje «Código de supervisor incorrecto», avisa al equipo de soporte: el administrador no debe escribir este código en ninguna pantalla.
 - No es una contraseña fija: no intentes memorizar el código de 6 dígitos, ya que se calcula criptográficamente en base a la hora oficial de Lima.
 
 ## Quien puede hacerlo
+El administrador (ADMIN) nunca necesita este código: al entrar como administrador, ninguna acción lo pide (ni horario, ni cierre, ni anulaciones, cobros sin voucher, mermas, usuarios o configuración). El sistema lo deja registrado en auditoría como autorizado por rol ADMIN.
+
 Esta pantalla requiere el permiso supervisor/ver_codigo y está restringida únicamente a usuarios con el rol Administrador (ADMIN) o supervisores autorizados. Ningún cajero, mozo, cocinero ni repartidor tiene acceso a esta vista para evitar autoautorizaciones.

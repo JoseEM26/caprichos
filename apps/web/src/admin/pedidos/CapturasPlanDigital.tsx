@@ -6,6 +6,7 @@ import type { VoucherPagoItem } from '../vouchers/tipos';
 import { digitalesDelPlan, faltanCapturas } from './mediosPago';
 import { nombreMedio } from './planPago';
 import { CampoCodigoSupervisor } from '../../comun/CampoCodigoSupervisor';
+import { usePideCodigo } from '../../comun/usePideCodigo';
 
 export interface CapturasPlanDigitalProps {
   pedidoId: string | number;
@@ -112,10 +113,13 @@ export function ExcepcionSinVoucher({
   onPin: (v: string) => void;
   alVolver: () => void;
 }) {
+  const pideCodigo = usePideCodigo();
   return (
     <>
       <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-rust, #B2500F)' }}>
-        Cobro sin foto: solo con motivo escrito y el código del supervisor. Queda auditado.
+        {pideCodigo
+          ? 'Cobro sin foto: solo con motivo escrito y el código del supervisor. Queda auditado.'
+          : 'Cobro sin foto: solo con motivo escrito. Queda auditado.'}
       </div>
       <label htmlFor="motivo-sin-voucher" style={{ fontWeight: 700, fontSize: 13 }}>
         Motivo (mínimo {MOTIVO_MINIMO_SIN_VOUCHER} letras)
@@ -137,7 +141,7 @@ export function ExcepcionSinVoucher({
           fontFamily: 'inherit',
         }}
       />
-      <CampoCodigoSupervisor valor={pin} onChange={onPin} />
+      {pideCodigo && <CampoCodigoSupervisor valor={pin} onChange={onPin} />}
       <button
         type="button"
         onClick={alVolver}

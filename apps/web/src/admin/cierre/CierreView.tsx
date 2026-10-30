@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useConfirmarAsync } from '../../comun/useConfirmarAsync';
 import { useSesion } from '../../comun/sesion';
+import { usePideCodigo } from '../../comun/usePideCodigo';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { HistorialCierres } from './HistorialCierres';
@@ -22,6 +23,7 @@ const hoyLima = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Americ
 
 export function CierreView() {
   const { usuario, tiene } = useSesion();
+  const pideCodigo = usePideCodigo();
   const { confirmar, dialogo } = useConfirmarAsync();
   const puedeVer = tiene('caja/ver') || tiene('caja/cerrar') || usuario?.rol === 'ADMIN' || usuario?.rol === 'CAJERO';
   const esAdmin = usuario?.rol === 'ADMIN';
@@ -234,6 +236,8 @@ export function CierreView() {
   const cuadraEnSistema = filasCuadre.length > 0 && filasCuadre.every((f) => Math.abs(f.dif) < 0.005);
   // El admin ve la diferencia y la supervisora firma con su PIN; el cajero, si el arqueo no cuadra o ya van 3 arqueos que no cuadraron
   const necesitaPin = esAdmin ? !cuadraEnSistema : revisadoCuadra === false || arqueosNoCuadra >= 3 || requierePin;
+  // El administrador no escribe código (él mismo sería el aprobador); la nota sigue siendo obligatoria si no cuadra
+  const pideCodigoCierre = pideCodigo && necesitaPin;
 
   const armarConteo = () => {
     const conteo: Record<string, number> = {};
@@ -459,7 +463,7 @@ export function CierreView() {
         setMsgCierreError('No cuadra: la supervisora debe escribir su código para revisar el detalle y cerrar.');
         return;
       }
-      if (!pinSupervisora.trim()) {
+      if (pideCodigoCierre && !pinSupervisora.trim()) {
         setMsgCierreError('Escribe el código de la supervisora de 6 dígitos.');
         return;
       }
@@ -490,7 +494,7 @@ export function CierreView() {
           medios: armarMedios(),
           nota: obsCierre.trim() || undefined,
         },
-        necesitaPin ? pinSupervisora.trim() : undefined,
+        pideCodigoCierre ? pinSupervisora.trim() : undefined,
       );
 
       setAbrirModalCierre(false);
@@ -1638,7 +1642,7 @@ export function CierreView() {
                         ¡Cuadra! Todo en orden.
                       </div>
                     )}
-                    {(revisadoCuadra === false || requierePin) && !pinVerificado && (
+                    {pideCodigo && (revisadoCuadra === false || requierePin) && !pinVerificado && (
                       <div style={{ marginTop: 8, border: '1px solid var(--cp-rust, #B2500F)', background: '#FFF0ED', borderRadius: 10, padding: 10 }}>
                         <div style={{ color: 'var(--cp-rust, #B2500F)', fontWeight: 700, fontSize: 13 }}>
                           No cuadra: la supervisora debe escribir su código para revisar el detalle y cerrar.
@@ -1713,33 +1717,6 @@ export function CierreView() {
                         </b>
                       </div>
                     ))}
-                  </div>
-                )}
-
-                {/* El administrador firma la diferencia con el código rotativo */}
-                {esAdmin && necesitaPin && (
-                  <div>
-                    <label htmlFor="cl-pin" style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>
-                      Código del supervisor (la diferencia se cierra con su código)
-                    </label>
-                    <input
-                      id="cl-pin"
-                      type="password"
-                      inputMode="numeric"
-                      maxLength={6}
-                      aria-label="Código de la supervisora"
-                      placeholder="Código del supervisor"
-                      value={pinSupervisora}
-                      onChange={(e) => setPinSupervisora(e.target.value.replace(/\D/g, ''))}
-                      style={{
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        minHeight: 44,
-                        borderRadius: 10,
-                        border: '1.5px solid var(--cp-line, #E3D6C6)',
-                        padding: '0 10px',
-                      }}
-                    />
                   </div>
                 )}
 

@@ -18,7 +18,10 @@ import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { CobrosService } from '../caja/cobros.service';
 import { PuntosService } from '../clientes/puntos.service';
-import { SupervisorCodigoService } from '../supervisor-codigo/supervisor-codigo.service';
+import {
+  SupervisorCodigoService,
+  autorizarAdminSinCodigo,
+} from '../supervisor-codigo/supervisor-codigo.service';
 import { CobrarDto } from '../caja/dto/cobrar.dto';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import {
@@ -174,6 +177,10 @@ export class CierreService {
       );
     }
 
+    // Mismo criterio que el servicio: el ADMIN no da código.
+    const admin = await autorizarAdminSinCodigo(this.prisma, this.auditoria, partyIdOperador, accion, ip, 'caja', cajaId);
+    if (admin) return { party_id: admin.party_id, id: admin.id };
+
     const claveIntentos = `pin:supervisor:intentos:${partyIdOperador ?? 'general'}`;
     const redis = this.redisService.obtenerCliente();
     await exigirPinNoBloqueado(redis, claveIntentos);
@@ -214,7 +221,7 @@ export class CierreService {
         where: { caja_id: caja.id, resultado: 'NO_CUADRA' },
       });
       if (noCuadraPrevios >= ARQUEOS_NO_CUADRA_PARA_PIN) {
-        if (!pinSupervisor) {
+        if (!pinSupervisor && usuario.rol !== 'ADMIN') {
           throw new HttpException(
             {
               codigo: 'PIN_REQUERIDO',
@@ -374,7 +381,7 @@ export class CierreService {
           );
         }
 
-        if (!pinSupervisor) {
+        if (!pinSupervisor && usuario.rol !== 'ADMIN') {
           throw new HttpException(
             {
               codigo: 'PIN_REQUERIDO',
