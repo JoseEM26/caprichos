@@ -21,6 +21,7 @@ import { CrearFechaEspecialDto } from './dto/crear-fecha-especial.dto';
 import { ActualizarFechaEspecialDto } from './dto/actualizar-fecha-especial.dto';
 import { ActualizarDatosLocalDto } from './dto/actualizar-datos-local.dto';
 import { ActualizarPagosDto } from './dto/actualizar-pagos.dto';
+import { SubirFotoLocalDto } from './dto/foto-local.dto';
 
 @Controller('admin/local')
 @UseGuards(AccesoGuard)
@@ -102,6 +103,32 @@ export class LocalController {
   ) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.localService.actualizarDatosLocal(dto, req.usuario, ip);
+  }
+
+  // ================= FOTOS DEL LOCAL =================
+
+  @Get('fotos')
+  @Permiso('local', 'ver')
+  async listarFotos() {
+    return this.localService.listarFotosLocal();
+  }
+
+  @Put('fotos/:slot')
+  @Permiso('local', 'editar')
+  async subirFoto(
+    @Param('slot') slot: string,
+    @Body() dto: SubirFotoLocalDto,
+    @Req() req: any,
+  ) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.localService.subirFotoLocal(slot, dto, req.usuario, ip);
+  }
+
+  @Delete('fotos/:slot')
+  @Permiso('local', 'editar')
+  async desactivarFoto(@Param('slot') slot: string, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.localService.desactivarFotoLocal(slot, req.usuario, ip);
   }
 
   // ================= MEDIOS DE PAGO =================

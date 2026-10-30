@@ -251,6 +251,7 @@ model Archivo {
 
 model FotoLocal {
   archivo_id BigInt  @id
+  slot       String? @unique
   orden      Int     @default(0)
   activo     Boolean @default(true)
   archivo    Archivo @relation(fields: [archivo_id], references: [id])

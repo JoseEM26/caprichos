@@ -1,3 +1,13 @@
+/** Slots fijos de «Fotos del local»: el orden de esta lista es el orden de la galería. */
+export const SLOTS_FOTOS_LOCAL = [
+  'Fachada',
+  'Salón principal',
+  'Barra y vitrina',
+  'Terraza',
+  'Equipo y cocina',
+  'Ambiente de noche',
+] as const;
+
 export const DIAS_SEMANA_NOMBRES: Record<number, string> = {
   1: 'Lunes',
   2: 'Martes',

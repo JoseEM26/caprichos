@@ -39,6 +39,15 @@ describe('LocalService', () => {
         update: jest.fn(),
         delete: jest.fn(),
       },
+      fotoLocal: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findUnique: jest.fn().mockResolvedValue(null),
+        update: jest.fn().mockResolvedValue({}),
+        upsert: jest.fn().mockResolvedValue({}),
+      },
+      archivo: {
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
       $transaction: jest.fn((promises) => Promise.all(promises)),
     };
 
@@ -542,6 +551,90 @@ describe('LocalService', () => {
           accion: 'ACTUALIZAR_PAGOS',
         }),
       );
+    });
+  });
+
+  describe('fotos del local', () => {
+    const fotoFila = (slot: string, archivoId: bigint, orden: number) => ({
+      archivo_id: archivoId,
+      slot,
+      orden,
+      activo: true,
+      archivo: { ruta: `publico/2026/10/${archivoId}.webp` },
+    });
+
+    it('listarFotosLocal devuelve solo las activas con slot, en orden, con url pública', async () => {
+      prismaMock.fotoLocal.findMany.mockResolvedValue([fotoFila('Fachada', 7n, 0), fotoFila('Terraza', 9n, 3)]);
+
+      const res = await service.listarFotosLocal();
+
+      expect(prismaMock.fotoLocal.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { activo: true, slot: { not: null } }, orderBy: { orden: 'asc' } }),
+      );
+      expect(res).toEqual([
+        { slot: 'Fachada', orden: 0, archivoId: '7', url: '/archivos/publico/2026/10/7.webp' },
+        { slot: 'Terraza', orden: 3, archivoId: '9', url: '/archivos/publico/2026/10/9.webp' },
+      ]);
+    });
+
+    it('obtenerDatosPublicosLocal incluye las fotos activas en "fotos"', async () => {
+      prismaMock.fotoLocal.findMany.mockResolvedValue([fotoFila('Fachada', 7n, 0)]);
+      prismaMock.parametro.findMany.mockResolvedValue([]);
+      prismaMock.horarioDia.findMany.mockResolvedValue([]);
+
+      const res = await service.obtenerDatosPublicosLocal();
+
+      expect(res.fotos).toEqual([{ slot: 'Fachada', orden: 0, archivoId: '7', url: '/archivos/publico/2026/10/7.webp' }]);
+    });
+
+    it('subirFotoLocal guarda el archivo en el slot y retira la foto anterior sin borrarla', async () => {
+      prismaMock.archivo.findUnique.mockResolvedValue({ id: 20n, ruta: 'publico/2026/10/20.webp', privado: false, tipo_mime: 'image/webp' });
+      prismaMock.fotoLocal.findUnique.mockResolvedValue({ archivo_id: 7n, slot: 'Fachada', activo: true });
+      const tx = { fotoLocal: { update: jest.fn().mockResolvedValue({}), upsert: jest.fn().mockResolvedValue({}) } };
+      prismaMock.$transaction.mockImplementation(async (fn: any) => fn(tx));
+
+      const res = await service.subirFotoLocal('Fachada', { archivoId: '20' }, adminAuth, '1.1.1.1');
+
+      expect(tx.fotoLocal.update).toHaveBeenCalledWith({ where: { archivo_id: 7n }, data: { slot: null, activo: false } });
+      expect(tx.fotoLocal.upsert).toHaveBeenCalledWith({
+        where: { archivo_id: 20n },
+        update: { slot: 'Fachada', orden: 0, activo: true },
+        create: { archivo_id: 20n, slot: 'Fachada', orden: 0, activo: true },
+      });
+      expect(res).toEqual({ slot: 'Fachada', orden: 0, archivoId: '20', url: '/archivos/publico/2026/10/20.webp' });
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'SUBIR_FOTO_LOCAL' }));
+    });
+
+    it('subirFotoLocal rechaza un slot que no existe', async () => {
+      await expect(service.subirFotoLocal('Cocina', { archivoId: '20' }, adminAuth)).rejects.toThrow(BadRequestException);
+      expect(prismaMock.archivo.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('subirFotoLocal rechaza archivos privados (comprobantes)', async () => {
+      prismaMock.archivo.findUnique.mockResolvedValue({ id: 21n, ruta: 'privado/x.pdf', privado: true, tipo_mime: 'application/pdf' });
+
+      await expect(service.subirFotoLocal('Fachada', { archivoId: '21' }, adminAuth)).rejects.toThrow(BadRequestException);
+      expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('subirFotoLocal responde 404 si el archivo no existe', async () => {
+      await expect(service.subirFotoLocal('Fachada', { archivoId: '99' }, adminAuth)).rejects.toThrow(NotFoundException);
+    });
+
+    it('desactivarFotoLocal marca inactiva la foto del slot (no la borra)', async () => {
+      prismaMock.fotoLocal.findUnique.mockResolvedValue({ archivo_id: 7n, slot: 'Fachada', activo: true });
+
+      await service.desactivarFotoLocal('Fachada', adminAuth);
+
+      expect(prismaMock.fotoLocal.update).toHaveBeenCalledWith({ where: { archivo_id: 7n }, data: { activo: false } });
+      expect(prismaMock.fotoLocal.delete).toBeUndefined();
+    });
+
+    it('desactivarFotoLocal responde 404 si no hay foto activa en el slot', async () => {
+      prismaMock.fotoLocal.findUnique.mockResolvedValue({ archivo_id: 7n, slot: 'Fachada', activo: false });
+
+      await expect(service.desactivarFotoLocal('Fachada', adminAuth)).rejects.toThrow(NotFoundException);
+      expect(prismaMock.fotoLocal.update).not.toHaveBeenCalled();
     });
   });
 });

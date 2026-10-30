@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useUrlArchivo } from '../../comun/useUrlArchivo';
+import { useSubidaArchivo } from '../../comun/useSubidaArchivo';
+import { IndicadorSubida } from '../../comun/IndicadorSubida';
 import { useNavigate } from 'react-router-dom';
 import { useSesion } from '../../comun/sesion';
 import { Cargando } from '../../comun/Cargando';
@@ -113,6 +115,9 @@ export function ProductosView() {
   const [npOpc, setNpOpc] = useState<EstadoOpciones>(ESTADO_VACIO);
   const [npFoto, setNpFoto] = useState<File | null>(null);
   const npFotoUrl = useUrlArchivo(npFoto);
+  /** La imagen nueva se sube al elegirla; «Agregar» espera a que el servidor la tenga. */
+  const [npFotoArchivoId, setNpFotoArchivoId] = useState<string | null>(null);
+  const subidaNpFoto = useSubidaArchivo();
   const npModo: 'unico' | 'opciones' =
     npModoElegido ?? (categorias.find((c) => c.id === npCategoriaId)?.llevaOpciones ? 'opciones' : 'unico');
   const [npError, setNpError] = useState('');
@@ -127,6 +132,7 @@ export function ProductosView() {
   const [edOculto, setEdOculto] = useState(false);
   const [edFotoUrl, setEdFotoUrl] = useState<string | null>(null);
   const [edFotoArchivoId, setEdFotoArchivoId] = useState<string | null>(null);
+  const subidaEdFoto = useSubidaArchivo();
   const [edSabores, setEdSabores] = useState<Array<{ id?: string; nombre: string; activo?: boolean }>>([]);
   const [edNuevoSabor, setEdNuevoSabor] = useState('');
   const [edError, setEdError] = useState('');
@@ -398,17 +404,27 @@ export function ProductosView() {
     });
   };
 
-  // Subir imagen en edición
-  const manejarSubidaFoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Subir imagen en edición: «Subiendo imagen…» hasta que el servidor responde
+  const manejarSubidaFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
-    try {
+    void subidaEdFoto.ejecutar(async () => {
       const res = await catalogoApi.subirFoto(file);
       setEdFotoUrl(res.url);
       setEdFotoArchivoId(res.id);
-    } catch (err: any) {
-      alert(err?.message || 'Error al subir la imagen');
-    }
+    });
+  };
+
+  const elegirNpFoto = (archivo: File | null) => {
+    setNpFoto(archivo);
+    setNpFotoArchivoId(null);
+    subidaNpFoto.reiniciar();
+    if (!archivo) return;
+    void subidaNpFoto.ejecutar(async () => {
+      const res = await catalogoApi.subirFoto(archivo);
+      setNpFotoArchivoId(res.id);
+    });
   };
 
   const quitarFoto = () => {
@@ -463,6 +479,11 @@ export function ProductosView() {
       return;
     }
 
+    if (npFoto && !npFotoArchivoId) {
+      setNpError(subidaNpFoto.subiendo ? 'Espera a que termine de subir la imagen.' : 'La imagen no se subió. Reintenta la subida o quítala.');
+      return;
+    }
+
     setConfirmarProps({
       abierto: true,
       titulo: `¿Agregar "${npNombre.trim().toUpperCase()}" a la carta?`,
@@ -470,13 +491,12 @@ export function ProductosView() {
         'Aparece en la carta virtual, en Nuevo pedido y en Productos. No se elimina: se puede marcar agotado.',
       accion: async () => {
         try {
-          const foto = npFoto ? await catalogoApi.subirFoto(npFoto) : null;
           await catalogoApi.crearProducto({
             nombre: npNombre.trim().toUpperCase(),
             categoriaId: npCategoriaId,
             precio: precioNum,
             descripcion: npDesc.trim() || undefined,
-            ...(foto ? { fotoArchivoId: foto.id } : {}),
+            ...(npFotoArchivoId ? { fotoArchivoId: npFotoArchivoId } : {}),
             ...(conOpciones
               ? {
                   tamanos: npOpc.tamanos.map((t) => ({ tamanoValorId: t.tamanoValorId, precio: t.precio, activo: t.activo })),
@@ -490,7 +510,7 @@ export function ProductosView() {
           setNpDesc('');
           setNpModoElegido(null);
           setNpOpc(ESTADO_VACIO);
-          setNpFoto(null);
+          elegirNpFoto(null);
           setNpError('');
           await cargarDatos();
         } catch (err: any) {
@@ -1747,19 +1767,20 @@ export function ProductosView() {
                     cursor: 'pointer',
                   }}
                 >
-                  {npFoto ? 'Cambiar imagen' : 'Subir imagen'}
+                  {subidaNpFoto.subiendo ? 'Subiendo imagen…' : npFoto ? 'Cambiar imagen' : 'Subir imagen'}
                   <input
                     type="file"
                     accept="image/*"
                     aria-label="Imagen del producto nuevo"
-                    onChange={(e) => setNpFoto(e.target.files?.[0] ?? null)}
+                    disabled={subidaNpFoto.subiendo}
+                    onChange={(e) => elegirNpFoto(e.target.files?.[0] ?? null)}
                     style={{ position: 'absolute', left: -9999 }}
                   />
                 </label>
                 {npFoto && (
                   <button
                     type="button"
-                    onClick={() => setNpFoto(null)}
+                    onClick={() => elegirNpFoto(null)}
                     style={{
                       minHeight: 44,
                       padding: '0 16px',
@@ -1775,6 +1796,7 @@ export function ProductosView() {
                   </button>
                 )}
               </div>
+              <IndicadorSubida estado={subidaNpFoto.estado} error={subidaNpFoto.error} onReintentar={subidaNpFoto.reintentar} />
             </div>
 
             {npError && (
@@ -2112,14 +2134,16 @@ export function ProductosView() {
                       cursor: 'pointer',
                     }}
                   >
-                    Subir imagen
+                    {subidaEdFoto.subiendo ? 'Subiendo imagen…' : 'Subir imagen'}
                     <input
                       type="file"
                       accept="image/*"
                       onChange={manejarSubidaFoto}
+                      disabled={subidaEdFoto.subiendo}
                       style={{ position: 'absolute', left: -9999 }}
                     />
                   </label>
+                  <IndicadorSubida estado={subidaEdFoto.estado} error={subidaEdFoto.error} onReintentar={subidaEdFoto.reintentar} />
                   {edFotoUrl && (
                     <button
                       onClick={quitarFoto}

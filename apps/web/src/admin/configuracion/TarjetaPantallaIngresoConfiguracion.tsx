@@ -3,6 +3,8 @@ import { Confirmar } from '../../comun/Confirmar';
 import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
 import { ErrorApi } from '../../comun/api';
+import { IndicadorSubida } from '../../comun/IndicadorSubida';
+import { useSubidaArchivo } from '../../comun/useSubidaArchivo';
 import { CampoAyuda } from './AyudaCampo';
 import { CampoConfig } from './CampoConfig';
 import { reducirImagenVoucher } from '../vouchers/reducirImagenVoucher';
@@ -71,7 +73,7 @@ export function TarjetaPantallaIngresoConfiguracion() {
   const [propias, setPropias] = useState<ImagenIngresoConfig[]>([]);
   const [frase, setFrase] = useState<string>(FRASE_INGRESO_DEFECTO);
   const [cargando, setCargando] = useState<boolean>(true);
-  const [subiendo, setSubiendo] = useState<boolean>(false);
+  const subida = useSubidaArchivo();
   const [guardando, setGuardando] = useState<boolean>(false);
   const [confirmarGuardar, setConfirmarGuardar] = useState<boolean>(false);
   const [mensajeExito, setMensajeExito] = useState<string | null>(null);
@@ -137,28 +139,17 @@ export function TarjetaPantallaIngresoConfiguracion() {
     setSeleccion((prev) => prev.filter((_, i) => i !== indice));
   };
 
-  const subirPropia = async (archivo: File) => {
-    setSubiendo(true);
+  const subirPropia = (archivo: File) => {
     setError(null);
     setMensajeExito(null);
-    try {
+    void subida.ejecutar(async () => {
       // Reduce el lado mayor a 1400 px en el navegador (en fotos verticales, el alto).
       const reducido = await reducirImagenVoucher(archivo, MAX_LADO_SUBIDA_PX, 0.85);
       const url = await pantallaIngresoApi.subirImagen(reducido);
       const nueva: ImagenIngresoConfig = { tipo: 'archivo', valor: url };
       setPropias((prev) => [...prev, nueva]);
-      setSeleccion((prev) =>
-        prev.length < MAX_IMAGENES_INGRESO ? [...prev, nueva] : prev,
-      );
-    } catch (err) {
-      setError(
-        err instanceof ErrorApi
-          ? err.message
-          : 'No se pudo subir la imagen. Prueba con una foto más liviana.',
-      );
-    } finally {
-      setSubiendo(false);
-    }
+      setSeleccion((prev) => (prev.length < MAX_IMAGENES_INGRESO ? [...prev, nueva] : prev));
+    });
   };
 
   const handleSolicitarGuardar = () => {
@@ -368,17 +359,17 @@ export function TarjetaPantallaIngresoConfiguracion() {
               color: 'var(--cp-navy, #0B2C3E)',
               fontWeight: 800,
               fontSize: '13px',
-              cursor: subiendo || guardando ? 'default' : 'pointer',
-              opacity: subiendo || guardando ? 0.6 : 1,
+              cursor: subida.subiendo || guardando ? 'default' : 'pointer',
+              opacity: subida.subiendo || guardando ? 0.6 : 1,
             }}
           >
-            {subiendo ? 'Subiendo imagen...' : 'Subir foto propia'}
+            {subida.subiendo ? 'Subiendo imagen…' : 'Subir foto propia'}
           </label>
           <input
             id="pantalla-ingreso-subir"
             type="file"
             accept="image/jpeg,image/png,image/webp"
-            disabled={subiendo || guardando}
+            disabled={subida.subiendo || guardando}
             style={{ display: 'none' }}
             onChange={(e) => {
               const archivo = e.target.files?.[0];
@@ -386,6 +377,7 @@ export function TarjetaPantallaIngresoConfiguracion() {
               if (archivo) void subirPropia(archivo);
             }}
           />
+          <IndicadorSubida estado={subida.estado} error={subida.error} onReintentar={subida.reintentar} />
           <div style={{ fontSize: '11.5px', color: 'var(--cp-soft, #2C4C5D)', marginTop: '6px' }}>
             Sube una foto JPG, PNG o WebP; se reduce en el navegador antes de subirla, queda en la biblioteca y se agrega al carrusel si hay lugar (máximo {MAX_IMAGENES_INGRESO}).
           </div>
@@ -430,7 +422,7 @@ export function TarjetaPantallaIngresoConfiguracion() {
         <Boton
           variante="primario"
           cargando={guardando}
-          disabled={subiendo}
+          disabled={subida.subiendo}
           onClick={handleSolicitarGuardar}
           data-testid="btn-guardar-pantalla-ingreso"
         >

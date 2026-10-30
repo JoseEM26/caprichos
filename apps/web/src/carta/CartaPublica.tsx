@@ -251,6 +251,12 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
     ).filter(Boolean);
   }, [contenido]);
 
+  /** Galería «Nuestro lugar»: las fotos del local (servidor); si no hay ninguna, las fotos de las destacadas de siempre. */
+  const fotosNuestroLugar = useMemo(() => {
+    const delLocal = (datosLocal?.fotos ?? []).map((f) => f.url).filter(Boolean);
+    return delLocal.length > 0 ? delLocal : fotosDestacadas;
+  }, [datosLocal, fotosDestacadas]);
+
   const destacadasVisibles = useMemo(() => {
     return (contenido?.destacadas ?? [])
       .filter((d) => d.activo !== false && !extraerOffDeUrl(d.portada_url) && Array.isArray(d.fotos) && d.fotos.length > 0)
@@ -747,7 +753,7 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
         storageKey={vistaPrevia ? 'caprichos_preview_franja_aviso' : undefined}
       />
 
-      {pagina === 'conocenos' && <PaginaConocenos datosLocal={datosLocal} estadoLocal={estadoLocal} fotos={fotosDestacadas} contenido={contenido?.conocenos} />}
+      {pagina === 'conocenos' && <PaginaConocenos datosLocal={datosLocal} estadoLocal={estadoLocal} fotos={fotosNuestroLugar} contenido={contenido?.conocenos} />}
       {pagina === 'novedades' && (
         <PaginaNovedades
           novedades={novedadesEnriquecidas}

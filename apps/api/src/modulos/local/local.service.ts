@@ -11,12 +11,14 @@ import {
   formatearHora,
   horaToDate,
   obtenerFechaHoraLima,
+  SLOTS_FOTOS_LOCAL,
 } from './local.util';
 import { ActualizarHorarioDiaDto } from './dto/actualizar-horario.dto';
 import { CrearFechaEspecialDto } from './dto/crear-fecha-especial.dto';
 import { ActualizarFechaEspecialDto } from './dto/actualizar-fecha-especial.dto';
 import { ActualizarDatosLocalDto } from './dto/actualizar-datos-local.dto';
 import { ActualizarPagosDto } from './dto/actualizar-pagos.dto';
+import { SubirFotoLocalDto } from './dto/foto-local.dto';
 
 export const PAGOS_DEFAULT = {
   efectivo: { activo: true },
@@ -269,7 +271,7 @@ export class LocalService {
    * Obtiene los datos públicos del local para la carta virtual.
    */
   async obtenerDatosPublicosLocal() {
-    const [parametros, horarios] = await Promise.all([
+    const [parametros, horarios, fotos] = await Promise.all([
       this.prisma.parametro.findMany({
         where: {
           clave: {
@@ -287,6 +289,7 @@ export class LocalService {
       this.prisma.horarioDia.findMany({
         orderBy: { dia_semana: 'asc' },
       }),
+      this.listarFotosLocal(),
     ]);
 
     const datosParam = parametros.find((p) => p.clave === 'local_datos')?.valor as any;
@@ -339,6 +342,7 @@ export class LocalService {
       envioGratisModo: typeof envioGratisModo === 'string' ? envioGratisModo : 'mas_de',
       pedidoMinimo: typeof pedidoMinimo === 'number' ? pedidoMinimo : null,
       puntosPorcentaje: puntosPorcentaje > 0 ? puntosPorcentaje : 5,
+      fotos,
     };
   }
 
@@ -697,6 +701,107 @@ export class LocalService {
     });
 
     return parametro.valor;
+  }
+
+  // ================= FOTOS DEL LOCAL =================
+
+  /** Fotos activas por slot, en el orden de la galería. Solo las que tienen slot (las reemplazadas no aparecen). */
+  async listarFotosLocal() {
+    const filas = await this.prisma.fotoLocal.findMany({
+      where: { activo: true, slot: { not: null } },
+      include: { archivo: { select: { ruta: true } } },
+      orderBy: { orden: 'asc' },
+    });
+    return filas.map((f) => ({
+      slot: f.slot as string,
+      orden: f.orden,
+      archivoId: f.archivo_id.toString(),
+      url: `/archivos/${f.archivo.ruta}`,
+    }));
+  }
+
+  /**
+   * Pone una foto en un slot. La foto que estaba en ese slot no se borra: pierde el slot y queda inactiva.
+   * El archivo tiene que ser público (imagen subida con POST /admin/archivos).
+   */
+  async subirFotoLocal(
+    slot: string,
+    dto: SubirFotoLocalDto,
+    usuarioActual?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const orden = SLOTS_FOTOS_LOCAL.indexOf(slot as (typeof SLOTS_FOTOS_LOCAL)[number]);
+    if (orden < 0) {
+      throw new BadRequestException({ codigo: 'SLOT_INVALIDO', mensaje: `Slot de foto no válido: ${slot}` });
+    }
+
+    const archivoId = BigInt(dto.archivoId);
+    const archivo = await this.prisma.archivo.findUnique({ where: { id: archivoId } });
+    if (!archivo) {
+      throw new NotFoundException({ codigo: 'ARCHIVO_NO_ENCONTRADO', mensaje: 'No se encontró la imagen subida' });
+    }
+    if (archivo.privado || !archivo.tipo_mime.startsWith('image/')) {
+      throw new BadRequestException({ codigo: 'ARCHIVO_NO_ES_FOTO', mensaje: 'Solo se pueden usar imágenes públicas' });
+    }
+
+    const anterior = await this.prisma.fotoLocal.findUnique({ where: { slot } });
+
+    await this.prisma.$transaction(async (tx) => {
+      if (anterior && anterior.archivo_id !== archivoId) {
+        await tx.fotoLocal.update({
+          where: { archivo_id: anterior.archivo_id },
+          data: { slot: null, activo: false },
+        });
+      }
+      await tx.fotoLocal.upsert({
+        where: { archivo_id: archivoId },
+        update: { slot, orden, activo: true },
+        create: { archivo_id: archivoId, slot, orden, activo: true },
+      });
+    });
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'local',
+      accion: 'SUBIR_FOTO_LOCAL',
+      resultado: 'OK',
+      entidad: 'foto_local',
+      entidadId: archivoId,
+      antes: anterior ? { slot, archivoId: anterior.archivo_id.toString() } : null,
+      despues: { slot, archivoId: archivoId.toString() },
+      partyId: usuarioActual?.partyId,
+      ip,
+    });
+
+    return { slot, orden, archivoId: archivoId.toString(), url: `/archivos/${archivo.ruta}` };
+  }
+
+  /** Quita una foto de la galería: se desactiva (no se borra) y el slot queda libre para otra. */
+  async desactivarFotoLocal(slot: string, usuarioActual?: UsuarioAutenticado, ip?: string) {
+    const fila = await this.prisma.fotoLocal.findUnique({ where: { slot } });
+    if (!fila || !fila.activo) {
+      throw new NotFoundException({ codigo: 'FOTO_NO_ENCONTRADA', mensaje: `No hay foto activa en ${slot}` });
+    }
+
+    await this.prisma.fotoLocal.update({
+      where: { archivo_id: fila.archivo_id },
+      data: { activo: false },
+    });
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'local',
+      accion: 'DESACTIVAR_FOTO_LOCAL',
+      resultado: 'OK',
+      entidad: 'foto_local',
+      entidadId: fila.archivo_id,
+      antes: { slot, activo: true },
+      despues: { slot, activo: false },
+      partyId: usuarioActual?.partyId,
+      ip,
+    });
+
+    return { mensaje: 'Foto quitada de la galería' };
   }
 
   // ================= ADMIN: MEDIOS DE PAGO =================

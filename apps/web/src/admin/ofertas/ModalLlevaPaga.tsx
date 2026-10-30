@@ -1,3 +1,5 @@
+import { IndicadorSubida } from '../../comun/IndicadorSubida';
+import { useSubidaArchivo } from '../../comun/useSubidaArchivo';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { OfertaItem, ofertasApi } from './ofertasApi';
 import { ModalConfirmacion } from './ModalConfirmacion';
@@ -66,7 +68,7 @@ export function ModalLlevaPaga({
   const [nombre, setNombre] = useState('');
   const [fotoUrl, setFotoUrl] = useState<string | null>(null);
   const [fotoArchivoId, setFotoArchivoId] = useState<string | null>(null);
-  const [subiendoFoto, setSubiendoFoto] = useState(false);
+  const subidaFoto = useSubidaArchivo();
   const [confirmarQuitarFoto, setConfirmarQuitarFoto] = useState(false);
   const [componentes, setComponentes] = useState<ComponenteLlevaPaga[]>([]);
   const [modoComp, setModoComp] = useState<'PRODUCTO' | 'CATEGORIA'>('PRODUCTO');
@@ -218,19 +220,15 @@ export function ModalLlevaPaga({
     setComponentes((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const manejarSubidaFoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const manejarSubidaFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
-    setSubiendoFoto(true);
-    try {
+    void subidaFoto.ejecutar(async () => {
       const res = await ofertasApi.subirFoto(file);
       setFotoUrl(res.url);
       setFotoArchivoId(res.id);
-    } catch (err: any) {
-      setMensajeError(err?.message || 'Error al subir la imagen');
-    } finally {
-      setSubiendoFoto(false);
-    }
+    });
   };
 
   const confirmarQuitar = () => {
@@ -670,9 +668,10 @@ export function ModalLlevaPaga({
                       cursor: 'pointer',
                     }}
                   >
-                    {subiendoFoto ? 'Subiendo...' : fotoUrl ? 'Cambiar foto' : 'Subir foto'}
-                    <input type="file" accept="image/*" onChange={manejarSubidaFoto} style={{ display: 'none' }} />
+                    {subidaFoto.subiendo ? 'Subiendo imagen…' : fotoUrl ? 'Cambiar foto' : 'Subir foto'}
+                    <input type="file" accept="image/*" onChange={manejarSubidaFoto} disabled={subidaFoto.subiendo} style={{ display: 'none' }} />
                   </label>
+                  <IndicadorSubida estado={subidaFoto.estado} error={subidaFoto.error} onReintentar={subidaFoto.reintentar} />
                   {fotoUrl && (
                     <button
                       type="button"

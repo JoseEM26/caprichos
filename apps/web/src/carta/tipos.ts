@@ -94,6 +94,8 @@ export interface DatosLocalCarta {
   puntosPorcentaje?: number;
   lat?: number;
   lng?: number;
+  /** Fotos del local (Admin ▸ Configuración ▸ Fotos del local), en orden. Alimentan la galería «Nuestro lugar». */
+  fotos?: Array<{ slot: string; orden: number; archivoId: string; url: string }>;
 }
 
 export interface ConsultaEnvioRespuesta {

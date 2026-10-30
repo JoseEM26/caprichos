@@ -79,7 +79,7 @@ export function AdjuntarCapturaPago({ codigo, token, pagoDigital }: AdjuntarCapt
             cursor: estado === 'subiendo' ? 'not-allowed' : 'pointer',
           }}
         >
-          {estado === 'subiendo' ? 'Enviando captura...' : 'Adjuntar captura'}
+          {estado === 'subiendo' ? 'Subiendo imagen…' : 'Adjuntar captura'}
           <input
             type="file"
             accept="image/*"

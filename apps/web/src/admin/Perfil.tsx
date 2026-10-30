@@ -6,6 +6,8 @@ import { Boton } from '../comun/Boton';
 import { Campo } from '../comun/Campo';
 import { Confirmar } from '../comun/Confirmar';
 import { Tarjeta } from '../comun/Tarjeta';
+import { IndicadorSubida } from '../comun/IndicadorSubida';
+import { useSubidaArchivo } from '../comun/useSubidaArchivo';
 import { MODULOS } from './modulos';
 import { reducirImagenVoucher } from './vouchers/reducirImagenVoucher';
 
@@ -85,6 +87,7 @@ export function Perfil() {
   const [errorCarga, setErrorCarga] = useState('');
   const [mensaje, setMensaje] = useState('');
   const [procesando, setProcesando] = useState(false);
+  const subidaFoto = useSubidaArchivo<MiPerfil>();
 
   const [form, setForm] = useState<DatosForm>({ nombres: '', apellidos: '', correo: '' });
   const [errorDatos, setErrorDatos] = useState('');
@@ -211,20 +214,20 @@ export function Perfil() {
     if (!fotoNueva) return;
     setProcesando(true);
     setErrorFoto('');
-    try {
+    // «Foto actualizada» solo cuando el servidor respondió; si falla, el indicador muestra el error con Reintentar.
+    const actualizado = await subidaFoto.ejecutar(async () => {
       const fd = new FormData();
       fd.append('foto', fotoNueva, 'foto.jpg');
-      const actualizado = await clienteFetch<MiPerfil>('/auth/perfil/foto', { method: 'PUT', body: fd });
+      return clienteFetch<MiPerfil>('/auth/perfil/foto', { method: 'PUT', body: fd });
+    });
+    if (actualizado) {
       setPerfil(actualizado);
       descartarFoto();
       setMensaje('Tu foto se actualizó.');
       await refrescarYo();
-    } catch (err) {
-      setErrorFoto(mensajeDe(err, 'No se pudo guardar la foto. Intenta de nuevo.'));
-    } finally {
-      setProcesando(false);
-      setConfirmarFoto(false);
     }
+    setProcesando(false);
+    setConfirmarFoto(false);
   };
 
   const quitarFoto = async () => {
@@ -440,10 +443,11 @@ export function Perfil() {
                 {perfil.fotoUrl ? 'Cambiar foto' : 'Subir foto'}
               </Boton>
             )}
+            <IndicadorSubida estado={subidaFoto.estado} error={subidaFoto.error} onReintentar={subidaFoto.reintentar} />
             {fotoNueva && (
               <>
-                <Boton variante="primario" onClick={() => setConfirmarFoto(true)} deshabilitado={procesando}>
-                  Guardar foto
+                <Boton variante="primario" onClick={() => setConfirmarFoto(true)} deshabilitado={procesando || subidaFoto.subiendo}>
+                  {subidaFoto.subiendo ? 'Subiendo imagen…' : 'Guardar foto'}
                 </Boton>
                 <Boton variante="texto" onClick={descartarFoto} deshabilitado={procesando}>
                   Cancelar

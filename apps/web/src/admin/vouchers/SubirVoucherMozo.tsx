@@ -4,7 +4,6 @@ import { vouchersApi, type ItemHistorialVoucher } from './vouchersApi';
 import { FotoAmpliable } from './FotoAmpliable';
 import { HistorialVoucher } from '../salon/HistorialVoucher';
 import { reducirImagenVoucher } from './reducirImagenVoucher';
-import { Cargando } from '../../comun/Cargando';
 import { ErrorApi } from '../../comun/api';
 import { usePideCodigo } from '../../comun/usePideCodigo';
 import type { RespuestaSubirVoucher, RespuestaSubirVoucherMozo } from './tipos';
@@ -370,7 +369,7 @@ export function SubirVoucherMozo({
             </div>
             <div style={{ color: 'var(--cp-soft, #2C4C5D)', marginTop: '2px' }}>
               {subiendo
-                ? 'Analizando voucher...'
+                ? 'Subiendo imagen…'
                 : voucherValidoId
                 ? avisos.length > 0
                   ? 'Voucher recibido'
@@ -512,7 +511,10 @@ export function SubirVoucherMozo({
           data-testid="voucher-mozo-analizando"
           style={{ padding: '8px 0' }}
         >
-          <Cargando mensaje="Analizando voucher en el momento..." />
+          <div role="status" aria-live="polite" style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 44, fontSize: 13, fontWeight: 700, color: 'var(--cp-navy, #0B2C3E)' }}>
+            <span aria-hidden="true" style={{ width: 18, height: 18, border: '3px solid var(--cp-line, #E3D6C6)', borderTopColor: 'var(--cp-orange, #F28C28)', borderRadius: '50%', display: 'inline-block', animation: 'cp-spin 0.8s linear infinite' }} />
+            Subiendo imagen…
+          </div>
         </div>
       )}
 

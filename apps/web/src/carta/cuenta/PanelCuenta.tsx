@@ -87,7 +87,7 @@ function BotonesFoto() {
         }}
       />
       <button onClick={() => inputFoto.current?.click()} disabled={subiendo} style={{ ...botonSecundario, flex: '1 1 150px' }}>
-        {subiendo ? 'Subiendo...' : cliente.fotoUrl ? 'Cambiar foto' : 'Subir foto'}
+        {subiendo ? 'Subiendo imagen…' : cliente.fotoUrl ? 'Cambiar foto' : 'Subir foto'}
       </button>
       {cliente.fotoUrl && (
         <button onClick={() => setConfirmarQuitar(true)} disabled={subiendo} style={{ ...botonSecundario, flex: '1 1 150px' }}>

@@ -1,6 +1,8 @@
 import { useRef } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { useSeleccionEd } from './LienzoEdicion';
+import { IndicadorSubida } from '../../../comun/IndicadorSubida';
+import { useSubidaArchivo } from '../../../comun/useSubidaArchivo';
 
 export interface BloqueEditableProps {
   clave: string;
@@ -17,7 +19,8 @@ export interface BloqueEditableProps {
   /** Mostrar / Ocultar. */
   onOcultar?: () => void;
   /** Cambiar foto: recibe el archivo elegido. */
-  onFoto?: (archivo: File) => void;
+  /** Sube y aplica la foto. Si rechaza, el bloque muestra el error con Reintentar. */
+  onFoto?: (archivo: File) => void | Promise<void>;
   /** Botones propios de este bloque (tamaño, duplicar, eliminar…). */
   acciones?: ReactNode;
   /** Ventana pequeña anclada al bloque. */
@@ -31,6 +34,7 @@ export interface BloqueEditableProps {
 export function BloqueEditable(p: BloqueEditableProps) {
   const s = useSeleccionEd();
   const entrada = useRef<HTMLInputElement>(null);
+  const subidaFoto = useSubidaArchivo();
   const envoltura = useRef<HTMLDivElement>(null);
   const seleccionado = s?.sel === p.clave;
   const aceptar = (desde: string | null) => !!desde && desde !== p.clave && !!p.onSoltar && (p.puedeSoltar?.(desde) ?? true);
@@ -118,12 +122,14 @@ export function BloqueEditable(p: BloqueEditableProps) {
                   accept="image/*"
                   aria-label={`Elegir foto para ${p.etiqueta}`}
                   style={{ position: 'absolute', width: 1, height: 1, opacity: 0, pointerEvents: 'none' }}
+                  disabled={subidaFoto.subiendo}
                   onChange={(e) => {
                     const f = e.target.files?.[0];
                     e.target.value = '';
-                    if (f) p.onFoto!(f);
+                    if (f) void subidaFoto.ejecutar(async () => { await p.onFoto!(f); });
                   }}
                 />
+                <IndicadorSubida estado={subidaFoto.estado} error={subidaFoto.error} onReintentar={subidaFoto.reintentar} />
               </>
             )}
             {p.acciones}

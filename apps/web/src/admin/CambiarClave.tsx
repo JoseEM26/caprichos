@@ -1,7 +1,9 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSesion } from '../comun/sesion';
-import { api, ErrorApi } from '../comun/api';
+import { api, clienteFetch, ErrorApi } from '../comun/api';
+import { IndicadorSubida } from '../comun/IndicadorSubida';
+import { useSubidaArchivo } from '../comun/useSubidaArchivo';
 
 export function CambiarClave() {
   const { usuario, debeCambiar, marcarClaveCambiada, salir } = useSesion();
@@ -21,6 +23,7 @@ export function CambiarClave() {
   const [cargando, setCargando] = useState(false);
   const [errorApi, setErrorApi] = useState('');
   const [foto, setFoto] = useState<string>('');
+  const subidaFoto = useSubidaArchivo();
 
   // Reglas de validación
   const tieneMinimo8 = nueva.length >= 8;
@@ -36,27 +39,33 @@ export function CambiarClave() {
     .map((p) => p[0].toUpperCase())
     .join('');
 
+  // La foto se guarda en el servidor (la misma de Mi perfil); se ve al abrir la pantalla.
+  useEffect(() => {
+    api
+      .get<{ fotoUrl: string | null }>('/auth/perfil')
+      .then((p) => setFoto(p.fotoUrl ?? ''))
+      .catch(() => {});
+  }, []);
+
   const handleSubirFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === 'string') {
-          setFoto(reader.result);
-          try {
-            localStorage.setItem(`foto_${usuario?.partyId || 'yo'}`, reader.result);
-          } catch {}
-        }
-      };
-      reader.readAsDataURL(file);
-    }
+    e.target.value = '';
+    if (!file) return;
+    void subidaFoto.ejecutar(async () => {
+      const fd = new FormData();
+      fd.append('foto', file, 'foto.jpg');
+      const actualizado = await clienteFetch<{ fotoUrl: string | null }>('/auth/perfil/foto', { method: 'PUT', body: fd });
+      setFoto(actualizado.fotoUrl ?? '');
+    });
   };
 
-  const handleQuitarFoto = () => {
-    setFoto('');
+  const handleQuitarFoto = async () => {
     try {
-      localStorage.removeItem(`foto_${usuario?.partyId || 'yo'}`);
-    } catch {}
+      const actualizado = await api.delete<{ fotoUrl: string | null }>('/auth/perfil/foto');
+      setFoto(actualizado.fotoUrl ?? '');
+    } catch (err) {
+      setErrorApi(err instanceof ErrorApi ? err.message : 'No se pudo quitar la foto. Inténtalo de nuevo.');
+    }
   };
 
   // Submit Primer Ingreso
@@ -349,6 +358,7 @@ export function CambiarClave() {
                       type="file"
                       accept="image/*"
                       onChange={handleSubirFoto}
+                      disabled={subidaFoto.subiendo}
                       aria-label="Elegir foto de perfil"
                       style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }}
                     />
@@ -375,6 +385,8 @@ export function CambiarClave() {
                 </div>
               </div>
             </div>
+
+            <IndicadorSubida estado={subidaFoto.estado} error={subidaFoto.error} onReintentar={subidaFoto.reintentar} />
 
             {errorApi && (
               <div

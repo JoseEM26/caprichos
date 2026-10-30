@@ -4,6 +4,7 @@ import { useSesion } from '../../comun/sesion';
 import { api, ErrorApi } from '../../comun/api';
 import { Confirmar } from '../../comun/Confirmar';
 import { HorarioTab } from './HorarioTab';
+import { FotosLocalSeccion } from './FotosLocalSeccion';
 import { PagosTab } from './PagosTab';
 import { FechasEspecialesTab } from './FechasEspecialesTab';
 import { ZonasRepartoView } from './ZonasRepartoView';
@@ -247,15 +248,6 @@ export const CATEGORIAS_CONFIG: CategoriaConfig[] = [
   },
 ];
 
-const SLOTS_FOTOS = [
-  'Fachada',
-  'Salón principal',
-  'Barra y vitrina',
-  'Terraza',
-  'Equipo y cocina',
-  'Ambiente de noche',
-];
-
 /** Valores de ejemplo que el servidor devuelve mientras el dueño no guarda sus datos: no se muestran como si fueran reales. */
 const EJEMPLOS_DEL_SERVIDOR = new Set(['Av. Principal 123', '999999999']);
 
@@ -338,14 +330,6 @@ export function ConfiguracionLocalView() {
   const [datosCargados, setDatosCargados] = useState(false);
 
   const [mensaje, setMensaje] = useState<string>('');
-  const [fotosLocales, setFotosLocales] = useState<Record<string, string>>(() => {
-    try {
-      const f = localStorage.getItem('caprichos_fotos_local');
-      return f ? JSON.parse(f) : {};
-    } catch {
-      return {};
-    }
-  });
 
   // Diálogos de confirmación
   const [confirmarGuardar, setConfirmarGuardar] = useState(false);
@@ -503,34 +487,6 @@ export function ConfiguracionLocalView() {
     setInfo(infoGuardada);
     setMensaje('Cambios descartados.');
     setTimeout(() => setMensaje(''), 3000);
-  };
-
-  const handleSubirFoto = (slot: string, e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === 'string') {
-          const nuevas = { ...fotosLocales, [slot]: reader.result };
-          setFotosLocales(nuevas);
-          try {
-            localStorage.setItem('caprichos_fotos_local', JSON.stringify(nuevas));
-          } catch {}
-          setMensaje(`Foto "${slot}" actualizada.`);
-          setTimeout(() => setMensaje(''), 3000);
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleQuitarFoto = (slot: string) => {
-    const nuevas = { ...fotosLocales };
-    delete nuevas[slot];
-    setFotosLocales(nuevas);
-    try {
-      localStorage.setItem('caprichos_fotos_local', JSON.stringify(nuevas));
-    } catch {}
   };
 
   const renderCampo = (f: CategoriaConfig['fields'][number]) => {
@@ -1060,121 +1016,8 @@ export function ConfiguracionLocalView() {
         )}
       </div>
 
-      {/* Tarjeta Fotos del Local (a todo el ancho) */}
-      {(!esMovil || verDetalle) && (
-      <div
-        style={{
-          background: 'var(--cp-white)',
-          border: '1px solid var(--cp-line)',
-          borderRadius: '12px',
-          padding: '20px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '12px',
-        }}
-      >
-        <div>
-          <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '18px' }}>
-            Fotos del local
-          </div>
-          <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
-            Se ven en la página Conócenos de la carta virtual (galería "Nuestro lugar"). Sube las fotos que entregue el restaurante: del local, del grupo, del equipo. Cada foto se guarda al subirla.
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
-          {SLOTS_FOTOS.map((slot) => {
-            const foto = fotosLocales[slot];
-            return (
-              <div
-                key={slot}
-                style={{
-                  border: '1px solid var(--cp-line)',
-                  borderRadius: '12px',
-                  padding: '10px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px',
-                }}
-              >
-                <div
-                  style={{
-                    position: 'relative',
-                    aspectRatio: '4/3',
-                    borderRadius: '10px',
-                    overflow: 'hidden',
-                    background: 'var(--cp-sand)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'var(--cp-soft)',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                  }}
-                >
-                  {foto ? (
-                    <img
-                      src={foto}
-                      alt={slot}
-                      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
-                  ) : (
-                    <span>Sin foto</span>
-                  )}
-                </div>
-                <div style={{ fontWeight: 700, fontSize: '13px' }}>{slot}</div>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <label
-                    style={{
-                      position: 'relative',
-                      flex: 1,
-                      minHeight: '44px',
-                      boxSizing: 'border-box',
-                      borderRadius: '10px',
-                      background: 'var(--cp-orange)',
-                      color: 'var(--cp-navy)',
-                      fontWeight: 800,
-                      fontSize: '12px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {foto ? 'Cambiar foto' : 'Subir foto'}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => handleSubirFoto(slot, e)}
-                      style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }}
-                    />
-                  </label>
-                  {foto && (
-                    <button
-                      type="button"
-                      onClick={() => handleQuitarFoto(slot)}
-                      style={{
-                        minHeight: '44px',
-                        padding: '0 12px',
-                        border: '1.5px solid var(--cp-rust)',
-                        borderRadius: '10px',
-                        background: 'transparent',
-                        color: 'var(--cp-rust)',
-                        fontWeight: 700,
-                        fontSize: '12px',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Quitar
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-      )}
+      {/* Tarjeta Fotos del Local (a todo el ancho): se guardan en el servidor */}
+      {(!esMovil || verDetalle) && <FotosLocalSeccion puedeEditar={puedeEditar} />}
 
       {/* Modales Confirmar */}
       <Confirmar

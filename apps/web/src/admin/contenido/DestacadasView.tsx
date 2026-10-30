@@ -1,5 +1,8 @@
 import { useState, useEffect, type ChangeEvent, type DragEvent } from 'react';
-import { api, clienteFetch } from '../../comun/api';
+import { api } from '../../comun/api';
+import { subirImagenAlServidor } from '../../comun/subidaImagen';
+import { useSubidaArchivo } from '../../comun/useSubidaArchivo';
+import { IndicadorSubida } from '../../comun/IndicadorSubida';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { Confirmar } from '../../comun/Confirmar';
@@ -123,29 +126,14 @@ const EJEMPLOS_PIES = [
   'Foto de ejemplo',
 ];
 
+/** Sube la imagen al servidor. Sin respaldo en el borrador: si falla, lanza el error (nunca se guarda un data URL). */
 async function subirArchivoImagen(file: File): Promise<string> {
-  try {
-    const fd = new FormData();
-    fd.append('archivo', file);
-    const res = await clienteFetch<{ id: string; url: string }>('/admin/archivos', {
-      method: 'POST',
-      body: fd,
-    });
-    if (res?.url) {
-      return normalizarUrlArchivo(res.url) || res.url;
-    }
-  } catch {
-    // Respaldo con DataURL si falla la subida o en entorno de pruebas
-  }
-  return await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (ev) => resolve((ev.target?.result as string) || '');
-    reader.onerror = () => reject(new Error('No se pudo leer la imagen'));
-    reader.readAsDataURL(file);
-  });
+  const res = await subirImagenAlServidor(file);
+  return normalizarUrlArchivo(res.url) || res.url;
 }
 
 export function DestacadasView() {
+  const subidaImagen = useSubidaArchivo<string>();
   const [destacadas, setDestacadas] = useState<DestacadaAdmin[]>([]);
   const [eliminadasIds, setEliminadasIds] = useState<string[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -272,7 +260,7 @@ export function DestacadasView() {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
-    const url = await subirArchivoImagen(file);
+    const url = await subidaImagen.ejecutar(() => subirArchivoImagen(file));
     if (url) {
       actualizarSeleccionada({ portada_url: url });
     }
@@ -296,15 +284,14 @@ export function DestacadasView() {
     e.target.value = '';
     const subidas: FotoDestacada[] = [];
     for (let i = 0; i < files.length; i++) {
-      const url = await subirArchivoImagen(files[i]);
-      if (url) {
-        subidas.push({
-          id: `foto-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`,
-          url,
-          pie: '',
-          orden: seleccionada.fotos.length + i + 1,
-        });
-      }
+      const url = await subidaImagen.ejecutar(() => subirArchivoImagen(files[i]));
+      if (!url) break; // se detiene al primer error; las subidas bien hechas quedan
+      subidas.push({
+        id: `foto-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`,
+        url,
+        pie: '',
+        orden: seleccionada.fotos.length + i + 1,
+      });
     }
     if (subidas.length > 0) {
       actualizarSeleccionada({ fotos: [...seleccionada.fotos, ...subidas] });
@@ -316,7 +303,7 @@ export function DestacadasView() {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
-    const url = await subirArchivoImagen(file);
+    const url = await subidaImagen.ejecutar(() => subirArchivoImagen(file));
     if (url) {
       const nuevas = seleccionada.fotos.map((f, j) =>
         j === fotoIdx ? { ...f, url } : f,
@@ -1063,6 +1050,7 @@ export function DestacadasView() {
                   type="file"
                   accept="image/*"
                   onChange={cambiarPortada}
+                  disabled={subidaImagen.subiendo}
                   style={{ position: 'absolute', left: -9999 }}
                 />
               </label>
@@ -1124,10 +1112,12 @@ export function DestacadasView() {
                   accept="image/*"
                   multiple
                   onChange={agregarFotos}
+                  disabled={subidaImagen.subiendo}
                   style={{ position: 'absolute', left: -9999 }}
                 />
               </label>
             </div>
+            <IndicadorSubida estado={subidaImagen.estado} error={subidaImagen.error} onReintentar={subidaImagen.reintentar} />
             {seleccionada.fotos.length === 0 && (
               <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
                 Todavía no hay imágenes. Un círculo sin imágenes no se muestra en la carta.
@@ -1255,6 +1245,7 @@ export function DestacadasView() {
                       type="file"
                       accept="image/*"
                       onChange={(e) => reemplazarFoto(fIdx, e)}
+                      disabled={subidaImagen.subiendo}
                       style={{ position: 'absolute', left: -9999 }}
                     />
                   </label>

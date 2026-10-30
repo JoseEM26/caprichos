@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { api } from '../../comun/api';
+import { IndicadorSubida } from '../../comun/IndicadorSubida';
+import { useSubidaArchivo } from '../../comun/useSubidaArchivo';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { EditorPantalla } from '../../comun/PantallaCompleta';
@@ -159,6 +161,7 @@ export function DisenadorView() {
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [sel, setSelRaw] = useState<string | null>(null);
   const [pop, setPop] = useState<{ bloque: string; tipo: string } | null>(null);
+  const subidaMomento = useSubidaArchivo();
   const [momentosBase, setMomentosBase] = useState<DestacadaAdmin[]>([]);
   const [datosPublicos, setDatosPublicos] = useState<{
     contenido: Partial<ContenidoCarta> | null;
@@ -320,12 +323,9 @@ export function DisenadorView() {
   const mismoTipo = (a: string) => (b2: string) => tipoDe(a) === tipoDe(b2);
   const setBanner = (parche: Partial<Banner>) => cambiar((s) => ({ ...s, banner: { ...s.banner, ...parche } }));
 
+  /** Sube la foto y la aplica solo cuando el servidor respondió; si falla, el error lo muestra el indicador. */
   const subirYAplicar = async (archivo: File, aplicar: (url: string) => void) => {
-    try {
-      aplicar(await subirFotoEdicion(archivo));
-    } catch {
-      setMensaje('No se pudo cargar la foto');
-    }
+    aplicar(await subirFotoEdicion(archivo));
   };
 
   // ---- barra por tipo de bloque ----
@@ -594,12 +594,17 @@ export function DisenadorView() {
           const f = ev.target.files?.[0];
           ev.target.value = '';
           if (!f) return;
-          subirYAplicar(f, (url) => {
-            const id = `nuevo-${Date.now()}`;
-            cambiar((s) => ({ ...s, momentos: { ...s.momentos, orden: [...ordenMomentos(), id], nuevos: [...s.momentos.nuevos, { id, titulo: 'Nuevo momento', foto: url }] } }));
-          });
+          void subidaMomento.ejecutar(() =>
+            subirYAplicar(f, (url) => {
+              const id = `nuevo-${Date.now()}`;
+              cambiar((s) => ({ ...s, momentos: { ...s.momentos, orden: [...ordenMomentos(), id], nuevos: [...s.momentos.nuevos, { id, titulo: 'Nuevo momento', foto: url }] } }));
+            }),
+          );
         }}
       />
+      <div style={{ position: 'fixed', bottom: 12, left: 12, zIndex: 50, background: 'var(--cp-white)', borderRadius: 10 }}>
+        <IndicadorSubida estado={subidaMomento.estado} error={subidaMomento.error} onReintentar={subidaMomento.reintentar} />
+      </div>
     </EditorPantalla>
   );
 }

@@ -260,12 +260,8 @@ export function NovedadesView() {
         }
         onOcultar={() => cambiarItem(id, { activo: !n.activo })}
         onFoto={async (f) => {
-          try {
-            const url = await subirFotoEdicion(f);
-            cambiarItem(id, { fotos: [url, ...n.fotos.slice(1)] });
-          } catch {
-            setMensaje('No se pudo cargar la foto');
-          }
+          const url = await subirFotoEdicion(f);
+          cambiarItem(id, { fotos: [url, ...n.fotos.slice(1)] });
         }}
         acciones={
           <>

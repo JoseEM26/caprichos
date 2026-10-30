@@ -144,6 +144,39 @@ export const PAL_DEFAULT: Record<string, Record<string, string>> = {
   },
 };
 
+/**
+ * Ruta de archivo (columna archivo.ruta) a partir de la URL que guarda el borrador o el formulario.
+ * Única puerta: `/archivos/<ruta>` se convierte a `<ruta>` para encontrar el archivo subido; un data URL
+ * (imagen incrustada) no es un archivo y se rechaza. Las URL externas (http) se guardan tal cual.
+ */
+function rutaDesdeUrl(url: string): string {
+  if (url.startsWith('data:')) {
+    throw new BadRequestException({
+      codigo: 'IMAGEN_NO_SUBIDA',
+      mensaje: 'Una imagen no está guardada en el servidor. Súbela de nuevo.',
+    });
+  }
+  return url.startsWith('/archivos/') ? url.slice('/archivos/'.length) : url;
+}
+
+/**
+ * Quita los data URLs (imágenes incrustadas) de un borrador antes de guardarlo: el borrador solo guarda
+ * URLs de archivos subidos. Las fotos que llegaron así se pierden del borrador; hay que subirlas de nuevo.
+ */
+function sinDataUrls(valor: unknown): unknown {
+  if (typeof valor === 'string') return valor.startsWith('data:') ? undefined : valor;
+  if (Array.isArray(valor)) return valor.map(sinDataUrls).filter((x) => x !== undefined);
+  if (valor && typeof valor === 'object') {
+    const salida: Record<string, unknown> = {};
+    for (const [clave, v] of Object.entries(valor)) {
+      const limpio = sinDataUrls(v);
+      if (limpio !== undefined) salida[clave] = limpio;
+    }
+    return salida;
+  }
+  return valor;
+}
+
 /** Ruta pública de un archivo guardado (misma regla que el catálogo: /archivos/<ruta>). */
 function urlArchivo(ruta: string): string {
   if (/^(https?:|data:)/.test(ruta)) return ruta;
@@ -511,6 +544,7 @@ export class ContenidoService {
       orderBy: { id: 'desc' },
     });
 
+    if (dto.contenido) dto = { ...dto, contenido: sinDataUrls(dto.contenido) as any };
     let contenido: any = dto.contenido || borradorExistente?.contenido || publicada?.contenido || {};
     if (dto.contenido) {
       // Disposición: si el cliente no la manda, se conserva la del borrador (o la publicada); si la manda, se valida estricta
@@ -642,7 +676,8 @@ export class ContenidoService {
     };
   }
 
-  private async archivoDeRuta(ruta: string): Promise<bigint> {
+  private async archivoDeRuta(url: string): Promise<bigint> {
+    const ruta = rutaDesdeUrl(url);
     const existente = await this.prisma.archivo.findFirst({ where: { ruta } });
     if (existente) return existente.id;
     const creado = await this.prisma.archivo.create({
@@ -969,7 +1004,7 @@ export class ContenidoService {
   }
 
   async guardarBorradorConocenos(dto: unknown, usuario?: UsuarioAutenticado) {
-    const borrador = normalizarConocenos(dto);
+    const borrador = normalizarConocenos(sinDataUrls(dto));
     await this.prisma.parametro.upsert({
       where: { clave: `${CLAVE_CONOCENOS}_borrador` },
       update: { valor: borrador as any },
@@ -1028,8 +1063,9 @@ export class ContenidoService {
 
   async guardarNovedadesBorrador(items: unknown, usuario?: UsuarioAutenticado) {
     if (!Array.isArray(items)) throw new BadRequestException('Las novedades del borrador deben ser una lista');
+    const listaSinDataUrls = sinDataUrls(items) as any[];
     const txt = (v: unknown, max: number) => (typeof v === 'string' ? v.slice(0, max) : undefined);
-    const limpias = items
+    const limpias = listaSinDataUrls
       .filter((n: any) => n && typeof n.id === 'string' && n.id)
       .slice(0, 100)
       .map((n: any) => ({
@@ -1134,11 +1170,12 @@ export class ContenidoService {
   private async asociarFotosNovedad(novedadId: bigint, fotos: string[]) {
     let ord = 1;
     for (const f of fotos) {
-      let archivo = await this.prisma.archivo.findFirst({ where: { ruta: f } });
+      const ruta = rutaDesdeUrl(f);
+      let archivo = await this.prisma.archivo.findFirst({ where: { ruta } });
       if (!archivo) {
         archivo = await this.prisma.archivo.create({
           data: {
-            ruta: f,
+            ruta,
             tipo_mime: 'image/webp',
             bytes: 1024,
             privado: false,
@@ -1240,11 +1277,12 @@ export class ContenidoService {
 
     let portadaArchivoId: bigint | null = null;
     if (dto.portada_url) {
-      let archivo = await this.prisma.archivo.findFirst({ where: { ruta: dto.portada_url } });
+      const rutaPortada = rutaDesdeUrl(dto.portada_url);
+      let archivo = await this.prisma.archivo.findFirst({ where: { ruta: rutaPortada } });
       if (!archivo) {
         archivo = await this.prisma.archivo.create({
           data: {
-            ruta: dto.portada_url,
+            ruta: rutaPortada,
             tipo_mime: 'image/webp',
             bytes: 1024,
             privado: false,
@@ -1297,10 +1335,11 @@ export class ContenidoService {
 
     if (dto.portada_url !== undefined) {
       if (dto.portada_url) {
-        let archivo = await this.prisma.archivo.findFirst({ where: { ruta: dto.portada_url } });
+        const rutaPortada = rutaDesdeUrl(dto.portada_url);
+        let archivo = await this.prisma.archivo.findFirst({ where: { ruta: rutaPortada } });
         if (!archivo) {
           archivo = await this.prisma.archivo.create({
-            data: { ruta: dto.portada_url, tipo_mime: 'image/webp', bytes: 1024, privado: false },
+            data: { ruta: rutaPortada, tipo_mime: 'image/webp', bytes: 1024, privado: false },
           });
         }
         data.portada_archivo_id = archivo.id;
@@ -1327,10 +1366,11 @@ export class ContenidoService {
       const vistos = new Set<string>();
       const fotosMetaList: Array<{ id?: string; url: string; pie: string; orden: number }> = [];
       for (const item of dto.fotos) {
-        let archivo = await this.prisma.archivo.findFirst({ where: { ruta: item.url } });
+        const rutaFoto = rutaDesdeUrl(item.url);
+        let archivo = await this.prisma.archivo.findFirst({ where: { ruta: rutaFoto } });
         if (!archivo) {
           archivo = await this.prisma.archivo.create({
-            data: { ruta: item.url, tipo_mime: 'image/webp', bytes: 1024, privado: false },
+            data: { ruta: rutaFoto, tipo_mime: 'image/webp', bytes: 1024, privado: false },
           });
         }
         const ordenItem = item.orden ?? ord++;

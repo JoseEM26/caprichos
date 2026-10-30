@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Confirmar } from '../../comun/Confirmar';
 import { subirCapturaIniciativa } from './iniciativasApi';
+import { IndicadorSubida } from '../../comun/IndicadorSubida';
+import { useSubidaArchivo } from '../../comun/useSubidaArchivo';
 
 export interface NuevaIniciativaModalProps {
   abierto: boolean;
@@ -42,7 +44,7 @@ export function NuevaIniciativaModal({
   const [cargando, setCargando] = useState<boolean>(false);
   const [archivoId, setArchivoId] = useState<string | null>(null);
   const [fotoVistaPrevia, setFotoVistaPrevia] = useState<string | null>(null);
-  const [subiendoFoto, setSubiendoFoto] = useState<boolean>(false);
+  const subidaCaptura = useSubidaArchivo();
   const [confirmando, setConfirmando] = useState<boolean>(false);
 
   useEffect(() => {
@@ -59,8 +61,9 @@ export function NuevaIniciativaModal({
 
   if (!abierto) return null;
 
-  const handleSeleccionarFoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSeleccionarFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
@@ -68,28 +71,21 @@ export function NuevaIniciativaModal({
       return;
     }
 
-    try {
-      setSubiendoFoto(true);
-      setError('');
-      if (fotoVistaPrevia && fotoVistaPrevia.startsWith('blob:')) {
-        try {
-          URL.revokeObjectURL(fotoVistaPrevia);
-        } catch {
-          // Ignorar
-        }
+    setError('');
+    if (fotoVistaPrevia && fotoVistaPrevia.startsWith('blob:')) {
+      try {
+        URL.revokeObjectURL(fotoVistaPrevia);
+      } catch {
+        // Ignorar
       }
-      const previewUrl = URL.createObjectURL(file);
-      setFotoVistaPrevia(previewUrl);
-
+    }
+    setFotoVistaPrevia(URL.createObjectURL(file));
+    setArchivoId(null);
+    // «Captura lista» solo cuando el servidor guardó el archivo
+    void subidaCaptura.ejecutar(async () => {
       const res = await subirCapturaIniciativa(file);
       setArchivoId(res.id);
-    } catch (err) {
-      setError(err instanceof Error && err.message ? err.message : 'Error al subir la imagen. Intenta de nuevo.');
-      setFotoVistaPrevia(null);
-      setArchivoId(null);
-    } finally {
-      setSubiendoFoto(false);
-    }
+    });
   };
 
   const quitarFoto = () => {
@@ -327,14 +323,16 @@ export function NuevaIniciativaModal({
                 cursor: 'pointer',
               }}
             >
-              {subiendoFoto ? 'Subiendo…' : 'Subir captura'}
+              {subidaCaptura.subiendo ? 'Subiendo imagen…' : 'Subir captura'}
               <input
                 type="file"
                 accept="image/*"
+                disabled={subidaCaptura.subiendo}
                 onChange={handleSeleccionarFoto}
                 style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }}
               />
             </label>
+            <IndicadorSubida estado={subidaCaptura.estado} error={subidaCaptura.error} onReintentar={subidaCaptura.reintentar} textoListo="Captura lista" />
             {fotoVistaPrevia && (
               <>
                 <img
@@ -380,7 +378,7 @@ export function NuevaIniciativaModal({
           <button
             type="button"
             onClick={intentarEnviar}
-            disabled={cargando || subiendoFoto}
+            disabled={cargando || subidaCaptura.subiendo}
             style={{
               flex: 1,
               minHeight: '52px',
