@@ -45,7 +45,7 @@ on:
         required: false
         type: string
       dominio_adicional:
-        description: 'Solo configurar-dominios-demo: segundo dominio que atiende la demo (por defecto caprichos.pe; déjelo vacío para quitarlo cuando producción lo use)'
+        description: 'Solo configurar-dominios-demo: segundo dominio que atiende la demo (por defecto caprichos.pe; escriba ninguno para quitarlo cuando producción lo use)'
         required: false
         default: 'caprichos.pe'
         type: string
@@ -642,6 +642,7 @@ jobs:
         run: |
           set -o pipefail
           if [ "$SIMULACRO" = "false" ]; then MODO=real; else MODO=simulacro; fi
+          if [ "$ADICIONAL" = "ninguno" ]; then ADICIONAL=""; fi
           if [ -n "$ADICIONAL" ] && [[ ! "$ADICIONAL" =~ ^[a-z0-9.-]+$ ]]; then
             echo "::error::dominio_adicional no válido."
             exit 1
