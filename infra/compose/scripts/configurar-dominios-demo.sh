@@ -63,9 +63,10 @@ TAG=$(leer TAG)
 FIN_DEMO="$NUEVO"
 FIN_ALT="$ADICIONAL"
 FIN_ALT2=""
-# Lo que ya atendía la demo no se pierde: el primero que no quede como principal ni adicional pasa a ALT2
+# Solo se conserva el enlace de respaldo por IP (*.sslip.io, lo usan el webhook y el agente de impresión);
+# cualquier otro dominio que no se pida explícitamente deja de atenderse
 for candidato in "$ACT_DEMO" "$ACT_ALT" "$ACT_ALT2"; do
-  if [[ -n "$candidato" && "$candidato" != "$FIN_DEMO" && "$candidato" != "$FIN_ALT" ]]; then
+  if [[ "$candidato" == *.sslip.io && "$candidato" != "$FIN_DEMO" && "$candidato" != "$FIN_ALT" ]]; then
     FIN_ALT2="$candidato"
     break
   fi
