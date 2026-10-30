@@ -1,10 +1,11 @@
 /** Plan de pago (pago dividido): monto por medio. Compartido por mesa, llevar/delivery, caja y Mis pedidos. */
-export type MedioPlan = 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TRANSFERENCIA';
+export type MedioPlan = 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TARJETA' | 'TRANSFERENCIA';
 
 export const MEDIOS_PLAN: ReadonlyArray<{ id: MedioPlan; nombre: string }> = [
   { id: 'EFECTIVO', nombre: 'Efectivo' },
   { id: 'YAPE', nombre: 'Yape' },
   { id: 'PLIN', nombre: 'Plin' },
+  { id: 'TARJETA', nombre: 'Tarjeta' },
   { id: 'TRANSFERENCIA', nombre: 'Transferencia' },
 ];
 
@@ -23,7 +24,7 @@ export interface PlanPagoItem {
 }
 
 export function nombreMedio(medio: string): string {
-  return MEDIOS_PLAN.find((m) => m.id === medio)?.nombre ?? (medio === 'TARJETA' ? 'Tarjeta' : medio);
+  return MEDIOS_PLAN.find((m) => m.id === medio)?.nombre ?? medio;
 }
 
 /** Plan inicial de un solo medio por el total. */

@@ -102,7 +102,7 @@ function coincideBusqueda(p: MiPedido, busqueda: string): boolean {
 }
 
 function nombreMedioPlan(medio: string): string {
-  return medio === 'EFECTIVO' ? 'Efectivo' : medio === 'YAPE' ? 'Yape' : medio === 'PLIN' ? 'Plin' : 'Transferencia';
+  return medio === 'EFECTIVO' ? 'Efectivo' : medio === 'YAPE' ? 'Yape' : medio === 'PLIN' ? 'Plin' : medio === 'TARJETA' ? 'Tarjeta' : 'Transferencia';
 }
 
 export function MisPedidosView() {

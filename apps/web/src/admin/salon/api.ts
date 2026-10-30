@@ -66,7 +66,7 @@ export interface AbrirPedidoMesaPayload {
   };
   /** Cómo paga: un medio o pago dividido (plan). */
   pago?: {
-    metodo: 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TRANSFERENCIA';
+    metodo: 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TARJETA' | 'TRANSFERENCIA';
     pagaCon?: number;
     plan?: PlanPagoItem[];
   };

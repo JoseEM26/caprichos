@@ -778,13 +778,17 @@ export const TEXTOS_BOT = {
     return `Estos son nuestros ${catNombre.toLowerCase()}. ¿Cuál te provoca?`;
   },
 
-  carruselFavoritos: (catNombre: string): string => {
-    return `Los favoritos de nuestros clientes ⭐\nDesliza para ver ${catNombre.toLowerCase()} y toca «Pedir este» en el que te provoque.`;
+  carruselFavoritos: (catNombre: string, total?: number): string => {
+    const cuantos = total && total > 10 ? ` (los 10 primeros de ${total})` : '';
+    return `Los favoritos de nuestros clientes ⭐\nDesliza para ver ${catNombre.toLowerCase()}${cuantos} y toca «Pedir este» en el que te provoque.`;
   },
 
   carruselMasOpciones: (): string => 'Más opciones para ti 💛\nDesliza y toca «Pedir este» en el que quieras.',
 
   carruselVerListaCompleta: (): string => '¿Quieres ver todo lo que tenemos en esta categoría?',
+
+  carruselVerMas: (quedan: number): string =>
+    `Hay ${quedan} ${quedan === 1 ? 'opción más' : 'opciones más'} en esta categoría. ¿Las vemos?`,
 
   pedidoProductoAgotado: (nombre: string, alternativas: string[] = []): string => {
     const altTexto = alternativas.length > 0 ? ` Te sugiero ${alternativas.join(' o ')}.` : '';

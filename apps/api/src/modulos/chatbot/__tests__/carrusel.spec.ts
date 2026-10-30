@@ -130,22 +130,41 @@ describe('flujo del bot: carrusel de productos y promociones', () => {
     return transicionarEstado(r.nuevoFlujo, normalizarEntrada({ listRowId: id }), c);
   };
 
-  it('primer carrusel = 10 más vendidos, segundo = siguientes, y «Ver lista completa» si aún quedan', () => {
+  it('primer envío = solo los 10 más vendidos + botones «Ver más» / «Ver lista completa»', () => {
     const ventas: Record<string, number> = { '25': 100, '24': 90 };
     const r = elegir(ctx([{ id: 'c1', nombre: 'Frappes', productos: productos(25) }], { ventasProductos: ventas }));
-    const [a, b, c] = r.acciones as any[];
+    const [a, b, ...resto] = r.acciones as any[];
+    expect(resto).toHaveLength(0);
     expect(a.tipo).toBe('enviarCarrusel');
     expect(a.carga.cuerpo).toContain('favoritos');
+    expect(a.carga.cuerpo).toContain('de 25');
     expect(a.carga.tarjetas.map((t: any) => t.boton.id).slice(0, 3)).toEqual(['ped_prod_25', 'ped_prod_24', 'ped_prod_1']);
     expect(a.carga.tarjetas).toHaveLength(10);
     expect(a.carga.respaldo.filas.length).toBeGreaterThan(0);
-    expect(b.tipo).toBe('enviarCarrusel');
-    expect(b.soloSiCarruselSalio).toBe(true);
-    expect(b.carga.cuerpo).toContain('Más opciones');
-    expect(b.carga.tarjetas).toHaveLength(10);
-    expect(c.tipo).toBe('enviarBotones');
-    expect(c.botones[0].id).toBe('ped_prod_lista');
+    expect(b.tipo).toBe('enviarBotones');
+    expect(b.botones.map((x: any) => x.id)).toEqual(['ped_prod_mas_2', 'ped_prod_lista', 'btn_categorias']);
     expect(a.carga.tarjetas[0].imagenUrl).toBe('https://caprichos.pe/carta/productos/25/imagen-inicial.png?v=F');
+  });
+  it('«Ver más» trae la siguiente página de 10, luego la última; con 1 sobrante va como lista', () => {
+    const c = ctx([{ id: 'c1', nombre: 'Frappes', productos: productos(25) }]);
+    const r = elegir(c);
+    const p2 = transicionarEstado(r.nuevoFlujo, normalizarEntrada({ buttonPayload: 'ped_prod_mas_2' }), c);
+    const [a2, b2] = p2.acciones as any[];
+    expect(a2.tipo).toBe('enviarCarrusel');
+    expect(a2.carga.cuerpo).toContain('Más opciones');
+    expect(a2.carga.tarjetas.map((t: any) => t.boton.id)[0]).toBe('ped_prod_11');
+    expect(b2.botones[0].id).toBe('ped_prod_mas_3');
+    const p3 = transicionarEstado(p2.nuevoFlujo, normalizarEntrada({ buttonPayload: 'ped_prod_mas_3' }), c);
+    expect(p3.acciones.map((x: any) => x.tipo)).toEqual(['enviarCarrusel']);
+    expect((p3.acciones[0] as any).carga.tarjetas).toHaveLength(5);
+    const c11 = ctx([{ id: 'c1', nombre: 'Frappes', productos: productos(11) }]);
+    const q = transicionarEstado(elegir(c11).nuevoFlujo, normalizarEntrada({ buttonPayload: 'ped_prod_mas_2' }), c11);
+    expect(q.acciones.map((x: any) => x.tipo)).toEqual(['enviarLista']);
+    expect((q.acciones[0] as any).filas[0].id).toBe('ped_prod_11');
+  });
+  it('hasta 10 productos: solo el carrusel, sin botones de «Ver más»', () => {
+    const r = elegir(ctx([{ id: 'c1', nombre: 'Frappes', productos: productos(10) }]));
+    expect(r.acciones.map((x: any) => x.tipo)).toEqual(['enviarCarrusel']);
   });
   it('«Desde S/ X» si tiene tamaños', () => {
     const ps = productos(2, { tamanos: [{ nombre: 'M', precio: 12 }, { nombre: 'G', precio: 15 }] });

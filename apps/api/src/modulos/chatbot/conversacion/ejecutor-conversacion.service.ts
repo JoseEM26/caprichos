@@ -234,7 +234,7 @@ export class EjecutorConversacionService {
       const ult = await this.prisma.mensajeChat.findMany({
         where: { conversacion_id: conversacionId, direccion: 'SALE', autor: 'BOT', tipo: { in: ['BOTON', 'LISTA'] } },
         orderBy: { id: 'desc' },
-        take: 3, // un carrusel puede ir en 2 mensajes: los toques de cualquiera de los últimos valen
+        take: 4, // carrusel + botones «Ver más», y la página anterior: los toques de cualquiera de los últimos valen
       });
       const c: any = ult?.[0]?.contenido;
       if (!c) return null;

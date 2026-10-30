@@ -6,6 +6,7 @@ import { EstadoError } from '../../comun/EstadoError';
 import { Confirmar } from '../../comun/Confirmar';
 import { Insignia } from '../../comun/Insignia';
 import { TarjetaProteccionSpam } from './TarjetaProteccionSpam';
+import { TarjetaConsumoWhatsapp } from './TarjetaConsumoWhatsapp';
 import { CampoConfig } from './CampoConfig';
 import { CampoAyuda } from './AyudaCampo';
 
@@ -945,6 +946,8 @@ function ChatbotConfiguracionVista({
         titulo="Protección y privacidad"
         descripcion="Anti-spam, pedidos falsos, retención de mensajes y derechos ARCO (Ley 29733)."
       >
+      <TarjetaConsumoWhatsapp esAdmin={puedeEditar} />
+
       <CampoConfig id="chatbot-proteccion-spam">
         <TarjetaProteccionSpam esAdmin={puedeEditar} />
       </CampoConfig>

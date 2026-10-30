@@ -108,7 +108,7 @@ describe('ModalNuevoPedidoMesa: medio de pago del mozo en llevar y delivery', ()
 
     const grupo = await screen.findByRole('group', { name: '¿Cómo paga?' });
     const opciones = within(grupo).getAllByRole('button');
-    expect(opciones.map((b) => b.textContent)).toEqual(['Efectivo', 'Yape', 'Plin', 'Transferencia']);
+    expect(opciones.map((b) => b.textContent)).toEqual(['Efectivo', 'Yape', 'Plin', 'Tarjeta', 'Transferencia']);
     expect(within(grupo).getByRole('button', { name: 'Efectivo' })).toHaveAttribute('aria-pressed', 'true');
     // El campo «con cuánto paga» aparece con efectivo en llevar también (para el vuelto)
     expect(screen.getByText('¿Con cuánto paga?')).toBeInTheDocument();

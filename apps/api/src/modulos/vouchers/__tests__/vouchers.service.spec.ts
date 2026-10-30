@@ -619,8 +619,15 @@ describe('VouchersService', () => {
     });
 
     it('medio no válido: 400 y no avisa', async () => {
-      await expect(service.enviarACaja('50', 'TARJETA', mozoUsuario)).rejects.toThrow(BadRequestException);
+      await expect(service.enviarACaja('50', 'BITCOIN', mozoUsuario)).rejects.toThrow(BadRequestException);
       expect(prismaMock.notificacion.create).not.toHaveBeenCalled();
+    });
+
+    it('TARJETA sin plan: no pide voucher, avisa a Caja como pago en mesa', async () => {
+      await expect(service.enviarACaja('50', 'TARJETA', mozoUsuario)).resolves.toEqual({ ok: true });
+      expect(prismaMock.notificacion.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ tipo: 'PAGO_EFECTIVO_MOZO' }),
+      });
     });
 
     describe('pago dividido (plan)', () => {

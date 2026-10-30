@@ -78,7 +78,7 @@ export interface LineaPedidoMesa {
 }
 
 /** Medio con el que paga el cliente de llevar o delivery (lo elige el mozo al registrar). */
-type MedioPagoMozo = 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TRANSFERENCIA';
+type MedioPagoMozo = 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TARJETA' | 'TRANSFERENCIA';
 
 /** Cliente que devuelve GET /admin/clientes?q= (busca por nombre o celular) */
 interface ClienteBuscado {

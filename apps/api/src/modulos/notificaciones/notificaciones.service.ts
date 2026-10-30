@@ -38,12 +38,14 @@ export const TIPOS_NOTIFICACION: Record<string, string> = {
   VOUCHER_IA_CAIDA: 'Lectura de vouchers con IA en pausa',
   VOUCHER_IA_RECUPERADA: 'Lectura de vouchers con IA recuperada',
   VOUCHER_IA_TOPE: 'Tope mensual de IA de vouchers',
+  WHATSAPP_CONSUMO: 'Mensajes de WhatsApp del mes',
 };
 
 export const COLORES_NOTIFICACION: Record<string, string> = {
   'Lectura de vouchers con IA en pausa': '#B5442E',
   'Lectura de vouchers con IA recuperada': '#2F7A45',
   'Tope mensual de IA de vouchers': '#C99A2E',
+  'Mensajes de WhatsApp del mes': '#C99A2E',
   'Pedido por confirmar': '#E2812C',
   'Delivery por confirmar': '#E2812C',
   'Stock bajo': '#C99A2E',
@@ -67,6 +69,7 @@ export const ACCIONES_NOTIFICACION: Record<string, [string, string]> = {
   'Lectura de vouchers con IA en pausa': ['mirest', 'Ver configuración'],
   'Lectura de vouchers con IA recuperada': ['mirest', 'Ver configuración'],
   'Tope mensual de IA de vouchers': ['mirest', 'Ver configuración'],
+  'Mensajes de WhatsApp del mes': ['mirest', 'Ver configuración'],
 };
 
 const ORDEN: Record<Prioridad, number> = { ALTA: 0, MEDIA: 1, BAJA: 2 };

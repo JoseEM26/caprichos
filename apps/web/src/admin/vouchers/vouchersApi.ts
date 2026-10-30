@@ -130,7 +130,7 @@ export const vouchersApi = {
    */
   async enviarACaja(
     pedidoId: string | number,
-    medio: 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TRANSFERENCIA',
+    medio: 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TARJETA' | 'TRANSFERENCIA',
     plan?: PlanPagoItem[],
   ): Promise<{ ok: boolean }> {
     return api.post<{ ok: boolean }>('/admin/vouchers/enviar-a-caja', {

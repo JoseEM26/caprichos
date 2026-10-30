@@ -44,11 +44,12 @@ export interface SubirVoucherOpciones {
 }
 
 /** Medios que el mozo puede enviar a Caja desde la mesa. */
-const MEDIOS_ENVIO_CAJA = ['EFECTIVO', 'YAPE', 'PLIN', 'TRANSFERENCIA'] as const;
+const MEDIOS_ENVIO_CAJA = ['EFECTIVO', 'YAPE', 'PLIN', 'TARJETA', 'TRANSFERENCIA'] as const;
 const NOMBRE_MEDIO_CAJA: Record<string, string> = {
   EFECTIVO: 'Efectivo',
   YAPE: 'Yape',
   PLIN: 'Plin',
+  TARJETA: 'Tarjeta',
   TRANSFERENCIA: 'Transferencia',
 };
 
@@ -639,7 +640,7 @@ export class VouchersService {
     const conPlan = Array.isArray(plan) && plan.length > 0;
     let medioNormalizado = String(medio || '').trim().toUpperCase();
     if (!conPlan && !MEDIOS_ENVIO_CAJA.includes(medioNormalizado as (typeof MEDIOS_ENVIO_CAJA)[number])) {
-      throw new BadRequestException({ codigo: 'MEDIO_INVALIDO', mensaje: 'Elige Efectivo, Yape, Plin o Transferencia' });
+      throw new BadRequestException({ codigo: 'MEDIO_INVALIDO', mensaje: 'Elige Efectivo, Yape, Plin, Tarjeta o Transferencia' });
     }
     const id = this.parsearId(pedidoId);
     const pedido = await this.prisma.pedido.findUnique({
@@ -659,14 +660,14 @@ export class VouchersService {
       ? planValidado.map((f) => `${NOMBRE_MEDIO_CAJA[f.medio]} S/ ${f.monto.toFixed(2)}`).join(' · ')
       : null;
     if (planValidado) medioNormalizado = this.pagoPlan.pagoPrincipal(planValidado);
-    const soloEfectivo = planValidado ? montoDigitalDePlan(planValidado) === 0 : medioNormalizado === 'EFECTIVO';
+    const soloEfectivo = planValidado ? montoDigitalDePlan(planValidado) === 0 : ['EFECTIVO', 'TARJETA'].includes(medioNormalizado);
 
     let aviso: { tipo: string; titulo: string; mensaje: string };
     if (soloEfectivo) {
       aviso = {
         tipo: 'PAGO_EFECTIVO_MOZO',
-        titulo: 'Mesa paga en efectivo',
-        mensaje: `El mozo avisa que el pedido ${pedido.codigo} se paga en efectivo en mesa. Cóbralo en Caja.`,
+        titulo: 'Mesa paga en efectivo o tarjeta',
+        mensaje: `El mozo avisa que el pedido ${pedido.codigo} se paga en efectivo o tarjeta en mesa. Cóbralo en Caja.`,
       };
     } else {
       const etiqueta = desglose ?? medioNormalizado;
