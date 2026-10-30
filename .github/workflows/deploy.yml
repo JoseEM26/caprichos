@@ -24,7 +24,7 @@ on:
         required: false
         type: string
       accion:
-        description: 'Acción: desplegar (normal), sanear-demo (borra cuentas de clientes, SOLO demo), respaldar-demo (copia manual de la demo), exportar-datos-demo (paquete de configuración y contenido de la demo), importar-datos-produccion (importa el paquete a PRODUCCIÓN), configurar-dominios-demo (la demo pasa a demo.caprichos.pe y conserva caprichos.pe)'
+        description: 'Acción: desplegar (normal), sanear-demo (borra cuentas de clientes, SOLO demo), respaldar-demo (copia manual de la demo), exportar-datos-demo (paquete de configuración y contenido de la demo), importar-datos-produccion (importa el paquete a PRODUCCIÓN), configurar-dominios-demo (la demo pasa a demo.caprichos.pe y conserva el dominio adicional), preparar-produccion (crea el .env de PRODUCCIÓN con claves aleatorias; no despliega)'
         required: false
         default: 'desplegar'
         type: choice
@@ -34,6 +34,7 @@ on:
           - respaldar-demo
           - exportar-datos-demo
           - configurar-dominios-demo
+          - preparar-produccion
           - importar-datos-produccion
       paquete:
         description: 'Solo importar-datos-produccion: carpeta del paquete exportado (fecha, p. ej. 20261030_120000, o ruta dentro de /opt/caprichos/respaldos/datos-empresa)'
@@ -43,8 +44,13 @@ on:
         description: 'Solo importar-datos-produccion: escriba IMPORTAR DATOS DE LA EMPRESA'
         required: false
         type: string
+      dominio_adicional:
+        description: 'Solo configurar-dominios-demo: segundo dominio que atiende la demo (por defecto caprichos.pe; déjelo vacío para quitarlo cuando producción lo use)'
+        required: false
+        default: 'caprichos.pe'
+        type: string
       simulacro:
-        description: 'Solo para sanear-demo, configurar-dominios-demo e importar-datos-produccion: true = simulacro (no escribe); false = real (con respaldo previo)'
+        description: 'Solo para sanear-demo, configurar-dominios-demo, preparar-produccion e importar-datos-produccion: true = simulacro (no escribe); false = real (con respaldo previo)'
         required: false
         default: true
         type: boolean
@@ -123,6 +129,15 @@ jobs:
             fi
             if [ "$ACCION" = "configurar-dominios-demo" ] && [ "$IN_CONFIRMACION" != "CONFIGURAR DOMINIOS DE LA DEMO" ]; then
               echo "::error::Escriba exactamente 'CONFIGURAR DOMINIOS DE LA DEMO' en confirmacion."
+              exit 1
+            fi
+          fi
+
+          # Preparar PRODUCCIÓN (crea su .env): manual; la validación de prod (PRODUCCION + tag en main) va abajo
+          if [ "$EVENTO" = "workflow_dispatch" ] && [ "$IN_ACCION" = "preparar-produccion" ]; then
+            ACCION="preparar-produccion"
+            if [ "$IN_AMBIENTE" != "prod" ]; then
+              echo "::error::Preparar producción solo existe para el ambiente prod."
               exit 1
             fi
           fi
@@ -623,12 +638,17 @@ jobs:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
           SIMULACRO: ${{ github.event.inputs.simulacro }}
+          ADICIONAL: ${{ github.event.inputs.dominio_adicional }}
         run: |
           set -o pipefail
           if [ "$SIMULACRO" = "false" ]; then MODO=real; else MODO=simulacro; fi
+          if [ -n "$ADICIONAL" ] && [[ ! "$ADICIONAL" =~ ^[a-z0-9.-]+$ ]]; then
+            echo "::error::dominio_adicional no válido."
+            exit 1
+          fi
           ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
             "${SSH_USER:-deploy}@${SSH_HOST}" \
-            "/opt/caprichos/scripts/configurar-dominios-demo.sh $MODO demo.caprichos.pe caprichos.pe" 2>&1 | tee dominios.log
+            "/opt/caprichos/scripts/configurar-dominios-demo.sh $MODO demo.caprichos.pe '$ADICIONAL'" 2>&1 | tee dominios.log
 
       - name: Resumen (sin secretos)
         if: always()
@@ -722,6 +742,69 @@ jobs:
             echo ""
             echo "$REPORTE" | head -c 900000
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Borrar la llave del ejecutor
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+  # Crea /opt/caprichos/prod/.env con claves aleatorias (solo si no existe). No despliega. Exige PRODUCCION + tag en main (validado arriba).
+  preparar-produccion:
+    name: Preparar PRODUCCIÓN (crear su .env)
+    needs: validar-y-determinar
+    if: needs.validar-y-determinar.outputs.accion == 'preparar-produccion'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: prod
+    concurrency:
+      group: preparar-produccion
+      cancel-in-progress: false
+    steps:
+      - name: Checkout (scripts del tag validado)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validar-y-determinar.outputs.ref }}
+          sparse-checkout: infra/compose
+
+      - name: Configurar llave y huella SSH (sin StrictHostKeyChecking=no)
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          for v in SSH_KEY SSH_HOST SSH_KNOWN_HOSTS; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Falta el secreto $v en GitHub (Settings > Secrets and variables > Actions)."
+              exit 1
+            fi
+          done
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Sincronizar scripts en el VPS
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -e
+          SSH="ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes ${SSH_USER:-deploy}@${SSH_HOST}"
+          tar -czf - -C infra/compose scripts | $SSH 'mkdir -p /opt/caprichos && tar -xzf - -C /opt/caprichos && chmod +x /opt/caprichos/scripts/*'
+
+      - name: Preparar producción (simulacro por defecto)
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SIMULACRO: ${{ github.event.inputs.simulacro }}
+        run: |
+          set -o pipefail
+          if [ "$SIMULACRO" = "false" ]; then MODO=real; else MODO=simulacro; fi
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "${SSH_USER:-deploy}@${SSH_HOST}" \
+            "/opt/caprichos/scripts/preparar-produccion.sh $MODO" 2>&1 | tee preparar.log
 
       - name: Borrar la llave del ejecutor
         if: always()
