@@ -306,8 +306,9 @@ export function TarjetaImpresionEtiquetas() {
             {estado?.impresora === 'lista' && 'Lista para imprimir'}
             {estado?.impresora === 'sin_papel' && 'Sin papel'}
             {estado?.impresora === 'desconectada' && 'Desconectada'}
+            {estado?.impresora === 'sin_permiso' && 'Sin permiso para usar la impresora'}
             {estado?.impresora === 'error' && 'Error reportado'}
-            {!['lista', 'sin_papel', 'desconectada', 'error'].includes(estado?.impresora || '') &&
+            {!['lista', 'sin_papel', 'desconectada', 'sin_permiso', 'error'].includes(estado?.impresora || '') &&
               (estado?.impresora || 'Desconocido')}
           </div>
           <div style={{ fontSize: 11, color: 'var(--cp-soft, #2C4C5D)', marginTop: 4 }}>

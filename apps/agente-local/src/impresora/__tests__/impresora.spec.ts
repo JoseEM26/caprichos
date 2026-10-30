@@ -66,8 +66,8 @@ describe('ImpresoraUsb (dispositivo fisico)', () => {
     vi.spyOn(fs.promises, 'access').mockRejectedValueOnce(errorAcceso);
 
     const estado = await impresora.verificarEstado();
-    expect(estado.estado).toBe('error');
-    expect(estado.detalle).toContain('Sin permisos');
+    expect(estado.estado).toBe('sin_permiso');
+    expect(estado.detalle).toContain('sudo usermod -aG lp $USER');
 
     vi.restoreAllMocks();
   });

@@ -6,7 +6,34 @@ import type {
 import { ErrorImpresora } from './dispositivo.interface';
 
 export class ImpresoraUsb implements IDispositivoImpresora {
-  constructor(private readonly rutaDispositivo: string = '/dev/usb/lp0') {}
+  /**
+   * @param identidad  MFG MDL|serie guardada al configurar (opcional: configs viejas solo traen la ruta)
+   * @param listar     impresoras USB actuales con su identidad, para reubicarla si cambió de lpN
+   */
+  constructor(
+    private rutaDispositivo: string = '/dev/usb/lp0',
+    private readonly identidad?: string,
+    private readonly listar?: () => { destino: string; identidad?: string }[],
+    private readonly logger: (m: string) => void = () => undefined,
+  ) {}
+
+  /** Si la identidad está en otra ruta (reconexión, dos impresoras), usa la nueva. */
+  resolverRuta(): string {
+    if (!this.identidad || !this.listar) return this.rutaDispositivo;
+    const mias = this.listar().filter((d) => d.identidad === this.identidad);
+    if (mias.length && !mias.some((d) => d.destino === this.rutaDispositivo)) {
+      // ponytail: con varias iguales y sin serie no se adivina; solo se mueve si hay una sola
+      if (mias.length === 1) {
+        this.logger(`La impresora ${this.identidad} cambió de ${this.rutaDispositivo} a ${mias[0].destino}`);
+        this.rutaDispositivo = mias[0].destino;
+      }
+    }
+    return this.rutaDispositivo;
+  }
+
+  private msgPermiso(): string {
+    return `Sin permiso para usar ${this.rutaDispositivo}: ejecuta \`sudo usermod -aG lp $USER\` y reinicia el equipo`;
+  }
 
   obtenerRuta(): string {
     return this.rutaDispositivo;
@@ -19,6 +46,7 @@ export class ImpresoraUsb implements IDispositivoImpresora {
    * Si hay fallo de hardware, arroja ErrorImpresora('error', 'EIO').
    */
   async escribir(datos: Buffer): Promise<void> {
+    this.resolverRuta();
     // 1. Verificar existencia del nodo de dispositivo para distinguir desconexión (ENOENT)
     try {
       await fs.promises.stat(this.rutaDispositivo);
@@ -32,8 +60,8 @@ export class ImpresoraUsb implements IDispositivoImpresora {
       }
       if (err.code === 'EACCES' || err.code === 'EPERM') {
         throw new ErrorImpresora(
-          `Permiso denegado al inspeccionar ${this.rutaDispositivo}. Verifique grupo lp o reglas udev.`,
-          'error',
+          this.msgPermiso(),
+          'sin_permiso',
           err.code
         );
       }
@@ -64,8 +92,8 @@ export class ImpresoraUsb implements IDispositivoImpresora {
 
       if (err.code === 'EACCES' || err.code === 'EPERM') {
         throw new ErrorImpresora(
-          `Permiso denegado al escribir en ${this.rutaDispositivo}. Verifique grupo lp o reglas udev.`,
-          'error',
+          this.msgPermiso(),
+          'sin_permiso',
           err.code
         );
       }
@@ -98,6 +126,7 @@ export class ImpresoraUsb implements IDispositivoImpresora {
    * Comprueba si el dispositivo existe y tiene permisos de escritura.
    */
   async verificarEstado(): Promise<EstadoDispositivo> {
+    this.resolverRuta();
     try {
       await fs.promises.access(this.rutaDispositivo, fs.constants.W_OK);
       return { estado: 'lista' };
@@ -105,13 +134,13 @@ export class ImpresoraUsb implements IDispositivoImpresora {
       if (err.code === 'ENOENT') {
         return {
           estado: 'desconectada',
-          detalle: `Dispositivo no encontrado en ${this.rutaDispositivo}`,
+          detalle: `No encontrada (ruta ${this.rutaDispositivo})`,
         };
       }
       if (err.code === 'EACCES' || err.code === 'EPERM') {
         return {
-          estado: 'error',
-          detalle: `Sin permisos de escritura en ${this.rutaDispositivo}. Requiere grupo lp.`,
+          estado: 'sin_permiso',
+          detalle: this.msgPermiso(),
         };
       }
       return {

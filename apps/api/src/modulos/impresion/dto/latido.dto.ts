@@ -6,7 +6,7 @@ export class ImpresoraLatidoDto {
   @IsIn(['ETIQUETERA', 'TICKETERA'])
   rol!: RolImpresora;
 
-  @IsIn(['lista', 'sin_papel', 'desconectada', 'error'])
+  @IsIn(['lista', 'sin_papel', 'desconectada', 'sin_permiso', 'error'])
   estado!: EstadoImpresora;
 
   @IsOptional()
@@ -20,8 +20,8 @@ export class LatidoDto {
   version!: string;
 
   @IsNotEmpty({ message: 'El estado de la impresora es obligatorio' })
-  @IsIn(['lista', 'sin_papel', 'desconectada', 'error'], {
-    message: 'El estado de la impresora debe ser lista, sin_papel, desconectada o error',
+  @IsIn(['lista', 'sin_papel', 'desconectada', 'sin_permiso', 'error'], {
+    message: 'El estado de la impresora debe ser lista, sin_papel, desconectada, sin_permiso o error',
   })
   impresora!: EstadoImpresora;
 

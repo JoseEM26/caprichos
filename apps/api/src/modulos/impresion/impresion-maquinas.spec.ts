@@ -35,6 +35,18 @@ describe('estadoPorRol', () => {
     expect(e.TICKETERA).toMatchObject({ conectada: false, motivo: 'Impresora no encontrada' });
   });
 
+  it('sin permiso y no encontrada traen el detalle del agente', () => {
+    const e = estadoPorRol(
+      latido([
+        { rol: 'ETIQUETERA', estado: 'sin_permiso', detalle: 'Sin permiso para usar /dev/usb/lp0: ejecuta `sudo usermod -aG lp $USER` y reinicia el equipo' },
+        { rol: 'TICKETERA', estado: 'desconectada', detalle: 'No encontrada (ruta /dev/usb/lp1)' },
+      ]),
+    );
+    expect(e.ETIQUETERA).toMatchObject({ conectada: false, estado: 'sin_permiso' });
+    expect(e.ETIQUETERA.motivo).toContain('sudo usermod -aG lp');
+    expect(e.TICKETERA.motivo).toBe('No encontrada (ruta /dev/usb/lp1)');
+  });
+
   it('rol ausente = no configurada; agente viejo solo habla de la etiquetera', () => {
     const e = estadoPorRol({ ultimo_latido: new Date(), latido_impresora: 'lista', latido_detalle: null });
     expect(e.ETIQUETERA.conectada).toBe(true);

@@ -61,6 +61,7 @@ export async function leerParametroNumerico(
 
 const MOTIVO_ESTADO: Record<string, string> = {
   desconectada: 'Impresora no encontrada',
+  sin_permiso: 'Sin permiso para usar la impresora: ejecuta `sudo usermod -aG lp $USER` y reinicia el equipo',
   sin_papel: 'Sin papel',
   error: 'Error en la impresora',
 };
@@ -112,7 +113,7 @@ export function estadoPorRol(
     }
     if (r.estado === 'lista') return { conectada: true, estado: 'lista', motivo: null };
     const base = MOTIVO_ESTADO[r.estado] || 'Impresora con problema';
-    return { conectada: false, estado: r.estado, motivo: r.detalle && r.estado === 'error' ? `${base}: ${r.detalle}` : base };
+    return { conectada: false, estado: r.estado, motivo: r.detalle && (r.estado === 'sin_permiso' || r.estado === 'desconectada') ? r.detalle : r.detalle && r.estado === 'error' ? `${base}: ${r.detalle}` : base };
   };
   return { ETIQUETERA: una('ETIQUETERA'), TICKETERA: una('TICKETERA') };
 }

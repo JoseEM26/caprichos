@@ -103,18 +103,81 @@ export async function ejecutarComandoVolcar(
   return archivosGenerados;
 }
 
-/** Linux: dispositivos USB de impresora (/dev/usb/lp0, lp1...) que el kernel ve conectados. */
-export function listarImpresorasLinux(dir = '/dev/usb'): string[] {
+export interface ImpresoraDetectada {
+  destino: string;
+  modelo?: string;
+  /** Lenguaje que declara la impresora (TSPL2, ESCPOS...). */
+  lenguaje?: string;
+  /** Etiquetas (TSPL/ZPL/EPL) o tickets (ESC/POS), según el lenguaje. */
+  sugerido?: 'ETIQUETERA' | 'TICKETERA';
+  /** MFG MDL|serie: estable aunque cambie el número de lpN. */
+  identidad?: string;
+  puedeEscribir: boolean;
+}
+
+/** Lee `MFG:..;CMD:..;MDL:..;` de ieee1284_id. */
+export function interpretarIeee1284(id: string): { modelo?: string; lenguaje?: string; sugerido?: 'ETIQUETERA' | 'TICKETERA'; serie?: string } {
+  const c: Record<string, string> = {};
+  for (const par of id.split(';')) {
+    const i = par.indexOf(':');
+    if (i > 0) c[par.slice(0, i).trim().toUpperCase()] = par.slice(i + 1).trim();
+  }
+  const mdl = c.MDL || c.MODEL;
+  const mfg = c.MFG || c.MANUFACTURER;
+  const modelo = [mfg && !mdl?.toUpperCase().startsWith(mfg.toUpperCase()) ? mfg : '', mdl].filter(Boolean).join(' ') || undefined;
+  const lenguaje = c.CMD || c.COMMAND || c['COMMAND SET'] || undefined;
+  const l = (lenguaje || '').toUpperCase();
+  const sugerido = /TSPL|ZPL|EPL|CPCL/.test(l) ? 'ETIQUETERA' : /ESC/.test(l) ? 'TICKETERA' : undefined;
+  const serie = c.SN || c.SERN || c.SERIALNUMBER || c.SERIAL || undefined;
+  return { modelo, lenguaje, sugerido, serie };
+}
+
+/** Linux: TODOS los /dev/usb/lpN que el kernel ve, aunque no haya permiso de escritura. */
+export function listarImpresorasLinux(dir = '/dev/usb', sysDir = '/sys/class/usbmisc'): ImpresoraDetectada[] {
+  let nombres: string[];
   try {
-    return fs.readdirSync(dir).filter((n) => /^lp\d+$/.test(n)).sort().map((n) => `${dir}/${n}`);
+    nombres = fs.readdirSync(dir).filter((n) => /^lp\d+$/.test(n)).sort((a, b) => Number(a.slice(2)) - Number(b.slice(2)));
   } catch {
     return [];
   }
+  return nombres.map((n) => {
+    const destino = `${dir}/${n}`;
+    let info: ReturnType<typeof interpretarIeee1284> = {};
+    try {
+      info = interpretarIeee1284(fs.readFileSync(`${sysDir}/${n}/device/ieee1284_id`, 'utf-8'));
+    } catch {
+      // sin ieee1284: se lista igual, sin modelo
+    }
+    let serie = info.serie;
+    if (!serie) {
+      try {
+        serie = fs.readFileSync(`${sysDir}/${n}/device/../serial`, 'utf-8').trim() || undefined; // atributo USB
+      } catch {
+        // la impresora no declara número de serie
+      }
+    }
+    const identidad = info.modelo ? `${info.modelo}${serie ? `|${serie}` : ''}` : undefined;
+    let puedeEscribir = true;
+    try {
+      fs.accessSync(destino, fs.constants.W_OK);
+    } catch {
+      puedeEscribir = false;
+    }
+    return { destino, modelo: info.modelo, lenguaje: info.lenguaje, sugerido: info.sugerido, identidad, puedeEscribir };
+  });
+}
+
+export function describirImpresora(i: ImpresoraDetectada): string {
+  const tipo = i.sugerido === 'ETIQUETERA' ? 'etiquetas' : i.sugerido === 'TICKETERA' ? 'tickets' : '';
+  const det = [tipo, i.lenguaje].filter(Boolean).join(' ');
+  return `${i.destino}${i.modelo ? ` — ${i.modelo}` : ''}${det ? ` (${det})` : ''}${i.puedeEscribir ? '' : ' [sin permiso]'}`;
 }
 
 /** Windows: nombre de la impresora instalada. Linux: ruta del dispositivo (empieza con /). */
-export function crearDispositivo(destino: string): IDispositivoImpresora {
-  return destino.startsWith('/') ? new ImpresoraUsb(destino) : new ImpresoraWindows(destino);
+export function crearDispositivo(destino: string, identidad?: string): IDispositivoImpresora {
+  return destino.startsWith('/')
+    ? new ImpresoraUsb(destino, identidad, () => listarImpresorasLinux(), (m) => console.log(`[${new Date().toISOString()}] [WARN] ${m}`))
+    : new ImpresoraWindows(destino);
 }
 
 export function leerArchivoConfiguracion(ruta = rutaArchivoConfiguracion()): ArchivoConfiguracion {
@@ -148,25 +211,58 @@ export async function ejecutarAsistente(
       agenteKey = r.llave;
       logger('Vinculado correctamente.');
     }
-    const nombres = process.platform === 'win32' ? await listarImpresorasWindows().catch(() => []) : listarImpresorasLinux();
-    if (!nombres.length && process.platform !== 'win32') {
-      logger('No hay impresoras USB en /dev/usb/lp*. Revisa el cable y el permiso (sudo usermod -aG lp $USER); puedes escribir la ruta a mano.');
-    }
-    if (nombres.length) {
+    const esWin = process.platform === 'win32';
+    const detectadas: ImpresoraDetectada[] = esWin
+      ? (await listarImpresorasWindows().catch(() => [])).map((n) => ({ destino: n, puedeEscribir: true }))
+      : listarImpresorasLinux();
+    if (!detectadas.length) {
+      logger(esWin ? 'No se encontraron impresoras instaladas en Windows.' : 'No hay impresoras USB en /dev/usb/lp*. Revisa el cable.');
+    } else {
       logger('Impresoras encontradas en este equipo:');
-      nombres.forEach((n, i) => logger(`  ${i + 1}. ${n}`));
+      detectadas.forEach((d, i) => logger(`  ${i + 1}) ${describirImpresora(d)}`));
     }
-    const elegir = async (rol: string, previa?: string) => {
-      const r = await ask(`Número o nombre de la ${rol}${previa ? ` [${previa}]` : ''} (Enter = ninguna): `);
-      if (!r) return previa;
-      return nombres[Number(r) - 1] ?? r;
+    const elegir = async (rol: string, previa?: string, sugerida?: number) => {
+      const porDefecto = previa ?? (sugerida ? detectadas[sugerida - 1].destino : undefined);
+      const nota = porDefecto ? ` [Enter = ${previa ? 'actual' : 'sugerida'}: ${porDefecto}]` : ' (Enter = ninguna)';
+      for (;;) {
+        const r = await ask(`Número o ${esWin ? 'nombre' : 'ruta'} de la ${rol}${nota}: `);
+        if (!r) return porDefecto;
+        if (/^\d+$/.test(r)) {
+          if (detectadas[Number(r) - 1]) return detectadas[Number(r) - 1].destino;
+        } else if (esWin) {
+          const d = detectadas.find((x) => x.destino.toLowerCase() === r.toLowerCase());
+          if (d) return d.destino;
+        } else if (r.startsWith('/') && fs.existsSync(r)) {
+          return r;
+        }
+        logger(`"${r}" no existe en este equipo. Elige un número de la lista${esWin ? ' o el nombre exacto' : ' o una ruta que exista'}.`);
+      }
     };
-    const etiquetera = await elegir('ETIQUETERA (stickers)', actual.etiquetera);
-    const ticketera = await elegir('TICKETERA (ticket de pago)', actual.ticketera);
-    const cfg: ArchivoConfiguracion = { apiUrl, agenteKey, etiquetera, ticketera, ticketColumnas: actual.ticketColumnas };
+    const sug = (rol: 'ETIQUETERA' | 'TICKETERA') => {
+      const i = detectadas.findIndex((d) => d.sugerido === rol);
+      return i >= 0 ? i + 1 : undefined;
+    };
+    const etiquetera = await elegir('ETIQUETERA (stickers)', actual.etiquetera, sug('ETIQUETERA'));
+    const ticketera = await elegir('TICKETERA (ticket de pago)', actual.ticketera, sug('TICKETERA'));
+    const idDe = (destino?: string, previo?: string, idPrevio?: string) =>
+      destino ? detectadas.find((d) => d.destino === destino)?.identidad ?? (destino === previo ? idPrevio : undefined) : undefined;
+    const cfg: ArchivoConfiguracion = {
+      apiUrl, agenteKey, etiquetera, ticketera,
+      etiqueteraId: idDe(etiquetera, actual.etiquetera, actual.etiqueteraId),
+      ticketeraId: idDe(ticketera, actual.ticketera, actual.ticketeraId),
+      ticketColumnas: actual.ticketColumnas,
+    };
     fs.mkdirSync(path.dirname(ruta), { recursive: true });
     fs.writeFileSync(ruta, JSON.stringify(cfg, null, 2), { mode: 0o600 });
     logger(`Configuración guardada en ${ruta}`);
+    for (const d of [etiquetera, ticketera]) {
+      if (d && d.startsWith('/') && detectadas.find((x) => x.destino === d && !x.puedeEscribir)) {
+        logger(`AVISO: sin permiso para usar ${d}. Ejecuta \`sudo usermod -aG lp $USER\` y reinicia el equipo.`);
+        logger('Alternativa sin reiniciar sesión: crea /etc/udev/rules.d/99-caprichos-impresoras.rules con');
+        logger('  SUBSYSTEM=="usbmisc", KERNEL=="lp*", GROUP="lp", MODE="0660", TAG+="uaccess"');
+        logger('  y ejecuta `sudo udevadm control --reload && sudo udevadm trigger` (el usuario debe estar en el grupo lp).');
+      }
+    }
     return cfg;
   } finally {
     rl?.close();
@@ -186,6 +282,17 @@ export async function main(): Promise<void> {
     process.exit(0);
   }
 
+  if (comando === 'impresoras') {
+    if (process.platform === 'win32') {
+      (await listarImpresorasWindows().catch(() => [])).forEach((n, i) => console.log(`  ${i + 1}) ${n}`));
+    } else {
+      const l = listarImpresorasLinux();
+      console.log(l.length ? 'Impresoras encontradas en este equipo:' : 'No hay impresoras USB en /dev/usb/lp*.');
+      l.forEach((d, i) => console.log(`  ${i + 1}) ${describirImpresora(d)}`));
+    }
+    process.exit(0);
+  }
+
   if (comando === 'configurar' || comando === 'vincular') {
     await ejecutarAsistente();
     process.exit(0);
@@ -202,8 +309,8 @@ export async function main(): Promise<void> {
   const clienteApi = new ClienteApiImpresion(config.apiUrl, config.agenteKey);
   const impresoras: Partial<Record<'ETIQUETERA' | 'TICKETERA', IDispositivoImpresora>> = {};
   const etiquetera = config.etiquetera ?? (config.ticketera ? undefined : config.impresoraRuta);
-  if (etiquetera) impresoras.ETIQUETERA = crearDispositivo(etiquetera);
-  if (config.ticketera) impresoras.TICKETERA = crearDispositivo(config.ticketera);
+  if (etiquetera) impresoras.ETIQUETERA = crearDispositivo(etiquetera, archivo.etiqueteraId);
+  if (config.ticketera) impresoras.TICKETERA = crearDispositivo(config.ticketera, archivo.ticketeraId);
 
   const agente = new AgenteLocalServicio({
     config,

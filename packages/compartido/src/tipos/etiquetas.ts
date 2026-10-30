@@ -43,7 +43,7 @@ export interface TicketPagoDatos {
 
 export type EstadoPrintJob = 'PENDIENTE' | 'IMPRIMIENDO' | 'IMPRESO' | 'FALLIDO';
 
-export type EstadoImpresora = 'lista' | 'sin_papel' | 'desconectada' | 'error';
+export type EstadoImpresora = 'lista' | 'sin_papel' | 'desconectada' | 'sin_permiso' | 'error';
 
 export interface EtiquetaGeneralProducto {
   cantidad: number;

@@ -11,6 +11,9 @@ export interface ArchivoConfiguracion {
   agenteKey?: string;
   etiquetera?: string;
   ticketera?: string;
+  /** Identidad (MFG MDL|serie) de la impresora de cada rol: sobrevive a que /dev/usb/lpN cambie de número. */
+  etiqueteraId?: string;
+  ticketeraId?: string;
   ticketColumnas?: number;
 }
 

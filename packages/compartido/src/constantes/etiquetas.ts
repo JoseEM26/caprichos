@@ -26,5 +26,6 @@ export const ESTADOS_IMPRESORA = {
   LISTA: 'lista',
   SIN_PAPEL: 'sin_papel',
   DESCONECTADA: 'desconectada',
+  SIN_PERMISO: 'sin_permiso',
   ERROR: 'error',
 } as const;
