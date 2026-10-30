@@ -24,7 +24,7 @@ on:
         required: false
         type: string
       accion:
-        description: 'Acción: desplegar (normal), sanear-demo (borra cuentas de clientes, SOLO demo), respaldar-demo (copia manual de la demo), exportar-datos-demo (paquete de configuración y contenido de la demo), importar-datos-produccion (importa el paquete a PRODUCCIÓN), configurar-dominios-demo (la demo pasa a demo.caprichos.pe y conserva el dominio adicional), preparar-produccion (crea el .env de PRODUCCIÓN con claves aleatorias; no despliega), crear-admin-produccion (roles y primer administrador de PRODUCCIÓN; la clave queda en un archivo del servidor), sincronizar-proxy (actualiza los middlewares de Traefik; simulacro por defecto), probar-restauracion (restaura el último respaldo en una base temporal; demo o prod), instalar-monitor (Uptime Kuma solo local en el servidor)'
+        description: 'Acción: desplegar (normal), sanear-demo (borra cuentas de clientes, SOLO demo), respaldar-demo (copia manual de la demo), exportar-datos-demo (paquete de configuración y contenido de la demo), importar-datos-produccion (importa el paquete a PRODUCCIÓN), configurar-dominios-demo (la demo pasa a demo.caprichos.pe y conserva el dominio adicional), preparar-produccion (crea el .env de PRODUCCIÓN con claves aleatorias; no despliega), crear-admin-produccion (roles y primer administrador de PRODUCCIÓN; la clave queda en un archivo del servidor), sincronizar-proxy (actualiza los middlewares de Traefik; simulacro por defecto), probar-restauracion (restaura el último respaldo en una base temporal; demo o prod), instalar-monitor (Uptime Kuma solo local en el servidor), ver-estado-servidor (consumo del VPS y respaldos; solo lectura)'
         required: false
         default: 'desplegar'
         type: choice
@@ -39,6 +39,7 @@ on:
           - sincronizar-proxy
           - probar-restauracion
           - instalar-monitor
+          - ver-estado-servidor
           - importar-datos-produccion
       paquete:
         description: 'Solo importar-datos-produccion: carpeta del paquete exportado (fecha, p. ej. 20261030_120000, o ruta dentro de /opt/caprichos/respaldos/datos-empresa)'
@@ -162,6 +163,13 @@ jobs:
             fi
             if [ "$IN_CONFIRMACION" != "ACTUALIZAR PROXY" ]; then
               echo "::error::Escriba exactamente 'ACTUALIZAR PROXY' en confirmacion."
+              exit 1
+            fi
+          fi
+          if [ "$EVENTO" = "workflow_dispatch" ] && [ "$IN_ACCION" = "ver-estado-servidor" ]; then
+            ACCION="ver-estado-servidor"
+            if [ "$IN_AMBIENTE" != "demo" ] || [ "$REF_NAME" != "preprod" ]; then
+              echo "::error::ver-estado-servidor se lanza con ambiente demo desde la rama preprod."
               exit 1
             fi
           fi
@@ -855,6 +863,66 @@ jobs:
           ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
             "${SSH_USER:-deploy}@${SSH_HOST}" \
             "/opt/caprichos/scripts/instalar-monitor.sh" 2>&1 | tee monitor.log
+
+      - name: Borrar la llave del ejecutor
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+  # Consumo del VPS y estado de respaldos. Solo lectura.
+  ver-estado-servidor:
+    name: Ver estado del servidor
+    needs: validar-y-determinar
+    if: needs.validar-y-determinar.outputs.accion == 'ver-estado-servidor'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: demo
+    concurrency:
+      group: ver-estado-servidor
+      cancel-in-progress: false
+    steps:
+      - name: Checkout (scripts de esta versión)
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: infra/compose
+
+      - name: Configurar llave y huella SSH (sin StrictHostKeyChecking=no)
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          for v in SSH_KEY SSH_HOST SSH_KNOWN_HOSTS; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Falta el secreto $v en GitHub (Settings > Secrets and variables > Actions)."
+              exit 1
+            fi
+          done
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Subir scripts al VPS
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -e
+          SSH="ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes ${SSH_USER:-deploy}@${SSH_HOST}"
+          tar -czf - -C infra/compose scripts | $SSH 'mkdir -p /opt/caprichos && tar -xzf - -C /opt/caprichos && chmod +x /opt/caprichos/scripts/*'
+
+      - name: Diagnóstico (solo lectura)
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -o pipefail
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "${SSH_USER:-deploy}@${SSH_HOST}" \
+            "/opt/caprichos/scripts/diagnostico-servidor.sh" 2>&1 | tee estado.log
 
       - name: Borrar la llave del ejecutor
         if: always()
