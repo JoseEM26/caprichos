@@ -20,11 +20,11 @@ on:
         required: false
         type: string
       confirmacion:
-        description: 'Producción: escriba PRODUCCION. Sanear: SANEAR CLIENTES DE LA DEMO. Respaldo: RESPALDAR DEMO. Exportar: EXPORTAR DATOS DE LA DEMO. Dominios: CONFIGURAR DOMINIOS DE LA DEMO. Proxy: ACTUALIZAR PROXY. Monitor: INSTALAR MONITOR'
+        description: 'Producción: escriba PRODUCCION. Sanear: SANEAR CLIENTES DE LA DEMO. Respaldo: RESPALDAR DEMO. Exportar: EXPORTAR DATOS DE LA DEMO. Dominios: CONFIGURAR DOMINIOS DE LA DEMO. Proxy: ACTUALIZAR PROXY. Monitor: INSTALAR MONITOR. Respaldos: PROGRAMAR RESPALDOS'
         required: false
         type: string
       accion:
-        description: 'Acción: desplegar (normal), sanear-demo (borra cuentas de clientes, SOLO demo), respaldar-demo (copia manual de la demo), exportar-datos-demo (paquete de configuración y contenido de la demo), importar-datos-produccion (importa el paquete a PRODUCCIÓN), configurar-dominios-demo (la demo pasa a demo.caprichos.pe y conserva el dominio adicional), preparar-produccion (crea el .env de PRODUCCIÓN con claves aleatorias; no despliega), crear-admin-produccion (roles y primer administrador de PRODUCCIÓN; la clave queda en un archivo del servidor), sincronizar-proxy (actualiza los middlewares de Traefik; simulacro por defecto), probar-restauracion (restaura el último respaldo en una base temporal; demo o prod), instalar-monitor (Uptime Kuma solo local en el servidor), ver-estado-servidor (consumo del VPS y respaldos; solo lectura)'
+        description: 'Acción: desplegar (normal), sanear-demo (borra cuentas de clientes, SOLO demo), respaldar-demo (copia manual de la demo), exportar-datos-demo (paquete de configuración y contenido de la demo), importar-datos-produccion (importa el paquete a PRODUCCIÓN), configurar-dominios-demo (la demo pasa a demo.caprichos.pe y conserva el dominio adicional), preparar-produccion (crea el .env de PRODUCCIÓN con claves aleatorias; no despliega), crear-admin-produccion (roles y primer administrador de PRODUCCIÓN; la clave queda en un archivo del servidor), sincronizar-proxy (actualiza los middlewares de Traefik; simulacro por defecto), probar-restauracion (restaura el último respaldo en una base temporal; demo o prod), instalar-monitor (Uptime Kuma solo local en el servidor), ver-estado-servidor (consumo del VPS y respaldos; solo lectura), programar-respaldos (cron diario de prod, copia cifrada en R2 y aviso a Uptime Kuma; simulacro por defecto)'
         required: false
         default: 'desplegar'
         type: choice
@@ -40,6 +40,7 @@ on:
           - probar-restauracion
           - instalar-monitor
           - ver-estado-servidor
+          - programar-respaldos
           - importar-datos-produccion
       paquete:
         description: 'Solo importar-datos-produccion: carpeta del paquete exportado (fecha, p. ej. 20261030_120000, o ruta dentro de /opt/caprichos/respaldos/datos-empresa)'
@@ -69,7 +70,7 @@ on:
         default: 'caprichos.pe'
         type: string
       simulacro:
-        description: 'Solo para sanear-demo, configurar-dominios-demo, sincronizar-proxy, preparar-produccion e importar-datos-produccion: true = simulacro (no escribe); false = real (con respaldo previo)'
+        description: 'Solo para sanear-demo, configurar-dominios-demo, sincronizar-proxy, programar-respaldos, preparar-produccion e importar-datos-produccion: true = simulacro (no escribe); false = real (con respaldo previo)'
         required: false
         default: true
         type: boolean
@@ -163,6 +164,17 @@ jobs:
             fi
             if [ "$IN_CONFIRMACION" != "ACTUALIZAR PROXY" ]; then
               echo "::error::Escriba exactamente 'ACTUALIZAR PROXY' en confirmacion."
+              exit 1
+            fi
+          fi
+          if [ "$EVENTO" = "workflow_dispatch" ] && [ "$IN_ACCION" = "programar-respaldos" ]; then
+            ACCION="programar-respaldos"
+            if [ "$IN_AMBIENTE" != "demo" ] || [ "$REF_NAME" != "preprod" ]; then
+              echo "::error::programar-respaldos se lanza con ambiente demo desde la rama preprod."
+              exit 1
+            fi
+            if [ "$IN_CONFIRMACION" != "PROGRAMAR RESPALDOS" ]; then
+              echo "::error::Escriba exactamente 'PROGRAMAR RESPALDOS' en confirmacion."
               exit 1
             fi
           fi
@@ -923,6 +935,79 @@ jobs:
           ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
             "${SSH_USER:-deploy}@${SSH_HOST}" \
             "/opt/caprichos/scripts/diagnostico-servidor.sh" 2>&1 | tee estado.log
+
+      - name: Borrar la llave del ejecutor
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+  # Respaldos automáticos: cron (prod diario 3:00, demo domingo 4:00), copia cifrada en R2 y latido a Uptime Kuma.
+  # Los secretos (opcionales) viven en el ambiente demo de GitHub y viajan por stdin; nunca se imprimen.
+  programar-respaldos:
+    name: Programar respaldos
+    needs: validar-y-determinar
+    if: needs.validar-y-determinar.outputs.accion == 'programar-respaldos'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: demo
+    concurrency:
+      group: programar-respaldos
+      cancel-in-progress: false
+    steps:
+      - name: Checkout (scripts de esta versión)
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: infra/compose
+
+      - name: Configurar llave y huella SSH (sin StrictHostKeyChecking=no)
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          for v in SSH_KEY SSH_HOST SSH_KNOWN_HOSTS; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Falta el secreto $v en GitHub (Settings > Secrets and variables > Actions)."
+              exit 1
+            fi
+          done
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Subir scripts al VPS
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -e
+          SSH="ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes ${SSH_USER:-deploy}@${SSH_HOST}"
+          tar -czf - -C infra/compose scripts | $SSH 'mkdir -p /opt/caprichos && tar -xzf - -C /opt/caprichos && chmod +x /opt/caprichos/scripts/*'
+
+      - name: Programar respaldos (simulacro primero; real solo si se desmarcó simulacro)
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SIMULACRO: ${{ github.event.inputs.simulacro }}
+          RESTIC_REPOSITORY: ${{ secrets.RESTIC_REPOSITORY }}
+          RESTIC_PASSWORD: ${{ secrets.RESTIC_PASSWORD }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          KUMA_PUSH_PROD: ${{ secrets.KUMA_PUSH_PROD }}
+          KUMA_PUSH_DEMO: ${{ secrets.KUMA_PUSH_DEMO }}
+        run: |
+          set -o pipefail
+          if [ "$SIMULACRO" = "false" ]; then MODO=real; else MODO=simulacro; fi
+          {
+            for v in RESTIC_REPOSITORY RESTIC_PASSWORD AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY KUMA_PUSH_PROD KUMA_PUSH_DEMO; do
+              printf '%s=%s\n' "$v" "${!v}"
+            done
+          } | ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "${SSH_USER:-deploy}@${SSH_HOST}" \
+            "/opt/caprichos/scripts/programar-respaldos.sh $MODO" 2>&1 | tee respaldos.log
 
       - name: Borrar la llave del ejecutor
         if: always()

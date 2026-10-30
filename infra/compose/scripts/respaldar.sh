@@ -131,28 +131,39 @@ echo "Directorio de almacenamiento: ${DIR_RESPALDOS}"
 ls -lh "${DIR_RESPALDOS}" | tail -n 5
 
 # 5. Integración remota con restic (ADR-012)
+# restic.env usa formato CLAVE=valor (sin export ni comillas; claves solo con letras y números).
+# Si restic no está instalado en el servidor se usa su imagen oficial de Docker, sin instalar nada.
 RESTIC_ENV_FILE="/opt/caprichos/restic.env"
 if [[ -f "$RESTIC_ENV_FILE" ]]; then
+  set -a
   # shellcheck source=/dev/null
   source "$RESTIC_ENV_FILE"
+  set +a
 fi
 
-if command -v restic &>/dev/null && [[ -n "${RESTIC_REPOSITORY:-}" && -n "${RESTIC_PASSWORD:-}" ]]; then
+restic_cmd() {
+  if command -v restic &>/dev/null; then
+    restic "$@"
+  elif command -v docker &>/dev/null; then
+    mkdir -p /opt/caprichos/restic-cache
+    docker run --rm --env-file "$RESTIC_ENV_FILE" \
+      -v "${DIR_RESPALDOS}:${DIR_RESPALDOS}:ro" -v /opt/caprichos/restic-cache:/root/.cache/restic \
+      restic/restic:0.17.3 "$@"
+  else
+    echo "ERROR: ni restic ni docker disponibles para la copia remota." >&2
+    return 1
+  fi
+}
+
+if [[ -n "${RESTIC_REPOSITORY:-}" && -n "${RESTIC_PASSWORD:-}" ]]; then
   echo "------------------------------------------------------------------------"
   echo "==> Enviando respaldo cifrado fuera del VPS con Restic (ADR-012)..."
-  restic backup "$DIR_RESPALDOS" --tag "$AMBIENTE"
-  restic forget --keep-daily 30 --keep-monthly 6 --prune --tag "$AMBIENTE"
+  restic_cmd backup "$DIR_RESPALDOS" --tag "$AMBIENTE"
+  restic_cmd forget --keep-daily 30 --keep-monthly 6 --prune --tag "$AMBIENTE"
   echo "    ✓ Respaldo Restic completado exitosamente."
 else
   echo "------------------------------------------------------------------------"
-  echo "RESPALDO REMOTO CIFRADO (ADR-012):"
-  echo "Para enviar estas copias fuera del VPS a Cloudflare R2 o Backblaze B2:"
-  echo "1. Cree el archivo /opt/caprichos/restic.env con:"
-  echo "     export RESTIC_REPOSITORY='s3:https://<cuenta>.r2.cloudflarestorage.com/caprichos-backups'"
-  echo "     export RESTIC_PASSWORD='<clave_maestra_restic>'"
-  echo "     export AWS_ACCESS_KEY_ID='<key_id_r2>'"
-  echo "     export AWS_SECRET_ACCESS_KEY='<secret_key_r2>'"
-  echo "2. Inicialice el repositorio una sola vez: restic init"
-  echo "3. Este script detectará restic.env automáticamente en cada ejecución."
+  echo "RESPALDO REMOTO CIFRADO (ADR-012): no configurado (falta /opt/caprichos/restic.env)."
+  echo "Use la acción programar-respaldos con los secretos de Cloudflare R2."
 fi
 echo "========================================================================"
