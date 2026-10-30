@@ -27,7 +27,7 @@ tags: [runbook, compose, deploy, rollback, devops]
 
 | Ambiente | Disparador GitHub Actions | Dominio Principal | Proyecto Docker | Aislamiento SEO |
 |---|---|---|---|---|
-| **Demo** | Push a `ola-1` | `207-244-232-127.sslip.io` | `caprichos-demo` | `noindex, nofollow` |
+| **Demo** | Push a `preprod` | `207-244-232-127.sslip.io` | `caprichos-demo` | `noindex, nofollow` |
 | **Staging** | Push a `main` | `staging.caprichos.pe` | `caprichos-staging` | `noindex, nofollow` |
 | **Producción** | Tag `v*` (ej. `v0.3.0`) + Aprobación manual | `caprichos.pe` <br> `admin.caprichos.pe` <br> `api.caprichos.pe` | `caprichos-prod` | **Indexable** (SEO activo) |
 
@@ -38,7 +38,7 @@ tags: [runbook, compose, deploy, rollback, devops]
 El repositorio cuenta con el flujo automatizado `.github/workflows/deploy.yml`:
 
 1. **Staging / Demo:**
-   - Hacer push a `ola-1` (demo) o crear PR y unir a `main` (staging).
+   - Hacer push a `preprod` (demo) o crear PR y unir a `main` (staging).
    - El workflow compila con Buildx, escanea con Trivy, sube a GHCR, conecta por SSH al VPS y corre `desplegar.sh <ambiente> <sha>`.
 2. **Producción:**
    - Crear un tag anotado de versión:

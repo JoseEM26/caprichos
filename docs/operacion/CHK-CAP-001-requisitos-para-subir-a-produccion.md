@@ -14,7 +14,7 @@ tags: [operacion, produccion, checklist, meta, whatsapp]
 
 # Requisitos para subir Caprichos a producción
 
-Lista única de todo lo que debe estar hecho **antes** de abrir el sistema a clientes reales. Hoy solo existe la **demo** (`caprichos.pe`, rama `ola-1`); el entorno de producción real se crea al final. Marcar cada punto con fecha y persona cuando se cumpla. Lo que depende de Meta puede empezarse antes: no cuesta y tarda días.
+Lista única de todo lo que debe estar hecho **antes** de abrir el sistema a clientes reales. Hoy solo existe la **demo** (`caprichos.pe`, rama `preprod`); el entorno de producción real se crea al final. Marcar cada punto con fecha y persona cuando se cumpla. Lo que depende de Meta puede empezarse antes: no cuesta y tarda días.
 
 ## 1. Meta y WhatsApp (empezar ya)
 

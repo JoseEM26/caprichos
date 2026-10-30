@@ -62,7 +62,7 @@ En ADR-011 se había seleccionado Dokploy para gestionar los despliegues de la d
    - Reemplaza a `deploy-staging.yml` y `deploy-prod.yml`.
    - **Control de Acceso y Plan Free de GitHub:** Al tratarse de un repositorio privado bajo plan gratuito de GitHub, la API no admite 'Required reviewers' en environments (error HTTP 422). Por tanto, la protección de producción se implementa de manera manual y deliberada en el propio workflow mediante `workflow_dispatch`, exigiendo la palabra literal `PRODUCCION`, validando que el tag semántico exista y verificando que su commit esté formalmente integrado en la rama `main`. Si la organización escala a GitHub Team/Pro, se podrá reincorporar la exigencia de revisores obligatorios desde la interfaz de GitHub.
    - **Disparadores:**
-     - Push a `ola-1` y `main`: Despliegue automático al ambiente Demo.
+     - Push a `preprod` y `main`: Despliegue automático al ambiente Demo.
      - `workflow_dispatch`: Despliegue manual deliberado a Producción (`ambiente: prod`, tag `vX.Y.Z`, confirmación `PRODUCCION`) bajo el environment `prod` (sin reglas de protección de plan).
    - **Pasos:** Buildx con caché GHA -> Escaneo Trivy (falla ante vulnerabilidades críticas) -> Push a GHCR -> Conexión SSH segura mediante llave ed25519 dedicada y verificación de host fingerprint -> Ejecución en el VPS de `desplegar.sh <ambiente> <tag>`.
 

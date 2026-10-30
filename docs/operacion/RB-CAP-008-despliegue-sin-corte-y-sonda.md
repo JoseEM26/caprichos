@@ -121,7 +121,7 @@ No se depende de plugins de usuario ni de `~/.docker/cli-plugins`. Todos los scr
 ## 3. Procedimiento de despliegue
 
 ### A. Despliegue automático (GitHub Actions)
-1. Para Staging / Demo: realizar push o merge a la rama correspondiente (`ola-1` para demo, `main` para staging).
+1. Para Staging / Demo: realizar push o merge a la rama correspondiente (`preprod` para demo, `main` para staging).
 2. Para Producción: generar un tag de versión (`git tag -a v0.4.0 -m "release" && git push origin v0.4.0`), entrar a la pestaña **Actions** en GitHub y autorizar el despliegue en el entorno `production`.
 3. El pipeline compila las imágenes, las sube a GHCR, conecta por SSH al VPS y ejecuta el despliegue progresivo.
 

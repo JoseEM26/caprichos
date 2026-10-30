@@ -79,9 +79,9 @@ omite y se informa). Nunca borra nada.
 
 1. **Preparar la demo.** Kevin deja activo solo lo real (ver «Antes de exportar»).
 2. **Respaldo de la demo (opcional, recomendado).** Workflow `deploy.yml` → *Run workflow* →
-   rama `ola-1`, ambiente `demo`, acción `respaldar-demo`, confirmación `RESPALDAR DEMO`.
+   rama `preprod`, ambiente `demo`, acción `respaldar-demo`, confirmación `RESPALDAR DEMO`.
    Ejecuta `respaldar.sh demo` en el VPS. No hay programación automática.
-3. **Exportar.** Acción `exportar-datos-demo`, confirmación `EXPORTAR DATOS DE LA DEMO`, rama `ola-1`.
+3. **Exportar.** Acción `exportar-datos-demo`, confirmación `EXPORTAR DATOS DE LA DEMO`, rama `preprod`.
    El paquete queda en el VPS en `/opt/caprichos/respaldos/datos-empresa/<fecha>/paquete/`
    (permisos 0600). El job muestra el `reporte.md` en su resumen.
 4. **Revisar el reporte.** Ver «Cómo revisar el reporte». No avanzar si algo no cuadra.

@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - ola-1
+      - preprod
   workflow_dispatch:
     inputs:
       ambiente:
@@ -20,11 +20,11 @@ on:
         required: false
         type: string
       confirmacion:
-        description: 'Producción: escriba PRODUCCION. Sanear: SANEAR CLIENTES DE LA DEMO. Respaldo: RESPALDAR DEMO. Exportar: EXPORTAR DATOS DE LA DEMO'
+        description: 'Producción: escriba PRODUCCION. Sanear: SANEAR CLIENTES DE LA DEMO. Respaldo: RESPALDAR DEMO. Exportar: EXPORTAR DATOS DE LA DEMO. Dominios: CONFIGURAR DOMINIOS DE LA DEMO'
         required: false
         type: string
       accion:
-        description: 'Acción: desplegar (normal), sanear-demo (borra cuentas de clientes, SOLO demo), respaldar-demo (copia manual de la demo), exportar-datos-demo (paquete de configuración y contenido de la demo), importar-datos-produccion (importa el paquete a PRODUCCIÓN)'
+        description: 'Acción: desplegar (normal), sanear-demo (borra cuentas de clientes, SOLO demo), respaldar-demo (copia manual de la demo), exportar-datos-demo (paquete de configuración y contenido de la demo), importar-datos-produccion (importa el paquete a PRODUCCIÓN), configurar-dominios-demo (la demo pasa a demo.caprichos.pe y conserva caprichos.pe)'
         required: false
         default: 'desplegar'
         type: choice
@@ -33,6 +33,7 @@ on:
           - sanear-demo
           - respaldar-demo
           - exportar-datos-demo
+          - configurar-dominios-demo
           - importar-datos-produccion
       paquete:
         description: 'Solo importar-datos-produccion: carpeta del paquete exportado (fecha, p. ej. 20261030_120000, o ruta dentro de /opt/caprichos/respaldos/datos-empresa)'
@@ -43,7 +44,7 @@ on:
         required: false
         type: string
       simulacro:
-        description: 'Solo para sanear-demo e importar-datos-produccion: true = simulacro (no escribe); false = real (con respaldo previo)'
+        description: 'Solo para sanear-demo, configurar-dominios-demo e importar-datos-produccion: true = simulacro (no escribe); false = real (con respaldo previo)'
         required: false
         default: true
         type: boolean
@@ -91,8 +92,8 @@ jobs:
               echo "::error::El saneamiento solo existe para el ambiente demo."
               exit 1
             fi
-            if [ "$REF_NAME" != "ola-1" ]; then
-              echo "::error::El saneamiento de la demo solo se lanza desde la rama ola-1."
+            if [ "$REF_NAME" != "preprod" ]; then
+              echo "::error::El saneamiento de la demo solo se lanza desde la rama preprod."
               exit 1
             fi
             if [ "$IN_CONFIRMACION" != "SANEAR CLIENTES DE LA DEMO" ]; then
@@ -100,16 +101,16 @@ jobs:
               exit 1
             fi
           fi
-          # Respaldo y exportación de la DEMO: manuales, solo demo y solo rama ola-1
-          if [ "$EVENTO" = "workflow_dispatch" ] && { [ "$IN_ACCION" = "respaldar-demo" ] || [ "$IN_ACCION" = "exportar-datos-demo" ]; }; then
+          # Respaldo y exportación de la DEMO: manuales, solo demo y solo rama preprod
+          if [ "$EVENTO" = "workflow_dispatch" ] && { [ "$IN_ACCION" = "respaldar-demo" ] || [ "$IN_ACCION" = "exportar-datos-demo" ] || [ "$IN_ACCION" = "configurar-dominios-demo" ]; }; then
             ACCION="$IN_ACCION"
-            echo "==> Acción ${ACCION} (solo demo, solo rama ola-1)..."
+            echo "==> Acción ${ACCION} (solo demo, solo rama preprod)..."
             if [ "$IN_AMBIENTE" != "demo" ]; then
               echo "::error::Esta acción solo existe para el ambiente demo."
               exit 1
             fi
-            if [ "$REF_NAME" != "ola-1" ]; then
-              echo "::error::Esta acción solo se lanza desde la rama ola-1."
+            if [ "$REF_NAME" != "preprod" ]; then
+              echo "::error::Esta acción solo se lanza desde la rama preprod."
               exit 1
             fi
             if [ "$ACCION" = "respaldar-demo" ] && [ "$IN_CONFIRMACION" != "RESPALDAR DEMO" ]; then
@@ -118,6 +119,10 @@ jobs:
             fi
             if [ "$ACCION" = "exportar-datos-demo" ] && [ "$IN_CONFIRMACION" != "EXPORTAR DATOS DE LA DEMO" ]; then
               echo "::error::Escriba exactamente 'EXPORTAR DATOS DE LA DEMO' en confirmacion."
+              exit 1
+            fi
+            if [ "$ACCION" = "configurar-dominios-demo" ] && [ "$IN_CONFIRMACION" != "CONFIGURAR DOMINIOS DE LA DEMO" ]; then
+              echo "::error::Escriba exactamente 'CONFIGURAR DOMINIOS DE LA DEMO' en confirmacion."
               exit 1
             fi
           fi
@@ -187,7 +192,7 @@ jobs:
             fi
 
           else
-            # Disparado por push a ramas (ola-1 o main)
+            # Disparado por push a ramas (preprod o main)
             ENV_DEST="demo"
             TAG_DEST="$SHORT_SHA"
           fi
@@ -432,7 +437,7 @@ jobs:
           EOF
 
   # Saneamiento manual de clientes/DNI de la DEMO (jamás producción). Solo con workflow_dispatch,
-  # accion=sanear-demo, ambiente=demo, rama ola-1 y la confirmación literal (validada arriba).
+  # accion=sanear-demo, ambiente=demo, rama preprod y la confirmación literal (validada arriba).
   sanear-demo:
     name: Sanear clientes de la demo (manual)
     needs: validar-y-determinar
@@ -494,7 +499,7 @@ jobs:
         if: always()
         run: rm -f ~/.ssh/deploy_key
 
-  # Copia manual de la demo (sin programación). Solo demo, rama ola-1 y confirmación RESPALDAR DEMO.
+  # Copia manual de la demo (sin programación). Solo demo, rama preprod y confirmación RESPALDAR DEMO.
   respaldar-demo:
     name: Respaldo manual de la demo
     needs: validar-y-determinar
@@ -560,6 +565,81 @@ jobs:
             echo ""
             echo '```'
             grep -E "respaldada|Volumen uploads|Directorio de almacenamiento|Se eliminaron|No hay archivos antiguos" respaldo.log || echo "(sin datos del respaldo: revise el log del paso anterior)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Borrar la llave del ejecutor
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+  # Cambia los dominios de la demo a demo.caprichos.pe (conservando caprichos.pe). Simulacro por defecto.
+  configurar-dominios-demo:
+    name: Configurar dominios de la demo
+    needs: validar-y-determinar
+    if: needs.validar-y-determinar.outputs.accion == 'configurar-dominios-demo'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: demo
+    concurrency:
+      group: configurar-dominios-demo
+      cancel-in-progress: false
+    steps:
+      - name: Checkout (scripts de esta versión)
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: infra/compose
+
+      - name: Configurar llave y huella SSH (sin StrictHostKeyChecking=no)
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          for v in SSH_KEY SSH_HOST SSH_KNOWN_HOSTS; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Falta el secreto $v en GitHub (Settings > Secrets and variables > Actions)."
+              exit 1
+            fi
+          done
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Sincronizar scripts en el VPS
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -e
+          SSH="ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes ${SSH_USER:-deploy}@${SSH_HOST}"
+          tar -czf - -C infra/compose scripts | $SSH 'mkdir -p /opt/caprichos && tar -xzf - -C /opt/caprichos && chmod +x /opt/caprichos/scripts/*'
+
+      - name: Configurar dominios (simulacro primero; real solo si se desmarcó simulacro)
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SIMULACRO: ${{ github.event.inputs.simulacro }}
+        run: |
+          set -o pipefail
+          if [ "$SIMULACRO" = "false" ]; then MODO=real; else MODO=simulacro; fi
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "${SSH_USER:-deploy}@${SSH_HOST}" \
+            "/opt/caprichos/scripts/configurar-dominios-demo.sh $MODO demo.caprichos.pe caprichos.pe" 2>&1 | tee dominios.log
+
+      - name: Resumen (sin secretos)
+        if: always()
+        run: |
+          {
+            echo "## Dominios de la demo"
+            echo ""
+            echo "Simulacro: \`${{ github.event.inputs.simulacro }}\`"
+            echo ""
+            echo '```'
+            grep -E "^(Hoy|Quedaría|DNS|AVISO|OK|ERROR|Sin cambios|Simulacro|Copia)" dominios.log || echo "(sin datos: revise el log del paso anterior)"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 

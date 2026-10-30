@@ -3,7 +3,7 @@ name: Programa de impresión (Windows y Linux)
 # Job aparte: solo corre si cambia el agente local; no alarga el despliegue normal.
 on:
   push:
-    branches: [main, ola-1]
+    branches: [main, preprod]
     paths:
       - 'apps/agente-local/**'
       - 'packages/compartido/**'

@@ -90,7 +90,7 @@ Ve a **Settings** > **Secrets and variables** > **Actions** > pestaña **Secrets
 ## 5. Procedimiento para Desplegar
 
 ### 5.1 Despliegue Automático en Demo
-- Cualquier push a la rama `ola-1` o a la rama `main` ejecuta automáticamente el pipeline de compilación, escaneo Trivy y despliegue hacia el ambiente **Demo**.
+- Cualquier push a la rama `preprod` o a la rama `main` ejecuta automáticamente el pipeline de compilación, escaneo Trivy y despliegue hacia el ambiente **Demo**.
 
 ### 5.2 Despliegue Deliberado a Producción (Paso a Paso)
 Cuando una versión esté lista para producción:
