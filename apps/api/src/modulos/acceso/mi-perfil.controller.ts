@@ -16,6 +16,7 @@ import { AccesoGuard } from './acceso.guard';
 import { UsuarioAutenticado } from './acceso.tipos';
 import { ActualizarMiPerfilDto, CAMPOS_MI_PERFIL } from './mi-perfil.dto';
 import { MiPerfilService } from './mi-perfil.service';
+import { SoloCambioClave } from './permiso.decorator';
 
 /** Mi perfil: cualquier usuario autenticado edita SOLO su cuenta (partyId de la sesión, sin permiso de usuarios). */
 @Controller('auth/perfil')
@@ -24,6 +25,7 @@ export class MiPerfilController {
   constructor(private readonly miPerfil: MiPerfilService) {}
 
   @Get()
+  @SoloCambioClave()
   obtener(@Req() req: any) {
     return this.miPerfil.obtener((req.usuario as UsuarioAutenticado).partyId);
   }
@@ -44,6 +46,7 @@ export class MiPerfilController {
   }
 
   @Put('foto')
+  @SoloCambioClave()
   @UseInterceptors(FileInterceptor('foto'))
   cambiarFoto(@UploadedFile() file: Express.Multer.File, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
@@ -51,6 +54,7 @@ export class MiPerfilController {
   }
 
   @Delete('foto')
+  @SoloCambioClave()
   quitarFoto(@Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.miPerfil.quitarFoto(req.usuario as UsuarioAutenticado, ip);
