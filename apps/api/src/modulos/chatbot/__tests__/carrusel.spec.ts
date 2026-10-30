@@ -99,7 +99,7 @@ describe('imagen-wa.jpg y URL pública', () => {
   const fs = require('fs');
   const os = require('os');
   const path = require('path');
-  it('devuelve JPEG cuadrado desde webp, desde iniciales y 404 si está oculto', async () => {
+  it('devuelve JPEG 5:3 (1200x720) desde webp, desde iniciales y 404 si está oculto', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wa-'));
     fs.mkdirSync(path.join(dir, 'publico'));
     await sharp({ create: { width: 300, height: 200, channels: 3, background: '#f00' } }).webp().toFile(path.join(dir, 'publico/a.webp'));
@@ -112,7 +112,7 @@ describe('imagen-wa.jpg y URL pública', () => {
     for (const id of ['1', '2']) {
       const buf = Buffer.from(await (await ctrl.imagenWhatsApp(id)).getStream().toArray().then((c: any[]) => Buffer.concat(c)));
       const m = await sharp(buf).metadata();
-      expect([m.format, m.width, m.height]).toEqual(['jpeg', 800, 800]);
+      expect([m.format, m.width, m.height]).toEqual(['jpeg', 1200, 720]);
       const h = (await ctrl.imagenWhatsApp(id)).getHeaders();
       expect(h).toMatchObject({ type: 'image/jpeg', length: buf.length });
     }
