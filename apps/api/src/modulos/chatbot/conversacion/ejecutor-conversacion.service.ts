@@ -7,7 +7,7 @@ import { RedisService } from '../../../comun/redis/redis.service';
 import { EventosGateway } from '../../../comun/socket/eventos.gateway';
 import { LocalService } from '../../local/local.service';
 import { CatalogoService } from '../../catalogo/catalogo.service';
-import { enviarCarruselConRespaldo, resumenCarrusel } from '../servicios/carrusel.util';
+import { enviarCarruselConRespaldo, resumenCarrusel, urlPublicaCarta } from '../servicios/carrusel.util';
 import { OfertasService } from '../../ofertas/ofertas.service';
 import { SeguimientoService } from '../../pedidos/seguimiento.service';
 import { PedidosService } from '../../pedidos/pedidos.service';
@@ -765,7 +765,7 @@ export class EjecutorConversacionService {
 
     // 6. Preparar datos del contexto consumiendo servicios y la Base de Datos
     const nombreMostrar = obtenerNombreMostrar(conversacion);
-    const cartaUrlPublica = this.configService.get<string>('CARTA_URL_PUBLICA', '').trim();
+    const cartaUrlPublica = urlPublicaCarta((k) => this.configService.get<string>(k));
     const telefonoCliente = normalizarTelefono(conversacion.telefono);
 
     let errorServicio = false;
@@ -1570,6 +1570,17 @@ export class EjecutorConversacionService {
           metaId = r.waMessageId || null;
         }
         const comoCarrusel = !r?.respaldo;
+        if (r?.motivoRespaldo) {
+          await this.prisma.mensajeChat.create({
+            data: {
+              conversacion_id: conversacion.id,
+              direccion: 'SALE',
+              autor: 'BOT',
+              tipo: 'SISTEMA',
+              contenido: { texto: `El carrusel no salió (${r.motivoRespaldo}); se envió la lista.` } as any,
+            },
+          });
+        }
         carruselSalio = carruselSalio || comoCarrusel;
         const rp = accion.carga.respaldo;
         // Registro legible para el admin; los ids de «Pedir este» quedan en botones para detectar toques viejos

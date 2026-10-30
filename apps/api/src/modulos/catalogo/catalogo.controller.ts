@@ -5,6 +5,7 @@ import {
   Header,
   NotFoundException,
   StreamableFile,
+  Optional,
   Param,
   Patch,
   Post,
@@ -15,6 +16,8 @@ import {
 } from '@nestjs/common';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
+import { ConfigService } from '@nestjs/config';
+import { jpegProductoWhatsApp } from './imagen-whatsapp';
 import { pngImagenInicial } from './imagen-inicial';
 import { CatalogoService } from './catalogo.service';
 import { CrearProductoDto } from './dto/crear-producto.dto';
@@ -41,7 +44,10 @@ import {
 // ===========================================================================
 @Controller('carta')
 export class CartaController {
-  constructor(private readonly catalogoService: CatalogoService) {}
+  constructor(
+    private readonly catalogoService: CatalogoService,
+    @Optional() private readonly config?: ConfigService,
+  ) {}
 
   @Get()
   async obtenerCarta(@Query('q') q?: string) {
@@ -56,6 +62,17 @@ export class CartaController {
     const nombre = /^\d+$/.test(id) ? await this.catalogoService.nombreProductoVisible(id) : null;
     if (!nombre) throw new NotFoundException('Producto no encontrado');
     return new StreamableFile(await pngImagenInicial(nombre));
+  }
+
+  /** JPEG cuadrado 800x800 para headers de WhatsApp (Meta no acepta WEBP): la foto del producto o sus iniciales. */
+  @Get('productos/:id/imagen-wa.jpg')
+  @Header('Content-Type', 'image/jpeg')
+  @Header('Cache-Control', 'public, max-age=604800')
+  async imagenWhatsApp(@Param('id') id: string) {
+    const foto = /^\d+$/.test(id) ? await this.catalogoService.fotoProductoVisible(id) : null;
+    if (!foto) throw new NotFoundException('Producto no encontrado');
+    const uploads = this.config?.get<string>('UPLOADS_DIR') || './data/uploads';
+    return new StreamableFile(await jpegProductoWhatsApp(id, foto.nombre, foto.ruta, uploads));
   }
 }
 

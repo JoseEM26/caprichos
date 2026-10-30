@@ -16,6 +16,7 @@ import {
 } from '../servicios/carrusel.util';
 import { inicialesProducto, pngImagenInicial } from '../../catalogo/imagen-inicial';
 import { CatalogoService } from '../../catalogo/catalogo.service';
+import { urlPublicaCarta } from '../servicios/carrusel.util';
 import { CartaController } from '../../catalogo/catalogo.controller';
 
 const BASE = 'https://caprichos.pe/carta';
@@ -68,8 +69,10 @@ describe('fotos: URL pública e imagen de iniciales', () => {
     expect(inicialesProducto('Dúo para compartir')).toBe('DP');
   });
   it('con foto usa la suya; sin foto usa el endpoint de iniciales; sin URL pública HTTPS, null', () => {
-    expect(imagenProductoCarrusel(BASE, { id: '7', nombre: 'Frappe Oreo', fotoUrl: '/archivos/a.jpg' })).toBe('https://caprichos.pe/archivos/a.jpg');
-    expect(imagenProductoCarrusel(BASE, { id: '7', nombre: 'Frappe Oreo' })).toBe('https://caprichos.pe/carta/productos/7/imagen-inicial.png?v=FO');
+    expect(imagenProductoCarrusel(BASE, { id: '7', nombre: 'Frappe Oreo', fotoUrl: '/archivos/a.webp' })).toBe(
+      'https://caprichos.pe/carta/productos/7/imagen-wa.jpg?v=%2Farchivos%2Fa.webp',
+    );
+    expect(imagenProductoCarrusel(BASE, { id: '7', nombre: 'Frappe Oreo' })).toBe('https://caprichos.pe/carta/productos/7/imagen-wa.jpg?v=FO');
     expect(imagenProductoCarrusel('http://localhost:5173', { id: '7', nombre: 'Frappe Oreo' })).toBeNull();
     expect(urlPublicaFoto('', '/archivos/a.jpg')).toBeNull();
   });
@@ -87,6 +90,39 @@ describe('fotos: URL pública e imagen de iniciales', () => {
     expect(Reflect.getMetadata('__headers__', CartaController.prototype.imagenInicial)).toEqual(
       expect.arrayContaining([expect.objectContaining({ name: 'Content-Type', value: 'image/png' })]),
     );
+  });
+});
+
+describe('imagen-wa.jpg y URL pública', () => {
+  const sharp = require('sharp');
+  const fs = require('fs');
+  const os = require('os');
+  const path = require('path');
+  it('devuelve JPEG cuadrado desde webp, desde iniciales y 404 si está oculto', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wa-'));
+    fs.mkdirSync(path.join(dir, 'publico'));
+    await sharp({ create: { width: 300, height: 200, channels: 3, background: '#f00' } }).webp().toFile(path.join(dir, 'publico/a.webp'));
+    const svc: any = {
+      fotoProductoVisible: jest.fn(async (id: string) =>
+        id === '1' ? { nombre: 'Frappe Oreo', ruta: 'publico/a.webp' } : id === '2' ? { nombre: 'Frappe Oreo', ruta: null } : null,
+      ),
+    };
+    const ctrl = new CartaController(svc, { get: () => dir } as any);
+    for (const id of ['1', '2']) {
+      const buf = Buffer.from(await (await ctrl.imagenWhatsApp(id)).getStream().toArray().then((c: any[]) => Buffer.concat(c)));
+      const m = await sharp(buf).metadata();
+      expect([m.format, m.width, m.height]).toEqual(['jpeg', 800, 800]);
+    }
+    await expect(ctrl.imagenWhatsApp('3')).rejects.toThrow('no encontrado');
+    expect(Reflect.getMetadata('__headers__', CartaController.prototype.imagenWhatsApp)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: 'Content-Type', value: 'image/jpeg' })]),
+    );
+  });
+  it('sin CARTA_URL_PUBLICA usa https://DOMINIO_BASE', () => {
+    const env = (o: any) => (k: string) => o[k];
+    expect(urlPublicaCarta(env({ CARTA_URL_PUBLICA: ' https://a.pe ', DOMINIO_BASE: 'b.pe' }))).toBe('https://a.pe');
+    expect(urlPublicaCarta(env({ CARTA_URL_PUBLICA: '', DOMINIO_BASE: 'b.pe' }))).toBe('https://b.pe');
+    expect(urlPublicaCarta(env({}))).toBe('');
   });
 });
 
@@ -143,7 +179,7 @@ describe('flujo del bot: carrusel de productos y promociones', () => {
     expect(a.carga.respaldo.filas.length).toBeGreaterThan(0);
     expect(b.tipo).toBe('enviarBotones');
     expect(b.botones.map((x: any) => x.id)).toEqual(['ped_prod_mas_2', 'ped_prod_lista', 'btn_categorias']);
-    expect(a.carga.tarjetas[0].imagenUrl).toBe('https://caprichos.pe/carta/productos/25/imagen-inicial.png?v=F');
+    expect(a.carga.tarjetas[0].imagenUrl).toBe('https://caprichos.pe/carta/productos/25/imagen-wa.jpg?v=F');
   });
   it('«Ver más» trae la siguiente página de 10, luego la última; con 1 sobrante va como lista', () => {
     const c = ctx([{ id: 'c1', nombre: 'Frappes', productos: productos(25) }]);
@@ -245,7 +281,7 @@ describe('respaldo a lista y outbox', () => {
     };
     const r = await enviarCarruselConRespaldo(m, '51999', { ...carga(2), respaldo });
     expect(m.enviarLista).toHaveBeenCalledWith('51999', 'Elige', 'Ver productos', respaldo.filas, expect.anything());
-    expect(r).toMatchObject({ exito: true, respaldo: true });
+    expect(r).toMatchObject({ exito: true, respaldo: true, motivoRespaldo: 'ERROR_META' });
   });
   it('si sale como carrusel no hay respaldo', async () => {
     const m: any = { enviarCarrusel: jest.fn(async () => ({ exito: true, estado: 'SIMULADO' })), enviarLista: jest.fn() };

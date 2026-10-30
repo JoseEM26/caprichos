@@ -1830,7 +1830,6 @@ function tarjetasDePromociones(contexto: ContextoConversacion) {
   return ordenarPorVentas(candidatas, contexto.ventasProductos).map(({ o, id }) => {
     const prod = productos.get(id);
     const t = tarjetaProducto(prod, contexto.cartaUrlPublica);
-    const propia = urlPublicaFoto(contexto.cartaUrlPublica, o.imagenUrl);
-    return { ...t, nombre: o.nombre, imagenUrl: propia ?? t.imagenUrl, cuerpo: `${o.nombre}\n${o.descripcion ?? t.cuerpo.split('\n')[1]}` };
+    return { ...t, nombre: o.nombre, imagenUrl: t.imagenUrl, cuerpo: `${o.nombre}\n${o.descripcion ?? t.cuerpo.split('\n')[1]}` };
   });
 }

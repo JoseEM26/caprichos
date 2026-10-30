@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { inicialesProducto } from '../../catalogo/imagen-inicial';
 import { BotonAccion, FilaLista, OpcionesEnvio, ResultadoEnvioWhatsApp, WhatsAppMensajeriaPuerto } from '../puerto/whatsapp-mensajeria.puerto';
 
@@ -92,24 +93,34 @@ export async function enviarCarruselConRespaldo(
   telefono: string,
   carga: CargaCarrusel,
   opciones?: OpcionesEnvio,
-): Promise<ResultadoEnvioWhatsApp & { respaldo?: boolean }> {
+): Promise<ResultadoEnvioWhatsApp & { respaldo?: boolean; motivoRespaldo?: string }> {
   const r = await mensajeria.enviarCarrusel(telefono, carga, opciones);
   const rp = carga.respaldo;
   if (r.exito || !rp) return r;
+  const motivoRespaldo = `${r.errorCodigo ?? 'SIN_CODIGO'}${r.errorDetalle ? `: ${r.errorDetalle}` : ''}`.slice(0, 300);
+  new Logger('Carrusel').warn(`El carrusel no salió (${motivoRespaldo}); se envió el respaldo`);
   if (rp.filas?.length) {
     const l = await mensajeria.enviarLista(telefono, rp.texto, rp.botonTexto ?? 'Ver productos', rp.filas.slice(0, 10), {
       ...opciones,
       tituloSeccion: rp.tituloSeccion,
     });
-    return { ...l, respaldo: true };
+    return { ...l, respaldo: true, motivoRespaldo };
   }
-  if (rp.botones?.length) return { ...(await mensajeria.enviarBotones(telefono, rp.texto, rp.botones.slice(0, 3), opciones)), respaldo: true };
+  if (rp.botones?.length) return { ...(await mensajeria.enviarBotones(telefono, rp.texto, rp.botones.slice(0, 3), opciones)), respaldo: true, motivoRespaldo };
   return r;
 }
 
 // ---------------------------------------------------------------------------
 // Fotos
 // ---------------------------------------------------------------------------
+
+/** Origen público de la carta: CARTA_URL_PUBLICA o, si está vacía, https://DOMINIO_BASE. */
+export function urlPublicaCarta(get: (clave: string) => string | undefined): string {
+  const url = (get('CARTA_URL_PUBLICA') ?? '').trim();
+  if (url) return url;
+  const dominio = (get('DOMINIO_BASE') ?? '').trim();
+  return dominio ? `https://${dominio}` : '';
+}
 
 /** URL pública HTTPS de una foto de la carta (rutas «/archivos/...» van sobre el origen de CARTA_URL_PUBLICA). */
 export function urlPublicaFoto(cartaUrlPublica: string | undefined | null, ruta: string | null | undefined): string | null {
@@ -124,18 +135,16 @@ export function urlPublicaFoto(cartaUrlPublica: string | undefined | null, ruta:
 }
 
 /**
- * Imagen del producto para la tarjeta: su foto o, si aún no tiene, la imagen de iniciales (dorado + azul marino)
- * que sirve la API en GET /carta/productos/:id/imagen-inicial.png (igual a la de la carta virtual).
- * Meta no acepta SVG como header, por eso es PNG. Null si no hay URL pública HTTPS (en real cae a la lista).
+ * Imagen del producto para la tarjeta: SIEMPRE el endpoint JPEG cuadrado de la API (foto convertida, o iniciales si no
+ * tiene), porque Meta solo acepta JPEG/PNG y las fotos son WEBP; así todas las tarjetas tienen la misma proporción.
+ * El parámetro `v` (foto actual) rompe cachés de Meta al cambiar la foto. Null si no hay URL pública HTTPS.
  */
 export function imagenProductoCarrusel(
   cartaUrlPublica: string | undefined | null,
   p: { id: string; nombre: string; fotoUrl?: string | null },
 ): string | null {
-  return (
-    urlPublicaFoto(cartaUrlPublica, p.fotoUrl) ??
-    urlPublicaFoto(cartaUrlPublica, `/carta/productos/${encodeURIComponent(p.id)}/imagen-inicial.png?v=${encodeURIComponent(inicialesProducto(p.nombre))}`)
-  );
+  const v = encodeURIComponent(p.fotoUrl ?? inicialesProducto(p.nombre));
+  return urlPublicaFoto(cartaUrlPublica, `/carta/productos/${encodeURIComponent(p.id)}/imagen-wa.jpg?v=${v}`);
 }
 
 /** Más vendidos primero; sin ventas (o empatados) conservan el orden de la carta. */

@@ -114,6 +114,15 @@ export class CatalogoService {
     return p?.nombre ?? null;
   }
 
+  /** Nombre y ruta de la foto de un producto visible (null si no existe u oculto). */
+  async fotoProductoVisible(id: string): Promise<{ nombre: string; ruta: string | null } | null> {
+    const p = await this.prisma.producto.findFirst({
+      where: { id: BigInt(id), oculto: false, categoria: { oculta: false } },
+      select: { nombre: true, foto_archivo: { select: { ruta: true } } },
+    });
+    return p ? { nombre: p.nombre, ruta: p.foto_archivo?.ruta ?? null } : null;
+  }
+
   async obtenerCarta(q?: string): Promise<CategoriaCarta[]> {
     const categorias = await this.prisma.categoria.findMany({
       where: { oculta: false },
