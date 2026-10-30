@@ -39,7 +39,7 @@ services:
       GIT_COMMIT: ${TAG:-demo}
       DOMINIO_BASE: ${DOMINIO_DEMO:-207-244-232-127.sslip.io}
       CORS_ORIGIN: https://${DOMINIO_DEMO:-207-244-232-127.sslip.io},https://${DOMINIO_ALT:-alt1.invalid},https://${DOMINIO_ALT2:-alt2.invalid}
-      TRUST_PROXY: "1"
+      TRUST_PROXY: "cloudflare"
       # Chatbot de WhatsApp: los valores viven solo en el .env del servidor (nunca en Git)
       WHATSAPP_TOKEN: ${WHATSAPP_TOKEN:-}
       WHATSAPP_PHONE_ID: ${WHATSAPP_PHONE_ID:-}

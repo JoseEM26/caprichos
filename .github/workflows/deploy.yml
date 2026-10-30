@@ -20,11 +20,11 @@ on:
         required: false
         type: string
       confirmacion:
-        description: 'Producción: escriba PRODUCCION. Sanear: SANEAR CLIENTES DE LA DEMO. Respaldo: RESPALDAR DEMO. Exportar: EXPORTAR DATOS DE LA DEMO. Dominios: CONFIGURAR DOMINIOS DE LA DEMO'
+        description: 'Producción: escriba PRODUCCION. Sanear: SANEAR CLIENTES DE LA DEMO. Respaldo: RESPALDAR DEMO. Exportar: EXPORTAR DATOS DE LA DEMO. Dominios: CONFIGURAR DOMINIOS DE LA DEMO. Proxy: ACTUALIZAR PROXY'
         required: false
         type: string
       accion:
-        description: 'Acción: desplegar (normal), sanear-demo (borra cuentas de clientes, SOLO demo), respaldar-demo (copia manual de la demo), exportar-datos-demo (paquete de configuración y contenido de la demo), importar-datos-produccion (importa el paquete a PRODUCCIÓN), configurar-dominios-demo (la demo pasa a demo.caprichos.pe y conserva el dominio adicional), preparar-produccion (crea el .env de PRODUCCIÓN con claves aleatorias; no despliega), crear-admin-produccion (roles y primer administrador de PRODUCCIÓN; la clave queda en un archivo del servidor)'
+        description: 'Acción: desplegar (normal), sanear-demo (borra cuentas de clientes, SOLO demo), respaldar-demo (copia manual de la demo), exportar-datos-demo (paquete de configuración y contenido de la demo), importar-datos-produccion (importa el paquete a PRODUCCIÓN), configurar-dominios-demo (la demo pasa a demo.caprichos.pe y conserva el dominio adicional), preparar-produccion (crea el .env de PRODUCCIÓN con claves aleatorias; no despliega), crear-admin-produccion (roles y primer administrador de PRODUCCIÓN; la clave queda en un archivo del servidor), sincronizar-proxy (actualiza los middlewares de Traefik; simulacro por defecto), probar-restauracion (restaura el último respaldo en una base temporal; demo o prod)'
         required: false
         default: 'desplegar'
         type: choice
@@ -36,6 +36,8 @@ on:
           - configurar-dominios-demo
           - preparar-produccion
           - crear-admin-produccion
+          - sincronizar-proxy
+          - probar-restauracion
           - importar-datos-produccion
       paquete:
         description: 'Solo importar-datos-produccion: carpeta del paquete exportado (fecha, p. ej. 20261030_120000, o ruta dentro de /opt/caprichos/respaldos/datos-empresa)'
@@ -65,7 +67,7 @@ on:
         default: 'caprichos.pe'
         type: string
       simulacro:
-        description: 'Solo para sanear-demo, configurar-dominios-demo, preparar-produccion e importar-datos-produccion: true = simulacro (no escribe); false = real (con respaldo previo)'
+        description: 'Solo para sanear-demo, configurar-dominios-demo, sincronizar-proxy, preparar-produccion e importar-datos-produccion: true = simulacro (no escribe); false = real (con respaldo previo)'
         required: false
         default: true
         type: boolean
@@ -145,6 +147,27 @@ jobs:
             fi
             if [ "$ACCION" = "configurar-dominios-demo" ] && [ "$IN_CONFIRMACION" != "CONFIGURAR DOMINIOS DE LA DEMO" ]; then
               echo "::error::Escriba exactamente 'CONFIGURAR DOMINIOS DE LA DEMO' en confirmacion."
+              exit 1
+            fi
+          fi
+
+          # Proxy (Traefik) y prueba de restauración: manuales. El proxy es de la demo/rama preprod; la prueba de
+          # restauración en prod pasa por la validación de producción (PRODUCCION + tag en main) de más abajo.
+          if [ "$EVENTO" = "workflow_dispatch" ] && [ "$IN_ACCION" = "sincronizar-proxy" ]; then
+            ACCION="sincronizar-proxy"
+            if [ "$IN_AMBIENTE" != "demo" ] || [ "$REF_NAME" != "preprod" ]; then
+              echo "::error::sincronizar-proxy se lanza con ambiente demo desde la rama preprod."
+              exit 1
+            fi
+            if [ "$IN_CONFIRMACION" != "ACTUALIZAR PROXY" ]; then
+              echo "::error::Escriba exactamente 'ACTUALIZAR PROXY' en confirmacion."
+              exit 1
+            fi
+          fi
+          if [ "$EVENTO" = "workflow_dispatch" ] && [ "$IN_ACCION" = "probar-restauracion" ]; then
+            ACCION="probar-restauracion"
+            if [ "$IN_AMBIENTE" = "demo" ] && [ "$REF_NAME" != "preprod" ]; then
+              echo "::error::probar-restauracion en demo se lanza desde la rama preprod."
               exit 1
             fi
           fi
@@ -309,8 +332,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      # TRIVY APAGADO por ahora. Reactivar ('true') antes de salir a producción real.
-      ESCANEAR_IMAGENES: 'false'
+      # Trivy (solo CRITICAL con corrección disponible) escanea lo que llega a main y a producción;
+      # preprod sigue por el camino rápido sin escaneo.
+      ESCANEAR_IMAGENES: ${{ github.ref_name == 'main' && 'true' || 'false' }}
       CAMBIO: ${{ fromJSON(needs.detectar-cambios.outputs.cambios)[matrix.imagen] }}
       IMAGE: ghcr.io/${{ needs.detectar-cambios.outputs.owner }}/caprichos-${{ matrix.imagen }}
       TAG: ${{ needs.validar-y-determinar.outputs.tag }}
@@ -690,6 +714,145 @@ jobs:
             echo ""
             echo '```'
             grep -E "^(Hoy|Quedaría|DNS|AVISO|OK|ERROR|Sin cambios|Simulacro|Copia)" dominios.log || echo "(sin datos: revise el log del paso anterior)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Borrar la llave del ejecutor
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+  # Actualiza los middlewares dinámicos de Traefik (límite de intentos por usuario real). Simulacro por defecto.
+  sincronizar-proxy:
+    name: Sincronizar proxy (Traefik)
+    needs: validar-y-determinar
+    if: needs.validar-y-determinar.outputs.accion == 'sincronizar-proxy'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: demo
+    concurrency:
+      group: sincronizar-proxy
+      cancel-in-progress: false
+    steps:
+      - name: Checkout (configuración de esta versión)
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: infra/compose
+
+      - name: Validar los YAML del proxy
+        run: python3 -c "import sys,yaml,glob; [yaml.safe_load(open(f)) for f in glob.glob('infra/compose/proxy/dynamic/*.yml')]; print('YAML correcto')"
+
+      - name: Configurar llave y huella SSH (sin StrictHostKeyChecking=no)
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          for v in SSH_KEY SSH_HOST SSH_KNOWN_HOSTS; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Falta el secreto $v en GitHub (Settings > Secrets and variables > Actions)."
+              exit 1
+            fi
+          done
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Subir scripts y la configuración nueva al VPS
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -e
+          SSH="ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes ${SSH_USER:-deploy}@${SSH_HOST}"
+          tar -czf - -C infra/compose scripts | $SSH 'mkdir -p /opt/caprichos && tar -xzf - -C /opt/caprichos && chmod +x /opt/caprichos/scripts/*'
+          tar -czf - -C infra/compose/proxy dynamic | $SSH 'rm -rf /opt/caprichos/proxy-nuevo && mkdir -p /opt/caprichos/proxy-nuevo && tar -xzf - -C /opt/caprichos/proxy-nuevo'
+
+      - name: Sincronizar proxy (simulacro primero; real solo si se desmarcó simulacro)
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SIMULACRO: ${{ github.event.inputs.simulacro }}
+        run: |
+          set -o pipefail
+          if [ "$SIMULACRO" = "false" ]; then MODO=real; else MODO=simulacro; fi
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "${SSH_USER:-deploy}@${SSH_HOST}" \
+            "/opt/caprichos/scripts/sincronizar-proxy.sh $MODO" 2>&1 | tee proxy.log
+
+      - name: Borrar la llave del ejecutor
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+  # Restaura el último respaldo en una base temporal aislada y cuenta filas clave. No toca la base real.
+  probar-restauracion:
+    name: Probar restauración del respaldo
+    needs: validar-y-determinar
+    if: needs.validar-y-determinar.outputs.accion == 'probar-restauracion'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: ${{ needs.validar-y-determinar.outputs.ambiente }}
+    concurrency:
+      group: probar-restauracion
+      cancel-in-progress: false
+    steps:
+      - name: Checkout (scripts de esta versión)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validar-y-determinar.outputs.ref }}
+          sparse-checkout: infra/compose
+
+      - name: Configurar llave y huella SSH (sin StrictHostKeyChecking=no)
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          for v in SSH_KEY SSH_HOST SSH_KNOWN_HOSTS; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Falta el secreto $v en GitHub (Settings > Secrets and variables > Actions)."
+              exit 1
+            fi
+          done
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Sincronizar scripts en el VPS
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -e
+          SSH="ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes ${SSH_USER:-deploy}@${SSH_HOST}"
+          tar -czf - -C infra/compose scripts | $SSH 'mkdir -p /opt/caprichos && tar -xzf - -C /opt/caprichos && chmod +x /opt/caprichos/scripts/*'
+
+      - name: Restaurar el último respaldo en una base temporal
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          AMBIENTE: ${{ needs.validar-y-determinar.outputs.ambiente }}
+        run: |
+          set -o pipefail
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "${SSH_USER:-deploy}@${SSH_HOST}" \
+            "/opt/caprichos/scripts/probar-restauracion.sh $AMBIENTE" 2>&1 | tee restauracion.log
+
+      - name: Resumen (solo conteos)
+        if: always()
+        run: |
+          {
+            echo "## Prueba de restauración"
+            echo ""
+            echo '```'
+            grep -E "^(Respaldo|AVISO|Tablas|Filas|OK|FALLA|ERROR)" restauracion.log || echo "(sin datos: revise el log del paso anterior)"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 

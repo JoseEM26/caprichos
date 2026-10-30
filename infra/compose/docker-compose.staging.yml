@@ -39,7 +39,7 @@ services:
       GIT_COMMIT: ${TAG:-staging}
       DOMINIO_BASE: ${DOMINIO_STAGING:-staging.caprichos.pe}
       CORS_ORIGIN: https://${DOMINIO_STAGING:-staging.caprichos.pe}
-      TRUST_PROXY: "1"
+      TRUST_PROXY: "cloudflare"
       # Chatbot de WhatsApp: los valores viven solo en el .env del servidor (nunca en Git)
       WHATSAPP_TOKEN: ${WHATSAPP_TOKEN:-}
       WHATSAPP_PHONE_ID: ${WHATSAPP_PHONE_ID:-}

@@ -31,11 +31,16 @@ http:
           X-Robots-Tag: "noindex, nofollow, noarchive"
 
     # Rate limiting para endpoint de autenticación (/auth/ingresar)
+    # El contador es por usuario real: detrás de Cloudflare, la IP de la conexión es la del nodo de Cloudflare
+    # y agruparía a todos los clientes de ese nodo. Cloudflare agrega la IP del usuario al final de X-Forwarded-For.
     rate-limit-login:
       rateLimit:
         average: 10
         burst: 20
         period: "1s"
+        sourceCriterion:
+          ipStrategy:
+            depth: 1
 
     # Rate limiting general para rutas públicas
     rate-limit-public:
@@ -43,6 +48,9 @@ http:
         average: 60
         burst: 100
         period: "1s"
+        sourceCriterion:
+          ipStrategy:
+            depth: 1
 
     # Compresión gzip/brotli
     compress-resp:
