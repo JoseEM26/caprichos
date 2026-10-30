@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { valorTrustProxy } from './comun/confianza-proxy';
 import { ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
 import { ConfigService } from '@nestjs/config';
@@ -36,9 +37,10 @@ async function bootstrap() {
 
   // Configuración de trust proxy para proxy inverso (Caddy / Cloudflare)
   const trustProxy = configService.get<string>('TRUST_PROXY', '1');
-  if (trustProxy) {
+  const valorProxy = valorTrustProxy(trustProxy);
+  if (valorProxy !== undefined) {
     const expressApp = app.getHttpAdapter().getInstance();
-    expressApp.set('trust proxy', trustProxy === 'true' || trustProxy === '1' ? 1 : trustProxy);
+    expressApp.set('trust proxy', valorProxy);
   }
 
   // Configuración de CORS estricto o por origen configurado
