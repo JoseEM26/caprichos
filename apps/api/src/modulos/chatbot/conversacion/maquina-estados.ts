@@ -1,4 +1,4 @@
-import { ordenarPorVentas, tarjetaProducto, urlPublicaFoto } from '../servicios/carrusel.util';
+import { accionesPaginaCarrusel, ordenarPorVentas, tarjetaProducto, urlPublicaFoto } from '../servicios/carrusel.util';
 import {
   BOTON_HABLAR_PERSONA,
   BOTON_LISTA_CATEGORIAS,
@@ -1001,7 +1001,9 @@ export function transicionarEstado(
   }
 
   // 6. Intención: "Promociones de hoy"
+  const paginaPromos = idInteractivo?.startsWith('promo_mas_') ? Math.max(2, parseInt(idInteractivo.slice(10), 10) || 2) : 1;
   const esPromociones =
+    paginaPromos > 1 ||
     idInteractivo === 'btn_promociones' ||
     idInteractivo === 'promos' ||
     idInteractivo === 'faq_promos' ||
@@ -1034,10 +1036,21 @@ export function transicionarEstado(
     return {
       nuevoEstado,
       acciones: tarjetasPromos.length >= 2
-        ? [
-            { tipo: 'enviarCarrusel', carga: { cuerpo: textoPromos, tarjetas: tarjetasPromos, respaldo: { texto: textoPromos, botones: botonesPromos } } },
-            { tipo: 'enviarBotones', texto: '¿Qué más te provoca? 💛', botones: botonesPromos, soloSiCarruselSalio: true },
-          ]
+        ? accionesPaginaCarrusel({
+            tarjetas: tarjetasPromos,
+            pagina: paginaPromos,
+            cuerpoPrimera: textoPromos,
+            cuerpoSiguientes: 'Más promociones para ti 💛\nDesliza y toca «Pedir este» en la que quieras.',
+            respaldoPrimera: { texto: textoPromos, botones: botonesPromos },
+            idVerMas: (n) => `promo_mas_${n}`,
+            textoVerMas: (q) => `Hay ${q} ${q === 1 ? 'promoción más' : 'promociones más'}. ¿Las vemos?`,
+            botonesExtra: botonesPromos,
+            textoLista: 'Más promociones para ti 💛',
+          }).concat(
+            tarjetasPromos.length <= paginaPromos * 10
+              ? [{ tipo: 'enviarBotones', texto: '¿Qué más te provoca? 💛', botones: botonesPromos, ...(paginaPromos === 1 ? { soloSiCarruselSalio: true } : {}) }]
+              : [],
+          )
         : [{ tipo: 'enviarBotones', texto: textoPromos, botones: botonesPromos }],
       nuevoFlujo: {
         ...flujo,

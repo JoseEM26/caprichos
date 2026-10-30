@@ -206,6 +206,35 @@ describe('flujo del bot: carrusel de productos y promociones', () => {
   });
 });
 
+describe('promociones con más de 10: «Ver más»', () => {
+  const cats = (n: number) => [{ id: 'c1', nombre: 'Frappes', productos: Array.from({ length: n }, (_, i) => ({ id: String(i + 1), nombre: `Frappe ${i + 1}`, precio: 10, disponible: true, tamanos: [] })) }];
+  const ctxP = (n: number): ContextoConversacion => ({
+    cartaUrlPublica: BASE,
+    datosLocal: { abierta: true, abre: '12:00', cierra: '23:00', direccion: 'x', enlaceMapa: '', telefono: '1' } as any,
+    categoriasCarta: cats(n),
+    ofertas: Array.from({ length: n }, (_, i) => ({ nombre: `Promo ${i + 1}`, vigenteAhora: true, alcanceProductoId: String(i + 1), imagenUrl: null })),
+  } as any);
+  it('11 promos: carrusel de 10 + botones «Ver más»; la página 2 con 1 va como lista', () => {
+    const c = ctxP(11);
+    const r = transicionarEstado(null, normalizarEntrada({ listRowId: 'menu_promos' }), c);
+    const [a, b] = r.acciones as any[];
+    expect(a.tipo).toBe('enviarCarrusel');
+    expect(a.carga.tarjetas).toHaveLength(10);
+    expect(b.tipo).toBe('enviarBotones');
+    expect(b.botones.map((x: any) => x.id)).toEqual(['promo_mas_2', 'btn_carta', 'btn_menu']);
+    const p2 = transicionarEstado(r.nuevoFlujo, normalizarEntrada({ buttonPayload: 'promo_mas_2' }), c);
+    expect(p2.acciones.map((x: any) => x.tipo)).toEqual(['enviarLista', 'enviarBotones']);
+    expect((p2.acciones[0] as any).filas[0].id).toBe('ped_prod_11');
+  });
+  it('25 promos: la página 2 es otro carrusel de 10 con su «Ver más»', () => {
+    const c = ctxP(25);
+    const p2 = transicionarEstado(null, normalizarEntrada({ buttonPayload: 'promo_mas_2' }), c);
+    const [a, b] = p2.acciones as any[];
+    expect(a.carga.tarjetas).toHaveLength(10);
+    expect(b.botones[0].id).toBe('promo_mas_3');
+  });
+});
+
 describe('respaldo a lista y outbox', () => {
   const respaldo = { texto: 'Elige', botonTexto: 'Ver productos', filas: [{ id: 'ped_prod_1', titulo: 'Prod 1' }] };
   it('si Meta rechaza el carrusel, reenvía como lista', async () => {

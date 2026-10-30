@@ -15,7 +15,7 @@ import {
   LineaCarritoBot,
   ItemEnConfiguracionBot,
 } from './tipos-pedido';
-import { ordenarPorVentas, tarjetaProducto } from '../../../servicios/carrusel.util';
+import { ordenarPorVentas, tarjetaProducto, accionesPaginaCarrusel as accionesPaginaCarruselGenerica } from '../../../servicios/carrusel.util';
 import {
   TEXTOS_BOT,
   BOTON_VOLVER_MENU,
@@ -3495,50 +3495,18 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     contexto: ContextoConversacion,
     listaBase: AccionMensaje,
   ): AccionMensaje[] {
-    const POR = 10;
-    const trozo = productos.slice((pagina - 1) * POR, pagina * POR);
-    const quedan = productos.length - pagina * POR;
-    const acciones: AccionMensaje[] = [];
-    let carrusel = false;
-    if (trozo.length >= 2) {
-      carrusel = true;
-      const lista = pagina === 1 ? (listaBase as any) : null;
-      acciones.push({
-        tipo: 'enviarCarrusel',
-        carga: {
-          cuerpo: pagina === 1 ? TEXTOS_BOT.carruselFavoritos(categoria.nombre, productos.length) : TEXTOS_BOT.carruselMasOpciones(),
-          tarjetas: trozo.map((p) => tarjetaProducto(p, contexto.cartaUrlPublica)),
-          respaldo: lista
-            ? { texto: lista.texto, botonTexto: lista.botonTexto, filas: lista.filas }
-            : {
-                texto: TEXTOS_BOT.carruselMasOpciones(),
-                botonTexto: 'Ver productos',
-                filas: trozo.map((p: any) => ({ id: `ped_prod_${p.id}`, titulo: String(p.nombre).slice(0, 24), descripcion: `S/ ${Number(p.precio || 0).toFixed(2)}` })),
-              },
-        },
-      });
-    } else if (trozo.length === 1) {
-      const p = trozo[0];
-      acciones.push({
-        tipo: 'enviarLista',
-        texto: TEXTOS_BOT.carruselMasOpciones(),
-        botonTexto: 'Ver productos',
-        filas: [{ id: `ped_prod_${p.id}`, titulo: String(p.nombre).slice(0, 24), descripcion: `S/ ${Number(p.precio || 0).toFixed(2)}` }],
-      });
-    }
-    if (quedan > 0) {
-      acciones.push({
-        tipo: 'enviarBotones',
-        texto: TEXTOS_BOT.carruselVerMas(quedan),
-        botones: [
-          { id: `ped_prod_mas_${pagina + 1}`, titulo: 'Ver más' },
-          { id: 'ped_prod_lista', titulo: 'Ver lista completa' },
-          { id: 'btn_categorias', titulo: 'Ver categorías' },
-        ],
-        ...(carrusel && pagina === 1 ? { soloSiCarruselSalio: true } : {}),
-      } as AccionMensaje);
-    }
-    return acciones;
+    const lista: any = listaBase;
+    return accionesPaginaCarruselGenerica({
+      tarjetas: productos.map((p) => tarjetaProducto(p, contexto.cartaUrlPublica)),
+      pagina,
+      cuerpoPrimera: TEXTOS_BOT.carruselFavoritos(categoria.nombre, productos.length),
+      cuerpoSiguientes: TEXTOS_BOT.carruselMasOpciones(),
+      respaldoPrimera: lista?.filas ? { texto: lista.texto, botonTexto: lista.botonTexto, filas: lista.filas } : undefined,
+      idVerMas: (n) => `ped_prod_mas_${n}`,
+      textoVerMas: TEXTOS_BOT.carruselVerMas,
+      botonesExtra: [{ id: 'ped_prod_lista', titulo: 'Ver lista completa' }, { id: 'btn_categorias', titulo: 'Ver categorías' }],
+      textoLista: TEXTOS_BOT.carruselMasOpciones(),
+    }) as AccionMensaje[];
   }
 
   // -------------------------------------------------------------------------

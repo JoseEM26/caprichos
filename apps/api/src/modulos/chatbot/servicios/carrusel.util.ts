@@ -157,3 +157,66 @@ export function tarjetaProducto(p: any, cartaUrlPublica?: string | null): Tarjet
     boton: { id: `ped_prod_${p.id}`, titulo: 'Pedir este' },
   };
 }
+
+// ---------------------------------------------------------------------------
+// Paginación de carruseles (todo carrusel con más de 10 tarjetas lleva «Ver más»)
+// ---------------------------------------------------------------------------
+
+export interface OpcionesPaginaCarrusel {
+  tarjetas: TarjetaCarrusel[];
+  /** 1 = primera página. */
+  pagina: number;
+  cuerpoPrimera: string;
+  cuerpoSiguientes: string;
+  /** Respaldo del carrusel de la página 1 (las demás páginas arman su lista solas). */
+  respaldoPrimera?: RespaldoCarrusel;
+  /** Id del botón «Ver más» que lleva a la página n. */
+  idVerMas: (n: number) => string;
+  textoVerMas: (quedan: number) => string;
+  /** Botones tras «Ver más» (máx. 2: Meta admite 3 botones). */
+  botonesExtra: BotonAccion[];
+  textoLista: string;
+}
+
+const filaDeTarjeta = (t: TarjetaCarrusel): FilaLista => ({
+  id: t.boton.id,
+  titulo: t.nombre.slice(0, 24),
+  descripcion: t.cuerpo.split('\n')[1] ?? '',
+});
+
+/**
+ * Una página de hasta 10 tarjetas como acciones del bot: carrusel (2 o más), lista si queda 1, y si hay más,
+ * un mensaje de botones aparte con «Ver más» (Meta no admite un botón extra dentro del carrusel).
+ */
+export function accionesPaginaCarrusel(o: OpcionesPaginaCarrusel): any[] {
+  const POR = LIMITES_CARRUSEL.max;
+  const trozo = o.tarjetas.slice((o.pagina - 1) * POR, o.pagina * POR);
+  const quedan = o.tarjetas.length - o.pagina * POR;
+  const acciones: any[] = [];
+  let carrusel = false;
+  if (trozo.length >= 2) {
+    carrusel = true;
+    acciones.push({
+      tipo: 'enviarCarrusel',
+      carga: {
+        cuerpo: o.pagina === 1 ? o.cuerpoPrimera : o.cuerpoSiguientes,
+        tarjetas: trozo,
+        respaldo:
+          o.pagina === 1 && o.respaldoPrimera
+            ? o.respaldoPrimera
+            : { texto: o.textoLista, botonTexto: 'Ver productos', filas: trozo.map(filaDeTarjeta) },
+      },
+    });
+  } else if (trozo.length === 1) {
+    acciones.push({ tipo: 'enviarLista', texto: o.textoLista, botonTexto: 'Ver productos', filas: [filaDeTarjeta(trozo[0])] });
+  }
+  if (quedan > 0) {
+    acciones.push({
+      tipo: 'enviarBotones',
+      texto: o.textoVerMas(quedan),
+      botones: [{ id: o.idVerMas(o.pagina + 1), titulo: 'Ver más' }, ...o.botonesExtra.slice(0, 2)],
+      ...(carrusel && o.pagina === 1 ? { soloSiCarruselSalio: true } : {}),
+    });
+  }
+  return acciones;
+}
