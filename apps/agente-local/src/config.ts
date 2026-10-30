@@ -1,4 +1,6 @@
 import { join } from 'path';
+import { formatoDesdeConfig } from './tspl/formato';
+import type { FormatoEtiqueta } from './tspl/formato';
 
 export interface DestinoImpresora {
   /** Nombre de la impresora en Windows o ruta del dispositivo en Linux (empieza con /). */
@@ -15,6 +17,8 @@ export interface ArchivoConfiguracion {
   etiqueteraId?: string;
   ticketeraId?: string;
   ticketColumnas?: number;
+  /** Tamaño del rollo y orientación del sticker (ver FormatoEtiqueta). */
+  etiqueta?: Partial<FormatoEtiqueta>;
 }
 
 export interface ConfiguracionAgente {
@@ -22,6 +26,8 @@ export interface ConfiguracionAgente {
   ticketera?: string;
   /** 32 columnas = papel de 58 mm; 48 = 80 mm. */
   ticketColumnas: number;
+  /** Formato del sticker: apaisado 101.6 x 63.5 mm por defecto. */
+  etiqueta: FormatoEtiqueta;
   apiUrl: string;
   agenteKey: string;
   impresoraRuta: string;
@@ -93,6 +99,7 @@ export function obtenerConfiguracion(
     impresoraRuta,
     etiquetera: env.ETIQUETERA || archivo.etiquetera || undefined,
     ticketera: env.TICKETERA || archivo.ticketera || undefined,
+    etiqueta: formatoDesdeConfig(env, archivo.etiqueta),
     ticketColumnas: Number(env.TICKET_COLUMNAS || archivo.ticketColumnas) === 32 ? 32 : 48,
     intervaloConsultaMs: isNaN(intervaloConsultaMs) ? 3000 : intervaloConsultaMs,
     intervaloLatidoMs: isNaN(intervaloLatidoMs) ? 20000 : intervaloLatidoMs,

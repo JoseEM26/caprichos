@@ -174,7 +174,7 @@ export class AgenteLocalServicio {
       const bytes =
         trabajo.tipo === 'TICKET_PAGO'
           ? generarTicketEscPos(trabajo.payload as any, this.config.ticketColumnas)
-          : generarBytesTrabajo(trabajo.tipo, trabajo.payload as any, trabajo.copia);
+          : generarBytesTrabajo(trabajo.tipo, trabajo.payload as any, trabajo.copia, this.config.etiqueta);
       await dispositivo.escribir(bytes);
 
       if (rol === 'ETIQUETERA') {

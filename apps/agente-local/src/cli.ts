@@ -11,6 +11,7 @@ import { AgenteLocalServicio } from './agente/bucle';
 import {
   generarTsplTrabajo,
   generarBytesTrabajo,
+  generarBytesDeScript,
 } from './tspl/generadorTspl';
 import {
   muestraEtiquetaGeneral,
@@ -22,7 +23,7 @@ export async function ejecutarComandoProbar(
   impresora?: IDispositivoImpresora,
   logger: (msg: string) => void = console.log
 ): Promise<{ exito: boolean; impresas: number; error?: string }> {
-  const config = obtenerConfiguracion();
+  const config = obtenerConfiguracion(process.env, leerArchivoConfiguracion());
   const dispositivo = impresora || new ImpresoraUsb(config.impresoraRuta);
 
   logger('=====================================================');
@@ -34,17 +35,17 @@ export async function ejecutarComandoProbar(
   try {
     // 1. General
     logger('Enviando Etiqueta General de Pedido (PED-101)...');
-    const bytesGeneral = generarBytesTrabajo('ETIQUETA_GENERAL', muestraEtiquetaGeneral);
+    const bytesGeneral = generarBytesTrabajo('ETIQUETA_GENERAL', muestraEtiquetaGeneral, false, config.etiqueta);
     await dispositivo.escribir(bytesGeneral);
 
     // 2. Área
     logger('Enviando Etiqueta de Área (COCINA 1 de 2)...');
-    const bytesArea = generarBytesTrabajo('ETIQUETA_AREA', muestraEtiquetaArea);
+    const bytesArea = generarBytesTrabajo('ETIQUETA_AREA', muestraEtiquetaArea, false, config.etiqueta);
     await dispositivo.escribir(bytesArea);
 
     // 3. Bebida
     logger('Enviando Etiqueta por Bebida (CAPPUCCINO VAINILLA - MARÍA ELENA)...');
-    const bytesBebida = generarBytesTrabajo('ETIQUETA_BEBIDA', muestraEtiquetaBebida);
+    const bytesBebida = generarBytesTrabajo('ETIQUETA_BEBIDA', muestraEtiquetaBebida, false, config.etiqueta);
     await dispositivo.escribir(bytesBebida);
 
     logger('-----------------------------------------------------');
@@ -76,25 +77,26 @@ export async function ejecutarComandoVolcar(
   }
 
   const archivosGenerados: string[] = [];
+  const config = obtenerConfiguracion(process.env, leerArchivoConfiguracion());
 
   // 1. General
-  const tsplGeneral = generarTsplTrabajo('ETIQUETA_GENERAL', muestraEtiquetaGeneral);
+  const tsplGeneral = generarTsplTrabajo('ETIQUETA_GENERAL', muestraEtiquetaGeneral, false, config.etiqueta);
   const rutaGeneral = path.join(directorioDestino, 'etiqueta-general.tspl');
-  fs.writeFileSync(rutaGeneral, tsplGeneral, 'utf-8');
+  fs.writeFileSync(rutaGeneral, generarBytesDeScript(tsplGeneral));
   archivosGenerados.push(rutaGeneral);
   logger(`✔ Escrito: ${rutaGeneral} (${tsplGeneral.length} bytes)`);
 
   // 2. Área
-  const tsplArea = generarTsplTrabajo('ETIQUETA_AREA', muestraEtiquetaArea);
+  const tsplArea = generarTsplTrabajo('ETIQUETA_AREA', muestraEtiquetaArea, false, config.etiqueta);
   const rutaArea = path.join(directorioDestino, 'etiqueta-area.tspl');
-  fs.writeFileSync(rutaArea, tsplArea, 'utf-8');
+  fs.writeFileSync(rutaArea, generarBytesDeScript(tsplArea));
   archivosGenerados.push(rutaArea);
   logger(`✔ Escrito: ${rutaArea} (${tsplArea.length} bytes)`);
 
   // 3. Bebida
-  const tsplBebida = generarTsplTrabajo('ETIQUETA_BEBIDA', muestraEtiquetaBebida);
+  const tsplBebida = generarTsplTrabajo('ETIQUETA_BEBIDA', muestraEtiquetaBebida, false, config.etiqueta);
   const rutaBebida = path.join(directorioDestino, 'etiqueta-bebida.tspl');
-  fs.writeFileSync(rutaBebida, tsplBebida, 'utf-8');
+  fs.writeFileSync(rutaBebida, generarBytesDeScript(tsplBebida));
   archivosGenerados.push(rutaBebida);
   logger(`✔ Escrito: ${rutaBebida} (${tsplBebida.length} bytes)`);
 

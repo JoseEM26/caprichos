@@ -6,11 +6,15 @@ import {
   generarTsplTrabajo,
   generarBytesTrabajo,
 } from '../generadorTspl';
+import { LOGO_BASE64 } from '../logoBitmap';
 import type {
   EtiquetaGeneralDatos,
   EtiquetaAreaDatos,
   EtiquetaBebidaDatos,
 } from '@caprichos/compartido';
+
+const V = { formato: { orientacion: 'vertical' as const } };
+const H = { formato: { orientacion: 'horizontal' as const } };
 
 describe('generadorTspl', () => {
   const datosGeneral: EtiquetaGeneralDatos = {
@@ -73,7 +77,7 @@ describe('generadorTspl', () => {
 
   describe('etiqueta general', () => {
     it('genera comandos iniciales, marco doble, cabecera y pie requeridos', () => {
-      const tspl = generarEtiquetaGeneral(datosGeneral);
+      const tspl = generarEtiquetaGeneral(datosGeneral, V);
       expect(tspl).toContain('SIZE 63.5 mm,101.6 mm\r\n');
       expect(tspl).toContain('GAP 3 mm,0 mm\r\n');
       expect(tspl).toContain('DIRECTION 1\r\n');
@@ -116,14 +120,14 @@ describe('generadorTspl', () => {
           { cantidad: 1, nombre: 'P7' },
         ],
       };
-      const tspl = generarEtiquetaGeneral(conMuchosProductos);
+      const tspl = generarEtiquetaGeneral(conMuchosProductos, V);
       expect(tspl).toContain('+ 2 producto(s)');
     });
   });
 
   describe('etiqueta de área', () => {
     it('genera cabecera con el nombre de área e índice', () => {
-      const tspl = generarEtiquetaArea(datosArea);
+      const tspl = generarEtiquetaArea(datosArea, V);
       expect(tspl).toContain('COCINA');
       expect(tspl).toContain('Area 1 de 2');
       expect(tspl).toContain('REVERSE 28,28,452,78\r\n');
@@ -133,7 +137,7 @@ describe('generadorTspl', () => {
     });
 
     it('soporta versión compacta cuando hay múltiples líneas', () => {
-      const tspl = generarEtiquetaArea(datosArea);
+      const tspl = generarEtiquetaArea(datosArea, V);
       // En compacta las opciones van en la misma línea separadas por coma
       expect(tspl).toContain('Bien tostado');
       expect(tspl).toContain('Con limón');
@@ -152,7 +156,7 @@ describe('generadorTspl', () => {
           },
         ],
       };
-      const tspl = generarEtiquetaArea(noCompacta);
+      const tspl = generarEtiquetaArea(noCompacta, V);
       expect(tspl).toContain('Hamburguesa Artesanal');
       expect(tspl).toContain('Doble');
       expect(tspl).toContain('Término medio');
@@ -161,7 +165,7 @@ describe('generadorTspl', () => {
 
   describe('etiqueta por bebida (vaso)', () => {
     it('genera nombre del bebedor gigante, bebida, opciones y recuadro contiene', () => {
-      const tspl = generarEtiquetaBebida(datosBebida);
+      const tspl = generarEtiquetaBebida(datosBebida, V);
       expect(tspl).toContain('BEBIDA 1 de 2');
       expect(tspl).toContain('MARÍA');
       expect(tspl).toContain('CAPPUCCINO VAINILLA');
@@ -179,7 +183,7 @@ describe('generadorTspl', () => {
         ...datosBebida,
         persona: 'MAXIMILIANO DE LOS RÍOS',
       };
-      const tspl = generarEtiquetaBebida(nombreLargo);
+      const tspl = generarEtiquetaBebida(nombreLargo, V);
       // No debe romperse ni desbordar; debe estar contenido
       expect(tspl).toContain('MAXIMILIANO');
     });
@@ -190,7 +194,7 @@ describe('generadorTspl', () => {
         bebidaIndex: 3,
         totalBebidas: 5,
       };
-      const tspl = generarEtiquetaBebida(bebida3de5);
+      const tspl = generarEtiquetaBebida(bebida3de5, V);
       expect(tspl).toContain('BEBIDA 3 de 5');
     });
   });
@@ -213,7 +217,7 @@ describe('generadorTspl', () => {
         who: 'CLIENTE CON UN NOMBRE EXTREMADAMENTE LARGO QUE EXCEDE CUALQUIER ANCHO NORMAL DE ETIQUETA FISICA',
         nota: 'ESTA ES UNA NOTA GIGANTE ESCRITA POR UN CLIENTE QUE QUIERE DESCRIBIR CADA DETALLE DE COMO PREPARAR SU PEDIDO CON VEINTE CONDICIONES DISTINTAS',
       };
-      const tspl = generarEtiquetaGeneral(conTextoExtremo);
+      const tspl = generarEtiquetaGeneral(conTextoExtremo, V);
       expect(tspl).toContain('...');
       expect(tspl).toContain('CLIENTE');
     });
@@ -229,6 +233,50 @@ describe('generadorTspl', () => {
 
       const bebida = generarTsplTrabajo('ETIQUETA_BEBIDA', datosBebida);
       expect(bebida).toContain('BEBIDA 1 de 2');
+    });
+  });
+
+  describe('formato apaisado (defecto) y logo', () => {
+    it('por defecto sale apaisado 101.6 x 63.5 mm, DIRECTION 1, con el logo en BITMAP OVERWRITE', () => {
+      for (const t of [
+        generarEtiquetaGeneral(datosGeneral),
+        generarEtiquetaArea(datosArea),
+        generarEtiquetaBebida(datosBebida),
+      ]) {
+        expect(t).toContain('SIZE 101.6 mm,63.5 mm\r\n');
+        expect(t).toContain('DIRECTION 1\r\n');
+        expect(t).toMatch(/BITMAP \d+,\d+,8,64,0,/);
+        expect(t).toMatch(/REVERSE 28,28,75\d,76/);
+        expect(t).toContain('PRINT 1,1\r\n');
+      }
+    });
+
+    it('el contenido cabe en el lienzo 813 x 508 dots', () => {
+      const t = generarEtiquetaGeneral(datosGeneral, H);
+      for (const m of t.matchAll(/^TEXT (\d+),(\d+),/gm)) {
+        expect(Number(m[1])).toBeLessThan(813);
+        expect(Number(m[2])).toBeLessThan(508);
+      }
+    });
+
+    it('la orientacion y el tamano son configurables', () => {
+      const v = generarEtiquetaGeneral(datosGeneral, V);
+      expect(v).toContain('SIZE 63.5 mm,101.6 mm\r\n');
+      expect(v).toMatch(/BITMAP \d+,\d+,8,64,0,/);
+      const c = generarEtiquetaBebida(datosBebida, { formato: { anchoMm: 100, altoMm: 60, direccion: 0, gapMm: 2 } });
+      expect(c).toContain('SIZE 100 mm,60 mm\r\n');
+      expect(c).toContain('GAP 2 mm,0 mm\r\n');
+      expect(c).toContain('DIRECTION 0\r\n');
+    });
+
+    it('los bytes llevan el bitmap del logo crudo (512 bytes) y el texto en Windows-1252', () => {
+      const bytes = generarBytesTrabajo('ETIQUETA_GENERAL', datosGeneral);
+      const i = bytes.indexOf(Buffer.from('BITMAP 34,34,8,64,0,'));
+      expect(i).toBeGreaterThan(0);
+      const logo = Buffer.from(LOGO_BASE64, 'base64');
+      expect(bytes.subarray(i + 20, i + 20 + 512).equals(logo)).toBe(true);
+      expect(bytes.subarray(i + 20 + 512, i + 20 + 514).toString()).toBe('\r\n');
+      expect(bytes.includes(Buffer.from('J'))).toBe(true);
     });
   });
 });

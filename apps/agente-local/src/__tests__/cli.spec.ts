@@ -7,6 +7,9 @@ import { ImpresoraMemoria } from '../impresora/impresoraMemoria';
 import { ImpresoraUsb } from '../impresora/impresoraUsb';
 import { ErrorImpresora } from '../impresora/dispositivo.interface';
 
+// Que los comandos no lean la configuracion real del equipo
+process.env.AGENTE_CONFIG = path.join(require('os').tmpdir(), 'caprichos-sin-config.json');
+
 describe('CLI - Comandos de prueba y volcado', () => {
   it('ejecutarComandoProbar envia 3 etiquetas de muestra a la impresora (general, area, bebida)', async () => {
     const memoria = new ImpresoraMemoria();
@@ -56,7 +59,7 @@ describe('CLI - Comandos de prueba y volcado', () => {
       path.join(dirTemporal, 'etiqueta-general.tspl'),
       'utf-8'
     );
-    expect(contenidoGeneral).toContain('SIZE 63.5 mm,101.6 mm');
+    expect(contenidoGeneral).toContain('SIZE 101.6 mm,63.5 mm');
     expect(contenidoGeneral).toContain('PEDIDO');
 
     // Limpieza

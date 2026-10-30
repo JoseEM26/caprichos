@@ -15,22 +15,19 @@ import {
   FUENTES_TSPL,
 } from './tipografia';
 import { generarSeparadorRombos } from './rombos';
+import { resolverFormato, comandosInicio, comandoLogo, aBytesTspl } from './formato';
+import type { FormatoEtiqueta } from './formato';
+import { generarGeneralH, generarAreaH, generarBebidaH } from './horizontal';
 
 export interface OpcionesGeneradorTspl {
   copias?: number;
+  /** Tamaño del rollo y orientación. Sin él: apaisado 101.6 x 63.5 mm. */
+  formato?: Partial<FormatoEtiqueta>;
 }
 
-/**
- * Emite los comandos de inicio estándar para 4BARCODE 4B-2054TH (63.5 x 101.6 mm).
- */
-function generarInicioTspl(): string {
-  return (
-    'SIZE 63.5 mm,101.6 mm\r\n' +
-    'GAP 3 mm,0 mm\r\n' +
-    'DIRECTION 1\r\n' +
-    'CLS\r\n' +
-    'CODEPAGE 1252\r\n'
-  );
+/** Comandos de inicio de la 4BARCODE 4B-2054TH para el formato vertical (63.5 x 101.6 mm por defecto). */
+function generarInicioTspl(f: FormatoEtiqueta): string {
+  return comandosInicio(f);
 }
 
 /**
@@ -48,13 +45,12 @@ function generarMarcoDoble(): string {
  */
 function generarCabeceraNegra(titulo: string, subtitulo: string): string {
   const lineas: string[] = [];
-  // Círculo del logo y letra 'C'
-  lineas.push('CIRCLE 62,67,40,3\r\n');
-  lineas.push(generarComandoTexto(54, 55, '3', 1, 1, 'C'));
+  // Logo de la marca (bitmap 64x64); el REVERSE de abajo lo deja como disco blanco
+  lineas.push(comandoLogo(34, 35));
 
   // Título y subtítulo
-  lineas.push(generarComandoTexto(105, 38, '4', 1, 1, truncar(titulo.toUpperCase(), 14)));
-  lineas.push(generarComandoTexto(105, 74, '2', 1, 1, truncar(subtitulo, 26)));
+  lineas.push(generarComandoTexto(112, 38, '4', 1, 1, truncar(titulo.toUpperCase(), 14)));
+  lineas.push(generarComandoTexto(112, 74, '2', 1, 1, truncar(subtitulo, 26)));
 
   // Inversión para convertir fondo a negro y trazos a blanco
   lineas.push('REVERSE 28,28,452,78\r\n');
@@ -173,9 +169,11 @@ export function generarEtiquetaGeneral(
   opciones?: OpcionesGeneradorTspl
 ): string {
   const copias = opciones?.copias ?? 1;
+  const f = resolverFormato(opciones?.formato);
+  if (f.orientacion === 'horizontal') return generarGeneralH(datos, copias, f);
   const partes: string[] = [];
 
-  partes.push(generarInicioTspl());
+  partes.push(generarInicioTspl(f));
   partes.push(generarMarcoDoble());
   partes.push(generarCabeceraNegra('CAPRICHOS', 'Pedido completo'));
 
@@ -249,9 +247,11 @@ export function generarEtiquetaArea(
   opciones?: OpcionesGeneradorTspl
 ): string {
   const copias = opciones?.copias ?? 1;
+  const f = resolverFormato(opciones?.formato);
+  if (f.orientacion === 'horizontal') return generarAreaH(datos, copias, f);
   const partes: string[] = [];
 
-  partes.push(generarInicioTspl());
+  partes.push(generarInicioTspl(f));
   partes.push(generarMarcoDoble());
   partes.push(
     generarCabeceraNegra(
@@ -339,9 +339,11 @@ export function generarEtiquetaBebida(
   opcionesGen?: OpcionesGeneradorTspl
 ): string {
   const copias = opcionesGen?.copias ?? 1;
+  const f = resolverFormato(opcionesGen?.formato);
+  if (f.orientacion === 'horizontal') return generarBebidaH(datos, copias, f);
   const partes: string[] = [];
 
-  partes.push(generarInicioTspl());
+  partes.push(generarInicioTspl(f));
   partes.push(generarMarcoDoble());
   partes.push(generarCabeceraNegra('CAPRICHOS', 'Cafeteria artesanal'));
 
@@ -421,9 +423,10 @@ export function generarEtiquetaBebida(
 export function generarTsplTrabajo(
   tipo: TipoEtiqueta,
   payload: PayloadEtiqueta,
-  copia: boolean = false
+  copia: boolean = false,
+  formato?: Partial<FormatoEtiqueta>
 ): string {
-  const opciones: OpcionesGeneradorTspl = { copias: copia ? 2 : 1 };
+  const opciones: OpcionesGeneradorTspl = { copias: copia ? 2 : 1, formato };
 
   switch (tipo) {
     case 'ETIQUETA_GENERAL':
@@ -443,8 +446,13 @@ export function generarTsplTrabajo(
 export function generarBytesTrabajo(
   tipo: TipoEtiqueta,
   payload: PayloadEtiqueta,
-  copia: boolean = false
+  copia: boolean = false,
+  formato?: Partial<FormatoEtiqueta>
 ): Buffer {
-  const scriptTspl = generarTsplTrabajo(tipo, payload, copia);
-  return aWindows1252(scriptTspl);
+  return generarBytesDeScript(generarTsplTrabajo(tipo, payload, copia, formato));
+}
+
+/** Texto TSPL (con el BITMAP del logo en latin1) a los bytes que recibe la impresora. */
+export function generarBytesDeScript(script: string): Buffer {
+  return aBytesTspl(script, aWindows1252);
 }

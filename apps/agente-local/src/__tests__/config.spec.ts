@@ -36,4 +36,12 @@ describe('config', () => {
     });
     expect(config.apiUrl).toBe('http://api.caprichos.pe');
   });
+
+  it('el formato del sticker tiene defecto apaisado y se ajusta por entorno o archivo sin recompilar', () => {
+    expect(obtenerConfiguracion({}).etiqueta).toEqual({ orientacion: 'horizontal', anchoMm: 101.6, altoMm: 63.5, direccion: 1, gapMm: 3 });
+    const e = obtenerConfiguracion({ ETIQUETA_ORIENTACION: 'vertical', ETIQUETA_DIRECCION: '0' }).etiqueta;
+    expect(e).toMatchObject({ orientacion: 'vertical', anchoMm: 63.5, altoMm: 101.6, direccion: 0 });
+    const a = obtenerConfiguracion({}, { etiqueta: { anchoMm: 100, altoMm: 50, gapMm: 2 } }).etiqueta;
+    expect(a).toMatchObject({ orientacion: 'horizontal', anchoMm: 100, altoMm: 50, gapMm: 2 });
+  });
 });
