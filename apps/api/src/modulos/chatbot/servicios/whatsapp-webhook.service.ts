@@ -169,10 +169,19 @@ export class WhatsappWebhookService {
     if (status.errors && status.errors.length > 0) {
       const err = status.errors[0];
       errorCodigo = String(err.code || 'ERROR_META');
-      errorDetalle = String(err.title || err.message || '');
+      // code + title + message + error_data.details: lo que Meta dio, para ver por qué falló
+      errorDetalle = [err.title, err.message, err.error_data?.details]
+        .filter((t, i, a) => t && a.indexOf(t) === i)
+        .join(' | ')
+        .slice(0, 500);
     }
 
     try {
+      const previo = await this.prisma.whatsappMensaje.findFirst({
+        where: { wa_message_id: waMessageId },
+        select: { id: true, estado: true, direccion: true, conversacion_id: true },
+      });
+
       await this.prisma.whatsappMensaje.updateMany({
         where: { wa_message_id: waMessageId },
         data: {
@@ -182,19 +191,76 @@ export class WhatsappWebhookService {
         },
       });
 
-      const waMsg = await this.prisma.whatsappMensaje.findFirst({
-        where: { wa_message_id: waMessageId },
-        select: { conversacion_id: true },
-      });
-
-      if (waMsg?.conversacion_id) {
+      if (previo?.conversacion_id) {
         this.eventos?.emitirAdmin('mensajes:actualizado', {
-          id: waMsg.conversacion_id.toString(),
+          id: previo.conversacion_id.toString(),
         });
+      }
+
+      // Falla asíncrona de un saliente nuestro (Meta lo aceptó y después no lo entregó): se avisa en el chat y,
+      // si era un carrusel, se reenvía la lista una sola vez (solo en la transición a FALLIDO)
+      if (estadoFinal === 'FALLIDO' && previo && previo.estado !== 'FALLIDO' && previo.direccion === 'SALIENTE') {
+        await this.atenderFalloAsincrono(previo, waMessageId, errorCodigo, errorDetalle);
       }
     } catch (err: any) {
       this.logger.error(`Error actualizando estado para waMessageId ${waMessageId}: ${err.message}`);
     }
+  }
+
+  private async atenderFalloAsincrono(
+    previo: { id: bigint; conversacion_id: bigint | null },
+    waMessageId: string,
+    errorCodigo: string | null,
+    errorDetalle: string | null,
+  ) {
+    if (!previo.conversacion_id) return;
+    const motivo = `${errorCodigo ?? 'ERROR_META'}${errorDetalle ? `: ${errorDetalle}` : ''}`;
+    const chat = await this.prisma.mensajeChat.findFirst({
+      where: { OR: [{ meta_id: waMessageId }, { whatsapp_mensaje_id: previo.id }] },
+      select: { contenido: true },
+    });
+    const contenido = (chat?.contenido as any) ?? {};
+    const rp = contenido.carrusel === true ? contenido.respaldo : null;
+    const conv = rp
+      ? await this.prisma.conversacion.findUnique({ where: { id: previo.conversacion_id }, select: { telefono: true } })
+      : null;
+    const destino = conv?.telefono ? normalizarTelefono(conv.telefono) || conv.telefono.trim() : null;
+    const reenviar = Boolean(rp && destino && (rp.filas?.length || rp.botones?.length));
+
+    await this.prisma.mensajeChat.create({
+      data: {
+        conversacion_id: previo.conversacion_id,
+        direccion: 'SALE',
+        autor: 'BOT',
+        tipo: 'SISTEMA',
+        contenido: {
+          texto: rp
+            ? `El carrusel no se entregó (${motivo})${reenviar ? '; se envió la lista.' : '.'}`
+            : `El mensaje no se entregó (${motivo}).`,
+        } as any,
+      },
+    });
+
+    if (reenviar) {
+      const opciones = { conversacionId: previo.conversacion_id };
+      const r = rp.filas?.length
+        ? await this.mensajeria.enviarLista(destino!, rp.texto, rp.botonTexto ?? 'Ver productos', rp.filas.slice(0, 10), {
+            ...opciones,
+            tituloSeccion: rp.tituloSeccion,
+          })
+        : await this.mensajeria.enviarBotones(destino!, rp.texto, rp.botones.slice(0, 3), opciones);
+      await this.prisma.mensajeChat.create({
+        data: {
+          conversacion_id: previo.conversacion_id,
+          direccion: 'SALE',
+          autor: 'BOT',
+          tipo: rp.filas?.length ? 'LISTA' : 'BOTON',
+          contenido: { texto: rp.texto, botonTexto: rp.botonTexto, filas: rp.filas, botones: rp.botones, carruselRespaldo: true } as any,
+          meta_id: r.waMessageId || null,
+        },
+      });
+    }
+    this.eventos?.emitirAdmin('mensajes:actualizado', { id: previo.conversacion_id.toString() });
   }
 
   /**

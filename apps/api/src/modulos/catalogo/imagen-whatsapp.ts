@@ -4,7 +4,7 @@ import sharp from 'sharp';
 import { pngImagenInicial } from './imagen-inicial';
 
 const LADO = 800;
-const MAX_CACHE = 300;
+const MAX_CACHE = 600;
 const cache = new Map<string, Buffer>();
 
 /**

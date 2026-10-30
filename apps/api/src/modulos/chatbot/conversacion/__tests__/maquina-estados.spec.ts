@@ -372,7 +372,7 @@ describe('Máquina de Estados del Bot Conversacional (transicionarEstado)', () =
       }
     });
 
-    it('al elegir una categoría muestra sus productos reales con precio en la descripción', () => {
+    it('al elegir una categoría muestra sus productos disponibles por el camino único del pedido', () => {
       const entrada = normalizarEntrada({ listRowId: 'cat_1' });
       const resultado = transicionarEstado(null, entrada, contextoBase);
 
@@ -380,13 +380,9 @@ describe('Máquina de Estados del Bot Conversacional (transicionarEstado)', () =
       expect(resultado.acciones[0].tipo).toBe('enviarLista');
       if (resultado.acciones[0].tipo === 'enviarLista') {
         expect(resultado.acciones[0].botonTexto).toBe('Ver productos');
-        expect(resultado.acciones[0].tituloSeccion).toBe('Frappes');
-        expect(resultado.acciones[0].filas).toHaveLength(2);
+        // Mismo camino que el pedido: solo disponibles (el agotado no se ofrece); con 1 sola, lista directa
+        expect(resultado.acciones[0].filas).toHaveLength(1);
         expect(resultado.acciones[0].filas[0].titulo).toBe('Frappe Oreo');
-        expect(resultado.acciones[0].filas[0].descripcion).toContain('Desde s/ 14.50');
-        // Producto agotado en la descripción de la lista (requisito b)
-        expect(resultado.acciones[0].filas[1].titulo).toBe('Frappe Fresa');
-        expect(resultado.acciones[0].filas[1].descripcion).toBe('Por ahora no está disponible');
       }
     });
 

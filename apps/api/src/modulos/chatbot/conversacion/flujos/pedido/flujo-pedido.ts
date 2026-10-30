@@ -337,6 +337,8 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       const pedidoBase: EstadoCarritoPedido = flujo.pedido || {
         estadoInterno: 'PEDIDO_PRODUCTOS',
         items: [],
+        // «Ver más» / «Ver lista completa» desde la carta: la categoría viene del flujo
+        categoriaSeleccionadaId: flujo.categoriaSeleccionadaId,
         idempotenciaPaso: `step_${Date.now()}`,
         timestampUltimaAccion: Date.now(),
       };

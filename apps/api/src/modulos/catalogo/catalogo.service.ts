@@ -3,8 +3,10 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  OnApplicationBootstrap,
   Optional,
 } from '@nestjs/common';
+import { jpegProductoWhatsApp } from './imagen-whatsapp';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
@@ -61,12 +63,37 @@ export function obtenerFotoUrl(archivo?: { ruta: string } | null): string | null
 }
 
 @Injectable()
-export class CatalogoService {
+export class CatalogoService implements OnApplicationBootstrap {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditoriaService,
     @Optional() private readonly eventosGateway?: EventosGateway,
   ) {}
+
+  /** Al arrancar deja listas las imágenes JPEG de WhatsApp: Meta espera la imagen al enviar el carrusel. */
+  onApplicationBootstrap() {
+    setTimeout(() => void this.calentarImagenesWhatsApp(), 5_000).unref?.();
+  }
+
+  /**
+   * Pre-genera (caché en memoria) el JPEG de WhatsApp de los productos dados (o de todos los visibles).
+   * Nunca lanza: si falla, el endpoint lo genera al pedirlo.
+   */
+  async calentarImagenesWhatsApp(ids?: string[], uploadsDir = process.env.UPLOADS_DIR || './data/uploads'): Promise<void> {
+    try {
+      const idsBig = ids?.filter((i) => /^\d+$/.test(i)).map((i) => BigInt(i));
+      if (ids && !idsBig?.length) return;
+      const ps = await this.prisma.producto.findMany({
+        where: { oculto: false, categoria: { oculta: false }, ...(idsBig ? { id: { in: idsBig } } : {}) },
+        select: { id: true, nombre: true, foto_archivo: { select: { ruta: true } } },
+      });
+      for (const p of ps) {
+        await jpegProductoWhatsApp(String(p.id), p.nombre, p.foto_archivo?.ruta ?? null, uploadsDir).catch(() => undefined);
+      }
+    } catch {
+      /* ponytail: sin calentar, el primer pedido de Meta paga la conversión */
+    }
+  }
 
   private parsearId(id: bigint | string | number): bigint {
     try {

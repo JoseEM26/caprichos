@@ -285,47 +285,37 @@ function construirListaCategorias(
   };
 }
 
-function construirListaProductos(
-  categoria: any,
-  pagina = 0,
-): AccionEnviarLista {
-  const tamanoPagina = 9;
-  const inicio = Math.max(0, pagina * tamanoPagina);
-  const todosProds = categoria.productos || [];
-  const prodsPagina = todosProds.slice(inicio, inicio + tamanoPagina);
-  const hayMas = todosProds.length > inicio + tamanoPagina;
-
-  const filas: FilaLista[] = prodsPagina.map((prod: any) => {
-    let desc = '';
-    if (!prod.disponible) {
-      desc = 'Por ahora no está disponible';
-    } else if (prod.tamanos && prod.tamanos.length > 0) {
-      desc = `Desde s/ ${Number(prod.tamanos[0].precio).toFixed(2)}`;
-    } else {
-      desc = `s/ ${Number(prod.precio || 0).toFixed(2)}`;
-    }
-
-    return {
-      id: `prod_${prod.id}`,
-      titulo: String(prod.nombre || '').slice(0, 24),
-      descripcion: desc.slice(0, 72),
-    };
-  });
-
-  if (hayMas) {
-    filas.push({
-      id: `prod_mas_${categoria.id}_${pagina + 1}`,
-      titulo: 'Ver más productos',
-      descripcion: 'Ver los siguientes productos de la categoría',
-    });
-  }
-
+/**
+ * Único camino para mostrar los productos de una categoría: delega en el flujo de pedido (carrusel con los 10 más
+ * vendidos + «Ver más», lista como respaldo). Conserva el estado y el carrito de quien llama.
+ */
+function productosDeCategoria(
+  flujo: FlujoConversacion,
+  cat: any,
+  entrada: EntradaNormalizada,
+  contexto: ContextoConversacion,
+  estado: EstadoConversacion,
+): ResultadoTransicion {
+  const pedidoFlujo = RegistroSubFlujos.obtenerFlujos().find((f) => f.nombre === 'pedido')!;
+  const r = pedidoFlujo.transicionar(
+    {
+      ...flujo,
+      estado: 'PEDIDO_CATEGORIAS',
+      pedido: { estadoInterno: 'PEDIDO_CATEGORIAS', items: flujo.pedido?.items ?? [] },
+    },
+    { ...entrada, id: `ped_cat_${cat.id}`, texto: '' },
+    contexto,
+  )!;
   return {
-    tipo: 'enviarLista',
-    texto: TEXTOS_BOT.cuerpoProductosCategoria(categoria.nombre),
-    botonTexto: BOTON_LISTA_PRODUCTOS,
-    tituloSeccion: String(categoria.nombre || '').slice(0, 24),
-    filas,
+    nuevoEstado: estado,
+    acciones: r.acciones,
+    nuevoFlujo: {
+      ...flujo,
+      estado,
+      categoriaSeleccionadaId: String(cat.id),
+      paginaProductos: 0,
+      repreguntasFallidas: 0,
+    },
   };
 }
 
@@ -512,18 +502,7 @@ export function transicionarEstado(
         const catId = idInteractivoEntrada.replace('cat_', '');
         const cat = (contexto.categoriasCarta || []).find((c: any) => String(c.id) === String(catId));
         if (cat) {
-          const accionLista = construirListaProductos(cat, 0);
-          return {
-            nuevoEstado: 'ATENCION_PERSONA',
-            acciones: [accionLista],
-            nuevoFlujo: {
-              ...flujo,
-              estado: 'ATENCION_PERSONA',
-              categoriaSeleccionadaId: catId,
-              paginaProductos: 0,
-              repreguntasFallidas: 0,
-            },
-          };
+          return productosDeCategoria(flujo, cat, entrada, contexto, 'ATENCION_PERSONA');
         }
       }
 
@@ -1087,21 +1066,9 @@ export function transicionarEstado(
   if (idInteractivo?.startsWith('prod_mas_')) {
     const partes = idInteractivo.split('_');
     const catId = partes[2];
-    const sigPag = parseInt(partes[3], 10) || 0;
     const cat = (contexto.categoriasCarta || []).find((c: any) => String(c.id) === String(catId));
     if (cat) {
-      const accionLista = construirListaProductos(cat, sigPag);
-      return {
-        nuevoEstado: 'CARTA_PRODUCTOS',
-        acciones: [accionLista],
-        nuevoFlujo: {
-          ...flujo,
-          estado: 'CARTA_PRODUCTOS',
-          categoriaSeleccionadaId: catId,
-          paginaProductos: sigPag,
-          repreguntasFallidas: 0,
-        },
-      };
+      return productosDeCategoria(flujo, cat, entrada, contexto, 'CARTA_PRODUCTOS');
     }
   }
 
@@ -1132,18 +1099,7 @@ export function transicionarEstado(
         };
       }
 
-      const accionLista = construirListaProductos(cat, 0);
-      return {
-        nuevoEstado: 'CARTA_PRODUCTOS',
-        acciones: [accionLista],
-        nuevoFlujo: {
-          ...flujo,
-          estado: 'CARTA_PRODUCTOS',
-          categoriaSeleccionadaId: catId,
-          paginaProductos: 0,
-          repreguntasFallidas: 0,
-        },
-      };
+      return productosDeCategoria(flujo, cat, entrada, contexto, 'CARTA_PRODUCTOS');
     }
   }
 

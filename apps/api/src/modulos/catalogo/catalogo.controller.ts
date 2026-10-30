@@ -72,7 +72,8 @@ export class CartaController {
     const foto = /^\d+$/.test(id) ? await this.catalogoService.fotoProductoVisible(id) : null;
     if (!foto) throw new NotFoundException('Producto no encontrado');
     const uploads = this.config?.get<string>('UPLOADS_DIR') || './data/uploads';
-    return new StreamableFile(await jpegProductoWhatsApp(id, foto.nombre, foto.ruta, uploads));
+    const jpg = await jpegProductoWhatsApp(id, foto.nombre, foto.ruta, uploads);
+    return new StreamableFile(jpg, { type: 'image/jpeg', length: jpg.length });
   }
 }
 

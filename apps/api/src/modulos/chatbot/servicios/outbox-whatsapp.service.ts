@@ -459,6 +459,7 @@ export class OutboxWhatsappService {
             ? {
                 botones: i.botones ?? i.carrusel?.tarjetas.map((t) => ({ id: t.boton.id, titulo: t.nombre })),
                 carrusel: i.carrusel ? !resultado.respaldo : undefined,
+                respaldo: i.carrusel && !resultado.respaldo ? (i.carrusel.respaldo ?? null) : undefined,
                 botonTexto: i.lista?.boton,
                 filas: i.lista ? i.lista.secciones.flatMap((s) => s.filas) : i.carrusel?.respaldo?.filas,
                 degradado: resultado.degradado ?? undefined,

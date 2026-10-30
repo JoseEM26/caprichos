@@ -1563,6 +1563,9 @@ export class EjecutorConversacionService {
         let metaId: string | null = null;
         let r: Awaited<ReturnType<typeof enviarCarruselConRespaldo>> | null = null;
         if (destinoEnvio) {
+          // Meta baja las imágenes justo al recibir el carrusel: se dejan generadas antes de enviar
+          const idsFotos = accion.carga.tarjetas.map((t) => /\/productos\/(\d+)\/imagen-wa\.jpg/.exec(t.imagenUrl ?? '')?.[1]).filter(Boolean) as string[];
+          if (idsFotos.length) await this.catalogoService?.calentarImagenesWhatsApp?.(idsFotos, this.configService.get<string>('UPLOADS_DIR') || undefined);
           r = await enviarCarruselConRespaldo(this.mensajeria, destinoEnvio, accion.carga, {
             conversacionId: conversacion.id,
             replyToWaMessageId: entradaRaw.waMessageId,
@@ -1591,7 +1594,7 @@ export class EjecutorConversacionService {
             autor: 'BOT',
             tipo: comoCarrusel ? 'BOTON' : rp?.filas?.length ? 'LISTA' : 'BOTON',
             contenido: (comoCarrusel
-              ? { texto: resumenCarrusel(accion.carga), carrusel: true, botones: accion.carga.tarjetas.map((t) => ({ id: t.boton.id, titulo: t.nombre })) }
+              ? { texto: resumenCarrusel(accion.carga), carrusel: true, respaldo: rp ?? null, botones: accion.carga.tarjetas.map((t) => ({ id: t.boton.id, titulo: t.nombre })) }
               : { texto: rp?.texto, botonTexto: rp?.botonTexto, filas: rp?.filas, botones: rp?.botones, carruselRespaldo: true }) as any,
             meta_id: metaId,
           },

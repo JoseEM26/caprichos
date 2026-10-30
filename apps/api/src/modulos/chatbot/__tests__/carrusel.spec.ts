@@ -36,6 +36,7 @@ describe('carrusel: payload y límites (doc de Meta)', () => {
     expect(p.action.cards).toHaveLength(3);
     expect(p.action.cards[1]).toMatchObject({
       card_index: 1,
+      type: 'cta_url', // la doc de Meta usa «cta_url» también en tarjetas con quick_reply
       header: { type: 'image', image: { link: 'https://caprichos.pe/archivos/2.jpg' } },
       action: { buttons: [{ type: 'quick_reply', quick_reply: { id: 'ped_prod_2', title: 'Pedir este' } }] },
     });
@@ -112,6 +113,8 @@ describe('imagen-wa.jpg y URL pública', () => {
       const buf = Buffer.from(await (await ctrl.imagenWhatsApp(id)).getStream().toArray().then((c: any[]) => Buffer.concat(c)));
       const m = await sharp(buf).metadata();
       expect([m.format, m.width, m.height]).toEqual(['jpeg', 800, 800]);
+      const h = (await ctrl.imagenWhatsApp(id)).getHeaders();
+      expect(h).toMatchObject({ type: 'image/jpeg', length: buf.length });
     }
     await expect(ctrl.imagenWhatsApp('3')).rejects.toThrow('no encontrado');
     expect(Reflect.getMetadata('__headers__', CartaController.prototype.imagenWhatsApp)).toEqual(
@@ -319,5 +322,72 @@ describe('respaldo a lista y outbox', () => {
     const chat = prisma.mensajeChat.create.mock.calls.at(-1)[0].data;
     expect(chat.contenido.texto).toBe('Carrusel: Prod 1, Prod 2');
     expect(chat.tipo).toBe('BOTON');
+  });
+});
+
+describe('un solo camino para productos de una categoría', () => {
+  const productos = Array.from({ length: 12 }, (_, i) => ({ id: String(i + 1), nombre: `Frappe ${i + 1}`, precio: 10, disponible: true, fotoUrl: null, tamanos: [] }));
+  const c: ContextoConversacion = {
+    cartaUrlPublica: BASE,
+    datosLocal: { abierta: true, abre: '12:00', cierra: '23:00', direccion: 'x', enlaceMapa: '', telefono: '1' } as any,
+    categoriasCarta: [{ id: 'c1', nombre: 'Frappes', productos }],
+    ofertas: [],
+  };
+  it('tras la referencia de entrega, elegir categoría envía el carrusel', () => {
+    const flujo: any = { version: 2, repreguntasFallidas: 0, estado: 'PEDIDO_REFERENCIA', pedido: { estadoInterno: 'PEDIDO_REFERENCIA', items: [], modalidad: 'DELIVERY', entrega: { modalidad: 'DELIVERY' } } };
+    const cats = transicionarEstado(flujo, normalizarEntrada({ text: 'frente al parque' } as any), c);
+    const r = transicionarEstado(cats.nuevoFlujo, normalizarEntrada({ listRowId: 'ped_cat_c1' }), c);
+    expect(r.acciones.map((a: any) => a.tipo)).toEqual(['enviarCarrusel', 'enviarBotones']);
+  });
+  it('«Ver la carta» → categoría usa el mismo carrusel, y «Ver más» sigue funcionando', () => {
+    const r = transicionarEstado({ version: 2, repreguntasFallidas: 0, estado: 'CARTA_CATEGORIAS' } as any, normalizarEntrada({ listRowId: 'cat_c1' }), c);
+    expect(r.acciones.map((a: any) => a.tipo)).toEqual(['enviarCarrusel', 'enviarBotones']);
+    expect(r.nuevoEstado).toBe('CARTA_PRODUCTOS');
+    expect(r.nuevoFlujo.pedido ?? null).toBeNull();
+    const mas = transicionarEstado(r.nuevoFlujo, normalizarEntrada({ buttonPayload: 'ped_prod_mas_2' }), c);
+    expect(mas.acciones.map((a: any) => a.tipo)).toEqual(['enviarCarrusel']);
+    expect((mas.acciones[0] as any).carga.tarjetas[0].boton.id).toBe('ped_prod_11');
+  });
+});
+
+describe('fallo asíncrono de Meta (statuses[].failed)', () => {
+  const { WhatsappWebhookService } = require('../servicios/whatsapp-webhook.service');
+  const montar = (contenido: any, previo: any = { id: 7n, estado: 'ENVIADO', direccion: 'SALIENTE', conversacion_id: 5n }) => {
+    const prisma: any = {
+      whatsappMensaje: { findFirst: jest.fn(async () => previo), updateMany: jest.fn(async () => ({ count: 1 })) },
+      mensajeChat: { findFirst: jest.fn(async () => ({ contenido })), create: jest.fn(async () => ({})) },
+      conversacion: { findUnique: jest.fn(async () => ({ telefono: '51999111222' })) },
+    };
+    const mensajeria: any = {
+      enviarLista: jest.fn(async () => ({ exito: true, waMessageId: 'wamid.L' })),
+      enviarBotones: jest.fn(async () => ({ exito: true, waMessageId: 'wamid.B' })),
+    };
+    const svc: any = new WhatsappWebhookService({ get: () => '' } as any, prisma, mensajeria, {} as any);
+    return { svc, prisma, mensajeria };
+  };
+  const failed = { id: 'wamid.X', status: 'failed', errors: [{ code: 131053, title: 'Media upload error', message: 'No se pudo bajar', error_data: { details: 'Unsupported image' } }] };
+
+  it('guarda código y detalle de Meta, avisa en el chat y reenvía la lista del carrusel una sola vez', async () => {
+    const respaldo = { texto: 'Estos son', botonTexto: 'Ver productos', filas: [{ id: 'ped_prod_1', titulo: 'A' }] };
+    const { svc, prisma, mensajeria } = montar({ carrusel: true, respaldo });
+    await svc.procesarEstado(failed);
+    expect(prisma.whatsappMensaje.updateMany.mock.calls[0][0].data).toMatchObject({
+      estado: 'FALLIDO',
+      error_codigo: '131053',
+      error_detalle: 'Media upload error | No se pudo bajar | Unsupported image',
+    });
+    expect(mensajeria.enviarLista).toHaveBeenCalledTimes(1);
+    expect(prisma.mensajeChat.create.mock.calls[0][0].data).toMatchObject({ tipo: 'SISTEMA' });
+    expect(prisma.mensajeChat.create.mock.calls[0][0].data.contenido.texto).toContain('El carrusel no se entregó (131053');
+    expect(prisma.mensajeChat.create.mock.calls[0][0].data.contenido.texto).toContain('se envió la lista');
+  });
+  it('si ya estaba FALLIDO no reenvía; un saliente que no es carrusel solo registra el motivo', async () => {
+    const a = montar({ carrusel: true, respaldo: { texto: 't', filas: [{ id: 'x', titulo: 'x' }] } }, { id: 7n, estado: 'FALLIDO', direccion: 'SALIENTE', conversacion_id: 5n });
+    await a.svc.procesarEstado(failed);
+    expect(a.mensajeria.enviarLista).not.toHaveBeenCalled();
+    const b = montar({ texto: 'hola' });
+    await b.svc.procesarEstado(failed);
+    expect(b.mensajeria.enviarLista).not.toHaveBeenCalled();
+    expect(b.prisma.mensajeChat.create.mock.calls[0][0].data.contenido.texto).toContain('El mensaje no se entregó (131053');
   });
 });
