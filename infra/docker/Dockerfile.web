@@ -19,7 +19,9 @@ COPY apps/api/package.json ./apps/api/
 COPY apps/web/package.json ./apps/web/
 COPY packages/compartido/package.json ./packages/compartido/
 
-RUN pnpm install --frozen-lockfile
+# Cache de BuildKit del store de pnpm: reinstalar solo descarga lo que cambió
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm install --frozen-lockfile --store-dir /pnpm/store
 
 # ==============================================================================
 # Etapa 3: Builder - Compilación de React + Vite (PWA y SPA)

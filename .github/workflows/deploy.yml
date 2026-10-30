@@ -143,34 +143,86 @@ jobs:
           echo "tag=${TAG_DEST}" >> "$GITHUB_OUTPUT"
           if [ "$ENV_DEST" = "prod" ]; then echo "ref=refs/tags/${TAG_DEST}" >> "$GITHUB_OUTPUT"; else echo "ref=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"; fi
 
-  build-and-push:
-    name: Construcción, escaneo y publicación en GHCR
+  # Decide qué imágenes hay que construir. Push a demo: solo las que cambiaron respecto del
+  # commit anterior (la otra se re-etiqueta en GHCR con el tag nuevo). Manual/producción: todo.
+  detectar-cambios:
+    name: Detectar imágenes a reconstruir
     needs: validar-y-determinar
     if: needs.validar-y-determinar.outputs.accion == 'desplegar'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 5
     outputs:
-      image_api: ${{ steps.meta.outputs.image_api }}
-      image_web: ${{ steps.meta.outputs.image_web }}
+      cambios: ${{ steps.dif.outputs.cambios }}
+      owner: ${{ steps.dif.outputs.owner }}
+      base7: ${{ steps.dif.outputs.base7 }}
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Iniciar sesión en GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Comparar con el commit anterior desplegado
+        id: dif
+        env:
+          EVENTO: ${{ github.event_name }}
+          AMBIENTE: ${{ needs.validar-y-determinar.outputs.ambiente }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "owner=${OWNER}" >> "$GITHUB_OUTPUT"
+          API=true; WEB=true; BASE7=""
+          # Solo en push a demo; manual y producción construyen todo siempre.
+          if [ "$EVENTO" = "push" ] && [ "$AMBIENTE" = "demo" ] \
+             && [ -n "$BEFORE" ] && [ "${BEFORE//0/}" != "" ] \
+             && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            BASE7="${BEFORE::7}"
+            CAMBIOS=$(git diff --name-only "$BEFORE" "$GITHUB_SHA")
+            echo "$CAMBIOS"
+            COMUN='^(packages/compartido/|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|package\.json$|tsconfig\.base\.json$|\.dockerignore$)'
+            echo "$CAMBIOS" | grep -Eq "${COMUN}|^(apps/api/|mockup/|docs/analisis/|infra/docker/Dockerfile\.api$)" || API=false
+            echo "$CAMBIOS" | grep -Eq "${COMUN}|^(apps/web/|infra/docker/(Dockerfile\.web|nginx-caprichos\.conf|demo-aviso\.html)$)" || WEB=false
+            # Una imagen sin cambios solo se re-etiqueta si la del commit anterior existe en GHCR
+            if [ "$API" = false ] && ! docker buildx imagetools inspect "ghcr.io/${OWNER}/caprichos-api:${BASE7}" >/dev/null 2>&1; then
+              echo "No hay imagen API del commit anterior: se construye."; API=true
+            fi
+            if [ "$WEB" = false ] && ! docker buildx imagetools inspect "ghcr.io/${OWNER}/caprichos-web:${BASE7}" >/dev/null 2>&1; then
+              echo "No hay imagen Web del commit anterior: se construye."; WEB=true
+            fi
+          fi
+          echo "base7=${BASE7}" >> "$GITHUB_OUTPUT"
+          echo "cambios={\"api\":${API},\"web\":${WEB}}" >> "$GITHUB_OUTPUT"
+          echo "Reconstruir -> api=${API} web=${WEB}"
+
+  # API y Web se construyen a la vez (matriz). Sin Trivy: build y push en un solo paso.
+  imagenes:
+    name: Imagen ${{ matrix.imagen }}
+    needs: [validar-y-determinar, detectar-cambios]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # TRIVY APAGADO por ahora. Reactivar ('true') antes de salir a producción real.
+      ESCANEAR_IMAGENES: 'false'
+      CAMBIO: ${{ fromJSON(needs.detectar-cambios.outputs.cambios)[matrix.imagen] }}
+      IMAGE: ghcr.io/${{ needs.detectar-cambios.outputs.owner }}/caprichos-${{ matrix.imagen }}
+      TAG: ${{ needs.validar-y-determinar.outputs.tag }}
+      SHORT_SHA: ${{ needs.validar-y-determinar.outputs.short_sha }}
+    strategy:
+      fail-fast: true
+      matrix:
+        imagen: [api, web]
     steps:
       - name: Checkout del repositorio (el commit exacto a desplegar)
+        if: env.CAMBIO == 'true'
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.validar-y-determinar.outputs.ref }}
-
-      - name: Liberar espacio en disco del ejecutor
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
-          df -h / | tail -1
-
-      - name: Metadatos de imagen
-        id: meta
-        run: |
-          OWNER="${GITHUB_REPOSITORY_OWNER,,}"
-          TAG="${{ needs.validar-y-determinar.outputs.tag }}"
-          echo "owner=${OWNER}" >> "$GITHUB_OUTPUT"
-          echo "image_api=ghcr.io/${OWNER}/caprichos-api:${TAG}" >> "$GITHUB_OUTPUT"
-          echo "image_web=ghcr.io/${OWNER}/caprichos-web:${TAG}" >> "$GITHUB_OUTPUT"
 
       - name: Configurar Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -182,75 +234,65 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 1. Construir y escanear API
-      - name: Construir imagen API para escaneo
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: infra/docker/Dockerfile.api
-          push: false
-          load: true
-          tags: |
-            caprichos-api:test
-            ${{ steps.meta.outputs.image_api }}
-            ghcr.io/${{ steps.meta.outputs.owner }}/caprichos-api:${{ needs.validar-y-determinar.outputs.short_sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Escanear imagen API con Trivy
-        uses: aquasecurity/trivy-action@v0.33.1
-        with:
-          version: 'v0.75.0'
-          image-ref: caprichos-api:test
-          format: table
-          exit-code: '1'
-          ignore-unfixed: true
-          vuln-type: os,library
-          severity: CRITICAL
-
-      # 2. Construir y escanear Web
-      - name: Construir imagen Web para escaneo
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: infra/docker/Dockerfile.web
-          push: false
-          load: true
-          tags: |
-            caprichos-web:test
-            ${{ steps.meta.outputs.image_web }}
-            ghcr.io/${{ steps.meta.outputs.owner }}/caprichos-web:${{ needs.validar-y-determinar.outputs.short_sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Escanear imagen Web con Trivy
-        uses: aquasecurity/trivy-action@v0.33.1
-        with:
-          version: 'v0.75.0'
-          image-ref: caprichos-web:test
-          format: table
-          exit-code: '1'
-          ignore-unfixed: true
-          vuln-type: os,library
-          severity: CRITICAL
-
-      # 3. Publicar imágenes verificadas en GHCR
-      - name: Publicar en GHCR las imágenes ya escaneadas (sin reconstruir)
+      # Sin cambios en esta imagen: se re-etiqueta la del commit anterior (sin construir)
+      - name: Re-etiquetar la imagen del commit anterior
+        if: env.CAMBIO != 'true'
         env:
-          IMAGE_API: ${{ steps.meta.outputs.image_api }}
-          IMAGE_WEB: ${{ steps.meta.outputs.image_web }}
-          OWNER: ${{ steps.meta.outputs.owner }}
-          SHORT_SHA: ${{ needs.validar-y-determinar.outputs.short_sha }}
+          BASE7: ${{ needs.detectar-cambios.outputs.base7 }}
         run: |
-          set -e
-          docker push "$IMAGE_API"
-          docker push "$IMAGE_WEB"
-          docker push "ghcr.io/${OWNER}/caprichos-api:${SHORT_SHA}" || true
-          docker push "ghcr.io/${OWNER}/caprichos-web:${SHORT_SHA}" || true
+          docker buildx imagetools create -t "${IMAGE}:${TAG}" -t "${IMAGE}:${SHORT_SHA}" "${IMAGE}:${BASE7}"
+
+      # Camino rápido (Trivy apagado): construir y publicar en un solo paso
+      - name: Construir y publicar
+        if: env.CAMBIO == 'true' && env.ESCANEAR_IMAGENES != 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/Dockerfile.${{ matrix.imagen }}
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ env.TAG }}
+            ${{ env.IMAGE }}:${{ env.SHORT_SHA }}
+          cache-from: type=gha,scope=${{ matrix.imagen }}
+          cache-to: type=gha,scope=${{ matrix.imagen }},mode=max
+
+      # Camino con escaneo (ESCANEAR_IMAGENES='true'): construir, escanear y publicar lo escaneado
+      - name: Construir imagen para escaneo
+        if: env.CAMBIO == 'true' && env.ESCANEAR_IMAGENES == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/Dockerfile.${{ matrix.imagen }}
+          push: false
+          load: true
+          tags: |
+            caprichos-${{ matrix.imagen }}:test
+            ${{ env.IMAGE }}:${{ env.TAG }}
+            ${{ env.IMAGE }}:${{ env.SHORT_SHA }}
+          cache-from: type=gha,scope=${{ matrix.imagen }}
+          cache-to: type=gha,scope=${{ matrix.imagen }},mode=max
+
+      - name: Escanear imagen con Trivy
+        if: env.CAMBIO == 'true' && env.ESCANEAR_IMAGENES == 'true'
+        uses: aquasecurity/trivy-action@v0.33.1
+        with:
+          version: 'v0.75.0'
+          image-ref: caprichos-${{ matrix.imagen }}:test
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: CRITICAL
+
+      - name: Publicar la imagen escaneada
+        if: env.CAMBIO == 'true' && env.ESCANEAR_IMAGENES == 'true'
+        run: |
+          docker push "${IMAGE}:${TAG}"
+          docker push "${IMAGE}:${SHORT_SHA}" || true
 
   deploy-ssh:
     name: Despliegue por SSH en VPS
-    needs: [validar-y-determinar, build-and-push]
+    needs: [validar-y-determinar, detectar-cambios, imagenes]
     if: needs.validar-y-determinar.outputs.accion == 'desplegar'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -326,7 +368,7 @@ jobs:
           | **Commit SHA** | `${{ github.sha }}` |
           | **Disparado por** | `@${{ github.actor }}` (`${{ github.event_name }}`) |
           | **Entorno GitHub** | `${{ needs.validar-y-determinar.outputs.ambiente }}` |
-          | **Imágenes GHCR** | `${{ needs.build-and-push.outputs.image_api }}` <br> `${{ needs.build-and-push.outputs.image_web }}` |
+          | **Imágenes GHCR** | `ghcr.io/${{ needs.detectar-cambios.outputs.owner }}/caprichos-api:${{ needs.validar-y-determinar.outputs.tag }}` <br> `ghcr.io/${{ needs.detectar-cambios.outputs.owner }}/caprichos-web:${{ needs.validar-y-determinar.outputs.tag }}` |
 
           ### 🔒 Seguridad y Garantías del Proceso
           - **Aprobación deliberada de Producción:** Ejecución manual exclusiva por `workflow_dispatch` con confirmación literal y verificación de tag y commit en `main`.

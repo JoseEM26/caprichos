@@ -21,7 +21,9 @@ COPY apps/web/package.json ./apps/web/
 COPY packages/compartido/package.json ./packages/compartido/
 
 # Instalar dependencias completas para construcción
-RUN pnpm install --frozen-lockfile
+# Cache de BuildKit del store de pnpm: reinstalar solo descarga lo que cambió
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm install --frozen-lockfile --store-dir /pnpm/store
 
 # ==============================================================================
 # Etapa 3: Builder - Generación de Prisma y compilación NestJS + TypeScript
@@ -48,7 +50,8 @@ RUN pnpm --filter @caprichos/api build || pnpm run build
 # copiado dentro. Así la imagen final es pequeña y no arrastra herramientas de desarrollo
 # (que Trivy reporta con vulnerabilidades críticas) ni enlaces rotos de pnpm.
 FROM builder AS prod
-RUN pnpm --filter @caprichos/api deploy --prod --legacy /out
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    npm_config_store_dir=/pnpm/store pnpm --filter @caprichos/api deploy --prod --legacy /out
 # «deploy» reinstala las dependencias y pierde el cliente de Prisma generado en el builder:
 # se vuelve a generar aquí, con la misma versión que declara la API.
 RUN cd /out && PRISMA_V=$(node -p "require('@prisma/client/package.json').version") \
