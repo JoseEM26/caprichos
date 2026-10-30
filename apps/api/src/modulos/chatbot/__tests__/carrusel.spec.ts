@@ -410,3 +410,16 @@ describe('carrusel: simulado no sube nada y resumen informa la vía', () => {
     expect(resumenCarrusel(c)).toContain('[imagen: 1 por id, 1 por link]');
   });
 });
+
+describe('botón común en todas las tarjetas', () => {
+  it('cada tarjeta lleva «Pedir este» y el segundo botón igual (mismos tipos y cantidad)', () => {
+    const { payloadInteractivoCarrusel: armar } = require('../servicios/carrusel.util');
+    const t = (id: string) => ({ nombre: id, imagenUrl: 'https://x.pe/a.jpg', cuerpo: id, boton: { id: `ped_prod_${id}`, titulo: 'Pedir este' } });
+    const p = armar({ cuerpo: 'Hola', tarjetas: [t('1'), t('2')], botonComun: { id: 'btn_categorias', titulo: 'Otra categoría' } });
+    for (const card of p.action.cards) {
+      expect(card.action.buttons.map((b: any) => b.quick_reply.id)).toEqual([expect.stringMatching(/^ped_prod_/), 'btn_categorias']);
+    }
+    const sin = armar({ cuerpo: 'Hola', tarjetas: [t('1'), t('2')] });
+    expect(sin.action.cards[0].action.buttons).toHaveLength(1);
+  });
+});

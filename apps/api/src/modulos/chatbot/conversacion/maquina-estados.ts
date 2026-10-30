@@ -1024,6 +1024,7 @@ export function transicionarEstado(
             cuerpoSiguientes: 'Más promociones para ti 💛\nDesliza y toca «Pedir este» en la que quieras.',
             respaldoPrimera: { texto: textoPromos, botones: botonesPromos },
             idVerMas: (n) => `promo_mas_${n}`,
+            botonTarjeta: botonesPromos.find((b: any) => /menu/i.test(b.id)) ?? botonesPromos[0],
             textoVerMas: (q) => `Hay ${q} ${q === 1 ? 'promoción más' : 'promociones más'}. ¿Las vemos?`,
             botonesExtra: botonesPromos,
             textoLista: 'Más promociones para ti 💛',

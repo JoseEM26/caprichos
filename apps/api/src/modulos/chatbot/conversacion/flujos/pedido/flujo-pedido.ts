@@ -3505,6 +3505,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       cuerpoSiguientes: TEXTOS_BOT.carruselMasOpciones(),
       respaldoPrimera: lista?.filas ? { texto: lista.texto, botonTexto: lista.botonTexto, filas: lista.filas } : undefined,
       idVerMas: (n) => `ped_prod_mas_${n}`,
+      botonTarjeta: { id: 'btn_categorias', titulo: 'Otra categoría' },
       textoVerMas: TEXTOS_BOT.carruselVerMas,
       botonesExtra: [{ id: 'ped_prod_lista', titulo: 'Ver lista completa' }, { id: 'btn_categorias', titulo: 'Ver categorías' }],
       textoLista: TEXTOS_BOT.carruselMasOpciones(),

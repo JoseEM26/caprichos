@@ -32,6 +32,8 @@ export interface CargaCarrusel {
   cuerpo: string;
   tarjetas: TarjetaCarrusel[];
   respaldo?: RespaldoCarrusel;
+  /** Segundo botón igual en todas las tarjetas (Meta exige mismos tipos y cantidad), p. ej. «Otra categoría». */
+  botonComun?: BotonAccion;
 }
 
 export const LIMITES_CARRUSEL = { cuerpo: 1024, tarjeta: 160, saltos: 2, boton: 20, id: 256, min: 2, max: 10 };
@@ -56,7 +58,8 @@ export function normalizarCarrusel(c: CargaCarrusel): CargaCarrusel {
     boton: { id: cortar(t.boton.id, L.id), titulo: cortar(t.boton.titulo, L.boton) },
   }));
   if (tarjetas.length < L.min) throw new Error('Un carrusel necesita entre 2 y 10 tarjetas');
-  return { cuerpo: cortar(c.cuerpo, L.cuerpo), tarjetas, respaldo: c.respaldo };
+  const botonComun = c.botonComun ? { id: cortar(c.botonComun.id, L.id), titulo: cortar(c.botonComun.titulo, L.boton) } : undefined;
+  return { cuerpo: cortar(c.cuerpo, L.cuerpo), tarjetas, respaldo: c.respaldo, botonComun };
 }
 
 /** Todas las tarjetas traen imagen HTTPS pública (Meta no baja imágenes de http ni de localhost). */
@@ -75,7 +78,12 @@ export function payloadInteractivoCarrusel(c: CargaCarrusel, ids: Array<string |
         type: 'cta_url',
         header: { type: 'image', image: ids[i] ? { id: ids[i] } : { link: t.imagenUrl } },
         body: { text: t.cuerpo },
-        action: { buttons: [{ type: 'quick_reply', quick_reply: { id: t.boton.id, title: t.boton.titulo } }] },
+        action: {
+          buttons: [t.boton, ...(n.botonComun ? [n.botonComun] : [])].map((b) => ({
+            type: 'quick_reply',
+            quick_reply: { id: b.id, title: b.titulo },
+          })),
+        },
       })),
     },
   };
@@ -186,6 +194,8 @@ export interface OpcionesPaginaCarrusel {
   /** Id del botón «Ver más» que lleva a la página n. */
   idVerMas: (n: number) => string;
   textoVerMas: (quedan: number) => string;
+  /** Segundo botón en cada tarjeta, para salir sin escribir (p. ej. «Otra categoría»). */
+  botonTarjeta?: BotonAccion;
   /** Botones tras «Ver más» (máx. 2: Meta admite 3 botones). */
   botonesExtra: BotonAccion[];
   textoLista: string;
@@ -214,6 +224,7 @@ export function accionesPaginaCarrusel(o: OpcionesPaginaCarrusel): any[] {
       carga: {
         cuerpo: o.pagina === 1 ? o.cuerpoPrimera : o.cuerpoSiguientes,
         tarjetas: trozo,
+        ...(o.botonTarjeta ? { botonComun: o.botonTarjeta } : {}),
         respaldo:
           o.pagina === 1 && o.respaldoPrimera
             ? o.respaldoPrimera
