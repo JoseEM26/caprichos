@@ -15,6 +15,8 @@ export interface TarjetaCarrusel {
   imagenUrl: string | null;
   cuerpo: string;
   boton: BotonAccion;
+  /** Cómo salió la imagen en Meta (lo fija el adaptador real): por media id subido o por link. */
+  via?: 'id' | 'link';
 }
 
 /** Lo que se envía si el carrusel no puede salir (sin URL pública o Meta lo rechaza): la lista o botones de hoy. */
@@ -62,7 +64,7 @@ export const carruselEnviable = (c: CargaCarrusel): boolean =>
   c.tarjetas.every((t) => /^https:\/\/[^/\s]+\.[^/\s]+/i.test(t.imagenUrl ?? ''));
 
 /** Bloque `interactive` del payload de Meta, tal como lo pide la doc. */
-export function payloadInteractivoCarrusel(c: CargaCarrusel) {
+export function payloadInteractivoCarrusel(c: CargaCarrusel, ids: Array<string | null> = []) {
   const n = normalizarCarrusel(c);
   return {
     type: 'carousel',
@@ -71,7 +73,7 @@ export function payloadInteractivoCarrusel(c: CargaCarrusel) {
       cards: n.tarjetas.map((t, i) => ({
         card_index: i,
         type: 'cta_url',
-        header: { type: 'image', image: { link: t.imagenUrl } },
+        header: { type: 'image', image: ids[i] ? { id: ids[i] } : { link: t.imagenUrl } },
         body: { text: t.cuerpo },
         action: { buttons: [{ type: 'quick_reply', quick_reply: { id: t.boton.id, title: t.boton.titulo } }] },
       })),
@@ -81,7 +83,9 @@ export function payloadInteractivoCarrusel(c: CargaCarrusel) {
 
 /** Resumen legible para el admin: «Carrusel: Frappe Oreo, Frappe Maracuyá…» */
 export function resumenCarrusel(c: CargaCarrusel): string {
-  return `Carrusel: ${c.tarjetas.map((t) => t.nombre).join(', ')}`.slice(0, 400);
+  const porId = c.tarjetas.filter((t) => t.via === 'id').length;
+  const via = c.tarjetas.some((t) => t.via) ? ` [imagen: ${porId} por id, ${c.tarjetas.filter((t) => t.via === 'link').length} por link]` : '';
+  return `Carrusel: ${c.tarjetas.map((t) => t.nombre).join(', ')}${via}`.slice(0, 400);
 }
 
 /**

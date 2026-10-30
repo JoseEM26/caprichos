@@ -1,3 +1,5 @@
+jest.mock('@nestjs/jwt', () => ({ JwtService: jest.fn() }));
+jest.mock('../../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {} }));
 import { ConfigService } from '@nestjs/config';
 import { WhatsAppMensajeriaProvider } from '../proveedor/whatsapp-mensajeria.proveedor';
 import { WhatsAppMetaAdaptador } from '../adaptadores/whatsapp-meta.adaptador';

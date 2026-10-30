@@ -1,5 +1,8 @@
 import { CargaCarrusel, carruselEnviable, payloadInteractivoCarrusel } from '../servicios/carrusel.util';
-import { Injectable, Logger } from '@nestjs/common';
+import { createHash } from 'crypto';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { CatalogoService } from '../../catalogo/catalogo.service';
+import { jpegProductoWhatsApp } from '../../catalogo/imagen-whatsapp';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import {
@@ -68,6 +71,7 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
+    @Optional() private readonly catalogo?: CatalogoService,
   ) {
     this.token = this.configService.get<string>('WHATSAPP_TOKEN', '').trim();
     this.phoneId = this.configService.get<string>('WHATSAPP_PHONE_ID', '').trim();
@@ -643,6 +647,79 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
     };
   }
 
+  /** Media Meta conserva 30 días; se renueva a los 25. */
+  private static readonly VIDA_MEDIA_MS = 25 * 24 * 3600 * 1000;
+
+  /** Sube un JPEG a la Media API de Meta y devuelve el media id (null si falla). */
+  async subirMedia(jpg: Buffer): Promise<string | null> {
+    const form = new FormData();
+    form.append('messaging_product', 'whatsapp');
+    form.append('type', 'image/jpeg');
+    form.append('file', new Blob([new Uint8Array(jpg)], { type: 'image/jpeg' }), 'imagen.jpg');
+    try {
+      const r = await fetch(`https://graph.facebook.com/${this.apiVersion}/${this.phoneId}/media`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${this.token}` },
+        body: form,
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
+      const data: any = await r.json().catch(() => ({}));
+      if (r.ok && data?.id) return String(data.id);
+      this.logger.warn(`Subida de media rechazada (${r.status}): ${JSON.stringify(data?.error ?? data).slice(0, 200)}`);
+    } catch (e: any) {
+      this.logger.warn(`Subida de media falló: ${e?.message}`);
+    }
+    return null;
+  }
+
+  /** Media id de la imagen de una tarjeta, con caché en `parametro` por (producto + sha1 del JPEG). Null = usar link. */
+  private async mediaIdTarjeta(imagenUrl: string | null): Promise<string | null> {
+    const productoId = /\/carta\/productos\/(\d+)\/imagen-wa\.jpg/.exec(imagenUrl ?? '')?.[1];
+    if (!productoId || !this.catalogo) return null;
+    try {
+      const foto = await this.catalogo.fotoProductoVisible(productoId);
+      if (!foto) return null;
+      const jpg = await jpegProductoWhatsApp(productoId, foto.nombre, foto.ruta, this.configService.get<string>('UPLOADS_DIR') || './data/uploads');
+      const clave = `wa_media:${productoId}:${createHash('sha1').update(jpg).digest('hex')}`;
+      const previo: any = (await this.prisma.parametro.findUnique({ where: { clave } }))?.valor;
+      if (previo?.mediaId && Date.now() - Number(previo.en) < WhatsAppMetaAdaptador.VIDA_MEDIA_MS) return previo.mediaId;
+      const mediaId = await this.subirMedia(jpg);
+      if (mediaId) {
+        const valor = { mediaId, en: Date.now() };
+        await this.prisma.parametro.upsert({ where: { clave }, create: { clave, valor }, update: { valor } });
+      }
+      return mediaId;
+    } catch (e: any) {
+      this.logger.warn(`Media de la tarjeta no disponible: ${e?.message}`);
+      return null;
+    }
+  }
+
+  /** Media ids de todas las tarjetas, 4 subidas a la vez. */
+  private async mediaIdsCarrusel(carga: CargaCarrusel): Promise<Array<string | null>> {
+    const ids: Array<string | null> = new Array(carga.tarjetas.length).fill(null);
+    let sig = 0;
+    const worker = async () => {
+      while (sig < ids.length) {
+        const i = sig++;
+        ids[i] = await this.mediaIdTarjeta(carga.tarjetas[i].imagenUrl);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(4, ids.length) }, worker));
+    return ids;
+  }
+
+  /** Borra del caché los media ids usados (Meta pudo haberlos descartado). */
+  private async olvidarMedia(carga: CargaCarrusel): Promise<void> {
+    const prefijos = carga.tarjetas
+      .map((t) => /\/carta\/productos\/(\d+)\//.exec(t.imagenUrl ?? '')?.[1])
+      .filter(Boolean)
+      .map((id) => `wa_media:${id}:`);
+    await Promise.all(
+      prefijos.map((p) => this.prisma.parametro.deleteMany({ where: { clave: { startsWith: p } } }).catch(() => undefined)),
+    );
+  }
+
   async enviarCarrusel(telefono: string, carga: CargaCarrusel, opciones?: OpcionesEnvio): Promise<ResultadoEnvioWhatsApp> {
     const destinatario = construirDestinatario(telefono);
     const telMask = enmascararTelefono(telefono);
@@ -661,15 +738,30 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
     }
 
     const url = `https://graph.facebook.com/${this.apiVersion}/${this.phoneId}/messages`;
-    const payload: any = {
-      messaging_product: 'whatsapp',
-      ...destinatario,
-      type: 'interactive',
-      interactive: payloadInteractivoCarrusel(carga),
+    const armar = (ids: Array<string | null>) => {
+      const payload: any = {
+        messaging_product: 'whatsapp',
+        ...destinatario,
+        type: 'interactive',
+        interactive: payloadInteractivoCarrusel(carga, ids),
+      };
+      if (opciones?.replyToWaMessageId) payload.context = { message_id: opciones.replyToWaMessageId };
+      return payload;
     };
-    if (opciones?.replyToWaMessageId) payload.context = { message_id: opciones.replyToWaMessageId };
+    const marcar = (ids: Array<string | null>) => carga.tarjetas.forEach((t, i) => (t.via = ids[i] ? 'id' : 'link'));
 
-    const resultado = await this.ejecutarConReintentos(url, payload, telMask);
+    // Imagen por media id subido (no depende de que Meta descargue el link); sin subida, link
+    let ids = await this.mediaIdsCarrusel(carga);
+    marcar(ids);
+    let resultado = await this.ejecutarConReintentos(url, armar(ids), telMask);
+    if (!resultado.exito && ids.some(Boolean)) {
+      // ponytail: un id vencido o rechazado se descarta y se reintenta una vez con links
+      this.logger.warn(`Carrusel con media ids rechazado (${resultado.error?.codigo}); se reintenta con links`);
+      await this.olvidarMedia(carga);
+      ids = ids.map(() => null);
+      marcar(ids);
+      resultado = await this.ejecutarConReintentos(url, armar(ids), telMask);
+    }
     const waMessageId = resultado.data?.messages?.[0]?.id;
     const estado = resultado.exito ? 'ENVIADO' : 'FALLIDO';
 

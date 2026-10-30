@@ -3,6 +3,8 @@ import {
   Controller,
   Get,
   Header,
+  Headers,
+  Logger,
   NotFoundException,
   StreamableFile,
   Optional,
@@ -68,11 +70,16 @@ export class CartaController {
   @Get('productos/:id/imagen-wa.jpg')
   @Header('Content-Type', 'image/jpeg')
   @Header('Cache-Control', 'public, max-age=604800')
-  async imagenWhatsApp(@Param('id') id: string) {
+  async imagenWhatsApp(@Param('id') id: string, @Headers('user-agent') ua?: string) {
+    new Logger('ImagenWA').log(`pedida id=${id} ua="${String(ua ?? '').slice(0, 80)}"`);
     const foto = /^\d+$/.test(id) ? await this.catalogoService.fotoProductoVisible(id) : null;
-    if (!foto) throw new NotFoundException('Producto no encontrado');
+    if (!foto) {
+      new Logger('ImagenWA').warn(`id=${id} no encontrado (404)`);
+      throw new NotFoundException('Producto no encontrado');
+    }
     const uploads = this.config?.get<string>('UPLOADS_DIR') || './data/uploads';
     const jpg = await jpegProductoWhatsApp(id, foto.nombre, foto.ruta, uploads);
+    new Logger('ImagenWA').log(`id=${id} servida (200, ${jpg.length} bytes)`);
     return new StreamableFile(jpg, { type: 'image/jpeg', length: jpg.length });
   }
 }

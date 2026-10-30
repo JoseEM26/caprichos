@@ -1,3 +1,5 @@
+jest.mock('@nestjs/jwt', () => ({ JwtService: jest.fn() }));
+jest.mock('../../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {} }));
 import { ConfigService } from '@nestjs/config';
 import {
   WhatsAppMetaAdaptador,
@@ -622,5 +624,98 @@ describe('WhatsAppMetaAdaptador', () => {
       expect(bodyEnviado.type).toBe('image');
       expect(bodyEnviado.image.id).toBe('media_id_123456789');
     });
+  });
+});
+
+describe('WhatsAppMetaAdaptador: carrusel con media ids', () => {
+  const cfg: any = { get: (k: string, d?: any) => ({ WHATSAPP_TOKEN: 'tk', WHATSAPP_PHONE_ID: '123', WHATSAPP_API_VERSION: 'v20.0', WHATSAPP_TIMEOUT_MS: 1000 } as any)[k] ?? d };
+  const carga = () => ({
+    cuerpo: 'c',
+    tarjetas: [1, 2].map((i) => ({
+      nombre: `P${i}`,
+      imagenUrl: `https://x.pe/carta/productos/${i}/imagen-wa.jpg?v=a`,
+      cuerpo: `P${i}\nS/ 1`,
+      boton: { id: `ped_prod_${i}`, titulo: 'Pedir' },
+    })),
+  });
+  let almacen: Record<string, any>;
+  let prisma: any;
+  let catalogo: any;
+  let subidas: any[];
+  let envios: any[];
+  const original = global.fetch;
+  const armar = (rechazarConIds = false) => {
+    subidas = [];
+    envios = [];
+    global.fetch = jest.fn().mockImplementation(async (url: string, init: any) => {
+      if (url.endsWith('/media')) {
+        subidas.push(init.body);
+        return { ok: true, status: 200, json: async () => ({ id: `m${subidas.length}` }) };
+      }
+      const body = JSON.parse(init.body);
+      envios.push(body);
+      const conId = JSON.stringify(body).includes('"id":"m');
+      if (rechazarConIds && conId) return { ok: false, status: 400, text: async () => JSON.stringify({ error: { code: 131053, message: 'media' } }) };
+      return { ok: true, status: 200, text: async () => JSON.stringify({ messages: [{ id: 'wamid.1' }] }) };
+    }) as any;
+  };
+  const crear = () => new WhatsAppMetaAdaptador(cfg, prisma, catalogo);
+  beforeEach(() => {
+    almacen = {};
+    prisma = {
+      whatsappMensaje: { create: jest.fn().mockResolvedValue({ id: BigInt(1) }) },
+      parametro: {
+        findUnique: jest.fn(({ where }) => Promise.resolve(almacen[where.clave] ? { valor: almacen[where.clave] } : null)),
+        upsert: jest.fn(({ where, create }) => ((almacen[where.clave] = create.valor), Promise.resolve())),
+        deleteMany: jest.fn(() => ((almacen = {}), Promise.resolve())),
+      },
+    };
+    catalogo = { fotoProductoVisible: jest.fn().mockResolvedValue({ nombre: 'Frappe', ruta: null }) };
+  });
+  afterEach(() => (global.fetch = original));
+
+  it('sube multipart con los campos correctos y manda image.id', async () => {
+    armar();
+    const c = carga();
+    const r = await crear().enviarCarrusel('51987654321', c);
+    expect(r.exito).toBe(true);
+    const f: FormData = subidas[0];
+    expect(f.get('messaging_product')).toBe('whatsapp');
+    expect(f.get('type')).toBe('image/jpeg');
+    expect((f.get('file') as File).type).toBe('image/jpeg');
+    expect(envios[0].interactive.action.cards[0].header.image).toEqual({ id: expect.stringMatching(/^m\d$/) });
+    expect(c.tarjetas.map((t: any) => t.via)).toEqual(['id', 'id']);
+  });
+
+  it('no resube con caché vigente y renueva si pasó de 25 días', async () => {
+    armar();
+    await crear().enviarCarrusel('51987654321', carga());
+    expect(subidas).toHaveLength(2);
+    await crear().enviarCarrusel('51987654321', carga());
+    expect(subidas).toHaveLength(2);
+    Object.values(almacen).forEach((v: any) => (v.en = Date.now() - 26 * 24 * 3600 * 1000));
+    await crear().enviarCarrusel('51987654321', carga());
+    expect(subidas).toHaveLength(4);
+  });
+
+  it('si Meta rechaza los ids: borra el caché y reintenta con links', async () => {
+    armar(true);
+    const c = carga();
+    const r = await crear().enviarCarrusel('51987654321', c);
+    expect(r.exito).toBe(true);
+    expect(envios).toHaveLength(2);
+    expect(envios[1].interactive.action.cards[0].header.image.link).toContain('imagen-wa.jpg');
+    expect(prisma.parametro.deleteMany).toHaveBeenCalled();
+    expect(c.tarjetas.map((t: any) => t.via)).toEqual(['link', 'link']);
+  });
+
+  it('si la subida falla usa link en esa tarjeta sin bloquear', async () => {
+    armar();
+    const a = crear();
+    jest.spyOn(a, 'subirMedia').mockResolvedValueOnce('mX').mockResolvedValueOnce(null);
+    const c = carga();
+    expect((await a.enviarCarrusel('51987654321', c)).exito).toBe(true);
+    expect(envios[0].interactive.action.cards.map((k: any) => Object.keys(k.header.image)[0])).toEqual(['id', 'link']);
+    expect(c.tarjetas.map((t: any) => t.via)).toEqual(['id', 'link']);
   });
 });

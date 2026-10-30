@@ -391,3 +391,22 @@ describe('fallo asíncrono de Meta (statuses[].failed)', () => {
     expect(b.prisma.mensajeChat.create.mock.calls[0][0].data.contenido.texto).toContain('El mensaje no se entregó (131053');
   });
 });
+
+describe('carrusel: simulado no sube nada y resumen informa la vía', () => {
+  it('simulado no llama a fetch', async () => {
+    const { WhatsAppSimuladoAdaptador } = require('../adaptadores/whatsapp-simulado.adaptador');
+    const f = jest.fn();
+    const orig = global.fetch;
+    global.fetch = f as any;
+    const a = new WhatsAppSimuladoAdaptador({ whatsappMensaje: { create: jest.fn().mockResolvedValue({ id: BigInt(1) }) } } as any);
+    await a.enviarCarrusel('51987654321', carga(2));
+    global.fetch = orig;
+    expect(f).not.toHaveBeenCalled();
+  });
+  it('resumen indica tarjetas por id y por link', () => {
+    const c: any = carga(2);
+    c.tarjetas[0].via = 'id';
+    c.tarjetas[1].via = 'link';
+    expect(resumenCarrusel(c)).toContain('[imagen: 1 por id, 1 por link]');
+  });
+});
