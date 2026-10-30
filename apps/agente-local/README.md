@@ -184,13 +184,48 @@ Cada latido (20 s) informa el estado de cada máquina (lista, no encontrada, sin
 
 Para cambiar las impresoras o re-vincular: `agente-impresion-windows.exe configurar` (borra `agenteKey` del config para re-vincular).
 
-### Linux / variables de entorno
+### Linux (binario autocontenido, sin Node)
+
+El panel «Instalar programa de impresión» tiene la pestaña **Linux** con estos mismos comandos listos para copiar (con la URL del sitio):
+
+```bash
+curl -fL <sitio>/api/agente-impresion/descargar/linux -o ~/caprichos-impresion && chmod +x ~/caprichos-impresion
+sudo usermod -aG lp $USER        # luego cerrar sesión y volver a entrar
+ls -l /dev/usb/lp*               # deben verse lp0 y lp1 (etiquetera y ticketera)
+~/caprichos-impresion configurar # pega el código de vinculación; lista /dev/usb/lp* y eliges etiquetera y ticketera
+```
+
+`configurar` guarda en `~/.config/CaprichosAgente/config.json` (respeta `XDG_CONFIG_HOME`; `AGENTE_CONFIG` lo cambia) con `etiquetera` y `ticketera` como rutas (`/dev/usb/lp0`, `/dev/usb/lp1`), igual que Windows guarda nombres. Enter = ninguna.
+
+Arranque automático (systemd de usuario), `~/.config/systemd/user/caprichos-impresion.service`:
+
+```ini
+[Unit]
+Description=Caprichos - programa de impresion
+After=network-online.target
+
+[Service]
+ExecStart=%h/caprichos-impresion
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+```
+
+```bash
+systemctl --user daemon-reload && systemctl --user enable --now caprichos-impresion
+loginctl enable-linger $USER          # arranca sin abrir sesión
+journalctl --user -u caprichos-impresion -f
+```
+
+### Variables de entorno
 
 `ETIQUETERA` y `TICKETERA` aceptan el nombre de la impresora (Windows) o la ruta del dispositivo (Linux, ej. `/dev/usb/lp1`). `IMPRESORA_RUTA` sigue valiendo como etiquetera. `TICKET_COLUMNAS=32` para papel de 58 mm (por defecto 48 = 80 mm). `AGENTE_CONFIG` cambia la ruta del archivo de configuración.
 
-### Empaquetar el .exe
+### Empaquetar (.exe y binario Linux)
 
-`pnpm --filter @caprichos/agente-local empaquetar:win` (usa `@yao-pkg/pkg`, nodo 22 para Windows x64; sale en `apps/agente-local/dist-exe/`). El workflow `.github/workflows/agente-windows.yml` lo construye solo cuando cambia el agente y lo sube a `~/caprichos-descargas/` del servidor, que la API monta en `/data/descargas` (`AGENTE_EXE_RUTA` lo cambia).
+`pnpm --filter @caprichos/agente-local empaquetar:linux` genera `dist-exe/agente-impresion-linux` (node22-linux-x64, ~74 MB). `pnpm --filter @caprichos/agente-local empaquetar:win` (usa `@yao-pkg/pkg`, nodo 22 para Windows x64; sale en `apps/agente-local/dist-exe/`). El workflow `.github/workflows/agente-windows.yml` construye ambos solo cuando cambia el agente y los sube a `~/caprichos-descargas/` del servidor, que la API monta en `/data/descargas` (`AGENTE_EXE_RUTA` y `AGENTE_LINUX_RUTA` cambian las rutas).
 
 ### Por qué no imprimía en la demo
 

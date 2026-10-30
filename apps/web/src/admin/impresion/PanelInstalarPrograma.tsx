@@ -4,13 +4,53 @@ import { impresionApi } from './impresionApi';
 import './cola-impresion.css';
 
 export const URL_DESCARGA_WINDOWS = '/api/agente-impresion/descargar/windows';
+export const URL_DESCARGA_LINUX = '/api/agente-impresion/descargar/linux';
 
-/** Instalar el programa del local (Windows): descarga, código de un solo uso y elegir las dos máquinas. */
+type Sistema = 'windows' | 'linux';
+
+function sistemaDetectado(): Sistema {
+  const plataforma = (navigator as any).userAgentData?.platform || navigator.userAgent || '';
+  return /linux/i.test(plataforma) && !/android/i.test(navigator.userAgent) ? 'linux' : 'windows';
+}
+
+const UNIDAD_SYSTEMD = `[Unit]
+Description=Caprichos - programa de impresion
+After=network-online.target
+
+[Service]
+ExecStart=%h/caprichos-impresion
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target`;
+
+/** Bloque de comando con botón Copiar. */
+function Comando({ texto }: { texto: string }) {
+  const [copiado, setCopiado] = useState(false);
+  const copiar = async () => {
+    try {
+      await navigator.clipboard.writeText(texto);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 1500);
+    } catch { /* sin permiso de portapapeles: el texto queda seleccionable */ }
+  };
+  return (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', margin: '6px 0' }}>
+      <pre data-testid="comando" style={{ flex: 1, margin: 0, padding: 8, background: '#0001', borderRadius: 6, fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-all', userSelect: 'all' }}>{texto}</pre>
+      <button type="button" className="cola-btn" onClick={copiar}>{copiado ? 'Copiado' : 'Copiar'}</button>
+    </div>
+  );
+}
+
+/** Instalar el programa del local (Windows o Linux): descarga, código de un solo uso y elegir las dos máquinas. */
 export function PanelInstalarPrograma({ alCerrar }: { alCerrar: () => void }) {
   const { usuario } = useSesion();
   const esAdmin = (usuario?.rol || '').toUpperCase() === 'ADMIN';
   const [codigo, setCodigo] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [sistema, setSistema] = useState<Sistema>(sistemaDetectado);
+  const origen = window.location.origin;
 
   const generar = async () => {
     setError('');
@@ -31,15 +71,24 @@ export function PanelInstalarPrograma({ alCerrar }: { alCerrar: () => void }) {
         <p className="cola-ayuda">
           Se instala una vez en la PC donde están conectadas la etiquetera y la ticketera. El navegador no puede ver impresoras USB; este programa sí.
         </p>
-        <ol style={{ lineHeight: '24px', fontSize: 14, paddingLeft: 20 }}>
-          <li>
-            Descarga e instala:{' '}
-            <a href={URL_DESCARGA_WINDOWS} download style={{ fontWeight: 800 }}>
-              Descargar el programa de impresión para Windows
-            </a>
-          </li>
-          <li>
-            Ábrelo y pega este código de vinculación (vale 15 minutos y se usa una sola vez):
+        <div role="tablist" style={{ display: 'flex', gap: 8, margin: '8px 0' }}>
+          {(['windows', 'linux'] as const).map((s) => (
+            <button key={s} type="button" role="tab" aria-selected={sistema === s} className="cola-btn"
+              style={{ fontWeight: sistema === s ? 800 : 400 }} onClick={() => setSistema(s)}>
+              {s === 'windows' ? 'Windows' : 'Linux'}
+            </button>
+          ))}
+        </div>
+        {sistema === 'windows' ? (
+          <ol style={{ lineHeight: '24px', fontSize: 14, paddingLeft: 20 }}>
+            <li>
+              Descarga e instala:{' '}
+              <a href={URL_DESCARGA_WINDOWS} download style={{ fontWeight: 800 }}>
+                Descargar el programa de impresión para Windows
+              </a>
+            </li>
+            <li>
+              Ábrelo y pega este código de vinculación (vale 15 minutos y se usa una sola vez):
             <div style={{ margin: '8px 0' }}>
               {codigo ? (
                 <code data-testid="codigo-vinculo" style={{ fontSize: 18, fontWeight: 800, userSelect: 'all' }}>{codigo}</code>
@@ -49,9 +98,44 @@ export function PanelInstalarPrograma({ alCerrar }: { alCerrar: () => void }) {
                 <em>Pídele al administrador que genere el código.</em>
               )}
             </div>
-          </li>
-          <li>Elige cuál es la etiquetera y cuál la ticketera.</li>
-        </ol>
+            </li>
+            <li>Elige cuál es la etiquetera y cuál la ticketera.</li>
+          </ol>
+        ) : (
+          <ol style={{ lineHeight: '24px', fontSize: 14, paddingLeft: 20 }}>
+            <li>
+              Descarga el programa:
+              <Comando texto={`curl -fL ${origen}${URL_DESCARGA_LINUX} -o ~/caprichos-impresion && chmod +x ~/caprichos-impresion`} />
+            </li>
+            <li>
+              Permiso de la impresora USB (cierra sesión y vuelve a entrar después):
+              <Comando texto="sudo usermod -aG lp $USER" />
+              Verifica que aparecen la etiquetera y la ticketera (lp0, lp1):
+              <Comando texto="ls -l /dev/usb/lp*" />
+            </li>
+            <li>
+              Vincula y elige las impresoras con este código (vale 15 minutos y se usa una sola vez):
+            <div style={{ margin: '8px 0' }}>
+              {codigo ? (
+                <code data-testid="codigo-vinculo" style={{ fontSize: 18, fontWeight: 800, userSelect: 'all' }}>{codigo}</code>
+              ) : esAdmin ? (
+                <button type="button" className="cola-btn" onClick={generar}>Generar código de vinculación</button>
+              ) : (
+                <em>Pídele al administrador que genere el código.</em>
+              )}
+            </div>
+              <Comando texto="~/caprichos-impresion configurar" />
+            </li>
+            <li>
+              Arranque automático. Crea el servicio:
+              <Comando texto={`mkdir -p ~/.config/systemd/user && cat > ~/.config/systemd/user/caprichos-impresion.service <<'EOF'\n${UNIDAD_SYSTEMD}\nEOF`} />
+              Actívalo:
+              <Comando texto="systemctl --user daemon-reload && systemctl --user enable --now caprichos-impresion && loginctl enable-linger $USER" />
+              Ver registros:
+              <Comando texto="journalctl --user -u caprichos-impresion -f" />
+            </li>
+          </ol>
+        )}
         {error && <p role="alert" style={{ color: 'var(--cp-rust, #B2500F)' }}>{error}</p>}
       </div>
     </div>

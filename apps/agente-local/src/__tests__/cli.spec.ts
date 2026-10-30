@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
-import { ejecutarComandoProbar, ejecutarComandoVolcar } from '../cli';
+import { ejecutarComandoProbar, ejecutarComandoVolcar, listarImpresorasLinux, crearDispositivo } from '../cli';
+import { rutaArchivoConfiguracion, obtenerConfiguracion } from '../config';
 import { ImpresoraMemoria } from '../impresora/impresoraMemoria';
 import { ErrorImpresora } from '../impresora/dispositivo.interface';
 
@@ -59,5 +60,22 @@ describe('CLI - Comandos de prueba y volcado', () => {
 
     // Limpieza
     fs.rmSync(dirTemporal, { recursive: true, force: true });
+  });
+});
+
+describe('Linux: dos impresoras por rol', () => {
+  it('lista los /dev/usb/lpN ordenados y ignora otros nodos', () => {
+    const d = fs.mkdtempSync(path.join(require('os').tmpdir(), 'usb-'));
+    ['lp1', 'lp0', 'hiddev0'].forEach((n) => fs.writeFileSync(path.join(d, n), ''));
+    expect(listarImpresorasLinux(d)).toEqual([`${d}/lp0`, `${d}/lp1`]);
+    fs.rmSync(d, { recursive: true, force: true });
+    expect(listarImpresorasLinux(d)).toEqual([]);
+  });
+
+  it('config en ~/.config/CaprichosAgente y rutas /dev/usb distintas por rol', () => {
+    expect(rutaArchivoConfiguracion({ HOME: '/home/caja' } as any)).toBe('/home/caja/.config/CaprichosAgente/config.json');
+    const c = obtenerConfiguracion({} as any, { etiquetera: '/dev/usb/lp0', ticketera: '/dev/usb/lp1' });
+    expect([c.etiquetera, c.ticketera]).toEqual(['/dev/usb/lp0', '/dev/usb/lp1']);
+    expect(crearDispositivo('/dev/usb/lp1').obtenerRuta()).toBe('/dev/usb/lp1');
   });
 });

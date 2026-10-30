@@ -32,9 +32,10 @@ export const VERSION_AGENTE = '0.1.0';
 
 export function rutaArchivoConfiguracion(env: NodeJS.ProcessEnv = process.env): string {
   if (env.AGENTE_CONFIG) return env.AGENTE_CONFIG;
-  return env.APPDATA
-    ? join(env.APPDATA, 'CaprichosAgente', 'config.json')
-    : join(env.HOME || env.USERPROFILE || '.', '.caprichos-agente.json');
+  if (env.APPDATA) return join(env.APPDATA, 'CaprichosAgente', 'config.json');
+  // Linux: ~/.config/CaprichosAgente/config.json (respeta XDG_CONFIG_HOME)
+  const base = env.XDG_CONFIG_HOME || join(env.HOME || env.USERPROFILE || '.', '.config');
+  return join(base, 'CaprichosAgente', 'config.json');
 }
 
 export function obtenerConfiguracion(

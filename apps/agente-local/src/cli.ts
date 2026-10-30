@@ -103,6 +103,15 @@ export async function ejecutarComandoVolcar(
   return archivosGenerados;
 }
 
+/** Linux: dispositivos USB de impresora (/dev/usb/lp0, lp1...) que el kernel ve conectados. */
+export function listarImpresorasLinux(dir = '/dev/usb'): string[] {
+  try {
+    return fs.readdirSync(dir).filter((n) => /^lp\d+$/.test(n)).sort().map((n) => `${dir}/${n}`);
+  } catch {
+    return [];
+  }
+}
+
 /** Windows: nombre de la impresora instalada. Linux: ruta del dispositivo (empieza con /). */
 export function crearDispositivo(destino: string): IDispositivoImpresora {
   return destino.startsWith('/') ? new ImpresoraUsb(destino) : new ImpresoraWindows(destino);
@@ -139,7 +148,10 @@ export async function ejecutarAsistente(
       agenteKey = r.llave;
       logger('Vinculado correctamente.');
     }
-    const nombres = process.platform === 'win32' ? await listarImpresorasWindows().catch(() => []) : [];
+    const nombres = process.platform === 'win32' ? await listarImpresorasWindows().catch(() => []) : listarImpresorasLinux();
+    if (!nombres.length && process.platform !== 'win32') {
+      logger('No hay impresoras USB en /dev/usb/lp*. Revisa el cable y el permiso (sudo usermod -aG lp $USER); puedes escribir la ruta a mano.');
+    }
     if (nombres.length) {
       logger('Impresoras encontradas en este equipo:');
       nombres.forEach((n, i) => logger(`  ${i + 1}. ${n}`));

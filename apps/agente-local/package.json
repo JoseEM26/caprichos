@@ -11,7 +11,8 @@
     "volcar": "node dist/cli.js volcar",
     "start": "node dist/index.js",
     "lint": "eslint src --ext .ts",
-    "empaquetar:win": "tsc && pkg dist/index.js --targets node22-win-x64 --output dist-exe/agente-impresion-windows.exe"
+    "empaquetar:win": "tsc && pkg dist/index.js --targets node22-win-x64 --output dist-exe/agente-impresion-windows.exe",
+    "empaquetar:linux": "tsc && pkg dist/index.js --targets node22-linux-x64 --output dist-exe/agente-impresion-linux"
   },
   "dependencies": {
     "@caprichos/compartido": "workspace:*"

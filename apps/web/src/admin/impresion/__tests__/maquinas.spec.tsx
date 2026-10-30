@@ -43,6 +43,7 @@ describe('indicadores de máquinas', () => {
     vi.mocked(impresionApi.generarCodigoVinculo).mockResolvedValue({ codigo: 'ABCD2345@demo.caprichos.pe', expiraEn: '' });
     render(<MemoryRouter><IndicadoresMaquinas maquinas={{ ETIQUETERA: caida, TICKETERA: caida } as any} /></MemoryRouter>);
     fireEvent.click(screen.getByRole('button', { name: 'Instalar programa de impresión' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Windows' }));
     expect(screen.getByRole('link', { name: /Descargar el programa de impresión para Windows/ })).toHaveAttribute('href', '/api/agente-impresion/descargar/windows');
     fireEvent.click(screen.getByRole('button', { name: 'Generar código de vinculación' }));
     expect(await screen.findByTestId('codigo-vinculo')).toHaveTextContent('ABCD2345@demo.caprichos.pe');

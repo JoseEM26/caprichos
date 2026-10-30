@@ -1,4 +1,4 @@
-name: Programa de impresión para Windows
+name: Programa de impresión (Windows y Linux)
 
 # Job aparte: solo corre si cambia el agente local; no alarga el despliegue normal.
 on:
@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   exe:
-    name: Construir agente-impresion-windows.exe
+    name: Construir programa de impresión (Windows y Linux)
     runs-on: ubuntu-latest
     # Los secretos SSH viven en el ambiente demo (igual que el despliegue); producción se publica aparte
     environment:
@@ -31,13 +31,16 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @caprichos/compartido build
       - run: pnpm --filter @caprichos/agente-local empaquetar:win
+      - run: pnpm --filter @caprichos/agente-local empaquetar:linux
       - uses: actions/upload-artifact@v4
         with:
-          name: agente-impresion-windows
-          path: apps/agente-local/dist-exe/agente-impresion-windows.exe
+          name: agente-impresion
+          path: |
+            apps/agente-local/dist-exe/agente-impresion-windows.exe
+            apps/agente-local/dist-exe/agente-impresion-linux
           retention-days: 30
 
-      # Publica el .exe donde la API lo sirve (/api/agente-impresion/descargar/windows).
+      # Publica el .exe donde la API lo sirve (/api/agente-impresion/descargar/{windows,linux}).
       - name: Subir al servidor
         env:
           SSH_KEY: ${{ secrets.SSH_KEY }}
@@ -52,4 +55,5 @@ jobs:
           ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes "${SSH_USER:-deploy}@${SSH_HOST}" 'mkdir -p ~/caprichos-descargas'
           scp -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
             apps/agente-local/dist-exe/agente-impresion-windows.exe \
-            "${SSH_USER:-deploy}@${SSH_HOST}:caprichos-descargas/agente-impresion-windows.exe"
+            apps/agente-local/dist-exe/agente-impresion-linux \
+            "${SSH_USER:-deploy}@${SSH_HOST}:caprichos-descargas/"
