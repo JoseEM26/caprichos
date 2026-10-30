@@ -1,11 +1,16 @@
 import { useId, useState } from 'react';
 import { vouchersApi, type ItemHistorialVoucher } from '../vouchers/vouchersApi';
+import { FotoAmpliable } from '../vouchers/FotoAmpliable';
 import './historial-voucher.css';
 
 export interface HistorialVoucherProps {
   pedidoId: string | number;
   /** Cuántos vouchers tiene el pedido (vigentes y reemplazados), si se conoce, para el rótulo. */
   total?: number;
+  /** Texto del botón (por defecto «Historial del voucher»). */
+  rotulo?: string;
+  /** Solo los reemplazados y retirados, no el vigente. */
+  soloAnteriores?: boolean;
 }
 
 const ETIQUETA_ESTADO: Record<ItemHistorialVoucher['estado'], string> = {
@@ -31,7 +36,7 @@ function fechaHora(iso: string): string {
  * Historial plegado de los vouchers de un pedido. Nada se borra: los reemplazados aparecen marcados.
  * Carga perezosa: el endpoint solo se pide al desplegar. El mozo no recibe semáforo (el servidor no lo envía).
  */
-export function HistorialVoucher({ pedidoId, total }: HistorialVoucherProps) {
+export function HistorialVoucher({ pedidoId, total, rotulo = 'Historial del voucher', soloAnteriores = false }: HistorialVoucherProps) {
   const idLista = useId();
   const [abierto, setAbierto] = useState(false);
   const [items, setItems] = useState<ItemHistorialVoucher[] | null>(null);
@@ -46,7 +51,7 @@ export function HistorialVoucher({ pedidoId, total }: HistorialVoucherProps) {
     setError(false);
     vouchersApi
       .historialPedido(pedidoId)
-      .then((r) => setItems(r.items ?? []))
+      .then((r) => setItems((r.items ?? []).filter((i) => !soloAnteriores || i.estado !== 'VIGENTE')))
       .catch(() => setError(true))
       .finally(() => setCargando(false));
   };
@@ -54,7 +59,7 @@ export function HistorialVoucher({ pedidoId, total }: HistorialVoucherProps) {
   return (
     <div className="hv">
       <button type="button" className="hv-boton" aria-expanded={abierto} aria-controls={idLista} onClick={alternar}>
-        Historial del voucher{total != null ? ` (${total})` : ''}
+        {rotulo}{total != null ? ` (${total})` : ''}
       </button>
       {abierto && (
         <div id={idLista} className="hv-lista">
@@ -69,6 +74,7 @@ export function HistorialVoucher({ pedidoId, total }: HistorialVoucherProps) {
             <ol className="hv-items">
               {items.map((it) => (
                 <li key={it.id} className={`hv-item hv-item--${it.estado.toLowerCase()}`}>
+                  {it.archivoId && <FotoAmpliable archivoId={it.archivoId} alt="Voucher del historial" alturaMaxima={96} />}
                   <div className="hv-cabeza">
                     <span>{fechaHora(it.subidoEn)}</span>
                     {it.subidoPor && <span>por {it.subidoPor}</span>}

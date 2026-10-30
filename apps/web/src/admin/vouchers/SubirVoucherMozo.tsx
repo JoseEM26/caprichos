@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { Confirmar } from '../../comun/Confirmar';
-import { vouchersApi } from './vouchersApi';
+import { vouchersApi, type ItemHistorialVoucher } from './vouchersApi';
+import { FotoAmpliable } from './FotoAmpliable';
+import { HistorialVoucher } from '../salon/HistorialVoucher';
 import { reducirImagenVoucher } from './reducirImagenVoucher';
 import { Cargando } from '../../comun/Cargando';
 import { ErrorApi } from '../../comun/api';
@@ -64,6 +66,27 @@ export function SubirVoucherMozo({
   const [pideMotivo, setPideMotivo] = useState(false);
   const [motivoLocal, setMotivoLocal] = useState('');
 
+  // Voucher vigente del pedido para este medio (se muestra antes de cambiarlo) y cuántos anteriores hay
+  const [actual, setActual] = useState<ItemHistorialVoucher | null>(null);
+  const [anteriores, setAnteriores] = useState(0);
+  const [cambiando, setCambiando] = useState(false);
+  const [confirmandoCambio, setConfirmandoCambio] = useState(false);
+
+  const cargarActual = () => {
+    Promise.resolve()
+      .then(() => vouchersApi.historialPedido(pedidoId))
+      .then((r) => {
+        const items = r?.items ?? [];
+        setActual(items.find((i) => i.estado === 'VIGENTE' && (!i.medio || i.medio === medio)) ?? null);
+        setAnteriores(items.filter((i) => i.estado === 'REEMPLAZADO').length);
+      })
+      .catch(() => undefined); // sin historial se sube como siempre; el servidor igual pide el motivo
+  };
+  useEffect(cargarActual, [pedidoId, medio]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fechaHora = (iso: string) =>
+    new Date(iso).toLocaleString('es-PE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Lima' });
+
   const textoGuardadoManual = 'Voucher guardado. La lectura automática no está disponible; Caja lo revisará.';
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -104,6 +127,7 @@ export function SubirVoucherMozo({
 
       setPideMotivo(false);
       alRespuesta?.(respuesta);
+      cargarActual();
       setUltimoVoucherId(respuesta.id);
 
       // Regla de oro del mozo: SOLO ve legible / no legible. NUNCA semáforo ni datos extraídos.
@@ -158,6 +182,11 @@ export function SubirVoucherMozo({
     setArchivo(file);
     if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
       setVistaPreviaUrl(URL.createObjectURL(file));
+    }
+    // Ya había un voucher: primero se compara «Antes» y «Nuevo» y se pide el motivo
+    if (actual && !ultimoVoucherId) {
+      setConfirmandoCambio(true);
+      return;
     }
     await procesarYSubir(file);
   };
@@ -232,7 +261,30 @@ export function SubirVoucherMozo({
       />
 
       {/* Dos caminos: foto con la cámara o captura desde la galería/archivo */}
-      {!archivo && (
+      {actual && !archivo && (
+        <div data-testid="voucher-actual" style={{ display: 'flex', flexDirection: 'column', gap: '6px', background: 'var(--cp-white, #FFFFFF)', border: '1px solid var(--cp-line, #E3D6C6)', borderRadius: '10px', padding: '8px' }}>
+          <div style={{ fontWeight: 800, fontSize: '13px', color: 'var(--cp-navy, #0B2C3E)' }}>Voucher actual</div>
+          {actual.archivoId && <FotoAmpliable archivoId={actual.archivoId} alt="Voucher actual" alturaMaxima={140} />}
+          <div style={{ fontSize: '12px', color: 'var(--cp-soft, #2C4C5D)', lineHeight: 1.4 }}>
+            Subido el {fechaHora(actual.subidoEn)}
+            {actual.subidoPor ? ` por ${actual.subidoPor}` : ''} · {actual.legible ? 'Se lee bien' : 'No se lee'}
+            {actual.semaforo ? ` · Semáforo: ${actual.semaforo}` : ''}
+          </div>
+          {!cambiando && (
+            <button
+              type="button"
+              disabled={bloqueado || subiendo}
+              onClick={() => setCambiando(true)}
+              data-testid="btn-cambiar-voucher"
+              style={{ alignSelf: 'flex-start', minHeight: '44px', minWidth: '44px', border: '1.5px solid var(--cp-navy, #0B2C3E)', borderRadius: '10px', background: 'var(--cp-white, #FFFFFF)', color: 'var(--cp-navy, #0B2C3E)', fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: '13px', padding: '8px 14px' }}
+            >
+              Cambiar voucher
+            </button>
+          )}
+        </div>
+      )}
+
+      {!archivo && (!actual || cambiando) && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
           <button
             type="button"
@@ -379,6 +431,48 @@ export function SubirVoucherMozo({
         </div>
       )}
       <Confirmar
+        abierto={confirmandoCambio}
+        titulo="Cambiar el voucher"
+        mensaje="El voucher actual queda en el historial como reemplazado; no se borra."
+        textoSi="Sí, cambiar"
+        textoNo="No"
+        alConfirmar={() => {
+          if (motivoLocal.trim().length < 5 || !archivo) return;
+          setConfirmandoCambio(false);
+          void procesarYSubir(archivo);
+        }}
+        alCancelar={() => {
+          setConfirmandoCambio(false);
+          setArchivo(null);
+          setVistaPreviaUrl(null);
+        }}
+      >
+        <div data-testid="comparar-voucher" style={{ display: 'flex', gap: '8px', margin: '8px 0' }}>
+          <div style={{ flex: 1, minWidth: 0, fontSize: '12px', fontWeight: 700 }}>
+            Antes
+            {actual?.archivoId && <FotoAmpliable archivoId={actual.archivoId} alt="Voucher anterior" alturaMaxima={120} />}
+            {actual && <div style={{ fontWeight: 400 }}>{fechaHora(actual.subidoEn)}</div>}
+          </div>
+          <div style={{ flex: 1, minWidth: 0, fontSize: '12px', fontWeight: 700 }}>
+            Nuevo
+            {vistaPreviaUrl && <img src={vistaPreviaUrl} alt="Voucher nuevo" style={{ display: 'block', maxWidth: '100%', maxHeight: 120, borderRadius: 8, objectFit: 'contain' }} />}
+          </div>
+        </div>
+        <label htmlFor={`motivo-nuevo-${pedidoId}-${medio}`} style={{ fontSize: '13px', fontWeight: 700 }}>
+          Motivo del cambio (mínimo 5 caracteres)
+        </label>
+        <textarea
+          id={`motivo-nuevo-${pedidoId}-${medio}`}
+          rows={2}
+          value={motivoLocal}
+          onChange={(e) => setMotivoLocal(e.target.value)}
+          style={{ width: '100%', boxSizing: 'border-box', minHeight: '44px', border: '1.5px solid var(--cp-line, #E3D6C6)', borderRadius: '8px', padding: '8px 10px', fontSize: '14px', fontFamily: 'inherit' }}
+        />
+      </Confirmar>
+      {anteriores > 0 && (
+        <HistorialVoucher key={anteriores} pedidoId={pedidoId} total={anteriores} rotulo="Ver vouchers anteriores" soloAnteriores />
+      )}
+      <Confirmar
         abierto={confirmandoQuitar}
         titulo="Quitar el voucher"
         mensaje="El voucher se retira del pedido. Queda en el historial como retirado; no se borra."
@@ -398,6 +492,7 @@ export function SubirVoucherMozo({
             setEsIlegible(false);
             setAvisos([]);
             alCambiarEstado?.({ subiendo: false, esValido: false });
+            cargarActual();
             alQuitado?.();
           } catch (err) {
             setConfirmandoQuitar(false);
