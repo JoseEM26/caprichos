@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  GoneException,
   Get,
   Param,
   Patch,
@@ -12,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
-import { ClientesService, enmascararDoc } from './clientes.service';
+import { ClientesService } from './clientes.service';
 import { DireccionesClienteService } from './direcciones-cliente.service';
 import { PuntosService } from './puntos.service';
 import {
@@ -30,18 +31,30 @@ export class ClientesAdminController {
     private readonly direcciones: DireccionesClienteService,
   ) {}
 
-  /** Cliente con cuenta por DNI exacto (8 dígitos) para atender un pedido de delivery. */
+  /** Cliente con cuenta por celular exacto (9 dígitos) para atender un pedido. */
+  @Get('por-telefono/:telefono')
+  @Permiso([
+    { modulo: 'pedidos', accion: 'crear' },
+    { modulo: 'clientes', accion: 'ver' },
+  ])
+  async buscarPorTelefono(@Param('telefono') telefono: string, @Req() req: any) {
+    if (!/^9\d{8}$/.test(telefono ?? '')) {
+      throw new BadRequestException({ codigo: 'TELEFONO_INVALIDO', mensaje: 'El celular debe tener 9 dígitos y empezar con 9.' });
+    }
+    return this.direcciones.buscarPorTelefono(telefono, req.usuario?.partyId);
+  }
+
+  /** Retirada: los clientes ya no se buscan por DNI. */
   @Get('por-dni/:dni')
   @Permiso([
     { modulo: 'pedidos', accion: 'crear' },
     { modulo: 'clientes', accion: 'ver' },
   ])
-  async buscarPorDni(@Param('dni') dni: string, @Req() req: any) {
-    if (!/^\d{8}$/.test(dni ?? '')) {
-      throw new BadRequestException({ codigo: 'DNI_INVALIDO', mensaje: 'El DNI debe tener 8 dígitos.' });
-    }
-    const resultado = await this.direcciones.buscarPorDni(dni, req.usuario?.partyId);
-    return resultado.encontrado ? { ...resultado, dniMascara: enmascararDoc(dni) } : resultado;
+  buscarPorDniRetirado(): never {
+    throw new GoneException({
+      codigo: 'BUSQUEDA_DNI_RETIRADA',
+      mensaje: 'Los clientes ya no se buscan por DNI. Busca por celular.',
+    });
   }
 
   @Get()

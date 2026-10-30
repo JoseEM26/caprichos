@@ -65,6 +65,8 @@ describe('ClientesService', () => {
         create: jest.fn(),
         upsert: jest.fn(),
         updateMany: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue(null),
+        findUnique: jest.fn(),
       },
       contactMechanism: {
         create: jest.fn(),
@@ -76,6 +78,12 @@ describe('ClientesService', () => {
       },
       archivo: {
         findUnique: jest.fn(),
+      },
+      parametro: {
+        findMany: jest.fn().mockResolvedValue([
+          { clave: 'terminos_version', valor: '2026-10-29' },
+          { clave: 'privacidad_version', valor: '2026-10-30' },
+        ]),
       },
       $transaction: jest.fn(async (cb) => cb(prismaMock)),
     };
@@ -130,8 +138,8 @@ describe('ClientesService', () => {
     service = module.get<ClientesService>(ClientesService);
   });
 
-  describe('listarAdmin: búsqueda por DNI parcial y nombre', () => {
-    const rol = (id: number, nombres: string, dni: string) => ({
+  describe('listarAdmin: búsqueda por nombre y teléfono, sin DNI', () => {
+    const rol = (id: number, nombres: string, tel: string) => ({
       id: BigInt(id),
       rol: 'CLIENTE',
       hasta: null,
@@ -142,8 +150,8 @@ describe('ClientesService', () => {
         tipo: 'PERSONA',
         usuario: null,
         persona: { nombres, apellidos: 'Test', correo: null, cumple_dia: null, cumple_mes: null },
-        documentos: [{ tipo: 'DNI', numero: dni }],
-        contactos: [],
+        documentos: [],
+        contactos: [{ tipo: 'TELEFONO', valor: tel }],
         pedidos: [],
         pedidosComoCliente: [],
       },
@@ -151,15 +159,20 @@ describe('ClientesService', () => {
 
     beforeEach(() => {
       prismaMock.partyRole.findMany = jest.fn().mockResolvedValue([
-        rol(1, 'Ana', '45217890'),
-        rol(2, 'Luis', '71234567'),
+        rol(1, 'Ana', '912345678'),
+        rol(2, 'Luis', '987654321'),
       ]);
     });
 
-    it('busca por DNI parcial aunque la respuesta lo enmascare para un no admin', async () => {
-      const res = await service.listarAdmin({ q: '4521' }, { rol: 'MOZO' });
+    it('busca por teléfono parcial y nunca devuelve DNI', async () => {
+      const res = await service.listarAdmin({ q: '9123' }, { rol: 'MOZO' });
       expect(res.items.map((i) => i.nombre)).toEqual(['Ana']);
-      expect(res.items[0].dni).toBe('4521****');
+      expect(res.items[0]).not.toHaveProperty('dni');
+    });
+
+    it('un número de documento ya no encuentra clientes', async () => {
+      const res = await service.listarAdmin({ q: '45217890' }, { rol: 'ADMIN' });
+      expect(res.items).toEqual([]);
     });
 
     it('busca por nombre sin distinguir mayusculas', async () => {
@@ -170,9 +183,9 @@ describe('ClientesService', () => {
     it('cuenta los pedidos pagados por cliente_party_id y los de carta sin ese campo, no los de mozo ni los no pagados', async () => {
       prismaMock.partyRole.findMany = jest.fn().mockResolvedValue([
         {
-          ...rol(1, 'Ana', '45217890'),
+          ...rol(1, 'Ana', '912345678'),
           party: {
-            ...rol(1, 'Ana', '45217890').party,
+            ...rol(1, 'Ana', '912345678').party,
             pedidosComoCliente: [{ id: 10n }, { id: 11n }],
             pedidos: [{ id: 12n }],
           },
@@ -248,74 +261,127 @@ describe('ClientesService', () => {
     });
   });
 
-  describe('registro (FT-CLI-01)', () => {
-    it('crea cliente con datos válidos, cumpleaños y consentimiento', async () => {
-      prismaMock.partyIdentifier.findFirst.mockResolvedValue(null);
-      prismaMock.party.create.mockResolvedValue({ id: 100n });
-      prismaMock.partyRole.create.mockResolvedValue({ id: 1n });
-
-      // Mock para llamada a yo(...)
+  describe('registro por teléfono (sin DNI)', () => {
+    const dtoOk = {
+      nombre: 'Ana Pérez',
+      contrasena: 'ClaveSegura2026',
+      telefono: '912345678',
+      aceptaDatos: true as const,
+    };
+    const ficha = () =>
       prismaMock.party.findUnique.mockResolvedValue({
         id: 100n,
-        persona: { nombres: 'Ana Pérez', correo: 'ana@ejemplo.com', cumple_dia: 14, cumple_mes: 3 },
-        documentos: [{ tipo: 'DNI', numero: '45217890' }],
+        persona: { nombres: 'Ana Pérez', correo: null, cumple_dia: null, cumple_mes: null },
+        contactos: [{ tipo: 'TELEFONO', valor: '912345678' }],
+        cuentaCliente: { telefono: '912345678' },
         roles: [],
       });
 
-      const res = await service.registro({
-        dni: '45217890',
-        nombre: 'Ana Pérez',
-        contrasena: 'ClaveSegura2026',
-        telefono: '912345678',
-        correo: 'ana@ejemplo.com',
-        cumpleanos: '1995-03-14',
-        aceptaDatos: true,
-      });
+    beforeEach(() => {
+      prismaMock.customerAccount.findFirst = jest.fn().mockResolvedValue(null);
+      prismaMock.person.findUnique = jest.fn();
+      prismaMock.contactMechanism.findFirst.mockResolvedValue(null);
+      prismaMock.party.create.mockResolvedValue({ id: 100n });
+      prismaMock.partyRole.create.mockResolvedValue({ id: 1n });
+    });
+
+    it('crea la cuenta con teléfono y contraseña, con consentimiento y sin tocar party_identifier', async () => {
+      ficha();
+      const res = await service.registro({ ...dtoOk, cumpleanos: '1995-03-14' });
 
       expect(res.token).toBe('jwt_token_cliente_mock');
       expect(res.cliente.nombre).toBe('Ana Pérez');
-      expect(res.cliente.dniMascara).toBe('4521****');
-      expect(prismaMock.party.create).toHaveBeenCalled();
+      expect(res.cliente.telefono).toBe('912345678');
+      expect(res.cliente).not.toHaveProperty('dniMascara');
+      expect(prismaMock.partyIdentifier.create).not.toHaveBeenCalled();
+      expect(prismaMock.customerAccount.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({ telefono: '912345678', hash: expect.stringContaining('argon2') }),
+        }),
+      );
       expect(prismaMock.consent.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
-            canal: 'CARTA',
-            version_texto: '1.0',
-          }),
+          data: expect.objectContaining({ canal: 'CARTA', version_texto: 'celular-v1|T:2026-10-29|P:2026-10-30' }),
         }),
+      );
+      expect(prismaMock.consent.create.mock.calls[0][0].data.version_texto).not.toMatch(/dni/i);
+      // la auditoría no lleva la contraseña ni el teléfono completo
+      const aud = JSON.stringify(auditoriaMock.registrar.mock.calls, (_k, v) => (typeof v === 'bigint' ? v.toString() : v));
+      expect(aud).not.toContain('ClaveSegura2026');
+      expect(aud).not.toContain('912345678');
+    });
+
+    it('acepta el celular con prefijo 51 y lo guarda de 9 dígitos', async () => {
+      ficha();
+      await service.registro({ ...dtoOk, telefono: '+51 912 345 678' });
+      expect(prismaMock.customerAccount.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ create: expect.objectContaining({ telefono: '912345678' }) }),
       );
     });
 
-    it('rechaza si no se acepta el tratamiento de datos', async () => {
-      await expect(
-        service.registro({
-          dni: '45217890',
-          nombre: 'Ana Pérez',
-          contrasena: 'ClaveSegura2026',
-          telefono: '912345678',
-          cumpleanos: '1995-03-14',
-          aceptaDatos: false,
-        }),
-      ).rejects.toThrow(BadRequestException);
+    it('cumpleaños es opcional', async () => {
+      ficha();
+      await expect(service.registro(dtoOk)).resolves.toBeDefined();
     });
 
-    it('rechaza si el DNI ya tiene cuenta con contraseña creada', async () => {
-      prismaMock.partyIdentifier.findFirst.mockResolvedValue({
-        party: {
-          cuentaCliente: { hash: '$argon2id$mockhash' },
-        },
+    it('rechaza teléfono inválido, contraseña corta y falta de consentimiento', async () => {
+      await expect(service.registro({ ...dtoOk, telefono: '812345678' })).rejects.toMatchObject({ response: { codigo: 'TELEFONO_INVALIDO' } });
+      await expect(service.registro({ ...dtoOk, contrasena: 'corta' })).rejects.toMatchObject({ response: { codigo: 'CONTRASENA_CORTA' } });
+      await expect(service.registro({ ...dtoOk, aceptaDatos: false as any })).rejects.toMatchObject({
+        response: { codigo: 'CONSENTIMIENTO_REQUERIDO' },
       });
+      expect(prismaMock.party.create).not.toHaveBeenCalled();
+    });
 
-      await expect(
-        service.registro({
-          dni: '45217890',
-          nombre: 'Ana Pérez',
-          contrasena: 'ClaveSegura2026',
-          telefono: '912345678',
-          cumpleanos: '1995-03-14',
-          aceptaDatos: true,
-        }),
-      ).rejects.toThrow(BadRequestException);
+    it('rechaza un teléfono que ya tiene cuenta con contraseña (409) sin crear nada', async () => {
+      prismaMock.customerAccount.findFirst
+        .mockResolvedValueOnce(null) // desactivada
+        .mockResolvedValueOnce({ id: 1n, party_id: 9n, hash: '$argon2id$x', activo: true });
+      await expect(service.registro(dtoOk)).rejects.toMatchObject({ response: { codigo: 'TELEFONO_REGISTRADO' }, status: 409 });
+      expect(prismaMock.party.create).not.toHaveBeenCalled();
+    });
+
+    it('no reactiva una cuenta desactivada con ese teléfono', async () => {
+      prismaMock.customerAccount.findFirst.mockResolvedValueOnce({ id: 1n });
+      await expect(service.registro(dtoOk)).rejects.toMatchObject({ response: { codigo: 'TELEFONO_NO_DISPONIBLE' } });
+    });
+
+    it('vincula una cuenta de mostrador sin contraseña en vez de duplicar', async () => {
+      ficha();
+      prismaMock.customerAccount.findFirst
+        .mockResolvedValueOnce(null) // desactivada
+        .mockResolvedValueOnce({ id: 1n, party_id: 77n, hash: null, activo: true });
+      prismaMock.person.findUnique.mockResolvedValue({ party_id: 77n, correo: null });
+      prismaMock.partyRole.findFirst.mockResolvedValue({ id: 5n, customer_detail: { party_role_id: 5n } });
+
+      await service.registro(dtoOk);
+
+      expect(prismaMock.party.create).not.toHaveBeenCalled();
+      expect(prismaMock.customerAccount.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { party_id: 77n }, update: expect.objectContaining({ telefono: '912345678' }) }),
+      );
+    });
+
+    it('vincula un party con ese teléfono y sin cuenta (identificado antes por WhatsApp)', async () => {
+      ficha();
+      prismaMock.contactMechanism.findFirst
+        .mockResolvedValueOnce(null) // cuentaPorCelular: ninguna cuenta
+        .mockResolvedValueOnce({ party_id: 88n }) // party suelto por contacto
+        .mockResolvedValue(null);
+      prismaMock.person.findUnique.mockResolvedValue(null);
+      prismaMock.partyRole.findFirst.mockResolvedValue(null);
+      prismaMock.partyRole.create.mockResolvedValue({ id: 6n });
+
+      await service.registro(dtoOk);
+
+      expect(prismaMock.party.create).not.toHaveBeenCalled();
+      expect(prismaMock.person.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ party_id: 88n }) }));
+      expect(prismaMock.customerAccount.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { party_id: 88n } }));
+    });
+
+    it('una carrera por el mismo teléfono (índice único) responde 409', async () => {
+      prismaMock.$transaction.mockRejectedValueOnce(Object.assign(new Error('dup'), { code: 'P2002' }));
+      await expect(service.registro(dtoOk)).rejects.toMatchObject({ response: { codigo: 'TELEFONO_REGISTRADO' } });
     });
   });
 
@@ -373,58 +439,34 @@ describe('ClientesService', () => {
   });
 
   describe('teléfono y perfil de la cuenta', () => {
-    const datosRegistro = {
-      dni: '45217890',
-      nombre: 'Ana Pérez',
-      contrasena: 'ClaveSegura2026',
-      cumpleanos: '1995-03-14',
-      aceptaDatos: true,
-    };
-
-    it('registro guarda el celular como contacto TELEFONO principal', async () => {
-      prismaMock.partyIdentifier.findFirst.mockResolvedValue(null);
-      prismaMock.party.create.mockResolvedValue({ id: 100n });
-      prismaMock.partyRole.create.mockResolvedValue({ id: 1n });
-      prismaMock.party.findUnique.mockResolvedValue({ id: 100n, persona: { nombres: 'Ana Pérez' }, documentos: [], roles: [] });
-
-      await service.registro({ ...datosRegistro, telefono: '912345678' });
-
-      expect(prismaMock.contactMechanism.create).toHaveBeenCalledWith({
-        data: { party_id: 100n, tipo: 'TELEFONO', valor: '912345678', principal: true },
-      });
+    const cuentaYo = (extra: any = {}) => ({
+      id: 100n,
+      persona: { nombres: 'Ana Pérez' },
+      contactos: [],
+      cuentaCliente: { telefono: '912345678' },
+      roles: [],
+      ...extra,
     });
 
-    it('registro rechaza teléfono que no tiene 9 dígitos empezando con 9', async () => {
-      for (const telefono of ['', '812345678', '91234567', '9123456789', '91234abcd']) {
-        await expect(service.registro({ ...datosRegistro, telefono })).rejects.toThrow(BadRequestException);
-      }
-      expect(prismaMock.party.create).not.toHaveBeenCalled();
+    it('yo devuelve el celular de la cuenta, o el contacto, o null', async () => {
+      prismaMock.party.findUnique.mockResolvedValueOnce(cuentaYo());
+      expect((await service.yo(100n))?.telefono).toBe('912345678');
+
+      prismaMock.party.findUnique.mockResolvedValueOnce(
+        cuentaYo({ cuentaCliente: null, contactos: [{ tipo: 'CORREO', valor: 'a@b.com' }, { tipo: 'TELEFONO', valor: '987654321' }] }),
+      );
+      expect((await service.yo(100n))?.telefono).toBe('987654321');
+
+      prismaMock.party.findUnique.mockResolvedValueOnce(cuentaYo({ cuentaCliente: null }));
+      expect((await service.yo(100n))?.telefono).toBeNull();
     });
 
-    it('yo devuelve el teléfono y null si el cliente no lo tiene', async () => {
-      prismaMock.party.findUnique.mockResolvedValueOnce({
-        id: 100n,
-        persona: { nombres: 'Ana' },
-        documentos: [],
-        contactos: [{ tipo: 'CORREO', valor: 'ana@ejemplo.com' }, { tipo: 'TELEFONO', valor: '912345678' }],
-        roles: [],
-      });
-      const conTelefono = await service.yo(100n);
-      expect(conTelefono?.telefono).toBe('912345678');
-
-      prismaMock.party.findUnique.mockResolvedValueOnce({ id: 101n, persona: { nombres: 'Luis' }, documentos: [], contactos: [], roles: [] });
-      const sinTelefono = await service.yo(101n);
-      expect(sinTelefono?.telefono).toBeNull();
-    });
-
-    it('actualizarPerfil guarda nombre, teléfono, correo y cumpleaños', async () => {
+    it('actualizarPerfil guarda nombre, correo y cumpleaños, y audita', async () => {
       prismaMock.person.update.mockResolvedValue({});
-      prismaMock.contactMechanism.findFirst.mockResolvedValue({ id: 7n });
-      prismaMock.party.findUnique.mockResolvedValue({ id: 100n, persona: { nombres: 'Ana Pérez' }, documentos: [], contactos: [], roles: [] });
+      prismaMock.party.findUnique.mockResolvedValue(cuentaYo());
 
       await service.actualizarPerfil(100n, {
         nombre: 'Ana Pérez Gil',
-        telefono: '987654321',
         correo: 'ana.nueva@ejemplo.com',
         cumpleanos: '14/03',
       }, '127.0.0.1');
@@ -433,26 +475,26 @@ describe('ClientesService', () => {
         where: { party_id: 100n },
         data: { nombres: 'Ana Pérez Gil', correo: 'ana.nueva@ejemplo.com', cumple_dia: 14, cumple_mes: 3 },
       });
-      expect(prismaMock.contactMechanism.update).toHaveBeenCalledWith({ where: { id: 7n }, data: { valor: '987654321' } });
+      expect(prismaMock.contactMechanism.update).not.toHaveBeenCalled();
       expect(auditoriaMock.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'CLIENTE_PERFIL_EDITADO', partyId: 100n }));
     });
 
     it('actualizarPerfil nunca cambia el DNI ni la contraseña aunque se envíen', async () => {
       prismaMock.person.update.mockResolvedValue({});
-      prismaMock.party.findUnique.mockResolvedValue({ id: 100n, persona: { nombres: 'Ana Pérez' }, documentos: [], contactos: [], roles: [] });
+      prismaMock.party.findUnique.mockResolvedValue(cuentaYo());
 
       await service.actualizarPerfil(100n, { nombre: 'Ana Pérez', dni: '11111111', contrasena: 'OtraClave2026' } as any);
 
       const datos = prismaMock.person.update.mock.calls[0][0].data;
       expect(datos).not.toHaveProperty('dni');
       expect(datos).not.toHaveProperty('contrasena');
+      expect(prismaMock.partyIdentifier.create).not.toHaveBeenCalled();
       expect(prismaMock.customerAccount.upsert).not.toHaveBeenCalled();
       expect(prismaMock.customerAccount.updateMany).not.toHaveBeenCalled();
     });
 
-    it('actualizarPerfil rechaza nombre corto, teléfono inválido, correo inválido y cumpleaños inválido', async () => {
+    it('actualizarPerfil rechaza nombre corto, correo inválido y cumpleaños inválido', async () => {
       await expect(service.actualizarPerfil(100n, { nombre: 'Al' })).rejects.toThrow(BadRequestException);
-      await expect(service.actualizarPerfil(100n, { telefono: '123' })).rejects.toThrow(BadRequestException);
       await expect(service.actualizarPerfil(100n, { correo: 'sin-arroba' })).rejects.toThrow(BadRequestException);
       await expect(service.actualizarPerfil(100n, { cumpleanos: '32/13' })).rejects.toThrow(BadRequestException);
       expect(prismaMock.person.update).not.toHaveBeenCalled();
@@ -460,7 +502,7 @@ describe('ClientesService', () => {
 
     it('actualizarPerfil con correo vacío quita el correo', async () => {
       prismaMock.person.update.mockResolvedValue({});
-      prismaMock.party.findUnique.mockResolvedValue({ id: 100n, persona: { nombres: 'Ana Pérez' }, documentos: [], contactos: [], roles: [] });
+      prismaMock.party.findUnique.mockResolvedValue(cuentaYo());
 
       await service.actualizarPerfil(100n, { correo: '' });
 
@@ -468,106 +510,191 @@ describe('ClientesService', () => {
     });
   });
 
-  describe('ingresar (FT-CLI-01)', () => {
-    it('ingresa con credenciales correctas y retorna token', async () => {
-      const hash = await argon2.hash('ClaveValida123');
-      prismaMock.partyIdentifier.findFirst.mockResolvedValue({
-        party: {
-          id: 100n,
-          cuentaCliente: { hash, activo: true },
-          persona: { nombres: 'Ana Pérez' },
-        },
-      });
-
+  describe('ingresar por teléfono', () => {
+    const fichaYo = () =>
       prismaMock.party.findUnique.mockResolvedValue({
         id: 100n,
-        persona: { nombres: 'Ana Pérez', correo: 'ana@ejemplo.com', cumple_dia: 14, cumple_mes: 3 },
-        documentos: [{ tipo: 'DNI', numero: '45217890' }],
+        persona: { nombres: 'Ana Pérez', correo: null, cumple_dia: 14, cumple_mes: 3 },
+        contactos: [],
+        cuentaCliente: { telefono: '912345678' },
         roles: [],
       });
+    const credencialesInvalidas = { response: { codigo: 'CREDENCIALES_INVALIDAS', mensaje: 'Celular o contraseña incorrectos.' } };
 
-      const res = await service.ingresar({
-        dni: '45217890',
-        contrasena: 'ClaveValida123',
-      });
+    beforeEach(() => {
+      prismaMock.customerAccount.findFirst = jest.fn();
+    });
+
+    it('ingresa con celular y contraseña correctos y retorna token', async () => {
+      const hash = await argon2.hash('ClaveValida123');
+      prismaMock.customerAccount.findFirst.mockResolvedValue({ party_id: 100n, hash, activo: true });
+      fichaYo();
+
+      const res = await service.ingresar({ telefono: '912345678', contrasena: 'ClaveValida123' });
 
       expect(res.token).toBe('jwt_token_cliente_mock');
       expect(res.cliente.nombre).toBe('Ana Pérez');
+      expect(prismaMock.customerAccount.findFirst).toHaveBeenCalledWith({ where: { telefono: '912345678', activo: true } });
     });
 
-    it('un DNI registrado en mostrador sin clave crea la contraseña la primera vez (RQ-CLI-01-07)', async () => {
-      prismaMock.partyIdentifier.findFirst.mockResolvedValue({
-        party: {
-          id: 100n,
-          cuentaCliente: { hash: null, activo: true }, // sin clave
-          persona: { nombres: 'Carlos Mostrador' },
-        },
-      });
+    it('contraseña errónea y teléfono sin cuenta responden exactamente lo mismo y suman intentos', async () => {
+      const hash = await argon2.hash('ClaveCorrecta');
+      prismaMock.customerAccount.findFirst.mockResolvedValueOnce({ party_id: 100n, hash, activo: true });
+      await expect(service.ingresar({ telefono: '912345678', contrasena: 'ClaveEquivocada' })).rejects.toMatchObject(credencialesInvalidas);
 
+      prismaMock.customerAccount.findFirst.mockResolvedValueOnce(null);
+      await expect(service.ingresar({ telefono: '955555555', contrasena: 'ClaveEquivocada' })).rejects.toMatchObject(credencialesInvalidas);
+
+      expect(redisMock.obtenerCliente().incr).toHaveBeenCalledTimes(2);
+    });
+
+    it('una cuenta de mostrador sin contraseña no entra: ya no se crea la clave al ingresar', async () => {
+      prismaMock.customerAccount.findFirst.mockResolvedValue({ party_id: 100n, hash: null, activo: true });
+      await expect(service.ingresar({ telefono: '912345678', contrasena: 'PrimeraClave2026' })).rejects.toMatchObject(credencialesInvalidas);
+      expect(prismaMock.customerAccount.upsert).not.toHaveBeenCalled();
+    });
+
+    it('al quinto fallo se audita el bloqueo; con 5 intentos ya no verifica', async () => {
+      const hash = await argon2.hash('ClaveCorrecta');
+      const redis = redisMock.obtenerCliente();
+      prismaMock.customerAccount.findFirst.mockResolvedValue({ party_id: 100n, hash, activo: true });
+
+      redis.incr.mockResolvedValueOnce(5);
+      await expect(service.ingresar({ telefono: '912345678', contrasena: 'mala-mala' })).rejects.toBeDefined();
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'CLIENTE_INGRESO_BLOQUEADO' }));
+      expect(JSON.stringify(auditoriaMock.registrar.mock.calls, (_k, v) => (typeof v === 'bigint' ? v.toString() : v))).not.toContain('912345678');
+
+      redis.get.mockResolvedValueOnce('5');
+      prismaMock.customerAccount.findFirst.mockClear();
+      await expect(service.ingresar({ telefono: '912345678', contrasena: 'ClaveCorrecta' })).rejects.toMatchObject({
+        response: { codigo: 'CREDENCIALES_INVALIDAS' },
+      });
+      expect(prismaMock.customerAccount.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('un DNI ya no sirve como usuario', async () => {
+      await expect(service.ingresar({ telefono: '45217890', contrasena: 'ClaveValida123' })).rejects.toMatchObject(credencialesInvalidas);
+    });
+  });
+
+  describe('sesión del cliente (clienteDesdeRequest)', () => {
+    const req = { cookies: { cp_cliente: 'tok' }, headers: {} } as any;
+    beforeEach(() => {
+      prismaMock.customerAccount.findUnique = jest.fn();
       prismaMock.party.findUnique.mockResolvedValue({
         id: 100n,
-        persona: { nombres: 'Carlos Mostrador', correo: null, cumple_dia: 1, cumple_mes: 1 },
-        documentos: [{ tipo: 'DNI', numero: '45217890' }],
+        persona: { nombres: 'Ana' },
+        contactos: [],
+        cuentaCliente: { telefono: '912345678' },
         roles: [],
       });
-
-      const res = await service.ingresar({
-        dni: '45217890',
-        contrasena: 'PrimeraClave2026',
-      });
-
-      expect(res.token).toBe('jwt_token_cliente_mock');
-      expect(prismaMock.customerAccount.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          update: expect.objectContaining({
-            hash: expect.any(String),
-          }),
-        }),
-      );
     });
 
-    it('rechaza con contraseña errónea e incrementa contador en Redis', async () => {
-      const hash = await argon2.hash('ClaveCorrecta');
-      prismaMock.partyIdentifier.findFirst.mockResolvedValue({
-        party: {
-          id: 100n,
-          cuentaCliente: { hash, activo: true },
-        },
+    it('vale una sesión emitida después del último cambio de contraseña', async () => {
+      jwtMock.verifyAsync.mockResolvedValue({ partyId: '100', iat: 2000 });
+      prismaMock.customerAccount.findUnique.mockResolvedValue({ activo: true, clave_cambiada_en: new Date(1_000_000) });
+      expect((await service.clienteDesdeRequest(req))?.partyId).toBe('100');
+    });
+
+    it('no vale una sesión anterior al cambio de contraseña ni la de una cuenta desactivada', async () => {
+      jwtMock.verifyAsync.mockResolvedValue({ partyId: '100', iat: 500 });
+      prismaMock.customerAccount.findUnique.mockResolvedValue({ activo: true, clave_cambiada_en: new Date(1_000_000) });
+      expect(await service.clienteDesdeRequest(req)).toBeNull();
+
+      jwtMock.verifyAsync.mockResolvedValue({ partyId: '100', iat: 5000 });
+      prismaMock.customerAccount.findUnique.mockResolvedValue({ activo: false, clave_cambiada_en: null });
+      expect(await service.clienteDesdeRequest(req)).toBeNull();
+    });
+  });
+
+  describe('perfil: el celular es la identidad', () => {
+    beforeEach(() => {
+      prismaMock.person.update.mockResolvedValue({});
+      prismaMock.party.findUnique.mockResolvedValue({
+        id: 100n,
+        persona: { nombres: 'Ana' },
+        contactos: [],
+        cuentaCliente: { telefono: '912345678' },
+        roles: [],
       });
+    });
 
-      await expect(
-        service.ingresar({
-          dni: '45217890',
-          contrasena: 'ClaveEquivocada',
-        }),
-      ).rejects.toThrow(BadRequestException);
-
-      const redis = redisMock.obtenerCliente();
-      expect(redis.incr).toHaveBeenCalled();
+    it('rechaza cambiar el celular pero acepta reenviar el mismo', async () => {
+      await expect(service.actualizarPerfil(100n, { telefono: '987654321' })).rejects.toMatchObject({
+        response: { codigo: 'TELEFONO_NO_EDITABLE' },
+      });
+      await expect(service.actualizarPerfil(100n, { nombre: 'Ana María', telefono: '912345678' })).resolves.toBeDefined();
     });
   });
 
   describe('registro en mostrador (RQ-CLI-01-06)', () => {
-    it('crea cliente en mostrador con hash=null para que cree contraseña después', async () => {
-      prismaMock.partyIdentifier.findFirst.mockResolvedValue(null);
+    beforeEach(() => {
+      prismaMock.customerAccount.findFirst = jest.fn().mockResolvedValue(null);
+      prismaMock.contactMechanism.findFirst.mockResolvedValue(null);
       prismaMock.party.create.mockResolvedValue({ id: 105n });
       prismaMock.partyRole.create.mockResolvedValue({ id: 2n });
+    });
 
+    it('crea cliente con celular, hash=null y sin DNI, para que cree contraseña al registrarse', async () => {
       const res = await service.crearEnMostrador({
-        dni: '45217890',
         nombre: 'Pedro Local',
+        telefono: '912345678',
         cumpleanos: '1990-10-15',
         aceptaDatos: true,
       });
 
       expect(res.nombre).toBe('Pedro Local');
+      expect(prismaMock.partyIdentifier.create).not.toHaveBeenCalled();
       expect(prismaMock.customerAccount.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            hash: null,
-          }),
-        }),
+        expect.objectContaining({ data: expect.objectContaining({ hash: null, telefono: '912345678' }) }),
       );
+    });
+
+    it('exige celular para una persona y rechaza uno repetido', async () => {
+      await expect(
+        service.crearEnMostrador({ nombre: 'Pedro Local', cumpleanos: '1990-10-15', aceptaDatos: true }),
+      ).rejects.toMatchObject({ response: { codigo: 'TELEFONO_INVALIDO' } });
+
+      prismaMock.customerAccount.findFirst.mockResolvedValue({ id: 1n });
+      await expect(
+        service.crearEnMostrador({ nombre: 'Pedro Local', telefono: '912345678', cumpleanos: '1990-10-15', aceptaDatos: true }),
+      ).rejects.toMatchObject({ response: { codigo: 'CLIENTE_YA_EXISTE' } });
+    });
+
+    it('una empresa lleva RUC y no exige celular', async () => {
+      prismaMock.partyIdentifier.findFirst.mockResolvedValue(null);
+      await service.crearEnMostrador({ nombre: 'Empresa SAC', ruc: '20601234567', aceptaDatos: true });
+      expect(prismaMock.partyIdentifier.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ tipo: 'RUC', numero: '20601234567' }),
+      });
+    });
+  });
+  describe('cuenta creada desde el bot (sin contraseña)', () => {
+    beforeEach(() => {
+      prismaMock.customerAccount.findFirst = jest.fn().mockResolvedValue(null);
+      prismaMock.contactMechanism.findFirst.mockResolvedValue(null);
+      prismaMock.party.create.mockResolvedValue({ id: 301n });
+      prismaMock.partyRole.create.mockResolvedValue({ id: 3n });
+    });
+
+    it('crea con hash null, consentimiento BOT versionado y auditoría', async () => {
+      const r = await service.crearCuentaDesdeBot('51912345678', '  Ana   Pérez ');
+      expect(r).toEqual({ partyId: '301', primerNombre: 'Ana' });
+      expect(prismaMock.customerAccount.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ hash: null, telefono: '912345678', activo: true }),
+      });
+      expect(prismaMock.consent.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ canal: 'BOT', version_texto: 'celular-v1|T:2026-10-29|P:2026-10-30' }),
+      });
+      expect(prismaMock.partyIdentifier.create).not.toHaveBeenCalled();
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'CLIENTE_CREADO_BOT' }));
+    });
+
+    it('rechaza celular inválido, nombre corto y celular ya registrado', async () => {
+      await expect(service.crearCuentaDesdeBot('123', 'Ana')).rejects.toMatchObject({ response: { codigo: 'TELEFONO_INVALIDO' } });
+      await expect(service.crearCuentaDesdeBot('912345678', 'A')).rejects.toMatchObject({ response: { codigo: 'NOMBRE_REQUERIDO' } });
+      prismaMock.customerAccount.findFirst.mockResolvedValue({ id: 1n });
+      await expect(service.crearCuentaDesdeBot('912345678', 'Ana')).rejects.toMatchObject({ response: { codigo: 'TELEFONO_REGISTRADO' } });
     });
   });
 });

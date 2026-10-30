@@ -2,7 +2,6 @@ export interface ClienteItem {
   id: string;
   nombre: string;
   tipo: 'Persona' | 'Empresa' | 'Personal';
-  dni: string;
   telefono: string;
   correo: string;
   cumpleanos: string;
@@ -43,8 +42,8 @@ export interface MovimientoPuntosItem {
 export interface FichaCliente {
   id: string;
   nombre: string;
-  dni: string;
-  dniMascara: string;
+  /** Solo empresas (enmascarado salvo ADMIN) */
+  ruc?: string;
   telefono: string;
   correo: string;
   cumpleanos: string;

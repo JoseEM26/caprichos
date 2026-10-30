@@ -186,7 +186,7 @@ export function ClientesAdminView() {
             type="search"
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Buscar por nombre"
+            placeholder="Buscar por nombre o celular"
             style={{
               flex: '1 1 0%',
               minWidth: 0,
@@ -534,15 +534,6 @@ export function ClientesAdminView() {
                     </div>
                     <div style={{ fontSize: 13, lineHeight: '18px', overflowWrap: 'anywhere' }}>
                       {c.tipo}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.05em', color: 'var(--cp-soft)' }}>
-                      DNI
-                    </div>
-                    <div style={{ fontSize: 13, lineHeight: '18px', overflowWrap: 'anywhere' }}>
-                      {c.dni}
                     </div>
                   </div>
 

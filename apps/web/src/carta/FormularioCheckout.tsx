@@ -123,7 +123,6 @@ export function FormularioCheckout({
   const [verPuntos, setVerPuntos] = useState(false);
   // Con sesión el pedido usa el nombre y el teléfono de la cuenta; el teléfono puede cambiarse solo para este pedido
   const [otroTelefono, setOtroTelefono] = useState(false);
-  const [guardarTelefono, setGuardarTelefono] = useState(true);
   useEffect(() => {
     if (!clienteCuenta) return;
     setNombre(clienteCuenta.nombre);
@@ -525,6 +524,8 @@ export function FormularioCheckout({
             opciones: u.opciones.map((o) => o.id),
             personas: u.persona?.trim() ? [u.persona.trim()] : [nombre.trim()],
             nota: lin.nota,
+            ofertaId: lin.ofertaId,
+            comboElecciones: lin.comboElecciones,
           });
         }
       } else {
@@ -535,6 +536,8 @@ export function FormularioCheckout({
           opciones: (lin.opciones || []).map((o) => o.id),
           personas: lin.personas && lin.personas.length > 0 ? lin.personas : [nombre.trim()],
           nota: lin.nota,
+          ofertaId: lin.ofertaId,
+          comboElecciones: lin.comboElecciones,
         });
       }
     }
@@ -581,9 +584,6 @@ export function FormularioCheckout({
       limpiarCarrito();
       cerrarCheckout();
       void cuentaCtx?.refrescar();
-      if (clienteCuenta && !clienteCuenta.telefono && guardarTelefono && /^9\d{8}$/.test(telefono.trim())) {
-        void cuentaCtx?.actualizarPerfil({ telefono: telefono.trim() }).catch(() => undefined);
-      }
       guardarPedido({
         codigo: respuesta.codigo,
         token: respuesta.seguimientoToken,
@@ -607,6 +607,8 @@ export function FormularioCheckout({
       if (err instanceof ErrorApi) {
         if (err.codigo === 'PRODUCTO_AGOTADO') {
           setErrorEnvio(err.message || 'Uno de los productos seleccionados se encuentra agotado.');
+        } else if (err.codigo === 'COMBO_PARTE_NO_DISPONIBLE') {
+          setErrorEnvio(`${err.message} Tu carrito sigue igual: quita el combo y vuelve a agregarlo para elegir otro reemplazo.`);
         } else if (err.codigo === 'CARTA_CERRADA') {
           setErrorEnvio('La carta se encuentra cerrada. No es posible enviar pedidos ahora.');
         } else if (err.codigo === 'FUERA_DE_COBERTURA') {
@@ -1023,7 +1025,7 @@ export function FormularioCheckout({
 
                       {clienteCuenta ? (
                         <div style={{ fontSize: '13px' }}>
-                          Pides con la cuenta de <b>{clienteCuenta.nombre}</b> · DNI {clienteCuenta.dniMascara}
+                          Pides con la cuenta de <b>{clienteCuenta.nombre}</b>
                         </div>
                       ) : (
                         <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
@@ -1132,12 +1134,6 @@ export function FormularioCheckout({
                             >
                               Usar mi número guardado ({clienteCuenta.telefono})
                             </button>
-                          )}
-                          {clienteCuenta && !clienteCuenta.telefono && (
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--cp-soft)' }}>
-                              <input type="checkbox" checked={guardarTelefono} onChange={(e) => setGuardarTelefono(e.target.checked)} />
-                              Guardar este número en mi perfil para los próximos pedidos
-                            </label>
                           )}
                         </>
                       )}
@@ -1518,6 +1514,9 @@ export function FormularioCheckout({
                             fontSize: '14px',
                           }}
                         />
+                        <div style={{ fontSize: '12px', color: 'var(--cp-soft)', marginTop: '3px' }}>
+                          Solo para tu comprobante; no se guarda en tu cuenta.
+                        </div>
                       </div>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

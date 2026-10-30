@@ -11,6 +11,8 @@ import { MapaRepartos, PuntoRepartoMapa } from './MapaRepartos';
 import { TarjetaReparto } from './TarjetaReparto';
 import { ResumenPedidoReparto } from './ResumenPedidoReparto';
 import { PanelRutaSugerida } from './PanelRutaSugerida';
+import { OpcionesRutaSugerida, colorOpcion } from './OpcionesRutaSugerida';
+import { useRutasSugeridas } from './useRutasSugeridas';
 import { esMiPedido } from './esMiPedido';
 import { useAccionesReparto } from './useAccionesReparto';
 import {
@@ -48,6 +50,7 @@ function RepartosAdminView() {
   const puedeVer = tiene('repartos/ver');
   const puedeLiquidar = tiene('repartos/liquidar');
   const esRolRepartidor = usuario?.rol === 'REPARTIDOR';
+  const puedeTomarRuta = tiene('repartos/tomar');
 
   // Configuración de reparto (umbrales y velocidad media)
   const [config, setConfig] = useState<ConfigReparto>(CONFIG_REPARTO_DEFECTO);
@@ -63,6 +66,7 @@ function RepartosAdminView() {
 
   // Filtro de rol / repartidor: arranca en 'all' ("Todos (caja)") o el id del repartidor
   const [filtroRider, setFiltroRider] = useState<string>('all');
+  const destinoAdmin = filtroRider !== 'all' ? filtroRider : undefined;
 
   // Filtro de zona: arranca en 'todas'
   const [filtroZona, setFiltroZona] = useState<string>('todas');
@@ -179,9 +183,12 @@ function RepartosAdminView() {
     cargarDatos();
   }, [cargarDatos]);
 
+  const sugeridas = useRutasSugeridas(puedeVer);
+
   // Actualización en vivo vía Socket.IO
   useEventos('pedido:estado', () => {
     cargarDatos();
+    sugeridas.recargar();
   });
 
   useEventos('reparto:incidente', () => {
@@ -318,9 +325,32 @@ function RepartosAdminView() {
   }, [disponibles]);
 
   // Rutas sugeridas por sector cardinal, más cercana y más urgente (hasta 5)
-  const rutasSugeridas = useMemo(() => {
+  const rutasLocales = useMemo(() => {
     return sugerirRutasPorSector(pedidosParaSectores, COORDENADAS_TIENDA_DEFECTO, config);
   }, [pedidosParaSectores, config]);
+
+  // Opciones calculadas por el servidor (todas las pantallas ven lo mismo). Si el servidor no responde,
+  // el mapa usa el cálculo local de respaldo.
+  const opcionesServidor = sugeridas.datos?.opciones ?? [];
+  const rutasSugeridas = useMemo((): RutaSugeridaSector[] => {
+    if (!sugeridas.datos) return rutasLocales;
+    return opcionesServidor.map((o, i) => ({
+      id: o.id,
+      nombre: `Ruta hacia el ${o.sector.toLowerCase()}`,
+      sector: o.sector,
+      color: colorOpcion(i),
+      pedidos: [],
+      totalPedidos: o.pedidos.length,
+      distanciaKm: o.distanciaKm,
+      tiempoMin: o.tiempoMin,
+      urgencia: o.puntaje,
+      coordenadasRuta: o.ruta,
+    }));
+  }, [sugeridas.datos, opcionesServidor, rutasLocales]);
+  const idsResaltados = useMemo(
+    () => opcionesServidor.find((o) => o.id === rutaSugeridaActivaId)?.pedidos.map((p) => p.id),
+    [opcionesServidor, rutaSugeridaActivaId],
+  );
 
   const rutaActiva = useMemo(() => {
     if (!rutaSugeridaActivaId) return null;
@@ -408,6 +438,7 @@ function RepartosAdminView() {
 
   const handleSeleccionarRutaSugerida = (ruta: RutaSugeridaSector) => {
     setRutaSugeridaActivaId(ruta.id);
+    if (sugeridas.datos) return; // opciones del servidor: se toman con «Tomar esta ruta»
     const limite = config.maxPedidosPorRepartidor ?? 3;
     const iniciales = ruta.pedidos.slice(0, limite).map((p) => p.id);
     setParadasRutaIds(iniciales);
@@ -923,8 +954,10 @@ function RepartosAdminView() {
             onAlternarPantallaCompleta={alternarPantallaCompleta}
             rutasSugeridas={rutasSugeridas}
             rutaActivaId={rutaSugeridaActivaId}
+            resaltadosIds={idsResaltados}
             onSeleccionarRutaSugerida={handleSeleccionarRutaSugerida}
-            mostrarRutasSugeridas={mostrarRutasSugeridas}
+            mostrarRutasSugeridas={mostrarRutasSugeridas || opcionesServidor.length > 0}
+            ocultarListaRutas={!!sugeridas.datos}
             onAlternarMostrarRutasSugeridas={() => setMostrarRutasSugeridas((v) => !v)}
           />
 
@@ -985,7 +1018,23 @@ function RepartosAdminView() {
               {panelRutaAbierto ? 'Ocultar ruta sugerida' : `Ruta sugerida (${rutaCalculada.paradas?.length ?? candidatosParaPanel.length})`}
             </button>
           )}
-          {candidatosParaPanel.length > 0 && (!pantallaCompleta || panelRutaAbierto) && (
+          {puedeTomarRuta && (
+            <OpcionesRutaSugerida
+              datos={sugeridas.datos}
+              cargando={sugeridas.cargando}
+              error={sugeridas.error}
+              alReintentar={sugeridas.recargar}
+              seleccionadaId={rutaSugeridaActivaId}
+              alSeleccionar={setRutaSugeridaActivaId}
+              alCambiar={() => {
+                sugeridas.recargar();
+                cargarDatos();
+              }}
+              repartidorDestinoId={esRolRepartidor ? undefined : destinoAdmin}
+              puedeTomar={esRolRepartidor || !!destinoAdmin}
+            />
+          )}
+          {(datosMios.pedidos.length > 0 || !sugeridas.datos) && candidatosParaPanel.length > 0 && (!pantallaCompleta || panelRutaAbierto) && (
             <PanelRutaSugerida
               ruta={rutaCalculada}
               pedidosCandidatos={candidatosParaPanel}

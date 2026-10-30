@@ -117,10 +117,11 @@ describe('InformesService', () => {
         count: jest.fn().mockResolvedValue(2),
         findMany: jest.fn().mockResolvedValue([]),
       },
+      parametro: { findUnique: jest.fn().mockResolvedValue({ valor: { lat: -12.02, lng: -76.96, nombre: 'Sede X' } }) },
       zonaReparto: {
         count: jest.fn().mockResolvedValue(5),
         findMany: jest.fn().mockResolvedValue([
-          { codigo: 'Z2', activa: true },
+          { codigo: 'Z2', activa: true, poligono: [[-12.01, -76.97], [-12.01, -76.96], [-12.02, -76.96]] },
           { codigo: 'Z3', activa: true },
           { codigo: 'Z4', activa: true },
           { codigo: 'Z5', activa: true },
@@ -296,7 +297,10 @@ describe('InformesService', () => {
       const mapa = await service.obtenerMapaEntregas({});
       expect(mapa.puntos.length).toBeGreaterThan(0);
       expect(mapa.zonas.length).toBe(5);
-      expect(mapa.radios.length).toBe(3);
+      expect(mapa.radios.length).toBe(4);
+      expect(mapa.radios[0].etiqueta).toBe('500 m');
+      expect(mapa.sede.nombre).toBe('Sede X');
+      expect(mapa.zonas[0].poligono.length).toBe(3);
       expect(mapa.kpis).toHaveLength(4);
       expect(mapa.fueraCoberturaConteo).toBeGreaterThan(0);
     });

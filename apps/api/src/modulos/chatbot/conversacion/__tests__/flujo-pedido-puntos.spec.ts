@@ -38,6 +38,11 @@ const dni = () => normalizarEntrada({ texto: '12345678', textoOriginal: '1234567
 const btn = (id: string) => normalizarEntrada({ buttonPayload: id });
 const texto = (r: any) => r.acciones.map((a: any) => a.texto ?? '').join('\n');
 const botones = (r: any) => r.acciones.flatMap((a: any) => (a.botones ?? []).map((b: any) => b.id));
+/** Sin cuenta: la bienvenida ofrece crearla; «Tengo otro número» lleva a dictar el número. */
+const aNumero = (c: ContextoConversacion) => {
+  const r = transicionarEstado(flujoAlCierre(), dni(), c);
+  return transicionarEstado(r.nuevoFlujo, btn('puntos_otro'), c);
+};
 const crear = (flujo: FlujoConversacion, c: ContextoConversacion) =>
   transicionarEstado({ ...flujo, estado: 'PEDIDO_RESUMEN_CONFIRMAR', pedido: { ...flujo.pedido!, estadoInterno: 'PEDIDO_RESUMEN_CONFIRMAR' } }, btn('ped_confirmar'), c)
     .acciones.find((a) => a.tipo === 'crearPedido') as any;
@@ -53,8 +58,8 @@ describe('Puntos en el pedido por WhatsApp', () => {
     const c = ctx({ cuentaTelefono: propia });
     let r = transicionarEstado(flujoAlCierre(), dni(), c);
     expect(r.nuevoEstado).toBe('PEDIDO_PUNTOS_PREGUNTA');
-    expect(texto(r)).toContain('cuenta de José');
-    expect(botones(r)).toEqual(['puntos_si', 'puntos_otro', 'puntos_no']);
+    expect(texto(r)).toContain('¡Hola, José! 💛');
+    expect(botones(r)).toEqual(['puntos_si', 'puntos_no', 'puntos_otro']);
     r = transicionarEstado(r.nuevoFlujo, btn('puntos_si'), c);
     expect(r.nuevoEstado).toBe('PEDIDO_RESUMEN_CONFIRMAR');
     expect(texto(r)).toContain('~0.75 puntos');
@@ -80,7 +85,7 @@ describe('Puntos en el pedido por WhatsApp', () => {
 
   it('número dictado encontrado: no revela nombre, confirma y no muestra saldo', () => {
     const c0 = ctx();
-    let r = transicionarEstado(flujoAlCierre(), dni(), c0);
+    let r = aNumero(c0);
     expect(r.nuevoEstado).toBe('PEDIDO_PUNTOS_NUMERO');
     const c = ctx({ busqueda: { telefono: '912345123', partyId: '9', terminacion: '123' } });
     r = transicionarEstado(r.nuevoFlujo, normalizarEntrada({ texto: '912 345 123', textoOriginal: '912 345 123' }), c);
@@ -94,7 +99,7 @@ describe('Puntos en el pedido por WhatsApp', () => {
   });
 
   it('número dictado no encontrado: da la URL de la carta y deja reintentar', () => {
-    let r = transicionarEstado(flujoAlCierre(), dni(), ctx());
+    let r = aNumero(ctx());
     const c = ctx({ busqueda: { telefono: '911111111', partyId: null, terminacion: '111' } });
     r = transicionarEstado(r.nuevoFlujo, normalizarEntrada({ texto: '911111111', textoOriginal: '911111111' }), c);
     expect(r.nuevoEstado).toBe('PEDIDO_PUNTOS_NUMERO');
@@ -103,7 +108,7 @@ describe('Puntos en el pedido por WhatsApp', () => {
   });
 
   it('tope de 3 números: sigue como invitado y avisa', () => {
-    let r = transicionarEstado(flujoAlCierre(), dni(), ctx());
+    let r = aNumero(ctx());
     for (let i = 1; i <= 3; i++) {
       const num = `91111111${i}`;
       const c = ctx({ busqueda: { telefono: num, partyId: null, terminacion: num.slice(-3) } });
@@ -116,7 +121,7 @@ describe('Puntos en el pedido por WhatsApp', () => {
   });
 
   it('texto que no es número se repite sin gastar intentos', () => {
-    let r = transicionarEstado(flujoAlCierre(), dni(), ctx());
+    let r = aNumero(ctx());
     r = transicionarEstado(r.nuevoFlujo, normalizarEntrada({ texto: 'hola', textoOriginal: 'hola' }), ctx());
     expect(r.nuevoEstado).toBe('PEDIDO_PUNTOS_NUMERO');
     expect(r.nuevoFlujo.puntosIntentos).toBeUndefined();

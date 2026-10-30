@@ -19,7 +19,7 @@ export interface TrabajoImpresionAdmin {
 
 /** Estado visible de una etiqueta del pedido, derivado de su último print_job. */
 /** DESCONOCIDO solo en la vista: la consulta de estado aún no llegó o falló. */
-export type EstadoEtiqueta = 'EN_COLA' | 'IMPRIMIENDO' | 'IMPRESA' | 'FALLIDA' | 'VENCIDA' | 'SIN_TRABAJO' | 'DESCONOCIDO';
+export type EstadoEtiqueta = 'EN_COLA' | 'IMPRIMIENDO' | 'IMPRESA' | 'FALLIDA' | 'VENCIDA' | 'DESCARTADA' | 'SIN_TRABAJO' | 'DESCONOCIDO';
 
 export interface EtiquetaEstado {
   /** GENERAL, AREA:<nombre> o BEBIDA:<indice>: identifica la etiqueta dentro del pedido */
@@ -49,6 +49,36 @@ export interface EstadoEtiquetasPedido {
     sinTrabajo: number;
   };
 }
+
+export interface GrupoCola {
+  pedidoId: string;
+  pedidoCodigo: string;
+  clienteNombre: string;
+  cantidad: number;
+  /** conteo por estado técnico: PENDIENTE, IMPRIMIENDO, IMPRESO, FALLIDO, VENCIDO, DESCARTADO */
+  estados: Record<string, number>;
+  masAntiguaEn: string;
+  error: string | null;
+  trabajoIds: string[];
+}
+
+export interface RespuestaCola {
+  items: GrupoCola[];
+  total: number;
+  pagina: number;
+  paginas: number;
+  resumen: {
+    pendientes: number;
+    enCurso: number;
+    fallidos: number;
+    vencidos: number;
+    descartados: number;
+    pendientesAntiguas: number;
+    minutosAntiguas: number;
+  };
+}
+
+export type FiltroCola = 'pendientes' | 'en_curso' | 'impresos' | 'fallidos' | 'vencidos' | 'descartados';
 
 export interface LlaveAgenteAdmin {
   id: string;
@@ -124,6 +154,22 @@ export const impresionApi = {
     pedidoId: string,
   ): Promise<{ ok: boolean; mensaje: string; cantidad?: number; omitidas?: number }> => {
     return api.post(`/admin/pedidos/${pedidoId}/etiquetas/reimprimir`, { tipo: 'TODAS' });
+  },
+
+  listarCola: async (filtro: FiltroCola, pagina = 1, minutos = 30): Promise<RespuestaCola> => {
+    return api.get<RespuestaCola>(`/admin/impresion/cola?filtro=${filtro}&pagina=${pagina}&limite=20&minutos=${minutos}`);
+  },
+
+  vaciarCola: async (body: {
+    alcance: 'ANTIGUAS' | 'TODAS';
+    minutos?: number;
+    motivo: string;
+  }): Promise<{ ok: boolean; descartadas: number; mensaje: string }> => {
+    return api.post('/admin/impresion/cola/vaciar', body);
+  },
+
+  descartarPedido: async (pedidoId: string): Promise<{ ok: boolean; descartadas: number; mensaje: string }> => {
+    return api.post(`/admin/impresion/pedidos/${pedidoId}/descartar`, {});
   },
 
   listarLlaves: async (): Promise<LlaveAgenteAdmin[]> => {

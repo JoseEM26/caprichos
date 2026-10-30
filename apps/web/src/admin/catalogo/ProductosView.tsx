@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useUrlArchivo } from '../../comun/useUrlArchivo';
 import { useNavigate } from 'react-router-dom';
 import { useSesion } from '../../comun/sesion';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { Confirmar } from '../../comun/Confirmar';
+import './productos-tarjeta.css';
 import {
   catalogoApi,
   ProductoAdmin,
@@ -86,6 +88,7 @@ export function ProductosView() {
   const [busqueda, setBusqueda] = useState('');
   const [filtrosAbiertos, setFiltrosAbiertos] = useState(false);
   const [filtroDisponibilidad, setFiltroDisponibilidad] = useState<'all' | 'avail' | 'off'>('all');
+  const [filtroRegistro, setFiltroRegistro] = useState<'activos' | 'desactivados' | 'todos'>('activos');
   const [filtroOrden, setFiltroOrden] = useState<'name-asc' | 'name-desc' | 'price-asc' | 'price-desc'>('name-asc');
   const [filtroPromo, setFiltroPromo] = useState(false);
   const [verTodosSinPagina, setVerTodosSinPagina] = useState(false);
@@ -109,8 +112,7 @@ export function ProductosView() {
   const [npModoElegido, setNpModoElegido] = useState<'unico' | 'opciones' | null>(null);
   const [npOpc, setNpOpc] = useState<EstadoOpciones>(ESTADO_VACIO);
   const [npFoto, setNpFoto] = useState<File | null>(null);
-  const npFotoUrl = useMemo(() => (npFoto ? URL.createObjectURL(npFoto) : null), [npFoto]);
-  useEffect(() => () => { if (npFotoUrl) URL.revokeObjectURL(npFotoUrl); }, [npFotoUrl]);
+  const npFotoUrl = useUrlArchivo(npFoto);
   const npModo: 'unico' | 'opciones' =
     npModoElegido ?? (categorias.find((c) => c.id === npCategoriaId)?.llevaOpciones ? 'opciones' : 'unico');
   const [npError, setNpError] = useState('');
@@ -122,6 +124,7 @@ export function ProductosView() {
   const [edNombre, setEdNombre] = useState('');
   const [edCategoriaId, setEdCategoriaId] = useState('');
   const [edPrecio, setEdPrecio] = useState('');
+  const [edOculto, setEdOculto] = useState(false);
   const [edFotoUrl, setEdFotoUrl] = useState<string | null>(null);
   const [edFotoArchivoId, setEdFotoArchivoId] = useState<string | null>(null);
   const [edSabores, setEdSabores] = useState<Array<{ id?: string; nombre: string; activo?: boolean }>>([]);
@@ -186,6 +189,10 @@ export function ProductosView() {
   const productosFiltrados = useMemo(() => {
     let res = [...productos];
 
+    // Por registro (activo = visible en la carta)
+    if (filtroRegistro === 'activos') res = res.filter((p) => !p.oculto);
+    else if (filtroRegistro === 'desactivados') res = res.filter((p) => p.oculto);
+
     // Por categoría
     if (catSeleccionada.toUpperCase() !== 'TODOS') {
       res = res.filter(
@@ -225,7 +232,7 @@ export function ProductosView() {
     });
 
     return res;
-  }, [productos, catSeleccionada, busqueda, filtroDisponibilidad, filtroOrden, filtroPromo]);
+  }, [productos, catSeleccionada, busqueda, filtroDisponibilidad, filtroOrden, filtroPromo, filtroRegistro]);
 
   // Paginación
   const totalPaginas = Math.ceil(productosFiltrados.length / PPAGE) || 1;
@@ -298,6 +305,26 @@ export function ProductosView() {
     });
   };
 
+  const toggleActivo = (p: ProductoAdmin) => {
+    const activar = p.oculto === true;
+    setConfirmarProps({
+      abierto: true,
+      titulo: activar ? `¿Activar «${p.nombre}»?` : `¿Desactivar «${p.nombre}»?`,
+      mensaje: activar
+        ? 'Volverá a mostrarse en la carta, en el pedido del mozo y en el bot de WhatsApp.'
+        : 'Agotado: se ve en la carta pero no se puede pedir (temporal, vuelve sola si pusiste hora). Desactivado: desaparece de la carta, del pedido del mozo y del bot de WhatsApp hasta que lo actives. No se borra: su historial de ventas se conserva.',
+      accion: async () => {
+        try {
+          if (activar) await catalogoApi.mostrarProducto(p.id);
+          else await catalogoApi.ocultarProducto(p.id);
+          await cargarDatos();
+        } catch (err: any) {
+          alert(err?.message || 'Error al cambiar el registro del producto');
+        }
+      },
+    });
+  };
+
   const toggleNoSuma = (p: ProductoAdmin) => {
     const actual = p.noSumaBeneficios;
     setConfirmarProps({
@@ -325,6 +352,7 @@ export function ProductosView() {
     setEdNombre(p.nombre);
     setEdCategoriaId(p.categoriaId);
     setEdPrecio(p.precio.toFixed(2));
+    setEdOculto(p.oculto === true);
     setEdFotoUrl(p.fotoUrl || null);
     setEdFotoArchivoId(null);
     setEdSabores(p.sabores.map((s) => ({ ...s })));
@@ -351,6 +379,7 @@ export function ProductosView() {
             nombre: edNombre.trim(),
             categoriaId: edCategoriaId,
             precio: precioNum,
+            oculto: edOculto,
             fotoArchivoId: edFotoArchivoId,
             sabores: edSabores.map((s) => ({
               id: s.id,
@@ -1036,6 +1065,40 @@ export function ProductosView() {
           </div>
         )}
 
+        {/* Registro: activos / desactivados */}
+        <div role="group" aria-label="Registro" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-navy)' }}>Registro</span>
+          {(
+            [
+              ['activos', 'Activos', productos.filter((x) => !x.oculto).length],
+              ['desactivados', 'Desactivados', productos.filter((x) => x.oculto).length],
+              ['todos', 'Todos', productos.length],
+            ] as const
+          ).map(([id, n, c]) => (
+            <button
+              key={id}
+              aria-pressed={filtroRegistro === id}
+              onClick={() => {
+                setFiltroRegistro(id);
+                setPagina(1);
+              }}
+              style={{
+                minHeight: 44,
+                padding: '0 14px',
+                border: '1.5px solid var(--cp-navy)',
+                borderRadius: 9999,
+                background: filtroRegistro === id ? 'var(--cp-navy)' : 'transparent',
+                color: filtroRegistro === id ? 'var(--cp-white)' : 'var(--cp-navy)',
+                fontWeight: 700,
+                fontSize: 12,
+                cursor: 'pointer',
+              }}
+            >
+              {n} ({c})
+            </button>
+          ))}
+        </div>
+
         {/* Resumen inferior del box de búsqueda */}
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ fontSize: 13, color: 'var(--cp-soft)', fontWeight: 600 }}>
@@ -1084,18 +1147,21 @@ export function ProductosView() {
           return (
             <div
               key={p.id}
+              className="pt-tarjeta"
+              data-oculto={p.oculto ? 'si' : 'no'}
               style={{
-                background: 'var(--cp-white)',
-                border: '1px solid var(--cp-line)',
-                borderRadius: 12,
-                boxShadow: '0 6px 18px rgba(11,44,62,0.10)',
-                padding: 16,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 12,
-                opacity: off ? 0.65 : 1,
+                opacity: p.oculto ? 0.5 : off ? 0.65 : 1,
               }}
             >
+              <div className="pt-insignias">
+                {p.oculto && <span className="pt-ins pt-ins--desactivado">Desactivado</span>}
+                <span className={off ? 'pt-ins pt-ins--agotado' : 'pt-ins'}>
+                  {off ? 'AGOTADO' : 'DISPONIBLE'}
+                </span>
+                {p.promociones && p.promociones.length > 0 && (
+                  <span className="pt-ins pt-ins--promo">En promoción</span>
+                )}
+              </div>
               {p.fotoUrl && (
                 <img
                   src={p.fotoUrl}
@@ -1130,19 +1196,6 @@ export function ProductosView() {
                 >
                   {p.nombre}
                 </div>
-                <span
-                  style={{
-                    flex: 'none',
-                    fontSize: 12,
-                    fontWeight: 700,
-                    borderRadius: 9999,
-                    padding: '2px 10px',
-                    background: off ? 'var(--cp-rust)' : 'var(--cp-navy)',
-                    color: 'var(--cp-white)',
-                  }}
-                >
-                  {off ? 'AGOTADO' : 'DISPONIBLE'}
-                </span>
               </div>
 
               <div
@@ -1187,96 +1240,55 @@ export function ProductosView() {
                 <AvisoPromocion p={p} />
               )}
 
-              {/* Botón no suma puntos ni aplica cupones (solo Admin) */}
-              {esAdmin && !(p.promociones?.length) && (
-                <button
-                  title="En combos no suma puntos, pero vendido suelto sí"
-                  onClick={() => toggleNoSuma(p)}
-                  style={{
-                    minHeight: 40,
-                    border: '1.5px solid var(--cp-navy)',
-                    borderRadius: 10,
-                    background: p.noSumaBeneficios ? 'var(--cp-rust)' : 'transparent',
-                    color: p.noSumaBeneficios ? 'var(--cp-white)' : 'var(--cp-navy)',
-                    fontWeight: 700,
-                    fontSize: 12,
-                    cursor: 'pointer',
-                  }}
-                >
-                  {p.noSumaBeneficios
-                    ? 'No suma puntos ni aplica cupones'
-                    : 'Suma puntos y acepta cupones'}
-                </button>
-              )}
-
-              {/* Fila de acciones */}
-              <div style={{ display: 'flex', gap: 8, marginTop: 'auto' }}>
+              {/* Acciones: una principal y el resto en cuadrícula de 2 columnas dentro de la tarjeta */}
+              <div className="pt-acciones">
                 {puedeEditar && (
-                  <button
-                    onClick={() => abrirOpciones(p)}
-                    style={{
-                      flex: 1.4,
-                      minHeight: 44,
-                      border: 0,
-                      borderRadius: 12,
-                      background: 'var(--cp-orange)',
-                      color: 'var(--cp-navy)',
-                      fontWeight: 800,
-                      fontSize: 13,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      lineHeight: '15px',
-                      padding: '4px 8px',
-                    }}
-                  >
-                    Tamaños y opciones
-                    <span style={{ fontSize: 11, fontWeight: 600 }}>{resumenOpciones(p)}</span>
-                  </button>
-                )}
-                {puedeEditar && (
-                  <button
-                    onClick={() => abrirEditar(p)}
-                    style={{
-                      flex: 1,
-                      minHeight: 44,
-                      border: '1.5px solid var(--cp-navy)',
-                      borderRadius: 12,
-                      background: 'transparent',
-                      color: 'var(--cp-navy)',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                    }}
-                  >
+                  <button className="pt-btn pt-btn--principal" onClick={() => abrirEditar(p)}>
                     Editar
                   </button>
                 )}
+                {puedeEditar && (
+                  <button className="pt-btn pt-btn--opciones" onClick={() => abrirOpciones(p)}>
+                    <span>Tamaños y opciones</span>
+                    <small>{resumenOpciones(p)}</small>
+                  </button>
+                )}
                 <button
+                  className="pt-btn"
                   onClick={() => toggleDisponibilidad(p)}
                   aria-label={`Cambiar disponibilidad de ${p.nombre}`}
-                  style={{
-                    flex: 1,
-                    minHeight: 44,
-                    border: '1.5px solid var(--cp-navy)',
-                    borderRadius: 12,
-                    background: off ? 'var(--cp-orange)' : 'transparent',
-                    color: 'var(--cp-navy)',
-                    fontWeight: 700,
-                    fontSize: 13,
-                    cursor: 'pointer',
-                  }}
                 >
                   {off ? 'Marcar disponible' : 'Marcar agotado'}
                 </button>
+                {puedeEditar && (
+                  <button
+                    className="pt-btn"
+                    onClick={() => toggleActivo(p)}
+                    aria-label={`${p.oculto ? 'Activar' : 'Desactivar'} ${p.nombre}`}
+                  >
+                    {p.oculto ? 'Activar' : 'Desactivar'}
+                  </button>
+                )}
+                {esAdmin && !(p.promociones?.length) && (
+                  <button
+                    className={p.noSumaBeneficios ? 'pt-btn pt-btn--ancho pt-btn--alerta' : 'pt-btn pt-btn--ancho'}
+                    title="En combos no suma puntos, pero vendido suelto sí"
+                    onClick={() => toggleNoSuma(p)}
+                  >
+                    {p.noSumaBeneficios
+                      ? 'No suma puntos ni aplica cupones'
+                      : 'Suma puntos y acepta cupones'}
+                  </button>
+                )}
+                <div className="pt-ancho">
+                  <BotonVistaPrevia
+                    bloque
+                    borrador={p}
+                    gruposGenerales={gruposGenerales}
+                    nombreProducto={p.nombre}
+                  />
+                </div>
               </div>
-              <BotonVistaPrevia
-                bloque
-                borrador={p}
-                gruposGenerales={gruposGenerales}
-                nombreProducto={p.nombre}
-              />
             </div>
           );
         })}
@@ -1976,6 +1988,19 @@ export function ProductosView() {
                 }}
               />
             </div>
+
+            {/* Mostrar en la carta (misma lógica que Desactivar/Activar) */}
+            <label
+              style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 44, fontWeight: 700 }}
+            >
+              <input
+                type="checkbox"
+                checked={!edOculto}
+                onChange={(e) => setEdOculto(!e.target.checked)}
+                style={{ width: 22, height: 22 }}
+              />
+              Mostrar en la carta
+            </label>
 
             {/* Sabores gestionables (Donas, Galletas, Pizzas, etc.) */}
             <div>

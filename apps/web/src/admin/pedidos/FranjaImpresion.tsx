@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { EstadoAdminImpresion } from '@caprichos/compartido';
 import { impresionApi } from '../impresion/impresionApi';
 import { useEventos } from '../../comun/socket';
+import { ColaImpresion } from '../impresion/ColaImpresion';
 
 /**
  * Franja fija arriba de Pedidos y caja: aparece mientras haya etiquetas en cola y la
@@ -10,6 +11,7 @@ import { useEventos } from '../../comun/socket';
  */
 export function FranjaImpresion() {
   const [estado, setEstado] = useState<EstadoAdminImpresion | null>(null);
+  const [verCola, setVerCola] = useState(false);
 
   const cargar = useCallback(async () => {
     try {
@@ -28,12 +30,25 @@ export function FranjaImpresion() {
 
   useEventos('impresion:sin_conexion', cargar);
   useEventos('pedido:nuevo', cargar);
+  useEventos('impresion:cola', cargar);
 
   if (!estado) return null;
   const conProblema = estado.agente === 'sin_conexion' || estado.impresora !== 'lista';
   if (!(estado.pendientes > 0 && conProblema)) return null;
 
+  const estiloBoton = {
+    minHeight: 44,
+    display: 'inline-flex',
+    alignItems: 'center',
+    padding: '0 14px',
+    borderRadius: 10,
+    fontWeight: 800,
+    fontSize: 13,
+    whiteSpace: 'nowrap' as const,
+  };
+
   return (
+    <>
     <div
       role="alert"
       data-testid="franja-impresion"
@@ -55,24 +70,23 @@ export function FranjaImpresion() {
         <strong>Impresora sin conexión: {estado.pendientes} etiqueta(s) en cola.</strong>{' '}
         Revisa que la PC de la etiquetera esté encendida con el programa de impresión abierto.
       </div>
-      <Link
-        to="/admin/configuracion"
-        style={{
-          minHeight: 40,
-          display: 'inline-flex',
-          alignItems: 'center',
-          padding: '0 14px',
-          borderRadius: 10,
-          background: 'var(--cp-navy, #0B2C3E)',
-          color: 'var(--cp-cream, #FBF4EC)',
-          fontWeight: 800,
-          fontSize: 13,
-          textDecoration: 'none',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        Ir a Impresión
-      </Link>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={() => setVerCola(true)}
+          style={{ ...estiloBoton, background: 'var(--cp-rust, #B2500F)', color: '#fff', border: 0, cursor: 'pointer' }}
+        >
+          Gestionar cola
+        </button>
+        <Link
+          to="/admin/configuracion?tab=impresion"
+          style={{ ...estiloBoton, background: 'var(--cp-navy, #0B2C3E)', color: 'var(--cp-cream, #FBF4EC)', textDecoration: 'none' }}
+        >
+          Ver impresión
+        </Link>
+      </div>
     </div>
+    {verCola && <ColaImpresion alCerrar={() => { setVerCola(false); void cargar(); }} />}
+    </>
   );
 }

@@ -23,8 +23,10 @@ export interface RespuestaListaClientes {
 
 export interface RegistrarClienteMostradorDto {
   nombre: string;
-  dni: string;
+  /** Persona: celular obligatorio (9 dígitos) */
   telefono?: string;
+  /** Empresa: RUC de 11 dígitos */
+  ruc?: string;
   correo?: string;
   cumpleanos?: string;
   aceptaDatos: boolean;

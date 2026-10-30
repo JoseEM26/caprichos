@@ -373,3 +373,35 @@
     border-radius: 0;
   }
 }
+
+/* Celular: tarjeta en fila con miniatura pequeña, para ver más productos sin bajar tanto */
+@media (max-width: 600px) {
+  .np-grilla {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .np-producto {
+    flex-direction: row;
+    align-items: center;
+    min-height: 56px;
+  }
+
+  .np-producto-foto {
+    width: 56px;
+    height: 56px;
+    aspect-ratio: auto;
+    border-radius: 8px;
+    margin: 4px 0 4px 4px;
+    overflow: hidden;
+  }
+
+  .np-producto-foto > span {
+    font-size: 14px !important;
+  }
+
+  .np-producto-texto {
+    flex: 1;
+    padding: 6px 10px;
+  }
+}

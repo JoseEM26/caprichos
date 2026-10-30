@@ -243,7 +243,7 @@ export async function main() {
     },
   });
   if (prodClubSandwich) {
-    await prisma.comboParte.create({
+    const parteClub = await prisma.comboParte.create({
       data: {
         oferta_id: combo2.id,
         tipo: 'FIJO',
@@ -251,6 +251,16 @@ export async function main() {
         categorias: [],
         productos: [prodClubSandwich.id],
       },
+    });
+    // Plan B, C y D si el Club Sándwich se agota: salados parecidos que existan en la carta (por nombre)
+    const reemplazosClub: { id: bigint }[] = [];
+    for (const nombre of ['SÁNDWICH CLÁSICO', 'CROISSANT DE JAMÓN Y QUESO', 'EMPANADA ARTESANAL']) {
+      const prod = await prisma.producto.findFirst({ where: { nombre: { equals: nombre, mode: 'insensitive' } } });
+      if (prod && prod.id !== prodClubSandwich.id) reemplazosClub.push({ id: prod.id });
+    }
+    await prisma.comboParteReemplazo.createMany({
+      data: reemplazosClub.map((r, orden) => ({ combo_parte_id: parteClub.id, producto_id: r.id, orden })),
+      skipDuplicates: true,
     });
   }
   console.log(`Combo 2 "${combo2Nombre}" asegurado.`);
@@ -365,8 +375,8 @@ export async function main() {
       descuento_valor: 15.00,
       compra_minima: 0,
       dias: [1, 2, 3, 4, 5],
-      hora_desde: '15:00',
-      hora_hasta: '17:00',
+      hora_desde: new Date('1970-01-01T15:00:00Z'),
+      hora_hasta: new Date('1970-01-01T17:00:00Z'),
       canales: ['CARTA', 'ADMIN', 'BOT'],
       no_suma_beneficios: false,
       activo: true,
@@ -381,8 +391,8 @@ export async function main() {
       descuento_valor: 15.00,
       compra_minima: 0,
       dias: [1, 2, 3, 4, 5],
-      hora_desde: '15:00',
-      hora_hasta: '17:00',
+      hora_desde: new Date('1970-01-01T15:00:00Z'),
+      hora_hasta: new Date('1970-01-01T17:00:00Z'),
       canales: ['CARTA', 'ADMIN', 'BOT'],
       no_suma_beneficios: false,
       activo: true,

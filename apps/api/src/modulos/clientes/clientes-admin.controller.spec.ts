@@ -41,7 +41,7 @@ describe('ClientesAdminController', () => {
       providers: [
         { provide: ClientesService, useValue: clientesServiceMock },
         { provide: PuntosService, useValue: puntosServiceMock },
-        { provide: DireccionesClienteService, useValue: { buscarPorDni: jest.fn() } },
+        { provide: DireccionesClienteService, useValue: { buscarPorTelefono: jest.fn() } },
         { provide: PrismaService, useValue: {} },
         { provide: Reflector, useValue: {} },
       ],
@@ -76,51 +76,45 @@ describe('ClientesAdminController', () => {
     );
   });
 
-  describe('GET por-dni/:dni', () => {
+  describe('GET por-telefono/:telefono', () => {
     const direccionesDe = () => (controller as any).direcciones;
 
-    it('DNI que no tiene 8 dígitos exactos: 400 DNI_INVALIDO y no busca', async () => {
-      await expect(controller.buscarPorDni('4521789', { usuario: { partyId: 55n } } as any)).rejects.toMatchObject({
-        response: { codigo: 'DNI_INVALIDO' },
-      });
-      await expect(controller.buscarPorDni('4521789a', { usuario: { partyId: 55n } } as any)).rejects.toMatchObject({
-        response: { codigo: 'DNI_INVALIDO' },
-      });
-      expect(direccionesDe().buscarPorDni).not.toHaveBeenCalled();
+    it('celular que no tiene 9 dígitos exactos y empieza en 9: 400 TELEFONO_INVALIDO y no busca', async () => {
+      for (const t of ['91234567', '812345678', '91234567a', '9123456789', '45217890']) {
+        await expect(controller.buscarPorTelefono(t, { usuario: { partyId: 55n } } as any)).rejects.toMatchObject({
+          response: { codigo: 'TELEFONO_INVALIDO' },
+        });
+      }
+      expect(direccionesDe().buscarPorTelefono).not.toHaveBeenCalled();
     });
 
-    it('encontrado: devuelve el DNI enmascarado y los datos del contrato', async () => {
-      direccionesDe().buscarPorDni.mockResolvedValue({
-        encontrado: true,
-        party: '100',
-        nombre: 'Ana',
-        telefono: '987654321',
-        puntos: 12,
-        direcciones: [],
-      });
+    it('encontrado: devuelve solo los datos del contrato, sin DNI ni correo', async () => {
+      const datos = { encontrado: true, party: '100', nombre: 'Ana', telefono: '987654321', puntos: 12, direcciones: [] };
+      direccionesDe().buscarPorTelefono.mockResolvedValue(datos);
 
-      const r: any = await controller.buscarPorDni('45217890', { usuario: { partyId: 55n } } as any);
+      const r: any = await controller.buscarPorTelefono('987654321', { usuario: { partyId: 55n } } as any);
 
-      expect(direccionesDe().buscarPorDni).toHaveBeenCalledWith('45217890', 55n);
-      expect(r).toEqual({
-        encontrado: true,
-        party: '100',
-        nombre: 'Ana',
-        telefono: '987654321',
-        puntos: 12,
-        direcciones: [],
-        dniMascara: '4521****',
-      });
-      expect(r).not.toHaveProperty('correo');
-      expect(r).not.toHaveProperty('cumpleanos');
+      expect(direccionesDe().buscarPorTelefono).toHaveBeenCalledWith('987654321', 55n);
+      expect(r).toEqual(datos);
+      for (const k of ['dniMascara', 'dni', 'correo', 'cumpleanos']) expect(r).not.toHaveProperty(k);
     });
 
     it('no encontrado: { encontrado: false } sin datos', async () => {
-      direccionesDe().buscarPorDni.mockResolvedValue({ encontrado: false });
+      direccionesDe().buscarPorTelefono.mockResolvedValue({ encontrado: false });
+      expect(await controller.buscarPorTelefono('987654321', { usuario: { partyId: 55n } } as any)).toEqual({ encontrado: false });
+    });
+  });
 
-      const r = await controller.buscarPorDni('45217890', { usuario: { partyId: 55n } } as any);
-
-      expect(r).toEqual({ encontrado: false });
+  describe('GET por-dni/:dni (retirado)', () => {
+    it('responde 410 BUSQUEDA_DNI_RETIRADA', () => {
+      let error: any;
+      try {
+        controller.buscarPorDniRetirado();
+      } catch (e) {
+        error = e;
+      }
+      expect(error.getStatus()).toBe(410);
+      expect(error.getResponse()).toMatchObject({ codigo: 'BUSQUEDA_DNI_RETIRADA' });
     });
   });
 });

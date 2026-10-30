@@ -8,11 +8,13 @@ import {
   TrabajoImpresionAdmin,
 } from './impresionApi';
 import { EstadoAdminImpresion } from '@caprichos/compartido';
+import { ColaImpresion } from './ColaImpresion';
 
 export function TarjetaImpresionEtiquetas() {
   const { usuario } = useSesion();
   const esAdmin = (usuario?.rol || '').toUpperCase() === 'ADMIN';
 
+  const [verCola, setVerCola] = useState<boolean>(false);
   const [cargando, setCargando] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [mensajeExito, setMensajeExito] = useState<string | null>(null);
@@ -166,6 +168,24 @@ export function TarjetaImpresionEtiquetas() {
           </div>
         </div>
 
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={() => setVerCola(true)}
+          style={{
+            minHeight: 44,
+            padding: '0 12px',
+            border: 0,
+            borderRadius: 8,
+            background: 'var(--cp-navy, #0B2C3E)',
+            color: 'var(--cp-cream, #FBF4EC)',
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: 'pointer',
+          }}
+        >
+          Gestionar cola
+        </button>
         <button
           type="button"
           data-cfg-id="impresion-actualizar"
@@ -185,6 +205,7 @@ export function TarjetaImpresionEtiquetas() {
         >
           Actualizar estado
         </button>
+        </div>
       </div>
 
       {/* Avisos */}
@@ -728,6 +749,7 @@ export function TarjetaImpresionEtiquetas() {
           alCancelar={() => setLlaveParaDesactivar(null)}
         />
       )}
+      {verCola && <ColaImpresion alCerrar={() => { setVerCola(false); void cargarDatos(); }} />}
     </div>
   );
 }

@@ -32,12 +32,17 @@ import {
   OfertaItem,
   ReglaAcumulacionItem,
 } from './ofertas.tipos';
+import { calcularDisponibilidadCombo, ProductoDisp } from './combo-disponibilidad.util';
 import {
   estaVigente,
   formatearFecha,
   formatearHora,
   generarCodigoCuponUnico,
 } from './ofertas.util';
+
+const INCLUDE_PARTES = {
+  include: { reemplazos: { orderBy: { orden: 'asc' as const }, include: { producto: true } } },
+};
 
 @Injectable()
 export class OfertasService {
@@ -74,11 +79,11 @@ export class OfertasService {
         combosPrecio: {
           include: { tamano_valor: true },
         },
-        combosParte: true,
+        combosParte: INCLUDE_PARTES,
       },
     });
 
-    return ofertasDb.map((o) => this.mapearOferta(o, canal));
+    return this.conDisponibilidad(ofertasDb.map((o) => this.mapearOferta(o, canal)));
   }
 
   async obtenerOfertaPorId(id: bigint | string | number): Promise<OfertaItem> {
@@ -91,7 +96,7 @@ export class OfertasService {
         combosPrecio: {
           include: { tamano_valor: true },
         },
-        combosParte: true,
+        combosParte: INCLUDE_PARTES,
       },
     });
 
@@ -102,7 +107,7 @@ export class OfertasService {
       });
     }
 
-    return this.mapearOferta(ofertaDb);
+    return (await this.conDisponibilidad([this.mapearOferta(ofertaDb)]))[0];
   }
 
   async crearOferta(dto: CrearOfertaDto, usuario?: any): Promise<OfertaItem> {
@@ -272,7 +277,7 @@ export class OfertasService {
               if (prod) prodIds.push(prod.id);
             }
           }
-          await tx.comboParte.create({
+          const parteCreada = await tx.comboParte.create({
             data: {
               oferta_id: oferta.id,
               tipo: tipoParte,
@@ -281,6 +286,7 @@ export class OfertasService {
               productos: prodIds,
             },
           });
+          await this.guardarReemplazos(tx, parteCreada.id, tipoParte, prodIds, p.reemplazos);
         }
       }
 
@@ -291,7 +297,7 @@ export class OfertasService {
           producto: true,
           imagen_archivo: true,
           combosPrecio: { include: { tamano_valor: true } },
-          combosParte: true,
+          combosParte: INCLUDE_PARTES,
         },
       });
     });
@@ -308,7 +314,7 @@ export class OfertasService {
 
     this.eventosGateway.emitirAdmin('ofertas:actualizado', { id: creada!.id.toString() });
 
-    return this.mapearOferta(creada!);
+    return (await this.conDisponibilidad([this.mapearOferta(creada!)]))[0];
   }
 
   async actualizarOferta(id: bigint | string | number, dto: ActualizarOfertaDto, usuario?: any): Promise<OfertaItem> {
@@ -503,7 +509,7 @@ export class OfertasService {
               if (prod) prodIds.push(prod.id);
             }
           }
-          await tx.comboParte.create({
+          const parteCreada = await tx.comboParte.create({
             data: {
               oferta_id: BigInt(id),
               tipo: tipoParte,
@@ -512,6 +518,7 @@ export class OfertasService {
               productos: prodIds,
             },
           });
+          await this.guardarReemplazos(tx, parteCreada.id, tipoParte, prodIds, p.reemplazos);
         }
       }
 
@@ -522,7 +529,7 @@ export class OfertasService {
           producto: true,
           imagen_archivo: true,
           combosPrecio: { include: { tamano_valor: true } },
-          combosParte: true,
+          combosParte: INCLUDE_PARTES,
         },
       });
     });
@@ -540,7 +547,7 @@ export class OfertasService {
 
     this.eventosGateway.emitirAdmin('ofertas:actualizado', { id: id.toString() });
 
-    return this.mapearOferta(actualizada!);
+    return (await this.conDisponibilidad([this.mapearOferta(actualizada!)]))[0];
   }
 
   async cambiarEstadoOferta(id: bigint | string | number, activo: boolean, usuario?: any): Promise<OfertaItem> {
@@ -552,7 +559,7 @@ export class OfertasService {
         producto: true,
         imagen_archivo: true,
         combosPrecio: { include: { tamano_valor: true } },
-        combosParte: true,
+        combosParte: INCLUDE_PARTES,
       },
     });
 
@@ -568,7 +575,7 @@ export class OfertasService {
 
     this.eventosGateway.emitirAdmin('ofertas:actualizado', { id: id.toString() });
 
-    return this.mapearOferta(actualizada);
+    return (await this.conDisponibilidad([this.mapearOferta(actualizada)]))[0];
   }
 
   // ==========================================
@@ -1690,6 +1697,108 @@ export class OfertasService {
   // MAPEOS AUXILIARES
   // ==========================================
 
+  /**
+   * Al crear el pedido: cada parte FIJO elegida debe ser el principal disponible o un reemplazo disponible.
+   * Devuelve la nota para comanda y ticket, p. ej. «Combo Dúo · Empanada (en lugar de Club Sandwich)».
+   */
+  async validarEleccionesCombo(
+    ofertaId: bigint | string | number,
+    elecciones: { parteId: string | number; productoId: string | number }[],
+  ): Promise<string> {
+    const oferta = await this.obtenerOfertaPorId(ofertaId);
+    if (oferta.tipo !== 'COMBO') return '';
+    const noDisponible = (mensaje: string) =>
+      new ConflictException({ codigo: 'COMBO_PARTE_NO_DISPONIBLE', mensaje });
+    if (oferta.disponible === false) throw noDisponible(`${oferta.nombre} está agotado: ${oferta.motivoAgotado ?? ''}`.trim());
+
+    const cambios: string[] = [];
+    for (const parte of (oferta.combosParte ?? []).filter((p) => p.tipo === 'FIJO')) {
+      const elegido = elecciones.find((e) => String(e.parteId) === parte.id)?.productoId;
+      const idElegido = elegido !== undefined ? String(elegido) : parte.opcionesDisponibles?.[0];
+      if (!idElegido || !parte.opcionesDisponibles?.includes(idElegido)) {
+        const prod = idElegido
+          ? await this.prisma.producto.findMany({ where: { id: { in: [BigInt(idElegido)] } }, select: { nombre: true } })
+          : [];
+        throw noDisponible(`${prod[0]?.nombre ?? 'El producto elegido'} se acaba de agotar; elige otro reemplazo`);
+      }
+      if (idElegido !== parte.productos[0]) {
+        const nombres = await this.prisma.producto.findMany({
+          where: { id: { in: [BigInt(idElegido), BigInt(parte.productos[0])] } },
+          select: { id: true, nombre: true },
+        });
+        const n = (id: string) => nombres.find((x) => x.id.toString() === id)?.nombre ?? '';
+        cambios.push(`${n(idElegido)} (en lugar de ${n(parte.productos[0])})`);
+      }
+    }
+    return cambios.length ? `${oferta.nombre} · ${cambios.join(' · ')}` : '';
+  }
+
+  /** Reemplazos (plan B, C...) de una parte FIJO: sin repetir, sin el principal y solo productos que existan. */
+  private async guardarReemplazos(
+    tx: Prisma.TransactionClient,
+    partePk: bigint,
+    tipo: string,
+    principales: bigint[],
+    reemplazos?: (string | number)[],
+  ): Promise<void> {
+    if (tipo !== 'FIJO' || !Array.isArray(reemplazos) || reemplazos.length === 0) return;
+    const ids = reemplazos.map((r) => BigInt(r));
+    if (new Set(ids.map(String)).size !== ids.length || ids.some((i) => principales.includes(i))) {
+      throw new BadRequestException({
+        codigo: 'COMBO_REEMPLAZO_INVALIDO',
+        mensaje: 'Los reemplazos no pueden repetirse ni incluir el producto principal',
+      });
+    }
+    const existentes = await tx.producto.findMany({ where: { id: { in: ids } }, select: { id: true } });
+    if (existentes.length !== ids.length) {
+      throw new BadRequestException({
+        codigo: 'COMBO_REEMPLAZO_INVALIDO',
+        mensaje: 'Algún reemplazo no es un producto de la carta',
+      });
+    }
+    await tx.comboParteReemplazo.createMany({
+      data: ids.map((producto_id, orden) => ({ combo_parte_id: partePk, producto_id, orden })),
+    });
+  }
+
+  /** Agrega `disponible`, `motivoAgotado` y por parte `opcionesDisponibles` a los combos (tiempo real, no toca `activo`). */
+  private async conDisponibilidad(items: OfertaItem[]): Promise<OfertaItem[]> {
+    const combos = items.filter((i) => i.tipo === 'COMBO' && i.combosParte?.length);
+    if (combos.length === 0) return items;
+    const partes = combos.flatMap((c) => c.combosParte!);
+    const ids = new Set<bigint>();
+    const cats = new Set<bigint>();
+    for (const p of partes) {
+      [...p.productos, ...(p.reemplazos ?? [])].forEach((x) => ids.add(BigInt(x)));
+      p.categorias.forEach((x) => cats.add(BigInt(x)));
+    }
+    const filas = await this.prisma.producto.findMany({
+      where: { OR: [{ id: { in: [...ids] } }, { categoria_id: { in: [...cats] } }] },
+      select: { id: true, nombre: true, categoria_id: true, oculto: true, agotado_hasta: true },
+    });
+    const productos: ProductoDisp[] = filas.map((f) => ({
+      id: f.id.toString(),
+      nombre: f.nombre,
+      categoriaId: f.categoria_id.toString(),
+      oculto: f.oculto,
+      agotadoHasta: f.agotado_hasta,
+    }));
+    for (const c of combos) {
+      const r = calcularDisponibilidadCombo(
+        c.combosParte!.map((p) => ({ ...p, reemplazos: p.reemplazos ?? [] })),
+        productos,
+      );
+      c.disponible = r.disponible;
+      c.motivoAgotado = r.motivoAgotado;
+      c.combosParte!.forEach((p, i) => {
+        p.disponible = r.partes[i].disponible;
+        p.opcionesDisponibles = r.partes[i].opcionesDisponibles;
+        if (p.tipo === 'FIJO') p.principalNombre = productos.find((x) => x.id === p.productos[0])?.nombre ?? '';
+      });
+    }
+    return items;
+  }
+
   private mapearOferta(o: any, canal?: string): OfertaItem {
     return {
       id: o.id.toString(),
@@ -1738,6 +1847,11 @@ export class OfertasService {
             cantidad: cp.cantidad,
             categorias: (cp.categorias || []).map((c: any) => c.toString()),
             productos: (cp.productos || []).map((p: any) => p.toString()),
+            reemplazos: (cp.reemplazos || []).map((r: any) => r.producto_id.toString()),
+            reemplazosDetalle: (cp.reemplazos || []).map((r: any) => ({
+              id: r.producto_id.toString(),
+              nombre: r.producto?.nombre ?? '',
+            })),
           }))
         : [],
     };

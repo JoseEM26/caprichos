@@ -17,8 +17,7 @@ const mockClientes: ClienteItem[] = [
     id: '100',
     nombre: 'Ana Pérez',
     tipo: 'Persona',
-    dni: '4521****',
-    telefono: '999 888 777',
+    telefono: '999888777',
     correo: 'ana@ejemplo.com',
     cumpleanos: '14/03',
     pedidos: 18,
@@ -32,7 +31,6 @@ const mockClientes: ClienteItem[] = [
     id: '101',
     nombre: 'Constructora Andina',
     tipo: 'Empresa',
-    dni: '2055****',
     telefono: '01 555 0202',
     correo: 'admin@ejemplo.com',
     cumpleanos: '—',
@@ -59,9 +57,7 @@ describe('Admin ▸ Clientes UI', () => {
     vi.spyOn(clientesApi, 'obtenerFichaCliente').mockResolvedValue({
       id: '100',
       nombre: 'Ana Pérez',
-      dni: '45218899',
-      dniMascara: '4521****',
-      telefono: '999 888 777',
+      telefono: '999888777',
       correo: 'ana@ejemplo.com',
       cumpleanos: '14/03',
       puntos: 180,
@@ -124,7 +120,7 @@ describe('Admin ▸ Clientes UI', () => {
     expect(screen.getByText(/Historial de quienes piden/i)).toBeInTheDocument();
     expect(screen.getByText('+ Nuevo cliente')).toBeInTheDocument();
     expect(screen.getByText('Comentarios de los clientes')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Buscar por nombre')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Buscar por nombre o celular')).toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.getByText('Ana Pérez')).toBeInTheDocument();
@@ -169,11 +165,11 @@ describe('Admin ▸ Clientes UI', () => {
     expect(screen.getByRole('dialog', { name: 'Nuevo cliente' })).toBeInTheDocument();
 
     const inputNombre = screen.getByLabelText(/Nombre \(obligatorio\)/i);
-    const inputDni = screen.getByLabelText(/DNI o RUC \(obligatorio\)/i);
+    const inputCel = screen.getByLabelText(/Celular \(obligatorio\)/i);
     const inputCumple = screen.getByLabelText(/Cumpleaños/i);
 
     fireEvent.change(inputNombre, { target: { value: 'Carlos Mendoza' } });
-    fireEvent.change(inputDni, { target: { value: '87654321' } });
+    fireEvent.change(inputCel, { target: { value: '987654321' } });
     fireEvent.change(inputCumple, { target: { value: '1990-05-20' } });
 
     // Intenta enviar sin consent
@@ -195,12 +191,38 @@ describe('Admin ▸ Clientes UI', () => {
     await waitFor(() => {
       expect(clientesApi.registrarClienteMostrador).toHaveBeenCalledWith({
         nombre: 'Carlos Mendoza',
-        dni: '87654321',
+        telefono: '987654321',
         cumpleanos: '1990-05-20',
         aceptaDatos: true,
       });
       expect(alGuardarExitoso).toHaveBeenCalled();
       expect(alCerrar).toHaveBeenCalled();
+    });
+  });
+
+  it('el alta de persona exige celular de 9 dígitos y no pide DNI', () => {
+    render(<ModalNuevoCliente abierto={true} alCerrar={vi.fn()} alGuardarExitoso={vi.fn()} />);
+    expect(screen.queryByLabelText(/DNI/i)).toBeNull();
+    fireEvent.change(screen.getByLabelText(/Nombre \(obligatorio\)/i), { target: { value: 'Carlos Mendoza' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar cliente' }));
+    expect(screen.getByText(/Escribe el celular del cliente/i)).toBeInTheDocument();
+    expect(clientesApi.registrarClienteMostrador).not.toHaveBeenCalled();
+  });
+
+  it('el alta de empresa pide RUC', () => {
+    render(<ModalNuevoCliente abierto={true} alCerrar={vi.fn()} alGuardarExitoso={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Empresa' }));
+    fireEvent.change(screen.getByLabelText(/Nombre \(obligatorio\)/i), { target: { value: 'Andina SAC' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar cliente' }));
+    expect(screen.getByText(/El RUC tiene 11 dígitos/i)).toBeInTheDocument();
+  });
+
+  it('el buscador de Clientes busca por nombre o celular', async () => {
+    render(<ClientesAdminView />);
+    const buscador = await screen.findByPlaceholderText('Buscar por nombre o celular');
+    fireEvent.change(buscador, { target: { value: '999888777' } });
+    await waitFor(() => {
+      expect(clientesApi.listarClientes).toHaveBeenCalledWith(expect.objectContaining({ q: '999888777' }));
     });
   });
 
@@ -318,7 +340,7 @@ describe('Carta ▸ PuntosCanje y NotificacionesCliente', () => {
     render(<PuntosCanje totalPedido={50} puntosAplicados={0} alAplicar={vi.fn()} />);
 
     expect(screen.getByText(/Ingresa con tu cuenta para usar tus puntos/i)).toBeInTheDocument();
-    const btnIngresar = screen.getByRole('button', { name: 'Ingresar con mi DNI' });
+    const btnIngresar = screen.getByRole('button', { name: 'Ingresar con mi celular' });
     fireEvent.click(btnIngresar);
     expect(abrirPanel).toHaveBeenCalled();
   });
@@ -329,7 +351,6 @@ describe('Carta ▸ PuntosCanje y NotificacionesCliente', () => {
       cliente: {
         partyId: '100',
         nombre: 'Ana',
-        dniMascara: '4521****',
         correo: 'ana@ejemplo.com',
         telefono: '912345678',
         fotoUrl: null,
@@ -367,7 +388,6 @@ describe('Carta ▸ PuntosCanje y NotificacionesCliente', () => {
       cliente: {
         partyId: '100',
         nombre: 'Ana',
-        dniMascara: '4521****',
         correo: 'ana@ejemplo.com',
         telefono: '912345678',
         fotoUrl: null,

@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
 } from '@nestjs/common';
+import { hoyLima } from '../reclamos/textos-legales';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
@@ -23,6 +24,7 @@ export const CLAVES_NUMERICAS = [
   'reparto_muy_tarde_min',
   'reparto_velocidad_kmh',
   'reparto_max_pedidos',
+  'reparto_rutas_sugeridas_max',
   'reparto_insistencia_min',
   'reparto_espera_max_min',
   'reparto_recargo_reprogramacion',
@@ -297,6 +299,12 @@ export class ConfiguracionService {
         mensaje: 'La velocidad media debe estar entre 5 y 100 km/h',
       });
     }
+    if (clave === 'reparto_rutas_sugeridas_max' && (valor < 1 || valor > 5)) {
+      throw new BadRequestException({
+        codigo: 'RANGO_INVALIDO',
+        mensaje: 'Las rutas sugeridas deben estar entre 1 y 5',
+      });
+    }
     if (clave === 'reparto_max_pedidos' && (valor < 1 || valor > 20)) {
       throw new BadRequestException({
         codigo: 'RANGO_INVALIDO',
@@ -355,6 +363,27 @@ export class ConfiguracionService {
       partyId: usuarioActual?.partyId,
       ip,
     });
+
+    // Un cambio real de Términos o Privacidad sube su versión (la que se guarda con el consentimiento)
+    if ((clave === 'terminos_texto' || clave === 'privacidad_texto') && anterior?.valor !== valor) {
+      const claveVersion = clave === 'terminos_texto' ? 'terminos_version' : 'privacidad_version';
+      const version = hoyLima();
+      await this.prisma.parametro.upsert({
+        where: { clave: claveVersion },
+        update: { valor: version },
+        create: { clave: claveVersion, valor: version },
+      });
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'configuracion',
+        accion: 'VERSION_TEXTO_LEGAL',
+        resultado: 'OK',
+        entidad: 'parametro',
+        despues: { clave: claveVersion, valor: version },
+        partyId: usuarioActual?.partyId,
+        ip,
+      });
+    }
 
     return {
       clave: parametro.clave,

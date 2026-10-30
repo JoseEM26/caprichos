@@ -54,3 +54,25 @@ export interface ResultadoVerificacionCadena {
   primerFalloId?: string | null;
   error?: string;
 }
+
+export interface HorarioDiaApi {
+  dia: number; // 0 = Domingo
+  entrada: string;
+  salida: string;
+}
+
+export interface ReemplazoDiaApi {
+  dia: number;
+  reemplazaPartyId: string;
+  nombre?: string;
+}
+
+export interface PersonalHorario {
+  id: string;
+  partyId: string;
+  nombres: string;
+  apellidos: string;
+  rol: string;
+  horarios: HorarioDiaApi[];
+  reemplazos: ReemplazoDiaApi[];
+}

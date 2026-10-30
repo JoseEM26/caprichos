@@ -21,6 +21,8 @@ import {
   BOTON_HABLAR_PERSONA,
   BOTONES_PEDIDO_MODALIDAD,
   BOTONES_PUNTOS_PROPIA,
+  BOTONES_PUNTOS_SIN_CUENTA,
+  BOTONES_CUENTA_CONSENTIMIENTO,
   BOTONES_PUNTOS_RECORDATORIO,
   BOTONES_PUNTOS_DICTADO,
   BOTONES_PUNTOS_NO_ENCONTRADO,
@@ -441,6 +443,12 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
 
       case 'PEDIDO_PUNTOS_NUMERO':
         return this.pasoPuntosNumero(flujo, pedido, entrada, contexto);
+
+      case 'PEDIDO_CUENTA_NOMBRE':
+        return this.pasoCuentaNombre(flujo, pedido, entrada, contexto);
+
+      case 'PEDIDO_CUENTA_CONSENT':
+        return this.pasoCuentaConsentimiento(flujo, pedido, entrada, contexto);
 
       case 'PEDIDO_RESUMEN_CONFIRMAR':
         return this.pasoResumenConfirmar(flujo, pedido, entrada, contexto);
@@ -2624,7 +2632,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       nuevoFlujo: { ...flujo, estado, pedido: { ...pedido, estadoInterno: estado, puntosModo: modo } },
     });
 
-    if (memoria?.partyId) {
+    if (memoria && (memoria.partyId || memoria.modo === 'TELEFONO_PROPIO')) {
       const destino =
         memoria.modo === 'TELEFONO_PROPIO'
           ? `la cuenta de ${memoria.primerNombre ?? 'tu cuenta'}`
@@ -2634,7 +2642,84 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     if (propia) {
       return preguntar('PEDIDO_PUNTOS_PREGUNTA', 'PROPIA', TEXTOS_BOT.puntosCuentaPropia(propia.primerNombre), BOTONES_PUNTOS_PROPIA);
     }
-    return preguntar('PEDIDO_PUNTOS_NUMERO', undefined, TEXTOS_BOT.puntosPedirNumero(), BOTONES_PUNTOS_NUMERO);
+    // Número sin cuenta: bienvenida con la opción de crearla (la bienvenida sale una sola vez; luego rige la memoria de 30 días)
+    return preguntar('PEDIDO_PUNTOS_PREGUNTA', 'SIN_CUENTA', TEXTOS_BOT.puntosSinCuentaBienvenida(), BOTONES_PUNTOS_SIN_CUENTA);
+  }
+
+  /** Enlaces a Términos y Privacidad a partir de la URL pública de la carta (sin inventar dominio). */
+  private enlacesLegales(contexto: ContextoConversacion): string {
+    try {
+      const origen = new URL(contexto.cartaUrlPublica || '').origin;
+      return TEXTOS_BOT.cuentaEnlacesLegales(`${origen}/legal/terminos`, `${origen}/legal/privacidad`);
+    } catch {
+      return TEXTOS_BOT.cuentaEnlacesLegales(null, null);
+    }
+  }
+
+  private pasoCuentaNombre(
+    flujo: FlujoConversacion,
+    pedido: EstadoCarritoPedido,
+    entrada: EntradaNormalizada,
+    contexto: ContextoConversacion,
+  ): ResultadoTransicion {
+    const nombre = (entrada.textoOriginal ?? '').trim().replace(/\s+/g, ' ');
+    const letras = (nombre.match(/\p{L}/gu) ?? []).length;
+    if (entrada.id || letras < 2 || nombre.length > 60) {
+      return {
+        nuevoEstado: 'PEDIDO_CUENTA_NOMBRE',
+        acciones: [{ tipo: 'enviarTexto', texto: TEXTOS_BOT.cuentaNombreInvalido() }],
+        nuevoFlujo: flujo,
+      };
+    }
+    return {
+      nuevoEstado: 'PEDIDO_CUENTA_CONSENT',
+      acciones: [
+        {
+          tipo: 'enviarBotones',
+          texto: TEXTOS_BOT.cuentaConsentimiento(nombre.split(' ')[0], this.enlacesLegales(contexto)),
+          botones: BOTONES_CUENTA_CONSENTIMIENTO,
+        },
+      ],
+      nuevoFlujo: {
+        ...flujo,
+        estado: 'PEDIDO_CUENTA_CONSENT',
+        pedido: { ...pedido, estadoInterno: 'PEDIDO_CUENTA_CONSENT', cuentaNombre: nombre },
+      },
+    };
+  }
+
+  private pasoCuentaConsentimiento(
+    flujo: FlujoConversacion,
+    pedido: EstadoCarritoPedido,
+    entrada: EntradaNormalizada,
+    contexto: ContextoConversacion,
+  ): ResultadoTransicion {
+    const ahora = Date.now();
+    const nombre = pedido.cuentaNombre;
+    const continuar = (f: FlujoConversacion, previas: AccionMensaje[]) => {
+      const r = this.avanzarHaciaCheckout({ ...f, estado: 'PEDIDO_RESUMEN_CONFIRMAR' as any }, f.pedido as EstadoCarritoPedido, contexto);
+      return { ...r, acciones: [...previas, ...r.acciones] };
+    };
+    if (!nombre || entrada.id === 'cuenta_no') {
+      const f = this.resolverPuntos(flujo, { ...pedido, cuentaNombre: undefined }, { modo: 'NINGUNO', en: ahora });
+      return continuar(f, [{ tipo: 'enviarTexto', texto: TEXTOS_BOT.cuentaSinConsentimiento() }]);
+    }
+    if (entrada.id === 'cuenta_acepto') {
+      // Memoria como cuenta del propio número: el pedido la re-resuelve por teléfono al crearse
+      const f = this.resolverPuntos(flujo, { ...pedido, cuentaNombre: undefined }, { modo: 'TELEFONO_PROPIO', primerNombre: nombre.split(' ')[0], en: ahora });
+      return continuar(f, [{ tipo: 'crearCuentaCliente', nombre }]);
+    }
+    return {
+      nuevoEstado: 'PEDIDO_CUENTA_CONSENT',
+      acciones: [
+        {
+          tipo: 'enviarBotones',
+          texto: TEXTOS_BOT.cuentaConsentimiento(nombre.split(' ')[0], this.enlacesLegales(contexto)),
+          botones: BOTONES_CUENTA_CONSENTIMIENTO,
+        },
+      ],
+      nuevoFlujo: flujo,
+    };
   }
 
   private pasoPuntosPregunta(
@@ -2649,6 +2734,17 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
 
     if (entrada.id === 'puntos_no' || entrada.id === 'puntos_sin') {
       return siguiente(this.resolverPuntos(flujo, pedido, { modo: 'NINGUNO', en: ahora }));
+    }
+    if (entrada.id === 'puntos_crear' && pedido.puntosModo === 'SIN_CUENTA') {
+      return {
+        nuevoEstado: 'PEDIDO_CUENTA_NOMBRE',
+        acciones: [{ tipo: 'enviarTexto', texto: TEXTOS_BOT.cuentaPedirNombre() }],
+        nuevoFlujo: {
+          ...flujo,
+          estado: 'PEDIDO_CUENTA_NOMBRE',
+          pedido: { ...pedido, estadoInterno: 'PEDIDO_CUENTA_NOMBRE', puntosModo: undefined },
+        },
+      };
     }
     if (entrada.id === 'puntos_otro') {
       return {
@@ -2770,7 +2866,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
   private lineaPuntosResumen(flujo: FlujoConversacion, pedido: EstadoCarritoPedido, contexto: ContextoConversacion): string | undefined {
     if (!contexto.puntos) return undefined;
     const mem = this.memoriaPuntosVigente(flujo);
-    if (!mem || mem.modo === 'NINGUNO' || !mem.partyId) return undefined;
+    if (!mem || mem.modo === 'NINGUNO' || (!mem.partyId && mem.modo !== 'TELEFONO_PROPIO')) return undefined;
     if (pedido.cuponCodigo) return TEXTOS_BOT.puntosLineaResumen({ estimado: null, sinPuntos: true });
     const elegible = pedido.items.filter((i) => !i.noSumaBeneficios).reduce((a, i) => a + i.subtotal, 0);
     const estimado = pedido.descuentoAplicado ? null : Math.round(elegible * ((contexto.puntos.porcentaje ?? 5) / 100) * 100) / 100;

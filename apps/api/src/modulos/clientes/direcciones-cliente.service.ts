@@ -25,8 +25,8 @@ export interface DireccionClienteDto {
   origen: string;
 }
 
-/** Búsquedas de DNI permitidas por usuario y minuto (anti-enumeración). */
-const MAX_BUSQUEDAS_DNI_POR_MINUTO = 20;
+/** Búsquedas por teléfono permitidas por usuario y minuto (anti-enumeración). */
+const MAX_BUSQUEDAS_TEL_POR_MINUTO = 20;
 
 /** Clave de deduplicación: texto en minúsculas y con espacios simples. */
 function claveDireccion(texto: string): string {
@@ -176,20 +176,13 @@ export class DireccionesClienteService {
     return { nombre: party.persona?.nombres || 'Cliente', telefono };
   }
 
-  /** Party del cliente con cuenta activa que tiene ese DNI, o null. */
-  async buscarPartyPorDni(dni: string): Promise<bigint | null> {
-    const doc = await this.prisma.partyIdentifier.findFirst({
-      where: { tipo: 'DNI', numero: dni, party: { cuentaCliente: { is: { activo: true } } } },
-      select: { party_id: true },
-    });
-    return doc?.party_id ?? null;
-  }
-
   /** Party del cliente con cuenta activa cuyo celular es ese teléfono (WhatsApp), o null. */
   async resolverPartyPorTelefono(telefono: string | null | undefined): Promise<bigint | null> {
     const norm = normalizarTelefono(telefono ?? '');
     const nacional = norm.length === 11 && norm.startsWith('51') ? norm.slice(2) : norm;
     if (!/^9\d{8}$/.test(nacional)) return null;
+    const cuenta = await this.prisma.customerAccount.findFirst({ where: { telefono: nacional, activo: true }, select: { party_id: true } });
+    if (cuenta) return cuenta.party_id;
     const contacto = await this.prisma.contactMechanism.findFirst({
       where: {
         tipo: { in: ['TELEFONO', 'WHATSAPP'] },
@@ -218,10 +211,10 @@ export class DireccionesClienteService {
   }
 
   /**
-   * Búsqueda de cliente por DNI para el mozo (GET /admin/clientes/por-dni/:dni).
-   * Sin datos extra: nombre, teléfono, puntos y direcciones. El DNI enmascarado lo pone el controlador.
+   * Búsqueda de cliente por celular exacto (9 dígitos) para el mozo (GET /admin/clientes/por-telefono/:telefono).
+   * Sin datos sensibles: nombre, teléfono, puntos y direcciones.
    */
-  async buscarPorDni(dni: string, usuarioPartyId?: string | number | bigint): Promise<
+  async buscarPorTelefono(celular: string, usuarioPartyId?: string | number | bigint): Promise<
     | { encontrado: false }
     | {
         encontrado: true;
@@ -232,8 +225,8 @@ export class DireccionesClienteService {
         direcciones: DireccionClienteDto[];
       }
   > {
-    await this.limitarBusquedaDni(usuarioPartyId);
-    const partyId = await this.buscarPartyPorDni(dni);
+    await this.limitarBusqueda(usuarioPartyId);
+    const partyId = await this.resolverPartyPorTelefono(celular);
     if (!partyId) return { encontrado: false };
 
     const party = await this.prisma.party.findUnique({
@@ -259,15 +252,15 @@ export class DireccionesClienteService {
   }
 
   /** Ventana fija de 1 minuto por usuario. Si Redis no responde, no bloquea. */
-  private async limitarBusquedaDni(usuarioPartyId?: string | number | bigint): Promise<void> {
+  private async limitarBusqueda(usuarioPartyId?: string | number | bigint): Promise<void> {
     try {
       const redis = this.redisService.obtenerCliente();
-      const clave = `busqueda-dni:${usuarioPartyId ?? 'anon'}`;
+      const clave = `busqueda-tel:${usuarioPartyId ?? 'anon'}`;
       const n = await redis.incr(clave);
       if (n === 1) await redis.expire(clave, 60);
-      if (n > MAX_BUSQUEDAS_DNI_POR_MINUTO) {
+      if (n > MAX_BUSQUEDAS_TEL_POR_MINUTO) {
         throw new HttpException(
-          { codigo: 'DEMASIADAS_BUSQUEDAS', mensaje: 'Espera un minuto antes de buscar otro DNI.' },
+          { codigo: 'DEMASIADAS_BUSQUEDAS', mensaje: 'Espera un minuto antes de buscar otro celular.' },
           HttpStatus.TOO_MANY_REQUESTS,
         );
       }

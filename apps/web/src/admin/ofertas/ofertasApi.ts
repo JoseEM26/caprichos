@@ -16,6 +16,13 @@ export interface ComboParteItem {
   productos?: any[];
   opciones?: any[];
   orden?: number;
+  /** Solo FIJO: plan B, plan C... (ids de producto en orden) */
+  reemplazos?: string[];
+  reemplazosDetalle?: { id: string; nombre: string }[];
+  /** Calculado por el servidor en tiempo real */
+  disponible?: boolean;
+  opcionesDisponibles?: string[];
+  principalNombre?: string;
 }
 
 export interface LlevaPagaConfig {
@@ -72,6 +79,9 @@ export interface OfertaItem {
   combosPrecio?: ComboPrecioItem[];
   combosPrecios?: ComboPrecioItem[];
   combosParte?: ComboParteItem[];
+  /** Combo: se puede armar ahora (calculado; no cambia `activo`) */
+  disponible?: boolean;
+  motivoAgotado?: string | null;
   combosPartes?: ComboParteItem[];
   llevaPaga?: LlevaPagaConfig | null;
 }

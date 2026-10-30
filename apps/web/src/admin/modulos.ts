@@ -26,6 +26,7 @@ import {
   DisenadorView,
   DestacadasView,
   NovedadesView,
+  ConocenosView,
   PaletaView,
 } from './contenido';
 import { MascotaAdminView } from './mascota';
@@ -295,6 +296,15 @@ export const MODULOS: DefinicionModulo[] = [
     ruta: '/admin/novedades',
     permisoMinimo: 'catalogo/ver',
     componente: NovedadesView,
+    icono: 'novedades',
+  },
+  {
+    clave: 'conocenos',
+    nombre: 'Conócenos',
+    grupo: 'Configuración',
+    ruta: '/admin/conocenos',
+    permisoMinimo: 'catalogo/ver',
+    componente: ConocenosView,
     icono: 'novedades',
   },
   {

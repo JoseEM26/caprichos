@@ -485,14 +485,19 @@ describe('ReclamosService', () => {
       prismaMock.parametro.findMany.mockResolvedValue([
         { clave: 'terminos_texto', valor: 'Términos de servicio Caprichos' },
         { clave: 'privacidad_texto', valor: 'Aviso de privacidad oficial' },
-        { clave: 'reclamo_plazo_dias_habiles', valor: 15 },
+        { clave: 'terminos_version', valor: '2026-10-29' },
+        { clave: 'privacidad_version', valor: '2026-10-30' },
       ]);
+      prismaMock.parametro.findUnique = jest.fn().mockResolvedValue({ clave: 'reclamo_plazo_dias_habiles', valor: 15 });
 
       const res = await service.obtenerCartaLegal();
 
       expect(res).toEqual({
         terminos: 'Términos de servicio Caprichos',
+        terminosVersion: '2026-10-29',
         privacidad: 'Aviso de privacidad oficial',
+        privacidadVersion: '2026-10-30',
+        textoConsentimiento: expect.stringContaining('mi celular y mis datos'),
         reclamoPlazoDiasHabiles: 15,
       });
     });

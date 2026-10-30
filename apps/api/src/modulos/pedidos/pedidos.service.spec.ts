@@ -184,10 +184,10 @@ describe('PedidosService', () => {
         detalles: [],
       }),
       emitirCuponesParaPedido: jest.fn().mockResolvedValue([]),
+      validarEleccionesCombo: jest.fn().mockResolvedValue(''),
     };
 
     direccionesMock = {
-      buscarPartyPorDni: jest.fn().mockResolvedValue(null),
       resolverPartyPorTelefono: jest.fn().mockResolvedValue(null),
       datosCuentaActiva: jest.fn().mockResolvedValue(null),
       registrarUso: jest.fn().mockResolvedValue({ id: '1' }),
@@ -620,6 +620,34 @@ describe('PedidosService', () => {
       expect(res.total).toBe(28.0);
     });
 
+    describe('combo con parte fija y reemplazos', () => {
+      const dtoCombo = (): CrearPedidoDto => ({
+        ...pedidoBaseDto,
+        lineas: [{ ...pedidoBaseDto.lineas[0], ofertaId: 3, comboElecciones: [{ parteId: 100, productoId: 7 }] }],
+      });
+
+      it('devuelve 409 COMBO_PARTE_NO_DISPONIBLE si la elección no está disponible y no crea el pedido', async () => {
+        ofertasServiceMock.validarEleccionesCombo.mockRejectedValueOnce(
+          new HttpException({ codigo: 'COMBO_PARTE_NO_DISPONIBLE', mensaje: 'x' }, HttpStatus.CONFLICT),
+        );
+        await expect(service.crear(dtoCombo(), 'idemp-combo-409')).rejects.toMatchObject({
+          response: { codigo: 'COMBO_PARTE_NO_DISPONIBLE' },
+          status: 409,
+        });
+        expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+      });
+
+      it('guarda en la nota de la línea el producto realmente elegido', async () => {
+        ofertasServiceMock.validarEleccionesCombo.mockResolvedValueOnce('Combo Dúo · Empanada (en lugar de Club Sandwich)');
+        prismaMock.pedido.create.mockResolvedValue({ id: 120n, codigo: 'CP-W120', estado: 'COLA', subtotal: 28, envio: 5, total: 33 });
+        await service.crear(dtoCombo(), 'idemp-combo-ok');
+        expect(ofertasServiceMock.validarEleccionesCombo).toHaveBeenCalledWith(3, [{ parteId: 100, productoId: 7 }]);
+        expect(prismaMock.pedidoLinea.create.mock.calls[0][0].data.nota).toBe(
+          'Combo Dúo · Empanada (en lugar de Club Sandwich) · Sin azúcar',
+        );
+      });
+    });
+
     describe('canje de puntos (DT-55)', () => {
       it('rechaza un canje mayor al monto elegible con TOPE_CANJE_EXCEDIDO', async () => {
         // Subtotal = 28 sin descuento: elegible = 28. Canje de 30 excede el monto de productos
@@ -834,16 +862,16 @@ describe('PedidosService', () => {
       return capturado;
     };
 
-    it('MOZO con DNI de cliente con cuenta: guarda cliente_party_id, deja party_id del mozo y registra la dirección', async () => {
+    it('MOZO con celular de cliente con cuenta: guarda cliente_party_id, deja party_id del mozo y registra la dirección', async () => {
       const capturado = crearPedidoCapturado();
-      direccionesMock.buscarPartyPorDni.mockResolvedValue(77n);
+      direccionesMock.resolverPartyPorTelefono.mockResolvedValue(77n);
 
-      await service.crear({ ...pedidoBaseDto, clienteDni: '12345678' } as any, 'idemp-dni-1', {
+      await service.crear({ ...pedidoBaseDto, clienteTelefono: '912345678' } as any, 'idemp-dni-1', {
         canal: 'MOZO',
         usuarioPartyId: 55n,
       });
 
-      expect(direccionesMock.buscarPartyPorDni).toHaveBeenCalledWith('12345678');
+      expect(direccionesMock.resolverPartyPorTelefono).toHaveBeenCalledWith('912345678');
       expect(capturado.data.cliente_party_id).toBe(77n);
       expect(capturado.data.party_id).toBe(55n);
       expect(direccionesMock.registrarUso).toHaveBeenCalledWith(
@@ -854,12 +882,12 @@ describe('PedidosService', () => {
       );
     });
 
-    it('MOZO con DNI sin cuenta: falla con CLIENTE_NO_ENCONTRADO y no crea el pedido', async () => {
+    it('MOZO con celular sin cuenta: falla con CLIENTE_NO_ENCONTRADO y no crea el pedido', async () => {
       crearPedidoCapturado();
-      direccionesMock.buscarPartyPorDni.mockResolvedValue(null);
+      direccionesMock.resolverPartyPorTelefono.mockResolvedValue(null);
 
       await expect(
-        service.crear({ ...pedidoBaseDto, clienteDni: '87654321' } as any, 'idemp-dni-2', {
+        service.crear({ ...pedidoBaseDto, clienteTelefono: '987654321' } as any, 'idemp-dni-2', {
           canal: 'MOZO',
           usuarioPartyId: 55n,
         }),
@@ -867,21 +895,21 @@ describe('PedidosService', () => {
       expect(prismaMock.pedido.create).not.toHaveBeenCalled();
     });
 
-    it('MOZO sin DNI (invitado): cliente_party_id queda null y no registra dirección', async () => {
+    it('MOZO sin celular (invitado): cliente_party_id queda null y no registra dirección', async () => {
       const capturado = crearPedidoCapturado();
 
       await service.crear(pedidoBaseDto, 'idemp-dni-3', { canal: 'MOZO', usuarioPartyId: 55n });
 
       expect(capturado.data.cliente_party_id).toBeNull();
-      expect(direccionesMock.buscarPartyPorDni).not.toHaveBeenCalled();
+      expect(direccionesMock.resolverPartyPorTelefono).not.toHaveBeenCalled();
       expect(direccionesMock.registrarUso).not.toHaveBeenCalled();
     });
 
-    it('MOZO con DNI en pedido para recoger: guarda el cliente pero no registra dirección', async () => {
+    it('MOZO con celular en pedido para recoger: guarda el cliente pero no registra dirección', async () => {
       const capturado = crearPedidoCapturado();
-      direccionesMock.buscarPartyPorDni.mockResolvedValue(77n);
+      direccionesMock.resolverPartyPorTelefono.mockResolvedValue(77n);
 
-      await service.crear({ ...pedidoBaseDto, modalidad: 'RECOGER', entrega: undefined, clienteDni: '12345678' } as any, 'idemp-dni-4', {
+      await service.crear({ ...pedidoBaseDto, modalidad: 'RECOGER', entrega: undefined, clienteTelefono: '912345678' } as any, 'idemp-dni-4', {
         canal: 'MOZO',
         usuarioPartyId: 55n,
       });
@@ -892,9 +920,9 @@ describe('PedidosService', () => {
 
     it('MOZO: el cupón compartido y el descuento se evalúan con el cliente identificado, no con el mozo', async () => {
       crearPedidoCapturado();
-      direccionesMock.buscarPartyPorDni.mockResolvedValue(77n);
+      direccionesMock.resolverPartyPorTelefono.mockResolvedValue(77n);
 
-      await service.crear({ ...pedidoBaseDto, clienteDni: '12345678' } as any, 'idemp-dni-5', {
+      await service.crear({ ...pedidoBaseDto, clienteTelefono: '912345678' } as any, 'idemp-dni-5', {
         canal: 'MOZO',
         usuarioPartyId: 55n,
       });
@@ -917,10 +945,10 @@ describe('PedidosService', () => {
     it('carta sin sesión: invitado, y un clienteDni enviado desde la carta se ignora', async () => {
       const capturado = crearPedidoCapturado();
 
-      await service.crear({ ...pedidoBaseDto, clienteDni: '12345678' } as any, 'idemp-carta-2', { canal: 'CARTA' });
+      await service.crear({ ...pedidoBaseDto, clienteTelefono: '912345678' } as any, 'idemp-carta-2', { canal: 'CARTA' });
 
       expect(capturado.data.cliente_party_id).toBeNull();
-      expect(direccionesMock.buscarPartyPorDni).not.toHaveBeenCalled();
+      expect(direccionesMock.resolverPartyPorTelefono).not.toHaveBeenCalled();
       expect(direccionesMock.registrarUso).not.toHaveBeenCalled();
     });
 
@@ -964,9 +992,9 @@ describe('PedidosService', () => {
 
     it('MOZO con clienteDni y clientePartyId: gana el DNI', async () => {
       const capturado = crearPedidoCapturado();
-      direccionesMock.buscarPartyPorDni.mockResolvedValue(77n);
+      direccionesMock.resolverPartyPorTelefono.mockResolvedValue(77n);
 
-      await service.crear({ ...pedidoBaseDto, clienteDni: '12345678', clientePartyId: '88' } as any, 'idemp-pid-4', {
+      await service.crear({ ...pedidoBaseDto, clienteTelefono: '912345678', clientePartyId: '88' } as any, 'idemp-pid-4', {
         canal: 'MOZO',
         usuarioPartyId: 55n,
       });

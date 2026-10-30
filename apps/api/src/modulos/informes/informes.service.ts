@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
+import { COORDENADAS_LOCAL_DEFAULT, DATOS_LOCAL_DEFAULT } from '../local/local.service';
 import { cobroVigente } from '../caja/caja.calculo';
 import { FiltroInformeDto, FiltroMapaDto } from './dto/filtro-informe.dto';
 import {
@@ -1562,19 +1563,31 @@ export class InformesService {
    * Datos para el «Mapa de entregas» (calor, zonas de reparto y radios desde la tienda)
    * Extrae los puntos de coordenadas reales de los pedidos delivery en la base de datos.
    */
-  async obtenerMapaEntregas(filtro: FiltroMapaDto): Promise<MapaEntregasData> {
-    const pedidosDelivery = await this.prisma.pedido.findMany({
-      where: {
-        OR: [{ canal: 'CARTA' }, { modalidad: 'DELIVERY' }],
-        entrega_lat: { not: null },
-        entrega_lng: { not: null },
-      },
-      include: { zona: true },
-    });
+  async obtenerMapaEntregas(filtro: FiltroMapaDto & { periodo?: string }): Promise<MapaEntregasData> {
+    const where: any = {
+      OR: [{ canal: 'CARTA' }, { modalidad: 'DELIVERY' }],
+      entrega_lat: { not: null },
+      entrega_lng: { not: null },
+    };
+    const dias = Number(filtro.periodo && filtro.periodo !== 'todo' ? filtro.periodo : filtro.dias);
+    if (dias > 0) where.creado_en = { gte: new Date(Date.now() - dias * 86400000) };
+    // Valores del CHECK ck_pedido_canal: el bot guarda BOT o WHATSAPP; el call center es TELEFONO
+    const canalBd: Record<string, string[]> = { Web: ['CARTA'], WhatsApp: ['WHATSAPP', 'BOT'], 'Call center': ['TELEFONO'] };
+    if (filtro.canal && canalBd[filtro.canal]) where.canal = { in: canalBd[filtro.canal] };
 
-    const zonasBd = await this.prisma.zonaReparto.findMany({
-      where: { activa: true },
-    });
+    const [pedidosDelivery, zonasBd, parametroLocal] = await Promise.all([
+      this.prisma.pedido.findMany({ where, include: { zona: true } }),
+      this.prisma.zonaReparto.findMany({ where: { activa: true }, orderBy: { codigo: 'asc' } }),
+      this.prisma.parametro?.findUnique({ where: { clave: 'local_datos' } }),
+    ]);
+
+    // Sede real: la misma que usa la carta (parametro local_datos); si falta, la de Caprichos Campoy
+    const datosLocal: any = parametroLocal?.valor ?? {};
+    const sede = {
+      lat: typeof datosLocal.lat === 'number' ? datosLocal.lat : COORDENADAS_LOCAL_DEFAULT.lat,
+      lng: typeof datosLocal.lng === 'number' ? datosLocal.lng : COORDENADAS_LOCAL_DEFAULT.lng,
+      nombre: datosLocal.nombre || DATOS_LOCAL_DEFAULT.nombre,
+    };
 
     const puntos: PuntoEntregaMapa[] = pedidosDelivery.map((p) => {
       const lat = Number(p.entrega_lat);
@@ -1601,14 +1614,6 @@ export class InformesService {
       { n: 'Intentos fuera de cobertura', v: String(outZona.length) },
     ];
 
-    const coloresZona: Record<string, string> = {
-      Z2: '#2B824E',
-      Z3: '#0B2C3E',
-      Z4: '#E67929',
-      Z5: '#D97706',
-      Z7: '#8B5CF6',
-    };
-
     const zonas: ZonaVentasFila[] = zonasBd.map((z) => {
       const pedidosDeZona = inZona.filter((p) => p.zona === z.codigo);
       const cant = pedidosDeZona.length;
@@ -1617,7 +1622,9 @@ export class InformesService {
       return {
         zona: z.codigo,
         nombre: `Zona ${z.codigo}`,
-        color: coloresZona[z.codigo] || '#0B2C3E',
+        // El color lo asigna el front con la misma paleta de Configuración (orden por código)
+        color: '',
+        poligono: Array.isArray(z.poligono) ? (z.poligono as unknown as [number, number][]) : [],
         pedidos: cant,
         ventas: this.soles(ventas),
         porcentaje: `${pct} %`,
@@ -1625,28 +1632,25 @@ export class InformesService {
       };
     });
 
-    // Radios concéntricos desde tienda base (-12.0147, -76.966)
-    const latBase = -12.0147;
-    const lngBase = -76.966;
-    let r05 = 0;
-    let r1 = 0;
-    let r2 = 0;
-
+    // Anillos desde la sede (distancia aproximada en km)
+    const tramos = [0.5, 1, 2, 3];
+    const conteo = tramos.map(() => 0);
     for (const p of inZona) {
-      // Fórmula de distancia euclidiana aproximada en km
-      const dKm = Math.sqrt(Math.pow((p.lat - latBase) * 111, 2) + Math.pow((p.lng - lngBase) * 111, 2));
-      if (dKm <= 0.5) r05++;
-      else if (dKm <= 1.0) r1++;
-      else r2++;
+      const dKm = Math.hypot((p.lat - sede.lat) * 111, (p.lng - sede.lng) * 111 * Math.cos((sede.lat * Math.PI) / 180));
+      const i = tramos.findIndex((t) => dKm <= t);
+      if (i >= 0) conteo[i]++;
+      else conteo[tramos.length - 1]++;
     }
-
-    const radios: RadioDistanciaFila[] = [
-      { rango: '0 a 0.5 km', pedidos: r05 },
-      { rango: '0.5 a 1 km', pedidos: r1 },
-      { rango: '1 a 2 km', pedidos: r2 },
-    ];
+    const etiquetaKm = (km: number) => (km < 1 ? `${km * 1000} m` : `${km} km`);
+    const radios: RadioDistanciaFila[] = tramos.map((t, i) => ({
+      rango: `${i === 0 ? '0' : etiquetaKm(tramos[i - 1])} a ${etiquetaKm(t)}`,
+      etiqueta: etiquetaKm(t),
+      metros: t * 1000,
+      pedidos: conteo[i],
+    }));
 
     return {
+      sede,
       puntos,
       kpis,
       zonas,

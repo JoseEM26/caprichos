@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -16,6 +17,9 @@ import { RedisService } from '../../comun/redis/redis.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { ArchivosService } from '../archivos/archivos.service';
 import { PuntosService } from './puntos.service';
+import { versionConsentimiento, versionesLegales } from '../reclamos/textos-legales';
+import { normalizarCelularPeru } from '../usuarios/alertas-whatsapp.util';
+import { enmascararTelefono } from '../chatbot/utilidades/enmascarar.util';
 import { explicarPedidosPorId } from './explicar-puntos-pedidos';
 import type { ExplicacionPuntos } from './explicar-puntos-pedido';
 import {
@@ -30,7 +34,6 @@ import {
   RegistroClienteDto,
 } from './clientes.tipos';
 
-const TELEFONO_CELULAR = /^9\d{8}$/;
 const FOTO_MAX_BYTES = 2 * 1024 * 1024;
 
 /** Tipo real de la imagen según sus primeros bytes (no la extensión ni el Content-Type que manda el cliente). */
@@ -43,6 +46,28 @@ export function tipoImagenPorBytes(buf: Buffer): string | null {
     return 'image/webp';
   }
   return null;
+}
+
+/** Celular de 9 dígitos que empieza en 9 (acepta 51 delante, espacios o guiones), o null. */
+export function celular9De(raw?: string | null): string | null {
+  const n = normalizarCelularPeru(raw);
+  return n.valido ? n.celular9! : null;
+}
+
+/** Contraseña de cuenta de cliente: 8 a 128 caracteres. */
+export function validarContrasena(c: unknown): void {
+  if (typeof c !== 'string' || c.length < 8) {
+    throw new BadRequestException({
+      codigo: 'CONTRASENA_CORTA',
+      mensaje: 'La contraseña debe tener al menos 8 caracteres.',
+    });
+  }
+  if (c.length > 128) {
+    throw new BadRequestException({
+      codigo: 'CONTRASENA_LARGA',
+      mensaje: 'La contraseña no puede pasar de 128 caracteres.',
+    });
+  }
 }
 
 export function enmascararDoc(doc: string): string {
@@ -101,13 +126,12 @@ export class ClientesService {
   /**
    * Genera el JWT de sesión del cliente con audiencia 'cliente' (30 días).
    */
-  async generarTokenCliente(partyId: bigint, dni: string): Promise<string> {
+  async generarTokenCliente(partyId: bigint): Promise<string> {
     const jwtSecret = this.configService.get<string>('JWT_SECRET', 'desarrollo_jwt_secret_caprichos_2026_muy_seguro');
     return this.jwtService.signAsync(
       {
         sub: partyId.toString(),
         partyId: partyId.toString(),
-        dni,
       },
       {
         secret: jwtSecret,
@@ -119,7 +143,7 @@ export class ClientesService {
 
   /**
    * Extrae y valida la sesión del cliente desde la request (cookie 'cp_cliente' o cabecera Authorization).
-   * Expuesto para integración pública.
+   * Una sesión emitida antes del último cambio de contraseña, o de una cuenta desactivada, no vale.
    */
   async clienteDesdeRequest(req: Request): Promise<ClienteSesion | null> {
     try {
@@ -139,6 +163,14 @@ export class ClientesService {
       });
 
       if (!payload?.partyId) return null;
+      const cuenta = await this.prisma.customerAccount.findUnique({
+        where: { party_id: BigInt(payload.partyId) },
+        select: { activo: true, clave_cambiada_en: true },
+      });
+      if (!cuenta?.activo) return null;
+      if (cuenta.clave_cambiada_en && Number(payload.iat ?? 0) < Math.floor(cuenta.clave_cambiada_en.getTime() / 1000)) {
+        return null;
+      }
       return this.yo(payload.partyId);
     } catch {
       return null;
@@ -146,14 +178,34 @@ export class ClientesService {
   }
 
   /**
-   * Registro de cliente desde la carta (POST /carta/cuenta/registro).
+   * Cuenta de cliente de un celular de 9 dígitos: la que lo guarda como identidad o, si es una cuenta de
+   * mostrador anterior, la del party (no personal) que lo tiene como contacto.
+   */
+  async cuentaPorCelular(celular9: string) {
+    const porColumna = await this.prisma.customerAccount.findFirst({ where: { telefono: celular9, activo: true } });
+    if (porColumna) return porColumna;
+    const contacto = await this.prisma.contactMechanism.findFirst({
+      where: {
+        tipo: { in: ['TELEFONO', 'WHATSAPP'] },
+        valor: { in: [celular9, `51${celular9}`] },
+        activo: true,
+        party: { usuario: { is: null }, cuentaCliente: { is: { activo: true, telefono: null } } },
+      },
+      select: { party: { select: { cuentaCliente: true } } },
+    });
+    return contacto?.party.cuentaCliente ?? null;
+  }
+
+  /**
+   * Registro de cliente desde la carta (POST /carta/cuenta/registro). La cuenta es teléfono + contraseña, sin DNI.
+   * Si el teléfono ya es de un cliente sin contraseña (mostrador) o de un party sin cuenta, se vincula en vez de duplicar.
    */
   async registro(dto: RegistroClienteDto, ip?: string): Promise<{ cliente: ClienteSesion; token: string }> {
-    const dni = String(dto.dni || '').trim().replace(/\D/g, '');
-    if (dni.length !== 8) {
+    const tel = celular9De(dto.telefono);
+    if (!tel) {
       throw new BadRequestException({
-        codigo: 'DNI_INVALIDO',
-        mensaje: 'El DNI debe tener 8 dígitos.',
+        codigo: 'TELEFONO_INVALIDO',
+        mensaje: 'El celular debe tener 9 dígitos y empezar con 9.',
       });
     }
 
@@ -164,188 +216,128 @@ export class ClientesService {
       });
     }
 
-    if (!TELEFONO_CELULAR.test(String(dto.telefono || '').trim())) {
-      throw new BadRequestException({
-        codigo: 'TELEFONO_INVALIDO',
-        mensaje: 'El teléfono celular debe tener 9 dígitos y empezar con 9.',
-      });
-    }
+    validarContrasena(dto.contrasena);
 
-    if (!dto.contrasena || dto.contrasena.length < 8) {
-      throw new BadRequestException({
-        codigo: 'CONTRASENA_CORTA',
-        mensaje: 'La contraseña debe tener al menos 8 caracteres.',
-      });
-    }
-
-    if (!dto.aceptaDatos) {
+    if (dto.aceptaDatos !== true) {
       throw new BadRequestException({
         codigo: 'CONSENTIMIENTO_REQUERIDO',
         mensaje: 'Debes aceptar el uso de tus datos para crear la cuenta.',
       });
     }
 
-    const cumple = parsearCumpleanos(dto.cumpleanos);
-    if (!cumple) {
+    const cumple = dto.cumpleanos ? parsearCumpleanos(dto.cumpleanos) : null;
+    if (dto.cumpleanos && !cumple) {
       throw new BadRequestException({
-        codigo: 'CUMPLEANOS_REQUERIDO',
-        mensaje: 'El cumpleaños es obligatorio para enviarte tu cupón.',
+        codigo: 'FECHA_INVALIDA',
+        mensaje: 'La fecha de cumpleaños no es válida.',
       });
     }
 
-    if (dto.correo && !/^\S+@\S+\.\S+$/.test(dto.correo.trim())) {
+    const correo = dto.correo?.trim() || null;
+    if (correo && !/^\S+@\S+\.\S+$/.test(correo)) {
       throw new BadRequestException({
         codigo: 'CORREO_INVALIDO',
         mensaje: 'El correo no es válido.',
       });
     }
 
-    // Verificar si ya existe documento
-    const docExistente = await this.prisma.partyIdentifier.findFirst({
-      where: { tipo: 'DNI', numero: dni },
-      include: {
-        party: {
-          include: {
-            cuentaCliente: true,
-            persona: true,
-            roles: { where: { rol: 'CLIENTE', hasta: null }, include: { customer_detail: true } },
-          },
-        },
-      },
-    });
-
-    const hashPw = await argon2.hash(dto.contrasena);
-    let partyId: bigint;
-
-    if (docExistente) {
-      const p = docExistente.party;
-      if (p.cuentaCliente?.hash) {
-        // Ya tiene cuenta activa con clave
-        throw new BadRequestException({
-          codigo: 'DNI_REGISTRADO',
-          mensaje: 'Ese DNI ya tiene cuenta.',
-        });
-      }
-
-      // Fue registrado en mostrador sin clave: completar datos
-      partyId = p.id;
-      await this.prisma.$transaction(async (tx) => {
-        // Actualizar datos de persona
-        await tx.person.update({
-          where: { party_id: partyId },
-          data: {
-            nombres: dto.nombre.trim(),
-            correo: dto.correo?.trim() || p.persona?.correo || null,
-            cumple_dia: cumple.dia,
-            cumple_mes: cumple.mes,
-          },
-        });
-
-        await this.guardarTelefono(tx, partyId, dto.telefono.trim());
-
-        // Asegurar cuenta de cliente con hash
-        await tx.customerAccount.upsert({
-          where: { party_id: partyId },
-          create: { party_id: partyId, hash: hashPw, activo: true },
-          update: { hash: hashPw, activo: true },
-        });
-
-        // Registrar consentimiento
-        await tx.consent.create({
-          data: {
-            party_id: partyId,
-            version_texto: '1.0',
-            canal: 'CARTA',
-          },
-        });
+    const desactivada = await this.prisma.customerAccount.findFirst({ where: { telefono: tel, activo: false }, select: { id: true } });
+    if (desactivada) {
+      throw new BadRequestException({
+        codigo: 'TELEFONO_NO_DISPONIBLE',
+        mensaje: 'No pudimos crear la cuenta con ese celular. Escríbenos por WhatsApp.',
       });
-    } else {
-      // Crear nuevo Party completo
-      const nuevoParty = await this.prisma.$transaction(async (tx) => {
-        const party = await tx.party.create({
-          data: {
-            tipo: 'PERSONA',
-            estado: 'ACTIVO',
-          },
-        });
-
-        await tx.partyIdentifier.create({
-          data: {
-            party_id: party.id,
-            tipo: 'DNI',
-            numero: dni,
-          },
-        });
-
-        await tx.person.create({
-          data: {
-            party_id: party.id,
-            nombres: dto.nombre.trim(),
-            correo: dto.correo?.trim() || null,
-            cumple_dia: cumple.dia,
-            cumple_mes: cumple.mes,
-          },
-        });
-
-        const role = await tx.partyRole.create({
-          data: {
-            party_id: party.id,
-            rol: 'CLIENTE',
-          },
-        });
-
-        await tx.customerDetail.create({
-          data: {
-            party_role_id: role.id,
-            puntos: 0,
-          },
-        });
-
-        await tx.customerAccount.create({
-          data: {
-            party_id: party.id,
-            hash: hashPw,
-            activo: true,
-          },
-        });
-
-        await this.guardarTelefono(tx, party.id, dto.telefono.trim());
-
-        if (dto.correo?.trim()) {
-          await tx.contactMechanism.create({
-            data: {
-              party_id: party.id,
-              tipo: 'CORREO',
-              valor: dto.correo.trim(),
-              principal: true,
-            },
-          });
-        }
-
-        await tx.consent.create({
-          data: {
-            party_id: party.id,
-            version_texto: '1.0',
-            canal: 'CARTA',
-          },
-        });
-
-        return party;
-      });
-      partyId = nuevoParty.id;
     }
 
-    const token = await this.generarTokenCliente(partyId, dni);
-    const cliente = await this.yo(partyId);
+    const registrado = new ConflictException({
+      codigo: 'TELEFONO_REGISTRADO',
+      mensaje: 'Ese celular ya tiene cuenta. Ingresa o recupera tu contraseña.',
+    });
 
-    // Auditoría
+    const cuenta = await this.cuentaPorCelular(tel);
+    if (cuenta?.hash) throw registrado;
+
+    // Party sin cuenta que ya tiene ese celular (p. ej. identificado antes por WhatsApp): se vincula
+    let partyId: bigint | null = cuenta?.party_id ?? null;
+    if (!partyId) {
+      const suelto = await this.prisma.contactMechanism.findFirst({
+        where: {
+          tipo: { in: ['TELEFONO', 'WHATSAPP'] },
+          valor: { in: [tel, `51${tel}`] },
+          activo: true,
+          party: { tipo: 'PERSONA', estado: 'ACTIVO', usuario: { is: null }, cuentaCliente: { is: null } },
+        },
+        select: { party_id: true },
+      });
+      partyId = suelto?.party_id ?? null;
+    }
+
+    const hashPw = await argon2.hash(dto.contrasena);
+    const versionTexto = versionConsentimiento(await versionesLegales(this.prisma));
+    try {
+      partyId = await this.prisma.$transaction(async (tx) => {
+        let id = partyId;
+        if (id) {
+          const persona = await tx.person.findUnique({ where: { party_id: id } });
+          if (persona) {
+            await tx.person.update({
+              where: { party_id: id },
+              data: {
+                nombres: dto.nombre.trim(),
+                correo: correo ?? persona.correo,
+                ...(cumple ? { cumple_dia: cumple.dia, cumple_mes: cumple.mes } : {}),
+              },
+            });
+          } else {
+            await tx.person.create({
+              data: { party_id: id, nombres: dto.nombre.trim(), correo, cumple_dia: cumple?.dia ?? null, cumple_mes: cumple?.mes ?? null },
+            });
+          }
+          const rol = await tx.partyRole.findFirst({ where: { party_id: id, rol: 'CLIENTE', hasta: null }, include: { customer_detail: true } });
+          if (!rol) {
+            const nuevo = await tx.partyRole.create({ data: { party_id: id, rol: 'CLIENTE' } });
+            await tx.customerDetail.create({ data: { party_role_id: nuevo.id, puntos: 0 } });
+          } else if (!rol.customer_detail) {
+            await tx.customerDetail.create({ data: { party_role_id: rol.id, puntos: 0 } });
+          }
+        } else {
+          const party = await tx.party.create({ data: { tipo: 'PERSONA', estado: 'ACTIVO' } });
+          id = party.id;
+          await tx.person.create({
+            data: { party_id: id, nombres: dto.nombre.trim(), correo, cumple_dia: cumple?.dia ?? null, cumple_mes: cumple?.mes ?? null },
+          });
+          const rol = await tx.partyRole.create({ data: { party_id: id, rol: 'CLIENTE' } });
+          await tx.customerDetail.create({ data: { party_role_id: rol.id, puntos: 0 } });
+        }
+
+        await tx.customerAccount.upsert({
+          where: { party_id: id },
+          create: { party_id: id, hash: hashPw, telefono: tel, activo: true },
+          update: { hash: hashPw, telefono: tel, activo: true },
+        });
+        await this.guardarTelefono(tx, id, tel);
+        if (correo && !(await tx.contactMechanism.findFirst({ where: { party_id: id, tipo: 'CORREO', valor: correo } }))) {
+          await tx.contactMechanism.create({ data: { party_id: id, tipo: 'CORREO', valor: correo, principal: false } });
+        }
+        await tx.consent.create({ data: { party_id: id, version_texto: versionTexto, canal: 'CARTA' } });
+        return id;
+      });
+    } catch (err: any) {
+      // Dos registros a la vez con el mismo celular: gana uno solo (índice único parcial)
+      if (err?.code === 'P2002') throw registrado;
+      throw err;
+    }
+
+    const token = await this.generarTokenCliente(partyId!);
+    const cliente = await this.yo(partyId!);
+
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
       modulo: 'clientes',
       accion: 'CLIENTE_REGISTRADO',
       entidad: 'party',
-      entidadId: partyId,
-      despues: { dniMascara: enmascararDoc(dni) },
+      entidadId: partyId!,
+      despues: { telefono: enmascararTelefono(tel), vinculado: Boolean(cuenta || partyId) },
       ip,
     });
 
@@ -353,27 +345,62 @@ export class ClientesService {
   }
 
   /**
-   * Ingreso de cliente desde la carta (POST /carta/cuenta/ingresar).
+   * Cuenta creada desde el bot de WhatsApp: solo celular y nombre, SIN contraseña (hash null). La persona define su
+   * contraseña luego en la carta con «¿Olvidaste tu contraseña?». El consentimiento se guarda (canal BOT) con la
+   * versión vigente de términos y privacidad. Si el celular ya tiene cuenta lanza TELEFONO_REGISTRADO.
+   */
+  async crearCuentaDesdeBot(telefono: string, nombre: string): Promise<{ partyId: string; primerNombre: string }> {
+    const tel = celular9De(telefono);
+    if (!tel) throw new BadRequestException({ codigo: 'TELEFONO_INVALIDO', mensaje: 'El celular debe tener 9 dígitos y empezar con 9.' });
+    const limpio = (nombre ?? '').trim().replace(/\s+/g, ' ');
+    if (limpio.length < 2) throw new BadRequestException({ codigo: 'NOMBRE_REQUERIDO', mensaje: 'Escribe tu nombre.' });
+    if ((await this.cuentaPorCelular(tel)) || (await this.prisma.customerAccount.findFirst({ where: { telefono: tel }, select: { id: true } }))) {
+      throw new ConflictException({ codigo: 'TELEFONO_REGISTRADO', mensaje: 'Ese celular ya tiene cuenta.' });
+    }
+    const versionTexto = versionConsentimiento(await versionesLegales(this.prisma));
+    let partyId: bigint;
+    try {
+      partyId = await this.prisma.$transaction(async (tx) => {
+        const party = await tx.party.create({ data: { tipo: 'PERSONA', estado: 'ACTIVO' } });
+        await tx.person.create({ data: { party_id: party.id, nombres: limpio } });
+        const rol = await tx.partyRole.create({ data: { party_id: party.id, rol: 'CLIENTE' } });
+        await tx.customerDetail.create({ data: { party_role_id: rol.id, puntos: 0 } });
+        await tx.customerAccount.create({ data: { party_id: party.id, hash: null, telefono: tel, activo: true } });
+        await tx.contactMechanism.create({ data: { party_id: party.id, tipo: 'TELEFONO', valor: tel, principal: true } });
+        await tx.consent.create({ data: { party_id: party.id, version_texto: versionTexto, canal: 'BOT' } });
+        return party.id;
+      });
+    } catch (err: any) {
+      if (err?.code === 'P2002') throw new ConflictException({ codigo: 'TELEFONO_REGISTRADO', mensaje: 'Ese celular ya tiene cuenta.' });
+      throw err;
+    }
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'clientes',
+      accion: 'CLIENTE_CREADO_BOT',
+      entidad: 'party',
+      entidadId: partyId,
+      despues: { telefono: enmascararTelefono(tel), consentimiento: versionTexto },
+    });
+    return { partyId: partyId.toString(), primerNombre: limpio.split(' ')[0] };
+  }
+
+  /**
+   * Ingreso de cliente desde la carta (POST /carta/cuenta/ingresar): celular + contraseña.
+   * Todo fallo responde igual: no revela si el celular tiene cuenta.
    */
   async ingresar(dto: IngresoClienteDto, ip?: string): Promise<{ cliente: ClienteSesion; token: string }> {
-    const dni = String(dto.dni || '').trim().replace(/\D/g, '');
-    if (dni.length !== 8) {
-      throw new BadRequestException({
+    const generico = () =>
+      new BadRequestException({
         codigo: 'CREDENCIALES_INVALIDAS',
-        mensaje: 'El DNI debe tener 8 dígitos.',
+        mensaje: 'Celular o contraseña incorrectos.',
       });
-    }
+    const tel = celular9De(dto.telefono);
+    if (!tel || !dto.contrasena || typeof dto.contrasena !== 'string') throw generico();
 
-    if (!dto.contrasena) {
-      throw new BadRequestException({
-        codigo: 'CREDENCIALES_INVALIDAS',
-        mensaje: 'Escribe tu contraseña.',
-      });
-    }
-
-    // 1. Revisar bloqueo por intentos fallidos (Redis DT-17 / D-17)
+    // 1. Bloqueo por intentos fallidos (Redis): 5 en 5 minutos
     const redis = this.redisService.obtenerCliente();
-    const claveRedis = `bloqueo:cliente:${dni}`;
+    const claveRedis = `bloqueo:cliente:${tel}`;
     let intentos: string | null = null;
     try {
       intentos = await redis.get(claveRedis);
@@ -387,86 +414,34 @@ export class ClientesService {
       });
     }
 
-    // 2. Buscar cliente por DNI
-    const doc = await this.prisma.partyIdentifier.findFirst({
-      where: { tipo: 'DNI', numero: dni },
-      include: {
-        party: {
-          include: {
-            cuentaCliente: true,
-            persona: true,
-            roles: { where: { rol: 'CLIENTE', hasta: null } },
-          },
-        },
-      },
-    });
-
-    if (!doc || !doc.party) {
+    const fallo = async () => {
       try {
-        await redis.incr(claveRedis);
+        const n = await redis.incr(claveRedis);
         await redis.expire(claveRedis, 300); // 5 min
+        if (n === 5) {
+          await this.auditoria.registrar({
+            categoria: 'ACCESO',
+            modulo: 'clientes',
+            accion: 'CLIENTE_INGRESO_BLOQUEADO',
+            entidad: 'customer_account',
+            despues: { telefono: enmascararTelefono(tel) },
+            ip,
+          });
+        }
       } catch {}
-      throw new BadRequestException({
-        codigo: 'CREDENCIALES_INVALIDAS',
-        mensaje: 'DNI o contraseña incorrectos.',
-      });
-    }
+      throw generico();
+    };
 
-    const party = doc.party;
-    const cuenta = party.cuentaCliente;
+    // 2. Cuenta por celular, activa y con contraseña
+    const cuenta = await this.prisma.customerAccount.findFirst({ where: { telefono: tel, activo: true } });
+    if (!cuenta?.hash) return fallo();
+    if (!(await argon2.verify(cuenta.hash, dto.contrasena))) return fallo();
 
-    // Caso: cliente registrado en mostrador sin clave
-    // "Un DNI registrado en mostrador sin contraseña crea la contraseña al ingresar la primera vez."
-    if (!cuenta || !cuenta.hash) {
-      if (dto.contrasena.length < 8) {
-        throw new BadRequestException({
-          codigo: 'CREDENCIALES_INVALIDAS',
-          mensaje: 'Crea una contraseña de al menos 8 caracteres.',
-        });
-      }
-
-      const nuevoHash = await argon2.hash(dto.contrasena);
-      await this.prisma.customerAccount.upsert({
-        where: { party_id: party.id },
-        create: { party_id: party.id, hash: nuevoHash, activo: true },
-        update: { hash: nuevoHash, activo: true },
-      });
-
-      try {
-        await redis.del(claveRedis);
-      } catch {}
-      const token = await this.generarTokenCliente(party.id, dni);
-      const cliente = await this.yo(party.id);
-      return { cliente: cliente!, token };
-    }
-
-    if (!cuenta.activo) {
-      throw new BadRequestException({
-        codigo: 'CREDENCIALES_INVALIDAS',
-        mensaje: 'Tu cuenta está desactivada.',
-      });
-    }
-
-    // Verificar contraseña con argon2
-    const claveValida = await argon2.verify(cuenta.hash, dto.contrasena);
-    if (!claveValida) {
-      try {
-        await redis.incr(claveRedis);
-        await redis.expire(claveRedis, 300);
-      } catch {}
-      throw new BadRequestException({
-        codigo: 'CREDENCIALES_INVALIDAS',
-        mensaje: 'DNI o contraseña incorrectos.',
-      });
-    }
-
-    // Éxito: limpiar intentos en Redis
     try {
       await redis.del(claveRedis);
     } catch {}
-    const token = await this.generarTokenCliente(party.id, dni);
-    const cliente = await this.yo(party.id);
-
+    const token = await this.generarTokenCliente(cuenta.party_id);
+    const cliente = await this.yo(cuenta.party_id);
     return { cliente: cliente!, token };
   }
 
@@ -479,8 +454,8 @@ export class ClientesService {
       where: { id },
       include: {
         persona: true,
-        documentos: true,
         contactos: true,
+        cuentaCliente: { select: { telefono: true } },
         roles: {
           where: { rol: 'CLIENTE', hasta: null },
           include: { customer_detail: true },
@@ -490,8 +465,6 @@ export class ClientesService {
 
     if (!party) return null;
 
-    const dniDoc = party.documentos.find((d) => d.tipo === 'DNI');
-    const dni = dniDoc ? dniDoc.numero : '';
     const puntos = await this.puntosService.obtenerSaldo(id);
     const fotoId = party.persona?.foto_archivo_id;
     const foto = fotoId ? await this.prisma.archivo.findUnique({ where: { id: fotoId } }) : null;
@@ -499,9 +472,8 @@ export class ClientesService {
     return {
       partyId: id.toString(),
       nombre: party.persona?.nombres || 'Cliente',
-      dniMascara: enmascararDoc(dni),
       correo: party.persona?.correo || null,
-      telefono: telefonoDeContactos(party.contactos),
+      telefono: party.cuentaCliente?.telefono ?? telefonoDeContactos(party.contactos),
       fotoUrl: foto ? `/archivos/${foto.ruta}` : null,
       cumpleanos: formatearCumpleanos(party.persona?.cumple_dia, party.persona?.cumple_mes),
       puntos,
@@ -510,7 +482,7 @@ export class ClientesService {
 
   /**
    * Edición del perfil desde la cuenta del cliente (PUT /carta/cuenta/perfil).
-   * Solo toca nombre, teléfono, correo y cumpleaños: nunca el DNI ni la contraseña.
+   * Solo toca nombre, correo y cumpleaños. El celular es la identidad de la cuenta y no se cambia aquí.
    */
   async actualizarPerfil(partyId: bigint | string, dto: PerfilClienteDto, ip?: string): Promise<ClienteSesion | null> {
     const id = BigInt(partyId);
@@ -522,11 +494,14 @@ export class ClientesService {
       });
     }
 
-    if (dto.telefono !== undefined && !TELEFONO_CELULAR.test(String(dto.telefono).trim())) {
-      throw new BadRequestException({
-        codigo: 'TELEFONO_INVALIDO',
-        mensaje: 'El teléfono celular debe tener 9 dígitos y empezar con 9.',
-      });
+    if (dto.telefono !== undefined) {
+      const actual = (await this.yo(id))?.telefono;
+      if (celular9De(dto.telefono) !== celular9De(actual)) {
+        throw new BadRequestException({
+          codigo: 'TELEFONO_NO_EDITABLE',
+          mensaje: 'Tu celular es tu usuario y no se puede cambiar desde aquí.',
+        });
+      }
     }
 
     const correo = dto.correo !== undefined ? String(dto.correo).trim() : undefined;
@@ -555,10 +530,6 @@ export class ClientesService {
             ...(cumple ? { cumple_dia: cumple.dia, cumple_mes: cumple.mes } : {}),
           },
         });
-      }
-
-      if (dto.telefono !== undefined) {
-        await this.guardarTelefono(tx, id, dto.telefono.trim());
       }
     });
 
@@ -789,8 +760,6 @@ export class ClientesService {
     ip?: string,
   ): Promise<{ items: ClienteAdminListItem[]; total: number; pagina: number; paginas: number }> {
     const q = filtros.q?.trim().toLowerCase();
-    const esAdmin = usuarioAutenticado?.rol === 'ADMIN' || usuarioAutenticado?.rol === 'admin';
-
     // Obtener todas las partes que tienen rol CLIENTE
     const roles = await this.prisma.partyRole.findMany({
       where: {
@@ -805,7 +774,7 @@ export class ClientesService {
         party: {
           include: {
             persona: true,
-            documentos: true,
+            documentos: { where: { tipo: 'RUC' } },
             contactos: true,
             // Pedidos pagados del cliente: los que lo tienen en cliente_party_id, y los de carta/WhatsApp/bot
             // sin ese campo (su party_id es el cliente). En MOZO/CAJA party_id es el personal: no cuenta.
@@ -827,13 +796,10 @@ export class ClientesService {
       orderBy: { id: 'desc' },
     });
 
-    // DNI sin enmascarar, solo para buscar; no sale en la respuesta a menos que sea admin
-    const docPorId = new Map<string, string>();
     let items: ClienteAdminListItem[] = roles.map((r) => {
       const p = r.party;
-      const dniDoc = p.documentos.find((d: any) => d.tipo === 'DNI' || d.tipo === 'RUC');
-      const docNum = dniDoc?.numero || '';
-      docPorId.set(p.id.toString(), docNum);
+      // Solo el RUC sirve para reconocer una empresa; el DNI de un cliente no se lee ni se devuelve
+      const docNum = p.documentos.find((d: any) => d.tipo === 'RUC')?.numero || '';
 
       // Tipo de cliente
       let tipo: 'Persona' | 'Empresa' | 'Personal' = 'Persona';
@@ -853,14 +819,10 @@ export class ClientesService {
       const envioFijo = detalle?.envio_tipo === 'FIJO' && detalle.envio_valor ? Number(detalle.envio_valor) : null;
       const descEnvio = detalle?.envio_tipo === 'PORCENTAJE' && detalle.envio_valor ? Number(detalle.envio_valor) : null;
 
-      // DNI: si es admin y se solicita, se puede ver completo, pero por defecto en listas enmascarado
-      const dniMascara = esAdmin ? docNum : enmascararDoc(docNum);
-
       return {
         id: p.id.toString(),
         nombre: p.persona?.nombres || 'Sin nombre',
         tipo,
-        dni: dniMascara,
         telefono: tel,
         correo,
         cumpleanos: cumple,
@@ -882,12 +844,9 @@ export class ClientesService {
       items = items.filter((it) => it.creditoPersonal === quiereCred);
     }
     if (q) {
+      const digitos = q.replace(/\D/g, '');
       items = items.filter(
-        (it) =>
-          it.nombre.toLowerCase().includes(q) ||
-          (docPorId.get(it.id) ?? '').includes(q) ||
-          it.telefono.includes(q) ||
-          it.correo.toLowerCase().includes(q),
+        (it) => it.nombre.toLowerCase().includes(q) || (digitos.length >= 3 && it.telefono.includes(digitos)),
       );
     }
 
@@ -915,7 +874,7 @@ export class ClientesService {
       where: { id },
       include: {
         persona: true,
-        documentos: true,
+        documentos: { where: { tipo: 'RUC' } },
         contactos: true,
         roles: { where: { rol: 'CLIENTE' }, include: { customer_detail: true } },
       },
@@ -958,22 +917,9 @@ export class ClientesService {
       }),
     ]);
 
+    // Solo una empresa tiene documento (RUC); un cliente persona no tiene DNI guardado
     const esAdmin = usuarioAutenticado?.rol === 'ADMIN' || usuarioAutenticado?.rol === 'admin';
-    const doc = party.documentos[0]?.numero || '';
-
-    // Si un admin solicita ver el documento completo, se audita como LECTURA_SENSIBLE (RQ-CLI-01-10)
-    if (esAdmin) {
-      await this.auditoria.registrar({
-        categoria: 'LECTURA_SENSIBLE',
-        modulo: 'clientes',
-        accion: 'CLIENTE_VER_COMPLETO',
-        entidad: 'party',
-        entidadId: id,
-        despues: { dniConsultado: doc },
-        partyId: usuarioAutenticado?.partyId ? BigInt(usuarioAutenticado.partyId) : undefined,
-        ip,
-      });
-    }
+    const ruc = party.documentos[0]?.numero || null;
 
     const puntos = await this.puntosService.obtenerSaldo(id);
     const puntosPedidos = await explicarPedidosPorId(this.prisma, pedidos.map((p) => p.id)).catch(() => new Map<string, ExplicacionPuntos>());
@@ -983,8 +929,7 @@ export class ClientesService {
     return {
       id: party.id.toString(),
       nombre: party.persona?.nombres || 'Sin nombre',
-      dni: doc,
-      dniMascara: enmascararDoc(doc),
+      ruc: ruc ? (esAdmin ? ruc : enmascararDoc(ruc)) : null,
       telefono: tel,
       correo,
       cumpleanos: formatearCumpleanos(party.persona?.cumple_dia, party.persona?.cumple_mes),
@@ -1007,17 +952,25 @@ export class ClientesService {
   }
 
   /**
-   * Registro en mostrador (RQ-CLI-01-06):
-   * Quien atiende crea el cliente sin contraseña.
+   * Registro en mostrador (RQ-CLI-01-06): quien atiende crea el cliente sin contraseña.
+   * Una persona se identifica por su celular (sin DNI); solo una empresa lleva RUC.
+   * Después se registra en la carta con ese mismo celular y la cuenta se vincula.
    */
   async crearEnMostrador(dto: RegistrarMostradorDto, usuarioId?: string, ip?: string) {
-    const dni = String(dto.dni || '').trim().replace(/\D/g, '');
-    const esEmpresa = dni.length === 11;
+    const ruc = String(dto.ruc || '').trim().replace(/\D/g, '');
+    const esEmpresa = ruc.length > 0;
+    const tel = celular9De(dto.telefono);
 
-    if (!(dni.length === 8 || esEmpresa)) {
+    if (esEmpresa && ruc.length !== 11) {
       throw new BadRequestException({
         codigo: 'DOCUMENTO_INVALIDO',
-        mensaje: 'El DNI tiene 8 dígitos (o el RUC de una empresa, 11).',
+        mensaje: 'El RUC de una empresa tiene 11 dígitos.',
+      });
+    }
+    if (!esEmpresa && !tel) {
+      throw new BadRequestException({
+        codigo: 'TELEFONO_INVALIDO',
+        mensaje: 'El celular debe tener 9 dígitos y empezar con 9.',
       });
     }
 
@@ -1043,17 +996,17 @@ export class ClientesService {
       });
     }
 
-    const docExistente = await this.prisma.partyIdentifier.findFirst({
-      where: { tipo: esEmpresa ? 'RUC' : 'DNI', numero: dni },
-    });
-
-    if (docExistente) {
+    const yaExiste = esEmpresa
+      ? await this.prisma.partyIdentifier.findFirst({ where: { tipo: 'RUC', numero: ruc } })
+      : await this.cuentaPorCelular(tel!);
+    if (yaExiste) {
       throw new BadRequestException({
         codigo: 'CLIENTE_YA_EXISTE',
-        mensaje: 'Ya existe un cliente con ese documento.',
+        mensaje: esEmpresa ? 'Ya existe un cliente con ese RUC.' : 'Ya existe un cliente con ese celular.',
       });
     }
 
+    const versionTexto = versionConsentimiento(await versionesLegales(this.prisma));
     const nuevoParty = await this.prisma.$transaction(async (tx) => {
       const party = await tx.party.create({
         data: {
@@ -1062,13 +1015,9 @@ export class ClientesService {
         },
       });
 
-      await tx.partyIdentifier.create({
-        data: {
-          party_id: party.id,
-          tipo: esEmpresa ? 'RUC' : 'DNI',
-          numero: dni,
-        },
-      });
+      if (esEmpresa) {
+        await tx.partyIdentifier.create({ data: { party_id: party.id, tipo: 'RUC', numero: ruc } });
+      }
 
       await tx.person.create({
         data: {
@@ -1094,21 +1043,22 @@ export class ClientesService {
         },
       });
 
-      // CustomerAccount con hash=null (sin contraseña, la crea después en la carta)
+      // CustomerAccount con hash=null (sin contraseña: la crea al registrarse en la carta con este celular)
       await tx.customerAccount.create({
         data: {
           party_id: party.id,
           hash: null,
+          telefono: esEmpresa ? null : tel,
           activo: true,
         },
       });
 
-      if (dto.telefono?.trim()) {
+      if (tel) {
         await tx.contactMechanism.create({
           data: {
             party_id: party.id,
             tipo: 'TELEFONO',
-            valor: dto.telefono.trim(),
+            valor: tel,
             principal: true,
           },
         });
@@ -1128,7 +1078,7 @@ export class ClientesService {
       await tx.consent.create({
         data: {
           party_id: party.id,
-          version_texto: '1.0',
+          version_texto: versionTexto,
           canal: 'CAJA',
         },
       });
@@ -1142,7 +1092,7 @@ export class ClientesService {
       accion: 'CLIENTE_CREADO_MOSTRADOR',
       entidad: 'party',
       entidadId: nuevoParty.id,
-      despues: { dniMascara: enmascararDoc(dni), nombre: dto.nombre.trim() },
+      despues: { nombre: dto.nombre.trim(), telefono: tel ? enmascararTelefono(tel) : null, ruc: esEmpresa ? enmascararDoc(ruc) : null },
       partyId: usuarioId ? BigInt(usuarioId) : undefined,
       ip,
     });
@@ -1150,12 +1100,12 @@ export class ClientesService {
     return {
       id: nuevoParty.id.toString(),
       nombre: dto.nombre.trim(),
-      dni: enmascararDoc(dni),
+      telefono: tel,
     };
   }
 
   /**
-   * Editar cliente desde el administrativo (el DNI NO se cambia - RN-CAP-083).
+   * Editar cliente desde el administrativo (si cambia el celular, cambia también el usuario de su cuenta).
    */
   async editarCliente(partyId: string, dto: EditarClienteAdminDto, usuarioId?: string, ip?: string) {
     const id = BigInt(partyId);
@@ -1190,26 +1140,24 @@ export class ClientesService {
         });
       }
 
-      // 2. Teléfono
+      // 2. Teléfono (también es el usuario de su cuenta: único entre cuentas activas)
       if (dto.telefono !== undefined) {
-        const telExistente = await tx.contactMechanism.findFirst({
-          where: { party_id: id, tipo: 'TELEFONO' },
-        });
-        if (telExistente) {
-          await tx.contactMechanism.update({
-            where: { id: telExistente.id },
-            data: { valor: dto.telefono.trim() },
-          });
-        } else if (dto.telefono.trim()) {
-          await tx.contactMechanism.create({
-            data: {
-              party_id: id,
-              tipo: 'TELEFONO',
-              valor: dto.telefono.trim(),
-              principal: true,
-            },
+        const tel = celular9De(dto.telefono);
+        if (!tel) {
+          throw new BadRequestException({
+            codigo: 'TELEFONO_INVALIDO',
+            mensaje: 'El celular debe tener 9 dígitos y empezar con 9.',
           });
         }
+        const otra = await tx.customerAccount.findFirst({ where: { telefono: tel, activo: true, party_id: { not: id } }, select: { id: true } });
+        if (otra) {
+          throw new BadRequestException({
+            codigo: 'TELEFONO_REGISTRADO',
+            mensaje: 'Ese celular ya es de otra cuenta.',
+          });
+        }
+        await this.guardarTelefono(tx, id, tel);
+        await tx.customerAccount.updateMany({ where: { party_id: id }, data: { telefono: tel } });
       }
 
       // 3. Tarifas preferenciales de envío (customer_detail)

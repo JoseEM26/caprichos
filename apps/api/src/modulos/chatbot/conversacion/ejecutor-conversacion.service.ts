@@ -1,4 +1,5 @@
 import { PuntosService } from '../../clientes/puntos.service';
+import { CUENTA_CLIENTE_BOT_PUERTO, CuentaClienteBotPuerto } from '../puerto/cuenta-cliente-bot.puerto';
 import { Inject, Injectable, Logger, Optional, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
@@ -81,6 +82,7 @@ export class EjecutorConversacionService {
     @Optional() private readonly direccionesService?: DireccionesClienteService,
     @Optional() private readonly outbox?: OutboxWhatsappService,
     @Optional() private readonly puntosService?: PuntosService,
+    @Optional() @Inject(CUENTA_CLIENTE_BOT_PUERTO) private readonly clientesService?: CuentaClienteBotPuerto,
   ) {}
 
   /**
@@ -1284,6 +1286,28 @@ export class EjecutorConversacionService {
             contenido: { texto: accion.texto },
             meta_id: metaId,
           },
+        });
+      } else if (accion.tipo === 'crearCuentaCliente') {
+        // Cuenta sin contraseña con el celular de la conversación; el texto sale por el mismo camino que cualquier respuesta del bot
+        let texto: string;
+        try {
+          if (!this.clientesService) throw new Error('ClientesService no disponible');
+          const r = await this.clientesService.crearCuentaDesdeBot(conversacion.telefono, accion.nombre);
+          texto = TEXTOS_BOT.cuentaCreada(r.primerNombre);
+        } catch (err: any) {
+          this.logger.warn(`No se pudo crear la cuenta del cliente desde el bot: ${err.message}`);
+          texto = TEXTOS_BOT.cuentaNoCreada();
+        }
+        let metaId: string | null = null;
+        if (destinoEnvio) {
+          const res = await this.mensajeria.enviarTexto(destinoEnvio, texto, {
+            conversacionId: conversacion.id,
+            replyToWaMessageId: entradaRaw.waMessageId,
+          });
+          metaId = res.waMessageId || null;
+        }
+        await this.prisma.mensajeChat.create({
+          data: { conversacion_id: conversacion.id, direccion: 'SALE', autor: 'BOT', tipo: 'TEXTO', contenido: { texto }, meta_id: metaId },
         });
       } else if (accion.tipo === 'enviarBotones') {
         let metaId: string | null = null;

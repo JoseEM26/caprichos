@@ -119,7 +119,7 @@ export interface ZonasMapaProps {
 
 // Colores alternados entre oscuros y claros, para distinguir zonas también por luminosidad
 const PALETA = ['#1565C0', '#FFB300', '#2E7D32', '#AD1457', '#00838F', '#6D4C41', '#5E35B1', '#C0CA33'];
-const colorDeZona = (indice: number) => PALETA[indice % PALETA.length];
+export const colorDeZona = (indice: number) => PALETA[indice % PALETA.length];
 
 const aCadena = (lista: CoordenadaPunto[]) => JSON.stringify(lista);
 

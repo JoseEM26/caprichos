@@ -1,4 +1,4 @@
-import { useRef, useState, type CSSProperties, type KeyboardEvent as RKeyboardEvent, type PointerEvent as RPointerEvent } from 'react';
+import { useRef, useState, type CSSProperties, type ReactNode, type KeyboardEvent as RKeyboardEvent, type PointerEvent as RPointerEvent } from 'react';
 import { DatosLocalCarta, EstadoLocalCarta } from './tipos';
 import { useEsMovil } from './useEsMovil';
 import { NovedadDetalle } from './NovedadDetalle';
@@ -34,6 +34,8 @@ interface PaginaNovedadesProps {
   cargando?: boolean;
   error?: string | null;
   alReintentar?: () => void;
+  /** Solo el admin: controles y marcas encima de cada tarjeta (también oculta «Momentos»). */
+  adminItem?: (n: NovedadCarta) => AdminTarjetaNovedad;
   encabezado?: {
     etiqueta?: string;
     titulo?: string;
@@ -167,7 +169,7 @@ function MosaicoEsqueleto({ movil }: { movil: boolean }) {
   );
 }
 
-function estiloMosaico(movil: boolean): CSSProperties {
+export function estiloMosaico(movil: boolean): CSSProperties {
   return {
     display: 'grid',
     gridTemplateColumns: movil ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))',
@@ -175,6 +177,192 @@ function estiloMosaico(movil: boolean): CSSProperties {
     gridAutoFlow: 'dense',
     gap: movil ? 10 : 16,
   };
+}
+
+/** Datos que el admin añade a cada tarjeta (controles y marcas); en la carta pública no existe. */
+export interface AdminTarjetaNovedad {
+  acciones: ReactNode;
+  borrador: boolean;
+}
+
+const MARCA_ADMIN: CSSProperties = {
+  fontFamily: 'Montserrat, sans-serif',
+  fontWeight: 800,
+  fontSize: 11,
+  borderRadius: 9999,
+  padding: '4px 10px',
+  background: 'var(--cp-white)',
+  color: 'var(--cp-navy)',
+};
+
+/** Marcas «Borrador» / «Desactivada» y barra de controles del admin, encima de la tarjeta. */
+function CapaAdmin({ novedad, admin }: { novedad: NovedadCarta; admin: AdminTarjetaNovedad }) {
+  return (
+    <>
+      {!novedad.activo && (
+        <span aria-hidden="true" style={{ position: 'absolute', inset: 0, zIndex: 3, background: 'rgba(255,255,255,0.5)', pointerEvents: 'none' }} />
+      )}
+      <span style={{ position: 'absolute', right: 10, top: 10, zIndex: 4, display: 'flex', gap: 6 }}>
+        {admin.borrador && <span style={{ ...MARCA_ADMIN, background: 'var(--cp-gold)' }}>Borrador</span>}
+        {!novedad.activo && <span style={MARCA_ADMIN}>Desactivada</span>}
+      </span>
+      <div
+        style={{ position: 'absolute', right: 8, top: 40, left: 8, zIndex: 4, display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 4 }}
+      >
+        {admin.acciones}
+      </div>
+    </>
+  );
+}
+
+/** Tarjeta del mosaico de Novedades: la misma en la carta y en la vista de admin. */
+export function TarjetaMosaicoNovedad({
+  item,
+  indice: i,
+  movil,
+  onAbrir,
+  admin,
+}: {
+  item: NovedadCarta;
+  indice: number;
+  movil: boolean;
+  onAbrir: (n: NovedadCarta) => void;
+  admin?: AdminTarjetaNovedad;
+}) {
+  const radio = movil ? 12 : 16;
+  const tamano = tamanoDeNovedad(item);
+  const foto = item.fotos[0]?.url;
+  const tipoUp = (item.tipo || '').toUpperCase();
+  const esVideo = tipoUp === 'VIDEO' || !!item.video_url;
+  const esAviso = tipoUp === 'AVISO' && !/nuevo:/i.test(item.titulo || '');
+  const compacta = tamano === 'CHICO';
+  return (
+    <article
+      key={item.id}
+      data-tamano={tamano}
+      className="cp-nov-card"
+      style={{
+        ...posicionMosaico(tamano, movil),
+        position: 'relative',
+        overflow: 'hidden',
+        borderRadius: radio,
+        background: 'var(--cp-navy)',
+        color: '#FFFFFF',
+        margin: 0,
+        animationDelay: `${i * 70}ms`,
+      }}
+    >
+      <button
+        type="button"
+        className="cp-nov-abrir"
+        aria-label={`Ver detalle de ${item.titulo}`}
+        onClick={() => onAbrir(item)}
+        style={{ position: 'absolute', inset: 0, zIndex: 2, border: 0, padding: 0, background: 'transparent', cursor: 'pointer', borderRadius: 'inherit' }}
+      />
+      {foto ? (
+        <img
+          className="cp-nov-foto"
+          src={foto}
+          alt=""
+          loading="lazy"
+          draggable={false}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+        />
+      ) : (
+        <div
+          aria-hidden="true"
+          style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          {!esAviso && (
+            <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="var(--cp-cream)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
+              <path d="M3 8h4l2-3h6l2 3h4v11H3z" />
+              <circle cx="12" cy="13.5" r="3.5" />
+            </svg>
+          )}
+        </div>
+      )}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background:
+            'linear-gradient(to top, rgba(11, 44, 62, 0.92) 0%, rgba(11, 44, 62, 0.35) 45%, rgba(11, 44, 62, 0) 70%)',
+        }}
+      />
+      <span style={{ ...INSIGNIA, position: 'absolute', left: 10, top: 10, zIndex: 1 }}>
+        {obtenerEtiquetaNovedad(item)}
+      </span>
+      {esVideo && foto && (
+        <span
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            left: '50%',
+            top: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: 56,
+            height: 56,
+            borderRadius: 28,
+            background: 'rgba(11, 44, 62, 0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1,
+          }}
+        >
+          <svg viewBox="0 0 24 24" width="26" height="26" fill="#FFFFFF">
+            <path d="M8 5v14l11-7z" />
+          </svg>
+        </span>
+      )}
+      <div
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 1,
+          padding: compacta ? '10px 12px' : movil ? '12px 14px' : '18px 20px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 6,
+          pointerEvents: 'none',
+        }}
+      >
+        <span
+          style={{
+            fontFamily: 'Montserrat, sans-serif',
+            fontWeight: 800,
+            fontSize: compacta ? 14 : 18,
+            lineHeight: 1.2,
+            display: '-webkit-box',
+            WebkitLineClamp: compacta ? 2 : 3,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}
+        >
+          {item.titulo}
+        </span>
+        {!compacta && item.texto && (
+          <span
+            style={{
+              fontSize: 13,
+              lineHeight: '18px',
+              opacity: 0.92,
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+            }}
+          >
+            {item.texto}
+          </span>
+        )}
+      </div>
+      {admin && <CapaAdmin novedad={item} admin={admin} />}
+    </article>
+  );
 }
 
 export function PaginaNovedades({
@@ -186,6 +374,7 @@ export function PaginaNovedades({
   error = null,
   alReintentar,
   encabezado,
+  adminItem,
 }: PaginaNovedadesProps) {
   const movil = useEsMovil();
   const [filtroActivo, setFiltroActivo] = useState('todo');
@@ -291,6 +480,7 @@ export function PaginaNovedades({
           }}
         />
         <span
+          data-testid="encabezado-etiqueta"
           style={{
             position: 'relative',
             fontFamily: 'Montserrat, sans-serif',
@@ -303,6 +493,7 @@ export function PaginaNovedades({
           {encabezado?.etiqueta?.trim() || 'NOVEDADES'}
         </span>
         <span
+          data-testid="encabezado-titulo"
           style={{
             position: 'relative',
             fontFamily: 'Montserrat, sans-serif',
@@ -314,6 +505,7 @@ export function PaginaNovedades({
           {encabezado?.titulo?.trim() || 'Lo nuevo en Caprichos'}
         </span>
         <span
+          data-testid="encabezado-subtitulo"
           style={{
             position: 'relative',
             fontSize: abTxt,
@@ -388,6 +580,7 @@ export function PaginaNovedades({
                         'linear-gradient(to top, rgba(11, 44, 62, 0.92), rgba(11, 44, 62, 0))',
                     }}
                   />
+                  {adminItem && <CapaAdmin novedad={item} admin={adminItem(item)} />}
                   <button
                     type="button"
                     className="cp-nov-abrir"
@@ -589,140 +782,9 @@ export function PaginaNovedades({
         </div>
       ) : (
         <div style={estiloMosaico(movil)}>
-          {novedadesFiltradas.map((item, i) => {
-            const tamano = tamanoDeNovedad(item);
-            const foto = item.fotos[0]?.url;
-            const tipoUp = (item.tipo || '').toUpperCase();
-            const esVideo = tipoUp === 'VIDEO' || !!item.video_url;
-            const esAviso = tipoUp === 'AVISO' && !/nuevo:/i.test(item.titulo || '');
-            const compacta = tamano === 'CHICO';
-            return (
-              <article
-                key={item.id}
-                data-tamano={tamano}
-                className="cp-nov-card"
-                style={{
-                  ...posicionMosaico(tamano, movil),
-                  position: 'relative',
-                  overflow: 'hidden',
-                  borderRadius: abRad,
-                  background: 'var(--cp-navy)',
-                  color: '#FFFFFF',
-                  margin: 0,
-                  animationDelay: `${i * 70}ms`,
-                }}
-              >
-                <button
-                  type="button"
-                  className="cp-nov-abrir"
-                  aria-label={`Ver detalle de ${item.titulo}`}
-                  onClick={() => setAbierta(item)}
-                  style={{ position: 'absolute', inset: 0, zIndex: 2, border: 0, padding: 0, background: 'transparent', cursor: 'pointer', borderRadius: 'inherit' }}
-                />
-                {foto ? (
-                  <img
-                    className="cp-nov-foto"
-                    src={foto}
-                    alt=""
-                    loading="lazy"
-                    draggable={false}
-                    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-                  />
-                ) : (
-                  <div
-                    aria-hidden="true"
-                    style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                  >
-                    {!esAviso && (
-                      <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="var(--cp-cream)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
-                        <path d="M3 8h4l2-3h6l2 3h4v11H3z" />
-                        <circle cx="12" cy="13.5" r="3.5" />
-                      </svg>
-                    )}
-                  </div>
-                )}
-                <div
-                  aria-hidden="true"
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    background:
-                      'linear-gradient(to top, rgba(11, 44, 62, 0.92) 0%, rgba(11, 44, 62, 0.35) 45%, rgba(11, 44, 62, 0) 70%)',
-                  }}
-                />
-                <span style={{ ...INSIGNIA, position: 'absolute', left: 10, top: 10, zIndex: 1 }}>
-                  {obtenerEtiquetaNovedad(item)}
-                </span>
-                {esVideo && foto && (
-                  <span
-                    aria-hidden="true"
-                    style={{
-                      position: 'absolute',
-                      left: '50%',
-                      top: '50%',
-                      transform: 'translate(-50%, -50%)',
-                      width: 56,
-                      height: 56,
-                      borderRadius: 28,
-                      background: 'rgba(11, 44, 62, 0.7)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      zIndex: 1,
-                    }}
-                  >
-                    <svg viewBox="0 0 24 24" width="26" height="26" fill="#FFFFFF">
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                  </span>
-                )}
-                <div
-                  style={{
-                    position: 'absolute',
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    zIndex: 1,
-                    padding: compacta ? '10px 12px' : movil ? '12px 14px' : '18px 20px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 6,
-                    pointerEvents: 'none',
-                  }}
-                >
-                  <span
-                    style={{
-                      fontFamily: 'Montserrat, sans-serif',
-                      fontWeight: 800,
-                      fontSize: compacta ? 14 : 18,
-                      lineHeight: 1.2,
-                      display: '-webkit-box',
-                      WebkitLineClamp: compacta ? 2 : 3,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    {item.titulo}
-                  </span>
-                  {!compacta && item.texto && (
-                    <span
-                      style={{
-                        fontSize: 13,
-                        lineHeight: '18px',
-                        opacity: 0.92,
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                      }}
-                    >
-                      {item.texto}
-                    </span>
-                  )}
-                </div>
-              </article>
-            );
-          })}
+          {novedadesFiltradas.map((item, i) => (
+            <TarjetaMosaicoNovedad key={item.id} item={item} indice={i} movil={movil} onAbrir={setAbierta} admin={adminItem?.(item)} />
+          ))}
         </div>
       )}
 
@@ -776,7 +838,7 @@ export function PaginaNovedades({
         </div>
       )}
 
-      {!cargando && !error && (
+      {!cargando && !error && !adminItem && (
         <MosaicoMomentos titulo="Momentos Caprichos" fotos={fotosDeNovedades} cantidad={8} />
       )}
 

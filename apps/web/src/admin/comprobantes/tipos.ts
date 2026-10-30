@@ -177,6 +177,9 @@ export interface ConsultaConstanciaPublica {
 export interface CartaLegalInfo {
   terminos: string;
   privacidad: string;
+  terminosVersion?: string;
+  privacidadVersion?: string;
+  textoConsentimiento?: string;
   reclamoPlazoDiasHabiles: number;
 }
 

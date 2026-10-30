@@ -13,7 +13,8 @@ export function ModalNuevoCliente({
   alGuardarExitoso,
 }: PropsModalNuevoCliente) {
   const [nombre, setNombre] = useState('');
-  const [dni, setDni] = useState('');
+  const [esEmpresa, setEsEmpresa] = useState(false);
+  const [ruc, setRuc] = useState('');
   const [telefono, setTelefono] = useState('');
   const [correo, setCorreo] = useState('');
   const [cumpleanos, setCumpleanos] = useState('');
@@ -24,27 +25,23 @@ export function ModalNuevoCliente({
 
   if (!abierto) return null;
 
-  const esEmpresa = dni.length === 11;
-  const subtituloDoc = dni.length === 11
-    ? 'Empresa (RUC de 11 dígitos)'
-    : 'Persona (DNI de 8 dígitos)';
 
   const validarYConfirmar = () => {
     setErrorMsg('');
     const n = nombre.trim();
-    const d = dni.trim();
+    const tel = telefono.replace(/[\s-]/g, '').replace(/^\+51/, '');
     const c = correo.trim();
 
     if (n.length < 2) {
       setErrorMsg('Escribe el nombre.');
       return;
     }
-    if (!(d.length === 8 || d.length === 11)) {
-      setErrorMsg('El DNI tiene 8 dígitos (o el RUC de una empresa, 11).');
+    if (esEmpresa && ruc.length !== 11) {
+      setErrorMsg('El RUC tiene 11 dígitos.');
       return;
     }
-    if (!esEmpresa && !/^\d{4}-\d{2}-\d{2}$/.test(cumpleanos.trim())) {
-      setErrorMsg('Elige el cumpleaños del cliente en el calendario.');
+    if (!esEmpresa && !/^9\d{8}$/.test(tel)) {
+      setErrorMsg('Escribe el celular del cliente: 9 dígitos y empieza con 9.');
       return;
     }
     if (c && !/.+@.+\..+/.test(c)) {
@@ -65,10 +62,11 @@ export function ModalNuevoCliente({
     try {
       await registrarClienteMostrador({
         nombre: nombre.trim(),
-        dni: dni.trim(),
-        telefono: telefono.trim() || undefined,
+        ...(esEmpresa
+          ? { ruc, telefono: telefono.trim() || undefined }
+          : { telefono: telefono.replace(/[\s-]/g, '').replace(/^\+51/, '') }),
         correo: correo.trim() || undefined,
-        cumpleanos: cumpleanos.trim() || undefined,
+        cumpleanos: esEmpresa ? undefined : cumpleanos.trim() || undefined,
         aceptaDatos: true,
       });
       setMostrarConfirmacion(false);
@@ -141,6 +139,30 @@ export function ModalNuevoCliente({
           </button>
         </div>
 
+        <div role="group" aria-label="Tipo de cliente" style={{ display: 'flex', gap: 8 }}>
+          {([[false, 'Persona'], [true, 'Empresa']] as const).map(([v, t]) => (
+            <button
+              key={t}
+              type="button"
+              aria-pressed={esEmpresa === v}
+              onClick={() => { setEsEmpresa(v); setErrorMsg(''); }}
+              style={{
+                minHeight: 44,
+                padding: '0 16px',
+                borderRadius: 9999,
+                border: `1.5px solid ${esEmpresa === v ? 'var(--cp-navy)' : 'var(--cp-line)'}`,
+                background: esEmpresa === v ? 'var(--cp-navy)' : 'var(--cp-white)',
+                color: esEmpresa === v ? 'var(--cp-white)' : 'var(--cp-navy)',
+                fontWeight: 800,
+                fontSize: 14,
+                cursor: 'pointer',
+              }}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+
         <div>
           <label
             htmlFor="nc-n"
@@ -170,23 +192,19 @@ export function ModalNuevoCliente({
           />
         </div>
 
-        <div>
-          <label
-            htmlFor="nc-d"
-            style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}
-          >
-            DNI o RUC (obligatorio)
-          </label>
-          <input
-            id="nc-d"
-            type="text"
-            value={dni}
-            onChange={(e) => {
-              setDni(e.target.value.replace(/\D/g, '').slice(0, 11));
-              setErrorMsg('');
-            }}
-            placeholder="8 dígitos, o 11 si es empresa"
-            style={{
+        {esEmpresa && (
+          <div>
+            <label htmlFor="nc-r" style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>
+              RUC (obligatorio)
+            </label>
+            <input
+              id="nc-r"
+              type="text"
+              inputMode="numeric"
+              value={ruc}
+              onChange={(e) => { setRuc(e.target.value.replace(/\D/g, '').slice(0, 11)); setErrorMsg(''); }}
+              placeholder="11 dígitos"
+              style={{
               width: '100%',
               boxSizing: 'border-box',
               minHeight: 44,
@@ -196,24 +214,25 @@ export function ModalNuevoCliente({
               padding: '0 12px',
               fontSize: 14,
               color: 'var(--cp-navy)',
-            }}
-          />
-        </div>
-
-        <div style={{ fontSize: 12, color: 'var(--cp-soft)' }}>{subtituloDoc}</div>
+              }}
+            />
+          </div>
+        )}
 
         <div>
           <label
             htmlFor="nc-t"
             style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}
           >
-            Teléfono
+            {esEmpresa ? 'Celular (opcional)' : 'Celular (obligatorio)'}
           </label>
           <input
             id="nc-t"
             type="text"
             value={telefono}
-            onChange={(e) => setTelefono(e.target.value)}
+            inputMode="numeric"
+            placeholder="Ej.: 987654321"
+            onChange={(e) => { setTelefono(e.target.value); setErrorMsg(''); }}
             style={{
               width: '100%',
               boxSizing: 'border-box',
@@ -259,7 +278,7 @@ export function ModalNuevoCliente({
             htmlFor="nc-b"
             style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}
           >
-            Cumpleaños (obligatorio para personas)
+            Cumpleaños (opcional)
           </label>
           <input
             id="nc-b"
@@ -317,7 +336,7 @@ export function ModalNuevoCliente({
             {aceptaDatos ? '✓' : ''}
           </span>
           <span>
-            El cliente acepta que Caprichos guarde su documento y sus datos para su cuenta y sus puntos.
+            El cliente acepta que Caprichos guarde su celular y sus datos para su cuenta y sus puntos.
           </span>
         </button>
 
@@ -408,7 +427,7 @@ export function ModalNuevoCliente({
               ¿Registrar a {nombre.trim()}?
             </div>
             <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--cp-soft)' }}>
-              Queda en Clientes. Si es persona, el cliente crea su contraseña después, en la carta.
+              Queda en Clientes. Si es persona, el cliente crea su contraseña después, en la carta, con el mismo celular.
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
               <button

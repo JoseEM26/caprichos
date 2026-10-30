@@ -8,6 +8,8 @@ import { OfertasModule } from '../ofertas/ofertas.module';
 import { PedidosModule } from '../pedidos/pedidos.module';
 import { ZonasModule } from '../zonas/zonas.module';
 import { ClientesModule } from '../clientes/clientes.module';
+import { ClientesService } from '../clientes/clientes.service';
+import { CUENTA_CLIENTE_BOT_PUERTO } from './puerto/cuenta-cliente-bot.puerto';
 import { ReservasModule } from '../reservas/reservas.module';
 import { ChatbotIaModule } from './ia/chatbot-ia.module';
 import { ChatbotConfiguracionModule } from './configuracion/chatbot-configuracion.module';
@@ -53,6 +55,7 @@ import { ColaWebhookService } from './servicios/cola-webhook.service';
   ],
   controllers: [WhatsappWebhookController, QuejasWhatsappController, AdminWhatsappSalientesController],
   providers: [
+    { provide: CUENTA_CLIENTE_BOT_PUERTO, useExisting: ClientesService },
     WhatsAppMetaAdaptador,
     WhatsAppSimuladoAdaptador,
     WhatsAppMensajeriaProvider,

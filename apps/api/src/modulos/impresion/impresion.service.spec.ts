@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { ImpresionService } from './impresion.service';
 
@@ -541,6 +541,77 @@ describe('ImpresionService', () => {
       const viejos = prismaMock.printJob.updateMany.mock.calls[1][0];
       expect(viejos.where.en.lt).toEqual(new Date(ahora - 60 * 60 * 1000));
       expect(viejos.data.estado).toBe('VENCIDO');
+    });
+  });
+
+  describe('cola: vaciar y descartar', () => {
+    const caja: any = { rol: 'CAJERO', partyId: 7n };
+    const motivo = 'Impresora apagada todo el dia';
+
+    it('vacía solo las pendientes antiguas (no las IMPRIMIENDO) y audita el conteo', async () => {
+      prismaMock.printJob.updateMany.mockResolvedValue({ count: 12 });
+      const res = await service.vaciarCola({ alcance: 'ANTIGUAS', minutos: 30, motivo }, caja, '1.1.1.1');
+      const arg = prismaMock.printJob.updateMany.mock.calls[0][0];
+      expect(arg.where.estado).toBe('PENDIENTE');
+      expect(arg.where.en.lt).toBeInstanceOf(Date);
+      expect(arg.data.estado).toBe('DESCARTADO');
+      expect(res.descartadas).toBe(12);
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({ accion: 'VACIAR_COLA', motivo, despues: expect.objectContaining({ descartadas: 12 }) }),
+      );
+    });
+
+    it('TODAS no filtra por antigüedad y acepta un pedido', async () => {
+      prismaMock.printJob.updateMany.mockResolvedValue({ count: 3 });
+      await service.vaciarCola({ alcance: 'TODAS', pedido_id: '55', motivo }, { rol: 'ADMIN', partyId: 1n } as any);
+      const { where } = prismaMock.printJob.updateMany.mock.calls[0][0];
+      expect(where).toEqual({ estado: 'PENDIENTE', pedido_id: 55n });
+    });
+
+    it('exige motivo de al menos 5 caracteres', async () => {
+      await expect(service.vaciarCola({ alcance: 'TODAS', motivo: ' ab ' }, caja)).rejects.toBeInstanceOf(BadRequestException);
+      expect(prismaMock.printJob.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('COCINA no puede descartar', async () => {
+      await expect(service.vaciarCola({ alcance: 'TODAS', motivo }, { rol: 'COCINA', partyId: 1n } as any)).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(service.descartarPedido('1', {}, { rol: 'MOZO', partyId: 1n } as any)).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('descartar un trabajo y un pedido marca DESCARTADO solo PENDIENTE/FALLIDO', async () => {
+      prismaMock.printJob.updateMany.mockResolvedValue({ count: 1 });
+      await service.descartarTrabajo('9', {}, caja);
+      expect(prismaMock.printJob.updateMany.mock.calls[0][0].where).toEqual({ id: 9n, estado: { in: ['PENDIENTE', 'FALLIDO'] } });
+      await service.descartarPedido('4', { motivo: 'Pedido ya entregado' }, caja);
+      expect(prismaMock.printJob.updateMany.mock.calls[1][0].where.pedido_id).toBe(4n);
+      expect(prismaMock.printJob.updateMany.mock.calls[1][0].data.error).toContain('Pedido ya entregado');
+    });
+
+    it('el agente nunca toma un descartado: tomarTrabajos solo pide PENDIENTE', async () => {
+      prismaMock.$queryRaw.mockResolvedValue([]);
+      await service.tomarTrabajos(5, 1n);
+      const sql = String((prismaMock.$queryRaw.mock.calls[0][0] as string[]).join(' '));
+      expect(sql).toContain("estado = 'PENDIENTE'");
+    });
+
+    it('un resultado fallido de un trabajo descartado no lo devuelve a la cola', async () => {
+      prismaMock.printJob.findUnique.mockResolvedValue({ id: 3n, estado: 'DESCARTADO', intentos: 0 });
+      await service.registrarResultado({ id: '3', ok: false, error: 'x' } as any);
+      expect(prismaMock.printJob.update).not.toHaveBeenCalled();
+    });
+
+    it('listarCola agrupa por pedido con resumen', async () => {
+      const t = (id: bigint, pedido: bigint, min: number) => ({
+        id, pedido_id: pedido, estado: 'PENDIENTE', error: null,
+        en: new Date(Date.now() - min * 60000), pedido: { codigo: `P-${pedido}`, cliente_nombre: 'Ana' },
+      });
+      prismaMock.printJob.findMany.mockResolvedValue([t(3n, 2n, 5), t(2n, 1n, 90), t(1n, 1n, 100)]);
+      prismaMock.printJob.groupBy = jest.fn().mockResolvedValue([{ estado: 'PENDIENTE', _count: { _all: 3 } }]);
+      prismaMock.printJob.count.mockResolvedValue(2);
+      const res = await service.listarCola('pendientes');
+      expect(res.items.map((g: any) => [g.pedidoCodigo, g.cantidad])).toEqual([['P-1', 2], ['P-2', 1]]);
+      expect(res.resumen.pendientes).toBe(3);
+      expect(res.resumen.pendientesAntiguas).toBe(2);
     });
   });
 });

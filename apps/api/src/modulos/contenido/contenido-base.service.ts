@@ -9,6 +9,13 @@ const SEED = (...n: string[]) => n.map((x) => `publico/seed/${x}.webp`);
 const MARCA = ['caprichos-del-mes', 'caprichos-de-octubre', 'donuts-halloween', 'fantasma-cafe', 'hechizo-pumpkin'].map(
   (x) => `/imagenes/caprichos/${x}.webp`,
 );
+// Fotos de las novedades de ejemplo (por título); antes eran un parche del front en la carta.
+const FOTOS_NOVEDADES: Record<string, string[]> = {
+  'Fin de semana de waffles': ['waffle_oreo'],
+  'Martes de 2x1 en Latte Coffe': ['iced_latte_coffee', 'mocaccino', 'caramel_macchiato'],
+  'Así preparamos nuestro Frappe Oreo': ['frappe_oreo'],
+  'Nuevo: Frappe Maracuyá Tropical': ['frappe_maracuya', 'frappe_strawberry', 'frappe_berries'],
+};
 const DESTACADAS_BASE = [
   { titulo: 'Caprichos del mes', rutas: SEED('frappe_maracuya', 'frappe_oreo', 'duo_irresistible', 'waffle_oreo', 'iced_latte_coffee') },
   {
@@ -30,7 +37,7 @@ export class ContenidoBaseService implements OnModuleInit {
   async onModuleInit(): Promise<void> {
     try {
       const r = await this.asegurar();
-      this.logger.log(`Contenido base: ${r.fotos} fotos de producto, ${r.destacadas} destacadas creadas`);
+      this.logger.log(`Contenido base: ${r.fotos} fotos de producto, ${r.novedades} novedades con foto, ${r.destacadas} destacadas creadas`);
     } catch (err: any) {
       this.logger.warn(`No se pudo asegurar el contenido base de la carta: ${err.message}`);
     }
@@ -38,8 +45,9 @@ export class ContenidoBaseService implements OnModuleInit {
 
   async asegurar() {
     const fotos = await this.enlazarFotosBase();
+    const novedades = await this.enlazarFotosNovedades();
     const destacadas = await this.crearDestacadasSiVacio();
-    return { fotos, destacadas };
+    return { fotos, novedades, destacadas };
   }
 
   /** Enlaza la foto base SOLO a productos sin foto y cuyo archivo exista en disco. */
@@ -62,6 +70,30 @@ export class ContenidoBaseService implements OnModuleInit {
       });
       await this.prisma.producto.update({ where: { id: p.id }, data: { foto_archivo_id: archivo.id } });
       n++;
+    }
+    return n;
+  }
+
+  /** Registra las fotos de las novedades de ejemplo SOLO si no tienen ninguna (nunca pisa ni duplica lo del admin). */
+  async enlazarFotosNovedades(): Promise<number> {
+    const dir = path.resolve(this.config.get<string>('UPLOADS_DIR', './data/uploads'), 'publico/seed');
+    const sinFoto = await this.prisma.novedad.findMany({
+      where: { titulo: { in: Object.keys(FOTOS_NOVEDADES) }, fotos: { none: {} } },
+      select: { id: true, titulo: true },
+    });
+    let n = 0;
+    for (const nov of sinFoto) {
+      const nombres = FOTOS_NOVEDADES[nov.titulo].filter((f) => fs.existsSync(path.join(dir, `${f}.webp`)));
+      for (const [orden, f] of nombres.entries()) {
+        const ruta = `publico/seed/${f}.webp`;
+        const archivo = await this.prisma.archivo.upsert({
+          where: { ruta },
+          update: {},
+          create: { ruta, tipo_mime: 'image/webp', bytes: fs.statSync(path.join(dir, `${f}.webp`)).size, privado: false },
+        });
+        await this.prisma.novedadFoto.create({ data: { novedad_id: nov.id, archivo_id: archivo.id, orden } });
+      }
+      if (nombres.length) n++;
     }
     return n;
   }

@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   Param,
   Post,
   Put,
@@ -19,6 +20,7 @@ import { Request, Response } from 'express';
 import { PuntosService } from './puntos.service';
 import { ClientesService } from './clientes.service';
 import { DireccionesClienteService } from './direcciones-cliente.service';
+import { RecuperarClaveService } from './recuperar-clave.service';
 import { IngresoClienteDto, PerfilClienteDto, RegistroClienteDto } from './clientes.tipos';
 
 @Controller('carta/cuenta')
@@ -28,6 +30,7 @@ export class CuentaClienteController {
     private readonly configService: ConfigService,
     private readonly direcciones: DireccionesClienteService,
     private readonly puntos: PuntosService,
+    private readonly recuperar: RecuperarClaveService,
   ) {}
 
   @Post('registro')
@@ -70,6 +73,24 @@ export class CuentaClienteController {
     });
 
     return { cliente };
+  }
+
+  /** Pide un código de 6 dígitos por WhatsApp. Responde siempre lo mismo, exista o no la cuenta. */
+  @Post('recuperar/solicitar')
+  @HttpCode(200)
+  async solicitarRecuperacion(@Body('telefono') telefono: string, @Req() req: Request) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.recuperar.solicitar(telefono, ip);
+  }
+
+  @Post('recuperar/confirmar')
+  @HttpCode(200)
+  async confirmarRecuperacion(
+    @Body() dto: { telefono: string; codigo: string; contrasenaNueva: string },
+    @Req() req: Request,
+  ) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.recuperar.confirmar(dto, ip);
   }
 
   @Get('yo')
@@ -157,7 +178,7 @@ export class CuentaClienteController {
   async movimientosPuntos(@Req() req: Request, @Query('pagina') pagina?: string) {
     const cliente = await this.clientesService.clienteDesdeRequest(req);
     if (!cliente) {
-      throw new UnauthorizedException({ codigo: 'SESION_REQUERIDA', mensaje: 'Ingresa con tu DNI para ver tus puntos.' });
+      throw new UnauthorizedException({ codigo: 'SESION_REQUERIDA', mensaje: 'Ingresa con tu celular para ver tus puntos.' });
     }
     return this.puntos.movimientosCuenta(BigInt(cliente.partyId), Math.max(1, parseInt(pagina ?? '1', 10) || 1));
   }

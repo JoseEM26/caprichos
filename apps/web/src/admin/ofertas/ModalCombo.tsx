@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { OfertaItem, ComboPrecioItem, ComboParteItem, ofertasApi } from './ofertasApi';
 import { ModalConfirmacion } from './ModalConfirmacion';
 import { PrevisualizacionCarta } from './PrevisualizacionCarta';
+import { ReemplazosParteFijo } from './ReemplazosParteFijo';
 
 const DIAS = [
   ['lun', 'Lunes', 'Lun'],
@@ -489,6 +490,7 @@ export function ModalCombo({
           cantidad: p.cantidad || 1,
           categorias: (p.categorias || []).map((c: any) => String(c)),
           productos: (p.productos || []).map((pr: any) => String(typeof pr === 'object' ? pr.productoId || pr.id : pr)),
+          reemplazos: p.tipoParte === 'FIJO' || p.tipo === 'FIJO' ? (p.reemplazos || []).map(String) : undefined,
           orden: idx + 1,
         })),
         combosPartes: partes.map((p, idx) => ({
@@ -498,6 +500,7 @@ export function ModalCombo({
           cantidad: p.cantidad || 1,
           categorias: (p.categorias || []).map((c: any) => String(c)),
           productos: (p.productos || []).map((pr: any) => String(typeof pr === 'object' ? pr.productoId || pr.id : pr)),
+          reemplazos: p.tipoParte === 'FIJO' || p.tipo === 'FIJO' ? (p.reemplazos || []).map(String) : undefined,
           orden: idx + 1,
         })),
       };
@@ -1195,7 +1198,11 @@ export function ModalCombo({
                               onChange={(e) => {
                                 const prodId = e.target.value;
                                 setPartes((prev) =>
-                                  prev.map((p, i) => (i === idx ? { ...p, productos: prodId ? [prodId] : [] } : p)),
+                                  prev.map((p, i) =>
+                                    i === idx
+                                      ? { ...p, productos: prodId ? [prodId] : [], reemplazos: (p.reemplazos || []).filter((r) => r !== prodId) }
+                                      : p,
+                                  ),
                                 );
                               }}
                               style={{
@@ -1218,6 +1225,23 @@ export function ModalCombo({
                             <span style={{ fontSize: '12px', color: 'var(--cp-soft)', display: 'block', marginTop: '6px' }}>
                               Ejemplo: Este producto vendrá siempre incluido en el combo de manera fija.
                             </span>
+                            {(() => {
+                              const principalId = sl.productos?.[0]
+                                ? String(typeof sl.productos[0] === 'object' ? sl.productos[0].id || sl.productos[0].productoId : sl.productos[0])
+                                : '';
+                              if (!principalId) return null;
+                              return (
+                                <ReemplazosParteFijo
+                                  principalId={principalId}
+                                  principalNombre={productosDisponibles.find((p) => String(p.id) === principalId)?.nombre ?? ''}
+                                  reemplazos={(sl.reemplazos || []).map(String)}
+                                  productos={productosDisponibles}
+                                  onCambiar={(ids) =>
+                                    setPartes((prev) => prev.map((p, i) => (i === idx ? { ...p, reemplazos: ids } : p)))
+                                  }
+                                />
+                              );
+                            })()}
                           </div>
                         )}
 

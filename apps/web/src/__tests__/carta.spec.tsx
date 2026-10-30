@@ -503,7 +503,6 @@ describe('Carta ▸ puntos (reglas vigentes)', () => {
         partyId: '100',
         nombre: 'Ana',
         telefono: '987654321',
-        dniMascara: '4521****',
         correo: 'ana@ejemplo.com',
         cumpleanos: '14/03',
         puntos: 30,

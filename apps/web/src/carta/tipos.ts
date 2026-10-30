@@ -143,6 +143,9 @@ export interface LineaCarrito {
   opciones: OpcionElegida[];
   nota?: string;
   personas?: string[];
+  /** Combo con parte fija: el combo y qué producto se eligió en cada parte (principal o reemplazo) */
+  ofertaId?: string;
+  comboElecciones?: { parteId: string; productoId: string }[];
   unidades?: UnidadPersonalizada[];
   precioUnitario: number;
   subtotal: number;

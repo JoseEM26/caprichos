@@ -46,6 +46,10 @@ export function ModalEditarCliente({
       setErrorMsg('Escribe el nombre.');
       return;
     }
+    if (telefono.trim() && !/^9\d{8}$/.test(telefono.replace(/[\s-]/g, '').replace(/^\+51/, ''))) {
+      setErrorMsg('El celular debe tener 9 dígitos y empezar con 9.');
+      return;
+    }
     if (correo.trim() && correo.trim() !== 'sin correo' && !/.+@.+\..+/.test(correo.trim())) {
       setErrorMsg('El correo no parece válido. Es opcional.');
       return;
@@ -179,7 +183,7 @@ export function ModalEditarCliente({
 
         <div>
           <label style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>
-            Teléfono
+            Celular
           </label>
           <input
             type="text"

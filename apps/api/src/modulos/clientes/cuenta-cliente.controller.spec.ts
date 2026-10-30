@@ -14,10 +14,12 @@ import { UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CuentaClienteController } from './cuenta-cliente.controller';
 import { ClientesService } from './clientes.service';
+import { RecuperarClaveService } from './recuperar-clave.service';
 import { DireccionesClienteService } from './direcciones-cliente.service';
 
 describe('CuentaClienteController', () => {
   let controller: CuentaClienteController;
+  const recuperarMock = { solicitar: jest.fn().mockResolvedValue({ ok: true }), confirmar: jest.fn().mockResolvedValue({ ok: true }) };
   let clientesServiceMock: any;
   let configServiceMock: any;
 
@@ -44,6 +46,7 @@ describe('CuentaClienteController', () => {
         { provide: PuntosService, useValue: { movimientosCuenta: jest.fn().mockResolvedValue({ porcentaje: 5, movimientos: [], pagina: 1, hayMas: false }) } },
         { provide: ConfigService, useValue: configServiceMock },
         { provide: DireccionesClienteService, useValue: { listar: jest.fn(), desactivar: jest.fn() } },
+        { provide: RecuperarClaveService, useValue: recuperarMock },
       ],
     }).compile();
 
@@ -52,7 +55,7 @@ describe('CuentaClienteController', () => {
 
   it('registro pone cookie cp_cliente y devuelve cliente', async () => {
     clientesServiceMock.registro.mockResolvedValue({
-      cliente: { partyId: '100', nombre: 'Ana', dniMascara: '4521****', correo: null, cumpleanos: '14/03', puntos: 0 },
+      cliente: { partyId: '100', nombre: 'Ana', correo: null, cumpleanos: '14/03', puntos: 0 },
       token: 'mock_jwt_token',
     });
 
@@ -60,7 +63,7 @@ describe('CuentaClienteController', () => {
     const req: any = { ip: '127.0.0.1' };
 
     const r = await controller.registro(
-      { dni: '45217890', nombre: 'Ana', contrasena: '12345678', telefono: '912345678', cumpleanos: '14/03', aceptaDatos: true },
+      { nombre: 'Ana', contrasena: '12345678', telefono: '912345678', aceptaDatos: true },
       req,
       res,
     );
@@ -185,5 +188,22 @@ describe('CuentaClienteController', () => {
       clientesServiceMock.clienteDesdeRequest.mockResolvedValue(null);
       await expect(controller.movimientosPuntos({} as any)).rejects.toBeInstanceOf(UnauthorizedException);
     });
+  });
+
+  it('ingresar pone la cookie cp_cliente con el celular y la contraseña', async () => {
+    clientesServiceMock.ingresar = jest.fn().mockResolvedValue({ cliente: { partyId: '100', nombre: 'Ana' }, token: 'tok' });
+    const res: any = { cookie: jest.fn() };
+    const r = await controller.ingresar({ telefono: '912345678', contrasena: '12345678' }, { ip: '1.1.1.1' } as any, res);
+    expect(clientesServiceMock.ingresar).toHaveBeenCalledWith({ telefono: '912345678', contrasena: '12345678' }, '1.1.1.1');
+    expect(res.cookie).toHaveBeenCalledWith('cp_cliente', 'tok', expect.objectContaining({ httpOnly: true }));
+    expect(r.cliente.nombre).toBe('Ana');
+  });
+
+  it('recuperar/solicitar y recuperar/confirmar delegan al servicio de recuperación', async () => {
+    await controller.solicitarRecuperacion('912345678', { ip: '1.1.1.1' } as any);
+    expect(recuperarMock.solicitar).toHaveBeenCalledWith('912345678', '1.1.1.1');
+    const dto = { telefono: '912345678', codigo: '123456', contrasenaNueva: 'NuevaClave2026' };
+    await controller.confirmarRecuperacion(dto, { ip: '1.1.1.1' } as any);
+    expect(recuperarMock.confirmar).toHaveBeenCalledWith(dto, '1.1.1.1');
   });
 });

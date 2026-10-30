@@ -69,7 +69,6 @@ const cuentaCon = () =>
       partyId: '100',
       nombre: 'Ana Torres',
       telefono: '987000222',
-      dniMascara: '4521****',
       correo: null,
       cumpleanos: '14/03',
       puntos: 0,

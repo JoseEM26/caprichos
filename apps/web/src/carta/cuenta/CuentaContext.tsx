@@ -5,7 +5,6 @@ import { api, clienteFetch } from '../../comun/api';
 export interface ClienteCuenta {
   partyId: string;
   nombre: string;
-  dniMascara: string;
   correo: string | null;
   telefono: string | null;
   fotoUrl: string | null;
@@ -14,18 +13,16 @@ export interface ClienteCuenta {
 }
 
 export interface DatosRegistro {
-  dni: string;
   nombre: string;
   contrasena: string;
   telefono: string;
   correo?: string;
-  cumpleanos: string;
+  cumpleanos?: string;
   aceptaDatos: boolean;
 }
 
 export interface DatosPerfil {
   nombre?: string;
-  telefono?: string;
   correo?: string;
   cumpleanos?: string;
 }
@@ -35,7 +32,7 @@ interface ContextoCuenta {
   panelAbierto: boolean;
   abrirPanel: () => void;
   cerrarPanel: () => void;
-  ingresar: (dni: string, contrasena: string) => Promise<void>;
+  ingresar: (telefono: string, contrasena: string) => Promise<void>;
   registrar: (datos: DatosRegistro) => Promise<void>;
   actualizarPerfil: (datos: DatosPerfil) => Promise<void>;
   subirFoto: (archivo: File) => Promise<void>;
@@ -86,8 +83,8 @@ export function CuentaProvider({ children }: { children: ReactNode }) {
     if (hayIndicio()) void refrescar();
   }, [refrescar]);
 
-  const ingresar = useCallback(async (dni: string, contrasena: string) => {
-    const r = await api.post<{ cliente: ClienteCuenta }>('/carta/cuenta/ingresar', { dni, contrasena });
+  const ingresar = useCallback(async (telefono: string, contrasena: string) => {
+    const r = await api.post<{ cliente: ClienteCuenta }>('/carta/cuenta/ingresar', { telefono, contrasena });
     marcar(true);
     setCliente(r.cliente);
   }, []);

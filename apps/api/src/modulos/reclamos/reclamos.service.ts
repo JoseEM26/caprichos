@@ -6,6 +6,7 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
+import { TEXTO_CONSENTIMIENTO, leerTextosLegales } from './textos-legales';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
@@ -260,22 +261,17 @@ export class ReclamosService {
    * Lee términos, privacidad y plazo legal desde los parámetros del sistema (GET /carta/legal).
    */
   async obtenerCartaLegal() {
-    const parametros = await this.prisma.parametro.findMany({
-      where: {
-        clave: {
-          in: ['terminos_texto', 'privacidad_texto', 'reclamo_plazo_dias_habiles'],
-        },
-      },
-    });
-
-    const terminosParam = parametros.find((p) => p.clave === 'terminos_texto');
-    const privacidadParam = parametros.find((p) => p.clave === 'privacidad_texto');
-    const plazoParam = parametros.find((p) => p.clave === 'reclamo_plazo_dias_habiles');
-
+    const [textos, plazo] = await Promise.all([
+      leerTextosLegales(this.prisma, 'carta'),
+      this.prisma.parametro.findUnique({ where: { clave: 'reclamo_plazo_dias_habiles' } }),
+    ]);
     return {
-      terminos: terminosParam?.valor ?? 'Términos y condiciones del servicio (pendiente de revisión legal D-06)',
-      privacidad: privacidadParam?.valor ?? 'Política de privacidad y protección de datos personales (pendiente de revisión legal D-06)',
-      reclamoPlazoDiasHabiles: typeof plazoParam?.valor === 'number' ? plazoParam.valor : 15,
+      terminos: textos.terminos.texto,
+      terminosVersion: textos.terminos.version,
+      privacidad: textos.privacidad.texto,
+      privacidadVersion: textos.privacidad.version,
+      textoConsentimiento: TEXTO_CONSENTIMIENTO,
+      reclamoPlazoDiasHabiles: typeof plazo?.valor === 'number' ? plazo.valor : 15,
     };
   }
 

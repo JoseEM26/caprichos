@@ -1,6 +1,6 @@
 export interface DefinicionPlantilla {
   nombre: string;
-  categoria: 'UTILITY' | 'MARKETING';
+  categoria: 'UTILITY' | 'MARKETING' | 'AUTHENTICATION';
   idioma: string;
   texto: string;
   variables: string[];
@@ -8,6 +8,14 @@ export interface DefinicionPlantilla {
 }
 
 export const CATALOGO_PLANTILLAS: Record<string, DefinicionPlantilla> = {
+  CODIGO_CUENTA: {
+    nombre: 'caprichos_codigo_cuenta',
+    categoria: 'AUTHENTICATION',
+    idioma: 'es',
+    variables: ['codigo'],
+    texto: 'Tu código de Caprichos es {{1}}. Vence en 10 minutos. Si no lo pediste, ignora este mensaje.',
+    descripcion: 'Código de 6 dígitos para recuperar la contraseña de la cuenta del cliente. Fuera de la ventana de 24 h Meta debe tenerla aprobada: se registra en Meta como categoría AUTHENTICATION (texto y botón «copiar código» según el formato que exige Meta) y debe quedar APROBADA antes de usarla.',
+  },
   DELIVERY_SALIDA: {
     nombre: 'caprichos_delivery_en_camino',
     categoria: 'UTILITY',

@@ -88,6 +88,8 @@ export function TarjetaOferta({
 
   // Vigencia
   const aplicaHoy = oferta.vigenteAhora !== false;
+  // Combo sin con qué armarse (principal y reemplazos agotados): se ve agotado y no se puede agregar
+  const agotado = oferta.tipo === 'COMBO' && oferta.disponible === false;
 
   const cardDir = movil ? 'row' : 'column';
   const imgW = movil ? '100px' : '100%';
@@ -149,13 +151,13 @@ export function TarjetaOferta({
         overflow: 'hidden',
         display: 'flex',
         flexDirection: cardDir,
-        opacity: aplicaHoy ? 1 : 0.75,
+        opacity: aplicaHoy && !agotado ? 1 : 0.75,
       }}
     >
       {/* Zona de imagen / letra inicial */}
       <button
         type="button"
-        onClick={handleAccion}
+        onClick={agotado ? undefined : handleAccion}
         aria-label={`Ver oferta ${oferta.nombre}`}
         style={{
           border: 0,
@@ -296,7 +298,20 @@ export function TarjetaOferta({
           >
             {textoBadge}
           </span>
-          {!aplicaHoy ? (
+          {agotado ? (
+            <span
+              style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                background: 'color-mix(in srgb, var(--cp-rust) 15%, var(--cp-cream))',
+                color: 'var(--cp-rust)',
+                borderRadius: '9999px',
+                padding: '2px 8px',
+              }}
+            >
+              Agotado
+            </span>
+          ) : !aplicaHoy ? (
             <span
               style={{
                 fontSize: '11px',
@@ -378,6 +393,7 @@ export function TarjetaOferta({
             {textoPrecio}
           </span>
 
+          {!agotado && (
           <button
             type="button"
             onClick={handleAccion}
@@ -396,6 +412,7 @@ export function TarjetaOferta({
           >
             {botonLabel}
           </button>
+          )}
         </div>
       </div>
     </article>

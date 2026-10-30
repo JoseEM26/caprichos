@@ -8,7 +8,7 @@ export const TITULOS_VISTA: Record<string, { titulo: string; subtitulo: string }
   cocina: { titulo: "Pantalla de cocina", subtitulo: "Pedidos aceptados por caja, con su tiempo." },
   repartos: { titulo: "Repartos", subtitulo: "Pedidos de delivery listos para salir." },
   reservas: { titulo: "Reservas", subtitulo: "Agenda de mesas por fecha, hora y comensales." },
-  clientes: { titulo: "Clientes", subtitulo: "Historial de quienes piden, con su DNI, cumpleaños y puntos." },
+  clientes: { titulo: "Clientes", subtitulo: "Historial de quienes piden, con su celular, cumpleaños y puntos." },
   creditos: { titulo: "Créditos del personal", subtitulo: "Lo que consume cada trabajador con su usuario, acumulado por mes. El descuento del pago se hace fuera del sistema." },
   productos: { titulo: "Productos", subtitulo: "Disponibilidad y precios de la carta." },
   listas: { titulo: "Listas y categorías", subtitulo: "Cada lista tiene su categoría: tamaños, leches, endulzantes, extras… Aquí se crean, editan y ocultan; los combos de Opciones y tamaños solo muestran la lista que les toca." },

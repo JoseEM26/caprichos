@@ -85,6 +85,11 @@ export class ComboParteDto {
   @IsOptional()
   @IsArray({ message: 'productos debe ser un arreglo' })
   productos?: (string | number)[];
+
+  /** Solo FIJO: plan B, plan C... en orden. Sin repetir ni incluir el principal. */
+  @IsOptional()
+  @IsArray({ message: 'reemplazos debe ser un arreglo' })
+  reemplazos?: (string | number)[];
 }
 
 export class CrearOfertaDto {

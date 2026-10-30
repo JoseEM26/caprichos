@@ -44,6 +44,8 @@ model Party {
   horariosTrabajo          HorarioTrabajo[]
   coberturasCubre          CoberturaTurno[]       @relation("CoberturasCubre")
   coberturasReemplaza      CoberturaTurno[]       @relation("CoberturasReemplaza")
+  reemplazosDia            ReemplazoDia[]         @relation("ReemplazoDiaTitular")
+  reemplazaDias            ReemplazoDia[]         @relation("ReemplazoDiaSuplente")
   pedidosProveedor         PedidoProveedor[]
   comprasProveedor         Compra[]
   pedidosInternosAvisados  PedidoInterno[]
@@ -314,6 +316,7 @@ model Producto {
   movimientosStock   MovimientoStock[]
   recetas            Receta[]
   ofertasAlcance     Oferta[]
+  comboReemplazos    ComboParteReemplazo[]
   cuponesAlcance     Cupon[]
   rankingsMes        RankingMes[]
 
@@ -1078,6 +1081,10 @@ model CustomerAccount {
   hash      String?
   activo    Boolean  @default(true)
   creado_en DateTime @default(now()) @db.Timestamptz
+  /// Celular de 9 dígitos: identidad de la cuenta. Único entre cuentas activas (índice parcial en la migración).
+  telefono          String?   @db.VarChar(9)
+  /// Sesiones emitidas antes de esta fecha ya no valen.
+  clave_cambiada_en DateTime? @db.Timestamptz
 
   party     Party    @relation(fields: [party_id], references: [id])
 
@@ -1200,8 +1207,24 @@ model ComboParte {
   productos  BigInt[]
 
   oferta     Oferta   @relation(fields: [oferta_id], references: [id], onDelete: Cascade)
+  reemplazos ComboParteReemplazo[]
 
   @@map("combo_parte")
+}
+
+/// Plan B, plan C...: productos que reemplazan al principal de una parte FIJO cuando se agota (mismo precio del combo)
+model ComboParteReemplazo {
+  id             BigInt @id @default(autoincrement())
+  combo_parte_id BigInt
+  producto_id    BigInt
+  orden          Int    @default(0)
+
+  parte    ComboParte @relation(fields: [combo_parte_id], references: [id], onDelete: Cascade)
+  producto Producto   @relation(fields: [producto_id], references: [id])
+
+  @@unique([combo_parte_id, producto_id])
+  @@index([combo_parte_id, orden])
+  @@map("combo_parte_reemplazo")
 }
 
 model ReglaAcumulacion {
@@ -1338,6 +1361,22 @@ model HorarioTrabajo {
   party      Party    @relation(fields: [party_id], references: [id])
 
   @@map("horario_trabajo")
+}
+
+// Reemplazo fijo por dia de la semana: valor por defecto cuando la persona no trabaja ese dia.
+// La CoberturaTurno por fecha tiene prioridad sobre este valor.
+model ReemplazoDia {
+  id                 BigInt  @id @default(autoincrement())
+  party_id           BigInt
+  dia_semana         Int     @db.SmallInt // 0 = Domingo
+  reemplaza_party_id BigInt
+  activo             Boolean @default(true)
+
+  party     Party @relation("ReemplazoDiaTitular", fields: [party_id], references: [id])
+  reemplaza Party @relation("ReemplazoDiaSuplente", fields: [reemplaza_party_id], references: [id])
+
+  @@unique([party_id, dia_semana])
+  @@map("reemplazo_dia")
 }
 
 model CoberturaTurno {

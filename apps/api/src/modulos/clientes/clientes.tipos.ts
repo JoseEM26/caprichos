@@ -1,7 +1,6 @@
 export interface ClienteSesion {
   partyId: string;
   nombre: string;
-  dniMascara: string;
   correo: string | null;
   telefono: string | null;
   fotoUrl: string | null;
@@ -10,24 +9,23 @@ export interface ClienteSesion {
 }
 
 export interface RegistroClienteDto {
-  dni: string;
   nombre: string;
-  contrasena: string;
-  telefono: string; // celular de 9 dígitos que empieza con 9
+  telefono: string; // celular de 9 dígitos que empieza con 9: es el usuario de la cuenta
+  contrasena: string; // mínimo 8 caracteres
   correo?: string;
-  cumpleanos: string; // YYYY-MM-DD o DD/MM
+  cumpleanos?: string; // YYYY-MM-DD o DD/MM
   aceptaDatos: boolean;
 }
 
 export interface PerfilClienteDto {
   nombre?: string;
-  telefono?: string;
+  telefono?: string; // solo se acepta el mismo celular de la cuenta
   correo?: string;
   cumpleanos?: string; // YYYY-MM-DD o DD/MM
 }
 
 export interface IngresoClienteDto {
-  dni: string;
+  telefono: string;
   contrasena: string;
 }
 
@@ -49,7 +47,6 @@ export interface ClienteAdminListItem {
   id: string;
   nombre: string;
   tipo: 'Persona' | 'Empresa' | 'Personal';
-  dni: string;
   telefono: string;
   correo: string;
   cumpleanos: string;
@@ -63,8 +60,8 @@ export interface ClienteAdminListItem {
 
 export interface RegistrarMostradorDto {
   nombre: string;
-  dni: string;
-  telefono?: string;
+  telefono?: string; // obligatorio para una persona
+  ruc?: string; // solo empresas (11 dígitos)
   correo?: string;
   cumpleanos?: string; // YYYY-MM-DD
   aceptaDatos: boolean;

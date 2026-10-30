@@ -168,9 +168,19 @@ export const BOTONES_PEDIDO_COMPROBANTE: BotonAccion[] = [
 ];
 
 export const BOTONES_PUNTOS_PROPIA: BotonAccion[] = [
-  { id: 'puntos_si', titulo: 'Sí, sumar puntos' },
+  { id: 'puntos_si', titulo: 'Sumar puntos' },
+  { id: 'puntos_no', titulo: 'Seguir como invitado' },
   { id: 'puntos_otro', titulo: 'Usar otro número' },
-  { id: 'puntos_no', titulo: 'No, gracias' },
+];
+// Meta limita el título de un botón a 20 caracteres: «Tengo cuenta con otro número» no cabe
+export const BOTONES_PUNTOS_SIN_CUENTA: BotonAccion[] = [
+  { id: 'puntos_crear', titulo: 'Crear mi cuenta' },
+  { id: 'puntos_no', titulo: 'Seguir como invitado' },
+  { id: 'puntos_otro', titulo: 'Tengo otro número' },
+];
+export const BOTONES_CUENTA_CONSENTIMIENTO: BotonAccion[] = [
+  { id: 'cuenta_acepto', titulo: 'Acepto' },
+  { id: 'cuenta_no', titulo: 'No, gracias' },
 ];
 export const BOTONES_PUNTOS_RECORDATORIO: BotonAccion[] = [
   { id: 'puntos_si', titulo: 'Sí' },
@@ -894,7 +904,7 @@ export const TEXTOS_BOT = {
   },
 
   pedidoComprobanteDni: (): string => {
-    return 'Por favor escribe tu número de DNI (8 dígitos) o escribe "omitir":';
+    return 'Para tu boleta con documento, escribe tu número de DNI (8 dígitos), solo para tu comprobante, o escribe "omitir":';
   },
 
   pedidoComprobanteRuc: (): string => {
@@ -907,17 +917,32 @@ export const TEXTOS_BOT = {
 
   // --- Puntos (cliente con cuenta, sin clave: se reconoce por el número de WhatsApp) ---
   puntosCuentaPropia: (primerNombre: string): string =>
-    `Tu número está vinculado a la cuenta de ${primerNombre} 😊\n¿Quieres que los puntos de este pedido se sumen a esa cuenta?`,
+    `¡Hola, ${primerNombre}! 💛 Qué bueno verte de nuevo. ¿Sumamos los puntos de hoy a tu cuenta o prefieres seguir como invitado?`,
+  puntosSinCuentaBienvenida: (): string =>
+    `¡Hola! 👋 Este número todavía no tiene cuenta en Caprichos. ¿Quieres crearla con este mismo número para sumar puntos, o prefieres seguir como invitado?`,
   puntosPedirNumero: (): string =>
-    `No encontré una cuenta con este número.\nSi quieres sumar puntos, escríbeme el número de celular (9 dígitos) asociado a tu cuenta, o toca "Sin puntos".`,
+    `Escríbeme el número de celular (9 dígitos) de la cuenta donde quieres sumar, o toca "Sin puntos".`,
   puntosEncontrado: (terminacion: string): string =>
-    `Encontré una cuenta con ese número (termina en ***${terminacion}).\n¿Sumo los puntos de este pedido ahí?`,
+    `Encontré una cuenta que termina en ***${terminacion}, ¿sumo ahí?`,
+  cuentaPedirNombre: (): string => `¡Genial! 😊 ¿Cómo te llamas? Escribe tu nombre.`,
+  cuentaNombreInvalido: (): string => `Necesito tu nombre con al menos 2 letras. ¿Cómo te llamas?`,
+  cuentaConsentimiento: (nombre: string, enlaces: string): string =>
+    `Gracias, ${nombre}. Para crear tu cuenta con este número guardaremos tu celular y tu nombre para gestionar tus pedidos, sumar puntos y avisarte por WhatsApp.\n${enlaces}\n¿Aceptas?`,
+  cuentaEnlacesLegales: (terminos: string | null, privacidad: string | null): string =>
+    terminos && privacidad
+      ? `Términos: ${terminos}\nPrivacidad: ${privacidad}`
+      : `Puedes leer los Términos y la Privacidad en nuestra carta.`,
+  cuentaCreada: (nombre: string): string =>
+    `¡Listo, ${nombre}! Tu cuenta quedó creada con este número. Para entrar en caprichos.pe define tu contraseña con “¿Olvidaste tu contraseña?”; te llegará un código por aquí.`,
+  cuentaNoCreada: (): string =>
+    `No pude crear tu cuenta ahora, pero tu pedido sigue en marcha. Puedes crearla después en la carta con este mismo número. 😊`,
+  cuentaSinConsentimiento: (): string => `Sin problema, seguimos como invitado. 😊`,
   puntosNoEncontrado: (urlCarta: string): string =>
-    `No encontré una cuenta con ese número.\nPuedes crear la tuya con tu DNI en ${urlCarta} y sumar en tu próximo pedido.`,
+    `No encontré una cuenta con ese número.\nPuedes crear la tuya con tu celular en ${urlCarta} y sumar en tu próximo pedido.`,
   puntosNumeroInvalido: (): string =>
     `Necesito un celular de 9 dígitos que empiece con 9 (por ejemplo 987654321), o toca "Sin puntos".`,
   puntosTopeIntentos: (urlCarta: string): string =>
-    `Ya probamos tres números, así que sigo con tu pedido sin puntos.\nPuedes crear tu cuenta con tu DNI en ${urlCarta} y sumar desde el próximo.`,
+    `Ya probamos tres números, así que sigo con tu pedido sin puntos.\nPuedes crear tu cuenta con tu celular en ${urlCarta} y sumar desde el próximo.`,
   puntosRecordatorio: (destino: string): string => `Sumo tus puntos a ${destino} como antes, ¿ok?`,
   puntosLineaResumen: (p: { estimado: number | null; saldo?: number | null; sinPuntos?: boolean }): string => {
     if (p.sinPuntos) return `⭐ Este pedido no suma puntos.`;
@@ -929,7 +954,7 @@ export const TEXTOS_BOT = {
   puntosMiSaldo: (primerNombre: string, saldo: number, porcentaje: number): string =>
     `⭐ ${primerNombre}, tienes ${saldo.toFixed(2)} puntos.\nGanas ${porcentaje} % de lo que pagas en productos sin promoción.`,
   puntosSinCuenta: (urlCarta: string): string =>
-    `No encontré una cuenta con este número de WhatsApp.\nCrea la tuya con tu DNI en ${urlCarta}, usando este mismo número, y empieza a sumar puntos.`,
+    `No encontré una cuenta con este número de WhatsApp.\nCrea la tuya con tu celular en ${urlCarta}, usando este mismo número, y empieza a sumar puntos.`,
   puntosNoDisponible: (): string => `Ahora no puedo consultar tus puntos. Inténtalo en unos minutos.`,
 
   pedidoResumenFinal: (params: {

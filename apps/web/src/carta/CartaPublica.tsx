@@ -17,6 +17,7 @@ import { CabeceraCarta } from './CabeceraCarta';
 import type { PaginaCarta } from './CabeceraCarta';
 import { BannerMesCarta, FranjaDatosCarta } from './PortadaCarta';
 import { PaginaConocenos } from './PaginaConocenos';
+import type { ContenidoConocenos } from './conocenosContenido';
 import { PaginaNovedades } from './PaginaNovedades';
 import { CuentaProvider } from './cuenta/CuentaContext';
 import { PanelCuenta } from './cuenta/PanelCuenta';
@@ -25,6 +26,7 @@ import { TarjetaProducto } from './TarjetaProducto';
 import { TarjetaOferta } from './TarjetaOferta';
 import type { OfertaItem } from '../admin/ofertas/ofertasApi';
 import { VentanaProductoCarta } from './VentanaProductoCarta';
+import { comboDeProducto } from './ReemplazoCombo';
 import { CajonCarrito } from './CajonCarrito';
 import { FormularioCheckout } from './FormularioCheckout';
 import { PantallaConfirmacion } from './PantallaConfirmacion';
@@ -54,25 +56,6 @@ const INFO_CATEGORIA: Record<string, { title: string; note: string }> = {
   COMPLEMENTOS: { title: 'Postres', note: 'Donas, galletas, tortas y postres individuales' },
 };
 
-const FOTOS_RESPALDO_NOVEDADES: Record<string, { id: string; url: string; orden: number }[]> = {
-  'Fin de semana de waffles': [
-    { id: 'seed-waf-1', url: '/archivos/publico/seed/waffle_oreo.webp', orden: 0 },
-  ],
-  'Martes de 2x1 en Latte Coffe': [
-    { id: 'seed-lat-1', url: '/archivos/publico/seed/iced_latte_coffee.webp', orden: 0 },
-    { id: 'seed-lat-2', url: '/archivos/publico/seed/mocaccino.webp', orden: 1 },
-    { id: 'seed-lat-3', url: '/archivos/publico/seed/caramel_macchiato.webp', orden: 2 },
-  ],
-  'Así preparamos nuestro Frappe Oreo': [
-    { id: 'seed-oreo-1', url: '/archivos/publico/seed/frappe_oreo.webp', orden: 0 },
-  ],
-  'Nuevo: Frappe Maracuyá Tropical': [
-    { id: 'seed-mar-1', url: '/archivos/publico/seed/frappe_maracuya.webp', orden: 0 },
-    { id: 'seed-mar-2', url: '/archivos/publico/seed/frappe_strawberry.webp', orden: 1 },
-    { id: 'seed-mar-3', url: '/archivos/publico/seed/frappe_berries.webp', orden: 2 },
-  ],
-};
-
 export interface ContenidoCarta {
   decoracion: string;
   disposicion?: unknown;
@@ -82,6 +65,7 @@ export interface ContenidoCarta {
   destacadas: HistoriaCírculo[];
   rankingMes: { productoId: string; puesto: number; estrellas: number; textoEstrellas: string }[];
   banner: BannerCarta;
+  conocenos?: ContenidoConocenos;
   novedadesEncabezado?: {
     etiqueta: string;
     titulo: string;
@@ -270,14 +254,8 @@ function ContenidoCartaPublica({ vistaPrevia }: { vistaPrevia?: VistaPreviaCarta
       }));
   }, [contenido]);
 
-  const novedadesEnriquecidas = useMemo(() => {
-    const lista = (contenido?.novedades ?? []).map((n) => {
-      if (Array.isArray(n.fotos) && n.fotos.length > 0) return n;
-      const respaldo = FOTOS_RESPALDO_NOVEDADES[n.titulo];
-      return respaldo ? { ...n, fotos: respaldo } : n;
-    });
-    return ordenarNovedadesCarta(lista);
-  }, [contenido]);
+  // Las fotos de las novedades de ejemplo ya vienen de la base (contenido-base del API).
+  const novedadesEnriquecidas = useMemo(() => ordenarNovedadesCarta(contenido?.novedades ?? []), [contenido]);
 
   const mapaBeneficios = useBeneficiosCarta(ofertas, categorias);
 
@@ -741,7 +719,7 @@ function ContenidoCartaPublica({ vistaPrevia }: { vistaPrevia?: VistaPreviaCarta
         storageKey={vistaPrevia ? 'caprichos_preview_franja_aviso' : undefined}
       />
 
-      {pagina === 'conocenos' && <PaginaConocenos datosLocal={datosLocal} estadoLocal={estadoLocal} fotos={fotosDestacadas} />}
+      {pagina === 'conocenos' && <PaginaConocenos datosLocal={datosLocal} estadoLocal={estadoLocal} fotos={fotosDestacadas} contenido={contenido?.conocenos} />}
       {pagina === 'novedades' && (
         <PaginaNovedades
           novedades={novedadesEnriquecidas}
@@ -893,6 +871,7 @@ function ContenidoCartaPublica({ vistaPrevia }: { vistaPrevia?: VistaPreviaCarta
             (categorias.find((c) => c.productos.some((p) => p.id === productoEnModal.id))?.nombre ?? '').toUpperCase(),
           )}
           onCerrar={cerrarModalProducto}
+          oferta={comboDeProducto(ofertas, productoEnModal.id)}
         />
       )}
 

@@ -258,7 +258,8 @@ describe('Administrativo: novedades (agregar, editar, eliminar y tamaño)', () =
     expect(delSpy).not.toHaveBeenCalled();
     expect(screen.queryByText('¿Eliminar esta novedad?')).toBeNull();
 
-    fireEvent.click(screen.getByText('Eliminar', { selector: 'button' }));
+    fireEvent.click(screen.getByText('Editar'));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Editar novedad' })).getByText('Eliminar'));
     fireEvent.click(screen.getByText('Sí, eliminar'));
 
     await waitFor(() => {
@@ -362,6 +363,52 @@ describe('Administrativo: novedades (agregar, editar, eliminar y tamaño)', () =
     const btnPc = screen.getByTestId('btn-novedades-disp-pc');
     fireEvent.click(btnPc);
     expect(screen.getByTestId('preview-novedades-pc')).toBeTruthy();
+  });
+});
+
+describe('Administrativo: novedades usa el mismo componente que la carta', () => {
+  const base = {
+    tipo: 'PROMOCION', texto: null, tema: null, video_url: null, evento_fecha: null, evento_lugar: null,
+    desde: null, hasta: null, tamano: 'GRANDE',
+  };
+  const lista = [
+    { ...base, id: '1', titulo: 'Martes de 2x1', orden: 1, activo: true, fotos: [{ id: 'a', url: '/archivos/publico/seed/iced_latte_coffee.webp' }] },
+    { ...base, id: '2', titulo: 'Oculta', orden: 2, activo: false, fotos: [] },
+  ];
+
+  async function abrir() {
+    vi.restoreAllMocks();
+    vi.spyOn(api, 'get').mockResolvedValue(lista);
+    render(<NovedadesView />);
+    await waitFor(() => expect(screen.getByText('Abrir el diseñador en pantalla completa')).toBeTruthy());
+    fireEvent.click(screen.getByText('Abrir el diseñador en pantalla completa'));
+  }
+
+  it('pinta las tarjetas del mosaico de la carta con la foto de la base, «Desactivada» y controles de 44 px', async () => {
+    await abrir();
+    const tarjetas = document.querySelectorAll('article.cp-nov-card, article[data-tamano]');
+    expect(tarjetas.length).toBeGreaterThan(0);
+    expect(document.querySelector('img[src="/archivos/publico/seed/iced_latte_coffee.webp"]')).toBeTruthy();
+    expect(screen.getByText('Desactivada')).toBeTruthy();
+    expect(screen.getByTestId('encabezado-titulo').textContent).toBe('Lo nuevo en Caprichos');
+    const editar = screen.getAllByText('Editar')[0] as HTMLElement;
+    expect(editar.style.minHeight).toBe('44px');
+  });
+
+  it('un cambio sin publicar marca la tarjeta como «Borrador»', async () => {
+    await abrir();
+    expect(screen.queryByText('Borrador')).toBeNull();
+    fireEvent.click(screen.getByText('Activar'));
+    expect(screen.getAllByText('Borrador').length).toBe(1);
+  });
+
+  it('la vista previa del modal usa el mismo componente de tarjeta', async () => {
+    await abrir();
+    fireEvent.click(screen.getAllByText('Editar')[0]);
+    const dialogo = screen.getByRole('dialog', { name: 'Editar novedad' });
+    const vista = within(dialogo).getByTestId('vista-tarjeta');
+    expect(vista.querySelector('article[data-tamano="GRANDE"]')).toBeTruthy();
+    expect(vista.querySelector('img[src="/archivos/publico/seed/iced_latte_coffee.webp"]')).toBeTruthy();
   });
 });
 

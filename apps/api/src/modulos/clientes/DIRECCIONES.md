@@ -7,20 +7,20 @@ Contrato para los agentes web (mozo, carta) y WhatsApp. Migración: `20261108100
 - `pedido.cliente_party_id` (BigInt, nullable): cliente con cuenta del pedido. `null` = invitado.
 - Cliente de un pedido, para puntos, historial y cupones: `cliente_party_id ?? party_id` solo si el canal es CARTA, WHATSAPP o BOT. En MOZO y CAJA, `party_id` es el party del personal, nunca el cliente.
 
-## Crear pedido de mozo con DNI
+## Crear pedido de mozo con celular
 
-`POST /admin/pedidos` (canal MOZO o CAJA) acepta `clienteDni?: string` (8 dígitos).
+`POST /admin/pedidos` (canal MOZO o CAJA) acepta `clienteTelefono?: string` (celular de 9 dígitos que empieza con 9; reemplaza al antiguo `clienteDni`).
 
-- Con DNI de cuenta activa: el pedido guarda `cliente_party_id`, la dirección queda en su libreta y el cliente suma puntos al cobrarse.
-- DNI sin cuenta: `404 { codigo: "CLIENTE_NO_ENCONTRADO" }`. El mozo puede reintentar sin `clienteDni` (invitado).
-- Sin `clienteDni`: invitado.
+- Con celular de cuenta activa: el pedido guarda `cliente_party_id`, la dirección queda en su libreta y el cliente suma puntos al cobrarse.
+- Celular sin cuenta: `404 { codigo: "CLIENTE_NO_ENCONTRADO" }`. El mozo puede reintentar sin `clienteTelefono` (invitado).
+- Sin `clienteTelefono`: invitado.
 - En carta (`POST /pedidos`) y WhatsApp el campo se ignora. Carta usa la cookie `cp_cliente`; WhatsApp usa el teléfono de quien escribe.
 
-## Buscar cliente por DNI (mozo)
+## Buscar cliente por celular (mozo)
 
-`GET /admin/clientes/por-dni/:dni` — permiso `pedidos/crear` o `clientes/ver`.
+`GET /admin/clientes/por-telefono/:telefono` — permiso `pedidos/crear` o `clientes/ver`. (`GET /admin/clientes/por-dni/:dni` responde `410 BUSQUEDA_DNI_RETIRADA`.)
 
-- DNI que no tiene 8 dígitos exactos: `400 { codigo: "DNI_INVALIDO" }`.
+- Celular que no tiene 9 dígitos exactos empezando con 9: `400 { codigo: "TELEFONO_INVALIDO" }`.
 - Más de 20 búsquedas por minuto y usuario: `429 { codigo: "DEMASIADAS_BUSQUEDAS" }`.
 
 Encontrado:
@@ -28,7 +28,6 @@ Encontrado:
 {
   "encontrado": true,
   "party": "100",
-  "dniMascara": "4521****",
   "nombre": "Ana",
   "telefono": "987654321",
   "puntos": 12.5,

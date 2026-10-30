@@ -10,6 +10,8 @@ import { SEDE_DEFECTO, cargarSede } from '../../../comun/mapa/sedeDefecto';
 import { CategoriaCarta, ProductoCarta, OpcionCarta as OpcionProducto } from '../../../carta/tipos';
 import { ElementoPlano, MesaSalon, PisoPlano, PisoSalon } from '../tipos';
 import { CuadriculaPlano } from './CuadriculaPlano';
+import { comboDeProducto } from '../../../carta/ReemplazoCombo';
+import type { OfertaItem } from '../../ofertas/ofertasApi';
 import { VentanaOpcionesProducto, ProductoConfigurado } from './VentanaOpcionesProducto';
 import { ModalLiberarMesa } from './ModalLiberarMesa';
 import { ModalForzarLiberarMesa } from './ModalForzarLiberarMesa';
@@ -32,12 +34,12 @@ import {
 } from '../../pedidos/planPago';
 import { listarPersonalActivo, ColaboradorActivo as PersonalItem } from '../../creditos/creditosApi';
 import {
-  buscarCuentaPorDni,
+  buscarCuentaPorTelefono,
   fechaCortaDireccion,
-  mensajeErrorCuentaDni,
+  mensajeErrorCuenta,
   type CuentaCliente,
   type DireccionCliente,
-} from './clienteCuentaDni';
+} from './clienteCuenta';
 
 export interface ModalNuevoPedidoMesaProps {
   abierto: boolean;
@@ -71,15 +73,17 @@ export interface LineaPedidoMesa {
   unidades?: Array<{ persona?: string; opciones?: OpcionProducto[] }>;
   nota?: string;
   personas?: string[];
+  ofertaId?: string;
+  comboElecciones?: { parteId: string; productoId: string }[];
 }
 
 /** Medio con el que paga el cliente de llevar o delivery (lo elige el mozo al registrar). */
 type MedioPagoMozo = 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TRANSFERENCIA';
 
-/** Cliente que devuelve GET /admin/clientes?q= (el DNI llega enmascarado para no admin) */
+/** Cliente que devuelve GET /admin/clientes?q= (busca por nombre o celular) */
 interface ClienteBuscado {
   nombre: string;
-  dni: string;
+  telefono: string;
   puntos: number;
   /** Id del party de la cuenta (lo manda el pedido como clientePartyId) */
   partyId: string;
@@ -257,9 +261,9 @@ export function ModalNuevoPedidoMesa({
     };
   }, [cliPuntoMapa]);
 
-  // Para llevar / delivery: 'invitado' pide nombre y teléfono; 'cuenta' toma los datos de la cuenta por DNI
+  // Para llevar / delivery: 'invitado' pide nombre y teléfono; 'cuenta' toma los datos de la cuenta por celular
   const [modoCli, setModoCli] = useState<'invitado' | 'cuenta'>('invitado');
-  const [dniCli, setDniCli] = useState('');
+  const [telCli, setTelCli] = useState('');
   const [cuenta, setCuenta] = useState<CuentaCliente | null>(null);
   const [buscandoCuenta, setBuscandoCuenta] = useState(false);
   const [errorCuenta, setErrorCuenta] = useState<string | null>(null);
@@ -269,7 +273,7 @@ export function ModalNuevoPedidoMesa({
 
   useEffect(() => {
     if (modoCli !== 'cuenta') return;
-    // Cambiar o borrar el DNI quita los datos de la cuenta anterior (no deben colarse al pedido)
+    // Cambiar o borrar el celular quita los datos de la cuenta anterior (no deben colarse al pedido)
     setCuenta(null);
     setSinCuenta(false);
     setErrorCuenta(null);
@@ -279,13 +283,13 @@ export function ModalNuevoPedidoMesa({
     setCliReferencia('');
     setCliPuntoMapa(null);
     setDireccionElegida(null);
-    if (dniCli.length !== 8) {
+    if (telCli.length !== 9) {
       setBuscandoCuenta(false);
       return;
     }
     let vigente = true;
     setBuscandoCuenta(true);
-    buscarCuentaPorDni(dniCli)
+    buscarCuentaPorTelefono(telCli)
       .then((c) => {
         if (!vigente) return;
         if (!c) {
@@ -298,7 +302,7 @@ export function ModalNuevoPedidoMesa({
         setDireccionElegida(c.direcciones.length === 0 ? 'nueva' : null);
       })
       .catch((err) => {
-        if (vigente) setErrorCuenta(mensajeErrorCuentaDni(err));
+        if (vigente) setErrorCuenta(mensajeErrorCuenta(err));
       })
       .finally(() => {
         if (vigente) setBuscandoCuenta(false);
@@ -306,12 +310,12 @@ export function ModalNuevoPedidoMesa({
     return () => {
       vigente = false;
     };
-  }, [dniCli, modoCli]);
+  }, [telCli, modoCli]);
 
   const cambiarModoCli = (m: 'invitado' | 'cuenta') => {
     if (m === modoCli) return;
     setModoCli(m);
-    setDniCli('');
+    setTelCli('');
     setCuenta(null);
     setSinCuenta(false);
     setErrorCuenta(null);
@@ -356,12 +360,12 @@ export function ModalNuevoPedidoMesa({
   const [pideQ, setPideQ] = useState('');
   const [clienteEncontrado, setClienteEncontrado] = useState<{
     nombre: string;
-    dni: string;
+    telefono: string;
     puntos: number;
     partyId: string;
   } | null>(null);
   // Cliente con cuenta de «¿Quién pide?» que viaja como clientePartyId. Si el paso de datos ya identificó
-  // a una cuenta por DNI (delivery/recoger), esa gana y no se envía este.
+  // a una cuenta por celular (delivery/recoger), esa gana y no se envía este.
   const clientePideId =
     pideMode === 'cliente' &&
     clienteEncontrado?.partyId &&
@@ -423,7 +427,7 @@ export function ModalNuevoPedidoMesa({
         setResultadosCliente(
           list.slice(0, 6).map((c) => ({
             nombre: c.nombre || `${c.nombres || ''} ${c.apellidos || ''}`.trim(),
-            dni: c.dni || '',
+            telefono: c.telefono || '',
             puntos: Number(c.puntos || 0),
             partyId: c.id != null ? String(c.id) : '',
           })),
@@ -457,6 +461,18 @@ export function ModalNuevoPedidoMesa({
 
   // Ventana de opciones del producto
   const [productoSeleccionado, setProductoSeleccionado] = useState<ProductoCarta | null>(null);
+  // Combos con su disponibilidad en tiempo real (plan B si se agota una parte fija)
+  const [ofertasCombo, setOfertasCombo] = useState<OfertaItem[]>([]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await api.get<OfertaItem[]>('/carta/ofertas');
+        setOfertasCombo(Array.isArray(r) ? r : []);
+      } catch {
+        setOfertasCombo([]);
+      }
+    })();
+  }, []);
 
   // Carrito de líneas de pedido
   const [lineas, setLineas] = useState<LineaPedidoMesa[]>([]);
@@ -644,6 +660,8 @@ export function ModalNuevoPedidoMesa({
         opciones: u.opciones,
       })),
       nota: config.nota,
+      ofertaId: config.ofertaId,
+      comboElecciones: config.comboElecciones,
       personas: config.unidades.map((u) => u.nombreVaso).filter(Boolean),
     };
 
@@ -778,6 +796,8 @@ export function ModalNuevoPedidoMesa({
           cantidad: lin.cantidad,
           opciones: opcionesIds,
           nota: lin.nota,
+          ofertaId: lin.ofertaId,
+          comboElecciones: lin.comboElecciones,
           personas: personas && personas.length > 0 ? personas : lin.personas,
         };
       });
@@ -848,7 +868,7 @@ export function ModalNuevoPedidoMesa({
             colaboradorPartyId: staffElegido?.partyId,
             canal: canalEnvio,
             // Solo con cuenta: el pedido suma puntos y guarda la dirección en su libreta
-            clienteDni: modoCli === 'cuenta' && cuenta ? dniCli : undefined,
+            clienteTelefono: modoCli === 'cuenta' && cuenta ? telCli : undefined,
             clientePartyId: clientePideId,
           },
           idempotencyKey,
@@ -875,7 +895,16 @@ export function ModalNuevoPedidoMesa({
       alCerrar();
     } catch (err: any) {
       setConfirmarEnviar(false);
-      if (err?.codigo === 'MESA_OCUPADA') {
+      if (err?.codigo === 'COMBO_PARTE_NO_DISPONIBLE') {
+        // El pedido no se pierde: se actualizan los combos para elegir otro reemplazo
+        setErrorEnvio(`${err.message} El pedido sigue igual: quita el combo y vuelve a agregarlo para elegir otro reemplazo.`);
+        try {
+          const r = await api.get<OfertaItem[]>('/carta/ofertas');
+          setOfertasCombo(Array.isArray(r) ? r : []);
+        } catch {
+          /* se mantiene la lista anterior */
+        }
+      } else if (err?.codigo === 'MESA_OCUPADA') {
         setErrorEnvio(
           err.message ||
             'La mesa ya está ocupada por otro pedido. Se actualizó el estado de las mesas.',
@@ -1738,11 +1767,11 @@ export function ModalNuevoPedidoMesa({
           {/* ============================================================= */}
           {paso === 'cli' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {/* Quién es el cliente: con cuenta (DNI) o invitado */}
+              {/* Quién es el cliente: con cuenta (celular) o invitado */}
               <div role="group" aria-label="Tipo de cliente" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 {(
                   [
-                    ['cuenta', 'Cliente con cuenta (DNI)'],
+                    ['cuenta', 'Cliente con cuenta (celular)'],
                     ['invitado', 'Invitado'],
                   ] as const
                 ).map(([valor, texto]) => (
@@ -1772,19 +1801,19 @@ export function ModalNuevoPedidoMesa({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <div>
                     <label
-                      htmlFor="cli-dni"
+                      htmlFor="cli-cel"
                       style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}
                     >
-                      DNI del cliente (8 dígitos) *
+                      Celular del cliente (9 dígitos) *
                     </label>
                     <input
-                      id="cli-dni"
+                      id="cli-cel"
                       type="text"
                       inputMode="numeric"
                       autoComplete="off"
-                      value={dniCli}
-                      onChange={(e) => setDniCli(e.target.value.replace(/\D/g, '').slice(0, 8))}
-                      placeholder="Ej.: 45213678"
+                      value={telCli}
+                      onChange={(e) => setTelCli(e.target.value.replace(/\D/g, '').slice(0, 9))}
+                      placeholder="Ej.: 987654321"
                       style={{
                         width: '100%',
                         maxWidth: '260px',
@@ -1821,7 +1850,7 @@ export function ModalNuevoPedidoMesa({
                         color: 'var(--cp-navy)',
                       }}
                     >
-                      <span>No hay cuenta con ese DNI.</span>
+                      <span>No hay cuenta con ese celular.</span>
                       <button
                         type="button"
                         onClick={() => cambiarModoCli('invitado')}
@@ -1857,8 +1886,7 @@ export function ModalNuevoPedidoMesa({
                       }}
                     >
                       <b style={{ fontSize: '15px' }}>{cuenta.nombre}</b>
-                      <span>DNI {cuenta.dniMascara}</span>
-                      <span>Teléfono: {cuenta.telefono || 'sin teléfono'}</span>
+                      <span>Celular: {cuenta.telefono || 'sin celular'}</span>
                       <span>Puntos: {Number(cuenta.puntos).toFixed(2)}</span>
                     </div>
                   )}
@@ -2504,7 +2532,7 @@ export function ModalNuevoPedidoMesa({
                     <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                       {[
                         { id: 'anon', n: 'Sin cuenta' },
-                        { id: 'cliente', n: 'Cliente con cuenta (DNI)' },
+                        { id: 'cliente', n: 'Cliente con cuenta (celular)' },
                         { id: 'personal', n: 'Personal' },
                       ].map((m) => {
                         const on = pideMode === m.id;
@@ -2559,8 +2587,8 @@ export function ModalNuevoPedidoMesa({
                                 forzarBusquedaCliente();
                               }
                             }}
-                            placeholder="DNI o nombre del cliente"
-                            aria-label="Buscar cliente por DNI o nombre"
+                            placeholder="Nombre o celular del cliente"
+                            aria-label="Buscar cliente por nombre o celular"
                             style={{
                               flex: 1,
                               boxSizing: 'border-box',
@@ -2599,7 +2627,7 @@ export function ModalNuevoPedidoMesa({
                         )}
                         {!buscandoCliente && !errorBuscarCliente && consultaResuelta === pideQ.trim() && resultadosCliente.length === 0 && (
                           <div style={{ fontSize: '11px', color: 'var(--cp-rust)', fontWeight: 700 }}>
-                            No hay cuenta con ese DNI o nombre.
+                            No hay cuenta con ese nombre o celular.
                           </div>
                         )}
                         {!buscandoCliente && resultadosCliente.length > 0 && (
@@ -2614,10 +2642,10 @@ export function ModalNuevoPedidoMesa({
                           >
                             {resultadosCliente.map((c, idx) => (
                               <button
-                                key={`${c.dni}-${idx}`}
+                                key={`${c.partyId}-${idx}`}
                                 type="button"
                                 onClick={() => {
-                                  setClienteEncontrado({ nombre: c.nombre, dni: c.dni, puntos: c.puntos, partyId: c.partyId });
+                                  setClienteEncontrado({ nombre: c.nombre, telefono: c.telefono, puntos: c.puntos, partyId: c.partyId });
                                   setPideQ('');
                                   setPideOpen(false);
                                 }}
@@ -2638,7 +2666,7 @@ export function ModalNuevoPedidoMesa({
                               >
                                 <b>{c.nombre}</b>
                                 <span style={{ color: 'var(--cp-soft)', whiteSpace: 'nowrap' }}>
-                                  {c.dni ? `${c.dni} · ` : ''}{c.puntos} pts
+                                  {c.telefono ? `${c.telefono} · ` : ''}{c.puntos} pts
                                 </span>
                               </button>
                             ))}
@@ -2961,6 +2989,7 @@ export function ModalNuevoPedidoMesa({
           producto={productoSeleccionado}
           alCerrar={() => setProductoSeleccionado(null)}
           alAgregar={handleAgregarProductoConfigurado}
+          oferta={comboDeProducto(ofertasCombo, productoSeleccionado.id)}
         />
       )}
 

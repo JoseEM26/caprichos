@@ -48,6 +48,8 @@ export interface AbrirPedidoMesaPayload {
     opciones?: (string | number)[];
     nota?: string;
     personas?: string[];
+    ofertaId?: string;
+    comboElecciones?: { parteId: string; productoId: string }[];
   }>;
   nota?: string;
   reservaId?: string;

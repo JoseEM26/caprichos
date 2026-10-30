@@ -19,6 +19,8 @@ import { EditarUsuarioDto } from './dto/editar-usuario.dto';
 import { FiltrarUsuariosDto } from './dto/filtrar-usuarios.dto';
 import { AsignarPinDto } from './dto/asignar-pin.dto';
 import { ConfigurarAlertasWhatsappDto } from './dto/configurar-alertas-whatsapp.dto';
+import { ConfigurarHorarioDto } from './dto/horario.dto';
+import { deHora, guardarHorarioTx } from './horario.util';
 import { enmascararDni, generarClaveAleatoria } from './usuarios.util';
 import {
   ROLES_ALERTAS_WHATSAPP,
@@ -234,8 +236,31 @@ export class UsuariosService {
             party_id: party.id,
             nombres: dto.nombres.trim(),
             apellidos: dto.apellidos.trim(),
+            ...(dto.correo ? { correo: dto.correo.trim().toLowerCase() } : {}),
+            ...(dto.fechaNacimiento
+              ? {
+                  cumple_mes: Number(dto.fechaNacimiento.slice(5, 7)),
+                  cumple_dia: Number(dto.fechaNacimiento.slice(8, 10)),
+                }
+              : {}),
           },
         });
+
+        if (dto.celular) {
+          await tx.contactMechanism.create({
+            data: { party_id: party.id, tipo: 'WHATSAPP', valor: dto.celular, principal: true, activo: true },
+          });
+        }
+
+        if (dto.descuentoPct !== undefined && dto.descuentoPct !== null) {
+          await tx.partyRole.create({
+            data: {
+              party_id: party.id,
+              rol: 'TRABAJADOR',
+              employee_detail: { create: { descuento_pct: dto.descuentoPct } },
+            },
+          });
+        }
 
         const partyIdentifier = await tx.partyIdentifier.create({
           data: {
@@ -254,6 +279,10 @@ export class UsuariosService {
             activo: true,
           },
         });
+
+        if (dto.horarios || dto.reemplazos) {
+          await guardarHorarioTx(tx, party.id, dto);
+        }
 
         return { party, person, partyIdentifier, userAccount };
       });
@@ -282,6 +311,8 @@ export class UsuariosService {
         rol: dto.rol,
         activo: true,
         debeCambiar: true,
+        diasTrabaja: dto.horarios?.length ?? 0,
+        reemplazosFijos: dto.reemplazos?.length ?? 0,
       },
       partyId: usuarioActual?.partyId,
       ip,
@@ -298,6 +329,88 @@ export class UsuariosService {
       debeCambiar: nuevo.userAccount.debe_cambiar,
       claveInicial,
     };
+  }
+
+  private async cuentaConParty(id: bigint | string | number) {
+    const cuenta = await this.prisma.userAccount.findUnique({ where: { id: this.parsearId(id) } });
+    if (!cuenta) {
+      throw new NotFoundException({ codigo: 'USUARIO_NO_ENCONTRADO', mensaje: 'Usuario no encontrado' });
+    }
+    return cuenta;
+  }
+
+  private async leerHorarios(partyIds: bigint[]) {
+    const [horarios, reemplazos] = await Promise.all([
+      this.prisma.horarioTrabajo.findMany({ where: { party_id: { in: partyIds }, activo: true } }),
+      this.prisma.reemplazoDia.findMany({
+        where: { party_id: { in: partyIds }, activo: true },
+        include: { reemplaza: { include: { persona: true } } },
+      }),
+    ]);
+    return (partyId: bigint) => ({
+      partyId: partyId.toString(),
+      horarios: horarios
+        .filter((h) => h.party_id === partyId)
+        .map((h) => ({ dia: h.dia_semana, entrada: deHora(h.entrada), salida: deHora(h.salida) }))
+        .sort((a, b) => a.dia - b.dia),
+      reemplazos: reemplazos
+        .filter((r) => r.party_id === partyId)
+        .map((r) => ({
+          dia: r.dia_semana,
+          reemplazaPartyId: r.reemplaza_party_id.toString(),
+          nombre: `${r.reemplaza.persona?.nombres ?? ''} ${r.reemplaza.persona?.apellidos ?? ''}`.trim(),
+        }))
+        .sort((a, b) => a.dia - b.dia),
+    });
+  }
+
+  /** Horario y reemplazos reales de una persona. */
+  async obtenerHorario(id: bigint | string | number) {
+    const cuenta = await this.cuentaConParty(id);
+    return (await this.leerHorarios([cuenta.party_id]))(cuenta.party_id);
+  }
+
+  /** Horario y reemplazos de todo el personal activo (pestaña Horarios). */
+  async listarHorarios() {
+    const cuentas = await this.prisma.userAccount.findMany({
+      where: { activo: true },
+      include: { party: { include: { persona: true } } },
+      orderBy: { id: 'asc' },
+    });
+    const por = await this.leerHorarios(cuentas.map((c) => c.party_id));
+    return cuentas.map((c) => ({
+      id: c.id.toString(),
+      nombres: c.party.persona?.nombres ?? '',
+      apellidos: c.party.persona?.apellidos ?? '',
+      rol: c.rol,
+      ...por(c.party_id),
+    }));
+  }
+
+  /** Cambia horario y/o reemplazos fijos de una persona existente, en una transacción. */
+  async configurarHorario(
+    id: bigint | string | number,
+    dto: ConfigurarHorarioDto,
+    usuarioActual?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const cuenta = await this.cuentaConParty(id);
+    const antes = await this.obtenerHorario(id);
+    await this.prisma.$transaction((tx) => guardarHorarioTx(tx, cuenta.party_id, dto));
+    const despues = await this.obtenerHorario(id);
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'usuarios',
+      accion: 'EDITAR_HORARIO',
+      resultado: 'OK',
+      entidad: 'user_account',
+      entidadId: cuenta.id,
+      antes,
+      despues,
+      partyId: usuarioActual?.partyId,
+      ip,
+    });
+    return despues;
   }
 
   /**

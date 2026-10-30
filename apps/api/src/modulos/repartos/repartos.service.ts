@@ -19,6 +19,9 @@ import {
 } from './ruta.service';
 import { FiltrarRepartosDto } from './dto/filtrar-repartos.dto';
 import { montoPendienteReprogramacion } from './recargo-reprogramacion';
+import { TomarRutaSugeridaDto } from './dto/tomar-ruta-sugerida.dto';
+import { leerConfigEta } from './eta-entrega';
+import { idOpcion as calcularIdOpcion, sugerirRutas } from './rutas-sugeridas';
 
 /** Estados de pedido que siguen vivos en el reparto: los únicos que muestra la vista activa. */
 export const ESTADOS_ACTIVOS_REPARTO = ['LISTO', 'EN_CAMINO'] as const;
@@ -2146,4 +2149,229 @@ export class RepartosService {
 
     return this.formatearPedidoReparto(actualizado, config, ahora);
   }
+
+  /**
+   * GET /admin/repartos/rutas-sugeridas (repartos/ver):
+   * Varias opciones de ruta (una por sector) para los pedidos LISTO sin repartidor, calculadas en el servidor.
+   * Al repartidor se le limita cada ruta a su cupo libre (rep_max_pedidos menos lo que ya lleva).
+   */
+  async listarRutasSugeridas(usuario?: UsuarioAutenticado) {
+    const config = await this.obtenerParametrosReparto();
+    const cfgEta = await leerConfigEta(this.prisma);
+    const filaMax = (
+      await this.prisma.parametro.findMany({ where: { clave: { in: ['reparto_rutas_sugeridas_max'] } } })
+    )[0];
+    const maxOpciones = Math.min(5, Math.max(1, Math.round(Number(filaMax?.valor)) || 3));
+
+    let cupo = config.maxPedidos;
+    if (usuario?.rol === 'REPARTIDOR') {
+      const activos = await this.prisma.pedido.count({
+        where: { repartidor_party_id: BigInt(usuario.partyId), estado: { in: ['LISTO', 'EN_CAMINO'] } },
+      });
+      cupo = Math.max(0, config.maxPedidos - activos);
+    }
+
+    const filas = await this.prisma.pedido.findMany({
+      where: { modalidad: 'DELIVERY', estado: 'LISTO', repartidor_party_id: null, motivo_falla: null },
+      select: {
+        id: true, codigo: true, cliente_nombre: true, entrega_lat: true, entrega_lng: true,
+        creado_en: true, eta_max: true,
+      },
+      orderBy: { creado_en: 'asc' },
+    });
+    const ahora = new Date();
+    const resultado = sugerirRutas(
+      filas.map((p) => ({
+        id: String(p.id),
+        codigo: p.codigo,
+        cliente: p.cliente_nombre ?? '',
+        lat: p.entrega_lat == null ? null : Number(p.entrega_lat),
+        lng: p.entrega_lng == null ? null : Number(p.entrega_lng),
+        creadoEn: p.creado_en,
+        prometidoMin: p.eta_max ?? cfgEta.respaldoMin,
+      })),
+      {
+        sede: cfgEta.local,
+        velocidadKmh: cfgEta.velocidadKmh,
+        factorUrbano: cfgEta.factorUrbano,
+        paradaMin: cfgEta.paradaMin,
+        maxPorRuta: Math.max(1, cupo),
+        maxOpciones,
+        ahora,
+      },
+    );
+    return {
+      ...resultado,
+      opciones: cupo > 0 ? resultado.opciones : [],
+      cupo,
+      sede: cfgEta.local,
+      generadoEn: ahora.toISOString(),
+    };
+  }
+
+  /**
+   * POST /admin/repartos/rutas-sugeridas/:idOpcion/tomar (repartos/tomar):
+   * Asigna TODOS los pedidos de la opción al repartidor (o, si lo hace Caja/Admin, al elegido) en una sola
+   * transacción con SELECT ... FOR UPDATE. Si alguno ya no está libre se aborta todo: 409 RUTA_YA_TOMADA.
+   * Idempotente: repetir la toma con los mismos pedidos ya suyos responde igual sin escribir de nuevo.
+   * El pedido queda LISTO asignado: la salida sigue siendo «Mi ruta» (iniciar-ruta), sin duplicar reglas.
+   */
+  async tomarRutaSugerida(
+    idOpcion: string,
+    dto: TomarRutaSugeridaDto,
+    usuario: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const actor = BigInt(usuario.partyId);
+    const config = await this.obtenerParametrosReparto();
+    const ids = [...new Set((dto?.pedidoIds ?? []).map((i) => String(i).trim()).filter(Boolean))];
+    if (ids.length === 0 || ids.some((i) => !/^\d+$/.test(i)) || calcularIdOpcion(ids) !== idOpcion) {
+      throw new BadRequestException({
+        codigo: 'OPCION_INVALIDA',
+        mensaje: 'La opción de ruta no coincide con sus pedidos: actualiza las opciones',
+      });
+    }
+
+    let destino = actor;
+    if (usuario.rol === 'REPARTIDOR') {
+      if (dto.repartidorPartyId && dto.repartidorPartyId !== String(actor)) {
+        throw new ForbiddenException({ codigo: 'NO_ASIGNADO', mensaje: 'Solo puedes tomar rutas para ti' });
+      }
+    } else {
+      if (!dto.repartidorPartyId) {
+        throw new BadRequestException({ codigo: 'REPARTIDOR_REQUERIDO', mensaje: 'Elige el repartidor de la ruta' });
+      }
+      destino = this.parsearId(dto.repartidorPartyId);
+      const cuenta = await this.prisma.userAccount.findUnique({ where: { party_id: destino } });
+      if (!cuenta || cuenta.rol !== 'REPARTIDOR' || !cuenta.activo) {
+        throw new BadRequestException({
+          codigo: 'REPARTIDOR_INVALIDO',
+          mensaje: 'El usuario destino no es un repartidor activo válido',
+        });
+      }
+    }
+
+    const idsAsc = ids.map((i) => BigInt(i)).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    const ahora = new Date();
+
+    const { nuevos, filas } = await this.prisma.$transaction(
+      async (tx) => {
+        const bloqueadas: any[] = await tx.$queryRaw`
+          SELECT p.id, p.codigo, p.modalidad, p.estado, p.repartidor_party_id,
+                 p.anulado_en, p.motivo_falla, p.entrega_lat, p.entrega_lng
+          FROM pedido p
+          WHERE p.id IN (${Prisma.join(idsAsc)})
+          ORDER BY p.id ASC
+          FOR UPDATE
+        `;
+        const porId = new Map<string, any>(bloqueadas.map((r) => [String(r.id), r]));
+        const cambiados: Array<{ pedidoId: string; codigo: string; motivo: string; tomadoPor?: string }> = [];
+        const nuevos: bigint[] = [];
+
+        const otros = [
+          ...new Set(
+            bloqueadas
+              .filter((r) => r.repartidor_party_id != null && BigInt(r.repartidor_party_id) !== destino)
+              .map((r) => BigInt(r.repartidor_party_id)),
+          ),
+        ];
+        const personas = otros.length ? await tx.person.findMany({ where: { party_id: { in: otros } } }) : [];
+        const nombre = new Map(personas.map((p) => [String(p.party_id), `${p.nombres} ${p.apellidos ?? ''}`.trim()]));
+
+        for (const id of ids) {
+          const r = porId.get(id);
+          if (!r) {
+            cambiados.push({ pedidoId: id, codigo: 'DESCONOCIDO', motivo: 'NO_DISPONIBLE' });
+          } else if (r.repartidor_party_id != null) {
+            if (BigInt(r.repartidor_party_id) === destino && ['LISTO', 'EN_CAMINO'].includes(r.estado)) continue; // ya suyo
+            cambiados.push({
+              pedidoId: id,
+              codigo: r.codigo,
+              motivo: 'OTRO_REPARTIDOR',
+              tomadoPor: nombre.get(String(r.repartidor_party_id)) || `Repartidor #${r.repartidor_party_id}`,
+            });
+          } else if (
+            r.modalidad !== 'DELIVERY' || r.estado !== 'LISTO' || r.anulado_en != null ||
+            r.motivo_falla != null || r.entrega_lat == null || r.entrega_lng == null
+          ) {
+            cambiados.push({ pedidoId: id, codigo: r.codigo, motivo: 'NO_DISPONIBLE' });
+          } else {
+            nuevos.push(r.id);
+          }
+        }
+        if (cambiados.length > 0) {
+          throw new ConflictException({
+            codigo: 'RUTA_YA_TOMADA',
+            mensaje: 'Otro repartidor tomó parte de esta ruta; actualizamos las opciones',
+            pedidos: cambiados,
+          });
+        }
+
+        if (nuevos.length > 0) {
+          const activos = await tx.pedido.count({
+            where: { repartidor_party_id: destino, estado: { in: ['LISTO', 'EN_CAMINO'] } },
+          });
+          if (activos + nuevos.length > config.maxPedidos) {
+            throw new ConflictException({
+              codigo: 'LIMITE_PEDIDOS',
+              mensaje: `Esta ruta supera el máximo de ${config.maxPedidos} pedidos: entrega alguno antes de tomarla`,
+            });
+          }
+          const act = await tx.pedido.updateMany({
+            where: { id: { in: nuevos }, estado: 'LISTO', repartidor_party_id: null },
+            data: { repartidor_party_id: destino, tomado_en: ahora },
+          });
+          if (act.count !== nuevos.length) {
+            throw new ConflictException({ codigo: 'RUTA_YA_TOMADA', mensaje: 'Otro repartidor tomó parte de esta ruta; actualizamos las opciones', pedidos: [] });
+          }
+          for (const id of nuevos) {
+            await tx.pedidoEstadoHistorial.create({
+              data: {
+                pedido_id: id,
+                estado_anterior: 'LISTO',
+                estado_nuevo: 'LISTO',
+                motivo: 'Ruta sugerida tomada',
+                por_party_id: actor,
+                en: ahora,
+              },
+            });
+          }
+        }
+        const filas = await tx.pedido.findMany({
+          where: { id: { in: idsAsc } },
+          include: { zona: true, lineas: { select: { cantidad: true } } },
+        });
+        return { nuevos, filas };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, timeout: 10000 },
+    );
+
+    if (nuevos.length > 0) {
+      for (const id of nuevos) {
+        await this.auditoria.registrar({
+          categoria: 'CAMBIO', modulo: 'repartos', accion: 'TOMAR_RUTA', resultado: 'OK',
+          entidad: 'pedido', entidadId: id, partyId: actor, ip, motivo: idOpcionLog(idOpcion, destino),
+        });
+      }
+      for (const f of filas.filter((x) => nuevos.includes(x.id))) {
+        this.eventosGateway?.emitirAdmin('pedido:estado', {
+          id: Number(f.id), codigo: f.codigo, estado: f.estado, repartidor_party_id: String(destino),
+        });
+      }
+      this.eventosGateway?.emitirAdmin('reparto:rutas', {
+        idOpcion, pedidoIds: ids, repartidor_party_id: String(destino),
+      });
+    }
+
+    const orden = new Map(ids.map((id, i) => [id, i]));
+    return {
+      idOpcion,
+      repartidor_party_id: String(destino),
+      tomados: filas
+        .sort((a, b) => (orden.get(String(a.id)) ?? 0) - (orden.get(String(b.id)) ?? 0))
+        .map((f) => this.formatearPedidoReparto(f, config, ahora, usuario)),
+    };
+  }
 }
+
+const idOpcionLog = (id: string, destino: bigint) => `${id} -> repartidor ${destino}`;

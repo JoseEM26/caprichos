@@ -16,6 +16,13 @@ export interface ComboParteItem {
   cantidad: number;
   categorias: string[];
   productos: string[];
+  /** Plan B, plan C...: ids de producto en orden (solo FIJO). */
+  reemplazos?: string[];
+  reemplazosDetalle?: { id: string; nombre: string }[];
+  /** Calculado en tiempo real. FIJO: principal si está, si no los reemplazos disponibles en orden. */
+  disponible?: boolean;
+  opcionesDisponibles?: string[];
+  principalNombre?: string;
 }
 
 export interface OfertaItem {
@@ -44,6 +51,9 @@ export interface OfertaItem {
   creadoEn: string;
   combosPrecio?: ComboPrecioItem[];
   combosParte?: ComboParteItem[];
+  /** Solo combos: se puede armar ahora (no cambia `activo`). */
+  disponible?: boolean;
+  motivoAgotado?: string | null;
   categoriaNombre?: string | null;
   productoNombre?: string | null;
   vigenteAhora?: boolean;

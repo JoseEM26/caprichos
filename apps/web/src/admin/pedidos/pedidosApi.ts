@@ -294,6 +294,8 @@ export const pedidosApi = {
         opciones?: (string | number)[];
         nota?: string;
         personas?: string[];
+        ofertaId?: string;
+        comboElecciones?: { parteId: string; productoId: string }[];
       }>;
       pago: {
         metodo: 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TARJETA' | 'TRANSFERENCIA';
@@ -316,9 +318,9 @@ export const pedidosApi = {
       };
       nota?: string;
       cuponCodigo?: string;
-      /** Cliente con cuenta (8 dígitos): el pedido suma puntos y guarda la dirección en su libreta */
-      clienteDni?: string;
-      /** Cliente con cuenta elegido en «¿Quién pide?» (id del party), si no va clienteDni */
+      /** Cliente con cuenta (celular de 9 dígitos): el pedido suma puntos y guarda la dirección en su libreta */
+      clienteTelefono?: string;
+      /** Cliente con cuenta elegido en «¿Quién pide?» (id del party), si no va clienteTelefono */
       clientePartyId?: string;
       esPersonal?: boolean;
       colaboradorPartyId?: string | number;

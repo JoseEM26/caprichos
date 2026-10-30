@@ -56,14 +56,15 @@ describe('OfertasService', () => {
       },
       producto: {
         findFirst: jest.fn(),
-        findMany: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
       },
+      comboParteReemplazo: { createMany: jest.fn() },
       comboPrecio: {
         create: jest.fn(),
         deleteMany: jest.fn(),
       },
       comboParte: {
-        create: jest.fn(),
+        create: jest.fn().mockResolvedValue({ id: 100n }),
         deleteMany: jest.fn(),
       },
       reglaAcumulacion: {
@@ -167,6 +168,95 @@ describe('OfertasService', () => {
       expect(res.nombre).toBe('Dúo Especial');
       expect(prismaMock.comboPrecio.create).toHaveBeenCalled();
       expect(prismaMock.comboParte.create).toHaveBeenCalled();
+    });
+
+    describe('reemplazos de la parte FIJO (plan B, C...)', () => {
+      const comboBase = {
+        id: 1n, tipo: 'COMBO', nombre: 'Dúo', descripcion: null, lleva: null, paga: null,
+        alcance_categoria_id: null, alcance_producto_id: null, descuento_tipo: null, descuento_valor: null,
+        compra_minima: null, dias: [], hora_desde: null, hora_hasta: null, fecha_desde: null, fecha_hasta: null,
+        canales: ['CARTA'], limite_usos: null, usos_actuales: 0, no_suma_beneficios: false, orden: 1,
+        activo: true, creado_en: new Date(), combosPrecio: [],
+      };
+      const crear = (reemplazos: (string | number)[]) =>
+        service.crearOferta({
+          tipo: 'COMBO', nombre: 'Dúo', tamanos: [{ tamanoValorId: '10', precio: 25 }],
+          partes: [{ tipo: 'FIJO', cantidad: 1, productos: ['5'], reemplazos }],
+        });
+
+      beforeEach(() => {
+        prismaMock.producto.findFirst.mockResolvedValue(null);
+        prismaMock.oferta.findUnique.mockResolvedValue(null);
+        prismaMock.oferta.create.mockResolvedValue({ ...comboBase });
+      });
+
+      it('guarda los reemplazos en el orden recibido', async () => {
+        prismaMock.producto.findMany.mockResolvedValueOnce([{ id: 7n }, { id: 8n }]);
+        prismaMock.oferta.findUnique.mockResolvedValueOnce(null);
+        prismaMock.oferta.findUnique.mockResolvedValue({
+          ...comboBase,
+          combosParte: [{ id: 100n, tipo: 'FIJO', cantidad: 1, categorias: [], productos: [5n],
+            reemplazos: [{ producto_id: 8n, producto: { nombre: 'Empanada' } }, { producto_id: 7n, producto: { nombre: 'Wrap' } }] }],
+        });
+        const res = await crear(['8', 7]);
+        expect(prismaMock.comboParteReemplazo.createMany).toHaveBeenCalledWith({
+          data: [
+            { combo_parte_id: 100n, producto_id: 8n, orden: 0 },
+            { combo_parte_id: 100n, producto_id: 7n, orden: 1 },
+          ],
+        });
+        expect(res.combosParte![0].reemplazos).toEqual(['8', '7']);
+      });
+
+      it('rechaza repetidos y el producto principal como reemplazo', async () => {
+        await expect(crear(['8', '8'])).rejects.toThrow(BadRequestException);
+        await expect(crear(['5'])).rejects.toThrow(BadRequestException);
+      });
+    });
+
+    describe('validarEleccionesCombo (pedido)', () => {
+      const comboConParte = (agotadoPrincipal: boolean) => {
+        const ahora = Date.now();
+        prismaMock.oferta.findUnique.mockResolvedValue({
+          id: 1n, tipo: 'COMBO', nombre: 'Combo Dúo Irresistible', dias: [], canales: [], creado_en: new Date(),
+          combosPrecio: [],
+          combosParte: [{ id: 100n, tipo: 'FIJO', cantidad: 1, categorias: [], productos: [5n],
+            reemplazos: [{ producto_id: 7n, producto: { nombre: 'Empanada' } }] }],
+        });
+        prismaMock.producto.findMany.mockImplementation(async (args: any) =>
+          args.select?.categoria_id
+            ? [
+                { id: 5n, nombre: 'Club Sandwich', categoria_id: 1n, oculto: false, agotado_hasta: agotadoPrincipal ? new Date(ahora + 3600000) : null },
+                { id: 7n, nombre: 'Empanada', categoria_id: 1n, oculto: false, agotado_hasta: null },
+              ]
+            : [{ id: 5n, nombre: 'Club Sandwich' }, { id: 7n, nombre: 'Empanada' }],
+        );
+      };
+
+      it('con el principal disponible acepta el principal sin nota', async () => {
+        comboConParte(false);
+        await expect(service.validarEleccionesCombo(1, [{ parteId: '100', productoId: '5' }])).resolves.toBe('');
+      });
+
+      it('con el principal agotado acepta el reemplazo y lo anota', async () => {
+        comboConParte(true);
+        await expect(service.validarEleccionesCombo(1, [{ parteId: '100', productoId: '7' }])).resolves.toBe(
+          'Combo Dúo Irresistible · Empanada (en lugar de Club Sandwich)',
+        );
+      });
+
+      it('con el principal agotado rechaza el principal con 409 COMBO_PARTE_NO_DISPONIBLE', async () => {
+        comboConParte(true);
+        await expect(service.validarEleccionesCombo(1, [{ parteId: '100', productoId: '5' }])).rejects.toMatchObject({
+          response: { codigo: 'COMBO_PARTE_NO_DISPONIBLE', mensaje: 'Club Sandwich se acaba de agotar; elige otro reemplazo' },
+          status: 409,
+        });
+      });
+
+      it('rechaza un producto que no es reemplazo de la parte', async () => {
+        comboConParte(true);
+        await expect(service.validarEleccionesCombo(1, [{ parteId: '100', productoId: '99' }])).rejects.toThrow(ConflictException);
+      });
     });
 
     it('cambia estado de oferta con Sí/No (activar/desactivar)', async () => {

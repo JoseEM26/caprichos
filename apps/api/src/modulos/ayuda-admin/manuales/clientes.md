@@ -18,15 +18,15 @@ Directorio centralizado de clientes de Caprichos. Permite registrar nuevos consu
 
 ## Como se hace: Registrar un cliente nuevo desde mostrador o telefono
 1. En la parte superior de la pantalla, pulsar el boton + Nuevo cliente.
-2. Ingresar el Nombre completo y el DNI (8 digitos).
-3. Completar el Telefono de contacto, Correo electronico y Fecha de cumpleanos si el cliente lo autoriza.
+2. Ingresar el Nombre completo y el Celular (9 digitos, empieza con 9). El celular es el usuario de su cuenta; no se pide DNI. Una empresa se registra con su RUC.
+3. Completar el Correo electronico y la Fecha de cumpleanos si el cliente lo autoriza.
 4. Marcar la casilla obligatoria de Acepta tratamiento de datos personales.
 5. Pulsar el boton Guardar cliente.
 Despues: [[caja]]
 Ver tambien: [[mensajes]]
 
 ## Como se hace: Consultar la ficha y compras de un cliente
-1. En el buscador superior, escribir el nombre, DNI o telefono del cliente.
+1. En el buscador superior, escribir el nombre o el celular del cliente.
 2. Hacer clic sobre la fila del cliente en la tabla de resultados.
 3. Se abrira la Ficha del cliente mostrando su saldo de puntos, nivel de cliente, cantidad total de compras registradas en [[caja]], monto historico gastado y direcciones registradas.
 Ver tambien: [[caja]]
@@ -50,7 +50,8 @@ Ver tambien: [[zonas]]
 ## Errores y dudas comunes
 - No es posible restar una cantidad de puntos superior al saldo actual que posee el cliente.
 - Si un cliente solicita ser dado de baja, se puede cambiar su estado a Inactivo pulsando Desactivar cliente, lo cual inhabilita sus canjes sin borrar su historial de pedidos previo.
-- El DNI debe tener exactamente 8 digitos numericos para ser considerado valido.
+- El celular debe tener 9 digitos y empezar con 9. No puede repetirse entre cuentas activas.
+- Los clientes no tienen DNI guardado: el DNI solo queda en el comprobante o en el reclamo cuando la ley lo exige.
 
 ## Quien puede hacerlo
 - Administrador y Call Center tienen autorizacion para acceder al modulo de Clientes y editar informacion.

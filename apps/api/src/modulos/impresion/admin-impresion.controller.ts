@@ -17,6 +17,8 @@ import { Permiso } from '../acceso/permiso.decorator';
 import { ImpresionService } from './impresion.service';
 import {
   CrearLlaveDto,
+  DescartarDto,
+  VaciarColaDto,
   ReimprimirDto,
 } from './dto';
 
@@ -42,6 +44,48 @@ export class AdminImpresionController {
     const pag = pagina ? parseInt(pagina, 10) : 1;
     const lim = limite ? parseInt(limite, 10) : 20;
     return this.impresionService.listarTrabajos(estado, pedido, pag, lim);
+  }
+
+  @Get('cola')
+  @Permiso('pedidos', 'ver')
+  async listarCola(
+    @Query('filtro') filtro?: string,
+    @Query('pagina') pagina?: string,
+    @Query('limite') limite?: string,
+    @Query('minutos') minutos?: string,
+  ) {
+    return this.impresionService.listarCola(
+      filtro || 'pendientes',
+      pagina ? parseInt(pagina, 10) : 1,
+      limite ? parseInt(limite, 10) : 20,
+      minutos ? parseInt(minutos, 10) : 30,
+    );
+  }
+
+  // Descartar: ADMIN y CAJERO (el servicio valida el rol; COCINA tiene el permiso pero no descarta)
+  @Post('cola/vaciar')
+  @HttpCode(HttpStatus.OK)
+  @Permiso('pedidos', 'cambiar_estado')
+  async vaciarCola(@Body() dto: VaciarColaDto, @Req() req: any) {
+    return this.impresionService.vaciarCola(dto, req.usuario, this.ip(req));
+  }
+
+  @Post('trabajos/:id/descartar')
+  @HttpCode(HttpStatus.OK)
+  @Permiso('pedidos', 'cambiar_estado')
+  async descartarTrabajo(@Param('id') id: string, @Body() dto: DescartarDto, @Req() req: any) {
+    return this.impresionService.descartarTrabajo(id, dto, req.usuario, this.ip(req));
+  }
+
+  @Post('pedidos/:id/descartar')
+  @HttpCode(HttpStatus.OK)
+  @Permiso('pedidos', 'cambiar_estado')
+  async descartarPedido(@Param('id') id: string, @Body() dto: DescartarDto, @Req() req: any) {
+    return this.impresionService.descartarPedido(id, dto, req.usuario, this.ip(req));
+  }
+
+  private ip(req: any): string | undefined {
+    return (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
   }
 
   @Post('trabajos/:id/reintentar')

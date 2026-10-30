@@ -6,6 +6,15 @@ import {
   OpcionCarta as OpcionProducto,
   GrupoOpcionesCarta as GrupoOpciones,
 } from '../../../carta/tipos';
+import type { OfertaItem } from '../../ofertas/ofertasApi';
+import {
+  AvisoReemplazoCombo,
+  eleccionesCombo,
+  eleccionInicial,
+  faltaElegirReemplazo,
+  notaReemplazos,
+  partesConReemplazo,
+} from '../../../carta/ReemplazoCombo';
 
 export interface ConfiguracionUnidad {
   opciones: OpcionProducto[];
@@ -17,6 +26,9 @@ export interface ProductoConfigurado {
   tamano: TamanoProducto | null;
   cantidad: number;
   nota: string;
+  /** Combo con parte fija: el combo y lo elegido en cada parte (principal o reemplazo) */
+  ofertaId?: string;
+  comboElecciones?: { parteId: string; productoId: string }[];
   opcionesGlobales: OpcionProducto[];
   unidades: ConfiguracionUnidad[];
   precioUnitario: number;
@@ -27,6 +39,8 @@ export interface VentanaOpcionesProductoProps {
   producto: ProductoCarta | null;
   alCerrar: () => void;
   alAgregar: (config: ProductoConfigurado) => void;
+  /** Combo vinculado al producto: avisa si una parte fija se agotó y ofrece reemplazos */
+  oferta?: OfertaItem | null;
 }
 
 const recortar = (t: string, n: number): string => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
@@ -35,6 +49,7 @@ export function VentanaOpcionesProducto({
   producto,
   alCerrar,
   alAgregar,
+  oferta = null,
 }: VentanaOpcionesProductoProps) {
   if (!producto) return null;
 
@@ -61,6 +76,11 @@ export function VentanaOpcionesProducto({
     0: '',
   });
   const [avisoNombres, setAvisoNombres] = useState(false);
+
+  // Combo: reemplazos de partes fijas agotadas
+  const partesRe = useMemo(() => partesConReemplazo(oferta), [oferta]);
+  const [reemplazos, setReemplazos] = useState<Record<string, string>>(() => eleccionInicial(partesRe));
+  const comboAgotado = oferta?.disponible === false;
 
   // Nota de cocina
   const [notaCocina, setNotaCocina] = useState('');
@@ -171,7 +191,7 @@ export function VentanaOpcionesProducto({
     return faltantes;
   }, [producto, opcionesActuales]);
 
-  const puedeAgregar = gruposFaltantes.length === 0;
+  const puedeAgregar = gruposFaltantes.length === 0 && !comboAgotado && !faltaElegirReemplazo(partesRe, reemplazos);
 
   // En las bebidas el nombre de quien la toma es obligatorio: va en la etiqueta del vaso
   const nombresFaltantes = esBebida
@@ -206,11 +226,13 @@ export function VentanaOpcionesProducto({
       }
     }
 
+    const elecciones = eleccionesCombo(oferta, reemplazos);
     alAgregar({
       producto,
+      ...(oferta && elecciones.length > 0 ? { ofertaId: String(oferta.id), comboElecciones: elecciones } : {}),
       tamano: tamanoSeleccionado,
       cantidad,
-      nota: notaCocina.trim(),
+      nota: [notaReemplazos(partesRe, reemplazos), notaCocina.trim()].filter(Boolean).join(' · '),
       opcionesGlobales: opcionesPorUnidad[0] || [],
       unidades,
       precioUnitario: precioTotal / cantidad,
@@ -653,6 +675,17 @@ export function VentanaOpcionesProducto({
           </div>
         )}
 
+        {comboAgotado && (
+          <div role="status" style={{ fontWeight: 800, color: 'var(--cp-rust)' }}>
+            Agotado
+          </div>
+        )}
+        <AvisoReemplazoCombo
+          partes={comboAgotado ? [] : partesRe}
+          elegidos={reemplazos}
+          onElegir={(parteId, productoId) => setReemplazos((prev) => ({ ...prev, [parteId]: productoId }))}
+        />
+
         {/* Nota para cocina */}
         <div>
           <label
@@ -862,7 +895,7 @@ export function VentanaOpcionesProducto({
               cursor: puedeAgregar ? 'pointer' : 'not-allowed',
             }}
           >
-            <span>Agregar al pedido</span>
+            <span>{comboAgotado ? 'Agotado' : 'Agregar al pedido'}</span>
             <span> · S/ {precioTotal.toFixed(2)}</span>
           </button>
         </div>

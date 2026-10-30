@@ -98,6 +98,30 @@ export class ContenidoAdminController {
     return this.contenidoService.descartarNovedadesEncabezado(req.usuario);
   }
 
+  @Get('conocenos')
+  @Permiso('novedades', 'ver')
+  async obtenerConocenos() {
+    return this.contenidoService.obtenerConocenosAdmin();
+  }
+
+  @Put('conocenos')
+  @Permiso('novedades', 'editar')
+  async guardarBorradorConocenos(@Body() dto: any, @Req() req: any) {
+    return this.contenidoService.guardarBorradorConocenos(dto, req.usuario);
+  }
+
+  @Post('conocenos/publicar')
+  @Permiso('novedades', 'editar')
+  async publicarConocenos(@Req() req: any) {
+    return this.contenidoService.publicarConocenos(req.usuario);
+  }
+
+  @Post('conocenos/descartar')
+  @Permiso('novedades', 'editar')
+  async descartarConocenos(@Req() req: any) {
+    return this.contenidoService.descartarConocenos(req.usuario);
+  }
+
   @Get('novedades')
   @Permiso('novedades', 'ver')
   async listarNovedades() {

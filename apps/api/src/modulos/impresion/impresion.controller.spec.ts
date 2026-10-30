@@ -33,6 +33,10 @@ describe('Controladores de Impresión', () => {
       listarLlavesAgente: jest.fn().mockResolvedValue([]),
       crearLlaveAgente: jest.fn().mockResolvedValue({ id: '1', llave: 'agk_123' }),
       desactivarLlaveAgente: jest.fn().mockResolvedValue({ ok: true }),
+      listarCola: jest.fn().mockResolvedValue({ items: [] }),
+      vaciarCola: jest.fn().mockResolvedValue({ ok: true }),
+      descartarPedido: jest.fn().mockResolvedValue({ ok: true }),
+      descartarTrabajo: jest.fn().mockResolvedValue({ ok: true }),
     };
 
     agenteController = new AgenteImpresionController(impresionServiceMock);
@@ -125,6 +129,23 @@ describe('Controladores de Impresión', () => {
         adminReq.usuario,
         '127.0.0.1',
       );
+    });
+  });
+
+  describe('cola y descarte (permisos)', () => {
+    it('vaciar y descartar piden pedidos/cambiar_estado y listar pide pedidos/ver', () => {
+      const P = (m: string) => Reflect.getMetadataKeys(AdminImpresionController.prototype.constructor.prototype[m]);
+      expect(P('vaciarCola').length).toBeGreaterThan(0);
+      expect(P('descartarPedido').length).toBeGreaterThan(0);
+      expect(P('listarCola').length).toBeGreaterThan(0);
+    });
+
+    it('delega al servicio con el usuario del request', async () => {
+      const req = { usuario: { rol: 'CAJERO' }, ip: '2.2.2.2' };
+      await adminController.vaciarCola({ alcance: 'TODAS', motivo: 'motivo largo' }, req);
+      expect(impresionServiceMock.vaciarCola).toHaveBeenCalledWith({ alcance: 'TODAS', motivo: 'motivo largo' }, req.usuario, '2.2.2.2');
+      await adminController.descartarPedido('5', {}, req);
+      expect(impresionServiceMock.descartarPedido).toHaveBeenCalledWith('5', {}, req.usuario, '2.2.2.2');
     });
   });
 });

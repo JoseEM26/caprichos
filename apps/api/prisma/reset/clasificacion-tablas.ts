@@ -77,7 +77,7 @@ export const ANONIMIZAR: Record<string, ReglaAnonimizar[]> = {
 export const CONSERVAR: string[] = [
   'agotado', 'ajuste_opcion', 'alta_demanda', 'archivo', 'area_cocina', 'auditoria', 'caja',
   'categoria', 'cierre_caja', 'cierre_dia', 'cierre_medio', 'cliente_whatsapp_consentimiento',
-  'cobertura_turno', 'cobro', 'cobro_pago', 'comanda_area', 'combo_parte', 'combo_precio',
+  'cobertura_turno', 'cobro', 'cobro_pago', 'comanda_area', 'combo_parte', 'combo_parte_reemplazo', 'combo_precio',
   'compra', 'compra_linea', 'consumo_personal', 'conteo_cierre', 'cupon', 'cupon_emitido',
   'destacada', 'destacada_foto', 'device_key', 'elemento_plano', 'employee_detail', 'encuesta',
   'encuesta_posventa', 'fecha_especial', 'foto_local', 'grupo_opciones', 'horario_dia',
@@ -88,7 +88,7 @@ export const CONSERVAR: string[] = [
   'pedido_linea', 'pedido_linea_opcion', 'pedido_mesa', 'pedido_pago_plan', 'pedido_proveedor',
   'pedido_proveedor_linea', 'permiso', 'piso', 'print_job', 'produccion', 'producto',
   'producto_grupo', 'producto_tamano', 'queja_whatsapp', 'ranking_mes', 'receta', 'receta_linea',
-  'regla_acumulacion', 'reserva', 'reserva_mesa', 'respuesta_rapida', 'rol', 'rol_permiso',
+  'regla_acumulacion', 'reemplazo_dia', 'reserva', 'reserva_mesa', 'respuesta_rapida', 'rol', 'rol_permiso',
   'sabor', 'saliente_whatsapp', 'secuencia_comprobante', 'secuencia_pedido', 'solicitud_cambio',
   'solicitud_reserva', 'stock', 'supervisor_secreto', 'supplier_detail', 'sys_control', 'traslado',
   'user_account', 'uso_externo', 'version_carta', 'voucher_pago', 'whatsapp_mensaje',
@@ -108,6 +108,7 @@ export const FK_PARTY_PERSONAL = [
   'pedido.repartidor_party_id', 'liquidacion.repartidor_party_id', 'comprobante.emitido_por',
   'reclamo.respondido_por', 'voucher_pago.reemplazado_por', 'pedido_proveedor.proveedor_party_id',
   'compra.proveedor_party_id', 'pedido_interno.avisado_party_id', 'consumo_personal.party_id',
+  'reemplazo_dia.party_id', 'reemplazo_dia.reemplaza_party_id',
 ];
 
 /**

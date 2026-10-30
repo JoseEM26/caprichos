@@ -218,7 +218,17 @@ export interface AccionConsultarIa {
   pregunta: string;
 }
 
+/**
+ * Acción interna: crear la cuenta del cliente con el celular de la conversación, sin contraseña (consentimiento
+ * aceptado en el chat). El ejecutor responde con el mensaje de «cuenta creada» o el de error.
+ */
+export interface AccionCrearCuentaCliente {
+  tipo: 'crearCuentaCliente';
+  nombre: string;
+}
+
 export type AccionMensaje =
+  | AccionCrearCuentaCliente
   | AccionEnviarTexto
   | AccionEnviarBotones
   | AccionEnviarLista

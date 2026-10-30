@@ -43,9 +43,8 @@ export function ModalFichaCliente({
   if (!abierto || !cliente) return null;
 
   const nombre = ficha?.nombre || cliente.nombre;
-  const dniMasc = ficha?.dniMascara || cliente.dni;
   const pedidosCount = ficha?.pedidos?.length ?? cliente.pedidos;
-  const info = `${cliente.tipo} · DNI ${dniMasc} · ${saldoPuntos.toFixed(2)} puntos · ${pedidosCount} pedidos`;
+  const info = `${cliente.tipo}${ficha?.ruc ? ` · RUC ${ficha.ruc}` : ''}${ficha?.telefono ? ` · Cel. ${ficha.telefono}` : ''} · ${saldoPuntos.toFixed(2)} puntos · ${pedidosCount} pedidos`;
 
   const pedidos = ficha?.pedidos || [];
 

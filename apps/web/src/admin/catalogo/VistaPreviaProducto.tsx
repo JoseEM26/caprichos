@@ -11,6 +11,7 @@
  * así siempre refleja el estado actual del formulario. `sinGuardar` muestra «Vista previa de tus cambios sin guardar».
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useUrlArchivo } from '../../comun/useUrlArchivo';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { CarritoProvider } from '../../carta/CarritoContext';
@@ -40,8 +41,7 @@ export function VistaPreviaProducto({ borrador, gruposGenerales = [], sinGuardar
   const d = borrador as BorradorProducto;
 
   // imagen elegida y no subida: URL local, liberada al cerrar
-  const urlLocal = useMemo(() => (d.fotoArchivo ? URL.createObjectURL(d.fotoArchivo) : null), [d.fotoArchivo]);
-  useEffect(() => () => { if (urlLocal) URL.revokeObjectURL(urlLocal); }, [urlLocal]);
+  const urlLocal = useUrlArchivo(d.fotoArchivo);
 
   const producto = useMemo(
     () => aProductoCarta({ ...d, fotoUrl: urlLocal ?? d.fotoUrl }, gruposGenerales),

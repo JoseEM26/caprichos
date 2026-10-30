@@ -148,10 +148,11 @@ describe('UsuariosView (/admin/usuarios)', () => {
     fireEvent.change(within(dialogCrear).getByLabelText(/Nombres/i), { target: { value: 'Nuevo' } });
     fireEvent.change(within(dialogCrear).getByLabelText(/Apellidos/i), { target: { value: 'Personal' } });
 
-    // Enviar formulario (buscar botón submit dentro del diálogo)
-    const botonCrear = dialogCrear.querySelector('button[type="submit"]');
-    expect(botonCrear).not.toBeNull();
-    fireEvent.click(botonCrear!);
+    // Asistente por pasos: avanza hasta el resumen y crea
+    for (let i = 0; i < 4; i++) {
+      fireEvent.click(within(dialogCrear).getByRole('button', { name: 'Siguiente' }));
+    }
+    fireEvent.click(within(dialogCrear).getByRole('button', { name: 'Crear usuario' }));
 
     // Antes de crear pide confirmación Sí/No y todavía no llama a la API
     const dialogConfirmar = await screen.findByRole('dialog', { name: /Crear usuario/i });
@@ -164,6 +165,8 @@ describe('UsuariosView (/admin/usuarios)', () => {
         nombres: 'Nuevo',
         apellidos: 'Personal',
         rol: 'CAJERO',
+        horarios: [],
+        reemplazos: [],
       });
     });
 
@@ -312,5 +315,31 @@ describe('UsuariosView (/admin/usuarios)', () => {
     await waitFor(() => {
       expect(spyPost).toHaveBeenCalledWith('/admin/usuarios/2/desactivar');
     });
+  });
+
+  it('5. La pestaña Horarios muestra los datos reales del servidor y quién reemplaza en los descansos', async () => {
+    setupSesion('ADMIN');
+    vi.spyOn(api, 'get').mockImplementation(async (ruta: string) => {
+      if (ruta.startsWith('/admin/usuarios/horarios')) {
+        return [
+          {
+            id: '2', partyId: '2', nombres: 'Lucia', apellidos: 'Prueba', rol: 'CAJERO',
+            horarios: [{ dia: 1, entrada: '08:00', salida: '16:00' }],
+            reemplazos: [{ dia: 2, reemplazaPartyId: '1', nombre: 'Carlos Mendoza' }],
+          },
+        ];
+      }
+      return { total: 3, pagina: 1, limite: 15, totalPaginas: 1, elementos: USUARIOS_MOCK };
+    });
+    render(
+      <MemoryRouter>
+        <UsuariosView />
+      </MemoryRouter>,
+    );
+    fireEvent.click(await screen.findByRole('tab', { name: /Horarios y turnos/i }));
+    const fila = await screen.findByTestId('horario-2');
+    expect(within(fila).getByText('08:00 a 16:00')).toBeInTheDocument();
+    expect(within(fila).getByText(/Lo reemplaza: Carlos Mendoza/)).toBeInTheDocument();
+    expect(within(fila).getByText(/8 h por semana/)).toBeInTheDocument();
   });
 });

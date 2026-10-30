@@ -320,15 +320,15 @@ describe('SalonService', () => {
       expect(dtoEnviado.modalidad).toBe('MESA');
     });
 
-    it('pedido de mesa con clienteDni lo reenvía a la creación compartida (suma puntos al cobrar)', async () => {
+    it('pedido de mesa con clienteTelefono lo reenvía a la creación compartida (suma puntos al cobrar)', async () => {
       prismaMock.elementoPlano.findMany.mockResolvedValue([{ id: 6n, numero: 6, tipo: 'MESA', activo: true }]);
       prismaMock.pedidoMesa.findMany.mockResolvedValue([]);
       prismaMock.reservaMesa.findMany.mockResolvedValue([]);
       pedidosServiceMock.crear.mockResolvedValue({ id: '78', codigo: 'CP-M078', total: 10 });
 
-      await service.abrirPedido({ mesas: [6], lineas: [{ productoId: 1, cantidad: 1 }], clienteDni: '70123401' });
+      await service.abrirPedido({ mesas: [6], lineas: [{ productoId: 1, cantidad: 1 }], clienteTelefono: '912340170' });
 
-      expect(pedidosServiceMock.crear.mock.calls[0][0].clienteDni).toBe('70123401');
+      expect(pedidosServiceMock.crear.mock.calls[0][0].clienteTelefono).toBe('912340170');
     });
 
     it('pedido de mesa con clientePartyId lo reenvía a la creación compartida sin nombre ni teléfono de relleno', async () => {

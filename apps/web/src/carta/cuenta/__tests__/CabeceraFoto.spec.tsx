@@ -20,7 +20,6 @@ const cuentaBase = {
 const cliente = (fotoUrl: string | null) => ({
   partyId: '100',
   nombre: 'Ana Pérez',
-  dniMascara: '4521****',
   correo: null,
   telefono: '912345678',
   fotoUrl,

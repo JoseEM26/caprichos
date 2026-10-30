@@ -61,13 +61,13 @@ describe('¿Quién pide?: buscador de cliente y de personal', () => {
   describe('Cliente con cuenta', () => {
     it('escribir dispara la búsqueda con debounce de 300 ms desde 2 caracteres y muestra resultados', async () => {
       await abrirQuienPide();
-      fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (DNI)' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (celular)' }));
       vi.mocked(api.get).mockResolvedValue({
-        items: [{ nombre: 'Ana Pérez', dni: '4521****', puntos: 12 }],
+        items: [{ nombre: 'Ana Pérez', telefono: '987654321', puntos: 12 }],
       } as any);
 
       vi.useFakeTimers();
-      const input = screen.getByPlaceholderText('DNI o nombre del cliente');
+      const input = screen.getByPlaceholderText('Nombre o celular del cliente');
       expect(document.activeElement).toBe(input);
 
       fireEvent.change(input, { target: { value: '4' } });
@@ -89,15 +89,15 @@ describe('¿Quién pide?: buscador de cliente y de personal', () => {
       expect(llamadasClientes()).toHaveLength(1);
       expect(api.get).toHaveBeenCalledWith('/admin/clientes?q=45');
       expect(screen.getByRole('button', { name: /Ana Pérez/ })).toBeInTheDocument();
-      expect(screen.getByText('4521**** · 12 pts')).toBeInTheDocument();
+      expect(screen.getByText('987654321 · 12 pts')).toBeInTheDocument();
     });
 
     it('Enter fuerza la búsqueda sin esperar el debounce', async () => {
       await abrirQuienPide();
-      fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (DNI)' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (celular)' }));
       vi.useFakeTimers();
 
-      const input = screen.getByPlaceholderText('DNI o nombre del cliente');
+      const input = screen.getByPlaceholderText('Nombre o celular del cliente');
       fireEvent.change(input, { target: { value: 'Ana' } });
       fireEvent.keyDown(input, { key: 'Enter' });
       await act(async () => {
@@ -109,15 +109,15 @@ describe('¿Quién pide?: buscador de cliente y de personal', () => {
 
     it('solo vale la última respuesta: una respuesta vieja que llega tarde no pisa la nueva', async () => {
       await abrirQuienPide();
-      fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (DNI)' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (celular)' }));
       vi.useFakeTimers();
 
       let resolverViejo: (v: any) => void = () => {};
       vi.mocked(api.get)
         .mockImplementationOnce(() => new Promise((r) => (resolverViejo = r)) as any)
-        .mockResolvedValueOnce({ items: [{ nombre: 'Luis Quispe', dni: '7123****', puntos: 3 }] } as any);
+        .mockResolvedValueOnce({ items: [{ nombre: 'Luis Quispe', telefono: '912345678', puntos: 3 }] } as any);
 
-      const input = screen.getByPlaceholderText('DNI o nombre del cliente');
+      const input = screen.getByPlaceholderText('Nombre o celular del cliente');
       fireEvent.change(input, { target: { value: 'ana' } });
       await act(async () => {
         vi.advanceTimersByTime(300);
@@ -132,7 +132,7 @@ describe('¿Quién pide?: buscador de cliente y de personal', () => {
 
       // Llega la respuesta vieja: no debe aparecer
       await act(async () => {
-        resolverViejo({ items: [{ nombre: 'Ana Pérez', dni: '4521****', puntos: 12 }] });
+        resolverViejo({ items: [{ nombre: 'Ana Pérez', telefono: '987654321', puntos: 12 }] });
       });
       await vaciarPromesas();
       expect(screen.queryByRole('button', { name: /Ana Pérez/ })).toBeNull();
@@ -141,46 +141,46 @@ describe('¿Quién pide?: buscador de cliente y de personal', () => {
 
     it('elegir un resultado fija el cliente en el resumen y cierra el panel', async () => {
       await abrirQuienPide();
-      fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (DNI)' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (celular)' }));
       vi.mocked(api.get).mockResolvedValue({
-        items: [{ nombre: 'Ana Pérez', dni: '4521****', puntos: 12 }],
+        items: [{ nombre: 'Ana Pérez', telefono: '987654321', puntos: 12 }],
       } as any);
 
-      fireEvent.change(screen.getByPlaceholderText('DNI o nombre del cliente'), {
+      fireEvent.change(screen.getByPlaceholderText('Nombre o celular del cliente'), {
         target: { value: 'Ana' },
       });
-      fireEvent.keyDown(screen.getByPlaceholderText('DNI o nombre del cliente'), { key: 'Enter' });
+      fireEvent.keyDown(screen.getByPlaceholderText('Nombre o celular del cliente'), { key: 'Enter' });
       fireEvent.click(await screen.findByRole('button', { name: /Ana Pérez/ }));
 
       expect(screen.getByText('Cliente: Ana Pérez (12 pts)')).toBeInTheDocument();
-      expect(screen.queryByPlaceholderText('DNI o nombre del cliente')).toBeNull();
+      expect(screen.queryByPlaceholderText('Nombre o celular del cliente')).toBeNull();
     });
 
     it('sin resultados muestra el mensaje y no deja elegir nada', async () => {
       await abrirQuienPide();
-      fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (DNI)' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (celular)' }));
       vi.mocked(api.get).mockResolvedValue({ items: [] } as any);
 
-      fireEvent.change(screen.getByPlaceholderText('DNI o nombre del cliente'), {
+      fireEvent.change(screen.getByPlaceholderText('Nombre o celular del cliente'), {
         target: { value: '99999999' },
       });
       fireEvent.click(screen.getByRole('button', { name: 'Buscar' }));
 
-      expect(await screen.findByText('No hay cuenta con ese DNI o nombre.')).toBeInTheDocument();
+      expect(await screen.findByText('No hay cuenta con ese nombre o celular.')).toBeInTheDocument();
     });
 
     it('si la búsqueda falla muestra un error discreto', async () => {
       await abrirQuienPide();
-      fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (DNI)' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (celular)' }));
       vi.mocked(api.get).mockRejectedValue(new Error('red'));
 
-      fireEvent.change(screen.getByPlaceholderText('DNI o nombre del cliente'), {
+      fireEvent.change(screen.getByPlaceholderText('Nombre o celular del cliente'), {
         target: { value: 'Ana' },
       });
       fireEvent.click(screen.getByRole('button', { name: 'Buscar' }));
 
       expect(await screen.findByText('No se pudo buscar. Intenta de nuevo.')).toBeInTheDocument();
-      expect(screen.queryByText('No hay cuenta con ese DNI o nombre.')).toBeNull();
+      expect(screen.queryByText('No hay cuenta con ese nombre o celular.')).toBeNull();
     });
   });
 
@@ -271,11 +271,11 @@ describe('¿Quién pide? con cliente de cuenta en el pedido enviado', () => {
     fireEvent.click(screen.getByText('Agregar al pedido'));
 
     fireEvent.click(await screen.findByRole('button', { name: 'Cambiar' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (DNI)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (celular)' }));
     vi.mocked(api.get).mockResolvedValue({
-      items: [{ id: 77, nombre: 'Ana Pérez', dni: '4521****', puntos: 12 }],
+      items: [{ id: 77, nombre: 'Ana Pérez', telefono: '987654321', puntos: 12 }],
     } as any);
-    const input = screen.getByPlaceholderText('DNI o nombre del cliente');
+    const input = screen.getByPlaceholderText('Nombre o celular del cliente');
     fireEvent.change(input, { target: { value: 'Ana' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     fireEvent.click(await screen.findByRole('button', { name: /Ana Pérez/ }));

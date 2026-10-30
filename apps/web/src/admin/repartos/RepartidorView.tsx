@@ -6,6 +6,8 @@ import { Confirmar } from '../../comun/Confirmar';
 import { useEsMovil } from '../../carta/useEsMovil';
 import { ModalReportarFalla } from './ModalReportarFalla';
 import { MapaRepartos, type PuntoRepartoMapa } from './MapaRepartos';
+import { OpcionesRutaSugerida } from './OpcionesRutaSugerida';
+import { useRutasSugeridas } from './useRutasSugeridas';
 import {
   repartosApi,
   AvisoRepartidor,
@@ -903,11 +905,21 @@ export function RepartidorView() {
     cargarDatos();
   }, [cargarDatos]);
 
+
+  // Opciones de ruta del servidor: elegir una la resalta en el mapa; tomarla la deja en «Mi ruta»
+  const sugeridas = useRutasSugeridas();
+  const [opcionSeleccionadaId, setOpcionSeleccionadaId] = useState<string | null>(null);
+  const opcionSeleccionada = sugeridas.datos?.opciones.find((o) => o.id === opcionSeleccionadaId) ?? null;
+
   // En vivo, como la vista del administrador: un pedido que pasa a LISTO aparece sin recargar
   useEventos('pedido:estado', () => {
     cargarDatos();
+    sugeridas.recargar();
   });
   useEventos('reparto:incidente', () => {
+    cargarDatos();
+  });
+  useEventos('reparto:rutas', () => {
     cargarDatos();
   });
 
@@ -1064,9 +1076,12 @@ export function RepartidorView() {
 
   const elegidosArr = useMemo(() => Array.from(seleccionadosIds), [seleccionadosIds]);
 
+  const idsOpcion = useMemo(() => opcionSeleccionada?.pedidos.map((p) => p.id) ?? [], [opcionSeleccionada]);
   const mapa =
     pestana === 'para_elegir'
-      ? { puntos: puntosSugeridos, ruta: rutaElegidos, resaltados: elegidosArr }
+      ? opcionSeleccionada
+        ? { puntos: puntosSugeridos, ruta: opcionSeleccionada.ruta, resaltados: idsOpcion }
+        : { puntos: puntosSugeridos, ruta: rutaElegidos, resaltados: elegidosArr }
       : { puntos: puntosMiRuta, ruta: rutaMiRuta, resaltados: SIN_RESALTADOS };
 
   // Acciones con modal Confirmar
@@ -1341,6 +1356,19 @@ export function RepartidorView() {
   const contenidoParaElegir = (
     <div data-testid="contenido-para-elegir" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {!escritorio && rutaSugeridaDisponibles.length > 0 && botonVerMapa('Ver en mapa')}
+      <OpcionesRutaSugerida
+        datos={sugeridas.datos}
+        cargando={sugeridas.cargando}
+        error={sugeridas.error}
+        alReintentar={sugeridas.recargar}
+        seleccionadaId={opcionSeleccionadaId}
+        alSeleccionar={setOpcionSeleccionadaId}
+        alCambiar={() => {
+          sugeridas.recargar();
+          cargarDatos();
+        }}
+        alTomada={() => setPestana('mi_ruta')}
+      />
       {rutaSugeridaDisponibles.length === 0 ? (
         <div
           data-testid="estado-vacio-para-elegir"

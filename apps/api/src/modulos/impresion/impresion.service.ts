@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -17,9 +18,11 @@ import {
 } from '@caprichos/compartido';
 import {
   CrearLlaveDto,
+  DescartarDto,
   LatidoDto,
   ReimprimirDto,
   ResultadoTrabajoDto,
+  VaciarColaDto,
 } from './dto';
 import {
   CLAVE_GENERAL,
@@ -47,6 +50,19 @@ const ESTADO_ETIQUETA: Record<string, string> = {
   IMPRESO: 'IMPRESA',
   FALLIDO: 'FALLIDA',
   VENCIDO: 'VENCIDA',
+  DESCARTADO: 'DESCARTADA',
+};
+
+/** Roles que pueden descartar etiquetas de la cola. */
+const ROLES_DESCARTAR = ['ADMIN', 'CAJERO'];
+
+const FILTROS_COLA: Record<string, string> = {
+  pendientes: 'PENDIENTE',
+  en_curso: 'IMPRIMIENDO',
+  impresos: 'IMPRESO',
+  fallidos: 'FALLIDO',
+  vencidos: 'VENCIDO',
+  descartados: 'DESCARTADO',
 };
 
 const INCLUDE_LINEAS_PEDIDO = {
@@ -184,6 +200,9 @@ export class ImpresionService {
         mensaje: 'Trabajo de impresión no encontrado',
       });
     }
+
+    // Un trabajo descartado no se toca: el agente no debe devolverlo a la cola
+    if (trabajo.estado === 'DESCARTADO') return;
 
     if (dto.ok) {
       await this.prisma.printJob.update({
@@ -332,6 +351,181 @@ export class ImpresionService {
       pagina,
       paginas: Math.ceil(total / take) || 1,
     };
+  }
+
+  /**
+   * Cola agrupada por pedido para el admin. `filtro`: pendientes (defecto), en_curso, impresos,
+   * fallidos, vencidos, descartados o todos. `minutos` solo afecta al conteo de pendientes antiguas.
+   */
+  async listarCola(filtro = 'pendientes', pagina = 1, limite = 20, minutos = 30) {
+    const take = Math.min(Math.max(1, limite || 20), 100);
+    const pag = Math.max(1, pagina || 1);
+    const estado = FILTROS_COLA[filtro];
+    const mins = minutos > 0 ? minutos : 30;
+
+    // ponytail: se agrupa en memoria con tope de 2000 trabajos; pasar a groupBy SQL si la cola crece
+    const [trabajos, porEstado, antiguas] = await Promise.all([
+      this.prisma.printJob.findMany({
+        where: estado ? { estado } : {},
+        include: { pedido: { select: { codigo: true, cliente_nombre: true } } },
+        orderBy: { id: 'desc' },
+        take: 2000,
+      }),
+      this.prisma.printJob.groupBy({ by: ['estado'], _count: { _all: true } }),
+      this.prisma.printJob.count({
+        where: { estado: 'PENDIENTE', en: { lt: new Date(Date.now() - mins * 60 * 1000) } },
+      }),
+    ]);
+
+    const grupos = new Map<string, any>();
+    for (const t of trabajos) {
+      const k = t.pedido_id.toString();
+      let g = grupos.get(k);
+      if (!g) {
+        g = {
+          pedidoId: k,
+          pedidoCodigo: t.pedido?.codigo || '',
+          clienteNombre: t.pedido?.cliente_nombre || '',
+          cantidad: 0,
+          estados: {} as Record<string, number>,
+          masAntiguaEn: t.en,
+          error: null as string | null,
+          trabajoIds: [] as string[],
+        };
+        grupos.set(k, g);
+      }
+      g.cantidad += 1;
+      g.estados[t.estado] = (g.estados[t.estado] || 0) + 1;
+      if (t.en < g.masAntiguaEn) g.masAntiguaEn = t.en;
+      if (!g.error && t.error) g.error = t.error;
+      g.trabajoIds.push(t.id.toString());
+    }
+
+    const todos = [...grupos.values()].sort((a, b) => a.masAntiguaEn - b.masAntiguaEn);
+    const total = todos.length;
+    const items = todos.slice((pag - 1) * take, pag * take).map((g) => ({
+      ...g,
+      masAntiguaEn: g.masAntiguaEn.toISOString(),
+    }));
+
+    const n = (e: string) => porEstado.find((x: any) => x.estado === e)?._count?._all ?? 0;
+    return {
+      items,
+      total,
+      pagina: pag,
+      paginas: Math.ceil(total / take) || 1,
+      resumen: {
+        pendientes: n('PENDIENTE'),
+        enCurso: n('IMPRIMIENDO'),
+        fallidos: n('FALLIDO'),
+        vencidos: n('VENCIDO'),
+        descartados: n('DESCARTADO'),
+        pendientesAntiguas: antiguas,
+        minutosAntiguas: mins,
+      },
+    };
+  }
+
+  private exigirRolDescartar(usuario?: UsuarioAutenticado) {
+    if (!ROLES_DESCARTAR.includes(String(usuario?.rol || '').toUpperCase())) {
+      throw new ForbiddenException({
+        codigo: 'SIN_PERMISO_DESCARTAR',
+        mensaje: 'Solo Caja o un administrador pueden descartar etiquetas de la cola',
+      });
+    }
+  }
+
+  /** Marca DESCARTADO (nada se borra) y audita con el conteo. Solo toca lo que el agente aún no tomó. */
+  private async descartar(
+    where: any,
+    motivo: string,
+    accion: string,
+    detalle: Record<string, unknown>,
+    usuario?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const res = await this.prisma.printJob.updateMany({
+      where,
+      data: { estado: 'DESCARTADO', error: `Descartada: ${motivo}` },
+    });
+    if (this.auditoria && usuario) {
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'impresion',
+        accion,
+        entidad: 'print_job',
+        partyId: usuario.partyId,
+        motivo,
+        despues: { descartadas: res.count, ...detalle },
+        ip,
+      });
+    }
+    this.eventos?.emitirAdmin('impresion:cola', { descartadas: res.count });
+    return {
+      ok: true,
+      descartadas: res.count,
+      mensaje: res.count > 0
+        ? `Se descartaron ${res.count} etiqueta(s); no se imprimirán`
+        : 'No había etiquetas para descartar',
+    };
+  }
+
+  async vaciarCola(dto: VaciarColaDto, usuario?: UsuarioAutenticado, ip?: string) {
+    this.exigirRolDescartar(usuario);
+    const motivo = (dto.motivo || '').trim();
+    if (motivo.length < 5) {
+      throw new BadRequestException({
+        codigo: 'MOTIVO_OBLIGATORIO',
+        mensaje: 'Escribe el motivo (al menos 5 caracteres)',
+      });
+    }
+    const where: any = { estado: 'PENDIENTE' };
+    if (dto.alcance === 'ANTIGUAS') {
+      const mins = dto.minutos && dto.minutos > 0 ? dto.minutos : 30;
+      where.en = { lt: new Date(Date.now() - mins * 60 * 1000) };
+    }
+    if (dto.pedido_id) {
+      try {
+        where.pedido_id = BigInt(dto.pedido_id);
+      } catch {
+        throw new BadRequestException({ codigo: 'ID_INVALIDO', mensaje: 'Identificador de pedido no válido' });
+      }
+    }
+    return this.descartar(
+      where, motivo, 'VACIAR_COLA',
+      { alcance: dto.alcance, minutos: dto.minutos ?? null, pedidoId: dto.pedido_id ?? null },
+      usuario, ip,
+    );
+  }
+
+  async descartarTrabajo(id: string | number, dto: DescartarDto, usuario?: UsuarioAutenticado, ip?: string) {
+    this.exigirRolDescartar(usuario);
+    let bigId: bigint;
+    try {
+      bigId = BigInt(id);
+    } catch {
+      throw new BadRequestException({ codigo: 'ID_INVALIDO', mensaje: 'Identificador no válido' });
+    }
+    const motivo = dto?.motivo?.trim() || 'Descartada desde la cola de impresión';
+    return this.descartar(
+      { id: bigId, estado: { in: ['PENDIENTE', 'FALLIDO'] } },
+      motivo, 'DESCARTAR_TRABAJO', { trabajoId: bigId.toString() }, usuario, ip,
+    );
+  }
+
+  async descartarPedido(pedidoIdInput: string | number, dto: DescartarDto, usuario?: UsuarioAutenticado, ip?: string) {
+    this.exigirRolDescartar(usuario);
+    let pedidoId: bigint;
+    try {
+      pedidoId = BigInt(pedidoIdInput);
+    } catch {
+      throw new BadRequestException({ codigo: 'ID_INVALIDO', mensaje: 'Identificador de pedido no válido' });
+    }
+    const motivo = dto?.motivo?.trim() || 'Descartada desde la cola de impresión';
+    return this.descartar(
+      { pedido_id: pedidoId, estado: { in: ['PENDIENTE', 'FALLIDO'] } },
+      motivo, 'DESCARTAR_PEDIDO', { pedidoId: pedidoId.toString() }, usuario, ip,
+    );
   }
 
   /**

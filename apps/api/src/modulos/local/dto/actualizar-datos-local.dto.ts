@@ -37,6 +37,12 @@ export class ActualizarDatosLocalDto {
   @Matches(/^$|^(10|15|17|20)\d{9}$/, { message: 'ruc debe tener 11 dígitos y comenzar con 10, 15, 17 o 20' })
   ruc?: string;
 
+  /** Correo de contacto (aparece en Términos y Privacidad). Vacío lo quita. */
+  @IsOptional()
+  @Matches(/^$|^\S+@\S+\.\S+$/, { message: 'correo no es válido' })
+  @MaxLength(120, { message: 'correo no puede pasar de 120 caracteres' })
+  correo?: string;
+
   @IsOptional()
   @IsString({ message: 'direccion_fiscal debe ser una cadena de texto' })
   @MaxLength(200, { message: 'direccion_fiscal no puede pasar de 200 caracteres' })

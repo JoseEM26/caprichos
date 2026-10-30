@@ -99,7 +99,7 @@ export class PuntosService {
       });
     }
 
-    // Cliente con cuenta del pedido; invitado (o pedido de mozo sin DNI) no acumula (RQ-CLI-02-03)
+    // Cliente con cuenta del pedido; invitado (o pedido de mozo sin cliente identificado) no acumula (RQ-CLI-02-03)
     const partyCliente = partyClienteDelPedido(pedido);
     if (!partyCliente) {
       return { puntos: 0, sumados: false };

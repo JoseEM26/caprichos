@@ -4,6 +4,15 @@ import { calcularPrecioLinea } from '@caprichos/compartido';
 import { GrupoOpcionesCarta, OpcionElegida, ProductoCarta } from './tipos';
 import { useCarrito } from './CarritoContext';
 import { useEsMovil } from './useEsMovil';
+import type { OfertaItem } from '../admin/ofertas/ofertasApi';
+import {
+  AvisoReemplazoCombo,
+  eleccionesCombo,
+  eleccionInicial,
+  faltaElegirReemplazo,
+  notaReemplazos,
+  partesConReemplazo,
+} from './ReemplazoCombo';
 
 interface Props {
   producto: ProductoCarta;
@@ -12,6 +21,8 @@ interface Props {
   onCerrar: () => void;
   soloLectura?: boolean;
   esMovilPreview?: boolean;
+  /** Combo vinculado a este producto (para avisar si una parte fija se agotó y ofrecer reemplazos) */
+  oferta?: OfertaItem | null;
 }
 
 const fmt = (n: number): string => `S/ ${n.toFixed(2)}`;
@@ -29,7 +40,7 @@ const nombreCorto = (g: GrupoOpcionesCarta): string => (g.nombre.includes(' · '
  * previa de la etiqueta del vaso, y los combos armados paso a paso. (La personalización unidad por
  * unidad, DT-62, es del pedido de caja y mozo: VentanaProducto.)
  */
-export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura = false, esMovilPreview }: Props) {
+export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura = false, esMovilPreview, oferta = null }: Props) {
   const { agregarLinea } = useCarrito();
   const esMovilDetectado = useEsMovil();
   const movil = esMovilPreview !== undefined ? esMovilPreview : esMovilDetectado;
@@ -43,6 +54,10 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
     }
     return inicial;
   });
+  const partesRe = useMemo(() => partesConReemplazo(oferta), [oferta]);
+  const [reemplazos, setReemplazos] = useState<Record<string, string>>(() => eleccionInicial(partesRe));
+  const comboAgotado = oferta?.disponible === false;
+  const elecciones = eleccionesCombo(oferta, reemplazos);
   const [cantidad, setCantidad] = useState(1);
   const [nombres, setNombres] = useState<string[]>([]);
   const [avisoNombres, setAvisoNombres] = useState(false);
@@ -76,7 +91,8 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
     }),
   );
   const unitario = calcularPrecioLinea({ precioBase, opciones: elegidas, cantidad: 1 }).precioUnitario;
-  const valido = producto.grupos.every((g) => (sel[g.id] ?? []).length >= g.minimo);
+  const valido =
+    !comboAgotado && !faltaElegirReemplazo(partesRe, reemplazos) && producto.grupos.every((g) => (sel[g.id] ?? []).length >= g.minimo);
 
   const alternar = (g: GrupoOpcionesCarta, oid: string) => {
     setSel((prev) => {
@@ -119,7 +135,8 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
       opciones: elegidas,
       personas,
       unidades: Array.from({ length: cantidad }, (_, i) => ({ persona: personas[i], opciones: elegidas })),
-      nota: nota.trim() || undefined,
+      nota: [notaReemplazos(partesRe, reemplazos), nota.trim()].filter(Boolean).join(' · ') || undefined,
+      ...(oferta && elecciones.length > 0 ? { ofertaId: String(oferta.id), comboElecciones: elecciones } : {}),
       precioUnitario: unitario,
       subtotal: Number((unitario * cantidad).toFixed(2)),
     });
@@ -250,6 +267,17 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                 </div>
               </div>
             )}
+
+            {comboAgotado && (
+              <div role="status" style={{ fontWeight: 800, color: 'var(--cp-rust)' }}>
+                Agotado
+              </div>
+            )}
+            <AvisoReemplazoCombo
+              partes={comboAgotado ? [] : partesRe}
+              elegidos={reemplazos}
+              onElegir={(parteId, productoId) => setReemplazos((prev) => ({ ...prev, [parteId]: productoId }))}
+            />
 
             {esCombo ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -464,7 +492,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                   opacity: soloLectura ? 0.9 : 1,
                 }}
               >
-                <span>{soloLectura ? 'Vista previa' : valido ? 'Agregar al pedido' : 'Elige las opciones obligatorias'}</span>
+                <span>{soloLectura ? 'Vista previa' : comboAgotado ? 'Agotado' : valido ? 'Agregar al pedido' : 'Elige las opciones obligatorias'}</span>
                 <span>{fmt(unitario * cantidad)}</span>
               </button>
             </div>

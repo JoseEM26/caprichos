@@ -17,6 +17,7 @@ import { UsuariosService } from './usuarios.service';
 import { CrearUsuarioDto } from './dto/crear-usuario.dto';
 import { EditarUsuarioDto } from './dto/editar-usuario.dto';
 import { FiltrarUsuariosDto } from './dto/filtrar-usuarios.dto';
+import { ConfigurarHorarioDto } from './dto/horario.dto';
 import { AsignarPinDto } from './dto/asignar-pin.dto';
 import { ConfigurarAlertasWhatsappDto } from './dto/configurar-alertas-whatsapp.dto';
 
@@ -29,6 +30,25 @@ export class UsuariosController {
   @Permiso('usuarios', 'ver')
   async listar(@Query() filtros: FiltrarUsuariosDto) {
     return this.usuariosService.listar(filtros);
+  }
+
+  @Get('horarios')
+  @Permiso('usuarios', 'ver')
+  async listarHorarios() {
+    return this.usuariosService.listarHorarios();
+  }
+
+  @Get(':id/horario')
+  @Permiso('usuarios', 'ver')
+  async obtenerHorario(@Param('id') id: string) {
+    return this.usuariosService.obtenerHorario(id);
+  }
+
+  @Put(':id/horario')
+  @Permiso('usuarios', 'editar')
+  async configurarHorario(@Param('id') id: string, @Body() dto: ConfigurarHorarioDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.usuariosService.configurarHorario(id, dto, req.usuario, ip);
   }
 
   @Get(':id/dni')

@@ -119,7 +119,50 @@ export interface ResolverFallaDto {
   recargo?: number;
 }
 
+export interface ParadaOpcionRuta {
+  id: string;
+  codigo: string;
+  cliente: string;
+  orden: number;
+  lat: number;
+  lng: number;
+  llegadaMin: number;
+  llegadaEstimada: string;
+  retrasoMin: number;
+  yaTarde: boolean;
+}
+
+export interface OpcionRutaSugerida {
+  id: string;
+  sector: string;
+  rumbo: number;
+  pedidos: ParadaOpcionRuta[];
+  distanciaKm: number;
+  tiempoMin: number;
+  retrasoTotalMin: number;
+  yaTarde: number;
+  urgente: boolean;
+  razon: string;
+  puntaje: number;
+  ruta: Array<[number, number]>;
+}
+
+export interface RespuestaRutasSugeridas {
+  opciones: OpcionRutaSugerida[];
+  sinUbicacion: Array<{ id: string; codigo: string; cliente: string }>;
+  cupo: number;
+}
+
 export const repartosApi = {
+  listarRutasSugeridas: () =>
+    api.get<RespuestaRutasSugeridas>('/admin/repartos/rutas-sugeridas'),
+
+  tomarRutaSugerida: (opcion: OpcionRutaSugerida, repartidorPartyId?: string) =>
+    api.post<{ idOpcion: string; tomados: PedidoReparto[] }>(
+      `/admin/repartos/rutas-sugeridas/${opcion.id}/tomar`,
+      { pedidoIds: opcion.pedidos.map((p) => p.id), ...(repartidorPartyId ? { repartidorPartyId } : {}) },
+    ),
+
   listarDisponibles: () =>
     api.get<PedidoReparto[]>('/admin/repartos/disponibles'),
 

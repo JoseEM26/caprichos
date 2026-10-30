@@ -9,5 +9,6 @@ export interface FiltroInformeDto {
 
 export interface FiltroMapaDto {
   dias?: number | string;
+  periodo?: string;
   canal?: string;
 }

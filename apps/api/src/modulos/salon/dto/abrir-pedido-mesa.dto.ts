@@ -59,12 +59,12 @@ export class AbrirPedidoMesaDto {
   @IsOptional()
   colaboradorPartyId?: number | string;
 
-  /** DNI de un cliente con cuenta: el pedido queda a su nombre y suma puntos al cobrar. Sin él: invitado. */
+  /** Celular (9 dígitos) de un cliente con cuenta: el pedido queda a su nombre y suma puntos al cobrar. Sin él: invitado. */
   @IsOptional()
-  @Matches(/^\d{8}$/, { message: 'El DNI debe tener 8 dígitos numéricos' })
-  clienteDni?: string;
+  @Matches(/^9\d{8}$/, { message: 'El celular debe tener 9 dígitos y empezar con 9' })
+  clienteTelefono?: string;
 
-  /** Id del party de un cliente con cuenta (buscador de clientes). Con clienteDni gana el DNI. */
+  /** Id del party de un cliente con cuenta (buscador de clientes). Con clienteTelefono gana el celular. */
   @IsOptional()
   @Matches(/^\d+$/, { message: 'clientePartyId debe ser un id numérico' })
   clientePartyId?: string;

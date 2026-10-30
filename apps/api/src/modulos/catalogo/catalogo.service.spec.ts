@@ -501,6 +501,16 @@ describe('CatalogoService', () => {
     });
   });
 
+  describe('Listado admin y productos desactivados', () => {
+    it('trae los ocultos por defecto y los excluye solo con incluyeOcultos=false', async () => {
+      prisma.producto.findMany.mockResolvedValue([]);
+      await service.listarProductosAdmin({} as any);
+      expect(prisma.producto.findMany.mock.calls[0][0].where.oculto).toBeUndefined();
+      await service.listarProductosAdmin({ incluyeOcultos: false } as any);
+      expect(prisma.producto.findMany.mock.calls[1][0].where.oculto).toBe(false);
+    });
+  });
+
   describe('Promociones por producto en el listado admin', () => {
     const base = (id: number, cat: number) => ({
       id: BigInt(id), categoria_id: BigInt(cat), categoria: { id: BigInt(cat), nombre: 'C' }, nombre: 'P' + id,

@@ -58,6 +58,11 @@ export class LineaPedidoDto {
   @IsOptional()
   ofertaId?: number | string | null;
 
+  /** Combo con parte fija: qué producto se eligió (principal o reemplazo). El servidor valida que esté disponible. */
+  @IsOptional()
+  @IsArray({ message: 'comboElecciones debe ser una lista' })
+  comboElecciones?: { parteId: number | string; productoId: number | string }[];
+
   @IsInt({ message: 'La cantidad debe ser un entero' })
   @Min(1, { message: 'La cantidad mínima es 1' })
   cantidad!: number;
@@ -185,12 +190,12 @@ export class CrearPedidoDto {
   @IsString()
   canal?: 'MOZO' | 'CAJA';
 
-  /** DNI de un cliente con cuenta (solo lo usa el mozo/caja; en carta y WhatsApp se ignora). Sin cuenta: invitado. */
+  /** Celular (9 dígitos) de un cliente con cuenta (solo lo usa el mozo/caja; en carta y WhatsApp se ignora). Sin cuenta: invitado. */
   @IsOptional()
-  @Matches(/^\d{8}$/, { message: 'El DNI debe tener 8 dígitos numéricos' })
-  clienteDni?: string;
+  @Matches(/^9\d{8}$/, { message: 'El celular debe tener 9 dígitos y empezar con 9' })
+  clienteTelefono?: string;
 
-  /** Id del party de un cliente con cuenta (lo da el buscador de clientes). Solo MOZO/CAJA; con clienteDni gana el DNI. */
+  /** Id del party de un cliente con cuenta (lo da el buscador de clientes). Solo MOZO/CAJA; con clienteTelefono gana el celular. */
   @IsOptional()
   @Matches(/^\d+$/, { message: 'clientePartyId debe ser un id numérico' })
   clientePartyId?: string;

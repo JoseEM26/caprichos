@@ -111,13 +111,13 @@ describe('Pedido de mesa: nombre obligatorio y teléfono opcional', () => {
     render(<ModalNuevoPedidoMesa abierto={true} alCerrar={vi.fn()} pisos={pisoConMesa} pasoInicial="modal" mesasPreseleccionadasIds={['m1']} />);
     await agregarCafe();
     fireEvent.click(await screen.findByRole('button', { name: 'Cambiar' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (DNI)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (celular)' }));
 
     // Sin cuenta elegida aún no se puede enviar
     expect(botonEnviar().disabled).toBe(true);
 
-    vi.mocked(api.get).mockResolvedValue({ items: [{ id: 77, nombre: 'Ana Pérez', dni: '4521****', puntos: 12 }] } as any);
-    const input = screen.getByPlaceholderText('DNI o nombre del cliente');
+    vi.mocked(api.get).mockResolvedValue({ items: [{ id: 77, nombre: 'Ana Pérez', telefono: '987654321', puntos: 12 }] } as any);
+    const input = screen.getByPlaceholderText('Nombre o celular del cliente');
     fireEvent.change(input, { target: { value: 'Ana' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     fireEvent.click(await screen.findByRole('button', { name: /Ana Pérez/ }));

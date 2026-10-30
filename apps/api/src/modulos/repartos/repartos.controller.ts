@@ -19,6 +19,7 @@ import { ActualizarConfigRepartoDto } from './dto/actualizar-config-reparto.dto'
 import { IniciarRutaDto } from './dto/iniciar-ruta.dto';
 import { LiberarPedidoDto } from './dto/liberar-pedido.dto';
 import { ReasignarPedidoDto } from './dto/reasignar-pedido.dto';
+import { TomarRutaSugeridaDto } from './dto/tomar-ruta-sugerida.dto';
 
 @Controller('admin/repartos')
 @UseGuards(AccesoGuard)
@@ -59,6 +60,23 @@ export class RepartosController {
   @Permiso('repartos', 'ver')
   async listarMios(@Req() req: any) {
     return this.repartosService.listarMios(req.usuario);
+  }
+
+  @Get('rutas-sugeridas')
+  @Permiso('repartos', 'ver')
+  async listarRutasSugeridas(@Req() req: any) {
+    return this.repartosService.listarRutasSugeridas(req.usuario);
+  }
+
+  @Post('rutas-sugeridas/:idOpcion/tomar')
+  @Permiso('repartos', 'tomar')
+  async tomarRutaSugerida(
+    @Param('idOpcion') idOpcion: string,
+    @Body() dto: TomarRutaSugeridaDto,
+    @Req() req: any,
+  ) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.repartosService.tomarRutaSugerida(idOpcion, dto, req.usuario, ip);
   }
 
   @Get('resumen')

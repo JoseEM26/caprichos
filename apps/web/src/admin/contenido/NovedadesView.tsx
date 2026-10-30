@@ -4,7 +4,14 @@ import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { Confirmar } from '../../comun/Confirmar';
 import { normalizarUrlArchivo } from './paletas-constantes';
-import { PaginaNovedades, type NovedadCarta } from '../../carta/PaginaNovedades';
+import {
+  PaginaNovedades,
+  TarjetaMosaicoNovedad,
+  estiloMosaico,
+  type AdminTarjetaNovedad,
+  type NovedadCarta,
+} from '../../carta/PaginaNovedades';
+import { ConmutadorDispositivo, MarcoDispositivo } from '../../comun/MarcoDispositivo';
 
 interface FotoNovedad {
   id: string;
@@ -67,10 +74,6 @@ const TAMANOS_CUADRO = [
   { id: 'ANCHO', n: 'Ancho', cols: 4, rows: 1 },
 ];
 
-function medidaTamano(id: string) {
-  return TAMANOS_CUADRO.find((t) => t.id === id) ?? TAMANOS_CUADRO[1];
-}
-
 /** Dibujo pequeño de la proporción: cuadrícula de 4 x 2 con el cuadro marcado. */
 function DibujoTamano({ cols, rows, activo }: { cols: number; rows: number; activo: boolean }) {
   return (
@@ -89,54 +92,20 @@ function DibujoTamano({ cols, rows, activo }: { cols: number; rows: number; acti
   );
 }
 
-/** Vista previa en vivo: el cuadro elegido dentro de una cuadrícula en miniatura de 4 columnas. */
-function VistaTamano({ tamano, titulo }: { tamano: string; titulo: string }) {
-  const medida = medidaTamano(tamano);
+/** Vista previa en vivo de la tarjeta: el MISMO componente del mosaico de la carta, en PC o celular. */
+function VistaTarjeta({ novedad }: { novedad: NovedadCarta }) {
+  const [celular, setCelular] = useState(false);
   return (
-    <div style={{ flex: '1 1 220px', maxWidth: 360, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-soft)' }}>Vista previa en la carta (PC, 4 columnas)</span>
-      <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gridTemplateRows: 'repeat(2, 56px)' }}>
-        {Array.from({ length: 8 }).map((_, i) => (
-          <span key={i} style={{ border: '1px dashed var(--cp-line)' }} />
-        ))}
-        <div
-          style={{
-            position: 'absolute',
-            left: 0,
-            top: 0,
-            width: `${medida.cols * 25}%`,
-            height: `${medida.rows * 50}%`,
-            boxSizing: 'border-box',
-            border: '2px solid var(--cp-navy)',
-            borderRadius: 8,
-            background: 'var(--cp-orange)',
-            color: 'var(--cp-navy)',
-            padding: 6,
-            overflow: 'hidden',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-            fontSize: 11,
-            fontWeight: 800,
-            lineHeight: '14px',
-          }}
-        >
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{titulo || 'Título de la novedad'}</span>
-          <span style={{ fontSize: 10, opacity: 0.8 }}>{medida.n}</span>
+    <div style={{ flex: '1 1 100%', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-soft)' }}>Vista previa en la carta</span>
+      <ConmutadorDispositivo celular={celular} onCambiar={setCelular} />
+      <MarcoDispositivo celular={celular} etiqueta="Vista previa de la tarjeta">
+        <div data-testid="vista-tarjeta" style={estiloMosaico(celular)}>
+          <TarjetaMosaicoNovedad item={novedad} indice={0} movil={celular} onAbrir={() => {}} />
         </div>
-      </div>
+      </MarcoDispositivo>
     </div>
   );
-}
-
-function badgeDeNovedad(n: NovedadAdmin): string {
-  if (n.tema) return n.tema.toUpperCase();
-  if (n.tipo === 'BANNER') return 'EN PORTADA';
-  if (n.tipo === 'PROMOCION') return 'PROMO';
-  if (n.tipo === 'VIDEO') return 'VIDEO';
-  if (n.tipo === 'AVISO') return 'AVISO';
-  if (n.tipo === 'EVENTO') return 'EVENTO';
-  return 'NOVEDAD';
 }
 
 export function NovedadesView() {
@@ -146,7 +115,8 @@ export function NovedadesView() {
 
   const [nsFull, setNsFull] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState<string>('todas');
-  const [filtroTipo, setFiltroTipo] = useState<string>('TODAS');
+  // Estado de cada novedad al cargar: lo que difiere queda como «Borrador» hasta publicar.
+  const [original, setOriginal] = useState<Record<string, string>>({});
   const [dirty, setDirty] = useState(false);
   const [mensaje, setMensaje] = useState<string | null>(null);
 
@@ -206,6 +176,7 @@ export function NovedadesView() {
           })),
         })),
       );
+      setOriginal(Object.fromEntries(data.map((n) => [n.id, `${n.activo}|${n.orden}|${n.tipo}`])));
       if (dataEnc?.encabezado) {
         setEncabezado(dataEnc.encabezado);
         setEtiquetaEdit(dataEnc.encabezado.etiqueta || ENCABEZADO_DEFAULT.etiqueta);
@@ -235,8 +206,8 @@ export function NovedadesView() {
     if (targetIdx < 0 || targetIdx >= novedades.length) return;
     const copia = [...novedades];
     const temp = copia[idx];
-    copia[idx] = copia[targetIdx];
-    copia[targetIdx] = temp;
+    copia[idx] = { ...copia[targetIdx], orden: temp.orden };
+    copia[targetIdx] = { ...temp, orden: copia[targetIdx].orden };
     setNovedades(copia);
     marcarModificado();
   };
@@ -244,20 +215,6 @@ export function NovedadesView() {
   const toggleActivo = (id: string) => {
     setNovedades(
       novedades.map((n) => (n.id === id ? { ...n, activo: !n.activo } : n)),
-    );
-    marcarModificado();
-  };
-
-  const toggleEnPortada = (id: string) => {
-    setNovedades(
-      novedades.map((n) => {
-        if (n.id !== id) return n;
-        const esBanner = n.tipo === 'BANNER';
-        return {
-          ...n,
-          tipo: esBanner ? 'PROMOCION' : 'BANNER',
-        };
-      }),
     );
     marcarModificado();
   };
@@ -555,18 +512,41 @@ export function NovedadesView() {
   });
 
   const visiblesPorEstado = novedades.filter((n) => filtroEstado === 'todas' || estadoClave(n) === filtroEstado);
-  const enPortada = visiblesPorEstado.filter((n) => n.tipo === 'BANNER');
-  const listaRegularBase = visiblesPorEstado.filter((n) => n.tipo !== 'BANNER');
-  const listaRegular = listaRegularBase.filter((n) => filtroTipo === 'TODAS' || n.tipo === filtroTipo);
 
-  const chipsTipoResto = [
-    { id: 'TODAS', n: 'Todo' },
-    { id: 'PROMOCION', n: 'Promociones' },
-    { id: 'VIDEO', n: 'Videos' },
-    { id: 'FOTOS', n: 'Novedades' },
-    { id: 'EVENTO', n: 'Eventos' },
-    { id: 'AVISO', n: 'Avisos' },
-  ].filter((c) => c.id === 'TODAS' || listaRegularBase.some((n) => n.tipo === c.id));
+  const estadoPagina = (n: NovedadAdmin) => `${n.activo}|${n.orden}|${n.tipo}`;
+  const idsVisibles = new Set(
+    (modoVista === 'previa' ? novedades.filter((n) => estadoClave(n) === 'act') : visiblesPorEstado).map((n) => n.id),
+  );
+  const listaPagina = novedadesParaPrevia.filter((n) => idsVisibles.has(n.id));
+
+  const botonAdmin = (principal = false): React.CSSProperties => ({
+    minWidth: 44,
+    minHeight: 44,
+    padding: '0 10px',
+    borderRadius: 10,
+    border: principal ? 0 : '1.5px solid var(--cp-navy)',
+    background: principal ? 'var(--cp-orange)' : 'var(--cp-white)',
+    color: 'var(--cp-navy)',
+    fontWeight: 800,
+    fontSize: 12,
+    cursor: 'pointer',
+  });
+
+  const adminItem = (c: NovedadCarta): AdminTarjetaNovedad => {
+    const n = novedades.find((x) => x.id === c.id);
+    if (!n) return { acciones: null, borrador: false };
+    return {
+      borrador: original[n.id] !== undefined && original[n.id] !== estadoPagina(n),
+      acciones: (
+        <>
+          <button type="button" aria-label={`Subir ${n.titulo}`} onClick={() => moverNovedad(n.id, -1)} style={botonAdmin()}>↑</button>
+          <button type="button" aria-label={`Bajar ${n.titulo}`} onClick={() => moverNovedad(n.id, 1)} style={botonAdmin()}>↓</button>
+          <button type="button" onClick={() => abrirEditar(n)} style={botonAdmin(true)}>Editar</button>
+          <button type="button" onClick={() => toggleActivo(n.id)} style={botonAdmin()}>{n.activo ? 'Desactivar' : 'Activar'}</button>
+        </>
+      ),
+    };
+  };
 
   const textoResumen =
     `${novedades.length} ${novedades.length === 1 ? 'novedad' : 'novedades'} · ${countByEstado.act} activas` +
@@ -864,374 +844,52 @@ export function NovedadesView() {
             </button>
           </div>
 
-          {/* VISTA PREVIA FIEL DE LA CARTA (Reutiliza PaginaNovedades exactamente) */}
-          {modoVista === 'previa' ? (
-            <div
-              style={{
-                padding: esCelular ? '24px 12px 64px' : '24px 24px 64px',
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'flex-start',
-              }}
-            >
-              <div
-                data-testid={`preview-novedades-${dispositivo}`}
-                style={{
-                  width: esCelular ? '390px' : '100%',
-                  maxWidth: esCelular ? '390px' : '1200px',
-                  minHeight: esCelular ? '640px' : '400px',
-                  border: esCelular ? '8px solid var(--cp-navy)' : '1px solid var(--cp-line)',
-                  borderRadius: esCelular ? '28px' : '16px',
-                  background: 'var(--cp-cream)',
-                  boxShadow: esCelular
-                    ? '0 14px 40px rgba(11, 44, 62, 0.25)'
-                    : '0 6px 20px rgba(11, 44, 62, 0.08)',
-                  boxSizing: 'border-box',
-                  overflow: 'hidden',
-                  position: 'relative',
-                }}
-              >
-                {/* Notch en celular */}
-                {esCelular && (
-                  <div
-                    style={{
-                      width: '120px',
-                      height: '14px',
-                      backgroundColor: 'var(--cp-navy)',
-                      borderRadius: '0 0 10px 10px',
-                      margin: '0 auto 8px',
-                    }}
-                  />
-                )}
-                <PaginaNovedades
-                  novedades={novedadesParaPrevia}
-                  encabezado={encabezado}
-                  onVerCarta={() => {}}
-                />
-              </div>
-            </div>
-          ) : (
-            /* MODO EDICIÓN CON LIENZO INTERACTIVO */
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'center',
-                padding: esCelular ? '16px 8px 60px' : '16px 24px 60px',
-              }}
-            >
-              <div
-                style={{
-                  width: esCelular ? '430px' : '100%',
-                  maxWidth: esCelular ? '430px' : '1200px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 16,
-                  border: esCelular ? '2px dashed var(--cp-line)' : 'none',
-                  borderRadius: esCelular ? 24 : 0,
-                  padding: esCelular ? 12 : 0,
-                  boxSizing: 'border-box',
-                }}
-              >
-                {/* Filtros de visualización por estado */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-                  <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', color: 'var(--cp-soft)' }}>
-                    MOSTRAR:
-                  </span>
-                  {[
-                    { id: 'todas', n: `Todas (${countByEstado.todas})` },
-                    { id: 'act', n: `Activas (${countByEstado.act})` },
-                    { id: 'prog', n: `Programadas (${countByEstado.prog})` },
-                    { id: 'venc', n: `Vencidas (${countByEstado.venc})` },
-                    { id: 'off', n: `Desactivadas (${countByEstado.off})` },
-                  ].map((f) => {
-                    const activo = filtroEstado === f.id;
-                    return (
-                      <button
-                        key={f.id}
-                        onClick={() => setFiltroEstado(f.id)}
-                        style={{
-                          minHeight: 36,
-                          padding: '0 12px',
-                          borderRadius: 9999,
-                          border: '1.5px solid var(--cp-navy)',
-                          background: activo ? 'var(--cp-navy)' : 'transparent',
-                          color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                          fontWeight: 700,
-                          fontSize: 12,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {f.n}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Cabecera hero réplica del cliente (con textos editables) */}
-                <div
-                  data-testid="hero-encabezado-novedades"
-                  style={{
-                    position: 'relative',
-                    overflow: 'hidden',
-                    background: 'linear-gradient(155deg, var(--cp-navy) 55%, color-mix(in srgb, var(--cp-navy) 65%, var(--cp-orange)))',
-                    color: 'var(--cp-cream)',
-                    borderRadius: 20,
-                    padding: esCelular ? '18px 16px' : '24px 28px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 6,
-                  }}
-                >
-                  <span aria-hidden="true" style={{ position: 'absolute', right: -50, top: -50, width: 180, height: 180, borderRadius: '50%', background: 'var(--cp-orange)', opacity: 0.16 }} />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-                    <span
-                      data-testid="encabezado-etiqueta"
-                      style={{
-                        position: 'relative',
-                        fontFamily: 'var(--fuente-titulos)',
-                        fontWeight: 800,
-                        fontSize: 12,
-                        letterSpacing: '0.12em',
-                        color: 'var(--cp-orange)',
-                      }}
-                    >
-                      {encabezado.etiqueta}
-                    </span>
+          {/* La misma página Novedades de la carta (componente compartido), con los controles del admin encima de cada tarjeta */}
+          <div style={{ padding: '16px 24px 60px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {modoVista === 'edicion' && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', color: 'var(--cp-soft)' }}>MOSTRAR:</span>
+                {[
+                  { id: 'todas', n: `Todas (${countByEstado.todas})` },
+                  { id: 'act', n: `Activas (${countByEstado.act})` },
+                  { id: 'prog', n: `Programadas (${countByEstado.prog})` },
+                  { id: 'venc', n: `Vencidas (${countByEstado.venc})` },
+                  { id: 'off', n: `Desactivadas (${countByEstado.off})` },
+                ].map((f) => {
+                  const activo = filtroEstado === f.id;
+                  return (
                     <button
-                      type="button"
-                      onClick={abrirEditorEncabezado}
+                      key={f.id}
+                      onClick={() => setFiltroEstado(f.id)}
                       style={{
-                        border: '1px solid var(--cp-orange)',
-                        borderRadius: 8,
-                        background: 'transparent',
-                        color: 'var(--cp-orange)',
-                        padding: '4px 10px',
-                        fontSize: 12,
+                        minHeight: 44,
+                        padding: '0 14px',
+                        borderRadius: 9999,
+                        border: '1.5px solid var(--cp-navy)',
+                        background: activo ? 'var(--cp-navy)' : 'transparent',
+                        color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
                         fontWeight: 700,
+                        fontSize: 12,
                         cursor: 'pointer',
                       }}
                     >
-                      Editar textos
+                      {f.n}
                     </button>
-                  </div>
-                  <span
-                    data-testid="encabezado-titulo"
-                    style={{
-                      position: 'relative',
-                      fontFamily: 'var(--fuente-titulos)',
-                      fontWeight: 800,
-                      fontSize: esCelular ? 22 : 28,
-                      lineHeight: esCelular ? '28px' : '34px',
-                    }}
-                  >
-                    {encabezado.titulo}
-                  </span>
-                  <span
-                    data-testid="encabezado-subtitulo"
-                    style={{
-                      position: 'relative',
-                      fontSize: esCelular ? 13 : 15,
-                      lineHeight: '21px',
-                      maxWidth: 720,
-                      opacity: 0.95,
-                    }}
-                  >
-                    {encabezado.subtitulo}
-                  </span>
-                </div>
-
-                {/* SECCIÓN EN PORTADA (Banners) */}
-                {enPortada.length > 0 && (
-                  <>
-                    <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 13, letterSpacing: '0.08em' }}>
-                      EN PORTADA <span style={{ fontWeight: 600, letterSpacing: 0, color: 'var(--cp-soft)' }}>· hasta 5 activas en la carta</span>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: esCelular ? '1fr' : 'repeat(auto-fill, minmax(min(340px, 100%), 1fr))', gap: 16 }}>
-                      {enPortada.map((n) => (
-                        <div
-                          key={n.id}
-                          style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: 6,
-                            minWidth: 0,
-                            opacity: n.activo ? 1 : 0.6,
-                            borderRadius: 22,
-                          }}
-                        >
-                          <div style={{ position: 'relative', aspectRatio: '16/9', borderRadius: 20, overflow: 'hidden', background: 'var(--cp-navy)', color: '#FFFFFF' }}>
-                            {n.fotos[0]?.url && (
-                              <img src={n.fotos[0].url} alt={n.titulo} style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-                            )}
-                            <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, top: '35%', background: 'linear-gradient(to top, rgba(11,44,62,0.92), rgba(11,44,62,0))' }} />
-                            <span style={{ position: 'absolute', right: 10, top: 10, fontSize: 11, fontWeight: 800, background: 'rgba(255,255,255,0.92)', color: '#0B2C3E', borderRadius: 9999, padding: '3px 10px' }}>
-                              {n.activo ? 'Activa' : 'Desactivada'}
-                            </span>
-                            <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: 16, display: 'flex', flexDirection: 'column', gap: 5 }}>
-                              <span style={{ alignSelf: 'flex-start', fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 11, letterSpacing: '0.08em', background: 'var(--cp-orange)', color: 'var(--cp-navy)', borderRadius: 9999, padding: '4px 10px' }}>
-                                {badgeDeNovedad(n)}
-                              </span>
-                              <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 18, lineHeight: 1.15 }}>{n.titulo}</span>
-                              <span style={{ fontSize: 13, lineHeight: '18px', opacity: 0.95 }}>{n.texto}</span>
-                            </div>
-                          </div>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                            <button onClick={() => moverNovedad(n.id, -1)} aria-label="Subir" style={{ width: 44, minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 800, cursor: 'pointer' }}>↑</button>
-                            <button onClick={() => moverNovedad(n.id, 1)} aria-label="Bajar" style={{ width: 44, minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 800, cursor: 'pointer' }}>↓</button>
-                            <button onClick={() => abrirEditar(n)} style={{ flex: '1 1 90px', minHeight: 44, border: 0, borderRadius: 10, background: 'var(--cp-orange)', color: 'var(--cp-navy)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>Editar</button>
-                            <button onClick={() => toggleActivo(n.id)} style={{ flex: '1 1 90px', minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
-                              {n.activo ? 'Desactivar' : 'Activar'}
-                            </button>
-                            <button onClick={() => toggleEnPortada(n.id)} style={{ flex: '1 1 90px', minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
-                              Destacada
-                            </button>
-                            <button onClick={() => duplicar(n)} style={{ flex: '1 1 80px', minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Duplicar</button>
-                            <button onClick={() => pedirEliminar(n)} style={{ flex: '1 1 80px', minHeight: 44, border: '1.5px solid var(--cp-rust)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-rust)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Eliminar</button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-
-                {/* SECCIÓN NOVEDADES */}
-                <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 13, letterSpacing: '0.08em' }}>
-                  NOVEDADES
-                </div>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {chipsTipoResto.map((c) => {
-                    const activo = filtroTipo === c.id;
-                    return (
-                      <button
-                        key={c.id}
-                        onClick={() => setFiltroTipo(c.id)}
-                        style={{
-                          minHeight: 40,
-                          padding: '0 14px',
-                          borderRadius: 9999,
-                          border: '1.5px solid var(--cp-navy)',
-                          background: activo ? 'var(--cp-navy)' : 'transparent',
-                          color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                          fontWeight: 700,
-                          fontSize: 13,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {c.n}
-                      </button>
-                    );
-                  })}
-                </div>
-                {listaRegular.length === 0 && (
-                  <div style={{ color: 'var(--cp-soft)', fontSize: 14 }}>
-                    No hay nada en esta sección con los filtros elegidos.
-                  </div>
-                )}
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: esCelular ? '1fr' : 'repeat(auto-fill, minmax(min(340px, 100%), 1fr))',
-                    gap: 16,
-                    alignItems: 'start',
-                  }}
-                >
-                  {listaRegular.map((n) => {
-                    const esAviso = n.tipo === 'AVISO';
-                    return (
-                      <div
-                        key={n.id}
-                        style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 6,
-                          minWidth: 0,
-                          opacity: n.activo ? 1 : 0.6,
-                          borderRadius: 22,
-                        }}
-                      >
-                        <div
-                          style={{
-                            background: esAviso ? 'var(--cp-navy)' : 'var(--cp-white)',
-                            color: esAviso ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                            border: '1px solid var(--cp-line)',
-                            borderRadius: 20,
-                            overflow: 'hidden',
-                            display: 'flex',
-                            flexDirection: 'column',
-                          }}
-                        >
-                          {n.fotos[0]?.url ? (
-                            <div style={{ position: 'relative', aspectRatio: '16/10', background: 'var(--cp-gold)' }}>
-                              <img src={n.fotos[0].url} alt={n.titulo} style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-                              <span style={{ position: 'absolute', left: 10, top: 10, fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 11, letterSpacing: '0.08em', background: 'var(--cp-orange)', color: 'var(--cp-navy)', borderRadius: 9999, padding: '4px 10px' }}>
-                                {badgeDeNovedad(n)}
-                              </span>
-                              <span style={{ position: 'absolute', right: 10, top: 10, fontSize: 11, fontWeight: 800, background: 'rgba(255,255,255,0.92)', color: '#0B2C3E', borderRadius: 9999, padding: '3px 10px' }}>
-                                {n.activo ? 'Activa' : 'Desactivada'}
-                              </span>
-                              {n.video_url && (
-                                <span aria-hidden="true" style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 56, height: 56, borderRadius: 28, background: 'rgba(11,44,62,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <svg viewBox="0 0 24 24" width="26" height="26" fill="#FFFFFF" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <div
-                              style={{
-                                position: 'relative',
-                                aspectRatio: '16/10',
-                                background: esAviso ? 'color-mix(in srgb, var(--cp-line) 55%, var(--cp-white))' : 'var(--cp-gold)',
-                                color: 'var(--cp-navy)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: 13,
-                                fontWeight: 700,
-                              }}
-                            >
-                              <span style={{ position: 'absolute', left: 10, top: 10, fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 11, letterSpacing: '0.08em', background: 'var(--cp-orange)', color: 'var(--cp-navy)', borderRadius: 9999, padding: '4px 10px' }}>
-                                {badgeDeNovedad(n)}
-                              </span>
-                              <span style={{ position: 'absolute', right: 10, top: 10, fontSize: 11, fontWeight: 800, background: 'rgba(255,255,255,0.92)', color: '#0B2C3E', borderRadius: 9999, padding: '3px 10px' }}>
-                                {n.activo ? 'Activa' : 'Desactivada'}
-                              </span>
-                            </div>
-                          )}
-                          <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                            <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 18, lineHeight: 1.2 }}>{n.titulo}</div>
-                            <div style={{ fontSize: 14, lineHeight: '20px', opacity: 0.92, whiteSpace: 'pre-line' }}>{n.texto}</div>
-                            {n.evento_fecha && (
-                              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-rust)' }}>
-                                Fecha: {new Date(n.evento_fecha).toLocaleDateString()} {n.evento_lugar ? `· ${n.evento_lugar}` : ''}
-                              </div>
-                            )}
-                            {n.video_url && (
-                              <a href={n.video_url} target="_blank" rel="noopener noreferrer" style={{ marginTop: 4, minHeight: 44, borderRadius: 12, background: 'var(--cp-orange)', color: 'var(--cp-navy)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
-                                Ver video
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                          <button onClick={() => moverNovedad(n.id, -1)} aria-label="Subir" style={{ width: 44, minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 800, cursor: 'pointer' }}>↑</button>
-                          <button onClick={() => moverNovedad(n.id, 1)} aria-label="Bajar" style={{ width: 44, minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 800, cursor: 'pointer' }}>↓</button>
-                          <button onClick={() => abrirEditar(n)} style={{ flex: '1 1 90px', minHeight: 44, border: 0, borderRadius: 10, background: 'var(--cp-orange)', color: 'var(--cp-navy)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>Editar</button>
-                          <button onClick={() => toggleActivo(n.id)} style={{ flex: '1 1 90px', minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
-                            {n.activo ? 'Desactivar' : 'Activar'}
-                          </button>
-                          <button onClick={() => toggleEnPortada(n.id)} style={{ flex: '1 1 90px', minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
-                            Destacar
-                          </button>
-                          <button onClick={() => duplicar(n)} style={{ flex: '1 1 80px', minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Duplicar</button>
-                          <button onClick={() => pedirEliminar(n)} style={{ flex: '1 1 80px', minHeight: 44, border: '1.5px solid var(--cp-rust)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-rust)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Eliminar</button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                  );
+                })}
               </div>
-            </div>
-          )}
+            )}
+            <MarcoDispositivo celular={esCelular} etiqueta="Página Novedades como la ve el cliente">
+              <div data-testid={`preview-novedades-${dispositivo}`}>
+                <PaginaNovedades
+                  novedades={listaPagina}
+                  encabezado={encabezado}
+                  onVerCarta={() => {}}
+                  adminItem={modoVista === 'edicion' ? adminItem : undefined}
+                />
+              </div>
+            </MarcoDispositivo>
+          </div>
         </div>
       )}
 
@@ -1376,7 +1034,20 @@ export function NovedadesView() {
                     );
                   })}
                 </div>
-                <VistaTamano tamano={tamanoEdit} titulo={tituloEdit} />
+                <VistaTarjeta
+                  novedad={{
+                    id: 'vista',
+                    tipo: tipoEdit,
+                    titulo: tituloEdit.trim() || 'Título de la novedad',
+                    texto: textoEdit.trim() || undefined,
+                    tema: temaEdit.trim() || undefined,
+                    video_url: videoUrlEdit.trim() || undefined,
+                    tamano: tamanoEdit,
+                    orden: 0,
+                    activo: true,
+                    fotos: fotosEdit.map((url, i) => ({ id: `f${i}`, url })),
+                  }}
+                />
               </div>
             </div>
 
@@ -1440,6 +1111,18 @@ export function NovedadesView() {
                   }}
                 >
                   Eliminar
+                </button>
+              )}
+              {editando.id !== 'nueva' && (
+                <button
+                  onClick={() => {
+                    const n = editando;
+                    setEditando(null);
+                    duplicar(n);
+                  }}
+                  style={{ minHeight: 52, padding: '0 18px', borderRadius: 12, border: '1.5px solid var(--cp-navy)', background: 'transparent', color: 'var(--cp-navy)', fontWeight: 800, fontSize: 15, cursor: 'pointer' }}
+                >
+                  Duplicar
                 </button>
               )}
               <button

@@ -618,6 +618,7 @@ const ESTADO_ETIQUETA_VISUAL: Record<string, { texto: string; color: string; fon
   IMPRESA: { texto: 'Impresa', color: '#2F7A45', fondo: '#E3F2E7' },
   FALLIDA: { texto: 'Fallida', color: '#B2500F', fondo: '#FBE9DF' },
   VENCIDA: { texto: 'Vencida', color: '#4A4A4A', fondo: '#ECECEC' },
+  DESCARTADA: { texto: 'Descartada', color: '#4A4A4A', fondo: '#ECECEC' },
   SIN_TRABAJO: { texto: 'Sin trabajo', color: '#4A4A4A', fondo: '#ECECEC' },
   DESCONOCIDO: { texto: 'Estado no disponible', color: '#4A4A4A', fondo: '#ECECEC' },
 };
@@ -782,7 +783,7 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
           </span>
         </div>
         {cuando && <div style={{ fontSize: 11, color: 'var(--cp-soft, #2C4C5D)' }}>{cuando}</div>}
-        {(e.estado === 'FALLIDA' || e.estado === 'VENCIDA') && e.error && (
+        {(e.estado === 'FALLIDA' || e.estado === 'VENCIDA' || e.estado === 'DESCARTADA') && e.error && (
           <div role="note" style={{ fontSize: 12, color: 'var(--cp-rust, #B2500F)', fontWeight: 700 }}>
             {e.error}
           </div>

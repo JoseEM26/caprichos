@@ -47,7 +47,6 @@ export async function main() {
     {
       nombre: 'Ana Pérez',
       telefono: '999888777',
-      dni: '10000001',
       duenio: 'PERSONA',
       urgente: true,
       estado: 'ABIERTA',
@@ -63,7 +62,6 @@ export async function main() {
     {
       nombre: 'Rosa Díaz',
       telefono: '977666555',
-      dni: '10000002',
       duenio: 'PERSONA',
       urgente: false,
       estado: 'VALIDAR_PAGO',
@@ -82,7 +80,6 @@ export async function main() {
     {
       nombre: 'Luis Ramos',
       telefono: '988777666',
-      dni: '10000003',
       duenio: 'BOT',
       urgente: false,
       estado: 'ABIERTA',
@@ -96,12 +93,14 @@ export async function main() {
 
   for (const c of convsMock) {
     let partyId: bigint;
-    const doc = await prisma.partyIdentifier.findUnique({
-      where: { tipo_numero: { tipo: 'DNI', numero: c.dni } },
+    // Los clientes se reconocen por su celular (WhatsApp); no llevan DNI
+    const contacto = await prisma.contactMechanism.findFirst({
+      where: { tipo: 'WHATSAPP', valor: c.telefono, party: { usuario: { is: null } } },
+      select: { party_id: true },
     });
 
-    if (doc) {
-      partyId = doc.party_id;
+    if (contacto) {
+      partyId = contacto.party_id;
     } else {
       const p = await prisma.party.create({
         data: {
@@ -111,12 +110,6 @@ export async function main() {
             create: {
               nombres: c.nombre.split(' ')[0],
               apellidos: c.nombre.split(' ').slice(1).join(' '),
-            },
-          },
-          documentos: {
-            create: {
-              tipo: 'DNI',
-              numero: c.dni,
             },
           },
           contactos: {

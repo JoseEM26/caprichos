@@ -9,7 +9,6 @@ const mockCuenta = (puntos: number) =>
       partyId: '100',
       nombre: 'Ana',
       telefono: '912345678',
-      dniMascara: '4521****',
       correo: 'ana@ejemplo.com',
       cumpleanos: '14/03',
       puntos,

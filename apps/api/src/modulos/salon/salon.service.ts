@@ -236,7 +236,7 @@ export class SalonService {
 
     // Sin cuenta, el nombre lo escribe el mozo (obligatorio). Con cuenta, nombre y teléfono salen de la cuenta
     // (pedidos.service). El teléfono es opcional: sin él el pedido se guarda sin teléfono real.
-    const identificado = Boolean(dto.clienteDni || dto.clientePartyId);
+    const identificado = Boolean(dto.clienteTelefono || dto.clientePartyId);
     const nombreEnviado = dto.cliente?.nombre?.trim() ?? '';
     if (!identificado && nombreEnviado.length < 2) {
       throw new BadRequestException({
@@ -264,7 +264,7 @@ export class SalonService {
       nota: dto.nota,
       mesa: mesaNombre,
       cuponCodigo: dto.cuponCodigo,
-      clienteDni: dto.clienteDni,
+      clienteTelefono: dto.clienteTelefono,
       clientePartyId: dto.clientePartyId,
     };
 

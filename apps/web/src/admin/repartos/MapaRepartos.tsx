@@ -46,6 +46,8 @@ export interface MapaRepartosProps {
   rutaActivaId?: string | null;
   onSeleccionarRutaSugerida?: (ruta: RutaSugeridaSector) => void;
   mostrarRutasSugeridas?: boolean;
+  /** Las opciones se muestran como tarjetas fuera del mapa: no repetir la lista de abajo. */
+  ocultarListaRutas?: boolean;
   onAlternarMostrarRutasSugeridas?: () => void;
   // Pedidos resaltados en naranja (p. ej. los elegidos en la vista del repartidor)
   resaltadosIds?: string[];
@@ -94,6 +96,7 @@ export function MapaRepartos({
   rutaActivaId,
   onSeleccionarRutaSugerida,
   mostrarRutasSugeridas = false,
+  ocultarListaRutas = false,
   onAlternarMostrarRutasSugeridas,
   resaltadosIds,
 }: MapaRepartosProps) {
@@ -188,7 +191,7 @@ export function MapaRepartos({
             dashArray: esActiva ? undefined : '7, 6',
             lineJoin: 'round',
             lineCap: 'round',
-            opacity: esActiva ? 1.0 : 0.85,
+            opacity: esActiva ? 1.0 : rutaActivaId ? 0.3 : 0.85,
           });
 
           // Nombre de la ruta: permanente solo en la elegida (evita encimar nombres en el mapa);
@@ -594,7 +597,7 @@ export function MapaRepartos({
       )}
 
       {/* Lista de rutas sugeridas debajo del mapa al estar activo (todas, con desplazamiento) */}
-      {mostrarRutasSugeridas && rutasSugeridas.length > 0 && (
+      {mostrarRutasSugeridas && !ocultarListaRutas && rutasSugeridas.length > 0 && (
         <div
           role="region"
           aria-label="Rutas sugeridas disponibles"

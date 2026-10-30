@@ -51,7 +51,6 @@ const pedidoCreado = { id: 'ped-9', codigo: 'CP-W009', estado: 'COLA', total: 8.
 const cuentaAna = {
   encontrado: true,
   party: '100',
-  dniMascara: '4521****',
   nombre: 'Ana Pérez',
   telefono: '987654321',
   puntos: 12.5,
@@ -81,8 +80,8 @@ const cuentaAna = {
   ],
 };
 
-/** Respuesta de GET /admin/clientes/por-dni/:dni que devolverá el mock en cada prueba */
-let respuestaDni: any = { encontrado: false };
+/** Respuesta de GET /admin/clientes/por-telefono/:telefono que devolverá el mock en cada prueba */
+let respuestaCuenta: any = { encontrado: false };
 
 /** Abre el alta, elige modalidad y deja el paso de datos del cliente listo */
 function abrirPaso(modalidad: 'Para llevar' | 'Delivery') {
@@ -92,9 +91,9 @@ function abrirPaso(modalidad: 'Para llevar' | 'Delivery') {
   fireEvent.click(screen.getByRole('button', { name: new RegExp(modalidad) }));
 }
 
-/** Escribe el DNI y espera la respuesta de la consulta */
-async function escribirDni(dni: string) {
-  fireEvent.change(screen.getByLabelText(/DNI del cliente/), { target: { value: dni } });
+/** Escribe el celular y espera la respuesta de la consulta */
+async function escribirCelular(cel: string) {
+  fireEvent.change(screen.getByLabelText(/Celular del cliente/), { target: { value: cel } });
 }
 
 /** Lleva el pedido desde los datos del cliente hasta registrarlo (un café) */
@@ -114,17 +113,17 @@ async function registrarCafe() {
   return vi.mocked(pedidosApi.crearPedidoAdmin).mock.calls[0][0] as any;
 }
 
-describe('ModalNuevoPedidoMesa: cliente con cuenta por DNI en delivery y para llevar', () => {
+describe('ModalNuevoPedidoMesa: cliente con cuenta por celular en delivery y para llevar', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    respuestaDni = { encontrado: false };
+    respuestaCuenta = { encontrado: false };
     vi.mocked(salonApi.obtenerCarta).mockResolvedValue(cartaMock as any);
     vi.mocked(salonApi.obtenerPlano).mockResolvedValue([] as any);
     vi.mocked(pedidosApi.crearPedidoAdmin).mockResolvedValue(pedidoCreado as any);
     vi.mocked(api.get).mockImplementation(async (ruta: string) => {
-      if (ruta.startsWith('/admin/clientes/por-dni/')) {
-        if (respuestaDni instanceof Error) throw respuestaDni;
-        return respuestaDni;
+      if (ruta.startsWith('/admin/clientes/por-telefono/')) {
+        if (respuestaCuenta instanceof Error) throw respuestaCuenta;
+        return respuestaCuenta;
       }
       if (ruta.startsWith('/carta/envio')) {
         return { cubierto: true, zona: 'Zona 1', tarifa: 5, gratisDesde: 70 };
@@ -133,33 +132,33 @@ describe('ModalNuevoPedidoMesa: cliente con cuenta por DNI en delivery y para ll
     });
   });
 
-  it('DNI encontrado rellena nombre y teléfono desde la cuenta y oculta esos campos', async () => {
-    respuestaDni = cuentaAna;
+  it('Celular encontrado rellena nombre y teléfono desde la cuenta y oculta esos campos', async () => {
+    respuestaCuenta = cuentaAna;
     abrirPaso('Para llevar');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (DNI)' }));
-    await escribirDni('45213678');
+    fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (celular)' }));
+    await escribirCelular('987654321');
 
     const tarjeta = await screen.findByRole('status');
     expect(within(tarjeta).getByText('Ana Pérez')).toBeInTheDocument();
-    expect(within(tarjeta).getByText('DNI 4521****')).toBeInTheDocument();
-    expect(within(tarjeta).getByText('Teléfono: 987654321')).toBeInTheDocument();
+    expect(within(tarjeta).queryByText(/DNI/)).toBeNull();
+    expect(within(tarjeta).getByText('Celular: 987654321')).toBeInTheDocument();
     expect(within(tarjeta).getByText('Puntos: 12.50')).toBeInTheDocument();
 
     expect(screen.queryByPlaceholderText('Ej.: María López')).toBeNull();
     expect(screen.queryByPlaceholderText('9 dígitos')).toBeNull();
     expect(screen.getByRole('button', { name: 'Continuar a productos →' })).toBeEnabled();
-    expect(api.get).toHaveBeenCalledWith('/admin/clientes/por-dni/45213678');
+    expect(api.get).toHaveBeenCalledWith('/admin/clientes/por-telefono/987654321');
   });
 
-  it('DNI sin cuenta muestra el aviso y ofrece seguir como invitado', async () => {
-    respuestaDni = { encontrado: false };
+  it('Celular sin cuenta muestra el aviso y ofrece seguir como invitado', async () => {
+    respuestaCuenta = { encontrado: false };
     abrirPaso('Para llevar');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (DNI)' }));
-    await escribirDni('11112222');
+    fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (celular)' }));
+    await escribirCelular('955512345');
 
-    expect(await screen.findByText('No hay cuenta con ese DNI.')).toBeInTheDocument();
+    expect(await screen.findByText('No hay cuenta con ese celular.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Continuar a productos →' })).toBeDisabled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Seguir como invitado' }));
@@ -169,21 +168,21 @@ describe('ModalNuevoPedidoMesa: cliente con cuenta por DNI en delivery y para ll
   });
 
   it('error 429 muestra un mensaje claro de demasiadas búsquedas', async () => {
-    respuestaDni = Object.assign(new Error('x'), { statusCode: 429, codigo: 'DEMASIADAS_BUSQUEDAS' });
+    respuestaCuenta = Object.assign(new Error('x'), { statusCode: 429, codigo: 'DEMASIADAS_BUSQUEDAS' });
     abrirPaso('Para llevar');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (DNI)' }));
-    await escribirDni('45213678');
+    fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (celular)' }));
+    await escribirCelular('987654321');
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Demasiadas búsquedas seguidas');
   });
 
   it('delivery con cuenta muestra las direcciones anteriores y elegir una rellena la dirección', async () => {
-    respuestaDni = cuentaAna;
+    respuestaCuenta = cuentaAna;
     abrirPaso('Delivery');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (DNI)' }));
-    await escribirDni('45213678');
+    fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (celular)' }));
+    await escribirCelular('987654321');
     await screen.findByRole('status');
 
     expect(
@@ -214,11 +213,11 @@ describe('ModalNuevoPedidoMesa: cliente con cuenta por DNI en delivery y para ll
   });
 
   it('delivery con cuenta sin direcciones guardadas va directo a la dirección nueva', async () => {
-    respuestaDni = { ...cuentaAna, direcciones: [] };
+    respuestaCuenta = { ...cuentaAna, direcciones: [] };
     abrirPaso('Delivery');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (DNI)' }));
-    await escribirDni('45213678');
+    fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (celular)' }));
+    await escribirCelular('987654321');
     await screen.findByRole('status');
 
     expect(
@@ -228,37 +227,37 @@ describe('ModalNuevoPedidoMesa: cliente con cuenta por DNI en delivery y para ll
     expect(screen.getByRole('button', { name: 'Continuar a productos →' })).toBeDisabled();
   });
 
-  it('invitado no envía clienteDni y pide nombre y teléfono', async () => {
+  it('invitado no envía clienteTelefono y pide nombre y teléfono', async () => {
     abrirPaso('Para llevar');
 
     fireEvent.change(screen.getByPlaceholderText('Ej.: María López'), { target: { value: 'Ana' } });
     fireEvent.change(screen.getByPlaceholderText('9 dígitos'), { target: { value: '987654321' } });
 
     const pedido = await registrarCafe();
-    expect(pedido.clienteDni).toBeUndefined();
+    expect(pedido.clienteTelefono).toBeUndefined();
     expect(pedido.cliente).toEqual({ nombre: 'Ana', telefono: '987654321' });
-    expect(api.get).not.toHaveBeenCalledWith(expect.stringContaining('/admin/clientes/por-dni/'));
+    expect(api.get).not.toHaveBeenCalledWith(expect.stringContaining('/admin/clientes/por-telefono/'));
   });
 
-  it('con cuenta envía clienteDni y los datos de la cuenta', async () => {
-    respuestaDni = cuentaAna;
+  it('con cuenta envía clienteTelefono y los datos de la cuenta', async () => {
+    respuestaCuenta = cuentaAna;
     abrirPaso('Para llevar');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (DNI)' }));
-    await escribirDni('45213678');
+    fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (celular)' }));
+    await escribirCelular('987654321');
     await screen.findByRole('status');
 
     const pedido = await registrarCafe();
-    expect(pedido.clienteDni).toBe('45213678');
+    expect(pedido.clienteTelefono).toBe('987654321');
     expect(pedido.cliente).toEqual({ nombre: 'Ana Pérez', telefono: '987654321' });
     expect(pedido.modalidad).toBe('RECOGER');
   });
 
-  it('con cuenta por DNI en el paso de datos no se pisa con el cliente de ¿Quién pide?', async () => {
-    respuestaDni = cuentaAna;
+  it('con cuenta por celular en el paso de datos no se pisa con el cliente de ¿Quién pide?', async () => {
+    respuestaCuenta = cuentaAna;
     abrirPaso('Para llevar');
-    fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (DNI)' }));
-    await escribirDni('45213678');
+    fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (celular)' }));
+    await escribirCelular('987654321');
     await screen.findByRole('status');
 
     fireEvent.click(screen.getByRole('button', { name: 'Continuar a productos →' }));
@@ -266,10 +265,10 @@ describe('ModalNuevoPedidoMesa: cliente con cuenta por DNI en delivery y para ll
     fireEvent.change(await screen.findByPlaceholderText('Ej.: Lucía o Mesa 4'), { target: { value: 'Ana' } });
     fireEvent.click(screen.getByText('Agregar al pedido'));
 
-    vi.mocked(api.get).mockResolvedValue({ items: [{ id: 55, nombre: 'Luis Quispe', dni: '7123****', puntos: 3 }] } as any);
+    vi.mocked(api.get).mockResolvedValue({ items: [{ id: 55, nombre: 'Luis Quispe', telefono: '912345678', puntos: 3 }] } as any);
     fireEvent.click(await screen.findByRole('button', { name: 'Cambiar' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (DNI)' }));
-    const input = screen.getByPlaceholderText('DNI o nombre del cliente');
+    fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (celular)' }));
+    const input = screen.getByPlaceholderText('Nombre o celular del cliente');
     fireEvent.change(input, { target: { value: 'Luis' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     fireEvent.click(await screen.findByRole('button', { name: /Luis Quispe/ }));
@@ -278,7 +277,7 @@ describe('ModalNuevoPedidoMesa: cliente con cuenta por DNI en delivery y para ll
     fireEvent.click(await screen.findByRole('button', { name: 'Sí, registrar' }));
     await waitFor(() => expect(pedidosApi.crearPedidoAdmin).toHaveBeenCalledTimes(1));
     const pedido = vi.mocked(pedidosApi.crearPedidoAdmin).mock.calls[0][0] as any;
-    expect(pedido.clienteDni).toBe('45213678');
+    expect(pedido.clienteTelefono).toBe('987654321');
     expect(pedido.clientePartyId).toBeUndefined();
   });
 });

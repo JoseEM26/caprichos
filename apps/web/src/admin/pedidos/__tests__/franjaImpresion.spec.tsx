@@ -6,7 +6,7 @@ import { impresionApi } from '../../impresion/impresionApi';
 
 vi.mock('../../../comun/socket', () => ({ useEventos: vi.fn() }));
 vi.mock('../../impresion/impresionApi', () => ({
-  impresionApi: { obtenerEstado: vi.fn() },
+  impresionApi: { obtenerEstado: vi.fn(), listarCola: vi.fn(), vaciarCola: vi.fn(), descartarPedido: vi.fn(), reimprimirTodas: vi.fn() },
 }));
 
 const base = { agente: 'conectado', impresora: 'lista', ultimoLatido: null, conteos: {} };
@@ -30,7 +30,8 @@ describe('FranjaImpresion', () => {
     montar();
 
     expect(await screen.findByTestId('franja-impresion')).toHaveTextContent('Impresora sin conexión: 4 etiqueta(s) en cola');
-    expect(screen.getByRole('link', { name: 'Ir a Impresión' })).toHaveAttribute('href', '/admin/configuracion');
+    expect(screen.getByRole('link', { name: 'Ver impresión' })).toHaveAttribute('href', '/admin/configuracion?tab=impresion');
+    expect(screen.getByRole('button', { name: 'Gestionar cola' })).toBeInTheDocument();
   });
 
   it('aparece si la impresora tiene error con el agente conectado', async () => {

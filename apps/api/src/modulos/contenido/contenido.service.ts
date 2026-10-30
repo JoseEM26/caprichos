@@ -9,6 +9,7 @@ import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { resolverDisposicionCarta } from './disposicion-carta';
+import { normalizarConocenos } from './conocenos';
 import {
   ActualizarBorradorDisenoDto,
   ActualizarDestacadaDto,
@@ -20,6 +21,8 @@ import {
   GuardarPaletaDto,
   TAMANOS_NOVEDAD,
 } from './contenido.dto';
+
+const CLAVE_CONOCENOS = 'contenido_conocenos';
 
 export const NOVEDADES_ENCABEZADO_DEFAULT = {
   etiqueta: 'NOVEDADES',
@@ -340,6 +343,10 @@ export class ContenidoService {
       subtitulo: (encVal.subtitulo || '').trim() || NOVEDADES_ENCABEZADO_DEFAULT.subtitulo,
     };
 
+    const paramConocenos = await this.prisma.parametro.findUnique({
+      where: { clave: CLAVE_CONOCENOS },
+    });
+
     return {
       versionCarta: {
         id: versionPublicada?.id.toString() ?? '1',
@@ -356,6 +363,7 @@ export class ContenidoService {
       rankingMes: estrellasVisibles ? rankingMes : [],
       estrellasVisibles,
       novedadesEncabezado,
+      conocenos: normalizarConocenos(paramConocenos?.valor),
       banner: contenidoConfig.banner ?? {
         activo: false,
         tag: '',
@@ -868,6 +876,68 @@ export class ContenidoService {
       ...datos,
       mensaje: 'Borrador del encabezado descartado',
     };
+  }
+
+  // --- Conócenos: borrador y publicado, como el encabezado de novedades ---
+
+  async obtenerConocenosAdmin() {
+    const [pub, bor] = await Promise.all([
+      this.prisma.parametro.findUnique({ where: { clave: CLAVE_CONOCENOS } }),
+      this.prisma.parametro.findUnique({ where: { clave: `${CLAVE_CONOCENOS}_borrador` } }),
+    ]);
+    const publicado = normalizarConocenos(pub?.valor);
+    const tieneBorrador = Boolean(bor);
+    return { contenido: tieneBorrador ? normalizarConocenos(bor?.valor) : publicado, publicado, tieneBorrador };
+  }
+
+  async guardarBorradorConocenos(dto: unknown, usuario?: UsuarioAutenticado) {
+    const borrador = normalizarConocenos(dto);
+    await this.prisma.parametro.upsert({
+      where: { clave: `${CLAVE_CONOCENOS}_borrador` },
+      update: { valor: borrador as any },
+      create: { clave: `${CLAVE_CONOCENOS}_borrador`, valor: borrador as any },
+    });
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'novedades',
+      accion: 'GUARDAR_BORRADOR_CONOCENOS',
+      resultado: 'OK',
+      partyId: usuario?.partyId,
+      despues: borrador,
+    });
+    return { ok: true, contenido: borrador, tieneBorrador: true, mensaje: 'Borrador de Conócenos guardado' };
+  }
+
+  async publicarConocenos(usuario?: UsuarioAutenticado) {
+    const bor = await this.prisma.parametro.findUnique({ where: { clave: `${CLAVE_CONOCENOS}_borrador` } });
+    if (!bor) throw new BadRequestException('No hay borrador de Conócenos para publicar');
+    await this.prisma.parametro.upsert({
+      where: { clave: CLAVE_CONOCENOS },
+      update: { valor: bor.valor as any },
+      create: { clave: CLAVE_CONOCENOS, valor: bor.valor as any },
+    });
+    await this.prisma.parametro.deleteMany({ where: { clave: `${CLAVE_CONOCENOS}_borrador` } });
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'novedades',
+      accion: 'PUBLICAR_CONOCENOS',
+      resultado: 'OK',
+      partyId: usuario?.partyId,
+      despues: bor.valor as any,
+    });
+    return { ok: true, ...(await this.obtenerConocenosAdmin()), mensaje: 'Conócenos publicado' };
+  }
+
+  async descartarConocenos(usuario?: UsuarioAutenticado) {
+    await this.prisma.parametro.deleteMany({ where: { clave: `${CLAVE_CONOCENOS}_borrador` } });
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'novedades',
+      accion: 'DESCARTAR_BORRADOR_CONOCENOS',
+      resultado: 'OK',
+      partyId: usuario?.partyId,
+    });
+    return { ok: true, ...(await this.obtenerConocenosAdmin()), mensaje: 'Borrador de Conócenos descartado' };
   }
 
   async publicarNovedades(usuario?: UsuarioAutenticado) {

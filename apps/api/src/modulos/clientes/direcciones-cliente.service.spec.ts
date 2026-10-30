@@ -38,6 +38,7 @@ describe('DireccionesClienteService', () => {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       partyIdentifier: { findFirst: jest.fn().mockResolvedValue(null) },
+      customerAccount: { findFirst: jest.fn().mockResolvedValue(null) },
       contactMechanism: { findFirst: jest.fn().mockResolvedValue(null) },
       party: { findUnique: jest.fn().mockResolvedValue(null) },
     };
@@ -204,13 +205,18 @@ describe('DireccionesClienteService', () => {
     });
   });
 
-  describe('buscarPorDni', () => {
-    it('sin cuenta con ese DNI: { encontrado: false }', async () => {
-      expect(await service.buscarPorDni('45217890', 55n)).toEqual({ encontrado: false });
+  describe('buscarPorTelefono', () => {
+    beforeEach(() => {
+      prismaMock.customerAccount.findFirst.mockResolvedValue(null);
     });
 
-    it('con cuenta: nombre, teléfono, puntos y direcciones; sin correo ni cumpleaños', async () => {
-      prismaMock.partyIdentifier.findFirst.mockResolvedValue({ party_id: 77n });
+    it('sin cuenta con ese celular: { encontrado: false }', async () => {
+      prismaMock.contactMechanism.findFirst.mockResolvedValue(null);
+      expect(await service.buscarPorTelefono('987654321', 55n)).toEqual({ encontrado: false });
+    });
+
+    it('con cuenta: nombre, teléfono, puntos y direcciones; sin correo, cumpleaños ni DNI', async () => {
+      prismaMock.customerAccount.findFirst.mockResolvedValue({ party_id: 77n });
       prismaMock.party.findUnique.mockResolvedValue({
         persona: { nombres: 'Ana', correo: 'ana@x.com', cumple_dia: 1, cumple_mes: 2 },
         contactos: [
@@ -220,12 +226,9 @@ describe('DireccionesClienteService', () => {
       });
       prismaMock.clienteDireccion.findMany.mockResolvedValue([fila()]);
 
-      const r: any = await service.buscarPorDni('45217890', 55n);
+      const r: any = await service.buscarPorTelefono('987654321', 55n);
 
-      expect(prismaMock.partyIdentifier.findFirst.mock.calls[0][0].where).toMatchObject({
-        tipo: 'DNI',
-        numero: '45217890',
-      });
+      expect(prismaMock.customerAccount.findFirst.mock.calls[0][0].where).toEqual({ telefono: '987654321', activo: true });
       expect(r).toEqual({
         encontrado: true,
         party: '77',
@@ -235,21 +238,18 @@ describe('DireccionesClienteService', () => {
         direcciones: [expect.objectContaining({ direccion: 'Av. Las Palmeras 123' })],
       });
       expect(JSON.stringify(r)).not.toContain('ana@x.com');
-      expect(r).not.toHaveProperty('correo');
-      expect(r).not.toHaveProperty('cumpleanos');
     });
 
     it('más de 20 búsquedas por minuto del mismo usuario: 429', async () => {
       redisMock.incr.mockResolvedValue(21);
-
-      await expect(service.buscarPorDni('45217890', 55n)).rejects.toBeInstanceOf(HttpException);
-      expect(prismaMock.partyIdentifier.findFirst).not.toHaveBeenCalled();
+      await expect(service.buscarPorTelefono('987654321', 55n)).rejects.toBeInstanceOf(HttpException);
+      expect(prismaMock.customerAccount.findFirst).not.toHaveBeenCalled();
     });
 
     it('si Redis no responde, no bloquea la búsqueda', async () => {
       redisMock.incr.mockRejectedValue(new Error('redis caído'));
-
-      expect(await service.buscarPorDni('45217890', 55n)).toEqual({ encontrado: false });
+      prismaMock.contactMechanism.findFirst.mockResolvedValue(null);
+      expect(await service.buscarPorTelefono('987654321', 55n)).toEqual({ encontrado: false });
     });
   });
 });

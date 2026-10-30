@@ -590,4 +590,59 @@ describe('ContenidoService', () => {
       });
     });
   });
+
+  describe('CONÓCENOS (borrador y publicado)', () => {
+    const BOR = 'contenido_conocenos_borrador';
+    it('sin nada guardado devuelve los textos de hoy', async () => {
+      prisma.parametro.findUnique.mockResolvedValue(null);
+      const r = await service.obtenerConocenosAdmin();
+      expect(r.tieneBorrador).toBe(false);
+      expect(r.contenido.titulo).toBe('Cafetería artesanal en San Juan de Lurigancho');
+      expect(r.contenido.bloques.map((b) => b.id)).toEqual(['donde', 'horario', 'contacto', 'redes', 'momentos']);
+      expect(r.contenido.momentosCantidad).toBe(8);
+    });
+
+    it('el admin ve el borrador y la carta solo lo publicado', async () => {
+      prisma.parametro.findUnique.mockImplementation(async ({ where }: any) =>
+        where.clave === BOR ? { valor: { titulo: 'Borrador' } } : where.clave === 'contenido_conocenos' ? { valor: { titulo: 'Publicado' } } : null,
+      );
+      const r = await service.obtenerConocenosAdmin();
+      expect(r.contenido.titulo).toBe('Borrador');
+      expect(r.publicado.titulo).toBe('Publicado');
+      prisma.versionCarta.findFirst.mockResolvedValue(null);
+      prisma.novedad.findMany.mockResolvedValue([]);
+      prisma.destacada.findMany.mockResolvedValue([]);
+      prisma.rankingMes.findMany.mockResolvedValue([]);
+      const carta = await service.obtenerContenidoPublicoCarta();
+      expect(carta.conocenos.titulo).toBe('Publicado');
+    });
+
+    it('guardar borrador normaliza, respeta el orden y audita', async () => {
+      const r = await service.guardarBorradorConocenos(
+        { titulo: ' Nuevo ', bloques: [{ id: 'redes', titulo: 'Redes', visible: false }, { id: 'zzz' }], momentosCantidad: 99 },
+        mockUsuario as any,
+      );
+      expect(r.contenido.titulo).toBe('Nuevo');
+      expect(r.contenido.bloques.map((b) => b.id)).toEqual(['redes', 'donde', 'horario', 'contacto', 'momentos']);
+      expect(r.contenido.bloques[0].visible).toBe(false);
+      expect(r.contenido.momentosCantidad).toBe(24);
+      expect(prisma.parametro.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { clave: BOR } }));
+      expect(auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'GUARDAR_BORRADOR_CONOCENOS' }));
+    });
+
+    it('publicar promueve el borrador y lo borra; sin borrador falla', async () => {
+      prisma.parametro.findUnique.mockResolvedValueOnce({ valor: { titulo: 'X' } }).mockResolvedValue(null);
+      await service.publicarConocenos(mockUsuario as any);
+      expect(prisma.parametro.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { clave: 'contenido_conocenos' } }));
+      expect(prisma.parametro.deleteMany).toHaveBeenCalledWith({ where: { clave: BOR } });
+      prisma.parametro.findUnique.mockResolvedValue(null);
+      await expect(service.publicarConocenos()).rejects.toThrow(BadRequestException);
+    });
+
+    it('descartar borra solo el borrador', async () => {
+      prisma.parametro.findUnique.mockResolvedValue(null);
+      await service.descartarConocenos(mockUsuario as any);
+      expect(prisma.parametro.deleteMany).toHaveBeenCalledWith({ where: { clave: BOR } });
+    });
+  });
 });

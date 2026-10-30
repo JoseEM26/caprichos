@@ -16,7 +16,7 @@ const cuentaBase = {
 const conPuntos = (puntos: number) =>
   vi.spyOn(cuentaModulo, 'useCuenta').mockReturnValue({
     ...cuentaBase,
-    cliente: { partyId: '1', nombre: 'José Pérez', dniMascara: '7617****', correo: null, telefono: '987654321', fotoUrl: null, cumpleanos: null, puntos },
+    cliente: { partyId: '1', nombre: 'José Pérez', correo: null, telefono: '987654321', fotoUrl: null, cumpleanos: null, puntos },
   } as any);
 
 describe('Carta ▸ puntos siempre visibles', () => {

@@ -5,6 +5,7 @@ import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { HistorialCierres } from './HistorialCierres';
 import { cierreApi, calcularTotalEfectivo, PendienteCobro, RepartidorPorLiquidar } from './cierreApi';
+import { VerificarMovimientos } from './VerificarMovimientos';
 import { PendientesCobroCierre, AvisoBloqueoCierre, FocoPendientes, GrupoFoco } from './PendientesCobroCierre';
 import { pedidosApi, MovimientoCaja, CobroTurno } from '../pedidos/pedidosApi';
 import { ErrorApi } from '../../comun/api';
@@ -1427,197 +1428,65 @@ export function CierreView() {
       {/* MODAL 3: CERRAR CAJA Y CUADRAR (Paso 1: Verificar -> Paso 2: Conteo y Arqueo) */}
       {abrirModalCierre && (
         <>
-          <div
-            onClick={() => setAbrirModalCierre(false)}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              zIndex: 50,
-              background: 'rgba(11,44,62,0.55)',
-            }}
-          />
+          <div className="vm-fondo" onClick={() => setAbrirModalCierre(false)} />
           <div
             role="dialog"
             aria-modal="true"
-            aria-label="Cerrar caja y cuadrar"
-            style={{
-              position: 'fixed',
-              zIndex: 60,
-              left: '50%',
-              top: '50%',
-              transform: 'translate(-50%,-50%)',
-              width: 'min(640px, calc(100% - 24px))',
-              maxHeight: 'calc(100% - 24px)',
-              overflowY: 'auto',
-              background: 'var(--cp-cream, #FBF4EC)',
-              borderRadius: 20,
-              boxShadow: '0 20px 50px rgba(11,44,62,0.4)',
-              padding: 20,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 12,
-            }}
+            aria-labelledby="vm-titulo"
+            className={`vm-modal${faseCierre === 'verificar' ? ' vm-ancho' : ''}`}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 20, color: 'var(--cp-navy, #0B2C3E)' }}>
+            <div className="vm-enc">
+              <h2 id="vm-titulo" className="vm-titulo">
                 {faseCierre === 'verificar' ? 'Verificar movimientos del turno' : 'Cerrar caja y cuadrar'}
-              </div>
-              <button
-                type="button"
-                onClick={() => setAbrirModalCierre(false)}
-                aria-label="Cerrar"
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 22,
-                  border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                  background: 'transparent',
-                  color: 'var(--cp-navy, #0B2C3E)',
-                  fontSize: 20,
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                }}
-              >
+              </h2>
+              <button type="button" className="vm-x" onClick={() => setAbrirModalCierre(false)} aria-label="Cerrar">
                 ×
               </button>
             </div>
 
             {/* FASE 1: VERIFICAR MOVIMIENTOS */}
             {faseCierre === 'verificar' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)' }}>
-                  Revisa los pedidos cobrados y los movimientos antes de contar el dinero.
-                </div>
-
-                {/* Pedidos cobrados */}
-                <div
-                  style={{
-                    background: 'var(--cp-white, #FFFFFF)',
-                    border: '1px solid var(--cp-line, #E3D6C6)',
-                    borderRadius: 12,
-                    padding: 12,
-                    maxHeight: 180,
-                    overflowY: 'auto',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 6,
-                  }}
-                >
-                  <div style={{ fontWeight: 800, fontSize: 13 }}>Pedidos cobrados en el turno</div>
-                  {pedidosCobrados.length === 0 ? (
-                    <div style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)' }}>Sin pedidos cobrados aún.</div>
-                  ) : (
-                    pedidosCobrados.map((p) => (
-                      <div
-                        key={p.pedidoId}
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          fontSize: 12,
-                          borderTop: '1px solid var(--cp-sand, #EDE1D1)',
-                          paddingTop: 4,
-                        }}
-                      >
-                        <span>
-                          <b>{p.codigo}</b> · {p.cliente || 'Cliente'} ({p.medios.join(' + ') || 'Efectivo'})
-                        </span>
-                        <span style={{ fontWeight: 700 }}>s/ {p.total.toFixed(2)}</span>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                {/* Movimientos */}
-                <div
-                  style={{
-                    background: 'var(--cp-white, #FFFFFF)',
-                    border: '1px solid var(--cp-line, #E3D6C6)',
-                    borderRadius: 12,
-                    padding: 12,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 6,
-                  }}
-                >
-                  <div style={{ fontWeight: 800, fontSize: 13 }}>Movimientos de caja</div>
-                  {movimientos.length === 0 ? (
-                    <div style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)' }}>Sin movimientos de caja en este turno.</div>
-                  ) : (
-                    movimientos.map((m) => (
-                      <div
-                        key={m.id}
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          fontSize: 12,
-                          borderTop: '1px solid var(--cp-sand, #EDE1D1)',
-                          paddingTop: 4,
-                        }}
-                      >
-                        <span>
-                          <b>{m.tipo === 'INGRESO' ? 'Ingreso' : 'Egreso'}</b> · {m.motivo}
-                        </span>
-                        <span style={{ fontWeight: 700, color: m.tipo === 'INGRESO' ? 'var(--cp-green, #2F7A45)' : 'var(--cp-rust, #B2500F)' }}>
-                          {m.tipo === 'INGRESO' ? '+ ' : '− '}s/ {Number(m.monto || 0).toFixed(2)}
-                        </span>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                {/* Pedidos sin cobrar que impiden el cierre: se cobran o se anulan desde aquí */}
-                <PendientesCobroCierre
-                  esAdmin={esAdmin}
-                  pendientes={pedidosAbiertos}
-                  setPendientes={setPedidosAbiertos}
-                  alCambiarTurno={cargarTurno}
-                  errorLista={errorPendientes}
-                  alReintentar={cargarTurno}
-                  foco={foco}
-                />
-
-                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                  <button
-                    type="button"
-                    onClick={() => setFaseCierre('arqueo')}
-                    style={{
-                      flex: 1,
-                      minHeight: 52,
-                      border: 0,
-                      borderRadius: 12,
-                      background: 'var(--cp-orange, #E67929)',
-                      color: 'var(--cp-navy, #0B2C3E)',
-                      fontFamily: 'Montserrat, sans-serif',
-                      fontWeight: 800,
-                      fontSize: 15,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Ya revisé: continuar al conteo
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAbrirModalCierre(false)}
-                    style={{
-                      flex: 1,
-                      minHeight: 52,
-                      border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                      borderRadius: 12,
-                      background: 'transparent',
-                      color: 'var(--cp-navy, #0B2C3E)',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Volver
-                  </button>
-                </div>
-              </div>
+              <VerificarMovimientos
+                fecha={hoyLima()}
+                cajero={cajeroNombre}
+                resumen={
+                  esperado
+                    ? {
+                        apertura: aperturaMonto,
+                        ventasEfectivo,
+                        yape: esperado.medios?.yape ?? 0,
+                        plin: esperado.medios?.plin ?? 0,
+                        transferencia: esperado.medios?.transferencia ?? 0,
+                        tarjeta: esperado.medios?.tarjeta ?? 0,
+                        efectivoEsperado,
+                      }
+                    : null
+                }
+                totalCobrado={ventasTotales}
+                ingresos={ingresosExtra}
+                egresos={egresosGasto}
+                pedidosCobrados={pedidosCobrados}
+                movimientos={movimientos}
+                pendientesCount={pedidosAbiertos.length}
+                pendientes={
+                  <PendientesCobroCierre
+                    esAdmin={esAdmin}
+                    pendientes={pedidosAbiertos}
+                    setPendientes={setPedidosAbiertos}
+                    alCambiarTurno={cargarTurno}
+                    errorLista={errorPendientes}
+                    alReintentar={cargarTurno}
+                    foco={foco}
+                  />
+                }
+                onContinuar={() => setFaseCierre('arqueo')}
+                onVolver={() => setAbrirModalCierre(false)}
+              />
             )}
 
             {/* FASE 2: CONTEO DE EFECTIVO Y ARQUEO CIEGO */}
             {faseCierre === 'arqueo' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div className="vm-cuerpo">
                 {/* 1. Billetes y Monedas */}
                 <div
                   style={{

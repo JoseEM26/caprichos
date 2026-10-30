@@ -84,7 +84,7 @@ export function PuntosCanje({ totalPedido, puntosAplicados, alAplicar, porcentaj
           Ingresa con tu cuenta para usar tus puntos acumulados o sumar en este pedido.
         </div>
         <button type="button" onClick={abrirPanel} style={botonIngresar}>
-          Ingresar con mi DNI
+          Ingresar con mi celular
         </button>
       </div>
     );
@@ -159,7 +159,7 @@ export function PuntosCanje({ totalPedido, puntosAplicados, alAplicar, porcentaj
   return (
     <div style={contenedor}>
       <div style={{ fontSize: 13, lineHeight: '18px' }}>
-        Pides con la cuenta de <b>{cliente.nombre}</b> · DNI {cliente.dniMascara}
+        Pides con la cuenta de <b>{cliente.nombre}</b>
       </div>
 
       <div style={{ borderTop: '1px solid var(--line, var(--cp-line, #E5D6C5))', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>

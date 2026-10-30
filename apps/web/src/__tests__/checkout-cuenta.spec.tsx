@@ -34,7 +34,6 @@ function ctx(telefono: string | null) {
       partyId: '100',
       nombre: 'Ana Torres',
       telefono,
-      dniMascara: '4521****',
       correo: null,
       cumpleanos: '14/03',
       puntos: 0,
@@ -124,13 +123,13 @@ describe('Pedido con la cuenta iniciada', () => {
     expect(screen.getByText('987000222')).toBeInTheDocument();
   });
 
-  it('si la cuenta no tiene teléfono lo pide y ofrece guardarlo en el perfil', () => {
+  it('si la cuenta no trae teléfono lo pide, sin DNI ni opción de guardarlo', () => {
     vi.spyOn(cuentaModulo, 'useCuentaOpcional').mockReturnValue(ctx(null));
     abrir();
 
     expect(screen.queryByLabelText(/Nombre completo/i)).not.toBeInTheDocument();
     expect(screen.getByLabelText(/Teléfono celular/i)).toBeInTheDocument();
-    const guardar = screen.getByLabelText(/Guardar este número en mi perfil/i);
-    expect(guardar).toBeChecked();
+    expect(screen.queryByLabelText(/Guardar este número/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/DNI/)).not.toBeInTheDocument();
   });
 });

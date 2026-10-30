@@ -241,6 +241,59 @@ describe('Módulo Catálogo - ProductosView', () => {
     const enNuevo = await screen.findByRole('dialog', { name: 'Nuevo producto' });
     expect(within(enNuevo).getByRole('button', { name: 'Ver cómo se ve en la carta' })).toBeInTheDocument();
   });
+
+  it('Desactivar: confirma y llama ocultarProducto; el producto desactivado sale de Activos y se ve atenuado en Desactivados', async () => {
+    const ocultar = vi.spyOn(catalogoApi, 'ocultarProducto').mockResolvedValue({ ok: true, id: 'prod-1', oculto: true });
+    const mostrar = vi.spyOn(catalogoApi, 'mostrarProducto').mockResolvedValue({ ok: true, id: 'prod-1', oculto: false });
+    render(
+      <MemoryRouter>
+        <ProductosView />
+      </MemoryRouter>,
+    );
+    await screen.findByText('Frappe Oreo');
+    fireEvent.click(screen.getByRole('button', { name: 'Desactivar Frappe Oreo' }));
+    expect(screen.getByText(/Desactivado: desaparece de la carta/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Sí/ }));
+    await waitFor(() => expect(ocultar).toHaveBeenCalledWith('prod-1'));
+
+    // Con un producto ya desactivado: filtro Registro y botón Activar
+    vi.spyOn(catalogoApi, 'listarProductos').mockResolvedValue([
+      PRODUCTOS_MOCK[0],
+      { ...PRODUCTOS_MOCK[1], oculto: true },
+    ] as any);
+    await waitFor(() => expect(ocultar).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole('button', { name: 'Desactivar Frappe Oreo' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Sí/ }));
+    await screen.findByRole('button', { name: 'Activos (1)' });
+    expect(screen.queryByText('Caja x6 Donas Artesanales')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Desactivados (1)' }));
+    expect(screen.getByText('Caja x6 Donas Artesanales')).toBeInTheDocument();
+    expect(screen.getByText('Desactivado')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Activar Caja x6 Donas Artesanales' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Sí/ }));
+    await waitFor(() => expect(mostrar).toHaveBeenCalledWith('prod-2'));
+    fireEvent.click(screen.getByRole('button', { name: 'Todos (2)' }));
+    expect(screen.getByText('Frappe Oreo')).toBeInTheDocument();
+  });
+
+  it('todas las acciones y las insignias quedan dentro de la tarjeta (pt-tarjeta / pt-acciones)', async () => {
+    render(
+      <MemoryRouter>
+        <ProductosView />
+      </MemoryRouter>,
+    );
+    await screen.findByText('Frappe Oreo');
+    const tarjeta = screen.getByText('Frappe Oreo').closest('.pt-tarjeta') as HTMLElement;
+    expect(tarjeta).not.toBeNull();
+    const acciones = tarjeta.querySelector('.pt-acciones') as HTMLElement;
+    expect(acciones).not.toBeNull();
+    for (const n of ['Editar', 'Desactivar Frappe Oreo', 'Cambiar disponibilidad de Frappe Oreo', 'Ver cómo se ve en la carta: Frappe Oreo']) {
+      expect(within(acciones).getByRole('button', { name: n })).toBeInTheDocument();
+    }
+    expect(tarjeta.querySelector('.pt-insignias')).not.toBeNull();
+    // Sin menú «…»: todas las acciones son visibles
+    expect(within(tarjeta).queryByRole('menu')).toBeNull();
+  });
 });
 
 describe('Módulo Catálogo - ListasCategoriasView', () => {

@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSesion } from '../../comun/sesion';
 import { api, ErrorApi } from '../../comun/api';
 import { Confirmar } from '../../comun/Confirmar';
-import type { UsuarioItem, RespuestaListarUsuarios } from './tipos';
+import type { UsuarioItem, RespuestaListarUsuarios, PersonalHorario } from './tipos';
+import { DIAS, formatoHoras, horasTurno } from './horario';
 import { CrearUsuarioModal, ETIQUETAS_ROLES } from './CrearUsuarioModal';
 import { EditarUsuarioModal } from './EditarUsuarioModal';
 import { ClaveInicialModal } from './ClaveInicialModal';
@@ -84,15 +85,8 @@ export function UsuariosView() {
   }, [tabActual]);
 
   // Horarios tab state
-  const [horariosState, setHorariosState] = useState<Array<{
-    id: string;
-    n: string;
-    rol: string;
-    horas: string;
-    dias: string[];
-    desde: string;
-    hasta: string;
-  }>>([]);
+  const [horariosServidor, setHorariosServidor] = useState<PersonalHorario[]>([]);
+  const [horariosError, setHorariosError] = useState('');
   const [coberturas, setCoberturas] = useState<Array<{ t: string }>>([]);
   const [nuevaCob, setNuevaCob] = useState({ fecha: '', cubre: '', reemplaza: '' });
   const [hrMsg, setHrMsg] = useState('');
@@ -193,24 +187,20 @@ export function UsuariosView() {
     }
   }, [puedeVer]);
 
-  // Sincronizar horarios con usuarios activos reales
+  // Horarios reales del servidor (se recargan al abrir la pestaña y al cerrar el editor)
+  const recargarHorarios = useCallback(() => {
+    api
+      .get<PersonalHorario[]>('/admin/usuarios/horarios')
+      .then((d) => {
+        setHorariosServidor(Array.isArray(d) ? d : []);
+        setHorariosError('');
+      })
+      .catch(() => setHorariosError('No se pudieron cargar los horarios del personal.'));
+  }, []);
+
   useEffect(() => {
-    const lista = todosUsuarios.length > 0 ? todosUsuarios : usuarios;
-    if (lista.length > 0) {
-      setHorariosState((prev) => {
-        if (prev.length > 0) return prev;
-        return lista.filter((u) => u.activo).map((u) => ({
-          id: u.id,
-          n: `${u.nombres} ${u.apellidos}`,
-          rol: ETIQUETAS_ROLES[u.rol] || u.rol,
-          horas: '8h',
-          dias: ['L', 'M', 'X', 'J', 'V', 'S'],
-          desde: '13:00',
-          hasta: '21:00',
-        }));
-      });
-    }
-  }, [todosUsuarios, usuarios]);
+    if (tabActual === 'horarios' && puedeVer) recargarHorarios();
+  }, [tabActual, puedeVer, recargarHorarios, usuarioEditando]);
 
   const limpiarFiltros = () => {
     setBusqueda('');
@@ -1326,64 +1316,56 @@ export function UsuariosView() {
             Qué días y de qué hora a qué hora trabaja cada persona (no todos trabajan 8 horas), y quién cubre un descanso. Con esto el sistema sabe a quién avisar, por ejemplo cuando cocina pide algo al almacén. No es control de asistencia.
           </div>
           <div role="status" style={{ background: 'var(--cp-white)', border: '1.5px solid var(--cp-navy)', borderRadius: '12px', padding: '10px 12px', fontSize: '13px', fontWeight: 700 }}>
-            Horario en curso: Turno Día ({totalActivos} trabajadores activos en personal)
+            Personal activo con horario: {totalActivos} trabajadores
           </div>
           {hrMsg && (
             <div role="status" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-green)' }}>
               {hrMsg}
             </div>
           )}
+          {horariosError && (
+            <div role="alert" style={{ color: 'var(--cp-rust)', fontSize: '13px', fontWeight: 700 }}>{horariosError}</div>
+          )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {horariosState.map((h, i) => (
-              <div key={h.n} style={{ background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: '12px', padding: '10px 12px', display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' }}>
-                <div style={{ flex: '1 1 160px', minWidth: 0 }}>
-                  <div style={{ fontWeight: 800 }}>{h.n}</div>
-                  <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>{h.rol} · {h.horas}</div>
-                </div>
-                <div role="group" aria-label="Días que trabaja" style={{ display: 'flex', gap: '4px' }}>
-                  {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((d) => {
-                    const on = h.dias.includes(d);
-                    return (
+            {horariosServidor.map((h) => {
+              const usuarioFila = (todosUsuarios.length > 0 ? todosUsuarios : usuarios).find((u) => u.id === h.id);
+              const horas = h.horarios.reduce((t, x) => t + horasTurno(x.entrada, x.salida), 0);
+              return (
+                <div key={h.id} data-testid={`horario-${h.id}`} style={{ background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: '12px', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 800 }}>{h.nombres} {h.apellidos}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
+                        {ETIQUETAS_ROLES[h.rol] || h.rol} · {h.horarios.length ? formatoHoras(horas) + ' por semana' : 'Sin horario'}
+                      </div>
+                    </div>
+                    {puedeEditar && usuarioFila && (
                       <button
-                        key={d}
                         type="button"
-                        onClick={() => {
-                          const nextDias = on ? h.dias.filter((x) => x !== d) : [...h.dias, d];
-                          setHorariosState((prev) => prev.map((item, idx) => idx === i ? { ...item, dias: nextDias } : item));
-                        }}
-                        style={{ width: '36px', height: '40px', borderRadius: '8px', border: '1.5px solid var(--cp-navy)', background: on ? 'var(--cp-navy)' : 'transparent', color: on ? 'var(--cp-cream)' : 'var(--cp-navy)', fontWeight: 800, fontSize: '12px', cursor: 'pointer' }}
+                        onClick={() => setUsuarioEditando(usuarioFila)}
+                        style={{ minHeight: '44px', padding: '0 12px', border: '1.5px solid var(--cp-navy)', borderRadius: '8px', background: 'transparent', color: 'var(--cp-navy)', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}
                       >
-                        {d}
+                        Editar horario
                       </button>
+                    )}
+                  </div>
+                  {DIAS.map((d) => {
+                    const turno = h.horarios.find((x) => x.dia === d.dia);
+                    const rep = h.reemplazos.find((x) => x.dia === d.dia);
+                    return (
+                      <div key={d.dia} style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 10px', fontSize: '13px', borderTop: '1px solid var(--cp-sand)', paddingTop: '4px' }}>
+                        <strong style={{ minWidth: '84px' }}>{d.nombre}</strong>
+                        <span>{turno ? `${turno.entrada} a ${turno.salida}` : 'Descansa'}</span>
+                        {rep && <span style={{ color: 'var(--cp-soft)' }}>{turno ? 'Si falta' : 'Lo reemplaza'}: {rep.nombre}</span>}
+                      </div>
                     );
                   })}
                 </div>
-                <label style={{ fontSize: '12px', fontWeight: 700 }}>
-                  De
-                  <input
-                    type="time"
-                    value={h.desde}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setHorariosState((prev) => prev.map((item, idx) => idx === i ? { ...item, desde: v } : item));
-                    }}
-                    style={{ display: 'block', minHeight: '40px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 6px' }}
-                  />
-                </label>
-                <label style={{ fontSize: '12px', fontWeight: 700 }}>
-                  A
-                  <input
-                    type="time"
-                    value={h.hasta}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setHorariosState((prev) => prev.map((item, idx) => idx === i ? { ...item, hasta: v } : item));
-                    }}
-                    style={{ display: 'block', minHeight: '40px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 6px' }}
-                  />
-                </label>
-              </div>
-            ))}
+              );
+            })}
+            {horariosServidor.length === 0 && !horariosError && (
+              <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>No hay personal activo con horario.</div>
+            )}
           </div>
 
           <div style={{ background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>

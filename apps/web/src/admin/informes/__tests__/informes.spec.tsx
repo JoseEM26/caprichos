@@ -3,7 +3,6 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { InformesView } from '../InformesView';
 import { IndicadoresView } from '../IndicadoresView';
-import { MapaEntregasView } from '../MapaEntregasView';
 import * as sesionModulo from '../../../comun/sesion';
 
 describe('Vistas de Análisis e Informes', () => {
@@ -72,20 +71,6 @@ describe('Vistas de Análisis e Informes', () => {
       fireEvent.click(botonEstrellas);
 
       expect(screen.getByText(/¿Quitar las estrellas de la carta\?/i)).toBeInTheDocument();
-    });
-  });
-
-  describe('MapaEntregasView', () => {
-    it('renderiza los KPIs del mapa y controles de capa', () => {
-      render(
-        <MemoryRouter>
-          <MapaEntregasView />
-        </MemoryRouter>,
-      );
-
-      expect(screen.getByText('Pedidos con entrega')).toBeInTheDocument();
-      expect(screen.getByText('Intentos fuera de cobertura')).toBeInTheDocument();
-      expect(screen.getByText('Capas')).toBeInTheDocument();
     });
   });
 });

@@ -67,8 +67,8 @@ export class PedidosService {
   ) {}
 
   /**
-   * Cliente con cuenta del pedido: DNI (solo MOZO/CAJA), cuenta de la carta o teléfono de WhatsApp.
-   * Null = invitado. Un clienteDni de carta o WhatsApp se ignora.
+   * Cliente con cuenta del pedido: celular (solo MOZO/CAJA), cuenta de la carta o teléfono de WhatsApp.
+   * Null = invitado. Un clienteTelefono de carta o WhatsApp se ignora.
    */
   private async clienteIdentificado(dto: CrearPedidoDto, origen?: OrigenPedido): Promise<bigint | null> {
     const canal = origen?.canal ?? 'CARTA';
@@ -77,10 +77,10 @@ export class PedidosService {
       const noEncontrado = () =>
         new NotFoundException({
           codigo: 'CLIENTE_NO_ENCONTRADO',
-          mensaje: 'No hay una cuenta de cliente con ese DNI. Puedes atender como invitado.',
+          mensaje: 'No hay una cuenta de cliente con ese celular. Puedes atender como invitado.',
         });
-      if (dto.clienteDni) {
-        const partyId = await this.direcciones.buscarPartyPorDni(dto.clienteDni);
+      if (dto.clienteTelefono) {
+        const partyId = await this.direcciones.resolverPartyPorTelefono(dto.clienteTelefono);
         if (!partyId) throw noEncontrado();
         return partyId;
       }
@@ -418,6 +418,12 @@ export class PedidosService {
         }
       }
 
+      // Combo con parte fija: la elección debe ser el principal o un reemplazo disponible (409 si no)
+      const notaCombo =
+        l.ofertaId && l.comboElecciones?.length
+          ? await this.ofertasService.validarEleccionesCombo(l.ofertaId, l.comboElecciones)
+          : '';
+
       lineasCalculadas.push({
         productoId: prodDb.id,
         ofertaId: l.ofertaId ? BigInt(l.ofertaId) : null,
@@ -429,7 +435,7 @@ export class PedidosService {
         precioUnitario,
         subtotal: lineaSubtotal,
         areaId: prodDb.categoria?.area_id ?? null,
-        nota: l.nota?.trim() || null,
+        nota: [notaCombo, l.nota?.trim()].filter(Boolean).join(' · ') || null,
         nombresPersona: personasAsignadas,
         opciones: opcionesElegidasInfo,
       });

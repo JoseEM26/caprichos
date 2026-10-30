@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ArchivosModule } from '../archivos/archivos.module';
+import { RecuperarClaveService } from './recuperar-clave.service';
 import { ClientesService } from './clientes.service';
 import { PuntosService } from './puntos.service';
 import { DireccionesClienteService } from './direcciones-cliente.service';
@@ -18,6 +19,7 @@ import { ClientesAdminController } from './clientes-admin.controller';
   ],
   providers: [
     ClientesService,
+    RecuperarClaveService,
     PuntosService,
     DireccionesClienteService,
   ],

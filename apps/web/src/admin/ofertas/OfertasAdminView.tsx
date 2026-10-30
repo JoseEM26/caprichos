@@ -208,7 +208,9 @@ function generarPastillasPartes(
           : null;
       const prod = prodId ? productos.find((p) => p.id === prodId) : null;
       const prodNombre = prod ? prod.nombre : cp.nombre || 'Producto';
-      return `${cant} × ${prodNombre.toUpperCase()}`;
+      const nRemp = (cp.reemplazos || []).length;
+      const sufijo = nRemp > 0 ? ` (o ${nRemp} ${nRemp === 1 ? 'reemplazo' : 'reemplazos'})` : '';
+      return `${cant} × ${prodNombre.toUpperCase()}${sufijo}`;
     }
 
     if (tipo === 'A_ELECCION') {
@@ -858,6 +860,22 @@ export function OfertasAdminView() {
                       {pr.activo ? 'Activa' : 'Desactivada'}
                     </span>
                   </div>
+                  {pr.tipo === 'COMBO' && pr.disponible === false && (
+                    <span
+                      data-testid="insignia-agotado-auto"
+                      style={{
+                        alignSelf: 'flex-start',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        borderRadius: '9999px',
+                        padding: '3px 9px',
+                        backgroundColor: 'var(--cp-rust)',
+                        color: 'var(--cp-white)',
+                      }}
+                    >
+                      Agotado automáticamente{pr.motivoAgotado ? `: ${pr.motivoAgotado.replace(/^Falta /, 'falta ')}` : ''}
+                    </span>
+                  )}
 
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
                     <span

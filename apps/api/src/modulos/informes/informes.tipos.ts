@@ -71,6 +71,7 @@ export interface ZonaVentasFila {
   zona: string;
   nombre: string;
   color: string;
+  poligono: [number, number][];
   pedidos: number;
   ventas: string;
   porcentaje: string;
@@ -79,10 +80,13 @@ export interface ZonaVentasFila {
 
 export interface RadioDistanciaFila {
   rango: string;
+  etiqueta: string;
+  metros: number;
   pedidos: number;
 }
 
 export interface MapaEntregasData {
+  sede: { lat: number; lng: number; nombre: string };
   puntos: PuntoEntregaMapa[];
   kpis: KpiItem[];
   zonas: ZonaVentasFila[];
