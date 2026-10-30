@@ -8,10 +8,11 @@ import { SalonModule } from '../salon/salon.module';
 import { ComprobantesModule } from '../comprobantes/comprobantes.module';
 import { ClientesModule } from '../clientes/clientes.module';
 import { StockModule } from '../stock/stock.module';
+import { ImpresionModule } from '../impresion/impresion.module';
 import { OfertasModule } from '../ofertas/ofertas.module';
 
 @Module({
-  imports: [SalonModule, ComprobantesModule, ClientesModule, StockModule, OfertasModule, LocalModule],
+  imports: [SalonModule, ComprobantesModule, ClientesModule, StockModule, OfertasModule, LocalModule, ImpresionModule],
   controllers: [CajaController],
   providers: [CajaService, CobrosService, CajaAvisoAperturaService],
   exports: [CajaService, CobrosService],

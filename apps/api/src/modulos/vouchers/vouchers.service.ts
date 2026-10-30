@@ -80,6 +80,17 @@ export class VouchersService {
   /**
    * Obtiene los parámetros operativos para la comparación del semáforo.
    */
+  /**
+   * Avisa a Caja/Cocina/Mozo (sala admin) que cambió algo del voucher o del plan de pago de un pedido.
+   * Se llama SIEMPRE después de guardar. Payload mínimo: pedidoIds, código y qué cambió.
+   * motivo: subido | reemplazado | quitado | reasignado | revisado | plan | enviado_caja
+   */
+  private avisarVoucher(pedidoIds: Array<bigint | string | number>, motivo: string, codigo?: string | null, origen?: string) {
+    const ids = pedidoIds.filter((i) => i != null).map((i) => i.toString());
+    if (ids.length === 0) return;
+    this.eventos?.emitirAdmin('vouchers:actualizado', { pedidoIds: ids, codigo: codigo ?? undefined, motivo, origen });
+  }
+
   async obtenerParametrosConfiguracion(): Promise<{
     titularEsperado: string;
     yapeNumeroEsperado: string;
@@ -306,6 +317,10 @@ export class VouchersService {
       });
     }
 
+    if (pedidoIdBigInt) {
+      this.avisarVoucher([pedidoIdBigInt], vigentesReemplazados.length ? 'reemplazado' : 'subido', pedido?.codigo, origen);
+    }
+
     // 10. Registrar auditoría
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
@@ -460,6 +475,8 @@ export class VouchersService {
       this.logger.log(
         `Voucher de WhatsApp registrado (id: ${voucher.id}, semáforo: ${voucher.semaforo}) para pedido ${pedido?.codigo || 'N/A'}`,
       );
+
+      if (pedidoIdBigInt) this.avisarVoucher([pedidoIdBigInt], 'subido', pedido?.codigo, 'WHATSAPP');
 
       // Si queda ILEGIBLE: crear notificación de campana para Caja y emitir actualización
       if (evaluacion.semaforo === 'ILEGIBLE') {
@@ -715,6 +732,7 @@ export class VouchersService {
       },
     });
     this.eventos?.emitirAdmin('notificaciones:nueva', { id: notif.id.toString(), titulo: notif.titulo });
+    this.avisarVoucher([pedido.id], 'enviado_caja', pedido.codigo);
 
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
@@ -756,6 +774,8 @@ export class VouchersService {
         revisado_por: usuario.partyId,
       },
     });
+
+    if (actualizado.pedido_id) this.avisarVoucher([actualizado.pedido_id], 'revisado');
 
     // Registrar en auditoría
     await this.auditoria.registrar({
@@ -935,7 +955,7 @@ export class VouchersService {
     });
 
     const pedidoIds = [origen?.id, destino.id].filter((x): x is bigint => x != null).map((x) => x.toString());
-    this.eventos?.emitirAdmin('vouchers:actualizado', { pedidoIds });
+    this.avisarVoucher(pedidoIds, 'reasignado');
     if (conversacion) this.eventos?.emitirAdmin('mensajes:actualizado', { id: conversacion.id.toString() });
 
     return {
@@ -989,6 +1009,7 @@ export class VouchersService {
         data: { pago_preferido: medioPrincipal, pago_metodo: medioPrincipal },
       });
     });
+    this.avisarVoucher([pedido.id], 'plan', pedido.codigo);
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
       modulo: 'vouchers',
@@ -1064,7 +1085,7 @@ export class VouchersService {
       antes: { pedidoId: pedido?.id.toString() ?? null },
       despues: { rol: usuario.rol, motivo: motivoTexto || null },
     });
-    if (pedido) this.eventos?.emitirAdmin('vouchers:actualizado', { pedidoIds: [pedido.id.toString()] });
+    if (pedido) this.avisarVoucher([pedido.id], 'quitado');
     return { ok: true, id: voucherId.toString() };
   }
 

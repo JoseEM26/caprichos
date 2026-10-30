@@ -96,7 +96,7 @@ describe('VouchersService.reasignar', () => {
         despues: { pedidoId: '2', pedidoCodigo: 'CP-2' },
       }),
     );
-    expect(eventos.emitirAdmin).toHaveBeenCalledWith('vouchers:actualizado', { pedidoIds: ['1', '2'] });
+    expect(eventos.emitirAdmin).toHaveBeenCalledWith('vouchers:actualizado', expect.objectContaining({ pedidoIds: ['1', '2'], motivo: 'reasignado' }));
   });
 
   it('no mueve un voucher que ya aprobó un pago', async () => {

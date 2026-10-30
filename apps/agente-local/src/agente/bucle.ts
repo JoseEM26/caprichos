@@ -1,14 +1,18 @@
-import type { EstadoImpresora, TrabajoImpresion } from '@caprichos/compartido';
+import type { EstadoImpresora, ImpresoraReportada, RolImpresora, TrabajoImpresion } from '@caprichos/compartido';
 import type { ConfiguracionAgente } from '../config';
 import type { IClienteApiImpresion } from '../api/clienteApi';
 import type { IDispositivoImpresora } from '../impresora/dispositivo.interface';
 import { ErrorImpresora } from '../impresora/dispositivo.interface';
 import { generarBytesTrabajo } from '../tspl/generadorTspl';
+import { generarTicketEscPos } from '../escpos/generadorTicket';
 
 export interface OpcionesAgenteLocalServicio {
   config: ConfiguracionAgente;
   clienteApi: IClienteApiImpresion;
-  impresora: IDispositivoImpresora;
+  /** Modo de una sola impresora (etiquetera); se mantiene por compatibilidad. */
+  impresora?: IDispositivoImpresora;
+  /** Una impresora por rol: la de cada máquina configurada. */
+  impresoras?: Partial<Record<RolImpresora, IDispositivoImpresora>>;
   logger?: (nivel: 'info' | 'warn' | 'error' | 'debug', mensaje: string) => void;
   temporizador?: (ms: number) => Promise<void>;
 }
@@ -17,6 +21,11 @@ export class AgenteLocalServicio {
   private readonly config: ConfiguracionAgente;
   private readonly clienteApi: IClienteApiImpresion;
   private readonly impresora: IDispositivoImpresora;
+  private readonly impresoras: Partial<Record<RolImpresora, IDispositivoImpresora>>;
+  private readonly modoPorRol: boolean;
+  /** Roles cuya impresora respondió lista en el último latido: solo esos toman trabajos. */
+  private rolesListos: RolImpresora[] = [];
+  private estadosRol: ImpresoraReportada[] = [];
   private readonly logger: (
     nivel: 'info' | 'warn' | 'error' | 'debug',
     mensaje: string
@@ -32,7 +41,9 @@ export class AgenteLocalServicio {
   constructor(opciones: OpcionesAgenteLocalServicio) {
     this.config = opciones.config;
     this.clienteApi = opciones.clienteApi;
-    this.impresora = opciones.impresora;
+    this.modoPorRol = Boolean(opciones.impresoras);
+    this.impresoras = opciones.impresoras ?? (opciones.impresora ? { ETIQUETERA: opciones.impresora } : {});
+    this.impresora = (this.impresoras.ETIQUETERA ?? opciones.impresora) as IDispositivoImpresora;
     this.logger =
       opciones.logger ||
       ((nivel, msg) => {
@@ -75,14 +86,27 @@ export class AgenteLocalServicio {
     // 1. Emitir latido si corresponde
     if (ahora - this.ultimoLatidoTs >= this.config.intervaloLatidoMs) {
       try {
-        const estadoDispositivo = await this.impresora.verificarEstado();
-        this.estadoImpresora = estadoDispositivo.estado;
-        this.detalleEstadoImpresora = estadoDispositivo.detalle;
+        const reportadas: ImpresoraReportada[] = [];
+        for (const rol of ['ETIQUETERA', 'TICKETERA'] as RolImpresora[]) {
+          const dispositivo = this.impresoras[rol];
+          if (!dispositivo) continue;
+          const e = await dispositivo.verificarEstado().catch((err: any) => ({
+            estado: 'error' as EstadoImpresora,
+            detalle: err.message as string | undefined,
+          }));
+          reportadas.push({ rol, estado: e.estado, detalle: e.detalle });
+        }
+        this.estadosRol = reportadas;
+        this.rolesListos = reportadas.filter((r) => r.estado === 'lista').map((r) => r.rol);
+        const etiquetera = reportadas.find((r) => r.rol === 'ETIQUETERA') ?? reportadas[0];
+        this.estadoImpresora = etiquetera ? etiquetera.estado : 'desconectada';
+        this.detalleEstadoImpresora = etiquetera?.detalle;
 
         await this.clienteApi.enviarLatido(
           this.config.version,
           this.estadoImpresora,
-          this.detalleEstadoImpresora
+          this.detalleEstadoImpresora,
+          ...(this.modoPorRol ? [reportadas] : [])
         );
         this.ultimoLatidoTs = ahora;
         this.logger(
@@ -100,9 +124,12 @@ export class AgenteLocalServicio {
     // 2. Tomar trabajos pendientes
     let trabajos: TrabajoImpresion[] = [];
     try {
-      trabajos = await this.clienteApi.tomarTrabajos(
-        this.config.maxTrabajosPorLote
-      );
+      // Una máquina que falla o no está lista no toma trabajos: los suyos esperan en la cola del servidor
+      trabajos = this.modoPorRol
+        ? this.rolesListos.length === 0
+          ? []
+          : await this.clienteApi.tomarTrabajos(this.config.maxTrabajosPorLote, this.rolesListos)
+        : await this.clienteApi.tomarTrabajos(this.config.maxTrabajosPorLote);
       // Conexión exitosa: restablecemos el multiplicador de espera
       this.factorEsperaRed = 1;
     } catch (err: any) {
@@ -139,15 +166,21 @@ export class AgenteLocalServicio {
     );
 
     try {
-      const bytes = generarBytesTrabajo(
-        trabajo.tipo,
-        trabajo.payload,
-        trabajo.copia
-      );
-      await this.impresora.escribir(bytes);
+      const rol: RolImpresora = trabajo.tipo === 'TICKET_PAGO' ? 'TICKETERA' : 'ETIQUETERA';
+      const dispositivo = this.impresoras[rol];
+      if (!dispositivo) {
+        throw new ErrorImpresora(`La ${rol.toLowerCase()} no está configurada en este equipo`, 'desconectada');
+      }
+      const bytes =
+        trabajo.tipo === 'TICKET_PAGO'
+          ? generarTicketEscPos(trabajo.payload as any, this.config.ticketColumnas)
+          : generarBytesTrabajo(trabajo.tipo, trabajo.payload as any, trabajo.copia);
+      await dispositivo.escribir(bytes);
 
-      this.estadoImpresora = 'lista';
-      this.detalleEstadoImpresora = undefined;
+      if (rol === 'ETIQUETERA') {
+        this.estadoImpresora = 'lista';
+        this.detalleEstadoImpresora = undefined;
+      }
 
       // Reportar éxito
       await this.clienteApi.reportarResultado(trabajo.id, true);
@@ -155,6 +188,9 @@ export class AgenteLocalServicio {
     } catch (err: any) {
       let mensajeError = err.message || 'Error desconocido al imprimir';
 
+      // Una máquina que falla deja de tomar trabajos hasta que el próximo latido la vea lista
+      const rolFallido: RolImpresora = trabajo.tipo === 'TICKET_PAGO' ? 'TICKETERA' : 'ETIQUETERA';
+      this.rolesListos = this.rolesListos.filter((r) => r !== rolFallido);
       if (err instanceof ErrorImpresora) {
         this.estadoImpresora = err.estado;
         this.detalleEstadoImpresora = err.message;
@@ -190,7 +226,10 @@ export class AgenteLocalServicio {
       `Iniciando Agente Local de Impresión Caprichos v${this.config.version}`
     );
     this.logger('info', `Servidor API: ${this.config.apiUrl}`);
-    this.logger('info', `Dispositivo impresora: ${this.config.impresoraRuta}`);
+    this.logger(
+      'info',
+      `Etiquetera: ${this.config.etiquetera ?? this.config.impresoraRuta} | Ticketera: ${this.config.ticketera ?? 'sin configurar'}`
+    );
 
     while (this.corriendo) {
       await this.ejecutarCiclo();

@@ -1,9 +1,12 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { obtenerConfiguracion } from './config';
+import * as readline from 'readline';
+import { obtenerConfiguracion, rutaArchivoConfiguracion } from './config';
+import type { ArchivoConfiguracion } from './config';
+import { ImpresoraWindows, listarImpresorasWindows } from './impresora/impresoraWindows';
 import { ImpresoraUsb } from './impresora/impresoraUsb';
 import type { IDispositivoImpresora } from './impresora/dispositivo.interface';
-import { ClienteApiImpresion } from './api/clienteApi';
+import { ClienteApiImpresion, canjearCodigoVinculo } from './api/clienteApi';
 import { AgenteLocalServicio } from './agente/bucle';
 import {
   generarTsplTrabajo,
@@ -100,6 +103,64 @@ export async function ejecutarComandoVolcar(
   return archivosGenerados;
 }
 
+/** Windows: nombre de la impresora instalada. Linux: ruta del dispositivo (empieza con /). */
+export function crearDispositivo(destino: string): IDispositivoImpresora {
+  return destino.startsWith('/') ? new ImpresoraUsb(destino) : new ImpresoraWindows(destino);
+}
+
+export function leerArchivoConfiguracion(ruta = rutaArchivoConfiguracion()): ArchivoConfiguracion {
+  try {
+    return JSON.parse(fs.readFileSync(ruta, 'utf-8'));
+  } catch {
+    return {};
+  }
+}
+
+function preguntar(rl: readline.Interface, texto: string): Promise<string> {
+  return new Promise((resolve) => rl.question(texto, (r) => resolve(r.trim())));
+}
+
+/** Asistente: pega el código de vinculación y elige cuál es la etiquetera y cuál la ticketera. */
+export async function ejecutarAsistente(
+  preguntarFn?: (texto: string) => Promise<string>,
+  logger: (m: string) => void = console.log
+): Promise<ArchivoConfiguracion> {
+  const rl = preguntarFn ? null : readline.createInterface({ input: process.stdin, output: process.stdout });
+  const ask = preguntarFn ?? ((t: string) => preguntar(rl!, t));
+  const ruta = rutaArchivoConfiguracion();
+  const actual = leerArchivoConfiguracion(ruta);
+  try {
+    logger('=== Programa de impresión de Caprichos ===');
+    let { apiUrl, agenteKey } = actual;
+    if (!agenteKey) {
+      const codigo = await ask('Pega el código de vinculación que te muestra Caprichos: ');
+      const r = await canjearCodigoVinculo(apiUrl || obtenerConfiguracion().apiUrl, codigo);
+      apiUrl = r.apiUrl;
+      agenteKey = r.llave;
+      logger('Vinculado correctamente.');
+    }
+    const nombres = process.platform === 'win32' ? await listarImpresorasWindows().catch(() => []) : [];
+    if (nombres.length) {
+      logger('Impresoras encontradas en este equipo:');
+      nombres.forEach((n, i) => logger(`  ${i + 1}. ${n}`));
+    }
+    const elegir = async (rol: string, previa?: string) => {
+      const r = await ask(`Número o nombre de la ${rol}${previa ? ` [${previa}]` : ''} (Enter = ninguna): `);
+      if (!r) return previa;
+      return nombres[Number(r) - 1] ?? r;
+    };
+    const etiquetera = await elegir('ETIQUETERA (stickers)', actual.etiquetera);
+    const ticketera = await elegir('TICKETERA (ticket de pago)', actual.ticketera);
+    const cfg: ArchivoConfiguracion = { apiUrl, agenteKey, etiquetera, ticketera, ticketColumnas: actual.ticketColumnas };
+    fs.mkdirSync(path.dirname(ruta), { recursive: true });
+    fs.writeFileSync(ruta, JSON.stringify(cfg, null, 2), { mode: 0o600 });
+    logger(`Configuración guardada en ${ruta}`);
+    return cfg;
+  } finally {
+    rl?.close();
+  }
+}
+
 export async function main(): Promise<void> {
   const comando = process.argv[2]?.trim().toLowerCase();
 
@@ -113,15 +174,29 @@ export async function main(): Promise<void> {
     process.exit(0);
   }
 
-  // Modo servicio (bucle continuo)
-  const config = obtenerConfiguracion();
+  if (comando === 'configurar' || comando === 'vincular') {
+    await ejecutarAsistente();
+    process.exit(0);
+  }
+
+  // Sin configuración (primer uso, doble clic en el .exe): abre el asistente
+  let archivo = leerArchivoConfiguracion();
+  if (!archivo.agenteKey && !process.env.AGENTE_KEY && process.stdin.isTTY) {
+    archivo = await ejecutarAsistente();
+  }
+
+  // Modo servicio (bucle continuo): una impresora por rol; IMPRESORA_RUTA sigue valiendo como etiquetera
+  const config = obtenerConfiguracion(process.env, archivo);
   const clienteApi = new ClienteApiImpresion(config.apiUrl, config.agenteKey);
-  const impresora = new ImpresoraUsb(config.impresoraRuta);
+  const impresoras: Partial<Record<'ETIQUETERA' | 'TICKETERA', IDispositivoImpresora>> = {};
+  const etiquetera = config.etiquetera ?? (config.ticketera ? undefined : config.impresoraRuta);
+  if (etiquetera) impresoras.ETIQUETERA = crearDispositivo(etiquetera);
+  if (config.ticketera) impresoras.TICKETERA = crearDispositivo(config.ticketera);
 
   const agente = new AgenteLocalServicio({
     config,
     clienteApi,
-    impresora,
+    impresoras,
   });
 
   const finalizar = () => {

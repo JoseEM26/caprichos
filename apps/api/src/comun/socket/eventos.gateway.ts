@@ -9,6 +9,16 @@ import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 
+/**
+ * Eventos de tiempo real de la sala «admin» (se emiten SIEMPRE después de guardar):
+ *  pedido:nuevo {id,codigo,estado}        pedido creado (bot, carta, mozo, caja)  -> Caja, Cocina, Repartos
+ *  pedido:estado {id,estado,...}          cambio de estado, ubicación, reparto    -> Caja, Cocina, Repartos
+ *  pedido:pago {id,pago_estado,cambio}    cobrado | coordinado | anulado          -> Caja, Cocina, Repartos
+ *  vouchers:actualizado {pedidoIds,codigo,motivo,origen}
+ *      motivo: subido | reemplazado | quitado | reasignado | revisado | plan | enviado_caja -> Caja (lista y modal)
+ *  cocina:comanda / cocina:comanda-actualizada / pedido:progreso / carta:disponibilidad      -> Cocina
+ *  reparto:rutas / reparto:incidente                                                         -> Repartos, Caja
+ */
 @WebSocketGateway({
   cors: {
     origin: '*',

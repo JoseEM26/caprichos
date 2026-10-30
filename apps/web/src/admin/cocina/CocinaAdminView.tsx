@@ -31,7 +31,7 @@ import { HistorialView } from './HistorialView';
 import { Confirmar } from '../../comun/Confirmar';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
-import { useEventos } from '../../comun/socket';
+import { useEventos, useTiempoReal } from '../../comun/socket';
 import { useSesion } from '../../comun/sesion';
 
 export type ModoCocina = 'area' | 'hist';
@@ -250,6 +250,13 @@ export function CocinaAdminView() {
   useEventos('pedido:estado', () => {
     cargarAreas();
     if (modo === 'area') cargarComandas(areaSeleccionada);
+  });
+
+  // Respaldo y cambios que no traían recarga: agotados, avance del salón, reconexión, volver a la pestaña
+  useTiempoReal(['carta:disponibilidad', 'cocina:comanda-actualizada', 'pedido:progreso', 'pedido:pago'], () => {
+    cargarAreas();
+    if (modo === 'area') cargarComandas(areaSeleccionada);
+    if (modo === 'hist') cargarHistorial(areaSeleccionada);
   });
 
   useEventos('cocina:alta-demanda', (datos: AltaDemandaEstado) => {

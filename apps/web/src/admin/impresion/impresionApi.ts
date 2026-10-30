@@ -100,6 +100,11 @@ export interface RespuestaCrearLlave {
 }
 
 export const impresionApi = {
+  /** Código de un solo uso (15 min) para vincular el programa del local; solo ADMIN. */
+  generarCodigoVinculo: async (): Promise<{ codigo: string; expiraEn: string }> => {
+    return api.post('/admin/impresion/codigo-vinculo', {});
+  },
+
   obtenerEstado: async (): Promise<EstadoAdminImpresion> => {
     return api.get<EstadoAdminImpresion>('/admin/impresion/estado');
   },

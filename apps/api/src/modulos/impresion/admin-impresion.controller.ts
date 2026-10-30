@@ -103,6 +103,21 @@ export class AdminImpresionController {
     return this.impresionService.reimprimirEtiqueta(id, dto);
   }
 
+  /** Código de un solo uso para vincular el programa del local (solo ADMIN). */
+  @Post('codigo-vinculo')
+  @Permiso('usuarios', 'crear')
+  async codigoVinculo(@Req() req: any) {
+    if (req.usuario?.rol !== 'ADMIN') {
+      throw new ForbiddenException({
+        codigo: 'SOLO_ADMIN',
+        mensaje: 'Solo los administradores pueden vincular el programa de impresión',
+      });
+    }
+    const host = String(req.headers?.['x-forwarded-host'] || req.headers?.host || '').split(',')[0].trim();
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.impresionService.generarCodigoVinculoAgente(host, req.usuario, ip);
+  }
+
   @Get('llaves')
   @Permiso('usuarios', 'ver')
   async listarLlaves(@Req() req: any) {

@@ -397,6 +397,8 @@ describe('CobrosService', () => {
       expect(eventosGatewayMock.emitirAdmin).toHaveBeenCalledWith('pedido:pago', {
         id: '100',
         codigo: 'CP-0100',
+        pago_estado: 'PAGADO',
+        cambio: 'cobrado',
       });
       expect(auditoriaMock.registrar).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -962,6 +964,7 @@ describe('CobrosService', () => {
       expect(res.id).toBe('10');
       expect(res.pago_estado).toBe('PENDIENTE');
       expect(res.motivo_anulacion).toBe('Cliente solicitó cambio de medio de pago');
+      expect(eventosGatewayMock.emitirAdmin).toHaveBeenCalledWith('pedido:pago', { id: '100', pago_estado: 'PENDIENTE', cambio: 'anulado' });
       expect(redisClientMock.del).toHaveBeenCalled();
       expect(auditoriaMock.registrar).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1058,6 +1061,7 @@ describe('CobrosService', () => {
 
       expect(res.id).toBe('20');
       expect(res.pago_estado).toBe('COORDINADO');
+      expect(eventosGatewayMock.emitirAdmin).toHaveBeenCalledWith('pedido:pago', expect.objectContaining({ id: '20', cambio: 'coordinado' }));
       expect(auditoriaMock.registrar).toHaveBeenCalledWith(
         expect.objectContaining({
           modulo: 'caja',

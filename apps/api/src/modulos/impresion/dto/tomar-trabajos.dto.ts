@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsArray, IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
 
 export class TomarTrabajosDto {
   @IsOptional()
@@ -8,4 +8,10 @@ export class TomarTrabajosDto {
   @Min(1)
   @Max(10)
   max?: number = 10;
+
+  /** Roles que el agente puede imprimir ahora (su impresora está lista). Sin roles: todos. */
+  @IsOptional()
+  @IsArray()
+  @IsIn(['ETIQUETERA', 'TICKETERA'], { each: true })
+  roles?: ('ETIQUETERA' | 'TICKETERA')[];
 }

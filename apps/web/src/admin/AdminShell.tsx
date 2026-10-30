@@ -6,6 +6,7 @@ import { Icono } from '../comun/Icono';
 import { useEsMovil } from '../carta/useEsMovil';
 import { GRUPOS_MODULOS, MODULOS } from './modulos';
 import { TITULOS_VISTA } from './titulos';
+import { useSocketConectado } from '../comun/socket';
 import { useNotificaciones } from './useNotificaciones';
 import type { NotificacionAdmin } from './useNotificaciones';
 
@@ -75,6 +76,7 @@ export function AdminShell() {
   const [confirmarSalida, setConfirmarSalida] = useState(false);
   const [saliendo, setSaliendo] = useState(false);
   const [ahora, setAhora] = useState(() => new Date());
+  const socketConectado = useSocketConectado();
   const [enLinea, setEnLinea] = useState<boolean>(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
   const [controlesVisiblesRepartidor, setControlesVisiblesRepartidor] = useState(true);
   const [masRepartidorAbierto, setMasRepartidorAbierto] = useState(false);
@@ -394,11 +396,11 @@ export function AdminShell() {
       style={{ flex: 'none', position: 'relative', zIndex: 35, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, padding: movil ? '6px 12px' : '8px 24px', background: 'var(--cp-cream)', borderBottom: '1px solid var(--cp-line)' }}
     >
       <span
-        title={enLinea ? 'Conectado al servidor' : 'Sin conexión con el servidor'}
-        style={{ display: 'flex', alignItems: 'center', gap: 6, border: `1px solid ${enLinea ? '#9BD3AB' : '#E9A79B'}`, background: enLinea ? '#E6F5EA' : '#FDECE8', borderRadius: 9999, padding: '4px 12px', fontSize: 12, fontWeight: 700, color: 'var(--cp-navy)' }}
+        title={!enLinea ? 'Sin conexión con el servidor' : socketConectado ? 'Conectado al servidor' : 'Reconectando con el servidor'}
+        style={{ display: 'flex', alignItems: 'center', gap: 6, border: `1px solid ${enLinea && socketConectado ? '#9BD3AB' : '#E9A79B'}`, background: enLinea && socketConectado ? '#E6F5EA' : '#FDECE8', borderRadius: 9999, padding: '4px 12px', fontSize: 12, fontWeight: 700, color: 'var(--cp-navy)' }}
       >
-        <span style={{ width: 8, height: 8, borderRadius: 4, background: enLinea ? 'var(--cp-ok)' : '#C73E2A' }} />
-        {enLinea ? 'En línea' : 'Sin internet'}
+        <span style={{ width: 8, height: 8, borderRadius: 4, background: enLinea && socketConectado ? 'var(--cp-ok)' : '#C73E2A' }} />
+        {!enLinea ? 'Sin internet' : socketConectado ? 'En línea' : 'Reconectando…'}
       </span>
       <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-soft)', fontVariantNumeric: 'tabular-nums' }}>{horaLima(ahora)}</span>
       <button

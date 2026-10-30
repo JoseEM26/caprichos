@@ -24,7 +24,7 @@ export class AgenteImpresionController {
   @HttpCode(HttpStatus.OK)
   async tomar(@Body() dto: TomarTrabajosDto, @Req() req: any) {
     const deviceKeyId = req.deviceKey?.id ? BigInt(req.deviceKey.id) : undefined;
-    return this.impresionService.tomarTrabajos(dto.max, deviceKeyId);
+    return this.impresionService.tomarTrabajos(dto.max, deviceKeyId, ...(dto.roles ? [dto.roles] : []));
   }
 
   @Post('resultado')

@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useConfirmarImpresion } from '../impresion/useConfirmarImpresion';
 import { Boton } from '../../comun/Boton';
 import { Confirmar } from '../../comun/Confirmar';
 import { pedidosApi, Pedido, PagoItem, CobrarDto } from './pedidosApi';
@@ -43,6 +44,7 @@ export function ModalCobrar({
   alCobrarExitoso,
   cobrar = pedidosApi.cobrar,
 }: ModalCobrarProps) {
+  const { pedir: pedirImpresion, dialogo: dialogoImpresion } = useConfirmarImpresion();
   const totalPedido = Number(pedido.total) || 0;
 
   // Con plan de pago (pago dividido) se precargan sus filas por medio; sin plan, una fila como antes
@@ -791,10 +793,11 @@ export function ModalCobrar({
             .map((p) => `${p.medio} S/ ${parseFloat(p.monto).toFixed(2)}`)
             .join(' + ')}.`}
           textoSi="Cobrar"
-          alConfirmar={ejecutarCobro}
+          alConfirmar={() => pedirImpresion(ejecutarCobro)}
           alCancelar={() => setMostrarConfirmar(false)}
         />
       )}
+      {dialogoImpresion}
     </>
   );
 }

@@ -5,16 +5,40 @@ import type {
   RespuestaTomarTrabajos,
   PeticionResultadoTrabajo,
   PeticionLatido,
+  RolImpresora,
+  ImpresoraReportada,
 } from '@caprichos/compartido';
 
 export interface IClienteApiImpresion {
-  tomarTrabajos(max?: number): Promise<TrabajoImpresion[]>;
+  tomarTrabajos(max?: number, roles?: RolImpresora[]): Promise<TrabajoImpresion[]>;
   reportarResultado(id: string, ok: boolean, error?: string): Promise<void>;
   enviarLatido(
     version: string,
     impresora: EstadoImpresora,
-    detalle?: string
+    detalle?: string,
+    impresoras?: ImpresoraReportada[]
   ): Promise<void>;
+}
+
+/** Canjea el código de vinculación (CODIGO o CODIGO@host) por la llave del agente. Sin llave previa. */
+export async function canjearCodigoVinculo(
+  apiUrlPorDefecto: string,
+  codigoCrudo: string,
+  fetchFn: typeof fetch = fetch
+): Promise<{ apiUrl: string; llave: string }> {
+  const [codigo, host] = codigoCrudo.trim().split('@');
+  const apiUrl = host ? `https://${host.replace(/^https?:\/\//, '').replace(/\/+$/, '')}` : apiUrlPorDefecto;
+  const res = await fetchFn(`${apiUrl}/api/agente-impresion/vincular`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ codigo }),
+  });
+  if (!res.ok) {
+    const cuerpo: any = await res.json().catch(() => ({}));
+    throw new Error(cuerpo?.mensaje || `No se pudo vincular (HTTP ${res.status})`);
+  }
+  const datos = (await res.json()) as { llave: string };
+  return { apiUrl, llave: datos.llave };
 }
 
 export class ErrorRedApi extends Error {
@@ -86,8 +110,8 @@ export class ClienteApiImpresion implements IClienteApiImpresion {
     }
   }
 
-  async tomarTrabajos(max: number = 10): Promise<TrabajoImpresion[]> {
-    const peticion: PeticionTomarTrabajos = { max };
+  async tomarTrabajos(max: number = 10, roles?: RolImpresora[]): Promise<TrabajoImpresion[]> {
+    const peticion: PeticionTomarTrabajos = roles ? { max, roles } : { max };
     const res = await this.ejecutarPeticion(
       '/api/agente-impresion/tomar',
       'POST',
@@ -128,9 +152,10 @@ export class ClienteApiImpresion implements IClienteApiImpresion {
   async enviarLatido(
     version: string,
     impresora: EstadoImpresora,
-    detalle?: string
+    detalle?: string,
+    impresoras?: ImpresoraReportada[]
   ): Promise<void> {
-    const peticion: PeticionLatido = { version, impresora, detalle };
+    const peticion: PeticionLatido = { version, impresora, detalle, ...(impresoras ? { impresoras } : {}) };
     const res = await this.ejecutarPeticion(
       '/api/agente-impresion/latido',
       'POST',

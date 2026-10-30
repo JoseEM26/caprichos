@@ -14,7 +14,9 @@ import {
   EstadoAdminImpresion,
   EstadoImpresora,
   RespuestaTomarTrabajos,
-  TipoEtiqueta,
+  RolImpresora,
+  TipoTrabajoImpresion,
+  TicketPagoDatos,
 } from '@caprichos/compartido';
 import {
   CrearLlaveDto,
@@ -33,14 +35,23 @@ import {
   construirEtiquetasArea,
   construirEtiquetasBebida,
   construirTodasLasEtiquetas,
+  construirTicketPago,
 } from './constructor-etiquetas';
 import {
   consultarEstadoAgente,
+  empaquetarDetalleLatido,
+  estadoPorRol,
   leerParametroNumerico,
 } from './estado-impresion';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 
 /** Estados de print_job que cuentan como "en cola" para el admin y para no reencolar dos veces. */
+const TIPOS_ETIQUETA = ['ETIQUETA_GENERAL', 'ETIQUETA_AREA', 'ETIQUETA_BEBIDA'];
+const tiposDeRoles = (roles: RolImpresora[]): string[] => [
+  ...(roles.includes('ETIQUETERA') ? TIPOS_ETIQUETA : []),
+  ...(roles.includes('TICKETERA') ? ['TICKET_PAGO'] : []),
+];
+
 const ESTADOS_EN_COLA = ['PENDIENTE', 'IMPRIMIENDO'];
 
 /** Estado técnico de print_job -> estado que ve el cajero en cada etiqueta. */
@@ -97,7 +108,10 @@ export class ImpresionService {
   async tomarTrabajos(
     max = 10,
     deviceKeyId?: bigint,
+    roles?: RolImpresora[],
   ): Promise<RespuestaTomarTrabajos> {
+    // Con roles, solo los trabajos de las máquinas que el agente puede imprimir ahora; el resto espera en cola
+    const tipos = roles ? tiposDeRoles(roles) : null;
     const limite = Math.min(Math.max(1, max || 10), 10);
 
     await this.vencerTrabajosObsoletos().catch((err: any) =>
@@ -125,7 +139,15 @@ export class ImpresionService {
       let ids: bigint[] = [];
 
       try {
-        const filas: Array<{ id: bigint }> = await tx.$queryRaw`
+        const filas: Array<{ id: bigint }> = tipos
+          ? await tx.$queryRaw`
+          SELECT id FROM "print_job"
+          WHERE estado = 'PENDIENTE' AND tipo = ANY(${tipos}::text[])
+          ORDER BY id ASC
+          LIMIT ${limite}
+          FOR UPDATE SKIP LOCKED
+        `
+          : await tx.$queryRaw`
           SELECT id FROM "print_job"
           WHERE estado = 'PENDIENTE'
           ORDER BY id ASC
@@ -137,7 +159,7 @@ export class ImpresionService {
         // Fallback para entornos donde raw SQL no soporte FOR UPDATE SKIP LOCKED (ej: SQLite mock)
         this.logger.warn(`Fallo $queryRaw SKIP LOCKED, usando findMany: ${err.message}`);
         const filas = await tx.printJob.findMany({
-          where: { estado: 'PENDIENTE' },
+          where: { estado: 'PENDIENTE', ...(tipos ? { tipo: { in: tipos } } : {}) },
           orderBy: { id: 'asc' },
           take: limite,
           select: { id: true },
@@ -167,7 +189,7 @@ export class ImpresionService {
       return {
         trabajos: actualizados.map((t) => ({
           id: t.id.toString(),
-          tipo: t.tipo as TipoEtiqueta,
+          tipo: t.tipo as TipoTrabajoImpresion,
           payload: t.payload as any,
           copia: t.copia,
           intentos: t.intentos,
@@ -240,16 +262,33 @@ export class ImpresionService {
    * Guarda el latido periódico del agente en su DeviceKey.
    */
   async registrarLatido(dto: LatidoDto, deviceKeyId: bigint): Promise<void> {
+    let antes: any = null;
+    try {
+      antes = await this.prisma.deviceKey.findUnique({ where: { id: deviceKeyId } });
+    } catch {
+      // sin estado previo: se emite el evento igual
+    }
+    const estadoAntes = JSON.stringify(estadoPorRol(antes));
     await this.prisma.deviceKey.update({
       where: { id: deviceKeyId },
       data: {
         ultimo_latido: new Date(),
         latido_version: dto.version,
         latido_impresora: dto.impresora,
-        latido_detalle: dto.detalle?.trim() || null,
+        latido_detalle: empaquetarDetalleLatido(dto.detalle, dto.impresoras),
         ultima_conexion: new Date(),
       },
     });
+    // Si cambió el estado de alguna máquina, las pantallas lo ven en vivo
+    const ahora = {
+      ultimo_latido: new Date(),
+      latido_impresora: dto.impresora,
+      latido_detalle: empaquetarDetalleLatido(dto.detalle, dto.impresoras),
+    };
+    const impresoras = estadoPorRol(ahora);
+    if (JSON.stringify(impresoras) !== estadoAntes) {
+      this.eventos?.emitirAdmin('impresion:estado', { impresoras });
+    }
   }
 
   /**
@@ -280,6 +319,7 @@ export class ImpresionService {
       agente: conectado ? 'conectado' : 'sin_conexion',
       ultimoLatido: agente?.ultimo_latido ? agente.ultimo_latido.toISOString() : null,
       impresora: (agente?.latido_impresora as EstadoImpresora) || 'desconectada',
+      impresoras: estadoPorRol(agente),
       pendientes,
       fallidos,
     };
@@ -603,7 +643,7 @@ export class ImpresionService {
 
       const { general, areas, bebidas } = construirTodasLasEtiquetas(pedido);
       // Solo el primer encolado del pedido avisa a Caja (los reintentos de la misma aceptación no repiten el aviso)
-      const yaTenia = (await this.prisma.printJob.count({ where: { pedido_id: pedido.id } })) > 0;
+      const yaTenia = (await this.prisma.printJob.count({ where: { pedido_id: pedido.id, tipo: { in: TIPOS_ETIQUETA } } })) > 0;
 
       // 1. Encolar General
       const claveGeneral = `${pedido.id}-ETIQUETA_GENERAL`;
@@ -668,6 +708,116 @@ export class ImpresionService {
       // El encolado NUNCA bloquea ni hace fallar la aceptación del pedido
       this.logger.error(`Error en encolado de etiquetas para pedido ${pedidoIdInput}: ${err.message}`, err.stack);
     }
+  }
+
+  /**
+   * Encola el ticket/voucher de pago del pedido para la ticketera. Idempotente por pedido+tipo
+   * (clave `<pedido>-TICKET_PAGO`): reintentar el cobro no duplica el ticket. Nunca bloquea el cobro.
+   * Reimprimirlo es crear otro trabajo desde el admin, no reintentar el cobro.
+   */
+  async encolarTicketPedido(pedidoIdInput: bigint | string | number): Promise<void> {
+    try {
+      const pedidoId = BigInt(pedidoIdInput);
+      const pedido: any = await this.prisma.pedido.findUnique({
+        where: { id: pedidoId },
+        include: {
+          lineas: true,
+          planPago: { orderBy: { orden: 'asc' } },
+          cobros: { include: { pagos: true } },
+        },
+      });
+      if (!pedido) {
+        this.logger.warn(`No se encontró el pedido ${pedidoId} para encolar el ticket`);
+        return;
+      }
+      const [local, comprobante] = await Promise.all([
+        this.prisma.parametro.findUnique({ where: { clave: 'local_datos' } }).catch(() => null),
+        this.prisma.comprobante.findUnique({ where: { pedido_id: pedido.id } }).catch(() => null),
+      ]);
+      const payload = construirTicketPago(pedido, (local?.valor as any) || {}, comprobante);
+      const clave = `${pedido.id}-TICKET_PAGO`;
+      await this.prisma.printJob.upsert({
+        where: { clave_idempotencia: clave },
+        create: {
+          pedido_id: pedido.id,
+          tipo: 'TICKET_PAGO',
+          clave_idempotencia: clave,
+          payload: payload as any,
+          copia: false,
+          estado: 'PENDIENTE',
+        },
+        update: {},
+      });
+      const estado = await consultarEstadoAgente(this.prisma).catch(() => null);
+      if (estado) {
+        this.eventos?.emitirAdmin('impresion:cola', { pedidoId: pedido.id.toString(), tipo: 'TICKET_PAGO' });
+      }
+    } catch (err: any) {
+      this.logger.error(`Error al encolar el ticket del pedido ${pedidoIdInput}: ${err.message}`, err.stack);
+    }
+  }
+
+  /**
+   * Código de vinculación de un solo uso (15 min) para instalar el programa del local sin pasar
+   * secretos por pantalla. Crea un agente inactivo que espera el código; `host` se añade tras la @.
+   */
+  async generarCodigoVinculoAgente(host: string, usuario?: UsuarioAutenticado, ip?: string) {
+    const alfabeto = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+    const bytes = crypto.randomBytes(8);
+    const codigo = Array.from(bytes, (b) => alfabeto[b % alfabeto.length]).join('');
+    const expira = new Date(Date.now() + 15 * 60 * 1000);
+    // un solo código vigente: los pendientes anteriores se borran
+    await this.prisma.deviceKey.deleteMany({
+      where: { tipo: 'AGENTE', activo: false, codigo_vinculo: { not: null } },
+    });
+    const nuevo = await this.prisma.deviceKey.create({
+      data: {
+        tipo: 'AGENTE',
+        nombre: 'Programa del local',
+        llave_hash: crypto.randomBytes(32).toString('hex'),
+        activo: false,
+        codigo_vinculo: codigo,
+        codigo_expira_en: expira,
+      },
+    });
+    if (this.auditoria && usuario) {
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'impresion',
+        accion: 'GENERAR_CODIGO_VINCULO_AGENTE',
+        entidad: 'device_key',
+        entidadId: nuevo.id,
+        partyId: usuario.partyId,
+        ip,
+      });
+    }
+    return { codigo: host ? `${codigo}@${host}` : codigo, expiraEn: expira.toISOString() };
+  }
+
+  /** El programa del local canjea el código por su llave (se muestra una sola vez). */
+  async vincularAgente(codigoCrudo: string): Promise<{ llave: string }> {
+    const codigo = (codigoCrudo || '').split('@')[0].trim().toUpperCase();
+    const pendiente = codigo
+      ? await this.prisma.deviceKey.findFirst({ where: { tipo: 'AGENTE', codigo_vinculo: codigo, activo: false } })
+      : null;
+    if (!pendiente || !pendiente.codigo_expira_en || pendiente.codigo_expira_en < new Date()) {
+      throw new BadRequestException({
+        codigo: 'CODIGO_INVALIDO',
+        mensaje: 'El código no existe o ya venció. Genera uno nuevo en Caprichos.',
+      });
+    }
+    const llave = `agk_${crypto.randomBytes(24).toString('hex')}`;
+    await this.prisma.deviceKey.update({
+      where: { id: pendiente.id },
+      data: {
+        llave_hash: crypto.createHash('sha256').update(llave).digest('hex'),
+        activo: true,
+        codigo_vinculo: null,
+        codigo_expira_en: null,
+        ultima_conexion: new Date(),
+      },
+    });
+    return { llave };
   }
 
   /**

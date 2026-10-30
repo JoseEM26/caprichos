@@ -4,6 +4,7 @@ import {
   EtiquetaAreaDatos,
   EtiquetaAreaLinea,
   EtiquetaBebidaDatos,
+  TicketPagoDatos,
 } from '@caprichos/compartido';
 
 export const CRITERIO_BEBIDA_AREAS = ['BARRA', 'BEBIDAS', 'CAFETERIA', 'BAR'];
@@ -251,4 +252,42 @@ export function claveDeTrabajo(job: { tipo: string; payload: any }): string | nu
   if (job.tipo === 'ETIQUETA_AREA') return claveEtiquetaArea(String(p.areaNombre ?? ''));
   if (job.tipo === 'ETIQUETA_BEBIDA') return claveEtiquetaBebida(Number(p.bebidaIndex));
   return null;
+}
+
+const num = (v: unknown): number => Math.round(Number(v ?? 0) * 100) / 100;
+
+/** Ticket/voucher de pago para la ticketera térmica; el agente lo maquetea a 58 u 80 mm. */
+export function construirTicketPago(pedido: any, local: any, comprobante?: any): TicketPagoDatos {
+  const texto = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+  const cobro = (pedido.cobros || []).find((c: any) => !c.anulado_en);
+  const ahora = cobro?.en ?? new Date();
+  return {
+    tipo: 'TICKET_PAGO',
+    local: {
+      nombre: texto(local?.nombre) || 'Caprichos',
+      razonSocial: texto(local?.razon_social) || texto(local?.razonSocial),
+      ruc: texto(local?.ruc),
+      direccion: texto(local?.direccion),
+    },
+    codigo: pedido.codigo,
+    fecha: formatearFecha(ahora),
+    hora: formatearHora(ahora),
+    who: pedido.cliente_nombre || '',
+    modalidad: pedido.modalidad || '',
+    lineas: (pedido.lineas || []).map((l: any) => ({
+      cantidad: l.cantidad,
+      nombre: l.nombre,
+      tamano: l.tamano ?? null,
+      subtotal: num(l.subtotal ?? Number(l.precio_unit) * l.cantidad),
+    })),
+    total: num(pedido.total),
+    pagos: (cobro?.pagos || []).map((p: any) => ({
+      medio: p.medio,
+      monto: num(p.monto),
+      recibido: p.recibido == null ? null : num(p.recibido),
+      vuelto: p.vuelto == null ? null : num(p.vuelto),
+    })),
+    plan: (pedido.planPago || []).map((p: any) => ({ medio: p.medio, monto: num(p.monto) })),
+    comprobante: comprobante ? { tipo: comprobante.tipo, numero: comprobante.numero_texto } : null,
+  };
 }

@@ -163,3 +163,35 @@ Inicia el bucle de impresión en primer plano para ver la salida en la consola:
 ```bash
 pnpm --filter @caprichos/agente-local start
 ```
+
+---
+
+## 7. Dos máquinas: etiquetera y ticketera
+
+El programa maneja **dos impresoras por rol**:
+
+- **ETIQUETERA** (stickers, TSPL2): etiquetas del pedido.
+- **TICKETERA** (térmica, ESC/POS 58 u 80 mm): ticket/voucher de pago, que la API encola al cobrar o registrar el pago como pagado (idempotente por pedido).
+
+Cada latido (20 s) informa el estado de cada máquina (lista, no encontrada, sin papel, error). La API lo expone en `GET /admin/impresion/estado` (campo `impresoras`) y avisa por `impresion:estado`. Una máquina que no está lista **no toma trabajos**: los suyos esperan en la cola y salen al volver.
+
+### Windows (recomendado)
+
+1. En Caprichos, el aviso «Instalar programa de impresión» ofrece **Descargar el programa de impresión para Windows** (`/api/agente-impresion/descargar/windows`).
+2. Abre el `.exe`. Pega el **código de vinculación** (un solo uso, 15 min) que genera el administrador en el mismo aviso. Tiene la forma `CODIGO@servidor`, así el mismo programa sirve para la demo y para producción según el código que pegues. No hay llaves ni secretos que copiar.
+3. El asistente lista las impresoras de Windows: elige cuál es la etiquetera y cuál la ticketera (Enter = ninguna). Se guarda en `%APPDATA%\CaprichosAgente\config.json`.
+4. Inicio automático (opcional): `Win + R` -> `shell:startup` y pon ahí un acceso directo al `.exe`.
+
+Para cambiar las impresoras o re-vincular: `agente-impresion-windows.exe configurar` (borra `agenteKey` del config para re-vincular).
+
+### Linux / variables de entorno
+
+`ETIQUETERA` y `TICKETERA` aceptan el nombre de la impresora (Windows) o la ruta del dispositivo (Linux, ej. `/dev/usb/lp1`). `IMPRESORA_RUTA` sigue valiendo como etiquetera. `TICKET_COLUMNAS=32` para papel de 58 mm (por defecto 48 = 80 mm). `AGENTE_CONFIG` cambia la ruta del archivo de configuración.
+
+### Empaquetar el .exe
+
+`pnpm --filter @caprichos/agente-local empaquetar:win` (usa `@yao-pkg/pkg`, nodo 22 para Windows x64; sale en `apps/agente-local/dist-exe/`). El workflow `.github/workflows/agente-windows.yml` lo construye solo cuando cambia el agente y lo sube a `~/caprichos-descargas/` del servidor, que la API monta en `/data/descargas` (`AGENTE_EXE_RUTA` lo cambia).
+
+### Por qué no imprimía en la demo
+
+El navegador no ve impresoras USB: solo este programa. Si no está instalado y vinculado en la PC del local, no hay latido, la API lo da por apagado y las etiquetas quedan en cola.

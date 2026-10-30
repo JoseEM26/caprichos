@@ -28,7 +28,19 @@ export function SeccionVouchersPedido({ pedidoId, recargarClave, total, medio, a
   const [vouchers, setVouchers] = useState<VoucherPagoItem[]>([]);
   // Sube cada vez que un voucher se mueve (aquí o desde Mensajes): vuelve a leer las fotos del pedido
   const [recarga, setRecarga] = useState(0);
-  useEventos('vouchers:actualizado', () => setRecarga((n) => n + 1));
+  const [aviso, setAviso] = useState('');
+  useEventos('vouchers:actualizado', (d?: { pedidoIds?: Array<string | number>; motivo?: string; origen?: string }) => {
+    setRecarga((n) => n + 1);
+    const esMio = !!d?.pedidoIds?.some((i) => String(i) === String(pedidoId));
+    if (esMio && (d?.motivo === 'subido' || d?.motivo === 'reemplazado')) {
+      setAviso(d.origen === 'WHATSAPP' ? 'Llegó el voucher por WhatsApp' : 'Se actualizó el voucher de este pedido');
+    }
+  });
+  useEffect(() => {
+    if (!aviso) return;
+    const t = setTimeout(() => setAviso(''), 6000);
+    return () => clearTimeout(t);
+  }, [aviso]);
   // Reemplazo tardío (Caja/Admin): motivo obligatorio y confirmación; el anterior queda en el historial
   const [reemplazando, setReemplazando] = useState(false);
   const [motivo, setMotivo] = useState('');
@@ -73,6 +85,11 @@ export function SeccionVouchersPedido({ pedidoId, recargarClave, total, medio, a
       }}
     >
       <BannerVouchersIaPausa />
+      {aviso && (
+        <div role="status" data-testid="aviso-voucher" style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-navy, #0B2C3E)', background: '#E6F5EA', border: '1px solid #9BD3AB', borderRadius: 8, padding: '4px 10px' }}>
+          {aviso}
+        </div>
+      )}
       <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--cp-navy, #0B2C3E)' }}>
         Comprobantes del pedido ({vouchers.length})
       </div>

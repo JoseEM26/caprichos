@@ -1,4 +1,24 @@
+import { join } from 'path';
+
+export interface DestinoImpresora {
+  /** Nombre de la impresora en Windows o ruta del dispositivo en Linux (empieza con /). */
+  destino: string;
+}
+
+/** Archivo de configuración que deja el asistente de vinculación (sin secretos en el repo). */
+export interface ArchivoConfiguracion {
+  apiUrl?: string;
+  agenteKey?: string;
+  etiquetera?: string;
+  ticketera?: string;
+  ticketColumnas?: number;
+}
+
 export interface ConfiguracionAgente {
+  etiquetera?: string;
+  ticketera?: string;
+  /** 32 columnas = papel de 58 mm; 48 = 80 mm. */
+  ticketColumnas: number;
   apiUrl: string;
   agenteKey: string;
   impresoraRuta: string;
@@ -10,9 +30,24 @@ export interface ConfiguracionAgente {
 
 export const VERSION_AGENTE = '0.1.0';
 
+export function rutaArchivoConfiguracion(env: NodeJS.ProcessEnv = process.env): string {
+  if (env.AGENTE_CONFIG) return env.AGENTE_CONFIG;
+  return env.APPDATA
+    ? join(env.APPDATA, 'CaprichosAgente', 'config.json')
+    : join(env.HOME || env.USERPROFILE || '.', '.caprichos-agente.json');
+}
+
 export function obtenerConfiguracion(
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  archivo: ArchivoConfiguracion = {}
 ): ConfiguracionAgente {
+  // El archivo del asistente completa lo que no venga por entorno
+  env = {
+    ...env,
+    API_URL: env.API_URL || env.CAPRICHOS_API_URL || archivo.apiUrl,
+    AGENTE_KEY: env.AGENTE_KEY || env.CAPRICHOS_AGENTE_KEY || archivo.agenteKey,
+  } as NodeJS.ProcessEnv;
+
   const urlBruta =
     env.API_URL ||
     env.CAPRICHOS_API_URL ||
@@ -52,6 +87,9 @@ export function obtenerConfiguracion(
     apiUrl,
     agenteKey,
     impresoraRuta,
+    etiquetera: env.ETIQUETERA || archivo.etiquetera || undefined,
+    ticketera: env.TICKETERA || archivo.ticketera || undefined,
+    ticketColumnas: Number(env.TICKET_COLUMNAS || archivo.ticketColumnas) === 32 ? 32 : 48,
     intervaloConsultaMs: isNaN(intervaloConsultaMs) ? 3000 : intervaloConsultaMs,
     intervaloLatidoMs: isNaN(intervaloLatidoMs) ? 20000 : intervaloLatidoMs,
     maxTrabajosPorLote: isNaN(maxTrabajosPorLote) ? 10 : maxTrabajosPorLote,

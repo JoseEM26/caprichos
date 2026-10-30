@@ -5,6 +5,7 @@ import { AccesoModule } from '../acceso/acceso.module';
 import { ImpresionService } from './impresion.service';
 import { AgenteImpresionController } from './agente-impresion.controller';
 import { AdminImpresionController } from './admin-impresion.controller';
+import { DescargaAgenteController } from './descarga-agente.controller';
 import { AgenteImpresionGuard } from './agente-impresion.guard';
 
 @Module({
@@ -15,6 +16,7 @@ import { AgenteImpresionGuard } from './agente-impresion.guard';
   controllers: [
     AgenteImpresionController,
     AdminImpresionController,
+    DescargaAgenteController,
   ],
   providers: [
     PrismaService,

@@ -6,6 +6,7 @@ import { SeccionVouchersPedido } from './SeccionVouchersPedido';
 import { digitalesDelPlan, medioDigitalVoucher, mismoMedio } from './mediosPago';
 import { CapturasPlanDigital, ExcepcionSinVoucher } from './CapturasPlanDigital';
 import type { VoucherPagoItem } from '../vouchers/tipos';
+import { useConfirmarImpresion } from '../impresion/useConfirmarImpresion';
 import { BotonAbrirChatCliente } from '../mensajes/BotonAbrirChatCliente';
 
 export interface ModalConfirmarPagoProps {
@@ -19,6 +20,7 @@ const MEDIOS_PC = ['Yape', 'Plin', 'Efectivo', 'Tarjeta', 'Transferencia'] as co
 const MOTIVO_MINIMO = 5;
 
 export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: ModalConfirmarPagoProps) {
+  const { pedir: pedirImpresion, dialogo: dialogoImpresion } = useConfirmarImpresion();
   const [contactado, setContactado] = useState(false);
   const [medio, setMedio] = useState<string>(pedido.pago_metodo || pedido.pago_preferido || 'Yape');
   const [montoPagaCon, setMontoPagaCon] = useState(pedido.paga_con ? String(pedido.paga_con) : '');
@@ -502,9 +504,10 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
         textoConfirmar="Sí, confirmar"
         textoNo="No"
         cargando={enviando}
-        alConfirmar={ejecutarConfirmacion}
+        alConfirmar={() => pedirImpresion(ejecutarConfirmacion)}
         alCancelar={() => setConfirmandoSiNo(false)}
       />
+      {dialogoImpresion}
     </>
   );
 }

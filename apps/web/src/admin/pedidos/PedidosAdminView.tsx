@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
-import { useEventos } from '../../comun/socket';
+import { useEventos, useTiempoReal } from '../../comun/socket';
 import { pedidosApi, Pedido, RespuestaNoEntregados } from './pedidosApi';
 import { PedidoDetalle } from './PedidoDetalle';
 import { PanelNoEntregados } from './PanelNoEntregados';
@@ -350,12 +350,26 @@ export function PedidosAdminView() {
     }).catch(() => {});
   });
 
-  useEventos('pedido:pago', (datos: { id: string | number }) => {
+  useEventos('pedido:pago', (datos: { id: string | number; pago_estado?: string }) => {
     const idStr = String(datos.id);
     setPedidos((prev) =>
-      prev.map((p) => (String(p.id) === idStr ? { ...p, pago_estado: 'PAGADO' } : p)),
+      prev.map((p) => (String(p.id) === idStr ? { ...p, pago_estado: datos.pago_estado ?? 'PAGADO' } : p)),
     );
+    // cobrado, coordinado o anulado: se vuelve a leer el pedido completo (el modal abierto lo toma de la lista)
+    pedidosApi.obtenerPorId(idStr).then((pa) => {
+      setPedidos((prev) => prev.map((p) => (String(p.id) === idStr ? pa : p)));
+    }).catch(() => {});
   });
+
+  // Tiempo real de Caja: voucher/plan, cobros, cierre y respaldo (reconexión, volver a la pestaña, sondeo sin socket).
+  // Recarga en silencio: no toca la selección, el scroll ni el modal abierto.
+  useTiempoReal(
+    ['vouchers:actualizado', 'pedido:pago', 'caja:cerrada', 'comprobante:cambio', 'reparto:incidente'],
+    () => {
+      void cargarDatos();
+      void cargarNoEntregados();
+    },
+  );
 
   // Conteo de pestañas
   const conteosTabs = useMemo(() => {

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { getTokenAcceso } from './api';
 
@@ -88,4 +88,84 @@ export function useEventos<T = any>(
       socket.off(evento, callback);
     };
   }, [evento, callback]);
+}
+
+/** Espera (ms) que junta una ráfaga de eventos en una sola recarga. */
+export const ESPERA_RECARGA_MS = 300;
+/** Sondeo de respaldo (ms): solo corre mientras el socket está desconectado. */
+export const SONDEO_SIN_SOCKET_MS = 60_000;
+
+/** true mientras el socket está conectado; false = «Reconectando…». */
+export function useSocketConectado(): boolean {
+  const [conectado, setConectado] = useState<boolean>(() => conectarSocket().connected);
+  useEffect(() => {
+    const socket = conectarSocket();
+    const alta = () => setConectado(true);
+    const baja = () => setConectado(false);
+    socket.on('connect', alta);
+    socket.on('disconnect', baja);
+    setConectado(socket.connected);
+    return () => {
+      socket.off('connect', alta);
+      socket.off('disconnect', baja);
+    };
+  }, []);
+  return conectado;
+}
+
+/**
+ * Recarga (con antirrebote) al llegar cualquiera de `eventos`,
+ * al reconectar el socket y al volver la pestaña al frente; y sondea cada 60 s solo con el socket caído.
+ */
+export function useTiempoReal(
+  eventos: readonly string[],
+  recargar: () => void,
+  esperaMs: number = ESPERA_RECARGA_MS,
+): void {
+  const ultima = useRef(recargar);
+  ultima.current = recargar;
+  const clave = eventos.join('|');
+
+  useEffect(() => {
+    const socket = conectarSocket();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const disparar = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
+        ultima.current();
+      }, esperaMs);
+    };
+    const lista = clave ? clave.split('|') : [];
+    lista.forEach((e) => socket.on(e, disparar));
+
+    // Reconexión: solo si antes hubo una caída (la primera conexión ya cargó la pantalla)
+    let cayo = !socket.connected;
+    const alBajar = () => { cayo = true; };
+    const alConectar = () => {
+      if (!cayo) return;
+      cayo = false;
+      disparar();
+    };
+    socket.on('disconnect', alBajar);
+    socket.on('connect', alConectar);
+
+    const alVolver = () => {
+      if (document.visibilityState === 'visible') disparar();
+    };
+    document.addEventListener('visibilitychange', alVolver);
+
+    const sondeo = setInterval(() => {
+      if (!socket.connected) ultima.current();
+    }, SONDEO_SIN_SOCKET_MS);
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      clearInterval(sondeo);
+      lista.forEach((e) => socket.off(e, disparar));
+      socket.off('disconnect', alBajar);
+      socket.off('connect', alConectar);
+      document.removeEventListener('visibilitychange', alVolver);
+    };
+  }, [clave, esperaMs]);
 }

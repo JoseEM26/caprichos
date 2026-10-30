@@ -4,7 +4,7 @@ import { useSesion } from '../../comun/sesion';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { EstadoVacio } from '../../comun/EstadoVacio';
-import { useEventos } from '../../comun/socket';
+import { useEventos, useTiempoReal } from '../../comun/socket';
 import { Confirmar } from '../../comun/Confirmar';
 import { useEsMovil } from '../../carta/useEsMovil';
 import { MapaRepartos, PuntoRepartoMapa } from './MapaRepartos';
@@ -193,6 +193,12 @@ function RepartosAdminView() {
 
   useEventos('reparto:incidente', () => {
     cargarDatos();
+  });
+
+  // Rutas, ubicación y cobros, más respaldo (reconexión, volver a la pestaña, sondeo sin socket); recarga en silencio
+  useTiempoReal(['reparto:rutas', 'pedido:nuevo', 'pedido:pago'], () => {
+    cargarDatos();
+    sugeridas.recargar();
   });
 
   // Lista consolidada de pedidos según rol y selección "Ver como:"

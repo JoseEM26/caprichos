@@ -1,4 +1,9 @@
-import { EstadoImpresora } from '@caprichos/compartido';
+import {
+  EstadoImpresora,
+  EstadoMaquinaImpresion,
+  ImpresoraReportada,
+  RolImpresora,
+} from '@caprichos/compartido';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 
 /** Un agente cuenta como conectado si su último latido tiene 60 s o menos. */
@@ -52,4 +57,62 @@ export async function leerParametroNumerico(
   } catch {
     return defecto;
   }
+}
+
+const MOTIVO_ESTADO: Record<string, string> = {
+  desconectada: 'Impresora no encontrada',
+  sin_papel: 'Sin papel',
+  error: 'Error en la impresora',
+};
+
+/**
+ * El latido guarda las máquinas en latido_detalle como JSON ({ detalle, impresoras }) para no tocar el
+ * esquema; un latido viejo trae texto plano o nada.
+ */
+export function empaquetarDetalleLatido(detalle?: string | null, impresoras?: ImpresoraReportada[]): string | null {
+  const d = detalle?.trim() || null;
+  if (!impresoras?.length) return d;
+  return JSON.stringify({ detalle: d, impresoras });
+}
+
+export function leerImpresorasLatido(detalle?: string | null): ImpresoraReportada[] | null {
+  if (!detalle || !detalle.startsWith('{')) return null;
+  try {
+    const j = JSON.parse(detalle);
+    return Array.isArray(j.impresoras) ? j.impresoras : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Estado de cada máquina. Sin latido vigente: ambas «el programa del local no está corriendo».
+ * Un agente viejo (sin lista por rol) solo habla de la etiquetera; la ticketera queda sin configurar.
+ */
+export function estadoPorRol(
+  agente: { ultimo_latido?: Date | string | null; latido_impresora?: string | null; latido_detalle?: string | null } | null | undefined,
+  ahora = Date.now(),
+): Record<RolImpresora, EstadoMaquinaImpresion> {
+  if (!agenteConectado(agente?.ultimo_latido, ahora)) {
+    const caida: EstadoMaquinaImpresion = {
+      conectada: false,
+      estado: 'sin_programa',
+      motivo: 'El programa del local no está corriendo',
+    };
+    return { ETIQUETERA: { ...caida }, TICKETERA: { ...caida } };
+  }
+  const lista = leerImpresorasLatido(agente?.latido_detalle) ??
+    (agente?.latido_impresora
+      ? [{ rol: 'ETIQUETERA' as const, estado: agente.latido_impresora as EstadoImpresora, detalle: agente.latido_detalle ?? undefined }]
+      : []);
+  const una = (rol: RolImpresora): EstadoMaquinaImpresion => {
+    const r = lista.find((x) => x.rol === rol);
+    if (!r) {
+      return { conectada: false, estado: 'no_configurada', motivo: 'No está configurada en el programa del local' };
+    }
+    if (r.estado === 'lista') return { conectada: true, estado: 'lista', motivo: null };
+    const base = MOTIVO_ESTADO[r.estado] || 'Impresora con problema';
+    return { conectada: false, estado: r.estado, motivo: r.detalle && r.estado === 'error' ? `${base}: ${r.detalle}` : base };
+  };
+  return { ETIQUETERA: una('ETIQUETERA'), TICKETERA: una('TICKETERA') };
 }

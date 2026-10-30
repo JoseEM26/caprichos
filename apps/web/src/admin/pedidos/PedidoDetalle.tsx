@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Confirmar } from '../../comun/Confirmar';
 import { Pedido, pedidosApi } from './pedidosApi';
 import { ModalCobrar } from './ModalCobrar';
+import { useConfirmarImpresion } from '../impresion/useConfirmarImpresion';
 import { SeccionVouchersPedido } from './SeccionVouchersPedido';
 import { ModalAnular } from './ModalAnular';
 import { ModalUbicar } from './ModalUbicar';
@@ -135,7 +136,15 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: 
   const hasMapCoords = lat != null && lng != null && lat !== '' && lng !== '';
 
   // Transiciones de estado con confirmación Sí/No
+  const { pedir: pedirImpresion, dialogo: dialogoImpresion } = useConfirmarImpresion();
   const cambiarEstado = async (nuevoEstado: string, motivo?: string) => {
+    // Aceptar el pedido (COLA/PREPARANDO) manda las etiquetas a imprimir: se avisa si falta una máquina
+    if (nuevoEstado === 'COLA' || nuevoEstado === 'PREPARANDO') {
+      return pedirImpresion(() => ejecutarCambioEstado(nuevoEstado, motivo));
+    }
+    return ejecutarCambioEstado(nuevoEstado, motivo);
+  };
+  const ejecutarCambioEstado = async (nuevoEstado: string, motivo?: string) => {
     setProcesando(true);
     setErrorAccion(null);
     try {
@@ -978,6 +987,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: 
       </div>
 
       {/* Modales */}
+      {dialogoImpresion}
       {abrirCobrar && (
         <ModalCobrar
           pedido={pedido}

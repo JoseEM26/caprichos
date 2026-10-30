@@ -9,6 +9,7 @@ import {
 import { Confirmar } from '../../comun/Confirmar';
 import { EstadoError } from '../../comun/EstadoError';
 import { useSesion } from '../../comun/sesion';
+import { useTiempoReal } from '../../comun/socket';
 
 export interface ModalAgotadosProps {
   abierto: boolean;
@@ -66,6 +67,11 @@ export function ModalAgotados({ abierto, alCerrar }: ModalAgotadosProps) {
       setCargando(false);
     }
   };
+
+  // Otro dispositivo marcó o reactivó un agotado: se actualiza la lista con el modal abierto
+  useTiempoReal(['carta:disponibilidad'], () => {
+    if (abierto) listarAgotados().then(setAgotadosVigentes).catch(() => {});
+  });
 
   useEffect(() => {
     if (abierto) {

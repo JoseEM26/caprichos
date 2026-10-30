@@ -62,6 +62,8 @@ services:
         condition: service_healthy
     volumes:
       - uploads_data:/data/uploads
+      # .exe del programa de impresión que sube el workflow agente-windows (la API lo sirve en /api/agente-impresion/descargar/windows)
+      - ${DESCARGAS_DIR:-/home/deploy/caprichos-descargas}:/data/descargas:ro
     networks:
       - red_interna
       - caprichos-proxy-net

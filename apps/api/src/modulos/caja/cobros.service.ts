@@ -1,4 +1,5 @@
 import { PuntosService } from '../clientes/puntos.service';
+import { ImpresionService } from '../impresion/impresion.service';
 import { StockService } from '../stock/stock.service';
 import { OfertasService } from '../ofertas/ofertas.service';
 import { SalonService } from '../salon/salon.service';
@@ -54,6 +55,7 @@ export class CobrosService {
     @Optional() private readonly stockService?: StockService,
     @Optional() private readonly ofertasService?: OfertasService,
     @Optional() private readonly supervisorCodigoService?: SupervisorCodigoService,
+    @Optional() private readonly impresionService?: ImpresionService,
   ) {}
 
   private parsearId(id: bigint | string | number): bigint {
@@ -422,6 +424,13 @@ export class CobrosService {
       }
     }
 
+    // ticket de pago para la ticketera: idempotente, nunca deshace el cobro
+    try {
+      await this.impresionService?.encolarTicketPedido(cobro.pedido_id);
+    } catch {
+      // se puede reimprimir desde el pedido
+    }
+
     // 8. Auditar
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
@@ -463,6 +472,8 @@ export class CobrosService {
       this.eventosGateway?.emitirAdmin?.('pedido:pago', {
         id: cobro.pedido_id.toString(),
         codigo: pedidoCodigo,
+        pago_estado: 'PAGADO',
+        cambio: 'cobrado',
       });
     } catch {
       // Ignorar fallo de socket
@@ -648,6 +659,9 @@ export class CobrosService {
       ip,
     });
 
+    // Avisa a Caja/Cocina/Repartos que el pedido volvió a quedar por cobrar (ya con el cobro anulado guardado)
+    this.eventosGateway?.emitirAdmin?.('pedido:pago', { id: cobro.pedido_id.toString(), pago_estado: 'PENDIENTE', cambio: 'anulado' });
+
     return {
       id: cobro.id.toString(),
       pedido_id: cobro.pedido_id.toString(),
@@ -794,6 +808,8 @@ export class CobrosService {
       },
       ip,
     });
+
+    this.eventosGateway?.emitirAdmin?.('pedido:pago', { id: actualizado.id.toString(), codigo: actualizado.codigo, pago_estado: 'COORDINADO', cambio: 'coordinado' });
 
     return {
       id: actualizado.id.toString(),

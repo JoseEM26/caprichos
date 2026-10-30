@@ -4,6 +4,8 @@ import { EstadoAdminImpresion } from '@caprichos/compartido';
 import { impresionApi } from '../impresion/impresionApi';
 import { useEventos } from '../../comun/socket';
 import { ColaImpresion } from '../impresion/ColaImpresion';
+import { IndicadoresMaquinas } from '../impresion/IndicadoresMaquinas';
+import { useEstadoMaquinas } from '../impresion/useEstadoMaquinas';
 
 /**
  * Franja fija arriba de Pedidos y caja: aparece mientras haya etiquetas en cola y la
@@ -12,6 +14,7 @@ import { ColaImpresion } from '../impresion/ColaImpresion';
 export function FranjaImpresion() {
   const [estado, setEstado] = useState<EstadoAdminImpresion | null>(null);
   const [verCola, setVerCola] = useState(false);
+  const { maquinas } = useEstadoMaquinas();
 
   const cargar = useCallback(async () => {
     try {
@@ -32,9 +35,16 @@ export function FranjaImpresion() {
   useEventos('pedido:nuevo', cargar);
   useEventos('impresion:cola', cargar);
 
-  if (!estado) return null;
-  const conProblema = estado.agente === 'sin_conexion' || estado.impresora !== 'lista';
-  if (!(estado.pendientes > 0 && conProblema)) return null;
+  const indicadores = <IndicadoresMaquinas maquinas={maquinas} alVerCola={() => setVerCola(true)} />;
+  const conProblema = estado ? estado.agente === 'sin_conexion' || estado.impresora !== 'lista' : false;
+  if (!estado || !(estado.pendientes > 0 && conProblema)) {
+    return (
+      <>
+        {indicadores}
+        {verCola && <ColaImpresion alCerrar={() => setVerCola(false)} />}
+      </>
+    );
+  }
 
   const estiloBoton = {
     minHeight: 44,
@@ -49,6 +59,7 @@ export function FranjaImpresion() {
 
   return (
     <>
+    {indicadores}
     <div
       role="alert"
       data-testid="franja-impresion"

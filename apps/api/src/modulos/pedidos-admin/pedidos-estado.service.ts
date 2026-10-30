@@ -1062,6 +1062,11 @@ export class PedidosEstadoService {
     // los puntos del cliente; es idempotente y, si falla, no deshace el pago
     if (dto.estado === 'PAGADO') {
       try {
+        await this.impresionService?.encolarTicketPedido(pedido.id);
+      } catch {
+        // el ticket se puede reimprimir
+      }
+      try {
         await this.puntosService?.acumularPorPedido(pedido.id);
       } catch {
         // se reintenta al volver a registrar

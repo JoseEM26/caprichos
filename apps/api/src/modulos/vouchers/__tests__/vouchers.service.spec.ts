@@ -343,6 +343,52 @@ describe('VouchersService', () => {
     });
   });
 
+  describe('Tiempo real: vouchers:actualizado tras guardar', () => {
+    const archivo: any = { buffer: Buffer.from('x'), size: 1, mimetype: 'image/jpeg', originalname: 'v.jpg' };
+    const llamadas = () => eventosMock.emitirAdmin.mock.calls.filter((c: any[]) => c[0] === 'vouchers:actualizado');
+
+    it('WhatsApp: emite después de crear el voucher, con pedido, código y origen', async () => {
+      await service.registrarDesdeWhatsapp(
+        Buffer.from('wa'), 'image/jpeg', 10n,
+        { id: 50n, codigo: 'CP-W001', total: 35.0, pago_preferido: 'YAPE' },
+        { id: 200n, telefono: '51987654321' },
+      );
+      expect(llamadas()).toEqual([
+        ['vouchers:actualizado', { pedidoIds: ['50'], codigo: 'CP-W001', motivo: 'subido', origen: 'WHATSAPP' }],
+      ]);
+      const orden = eventosMock.emitirAdmin.mock.invocationCallOrder[0];
+      expect(prismaMock.voucherPago.create.mock.invocationCallOrder[0]).toBeLessThan(orden);
+    });
+
+    it('WhatsApp sin pedido: no emite vouchers:actualizado', async () => {
+      await service.registrarDesdeWhatsapp(Buffer.from('wa'), 'image/jpeg', 12n, null, { id: 301n });
+      expect(llamadas()).toHaveLength(0);
+    });
+
+    it('subida de Caja/mozo/carta: emite subido con su origen', async () => {
+      await service.subirYProcesar(archivo, { pedidoId: '50', medio: 'YAPE' }, mozoUsuario);
+      expect(llamadas()[0][1]).toMatchObject({ pedidoIds: ['50'], motivo: 'subido', origen: 'MOZO' });
+    });
+
+    it('marcar revisado y enviar a Caja emiten su cambio', async () => {
+      prismaMock.voucherPago.findUnique.mockResolvedValue({ id: 5n, revisado_en: null });
+      prismaMock.voucherPago.update.mockResolvedValue({ id: 5n, pedido_id: 50n, revisado_en: new Date(), revisado_por: 102n });
+      await service.marcarRevisado('5', cajeroUsuario);
+      await service.enviarACaja('50', 'efectivo', mozoUsuario);
+      expect(llamadas().map((c: any[]) => c[1].motivo)).toEqual(['revisado', 'enviado_caja']);
+    });
+
+    it('guardar el plan del mozo emite plan tras la transacción', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 50n, codigo: 'PED-50', party_id: 101n, total: 35, estado: 'NUEVO', modalidad: 'SALON',
+        pago_metodo: null, pago_estado: 'PENDIENTE', pago_coordinado_en: null,
+      });
+      await service.guardarPlanMozo('50', [{ medio: 'YAPE', monto: 35 }], mozoUsuario);
+      expect(llamadas()[0][1]).toMatchObject({ pedidoIds: ['50'], motivo: 'plan' });
+      expect(prismaMock.$transaction.mock.invocationCallOrder[0]).toBeLessThan(eventosMock.emitirAdmin.mock.invocationCallOrder[0]);
+    });
+  });
+
   describe('Webhook de WhatsApp en segundo plano', () => {
     it('procesa el voucher y emite mensajes:actualizado', async () => {
       const buffer = Buffer.from('comprobante-wa-bytes');
