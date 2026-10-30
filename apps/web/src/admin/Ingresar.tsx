@@ -150,6 +150,7 @@ export function Ingresar() {
   const { ingresar, usuario, debeCambiar, cargando: sesionCargando } = useSesion();
   const navigate = useNavigate();
   const location = useLocation();
+  const avisoSalida = (location.state as { aviso?: string } | null)?.aviso;
   const pantallaAncha = useEsPantallaAncha();
   const contenidoIngreso = useContenidoIngreso();
 
@@ -369,6 +370,24 @@ export function Ingresar() {
             }}
           />
         </div>
+
+        {avisoSalida && !errorTexto && !errorApi && (
+          <div
+            role="status"
+            style={{
+              border: '1.5px solid var(--cp-navy)',
+              background: '#EEF3F7',
+              color: 'var(--cp-navy)',
+              borderRadius: '12px',
+              padding: '10px 12px',
+              fontSize: '14px',
+              fontWeight: 700,
+              lineHeight: '19px',
+            }}
+          >
+            {avisoSalida}
+          </div>
+        )}
 
         {(errorTexto || errorApi) && (
           <div

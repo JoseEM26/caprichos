@@ -5,6 +5,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { UsuariosService } from '../usuarios.service';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../../auditoria/auditoria.service';
+import { ArchivosService } from '../../archivos/archivos.service';
 import { AvisosInternosService } from '../../chatbot/avisos-internos/avisos-internos.service';
 import { UsuarioAutenticado } from '../../acceso/acceso.tipos';
 import {
@@ -51,6 +52,7 @@ describe('Alertas WhatsApp en Usuarios (Contrato Caprichos - Sección 1)', () =>
         UsuariosService,
         { provide: PrismaService, useValue: prismaMock },
         { provide: AuditoriaService, useValue: auditoriaMock },
+        { provide: ArchivosService, useValue: { subirArchivo: jest.fn() } },
         { provide: AvisosInternosService, useValue: avisosInternosMock },
       ],
     }).compile();

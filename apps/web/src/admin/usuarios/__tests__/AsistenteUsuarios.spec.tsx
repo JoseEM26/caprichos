@@ -3,6 +3,11 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import { CrearUsuarioModal } from '../CrearUsuarioModal';
 import { EditarUsuarioModal } from '../EditarUsuarioModal';
 import { api } from '../../../comun/api';
+import { MemoryRouter } from 'react-router-dom';
+
+vi.mock('../../../comun/sesion', () => ({
+  useSesion: () => ({ usuario: { partyId: '1', nombres: 'Admin', rol: 'ADMIN' }, salir: vi.fn() }),
+}));
 
 vi.mock('../../../comun/api', () => ({
   api: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn() },
@@ -116,12 +121,14 @@ describe('Asistente Nuevo usuario', () => {
     );
     vi.mocked(api.put).mockResolvedValue({});
     render(
-      <EditarUsuarioModal
-        abierto
-        alCerrar={vi.fn()}
-        alUsuarioEditado={vi.fn()}
-        usuario={{ id: '5', partyId: '50', nombres: 'Ana', apellidos: 'Paz', dni: '12****78', rol: 'CAJERO', activo: true, debeCambiar: false }}
-      />,
+      <MemoryRouter>
+        <EditarUsuarioModal
+          abierto
+          alCerrar={vi.fn()}
+          alUsuarioEditado={vi.fn()}
+          usuario={{ id: '5', partyId: '50', nombres: 'Ana', apellidos: 'Paz', dni: '12****78', rol: 'CAJERO', activo: true, debeCambiar: false }}
+        />
+      </MemoryRouter>,
     );
     fireEvent.click(screen.getByRole('tab', { name: 'Horario' }));
     await waitFor(() => expect((screen.getByLabelText('Entrada del lunes') as HTMLInputElement).value).toBe('08:00'));

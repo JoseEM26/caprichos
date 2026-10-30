@@ -4,6 +4,7 @@ import { BadRequestException } from '@nestjs/common';
 import { UsuariosService } from '../usuarios.service';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../../auditoria/auditoria.service';
+import { ArchivosService } from '../../archivos/archivos.service';
 
 describe('Alta y edición con horario y reemplazos', () => {
   let service: UsuariosService;
@@ -41,6 +42,7 @@ describe('Alta y edición con horario y reemplazos', () => {
         UsuariosService,
         { provide: PrismaService, useValue: prisma },
         { provide: AuditoriaService, useValue: { registrar: jest.fn() } },
+        { provide: ArchivosService, useValue: { subirArchivo: jest.fn() } },
       ],
     }).compile();
     service = mod.get(UsuariosService);

@@ -8,14 +8,17 @@ import {
   BadRequestException,
   Inject,
   Optional,
+  PayloadTooLargeException,
   forwardRef,
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
+import { ArchivosService } from '../archivos/archivos.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { CrearUsuarioDto } from './dto/crear-usuario.dto';
 import { EditarUsuarioDto } from './dto/editar-usuario.dto';
+import { CambiarClaveUsuarioDto } from './dto/cambiar-clave-usuario.dto';
 import { FiltrarUsuariosDto } from './dto/filtrar-usuarios.dto';
 import { AsignarPinDto } from './dto/asignar-pin.dto';
 import { ConfigurarAlertasWhatsappDto } from './dto/configurar-alertas-whatsapp.dto';
@@ -29,11 +32,15 @@ import {
 } from './alertas-whatsapp.util';
 import { AvisosInternosService } from '../chatbot/avisos-internos/avisos-internos.service';
 
+/** Mismo límite que la foto de Mi perfil (acceso/mi-perfil.service.ts). */
+const FOTO_MAX_BYTES = 2 * 1024 * 1024;
+
 @Injectable()
 export class UsuariosService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditoriaService,
+    private readonly archivos: ArchivosService,
     @Optional()
     @Inject(forwardRef(() => AvisosInternosService))
     private readonly avisosInternosService?: AvisosInternosService,
@@ -413,8 +420,45 @@ export class UsuariosService {
     return despues;
   }
 
+  private exigirAdmin(usuarioActual?: UsuarioAutenticado) {
+    if (usuarioActual?.rol !== 'ADMIN') {
+      throw new ForbiddenException({ codigo: 'SOLO_ADMIN', mensaje: 'Solo un administrador puede hacer esto' });
+    }
+  }
+
   /**
-   * Edita nombres, apellidos o rol. No permite quitar el rol al último ADMIN activo.
+   * Re-autenticación: la clave del ADMIN que opera debe coincidir con su hash. No cuenta intentos
+   * ni revela nada más si falla.
+   */
+  private async exigirClaveAdmin(usuarioActual: UsuarioAutenticado | undefined, claveAdmin: string | undefined) {
+    this.exigirAdmin(usuarioActual);
+    if (!claveAdmin) {
+      throw new BadRequestException({ codigo: 'CLAVE_ADMIN_REQUERIDA', mensaje: 'Escribe tu contraseña de administrador' });
+    }
+    const admin = await this.prisma.userAccount.findUnique({
+      where: { party_id: usuarioActual!.partyId },
+      select: { hash: true },
+    });
+    let coincide = false;
+    if (admin) {
+      try {
+        coincide = await argon2.verify(admin.hash, claveAdmin);
+      } catch {
+        coincide = false;
+      }
+    }
+    if (!coincide) {
+      throw new ForbiddenException({
+        codigo: 'CLAVE_ADMIN_INCORRECTA',
+        mensaje: 'La contraseña de administrador no es correcta',
+      });
+    }
+  }
+
+  /**
+   * Edita nombres, apellidos, correo, DNI o rol. No permite quitar el rol al último ADMIN activo.
+   * El DNI solo lo cambia el ADMIN y exige su clave; si cambia la cuenta propia, se revocan sus sesiones
+   * y la respuesta trae reingresar=true.
    */
   async editar(id: bigint | string | number, dto: EditarUsuarioDto, usuarioActual?: UsuarioAutenticado, ip?: string) {
     const accountId = this.parsearId(id);
@@ -450,40 +494,86 @@ export class UsuariosService {
       }
     }
 
-    const dniDoc = usuario.party?.documentos?.[0]?.numero ?? '';
+    const esPropia = usuarioActual?.partyId === usuario.party_id;
+    const dniAnterior = usuario.party?.documentos?.[0]?.numero ?? '';
+    const dniNuevo = dto.dni !== undefined ? dto.dni.trim() : dniAnterior;
+    const dniCambia = dto.dni !== undefined && dniNuevo !== dniAnterior;
+    const correoAnterior = usuario.party?.persona?.correo ?? null;
+    const correoNuevo = dto.correo !== undefined ? dto.correo.trim().toLowerCase() || null : correoAnterior;
+    const correoCambia = dto.correo !== undefined && correoNuevo !== correoAnterior;
+
+    if (dto.dni !== undefined || dto.correo !== undefined) this.exigirAdmin(usuarioActual);
+    if (dniCambia) {
+      await this.exigirClaveAdmin(usuarioActual, dto.claveAdmin);
+      const otro = await this.prisma.partyIdentifier.findUnique({
+        where: { tipo_numero: { tipo: 'DNI', numero: dniNuevo } },
+      });
+      if (otro && otro.party_id !== usuario.party_id) {
+        throw new ConflictException({ codigo: 'DNI_DUPLICADO', mensaje: 'El DNI ya se encuentra registrado en el sistema' });
+      }
+    }
+    const reingresar = dniCambia && esPropia;
+
     const antes = {
       nombres: usuario.party?.persona?.nombres ?? '',
       apellidos: usuario.party?.persona?.apellidos ?? '',
       rol: usuario.rol,
-      dni: enmascararDni(dniDoc),
+      dni: enmascararDni(dniAnterior),
     };
 
     const despues = {
       nombres: dto.nombres !== undefined ? dto.nombres.trim() : antes.nombres,
       apellidos: dto.apellidos !== undefined ? dto.apellidos.trim() : antes.apellidos,
       rol: dto.rol !== undefined ? dto.rol : antes.rol,
-      dni: enmascararDni(dniDoc),
+      dni: enmascararDni(dniNuevo),
     };
 
-    await this.prisma.$transaction(async (tx) => {
-      if (dto.nombres !== undefined || dto.apellidos !== undefined) {
-        await tx.person.update({
-          where: { party_id: usuario.party_id },
-          data: {
-            ...(dto.nombres !== undefined ? { nombres: dto.nombres.trim() } : {}),
-            ...(dto.apellidos !== undefined ? { apellidos: dto.apellidos.trim() } : {}),
-          },
-        });
-      }
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        if (dto.nombres !== undefined || dto.apellidos !== undefined || correoCambia) {
+          await tx.person.update({
+            where: { party_id: usuario.party_id },
+            data: {
+              ...(dto.nombres !== undefined ? { nombres: dto.nombres.trim() } : {}),
+              ...(dto.apellidos !== undefined ? { apellidos: dto.apellidos.trim() } : {}),
+              ...(correoCambia ? { correo: correoNuevo } : {}),
+            },
+          });
+        }
 
-      if (dto.rol !== undefined) {
-        await tx.userAccount.update({
-          where: { id: usuario.id },
-          data: { rol: dto.rol },
-        });
-      }
-    });
+        if (dniCambia) {
+          const doc = usuario.party?.documentos?.[0];
+          if (doc) {
+            await tx.partyIdentifier.update({ where: { id: doc.id }, data: { numero: dniNuevo } });
+          } else {
+            await tx.partyIdentifier.create({
+              data: { party_id: usuario.party_id, tipo: 'DNI', numero: dniNuevo },
+            });
+          }
+        }
 
+        if (dto.rol !== undefined) {
+          await tx.userAccount.update({
+            where: { id: usuario.id },
+            data: { rol: dto.rol },
+          });
+        }
+
+        if (reingresar) {
+          await tx.sesion.updateMany({
+            where: { party_id: usuario.party_id, revocada_en: null },
+            data: { revocada_en: new Date() },
+          });
+        }
+      });
+    } catch (err: any) {
+      if (err?.code === 'P2002') {
+        throw new ConflictException({ codigo: 'DNI_DUPLICADO', mensaje: 'El DNI ya se encuentra registrado en el sistema' });
+      }
+      throw err;
+    }
+
+    // Auditoría sin valores de correo (dato personal): solo si cambió.
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
       modulo: 'usuarios',
@@ -492,7 +582,7 @@ export class UsuariosService {
       entidad: 'user_account',
       entidadId: usuario.id,
       antes,
-      despues,
+      despues: { ...despues, correoCambiado: correoCambia, dniCambiado: dniCambia },
       partyId: usuarioActual?.partyId,
       ip,
     });
@@ -506,7 +596,127 @@ export class UsuariosService {
       rol: despues.rol,
       activo: usuario.activo,
       debeCambiar: usuario.debe_cambiar,
+      reingresar,
     };
+  }
+
+  /**
+   * Cambia la contraseña de otra persona (o la propia) sin pedir la anterior. Solo ADMIN.
+   * Exige la clave del ADMIN que opera, marca debe_cambiar y revoca todas las sesiones de la cuenta.
+   */
+  async cambiarClaveAdmin(
+    id: bigint | string | number,
+    dto: CambiarClaveUsuarioDto,
+    usuarioActual?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    this.exigirAdmin(usuarioActual);
+    const claveNueva = dto.claveNueva ?? '';
+    if (claveNueva.length < 8 || !/[a-zA-Z]/.test(claveNueva) || !/\d/.test(claveNueva)) {
+      throw new BadRequestException({
+        codigo: 'CLAVE_INVALIDA',
+        mensaje: 'La contraseña debe tener mínimo 8 caracteres, con letras y números',
+      });
+    }
+    await this.exigirClaveAdmin(usuarioActual, dto.claveAdmin);
+
+    const cuenta = await this.cuentaConParty(id);
+    const hash = await argon2.hash(claveNueva, { type: argon2.argon2id });
+    const esPropia = usuarioActual?.partyId === cuenta.party_id;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.userAccount.update({
+        where: { id: cuenta.id },
+        data: { hash, debe_cambiar: true },
+      });
+      await tx.sesion.updateMany({
+        where: { party_id: cuenta.party_id, revocada_en: null },
+        data: { revocada_en: new Date() },
+      });
+    });
+
+    // Auditoría sin la clave en ningún campo.
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'usuarios',
+      accion: 'CAMBIAR_CLAVE_ADMIN',
+      resultado: 'OK',
+      entidad: 'user_account',
+      entidadId: cuenta.id,
+      antes: { debeCambiar: cuenta.debe_cambiar },
+      despues: { debeCambiar: true, sesionesRevocadas: true },
+      partyId: usuarioActual?.partyId,
+      ip,
+    });
+
+    return {
+      mensaje: 'Contraseña cambiada. La persona deberá cambiarla al ingresar.',
+      reingresar: esPropia,
+    };
+  }
+
+  /**
+   * Cambia la foto de perfil de otra persona. Solo ADMIN. Usa el mismo servicio de archivos que Mi perfil
+   * (ArchivosService.subirArchivo) con el mismo límite de 2 MB.
+   */
+  async cambiarFotoUsuario(
+    id: bigint | string | number,
+    file: Express.Multer.File,
+    usuarioActual?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    this.exigirAdmin(usuarioActual);
+    if (!file?.buffer) {
+      throw new BadRequestException({ codigo: 'ARCHIVO_REQUERIDO', mensaje: 'Elige una foto para el perfil.' });
+    }
+    if (file.buffer.length > FOTO_MAX_BYTES) {
+      throw new PayloadTooLargeException({ codigo: 'FOTO_GRANDE', mensaje: 'La foto no puede pasar de 2 MB.' });
+    }
+    const cuenta = await this.cuentaConParty(id);
+
+    let archivo: { id: string; url: string };
+    try {
+      archivo = await this.archivos.subirArchivo(file, false, usuarioActual, ip);
+    } catch {
+      throw new BadRequestException({ codigo: 'FOTO_NO_VALIDA', mensaje: 'No pudimos leer esa imagen. Prueba con otra foto.' });
+    }
+
+    await this.prisma.person.update({
+      where: { party_id: cuenta.party_id },
+      data: { foto_archivo_id: BigInt(archivo.id) },
+    });
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'usuarios',
+      accion: 'CAMBIAR_FOTO',
+      resultado: 'OK',
+      entidad: 'person',
+      entidadId: cuenta.party_id,
+      partyId: usuarioActual?.partyId,
+      ip,
+    });
+    return { fotoUrl: archivo.url };
+  }
+
+  /** Solo desvincula la foto: el archivo queda en disco. Solo ADMIN. */
+  async quitarFotoUsuario(id: bigint | string | number, usuarioActual?: UsuarioAutenticado, ip?: string) {
+    this.exigirAdmin(usuarioActual);
+    const cuenta = await this.cuentaConParty(id);
+    await this.prisma.person.update({
+      where: { party_id: cuenta.party_id },
+      data: { foto_archivo_id: null },
+    });
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'usuarios',
+      accion: 'QUITAR_FOTO',
+      resultado: 'OK',
+      entidad: 'person',
+      entidadId: cuenta.party_id,
+      partyId: usuarioActual?.partyId,
+      ip,
+    });
+    return { fotoUrl: null };
   }
 
   /**
