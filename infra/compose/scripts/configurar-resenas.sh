@@ -44,12 +44,42 @@ recortar() {
   v="${v%"${v##*[![:space:]]}"}"
   printf '%s' "$v"
 }
+# Todo en bytes: con LC_ALL=C, ${#v} cuenta bytes y los patrones actúan byte a byte
+export LC_ALL=C
+
+# Invisibles o espacios Unicode que una clave de API nunca lleva, en UTF-8 (bytes):
+# U+00A0, U+200B, U+200C, U+200D, U+2060, U+FEFF, U+202F, U+3000, U+2028, U+2029
+INVISIBLES=(
+  $'\xc2\xa0'      # espacio duro
+  $'\xe2\x80\x8b'  # espacio de ancho cero
+  $'\xe2\x80\x8c'  # no unir
+  $'\xe2\x80\x8d'  # unir
+  $'\xe2\x81\xa0'  # unir sin separación
+  $'\xef\xbb\xbf'  # BOM
+  $'\xe2\x80\xaf'  # espacio estrecho de no separación
+  $'\xe3\x80\x80'  # espacio ideográfico
+  $'\xe2\x80\xa8'  # separador de línea
+  $'\xe2\x80\xa9'  # separador de párrafo
+)
+QUITADOS=0
+for inv in "${INVISIBLES[@]}"; do
+  antes=${#CLAVE}
+  CLAVE="${CLAVE//$inv/}"
+  QUITADOS=$(( QUITADOS + (antes - ${#CLAVE}) / ${#inv} ))
+done
+NO_ASCII_N=$(printf '%s' "$CLAVE" | tr -d '\000-\177' | wc -c | tr -d ' ')
+
 CLAVE=$(recortar "$CLAVE")
 if (( ${#CLAVE} >= 2 )) && { [[ "$CLAVE" == \"*\" ]] || [[ "$CLAVE" == \'*\' ]]; }; then
   CLAVE="${CLAVE:1:${#CLAVE}-2}"
   CLAVE=$(recortar "$CLAVE")
 fi
 LONG=${#CLAVE}
+
+NOTA_INVISIBLES=""
+if (( QUITADOS > 0 )); then
+  NOTA_INVISIBLES="se quitaron ${QUITADOS} caracteres invisibles (espacio duro/ancho cero/BOM)"
+fi
 
 # Solo caracteres que no necesitan comillas en el .env ni interpolación en docker compose
 RE_CLAVE='^[A-Za-z0-9._~+/=-]+$'
@@ -62,6 +92,10 @@ if (( LONG < 10 || LONG > 200 )) || [[ ! "$CLAVE" =~ $RE_CLAVE ]]; then
   echo "ERROR: la clave no tiene formato válido (${LONG} caracteres tras quitar espacios y comillas de los extremos):" >&2
   if (( LONG < 10 )); then echo "  - muy corta: mínimo 10 caracteres" >&2; fi
   if (( LONG > 200 )); then echo "  - muy larga: máximo 200 caracteres" >&2; fi
+  if (( QUITADOS > 0 )); then echo "  - ${NOTA_INVISIBLES}" >&2; fi
+  if (( NO_ASCII_N > 0 )); then
+    echo "  - tiene ${NO_ASCII_N} bytes no ASCII (letra con tilde u otro carácter Unicode)" >&2
+  fi
   if [[ "$CLAVE" == *[[:space:]]* ]]; then
     ESP="${CLAVE//[^[:space:]]/}"
     echo "  - tiene espacios, tabuladores o saltos de línea en medio (${#ESP} caracteres de separación)" >&2
@@ -107,6 +141,7 @@ echo "== Reseñas de Google (${AMBIENTE}) =="
 echo "OPENWEBNINJA_API_KEY: configurada (${LONG} caracteres)"
 echo "RESENAS_ACTUALIZAR_AUTO=${AUTO}"
 echo "TAG=${TAG} (no cambia)"
+if [[ -n "$NOTA_INVISIBLES" ]]; then echo "  ${NOTA_INVISIBLES}"; fi
 
 COPIA="${ENV_FILE}.bak-$(date +%Y%m%d-%H%M%S)"
 cp -p "$ENV_FILE" "$COPIA"
