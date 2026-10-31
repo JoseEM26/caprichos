@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useEventos } from '../../comun/socket';
-import { Confirmar } from '../../comun/Confirmar';
 import { HistorialVoucher } from '../salon/HistorialVoucher';
 import { SubirVoucherMozo } from '../vouchers/SubirVoucherMozo';
 import { ReasignarVoucherBoton } from '../vouchers/ReasignarVoucherBoton';
@@ -8,6 +7,7 @@ import { vouchersApi } from '../vouchers/vouchersApi';
 import { TarjetaLecturaVoucher } from '../vouchers/TarjetaLecturaVoucher';
 import { FotoAmpliable } from '../vouchers/FotoAmpliable';
 import { BannerVouchersIaPausa } from '../vouchers/BannerVouchersIaPausa';
+import { Boton } from '../../comun/Boton';
 import type { VoucherPagoItem } from '../vouchers/tipos';
 
 export interface SeccionVouchersPedidoProps {
@@ -41,12 +41,10 @@ export function SeccionVouchersPedido({ pedidoId, recargarClave, total, medio, a
     const t = setTimeout(() => setAviso(''), 6000);
     return () => clearTimeout(t);
   }, [aviso]);
-  // Reemplazo tardío (Caja/Admin): motivo obligatorio y confirmación; el anterior queda en el historial
+  // Reemplazo tardío (Caja/Admin): se elige el medio y la foto; el motivo se pregunta UNA vez, junto al «Antes/Nuevo»
+  // (SubirVoucherMozo). El anterior queda en el historial como reemplazado.
   const [reemplazando, setReemplazando] = useState(false);
-  const [motivo, setMotivo] = useState('');
-  const [medioCambio, setMedioCambio] = useState<'YAPE' | 'PLIN' | 'TRANSFERENCIA'>('YAPE');
-  const [confirmando, setConfirmando] = useState(false);
-  const [subiendoCambio, setSubiendoCambio] = useState(false);
+  const [medioCambio, setMedioCambio] = useState<'YAPE' | 'PLIN' | 'TRANSFERENCIA' | null>(null);
 
   useEffect(() => {
     let activo = true;
@@ -112,61 +110,70 @@ export function SeccionVouchersPedido({ pedidoId, recargarClave, total, medio, a
         </div>
       ))}
       {!reemplazando ? (
-        <button type="button" onClick={() => setReemplazando(true)} style={{ alignSelf: 'flex-start', fontSize: 12, fontWeight: 700 }}>
+        <Boton
+          variante="secundario"
+          onClick={() => {
+            const m = String(vouchers[0]?.medio ?? medio ?? 'YAPE').toUpperCase();
+            setMedioCambio(m.includes('PLIN') ? 'PLIN' : m.includes('TRANSF') ? 'TRANSFERENCIA' : 'YAPE');
+            setReemplazando(true);
+          }}
+          style={{ alignSelf: 'flex-start' }}
+        >
           Reemplazar voucher
-        </button>
+        </Boton>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <label style={{ fontSize: 12 }}>
-            Medio{' '}
-            <select value={medioCambio} onChange={(e) => setMedioCambio(e.target.value as typeof medioCambio)}>
-              <option value="YAPE">Yape</option>
-              <option value="PLIN">Plin</option>
-              <option value="TRANSFERENCIA">Transferencia</option>
-            </select>
-          </label>
-          <label style={{ fontSize: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
-            Motivo del cambio (mínimo 5 caracteres)
-            <textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} rows={2} />
-          </label>
-          {!subiendoCambio && (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button type="button" disabled={motivo.trim().length < 5} onClick={() => setConfirmando(true)}>
-                Continuar
-              </button>
-              <button type="button" onClick={() => { setReemplazando(false); setMotivo(''); }}>
-                Cancelar
-              </button>
-            </div>
-          )}
-          {subiendoCambio && (
+        <div
+          data-testid="reemplazo-voucher"
+          style={{ display: 'flex', flexDirection: 'column', gap: 10, border: '1.5px solid var(--cp-orange, #E67929)', background: 'var(--cp-cream, #FFF4E6)', borderRadius: 14, padding: 12 }}
+        >
+          <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--cp-navy, #0B2C3E)' }}>Cambiar el voucher</div>
+          <div style={{ fontSize: 12.5, color: 'var(--cp-soft, #2C4C5D)' }}>
+            Elige el medio y la foto correcta. Antes de guardar verás el voucher anterior junto al nuevo y escribirás el motivo una sola vez.
+          </div>
+          <div role="group" aria-label="Medio del voucher" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {(['YAPE', 'PLIN', 'TRANSFERENCIA'] as const).map((m) => {
+              const activo = medioCambio === m;
+              return (
+                <button
+                  key={m}
+                  type="button"
+                  aria-pressed={activo}
+                  onClick={() => setMedioCambio(m)}
+                  style={{
+                    minHeight: 44,
+                    padding: '6px 16px',
+                    borderRadius: 999,
+                    border: `1.5px solid ${activo ? 'var(--cp-navy, #0B2C3E)' : 'var(--cp-line, #E3D6C6)'}`,
+                    background: activo ? 'var(--cp-navy, #0B2C3E)' : 'var(--cp-white, #FFFFFF)',
+                    color: activo ? 'var(--cp-white, #FFFFFF)' : 'var(--cp-navy, #0B2C3E)',
+                    fontWeight: 800,
+                    fontSize: 13,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {m === 'YAPE' ? 'Yape' : m === 'PLIN' ? 'Plin' : 'Transferencia'}
+                </button>
+              );
+            })}
+          </div>
+          {medioCambio && (
             <SubirVoucherMozo
+              key={medioCambio}
+              cambioDirecto
               pedidoId={pedidoId}
               medio={medioCambio}
-              motivoCambio={motivo.trim()}
               alVoucherValido={() => undefined}
               alRespuesta={() => {
-                setSubiendoCambio(false);
                 setReemplazando(false);
-                setMotivo('');
                 setRecarga((n) => n + 1);
               }}
             />
           )}
+          <Boton variante="secundario" onClick={() => setReemplazando(false)} style={{ alignSelf: 'flex-start' }}>
+            Cancelar
+          </Boton>
         </div>
       )}
-      <Confirmar
-        abierto={confirmando}
-        titulo="Reemplazar el voucher"
-        mensaje="El voucher vigente queda en el historial como reemplazado. Después elige la nueva foto."
-        textoSi="Sí, reemplazar"
-        textoNo="No"
-        alConfirmar={() => {
-          setConfirmando(false);
-          setSubiendoCambio(true);
-        }}
-        alCancelar={() => setConfirmando(false)}
-      />
     </div>
   );
 }
