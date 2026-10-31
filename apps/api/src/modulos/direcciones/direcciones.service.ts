@@ -88,6 +88,31 @@ export class DireccionesService {
     return turno;
   }
 
+  /** Dirección aproximada de un punto (Nominatim /reverse). Null si no hay dato, sin cupo o el proveedor falla. */
+  async inversa(lat: number, lng: number): Promise<string | null> {
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+    if (!this.hayCupoDiario()) return null;
+    try {
+      return await this.encolar(() => this.consultarInversa(lat, lng));
+    } catch (err) {
+      this.logger.warn(`Dirección inversa no disponible: ${(err as Error).message}`);
+      return null;
+    }
+  }
+
+  private async consultarInversa(lat: number, lng: number): Promise<string | null> {
+    const base = this.config.get<string>('NOMINATIM_URL', 'https://nominatim.openstreetmap.org');
+    const contacto = this.config.get<string>('DIRECCIONES_CONTACTO', 'caprichos-cafe');
+    const url = `${base}/reverse?format=jsonv2&zoom=18&accept-language=es&lat=${lat}&lon=${lng}`;
+    const res = await fetch(url, {
+      headers: { 'User-Agent': `Caprichos/1.0 (${contacto})`, 'Accept-Language': 'es' },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const datos = (await res.json()) as { display_name?: string };
+    return datos.display_name?.trim() || null;
+  }
+
   private async consultar(q: string): Promise<ResultadoDireccion[]> {
     const base = this.config.get<string>('NOMINATIM_URL', 'https://nominatim.openstreetmap.org');
     const contacto = this.config.get<string>('DIRECCIONES_CONTACTO', 'caprichos-cafe');

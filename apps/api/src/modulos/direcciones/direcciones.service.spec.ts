@@ -40,4 +40,37 @@ describe('DireccionesService', () => {
     fetchMock.mockRejectedValue(new Error('caído'));
     expect(await crear().buscar('cualquier calle')).toEqual({ resultados: [], apagado: true });
   });
+
+  describe('inversa (dirección aproximada de un punto)', () => {
+    it('llama a /reverse con las coordenadas y devuelve display_name', async () => {
+      fetchMock.mockResolvedValue({ ok: true, json: async () => ({ display_name: 'Av. Brasil 1234, Lima' }) });
+      expect(await crear().inversa(-12.07, -77.05)).toBe('Av. Brasil 1234, Lima');
+      const [url, opts] = fetchMock.mock.calls[0];
+      expect(url).toContain('/reverse?');
+      expect(url).toContain('lat=-12.07');
+      expect(url).toContain('lon=-77.05');
+      expect(opts.headers['User-Agent']).toContain('Caprichos');
+    });
+
+    it('devuelve null si el proveedor falla o responde sin dirección', async () => {
+      fetchMock.mockResolvedValue({ ok: false, status: 503 });
+      expect(await crear().inversa(-12.07, -77.05)).toBeNull();
+      fetchMock.mockResolvedValue({ ok: true, json: async () => ({ error: 'Unable to geocode' }) });
+      expect(await crear().inversa(-12.07, -77.05)).toBeNull();
+    });
+
+    it('no consulta con coordenadas inválidas', async () => {
+      const s = crear();
+      expect(await s.inversa(95, 0)).toBeNull();
+      expect(await s.inversa(0, NaN)).toBeNull();
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('respeta el tope diario compartido con la búsqueda', async () => {
+      const s = crear(1);
+      await s.buscar('primera calle');
+      expect(await s.inversa(-12.07, -77.05)).toBeNull();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+  });
 });

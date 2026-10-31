@@ -325,6 +325,17 @@ describe('MensajesService', () => {
     expect(d.voucher).toBeNull();
   });
 
+  it('detalle entrega la ubicación del cliente tal cual (lat, lng, dirección y aproximada)', async () => {
+    const ubicacion = { lat: -12.07, lng: -77.04, nombre: 'Casa', direccion: 'Av. Brasil 1234', direccionAprox: 'Jesús María, Lima' };
+    prisma.mensajeChat.findMany.mockResolvedValueOnce([
+      { id: 12n, autor: 'CLIENTE', direccion: 'ENTRA', tipo: 'TEXTO', contenido: { texto: 'Av. Brasil 1234', ubicacion }, en: new Date() },
+      { id: 13n, autor: 'CLIENTE', direccion: 'ENTRA', tipo: 'TEXTO', contenido: { texto: 'Hola' }, en: new Date() },
+    ]);
+    const d = await service.detalle('1', usuarioAdmin);
+    expect(d.mensajes[0]).toMatchObject({ texto: 'Av. Brasil 1234', ubicacion });
+    expect(d.mensajes[1].ubicacion).toBeNull();
+  });
+
   it('respuestasRapidas lista las plantillas activas', async () => {
     const rr = await service.respuestasRapidas();
     expect(rr.length).toBe(1);

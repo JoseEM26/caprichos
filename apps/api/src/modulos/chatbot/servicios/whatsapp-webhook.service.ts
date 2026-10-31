@@ -39,6 +39,8 @@ import { marcarPagoParaPersona } from './pago-para-persona.util';
 import { pedidoEsperandoVoucher } from './pedido-esperando-voucher.util';
 import { OutboxWhatsappService } from './outbox-whatsapp.service';
 import { interpretarPuntajeEncuesta } from './encuesta-posventa.util';
+import { ubicacionValida, UbicacionCliente } from './ubicacion-cliente.util';
+import { DireccionesService } from '../../direcciones/direcciones.service';
 import { textoGraciasEncuesta } from '../conversacion/textos-encuesta';
 import { leerParametroNumerico } from '../../impresion/estado-impresion';
 import {
@@ -88,6 +90,7 @@ export class WhatsappWebhookService {
     @Optional() private readonly reprogramacion?: ReprogramacionService,
     @Optional() private readonly outbox?: OutboxWhatsappService,
     @Optional() private readonly redis?: RedisService,
+    @Optional() private readonly direcciones?: DireccionesService,
   ) {
     this.verifyToken = this.configService.get<string>('WHATSAPP_VERIFY_TOKEN', '').trim();
     this.appSecret = this.configService.get<string>('WHATSAPP_APP_SECRET', '').trim();
@@ -617,25 +620,34 @@ export class WhatsappWebhookService {
       }
     }
 
-    // Registrar mensaje en mensaje_chat del módulo de mensajes
-    await this.prisma.mensajeChat.create({
-      data: {
-        conversacion_id: conversacion.id,
-        direccion: 'ENTRA',
-        autor: 'CLIENTE',
-        tipo: esNoCompatible
-          ? tipoChatNoCompatible(clasificacion.subtipo)
-          : tipoRegistro === 'IMAGEN'
-            ? 'IMAGEN'
-            : 'TEXTO',
-        contenido: archivoMensajeId
-          ? { texto, archivoId: archivoMensajeId }
-          : esNoCompatible
-            ? { texto, clase: clasificacion.clase, subtipo: clasificacion.subtipo, etiqueta: clasificacion.etiqueta, waMessageId: waMessageId || null }
-            : { texto },
-        meta_id: waMessageId || null,
-      },
-    });
+    // Registrar mensaje en mensaje_chat del módulo de mensajes (la ubicación conserva sus coordenadas)
+    const ubicacionGuardada: UbicacionCliente | null =
+      ubicacion && ubicacionValida(ubicacion.latitud, ubicacion.longitud)
+        ? { lat: ubicacion.latitud, lng: ubicacion.longitud, nombre: ubicacion.nombre, direccion: ubicacion.direccion }
+        : null;
+    const ubicacionChat = await this.prisma.mensajeChat
+      .create({
+        data: {
+          conversacion_id: conversacion.id,
+          direccion: 'ENTRA',
+          autor: 'CLIENTE',
+          tipo: esNoCompatible
+            ? tipoChatNoCompatible(clasificacion.subtipo)
+            : tipoRegistro === 'IMAGEN'
+              ? 'IMAGEN'
+              : 'TEXTO',
+          contenido: archivoMensajeId
+            ? { texto, archivoId: archivoMensajeId }
+            : esNoCompatible
+              ? { texto, clase: clasificacion.clase, subtipo: clasificacion.subtipo, etiqueta: clasificacion.etiqueta, waMessageId: waMessageId || null }
+              : ubicacionGuardada
+                ? { texto, ubicacion: ubicacionGuardada }
+                : { texto },
+          meta_id: waMessageId || null,
+        },
+      })
+      .then((m) => (ubicacionGuardada ? { id: m.id, ubicacion: ubicacionGuardada } : null));
+    if (ubicacionChat) void this.completarDireccionUbicacion(ubicacionChat.id, conversacion.id, ubicacionChat.ubicacion);
 
     // Registrar en tabla whatsapp_mensaje
     await this.prisma.whatsappMensaje.create({
@@ -788,6 +800,28 @@ export class WhatsappWebhookService {
     }
 
     return true;
+  }
+
+  /** Pone la dirección aproximada en la ubicación del chat. No bloquea al bot: si falla, la ubicación queda sin dirección. */
+  private async completarDireccionUbicacion(
+    mensajeId: bigint,
+    conversacionId: bigint,
+    ubicacion: UbicacionCliente,
+  ): Promise<void> {
+    try {
+      const direccionAprox = this.direcciones ? await this.direcciones.inversa(ubicacion.lat, ubicacion.lng) : null;
+      if (!direccionAprox) return;
+      const fila = await this.prisma.mensajeChat.findUnique({ where: { id: mensajeId }, select: { contenido: true } });
+      const contenido = (fila?.contenido as any) ?? {};
+      if (!contenido.ubicacion) return;
+      await this.prisma.mensajeChat.update({
+        where: { id: mensajeId },
+        data: { contenido: { ...contenido, ubicacion: { ...contenido.ubicacion, direccionAprox } } as any },
+      });
+      this.eventos?.emitirAdmin('mensajes:actualizado', { id: conversacionId.toString() });
+    } catch (err: any) {
+      this.logger.warn(`No se pudo obtener la dirección de la ubicación: ${err?.message}`);
+    }
   }
 
   /**

@@ -1,3 +1,5 @@
+import type { UbicacionChat } from './TarjetaUbicacion';
+
 export type EstadoChat = 'bot' | 'atencion' | 'validar' | 'atendido' | 'pausado';
 export type FiltroChat = 'todos' | 'atender' | 'bot' | 'atendidos';
 
@@ -8,6 +10,7 @@ export interface MensajeItem {
   imagen: boolean;
   imagenId?: string | null;
   texto: string;
+  ubicacion?: UbicacionChat | null;
   hora: string;
   estado?: string;
   errorCodigo?: string | null;

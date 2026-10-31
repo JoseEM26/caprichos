@@ -28,6 +28,8 @@ import { AvisosPedidoService } from './servicios/avisos-pedido.service';
 import { ReprogramacionService } from './servicios/reprogramacion.service';
 import { OutboxWhatsappService } from './servicios/outbox-whatsapp.service';
 import { AdminWhatsappSalientesController } from './controladores/admin-whatsapp-salientes.controller';
+import { UbicacionWhatsappController } from './controladores/ubicacion-whatsapp.controller';
+import { DireccionesModule } from '../direcciones/direcciones.module';
 import { AccesoModule } from '../acceso/acceso.module';
 import { RecordatorioReservasTarea } from './servicios/recordatorio-reservas.tarea';
 import { TareaRecordatorioPagoService } from './servicios/tarea-recordatorio-pago.service';
@@ -53,8 +55,9 @@ import { ColaWebhookService } from './servicios/cola-webhook.service';
     forwardRef(() => AvisosInternosModule),
     forwardRef(() => VouchersModule),
     AccesoModule,
+    DireccionesModule,
   ],
-  controllers: [WhatsappWebhookController, QuejasWhatsappController, AdminWhatsappSalientesController],
+  controllers: [WhatsappWebhookController, QuejasWhatsappController, AdminWhatsappSalientesController, UbicacionWhatsappController],
   providers: [
     { provide: CUENTA_CLIENTE_BOT_PUERTO, useExisting: ClientesService },
     WhatsAppMetaAdaptador,

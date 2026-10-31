@@ -26,6 +26,7 @@ import { useSesion } from '../../comun/sesion';
 import { TarjetaLecturaVoucher } from '../vouchers/TarjetaLecturaVoucher';
 import { ReasignarVoucherBoton } from '../vouchers/ReasignarVoucherBoton';
 import { SalientesWhatsApp } from './SalientesWhatsApp';
+import { TarjetaUbicacion } from './TarjetaUbicacion';
 import { InsigniaBloqueoSpam, ModalDesbloquearSpam } from './BloqueoSpam';
 import { salientesApi } from './salientesApi';
 import { FotoAmpliable } from '../vouchers/FotoAmpliable';
@@ -1148,7 +1149,11 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
                             puedeVer={tieneVouchersVer}
                           />
                         )}
-                        <div className="cv-txt">{m.texto}</div>
+                        {m.ubicacion ? (
+                          <TarjetaUbicacion ubicacion={m.ubicacion} />
+                        ) : (
+                          <div className="cv-txt">{m.texto}</div>
+                        )}
                         <div className="cv-meta" style={{ flexWrap: 'wrap', gap: '6px' }}>
                           <span>{m.hora}</span>
                           {!esCliente && (
