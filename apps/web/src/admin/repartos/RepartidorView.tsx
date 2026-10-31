@@ -9,6 +9,7 @@ import { Icono } from '../../comun/Icono';
 import { ModalReportarFalla } from './ModalReportarFalla';
 import { MapaRepartidor, type PuntoRepartidor, type PosicionMarcador } from './MapaRepartidor';
 import { HojaInferior } from './HojaInferior';
+import { SaltarPedidoModal } from './SaltarPedidoModal';
 import { colorOpcion } from './OpcionesRutaSugerida';
 import { HojaRutasSugeridas, ALTO_PLEGADA_PX, FRACCION_MEDIA, type AlturaRutas } from './HojaRutasSugeridas';
 import { useRutasSugeridas } from './useRutasSugeridas';
@@ -18,6 +19,7 @@ import {
   AvisoRepartidor,
   PedidoProximo,
   PedidoReparto,
+  MotivoSalto,
   RespuestaMios,
   ResumenRepartidor,
 } from './repartosApi';
@@ -130,28 +132,42 @@ export function BotonEtapa({
   etapa,
   grande = false,
   onAccion,
+  bloqueadoPor,
 }: {
   pedido: PedidoReparto;
   etapa: InfoEtapa;
   grande?: boolean;
   onAccion: (p: PedidoReparto, etapa: EtapaId) => void;
+  /** Motivo por el que no se puede avanzar todavía (orden de entrega); deshabilita el botón. */
+  bloqueadoPor?: string;
 }) {
   return (
-    <button
-      type="button"
-      data-testid={`btn-${etapa.id}-${pedido.id}`}
-      onClick={() => onAccion(pedido, etapa.id)}
-      style={{
-        ...botonBase,
-        width: '100%',
-        minHeight: grande ? 56 : 48,
-        fontSize: grande ? 17 : 15,
-        background: etapa.fondo,
-        color: etapa.color,
-      }}
-    >
-      {etapa.texto}
-    </button>
+    <>
+      <button
+        type="button"
+        data-testid={`btn-${etapa.id}-${pedido.id}`}
+        disabled={!!bloqueadoPor}
+        aria-describedby={bloqueadoPor ? `motivo-${pedido.id}` : undefined}
+        onClick={() => onAccion(pedido, etapa.id)}
+        style={{
+          ...botonBase,
+          width: '100%',
+          minHeight: grande ? 56 : 48,
+          fontSize: grande ? 17 : 15,
+          background: etapa.fondo,
+          color: etapa.color,
+          opacity: bloqueadoPor ? 0.45 : 1,
+          cursor: bloqueadoPor ? 'not-allowed' : 'pointer',
+        }}
+      >
+        {etapa.texto}
+      </button>
+      {bloqueadoPor && (
+        <div id={`motivo-${pedido.id}`} data-testid={`motivo-bloqueo-${pedido.id}`} style={{ fontSize: 13, fontWeight: 800, color: 'var(--cp-rust)' }}>
+          {bloqueadoPor}
+        </div>
+      )}
+    </>
   );
 }
 
@@ -349,10 +365,14 @@ interface DetalleProps {
   alTomar: (p: PedidoReparto) => void;
   alEtapa: (p: PedidoReparto, etapa: EtapaId) => void;
   alReportar: (p: PedidoReparto) => void;
+  /** Orden de entrega de la ruta (solo con pedidos que ya tienen orden). */
+  orden?: { siguiente: PedidoReparto | null; pendientes: number; enCurso: boolean };
+  alEmpezarPor?: (p: PedidoReparto) => void;
+  alSaltar?: (p: PedidoReparto) => void;
 }
 
 /** Contenido de la hoja de un pedido: lo que dice el servidor y las acciones que le tocan según su estado. */
-function DetallePedido({ id, mio, disponible, proximo, enRuta, recarga, alAlternarRuta, alTomar, alEtapa, alReportar }: DetalleProps) {
+function DetallePedido({ id, mio, disponible, proximo, enRuta, recarga, alAlternarRuta, alTomar, alEtapa, alReportar, orden, alEmpezarPor, alSaltar }: DetalleProps) {
   const [resumen, setResumen] = useState<ResumenRepartidor | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -377,6 +397,9 @@ function DetallePedido({ id, mio, disponible, proximo, enRuta, recarga, alAltern
   const direccion = mio?.direccion ?? resumen.direccion;
   const telefono = mio?.cliente_telefono ?? resumen.telefono;
   const fila: CSSProperties = { display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 14 };
+  const conOrden = !!mio && mio.ordenRuta != null && !!orden?.siguiente;
+  const noLeToca = conOrden && orden!.siguiente!.id !== mio!.id;
+  const botonOrden: CSSProperties = { ...botonBase, width: '100%', minHeight: 48, background: 'var(--cp-white)', color: 'var(--cp-navy)', border: '1.5px solid var(--cp-navy)', fontSize: 14 };
 
   return (
     <div data-testid="detalle-pedido" style={{ display: 'flex', flexDirection: 'column', gap: 10, fontFamily: FUENTE_TEXTO, color: 'var(--cp-navy)' }}>
@@ -441,7 +464,23 @@ function DetallePedido({ id, mio, disponible, proximo, enRuta, recarga, alAltern
       {mio ? (
         <>
           <ContactoPedido pedido={mio} />
-          <BotonEtapa pedido={mio} etapa={etapaDe(mio)} grande onAccion={alEtapa} />
+          <BotonEtapa
+            pedido={mio}
+            etapa={etapaDe(mio)}
+            grande
+            onAccion={alEtapa}
+            bloqueadoPor={noLeToca ? `Siguiente: ${orden!.siguiente!.codigo}` : undefined}
+          />
+          {conOrden && !orden!.enCurso && orden!.pendientes > 1 && alEmpezarPor && mio.estado === 'LISTO' && (
+            <button type="button" data-testid={`btn-empezar-por-${mio.id}`} onClick={() => alEmpezarPor(mio)} style={botonOrden}>
+              Empezar por este
+            </button>
+          )}
+          {conOrden && !noLeToca && orden!.pendientes > 1 && alSaltar && (
+            <button type="button" data-testid={`btn-saltar-${mio.id}`} onClick={() => alSaltar(mio)} style={botonOrden}>
+              Saltar este pedido
+            </button>
+          )}
           <BotonReportar pedido={mio} onReportar={alReportar} />
         </>
       ) : disponible ? (
@@ -551,6 +590,8 @@ export function RepartidorView() {
   const [confirmacion, setConfirmacion] = useState<ConfirmarAccionModal>({ abierto: false, titulo: '', mensaje: '', accion: async () => {} });
   const [ejecutando, setEjecutando] = useState(false);
   const [pedidoParaFalla, setPedidoParaFalla] = useState<PedidoReparto | null>(null);
+  const [pedidoParaSaltar, setPedidoParaSaltar] = useState<PedidoReparto | null>(null);
+  const [saltando, setSaltando] = useState(false);
   const [opcionSugeridaId, setOpcionSugeridaId] = useState<string | null>(null);
   const [alturaRutas, setAlturaRutas] = useState<AlturaRutas>('plegada');
   const [verTodoRutas, setVerTodoRutas] = useState(0);
@@ -614,6 +655,41 @@ export function RepartidorView() {
   }, [datosMios]);
 
   const cupo = Math.max(0, maxPedidos - pedidosActivos.length);
+
+  // Orden de entrega vigente: le toca el de menor orden aún pendiente (los sin orden no cuentan)
+  const ordenRuta = useMemo(() => {
+    const conOrden = pedidosActivos
+      .filter((p) => p.ordenRuta != null && (p.estado === 'LISTO' || p.estado === 'EN_CAMINO'))
+      .sort((a, b) => a.ordenRuta! - b.ordenRuta!);
+    return { siguiente: conOrden[0] ?? null, pendientes: conOrden.length, enCurso: conOrden.some((p) => p.estado === 'EN_CAMINO') };
+  }, [pedidosActivos]);
+
+  const empezarPor = async (p: PedidoReparto) => {
+    setHoja(null);
+    try {
+      await repartosApi.empezarPor(p.id);
+      setAviso({ tipo: 'ok', texto: `Empiezas por ${p.codigo}; el resto quedó por cercanía` });
+    } catch (err: any) {
+      setAviso({ tipo: 'error', texto: err?.message || 'No se pudo cambiar el orden' });
+    }
+    await cargarDatos();
+  };
+
+  const saltarPedido = async (motivo: MotivoSalto, detalle?: string) => {
+    if (!pedidoParaSaltar) return;
+    setSaltando(true);
+    try {
+      await repartosApi.saltar(pedidoParaSaltar.id, { motivo, detalle });
+      setAviso({ tipo: 'ok', texto: `${pedidoParaSaltar.codigo} pasó al final de tu ruta` });
+      setHoja(null);
+    } catch (err: any) {
+      setAviso({ tipo: 'error', texto: err?.message || 'No se pudo saltar el pedido' });
+    } finally {
+      setSaltando(false);
+      setPedidoParaSaltar(null);
+    }
+    await cargarDatos();
+  };
   const dispPorId = useMemo(() => new Map(disponibles.map((p) => [p.id, p])), [disponibles]);
 
   // Un pedido de la ruta armada que deja de estar disponible se quita y se avisa
@@ -663,6 +739,7 @@ export function RepartidorView() {
               color: clasificarEspera(p.minutosEspera, config).color,
               numero: idx + 1,
               disponible: true,
+              siguiente: ordenRuta.siguiente?.id === p.id,
             }],
       );
     }
@@ -695,7 +772,7 @@ export function RepartidorView() {
           }],
     );
     return [...libres, ...grises];
-  }, [vista, pedidosActivos, disponibles, proximos, miRuta, config]);
+  }, [vista, pedidosActivos, disponibles, proximos, miRuta, config, ordenRuta]);
 
   const linea: Array<[number, number]> = useMemo(() => {
     const paradas = puntos
@@ -1067,6 +1144,9 @@ export function RepartidorView() {
               alTomar={acciones.tomar}
               alEtapa={ejecutarEtapa}
               alReportar={setPedidoParaFalla}
+              orden={ordenRuta}
+              alEmpezarPor={empezarPor}
+              alSaltar={setPedidoParaSaltar}
             />
           )}
           {hoja.tipo === 'hechos' && <HechosHoy hechos={hechosHoy} />}
@@ -1154,6 +1234,14 @@ export function RepartidorView() {
         alConfirmar={alSalir}
         alCancelar={() => setConfirmarSalida(false)}
       />
+      {pedidoParaSaltar && (
+        <SaltarPedidoModal
+          codigo={pedidoParaSaltar.codigo}
+          cargando={saltando}
+          alConfirmar={saltarPedido}
+          alCancelar={() => setPedidoParaSaltar(null)}
+        />
+      )}
       {pedidoParaFalla && (
         <ModalReportarFalla
           pedido={pedidoParaFalla}

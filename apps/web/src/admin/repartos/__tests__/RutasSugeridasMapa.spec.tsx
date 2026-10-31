@@ -24,7 +24,9 @@ const leaflet = vi.hoisted(() => {
     lineas.push(l);
     return l;
   });
-  return { m, polilinea, lineas };
+  const zoom = vi.fn();
+  const crearMapa = vi.fn();
+  return { m, polilinea, lineas, zoom, crearMapa };
 });
 
 vi.mock('../../../comun/mapa/leaflet', () => {
@@ -37,8 +39,11 @@ vi.mock('../../../comun/mapa/leaflet', () => {
     ATRIBUCION: '',
     URL_TESELAS: '',
     L: {
-      map: () => leaflet.m,
-      control: { zoom: capa, attribution: capa },
+      map: (...a: unknown[]) => {
+        leaflet.crearMapa(...a);
+        return leaflet.m;
+      },
+      control: { zoom: (...a: unknown[]) => { leaflet.zoom(...a); return capa(); }, attribution: capa },
       tileLayer: capa,
       polyline: leaflet.polilinea,
       latLngBounds: (coords: unknown) => ({ coords, pad: () => coords }),
@@ -91,7 +96,7 @@ describe('RepartidorView: rutas sugeridas sobre el mapa', () => {
   it('abre plegada y ningún overlay con eventos cubre el mapa (plegada ni media)', async () => {
     const hoja = await abrir();
     expect(hoja).toHaveAttribute('data-altura', 'plegada');
-    expect(hoja.style.height).toBe('96px');
+    expect(hoja.style.height).toBe('136px');
     const sinCapaSobreElMapa = () => {
       const mapa = screen.getByTestId('mapa-repartidor');
       const vista = screen.getByTestId('vista-repartidor');
@@ -182,5 +187,24 @@ describe('RepartidorView: rutas sugeridas sobre el mapa', () => {
     await waitFor(() => expect(screen.getByTestId('hoja-rutas')).toHaveTextContent('Otro repartidor tomó parte de esta ruta'));
     expect(screen.getByTestId('chip-ruta-ra')).toHaveAttribute('aria-pressed', 'false');
     await waitFor(() => expect((repartosApi.listarRutasSugeridas as any).mock.calls.length).toBeGreaterThan(antes));
+  });
+
+  it('no hay control de zoom de Leaflet y el zoom táctil, doble toque y rueda están activos', async () => {
+    await abrir();
+    expect(leaflet.zoom).not.toHaveBeenCalled();
+    expect(leaflet.crearMapa.mock.calls[0][1]).toMatchObject({ zoomControl: false, touchZoom: true, doubleClickZoom: true, scrollWheelZoom: true });
+  });
+
+  it('la cabecera tiene título, Ver todo y Cerrar (icono con aria-label) separados y del mismo alto', async () => {
+    await abrir();
+    const cab = screen.getByTestId('cabecera-rutas');
+    expect(within(cab).getByRole('heading', { name: 'Rutas sugeridas' })).toBeInTheDocument();
+    const ver = within(cab).getByRole('button', { name: /Ver todas las rutas/ });
+    const cerrar = within(cab).getByRole('button', { name: 'Cerrar rutas sugeridas' });
+    expect(ver.parentElement).toBe(cerrar.parentElement);
+    expect(ver.parentElement!.style.gap).toBe('8px');
+    expect(ver.style.minHeight).toBe('44px');
+    expect(cerrar.style.minHeight).toBe('44px');
+    expect(ver.style.padding).toBe('0px 12px');
   });
 });

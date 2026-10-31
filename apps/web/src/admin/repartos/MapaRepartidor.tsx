@@ -36,6 +36,8 @@ export interface PuntoRepartidor {
   disponible: boolean;
   /** Texto de estado de los grises ("En cocina", "Por validar"). */
   estadoTexto?: string;
+  /** El pedido que le toca entregar ahora: borde grueso y etiqueta «Siguiente». */
+  siguiente?: boolean;
 }
 
 export interface PosicionMarcador {
@@ -114,6 +116,9 @@ function Marcador({
   const inicio = useRef<{ x: number; y: number } | null>(null);
   const ultimo = useRef<{ x: number; y: number } | null>(null);
   const arrastrando = useRef(false);
+  // Punteros apoyados en este marcador: con dos es un pellizco del mapa, no un toque ni un arrastre
+  const activos = useRef(new Set<number>());
+  const pellizco = useRef(false);
   const posRef = useRef(pos);
   posRef.current = pos;
 
@@ -130,6 +135,13 @@ function Marcador({
 
   const alBajar = (e: PointerEvent<HTMLButtonElement>) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (activos.current.size === 0) pellizco.current = false;
+    activos.current.add(e.pointerId);
+    if (activos.current.size > 1) {
+      pellizco.current = true;
+      cancelar();
+      return;
+    }
     largo.current = false;
     arrastrando.current = false;
     inicio.current = { x: e.clientX, y: e.clientY };
@@ -140,7 +152,7 @@ function Marcador({
 
   const alMover = (e: PointerEvent<HTMLButtonElement>) => {
     const i = inicio.current;
-    if (!i || !Number.isFinite(e.clientX)) return;
+    if (!i || pellizco.current || !Number.isFinite(e.clientX)) return;
     // Si el dedo se arrastra es un gesto del mapa, no una presión larga: se cancela y se mueve el mapa.
     // Los marcadores viven fuera del panel de Leaflet, así que el arrastre no le llega solo.
     if (!arrastrando.current && Math.hypot(e.clientX - i.x, e.clientY - i.y) > 12) {
@@ -172,9 +184,11 @@ function Marcador({
       data-testid={`marcador-${punto.id}`}
       data-color={punto.disponible ? punto.color : 'gris'}
       data-numero={punto.numero ?? ''}
+      data-siguiente={punto.siguiente ? 'true' : undefined}
       aria-label={`Pedido ${punto.codigo} de ${punto.cliente}, ${descripcion}. Mantén presionado para ver opciones`}
       aria-pressed={punto.disponible ? enRuta : undefined}
       onClick={() => {
+        if (pellizco.current) return;
         if (largo.current || arrastrando.current) {
           largo.current = false;
           arrastrando.current = false;
@@ -184,9 +198,18 @@ function Marcador({
       }}
       onPointerDown={alBajar}
       onPointerMove={alMover}
-      onPointerUp={cancelar}
-      onPointerLeave={cancelar}
-      onPointerCancel={cancelar}
+      onPointerUp={(e) => {
+        activos.current.delete(e.pointerId);
+        cancelar();
+      }}
+      onPointerLeave={(e) => {
+        if (e.pointerType === 'mouse') activos.current.delete(e.pointerId);
+        cancelar();
+      }}
+      onPointerCancel={(e) => {
+        activos.current.delete(e.pointerId);
+        cancelar();
+      }}
       onContextMenu={(e) => {
         e.preventDefault();
         cancelar();
@@ -203,7 +226,7 @@ function Marcador({
           borderRadius: '50%',
           background: fondo,
           color: punto.disponible && punto.color === 'amarillo' ? 'var(--cp-navy)' : punto.disponible ? 'var(--cp-white)' : 'var(--cp-soft)',
-          border: `3px ${punto.disponible ? 'solid' : 'dashed'} ${enRuta ? 'var(--cp-navy)' : 'var(--cp-white)'}`,
+          border: `${punto.siguiente ? 5 : 3}px ${punto.disponible ? 'solid' : 'dashed'} ${enRuta ? 'var(--cp-navy)' : 'var(--cp-white)'}`,
           boxShadow: enRuta ? '0 0 0 3px var(--cp-orange), 0 2px 6px rgba(11,44,62,.4)' : '0 2px 6px rgba(11,44,62,.35)',
           display: 'flex',
           alignItems: 'center',
@@ -237,6 +260,7 @@ function Marcador({
         <strong style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{punto.cliente}</strong>
         <span style={{ fontSize: 10, fontWeight: 700 }}>{punto.codigo}</span>
         {!punto.disponible && punto.estadoTexto && <span style={{ fontSize: 10 }}>{punto.estadoTexto}</span>}
+        {punto.siguiente && <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--cp-orange)' }}>Siguiente</span>}
       </span>
     </button>
   );
@@ -265,8 +289,13 @@ export function MapaRepartidor({ puntos, linea, vistaClave, alTocar, alAbrirOpci
   // 1. Inicialización de Leaflet
   useEffect(() => {
     if (!contenedorRef.current) return;
-    const map = L.map(contenedorRef.current, { zoomControl: false, attributionControl: false }).setView(SEDE, ZOOM_BARRIO);
-    L.control.zoom({ position: 'bottomleft' }).addTo(map);
+    const map = L.map(contenedorRef.current, {
+      zoomControl: false, // sin botones + / -: el zoom es con los dedos, doble toque y rueda
+      attributionControl: false,
+      touchZoom: true,
+      doubleClickZoom: true,
+      scrollWheelZoom: true,
+    }).setView(SEDE, ZOOM_BARRIO);
     L.tileLayer(URL_TESELAS, { attribution: ATRIBUCION, maxZoom: 19 }).addTo(map);
     L.control.attribution({ position: 'bottomright', prefix: false }).addTo(map);
     mapaRef.current = map;

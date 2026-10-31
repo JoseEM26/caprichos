@@ -19,6 +19,7 @@ import { ActualizarConfigRepartoDto } from './dto/actualizar-config-reparto.dto'
 import { IniciarRutaDto } from './dto/iniciar-ruta.dto';
 import { LiberarPedidoDto } from './dto/liberar-pedido.dto';
 import { ReasignarPedidoDto } from './dto/reasignar-pedido.dto';
+import { SaltarPedidoDto } from './dto/saltar-pedido.dto';
 import { TomarRutaDto } from './dto/tomar-ruta.dto';
 import { TomarRutaSugeridaDto } from './dto/tomar-ruta-sugerida.dto';
 
@@ -176,6 +177,20 @@ export class RepartosController {
   async entregar(@Param('id') id: string, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.repartosService.entregar(id, req.usuario, ip);
+  }
+
+  @Post(':id/empezar-por')
+  @Permiso('repartos', 'tomar')
+  async empezarPor(@Param('id') id: string, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.repartosService.empezarPor(id, req.usuario, ip);
+  }
+
+  @Post(':id/saltar')
+  @Permiso('repartos', 'entregar')
+  async saltar(@Param('id') id: string, @Body() dto: SaltarPedidoDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.repartosService.saltar(id, dto, req.usuario, ip);
   }
 
   @Post(':id/reportar')

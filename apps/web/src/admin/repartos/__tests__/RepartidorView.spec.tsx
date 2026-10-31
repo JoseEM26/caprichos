@@ -397,6 +397,8 @@ describe('RepartidorView: pantalla toda mapa del repartidor', () => {
 
     it('14. acciones de mi pedido según su estado, con Confirmar Sí/No', async () => {
       const spySalir = vi.spyOn(repartosApi, 'salir').mockResolvedValue({} as any);
+      // 101 es el que le toca (orden 1): con el orden obligatorio solo ese puede salir
+      vi.spyOn(repartosApi, 'listarMios').mockResolvedValue({ pedidos: [{ ...mio1, ordenRuta: 1 }, { ...mio2, ordenRuta: 2 }], orden: ['101', '102'], paso: [], ruta: [] });
       await abrirDetalleMio();
 
       const btn = screen.getByTestId('btn-salir-101');

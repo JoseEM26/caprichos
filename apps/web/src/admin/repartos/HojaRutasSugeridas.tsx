@@ -4,13 +4,14 @@ import { Confirmar } from '../../comun/Confirmar';
 import { ErrorApi } from '../../comun/api';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
+import { Icono } from '../../comun/Icono';
 import { colorOpcion } from './OpcionesRutaSugerida';
 import { OpcionRutaSugerida, RespuestaRutasSugeridas, repartosApi } from './repartosApi';
 
 export type AlturaRutas = 'plegada' | 'media';
 
-/** Alto de la tira plegada: asa y botones (44 px) más una fila de chips (44 px) y un respiro. */
-export const ALTO_PLEGADA_PX = 96;
+/** Alto de la tira plegada: asa (44 px), cabecera con título y botones (44 px) y fila de chips (44 px). */
+export const ALTO_PLEGADA_PX = 136;
 /** Fracción del alto de la pantalla que ocupa la hoja a media altura. */
 export const FRACCION_MEDIA = 0.4;
 /** Cuánto hay que arrastrar el asa para cambiar de altura. */
@@ -22,6 +23,10 @@ const botonChico: CSSProperties = {
   minWidth: 44,
   minHeight: 44,
   padding: '0 12px',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 6,
   borderRadius: 12,
   border: '1.5px solid var(--cp-line)',
   background: 'var(--cp-cream)',
@@ -134,7 +139,7 @@ export function HojaRutasSugeridas({
     tira = (
       <div
         data-testid="chips-rutas"
-        style={{ display: 'flex', gap: 8, overflowX: 'auto', touchAction: 'pan-x', overscrollBehavior: 'contain', paddingBottom: 2 }}
+        style={{ display: 'flex', gap: 8, overflowX: 'auto', touchAction: 'pan-x', overscrollBehavior: 'contain', padding: '0 12px 8px' }}
       >
         {opciones.map((o, i) => {
           const color = colorOpcion(i);
@@ -155,13 +160,15 @@ export function HojaRutasSugeridas({
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
-                whiteSpace: 'nowrap',
+                maxWidth: 260,
                 background: activa ? 'var(--cp-white)' : 'var(--cp-cream)',
                 border: activa ? `2.5px solid ${color}` : '1.5px solid var(--cp-line)',
               }}
             >
               <span aria-hidden="true" style={{ width: 12, height: 12, borderRadius: '50%', background: color, flexShrink: 0 }} />
-              Ruta {i + 1} · {o.sector} · {o.pedidos.length} {o.pedidos.length === 1 ? 'pedido' : 'pedidos'} · {o.distanciaKm} km
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                Ruta {i + 1} · {o.sector} · {o.pedidos.length} {o.pedidos.length === 1 ? 'pedido' : 'pedidos'} · {o.distanciaKm} km
+              </span>
             </button>
           );
         })}
@@ -192,44 +199,51 @@ export function HojaRutasSugeridas({
         transition: sinMovimiento() ? 'none' : 'height .2s ease',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px 0 8px', flexShrink: 0 }}>
-        <button
-          type="button"
-          data-testid="hoja-rutas-asa"
-          aria-label={media ? 'Plegar rutas sugeridas' : 'Ampliar rutas sugeridas'}
-          aria-expanded={media}
-          onPointerDown={alBajar}
-          onPointerUp={alSoltar}
-          onPointerCancel={alSoltar}
-          onClick={() => {
-            if (arrastrado.current) arrastrado.current = false;
-            else alternar();
-          }}
-          style={{
-            flex: 1,
-            minHeight: 44,
-            border: 'none',
-            background: 'transparent',
-            touchAction: 'none',
-            cursor: 'grab',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <span aria-hidden="true" style={{ width: 44, height: 5, borderRadius: 3, background: 'var(--cp-line2)' }} />
-        </button>
-        <button type="button" data-testid="btn-ver-todo" onClick={alVerTodo} aria-label="Ver todas las rutas en el mapa" style={botonChico}>
-          Ver todo
-        </button>
-        <button type="button" onClick={alCerrar} aria-label="Cerrar rutas sugeridas" style={botonChico}>
-          Cerrar
-        </button>
+      <button
+        type="button"
+        data-testid="hoja-rutas-asa"
+        aria-label={media ? 'Plegar rutas sugeridas' : 'Ampliar rutas sugeridas'}
+        aria-expanded={media}
+        onPointerDown={alBajar}
+        onPointerUp={alSoltar}
+        onPointerCancel={alSoltar}
+        onClick={() => {
+          if (arrastrado.current) arrastrado.current = false;
+          else alternar();
+        }}
+        style={{
+          width: '100%',
+          minHeight: 44,
+          flexShrink: 0,
+          border: 'none',
+          background: 'transparent',
+          touchAction: 'none',
+          cursor: 'grab',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <span aria-hidden="true" style={{ width: 44, height: 5, borderRadius: 3, background: 'var(--cp-line2)' }} />
+      </button>
+      <div data-testid="cabecera-rutas" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '0 12px', flexShrink: 0 }}>
+        <h3 style={{ margin: 0, minWidth: 0, fontFamily: 'var(--fuente-titulos)', fontSize: 16, color: 'var(--cp-navy)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          Rutas sugeridas
+        </h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <button type="button" data-testid="btn-ver-todo" onClick={alVerTodo} aria-label="Ver todas las rutas en el mapa" style={botonChico}>
+            <Icono nombre="mapa" tamano={16} />
+            Ver todo
+          </button>
+          <button type="button" data-testid="btn-cerrar-rutas" onClick={alCerrar} aria-label="Cerrar rutas sugeridas" style={{ ...botonChico, padding: 0 }}>
+            <Icono nombre="cerrar" tamano={18} />
+          </button>
+        </div>
       </div>
-      <div style={{ padding: '0 12px 8px', flexShrink: 0 }}>{tira}</div>
+      <div style={{ flexShrink: 0, paddingTop: 6 }}>{tira}</div>
 
       {media && (
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '4px 16px 16px', overscrollBehavior: 'contain', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '4px 16px 8px', overscrollBehavior: 'contain', display: 'flex', flexDirection: 'column', gap: 10 }}>
           {aviso && (
             <div role="status" data-testid="aviso-rutas" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-navy)' }}>
               {aviso}
@@ -246,7 +260,7 @@ export function HojaRutasSugeridas({
                 <strong>{elegida.tiempoMin} min</strong> · {elegida.razon}
                 {elegida.urgente && <strong style={{ color: 'var(--cp-rust)' }}> · Urgente</strong>}
               </div>
-              <ol data-testid="paradas-ruta" style={{ margin: 0, paddingLeft: 22, fontSize: 14 }}>
+              <ol data-testid="paradas-ruta" style={{ margin: 0, paddingLeft: 22, fontSize: 14, display: 'grid', gap: 10 }}>
                 {elegida.pedidos.map((p) => (
                   <li key={p.id}>
                     {p.codigo} · {p.cliente}
@@ -256,18 +270,22 @@ export function HojaRutasSugeridas({
                   </li>
                 ))}
               </ol>
-              <button
-                type="button"
-                disabled={tomando}
-                onClick={() => setPorTomar(elegida)}
-                style={{ minHeight: 44, borderRadius: 12, border: 'none', background: colorOpcion(indice), color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}
-              >
-                Tomar esta ruta
-              </button>
             </>
           ) : (
             opciones.length > 0 && <p style={{ margin: 0, fontSize: 14, color: 'var(--cp-soft)' }}>Toca una ruta (aquí o en el mapa) para ver sus paradas.</p>
           )}
+        </div>
+      )}
+      {media && elegida && (
+        <div style={{ padding: '8px 16px 12px', flexShrink: 0 }}>
+          <button
+            type="button"
+            disabled={tomando}
+            onClick={() => setPorTomar(elegida)}
+            style={{ width: '100%', minHeight: 48, borderRadius: 12, border: 'none', background: colorOpcion(indice), color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer' }}
+          >
+            Tomar esta ruta
+          </button>
         </div>
       )}
 

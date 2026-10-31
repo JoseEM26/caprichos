@@ -19,6 +19,7 @@ import {
 } from './ruta.service';
 import { FiltrarRepartosDto } from './dto/filtrar-repartos.dto';
 import { montoPendienteReprogramacion } from './recargo-reprogramacion';
+import { SaltarPedidoDto } from './dto/saltar-pedido.dto';
 import { TomarRutaDto } from './dto/tomar-ruta.dto';
 import { TomarRutaSugeridaDto } from './dto/tomar-ruta-sugerida.dto';
 import { leerConfigEta } from './eta-entrega';
@@ -972,6 +973,8 @@ export class RepartosService {
       }
     }
 
+    await this.verificarTurno(pedido);
+
     if (pedido.estado !== 'LISTO') {
       throw new BadRequestException({
         codigo: 'ESTADO_INVALIDO',
@@ -1062,6 +1065,8 @@ export class RepartosService {
         });
       }
     }
+
+    await this.verificarTurno(pedido);
 
     if (pedido.estado !== 'EN_CAMINO') {
       throw new BadRequestException({
@@ -1157,6 +1162,8 @@ export class RepartosService {
         });
       }
     }
+
+    await this.verificarTurno(pedido);
 
     if (pedido.estado !== 'EN_CAMINO') {
       throw new BadRequestException({
@@ -2256,6 +2263,135 @@ export class RepartosService {
           }
         : {}),
     };
+  }
+
+  /**
+   * Orden obligatorio: si el pedido tiene orden_ruta, solo puede avanzar el de menor orden entre los
+   * pendientes (LISTO o EN_CAMINO) del mismo repartidor. Sin orden_ruta (flujo viejo) no se bloquea.
+   */
+  private async verificarTurno(pedido: { id: bigint; orden_ruta?: number | null; repartidor_party_id?: bigint | null }) {
+    if (pedido.orden_ruta == null || pedido.repartidor_party_id == null) return;
+    const toca = await this.prisma.pedido.findFirst({
+      where: {
+        repartidor_party_id: pedido.repartidor_party_id,
+        orden_ruta: { not: null },
+        estado: { in: ['LISTO', 'EN_CAMINO'] },
+      },
+      orderBy: { orden_ruta: 'asc' },
+      select: { id: true, codigo: true },
+    });
+    if (toca && toca.id !== pedido.id) {
+      throw new ConflictException({ codigo: 'ORDEN_RUTA', pedido: toca.codigo, mensaje: `Primero entrega ${toca.codigo}` });
+    }
+  }
+
+  /** Pedidos pendientes del repartidor que ya tienen orden, de menor a mayor orden. */
+  private async pendientesConOrden(tx: any, partyId: bigint) {
+    return tx.pedido.findMany({
+      where: { repartidor_party_id: partyId, orden_ruta: { not: null }, estado: { in: ['LISTO', 'EN_CAMINO'] } },
+      select: { id: true, codigo: true, estado: true, orden_ruta: true, entrega_lat: true, entrega_lng: true },
+      orderBy: { orden_ruta: 'asc' },
+    });
+  }
+
+  /**
+   * POST /admin/repartos/:id/empezar-por (repartos/tomar): el repartidor elige con cuál empieza y el resto se
+   * reordena por vecino más cercano (distancia en línea recta). Solo antes de salir con alguno.
+   */
+  async empezarPor(id: string | bigint, usuario: UsuarioAutenticado, ip?: string) {
+    const pedidoId = this.parsearId(id);
+    const partyId = BigInt(usuario.partyId);
+    const orden = await this.prisma.$transaction(async (tx) => {
+      const lista: any[] = await this.pendientesConOrden(tx, partyId);
+      const elegido = lista.find((p) => p.id === pedidoId);
+      if (!elegido) {
+        throw new ConflictException({ codigo: 'NO_EN_RUTA', mensaje: 'Ese pedido no está en tu ruta' });
+      }
+      if (lista.some((p) => p.estado === 'EN_CAMINO')) {
+        throw new ConflictException({ codigo: 'RUTA_EN_CURSO', mensaje: 'Ya saliste con un pedido: el orden ya no se puede cambiar' });
+      }
+      const sinCoord = lista.filter((p) => p.id !== pedidoId && (p.entrega_lat == null || p.entrega_lng == null));
+      let pendientes = lista.filter((p) => p.id !== pedidoId && !sinCoord.includes(p));
+      const resultado = [elegido];
+      let actual = elegido;
+      while (pendientes.length > 0 && actual.entrega_lat != null) {
+        let mejor = pendientes[0];
+        let mejorKm = Infinity;
+        for (const c of pendientes) {
+          const km = this.rutaService.haversineKm(Number(actual.entrega_lat), Number(actual.entrega_lng), Number(c.entrega_lat), Number(c.entrega_lng));
+          if (km < mejorKm) { mejorKm = km; mejor = c; }
+        }
+        resultado.push(mejor);
+        pendientes = pendientes.filter((p) => p !== mejor);
+        actual = mejor;
+      }
+      resultado.push(...pendientes, ...sinCoord);
+      for (let i = 0; i < resultado.length; i++) {
+        await tx.pedido.update({ where: { id: resultado[i].id }, data: { orden_ruta: i + 1 } });
+      }
+      await tx.pedidoEstadoHistorial.create({
+        data: {
+          pedido_id: pedidoId, estado_anterior: elegido.estado, estado_nuevo: elegido.estado,
+          motivo: 'Empezar por este: ruta reordenada por cercanía', por_party_id: partyId, en: new Date(),
+        },
+      });
+      return resultado.map((p, i) => ({ id: String(p.id), codigo: p.codigo, ordenRuta: i + 1 }));
+    });
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO', modulo: 'repartos', accion: 'EMPEZAR_POR', resultado: 'OK',
+      entidad: 'pedido', entidadId: pedidoId, partyId, ip, despues: { orden },
+    });
+    this.eventosGateway?.emitirAdmin('reparto:rutas', {});
+    return { orden };
+  }
+
+  /**
+   * POST /admin/repartos/:id/saltar (repartos/entregar): el pedido que toca pasa al final del orden.
+   * Pide motivo, queda en el historial del pedido y en auditoría; máximo 2 saltos por pedido.
+   */
+  async saltar(id: string | bigint, dto: SaltarPedidoDto, usuario: UsuarioAutenticado, ip?: string) {
+    const pedidoId = this.parsearId(id);
+    const partyId = BigInt(usuario.partyId);
+    const texto: Record<string, string> = {
+      NO_CONTESTA: 'Cliente no contesta',
+      DIRECCION_NO_ENCONTRADA: 'Dirección no encontrada',
+      TRAFICO: 'Tráfico o vía cerrada',
+      OTRO: 'Otro',
+    };
+    const detalle = (dto.detalle ?? '').trim();
+    if (dto.motivo === 'OTRO' && !detalle) {
+      throw new BadRequestException({ codigo: 'DETALLE_REQUERIDO', mensaje: 'Cuéntanos el motivo del salto' });
+    }
+    const motivo = `Salto de orden: ${texto[dto.motivo]}${detalle ? ` (${detalle})` : ''}`;
+    const nuevoOrden = await this.prisma.$transaction(async (tx) => {
+      const lista: any[] = await this.pendientesConOrden(tx, partyId);
+      const pedido = lista.find((p) => p.id === pedidoId);
+      if (!pedido) throw new ConflictException({ codigo: 'NO_EN_RUTA', mensaje: 'Ese pedido no está en tu ruta' });
+      if (lista[0].id !== pedidoId) {
+        throw new ConflictException({ codigo: 'ORDEN_RUTA', pedido: lista[0].codigo, mensaje: `Primero entrega ${lista[0].codigo}` });
+      }
+      if (lista.length < 2) {
+        throw new ConflictException({ codigo: 'SIN_OTROS', mensaje: 'No hay otro pedido en tu ruta al que pasar el turno' });
+      }
+      const previos = await tx.pedidoEstadoHistorial.count({
+        where: { pedido_id: pedidoId, motivo: { startsWith: 'Salto de orden' } },
+      });
+      if (previos >= 2) {
+        throw new ConflictException({ codigo: 'TOPE_SALTOS', mensaje: 'Ya saltaste este pedido 2 veces: reporta la falla' });
+      }
+      const ultimo = Math.max(...lista.map((p) => p.orden_ruta as number)) + 1;
+      await tx.pedido.update({ where: { id: pedidoId }, data: { orden_ruta: ultimo } });
+      await tx.pedidoEstadoHistorial.create({
+        data: { pedido_id: pedidoId, estado_anterior: pedido.estado, estado_nuevo: pedido.estado, motivo, por_party_id: partyId, en: new Date() },
+      });
+      return ultimo;
+    });
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO', modulo: 'repartos', accion: 'SALTAR', resultado: 'OK',
+      entidad: 'pedido', entidadId: pedidoId, partyId, ip, motivo, despues: { ordenRuta: nuevoOrden },
+    });
+    this.eventosGateway?.emitirAdmin('reparto:rutas', {});
+    return { id: String(pedidoId), ordenRuta: nuevoOrden };
   }
 
   /**

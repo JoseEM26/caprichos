@@ -153,6 +153,8 @@ export interface ResolverFallaDto {
   recargo?: number;
 }
 
+export type MotivoSalto = 'NO_CONTESTA' | 'DIRECCION_NO_ENCONTRADA' | 'TRAFICO' | 'OTRO';
+
 export interface ParadaOpcionRuta {
   id: string;
   codigo: string;
@@ -242,6 +244,14 @@ export const repartosApi = {
 
   salir: (id: string) =>
     api.post<PedidoReparto>(`/admin/repartos/${id}/salir`),
+
+  /** Reordena la ruta por cercanía empezando por este pedido (solo antes de salir). */
+  empezarPor: (id: string) =>
+    api.post<{ orden: Array<{ id: string; codigo: string; ordenRuta: number }> }>(`/admin/repartos/${id}/empezar-por`),
+
+  /** El pedido que toca pasa al final del orden; la API guarda el motivo y limita a 2 saltos. */
+  saltar: (id: string, dto: { motivo: MotivoSalto; detalle?: string }) =>
+    api.post<{ id: string; ordenRuta: number }>(`/admin/repartos/${id}/saltar`, dto),
 
   llegue: (id: string) =>
     api.post<PedidoReparto>(`/admin/repartos/${id}/llegue`),
