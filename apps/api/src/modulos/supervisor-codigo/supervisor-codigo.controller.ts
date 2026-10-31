@@ -19,7 +19,7 @@ export class SupervisorCodigoController {
 
   /**
    * Obtiene el código actual de 6 dígitos calculado por el servidor y los segundos restantes.
-   * Exclusivo para rol ADMIN con permiso supervisor/ver_codigo.
+   * Lo ven el ADMIN y el SUPERVISOR (permiso supervisor/ver_codigo).
    * Envía cabecera Cache-Control: no-store para evitar almacenamiento en cachés intermedias.
    */
   @Get('codigo')
@@ -36,19 +36,20 @@ export class SupervisorCodigoController {
 
   /**
    * Genera el secreto criptográfico inicial de 20 bytes si el local aún no lo tiene.
+   * Solo ADMIN (supervisor/gestionar_codigo): el supervisor no configura el secreto.
    */
   @Post('generar-secreto')
-  @Permiso('supervisor', 'ver_codigo')
+  @Permiso('supervisor', 'gestionar_codigo')
   async generarSecreto(@Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.supervisorCodigoService.generarSecreto(req.usuario.partyId, ip);
   }
 
   /**
-   * Rota el secreto criptográfico del supervisor, invalidando el anterior.
+   * Rota el secreto criptográfico del supervisor, invalidando el anterior. Solo ADMIN.
    */
   @Post('rotar-secreto')
-  @Permiso('supervisor', 'ver_codigo')
+  @Permiso('supervisor', 'gestionar_codigo')
   async rotarSecreto(@Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.supervisorCodigoService.rotarSecreto(req.usuario.partyId, ip);
@@ -71,9 +72,9 @@ export class SupervisorCodigoController {
     return this.supervisorCodigoService.listarBloqueados();
   }
 
-  /** Desbloquea el contador de intentos de un operador. */
+  /** Desbloquea el contador de intentos de un operador. Solo ADMIN. */
   @Post('desbloquear')
-  @Permiso('supervisor', 'ver_codigo')
+  @Permiso('supervisor', 'gestionar_codigo')
   async desbloquear(@Body('operadorPartyId') operadorPartyId: string, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.supervisorCodigoService.desbloquearOperador(operadorPartyId, req.usuario.partyId, ip);

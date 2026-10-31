@@ -1,0 +1,60 @@
+import { describe, it, expect } from 'vitest';
+import { MODULOS } from '../modulos';
+import { ETIQUETAS_ROLES } from '../usuarios/CrearUsuarioModal';
+import { ROLES_SISTEMA } from '@caprichos/compartido';
+
+// Permisos del SUPERVISOR tal como los devuelve la API (MATRIZ.SUPERVISOR en permisos.ts):
+// la unión de CAJERO y MOZO más supervisor/ver_codigo.
+const PERMISOS_SUPERVISOR = [
+  'pedidos/ver', 'pedidos/crear', 'pedidos/cambiar_estado',
+  'caja/abrir', 'caja/cobrar', 'caja/movimientos', 'caja/cerrar', 'caja/ver',
+  'cocina/ver', 'catalogo/ver', 'comprobantes/ver', 'comprobantes/reimprimir',
+  'mesas/ver', 'mesas/liberar', 'mesas/abrir', 'repartos/ver', 'repartos/liquidar',
+  'vouchers/subir', 'vouchers/ver', 'plano/ver', 'reservas/ver', 'reservas/crear', 'reservas/editar',
+  'iniciativas/ver', 'iniciativas/crear', 'iniciativas/comentar',
+  'notificaciones/ver', 'notificaciones/marcar', 'supervisor/ver_codigo',
+];
+
+// Misma regla que useSesion().tiene para un rol que no es ADMIN
+const tiene = (permiso: string) =>
+  PERMISOS_SUPERVISOR.some((p) => p === permiso || p.startsWith(`${permiso}/`));
+
+const visibles = () => MODULOS.filter((m) => !m.permisoMinimo || tiene(m.permisoMinimo)).map((m) => m.clave);
+
+describe('menú del SUPERVISOR', () => {
+  it('no ve los módulos reservados al administrador', () => {
+    const reservados = [
+      'disenador', 'novedades', 'conocenos', 'destacadas', 'paleta', 'mirest', 'zonas',
+      'usuarios', 'historial', 'informes', 'indicadores', 'mapa', 'pantallas', 'mascota',
+      'compras', 'almacen', 'stock', 'recetas', 'clientes', 'ofertas', 'creditos', 'reclamos', 'mensajes',
+    ];
+    const ve = visibles();
+    for (const clave of reservados) {
+      expect(ve, `no debe ver ${clave}`).not.toContain(clave);
+    }
+  });
+
+  it('ve caja, salón, cocina, cobros y la pantalla Código del supervisor', () => {
+    const ve = visibles();
+    for (const clave of ['caja', 'cierre', 'cocina', 'repartos', 'reservas', 'plano', 'comprobantes', 'iniciativas', 'supervisor-codigo']) {
+      expect(ve, `debe ver ${clave}`).toContain(clave);
+    }
+    const codigo = MODULOS.find((m) => m.clave === 'supervisor-codigo');
+    expect(codigo?.nombre).toBe('Código del supervisor');
+    expect(codigo?.grupo).toBe('Configuración');
+  });
+
+  it('Novedades, Conócenos y Destacadas se miran con el permiso que exige su API', () => {
+    const porClave = (c: string) => MODULOS.find((m) => m.clave === c)?.permisoMinimo;
+    expect(porClave('novedades')).toBe('novedades/ver');
+    expect(porClave('conocenos')).toBe('novedades/ver');
+    expect(porClave('destacadas')).toBe('destacadas/ver');
+  });
+});
+
+describe('rol SUPERVISOR en el alta y edición de usuarios', () => {
+  it('aparece en los roles del sistema con su descripción corta', () => {
+    expect(Object.values(ROLES_SISTEMA)).toContain('SUPERVISOR');
+    expect(ETIQUETAS_ROLES.SUPERVISOR).toBe('Supervisor (Caja y salón, y ve el código de supervisor)');
+  });
+});

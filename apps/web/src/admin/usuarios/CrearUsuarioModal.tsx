@@ -35,6 +35,7 @@ export const ETIQUETAS_ROLES: Record<string, string> = {
   BARRA: 'Barra (Bebidas y postres)',
   REPARTIDOR: 'Repartidor (Delivery)',
   CALLCENTER: 'Call center (Atención y pedidos)',
+  SUPERVISOR: 'Supervisor (Caja y salón, y ve el código de supervisor)',
 };
 
 const OPCIONES_ROLES = Object.values(ROLES_SISTEMA).map((rol) => ({
