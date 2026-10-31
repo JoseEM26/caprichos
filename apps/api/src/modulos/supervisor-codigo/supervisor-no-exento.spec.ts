@@ -35,11 +35,13 @@ function montar() {
   const prisma: any = {
     supervisorSecreto: { findUnique: jest.fn(async () => filaSecreto) },
     userAccount: {
-      // Respeta el where como Prisma: sin party_id es la búsqueda del primer ADMIN activo (respaldo)
+      // Respeta el where como Prisma: con party_id busca ese usuario y su rol; sin party_id es el respaldo del ADMIN activo
       findFirst: jest.fn(async ({ where }: any) => {
-        if (where.rol !== 'ADMIN') return null;
-        if (where.party_id !== undefined && where.party_id !== ADMIN) return null;
-        return { party_id: ADMIN, id: 10n };
+        const roles: string[] = where.rol?.in ?? [where.rol];
+        if (where.party_id === undefined) return roles.includes('ADMIN') ? { party_id: ADMIN, id: 10n, rol: 'ADMIN' } : null;
+        if (where.party_id === ADMIN && roles.includes('ADMIN')) return { party_id: ADMIN, id: 10n, rol: 'ADMIN' };
+        if (where.party_id === SUPERVISOR && roles.includes('SUPERVISOR')) return { party_id: SUPERVISOR, id: 30n, rol: 'SUPERVISOR' };
+        return null;
       }),
       findUnique: jest.fn(async ({ where }: any) => {
         if (where.party_id === SUPERVISOR) return { party_id: SUPERVISOR, id: 30n };
@@ -56,10 +58,20 @@ function montar() {
 const autorizaciones = (auditoria: any) =>
   auditoria.registrar.mock.calls.filter(([a]: any[]) => a.accion === 'AUTORIZACION_SUPERVISOR');
 
-describe('SUPERVISOR no tiene exención: escribe el código como cualquiera', () => {
-  it('sin código: 403 CODIGO_INVALIDO y cuenta el intento', async () => {
+describe('SUPERVISOR se autoriza sola, como el ADMIN (no escribe el código)', () => {
+  it('sin código: pasa, no cuenta intentos y queda auditada a su nombre', async () => {
     const { service, redis, auditoria } = montar();
-    await expect(service.verificarYConsumirCodigo(undefined, SUPERVISOR, 'caja/cobrar')).rejects.toMatchObject({
+    const r = await service.verificarYConsumirCodigo(undefined, SUPERVISOR, 'caja/cobrar');
+    expect(r.party_id).toBe(SUPERVISOR);
+    expect(redis.incr).not.toHaveBeenCalled();
+    const [registro] = autorizaciones(auditoria);
+    expect(registro[0].partyId).toBe(SUPERVISOR);
+    expect(registro[0].motivo).toContain('rol SUPERVISOR');
+  });
+
+  it('el CAJERO sigue escribiendo el código: sin código 403 CODIGO_INVALIDO y cuenta el intento', async () => {
+    const { service, redis, auditoria } = montar();
+    await expect(service.verificarYConsumirCodigo(undefined, CAJERO, 'caja/cobrar')).rejects.toMatchObject({
       status: 403,
       response: { codigo: 'CODIGO_INVALIDO' },
     });

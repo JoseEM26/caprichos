@@ -1,11 +1,12 @@
 import { createHash } from 'crypto';
-import { HttpException, HttpStatus, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { ForbiddenException, HttpException, HttpStatus, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { controlAlmacenActivo } from '../stock/control-almacen';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { AuditoriaService } from '../auditoria/auditoria.service';
+import { AjustesNotificaciones, CLAVES_AJUSTES_NOTIF, leerAjustesNotificacion } from './ajustes-notificaciones';
 
 export type Prioridad = 'ALTA' | 'MEDIA' | 'BAJA';
 
@@ -32,6 +33,8 @@ export interface ResumenNotificaciones {
   conteos: Record<string, number>;
   /** Primero las no leídas (urgentes primero, las más nuevas arriba); después las leídas de las últimas 24 h */
   notificaciones: Notificacion[];
+  /** Sonido y «Marcar todas leídas»: los lee la web sin recargar */
+  ajustes: AjustesNotificaciones;
 }
 
 export const TIPOS_NOTIFICACION: Record<string, string> = {
@@ -164,11 +167,17 @@ const CLAVE_VALIDA = /^(n:\d+|c:[a-z-]+:[0-9a-f]{12})$/;
 const claveCalculada = (tipo: string, valores: Array<string | number | bigint>): string =>
   `c:${tipo}:${createHash('sha1').update(valores.map(String).join('|')).digest('hex').slice(0, 12)}`;
 
-/** Condición de visibilidad por rol: el administrador ve todo; el resto, lo de su rol o lo de todos. */
+/**
+ * Roles cuyos avisos ve cada rol. El SUPERVISOR ve también los del CAJERO (decisión del dueño):
+ * la caja es suya y cada uno marca su propio Leído.
+ */
+const ROLES_QUE_VE = (rol: string): string[] => (rol === 'SUPERVISOR' ? ['SUPERVISOR', 'CAJERO'] : [rol]);
+
+/** Condición de visibilidad por rol: el administrador ve todo; el resto, lo de su rol (y el de los que hereda) o lo de todos. */
 const aRol = (usuario: UsuarioAutenticado, condicion: Prisma.NotificacionWhereInput): Prisma.NotificacionWhereInput =>
   usuario.rol === 'ADMIN'
     ? condicion
-    : { AND: [{ OR: [{ rol_destino: null }, { rol_destino: usuario.rol }] }, condicion] };
+    : { AND: [{ OR: [{ rol_destino: null }, { rol_destino: { in: ROLES_QUE_VE(usuario.rol) } }] }, condicion] };
 
 const haceHoras = (horas: number): Date => new Date(Date.now() - horas * 3600000);
 const ABIERTOS = ['COLA', 'PREPARANDO', 'LISTO', 'EN_CAMINO'];
@@ -504,7 +513,13 @@ export class NotificacionesService {
       .sort((a, b) => (b.leidaEn ?? '').localeCompare(a.leidaEn ?? ''))
       .slice(0, MAX_LEIDAS_VISIBLES);
 
-    return { conteos, notificaciones: [...sinLeer, ...yaLeidas] };
+    return { conteos, notificaciones: [...sinLeer, ...yaLeidas], ajustes: await this.ajustes() };
+  }
+
+  /** Ajustes de sonido y «Marcar todas leídas» (tabla parametro, los cambia el ADMIN en Configuración). */
+  async ajustes(): Promise<AjustesNotificaciones> {
+    const filas = await this.prisma.parametro.findMany({ where: { clave: { in: Object.values(CLAVES_AJUSTES_NOTIF) } } });
+    return leerAjustesNotificacion(filas);
   }
 
   /**
@@ -603,6 +618,7 @@ export class NotificacionesService {
     });
 
     return {
+      ajustes: res.ajustes,
       metricas: {
         pendientesAhora,
         urgentesAhora,
@@ -656,6 +672,13 @@ export class NotificacionesService {
 
   /** Marca leídas para ESTE usuario: las de `ids` o, sin ids, todo lo que hoy ve como no leído. */
   async marcarTodasLeidas(usuario: UsuarioAutenticado, ids?: string[]) {
+    // Decisión del dueño: con el botón apagado, cada aviso se marca uno por uno
+    if (!(await this.ajustes()).marcarTodasActivo) {
+      throw new ForbiddenException({
+        codigo: 'MARCAR_TODAS_DESACTIVADO',
+        mensaje: 'Marcar todas como leídas está desactivado. Marca cada aviso por separado.',
+      });
+    }
     let claves: string[];
     if (ids && ids.length > 0) {
       if (!ids.every((i) => /^\d+$/.test(i))) {

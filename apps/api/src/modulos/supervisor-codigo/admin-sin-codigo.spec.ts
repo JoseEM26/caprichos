@@ -17,9 +17,12 @@ const CAJERO = 2n;
 function montar() {
   const prisma: any = {
     userAccount: {
-      findFirst: jest.fn(async ({ where }: any) =>
-        where.party_id === undefined || where.party_id === ADMIN ? { party_id: ADMIN, id: 10n } : null,
-      ),
+      findFirst: jest.fn(async ({ where }: any) => {
+        const roles: string[] = where.rol?.in ?? [where.rol];
+        if (where.party_id === undefined) return roles.includes('ADMIN') ? { party_id: ADMIN, id: 10n, rol: 'ADMIN' } : null;
+        if (where.party_id === ADMIN && roles.includes('ADMIN')) return { party_id: ADMIN, id: 10n, rol: 'ADMIN' };
+        return null;
+      }),
     },
     supervisorSecreto: { findUnique: jest.fn(async () => ({ secreto_cifrado: '', iv: '', tag: '' })) },
   };
@@ -53,6 +56,16 @@ describe('ADMIN sin código de supervisor', () => {
           entidadId: 5n,
           motivo: 'Acción local/horario: autorizado por rol ADMIN (sin código)',
         }),
+      );
+    });
+
+    it('SUPERVISOR: se autoriza sola, queda auditada a su nombre con su rol', async () => {
+      const { prisma, auditoria } = montar();
+      prisma.userAccount.findFirst = jest.fn(async () => ({ party_id: 3n, id: 30n, rol: 'SUPERVISOR' }));
+      const r = await autorizarAdminSinCodigo(prisma, auditoria, 3n, 'caja/cobrar', undefined, 'cobro', 9n);
+      expect(r).toEqual({ party_id: 3n, id: 30n });
+      expect(auditoria.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({ accion: 'AUTORIZACION_SUPERVISOR', partyId: 3n, motivo: 'Acción caja/cobrar: autorizado por rol SUPERVISOR (sin código)' }),
       );
     });
 

@@ -156,6 +156,7 @@ describe('EditorOpcionesTamanos', () => {
       tamanos: [{ tamanoValorId: 'v1', precio: 6, activo: true }],
       grupos: [],
       sincronizarGrupos: true,
+      resaltarOpcionMenosPedida: false,
     }));
     await waitFor(() => expect(alGuardar).toHaveBeenCalled());
   });

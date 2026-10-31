@@ -60,7 +60,26 @@ export interface MetricasNotificaciones {
   rolNombre: string;
 }
 
+/** Ajustes que cambia el ADMIN en Configuración (llegan con el resumen y con el historial) */
+export type AlcanceSonido = 'TODOS_NO_LEIDOS' | 'SOLO_URGENTES' | 'SOLO_HOY';
+
+export interface AjustesNotificaciones {
+  sonidoActivo: boolean;
+  sonidoIntervaloSeg: number;
+  sonidoAlcance: AlcanceSonido;
+  marcarTodasActivo: boolean;
+}
+
+/** Mismos valores que el servidor: se usan si aún no llegó el resumen */
+export const AJUSTES_NOTIFICACIONES_DEFECTO: AjustesNotificaciones = {
+  sonidoActivo: true,
+  sonidoIntervaloSeg: 15,
+  sonidoAlcance: 'TODOS_NO_LEIDOS',
+  marcarTodasActivo: true,
+};
+
 export interface RespuestaHistorialNotificaciones {
+  ajustes?: AjustesNotificaciones;
   metricas: MetricasNotificaciones;
   pendientes: NotificacionPendiente[];
   conteosPorTipo: Record<string, number>;

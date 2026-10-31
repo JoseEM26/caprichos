@@ -12,10 +12,12 @@ import { ModalAnular } from '../ModalAnular';
 import { ExcepcionSinVoucher } from '../CapturasPlanDigital';
 
 describe('requiereCodigo', () => {
-  it('ADMIN no pide código; los demás roles sí', () => {
+  it('ADMIN y SUPERVISOR no piden código; los demás roles sí', () => {
     expect(requiereCodigo({ rol: 'ADMIN' })).toBe(false);
     expect(requiereCodigo({ rol: 'admin' })).toBe(false);
+    expect(requiereCodigo({ rol: 'SUPERVISOR' })).toBe(false);
     expect(requiereCodigo({ rol: 'CAJERO' })).toBe(true);
+    expect(requiereCodigo({ rol: 'MOZO' })).toBe(true);
     expect(requiereCodigo(null)).toBe(true);
   });
 });

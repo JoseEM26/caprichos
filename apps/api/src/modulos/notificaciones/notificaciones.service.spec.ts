@@ -65,7 +65,11 @@ describe('NotificacionesService', () => {
   beforeEach(() => {
     cargarFake();
     prisma = {
-      parametro: { findUnique: jest.fn().mockResolvedValue({ valor: 'si' }) },
+      parametro: {
+        findUnique: jest.fn().mockResolvedValue({ valor: 'si' }),
+        // ajustes de avisos: sin filas = valores por defecto
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       // el cajero tiene caja/ver; el mozo y el resto no tienen permisos
       rolPermiso: {
         findMany: jest.fn().mockImplementation(({ where }: any) =>
@@ -287,5 +291,56 @@ describe('NotificacionesService', () => {
     const r = await service.resumen(ADMIN);
     expect(r.notificaciones.find((n) => n.clave.startsWith('c:stock-bajo:'))).toBeUndefined();
     expect(prisma.insumo.findMany).not.toHaveBeenCalled();
+  });
+
+  it('el SUPERVISOR ve los avisos dirigidos a CAJERO, y el MOZO no', async () => {
+    const SUPERVISOR = { partyId: 5n, rol: 'SUPERVISOR', debeCambiar: false };
+    prisma.rolPermiso.findMany.mockResolvedValue([{ permiso: { modulo: 'caja', accion: 'ver' } }]);
+    const sup = await service.resumen(SUPERVISOR);
+    expect(sup.notificaciones.map((n) => n.clave)).toContain('n:4');
+    const mozo = await service.resumen(MOZO);
+    expect(mozo.notificaciones.map((n) => n.clave)).not.toContain('n:4');
+  });
+
+  it('el SUPERVISOR marca su propio Leído sin afectar al cajero', async () => {
+    const SUPERVISOR = { partyId: 5n, rol: 'SUPERVISOR', debeCambiar: false };
+    await service.marcarClave('n:4', true, SUPERVISOR);
+    const sup = await service.resumen(SUPERVISOR);
+    expect(sup.notificaciones.find((n) => n.clave === 'n:4')).toMatchObject({ leida: true });
+    const cajero = await service.resumen(CAJERO_A);
+    expect(cajero.notificaciones.find((n) => n.clave === 'n:4')).toMatchObject({ leida: false });
+  });
+
+  it('el resumen trae los ajustes de sonido con sus valores por defecto', async () => {
+    const r = await service.resumen(CAJERO_A);
+    expect(r.ajustes).toEqual({ sonidoActivo: true, sonidoIntervaloSeg: 15, sonidoAlcance: 'TODOS_NO_LEIDOS', marcarTodasActivo: true });
+  });
+
+  it('con «Marcar todas» apagado, responde 403 y no marca nada; cada aviso se marca por separado', async () => {
+    prisma.parametro.findMany.mockResolvedValue([{ clave: 'notif_marcar_todas_activo', valor: 'no' }]);
+    await expect(service.marcarTodasLeidas(CAJERO_A)).rejects.toMatchObject({
+      status: 403,
+      response: { codigo: 'MARCAR_TODAS_DESACTIVADO' },
+    });
+    await expect(service.marcarTodasLeidas(CAJERO_A, ['3'])).rejects.toMatchObject({ status: 403 });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    const r = await service.marcarClave('n:3', true, CAJERO_A);
+    expect(r.ok).toBe(true);
+  });
+
+  it('los ajustes inválidos en la tabla vuelven a su valor por defecto', async () => {
+    prisma.parametro.findMany.mockResolvedValue([
+      { clave: 'notif_sonido_intervalo_seg', valor: 1 },
+      { clave: 'notif_sonido_alcance', valor: 'MAL' },
+      { clave: 'notif_sonido_activo', valor: 'no' },
+    ]);
+    const r = await service.resumen(CAJERO_A);
+    expect(r.ajustes).toMatchObject({ sonidoActivo: false, sonidoIntervaloSeg: 15, sonidoAlcance: 'TODOS_NO_LEIDOS' });
+  });
+
+  it('un mensaje interno dirigido a SUPERVISOR se guarda para ese rol y lo ve el supervisor', async () => {
+    const SUPERVISOR = { partyId: 5n, rol: 'SUPERVISOR', debeCambiar: false };
+    await service.crearMensajeInterno({ rol_destino: 'supervisor', titulo: 'Turno', mensaje: 'Revisar mesas' }, ADMIN);
+    expect(prisma.notificacion.create.mock.calls[0][0].data.rol_destino).toBe('SUPERVISOR');
   });
 });

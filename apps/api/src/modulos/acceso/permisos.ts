@@ -158,6 +158,8 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'pantallas', accion: 'ver' },
   { modulo: 'pantallas', accion: 'vincular' },
   { modulo: 'pantallas', accion: 'desactivar' },
+  // Escritorio operativo del supervisor: solo conteos y horarios, sin dinero
+  { modulo: 'escritorio', accion: 'operativo' },
   // Supervisor: código rotativo general (TOTP)
   { modulo: 'supervisor', accion: 'ver_codigo' },
   // Generar, rotar el secreto y desbloquear operadores: solo ADMIN
@@ -295,5 +297,6 @@ export const MATRIZ: Record<string, string[]> = {
 
 // Supervisor: la unión de lo que tienen CAJERO y MOZO, más ver el código rotativo de 6 dígitos.
 // No recibe diseño de carta, Novedades, informes, usuarios, configuración ni compras (ver la tabla del informe).
-MATRIZ.SUPERVISOR = [...new Set([...MATRIZ.CAJERO, ...MATRIZ.MOZO, 'supervisor/ver_codigo'])];
+// Y su escritorio operativo (conteos, sin montos).
+MATRIZ.SUPERVISOR = [...new Set([...MATRIZ.CAJERO, ...MATRIZ.MOZO, 'supervisor/ver_codigo', 'escritorio/operativo'])];
 

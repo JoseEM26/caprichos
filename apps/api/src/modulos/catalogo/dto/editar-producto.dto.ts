@@ -54,6 +54,11 @@ export class EditarProductoDto {
   @IsBoolean()
   noSumaBeneficios?: boolean;
 
+  /** Cocina: resaltar la opción menos pedida (30 días) de cada grupo de este producto. */
+  @IsOptional()
+  @IsBoolean()
+  resaltarOpcionMenosPedida?: boolean;
+
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })

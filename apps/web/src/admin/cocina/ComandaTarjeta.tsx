@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import type { ColorComanda, Comanda, LineaComanda } from './cocinaTipos';
 
 export interface ComandaTarjetaProps {
@@ -34,14 +35,67 @@ export function areasQueFaltan(comanda: Comanda): string[] {
     .map((a) => a.areaNombre);
 }
 
-function descripcionLinea(it: LineaComanda): string {
-  const opcionesArr = (it.opciones || []).map(normalizarOpcion).filter(Boolean);
-  const partes: string[] = [];
-  if (it.tamano) partes.push(it.tamano);
-  if (it.sabor) partes.push(it.sabor);
-  if (opcionesArr.length > 0) partes.push(opcionesArr.join(' · '));
-  if (it.nota) partes.push(it.nota);
-  return partes.join(' · ');
+/** Texto oculto a la vista y leído por lectores de pantalla: la opción es la menos pedida de su grupo. */
+const sinVista: CSSProperties = {
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  overflow: 'hidden',
+  clip: 'rect(0 0 0 0)',
+  whiteSpace: 'nowrap',
+};
+
+/**
+ * Tamaño, sabor, opciones y nota de la línea. Una opción «menos pedida» va más oscura, en negrita y con
+ * fondo y borde de acento; las demás van normales.
+ */
+function DescripcionLinea({ it }: { it: LineaComanda }) {
+  const opciones = (it.opciones || []).filter((o) => normalizarOpcion(o));
+  const partes: ReactNode[] = [];
+  if (it.tamano) partes.push(<span key="tamano">{it.tamano}</span>);
+  if (it.sabor) partes.push(<span key="sabor">{it.sabor}</span>);
+  opciones.forEach((o, i) => {
+    const texto = normalizarOpcion(o);
+    const destacada = typeof o === 'object' && o !== null && o.pocoPedida === true;
+    partes.push(
+      destacada ? (
+        <span
+          key={`op-${i}`}
+          data-testid="opcion-poco-pedida"
+          title="Poco pedida: la opción que menos se eligió en su grupo (últimos 30 días)"
+          style={{
+            fontWeight: 800,
+            color: 'var(--cp-navy)',
+            background: 'var(--cp-cream)',
+            border: '1.5px solid var(--cp-rust, #B2500F)',
+            borderRadius: '6px',
+            padding: '0 5px',
+          }}
+        >
+          {texto}
+          <span style={sinVista}> (poco pedida)</span>
+        </span>
+      ) : (
+        <span key={`op-${i}`}>{texto}</span>
+      ),
+    );
+  });
+  if (it.nota) partes.push(<span key="nota">{it.nota}</span>);
+
+  if (partes.length === 0) return null;
+  return (
+    <>
+      <br />
+      <span style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
+        {partes.map((p, i) => (
+          <span key={i}>
+            {i > 0 && ' · '}
+            {p}
+          </span>
+        ))}
+      </span>
+    </>
+  );
 }
 
 function IconoListo({ listo }: { listo: boolean }) {
@@ -89,7 +143,6 @@ function LineaFila({
   etiquetaArea?: string;
   listo?: boolean;
 }) {
-  const desc = descripcionLinea(it);
   return (
     <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
       <span style={{ fontWeight: 800, color: 'var(--cp-navy)' }}>{it.cantidad}×</span>
@@ -110,12 +163,7 @@ function LineaFila({
             {etiquetaArea}
           </span>
         )}
-        {desc && (
-          <>
-            <br />
-            <span style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>{desc}</span>
-          </>
-        )}
+        <DescripcionLinea it={it} />
       </span>
       {listo !== undefined && <IconoListo listo={listo} />}
     </div>
@@ -348,26 +396,44 @@ export function ComandaTarjeta({
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          gap: '8px',
         }}
       >
-        <span
-          style={{
-            fontFamily: 'Montserrat, sans-serif',
-            fontWeight: 800,
-            fontSize: '16px',
-            color: 'var(--cp-navy)',
-          }}
-        >
-          {comanda.ticket || comanda.codigo}
-          {comanda.cliente && (
+        {comanda.cliente ? (
+          <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
             <span
               data-testid="comanda-cliente"
-              style={{ marginLeft: 8, fontSize: '11px', fontWeight: 600, color: 'var(--cp-soft)' }}
+              style={{
+                fontFamily: 'Montserrat, sans-serif',
+                fontWeight: 800,
+                fontSize: '20px',
+                lineHeight: '24px',
+                color: 'var(--cp-navy)',
+                overflowWrap: 'anywhere',
+              }}
             >
               {comanda.cliente}
             </span>
-          )}
-        </span>
+            <span
+              data-testid="comanda-codigo"
+              style={{ fontSize: '11px', fontWeight: 600, color: 'var(--cp-soft)' }}
+            >
+              {comanda.ticket || comanda.codigo}
+            </span>
+          </span>
+        ) : (
+          <span
+            data-testid="comanda-codigo"
+            style={{
+              fontFamily: 'Montserrat, sans-serif',
+              fontWeight: 800,
+              fontSize: '16px',
+              color: 'var(--cp-navy)',
+            }}
+          >
+            {comanda.ticket || comanda.codigo}
+          </span>
+        )}
         <span
           data-testid="indicador-tiempo"
           data-color={colorCalculado}
@@ -378,6 +444,7 @@ export function ComandaTarjeta({
             padding: '2px 10px',
             background: tBg,
             color: tFg,
+            flexShrink: 0,
           }}
         >
           {minutosEnVivo} min

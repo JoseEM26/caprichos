@@ -32,9 +32,12 @@ const claveVisorCodigo = (localCodigo: string) => `supervisor:visor:${localCodig
 /** Ventana en la que se atribuye la autorización al último que vio el código (el código cambia cada 30 s). */
 export const SEGUNDOS_VISOR = 120;
 
+/** Roles que se autorizan solos: no escriben el código (serían ellos mismos aprobándose) y queda auditado a su nombre. */
+const ROLES_SIN_CODIGO = ['ADMIN', 'SUPERVISOR'];
+
 /**
- * Regla única: el usuario ADMIN activo no necesita código de supervisor (sería él mismo aprobándose).
- * Audita la acción como AUTORIZACION_SUPERVISOR y devuelve su identidad; null si no es ADMIN.
+ * Regla única: el ADMIN y el SUPERVISOR activos no necesitan código de supervisor.
+ * Audita la acción como AUTORIZACION_SUPERVISOR y devuelve su identidad; null si no es uno de ellos.
  * La usan verificarYConsumirCodigo y los servicios que verifican el PIN por su cuenta.
  */
 export async function autorizarAdminSinCodigo(
@@ -48,8 +51,8 @@ export async function autorizarAdminSinCodigo(
 ): Promise<{ party_id: bigint; id: bigint } | null> {
   if (operadorPartyId === undefined) return null;
   const admin = await prisma.userAccount.findFirst({
-    where: { party_id: BigInt(operadorPartyId), rol: 'ADMIN', activo: true },
-    select: { party_id: true, id: true },
+    where: { party_id: BigInt(operadorPartyId), rol: { in: ROLES_SIN_CODIGO }, activo: true },
+    select: { party_id: true, id: true, rol: true },
   });
   if (!admin) return null;
   await auditoria.registrar({
@@ -59,11 +62,11 @@ export async function autorizarAdminSinCodigo(
     resultado: 'OK',
     entidad: entidad ?? 'supervisor_codigo',
     entidadId,
-    motivo: `Acción ${accion}: autorizado por rol ADMIN (sin código)`,
+    motivo: `Acción ${accion}: autorizado por rol ${admin.rol} (sin código)`,
     partyId: admin.party_id,
     ip,
   });
-  return admin;
+  return { party_id: admin.party_id, id: admin.id };
 }
 
 @Injectable()

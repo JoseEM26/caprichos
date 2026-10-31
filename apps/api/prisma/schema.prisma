@@ -306,6 +306,8 @@ model Producto {
   oculto             Boolean          @default(false)
   agotado_hasta      DateTime?        @db.Timestamptz
   no_suma_beneficios Boolean          @default(false)
+  // Cocina: resaltar la opción menos pedida (últimos 30 días) de cada grupo de este producto
+  resaltar_opcion_menos_pedida Boolean @default(false)
   categoria          Categoria        @relation(fields: [categoria_id], references: [id])
   foto_archivo       Archivo?         @relation(fields: [foto_archivo_id], references: [id])
   tamanos            ProductoTamano[]

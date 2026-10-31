@@ -13,6 +13,7 @@ import {
   listarAreasCocina,
   listarComandasArea,
   listarHistorialCocina,
+  obtenerAjustesCocina,
   obtenerAltaDemanda,
   pedirInsumosAlmacen,
   registrarMermaIndividual,
@@ -120,6 +121,9 @@ export function CocinaAdminView() {
   const [error, setError] = useState<string | null>(null);
   const [mensajeAccion, setMensajeAccion] = useState<string | null>(null);
 
+  // Ajuste «Confirmar al despejar» (Configuración › Cocina). Por defecto, pide confirmación.
+  const [confirmarDespejar, setConfirmarDespejar] = useState<boolean>(true);
+
   // Audio
   const [silenciado, setSilenciadoEstado] = useState<boolean>(estaSilenciado());
 
@@ -182,6 +186,15 @@ export function CocinaAdminView() {
       // Ignorar fallo secundario
     }
   }, []);
+
+  // Ajustes de cocina: si no se pueden leer, se queda con la confirmación encendida
+  useEffect(() => {
+    if (!puedeVer) return;
+    Promise.resolve()
+      .then(() => obtenerAjustesCocina())
+      .then((a) => setConfirmarDespejar(a?.confirmarDespejar !== false))
+      .catch(() => setConfirmarDespejar(true));
+  }, [puedeVer]);
 
   // Inicialización (montaje inicial)
   useEffect(() => {
@@ -286,24 +299,29 @@ export function CocinaAdminView() {
     setAreaSeleccionada(match ? match.id : areaId);
   };
 
-  // Despejar comanda
-  const ejecutarDespeje = async () => {
-    if (!comandaParaDespejar) return;
+  // Despejar comanda. Con «Confirmar al despejar» apagado, el toque despeja directo (sin Sí/No).
+  const pedirDespeje = (comanda: Comanda) => {
+    if (confirmarDespejar) setComandaParaDespejar(comanda);
+    else void ejecutarDespeje(comanda);
+  };
+
+  const ejecutarDespeje = async (comanda: Comanda | null = comandaParaDespejar) => {
+    if (!comanda) return;
     try {
       setDespejando(true);
       await despejarComanda(
-        comandaParaDespejar.pedidoId,
-        comandaParaDespejar.areaId,
+        comanda.pedidoId,
+        comanda.areaId,
       );
 
-      const cod = comandaParaDespejar.ticket || comandaParaDespejar.codigo;
+      const cod = comanda.ticket || comanda.codigo;
       const nomArea =
         areaActiva === 'todas'
           ? ''
           : ` (${AREAS_MOCKUP.find((a) => a.id === areaActiva)?.n || areaActiva})`;
       setUndoInfo({
-        pedidoId: comandaParaDespejar.pedidoId,
-        areaId: comandaParaDespejar.areaId,
+        pedidoId: comanda.pedidoId,
+        areaId: comanda.areaId,
         texto: `${cod}: despejado${nomArea}`,
       });
 
@@ -822,7 +840,7 @@ export function CocinaAdminView() {
                   mostrarArea={enTodas}
                   soloArea={!enTodas}
                   soloLectura={enTodas}
-                  onDespejar={puedeDespejar && !enTodas ? (com) => setComandaParaDespejar(com) : undefined}
+                  onDespejar={puedeDespejar && !enTodas ? pedirDespeje : undefined}
                   despejando={despejando}
                 />
               ))}
@@ -1032,7 +1050,7 @@ export function CocinaAdminView() {
                       mostrarArea={enTodas}
                       soloArea={!enTodas}
                       soloLectura={enTodas}
-                      onDespejar={puedeDespejar && !enTodas ? (com) => setComandaParaDespejar(com) : undefined}
+                      onDespejar={puedeDespejar && !enTodas ? pedirDespeje : undefined}
                       despejando={despejando}
                     />
                   ))}
@@ -1052,7 +1070,7 @@ export function CocinaAdminView() {
         mensaje="Tu área quedará lista. El pedido sale de cocina cuando todas sus áreas estén listas."
         textoConfirmar="Sí, despejar"
         textoNo="No, cancelar"
-        alConfirmar={ejecutarDespeje}
+        alConfirmar={() => ejecutarDespeje(comandaParaDespejar)}
         alCancelar={() => setComandaParaDespejar(null)}
       />
 

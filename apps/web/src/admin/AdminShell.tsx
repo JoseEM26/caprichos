@@ -12,6 +12,8 @@ import { marcarTodasNotificacionesLeidas } from './notificaciones/notificaciones
 import { CampanaNotificaciones } from './notificaciones/CampanaNotificaciones';
 import { AvisosEmergentes, useTituloContador } from './notificaciones/AvisosNotificaciones';
 import { hayQueSonar, useSonidoAvisos } from './notificaciones/sonidoAviso';
+import { AJUSTES_NOTIFICACIONES_DEFECTO } from './notificaciones/notificacionesTipos';
+import './notificaciones/parpadeo-reservas.css';
 
 // Carga diferida de la ayuda con Capri para no penalizar el tiempo de carga del panel
 const AyudaCapri = lazy(() => import('./ayuda/AyudaCapri'));
@@ -166,7 +168,15 @@ export function AdminShell() {
   // Lo no leído (urgente primero) es lo que suena, cuenta en la campanita y en el título
   const noLeidasAhora = resumen.notificaciones.filter((n) => !n.leida);
   const totalNotif = noLeidasAhora.length;
-  const sonido = useSonidoAvisos(hayQueSonar(resumen.notificaciones));
+  // Ajustes del ADMIN (Configuración › Notificaciones): mientras no llegan, valen los de siempre
+  const ajustes = { ...AJUSTES_NOTIFICACIONES_DEFECTO, ...(resumen.ajustes ?? {}) };
+  const sonido = useSonidoAvisos(
+    ajustes.sonidoActivo && hayQueSonar(resumen.notificaciones, ajustes.sonidoAlcance),
+    ajustes.sonidoIntervaloSeg * 1000,
+  );
+  // Reservas nuevas sin atender: la entrada «Reservas» y su fila parpadean hasta que alguien las atienda o las marque leídas
+  const reservasSinAtender = tiene('reservas/ver') && resumen.notificaciones.some((n) => n.id === 'reservas' && !n.leida);
+  const parpadea = (clave: string) => clave === 'reservas' && reservasSinAtender;
   useTituloContador(totalNotif);
 
   // ---- piezas del menú ----
@@ -200,7 +210,7 @@ export function AdminShell() {
           {m.nombre}
         </span>
         {n > 0 && (
-          <span style={{ minWidth: 22, textAlign: 'center', borderRadius: 11, background: 'var(--cp-orange)', color: 'var(--cp-navy)', fontSize: 12, padding: '1px 6px' }}>
+          <span className={parpadea(m.clave) ? 'cp-parpadea-insignia' : undefined} style={{ minWidth: 22, textAlign: 'center', borderRadius: 11, background: 'var(--cp-orange)', color: 'var(--cp-navy)', fontSize: 12, padding: '1px 6px' }}>
             {n}
           </span>
         )}
@@ -329,7 +339,7 @@ export function AdminShell() {
                     >
                       <Icono nombre={m.icono || m.clave} tamano={22} />
                       {n > 0 && (
-                        <span style={{ position: 'absolute', top: 2, right: 2, minWidth: 16, height: 16, borderRadius: 8, background: 'var(--cp-orange)', color: 'var(--cp-navy)', fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px', border: '2px solid var(--cp-navy)', boxSizing: 'content-box' }}>
+                        <span className={parpadea(m.clave) ? 'cp-parpadea-insignia' : undefined} style={{ position: 'absolute', top: 2, right: 2, minWidth: 16, height: 16, borderRadius: 8, background: 'var(--cp-orange)', color: 'var(--cp-navy)', fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px', border: '2px solid var(--cp-navy)', boxSizing: 'content-box' }}>
                           {n}
                         </span>
                       )}
@@ -415,6 +425,7 @@ export function AdminShell() {
         sonidoBloqueado={sonido.bloqueado}
         onMarcar={resumen.marcar}
         onMarcarTodas={marcarTodasLeidas}
+        marcarTodasActivo={ajustes.marcarTodasActivo}
         onActivarSonido={() => void sonido.activar()}
       />
     </div>

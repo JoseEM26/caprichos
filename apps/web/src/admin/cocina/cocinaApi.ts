@@ -31,6 +31,11 @@ export async function despejarComanda(
   );
 }
 
+/** Ajustes de la pantalla que lee el personal (GET /admin/cocina/ajustes). */
+export async function obtenerAjustesCocina(): Promise<{ confirmarDespejar: boolean }> {
+  return api.get<{ confirmarDespejar: boolean }>('/admin/cocina/ajustes');
+}
+
 export async function listarHistorialCocina(
   areaRef?: string,
 ): Promise<HistorialComanda[]> {

@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import type { NotificacionPendiente } from './notificacionesTipos';
+import type { AlcanceSonido, NotificacionPendiente } from './notificacionesTipos';
 
-/** Cada cuánto suena mientras haya avisos sin leer de prioridad alta o media */
+/** Cada cuánto suena mientras haya avisos sin leer de prioridad alta o media (por defecto; lo ajusta el ADMIN) */
 export const CADA_SONIDO_MS = 15000;
+
+const diaLima = (d: Date): string => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(d);
 
 let contexto: AudioContext | null = null;
 
@@ -70,16 +72,36 @@ export function reproducirAviso(): boolean {
   return true;
 }
 
-/** Suena mientras haya algún aviso sin leer de prioridad ALTA o MEDIA (las BAJA no suenan). */
-export function hayQueSonar(notificaciones: NotificacionPendiente[]): boolean {
-  return notificaciones.some((n) => !n.leida && (n.prioridad === 'ALTA' || n.prioridad === 'MEDIA'));
+/**
+ * Según el alcance que eligió el ADMIN, ¿este aviso sin leer hace sonar?
+ * TODOS_NO_LEIDOS: todo lo no leído salvo prioridad BAJA. SOLO_URGENTES: solo ALTA.
+ * SOLO_HOY: lo no leído creado hoy (hora Lima), salvo BAJA; un aviso sin fecha (siempre pendiente) cuenta como hoy.
+ */
+export function cuentaParaSonar(n: NotificacionPendiente, alcance: AlcanceSonido, ahora: Date = new Date()): boolean {
+  if (n.leida) return false;
+  if (alcance === 'SOLO_URGENTES') return n.prioridad === 'ALTA';
+  if (n.prioridad === 'BAJA') return false;
+  if (alcance === 'SOLO_HOY') return n.desde === null || diaLima(new Date(n.desde)) === diaLima(ahora);
+  return true;
+}
+
+/** Suena mientras haya algún aviso sin leer que cuente según el alcance (por defecto, todo salvo BAJA). */
+export function hayQueSonar(
+  notificaciones: NotificacionPendiente[],
+  alcance: AlcanceSonido = 'TODOS_NO_LEIDOS',
+  ahora: Date = new Date(),
+): boolean {
+  return notificaciones.some((n) => cuentaParaSonar(n, alcance, ahora));
 }
 
 /**
  * Sonido de los avisos: si `activo`, suena al momento y luego cada CADA_SONIDO_MS; al pasar a false, se calla.
  * Si el navegador bloquea el audio, `bloqueado` queda en true hasta que el usuario active el sonido.
  */
-export function useSonidoAvisos(activo: boolean): {
+export function useSonidoAvisos(
+  activo: boolean,
+  intervaloMs: number = CADA_SONIDO_MS,
+): {
   soportado: boolean;
   bloqueado: boolean;
   activar: () => Promise<boolean>;
@@ -115,9 +137,9 @@ export function useSonidoAvisos(activo: boolean): {
       if (!reproducirAviso()) setBloqueado(true);
     };
     sonar();
-    const cada = setInterval(sonar, CADA_SONIDO_MS);
+    const cada = setInterval(sonar, intervaloMs);
     return () => clearInterval(cada);
-  }, [activo, soportado]);
+  }, [activo, soportado, intervaloMs]);
 
   const activar = async (): Promise<boolean> => {
     const ok = await activarSonido();

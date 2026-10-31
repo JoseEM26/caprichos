@@ -153,6 +153,9 @@ export function NotificacionesView() {
     } catch { /* best-effort: el refresco es opcional, la vista ya cargo */ }
   };
 
+  // Decisión del ADMIN: con «Marcar todas» apagado, cada aviso se marca aparte
+  const marcarTodasActivo = data?.ajustes?.marcarTodasActivo ?? true;
+
   // Agrupar items por día
   const gruposPorDia = useMemo(() => {
     if (!data?.items) return [];
@@ -454,22 +457,24 @@ export function NotificacionesView() {
             <span style={{ fontSize: '13px', fontWeight: 700 }}>
               {data?.items.length ?? 0} avisos
             </span>
-            <button
-              style={{
-                minHeight: '44px',
-                padding: '0 14px',
-                border: '1.5px solid var(--cp-navy)',
-                borderRadius: '10px',
-                background: 'transparent',
-                color: 'var(--cp-navy)',
-                fontWeight: 700,
-                fontSize: '13px',
-                cursor: 'pointer',
-              }}
-              onClick={() => setConfirmarMarcarTodas(true)}
-            >
-              Marcar todas como leídas
-            </button>
+            {marcarTodasActivo && (
+              <button
+                style={{
+                  minHeight: '44px',
+                  padding: '0 14px',
+                  border: '1.5px solid var(--cp-navy)',
+                  borderRadius: '10px',
+                  background: 'transparent',
+                  color: 'var(--cp-navy)',
+                  fontWeight: 700,
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                }}
+                onClick={() => setConfirmarMarcarTodas(true)}
+              >
+                Marcar todas como leídas
+              </button>
+            )}
             <button
               style={{
                 minHeight: '44px',

@@ -62,6 +62,8 @@ export interface ProductoAdmin {
   disponible: boolean;
   agotadoHasta?: string | null;
   noSumaBeneficios: boolean;
+  /** Cocina: resaltar la opción menos pedida (últimos 30 días) de cada grupo de este producto. */
+  resaltarOpcionMenosPedida?: boolean;
   /** Promociones activas (descuento / lleva-paga) que alcanzan al producto; los combos no cuentan. */
   promociones?: PromocionProducto[];
   /** Promociones activas de toda la carta (no esconden el botón). */
@@ -128,6 +130,7 @@ export const catalogoApi = {
     fotoArchivoId?: string | number | null;
     orden?: number;
     noSumaBeneficios?: boolean;
+    resaltarOpcionMenosPedida?: boolean;
     tamanos?: Array<{ tamanoValorId: string | number; precio: number; activo?: boolean }>;
     grupos?: Array<{ grupoId: string | number; orden?: number }>;
     sabores?: string[];
@@ -146,6 +149,7 @@ export const catalogoApi = {
       orden?: number;
       oculto?: boolean;
       noSumaBeneficios?: boolean;
+      resaltarOpcionMenosPedida?: boolean;
       tamanos?: Array<{ tamanoValorId: string | number; precio: number; activo?: boolean }>;
       grupos?: Array<{ grupoId: string | number; orden?: number }>;
       sabores?: Array<{ id?: string | number; nombre: string; activo?: boolean }>;

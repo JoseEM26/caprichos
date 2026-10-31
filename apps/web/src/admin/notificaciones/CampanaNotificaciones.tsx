@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Icono } from '../../comun/Icono';
 import type { NotificacionAdmin } from '../useNotificaciones';
 import { COLOR_PRIORIDAD, TEXTO_PRIORIDAD, rutaDeAviso } from './AvisosNotificaciones';
+import './parpadeo-reservas.css';
 
 interface CampanaNotificacionesProps {
   notificaciones: NotificacionAdmin[];
@@ -10,6 +11,8 @@ interface CampanaNotificacionesProps {
   sonidoBloqueado: boolean;
   onMarcar: (clave: string, leida: boolean) => Promise<boolean>;
   onMarcarTodas: () => Promise<void>;
+  /** Decisión del ADMIN: si está apagado, no aparece «Marcar todas leídas» (cada aviso se marca aparte) */
+  marcarTodasActivo?: boolean;
   onActivarSonido: () => void;
 }
 
@@ -31,6 +34,7 @@ export function CampanaNotificaciones({
   sonidoBloqueado,
   onMarcar,
   onMarcarTodas,
+  marcarTodasActivo = true,
   onActivarSonido,
 }: CampanaNotificacionesProps) {
   const navigate = useNavigate();
@@ -94,7 +98,7 @@ export function CampanaNotificaciones({
               <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 16 }}>Notificaciones</span>
               <span style={{ fontSize: 12, color: 'var(--cp-soft)' }}>Lo más urgente primero. Lo que marcas como leído baja al final.</span>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {total > 0 && (
+                {total > 0 && marcarTodasActivo && (
                   <button
                     type="button"
                     onClick={() => void marcarTodas()}
@@ -121,6 +125,7 @@ export function CampanaNotificaciones({
             {notificaciones.map((n) => (
               <div
                 key={n.clave}
+                className={n.id === 'reservas' && !n.leida ? 'cp-parpadea-fila' : undefined}
                 style={{ display: 'flex', gap: 10, padding: '12px 16px', borderBottom: '1px solid var(--cp-sand)', opacity: n.leida ? 0.6 : 1 }}
               >
                 <span style={{ flex: 'none', width: 6, borderRadius: 3, background: n.leida ? 'var(--cp-line)' : COLOR_PRIORIDAD[n.prioridad] }} />

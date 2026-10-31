@@ -3,7 +3,7 @@ import { api } from '../comun/api';
 import { useEventos } from '../comun/socket';
 import { marcarNotificacion } from './notificaciones/notificacionesApi';
 import { ordenarNotificaciones } from './notificaciones/notificacionesTipos';
-import type { NotificacionPendiente } from './notificaciones/notificacionesTipos';
+import type { AjustesNotificaciones, NotificacionPendiente } from './notificaciones/notificacionesTipos';
 
 /** Un aviso tal como lo devuelve el servidor (guardado o calculado), con su lectura de este usuario. */
 export type NotificacionAdmin = NotificacionPendiente;
@@ -11,6 +11,8 @@ export type NotificacionAdmin = NotificacionPendiente;
 export interface ResumenNotificaciones {
   conteos: Record<string, number>;
   notificaciones: NotificacionAdmin[];
+  /** Ajustes de sonido y «Marcar todas leídas» (los cambia el ADMIN); puede faltar en respuestas viejas */
+  ajustes?: AjustesNotificaciones;
 }
 
 export interface ResumenNotificacionesVivo extends ResumenNotificaciones {

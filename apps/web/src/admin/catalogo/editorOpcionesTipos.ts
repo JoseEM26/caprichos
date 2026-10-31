@@ -21,12 +21,15 @@ export interface GrupoEstado {
 export interface EstadoOpciones {
   tamanos: TamanoEstado[];
   grupos: GrupoEstado[];
+  /** Cocina: resaltar la opción menos pedida de cada grupo. Sin valor = apagado. */
+  resaltarMenosPedida?: boolean;
 }
 
 export const ESTADO_VACIO: EstadoOpciones = { tamanos: [], grupos: [] };
 
 export function estadoDesdeProducto(p: ProductoAdmin): EstadoOpciones {
   return {
+    resaltarMenosPedida: p.resaltarOpcionMenosPedida === true,
     tamanos: (p.tamanos || []).map((t) => ({
       tamanoValorId: t.tamanoValorId,
       nombre: t.nombre,

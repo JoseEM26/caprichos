@@ -33,6 +33,7 @@ import {
   AgregarValorDto,
   CrearListaDto,
 } from './dto/lista.dto';
+import { invalidarOpcionesMenosPedida } from '../cocina/opcion-menos-pedida';
 
 export function normalizarTexto(texto: string): string {
   if (!texto) return '';
@@ -376,6 +377,7 @@ export class CatalogoService implements OnApplicationBootstrap {
       disponible: estaDisponible(p.agotado_hasta),
       agotadoHasta: p.agotado_hasta ? p.agotado_hasta.toISOString() : null,
       noSumaBeneficios: p.no_suma_beneficios,
+      resaltarOpcionMenosPedida: p.resaltar_opcion_menos_pedida,
       promociones: ofertas
         .filter((o) => o.alcance_producto_id === p.id || (!o.alcance_producto_id && o.alcance_categoria_id === p.categoria_id))
         .map(aItem),
@@ -460,6 +462,7 @@ export class CatalogoService implements OnApplicationBootstrap {
       disponible: estaDisponible(p.agotado_hasta),
       agotadoHasta: p.agotado_hasta ? p.agotado_hasta.toISOString() : null,
       noSumaBeneficios: p.no_suma_beneficios,
+      resaltarOpcionMenosPedida: p.resaltar_opcion_menos_pedida,
       fotoUrl: obtenerFotoUrl(p.foto_archivo),
       tamanos: (p.tamanos || []).map((t) => ({
         id: t.id.toString(),
@@ -546,6 +549,7 @@ export class CatalogoService implements OnApplicationBootstrap {
           foto_archivo_id: fotoArchivoId,
           orden: dto.orden ?? 0,
           no_suma_beneficios: dto.noSumaBeneficios ?? false,
+          resaltar_opcion_menos_pedida: dto.resaltarOpcionMenosPedida ?? false,
           oculto: false,
         },
       });
@@ -688,6 +692,8 @@ export class CatalogoService implements OnApplicationBootstrap {
           oculto: dto.oculto !== undefined ? dto.oculto : undefined,
           no_suma_beneficios:
             dto.noSumaBeneficios !== undefined ? dto.noSumaBeneficios : undefined,
+          resaltar_opcion_menos_pedida:
+            dto.resaltarOpcionMenosPedida !== undefined ? dto.resaltarOpcionMenosPedida : undefined,
           foto_archivo_id: fotoArchivoId,
         },
       });
@@ -785,6 +791,11 @@ export class CatalogoService implements OnApplicationBootstrap {
         }
       }
     });
+
+    // El resaltado de cocina se cuenta con las opciones y grupos del producto: al cambiarlos, se vuelve a contar
+    if (dto.resaltarOpcionMenosPedida !== undefined || dto.grupos !== undefined) {
+      invalidarOpcionesMenosPedida(pId);
+    }
 
     await this.auditoria.registrar({
       categoria: 'CAMBIO',

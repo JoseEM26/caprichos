@@ -500,6 +500,7 @@ export function ProductosView() {
               ? {
                   tamanos: npOpc.tamanos.map((t) => ({ tamanoValorId: t.tamanoValorId, precio: t.precio, activo: t.activo })),
                   grupos: npOpc.grupos.map((g, orden) => ({ grupoId: g.grupoId, orden })),
+                  resaltarOpcionMenosPedida: npOpc.resaltarMenosPedida === true,
                 }
               : {}),
           });
