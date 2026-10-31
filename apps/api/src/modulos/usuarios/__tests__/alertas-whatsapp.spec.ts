@@ -35,6 +35,8 @@ describe('Alertas WhatsApp en Usuarios (Contrato Caprichos - Sección 1)', () =>
       contactMechanism: {
         create: jest.fn(),
         update: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn().mockResolvedValue(null),
       },
       $transaction: jest.fn().mockImplementation((cb) => cb(prismaMock)),
     };

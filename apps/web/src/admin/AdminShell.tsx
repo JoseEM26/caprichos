@@ -9,6 +9,7 @@ import { TITULOS_VISTA } from './titulos';
 import { useSocketConectado } from '../comun/socket';
 import { useNotificaciones } from './useNotificaciones';
 import type { NotificacionAdmin } from './useNotificaciones';
+import { marcarNotificacionLeida } from './notificaciones/notificacionesApi';
 
 // Carga diferida de la ayuda con Capri para no penalizar el tiempo de carga del panel
 const AyudaCapri = lazy(() => import('./ayuda/AyudaCapri'));
@@ -73,6 +74,8 @@ export function AdminShell() {
   const [menuMovil, setMenuMovil] = useState(false);
   const [gruposCerrados, setGruposCerrados] = useState<Record<string, boolean>>({});
   const [campanaAbierta, setCampanaAbierta] = useState(false);
+  const [aMarcarLeida, setAMarcarLeida] = useState<NotificacionAdmin | null>(null);
+  const [marcandoLeida, setMarcandoLeida] = useState(false);
   const [confirmarSalida, setConfirmarSalida] = useState(false);
   const [saliendo, setSaliendo] = useState(false);
   const [ahora, setAhora] = useState(() => new Date());
@@ -158,6 +161,21 @@ export function AdminShell() {
   const ir = (ruta: string) => {
     navigate(ruta);
     setMenuMovil(false);
+  };
+
+  /** Marca leído el aviso guardado: sale de la cola y de la insignia; sigue en el historial. */
+  const confirmarMarcarLeida = async () => {
+    if (!aMarcarLeida) return;
+    setMarcandoLeida(true);
+    try {
+      await marcarNotificacionLeida(aMarcarLeida.id);
+      await resumen.refrescar();
+    } catch {
+      // sin conexión o sin permiso: el aviso se queda en la cola
+    } finally {
+      setMarcandoLeida(false);
+      setAMarcarLeida(null);
+    }
   };
 
   const prioritaria = resumen.notificaciones[0];
@@ -460,6 +478,15 @@ export function AdminShell() {
                     >
                       {n.accion}
                     </button>
+                    {n.marcable && (
+                      <button
+                        type="button"
+                        onClick={() => setAMarcarLeida(n)}
+                        style={{ minHeight: 44, padding: '0 14px', border: '1.5px solid var(--cp-soft)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-soft)', fontWeight: 700, fontSize: 13 }}
+                      >
+                        Leído
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -477,6 +504,15 @@ export function AdminShell() {
           </div>
         </>
       )}
+      <Confirmar
+        abierto={aMarcarLeida !== null}
+        titulo="¿Marcar como leída esta notificación?"
+        mensaje={aMarcarLeida?.titulo}
+        textoSi="Sí, marcar leída"
+        cargando={marcandoLeida}
+        alConfirmar={confirmarMarcarLeida}
+        alCancelar={() => setAMarcarLeida(null)}
+      />
     </div>
   );
 

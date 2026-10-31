@@ -18,6 +18,8 @@ export interface Notificacion {
   modulo: string;
   accion: string;
   ruta?: string;
+  /** true si tiene fila en la tabla notificacion: se puede marcar leída. Las calculadas al vuelo no se pueden. */
+  marcable: boolean;
 }
 
 export interface ResumenNotificaciones {
@@ -139,7 +141,7 @@ export class NotificacionesService {
     const puede = await this.permisosDe(usuario);
     const ahora = Date.now();
     const conteos: Record<string, number> = {};
-    const lista: Notificacion[] = [];
+    const lista: Omit<Notificacion, 'marcable'>[] = [];
 
     if (puede('caja/ver') || puede('pedidos/ver')) {
       const porCobrar = await this.prisma.pedido.findMany({
@@ -301,12 +303,38 @@ export class NotificacionesService {
       }
     }
 
-    lista.sort(
+    // Avisos guardados (filas de notificacion) que no se han leído: sí se pueden marcar leídos
+    const noLeidas = await this.prisma.notificacion.findMany({
+      where: {
+        leida_en: null,
+        ...(usuario.rol === 'ADMIN' ? {} : { OR: [{ rol_destino: null }, { rol_destino: usuario.rol }] }),
+      },
+      orderBy: { en: 'asc' },
+      take: 50,
+    });
+    const avisos: Notificacion[] = noLeidas.map((n) => {
+      const tipoLegible = TIPOS_NOTIFICACION[n.tipo] || n.tipo;
+      const accionGo = ACCIONES_NOTIFICACION[tipoLegible];
+      return {
+        id: n.id.toString(),
+        titulo: n.titulo,
+        detalle: n.mensaje ?? '',
+        prioridad: 'MEDIA',
+        desde: n.en.toISOString(),
+        modulo: accionGo ? accionGo[0] : 'notificaciones',
+        accion: accionGo ? accionGo[1] : 'Ver en el historial',
+        ruta: n.enlace ?? undefined,
+        marcable: true,
+      };
+    });
+
+    const notificaciones: Notificacion[] = [...lista.map((n) => ({ ...n, marcable: false })), ...avisos];
+    notificaciones.sort(
       (a, b) =>
         ORDEN[a.prioridad] - ORDEN[b.prioridad] ||
         (a.desde ?? '9').localeCompare(b.desde ?? '9'),
     );
-    return { conteos, notificaciones: lista };
+    return { conteos, notificaciones };
   }
 
   /**

@@ -27,6 +27,7 @@ describe('NotificacionesView (/admin/notificaciones)', () => {
         desde: '2026-10-15T19:40:00Z',
         modulo: 'cocina',
         accion: 'Ir a Cocina',
+        marcable: true,
       },
     ],
     conteosPorTipo: {
@@ -155,6 +156,60 @@ describe('NotificacionesView (/admin/notificaciones)', () => {
         titulo: 'Aviso de turno',
         mensaje: 'Turno de tarde inicia 15:00',
       });
+    });
+  });
+
+  it('4. Un pendiente guardado tiene el botón Leído; una alerta calculada no lo tiene', async () => {
+    vi.spyOn(api, 'listarHistorialNotificaciones').mockResolvedValue({
+      ...mockData,
+      pendientes: [
+        ...mockData.pendientes,
+        {
+          id: 'por-cobrar',
+          titulo: '2 pedidos por cobrar',
+          detalle: 'Pedidos activos que aún no tienen el cobro registrado.',
+          prioridad: 'MEDIA' as const,
+          desde: null,
+          modulo: 'caja',
+          accion: 'Ir a Pedidos y caja',
+          marcable: false,
+        },
+      ],
+    });
+    render(
+      <MemoryRouter>
+        <NotificacionesView />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('2 pedidos por cobrar')).toBeInTheDocument();
+    });
+    expect(screen.getAllByRole('button', { name: 'Leído' })).toHaveLength(1);
+    const botones = screen.getAllByRole('button', { name: 'Leído' });
+    for (const b of botones) {
+      expect(b.getAttribute('style')).toContain('min-height: 44px');
+    }
+  });
+
+  it('5. Leído pide confirmación Sí/No y, con Sí, marca el aviso como leído', async () => {
+    render(
+      <MemoryRouter>
+        <NotificacionesView />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Leído' })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Leído' }));
+    expect(api.marcarNotificacionLeida).not.toHaveBeenCalledWith('p1');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, marcar leída' }));
+
+    await waitFor(() => {
+      expect(api.marcarNotificacionLeida).toHaveBeenCalledWith('p1');
     });
   });
 });

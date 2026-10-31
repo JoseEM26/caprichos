@@ -31,6 +31,12 @@ import {
   normalizarCelularPeru,
 } from './alertas-whatsapp.util';
 import { AvisosInternosService } from '../chatbot/avisos-internos/avisos-internos.service';
+import {
+  CELULAR_OTRA_PERSONA,
+  asegurarContactoCelular,
+  celularDeOtraPersona,
+  partyDeCelular,
+} from '../clientes/celular-party.util';
 
 /** Mismo límite que la foto de Mi perfil (acceso/mi-perfil.service.ts). */
 const FOTO_MAX_BYTES = 2 * 1024 * 1024;
@@ -207,8 +213,10 @@ export class UsuariosService {
    */
   async crear(dto: CrearUsuarioDto, usuarioActual?: UsuarioAutenticado, ip?: string) {
     const dniLimpio = dto.dni.trim();
+    const celular9 = dto.celular ?? null;
 
-    // Validar DNI duplicado
+    // Una persona = un party. Si el DNI (o el celular) ya es de un party SIN usuario, se reutiliza y se le suma
+    // el usuario del personal. Si ya tiene usuario, es otra persona: error.
     const dniExistente = await this.prisma.partyIdentifier.findUnique({
       where: {
         tipo_numero: {
@@ -218,11 +226,23 @@ export class UsuariosService {
       },
     });
 
+    let reutilizarId: bigint | null = null;
     if (dniExistente) {
-      throw new ConflictException({
-        codigo: 'DNI_DUPLICADO',
-        mensaje: 'El DNI ya se encuentra registrado en el sistema',
-      });
+      if (await this.tienePartyUsuario(dniExistente.party_id)) {
+        throw new ConflictException({
+          codigo: 'DNI_DUPLICADO',
+          mensaje: 'El DNI ya se encuentra registrado en el sistema',
+        });
+      }
+      reutilizarId = dniExistente.party_id;
+    } else if (celular9) {
+      const dueno = await partyDeCelular(this.prisma, celular9);
+      if (dueno) {
+        if (await this.tienePartyUsuario(dueno)) {
+          throw new ConflictException(CELULAR_OTRA_PERSONA);
+        }
+        reutilizarId = dueno;
+      }
     }
 
     const claveInicial = generarClaveAleatoria(12);
@@ -231,32 +251,49 @@ export class UsuariosService {
     let nuevo;
     try {
       nuevo = await this.prisma.$transaction(async (tx) => {
-        const party = await tx.party.create({
-          data: {
-            tipo: 'PERSONA',
-            estado: 'ACTIVO',
-          },
-        });
+        const party = reutilizarId
+          ? { id: reutilizarId }
+          : await tx.party.create({
+              data: {
+                tipo: 'PERSONA',
+                estado: 'ACTIVO',
+              },
+            });
 
-        const person = await tx.person.create({
-          data: {
-            party_id: party.id,
-            nombres: dto.nombres.trim(),
-            apellidos: dto.apellidos.trim(),
-            ...(dto.correo ? { correo: dto.correo.trim().toLowerCase() } : {}),
-            ...(dto.fechaNacimiento
-              ? {
-                  cumple_mes: Number(dto.fechaNacimiento.slice(5, 7)),
-                  cumple_dia: Number(dto.fechaNacimiento.slice(8, 10)),
-                }
-              : {}),
-          },
-        });
+        const nombres = dto.nombres.trim();
+        const apellidos = dto.apellidos.trim();
+        const correo = dto.correo ? dto.correo.trim().toLowerCase() : null;
+        const cumple = dto.fechaNacimiento
+          ? {
+              cumple_mes: Number(dto.fechaNacimiento.slice(5, 7)),
+              cumple_dia: Number(dto.fechaNacimiento.slice(8, 10)),
+            }
+          : null;
 
-        if (dto.celular) {
-          await tx.contactMechanism.create({
-            data: { party_id: party.id, tipo: 'WHATSAPP', valor: dto.celular, principal: true, activo: true },
-          });
+        const personaPrevia = reutilizarId ? await tx.person.findUnique({ where: { party_id: party.id } }) : null;
+        const person = personaPrevia
+          ? await tx.person.update({
+              where: { party_id: party.id },
+              data: {
+                // El nombre del formulario reemplaza solo el placeholder «Cliente» (o uno vacío); lo demás, solo si falta
+                nombres: !personaPrevia.nombres || personaPrevia.nombres === 'Cliente' ? nombres : personaPrevia.nombres,
+                apellidos: personaPrevia.apellidos || apellidos,
+                correo: personaPrevia.correo || correo,
+                ...(cumple && personaPrevia.cumple_mes == null ? cumple : {}),
+              },
+            })
+          : await tx.person.create({
+              data: {
+                party_id: party.id,
+                nombres,
+                apellidos,
+                ...(correo ? { correo } : {}),
+                ...(cumple ?? {}),
+              },
+            });
+
+        if (celular9) {
+          await asegurarContactoCelular(tx, party.id, celular9, 'WHATSAPP');
         }
 
         if (dto.descuentoPct !== undefined && dto.descuentoPct !== null) {
@@ -269,13 +306,15 @@ export class UsuariosService {
           });
         }
 
-        const partyIdentifier = await tx.partyIdentifier.create({
-          data: {
-            party_id: party.id,
-            tipo: 'DNI',
-            numero: dniLimpio,
-          },
-        });
+        const partyIdentifier =
+          dniExistente ??
+          (await tx.partyIdentifier.create({
+            data: {
+              party_id: party.id,
+              tipo: 'DNI',
+              numero: dniLimpio,
+            },
+          }));
 
         const userAccount = await tx.userAccount.create({
           data: {
@@ -295,10 +334,17 @@ export class UsuariosService {
       });
     } catch (error: any) {
       if (error?.code === 'P2002') {
-        throw new ConflictException({
-          codigo: 'DNI_DUPLICADO',
-          mensaje: 'El DNI ya se encuentra registrado en el sistema',
+        // Choque de unicidad en la carrera: si el DNI existe ya es el DNI; si no, el celular de otra persona
+        const dniAhora = await this.prisma.partyIdentifier.findUnique({
+          where: { tipo_numero: { tipo: 'DNI', numero: dniLimpio } },
         });
+        if (dniAhora) {
+          throw new ConflictException({
+            codigo: 'DNI_DUPLICADO',
+            mensaje: 'El DNI ya se encuentra registrado en el sistema',
+          });
+        }
+        throw new ConflictException(CELULAR_OTRA_PERSONA);
       }
       throw error;
     }
@@ -336,6 +382,11 @@ export class UsuariosService {
       debeCambiar: nuevo.userAccount.debe_cambiar,
       claveInicial,
     };
+  }
+
+  private async tienePartyUsuario(partyId: bigint): Promise<boolean> {
+    const cuenta = await this.prisma.userAccount.findUnique({ where: { party_id: partyId }, select: { id: true } });
+    return Boolean(cuenta);
   }
 
   private async cuentaConParty(id: bigint | string | number) {
@@ -1063,44 +1114,45 @@ export class UsuariosService {
     const celExistenteSolo9 = celExistenteVal ? celExistenteVal.replace(/\D/g, '').slice(-9) : null;
     const numeroCambio = Boolean(nuevoCelular9 && celExistenteSolo9 && nuevoCelular9 !== celExistenteSolo9);
 
-    await this.prisma.$transaction(async (tx) => {
-      if (nuevoCelular9) {
-        if (contactoExistente) {
-          await tx.contactMechanism.update({
-            where: { id: contactoExistente.id },
-            data: {
-              valor: nuevoCelular9,
-              principal: true,
-              activo: true,
-            },
-          });
-        } else {
-          await tx.contactMechanism.create({
-            data: {
-              party_id: usuario.party_id,
-              tipo: 'WHATSAPP',
-              valor: nuevoCelular9,
-              principal: true,
-              activo: true,
-            },
-          });
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        if (nuevoCelular9) {
+          if (contactoExistente) {
+            // Mismo criterio de unicidad que el alta: el celular no puede ser de otra persona
+            if (await celularDeOtraPersona(tx, usuario.party_id, nuevoCelular9)) {
+              throw new ConflictException(CELULAR_OTRA_PERSONA);
+            }
+            await tx.contactMechanism.update({
+              where: { id: contactoExistente.id },
+              data: {
+                valor: nuevoCelular9,
+                principal: true,
+                activo: true,
+              },
+            });
+          } else {
+            await asegurarContactoCelular(tx, usuario.party_id, nuevoCelular9, 'WHATSAPP');
+          }
         }
-      }
 
-      const nuevoConfirmadoEn = numeroCambio
-        ? null
-        : activaAlertas
-          ? usuario.alertas_whatsapp_confirmado_en
-          : null;
+        const nuevoConfirmadoEn = numeroCambio
+          ? null
+          : activaAlertas
+            ? usuario.alertas_whatsapp_confirmado_en
+            : null;
 
-      await tx.userAccount.update({
-        where: { id: usuario.id },
-        data: {
-          alertas_whatsapp: activaAlertas,
-          alertas_whatsapp_confirmado_en: nuevoConfirmadoEn,
-        },
+        await tx.userAccount.update({
+          where: { id: usuario.id },
+          data: {
+            alertas_whatsapp: activaAlertas,
+            alertas_whatsapp_confirmado_en: nuevoConfirmadoEn,
+          },
+        });
       });
-    });
+    } catch (err: any) {
+      if (err?.code === 'P2002') throw new ConflictException(CELULAR_OTRA_PERSONA);
+      throw err;
+    }
 
     // Enviar prueba si se guardó con casilla activa y no está confirmado
     const debeEnviarPrueba = activaAlertas && (numeroCambio || !usuario.alertas_whatsapp_confirmado_en) && nuevoCelularE164;

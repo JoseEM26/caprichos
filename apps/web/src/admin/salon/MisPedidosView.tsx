@@ -11,7 +11,6 @@ import { ModalVoucherPedido } from './ModalVoucherPedido';
 import { HistorialVoucher } from './HistorialVoucher';
 import { Confirmar } from '../../comun/Confirmar';
 import { vouchersApi } from '../vouchers/vouchersApi';
-import { ModalPrecuenta } from './componentes/ModalPrecuenta';
 import { ProgresoPedido } from './ProgresoPedido';
 import { medioDigitalVoucher } from '../pedidos/mediosPago';
 import type { MiPedido, PisoSalon, RangoMisPedidos, RespuestaMisPedidos } from './tipos';
@@ -66,10 +65,6 @@ const lugar = (p: MiPedido) => p.mesaNombre || MODALIDAD[p.modalidad] || p.modal
 
 const resumenLineas = (p: MiPedido) => p.lineas.map((l) => `${l.cantidad} x ${l.nombre}`).join(', ');
 
-/** La cuenta de una mesa se envía a Caja mientras el pedido no esté anulado, entregado ni cobrado. */
-const puedeEnviarACaja = (p: MiPedido) =>
-  p.modalidad === 'MESA' && p.estado !== 'ANULADO' && p.estado !== 'ENTREGADO' && p.pagoEstado !== 'PAGADO';
-
 const RESUMEN_VACIO = { cantidad: 0, total: 0, enCurso: 0, entregados: 0 };
 
 /** Pedidos que tomó el mozo: resumen del rango, filtro por estado y detalle de solo lectura. */
@@ -120,7 +115,6 @@ export function MisPedidosView() {
   const [quitando, setQuitando] = useState(false);
   const [errorQuitar, setErrorQuitar] = useState<string | null>(null);
   const [voucherPedido, setVoucherPedido] = useState<{ pedido: MiPedido; medio: 'YAPE' | 'PLIN' | 'TRANSFERENCIA'; monto: number } | null>(null);
-  const [cuentaPedido, setCuentaPedido] = useState<MiPedido | null>(null);
   const [pisos, setPisos] = useState<PisoSalon[]>([]);
   const ultimaSolicitud = useRef(0);
 
@@ -321,14 +315,6 @@ export function MisPedidosView() {
                   </div>
                 )}
 
-                {puedeEnviarACaja(p) && (
-                  <div className="mpv-fila">
-                    <button type="button" className="mpv-boton" onClick={() => setCuentaPedido(p)}>
-                      Enviar a Caja
-                    </button>
-                  </div>
-                )}
-
                 {p.plan && p.plan.length > 0 && (
                   <p className="mpv-ayuda">
                     {p.plan.map((f) => `${nombreMedioPlan(f.medio)} ${soles(f.monto)}`).join(' · ')}
@@ -380,24 +366,6 @@ export function MisPedidosView() {
           pisos={pisos}
           alCerrar={() => setModalAbierto(false)}
           alExitoPedido={() => void cargar()}
-        />
-      )}
-
-      {cuentaPedido && (
-        <ModalPrecuenta
-          abierto={true}
-          alCerrar={() => {
-            setCuentaPedido(null);
-            void cargar();
-          }}
-          mesa={cuentaPedido.mesaNombre || 'Mesa'}
-          lineas={cuentaPedido.lineas.map((l) => ({ cantidad: l.cantidad, nombre: l.nombre, detalle: '' }))}
-          total={cuentaPedido.total}
-          plan={cuentaPedido.plan}
-          pedidoId={cuentaPedido.id}
-          pagoMetodo={cuentaPedido.pagoMetodo}
-          vouchersPorMedio={cuentaPedido.vouchersPorMedio}
-          puedeCambiarVoucher={cuentaPedido.puedeCambiarVoucher}
         />
       )}
 

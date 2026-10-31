@@ -102,4 +102,25 @@ describe('PartyPuntosService', () => {
     expect(await service.resolverOCrear('987654321')).toBe(88n);
     expect(prisma.party.create).toHaveBeenCalledTimes(1);
   });
+
+  it('celular de un party de personal (con usuario): lo reutiliza y le asegura el rol CLIENTE, sin crear otro party', async () => {
+    // La consulta de contacto del party suelto ya no excluye a los parties con user_account
+    prisma.contactMechanism.findFirst.mockImplementation(({ where }: any) =>
+      Promise.resolve(where.party?.cuentaCliente?.is === null ? { party_id: 33n } : null),
+    );
+    prisma.partyRole.findFirst.mockResolvedValue(null);
+    prisma.partyRole.create.mockResolvedValue({ id: 901n });
+
+    expect(await service.resolverOCrear('987654321')).toBe(33n);
+    expect(prisma.party.create).not.toHaveBeenCalled();
+    expect(prisma.partyRole.create).toHaveBeenCalledWith({ data: { party_id: 33n, rol: 'CLIENTE' } });
+    expect(prisma.customerDetail.create).toHaveBeenCalledWith({ data: { party_role_id: 901n, puntos: 0 } });
+  });
+
+  it('carrera con choque de unicidad y nadie más con ese celular: devuelve null, nunca lanza', async () => {
+    sueltoCon(() => null);
+    prisma.party.create.mockRejectedValueOnce(Object.assign(new Error('unique'), { code: 'P2002' }));
+
+    expect(await service.resolverOCrear('987654321')).toBeNull();
+  });
 });

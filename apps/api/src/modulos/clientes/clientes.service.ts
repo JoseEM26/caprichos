@@ -21,6 +21,7 @@ import { CodigoRegistroService } from './codigo-registro.service';
 import { enmascararDni, validarDni } from '../comprobantes/comprobantes.util';
 import { versionConsentimiento, versionesLegales } from '../reclamos/textos-legales';
 import { normalizarCelularPeru } from '../usuarios/alertas-whatsapp.util';
+import { CELULAR_OTRA_PERSONA, partyDeCelular } from './celular-party.util';
 import { enmascararTelefono } from '../chatbot/utilidades/enmascarar.util';
 import { explicarPedidosPorId } from './explicar-puntos-pedidos';
 import type { ExplicacionPuntos } from './explicar-puntos-pedido';
@@ -679,6 +680,12 @@ export class ClientesService {
   }
 
   private async guardarTelefono(tx: Prisma.TransactionClient, partyId: bigint, telefono: string) {
+    // Si el party ya tiene ese celular activo (p. ej. como WHATSAPP), no se duplica: el índice único no lo admite
+    const mismo = await tx.contactMechanism.findFirst({
+      where: { party_id: partyId, tipo: { in: ['TELEFONO', 'WHATSAPP'] }, valor: { in: [telefono, `51${telefono}`] }, activo: true },
+      select: { id: true },
+    });
+    if (mismo) return;
     const existente = await tx.contactMechanism.findFirst({
       where: { party_id: partyId, tipo: 'TELEFONO' },
     });
@@ -1047,6 +1054,10 @@ export class ClientesService {
         mensaje: esEmpresa ? 'Ya existe un cliente con ese RUC.' : 'Ya existe un cliente con ese celular.',
       });
     }
+    // Una persona = un party: el celular no puede estar activo en otro party (aunque no tenga cuenta)
+    if (!esEmpresa && (await partyDeCelular(this.prisma, tel!))) {
+      throw new ConflictException(CELULAR_OTRA_PERSONA);
+    }
 
     const versionTexto = versionConsentimiento(await versionesLegales(this.prisma));
     const nuevoParty = await this.prisma.$transaction(async (tx) => {
@@ -1126,6 +1137,10 @@ export class ClientesService {
       });
 
       return party;
+    }).catch((err: any) => {
+      // Celular que otro party ya tiene (carrera): 409 claro, nunca 500
+      if (err?.code === 'P2002') throw new ConflictException(CELULAR_OTRA_PERSONA);
+      throw err;
     });
 
     await this.auditoria.registrar({

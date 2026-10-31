@@ -68,12 +68,13 @@ export class PartyPuntosService {
     });
     if (inactiva) return 'INACTIVA';
 
+    // Una persona = un party: también reutiliza el party de personal (con usuario) que tenga ese celular
     const suelto = await this.prisma.contactMechanism.findFirst({
       where: {
         tipo: { in: TIPOS_TELEFONO },
         valor: { in: [tel, `51${tel}`] },
         activo: true,
-        party: { tipo: 'PERSONA', estado: 'ACTIVO', usuario: { is: null }, cuentaCliente: { is: null } },
+        party: { tipo: 'PERSONA', estado: 'ACTIVO', cuentaCliente: { is: null } },
       },
       select: { party_id: true },
     });

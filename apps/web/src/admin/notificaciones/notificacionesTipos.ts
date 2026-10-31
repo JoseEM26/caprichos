@@ -8,6 +8,8 @@ export interface NotificacionPendiente {
   desde: string | null;
   modulo: string;
   accion: string;
+  /** true si es un aviso guardado: se puede marcar leído. Las calculadas al vuelo no tienen fila. */
+  marcable: boolean;
 }
 
 export interface NotificacionHistorialItem {

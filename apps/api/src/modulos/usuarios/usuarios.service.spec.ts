@@ -132,9 +132,12 @@ describe('UsuariosService', () => {
     it('DNI duplicado → 409 DNI_DUPLICADO', async () => {
       prismaMock.partyIdentifier.findUnique.mockResolvedValue({
         id: 1n,
+        party_id: 10n,
         tipo: 'DNI',
         numero: '12345678',
       });
+      // El party del DNI ya tiene usuario: es otra persona con cuenta, no se reutiliza
+      prismaMock.userAccount.findUnique.mockResolvedValue({ id: 7n, party_id: 10n });
 
       await expect(
         service.crear(

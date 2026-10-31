@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '../comun/api';
 import { useEventos } from '../comun/socket';
 
@@ -11,6 +11,8 @@ export interface NotificacionAdmin {
   modulo: string;
   accion: string;
   ruta?: string;
+  /** true si es un aviso guardado (se puede marcar leído); las calculadas al vuelo no */
+  marcable?: boolean;
 }
 
 export interface ResumenNotificaciones {
@@ -18,10 +20,15 @@ export interface ResumenNotificaciones {
   notificaciones: NotificacionAdmin[];
 }
 
+export interface ResumenNotificacionesVivo extends ResumenNotificaciones {
+  /** Vuelve a pedir el resumen (tras marcar leído, por ejemplo) */
+  refrescar: () => Promise<void>;
+}
+
 const VACIO: ResumenNotificaciones = { conteos: {}, notificaciones: [] };
 
 /** Lo pendiente para la campanita y las insignias del menú: se refresca solo y con los eventos en vivo. */
-export function useNotificaciones(): ResumenNotificaciones {
+export function useNotificaciones(): ResumenNotificacionesVivo {
   const [resumen, setResumen] = useState<ResumenNotificaciones>(VACIO);
 
   const cargar = useCallback(async () => {
@@ -45,5 +52,5 @@ export function useNotificaciones(): ResumenNotificaciones {
   useEventos('reserva:cambio', cargar);
   useEventos('notificaciones:nueva', cargar);
 
-  return resumen;
+  return useMemo(() => ({ ...resumen, refrescar: cargar }), [resumen, cargar]);
 }

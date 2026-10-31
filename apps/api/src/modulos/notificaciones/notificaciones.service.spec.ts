@@ -26,7 +26,10 @@ describe('NotificacionesService', () => {
       solicitudReserva: { findMany: jest.fn().mockResolvedValue([{ creado_en: hace(30) }]) },
       insumo: { findMany: jest.fn().mockResolvedValue([]) },
       notificacion: {
-        findMany: jest.fn().mockResolvedValue([
+        // Como la BD: el filtro leida_en null deja fuera las leídas
+        findMany: jest.fn().mockImplementation(({ where }: any) =>
+          Promise.resolve(
+            [
           {
             id: 1n,
             tipo: 'STOCK_BAJO',
@@ -45,7 +48,9 @@ describe('NotificacionesService', () => {
             leida_en: new Date('2026-10-15T21:00:00Z'),
             en: new Date('2026-10-15T19:40:00Z'),
           },
-        ]),
+            ].filter((n) => (where?.leida_en === null ? n.leida_en === null : true)),
+          ),
+        ),
         findUnique: jest.fn().mockResolvedValue({ id: 1n, leida_en: null }),
         update: jest.fn().mockResolvedValue({ id: 1n }),
         updateMany: jest.fn().mockResolvedValue({ count: 2 }),
@@ -68,10 +73,44 @@ describe('NotificacionesService', () => {
     expect(prioridades).toEqual([...prioridades].sort((a, b) => ['ALTA', 'MEDIA', 'BAJA'].indexOf(a) - ['ALTA', 'MEDIA', 'BAJA'].indexOf(b)));
   });
 
-  it('un rol sin permisos no recibe nada', async () => {
+  it('un rol sin permisos no recibe avisos calculados, pero sí los avisos guardados sin leer para todos', async () => {
     const r = await service.resumen({ partyId: 2n, rol: 'MOZO', debeCambiar: false });
-    expect(r).toEqual({ conteos: {}, notificaciones: [] });
+    expect(r.conteos).toEqual({});
+    expect(r.notificaciones.map((n) => n.id)).toEqual(['1']);
     expect(prisma.pedido.findMany).not.toHaveBeenCalled();
+  });
+
+  it('la cola solo trae las no leídas y las marca como marcables; las calculadas no lo son', async () => {
+    const r = await service.resumen({ partyId: 1n, rol: 'ADMIN', debeCambiar: false });
+    expect(prisma.notificacion.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ leida_en: null }) }),
+    );
+    const aviso = r.notificaciones.find((n) => n.id === '1');
+    expect(aviso).toMatchObject({ marcable: true, titulo: 'Stock bajo', detalle: 'Crema chantilly bajo el mínimo' });
+    expect(r.notificaciones.find((n) => n.id === '2')).toBeUndefined();
+    for (const n of r.notificaciones.filter((x) => x.id !== '1')) {
+      expect(n.marcable).toBe(false);
+    }
+  });
+
+  it('un rol que no es ADMIN solo recibe los avisos de su rol o de todos', async () => {
+    await service.resumen({ partyId: 3n, rol: 'CAJERO', debeCambiar: false });
+    expect(prisma.notificacion.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { leida_en: null, OR: [{ rol_destino: null }, { rol_destino: 'CAJERO' }] },
+      }),
+    );
+  });
+
+  it('marcar leída un aviso (fila) lo deja de la cola; una notificación calculada no se puede marcar', async () => {
+    await service.marcarLeida('1', true, { partyId: 1n, rol: 'ADMIN', debeCambiar: false });
+    expect(prisma.notificacion.update).toHaveBeenCalledWith({
+      where: { id: 1n },
+      data: { leida_en: expect.any(Date) },
+    });
+    await expect(
+      service.marcarLeida('por-cobrar', true, { partyId: 1n, rol: 'ADMIN', debeCambiar: false }),
+    ).rejects.toMatchObject({ response: { codigo: 'NOTIFICACION_NO_ENCONTRADA' } });
   });
 
   it('un cajero solo ve caja', async () => {

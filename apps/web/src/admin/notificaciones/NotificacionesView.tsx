@@ -10,6 +10,7 @@ import {
 import {
   FiltrosHistorial,
   NotificacionHistorialItem,
+  NotificacionPendiente,
   RespuestaHistorialNotificaciones,
 } from './notificacionesTipos';
 import { NuevoMensajeModal } from './NuevoMensajeModal';
@@ -64,6 +65,7 @@ export function NotificacionesView() {
   // Modales
   const [modalNuevoMensaje, setModalNuevoMensaje] = useState(false);
   const [confirmarMarcarTodas, setConfirmarMarcarTodas] = useState(false);
+  const [pendienteLeida, setPendienteLeida] = useState<NotificacionPendiente | null>(null);
 
   // Cargar datos del historial y pendientes
   const cargar = useCallback(async () => {
@@ -132,6 +134,15 @@ export function NotificacionesView() {
       await marcarNotificacionLeida(item.id, !item.leida);
       await cargar();
     } catch { /* best-effort: el refresco es opcional, la vista ya cargo */ }
+  };
+
+  const handleMarcarPendienteLeida = async () => {
+    if (!pendienteLeida) return;
+    try {
+      await marcarNotificacionLeida(pendienteLeida.id);
+      await cargar();
+    } catch { /* best-effort: el refresco es opcional, la vista ya cargo */ }
+    setPendienteLeida(null);
   };
 
   const handleMarcarTodasLeidas = async () => {
@@ -388,6 +399,24 @@ export function NotificacionesView() {
                       >
                         {p.accion}
                       </button>
+                      {p.marcable && (
+                        <button
+                          style={{
+                            minHeight: '44px',
+                            padding: '0 14px',
+                            border: '1.5px solid var(--cp-line)',
+                            borderRadius: '10px',
+                            background: 'var(--cp-white)',
+                            color: 'var(--cp-soft)',
+                            fontWeight: 700,
+                            fontSize: '13px',
+                            cursor: 'pointer',
+                          }}
+                          onClick={() => setPendienteLeida(p)}
+                        >
+                          Leído
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -754,6 +783,16 @@ export function NotificacionesView() {
           ))
         )}
       </div>
+
+      {/* Modal: marcar un aviso pendiente como leído (sale de la cola, sigue en el historial) */}
+      <Confirmar
+        abierto={pendienteLeida !== null}
+        titulo="¿Marcar como leída esta notificación?"
+        mensaje={pendienteLeida?.titulo}
+        textoSi="Sí, marcar leída"
+        alConfirmar={handleMarcarPendienteLeida}
+        alCancelar={() => setPendienteLeida(null)}
+      />
 
       {/* Modal Marcar Todas como Leídas */}
       <Confirmar
