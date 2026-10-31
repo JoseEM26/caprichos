@@ -42,11 +42,16 @@ function fakePrisma() {
           return nueva;
         }),
         count: jest.fn(async (w?: any) => visibleDe(w).length),
-        findMany: jest.fn(async (w?: any) => visibleDe(w)),
+        findMany: jest.fn(async (w?: any) => (w?.where?.id?.in ? filas.filter((f) => w.where.id.in.includes(f.id)).map((f) => ({ ...f })) : visibleDe(w))),
         update: jest.fn(async ({ where, data }: any) => {
           const f = filas.find((x) => x.id === where.id);
           Object.assign(f, data);
           return f;
+        }),
+        updateMany: jest.fn(async ({ where, data }: any) => {
+          const afectadas = filas.filter((f) => where.id.in.includes(f.id));
+          afectadas.forEach((f) => Object.assign(f, data));
+          return { count: afectadas.length };
         }),
       },
     },
@@ -279,6 +284,35 @@ describe('ResenasGoogleService', () => {
     expect(r.visible).toBe(false);
     expect(fp.filas).toHaveLength(1);
     expect(auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({ modulo: 'resenas', accion: 'VISIBILIDAD' }));
+  });
+
+  it('cambio en lote oculta varias, no borra, audita cada una y acepta ids repetidos una sola vez', async () => {
+    const { svc, fp, auditoria } = crear({
+      filas: [
+        { id: 5n, google_review_id: 'a', visible: true, texto: LARGO, calificacion: 5, autor_nombre: 'Ana' },
+        { id: 6n, google_review_id: 'b', visible: true, texto: LARGO, calificacion: 4, autor_nombre: 'Luis' },
+        { id: 7n, google_review_id: 'c', visible: true, texto: LARGO, calificacion: 5, autor_nombre: 'Rosa' },
+      ],
+    });
+    const r = await svc.cambiarVisibleLote(['5', '6', '5'], false, { partyId: 1n, rol: 'ADMIN', debeCambiar: false } as any, '1.2.3.4');
+    expect(r).toEqual({ cambiadas: 2, visible: false });
+    expect(fp.filas.map((f: any) => [f.id, f.visible])).toEqual([
+      [5n, false],
+      [6n, false],
+      [7n, true],
+    ]);
+    expect(fp.filas).toHaveLength(3);
+    expect(auditoria.registrar).toHaveBeenCalledTimes(2);
+    expect(auditoria.registrar).toHaveBeenCalledWith(
+      expect.objectContaining({ modulo: 'resenas', accion: 'VISIBILIDAD', entidadId: 5n, antes: { visible: true }, despues: { visible: false } }),
+    );
+  });
+
+  it('cambio en lote con un id que no existe responde 404 y no cambia nada', async () => {
+    const { svc, fp, auditoria } = crear({ filas: [{ id: 5n, google_review_id: 'a', visible: true, texto: LARGO, calificacion: 5, autor_nombre: 'Ana' }] });
+    await expect(svc.cambiarVisibleLote(['5', '99'], false)).rejects.toMatchObject({ status: 404 });
+    expect(fp.filas[0].visible).toBe(true);
+    expect(auditoria.registrar).not.toHaveBeenCalled();
   });
 
   it('listarPublico solo devuelve visibles y el resumen si existe', async () => {

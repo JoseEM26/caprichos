@@ -30,6 +30,7 @@ import {
   PaletaView,
 } from './contenido';
 import { MascotaAdminView } from './mascota';
+import { ResenasView } from './resenas/ResenasView';
 import { CodigoSupervisorView } from './supervisor/CodigoSupervisorView';
 
 export type GrupoModulo =
@@ -315,6 +316,15 @@ export const MODULOS: DefinicionModulo[] = [
     permisoMinimo: 'destacadas/ver',
     componente: DestacadasView,
     icono: 'destacadas',
+  },
+  {
+    clave: 'resenas',
+    nombre: 'Reseñas de Google',
+    grupo: 'Configuración',
+    ruta: '/admin/resenas',
+    permisoMinimo: 'configuracion/ver',
+    componente: ResenasView,
+    icono: 'estrella',
   },
   {
     clave: 'paleta',

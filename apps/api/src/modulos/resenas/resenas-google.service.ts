@@ -455,6 +455,31 @@ export class ResenasGoogleService implements OnModuleInit, OnModuleDestroy {
     return this.serializarAdmin(despues);
   }
 
+  /** Visible/oculta en lote (máx. 200 ids). Si alguna no existe, no cambia nada. Audita una por una, como el individual. */
+  async cambiarVisibleLote(ids: string[], visible: boolean, usuario?: UsuarioAutenticado, ip?: string) {
+    const idsUnicos = [...new Set(ids)];
+    const idsBig = idsUnicos.map((id) => BigInt(id));
+    const antes = await this.prisma.resenaGoogle.findMany({ where: { id: { in: idsBig } } });
+    if (antes.length !== idsBig.length) {
+      throw new NotFoundException({ codigo: 'NO_ENCONTRADAS', mensaje: 'Alguna reseña ya no existe. No se cambió nada.' });
+    }
+    await this.prisma.resenaGoogle.updateMany({ where: { id: { in: idsBig } }, data: { visible } });
+    for (const fila of antes) {
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'resenas',
+        accion: 'VISIBILIDAD',
+        entidad: 'resena_google',
+        entidadId: fila.id,
+        antes: { visible: fila.visible },
+        despues: { visible },
+        partyId: usuario?.partyId,
+        ip,
+      });
+    }
+    return { cambiadas: antes.length, visible };
+  }
+
   private serializarAdmin(r: any) {
     return {
       id: r.id.toString(),

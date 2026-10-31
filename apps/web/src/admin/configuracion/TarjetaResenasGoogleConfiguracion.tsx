@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api, ErrorApi } from '../../comun/api';
 import { useSesion } from '../../comun/sesion';
 import { Confirmar } from '../../comun/Confirmar';
-import { Insignia } from '../../comun/Insignia';
 import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
 import { CampoConfig } from './CampoConfig';
@@ -35,7 +35,7 @@ export interface ResenaAdmin {
   visible: boolean;
 }
 
-interface EstadoResenas {
+export interface EstadoResenas {
   negocio: { businessId: string; nombre: string } | null;
   claveConfigurada: boolean;
   resumen: { rating: number; total: number } | null;
@@ -50,7 +50,7 @@ interface EstadoResenas {
   autoActiva: boolean;
 }
 
-interface RespuestaListar {
+export interface RespuestaListar {
   estado: EstadoResenas;
   resenas: ResenaAdmin[];
 }
@@ -58,8 +58,7 @@ interface RespuestaListar {
 type Accion =
   | { tipo: 'negocio'; candidato: CandidatoResena }
   | { tipo: 'actualizar' }
-  | { tipo: 'carga' }
-  | { tipo: 'visible'; resena: ResenaAdmin };
+  | { tipo: 'carga' };
 
 const MINIMO_CARGA = 20;
 
@@ -72,7 +71,7 @@ const MOTIVOS: Record<string, string> = {
 
 const fecha = (iso: string | null) => (iso ? new Date(iso).toLocaleString('es-PE', { dateStyle: 'medium', timeStyle: 'short' }) : 'Nunca');
 
-/** Tarjeta «Reseñas de Google» en Operación: elegir el local una vez, actualizar, carga inicial y mostrar u ocultar reseñas. Solo ADMIN. */
+/** Tarjeta «Reseñas de Google» en Operación: lo técnico (local, carga inicial, actualizar, consumo y totales). Elegir reseñas está en /admin/resenas. Solo ADMIN. */
 export function TarjetaResenasGoogleConfiguracion({ esAdmin: esAdminProp }: { esAdmin?: boolean } = {}) {
   const sesion = useSesionSegura();
   const esAdmin = esAdminProp !== undefined ? esAdminProp : (sesion?.usuario?.rol || '').toUpperCase() === 'ADMIN';
@@ -150,9 +149,6 @@ export function TarjetaResenasGoogleConfiguracion({ esAdmin: esAdminProp }: { es
             : `Carga lista: ${r.guardadas} reseñas guardadas en ${r.paginas} páginas.`,
         );
         if (r.ok === false) setError(r.mensaje ?? 'La carga se detuvo');
-      } else {
-        const r = await api.patch<any>(`/admin/resenas/${accion.resena.id}`, { visible: !accion.resena.visible });
-        setExito(r.visible ? 'Reseña visible en la carta.' : 'Reseña oculta de la carta.');
       }
       setAccion(null);
       await cargar();
@@ -271,28 +267,14 @@ export function TarjetaResenasGoogleConfiguracion({ esAdmin: esAdminProp }: { es
               </Boton>
               {motivoActualizar && <span style={{ fontSize: 12.5, color: 'var(--cp-soft)' }}>{motivoActualizar}</span>}
             </div>
-          </>
-        )}
 
-        {(datos?.resenas?.length ?? 0) > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 420, overflowY: 'auto' }}>
-            {(datos?.resenas ?? []).map((r) => (
-              <div key={r.id} style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', justifyContent: 'space-between', padding: 12, border: '1px solid var(--cp-line)', borderRadius: 12 }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 260px', minWidth: 0 }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-navy)' }}>
-                    {r.autor} · Calificación {r.estrellas} de 5
-                  </span>
-                  <span style={{ fontSize: 13, color: 'var(--cp-soft)' }}>{r.texto.length > 160 ? `${r.texto.slice(0, 160)}...` : r.texto}</span>
-                </div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <Insignia variante={r.visible ? 'exito' : 'neutro'}>{r.visible ? 'Visible' : 'Oculta'}</Insignia>
-                  <Boton variante="secundario" onClick={() => setAccion({ tipo: 'visible', resena: r })} aria-label={`${r.visible ? 'Ocultar' : 'Mostrar'} reseña de ${r.autor}`}>
-                    {r.visible ? 'Ocultar' : 'Mostrar'}
-                  </Boton>
-                </div>
-              </div>
-            ))}
-          </div>
+            <Link
+              to="/admin/resenas"
+              style={{ alignSelf: 'flex-start', color: 'var(--cp-rust)', fontWeight: 700, fontSize: 13.5, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
+            >
+              Ver y elegir reseñas
+            </Link>
+          </>
         )}
       </CampoConfig>
 
@@ -307,9 +289,7 @@ export function TarjetaResenasGoogleConfiguracion({ esAdmin: esAdminProp }: { es
                 ? pocas
                   ? 'Cargar reseñas'
                   : 'Repetir la carga de reseñas'
-                : accion?.tipo === 'visible' && accion.resena.visible
-                  ? 'Ocultar esta reseña'
-                  : 'Mostrar esta reseña'
+                : ''
         }
         mensaje={
           accion?.tipo === 'negocio'
@@ -318,13 +298,10 @@ export function TarjetaResenasGoogleConfiguracion({ esAdmin: esAdminProp }: { es
               ? 'Se consulta Google una vez (una unidad del consumo del mes). Trae las reseñas más nuevas.'
               : accion?.tipo === 'carga'
                 ? `Se consultarán varias páginas de Google (una unidad cada una) hasta juntar el máximo de reseñas buenas configurado.${pocas ? '' : ' Esto puede sumar varias unidades del consumo del mes.'}`
-                : accion?.tipo === 'visible' && accion.resena.visible
-                  ? 'La reseña deja de verse en la carta. No se borra: puedes mostrarla de nuevo.'
-                  : 'La reseña vuelve a verse en la carta.'
+                : ''
         }
         textoSi="Sí, confirmar"
         textoNo="No, cancelar"
-        peligro={accion?.tipo === 'visible' && accion.resena.visible}
         cargando={guardando}
         alConfirmar={ejecutar}
         alCancelar={() => setAccion(null)}

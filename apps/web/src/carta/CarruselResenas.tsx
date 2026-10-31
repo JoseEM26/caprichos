@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { api } from '../comun/api';
 import { useEsMovil } from './useEsMovil';
 
@@ -51,7 +51,7 @@ function movimientoReducido(): boolean {
 }
 
 /** Foto del autor; si no carga (o no hay), un círculo con la inicial del nombre. */
-function FotoAutor({ nombre, url }: { nombre: string; url: string | null }) {
+export function FotoAutor({ nombre, url }: { nombre: string; url: string | null }) {
   const [fallo, setFallo] = useState(false);
   const estilo = { width: 44, height: 44, borderRadius: '50%', flexShrink: 0, boxShadow: '0 0 0 2px var(--cp-white), 0 0 0 4px var(--cp-sand)' } as const;
   if (!url || fallo) {
@@ -69,7 +69,7 @@ function FotoAutor({ nombre, url }: { nombre: string; url: string | null }) {
   return <img src={url} alt="" referrerPolicy="no-referrer" onError={() => setFallo(true)} style={{ ...estilo, objectFit: 'cover' }} />;
 }
 
-function Estrellas({ valor, tamano, etiqueta }: { valor: number; tamano: number; etiqueta?: string }) {
+export function Estrellas({ valor, tamano, etiqueta }: { valor: number; tamano: number; etiqueta?: string }) {
   return (
     <span role="img" aria-label={etiqueta ?? `${valor} de 5 estrellas`} style={{ fontSize: tamano, letterSpacing: 2, lineHeight: 1 }}>
       <span style={{ color: 'var(--cp-gold)' }}>{'★'.repeat(valor)}</span>
@@ -78,7 +78,8 @@ function Estrellas({ valor, tamano, etiqueta }: { valor: number; tamano: number;
   );
 }
 
-function TarjetaResena({ r, oculta }: { r: ResenaCarta; oculta: boolean }) {
+/** Acciones opcionales (p. ej. ocultar o mostrar) van en un pie; `atenuada` la muestra apagada. La carta no las usa. */
+export function TarjetaResena({ r, oculta, acciones, atenuada = false }: { r: ResenaCarta; oculta: boolean; acciones?: ReactNode; atenuada?: boolean }) {
   const [abierta, setAbierta] = useState(false);
   const estrellas = Math.max(0, Math.min(5, Math.round(r.estrellas)));
   const fecha = mesYAnio(r.fecha);
@@ -96,6 +97,7 @@ function TarjetaResena({ r, oculta }: { r: ResenaCarta; oculta: boolean }) {
         gap: 14,
         boxShadow: '0 12px 30px rgba(0,0,0,0.18)',
         overflow: 'hidden',
+        opacity: atenuada ? 0.6 : undefined,
       }}
     >
       <span
@@ -138,6 +140,7 @@ function TarjetaResena({ r, oculta }: { r: ResenaCarta; oculta: boolean }) {
           Ver en Google Maps
         </a>
       )}
+      {acciones && <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, paddingTop: 12, borderTop: '1px dashed var(--cp-line)' }}>{acciones}</div>}
     </article>
   );
 }

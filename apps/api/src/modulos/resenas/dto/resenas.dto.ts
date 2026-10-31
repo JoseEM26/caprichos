@@ -1,4 +1,4 @@
-import { IsBoolean, IsNumber, IsOptional, IsString, IsUrl, Length, MaxLength } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsNumber, IsOptional, IsString, IsUrl, Length, Matches, MaxLength } from 'class-validator';
 
 export class BuscarNegocioDto {
   @IsString()
@@ -36,6 +36,19 @@ export class CargaInicialDto {
 }
 
 export class VisibleResenaDto {
+  @IsBoolean({ message: 'visible debe ser verdadero o falso' })
+  visible!: boolean;
+}
+
+/** Cambio de visibilidad en lote: hasta 200 reseñas por vez (la lista del admin trae como máximo 200). */
+export class VisibleLoteDto {
+  @IsArray({ message: 'ids debe ser una lista de reseñas' })
+  @ArrayMinSize(1, { message: 'Elige al menos una reseña' })
+  @ArrayMaxSize(200, { message: 'Máximo 200 reseñas por vez' })
+  @IsString({ each: true })
+  @Matches(/^\d+$/, { each: true, message: 'Reseña no válida' })
+  ids!: string[];
+
   @IsBoolean({ message: 'visible debe ser verdadero o falso' })
   visible!: boolean;
 }

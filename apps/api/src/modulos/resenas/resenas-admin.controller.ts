@@ -2,7 +2,7 @@ import { Body, Controller, ForbiddenException, Get, Ip, Param, Patch, Post, Put,
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
 import { ResenasGoogleService } from './resenas-google.service';
-import { BuscarNegocioDto, CargaInicialDto, GuardarNegocioDto, VisibleResenaDto } from './dto/resenas.dto';
+import { BuscarNegocioDto, CargaInicialDto, GuardarNegocioDto, VisibleLoteDto, VisibleResenaDto } from './dto/resenas.dto';
 
 function soloAdmin(req: any): void {
   if (req.usuario?.rol !== 'ADMIN') {
@@ -48,6 +48,14 @@ export class ResenasAdminController {
   async actualizar(@Req() req: any, @Ip() ip: string) {
     soloAdmin(req);
     return this.resenas.actualizar({ manual: true, usuario: req.usuario, ip });
+  }
+
+  // Va antes de PATCH :id para que «visibilidad» no se tome como un id
+  @Patch('visibilidad')
+  @Permiso('configuracion', 'editar')
+  async cambiarVisibleLote(@Body() dto: VisibleLoteDto, @Req() req: any, @Ip() ip: string) {
+    soloAdmin(req);
+    return this.resenas.cambiarVisibleLote(dto.ids, dto.visible, req.usuario, ip);
   }
 
   @Patch(':id')
