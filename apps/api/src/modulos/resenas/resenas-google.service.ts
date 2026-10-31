@@ -32,7 +32,8 @@ export type MotivoResenas =
   | 'NO_AUTORIZADO'
   | 'LIMITE_API'
   | 'ERROR_API'
-  | 'ERROR_RED';
+  | 'ERROR_RED'
+  | 'CLAVE_INVALIDA';
 
 export interface Fallo {
   ok: false;
@@ -58,7 +59,11 @@ const MENSAJES: Record<MotivoResenas, string> = {
   LIMITE_API: 'La API de reseñas pidió esperar (límite de uso). No se cambió nada.',
   ERROR_API: 'La API de reseñas respondió con error. No se cambió nada.',
   ERROR_RED: 'No se pudo conectar con la API de reseñas. No se cambió nada.',
+  CLAVE_INVALIDA: 'La clave tiene caracteres que no se pueden enviar; vuelve a copiarla con el botón Copy',
 };
+
+/** Códigos de undici (error.cause.code) que son fallo de conexión o DNS. */
+const CODIGOS_CONEXION = new Set(['ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'ECONNRESET', 'EPIPE', 'ENETUNREACH', 'EHOSTUNREACH', 'UND_ERR_SOCKET']);
 
 const fallo = (motivo: MotivoResenas): Fallo => ({ ok: false, motivo, mensaje: MENSAJES[motivo] });
 
@@ -207,8 +212,7 @@ export class ResenasGoogleService implements OnModuleInit, OnModuleDestroy {
     try {
       res = await fetch(url, { headers: { 'X-API-Key': clave }, signal: AbortSignal.timeout(TIMEOUT_API_MS) });
     } catch (e: any) {
-      this.logger.warn(`Reseñas: error de red al llamar ${ruta} (${e?.name || 'Error'})`);
-      return fallo('ERROR_RED');
+      return this.falloRed(e, clave, ruta);
     }
     const body: any = await res.json().catch(() => null);
     if (!res.ok || body?.status !== 'OK') {
@@ -218,6 +222,26 @@ export class ResenasGoogleService implements OnModuleInit, OnModuleDestroy {
       return fallo(motivo);
     }
     return { ok: true, body };
+  }
+
+  /** Error de red: registra la causa (code de undici) y clasifica el mensaje. La clave se enmascara en el log. */
+  private falloRed(e: any, clave: string, ruta: string): Fallo {
+    const enmascarar = (v: unknown) => String(v ?? '').split(clave).join('***');
+    const causa = e?.cause ?? {};
+    const code: string | undefined = typeof causa.code === 'string' ? causa.code : undefined;
+    const partes = [code, causa.name, causa.message].filter((v) => v !== undefined && v !== '').map(enmascarar);
+    this.logger.warn(
+      `Reseñas: error de red al llamar ${ruta} (${enmascarar(e?.name) || 'Error'}: ${enmascarar(e?.message)}; causa: ${partes.join(' | ') || 'ninguna'})`,
+    );
+    const texto = `${e?.message ?? ''} ${causa.message ?? ''}`;
+    if (code === 'ERR_INVALID_CHAR' || /invalid .*header|header.*invalid/i.test(texto)) return fallo('CLAVE_INVALIDA');
+    if (e?.name === 'TimeoutError' || code === 'UND_ERR_CONNECT_TIMEOUT' || code === 'ETIMEDOUT') {
+      return { ok: false, motivo: 'ERROR_RED', mensaje: 'La API de reseñas no respondió a tiempo' };
+    }
+    if (code && CODIGOS_CONEXION.has(code)) {
+      return { ok: false, motivo: 'ERROR_RED', mensaje: `No se pudo conectar con la API de reseñas (código ${code})` };
+    }
+    return fallo('ERROR_RED');
   }
 
   // ---------- mapeo y guardado ----------

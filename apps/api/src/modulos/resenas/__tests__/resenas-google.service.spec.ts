@@ -144,6 +144,45 @@ describe('ResenasGoogleService', () => {
     expect(fp.filas).toHaveLength(1);
   });
 
+  it('error de red con cause.code ENOTFOUND: el mensaje dice el código y el log no tiene la clave', async () => {
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const { svc, fetchMock } = crear();
+    const err = Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error(`getaddrinfo ENOTFOUND api.openwebninja.com ${CLAVE}`), { code: 'ENOTFOUND', name: 'Error' }) });
+    fetchMock.mockRejectedValueOnce(err);
+    const r = await svc.buscarNegocio('Caprichos Campoy');
+    expect(r).toMatchObject({ ok: false, motivo: 'ERROR_RED', mensaje: 'No se pudo conectar con la API de reseñas (código ENOTFOUND)' });
+    const log = JSON.stringify(warn.mock.calls);
+    expect(log).toContain('ENOTFOUND');
+    expect(log).toContain('***');
+    expect(log).not.toContain(CLAVE);
+    expect(JSON.stringify(r)).not.toContain(CLAVE);
+  });
+
+  it('cabecera inválida (ERR_INVALID_CHAR) da CLAVE_INVALIDA', async () => {
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const { svc, fetchMock } = crear();
+    const err = Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new TypeError('Invalid character in header content ["X-API-Key"]'), { code: 'ERR_INVALID_CHAR' }) });
+    fetchMock.mockRejectedValueOnce(err);
+    expect(await svc.buscarNegocio('Caprichos Campoy')).toMatchObject({ ok: false, motivo: 'CLAVE_INVALIDA' });
+  });
+
+  it('tiempo agotado da el mensaje de no respondió a tiempo', async () => {
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const { svc, fetchMock } = crear();
+    fetchMock.mockRejectedValueOnce(Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' }));
+    expect(await svc.buscarNegocio('Caprichos Campoy')).toMatchObject({ ok: false, motivo: 'ERROR_RED', mensaje: 'La API de reseñas no respondió a tiempo' });
+  });
+
+  it('si el mensaje del error trae la clave, el log la enmascara', async () => {
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const { svc, fetchMock } = crear();
+    fetchMock.mockRejectedValueOnce(new TypeError(`fallo con ${CLAVE}`));
+    expect(await svc.buscarNegocio('Caprichos Campoy')).toMatchObject({ ok: false, motivo: 'ERROR_RED' });
+    const log = JSON.stringify(warn.mock.calls);
+    expect(log).toContain('fallo con ***');
+    expect(log).not.toContain(CLAVE);
+  });
+
   it('sin clave configurada no llama a la API', async () => {
     const { svc, fetchMock } = crear({ env: { OPENWEBNINJA_API_KEY: '' } });
     expect(await svc.buscarNegocio('caprichos campoy')).toMatchObject({ ok: false, motivo: 'SIN_CLAVE' });
